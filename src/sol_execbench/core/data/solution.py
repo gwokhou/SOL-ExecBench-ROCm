@@ -20,7 +20,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Optional
 
-from pydantic import ConfigDict, Field, PrivateAttr, model_validator
+from pydantic import ConfigDict, Field, PrivateAttr, field_validator, model_validator
 
 from .base_model import BaseModelWithDocstrings, NonEmptyString
 
@@ -37,21 +37,17 @@ class SupportedLanguages(str, Enum):
     """PyTorch programming language. Specified if the solution uses PyTorch operators."""
     TRITON = "triton"
     """Triton GPU programming language."""
-    CUTE_DSL = "cute_dsl"
-    """NVIDIA CuTe DSL programming language."""
-    CUTILE = "cutile"
-    """NVIDIA cuTile programming language."""
-    CUDNN_FRONTEND = "cudnn_frontend"
-    """NVIDIA cuDNN frontend programming language."""
-    # C++ languages
-    CUTLASS = "cutlass"
-    """Pure C++ source code."""
-    CUDNN = "cudnn"
-    """NVIDIA cuDNN programming language."""
-    CUBLAS = "cublas"
-    """NVIDIA cuBLAS programming language."""
-    CUDA_CPP = "cuda_cpp"
-    """CUDA C++ programming language with inline PTX support."""
+    # Native ROCm languages and library/DSL categories
+    HIP_CPP = "hip_cpp"
+    """HIP C++ programming language."""
+    HIPBLAS = "hipblas"
+    """hipBLAS-backed native ROCm implementation."""
+    MIOPEN = "miopen"
+    """MIOpen-backed native ROCm implementation."""
+    CK = "ck"
+    """Composable Kernel native ROCm implementation."""
+    ROCWMMA = "rocwmma"
+    """rocWMMA native ROCm implementation."""
 
 
 class SupportedHardware(str, Enum):
@@ -60,10 +56,10 @@ class SupportedHardware(str, Enum):
     Enumeration of hardware platforms that solutions can target.
     """
 
-    B200 = "B200"
-    """NVIDIA B200."""
+    GFX1200 = "gfx1200"
+    """AMD gfx1200."""
     LOCAL = "LOCAL"
-    """Local NVIDIA GPU."""
+    """Local AMD GPU."""
 
 
 class SupportedBindings(str, Enum):
@@ -115,17 +111,17 @@ class SourceFile(BaseModelWithDocstrings):
 
 
 class CompileOptions(BaseModelWithDocstrings):
-    """Compiler and linker flags for C++/CUDA solutions.
+    """Compiler and linker flags for HIP/C++ solutions.
 
     Passed directly to the underlying build system (e.g. torch.utils.cpp_extension.load).
     """
 
     cflags: list[str] = Field(default_factory=list)
     """Extra flags passed to the C++ compiler (gcc/g++)."""
-    cuda_cflags: list[str] = Field(default_factory=lambda: ["-O3", "--use_fast_math"])
-    """Extra flags passed to the CUDA compiler (nvcc). Defaults to -O3 and --use_fast_math."""
-    ld_flags: list[str] = Field(default_factory=lambda: ["-lcuda"])
-    """Extra flags passed to the linker. Defaults to -lcuda."""
+    hip_cflags: list[str] = Field(default_factory=lambda: ["-O3"])
+    """Extra flags passed to the HIP compiler. Defaults to -O3."""
+    ld_flags: list[str] = Field(default_factory=list)
+    """Extra flags passed to the linker."""
 
 
 class BuildSpec(BaseModelWithDocstrings):
@@ -138,7 +134,7 @@ class BuildSpec(BaseModelWithDocstrings):
     languages: list[SupportedLanguages]
     """The list of programming languages used to implement the solution. C++ languages and Python languages cannot be mixed."""
     target_hardware: list[SupportedHardware] = Field(min_length=1)
-    """List of hardware this solution is compatible with (e.g., B200, LOCAL)."""
+    """List of hardware this solution is compatible with (e.g., gfx1200, LOCAL)."""
     entry_point: NonEmptyString
     """The exact path to the function to be called. Format: '{file_path}::{function_name}'
     (e.g., 'main.py::run')."""
@@ -150,10 +146,46 @@ class BuildSpec(BaseModelWithDocstrings):
     accept the output tensors as the last arguments. If False, the solution should return the
     output tensors."""
     binding: Optional[SupportedBindings] = None
-    """The binding type to use for C++/CUDA solutions. If None, defaults to 'torch' for
-    C++/CUDA languages. Ignored for Python and Triton languages."""
+    """The binding type to use for HIP/C++ solutions. If None, defaults to 'torch' for
+    HIP/C++ languages. Ignored for Python and Triton languages."""
     compile_options: Optional[CompileOptions] = None
-    """Optional compiler and linker flags. Only used for C++/CUDA solutions with torch binding."""
+    """Optional compiler and linker flags. Only used for HIP/C++ solutions with torch binding."""
+
+    @field_validator("languages", mode="before")
+    @classmethod
+    def _reject_legacy_languages(cls, value: Any) -> Any:
+        """Reject CUDA/NVIDIA language values with ROCm migration guidance."""
+        if value is None:
+            return value
+        values = value if isinstance(value, list) else [value]
+        replacements = {
+            "cuda_cpp": "hip_cpp",
+            "cutlass": "ck or rocwmma",
+            "cudnn": "miopen",
+            "cudnn_frontend": "miopen",
+            "cublas": "hipblas",
+            "cute_dsl": "no direct Phase 2 ROCm replacement; Phase 4 owns concrete replacements",
+            "cutile": "no direct Phase 2 ROCm replacement; Phase 4 owns concrete replacements",
+        }
+        for item in values:
+            raw = item.value if isinstance(item, Enum) else item
+            if raw in replacements:
+                raise ValueError(
+                    f"Unsupported CUDA/NVIDIA language value '{raw}' in ROCm "
+                    f"schema; use {replacements[raw]} instead."
+                )
+        return value
+
+    @field_validator("compile_options", mode="before")
+    @classmethod
+    def _reject_legacy_compile_options(cls, value: Any) -> Any:
+        """Reject CUDA compile option keys before nested model validation."""
+        if isinstance(value, dict) and "cuda_cflags" in value:
+            raise ValueError(
+                "Unsupported compile option 'cuda_cflags' in ROCm schema; use "
+                "'hip_cflags' instead."
+            )
+        return value
 
     @model_validator(mode="after")
     def _validate_entry_point(self) -> "BuildSpec":
@@ -181,18 +213,13 @@ class BuildSpec(BaseModelWithDocstrings):
             If the languages are not valid.
         """
 
-        python_languages = [
-            SupportedLanguages.PYTORCH,
-            SupportedLanguages.TRITON,
-            SupportedLanguages.CUTE_DSL,
-            SupportedLanguages.CUTILE,
-            SupportedLanguages.CUDNN_FRONTEND,
-        ]
+        python_languages = [SupportedLanguages.PYTORCH, SupportedLanguages.TRITON]
         cpp_languages = [
-            SupportedLanguages.CUTLASS,
-            SupportedLanguages.CUDNN,
-            SupportedLanguages.CUBLAS,
-            SupportedLanguages.CUDA_CPP,
+            SupportedLanguages.HIP_CPP,
+            SupportedLanguages.HIPBLAS,
+            SupportedLanguages.MIOPEN,
+            SupportedLanguages.CK,
+            SupportedLanguages.ROCWMMA,
         ]
 
         included_python_langs = [
@@ -203,24 +230,24 @@ class BuildSpec(BaseModelWithDocstrings):
         ]
         if len(included_cpp_langs) and len(included_python_langs):
             raise ValueError(
-                f"C++ and Python cannot be mixed, but got {included_cpp_langs} and {included_python_langs}"
+                f"HIP/C++ and Python cannot be mixed, but got {included_cpp_langs} "
+                f"and {included_python_langs}"
             )
 
         # Validate entry point file suffix matches the language category.
         entry_file = self.entry_point.split("::")[0]
         suffix = Path(entry_file).suffix
         if included_cpp_langs and suffix not in (
-            ".cu",
+            ".hip",
             ".cpp",
             ".cc",
             ".cxx",
             ".c",
             ".h",
             ".hpp",
-            ".cuh",
         ):
             raise ValueError(
-                f"C++ languages require a C++/CUDA entry point file, "
+                f"HIP/C++ languages require a .hip or C/C++ entry point file, "
                 f"but got '{entry_file}' (suffix '{suffix}')"
             )
         if included_python_langs and suffix != ".py":
