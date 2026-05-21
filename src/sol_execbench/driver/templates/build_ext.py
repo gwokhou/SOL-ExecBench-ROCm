@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import json
-import os
 from pathlib import Path
 
 import torch.utils.cpp_extension as ext
@@ -28,30 +27,26 @@ solution = Solution(**json.loads((HERE / "solution.json").read_text()))
 compile_options = solution.spec.compile_options
 
 # set flags
-cuda_cflags = compile_options.cuda_cflags if compile_options else []
+hip_cflags = compile_options.hip_cflags if compile_options else []
 cflags = compile_options.cflags if compile_options else []
 ld_flags = compile_options.ld_flags if compile_options else []
 
-# Collect C/C++/CUDA source files from current directory
+# Collect HIP/C++ source files from current directory
 sources = [
     str(p)
     for p in HERE.iterdir()
-    if p.suffix in (".cu", ".cpp", ".cc", ".cxx", ".c") and p.is_file()
+    if p.suffix in (".hip", ".cpp", ".cc", ".cxx", ".c") and p.is_file()
 ]
 if not sources:
-    raise RuntimeError("No CUDA/C++ source files found in working directory")
+    raise RuntimeError("No HIP/C++ source files found in working directory")
 
-cutlass_dir = os.environ.get("CUTLASS_DIR", "/usr/local/cutlass")
-extra_include_paths = [
-    str(HERE),
-    f"{cutlass_dir}/include",
-    f"{cutlass_dir}/tools/util/include",
-]
+extra_include_paths = [str(HERE)]
 
 ext.load(
     name="benchmark_kernel",
     sources=sources,
-    extra_cuda_cflags=cuda_cflags,
+    # PyTorch extension API uses this keyword for device compiler flags on ROCm too.
+    extra_cuda_cflags=hip_cflags,
     extra_cflags=cflags,
     extra_ldflags=ld_flags,
     extra_include_paths=extra_include_paths,

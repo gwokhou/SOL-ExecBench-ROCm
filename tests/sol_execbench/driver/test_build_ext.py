@@ -49,13 +49,13 @@ def _make_solution_json(compile_options: dict | None = None) -> str:
         "definition": "test_def",
         "author": "test",
         "spec": {
-            "languages": ["cuda_cpp"],
+            "languages": ["hip_cpp"],
             "target_hardware": ["LOCAL"],
-            "entry_point": "main.cpp::run",
+            "entry_point": "main.hip::run",
             "destination_passing_style": True,
             "compile_options": compile_options,
         },
-        "sources": [{"path": "main.cpp", "content": "// test source"}],
+        "sources": [{"path": "main.hip", "content": "// test source"}],
     }
     return json.dumps(solution)
 
@@ -63,8 +63,6 @@ def _make_solution_json(compile_options: dict | None = None) -> str:
 def _exec_build_ext(
     cwd: Path,
     compile_options: dict | None = None,
-    *,
-    cutlass_dir: str | None = None,
 ) -> MagicMock:
     """Write solution.json and execute the build_ext template in *cwd* with ext.load mocked.
 
@@ -92,21 +90,12 @@ def _exec_build_ext(
     sys.modules["torch.utils"] = fake_torch_utils
     sys.modules["torch.utils.cpp_extension"] = fake_torch_utils_cpp
 
-    old_cwd = os.getcwd()
-    env_backup = os.environ.get("CUTLASS_DIR")
+    old_cwd = Path.cwd()
     try:
         os.chdir(cwd)
-        if cutlass_dir is not None:
-            os.environ["CUTLASS_DIR"] = cutlass_dir
-        elif "CUTLASS_DIR" in os.environ:
-            del os.environ["CUTLASS_DIR"]
         exec(compile(script, "build_ext.py", "exec"), {"__builtins__": __builtins__})
     finally:
         os.chdir(old_cwd)
-        if env_backup is not None:
-            os.environ["CUTLASS_DIR"] = env_backup
-        elif "CUTLASS_DIR" in os.environ:
-            del os.environ["CUTLASS_DIR"]
         for mod_name, orig in saved_modules.items():
             if orig is None:
                 sys.modules.pop(mod_name, None)
@@ -134,7 +123,7 @@ class TestTemplateAST:
                 import_names.extend(alias.name for alias in node.names)
             elif isinstance(node, ast.ImportFrom):
                 import_names.append(node.module)
-        assert "os" in import_names
+        assert "os" not in import_names
         assert "torch.utils.cpp_extension" in import_names
         assert "sol_execbench.core" in import_names
 
@@ -142,7 +131,7 @@ class TestTemplateAST:
 class TestSourceDiscovery:
     """Tests for source file collection logic."""
 
-    @pytest.mark.parametrize("suffix", [".cu", ".cpp", ".cc", ".cxx", ".c"])
+    @pytest.mark.parametrize("suffix", [".hip", ".cpp", ".cc", ".cxx", ".c"])
     def test_collects_supported_extensions(self, tmp_path, suffix):
         (tmp_path / f"kernel{suffix}").write_text("// source")
         (tmp_path / "benchmark_kernel.so").write_bytes(b"fake")
@@ -152,7 +141,8 @@ class TestSourceDiscovery:
         assert sources[0].endswith(suffix)
 
     def test_ignores_non_source_files(self, tmp_path):
-        (tmp_path / "kernel.cu").write_text("// source")
+        (tmp_path / "kernel.hip").write_text("// source")
+        (tmp_path / "legacy.cu").write_text("// ignored")
         (tmp_path / "readme.md").write_text("docs")
         (tmp_path / "data.json").write_text("{}")
         (tmp_path / "helper.py").write_text("pass")
@@ -162,7 +152,7 @@ class TestSourceDiscovery:
         assert len(sources) == 1
 
     def test_collects_multiple_sources(self, tmp_path):
-        (tmp_path / "kernel.cu").write_text("// cuda")
+        (tmp_path / "kernel.hip").write_text("// hip")
         (tmp_path / "utils.cpp").write_text("// cpp")
         (tmp_path / "benchmark_kernel.so").write_bytes(b"fake")
         mock = _exec_build_ext(tmp_path)
@@ -170,79 +160,80 @@ class TestSourceDiscovery:
         assert len(sources) == 2
 
     def test_no_sources_raises(self, tmp_path):
-        with pytest.raises(RuntimeError, match="No CUDA/C\\+\\+ source files"):
+        with pytest.raises(RuntimeError, match="No HIP/C\\+\\+ source files"):
+            _exec_build_ext(tmp_path)
+
+    def test_cu_files_are_ignored(self, tmp_path):
+        (tmp_path / "kernel.cu").write_text("// legacy source")
+        with pytest.raises(RuntimeError, match="No HIP/C\\+\\+ source files"):
             _exec_build_ext(tmp_path)
 
 
 class TestCompileOptions:
     """Tests for compile option extraction."""
 
-    def test_default_cuda_cflags(self, tmp_path):
-        (tmp_path / "k.cu").write_text("")
+    def test_default_hip_cflags(self, tmp_path):
+        (tmp_path / "k.hip").write_text("")
         (tmp_path / "benchmark_kernel.so").write_bytes(b"fake")
         mock = _exec_build_ext(tmp_path, {})
-        cuda_cflags = mock.load.call_args.kwargs["extra_cuda_cflags"]
-        assert cuda_cflags == ["-O3", "--use_fast_math"]
+        hip_cflags = mock.load.call_args.kwargs["extra_cuda_cflags"]
+        assert hip_cflags == ["-O3"]
 
     def test_no_compile_options_gives_empty_flags(self, tmp_path):
-        (tmp_path / "k.cu").write_text("")
+        (tmp_path / "k.hip").write_text("")
         (tmp_path / "benchmark_kernel.so").write_bytes(b"fake")
         mock = _exec_build_ext(tmp_path)
-        cuda_cflags = mock.load.call_args.kwargs["extra_cuda_cflags"]
-        assert cuda_cflags == []
+        hip_cflags = mock.load.call_args.kwargs["extra_cuda_cflags"]
+        assert hip_cflags == []
 
-    def test_custom_cuda_cflags(self, tmp_path):
-        (tmp_path / "k.cu").write_text("")
+    def test_custom_hip_cflags(self, tmp_path):
+        (tmp_path / "k.hip").write_text("")
         (tmp_path / "benchmark_kernel.so").write_bytes(b"fake")
-        mock = _exec_build_ext(tmp_path, {"cuda_cflags": ["-arch=sm_90a"]})
-        cuda_cflags = mock.load.call_args.kwargs["extra_cuda_cflags"]
-        assert cuda_cflags == ["-arch=sm_90a"]
+        mock = _exec_build_ext(tmp_path, {"hip_cflags": ["--offload-arch=gfx1200"]})
+        hip_cflags = mock.load.call_args.kwargs["extra_cuda_cflags"]
+        assert hip_cflags == ["--offload-arch=gfx1200"]
 
     def test_cflags_default_empty(self, tmp_path):
-        (tmp_path / "k.cu").write_text("")
+        (tmp_path / "k.hip").write_text("")
         (tmp_path / "benchmark_kernel.so").write_bytes(b"fake")
         mock = _exec_build_ext(tmp_path)
         assert mock.load.call_args.kwargs["extra_cflags"] == []
 
     def test_custom_cflags(self, tmp_path):
-        (tmp_path / "k.cu").write_text("")
+        (tmp_path / "k.hip").write_text("")
         (tmp_path / "benchmark_kernel.so").write_bytes(b"fake")
         mock = _exec_build_ext(tmp_path, {"cflags": ["-Wall"]})
         assert mock.load.call_args.kwargs["extra_cflags"] == ["-Wall"]
 
     def test_custom_ld_flags(self, tmp_path):
-        (tmp_path / "k.cu").write_text("")
+        (tmp_path / "k.hip").write_text("")
         (tmp_path / "benchmark_kernel.so").write_bytes(b"fake")
-        mock = _exec_build_ext(tmp_path, {"ld_flags": ["-lcublas"]})
-        assert mock.load.call_args.kwargs["extra_ldflags"] == ["-lcublas"]
+        mock = _exec_build_ext(tmp_path, {"ld_flags": ["-lrocblas"]})
+        assert mock.load.call_args.kwargs["extra_ldflags"] == ["-lrocblas"]
+
+    def test_ld_flags_default_empty(self, tmp_path):
+        (tmp_path / "k.hip").write_text("")
+        (tmp_path / "benchmark_kernel.so").write_bytes(b"fake")
+        mock = _exec_build_ext(tmp_path, {})
+        assert mock.load.call_args.kwargs["extra_ldflags"] == []
 
 
 class TestIncludePaths:
     """Tests for extra_include_paths construction."""
 
-    def test_default_cutlass_dir(self, tmp_path):
-        (tmp_path / "k.cu").write_text("")
+    def test_only_staging_directory_included(self, tmp_path):
+        (tmp_path / "k.hip").write_text("")
         (tmp_path / "benchmark_kernel.so").write_bytes(b"fake")
         mock = _exec_build_ext(tmp_path)
         includes = mock.load.call_args.kwargs["extra_include_paths"]
-        assert str(tmp_path) in includes
-        assert "/usr/local/cutlass/include" in includes
-        assert "/usr/local/cutlass/tools/util/include" in includes
-
-    def test_custom_cutlass_dir(self, tmp_path):
-        (tmp_path / "k.cu").write_text("")
-        (tmp_path / "benchmark_kernel.so").write_bytes(b"fake")
-        mock = _exec_build_ext(tmp_path, cutlass_dir="/opt/cutlass")
-        includes = mock.load.call_args.kwargs["extra_include_paths"]
-        assert "/opt/cutlass/include" in includes
-        assert "/opt/cutlass/tools/util/include" in includes
+        assert includes == [str(tmp_path)]
 
 
 class TestSoRename:
     """Tests for the .so rename logic after compilation."""
 
     def test_renames_suffixed_so(self, tmp_path):
-        (tmp_path / "k.cu").write_text("")
+        (tmp_path / "k.hip").write_text("")
         suffixed = tmp_path / "benchmark_kernel.cpython-312-x86_64-linux-gnu.so"
         suffixed.write_bytes(b"ELF-fake")
         _exec_build_ext(tmp_path)
@@ -250,13 +241,13 @@ class TestSoRename:
         assert not suffixed.exists()
 
     def test_already_named_correctly(self, tmp_path):
-        (tmp_path / "k.cu").write_text("")
+        (tmp_path / "k.hip").write_text("")
         (tmp_path / "benchmark_kernel.so").write_bytes(b"ELF-fake")
         _exec_build_ext(tmp_path)
         assert (tmp_path / "benchmark_kernel.so").exists()
 
     def test_no_so_raises(self, tmp_path):
-        (tmp_path / "k.cu").write_text("")
+        (tmp_path / "k.hip").write_text("")
         with pytest.raises(FileNotFoundError, match="benchmark_kernel.so not produced"):
             _exec_build_ext(tmp_path)
 
@@ -265,19 +256,19 @@ class TestExtLoad:
     """Tests for ext.load call arguments."""
 
     def test_load_called_with_correct_name(self, tmp_path):
-        (tmp_path / "k.cu").write_text("")
+        (tmp_path / "k.hip").write_text("")
         (tmp_path / "benchmark_kernel.so").write_bytes(b"fake")
         mock = _exec_build_ext(tmp_path)
         assert mock.load.call_args.kwargs["name"] == "benchmark_kernel"
 
     def test_build_directory_is_cwd(self, tmp_path):
-        (tmp_path / "k.cu").write_text("")
+        (tmp_path / "k.hip").write_text("")
         (tmp_path / "benchmark_kernel.so").write_bytes(b"fake")
         mock = _exec_build_ext(tmp_path)
         assert mock.load.call_args.kwargs["build_directory"] == str(tmp_path)
 
     def test_verbose_enabled(self, tmp_path):
-        (tmp_path / "k.cu").write_text("")
+        (tmp_path / "k.hip").write_text("")
         (tmp_path / "benchmark_kernel.so").write_bytes(b"fake")
         mock = _exec_build_ext(tmp_path)
         assert mock.load.call_args.kwargs["verbose"] is True
