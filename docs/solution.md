@@ -23,7 +23,7 @@ rejected with migration guidance.
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `languages` | array[string] | Yes | ROCm-supported language/category values. |
-| `target_hardware` | array[string] | Yes | `["gfx1200"]`, `["LOCAL"]`, or both. |
+| `target_hardware` | array[string] | Yes | Supported AMD targets such as `["gfx1200"]`, `["gfx942"]`, `["LOCAL"]`, or combinations. |
 | `entry_point` | string | Yes | `"filename::function_name"`. |
 | `destination_passing_style` | bool | No | Outputs passed as final args when `true`; default is `true`. |
 | `binding` | string or null | No | `torch` for HIP/C++ categories. Ignored for Python/Triton. |
@@ -57,7 +57,20 @@ These values are not active ROCm schema values:
 | `cudnn`, `cudnn_frontend` | `miopen` or a HIP/Triton implementation |
 | `cute_dsl`, `cutile` | No direct runtime in this port; use HIP, Triton ROCm, CK, or rocWMMA where feasible |
 | `cuda_cflags` | `hip_cflags` |
-| `B200` | `gfx1200` or `LOCAL` |
+| `B200` | `gfx1200`, `gfx940`, `gfx941`, `gfx942`, or `LOCAL` |
+
+## Supported Hardware Targets
+
+| Value | Hardware class | Validation status |
+| --- | --- | --- |
+| `gfx1200` | RDNA 4 | Full adapted suite passed locally. |
+| `gfx940` | CDNA 3 | Code/schema support; real hardware validation deferred. |
+| `gfx941` | CDNA 3 | Code/schema support; real hardware validation deferred. |
+| `gfx942` | CDNA 3 | Code/schema support; real hardware validation deferred. |
+| `LOCAL` | Local AMD GPU detected at packaging time | Uses the detected local AMD gfx target. |
+
+CDNA 3 entries allow solution metadata and HIP offload flag staging to target
+`gfx94*` devices. They are not hardware-validation evidence by themselves.
 
 ## Destination Passing Style
 
@@ -93,7 +106,7 @@ Example:
 
 ```json
 "compile_options": {
-  "hip_cflags": ["-O3", "-ffast-math", "--offload-arch=gfx1200"],
+  "hip_cflags": ["-O3", "-ffast-math", "--offload-arch=gfx942"],
   "ld_flags": []
 }
 ```

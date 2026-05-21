@@ -27,9 +27,9 @@
 
 ### Documentation and Next Validation
 
-- [ ] **DOC-01**: User-facing docs describe supported AMD architecture targets, including CDNA 3 code/schema support and deferred hardware validation.
-- [ ] **DOC-02**: Known gaps clearly state that full CDNA 3 suite evidence is planned for the next milestone.
-- [ ] **DOC-03**: The next milestone's hardware validation requirements are explicit enough to run and record a `gfx94*` full-suite pass.
+- [x] **DOC-01**: User-facing docs describe supported AMD architecture targets, including CDNA 3 code/schema support and deferred hardware validation.
+- [x] **DOC-02**: Known gaps clearly state that full CDNA 3 suite evidence is planned for the next milestone.
+- [x] **DOC-03**: The next milestone's hardware validation requirements are explicit enough to run and record a `gfx94*` full-suite pass.
 
 ## Future Requirements
 
@@ -67,9 +67,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | EXMP-01 | Phase 8 | Complete |
 | EXMP-02 | Phase 8 | Complete |
 | EXMP-03 | Phase 8 | Complete |
-| DOC-01 | Phase 9 | Pending |
-| DOC-02 | Phase 9 | Pending |
-| DOC-03 | Phase 9 | Pending |
+| DOC-01 | Phase 9 | Complete |
+| DOC-02 | Phase 9 | Complete |
+| DOC-03 | Phase 9 | Complete |
 
 **Coverage:**
 - v1.1 requirements: 13 total
