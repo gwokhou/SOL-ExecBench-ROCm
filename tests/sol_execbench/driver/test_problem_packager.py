@@ -28,7 +28,8 @@ from sol_execbench.core import (
     Trace,
     Workload,
 )
-from sol_execbench.driver.problem_packager import ProblemPackager
+from sol_execbench.driver import problem_packager
+from sol_execbench.driver.problem_packager import ProblemPackager, _get_local_gfx
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -68,17 +69,17 @@ _PYTHON_SOLUTION_DICT = {
     "sources": [{"path": "kernel.py", "content": "def run(x, y):\n    return x + y\n"}],
 }
 
-_CUDA_SOLUTION_DICT = {
-    "name": "vecadd_cuda",
+_HIP_SOLUTION_DICT = {
+    "name": "vecadd_hip",
     "definition": "test_vecadd",
     "author": "test",
     "spec": {
-        "languages": ["cuda_cpp"],
-        "target_hardware": ["B200"],
-        "entry_point": "kernel.cu::vecadd",
+        "languages": ["hip_cpp"],
+        "target_hardware": ["gfx1200"],
+        "entry_point": "kernel.hip::vecadd",
     },
     "sources": [
-        {"path": "kernel.cu", "content": "// placeholder cuda kernel\n"},
+        {"path": "kernel.hip", "content": "// placeholder HIP kernel\n"},
     ],
 }
 
@@ -99,8 +100,8 @@ def python_solution() -> Solution:
 
 
 @pytest.fixture
-def cuda_solution() -> Solution:
-    return Solution(**_CUDA_SOLUTION_DICT)
+def hip_solution() -> Solution:
+    return Solution(**_HIP_SOLUTION_DICT)
 
 
 @pytest.fixture
@@ -171,13 +172,13 @@ class TestInit:
         assert kernel.exists()
         assert "def run(x, y):" in kernel.read_text()
 
-    def test_cuda_sources_written(
-        self, tmp_path, definition, workloads, cuda_solution, config
+    def test_hip_sources_written(
+        self, tmp_path, definition, workloads, hip_solution, config
     ):
-        pkg = _make_packager(tmp_path, definition, workloads, cuda_solution, config)
-        kernel = pkg.output_dir / "kernel.cu"
+        pkg = _make_packager(tmp_path, definition, workloads, hip_solution, config)
+        kernel = pkg.output_dir / "kernel.hip"
         assert kernel.exists()
-        assert "cuda kernel" in kernel.read_text()
+        assert "HIP kernel" in kernel.read_text()
 
 
 # ── compile() ─────────────────────────────────────────────────────────────────
@@ -185,53 +186,71 @@ class TestInit:
 
 class TestCompile:
     def test_returns_command_and_artifact_path(
-        self, tmp_path, definition, workloads, cuda_solution, config
+        self, tmp_path, definition, workloads, hip_solution, config
     ):
-        pkg = _make_packager(tmp_path, definition, workloads, cuda_solution, config)
+        pkg = _make_packager(tmp_path, definition, workloads, hip_solution, config)
         cmd, artifact_path = pkg.compile()
         assert cmd == ["python", "build_ext.py"]
         assert artifact_path.endswith("benchmark_kernel.so")
 
     def test_build_ext_staged(
-        self, tmp_path, definition, workloads, cuda_solution, config
+        self, tmp_path, definition, workloads, hip_solution, config
     ):
-        pkg = _make_packager(tmp_path, definition, workloads, cuda_solution, config)
+        pkg = _make_packager(tmp_path, definition, workloads, hip_solution, config)
         pkg.compile()
         build_ext = pkg.output_dir / "build_ext.py"
         assert build_ext.exists()
         ast.parse(build_ext.read_text())
 
-    def test_gencode_injected_for_blackwell(
-        self, tmp_path, definition, workloads, cuda_solution, config
+    def test_offload_arch_injected_for_gfx1200(
+        self, tmp_path, definition, workloads, hip_solution, config
     ):
-        pkg = _make_packager(tmp_path, definition, workloads, cuda_solution, config)
+        pkg = _make_packager(tmp_path, definition, workloads, hip_solution, config)
         pkg.compile()
         sol = json.loads((pkg.output_dir / "solution.json").read_text())
-        cuda_cflags = sol["spec"]["compile_options"]["cuda_cflags"]
-        assert any("sm_100a" in f for f in cuda_cflags)
+        hip_cflags = sol["spec"]["compile_options"]["hip_cflags"]
+        assert hip_cflags == ["--offload-arch=gfx1200"]
 
-    def test_gencode_not_injected_when_explicit(
+    def test_offload_arch_not_duplicated_when_explicit(
         self, tmp_path, definition, workloads, config
     ):
         sol_dict = {
-            **_CUDA_SOLUTION_DICT,
+            **_HIP_SOLUTION_DICT,
             "spec": {
-                **_CUDA_SOLUTION_DICT["spec"],
-                "compile_options": {"cuda_cflags": ["-arch=sm_90"]},
+                **_HIP_SOLUTION_DICT["spec"],
+                "compile_options": {"hip_cflags": ["--offload-arch=gfx1200"]},
             },
         }
         solution = Solution(**sol_dict)
         pkg = _make_packager(tmp_path, definition, workloads, solution, config)
         pkg.compile()
         sol = json.loads((pkg.output_dir / "solution.json").read_text())
-        cuda_cflags = sol["spec"]["compile_options"]["cuda_cflags"]
-        assert cuda_cflags == ["-arch=sm_90"]
+        hip_cflags = sol["spec"]["compile_options"]["hip_cflags"]
+        assert hip_cflags == ["--offload-arch=gfx1200"]
+
+    def test_offload_arch_injected_for_local_target(
+        self, tmp_path, definition, workloads, config, monkeypatch
+    ):
+        sol_dict = {
+            **_HIP_SOLUTION_DICT,
+            "spec": {
+                **_HIP_SOLUTION_DICT["spec"],
+                "target_hardware": ["LOCAL"],
+            },
+        }
+        monkeypatch.setattr(problem_packager, "_get_local_gfx", lambda: "gfx1200")
+        solution = Solution(**sol_dict)
+        pkg = _make_packager(tmp_path, definition, workloads, solution, config)
+        pkg.compile()
+        sol = json.loads((pkg.output_dir / "solution.json").read_text())
+        hip_cflags = sol["spec"]["compile_options"]["hip_cflags"]
+        assert hip_cflags == ["--offload-arch=gfx1200"]
 
     def test_asserts_on_python_solution(
         self, tmp_path, definition, workloads, python_solution, config
     ):
         pkg = _make_packager(tmp_path, definition, workloads, python_solution, config)
-        with pytest.raises(AssertionError, match="C\\+\\+/CUDA"):
+        with pytest.raises(AssertionError, match="HIP/C\\+\\+"):
             pkg.compile()
 
 
@@ -256,20 +275,50 @@ class TestExecute:
         ast.parse(driver.read_text())
 
     def test_raises_without_so_for_cpp(
-        self, tmp_path, definition, workloads, cuda_solution, config
+        self, tmp_path, definition, workloads, hip_solution, config
     ):
-        pkg = _make_packager(tmp_path, definition, workloads, cuda_solution, config)
+        pkg = _make_packager(tmp_path, definition, workloads, hip_solution, config)
         with pytest.raises(FileNotFoundError, match="benchmark_kernel.so"):
             pkg.execute()
 
     def test_succeeds_with_so_for_cpp(
-        self, tmp_path, definition, workloads, cuda_solution, config
+        self, tmp_path, definition, workloads, hip_solution, config
     ):
-        pkg = _make_packager(tmp_path, definition, workloads, cuda_solution, config)
+        pkg = _make_packager(tmp_path, definition, workloads, hip_solution, config)
         # Simulate a compiled artifact.
         (pkg.output_dir / "benchmark_kernel.so").write_bytes(b"\x00")
         cmd = pkg.execute()
         assert cmd == ["python", "eval_driver.py"]
+
+
+class TestLocalGfxDetection:
+    def test_get_local_gfx_uses_rocm_agent_enumerator(self, monkeypatch):
+        def fake_check_output(cmd, **kwargs):
+            assert kwargs["text"] is True
+            assert cmd == ["rocm_agent_enumerator", "-name"]
+            return "gfx000\ngfx1200\n"
+
+        monkeypatch.setattr(problem_packager.subprocess, "check_output", fake_check_output)
+        assert _get_local_gfx() == "gfx1200"
+
+    def test_get_local_gfx_falls_back_to_rocminfo(self, monkeypatch):
+        def fake_check_output(cmd, **kwargs):
+            if cmd == ["rocm_agent_enumerator", "-name"]:
+                raise FileNotFoundError
+            assert cmd == ["rocminfo"]
+            return "Agent 2\n  Name:                    gfx1200\n"
+
+        monkeypatch.setattr(problem_packager.subprocess, "check_output", fake_check_output)
+        assert _get_local_gfx() == "gfx1200"
+
+    def test_get_local_gfx_returns_none_when_no_target_found(self, monkeypatch):
+        def fake_check_output(cmd, **kwargs):
+            if cmd == ["rocm_agent_enumerator", "-name"]:
+                return "gfx000\n"
+            return "Name: CPU\n"
+
+        monkeypatch.setattr(problem_packager.subprocess, "check_output", fake_check_output)
+        assert _get_local_gfx() is None
 
 
 # ── convert_stdout_to_traces() ────────────────────────────────────────────────
