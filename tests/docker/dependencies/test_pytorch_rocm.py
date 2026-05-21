@@ -11,4 +11,4 @@ def test_torch_rocm_backend_available():
     assert torch.cuda.is_available(), "No ROCm GPU visible through PyTorch"
     x = torch.ones((4,), device="cuda")
     y = x + 1
-    torch.testing.assert_close(y, torch.full((4,), 2, device="cuda"))
+    torch.testing.assert_close(y, torch.full((4,), 2.0, device="cuda"))

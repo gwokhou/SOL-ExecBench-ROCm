@@ -40,6 +40,7 @@ def test_rocm_runtime_tools():
     assert result.returncode == 0, command_output(result)
     assert result.stdout.strip(), "rocprofv3 --help produced no output"
 
-    result = run_command([smi, "--version"], timeout=30)
+    smi_version_args = [smi, "version"] if smi.endswith("amd-smi") else [smi, "--version"]
+    result = run_command(smi_version_args, timeout=30)
     assert result.returncode == 0, command_output(result)
-    assert result.stdout.strip(), f"{smi} --version produced no output"
+    assert result.stdout.strip(), f"{' '.join(smi_version_args)} produced no output"
