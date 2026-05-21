@@ -2,9 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: CDNA 3 Support and Migration Closure
-status: planning
-last_updated: "2026-05-21T15:44:28.556Z"
-last_activity: 2026-05-21
+current_phase: complete
+status: completed
+last_updated: "2026-05-21T16:15:17.738Z"
+last_activity: 2026-05-21 — Milestone v1.1 completed and archived
 progress:
   total_phases: 3
   completed_phases: 3
@@ -18,14 +19,14 @@ progress:
 **Project:** SOL ExecBench ROCm Port
 **Initialized:** 2026-05-21
 **Current phase:** complete
-**Status:** v1.1 phases complete; lifecycle pending
+**Status:** v1.1 milestone complete
 
 ## Project Reference
 
 See: `.planning/PROJECT.md` (updated 2026-05-21)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Milestone audit and completion
+**Current focus:** Awaiting next milestone
 
 ## Workflow Settings
 
@@ -55,6 +56,9 @@ v1.1 CDNA 3 Support and Migration Closure contains 3 phases:
 - v1 requirements archived in `.planning/milestones/v1.0-REQUIREMENTS.md`.
 - v1 roadmap archived in `.planning/milestones/v1.0-ROADMAP.md`.
 - v1 phase execution history archived in `.planning/milestones/v1.0-phases/`.
+- v1.1 requirements archived in `.planning/milestones/v1.1-REQUIREMENTS.md`.
+- v1.1 roadmap archived in `.planning/milestones/v1.1-ROADMAP.md`.
+- v1.1 audit archived in `.planning/milestones/v1.1-MILESTONE-AUDIT.md`.
 
 ## Deferred Items
 
@@ -66,16 +70,17 @@ Items acknowledged and deferred at milestone close on 2026-05-21:
 
 ## Next Action
 
-Run milestone audit and completion. Keep CDNA 3 TEST-05 as a deferred hardware
-validation follow-up for the next milestone.
+Start the next milestone with `/gsd-new-milestone`. Recommended focus: run and
+record the CDNA 3 `gfx94*` full-suite validation described in
+`.planning/CDNA3-VALIDATION-HANDOFF.md`.
 
 ## Current Position
 
-Phase: v1.1 phases complete
+Phase: Milestone v1.1 complete
 Plan: —
-Status: Lifecycle pending
-Last activity: 2026-05-21 — Phase 9 completed
+Status: Awaiting next milestone
+Last activity: 2026-05-21 — Milestone v1.1 completed and archived
 
 ## Operator Next Steps
 
-- Run milestone audit and complete v1.1
+- Start the next milestone with /gsd-new-milestone

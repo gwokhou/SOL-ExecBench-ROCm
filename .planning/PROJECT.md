@@ -13,40 +13,23 @@ equivalents.
 Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm
 hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
-## Current Milestone: v1.1 CDNA 3 Support and Migration Closure
-
-**Goal:** Finish the remaining ROCm migration preparation work and add
-code/schema/documentation support for CDNA 3 while deferring real `gfx94*`
-hardware validation to the next milestone.
-
-**Target features:**
-- Add CDNA 3 support at the schema, configuration, test, and documentation
-  level, including explicit `gfx94*` target handling where appropriate.
-- Audit remaining non-archived CUDA/NVIDIA migration residue and classify each
-  match as fixed, intentional compatibility naming, or documented legacy
-  context.
-- Replace or firm up remaining former NVIDIA library/DSL fallback examples
-  where benchmark quality depends on the example category.
-- Update support documentation so CDNA 3 is supported by code and schemas but
-  not yet hardware-validated.
-- Preserve the next milestone for real CDNA 3 hardware validation and recorded
-  full-suite evidence.
-
 ## Current State
 
-**Shipped version:** v1.0 ROCm Port, archived 2026-05-21.
+**Shipped version:** v1.1 CDNA 3 Support and Migration Closure, archived
+2026-05-21.
 
-The v1.0 milestone migrated the repository to a ROCm-only runtime baseline:
-ROCm Docker and dependency configuration, HIP/C++ native build staging,
-ROCm-native solution schema values, ROCm-compatible evaluation timing, AMD
-hardware/environment reporting, migrated examples, adapted pytest semantics,
-and user-facing setup/schema/analysis/compliance documentation.
+The v1.0 milestone migrated the repository to a ROCm-only runtime baseline. The
+v1.1 milestone added CDNA 3 code/schema support, maintained active
+CUDA/NVIDIA-residue audit coverage, ROCm-facing public example paths, clarified
+compatibility-example metadata, and a concrete CDNA 3 hardware validation
+handoff for the next milestone.
 
 Validation status:
 
 - RDNA 4 (`gfx1200`) full adapted suite passed: `462 passed, 58 skipped`.
-- CDNA 3 (`gfx94*`) full adapted suite validation is deferred to a later
-  milestone and must be completed before claiming CDNA 3 support.
+- CDNA 3 (`gfx940`, `gfx941`, `gfx942`) is supported by schema/build/docs.
+- CDNA 3 (`gfx94*`) full adapted suite validation remains deferred and must be
+  completed before claiming CDNA 3 hardware validation.
 
 ## Requirements
 
@@ -65,21 +48,23 @@ Validation status:
 - Public examples and sample categories are migrated to ROCm-compatible execution, documented replacements, or explicit fallback notes - v1.0.
 - Adapted pytest markers and tests use ROCm/AMD semantics, with reward-hack defenses still active - v1.0.
 - Documentation explains ROCm setup, solution schema, trace schema, analysis workflow, compliance, unsupported NVIDIA runtime features, and known gaps - v1.0.
+- CDNA 3 `gfx94*` schema targets and HIP offload staging are supported without claiming hardware validation - v1.1.
+- Active source, tests, docs, examples, scripts, Docker, README, and pyproject have maintained CUDA/NVIDIA residue audit coverage - v1.1.
+- Public native examples use HIP-facing paths and solution filenames - v1.1.
+- Former NVIDIA library/DSL examples use ROCm compatibility-example terminology and portable examples include CDNA 3 metadata where appropriate - v1.1.
+- CDNA 3 hardware validation handoff is documented for the next milestone - v1.1.
 
 ### Active
 
-- [ ] Add code/schema/documentation support for CDNA 3 (`gfx94*`) without claiming real hardware validation.
-- [ ] Audit remaining non-archived CUDA/NVIDIA migration residue and classify or remove it.
-- [ ] Replace or firm up remaining PyTorch fallback examples for former NVIDIA library/DSL categories where benchmark quality depends on them.
-- [ ] Define the next milestone's CDNA 3 hardware validation evidence requirements.
+- [ ] Run and record CDNA 3 full-suite validation on real `gfx94*` hardware.
 - [ ] Define AMD-native scoring or roofline interpretation before making AMD hardware performance claims from SOL-Score-style outputs.
 
 ### Out of Scope
 
 - Maintaining CUDA/NVIDIA runtime compatibility - ROCm is the target platform for this port.
 - Preserving NVIDIA-specific dependency implementations when a ROCm replacement is required - equivalent behavior matters more than retaining original code.
-- Guaranteeing one-to-one high-performance replacements for every NVIDIA DSL in v1.0 - some former CUTLASS/cuDNN/CuTe/cuTile categories remain documented fallbacks or candidates.
-- Claiming CDNA 3 support before a full `gfx94*` suite pass is recorded.
+- Guaranteeing one-to-one high-performance replacements for every NVIDIA DSL - some former CUTLASS/cuDNN/CuTe/cuTile categories remain documented compatibility examples or candidates.
+- Claiming CDNA 3 hardware validation before a full `gfx94*` suite pass is recorded.
 
 ## Context
 
@@ -90,14 +75,14 @@ torchvision at ROCm wheels. The package remains a Python CLI benchmark runner:
 files and injects AMD architecture flags, and `src/sol_execbench/driver/templates/`
 contains the HIP-aware build and eval subprocess scripts.
 
-High-risk areas for future work remain hardware validation breadth, native
+High-risk areas for future work remain real CDNA 3 hardware validation, native
 library replacement quality, timing integrity on additional AMD architectures,
-and score interpretation.
+and AMD-native score interpretation.
 
 ## Constraints
 
 - **Platform**: ROCm >= 7.0 is the supported software baseline.
-- **Hardware**: RDNA 4 is validated for v1.0; CDNA 3 validation remains deferred.
+- **Hardware**: RDNA 4 is validated; CDNA 3 is code/schema-supported but hardware validation remains deferred.
 - **Compatibility**: Preserve SOL ExecBench benchmark semantics and public schemas unless a ROCm-specific change is unavoidable.
 - **Scope**: NVIDIA/CUDA runtime support is intentionally not maintained.
 - **Licensing**: All retained and replacement code must comply with the repository LICENSE and third-party dependency obligations.
@@ -108,14 +93,15 @@ and score interpretation.
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | ROCm-only port | User explicitly chose to replace NVIDIA/CUDA paths rather than maintain dual backend compatibility. | Validated in v1.0 |
-| Broad solution ecosystem target | User chose to pursue ROCm equivalents for all original solution categories, not just HIP-only or a minimal subset. | Partially validated in v1.0; some former NVIDIA DSL categories remain fallback/documented candidates |
+| Broad solution ecosystem target | User chose to pursue ROCm equivalents for all original solution categories, not just HIP-only or a minimal subset. | Partially validated in v1.1; some former NVIDIA DSL categories remain compatibility examples/documented candidates |
 | Adapted test suite is the completion gate | User defined done as passing the migrated existing tests on ROCm, rather than adding a separate parity suite as v1 scope. | Validated on RDNA 4 in v1.0 |
 | Preserve benchmark standards | The port should remain consistent with the NVIDIA SOL ExecBench paper and implementation standards wherever feasible. | Validated for public schemas and eval semantics in v1.0 |
 | Defer CDNA 3 validation | No CDNA 3 hardware run was available during closure. | Accepted as v1.0 technical debt |
+| Separate CDNA 3 code support from hardware validation | User requested CDNA 3 support in v1.1 while deferring real hardware validation to the next milestone. | Validated in v1.1 |
 
 ## Evolution
 
 This document evolves at phase transitions and milestone boundaries.
 
 ---
-*Last updated: 2026-05-21 after v1.1 milestone start*
+*Last updated: 2026-05-21 after v1.1 milestone*
