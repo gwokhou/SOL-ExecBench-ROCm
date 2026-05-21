@@ -14,8 +14,8 @@
 
 ### Schema and Configuration
 
-- [ ] **SCFG-01**: Solution language and hardware enums represent ROCm targets, including HIP/C++ and AMD architecture targets.
-- [ ] **SCFG-02**: Existing problem schemas for `definition.json`, `workload.jsonl`, `solution.json`, and traces remain compatible unless a ROCm-specific change is explicitly documented.
+- [x] **SCFG-01**: Solution language and hardware enums represent ROCm targets, including HIP/C++ and AMD architecture targets.
+- [x] **SCFG-02**: Existing problem schemas for `definition.json`, `workload.jsonl`, `solution.json`, and traces remain compatible unless a ROCm-specific change is explicitly documented.
 - [ ] **SCFG-03**: NVIDIA/CUDA-only dependency declarations are removed or replaced with ROCm equivalents.
 - [ ] **SCFG-04**: Documentation states that this port is ROCm-only and does not maintain CUDA/NVIDIA runtime support.
 
@@ -95,8 +95,8 @@
 | ENV-02 | Phase 1 | Pending |
 | ENV-03 | Phase 1 | Pending |
 | ENV-04 | Phase 1 | Pending |
-| SCFG-01 | Phase 2 | Pending |
-| SCFG-02 | Phase 2 | Pending |
+| SCFG-01 | Phase 2 | Complete |
+| SCFG-02 | Phase 2 | Complete |
 | SCFG-03 | Phase 1 | Pending |
 | SCFG-04 | Phase 6 | Pending |
 | BUILD-01 | Phase 2 | Pending |
