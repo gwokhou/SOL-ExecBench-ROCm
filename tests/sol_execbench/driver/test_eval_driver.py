@@ -383,16 +383,16 @@ def test_load_inline_blocked_at_import(tmp_path):
     )
 
 
-def test_cpp_getCurrentCUDAStream_allowed():
-    """C++ files may use getCurrentCUDAStream (the default stream)."""
+def test_hip_cpp_sources_accept_pytorch_rocm_stream_api_text():
+    """HIP/C++ files may use PyTorch's HIP-backed torch.cuda stream API text."""
     from sol_execbench.core.data import Solution
 
-    good_cuda = {
-        "name": "good_cuda_stream",
+    good_hip = {
+        "name": "good_hip_stream",
         "definition": "test_def",
         "author": "good_agent",
         "spec": {
-            "languages": ["cuda_cpp"],
+            "languages": ["hip_cpp"],
             "target_hardware": ["LOCAL"],
             "entry_point": "main.cpp::run",
             "destination_passing_style": True,
@@ -403,7 +403,7 @@ def test_cpp_getCurrentCUDAStream_allowed():
                 "content": "void run() {}",
             },
             {
-                "path": "kernel.cu",
+                "path": "kernel.hip",
                 "content": (
                     "auto stream = at::cuda::getCurrentCUDAStream();\n"
                     "kernel<<<grid, block, 0, stream>>>(args);\n"
@@ -412,7 +412,7 @@ def test_cpp_getCurrentCUDAStream_allowed():
         ],
     }
     # Should NOT raise
-    Solution(**good_cuda)
+    Solution(**good_hip)
 
 
 # ---------------------------------------------------------------------------
