@@ -27,8 +27,8 @@ created: 2026-05-21
 
 ## Sampling Rate
 
-- **After every task commit:** Run `uv run pytest tests/docker/dependencies -n 0` where tests can run in the current environment.
-- **After every plan wave:** Run `./scripts/run_docker.sh --build -- pytest tests/docker/dependencies -n 0` when Docker/ROCm device access is available.
+- **After every task commit:** Run the task-specific `verify` command in the plan file.
+- **After every plan wave:** Run the wave-level Docker command when Docker/ROCm access is available.
 - **Before `$gsd-verify-work`:** Docker build succeeds and in-container Docker dependency tests pass.
 - **Max feedback latency:** 300 seconds for host-side tests; Docker build latency is accepted for phase gate validation.
 
@@ -38,21 +38,27 @@ created: 2026-05-21
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 01-01-01 | 01 | 1 | ENV-01, ENV-02 | T-01-01 | Docker runtime flags avoid over-broad mounts beyond ROCm device access | static/smoke | `uv run pytest tests/docker/dependencies -n 0` | W0 | pending |
-| 01-02-01 | 02 | 1 | ENV-03, SCFG-03 | T-01-02 | Python dependencies resolve from explicit ROCm wheel sources without CUDA/NVIDIA packages | static | `uv lock --check` and Docker dependency package tests | W0 | pending |
-| 01-03-01 | 03 | 1 | ENV-02, ENV-04 | T-01-03 | Dependency tests use fixed command lists and clear failure messages | integration | `uv run pytest tests/docker/dependencies -n 0` | W0 | pending |
-| 01-04-01 | 04 | 2 | ENV-01, ENV-02, ENV-03, ENV-04, SCFG-03 | T-01-04 | In-container validation proves ROCm runtime, HIP, PyTorch ROCm, Triton ROCm, and selected ROCm libraries | integration | `./scripts/run_docker.sh --build -- pytest tests/docker/dependencies -n 0` | W0 | pending |
+| 01-01-01 | 01-01 | 1 | ENV-01, ENV-02 | T-01-01 | Docker runtime flags avoid over-broad mounts beyond ROCm device access | static/smoke | `grep -v '^#' docker/Dockerfile | grep -q 'rocm/dev-ubuntu-24.04:7.1.1-complete'` | W0 | pending |
+| 01-01-02 | 01-01 | 1 | ENV-01, ENV-02 | T-01-01 | Docker run script uses AMD device passthrough flags only | static/smoke | `grep -q -- '--device=/dev/kfd' scripts/run_docker.sh` | W0 | pending |
+| 01-01-03 | 01-01 | 1 | ENV-02 | T-01-01 | Entrypoint probes ROCm/HIP availability instead of CUDA-only text | static | `grep -q 'torch.version.hip' docker/entrypoint.sh` | W0 | pending |
+| 01-02-01 | 01-02 | 1 | ENV-03, SCFG-03 | T-01-02 | Static dependency test file parses `pyproject.toml` with `tomllib` | unit/collection | `uv run pytest tests/docker/dependencies/test_python_dependencies.py -n 0 --collect-only` | W0 | pending |
+| 01-02-02 | 01-02 | 1 | ENV-03, SCFG-03 | T-01-02 | `pyproject.toml` resolves PyTorch/torchvision from ROCm wheel index | unit | `uv run pytest tests/docker/dependencies/test_python_dependencies.py -n 0` | W0 | pending |
+| 01-02-03 | 01-02 | 1 | ENV-03, SCFG-03 | T-01-02 | `uv.lock` remains synchronized after dependency migration | integration | `uv lock --check` | W0 | pending |
+| 01-03-01 | 01-03 | 2 | ENV-02, ENV-04 | T-01-03 | ROCm runtime smoke tests report missing tooling by command name | integration | `uv run pytest tests/docker/dependencies/test_rocm_runtime.py tests/docker/dependencies/test_hip.py -n 0` | W0 | pending |
+| 01-03-02 | 01-03 | 2 | ENV-03, ENV-04 | T-01-04 | PyTorch/Triton/ROCm library smoke tests run with ROCm dependencies installed | integration | `uv run pytest tests/docker/dependencies/test_pytorch_rocm.py tests/docker/dependencies/test_triton_rocm.py tests/docker/dependencies/test_rocm_libraries.py -n 0` | W0 | pending |
+| 01-04-01 | 01-04 | 3 | ENV-04, SCFG-03 | T-01-10 | Obsolete CUDA/CUTLASS/CuDNN tests are absent from Docker dependency collection | static | `! find tests/docker/dependencies -maxdepth 1 -type f | grep -E 'test_(cuda|cudnn|cutlass)\.py'` | W0 | pending |
+| 01-04-02 | 01-04 | 3 | ENV-04, SCFG-03 | T-01-11 | Duplicate CUDA DSL/cuTile/import-only Triton tests are absent from Docker dependency collection | static | `uv run pytest tests/docker/dependencies -n 0 && ! find tests/docker/dependencies -maxdepth 1 -type f | grep -E 'test_(cudnn_frontend|cutedsl|cutile|triton)\.py|_cutedsl_kernels\.py'` | W0 | pending |
 
 ---
 
 ## Wave 0 Requirements
 
-- [ ] `tests/docker/dependencies/test_rocm_runtime.py` - stubs/checks for ENV-02 and ENV-04.
+- [ ] `tests/docker/dependencies/test_python_dependencies.py` - static source guard for ENV-03 and SCFG-03.
+- [ ] `tests/docker/dependencies/test_rocm_runtime.py` - ROCm runtime smoke test for ENV-02 and ENV-04.
 - [ ] `tests/docker/dependencies/test_hip.py` - HIP compiler smoke test for ENV-02 and ENV-04.
-- [ ] `tests/docker/dependencies/test_pytorch_rocm.py` - PyTorch ROCm backend smoke test for ENV-03 and ENV-04.
-- [ ] `tests/docker/dependencies/test_triton_rocm.py` - Triton ROCm import/minimal runtime smoke test for ENV-03 and ENV-04.
-- [ ] `tests/docker/dependencies/test_rocm_libraries.py` - selected ROCm library discovery/link checks for ENV-02 and ENV-04.
-- [ ] Static dependency assertion covering absence of CUDA/NVIDIA package declarations for SCFG-03.
+- [ ] `tests/docker/dependencies/test_pytorch_rocm.py` - PyTorch ROCm smoke test for ENV-03 and ENV-04.
+- [ ] `tests/docker/dependencies/test_triton_rocm.py` - Triton ROCm smoke test for ENV-03 and ENV-04.
+- [ ] `tests/docker/dependencies/test_rocm_libraries.py` - selected ROCm library checks for ENV-02 and ENV-04.
 
 ---
 
