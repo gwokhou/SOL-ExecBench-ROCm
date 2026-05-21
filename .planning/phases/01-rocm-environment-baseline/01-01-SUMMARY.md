@@ -67,7 +67,7 @@ None. The final entrypoint uses the literal `torch.version.hip` expression expec
 
 ## Issues Encountered
 
-None in implementation. Host-level runtime validation later showed `/dev/kfd` is absent in the current shell environment; that is recorded in Plan 03.
+Docker build validation showed the ROCm base image may already contain UID 1000. The Dockerfile now reuses existing UID/GID users instead of unconditionally creating a new user. Host-level runtime validation also showed `/dev/kfd` is absent in the current shell environment; that is recorded in Plan 03.
 
 ## User Setup Required
 
