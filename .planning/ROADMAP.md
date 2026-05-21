@@ -18,7 +18,7 @@ migrate examples, validate hardware, and finish documentation/compliance.
 - [x] **Phase 3: ROCm Evaluation, Timing, and Hardware Introspection** (completed 2026-05-21)
 - [x] **Phase 4: ROCm Library and Example Migration** (completed 2026-05-21)
 - [x] **Phase 5: ROCm Test Suite and Hardware Validation** (completed 2026-05-21; CDNA 3 validation deferred)
-- [ ] **Phase 6: Documentation, Analysis Workflow, and Compliance**
+- [x] **Phase 6: Documentation, Analysis Workflow, and Compliance** (completed 2026-05-21)
 
 ## Phases
 

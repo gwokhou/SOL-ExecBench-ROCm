@@ -1,136 +1,186 @@
-# SOL ExecBench
+# SOL ExecBench ROCm Port
 
-<div align="center" id="top">
+SOL ExecBench ROCm Port evaluates AI-generated GPU kernel solutions on AMD
+ROCm hardware while preserving the original SOL ExecBench problem, workload,
+solution, and trace semantics where practical.
 
-[![Docs](https://img.shields.io/badge/docs-latest-brightgreen.svg)](/docs/)
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
+This repository is ROCm-only. It does not maintain CUDA/NVIDIA runtime support.
+Legacy NVIDIA-specific solution categories are rejected by the ROCm schema or
+kept only as documented fallback examples.
 
-[HuggingFace Dataset](https://huggingface.co/datasets/nvidia/SOL-ExecBench) | [Leaderboard](https://research.nvidia.com/benchmarks/sol-execbench)
-| [Technical Report](https://arxiv.org/abs/2603.19173) </div>
-
-**Speed-Of-Light ExecBench** is a rigorous GPU kernel evaluation and benchmarking framework built to benchmark AI-generated kernel solutions written with the variety of DSLs that NVIDIA hardware supports.
+[HuggingFace Dataset](https://huggingface.co/datasets/nvidia/SOL-ExecBench) |
+[Original Leaderboard](https://research.nvidia.com/benchmarks/sol-execbench) |
+[Technical Report](https://arxiv.org/abs/2603.19173)
 
 Kernels are:
-* Checked for various forms of reward hacking
-* Tested against a reference solution for numerical correctness
-* Timed under reproducible conditions
 
-Leaderboard submissions are ranked based on [SOL-Score](/src/sol_execbench/sol_score.py): a metric that grades custom kernel performance based on the theoretical roofline of a NVIDIA B200 GPU (obtained analytically with [SOLAR](https://github.com/NVlabs/SOLAR)).  
+- checked for reward hacking,
+- tested against a PyTorch reference solution for numerical correctness,
+- timed under reproducible ROCm-compatible conditions.
 
-Supported kernel languages: PyTorch, Triton, CUTLASS, cuDNN, CuTe DSL, cuTile, CUDA C++.
+Supported solution categories in this port:
+
+- PyTorch on ROCm
+- Triton ROCm
+- HIP/C++
+- ROCm library-oriented native categories: `hipblas`, `miopen`, `ck`, `rocwmma`
+
+Current local validation evidence covers RDNA 4 (`gfx1200`). CDNA 3 validation
+is a deferred hardware follow-up and should not be claimed until a full
+adapted-suite run is recorded on `gfx94*`.
 
 ## Prerequisites
 
-- Docker with [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
-- [Hugging Face CLI](https://huggingface.co/docs/huggingface_hub/guides/cli) (`pip install huggingface-hub[cli]`)
-- NVIDIA driver version 580+
+- Linux host with ROCm 7.0 or newer and a visible AMD GPU.
+- Native Linux Docker daemon for container use. Docker Desktop cannot pass
+  `/dev/kfd` and `/dev/dri` through correctly for ROCm evaluation.
+- Access to `/dev/kfd` and `/dev/dri` on the host.
+- `uv` for local Python environment management.
+- Hugging Face CLI for benchmark dataset downloads:
+
+```bash
+pip install "huggingface-hub[cli]"
+```
+
+See [ROCm setup](docs/rocm.md) for detailed host, Docker, and validation notes.
 
 ## Setup
 
-### 1. Download benchmark data (one-time)
+Install the Python environment:
+
+```bash
+uv sync --all-groups
+```
+
+Verify that PyTorch is using ROCm wheels:
+
+```bash
+uv run python - <<'PY'
+import torch
+print(torch.__version__)
+print(torch.version.hip)
+print(torch.version.cuda)
+print(torch.cuda.is_available())
+print(torch.cuda.get_device_properties(0).gcnArchName)
+PY
+```
+
+`torch.version.hip` should be set and `torch.version.cuda` should be `None`.
+
+Download benchmark data:
 
 ```bash
 ./scripts/download_data.sh
 ```
 
-This downloads the [SOL-ExecBench](https://huggingface.co/datasets/nvidia/SOL-ExecBench) and [FlashInfer Trace](https://huggingface.co/datasets/flashinfer-ai/flashinfer-trace) datasets into `data/`.
+This downloads the original SOL-ExecBench dataset and FlashInfer trace dataset
+into `data/`.
 
-### 2. Build and launch the Docker container
+## Docker
+
+Build and enter the ROCm container:
 
 ```bash
 ./scripts/run_docker.sh --build
 ```
 
-This builds the image and drops you into an interactive shell inside the container. The repo's `src/`, `tests/`, and downloaded data are mounted automatically.
-
-## Evaluating a Solution
-
-Inside the container, use the `sol-execbench` CLI:
+Run a command inside the container:
 
 ```bash
-# Evaluate using a problem directory (contains definition.json + workload.jsonl)
-sol-execbench <problem_dir> --solution solution.json
-
-# Or specify files explicitly
-sol-execbench --definition def.json --workload wkl.jsonl --solution sol.json
+./scripts/run_docker.sh -- sol-execbench tests/sol_execbench/samples/rmsnorm \
+  --solution tests/sol_execbench/samples/rmsnorm/solution_python.json
 ```
 
-### Example
+The script mounts the repository at `/sol-execbench`, passes `/dev/kfd` and
+`/dev/dri`, and sets the FlashInfer trace path when data is present.
+
+## Evaluating A Solution
+
+Use the `sol-execbench` CLI:
 
 ```bash
-# From the host — build, launch, and evaluate in one command:
-./scripts/run_docker.sh --build -- \
-  sol-execbench examples/cute_dsl/jamba_attn_proj \
-    --solution examples/cute_dsl/jamba_attn_proj/solution_cute_dsl.json
-
-# Or from inside the container:
-sol-execbench examples/cute_dsl/jamba_attn_proj \
-  --solution examples/cute_dsl/jamba_attn_proj/solution_cute_dsl.json
+uv run sol-execbench <problem_dir> --solution solution.json
 ```
 
-### CLI Options
+or specify files explicitly:
+
+```bash
+uv run sol-execbench \
+  --definition def.json \
+  --workload workload.jsonl \
+  --solution solution.json
+```
+
+Common options:
 
 | Flag | Description |
-|---|---|
-| `--compile-timeout` | Compilation timeout in seconds (default: 120) |
-| `--timeout` | Evaluation timeout in seconds (default: 600) |
-| `-o, --output` | Write JSONL traces to file |
-| `--json` | Print traces as JSON to stdout |
-| `--lock-clocks` | Lock GPU clocks for stable benchmarks |
-| `--keep-staging` | Preserve staging directory after run |
-| `-v, --verbose` | Show subprocess output |
+| --- | --- |
+| `--compile-timeout` | HIP/C++ compilation timeout in seconds. |
+| `--timeout` | Evaluation subprocess timeout in seconds. |
+| `-o, --output` | Write trace JSONL to a file. |
+| `--json` | Print trace JSON to stdout. |
+| `--lock-clocks` | Require ROCm GPU clocks to be locked before benchmarking. |
+| `--keep-staging` | Preserve the staging directory after a run. |
+| `-v, --verbose` | Show subprocess output. |
 
-## Running a Dataset
+## Running A Dataset
 
-Use `scripts/run_dataset.py` to evaluate an entire dataset (or a single problem) in batch. By default it runs the definition's reference implementation as the solution unless `--solution-name` is specified. Saves to `./out/{subset}` by default.
+Evaluate a dataset batch with:
 
 ```bash
-# Run all problems in the benchmark.
-# Auto builds solution.json from a single code file
-uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark --solution-name solution.py
-
-# Run specific categories with multiple solution code files
-uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark --category L1 L2 --solution-name solution.json
-
-# Run a single problem
-uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark/L1/my_problem
-
-# Limit number of problems and workloads
-uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark --limit 5 --max-workloads 3 -o ./results
+uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark --limit 5
 ```
 
-Results (traces and a summary JSON) are written to `out/run_dataset/` by default (override with `-o`). Problems that already passed are skipped on subsequent runs unless `--rerun` is specified.
+Use a named solution file for each problem:
 
-## Problem Format
+```bash
+uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
+  --solution-name solution.json
+```
 
-A problem directory contains:
+Results are written under `out/run_dataset/` by default. Existing passed
+problems are skipped unless `--rerun` is supplied.
 
-- **`definition.json`** — Kernel specification: function signature, tensor shapes, dtypes, reference implementation.
-- **`workload.jsonl`** — One JSON object per line, each defining input shapes, values, and tolerance thresholds.
+## Schemas And Analysis
 
-A solution is a separate JSON file referencing source files with the kernel implementation.
+- [Definition](docs/definition.md): kernel specification and PyTorch reference.
+- [Workload](docs/workload.md): concrete input configurations and tolerances.
+- [Solution](docs/solution.md): ROCm-supported implementation metadata.
+- [Trace](docs/trace.md): evaluation output and ROCm environment fields.
+- [Analysis](docs/analysis.md): timing, trace review, clock locking, and
+  `rocprofv3` workflow.
+- [Compliance](docs/compliance.md): third-party notices and unsupported features.
 
-See the full schema docs:
+## Testing
 
-- [Definition](docs/definition.md) — Kernel specification (function signature, tensor shapes, dtypes, reference code)
-- [Workload](docs/workload.md) — Concrete input configurations and tolerance thresholds
-- [Solution](docs/solution.md) — Source files and build specs for a kernel implementation
-- [Trace](docs/trace.md) — Evaluation output (correctness and performance results)
+Run the full adapted test suite:
+
+```bash
+uv run pytest tests/
+```
+
+Focused checks:
+
+```bash
+uv run pytest tests/sol_execbench/core/data/test_solution.py
+uv run pytest tests/examples/test_examples.py -k consistency
+uv run ruff check .
+```
 
 ## Citation
 
 ```bibtex
 @misc{lin2026solexecbench,
-      title={SOL-ExecBench: Speed-of-Light Benchmarking for Real-World GPU Kernels Against Hardware Limits}, 
+      title={SOL-ExecBench: Speed-of-Light Benchmarking for Real-World GPU Kernels Against Hardware Limits},
       author={Edward Lin, Sahil Modi, Siva Kumar Sastry Hari, Qijing Huang, Zhifan Ye, Nestor Qin, Fengzhe Zhou, Yuan Zhang, Jingquan Wang, Sana Damani, Dheeraj Peri, Ouye Xie, Aditya Kane, Moshe Maor, Michael Behar, Triston Cao, Rishabh Mehta, Vartika Singh, Vikram Sharma Mailthody, Terry Chen, Zihao Ye, Hanfeng Chen, Tianqi Chen, Vinod Grover, Wei Chen, Wei Liu, Eric Chung, Luis Ceze, Roger Bringmann, Cyril Zeller, Michael Lightstone, Christos Kozyrakis, Humphrey Shi},
       year={2026},
       eprint={2603.19173},
       archivePrefix={arXiv},
       primaryClass={cs.LG},
-      url={https://arxiv.org/abs/2603.19173}, 
+      url={https://arxiv.org/abs/2603.19173},
 }
 ```
 
 ## License
 
-Apache-2.0. See [LICENSE](LICENSE). Contributions require DCO sign-off — see [CONTRIBUTING.md](CONTRIBUTING.md).
+Apache-2.0. See [LICENSE](LICENSE) and [Compliance](docs/compliance.md).

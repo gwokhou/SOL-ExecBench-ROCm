@@ -1,213 +1,141 @@
 # Solution Schema
 
-A **Solution** is your concrete kernel implementation for a given Definition. It encapsulates the source code, build metadata, and submission identity.
+A Solution is a concrete ROCm-compatible kernel implementation for a Definition.
+It contains source files, build metadata, dependencies, and the entry point that
+the evaluator calls.
 
----
-
-## Table of Contents
-- [Solution Schema](#solution-schema)
-  - [Table of Contents](#table-of-contents)
-  - [Top-Level Schema](#top-level-schema)
-  - [`spec` — Build Specification](#spec--build-specification)
-  - [Destination Passing Style (DPS)](#destination-passing-style-dps)
-  - [`compile_options` — Compiler Flags](#compile_options--compiler-flags)
-  - [`dependencies` — Supported Libraries](#dependencies--supported-libraries)
-  - [`sources` — Source Code Files](#sources--source-code-files)
-  - [Supported Languages](#supported-languages)
-    - [Python / Triton / CuTe DSL / cuTile Function Signature](#python--triton--cute-dsl--cutile-function-signature)
-    - [CUDA C++ Function Signature](#cuda-c-function-signature)
-    - [CuTe DSL Best Practices](#cute-dsl-best-practices)
-  - [Complete Examples](#complete-examples)
-    - [Python Solution](#python-solution)
-    - [Triton Solution](#triton-solution)
-    - [CUDA C++ Solution](#cuda-c-solution)
-    - [CuTe DSL Solution](#cute-dsl-solution)
-
----
+This port accepts ROCm solution metadata only. CUDA/NVIDIA schema values are
+rejected with migration guidance.
 
 ## Top-Level Schema
 
 | Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | Yes | Unique solution name (e.g. `rmsnorm_triton_b200_v2`) |
-| `definition` | string | Yes | The `name` of the Definition this solves |
-| `author` | string | Yes | Agent or human author identifier |
-| `description` | string | No | Brief description of the technique |
-| `spec` | object | Yes | Build specification — see below |
-| `sources` | array | Yes | Source code files — see below |
+| --- | --- | --- | --- |
+| `name` | string | Yes | Unique solution name. |
+| `definition` | string | Yes | Name of the Definition this solves. |
+| `author` | string | Yes | Agent or human author identifier. |
+| `description` | string | No | Brief implementation description. |
+| `spec` | object | Yes | Build specification. |
+| `sources` | array | Yes | Source code files reconstructed in staging. |
 
----
-
-## `spec` — Build Specification
+## Build Specification
 
 | Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `languages` | array[string] | Yes | Programming languages — see Supported Languages. C++ and Python languages cannot be mixed. |
-| `target_hardware` | array[string] | Yes | Target hardware list: `["B200"]`, `["local"]`, or both |
-| `entry_point` | string | Yes | `"filename::function_name"` — the function the evaluator calls |
-| `destination_passing_style` | bool | No | Whether to use DPS — outputs passed as last args (default: `true`) |
-| `binding` | string \| null | No | Binding type for C++/CUDA solutions. Defaults to `"torch"` for C++/CUDA languages, ignored for Python. |
-| `dependencies` | array[string] | No | Required packages (limited set — see Dependencies) |
-| `compile_options` | object | No | Extra compiler flags for CUDA/C++ — see below |
+| --- | --- | --- | --- |
+| `languages` | array[string] | Yes | ROCm-supported language/category values. |
+| `target_hardware` | array[string] | Yes | `["gfx1200"]`, `["LOCAL"]`, or both. |
+| `entry_point` | string | Yes | `"filename::function_name"`. |
+| `destination_passing_style` | bool | No | Outputs passed as final args when `true`; default is `true`. |
+| `binding` | string or null | No | `torch` for HIP/C++ categories. Ignored for Python/Triton. |
+| `dependencies` | array[string] | No | Required packages/libraries. |
+| `compile_options` | object | No | HIP/C++ compiler and linker flags. |
 
----
+## Supported Languages
 
-## Destination Passing Style (DPS)
+| Value | Entry point | Notes |
+| --- | --- | --- |
+| `pytorch` | `.py::function` | PyTorch running on ROCm. |
+| `triton` | `.py::function` | Triton ROCm kernels plus PyTorch. |
+| `hip_cpp` | `.hip`, `.cpp`, `.cc`, `.cxx`, `.c`, `.h`, or `.hpp` | HIP/C++ extension compiled through PyTorch. |
+| `hipblas` | Native C/C++ entry point | hipBLAS-oriented implementation category. |
+| `miopen` | Native C/C++ entry point | MIOpen-oriented implementation category. |
+| `ck` | Native C/C++ entry point | Composable Kernel-oriented implementation category. |
+| `rocwmma` | Native C/C++ entry point | rocWMMA-oriented implementation category. |
 
-DPS is the default calling convention. Set `destination_passing_style: true` (or omit — it defaults to `true`).
+Python languages (`pytorch`, `triton`) cannot be mixed with native C/C++
+languages in the same solution.
 
-The evaluator pre-allocates all output tensors and passes them as the **last positional arguments** after all inputs. Your function writes results in-place and **does not return anything**.
+## Unsupported Legacy Values
+
+These values are not active ROCm schema values:
+
+| Legacy value | Replacement direction |
+| --- | --- |
+| `cuda_cpp` | `hip_cpp` |
+| `cutlass` | `ck` or `rocwmma`, or a HIP/Triton implementation |
+| `cublas` | `hipblas` |
+| `cudnn`, `cudnn_frontend` | `miopen` or a HIP/Triton implementation |
+| `cute_dsl`, `cutile` | No direct runtime in this port; use HIP, Triton ROCm, CK, or rocWMMA where feasible |
+| `cuda_cflags` | `hip_cflags` |
+| `B200` | `gfx1200` or `LOCAL` |
+
+## Destination Passing Style
+
+Destination passing style is the default. The evaluator pre-allocates output
+tensors and passes them after all inputs.
 
 ```python
-# ✅ DPS = true (required): outputs pre-allocated, write in-place
 def run(input, weight, eps, output):
-    #                        ^^^^^^ pre-allocated output tensor
     output[:] = normalize(input, weight, eps)
-    # no return
+```
 
-# ❌ DPS = false: value-returning style
+When `destination_passing_style` is `false`, the solution returns output
+tensors instead:
+
+```python
 def run(input, weight, eps):
     return normalize(input, weight, eps)
 ```
 
-**Argument order:** inputs in the order they appear in `Definition.inputs`, then outputs in the order they appear in `Definition.outputs`.
+Argument order is Definition inputs first, followed by Definition outputs.
 
-```python
-# For Definition with:
-#   inputs:  {A, B, eps}
-#   outputs: {C, stats}
-def run(A, B, eps, C, stats):  # inputs first, then outputs
-    ...
-```
+## Compile Options
 
----
-
-## `compile_options` — Compiler Flags
-
-For C++ language solutions (e.g. `"cuda_cpp"`, `"cutlass"`), extra compiler flags can be specified. An empty `"compile_options": {}` object uses the defaults:
+HIP/C++ solution categories accept:
 
 | Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `cflags` | array[string] | `[]` | Extra GCC/Clang C compiler flags |
-| `cuda_cflags` | array[string] | `["-O3", "--use_fast_math"]` | Extra NVCC flags |
-| `ld_flags` | array[string] | `["-lcuda"]` | Extra linker flags |
+| --- | --- | --- | --- |
+| `cflags` | array[string] | `[]` | Extra host compiler flags. |
+| `hip_cflags` | array[string] | `["-O3"]` | Extra HIP compiler flags. |
+| `ld_flags` | array[string] | `[]` | Extra linker flags. |
 
-If your solution links against additional libraries, add the corresponding `-l` flag to `ld_flags`. For example, a cuDNN solution needs `"-lcudnn"`, and a cuBLAS solution needs `"-lcublas"`:
+Example:
 
 ```json
 "compile_options": {
-  "cuda_cflags": ["-O3", "--use_fast_math", "-std=c++17"],
-  "ld_flags": ["-lcuda", "-lcudnn"]
+  "hip_cflags": ["-O3", "-ffast-math", "--offload-arch=gfx1200"],
+  "ld_flags": []
 }
 ```
 
----
+PyTorch's extension API still names the device-compiler keyword
+`extra_cuda_cflags`; that is an implementation detail in the build template.
+Solution JSON must use `hip_cflags`.
 
-## `dependencies` — Supported Libraries
+## Dependencies
 
-The supported dependency set is limited to:
+Dependencies are validated against the current environment. Common values:
 
-| Library | Example specifier |
-|---------|------------------|
-| CUTLASS | `"CUTLASS_3_7"` → injects CUTLASS 3.7 header paths |
-| CuTe DSL | `"cutlass"` |
-| Triton | `"triton >= 2.3"` |
-| cuBLAS | `"cublas"` |
-| cuDNN | `"cudnn"` |
-| PyTorch | `"torch"` |
+| Dependency | Notes |
+| --- | --- |
+| `torch` | PyTorch ROCm runtime. |
+| `triton-rocm` or `triton` | Triton ROCm environment, depending on installed package metadata. |
+| `hipblas` | Native hipBLAS implementation category. |
+| `miopen` | Native MIOpen implementation category. |
+| `ck` | Composable Kernel implementation category. |
+| `rocwmma` | rocWMMA implementation category. |
 
-Python package specifiers are validated against the current environment — if a listed version is not installed, the build fails fast.
+## Sources
 
----
-
-## `sources` — Source Code Files
-
-Array of `{path, content}` objects. The evaluator reconstructs this directory structure at evaluation time.
+Each source entry has:
 
 | Field | Required | Description |
-|-------|----------|-------------|
-| `path` | Yes | Relative file path including extension (e.g. `kernel.py`, `src/kernel.cu`) |
-| `content` | Yes | Complete source code text |
+| --- | --- | --- |
+| `path` | Yes | Relative path without `..` or a leading slash. |
+| `content` | Yes | Complete source text. |
 
-**Rules:**
-- `path` must be relative (no leading `/`, no `..`)
-- The entry point file (`spec.entry_point` prefix) must be in `sources`
-- No duplicate paths
+The entry point file must be present in `sources`.
 
----
-
-## Supported Languages
-These are the languages used for computation. More than one may be specified, but C++ and Python cannot be mixed.
-
-| `spec.languages` | Entry point format | Notes |
-|------------------|-------------------|-------|
-| `["pytorch"]` | `"file.py::function_name"` | PyTorch, any pure Python library |
-| `["triton"]` | `"file.py::function_name"` | Triton kernels + PyTorch |
-| `["cute_dsl"]` | `"file.py::function_name"` | NVIDIA CuTe DSL (Python); treated as Python by evaluator |
-| `["cutile"]` | `"file.py::function_name"` | NVIDIA cuTile Python DSL |
-| `["cudnn_frontend"]` | `"file.py::function_name"` | NVIDIA cuDNN frontend Python DSL |
-| `["cuda_cpp"]` | `"file.cu::function_name"` | CUDA C++; compiled via PyTorch `torch` binding |
-| `["cutlass"]` | `"file.cpp::function_name"` | Pure C++ with CUTLASS; compiled via PyTorch `torch` binding |
-| `["cudnn"]` | `"file.cpp::function_name"` | C++ with cuDNN; compiled via PyTorch `torch` binding |
-| `["cublas"]` | `"file.cpp::function_name"` | C++ with cuBLAS; compiled via PyTorch `torch` binding |
-
-### Python / Triton / CuTe DSL / cuTile Function Signature
-
-```python
-# Parameter names must exactly match Definition.inputs keys, then Definition.outputs keys (DPS)
-def run(input_name_1, input_name_2, ..., output_name_1, output_name_2, ...):
-    # write results into output tensors
-    output_name_1[:] = ...
-```
-
-`**kwargs` in the signature is allowed and ignored during validation.
-
-### CUDA C++ Function Signature
-
-Uses PyTorch `torch` binding. Entry point is a C function symbol exposed to Python:
-
-```cpp
-// Inputs as torch::Tensor by value, outputs as torch::Tensor by reference (written in-place)
-void run(torch::Tensor A, torch::Tensor B, torch::Tensor C) {
-    // kernel implementation
-    // write result into C in-place
-}
-```
-
-### CuTe DSL Best Practices
-
-```python
-import cutlass.cute as cute
-from cuda.core.experimental._dlpack import from_dlpack
-
-# Cache compiled kernel at module level — avoids recompilation per workload
-_compiled_fn = None
-
-def run(A, B, C):
-    global _compiled_fn
-    if _compiled_fn is None:
-        # mark_layout_dynamic() makes shape-agnostic JIT — reuses across workloads
-        a_cute = from_dlpack(A).mark_layout_dynamic()
-        b_cute = from_dlpack(B).mark_layout_dynamic()
-        c_cute = from_dlpack(C).mark_layout_dynamic()
-        _compiled_fn = cute.compile(jit_fn, a_cute, b_cute, c_cute)
-    _compiled_fn(from_dlpack(A), from_dlpack(B), from_dlpack(C))
-```
-
----
-
-## Complete Examples
-
-### Python Solution
+## PyTorch Example
 
 ```json
 {
-  "name": "swiglu_python_v1",
-  "definition": "gemma3...swiglu_h4096",
+  "name": "swiglu_pytorch_rocm_v1",
+  "definition": "swiglu_h4096",
   "author": "my-agent",
   "spec": {
     "languages": ["pytorch"],
-    "target_hardware": ["B200"],
+    "target_hardware": ["LOCAL"],
     "entry_point": "kernel.py::run",
     "dependencies": ["torch"],
     "destination_passing_style": true
@@ -221,73 +149,51 @@ def run(A, B, C):
 }
 ```
 
-### Triton Solution
+## Triton ROCm Example
 
 ```json
 {
-  "name": "rmsnorm_triton_v1",
-  "definition": "nvidia...rmsnorm_h4096",
+  "name": "rmsnorm_triton_rocm_v1",
+  "definition": "rmsnorm_h4096",
   "author": "my-agent",
   "spec": {
     "languages": ["triton"],
-    "target_hardware": ["B200"],
+    "target_hardware": ["gfx1200"],
     "entry_point": "kernel.py::run",
-    "dependencies": ["torch", "triton >= 2.3"],
+    "dependencies": ["torch", "triton-rocm"],
     "destination_passing_style": true
   },
   "sources": [
     {
       "path": "kernel.py",
-      "content": "import torch\nimport triton\nimport triton.language as tl\n\n@triton.jit\ndef _rmsnorm_kernel(...):\n    ...\n\ndef run(input, weight, eps, output):\n    n_rows, n_cols = input.shape\n    grid = (n_rows,)\n    _rmsnorm_kernel[grid](input, weight, output, n_cols, eps, BLOCK_SIZE=1024)"
+      "content": "import triton\nimport triton.language as tl\n\n@triton.jit\ndef _kernel(...):\n    ...\n\ndef run(input, weight, eps, output):\n    _kernel[(input.shape[0],)](input, weight, output, input.shape[1], eps, BLOCK_SIZE=1024)"
     }
   ]
 }
 ```
 
-### CUDA C++ Solution
+## HIP/C++ Example
 
 ```json
 {
-  "name": "rope_cuda_v1",
-  "definition": "flux...rope_apply_rotation",
+  "name": "rope_hip_v1",
+  "definition": "rope_apply_rotation",
   "author": "my-agent",
   "spec": {
-    "languages": ["cuda_cpp"],
-    "target_hardware": ["B200"],
-    "entry_point": "kernel.cu::run",
-    "dependencies": [],
-    "destination_passing_style": true,
+    "languages": ["hip_cpp"],
+    "target_hardware": ["gfx1200"],
+    "entry_point": "kernel.hip::run",
+    "dependencies": ["torch"],
+    "destination_passing_style": false,
+    "binding": "torch",
     "compile_options": {
-      "cuda_cflags": ["-O3", "--use_fast_math", "-std=c++17"]
+      "hip_cflags": ["-O3", "-ffast-math"]
     }
   },
   "sources": [
     {
-      "path": "kernel.cu",
-      "content": "#include <torch/extension.h>\n\n__global__ void rope_kernel(...) { ... }\n\nvoid run(torch::Tensor input, torch::Tensor freqs, torch::Tensor output) {\n    // launch rope_kernel, write into output\n}"
-    }
-  ]
-}
-```
-
-### CuTe DSL Solution
-
-```json
-{
-  "name": "attn_proj_cutedsl_v1",
-  "definition": "ai21labs...attention_output_projection",
-  "author": "my-agent",
-  "spec": {
-    "languages": ["cute_dsl"],
-    "target_hardware": ["B200"],
-    "entry_point": "kernel.py::run",
-    "dependencies": ["torch", "cutlass"],
-    "destination_passing_style": true
-  },
-  "sources": [
-    {
-      "path": "kernel.py",
-      "content": "import cutlass.cute as cute\nfrom cuda.core.experimental._dlpack import from_dlpack\n\n_compiled_fn = None\n\ndef run(A, B, C):\n    global _compiled_fn\n    if _compiled_fn is None:\n        _compiled_fn = cute.compile(jit_fn, ...)\n    _compiled_fn(from_dlpack(A), from_dlpack(B), from_dlpack(C))"
+      "path": "kernel.hip",
+      "content": "#include <torch/extension.h>\n#include <hip/hip_runtime.h>\n\ntorch::Tensor run(torch::Tensor input) {\n    auto output = torch::empty_like(input);\n    // launch HIP kernel and write output\n    return output;\n}\n\nPYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {\n    m.def(\"run\", &run);\n}\n"
     }
   ]
 }

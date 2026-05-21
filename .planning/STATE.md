@@ -2,31 +2,31 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 06
-status: phase_06_ready
-last_updated: 2026-05-21T23:35:00.000Z
+current_phase: complete
+status: milestone_complete_with_cdna3_deferred
+last_updated: 2026-05-21T23:55:00.000Z
 progress:
   total_phases: 6
-  completed_phases: 5
-  total_plans: 18
-  completed_plans: 18
-  percent: 83
-stopped_at: Phase 05 complete for current milestone; CDNA3 TEST-05 deferred by user decision
+  completed_phases: 6
+  total_plans: 21
+  completed_plans: 21
+  percent: 100
+stopped_at: Milestone complete; CDNA3 TEST-05 deferred to later milestone
 ---
 
 # Project State
 
 **Project:** SOL ExecBench ROCm Port
 **Initialized:** 2026-05-21
-**Current phase:** 6
-**Status:** Phase 6 ready; CDNA3 validation deferred to later milestone
+**Current phase:** complete
+**Status:** Milestone complete; CDNA3 validation deferred to later milestone
 
 ## Project Reference
 
 See: `.planning/PROJECT.md` (updated 2026-05-21)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Phase 6 — documentation, analysis workflow, and compliance
+**Current focus:** Milestone closure
 
 ## Workflow Settings
 
@@ -59,6 +59,6 @@ See: `.planning/ROADMAP.md`
 
 ## Next Action
 
-Plan and execute Phase 6 documentation, analysis workflow, and compliance work.
-Track CDNA 3 TEST-05 as a deferred hardware validation follow-up before making
-CDNA 3 support claims.
+Optional next step: run milestone audit and archive/cleanup workflow. Track
+CDNA 3 TEST-05 as a deferred hardware validation follow-up before making CDNA 3
+support claims.
