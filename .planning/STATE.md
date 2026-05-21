@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 current_phase: 05
-status: ready_to_plan
-last_updated: 2026-05-21T13:49:01.790Z
+status: blocked_pending_hardware
+last_updated: 2026-05-21T14:35:00.000Z
 progress:
   total_phases: 6
   completed_phases: 4
-  total_plans: 15
-  completed_plans: 15
-  percent: 67
-stopped_at: Phase 04 complete (3/3) — ready to discuss Phase 5
+  total_plans: 18
+  completed_plans: 17
+  percent: 72
+stopped_at: Phase 05 local validation complete; full RDNA4/CDNA3 suite evidence pending
 ---
 
 # Project State
@@ -19,7 +19,7 @@ stopped_at: Phase 04 complete (3/3) — ready to discuss Phase 5
 **Project:** SOL ExecBench ROCm Port
 **Initialized:** 2026-05-21
 **Current phase:** 5
-**Status:** Ready to plan
+**Status:** Blocked pending hardware validation
 
 ## Project Reference
 
@@ -59,5 +59,6 @@ See: `.planning/ROADMAP.md`
 
 ## Next Action
 
-Run `$gsd-discuss-phase 5` to clarify Phase 5 implementation approach, or
-`$gsd-plan-phase 5` to plan directly.
+Run the adapted suite in PyTorch ROCm environments on RDNA 4 and CDNA 3, then
+update `.planning/phases/05-rocm-test-suite-and-hardware-validation/05-HARDWARE-MATRIX.md`
+and re-run Phase 5 verification.
