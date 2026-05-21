@@ -8,7 +8,7 @@ source:
   - .planning/phases/01-rocm-environment-baseline/01-04-SUMMARY.md
   - .planning/phases/01-rocm-environment-baseline/01-VERIFICATION.md
 started: 2026-05-21T07:13:44Z
-updated: 2026-05-21T07:19:28Z
+updated: 2026-05-21T07:38:00Z
 ---
 
 ## Current Test
@@ -20,8 +20,8 @@ updated: 2026-05-21T07:19:28Z
 ### 1. Docker ROCm Image Build
 expected: Running `./scripts/run_docker.sh --build -- pytest tests/docker/dependencies -n 0` starts from the ROCm base image `rocm/dev-ubuntu-24.04:7.1.1-complete` and completes the Docker image build without CUDA/NVIDIA base image dependencies.
 result: blocked
-blocked_by: docker-buildkit
-reason: "`./scripts/run_docker.sh --build -- pytest tests/docker/dependencies -n 0` connected to Docker after approval and downloaded/extracted the `rocm/dev-ubuntu-24.04:7.1.1-complete` base layer, then failed at Dockerfile line 14 with `failed to compute cache key: parent snapshot sha256:b2f263ae11456dc18a5073930f82c8dcc3e7c860bd3fb580711280c473714ffc does not exist: not found`. `docker system df` reports 13.28GB of inactive Build Cache. This blocks container build validation before runtime tests can run."
+blocked_by: docker-storage
+reason: "`./scripts/run_docker.sh --build -- pytest tests/docker/dependencies -n 0` connected to Docker after approval. The first attempt failed with a BuildKit parent snapshot error; after `docker builder prune -f` reclaimed 13.28GB, the retry passed the ROCm base/tooling layer (`hipcc --version`, `rocminfo`, `rocprofv3`, and `amd-smi` were found). The build then failed at Dockerfile line 75 during `uv sync --frozen --no-install-project --all-groups`: uv could not extract `torch==2.10.0+rocm7.1` because creating a hipBLASLt Tensile library file failed with `No space left on device (os error 28)`. Container runtime and pytest validation cannot run until Docker storage is expanded or more space is reclaimed."
 
 ### 2. AMD Device Visibility
 expected: Inside the built container, ROCm sees AMD GPU device access through `/dev/kfd` and `/dev/dri`, and startup output reports ROCm/HIP availability instead of CUDA-only device messaging.
