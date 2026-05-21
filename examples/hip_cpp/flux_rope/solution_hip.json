@@ -8,6 +8,7 @@
     ],
     "target_hardware": [
       "gfx1200",
+      "gfx942",
       "LOCAL"
     ],
     "entry_point": "kernel.hip::run",

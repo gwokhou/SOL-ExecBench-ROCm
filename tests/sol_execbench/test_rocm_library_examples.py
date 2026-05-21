@@ -38,7 +38,7 @@ LEGACY_LANGUAGES = {
 
 REPLACEMENT_DOC = (
     REPO_ROOT
-    / ".planning/phases/04-rocm-library-and-example-migration/04-REPLACEMENTS.md"
+    / ".planning/milestones/v1.0-phases/04-rocm-library-and-example-migration/04-REPLACEMENTS.md"
 )
 
 
@@ -101,6 +101,33 @@ def test_no_legacy_cuda_source_files_remain_in_public_examples():
     assert not cu_files, "Legacy .cu files remain:\n" + "\n".join(
         str(path.relative_to(REPO_ROOT)) for path in cu_files
     )
+
+
+def test_public_native_examples_use_hip_cpp_paths_and_filenames():
+    public_paths = {str(path.relative_to(REPO_ROOT)) for path in EXAMPLE_SOLUTION_FILES}
+
+    assert "examples/hip_cpp/rmsnorm/solution_hip.json" in public_paths
+    assert "examples/hip_cpp/flux_rope/solution_hip.json" in public_paths
+    assert not any(path.startswith("examples/cuda_cpp/") for path in public_paths)
+    assert not any(path.endswith("/solution_cuda.json") for path in public_paths)
+
+
+def test_portable_public_examples_include_cdna3_metadata():
+    portable_examples = [
+        "examples/pytorch/gemma3_swiglu/solution_python.json",
+        "examples/pytorch/linear_backward/solution_python.json",
+        "examples/triton/olmo3_post_norm/solution_triton.json",
+        "examples/triton/nemotron_rms_norm/solution_triton.json",
+        "examples/hip_cpp/flux_rope/solution_hip.json",
+        "examples/cutlass/gemm/solution_cutlass.json",
+        "examples/cudnn/softmax/solution_cudnn.json",
+        "examples/cute_dsl/jamba_attn_proj/solution_cute_dsl.json",
+        "examples/cutile/jamba_attn_proj/solution_cutile.json",
+    ]
+
+    for relative_path in portable_examples:
+        data = _load_solution(REPO_ROOT / relative_path)
+        assert "gfx942" in data["spec"]["target_hardware"], relative_path
 
 
 def test_replacement_decisions_cover_named_rocm_libraries():

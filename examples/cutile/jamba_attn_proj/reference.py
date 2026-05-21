@@ -14,7 +14,7 @@ def run(
     1. Linear projection: attn_output @ o_proj_weight.T
     2. Residual addition: projected + residual
     
-    In a custom CUDA kernel, these operations would be fused to:
+    In a custom GPU kernel, these operations would be fused to:
     - Compute matmul tiles in registers
     - Add residual directly to register-held results
     - Write final result to global memory (eliminating intermediate write)

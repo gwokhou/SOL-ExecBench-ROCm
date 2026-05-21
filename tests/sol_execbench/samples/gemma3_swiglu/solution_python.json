@@ -4,7 +4,7 @@
   "author": "test",
   "spec": {
     "languages": ["pytorch"],
-    "target_hardware": ["gfx1200", "LOCAL"],
+    "target_hardware": ["gfx1200", "gfx942", "LOCAL"],
     "entry_point": "kernel.py::run",
     "dependencies": ["torch"],
     "destination_passing_style": false

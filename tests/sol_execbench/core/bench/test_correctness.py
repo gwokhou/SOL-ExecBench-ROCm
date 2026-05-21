@@ -470,7 +470,7 @@ class TestComputeErrorStats:
         assert exceeds
 
     # ------------------------------------------------------------------
-    # max_error_cap (cuDNN pattern)
+        # max_error_cap for library-style kernels
     # ------------------------------------------------------------------
 
     def test_max_error_cap_no_cap(self):
