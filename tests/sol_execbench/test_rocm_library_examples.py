@@ -13,11 +13,15 @@ from sol_execbench.core.data import Solution
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-EXAMPLE_SOLUTION_FILES = tuple(sorted((REPO_ROOT / "examples").glob("*/*/solution*.json")))
+EXAMPLE_SOLUTION_FILES = tuple(
+    sorted((REPO_ROOT / "examples").glob("*/*/solution*.json"))
+)
 SAMPLE_SOLUTION_FILES = tuple(
     sorted(
         path
-        for path in (REPO_ROOT / "tests/sol_execbench/samples").glob("*/*solution*.json")
+        for path in (REPO_ROOT / "tests/sol_execbench/samples").glob(
+            "*/*solution*.json"
+        )
         if path.name.startswith("solution_")
     )
 )
@@ -73,7 +77,9 @@ def test_phase_4_solution_metadata_uses_rocm_schema_values():
         if str(spec.get("entry_point", "")).split("::", 1)[0].endswith(".cu"):
             failures.append(f"{path.relative_to(REPO_ROOT)} still has .cu entry point")
         if any(source_path.endswith(".cu") for source_path in source_paths):
-            failures.append(f"{path.relative_to(REPO_ROOT)} still embeds .cu source path")
+            failures.append(
+                f"{path.relative_to(REPO_ROOT)} still embeds .cu source path"
+            )
     assert not failures, "Legacy schema residue found:\n" + "\n".join(failures)
 
 
