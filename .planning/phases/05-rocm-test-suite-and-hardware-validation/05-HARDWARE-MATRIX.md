@@ -29,7 +29,7 @@ Initial local tool visibility:
 | Target | Architecture Match | Suite Status | Evidence |
 |--------|--------------------|--------------|----------|
 | RDNA 4 | `gfx12*` such as `gfx1200` | Full local pass | PyTorch ROCm sees `AMD Radeon Graphics` / `gfx1200`; full local adapted suite passed with `462 passed, 58 skipped`. |
-| CDNA 3 | `gfx94*` such as `gfx942` | Pending | No full adapted suite run recorded yet in this phase. |
+| CDNA 3 | `gfx94*` such as `gfx942` | Deferred | No full adapted suite run recorded in this milestone; deferred by project decision on 2026-05-21. |
 
 ## Local Test Commands
 
@@ -50,10 +50,11 @@ Initial local tool visibility:
 - `uv run --no-sync pytest tests/`
   - Result on RDNA 4 `gfx1200`: 462 passed, 58 skipped
 
-## Hardware Evidence Required Before Completion Claims
+## Deferred Hardware Evidence
 
 - RDNA 4 pass evidence has been collected on local `gfx1200`.
 - CDNA 3 pass evidence requires running the adapted suite in a PyTorch ROCm
   environment on `gfx94*`.
 - The current local machine now has PyTorch ROCm visibility for `gfx1200`.
-- TEST-05 remains pending until the adapted suite runs on CDNA 3.
+- TEST-05 is deferred to a later milestone. Do not claim CDNA 3 support until
+  that run is recorded.

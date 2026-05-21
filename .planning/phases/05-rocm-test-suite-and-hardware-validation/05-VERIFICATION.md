@@ -1,6 +1,6 @@
 ---
 phase: 05-rocm-test-suite-and-hardware-validation
-status: rdna4_full_pass_pending_cdna3
+status: completed_with_cdna3_deferred
 verified_at: 2026-05-21
 ---
 
@@ -8,11 +8,12 @@ verified_at: 2026-05-21
 
 ## Result
 
-RDNA4 VALIDATION PASSED; CDNA3 PENDING.
+PASSED FOR CURRENT MILESTONE; CDNA3 DEFERRED.
 
 The local environment has been switched to PyTorch ROCm and the full adapted
-test suite passes on the visible RDNA 4 `gfx1200` GPU. The phase cannot be
-marked fully complete because no CDNA 3 run was recorded.
+test suite passes on the visible RDNA 4 `gfx1200` GPU. No CDNA 3 run was
+recorded on this machine, so TEST-05 is explicitly deferred to a later
+milestone by project decision on 2026-05-21.
 
 ## Requirement Coverage
 
@@ -22,7 +23,7 @@ marked fully complete because no CDNA 3 run was recorded.
 | TEST-02 | PASS | `requires_rocm`, `requires_rdna4`, `requires_cdna3`, unsupported AMD architecture, and unavailable ROCm skip paths are implemented in `tests/conftest.py`. |
 | TEST-03 | PASS | Full local adapted suite passed under PyTorch ROCm on RDNA 4: `462 passed, 58 skipped`. |
 | TEST-04 | PASS | PyTorch ROCm sees `AMD Radeon Graphics` / `gfx1200`; full local adapted suite passed. |
-| TEST-05 | PENDING | No CDNA 3 full-suite run was recorded. |
+| TEST-05 | DEFERRED | No CDNA 3 full-suite run was recorded; deferred to a later milestone by project decision on 2026-05-21. |
 | TEST-06 | PASS | Reward-hack tests remain active; focused reward-hack suite passed locally. |
 
 ## Tests
@@ -46,7 +47,8 @@ marked fully complete because no CDNA 3 run was recorded.
 - `/opt/amdgpu/share/libdrm/amdgpu.ids` exists as a symlink to
   `/usr/share/libdrm/amdgpu.ids`; the earlier runtime warning is resolved.
 
-## Residual Risk
+## Deferred Follow-up
 
-Phase 5 should remain open until the full adapted suite is run under PyTorch
-ROCm on CDNA 3, or the project explicitly relaxes TEST-05.
+Run the full adapted suite under PyTorch ROCm on CDNA 3 (`gfx94*`) before
+claiming CDNA 3 hardware support. This is no longer blocking Phase 6 in the
+current milestone.
