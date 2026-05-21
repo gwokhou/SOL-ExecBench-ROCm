@@ -8,7 +8,7 @@ ENV ROCM_PATH=/opt/rocm \
     HIP_PATH=/opt/rocm \
     HIP_PLATFORM=amd \
     PATH=/opt/rocm/bin:/opt/rocm/llvm/bin:${PATH} \
-    LD_LIBRARY_PATH=/opt/rocm/lib:${LD_LIBRARY_PATH}
+    LD_LIBRARY_PATH=/opt/rocm/lib
 
 # System packages (changes infrequently - cache this layer well)
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -26,22 +26,32 @@ ARG HOST_UID=1000
 ARG HOST_GID=1000
 ARG HOST_USER=sol-execbench
 
+ENV HOME=/home/${HOST_USER} \
+    UV_CACHE_DIR=/home/${HOST_USER}/.cache/uv
+
 # Copy uv binary early (changes rarely)
 COPY --from=ghcr.io/astral-sh/uv:0.5.11 /uv /usr/local/bin/uv
 
-# Create user and setup directories
-# Note: Host GID may already exist in base image, so we use -f (force) flag
-# When running as root (UID 0), skip user creation since root already exists
-RUN if [ "${HOST_UID}" != "0" ]; then \
-        groupadd -f -g ${HOST_GID} ${HOST_USER} && \
-        useradd -m -u ${HOST_UID} -g ${HOST_GID} -s /bin/bash ${HOST_USER}; \
+# Create user and setup directories. ROCm base images may already contain UID
+# 1000, so reuse existing users/groups instead of assuming the host IDs are free.
+RUN if [ "${HOST_UID}" = "0" ]; then \
+        RUN_USER=root; \
+    else \
+        RUN_GROUP="$(getent group "${HOST_GID}" | cut -d: -f1 || true)" && \
+        if [ -z "${RUN_GROUP}" ]; then \
+            groupadd -g "${HOST_GID}" "${HOST_USER}" && RUN_GROUP="${HOST_USER}"; \
+        fi && \
+        RUN_USER="$(getent passwd "${HOST_UID}" | cut -d: -f1 || true)" && \
+        if [ -z "${RUN_USER}" ]; then \
+            useradd -m -u "${HOST_UID}" -g "${HOST_GID}" -s /bin/bash "${HOST_USER}" && RUN_USER="${HOST_USER}"; \
+        fi; \
     fi && \
-    mkdir -p /sol-execbench && mkdir -p /venv && \
-    chown -R ${HOST_UID}:${HOST_GID} /sol-execbench /venv && \
+    mkdir -p /sol-execbench /venv /home/${HOST_USER}/.cache/uv && \
+    chown -R ${HOST_UID}:${HOST_GID} /sol-execbench /venv /home/${HOST_USER} && \
     if command -v amd-smi >/dev/null 2>&1; then \
-        echo "${HOST_USER} ALL=(ALL) NOPASSWD: $(command -v amd-smi)" >> /etc/sudoers; \
+        echo "${RUN_USER} ALL=(ALL) NOPASSWD: $(command -v amd-smi)" >> /etc/sudoers; \
     elif command -v rocm-smi >/dev/null 2>&1; then \
-        echo "${HOST_USER} ALL=(ALL) NOPASSWD: $(command -v rocm-smi)" >> /etc/sudoers; \
+        echo "${RUN_USER} ALL=(ALL) NOPASSWD: $(command -v rocm-smi)" >> /etc/sudoers; \
     fi
 
 # Copy and set up entrypoint while still root (avoid switching back)
