@@ -208,13 +208,14 @@ if "::" in _entry_point:
 else:
     _entry_module_or_file, _entry_func_name = _entry_point, "run"
 
-_CPP_LANGUAGES = {
-    SupportedLanguages.CUDA_CPP,
-    SupportedLanguages.CUTLASS,
-    SupportedLanguages.CUDNN,
-    SupportedLanguages.CUBLAS,
+_NATIVE_ROCM_LANGUAGES = {
+    SupportedLanguages.HIP_CPP,
+    SupportedLanguages.HIPBLAS,
+    SupportedLanguages.MIOPEN,
+    SupportedLanguages.CK,
+    SupportedLanguages.ROCWMMA,
 }
-if any(lang in _CPP_LANGUAGES for lang in _solution.spec.languages):
+if any(lang in _NATIVE_ROCM_LANGUAGES for lang in _solution.spec.languages):
     _so_path = STAGING_DIR / "benchmark_kernel.so"
     if not _so_path.exists():
         raise RuntimeError(f"benchmark_kernel.so not found at {_so_path}")
@@ -224,14 +225,14 @@ if any(lang in _CPP_LANGUAGES for lang in _solution.spec.languages):
     user_fn = getattr(_user_mod, _entry_func_name)
 else:
     # Block torch.utils.cpp_extension.load/load_inline on the GPU server.
-    # CUDA/C++ compilation must go through Phase 1 on the compile server
-    # (use a C++ language like "cuda_cpp" in the solution spec).
+    # HIP/C++ compilation must go through the compile server
+    # (use a native language like "hip_cpp" in the solution spec).
     import torch.utils.cpp_extension as _cpp_ext
 
     def _blocked_cpp_ext_load(*args, **kwargs):
         raise RuntimeError(
             "torch.utils.cpp_extension.load() and load_inline() are not permitted "
-            'on the GPU server. Use a C++ language (e.g. "cuda_cpp") in your '
+            'on the GPU server. Use a native HIP language (e.g. "hip_cpp") in your '
             "solution spec to compile on the compile server."
         )
 
