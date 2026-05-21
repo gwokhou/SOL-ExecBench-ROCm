@@ -18,6 +18,14 @@ migrate examples, validate hardware, and finish documentation/compliance.
 
 **Requirements:** ENV-01, ENV-02, ENV-03, ENV-04, SCFG-03
 
+**Plans:** 4 plans
+
+Plans:
+- [ ] 01-01-PLAN.md - Replace Dockerfile, Docker run flags, and entrypoint with ROCm baseline behavior.
+- [ ] 01-02-PLAN.md - Replace CUDA/NVIDIA Python dependency sources with ROCm wheel sources and refreshed lock data.
+- [ ] 01-03-PLAN.md - Add ROCm dependency smoke tests for ROCm runtime, HIP, PyTorch, Triton, and selected ROCm libraries.
+- [ ] 01-04-PLAN.md - Remove superseded CUDA/NVIDIA Docker dependency smoke tests after ROCm replacements exist.
+
 **Success Criteria:**
 1. Docker image builds from a ROCm base and no longer depends on `nvidia/cuda`.
 2. Container verifies ROCm runtime, HIP compiler, PyTorch ROCm, Triton ROCm, and selected ROCm libraries.
