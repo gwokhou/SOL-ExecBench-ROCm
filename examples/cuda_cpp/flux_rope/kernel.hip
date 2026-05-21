@@ -1,5 +1,5 @@
 #include <torch/extension.h>
-#include <hip/hip_bfloat16.h>
+#include <hip/hip_bf16.h>
 #include <c10/cuda/CUDAGuard.h>
 
 __global__ void rope_kernel(

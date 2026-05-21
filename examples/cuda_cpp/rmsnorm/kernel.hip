@@ -1,6 +1,6 @@
 #include "kernel.h"
 #include <hip/hip_runtime.h>
-#include <hip/hip_bfloat16.h>
+#include <hip/hip_bf16.h>
 #include <stdexcept>
 #include <string>
 
@@ -15,7 +15,7 @@
  */
 __device__ inline float warp_reduce_sum(float val) {
     for (int offset = 16; offset > 0; offset /= 2) {
-        val += __shfl_down_sync(0xFFFFFFFF, val, offset);
+        val += __shfl_down_sync(0xFFFFFFFFFFFFFFFFULL, val, offset);
     }
     return val;
 }
@@ -23,7 +23,7 @@ __device__ inline float warp_reduce_sum(float val) {
 /**
  * @brief HIP kernel for RMS Normalization, optimized for hidden_size=4096.
  *
- * This kernel is specifically tailored for the B200 architecture by using:
+ * This kernel is specifically tailored for the gfx1200 architecture by using:
  * - __hip_bfloat162 for vectorized memory access, doubling memory throughput.
  * - A large block size (1024 threads) to maximize parallelism.
  * - A two-stage reduction: a fast, parallel reduction in shared memory followed
@@ -71,7 +71,7 @@ __global__ void __launch_bounds__(1024, 1) rmsnorm_h4096_kernel(
     float thread_sum_sq = 0.0f;
     for (int i = 0; i < items_per_thread; ++i) {
         int col_idx = thread_idx + i * blockDim.x;
-        __hip_bfloat162 h_vec = __ldg(hidden_states_vec + col_idx); // Use L1 cache streaming
+        __hip_bfloat162 h_vec = hidden_states_vec[col_idx];
         float2 h_f2 = __bfloat1622float2(h_vec);
         thread_sum_sq += h_f2.x * h_f2.x + h_f2.y * h_f2.y;
     }
@@ -114,8 +114,8 @@ __global__ void __launch_bounds__(1024, 1) rmsnorm_h4096_kernel(
     // --- Step 4: Apply normalization and scaling ---
     for (int i = 0; i < items_per_thread; ++i) {
         int col_idx = thread_idx + i * blockDim.x;
-        __hip_bfloat162 h_vec = __ldg(hidden_states_vec + col_idx);
-        __hip_bfloat162 w_vec = __ldg(weight_vec + col_idx);
+        __hip_bfloat162 h_vec = hidden_states_vec[col_idx];
+        __hip_bfloat162 w_vec = weight_vec[col_idx];
 
         float2 h_f2 = __bfloat1622float2(h_vec);
         float2 w_f2 = __bfloat1622float2(w_vec);
