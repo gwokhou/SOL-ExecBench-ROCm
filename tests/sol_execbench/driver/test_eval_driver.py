@@ -115,7 +115,7 @@ def _run_eval_driver(
         tmp_path: Temporary directory to use as the staging directory.
         kernel_code: Python source to write to kernel.py.
         bench_config: BenchmarkConfig overrides to write to config.json.
-            Defaults to ``{"lock_clocks": False}`` to suppress nvidia-smi
+            Defaults to ``{"lock_clocks": False}`` to suppress ROCm clock-lock
             warnings on machines where clock locking is not available.
         extra_env: Additional environment variables for the subprocess.
         definition: Problem definition dict. Defaults to ``_MINIMAL_DEFINITION``.
@@ -131,7 +131,7 @@ def _run_eval_driver(
     (tmp_path / "solution.json").write_text(json.dumps(_SOLUTION_SPEC))
     (tmp_path / "kernel.py").write_text(kernel_code)
 
-    # Default config: disable clock-locking (no nvidia-smi).
+    # Default config: disable clock-locking for machines without ROCm clock access.
     cfg = (
         bench_config
         if bench_config is not None
