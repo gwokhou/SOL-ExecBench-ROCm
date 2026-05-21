@@ -26,6 +26,7 @@ def _make_spec(**overrides):
 
 PYTHON_LANGUAGES = ["pytorch", "triton"]
 NATIVE_LANGUAGES = ["hip_cpp", "hipblas", "miopen", "ck", "rocwmma"]
+CDNA3_TARGETS = ["gfx940", "gfx941", "gfx942"]
 LEGACY_LANGUAGE_REPLACEMENTS = [
     ("cuda_cpp", "hip_cpp"),
     ("cutlass", "ck or rocwmma"),
@@ -134,19 +135,27 @@ class TestEntryPointSuffixValidation:
 class TestHardwareAndCompileOptions:
     """ROCm hardware targets and compile options are strict and HIP-named."""
 
-    def test_supported_hardware_contains_local_and_gfx1200_only(self):
+    def test_supported_hardware_contains_rdna4_cdna3_and_local(self):
         assert SupportedHardware.LOCAL.value == "LOCAL"
         assert SupportedHardware.GFX1200.value == "gfx1200"
+        assert SupportedHardware.GFX940.value == "gfx940"
+        assert SupportedHardware.GFX941.value == "gfx941"
+        assert SupportedHardware.GFX942.value == "gfx942"
         assert not hasattr(SupportedHardware, "B200")
 
-    @pytest.mark.parametrize("target", ["LOCAL", "gfx1200"])
+    @pytest.mark.parametrize("target", ["LOCAL", "gfx1200", *CDNA3_TARGETS])
     def test_rocm_hardware_targets_accepted(self, target):
         spec = _make_spec(target_hardware=[target])
         assert spec.target_hardware == [SupportedHardware(target)]
 
     def test_unknown_gfx_target_rejected(self):
-        with pytest.raises(ValidationError, match="gfx942"):
-            _make_spec(target_hardware=["gfx942"])
+        with pytest.raises(ValidationError, match="gfx950"):
+            _make_spec(target_hardware=["gfx950"])
+
+    @pytest.mark.parametrize("target", CDNA3_TARGETS)
+    def test_cdna3_targets_are_schema_supported_not_hardware_validated(self, target):
+        spec = _make_spec(target_hardware=[target])
+        assert spec.target_hardware == [SupportedHardware(target)]
 
     def test_compile_options_defaults_are_hip_minimal(self):
         opts = CompileOptions()

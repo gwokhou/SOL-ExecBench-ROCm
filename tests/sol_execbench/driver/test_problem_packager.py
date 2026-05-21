@@ -211,6 +211,41 @@ class TestCompile:
         hip_cflags = sol["spec"]["compile_options"]["hip_cflags"]
         assert hip_cflags == ["--offload-arch=gfx1200"]
 
+    @pytest.mark.parametrize("target", ["gfx940", "gfx941", "gfx942"])
+    def test_offload_arch_injected_for_cdna3_targets(
+        self, tmp_path, definition, workloads, config, target
+    ):
+        sol_dict = {
+            **_HIP_SOLUTION_DICT,
+            "spec": {
+                **_HIP_SOLUTION_DICT["spec"],
+                "target_hardware": [target],
+            },
+        }
+        solution = Solution(**sol_dict)
+        pkg = _make_packager(tmp_path, definition, workloads, solution, config)
+        pkg.compile()
+        sol = json.loads((pkg.output_dir / "solution.json").read_text())
+        hip_cflags = sol["spec"]["compile_options"]["hip_cflags"]
+        assert hip_cflags == [f"--offload-arch={target}"]
+
+    def test_offload_arch_injected_for_multiple_explicit_amd_targets(
+        self, tmp_path, definition, workloads, config
+    ):
+        sol_dict = {
+            **_HIP_SOLUTION_DICT,
+            "spec": {
+                **_HIP_SOLUTION_DICT["spec"],
+                "target_hardware": ["gfx1200", "gfx942"],
+            },
+        }
+        solution = Solution(**sol_dict)
+        pkg = _make_packager(tmp_path, definition, workloads, solution, config)
+        pkg.compile()
+        sol = json.loads((pkg.output_dir / "solution.json").read_text())
+        hip_cflags = sol["spec"]["compile_options"]["hip_cflags"]
+        assert hip_cflags == ["--offload-arch=gfx1200", "--offload-arch=gfx942"]
+
     def test_offload_arch_not_duplicated_when_explicit(
         self, tmp_path, definition, workloads, config
     ):

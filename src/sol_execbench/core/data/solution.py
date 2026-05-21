@@ -58,6 +58,12 @@ class SupportedHardware(str, Enum):
 
     GFX1200 = "gfx1200"
     """AMD gfx1200."""
+    GFX940 = "gfx940"
+    """AMD CDNA 3 gfx940."""
+    GFX941 = "gfx941"
+    """AMD CDNA 3 gfx941."""
+    GFX942 = "gfx942"
+    """AMD CDNA 3 gfx942."""
     LOCAL = "LOCAL"
     """Local AMD GPU."""
 
@@ -133,7 +139,7 @@ class BuildSpec(BaseModelWithDocstrings):
     languages: list[SupportedLanguages]
     """The list of programming languages used to implement the solution. C++ languages and Python languages cannot be mixed."""
     target_hardware: list[SupportedHardware] = Field(min_length=1)
-    """List of hardware this solution is compatible with (e.g., gfx1200, LOCAL)."""
+    """List of hardware this solution is compatible with (e.g., gfx1200, gfx942, LOCAL)."""
     entry_point: NonEmptyString
     """The exact path to the function to be called. Format: '{file_path}::{function_name}'
     (e.g., 'main.py::run')."""

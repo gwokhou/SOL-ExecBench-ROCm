@@ -8,10 +8,10 @@
 
 ### CDNA 3 Schema and Build Support
 
-- [ ] **CDNA-01**: Developer can declare CDNA 3 `gfx94*` solution targets in `solution.json` without schema rejection.
-- [ ] **CDNA-02**: HIP/C++ packaging injects the correct ROCm offload architecture flags for explicit CDNA 3 targets.
-- [ ] **CDNA-03**: Local hardware detection and test marker logic consistently treat `gfx94*` as CDNA 3.
-- [ ] **CDNA-04**: CDNA 3 support is represented as code/schema support, not as hardware-validation evidence.
+- [x] **CDNA-01**: Developer can declare CDNA 3 `gfx94*` solution targets in `solution.json` without schema rejection.
+- [x] **CDNA-02**: HIP/C++ packaging injects the correct ROCm offload architecture flags for explicit CDNA 3 targets.
+- [x] **CDNA-03**: Local hardware detection and test marker logic consistently treat `gfx94*` as CDNA 3.
+- [x] **CDNA-04**: CDNA 3 support is represented as code/schema support, not as hardware-validation evidence.
 
 ### Migration Residue Audit
 
@@ -57,10 +57,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CDNA-01 | Phase 7 | Pending |
-| CDNA-02 | Phase 7 | Pending |
-| CDNA-03 | Phase 7 | Pending |
-| CDNA-04 | Phase 7 | Pending |
+| CDNA-01 | Phase 7 | Complete |
+| CDNA-02 | Phase 7 | Complete |
+| CDNA-03 | Phase 7 | Complete |
+| CDNA-04 | Phase 7 | Complete |
 | AUDIT-01 | Phase 8 | Pending |
 | AUDIT-02 | Phase 8 | Pending |
 | AUDIT-03 | Phase 8 | Pending |

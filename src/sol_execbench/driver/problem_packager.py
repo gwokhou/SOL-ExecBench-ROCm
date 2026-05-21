@@ -143,8 +143,10 @@ class ProblemPackager:
         offload_arches: list[str] = []
         target_hw = set(spec.get("target_hardware", []))
 
-        if SupportedHardware.GFX1200.value in target_hw:
-            offload_arches.append(SupportedHardware.GFX1200.value)
+        for hardware in SupportedHardware:
+            value = hardware.value
+            if value != SupportedHardware.LOCAL.value and value in target_hw:
+                offload_arches.append(value)
 
         if SupportedHardware.LOCAL.value in target_hw:
             local_gfx = _get_local_gfx()
