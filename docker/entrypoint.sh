@@ -8,50 +8,58 @@ set -e
 # ---------------------------------------------------------------------------
 
 lock_clocks() {
-    if python -c "
-import logging, torch
+    local status
+    status="$(python - <<'ROCPY'
+import logging
+import torch
+
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 from sol_execbench.core.bench.clock_lock import lock_clocks
+
+hip_version = torch.version.hip
+if hip_version:
+    print(f'Detected HIP backend: {hip_version}')
+else:
+    print('WARNING: PyTorch HIP backend not detected')
+
 device = torch.cuda.get_device_name(0) if torch.cuda.is_available() else ''
 if not device:
-    raise SystemExit('No CUDA device detected')
+    print('WARNING: No ROCm GPU detected — continuing without clock lock')
+    print('CLOCKS_LOCKED=0')
+    raise SystemExit(0)
+
 print(f'Detected GPU: {device}')
 if not lock_clocks(device):
-    raise SystemExit(1)
-"; then
+    print('WARNING: Clock locking unavailable — continuing unlocked')
+    print('CLOCKS_LOCKED=0')
+    raise SystemExit(0)
+
+print('CLOCKS_LOCKED=1')
+ROCPY
+)"
+    if echo "$status" | grep -q 'CLOCKS_LOCKED=1'; then
         export SOL_EXECBENCH_CLOCKS_LOCKED=1
     else
-        echo "WARNING: Clock locking failed — proceeding unlocked"
         export SOL_EXECBENCH_CLOCKS_LOCKED=0
     fi
+    printf '%s\n' "$status"
 }
 
 cleanup() {
     if [ "${SOL_EXECBENCH_CLOCKS_LOCKED}" = "1" ]; then
-        python -c "
+        python -c '
 from sol_execbench.core.bench.clock_lock import unlock_clocks
-print('Unlocking clocks...')
+print("Unlocking clocks...")
 unlock_clocks()
-print('Clocks unlocked')
-"
+print("Clocks unlocked")
+'
     fi
 }
 
 # check if flashinfer-trace directory is mounted
 if [ ! -d "${FLASHINFER_TRACE_DIR}" ]; then
-    echo "ERROR: FLASHINFER_TRACE_DIR is not mounted"
-    echo "       Mount the flashinfer-trace directory into the container and set the env var."
-    echo "       The easiest way is to use the helper script:"
-    echo ""
-    echo "         ./scripts/run_docker.sh -- <command>"
-    echo ""
-    echo "       Or manually:"
-    echo ""
-    echo "         docker run \\"
-    echo "           -v /path/to/flashinfer-trace:/sol-execbench/data/flashinfer-trace \\"
-    echo "           -e FLASHINFER_TRACE_DIR=/sol-execbench/data/flashinfer-trace \\"
-    echo "           sol-execbench:latest <command>"
-    exit 1
+    echo "WARNING: FLASHINFER_TRACE_DIR is not mounted"
+    echo "         Continuing without flashinfer-trace; dependency smoke tests are still allowed."
 fi
 
 lock_clocks
