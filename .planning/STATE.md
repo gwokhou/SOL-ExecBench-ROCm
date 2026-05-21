@@ -1,32 +1,32 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: CDNA 3 Support and Migration Closure
-current_phase: complete
-status: completed
-last_updated: "2026-05-21T16:15:17.738Z"
-last_activity: 2026-05-21 — Milestone v1.1 completed and archived
+milestone: v1.2
+milestone_name: Engineering Practice Harvest and Compatibility Guardrails
+current_phase: 10
+status: planning
+last_updated: "2026-05-22T00:26:11+08:00"
+last_activity: 2026-05-22 — Milestone v1.2 roadmap created
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 3
-  completed_plans: 3
-  percent: 100
+  total_phases: 4
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 **Project:** SOL ExecBench ROCm Port
 **Initialized:** 2026-05-21
-**Current phase:** complete
-**Status:** v1.1 milestone complete
+**Current phase:** Phase 10
+**Status:** v1.2 milestone planning
 
 ## Project Reference
 
 See: `.planning/PROJECT.md` (updated 2026-05-21)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Awaiting next milestone
+**Current focus:** Practice Harvest and Adaptation Map
 
 ## Workflow Settings
 
@@ -43,11 +43,12 @@ See: `.planning/config.json`
 
 See: `.planning/ROADMAP.md`
 
-v1.1 CDNA 3 Support and Migration Closure contains 3 phases:
+v1.2 Engineering Practice Harvest and Compatibility Guardrails contains 4 phases:
 
-- Phase 7: CDNA 3 Schema and Build Surface - complete
-- Phase 8: Migration Residue and Example Closure - complete
-- Phase 9: Support Documentation and Validation Handoff - complete
+- Phase 10: Practice Harvest and Adaptation Map - not started
+- Phase 11: ROCm Diagnostics and Failure Reporting - not started
+- Phase 12: Scoring and Baseline Comparison Review - not started
+- Phase 13: Public Contract Compatibility Guardrails - not started
 
 ## Memory
 
@@ -70,17 +71,16 @@ Items acknowledged and deferred at milestone close on 2026-05-21:
 
 ## Next Action
 
-Start the next milestone with `/gsd-new-milestone`. Recommended focus: run and
-record the CDNA 3 `gfx94*` full-suite validation described in
-`.planning/CDNA3-VALIDATION-HANDOFF.md`.
+Start Phase 10 with `/gsd-discuss-phase 10` to gather implementation context
+for the `hip-execbench` practice harvest and adaptation map.
 
 ## Current Position
 
-Phase: Milestone v1.1 complete
+Phase: Phase 10 — Practice Harvest and Adaptation Map
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-05-21 — Milestone v1.1 completed and archived
+Status: Ready for discussion
+Last activity: 2026-05-22 — Milestone v1.2 roadmap created
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Start Phase 10 with /gsd-discuss-phase 10
