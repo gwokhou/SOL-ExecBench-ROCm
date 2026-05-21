@@ -1,124 +1,105 @@
-# Trace
+# Trace Schema
 
-This document describes the JSON schema for a **Trace**.
+A Trace is an immutable record for one workload evaluation. It links a
+Solution, Definition, concrete Workload, correctness result, performance
+measurement, and ROCm environment snapshot.
 
-A `Trace` is an atomic, immutable record of a **single benchmark run**. It links a specific `Solution` to a specific `Definition`, details the exact `workload` configuration used for the run (i.e., shapes and input data), and records the complete `evaluation` result. The collection of all Trace files forms the database of benchmark results.
+## Top-Level Object
 
-## Table of Contents
-1. [Top-Level Object Structure](#top-level-object-structure)
-2. [workload — Input Shapes and Data](#workload--input-shapes-and-data)
-3. [inputs — Input Descriptor Objects](#inputs--input-descriptor-objects)
-4. [evaluation — Benchmark Statistics Summary](#evaluation--benchmark-statistics-summary)
-5. [correctness — Correctness Summary](#correctness--correctness-summary)
-6. [performance — Performance Summary](#performance--performance-summary)
-7. [environment — Environment Definition Object](#environment-environment-definition-object)
-8. [Nullable Table](#the-correctness-and-performance-nullable-table)
-9. [Example](#example-rmsnorm-trace)
-
----
-
-## JSON Schema Description
-
-### **Top-Level Object Structure**
-
-| **Field** | **Type** | **Required** | **Description** |
+| Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `definition` | string | Yes | The `name` of the `Definition` used in this run. |
-| `solution` | string | No | The `name` of the `Solution` tested in this run. |
-| `workload` | object | Yes | An object describing the specific input configuration for this run.  |
-| `evaluation` | object | No | An object containing the detailed results of this run. |
+| `definition` | string | Yes | Name of the Definition used in this run. |
+| `solution` | string or null | No | Name of the Solution tested. |
+| `workload` | object | Yes | Concrete workload axes and input descriptors. |
+| `evaluation` | object or null | No | Evaluation result. |
 
-### `workload` : Input Shapes and Data
+A workload-only trace has `solution == null` and `evaluation == null`.
 
-This object provides the concrete data required to instantiate a `Definition`. This data includes the variable dimensions of inputs and outputs and, for cases where latency is correlated with the input distribution, the specific input values themselves.
+## Workload
 
-| **Field** | **Type** | **Required** | **Description** |
+The embedded workload object follows [Workload](workload.md). It includes:
+
+- `uuid`
+- concrete `axes`
+- `inputs`
+- optional `tolerance`
+
+## Evaluation
+
+| Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `uuid` | string | Yes | A randomly generate UUID for this workload entry. |
-| `axes` | object | Yes | An object mapping `var` axis names from the `Definition` to their concrete integer values. |
-| `inputs` | object | Yes | An object describing the location and format of the required input tensor data files. |
+| `status` | string | Yes | Final evaluation status. |
+| `log` | string | No | Captured stdout/stderr or diagnostic text. |
+| `correctness` | object or null | Depends on status | Correctness metrics. |
+| `performance` | object or null | Depends on status | Timing metrics. |
+| `environment` | object | Yes | AMD/ROCm hardware and software snapshot. |
+| `timestamp` | string | Yes | ISO-style timestamp. |
 
-### `inputs` : Input Descriptor Objects
+Status values:
 
-This object maps **input names** (e.g., `"A"`, `"weight"`, `"mask"`) to **input descriptors** that explain **where the data comes from** and (when necessary) **how it should be generated or loaded**.
+- `PASSED`
+- `INCORRECT_SHAPE`
+- `INCORRECT_NUMERICAL`
+- `INCORRECT_DTYPE`
+- `RUNTIME_ERROR`
+- `COMPILE_ERROR`
+- `TIMEOUT`
+- `REWARD_HACK`
+- `INVALID_REFERENCE`
 
-Each descriptor **must** contain at least the `type` field. Additional fields become **required or optional** depending on the chosen `type`.
+## Correctness
 
-| **Field** | **Type** | **Required** | **Description** |
-| --- | --- | --- | --- |
-| `type` | string | **Yes** | Data source type. Could be `random`, `scalar`, or `safetensors`. |
-
-Additional fields for type `scalar`:
-| **Field** | **Type** | **Required** | **Description** |
-| --- | --- | --- | --- |
-| `value` | int, float, bool | **Yes** | The concrete value of the input. |
-
-Additional fields for type `safetensors`:
-
-| **Field** | **Type** | **Required** | **Description** |
-| --- | --- | --- | --- |
-| `path` | string | **Yes** | Relative path or URI of the `.safetensors` file. |
-| `tensor_key` | string | **Yes** | The key inside the safetensors container that holds this tensor. |
-
-### `evaluation` : Benchmark Statistics Summary
-
-This object represents a single, complete benchmark result.
-
-| **Field** | **Type** | **Required** | **Description** |
-| --- | --- | --- | --- |
-| `status` | string | Yes | The final status of the evaluation run. Has to be one of the following: `"PASSED"`, `"INCORRECT_SHAPE"`, `"INCORRECT_NUMERICAL"`, `"INCORRECT_DTYPE"`, `"RUNTIME_ERROR"`, `"COMPILE_ERROR"`, `"TIMEOUT"`, `"REWARD_HACK"`, `"INVALID_REFERENCE"`. |
-| `log` | string | No | The embedded record of the stdout and stderr of the evaluation run (default: `""`). |
-| `correctness` | object | Yes | The summarized correctness results across all entries in the dataset. |
-| `performance` | object | Yes | The summarized performance metrics across all entries in the dataset. |
-| `environment` | object | Yes | A snapshot of the hardware and software execution environment. |
-| `timestamp` | string | Yes | The ISO 8601 timestamp of when this summary was generated. |
-
-### `correctness` : Correctness Summary
-
-| **Field** | **Type** | **Required** | **Description** |
-| --- | --- | --- | --- |
-| `max_relative_error` | float | Yes | The maximum relative difference found (0.0 when non-finite values present). |
-| `max_absolute_error` | float | Yes | The maximum absolute difference found (0.0 when non-finite values present). |
-| `has_nan` | bool | No | True when the solution or reference output contains NaN values (default: `false`). |
-| `has_inf` | bool | No | True when the solution or reference output contains Inf values but no NaN (default: `false`). |
-
-### `performance` : Performance Summary
-
-| **Field** | **Type** | **Required** | **Description** |
-| --- | --- | --- | --- |
-| `latency_ms` | float | Yes | The mean latency in milliseconds per execution for this implementation. |
-| `reference_latency_ms` | float | Yes | The mean latency of the `Definition`'s reference code on the same data/hardware. |
-| `speedup_factor` | float | Yes | The calculated speedup (`reference_latency_ms / latency_ms`). |
-> Note that it's normal for the speedup factor to be very large since the references are torch only, unoptimized implementations.
-
-### **`environment`: Environment Definition Object**
-
-The `environment` object specifies the exact execution environment for this benchmark run.
-
-| **Field** | **Type** | **Required** | **Description** |
-| --- | --- | --- | --- |
-| `hardware` | string | Yes | The name of the hardware, e.g., `"NVIDIA_H100"`. |
-| `libs` | object | Yes | A snapshot of the relevant software libraries and their versions. Keys are library names, and values are version strings. |
-
-### The `correctness` and `performance` Nullable Table
-The `correctness` and `performance` fields are set to be nullable depending on the `status`.
-| status | correctness | performance |
+| Field | Type | Description |
 | --- | --- | --- |
-| PASSED | Required | Required |
-| INCORRECT_NUMERICAL | Required | **None** |
-| INCORRECT_SHAPE/DTYPE | **None** | **None** |
-| RUNTIME_ERROR | **None** | **None** |
-| COMPILE_ERROR | **None** | **None** |
-| TIMEOUT | **None** | **None** |
-| REWARD_HACK | **None** | **None** |
-| INVALID_REFERENCE | **None** | **None** |
+| `max_relative_error` | float | Maximum relative error. |
+| `max_absolute_error` | float | Maximum absolute error. |
+| `has_nan` | bool | True when solution or reference output contains NaN. |
+| `has_inf` | bool | True when solution or reference output contains Inf but no NaN. |
+| `extra` | object or null | Optional extra metrics. |
 
-### Example: RMSNorm Trace
+When outputs contain non-finite values, max error fields are set to `0.0` and
+`has_nan` or `has_inf` explains the reason.
 
-```python
+## Performance
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `latency_ms` | float | Solution latency in milliseconds. |
+| `reference_latency_ms` | float | PyTorch reference latency on the same hardware. |
+| `speedup_factor` | float | `reference_latency_ms / latency_ms`. |
+
+Timing uses PyTorch's HIP-backed device event API. See [Analysis](analysis.md).
+
+## Environment
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `hardware` | string | AMD GPU/device identifier, such as `AMD Radeon Graphics gfx1200`. |
+| `libs` | object | Library/tool versions, such as `torch`, `hip`, `rocm`, or `triton`. |
+
+PyTorch ROCm still exposes devices through `torch.cuda` compatibility APIs, but
+trace environment data should identify AMD hardware and ROCm/HIP versions.
+
+## Nullable Fields By Status
+
+| Status | `correctness` | `performance` |
+| --- | --- | --- |
+| `PASSED` | Required | Required |
+| `INCORRECT_NUMERICAL` | Required | `null` |
+| `INCORRECT_SHAPE` | `null` | `null` |
+| `INCORRECT_DTYPE` | `null` | `null` |
+| `RUNTIME_ERROR` | `null` | `null` |
+| `COMPILE_ERROR` | `null` | `null` |
+| `TIMEOUT` | `null` | `null` |
+| `REWARD_HACK` | `null` | `null` |
+| `INVALID_REFERENCE` | `null` | `null` |
+
+## Example
+
+```json
 {
   "definition": "rmsnorm",
-  "solution": "rmsnorm_triton_v1",
+  "solution": "rmsnorm_triton_rocm_v1",
   "workload": {
     "uuid": "6120f144-b973-4bd9-b884-77ecb132914e",
     "axes": {
@@ -127,24 +108,25 @@ The `correctness` and `performance` fields are set to be nullable depending on t
     "inputs": {
       "input": {
         "type": "safetensors",
-        "path": "/data/rmsnorm_evals/b32_input.safetensors",
+        "path": "data/rmsnorm/b32_input.safetensors",
         "tensor_key": "input"
       },
       "weight": {
         "type": "safetensors",
-        "path": "/data/rmsnorm_evals/rmsnorm_weight.safetensors",
+        "path": "data/rmsnorm/rmsnorm_weight.safetensors",
         "tensor_key": "weight"
       }
     }
   },
   "evaluation": {
     "status": "PASSED",
-    "log": "...",
+    "log": "",
     "correctness": {
-      "max_relative_error": 1.15e-05,
-      "max_absolute_error": 0.89e-05,
+      "max_relative_error": 0.0000115,
+      "max_absolute_error": 0.0000089,
       "has_nan": false,
-      "has_inf": false
+      "has_inf": false,
+      "extra": null
     },
     "performance": {
       "latency_ms": 0.008,
@@ -152,14 +134,14 @@ The `correctness` and `performance` fields are set to be nullable depending on t
       "speedup_factor": 2.375
     },
     "environment": {
-      "hardware": "NVIDIA_H100",
+      "hardware": "AMD Radeon Graphics gfx1200",
       "libs": {
-        "cuda": "12.6",
-        "torch": "2.6.0",
-        "triton": "2.4.0"
+        "torch": "2.10.0+rocm7.1",
+        "hip": "7.1.25424",
+        "triton": "3.6.0"
       }
     },
-    "timestamp": "2025-06-27T12:45:00Z"
+    "timestamp": "2026-05-21T12:45:00Z"
   }
 }
 ```

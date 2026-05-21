@@ -142,7 +142,8 @@ def fn(axes_and_scalars: dict[str, int], device: torch.device) -> dict[str, torc
     Args:
         axes_and_scalars: All const axis values + scalar inputs from the workload.
                           Keys are axis names (str), values are Python ints.
-        device: The target CUDA device.
+        device: The target GPU device. In this ROCm port, PyTorch still exposes
+                AMD GPUs through the `torch.cuda` compatibility namespace.
     Returns:
         Dict mapping input names (matching Definition.inputs keys) to generated tensors.
         Only needs to return the inputs that are marked 'custom' in the workload.

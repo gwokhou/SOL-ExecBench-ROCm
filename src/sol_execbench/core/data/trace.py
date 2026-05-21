@@ -78,7 +78,7 @@ class Environment(BaseModelWithDocstrings):
     """
 
     hardware: NonEmptyString
-    """Hardware identifier where the evaluation was performed (e.g., 'NVIDIA_H100')."""
+    """AMD hardware identifier where the evaluation was performed (e.g., 'AMD Radeon Graphics gfx1200')."""
     libs: dict[str, str] = Field(default_factory=dict)
     """Dictionary of library names to version strings used during evaluation."""
 
