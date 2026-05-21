@@ -165,6 +165,23 @@ def _run_subprocess(cmd: list[str], cwd: Path) -> subprocess.CompletedProcess:
     )
 
 
+def _missing_safetensors_inputs(sample_dir: Path) -> list[Path]:
+    """Return safetensors paths referenced by workloads but absent locally."""
+    missing: list[Path] = []
+    workload_path = sample_dir / "workload.jsonl"
+    for line in workload_path.read_text().splitlines():
+        if not line.strip():
+            continue
+        workload = json.loads(line)
+        for input_spec in workload.get("inputs", {}).values():
+            if input_spec.get("type") != "safetensors":
+                continue
+            path = Path(input_spec["path"])
+            if not path.exists():
+                missing.append(path)
+    return missing
+
+
 def _mark_case(case: Sample) -> list:
     marks = [pytest.mark.xdist_group("serial")]
     for m in case.extra_markers:
@@ -309,6 +326,13 @@ def test_reward_hack_e2e(tmp_path: Path, case: EvilCase):
 def test_cli_gqa_paged_decode(tmp_path: Path):
     """CLI e2e: run sol-execbench on a GQA paged-decode problem with safetensors inputs."""
     sample_dir = _SAMPLES_DIR / "gqa_paged_decode"
+    missing_inputs = _missing_safetensors_inputs(sample_dir)
+    if missing_inputs:
+        pytest.skip(
+            "GQA paged-decode safetensors inputs are not available locally: "
+            + ", ".join(str(path) for path in missing_inputs[:2])
+        )
+
     output_file = tmp_path / "traces.jsonl"
 
     result = subprocess.run(
