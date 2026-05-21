@@ -17,7 +17,7 @@ Phases 1 through 6, so this milestone starts at Phase 7.
 
 ## Phase Status
 
-- [ ] **Phase 7: CDNA 3 Schema and Build Surface**
+- [x] **Phase 7: CDNA 3 Schema and Build Surface** (completed 2026-05-21)
 - [ ] **Phase 8: Migration Residue and Example Closure**
 - [ ] **Phase 9: Support Documentation and Validation Handoff**
 

@@ -43,6 +43,17 @@ def test_pytest_markers_describe_rocm_hardware_semantics():
         assert phrase not in conftest
 
 
+def test_cdna3_schema_support_is_distinct_from_hardware_validation():
+    solution_schema = _read("src/sol_execbench/core/data/solution.py")
+    requirements = _read(".planning/REQUIREMENTS.md")
+
+    for target in ("gfx940", "gfx941", "gfx942"):
+        assert target in solution_schema
+
+    assert "Real CDNA 3 hardware validation" in requirements
+    assert "deferred" in requirements
+
+
 def test_native_language_groups_are_rocm_only():
     expected = '_CPP_LANGUAGES = {"hip_cpp", "hipblas", "miopen", "ck", "rocwmma"}'
 
@@ -86,4 +97,3 @@ def test_reward_hack_skip_text_uses_rocm_gpu_availability():
 
     assert "ROCm GPU unavailable" in reward_hack_tests
     assert "CUDA not available" not in reward_hack_tests
-
