@@ -60,9 +60,11 @@ tested, and validated on the relevant hardware class.
 
 - CDNA 3 full-suite validation is deferred. Do not claim CDNA 3 support until
   the adapted test suite passes on `gfx94*`.
-- Explicit schema hardware values currently include `gfx1200` and `LOCAL`.
-  Add a CDNA 3 schema value only with matching validation evidence.
+- Explicit schema hardware values include `gfx1200`, `gfx940`, `gfx941`,
+  `gfx942`, and `LOCAL`. The `gfx94*` entries are code/schema support, not
+  hardware-validation evidence.
 - Original SOL-Score references a NVIDIA B200 roofline model. Scores computed
   from that model are not an AMD hardware roofline claim.
-- Some examples remain PyTorch fallbacks for former NVIDIA library/DSL
-  categories until ROCm-native library variants are implemented and validated.
+- Some examples remain PyTorch compatibility examples for former NVIDIA
+  library/DSL categories until ROCm-native library variants are implemented and
+  validated.

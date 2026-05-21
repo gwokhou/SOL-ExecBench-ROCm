@@ -6,7 +6,7 @@ solution, and trace semantics where practical.
 
 This repository is ROCm-only. It does not maintain CUDA/NVIDIA runtime support.
 Legacy NVIDIA-specific solution categories are rejected by the ROCm schema or
-kept only as documented fallback examples.
+kept only as documented compatibility examples.
 
 [HuggingFace Dataset](https://huggingface.co/datasets/nvidia/SOL-ExecBench) |
 [Original Leaderboard](https://research.nvidia.com/benchmarks/sol-execbench) |
@@ -25,9 +25,11 @@ Supported solution categories in this port:
 - HIP/C++
 - ROCm library-oriented native categories: `hipblas`, `miopen`, `ck`, `rocwmma`
 
-Current local validation evidence covers RDNA 4 (`gfx1200`). CDNA 3 validation
-is a deferred hardware follow-up and should not be claimed until a full
-adapted-suite run is recorded on `gfx94*`.
+Current local validation evidence covers RDNA 4 (`gfx1200`). CDNA 3 targets
+(`gfx940`, `gfx941`, `gfx942`) are supported by the solution schema and HIP
+packaging paths, but real CDNA 3 hardware validation is deferred. Do not claim
+CDNA 3 hardware validation until a full adapted-suite run is recorded on
+`gfx94*`.
 
 ## Prerequisites
 
