@@ -1,25 +1,17 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 
-
-"""Tests for sol_execbench.core.data.solution — language and entry point validation."""
+"""Tests for solution schema ROCm language, hardware, and entry point validation."""
 
 import pytest
 from pydantic import ValidationError
 
-from sol_execbench.core.data.solution import BuildSpec, SupportedLanguages
+from sol_execbench.core.data.solution import (
+    BuildSpec,
+    CompileOptions,
+    SupportedHardware,
+    SupportedLanguages,
+)
 
 
 def _make_spec(**overrides):
@@ -32,117 +24,148 @@ def _make_spec(**overrides):
     return BuildSpec(**base)
 
 
-# ── _validate_languages — mixing ─────────────────────────────────────────────
+PYTHON_LANGUAGES = ["pytorch", "triton"]
+NATIVE_LANGUAGES = ["hip_cpp", "hipblas", "miopen", "ck", "rocwmma"]
+LEGACY_LANGUAGE_REPLACEMENTS = [
+    ("cuda_cpp", "hip_cpp"),
+    ("cutlass", "ck or rocwmma"),
+    ("cudnn", "miopen"),
+    ("cudnn_frontend", "miopen"),
+    ("cublas", "hipblas"),
+    ("cute_dsl", "Phase 4"),
+    ("cutile", "Phase 4"),
+]
 
 
-class TestLanguageMixingValidation:
-    """BuildSpec must reject specs that mix C++ and Python languages."""
+class TestLanguageValidation:
+    """BuildSpec accepts only ROCm-native language categories."""
 
-    # -- pure Python sets (should all pass) --
-
-    @pytest.mark.parametrize(
-        "langs",
-        [
-            ["pytorch"],
-            ["triton"],
-            ["cute_dsl"],
-            ["cutile"],
-            ["cudnn_frontend"],
-            ["pytorch", "triton"],
-            ["pytorch", "triton", "cute_dsl", "cutile", "cudnn_frontend"],
-        ],
-    )
+    @pytest.mark.parametrize("langs", [["pytorch"], ["triton"], ["pytorch", "triton"]])
     def test_pure_python_languages_accepted(self, langs):
         spec = _make_spec(languages=langs)
         assert set(spec.languages) == {SupportedLanguages(lg) for lg in langs}
 
-    # -- pure C++ sets (should all pass) --
-
     @pytest.mark.parametrize(
         "langs",
         [
-            ["cuda_cpp"],
-            ["cutlass"],
-            ["cudnn"],
-            ["cublas"],
-            ["cuda_cpp", "cutlass"],
-            ["cuda_cpp", "cutlass", "cudnn", "cublas"],
+            ["hip_cpp"],
+            ["hipblas"],
+            ["miopen"],
+            ["ck"],
+            ["rocwmma"],
+            ["hip_cpp", "hipblas"],
+            ["hip_cpp", "ck", "rocwmma"],
         ],
     )
-    def test_pure_cpp_languages_accepted(self, langs):
-        spec = _make_spec(languages=langs, entry_point="kernel.cu::run")
+    def test_native_rocm_languages_accepted(self, langs):
+        spec = _make_spec(languages=langs, entry_point="kernel.hip::run")
         assert set(spec.languages) == {SupportedLanguages(lg) for lg in langs}
 
-    # -- mixed sets (should all fail) --
-
     @pytest.mark.parametrize(
         "langs",
         [
-            ["pytorch", "cuda_cpp"],
-            ["triton", "cutlass"],
-            ["cute_dsl", "cudnn"],
-            ["cutile", "cublas"],
-            ["cudnn_frontend", "cuda_cpp"],
-            ["pytorch", "triton", "cuda_cpp"],
-            ["cuda_cpp", "cutlass", "pytorch"],
+            ["pytorch", "hip_cpp"],
+            ["triton", "hipblas"],
+            ["pytorch", "triton", "ck"],
         ],
     )
-    def test_mixed_languages_rejected(self, langs):
-        with pytest.raises(ValidationError, match="C\\+\\+ and Python cannot be mixed"):
-            _make_spec(languages=langs, entry_point="kernel.cu::run")
+    def test_mixed_python_and_native_languages_rejected(self, langs):
+        with pytest.raises(ValidationError, match="HIP/C\\+\\+ and Python cannot be mixed"):
+            _make_spec(languages=langs, entry_point="kernel.hip::run")
 
-    # -- single language (every enum value should pass alone) --
+    @pytest.mark.parametrize(("legacy", "replacement"), LEGACY_LANGUAGE_REPLACEMENTS)
+    def test_legacy_cuda_nvidia_languages_rejected_with_guidance(
+        self, legacy, replacement
+    ):
+        with pytest.raises(ValidationError) as exc_info:
+            _make_spec(languages=[legacy], entry_point="kernel.hip::run")
+
+        message = str(exc_info.value)
+        assert legacy in message
+        assert replacement in message
 
     @pytest.mark.parametrize("lang", [lg.value for lg in SupportedLanguages])
-    def test_every_language_accepted_alone(self, lang):
-        ext = ".cu" if lang in ("cuda_cpp", "cutlass", "cudnn", "cublas") else ".py"
+    def test_every_remaining_language_accepted_alone(self, lang):
+        ext = ".hip" if lang in NATIVE_LANGUAGES else ".py"
         spec = _make_spec(languages=[lang], entry_point=f"kernel{ext}::run")
         assert spec.languages == [SupportedLanguages(lang)]
 
 
-# ── _validate_languages — entry point suffix ─────────────────────────────────
-
-
 class TestEntryPointSuffixValidation:
-    """BuildSpec must reject entry points whose suffix doesn't match the language category."""
+    """BuildSpec rejects entry points whose suffix does not match language category."""
 
-    # -- Python languages with wrong suffix --
-
-    @pytest.mark.parametrize(
-        "lang", ["pytorch", "triton", "cute_dsl", "cutile", "cudnn_frontend"]
-    )
-    def test_python_language_rejects_cu_entry(self, lang):
+    @pytest.mark.parametrize("lang", PYTHON_LANGUAGES)
+    def test_python_language_rejects_hip_entry(self, lang):
         with pytest.raises(ValidationError, match="require a .py entry point"):
-            _make_spec(languages=[lang], entry_point="kernel.cu::run")
+            _make_spec(languages=[lang], entry_point="kernel.hip::run")
 
-    @pytest.mark.parametrize(
-        "lang", ["pytorch", "triton", "cute_dsl", "cutile", "cudnn_frontend"]
-    )
+    @pytest.mark.parametrize("lang", PYTHON_LANGUAGES)
     def test_python_language_rejects_cpp_entry(self, lang):
         with pytest.raises(ValidationError, match="require a .py entry point"):
             _make_spec(languages=[lang], entry_point="kernel.cpp::run")
 
-    # -- C++ languages with wrong suffix --
-
-    @pytest.mark.parametrize("lang", ["cuda_cpp", "cutlass", "cudnn", "cublas"])
-    def test_cpp_language_rejects_py_entry(self, lang):
-        with pytest.raises(ValidationError, match="require a C\\+\\+/CUDA entry point"):
+    @pytest.mark.parametrize("lang", NATIVE_LANGUAGES)
+    def test_native_language_rejects_py_entry(self, lang):
+        with pytest.raises(ValidationError, match="require a .hip or C/C\\+\\+ entry point"):
             _make_spec(languages=[lang], entry_point="kernel.py::run")
 
-    # -- C++ languages with valid suffixes --
+    @pytest.mark.parametrize("lang", NATIVE_LANGUAGES)
+    def test_native_language_rejects_cu_entry(self, lang):
+        with pytest.raises(ValidationError, match="\\.hip"):
+            _make_spec(languages=[lang], entry_point="kernel.cu::run")
 
-    @pytest.mark.parametrize(
-        "suffix", [".cu", ".cpp", ".cc", ".cxx", ".c", ".h", ".hpp", ".cuh"]
-    )
-    def test_cpp_language_accepts_valid_suffixes(self, suffix):
-        spec = _make_spec(languages=["cuda_cpp"], entry_point=f"kernel{suffix}::run")
-        assert spec.languages == [SupportedLanguages.CUDA_CPP]
+    @pytest.mark.parametrize("suffix", [".hip", ".cpp", ".cc", ".cxx", ".c", ".h", ".hpp"])
+    def test_native_language_accepts_valid_suffixes(self, suffix):
+        spec = _make_spec(languages=["hip_cpp"], entry_point=f"kernel{suffix}::run")
+        assert spec.languages == [SupportedLanguages.HIP_CPP]
 
-    # -- Python languages with valid suffix --
-
-    @pytest.mark.parametrize(
-        "lang", ["pytorch", "triton", "cute_dsl", "cutile", "cudnn_frontend"]
-    )
+    @pytest.mark.parametrize("lang", PYTHON_LANGUAGES)
     def test_python_language_accepts_py_entry(self, lang):
         spec = _make_spec(languages=[lang], entry_point="kernel.py::run")
         assert spec.languages == [SupportedLanguages(lang)]
+
+
+class TestHardwareAndCompileOptions:
+    """ROCm hardware targets and compile options are strict and HIP-named."""
+
+    def test_supported_hardware_contains_local_and_gfx1200_only(self):
+        assert SupportedHardware.LOCAL.value == "LOCAL"
+        assert SupportedHardware.GFX1200.value == "gfx1200"
+        assert not hasattr(SupportedHardware, "B200")
+
+    @pytest.mark.parametrize("target", ["LOCAL", "gfx1200"])
+    def test_rocm_hardware_targets_accepted(self, target):
+        spec = _make_spec(target_hardware=[target])
+        assert spec.target_hardware == [SupportedHardware(target)]
+
+    def test_unknown_gfx_target_rejected(self):
+        with pytest.raises(ValidationError, match="gfx942"):
+            _make_spec(target_hardware=["gfx942"])
+
+    def test_compile_options_defaults_are_hip_minimal(self):
+        opts = CompileOptions()
+        assert opts.cflags == []
+        assert opts.hip_cflags == ["-O3"]
+        assert opts.ld_flags == []
+        assert not hasattr(opts, "cuda_cflags")
+
+    def test_cuda_cflags_rejected_with_hip_cflags_guidance(self):
+        with pytest.raises(ValidationError) as exc_info:
+            _make_spec(
+                languages=["hip_cpp"],
+                entry_point="kernel.hip::run",
+                compile_options={"cuda_cflags": ["-O3"]},
+            )
+
+        message = str(exc_info.value)
+        assert "cuda_cflags" in message
+        assert "hip_cflags" in message
+
+    def test_hip_compile_options_accepted(self):
+        spec = _make_spec(
+            languages=["hip_cpp"],
+            entry_point="kernel.hip::run",
+            compile_options={"hip_cflags": ["--offload-arch=gfx1200"]},
+        )
+        assert spec.compile_options is not None
+        assert spec.compile_options.hip_cflags == ["--offload-arch=gfx1200"]
