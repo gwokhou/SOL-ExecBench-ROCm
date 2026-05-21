@@ -17,15 +17,15 @@ progress:
 
 **Project:** SOL ExecBench ROCm Port
 **Initialized:** 2026-05-21
-**Current phase:** complete
-**Status:** v1.0 milestone complete
+**Current phase:** 7 - CDNA 3 Schema and Build Surface
+**Status:** v1.1 milestone planned
 
 ## Project Reference
 
 See: `.planning/PROJECT.md` (updated 2026-05-21)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Planning next milestone
+**Current focus:** Planning Phase 7
 
 ## Workflow Settings
 
@@ -66,8 +66,8 @@ Items acknowledged and deferred at milestone close on 2026-05-21:
 
 ## Next Action
 
-Start the next milestone with `/gsd-new-milestone`. Track CDNA 3 TEST-05 as a
-deferred hardware validation follow-up before making CDNA 3 support claims.
+Start Phase 7 with `/gsd-plan-phase 7`. Keep CDNA 3 TEST-05 as a deferred
+hardware validation follow-up for the next milestone.
 
 ## Current Position
 
