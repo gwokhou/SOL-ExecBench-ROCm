@@ -17,7 +17,7 @@ migrate examples, validate hardware, and finish documentation/compliance.
 - [x] **Phase 2: ROCm Schema and Native Build Layer** (completed 2026-05-21)
 - [x] **Phase 3: ROCm Evaluation, Timing, and Hardware Introspection** (completed 2026-05-21)
 - [x] **Phase 4: ROCm Library and Example Migration** (completed 2026-05-21)
-- [ ] **Phase 5: ROCm Test Suite and Hardware Validation**
+- [x] **Phase 5: ROCm Test Suite and Hardware Validation** (completed 2026-05-21; CDNA 3 validation deferred)
 - [ ] **Phase 6: Documentation, Analysis Workflow, and Compliance**
 
 ## Phases
@@ -88,6 +88,11 @@ Plans:
 3. Reward-hack tests remain active and pass under ROCm.
 4. Full adapted suite passes in a ROCm >= 7.0 environment on RDNA 4.
 5. Full adapted suite passes in a ROCm >= 7.0 environment on CDNA 3.
+
+**Deferred Follow-up:** TEST-05 / CDNA 3 full-suite validation is deferred to a
+later milestone by project decision on 2026-05-21. Phase 5 is considered
+complete for the current milestone based on the full RDNA 4 ROCm pass and
+recorded CDNA 3 validation gap.
 
 ### Phase 6: Documentation, Analysis Workflow, and Compliance
 **Goal:** Make the ROCm port usable and legally clean for researchers and developers.

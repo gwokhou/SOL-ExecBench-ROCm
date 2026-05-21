@@ -2,31 +2,31 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 05
-status: rdna4_full_pass_pending_cdna3
-last_updated: 2026-05-21T23:20:00.000Z
+current_phase: 06
+status: phase_06_ready
+last_updated: 2026-05-21T23:35:00.000Z
 progress:
   total_phases: 6
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 18
-  completed_plans: 17
-  percent: 72
-stopped_at: Phase 05 full RDNA4 ROCm validation complete; CDNA3 evidence pending
+  completed_plans: 18
+  percent: 83
+stopped_at: Phase 05 complete for current milestone; CDNA3 TEST-05 deferred by user decision
 ---
 
 # Project State
 
 **Project:** SOL ExecBench ROCm Port
 **Initialized:** 2026-05-21
-**Current phase:** 5
-**Status:** RDNA4 validation passed; CDNA3 pending
+**Current phase:** 6
+**Status:** Phase 6 ready; CDNA3 validation deferred to later milestone
 
 ## Project Reference
 
 See: `.planning/PROJECT.md` (updated 2026-05-21)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Phase 5 — rocm test suite and hardware validation
+**Current focus:** Phase 6 — documentation, analysis workflow, and compliance
 
 ## Workflow Settings
 
@@ -59,6 +59,6 @@ See: `.planning/ROADMAP.md`
 
 ## Next Action
 
-Run the full adapted suite in a PyTorch ROCm environment on CDNA 3, then
-update `.planning/phases/05-rocm-test-suite-and-hardware-validation/05-HARDWARE-MATRIX.md`
-and re-run Phase 5 verification.
+Plan and execute Phase 6 documentation, analysis workflow, and compliance work.
+Track CDNA 3 TEST-05 as a deferred hardware validation follow-up before making
+CDNA 3 support claims.
