@@ -16,13 +16,14 @@
 """Package a problem (definition + workloads + solution) into a staging directory.
 
 Produces shell commands that the CLI can run directly via subprocess to compile
-C++/CUDA solutions and evaluate them on the GPU.
+HIP/C++ solutions and evaluate them on the GPU.
 """
 
 from __future__ import annotations
 
 import dataclasses
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -40,41 +41,51 @@ from ..core import (
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 _CPP_LANGUAGES = {
-    SupportedLanguages.CUDA_CPP,
-    SupportedLanguages.CUTLASS,
-    SupportedLanguages.CUDNN,
-    SupportedLanguages.CUBLAS,
+    SupportedLanguages.HIP_CPP,
+    SupportedLanguages.HIPBLAS,
+    SupportedLanguages.MIOPEN,
+    SupportedLanguages.CK,
+    SupportedLanguages.ROCWMMA,
 }
 
-_BLACKWELL_HARDWARE = {SupportedHardware.B200}
+
+def _first_gfx_target(lines: list[str]) -> str | None:
+    """Return the first concrete AMD gfx target from command output lines."""
+    for line in lines:
+        match = re.search(r"\bgfx[0-9a-fA-F]+\b", line)
+        if match and match.group(0) != "gfx000":
+            return match.group(0)
+    return None
 
 
-def _get_local_sm() -> str | None:
-    """Detect the local GPU's SM version via nvidia-smi."""
+def _get_local_gfx() -> str | None:
+    """Detect the local AMD GPU gfx target using ROCm tooling."""
     try:
-        out = (
-            subprocess.check_output(
-                [
-                    "nvidia-smi",
-                    "--query-gpu=compute_cap",
-                    "--format=csv,noheader",
-                ],
-                text=True,
-                stderr=subprocess.DEVNULL,
-            )
-            .strip()
-            .splitlines()[0]
-            .strip()
+        out = subprocess.check_output(
+            ["rocm_agent_enumerator", "-name"],
+            text=True,
+            stderr=subprocess.DEVNULL,
         )
-        return f"sm_{out.replace('.', '')}"
+        target = _first_gfx_target(out.splitlines())
+        if target:
+            return target
+    except Exception:
+        pass
+
+    try:
+        out = subprocess.check_output(
+            ["rocminfo"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        )
+        return _first_gfx_target(out.splitlines())
     except Exception:
         return None
 
 
-def _sm_to_gencode(sm: str) -> str:
-    """Convert an SM version string (e.g. 'sm_90', 'sm_100a') to a gencode flag."""
-    arch = sm.removeprefix("sm_")
-    return f"-gencode=arch=compute_{arch},code={sm}"
+def _gfx_to_offload_arch(gfx: str) -> str:
+    """Convert an AMD gfx target string to a HIP offload architecture flag."""
+    return f"--offload-arch={gfx}"
 
 
 class ProblemPackager:
@@ -117,37 +128,36 @@ class ProblemPackager:
     def _is_cpp(self) -> bool:
         return any(lang in _CPP_LANGUAGES for lang in self.solution.spec.languages)
 
-    def _inject_gencode_flags(self, sol_dict: dict) -> dict:
-        """Auto-inject -gencode flags when no explicit arch flag is set.
-
-        Blackwell targets get sm_100a (required for tcgen05/TMEM instructions).
-        LOCAL target detects the compile machine's GPU.
-        """
+    def _inject_offload_arch_flags(self, sol_dict: dict) -> dict:
+        """Auto-inject HIP offload architecture flags when none are explicit."""
         spec = sol_dict["spec"]
         compile_options = dict(spec.get("compile_options") or {})
-        cuda_cflags = list(compile_options.get("cuda_cflags", []))
+        hip_cflags = list(compile_options.get("hip_cflags", []))
 
-        if any("-gencode" in f or "-arch" in f for f in cuda_cflags):
+        if any(
+            flag.startswith(("--offload-arch", "-offload-arch", "--amdgpu-target"))
+            for flag in hip_cflags
+        ):
             return sol_dict
 
-        gencode_sms: list[str] = []
-        target_hw = {h.upper() for h in spec.get("target_hardware", [])}
+        offload_arches: list[str] = []
+        target_hw = set(spec.get("target_hardware", []))
 
-        if any(h == hw.value for h in target_hw for hw in _BLACKWELL_HARDWARE):
-            gencode_sms.append("sm_100a")
+        if SupportedHardware.GFX1200.value in target_hw:
+            offload_arches.append(SupportedHardware.GFX1200.value)
 
         if SupportedHardware.LOCAL.value in target_hw:
-            local_sm = _get_local_sm()
-            if local_sm:
-                gencode_sms.append(local_sm)
+            local_gfx = _get_local_gfx()
+            if local_gfx:
+                offload_arches.append(local_gfx)
 
         # Deduplicate preserving order
         seen: set[str] = set()
-        unique = [s for s in gencode_sms if not (s in seen or seen.add(s))]
+        unique = [gfx for gfx in offload_arches if not (gfx in seen or seen.add(gfx))]
         if unique:
-            compile_options["cuda_cflags"] = [
-                _sm_to_gencode(sm) for sm in unique
-            ] + cuda_cflags
+            compile_options["hip_cflags"] = [
+                _gfx_to_offload_arch(gfx) for gfx in unique
+            ] + hip_cflags
             spec["compile_options"] = compile_options
             sol_dict["spec"] = spec
 
@@ -163,21 +173,21 @@ class ProblemPackager:
     def compile(self) -> tuple[list[str], str]:
         """Stage compilation files and return (command, artifact_path).
 
-        Writes build_ext.py, solution.json, and C++/CUDA source files to
-        output_dir. Injects gencode flags for the target hardware.
+        Writes build_ext.py, solution.json, and HIP/C++ source files to
+        output_dir. Injects offload architecture flags for the target hardware.
 
         The CLI should run the command in output_dir.
         After success, the artifact (benchmark_kernel.so) will be at artifact_path.
         """
         assert self._is_cpp, (
-            f"compile() only handles C++/CUDA solutions, "
+            f"compile() only handles HIP/C++ solutions, "
             f"got languages={self.solution.spec.languages}"
         )
 
         sol_dict = json.loads(self.solution.model_dump_json())
-        sol_dict = self._inject_gencode_flags(sol_dict)
+        sol_dict = self._inject_offload_arch_flags(sol_dict)
 
-        # Overwrite solution.json with injected gencode flags.
+        # Overwrite solution.json with injected offload architecture flags.
         (self.output_dir / "solution.json").write_text(json.dumps(sol_dict))
         (self.output_dir / "build_ext.py").write_text(
             (_TEMPLATES_DIR / "build_ext.py").read_text()
@@ -204,7 +214,7 @@ class ProblemPackager:
             if not so_path.exists():
                 raise FileNotFoundError(
                     f"benchmark_kernel.so not found at {so_path} — "
-                    "run compile() first for C++/CUDA solutions"
+                    "run compile() first for HIP/C++ solutions"
                 )
 
         (self.output_dir / "eval_driver.py").write_text(
