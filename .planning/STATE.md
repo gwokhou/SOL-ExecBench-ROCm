@@ -1,18 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-current_phase: complete
-status: completed
-last_updated: "2026-05-21T15:31:13.719Z"
-last_activity: 2026-05-21 — Milestone v1.0 completed and archived
-stopped_at: Milestone complete; CDNA3 TEST-05 deferred to later milestone
+milestone: v1.1
+milestone_name: CDNA 3 Support and Migration Closure
+status: planning
+last_updated: "2026-05-21T15:44:28.556Z"
+last_activity: 2026-05-21
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 21
-  completed_plans: 21
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -69,10 +67,10 @@ deferred hardware validation follow-up before making CDNA 3 support claims.
 
 ## Current Position
 
-Phase: Milestone v1.0 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-05-21 — Milestone v1.0 completed and archived
+Status: Defining requirements
+Last activity: 2026-05-21 — Milestone v1.1 started
 
 ## Operator Next Steps
 
