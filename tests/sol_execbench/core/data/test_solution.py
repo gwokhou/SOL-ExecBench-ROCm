@@ -70,7 +70,9 @@ class TestLanguageValidation:
         ],
     )
     def test_mixed_python_and_native_languages_rejected(self, langs):
-        with pytest.raises(ValidationError, match="HIP/C\\+\\+ and Python cannot be mixed"):
+        with pytest.raises(
+            ValidationError, match="HIP/C\\+\\+ and Python cannot be mixed"
+        ):
             _make_spec(languages=langs, entry_point="kernel.hip::run")
 
     @pytest.mark.parametrize(("legacy", "replacement"), LEGACY_LANGUAGE_REPLACEMENTS)
@@ -106,7 +108,9 @@ class TestEntryPointSuffixValidation:
 
     @pytest.mark.parametrize("lang", NATIVE_LANGUAGES)
     def test_native_language_rejects_py_entry(self, lang):
-        with pytest.raises(ValidationError, match="require a .hip or C/C\\+\\+ entry point"):
+        with pytest.raises(
+            ValidationError, match="require a .hip or C/C\\+\\+ entry point"
+        ):
             _make_spec(languages=[lang], entry_point="kernel.py::run")
 
     @pytest.mark.parametrize("lang", NATIVE_LANGUAGES)
@@ -114,7 +118,9 @@ class TestEntryPointSuffixValidation:
         with pytest.raises(ValidationError, match="\\.hip"):
             _make_spec(languages=[lang], entry_point="kernel.cu::run")
 
-    @pytest.mark.parametrize("suffix", [".hip", ".cpp", ".cc", ".cxx", ".c", ".h", ".hpp"])
+    @pytest.mark.parametrize(
+        "suffix", [".hip", ".cpp", ".cc", ".cxx", ".c", ".h", ".hpp"]
+    )
     def test_native_language_accepts_valid_suffixes(self, suffix):
         spec = _make_spec(languages=["hip_cpp"], entry_point=f"kernel{suffix}::run")
         assert spec.languages == [SupportedLanguages.HIP_CPP]
