@@ -353,17 +353,13 @@ torchvision = [{ index = "pytorch-rocm71", marker = "sys_platform == 'linux'" }]
 | A3 | `ldconfig`, `ctypes.util.find_library`, or compile/link checks are sufficient for selected ROCm library availability in Phase 1. | Don't Hand-Roll | Library presence may pass while later functional examples still fail. |
 | A4 | Framework image `rocm/pytorch:*` is less desirable because it may conflict with `uv` dependency ownership. | Alternatives Considered | Planner may do extra dependency work compared with starting from a framework image. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Should the project freeze exactly at ROCm 7.0.x or allow a newer exact ROCm 7.x patch?**
-   - What we know: The project requires ROCm >= 7.0. [VERIFIED: AGENTS.md]
-   - What's unclear: Whether validation must prove the lowest supported version specifically. [ASSUMED]
-   - Recommendation: Plan against exact ROCm 7.1.1 unless the user explicitly requires lowest-version validation. [ASSUMED]
+1. **Should the project freeze exactly at ROCm 7.0.x or allow a newer exact ROCm 7.x patch?**  
+   **RESOLVED:** Use the exact ROCm 7.1.1 baseline `rocm/dev-ubuntu-24.04:7.1.1-complete` for Phase 1. The project still satisfies the ROCm >= 7.0 requirement, and the exact patch-level pin is the reproducible environment decision for this milestone. [VERIFIED: AGENTS.md] [CITED: https://hub.docker.com/r/rocm/dev-ubuntu-24.04/tags]
 
-2. **Which selected ROCm libraries should Phase 1 test?**
-   - What we know: Requirements mention selected ROCm libraries; later phases mention rocBLAS, hipBLASLt, MIOpen, Composable Kernel, rocWMMA, hipCUB, rocPRIM, and rocThrust. [VERIFIED: .planning/REQUIREMENTS.md]
-   - What's unclear: Whether Phase 1 must install every future candidate. [ASSUMED]
-   - Recommendation: In Phase 1, test `rocBLAS`, `hipBLASLt`, and `MIOpen` discovery/linkage as representative core libraries; defer broader library replacement to Phase 4. [ASSUMED]
+2. **Which selected ROCm libraries should Phase 1 test?**  
+   **RESOLVED:** Test `rocBLAS`, `hipBLASLt`, and `MIOpen` as representative Phase 1 ROCm libraries. Broader library replacement and ecosystem decisions remain Phase 4 scope. [VERIFIED: .planning/REQUIREMENTS.md]
 
 ## Environment Availability
 
