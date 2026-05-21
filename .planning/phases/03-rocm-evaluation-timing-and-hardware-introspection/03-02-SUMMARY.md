@@ -20,10 +20,12 @@ metrics:
 - Made `time_runnable()` default to ROCm-compatible PyTorch device event timing.
 - Kept compatibility wrappers for existing `bench_time_with_cuda_events()` and `bench_gpu_time_with_cupti()` callers, with the latter routed to device events instead of CUPTI.
 - Preserved shifting allocator setup exclusion, cache clearing, warmup/rep handling, and return modes.
+- Added a post-call device synchronization before recording the end event so submitted non-default-stream work is not hidden from the timing interval.
 
 ## Verification
 
 - `uv run --no-sync pytest tests/sol_execbench/core/bench/test_timing.py` -> 57 skipped under the repository's current `timing_serial` marker configuration.
+- `uv run --no-sync pytest tests/sol_execbench/core/bench/test_timing.py tests/sol_execbench/test_rocm_eval_timing_audit.py` -> 3 passed, 57 skipped.
 
 ## Deviations
 

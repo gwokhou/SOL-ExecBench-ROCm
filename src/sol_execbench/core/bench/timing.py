@@ -107,6 +107,7 @@ def bench_time_with_device_events(
         torch.cuda.synchronize()
         start_events[i].record()
         fn(args)
+        torch.cuda.synchronize()
         end_events[i].record()
 
     torch.cuda.synchronize()
