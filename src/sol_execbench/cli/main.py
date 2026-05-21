@@ -209,7 +209,7 @@ def _print_traces_table(traces: list[Trace]) -> None:
     "--compile-timeout",
     default=120,
     type=int,
-    help="Compilation timeout in seconds (C++/CUDA only)",
+    help="Compilation timeout in seconds (HIP/C++ only)",
 )
 @click.option(
     "--timeout", default=600, type=int, help="Evaluation subprocess timeout in seconds"
@@ -297,14 +297,14 @@ def cli(
     if verbose:
         console.print(f"[dim]Staging dir: {staging_dir}[/dim]")
 
-    # Phase 1: Compile (C++/CUDA only)
+    # Phase 1: Compile (HIP/C++ only)
     if packager._is_cpp:
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
             console=console,
         ) as progress:
-            task = progress.add_task("Compiling C++/CUDA solution...", total=None)
+            task = progress.add_task("Compiling HIP/C++ solution...", total=None)
 
             cmd, artifact_path = packager.compile()
             proc = subprocess.run(

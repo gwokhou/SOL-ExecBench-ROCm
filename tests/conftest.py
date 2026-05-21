@@ -14,28 +14,30 @@
 # limitations under the License.
 
 from pathlib import Path
-from typing import List
 
 import pytest
 
 
-def _gpu_sm_version() -> int:
-    """Return the SM version of the current GPU (e.g. 90, 100), or 0 if unavailable."""
+def _rocm_gpu_info() -> tuple[bool, str]:
+    """Return ROCm GPU availability and AMD gfx architecture."""
     try:
         import torch
 
-        if not torch.cuda.is_available():
-            return 0
-        major, minor = torch.cuda.get_device_capability()
-        return major * 10 + minor
-    except ImportError:
-        return 0
+        if not torch.cuda.is_available() or getattr(torch.version, "hip", None) is None:
+            return False, ""
+        props = torch.cuda.get_device_properties(0)
+        arch = getattr(props, "gcnArchName", "") or getattr(props, "gfx_arch_name", "")
+        return True, str(arch).split(":", maxsplit=1)[0]
+    except (ImportError, RuntimeError, AttributeError):
+        return False, ""
 
 
-requires_sm100 = pytest.mark.skipif(
-    _gpu_sm_version() < 100,
-    reason=f"Requires sm_100+ (detected sm_{_gpu_sm_version()})",
-)
+def _is_rdna4(gfx_arch: str) -> bool:
+    return gfx_arch.startswith("gfx12")
+
+
+def _is_cdna3(gfx_arch: str) -> bool:
+    return gfx_arch.startswith("gfx94")
 
 
 def pytest_configure(config):
@@ -44,18 +46,49 @@ def pytest_configure(config):
         "markers",
         "timing_serial: GPU timing tests (skipped by default; run with: pytest tests -m timing_serial -n 0)",
     )
+    config.addinivalue_line(
+        "markers",
+        "requires_rocm: test requires a ROCm GPU visible through PyTorch",
+    )
+    config.addinivalue_line(
+        "markers",
+        "requires_rdna4: test requires an AMD RDNA 4 GPU, such as gfx1200",
+    )
+    config.addinivalue_line(
+        "markers",
+        "requires_cdna3: test requires an AMD CDNA 3 GPU, such as gfx942",
+    )
+    config.addinivalue_line(
+        "markers",
+        "requires_cutile: legacy NVIDIA cuTile marker; skipped in this ROCm-only port",
+    )
 
 
 def pytest_collection_modifyitems(
-    config: pytest.Config, items: List[pytest.Item]
+    config: pytest.Config, items: list[pytest.Item]
 ) -> None:
     """Skip tests based on hardware availability.
 
     Also skips timing_serial tests unless explicitly selected with -m.
     """
-    sm_version = _gpu_sm_version()
+    rocm_available, gfx_arch = _rocm_gpu_info()
+    detected = gfx_arch or "unavailable"
+    supported_arch = _is_rdna4(gfx_arch) or _is_cdna3(gfx_arch)
     skip_timing = pytest.mark.skip(
         reason="timing_serial tests skipped by default; run with: pytest tests -m timing_serial -n 0"
+    )
+    skip_no_rocm = pytest.mark.skip(reason="ROCm GPU unavailable through PyTorch")
+    skip_rdna4 = pytest.mark.skip(
+        reason=f"requires AMD RDNA 4 ROCm GPU (detected {detected})"
+    )
+    skip_cdna3 = pytest.mark.skip(
+        reason=f"requires AMD CDNA 3 ROCm GPU (detected {detected})"
+    )
+    skip_unsupported = pytest.mark.skip(
+        reason=f"unsupported AMD GPU architecture for ROCm test (detected {detected})"
+    )
+    skip_legacy_cutile = pytest.mark.skip(
+        reason="legacy cuTile tests are NVIDIA-only and unavailable in this ROCm-only port"
     )
 
     # If the user passed -m that includes timing_serial, don't auto-skip them.
@@ -63,12 +96,20 @@ def pytest_collection_modifyitems(
     timing_selected = "timing_serial" in markexpr
 
     for item in items:
-        if sm_version < 100 and any(item.iter_markers(name="requires_cutile")):
-            item.add_marker(
-                pytest.mark.skip(
-                    reason=f"cuTile requires sm_100+ (detected sm_{sm_version})"
-                )
-            )
+        if any(item.iter_markers(name="requires_rocm")) and not rocm_available:
+            item.add_marker(skip_no_rocm)
+        if any(item.iter_markers(name="requires_rdna4")) and not _is_rdna4(gfx_arch):
+            item.add_marker(skip_rdna4 if rocm_available else skip_no_rocm)
+        if any(item.iter_markers(name="requires_cdna3")) and not _is_cdna3(gfx_arch):
+            item.add_marker(skip_cdna3 if rocm_available else skip_no_rocm)
+        if (
+            any(item.iter_markers(name="requires_rocm"))
+            and rocm_available
+            and not supported_arch
+        ):
+            item.add_marker(skip_unsupported)
+        if any(item.iter_markers(name="requires_cutile")):
+            item.add_marker(skip_legacy_cutile)
         if "timing_serial" in item.keywords and not timing_selected:
             item.add_marker(skip_timing)
 

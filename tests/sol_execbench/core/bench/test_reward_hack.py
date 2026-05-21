@@ -42,7 +42,7 @@ class TestCheckMonkeyPatch:
 
         if reward_hack._ELAPSED_TIME_ADDR is None:
             pytest.skip(
-                "CUDA not available; _ELAPSED_TIME_ADDR was not captured at import"
+                "ROCm GPU unavailable; _ELAPSED_TIME_ADDR was not captured at import"
             )
 
         monkeypatch.setattr(torch.cuda.Event, "elapsed_time", lambda self, other: 0.0)

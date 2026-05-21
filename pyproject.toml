@@ -36,8 +36,11 @@ dev = [
 [tool.pytest.ini_options]
 addopts = "-n auto --dist loadgroup"
 markers = [
-    "cpp: test compiles C++/CUDA extensions (slow, requires compiler toolchain)",
-    "requires_cutile: test requires cuTile (sm_100+ / Blackwell GPU)",
+    "cpp: test compiles HIP/C++ extensions (slow, requires ROCm compiler toolchain)",
+    "requires_rocm: test requires a ROCm GPU visible through PyTorch",
+    "requires_rdna4: test requires an AMD RDNA 4 GPU, such as gfx1200",
+    "requires_cdna3: test requires an AMD CDNA 3 GPU, such as gfx942",
+    "requires_cutile: legacy NVIDIA cuTile marker; skipped in this ROCm-only port",
 ]
 
 [tool.ruff]

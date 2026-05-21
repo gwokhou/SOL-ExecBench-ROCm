@@ -126,7 +126,7 @@ _CASES = [
 # Helpers
 # ---------------------------------------------------------------------------
 
-_CPP_LANGUAGES = {"cuda_cpp", "cutlass", "cudnn", "cublas"}
+_CPP_LANGUAGES = {"hip_cpp", "hipblas", "miopen", "ck", "rocwmma"}
 
 
 def _load_sample(
@@ -195,7 +195,7 @@ def test_e2e(tmp_path: Path, case: Sample):
         keep_output_dir=True,
     )
 
-    # Phase 1 (CUDA/C++ only): compile
+    # Phase 1 (HIP/C++ only): compile
     languages = {lang.value for lang in solution.spec.languages}
     if languages & _CPP_LANGUAGES:
         cmd, artifact_path = pkg.compile()
