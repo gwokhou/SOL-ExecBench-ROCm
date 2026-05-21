@@ -6,7 +6,7 @@ status: planning
 last_updated: "2026-05-21T15:44:28.556Z"
 last_activity: 2026-05-21
 progress:
-  total_phases: 0
+  total_phases: 3
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -42,7 +42,11 @@ See: `.planning/config.json`
 
 See: `.planning/ROADMAP.md`
 
-v1.0 ROCm Port is archived. Start the next milestone with fresh requirements.
+v1.1 CDNA 3 Support and Migration Closure contains 3 phases:
+
+- Phase 7: CDNA 3 Schema and Build Surface
+- Phase 8: Migration Residue and Example Closure
+- Phase 9: Support Documentation and Validation Handoff
 
 ## Memory
 
@@ -67,11 +71,11 @@ deferred hardware validation follow-up before making CDNA 3 support claims.
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 7 - CDNA 3 Schema and Build Surface
 Plan: —
-Status: Defining requirements
-Last activity: 2026-05-21 — Milestone v1.1 started
+Status: Ready for phase planning
+Last activity: 2026-05-21 — Milestone v1.1 roadmap created
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Start Phase 7 with /gsd-plan-phase 7
