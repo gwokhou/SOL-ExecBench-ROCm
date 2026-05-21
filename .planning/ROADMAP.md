@@ -11,6 +11,15 @@ horizontal technical layers. The order follows hard dependencies: establish the
 ROCm environment, define schema/build targets, port evaluation and timing, then
 migrate examples, validate hardware, and finish documentation/compliance.
 
+## Phase Status
+
+- [x] **Phase 1: ROCm Environment Baseline** (completed 2026-05-21)
+- [x] **Phase 2: ROCm Schema and Native Build Layer** (completed 2026-05-21)
+- [ ] **Phase 3: ROCm Evaluation, Timing, and Hardware Introspection**
+- [ ] **Phase 4: ROCm Library and Example Migration**
+- [ ] **Phase 5: ROCm Test Suite and Hardware Validation**
+- [ ] **Phase 6: Documentation, Analysis Workflow, and Compliance**
+
 ## Phases
 
 ### Phase 1: ROCm Environment Baseline
