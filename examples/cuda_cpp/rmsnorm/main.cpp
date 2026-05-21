@@ -5,7 +5,7 @@
 
 // Helper function to check common tensor properties
 void check_tensor(const torch::Tensor& tensor, const std::string& name) {
-    TORCH_CHECK(tensor.is_cuda(), name, " must be a CUDA tensor");
+    TORCH_CHECK(tensor.is_cuda(), name, " must be a HIP tensor");
     TORCH_CHECK(tensor.dtype() == torch::kBFloat16, name, " must have bfloat16 dtype");
     TORCH_CHECK(tensor.is_contiguous(), name, " must be contiguous");
 }
@@ -15,7 +15,7 @@ void check_tensor(const torch::Tensor& tensor, const std::string& name) {
  *
  * This function serves as the entry point from Python. It performs extensive
  * validation on the input tensors to ensure they meet the kernel's requirements.
- * It then allocates the output tensor and calls the CUDA kernel launcher.
+ * It then allocates the output tensor and calls the HIP kernel launcher.
  *
  * @param hidden_states Input tensor of shape [batch_size, 4096] and dtype bfloat16.
  * @param weight Weight tensor of shape [4096] and dtype bfloat16.
@@ -43,10 +43,10 @@ torch::Tensor run(
     // --- Kernel Execution ---
     const float eps = 1e-5f;
 
-    // Get current CUDA stream from PyTorch's context
-    cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+    // Get current HIP stream from PyTorch's context
+    hipStream_t stream = at::cuda::getCurrentCUDAStream();
 
-    // Launch the kernel via the C++ wrapper function in the .cu file
+    // Launch the kernel via the C++ wrapper function in the .hip file
     rmsnorm_h4096_launcher(
         output,
         hidden_states,
@@ -61,5 +61,5 @@ torch::Tensor run(
 // --- Pybind11 Module Definition ---
 // Exposes the 'run' function to Python, making it callable as a C++ extension.
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
-    m.def("run", &run, "RMSNorm kernel for hidden_size=4096 (BFloat16, CUDA, B200 Optimized)");
+    m.def("run", &run, "RMSNorm kernel for hidden_size=4096 (BFloat16, HIP, B200 Optimized)");
 }

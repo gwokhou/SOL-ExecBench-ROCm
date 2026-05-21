@@ -39,7 +39,7 @@ from sol_execbench.driver.problem_packager import ProblemPackager
 
 _EXAMPLES_DIR = Path(__file__).resolve().parent.parent.parent / "examples"
 
-_CPP_LANGUAGES = {"cuda_cpp", "cutlass", "cudnn", "cublas"}
+_CPP_LANGUAGES = {"hip_cpp", "hipblas", "miopen", "ck", "rocwmma"}
 
 
 # ---------------------------------------------------------------------------
@@ -96,7 +96,7 @@ _EXAMPLES = [
         expected_count=14,
     ),
     Example(
-        test_id="rmsnorm_cuda",
+        test_id="rmsnorm_hip",
         language="cuda_cpp",
         problem="rmsnorm",
         solution_file="solution_cuda.json",
@@ -104,7 +104,7 @@ _EXAMPLES = [
         extra_markers=["cpp"],
     ),
     Example(
-        test_id="flux_rope_cuda",
+        test_id="flux_rope_hip",
         language="cuda_cpp",
         problem="flux_rope",
         solution_file="solution_cuda.json",
@@ -112,14 +112,14 @@ _EXAMPLES = [
         extra_markers=["cpp"],
     ),
     Example(
-        test_id="jamba_attn_proj_cute_dsl",
+        test_id="jamba_attn_proj_rocm_cute_dsl_fallback",
         language="cute_dsl",
         problem="jamba_attn_proj",
         solution_file="solution_cute_dsl.json",
         expected_count=3,
     ),
     Example(
-        test_id="jamba_attn_proj_cutile",
+        test_id="jamba_attn_proj_rocm_cutile_fallback",
         language="cutile",
         problem="jamba_attn_proj",
         solution_file="solution_cutile.json",
@@ -127,7 +127,7 @@ _EXAMPLES = [
         extra_markers=["requires_cutile"],
     ),
     Example(
-        test_id="gemm_cutlass",
+        test_id="gemm_ck_fallback",
         language="cutlass",
         problem="gemm",
         solution_file="solution_cutlass.json",
@@ -135,7 +135,7 @@ _EXAMPLES = [
         extra_markers=["cpp"],
     ),
     Example(
-        test_id="softmax_cudnn",
+        test_id="softmax_miopen_fallback",
         language="cudnn",
         problem="softmax",
         solution_file="solution_cudnn.json",
