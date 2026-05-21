@@ -298,7 +298,9 @@ class TestLocalGfxDetection:
             assert cmd == ["rocm_agent_enumerator", "-name"]
             return "gfx000\ngfx1200\n"
 
-        monkeypatch.setattr(problem_packager.subprocess, "check_output", fake_check_output)
+        monkeypatch.setattr(
+            problem_packager.subprocess, "check_output", fake_check_output
+        )
         assert _get_local_gfx() == "gfx1200"
 
     def test_get_local_gfx_falls_back_to_rocminfo(self, monkeypatch):
@@ -308,7 +310,9 @@ class TestLocalGfxDetection:
             assert cmd == ["rocminfo"]
             return "Agent 2\n  Name:                    gfx1200\n"
 
-        monkeypatch.setattr(problem_packager.subprocess, "check_output", fake_check_output)
+        monkeypatch.setattr(
+            problem_packager.subprocess, "check_output", fake_check_output
+        )
         assert _get_local_gfx() == "gfx1200"
 
     def test_get_local_gfx_returns_none_when_no_target_found(self, monkeypatch):
@@ -317,7 +321,9 @@ class TestLocalGfxDetection:
                 return "gfx000\n"
             return "Name: CPU\n"
 
-        monkeypatch.setattr(problem_packager.subprocess, "check_output", fake_check_output)
+        monkeypatch.setattr(
+            problem_packager.subprocess, "check_output", fake_check_output
+        )
         assert _get_local_gfx() is None
 
 

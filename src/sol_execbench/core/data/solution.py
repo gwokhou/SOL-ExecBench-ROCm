@@ -109,7 +109,6 @@ class SourceFile(BaseModelWithDocstrings):
         return self
 
 
-
 class CompileOptions(BaseModelWithDocstrings):
     """Compiler and linker flags for HIP/C++ solutions.
 
