@@ -499,7 +499,7 @@ def allocate_outputs(
         Concrete values for all variable axes (as returned by
         ``definition.get_resolved_axes_values(workload.axes)``).
     device : str
-        The device to allocate tensors on (e.g., "cuda:0").
+        The device to allocate tensors on (e.g., a PyTorch ROCm GPU device).
 
     Returns
     -------

@@ -1,10 +1,10 @@
 {
-  "name": "ck_gemm_pytorch_fallback_example",
+  "name": "ck_gemm_pytorch_compatibility_example",
   "definition": "gemm_n4096_k4096",
   "author": "example",
   "spec": {
     "languages": ["pytorch"],
-    "target_hardware": ["gfx1200", "LOCAL"],
+    "target_hardware": ["gfx1200", "gfx942", "LOCAL"],
     "entry_point": "kernel.py::run",
     "dependencies": ["torch"],
     "destination_passing_style": false
@@ -15,5 +15,5 @@
       "content": "import torch\n\n\n@torch.no_grad()\ndef run(A, B):\n    return torch.mm(A, B)\n"
     }
   ],
-  "description": "ROCm-compatible fallback for the former CUTLASS GEMM example. A production ROCm library variant should use Composable Kernel, rocWMMA, rocBLAS, or hipBLASLt depending on the target GEMM shape and dtype."
+  "description": "ROCm compatibility example for the former CUTLASS GEMM category. This portable PyTorch implementation preserves example semantics; a production ROCm library variant should use Composable Kernel, rocWMMA, rocBLAS, or hipBLASLt depending on the target GEMM shape and dtype."
 }

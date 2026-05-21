@@ -69,15 +69,15 @@ def test_native_language_groups_are_rocm_only():
         assert "CUDA/C++ only" not in content
 
 
-def test_python_fallback_examples_do_not_carry_native_markers():
+def test_python_compatibility_examples_do_not_carry_native_markers():
     examples = _read("tests/examples/test_examples.py")
 
-    fallback_blocks = [
-        'test_id="jamba_attn_proj_rocm_cutile_fallback"',
-        'test_id="gemm_ck_fallback"',
-        'test_id="softmax_miopen_fallback"',
+    compatibility_blocks = [
+        'test_id="jamba_attn_proj_rocm_cutile_compatibility"',
+        'test_id="gemm_ck_compatibility"',
+        'test_id="softmax_miopen_compatibility"',
     ]
-    for marker in fallback_blocks:
+    for marker in compatibility_blocks:
         start = examples.index(marker)
         end = examples.index("),", start)
         block = examples[start:end]

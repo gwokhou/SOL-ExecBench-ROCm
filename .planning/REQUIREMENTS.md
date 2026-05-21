@@ -15,15 +15,15 @@
 
 ### Migration Residue Audit
 
-- [ ] **AUDIT-01**: Maintainer can run an audit that reports remaining non-archived CUDA/NVIDIA/CUPTI/library residue.
-- [ ] **AUDIT-02**: Each remaining CUDA/NVIDIA term in active source, tests, examples, or docs is either removed, renamed, or allowlisted with a reason.
-- [ ] **AUDIT-03**: Compatibility naming from upstream APIs such as PyTorch `torch.cuda` is documented separately from real NVIDIA runtime support.
+- [x] **AUDIT-01**: Maintainer can run an audit that reports remaining non-archived CUDA/NVIDIA/CUPTI/library residue.
+- [x] **AUDIT-02**: Each remaining CUDA/NVIDIA term in active source, tests, examples, or docs is either removed, renamed, or allowlisted with a reason.
+- [x] **AUDIT-03**: Compatibility naming from upstream APIs such as PyTorch `torch.cuda` is documented separately from real NVIDIA runtime support.
 
 ### Example and Library Closure
 
-- [ ] **EXMP-01**: Former CUTLASS/cuDNN/CuTe/cuTile example categories no longer present ambiguous "fallback" status where benchmark quality requires a stronger ROCm story.
-- [ ] **EXMP-02**: Example metadata and tests distinguish ROCm-native implementations, compatibility fallbacks, and intentionally documented non-goals.
-- [ ] **EXMP-03**: Example target hardware declarations include CDNA 3 where the implementation is intended to be portable across supported AMD architectures.
+- [x] **EXMP-01**: Former CUTLASS/cuDNN/CuTe/cuTile example categories no longer present ambiguous "fallback" status where benchmark quality requires a stronger ROCm story.
+- [x] **EXMP-02**: Example metadata and tests distinguish ROCm-native implementations, compatibility fallbacks, and intentionally documented non-goals.
+- [x] **EXMP-03**: Example target hardware declarations include CDNA 3 where the implementation is intended to be portable across supported AMD architectures.
 
 ### Documentation and Next Validation
 
@@ -61,12 +61,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CDNA-02 | Phase 7 | Complete |
 | CDNA-03 | Phase 7 | Complete |
 | CDNA-04 | Phase 7 | Complete |
-| AUDIT-01 | Phase 8 | Pending |
-| AUDIT-02 | Phase 8 | Pending |
-| AUDIT-03 | Phase 8 | Pending |
-| EXMP-01 | Phase 8 | Pending |
-| EXMP-02 | Phase 8 | Pending |
-| EXMP-03 | Phase 8 | Pending |
+| AUDIT-01 | Phase 8 | Complete |
+| AUDIT-02 | Phase 8 | Complete |
+| AUDIT-03 | Phase 8 | Complete |
+| EXMP-01 | Phase 8 | Complete |
+| EXMP-02 | Phase 8 | Complete |
+| EXMP-03 | Phase 8 | Complete |
 | DOC-01 | Phase 9 | Pending |
 | DOC-02 | Phase 9 | Pending |
 | DOC-03 | Phase 9 | Pending |

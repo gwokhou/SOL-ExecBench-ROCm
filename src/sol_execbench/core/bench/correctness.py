@@ -27,7 +27,7 @@ from sol_execbench.core.data.workload import ToleranceSpec
 
 
 def set_seed(seed: int) -> None:
-    """Set random seeds for reproducibility across Python, PyTorch CPU and CUDA."""
+    """Set random seeds for reproducibility across Python, CPU, and GPU backends."""
     random.seed(seed)
     torch.manual_seed(seed)
     if torch.cuda.is_available():
@@ -133,7 +133,7 @@ def compute_error_stats(
     matched_ratio = 1.0 - (exceeds_count / float(total_elements))
     matched_ratio = max(0.0, min(1.0, matched_ratio))
 
-    # Hard ceiling on max absolute error (cuDNN pattern).
+    # Hard ceiling on max absolute error for library-style kernels.
     # Prevents accepting solutions where most elements match but rare outliers
     # have arbitrarily large errors.
     exceeds_tol = matched_ratio < tolerance.required_matched_ratio

@@ -1,10 +1,10 @@
 {
-  "name": "miopen_softmax_pytorch_fallback_example",
+  "name": "miopen_softmax_pytorch_compatibility_example",
   "definition": "softmax_h4096",
   "author": "example",
   "spec": {
     "languages": ["pytorch"],
-    "target_hardware": ["gfx1200", "LOCAL"],
+    "target_hardware": ["gfx1200", "gfx942", "LOCAL"],
     "entry_point": "kernel.py::run",
     "dependencies": ["torch"],
     "destination_passing_style": false
@@ -15,5 +15,5 @@
       "content": "import torch\n\n\n@torch.no_grad()\ndef run(input):\n    return torch.softmax(input, dim=-1)\n"
     }
   ],
-  "description": "ROCm-compatible fallback for the former cuDNN softmax example. A production ROCm library variant should evaluate MIOpen support or use a HIP/Triton kernel for this exact softmax shape."
+  "description": "ROCm compatibility example for the former cuDNN softmax category. This portable PyTorch implementation preserves example semantics; a production ROCm library variant should evaluate MIOpen support or use a HIP/Triton kernel for this exact softmax shape."
 }

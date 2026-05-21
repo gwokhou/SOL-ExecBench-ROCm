@@ -1,10 +1,10 @@
 {
-  "name": "attn_proj_residual_rocm_pytorch_fallback",
+  "name": "attn_proj_residual_rocm_pytorch_compatibility",
   "definition": "ai21labs_AI21-Jamba-Reasoning-3B_attention_output_projection_with_residual",
   "author": "test",
   "spec": {
     "languages": ["pytorch"],
-    "target_hardware": ["gfx1200", "LOCAL"],
+    "target_hardware": ["gfx1200", "gfx942", "LOCAL"],
     "entry_point": "kernel.py::run",
     "dependencies": ["torch"],
     "destination_passing_style": false
@@ -15,5 +15,5 @@
       "content": "import torch\n\n\n@torch.no_grad()\ndef run(attn_output, residual, o_proj_weight):\n    shape = attn_output.shape\n    hidden_size = shape[-1]\n    projected = torch.matmul(\n        attn_output.contiguous().view(-1, hidden_size),\n        o_proj_weight.t(),\n    )\n    output = projected + residual.contiguous().view(-1, hidden_size)\n    return output.view(shape)\n"
     }
   ],
-  "description": "ROCm-compatible fallback for the former CuTe DSL example. A production ROCm implementation should evaluate Composable Kernel, rocWMMA, or a purpose-built HIP/Triton fused matmul-add kernel."
+  "description": "ROCm compatibility example for the former CuTe DSL category. This portable PyTorch implementation preserves example semantics; a production ROCm implementation should evaluate Composable Kernel, rocWMMA, or a purpose-built HIP/Triton fused matmul-add kernel."
 }
