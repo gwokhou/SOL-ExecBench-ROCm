@@ -23,35 +23,23 @@ from typing import Optional
 
 @dataclass(frozen=True)
 class ClockPreset:
-    """GPU and DRAM clock frequencies for stable benchmarking."""
+    """ROCm DPM levels for stable benchmarking."""
 
-    gpu_clk_mhz: int
-    dram_clk_mhz: int
+    sclk_level: int
+    mclk_level: int
 
 
 CLOCK_LOCK_PRESETS: dict[str, ClockPreset] = {
-    "NVIDIA B200": ClockPreset(gpu_clk_mhz=1500, dram_clk_mhz=3996),
-    "NVIDIA H100": ClockPreset(gpu_clk_mhz=1410, dram_clk_mhz=1593),
-    "NVIDIA A100": ClockPreset(gpu_clk_mhz=1065, dram_clk_mhz=1215),
+    "gfx1200": ClockPreset(sclk_level=1, mclk_level=1),
+    "gfx942": ClockPreset(sclk_level=1, mclk_level=1),
+    "AMD Radeon": ClockPreset(sclk_level=1, mclk_level=1),
+    "AMD Instinct": ClockPreset(sclk_level=1, mclk_level=1),
 }
 
 
 def get_clock_preset(device_name: str) -> Optional[ClockPreset]:
-    """Get the clock preset for a given GPU device name.
-
-    Returns None if the device is not in the preset table.
-
-    Parameters
-    ----------
-    device_name : str
-        The GPU device name string (e.g., from torch.cuda.get_device_name()).
-
-    Returns
-    -------
-    Optional[ClockPreset]
-        Clock preset with GPU and DRAM frequencies, or None if not in presets.
-    """
+    """Get the ROCm clock preset for a GPU device name or architecture string."""
     for key, preset in CLOCK_LOCK_PRESETS.items():
-        if key in device_name:
+        if key.lower() in device_name.lower():
             return preset
     return None
