@@ -25,6 +25,42 @@ IMAGE="${IMAGE_NAME}:${IMAGE_TAG}"
 # Container-side paths (must match Dockerfile / entrypoint expectations)
 CONTAINER_PROJECT="/sol-execbench"
 
+require_rocm_host_docker() {
+    local context_name
+    local docker_host
+
+    context_name="$(docker context show 2>/dev/null || true)"
+    docker_host="$(docker context inspect --format '{{ (index .Endpoints "docker").Host }}' 2>/dev/null || true)"
+
+    if [[ "${context_name}" == "desktop-linux" || "${docker_host}" == *"/.docker/desktop/"* ]]; then
+        cat >&2 <<EOF
+ERROR: Docker context '${context_name}' points to Docker Desktop (${docker_host}).
+
+ROCm device passthrough requires the native Linux Docker daemon so the
+container can see /dev/kfd and /dev/dri.
+
+Run:
+  docker context use default
+  unset DOCKER_HOST DOCKER_CONTEXT
+
+Then retry this script.
+EOF
+        exit 1
+    fi
+
+    if [ ! -e /dev/kfd ]; then
+        echo "ERROR: /dev/kfd is missing on the host. ROCm containers cannot access the AMD KFD device." >&2
+        echo "Check that the amdgpu/ROCm kernel driver is loaded and that rocminfo works on the host." >&2
+        exit 1
+    fi
+
+    if [ ! -d /dev/dri ]; then
+        echo "ERROR: /dev/dri is missing on the host. ROCm containers cannot access DRM render devices." >&2
+        echo "Check that the amdgpu DRM driver is loaded and that render nodes exist under /dev/dri." >&2
+        exit 1
+    fi
+}
+
 # Parse --build flag, then split remaining args on "--"
 BUILD=false
 DOCKER_ARGS=()
@@ -45,6 +81,8 @@ for arg in "$@"; do
         DOCKER_ARGS+=("$arg")
     fi
 done
+
+require_rocm_host_docker
 
 # Build the image if requested
 if $BUILD; then
@@ -70,8 +108,14 @@ if [ ${#CMD[@]} -eq 0 ]; then
     CMD=("bash")
 fi
 
+TTY_ARGS=()
+if [ -t 0 ] && [ -t 1 ]; then
+    TTY_ARGS=(-it)
+fi
+
 DOCKER_CMD=(
-    docker run --rm -it
+    docker run --rm
+    "${TTY_ARGS[@]}"
     --device=/dev/kfd
     --device=/dev/dri
     --group-add video
