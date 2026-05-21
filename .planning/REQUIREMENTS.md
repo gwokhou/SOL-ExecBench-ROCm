@@ -57,25 +57,25 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CDNA-01 | TBD | Pending |
-| CDNA-02 | TBD | Pending |
-| CDNA-03 | TBD | Pending |
-| CDNA-04 | TBD | Pending |
-| AUDIT-01 | TBD | Pending |
-| AUDIT-02 | TBD | Pending |
-| AUDIT-03 | TBD | Pending |
-| EXMP-01 | TBD | Pending |
-| EXMP-02 | TBD | Pending |
-| EXMP-03 | TBD | Pending |
-| DOC-01 | TBD | Pending |
-| DOC-02 | TBD | Pending |
-| DOC-03 | TBD | Pending |
+| CDNA-01 | Phase 7 | Pending |
+| CDNA-02 | Phase 7 | Pending |
+| CDNA-03 | Phase 7 | Pending |
+| CDNA-04 | Phase 7 | Pending |
+| AUDIT-01 | Phase 8 | Pending |
+| AUDIT-02 | Phase 8 | Pending |
+| AUDIT-03 | Phase 8 | Pending |
+| EXMP-01 | Phase 8 | Pending |
+| EXMP-02 | Phase 8 | Pending |
+| EXMP-03 | Phase 8 | Pending |
+| DOC-01 | Phase 9 | Pending |
+| DOC-02 | Phase 9 | Pending |
+| DOC-03 | Phase 9 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 13 total
-- Mapped to phases: 0
-- Unmapped: 13
+- Mapped to phases: 13
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-05-21*
-*Last updated: 2026-05-21 after v1.1 requirements definition*
+*Last updated: 2026-05-21 after v1.1 roadmap creation*
