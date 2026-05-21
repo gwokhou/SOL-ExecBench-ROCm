@@ -1,6 +1,6 @@
 #include "kernel.h"
-#include <cuda_runtime.h>
-#include <cuda_bf16.h>
+#include <hip/hip_runtime.h>
+#include <hip/hip_bfloat16.h>
 #include <stdexcept>
 #include <string>
 
@@ -21,10 +21,10 @@ __device__ inline float warp_reduce_sum(float val) {
 }
 
 /**
- * @brief CUDA kernel for RMS Normalization, optimized for hidden_size=4096.
+ * @brief HIP kernel for RMS Normalization, optimized for hidden_size=4096.
  *
  * This kernel is specifically tailored for the B200 architecture by using:
- * - __nv_bfloat162 for vectorized memory access, doubling memory throughput.
+ * - __hip_bfloat162 for vectorized memory access, doubling memory throughput.
  * - A large block size (1024 threads) to maximize parallelism.
  * - A two-stage reduction: a fast, parallel reduction in shared memory followed
  *   by an efficient warp-level reduction using shuffle instructions.
@@ -39,9 +39,9 @@ __device__ inline float warp_reduce_sum(float val) {
  * @param eps A small constant to add to the variance for numerical stability.
  */
 __global__ void __launch_bounds__(1024, 1) rmsnorm_h4096_kernel(
-    __nv_bfloat16* __restrict__ output,
-    const __nv_bfloat16* __restrict__ hidden_states,
-    const __nv_bfloat16* __restrict__ weight,
+    __hip_bfloat16* __restrict__ output,
+    const __hip_bfloat16* __restrict__ hidden_states,
+    const __hip_bfloat16* __restrict__ weight,
     const int batch_size,
     const float eps) {
 
@@ -60,9 +60,9 @@ __global__ void __launch_bounds__(1024, 1) rmsnorm_h4096_kernel(
     constexpr int hidden_size = 4096;
 
     // Pointers for the current row, cast for vectorized access
-    const __nv_bfloat162* hidden_states_vec = reinterpret_cast<const __nv_bfloat162*>(hidden_states) + row_idx * hidden_size_vec;
-    const __nv_bfloat162* weight_vec = reinterpret_cast<const __nv_bfloat162*>(weight);
-    __nv_bfloat162* output_vec = reinterpret_cast<__nv_bfloat162*>(output) + row_idx * hidden_size_vec;
+    const __hip_bfloat162* hidden_states_vec = reinterpret_cast<const __hip_bfloat162*>(hidden_states) + row_idx * hidden_size_vec;
+    const __hip_bfloat162* weight_vec = reinterpret_cast<const __hip_bfloat162*>(weight);
+    __hip_bfloat162* output_vec = reinterpret_cast<__hip_bfloat162*>(output) + row_idx * hidden_size_vec;
 
     // Shared memory for block-wide reduction. Size is fixed (1024 floats).
     __shared__ float s_sum[1024];
@@ -71,7 +71,7 @@ __global__ void __launch_bounds__(1024, 1) rmsnorm_h4096_kernel(
     float thread_sum_sq = 0.0f;
     for (int i = 0; i < items_per_thread; ++i) {
         int col_idx = thread_idx + i * blockDim.x;
-        __nv_bfloat162 h_vec = __ldg(hidden_states_vec + col_idx); // Use L1 cache streaming
+        __hip_bfloat162 h_vec = __ldg(hidden_states_vec + col_idx); // Use L1 cache streaming
         float2 h_f2 = __bfloat1622float2(h_vec);
         thread_sum_sq += h_f2.x * h_f2.x + h_f2.y * h_f2.y;
     }
@@ -114,8 +114,8 @@ __global__ void __launch_bounds__(1024, 1) rmsnorm_h4096_kernel(
     // --- Step 4: Apply normalization and scaling ---
     for (int i = 0; i < items_per_thread; ++i) {
         int col_idx = thread_idx + i * blockDim.x;
-        __nv_bfloat162 h_vec = __ldg(hidden_states_vec + col_idx);
-        __nv_bfloat162 w_vec = __ldg(weight_vec + col_idx);
+        __hip_bfloat162 h_vec = __ldg(hidden_states_vec + col_idx);
+        __hip_bfloat162 w_vec = __ldg(weight_vec + col_idx);
 
         float2 h_f2 = __bfloat1622float2(h_vec);
         float2 w_f2 = __bfloat1622float2(w_vec);
@@ -133,7 +133,7 @@ void rmsnorm_h4096_launcher(
     const torch::Tensor& hidden_states,
     const torch::Tensor& weight,
     float eps,
-    cudaStream_t stream) {
+    hipStream_t stream) {
 
     const auto batch_size = hidden_states.size(0);
     
@@ -149,18 +149,18 @@ void rmsnorm_h4096_launcher(
     
     // Launch the kernel
     rmsnorm_h4096_kernel<<<gridDim, blockDim, 0, stream>>>(
-        reinterpret_cast<__nv_bfloat16*>(output_ptr),
-        reinterpret_cast<const __nv_bfloat16*>(hidden_states_ptr),
-        reinterpret_cast<const __nv_bfloat16*>(weight_ptr),
+        reinterpret_cast<__hip_bfloat16*>(output_ptr),
+        reinterpret_cast<const __hip_bfloat16*>(hidden_states_ptr),
+        reinterpret_cast<const __hip_bfloat16*>(weight_ptr),
         batch_size,
         eps
     );
 
     // Check for any kernel launch errors in debug builds
     #ifndef NDEBUG
-    cudaError_t err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        throw std::runtime_error(std::string("CUDA kernel launch failed: ") + cudaGetErrorString(err));
+    hipError_t err = hipGetLastError();
+    if (err != hipSuccess) {
+        throw std::runtime_error(std::string("HIP kernel launch failed: ") + hipGetErrorString(err));
     }
     #endif
 }

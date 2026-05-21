@@ -6,7 +6,7 @@
   "spec": {
     "languages": ["triton"],
     "target_hardware": [
-      "B200",
+      "gfx1200",
       "LOCAL"
     ],
     "entry_point": "kernel.py::rmsnorm_fwd",
