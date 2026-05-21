@@ -124,7 +124,6 @@ _EXAMPLES = [
         problem="jamba_attn_proj",
         solution_file="solution_cutile.json",
         expected_count=3,
-        extra_markers=["requires_cutile"],
     ),
     Example(
         test_id="gemm_ck_fallback",
@@ -132,7 +131,6 @@ _EXAMPLES = [
         problem="gemm",
         solution_file="solution_cutlass.json",
         expected_count=3,
-        extra_markers=["cpp"],
     ),
     Example(
         test_id="softmax_miopen_fallback",
@@ -140,7 +138,6 @@ _EXAMPLES = [
         problem="softmax",
         solution_file="solution_cudnn.json",
         expected_count=3,
-        extra_markers=["cpp"],
     ),
 ]
 

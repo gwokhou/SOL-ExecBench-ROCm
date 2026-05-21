@@ -343,7 +343,7 @@ class TestConvertStdoutToTraces:
                 "solution": "vecadd_python",
                 "evaluation": {
                     "status": "PASSED",
-                    "environment": {"hardware": "NVIDIA H100"},
+                    "environment": {"hardware": "AMD Instinct MI300X (gfx942)"},
                     "timestamp": "2026-01-01T00:00:00",
                     "correctness": {
                         "max_absolute_error": 0.0,
