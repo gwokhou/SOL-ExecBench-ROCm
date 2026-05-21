@@ -7,8 +7,8 @@
 # Examples:
 #   ./scripts/run_docker.sh                             # interactive shell
 #   ./scripts/run_docker.sh --build                     # build image, then shell
-#   ./scripts/run_docker.sh -- sol-execbench tests/sol_execbench/samples/rmsnorm --solution tests/sol_execbench/samples/rmsnorm/solution_cuda.json
-#   ./scripts/run_docker.sh --gpus '"device=1"' -- bash
+#   ./scripts/run_docker.sh -- sol-execbench tests/sol_execbench/samples/rmsnorm --solution tests/sol_execbench/samples/rmsnorm/solution_python.json
+#   ./scripts/run_docker.sh --device=/dev/kfd --device=/dev/dri -- bash
 #
 # Environment variables:
 #   IMAGE_NAME          Docker image name    (default: sol-execbench)
@@ -72,9 +72,11 @@ fi
 
 DOCKER_CMD=(
     docker run --rm -it
-    --gpus all
+    --device=/dev/kfd
+    --device=/dev/dri
+    --group-add video
+    --security-opt seccomp=unconfined
     --ipc=host
-    --privileged
     --ulimit memlock=-1
     --ulimit stack=67108864
     -v "${REPO_ROOT}:${CONTAINER_PROJECT}"
