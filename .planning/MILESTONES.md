@@ -1,5 +1,24 @@
 # Milestones
 
+## v1.1 CDNA 3 Support and Migration Closure (Shipped: 2026-05-21)
+
+**Phases completed:** 3 phases, 3 plans, 0 tasks
+
+**Key accomplishments:**
+
+- Added explicit CDNA 3 schema targets (`gfx940`, `gfx941`, `gfx942`) and HIP offload flag staging for `gfx94*`.
+- Added an active migration residue audit that classifies intentional CUDA/NVIDIA compatibility names and blocks unclassified residue.
+- Renamed public native examples to HIP-facing paths and solution filenames.
+- Reframed former NVIDIA library/DSL examples as ROCm compatibility examples and added CDNA 3 metadata where portable.
+- Updated support docs to distinguish CDNA 3 code/schema support from deferred hardware validation.
+- Created a CDNA 3 validation handoff with commands, evidence requirements, and acceptance criteria for the next milestone.
+
+**Known gaps:**
+
+- Real CDNA 3 hardware validation remains deferred. Run the full adapted suite on `gfx94*` before claiming CDNA 3 hardware validation.
+
+---
+
 ## v1.0 ROCm Port (Shipped: 2026-05-21)
 
 **Phases completed:** 6 phases, 21 plans, 18 tasks
