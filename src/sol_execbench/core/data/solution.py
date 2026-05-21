@@ -63,14 +63,14 @@ class SupportedHardware(str, Enum):
 
 
 class SupportedBindings(str, Enum):
-    """Supported bindings for C++/CUDA solution implementations.
+    """Supported bindings for HIP/C++ solution implementations.
 
     Enumeration of binding types that can be used to interface compiled
-    C++/CUDA code with Python.
+    HIP/C++ code with Python.
     """
 
     TORCH = "torch"
-    """PyTorch C++/CUDA extension binding."""
+    """PyTorch HIP/C++ extension binding."""
 
 
 class SourceFile(BaseModelWithDocstrings):
@@ -139,8 +139,7 @@ class BuildSpec(BaseModelWithDocstrings):
     """The exact path to the function to be called. Format: '{file_path}::{function_name}'
     (e.g., 'main.py::run')."""
     dependencies: list[NonEmptyString] = Field(default_factory=list)
-    """Optional list of required libraries or packages. E.g. for CUDA, we support 'cublas',
-    'cudnn', 'cutlass'"""
+    """Optional list of required libraries or packages."""
     destination_passing_style: bool = True
     """Whether to use destination passing style for the solution. If True, the solution should
     accept the output tensors as the last arguments. If False, the solution should return the
