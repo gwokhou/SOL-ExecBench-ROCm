@@ -24,7 +24,7 @@
 - [x] **BUILD-01**: HIP/C++ solution sources can be staged, compiled, and loaded through the existing driver flow.
 - [x] **BUILD-02**: Native compile logic uses ROCm compiler/toolchain flags and AMD gfx target handling instead of CUDA `-gencode` flags.
 - [x] **BUILD-03**: Build failures produce actionable logs without corrupting trace JSON output.
-- [ ] **BUILD-04**: HIPIFY or equivalent audit output is available to identify remaining CUDA-specific source patterns during the port.
+- [x] **BUILD-04**: HIPIFY or equivalent audit output is available to identify remaining CUDA-specific source patterns during the port.
 
 ### Evaluation Runtime
 
@@ -102,7 +102,7 @@
 | BUILD-01 | Phase 2 | Complete |
 | BUILD-02 | Phase 2 | Complete |
 | BUILD-03 | Phase 2 | Complete |
-| BUILD-04 | Phase 2 | Pending |
+| BUILD-04 | Phase 2 | Complete |
 | EVAL-01 | Phase 3 | Pending |
 | EVAL-02 | Phase 3 | Pending |
 | EVAL-03 | Phase 3 | Pending |
