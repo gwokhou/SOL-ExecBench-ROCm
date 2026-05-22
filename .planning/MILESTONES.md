@@ -1,5 +1,31 @@
 # Milestones
 
+## v1.2 Engineering Practice Harvest and Compatibility Guardrails (Shipped: 2026-05-22)
+
+**Phases completed:** 4 phases, 4 plans, 0 tasks
+
+**Key accomplishments:**
+
+- Documented accepted, rejected, and deferred `hip-execbench` engineering
+  practices in an internal adaptation map.
+- Added internal ROCm diagnostics for tool readiness, gfx classification, local
+  gfx detection, and profiler backend fallback reasoning.
+- Added pure trace reporting helpers that summarize existing trace objects
+  without changing trace JSONL.
+- Added SOL-Score interpretation guardrails that warn against unsupported AMD
+  hardware performance claims while preserving the existing score formula.
+- Added public contract tests for solution/workload/trace schemas, CLI help,
+  HIP-facing example paths, and CDNA 3 validation deferral language.
+
+**Known gaps:**
+
+- Real CDNA 3 hardware validation remains deferred until a future milestone with
+  access to `gfx94*` hardware evidence.
+- Public baseline-comparison CLI and AMD-native roofline interpretation remain
+  future scope.
+
+---
+
 ## v1.1 CDNA 3 Support and Migration Closure (Shipped: 2026-05-21)
 
 **Phases completed:** 3 phases, 3 plans, 0 tasks

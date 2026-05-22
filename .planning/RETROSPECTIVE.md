@@ -46,6 +46,64 @@
 
 ---
 
+## Milestone: v1.2 - Engineering Practice Harvest and Compatibility Guardrails
+
+**Shipped:** 2026-05-22
+**Phases:** 4 | **Plans:** 4 | **Tasks:** 0
+
+### What Was Built
+
+- Internal adaptation map for selected `hip-execbench` engineering practices.
+- ROCm diagnostic helpers for tool readiness, gfx classification, local gfx
+  detection, and profiler backend fallback reasoning.
+- Pure trace summary helpers that preserve the existing trace JSONL contract.
+- SOL-Score interpretation guardrails for unsupported AMD-native performance
+  claims.
+- Public contract tests for schemas, CLI help, trace behavior, examples, and
+  CDNA 3 validation deferral language.
+
+### What Worked
+
+- Treating `hip-execbench` as a practice source instead of a port target kept
+  changes narrow and avoided public interface churn.
+- Pure helper modules made diagnostics/reporting easy to test without requiring
+  GPU hardware in CI.
+- Contract tests gave concrete protection for the user's "do not change public
+  formats" constraint.
+
+### What Was Inefficient
+
+- The SDK autonomous runner failed immediately, so the workflow had to be
+  executed inline.
+- Summary extraction produced generic "Completed:" one-liners, requiring manual
+  milestone accomplishment synthesis.
+
+### Patterns Established
+
+- Borrow practices through an explicit accept/reject/defer map before touching
+  runtime code.
+- Add public-contract guardrail tests whenever internal quality work risks
+  drifting schemas, CLI help, examples, or trace output.
+- Keep score interpretation warnings separate from score calculation so legacy
+  benchmark semantics remain stable.
+
+### Key Lessons
+
+1. Practice-harvest milestones need compatibility tests as first-class outputs,
+   not just implementation improvements.
+2. ROCm diagnostic routes can be modeled as descriptive readiness metadata
+   before becoming user-facing commands.
+3. AMD performance claims should be guarded in code and docs until a validated
+   AMD-native interpretation model exists.
+
+### Cost Observations
+
+- Model mix: not recorded.
+- Sessions: 1 autonomous session with inline fallback after SDK runner failure.
+- Notable: phase artifacts and commits were kept small enough to audit.
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -53,14 +111,17 @@
 | Milestone | Sessions | Phases | Key Change |
 |-----------|----------|--------|------------|
 | v1.0 | not recorded | 6 | Established ROCm-only milestone workflow with phase verification, validation artifacts, and hardware matrix evidence |
+| v1.2 | 1 | 4 | Added practice-harvest workflow with explicit public-contract guardrails |
 
 ### Cumulative Quality
 
 | Milestone | Tests | Coverage | Deferred Items |
 |-----------|-------|----------|----------------|
 | v1.0 | 462 passed, 58 skipped on RDNA 4 | v1 requirements 38/39 complete, 1 deferred | TEST-05 CDNA 3 full-suite validation |
+| v1.2 | 16 focused tests passed; ruff clean | v1.2 requirements 14/14 complete | CDNA 3 real hardware validation; AMD-native scoring model |
 
 ### Top Lessons
 
 1. Hardware-specific requirements need hardware-specific evidence before support claims are made.
 2. Compatibility wrappers can preserve caller stability while changing the underlying ROCm implementation path.
+3. Engineering-practice borrowing should be protected by explicit public-contract tests.
