@@ -1,116 +1,89 @@
-# Feature Research
+# Project Research: Features
 
-**Domain:** AMD-native SOL scoring and ROCm profiler timing
+**Project:** SOL ExecBench ROCm Port
+**Milestone:** v1.6 AMD SOLAR Coverage, Live Profiler Timing, and Scoring Workflow
 **Researched:** 2026-05-22
-**Confidence:** MEDIUM
+**Confidence:** HIGH
 
-## Feature Landscape
+## Paper Baseline
 
-### Table Stakes (Users Expect These)
+The original SOL-ExecBench paper frames the benchmark around three properties:
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| AMD hardware model registry | SOL bounds need peak compute, bandwidth, clock policy, and architecture identity. | MEDIUM | Start with explicit YAML/JSON/Pydantic records for `gfx1200` and extensible `gfx94*` placeholders without validation claims. |
-| SOLAR-like graph extraction path | User selected a SOLAR-like pipeline rather than a config-only roofline. | HIGH | Must handle PyTorch references, custom inputs, dynamic axes, and unsupported ops with auditable fallback states. |
-| FLOP/byte analysis engine | SOL bounds require compute and memory traffic estimates. | HIGH | Begin with known op analyzers and clear unsupported-op diagnostics; do not fabricate precision for unsupported kernels. |
-| AMD SOL-bound artifact | Scores need a concrete bound input per workload. | MEDIUM | Emit separate analysis artifacts so trace JSONL remains stable unless an additive output is approved. |
-| AMD-native scoring workflow | Existing `sol_score()` is only a formula helper. | MEDIUM | Add workload and suite aggregation, baseline ingestion, score output, and claim-level guardrails. |
-| Profiler-backed default timing | User selected replacing default event timing. | HIGH | Must preserve correctness loop and reward-hack defenses while invoking profiler around measured work only. |
-| Source-specific timing semantics | User requires Triton/HIP/PyTorch timing口径 review. | HIGH | Expose `source_type`, `timer_backend`, `aggregation_rule`, and limitations in reports/artifacts. |
+- analytically derived hardware Speed-of-Light bounds from a SOLAR pipeline;
+- SOL Score as progress from a release-defined baseline toward the SOL bound;
+- robust benchmark execution with isolation, clock discipline, cache handling,
+  and reward-hack defenses.
 
-### Differentiators (Competitive Advantage)
+For this ROCm port, v1.6 should improve the AMD-native equivalents of the first
+two properties while preserving the already migrated harness semantics.
 
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| Accuracy-first chimney model | Avoids false precision from a single timing口径 that cannot fit all operator sources. | MEDIUM | This is the key user-requested policy: split by source type when needed. |
-| Bound confidence levels | Makes SOL-like results useful before every op analyzer is perfect. | MEDIUM | Mark bounds as exact/formula/manual/unsupported and prevent unsupported bounds from silently scoring. |
-| Profiler evidence bundle | Makes timing claims auditable and reviewable. | MEDIUM | Store raw profiler trace path, parsed kernel rows, aggregation summary, tool versions, and clock policy. |
-| PyTorch op attribution cross-check | Helps explain PyTorch references whose device work spans many library kernels. | HIGH | Use PyTorch profiler or annotations for attribution, but keep kernel trace as timing authority when possible. |
-| Timing drift comparison | Provides confidence when replacing event timing. | MEDIUM | Compare profiler timing to existing event timing on focused fixtures before making profiler default. |
+## Feature Categories
 
-### Anti-Features (Commonly Requested, Often Problematic)
+### AMD SOLAR Coverage
 
-| Feature | Why Requested | Why Problematic | Alternative |
-|---------|---------------|-----------------|-------------|
-| One score without bound evidence | Simple reports look cleaner. | It hides unsupported SOL bounds and can imply false AMD hardware validity. | Require bound artifact and claim level for every score. |
-| One unified timer for every source type | Easier API and tables. | It may be inaccurate for Triton JIT/autotune, HIP native kernels, or PyTorch library dispatch. | Source-specific timer semantics with explicit backend mapping. |
-| Replacing trace JSONL fields in place | Direct output looks convenient. | It breaks established public trace consumers. | Add sidecar scoring/timing reports first; only add trace fields via documented additive contract. |
-| CDNA 3 validation upgrade | It closes a visible deferred item. | User excluded real CDNA 3 validation from this milestone. | Keep CDNA 3 as code/schema/readiness only. |
+**Table stakes**
 
-## Feature Dependencies
+- Add more operation analyzers beyond v1.5 matmul and broad elementwise
+  detection.
+- Preserve per-op confidence: supported, inexact, unsupported.
+- Emit coverage summaries so unsupported operations do not look like complete
+  SOL evidence.
+- Keep bound artifacts derived and auditable.
 
-```text
-AMD hardware model registry
-    -> FLOP/byte analysis engine
-        -> AMD SOL-bound artifact
-            -> AMD-native scoring workflow
+**Good v1.6 targets**
 
-Profiler-backed default timing
-    -> Source-specific timing semantics
-        -> Profiler evidence bundle
-            -> Timing drift comparison
+- Reductions and normalization patterns used by RMSNorm/layernorm.
+- Softmax and attention-like score/probability patterns.
+- Shape/view/transpose/broadcast operations as data-movement or zero-FLOP nodes.
+- Elementwise activation families with clearer FLOP and byte rationale.
 
-Graph extraction path
-    -> FLOP/byte analysis engine
-```
+### Live Timing
 
-### Dependency Notes
+**Table stakes**
 
-- **Hardware model before scoring:** SOL Score needs `T_SOL`; an AMD score cannot be valid without a target hardware model and clock policy.
-- **Graph extraction before broad FLOP/byte coverage:** The analyzer needs a stable intermediate representation before op formulas scale.
-- **Timing semantics before default replacement:** Replacing the default timer must first establish what is measured for Triton, HIP native, and PyTorch sources.
-- **Evidence before claims:** Profiler output and bound artifacts should be stored before reports claim AMD-native score validity.
+- Execute benchmark subprocesses through `rocprofv3` when policy selects
+  profiler-backed timing.
+- Parse generated timing output into evidence artifacts.
+- Label backend, activity domain, aggregation rule, fallback reason, tool
+  version, GPU architecture, and parsed rows.
+- Preserve source-specific semantics:
+  HIP native and Triton are primarily kernel-activity timing; PyTorch needs
+  operator attribution; mixed workloads need explicit fallback or split evidence.
 
-## MVP Definition
+**Anti-feature**
 
-### Launch With (v1.5)
+- A single unified timer口径 is not acceptable if it hides the difference between
+  HIP kernel activity, Triton generated-kernel activity, and PyTorch operator
+  attribution.
 
-- [ ] AMD hardware model schema and first RDNA 4 model entry with explicit confidence/claim level.
-- [ ] SOLAR-like graph extraction prototype for a focused subset of existing reference problems.
-- [ ] FLOP/byte analyzers for a narrow set of high-value ops, plus unsupported-op diagnostics.
-- [ ] AMD SOL-bound artifact and parser.
-- [ ] AMD-native scoring command or workflow that consumes traces, baselines, and bound artifacts.
-- [ ] ROCm profiler-backed timing backend selected as default through the benchmark config.
-- [ ] Source-specific timing semantics for `triton`, `hip_native`, and `pytorch`.
-- [ ] Tests and docs proving CDNA 3 validation remains deferred.
+### Score Workflow
 
-### Add After Validation (v1.x)
+**Table stakes**
 
-- [ ] Broader op analyzer coverage for attention, MoE, normalization, and backward patterns.
-- [ ] Richer profiler correlation with ROCTx markers and PyTorch operator attribution.
-- [ ] Repeated-sample statistical score/timing confidence intervals.
-- [ ] Optional rocpd/SQLite parser when CSV is insufficient.
+- Generate AMD-native workload and suite score reports from existing trace
+  JSONL plus derived timing and SOL-bound artifacts.
+- Expose reports through dataset runner or additive CLI paths.
+- Keep score reports separate from canonical trace JSONL.
+- Carry evidence references and warnings for incomplete inputs, unsupported
+  operators, unvalidated hardware models, and CDNA3 no-claim status.
 
-### Future Consideration (v2+)
+### Compatibility
 
-- [ ] Full AMD SOLAR-equivalent support across the public 235-problem dataset.
-- [ ] Public AMD leaderboard policy.
-- [ ] Real CDNA 3 full-suite validation and support-matrix upgrade.
-- [ ] Hardware counter-based roofline calibration beyond static peak specs.
+**Table stakes**
 
-## Feature Prioritization Matrix
+- Existing `sol-execbench` invocation semantics continue to work.
+- Existing trace JSONL and public Pydantic schemas remain unchanged.
+- New outputs are opt-in, additive, or separate files.
+- Contract tests fail if canonical traces gain new fields or CLI defaults change.
 
-| Feature | User Value | Implementation Cost | Priority |
-|---------|------------|---------------------|----------|
-| Source-specific timing semantics | HIGH | MEDIUM | P1 |
-| Profiler-backed default timing | HIGH | HIGH | P1 |
-| AMD hardware model registry | HIGH | MEDIUM | P1 |
-| SOL-bound artifact format | HIGH | MEDIUM | P1 |
-| SOLAR-like graph extraction prototype | HIGH | HIGH | P1 |
-| Initial FLOP/byte analyzers | HIGH | HIGH | P1 |
-| AMD-native scoring workflow | HIGH | MEDIUM | P1 |
-| PyTorch op attribution cross-check | MEDIUM | HIGH | P2 |
-| rocpd parser | MEDIUM | MEDIUM | P2 |
-| Full 235-problem coverage | HIGH | VERY HIGH | P3 |
+## Deferred
+
+- Real CDNA3 `gfx94*` full-suite validation.
+- NVIDIA B200/SOLAR/leaderboard equivalence.
+- Full upstream SOLAR parity, especially Blackwell-specific datatype and
+  hardware-feature modeling.
 
 ## Sources
 
-- arXiv 2603.19173 - SOL ExecBench benchmark design, SOLAR, SOL Score, and robust evaluation harness.
-- ROCprofiler-SDK `rocprofv3` documentation - kernel trace, HIP runtime trace, HSA trace, output controls.
-- PyTorch profiler documentation - operator/device activity profiling and activity groups.
-- PyTorch HIP semantics documentation - ROCm reuse of `torch.cuda` interfaces.
-- ROCm Triton optimization documentation - Triton AMD kernel optimization context.
-
----
-*Feature research for: AMD-native SOL scoring and ROCm profiler timing*
-*Researched: 2026-05-22*
+- SOL-ExecBench paper: https://arxiv.org/abs/2603.19173
+- ROCprofiler-SDK `rocprofv3` docs: https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/docs-7.0.1/how-to/using-rocprofv3.html
