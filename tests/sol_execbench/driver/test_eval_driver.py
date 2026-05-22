@@ -128,7 +128,11 @@ def _run_eval_driver(
         json.dumps(definition if definition is not None else _MINIMAL_DEFINITION)
     )
     (tmp_path / "workload.jsonl").write_text(json.dumps(_MINIMAL_WORKLOAD))
-    (tmp_path / "solution.json").write_text(json.dumps(_SOLUTION_SPEC))
+    solution = {
+        **_SOLUTION_SPEC,
+        "sources": [{"path": "kernel.py", "content": kernel_code}],
+    }
+    (tmp_path / "solution.json").write_text(json.dumps(solution))
     (tmp_path / "kernel.py").write_text(kernel_code)
 
     # Default config: disable clock-locking for machines without ROCm clock access.
@@ -333,7 +337,7 @@ def test_triton_jit_reference(tmp_path):
 
 @pytest.mark.xdist_group("serial")
 def test_load_inline_blocked_in_run(tmp_path):
-    """Kernel that calls load_inline inside run() → RUNTIME_ERROR."""
+    """Kernel that calls load_inline inside run() → static REWARD_HACK."""
     kernel = (
         "from torch.utils import cpp_extension\n"
         "\n"
@@ -345,16 +349,14 @@ def test_load_inline_blocked_in_run(tmp_path):
 
     assert len(traces) == 1
     ev = traces[0]["evaluation"]
-    assert ev["status"] == "RUNTIME_ERROR", (
-        f"Expected RUNTIME_ERROR, got {ev['status']}; log={ev.get('log')}"
+    assert ev["status"] == "REWARD_HACK", (
+        f"Expected REWARD_HACK, got {ev['status']}; log={ev.get('log')}"
     )
-    assert "not permitted" in ev.get("log", ""), (
-        f"Expected 'not permitted' in log; got: {ev.get('log')}"
-    )
+    assert "unauthorized_file_or_loader" in ev.get("log", "")
 
 
 def test_load_inline_blocked_at_import(tmp_path):
-    """Kernel that calls load_inline at import time → subprocess crash."""
+    """Kernel that calls load_inline at import time → static REWARD_HACK."""
     kernel = (
         "from torch.utils.cpp_extension import load_inline\n"
         "load_inline(name='evil', cpp_sources='void f(){}')\n"
@@ -362,25 +364,62 @@ def test_load_inline_blocked_at_import(tmp_path):
         "def run(x, y):\n"
         "    return x + y\n"
     )
-    (tmp_path / "eval_driver.py").write_text(build_driver())
-    (tmp_path / "definition.json").write_text(json.dumps(_MINIMAL_DEFINITION))
-    (tmp_path / "workload.jsonl").write_text(json.dumps(_MINIMAL_WORKLOAD))
-    (tmp_path / "solution.json").write_text(json.dumps(_SOLUTION_SPEC))
-    (tmp_path / "kernel.py").write_text(kernel)
-    (tmp_path / "config.json").write_text(json.dumps({"lock_clocks": False}))
+    traces = _run_eval_driver(tmp_path, kernel)
 
-    result = subprocess.run(
-        [sys.executable, "eval_driver.py"],
-        cwd=tmp_path,
-        env={**os.environ, "SOL_EXECBENCH_CLOCKS_LOCKED": "0"},
-        capture_output=True,
-        text=True,
-        timeout=60,
+    assert len(traces) == 1
+    ev = traces[0]["evaluation"]
+    assert ev["status"] == "REWARD_HACK", (
+        f"Expected REWARD_HACK, got {ev['status']}; log={ev.get('log')}"
     )
-    assert result.returncode != 0
-    assert "not permitted" in result.stderr, (
-        f"Expected 'not permitted' in stderr; got:\n{result.stderr}"
+    assert "unauthorized_file_or_loader" in ev.get("log", "")
+
+
+def test_static_source_review_blocks_non_default_stream(tmp_path):
+    """Kernel that creates a non-default stream is rejected before import."""
+    kernel = (
+        "import torch\n"
+        "stream = torch.cuda.Stream()\n"
+        "\n"
+        "def run(x, y):\n"
+        "    with torch.cuda.stream(stream):\n"
+        "        return x + y\n"
     )
+    traces = _run_eval_driver(tmp_path, kernel)
+
+    assert len(traces) == 1
+    ev = traces[0]["evaluation"]
+    assert ev["status"] == "REWARD_HACK"
+    assert "hidden_async_stream" in ev.get("log", "")
+
+
+def test_static_source_review_blocks_semantic_cache(tmp_path):
+    """Kernel that keys cached output by input data pointer is rejected."""
+    kernel = (
+        "_cache = {}\n"
+        "\n"
+        "def run(x, y):\n"
+        "    key = (x.data_ptr(), y.data_ptr())\n"
+        "    if key not in _cache:\n"
+        "        _cache[key] = x + y\n"
+        "    return _cache[key]\n"
+    )
+    traces = _run_eval_driver(tmp_path, kernel)
+
+    assert len(traces) == 1
+    ev = traces[0]["evaluation"]
+    assert ev["status"] == "REWARD_HACK"
+    assert "semantic_output_cache" in ev.get("log", "")
+
+
+def test_static_source_review_blocks_precision_downgrade(tmp_path):
+    """Float32-output solution that downcasts internally is rejected."""
+    kernel = "def run(x, y):\n    return (x.half() + y.half()).float()\n"
+    traces = _run_eval_driver(tmp_path, kernel)
+
+    assert len(traces) == 1
+    ev = traces[0]["evaluation"]
+    assert ev["status"] == "REWARD_HACK"
+    assert "precision_downgrade" in ev.get("log", "")
 
 
 def test_hip_cpp_sources_accept_pytorch_rocm_stream_api_text():

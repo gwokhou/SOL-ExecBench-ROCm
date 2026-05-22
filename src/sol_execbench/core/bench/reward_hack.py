@@ -23,7 +23,10 @@ detected.
 
 from __future__ import annotations
 
-from typing import Any, List
+import re
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any, Iterable, List
 
 import torch
 
@@ -43,6 +46,178 @@ except Exception:
 
 class RewardHackDetected(RuntimeError):
     """Raised when a reward-hacking pattern is detected in a submission."""
+
+
+class SourceReviewSeverity(str, Enum):
+    """Severity for static source review findings."""
+
+    FLAG = "flag"
+    BLOCK = "block"
+
+
+@dataclass(frozen=True)
+class SourceReviewIssue:
+    """One static source review finding."""
+
+    path: str
+    rule: str
+    severity: SourceReviewSeverity
+    message: str
+    evidence: str
+
+    def to_dict(self) -> dict[str, str]:
+        """Return a JSON-serializable issue payload."""
+        return {
+            "path": self.path,
+            "rule": self.rule,
+            "severity": self.severity.value,
+            "message": self.message,
+            "evidence": self.evidence,
+        }
+
+
+@dataclass(frozen=True)
+class SourceReview:
+    """Static review result for a submitted solution."""
+
+    issues: tuple[SourceReviewIssue, ...]
+
+    @property
+    def blocked(self) -> bool:
+        """Whether any finding should reject execution."""
+        return any(
+            issue.severity == SourceReviewSeverity.BLOCK for issue in self.issues
+        )
+
+    def to_dict(self) -> dict[str, object]:
+        """Return a JSON-serializable review payload."""
+        return {
+            "blocked": self.blocked,
+            "issues": [issue.to_dict() for issue in self.issues],
+        }
+
+    def format_blocking_message(self) -> str:
+        """Return a compact human-readable blocking summary."""
+        blocking = [
+            f"{issue.path}:{issue.rule}: {issue.message} ({issue.evidence})"
+            for issue in self.issues
+            if issue.severity == SourceReviewSeverity.BLOCK
+        ]
+        return "Static source review blocked submission: " + "; ".join(blocking)
+
+
+@dataclass(frozen=True)
+class _SourceRule:
+    rule: str
+    severity: SourceReviewSeverity
+    pattern: re.Pattern[str]
+    message: str
+    suffixes: tuple[str, ...] | None = None
+
+    def applies_to(self, path: str) -> bool:
+        return self.suffixes is None or path.endswith(self.suffixes)
+
+
+_STATIC_RULES = (
+    _SourceRule(
+        "hidden_async_stream",
+        SourceReviewSeverity.BLOCK,
+        re.compile(
+            r"\b(torch\.cuda\.Stream|torch\.cuda\.stream|wait_stream|hipStreamCreate|"
+            r"cudaStreamCreate|hipStreamSynchronize|cudaStreamSynchronize)\b"
+        ),
+        "non-default stream or explicit stream synchronization can hide work from event timing",
+    ),
+    _SourceRule(
+        "semantic_output_cache",
+        SourceReviewSeverity.BLOCK,
+        re.compile(
+            r"(\bdata_ptr\s*\(|\blru_cache\b|\bglobal\s+[_A-Za-z0-9]*cache\b|"
+            r"[_A-Za-z0-9]*cache\s*=\s*\{|\btobytes\s*\(|\bhashlib\b)"
+        ),
+        "data-pointer or content-keyed caching can reuse outputs across phases",
+    ),
+    _SourceRule(
+        "unauthorized_file_or_loader",
+        SourceReviewSeverity.BLOCK,
+        re.compile(
+            r"(\bopen\s*\(|\bPath\s*\(|\bread_text\s*\(|\bwrite_text\s*\(|"
+            r"\bbase64\b|\bmarshal\.loads\b|\bpickle\.loads\b|\bctypes\.CDLL\b|"
+            r"\bctypes\.cdll\b|\bdlopen\b|\btorch\.ops\.load_library\b|"
+            r"\bload_inline\s*\(|\bcpp_extension\.load\s*\(|\bsubprocess\b|"
+            r"\bsocket\b|\burllib\b|\brequests\b)"
+        ),
+        "file I/O, embedded payload decoding, dynamic native loading, or process/network access is not allowed in submitted sources",
+    ),
+)
+
+_PRECISION_DOWNGRADE_RULE = _SourceRule(
+    "precision_downgrade",
+    SourceReviewSeverity.BLOCK,
+    re.compile(
+        r"(\.half\s*\(|\.bfloat16\s*\(|\.to\s*\(\s*torch\.(float16|bfloat16)|"
+        r"\btorch\.(float16|bfloat16)\b|\btl\.(float16|bfloat16)\b|"
+        r"\.to\s*\(\s*tl\.(float16|bfloat16))"
+    ),
+    "precision downgrade is not allowed for float32 output contracts without explicit benchmark approval",
+)
+
+
+def review_solution_sources(
+    solution: Any,
+    *,
+    output_dtypes: dict[str, torch.dtype] | None = None,
+) -> SourceReview:
+    """Statically review solution sources for reward-hack patterns.
+
+    The review is intentionally conservative for execution-blocking exploit
+    families while remaining structured and inspectable for tests and tooling.
+    """
+    issues: list[SourceReviewIssue] = []
+    float32_contract = bool(output_dtypes) and any(
+        dtype == torch.float32 for dtype in output_dtypes.values()
+    )
+    for source in getattr(solution, "sources", []):
+        path = str(getattr(source, "path", ""))
+        content = str(getattr(source, "content", ""))
+        for rule in _STATIC_RULES:
+            issues.extend(_match_rule(path, content, rule))
+        if float32_contract:
+            issues.extend(_match_rule(path, content, _PRECISION_DOWNGRADE_RULE))
+    return SourceReview(issues=tuple(issues))
+
+
+def _match_rule(
+    path: str,
+    content: str,
+    rule: _SourceRule,
+) -> Iterable[SourceReviewIssue]:
+    if not rule.applies_to(path):
+        return ()
+    found: list[SourceReviewIssue] = []
+    for match in rule.pattern.finditer(_strip_comments(content)):
+        evidence = match.group(0).strip()
+        found.append(
+            SourceReviewIssue(
+                path=path,
+                rule=rule.rule,
+                severity=rule.severity,
+                message=rule.message,
+                evidence=evidence[:120],
+            )
+        )
+    return tuple(found)
+
+
+def _strip_comments(content: str) -> str:
+    """Remove simple line comments before pattern scanning."""
+    lines = []
+    for line in content.splitlines():
+        stripped = line.lstrip()
+        if stripped.startswith("#") or stripped.startswith("//"):
+            continue
+        lines.append(line)
+    return "\n".join(lines)
 
 
 def check_monkey_patch() -> None:
