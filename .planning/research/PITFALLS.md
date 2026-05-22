@@ -1,33 +1,22 @@
-# Project Research: Pitfalls
+# Project Research: Pitfalls for v1.8
 
-**Project:** SOL ExecBench ROCm Port
-**Milestone:** v1.6 AMD SOLAR Coverage, Live Profiler Timing, and Scoring Workflow
-**Researched:** 2026-05-22
-**Confidence:** HIGH
+## Pitfalls
 
-## Critical Pitfalls
+| Pitfall | Risk | Prevention |
+| --- | --- | --- |
+| Declaring support when only schema accepts the category | Repeats the candidate-category gap v1.8 is meant to close | Require runnable example, dependency test, docs, and RDNA 4 E2E evidence before marking supported |
+| Silent PyTorch fallback inside a library solution | Public examples overclaim library replacement | Tests inspect solution language and source patterns for real library includes/API calls |
+| Missing ROCm package headers in Docker | Examples compile locally for one developer but fail in CI/container | Add dependency smoke tests with explicit missing-header/missing-library messages |
+| rocWMMA architecture mismatch | rocWMMA example may not run on unsupported GPUs | Scope v1.8 validation to RDNA 4 and document CDNA 3/CDNA 4 deferral separately |
+| MIOpen API shape limitations | Softmax or convolution descriptors may not match arbitrary benchmark shapes | Choose a small supported example and document operation-specific constraints |
+| CK template complexity | A full CK example can become too large or fragile | Start with minimal GEMM/fused epilogue and keep requirements focused on runnable support, not peak performance |
+| Changing public schema to solve build convenience | Breaks SOL ExecBench compatibility guarantees | Use existing `compile_options` first; add internal helpers only if required |
+| Performance claims without measurement discipline | Users infer SOL or leaderboard-quality support from examples | Keep v1.8 about support completeness; require separate profiler evidence for performance claims |
+| CDNA 3/CDNA 4 validation creep | Milestone completion becomes blocked by unavailable hardware | Tests and docs must state RDNA 4-only acceptance and deferred CDNA validation |
 
-| Pitfall | Why It Matters | Prevention |
-|---------|----------------|------------|
-| Unified timing hides source semantics | HIP native, Triton, and PyTorch do not naturally share one accurate timing interpretation. | Keep `source_type -> timer_backend -> interpretation` as an explicit contract and allow chimney-style outputs. |
-| Profiler rows include unmeasured work | Compile, autotune, memory copies, unrelated kernels, or warmup can pollute measured duration. | Require timing-region evidence, post-warmup aggregation rules, kernel filters or markers where available, and fallback labels when evidence is ambiguous. |
-| PyTorch kernel activity loses operator attribution | One PyTorch op can dispatch many kernels or library calls. | Treat PyTorch as operator attribution first, with device rows as supporting evidence. |
-| SOL coverage appears complete when unsupported ops remain | Score reports become misleading if unsupported nodes quietly contribute zero or coarse estimates. | Surface unsupported/inexact counts and block or warn on complete-score claims. |
-| Hardware model confidence is overstated | RDNA4 and CDNA3 peak values may differ by dtype/path and validation state. | Carry source, confidence, and validation status in every bound artifact. |
-| Derived artifacts mutate public contracts | Changing trace JSONL or default CLI behavior would violate the milestone's hard constraint. | Add contract tests for trace fields, schemas, and primary CLI behavior before integration. |
-| CDNA3 validation leaks into claims | User excluded CDNA3 validation from v1.6. | Keep CDNA3 warnings and no-claim docs active in all score outputs. |
+## Phase Ownership
 
-## Phase-Level Risk Guidance
-
-- Analyzer work should prioritize correctness of confidence labels over broad but
-  vague coverage.
-- Live timing should first prove the adapter can isolate measured regions and
-  produce auditable evidence before becoming a report input.
-- Scoring workflow should treat missing timing, missing baseline, missing bound,
-  unsupported ops, or unvalidated hardware as explicit report states.
-- Compatibility tests should be part of the roadmap, not a final afterthought.
-
-## Sources
-
-- SOL-ExecBench paper: https://arxiv.org/abs/2603.19173
-- ROCprofiler-SDK `rocprofv3` docs: https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/docs-7.0.1/how-to/using-rocprofv3.html
+- Build plumbing phase owns dependency diagnostics and compile metadata risks.
+- Per-library phases own API correctness and example E2E risks.
+- Closure phase owns overclaiming, compatibility cleanup, and RDNA 4 validation
+  evidence.

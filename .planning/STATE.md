@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.7
-milestone_name: Baseline, Timing, Reward-Hack Hardening, and ROCm Library Migration
-current_phase: none
-status: completed
-last_updated: "2026-05-22T13:05:49.227Z"
-last_activity: 2026-05-22 — Milestone v1.7 completed and archived
+milestone: v1.8
+milestone_name: ROCm Library Ecosystem Completion
+status: planning
+last_updated: "2026-05-22T14:17:57.947Z"
+last_activity: 2026-05-22
 progress:
   total_phases: 5
-  completed_phases: 5
+  completed_phases: 0
   total_plans: 5
-  completed_plans: 5
-  percent: 100
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -19,7 +18,7 @@ progress:
 **Project:** SOL ExecBench ROCm Port
 **Initialized:** 2026-05-21
 **Current phase:** none
-**Status:** v1.7 milestone complete
+**Status:** Defining requirements for v1.8 ROCm Library Ecosystem Completion
 
 ## Project Reference
 
@@ -43,7 +42,7 @@ See: `.planning/config.json`
 
 See: `.planning/ROADMAP.md`
 
-v1.7 is archived; no active roadmap is open.
+v1.8 is active with phases 36-40.
 
 ## Memory
 
@@ -88,15 +87,15 @@ Items acknowledged and deferred at milestone close on 2026-05-21:
 
 ## Next Action
 
-Start the next milestone when ready.
+Plan Phase 36: Library Build Plumbing and Diagnostics.
 
 ## Current Position
 
-Phase: Milestone v1.7 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-05-22 — Milestone v1.7 completed and archived
+Status: Defining requirements
+Last activity: 2026-05-22 — Milestone v1.8 started
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Start Phase 36 with /gsd-plan-phase 36

@@ -1,42 +1,76 @@
-# Project Research: Stack
+# Project Research: Stack Additions for v1.8
 
-**Project:** SOL ExecBench ROCm Port
-**Milestone:** v1.6 AMD SOLAR Coverage, Live Profiler Timing, and Scoring Workflow
-**Researched:** 2026-05-22
-**Confidence:** HIGH
+**Milestone:** v1.8 ROCm Library Ecosystem Completion
+**Scope:** RDNA 4 validation only. CDNA 3 and CDNA 4 validation are deferred.
 
-## Scope
+## Existing Stack
 
-This milestone should extend the v1.5 foundation without changing canonical
-trace JSONL, public schemas, or the primary `sol-execbench` CLI contract.
+- Python package and CLI remain under `src/sol_execbench/`.
+- Native ROCm examples compile through `torch.utils.cpp_extension.load` in
+  `src/sol_execbench/driver/templates/build_ext.py`.
+- `BuildSpec.languages` already recognizes `hip_cpp`, `hipblas`, `miopen`,
+  `ck`, and `rocwmma`.
+- Current supported native library category is `hipblas`; MIOpen, CK, and
+  rocWMMA are still candidate categories.
 
-## Recommended Stack Additions
+## Stack Additions
 
-| Area | Recommendation | Rationale |
-|------|----------------|-----------|
-| Live profiling | Use `rocprofv3` runtime/kernel trace as the live timing evidence collector for HIP native and Triton-generated kernels. | ROCm 7 documentation supports runtime trace, granular `--hip-trace --kernel-trace`, CSV/rocpd outputs, kernel filters, and output directory/file controls. |
-| PyTorch attribution | Keep PyTorch source timing as a separate PyTorch-operator attribution path, with ROCm device activity as evidence where available. | PyTorch operators can dispatch multiple HIP/library kernels, so raw kernel activity alone can lose operator semantics. |
-| SOL analysis | Extend `src/sol_execbench/core/scoring/amd_sol.py` instead of adding a separate scoring stack. | v1.5 already defines graph nodes, work estimates, hardware models, per-op bounds, confidence, and derived artifacts. |
-| Score workflow | Add additive report generation around `src/sol_execbench/core/scoring/amd_score.py`, dataset runner, and optional CLI output flags. | Existing AMD-native scores are derived artifacts and already preserve evidence references. |
-| Contract tests | Reuse existing public contract guardrail tests and add negative tests for trace/schema/CLI stability. | User constraint requires compatibility to be an implementation gate. |
+### MIOpen
 
-## Current Project Hooks
+- Use MIOpen C API through HIP/C++ extension sources.
+- Link with `-lMIOpen` and include `<miopen/miopen.h>`.
+- Prefer a softmax or convolution example with a simple tensor contract that
+  fits existing definition/workload/reference schemas.
+- MIOpen API modules include Convolution, Softmax, BatchNorm, Activation,
+  Pooling, Reduction, and experimental LayerNorm/GroupNorm/RoPE modules.
+- Softmax is a practical first replacement because MIOpen exposes forward and
+  backward APIs and the current repo has a former cuDNN softmax compatibility
+  example.
 
-- `timing_policy.py` already models `source_type -> backend -> activity_domain`.
-- `rocm_profiler.py` already builds `rocprofv3` commands and parses representative CSV.
-- `amd_sol.py` currently recognizes matmul and broad elementwise/reduction-like calls, with unsupported operations surfaced explicitly.
-- `amd_score.py` already builds guarded workload and suite reports from timing, baseline, and SOL-bound evidence.
-- `scripts/run_dataset.py` is the natural integration point for suite-level derived score outputs.
+Sources:
+- https://rocm.docs.amd.com/projects/MIOpen/en/latest/reference/index.html
+- https://rocm.docs.amd.com/projects/MIOpen/en/latest/doxygen/html/group__softmax.html
 
-## Stack Constraints
+### Composable Kernel
 
-- Do not make `rocprofv3` trace output part of canonical benchmark stdout.
-- Do not force HIP, Triton, and PyTorch into one timer if it weakens timing accuracy.
-- Do not promote CDNA3 hardware validation claims in v1.6.
-- Prefer derived JSON artifacts and additive options over schema changes.
+- Use CK through native HIP/C++ extension sources.
+- Link/include handling may need CK include paths and optional library paths
+  depending on the installed ROCm package layout.
+- Prefer a GEMM or GEMM-with-epilogue example because CK documentation centers
+  examples around template-instantiated GEMM and fused element operations.
+- CK is best positioned as the replacement direction for CUTLASS and some
+  CuTe-style fused matmul examples.
 
-## Sources
+Sources:
+- https://rocm.docs.amd.com/projects/composable_kernel/en/latest/
+- https://rocm.docs.amd.com/en/latest/how-to/rocm-for-ai/inference-optimization/optimizing-with-composable-kernel.html
 
-- SOL-ExecBench paper: https://arxiv.org/abs/2603.19173
-- ROCprofiler-SDK `rocprofv3` docs: https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/docs-7.0.1/how-to/using-rocprofv3.html
-- ROCprofiler-SDK quick guide: https://rocmdocs.amd.com/projects/rocprofiler-sdk/en/latest/quick_guide.html
+### rocWMMA
+
+- Use rocWMMA as a header-oriented HIP/C++ extension category for
+  matrix-core-style mixed precision GEMM.
+- Include `<rocwmma/rocwmma.hpp>` or equivalent installed headers.
+- Linkage may be header-only for the kernel path, but dependency detection must
+  verify headers and any package-provided runtime requirements.
+- rocWMMA docs list RDNA `gfx1200` and `gfx1201` as supported architectures, so
+  RDNA 4 validation is a valid v1.8 target.
+
+Sources:
+- https://rocm.docs.amd.com/projects/rocWMMA/en/latest/index.html
+- https://rocmdocs.amd.com/projects/rocWMMA/en/latest/api-reference/api-reference-guide.html
+
+## Build-System Implications
+
+- `build_ext.py` currently passes user-provided `hip_cflags`, `cflags`, and
+  `ld_flags`; v1.8 should make library-specific examples self-contained using
+  these fields where possible.
+- If common include or link flags are repeated across examples, add a small
+  helper or documented pattern rather than changing public solution schema.
+- Dependency tests should distinguish missing headers, missing libraries, and
+  unsupported RDNA 4 architectures.
+
+## What Not To Add
+
+- Do not add new public CLI flags solely for library category support.
+- Do not mutate trace JSONL or solution schema names.
+- Do not make CDNA 3 or CDNA 4 validation a v1.8 completion gate.
