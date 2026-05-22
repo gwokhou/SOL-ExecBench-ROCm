@@ -23,7 +23,12 @@ Supported solution categories in this port:
 - PyTorch on ROCm
 - Triton ROCm
 - HIP/C++
-- ROCm library-oriented native categories: `hipblas`, `miopen`, `ck`, `rocwmma`
+- ROCm library-oriented candidate categories: `hipblas`, `miopen`, `ck`,
+  `rocwmma`
+
+See [ROCm library category readiness](docs/rocm_libraries.md) before treating
+library-oriented categories as runnable support. Some former NVIDIA library/DSL
+example directories are retained as PyTorch compatibility examples.
 
 Current local validation evidence covers RDNA 4 (`gfx1200`). CDNA 3 targets
 (`gfx940`, `gfx941`, `gfx942`) are supported by the solution schema and HIP
@@ -151,6 +156,8 @@ problems are skipped unless `--rerun` is supplied.
 - [Trace](docs/trace.md): evaluation output and ROCm environment fields.
 - [Analysis](docs/analysis.md): timing, trace review, clock locking, and
   `rocprofv3` workflow.
+- [ROCm library categories](docs/rocm_libraries.md): supported vs candidate
+  native library categories and compatibility examples.
 - [Compliance](docs/compliance.md): third-party notices and unsupported features.
 
 ## Testing
