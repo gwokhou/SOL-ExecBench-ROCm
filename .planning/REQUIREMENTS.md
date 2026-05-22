@@ -29,17 +29,17 @@
 
 ### AMD-native Scoring
 
-- [ ] **SCORE-01**: Maintainer can generate per-problem AMD-native scores from measured timing and AMD SOL bound artifacts.
-- [ ] **SCORE-02**: Baseline ingestion and comparison are supported without claiming NVIDIA B200, SOLAR, or leaderboard equivalence.
-- [ ] **SCORE-03**: Suite-level aggregation preserves references to each workload's timing and SOL-bound evidence.
-- [ ] **SCORE-04**: Score and report outputs include claim guardrails for unsupported, incomplete, or unvalidated evidence.
+- [x] **SCORE-01**: Maintainer can generate per-problem AMD-native scores from measured timing and AMD SOL bound artifacts.
+- [x] **SCORE-02**: Baseline ingestion and comparison are supported without claiming NVIDIA B200, SOLAR, or leaderboard equivalence.
+- [x] **SCORE-03**: Suite-level aggregation preserves references to each workload's timing and SOL-bound evidence.
+- [x] **SCORE-04**: Score and report outputs include claim guardrails for unsupported, incomplete, or unvalidated evidence.
 
 ### Compatibility and Claims
 
-- [ ] **COMPAT-01**: v1.5 does not regress existing CLI behavior, solution schema, canonical trace JSONL, eval-driver correctness semantics, or reward-hack defenses.
-- [ ] **COMPAT-02**: SOL and timing evidence are emitted as derived artifacts unless an additive documented output is explicitly introduced.
-- [ ] **CLAIM-01**: v1.5 does not include real CDNA3 `gfx94*` full-suite validation.
-- [ ] **CLAIM-02**: CDNA3 hardware model or readiness scaffolding is labeled as unvalidated and does not produce CDNA3 hardware-validation claims.
+- [x] **COMPAT-01**: v1.5 does not regress existing CLI behavior, solution schema, canonical trace JSONL, eval-driver correctness semantics, or reward-hack defenses.
+- [x] **COMPAT-02**: SOL and timing evidence are emitted as derived artifacts unless an additive documented output is explicitly introduced.
+- [x] **CLAIM-01**: v1.5 does not include real CDNA3 `gfx94*` full-suite validation.
+- [x] **CLAIM-02**: CDNA3 hardware model or readiness scaffolding is labeled as unvalidated and does not produce CDNA3 hardware-validation claims.
 
 ## Future Requirements
 
@@ -85,14 +85,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SOL-02 | Phase 25 | Complete |
 | SOL-03 | Phase 25 | Complete |
 | SOL-04 | Phase 25 | Complete |
-| SCORE-01 | Phase 26 | Pending |
-| SCORE-02 | Phase 26 | Pending |
-| SCORE-03 | Phase 26 | Pending |
-| SCORE-04 | Phase 26 | Pending |
-| COMPAT-01 | Phase 26 | Pending |
-| COMPAT-02 | Phase 26 | Pending |
-| CLAIM-01 | Phase 26 | Pending |
-| CLAIM-02 | Phase 26 | Pending |
+| SCORE-01 | Phase 26 | Complete |
+| SCORE-02 | Phase 26 | Complete |
+| SCORE-03 | Phase 26 | Complete |
+| SCORE-04 | Phase 26 | Complete |
+| COMPAT-01 | Phase 26 | Complete |
+| COMPAT-02 | Phase 26 | Complete |
+| CLAIM-01 | Phase 26 | Complete |
+| CLAIM-02 | Phase 26 | Complete |
 
 **Coverage:**
 - v1.5 requirements: 20 total
@@ -101,4 +101,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-05-22*
-*Last updated: 2026-05-22 after Phase 25 completion*
+*Last updated: 2026-05-22 after Phase 26 completion*
