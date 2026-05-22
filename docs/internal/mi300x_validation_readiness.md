@@ -19,13 +19,13 @@ rocminfo | grep -E "Name: *gfx94|Marketing Name" || true
 rocm-smi --showproductname --showdriverversion --showhw || true
 uv run python -c 'import torch; print(torch.__version__, torch.version.hip, torch.cuda.is_available())'
 uv run pytest tests/
-uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
+uv run scripts/run_dataset.py data/benchmark \
   --output out/mi300x-validation \
   --lock-clocks \
   --timing-evidence-dir out/mi300x-timing \
   --gpu-architecture gfx942 \
   --amd-score-report out/mi300x-amd-score.json \
-  --scoring-baseline baselines/mi300x-scoring-baseline.json
+  --scoring-baseline <path-to-mi300x-scoring-baseline.json>
 ```
 
 ## Evidence To Record

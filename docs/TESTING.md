@@ -21,11 +21,12 @@ The `dev` dependency group in `pyproject.toml` includes:
 | `pytest-xdist` | `>=3.5` |
 
 Some tests require ROCm hardware or compiler support. The configured pytest
-markers are:
+markers in `pyproject.toml` and `tests/conftest.py` are:
 
 | Marker | Meaning |
 | --- | --- |
 | `cpp` | Compiles HIP/C++ extensions and may be slow. |
+| `timing_serial` | GPU timing tests skipped by default; run explicitly with `-m timing_serial -n 0`. |
 | `requires_rocm` | Requires a ROCm GPU visible through PyTorch. |
 | `requires_rdna4` | Requires an AMD RDNA 4 GPU such as `gfx1200`. |
 | `requires_cdna3` | Requires an AMD CDNA 3 GPU such as `gfx942`. |
@@ -63,6 +64,12 @@ Run example consistency coverage:
 uv run pytest tests/examples/test_examples.py -k consistency
 ```
 
+Run timing tests that are skipped by default:
+
+```bash
+uv run pytest tests -m timing_serial -n 0
+```
+
 Run Docker dependency checks from inside the ROCm container:
 
 ```bash
@@ -86,8 +93,9 @@ Existing test organization mirrors the source tree:
 | `tests/examples/` | Example file consistency and runnable example workflows. |
 
 Use markers for environment-sensitive coverage. Mark compiled extension tests
-with `cpp`, ROCm GPU tests with `requires_rocm`, and architecture-specific tests
-with `requires_rdna4` or `requires_cdna3`.
+with `cpp`, ROCm GPU tests with `requires_rocm`, architecture-specific tests
+with `requires_rdna4` or `requires_cdna3`, and timing tests that should not run
+under xdist with `timing_serial`.
 
 ## Coverage Requirements
 
@@ -122,4 +130,3 @@ For end-to-end benchmark behavior, run a small included example:
 uv run sol-execbench examples/pytorch/gemma3_swiglu \
   --solution examples/pytorch/gemma3_swiglu/solution_python.json
 ```
-

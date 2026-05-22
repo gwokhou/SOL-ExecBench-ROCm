@@ -8,19 +8,19 @@ Port against a small benchmark problem.
 
 | Requirement | Version or Detail |
 | --- | --- |
-| Python | `>=3.12,<3.14` from `pyproject.toml` |
+| Python | `3.12` from `.python-version`; `pyproject.toml` allows `>=3.12,<3.14` |
 | ROCm | ROCm 7.0 or newer for the project baseline; the Docker image uses `rocm/dev-ubuntu-24.04:7.1.1-complete` |
 | GPU | AMD GPU visible to PyTorch ROCm |
 | Package manager | `uv` |
 | Optional container runtime | Native Linux Docker daemon with `/dev/kfd` and `/dev/dri` access |
-| Optional dataset download | Hugging Face CLI from `huggingface-hub[cli]` |
+| Optional dataset download | Hugging Face CLI command `hf` from `huggingface-hub[cli]` |
 
 ## Installation Steps
 
 1. Clone the repository.
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/gwokhou/SOL-ExecBench-ROCm.git
 cd SOL-ExecBench-ROCm
 ```
 
@@ -63,13 +63,14 @@ summary table.
 Download the benchmark assets when you need dataset-scale runs:
 
 ```bash
+pip install "huggingface-hub[cli]"
 ./scripts/download_data.sh
 ```
 
 Then run a small dataset batch:
 
 ```bash
-uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark --limit 5
+uv run scripts/run_dataset.py data/benchmark --limit 5
 ```
 
 ## Optional Docker Setup
@@ -94,6 +95,7 @@ Run a command inside the container:
 | PyTorch reports `torch.version.cuda` instead of `torch.version.hip`. | Re-run `uv sync --all-groups` and confirm the ROCm wheel indexes in `pyproject.toml` are reachable. |
 | `torch.cuda.is_available()` returns `False` on a ROCm host. | Confirm ROCm is installed, the current user can access `/dev/kfd` and `/dev/dri`, and the GPU is visible through ROCm tools. |
 | Docker cannot see the AMD GPU. | Use a native Linux Docker daemon and `./scripts/run_docker.sh`; Docker Desktop cannot correctly pass ROCm devices through. |
+| `./scripts/download_data.sh` cannot find `hf`. | Install the Hugging Face CLI with `pip install "huggingface-hub[cli]"`, then rerun the download script. |
 | HIP/C++ examples fail to compile. | Confirm ROCm compiler tools such as `hipcc` are available, or use the provided Docker image. |
 
 ## Next Steps
@@ -102,4 +104,3 @@ Run a command inside the container:
 - Read [Configuration](CONFIGURATION.md) for CLI and benchmark settings.
 - Read [Development](DEVELOPMENT.md) before changing source code.
 - Read [Testing](TESTING.md) before running or adding tests.
-

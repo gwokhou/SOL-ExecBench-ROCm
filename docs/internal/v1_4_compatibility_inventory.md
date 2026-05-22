@@ -1,7 +1,7 @@
 # v1.4 Compatibility Inventory
 
 This inventory defines public contracts that v1.4 must preserve while adapting
-engineering practices from `~/PyCharmMiscProject/hip-playground/hip-execbench`.
+engineering practices from the separate hip-execbench project.
 It is source-grounded and intentionally separate from the user-facing benchmark
 schema.
 
@@ -11,8 +11,8 @@ Source: `src/sol_execbench/cli/main.py`
 
 - Entry point: `sol_execbench.cli:cli`, exposed as `sol-execbench`.
 - Supported invocation shapes:
-  - `sol-execbench <problem_dir> --solution solution.json`
-  - `sol-execbench --definition definition.json --workload workload.jsonl --solution solution.json`
+  - `sol-execbench <problem_dir> --solution <solution-file>`
+  - `sol-execbench --definition <definition-file> --workload <workload-file> --solution <solution-file>`
 - Public options include:
   - `--definition`
   - `--workload`
@@ -34,7 +34,7 @@ Source: `src/sol_execbench/cli/main.py`
 
 Source: `src/sol_execbench/core/data/definition.py`
 
-- `Definition` remains the public model for `definition.json`.
+- `Definition` remains the public model for benchmark definition files.
 - Contract fields include `name`, `op_type`, `axes`,
   `custom_inputs_entrypoint`, `inputs`, `outputs`, `reference`,
   `description`, and `hf_id`.
@@ -47,7 +47,7 @@ Source: `src/sol_execbench/core/data/definition.py`
 
 Source: `src/sol_execbench/core/data/workload.py`
 
-- `Workload` remains the public model for `workload.jsonl`.
+- `Workload` remains the public model for benchmark workload JSONL files.
 - Contract fields include `axes`, `inputs`, `uuid`, and `tolerance`.
 - Input variants remain `random`, `scalar`, `safetensors`, and `custom`.
 - Workloads must not mix `custom` inputs with non-custom inputs.
@@ -57,7 +57,7 @@ Source: `src/sol_execbench/core/data/workload.py`
 
 Source: `src/sol_execbench/core/data/solution.py`
 
-- `Solution` remains the public model for `solution.json`.
+- `Solution` remains the public model for solution metadata files.
 - `BuildSpec.languages` remains the public language selector.
 - ROCm-facing native/library language values include `hip_cpp`, `hipblas`,
   `miopen`, `ck`, and `rocwmma`; Python-side values include `pytorch` and
@@ -96,8 +96,8 @@ Source: `src/sol_execbench/core/data/trace.py`
 
 Source: `src/sol_execbench/driver/templates/eval_driver.py`
 
-- The eval driver evaluates the staged `solution.json`, `definition.json`, and
-  `workload.jsonl` files.
+- The eval driver evaluates the staged solution metadata, definition, and
+  workload JSONL files.
 - It emits JSONL `Trace` objects to stdout through the existing `_emit` path.
 - It preserves reward-hack detection, reference execution, user execution,
   shape/dtype checks, numerical correctness checks, timing, and environment
@@ -110,14 +110,14 @@ Source: `src/sol_execbench/driver/templates/eval_driver.py`
 Useful hip-execbench ideas may be adapted only when they preserve the contracts
 above:
 
-- Internal profiler-readiness diagnostics may use source patterns from
-  `src/profiler/router.ts`.
-- Internal stage diagnostics may use source patterns from `src/errors/index.ts`.
-- Derived summaries may use source patterns from `src/agent/builder.ts`, but
-  they must remain separate from canonical trace JSONL.
-- Baseline-relative comparison may use source patterns from
-  `src/baseline/comparator.ts`, but repeated-sample statistical claims require
-  a separate repeated-run trace contract.
+- Internal profiler-readiness diagnostics may adapt hip-execbench-style source
+  patterns when they remain private implementation details.
+- Internal stage diagnostics may adapt typed error-surface patterns.
+- Derived summaries may adapt pure transformation patterns, but they must remain
+  separate from canonical trace JSONL.
+- Baseline-relative comparison may adapt comparator-style thresholding, but
+  repeated-sample statistical claims require a separate repeated-run trace
+  contract.
 
 ## Phase 19 Non-Goals
 

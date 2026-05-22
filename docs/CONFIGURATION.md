@@ -1,16 +1,18 @@
 <!-- generated-by: gsd-doc-writer -->
 # Configuration
 
-SOL ExecBench ROCm Port has no required application environment variables in
-the Python package itself. Runtime behavior is configured through CLI flags,
-optional benchmark `config.json` files, package dependency configuration in
-`pyproject.toml`, and Docker environment variables in `docker/Dockerfile`.
+SOL ExecBench ROCm Port has no required application-level `.env` file. Runtime
+behavior is configured through CLI flags, optional benchmark `config.json` files,
+package dependency configuration in `pyproject.toml`, and environment variables
+used by the Docker wrapper, entrypoint, evaluation driver, and ROCm clock-lock
+helpers.
 
 ## Environment Variables
 
-No `.env.example`, `.env.sample`, or source-level `process.env` configuration
-exists in this Python project. The Docker image defines runtime environment
-variables for ROCm and `uv`:
+No `.env.example`, `.env.sample`, or Node-style `process.env` configuration
+exists in this Python project. The repository does use Python and shell
+environment variables for Docker execution, ROCm clock locking, PyTorch
+allocation behavior, and benchmark data lookup:
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
@@ -25,9 +27,16 @@ variables for ROCm and `uv`:
 | `UV_PYTHON_DOWNLOADS` | Container-only | `never` | Prevents Python downloads during Docker builds. |
 | `UV_PROJECT_ENVIRONMENT` | Container-only | `/venv` | Installs the project environment into `/venv`. |
 | `PYTHONPATH` | Container-only | `/sol-execbench/src` | Lets the mounted source tree override the installed package at runtime. |
+| `FLASHINFER_TRACE_DIR` | Optional | `/sol-execbench/data/flashinfer-trace` when launched through `scripts/run_docker.sh` | Adds downloaded FlashInfer trace safetensors to the evaluation driver's lookup roots. |
+| `SOL_EXECBENCH_CLOCKS_LOCKED` | Runtime state | `0` when unset | Set by `docker/entrypoint.sh` after clock-lock probing; evaluation treats `1` as locked. |
+| `SOL_EXECBENCH_SCLK_LEVEL` | Optional | Device preset from `src/sol_execbench/core/bench/config/device_config.py` when available | Overrides the ROCm SCLK DPM level used by `lock_clocks()`. |
+| `SOL_EXECBENCH_MCLK_LEVEL` | Optional | Device preset from `src/sol_execbench/core/bench/config/device_config.py` when available | Overrides the ROCm MCLK DPM level used by `lock_clocks()`. |
+| `SOL_EXECBENCH_GPU_CLK_MHZ` | Optional passthrough | Empty when unset | Forwarded into the Docker container by `scripts/run_docker.sh`; no current Python source reads it. |
+| `SOL_EXECBENCH_DRAM_CLK_MHZ` | Optional passthrough | Empty when unset | Forwarded into the Docker container by `scripts/run_docker.sh`; no current Python source reads it. |
+| `PYTORCH_ALLOC_CONF` | Subprocess-only | `expandable_segments:True` | Set by the CLI for compilation and evaluation subprocesses. |
 
-The CLI also sets `PYTORCH_ALLOC_CONF=expandable_segments:True` for compilation
-and evaluation subprocesses in `src/sol_execbench/cli/main.py`.
+`docker/entrypoint.sh` also checks `FLASHINFER_TRACE_DIR` and warns if that
+directory is not mounted.
 
 ## Config File Format
 
@@ -99,7 +108,9 @@ No separate development, staging, or production configuration files are present.
 For local runs, pass CLI flags or a benchmark `config.json`. For Docker runs,
 use `./scripts/run_docker.sh` so the container receives ROCm device access,
 repository mounts, and the runtime environment defined in `docker/Dockerfile`
-and `docker/entrypoint.sh`.
+and `docker/entrypoint.sh`. The wrapper also forwards `FLASHINFER_TRACE_DIR`,
+`SOL_EXECBENCH_GPU_CLK_MHZ`, and `SOL_EXECBENCH_DRAM_CLK_MHZ` into the
+container.
 
 ## Dependency Configuration
 
@@ -109,4 +120,3 @@ markers, and ROCm wheel indexes. The project requires Python `>=3.12,<3.14`.
 On Linux and Windows, `torch` and `torchvision` resolve from the
 `pytorch-rocm71` index, and `triton-rocm` resolves from the PyTorch ROCm root
 index on Linux.
-

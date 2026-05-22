@@ -19,8 +19,8 @@ downloaded benchmark assets belong in `data/`.
   dataset batch.
 - `uv run pytest tests/`: run the full test suite.
 - `uv run pytest tests/sol_execbench/test_e2e.py`: run one test file.
-- `uv run ruff check .`: lint the repository.
-- `uv run ruff format .`: format Python files.
+- `uv run --with ruff ruff check .`: lint the repository when Ruff is not already installed.
+- `uv run --with ruff ruff format .`: format Python files when Ruff is not already installed.
 - `./scripts/run_docker.sh --build`: build and enter the Docker environment used for
   GPU evaluation.
 
@@ -38,8 +38,10 @@ not commit local cache, build, or downloaded benchmark output.
 
 Pytest is the test framework. Place new tests next to related coverage under
 `tests/sol_execbench/`, or under `tests/examples/` for example workflows. Use existing
-markers for environment-sensitive tests, including `cpp` for compiled extension tests
-and `requires_cutile` for cuTile or Blackwell-only behavior. Prefer small unit tests
+markers for environment-sensitive tests, including `cpp` for compiled extension tests,
+`requires_rocm` for ROCm GPU behavior, and architecture-specific markers such as
+`requires_rdna4` or `requires_cdna3`. `requires_cutile` is a legacy NVIDIA cuTile
+marker that is skipped in this ROCm-only port. Prefer small unit tests
 for schema and driver logic, and add integration coverage when changing subprocess
 evaluation or GPU execution behavior.
 
@@ -60,11 +62,11 @@ documentation and tests.
 ## Security & Configuration Tips
 
 Do not commit proprietary kernels, credentials, Hugging Face tokens, or downloaded
-datasets. GPU evaluation may require Docker, NVIDIA Container Toolkit, CUDA-capable
-hardware, and driver support; document any hardware-specific assumptions in tests or
-PR notes.
+datasets. GPU evaluation may require Docker, ROCm-capable AMD hardware, ROCm
+drivers, and access to `/dev/kfd` and `/dev/dri`; document any hardware-specific
+assumptions in tests or PR notes.
 
-<!-- GSD:project-start source:PROJECT.md -->
+<!-- GSD:project-start source:.planning/PROJECT.md -->
 ## Project
 
 **SOL ExecBench ROCm Port**
@@ -87,7 +89,7 @@ while preserving the benchmark semantics and rigor of SOL ExecBench.
 - **Quality**: Migrated tests, examples, Docker checks, and end-to-end evaluation must pass under ROCm.
 <!-- GSD:project-end -->
 
-<!-- GSD:stack-start source:codebase/STACK.md -->
+<!-- GSD:stack-start source:.planning/codebase/STACK.md -->
 ## Technology Stack
 
 ## Runtime
@@ -95,9 +97,11 @@ while preserving the benchmark semantics and rigor of SOL ExecBench.
 - Python package source lives in `src/sol_execbench/`.
 - CLI layer uses Click and Rich in `src/sol_execbench/cli/main.py`.
 - Data schemas use Pydantic v2 models in `src/sol_execbench/core/data/`.
-- GPU evaluation uses PyTorch, CUDA, Triton, CUTLASS, cuDNN, CuTe DSL, cuTile,
-- Native C++/CUDA builds go through `torch.utils.cpp_extension` from
-- Timing uses CUPTI activity tracing in `src/sol_execbench/core/bench/timing.py`.
+- GPU evaluation uses PyTorch ROCm, Triton ROCm, HIP/C++, hipBLAS, and ROCm
+  library candidate categories.
+- Native HIP/C++ builds go through `torch.utils.cpp_extension`.
+- Timing uses HIP-backed PyTorch device events, with optional `rocprofv3`
+  evidence collection.
 ## Dependency Configuration
 ## Packaging
 ## Container
@@ -105,12 +109,12 @@ while preserving the benchmark semantics and rigor of SOL ExecBench.
 - `uv sync --all-groups` installs dependencies.
 - `uv run sol-execbench <problem_dir> --solution solution.json` runs one problem.
 - `uv run pytest tests/` runs tests.
-- `uv run ruff check .` lints.
-- `uv run ruff format .` formats.
+- `uv run --with ruff ruff check .` lints when Ruff is not already installed.
+- `uv run --with ruff ruff format .` formats when Ruff is not already installed.
 - `./scripts/run_docker.sh --build` builds and enters the GPU container.
 <!-- GSD:stack-end -->
 
-<!-- GSD:conventions-start source:CONVENTIONS.md -->
+<!-- GSD:conventions-start source:.planning/codebase/CONVENTIONS.md -->
 ## Conventions
 
 ## Python Style
@@ -127,7 +131,7 @@ while preserving the benchmark semantics and rigor of SOL ExecBench.
 ## Documentation
 <!-- GSD:conventions-end -->
 
-<!-- GSD:architecture-start source:ARCHITECTURE.md -->
+<!-- GSD:architecture-start source:.planning/codebase/ARCHITECTURE.md -->
 ## Architecture
 
 ## System Shape

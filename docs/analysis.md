@@ -9,8 +9,8 @@ inspection when needed.
 Write JSONL traces from a single problem:
 
 ```bash
-uv run sol-execbench tests/sol_execbench/samples/rmsnorm \
-  --solution tests/sol_execbench/samples/rmsnorm/solution_python.json \
+uv run sol-execbench examples/pytorch/gemma3_swiglu \
+  --solution examples/pytorch/gemma3_swiglu/solution_python.json \
   --json \
   -o out/rmsnorm.jsonl
 ```
@@ -21,8 +21,9 @@ Run a dataset batch:
 uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark --limit 5
 ```
 
-Dataset runs write per-problem traces and a summary under `out/run_dataset/`
-unless `-o` is supplied.
+Dataset runs write per-problem traces under category/problem subdirectories of
+the selected output directory and write `summary.json` directly under that
+output directory. The default output directory is `out/`.
 
 For source-specific ROCm timing evidence, add a timing evidence directory and
 record the target architecture:
@@ -58,7 +59,7 @@ The benchmark path:
 For benchmark-grade runs, use:
 
 ```bash
-uv run sol-execbench <problem_dir> --solution solution.json --lock-clocks
+uv run sol-execbench <problem_dir> --solution <solution-file> --lock-clocks
 ```
 
 Clock locking uses `rocm-smi`. The command fails the workload if
@@ -88,8 +89,8 @@ analysis is needed:
 
 ```bash
 rocprofv3 --stats -- \
-  uv run sol-execbench tests/sol_execbench/samples/rmsnorm \
-    --solution tests/sol_execbench/samples/rmsnorm/solution_python.json
+  uv run sol-execbench examples/pytorch/gemma3_swiglu \
+    --solution examples/pytorch/gemma3_swiglu/solution_python.json
 ```
 
 For HIP/C++ solutions, keep compilation outside the profiling window when
@@ -151,6 +152,8 @@ uv run sol-execbench-baseline \
   --output out/baseline-comparison.json
 ```
 
+The `out/` path above is an example output location created by the command.
+
 Baseline comparison is baseline-relative. It is not an AMD-native roofline claim
 unless you provide and validate a separate AMD interpretation model. The
 `--amd-native-claim` flag intentionally emits a warning so reports cannot
@@ -186,6 +189,9 @@ uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
   --amd-score-report out/amd-score-report.json
 ```
 
+The `out/amd-score-report.json` path is an example output path created by the
+dataset command.
+
 The report is opt-in. It reads canonical trace output and derived AMD SOL bound
 inputs, records trace, timing, SOL-bound, baseline, and hardware-model evidence
 references for each workload score, and keeps the output separate from canonical
@@ -198,7 +204,7 @@ For release-defined scoring, provide an optimized scoring baseline artifact:
 uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
   --limit 5 \
   --amd-score-report out/amd-score-report.json \
-  --scoring-baseline baselines/v1.7.json
+  --scoring-baseline <path-to-scoring-baseline.json>
 ```
 
 Baseline artifacts are derived JSON inputs keyed by definition and workload UUID:

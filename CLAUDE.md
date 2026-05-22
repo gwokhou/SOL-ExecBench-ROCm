@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-SOL ExecBench is NVIDIA's GPU kernel evaluation and benchmarking framework. It evaluates custom GPU kernel solutions (PyTorch, Triton, CUTLASS, cuDNN, CuTe DSL, cuTile, CUDA C++) for correctness and performance by comparing them against reference implementations.
+SOL ExecBench ROCm Port evaluates custom GPU kernel solutions on AMD ROCm
+hardware. It supports PyTorch ROCm, Triton ROCm, HIP/C++, and selected ROCm
+library categories while rejecting legacy CUDA/NVIDIA runtime metadata.
 
 ## Build & Run Commands
 
@@ -24,8 +26,8 @@ uv run pytest tests/sol_execbench/core/data/test_definition.py
 # Run tests matching a keyword
 uv run pytest tests/ -k "test_correctness"
 
-# Run sample integration tests (requires CUDA GPU)
-uv run pytest tests/sol_execbench/samples/
+# Run ROCm-sensitive tests when ROCm hardware is available
+uv run pytest tests/sol_execbench/test_e2e.py
 
 # Lint and format
 uv run ruff check .
@@ -36,17 +38,17 @@ uv run ruff format .
 
 The codebase has three layers:
 
-1. **CLI** (`cli/main.py`) — Click-based CLI entry point (`sol-execbench`). Parses args, invokes the driver, displays Rich tables with results.
+1. **CLI** (`src/sol_execbench/cli/main.py`) — Click-based CLI entry point (`sol-execbench`). Parses args, invokes the driver, displays Rich tables with results.
 
-2. **Driver** (`driver/`) — Orchestrates evaluation. `ProblemPackager` stages problem files (definition, workloads, solution sources) into a temp directory, then runs compilation and evaluation as **subprocesses**. The eval driver template (`driver/templates/eval_driver.py`, ~800 lines) is the self-contained script that runs inside the subprocess — it imports torch/triton, loads inputs, executes kernels, computes correctness/performance, and emits JSONL traces to stdout.
+2. **Driver** (`src/sol_execbench/driver/`) — Orchestrates evaluation. `ProblemPackager` stages problem files (definition, workloads, solution sources) into a temp directory, then runs compilation and evaluation as **subprocesses**. The eval driver template (`src/sol_execbench/driver/templates/eval_driver.py`) is the self-contained script that runs inside the subprocess; it imports torch, loads inputs, executes kernels, computes correctness/performance, and emits JSONL traces to stdout.
 
-3. **Core** (`core/`) — Two sub-packages:
-   - `core/data/` — Pydantic v2 models for all data types: Definition (kernel specs, tensor shapes), Solution (source files, build specs), Workload (input generation), Trace (evaluation results with correctness/performance).
-   - `core/bench/` — Benchmarking utilities: CUDA event timing, numerical correctness computation, GPU clock locking, reward hack detection (detects timing manipulation, stream injection, monkey-patching).
+3. **Core** (`src/sol_execbench/core/`) — Package modules for data models, benchmarking, scoring, diagnostics, and reporting:
+   - `src/sol_execbench/core/data/` — Pydantic v2 models for Definition, Solution, Workload, Trace, shapes, and dtypes.
+   - `src/sol_execbench/core/bench/` — Benchmarking utilities: HIP-backed event timing, numerical correctness computation, ROCm clock locking, and reward-hack detection.
 
 ### Key execution flow
 
-CLI → ProblemPackager stages files to temp dir → subprocess compiles C++/CUDA (if needed) → subprocess runs eval_driver.py → eval_driver outputs JSONL traces to stdout → CLI parses traces and displays results.
+CLI → ProblemPackager stages files to temp dir → subprocess compiles HIP/C++ when needed → subprocess runs eval_driver.py → eval_driver outputs JSONL traces to stdout → CLI parses traces and displays results.
 
 ### Two calling conventions
 
@@ -54,14 +56,16 @@ Kernel solutions use either **destination-passing style** (DPS, modifies pre-all
 
 ## Test Markers & Fixtures
 
-- `@pytest.mark.requires_torch_cuda` — auto-skipped when no CUDA GPU available
-- `@pytest.mark.cpp` — compiles C++/CUDA extensions (slow)
-- `@requires_sm100` — skips on GPUs below sm_100 (Blackwell). Use this for cuTile tests.
+- `@pytest.mark.requires_rocm` — requires a ROCm GPU visible through PyTorch
+- `@pytest.mark.cpp` — compiles HIP/C++ extensions (slow)
+- `@pytest.mark.requires_rdna4` / `@pytest.mark.requires_cdna3` — require specific AMD architecture classes
+- `@pytest.mark.requires_cutile` — legacy NVIDIA cuTile marker skipped in this ROCm-only port
 - `tmp_cache_dir` fixture — isolated build cache per test via `SOLEXECBENCH_CACHE_PATH`
 
 ## Style
 
-Ruff for linting and formatting. Rule E741 is ignored. Exclude `data/` and `tests/data/` from lint.
+Ruff for linting and formatting. Rule E741 is ignored. `data/` and `examples/`
+are excluded from lint.
 
 ## Commits
 
