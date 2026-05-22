@@ -11,7 +11,7 @@ public example coverage.
 | --- | --- | --- | --- | --- |
 | HIP/C++ | `hip_cpp` | Supported | Runnable HIP examples exist under `examples/hip_cpp/` | Primary native extension path. |
 | hipBLAS / hipBLASLt | `hipblas` | Supported | Runnable SGEMM example exists under `examples/hipblas/gemm/` | BLAS/GEMM replacement path using the native ROCm build flow and `-lhipblas`. |
-| MIOpen | `miopen` | Candidate | Former cuDNN examples are PyTorch compatibility examples | Use only after an operation-specific MIOpen solution is implemented and tested. |
+| MIOpen | `miopen` | Supported | Runnable softmax example exists under `examples/miopen/softmax/` | cuDNN-style softmax replacement path using the native ROCm build flow and `-lMIOpen`. |
 | Composable Kernel | `ck` | Candidate | Former CUTLASS examples are PyTorch compatibility examples | Candidate replacement for selected CUTLASS/CuTe-style kernels. |
 | rocWMMA | `rocwmma` | Candidate | No runnable public `rocwmma` example yet | Candidate for WMMA-style matrix kernels. |
 
@@ -38,7 +38,7 @@ the old directory name for discoverability.
 | Original NVIDIA category | Public path | Current implementation | Replacement direction |
 | --- | --- | --- | --- |
 | CUTLASS | `examples/cutlass/gemm/` | PyTorch ROCm compatibility example | `ck`, `rocwmma`, `hipblas`, or HIP/Triton |
-| cuDNN | `examples/cudnn/softmax/` | PyTorch ROCm compatibility example | `miopen`, HIP, or Triton |
+| cuDNN | `examples/cudnn/softmax/` | PyTorch ROCm compatibility example | `examples/miopen/softmax/`, HIP, or Triton |
 | CuTe DSL | `examples/cute_dsl/jamba_attn_proj/` | PyTorch ROCm compatibility example | `ck`, `rocwmma`, HIP, or Triton |
 | cuTile | `examples/cutile/jamba_attn_proj/` | PyTorch ROCm compatibility example | HIP or Triton |
 
@@ -47,6 +47,13 @@ the old directory name for discoverability.
 | ROCm library | Public path | Evidence |
 | --- | --- | --- |
 | hipBLAS | `examples/hipblas/gemm/` | `solution_hipblas.json` uses schema language `hipblas`, includes `hipblas/hipblas.h`, calls `hipblasSgemm`, and links with `-lhipblas`. |
+| MIOpen | `examples/miopen/softmax/` | `solution_miopen.json` uses schema language `miopen`, includes `miopen/miopen.h`, calls `miopenSoftmaxForward_V2`, and links with `-lMIOpen`. |
+
+The MIOpen softmax example is intentionally operation-specific: it validates
+float32 tensors shaped `[batch_size, 4096]`, maps them to MIOpen tensor
+descriptors as `N=batch_size, C=4096, H=1, W=1`, and uses
+`MIOPEN_SOFTMAX_MODE_INSTANCE` so the measured implementation computes softmax
+across the hidden dimension for each batch item.
 
 ## Dependency Diagnostics
 
@@ -66,8 +73,8 @@ specific dependency group instead of surfacing as opaque compile errors.
 
 ## User Guidance
 
-- Use `hip_cpp`, `hipblas`, `pytorch`, or `triton` for runnable examples today.
-- Use `miopen`, `ck`, or `rocwmma` only when the solution source and local ROCm
+- Use `hip_cpp`, `hipblas`, `miopen`, `pytorch`, or `triton` for runnable examples today.
+- Use `ck` or `rocwmma` only when the solution source and local ROCm
   environment actually provide the required library integration.
 - Do not treat candidate categories as evidence of performance portability from
   NVIDIA libraries.

@@ -139,6 +139,14 @@ _EXAMPLES = [
         solution_file="solution_cudnn.json",
         expected_count=3,
     ),
+    Example(
+        test_id="softmax_miopen",
+        language="miopen",
+        problem="softmax",
+        solution_file="solution_miopen.json",
+        expected_count=3,
+        extra_markers=["cpp", "requires_rocm", "requires_rocm_dev", "requires_rdna4"],
+    ),
 ]
 
 

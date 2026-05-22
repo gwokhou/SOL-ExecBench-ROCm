@@ -15,10 +15,10 @@
 
 ### MIOpen Replacement
 
-- [ ] **MIOPEN-01**: User can run a public MIOpen-backed example on RDNA 4 through `sol-execbench` and receive passing trace JSONL.
-- [ ] **MIOPEN-02**: The MIOpen example uses real MIOpen headers/API calls and does not silently fall back to PyTorch for the measured implementation.
-- [ ] **MIOPEN-03**: Tests cover MIOpen solution metadata, source consistency, dependency detection, and RDNA 4 E2E behavior where hardware is available.
-- [ ] **MIOPEN-04**: Documentation identifies MIOpen as the supported ROCm replacement path for the former cuDNN softmax-style example, including operation-specific constraints.
+- [x] **MIOPEN-01**: User can run a public MIOpen-backed example on RDNA 4 through `sol-execbench` and receive passing trace JSONL.
+- [x] **MIOPEN-02**: The MIOpen example uses real MIOpen headers/API calls and does not silently fall back to PyTorch for the measured implementation.
+- [x] **MIOPEN-03**: Tests cover MIOpen solution metadata, source consistency, dependency detection, and RDNA 4 E2E behavior where hardware is available.
+- [x] **MIOPEN-04**: Documentation identifies MIOpen as the supported ROCm replacement path for the former cuDNN softmax-style example, including operation-specific constraints.
 
 ### Composable Kernel Replacement
 
@@ -81,10 +81,10 @@
 | BUILD-02 | Phase 36 | Complete |
 | BUILD-03 | Phase 36 | Complete |
 | BUILD-04 | Phase 36 | Complete |
-| MIOPEN-01 | Phase 37 | Pending |
-| MIOPEN-02 | Phase 37 | Pending |
-| MIOPEN-03 | Phase 37 | Pending |
-| MIOPEN-04 | Phase 37 | Pending |
+| MIOPEN-01 | Phase 37 | Complete |
+| MIOPEN-02 | Phase 37 | Complete |
+| MIOPEN-03 | Phase 37 | Complete |
+| MIOPEN-04 | Phase 37 | Complete |
 | CK-01 | Phase 38 | Pending |
 | CK-02 | Phase 38 | Pending |
 | CK-03 | Phase 38 | Pending |
@@ -108,4 +108,4 @@
 
 ---
 *Requirements defined: 2026-05-22*
-*Last updated: 2026-05-22 after Phase 36 completion*
+*Last updated: 2026-05-22 after Phase 37 completion*

@@ -147,6 +147,30 @@ def test_hipblas_public_example_is_runnable_native_category():
     assert "gfx942" in data["spec"]["target_hardware"]
 
 
+def test_miopen_public_example_is_runnable_native_category():
+    path = REPO_ROOT / "examples/miopen/softmax/solution_miopen.json"
+    data = _load_solution(path)
+    solution = Solution(**data)
+
+    assert [language.value for language in solution.spec.languages] == ["miopen"]
+    assert solution.definition == "miopen_softmax_h4096"
+    assert solution.spec.destination_passing_style is False
+    assert solution.spec.compile_options is not None
+    assert "-lMIOpen" in solution.spec.compile_options.ld_flags
+    assert "-I/opt/rocm/include" in solution.spec.compile_options.cflags
+    assert "miopenSoftmaxForward_V2" in solution.sources[0].content
+    assert "miopen/miopen.h" in solution.sources[0].content
+    assert "gfx1200" in data["spec"]["target_hardware"]
+    assert "gfx942" not in data["spec"]["target_hardware"]
+
+
+def test_miopen_solution_embeds_checked_in_source():
+    example_dir = REPO_ROOT / "examples/miopen/softmax"
+    solution = Solution(**_load_solution(example_dir / "solution_miopen.json"))
+
+    assert solution.sources[0].content == (example_dir / "main.cpp").read_text()
+
+
 def test_hipblas_example_stages_through_native_packager(tmp_path):
     example_dir = REPO_ROOT / "examples/hipblas/gemm"
     definition = Definition(**_load_solution(example_dir / "definition.json"))
@@ -169,6 +193,31 @@ def test_hipblas_example_stages_through_native_packager(tmp_path):
     staged_solution = json.loads((tmp_path / "solution.json").read_text())
     assert staged_solution["spec"]["languages"] == ["hipblas"]
     assert "-lhipblas" in staged_solution["spec"]["compile_options"]["ld_flags"]
+
+
+def test_miopen_example_stages_through_native_packager(tmp_path):
+    example_dir = REPO_ROOT / "examples/miopen/softmax"
+    definition = Definition(**_load_solution(example_dir / "definition.json"))
+    workload = Workload(**json.loads((example_dir / "workload.jsonl").read_text().splitlines()[0]))
+    solution = Solution(**_load_solution(example_dir / "solution_miopen.json"))
+    packager = ProblemPackager(
+        definition=definition,
+        workloads=[workload],
+        solution=solution,
+        config=BenchmarkConfig(lock_clocks=False),
+        output_dir=tmp_path,
+        keep_output_dir=True,
+    )
+
+    command, artifact_path = packager.compile()
+
+    assert command == ["python", "build_ext.py"]
+    assert artifact_path == str(tmp_path / "benchmark_kernel.so")
+    assert (tmp_path / "main.cpp").exists()
+    staged_solution = json.loads((tmp_path / "solution.json").read_text())
+    assert staged_solution["spec"]["languages"] == ["miopen"]
+    assert "-lMIOpen" in staged_solution["spec"]["compile_options"]["ld_flags"]
+    assert "-I/opt/rocm/include" in staged_solution["spec"]["compile_options"]["cflags"]
 
 
 def test_remaining_rocm_library_categories_stage_through_native_packager(tmp_path):

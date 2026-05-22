@@ -36,15 +36,18 @@ def test_former_nvidia_library_examples_are_pytorch_compatibility_examples():
 
 
 def test_only_supported_library_category_has_public_runnable_example():
-    supported_library_examples = {"examples/hipblas/gemm/solution_hipblas.json"}
-    candidate_categories = {"miopen", "ck", "rocwmma"}
+    supported_library_examples = {
+        "examples/hipblas/gemm/solution_hipblas.json",
+        "examples/miopen/softmax/solution_miopen.json",
+    }
+    candidate_categories = {"ck", "rocwmma"}
     offenders = []
     supported_seen = set()
     for path in sorted((REPO_ROOT / "examples").glob("*/*/solution*.json")):
         data = json.loads(path.read_text())
         languages = set(data["spec"]["languages"])
         relative = str(path.relative_to(REPO_ROOT))
-        if "hipblas" in languages:
+        if languages & {"hipblas", "miopen"}:
             supported_seen.add(relative)
         if languages & candidate_categories:
             offenders.append(relative)

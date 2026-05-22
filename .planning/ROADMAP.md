@@ -14,7 +14,7 @@ deferred and must not be claimed by this milestone.
 ## Phase Summary
 
 - [x] Phase 36: Library Build Plumbing and Diagnostics
-- [ ] Phase 37: MIOpen Supported Replacement
+- [x] Phase 37: MIOpen Supported Replacement
 - [ ] Phase 38: Composable Kernel Supported Replacement
 - [ ] Phase 39: rocWMMA Supported Replacement
 - [ ] Phase 40: Compatibility Cleanup and RDNA 4 Validation Closure
@@ -22,7 +22,7 @@ deferred and must not be claimed by this milestone.
 | Phase | Name | Goal | Requirements |
 |-------|------|------|--------------|
 | 36 | Library Build Plumbing and Diagnostics | Complete 2026-05-22: Added reusable ROCm library dependency diagnostics, Docker dependency checks, native staging tests, and dependency docs for MIOpen, CK, and rocWMMA. | BUILD-01, BUILD-02, BUILD-03, BUILD-04 |
-| 37 | MIOpen Supported Replacement | Promote MIOpen from candidate to supported RDNA 4 replacement with a real runnable example and tests. | MIOPEN-01, MIOPEN-02, MIOPEN-03, MIOPEN-04 |
+| 37 | MIOpen Supported Replacement | Complete 2026-05-22: Added a native MIOpen softmax example, RDNA 4 E2E registration, source/staging tests, and supported-status docs. | MIOPEN-01, MIOPEN-02, MIOPEN-03, MIOPEN-04 |
 | 38 | Composable Kernel Supported Replacement | Promote CK from candidate to supported RDNA 4 replacement for selected GEMM/fused GEMM workloads. | CK-01, CK-02, CK-03, CK-04 |
 | 39 | rocWMMA Supported Replacement | Promote rocWMMA from candidate to supported RDNA 4 replacement for matrix-core GEMM-style workloads. | WMM-01, WMM-02, WMM-03, WMM-04 |
 | 40 | Compatibility Cleanup and RDNA 4 Validation Closure | Remove support-status ambiguity, map former NVIDIA categories, and record RDNA 4-only completion evidence. | COMPAT-01, COMPAT-02, COMPAT-03, COMPAT-04, RDNA4-01, RDNA4-02, RDNA4-03 |
@@ -62,7 +62,7 @@ Plans:
 
 ### Phase 37: MIOpen Supported Replacement
 
-**Status:** Not Started
+**Status:** Complete 2026-05-22
 
 **Goal:** Promote MIOpen to supported status with a real RDNA 4 runnable public
 example.
@@ -83,7 +83,12 @@ example.
 - Do not silently fall back to PyTorch in the measured implementation.
 - Document operation-specific MIOpen descriptor limitations.
 
-**Plans:** 0 plans
+**Plans:** 1 plan
+
+Plans:
+
+- [x] 37-01: Add MIOpen softmax supported example, metadata/source tests,
+  native staging coverage, RDNA 4 E2E registration, and support docs.
 
 ### Phase 38: Composable Kernel Supported Replacement
 
@@ -193,10 +198,10 @@ RDNA4-02, RDNA4-03
 | BUILD-02 | Phase 36 | Complete |
 | BUILD-03 | Phase 36 | Complete |
 | BUILD-04 | Phase 36 | Complete |
-| MIOPEN-01 | Phase 37 | Pending |
-| MIOPEN-02 | Phase 37 | Pending |
-| MIOPEN-03 | Phase 37 | Pending |
-| MIOPEN-04 | Phase 37 | Pending |
+| MIOPEN-01 | Phase 37 | Complete |
+| MIOPEN-02 | Phase 37 | Complete |
+| MIOPEN-03 | Phase 37 | Complete |
+| MIOPEN-04 | Phase 37 | Complete |
 | CK-01 | Phase 38 | Pending |
 | CK-02 | Phase 38 | Pending |
 | CK-03 | Phase 38 | Pending |
