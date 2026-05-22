@@ -15,7 +15,7 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
 ## Current State
 
-**Shipped version:** v1.5 AMD-native SOL Scoring and ROCm Profiler Timing,
+**Shipped version:** v1.6 AMD SOLAR Coverage, Live Profiler Timing, and Scoring Workflow,
 archived 2026-05-22.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline. The
@@ -35,7 +35,11 @@ readiness metadata, and RDNA 4 validation evidence while still excluding real
 CDNA 3 hardware validation and any CDNA 3 hardware-validation claim. The v1.5
 milestone added source-specific timing semantics, `rocprofv3` timing evidence
 helpers, AMD SOL bound artifacts, and derived AMD-native score reports with
-explicit evidence references and claim guardrails.
+explicit evidence references and claim guardrails. The v1.6 milestone broadened
+AMD SOL analyzer coverage, added live `rocprofv3` collection helpers, connected
+derived AMD-native score reports to the dataset workflow, and added focused
+compatibility/claim guardrails for canonical trace JSONL, public schemas, and
+primary CLI behavior.
 
 Validation status:
 
@@ -44,26 +48,17 @@ Validation status:
 - CDNA 3 (`gfx94*`) full adapted suite validation remains deferred by user
   decision and must be completed before claiming CDNA 3 hardware validation.
 
-## Current Milestone: v1.6 AMD SOLAR Coverage, Live Profiler Timing, and Scoring Workflow
+## Next Milestone Goals
 
-**Goal:** Turn the v1.5 AMD-native SOL, timing, and scoring foundations into an
-end-to-end workflow while preserving existing public contracts.
+No active milestone is defined. Candidate next directions:
 
-**Target features:**
-
-- Broaden AMD SOL/SOLAR-like operator coverage beyond the conservative v1.5
-  foundation.
-- Integrate `rocprofv3` live collection into the actual benchmark timing path
-  while preserving source-specific HIP, Triton, and PyTorch timing semantics.
-- Connect AMD-native score reports to dataset runner or CLI workflows so
-  trace, timing evidence, and SOL bound artifacts can produce workload and
-  suite score outputs.
-
-**Hard constraint:**
-
-- Do not break existing canonical trace JSONL, public schemas, or the primary
-  `sol-execbench` CLI contract. New scoring or timing outputs must be derived
-  artifacts or additive documented outputs.
+- Run real CDNA 3 `gfx94*` full-suite validation when hardware is available.
+- Validate live `rocprofv3` collection against real profiler output on target
+  hardware and expand parser coverage if ROCm output schemas differ.
+- Continue closing upstream SOLAR parity gaps for additional benchmark operator
+  categories.
+- Promote AMD hardware model entries from provisional or unvalidated only after
+  architecture-specific evidence is recorded.
 
 ## Requirements
 
@@ -115,14 +110,15 @@ end-to-end workflow while preserving existing public contracts.
   bound artifacts, and derived AMD-native score reports are implemented without
   mutating canonical trace JSONL or claiming NVIDIA B200/SOLAR/leaderboard
   equivalence - v1.5.
+- Broader AMD SOL analyzer coverage, live `rocprofv3` collection helpers,
+  dataset-runner AMD-native score reports, and v1.6 compatibility/claim
+  guardrails are implemented without breaking canonical trace JSONL, public
+  schemas, or primary `sol-execbench` CLI defaults - v1.6.
 
 ### Active
 
-- [ ] Broaden AMD SOL operator analyzer coverage beyond the v1.5 foundation.
-- [ ] Integrate live `rocprofv3` timing collection into benchmark execution
-      without changing canonical trace JSONL or public CLI defaults.
-- [ ] Connect AMD-native score report generation to dataset runner or CLI
-      workflows as a derived artifact.
+No active milestone requirements. Start the next milestone with
+`$gsd-new-milestone`.
 
 ### Out of Scope
 
@@ -145,11 +141,11 @@ contains the HIP-aware build and eval subprocess scripts.
 
 High-risk areas for future work remain real CDNA 3 hardware validation, native
 library replacement quality, timing integrity on additional AMD architectures,
-and AMD-native score interpretation. v1.5 established a conservative
-SOLAR-like AMD-native scoring model and profiler-backed timing evidence layer.
-Timing accuracy remains the highest priority: Triton, HIP native, and PyTorch
-operator sources may require separate timer semantics instead of one forced
-unified timer.
+and deeper upstream SOLAR parity. v1.6 established an end-to-end derived
+AMD-native workflow from analyzer coverage through live profiler evidence and
+dataset score reporting. Timing accuracy remains the highest priority: Triton,
+HIP native, and PyTorch operator sources may require separate timer semantics
+instead of one forced unified timer.
 
 ## Constraints
 
@@ -179,6 +175,9 @@ unified timer.
 | Replace default timing with profiler timing | User selected replacing the default event timing path with a profiler-backed path for v1.5. | Validated in v1.5 as policy/evidence foundation |
 | Accuracy beats unified timing semantics | User clarified that Triton, HIP native, and PyTorch timing semantics must be investigated separately; if one unified timing definition is inaccurate, expose operator-source-specific timer backends. | Validated in v1.5 |
 | Exclude CDNA 3 hardware validation from v1.5 | User explicitly said the next milestone does not include CDNA 3 validation. | Validated in v1.5 |
+| Preserve public contracts during v1.6 workflow integration | User made canonical trace JSONL, schema, and primary CLI compatibility a hard constraint for v1.6. | Validated in v1.6 |
+| Keep CDNA 3 validation out of v1.6 | User said the next milestone's forced constraint still excludes CDNA 3 validation. | Validated in v1.6 |
+| Expose source-specific timer chimneys when needed | User required timing accuracy over one unified口径 for Triton, HIP, and PyTorch sources. | Validated in v1.6 |
 
 ## Evolution
 
@@ -198,4 +197,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-22 after starting v1.6 milestone*
+*Last updated: 2026-05-22 after completing v1.6 milestone*

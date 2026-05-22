@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: AMD SOLAR Coverage, Live Profiler Timing, and Scoring Workflow
-status: planning
-last_updated: "2026-05-22T10:52:00.000Z"
-last_activity: 2026-05-22
+status: completed
+last_updated: "2026-05-22T11:30:00.000Z"
+last_activity: 2026-05-22 — Milestone v1.6 completed and archived
 progress:
   total_phases: 4
   completed_phases: 4
@@ -18,14 +18,14 @@ progress:
 **Project:** SOL ExecBench ROCm Port
 **Initialized:** 2026-05-21
 **Current phase:** 30
-**Status:** v1.6 phases complete; ready for milestone lifecycle
+**Status:** v1.6 milestone complete
 
 ## Project Reference
 
 See: `.planning/PROJECT.md` (updated 2026-05-22)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** AMD SOLAR coverage, live profiler timing, and scoring workflow
+**Current focus:** Planning next milestone
 
 ## Workflow Settings
 
@@ -42,8 +42,7 @@ See: `.planning/config.json`
 
 See: `.planning/ROADMAP.md`
 
-v1.6 roadmap is active with Phases 27-30 and 19 mapped requirements. All
-phases are complete.
+No active milestone is defined. v1.6 is archived.
 
 ## Memory
 
@@ -69,6 +68,9 @@ phases are complete.
 - v1.5 roadmap archived in `.planning/milestones/v1.5-ROADMAP.md`.
 - v1.5 audit archived in `.planning/milestones/v1.5-MILESTONE-AUDIT.md`.
 - v1.5 phase execution history archived in `.planning/milestones/v1.5-phases/`.
+- v1.6 requirements archived in `.planning/milestones/v1.6-REQUIREMENTS.md`.
+- v1.6 roadmap archived in `.planning/milestones/v1.6-ROADMAP.md`.
+- v1.6 audit archived in `.planning/milestones/v1.6-MILESTONE-AUDIT.md`.
 
 ## Deferred Items
 
@@ -80,15 +82,16 @@ Items acknowledged and deferred at milestone close on 2026-05-21:
 
 ## Next Action
 
-Run milestone audit, complete v1.6, then cleanup.
+Archive v1.6 phase directories, then start the next milestone when ready.
 
 ## Current Position
 
-Phase: 30 - Compatibility and Claim Guardrails
+Phase: Milestone v1.6 complete
 Plan: —
-Status: v1.6 phases complete
-Last activity: 2026-05-22 — Phase 30 completed
+Status: Awaiting cleanup / next milestone
+Last activity: 2026-05-22 — Milestone v1.6 completed and archived
 
 ## Operator Next Steps
 
-- Continue autonomous lifecycle: audit, complete milestone, cleanup.
+- Run cleanup to archive v1.6 phase directories.
+- Start the next milestone with `$gsd-new-milestone`.
