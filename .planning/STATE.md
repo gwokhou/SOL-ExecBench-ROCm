@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.2
-milestone_name: Engineering Practice Harvest and Compatibility Guardrails
-current_phase: complete
-status: completed
-last_updated: "2026-05-22T16:40:00+08:00"
-last_activity: 2026-05-22 — Milestone v1.2 completed and archived
+milestone: v1.3
+milestone_name: Non-CDNA Issue Closure
+status: planning
+last_updated: "2026-05-22T04:07:07.093Z"
+last_activity: 2026-05-22
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 4
-  completed_plans: 4
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -78,10 +77,10 @@ Start the next milestone with `/gsd-new-milestone`.
 
 ## Current Position
 
-Phase: Milestone v1.2 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-05-22 — Milestone v1.2 completed and archived
+Status: Defining requirements
+Last activity: 2026-05-22 — Milestone v1.3 started
 
 ## Operator Next Steps
 
