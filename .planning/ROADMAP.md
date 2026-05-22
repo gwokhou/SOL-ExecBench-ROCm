@@ -13,7 +13,7 @@ real CDNA3 hardware validation explicitly out of scope.
 | Phase | Name | Goal | Requirements |
 |-------|------|------|--------------|
 | 23 | Timing Semantics and Policy | Complete 2026-05-22: Defined source classification and accuracy-first timing policy for HIP native, Triton, PyTorch, and mixed workloads. | TIME-01, TIME-02, TIME-03, TIME-04 |
-| 24 | rocprofv3 Default Timing Path | Replace default timing with profiler-backed ROCm timing where accurate, with labeled fallbacks and auditable evidence. | PROF-01, PROF-02, PROF-03, PROF-04 |
+| 24 | rocprofv3 Default Timing Path | Complete 2026-05-22: Added profiler-backed ROCm timing evidence helpers, parser fixtures, policy-aware default selection, and labeled fallbacks. | PROF-01, PROF-02, PROF-03, PROF-04 |
 | 25 | AMD SOL Bound Foundation | Build the SOLAR-like AMD graph, FLOP/byte, hardware model, and bound artifact foundation. | SOL-01, SOL-02, SOL-03, SOL-04 |
 | 26 | AMD-native Scoring and Guarded Reports | Produce AMD-native per-problem and suite scores with baseline comparison, evidence references, compatibility guardrails, and CDNA3 no-claim protection. | SCORE-01, SCORE-02, SCORE-03, SCORE-04, COMPAT-01, COMPAT-02, CLAIM-01, CLAIM-02 |
 
@@ -59,7 +59,7 @@ Plans:
 
 ### Phase 24: rocprofv3 Default Timing Path
 
-**Status:** Not started
+**Status:** Complete 2026-05-22
 
 **Goal:** Implement profiler-backed ROCm timing and make it the default timing
 path when it is the most accurate supported backend for the classified source
@@ -85,6 +85,13 @@ type.
 - Keep profiler output in controlled evidence directories.
 - Do not include Triton JIT/autotune or PyTorch setup overhead in steady-state
   device timing unless the evidence explicitly labels that interpretation.
+
+**Plans:** 1 plan
+
+Plans:
+
+- [x] 24-01: Add rocprofv3 command construction, CSV parser, timing evidence,
+  policy-aware default selection, fallback metadata, and profiler evidence docs.
 
 ### Phase 25: AMD SOL Bound Foundation
 
@@ -159,10 +166,10 @@ COMPAT-02, CLAIM-01, CLAIM-02
 | TIME-02 | Phase 23 | Complete |
 | TIME-03 | Phase 23 | Complete |
 | TIME-04 | Phase 23 | Complete |
-| PROF-01 | Phase 24 | Pending |
-| PROF-02 | Phase 24 | Pending |
-| PROF-03 | Phase 24 | Pending |
-| PROF-04 | Phase 24 | Pending |
+| PROF-01 | Phase 24 | Complete |
+| PROF-02 | Phase 24 | Complete |
+| PROF-03 | Phase 24 | Complete |
+| PROF-04 | Phase 24 | Complete |
 | SOL-01 | Phase 25 | Pending |
 | SOL-02 | Phase 25 | Pending |
 | SOL-03 | Phase 25 | Pending |

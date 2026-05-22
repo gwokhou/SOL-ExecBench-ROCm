@@ -15,10 +15,10 @@
 
 ### ROCm Profiler Timing
 
-- [ ] **PROF-01**: Maintainer can collect and parse `rocprofv3` profiler timing evidence for representative benchmark executions.
-- [ ] **PROF-02**: The default timing path uses profiler-backed timing when it is the most accurate supported backend for the source type.
-- [ ] **PROF-03**: Any fallback timing path is labeled with backend, reason, and interpretation in timing evidence.
-- [ ] **PROF-04**: Timing evidence includes tool version, GPU architecture, activity domain, aggregation rule, and parsed timing rows needed to audit the measured duration.
+- [x] **PROF-01**: Maintainer can collect and parse `rocprofv3` profiler timing evidence for representative benchmark executions.
+- [x] **PROF-02**: The default timing path uses profiler-backed timing when it is the most accurate supported backend for the source type.
+- [x] **PROF-03**: Any fallback timing path is labeled with backend, reason, and interpretation in timing evidence.
+- [x] **PROF-04**: Timing evidence includes tool version, GPU architecture, activity domain, aggregation rule, and parsed timing rows needed to audit the measured duration.
 
 ### AMD SOL Bound
 
@@ -77,10 +77,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TIME-02 | Phase 23 | Complete |
 | TIME-03 | Phase 23 | Complete |
 | TIME-04 | Phase 23 | Complete |
-| PROF-01 | Phase 24 | Pending |
-| PROF-02 | Phase 24 | Pending |
-| PROF-03 | Phase 24 | Pending |
-| PROF-04 | Phase 24 | Pending |
+| PROF-01 | Phase 24 | Complete |
+| PROF-02 | Phase 24 | Complete |
+| PROF-03 | Phase 24 | Complete |
+| PROF-04 | Phase 24 | Complete |
 | SOL-01 | Phase 25 | Pending |
 | SOL-02 | Phase 25 | Pending |
 | SOL-03 | Phase 25 | Pending |
