@@ -1,5 +1,46 @@
 # Milestones
 
+## v1.7 Baseline, Timing, Reward-Hack Hardening, and ROCm Library Migration (Shipped: 2026-05-22)
+
+**Delivered:** Optimized scoring baseline artifacts, source-specific ROCm
+profiler timing evidence, expanded reward-hack defenses, the first supported
+hipBLAS library example, and MI300X validation-readiness guardrails.
+
+**Phases completed:** 31-35 (5 phases, 5 plans)
+
+**Key accomplishments:**
+
+- Added release-scoped scoring baseline artifacts and `baseline_source`
+  reporting so AMD-native scores distinguish optimized baselines from
+  provisional reference-latency fallback.
+
+- Added source-specific `rocprofv3` timing evidence collection through the
+  dataset workflow with auditable backend, aggregation, warmup, clock-lock,
+  architecture, and fallback metadata.
+
+- Added static reward-hack source review before submitted Python code import,
+  covering hidden streams, semantic caches, unauthorized loaders/file I/O, and
+  precision downgrade patterns.
+
+- Promoted `hipblas` with a runnable SGEMM public example, native staging tests,
+  docs, and candidate guardrails for MIOpen, CK, and rocWMMA.
+
+- Added MI300X/CDNA3 validation handoff docs, FP8/NVFP4 decision records, and
+  evidence gates that prevent premature hardware-validation claims.
+
+**Known gaps:**
+
+- Real AMD Instinct MI300X/CDNA3 full-suite validation remains deferred until
+  hardware access is available.
+
+- FP8 real validation waits for MI300X; NVFP4/MXFP4 remains deferred without a
+  suitable AMD validation path.
+
+- Original paper dataset extraction and full upstream SOLAR parity remain
+  future work by explicit user decision.
+
+---
+
 ## v1.6 AMD SOLAR Coverage, Live Profiler Timing, and Scoring Workflow (Shipped: 2026-05-22)
 
 **Delivered:** Broader AMD SOL analyzer coverage, live `rocprofv3` collection
@@ -13,13 +54,17 @@ guardrails.
 - Broadened AMD SOL/SOLAR-like analyzer coverage for reductions,
   normalization-like calls, softmax-like calls, activations, and data movement,
   with derived coverage summaries and confidence labels.
+
 - Added a live `rocprofv3` collection adapter with source-specific timing
   semantics and explicit fallback metadata.
+
 - Connected canonical trace JSONL, live timing evidence refs, AMD SOL bounds,
   baseline latency, and hardware model refs into derived AMD-native score
   reports.
+
 - Added `scripts/run_dataset.py --amd-score-report` as an opt-in suite report
   output without changing primary `sol-execbench` defaults.
+
 - Added focused v1.6 compatibility and claim guardrails for trace/schema/CLI
   stability, CDNA3 validation deferral, and no NVIDIA B200/SOLAR/leaderboard
   equivalence claims.
@@ -28,8 +73,10 @@ guardrails.
 
 - Real CDNA 3 `gfx94*` full-suite validation remains deferred by explicit user
   instruction.
+
 - Live profiler unit tests use mocked collection; real `rocprofv3` output
   validation remains environment-dependent.
+
 - Full upstream SOLAR parity remains future scope.
 
 ---
@@ -46,12 +93,16 @@ ROCm timing policy and profiler evidence helpers.
 - Defined source-specific timing semantics for HIP native, Triton, PyTorch,
   mixed, and unknown workloads without forcing a single inaccurate timing
   interpretation.
+
 - Added `rocprofv3` timing evidence helpers with command construction, CSV
   parsing, policy-aware default selection, and labeled fallback metadata.
+
 - Added AMD SOL bound artifacts with graph nodes, FLOP/byte estimates, hardware
   model metadata, per-op bounds, aggregate bounds, and CDNA3 unvalidated status.
+
 - Added derived AMD-native per-workload and suite score reports with timing and
   SOL-bound evidence references.
+
 - Preserved public CLI, schema, trace JSONL, eval-driver correctness, and
   reward-hack contracts while documenting no NVIDIA B200/SOLAR/leaderboard
   equivalence claim.
@@ -60,6 +111,7 @@ ROCm timing policy and profiler evidence helpers.
 
 - Real CDNA 3 `gfx94*` full-suite validation remains deferred by explicit user
   instruction.
+
 - AMD SOL operator coverage is a conservative foundation; broader analyzers are
   future work.
 
