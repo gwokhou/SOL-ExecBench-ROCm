@@ -54,6 +54,13 @@ for v1.9.
 
 **Requirements:** HW-01, HW-02, HW-03, HW-04, DOC-01
 
+**Plans:** 3 plans
+
+Plans:
+- [ ] 41-01-PLAN.md — Create strict packaged/external AMD hardware model JSON loaders.
+- [ ] 41-02-PLAN.md — Wire v2 hardware model defaults into AMD SOL and score compatibility surfaces.
+- [ ] 41-03-PLAN.md — Lock public contract, CLI, schema, Trace, and claim guardrails.
+
 **Success criteria:**
 
 1. Versioned AMD hardware model JSON artifacts can be loaded and validated with
