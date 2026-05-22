@@ -99,6 +99,24 @@ code can consume without depending on raw AST details.
 
 **Requirements:** IR-01, IR-02, IR-03, IR-04
 
+**Plans:** 3 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 42-01-PLAN.md — Create structured AMD bound graph IR contract, taxonomy,
+  serialization, and AST fallback evidence.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 42-02-PLAN.md — Implement workload-aware dynamic-trace-first extraction,
+  dataflow edges, and explicit unsupported/inexact evidence.
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 42-03-PLAN.md — Wire the new IR through AMD SOL compatibility facades and
+  public-contract guardrails.
+
 **Success criteria:**
 
 1. `Definition` and `Workload` inputs produce structured graph nodes with
