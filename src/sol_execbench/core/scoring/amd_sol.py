@@ -1,0 +1,387 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+"""AMD speed-of-light bound artifacts for benchmark workloads."""
+
+from __future__ import annotations
+
+import ast
+from dataclasses import dataclass
+from enum import Enum
+from math import prod
+
+from sol_execbench.core.data.definition import DType, Definition
+from sol_execbench.core.data.workload import Workload
+
+
+AMD_SOL_SCHEMA_VERSION = "sol_execbench.amd_sol_bound.v1"
+
+
+class EstimateConfidence(str, Enum):
+    """Confidence level for graph and work estimates."""
+
+    SUPPORTED = "supported"
+    INEXACT = "inexact"
+    UNSUPPORTED = "unsupported"
+
+
+class HardwareValidationStatus(str, Enum):
+    """Validation state for hardware model entries."""
+
+    VALIDATED = "validated"
+    PROVISIONAL = "provisional"
+    UNVALIDATED = "unvalidated"
+
+
+@dataclass(frozen=True)
+class GraphNode:
+    """Normalized operation graph node."""
+
+    node_id: str
+    op_type: str
+    expression: str
+    confidence: EstimateConfidence
+    rationale: str
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "node_id": self.node_id,
+            "op_type": self.op_type,
+            "expression": self.expression,
+            "confidence": self.confidence.value,
+            "rationale": self.rationale,
+        }
+
+
+@dataclass(frozen=True)
+class WorkEstimate:
+    """Estimated FLOPs and bytes for one graph node."""
+
+    node_id: str
+    flops: float
+    bytes_accessed: float
+    confidence: EstimateConfidence
+    rationale: str
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "node_id": self.node_id,
+            "flops": self.flops,
+            "bytes_accessed": self.bytes_accessed,
+            "confidence": self.confidence.value,
+            "rationale": self.rationale,
+        }
+
+
+@dataclass(frozen=True)
+class AmdHardwareModel:
+    """Architecture-specific AMD SOL model input."""
+
+    architecture: str
+    dtype_or_path: str
+    peak_tflops: float
+    memory_bandwidth_gbps: float
+    source: str
+    confidence: EstimateConfidence
+    validation_status: HardwareValidationStatus
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "architecture": self.architecture,
+            "dtype_or_path": self.dtype_or_path,
+            "peak_tflops": self.peak_tflops,
+            "memory_bandwidth_gbps": self.memory_bandwidth_gbps,
+            "source": self.source,
+            "confidence": self.confidence.value,
+            "validation_status": self.validation_status.value,
+        }
+
+
+@dataclass(frozen=True)
+class OpSolBound:
+    """Per-operation AMD speed-of-light bound."""
+
+    node_id: str
+    compute_bound_ms: float
+    memory_bound_ms: float
+    sol_bound_ms: float
+    limiting_resource: str
+    confidence: EstimateConfidence
+    rationale: str
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "node_id": self.node_id,
+            "compute_bound_ms": self.compute_bound_ms,
+            "memory_bound_ms": self.memory_bound_ms,
+            "sol_bound_ms": self.sol_bound_ms,
+            "limiting_resource": self.limiting_resource,
+            "confidence": self.confidence.value,
+            "rationale": self.rationale,
+        }
+
+
+@dataclass(frozen=True)
+class AmdSolBoundArtifact:
+    """Auditable AMD SOL bound artifact for one workload."""
+
+    definition: str
+    workload_uuid: str
+    hardware_model: AmdHardwareModel
+    graph_nodes: tuple[GraphNode, ...]
+    work_estimates: tuple[WorkEstimate, ...]
+    op_bounds: tuple[OpSolBound, ...]
+    schema_version: str = AMD_SOL_SCHEMA_VERSION
+    derived: bool = True
+
+    @property
+    def aggregate_sol_bound_ms(self) -> float:
+        """Aggregate SOL bound as the sum of per-op bounds."""
+        return sum(bound.sol_bound_ms for bound in self.op_bounds)
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "schema_version": self.schema_version,
+            "derived": self.derived,
+            "definition": self.definition,
+            "workload_uuid": self.workload_uuid,
+            "hardware_model": self.hardware_model.to_dict(),
+            "graph_nodes": [node.to_dict() for node in self.graph_nodes],
+            "work_estimates": [estimate.to_dict() for estimate in self.work_estimates],
+            "op_bounds": [bound.to_dict() for bound in self.op_bounds],
+            "aggregate_sol_bound_ms": self.aggregate_sol_bound_ms,
+        }
+
+
+def default_amd_hardware_models() -> dict[str, AmdHardwareModel]:
+    """Return built-in AMD hardware model entries."""
+    return {
+        "gfx1200": AmdHardwareModel(
+            architecture="gfx1200",
+            dtype_or_path="bf16/fp32 mixed benchmark path",
+            peak_tflops=48.0,
+            memory_bandwidth_gbps=640.0,
+            source="project provisional RDNA4 model input; validate before publication",
+            confidence=EstimateConfidence.INEXACT,
+            validation_status=HardwareValidationStatus.PROVISIONAL,
+        ),
+        "gfx942": AmdHardwareModel(
+            architecture="gfx942",
+            dtype_or_path="bf16/fp32 mixed benchmark path",
+            peak_tflops=1300.0,
+            memory_bandwidth_gbps=5300.0,
+            source="CDNA3 scaffold only; real hardware validation excluded from v1.5",
+            confidence=EstimateConfidence.INEXACT,
+            validation_status=HardwareValidationStatus.UNVALIDATED,
+        ),
+    }
+
+
+def extract_graph(definition: Definition) -> tuple[GraphNode, ...]:
+    """Extract a conservative operation graph from reference code."""
+    tree = ast.parse(definition.reference, mode="exec")
+    visitor = _GraphVisitor()
+    visitor.visit(tree)
+    return tuple(visitor.nodes)
+
+
+def estimate_work(
+    definition: Definition,
+    workload: Workload,
+    graph_nodes: tuple[GraphNode, ...],
+) -> tuple[WorkEstimate, ...]:
+    """Estimate FLOPs and bytes for graph nodes."""
+    axes = definition.get_resolved_axes_values(workload.axes)
+    input_shapes = definition.get_input_shapes(workload.axes)
+    output_shapes = definition.get_output_shapes(workload.axes)
+    tensor_bytes = _tensor_bytes(definition, input_shapes, output_shapes)
+    output_numel = sum(prod(shape) for shape in output_shapes.values() if shape)
+    reduction_dim = _largest_reduction_dim(definition, axes)
+    estimates: list[WorkEstimate] = []
+
+    for node in graph_nodes:
+        if node.op_type == "matmul" and output_numel and reduction_dim:
+            estimates.append(
+                WorkEstimate(
+                    node_id=node.node_id,
+                    flops=float(2 * output_numel * reduction_dim),
+                    bytes_accessed=float(tensor_bytes),
+                    confidence=EstimateConfidence.SUPPORTED,
+                    rationale="matmul FLOPs estimated as 2 * output elements * reduction dimension",
+                )
+            )
+        elif node.op_type == "elementwise" and output_numel:
+            estimates.append(
+                WorkEstimate(
+                    node_id=node.node_id,
+                    flops=float(output_numel),
+                    bytes_accessed=float(tensor_bytes),
+                    confidence=EstimateConfidence.INEXACT,
+                    rationale="elementwise work estimated as one operation per output element",
+                )
+            )
+        else:
+            estimates.append(
+                WorkEstimate(
+                    node_id=node.node_id,
+                    flops=0.0,
+                    bytes_accessed=float(tensor_bytes),
+                    confidence=EstimateConfidence.UNSUPPORTED,
+                    rationale=f"unsupported operation estimate for {node.op_type}",
+                )
+            )
+    return tuple(estimates)
+
+
+def build_amd_sol_bound_artifact(
+    definition: Definition,
+    workload: Workload,
+    hardware_model: AmdHardwareModel,
+) -> AmdSolBoundArtifact:
+    """Build an auditable AMD SOL bound artifact."""
+    graph_nodes = extract_graph(definition)
+    work_estimates = estimate_work(definition, workload, graph_nodes)
+    op_bounds = tuple(
+        _bound_for_estimate(estimate, hardware_model) for estimate in work_estimates
+    )
+    return AmdSolBoundArtifact(
+        definition=definition.name,
+        workload_uuid=workload.uuid,
+        hardware_model=hardware_model,
+        graph_nodes=graph_nodes,
+        work_estimates=work_estimates,
+        op_bounds=op_bounds,
+    )
+
+
+class _GraphVisitor(ast.NodeVisitor):
+    def __init__(self) -> None:
+        self.nodes: list[GraphNode] = []
+
+    def visit_Call(self, node: ast.Call) -> None:
+        expression = ast.unparse(node)
+        func_name = _call_name(node.func)
+        if func_name.endswith("matmul") or func_name in {"mm", "bmm"}:
+            self._append("matmul", expression, EstimateConfidence.SUPPORTED, "recognized matmul call")
+        elif any(name in func_name for name in ("gelu", "tanh", "softmax", "rsqrt")):
+            self._append(
+                "elementwise",
+                expression,
+                EstimateConfidence.INEXACT,
+                "recognized elementwise or reduction-like call",
+            )
+        elif func_name in {"to", "t"}:
+            pass
+        else:
+            self._append("unsupported", expression, EstimateConfidence.UNSUPPORTED, "unsupported call")
+        self.generic_visit(node)
+
+    def visit_BinOp(self, node: ast.BinOp) -> None:
+        if isinstance(node.op, ast.MatMult):
+            self._append("@", ast.unparse(node), EstimateConfidence.SUPPORTED, "recognized @ matmul")
+        elif isinstance(node.op, (ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Pow)):
+            self._append(
+                "elementwise",
+                ast.unparse(node),
+                EstimateConfidence.INEXACT,
+                "recognized elementwise binary operation",
+            )
+        self.generic_visit(node)
+
+    def _append(
+        self,
+        op_type: str,
+        expression: str,
+        confidence: EstimateConfidence,
+        rationale: str,
+    ) -> None:
+        self.nodes.append(
+            GraphNode(
+                node_id=f"op_{len(self.nodes) + 1}",
+                op_type="matmul" if op_type == "@" else op_type,
+                expression=expression,
+                confidence=confidence,
+                rationale=rationale,
+            )
+        )
+
+
+def _call_name(node: ast.AST) -> str:
+    if isinstance(node, ast.Attribute):
+        parent = _call_name(node.value)
+        return f"{parent}.{node.attr}" if parent else node.attr
+    if isinstance(node, ast.Name):
+        return node.id
+    return ""
+
+
+def _dtype_bytes(dtype: DType) -> float:
+    return {
+        DType.FLOAT64: 8.0,
+        DType.FLOAT32: 4.0,
+        DType.FLOAT16: 2.0,
+        DType.BFLOAT16: 2.0,
+        DType.FLOAT8_E4M3FN: 1.0,
+        DType.FLOAT8_E5M2: 1.0,
+        DType.FLOAT4_E2M1: 0.5,
+        DType.FLOAT4_E2M1FN_X2: 0.5,
+        DType.INT64: 8.0,
+        DType.INT32: 4.0,
+        DType.INT16: 2.0,
+        DType.INT8: 1.0,
+        DType.BOOL: 1.0,
+    }[dtype]
+
+
+def _tensor_bytes(
+    definition: Definition,
+    input_shapes: dict[str, tuple[int, ...] | None],
+    output_shapes: dict[str, tuple[int, ...] | None],
+) -> float:
+    total = 0.0
+    for name, shape in input_shapes.items():
+        if shape:
+            total += prod(shape) * _dtype_bytes(definition.inputs[name].dtype)
+    for name, shape in output_shapes.items():
+        if shape:
+            total += prod(shape) * _dtype_bytes(definition.outputs[name].dtype)
+    return total
+
+
+def _largest_reduction_dim(definition: Definition, axes: dict[str, int]) -> int:
+    """Infer the common matmul K dimension from the first shaped input."""
+    for spec in definition.inputs.values():
+        if spec.shape:
+            axis_name = spec.shape[-1]
+            if axis_name.isdigit():
+                return int(axis_name)
+            return axes.get(axis_name, 0)
+    return 0
+
+
+def _bound_for_estimate(
+    estimate: WorkEstimate,
+    hardware_model: AmdHardwareModel,
+) -> OpSolBound:
+    compute_bound_ms = (
+        estimate.flops / (hardware_model.peak_tflops * 1_000_000_000_000.0) * 1000.0
+        if hardware_model.peak_tflops > 0
+        else 0.0
+    )
+    memory_bound_ms = (
+        estimate.bytes_accessed
+        / (hardware_model.memory_bandwidth_gbps * 1_000_000_000.0)
+        * 1000.0
+        if hardware_model.memory_bandwidth_gbps > 0
+        else 0.0
+    )
+    limiting_resource = "compute" if compute_bound_ms >= memory_bound_ms else "memory"
+    return OpSolBound(
+        node_id=estimate.node_id,
+        compute_bound_ms=compute_bound_ms,
+        memory_bound_ms=memory_bound_ms,
+        sol_bound_ms=max(compute_bound_ms, memory_bound_ms),
+        limiting_resource=limiting_resource,
+        confidence=estimate.confidence,
+        rationale=estimate.rationale,
+    )
