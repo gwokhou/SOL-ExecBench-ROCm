@@ -15,7 +15,7 @@ real CDNA3 hardware validation explicitly out of scope.
 | 23 | Timing Semantics and Policy | Complete 2026-05-22: Defined source classification and accuracy-first timing policy for HIP native, Triton, PyTorch, and mixed workloads. | TIME-01, TIME-02, TIME-03, TIME-04 |
 | 24 | rocprofv3 Default Timing Path | Complete 2026-05-22: Added profiler-backed ROCm timing evidence helpers, parser fixtures, policy-aware default selection, and labeled fallbacks. | PROF-01, PROF-02, PROF-03, PROF-04 |
 | 25 | AMD SOL Bound Foundation | Complete 2026-05-22: Added conservative graph extraction, FLOP/byte estimates, AMD hardware model metadata, and derived bound artifacts. | SOL-01, SOL-02, SOL-03, SOL-04 |
-| 26 | AMD-native Scoring and Guarded Reports | Produce AMD-native per-problem and suite scores with baseline comparison, evidence references, compatibility guardrails, and CDNA3 no-claim protection. | SCORE-01, SCORE-02, SCORE-03, SCORE-04, COMPAT-01, COMPAT-02, CLAIM-01, CLAIM-02 |
+| 26 | AMD-native Scoring and Guarded Reports | Complete 2026-05-22: Added derived AMD-native score reports with evidence refs, suite aggregation, baseline compatibility, and CDNA3 no-claim guardrails. | SCORE-01, SCORE-02, SCORE-03, SCORE-04, COMPAT-01, COMPAT-02, CLAIM-01, CLAIM-02 |
 
 **Coverage:** 20 / 20 v1.5 requirements mapped.
 
@@ -127,7 +127,7 @@ Plans:
 
 ### Phase 26: AMD-native Scoring and Guarded Reports
 
-**Status:** Not started
+**Status:** Complete 2026-05-22
 
 **Goal:** Combine timing evidence, AMD SOL bounds, baselines, and claim
 guardrails into an end-to-end AMD-native scoring workflow.
@@ -157,6 +157,13 @@ COMPAT-02, CLAIM-01, CLAIM-02
 - Reuse existing scoring guardrail patterns where they fit.
 - Add compatibility tests around trace/schema behavior before final closure.
 
+**Plans:** 1 plan
+
+Plans:
+
+- [x] 26-01: Add derived AMD-native per-workload and suite score reports,
+  evidence references, baseline compatibility docs, and claim guardrails.
+
 ## Completed Milestones
 
 - [x] **v1.4 hip-execbench Engineering Experience Adaptation + Validation Workflow Readiness** - shipped 2026-05-22. See `.planning/milestones/v1.4-ROADMAP.md`.
@@ -181,11 +188,11 @@ COMPAT-02, CLAIM-01, CLAIM-02
 | SOL-02 | Phase 25 | Complete |
 | SOL-03 | Phase 25 | Complete |
 | SOL-04 | Phase 25 | Complete |
-| SCORE-01 | Phase 26 | Pending |
-| SCORE-02 | Phase 26 | Pending |
-| SCORE-03 | Phase 26 | Pending |
-| SCORE-04 | Phase 26 | Pending |
-| COMPAT-01 | Phase 26 | Pending |
-| COMPAT-02 | Phase 26 | Pending |
-| CLAIM-01 | Phase 26 | Pending |
-| CLAIM-02 | Phase 26 | Pending |
+| SCORE-01 | Phase 26 | Complete |
+| SCORE-02 | Phase 26 | Complete |
+| SCORE-03 | Phase 26 | Complete |
+| SCORE-04 | Phase 26 | Complete |
+| COMPAT-01 | Phase 26 | Complete |
+| COMPAT-02 | Phase 26 | Complete |
+| CLAIM-01 | Phase 26 | Complete |
+| CLAIM-02 | Phase 26 | Complete |
