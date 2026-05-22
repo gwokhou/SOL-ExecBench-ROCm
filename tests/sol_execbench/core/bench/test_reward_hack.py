@@ -261,3 +261,16 @@ class TestStaticSourceReview:
         )
 
         assert review.blocked is False
+
+    def test_allows_native_data_ptr_for_library_calls(self):
+        review = review_solution_sources(
+            _solution_with_source(
+                "hipblasSgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N,\n"
+                "             n, m, k, &alpha, b.data_ptr<float>(), n,\n"
+                "             a.data_ptr<float>(), k, &beta,\n"
+                "             out.data_ptr<float>(), n);\n",
+                path="main.cpp",
+            )
+        )
+
+        assert review.blocked is False

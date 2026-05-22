@@ -15,7 +15,7 @@ timing workflow, reward-hack defenses, and runnable ROCm library migration.
 | 31 | Optimized Scoring Baseline Semantics | Complete 2026-05-22: Added release-defined baseline artifacts and wired them into AMD-native scoring without mutating canonical traces. | BASE-01, BASE-02, BASE-03, BASE-04 |
 | 32 | Source-Specific Profiler Timing Workflow | Complete 2026-05-22: Added source-specific profiler evidence collection, dataset integration, fallback metadata, and run metadata. | TIME-01, TIME-02, TIME-03, TIME-04 |
 | 33 | Reward-Hack Defense Expansion | Complete 2026-05-22: Added static source review and pre-import blocking for stream hiding, caches, loaders, and precision downgrades. | HACK-01, HACK-02, HACK-03, HACK-04, HACK-05 |
-| 34 | ROCm Library Category Migration | Move priority ROCm library categories from candidate-only status toward runnable examples, build checks, and accurate support docs. | LIB-01, LIB-02, LIB-03, LIB-04, LIB-05 |
+| 34 | ROCm Library Category Migration | Complete 2026-05-22: Promoted hipBLAS with runnable SGEMM example while guarding MIOpen, CK, and rocWMMA as candidates. | LIB-01, LIB-02, LIB-03, LIB-04, LIB-05 |
 | 35 | MI300X Validation Readiness Guardrails | Prepare MI300X/CDNA3 and FP8 validation instructions, evidence gates, and no-claim protections for later hardware runs. | MI3-01, MI3-02, MI3-03 |
 
 **Coverage:** 21 / 21 v1.7 requirements mapped. 0 unmapped.
@@ -125,7 +125,7 @@ that can distort correctness or timing.
 
 ### Phase 34: ROCm Library Category Migration
 
-**Status:** Planned
+**Status:** Complete
 
 **Goal:** Move priority ROCm library categories from candidate-only status
 toward runnable examples, build checks, and accurate support docs.
@@ -151,7 +151,10 @@ toward runnable examples, build checks, and accurate support docs.
 - Keep candidate categories accepted only when documentation and tests prevent
   unsupported support claims.
 
-**Plans:** 0 plans
+**Plans:** 1 plan
+
+- [x] 34-01: Add hipBLAS public example, native staging tests, docs, and
+  candidate-category guardrails for MIOpen, CK, and rocWMMA.
 
 ### Phase 35: MI300X Validation Readiness Guardrails
 
@@ -220,11 +223,11 @@ and no-claim protections for later hardware runs.
 | HACK-03 | Phase 33 | Complete |
 | HACK-04 | Phase 33 | Complete |
 | HACK-05 | Phase 33 | Complete |
-| LIB-01 | Phase 34 | Pending |
-| LIB-02 | Phase 34 | Pending |
-| LIB-03 | Phase 34 | Pending |
-| LIB-04 | Phase 34 | Pending |
-| LIB-05 | Phase 34 | Pending |
+| LIB-01 | Phase 34 | Complete |
+| LIB-02 | Phase 34 | Complete |
+| LIB-03 | Phase 34 | Complete |
+| LIB-04 | Phase 34 | Complete |
+| LIB-05 | Phase 34 | Complete |
 | MI3-01 | Phase 35 | Pending |
 | MI3-02 | Phase 35 | Pending |
 | MI3-03 | Phase 35 | Pending |

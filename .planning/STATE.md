@@ -3,21 +3,21 @@ gsd_state_version: 1.0
 milestone: v1.7
 milestone_name: Baseline, Timing, Reward-Hack Hardening, and ROCm Library Migration
 status: planning
-last_updated: "2026-05-22T14:05:00.000Z"
-last_activity: 2026-05-22 — Phase 33 completed
+last_updated: "2026-05-22T14:35:00.000Z"
+last_activity: 2026-05-22 — Phase 34 completed
 progress:
   total_phases: 5
-  completed_phases: 3
-  total_plans: 3
-  completed_plans: 3
-  percent: 60
+  completed_phases: 4
+  total_plans: 4
+  completed_plans: 4
+  percent: 80
 ---
 
 # Project State
 
 **Project:** SOL ExecBench ROCm Port
 **Initialized:** 2026-05-21
-**Current phase:** 34
+**Current phase:** 35
 **Status:** v1.7 in progress
 
 ## Project Reference
@@ -25,7 +25,7 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-22)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Phase 34 — ROCm Library Category Migration
+**Current focus:** Phase 35 — MI300X Validation Readiness Guardrails
 
 ## Workflow Settings
 
@@ -87,11 +87,11 @@ Start the next milestone when ready.
 
 ## Current Position
 
-Phase: 34 — ROCm Library Category Migration
+Phase: 35 — MI300X Validation Readiness Guardrails
 Plan: —
 Status: Ready for discussion/planning
-Last activity: 2026-05-22 — Phase 33 completed
+Last activity: 2026-05-22 — Phase 34 completed
 
 ## Operator Next Steps
 
-- Continue with Phase 34 using `$gsd-discuss-phase 34` or `$gsd-plan-phase 34`.
+- Continue with Phase 35 using `$gsd-discuss-phase 35` or `$gsd-plan-phase 35`.

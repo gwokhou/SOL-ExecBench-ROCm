@@ -10,7 +10,7 @@ public example coverage.
 | Category | Schema value | Current status | Public example status | Notes |
 | --- | --- | --- | --- | --- |
 | HIP/C++ | `hip_cpp` | Supported | Runnable HIP examples exist under `examples/hip_cpp/` | Primary native extension path. |
-| hipBLAS / hipBLASLt | `hipblas` | Candidate | No runnable public `hipblas` example yet | Use for BLAS/GEMM replacement work once examples and build checks exist. |
+| hipBLAS / hipBLASLt | `hipblas` | Supported | Runnable SGEMM example exists under `examples/hipblas/gemm/` | BLAS/GEMM replacement path using the native ROCm build flow and `-lhipblas`. |
 | MIOpen | `miopen` | Candidate | Former cuDNN examples are PyTorch compatibility examples | Use only after an operation-specific MIOpen solution is implemented and tested. |
 | Composable Kernel | `ck` | Candidate | Former CUTLASS examples are PyTorch compatibility examples | Candidate replacement for selected CUTLASS/CuTe-style kernels. |
 | rocWMMA | `rocwmma` | Candidate | No runnable public `rocwmma` example yet | Candidate for WMMA-style matrix kernels. |
@@ -42,11 +42,17 @@ the old directory name for discoverability.
 | CuTe DSL | `examples/cute_dsl/jamba_attn_proj/` | PyTorch ROCm compatibility example | `ck`, `rocwmma`, HIP, or Triton |
 | cuTile | `examples/cutile/jamba_attn_proj/` | PyTorch ROCm compatibility example | HIP or Triton |
 
+## Runnable Library Examples
+
+| ROCm library | Public path | Evidence |
+| --- | --- | --- |
+| hipBLAS | `examples/hipblas/gemm/` | `solution_hipblas.json` uses schema language `hipblas`, includes `hipblas/hipblas.h`, calls `hipblasSgemm`, and links with `-lhipblas`. |
+
 ## User Guidance
 
-- Use `hip_cpp`, `pytorch`, or `triton` for runnable examples today.
-- Use `hipblas`, `miopen`, `ck`, or `rocwmma` only when the solution source and
-  local ROCm environment actually provide the required library integration.
+- Use `hip_cpp`, `hipblas`, `pytorch`, or `triton` for runnable examples today.
+- Use `miopen`, `ck`, or `rocwmma` only when the solution source and local ROCm
+  environment actually provide the required library integration.
 - Do not treat candidate categories as evidence of performance portability from
   NVIDIA libraries.
 - CDNA 3 metadata in examples remains schema/build intent, not real hardware

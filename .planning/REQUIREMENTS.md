@@ -30,11 +30,11 @@
 
 ### ROCm Library Migration
 
-- [ ] **LIB-01**: `hipblas` or hipBLASLt has at least one runnable public example, build path, and focused test that demonstrates a supported ROCm BLAS-backed solution category.
-- [ ] **LIB-02**: MIOpen has at least one runnable or clearly guarded public example and test path, or is explicitly retained as candidate with a concrete blocker.
-- [ ] **LIB-03**: Composable Kernel has at least one runnable or clearly guarded public example and test path, or is explicitly retained as candidate with a concrete blocker.
-- [ ] **LIB-04**: rocWMMA has at least one runnable or clearly guarded public example and test path, or is explicitly retained as candidate with a concrete blocker.
-- [ ] **LIB-05**: Documentation and public-contract tests accurately distinguish supported, guarded, and candidate ROCm library categories.
+- [x] **LIB-01**: `hipblas` or hipBLASLt has at least one runnable public example, build path, and focused test that demonstrates a supported ROCm BLAS-backed solution category.
+- [x] **LIB-02**: MIOpen has at least one runnable or clearly guarded public example and test path, or is explicitly retained as candidate with a concrete blocker.
+- [x] **LIB-03**: Composable Kernel has at least one runnable or clearly guarded public example and test path, or is explicitly retained as candidate with a concrete blocker.
+- [x] **LIB-04**: rocWMMA has at least one runnable or clearly guarded public example and test path, or is explicitly retained as candidate with a concrete blocker.
+- [x] **LIB-05**: Documentation and public-contract tests accurately distinguish supported, guarded, and candidate ROCm library categories.
 
 ### MI300X Validation Readiness
 
@@ -82,11 +82,11 @@
 | HACK-03 | Phase 33 | Complete |
 | HACK-04 | Phase 33 | Complete |
 | HACK-05 | Phase 33 | Complete |
-| LIB-01 | Phase 34 | Pending |
-| LIB-02 | Phase 34 | Pending |
-| LIB-03 | Phase 34 | Pending |
-| LIB-04 | Phase 34 | Pending |
-| LIB-05 | Phase 34 | Pending |
+| LIB-01 | Phase 34 | Complete |
+| LIB-02 | Phase 34 | Complete |
+| LIB-03 | Phase 34 | Complete |
+| LIB-04 | Phase 34 | Complete |
+| LIB-05 | Phase 34 | Complete |
 | MI3-01 | Phase 35 | Pending |
 | MI3-02 | Phase 35 | Pending |
 | MI3-03 | Phase 35 | Pending |

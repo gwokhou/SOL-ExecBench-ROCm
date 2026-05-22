@@ -136,6 +136,7 @@ _STATIC_RULES = (
             r"[_A-Za-z0-9]*cache\s*=\s*\{|\btobytes\s*\(|\bhashlib\b)"
         ),
         "data-pointer or content-keyed caching can reuse outputs across phases",
+        suffixes=(".py",),
     ),
     _SourceRule(
         "unauthorized_file_or_loader",
