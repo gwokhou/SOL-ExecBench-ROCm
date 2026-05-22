@@ -4,7 +4,7 @@ milestone: v1.8
 milestone_name: ROCm Library Ecosystem Completion
 status: planning
 last_updated: "2026-05-22T16:25:00.000Z"
-last_activity: 2026-05-22 — Phase 40 completed
+last_activity: 2026-05-22 — Quick task completed: HIP native stream headers
 progress:
   total_phases: 5
   completed_phases: 5
@@ -87,15 +87,23 @@ Items acknowledged and deferred at milestone close on 2026-05-21:
 
 ## Next Action
 
-Run v1.8 milestone audit and completion cleanup.
+Choose next milestone or run additional validation on a complete ROCm
+development environment.
 
 ## Current Position
 
 Phase: complete
 Plan: —
 Status: Ready for milestone audit
-Last activity: 2026-05-22 — Phase 40 completed
+Last activity: 2026-05-22 — Quick task completed: HIP native stream headers
+
+## Quick Tasks Completed
+
+| Date | Task | Status |
+|------|------|--------|
+| 2026-05-22 | `hip-native-stream-headers` | Complete |
 
 ## Operator Next Steps
 
-- Run milestone audit and complete v1.8
+- Start the next milestone with `$gsd-new-milestone`, or run native example E2E
+  on a complete ROCm development environment.

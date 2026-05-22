@@ -1,4 +1,4 @@
-#include <ATen/cuda/CUDAContext.h>
+#include <c10/hip/HIPStream.h>
 #include <miopen/miopen.h>
 #include <torch/extension.h>
 
@@ -32,7 +32,7 @@ torch::Tensor run(const torch::Tensor& input) {
 
     check_miopen(miopenCreate(&handle), "miopenCreate");
     check_miopen(
-        miopenSetStream(handle, at::cuda::getCurrentCUDAStream()),
+        miopenSetStream(handle, c10::hip::getCurrentHIPStream()),
         "miopenSetStream"
     );
     check_miopen(miopenCreateTensorDescriptor(&input_desc), "miopenCreateTensorDescriptor");

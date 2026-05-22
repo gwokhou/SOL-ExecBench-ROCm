@@ -1,6 +1,6 @@
-#include <ATen/cuda/CUDAContext.h>
 #include <ck/ck.hpp>
 #include <ck/tensor_description/tensor_descriptor_helper.hpp>
+#include <c10/hip/HIPStream.h>
 #include <hip/hip_runtime.h>
 #include <torch/extension.h>
 
@@ -63,7 +63,7 @@ torch::Tensor run(const torch::Tensor& a, const torch::Tensor& b) {
         grid,
         block,
         0,
-        at::cuda::getCurrentCUDAStream(),
+        c10::hip::getCurrentHIPStream(),
         a.data_ptr<float>(),
         b.data_ptr<float>(),
         c.data_ptr<float>(),

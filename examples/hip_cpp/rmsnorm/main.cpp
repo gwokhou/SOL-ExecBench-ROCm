@@ -1,5 +1,5 @@
 #include <torch/extension.h>
-#include <ATen/cuda/CUDAContext.h>
+#include <c10/hip/HIPStream.h>
 #include "kernel.h"
 #include <string>
 
@@ -44,7 +44,7 @@ torch::Tensor run(
     const float eps = 1e-5f;
 
     // Get current HIP stream from PyTorch's context
-    hipStream_t stream = at::cuda::getCurrentCUDAStream();
+    hipStream_t stream = c10::hip::getCurrentHIPStream();
 
     // Launch the kernel via the C++ wrapper function in the .hip file
     rmsnorm_h4096_launcher(

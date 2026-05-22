@@ -4,21 +4,35 @@
   "author": "SOL ExecBench ROCm",
   "description": "Runnable rocWMMA matrix-core GEMM example using fragment load, mma, and store APIs in the measured native ROCm implementation.",
   "spec": {
-    "languages": ["rocwmma"],
-    "target_hardware": ["LOCAL", "gfx1200"],
+    "languages": [
+      "rocwmma"
+    ],
+    "target_hardware": [
+      "LOCAL",
+      "gfx1200"
+    ],
     "entry_point": "kernel.hip::run",
-    "dependencies": ["torch", "rocwmma"],
+    "dependencies": [
+      "torch",
+      "rocwmma"
+    ],
     "destination_passing_style": false,
     "compile_options": {
-      "cflags": ["-I/opt/rocm/include"],
-      "hip_cflags": ["-O3"],
+      "cflags": [
+        "-I/opt/rocm/include"
+      ],
+      "hip_cflags": [
+        "-O3",
+        "-U__HIP_NO_HALF_CONVERSIONS__",
+        "-U__HIP_NO_HALF_OPERATORS__"
+      ],
       "ld_flags": []
     }
   },
   "sources": [
     {
       "path": "kernel.hip",
-      "content": "#include <ATen/cuda/CUDAContext.h>\n#include <hip/hip_runtime.h>\n#include <rocwmma/rocwmma.hpp>\n#include <torch/extension.h>\n\n#include <string>\n\nnamespace {\n\nconstexpr uint32_t kBlockM = 16;\nconstexpr uint32_t kBlockN = 16;\nconstexpr uint32_t kBlockK = 16;\n\nvoid check_tensor(const torch::Tensor& tensor, const std::string& name) {\n    TORCH_CHECK(tensor.is_cuda(), name, \" must be a HIP tensor\");\n    TORCH_CHECK(tensor.is_contiguous(), name, \" must be contiguous\");\n}\n\nvoid check_hip(hipError_t status, const char* call) {\n    TORCH_CHECK(status == hipSuccess, call, \" failed with status \", hipGetErrorString(status));\n}\n\n__global__ void rocwmma_gemm_kernel(\n    const rocwmma::float16_t* __restrict__ a,\n    const rocwmma::float16_t* __restrict__ b,\n    float* __restrict__ c,\n    uint32_t m\n) {\n    using FragA = rocwmma::fragment<\n        rocwmma::matrix_a,\n        kBlockM,\n        kBlockN,\n        kBlockK,\n        rocwmma::float16_t,\n        rocwmma::row_major>;\n    using FragB = rocwmma::fragment<\n        rocwmma::matrix_b,\n        kBlockM,\n        kBlockN,\n        kBlockK,\n        rocwmma::float16_t,\n        rocwmma::row_major>;\n    using FragC = rocwmma::fragment<\n        rocwmma::accumulator,\n        kBlockM,\n        kBlockN,\n        kBlockK,\n        float>;\n\n    const uint32_t row = blockIdx.y * kBlockM;\n    const uint32_t col = blockIdx.x * kBlockN;\n    if (row >= m || col >= kBlockN) {\n        return;\n    }\n\n    FragA frag_a;\n    FragB frag_b;\n    FragC frag_c;\n    rocwmma::fill_fragment(frag_c, 0.0f);\n    rocwmma::load_matrix_sync(frag_a, a + row * kBlockK, kBlockK);\n    rocwmma::load_matrix_sync(frag_b, b + col, kBlockN);\n    rocwmma::mma_sync(frag_c, frag_a, frag_b, frag_c);\n    rocwmma::store_matrix_sync(c + row * kBlockN + col, frag_c, kBlockN, rocwmma::mem_row_major);\n}\n\n}  // namespace\n\ntorch::Tensor run(const torch::Tensor& a, const torch::Tensor& b) {\n    check_tensor(a, \"A\");\n    check_tensor(b, \"B\");\n    TORCH_CHECK(a.dtype() == torch::kFloat16, \"A must have float16 dtype\");\n    TORCH_CHECK(b.dtype() == torch::kFloat16, \"B must have float16 dtype\");\n    TORCH_CHECK(a.dim() == 2, \"A must be 2D\");\n    TORCH_CHECK(b.dim() == 2, \"B must be 2D\");\n    TORCH_CHECK(a.size(0) % kBlockM == 0, \"A.size(0) must be a multiple of 16\");\n    TORCH_CHECK(a.size(1) == kBlockK, \"A.size(1) must be 16\");\n    TORCH_CHECK(b.size(0) == kBlockK, \"B.size(0) must be 16\");\n    TORCH_CHECK(b.size(1) == kBlockN, \"B.size(1) must be 16\");\n\n    auto c = torch::empty({a.size(0), b.size(1)}, a.options().dtype(torch::kFloat32));\n    const dim3 block(32);\n    const dim3 grid(1, static_cast<uint32_t>(a.size(0)) / kBlockM);\n    hipLaunchKernelGGL(\n        rocwmma_gemm_kernel,\n        grid,\n        block,\n        0,\n        at::cuda::getCurrentCUDAStream(),\n        reinterpret_cast<const rocwmma::float16_t*>(a.data_ptr<at::Half>()),\n        reinterpret_cast<const rocwmma::float16_t*>(b.data_ptr<at::Half>()),\n        c.data_ptr<float>(),\n        static_cast<uint32_t>(a.size(0))\n    );\n    check_hip(hipGetLastError(), \"rocwmma_gemm_kernel\");\n    return c;\n}\n\nPYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {\n    m.def(\"run\", &run, \"rocWMMA FP16-to-FP32 16x16x16 GEMM\");\n}\n"
+      "content": "#include <c10/hip/HIPStream.h>\n#include <hip/hip_runtime.h>\n#include <rocwmma/rocwmma.hpp>\n#include <torch/extension.h>\n\n#include <string>\n\nnamespace {\n\nconstexpr uint32_t kBlockM = 16;\nconstexpr uint32_t kBlockN = 16;\nconstexpr uint32_t kBlockK = 16;\n\nvoid check_tensor(const torch::Tensor& tensor, const std::string& name) {\n    TORCH_CHECK(tensor.is_cuda(), name, \" must be a HIP tensor\");\n    TORCH_CHECK(tensor.is_contiguous(), name, \" must be contiguous\");\n}\n\nvoid check_hip(hipError_t status, const char* call) {\n    TORCH_CHECK(status == hipSuccess, call, \" failed with status \", hipGetErrorString(status));\n}\n\n__global__ void rocwmma_gemm_kernel(\n    const rocwmma::float16_t* __restrict__ a,\n    const rocwmma::float16_t* __restrict__ b,\n    float* __restrict__ c,\n    uint32_t m\n) {\n    using FragA = rocwmma::fragment<\n        rocwmma::matrix_a,\n        kBlockM,\n        kBlockN,\n        kBlockK,\n        rocwmma::float16_t,\n        rocwmma::row_major>;\n    using FragB = rocwmma::fragment<\n        rocwmma::matrix_b,\n        kBlockM,\n        kBlockN,\n        kBlockK,\n        rocwmma::float16_t,\n        rocwmma::row_major>;\n    using FragC = rocwmma::fragment<\n        rocwmma::accumulator,\n        kBlockM,\n        kBlockN,\n        kBlockK,\n        float>;\n\n    const uint32_t row = blockIdx.y * kBlockM;\n    const uint32_t col = blockIdx.x * kBlockN;\n    if (row >= m || col >= kBlockN) {\n        return;\n    }\n\n    FragA frag_a;\n    FragB frag_b;\n    FragC frag_c;\n    rocwmma::fill_fragment(frag_c, 0.0f);\n    rocwmma::load_matrix_sync(frag_a, a + row * kBlockK, kBlockK);\n    rocwmma::load_matrix_sync(frag_b, b + col, kBlockN);\n    rocwmma::mma_sync(frag_c, frag_a, frag_b, frag_c);\n    rocwmma::store_matrix_sync(c + row * kBlockN + col, frag_c, kBlockN, rocwmma::mem_row_major);\n}\n\n}  // namespace\n\ntorch::Tensor run(const torch::Tensor& a, const torch::Tensor& b) {\n    check_tensor(a, \"A\");\n    check_tensor(b, \"B\");\n    TORCH_CHECK(a.dtype() == torch::kFloat16, \"A must have float16 dtype\");\n    TORCH_CHECK(b.dtype() == torch::kFloat16, \"B must have float16 dtype\");\n    TORCH_CHECK(a.dim() == 2, \"A must be 2D\");\n    TORCH_CHECK(b.dim() == 2, \"B must be 2D\");\n    TORCH_CHECK(a.size(0) % kBlockM == 0, \"A.size(0) must be a multiple of 16\");\n    TORCH_CHECK(a.size(1) == kBlockK, \"A.size(1) must be 16\");\n    TORCH_CHECK(b.size(0) == kBlockK, \"B.size(0) must be 16\");\n    TORCH_CHECK(b.size(1) == kBlockN, \"B.size(1) must be 16\");\n\n    auto c = torch::empty({a.size(0), b.size(1)}, a.options().dtype(torch::kFloat32));\n    const dim3 block(32);\n    const dim3 grid(1, static_cast<uint32_t>(a.size(0)) / kBlockM);\n    hipLaunchKernelGGL(\n        rocwmma_gemm_kernel,\n        grid,\n        block,\n        0,\n        c10::hip::getCurrentHIPStream(),\n        reinterpret_cast<const rocwmma::float16_t*>(a.data_ptr<at::Half>()),\n        reinterpret_cast<const rocwmma::float16_t*>(b.data_ptr<at::Half>()),\n        c.data_ptr<float>(),\n        static_cast<uint32_t>(a.size(0))\n    );\n    check_hip(hipGetLastError(), \"rocwmma_gemm_kernel\");\n    return c;\n}\n\nPYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {\n    m.def(\"run\", &run, \"rocWMMA FP16-to-FP32 16x16x16 GEMM\");\n}\n"
     }
   ]
 }
