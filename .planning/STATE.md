@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.3
-milestone_name: Non-CDNA Issue Closure
-status: completed
-last_updated: "2026-05-22T04:07:07.093Z"
+milestone: v1.4
+milestone_name: hip-execbench Engineering Experience Adaptation + Validation Workflow Readiness
+status: planning
+last_updated: "2026-05-22T05:33:21.684Z"
 last_activity: 2026-05-22
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 5
-  completed_plans: 5
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -81,10 +81,10 @@ Start the next milestone with `/gsd-new-milestone`.
 
 ## Current Position
 
-Phase: Milestone v1.3 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-05-22 — v1.3 milestone completed and archived
+Status: Defining requirements
+Last activity: 2026-05-22 — Milestone v1.4 started
 
 ## Operator Next Steps
 
