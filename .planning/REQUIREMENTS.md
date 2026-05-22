@@ -68,31 +68,31 @@ Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SOLCOV-01 | TBD | Pending |
-| SOLCOV-02 | TBD | Pending |
-| SOLCOV-03 | TBD | Pending |
-| SOLCOV-04 | TBD | Pending |
-| PROF-01 | TBD | Pending |
-| PROF-02 | TBD | Pending |
-| PROF-03 | TBD | Pending |
-| PROF-04 | TBD | Pending |
-| SCORE-01 | TBD | Pending |
-| SCORE-02 | TBD | Pending |
-| SCORE-03 | TBD | Pending |
-| SCORE-04 | TBD | Pending |
-| COMPAT-01 | TBD | Pending |
-| COMPAT-02 | TBD | Pending |
-| COMPAT-03 | TBD | Pending |
-| COMPAT-04 | TBD | Pending |
-| CLAIM-01 | TBD | Pending |
-| CLAIM-02 | TBD | Pending |
-| CLAIM-03 | TBD | Pending |
+| SOLCOV-01 | Phase 27 | Pending |
+| SOLCOV-02 | Phase 27 | Pending |
+| SOLCOV-03 | Phase 27 | Pending |
+| SOLCOV-04 | Phase 27 | Pending |
+| PROF-01 | Phase 28 | Pending |
+| PROF-02 | Phase 28 | Pending |
+| PROF-03 | Phase 28 | Pending |
+| PROF-04 | Phase 28 | Pending |
+| SCORE-01 | Phase 29 | Pending |
+| SCORE-02 | Phase 29 | Pending |
+| SCORE-03 | Phase 29 | Pending |
+| SCORE-04 | Phase 29 | Pending |
+| COMPAT-01 | Phase 30 | Pending |
+| COMPAT-02 | Phase 30 | Pending |
+| COMPAT-03 | Phase 30 | Pending |
+| COMPAT-04 | Phase 30 | Pending |
+| CLAIM-01 | Phase 30 | Pending |
+| CLAIM-02 | Phase 30 | Pending |
+| CLAIM-03 | Phase 30 | Pending |
 
 **Coverage:**
 - v1.6 requirements: 19 total
-- Mapped to phases: 0
-- Unmapped: 19
+- Mapped to phases: 19
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-05-22*
-*Last updated: 2026-05-22 after v1.6 research*
+*Last updated: 2026-05-22 after v1.6 roadmap creation*

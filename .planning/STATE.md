@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: AMD SOLAR Coverage, Live Profiler Timing, and Scoring Workflow
 status: planning
-last_updated: "2026-05-22T10:26:36.097Z"
+last_updated: "2026-05-22T10:52:00.000Z"
 last_activity: 2026-05-22
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
-  total_plans: 0
+  total_plans: 4
   completed_plans: 0
   percent: 0
 ---
@@ -17,8 +17,8 @@ progress:
 
 **Project:** SOL ExecBench ROCm Port
 **Initialized:** 2026-05-21
-**Current phase:** Not started
-**Status:** Defining v1.6 requirements
+**Current phase:** 27
+**Status:** Roadmap drafted for approval
 
 ## Project Reference
 
@@ -42,7 +42,7 @@ See: `.planning/config.json`
 
 See: `.planning/ROADMAP.md`
 
-v1.6 milestone is being defined. Requirements and roadmap are pending.
+v1.6 roadmap is drafted with Phases 27-30 and 19 mapped requirements.
 
 ## Memory
 
@@ -79,16 +79,16 @@ Items acknowledged and deferred at milestone close on 2026-05-21:
 
 ## Next Action
 
-Define v1.6 requirements and roadmap.
+Approve v1.6 roadmap, then start Phase 27 planning.
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 27 - AMD SOL Analyzer Coverage
 Plan: —
-Status: Defining requirements
-Last activity: 2026-05-22 — Milestone v1.6 started
+Status: Roadmap drafted for approval
+Last activity: 2026-05-22 — Milestone v1.6 roadmap drafted
 
 ## Operator Next Steps
 
-- Choose whether to run pre-planning research.
-- Write v1.6 requirements and roadmap after the research decision.
+- Approve or adjust the v1.6 roadmap.
+- After approval, run `$gsd-discuss-phase 27` or `$gsd-plan-phase 27`.
