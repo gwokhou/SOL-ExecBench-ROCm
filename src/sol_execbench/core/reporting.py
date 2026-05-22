@@ -12,6 +12,11 @@ import statistics
 from dataclasses import dataclass, field
 
 from .data.trace import EvaluationStatus, Trace
+from .diagnostics import StageDiagnostic
+
+
+DERIVED_EVIDENCE_SCHEMA_VERSION = "sol_execbench.derived_evidence.v1"
+CANONICAL_BENCHMARK_OUTPUT = "trace_jsonl"
 
 
 @dataclass(frozen=True)
@@ -30,6 +35,50 @@ class TraceRunSummary:
         if self.total == 0:
             return 0.0
         return self.passed / self.total
+
+    def to_dict(self) -> dict[str, object]:
+        """Return a JSON-serializable representation of the summary."""
+        return {
+            "total": self.total,
+            "passed": self.passed,
+            "pass_rate": self.pass_rate,
+            "statuses": dict(self.statuses),
+            "median_latency_ms": self.median_latency_ms,
+            "mean_latency_ms": self.mean_latency_ms,
+        }
+
+
+@dataclass(frozen=True)
+class DerivedEvidenceReport:
+    """Derived report data built from canonical traces and diagnostics.
+
+    This object is intentionally not a benchmark trace. It is a convenience
+    structure for local reporting, tests, and future agent-readable summaries.
+    """
+
+    summary: TraceRunSummary
+    diagnostics: tuple[StageDiagnostic, ...] = field(default_factory=tuple)
+    schema_version: str = DERIVED_EVIDENCE_SCHEMA_VERSION
+    derived: bool = True
+    canonical_output: str = CANONICAL_BENCHMARK_OUTPUT
+
+    def to_dict(self) -> dict[str, object]:
+        """Return a JSON-serializable derived evidence payload."""
+        return {
+            "schema_version": self.schema_version,
+            "derived": self.derived,
+            "canonical_output": self.canonical_output,
+            "summary": self.summary.to_dict(),
+            "diagnostics": [
+                {
+                    "stage": diagnostic.stage.value,
+                    "status": diagnostic.status,
+                    "message": diagnostic.message,
+                    "hint": diagnostic.hint,
+                }
+                for diagnostic in self.diagnostics
+            ],
+        }
 
 
 def summarize_traces(traces: list[Trace]) -> TraceRunSummary:
@@ -70,4 +119,15 @@ def format_trace_summary(summary: TraceRunSummary) -> str:
         f"traces={summary.total}, passed={summary.passed}, "
         f"pass_rate={summary.pass_rate:.2%}, statuses=[{status_part}]"
         f"{latency_part}"
+    )
+
+
+def build_evidence_report(
+    traces: list[Trace],
+    diagnostics: list[StageDiagnostic] | tuple[StageDiagnostic, ...] | None = None,
+) -> DerivedEvidenceReport:
+    """Build a derived evidence report from existing traces and diagnostics."""
+    return DerivedEvidenceReport(
+        summary=summarize_traces(traces),
+        diagnostics=tuple(diagnostics or ()),
     )
