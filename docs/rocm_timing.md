@@ -9,8 +9,9 @@ Triton, and HIP native sources, timing is exposed as:
 source_type -> timer_backend -> interpretation
 ```
 
-This document defines that chimney-style contract. Phase 23 defines semantics
-only; profiler collection and parsing are implemented separately.
+This document defines that chimney-style contract. Profiler collection remains
+a derived evidence path: it can be used by benchmark or dataset workflows
+without adding fields to canonical trace JSONL.
 
 ## Source-Specific Timing Policy
 
@@ -77,3 +78,27 @@ reason, and interpretation separate from profiler-backed kernel activity.
 Canonical trace JSONL remains the benchmark output contract. Timing policy and
 profiler evidence are derived methodology artifacts unless a future phase adds
 an explicit documented output path.
+
+## Live rocprofv3 Collection
+
+`src/sol_execbench/core/bench/rocm_profiler.py` provides a reusable live
+collection adapter for workflows that opt into profiler-backed evidence. The
+adapter builds a `rocprofv3 --kernel-trace --hip-runtime-trace` command, runs
+the benchmark or dataset command after the `--` separator, reads generated CSV
+output from a caller-controlled evidence directory, and converts rows into a
+derived `Rocprofv3TimingEvidence` payload.
+
+The adapter follows the same source-specific timing policy:
+
+- HIP native and Triton sources can collect `rocprofv3` kernel activity timing
+  when the profiler is available.
+- PyTorch sources keep PyTorch operator-attribution semantics and do not
+  masquerade as raw kernel activity timing.
+- Mixed or unknown sources use explicit fallback or unsupported timing evidence
+  until runtime evidence is specific enough to choose a more accurate timer.
+
+Profiler failures, missing CSV output, unsupported source types, and event
+fallbacks are labeled in the collection result. Compile, autotune, warmup, or
+unrelated kernel activity must be excluded by the caller's benchmark command or
+explicitly labeled in the resulting evidence; it must not silently become the
+reported measured latency.

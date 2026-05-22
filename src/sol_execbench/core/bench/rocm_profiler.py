@@ -7,8 +7,11 @@ from __future__ import annotations
 
 import csv
 import re
+import subprocess
+from collections.abc import Callable
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from sol_execbench.core.bench.timing_policy import (
     TimingActivityDomain,
@@ -21,6 +24,7 @@ from sol_execbench.core.reporting import CANONICAL_BENCHMARK_OUTPUT
 
 ROCPROFV3_EXECUTABLE = "rocprofv3"
 ROCPROFV3_EVIDENCE_SCHEMA_VERSION = "sol_execbench.rocprofv3_timing.v1"
+ProfilerRunner = Callable[[Sequence[str]], subprocess.CompletedProcess[str]]
 
 
 @dataclass(frozen=True)
@@ -112,6 +116,51 @@ class DefaultTimingSelection:
             "profiler_backed": self.profiler_backed,
             "fallback_applied": self.fallback_applied,
             "reason": self.reason,
+        }
+
+
+@dataclass(frozen=True)
+class Rocprofv3CollectionRequest:
+    """Request to collect live profiler timing evidence for one command."""
+
+    application_command: tuple[str, ...]
+    output_directory: Path
+    output_file: str
+    policy: TimingPolicy
+    tool_version: str
+    gpu_architecture: str
+    executable: str = ROCPROFV3_EXECUTABLE
+    include_hip_runtime: bool = True
+
+
+@dataclass(frozen=True)
+class Rocprofv3CollectionResult:
+    """Result of live profiler collection or explicit fallback routing."""
+
+    evidence: Rocprofv3TimingEvidence | None
+    selection: DefaultTimingSelection
+    command: tuple[str, ...] = ()
+    csv_path: Path | None = None
+    returncode: int | None = None
+    stdout: str = ""
+    stderr: str = ""
+
+    @property
+    def profiler_collected(self) -> bool:
+        """Whether live profiler evidence was collected and parsed."""
+        return self.evidence is not None and not self.selection.fallback_applied
+
+    def to_dict(self) -> dict[str, object]:
+        """Return a JSON-serializable collection result payload."""
+        return {
+            "profiler_collected": self.profiler_collected,
+            "selection": self.selection.to_dict(),
+            "command": list(self.command),
+            "csv_path": str(self.csv_path) if self.csv_path is not None else None,
+            "returncode": self.returncode,
+            "stdout": self.stdout,
+            "stderr": self.stderr,
+            "evidence": self.evidence.to_dict() if self.evidence is not None else None,
         }
 
 
@@ -216,6 +265,99 @@ def build_timing_evidence(
         fallback_applied=policy.fallback_applied,
         fallback_reason=policy.reason if policy.fallback_applied else None,
     )
+
+
+def collect_rocprofv3_timing(
+    request: Rocprofv3CollectionRequest,
+    *,
+    rocprofv3_available: bool = True,
+    runner: ProfilerRunner | None = None,
+) -> Rocprofv3CollectionResult:
+    """Collect live `rocprofv3` timing evidence for a command.
+
+    The runner is injectable so unit tests can exercise live collection without
+    requiring a GPU or installed profiler. Non-profiler policies return explicit
+    fallback metadata instead of masquerading as kernel activity timing.
+    """
+    selection = select_default_timing(
+        request.policy,
+        rocprofv3_available=rocprofv3_available,
+    )
+    if not selection.profiler_backed:
+        return Rocprofv3CollectionResult(evidence=None, selection=selection)
+
+    request.output_directory.mkdir(parents=True, exist_ok=True)
+    command = build_rocprofv3_command(
+        request.application_command,
+        output_directory=str(request.output_directory),
+        output_file=request.output_file,
+        executable=request.executable,
+        include_hip_runtime=request.include_hip_runtime,
+    )
+    run = runner or _default_runner
+    completed = run(command)
+    csv_path = _find_rocprofv3_csv(request.output_directory, request.output_file)
+    if completed.returncode != 0:
+        fallback = DefaultTimingSelection(
+            policy=select_timing_policy(request.policy.source_type, profiler_available=False),
+            profiler_backed=False,
+            fallback_applied=True,
+            reason=f"rocprofv3 command failed with exit code {completed.returncode}",
+        )
+        return Rocprofv3CollectionResult(
+            evidence=None,
+            selection=fallback,
+            command=tuple(command),
+            csv_path=csv_path,
+            returncode=completed.returncode,
+            stdout=completed.stdout or "",
+            stderr=completed.stderr or "",
+        )
+    if csv_path is None:
+        fallback = DefaultTimingSelection(
+            policy=select_timing_policy(request.policy.source_type, profiler_available=False),
+            profiler_backed=False,
+            fallback_applied=True,
+            reason="rocprofv3 did not produce a CSV timing output",
+        )
+        return Rocprofv3CollectionResult(
+            evidence=None,
+            selection=fallback,
+            command=tuple(command),
+            returncode=completed.returncode,
+            stdout=completed.stdout or "",
+            stderr=completed.stderr or "",
+        )
+
+    evidence = build_timing_evidence(
+        policy=request.policy,
+        csv_content=csv_path.read_text(),
+        tool_version=request.tool_version,
+        gpu_architecture=request.gpu_architecture,
+    )
+    return Rocprofv3CollectionResult(
+        evidence=evidence,
+        selection=selection,
+        command=tuple(command),
+        csv_path=csv_path,
+        returncode=completed.returncode,
+        stdout=completed.stdout or "",
+        stderr=completed.stderr or "",
+    )
+
+
+def _default_runner(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        list(command),
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+
+def _find_rocprofv3_csv(output_directory: Path, output_file: str) -> Path | None:
+    candidates = sorted(output_directory.glob(f"{output_file}*.csv"))
+    return candidates[0] if candidates else None
 
 
 def _normalize_header(header: str | None) -> str:
