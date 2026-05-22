@@ -8,26 +8,31 @@ benchmark semantics remain owned by SOL ExecBench ROCm.
 
 ## Accepted Practices
 
-| Practice | Source pattern | SOL ExecBench ROCm adaptation | Public contract impact |
-|----------|----------------|-------------------------------|------------------------|
-| Tool readiness diagnostics | Profiler router and PMC availability checks distinguish basic/full profiling and fallback reasons. | Add internal ROCm diagnostic helpers that report tool presence and selected profiling readiness without adding CLI flags. | None |
-| Structured failure surfaces | Typed errors carry stage and actionable fix hints. | Add internal stage/error helpers for parse, packaging, compile, runtime, verification, timing, and environment failures. | None |
-| Agent/report transformation layer | Agent builder turns pipeline internals into stable machine-readable summaries. | Add pure trace summary helpers for local reporting and tests; do not add fields to trace JSONL. | None |
-| Baseline/scoring discipline | Baseline comparison uses explicit thresholds and significance tests. | Add documentation and tests that keep SOL-Score-style output stable and warn against unsupported AMD performance claims. | None |
-| Trace-file baseline comparison | `src/baseline/` compares agent results with named baselines and emits markdown summaries. | Add `sol-execbench-baseline` over existing trace JSONL with WIN/PARITY/LOSS classifications and JSON/text output. | Additive CLI only; existing `sol-execbench` behavior and trace schema unchanged |
-| Hardware/tool caching as an optimization | PMC counter discovery caches expensive subprocess calls. | Keep as a future optimization candidate for diagnostics if profiling probes become expensive. | None |
+| Practice | hip-execbench source evidence | SOL ExecBench ROCm adaptation | Public contract impact |
+|----------|-------------------------------|-------------------------------|------------------------|
+| Tool readiness diagnostics | `src/profiler/router.ts` returns backend, reason, fallback status, and effective profiling level for RDNA/CDNA/tool combinations. | Add internal ROCm diagnostic helpers that report tool presence and selected profiling readiness without adding CLI flags. | None |
+| Structured failure surfaces | `src/errors/index.ts` defines typed errors carrying path, field, expected, actual, detail, and fix-hint context. | Add internal stage/error helpers for parse, packaging, compile, runtime, verification, timing, and environment failures. | None |
+| Agent/report transformation layer | `src/agent/builder.ts` maps pipeline data into a stable agent document through pure transformation helpers. | Add pure derived trace summary helpers for local reporting and tests; do not add fields to trace JSONL. | None |
+| Baseline/scoring discipline | `src/baseline/comparator.ts` compares named sources with thresholds and repeated-run pairwise tests. | Keep baseline comparison baseline-relative and warn against unsupported AMD performance claims. | None |
+| Trace-file baseline comparison | `src/baseline/comparator.ts` and `src/baseline/comparisonReport.ts` compare named baselines and emit summaries. | Keep `sol-execbench-baseline` over existing trace JSONL with WIN/PARITY/LOSS classifications and JSON/text output. | Additive CLI only; existing `sol-execbench` behavior and trace schema unchanged |
 
-## Rejected Or Deferred Practices
+## Rejected Practices
 
 | Practice | Reason |
 |----------|--------|
-| Replacing the Python CLI with `hip-bench` subcommands | Would change public CLI contracts and duplicate existing SOL ExecBench entry points. |
-| Switching schemas to the TypeScript/Zod model | Would change the public Pydantic schema surface and validation behavior. |
-| Emitting a new agent JSON contract from normal runs | Trace JSONL is the public machine-readable contract in this project. |
-| Importing `hip-execbench` Mann-Whitney U significance tests directly | SOL ExecBench ROCm currently records one trace per workload by default; significance testing needs an explicit repeated-sample contract before it is meaningful. |
-| Importing `hip-execbench` HTML/Plotly reports | Adds frontend/reporting dependencies and a new report surface beyond the v1.3 closure goal. |
-| Replacing trace JSONL with `hip-execbench` trace blocks | Would change the established SOL ExecBench trace contract. |
-| Claiming CDNA 3 hardware validation | User explicitly deferred real `gfx94*` validation for this milestone. |
+| Replacing the Python CLI with `hip-bench` subcommands | `src/cli/index.ts` and `src/main.ts` implement a distinct command shape that would change public CLI contracts and duplicate existing SOL ExecBench entry points. |
+| Switching schemas to the TypeScript/Zod model | `src/schemas/*.ts` uses Zod; importing that model would change the public Pydantic schema surface and validation behavior. |
+| Emitting a new agent JSON contract from normal runs | `src/agent/builder.ts` is useful as a transformation pattern, but trace JSONL is the public machine-readable contract in this project. |
+| Importing `hip-execbench` HTML/Plotly reports | `src/reporting/html.ts` and `src/reporting/charts.ts` add frontend/reporting dependencies and a new report surface outside this milestone. |
+| Replacing trace JSONL with `hip-execbench` trace blocks | `src/tracing/trace.ts` is a separate trace model and would change the established SOL ExecBench trace contract. |
+
+## Deferred Practices
+
+| Practice | Reason |
+|----------|--------|
+| Importing `hip-execbench` Mann-Whitney U significance tests directly | `src/pipeline/statistics.ts` is a solid pure implementation, but SOL ExecBench ROCm currently records one trace per workload by default; significance testing needs an explicit repeated-sample contract before it is meaningful. |
+| Hardware/tool caching as an optimization | `src/profiler/pmc-cache.ts` and `src/profiler/profile-cache.ts` cache expensive probes, but SOL ExecBench ROCm should defer this until diagnostics probes are implemented and measured. |
+| Claiming CDNA 3 hardware validation | User scope is CDNA 3 implementation/readiness only; real `gfx94*` hardware validation remains a future milestone. |
 
 ## Guardrails
 

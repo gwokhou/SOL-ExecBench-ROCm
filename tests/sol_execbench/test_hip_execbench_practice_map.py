@@ -14,6 +14,21 @@ def test_practice_map_records_baseline_comparison_adaptation():
     assert "WIN/PARITY/LOSS" in text
 
 
+def test_practice_map_classifies_practices_with_source_evidence():
+    text = PRACTICE_MAP.read_text()
+    for heading in ("Accepted Practices", "Rejected Practices", "Deferred Practices"):
+        assert heading in text
+    for source_ref in (
+        "src/profiler/router.ts",
+        "src/errors/index.ts",
+        "src/agent/builder.ts",
+        "src/baseline/comparator.ts",
+        "src/schemas/*.ts",
+        "src/pipeline/statistics.ts",
+    ):
+        assert source_ref in text
+
+
 def test_practice_map_rejects_contract_changing_hip_execbench_imports():
     text = PRACTICE_MAP.read_text()
     for rejected in (
@@ -31,3 +46,4 @@ def test_practice_map_keeps_public_contract_guardrails():
     assert "solution.json" in text
     assert "trace JSONL" in text
     assert "Baseline comparison is baseline-relative" in text
+    assert "existing `sol-execbench` behavior and trace schema unchanged" in text
