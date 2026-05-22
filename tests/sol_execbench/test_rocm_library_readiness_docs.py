@@ -15,11 +15,15 @@ def test_rocm_library_readiness_doc_classifies_all_schema_categories():
     assert "Compatibility example" in text
 
 
-def test_readme_links_library_readiness_before_claiming_support():
+def test_readme_links_library_readiness_and_names_supported_libraries():
     text = (REPO_ROOT / "README.md").read_text()
     assert "hipBLAS" in text
-    assert "ROCm library-oriented candidate categories" in text
+    assert "MIOpen" in text
+    assert "Composable Kernel" in text
+    assert "rocWMMA" in text
     assert "docs/rocm_libraries.md" in text
+    assert "CDNA 3" in text
+    assert "CDNA 4 validation is also deferred" in text
 
 
 def test_former_nvidia_library_examples_are_pytorch_compatibility_examples():

@@ -36,16 +36,16 @@
 
 ### Compatibility Cleanup and Claims
 
-- [ ] **COMPAT-01**: Public docs map each former NVIDIA library/DSL category to a supported ROCm replacement, a retired compatibility example, or a clearly deferred validation target.
-- [ ] **COMPAT-02**: Former cuDNN, CUTLASS, CuTe DSL, and cuTile example paths no longer imply supported library replacement unless they contain a real runnable ROCm library solution.
-- [ ] **COMPAT-03**: Public-contract tests prevent MIOpen, CK, or rocWMMA from being documented as supported unless runnable examples and tests exist.
-- [ ] **COMPAT-04**: README and support docs state that v1.8 validation is RDNA 4 only and that CDNA 3 and CDNA 4 validation are deferred.
+- [x] **COMPAT-01**: Public docs map each former NVIDIA library/DSL category to a supported ROCm replacement, a retired compatibility example, or a clearly deferred validation target.
+- [x] **COMPAT-02**: Former cuDNN, CUTLASS, CuTe DSL, and cuTile example paths no longer imply supported library replacement unless they contain a real runnable ROCm library solution.
+- [x] **COMPAT-03**: Public-contract tests prevent MIOpen, CK, or rocWMMA from being documented as supported unless runnable examples and tests exist.
+- [x] **COMPAT-04**: README and support docs state that v1.8 validation is RDNA 4 only and that CDNA 3 and CDNA 4 validation are deferred.
 
 ### RDNA 4 Validation Closure
 
-- [ ] **RDNA4-01**: Maintainer can run the focused library example suite on RDNA 4 and record passing evidence for hipBLAS, MIOpen, CK, and rocWMMA examples.
-- [ ] **RDNA4-02**: Maintainer can run focused unit/docs tests that protect dependency diagnostics, native staging, solution metadata, and support-status wording.
-- [ ] **RDNA4-03**: Completion artifacts summarize which library categories are supported on RDNA 4 and explicitly avoid CDNA 3/CDNA 4 validation claims.
+- [x] **RDNA4-01**: Maintainer can run the focused library example suite on RDNA 4 and record passing evidence for hipBLAS, MIOpen, CK, and rocWMMA examples.
+- [x] **RDNA4-02**: Maintainer can run focused unit/docs tests that protect dependency diagnostics, native staging, solution metadata, and support-status wording.
+- [x] **RDNA4-03**: Completion artifacts summarize which library categories are supported on RDNA 4 and explicitly avoid CDNA 3/CDNA 4 validation claims.
 
 ## Future Requirements
 
@@ -93,13 +93,13 @@
 | WMM-02 | Phase 39 | Complete |
 | WMM-03 | Phase 39 | Complete |
 | WMM-04 | Phase 39 | Complete |
-| COMPAT-01 | Phase 40 | Pending |
-| COMPAT-02 | Phase 40 | Pending |
-| COMPAT-03 | Phase 40 | Pending |
-| COMPAT-04 | Phase 40 | Pending |
-| RDNA4-01 | Phase 40 | Pending |
-| RDNA4-02 | Phase 40 | Pending |
-| RDNA4-03 | Phase 40 | Pending |
+| COMPAT-01 | Phase 40 | Complete |
+| COMPAT-02 | Phase 40 | Complete |
+| COMPAT-03 | Phase 40 | Complete |
+| COMPAT-04 | Phase 40 | Complete |
+| RDNA4-01 | Phase 40 | Complete |
+| RDNA4-02 | Phase 40 | Complete |
+| RDNA4-03 | Phase 40 | Complete |
 
 **Coverage:**
 - v1.8 requirements: 23 total
@@ -108,4 +108,4 @@
 
 ---
 *Requirements defined: 2026-05-22*
-*Last updated: 2026-05-22 after Phase 39 completion*
+*Last updated: 2026-05-22 after Phase 40 completion*

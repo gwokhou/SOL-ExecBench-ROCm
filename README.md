@@ -24,19 +24,20 @@ Supported solution categories in this port:
 - Triton ROCm
 - HIP/C++
 - hipBLAS via the native ROCm build path
-- ROCm library-oriented candidate categories: `miopen`, `ck`,
-  `rocwmma`
+- MIOpen, Composable Kernel, and rocWMMA through scoped native ROCm examples
 
-See [ROCm library category readiness](docs/rocm_libraries.md) before treating
-candidate library-oriented categories as runnable support. Some former NVIDIA
-library/DSL example directories are retained as PyTorch compatibility examples.
+See [ROCm library category readiness](docs/rocm_libraries.md) for the exact
+operation scope and dependency requirements of each native library example.
+Some former NVIDIA library/DSL example directories are retained as PyTorch
+compatibility examples and do not imply native replacement support by
+themselves.
 
-Current local validation evidence covers RDNA 4 (`gfx1200`). CDNA 3 targets
-(`gfx940`, `gfx941`, `gfx942`) are supported by the solution schema and HIP
-packaging paths, but real CDNA 3 hardware validation is deferred. The planned
-commercial GPU validation target is AMD Instinct MI300X (`gfx942`). Do not claim
-MI300X/CDNA3 hardware validation until a full adapted-suite run, environment
-evidence, clock-lock evidence, and validation artifacts are recorded.
+Current validation scope for the v1.8 ROCm library ecosystem is RDNA 4
+(`gfx1200`). CDNA 3 targets (`gfx940`, `gfx941`, `gfx942`) are supported by the
+solution schema and HIP packaging paths, but real CDNA 3 hardware validation is
+deferred. CDNA 4 validation is also deferred. Do not claim MI300X/CDNA3 or CDNA4
+library validation until a full adapted-suite run, environment evidence,
+clock-lock evidence, and validation artifacts are recorded.
 
 ## Prerequisites
 
@@ -158,8 +159,8 @@ problems are skipped unless `--rerun` is supplied.
 - [Trace](docs/trace.md): evaluation output and ROCm environment fields.
 - [Analysis](docs/analysis.md): timing, trace review, clock locking, and
   `rocprofv3` workflow.
-- [ROCm library categories](docs/rocm_libraries.md): supported vs candidate
-  native library categories and compatibility examples.
+- [ROCm library categories](docs/rocm_libraries.md): supported native library
+  examples, operation scope, dependencies, and compatibility examples.
 - [Compliance](docs/compliance.md): third-party notices and unsupported features.
 
 ## Testing
