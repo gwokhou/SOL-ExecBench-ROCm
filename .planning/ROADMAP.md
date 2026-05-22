@@ -12,11 +12,11 @@ end-to-end workflow while preserving existing public contracts.
 | Phase | Name | Goal | Requirements |
 |-------|------|------|--------------|
 | 27 | AMD SOL Analyzer Coverage | Complete 2026-05-22: Broadened analyzer coverage and added derived coverage summaries with confidence labels. | SOLCOV-01, SOLCOV-02, SOLCOV-03, SOLCOV-04 |
-| 28 | Live rocprofv3 Timing Integration | Collect live source-specific ROCm profiler timing evidence during benchmark or dataset execution. | PROF-01, PROF-02, PROF-03, PROF-04 |
+| 28 | Live rocprofv3 Timing Integration | Complete 2026-05-22: Added live `rocprofv3` collection adapter, explicit fallback metadata, and source-specific timing evidence docs. | PROF-01, PROF-02, PROF-03, PROF-04 |
 | 29 | Derived AMD Scoring Workflow | Connect trace JSONL, live timing evidence, AMD SOL bounds, and baseline inputs into workload and suite reports. | SCORE-01, SCORE-02, SCORE-03, SCORE-04 |
 | 30 | Compatibility and Claim Guardrails | Prove public contracts remain compatible and keep CDNA3/NVIDIA equivalence claims out of v1.6. | COMPAT-01, COMPAT-02, COMPAT-03, COMPAT-04, CLAIM-01, CLAIM-02, CLAIM-03 |
 
-**Coverage:** 19 / 19 v1.6 requirements mapped. 4 / 19 complete.
+**Coverage:** 19 / 19 v1.6 requirements mapped. 8 / 19 complete.
 
 ## Phases
 
@@ -57,7 +57,7 @@ Plans:
 
 ### Phase 28: Live rocprofv3 Timing Integration
 
-**Status:** Pending
+**Status:** Complete 2026-05-22
 
 **Goal:** Collect live source-specific ROCm profiler timing evidence during
 benchmark or dataset execution.
@@ -82,7 +82,12 @@ benchmark or dataset execution.
   on local hardware traces.
 - Keep PyTorch operator attribution distinct from HIP/Triton kernel activity.
 
-**Plans:** TBD
+**Plans:** 1 plan
+
+Plans:
+
+- [x] 28-01: Add live `rocprofv3` collection adapter, fallback evidence
+  routing, mocked subprocess tests, and live timing documentation.
 
 ### Phase 29: Derived AMD Scoring Workflow
 
@@ -165,10 +170,10 @@ CLAIM-02, CLAIM-03
 | SOLCOV-02 | Phase 27 | Complete |
 | SOLCOV-03 | Phase 27 | Complete |
 | SOLCOV-04 | Phase 27 | Complete |
-| PROF-01 | Phase 28 | Pending |
-| PROF-02 | Phase 28 | Pending |
-| PROF-03 | Phase 28 | Pending |
-| PROF-04 | Phase 28 | Pending |
+| PROF-01 | Phase 28 | Complete |
+| PROF-02 | Phase 28 | Complete |
+| PROF-03 | Phase 28 | Complete |
+| PROF-04 | Phase 28 | Complete |
 | SCORE-01 | Phase 29 | Pending |
 | SCORE-02 | Phase 29 | Pending |
 | SCORE-03 | Phase 29 | Pending |
