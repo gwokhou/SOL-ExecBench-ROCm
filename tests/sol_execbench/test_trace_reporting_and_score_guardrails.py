@@ -9,7 +9,14 @@ from sol_execbench.core.data.trace import (
     Trace,
 )
 from sol_execbench.core.data.workload import Workload
-from sol_execbench.core.reporting import format_trace_summary, summarize_traces
+from sol_execbench.core.diagnostics import DiagnosticStage, StageDiagnostic
+from sol_execbench.core.reporting import (
+    CANONICAL_BENCHMARK_OUTPUT,
+    DERIVED_EVIDENCE_SCHEMA_VERSION,
+    build_evidence_report,
+    format_trace_summary,
+    summarize_traces,
+)
 from sol_execbench.core.scoring_guardrails import (
     AMD_PERFORMANCE_CLAIM_WARNING,
     interpret_sol_score,
@@ -65,6 +72,37 @@ def test_trace_summary_does_not_mutate_public_trace_schema():
     assert summary.statuses == {"PASSED": 2, "RUNTIME_ERROR": 1}
     assert summary.median_latency_ms == 2.0
     assert "pass_rate=66.67%" in format_trace_summary(summary)
+
+
+def test_derived_evidence_report_labels_noncanonical_output():
+    traces = [_trace(EvaluationStatus.PASSED, 1.5)]
+    diagnostics = [
+        StageDiagnostic(
+            stage=DiagnosticStage.ENVIRONMENT,
+            status="available",
+            message="hipcc found",
+        )
+    ]
+
+    before = [trace.model_dump(mode="json") for trace in traces]
+    report = build_evidence_report(traces, diagnostics)
+    after = [trace.model_dump(mode="json") for trace in traces]
+    payload = report.to_dict()
+
+    assert before == after
+    assert report.schema_version == DERIVED_EVIDENCE_SCHEMA_VERSION
+    assert report.derived is True
+    assert report.canonical_output == CANONICAL_BENCHMARK_OUTPUT
+    assert payload["canonical_output"] == "trace_jsonl"
+    assert payload["summary"]["total"] == 1
+    assert payload["diagnostics"] == [
+        {
+            "stage": "environment",
+            "status": "available",
+            "message": "hipcc found",
+            "hint": None,
+        }
+    ]
 
 
 def test_sol_score_formula_stays_unchanged_for_existing_contract():
