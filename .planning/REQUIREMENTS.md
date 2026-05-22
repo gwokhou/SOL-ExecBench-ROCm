@@ -20,9 +20,9 @@
 
 ### Validation Readiness
 
-- [ ] **VAL-04**: Maintainer can run or inspect CDNA 3 `gfx94*` validation readiness logic that detects environment capability, expected commands, evidence requirements, and blockers without requiring real CDNA 3 hardware.
-- [ ] **VAL-05**: CDNA 3 readiness outputs and docs clearly state that readiness is not a hardware-validation pass and do not claim CDNA 3 validation until real `gfx94*` full-suite evidence exists.
-- [ ] **VAL-06**: RDNA 4 validation path has focused unit tests for new readiness/diagnostic/evidence behavior.
+- [x] **VAL-04**: Maintainer can run or inspect CDNA 3 `gfx94*` validation readiness logic that detects environment capability, expected commands, evidence requirements, and blockers without requiring real CDNA 3 hardware.
+- [x] **VAL-05**: CDNA 3 readiness outputs and docs clearly state that readiness is not a hardware-validation pass and do not claim CDNA 3 validation until real `gfx94*` full-suite evidence exists.
+- [x] **VAL-06**: RDNA 4 validation path has focused unit tests for new readiness/diagnostic/evidence behavior.
 
 ### RDNA 4 E2E
 
@@ -68,9 +68,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ENG-04 | Phase 20 | Complete |
 | ENG-05 | Phase 20 | Complete |
 | ENG-06 | Phase 20 | Complete |
-| VAL-04 | Phase 21 | Pending |
-| VAL-05 | Phase 21 | Pending |
-| VAL-06 | Phase 21 | Pending |
+| VAL-04 | Phase 21 | Complete |
+| VAL-05 | Phase 21 | Complete |
+| VAL-06 | Phase 21 | Complete |
 | RDNA-01 | Phase 22 | Pending |
 | RDNA-02 | Phase 22 | Pending |
 | RDNA-03 | Phase 22 | Pending |

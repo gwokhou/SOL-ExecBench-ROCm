@@ -3,22 +3,22 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: hip-execbench Engineering Experience Adaptation + Validation Workflow Readiness
 status: ready_to_plan
-last_updated: 2026-05-22T07:11:18.656Z
+last_updated: 2026-05-22T07:16:19.023Z
 last_activity: 2026-05-22
 progress:
   total_phases: 4
-  completed_phases: 2
-  total_plans: 2
-  completed_plans: 2
-  percent: 50
-stopped_at: Phase 20 complete (1/1) — ready to discuss Phase 21
+  completed_phases: 3
+  total_plans: 3
+  completed_plans: 3
+  percent: 75
+stopped_at: Phase 21 complete (1/1) — ready to discuss Phase 22
 ---
 
 # Project State
 
 **Project:** SOL ExecBench ROCm Port
 **Initialized:** 2026-05-21
-**Current phase:** 21
+**Current phase:** 22
 **Status:** Ready to plan
 
 ## Project Reference
@@ -26,7 +26,7 @@ stopped_at: Phase 20 complete (1/1) — ready to discuss Phase 21
 See: `.planning/PROJECT.md` (updated 2026-05-22)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Phase 21 — cdna 3 validation readiness
+**Current focus:** Phase 22 — rdna 4 validation closure
 
 ## Workflow Settings
 
@@ -77,15 +77,15 @@ Items acknowledged and deferred at milestone close on 2026-05-21:
 
 ## Next Action
 
-Start Phase 21 planning with `/gsd-plan-phase 21`.
+Start Phase 22 planning with `/gsd-plan-phase 22`.
 
 ## Current Position
 
 Phase: 20
 Plan: Not started
-Status: Ready to plan Phase 21
+Status: Ready to plan Phase 22
 Last activity: 2026-05-22
 
 ## Operator Next Steps
 
-- Start Phase 21 with /gsd-plan-phase 21
+- Start Phase 22 with /gsd-plan-phase 22
