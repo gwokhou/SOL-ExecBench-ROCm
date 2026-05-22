@@ -126,3 +126,10 @@ def test_rocm_timing_docs_define_source_specific_timing_semantics():
     assert "PyTorch operator attribution" in text
     assert "fallback event timing" in text
     assert "torch.cuda" in text
+    assert "Profiler Evidence" in text
+    assert "tool_version" in text
+    assert "gpu_architecture" in text
+    assert "activity_domain" in text
+    assert "aggregation_rule" in text
+    assert "parsed timing rows" in text
+    assert "fallback reason" in text

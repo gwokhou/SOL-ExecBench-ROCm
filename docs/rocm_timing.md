@@ -55,6 +55,25 @@ The current benchmark timing function is `time_runnable()` in
 behavior. It defines the policy that later phases use to decide when
 profiler-backed timing should replace fallback event timing.
 
+## Profiler Evidence
+
+Profiler-backed timing evidence is a derived methodology artifact. It must
+include:
+
+- `tool_version`: the `rocprofv3` version used to collect the trace.
+- `gpu_architecture`: the AMD gfx target, such as `gfx1200`.
+- `activity_domain`: the measured domain, such as kernel activity or HIP
+  runtime.
+- `aggregation_rule`: how parsed timing rows were combined.
+- `backend`: the selected timer backend.
+- `interpretation`: what the duration means for the source type.
+- `parsed timing rows`: normalized rows used to compute the duration.
+- `fallback reason`: why fallback event timing was used, when applicable.
+
+Fallback evidence must be explicit. Event timing may be used when profiler
+evidence is unavailable or unsupported, but it must keep its backend, fallback
+reason, and interpretation separate from profiler-backed kernel activity.
+
 Canonical trace JSONL remains the benchmark output contract. Timing policy and
 profiler evidence are derived methodology artifacts unless a future phase adds
 an explicit documented output path.
