@@ -40,6 +40,19 @@ import subprocess
 import sys
 from pathlib import Path
 
+from sol_execbench.core.data.definition import Definition
+from sol_execbench.core.data.trace import Trace
+from sol_execbench.core.data.workload import Workload
+from sol_execbench.core.scoring.amd_score import (
+    AmdNativeScore,
+    build_amd_native_suite_report,
+    score_amd_native_trace_workload,
+)
+from sol_execbench.core.scoring.amd_sol import (
+    build_amd_sol_bound_artifact,
+    default_amd_hardware_models,
+)
+
 ROOT = Path(__file__).resolve().parent.parent
 
 CATEGORIES = {"L1", "L2", "FlashInfer-Bench", "Quant"}
@@ -339,6 +352,68 @@ def print_summary(summaries: list[dict]):
 
 
 # ---------------------------------------------------------------------------
+# AMD-native derived score report
+# ---------------------------------------------------------------------------
+
+
+def _hardware_model_key_from_traces(traces: list[Trace]) -> str:
+    """Return the first known AMD gfx key found in trace environment strings."""
+    known = default_amd_hardware_models()
+    for trace in traces:
+        if trace.evaluation is None:
+            continue
+        hardware = trace.evaluation.environment.hardware
+        for key in known:
+            if key in hardware:
+                return key
+    return "gfx1200"
+
+
+def build_amd_score_reports_for_problem(
+    *,
+    definition_payload: dict,
+    workload_path: Path,
+    traces_payload: list[dict],
+    trace_ref: str,
+) -> list[AmdNativeScore]:
+    """Build derived AMD-native scores for one dataset-run problem."""
+    definition = Definition(**definition_payload)
+    workloads = {
+        workload.uuid: workload
+        for workload in (
+            Workload(**json.loads(line))
+            for line in workload_path.read_text().splitlines()
+            if line.strip()
+        )
+    }
+    traces = [Trace(**trace) for trace in traces_payload]
+    hardware_models = default_amd_hardware_models()
+    hardware_model_key = _hardware_model_key_from_traces(traces)
+    hardware_model = hardware_models[hardware_model_key]
+    scores: list[AmdNativeScore] = []
+
+    for trace in traces:
+        workload = workloads.get(trace.workload.uuid)
+        artifact = (
+            build_amd_sol_bound_artifact(definition, workload, hardware_model)
+            if workload is not None
+            else None
+        )
+        scores.append(
+            score_amd_native_trace_workload(
+                trace,
+                artifact,
+                trace_ref=trace_ref,
+                timing_evidence_ref=trace_ref,
+                sol_bound_ref=f"derived:{definition.name}:{trace.workload.uuid}:amd_sol_bound",
+                baseline_ref="trace.evaluation.performance.reference_latency_ms",
+                hardware_model_ref=f"default_amd_hardware_models.{hardware_model_key}",
+            )
+        )
+    return scores
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -418,6 +493,12 @@ def main():
         action="store_true",
         help="Pass --verbose to the sol-execbench CLI.",
     )
+    ap.add_argument(
+        "--amd-score-report",
+        type=Path,
+        default=None,
+        help="Optional path for a derived AMD-native suite score JSON report.",
+    )
     args = ap.parse_args()
 
     problems_dir = args.problems_dir.resolve()
@@ -455,6 +536,7 @@ def main():
         print(f"Using custom iterations: {args.iterations}")
 
     summaries = []
+    amd_scores: list[AmdNativeScore] = []
     for i, problem_dir in enumerate(problems):
         problem_name = problem_dir.name
         category = problem_dir.parent.name
@@ -542,6 +624,16 @@ def main():
         traces_path = problem_output_dir / "traces.json"
         traces_path.write_text(json.dumps(traces, indent=2))
 
+        if args.amd_score_report is not None:
+            amd_scores.extend(
+                build_amd_score_reports_for_problem(
+                    definition_payload=definition,
+                    workload_path=workload_path,
+                    traces_payload=traces,
+                    trace_ref=str(traces_path.relative_to(output_dir)),
+                )
+            )
+
         # Inspect
         summary = inspect_traces(traces, f"{category}/{problem_name}")
         summaries.append(summary)
@@ -561,6 +653,19 @@ def main():
     summary_path.write_text(json.dumps(summaries, indent=2))
     print(f"\nSummary saved to {summary_path}")
     print(f"Per-problem traces saved under {output_dir}")
+
+    if args.amd_score_report is not None:
+        report_path = args.amd_score_report.resolve()
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report = build_amd_native_suite_report(
+            amd_scores,
+            baseline_summary={
+                "problems": len(summaries),
+                "scores": len(amd_scores),
+            },
+        )
+        report_path.write_text(json.dumps(report.to_dict(), indent=2))
+        print(f"AMD-native score report saved to {report_path}")
 
 
 if __name__ == "__main__":

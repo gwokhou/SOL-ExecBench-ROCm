@@ -139,6 +139,20 @@ ROCm timing evidence, baseline summaries, and AMD SOL bound artifacts, but they
 do not add fields to canonical trace JSONL. These reports are AMD ROCm
 interpretation artifacts: not NVIDIA B200, SOLAR, or leaderboard equivalence claims.
 
+Dataset runs can optionally write a derived AMD-native suite score report:
+
+```bash
+uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
+  --limit 5 \
+  --amd-score-report out/amd-score-report.json
+```
+
+The report is opt-in. It reads canonical trace output and derived AMD SOL bound
+inputs, uses trace reference latency as the baseline when available, and records
+trace, timing, SOL-bound, baseline, and hardware-model evidence references for
+each workload score. Missing timing, baseline, or bound evidence is reported as
+an unscored guarded state rather than an invented score.
+
 ## AMD SOL Coverage Semantics
 
 AMD SOL bound artifacts include a derived coverage summary before scores are
