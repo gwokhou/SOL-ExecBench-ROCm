@@ -223,6 +223,66 @@
 
 ---
 
+## Milestone: v1.8 - ROCm Library Ecosystem Completion
+
+**Shipped:** 2026-05-22
+**Phases:** 5 | **Plans:** 5 | **Tasks:** 0
+
+### What Was Built
+
+- Reusable ROCm library dependency diagnostics and Docker dependency checks for
+  MIOpen, Composable Kernel, rocWMMA, and hipBLAS.
+- Native public examples for MIOpen softmax, CK small GEMM, and rocWMMA
+  matrix-core GEMM, each with metadata, source consistency, staging, and RDNA 4
+  E2E registration coverage.
+- Public docs mapping former NVIDIA library/DSL categories to supported ROCm
+  examples, compatibility examples, or deferred validation targets.
+- Nyquist validation artifacts for all v1.8 phases and a passed milestone audit
+  with 23/23 requirements satisfied.
+
+### What Worked
+
+- Keeping RDNA 4 as the only validation scope made support claims crisp and
+  prevented CDNA 3/CDNA 4 overclaiming.
+- Promoting one scoped runnable example per library category gave each support
+  claim concrete source, metadata, test, and documentation evidence.
+- Public-contract tests tied support wording to runnable examples, which closed
+  the previous candidate-category ambiguity.
+
+### What Was Inefficient
+
+- Summary frontmatter and Nyquist validation artifacts were missing at first,
+  so milestone audit needed a follow-up automatic validation pass.
+- Local native E2E coverage remains environment-dependent because complete
+  ROCm development/library headers are not always installed.
+
+### Patterns Established
+
+- Library support status requires four artifacts: public example, native source
+  or metadata evidence, focused tests, and docs that state operation scope.
+- CDNA validation wording should remain explicit in every support matrix until
+  real hardware evidence exists.
+- Milestone audits should run after Nyquist validation files are created, not
+  before.
+
+### Key Lessons
+
+1. Candidate ROCm library categories should become supported only through
+   small, runnable, operation-specific examples.
+2. Validation artifacts are part of the shipped state; missing planning
+   metadata can block closure even when implementation evidence is strong.
+3. Environment-gated native E2E tests are acceptable only when the guard reason
+   is documented and support claims remain scoped.
+
+### Cost Observations
+
+- Model mix: not recorded.
+- Sessions: 1 autonomous validation/closure session after phase execution.
+- Notable: final validation ran 41 focused tests, Ruff, Docker entrypoint syntax,
+  summary requirement extraction, and Nyquist artifact checks.
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -233,6 +293,7 @@
 | v1.2 | 1 | 4 | Added practice-harvest workflow with explicit public-contract guardrails |
 | v1.5 | 1 | 4 | Added AMD-native timing/SOL/scoring evidence layers while preserving public contracts |
 | v1.7 | 1 | 5 | Added baseline/timing/reward-hack/library/MI300X readiness hardening before real commercial GPU validation |
+| v1.8 | 1 | 5 | Completed scoped ROCm library replacement support for RDNA 4 and added Nyquist validation artifacts |
 
 ### Cumulative Quality
 
@@ -242,9 +303,12 @@
 | v1.2 | 16 focused tests passed; ruff clean | v1.2 requirements 14/14 complete | CDNA 3 real hardware validation; AMD-native scoring model |
 | v1.5 | 42 focused milestone tests passed; ruff clean | v1.5 requirements 20/20 complete | Real CDNA 3 hardware validation; broader AMD SOL operator coverage |
 | v1.7 | 67 focused audit tests passed | v1.7 requirements 21/21 complete | MI300X/CDNA3 full-suite validation; FP8 real-hardware validation; paper extraction; full SOLAR parity |
+| v1.8 | 41 focused tests passed; ruff clean; Docker entrypoint syntax passed | v1.8 requirements 23/23 complete | CDNA 3/CDNA 4 library validation; complete local ROCm development headers for native E2E |
 
 ### Top Lessons
 
 1. Hardware-specific requirements need hardware-specific evidence before support claims are made.
 2. Compatibility wrappers can preserve caller stability while changing the underlying ROCm implementation path.
 3. Engineering-practice borrowing should be protected by explicit public-contract tests.
+4. Support matrices should only use "supported" for categories with runnable
+   examples, tests, and scope-specific docs.

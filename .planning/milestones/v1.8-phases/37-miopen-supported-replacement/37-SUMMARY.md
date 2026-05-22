@@ -2,6 +2,11 @@
 phase: 37
 status: complete
 completed: 2026-05-22
+requirements-completed:
+  - MIOPEN-01
+  - MIOPEN-02
+  - MIOPEN-03
+  - MIOPEN-04
 ---
 
 # Phase 37 Summary

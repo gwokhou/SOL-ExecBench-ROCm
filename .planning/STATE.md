@@ -2,9 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: ROCm Library Ecosystem Completion
-status: planning
-last_updated: "2026-05-22T16:25:00.000Z"
-last_activity: 2026-05-22 — Quick task completed: HIP native stream headers
+current_phase: complete
+status: completed
+last_updated: "2026-05-22T15:30:35.581Z"
+last_activity: 2026-05-22 — Milestone v1.8 completed and archived
 progress:
   total_phases: 5
   completed_phases: 5
@@ -18,7 +19,7 @@ progress:
 **Project:** SOL ExecBench ROCm Port
 **Initialized:** 2026-05-21
 **Current phase:** complete
-**Status:** v1.8 phases complete; ready for milestone audit
+**Status:** v1.8 milestone complete
 
 ## Project Reference
 
@@ -42,7 +43,7 @@ See: `.planning/config.json`
 
 See: `.planning/ROADMAP.md`
 
-v1.8 is active with phases 36-40.
+No active milestone is currently planned. v1.8 is archived.
 
 ## Memory
 
@@ -76,6 +77,10 @@ v1.8 is active with phases 36-40.
 - v1.7 roadmap archived in `.planning/milestones/v1.7-ROADMAP.md`.
 - v1.7 audit archived in `.planning/milestones/v1.7-MILESTONE-AUDIT.md`.
 - v1.7 phase execution history archived in `.planning/milestones/v1.7-phases/`.
+- v1.8 requirements archived in `.planning/milestones/v1.8-REQUIREMENTS.md`.
+- v1.8 roadmap archived in `.planning/milestones/v1.8-ROADMAP.md`.
+- v1.8 audit archived in `.planning/milestones/v1.8-MILESTONE-AUDIT.md`.
+- v1.8 phase execution history archived in `.planning/milestones/v1.8-phases/`.
 
 ## Deferred Items
 
@@ -92,10 +97,10 @@ development environment.
 
 ## Current Position
 
-Phase: complete
+Phase: Milestone v1.8 complete
 Plan: —
-Status: Ready for milestone audit
-Last activity: 2026-05-22 — Quick task completed: HIP native stream headers
+Status: Awaiting next milestone
+Last activity: 2026-05-22 — Milestone v1.8 completed and archived
 
 ## Quick Tasks Completed
 
@@ -105,5 +110,4 @@ Last activity: 2026-05-22 — Quick task completed: HIP native stream headers
 
 ## Operator Next Steps
 
-- Start the next milestone with `$gsd-new-milestone`, or run native example E2E
-  on a complete ROCm development environment.
+- Start the next milestone with `$gsd-new-milestone`.
