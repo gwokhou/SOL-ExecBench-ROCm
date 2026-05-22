@@ -104,6 +104,64 @@
 
 ---
 
+## Milestone: v1.5 - AMD-native SOL Scoring and ROCm Profiler Timing
+
+**Shipped:** 2026-05-22
+**Phases:** 4 | **Plans:** 4 | **Tasks:** 0
+
+### What Was Built
+
+- Source-specific timing policy for HIP native, Triton, PyTorch, mixed, and
+  unknown workloads.
+- `rocprofv3` timing evidence helpers with command construction, CSV parsing,
+  policy-aware default selection, and fallback metadata.
+- AMD SOL bound artifacts with graph nodes, FLOP/byte work estimates, hardware
+  model metadata, per-op bounds, and aggregate bounds.
+- Derived AMD-native score reports with per-workload scores, suite aggregation,
+  evidence references, and CDNA3 no-validation guardrails.
+
+### What Worked
+
+- Keeping timing policy, profiler evidence, SOL bounds, and scoring reports as
+  separate layers made each phase testable without GPU hardware.
+- Derived artifacts preserved the canonical trace JSONL contract while still
+  giving future scoring workflows auditable evidence.
+- Explicit CDNA3 no-claim wording kept readiness scaffolding separate from
+  hardware validation claims.
+
+### What Was Inefficient
+
+- Summary extraction still produced generic `Status:` entries, so milestone
+  accomplishments required manual synthesis.
+- The `rocprofv3` work remains an evidence-helper foundation; live benchmark
+  integration is still future work.
+
+### Patterns Established
+
+- Treat timing source type as part of measurement semantics, not just metadata.
+- Carry confidence and rationale through graph extraction, FLOP/byte estimates,
+  hardware model data, and final score reports.
+- Keep AMD-native performance interpretation as a derived report until the
+  hardware model and validation evidence are strong enough for public claims.
+
+### Key Lessons
+
+1. A chimney-style timing model is preferable when one timing backend would
+   conflate HIP runtime, kernel activity, Triton, and PyTorch operator costs.
+2. SOL-like score reports need evidence references and claim guardrails as much
+   as they need formulas.
+3. CDNA3 support scaffolding should remain visibly unvalidated until a real
+   `gfx94*` full-suite pass exists.
+
+### Cost Observations
+
+- Model mix: not recorded.
+- Sessions: 1 autonomous session plus milestone completion.
+- Notable: phase separation kept the final audit small; 42 milestone tests and
+  focused ruff checks passed at closure.
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -112,6 +170,7 @@
 |-----------|----------|--------|------------|
 | v1.0 | not recorded | 6 | Established ROCm-only milestone workflow with phase verification, validation artifacts, and hardware matrix evidence |
 | v1.2 | 1 | 4 | Added practice-harvest workflow with explicit public-contract guardrails |
+| v1.5 | 1 | 4 | Added AMD-native timing/SOL/scoring evidence layers while preserving public contracts |
 
 ### Cumulative Quality
 
@@ -119,6 +178,7 @@
 |-----------|-------|----------|----------------|
 | v1.0 | 462 passed, 58 skipped on RDNA 4 | v1 requirements 38/39 complete, 1 deferred | TEST-05 CDNA 3 full-suite validation |
 | v1.2 | 16 focused tests passed; ruff clean | v1.2 requirements 14/14 complete | CDNA 3 real hardware validation; AMD-native scoring model |
+| v1.5 | 42 focused milestone tests passed; ruff clean | v1.5 requirements 20/20 complete | Real CDNA 3 hardware validation; broader AMD SOL operator coverage |
 
 ### Top Lessons
 

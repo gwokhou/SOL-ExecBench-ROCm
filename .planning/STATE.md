@@ -2,9 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: AMD-native SOL Scoring and ROCm Profiler Timing
-status: ready_for_milestone_audit
-last_updated: "2026-05-22T10:05:00.000Z"
-last_activity: 2026-05-22
+current_phase: 26
+status: completed
+last_updated: "2026-05-22T10:04:25.245Z"
+last_activity: 2026-05-22 — Milestone v1.5 completed and archived
 progress:
   total_phases: 4
   completed_phases: 4
@@ -18,14 +19,14 @@ progress:
 **Project:** SOL ExecBench ROCm Port
 **Initialized:** 2026-05-21
 **Current phase:** 26
-**Status:** Phase 26 complete
+**Status:** v1.5 milestone complete
 
 ## Project Reference
 
 See: `.planning/PROJECT.md` (updated 2026-05-22)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** AMD-native SOL scoring and ROCm profiler timing
+**Current focus:** Planning next milestone
 
 ## Workflow Settings
 
@@ -42,12 +43,7 @@ See: `.planning/config.json`
 
 See: `.planning/ROADMAP.md`
 
-v1.5 AMD-native SOL Scoring and ROCm Profiler Timing is planned.
-
-- Phase 23: Timing Semantics and Policy - complete
-- Phase 24: rocprofv3 Default Timing Path - complete
-- Phase 25: AMD SOL Bound Foundation - complete
-- Phase 26: AMD-native Scoring and Guarded Reports - complete
+No active milestone is defined. v1.5 is archived.
 
 ## Memory
 
@@ -80,15 +76,15 @@ Items acknowledged and deferred at milestone close on 2026-05-21:
 
 ## Next Action
 
-Audit milestone v1.5 completion.
+Start the next milestone with /gsd-new-milestone.
 
 ## Current Position
 
-Phase: 26 - AMD-native Scoring and Guarded Reports
+Phase: Milestone v1.5 complete
 Plan: —
-Status: Phase 26 complete
-Last activity: 2026-05-22 — Phase 26 executed and verified
+Status: Awaiting next milestone
+Last activity: 2026-05-22 — Milestone v1.5 completed and archived
 
 ## Operator Next Steps
 
-- Run milestone audit for v1.5.
+- Start the next milestone with /gsd-new-milestone
