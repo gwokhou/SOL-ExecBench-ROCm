@@ -150,40 +150,40 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 | --- | --- | --- |
-| IR-01 | TBD | Pending |
-| IR-02 | TBD | Pending |
-| IR-03 | TBD | Pending |
-| IR-04 | TBD | Pending |
-| MODEL-01 | TBD | Pending |
-| MODEL-02 | TBD | Pending |
-| MODEL-03 | TBD | Pending |
-| MODEL-04 | TBD | Pending |
-| MODEL-05 | TBD | Pending |
-| HW-01 | TBD | Pending |
-| HW-02 | TBD | Pending |
-| HW-03 | TBD | Pending |
-| HW-04 | TBD | Pending |
-| BOUND-01 | TBD | Pending |
-| BOUND-02 | TBD | Pending |
-| BOUND-03 | TBD | Pending |
-| BOUND-04 | TBD | Pending |
-| SCORE-01 | TBD | Pending |
-| SCORE-02 | TBD | Pending |
-| SCORE-03 | TBD | Pending |
-| SCORE-04 | TBD | Pending |
-| DOC-01 | TBD | Pending |
-| DOC-02 | TBD | Pending |
-| DOC-03 | TBD | Pending |
-| VAL-01 | TBD | Pending |
-| VAL-02 | TBD | Pending |
-| VAL-03 | TBD | Pending |
-| VAL-04 | TBD | Pending |
+| IR-01 | Phase 42 | Pending |
+| IR-02 | Phase 42 | Pending |
+| IR-03 | Phase 42 | Pending |
+| IR-04 | Phase 42 | Pending |
+| MODEL-01 | Phase 43 | Pending |
+| MODEL-02 | Phase 43 | Pending |
+| MODEL-03 | Phase 43 | Pending |
+| MODEL-04 | Phase 43 | Pending |
+| MODEL-05 | Phase 43 | Pending |
+| HW-01 | Phase 41 | Pending |
+| HW-02 | Phase 41 | Pending |
+| HW-03 | Phase 41 | Pending |
+| HW-04 | Phase 41 | Pending |
+| BOUND-01 | Phase 44 | Pending |
+| BOUND-02 | Phase 44 | Pending |
+| BOUND-03 | Phase 44 | Pending |
+| BOUND-04 | Phase 44 | Pending |
+| SCORE-01 | Phase 45 | Pending |
+| SCORE-02 | Phase 45 | Pending |
+| SCORE-03 | Phase 45 | Pending |
+| SCORE-04 | Phase 45 | Pending |
+| DOC-01 | Phase 41 | Pending |
+| DOC-02 | Phase 46 | Pending |
+| DOC-03 | Phase 46 | Pending |
+| VAL-01 | Phase 46 | Pending |
+| VAL-02 | Phase 46 | Pending |
+| VAL-03 | Phase 46 | Pending |
+| VAL-04 | Phase 46 | Pending |
 
 **Coverage:**
 - v1.9 requirements: 28 total
-- Mapped to phases: 0
-- Unmapped: 28
+- Mapped to phases: 28
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-05-22*
-*Last updated: 2026-05-22 after v1.9 requirement definition*
+*Last updated: 2026-05-22 after v1.9 roadmap creation*
