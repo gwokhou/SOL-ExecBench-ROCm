@@ -15,29 +15,18 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
 ## Current State
 
-**Shipped version:** v1.7 Baseline, Timing, Reward-Hack Hardening, and ROCm Library Migration,
-archived 2026-05-22.
+**Shipped version:** v1.8 ROCm Library Ecosystem Completion,
+completed 2026-05-22.
 
-**Current milestone:** v1.8 ROCm Library Ecosystem Completion.
+**Current milestone:** none active.
 
-**Goal:** Promote the remaining ROCm library replacement categories from
-candidate or compatibility-only status to supported, runnable, tested public
-replacement paths on RDNA 4.
+**Latest milestone outcome:** MIOpen, Composable Kernel, and rocWMMA now have
+scoped native ROCm public examples, dependency diagnostics, native staging
+tests, support-status documentation, and RDNA 4 E2E registrations.
 
-**Target features:**
-- MIOpen replacement path with a runnable RDNA 4 public example, native
-  build/staging support, tests, documentation, and claim guardrails.
-- Composable Kernel replacement path with a runnable RDNA 4 public example,
-  build/staging support, tests, documentation, and CUTLASS/CuTe-style
-  replacement guidance.
-- rocWMMA replacement path with a runnable RDNA 4 public example where
-  supported, build/staging support, tests, documentation, and explicit
-  architecture constraints.
-- Compatibility example cleanup so former cuDNN/CUTLASS/CuTe/cuTile examples
-  either become real ROCm library examples or remain explicitly
-  retired/reclassified with no supported-claim ambiguity.
-- Library ecosystem validation covering dependency checks, Docker/runtime docs,
-  public-contract tests, and RDNA 4 example E2E coverage.
+**Next milestone goals:** not selected. Candidate future work remains CDNA 3
+library validation, CDNA 4 validation, FP8 behavior on MI300X, original paper
+dataset extraction, and deeper SOLAR parity.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline.
 Milestones v1.1-v1.6 added CDNA 3 code/schema support, maintained residue
@@ -48,6 +37,9 @@ dataset score reporting, and compatibility/claim guardrails. The v1.7 milestone
 added optimized scoring baseline artifacts, source-specific profiler evidence
 collection, expanded reward-hack defenses, a runnable hipBLAS public example,
 and MI300X validation-readiness guardrails.
+The v1.8 milestone completed the remaining ROCm library ecosystem replacements
+for RDNA 4 scope by adding MIOpen, CK, and rocWMMA public examples and claim
+guardrails.
 
 Validation status:
 
@@ -119,10 +111,17 @@ Validation status:
   unauthorized loaders/file I/O, opaque payloads, and precision downgrade
   patterns before submitted Python source import - v1.7.
 - `hipblas` has a runnable public SGEMM example and native staging tests, while
-  MIOpen, CK, and rocWMMA remain documented candidate categories with
+  MIOpen, CK, and rocWMMA were documented candidate categories with
   overclaiming guardrails - v1.7.
 - MI300X/CDNA3 validation instructions, FP8/NVFP4 decision records, and
   evidence gates for validation claims are implemented - v1.7.
+- MIOpen, Composable Kernel, and rocWMMA each have scoped native ROCm public
+  examples, native staging tests, dependency diagnostics, RDNA 4 E2E
+  registration, and support-status docs - v1.8.
+- Former NVIDIA library/DSL compatibility paths are mapped to supported ROCm
+  examples or kept explicitly as PyTorch compatibility examples - v1.8.
+- v1.8 library validation claims are scoped to RDNA 4; CDNA 3 and CDNA 4
+  validation remain deferred - v1.8.
 
 ### Active
 
@@ -165,10 +164,9 @@ prepared the validation and claim-guardrail scaffolding for MI300X, but no
 commercial GPU validation claim should be made until a full adapted suite run
 and required environment evidence are archived.
 
-The v1.8 milestone is scoped to RDNA 4 validation only. CDNA 3 and CDNA 4
-library validation are intentionally deferred; the milestone may preserve
-schema, documentation, and no-claim guardrails for those architectures, but they
-are not acceptance gates for v1.8.
+The v1.8 milestone was scoped to RDNA 4 validation only. CDNA 3 and CDNA 4
+library validation remain intentionally deferred; current artifacts preserve
+schema, documentation, and no-claim guardrails for those architectures.
 
 ## Constraints
 
@@ -206,7 +204,7 @@ are not acceptance gates for v1.8.
 | Defer dataset extraction and full SOLAR parity | User explicitly postponed the original paper's extraction pipeline and deeper SOLAR parity work. | Deferred |
 | Prioritize baseline, timing, reward-hack, and ROCm libraries | User marked scoring baseline, evaluation timing loop, reward-hack defenses, and ROCm library migration as the implementation priorities. | Validated in v1.7 |
 | Defer NVFP4/MXFP4 validation | User noted MI300X can validate FP8 later, but no hardware is available for NVFP4/MXFP4 validation now. | Deferred |
-| Complete ROCm library replacement ecosystem on RDNA 4 | User requested the next milestone focus on thoroughly resolving incomplete ROCm library replacements, and clarified only RDNA 4 validation is in scope. | Active in v1.8 |
+| Complete ROCm library replacement ecosystem on RDNA 4 | User requested the next milestone focus on thoroughly resolving incomplete ROCm library replacements, and clarified only RDNA 4 validation is in scope. | Validated in v1.8 |
 
 ## Evolution
 

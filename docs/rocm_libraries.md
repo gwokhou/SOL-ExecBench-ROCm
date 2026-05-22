@@ -2,8 +2,9 @@
 
 This page defines the support status for ROCm library-oriented solution
 categories. The schema recognizes these categories so future ROCm-native
-solutions can state intent clearly, but recognition is not the same as runnable
-public example coverage.
+solutions can state intent clearly. Supported status here is tied to a runnable
+public example, its documented operation scope, and the dependency set required
+to build that example.
 
 ## Status Summary
 
@@ -28,6 +29,10 @@ public example coverage.
 **Candidate** means the schema has a ROCm-facing value and the category is a
 known replacement direction, but public runnable examples and tests are not yet
 sufficient to advertise full support.
+
+There are no remaining v1.8 library categories in candidate status. New
+operation families should still start as candidate claims until they have
+matching runnable examples and tests.
 
 **Compatibility example** means the example preserves the original problem
 semantics using another supported runtime, usually PyTorch ROCm, while keeping

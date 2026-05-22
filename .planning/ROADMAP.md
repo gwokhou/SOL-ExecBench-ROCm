@@ -17,7 +17,7 @@ deferred and must not be claimed by this milestone.
 - [x] Phase 37: MIOpen Supported Replacement
 - [x] Phase 38: Composable Kernel Supported Replacement
 - [x] Phase 39: rocWMMA Supported Replacement
-- [ ] Phase 40: Compatibility Cleanup and RDNA 4 Validation Closure
+- [x] Phase 40: Compatibility Cleanup and RDNA 4 Validation Closure
 
 | Phase | Name | Goal | Requirements |
 |-------|------|------|--------------|
@@ -25,7 +25,7 @@ deferred and must not be claimed by this milestone.
 | 37 | MIOpen Supported Replacement | Complete 2026-05-22: Added a native MIOpen softmax example, RDNA 4 E2E registration, source/staging tests, and supported-status docs. | MIOPEN-01, MIOPEN-02, MIOPEN-03, MIOPEN-04 |
 | 38 | Composable Kernel Supported Replacement | Complete 2026-05-22: Added a CK-facing small GEMM example, RDNA 4 E2E registration, source/staging tests, and supported-status docs. | CK-01, CK-02, CK-03, CK-04 |
 | 39 | rocWMMA Supported Replacement | Complete 2026-05-22: Added a rocWMMA matrix-core GEMM example, RDNA 4 E2E registration, source/staging tests, and supported-status docs. | WMM-01, WMM-02, WMM-03, WMM-04 |
-| 40 | Compatibility Cleanup and RDNA 4 Validation Closure | Remove support-status ambiguity, map former NVIDIA categories, and record RDNA 4-only completion evidence. | COMPAT-01, COMPAT-02, COMPAT-03, COMPAT-04, RDNA4-01, RDNA4-02, RDNA4-03 |
+| 40 | Compatibility Cleanup and RDNA 4 Validation Closure | Complete 2026-05-22: Cleaned public support wording, mapped compatibility paths, protected RDNA 4-only claims, and recorded focused validation evidence. | COMPAT-01, COMPAT-02, COMPAT-03, COMPAT-04, RDNA4-01, RDNA4-02, RDNA4-03 |
 
 **Coverage:** 23 / 23 v1.8 requirements mapped. 0 unmapped.
 
@@ -152,7 +152,7 @@ Plans:
 
 ### Phase 40: Compatibility Cleanup and RDNA 4 Validation Closure
 
-**Status:** Not Started
+**Status:** Complete 2026-05-22
 
 **Goal:** Close the library ecosystem gap by removing ambiguous compatibility
 claims and recording RDNA 4 validation evidence.
@@ -175,7 +175,12 @@ RDNA4-02, RDNA4-03
 - Update README, `docs/rocm_libraries.md`, and internal readiness docs together.
 - Treat CDNA 3 and CDNA 4 as deferred validation targets.
 
-**Plans:** 0 plans
+**Plans:** 1 plan
+
+Plans:
+
+- [x] 40-01: Clean public compatibility/support wording, protect RDNA 4-only
+  validation claims, and record focused library validation evidence.
 
 ## Completed Phase History
 
@@ -221,10 +226,10 @@ RDNA4-02, RDNA4-03
 | WMM-02 | Phase 39 | Complete |
 | WMM-03 | Phase 39 | Complete |
 | WMM-04 | Phase 39 | Complete |
-| COMPAT-01 | Phase 40 | Pending |
-| COMPAT-02 | Phase 40 | Pending |
-| COMPAT-03 | Phase 40 | Pending |
-| COMPAT-04 | Phase 40 | Pending |
-| RDNA4-01 | Phase 40 | Pending |
-| RDNA4-02 | Phase 40 | Pending |
-| RDNA4-03 | Phase 40 | Pending |
+| COMPAT-01 | Phase 40 | Complete |
+| COMPAT-02 | Phase 40 | Complete |
+| COMPAT-03 | Phase 40 | Complete |
+| COMPAT-04 | Phase 40 | Complete |
+| RDNA4-01 | Phase 40 | Complete |
+| RDNA4-02 | Phase 40 | Complete |
+| RDNA4-03 | Phase 40 | Complete |

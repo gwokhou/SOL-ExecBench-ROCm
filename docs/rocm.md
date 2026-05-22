@@ -77,9 +77,9 @@ to HIP itself:
 | Library category | Headers | Link/runtime library | Notes |
 | --- | --- | --- | --- |
 | hipBLAS | `hipblas/hipblas.h` | `-lhipblas` | Supported by the existing SGEMM example. |
-| MIOpen | `miopen/miopen.h` | `-lMIOpen` | Planned v1.8 replacement path for softmax/cuDNN-style examples. |
-| Composable Kernel | `ck/ck.hpp` | Header-driven for the planned example path | Planned v1.8 replacement path for selected GEMM/fused GEMM examples. |
-| rocWMMA | `rocwmma/rocwmma.hpp` | Header-driven for the planned example path | Planned v1.8 matrix-core GEMM replacement path on RDNA 4. |
+| MIOpen | `miopen/miopen.h` | `-lMIOpen` | Supported by `examples/miopen/softmax/` for softmax/cuDNN-style coverage. |
+| Composable Kernel | `ck/ck.hpp` | Header-driven for the example path | Supported by `examples/ck/gemm/` for a small GEMM coverage path. |
+| rocWMMA | `rocwmma/rocwmma.hpp` | Header-driven for the example path | Supported by `examples/rocwmma/gemm/` for RDNA 4 matrix-core GEMM coverage. |
 
 Run `uv run pytest tests/docker/dependencies/test_rocm_libraries.py` inside the
 ROCm container to check these dependencies before attempting the library
@@ -105,7 +105,7 @@ Validation recorded in this milestone:
 
 | Hardware class | Architecture | Status |
 | --- | --- | --- |
-| RDNA 4 | `gfx1200` | Full adapted suite passed locally. |
+| RDNA 4 | `gfx1200` | v1.8 library example scope is RDNA 4 only. |
 | CDNA 3 | `gfx940`, `gfx941`, `gfx942` (`gfx94*`) | Code/schema support present; MI300X (`gfx942`) validation is prepared but deferred. Do not claim hardware validation until a full suite run and required evidence are recorded. |
 | CDNA 4 | future `gfx95*` class targets | Validation deferred; not a v1.8 completion gate. |
 
