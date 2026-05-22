@@ -80,3 +80,53 @@ Key trace fields:
 
 Do not compare latencies across machines unless ROCm version, GPU architecture,
 clock policy, and problem inputs are comparable.
+
+## Baseline Comparison
+
+Use `sol-execbench-baseline` to compare existing trace JSONL files without
+changing the trace schema:
+
+```bash
+uv run sol-execbench-baseline \
+  --candidate out/candidate.jsonl \
+  --baseline out/baseline.jsonl
+```
+
+The comparison matches traces by `definition` and `workload.uuid`, uses the
+fastest passed baseline for each workload, and classifies each candidate result
+as:
+
+- `WIN`: candidate beats the baseline by at least `--win-pct` percent.
+- `PARITY`: candidate is within `--parity-pct` percent of the baseline.
+- `LOSS`: candidate is slower than the parity threshold.
+- `NO_BASELINE` or `NO_CANDIDATE`: one side lacks a passed trace with
+  performance data.
+
+JSON output is available for automation:
+
+```bash
+uv run sol-execbench-baseline \
+  --candidate out/candidate.jsonl \
+  --baseline out/baseline.jsonl \
+  --format json \
+  --output out/baseline-comparison.json
+```
+
+Baseline comparison is baseline-relative. It is not an AMD-native roofline claim
+unless you provide and validate a separate AMD interpretation model. The
+`--amd-native-claim` flag intentionally emits a warning so reports cannot
+silently present benchmark-relative data as hardware validation.
+
+## AMD-Native Score Interpretation
+
+The original SOL-Score formula is preserved for compatibility, but the original
+published interpretation is anchored to NVIDIA B200/SOLAR data. In this ROCm
+port:
+
+1. `sol_score()` remains a formula helper.
+2. Baseline comparison reports are baseline-relative by default.
+3. AMD-native claims require an explicit AMD roofline or equivalent model,
+   recorded hardware evidence, and documentation of which architecture and
+   clock policy the model covers.
+4. CDNA 3 claims additionally require the deferred `gfx94*` full-suite
+   validation evidence.
