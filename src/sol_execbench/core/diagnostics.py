@@ -80,6 +80,52 @@ class ProfilerReadiness:
     effective_level: str
 
 
+@dataclass(frozen=True)
+class ValidationReadiness:
+    """Internal validation-readiness metadata for future hardware runs."""
+
+    target_family: str
+    ready: bool
+    claim: str
+    commands: tuple[str, ...]
+    evidence_required: tuple[str, ...]
+    acceptance_criteria: tuple[str, ...]
+    blockers: tuple[str, ...] = ()
+
+    def to_dict(self) -> dict[str, object]:
+        """Return a JSON-serializable readiness payload."""
+        return {
+            "target_family": self.target_family,
+            "ready": self.ready,
+            "claim": self.claim,
+            "commands": list(self.commands),
+            "evidence_required": list(self.evidence_required),
+            "acceptance_criteria": list(self.acceptance_criteria),
+            "blockers": list(self.blockers),
+        }
+
+
+CDNA3_VALIDATION_COMMANDS: tuple[str, ...] = (
+    "uv run --no-sync pytest tests/",
+    "uv run python -c 'import torch; print(torch.__version__, torch.version.hip, torch.cuda.is_available())'",
+    "rocm-smi --showproductname --showdriverversion --showhw || true",
+    "rocminfo | grep -E \"Name: *gfx94|Marketing Name\" || true",
+)
+
+CDNA3_EVIDENCE_REQUIRED: tuple[str, ...] = (
+    "Exact GPU name and gfx94* architecture",
+    "ROCm/HIP/PyTorch versions",
+    "Full pytest command and final pass/skip/fail counts",
+    "Expected skips and CDNA 3-specific deviations",
+)
+
+CDNA3_ACCEPTANCE_CRITERIA: tuple[str, ...] = (
+    "Full adapted pytest suite completes successfully on a real CDNA 3 GPU",
+    "Recorded environment reports gfx94*",
+    "Support matrix claim is updated only after recorded evidence exists",
+)
+
+
 def detect_tool(path: str, which: Callable[[str], str | None] = shutil.which) -> bool:
     """Return whether *path* is available on ``PATH``."""
     return which(path) is not None
@@ -168,6 +214,55 @@ def select_profiler_backend(
         reason="GPU architecture unknown; profiling readiness skipped",
         fallback_applied=True,
         effective_level="skip",
+    )
+
+
+def cdna3_validation_readiness(
+    gfx: str | None,
+    *,
+    tool_diagnostics: list[StageDiagnostic] | tuple[StageDiagnostic, ...] = (),
+) -> ValidationReadiness:
+    """Return readiness metadata for a future real CDNA 3 validation run.
+
+    This helper never claims a hardware-validation pass. It only describes
+    whether the supplied target and tooling are ready to attempt one.
+    """
+    family = classify_gfx(gfx)
+    blockers: list[str] = []
+    if family != "cdna3":
+        if family == "rdna4":
+            blockers.append(
+                "Detected RDNA 4 target; CDNA 3 validation requires gfx94* hardware."
+            )
+        else:
+            blockers.append(
+                "CDNA 3 validation requires an AMD gfx94* target such as gfx942."
+            )
+
+    missing_tools = [
+        diagnostic.message.removesuffix(" not found")
+        for diagnostic in tool_diagnostics
+        if diagnostic.status == "missing"
+    ]
+    if missing_tools:
+        blockers.append(
+            "Missing ROCm validation tools: " + ", ".join(sorted(missing_tools))
+        )
+
+    ready = family == "cdna3" and not blockers
+    claim = (
+        "cdna3_readiness_implemented"
+        if ready
+        else "cdna3_hardware_validation_deferred"
+    )
+    return ValidationReadiness(
+        target_family=family,
+        ready=ready,
+        claim=claim,
+        commands=CDNA3_VALIDATION_COMMANDS,
+        evidence_required=CDNA3_EVIDENCE_REQUIRED,
+        acceptance_criteria=CDNA3_ACCEPTANCE_CRITERIA,
+        blockers=tuple(blockers),
     )
 
 
