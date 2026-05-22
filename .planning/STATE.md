@@ -42,13 +42,12 @@ See: `.planning/config.json`
 
 See: `.planning/ROADMAP.md`
 
-v1.3 Non-CDNA Issue Closure completed 5 phases:
+v1.4 hip-execbench Engineering Experience Adaptation + Validation Workflow Readiness is in planning with 4 phases:
 
-- Phase 14: Original Feature Parity Audit - complete
-- Phase 15: AMD Scoring and Baseline Workflow - complete
-- Phase 16: ROCm Library Category Readiness - complete
-- Phase 17: hip-execbench Practice Adaptation - complete
-- Phase 18: Non-CDNA Validation Closure - complete
+- Phase 19: Compatibility and Practice Inventory - pending
+- Phase 20: Internal Diagnostics and Evidence Model - pending
+- Phase 21: CDNA 3 Validation Readiness - pending
+- Phase 22: RDNA 4 Validation Closure - pending
 
 ## Memory
 
@@ -77,7 +76,7 @@ Items acknowledged and deferred at milestone close on 2026-05-21:
 
 ## Next Action
 
-Start the next milestone with `/gsd-new-milestone`.
+Start Phase 19 planning with `/gsd-plan-phase 19`.
 
 ## Current Position
 
@@ -88,4 +87,4 @@ Last activity: 2026-05-22 — Milestone v1.4 started
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Start Phase 19 with /gsd-plan-phase 19

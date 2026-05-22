@@ -62,24 +62,24 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| COMPAT-01 | TBD | Pending |
-| COMPAT-02 | TBD | Pending |
-| COMPAT-03 | TBD | Pending |
-| ENG-04 | TBD | Pending |
-| ENG-05 | TBD | Pending |
-| ENG-06 | TBD | Pending |
-| VAL-04 | TBD | Pending |
-| VAL-05 | TBD | Pending |
-| VAL-06 | TBD | Pending |
-| RDNA-01 | TBD | Pending |
-| RDNA-02 | TBD | Pending |
-| RDNA-03 | TBD | Pending |
+| COMPAT-01 | Phase 19 | Pending |
+| COMPAT-02 | Phase 19 | Pending |
+| COMPAT-03 | Phase 19 | Pending |
+| ENG-04 | Phase 20 | Pending |
+| ENG-05 | Phase 20 | Pending |
+| ENG-06 | Phase 20 | Pending |
+| VAL-04 | Phase 21 | Pending |
+| VAL-05 | Phase 21 | Pending |
+| VAL-06 | Phase 21 | Pending |
+| RDNA-01 | Phase 22 | Pending |
+| RDNA-02 | Phase 22 | Pending |
+| RDNA-03 | Phase 22 | Pending |
 
 **Coverage:**
 - v1.4 requirements: 12 total
-- Mapped to phases: 0
-- Unmapped: 12
+- Mapped to phases: 12
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-05-22*
-*Last updated: 2026-05-22 after v1.4 requirements definition*
+*Last updated: 2026-05-22 after v1.4 roadmap creation*
