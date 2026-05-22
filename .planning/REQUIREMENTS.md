@@ -22,10 +22,10 @@
 
 ### Composable Kernel Replacement
 
-- [ ] **CK-01**: User can run a public Composable Kernel-backed example on RDNA 4 through `sol-execbench` and receive passing trace JSONL.
-- [ ] **CK-02**: The CK example uses real CK headers/API patterns and does not silently fall back to PyTorch for the measured implementation.
-- [ ] **CK-03**: Tests cover CK solution metadata, source consistency, dependency detection, and RDNA 4 E2E behavior where hardware is available.
-- [ ] **CK-04**: Documentation identifies CK as a supported ROCm replacement path for selected CUTLASS/CuTe-style GEMM or fused GEMM workloads, including known scope limits.
+- [x] **CK-01**: User can run a public Composable Kernel-backed example on RDNA 4 through `sol-execbench` and receive passing trace JSONL.
+- [x] **CK-02**: The CK example uses real CK headers/API patterns and does not silently fall back to PyTorch for the measured implementation.
+- [x] **CK-03**: Tests cover CK solution metadata, source consistency, dependency detection, and RDNA 4 E2E behavior where hardware is available.
+- [x] **CK-04**: Documentation identifies CK as a supported ROCm replacement path for selected CUTLASS/CuTe-style GEMM or fused GEMM workloads, including known scope limits.
 
 ### rocWMMA Replacement
 
@@ -85,10 +85,10 @@
 | MIOPEN-02 | Phase 37 | Complete |
 | MIOPEN-03 | Phase 37 | Complete |
 | MIOPEN-04 | Phase 37 | Complete |
-| CK-01 | Phase 38 | Pending |
-| CK-02 | Phase 38 | Pending |
-| CK-03 | Phase 38 | Pending |
-| CK-04 | Phase 38 | Pending |
+| CK-01 | Phase 38 | Complete |
+| CK-02 | Phase 38 | Complete |
+| CK-03 | Phase 38 | Complete |
+| CK-04 | Phase 38 | Complete |
 | WMM-01 | Phase 39 | Pending |
 | WMM-02 | Phase 39 | Pending |
 | WMM-03 | Phase 39 | Pending |
@@ -108,4 +108,4 @@
 
 ---
 *Requirements defined: 2026-05-22*
-*Last updated: 2026-05-22 after Phase 37 completion*
+*Last updated: 2026-05-22 after Phase 38 completion*

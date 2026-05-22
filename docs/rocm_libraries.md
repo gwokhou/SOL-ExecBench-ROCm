@@ -12,7 +12,7 @@ public example coverage.
 | HIP/C++ | `hip_cpp` | Supported | Runnable HIP examples exist under `examples/hip_cpp/` | Primary native extension path. |
 | hipBLAS / hipBLASLt | `hipblas` | Supported | Runnable SGEMM example exists under `examples/hipblas/gemm/` | BLAS/GEMM replacement path using the native ROCm build flow and `-lhipblas`. |
 | MIOpen | `miopen` | Supported | Runnable softmax example exists under `examples/miopen/softmax/` | cuDNN-style softmax replacement path using the native ROCm build flow and `-lMIOpen`. |
-| Composable Kernel | `ck` | Candidate | Former CUTLASS examples are PyTorch compatibility examples | Candidate replacement for selected CUTLASS/CuTe-style kernels. |
+| Composable Kernel | `ck` | Supported | Runnable small GEMM example exists under `examples/ck/gemm/` | CUTLASS/CuTe-style replacement direction using CK headers and native ROCm execution. |
 | rocWMMA | `rocwmma` | Candidate | No runnable public `rocwmma` example yet | Candidate for WMMA-style matrix kernels. |
 
 ## Support Levels
@@ -37,7 +37,7 @@ the old directory name for discoverability.
 
 | Original NVIDIA category | Public path | Current implementation | Replacement direction |
 | --- | --- | --- | --- |
-| CUTLASS | `examples/cutlass/gemm/` | PyTorch ROCm compatibility example | `ck`, `rocwmma`, `hipblas`, or HIP/Triton |
+| CUTLASS | `examples/cutlass/gemm/` | PyTorch ROCm compatibility example | `examples/ck/gemm/`, `rocwmma`, `hipblas`, or HIP/Triton |
 | cuDNN | `examples/cudnn/softmax/` | PyTorch ROCm compatibility example | `examples/miopen/softmax/`, HIP, or Triton |
 | CuTe DSL | `examples/cute_dsl/jamba_attn_proj/` | PyTorch ROCm compatibility example | `ck`, `rocwmma`, HIP, or Triton |
 | cuTile | `examples/cutile/jamba_attn_proj/` | PyTorch ROCm compatibility example | HIP or Triton |
@@ -48,12 +48,18 @@ the old directory name for discoverability.
 | --- | --- | --- |
 | hipBLAS | `examples/hipblas/gemm/` | `solution_hipblas.json` uses schema language `hipblas`, includes `hipblas/hipblas.h`, calls `hipblasSgemm`, and links with `-lhipblas`. |
 | MIOpen | `examples/miopen/softmax/` | `solution_miopen.json` uses schema language `miopen`, includes `miopen/miopen.h`, calls `miopenSoftmaxForward_V2`, and links with `-lMIOpen`. |
+| Composable Kernel | `examples/ck/gemm/` | `solution_ck.json` uses schema language `ck`, includes `ck/ck.hpp`, uses CK index/tiling conventions, and stages through the native HIP compile path. |
 
 The MIOpen softmax example is intentionally operation-specific: it validates
 float32 tensors shaped `[batch_size, 4096]`, maps them to MIOpen tensor
 descriptors as `N=batch_size, C=4096, H=1, W=1`, and uses
 `MIOPEN_SOFTMAX_MODE_INSTANCE` so the measured implementation computes softmax
 across the hidden dimension for each batch item.
+
+The CK GEMM example is intentionally small: it validates float32 GEMM tensors
+with `K=N=128`, includes CK headers, and uses CK integer/tiling conventions in a
+native HIP kernel. It is a correctness and build-path support example, not a
+claim that every CUTLASS/CuTe workload now has a one-for-one CK replacement.
 
 ## Dependency Diagnostics
 
@@ -73,8 +79,8 @@ specific dependency group instead of surfacing as opaque compile errors.
 
 ## User Guidance
 
-- Use `hip_cpp`, `hipblas`, `miopen`, `pytorch`, or `triton` for runnable examples today.
-- Use `ck` or `rocwmma` only when the solution source and local ROCm
+- Use `hip_cpp`, `hipblas`, `miopen`, `ck`, `pytorch`, or `triton` for runnable examples today.
+- Use `rocwmma` only when the solution source and local ROCm
   environment actually provide the required library integration.
 - Do not treat candidate categories as evidence of performance portability from
   NVIDIA libraries.

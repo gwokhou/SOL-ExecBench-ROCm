@@ -147,6 +147,20 @@ _EXAMPLES = [
         expected_count=3,
         extra_markers=["cpp", "requires_rocm", "requires_rocm_dev", "requires_rdna4"],
     ),
+    Example(
+        test_id="gemm_ck",
+        language="ck",
+        problem="gemm",
+        solution_file="solution_ck.json",
+        expected_count=3,
+        extra_markers=[
+            "cpp",
+            "requires_rocm",
+            "requires_rocm_dev",
+            "requires_ck",
+            "requires_rdna4",
+        ],
+    ),
 ]
 
 
