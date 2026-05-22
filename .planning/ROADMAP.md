@@ -16,7 +16,7 @@ contracts.
 **Scope boundary:** Real CDNA 3 `gfx94*` hardware validation and CDNA 3
 hardware-validation claims remain deferred.
 
-## Phase 14: Original Feature Parity Audit
+## Phase 14: Original Feature Parity Audit ✓
 
 **Goal:** Produce a source-backed comparison between NVIDIA SOL ExecBench public
 functionality and the ROCm port, separating intentional substitutions from
@@ -36,7 +36,7 @@ unresolved gaps.
 4. Tests or documentation checks protect the parity classification from drifting
    silently.
 
-## Phase 15: AMD Scoring and Baseline Workflow
+## Phase 15: AMD Scoring and Baseline Workflow ✓
 
 **Goal:** Make scoring and baseline comparison usable on ROCm without implying
 unsupported AMD hardware-performance claims.
@@ -54,7 +54,7 @@ unsupported AMD hardware-performance claims.
 4. Focused tests cover score interpretation, baseline comparison behavior, and
    public contract stability.
 
-## Phase 16: ROCm Library Category Readiness
+## Phase 16: ROCm Library Category Readiness ✓
 
 **Goal:** Verify whether `hipblas`, `miopen`, `ck`, and `rocwmma` are truly
 supported solution categories or should be documented as candidates or
@@ -73,7 +73,7 @@ compatibility-only examples.
 4. Compatibility examples remain valid and do not imply unsupported runtime
    coverage.
 
-## Phase 17: hip-execbench Practice Adaptation
+## Phase 17: hip-execbench Practice Adaptation ✓
 
 **Goal:** Borrow useful engineering practices from
 `~/PyCharmMiscProject/hip-playground/hip-execbench` without replacing SOL
@@ -91,7 +91,7 @@ ExecBench's architecture or public contracts.
 4. Added practices have tests or documentation checks proportional to their
    public impact.
 
-## Phase 18: Non-CDNA Validation Closure
+## Phase 18: Non-CDNA Validation Closure ✓
 
 **Goal:** Close validation debt and prove that the only remaining deferred
 project risk is CDNA 3 real hardware validation.
@@ -112,27 +112,28 @@ project risk is CDNA 3 real hardware validation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PARITY-01 | Phase 14 | Pending |
-| PARITY-02 | Phase 14 | Pending |
-| PARITY-03 | Phase 14 | Pending |
-| SCORE-04 | Phase 15 | Pending |
-| SCORE-05 | Phase 15 | Pending |
-| SCORE-06 | Phase 15 | Pending |
-| LIB-01 | Phase 16 | Pending |
-| LIB-02 | Phase 16 | Pending |
-| LIB-03 | Phase 16 | Pending |
-| ENG-01 | Phase 17 | Pending |
-| ENG-02 | Phase 17 | Pending |
-| ENG-03 | Phase 17 | Pending |
-| VAL-01 | Phase 18 | Pending |
-| VAL-02 | Phase 18 | Pending |
-| VAL-03 | Phase 18 | Pending |
+| PARITY-01 | Phase 14 | Complete |
+| PARITY-02 | Phase 14 | Complete |
+| PARITY-03 | Phase 14 | Complete |
+| SCORE-04 | Phase 15 | Complete |
+| SCORE-05 | Phase 15 | Complete |
+| SCORE-06 | Phase 15 | Complete |
+| LIB-01 | Phase 16 | Complete |
+| LIB-02 | Phase 16 | Complete |
+| LIB-03 | Phase 16 | Complete |
+| ENG-01 | Phase 17 | Complete |
+| ENG-02 | Phase 17 | Complete |
+| ENG-03 | Phase 17 | Complete |
+| VAL-01 | Phase 18 | Complete |
+| VAL-02 | Phase 18 | Complete |
+| VAL-03 | Phase 18 | Complete |
 
 **Coverage summary:**
 
 - v1.3 requirements: 15 total
 - Mapped to phases: 15
 - Unmapped: 0
+- Completed phases: 5/5
 - Phase numbering: continued from v1.2, starting at Phase 14
 
 ---
