@@ -43,6 +43,11 @@ def _has_ck_headers() -> bool:
     return Path("/opt/rocm/include/ck/ck.hpp").exists()
 
 
+def _has_rocwmma_headers() -> bool:
+    """Return whether rocWMMA headers are installed."""
+    return Path("/opt/rocm/include/rocwmma/rocwmma.hpp").exists()
+
+
 def _is_rdna4(gfx_arch: str) -> bool:
     return gfx_arch.startswith("gfx12")
 
@@ -71,6 +76,10 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers",
+        "requires_rocwmma: test requires rocWMMA headers",
+    )
+    config.addinivalue_line(
+        "markers",
         "requires_rdna4: test requires an AMD RDNA 4 GPU, such as gfx1200",
     )
     config.addinivalue_line(
@@ -93,6 +102,7 @@ def pytest_collection_modifyitems(
     rocm_available, gfx_arch = _rocm_gpu_info()
     rocm_dev_available = _has_rocm_dev_headers()
     ck_available = _has_ck_headers()
+    rocwmma_available = _has_rocwmma_headers()
     detected = gfx_arch or "unavailable"
     supported_arch = _is_rdna4(gfx_arch) or _is_cdna3(gfx_arch)
     skip_timing = pytest.mark.skip(
@@ -103,6 +113,7 @@ def pytest_collection_modifyitems(
         reason="ROCm native extension development headers unavailable"
     )
     skip_no_ck = pytest.mark.skip(reason="Composable Kernel headers unavailable")
+    skip_no_rocwmma = pytest.mark.skip(reason="rocWMMA headers unavailable")
     skip_rdna4 = pytest.mark.skip(
         reason=f"requires AMD RDNA 4 ROCm GPU (detected {detected})"
     )
@@ -127,6 +138,8 @@ def pytest_collection_modifyitems(
             item.add_marker(skip_no_rocm_dev)
         if any(item.iter_markers(name="requires_ck")) and not ck_available:
             item.add_marker(skip_no_ck)
+        if any(item.iter_markers(name="requires_rocwmma")) and not rocwmma_available:
+            item.add_marker(skip_no_rocwmma)
         if any(item.iter_markers(name="requires_rdna4")) and not _is_rdna4(gfx_arch):
             item.add_marker(skip_rdna4 if rocm_available else skip_no_rocm)
         if any(item.iter_markers(name="requires_cdna3")) and not _is_cdna3(gfx_arch):

@@ -161,6 +161,20 @@ _EXAMPLES = [
             "requires_rdna4",
         ],
     ),
+    Example(
+        test_id="gemm_rocwmma",
+        language="rocwmma",
+        problem="gemm",
+        solution_file="solution_rocwmma.json",
+        expected_count=3,
+        extra_markers=[
+            "cpp",
+            "requires_rocm",
+            "requires_rocm_dev",
+            "requires_rocwmma",
+            "requires_rdna4",
+        ],
+    ),
 ]
 
 
