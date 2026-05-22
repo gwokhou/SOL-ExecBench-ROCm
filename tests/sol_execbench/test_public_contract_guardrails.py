@@ -5,9 +5,31 @@ from pathlib import Path
 from click.testing import CliRunner
 
 from sol_execbench.cli.main import cli
+from sol_execbench.core.bench.rocm_profiler import (
+    Rocprofv3TimingEvidence,
+    Rocprofv3TimingRow,
+)
+from sol_execbench.core.bench.timing_policy import (
+    TimingActivityDomain,
+    TimingBackend,
+    TimingSourceType,
+    select_timing_policy,
+)
 from sol_execbench.core.data.solution import Solution
 from sol_execbench.core.data.trace import Trace
 from sol_execbench.core.data.workload import Workload
+from sol_execbench.core.scoring.amd_score import (
+    CDNA3_NO_VALIDATION_WARNING,
+    build_amd_native_suite_report,
+    score_amd_native_workload,
+)
+from sol_execbench.core.scoring.amd_sol import (
+    EstimateConfidence,
+    HardwareValidationStatus,
+    build_amd_sol_bound_artifact,
+    default_amd_hardware_models,
+)
+from sol_execbench.core.data.definition import Definition
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 COMPATIBILITY_INVENTORY = REPO_ROOT / "docs/internal/v1_4_compatibility_inventory.md"
@@ -80,6 +102,94 @@ def test_cli_help_preserves_existing_public_options():
         assert unexpected_option not in help_text
 
 
+def test_primary_cli_does_not_expose_v1_6_derived_workflow_options():
+    result = CliRunner().invoke(cli, ["--help"])
+    assert result.exit_code == 0
+    help_text = result.output
+
+    for additive_non_primary_option in (
+        "--amd-score-report",
+        "--rocprofv3",
+        "--timing-evidence",
+        "--sol-bound",
+    ):
+        assert additive_non_primary_option not in help_text
+
+
+def test_v1_6_derived_artifacts_remain_noncanonical():
+    policy = select_timing_policy(TimingSourceType.HIP_NATIVE)
+    timing = Rocprofv3TimingEvidence(
+        tool_version="rocprofv3 7.0.0",
+        gpu_architecture="gfx1200",
+        activity_domain=TimingActivityDomain.KERNEL_ACTIVITY,
+        aggregation_rule=policy.aggregation_rule,
+        backend=TimingBackend.ROCPROFV3,
+        interpretation=policy.interpretation,
+        parsed_rows=(
+            Rocprofv3TimingRow(
+                name="kernel",
+                domain="KERNEL_DISPATCH",
+                duration_ns=1000.0,
+            ),
+        ),
+    )
+    suite = build_amd_native_suite_report([])
+
+    assert timing.to_dict()["derived"] is True
+    assert timing.to_dict()["canonical_output"] == "trace_jsonl"
+    assert suite.to_dict()["derived"] is True
+    assert suite.to_dict()["canonical_output"] == "trace_jsonl"
+
+
+def test_v1_6_claim_guardrails_keep_cdna3_and_nvidia_equivalence_out_of_scope():
+    project = Path(".planning/PROJECT.md").read_text()
+    requirements = Path(".planning/REQUIREMENTS.md").read_text()
+    analysis = Path("docs/analysis.md").read_text()
+
+    assert "Performing real CDNA 3 `gfx94*` full-suite hardware validation in v1.6" in project
+    assert "Real CDNA3 `gfx94*` full-suite validation" in requirements
+    assert "not NVIDIA B200, SOLAR, or leaderboard equivalence claims" in analysis
+
+
+def test_hardware_model_evidence_survives_bound_and_score_artifacts():
+    definition = Definition(
+        name="matmul_demo",
+        axes={
+            "M": {"type": "var"},
+            "K": {"type": "const", "value": 4},
+            "N": {"type": "const", "value": 8},
+        },
+        inputs={
+            "a": {"shape": ["M", "K"], "dtype": "float32"},
+            "b": {"shape": ["K", "N"], "dtype": "float32"},
+        },
+        outputs={"out": {"shape": ["M", "N"], "dtype": "float32"}},
+        reference="def run(a, b):\n    return a @ b",
+    )
+    workload = Workload(
+        axes={"M": 2},
+        inputs={"a": {"type": "random"}, "b": {"type": "random"}},
+        uuid="matmul-workload",
+    )
+    hardware = default_amd_hardware_models()["gfx1200"]
+    artifact = build_amd_sol_bound_artifact(definition, workload, hardware)
+    score = score_amd_native_workload(
+        artifact,
+        measured_latency_ms=1.0,
+        baseline_latency_ms=2.0,
+        hardware_model_ref="default_amd_hardware_models.gfx1200",
+    )
+    payload = artifact.to_dict()
+
+    assert payload["hardware_model"]["source"]
+    assert payload["hardware_model"]["confidence"] == EstimateConfidence.INEXACT.value
+    assert (
+        payload["hardware_model"]["validation_status"]
+        == HardwareValidationStatus.PROVISIONAL.value
+    )
+    assert score.evidence_refs["hardware_model"] == "default_amd_hardware_models.gfx1200"
+
+
 def test_v1_4_compatibility_inventory_covers_public_contracts():
     text = COMPATIBILITY_INVENTORY.read_text()
     for heading in (
@@ -128,3 +238,5 @@ def test_cdna3_validation_remains_deferred_in_docs():
     project = Path(".planning/PROJECT.md").read_text()
     assert "Status:** Deferred to next milestone" in handoff
     assert "hardware validation remains deferred" in project
+    assert "v1.6" in project
+    assert "CDNA3 full-suite validation has not been recorded" in CDNA3_NO_VALIDATION_WARNING
