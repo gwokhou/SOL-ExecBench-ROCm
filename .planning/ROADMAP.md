@@ -1,8 +1,174 @@
 # Roadmap: SOL ExecBench ROCm Port
 
-## Current Milestone
+## Current Milestone: v1.7 Baseline, Timing, Reward-Hack Hardening, and ROCm Library Migration
 
-No active milestone. Start the next milestone with `$gsd-new-milestone`.
+**Goal:** Close the highest-impact evaluation credibility gaps before MI300X
+hardware validation by completing optimized baseline semantics, profiler-backed
+timing workflow, reward-hack defenses, and runnable ROCm library migration.
+
+**Phase numbering:** Continues from v1.6. v1.7 starts at Phase 31.
+
+## Phase Summary
+
+| Phase | Name | Goal | Requirements |
+|-------|------|------|--------------|
+| 31 | Optimized Scoring Baseline Semantics | Add release-defined baseline artifacts and wire them into AMD-native scoring without mutating canonical traces. | BASE-01, BASE-02, BASE-03, BASE-04 |
+| 32 | Source-Specific Profiler Timing Workflow | Promote `rocprofv3` timing from helper evidence to an end-to-end selectable timing path with explicit fallback metadata. | TIME-01, TIME-02, TIME-03, TIME-04 |
+| 33 | Reward-Hack Defense Expansion | Extend dynamic and static checks to cover remaining exploit families that can distort correctness or timing. | HACK-01, HACK-02, HACK-03, HACK-04, HACK-05 |
+| 34 | ROCm Library Category Migration | Move priority ROCm library categories from candidate-only status toward runnable examples, build checks, and accurate support docs. | LIB-01, LIB-02, LIB-03, LIB-04, LIB-05 |
+| 35 | MI300X Validation Readiness Guardrails | Prepare MI300X/CDNA3 and FP8 validation instructions, evidence gates, and no-claim protections for later hardware runs. | MI3-01, MI3-02, MI3-03 |
+
+**Coverage:** 21 / 21 v1.7 requirements mapped. 0 unmapped.
+
+## Phases
+
+### Phase 31: Optimized Scoring Baseline Semantics
+
+**Status:** Planned
+
+**Goal:** Add release-defined baseline artifacts and wire them into AMD-native
+scoring without mutating canonical trace JSONL.
+
+**Requirements:** BASE-01, BASE-02, BASE-03, BASE-04
+
+**Success criteria:**
+
+1. Maintainers can provide optimized baseline timing evidence keyed by
+   definition and workload UUID.
+2. AMD-native score reports prefer explicit scoring baseline timing and label
+   fallback-to-reference timing as provisional.
+3. Dataset scoring consumes baseline artifacts without changing canonical trace
+   schemas or primary `sol-execbench` defaults.
+4. Documentation makes the reference/candidate/baseline/SOL-bound distinction
+   unambiguous.
+
+**Implementation notes:**
+
+- Preserve `Trace` as the canonical benchmark output.
+- Treat baseline artifacts as derived/release-scoped inputs with evidence
+  references and guardrails.
+- Avoid implying that PyTorch reference latency is the paper-style optimized
+  scoring baseline.
+
+**Plans:** 0 plans
+
+### Phase 32: Source-Specific Profiler Timing Workflow
+
+**Status:** Planned
+
+**Goal:** Promote `rocprofv3` timing from helper evidence to an end-to-end
+selectable timing path with explicit fallback metadata.
+
+**Requirements:** TIME-01, TIME-02, TIME-03, TIME-04
+
+**Success criteria:**
+
+1. HIP native, Triton, and PyTorch/operator timing policies select an explicit
+   backend and record the selected interpretation.
+2. A benchmark or dataset workflow can collect and attach `rocprofv3` timing
+   evidence when the source policy supports profiler-backed timing.
+3. Parser tests cover representative real or fixture-backed ROCm profiler CSV
+   shapes, missing output, and command failure.
+4. Timing artifacts include iteration/trial configuration, aggregation rule,
+   clock-lock state, architecture, backend, and fallback reason.
+
+**Implementation notes:**
+
+- Accuracy beats a forced unified timing definition.
+- Keep event fallback visible instead of pretending profiler evidence exists.
+- Avoid adding fields to canonical trace JSONL unless a compatibility decision
+  explicitly permits it.
+
+**Plans:** 0 plans
+
+### Phase 33: Reward-Hack Defense Expansion
+
+**Status:** Planned
+
+**Goal:** Extend dynamic and static checks to cover remaining exploit families
+that can distort correctness or timing.
+
+**Requirements:** HACK-01, HACK-02, HACK-03, HACK-04, HACK-05
+
+**Success criteria:**
+
+1. Non-default stream or asynchronous hidden-work attempts are rejected or
+   clearly flagged under ROCm timing semantics.
+2. Reuse of cached outputs across correctness and timing phases is detected for
+   practical data-pointer and semantic-cache cases.
+3. Unauthorized file I/O, dynamic native loading, embedded binaries, and
+   base64-loaded payloads are statically or dynamically flagged.
+4. Precision downgrade behavior is guarded by source/dtype/tolerance checks
+   rather than output dtype alone.
+5. Static review results are exposed as structured evidence and tested against
+   both malicious fixtures and legitimate submissions.
+
+**Implementation notes:**
+
+- Keep false positives low for valid PyTorch, Triton, and HIP/C++ solutions.
+- Prefer layered checks: source scan before execution, runtime invariants
+  during correctness, and timing integrity checks before score reporting.
+- Document accepted limitations where perfect detection is impractical.
+
+**Plans:** 0 plans
+
+### Phase 34: ROCm Library Category Migration
+
+**Status:** Planned
+
+**Goal:** Move priority ROCm library categories from candidate-only status
+toward runnable examples, build checks, and accurate support docs.
+
+**Requirements:** LIB-01, LIB-02, LIB-03, LIB-04, LIB-05
+
+**Success criteria:**
+
+1. At least one hipBLAS or hipBLASLt-backed public example is runnable and
+   protected by tests.
+2. MIOpen, Composable Kernel, and rocWMMA each have either runnable guarded
+   example coverage or a documented blocker with tests preventing overclaiming.
+3. Solution schema, build staging, examples, and docs agree on supported versus
+   candidate library categories.
+4. Former NVIDIA compatibility examples no longer imply performance portability
+   where no ROCm-native replacement exists.
+
+**Implementation notes:**
+
+- Prioritize one high-signal runnable library path over broad untested claims.
+- Preserve existing HIP/C++ and Triton paths while adding library-specific
+  evidence.
+- Keep candidate categories accepted only when documentation and tests prevent
+  unsupported support claims.
+
+**Plans:** 0 plans
+
+### Phase 35: MI300X Validation Readiness Guardrails
+
+**Status:** Planned
+
+**Goal:** Prepare MI300X/CDNA3 and FP8 validation instructions, evidence gates,
+and no-claim protections for later hardware runs.
+
+**Requirements:** MI3-01, MI3-02, MI3-03
+
+**Success criteria:**
+
+1. MI300X validation docs list required hardware, ROCm stack, clock-lock setup,
+   command sequence, artifacts, and acceptance criteria.
+2. FP8 readiness is documented for MI300X, while NVFP4/MXFP4 remains explicitly
+   deferred.
+3. Reports and support matrices cannot mark CDNA3/MI300X as hardware-validated
+   unless full-suite evidence is recorded.
+4. The future validation handoff is clear enough to execute once MI300X access
+   is available.
+
+**Implementation notes:**
+
+- Do not require real MI300X hardware during this phase.
+- Keep RDNA4 evidence separate from CDNA3/MI300X evidence.
+- Preserve no-claim wording until a real full-suite run is archived.
+
+**Plans:** 0 plans
 
 ## Completed Phase History
 
@@ -25,3 +191,29 @@ No active milestone. Start the next milestone with `$gsd-new-milestone`.
 - [x] **v1.2 Engineering Practice Harvest and Compatibility Guardrails** - shipped 2026-05-22. See `.planning/milestones/v1.2-ROADMAP.md`.
 - [x] **v1.1 CDNA 3 Support and Migration Closure** - shipped 2026-05-21. See `.planning/milestones/v1.1-ROADMAP.md`.
 - [x] **v1.0 ROCm Port** - shipped 2026-05-21. See `.planning/milestones/v1.0-ROADMAP.md`.
+
+## Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| BASE-01 | Phase 31 | Pending |
+| BASE-02 | Phase 31 | Pending |
+| BASE-03 | Phase 31 | Pending |
+| BASE-04 | Phase 31 | Pending |
+| TIME-01 | Phase 32 | Pending |
+| TIME-02 | Phase 32 | Pending |
+| TIME-03 | Phase 32 | Pending |
+| TIME-04 | Phase 32 | Pending |
+| HACK-01 | Phase 33 | Pending |
+| HACK-02 | Phase 33 | Pending |
+| HACK-03 | Phase 33 | Pending |
+| HACK-04 | Phase 33 | Pending |
+| HACK-05 | Phase 33 | Pending |
+| LIB-01 | Phase 34 | Pending |
+| LIB-02 | Phase 34 | Pending |
+| LIB-03 | Phase 34 | Pending |
+| LIB-04 | Phase 34 | Pending |
+| LIB-05 | Phase 34 | Pending |
+| MI3-01 | Phase 35 | Pending |
+| MI3-02 | Phase 35 | Pending |
+| MI3-03 | Phase 35 | Pending |
