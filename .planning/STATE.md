@@ -71,6 +71,7 @@ No active milestone is defined. v1.6 is archived.
 - v1.6 requirements archived in `.planning/milestones/v1.6-REQUIREMENTS.md`.
 - v1.6 roadmap archived in `.planning/milestones/v1.6-ROADMAP.md`.
 - v1.6 audit archived in `.planning/milestones/v1.6-MILESTONE-AUDIT.md`.
+- v1.6 phase execution history archived in `.planning/milestones/v1.6-phases/`.
 
 ## Deferred Items
 
@@ -82,16 +83,15 @@ Items acknowledged and deferred at milestone close on 2026-05-21:
 
 ## Next Action
 
-Archive v1.6 phase directories, then start the next milestone when ready.
+Start the next milestone when ready.
 
 ## Current Position
 
 Phase: Milestone v1.6 complete
 Plan: —
-Status: Awaiting cleanup / next milestone
-Last activity: 2026-05-22 — Milestone v1.6 completed and archived
+Status: Awaiting next milestone
+Last activity: 2026-05-22 — Milestone v1.6 completed, archived, and cleaned up
 
 ## Operator Next Steps
 
-- Run cleanup to archive v1.6 phase directories.
 - Start the next milestone with `$gsd-new-milestone`.
