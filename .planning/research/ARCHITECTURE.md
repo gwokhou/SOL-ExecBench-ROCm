@@ -1,71 +1,67 @@
-# Project Research: Architecture
+# Project Research: Architecture for v1.8
 
-**Project:** SOL ExecBench ROCm Port
-**Milestone:** v1.6 AMD SOLAR Coverage, Live Profiler Timing, and Scoring Workflow
-**Researched:** 2026-05-22
-**Confidence:** MEDIUM-HIGH
+## Integration Points
 
-## Integration Shape
+### Solution Schema
 
-v1.6 should be built as three additive layers around the existing benchmark
-contract:
+`src/sol_execbench/core/data/solution.py` already exposes `miopen`, `ck`, and
+`rocwmma` as native/C++ solution languages. v1.8 should preserve this public
+contract and focus on making those values runnable and tested.
 
-1. **Analyzer layer:** extends AMD SOL graph and work estimation coverage.
-2. **Timing layer:** runs live profiler collection when the timing policy says
-   that is the most accurate source-specific backend.
-3. **Workflow layer:** connects trace JSONL, timing evidence, SOL bounds, and
-   baseline inputs into derived score reports.
+### Native Packaging
 
-Canonical trace JSONL remains the stable substrate. Timing, bound, and score
-artifacts reference it rather than modifying it.
+`ProblemPackager` treats all three categories as C++ languages and compiles them
+through `build_ext.py`. The architecture should keep that flow:
+
+1. Solution JSON declares one library category.
+2. Source files are staged into a temporary build directory.
+3. `compile_options` provide include, HIP, and linker flags.
+4. `build_ext.py` compiles `benchmark_kernel.so`.
+5. `eval_driver.py` imports the compiled extension and runs the entry point.
+
+### Examples
+
+Each library category should get a focused example under `examples/`:
+
+- `examples/miopen/softmax/`
+- `examples/ck/gemm/` or `examples/ck/gemm_bias_relu/`
+- `examples/rocwmma/gemm/`
+
+These examples should follow the same four-file public pattern:
+
+- `definition.json`
+- `reference.py`
+- `workload.jsonl`
+- `solution_<category>.json`
+
+### Tests
+
+Tests should be layered:
+
+- Schema/build tests verify staging and compile metadata without requiring a
+  real GPU.
+- Dependency tests verify MIOpen, CK, and rocWMMA headers/libraries are present
+  in the Docker/ROCm environment.
+- Example tests run on RDNA 4 using existing `requires_rocm`/architecture
+  markers.
+- Documentation tests protect support-status wording and deferred CDNA 3/CDNA 4
+  claims.
+
+## Suggested Build Order
+
+1. Build plumbing and dependency diagnostics for the three categories.
+2. MIOpen softmax replacement because it maps directly to an existing former
+   cuDNN compatibility example.
+3. CK GEMM or fused GEMM replacement because it maps to the former CUTLASS
+   compatibility example and CK's documented strengths.
+4. rocWMMA GEMM replacement with RDNA 4 support constraints.
+5. Compatibility cleanup and RDNA 4 validation closure.
 
 ## Data Flow
 
-```text
-problem + solution
-  -> existing eval driver
-  -> canonical trace JSONL
-  -> source classifier
-  -> timing policy
-  -> live timing evidence artifact
-  -> AMD SOL bound artifact
-  -> AMD-native workload/suite score report
-```
+The data flow remains unchanged from the benchmark perspective:
 
-## Component Implications
+`definition/workload/solution -> ProblemPackager -> native extension compile -> eval_driver -> Trace JSONL`
 
-### Analyzer Layer
-
-Modify `amd_sol.py` by adding a small analyzer registry rather than continuing
-to grow `_GraphVisitor` as a chain of string checks. Each analyzer should return
-normalized nodes and work estimates with confidence and rationale. Unsupported
-or partially supported operations remain first-class output.
-
-### Timing Layer
-
-`rocm_profiler.py` should evolve from command/parser helpers into an execution
-adapter used by the benchmark or dataset path. The adapter needs controlled
-output directories, version capture, CSV/rocpd parsing, and fallback evidence.
-
-`timing_policy.py` remains the authority for whether a source uses
-`rocprofv3`, PyTorch profiler, event fallback, or unsupported timing.
-
-### Workflow Layer
-
-The dataset runner and/or additive CLI command should accept artifact output
-locations and generate a suite score report. The primary CLI defaults should
-continue emitting the same canonical traces unless the user opts into derived
-artifacts.
-
-## Build Order
-
-1. Add analyzer registry and coverage reports.
-2. Add live `rocprofv3` execution adapter behind timing policy.
-3. Add score-report workflow integration.
-4. Add compatibility tests and docs around output boundaries.
-
-## Sources
-
-- SOL-ExecBench paper: https://arxiv.org/abs/2603.19173
-- ROCprofiler-SDK `rocprofv3` docs: https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/docs-7.0.1/how-to/using-rocprofv3.html
-- ROCprofiler-SDK quick guide: https://rocmdocs.amd.com/projects/rocprofiler-sdk/en/latest/quick_guide.html
+Library-specific code lives inside solution examples and compile metadata, not
+inside canonical trace or schema models.

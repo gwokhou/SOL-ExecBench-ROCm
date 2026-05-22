@@ -1,89 +1,58 @@
-# Project Research: Features
+# Project Research: Feature Expectations for v1.8
 
-**Project:** SOL ExecBench ROCm Port
-**Milestone:** v1.6 AMD SOLAR Coverage, Live Profiler Timing, and Scoring Workflow
-**Researched:** 2026-05-22
-**Confidence:** HIGH
+**Milestone:** v1.8 ROCm Library Ecosystem Completion
 
-## Paper Baseline
+## Table Stakes
 
-The original SOL-ExecBench paper frames the benchmark around three properties:
+### Library Category Support
 
-- analytically derived hardware Speed-of-Light bounds from a SOLAR pipeline;
-- SOL Score as progress from a release-defined baseline toward the SOL bound;
-- robust benchmark execution with isolation, clock discipline, cache handling,
-  and reward-hack defenses.
+- Each remaining candidate category (`miopen`, `ck`, `rocwmma`) has at least
+  one public runnable example.
+- Each example uses the declared library category in `solution_*.json`.
+- Each example compiles through the existing native packaging flow.
+- Each example runs through `sol-execbench` and produces `PASSED` trace JSONL
+  on RDNA 4.
+- Each category has dependency smoke tests that fail with clear messages when
+  ROCm packages are missing.
 
-For this ROCm port, v1.6 should improve the AMD-native equivalents of the first
-two properties while preserving the already migrated harness semantics.
+### Documentation
 
-## Feature Categories
+- `docs/rocm_libraries.md` distinguishes supported, guarded, and deferred
+  categories based on runnable evidence.
+- README and compliance docs no longer imply MIOpen, CK, or rocWMMA are merely
+  future directions once examples and tests exist.
+- Former NVIDIA category docs explain the exact ROCm replacement path.
 
-### AMD SOLAR Coverage
+### Compatibility Cleanup
 
-**Table stakes**
+- Former cuDNN softmax compatibility example becomes a MIOpen-backed example,
+  or the compatibility-only path is explicitly retired.
+- Former CUTLASS GEMM compatibility example becomes CK, rocWMMA, or hipBLAS
+  backed, with each replacement documented.
+- Former CuTe/cuTile Jamba projection examples are either replaced with a real
+  ROCm native library path or kept as explicitly non-supported historical
+  compatibility examples.
 
-- Add more operation analyzers beyond v1.5 matmul and broad elementwise
-  detection.
-- Preserve per-op confidence: supported, inexact, unsupported.
-- Emit coverage summaries so unsupported operations do not look like complete
-  SOL evidence.
-- Keep bound artifacts derived and auditable.
+### Validation
 
-**Good v1.6 targets**
+- v1.8 completion evidence is RDNA 4 only.
+- CDNA 3 and CDNA 4 are documented as deferred validation targets.
+- Public-contract tests prevent unsupported hardware validation claims.
 
-- Reductions and normalization patterns used by RMSNorm/layernorm.
-- Softmax and attention-like score/probability patterns.
-- Shape/view/transpose/broadcast operations as data-movement or zero-FLOP nodes.
-- Elementwise activation families with clearer FLOP and byte rationale.
+## Differentiators
 
-### Live Timing
+- A support matrix that ties each original NVIDIA category to a concrete ROCm
+  replacement, example path, tests, and validation status.
+- Library examples chosen to represent useful SOL ExecBench operation classes:
+  softmax for MIOpen, GEMM/fused epilogue for CK, and matrix-core GEMM for
+  rocWMMA.
+- A repeatable RDNA 4 validation checklist for library examples and dependency
+  checks.
 
-**Table stakes**
+## Anti-Features
 
-- Execute benchmark subprocesses through `rocprofv3` when policy selects
-  profiler-backed timing.
-- Parse generated timing output into evidence artifacts.
-- Label backend, activity domain, aggregation rule, fallback reason, tool
-  version, GPU architecture, and parsed rows.
-- Preserve source-specific semantics:
-  HIP native and Triton are primarily kernel-activity timing; PyTorch needs
-  operator attribution; mixed workloads need explicit fallback or split evidence.
-
-**Anti-feature**
-
-- A single unified timer口径 is not acceptable if it hides the difference between
-  HIP kernel activity, Triton generated-kernel activity, and PyTorch operator
-  attribution.
-
-### Score Workflow
-
-**Table stakes**
-
-- Generate AMD-native workload and suite score reports from existing trace
-  JSONL plus derived timing and SOL-bound artifacts.
-- Expose reports through dataset runner or additive CLI paths.
-- Keep score reports separate from canonical trace JSONL.
-- Carry evidence references and warnings for incomplete inputs, unsupported
-  operators, unvalidated hardware models, and CDNA3 no-claim status.
-
-### Compatibility
-
-**Table stakes**
-
-- Existing `sol-execbench` invocation semantics continue to work.
-- Existing trace JSONL and public Pydantic schemas remain unchanged.
-- New outputs are opt-in, additive, or separate files.
-- Contract tests fail if canonical traces gain new fields or CLI defaults change.
-
-## Deferred
-
-- Real CDNA3 `gfx94*` full-suite validation.
-- NVIDIA B200/SOLAR/leaderboard equivalence.
-- Full upstream SOLAR parity, especially Blackwell-specific datatype and
-  hardware-feature modeling.
-
-## Sources
-
-- SOL-ExecBench paper: https://arxiv.org/abs/2603.19173
-- ROCprofiler-SDK `rocprofv3` docs: https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/docs-7.0.1/how-to/using-rocprofv3.html
+- Broad performance claims without profiler-backed evidence.
+- Silent fallback from a declared library category to PyTorch compatibility
+  code.
+- Treating schema recognition as support without runnable example evidence.
+- Expanding scope into full CDNA 3/CDNA 4 validation during v1.8.
