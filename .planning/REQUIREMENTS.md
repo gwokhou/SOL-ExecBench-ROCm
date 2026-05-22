@@ -15,10 +15,10 @@
 
 ### Source-Specific Timing Workflow
 
-- [ ] **TIME-01**: HIP native, Triton, and PyTorch/operator sources have explicit timing backend selection that records whether timing came from `rocprofv3` or event fallback.
-- [ ] **TIME-02**: The evaluation or dataset workflow can invoke `rocprofv3` collection end-to-end for profiler-backed timing evidence when the selected source policy supports it.
-- [ ] **TIME-03**: Real or fixture-backed `rocprofv3` parser coverage validates representative kernel, HIP runtime, missing-output, and command-failure cases.
-- [ ] **TIME-04**: Timing reports preserve aggregation rule, trial count, warmup count, iteration count, clock-lock status, hardware architecture, and fallback reason.
+- [x] **TIME-01**: HIP native, Triton, and PyTorch/operator sources have explicit timing backend selection that records whether timing came from `rocprofv3` or event fallback.
+- [x] **TIME-02**: The evaluation or dataset workflow can invoke `rocprofv3` collection end-to-end for profiler-backed timing evidence when the selected source policy supports it.
+- [x] **TIME-03**: Real or fixture-backed `rocprofv3` parser coverage validates representative kernel, HIP runtime, missing-output, and command-failure cases.
+- [x] **TIME-04**: Timing reports preserve aggregation rule, trial count, warmup count, iteration count, clock-lock status, hardware architecture, and fallback reason.
 
 ### Reward-Hack Hardening
 
@@ -73,10 +73,10 @@
 | BASE-02 | Phase 31 | Complete |
 | BASE-03 | Phase 31 | Complete |
 | BASE-04 | Phase 31 | Complete |
-| TIME-01 | Phase 32 | Pending |
-| TIME-02 | Phase 32 | Pending |
-| TIME-03 | Phase 32 | Pending |
-| TIME-04 | Phase 32 | Pending |
+| TIME-01 | Phase 32 | Complete |
+| TIME-02 | Phase 32 | Complete |
+| TIME-03 | Phase 32 | Complete |
+| TIME-04 | Phase 32 | Complete |
 | HACK-01 | Phase 33 | Pending |
 | HACK-02 | Phase 33 | Pending |
 | HACK-03 | Phase 33 | Pending |

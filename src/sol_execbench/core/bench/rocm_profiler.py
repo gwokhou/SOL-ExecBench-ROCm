@@ -17,6 +17,7 @@ from sol_execbench.core.bench.timing_policy import (
     TimingActivityDomain,
     TimingBackend,
     TimingPolicy,
+    timing_policy_for_languages,
     select_timing_policy,
 )
 from sol_execbench.core.reporting import CANONICAL_BENCHMARK_OUTPUT
@@ -70,6 +71,10 @@ class Rocprofv3TimingEvidence:
     backend: TimingBackend
     interpretation: str
     parsed_rows: tuple[Rocprofv3TimingRow, ...]
+    warmup_runs: int | None = None
+    iterations: int | None = None
+    trial_count: int | None = None
+    clock_locked: bool | None = None
     fallback_applied: bool = False
     fallback_reason: str | None = None
     schema_version: str = ROCPROFV3_EVIDENCE_SCHEMA_VERSION
@@ -79,7 +84,9 @@ class Rocprofv3TimingEvidence:
     @property
     def kernel_duration_ms(self) -> float:
         """Aggregate kernel activity duration in milliseconds."""
-        return sum(row.duration_ms for row in self.parsed_rows if row.is_kernel_activity)
+        return sum(
+            row.duration_ms for row in self.parsed_rows if row.is_kernel_activity
+        )
 
     def to_dict(self) -> dict[str, object]:
         """Return a JSON-serializable evidence payload."""
@@ -93,6 +100,10 @@ class Rocprofv3TimingEvidence:
             "aggregation_rule": self.aggregation_rule,
             "backend": self.backend.value,
             "interpretation": self.interpretation,
+            "warmup_runs": self.warmup_runs,
+            "iterations": self.iterations,
+            "trial_count": self.trial_count,
+            "clock_locked": self.clock_locked,
             "fallback_applied": self.fallback_applied,
             "fallback_reason": self.fallback_reason,
             "kernel_duration_ms": self.kernel_duration_ms,
@@ -131,6 +142,10 @@ class Rocprofv3CollectionRequest:
     gpu_architecture: str
     executable: str = ROCPROFV3_EXECUTABLE
     include_hip_runtime: bool = True
+    warmup_runs: int | None = None
+    iterations: int | None = None
+    trial_count: int | None = None
+    clock_locked: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -252,6 +267,10 @@ def build_timing_evidence(
     csv_content: str,
     tool_version: str,
     gpu_architecture: str,
+    warmup_runs: int | None = None,
+    iterations: int | None = None,
+    trial_count: int | None = None,
+    clock_locked: bool | None = None,
 ) -> Rocprofv3TimingEvidence:
     """Build derived profiler timing evidence from parsed CSV content."""
     return Rocprofv3TimingEvidence(
@@ -262,6 +281,10 @@ def build_timing_evidence(
         backend=policy.backend,
         interpretation=policy.interpretation,
         parsed_rows=parse_rocprofv3_csv(csv_content),
+        warmup_runs=warmup_runs,
+        iterations=iterations,
+        trial_count=trial_count,
+        clock_locked=clock_locked,
         fallback_applied=policy.fallback_applied,
         fallback_reason=policy.reason if policy.fallback_applied else None,
     )
@@ -299,7 +322,9 @@ def collect_rocprofv3_timing(
     csv_path = _find_rocprofv3_csv(request.output_directory, request.output_file)
     if completed.returncode != 0:
         fallback = DefaultTimingSelection(
-            policy=select_timing_policy(request.policy.source_type, profiler_available=False),
+            policy=select_timing_policy(
+                request.policy.source_type, profiler_available=False
+            ),
             profiler_backed=False,
             fallback_applied=True,
             reason=f"rocprofv3 command failed with exit code {completed.returncode}",
@@ -315,7 +340,9 @@ def collect_rocprofv3_timing(
         )
     if csv_path is None:
         fallback = DefaultTimingSelection(
-            policy=select_timing_policy(request.policy.source_type, profiler_available=False),
+            policy=select_timing_policy(
+                request.policy.source_type, profiler_available=False
+            ),
             profiler_backed=False,
             fallback_applied=True,
             reason="rocprofv3 did not produce a CSV timing output",
@@ -334,6 +361,10 @@ def collect_rocprofv3_timing(
         csv_content=csv_path.read_text(),
         tool_version=request.tool_version,
         gpu_architecture=request.gpu_architecture,
+        warmup_runs=request.warmup_runs,
+        iterations=request.iterations,
+        trial_count=request.trial_count,
+        clock_locked=request.clock_locked,
     )
     return Rocprofv3CollectionResult(
         evidence=evidence,
@@ -343,6 +374,44 @@ def collect_rocprofv3_timing(
         returncode=completed.returncode,
         stdout=completed.stdout or "",
         stderr=completed.stderr or "",
+    )
+
+
+def collect_source_timing_evidence(
+    *,
+    application_command: Sequence[str],
+    languages: Sequence[str],
+    output_directory: Path,
+    output_file: str,
+    tool_version: str,
+    gpu_architecture: str,
+    rocprofv3_available: bool = True,
+    runner: ProfilerRunner | None = None,
+    executable: str = ROCPROFV3_EXECUTABLE,
+    warmup_runs: int | None = None,
+    iterations: int | None = None,
+    trial_count: int | None = None,
+    clock_locked: bool | None = None,
+) -> Rocprofv3CollectionResult:
+    """Select source-specific timing policy and collect evidence when supported."""
+    policy = timing_policy_for_languages(languages, profiler_available=True)
+    request = Rocprofv3CollectionRequest(
+        application_command=tuple(application_command),
+        output_directory=output_directory,
+        output_file=output_file,
+        policy=policy,
+        tool_version=tool_version,
+        gpu_architecture=gpu_architecture,
+        executable=executable,
+        warmup_runs=warmup_runs,
+        iterations=iterations,
+        trial_count=trial_count,
+        clock_locked=clock_locked,
+    )
+    return collect_rocprofv3_timing(
+        request,
+        rocprofv3_available=rocprofv3_available,
+        runner=runner,
     )
 
 

@@ -38,8 +38,14 @@ import json
 import shutil
 import subprocess
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 
+from sol_execbench.core.bench.config import BenchmarkConfig
+from sol_execbench.core.bench.rocm_profiler import (
+    ProfilerRunner,
+    collect_source_timing_evidence,
+)
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.trace import Trace
 from sol_execbench.core.data.workload import Workload
@@ -218,18 +224,17 @@ def build_reference_solution(definition: dict) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def run_cli(
+def build_cli_command(
+    *,
     definition_path: Path,
     workload_path: Path,
     solution_path: Path,
-    output_dir: Path,
-    job_name: str,
     timeout: int,
     config_path: Path | None = None,
     keep_staging: bool = False,
     verbose: bool = False,
-) -> list[dict] | None:
-    """Invoke ``sol-execbench`` and return parsed trace dicts (or None on error)."""
+) -> list[str]:
+    """Build the `sol-execbench` command used by dataset runs."""
     cmd = [
         str(Path(sys.executable).parent / "sol-execbench"),
         "--definition",
@@ -249,6 +254,30 @@ def run_cli(
         cmd.append("--keep-staging")
     if verbose:
         cmd.append("--verbose")
+    return cmd
+
+
+def run_cli(
+    definition_path: Path,
+    workload_path: Path,
+    solution_path: Path,
+    output_dir: Path,
+    job_name: str,
+    timeout: int,
+    config_path: Path | None = None,
+    keep_staging: bool = False,
+    verbose: bool = False,
+) -> list[dict] | None:
+    """Invoke ``sol-execbench`` and return parsed trace dicts (or None on error)."""
+    cmd = build_cli_command(
+        definition_path=definition_path,
+        workload_path=workload_path,
+        solution_path=solution_path,
+        timeout=timeout,
+        config_path=config_path,
+        keep_staging=keep_staging,
+        verbose=verbose,
+    )
 
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 60)
 
@@ -280,6 +309,62 @@ def _save_cli_log(output_dir: Path, job_name: str, result: subprocess.CompletedP
     ]
     log_path.write_text("\n".join(parts))
     print(f"Saved CLI log to {log_path}")
+
+
+def collect_timing_evidence_for_problem(
+    *,
+    definition_path: Path,
+    workload_path: Path,
+    solution_path: Path,
+    output_dir: Path,
+    timing_evidence_root: Path,
+    job_name: str,
+    solution: dict,
+    benchmark_config: BenchmarkConfig,
+    timeout: int,
+    config_path: Path | None = None,
+    keep_staging: bool = False,
+    verbose: bool = False,
+    tool_version: str = "rocprofv3",
+    gpu_architecture: str = "unknown",
+    rocprofv3_available: bool = True,
+    runner: ProfilerRunner | None = None,
+) -> dict[str, object]:
+    """Collect source-specific profiler timing evidence for a dataset problem."""
+    languages = solution.get("spec", {}).get("languages", [])
+    if isinstance(languages, str):
+        languages = [languages]
+    elif not isinstance(languages, Sequence):
+        languages = []
+    command = build_cli_command(
+        definition_path=definition_path,
+        workload_path=workload_path,
+        solution_path=solution_path,
+        timeout=timeout,
+        config_path=config_path,
+        keep_staging=keep_staging,
+        verbose=verbose,
+    )
+    evidence_dir = timing_evidence_root / output_dir.name
+    result = collect_source_timing_evidence(
+        application_command=command,
+        languages=tuple(str(language) for language in languages),
+        output_directory=evidence_dir,
+        output_file=job_name,
+        tool_version=tool_version,
+        gpu_architecture=gpu_architecture,
+        rocprofv3_available=rocprofv3_available,
+        runner=runner,
+        warmup_runs=benchmark_config.warmup_runs,
+        iterations=benchmark_config.iterations,
+        trial_count=1,
+        clock_locked=benchmark_config.lock_clocks,
+    )
+    payload = result.to_dict()
+    timing_evidence_root.mkdir(parents=True, exist_ok=True)
+    output_path = timing_evidence_root / f"{output_dir.name}.timing.json"
+    output_path.write_text(json.dumps(payload, indent=2))
+    return payload
 
 
 # ---------------------------------------------------------------------------
@@ -480,6 +565,17 @@ def main():
         help="Number of timing iterations per workload (default: 50, from BenchmarkConfig).",
     )
     ap.add_argument(
+        "--warmup-runs",
+        type=int,
+        default=None,
+        help="Number of warmup executions before timing (default: 10, from BenchmarkConfig).",
+    )
+    ap.add_argument(
+        "--lock-clocks",
+        action="store_true",
+        help="Require locked GPU clocks for benchmark and timing evidence.",
+    )
+    ap.add_argument(
         "--solution-name",
         type=str,
         default=None,
@@ -521,6 +617,27 @@ def main():
             "provisional fallback."
         ),
     )
+    ap.add_argument(
+        "--timing-evidence-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Optional directory for per-problem source-specific ROCm timing "
+            "evidence JSON. Profiler-backed policies invoke rocprofv3."
+        ),
+    )
+    ap.add_argument(
+        "--timing-tool-version",
+        type=str,
+        default="rocprofv3",
+        help="Tool version string recorded in timing evidence.",
+    )
+    ap.add_argument(
+        "--gpu-architecture",
+        type=str,
+        default="unknown",
+        help="GPU architecture string recorded in timing evidence, e.g. gfx942.",
+    )
     args = ap.parse_args()
 
     problems_dir = args.problems_dir.resolve()
@@ -549,13 +666,31 @@ def main():
             print("No problems found. Check the directory path.")
             sys.exit(1)
 
-    # Build benchmark config if non-default iterations requested
+    benchmark_config = BenchmarkConfig(
+        warmup_runs=(
+            args.warmup_runs
+            if args.warmup_runs is not None
+            else BenchmarkConfig().warmup_runs
+        ),
+        iterations=(
+            args.iterations
+            if args.iterations is not None
+            else BenchmarkConfig().iterations
+        ),
+        lock_clocks=args.lock_clocks,
+    )
+
+    # Build benchmark config if non-default timing settings were requested
     config_path = None
-    if args.iterations is not None:
-        config_dict = {"iterations": args.iterations}
+    if args.iterations is not None or args.warmup_runs is not None or args.lock_clocks:
+        config_dict = {
+            "warmup_runs": benchmark_config.warmup_runs,
+            "iterations": benchmark_config.iterations,
+            "lock_clocks": benchmark_config.lock_clocks,
+        }
         config_path = output_dir / "config.json"
         config_path.write_text(json.dumps(config_dict, indent=2))
-        print(f"Using custom iterations: {args.iterations}")
+        print(f"Using benchmark config: {config_dict}")
 
     summaries = []
     amd_scores: list[AmdNativeScore] = []
@@ -661,6 +796,26 @@ def main():
                     baseline_artifact=scoring_baseline,
                 )
             )
+
+        if args.timing_evidence_dir is not None:
+            timing_root = args.timing_evidence_dir.resolve()
+            collect_timing_evidence_for_problem(
+                definition_path=definition_path,
+                workload_path=workload_path,
+                solution_path=solution_path,
+                output_dir=problem_output_dir,
+                timing_evidence_root=timing_root / category,
+                job_name=job_name,
+                solution=solution,
+                benchmark_config=benchmark_config,
+                timeout=args.timeout,
+                config_path=config_path,
+                keep_staging=args.keep_staging,
+                verbose=args.verbose,
+                tool_version=args.timing_tool_version,
+                gpu_architecture=args.gpu_architecture,
+            )
+            print(f"  Timing evidence saved under {timing_root / category}")
 
         # Inspect
         summary = inspect_traces(traces, f"{category}/{problem_name}")
