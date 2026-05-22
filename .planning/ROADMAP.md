@@ -16,7 +16,7 @@ evidence.
 | 19 | Compatibility and Practice Inventory | Complete 2026-05-22: Established non-negotiable contracts and classified `hip-execbench` practices before implementation. | COMPAT-01, COMPAT-02, COMPAT-03 |
 | 20 | Internal Diagnostics and Evidence Model | Complete 2026-05-22: Added derived evidence/report helpers without changing benchmark output contracts. | ENG-04, ENG-05, ENG-06 |
 | 21 | CDNA 3 Validation Readiness | Complete 2026-05-22: Implemented `gfx94*` readiness metadata, evidence requirements, blockers, and no-claim guardrails without CDNA 3 hardware validation. | VAL-04, VAL-05, VAL-06 |
-| 22 | RDNA 4 Validation Closure | Run and record RDNA 4 unit + E2E validation and confirm benchmark semantics did not regress. | RDNA-01, RDNA-02, RDNA-03 |
+| 22 | RDNA 4 Validation Closure | Complete 2026-05-22: Validated v1.4 on RDNA 4 with unit, E2E pytest, and `sol-execbench` CLI trace evidence. | RDNA-01, RDNA-02, RDNA-03 |
 
 **Coverage:** 12 / 12 v1.4 requirements mapped.
 
@@ -101,6 +101,8 @@ criteria ready, while explicitly avoiding a validation-pass claim.
 
 ### Phase 22: RDNA 4 Validation Closure
 
+**Status:** Complete 2026-05-22
+
 **Goal:** Validate v1.4 implementation on RDNA 4 with unit and E2E evidence and
 prove compatibility and benchmark semantics remain intact.
 
@@ -143,6 +145,6 @@ prove compatibility and benchmark semantics remain intact.
 | VAL-04 | Phase 21 | Complete |
 | VAL-05 | Phase 21 | Complete |
 | VAL-06 | Phase 21 | Complete |
-| RDNA-01 | Phase 22 | Pending |
-| RDNA-02 | Phase 22 | Pending |
-| RDNA-03 | Phase 22 | Pending |
+| RDNA-01 | Phase 22 | Complete |
+| RDNA-02 | Phase 22 | Complete |
+| RDNA-03 | Phase 22 | Complete |

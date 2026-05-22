@@ -26,9 +26,9 @@
 
 ### RDNA 4 E2E
 
-- [ ] **RDNA-01**: The implemented v1.4 path passes the relevant unit test suite on RDNA 4.
-- [ ] **RDNA-02**: The implemented v1.4 path has recorded RDNA 4 E2E validation evidence using the existing `sol-execbench` benchmark flow.
-- [ ] **RDNA-03**: Final validation confirms v1.4 did not regress reference correctness, timing integrity, reward-hack defenses, ROCm-only schema/build/eval behavior, or compatibility guardrails.
+- [x] **RDNA-01**: The implemented v1.4 path passes the relevant unit test suite on RDNA 4.
+- [x] **RDNA-02**: The implemented v1.4 path has recorded RDNA 4 E2E validation evidence using the existing `sol-execbench` benchmark flow.
+- [x] **RDNA-03**: Final validation confirms v1.4 did not regress reference correctness, timing integrity, reward-hack defenses, ROCm-only schema/build/eval behavior, or compatibility guardrails.
 
 ## Future Requirements
 
@@ -71,9 +71,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VAL-04 | Phase 21 | Complete |
 | VAL-05 | Phase 21 | Complete |
 | VAL-06 | Phase 21 | Complete |
-| RDNA-01 | Phase 22 | Pending |
-| RDNA-02 | Phase 22 | Pending |
-| RDNA-03 | Phase 22 | Pending |
+| RDNA-01 | Phase 22 | Complete |
+| RDNA-02 | Phase 22 | Complete |
+| RDNA-03 | Phase 22 | Complete |
 
 **Coverage:**
 - v1.4 requirements: 12 total
