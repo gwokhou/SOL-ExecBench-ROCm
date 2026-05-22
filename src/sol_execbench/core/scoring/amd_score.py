@@ -9,6 +9,7 @@ import statistics
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 
+from sol_execbench.core.data.trace import EvaluationStatus, Trace
 from sol_execbench.core.reporting import CANONICAL_BENCHMARK_OUTPUT
 from sol_execbench.core.scoring.amd_sol import (
     AmdSolBoundArtifact,
@@ -119,13 +120,22 @@ def score_amd_native_workload(
     *,
     measured_latency_ms: float | None,
     baseline_latency_ms: float | None,
+    trace_ref: str | None = None,
     timing_evidence_ref: str | None = None,
     sol_bound_ref: str | None = None,
+    baseline_ref: str | None = None,
+    hardware_model_ref: str | None = None,
 ) -> AmdNativeScore:
     """Build a guarded AMD-native score for one workload."""
     sol_bound_ms = artifact.aggregate_sol_bound_ms
     warnings = _warnings_for_artifact(artifact)
-    evidence_refs = _evidence_refs(timing_evidence_ref, sol_bound_ref)
+    evidence_refs = _evidence_refs(
+        trace_ref=trace_ref,
+        timing_evidence_ref=timing_evidence_ref,
+        sol_bound_ref=sol_bound_ref,
+        baseline_ref=baseline_ref,
+        hardware_model_ref=hardware_model_ref,
+    )
 
     score_value = None
     if _has_complete_numeric_inputs(
@@ -166,6 +176,84 @@ def build_amd_native_suite_report(
     )
 
 
+def score_amd_native_trace_workload(
+    trace: Trace,
+    artifact: AmdSolBoundArtifact | None,
+    *,
+    trace_ref: str | None = None,
+    timing_evidence_ref: str | None = None,
+    sol_bound_ref: str | None = None,
+    baseline_ref: str | None = None,
+    hardware_model_ref: str | None = None,
+) -> AmdNativeScore:
+    """Build a guarded AMD-native score from a canonical trace and SOL artifact."""
+    measured_latency_ms = None
+    baseline_latency_ms = None
+    if (
+        trace.evaluation is not None
+        and trace.evaluation.status == EvaluationStatus.PASSED
+        and trace.evaluation.performance is not None
+    ):
+        measured_latency_ms = trace.evaluation.performance.latency_ms
+        baseline_latency_ms = trace.evaluation.performance.reference_latency_ms
+
+    if artifact is None:
+        return AmdNativeScore(
+            definition=trace.definition,
+            workload_uuid=trace.workload.uuid,
+            measured_latency_ms=measured_latency_ms,
+            baseline_latency_ms=baseline_latency_ms,
+            sol_bound_ms=None,
+            score=None,
+            claim_level=AMD_SCORE_CLAIM_LEVEL,
+            warnings=(INCOMPLETE_EVIDENCE_WARNING,),
+            evidence_refs=_evidence_refs(
+                trace_ref=trace_ref,
+                timing_evidence_ref=timing_evidence_ref,
+                sol_bound_ref=sol_bound_ref,
+                baseline_ref=baseline_ref,
+                hardware_model_ref=hardware_model_ref,
+            ),
+        )
+
+    return score_amd_native_workload(
+        artifact,
+        measured_latency_ms=measured_latency_ms,
+        baseline_latency_ms=baseline_latency_ms,
+        trace_ref=trace_ref,
+        timing_evidence_ref=timing_evidence_ref,
+        sol_bound_ref=sol_bound_ref,
+        baseline_ref=baseline_ref,
+        hardware_model_ref=hardware_model_ref,
+    )
+
+
+def build_amd_native_suite_report_from_traces(
+    traces: Iterable[Trace],
+    artifacts_by_workload_uuid: dict[str, AmdSolBoundArtifact],
+    *,
+    evidence_refs_by_workload_uuid: dict[str, dict[str, str]] | None = None,
+    baseline_summary: dict[str, int] | None = None,
+) -> AmdNativeSuiteReport:
+    """Build a suite report from canonical traces and derived SOL artifacts."""
+    evidence_refs_by_workload_uuid = evidence_refs_by_workload_uuid or {}
+    scores = []
+    for trace in traces:
+        refs = evidence_refs_by_workload_uuid.get(trace.workload.uuid, {})
+        scores.append(
+            score_amd_native_trace_workload(
+                trace,
+                artifacts_by_workload_uuid.get(trace.workload.uuid),
+                trace_ref=refs.get("trace"),
+                timing_evidence_ref=refs.get("timing"),
+                sol_bound_ref=refs.get("sol_bound"),
+                baseline_ref=refs.get("baseline"),
+                hardware_model_ref=refs.get("hardware_model"),
+            )
+        )
+    return build_amd_native_suite_report(scores, baseline_summary=baseline_summary)
+
+
 def _has_complete_numeric_inputs(
     *,
     measured_latency_ms: float | None,
@@ -200,12 +288,22 @@ def _warnings_for_artifact(artifact: AmdSolBoundArtifact) -> list[str]:
 
 
 def _evidence_refs(
+    *,
+    trace_ref: str | None = None,
     timing_evidence_ref: str | None,
     sol_bound_ref: str | None,
+    baseline_ref: str | None = None,
+    hardware_model_ref: str | None = None,
 ) -> dict[str, str]:
     refs: dict[str, str] = {}
+    if trace_ref:
+        refs["trace"] = trace_ref
     if timing_evidence_ref:
         refs["timing"] = timing_evidence_ref
     if sol_bound_ref:
         refs["sol_bound"] = sol_bound_ref
+    if baseline_ref:
+        refs["baseline"] = baseline_ref
+    if hardware_model_ref:
+        refs["hardware_model"] = hardware_model_ref
     return refs
