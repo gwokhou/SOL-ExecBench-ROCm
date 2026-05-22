@@ -133,3 +133,8 @@ port:
    before reporting AMD-native scores.
 5. CDNA 3 claims additionally require the deferred `gfx94*` full-suite
    validation evidence.
+
+AMD-native score reports are derived artifacts. They can reference trace timing,
+ROCm timing evidence, baseline summaries, and AMD SOL bound artifacts, but they
+do not add fields to canonical trace JSONL. These reports are AMD ROCm
+interpretation artifacts: not NVIDIA B200, SOLAR, or leaderboard equivalence claims.
