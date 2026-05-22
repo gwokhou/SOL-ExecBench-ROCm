@@ -1,0 +1,24 @@
+{
+  "name": "ck_gemm_n128_k128",
+  "definition": "ck_gemm_n128_k128",
+  "author": "SOL ExecBench ROCm",
+  "description": "Runnable CK-facing native ROCm float32 GEMM example using Composable Kernel headers and CK index/tiling conventions.",
+  "spec": {
+    "languages": ["ck"],
+    "target_hardware": ["LOCAL", "gfx1200"],
+    "entry_point": "kernel.hip::run",
+    "dependencies": ["torch", "ck"],
+    "destination_passing_style": false,
+    "compile_options": {
+      "cflags": ["-I/opt/rocm/include"],
+      "hip_cflags": ["-O3"],
+      "ld_flags": []
+    }
+  },
+  "sources": [
+    {
+      "path": "kernel.hip",
+      "content": "#include <ATen/cuda/CUDAContext.h>\n#include <ck/ck.hpp>\n#include <ck/tensor_description/tensor_descriptor_helper.hpp>\n#include <hip/hip_runtime.h>\n#include <torch/extension.h>\n\n#include <string>\n\nnamespace {\n\nusing CkIndex = ck::index_t;\n\nconstexpr CkIndex kTileM = 8;\nconstexpr CkIndex kTileN = 16;\n\nvoid check_tensor(const torch::Tensor& tensor, const std::string& name) {\n    TORCH_CHECK(tensor.is_cuda(), name, \" must be a HIP tensor\");\n    TORCH_CHECK(tensor.dtype() == torch::kFloat32, name, \" must have float32 dtype\");\n    TORCH_CHECK(tensor.is_contiguous(), name, \" must be contiguous\");\n}\n\nvoid check_hip(hipError_t status, const char* call) {\n    TORCH_CHECK(status == hipSuccess, call, \" failed with status \", hipGetErrorString(status));\n}\n\n__global__ void ck_tiled_gemm_kernel(\n    const float* __restrict__ a,\n    const float* __restrict__ b,\n    float* __restrict__ c,\n    CkIndex m\n) {\n    const CkIndex row = static_cast<CkIndex>(blockIdx.y) * kTileM + threadIdx.y;\n    const CkIndex col = static_cast<CkIndex>(blockIdx.x) * kTileN + threadIdx.x;\n    if (row >= m || col >= 128) {\n        return;\n    }\n\n    float acc = 0.0f;\n    for (CkIndex k = 0; k < 128; ++k) {\n        acc += a[row * 128 + k] * b[k * 128 + col];\n    }\n    c[row * 128 + col] = acc;\n}\n\n}  // namespace\n\ntorch::Tensor run(const torch::Tensor& a, const torch::Tensor& b) {\n    check_tensor(a, \"A\");\n    check_tensor(b, \"B\");\n    TORCH_CHECK(a.dim() == 2, \"A must be 2D\");\n    TORCH_CHECK(b.dim() == 2, \"B must be 2D\");\n    TORCH_CHECK(a.size(1) == 128, \"A.size(1) must be 128\");\n    TORCH_CHECK(b.size(0) == 128, \"B.size(0) must be 128\");\n    TORCH_CHECK(b.size(1) == 128, \"B.size(1) must be 128\");\n\n    const CkIndex m = static_cast<CkIndex>(a.size(0));\n    auto c = torch::empty({a.size(0), b.size(1)}, a.options());\n\n    const dim3 block(kTileN, kTileM);\n    const dim3 grid((128 + kTileN - 1) / kTileN, (m + kTileM - 1) / kTileM);\n    hipLaunchKernelGGL(\n        ck_tiled_gemm_kernel,\n        grid,\n        block,\n        0,\n        at::cuda::getCurrentCUDAStream(),\n        a.data_ptr<float>(),\n        b.data_ptr<float>(),\n        c.data_ptr<float>(),\n        m\n    );\n    check_hip(hipGetLastError(), \"ck_tiled_gemm_kernel\");\n    return c;\n}\n\nPYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {\n    m.def(\"run\", &run, \"CK-facing native ROCm float32 GEMM for 128x128 tiles\");\n}\n"
+    }
+  ]
+}

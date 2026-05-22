@@ -171,6 +171,31 @@ def test_miopen_solution_embeds_checked_in_source():
     assert solution.sources[0].content == (example_dir / "main.cpp").read_text()
 
 
+def test_ck_public_example_is_runnable_native_category():
+    path = REPO_ROOT / "examples/ck/gemm/solution_ck.json"
+    data = _load_solution(path)
+    solution = Solution(**data)
+
+    assert [language.value for language in solution.spec.languages] == ["ck"]
+    assert solution.definition == "ck_gemm_n128_k128"
+    assert solution.spec.destination_passing_style is False
+    assert solution.spec.compile_options is not None
+    assert solution.spec.compile_options.ld_flags == []
+    assert "-I/opt/rocm/include" in solution.spec.compile_options.cflags
+    assert "ck/ck.hpp" in solution.sources[0].content
+    assert "ck::index_t" in solution.sources[0].content
+    assert "torch.mm" not in solution.sources[0].content
+    assert "gfx1200" in data["spec"]["target_hardware"]
+    assert "gfx942" not in data["spec"]["target_hardware"]
+
+
+def test_ck_solution_embeds_checked_in_source():
+    example_dir = REPO_ROOT / "examples/ck/gemm"
+    solution = Solution(**_load_solution(example_dir / "solution_ck.json"))
+
+    assert solution.sources[0].content == (example_dir / "kernel.hip").read_text()
+
+
 def test_hipblas_example_stages_through_native_packager(tmp_path):
     example_dir = REPO_ROOT / "examples/hipblas/gemm"
     definition = Definition(**_load_solution(example_dir / "definition.json"))
@@ -217,6 +242,31 @@ def test_miopen_example_stages_through_native_packager(tmp_path):
     staged_solution = json.loads((tmp_path / "solution.json").read_text())
     assert staged_solution["spec"]["languages"] == ["miopen"]
     assert "-lMIOpen" in staged_solution["spec"]["compile_options"]["ld_flags"]
+    assert "-I/opt/rocm/include" in staged_solution["spec"]["compile_options"]["cflags"]
+
+
+def test_ck_example_stages_through_native_packager(tmp_path):
+    example_dir = REPO_ROOT / "examples/ck/gemm"
+    definition = Definition(**_load_solution(example_dir / "definition.json"))
+    workload = Workload(**json.loads((example_dir / "workload.jsonl").read_text().splitlines()[0]))
+    solution = Solution(**_load_solution(example_dir / "solution_ck.json"))
+    packager = ProblemPackager(
+        definition=definition,
+        workloads=[workload],
+        solution=solution,
+        config=BenchmarkConfig(lock_clocks=False),
+        output_dir=tmp_path,
+        keep_output_dir=True,
+    )
+
+    command, artifact_path = packager.compile()
+
+    assert command == ["python", "build_ext.py"]
+    assert artifact_path == str(tmp_path / "benchmark_kernel.so")
+    assert (tmp_path / "kernel.hip").exists()
+    staged_solution = json.loads((tmp_path / "solution.json").read_text())
+    assert staged_solution["spec"]["languages"] == ["ck"]
+    assert staged_solution["spec"]["compile_options"]["ld_flags"] == []
     assert "-I/opt/rocm/include" in staged_solution["spec"]["compile_options"]["cflags"]
 
 
