@@ -8,10 +8,10 @@
 
 ### AMD SOLAR Coverage
 
-- [ ] **SOLCOV-01**: Maintainer can run an AMD SOL analyzer with broader operator coverage than the v1.5 matmul and broad elementwise foundation.
-- [ ] **SOLCOV-02**: Maintainer can inspect per-operation coverage status as supported, inexact, or unsupported with rationale.
-- [ ] **SOLCOV-03**: Maintainer can produce a derived coverage summary that reports supported, inexact, and unsupported operation counts before score generation.
-- [ ] **SOLCOV-04**: AMD SOL bound artifacts preserve per-op FLOP, byte, limiting-resource, confidence, and hardware-model evidence without mutating canonical trace JSONL.
+- [x] **SOLCOV-01**: Maintainer can run an AMD SOL analyzer with broader operator coverage than the v1.5 matmul and broad elementwise foundation.
+- [x] **SOLCOV-02**: Maintainer can inspect per-operation coverage status as supported, inexact, or unsupported with rationale.
+- [x] **SOLCOV-03**: Maintainer can produce a derived coverage summary that reports supported, inexact, and unsupported operation counts before score generation.
+- [x] **SOLCOV-04**: AMD SOL bound artifacts preserve per-op FLOP, byte, limiting-resource, confidence, and hardware-model evidence without mutating canonical trace JSONL.
 
 ### Live Profiler Timing
 
@@ -68,10 +68,10 @@ Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SOLCOV-01 | Phase 27 | Pending |
-| SOLCOV-02 | Phase 27 | Pending |
-| SOLCOV-03 | Phase 27 | Pending |
-| SOLCOV-04 | Phase 27 | Pending |
+| SOLCOV-01 | Phase 27 | Complete |
+| SOLCOV-02 | Phase 27 | Complete |
+| SOLCOV-03 | Phase 27 | Complete |
+| SOLCOV-04 | Phase 27 | Complete |
 | PROF-01 | Phase 28 | Pending |
 | PROF-02 | Phase 28 | Pending |
 | PROF-03 | Phase 28 | Pending |
@@ -95,4 +95,4 @@ Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-05-22*
-*Last updated: 2026-05-22 after v1.6 roadmap creation*
+*Last updated: 2026-05-22 after Phase 27 completion*
