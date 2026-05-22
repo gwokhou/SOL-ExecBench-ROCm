@@ -8,10 +8,10 @@
 
 ### Timing Semantics
 
-- [ ] **TIME-01**: Maintainer can classify measured work as HIP native, Triton, PyTorch, or mixed source type before selecting a timing backend.
-- [ ] **TIME-02**: Maintainer can inspect a `source_type -> timer_backend -> interpretation` timing policy table.
-- [ ] **TIME-03**: When a unified timing口径 would reduce accuracy, the benchmark exposes source-specific timing chimneys instead of forcing one interpretation.
-- [ ] **TIME-04**: Timing documentation states whether each timer measures kernel activity, HIP runtime/API activity, PyTorch operator attribution, or fallback event timing.
+- [x] **TIME-01**: Maintainer can classify measured work as HIP native, Triton, PyTorch, or mixed source type before selecting a timing backend.
+- [x] **TIME-02**: Maintainer can inspect a `source_type -> timer_backend -> interpretation` timing policy table.
+- [x] **TIME-03**: When a unified timing口径 would reduce accuracy, the benchmark exposes source-specific timing chimneys instead of forcing one interpretation.
+- [x] **TIME-04**: Timing documentation states whether each timer measures kernel activity, HIP runtime/API activity, PyTorch operator attribution, or fallback event timing.
 
 ### ROCm Profiler Timing
 
@@ -73,10 +73,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TIME-01 | Phase 23 | Pending |
-| TIME-02 | Phase 23 | Pending |
-| TIME-03 | Phase 23 | Pending |
-| TIME-04 | Phase 23 | Pending |
+| TIME-01 | Phase 23 | Complete |
+| TIME-02 | Phase 23 | Complete |
+| TIME-03 | Phase 23 | Complete |
+| TIME-04 | Phase 23 | Complete |
 | PROF-01 | Phase 24 | Pending |
 | PROF-02 | Phase 24 | Pending |
 | PROF-03 | Phase 24 | Pending |
