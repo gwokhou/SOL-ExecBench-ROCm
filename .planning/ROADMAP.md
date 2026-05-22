@@ -14,7 +14,7 @@ evidence.
 | Phase | Name | Goal | Requirements |
 |-------|------|------|--------------|
 | 19 | Compatibility and Practice Inventory | Complete 2026-05-22: Established non-negotiable contracts and classified `hip-execbench` practices before implementation. | COMPAT-01, COMPAT-02, COMPAT-03 |
-| 20 | Internal Diagnostics and Evidence Model | Add internal/additive diagnostics and derived evidence/report structures without changing benchmark output contracts. | ENG-04, ENG-05, ENG-06 |
+| 20 | Internal Diagnostics and Evidence Model | Complete 2026-05-22: Added derived evidence/report helpers without changing benchmark output contracts. | ENG-04, ENG-05, ENG-06 |
 | 21 | CDNA 3 Validation Readiness | Implement `gfx94*` readiness, evidence requirements, blockers, and no-claim guardrails without requiring real CDNA 3 hardware. | VAL-04, VAL-05, VAL-06 |
 | 22 | RDNA 4 Validation Closure | Run and record RDNA 4 unit + E2E validation and confirm benchmark semantics did not regress. | RDNA-01, RDNA-02, RDNA-03 |
 
@@ -48,6 +48,8 @@ evidence.
   claims as implementation evidence.
 
 ### Phase 20: Internal Diagnostics and Evidence Model
+
+**Status:** Complete 2026-05-22
 
 **Goal:** Adapt `hip-execbench` stage-result and report/evidence practices as
 internal or derived helpers while preserving trace JSONL as the canonical
@@ -133,9 +135,9 @@ prove compatibility and benchmark semantics remain intact.
 | COMPAT-01 | Phase 19 | Complete |
 | COMPAT-02 | Phase 19 | Complete |
 | COMPAT-03 | Phase 19 | Complete |
-| ENG-04 | Phase 20 | Pending |
-| ENG-05 | Phase 20 | Pending |
-| ENG-06 | Phase 20 | Pending |
+| ENG-04 | Phase 20 | Complete |
+| ENG-05 | Phase 20 | Complete |
+| ENG-06 | Phase 20 | Complete |
 | VAL-04 | Phase 21 | Pending |
 | VAL-05 | Phase 21 | Pending |
 | VAL-06 | Phase 21 | Pending |
