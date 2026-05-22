@@ -9,6 +9,9 @@ from sol_execbench.core.data.solution import Solution
 from sol_execbench.core.data.trace import Trace
 from sol_execbench.core.data.workload import Workload
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+COMPATIBILITY_INVENTORY = REPO_ROOT / "docs/internal/v1_4_compatibility_inventory.md"
+
 
 def test_solution_json_contract_accepts_existing_rocm_shape():
     solution = Solution(
@@ -58,12 +61,59 @@ def test_cli_help_preserves_existing_public_options():
     result = CliRunner().invoke(cli, ["--help"])
     assert result.exit_code == 0
     help_text = result.output
-    assert "Usage:" in help_text
-    assert "--definition" in help_text
-    assert "--workload" in help_text
-    assert "--solution" in help_text
-    assert "--json" in help_text
-    assert "diagnose" not in help_text
+    for expected_option in (
+        "Usage:",
+        "--definition",
+        "--workload",
+        "--solution",
+        "--config",
+        "--compile-timeout",
+        "--timeout",
+        "--output",
+        "--json",
+        "--lock-clocks",
+        "--keep-staging",
+        "--verbose",
+    ):
+        assert expected_option in help_text
+    for unexpected_option in ("diagnose", "profile", "hip-bench"):
+        assert unexpected_option not in help_text
+
+
+def test_v1_4_compatibility_inventory_covers_public_contracts():
+    text = COMPATIBILITY_INVENTORY.read_text()
+    for heading in (
+        "Public CLI Contract",
+        "Definition Schema Contract",
+        "Workload Schema Contract",
+        "Solution Format Contract",
+        "Trace JSONL Contract",
+        "Eval-Driver Semantics Contract",
+        "Phase 19 Non-Goals",
+    ):
+        assert heading in text
+    for source_ref in (
+        "src/sol_execbench/cli/main.py",
+        "src/sol_execbench/core/data/definition.py",
+        "src/sol_execbench/core/data/workload.py",
+        "src/sol_execbench/core/data/solution.py",
+        "src/sol_execbench/core/data/trace.py",
+        "src/sol_execbench/driver/templates/eval_driver.py",
+    ):
+        assert source_ref in text
+
+
+def test_v1_4_compatibility_inventory_rejects_phase_19_public_drift():
+    text = COMPATIBILITY_INVENTORY.read_text()
+    for invariant in (
+        "Do not add public `sol-execbench` CLI options or subcommands.",
+        "Do not change Pydantic public field names",
+        "Do not add fields to trace JSONL.",
+        "Do not replace the eval driver",
+        "Do not claim CDNA 3 hardware validation.",
+        "Do not introduce the hip-execbench TypeScript/Zod runtime stack.",
+    ):
+        assert invariant in text
 
 
 def test_public_example_paths_remain_hip_facing():
