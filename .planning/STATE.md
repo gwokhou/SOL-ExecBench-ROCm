@@ -8,7 +8,7 @@ last_activity: 2026-05-22
 progress:
   total_phases: 4
   completed_phases: 0
-  total_plans: 0
+  total_plans: 1
   completed_plans: 0
   percent: 0
 ---
@@ -18,7 +18,7 @@ progress:
 **Project:** SOL ExecBench ROCm Port
 **Initialized:** 2026-05-21
 **Current phase:** 23
-**Status:** v1.5 roadmap defined
+**Status:** Phase 23 planned
 
 ## Project Reference
 
@@ -44,7 +44,7 @@ See: `.planning/ROADMAP.md`
 
 v1.5 AMD-native SOL Scoring and ROCm Profiler Timing is planned.
 
-- Phase 23: Timing Semantics and Policy - not started
+- Phase 23: Timing Semantics and Policy - planned
 - Phase 24: rocprofv3 Default Timing Path - not started
 - Phase 25: AMD SOL Bound Foundation - not started
 - Phase 26: AMD-native Scoring and Guarded Reports - not started
@@ -80,16 +80,15 @@ Items acknowledged and deferred at milestone close on 2026-05-21:
 
 ## Next Action
 
-Plan Phase 23: Timing Semantics and Policy.
+Execute Phase 23: Timing Semantics and Policy.
 
 ## Current Position
 
 Phase: 23 - Timing Semantics and Policy
-Plan: —
-Status: Roadmap defined
-Last activity: 2026-05-22 — Milestone v1.5 roadmap drafted
+Plan: 23-01
+Status: Planned
+Last activity: 2026-05-22 — Phase 23 plan created
 
 ## Operator Next Steps
 
-- Review and approve the v1.5 roadmap.
-- Plan Phase 23 with /gsd-plan-phase after approval.
+- Execute Phase 23 with /gsd-execute-phase 23.
