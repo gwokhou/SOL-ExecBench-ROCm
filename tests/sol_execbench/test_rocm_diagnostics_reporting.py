@@ -5,7 +5,9 @@ import pytest
 from sol_execbench.core.diagnostics import (
     DiagnosticStage,
     ProfilerBackend,
+    StageDiagnostic,
     SolExecBenchError,
+    cdna3_validation_readiness,
     classify_gfx,
     local_gfx_target,
     rocm_tool_diagnostics,
@@ -71,3 +73,42 @@ def test_local_gfx_target_uses_first_available_rocm_output():
         return "Name: gfx1200\n"
 
     assert local_gfx_target(check_output=fake_check_output) == "gfx1200"
+
+
+def test_cdna3_validation_readiness_for_gfx94_target():
+    readiness = cdna3_validation_readiness("gfx942")
+    payload = readiness.to_dict()
+
+    assert readiness.target_family == "cdna3"
+    assert readiness.ready is True
+    assert readiness.claim == "cdna3_readiness_implemented"
+    assert "uv run --no-sync pytest tests/" in readiness.commands
+    assert any("gfx94" in item for item in readiness.acceptance_criteria)
+    assert payload["commands"][0] == "uv run --no-sync pytest tests/"
+
+
+def test_cdna3_validation_readiness_blocks_rdna4_target():
+    readiness = cdna3_validation_readiness("gfx1200")
+
+    assert readiness.target_family == "rdna4"
+    assert readiness.ready is False
+    assert readiness.claim == "cdna3_hardware_validation_deferred"
+    assert readiness.blockers == (
+        "Detected RDNA 4 target; CDNA 3 validation requires gfx94* hardware.",
+    )
+
+
+def test_cdna3_validation_readiness_reports_missing_tools():
+    diagnostics = [
+        StageDiagnostic(
+            stage=DiagnosticStage.ENVIRONMENT,
+            status="missing",
+            message="rocminfo not found",
+            hint="Install ROCm runtime tools.",
+        )
+    ]
+    readiness = cdna3_validation_readiness("gfx942", tool_diagnostics=diagnostics)
+
+    assert readiness.ready is False
+    assert readiness.claim == "cdna3_hardware_validation_deferred"
+    assert readiness.blockers == ("Missing ROCm validation tools: rocminfo",)

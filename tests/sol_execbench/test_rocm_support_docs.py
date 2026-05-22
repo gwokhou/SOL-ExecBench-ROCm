@@ -45,3 +45,17 @@ def test_cdna3_validation_handoff_defines_next_milestone_gate():
     ]
     for phrase in expected:
         assert phrase in handoff
+
+
+def test_cdna3_readiness_doc_is_not_hardware_validation_claim():
+    readiness = _read("docs/internal/cdna3_validation_readiness.md")
+
+    for phrase in (
+        "does not record a CDNA 3 hardware-validation pass",
+        "cdna3_readiness_implemented",
+        "cdna3_hardware_validation_deferred",
+        "must not say CDNA 3 hardware validation passed",
+    ):
+        assert phrase in readiness
+    assert "uv run --no-sync pytest tests/" in readiness
+    assert "gfx94*" in readiness
