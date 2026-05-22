@@ -36,3 +36,4 @@ pytest*
 
 # other
 /out/
+.planning/config.json
