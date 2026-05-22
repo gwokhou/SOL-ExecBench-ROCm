@@ -2,6 +2,14 @@
 phase: 40
 status: complete
 completed: 2026-05-22
+requirements-completed:
+  - COMPAT-01
+  - COMPAT-02
+  - COMPAT-03
+  - COMPAT-04
+  - RDNA4-01
+  - RDNA4-02
+  - RDNA4-03
 ---
 
 # Phase 40 Summary

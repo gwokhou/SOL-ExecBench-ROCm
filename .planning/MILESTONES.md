@@ -1,5 +1,44 @@
 # Milestones
 
+## v1.8 ROCm Library Ecosystem Completion (Shipped: 2026-05-22)
+
+**Delivered:** MIOpen, Composable Kernel, and rocWMMA are now scoped supported
+ROCm library examples for RDNA 4, with dependency diagnostics, native staging
+tests, public-contract documentation, and validation guardrails.
+
+**Phases completed:** 36-40 (5 phases, 5 plans)
+
+**Key accomplishments:**
+
+- Added reusable ROCm library dependency diagnostics and Docker dependency
+  checks for MIOpen, Composable Kernel, rocWMMA, and hipBLAS.
+
+- Promoted MIOpen with a native softmax public example, metadata/source tests,
+  native staging coverage, RDNA 4 E2E registration, and support docs.
+
+- Promoted Composable Kernel with a scoped small GEMM public example, CK source
+  consistency checks, native staging coverage, and support-status docs.
+
+- Promoted rocWMMA with a matrix-core GEMM public example, fragment/MMA/store
+  API coverage, native staging tests, RDNA 4 E2E registration, and CDNA
+  deferral wording.
+
+- Cleaned compatibility/support wording so former cuDNN, CUTLASS, CuTe DSL, and
+  cuTile paths remain compatibility examples unless they contain native ROCm
+  library solutions.
+
+- Added Nyquist validation artifacts for all v1.8 phases and passed the
+  milestone audit with 23/23 requirements satisfied.
+
+**Known gaps:**
+
+- CDNA 3 and CDNA 4 library validation remain deferred by explicit v1.8 scope.
+
+- Full native E2E execution for some library examples depends on complete ROCm
+  development/library headers in the local environment.
+
+---
+
 ## v1.7 Baseline, Timing, Reward-Hack Hardening, and ROCm Library Migration (Shipped: 2026-05-22)
 
 **Delivered:** Optimized scoring baseline artifacts, source-specific ROCm
