@@ -33,9 +33,10 @@ library/DSL example directories are retained as PyTorch compatibility examples.
 
 Current local validation evidence covers RDNA 4 (`gfx1200`). CDNA 3 targets
 (`gfx940`, `gfx941`, `gfx942`) are supported by the solution schema and HIP
-packaging paths, but real CDNA 3 hardware validation is deferred. Do not claim
-CDNA 3 hardware validation until a full adapted-suite run is recorded on
-`gfx94*`.
+packaging paths, but real CDNA 3 hardware validation is deferred. The planned
+commercial GPU validation target is AMD Instinct MI300X (`gfx942`). Do not claim
+MI300X/CDNA3 hardware validation until a full adapted-suite run, environment
+evidence, clock-lock evidence, and validation artifacts are recorded.
 
 ## Prerequisites
 

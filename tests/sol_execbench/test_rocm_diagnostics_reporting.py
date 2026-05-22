@@ -4,12 +4,16 @@ import pytest
 
 from sol_execbench.core.diagnostics import (
     DiagnosticStage,
+    MI300X_FP8_READINESS,
+    MI300X_REQUIRED_ARTIFACTS,
     ProfilerBackend,
     StageDiagnostic,
     SolExecBenchError,
+    can_mark_mi300x_hardware_validated,
     cdna3_validation_readiness,
     classify_gfx,
     local_gfx_target,
+    mi300x_validation_claim_blockers,
     rocm_tool_diagnostics,
     select_profiler_backend,
 )
@@ -112,3 +116,42 @@ def test_cdna3_validation_readiness_reports_missing_tools():
     assert readiness.ready is False
     assert readiness.claim == "cdna3_hardware_validation_deferred"
     assert readiness.blockers == ("Missing ROCm validation tools: rocminfo",)
+
+
+def test_mi300x_validation_claim_requires_complete_evidence():
+    blockers = mi300x_validation_claim_blockers(
+        {
+            "gpu_name": "AMD Radeon RX 9070 XT",
+            "gfx": "gfx1200",
+            "rocm_version": "7.0.0",
+            "clocks_locked": False,
+            "full_suite_passed": False,
+            "artifacts": [],
+            "fp8_validation": "missing",
+            "nvfp4_mxfp4_validation": "passed",
+        }
+    )
+
+    assert can_mark_mi300x_hardware_validated({}) is False
+    assert "gpu_name must identify AMD Instinct MI300X" in blockers
+    assert "gfx must be a CDNA 3 gfx94* target" in blockers
+    assert "clock-lock evidence must record clocks_locked=True" in blockers
+    assert any("missing validation artifacts" in blocker for blocker in blockers)
+
+
+def test_mi300x_validation_claim_allows_complete_evidence():
+    evidence = {
+        "gpu_name": "AMD Instinct MI300X",
+        "gfx": "gfx942",
+        "rocm_version": "7.0.0",
+        "clocks_locked": True,
+        "full_suite_passed": True,
+        "artifacts": list(MI300X_REQUIRED_ARTIFACTS),
+        "fp8_validation": "passed",
+        "nvfp4_mxfp4_validation": "deferred_no_amd_path",
+    }
+
+    assert mi300x_validation_claim_blockers(evidence) == ()
+    assert can_mark_mi300x_hardware_validated(evidence) is True
+    assert "MI300X/CDNA 3 can validate FP8" in MI300X_FP8_READINESS[0]
+    assert "NVFP4/MXFP4 validation is deferred" in MI300X_FP8_READINESS[1]

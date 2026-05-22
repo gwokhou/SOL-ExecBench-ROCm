@@ -14,6 +14,7 @@ import shutil
 import subprocess
 from dataclasses import dataclass
 from enum import Enum
+from collections.abc import Mapping
 from typing import Callable
 
 
@@ -109,7 +110,7 @@ CDNA3_VALIDATION_COMMANDS: tuple[str, ...] = (
     "uv run --no-sync pytest tests/",
     "uv run python -c 'import torch; print(torch.__version__, torch.version.hip, torch.cuda.is_available())'",
     "rocm-smi --showproductname --showdriverversion --showhw || true",
-    "rocminfo | grep -E \"Name: *gfx94|Marketing Name\" || true",
+    'rocminfo | grep -E "Name: *gfx94|Marketing Name" || true',
 )
 
 CDNA3_EVIDENCE_REQUIRED: tuple[str, ...] = (
@@ -123,6 +124,18 @@ CDNA3_ACCEPTANCE_CRITERIA: tuple[str, ...] = (
     "Full adapted pytest suite completes successfully on a real CDNA 3 GPU",
     "Recorded environment reports gfx94*",
     "Support matrix claim is updated only after recorded evidence exists",
+)
+
+MI300X_REQUIRED_ARTIFACTS: tuple[str, ...] = (
+    "pytest_full_suite_log",
+    "run_dataset_summary",
+    "environment_report",
+    "clock_lock_evidence",
+)
+
+MI300X_FP8_READINESS: tuple[str, ...] = (
+    "MI300X/CDNA 3 can validate FP8 behavior once hardware access exists",
+    "NVFP4/MXFP4 validation is deferred until a suitable AMD hardware and methodology path exists",
 )
 
 
@@ -251,9 +264,7 @@ def cdna3_validation_readiness(
 
     ready = family == "cdna3" and not blockers
     claim = (
-        "cdna3_readiness_implemented"
-        if ready
-        else "cdna3_hardware_validation_deferred"
+        "cdna3_readiness_implemented" if ready else "cdna3_hardware_validation_deferred"
     )
     return ValidationReadiness(
         target_family=family,
@@ -264,6 +275,51 @@ def cdna3_validation_readiness(
         acceptance_criteria=CDNA3_ACCEPTANCE_CRITERIA,
         blockers=tuple(blockers),
     )
+
+
+def mi300x_validation_claim_blockers(evidence: Mapping[str, object]) -> tuple[str, ...]:
+    """Return blockers that prevent marking MI300X/CDNA3 reports as validated.
+
+    This pure guard is intentionally strict. It does not run hardware checks; it
+    validates that a report has already recorded the minimum evidence required
+    to upgrade from readiness/deferred status to hardware-validated status.
+    """
+    blockers: list[str] = []
+    gpu_name = str(evidence.get("gpu_name", ""))
+    gfx = str(evidence.get("gfx", ""))
+    if "MI300X" not in gpu_name:
+        blockers.append("gpu_name must identify AMD Instinct MI300X")
+    if classify_gfx(gfx) != "cdna3":
+        blockers.append("gfx must be a CDNA 3 gfx94* target")
+    if not evidence.get("rocm_version"):
+        blockers.append("rocm_version must be recorded")
+    if evidence.get("clocks_locked") is not True:
+        blockers.append("clock-lock evidence must record clocks_locked=True")
+    if evidence.get("full_suite_passed") is not True:
+        blockers.append("full adapted suite must pass on MI300X")
+
+    artifacts = evidence.get("artifacts", ())
+    if not isinstance(artifacts, (list, tuple, set)):
+        artifacts = ()
+    missing_artifacts = [
+        artifact for artifact in MI300X_REQUIRED_ARTIFACTS if artifact not in artifacts
+    ]
+    if missing_artifacts:
+        blockers.append("missing validation artifacts: " + ", ".join(missing_artifacts))
+
+    fp8_status = evidence.get("fp8_validation")
+    if fp8_status not in {"passed", "deferred_no_case"}:
+        blockers.append("fp8_validation must be 'passed' or 'deferred_no_case'")
+
+    nvfp4_status = evidence.get("nvfp4_mxfp4_validation")
+    if nvfp4_status != "deferred_no_amd_path":
+        blockers.append("NVFP4/MXFP4 validation must remain deferred_no_amd_path")
+    return tuple(blockers)
+
+
+def can_mark_mi300x_hardware_validated(evidence: Mapping[str, object]) -> bool:
+    """Return whether evidence is sufficient for an MI300X validation claim."""
+    return not mi300x_validation_claim_blockers(evidence)
 
 
 def rocm_tool_diagnostics(
