@@ -6,7 +6,7 @@ status: planning
 last_updated: "2026-05-22T04:07:07.093Z"
 last_activity: 2026-05-22
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -17,15 +17,15 @@ progress:
 
 **Project:** SOL ExecBench ROCm Port
 **Initialized:** 2026-05-21
-**Current phase:** complete
-**Status:** v1.2 milestone complete
+**Current phase:** Not started
+**Status:** v1.3 milestone planned
 
 ## Project Reference
 
 See: `.planning/PROJECT.md` (updated 2026-05-22)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Awaiting next milestone
+**Current focus:** v1.3 Non-CDNA Issue Closure
 
 ## Workflow Settings
 
@@ -42,12 +42,13 @@ See: `.planning/config.json`
 
 See: `.planning/ROADMAP.md`
 
-v1.2 Engineering Practice Harvest and Compatibility Guardrails contains 4 phases:
+v1.3 Non-CDNA Issue Closure contains 5 phases:
 
-- Phase 10: Practice Harvest and Adaptation Map - complete
-- Phase 11: ROCm Diagnostics and Failure Reporting - complete
-- Phase 12: Scoring and Baseline Comparison Review - complete
-- Phase 13: Public Contract Compatibility Guardrails - complete
+- Phase 14: Original Feature Parity Audit - pending
+- Phase 15: AMD Scoring and Baseline Workflow - pending
+- Phase 16: ROCm Library Category Readiness - pending
+- Phase 17: hip-execbench Practice Adaptation - pending
+- Phase 18: Non-CDNA Validation Closure - pending
 
 ## Memory
 
@@ -73,15 +74,16 @@ Items acknowledged and deferred at milestone close on 2026-05-21:
 
 ## Next Action
 
-Start the next milestone with `/gsd-new-milestone`.
+Start Phase 14 with `/gsd-discuss-phase 14` or `/gsd-plan-phase 14`.
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 14 - Original Feature Parity Audit (not started)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-05-22 — Milestone v1.3 started
+Status: Ready for phase planning
+Last activity: 2026-05-22 — Milestone v1.3 roadmap created
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Start Phase 14 with /gsd-discuss-phase 14
+- Or plan directly with /gsd-plan-phase 14
