@@ -23,7 +23,7 @@ real CDNA3 hardware validation explicitly out of scope.
 
 ### Phase 23: Timing Semantics and Policy
 
-**Status:** Not started
+**Status:** Planned 2026-05-22
 
 **Goal:** Define how benchmark work is classified and timed before changing the
 default timing implementation.
@@ -49,6 +49,13 @@ default timing implementation.
   profilers.
 - Treat PyTorch ROCm's `torch.cuda` and `ProfilerActivity.CUDA` naming as API
   compatibility surface, not NVIDIA runtime evidence.
+
+**Plans:** 1 plan
+
+Plans:
+
+- [ ] 23-01: Add timing source classification, timing policy models, chimney
+  documentation, and focused policy/audit tests.
 
 ### Phase 24: rocprofv3 Default Timing Path
 
@@ -168,4 +175,3 @@ COMPAT-02, CLAIM-01, CLAIM-02
 | COMPAT-02 | Phase 26 | Pending |
 | CLAIM-01 | Phase 26 | Pending |
 | CLAIM-02 | Phase 26 | Pending |
-
