@@ -4,25 +4,34 @@
 
 - 🔄 **v1.9 AMD SOL/SOLAR Bound Modeling Completion** — Phases 41-46
   (active).
+
 - ✅ **v1.8 ROCm Library Ecosystem Completion** — Phases 36-40 (shipped
   2026-05-22). See `.planning/milestones/v1.8-ROADMAP.md`.
+
 - ✅ **v1.7 Baseline, Timing, Reward-Hack Hardening, and ROCm Library
   Migration** — Phases 31-35 (shipped 2026-05-22). See
   `.planning/milestones/v1.7-ROADMAP.md`.
+
 - ✅ **v1.6 AMD SOLAR Coverage, Live Profiler Timing, and Scoring Workflow** —
   Phases 27-30 (shipped 2026-05-22). See
   `.planning/milestones/v1.6-ROADMAP.md`.
+
 - ✅ **v1.5 AMD-native SOL Scoring and ROCm Profiler Timing** — Phases 23-26
   (shipped 2026-05-22). See `.planning/milestones/v1.5-ROADMAP.md`.
+
 - ✅ **v1.4 hip-execbench Engineering Experience Adaptation + Validation
   Workflow Readiness** — shipped 2026-05-22. See
   `.planning/milestones/v1.4-ROADMAP.md`.
+
 - ✅ **v1.3 Non-CDNA Issue Closure** — shipped 2026-05-22. See
   `.planning/milestones/v1.3-ROADMAP.md`.
+
 - ✅ **v1.2 Engineering Practice Harvest and Compatibility Guardrails** —
   shipped 2026-05-22. See `.planning/milestones/v1.2-ROADMAP.md`.
+
 - ✅ **v1.1 CDNA 3 Support and Migration Closure** — shipped 2026-05-21. See
   `.planning/milestones/v1.1-ROADMAP.md`.
+
 - ✅ **v1.0 ROCm Port** — shipped 2026-05-21. See
   `.planning/milestones/v1.0-ROADMAP.md`.
 
@@ -57,18 +66,29 @@ for v1.9.
 **Plans:** 3 plans
 
 Plans:
+**Wave 1**
+
 - [ ] 41-01-PLAN.md — Create strict packaged/external AMD hardware model JSON loaders.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 41-02-PLAN.md — Wire v2 hardware model defaults into AMD SOL and score compatibility surfaces.
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 41-03-PLAN.md — Lock public contract, CLI, schema, Trace, and claim guardrails.
 
 **Success criteria:**
 
 1. Versioned AMD hardware model JSON artifacts can be loaded and validated with
    clear errors for invalid provenance, values, status, or architecture.
+
 2. RDNA 4 `gfx1200` is the only v1.9 validation target in model artifacts; CDNA
    3 / MI300X and CDNA 4 remain explicitly unvalidated/deferred.
+
 3. Built-in fallback models, if retained, flow through the same validation path
    and remain labeled provisional or unvalidated.
+
 4. Tests prove canonical `Trace` JSONL, public schemas, and primary
    `sol-execbench` output remain unchanged by the new derived artifacts.
 
@@ -84,10 +104,13 @@ code can consume without depending on raw AST details.
 1. `Definition` and `Workload` inputs produce structured graph nodes with
    stable IDs, op families, source expressions, tensor roles, shapes, dtypes,
    confidence, and rationale.
+
 2. Unsupported or ambiguous source constructs remain visible as unsupported or
    inexact graph evidence.
+
 3. Existing public scoring imports, including `build_amd_sol_bound_artifact()`,
    continue to work through a compatibility facade.
+
 4. Golden parser tests cover aliases, tensor methods, chained expressions,
    tuple outputs, and unsupported constructs.
 
@@ -102,13 +125,17 @@ SOL ExecBench operator families.
 
 1. Matmul, batched matmul, and `@`/`torch.mm`/`torch.matmul` style operations
    produce explicit FLOP formulas and dtype-aware byte evidence.
+
 2. Elementwise arithmetic and activation chains produce conservative formulas
    with confidence labels.
+
 3. Reductions, normalization/RMSNorm/layer-norm-like patterns, and
    softmax/log-softmax-like patterns produce axis-aware conservative evidence.
+
 4. View/data-movement operations distinguish logical view, materialized
    movement, broadcast, contiguous, and dtype-conversion-like evidence where
    detectable.
+
 5. Tests assert read bytes, write bytes, intermediate/movement bytes, total
    bytes, formula inputs, and rationale for representative fixtures.
 
@@ -124,10 +151,13 @@ sidecars with deterministic coverage and warning behavior.
 1. AMD SOL bound artifact v2 sidecars serialize and load with schema version,
    derived marker, workload identity, graph, estimates, op bounds, aggregate
    bound, hardware model reference, warnings, and coverage summary.
+
 2. Every operation reports compute bound, memory bound, limiting resource,
    confidence, and rationale.
+
 3. Coverage summaries report supported, inexact, unsupported counts by family
    plus worst confidence.
+
 4. Unsupported or missing evidence cannot silently improve aggregate bounds;
    warnings or unscored degradation are generated deterministically.
 
@@ -142,11 +172,14 @@ reports without changing canonical traces.
 
 1. AMD-native score reports consume v2 artifacts and preserve trace, timing,
    SOL-bound, baseline, and hardware-model evidence refs.
+
 2. Unsupported, inexact, provisional hardware, missing bound, failed trace, and
    `reference_latency` fallback cases propagate deterministic warnings or
    unscored states.
+
 3. Dataset runs can optionally emit or reference AMD SOL sidecars when
    `--amd-score-report` is requested.
+
 4. Suite reports expose scored/unscored counts and baseline/evidence summaries
    sufficient to avoid release score misuse.
 
@@ -162,14 +195,18 @@ validation evidence.
 1. Documentation explains AMD SOL bound artifact v2 semantics, hardware model
    provenance, confidence labels, unsupported/inexact degradation, and RDNA
    4-only validation scope.
+
 2. Guardrail tests prevent NVIDIA B200, upstream SOLAR, leaderboard-equivalence,
    CDNA 3 / MI300X validation, and CDNA 4 validation claims.
+
 3. Golden tests cover matmul, batched matmul, elementwise chains, activation,
    reduction, normalization, softmax, data movement, dtype conversion, tuple
    outputs, and unsupported operations.
+
 4. Score integration tests cover complete, inexact, unsupported, missing
    baseline, reference-latency fallback, provisional hardware, and failed-trace
    cases.
+
 5. RDNA 4 validation evidence records focused unit tests and a small
    derived-report/sample run that emits trace JSONL, bound artifacts, and
    AMD-native score output.
@@ -219,8 +256,10 @@ validation evidence.
 - FP8 behavior and performance validation on MI300X.
 - CDNA 3 and CDNA 4 validation for supported ROCm library examples and bound
   model hardware inputs.
+
 - Profiler-backed performance comparison reports for supported ROCm library
   examples.
+
 - Original paper model-to-subgraph extraction and curation pipeline adaptation.
 - Broader upstream SOLAR parity beyond v1.9 local IR and artifact contracts.
 - NVFP4/MXFP4-like validation if suitable AMD hardware support and methodology
