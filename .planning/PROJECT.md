@@ -38,6 +38,32 @@ Validation status:
 - CDNA 3 (`gfx94*`) full adapted suite validation remains deferred by user
   decision and must be completed before claiming CDNA 3 hardware validation.
 
+## Current Milestone: v1.4 hip-execbench Engineering Experience Adaptation + Validation Workflow Readiness
+
+**Goal:** Learn and adapt strong engineering practices from
+`~/PyCharmMiscProject/hip-playground/hip-execbench` while preserving this
+project's public SOL ExecBench ROCm contracts; implement CDNA 3 validation
+readiness without claiming hardware validation, and validate the implemented
+RDNA 4 path with unit and E2E evidence.
+
+**Target features:**
+
+- Identify `hip-execbench` engineering practices worth adapting, including
+  pipeline stage results, compile-cache discipline, diagnostics/profiling
+  readiness, agent/report transformations, baseline comparison, and statistical
+  comparison patterns.
+- Adapt selected practices as additive or internal enhancements only: keep the
+  existing `sol-execbench` CLI behavior, public schemas, trace JSONL contract,
+  solution format, and benchmark semantics stable.
+- Implement CDNA 3 validation workflow readiness for `gfx94*`, including
+  environment detection, validation entry points, result/evidence collection,
+  failure diagnostics, evidence templates, and acceptance criteria, without
+  requiring or claiming a real CDNA 3 hardware pass in this milestone.
+- Implement and validate the RDNA 4 path with focused unit tests and full E2E
+  validation evidence.
+- Preserve existing reference correctness, timing integrity, reward-hack
+  defenses, ROCm-only schema/build/eval behavior, and compatibility guardrails.
+
 ## Requirements
 
 ### Validated
@@ -83,8 +109,11 @@ Validation status:
 
 ### Active
 
-- [ ] Keep CDNA 3 real hardware validation deferred until a future milestone
-      with access to `gfx94*` hardware evidence.
+- [ ] Adapt selected `hip-execbench` engineering practices without changing
+      existing public interfaces or benchmark contracts.
+- [ ] Implement CDNA 3 validation workflow readiness while keeping real CDNA 3
+      hardware validation deferred.
+- [ ] Validate RDNA 4 implementation paths with unit and E2E evidence.
 
 ### Out of Scope
 
@@ -104,9 +133,10 @@ contains the HIP-aware build and eval subprocess scripts.
 
 High-risk areas for future work remain real CDNA 3 hardware validation, native
 library replacement quality, timing integrity on additional AMD architectures,
-and AMD-native score interpretation. v1.2 added internal diagnostics and
-contract guardrails, but it intentionally did not add new public commands or
-formats.
+and AMD-native score interpretation. v1.4 focuses on adapting useful
+`hip-execbench` engineering practices and implementing validation readiness
+without changing public contracts or claiming unperformed CDNA 3 hardware
+validation.
 
 ## Constraints
 
@@ -129,6 +159,9 @@ formats.
 | Separate CDNA 3 code support from hardware validation | User requested CDNA 3 support in v1.1 while deferring real hardware validation to the next milestone. | Validated in v1.1 |
 | Preserve public interfaces during practice harvest | User requested borrowing engineering experience from `hip-execbench` without changing this project's external interfaces or formats. | Validated in v1.2 |
 | Close non-CDNA gaps before CDNA hardware validation | User requested v1.3 converge all issues except CDNA 3 validation, using NVIDIA SOL ExecBench parity and `hip-execbench` engineering experience as references. | Validated in v1.3 |
+| Preserve compatibility during v1.4 engineering adaptation | User requested comprehensive `hip-execbench` engineering practice adaptation without breaking existing CLI, schema, trace, solution, or benchmark semantics. | Pending in v1.4 |
+| Implement CDNA 3 readiness without hardware claim | User clarified v1.4 should implement CDNA 3 validation workflow readiness but not perform or claim real CDNA 3 validation. | Pending in v1.4 |
+| RDNA 4 is the validation platform for v1.4 | User clarified v1.4 implementation must be validated on RDNA 4 with unit and E2E evidence. | Pending in v1.4 |
 
 ## Evolution
 
@@ -148,4 +181,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-22 after v1.3 milestone*
+*Last updated: 2026-05-22 after starting v1.4 milestone*
