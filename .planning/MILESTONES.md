@@ -1,5 +1,39 @@
 # Milestones
 
+## v1.6 AMD SOLAR Coverage, Live Profiler Timing, and Scoring Workflow (Shipped: 2026-05-22)
+
+**Delivered:** Broader AMD SOL analyzer coverage, live `rocprofv3` collection
+workflow, opt-in AMD-native score reports, and focused compatibility/claim
+guardrails.
+
+**Phases completed:** 27-30 (4 phases, 4 plans)
+
+**Key accomplishments:**
+
+- Broadened AMD SOL/SOLAR-like analyzer coverage for reductions,
+  normalization-like calls, softmax-like calls, activations, and data movement,
+  with derived coverage summaries and confidence labels.
+- Added a live `rocprofv3` collection adapter with source-specific timing
+  semantics and explicit fallback metadata.
+- Connected canonical trace JSONL, live timing evidence refs, AMD SOL bounds,
+  baseline latency, and hardware model refs into derived AMD-native score
+  reports.
+- Added `scripts/run_dataset.py --amd-score-report` as an opt-in suite report
+  output without changing primary `sol-execbench` defaults.
+- Added focused v1.6 compatibility and claim guardrails for trace/schema/CLI
+  stability, CDNA3 validation deferral, and no NVIDIA B200/SOLAR/leaderboard
+  equivalence claims.
+
+**Known gaps:**
+
+- Real CDNA 3 `gfx94*` full-suite validation remains deferred by explicit user
+  instruction.
+- Live profiler unit tests use mocked collection; real `rocprofv3` output
+  validation remains environment-dependent.
+- Full upstream SOLAR parity remains future scope.
+
+---
+
 ## v1.5 AMD-native SOL Scoring and ROCm Profiler Timing (Shipped: 2026-05-22)
 
 **Delivered:** AMD-native SOL bound and scoring foundations plus accuracy-first
