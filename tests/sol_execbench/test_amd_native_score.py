@@ -141,6 +141,7 @@ def test_unsupported_cdna3_score_carries_no_validation_guardrails():
     assert UNSUPPORTED_EVIDENCE_WARNING in report.warnings
     assert UNVALIDATED_HARDWARE_WARNING in report.warnings
     assert CDNA3_NO_VALIDATION_WARNING in report.warnings
+    assert "v1.5" not in CDNA3_NO_VALIDATION_WARNING
 
 
 def test_incomplete_score_inputs_are_reported_without_inventing_score():

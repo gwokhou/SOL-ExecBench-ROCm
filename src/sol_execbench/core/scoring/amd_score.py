@@ -33,8 +33,8 @@ UNVALIDATED_HARDWARE_WARNING = (
     "AMD hardware model is not validated; score is provisional derived evidence."
 )
 CDNA3_NO_VALIDATION_WARNING = (
-    "CDNA3 full-suite validation is excluded from v1.5; do not present this "
-    "report as a CDNA3 hardware-validation claim."
+    "CDNA3 full-suite validation has not been recorded for this ROCm port; do "
+    "not present this report as a CDNA3 hardware-validation claim."
 )
 
 

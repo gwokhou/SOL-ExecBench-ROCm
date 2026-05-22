@@ -131,8 +131,8 @@ port:
 4. AMD-native scoring requires an AMD SOL bound artifact with graph nodes,
    FLOP/byte evidence, hardware model source, confidence, and validation status
    before reporting AMD-native scores.
-5. CDNA 3 claims additionally require the deferred `gfx94*` full-suite
-   validation evidence.
+5. CDNA 3 claims additionally require real `gfx94*` full-suite validation
+   evidence, which is not part of the v1.6 milestone.
 
 AMD-native score reports are derived artifacts. They can reference trace timing,
 ROCm timing evidence, baseline summaries, and AMD SOL bound artifacts, but they
