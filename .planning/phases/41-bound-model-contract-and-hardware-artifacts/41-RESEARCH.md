@@ -415,22 +415,19 @@ def default_amd_hardware_models() -> dict[str, AmdHardwareModel]:
 | A3 | Architecture validation may become too permissive because schema-supported hardware targets differ from model-validated targets. | Common Pitfalls | Planner may accidentally keep `gfx942` as a default or mark CDNA 3 validated. |
 | A4 | Public contract tests may be weakened to match drift during derived artifact work. | Common Pitfalls | Canonical trace or CLI behavior could change unnoticed. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Should `AmdHardwareModel` expose both split statuses or keep a derived compatibility `validation_status` property?**
+1. **RESOLVED: Should `AmdHardwareModel` expose both split statuses or keep a derived compatibility `validation_status` property?**
    - What we know: v2 JSON must use split fields only, but existing tests and score code reference `hardware_model.validation_status`. [VERIFIED: codebase grep] [CITED: CONTEXT.md]
-   - What's unclear: Whether downstream compatibility should preserve a property, add new fields, or both.
-   - Recommendation: Add split dataclass fields and a compatibility property only if needed for existing score code; ensure `to_dict()` for v2 does not emit `validation_status`. [CITED: CONTEXT.md]
+   - Decision: Add split dataclass fields as the canonical public object state. Do not include `validation_status` in v2 JSON or `to_dict()` output. A derived compatibility property may exist only if required to keep existing internal score code working during Phase 41, and it must not serialize into v2 artifacts. [CITED: CONTEXT.md]
 
-2. **Should external artifacts for non-`gfx1200` be loadable but unvalidated, or rejected in Phase 41?**
+2. **RESOLVED: Should external artifacts for non-`gfx1200` be loadable but unvalidated, or rejected in Phase 41?**
    - What we know: Loader support for arbitrary external JSON path is required, and RDNA 4 `gfx1200` is the only v1.9 validation target. [CITED: CONTEXT.md]
-   - What's unclear: Whether a valid external `gfx942` artifact with `unvalidated` status should load.
-   - Recommendation: Allow external non-`gfx1200` only when statuses are not `validated`; keep packaged defaults to `gfx1200` only. [ASSUMED]
+   - Decision: Allow external non-`gfx1200` artifacts only when both status fields are non-`validated`; keep packaged defaults to `gfx1200` only. Reject non-`gfx1200` artifacts that claim v1.9 validation. [CITED: CONTEXT.md]
 
-3. **Does Hatchling include `src/sol_execbench/data/**/*.json` by default for this project?**
+3. **RESOLVED: Does Hatchling include `src/sol_execbench/data/**/*.json` by default for this project?**
    - What we know: Hatchling is the build backend and package-resource docs require resources to be packaged. [VERIFIED: pyproject.toml] [CITED: https://docs.python.org/3/library/importlib.resources.html]
-   - What's unclear: The current runtime does not have `hatchling` importable, and no build smoke was run during research. [VERIFIED: uv run python import]
-   - Recommendation: Planner should include a packaging/resource smoke test or explicit Hatchling include config if the smoke fails. [CITED: https://hatch.pypa.io/1.4/config/build/]
+   - Decision: Treat installed-package resource availability as mandatory execution verification. Plan 41-01 must include either a build/install resource smoke test or an explicit Hatchling include stanza plus artifact-content verification. [CITED: https://hatch.pypa.io/1.4/config/build/]
 
 ## Environment Availability
 
