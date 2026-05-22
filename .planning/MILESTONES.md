@@ -1,5 +1,36 @@
 # Milestones
 
+## v1.5 AMD-native SOL Scoring and ROCm Profiler Timing (Shipped: 2026-05-22)
+
+**Delivered:** AMD-native SOL bound and scoring foundations plus accuracy-first
+ROCm timing policy and profiler evidence helpers.
+
+**Phases completed:** 23-26 (4 phases, 4 plans)
+
+**Key accomplishments:**
+
+- Defined source-specific timing semantics for HIP native, Triton, PyTorch,
+  mixed, and unknown workloads without forcing a single inaccurate timing
+  interpretation.
+- Added `rocprofv3` timing evidence helpers with command construction, CSV
+  parsing, policy-aware default selection, and labeled fallback metadata.
+- Added AMD SOL bound artifacts with graph nodes, FLOP/byte estimates, hardware
+  model metadata, per-op bounds, aggregate bounds, and CDNA3 unvalidated status.
+- Added derived AMD-native per-workload and suite score reports with timing and
+  SOL-bound evidence references.
+- Preserved public CLI, schema, trace JSONL, eval-driver correctness, and
+  reward-hack contracts while documenting no NVIDIA B200/SOLAR/leaderboard
+  equivalence claim.
+
+**Known gaps:**
+
+- Real CDNA 3 `gfx94*` full-suite validation remains deferred by explicit user
+  instruction.
+- AMD SOL operator coverage is a conservative foundation; broader analyzers are
+  future work.
+
+---
+
 ## v1.4 hip-execbench Engineering Experience Adaptation + Validation Workflow Readiness (Shipped: 2026-05-22)
 
 **Phases completed:** 4 phases, 4 plans, 0 tasks
