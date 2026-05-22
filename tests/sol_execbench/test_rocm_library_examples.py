@@ -171,6 +171,61 @@ def test_hipblas_example_stages_through_native_packager(tmp_path):
     assert "-lhipblas" in staged_solution["spec"]["compile_options"]["ld_flags"]
 
 
+def test_remaining_rocm_library_categories_stage_through_native_packager(tmp_path):
+    example_dir = REPO_ROOT / "examples/hipblas/gemm"
+    definition = Definition(**_load_solution(example_dir / "definition.json"))
+    workload = Workload(**json.loads((example_dir / "workload.jsonl").read_text()))
+
+    for language, source_path, include_text, link_flags in (
+        ("miopen", "main.cpp", "#include <miopen/miopen.h>\n", ["-lMIOpen"]),
+        ("ck", "kernel.hip", "#include <ck/ck.hpp>\n", []),
+        ("rocwmma", "kernel.hip", "#include <rocwmma/rocwmma.hpp>\n", []),
+    ):
+        solution = Solution(
+            **{
+                "name": f"staging_{language}",
+                "definition": definition.name,
+                "author": "test",
+                "description": f"Staging-only {language} solution.",
+                "spec": {
+                    "languages": [language],
+                    "target_hardware": ["gfx1200"],
+                    "entry_point": f"{source_path}::run",
+                    "destination_passing_style": False,
+                    "compile_options": {
+                        "hip_cflags": ["-O3"],
+                        "ld_flags": link_flags,
+                    },
+                },
+                "sources": [
+                    {
+                        "path": source_path,
+                        "content": include_text
+                        + "void run() {}\n",
+                    }
+                ],
+            }
+        )
+        output_dir = tmp_path / language
+        packager = ProblemPackager(
+            definition=definition,
+            workloads=[workload],
+            solution=solution,
+            config=BenchmarkConfig(lock_clocks=False),
+            output_dir=output_dir,
+            keep_output_dir=True,
+        )
+
+        command, artifact_path = packager.compile()
+
+        assert command == ["python", "build_ext.py"]
+        assert artifact_path == str(output_dir / "benchmark_kernel.so")
+        assert (output_dir / source_path).exists()
+        staged_solution = json.loads((output_dir / "solution.json").read_text())
+        assert staged_solution["spec"]["languages"] == [language]
+        assert staged_solution["spec"]["compile_options"]["ld_flags"] == link_flags
+
+
 def test_replacement_decisions_cover_named_rocm_libraries():
     text = REPLACEMENT_DOC.read_text()
     for library in (

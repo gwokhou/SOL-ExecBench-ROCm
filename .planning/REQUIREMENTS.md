@@ -8,10 +8,10 @@
 
 ### Library Build Plumbing
 
-- [ ] **BUILD-01**: Maintainer can verify MIOpen, Composable Kernel, and rocWMMA dependency availability with clear missing-header or missing-library diagnostics.
-- [ ] **BUILD-02**: Native library solutions can express required include, compiler, and linker flags through existing solution compile metadata without changing public schema fields.
-- [ ] **BUILD-03**: Docker/runtime documentation lists the ROCm packages or files required for MIOpen, Composable Kernel, rocWMMA, and hipBLAS examples.
-- [ ] **BUILD-04**: Build and packaging tests prove `miopen`, `ck`, and `rocwmma` solutions stage through the native ROCm compile path rather than compatibility-only Python paths.
+- [x] **BUILD-01**: Maintainer can verify MIOpen, Composable Kernel, and rocWMMA dependency availability with clear missing-header or missing-library diagnostics.
+- [x] **BUILD-02**: Native library solutions can express required include, compiler, and linker flags through existing solution compile metadata without changing public schema fields.
+- [x] **BUILD-03**: Docker/runtime documentation lists the ROCm packages or files required for MIOpen, Composable Kernel, rocWMMA, and hipBLAS examples.
+- [x] **BUILD-04**: Build and packaging tests prove `miopen`, `ck`, and `rocwmma` solutions stage through the native ROCm compile path rather than compatibility-only Python paths.
 
 ### MIOpen Replacement
 
@@ -77,10 +77,10 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BUILD-01 | Phase 36 | Pending |
-| BUILD-02 | Phase 36 | Pending |
-| BUILD-03 | Phase 36 | Pending |
-| BUILD-04 | Phase 36 | Pending |
+| BUILD-01 | Phase 36 | Complete |
+| BUILD-02 | Phase 36 | Complete |
+| BUILD-03 | Phase 36 | Complete |
+| BUILD-04 | Phase 36 | Complete |
 | MIOPEN-01 | Phase 37 | Pending |
 | MIOPEN-02 | Phase 37 | Pending |
 | MIOPEN-03 | Phase 37 | Pending |
@@ -108,4 +108,4 @@
 
 ---
 *Requirements defined: 2026-05-22*
-*Last updated: 2026-05-22 after v1.8 milestone initialization*
+*Last updated: 2026-05-22 after Phase 36 completion*

@@ -4,21 +4,21 @@ milestone: v1.8
 milestone_name: ROCm Library Ecosystem Completion
 status: planning
 last_updated: "2026-05-22T14:17:57.947Z"
-last_activity: 2026-05-22
+last_activity: 2026-05-22 — Phase 36 completed
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 5
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
+  percent: 20
 ---
 
 # Project State
 
 **Project:** SOL ExecBench ROCm Port
 **Initialized:** 2026-05-21
-**Current phase:** none
-**Status:** Defining requirements for v1.8 ROCm Library Ecosystem Completion
+**Current phase:** 37
+**Status:** Phase 36 complete; ready for Phase 37
 
 ## Project Reference
 
@@ -87,15 +87,15 @@ Items acknowledged and deferred at milestone close on 2026-05-21:
 
 ## Next Action
 
-Plan Phase 36: Library Build Plumbing and Diagnostics.
+Plan Phase 37: MIOpen Supported Replacement.
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 37
 Plan: —
-Status: Defining requirements
-Last activity: 2026-05-22 — Milestone v1.8 started
+Status: Ready for planning
+Last activity: 2026-05-22 — Phase 36 completed
 
 ## Operator Next Steps
 
-- Start Phase 36 with /gsd-plan-phase 36
+- Start Phase 37 with /gsd-plan-phase 37

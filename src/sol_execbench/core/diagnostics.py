@@ -12,8 +12,10 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import ctypes.util
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 from collections.abc import Mapping
 from typing import Callable
 
@@ -104,6 +106,94 @@ class ValidationReadiness:
             "acceptance_criteria": list(self.acceptance_criteria),
             "blockers": list(self.blockers),
         }
+
+
+@dataclass(frozen=True)
+class RocmLibrarySpec:
+    """Filesystem-level requirements for one ROCm library category."""
+
+    name: str
+    headers: tuple[str, ...]
+    libraries: tuple[str, ...]
+    packages: tuple[str, ...]
+    hint: str
+
+
+@dataclass(frozen=True)
+class RocmLibraryReadiness:
+    """Readiness result for a ROCm library dependency group."""
+
+    spec: RocmLibrarySpec
+    header_paths: tuple[str, ...]
+    library_paths: tuple[str, ...]
+    missing_headers: tuple[str, ...]
+    missing_libraries: tuple[str, ...]
+
+    @property
+    def ready(self) -> bool:
+        """Whether all required headers and libraries were found."""
+        return not self.missing_headers and not self.missing_libraries
+
+    @property
+    def status(self) -> str:
+        """Short readiness label."""
+        return "available" if self.ready else "missing"
+
+    def to_diagnostic(self) -> StageDiagnostic:
+        """Return a stage diagnostic with actionable missing dependency detail."""
+        if self.ready:
+            return StageDiagnostic(
+                stage=DiagnosticStage.ENVIRONMENT,
+                status="available",
+                message=f"{self.spec.name} library dependencies found",
+            )
+
+        missing: list[str] = []
+        if self.missing_headers:
+            missing.append("headers: " + ", ".join(self.missing_headers))
+        if self.missing_libraries:
+            missing.append("libraries: " + ", ".join(self.missing_libraries))
+        return StageDiagnostic(
+            stage=DiagnosticStage.ENVIRONMENT,
+            status="missing",
+            message=f"{self.spec.name} missing " + "; ".join(missing),
+            hint=self.spec.hint,
+        )
+
+
+ROCM_LIBRARY_SPECS: dict[str, RocmLibrarySpec] = {
+    "hipblas": RocmLibrarySpec(
+        name="hipBLAS",
+        headers=("hipblas/hipblas.h",),
+        libraries=("hipblas",),
+        packages=("hipblas", "hipblas-dev"),
+        hint="Install hipBLAS development files from the ROCm distribution.",
+    ),
+    "miopen": RocmLibrarySpec(
+        name="MIOpen",
+        headers=("miopen/miopen.h",),
+        libraries=("MIOpen", "miopen"),
+        packages=("miopen-hip", "miopen-hip-dev"),
+        hint="Install MIOpen HIP development files from the ROCm distribution.",
+    ),
+    "ck": RocmLibrarySpec(
+        name="Composable Kernel",
+        headers=("ck/ck.hpp",),
+        libraries=(),
+        packages=("composablekernel-dev", "composable-kernel"),
+        hint=(
+            "Install Composable Kernel headers, usually from the ROCm "
+            "rocm-libraries or composable-kernel package."
+        ),
+    ),
+    "rocwmma": RocmLibrarySpec(
+        name="rocWMMA",
+        headers=("rocwmma/rocwmma.hpp",),
+        libraries=(),
+        packages=("rocwmma-dev", "rocwmma"),
+        hint="Install rocWMMA development headers from the ROCm distribution.",
+    ),
+}
 
 
 CDNA3_VALIDATION_COMMANDS: tuple[str, ...] = (
@@ -345,6 +435,124 @@ def rocm_tool_diagnostics(
             )
         )
     return diagnostics
+
+
+def _default_rocm_roots() -> tuple[Path, ...]:
+    roots = [Path("/opt/rocm")]
+    for candidate in (Path("/usr"), Path("/usr/local")):
+        if candidate.exists():
+            roots.append(candidate)
+    return tuple(roots)
+
+
+def _find_header(
+    header: str,
+    roots: tuple[Path, ...],
+    *,
+    exists: Callable[[Path], bool] = Path.exists,
+) -> str | None:
+    for root in roots:
+        for prefix in ("include", ""):
+            candidate = root / prefix / header if prefix else root / header
+            if exists(candidate):
+                return str(candidate)
+    return None
+
+
+def _find_library(
+    library: str,
+    roots: tuple[Path, ...],
+    *,
+    find_library: Callable[[str], str | None] = ctypes.util.find_library,
+    exists: Callable[[Path], bool] = Path.exists,
+) -> str | None:
+    found = find_library(library)
+    if found:
+        return found
+
+    names = (
+        library,
+        f"lib{library}.so",
+        f"lib{library}.so.0",
+        f"lib{library}.so.1",
+    )
+    for root in roots:
+        for lib_dir in ("lib", "lib64", ""):
+            base = root / lib_dir if lib_dir else root
+            for name in names:
+                candidate = base / name
+                if exists(candidate):
+                    return str(candidate)
+    return None
+
+
+def rocm_library_readiness(
+    key: str,
+    *,
+    roots: tuple[Path, ...] | None = None,
+    find_library: Callable[[str], str | None] = ctypes.util.find_library,
+    exists: Callable[[Path], bool] = Path.exists,
+) -> RocmLibraryReadiness:
+    """Return header/library readiness for one ROCm library category."""
+    try:
+        spec = ROCM_LIBRARY_SPECS[key]
+    except KeyError as exc:
+        raise SolExecBenchError(
+            DiagnosticStage.ENVIRONMENT,
+            f"unknown ROCm library dependency key: {key}",
+            hint="Use one of: " + ", ".join(sorted(ROCM_LIBRARY_SPECS)),
+        ) from exc
+
+    search_roots = roots or _default_rocm_roots()
+    header_paths: list[str] = []
+    missing_headers: list[str] = []
+    for header in spec.headers:
+        path = _find_header(header, search_roots, exists=exists)
+        if path:
+            header_paths.append(path)
+        else:
+            missing_headers.append(header)
+
+    library_paths: list[str] = []
+    missing_libraries: list[str] = []
+    for library in spec.libraries:
+        path = _find_library(
+            library,
+            search_roots,
+            find_library=find_library,
+            exists=exists,
+        )
+        if path:
+            library_paths.append(path)
+        else:
+            missing_libraries.append(library)
+
+    return RocmLibraryReadiness(
+        spec=spec,
+        header_paths=tuple(header_paths),
+        library_paths=tuple(library_paths),
+        missing_headers=tuple(missing_headers),
+        missing_libraries=tuple(missing_libraries),
+    )
+
+
+def rocm_library_diagnostics(
+    keys: tuple[str, ...] = ("hipblas", "miopen", "ck", "rocwmma"),
+    *,
+    roots: tuple[Path, ...] | None = None,
+    find_library: Callable[[str], str | None] = ctypes.util.find_library,
+    exists: Callable[[Path], bool] = Path.exists,
+) -> list[StageDiagnostic]:
+    """Return actionable diagnostics for ROCm library example dependencies."""
+    return [
+        rocm_library_readiness(
+            key,
+            roots=roots,
+            find_library=find_library,
+            exists=exists,
+        ).to_diagnostic()
+        for key in keys
+    ]
 
 
 def local_gfx_target(

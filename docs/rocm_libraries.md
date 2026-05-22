@@ -48,6 +48,22 @@ the old directory name for discoverability.
 | --- | --- | --- |
 | hipBLAS | `examples/hipblas/gemm/` | `solution_hipblas.json` uses schema language `hipblas`, includes `hipblas/hipblas.h`, calls `hipblasSgemm`, and links with `-lhipblas`. |
 
+## Dependency Diagnostics
+
+The Docker dependency suite checks the development files needed by runnable
+library examples. The expected ROCm package or file groups are:
+
+| Category | Required headers | Required libraries | Typical ROCm packages |
+| --- | --- | --- | --- |
+| hipBLAS | `hipblas/hipblas.h` | `libhipblas.so` | `hipblas`, `hipblas-dev` |
+| MIOpen | `miopen/miopen.h` | `libMIOpen.so` | `miopen-hip`, `miopen-hip-dev` |
+| Composable Kernel | `ck/ck.hpp` | Header-only for the planned example path | `composablekernel-dev` or ROCm `rocm-libraries` headers |
+| rocWMMA | `rocwmma/rocwmma.hpp` | Header-only for the planned example path | `rocwmma-dev`, `rocwmma` |
+
+Missing headers and libraries are reported through
+`sol_execbench.core.diagnostics.rocm_library_diagnostics()` so failures name the
+specific dependency group instead of surfacing as opaque compile errors.
+
 ## User Guidance
 
 - Use `hip_cpp`, `hipblas`, `pytorch`, or `triton` for runnable examples today.
@@ -55,5 +71,6 @@ the old directory name for discoverability.
   environment actually provide the required library integration.
 - Do not treat candidate categories as evidence of performance portability from
   NVIDIA libraries.
-- CDNA 3 metadata in examples remains schema/build intent, not real hardware
-  validation evidence.
+- v1.8 library validation is scoped to RDNA 4 only. CDNA 3 and CDNA 4 metadata
+  remains schema/build intent until real hardware evidence is recorded in a
+  later milestone.

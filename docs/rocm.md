@@ -10,6 +10,9 @@ ROCm 7.1 wheels.
 - `rocminfo` can see at least one AMD GPU agent.
 - `rocm-smi` or `amd-smi` is available for hardware inspection.
 - `hipcc` is available when building HIP/C++ solutions.
+- ROCm library development headers are installed when running native library
+  examples: `hipblas/hipblas.h`, `miopen/miopen.h`, `ck/ck.hpp`, and
+  `rocwmma/rocwmma.hpp` for the supported/planned library categories.
 
 Quick host checks:
 
@@ -17,6 +20,7 @@ Quick host checks:
 rocminfo
 rocm-smi
 hipcc --version
+find /opt/rocm/include -maxdepth 3 \( -path '*hipblas/hipblas.h' -o -path '*miopen/miopen.h' -o -path '*ck/ck.hpp' -o -path '*rocwmma/rocwmma.hpp' \)
 ```
 
 ## Python Environment
@@ -65,6 +69,22 @@ requires the native Linux Docker daemon. It runs containers with:
 The image is based on `rocm/dev-ubuntu-24.04:7.1.1-complete` and installs the
 project into `/venv`.
 
+## ROCm Library Dependencies
+
+Runnable native library examples rely on ROCm development packages in addition
+to HIP itself:
+
+| Library category | Headers | Link/runtime library | Notes |
+| --- | --- | --- | --- |
+| hipBLAS | `hipblas/hipblas.h` | `-lhipblas` | Supported by the existing SGEMM example. |
+| MIOpen | `miopen/miopen.h` | `-lMIOpen` | Planned v1.8 replacement path for softmax/cuDNN-style examples. |
+| Composable Kernel | `ck/ck.hpp` | Header-driven for the planned example path | Planned v1.8 replacement path for selected GEMM/fused GEMM examples. |
+| rocWMMA | `rocwmma/rocwmma.hpp` | Header-driven for the planned example path | Planned v1.8 matrix-core GEMM replacement path on RDNA 4. |
+
+Run `uv run pytest tests/docker/dependencies/test_rocm_libraries.py` inside the
+ROCm container to check these dependencies before attempting the library
+examples.
+
 ## Clock Locking
 
 `--lock-clocks` requires ROCm clock tooling to be available through
@@ -87,9 +107,13 @@ Validation recorded in this milestone:
 | --- | --- | --- |
 | RDNA 4 | `gfx1200` | Full adapted suite passed locally. |
 | CDNA 3 | `gfx940`, `gfx941`, `gfx942` (`gfx94*`) | Code/schema support present; MI300X (`gfx942`) validation is prepared but deferred. Do not claim hardware validation until a full suite run and required evidence are recorded. |
+| CDNA 4 | future `gfx95*` class targets | Validation deferred; not a v1.8 completion gate. |
 
 The missing CDNA 3 evidence is a real AMD Instinct MI300X (`gfx942`) run of the
 full adapted pytest suite, with logs, clock-lock evidence, dataset artifacts,
 and hardware/software environment details recorded before the support matrix is
 upgraded to hardware-validated. FP8 validation is expected on MI300X once
 hardware access exists; NVFP4/MXFP4 validation remains deferred.
+
+The v1.8 ROCm library ecosystem milestone uses RDNA 4 validation only. CDNA 3
+and CDNA 4 library validation remain future work.
