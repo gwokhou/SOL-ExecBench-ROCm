@@ -31,7 +31,7 @@ scope for this ROCm-only fork.
 | PyTorch | `pytorch` | Ported | PyTorch ROCm through the historical `torch.cuda` compatibility namespace. |
 | Triton | `triton` | Ported | Triton ROCm environment. |
 | CUDA C++ | `cuda_cpp` | Replaced | `hip_cpp` native extension path. |
-| cuBLAS | `cublas` | Candidate replacement | `hipblas`/hipBLASLt category; must be documented as supported only when runnable examples and tests exist. |
+| cuBLAS | `cublas` | Replaced | `hipblas` is supported with runnable SGEMM example coverage; hipBLASLt remains a future replacement direction. |
 | cuDNN C++ | `cudnn` | Candidate replacement | `miopen` or HIP/Triton fallback. |
 | cuDNN frontend | `cudnn_frontend` | Candidate replacement | `miopen` or HIP/Triton fallback; no direct Python frontend parity is claimed. |
 | CUTLASS | `cutlass` | Candidate replacement | `ck`, `rocwmma`, HIP, or Triton ROCm. |

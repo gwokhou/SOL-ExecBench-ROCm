@@ -14,14 +14,15 @@ ROCm port supports NVIDIA runtime execution.
 Runtime and development dependencies are declared in `pyproject.toml` and
 locked in `uv.lock`. Important dependency families include:
 
-| Dependency family | Purpose |
+| Dependency family or configuration | Purpose |
 | --- | --- |
 | PyTorch ROCm / torchvision ROCm | Tensor runtime, reference execution, HIP-backed extension builds. |
 | Triton ROCm | Triton kernel examples and evaluation. |
 | ROCm runtime and tools | HIP compiler, `rocminfo`, `rocm-smi`, `rocprofv3`, AMD GPU runtime libraries. |
 | Pydantic, Click, Rich | Schemas and CLI. |
 | safetensors, datasets | Benchmark input loading and dataset workflows. |
-| pytest, pytest-xdist, Ruff | Test and development tooling. |
+| pytest, pytest-xdist | Test execution and parallelization tooling. |
+| `tool.ruff` configuration | Linting and formatting policy declared in `pyproject.toml`; Ruff itself is not declared as a package dependency in this checkout. |
 
 Review each package's upstream license before redistributing binaries or
 container images that include those dependencies.

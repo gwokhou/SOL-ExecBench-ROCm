@@ -1,6 +1,6 @@
 # Trace Schema
 
-A Trace is an immutable record for one workload evaluation. It links a
+A Trace is the record model for one workload evaluation. It links a
 Solution, Definition, concrete Workload, correctness result, performance
 measurement, and ROCm environment snapshot.
 

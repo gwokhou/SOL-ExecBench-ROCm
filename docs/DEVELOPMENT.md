@@ -20,7 +20,8 @@ cd SOL-ExecBench-ROCm
 uv sync --all-groups
 ```
 
-3. Run the test suite or a focused test before editing behavior.
+3. Run the test suite or a focused test before editing behavior. Pytest is
+   configured to use `pytest-xdist` with `-n auto --dist loadgroup`.
 
 ```bash
 uv run pytest tests/
@@ -39,12 +40,16 @@ uv run pytest tests/
 | --- | --- |
 | `uv sync --all-groups` | Install runtime and development dependencies. |
 | `uv run sol-execbench <problem_dir> --solution solution.json` | Run the benchmark CLI against one problem. |
+| `uv run sol-execbench-baseline <problem_dir>` | Run the baseline CLI entry point. |
 | `uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark --limit 5` | Run a small dataset batch. |
 | `uv run pytest tests/` | Run the full adapted pytest suite. |
 | `uv run pytest tests/sol_execbench/test_e2e.py` | Run one focused test file. |
 | `uv run ruff check .` | Run lint checks. |
 | `uv run ruff format .` | Format Python files. |
 | `./scripts/run_docker.sh --build` | Build and enter the ROCm Docker environment. |
+
+There is no dedicated package build script in `pyproject.toml`; the package uses
+Hatchling as its build backend.
 
 ## Code Style
 
@@ -57,6 +62,8 @@ Ruff is the configured linting and formatting tool. The configuration lives in
 - Keep changes consistent with nearby modules and avoid broad refactors in
   focused fixes.
 - Generated data, downloaded datasets, and examples are excluded from Ruff.
+- PyTorch and torchvision resolve from the ROCm 7.1 wheel index on Linux and
+  Windows through `tool.uv.sources`.
 
 Run style checks with:
 
@@ -67,9 +74,10 @@ uv run ruff format .
 
 ## Branch Conventions
 
-No branch naming convention is defined in repository configuration. The
-contribution guide requires that changes start from an approved issue and that
-commit titles use this format:
+No branch naming convention is defined in repository configuration, and there is
+no `.github/PULL_REQUEST_TEMPLATE.md` file in this checkout. The contribution
+guide requires that changes start from an approved issue and that commit titles
+use this format:
 
 ```text
 #<Issue Number> - <Commit Title>
@@ -86,11 +94,27 @@ git commit -s -m "#123 - Fix trace parsing"
 The root `CONTRIBUTING.md` describes the contribution process. In practice:
 
 - Start from an approved GitHub issue before opening a code contribution.
+- Fork the repository, push changes to a branch on the fork, and open a pull
+  request from that branch.
 - Keep pull requests focused on one concern.
 - Include tests and documentation for new components.
 - Run relevant pytest and Ruff checks before requesting review.
 - Sign commits with `git commit -s`.
+- Ensure local build and test logs are clean before submitting.
 - Document any ROCm hardware assumptions in tests or PR notes.
+
+## Test Markers For Development
+
+The pytest marker definitions live in `pyproject.toml`, with additional runtime
+skip behavior in `tests/conftest.py`.
+
+| Marker | Purpose |
+| --- | --- |
+| `cpp` | Marks tests that compile HIP/C++ extensions and require the ROCm compiler toolchain. |
+| `requires_rocm` | Marks tests that require a ROCm GPU visible through PyTorch. |
+| `requires_rdna4` | Marks tests that require an AMD RDNA 4 GPU such as `gfx1200`. |
+| `requires_cdna3` | Marks tests that require an AMD CDNA 3 GPU such as `gfx942`. |
+| `requires_cutile` | Legacy NVIDIA cuTile marker that is skipped in this ROCm-only port. |
 
 ## Source Areas
 
@@ -103,4 +127,3 @@ The root `CONTRIBUTING.md` describes the contribution process. In practice:
 | `tests/sol_execbench/` | Package-level unit, integration, and migration tests. |
 | `tests/examples/` | Example consistency coverage. |
 | `tests/docker/dependencies/` | Docker dependency readiness checks. |
-
