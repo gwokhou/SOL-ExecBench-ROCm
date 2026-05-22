@@ -148,10 +148,42 @@ uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
 ```
 
 The report is opt-in. It reads canonical trace output and derived AMD SOL bound
-inputs, uses trace reference latency as the baseline when available, and records
-trace, timing, SOL-bound, baseline, and hardware-model evidence references for
-each workload score. Missing timing, baseline, or bound evidence is reported as
-an unscored guarded state rather than an invented score.
+inputs, records trace, timing, SOL-bound, baseline, and hardware-model evidence
+references for each workload score, and keeps the output separate from canonical
+trace JSONL. Missing timing, baseline, or bound evidence is reported as an
+unscored guarded state rather than an invented score.
+
+For release-defined scoring, provide an optimized scoring baseline artifact:
+
+```bash
+uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
+  --limit 5 \
+  --amd-score-report out/amd-score-report.json \
+  --scoring-baseline baselines/v1.7.json
+```
+
+Baseline artifacts are derived JSON inputs keyed by definition and workload UUID:
+
+```json
+{
+  "schema_version": "sol_execbench.scoring_baseline.v1",
+  "release": "v1.7",
+  "entries": [
+    {
+      "definition": "example_problem",
+      "workload_uuid": "workload-uuid",
+      "latency_ms": 0.123,
+      "solution": "optimized_baseline"
+    }
+  ]
+}
+```
+
+When no matching scoring baseline artifact entry exists, AMD-native reports may
+fall back to `trace.evaluation.performance.reference_latency_ms`, but the score
+is labeled with `baseline_source: reference_latency` and carries a provisional
+baseline warning. Treat `baseline_source: scoring_baseline` as the release-style
+path; treat `reference_latency` as a development fallback.
 
 ## AMD SOL Coverage Semantics
 

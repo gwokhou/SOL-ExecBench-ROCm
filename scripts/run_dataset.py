@@ -48,6 +48,10 @@ from sol_execbench.core.scoring.amd_score import (
     build_amd_native_suite_report,
     score_amd_native_trace_workload,
 )
+from sol_execbench.core.scoring.baseline_artifact import (
+    ScoringBaselineArtifact,
+    load_scoring_baseline_artifact,
+)
 from sol_execbench.core.scoring.amd_sol import (
     build_amd_sol_bound_artifact,
     default_amd_hardware_models,
@@ -375,6 +379,7 @@ def build_amd_score_reports_for_problem(
     workload_path: Path,
     traces_payload: list[dict],
     trace_ref: str,
+    baseline_artifact: ScoringBaselineArtifact | None = None,
 ) -> list[AmdNativeScore]:
     """Build derived AMD-native scores for one dataset-run problem."""
     definition = Definition(**definition_payload)
@@ -406,7 +411,14 @@ def build_amd_score_reports_for_problem(
                 trace_ref=trace_ref,
                 timing_evidence_ref=trace_ref,
                 sol_bound_ref=f"derived:{definition.name}:{trace.workload.uuid}:amd_sol_bound",
-                baseline_ref="trace.evaluation.performance.reference_latency_ms",
+                baseline_ref=(
+                    f"{baseline_artifact.source}#{definition.name}:{trace.workload.uuid}"
+                    if baseline_artifact
+                    and baseline_artifact.lookup(definition.name, trace.workload.uuid)
+                    is not None
+                    else "trace.evaluation.performance.reference_latency_ms"
+                ),
+                baseline_artifact=baseline_artifact,
                 hardware_model_ref=f"default_amd_hardware_models.{hardware_model_key}",
             )
         )
@@ -499,6 +511,16 @@ def main():
         default=None,
         help="Optional path for a derived AMD-native suite score JSON report.",
     )
+    ap.add_argument(
+        "--scoring-baseline",
+        type=Path,
+        default=None,
+        help=(
+            "Optional release-defined scoring baseline artifact JSON for "
+            "--amd-score-report. Without it, reference latency is used as a "
+            "provisional fallback."
+        ),
+    )
     args = ap.parse_args()
 
     problems_dir = args.problems_dir.resolve()
@@ -537,6 +559,11 @@ def main():
 
     summaries = []
     amd_scores: list[AmdNativeScore] = []
+    scoring_baseline = (
+        load_scoring_baseline_artifact(args.scoring_baseline)
+        if args.scoring_baseline is not None
+        else None
+    )
     for i, problem_dir in enumerate(problems):
         problem_name = problem_dir.name
         category = problem_dir.parent.name
@@ -631,6 +658,7 @@ def main():
                     workload_path=workload_path,
                     traces_payload=traces,
                     trace_ref=str(traces_path.relative_to(output_dir)),
+                    baseline_artifact=scoring_baseline,
                 )
             )
 
@@ -662,6 +690,9 @@ def main():
             baseline_summary={
                 "problems": len(summaries),
                 "scores": len(amd_scores),
+                "baseline_entries": (
+                    len(scoring_baseline.entries) if scoring_baseline else 0
+                ),
             },
         )
         report_path.write_text(json.dumps(report.to_dict(), indent=2))

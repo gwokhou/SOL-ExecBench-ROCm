@@ -12,7 +12,7 @@ timing workflow, reward-hack defenses, and runnable ROCm library migration.
 
 | Phase | Name | Goal | Requirements |
 |-------|------|------|--------------|
-| 31 | Optimized Scoring Baseline Semantics | Add release-defined baseline artifacts and wire them into AMD-native scoring without mutating canonical traces. | BASE-01, BASE-02, BASE-03, BASE-04 |
+| 31 | Optimized Scoring Baseline Semantics | Complete 2026-05-22: Added release-defined baseline artifacts and wired them into AMD-native scoring without mutating canonical traces. | BASE-01, BASE-02, BASE-03, BASE-04 |
 | 32 | Source-Specific Profiler Timing Workflow | Promote `rocprofv3` timing from helper evidence to an end-to-end selectable timing path with explicit fallback metadata. | TIME-01, TIME-02, TIME-03, TIME-04 |
 | 33 | Reward-Hack Defense Expansion | Extend dynamic and static checks to cover remaining exploit families that can distort correctness or timing. | HACK-01, HACK-02, HACK-03, HACK-04, HACK-05 |
 | 34 | ROCm Library Category Migration | Move priority ROCm library categories from candidate-only status toward runnable examples, build checks, and accurate support docs. | LIB-01, LIB-02, LIB-03, LIB-04, LIB-05 |
@@ -24,7 +24,7 @@ timing workflow, reward-hack defenses, and runnable ROCm library migration.
 
 ### Phase 31: Optimized Scoring Baseline Semantics
 
-**Status:** Planned
+**Status:** Complete 2026-05-22
 
 **Goal:** Add release-defined baseline artifacts and wire them into AMD-native
 scoring without mutating canonical trace JSONL.
@@ -50,7 +50,12 @@ scoring without mutating canonical trace JSONL.
 - Avoid implying that PyTorch reference latency is the paper-style optimized
   scoring baseline.
 
-**Plans:** 0 plans
+**Plans:** 1 plan
+
+Plans:
+
+- [x] 31-01: Add scoring baseline artifacts, explicit baseline source
+  semantics, dataset integration, docs, and focused tests.
 
 ### Phase 32: Source-Specific Profiler Timing Workflow
 
@@ -196,10 +201,10 @@ and no-claim protections for later hardware runs.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BASE-01 | Phase 31 | Pending |
-| BASE-02 | Phase 31 | Pending |
-| BASE-03 | Phase 31 | Pending |
-| BASE-04 | Phase 31 | Pending |
+| BASE-01 | Phase 31 | Complete |
+| BASE-02 | Phase 31 | Complete |
+| BASE-03 | Phase 31 | Complete |
+| BASE-04 | Phase 31 | Complete |
 | TIME-01 | Phase 32 | Pending |
 | TIME-02 | Phase 32 | Pending |
 | TIME-03 | Phase 32 | Pending |
