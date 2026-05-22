@@ -162,6 +162,67 @@
 
 ---
 
+## Milestone: v1.7 - Baseline, Timing, Reward-Hack Hardening, and ROCm Library Migration
+
+**Shipped:** 2026-05-22
+**Phases:** 5 | **Plans:** 5 | **Tasks:** 0
+
+### What Was Built
+
+- Release-scoped optimized scoring baseline artifacts with explicit
+  `baseline_source` reporting and dataset-runner integration.
+- Source-specific `rocprofv3` timing evidence collection with backend,
+  aggregation, warmup, clock-lock, architecture, and fallback metadata.
+- Static reward-hack source review before submitted Python import for stream
+  hiding, semantic caches, unauthorized loaders, opaque payloads, and precision
+  downgrade patterns.
+- A runnable hipBLAS SGEMM public example with native staging tests and support
+  docs distinguishing supported and candidate ROCm library categories.
+- MI300X validation handoff docs and evidence gates that prevent premature
+  CDNA3/MI300X hardware-validation claims.
+
+### What Worked
+
+- Keeping scoring baselines and timing evidence as derived artifacts preserved
+  canonical trace JSONL while improving auditability.
+- The reward-hack source review was integrated before execution, which reduced
+  subprocess failure ambiguity and kept findings in existing `REWARD_HACK`
+  semantics.
+- Promoting only hipBLAS to supported status avoided overclaiming MIOpen, CK,
+  and rocWMMA without blocking future migration.
+
+### What Was Inefficient
+
+- Automatic milestone accomplishment extraction still produced generic
+  `Completed:` entries, requiring manual rewrite during closure.
+- Formal Nyquist `*-VALIDATION.md` artifacts were absent for Phases 31-35, so
+  the milestone audit recorded this as discovery-only.
+
+### Patterns Established
+
+- Label every AMD-native score with its baseline source.
+- Record timer backend and fallback reason as first-class timing evidence.
+- Separate validation readiness from validation claims through pure evidence
+  gates and public-contract tests.
+
+### Key Lessons
+
+1. ROCm-only parity reviews should remove NVIDIA hardware expectations from the
+   missing-feature list while preserving original benchmark semantics.
+2. Library category support should advance one runnable, tested path at a time;
+   candidate categories need tests that prevent public overclaiming.
+3. MI300X/FP8 validation can be prepared before hardware access, but status
+   upgrades must remain gated by full-suite evidence.
+
+### Cost Observations
+
+- Model mix: not recorded.
+- Sessions: 1 autonomous session plus audit and milestone completion.
+- Notable: the final audit aggregate covered 67 focused tests across scoring,
+  profiler timing, reward-hack review, hipBLAS examples, and MI300X guardrails.
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -171,6 +232,7 @@
 | v1.0 | not recorded | 6 | Established ROCm-only milestone workflow with phase verification, validation artifacts, and hardware matrix evidence |
 | v1.2 | 1 | 4 | Added practice-harvest workflow with explicit public-contract guardrails |
 | v1.5 | 1 | 4 | Added AMD-native timing/SOL/scoring evidence layers while preserving public contracts |
+| v1.7 | 1 | 5 | Added baseline/timing/reward-hack/library/MI300X readiness hardening before real commercial GPU validation |
 
 ### Cumulative Quality
 
@@ -179,6 +241,7 @@
 | v1.0 | 462 passed, 58 skipped on RDNA 4 | v1 requirements 38/39 complete, 1 deferred | TEST-05 CDNA 3 full-suite validation |
 | v1.2 | 16 focused tests passed; ruff clean | v1.2 requirements 14/14 complete | CDNA 3 real hardware validation; AMD-native scoring model |
 | v1.5 | 42 focused milestone tests passed; ruff clean | v1.5 requirements 20/20 complete | Real CDNA 3 hardware validation; broader AMD SOL operator coverage |
+| v1.7 | 67 focused audit tests passed | v1.7 requirements 21/21 complete | MI300X/CDNA3 full-suite validation; FP8 real-hardware validation; paper extraction; full SOLAR parity |
 
 ### Top Lessons
 

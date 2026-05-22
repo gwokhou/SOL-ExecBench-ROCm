@@ -2,9 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.7
 milestone_name: Baseline, Timing, Reward-Hack Hardening, and ROCm Library Migration
-status: planning
-last_updated: "2026-05-22T15:05:00.000Z"
-last_activity: 2026-05-22 — Phase 35 completed; v1.7 implementation complete
+current_phase: none
+status: completed
+last_updated: "2026-05-22T13:05:49.227Z"
+last_activity: 2026-05-22 — Milestone v1.7 completed and archived
 progress:
   total_phases: 5
   completed_phases: 5
@@ -18,14 +19,14 @@ progress:
 **Project:** SOL ExecBench ROCm Port
 **Initialized:** 2026-05-21
 **Current phase:** none
-**Status:** v1.7 implementation complete
+**Status:** v1.7 milestone complete
 
 ## Project Reference
 
 See: `.planning/PROJECT.md` (updated 2026-05-22)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** v1.7 implementation complete; ready for milestone audit or completion
+**Current focus:** Planning next milestone.
 
 ## Workflow Settings
 
@@ -42,7 +43,7 @@ See: `.planning/config.json`
 
 See: `.planning/ROADMAP.md`
 
-v1.7 roadmap is active with Phases 31-35.
+v1.7 is archived; no active roadmap is open.
 
 ## Memory
 
@@ -72,6 +73,10 @@ v1.7 roadmap is active with Phases 31-35.
 - v1.6 roadmap archived in `.planning/milestones/v1.6-ROADMAP.md`.
 - v1.6 audit archived in `.planning/milestones/v1.6-MILESTONE-AUDIT.md`.
 - v1.6 phase execution history archived in `.planning/milestones/v1.6-phases/`.
+- v1.7 requirements archived in `.planning/milestones/v1.7-REQUIREMENTS.md`.
+- v1.7 roadmap archived in `.planning/milestones/v1.7-ROADMAP.md`.
+- v1.7 audit archived in `.planning/milestones/v1.7-MILESTONE-AUDIT.md`.
+- v1.7 phase execution history archived in `.planning/milestones/v1.7-phases/`.
 
 ## Deferred Items
 
@@ -87,11 +92,11 @@ Start the next milestone when ready.
 
 ## Current Position
 
-Phase: —
+Phase: Milestone v1.7 complete
 Plan: —
-Status: All v1.7 phases complete
-Last activity: 2026-05-22 — Phase 35 completed
+Status: Awaiting next milestone
+Last activity: 2026-05-22 — Milestone v1.7 completed and archived
 
 ## Operator Next Steps
 
-- Run `$gsd-audit-milestone` or `$gsd-complete-milestone` when ready.
+- Start the next milestone with /gsd-new-milestone

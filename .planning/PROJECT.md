@@ -15,34 +15,21 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
 ## Current State
 
-**Shipped version:** v1.6 AMD SOLAR Coverage, Live Profiler Timing, and Scoring Workflow,
+**Shipped version:** v1.7 Baseline, Timing, Reward-Hack Hardening, and ROCm Library Migration,
 archived 2026-05-22.
 
-**Current milestone:** v1.7 Baseline, Timing, Reward-Hack Hardening, and ROCm
-Library Migration, started 2026-05-22.
+**Current milestone:** none. Next milestone planning starts with
+`$gsd-new-milestone`.
 
-The v1.0 milestone migrated the repository to a ROCm-only runtime baseline. The
-v1.1 milestone added CDNA 3 code/schema support, maintained active
-CUDA/NVIDIA-residue audit coverage, ROCm-facing public example paths, clarified
-compatibility-example metadata, and a concrete CDNA 3 hardware validation
-handoff for a future milestone. The v1.2 milestone harvested selected
-engineering practices from `hip-execbench` as internal diagnostics, reporting,
-score-interpretation guardrails, and public-contract tests without changing
-external schemas, CLI behavior, trace formats, or examples. The v1.3 milestone
-closed non-CDNA residual gaps by comparing the ROCm port
-against NVIDIA SOL ExecBench's original public functionality and selectively
-borrowing engineering practices from
-`~/PyCharmMiscProject/hip-playground/hip-execbench`. The v1.4 milestone added a
-compatibility inventory, internal evidence/report modeling, CDNA 3 validation
-readiness metadata, and RDNA 4 validation evidence while still excluding real
-CDNA 3 hardware validation and any CDNA 3 hardware-validation claim. The v1.5
-milestone added source-specific timing semantics, `rocprofv3` timing evidence
-helpers, AMD SOL bound artifacts, and derived AMD-native score reports with
-explicit evidence references and claim guardrails. The v1.6 milestone broadened
-AMD SOL analyzer coverage, added live `rocprofv3` collection helpers, connected
-derived AMD-native score reports to the dataset workflow, and added focused
-compatibility/claim guardrails for canonical trace JSONL, public schemas, and
-primary CLI behavior.
+The v1.0 milestone migrated the repository to a ROCm-only runtime baseline.
+Milestones v1.1-v1.6 added CDNA 3 code/schema support, maintained residue
+audits, harvested selected `hip-execbench` practices, closed non-CDNA parity
+gaps, added source-specific timing semantics, `rocprofv3` evidence helpers, AMD
+SOL bound artifacts, derived AMD-native score reports, live profiler collection,
+dataset score reporting, and compatibility/claim guardrails. The v1.7 milestone
+added optimized scoring baseline artifacts, source-specific profiler evidence
+collection, expanded reward-hack defenses, a runnable hipBLAS public example,
+and MI300X validation-readiness guardrails.
 
 Validation status:
 
@@ -50,28 +37,6 @@ Validation status:
 - CDNA 3 (`gfx940`, `gfx941`, `gfx942`) is supported by schema/build/docs.
 - CDNA 3 (`gfx94*`) full adapted suite validation remains deferred by user
   decision and must be completed before claiming CDNA 3 hardware validation.
-
-## Current Milestone: v1.7 Baseline, Timing, Reward-Hack Hardening, and ROCm Library Migration
-
-**Goal:** Close the highest-impact evaluation credibility gaps before MI300X
-hardware validation by completing optimized baseline semantics, profiler-backed
-timing workflow, reward-hack defenses, and runnable ROCm library migration.
-
-**Target features:**
-
-- Release-defined optimized scoring baseline management that distinguishes
-  PyTorch reference timing, candidate timing, scoring baseline timing, and AMD
-  SOL bound evidence.
-- Source-specific timing and evaluation loop that can use validated
-  `rocprofv3` evidence end-to-end for HIP native, Triton, and PyTorch/operator
-  paths without weakening canonical trace contracts.
-- Hardened reward-hack defenses for stream hiding, semantic caching,
-  unauthorized file or binary loading, embedded opaque payloads, precision
-  downgrade abuse, and static submission review.
-- Runnable ROCm library solution paths and examples for priority
-  `hipblas`/hipBLASLt, MIOpen, Composable Kernel, and rocWMMA categories.
-- Validation and report interfaces prepared for future AMD MI300X/CDNA3
-  full-suite and FP8 evidence once hardware is available.
 
 ## Requirements
 
@@ -127,17 +92,30 @@ timing workflow, reward-hack defenses, and runnable ROCm library migration.
   dataset-runner AMD-native score reports, and v1.6 compatibility/claim
   guardrails are implemented without breaking canonical trace JSONL, public
   schemas, or primary `sol-execbench` CLI defaults - v1.6.
+- Optimized scoring baseline artifacts, explicit baseline-source semantics,
+  dataset integration, and baseline documentation are implemented without
+  mutating canonical trace JSONL - v1.7.
+- Source-specific ROCm profiler timing evidence collection, dataset integration,
+  parser coverage, and auditable timing metadata are implemented - v1.7.
+- Static reward-hack review now covers hidden streams, semantic caches,
+  unauthorized loaders/file I/O, opaque payloads, and precision downgrade
+  patterns before submitted Python source import - v1.7.
+- `hipblas` has a runnable public SGEMM example and native staging tests, while
+  MIOpen, CK, and rocWMMA remain documented candidate categories with
+  overclaiming guardrails - v1.7.
+- MI300X/CDNA3 validation instructions, FP8/NVFP4 decision records, and
+  evidence gates for validation claims are implemented - v1.7.
 
 ### Active
 
-- Define and implement optimized scoring baseline artifacts and CLI/dataset
-  integration for v1.7.
-- Promote source-specific ROCm profiler timing from helper/evidence utilities
-  into an end-to-end validated evaluation workflow.
-- Extend reward-hack mitigation beyond existing dynamic checks to cover the
-  remaining exploit families identified during paper-parity review.
-- Migrate priority ROCm library categories from candidate documentation to
-  runnable examples, build paths, and tests.
+- Run the full adapted suite on AMD MI300X/CDNA3 and record evidence before
+  claiming commercial GPU hardware validation.
+- Validate FP8 behavior and performance on MI300X once hardware access is
+  available.
+- Continue toward deeper upstream SOLAR parity with graph tracing,
+  einsum/IR conversion, lookup validation, and tighter movement bounds.
+- Recreate or adapt the original paper's model-to-subgraph extraction and
+  curation pipeline when paper-parity work is prioritized.
 
 ### Out of Scope
 
@@ -145,8 +123,6 @@ timing workflow, reward-hack defenses, and runnable ROCm library migration.
 - Preserving NVIDIA-specific dependency implementations when a ROCm replacement is required - equivalent behavior matters more than retaining original code.
 - Guaranteeing one-to-one high-performance replacements for every NVIDIA DSL - some former CUTLASS/cuDNN/CuTe/cuTile categories remain documented compatibility examples or candidates.
 - Claiming CDNA 3 hardware validation before a full `gfx94*` suite pass is recorded.
-- Performing real CDNA 3 `gfx94*` full-suite hardware validation in v1.5 - user explicitly excluded it from this milestone.
-- Performing real CDNA 3 `gfx94*` full-suite hardware validation in v1.6 - user did not include CDNA 3 validation in this milestone scope.
 - Claiming NVIDIA leaderboard equivalence or B200/SOLAR equivalence for AMD-native scores.
 - Reintroducing NVIDIA/CUDA runtime parity as a goal - this project remains a
   ROCm-only port.
@@ -165,14 +141,11 @@ torchvision at ROCm wheels. The package remains a Python CLI benchmark runner:
 files and injects AMD architecture flags, and `src/sol_execbench/driver/templates/`
 contains the HIP-aware build and eval subprocess scripts.
 
-High-risk areas for v1.7 are optimized baseline semantics, native library
-replacement quality, timing integrity on additional AMD architectures, and
-remaining reward-hack bypasses. Real MI300X/CDNA3 validation is the intended
-commercial GPU validation target after the supporting workflow is ready. v1.6
-established an end-to-end derived AMD-native workflow from analyzer coverage
-through live profiler evidence and dataset score reporting. Timing accuracy
-remains the highest priority: Triton, HIP native, and PyTorch operator sources
-may require separate timer semantics instead of one forced unified timer.
+Current high-risk areas are real MI300X/CDNA3 hardware validation, FP8 evidence,
+deeper upstream SOLAR parity, and original-paper dataset extraction. v1.7
+prepared the validation and claim-guardrail scaffolding for MI300X, but no
+commercial GPU validation claim should be made until a full adapted suite run
+and required environment evidence are archived.
 
 ## Constraints
 
@@ -205,10 +178,10 @@ may require separate timer semantics instead of one forced unified timer.
 | Preserve public contracts during v1.6 workflow integration | User made canonical trace JSONL, schema, and primary CLI compatibility a hard constraint for v1.6. | Validated in v1.6 |
 | Keep CDNA 3 validation out of v1.6 | User said the next milestone's forced constraint still excludes CDNA 3 validation. | Validated in v1.6 |
 | Expose source-specific timer chimneys when needed | User required timing accuracy over one unified口径 for Triton, HIP, and PyTorch sources. | Validated in v1.6 |
-| Treat NVIDIA/B200 parity as non-scope | User clarified the project is ROCm-only and original NVIDIA hardware should not be counted as a missing feature. | Active for v1.7 |
-| Use MI300X as commercial validation target | User selected AMD MI300X/CDNA3 as the later real-hardware validation example, including FP8 validation when available. | Active for v1.7 planning |
+| Treat NVIDIA/B200 parity as non-scope | User clarified the project is ROCm-only and original NVIDIA hardware should not be counted as a missing feature. | Validated in v1.7 |
+| Use MI300X as commercial validation target | User selected AMD MI300X/CDNA3 as the later real-hardware validation example, including FP8 validation when available. | Validated in v1.7 readiness docs |
 | Defer dataset extraction and full SOLAR parity | User explicitly postponed the original paper's extraction pipeline and deeper SOLAR parity work. | Deferred |
-| Prioritize baseline, timing, reward-hack, and ROCm libraries | User marked scoring baseline, evaluation timing loop, reward-hack defenses, and ROCm library migration as the implementation priorities. | Active for v1.7 |
+| Prioritize baseline, timing, reward-hack, and ROCm libraries | User marked scoring baseline, evaluation timing loop, reward-hack defenses, and ROCm library migration as the implementation priorities. | Validated in v1.7 |
 | Defer NVFP4/MXFP4 validation | User noted MI300X can validate FP8 later, but no hardware is available for NVFP4/MXFP4 validation now. | Deferred |
 
 ## Evolution
@@ -229,4 +202,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-22 after starting v1.7 milestone*
+*Last updated: 2026-05-22 after v1.7 milestone*
