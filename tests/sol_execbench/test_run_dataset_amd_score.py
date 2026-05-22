@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import json
 import importlib.util
+import subprocess
+from collections.abc import Sequence
 from pathlib import Path
 
+from sol_execbench.core.bench.config import BenchmarkConfig
 from sol_execbench.core.scoring.amd_score import build_amd_native_suite_report
 from sol_execbench.core.scoring.baseline_artifact import (
     scoring_baseline_artifact_from_dict,
@@ -17,6 +20,7 @@ run_dataset = importlib.util.module_from_spec(spec)
 assert spec.loader is not None
 spec.loader.exec_module(run_dataset)
 build_amd_score_reports_for_problem = run_dataset.build_amd_score_reports_for_problem
+collect_timing_evidence_for_problem = run_dataset.collect_timing_evidence_for_problem
 
 
 def test_dataset_helper_builds_derived_amd_score_report(tmp_path):
@@ -196,3 +200,67 @@ def test_dataset_helper_marks_missing_workload_bound_as_unscored(tmp_path):
 
     assert scores[0].supported is False
     assert scores[0].sol_bound_ms is None
+
+
+def test_dataset_helper_collects_source_specific_timing_evidence(tmp_path):
+    problem_output_dir = tmp_path / "out" / "L1" / "triton_problem"
+    problem_output_dir.mkdir(parents=True)
+    definition_path = tmp_path / "definition.json"
+    workload_path = tmp_path / "workload.jsonl"
+    solution_path = problem_output_dir / "solution.json"
+    config_path = problem_output_dir / "config.json"
+    timing_root = tmp_path / "timing" / "L1"
+    for path in (definition_path, workload_path, solution_path, config_path):
+        path.write_text("{}")
+
+    calls: list[list[str]] = []
+
+    def runner(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
+        calls.append(list(command))
+        evidence_dir = timing_root / problem_output_dir.name
+        evidence_dir.mkdir(parents=True, exist_ok=True)
+        (evidence_dir / "ref_triton_problem.csv").write_text(
+            "Domain,Name,Duration(ns)\nKERNEL_DISPATCH,kernel,9000\n"
+        )
+        return subprocess.CompletedProcess(
+            args=list(command),
+            returncode=0,
+            stdout="profiled",
+            stderr="",
+        )
+
+    payload = collect_timing_evidence_for_problem(
+        definition_path=definition_path,
+        workload_path=workload_path,
+        solution_path=solution_path,
+        output_dir=problem_output_dir,
+        timing_evidence_root=timing_root,
+        job_name="ref_triton_problem",
+        solution={"spec": {"languages": ["triton"]}},
+        benchmark_config=BenchmarkConfig(
+            warmup_runs=4,
+            iterations=12,
+            lock_clocks=True,
+        ),
+        timeout=30,
+        config_path=config_path,
+        runner=runner,
+        tool_version="rocprofv3 7.0.0",
+        gpu_architecture="gfx942",
+    )
+
+    output_path = timing_root / "triton_problem.timing.json"
+    saved = json.loads(output_path.read_text())
+
+    assert calls
+    assert "--" in calls[0]
+    assert str(config_path) in calls[0]
+    assert payload == saved
+    assert saved["profiler_collected"] is True
+    assert saved["selection"]["policy"]["source_type"] == "triton"
+    assert saved["evidence"]["backend"] == "rocprofv3"
+    assert saved["evidence"]["gpu_architecture"] == "gfx942"
+    assert saved["evidence"]["warmup_runs"] == 4
+    assert saved["evidence"]["iterations"] == 12
+    assert saved["evidence"]["trial_count"] == 1
+    assert saved["evidence"]["clock_locked"] is True

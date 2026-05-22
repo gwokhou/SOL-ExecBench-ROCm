@@ -7,6 +7,7 @@ from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3CollectionRequest,
     build_rocprofv3_command,
     build_timing_evidence,
+    collect_source_timing_evidence,
     collect_rocprofv3_timing,
     parse_rocprofv3_csv,
     select_default_timing,
@@ -68,6 +69,10 @@ def test_timing_evidence_contains_auditable_profiler_fields():
         csv_content=ROCPROFV3_CSV,
         tool_version="rocprofv3 7.0.0",
         gpu_architecture="gfx1200",
+        warmup_runs=3,
+        iterations=11,
+        trial_count=1,
+        clock_locked=True,
     )
     payload = evidence.to_dict()
 
@@ -79,6 +84,10 @@ def test_timing_evidence_contains_auditable_profiler_fields():
     assert payload["aggregation_rule"] == policy.aggregation_rule
     assert payload["backend"] == "rocprofv3"
     assert payload["interpretation"] == policy.interpretation
+    assert payload["warmup_runs"] == 3
+    assert payload["iterations"] == 11
+    assert payload["trial_count"] == 1
+    assert payload["clock_locked"] is True
     assert payload["kernel_duration_ms"] == 0.007
     assert len(payload["parsed_rows"]) == 3
 
@@ -197,3 +206,92 @@ def test_live_collection_labels_failed_profiler_as_fallback(tmp_path):
     assert result.selection.fallback_applied is True
     assert "exit code 17" in result.selection.reason
     assert result.stderr == "profiler failed"
+
+
+def test_live_collection_labels_missing_csv_as_fallback(tmp_path):
+    def runner(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            args=list(command),
+            returncode=0,
+            stdout="profiled",
+            stderr="",
+        )
+
+    request = Rocprofv3CollectionRequest(
+        application_command=("uv", "run", "sol-execbench", "problem"),
+        output_directory=tmp_path,
+        output_file="timing",
+        policy=select_timing_policy(TimingSourceType.HIP_NATIVE),
+        tool_version="rocprofv3 7.0.0",
+        gpu_architecture="gfx1200",
+    )
+
+    result = collect_rocprofv3_timing(request, runner=runner)
+
+    assert result.profiler_collected is False
+    assert result.evidence is None
+    assert result.selection.fallback_applied is True
+    assert "did not produce a CSV" in result.selection.reason
+
+
+def test_source_collection_selects_triton_rocprofv3_and_records_run_config(tmp_path):
+    calls: list[list[str]] = []
+
+    def runner(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
+        calls.append(list(command))
+        (tmp_path / "timing.csv").write_text(ROCPROFV3_CSV)
+        return subprocess.CompletedProcess(
+            args=list(command),
+            returncode=0,
+            stdout="profiled",
+            stderr="",
+        )
+
+    result = collect_source_timing_evidence(
+        application_command=("uv", "run", "sol-execbench", "problem"),
+        languages=("triton",),
+        output_directory=tmp_path,
+        output_file="timing",
+        tool_version="rocprofv3 7.0.0",
+        gpu_architecture="gfx942",
+        runner=runner,
+        warmup_runs=5,
+        iterations=50,
+        trial_count=2,
+        clock_locked=False,
+    )
+
+    assert calls
+    assert result.profiler_collected is True
+    assert result.evidence is not None
+    payload = result.evidence.to_dict()
+    assert payload["backend"] == "rocprofv3"
+    assert payload["gpu_architecture"] == "gfx942"
+    assert payload["warmup_runs"] == 5
+    assert payload["iterations"] == 50
+    assert payload["trial_count"] == 2
+    assert payload["clock_locked"] is False
+
+
+def test_source_collection_routes_pytorch_to_explicit_fallback(tmp_path):
+    def runner(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
+        raise AssertionError(f"runner should not be called: {command}")
+
+    result = collect_source_timing_evidence(
+        application_command=("uv", "run", "sol-execbench", "problem"),
+        languages=("pytorch",),
+        output_directory=tmp_path,
+        output_file="timing",
+        tool_version="rocprofv3 7.0.0",
+        gpu_architecture="gfx942",
+        runner=runner,
+        warmup_runs=5,
+        iterations=50,
+        trial_count=1,
+        clock_locked=True,
+    )
+
+    assert result.profiler_collected is False
+    assert result.evidence is None
+    assert result.selection.fallback_applied is True
+    assert result.selection.policy.backend == TimingBackend.DEVICE_EVENTS

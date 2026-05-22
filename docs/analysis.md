@@ -24,6 +24,21 @@ uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark --limit 5
 Dataset runs write per-problem traces and a summary under `out/run_dataset/`
 unless `-o` is supplied.
 
+For source-specific ROCm timing evidence, add a timing evidence directory and
+record the target architecture:
+
+```bash
+uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
+  --limit 5 \
+  --timing-evidence-dir out/timing-evidence \
+  --gpu-architecture gfx942 \
+  --timing-tool-version "rocprofv3 7.0.0"
+```
+
+HIP-native and Triton sources use `rocprofv3` kernel activity timing when the
+tool is available. PyTorch/operator and unsupported mixed-source cases emit an
+explicit fallback selection instead of being labeled as kernel activity timing.
+
 ## Timing Method
 
 The ROCm port does not use CUPTI. Timing uses PyTorch's HIP-backed device event
@@ -65,6 +80,15 @@ rocprofv3 --stats -- \
 For HIP/C++ solutions, keep compilation outside the profiling window when
 possible by running once with `--keep-staging`, then profiling a repeated run.
 This keeps compile overhead out of kernel timing analysis.
+
+Dataset timing evidence JSON records:
+
+- source type, selected backend, activity domain, aggregation rule, and fallback
+  reason when applicable,
+- `rocprofv3` command, return code, stdout/stderr, and parsed CSV path,
+- tool version, GPU architecture, warmup runs, measured iterations, trial count,
+  and clock-lock status,
+- parsed profiler rows and aggregate kernel duration for profiler-backed runs.
 
 ## Interpreting Results
 
