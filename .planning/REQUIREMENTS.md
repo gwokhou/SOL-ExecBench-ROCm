@@ -14,9 +14,9 @@
 
 ### Engineering Adaptation
 
-- [ ] **ENG-04**: Maintainer can inspect internal stage diagnostics for parse/package/compile/evaluate/report-style readiness without replacing the existing benchmark execution path.
-- [ ] **ENG-05**: Maintainer can generate or inspect derived evidence/report data from existing traces and diagnostics without adding fields to trace JSONL.
-- [ ] **ENG-06**: Adapted reporting or agent-readable summaries explicitly identify themselves as derived artifacts, not canonical benchmark output.
+- [x] **ENG-04**: Maintainer can inspect internal stage diagnostics for parse/package/compile/evaluate/report-style readiness without replacing the existing benchmark execution path.
+- [x] **ENG-05**: Maintainer can generate or inspect derived evidence/report data from existing traces and diagnostics without adding fields to trace JSONL.
+- [x] **ENG-06**: Adapted reporting or agent-readable summaries explicitly identify themselves as derived artifacts, not canonical benchmark output.
 
 ### Validation Readiness
 
@@ -65,9 +65,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | COMPAT-01 | Phase 19 | Complete |
 | COMPAT-02 | Phase 19 | Complete |
 | COMPAT-03 | Phase 19 | Complete |
-| ENG-04 | Phase 20 | Pending |
-| ENG-05 | Phase 20 | Pending |
-| ENG-06 | Phase 20 | Pending |
+| ENG-04 | Phase 20 | Complete |
+| ENG-05 | Phase 20 | Complete |
+| ENG-06 | Phase 20 | Complete |
 | VAL-04 | Phase 21 | Pending |
 | VAL-05 | Phase 21 | Pending |
 | VAL-06 | Phase 21 | Pending |
