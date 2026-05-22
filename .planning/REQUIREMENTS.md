@@ -22,11 +22,11 @@
 
 ### Reward-Hack Hardening
 
-- [ ] **HACK-01**: Evaluation rejects or flags hidden-work patterns using non-default streams or stream-like asynchronous dispatch that can evade the selected timer.
-- [ ] **HACK-02**: Evaluation rejects or flags semantic output caching across correctness and timing phases, including data-pointer and content-keyed cache patterns where practical.
-- [ ] **HACK-03**: Evaluation rejects unauthorized file I/O, embedded opaque binary payloads, base64-loaded code objects, and runtime dynamic native loading outside approved build paths.
-- [ ] **HACK-04**: Evaluation rejects precision downgrade abuse when output dtype alone is insufficient to prove numerical contract preservation.
-- [ ] **HACK-05**: A static submission review layer reports suspicious Python and native-source patterns before execution without blocking legitimate HIP/Triton/PyTorch solutions by default.
+- [x] **HACK-01**: Evaluation rejects or flags hidden-work patterns using non-default streams or stream-like asynchronous dispatch that can evade the selected timer.
+- [x] **HACK-02**: Evaluation rejects or flags semantic output caching across correctness and timing phases, including data-pointer and content-keyed cache patterns where practical.
+- [x] **HACK-03**: Evaluation rejects unauthorized file I/O, embedded opaque binary payloads, base64-loaded code objects, and runtime dynamic native loading outside approved build paths.
+- [x] **HACK-04**: Evaluation rejects precision downgrade abuse when output dtype alone is insufficient to prove numerical contract preservation.
+- [x] **HACK-05**: A static submission review layer reports suspicious Python and native-source patterns before execution without blocking legitimate HIP/Triton/PyTorch solutions by default.
 
 ### ROCm Library Migration
 
@@ -77,11 +77,11 @@
 | TIME-02 | Phase 32 | Complete |
 | TIME-03 | Phase 32 | Complete |
 | TIME-04 | Phase 32 | Complete |
-| HACK-01 | Phase 33 | Pending |
-| HACK-02 | Phase 33 | Pending |
-| HACK-03 | Phase 33 | Pending |
-| HACK-04 | Phase 33 | Pending |
-| HACK-05 | Phase 33 | Pending |
+| HACK-01 | Phase 33 | Complete |
+| HACK-02 | Phase 33 | Complete |
+| HACK-03 | Phase 33 | Complete |
+| HACK-04 | Phase 33 | Complete |
+| HACK-05 | Phase 33 | Complete |
 | LIB-01 | Phase 34 | Pending |
 | LIB-02 | Phase 34 | Pending |
 | LIB-03 | Phase 34 | Pending |

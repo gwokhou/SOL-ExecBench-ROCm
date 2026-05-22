@@ -129,6 +129,7 @@ from sol_execbench.core.bench.reward_hack import (  # noqa: E402
     check_lazy_outputs,
     check_monkey_patch,
     check_thread_injection,
+    review_solution_sources,
     snapshot_critical_functions,
 )
 from sol_execbench.core.bench.timing import time_runnable  # noqa: E402
@@ -164,6 +165,39 @@ _solution = Solution(**json.loads((STAGING_DIR / "solution.json").read_text()))
 _solution_name = _solution.name
 _entry_point = _solution.spec.entry_point
 _dps = _solution.spec.destination_passing_style
+
+# ── Device and output metadata ───────────────────────────────────────────────
+_device = "cuda:0" if torch.cuda.is_available() else "cpu"
+_output_names = list(definition.outputs.keys())
+_output_dtypes_torch = {
+    k: dtype_str_to_torch_dtype(v.dtype) for k, v in definition.outputs.items()
+}
+
+# ── Static source review before user-code import ────────────────────────────
+_source_review = review_solution_sources(
+    _solution,
+    output_dtypes=_output_dtypes_torch,
+)
+if _source_review.blocked:
+    _static_msg = _source_review.format_blocking_message()
+    for _wl in workloads:
+        _trace = Trace(
+            definition=definition.name,
+            solution=_solution_name,
+            workload=_wl,
+            evaluation=make_eval(
+                EvaluationStatus.REWARD_HACK,
+                _device,
+                None,
+                extra_msg=_static_msg,
+            ),
+        )
+        print(
+            json.dumps(_trace.model_dump(mode="json"), allow_nan=False),
+            file=_real_stdout,
+            flush=True,
+        )
+    sys.exit(0)
 
 # ── Exec reference code ───────────────────────────────────────────────────────
 # Write to a real file so decorators that call inspect.getsourcelines()
@@ -246,9 +280,6 @@ else:
     _user_mod = importlib.import_module(_mod_name)
     user_fn = getattr(_user_mod, _entry_func_name)
 
-# ── Device ────────────────────────────────────────────────────────────────────
-_device = "cuda:0" if torch.cuda.is_available() else "cpu"
-
 # ── Safetensors blob roots ────────────────────────────────────────────────────
 # Priority: 1) staging dir (client-inlined blobs), 2) flashinfer-trace directory.
 _safetensors_roots = [STAGING_DIR]
@@ -292,13 +323,6 @@ def _reward_hack_check(workload, check_fn, *args, suppress_errors=False):
         if not suppress_errors:
             raise
     return False
-
-
-# ── Pre-compute output metadata (used by normalize_outputs for DPS=false) ─────
-_output_names = list(definition.outputs.keys())
-_output_dtypes_torch = {
-    k: dtype_str_to_torch_dtype(v.dtype) for k, v in definition.outputs.items()
-}
 
 
 # ── Evaluate each workload ────────────────────────────────────────────────────

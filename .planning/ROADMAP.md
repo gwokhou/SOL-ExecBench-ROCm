@@ -14,7 +14,7 @@ timing workflow, reward-hack defenses, and runnable ROCm library migration.
 |-------|------|------|--------------|
 | 31 | Optimized Scoring Baseline Semantics | Complete 2026-05-22: Added release-defined baseline artifacts and wired them into AMD-native scoring without mutating canonical traces. | BASE-01, BASE-02, BASE-03, BASE-04 |
 | 32 | Source-Specific Profiler Timing Workflow | Complete 2026-05-22: Added source-specific profiler evidence collection, dataset integration, fallback metadata, and run metadata. | TIME-01, TIME-02, TIME-03, TIME-04 |
-| 33 | Reward-Hack Defense Expansion | Extend dynamic and static checks to cover remaining exploit families that can distort correctness or timing. | HACK-01, HACK-02, HACK-03, HACK-04, HACK-05 |
+| 33 | Reward-Hack Defense Expansion | Complete 2026-05-22: Added static source review and pre-import blocking for stream hiding, caches, loaders, and precision downgrades. | HACK-01, HACK-02, HACK-03, HACK-04, HACK-05 |
 | 34 | ROCm Library Category Migration | Move priority ROCm library categories from candidate-only status toward runnable examples, build checks, and accurate support docs. | LIB-01, LIB-02, LIB-03, LIB-04, LIB-05 |
 | 35 | MI300X Validation Readiness Guardrails | Prepare MI300X/CDNA3 and FP8 validation instructions, evidence gates, and no-claim protections for later hardware runs. | MI3-01, MI3-02, MI3-03 |
 
@@ -91,7 +91,7 @@ selectable timing path with explicit fallback metadata.
 
 ### Phase 33: Reward-Hack Defense Expansion
 
-**Status:** Planned
+**Status:** Complete
 
 **Goal:** Extend dynamic and static checks to cover remaining exploit families
 that can distort correctness or timing.
@@ -118,7 +118,10 @@ that can distort correctness or timing.
   during correctness, and timing integrity checks before score reporting.
 - Document accepted limitations where perfect detection is impractical.
 
-**Plans:** 0 plans
+**Plans:** 1 plan
+
+- [x] 33-01: Add structured static reward-hack review, eval-driver blocking,
+  docs, and malicious/legitimate fixture tests.
 
 ### Phase 34: ROCm Library Category Migration
 
@@ -212,11 +215,11 @@ and no-claim protections for later hardware runs.
 | TIME-02 | Phase 32 | Complete |
 | TIME-03 | Phase 32 | Complete |
 | TIME-04 | Phase 32 | Complete |
-| HACK-01 | Phase 33 | Pending |
-| HACK-02 | Phase 33 | Pending |
-| HACK-03 | Phase 33 | Pending |
-| HACK-04 | Phase 33 | Pending |
-| HACK-05 | Phase 33 | Pending |
+| HACK-01 | Phase 33 | Complete |
+| HACK-02 | Phase 33 | Complete |
+| HACK-03 | Phase 33 | Complete |
+| HACK-04 | Phase 33 | Complete |
+| HACK-05 | Phase 33 | Complete |
 | LIB-01 | Phase 34 | Pending |
 | LIB-02 | Phase 34 | Pending |
 | LIB-03 | Phase 34 | Pending |

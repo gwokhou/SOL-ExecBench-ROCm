@@ -66,6 +66,21 @@ Clock locking uses `rocm-smi`. The command fails the workload if
 evaluation subprocess starts. This prevents silently mixing locked and unlocked
 timing data.
 
+## Reward-Hack Review
+
+Before user code is imported, the evaluation driver statically reviews submitted
+source text for exploit patterns that can distort correctness or timing. Blocked
+patterns include non-default stream creation, data-pointer or content-keyed
+semantic caches, unauthorized file I/O, embedded payload decoding, dynamic native
+loading, subprocess or network access, and precision downgrades for float32
+output contracts.
+
+The review emits `REWARD_HACK` traces with rule names such as
+`hidden_async_stream`, `semantic_output_cache`,
+`unauthorized_file_or_loader`, and `precision_downgrade`. Existing runtime
+guards still check timing monkey-patches, eval-driver integrity, thread
+injection, and lazy/proxy outputs.
+
 ## External ROCm Profiling
 
 Use `rocprofv3` around a small, representative command when kernel-level

@@ -25,6 +25,7 @@ from sol_execbench.core.bench.reward_hack import (
     check_lazy_outputs,
     check_monkey_patch,
     check_thread_injection,
+    review_solution_sources,
     snapshot_critical_functions,
 )
 
@@ -168,3 +169,95 @@ class TestEvalIntegrity:
 
         with pytest.raises(RewardHackDetected, match="time_runnable"):
             check_eval_integrity(snap, ns)
+
+
+# ── static source review ─────────────────────────────────────────────────────
+
+
+def _solution_with_source(content: str, path: str = "kernel.py"):
+    class Source:
+        pass
+
+    class Solution:
+        pass
+
+    source = Source()
+    source.path = path
+    source.content = content
+    solution = Solution()
+    solution.sources = [source]
+    return solution
+
+
+class TestStaticSourceReview:
+    def test_reports_non_default_stream_patterns(self):
+        review = review_solution_sources(
+            _solution_with_source(
+                "import torch\n"
+                "s = torch.cuda.Stream()\n"
+                "def run(x):\n"
+                "    with torch.cuda.stream(s):\n"
+                "        return x + 1\n"
+            )
+        )
+
+        assert review.blocked is True
+        assert {issue.rule for issue in review.issues} == {"hidden_async_stream"}
+
+    def test_reports_data_pointer_cache_patterns(self):
+        review = review_solution_sources(
+            _solution_with_source(
+                "_cache = {}\n"
+                "def run(x):\n"
+                "    key = x.data_ptr()\n"
+                "    return _cache.setdefault(key, x + 1)\n"
+            )
+        )
+
+        assert review.blocked is True
+        assert "semantic_output_cache" in {issue.rule for issue in review.issues}
+
+    def test_reports_unauthorized_file_and_loader_patterns(self):
+        review = review_solution_sources(
+            _solution_with_source(
+                "import base64, ctypes\n"
+                "payload = base64.b64decode('AA==')\n"
+                "lib = ctypes.CDLL('/tmp/libx.so')\n"
+                "def run(x):\n"
+                "    return x\n"
+            )
+        )
+
+        assert review.blocked is True
+        assert "unauthorized_file_or_loader" in {issue.rule for issue in review.issues}
+
+    def test_reports_precision_downgrade_for_float32_outputs(self):
+        review = review_solution_sources(
+            _solution_with_source("def run(x):\n    return x.half().float()\n"),
+            output_dtypes={"out": torch.float32},
+        )
+
+        assert review.blocked is True
+        assert "precision_downgrade" in {issue.rule for issue in review.issues}
+
+    def test_allows_legitimate_torch_compile_solution(self):
+        review = review_solution_sources(
+            _solution_with_source(
+                "import torch\n@torch.compile\ndef run(x, y):\n    return x + y\n"
+            ),
+            output_dtypes={"z": torch.float32},
+        )
+
+        assert review.blocked is False
+        assert review.to_dict() == {"blocked": False, "issues": []}
+
+    def test_allows_hip_current_stream_text(self):
+        review = review_solution_sources(
+            _solution_with_source(
+                "auto stream = at::cuda::getCurrentCUDAStream();\n"
+                "kernel<<<grid, block, 0, stream>>>(args);\n",
+                path="kernel.hip",
+            )
+        )
+
+        assert review.blocked is False
