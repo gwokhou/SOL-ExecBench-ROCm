@@ -15,16 +15,17 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
 ## Current State
 
-**Shipped version:** v1.1 CDNA 3 Support and Migration Closure, archived
-2026-05-21.
-**Current milestone:** v1.2 Engineering Practice Harvest and Compatibility
-Guardrails.
+**Shipped version:** v1.2 Engineering Practice Harvest and Compatibility
+Guardrails, archived 2026-05-22.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline. The
 v1.1 milestone added CDNA 3 code/schema support, maintained active
 CUDA/NVIDIA-residue audit coverage, ROCm-facing public example paths, clarified
 compatibility-example metadata, and a concrete CDNA 3 hardware validation
-handoff for the next milestone.
+handoff for a future milestone. The v1.2 milestone harvested selected
+engineering practices from `hip-execbench` as internal diagnostics, reporting,
+score-interpretation guardrails, and public-contract tests without changing
+external schemas, CLI behavior, trace formats, or examples.
 
 Validation status:
 
@@ -32,25 +33,6 @@ Validation status:
 - CDNA 3 (`gfx940`, `gfx941`, `gfx942`) is supported by schema/build/docs.
 - CDNA 3 (`gfx94*`) full adapted suite validation remains deferred by user
   decision and must be completed before claiming CDNA 3 hardware validation.
-
-## Current Milestone: v1.2 Engineering Practice Harvest and Compatibility Guardrails
-
-**Goal:** Borrow suitable engineering practices from
-`~/PyCharmMiscProject/hip-playground/hip-execbench` to improve internal
-diagnostics, reporting, comparison review, and maintainability while preserving
-SOL ExecBench ROCm's public CLI, schemas, trace contracts, and file formats.
-
-**Target features:**
-
-- Assess `hip-execbench` patterns that are worth adapting, including profiler
-  readiness routing, structured error surfaces, agent/report builders, and
-  baseline/scoring comparison discipline.
-- Improve internal diagnostics and reporting where the behavior strengthens
-  ROCm maintainability without adding new public interface requirements.
-- Add compatibility guardrails that prove `definition.json`, `workload.jsonl`,
-  `solution.json`, CLI usage, examples, and trace JSONL behavior stay stable.
-- Keep real CDNA 3 hardware validation deferred and prevent documentation or
-  support matrices from implying otherwise.
 
 ## Requirements
 
@@ -74,19 +56,21 @@ SOL ExecBench ROCm's public CLI, schemas, trace contracts, and file formats.
 - Public native examples use HIP-facing paths and solution filenames - v1.1.
 - Former NVIDIA library/DSL examples use ROCm compatibility-example terminology and portable examples include CDNA 3 metadata where appropriate - v1.1.
 - CDNA 3 hardware validation handoff is documented for the next milestone - v1.1.
+- `hip-execbench` engineering practices have been assessed and mapped to
+  accepted, rejected, and deferred SOL ExecBench ROCm adaptations - v1.2.
+- Internal ROCm diagnostics and trace reporting helpers improve operator
+  inspection without changing public CLI or trace contracts - v1.2.
+- SOL-Score interpretation guardrails warn against unsupported AMD-native
+  performance claims while preserving the existing score formula - v1.2.
+- Public contract guardrail tests protect schemas, CLI help, trace behavior,
+  HIP-facing examples, and CDNA 3 validation deferral language - v1.2.
 
 ### Active
 
-- [ ] Evaluate and adapt suitable engineering practices from `hip-execbench`
-      without changing public interfaces or formats.
-- [ ] Strengthen internal ROCm diagnostics, reporting, and error handling where
-      it improves operator clarity and maintainability.
-- [ ] Review comparison/scoring practices for AMD interpretation guardrails
-      before making new performance claims.
-- [ ] Add compatibility tests proving public schemas, CLI behavior, examples,
-      and trace JSONL contracts remain stable.
 - [ ] Keep CDNA 3 real hardware validation deferred until a future milestone
       with access to `gfx94*` hardware evidence.
+- [ ] Define AMD-native scoring or roofline interpretation before making AMD
+      hardware performance claims from SOL-Score-style outputs.
 
 ### Out of Scope
 
@@ -106,7 +90,9 @@ contains the HIP-aware build and eval subprocess scripts.
 
 High-risk areas for future work remain real CDNA 3 hardware validation, native
 library replacement quality, timing integrity on additional AMD architectures,
-and AMD-native score interpretation.
+and AMD-native score interpretation. v1.2 added internal diagnostics and
+contract guardrails, but it intentionally did not add new public commands or
+formats.
 
 ## Constraints
 
@@ -127,11 +113,11 @@ and AMD-native score interpretation.
 | Preserve benchmark standards | The port should remain consistent with the NVIDIA SOL ExecBench paper and implementation standards wherever feasible. | Validated for public schemas and eval semantics in v1.0 |
 | Defer CDNA 3 validation | No CDNA 3 hardware run was available during closure. | Accepted as v1.0 technical debt |
 | Separate CDNA 3 code support from hardware validation | User requested CDNA 3 support in v1.1 while deferring real hardware validation to the next milestone. | Validated in v1.1 |
-| Preserve public interfaces during practice harvest | User requested borrowing engineering experience from `hip-execbench` without changing this project's external interfaces or formats. | Pending in v1.2 |
+| Preserve public interfaces during practice harvest | User requested borrowing engineering experience from `hip-execbench` without changing this project's external interfaces or formats. | Validated in v1.2 |
 
 ## Evolution
 
 This document evolves at phase transitions and milestone boundaries.
 
 ---
-*Last updated: 2026-05-22 after v1.2 milestone start*
+*Last updated: 2026-05-22 after v1.2 milestone*

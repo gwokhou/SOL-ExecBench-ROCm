@@ -4,8 +4,8 @@ milestone: v1.2
 milestone_name: Engineering Practice Harvest and Compatibility Guardrails
 current_phase: complete
 status: completed
-last_updated: "2026-05-22T16:35:00+08:00"
-last_activity: 2026-05-22 — Milestone v1.2 autonomous execution complete
+last_updated: "2026-05-22T16:40:00+08:00"
+last_activity: 2026-05-22 — Milestone v1.2 completed and archived
 progress:
   total_phases: 4
   completed_phases: 4
@@ -23,10 +23,10 @@ progress:
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (updated 2026-05-21)
+See: `.planning/PROJECT.md` (updated 2026-05-22)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Awaiting milestone audit and completion
+**Current focus:** Awaiting next milestone
 
 ## Workflow Settings
 
@@ -60,6 +60,9 @@ v1.2 Engineering Practice Harvest and Compatibility Guardrails contains 4 phases
 - v1.1 requirements archived in `.planning/milestones/v1.1-REQUIREMENTS.md`.
 - v1.1 roadmap archived in `.planning/milestones/v1.1-ROADMAP.md`.
 - v1.1 audit archived in `.planning/milestones/v1.1-MILESTONE-AUDIT.md`.
+- v1.2 requirements archived in `.planning/milestones/v1.2-REQUIREMENTS.md`.
+- v1.2 roadmap archived in `.planning/milestones/v1.2-ROADMAP.md`.
+- v1.2 audit archived in `.planning/milestones/v1.2-MILESTONE-AUDIT.md`.
 
 ## Deferred Items
 
@@ -71,15 +74,15 @@ Items acknowledged and deferred at milestone close on 2026-05-21:
 
 ## Next Action
 
-Run milestone audit, then complete and archive the milestone.
+Start the next milestone with `/gsd-new-milestone`.
 
 ## Current Position
 
 Phase: Milestone v1.2 complete
 Plan: —
-Status: Awaiting milestone lifecycle
-Last activity: 2026-05-22 — Milestone v1.2 autonomous execution complete
+Status: Awaiting next milestone
+Last activity: 2026-05-22 — Milestone v1.2 completed and archived
 
 ## Operator Next Steps
 
-- Run /gsd-audit-milestone
+- Start the next milestone with /gsd-new-milestone
