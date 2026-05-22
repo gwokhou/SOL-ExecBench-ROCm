@@ -11,6 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 AUDITED_PATHS = (
     "src/sol_execbench/driver/templates/eval_driver.py",
     "src/sol_execbench/core/bench/timing.py",
+    "src/sol_execbench/core/bench/timing_policy.py",
     "src/sol_execbench/core/bench/clock_lock.py",
     "src/sol_execbench/core/bench/config/device_config.py",
     "src/sol_execbench/core/utils.py",
@@ -114,3 +115,14 @@ def test_allowlist_entries_have_non_empty_reasons_and_audited_paths():
         assert rel_path in audited
         assert pattern in COMPAT_PATTERNS
         assert reason.strip()
+
+
+def test_rocm_timing_docs_define_source_specific_timing_semantics():
+    text = (REPO_ROOT / "docs/rocm_timing.md").read_text()
+
+    assert "source_type -> timer_backend -> interpretation" in text
+    assert "kernel activity" in text
+    assert "HIP runtime" in text
+    assert "PyTorch operator attribution" in text
+    assert "fallback event timing" in text
+    assert "torch.cuda" in text
