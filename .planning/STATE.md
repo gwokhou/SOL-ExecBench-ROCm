@@ -18,7 +18,7 @@ progress:
 **Project:** SOL ExecBench ROCm Port
 **Initialized:** 2026-05-21
 **Current phase:** complete
-**Status:** v1.3 milestone complete pending audit/archive
+**Status:** v1.3 milestone complete
 
 ## Project Reference
 
@@ -42,7 +42,7 @@ See: `.planning/config.json`
 
 See: `.planning/ROADMAP.md`
 
-v1.3 Non-CDNA Issue Closure contains 5 phases:
+v1.3 Non-CDNA Issue Closure completed 5 phases:
 
 - Phase 14: Original Feature Parity Audit - complete
 - Phase 15: AMD Scoring and Baseline Workflow - complete
@@ -63,6 +63,9 @@ v1.3 Non-CDNA Issue Closure contains 5 phases:
 - v1.2 requirements archived in `.planning/milestones/v1.2-REQUIREMENTS.md`.
 - v1.2 roadmap archived in `.planning/milestones/v1.2-ROADMAP.md`.
 - v1.2 audit archived in `.planning/milestones/v1.2-MILESTONE-AUDIT.md`.
+- v1.3 requirements archived in `.planning/milestones/v1.3-REQUIREMENTS.md`.
+- v1.3 roadmap archived in `.planning/milestones/v1.3-ROADMAP.md`.
+- v1.3 audit archived in `.planning/milestones/v1.3-MILESTONE-AUDIT.md`.
 
 ## Deferred Items
 
@@ -74,16 +77,15 @@ Items acknowledged and deferred at milestone close on 2026-05-21:
 
 ## Next Action
 
-Run milestone audit and archive v1.3.
+Start the next milestone with `/gsd-new-milestone`.
 
 ## Current Position
 
 Phase: Milestone v1.3 complete
 Plan: —
-Status: Awaiting milestone audit/archive
-Last activity: 2026-05-22 — v1.3 phases completed
+Status: Awaiting next milestone
+Last activity: 2026-05-22 — v1.3 milestone completed and archived
 
 ## Operator Next Steps
 
-- Run /gsd-audit-milestone
-- Then run /gsd-complete-milestone v1.3
+- Start the next milestone with /gsd-new-milestone
