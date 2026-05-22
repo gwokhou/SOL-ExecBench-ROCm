@@ -15,10 +15,10 @@
 
 ### Live Profiler Timing
 
-- [ ] **PROF-01**: Maintainer can collect live `rocprofv3` timing evidence during benchmark or dataset execution when the timing policy selects profiler-backed timing.
-- [ ] **PROF-02**: Timing evidence records source type, timer backend, activity domain, aggregation rule, tool version, GPU architecture, parsed rows, and fallback reason when applicable.
-- [ ] **PROF-03**: HIP native, Triton, PyTorch, mixed, and unknown sources preserve source-specific timing semantics instead of forcing one unified timer口径.
-- [ ] **PROF-04**: Live timing excludes or explicitly labels compile, autotune, warmup, unrelated kernel rows, and event-timing fallback so measured latency remains auditable.
+- [x] **PROF-01**: Maintainer can collect live `rocprofv3` timing evidence during benchmark or dataset execution when the timing policy selects profiler-backed timing.
+- [x] **PROF-02**: Timing evidence records source type, timer backend, activity domain, aggregation rule, tool version, GPU architecture, parsed rows, and fallback reason when applicable.
+- [x] **PROF-03**: HIP native, Triton, PyTorch, mixed, and unknown sources preserve source-specific timing semantics instead of forcing one unified timer口径.
+- [x] **PROF-04**: Live timing excludes or explicitly labels compile, autotune, warmup, unrelated kernel rows, and event-timing fallback so measured latency remains auditable.
 
 ### Derived Scoring Workflow
 
@@ -72,10 +72,10 @@ Updated during roadmap creation.
 | SOLCOV-02 | Phase 27 | Complete |
 | SOLCOV-03 | Phase 27 | Complete |
 | SOLCOV-04 | Phase 27 | Complete |
-| PROF-01 | Phase 28 | Pending |
-| PROF-02 | Phase 28 | Pending |
-| PROF-03 | Phase 28 | Pending |
-| PROF-04 | Phase 28 | Pending |
+| PROF-01 | Phase 28 | Complete |
+| PROF-02 | Phase 28 | Complete |
+| PROF-03 | Phase 28 | Complete |
+| PROF-04 | Phase 28 | Complete |
 | SCORE-01 | Phase 29 | Pending |
 | SCORE-02 | Phase 29 | Pending |
 | SCORE-03 | Phase 29 | Pending |
@@ -95,4 +95,4 @@ Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-05-22*
-*Last updated: 2026-05-22 after Phase 27 completion*
+*Last updated: 2026-05-22 after Phase 28 completion*
