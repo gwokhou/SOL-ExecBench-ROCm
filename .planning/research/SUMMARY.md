@@ -1,151 +1,170 @@
 # Project Research Summary
 
 **Project:** SOL ExecBench ROCm Port
-**Domain:** ROCm port of GPU kernel benchmark framework
-**Researched:** 2026-05-21
-**Confidence:** MEDIUM-HIGH
+**Domain:** SOL ExecBench ROCm engineering-practice adaptation
+**Researched:** 2026-05-22
+**Confidence:** HIGH
 
 ## Executive Summary
 
-This project should be treated as a backend replacement of a benchmark runtime,
-not as a simple CUDA-to-HIP search/replace. The existing CLI, JSON schemas,
-staging model, trace format, correctness logic, and test organization are worth
-preserving. The NVIDIA-specific layers are Docker/runtime dependencies, native
-compile flags, eval-driver CUDA assumptions, CUPTI/timing/profile logic,
-hardware discovery/clock controls, examples, and Docker dependency checks.
+`hip-execbench` is strongest as an engineering workflow around HIP kernel
+development: explicit pipeline stages, compile-cache discipline, richer
+diagnostics, profiling/report output, agent-readable summaries, and repeated-run
+baseline comparison. Those are valuable practices, but the implementation is
+not semantically equivalent to the current SOL ExecBench ROCm harness. The
+current repository has stronger paper-aligned correctness, timing, trace, and
+reward-hack behavior.
 
-The recommended ROCm stack is ROCm >= 7.0 with HIP/hipCC or amdclang++ for native
-kernels, PyTorch ROCm wheels or ROCm PyTorch images for tensor execution,
-Triton ROCm for Python DSL kernels, rocprofiler-sdk/rocprofv3 for profiling,
-AMD SMI/ROCm SMI/rocminfo for system inspection, and ROCm libraries such as
-rocBLAS/hipBLASLt, MIOpen, Composable Kernel, rocWMMA, hipCUB, rocPRIM, and
-rocThrust for replacements of NVIDIA library/DSL examples.
+The recommended v1.4 approach is to adapt practices, not frameworks. Keep the
+existing CLI, Pydantic schemas, solution format, trace JSONL, and eval driver as
+the public benchmark contract. Add internal or opt-in helpers for stage
+diagnostics, validation readiness, derived evidence reports, and compatibility
+guardrails.
 
-The main risk is benchmark drift: a port that compiles and runs but no longer
-measures the same thing or no longer defends against the same reward-hacking
-patterns. The roadmap should therefore stabilize environment, build, eval, and
-timing contracts before broad example migration.
+The main risk is claim inflation: CDNA 3 validation readiness can be useful
+without proving real CDNA 3 hardware validation. v1.4 should implement CDNA 3
+readiness and evidence collection, but only RDNA 4 is required to receive real
+unit and E2E validation evidence in this milestone.
 
 ## Key Findings
 
 ### Recommended Stack
 
+No new runtime dependency is recommended. Use the existing Python package,
+Pydantic v2 schemas, Click/Rich CLI surface, PyTorch ROCm event timing, JSON and
+Markdown derived artifacts, and pytest validation. Do not import the
+TypeScript/Node stack from `hip-execbench`.
+
 **Core technologies:**
-- ROCm >= 7.0: required platform baseline.
-- HIP/hipCC or amdclang++: native kernel compile path.
-- PyTorch ROCm: replacement for current PyTorch CUDA dependency.
-- Triton ROCm: replacement for Triton examples where supported.
-- rocprofiler-sdk/rocprofv3: replacement direction for CUPTI profiling/timing.
-- ROCm libraries: rocBLAS/hipBLASLt, MIOpen, Composable Kernel, rocWMMA, hipCUB, rocPRIM, rocThrust.
+- Python/Pydantic: preserve public benchmark contracts.
+- PyTorch ROCm event timing: preserve current timing semantics.
+- Pytest: enforce public contract, readiness, and RDNA 4 E2E validation.
+- JSON/Markdown: produce separate evidence artifacts without mutating traces.
 
 ### Expected Features
 
 **Must have:**
-- ROCm Docker/dev environment.
-- HIP/C++ native compile and load path.
-- PyTorch ROCm and Triton ROCm solution paths.
-- ROCm-native profiling/timing and hardware detection.
-- Replacement matrix for original CUDA/CUTLASS/cuDNN/CuTe/cuTile capabilities.
-- Adapted tests passing on RDNA 4 and CDNA 3.
-- License and third-party dependency compliance.
+- Compatibility contract inventory and guardrail tests.
+- Source-grounded `hip-execbench` practice adaptation map.
+- Internal/additive stage diagnostics or evidence model.
+- CDNA 3 validation readiness workflow for `gfx94*`.
+- RDNA 4 unit and E2E validation evidence.
 
 **Should have:**
-- Porting diagnostics using HIPIFY examine output.
-- ROCm-native profile/analyze workflow documentation.
-- Clear architecture-specific skip/failure reporting.
+- Evidence/report writer derived from existing trace and diagnostics.
+- Agent-readable summaries that do not replace trace JSONL.
+- Profiling readiness classification.
 
 **Defer:**
-- Dual CUDA/ROCm backend.
-- Assembly-level AMD-specific optimization beyond what is needed for correctness and representative examples.
+- Public experimental CLI.
+- AMD-native SOL interpretation model.
+- Real CDNA 3 hardware validation pass and claim update.
 
 ### Architecture Approach
 
-Keep the current package and data contracts. Replace NVIDIA-specific behavior
-inside existing backend boundaries: Docker/dependencies, `ProblemPackager`,
-`build_ext.py`, `eval_driver.py`, timing/profile helpers, clock/hardware helpers,
-examples, and tests. This limits blast radius and keeps the ROCm port aligned
-with the original benchmark semantics.
+Add a new internal/additive layer around the existing eval path. The layer can
+observe and summarize parse/package/compile/eval/verify/timing stages, classify
+validation readiness, and generate evidence files. It must not replace
+`ProblemPackager`, `build_ext.py`, `eval_driver.py`, or trace JSONL as the
+benchmark authority.
 
 **Major components:**
-1. Environment baseline — Docker, dependencies, ROCm package validation.
-2. Native build path — HIP language/schema support and gfx target compilation.
-3. Eval runtime — ROCm-aware import, input/output, correctness, timing, reward-hack checks.
-4. Library/example migration — ROCm equivalents for original solution categories.
-5. Validation — adapted test suite on RDNA 4 and CDNA 3.
+1. Compatibility inventory and tests — define non-negotiable public contracts.
+2. Stage diagnostics/evidence helpers — capture status and failure context.
+3. Validation readiness helpers — model RDNA 4/CDNA 3 requirements and evidence.
+4. Derived reporting — generate optional JSON/Markdown summaries.
+5. RDNA 4 validation closure — run unit and E2E checks.
 
 ### Critical Pitfalls
 
-1. **Assuming HIPIFY completes the port** — use it to scope, then manually review semantic differences.
-2. **Replacing CUPTI timing weakly** — validate ROCm profiler/timing against stream and reward-hack tests.
-3. **Migrating examples too early** — stabilize backend contracts first.
-4. **Treating RDNA 4 and CDNA 3 as equivalent** — validate both explicitly.
-5. **License drift** — review replacement libraries and copied code continuously.
+1. **Breaking paper harness semantics** — avoid by keeping new helpers
+   observational or additive.
+2. **Treating readiness as CDNA 3 validation** — avoid through explicit claim
+   levels and docs/tests.
+3. **Importing dependencies instead of practices** — avoid TypeScript/Node
+   runtime additions.
+4. **Report format becoming accidental API** — keep reports derived and
+   separate from trace JSONL.
+5. **Narrow RDNA 4 validation** — require unit plus E2E evidence.
 
 ## Implications for Roadmap
 
-### Phase 1: ROCm Environment Baseline
-**Rationale:** Everything depends on a reproducible ROCm 7+ environment.
-**Delivers:** Docker image, dependency installation, ROCm PyTorch/Triton/HIP checks, AMD hardware discovery smoke tests.
-**Addresses:** Docker, package, and system-tool replacement.
-**Avoids:** Environment drift hiding as code failure.
+### Phase 1: Compatibility and Practice Inventory
 
-### Phase 2: Schema and Native Build Port
-**Rationale:** Native solutions need ROCm language/hardware concepts before examples can migrate.
-**Delivers:** HIP language/hardware support, gfx target handling, HIP build template, replacement for CUDA compile flags.
-**Uses:** HIP, hipCC/amdclang++, HIPIFY inventory.
+**Rationale:** Establish what cannot change before adapting patterns.
+**Delivers:** Source-grounded adaptation map and public-contract guardrails.
+**Addresses:** Compatibility and practice selection.
+**Avoids:** Public contract drift.
 
-### Phase 3: ROCm Eval Driver and Timing
-**Rationale:** Benchmark validity depends on isolated execution and trustworthy timing.
-**Delivers:** ROCm-aware eval driver, PyTorch/Triton ROCm runtime behavior, rocprofiler/HIP timing path, clock/environment capture.
-**Avoids:** Benchmark drift and reward-hack regressions.
+### Phase 2: Internal Diagnostics and Evidence Model
 
-### Phase 4: Library and Example Migration
-**Rationale:** Once runtime contracts are stable, port examples by category.
-**Delivers:** HIP/PyTorch/Triton examples plus ROCm replacements for CUTLASS/cuDNN/CuTe/cuTile categories where feasible.
-**Uses:** rocBLAS/hipBLASLt, MIOpen, Composable Kernel, rocWMMA, rocPRIM/hipCUB/rocThrust.
+**Rationale:** Stage-result and evidence helpers are the safest high-value
+`hip-execbench` adaptation.
+**Delivers:** Internal stage diagnostics and derived evidence structures.
+**Uses:** Existing Python modules and pytest.
+**Implements:** Additive layer around existing benchmark flow.
 
-### Phase 5: Test Suite Adaptation and Hardware Validation
-**Rationale:** User-defined done is adapted tests passing on ROCm >= 7.0 with RDNA 4 and CDNA 3.
-**Delivers:** Migrated pytest markers, Docker dependency tests, e2e examples, timing/reward-hack tests, recorded hardware validation.
+### Phase 3: CDNA 3 Validation Readiness
 
-### Phase 6: Documentation and License Compliance
-**Rationale:** Researchers and developers need clear usage and compliance boundaries.
-**Delivers:** README/docs updates, solution schema docs, Docker instructions, profile/analyze docs, third-party notices review.
+**Rationale:** User wants implementation without real CDNA 3 hardware validation.
+**Delivers:** `gfx94*` readiness checks, command/evidence template, claim
+guardrails, and tests.
+**Avoids:** Claim inflation.
+
+### Phase 4: RDNA 4 Validation Closure
+
+**Rationale:** User requires actual RDNA 4 unit and E2E validation.
+**Delivers:** Unit test pass, E2E evidence, and final compatibility checks.
+**Avoids:** Looks-done-but-isn't validation.
+
+### Phase Ordering Rationale
+
+- Compatibility comes before implementation so borrowed practices cannot drift
+  public contracts.
+- Diagnostics/evidence comes before CDNA readiness because readiness needs a
+  place to record evidence.
+- RDNA 4 closure comes last because it validates the integrated result.
+
+### Research Flags
+
+Phases likely needing deeper research during planning:
+- **Phase 2:** Exact internal API shape for stage diagnostics.
+- **Phase 3:** CDNA 3 evidence template and claim-level wording.
+- **Phase 4:** E2E command selection based on available RDNA 4 environment.
+
+Phases with standard patterns:
+- **Phase 1:** Existing public-contract guardrail pattern is already present.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Official ROCm docs identify core tools and libraries. |
-| Features | MEDIUM-HIGH | User goal is clear; exact equivalents for every NVIDIA DSL/library require implementation validation. |
-| Architecture | MEDIUM-HIGH | Existing code boundaries are clear; profiler/timing design needs proof. |
-| Pitfalls | HIGH | Porting and benchmark-integrity risks are well-established. |
+| Stack | HIGH | Existing Python stack is clearly sufficient. |
+| Features | HIGH | User constraints and source comparison point to the same priorities. |
+| Architecture | HIGH | Existing public contracts require an additive/internal layer. |
+| Pitfalls | HIGH | Risks are directly visible in current and comparison code paths. |
 
-**Overall confidence:** MEDIUM-HIGH
+**Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- Exact ROCm replacements for CuTe DSL/cuTile examples need validation during planning.
-- rocprofiler-sdk integration shape in Python subprocess needs a prototype.
-- RDNA 4 support details must be verified on the actual target hardware and ROCm 7.x image.
-- License compatibility must be checked when concrete replacement dependencies are selected.
+- Exact validation evidence file format should be decided in phase planning.
+- Whether to add a new script or keep validation readiness as internal helpers
+  should be decided based on compatibility and testability.
+- E2E evidence depends on the local RDNA 4 environment available at execution
+  time.
 
 ## Sources
 
 ### Primary
-- ROCm compatibility matrix — https://rocm.docs.amd.com/en/docs-7.0.1/compatibility/compatibility-matrix.html
-- HIP porting guide — https://rocm.docs.amd.com/projects/HIP/en/latest/how-to/hip_porting_guide.html
-- PyTorch ROCm install docs — https://rocm.docs.amd.com/projects/install-on-linux/en/docs-7.0.1/install/3rd-party/pytorch-install.html
-- rocprofv3 docs — https://rocmdocs.amd.com/projects/rocprofiler-sdk/en/latest/how-to/using-rocprofv3.html
-- Triton for ROCm docs — https://rocm.docs.amd.com/projects/radeon-ryzen/en/latest/docs/install/installrad/native_linux/install-triton.html
-- ROCm library docs for rocBLAS, MIOpen, Composable Kernel, rocWMMA, and primitives.
 
-### Local
-- `.planning/PROJECT.md`
-- `.planning/codebase/ARCHITECTURE.md`
-- `.planning/codebase/STACK.md`
-- `.planning/codebase/CONCERNS.md`
+- `src/sol_execbench/core/data/*.py` — public schema contracts.
+- `src/sol_execbench/driver/templates/eval_driver.py` — paper-style correctness and reward-hack harness.
+- `src/sol_execbench/core/bench/timing.py` — timing semantics.
+- `~/PyCharmMiscProject/hip-playground/hip-execbench/src/pipeline/runner.ts` — stage-result pattern.
+- `~/PyCharmMiscProject/hip-playground/hip-execbench/src/compiler/hipcc.ts` — compile-cache discipline.
+- `~/PyCharmMiscProject/hip-playground/hip-execbench/src/baseline/comparator.ts` — repeated-run comparison pattern.
 
 ---
-*Research completed: 2026-05-21*
+*Research completed: 2026-05-22*
 *Ready for roadmap: yes*
