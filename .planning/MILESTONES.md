@@ -1,5 +1,29 @@
 # Milestones
 
+## v1.3 Non-CDNA Issue Closure (Shipped: 2026-05-22)
+
+**Phases completed:** 5 phases, 5 plans, 0 tasks
+
+**Key accomplishments:**
+
+- Added a maintained parity audit against NVIDIA SOL ExecBench public
+  functionality and original solution categories.
+- Added `sol-execbench-baseline`, a public trace JSONL baseline-comparison
+  command with text/JSON output and claim-level guardrails.
+- Clarified ROCm library category readiness so `hipblas`, `miopen`, `ck`, and
+  `rocwmma` are candidate categories unless runnable evidence exists.
+- Updated the `hip-execbench` practice map to record accepted baseline
+  comparison adaptation and rejected contract-changing imports.
+- Closed non-CDNA validation debt with focused public-contract, parity,
+  baseline, library-readiness, and practice-map tests.
+
+**Known gaps:**
+
+- Real CDNA 3 hardware validation remains deferred until a future milestone with
+  access to `gfx94*` hardware evidence.
+
+---
+
 ## v1.2 Engineering Practice Harvest and Compatibility Guardrails (Shipped: 2026-05-22)
 
 **Phases completed:** 4 phases, 4 plans, 0 tasks

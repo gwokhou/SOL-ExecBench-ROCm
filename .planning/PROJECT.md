@@ -15,10 +15,7 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
 ## Current State
 
-**Shipped version:** v1.2 Engineering Practice Harvest and Compatibility
-Guardrails, archived 2026-05-22.
-
-**Current milestone:** v1.3 Non-CDNA Issue Closure.
+**Shipped version:** v1.3 Non-CDNA Issue Closure, archived 2026-05-22.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline. The
 v1.1 milestone added CDNA 3 code/schema support, maintained active
@@ -27,12 +24,11 @@ compatibility-example metadata, and a concrete CDNA 3 hardware validation
 handoff for a future milestone. The v1.2 milestone harvested selected
 engineering practices from `hip-execbench` as internal diagnostics, reporting,
 score-interpretation guardrails, and public-contract tests without changing
-external schemas, CLI behavior, trace formats, or examples.
-
-The v1.3 milestone closes non-CDNA residual gaps by comparing the ROCm port
+external schemas, CLI behavior, trace formats, or examples. The v1.3 milestone
+closed non-CDNA residual gaps by comparing the ROCm port
 against NVIDIA SOL ExecBench's original public functionality and selectively
 borrowing engineering practices from
-`~/PyCharmMiscProject/hip-playground/hip-execbench`. The milestone excludes real
+`~/PyCharmMiscProject/hip-playground/hip-execbench`. The milestone excluded real
 CDNA 3 hardware validation and any CDNA 3 hardware-validation claim.
 
 Validation status:
@@ -72,23 +68,23 @@ Validation status:
   performance claims while preserving the existing score formula - v1.2.
 - Public contract guardrail tests protect schemas, CLI help, trace behavior,
   HIP-facing examples, and CDNA 3 validation deferral language - v1.2.
+- Original NVIDIA SOL ExecBench public functionality is mapped to ROCm port
+  disposition with tests protecting parity documentation - v1.3.
+- Public baseline comparison over existing trace JSONL is available through
+  `sol-execbench-baseline` without changing trace schemas or the main benchmark
+  CLI - v1.3.
+- ROCm library categories distinguish supported HIP/C++ from candidate
+  `hipblas`, `miopen`, `ck`, and `rocwmma` replacement directions - v1.3.
+- `hip-execbench` baseline/reporting practices have been selectively adapted or
+  explicitly rejected according to SOL ExecBench public-contract constraints -
+  v1.3.
+- Non-CDNA validation debt is closed; real CDNA 3 hardware validation remains
+  the only deferred project-level item - v1.3.
 
 ### Active
 
 - [ ] Keep CDNA 3 real hardware validation deferred until a future milestone
       with access to `gfx94*` hardware evidence.
-- [ ] Define AMD-native scoring or roofline interpretation before making AMD
-      hardware performance claims from SOL-Score-style outputs.
-- [ ] Provide a public baseline-comparison CLI or documented workflow that is
-      safe for ROCm users and preserves existing trace/schema contracts.
-- [ ] Complete a feature-parity audit against NVIDIA SOL ExecBench and classify
-      each original public capability as ported, intentionally replaced,
-      documented compatibility-only, or out of scope.
-- [ ] Verify ROCm library-oriented solution categories (`hipblas`, `miopen`,
-      `ck`, `rocwmma`) have sufficient schema, build, documentation, example,
-      and test coverage for their intended support status.
-- [ ] Close non-CDNA validation debt, including v1.2 discovery-only validation
-      gaps where phase-specific validation artifacts or tests are missing.
 
 ### Out of Scope
 
@@ -132,7 +128,7 @@ formats.
 | Defer CDNA 3 validation | No CDNA 3 hardware run was available during closure. | Accepted as v1.0 technical debt |
 | Separate CDNA 3 code support from hardware validation | User requested CDNA 3 support in v1.1 while deferring real hardware validation to the next milestone. | Validated in v1.1 |
 | Preserve public interfaces during practice harvest | User requested borrowing engineering experience from `hip-execbench` without changing this project's external interfaces or formats. | Validated in v1.2 |
-| Close non-CDNA gaps before CDNA hardware validation | User requested v1.3 converge all issues except CDNA 3 validation, using NVIDIA SOL ExecBench parity and `hip-execbench` engineering experience as references. | Pending in v1.3 |
+| Close non-CDNA gaps before CDNA hardware validation | User requested v1.3 converge all issues except CDNA 3 validation, using NVIDIA SOL ExecBench parity and `hip-execbench` engineering experience as references. | Validated in v1.3 |
 
 ## Evolution
 
@@ -152,4 +148,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-22 after starting v1.3 milestone*
+*Last updated: 2026-05-22 after v1.3 milestone*
