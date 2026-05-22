@@ -1,5 +1,31 @@
 # Milestones
 
+## v1.4 hip-execbench Engineering Experience Adaptation + Validation Workflow Readiness (Shipped: 2026-05-22)
+
+**Phases completed:** 4 phases, 4 plans, 0 tasks
+
+**Key accomplishments:**
+
+- Added a source-grounded v1.4 compatibility inventory and guardrail tests for
+  CLI, schemas, solution format, trace JSONL, and eval-driver semantics.
+
+- Added a derived evidence/report model that combines trace summaries and stage
+  diagnostics while labeling itself as non-canonical.
+
+- Implemented CDNA 3 `gfx94*` validation readiness metadata with commands,
+  evidence requirements, blockers, acceptance criteria, and no-claim wording.
+
+- Recorded RDNA 4 `gfx1200` validation evidence: focused unit tests passed,
+  existing E2E pytest passed, and `sol-execbench` CLI produced 3 passing trace
+  JSONL records.
+
+**Known gaps:**
+
+- Real CDNA 3 hardware validation remains deferred until a future full-suite
+  `gfx94*` run is recorded.
+
+---
+
 ## v1.3 Non-CDNA Issue Closure (Shipped: 2026-05-22)
 
 **Phases completed:** 5 phases, 5 plans, 0 tasks
@@ -8,12 +34,16 @@
 
 - Added a maintained parity audit against NVIDIA SOL ExecBench public
   functionality and original solution categories.
+
 - Added `sol-execbench-baseline`, a public trace JSONL baseline-comparison
   command with text/JSON output and claim-level guardrails.
+
 - Clarified ROCm library category readiness so `hipblas`, `miopen`, `ck`, and
   `rocwmma` are candidate categories unless runnable evidence exists.
+
 - Updated the `hip-execbench` practice map to record accepted baseline
   comparison adaptation and rejected contract-changing imports.
+
 - Closed non-CDNA validation debt with focused public-contract, parity,
   baseline, library-readiness, and practice-map tests.
 
@@ -32,12 +62,16 @@
 
 - Documented accepted, rejected, and deferred `hip-execbench` engineering
   practices in an internal adaptation map.
+
 - Added internal ROCm diagnostics for tool readiness, gfx classification, local
   gfx detection, and profiler backend fallback reasoning.
+
 - Added pure trace reporting helpers that summarize existing trace objects
   without changing trace JSONL.
+
 - Added SOL-Score interpretation guardrails that warn against unsupported AMD
   hardware performance claims while preserving the existing score formula.
+
 - Added public contract tests for solution/workload/trace schemas, CLI help,
   HIP-facing example paths, and CDNA 3 validation deferral language.
 
@@ -45,6 +79,7 @@
 
 - Real CDNA 3 hardware validation remains deferred until a future milestone with
   access to `gfx94*` hardware evidence.
+
 - Public baseline-comparison CLI and AMD-native roofline interpretation remain
   future scope.
 
