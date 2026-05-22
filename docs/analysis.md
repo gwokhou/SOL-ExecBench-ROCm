@@ -128,5 +128,8 @@ port:
 3. AMD-native claims require an explicit AMD roofline or equivalent model,
    recorded hardware evidence, and documentation of which architecture and
    clock policy the model covers.
-4. CDNA 3 claims additionally require the deferred `gfx94*` full-suite
+4. AMD-native scoring requires an AMD SOL bound artifact with graph nodes,
+   FLOP/byte evidence, hardware model source, confidence, and validation status
+   before reporting AMD-native scores.
+5. CDNA 3 claims additionally require the deferred `gfx94*` full-suite
    validation evidence.
