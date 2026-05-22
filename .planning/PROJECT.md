@@ -44,16 +44,26 @@ Validation status:
 - CDNA 3 (`gfx94*`) full adapted suite validation remains deferred by user
   decision and must be completed before claiming CDNA 3 hardware validation.
 
-## Next Milestone Goals
+## Current Milestone: v1.6 AMD SOLAR Coverage, Live Profiler Timing, and Scoring Workflow
 
-No active milestone is defined. Candidate next directions:
+**Goal:** Turn the v1.5 AMD-native SOL, timing, and scoring foundations into an
+end-to-end workflow while preserving existing public contracts.
 
-- Broaden AMD SOL operator coverage beyond the conservative v1.5 foundation.
-- Integrate profiler-backed timing evidence deeper into benchmark execution
-  once live collection policy and runtime cost are accepted.
-- Promote AMD hardware model entries from provisional/unvalidated only after
-  architecture-specific evidence is recorded.
-- Run real CDNA 3 `gfx94*` full-suite validation when hardware is available.
+**Target features:**
+
+- Broaden AMD SOL/SOLAR-like operator coverage beyond the conservative v1.5
+  foundation.
+- Integrate `rocprofv3` live collection into the actual benchmark timing path
+  while preserving source-specific HIP, Triton, and PyTorch timing semantics.
+- Connect AMD-native score reports to dataset runner or CLI workflows so
+  trace, timing evidence, and SOL bound artifacts can produce workload and
+  suite score outputs.
+
+**Hard constraint:**
+
+- Do not break existing canonical trace JSONL, public schemas, or the primary
+  `sol-execbench` CLI contract. New scoring or timing outputs must be derived
+  artifacts or additive documented outputs.
 
 ## Requirements
 
@@ -109,10 +119,10 @@ No active milestone is defined. Candidate next directions:
 ### Active
 
 - [ ] Broaden AMD SOL operator analyzer coverage beyond the v1.5 foundation.
-- [ ] Promote AMD hardware model entries from provisional or unvalidated to
-      validated after architecture-specific evidence is recorded.
-- [ ] Perform real CDNA 3 `gfx94*` full-suite hardware validation when hardware
-      is available.
+- [ ] Integrate live `rocprofv3` timing collection into benchmark execution
+      without changing canonical trace JSONL or public CLI defaults.
+- [ ] Connect AMD-native score report generation to dataset runner or CLI
+      workflows as a derived artifact.
 
 ### Out of Scope
 
@@ -121,6 +131,7 @@ No active milestone is defined. Candidate next directions:
 - Guaranteeing one-to-one high-performance replacements for every NVIDIA DSL - some former CUTLASS/cuDNN/CuTe/cuTile categories remain documented compatibility examples or candidates.
 - Claiming CDNA 3 hardware validation before a full `gfx94*` suite pass is recorded.
 - Performing real CDNA 3 `gfx94*` full-suite hardware validation in v1.5 - user explicitly excluded it from this milestone.
+- Performing real CDNA 3 `gfx94*` full-suite hardware validation in v1.6 - user did not include CDNA 3 validation in this milestone scope.
 - Claiming NVIDIA leaderboard equivalence or B200/SOLAR equivalence for AMD-native scores.
 
 ## Context
@@ -187,4 +198,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-22 after v1.5 milestone*
+*Last updated: 2026-05-22 after starting v1.6 milestone*

@@ -1,32 +1,31 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.5
-milestone_name: AMD-native SOL Scoring and ROCm Profiler Timing
-current_phase: 26
-status: completed
-last_updated: "2026-05-22T10:04:25.245Z"
-last_activity: 2026-05-22 — Milestone v1.5 completed and archived
+milestone: v1.6
+milestone_name: AMD SOLAR Coverage, Live Profiler Timing, and Scoring Workflow
+status: planning
+last_updated: "2026-05-22T10:26:36.097Z"
+last_activity: 2026-05-22
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 4
-  completed_plans: 4
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 **Project:** SOL ExecBench ROCm Port
 **Initialized:** 2026-05-21
-**Current phase:** 26
-**Status:** v1.5 milestone complete
+**Current phase:** Not started
+**Status:** Defining v1.6 requirements
 
 ## Project Reference
 
 See: `.planning/PROJECT.md` (updated 2026-05-22)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Planning next milestone
+**Current focus:** AMD SOLAR coverage, live profiler timing, and scoring workflow
 
 ## Workflow Settings
 
@@ -43,7 +42,7 @@ See: `.planning/config.json`
 
 See: `.planning/ROADMAP.md`
 
-No active milestone is defined. v1.5 is archived.
+v1.6 milestone is being defined. Requirements and roadmap are pending.
 
 ## Memory
 
@@ -65,6 +64,10 @@ No active milestone is defined. v1.5 is archived.
 - v1.4 roadmap archived in `.planning/milestones/v1.4-ROADMAP.md`.
 - v1.4 audit archived in `.planning/milestones/v1.4-MILESTONE-AUDIT.md`.
 - v1.4 phase execution history archived in `.planning/milestones/v1.4-phases/`.
+- v1.5 requirements archived in `.planning/milestones/v1.5-REQUIREMENTS.md`.
+- v1.5 roadmap archived in `.planning/milestones/v1.5-ROADMAP.md`.
+- v1.5 audit archived in `.planning/milestones/v1.5-MILESTONE-AUDIT.md`.
+- v1.5 phase execution history archived in `.planning/milestones/v1.5-phases/`.
 
 ## Deferred Items
 
@@ -76,15 +79,16 @@ Items acknowledged and deferred at milestone close on 2026-05-21:
 
 ## Next Action
 
-Start the next milestone with /gsd-new-milestone.
+Define v1.6 requirements and roadmap.
 
 ## Current Position
 
-Phase: Milestone v1.5 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-05-22 — Milestone v1.5 completed and archived
+Status: Defining requirements
+Last activity: 2026-05-22 — Milestone v1.6 started
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Choose whether to run pre-planning research.
+- Write v1.6 requirements and roadmap after the research decision.
