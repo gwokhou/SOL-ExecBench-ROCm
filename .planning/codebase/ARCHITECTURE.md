@@ -6,280 +6,247 @@
 ## System Overview
 
 ```text
-+-------------------------------------------------------------+
-|                         CLI Layer                            |
-| `src/sol_execbench/cli/main.py`  `src/sol_execbench/cli/baseline.py` |
-+---------------------+---------------------+-----------------+
-                      |
-                      v
-+-------------------------------------------------------------+
-|                   Public Core Model Surface                  |
-| `src/sol_execbench/core/__init__.py`                         |
-| Pydantic schemas, config, trace/result objects               |
-+---------------------+---------------------+-----------------+
-                      |
-                      v
-+---------------------+---------------------+-----------------+
-|    Staging Driver    |       Bench Runtime      | Reporting   |
-| `driver/`            | `core/bench/`            | `core/*.py`  |
-| ProblemPackager      | input/correctness/timing | summaries    |
-+----------+----------+-----------+-------------+-------------+
-           |                      |
-           v                      v
-+-------------------------------------------------------------+
-|              Subprocess Evaluation Sandbox                   |
-| `src/sol_execbench/driver/templates/build_ext.py`            |
-| `src/sol_execbench/driver/templates/eval_driver.py`          |
-+---------------------+---------------------+-----------------+
-                      |
-                      v
-+-------------------------------------------------------------+
-|         Filesystem Artifacts and Trace JSONL Output           |
-| temp staging dirs, `definition.json`, `workload.jsonl`,       |
-| `solution.json`, `config.json`, `benchmark_kernel.so`, traces |
-+-------------------------------------------------------------+
+┌─────────────────────────────────────────────────────────────┐
+│                         CLI Layer                           │
+├───────────────────────────────┬─────────────────────────────┤
+│ Benchmark CLI                 │ Baseline CLI                │
+│ `src/sol_execbench/cli/main.py` │ `src/sol_execbench/cli/baseline.py` │
+└───────────────┬───────────────┴──────────────┬──────────────┘
+                │                              │
+                ▼                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                         Core Layer                          │
+├───────────────────┬───────────────────┬─────────────────────┤
+│ Data contracts    │ Benchmark utils   │ Reporting/scoring   │
+│ `src/sol_execbench/core/data/` │ `src/sol_execbench/core/bench/` │ `src/sol_execbench/core/scoring/` │
+└───────────────┬───┴───────────────┬───┴──────────────┬──────┘
+                │                   │                  │
+                ▼                   ▼                  ▼
+┌─────────────────────────────────────────────────────────────┐
+│                       Driver Layer                          │
+│ `src/sol_execbench/driver/problem_packager.py`               │
+│ `src/sol_execbench/driver/templates/`                        │
+└─────────────────────────────┬───────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Staged Subprocess Runtime                 │
+│ `definition.json`, `workload.jsonl`, `solution.json`,        │
+│ `config.json`, `eval_driver.py`, optional `build_ext.py`     │
+└─────────────────────────────────────────────────────────────┘
 ```
+
+SOL ExecBench ROCm is a layered Python package. The CLI loads JSON inputs into typed contracts, `ProblemPackager` materializes a staging directory, generated driver scripts run candidate code in a subprocess, and the subprocess emits JSONL `Trace` records that the CLI parses and reports.
 
 ## Component Responsibilities
 
 | Component | Responsibility | File |
 |-----------|----------------|------|
-| Main benchmark CLI | Parse CLI options, load problem files into models, create staging directory, invoke compile/evaluate subprocesses, render trace results. | `src/sol_execbench/cli/main.py` |
-| Baseline CLI | Compare candidate trace JSONL files against one or more baseline trace JSONL files. | `src/sol_execbench/cli/baseline.py` |
-| Public package exports | Re-export the schema and config types used by the CLI, driver, tests, and examples. | `src/sol_execbench/core/__init__.py`, `src/sol_execbench/__init__.py` |
-| Schema models | Define benchmark contracts for definitions, workloads, solutions, traces, evaluation metrics, dtypes, shapes, and JSON helpers. | `src/sol_execbench/core/data/` |
-| Benchmark config | Hold runtime knobs such as seeds, warmup/iteration counts, reference timing, and clock-lock requirements. | `src/sol_execbench/core/bench/config/benchmark_config.py` |
-| Problem packager | Materialize validated models and submitted sources into a temporary staging directory and return subprocess commands. | `src/sol_execbench/driver/problem_packager.py` |
-| Build template | Compile HIP/C++ sources into `benchmark_kernel.so` through `torch.utils.cpp_extension.load`. | `src/sol_execbench/driver/templates/build_ext.py` |
-| Evaluation template | Load reference and submitted code, generate inputs, run correctness checks, time kernels, apply reward-hack defenses, and emit `Trace` JSONL. | `src/sol_execbench/driver/templates/eval_driver.py` |
-| Bench I/O | Generate random/custom/safetensors inputs, normalize return-value outputs, allocate DPS outputs, and provide unique memory views for timing. | `src/sol_execbench/core/bench/io.py` |
-| Correctness | Seed execution and compute numerical error metrics against workload tolerances. | `src/sol_execbench/core/bench/correctness.py` |
-| Timing | Measure ROCm kernels using PyTorch HIP-backed `torch.cuda.Event` timing with cache clearing and shifted tensor addresses. | `src/sol_execbench/core/bench/timing.py` |
-| Reward-hack checks | Detect timing monkey-patches, lazy output proxies, thread injection, and eval-driver integrity changes. | `src/sol_execbench/core/bench/reward_hack.py` |
-| Diagnostics/reporting | Provide internal ROCm readiness diagnostics and derived summaries without changing trace schema. | `src/sol_execbench/core/diagnostics.py`, `src/sol_execbench/core/reporting.py` |
+| Benchmark CLI | Resolve problem paths, load schemas, create staging directory, run compile/eval subprocesses, print or write traces. | `src/sol_execbench/cli/main.py` |
+| Baseline CLI | Compare candidate trace JSONL against baseline trace JSONL and render text or JSON. | `src/sol_execbench/cli/baseline.py` |
+| Public exports | Re-export data models and JSON helpers for package consumers. | `src/sol_execbench/__init__.py`, `src/sol_execbench/core/__init__.py` |
+| Data contracts | Define Pydantic schemas for definitions, workloads, solutions, traces, dtypes, and JSON utilities. | `src/sol_execbench/core/data/` |
+| Benchmark execution helpers | Generate inputs, allocate outputs, normalize outputs, check correctness, time GPU functions, detect reward-hack behavior, and manage clock/profiler utilities. | `src/sol_execbench/core/bench/` |
+| Reporting | Summarize trace runs and build derived evidence reports. | `src/sol_execbench/core/reporting.py` |
+| Baseline comparison | Load trace files and classify candidate latency against best matching baseline latency. | `src/sol_execbench/core/baseline.py` |
+| AMD scoring | Build AMD-native SOL bound artifacts and guarded suite score reports. | `src/sol_execbench/core/scoring/` |
+| Driver packager | Write normalized inputs and source files into a staging directory and return subprocess commands. | `src/sol_execbench/driver/problem_packager.py` |
+| Evaluation driver template | Run reference and user code per workload, enforce guardrails, time solutions, and emit `Trace` JSONL. | `src/sol_execbench/driver/templates/eval_driver.py` |
+| Native build template | Compile HIP/C++ sources through PyTorch's extension API into `benchmark_kernel.so`. | `src/sol_execbench/driver/templates/build_ext.py` |
 
 ## Pattern Overview
 
-**Overall:** CLI-orchestrated, schema-first benchmark runner with generated staging scripts and subprocess isolation.
+**Overall:** Layered CLI application with typed data contracts and subprocess isolation.
 
 **Key Characteristics:**
-- Treat `Definition`, `Workload`, `Solution`, and `Trace` Pydantic models in `src/sol_execbench/core/data/` as the public benchmark contract.
-- Keep user code out of the parent CLI process. The CLI stages files with `ProblemPackager`, then runs `build_ext.py` and `eval_driver.py` under `subprocess.run`.
-- Use filesystem staging as the handoff boundary: staged JSON models, source files, optional compiled `benchmark_kernel.so`, and stdout trace JSONL are the integration format.
-- Keep ROCm compatibility behind existing PyTorch CUDA-named APIs where PyTorch exposes HIP behavior, especially `torch.cuda.Event`, `torch.cuda.synchronize`, and `torch.utils.cpp_extension`.
+- Keep public benchmark semantics in Pydantic models under `src/sol_execbench/core/data/`; CLI and driver code should consume these models instead of manipulating raw dictionaries.
+- Keep user solution execution out of the CLI process. Candidate sources are copied to staging and imported by `src/sol_execbench/driver/templates/eval_driver.py`.
+- Treat ROCm as the execution target while retaining PyTorch's HIP-backed `torch.cuda` device API where PyTorch ROCm exposes it.
+- Keep native HIP/C++ compilation as a separate staged phase through `src/sol_execbench/driver/templates/build_ext.py`.
 
 ## Layers
 
 **CLI Layer:**
-- Purpose: Own user interaction, option parsing, problem-file resolution, output formatting, and process exit codes.
+- Purpose: User-facing commands, path resolution, subprocess orchestration, and console output.
 - Location: `src/sol_execbench/cli/`
-- Contains: `sol-execbench` main CLI in `src/sol_execbench/cli/main.py`; `sol-execbench-baseline` in `src/sol_execbench/cli/baseline.py`.
-- Depends on: `src/sol_execbench/core/`, `src/sol_execbench/driver/problem_packager.py`, Click, Rich, subprocess.
-- Used by: Package scripts configured in `pyproject.toml` and CLI e2e tests in `tests/sol_execbench/test_e2e.py`.
+- Contains: Click commands, Rich table rendering, trace JSONL output handling.
+- Depends on: `src/sol_execbench/core/`, `src/sol_execbench/driver/`
+- Used by: `pyproject.toml` script entry points `sol-execbench` and `sol-execbench-baseline`.
 
-**Data Contract Layer:**
-- Purpose: Validate and serialize every public benchmark artifact.
+**Core Data Layer:**
+- Purpose: Public schema contracts and serialization helpers.
 - Location: `src/sol_execbench/core/data/`
-- Contains: `Definition`, `Workload`, `Solution`, `Trace`, JSON helpers, dtype conversion, and shape resolution.
-- Depends on: Pydantic, Python AST parsing, PyTorch dtype APIs.
-- Used by: CLI loaders, `ProblemPackager`, generated templates, tests, examples, scoring, reporting, and baseline comparison.
+- Contains: `Definition`, `Workload`, `Solution`, `Trace`, dtype conversion, shape expression resolution, JSON/JSONL helpers.
+- Depends on: Pydantic, Python standard library; dtype helpers lazily import PyTorch for torch dtype mapping.
+- Used by: CLI loading, driver templates, benchmark utilities, scoring, tests, examples.
 
-**Driver/Staging Layer:**
-- Purpose: Convert validated in-memory models into executable staging directories.
+**Core Benchmark Layer:**
+- Purpose: Runtime operations used by the staged evaluation driver.
+- Location: `src/sol_execbench/core/bench/`
+- Contains: Input generation in `src/sol_execbench/core/bench/io.py`, correctness in `src/sol_execbench/core/bench/correctness.py`, timing in `src/sol_execbench/core/bench/timing.py`, reward-hack checks in `src/sol_execbench/core/bench/reward_hack.py`, clock and profiler utilities.
+- Depends on: PyTorch ROCm APIs, safetensors when safetensors inputs are used, ROCm command-line tools for clock/profiler paths.
+- Used by: `src/sol_execbench/driver/templates/eval_driver.py`, diagnostics/scoring tests.
+
+**Driver Layer:**
+- Purpose: Convert typed benchmark inputs into a temporary filesystem runtime.
 - Location: `src/sol_execbench/driver/`
-- Contains: `ProblemPackager`, ROCm gfx detection helpers, template files.
-- Depends on: `src/sol_execbench/core/`, filesystem writes to temp staging dirs, ROCm tools `rocm_agent_enumerator` and `rocminfo` for LOCAL target expansion.
-- Used by: Main CLI, tests under `tests/sol_execbench/driver/`, example and e2e tests.
+- Contains: `ProblemPackager`, templates copied into staging, offload architecture detection for HIP builds.
+- Depends on: Core data/config models, subprocess, filesystem utilities.
+- Used by: `src/sol_execbench/cli/main.py`, `tests/sol_execbench/driver/`, `tests/examples/test_examples.py`.
 
-**Evaluation Runtime Layer:**
-- Purpose: Execute reference and user functions, enforce benchmark semantics, and emit canonical trace JSONL.
-- Location: `src/sol_execbench/driver/templates/eval_driver.py` and helpers in `src/sol_execbench/core/bench/`
-- Contains: Reference import, user import/native module load, input generation, output normalization, correctness, timing, reward-hack checks, trace emission.
-- Depends on: PyTorch ROCm runtime, safetensors for blob-backed workloads, staged files.
-- Used by: Subprocesses launched from the CLI and direct template tests in `tests/sol_execbench/driver/test_eval_driver.py`.
-
-**Reporting and Scoring Layer:**
-- Purpose: Summarize or compare existing trace objects without changing the trace JSONL schema.
-- Location: `src/sol_execbench/core/baseline.py`, `src/sol_execbench/core/reporting.py`, `src/sol_execbench/sol_score.py`
-- Contains: Baseline comparison dataclasses, trace summary dataclasses, score helper.
-- Depends on: `Trace` and `EvaluationStatus` models.
-- Used by: Baseline CLI and tests under `tests/sol_execbench/`.
-
-**Documentation and Examples Layer:**
-- Purpose: Preserve schema, ROCm migration, compatibility, and runnable example guidance.
-- Location: `docs/`, `examples/`, `tests/examples/`
-- Contains: Schema docs, ROCm support docs, example problem directories with `definition.json`, `workload.jsonl`, `solution_*.json`, and source files.
-- Depends on: Core schema and driver behavior.
-- Used by: Docs guardrail tests and example workflow tests.
+**Scoring and Reporting Layer:**
+- Purpose: Summarize traces, compare baselines, and produce guarded AMD-native scoring evidence.
+- Location: `src/sol_execbench/core/reporting.py`, `src/sol_execbench/core/baseline.py`, `src/sol_execbench/core/scoring/`
+- Contains: Baseline comparison dataclasses, AMD SOL bound estimates, score guardrails, suite reports.
+- Depends on: `Trace`, `Definition`, workload metadata, scoring guardrail helpers.
+- Used by: `src/sol_execbench/cli/baseline.py`, `scripts/run_dataset.py`, scoring/reporting tests.
 
 ## Data Flow
 
-### Primary Request Path
+### Primary Benchmark Path
 
-1. User invokes `sol-execbench` via `pyproject.toml` script `sol_execbench.cli:cli`; Click options are defined in `src/sol_execbench/cli/main.py:180`.
-2. CLI resolves either `problem_dir` or explicit `--definition`, `--workload`, and `--solution` paths in `src/sol_execbench/cli/main.py:252`.
-3. CLI loads JSON into `Definition`, `Workload`, `Solution`, and `BenchmarkConfig` models in `src/sol_execbench/cli/main.py:269`.
-4. CLI creates a temp staging directory and instantiates `ProblemPackager` in `src/sol_execbench/cli/main.py:286`.
-5. `ProblemPackager.__init__` writes `definition.json`, `workload.jsonl`, `solution.json`, `config.json`, and submitted sources to staging in `src/sol_execbench/driver/problem_packager.py:112`.
-6. For native ROCm/C++ languages, CLI runs the `ProblemPackager.compile()` command from `src/sol_execbench/driver/problem_packager.py:175`; the staged `build_ext.py` compiles `benchmark_kernel.so` in `src/sol_execbench/driver/templates/build_ext.py`.
-7. CLI stages and runs `eval_driver.py` through `ProblemPackager.execute()` in `src/sol_execbench/driver/problem_packager.py:203` and `src/sol_execbench/cli/main.py:332`.
-8. `eval_driver.py` parses staged models, imports reference code, imports submitted Python code or compiled `benchmark_kernel.so`, and selects device in `src/sol_execbench/driver/templates/eval_driver.py:158` through `src/sol_execbench/driver/templates/eval_driver.py:250`.
-9. For each workload, `eval_driver.py` resolves axes, loads safetensors if needed, generates inputs, runs reference and user functions, checks shape/dtype/numerics, times the user function, optionally times the reference, and emits one `Trace` JSON object in `src/sol_execbench/driver/templates/eval_driver.py:380` through `src/sol_execbench/driver/templates/eval_driver.py:656`.
-10. CLI parses stdout JSONL into `Trace` models using `ProblemPackager.convert_stdout_to_traces()` in `src/sol_execbench/driver/problem_packager.py:228`, then writes output JSONL or renders a Rich table in `src/sol_execbench/cli/main.py`.
+1. The Click command receives either a problem directory or explicit JSON paths (`src/sol_execbench/cli/main.py:180`, `src/sol_execbench/cli/main.py:230`).
+2. The CLI resolves `definition.json`, `workload.jsonl`, optional `config.json`, and `solution.json` (`src/sol_execbench/cli/main.py:83`).
+3. JSON files are parsed into `Definition`, `Workload`, `Solution`, and `BenchmarkConfig` (`src/sol_execbench/cli/main.py:52`, `src/sol_execbench/cli/main.py:56`, `src/sol_execbench/cli/main.py:65`, `src/sol_execbench/cli/main.py:77`).
+4. `ProblemPackager` writes normalized JSON files and source contents into a temporary staging directory (`src/sol_execbench/cli/main.py:286`, `src/sol_execbench/driver/problem_packager.py:91`).
+5. HIP/C++ solutions run a compile subprocess using `build_ext.py`; Python and Triton solutions skip compile (`src/sol_execbench/cli/main.py:301`, `src/sol_execbench/driver/problem_packager.py:169`).
+6. `ProblemPackager.execute()` stages `eval_driver.py` and returns `["python", "eval_driver.py"]` (`src/sol_execbench/driver/problem_packager.py:202`).
+7. The CLI runs the evaluation subprocess with `PYTORCH_ALLOC_CONF=expandable_segments:True` (`src/sol_execbench/cli/main.py:335`).
+8. The evaluation driver loads staged schemas, reference code, solution code, workloads, and config (`src/sol_execbench/driver/templates/eval_driver.py:90`, `src/sol_execbench/driver/templates/eval_driver.py:160`, `src/sol_execbench/driver/templates/eval_driver.py:164`).
+9. For each workload, the driver generates inputs, runs reference and candidate functions, checks reward-hack defenses, validates shape/dtype/numerics, times the candidate, and emits one `Trace` JSON object (`src/sol_execbench/driver/templates/eval_driver.py:292`, `src/sol_execbench/driver/templates/eval_driver.py:376`).
+10. The CLI parses JSONL stdout into `Trace` models, writes optional output, renders a table, and exits `0` only when all traces pass (`src/sol_execbench/driver/problem_packager.py:228`, `src/sol_execbench/cli/main.py:351`, `src/sol_execbench/cli/main.py:379`).
 
-### HIP/C++ Compile Flow
+### Native HIP/C++ Compile Path
 
-1. `Solution.spec.languages` is validated as native ROCm or Python/Triton but not both in `src/sol_execbench/core/data/solution.py:210`.
-2. `ProblemPackager._is_cpp` classifies native ROCm languages in `src/sol_execbench/driver/problem_packager.py:127`.
-3. `ProblemPackager._inject_offload_arch_flags()` adds `--offload-arch=<gfx>` flags from explicit `target_hardware` values or local ROCm tool detection in `src/sol_execbench/driver/problem_packager.py:131`.
-4. `build_ext.py` reads staged `solution.json`, collects top-level HIP/C/C++ files in the staging directory, passes `hip_cflags`, `cflags`, and `ld_flags` into `torch.utils.cpp_extension.load`, and normalizes the output shared object name to `benchmark_kernel.so`.
-5. `eval_driver.py` imports `benchmark_kernel.so` as module `benchmark_kernel` and resolves the entry symbol in `src/sol_execbench/driver/templates/eval_driver.py:218`.
+1. `ProblemPackager._is_cpp` checks whether any solution language is a native ROCm language (`src/sol_execbench/driver/problem_packager.py:43`, `src/sol_execbench/driver/problem_packager.py:130`).
+2. `ProblemPackager.compile()` injects `--offload-arch=<gfx>` flags from explicit hardware or local ROCm tool detection when flags are absent (`src/sol_execbench/driver/problem_packager.py:132`, `src/sol_execbench/driver/problem_packager.py:169`).
+3. `build_ext.py` validates `solution.json`, collects staged `.hip`/C/C++ files, and calls `torch.utils.cpp_extension.load()` (`src/sol_execbench/driver/templates/build_ext.py:21`, `src/sol_execbench/driver/templates/build_ext.py:35`).
+4. The compiled module is normalized to `benchmark_kernel.so` in the staging directory (`src/sol_execbench/driver/templates/build_ext.py:53`).
+5. The evaluation driver imports `benchmark_kernel.so` for native ROCm languages (`src/sol_execbench/driver/templates/eval_driver.py:245`).
 
-### Python/Triton Evaluation Flow
+### Baseline Comparison Path
 
-1. `Solution.spec.entry_point` must use `<file_path>::<function_name>` and Python solutions require a `.py` entry file in `src/sol_execbench/core/data/solution.py:194` and `src/sol_execbench/core/data/solution.py:257`.
-2. `ProblemPackager._write_sources()` writes all `Solution.sources` under staging paths in `src/sol_execbench/driver/problem_packager.py:168`.
-3. `eval_driver.py` inserts the staging directory on `sys.path`, blocks `torch.utils.cpp_extension.load/load_inline` for Python solutions, imports the staged module, and resolves the function in `src/sol_execbench/driver/templates/eval_driver.py:226`.
-
-### Baseline Comparison Flow
-
-1. `sol-execbench-baseline` loads candidate and baseline trace JSONL paths from Click options in `src/sol_execbench/cli/baseline.py`.
-2. `load_trace_jsonl()` validates each row as a `Trace` in `src/sol_execbench/core/baseline.py`.
-3. `compare_trace_baselines()` groups passed baseline traces by `(definition, workload.uuid)` and classifies candidate latency as `WIN`, `PARITY`, `LOSS`, `NO_CANDIDATE`, or `NO_BASELINE` in `src/sol_execbench/core/baseline.py`.
-4. CLI renders text or JSON with `format_baseline_comparison()` or `comparison_to_json()` in `src/sol_execbench/core/baseline.py`.
+1. `sol-execbench-baseline` receives candidate and baseline trace JSONL file paths (`src/sol_execbench/cli/baseline.py:21`, `src/sol_execbench/cli/baseline.py:70`).
+2. `load_trace_jsonl()` parses each line into `Trace` models (`src/sol_execbench/core/baseline.py:51`).
+3. `compare_trace_baselines()` groups passed baseline traces by `(definition, workload.uuid)` and keeps the lowest latency (`src/sol_execbench/core/baseline.py:65`).
+4. Results are rendered as text with `format_baseline_comparison()` or JSON with `comparison_to_json()` (`src/sol_execbench/core/baseline.py:124`, `src/sol_execbench/core/baseline.py:165`).
 
 **State Management:**
-- Long-lived application state is intentionally minimal. The parent CLI keeps in-memory validated models and a temporary staging path for one run.
-- Evaluation state is process-local inside `eval_driver.py`: parsed models, imported functions, integrity snapshots, per-workload tensors, and clock status.
-- Benchmark reproducibility state is in `BenchmarkConfig` plus `set_seed()` in `src/sol_execbench/core/bench/correctness.py`.
-- Temporary files are owned by `ProblemPackager`; `ProblemPackager.__del__` removes the staging directory unless `keep_output_dir` is true in `src/sol_execbench/driver/problem_packager.py:123`.
+- Runtime state is filesystem-scoped to a temporary staging directory created in `src/sol_execbench/cli/main.py:286`.
+- Benchmark configuration is a dataclass (`src/sol_execbench/core/bench/config/benchmark_config.py:24`) serialized to `config.json` by `ProblemPackager`.
+- Model objects are immutable where behavioral identity matters; `Solution` is frozen and memoizes a content hash (`src/sol_execbench/core/data/solution.py:265`).
+- The evaluation driver uses module-level variables because it is generated as a one-shot script executed in a subprocess (`src/sol_execbench/driver/templates/eval_driver.py`).
 
 ## Key Abstractions
 
 **Definition:**
-- Purpose: Formal workload contract: axes, tensor specs, reference implementation, optional custom input entrypoint, and shape/dtype helpers.
-- Examples: `src/sol_execbench/core/data/definition.py`, `docs/definition.md`, `examples/*/*/definition.json`
-- Pattern: Pydantic model with AST validators and cached shape/dtype properties. Add schema changes here first and update docs/tests.
+- Purpose: Formal benchmark problem contract with axes, input/output tensor specs, and reference Python code.
+- Examples: `src/sol_execbench/core/data/definition.py:136`, `examples/pytorch/linear_backward/definition.json`
+- Pattern: Pydantic model with validators for reference code, parameter matching, axis references, and tensor names.
 
 **Workload:**
-- Purpose: Concrete axis values, input generation strategy, workload UUID, and numerical tolerance.
-- Examples: `src/sol_execbench/core/data/workload.py`, `examples/*/*/workload.jsonl`
-- Pattern: Pydantic discriminated-style unions by `type` for random, scalar, safetensors, and custom inputs.
+- Purpose: Concrete axis values, input source descriptors, UUID, and numerical tolerance for one benchmark run.
+- Examples: `src/sol_execbench/core/data/workload.py:102`, `examples/pytorch/linear_backward/workload.jsonl`
+- Pattern: Pydantic discriminated-style union by `type` fields for random, scalar, safetensors, and custom inputs.
 
-**Solution / BuildSpec / SourceFile:**
-- Purpose: Submitted implementation metadata, source payloads, language/hardware target, entrypoint, DPS mode, and compile flags.
-- Examples: `src/sol_execbench/core/data/solution.py`, `examples/*/*/solution_*.json`
-- Pattern: Frozen Pydantic model with source-path validation, entrypoint validation, legacy CUDA value rejection, and deterministic content hash.
+**Solution:**
+- Purpose: Candidate implementation metadata, source files, language categories, target hardware, entry point, and compile options.
+- Examples: `src/sol_execbench/core/data/solution.py:265`, `examples/hip_cpp/rmsnorm/solution_hip.json`
+- Pattern: Frozen Pydantic model with source path validation, ROCm language validation, and deterministic content hashing.
 
-**Trace / Evaluation:**
-- Purpose: Canonical result format emitted by evaluation subprocesses and consumed by reporting, scoring, and baseline comparison.
-- Examples: `src/sol_execbench/core/data/trace.py`, `src/sol_execbench/core/baseline.py`, `src/sol_execbench/core/reporting.py`
-- Pattern: Pydantic model with status-dependent metric validation. Preserve this schema for public compatibility.
+**Trace:**
+- Purpose: Canonical JSONL output linking a definition, workload, optional solution name, and optional evaluation result.
+- Examples: `src/sol_execbench/core/data/trace.py:176`, `docs/trace.md`
+- Pattern: Pydantic model with status-specific validation for correctness and performance fields.
 
 **ProblemPackager:**
-- Purpose: Bridge between validated objects and executable staging files.
-- Examples: `src/sol_execbench/driver/problem_packager.py`, `tests/sol_execbench/driver/test_problem_packager.py`
-- Pattern: Writes files once, returns simple `["python", "..."]` commands, and parses JSONL stdout back into `Trace`.
+- Purpose: Staging adapter between typed in-process models and subprocess files/commands.
+- Examples: `src/sol_execbench/driver/problem_packager.py:91`, `tests/sol_execbench/driver/test_problem_packager.py`
+- Pattern: Constructor writes base staging files; `compile()` and `execute()` add phase-specific templates and return command arrays.
 
 **Evaluation Driver Template:**
-- Purpose: Self-contained script copied into staging and executed in a subprocess.
-- Examples: `src/sol_execbench/driver/templates/eval_driver.py`, `tests/sol_execbench/driver/test_eval_driver.py`
-- Pattern: Use staged JSON files and imported `sol_execbench.core` helpers. Emit only strict JSON trace rows to original stdout; redirect library noise to stderr.
+- Purpose: Self-contained subprocess script for importing user code, running workloads, and emitting strict JSON traces.
+- Examples: `src/sol_execbench/driver/templates/eval_driver.py`
+- Pattern: Generated script with early stdout redirection, module-level staged state, and helper functions for emitting traces and detecting benchmark abuse.
 
 **ShiftingMemoryPoolAllocator:**
-- Purpose: Prevent timing artifacts from repeated identical tensor addresses.
+- Purpose: Provide unique tensor data pointers across timing iterations without full data duplication.
 - Examples: `src/sol_execbench/core/bench/io.py:519`, `src/sol_execbench/core/bench/timing.py:161`
-- Pattern: Pre-allocate pools and return shifted as-strided views for each warmup/timed iteration.
+- Pattern: Pre-allocate memory pools and provide fresh strided views via `get_unique_args()`.
 
 ## Entry Points
 
-**Main CLI:**
-- Location: `src/sol_execbench/cli/main.py`
-- Triggers: `sol-execbench` package script in `pyproject.toml`.
-- Responsibilities: Load problem artifacts, package staging files, run compile/evaluation subprocesses, parse traces, write output, set exit code.
+**Benchmark CLI:**
+- Location: `src/sol_execbench/cli/main.py:230`
+- Triggers: `sol-execbench` script from `pyproject.toml`.
+- Responsibilities: Validate inputs, run compile/evaluation subprocesses, parse `Trace` JSONL, and determine process exit code.
 
 **Baseline CLI:**
-- Location: `src/sol_execbench/cli/baseline.py`
-- Triggers: `sol-execbench-baseline` package script in `pyproject.toml`.
-- Responsibilities: Load trace JSONL files, compare candidate latencies against baselines, render text/JSON output.
+- Location: `src/sol_execbench/cli/baseline.py:70`
+- Triggers: `sol-execbench-baseline` script from `pyproject.toml`.
+- Responsibilities: Load trace JSONL, compare candidate latencies to baselines, render comparison output.
 
-**Generated Build Script:**
-- Location: `src/sol_execbench/driver/templates/build_ext.py`
-- Triggers: `ProblemPackager.compile()` and CLI subprocess execution.
-- Responsibilities: Compile staged HIP/C/C++ sources and produce `benchmark_kernel.so`.
-
-**Generated Evaluation Script:**
-- Location: `src/sol_execbench/driver/templates/eval_driver.py`
-- Triggers: `ProblemPackager.execute()` and CLI subprocess execution.
-- Responsibilities: Execute all workloads and emit canonical trace JSONL.
-
-**Dataset Runner Script:**
+**Dataset Runner:**
 - Location: `scripts/run_dataset.py`
-- Triggers: Manual command `uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark --limit 5`.
-- Responsibilities: Batch-run benchmark problem directories through the installed CLI-style workflow.
+- Triggers: `uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark --limit 5`
+- Responsibilities: Batch over benchmark assets and drive package scoring/report generation.
 
 **Docker Entrypoint:**
 - Location: `docker/entrypoint.sh`
-- Triggers: Container startup through `./scripts/run_docker.sh`.
-- Responsibilities: Prepare the ROCm/GPU evaluation environment and clock-lock behavior used by benchmark runs.
+- Triggers: `./scripts/run_docker.sh --build` or container startup.
+- Responsibilities: Prepare GPU evaluation environment and clock/runtime setup.
+
+**Package API:**
+- Location: `src/sol_execbench/__init__.py`, `src/sol_execbench/core/__init__.py`
+- Triggers: `import sol_execbench`
+- Responsibilities: Export schema models, config helpers, and JSON utilities.
 
 ## Architectural Constraints
 
-- **Threading:** The benchmark path is synchronous in the parent CLI. User code may initialize JIT infrastructure threads during correctness warmup, but new thread injection during timing is rejected by `check_thread_injection()` in `src/sol_execbench/core/bench/reward_hack.py`.
-- **Global state:** `eval_driver.py` uses module-level runtime state for staged models, imported functions, device, integrity snapshot, and per-workload buffers. Keep helper functions pure where practical because user code integrity checks snapshot named globals in `src/sol_execbench/driver/templates/eval_driver.py:185`.
-- **Subprocess boundary:** Evaluation and compilation happen in child Python processes. Do not import or execute submitted solution code in `src/sol_execbench/cli/main.py`.
-- **Public schema stability:** `Definition`, `Workload`, `Solution`, and `Trace` are public contracts. Additive changes need docs and guardrail tests under `tests/sol_execbench/`.
-- **ROCm-only target:** Native language values are HIP/ROCm-specific; legacy CUDA/NVIDIA schema values are rejected in `src/sol_execbench/core/data/solution.py:158`.
-- **Device naming:** PyTorch ROCm still uses `torch.cuda.*`; use these APIs consistently for HIP-backed devices instead of introducing parallel CUDA/ROCm wrappers unless a real abstraction is needed.
-- **Filesystem staging:** Source paths inside `Solution.sources` must remain relative and cannot contain `..`; staged files are the execution boundary.
-- **Circular imports:** Not detected in the package structure. Keep dependencies flowing from CLI to core/driver and from templates to core helpers; avoid importing CLI code from core modules.
+- **Threading:** Main CLI work is synchronous. Evaluation runs in a subprocess. `eval_driver.py` samples `threading.active_count()` to detect thread injection around timing (`src/sol_execbench/driver/templates/eval_driver.py:514`).
+- **Global state:** `eval_driver.py` intentionally uses module-level staged state such as `STAGING_DIR`, `definition`, `workloads`, `_solution`, `_device`, and `bench_config` because it is a generated one-shot script (`src/sol_execbench/driver/templates/eval_driver.py:86`).
+- **Circular imports:** No required circular import chains detected in `src/sol_execbench/`; package-level `__init__.py` files re-export core models for public API convenience.
+- **Subprocess boundary:** User code must run through staged subprocess scripts. Do not import candidate solution modules in `src/sol_execbench/cli/main.py`.
+- **Public schema stability:** Public contracts live in `src/sol_execbench/core/data/`; schema changes need corresponding docs and tests under `docs/` and `tests/sol_execbench/`.
+- **ROCm API naming:** PyTorch ROCm still exposes HIP-backed device APIs through `torch.cuda`; do not rename these calls mechanically when they represent the PyTorch ROCm device API (`src/sol_execbench/core/bench/timing.py:67`).
 
 ## Anti-Patterns
 
-### Executing User Code In The CLI Process
+### Importing User Code In The CLI
 
-**What happens:** New code imports or calls submitted kernels from `src/sol_execbench/cli/main.py` or `src/sol_execbench/driver/problem_packager.py`.
-**Why it's wrong:** It bypasses the subprocess isolation, stdout/stderr handling, reward-hack checks, and staged artifact contract used by `eval_driver.py`.
-**Do this instead:** Stage source files through `ProblemPackager` in `src/sol_execbench/driver/problem_packager.py` and execute `src/sol_execbench/driver/templates/eval_driver.py`.
+**What happens:** Candidate solution modules are imported directly from `src/sol_execbench/cli/main.py`.
+**Why it's wrong:** It bypasses subprocess isolation, stdout redirection, reward-hack checks, compile separation, and staging cleanup.
+**Do this instead:** Add runtime logic to `src/sol_execbench/driver/templates/eval_driver.py` and stage it through `src/sol_execbench/driver/problem_packager.py`.
 
-### Changing Trace JSONL For Derived Reports
+### Mutating Raw Schema Dictionaries Past Load Boundaries
 
-**What happens:** New diagnostic or summary fields are added directly to `Trace` for local reporting needs.
-**Why it's wrong:** Trace JSONL is the canonical public output consumed by CLI users, baseline comparison, docs, and tests.
-**Do this instead:** Put derived summaries in `src/sol_execbench/core/reporting.py` or diagnostic helpers in `src/sol_execbench/core/diagnostics.py`.
+**What happens:** Code passes unvalidated dictionaries through benchmark execution after JSON parsing.
+**Why it's wrong:** It skips validators in `src/sol_execbench/core/data/definition.py`, `src/sol_execbench/core/data/workload.py`, `src/sol_execbench/core/data/solution.py`, and `src/sol_execbench/core/data/trace.py`.
+**Do this instead:** Convert JSON to Pydantic models at the boundary, then use model methods such as `Definition.get_resolved_axes_values()` and `Solution.get_entry_symbol()`.
 
-### Adding CUDA/NVIDIA Language Paths
+### Adding CUDA/NVIDIA Language Paths As Active Backends
 
-**What happens:** New code accepts `cuda_cpp`, `cutlass`, `cudnn`, or `cuda_cflags` values.
-**Why it's wrong:** This ROCm port intentionally rejects legacy CUDA schema values and maps native support to HIP/ROCm language categories.
-**Do this instead:** Extend `SupportedLanguages` in `src/sol_execbench/core/data/solution.py` with ROCm-native categories and update `ProblemPackager._CPP_LANGUAGES` plus `eval_driver.py` native language sets.
-
-### Timing Without Shifted Arguments
-
-**What happens:** New benchmark timing calls invoke `torch.cuda.Event` directly around repeated calls with the same tensors.
-**Why it's wrong:** It skips cache/address-shift semantics and can change measured behavior.
-**Do this instead:** Use `time_runnable()` in `src/sol_execbench/core/bench/timing.py`, which uses `ShiftingMemoryPoolAllocator` from `src/sol_execbench/core/bench/io.py`.
+**What happens:** New code accepts CUDA-specific language values or compile option keys in solution specs.
+**Why it's wrong:** `BuildSpec` rejects legacy CUDA/NVIDIA language values and maps ROCm-native replacements (`src/sol_execbench/core/data/solution.py:132`).
+**Do this instead:** Add ROCm language/library categories to `SupportedLanguages`, `_CPP_LANGUAGES`, and `_NATIVE_ROCM_LANGUAGES` when needed (`src/sol_execbench/core/data/solution.py:28`, `src/sol_execbench/driver/problem_packager.py:43`, `src/sol_execbench/driver/templates/eval_driver.py:245`).
 
 ## Error Handling
 
-**Strategy:** Validate early with Pydantic models, isolate runtime failures into per-workload `Trace.evaluation.status`, and use subprocess exit codes only for unrecoverable compile/evaluation failures.
+**Strategy:** Validate early with Pydantic and Click, convert per-workload runtime failures into `Trace` statuses inside the evaluation driver, and reserve process failure for staging/evaluation failures that produce no traces.
 
 **Patterns:**
-- Schema violations raise Pydantic validation errors when loading models in `src/sol_execbench/cli/main.py` and `src/sol_execbench/driver/templates/eval_driver.py`.
-- CLI input problems raise `click.ClickException` in `src/sol_execbench/cli/main.py`.
-- Compile subprocess failures are printed and exit with code 1 in `src/sol_execbench/cli/main.py:320`.
-- Evaluation runtime failures usually emit `Trace` rows with statuses such as `INVALID_REFERENCE`, `RUNTIME_ERROR`, `INCORRECT_SHAPE`, `INCORRECT_DTYPE`, `INCORRECT_NUMERICAL`, or `REWARD_HACK`.
-- `make_eval()` in `src/sol_execbench/core/bench/utils.py` attaches environment snapshots, timestamps, bounded logs, and optional extra messages.
+- Use `click.ClickException` for missing CLI inputs (`src/sol_execbench/cli/main.py:83`, `src/sol_execbench/cli/main.py:262`).
+- Use Pydantic validators for schema invariants (`src/sol_execbench/core/data/definition.py:170`, `src/sol_execbench/core/data/solution.py:145`, `src/sol_execbench/core/data/trace.py:127`).
+- Emit `EvaluationStatus.RUNTIME_ERROR`, `INVALID_REFERENCE`, `INCORRECT_*`, or `REWARD_HACK` traces from `eval_driver.py` for workload-local failures (`src/sol_execbench/driver/templates/eval_driver.py:306`, `src/sol_execbench/driver/templates/eval_driver.py:416`).
+- Exit the CLI with nonzero status when compilation fails, no traces are produced, or not all traces pass (`src/sol_execbench/cli/main.py:317`, `src/sol_execbench/cli/main.py:355`, `src/sol_execbench/cli/main.py:379`).
 
 ## Cross-Cutting Concerns
 
-**Logging:** CLI user-facing output uses Rich in `src/sol_execbench/cli/main.py`. Evaluation template redirects library stdout to stderr and writes strict JSON traces to the original stdout in `src/sol_execbench/driver/templates/eval_driver.py:261`. Clock-lock helpers use Python logging in `src/sol_execbench/core/bench/clock_lock.py`.
-
-**Validation:** Pydantic models validate public schemas in `src/sol_execbench/core/data/`. AST parsing validates reference `run()` and input ordering in `src/sol_execbench/core/data/definition.py`. Tests under `tests/sol_execbench/test_public_contract_guardrails.py` and ROCm audit tests guard public behavior and migration constraints.
-
-**Authentication:** Not applicable. The package evaluates local files and does not implement user identity or network authentication.
-
-**Security:** Submitted source paths are constrained in `src/sol_execbench/core/data/solution.py`; Python solution attempts to call `torch.utils.cpp_extension.load/load_inline` are blocked inside `eval_driver.py`; reward-hack checks detect patched timing/eval functions, lazy outputs, and thread injection in `src/sol_execbench/core/bench/reward_hack.py`.
+**Logging:** CLI user output uses Rich in `src/sol_execbench/cli/main.py`; evaluation driver redirects non-JSON stdout to stderr so stdout stays parseable JSONL (`src/sol_execbench/driver/templates/eval_driver.py:41`).
+**Validation:** Pydantic models in `src/sol_execbench/core/data/` own schema validation; tests in `tests/sol_execbench/core/data/` and public contract tests guard this behavior.
+**Authentication:** Not applicable; the package is a local benchmark CLI with no built-in auth provider.
+**Security:** Source path traversal is rejected in `SourceFile` (`src/sol_execbench/core/data/solution.py:82`); reward-hack checks inspect sources, monkey patches, lazy outputs, thread injection, and critical function identity (`src/sol_execbench/core/bench/reward_hack.py`).
+**Hardware/ROCm detection:** Local gfx detection uses `rocm_agent_enumerator` or `rocminfo` in `src/sol_execbench/driver/problem_packager.py`; diagnostics and profiler readiness live in `src/sol_execbench/core/diagnostics.py` and `src/sol_execbench/core/bench/rocm_profiler.py`.
 
 ---
 
