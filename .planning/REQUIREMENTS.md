@@ -8,10 +8,10 @@
 
 ### Optimized Scoring Baselines
 
-- [ ] **BASE-01**: Maintainers can store optimized scoring baseline timing artifacts separately from PyTorch reference timing and canonical trace JSONL.
-- [ ] **BASE-02**: AMD-native score reports use an explicit scoring baseline input when available, and label fallback-to-reference scoring as provisional rather than release-defined.
-- [ ] **BASE-03**: Dataset runs can consume baseline artifacts by definition and workload UUID without mutating existing trace records.
-- [ ] **BASE-04**: Baseline comparison and AMD-native score documentation explain reference timing, candidate timing, scoring baseline timing, and AMD SOL bound roles.
+- [x] **BASE-01**: Maintainers can store optimized scoring baseline timing artifacts separately from PyTorch reference timing and canonical trace JSONL.
+- [x] **BASE-02**: AMD-native score reports use an explicit scoring baseline input when available, and label fallback-to-reference scoring as provisional rather than release-defined.
+- [x] **BASE-03**: Dataset runs can consume baseline artifacts by definition and workload UUID without mutating existing trace records.
+- [x] **BASE-04**: Baseline comparison and AMD-native score documentation explain reference timing, candidate timing, scoring baseline timing, and AMD SOL bound roles.
 
 ### Source-Specific Timing Workflow
 
@@ -69,10 +69,10 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BASE-01 | Phase 31 | Pending |
-| BASE-02 | Phase 31 | Pending |
-| BASE-03 | Phase 31 | Pending |
-| BASE-04 | Phase 31 | Pending |
+| BASE-01 | Phase 31 | Complete |
+| BASE-02 | Phase 31 | Complete |
+| BASE-03 | Phase 31 | Complete |
+| BASE-04 | Phase 31 | Complete |
 | TIME-01 | Phase 32 | Pending |
 | TIME-02 | Phase 32 | Pending |
 | TIME-03 | Phase 32 | Pending |

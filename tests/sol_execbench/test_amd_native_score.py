@@ -17,12 +17,17 @@ from sol_execbench.core.scoring.amd_score import (
     AMD_SCORE_SCHEMA_VERSION,
     CDNA3_NO_VALIDATION_WARNING,
     INCOMPLETE_EVIDENCE_WARNING,
+    REFERENCE_BASELINE_WARNING,
     UNSUPPORTED_EVIDENCE_WARNING,
     UNVALIDATED_HARDWARE_WARNING,
     build_amd_native_suite_report,
     build_amd_native_suite_report_from_traces,
     score_amd_native_workload,
     score_amd_native_trace_workload,
+)
+from sol_execbench.core.scoring.baseline_artifact import (
+    BASELINE_ARTIFACT_SCHEMA_VERSION,
+    scoring_baseline_artifact_from_dict,
 )
 from sol_execbench.core.scoring.amd_sol import (
     build_amd_sol_bound_artifact,
@@ -191,6 +196,8 @@ def test_trace_workflow_scores_from_canonical_trace_without_mutation():
     )
 
     assert score.score is not None
+    assert score.baseline_source == "reference_latency"
+    assert REFERENCE_BASELINE_WARNING in score.warnings
     assert score.evidence_refs == {
         "trace": "traces.json",
         "timing": "timing.json",
@@ -199,6 +206,59 @@ def test_trace_workflow_scores_from_canonical_trace_without_mutation():
         "hardware_model": "artifact.hardware_model",
     }
     assert trace.model_dump(mode="json") == before
+
+
+def test_trace_workflow_prefers_release_scoring_baseline_artifact():
+    artifact = _matmul_artifact()
+    trace = Trace(
+        definition=artifact.definition,
+        workload=Workload(
+            axes={"M": 2},
+            inputs={"a": {"type": "random"}, "b": {"type": "random"}},
+            uuid=artifact.workload_uuid,
+        ),
+        solution="solution",
+        evaluation=Evaluation(
+            status=EvaluationStatus.PASSED,
+            environment=Environment(hardware="AMD gfx1200", libs={}),
+            timestamp="2026-05-22T00:00:00Z",
+            correctness=Correctness(),
+            performance=Performance(
+                latency_ms=1.5,
+                reference_latency_ms=9.0,
+                speedup_factor=6.0,
+            ),
+        ),
+    )
+    baseline = scoring_baseline_artifact_from_dict(
+        {
+            "schema_version": BASELINE_ARTIFACT_SCHEMA_VERSION,
+            "release": "v1.7",
+            "entries": [
+                {
+                    "definition": artifact.definition,
+                    "workload_uuid": artifact.workload_uuid,
+                    "latency_ms": 2.0,
+                    "solution": "optimized",
+                }
+            ],
+        },
+        source="baselines/v1.7.json",
+    )
+
+    score = score_amd_native_trace_workload(
+        trace,
+        artifact,
+        baseline_artifact=baseline,
+    )
+
+    assert score.baseline_latency_ms == 2.0
+    assert score.baseline_source == "scoring_baseline"
+    assert (
+        score.evidence_refs["baseline"]
+        == "baselines/v1.7.json#matmul_demo:matmul-workload"
+    )
+    assert REFERENCE_BASELINE_WARNING not in score.warnings
 
 
 def test_trace_workflow_marks_missing_bound_as_unscored():

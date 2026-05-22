@@ -5,6 +5,9 @@ import importlib.util
 from pathlib import Path
 
 from sol_execbench.core.scoring.amd_score import build_amd_native_suite_report
+from sol_execbench.core.scoring.baseline_artifact import (
+    scoring_baseline_artifact_from_dict,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RUN_DATASET_PATH = REPO_ROOT / "scripts" / "run_dataset.py"
@@ -81,6 +84,84 @@ def test_dataset_helper_builds_derived_amd_score_report(tmp_path):
         == "trace.evaluation.performance.reference_latency_ms"
     )
     assert report["scores"][0]["evidence_refs"]["hardware_model"].endswith("gfx1200")
+    assert report["scores"][0]["baseline_source"] == "reference_latency"
+
+
+def test_dataset_helper_uses_scoring_baseline_artifact(tmp_path):
+    definition = {
+        "name": "matmul_demo",
+        "axes": {
+            "M": {"type": "var"},
+            "K": {"type": "const", "value": 4},
+            "N": {"type": "const", "value": 8},
+        },
+        "inputs": {
+            "a": {"shape": ["M", "K"], "dtype": "float32"},
+            "b": {"shape": ["K", "N"], "dtype": "float32"},
+        },
+        "outputs": {"out": {"shape": ["M", "N"], "dtype": "float32"}},
+        "reference": "def run(a, b):\n    return a @ b",
+    }
+    workload_path = tmp_path / "workload.jsonl"
+    workload_path.write_text(
+        json.dumps(
+            {
+                "uuid": "matmul-workload",
+                "axes": {"M": 2},
+                "inputs": {"a": {"type": "random"}, "b": {"type": "random"}},
+            }
+        )
+    )
+    traces = [
+        {
+            "definition": "matmul_demo",
+            "workload": {
+                "uuid": "matmul-workload",
+                "axes": {"M": 2},
+                "inputs": {"a": {"type": "random"}, "b": {"type": "random"}},
+            },
+            "solution": "solution",
+            "evaluation": {
+                "status": "PASSED",
+                "environment": {"hardware": "AMD gfx1200", "libs": {}},
+                "timestamp": "2026-05-22T00:00:00Z",
+                "correctness": {},
+                "performance": {
+                    "latency_ms": 1.5,
+                    "reference_latency_ms": 9.0,
+                    "speedup_factor": 6.0,
+                },
+            },
+        }
+    ]
+    baseline = scoring_baseline_artifact_from_dict(
+        {
+            "release": "v1.7",
+            "entries": [
+                {
+                    "definition": "matmul_demo",
+                    "workload_uuid": "matmul-workload",
+                    "latency_ms": 2.0,
+                }
+            ],
+        },
+        source="baselines/v1.7.json",
+    )
+
+    scores = build_amd_score_reports_for_problem(
+        definition_payload=definition,
+        workload_path=workload_path,
+        traces_payload=traces,
+        trace_ref="L1/matmul_demo/traces.json",
+        baseline_artifact=baseline,
+    )
+    payload = build_amd_native_suite_report(scores).to_dict()
+
+    assert payload["scores"][0]["baseline_latency_ms"] == 2.0
+    assert payload["scores"][0]["baseline_source"] == "scoring_baseline"
+    assert payload["scores"][0]["evidence_refs"]["baseline"] == (
+        "baselines/v1.7.json#matmul_demo:matmul-workload"
+    )
 
 
 def test_dataset_helper_marks_missing_workload_bound_as_unscored(tmp_path):

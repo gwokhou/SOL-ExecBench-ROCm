@@ -3,29 +3,29 @@ gsd_state_version: 1.0
 milestone: v1.7
 milestone_name: Baseline, Timing, Reward-Hack Hardening, and ROCm Library Migration
 status: planning
-last_updated: "2026-05-22T12:35:00.000Z"
-last_activity: 2026-05-22 — Milestone v1.7 roadmap created
+last_updated: "2026-05-22T13:05:00.000Z"
+last_activity: 2026-05-22 — Phase 31 completed
 progress:
   total_phases: 5
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  completed_phases: 1
+  total_plans: 1
+  completed_plans: 1
+  percent: 20
 ---
 
 # Project State
 
 **Project:** SOL ExecBench ROCm Port
 **Initialized:** 2026-05-21
-**Current phase:** 31
-**Status:** v1.7 milestone planned
+**Current phase:** 32
+**Status:** v1.7 in progress
 
 ## Project Reference
 
 See: `.planning/PROJECT.md` (updated 2026-05-22)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Phase 31 — Optimized Scoring Baseline Semantics
+**Current focus:** Phase 32 — Source-Specific Profiler Timing Workflow
 
 ## Workflow Settings
 
@@ -87,11 +87,11 @@ Start the next milestone when ready.
 
 ## Current Position
 
-Phase: 31 — Optimized Scoring Baseline Semantics
+Phase: 32 — Source-Specific Profiler Timing Workflow
 Plan: —
 Status: Ready for discussion/planning
-Last activity: 2026-05-22 — Milestone v1.7 roadmap created
+Last activity: 2026-05-22 — Phase 31 completed
 
 ## Operator Next Steps
 
-- Start Phase 31 with `$gsd-discuss-phase 31` or `$gsd-plan-phase 31`.
+- Continue with Phase 32 using `$gsd-discuss-phase 32` or `$gsd-plan-phase 32`.
