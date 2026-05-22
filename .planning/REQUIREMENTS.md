@@ -38,9 +38,9 @@
 
 ### MI300X Validation Readiness
 
-- [ ] **MI3-01**: MI300X/CDNA3 validation instructions identify required hardware, ROCm version, clock-lock setup, commands, artifacts, and acceptance criteria.
-- [ ] **MI3-02**: FP8 validation readiness is documented for MI300X while NVFP4/MXFP4 remains explicitly deferred until suitable AMD hardware support exists.
-- [ ] **MI3-03**: Reports cannot upgrade CDNA3/MI300X validation status unless a full adapted suite run and environment evidence are recorded.
+- [x] **MI3-01**: MI300X/CDNA3 validation instructions identify required hardware, ROCm version, clock-lock setup, commands, artifacts, and acceptance criteria.
+- [x] **MI3-02**: FP8 validation readiness is documented for MI300X while NVFP4/MXFP4 remains explicitly deferred until suitable AMD hardware support exists.
+- [x] **MI3-03**: Reports cannot upgrade CDNA3/MI300X validation status unless a full adapted suite run and environment evidence are recorded.
 
 ## Future Requirements
 
@@ -48,6 +48,8 @@
 
 - **HW-01**: Run the full adapted suite on AMD MI300X/CDNA3 and record evidence before claiming commercial GPU hardware validation.
 - **HW-02**: Validate FP8 behavior and performance on MI300X once hardware access is available.
+- **HW-03**: Real CDNA3 `gfx94*` full-suite validation remains deferred until
+  MI300X evidence is recorded.
 
 ### Deferred Paper-Parity Work
 
@@ -87,9 +89,9 @@
 | LIB-03 | Phase 34 | Complete |
 | LIB-04 | Phase 34 | Complete |
 | LIB-05 | Phase 34 | Complete |
-| MI3-01 | Phase 35 | Pending |
-| MI3-02 | Phase 35 | Pending |
-| MI3-03 | Phase 35 | Pending |
+| MI3-01 | Phase 35 | Complete |
+| MI3-02 | Phase 35 | Complete |
+| MI3-03 | Phase 35 | Complete |
 
 **Coverage:**
 - v1.7 requirements: 21 total

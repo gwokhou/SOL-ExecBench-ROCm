@@ -16,7 +16,7 @@ timing workflow, reward-hack defenses, and runnable ROCm library migration.
 | 32 | Source-Specific Profiler Timing Workflow | Complete 2026-05-22: Added source-specific profiler evidence collection, dataset integration, fallback metadata, and run metadata. | TIME-01, TIME-02, TIME-03, TIME-04 |
 | 33 | Reward-Hack Defense Expansion | Complete 2026-05-22: Added static source review and pre-import blocking for stream hiding, caches, loaders, and precision downgrades. | HACK-01, HACK-02, HACK-03, HACK-04, HACK-05 |
 | 34 | ROCm Library Category Migration | Complete 2026-05-22: Promoted hipBLAS with runnable SGEMM example while guarding MIOpen, CK, and rocWMMA as candidates. | LIB-01, LIB-02, LIB-03, LIB-04, LIB-05 |
-| 35 | MI300X Validation Readiness Guardrails | Prepare MI300X/CDNA3 and FP8 validation instructions, evidence gates, and no-claim protections for later hardware runs. | MI3-01, MI3-02, MI3-03 |
+| 35 | MI300X Validation Readiness Guardrails | Complete 2026-05-22: Added MI300X handoff, FP8/NVFP4 decisions, and evidence gates for validation claims. | MI3-01, MI3-02, MI3-03 |
 
 **Coverage:** 21 / 21 v1.7 requirements mapped. 0 unmapped.
 
@@ -158,7 +158,7 @@ toward runnable examples, build checks, and accurate support docs.
 
 ### Phase 35: MI300X Validation Readiness Guardrails
 
-**Status:** Planned
+**Status:** Complete
 
 **Goal:** Prepare MI300X/CDNA3 and FP8 validation instructions, evidence gates,
 and no-claim protections for later hardware runs.
@@ -182,7 +182,10 @@ and no-claim protections for later hardware runs.
 - Keep RDNA4 evidence separate from CDNA3/MI300X evidence.
 - Preserve no-claim wording until a real full-suite run is archived.
 
-**Plans:** 0 plans
+**Plans:** 1 plan
+
+- [x] 35-01: Add MI300X validation handoff, diagnostics evidence gate, docs,
+  no-claim wording, and tests.
 
 ## Completed Phase History
 
@@ -228,6 +231,6 @@ and no-claim protections for later hardware runs.
 | LIB-03 | Phase 34 | Complete |
 | LIB-04 | Phase 34 | Complete |
 | LIB-05 | Phase 34 | Complete |
-| MI3-01 | Phase 35 | Pending |
-| MI3-02 | Phase 35 | Pending |
-| MI3-03 | Phase 35 | Pending |
+| MI3-01 | Phase 35 | Complete |
+| MI3-02 | Phase 35 | Complete |
+| MI3-03 | Phase 35 | Complete |

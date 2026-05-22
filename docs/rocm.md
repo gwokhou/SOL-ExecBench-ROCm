@@ -86,8 +86,10 @@ Validation recorded in this milestone:
 | Hardware class | Architecture | Status |
 | --- | --- | --- |
 | RDNA 4 | `gfx1200` | Full adapted suite passed locally. |
-| CDNA 3 | `gfx940`, `gfx941`, `gfx942` (`gfx94*`) | Code/schema support present; hardware validation deferred. Do not claim hardware validation until a full suite run is recorded. |
+| CDNA 3 | `gfx940`, `gfx941`, `gfx942` (`gfx94*`) | Code/schema support present; MI300X (`gfx942`) validation is prepared but deferred. Do not claim hardware validation until a full suite run and required evidence are recorded. |
 
-The missing CDNA 3 evidence is a real `gfx94*` run of the full adapted pytest
-suite, with logs and hardware/software environment details recorded in planning
-artifacts before the support matrix is upgraded to hardware-validated.
+The missing CDNA 3 evidence is a real AMD Instinct MI300X (`gfx942`) run of the
+full adapted pytest suite, with logs, clock-lock evidence, dataset artifacts,
+and hardware/software environment details recorded before the support matrix is
+upgraded to hardware-validated. FP8 validation is expected on MI300X once
+hardware access exists; NVFP4/MXFP4 validation remains deferred.
