@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: hip-execbench Engineering Experience Adaptation + Validation Workflow Readiness
-status: milestone_complete
-last_updated: 2026-05-22T07:21:53.308Z
-last_activity: 2026-05-22
+current_phase: 22
+status: completed
+last_updated: "2026-05-22T07:23:25.214Z"
+last_activity: 2026-05-22 — Milestone v1.4 completed and archived
 progress:
   total_phases: 4
   completed_phases: 4
   total_plans: 4
   completed_plans: 4
   percent: 100
-stopped_at: Milestone complete (Phase 22 was final phase)
 ---
 
 # Project State
@@ -19,7 +19,7 @@ stopped_at: Milestone complete (Phase 22 was final phase)
 **Project:** SOL ExecBench ROCm Port
 **Initialized:** 2026-05-21
 **Current phase:** 22
-**Status:** Milestone complete
+**Status:** v1.4 milestone complete
 
 ## Project Reference
 
@@ -43,12 +43,12 @@ See: `.planning/config.json`
 
 See: `.planning/ROADMAP.md`
 
-v1.4 hip-execbench Engineering Experience Adaptation + Validation Workflow Readiness is in planning with 4 phases:
+v1.4 hip-execbench Engineering Experience Adaptation + Validation Workflow Readiness is complete and archived.
 
-- Phase 19: Compatibility and Practice Inventory - pending
-- Phase 20: Internal Diagnostics and Evidence Model - pending
-- Phase 21: CDNA 3 Validation Readiness - pending
-- Phase 22: RDNA 4 Validation Closure - pending
+- Phase 19: Compatibility and Practice Inventory - complete
+- Phase 20: Internal Diagnostics and Evidence Model - complete
+- Phase 21: CDNA 3 Validation Readiness - complete
+- Phase 22: RDNA 4 Validation Closure - complete
 
 ## Memory
 
@@ -66,6 +66,10 @@ v1.4 hip-execbench Engineering Experience Adaptation + Validation Workflow Readi
 - v1.3 requirements archived in `.planning/milestones/v1.3-REQUIREMENTS.md`.
 - v1.3 roadmap archived in `.planning/milestones/v1.3-ROADMAP.md`.
 - v1.3 audit archived in `.planning/milestones/v1.3-MILESTONE-AUDIT.md`.
+- v1.4 requirements archived in `.planning/milestones/v1.4-REQUIREMENTS.md`.
+- v1.4 roadmap archived in `.planning/milestones/v1.4-ROADMAP.md`.
+- v1.4 audit archived in `.planning/milestones/v1.4-MILESTONE-AUDIT.md`.
+- v1.4 phase execution history archived in `.planning/milestones/v1.4-phases/`.
 
 ## Deferred Items
 
@@ -77,15 +81,15 @@ Items acknowledged and deferred at milestone close on 2026-05-21:
 
 ## Next Action
 
-Start Phase 22 planning with `/gsd-plan-phase 22`.
+Start the next milestone with `/gsd-new-milestone`.
 
 ## Current Position
 
-Phase: 20
-Plan: Not started
-Status: Ready to plan Phase 22
-Last activity: 2026-05-22
+Phase: Milestone v1.4 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-05-22 — Milestone v1.4 completed and archived
 
 ## Operator Next Steps
 
-- Start Phase 22 with /gsd-plan-phase 22
+- Start the next milestone with /gsd-new-milestone
