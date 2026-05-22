@@ -1,6 +1,6 @@
 #include <torch/extension.h>
 #include <hip/hip_bf16.h>
-#include <c10/cuda/CUDAGuard.h>
+#include <c10/hip/HIPGuard.h>
 
 __global__ void rope_kernel(
     const __hip_bfloat16* __restrict__ x,
@@ -30,7 +30,8 @@ __global__ void rope_kernel(
 
 torch::Tensor run(torch::Tensor query_or_key,
                   torch::Tensor freqs_cos, torch::Tensor freqs_sin) {
-    const at::cuda::CUDAGuard guard(query_or_key.device());
+    const c10::hip::HIPGuard guard(
+        static_cast<c10::DeviceIndex>(query_or_key.get_device()));
     auto B = query_or_key.size(0), S = query_or_key.size(1);
     auto H = query_or_key.size(2), head_dim = query_or_key.size(3);
     auto output = torch::empty_like(query_or_key);

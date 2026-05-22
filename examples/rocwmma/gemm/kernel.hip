@@ -1,4 +1,4 @@
-#include <ATen/cuda/CUDAContext.h>
+#include <c10/hip/HIPStream.h>
 #include <hip/hip_runtime.h>
 #include <rocwmma/rocwmma.hpp>
 #include <torch/extension.h>
@@ -85,7 +85,7 @@ torch::Tensor run(const torch::Tensor& a, const torch::Tensor& b) {
         grid,
         block,
         0,
-        at::cuda::getCurrentCUDAStream(),
+        c10::hip::getCurrentHIPStream(),
         reinterpret_cast<const rocwmma::float16_t*>(a.data_ptr<at::Half>()),
         reinterpret_cast<const rocwmma::float16_t*>(b.data_ptr<at::Half>()),
         c.data_ptr<float>(),

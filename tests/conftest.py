@@ -35,7 +35,7 @@ def _rocm_gpu_info() -> tuple[bool, str]:
 def _has_rocm_dev_headers() -> bool:
     """Return whether ROCm native extension development headers are installed."""
     rocm_root = Path("/opt/rocm")
-    return (rocm_root / "include/cuda_runtime_api.h").exists()
+    return (rocm_root / "include/hip/hip_runtime_api.h").exists()
 
 
 def _has_ck_headers() -> bool:
@@ -109,9 +109,7 @@ def pytest_collection_modifyitems(
         reason="timing_serial tests skipped by default; run with: pytest tests -m timing_serial -n 0"
     )
     skip_no_rocm = pytest.mark.skip(reason="ROCm GPU unavailable through PyTorch")
-    skip_no_rocm_dev = pytest.mark.skip(
-        reason="ROCm native extension development headers unavailable"
-    )
+    skip_no_rocm_dev = pytest.mark.skip(reason="ROCm HIP development headers unavailable")
     skip_no_ck = pytest.mark.skip(reason="Composable Kernel headers unavailable")
     skip_no_rocwmma = pytest.mark.skip(reason="rocWMMA headers unavailable")
     skip_rdna4 = pytest.mark.skip(

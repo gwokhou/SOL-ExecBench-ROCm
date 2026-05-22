@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import json
+import os
 from pathlib import Path
 
 import torch.utils.cpp_extension as ext
@@ -30,6 +31,14 @@ compile_options = solution.spec.compile_options
 hip_cflags = compile_options.hip_cflags if compile_options else []
 cflags = compile_options.cflags if compile_options else []
 ld_flags = compile_options.ld_flags if compile_options else []
+
+rocm_arches = [
+    target.value
+    for target in solution.spec.target_hardware
+    if target.value.startswith("gfx")
+]
+if rocm_arches and "PYTORCH_ROCM_ARCH" not in os.environ:
+    os.environ["PYTORCH_ROCM_ARCH"] = ";".join(dict.fromkeys(rocm_arches))
 
 # Collect HIP/C++ source files from current directory
 sources = [

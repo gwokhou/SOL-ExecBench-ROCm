@@ -1,4 +1,4 @@
-#include <ATen/cuda/CUDAContext.h>
+#include <c10/hip/HIPStream.h>
 #include <hipblas/hipblas.h>
 #include <torch/extension.h>
 
@@ -33,7 +33,7 @@ torch::Tensor run(const torch::Tensor& a, const torch::Tensor& b) {
     hipblasHandle_t handle = nullptr;
     check_hipblas(hipblasCreate(&handle), "hipblasCreate");
     check_hipblas(
-        hipblasSetStream(handle, at::cuda::getCurrentCUDAStream()),
+        hipblasSetStream(handle, c10::hip::getCurrentHIPStream()),
         "hipblasSetStream"
     );
 
