@@ -8,9 +8,9 @@
 
 ### Compatibility
 
-- [ ] **COMPAT-01**: Maintainer can review a source-grounded inventory of public contracts that v1.4 must not change, including CLI behavior, Pydantic schemas, solution format, trace JSONL, and eval-driver semantics.
-- [ ] **COMPAT-02**: Public contract guardrail tests fail if v1.4 changes existing CLI help, schema behavior, trace JSONL fields, or supported solution metadata unexpectedly.
-- [ ] **COMPAT-03**: Any adapted `hip-execbench` practice is classified as accepted, rejected, or deferred with rationale tied to SOL ExecBench ROCm compatibility.
+- [x] **COMPAT-01**: Maintainer can review a source-grounded inventory of public contracts that v1.4 must not change, including CLI behavior, Pydantic schemas, solution format, trace JSONL, and eval-driver semantics.
+- [x] **COMPAT-02**: Public contract guardrail tests fail if v1.4 changes existing CLI help, schema behavior, trace JSONL fields, or supported solution metadata unexpectedly.
+- [x] **COMPAT-03**: Any adapted `hip-execbench` practice is classified as accepted, rejected, or deferred with rationale tied to SOL ExecBench ROCm compatibility.
 
 ### Engineering Adaptation
 
@@ -62,9 +62,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| COMPAT-01 | Phase 19 | Pending |
-| COMPAT-02 | Phase 19 | Pending |
-| COMPAT-03 | Phase 19 | Pending |
+| COMPAT-01 | Phase 19 | Complete |
+| COMPAT-02 | Phase 19 | Complete |
+| COMPAT-03 | Phase 19 | Complete |
 | ENG-04 | Phase 20 | Pending |
 | ENG-05 | Phase 20 | Pending |
 | ENG-06 | Phase 20 | Pending |
