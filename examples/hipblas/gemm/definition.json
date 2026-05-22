@@ -1,0 +1,18 @@
+{
+  "name": "hipblas_gemm",
+  "description": "Float32 GEMM C = A @ B for hipBLAS example coverage.",
+  "op_type": "matmul",
+  "axes": {
+    "M": {"type": "var"},
+    "K": {"type": "const", "value": 32},
+    "N": {"type": "const", "value": 24}
+  },
+  "inputs": {
+    "a": {"shape": ["M", "K"], "dtype": "float32"},
+    "b": {"shape": ["K", "N"], "dtype": "float32"}
+  },
+  "outputs": {
+    "out": {"shape": ["M", "N"], "dtype": "float32"}
+  },
+  "reference": "import torch\n\ndef run(a, b):\n    return a @ b\n"
+}

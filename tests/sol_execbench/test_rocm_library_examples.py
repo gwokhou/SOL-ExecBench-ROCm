@@ -8,7 +8,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from sol_execbench.core.data import Definition, Workload
 from sol_execbench.core.data import Solution
+from sol_execbench.core.bench.config import BenchmarkConfig
+from sol_execbench.driver.problem_packager import ProblemPackager
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -128,6 +131,44 @@ def test_portable_public_examples_include_cdna3_metadata():
     for relative_path in portable_examples:
         data = _load_solution(REPO_ROOT / relative_path)
         assert "gfx942" in data["spec"]["target_hardware"], relative_path
+
+
+def test_hipblas_public_example_is_runnable_native_category():
+    path = REPO_ROOT / "examples/hipblas/gemm/solution_hipblas.json"
+    data = _load_solution(path)
+    solution = Solution(**data)
+
+    assert [language.value for language in solution.spec.languages] == ["hipblas"]
+    assert solution.spec.destination_passing_style is False
+    assert solution.spec.compile_options is not None
+    assert "-lhipblas" in solution.spec.compile_options.ld_flags
+    assert "hipblasSgemm" in solution.sources[0].content
+    assert "hipblas/hipblas.h" in solution.sources[0].content
+    assert "gfx942" in data["spec"]["target_hardware"]
+
+
+def test_hipblas_example_stages_through_native_packager(tmp_path):
+    example_dir = REPO_ROOT / "examples/hipblas/gemm"
+    definition = Definition(**_load_solution(example_dir / "definition.json"))
+    workload = Workload(**json.loads((example_dir / "workload.jsonl").read_text()))
+    solution = Solution(**_load_solution(example_dir / "solution_hipblas.json"))
+    packager = ProblemPackager(
+        definition=definition,
+        workloads=[workload],
+        solution=solution,
+        config=BenchmarkConfig(lock_clocks=False),
+        output_dir=tmp_path,
+        keep_output_dir=True,
+    )
+
+    command, artifact_path = packager.compile()
+
+    assert command == ["python", "build_ext.py"]
+    assert artifact_path == str(tmp_path / "benchmark_kernel.so")
+    assert (tmp_path / "main.cpp").exists()
+    staged_solution = json.loads((tmp_path / "solution.json").read_text())
+    assert staged_solution["spec"]["languages"] == ["hipblas"]
+    assert "-lhipblas" in staged_solution["spec"]["compile_options"]["ld_flags"]
 
 
 def test_replacement_decisions_cover_named_rocm_libraries():

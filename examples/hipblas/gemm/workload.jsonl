@@ -1,0 +1,1 @@
+{"uuid": "hipblas-gemm-m16", "axes": {"M": 16}, "inputs": {"a": {"type": "random"}, "b": {"type": "random"}}, "tolerance": {"atol": 0.001, "rtol": 0.001}}

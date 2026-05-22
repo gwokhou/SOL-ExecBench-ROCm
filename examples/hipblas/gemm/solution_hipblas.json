@@ -1,0 +1,23 @@
+{
+  "name": "hipblas_gemm_sgemm",
+  "definition": "hipblas_gemm",
+  "author": "SOL ExecBench ROCm",
+  "description": "Runnable hipBLAS-backed float32 GEMM example using hipblasSgemm through the native ROCm build path.",
+  "spec": {
+    "languages": ["hipblas"],
+    "target_hardware": ["LOCAL", "gfx1200", "gfx942"],
+    "entry_point": "main.cpp::run",
+    "dependencies": ["torch", "hipblas"],
+    "destination_passing_style": false,
+    "compile_options": {
+      "hip_cflags": ["-O3"],
+      "ld_flags": ["-lhipblas"]
+    }
+  },
+  "sources": [
+    {
+      "path": "main.cpp",
+      "content": "#include <ATen/cuda/CUDAContext.h>\n#include <hipblas/hipblas.h>\n#include <torch/extension.h>\n\n#include <string>\n\nnamespace {\n\nvoid check_tensor(const torch::Tensor& tensor, const std::string& name) {\n    TORCH_CHECK(tensor.is_cuda(), name, \" must be a HIP tensor\");\n    TORCH_CHECK(tensor.dtype() == torch::kFloat32, name, \" must have float32 dtype\");\n    TORCH_CHECK(tensor.is_contiguous(), name, \" must be contiguous\");\n}\n\nvoid check_hipblas(hipblasStatus_t status, const char* call) {\n    TORCH_CHECK(status == HIPBLAS_STATUS_SUCCESS, call, \" failed with status \", status);\n}\n\n}  // namespace\n\ntorch::Tensor run(const torch::Tensor& a, const torch::Tensor& b) {\n    check_tensor(a, \"a\");\n    check_tensor(b, \"b\");\n    TORCH_CHECK(a.dim() == 2, \"a must be 2D\");\n    TORCH_CHECK(b.dim() == 2, \"b must be 2D\");\n    TORCH_CHECK(a.size(1) == b.size(0), \"a.size(1) must equal b.size(0)\");\n\n    const int64_t m = a.size(0);\n    const int64_t k = a.size(1);\n    const int64_t n = b.size(1);\n    auto out = torch::empty({m, n}, a.options());\n\n    hipblasHandle_t handle = nullptr;\n    check_hipblas(hipblasCreate(&handle), \"hipblasCreate\");\n    check_hipblas(\n        hipblasSetStream(handle, at::cuda::getCurrentCUDAStream()),\n        \"hipblasSetStream\"\n    );\n\n    const float alpha = 1.0f;\n    const float beta = 0.0f;\n    // hipBLAS assumes column-major operands. Swapping A/B computes row-major A @ B.\n    check_hipblas(\n        hipblasSgemm(\n            handle,\n            HIPBLAS_OP_N,\n            HIPBLAS_OP_N,\n            static_cast<int>(n),\n            static_cast<int>(m),\n            static_cast<int>(k),\n            &alpha,\n            b.data_ptr<float>(),\n            static_cast<int>(n),\n            a.data_ptr<float>(),\n            static_cast<int>(k),\n            &beta,\n            out.data_ptr<float>(),\n            static_cast<int>(n)\n        ),\n        \"hipblasSgemm\"\n    );\n    check_hipblas(hipblasDestroy(handle), \"hipblasDestroy\");\n    return out;\n}\n\nPYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {\n    m.def(\"run\", &run, \"hipBLAS-backed float32 GEMM\");\n}\n"
+    }
+  ]
+}
