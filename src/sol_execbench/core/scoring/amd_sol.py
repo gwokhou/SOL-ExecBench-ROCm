@@ -139,6 +139,11 @@ class AmdSolBoundArtifact:
         """Aggregate SOL bound as the sum of per-op bounds."""
         return sum(bound.sol_bound_ms for bound in self.op_bounds)
 
+    @property
+    def coverage_summary(self) -> AmdSolCoverageSummary:
+        """Derived coverage summary for this artifact."""
+        return summarize_amd_sol_coverage(self.graph_nodes, self.work_estimates)
+
     def to_dict(self) -> dict[str, object]:
         return {
             "schema_version": self.schema_version,
@@ -150,6 +155,29 @@ class AmdSolBoundArtifact:
             "work_estimates": [estimate.to_dict() for estimate in self.work_estimates],
             "op_bounds": [bound.to_dict() for bound in self.op_bounds],
             "aggregate_sol_bound_ms": self.aggregate_sol_bound_ms,
+            "coverage_summary": self.coverage_summary.to_dict(),
+        }
+
+
+@dataclass(frozen=True)
+class AmdSolCoverageSummary:
+    """Derived AMD SOL coverage summary for one graph or artifact."""
+
+    total_ops: int
+    supported_ops: int
+    inexact_ops: int
+    unsupported_ops: int
+    op_type_counts: dict[str, int]
+    derived: bool = True
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "derived": self.derived,
+            "total_ops": self.total_ops,
+            "supported_ops": self.supported_ops,
+            "inexact_ops": self.inexact_ops,
+            "unsupported_ops": self.unsupported_ops,
+            "op_type_counts": dict(self.op_type_counts),
         }
 
 
@@ -196,6 +224,7 @@ def estimate_work(
     output_shapes = definition.get_output_shapes(workload.axes)
     tensor_bytes = _tensor_bytes(definition, input_shapes, output_shapes)
     output_numel = sum(prod(shape) for shape in output_shapes.values() if shape)
+    input_numel = sum(prod(shape) for shape in input_shapes.values() if shape)
     reduction_dim = _largest_reduction_dim(definition, axes)
     estimates: list[WorkEstimate] = []
 
@@ -210,14 +239,60 @@ def estimate_work(
                     rationale="matmul FLOPs estimated as 2 * output elements * reduction dimension",
                 )
             )
-        elif node.op_type == "elementwise" and output_numel:
+        elif node.op_type in {"elementwise", "activation"} and output_numel:
             estimates.append(
                 WorkEstimate(
                     node_id=node.node_id,
                     flops=float(output_numel),
                     bytes_accessed=float(tensor_bytes),
                     confidence=EstimateConfidence.INEXACT,
-                    rationale="elementwise work estimated as one operation per output element",
+                    rationale=f"{node.op_type} work estimated as one operation per output element",
+                )
+            )
+        elif node.op_type == "reduction" and (input_numel or output_numel):
+            estimates.append(
+                WorkEstimate(
+                    node_id=node.node_id,
+                    flops=float(max(input_numel, output_numel)),
+                    bytes_accessed=float(tensor_bytes),
+                    confidence=EstimateConfidence.INEXACT,
+                    rationale="reduction work conservatively estimated from input elements",
+                )
+            )
+        elif node.op_type == "normalization" and (input_numel or output_numel):
+            estimates.append(
+                WorkEstimate(
+                    node_id=node.node_id,
+                    flops=float(4 * max(input_numel, output_numel)),
+                    bytes_accessed=float(tensor_bytes),
+                    confidence=EstimateConfidence.INEXACT,
+                    rationale=(
+                        "normalization-like work conservatively estimates reductions, "
+                        "scaling, and elementwise application"
+                    ),
+                )
+            )
+        elif node.op_type == "softmax" and (input_numel or output_numel):
+            estimates.append(
+                WorkEstimate(
+                    node_id=node.node_id,
+                    flops=float(5 * max(input_numel, output_numel)),
+                    bytes_accessed=float(tensor_bytes),
+                    confidence=EstimateConfidence.INEXACT,
+                    rationale=(
+                        "softmax-like work conservatively estimates max, exp, sum, "
+                        "and normalization passes"
+                    ),
+                )
+            )
+        elif node.op_type == "data_movement":
+            estimates.append(
+                WorkEstimate(
+                    node_id=node.node_id,
+                    flops=0.0,
+                    bytes_accessed=float(tensor_bytes),
+                    confidence=EstimateConfidence.INEXACT,
+                    rationale="data movement or view-like operation modeled as zero-FLOP tensor traffic",
                 )
             )
         else:
@@ -231,6 +306,36 @@ def estimate_work(
                 )
             )
     return tuple(estimates)
+
+
+def summarize_amd_sol_coverage(
+    graph_nodes: tuple[GraphNode, ...],
+    work_estimates: tuple[WorkEstimate, ...],
+) -> AmdSolCoverageSummary:
+    """Summarize analyzer coverage for a graph and its work estimates."""
+    op_type_counts: dict[str, int] = {}
+    for node in graph_nodes:
+        op_type_counts[node.op_type] = op_type_counts.get(node.op_type, 0) + 1
+
+    return AmdSolCoverageSummary(
+        total_ops=len(graph_nodes),
+        supported_ops=sum(
+            1
+            for estimate in work_estimates
+            if estimate.confidence == EstimateConfidence.SUPPORTED
+        ),
+        inexact_ops=sum(
+            1
+            for estimate in work_estimates
+            if estimate.confidence == EstimateConfidence.INEXACT
+        ),
+        unsupported_ops=sum(
+            1
+            for estimate in work_estimates
+            if estimate.confidence == EstimateConfidence.UNSUPPORTED
+        ),
+        op_type_counts=op_type_counts,
+    )
 
 
 def build_amd_sol_bound_artifact(
@@ -261,19 +366,18 @@ class _GraphVisitor(ast.NodeVisitor):
     def visit_Call(self, node: ast.Call) -> None:
         expression = ast.unparse(node)
         func_name = _call_name(node.func)
-        if func_name.endswith("matmul") or func_name in {"mm", "bmm"}:
-            self._append("matmul", expression, EstimateConfidence.SUPPORTED, "recognized matmul call")
-        elif any(name in func_name for name in ("gelu", "tanh", "softmax", "rsqrt")):
-            self._append(
-                "elementwise",
-                expression,
-                EstimateConfidence.INEXACT,
-                "recognized elementwise or reduction-like call",
-            )
-        elif func_name in {"to", "t"}:
+        analyzer = _classify_call(func_name)
+        if analyzer is None:
+            self._append("unsupported", expression, EstimateConfidence.UNSUPPORTED, "unsupported call")
+        elif analyzer.op_type == "ignore":
             pass
         else:
-            self._append("unsupported", expression, EstimateConfidence.UNSUPPORTED, "unsupported call")
+            self._append(
+                analyzer.op_type,
+                expression,
+                analyzer.confidence,
+                analyzer.rationale,
+            )
         self.generic_visit(node)
 
     def visit_BinOp(self, node: ast.BinOp) -> None:
@@ -304,6 +408,85 @@ class _GraphVisitor(ast.NodeVisitor):
                 rationale=rationale,
             )
         )
+
+
+@dataclass(frozen=True)
+class _CallAnalyzer:
+    op_type: str
+    confidence: EstimateConfidence
+    rationale: str
+
+
+_CALL_ANALYZERS: tuple[tuple[set[str], _CallAnalyzer], ...] = (
+    (
+        {"matmul", "mm", "bmm"},
+        _CallAnalyzer("matmul", EstimateConfidence.SUPPORTED, "recognized matmul call"),
+    ),
+    (
+        {"sum", "mean", "amax", "max", "amin", "min", "var", "std"},
+        _CallAnalyzer(
+            "reduction",
+            EstimateConfidence.INEXACT,
+            "recognized reduction call with conservative estimate",
+        ),
+    ),
+    (
+        {"layer_norm", "group_norm", "rms_norm", "norm", "rsqrt"},
+        _CallAnalyzer(
+            "normalization",
+            EstimateConfidence.INEXACT,
+            "recognized normalization-like call with conservative estimate",
+        ),
+    ),
+    (
+        {"softmax", "log_softmax"},
+        _CallAnalyzer(
+            "softmax",
+            EstimateConfidence.INEXACT,
+            "recognized softmax-like call with conservative estimate",
+        ),
+    ),
+    (
+        {"relu", "gelu", "silu", "sigmoid", "tanh", "exp", "sqrt"},
+        _CallAnalyzer(
+            "activation",
+            EstimateConfidence.INEXACT,
+            "recognized activation call with conservative estimate",
+        ),
+    ),
+    (
+        {
+            "t",
+            "transpose",
+            "permute",
+            "view",
+            "reshape",
+            "flatten",
+            "contiguous",
+            "unsqueeze",
+            "squeeze",
+            "expand",
+            "broadcast_to",
+        },
+        _CallAnalyzer(
+            "data_movement",
+            EstimateConfidence.INEXACT,
+            "recognized view or data-movement call",
+        ),
+    ),
+    (
+        {"to", "type", "float", "half", "bfloat16"},
+        _CallAnalyzer("ignore", EstimateConfidence.INEXACT, "ignored dtype/device conversion"),
+    ),
+)
+
+
+def _classify_call(func_name: str) -> _CallAnalyzer | None:
+    leaf_name = func_name.rsplit(".", maxsplit=1)[-1]
+    for names, analyzer in _CALL_ANALYZERS:
+        if leaf_name in names or func_name in names:
+            return analyzer
+    return None
 
 
 def _call_name(node: ast.AST) -> str:
