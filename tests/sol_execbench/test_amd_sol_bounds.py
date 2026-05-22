@@ -3,6 +3,14 @@ from __future__ import annotations
 from pathlib import Path
 
 from sol_execbench.core.data.definition import Definition
+from sol_execbench.core.data.trace import (
+    Correctness,
+    Environment,
+    Evaluation,
+    EvaluationStatus,
+    Performance,
+    Trace,
+)
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.scoring.amd_sol import (
     AMD_SOL_SCHEMA_VERSION,
@@ -12,6 +20,7 @@ from sol_execbench.core.scoring.amd_sol import (
     default_amd_hardware_models,
     estimate_work,
     extract_graph,
+    summarize_amd_sol_coverage,
 )
 
 
@@ -55,6 +64,7 @@ def test_matmul_bound_artifact_records_graph_work_hardware_and_bounds():
     assert artifact.work_estimates[0].bytes_accessed == 224.0
     assert artifact.op_bounds[0].sol_bound_ms > 0.0
     assert artifact.aggregate_sol_bound_ms == artifact.op_bounds[0].sol_bound_ms
+    assert payload["coverage_summary"]["supported_ops"] == 1
     assert payload["hardware_model"]["architecture"] == "gfx1200"
     assert payload["hardware_model"]["validation_status"] == "provisional"
 
@@ -88,16 +98,16 @@ def test_elementwise_work_estimate_is_inexact_and_auditable():
 
 def test_unsupported_ops_stay_visible_instead_of_getting_silent_scores():
     definition = Definition(
-        name="exp_demo",
+        name="unsupported_demo",
         axes={"N": {"type": "var"}},
-        inputs={"x": {"shape": ["N"], "dtype": "float32"}},
-        outputs={"out": {"shape": ["N"], "dtype": "float32"}},
-        reference="import torch\n\ndef run(x):\n    return torch.exp(x)",
+        inputs={"x": {"shape": ["N", "N"], "dtype": "float32"}},
+        outputs={"out": {"shape": ["N", "N"], "dtype": "float32"}},
+        reference="import torch\n\ndef run(x):\n    return torch.linalg.inv(x)",
     )
     workload = Workload(
-        axes={"N": 8},
+        axes={"N": 4},
         inputs={"x": {"type": "random"}},
-        uuid="exp-workload",
+        uuid="unsupported-workload",
     )
     hardware = default_amd_hardware_models()["gfx942"]
 
@@ -110,8 +120,113 @@ def test_unsupported_ops_stay_visible_instead_of_getting_silent_scores():
     assert artifact.hardware_model.source.endswith("excluded from v1.5")
 
 
+def test_coverage_summary_counts_supported_inexact_and_unsupported_ops():
+    definition = Definition(
+        name="coverage_demo",
+        axes={"N": {"type": "var"}},
+        inputs={"x": {"shape": ["N"], "dtype": "float32"}},
+        outputs={"out": {"shape": ["N"], "dtype": "float32"}},
+        reference=(
+            "import torch\n\n"
+            "def run(x):\n"
+            "    y = torch.relu(x)\n"
+            "    z = y.sum()\n"
+            "    return z.reshape(1)\n"
+        ),
+    )
+    workload = Workload(
+        axes={"N": 8},
+        inputs={"x": {"type": "random"}},
+        uuid="coverage-workload",
+    )
+
+    graph = extract_graph(definition)
+    estimates = estimate_work(definition, workload, graph)
+    summary = summarize_amd_sol_coverage(graph, estimates)
+    payload = summary.to_dict()
+
+    assert summary.derived is True
+    assert summary.total_ops == 3
+    assert summary.supported_ops == 0
+    assert summary.inexact_ops == 3
+    assert summary.unsupported_ops == 0
+    assert payload["op_type_counts"] == {
+        "activation": 1,
+        "reduction": 1,
+        "data_movement": 1,
+    }
+
+
+def test_reduction_data_movement_and_softmax_estimates_are_labeled():
+    definition = Definition(
+        name="softmax_demo",
+        axes={"N": {"type": "var"}, "M": {"type": "const", "value": 4}},
+        inputs={"x": {"shape": ["N", "M"], "dtype": "float32"}},
+        outputs={"out": {"shape": ["N", "M"], "dtype": "float32"}},
+        reference=(
+            "import torch\n\n"
+            "def run(x):\n"
+            "    y = x.transpose(0, 1)\n"
+            "    z = torch.softmax(y, dim=-1)\n"
+            "    return z.reshape(x.shape)\n"
+        ),
+    )
+    workload = Workload(
+        axes={"N": 8},
+        inputs={"x": {"type": "random"}},
+        uuid="softmax-workload",
+    )
+
+    graph = extract_graph(definition)
+    estimates = estimate_work(definition, workload, graph)
+
+    assert [node.op_type for node in graph] == [
+        "data_movement",
+        "softmax",
+        "data_movement",
+    ]
+    assert all(estimate.confidence == EstimateConfidence.INEXACT for estimate in estimates)
+    assert estimates[0].flops == 0.0
+    assert estimates[1].flops > 0.0
+    assert "softmax-like" in estimates[1].rationale
+
+
+def test_amd_sol_artifacts_do_not_mutate_canonical_trace_payloads():
+    trace = Trace(
+        definition="matmul_demo",
+        workload=Workload(
+            axes={"M": 2},
+            inputs={"a": {"type": "random"}, "b": {"type": "random"}},
+            uuid="matmul-workload",
+        ),
+        solution="solution",
+        evaluation=Evaluation(
+            status=EvaluationStatus.PASSED,
+            environment=Environment(hardware="AMD gfx1200", libs={}),
+            timestamp="2026-05-22T00:00:00Z",
+            correctness=Correctness(),
+            performance=Performance(
+                latency_ms=1.0,
+                reference_latency_ms=2.0,
+                speedup_factor=2.0,
+            ),
+        ),
+    )
+    before = trace.model_dump(mode="json")
+
+    artifact = build_amd_sol_bound_artifact(
+        _matmul_definition(),
+        trace.workload,
+        default_amd_hardware_models()["gfx1200"],
+    )
+    _ = artifact.to_dict()
+
+    assert trace.model_dump(mode="json") == before
+
+
 def test_analysis_docs_require_amd_sol_bound_artifact_before_reporting_scores():
     text = (REPO_ROOT / "docs" / "analysis.md").read_text()
 
     assert "AMD SOL bound artifact" in text
     assert "before reporting AMD-native scores" in text
+    assert "supported, inexact, and unsupported" in text

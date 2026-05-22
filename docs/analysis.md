@@ -138,3 +138,21 @@ AMD-native score reports are derived artifacts. They can reference trace timing,
 ROCm timing evidence, baseline summaries, and AMD SOL bound artifacts, but they
 do not add fields to canonical trace JSONL. These reports are AMD ROCm
 interpretation artifacts: not NVIDIA B200, SOLAR, or leaderboard equivalence claims.
+
+## AMD SOL Coverage Semantics
+
+AMD SOL bound artifacts include a derived coverage summary before scores are
+reported. Coverage labels distinguish supported, inexact, and unsupported
+operation evidence:
+
+- `supported`: an analyzer has a direct, auditable estimate for the operation.
+- `inexact`: the operation is recognized, but the FLOP or byte estimate is
+  conservative and should not be presented as exact hardware validation.
+- `unsupported`: the operation remains visible in the artifact and must not be
+  silently treated as complete SOL evidence.
+
+Shape, view, transpose, broadcast, and reshape-like operations are modeled as
+data-movement or zero-FLOP nodes when recognized. Reductions, normalization,
+softmax-like operations, and activations use conservative estimates unless a
+future analyzer records a more exact formula. These coverage summaries are
+derived methodology artifacts and do not modify canonical trace JSONL.
