@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.8
-milestone_name: ROCm Library Ecosystem Completion
-current_phase: complete
-status: completed
-last_updated: "2026-05-22T15:30:35.581Z"
-last_activity: 2026-05-22 — Milestone v1.8 completed and archived
+milestone: v1.9
+milestone_name: AMD SOL/SOLAR Bound Modeling Completion
+status: planning
+last_updated: "2026-05-22T15:56:20.127Z"
+last_activity: 2026-05-22
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 5
-  completed_plans: 5
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -97,10 +96,10 @@ development environment.
 
 ## Current Position
 
-Phase: Milestone v1.8 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-05-22 — Milestone v1.8 completed and archived
+Status: Defining requirements
+Last activity: 2026-05-22 — Milestone v1.9 started
 
 ## Quick Tasks Completed
 
