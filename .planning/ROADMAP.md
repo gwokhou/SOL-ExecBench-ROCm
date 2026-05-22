@@ -15,7 +15,7 @@ evidence.
 |-------|------|------|--------------|
 | 19 | Compatibility and Practice Inventory | Complete 2026-05-22: Established non-negotiable contracts and classified `hip-execbench` practices before implementation. | COMPAT-01, COMPAT-02, COMPAT-03 |
 | 20 | Internal Diagnostics and Evidence Model | Complete 2026-05-22: Added derived evidence/report helpers without changing benchmark output contracts. | ENG-04, ENG-05, ENG-06 |
-| 21 | CDNA 3 Validation Readiness | Implement `gfx94*` readiness, evidence requirements, blockers, and no-claim guardrails without requiring real CDNA 3 hardware. | VAL-04, VAL-05, VAL-06 |
+| 21 | CDNA 3 Validation Readiness | Complete 2026-05-22: Implemented `gfx94*` readiness metadata, evidence requirements, blockers, and no-claim guardrails without CDNA 3 hardware validation. | VAL-04, VAL-05, VAL-06 |
 | 22 | RDNA 4 Validation Closure | Run and record RDNA 4 unit + E2E validation and confirm benchmark semantics did not regress. | RDNA-01, RDNA-02, RDNA-03 |
 
 **Coverage:** 12 / 12 v1.4 requirements mapped.
@@ -74,6 +74,8 @@ benchmark output.
 - Avoid replacing `ProblemPackager`, `build_ext.py`, or `eval_driver.py`.
 
 ### Phase 21: CDNA 3 Validation Readiness
+
+**Status:** Complete 2026-05-22
 
 **Goal:** Implement CDNA 3 validation readiness for `gfx94*` so a future real
 hardware run has commands, evidence requirements, blockers, and acceptance
@@ -138,9 +140,9 @@ prove compatibility and benchmark semantics remain intact.
 | ENG-04 | Phase 20 | Complete |
 | ENG-05 | Phase 20 | Complete |
 | ENG-06 | Phase 20 | Complete |
-| VAL-04 | Phase 21 | Pending |
-| VAL-05 | Phase 21 | Pending |
-| VAL-06 | Phase 21 | Pending |
+| VAL-04 | Phase 21 | Complete |
+| VAL-05 | Phase 21 | Complete |
+| VAL-06 | Phase 21 | Complete |
 | RDNA-01 | Phase 22 | Pending |
 | RDNA-02 | Phase 22 | Pending |
 | RDNA-03 | Phase 22 | Pending |
