@@ -3,22 +3,22 @@ gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: AMD-native SOL Scoring and ROCm Profiler Timing
 status: planning
-last_updated: "2026-05-22T09:13:34.333Z"
+last_updated: "2026-05-22T09:53:50.000Z"
 last_activity: 2026-05-22
 progress:
   total_phases: 4
-  completed_phases: 2
-  total_plans: 2
-  completed_plans: 2
-  percent: 50
+  completed_phases: 3
+  total_plans: 3
+  completed_plans: 3
+  percent: 75
 ---
 
 # Project State
 
 **Project:** SOL ExecBench ROCm Port
 **Initialized:** 2026-05-21
-**Current phase:** 25
-**Status:** Phase 24 complete
+**Current phase:** 26
+**Status:** Phase 25 complete
 
 ## Project Reference
 
@@ -46,7 +46,7 @@ v1.5 AMD-native SOL Scoring and ROCm Profiler Timing is planned.
 
 - Phase 23: Timing Semantics and Policy - complete
 - Phase 24: rocprofv3 Default Timing Path - complete
-- Phase 25: AMD SOL Bound Foundation - not started
+- Phase 25: AMD SOL Bound Foundation - complete
 - Phase 26: AMD-native Scoring and Guarded Reports - not started
 
 ## Memory
@@ -80,15 +80,15 @@ Items acknowledged and deferred at milestone close on 2026-05-21:
 
 ## Next Action
 
-Plan Phase 25: AMD SOL Bound Foundation.
+Plan Phase 26: AMD-native Scoring and Guarded Reports.
 
 ## Current Position
 
-Phase: 25 - AMD SOL Bound Foundation
+Phase: 26 - AMD-native Scoring and Guarded Reports
 Plan: —
-Status: Phase 24 complete
-Last activity: 2026-05-22 — Phase 24 executed and verified
+Status: Phase 25 complete
+Last activity: 2026-05-22 — Phase 25 executed and verified
 
 ## Operator Next Steps
 
-- Continue autonomous mode with Phase 24 planning and execution.
+- Continue autonomous mode with Phase 26 planning and execution.

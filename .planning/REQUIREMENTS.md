@@ -22,10 +22,10 @@
 
 ### AMD SOL Bound
 
-- [ ] **SOL-01**: Maintainer can run a SOLAR-like graph extraction foundation for supported benchmark workloads.
-- [ ] **SOL-02**: FLOP and byte analysis records supported, inexact, and unsupported operations with confidence and rationale.
-- [ ] **SOL-03**: AMD hardware model inputs record architecture, dtype or execution path, peak-value source, confidence, and validation status.
-- [ ] **SOL-04**: Per-op and aggregate AMD SOL bound artifacts are generated before AMD-native scoring is allowed.
+- [x] **SOL-01**: Maintainer can run a SOLAR-like graph extraction foundation for supported benchmark workloads.
+- [x] **SOL-02**: FLOP and byte analysis records supported, inexact, and unsupported operations with confidence and rationale.
+- [x] **SOL-03**: AMD hardware model inputs record architecture, dtype or execution path, peak-value source, confidence, and validation status.
+- [x] **SOL-04**: Per-op and aggregate AMD SOL bound artifacts are generated before AMD-native scoring is allowed.
 
 ### AMD-native Scoring
 
@@ -81,10 +81,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PROF-02 | Phase 24 | Complete |
 | PROF-03 | Phase 24 | Complete |
 | PROF-04 | Phase 24 | Complete |
-| SOL-01 | Phase 25 | Pending |
-| SOL-02 | Phase 25 | Pending |
-| SOL-03 | Phase 25 | Pending |
-| SOL-04 | Phase 25 | Pending |
+| SOL-01 | Phase 25 | Complete |
+| SOL-02 | Phase 25 | Complete |
+| SOL-03 | Phase 25 | Complete |
+| SOL-04 | Phase 25 | Complete |
 | SCORE-01 | Phase 26 | Pending |
 | SCORE-02 | Phase 26 | Pending |
 | SCORE-03 | Phase 26 | Pending |
@@ -101,4 +101,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-05-22*
-*Last updated: 2026-05-22 after v1.5 requirements confirmation*
+*Last updated: 2026-05-22 after Phase 25 completion*
