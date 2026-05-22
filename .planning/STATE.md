@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.4
-milestone_name: hip-execbench Engineering Experience Adaptation + Validation Workflow Readiness
-current_phase: 22
-status: completed
-last_updated: "2026-05-22T07:23:25.214Z"
-last_activity: 2026-05-22 — Milestone v1.4 completed and archived
+milestone: v1.5
+milestone_name: AMD-native SOL Scoring and ROCm Profiler Timing
+status: planning
+last_updated: "2026-05-22T09:13:34.333Z"
+last_activity: 2026-05-22
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 4
-  completed_plans: 4
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -85,10 +84,10 @@ Start the next milestone with `/gsd-new-milestone`.
 
 ## Current Position
 
-Phase: Milestone v1.4 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-05-22 — Milestone v1.4 completed and archived
+Status: Defining requirements
+Last activity: 2026-05-22 — Milestone v1.5 started
 
 ## Operator Next Steps
 
