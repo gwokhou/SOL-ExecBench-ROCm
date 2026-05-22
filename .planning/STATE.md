@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.6
-milestone_name: AMD SOLAR Coverage, Live Profiler Timing, and Scoring Workflow
-status: completed
-last_updated: "2026-05-22T11:30:00.000Z"
-last_activity: 2026-05-22 — Milestone v1.6 completed and archived
+milestone: v1.7
+milestone_name: Baseline, Timing, Reward-Hack Hardening, and ROCm Library Migration
+status: planning
+last_updated: "2026-05-22T12:25:40.890Z"
+last_activity: 2026-05-22
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 4
-  completed_plans: 4
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -87,10 +87,10 @@ Start the next milestone when ready.
 
 ## Current Position
 
-Phase: Milestone v1.6 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-05-22 — Milestone v1.6 completed, archived, and cleaned up
+Status: Defining requirements
+Last activity: 2026-05-22 — Milestone v1.7 started
 
 ## Operator Next Steps
 
