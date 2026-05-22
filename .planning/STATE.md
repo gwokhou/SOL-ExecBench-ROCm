@@ -6,7 +6,7 @@ status: planning
 last_updated: "2026-05-22T09:13:34.333Z"
 last_activity: 2026-05-22
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -17,15 +17,15 @@ progress:
 
 **Project:** SOL ExecBench ROCm Port
 **Initialized:** 2026-05-21
-**Current phase:** 22
-**Status:** v1.4 milestone complete
+**Current phase:** 23
+**Status:** v1.5 roadmap defined
 
 ## Project Reference
 
 See: `.planning/PROJECT.md` (updated 2026-05-22)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Milestone complete
+**Current focus:** AMD-native SOL scoring and ROCm profiler timing
 
 ## Workflow Settings
 
@@ -42,12 +42,12 @@ See: `.planning/config.json`
 
 See: `.planning/ROADMAP.md`
 
-v1.4 hip-execbench Engineering Experience Adaptation + Validation Workflow Readiness is complete and archived.
+v1.5 AMD-native SOL Scoring and ROCm Profiler Timing is planned.
 
-- Phase 19: Compatibility and Practice Inventory - complete
-- Phase 20: Internal Diagnostics and Evidence Model - complete
-- Phase 21: CDNA 3 Validation Readiness - complete
-- Phase 22: RDNA 4 Validation Closure - complete
+- Phase 23: Timing Semantics and Policy - not started
+- Phase 24: rocprofv3 Default Timing Path - not started
+- Phase 25: AMD SOL Bound Foundation - not started
+- Phase 26: AMD-native Scoring and Guarded Reports - not started
 
 ## Memory
 
@@ -80,15 +80,16 @@ Items acknowledged and deferred at milestone close on 2026-05-21:
 
 ## Next Action
 
-Start the next milestone with `/gsd-new-milestone`.
+Plan Phase 23: Timing Semantics and Policy.
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 23 - Timing Semantics and Policy
 Plan: —
-Status: Defining requirements
-Last activity: 2026-05-22 — Milestone v1.5 started
+Status: Roadmap defined
+Last activity: 2026-05-22 — Milestone v1.5 roadmap drafted
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Review and approve the v1.5 roadmap.
+- Plan Phase 23 with /gsd-plan-phase after approval.

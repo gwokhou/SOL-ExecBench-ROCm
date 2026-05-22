@@ -1,150 +1,171 @@
 # Roadmap: SOL ExecBench ROCm Port
 
-## Current Milestone: v1.4 hip-execbench Engineering Experience Adaptation + Validation Workflow Readiness
+## Current Milestone: v1.5 AMD-native SOL Scoring and ROCm Profiler Timing
 
-**Goal:** Adapt selected `hip-execbench` engineering practices without public
-contract breakage, implement CDNA 3 validation readiness without a hardware
-validation claim, and validate the implemented RDNA 4 path with unit and E2E
-evidence.
+**Goal:** Build a SOLAR-like AMD-native scoring foundation and replace default
+ROCm timing with an accuracy-first profiler-backed timing model, while keeping
+real CDNA3 hardware validation explicitly out of scope.
 
-**Phase numbering:** Continues from v1.3. v1.4 starts at Phase 19.
+**Phase numbering:** Continues from v1.4. v1.5 starts at Phase 23.
 
 ## Phase Summary
 
 | Phase | Name | Goal | Requirements |
 |-------|------|------|--------------|
-| 19 | Compatibility and Practice Inventory | Complete 2026-05-22: Established non-negotiable contracts and classified `hip-execbench` practices before implementation. | COMPAT-01, COMPAT-02, COMPAT-03 |
-| 20 | Internal Diagnostics and Evidence Model | Complete 2026-05-22: Added derived evidence/report helpers without changing benchmark output contracts. | ENG-04, ENG-05, ENG-06 |
-| 21 | CDNA 3 Validation Readiness | Complete 2026-05-22: Implemented `gfx94*` readiness metadata, evidence requirements, blockers, and no-claim guardrails without CDNA 3 hardware validation. | VAL-04, VAL-05, VAL-06 |
-| 22 | RDNA 4 Validation Closure | Complete 2026-05-22: Validated v1.4 on RDNA 4 with unit, E2E pytest, and `sol-execbench` CLI trace evidence. | RDNA-01, RDNA-02, RDNA-03 |
+| 23 | Timing Semantics and Policy | Define source classification and accuracy-first timing policy for HIP native, Triton, PyTorch, and mixed workloads. | TIME-01, TIME-02, TIME-03, TIME-04 |
+| 24 | rocprofv3 Default Timing Path | Replace default timing with profiler-backed ROCm timing where accurate, with labeled fallbacks and auditable evidence. | PROF-01, PROF-02, PROF-03, PROF-04 |
+| 25 | AMD SOL Bound Foundation | Build the SOLAR-like AMD graph, FLOP/byte, hardware model, and bound artifact foundation. | SOL-01, SOL-02, SOL-03, SOL-04 |
+| 26 | AMD-native Scoring and Guarded Reports | Produce AMD-native per-problem and suite scores with baseline comparison, evidence references, compatibility guardrails, and CDNA3 no-claim protection. | SCORE-01, SCORE-02, SCORE-03, SCORE-04, COMPAT-01, COMPAT-02, CLAIM-01, CLAIM-02 |
 
-**Coverage:** 12 / 12 v1.4 requirements mapped.
+**Coverage:** 20 / 20 v1.5 requirements mapped.
 
 ## Phases
 
-### Phase 19: Compatibility and Practice Inventory
+### Phase 23: Timing Semantics and Policy
 
-**Status:** Complete 2026-05-22
+**Status:** Not started
 
-**Goal:** Establish the v1.4 compatibility boundary and source-grounded
-`hip-execbench` adaptation decisions before touching implementation paths.
+**Goal:** Define how benchmark work is classified and timed before changing the
+default timing implementation.
 
-**Requirements:** COMPAT-01, COMPAT-02, COMPAT-03
-
-**Success criteria:**
-
-1. Public contracts are inventoried with explicit references to current CLI,
-   schema, trace JSONL, solution format, and eval-driver behavior.
-2. Guardrail tests protect the inventoried contracts from unintentional v1.4
-   drift.
-3. `hip-execbench` practices are classified as accepted, rejected, or deferred
-   with rationale tied to compatibility and benchmark semantics.
-4. No runtime dependency or public API change is introduced in this phase.
-
-**Implementation notes:**
-
-- Extend existing public-contract guardrail test style.
-- Use local source evidence from both repositories; do not rely on README
-  claims as implementation evidence.
-
-### Phase 20: Internal Diagnostics and Evidence Model
-
-**Status:** Complete 2026-05-22
-
-**Goal:** Adapt `hip-execbench` stage-result and report/evidence practices as
-internal or derived helpers while preserving trace JSONL as the canonical
-benchmark output.
-
-**Requirements:** ENG-04, ENG-05, ENG-06
+**Requirements:** TIME-01, TIME-02, TIME-03, TIME-04
 
 **Success criteria:**
 
-1. Maintainers can inspect parse/package/compile/evaluate/report-style
-   readiness through internal diagnostics or evidence data structures.
-2. Derived reports or evidence artifacts are generated from existing traces and
-   diagnostics without mutating trace JSONL.
-3. Any agent-readable or report-style output labels itself as derived and not
-   canonical benchmark output.
-4. Tests prove existing public trace schema and CLI behavior remain unchanged.
+1. Maintainers can classify measured work as HIP native, Triton, PyTorch, or
+   mixed source type before a timing backend is selected.
+2. A timing policy table maps each source type to timer backend and
+   interpretation.
+3. The implementation permits source-specific timing chimneys when a unified
+   timing口径 would reduce accuracy.
+4. Documentation explains whether each timing path measures kernel activity,
+   HIP runtime/API activity, PyTorch operator attribution, or fallback event
+   timing.
 
 **Implementation notes:**
 
-- Prefer dataclasses and pure helpers under `src/sol_execbench/core/`.
-- Avoid adding mandatory runtime dependencies.
-- Avoid replacing `ProblemPackager`, `build_ext.py`, or `eval_driver.py`.
+- Keep timing accuracy as the top rule.
+- Start with pure policy/data models and tests before invoking external
+  profilers.
+- Treat PyTorch ROCm's `torch.cuda` and `ProfilerActivity.CUDA` naming as API
+  compatibility surface, not NVIDIA runtime evidence.
 
-### Phase 21: CDNA 3 Validation Readiness
+### Phase 24: rocprofv3 Default Timing Path
 
-**Status:** Complete 2026-05-22
+**Status:** Not started
 
-**Goal:** Implement CDNA 3 validation readiness for `gfx94*` so a future real
-hardware run has commands, evidence requirements, blockers, and acceptance
-criteria ready, while explicitly avoiding a validation-pass claim.
+**Goal:** Implement profiler-backed ROCm timing and make it the default timing
+path when it is the most accurate supported backend for the classified source
+type.
 
-**Requirements:** VAL-04, VAL-05, VAL-06
+**Requirements:** PROF-01, PROF-02, PROF-03, PROF-04
 
 **Success criteria:**
 
-1. Readiness logic distinguishes RDNA 4, CDNA 3 `gfx94*`, unknown AMD targets,
-   and missing ROCm hardware/tooling.
-2. CDNA 3 readiness output identifies expected commands, evidence files,
-   acceptance criteria, and blockers for a future real `gfx94*` run.
-3. Docs and tests explicitly distinguish readiness from real CDNA 3 hardware
-   validation.
-4. Focused unit tests cover readiness behavior without requiring real CDNA 3
-   hardware.
+1. Maintainers can collect and parse representative `rocprofv3` timing evidence
+   for benchmark executions.
+2. The default benchmark timing path uses profiler-backed timing where the
+   Phase 23 policy selects it.
+3. Fallback timing paths are explicitly labeled with backend, reason, and
+   interpretation.
+4. Timing evidence records tool version, GPU architecture, activity domain,
+   aggregation rule, and parsed rows needed to audit measured duration.
 
 **Implementation notes:**
 
-- Reuse and extend existing ROCm diagnostics patterns where possible.
-- Keep claim wording conservative: "readiness implemented" is not "validated".
+- Add fixture tests for profiler output parsing before relying on local hardware
+  traces.
+- Keep profiler output in controlled evidence directories.
+- Do not include Triton JIT/autotune or PyTorch setup overhead in steady-state
+  device timing unless the evidence explicitly labels that interpretation.
 
-### Phase 22: RDNA 4 Validation Closure
+### Phase 25: AMD SOL Bound Foundation
 
-**Status:** Complete 2026-05-22
+**Status:** Not started
 
-**Goal:** Validate v1.4 implementation on RDNA 4 with unit and E2E evidence and
-prove compatibility and benchmark semantics remain intact.
+**Goal:** Build a SOLAR-like AMD bound pipeline that produces auditable
+theoretical bound artifacts before scoring.
 
-**Requirements:** RDNA-01, RDNA-02, RDNA-03
+**Requirements:** SOL-01, SOL-02, SOL-03, SOL-04
 
 **Success criteria:**
 
-1. Relevant unit tests for v1.4 diagnostics, evidence, readiness, and
-   compatibility guardrails pass on RDNA 4.
-2. Existing `sol-execbench` benchmark flow is exercised on RDNA 4 and produces
-   valid trace output.
-3. Final validation confirms reference correctness, timing integrity,
-   reward-hack defenses, ROCm-only schema/build/eval behavior, and public
-   compatibility guardrails did not regress.
-4. Validation evidence is recorded in a durable planning or documentation
-   artifact for milestone audit.
+1. Maintainers can run graph extraction for supported benchmark workloads.
+2. FLOP and byte analysis records supported, inexact, and unsupported
+   operations with confidence and rationale.
+3. AMD hardware model entries record architecture, dtype or execution path,
+   peak-value source, confidence, and validation status.
+4. Per-op and aggregate AMD SOL bound artifacts are generated before
+   AMD-native scoring is allowed.
 
 **Implementation notes:**
 
-- Use existing E2E samples and markers unless a new focused sample is necessary.
-- Do not claim CDNA 3 validation during this phase.
+- Prefer evidence-carrying bound objects over bare score formulas.
+- Keep hardware model data versioned and auditable.
+- CDNA3 model scaffolding is allowed only with unvalidated claim status.
+
+### Phase 26: AMD-native Scoring and Guarded Reports
+
+**Status:** Not started
+
+**Goal:** Combine timing evidence, AMD SOL bounds, baselines, and claim
+guardrails into an end-to-end AMD-native scoring workflow.
+
+**Requirements:** SCORE-01, SCORE-02, SCORE-03, SCORE-04, COMPAT-01,
+COMPAT-02, CLAIM-01, CLAIM-02
+
+**Success criteria:**
+
+1. Maintainers can generate per-problem AMD-native scores from measured timing
+   and AMD SOL bound artifacts.
+2. Baseline ingestion and comparison work without claiming NVIDIA B200, SOLAR,
+   or leaderboard equivalence.
+3. Suite-level aggregation preserves references to each workload's timing and
+   bound evidence.
+4. Score and report outputs include guardrails for unsupported, incomplete, or
+   unvalidated evidence.
+5. Existing CLI behavior, solution schema, canonical trace JSONL, eval-driver
+   correctness semantics, and reward-hack defenses do not regress.
+6. Reports explicitly state that real CDNA3 `gfx94*` full-suite validation is
+   excluded from v1.5.
+
+**Implementation notes:**
+
+- Keep SOL and timing evidence as derived artifacts unless an additive,
+  documented output path is explicitly introduced.
+- Reuse existing scoring guardrail patterns where they fit.
+- Add compatibility tests around trace/schema behavior before final closure.
 
 ## Completed Milestones
 
-- [x] **v1.3 Non-CDNA Issue Closure** — shipped 2026-05-22. See `.planning/milestones/v1.3-ROADMAP.md`.
-- [x] **v1.2 Engineering Practice Harvest and Compatibility Guardrails** — shipped 2026-05-22. See `.planning/milestones/v1.2-ROADMAP.md`.
-- [x] **v1.1 CDNA 3 Support and Migration Closure** — shipped 2026-05-21. See `.planning/milestones/v1.1-ROADMAP.md`.
-- [x] **v1.0 ROCm Port** — shipped 2026-05-21. See `.planning/milestones/v1.0-ROADMAP.md`.
+- [x] **v1.4 hip-execbench Engineering Experience Adaptation + Validation Workflow Readiness** - shipped 2026-05-22. See `.planning/milestones/v1.4-ROADMAP.md`.
+- [x] **v1.3 Non-CDNA Issue Closure** - shipped 2026-05-22. See `.planning/milestones/v1.3-ROADMAP.md`.
+- [x] **v1.2 Engineering Practice Harvest and Compatibility Guardrails** - shipped 2026-05-22. See `.planning/milestones/v1.2-ROADMAP.md`.
+- [x] **v1.1 CDNA 3 Support and Migration Closure** - shipped 2026-05-21. See `.planning/milestones/v1.1-ROADMAP.md`.
+- [x] **v1.0 ROCm Port** - shipped 2026-05-21. See `.planning/milestones/v1.0-ROADMAP.md`.
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| COMPAT-01 | Phase 19 | Complete |
-| COMPAT-02 | Phase 19 | Complete |
-| COMPAT-03 | Phase 19 | Complete |
-| ENG-04 | Phase 20 | Complete |
-| ENG-05 | Phase 20 | Complete |
-| ENG-06 | Phase 20 | Complete |
-| VAL-04 | Phase 21 | Complete |
-| VAL-05 | Phase 21 | Complete |
-| VAL-06 | Phase 21 | Complete |
-| RDNA-01 | Phase 22 | Complete |
-| RDNA-02 | Phase 22 | Complete |
-| RDNA-03 | Phase 22 | Complete |
+| TIME-01 | Phase 23 | Pending |
+| TIME-02 | Phase 23 | Pending |
+| TIME-03 | Phase 23 | Pending |
+| TIME-04 | Phase 23 | Pending |
+| PROF-01 | Phase 24 | Pending |
+| PROF-02 | Phase 24 | Pending |
+| PROF-03 | Phase 24 | Pending |
+| PROF-04 | Phase 24 | Pending |
+| SOL-01 | Phase 25 | Pending |
+| SOL-02 | Phase 25 | Pending |
+| SOL-03 | Phase 25 | Pending |
+| SOL-04 | Phase 25 | Pending |
+| SCORE-01 | Phase 26 | Pending |
+| SCORE-02 | Phase 26 | Pending |
+| SCORE-03 | Phase 26 | Pending |
+| SCORE-04 | Phase 26 | Pending |
+| COMPAT-01 | Phase 26 | Pending |
+| COMPAT-02 | Phase 26 | Pending |
+| CLAIM-01 | Phase 26 | Pending |
+| CLAIM-02 | Phase 26 | Pending |
+
