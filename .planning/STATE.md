@@ -7,18 +7,18 @@ last_updated: "2026-05-22T10:52:00.000Z"
 last_activity: 2026-05-22
 progress:
   total_phases: 4
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 4
-  completed_plans: 2
-  percent: 50
+  completed_plans: 3
+  percent: 75
 ---
 
 # Project State
 
 **Project:** SOL ExecBench ROCm Port
 **Initialized:** 2026-05-21
-**Current phase:** 29
-**Status:** Phase 28 complete; ready for Phase 29
+**Current phase:** 30
+**Status:** Phase 29 complete; ready for Phase 30
 
 ## Project Reference
 
@@ -42,8 +42,8 @@ See: `.planning/config.json`
 
 See: `.planning/ROADMAP.md`
 
-v1.6 roadmap is active with Phases 27-30 and 19 mapped requirements. Phases 27
-and 28 are complete.
+v1.6 roadmap is active with Phases 27-30 and 19 mapped requirements. Phases
+27-29 are complete.
 
 ## Memory
 
@@ -80,15 +80,15 @@ Items acknowledged and deferred at milestone close on 2026-05-21:
 
 ## Next Action
 
-Start Phase 29 smart discuss and planning.
+Start Phase 30 smart discuss and planning.
 
 ## Current Position
 
-Phase: 29 - Derived AMD Scoring Workflow
+Phase: 30 - Compatibility and Claim Guardrails
 Plan: —
-Status: Phase 28 complete; ready for Phase 29
-Last activity: 2026-05-22 — Phase 28 completed
+Status: Phase 29 complete; ready for Phase 30
+Last activity: 2026-05-22 — Phase 29 completed
 
 ## Operator Next Steps
 
-- Continue autonomous execution with Phase 29.
+- Continue autonomous execution with Phase 30.

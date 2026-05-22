@@ -22,10 +22,10 @@
 
 ### Derived Scoring Workflow
 
-- [ ] **SCORE-01**: Maintainer can generate AMD-native workload score reports from canonical trace JSONL, live timing evidence, AMD SOL bound artifacts, and baseline latency inputs.
-- [ ] **SCORE-02**: Maintainer can generate suite-level AMD-native score reports through the dataset runner or an additive CLI workflow.
-- [ ] **SCORE-03**: Score reports preserve evidence references for trace, timing, SOL-bound, baseline, and hardware-model inputs.
-- [ ] **SCORE-04**: Score reports explicitly mark missing timing, missing baseline, missing bound, unsupported operators, or unvalidated hardware as guarded or unscored states.
+- [x] **SCORE-01**: Maintainer can generate AMD-native workload score reports from canonical trace JSONL, live timing evidence, AMD SOL bound artifacts, and baseline latency inputs.
+- [x] **SCORE-02**: Maintainer can generate suite-level AMD-native score reports through the dataset runner or an additive CLI workflow.
+- [x] **SCORE-03**: Score reports preserve evidence references for trace, timing, SOL-bound, baseline, and hardware-model inputs.
+- [x] **SCORE-04**: Score reports explicitly mark missing timing, missing baseline, missing bound, unsupported operators, or unvalidated hardware as guarded or unscored states.
 
 ### Compatibility Guardrails
 
@@ -76,10 +76,10 @@ Updated during roadmap creation.
 | PROF-02 | Phase 28 | Complete |
 | PROF-03 | Phase 28 | Complete |
 | PROF-04 | Phase 28 | Complete |
-| SCORE-01 | Phase 29 | Pending |
-| SCORE-02 | Phase 29 | Pending |
-| SCORE-03 | Phase 29 | Pending |
-| SCORE-04 | Phase 29 | Pending |
+| SCORE-01 | Phase 29 | Complete |
+| SCORE-02 | Phase 29 | Complete |
+| SCORE-03 | Phase 29 | Complete |
+| SCORE-04 | Phase 29 | Complete |
 | COMPAT-01 | Phase 30 | Pending |
 | COMPAT-02 | Phase 30 | Pending |
 | COMPAT-03 | Phase 30 | Pending |
@@ -95,4 +95,4 @@ Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-05-22*
-*Last updated: 2026-05-22 after Phase 28 completion*
+*Last updated: 2026-05-22 after Phase 29 completion*
