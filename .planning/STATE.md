@@ -7,18 +7,18 @@ last_updated: "2026-05-22T09:13:34.333Z"
 last_activity: 2026-05-22
 progress:
   total_phases: 4
-  completed_phases: 1
-  total_plans: 1
-  completed_plans: 1
-  percent: 25
+  completed_phases: 2
+  total_plans: 2
+  completed_plans: 2
+  percent: 50
 ---
 
 # Project State
 
 **Project:** SOL ExecBench ROCm Port
 **Initialized:** 2026-05-21
-**Current phase:** 24
-**Status:** Phase 23 complete
+**Current phase:** 25
+**Status:** Phase 24 complete
 
 ## Project Reference
 
@@ -45,7 +45,7 @@ See: `.planning/ROADMAP.md`
 v1.5 AMD-native SOL Scoring and ROCm Profiler Timing is planned.
 
 - Phase 23: Timing Semantics and Policy - complete
-- Phase 24: rocprofv3 Default Timing Path - not started
+- Phase 24: rocprofv3 Default Timing Path - complete
 - Phase 25: AMD SOL Bound Foundation - not started
 - Phase 26: AMD-native Scoring and Guarded Reports - not started
 
@@ -80,14 +80,14 @@ Items acknowledged and deferred at milestone close on 2026-05-21:
 
 ## Next Action
 
-Plan Phase 24: rocprofv3 Default Timing Path.
+Plan Phase 25: AMD SOL Bound Foundation.
 
 ## Current Position
 
-Phase: 24 - rocprofv3 Default Timing Path
+Phase: 25 - AMD SOL Bound Foundation
 Plan: —
-Status: Phase 23 complete
-Last activity: 2026-05-22 — Phase 23 executed and verified
+Status: Phase 24 complete
+Last activity: 2026-05-22 — Phase 24 executed and verified
 
 ## Operator Next Steps
 
