@@ -6,6 +6,7 @@ from sol_execbench.core.diagnostics import (
     DiagnosticStage,
     MI300X_FP8_READINESS,
     MI300X_REQUIRED_ARTIFACTS,
+    ROCM_LIBRARY_SPECS,
     ProfilerBackend,
     StageDiagnostic,
     SolExecBenchError,
@@ -14,6 +15,8 @@ from sol_execbench.core.diagnostics import (
     classify_gfx,
     local_gfx_target,
     mi300x_validation_claim_blockers,
+    rocm_library_diagnostics,
+    rocm_library_readiness,
     rocm_tool_diagnostics,
     select_profiler_backend,
 )
@@ -68,6 +71,63 @@ def test_rocm_tool_diagnostics_reports_missing_tools():
         "rocprofv3 not found",
     }
     assert all(diag.hint for diag in diagnostics)
+
+
+def test_rocm_library_specs_cover_supported_native_categories():
+    assert set(ROCM_LIBRARY_SPECS) == {"hipblas", "miopen", "ck", "rocwmma"}
+    assert ROCM_LIBRARY_SPECS["miopen"].headers == ("miopen/miopen.h",)
+    assert "MIOpen" in ROCM_LIBRARY_SPECS["miopen"].libraries
+    assert ROCM_LIBRARY_SPECS["ck"].libraries == ()
+    assert ROCM_LIBRARY_SPECS["rocwmma"].headers == ("rocwmma/rocwmma.hpp",)
+
+
+def test_rocm_library_readiness_reports_missing_headers_and_libraries(tmp_path):
+    readiness = rocm_library_readiness(
+        "miopen",
+        roots=(tmp_path,),
+        find_library=lambda _name: None,
+        exists=lambda _path: False,
+    )
+
+    assert readiness.ready is False
+    assert readiness.status == "missing"
+    assert readiness.missing_headers == ("miopen/miopen.h",)
+    assert "MIOpen" in readiness.missing_libraries
+    diagnostic = readiness.to_diagnostic()
+    assert diagnostic.stage == DiagnosticStage.ENVIRONMENT
+    assert diagnostic.status == "missing"
+    assert "headers: miopen/miopen.h" in diagnostic.message
+    assert diagnostic.hint
+
+
+def test_rocm_library_readiness_accepts_header_only_libraries(tmp_path):
+    header = tmp_path / "include" / "rocwmma" / "rocwmma.hpp"
+    header.parent.mkdir(parents=True)
+    header.write_text("// test header")
+
+    readiness = rocm_library_readiness(
+        "rocwmma",
+        roots=(tmp_path,),
+        find_library=lambda _name: None,
+    )
+
+    assert readiness.ready is True
+    assert readiness.header_paths == (str(header),)
+    assert readiness.library_paths == ()
+    assert readiness.to_diagnostic().status == "available"
+
+
+def test_rocm_library_diagnostics_reports_each_requested_library(tmp_path):
+    diagnostics = rocm_library_diagnostics(
+        ("miopen", "ck"),
+        roots=(tmp_path,),
+        find_library=lambda _name: None,
+        exists=lambda _path: False,
+    )
+
+    assert [diagnostic.status for diagnostic in diagnostics] == ["missing", "missing"]
+    assert "MIOpen" in diagnostics[0].message
+    assert "Composable Kernel" in diagnostics[1].message
 
 
 def test_local_gfx_target_uses_first_available_rocm_output():

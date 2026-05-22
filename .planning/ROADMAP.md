@@ -13,9 +13,15 @@ deferred and must not be claimed by this milestone.
 
 ## Phase Summary
 
+- [x] Phase 36: Library Build Plumbing and Diagnostics
+- [ ] Phase 37: MIOpen Supported Replacement
+- [ ] Phase 38: Composable Kernel Supported Replacement
+- [ ] Phase 39: rocWMMA Supported Replacement
+- [ ] Phase 40: Compatibility Cleanup and RDNA 4 Validation Closure
+
 | Phase | Name | Goal | Requirements |
 |-------|------|------|--------------|
-| 36 | Library Build Plumbing and Diagnostics | Make dependency detection, compile metadata, Docker docs, and native staging ready for MIOpen, CK, and rocWMMA. | BUILD-01, BUILD-02, BUILD-03, BUILD-04 |
+| 36 | Library Build Plumbing and Diagnostics | Complete 2026-05-22: Added reusable ROCm library dependency diagnostics, Docker dependency checks, native staging tests, and dependency docs for MIOpen, CK, and rocWMMA. | BUILD-01, BUILD-02, BUILD-03, BUILD-04 |
 | 37 | MIOpen Supported Replacement | Promote MIOpen from candidate to supported RDNA 4 replacement with a real runnable example and tests. | MIOPEN-01, MIOPEN-02, MIOPEN-03, MIOPEN-04 |
 | 38 | Composable Kernel Supported Replacement | Promote CK from candidate to supported RDNA 4 replacement for selected GEMM/fused GEMM workloads. | CK-01, CK-02, CK-03, CK-04 |
 | 39 | rocWMMA Supported Replacement | Promote rocWMMA from candidate to supported RDNA 4 replacement for matrix-core GEMM-style workloads. | WMM-01, WMM-02, WMM-03, WMM-04 |
@@ -27,7 +33,7 @@ deferred and must not be claimed by this milestone.
 
 ### Phase 36: Library Build Plumbing and Diagnostics
 
-**Status:** Not Started
+**Status:** Complete 2026-05-22
 
 **Goal:** Make the native library infrastructure ready for MIOpen, CK, and
 rocWMMA without changing public schema or trace contracts.
@@ -47,7 +53,12 @@ rocWMMA without changing public schema or trace contracts.
 - Prefer existing `compile_options` fields before adding internal helpers.
 - Keep RDNA 4 as the validation target for this milestone.
 
-**Plans:** 0 plans
+**Plans:** 1 plan
+
+Plans:
+
+- [x] 36-01: Add ROCm library dependency diagnostics, native staging tests,
+  dependency docs, and focused verification for remaining candidate categories.
 
 ### Phase 37: MIOpen Supported Replacement
 
@@ -178,10 +189,10 @@ RDNA4-02, RDNA4-03
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BUILD-01 | Phase 36 | Pending |
-| BUILD-02 | Phase 36 | Pending |
-| BUILD-03 | Phase 36 | Pending |
-| BUILD-04 | Phase 36 | Pending |
+| BUILD-01 | Phase 36 | Complete |
+| BUILD-02 | Phase 36 | Complete |
+| BUILD-03 | Phase 36 | Complete |
+| BUILD-04 | Phase 36 | Complete |
 | MIOPEN-01 | Phase 37 | Pending |
 | MIOPEN-02 | Phase 37 | Pending |
 | MIOPEN-03 | Phase 37 | Pending |
@@ -201,4 +212,3 @@ RDNA4-02, RDNA4-03
 | RDNA4-01 | Phase 40 | Pending |
 | RDNA4-02 | Phase 40 | Pending |
 | RDNA4-03 | Phase 40 | Pending |
-

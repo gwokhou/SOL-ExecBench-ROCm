@@ -6,6 +6,8 @@ from __future__ import annotations
 import ctypes.util
 import subprocess
 
+from sol_execbench.core.diagnostics import rocm_library_diagnostics
+
 
 def _resolve_rocm_library(name: str, candidates: tuple[str, ...]) -> str:
     for candidate in candidates:
@@ -31,3 +33,15 @@ def test_selected_rocm_libraries_available():
     for name, candidates in libraries.items():
         resolved = _resolve_rocm_library(name, candidates)
         assert resolved, f"Missing ROCm library: {name}"
+
+
+def test_rocm_library_example_dependencies_available():
+    diagnostics = rocm_library_diagnostics()
+    missing = [
+        diagnostic.format()
+        for diagnostic in diagnostics
+        if diagnostic.status != "available"
+    ]
+    assert not missing, "Missing ROCm library example dependencies:\n" + "\n".join(
+        missing
+    )
