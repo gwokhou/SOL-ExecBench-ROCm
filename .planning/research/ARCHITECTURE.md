@@ -1,116 +1,154 @@
 # Architecture Research
 
-**Domain:** ROCm port of GPU kernel benchmark framework
-**Researched:** 2026-05-21
-**Confidence:** MEDIUM-HIGH
+**Domain:** SOL ExecBench ROCm engineering-practice adaptation
+**Researched:** 2026-05-22
+**Confidence:** HIGH
 
-## Standard Architecture
+## Recommended Architecture
 
 ### System Overview
 
-```text
-CLI and Dataset Runner
-  -> schema loading and validation
-  -> ROCm-aware problem staging
-  -> optional HIP/native compile phase
-  -> isolated ROCm eval driver subprocess
-  -> trace JSONL parsing and reporting
-
-ROCm Runtime Layer
-  -> PyTorch ROCm / Triton ROCm / HIP shared objects
-  -> ROCm libraries: rocBLAS, MIOpen, CK, rocWMMA, rocPRIM
-  -> profiling: rocprofiler-sdk, rocprofv3, ROCm Compute Profiler
-  -> system discovery: AMD SMI, ROCm SMI, rocminfo
 ```
+Existing public surface
+    sol-execbench CLI
+    Pydantic definition/workload/solution/trace schemas
+    Trace JSONL output
+        |
+        v
+Existing eval core
+    ProblemPackager -> build_ext.py -> eval_driver.py
+    reference correctness, timing, reward-hack checks
+        |
+        v
+New internal/additive layer
+    stage diagnostics
+    validation readiness
+    evidence/report helpers
+    compatibility guardrails
+```
+
+The new layer should observe, summarize, and validate existing behavior. It
+must not become the primary benchmark contract.
 
 ### Component Responsibilities
 
 | Component | Responsibility | Typical Implementation |
 |-----------|----------------|------------------------|
-| CLI | Keep user-facing invocation stable | Modify `src/sol_execbench/cli/main.py` only for ROCm-specific config/labels. |
-| Schemas | Preserve public problem/trace contracts | Extend `SupportedLanguages` and hardware enums without unnecessary schema churn. |
-| Packager | Stage files and compile native code | Replace SM/gencode injection with AMD gfx target handling. |
-| Build template | Compile HIP/native sources | Use hipcc/amdclang++/torch extension ROCm path as appropriate. |
-| Eval driver | Import user code, run workloads, emit traces | Replace CUDA-only guards and timing hooks with ROCm-aware logic. |
-| Benchmark helpers | Generate inputs, compare outputs, time kernels | Preserve correctness semantics; port timing and clock control. |
-| Tests/examples | Prove behavior on ROCm | Migrate sample solutions and hardware markers. |
+| Compatibility inventory | Define what must not change. | Tests and docs referencing CLI help, schemas, trace fields, and solution model. |
+| Stage diagnostics | Capture parse/package/compile/eval/verify/timing readiness and failure context. | Internal dataclasses and pure helpers under `src/sol_execbench/core/`. |
+| Validation readiness | Model RDNA 4 and CDNA 3 validation preconditions and evidence requirements. | Internal Python helpers plus scripts/docs/tests. |
+| Evidence writer | Produce opt-in JSON/Markdown evidence files. | Derived artifacts separate from trace JSONL. |
+| RDNA 4 validation tests | Prove implementation works on validated platform. | Unit tests plus E2E command/test evidence. |
 
 ## Recommended Project Structure
 
-Keep the current package shape. Add ROCm-specific code by replacing backend
-modules where NVIDIA assumptions are embedded, rather than creating a parallel
-CUDA/ROCm abstraction tree.
-
-```text
-src/sol_execbench/
-├── cli/                 # stable CLI
-├── driver/              # ROCm-aware staging and compile commands
-│   └── templates/       # HIP build and ROCm eval subprocess scripts
-├── core/
-│   ├── data/            # schemas and supported language/hardware enums
-│   └── bench/           # IO, correctness, ROCm timing, SMI/clock logic
-└── sol_score.py         # scoring logic, unchanged unless SOL constants change
-
-tests/
-├── docker/dependencies/ # ROCm dependency checks
-├── sol_execbench/       # unit, driver, e2e tests
-└── examples/            # migrated ROCm examples
 ```
+src/sol_execbench/core/
+├── diagnostics.py              # Existing diagnostics helpers, extend carefully
+├── reporting.py                # Existing pure trace summaries, extend only as derived reports
+├── validation.py               # Candidate new internal validation readiness helpers
+└── baseline.py                 # Existing trace-baseline comparison, keep contract stable
+
+scripts/
+└── validate_rocm.py            # Candidate opt-in validation/evidence runner if needed
+
+tests/sol_execbench/
+├── test_public_contract_guardrails.py
+├── test_rocm_diagnostics_reporting.py
+├── test_validation_readiness.py
+└── test_e2e.py
+
+docs/
+└── validation.md               # Candidate evidence and claim-boundary documentation
+```
+
+### Structure Rationale
+
+- Keep public CLI and schemas in place.
+- Put new functionality in internal modules first.
+- Use docs/tests to expose behavior before adding any public command.
+- Keep validation evidence separate from trace JSONL.
 
 ## Architectural Patterns
 
-### Pattern 1: Preserve CLI and Schema Contracts
+### Pattern 1: Stage Result Wrapper
 
-**What:** Keep `definition.json`, `workload.jsonl`, `solution.json`, and trace
-formats stable while changing backend implementation.
-**Trade-off:** Some language names may need migration aliases.
+**What:** Represent each phase result as status, duration, error, and optional data.
+**When to use:** Internal command readiness, validation workflows, and evidence generation.
+**Trade-offs:** Improves diagnostics but can become a shadow pipeline if allowed to replace eval semantics.
 
-### Pattern 2: Backend Replacement by Subsystem
+### Pattern 2: Derived Report Layer
 
-**What:** Port Docker, dependencies, compile, eval, timing, examples, and tests
-as separate layers.
-**Trade-off:** Slower than search/replace, but prevents silent benchmark drift.
+**What:** Generate JSON/Markdown summaries from existing trace objects, state, and diagnostics.
+**When to use:** Agent/operator readability.
+**Trade-offs:** Safe if derived; unsafe if users start treating it as canonical trace schema.
 
-### Pattern 3: Hardware-Gated Tests
+### Pattern 3: Claim-Level Guardrails
 
-**What:** Replace `sm_100` and CUDA availability markers with ROCm architecture
-checks for RDNA 4 and CDNA 3.
-**Trade-off:** Requires clear skip messages and access to both hardware classes.
+**What:** Explicitly classify readiness, simulated/unsupported checks, RDNA 4 evidence, and real CDNA 3 validation.
+**When to use:** Any score, baseline, or validation evidence involving AMD architecture claims.
+**Trade-offs:** Adds text/tests, but prevents false hardware validation claims.
 
-## Key Data Flows
+## Data Flow
 
-1. **Python solution:** CLI -> staging -> `eval_driver.py` -> PyTorch/Triton ROCm
-   import -> correctness -> ROCm timing -> trace JSON.
-2. **HIP/native solution:** CLI -> staging -> HIP build -> shared object import
-   -> correctness -> ROCm timing -> trace JSON.
-3. **Dataset run:** `scripts/run_dataset.py` -> per-problem solution wrapping ->
-   CLI invocation -> trace summary output.
+### Validation Readiness Flow
+
+```
+Environment detection
+    -> classify gfx target
+    -> select validation profile
+    -> run or skip hardware-bound checks
+    -> collect evidence metadata
+    -> write separate evidence artifact
+    -> summarize claim level
+```
+
+### Engineering Adaptation Flow
+
+```
+hip-execbench source pattern
+    -> classify as accepted/rejected/deferred
+    -> map to internal Python adaptation
+    -> add guardrail tests
+    -> validate RDNA 4 path
+```
 
 ## Integration Points
 
 | Boundary | Communication | Notes |
 |----------|---------------|-------|
-| Python to native build | Staging files and shared object | Existing `benchmark_kernel.so` contract can remain if build changes underneath. |
-| Eval driver to profiler | Python subprocess invoking ROCm APIs/tools | Need deterministic JSON stdout and library noise isolation. |
-| Test suite to hardware | pytest markers and env probes | Must distinguish no ROCm, unsupported arch, and real failures. |
-| Docker to host GPU | ROCm device mounts and groups | Replace NVIDIA Docker flags with ROCm device access requirements. |
+| CLI -> ProblemPackager | Existing direct calls | Avoid changing arguments or exit behavior. |
+| ProblemPackager -> eval driver | Existing staging files | New diagnostics can observe, not replace. |
+| Trace JSONL -> reports | Derived object loading | Reports must not add fields to trace JSONL. |
+| Validation helpers -> docs/tests | Python helper APIs | Keep hardware claims explicit. |
 
-## Phase Ordering Implications
+## Anti-Patterns
 
-1. Establish ROCm environment and dependency baseline first.
-2. Port schemas/build language names and HIP compile path before examples.
-3. Port eval driver and timing before claiming benchmark validity.
-4. Migrate examples/tests after the runtime paths exist.
-5. Validate on RDNA 4 and CDNA 3 last, then tighten docs and license notes.
+### Shadow Benchmark Pipeline
+
+**What people do:** Add a new pipeline that compiles/runs kernels differently from `sol-execbench`.
+**Why it is wrong:** Creates incompatible results and weakens paper semantics.
+**Do this instead:** Wrap existing stages with diagnostics and evidence.
+
+### Public Contract Drift
+
+**What people do:** Add convenient fields to trace or solution models for new reports.
+**Why it is wrong:** Breaks dataset and tool compatibility.
+**Do this instead:** Generate separate derived artifacts.
+
+### Readiness Claim Inflation
+
+**What people do:** Treat CDNA 3 readiness tests as validation.
+**Why it is wrong:** No real `gfx94*` hardware evidence exists.
+**Do this instead:** Use claim levels: not-run, readiness-only, RDNA-validated, CDNA-validated.
 
 ## Sources
 
-- Current codebase map: `.planning/codebase/ARCHITECTURE.md`
-- AMD HIP porting guide
-- ROCm PyTorch installation docs
-- rocprofv3 documentation
-- ROCm library documentation for rocBLAS, MIOpen, CK, rocWMMA, and primitives
+- `src/sol_execbench/cli/main.py` and `src/sol_execbench/driver/problem_packager.py` for current pipeline boundaries.
+- `src/sol_execbench/driver/templates/eval_driver.py` for benchmark semantics.
+- `hip-execbench/src/pipeline/runner.ts` for stage result architecture.
+- `hip-execbench/src/cli/commands/score.ts` for derived agent/report architecture.
 
 ---
-*Architecture research for: ROCm port of SOL ExecBench*
-*Researched: 2026-05-21*
+*Architecture research for: v1.4 engineering-practice adaptation*
+*Researched: 2026-05-22*

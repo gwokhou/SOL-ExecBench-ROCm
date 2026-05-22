@@ -1,146 +1,159 @@
 # Pitfalls Research
 
-**Domain:** ROCm port of GPU kernel benchmark framework
-**Researched:** 2026-05-21
-**Confidence:** HIGH for common porting pitfalls, MEDIUM for project-specific profiler replacement details
+**Domain:** SOL ExecBench ROCm engineering-practice adaptation
+**Researched:** 2026-05-22
+**Confidence:** HIGH
 
 ## Critical Pitfalls
 
-### Pitfall 1: Assuming HIPIFY Completes the Port
+### Pitfall 1: Breaking Paper Harness Semantics
 
-**What goes wrong:** CUDA code compiles after automatic conversion but benchmark
-semantics drift or architecture-specific bugs remain.
+**What goes wrong:**
+New pipeline helpers replace or bypass reference execution, 10-round correctness,
+timing integrity, L2 clearing, unique tensor allocation, or reward-hack checks.
 
-**Why it happens:** HIPIFY handles API translation, not every semantic issue.
-AMD's HIP porting guide specifically calls out architecture differences such as
-warp size and lane masks.
+**Why it happens:**
+`hip-execbench` has a cleaner standalone HIP binary flow, but that flow is not
+semantically equivalent to the current SOL ExecBench eval driver.
 
-**How to avoid:** Use HIPIFY `--examine` to inventory CUDA surface area, then
-manually port and test each subsystem.
+**How to avoid:**
+Keep new helpers observational or additive. Any execution-path change must prove
+equivalence through focused tests and E2E validation.
 
-**Warning signs:** `warpSize`, lane masks, inline PTX, hard-coded SM/gencode
-flags, CUDA stream/event assumptions, and NVIDIA-only headers remain.
+**Warning signs:**
+New code emits benchmark results without going through `eval_driver.py`, or trace
+schema fields start depending on new report helpers.
 
-**Phase to address:** Initial audit and native compile phases.
-
----
-
-### Pitfall 2: Replacing CUPTI Timing With Weak Timing
-
-**What goes wrong:** The benchmark reports timings that miss non-default stream
-work or profiler-relevant GPU activity.
-
-**Why it happens:** Existing timing relies on CUPTI concepts and has tests for
-stream-hiding attacks. A simple HIP event replacement may not preserve those
-defenses.
-
-**How to avoid:** Prototype rocprofiler-sdk/rocprofv3 timing and validate it
-against existing reward-hack and stream tests before migrating examples.
-
-**Warning signs:** Timing tests are skipped, removed, or rewritten only to match
-implementation convenience.
-
-**Phase to address:** Timing/profile subsystem phase.
+**Phase to address:**
+First compatibility/contract phase.
 
 ---
 
-### Pitfall 3: Porting Examples Before Runtime Contracts
+### Pitfall 2: Treating CDNA 3 Readiness as CDNA 3 Validation
 
-**What goes wrong:** Example kernels are ported repeatedly because language
-enums, build flags, loader behavior, and output normalization keep changing.
+**What goes wrong:**
+Docs or reports imply `gfx94*` passed even though only readiness or command
+construction was tested.
 
-**Why it happens:** Examples exercise all backend assumptions.
+**Why it happens:**
+Validation readiness is useful and can look like completion in status summaries.
 
-**How to avoid:** Stabilize schemas, HIP build, eval import, hardware detection,
-and timing before broad example migration.
+**How to avoid:**
+Introduce explicit claim levels and require real hardware evidence before
+changing CDNA 3 validation status.
 
-**Warning signs:** Example PRs contain Docker, build, timing, schema, and kernel
-changes all at once.
+**Warning signs:**
+Phrases like "CDNA 3 validated" appear without a recorded full-suite `gfx94*`
+run.
 
-**Phase to address:** Roadmap should separate environment/build/runtime from
-example migration.
-
----
-
-### Pitfall 4: Treating RDNA 4 and CDNA 3 as Equivalent
-
-**What goes wrong:** Tests pass on one AMD architecture but fail or perform
-incorrectly on the other.
-
-**Why it happens:** Consumer RDNA and datacenter CDNA differ in supported
-features, library tuning, matrix instructions, and performance counters.
-
-**How to avoid:** Add architecture detection early and keep per-architecture
-test gates explicit.
-
-**Warning signs:** Test names say "ROCm" but no run records show both RDNA 4 and
-CDNA 3.
-
-**Phase to address:** Test migration and final validation.
+**Phase to address:**
+Validation readiness phase.
 
 ---
 
-### Pitfall 5: License Drift During Dependency Replacement
+### Pitfall 3: Importing `hip-execbench` Dependencies Instead of Practices
 
-**What goes wrong:** The port accidentally introduces dependencies or copied
-code that conflict with the repository license or third-party notices.
+**What goes wrong:**
+The Python package gains a Node/TypeScript or frontend reporting dependency
+surface.
 
-**Why it happens:** CUDA-to-ROCm replacement often involves borrowing examples,
-headers, or snippets from multiple upstream projects.
+**Why it happens:**
+The useful patterns in `hip-execbench` are packaged in a different stack.
 
-**How to avoid:** Track dependency licenses during each replacement and update
-notices/docs as part of the same phase.
+**How to avoid:**
+Translate patterns into existing Python modules using dataclasses, JSON,
+Markdown, pytest, and current CLI conventions.
 
-**Warning signs:** New vendored code, copied kernels, or dependency additions
-without license review.
+**Warning signs:**
+`package.json`, TypeScript build steps, or report frontend assets become runtime
+requirements for `sol-execbench`.
 
-**Phase to address:** Every phase; final compliance pass before completion.
+**Phase to address:**
+Practice adaptation phase.
+
+---
+
+### Pitfall 4: Report Format Becomes Accidental Public API
+
+**What goes wrong:**
+Derived evidence files become relied upon as canonical benchmark output before
+their stability is defined.
+
+**Why it happens:**
+Agent-readable JSON and Markdown reports are useful in automation.
+
+**How to avoid:**
+Label derived artifacts as evidence/reporting outputs and keep trace JSONL as
+the benchmark output contract.
+
+**Warning signs:**
+Tests assert new report fields as if they are trace schema fields.
+
+**Phase to address:**
+Reporting/evidence phase.
+
+---
+
+### Pitfall 5: RDNA 4 Validation is Too Narrow
+
+**What goes wrong:**
+Only unit tests pass, but the integrated benchmark flow regresses.
+
+**Why it happens:**
+Additive helpers can still affect environment detection, packaging, or scripts.
+
+**How to avoid:**
+Require both focused unit tests and RDNA 4 E2E evidence for implemented paths.
+
+**Warning signs:**
+No E2E run is recorded after changing validation or diagnostics code.
+
+**Phase to address:**
+Final validation closure phase.
 
 ## Technical Debt Patterns
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Leaving CUDA names in ROCm-only code | Smaller diff | Confusing APIs and tests | Only as temporary aliases with deprecation notes. |
-| Skipping hardware-specific tests | Faster CI | False confidence | Only for local development, never completion gate. |
-| Disabling reward-hack tests | Unblocks timing port | Breaks benchmark trust | Never acceptable for final v1. |
-| Hard-coding one gfx target | Simplifies compile | Fails RDNA/CDNA requirement | Only for a narrow prototype branch. |
+| Add new trace fields for reports | Easy data plumbing | Breaks public contract | Never in v1.4 |
+| Mock all hardware checks | Fast tests | Readiness not grounded in actual ROCm behavior | Acceptable only for unit tests with separate RDNA 4 E2E |
+| Copy TypeScript behavior verbatim | Faster initial implementation | Mismatched semantics and dependencies | Never for public benchmark path |
+| Skip claim-level docs | Less writing | Future false validation claims | Never |
 
 ## Integration Gotchas
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| Docker | Keeping NVIDIA runtime flags | Use ROCm device mounts, groups, and official ROCm base image. |
-| PyTorch | Installing CUDA wheels | Use ROCm wheels or ROCm PyTorch image. |
-| Native build | Reusing `-gencode` flags | Map to AMD gfx targets and HIP compiler options. |
-| Profiling | Shelling out to profiler without JSON discipline | Preserve stdout JSON contract and route profiler noise to logs/stderr. |
-| SMI tools | Porting `nvidia-smi` call names mechanically | Rebuild discovery/clock logic around AMD SMI/ROCm SMI/rocminfo. |
+| ROCm detection | Treat missing tools as generic failure | Return stage-aware readiness diagnostics and hints. |
+| Evidence writing | Write into trace JSONL | Write separate evidence files. |
+| Baseline comparison | Apply significance tests to single samples | Require repeated timing samples before statistical claims. |
+| Compile caching | Cache without all behavior-affecting inputs | Include source, flags, ROCm version, target arch, and invalidate conservatively. |
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Docker:** Container builds and imports torch, but HIP examples do not compile.
-- [ ] **PyTorch:** `torch.cuda.is_available()` works, but architecture-specific kernels fail.
-- [ ] **Timing:** Latency is nonzero, but stream-hiding tests are not equivalent.
-- [ ] **Examples:** One HIP sample passes, but CUTLASS/cuDNN/CuTe/cuTile replacements are unplanned.
-- [ ] **Tests:** Unit tests pass on CPU, but RDNA 4 and CDNA 3 hardware runs are missing.
-- [ ] **Licensing:** Code compiles, but third-party notices are stale.
+- [ ] **CDNA 3 readiness:** Has commands and evidence template, but docs still say real validation is deferred.
+- [ ] **RDNA 4 validation:** Unit tests pass and E2E evidence is recorded.
+- [ ] **Compatibility:** CLI help, schema behavior, and trace JSONL remain unchanged.
+- [ ] **Practice adaptation:** Each borrowed pattern has accepted/rejected/deferred rationale.
+- [ ] **Scoring/baseline:** Any AMD performance claim includes guardrail language.
 
 ## Pitfall-to-Phase Mapping
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| HIPIFY over-trust | Audit/build phase | HIPIFY report plus manual removal of CUDA-only patterns. |
-| Weak timing | Timing/profile phase | Stream/reward-hack tests pass under ROCm. |
-| Example churn | Runtime-before-examples ordering | Examples migrate after schemas/build/eval are stable. |
-| RDNA/CDNA mismatch | Validation phase | Test logs from both architecture families. |
-| License drift | Every dependency phase | Updated notices and dependency review. |
+| Breaking harness semantics | Compatibility inventory and guardrails | Public contract tests and E2E trace comparison. |
+| Readiness claim inflation | CDNA 3 readiness implementation | Tests assert no CDNA 3 validation claim without evidence. |
+| Dependency creep | Practice adaptation | Dependency diff and pyproject audit. |
+| Accidental public report API | Evidence/reporting implementation | Tests prove trace schema is unchanged. |
+| Narrow RDNA 4 validation | Validation closure | Recorded unit + E2E command outcomes. |
 
 ## Sources
 
-- HIP porting guide — CUDA-to-HIP migration and semantic traps.
-- rocprofv3 docs — profiler and tracing replacement direction.
-- ROCm compatibility matrix — ROCm 7.x components and hardware/system support.
-- Current codebase map — high-risk eval driver, timing, and native compilation areas.
+- Current eval driver and timing helpers.
+- Current public contract guardrail tests.
+- `hip-execbench` pipeline, scoring, baseline, reporting, and profiler modules.
+- User constraints from v1.4 milestone questioning.
 
 ---
-*Pitfalls research for: ROCm port of SOL ExecBench*
-*Researched: 2026-05-21*
+*Pitfalls research for: v1.4 engineering-practice adaptation*
+*Researched: 2026-05-22*
