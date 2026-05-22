@@ -13,7 +13,7 @@ public example coverage.
 | hipBLAS / hipBLASLt | `hipblas` | Supported | Runnable SGEMM example exists under `examples/hipblas/gemm/` | BLAS/GEMM replacement path using the native ROCm build flow and `-lhipblas`. |
 | MIOpen | `miopen` | Supported | Runnable softmax example exists under `examples/miopen/softmax/` | cuDNN-style softmax replacement path using the native ROCm build flow and `-lMIOpen`. |
 | Composable Kernel | `ck` | Supported | Runnable small GEMM example exists under `examples/ck/gemm/` | CUTLASS/CuTe-style replacement direction using CK headers and native ROCm execution. |
-| rocWMMA | `rocwmma` | Candidate | No runnable public `rocwmma` example yet | Candidate for WMMA-style matrix kernels. |
+| rocWMMA | `rocwmma` | Supported | Runnable matrix-core GEMM example exists under `examples/rocwmma/gemm/` | RDNA 4 matrix-core GEMM path using rocWMMA fragments. |
 
 ## Support Levels
 
@@ -39,7 +39,7 @@ the old directory name for discoverability.
 | --- | --- | --- | --- |
 | CUTLASS | `examples/cutlass/gemm/` | PyTorch ROCm compatibility example | `examples/ck/gemm/`, `rocwmma`, `hipblas`, or HIP/Triton |
 | cuDNN | `examples/cudnn/softmax/` | PyTorch ROCm compatibility example | `examples/miopen/softmax/`, HIP, or Triton |
-| CuTe DSL | `examples/cute_dsl/jamba_attn_proj/` | PyTorch ROCm compatibility example | `ck`, `rocwmma`, HIP, or Triton |
+| CuTe DSL | `examples/cute_dsl/jamba_attn_proj/` | PyTorch ROCm compatibility example | `examples/ck/gemm/`, `examples/rocwmma/gemm/`, HIP, or Triton |
 | cuTile | `examples/cutile/jamba_attn_proj/` | PyTorch ROCm compatibility example | HIP or Triton |
 
 ## Runnable Library Examples
@@ -49,6 +49,7 @@ the old directory name for discoverability.
 | hipBLAS | `examples/hipblas/gemm/` | `solution_hipblas.json` uses schema language `hipblas`, includes `hipblas/hipblas.h`, calls `hipblasSgemm`, and links with `-lhipblas`. |
 | MIOpen | `examples/miopen/softmax/` | `solution_miopen.json` uses schema language `miopen`, includes `miopen/miopen.h`, calls `miopenSoftmaxForward_V2`, and links with `-lMIOpen`. |
 | Composable Kernel | `examples/ck/gemm/` | `solution_ck.json` uses schema language `ck`, includes `ck/ck.hpp`, uses CK index/tiling conventions, and stages through the native HIP compile path. |
+| rocWMMA | `examples/rocwmma/gemm/` | `solution_rocwmma.json` uses schema language `rocwmma`, includes `rocwmma/rocwmma.hpp`, uses `rocwmma::fragment`, and calls `rocwmma::mma_sync`. |
 
 The MIOpen softmax example is intentionally operation-specific: it validates
 float32 tensors shaped `[batch_size, 4096]`, maps them to MIOpen tensor
@@ -60,6 +61,12 @@ The CK GEMM example is intentionally small: it validates float32 GEMM tensors
 with `K=N=128`, includes CK headers, and uses CK integer/tiling conventions in a
 native HIP kernel. It is a correctness and build-path support example, not a
 claim that every CUTLASS/CuTe workload now has a one-for-one CK replacement.
+
+The rocWMMA GEMM example is RDNA 4 scoped: it validates FP16 inputs with
+FP32 accumulation/output for 16x16x16 tiles, uses `rocwmma::fragment`,
+`rocwmma::load_matrix_sync`, `rocwmma::mma_sync`, and
+`rocwmma::store_matrix_sync`, and targets `gfx1200` without claiming CDNA 3 or
+CDNA 4 validation.
 
 ## Dependency Diagnostics
 
@@ -79,11 +86,11 @@ specific dependency group instead of surfacing as opaque compile errors.
 
 ## User Guidance
 
-- Use `hip_cpp`, `hipblas`, `miopen`, `ck`, `pytorch`, or `triton` for runnable examples today.
-- Use `rocwmma` only when the solution source and local ROCm
-  environment actually provide the required library integration.
-- Do not treat candidate categories as evidence of performance portability from
-  NVIDIA libraries.
+- Use `hip_cpp`, `hipblas`, `miopen`, `ck`, `rocwmma`, `pytorch`, or `triton`
+  for runnable examples today.
+- Do not treat supported example categories as broad performance portability
+  claims from NVIDIA libraries; support is tied to the documented operation
+  scope and dependency set.
 - v1.8 library validation is scoped to RDNA 4 only. CDNA 3 and CDNA 4 metadata
   remains schema/build intent until real hardware evidence is recorded in a
   later milestone.

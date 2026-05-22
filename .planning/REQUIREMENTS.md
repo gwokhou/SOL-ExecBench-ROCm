@@ -29,10 +29,10 @@
 
 ### rocWMMA Replacement
 
-- [ ] **WMM-01**: User can run a public rocWMMA-backed example on RDNA 4 through `sol-execbench` and receive passing trace JSONL.
-- [ ] **WMM-02**: The rocWMMA example uses real rocWMMA headers/API patterns and does not silently fall back to PyTorch for the measured implementation.
-- [ ] **WMM-03**: Tests cover rocWMMA solution metadata, source consistency, dependency detection, and RDNA 4 E2E behavior where hardware is available.
-- [ ] **WMM-04**: Documentation identifies rocWMMA as a supported ROCm replacement path for matrix-core GEMM-style workloads on supported RDNA 4 targets, with CDNA validation deferred.
+- [x] **WMM-01**: User can run a public rocWMMA-backed example on RDNA 4 through `sol-execbench` and receive passing trace JSONL.
+- [x] **WMM-02**: The rocWMMA example uses real rocWMMA headers/API patterns and does not silently fall back to PyTorch for the measured implementation.
+- [x] **WMM-03**: Tests cover rocWMMA solution metadata, source consistency, dependency detection, and RDNA 4 E2E behavior where hardware is available.
+- [x] **WMM-04**: Documentation identifies rocWMMA as a supported ROCm replacement path for matrix-core GEMM-style workloads on supported RDNA 4 targets, with CDNA validation deferred.
 
 ### Compatibility Cleanup and Claims
 
@@ -89,10 +89,10 @@
 | CK-02 | Phase 38 | Complete |
 | CK-03 | Phase 38 | Complete |
 | CK-04 | Phase 38 | Complete |
-| WMM-01 | Phase 39 | Pending |
-| WMM-02 | Phase 39 | Pending |
-| WMM-03 | Phase 39 | Pending |
-| WMM-04 | Phase 39 | Pending |
+| WMM-01 | Phase 39 | Complete |
+| WMM-02 | Phase 39 | Complete |
+| WMM-03 | Phase 39 | Complete |
+| WMM-04 | Phase 39 | Complete |
 | COMPAT-01 | Phase 40 | Pending |
 | COMPAT-02 | Phase 40 | Pending |
 | COMPAT-03 | Phase 40 | Pending |
@@ -108,4 +108,4 @@
 
 ---
 *Requirements defined: 2026-05-22*
-*Last updated: 2026-05-22 after Phase 38 completion*
+*Last updated: 2026-05-22 after Phase 39 completion*

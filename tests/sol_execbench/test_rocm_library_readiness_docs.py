@@ -11,7 +11,7 @@ def test_rocm_library_readiness_doc_classifies_all_schema_categories():
     text = (REPO_ROOT / "docs/rocm_libraries.md").read_text()
     for category in ("`hip_cpp`", "`hipblas`", "`miopen`", "`ck`", "`rocwmma`"):
         assert category in text
-    assert "Candidate" in text
+    assert "Supported" in text
     assert "Compatibility example" in text
 
 
@@ -40,15 +40,16 @@ def test_only_supported_library_category_has_public_runnable_example():
         "examples/ck/gemm/solution_ck.json",
         "examples/hipblas/gemm/solution_hipblas.json",
         "examples/miopen/softmax/solution_miopen.json",
+        "examples/rocwmma/gemm/solution_rocwmma.json",
     }
-    candidate_categories = {"rocwmma"}
+    candidate_categories = set()
     offenders = []
     supported_seen = set()
     for path in sorted((REPO_ROOT / "examples").glob("*/*/solution*.json")):
         data = json.loads(path.read_text())
         languages = set(data["spec"]["languages"])
         relative = str(path.relative_to(REPO_ROOT))
-        if languages & {"ck", "hipblas", "miopen"}:
+        if languages & {"ck", "hipblas", "miopen", "rocwmma"}:
             supported_seen.add(relative)
         if languages & candidate_categories:
             offenders.append(relative)

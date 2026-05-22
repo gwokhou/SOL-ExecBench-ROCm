@@ -1,0 +1,42 @@
+{
+  "name": "rocwmma_gemm_m16n16k16",
+  "op_type": "gemm",
+  "description": "FP16 input, FP32 output GEMM using rocWMMA matrix-core fragments for 16x16x16 tiles.",
+  "axes": {
+    "M": {
+      "type": "var",
+      "description": "Batch/sequence dimension, constrained to multiples of 16"
+    },
+    "N": {
+      "type": "const",
+      "value": 16,
+      "description": "Output features"
+    },
+    "K": {
+      "type": "const",
+      "value": 16,
+      "description": "Input features"
+    }
+  },
+  "custom_inputs_entrypoint": null,
+  "inputs": {
+    "A": {
+      "shape": ["M", "K"],
+      "dtype": "float16",
+      "description": "Input activation matrix"
+    },
+    "B": {
+      "shape": ["K", "N"],
+      "dtype": "float16",
+      "description": "Weight matrix"
+    }
+  },
+  "outputs": {
+    "C": {
+      "shape": ["M", "N"],
+      "dtype": "float32",
+      "description": "Output matrix"
+    }
+  },
+  "reference": "import torch\n\n\n@torch.no_grad()\ndef run(A, B):\n    return torch.mm(A.float(), B.float())\n"
+}

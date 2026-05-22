@@ -16,7 +16,7 @@ deferred and must not be claimed by this milestone.
 - [x] Phase 36: Library Build Plumbing and Diagnostics
 - [x] Phase 37: MIOpen Supported Replacement
 - [x] Phase 38: Composable Kernel Supported Replacement
-- [ ] Phase 39: rocWMMA Supported Replacement
+- [x] Phase 39: rocWMMA Supported Replacement
 - [ ] Phase 40: Compatibility Cleanup and RDNA 4 Validation Closure
 
 | Phase | Name | Goal | Requirements |
@@ -24,7 +24,7 @@ deferred and must not be claimed by this milestone.
 | 36 | Library Build Plumbing and Diagnostics | Complete 2026-05-22: Added reusable ROCm library dependency diagnostics, Docker dependency checks, native staging tests, and dependency docs for MIOpen, CK, and rocWMMA. | BUILD-01, BUILD-02, BUILD-03, BUILD-04 |
 | 37 | MIOpen Supported Replacement | Complete 2026-05-22: Added a native MIOpen softmax example, RDNA 4 E2E registration, source/staging tests, and supported-status docs. | MIOPEN-01, MIOPEN-02, MIOPEN-03, MIOPEN-04 |
 | 38 | Composable Kernel Supported Replacement | Complete 2026-05-22: Added a CK-facing small GEMM example, RDNA 4 E2E registration, source/staging tests, and supported-status docs. | CK-01, CK-02, CK-03, CK-04 |
-| 39 | rocWMMA Supported Replacement | Promote rocWMMA from candidate to supported RDNA 4 replacement for matrix-core GEMM-style workloads. | WMM-01, WMM-02, WMM-03, WMM-04 |
+| 39 | rocWMMA Supported Replacement | Complete 2026-05-22: Added a rocWMMA matrix-core GEMM example, RDNA 4 E2E registration, source/staging tests, and supported-status docs. | WMM-01, WMM-02, WMM-03, WMM-04 |
 | 40 | Compatibility Cleanup and RDNA 4 Validation Closure | Remove support-status ambiguity, map former NVIDIA categories, and record RDNA 4-only completion evidence. | COMPAT-01, COMPAT-02, COMPAT-03, COMPAT-04, RDNA4-01, RDNA4-02, RDNA4-03 |
 
 **Coverage:** 23 / 23 v1.8 requirements mapped. 0 unmapped.
@@ -122,7 +122,7 @@ Plans:
 
 ### Phase 39: rocWMMA Supported Replacement
 
-**Status:** Not Started
+**Status:** Complete 2026-05-22
 
 **Goal:** Promote rocWMMA to supported status for RDNA 4 matrix-core GEMM-style
 workloads.
@@ -142,7 +142,13 @@ workloads.
 - Prefer a small matrix-core GEMM-style example.
 - Do not claim CDNA validation in v1.8.
 
-**Plans:** 0 plans
+**Plans:** 1 plan
+
+Plans:
+
+- [x] 39-01: Add rocWMMA matrix-core GEMM supported example,
+  metadata/source tests, native staging coverage, RDNA 4 E2E registration, and
+  support docs.
 
 ### Phase 40: Compatibility Cleanup and RDNA 4 Validation Closure
 
@@ -211,10 +217,10 @@ RDNA4-02, RDNA4-03
 | CK-02 | Phase 38 | Complete |
 | CK-03 | Phase 38 | Complete |
 | CK-04 | Phase 38 | Complete |
-| WMM-01 | Phase 39 | Pending |
-| WMM-02 | Phase 39 | Pending |
-| WMM-03 | Phase 39 | Pending |
-| WMM-04 | Phase 39 | Pending |
+| WMM-01 | Phase 39 | Complete |
+| WMM-02 | Phase 39 | Complete |
+| WMM-03 | Phase 39 | Complete |
+| WMM-04 | Phase 39 | Complete |
 | COMPAT-01 | Phase 40 | Pending |
 | COMPAT-02 | Phase 40 | Pending |
 | COMPAT-03 | Phase 40 | Pending |
