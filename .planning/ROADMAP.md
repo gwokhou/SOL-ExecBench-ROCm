@@ -14,9 +14,9 @@ end-to-end workflow while preserving existing public contracts.
 | 27 | AMD SOL Analyzer Coverage | Complete 2026-05-22: Broadened analyzer coverage and added derived coverage summaries with confidence labels. | SOLCOV-01, SOLCOV-02, SOLCOV-03, SOLCOV-04 |
 | 28 | Live rocprofv3 Timing Integration | Complete 2026-05-22: Added live `rocprofv3` collection adapter, explicit fallback metadata, and source-specific timing evidence docs. | PROF-01, PROF-02, PROF-03, PROF-04 |
 | 29 | Derived AMD Scoring Workflow | Complete 2026-05-22: Added trace-based score workflow helpers and opt-in dataset runner AMD score reports. | SCORE-01, SCORE-02, SCORE-03, SCORE-04 |
-| 30 | Compatibility and Claim Guardrails | Prove public contracts remain compatible and keep CDNA3/NVIDIA equivalence claims out of v1.6. | COMPAT-01, COMPAT-02, COMPAT-03, COMPAT-04, CLAIM-01, CLAIM-02, CLAIM-03 |
+| 30 | Compatibility and Claim Guardrails | Complete 2026-05-22: Added focused v1.6 compatibility and claim guardrails for trace/schema/CLI, CDNA3, and NVIDIA equivalence boundaries. | COMPAT-01, COMPAT-02, COMPAT-03, COMPAT-04, CLAIM-01, CLAIM-02, CLAIM-03 |
 
-**Coverage:** 19 / 19 v1.6 requirements mapped. 12 / 19 complete.
+**Coverage:** 19 / 19 v1.6 requirements mapped. 19 / 19 complete.
 
 ## Phases
 
@@ -125,7 +125,7 @@ Plans:
 
 ### Phase 30: Compatibility and Claim Guardrails
 
-**Status:** Pending
+**Status:** Complete 2026-05-22
 
 **Goal:** Prove public contracts remain compatible and keep CDNA3/NVIDIA
 equivalence claims out of v1.6.
@@ -156,7 +156,12 @@ CLAIM-02, CLAIM-03
   records real `gfx94*` evidence.
 - Use this phase as the compatibility gate before milestone closure.
 
-**Plans:** TBD
+**Plans:** 1 plan
+
+Plans:
+
+- [x] 30-01: Add v1.6 compatibility and claim guardrails, update stale CDNA3
+  warning wording, and run focused regression tests.
 
 ## Completed Milestones
 
@@ -183,10 +188,10 @@ CLAIM-02, CLAIM-03
 | SCORE-02 | Phase 29 | Complete |
 | SCORE-03 | Phase 29 | Complete |
 | SCORE-04 | Phase 29 | Complete |
-| COMPAT-01 | Phase 30 | Pending |
-| COMPAT-02 | Phase 30 | Pending |
-| COMPAT-03 | Phase 30 | Pending |
-| COMPAT-04 | Phase 30 | Pending |
-| CLAIM-01 | Phase 30 | Pending |
-| CLAIM-02 | Phase 30 | Pending |
-| CLAIM-03 | Phase 30 | Pending |
+| COMPAT-01 | Phase 30 | Complete |
+| COMPAT-02 | Phase 30 | Complete |
+| COMPAT-03 | Phase 30 | Complete |
+| COMPAT-04 | Phase 30 | Complete |
+| CLAIM-01 | Phase 30 | Complete |
+| CLAIM-02 | Phase 30 | Complete |
+| CLAIM-03 | Phase 30 | Complete |

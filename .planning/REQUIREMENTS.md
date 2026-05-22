@@ -29,16 +29,16 @@
 
 ### Compatibility Guardrails
 
-- [ ] **COMPAT-01**: Existing canonical trace JSONL fields and parsing behavior remain unchanged.
-- [ ] **COMPAT-02**: Existing public schemas remain backward compatible for definitions, workloads, solutions, and traces.
-- [ ] **COMPAT-03**: Existing primary `sol-execbench` CLI defaults remain compatible; new timing or scoring outputs are opt-in, additive, or separate derived artifacts.
-- [ ] **COMPAT-04**: Contract tests verify trace/schema/primary CLI compatibility after the analyzer, timing, and scoring workflow changes.
+- [x] **COMPAT-01**: Existing canonical trace JSONL fields and parsing behavior remain unchanged.
+- [x] **COMPAT-02**: Existing public schemas remain backward compatible for definitions, workloads, solutions, and traces.
+- [x] **COMPAT-03**: Existing primary `sol-execbench` CLI defaults remain compatible; new timing or scoring outputs are opt-in, additive, or separate derived artifacts.
+- [x] **COMPAT-04**: Contract tests verify trace/schema/primary CLI compatibility after the analyzer, timing, and scoring workflow changes.
 
 ### Claim Boundaries
 
-- [ ] **CLAIM-01**: v1.6 documentation and report warnings state that real CDNA3 `gfx94*` full-suite validation is not part of this milestone.
-- [ ] **CLAIM-02**: AMD-native score reports do not claim NVIDIA B200, upstream SOLAR, or leaderboard equivalence.
-- [ ] **CLAIM-03**: Hardware model entries retain source, confidence, and validation status in every derived bound or score artifact.
+- [x] **CLAIM-01**: v1.6 documentation and report warnings state that real CDNA3 `gfx94*` full-suite validation is not part of this milestone.
+- [x] **CLAIM-02**: AMD-native score reports do not claim NVIDIA B200, upstream SOLAR, or leaderboard equivalence.
+- [x] **CLAIM-03**: Hardware model entries retain source, confidence, and validation status in every derived bound or score artifact.
 
 ## Future Requirements
 
@@ -80,13 +80,13 @@ Updated during roadmap creation.
 | SCORE-02 | Phase 29 | Complete |
 | SCORE-03 | Phase 29 | Complete |
 | SCORE-04 | Phase 29 | Complete |
-| COMPAT-01 | Phase 30 | Pending |
-| COMPAT-02 | Phase 30 | Pending |
-| COMPAT-03 | Phase 30 | Pending |
-| COMPAT-04 | Phase 30 | Pending |
-| CLAIM-01 | Phase 30 | Pending |
-| CLAIM-02 | Phase 30 | Pending |
-| CLAIM-03 | Phase 30 | Pending |
+| COMPAT-01 | Phase 30 | Complete |
+| COMPAT-02 | Phase 30 | Complete |
+| COMPAT-03 | Phase 30 | Complete |
+| COMPAT-04 | Phase 30 | Complete |
+| CLAIM-01 | Phase 30 | Complete |
+| CLAIM-02 | Phase 30 | Complete |
+| CLAIM-03 | Phase 30 | Complete |
 
 **Coverage:**
 - v1.6 requirements: 19 total
@@ -95,4 +95,4 @@ Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-05-22*
-*Last updated: 2026-05-22 after Phase 29 completion*
+*Last updated: 2026-05-22 after Phase 30 completion*
