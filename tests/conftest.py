@@ -32,6 +32,12 @@ def _rocm_gpu_info() -> tuple[bool, str]:
         return False, ""
 
 
+def _has_rocm_dev_headers() -> bool:
+    """Return whether ROCm native extension development headers are installed."""
+    rocm_root = Path("/opt/rocm")
+    return (rocm_root / "include/cuda_runtime_api.h").exists()
+
+
 def _is_rdna4(gfx_arch: str) -> bool:
     return gfx_arch.startswith("gfx12")
 
@@ -49,6 +55,10 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers",
         "requires_rocm: test requires a ROCm GPU visible through PyTorch",
+    )
+    config.addinivalue_line(
+        "markers",
+        "requires_rocm_dev: test requires ROCm native extension development headers",
     )
     config.addinivalue_line(
         "markers",
@@ -72,12 +82,16 @@ def pytest_collection_modifyitems(
     Also skips timing_serial tests unless explicitly selected with -m.
     """
     rocm_available, gfx_arch = _rocm_gpu_info()
+    rocm_dev_available = _has_rocm_dev_headers()
     detected = gfx_arch or "unavailable"
     supported_arch = _is_rdna4(gfx_arch) or _is_cdna3(gfx_arch)
     skip_timing = pytest.mark.skip(
         reason="timing_serial tests skipped by default; run with: pytest tests -m timing_serial -n 0"
     )
     skip_no_rocm = pytest.mark.skip(reason="ROCm GPU unavailable through PyTorch")
+    skip_no_rocm_dev = pytest.mark.skip(
+        reason="ROCm native extension development headers unavailable"
+    )
     skip_rdna4 = pytest.mark.skip(
         reason=f"requires AMD RDNA 4 ROCm GPU (detected {detected})"
     )
@@ -98,6 +112,8 @@ def pytest_collection_modifyitems(
     for item in items:
         if any(item.iter_markers(name="requires_rocm")) and not rocm_available:
             item.add_marker(skip_no_rocm)
+        if any(item.iter_markers(name="requires_rocm_dev")) and not rocm_dev_available:
+            item.add_marker(skip_no_rocm_dev)
         if any(item.iter_markers(name="requires_rdna4")) and not _is_rdna4(gfx_arch):
             item.add_marker(skip_rdna4 if rocm_available else skip_no_rocm)
         if any(item.iter_markers(name="requires_cdna3")) and not _is_cdna3(gfx_arch):

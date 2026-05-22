@@ -3,22 +3,22 @@ gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: ROCm Library Ecosystem Completion
 status: planning
-last_updated: "2026-05-22T14:17:57.947Z"
-last_activity: 2026-05-22 — Phase 36 completed
+last_updated: "2026-05-22T15:10:00.000Z"
+last_activity: 2026-05-22 — Phase 37 completed
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 5
-  completed_plans: 1
-  percent: 20
+  completed_plans: 2
+  percent: 40
 ---
 
 # Project State
 
 **Project:** SOL ExecBench ROCm Port
 **Initialized:** 2026-05-21
-**Current phase:** 37
-**Status:** Phase 36 complete; ready for Phase 37
+**Current phase:** 38
+**Status:** Phase 37 complete; ready for Phase 38
 
 ## Project Reference
 
@@ -87,15 +87,15 @@ Items acknowledged and deferred at milestone close on 2026-05-21:
 
 ## Next Action
 
-Plan Phase 37: MIOpen Supported Replacement.
+Plan Phase 38: Composable Kernel Supported Replacement.
 
 ## Current Position
 
-Phase: 37
+Phase: 38
 Plan: —
 Status: Ready for planning
-Last activity: 2026-05-22 — Phase 36 completed
+Last activity: 2026-05-22 — Phase 37 completed
 
 ## Operator Next Steps
 
-- Start Phase 37 with /gsd-plan-phase 37
+- Start Phase 38 with /gsd-plan-phase 38
