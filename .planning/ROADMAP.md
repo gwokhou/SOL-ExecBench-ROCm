@@ -311,7 +311,20 @@ Plans:
      SOLAR sidecars without requiring paper-scale extraction or new hardware
      validation.
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 52-01-PLAN.md — Integrate dataset-runner SOLAR sidecars/reports and preserve skipped-trace report generation.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 52-02-PLAN.md — Document v1.10 sidecar consumption and claim boundaries.
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 52-03-PLAN.md — Close public contract, claim guardrail, and full regression coverage.
 
 ## Progress
 
@@ -322,7 +335,7 @@ Plans:
 | 49. High-Confidence Family Modeling | 4/4 | Complete    | 2026-05-23 |
 | 50. Degraded Complex Family Modeling | 3/3 | Complete    | 2026-05-23 |
 | 51. Sidecar Coverage And Score Guards | 3/3 | Complete    | 2026-05-23 |
-| 52. Dataset Runner And Public Contract Closure | 0/TBD | Not started | - |
+| 52. Dataset Runner And Public Contract Closure | 0/3 | Not started | - |
 
 ## Requirements Coverage
 
