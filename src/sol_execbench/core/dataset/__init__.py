@@ -43,6 +43,12 @@ from .readiness import (
     write_dataset_readiness,
 )
 from .ready_subset import ReadySubset, build_ready_subset, write_ready_subset
+from .parity_gap import (
+    ParityGapReport,
+    build_parity_gap_report,
+    render_parity_gap_markdown,
+    write_parity_gap_reports,
+)
 
 __all__ = [
     "DEFAULT_CATEGORIES",
@@ -55,6 +61,7 @@ __all__ = [
     "LayoutCategory",
     "LayoutDiagnostic",
     "ProblemInventoryRecord",
+    "ParityGapReport",
     "ReadySubset",
     "WorkloadInventoryRecord",
     "WorkloadReadinessRecord",
@@ -62,10 +69,13 @@ __all__ = [
     "build_dataset_inventory",
     "classify_rocm_readiness",
     "build_ready_subset",
+    "build_parity_gap_report",
     "inspect_dataset_layout",
+    "render_parity_gap_markdown",
     "validate_categories",
     "write_dataset_manifest",
     "write_dataset_inventory",
     "write_dataset_readiness",
     "write_ready_subset",
+    "write_parity_gap_reports",
 ]

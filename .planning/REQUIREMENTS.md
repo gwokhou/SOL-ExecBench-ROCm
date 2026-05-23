@@ -172,11 +172,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | EXEC-03 | Phase 55 | Complete |
 | EXEC-04 | Phase 55 | Complete |
 | EXEC-05 | Phase 55 | Complete |
-| GAP-01 | Phase 56 | Pending |
-| GAP-02 | Phase 56 | Pending |
-| GAP-03 | Phase 56 | Pending |
-| GAP-04 | Phase 56 | Pending |
-| GAP-05 | Phase 56 | Pending |
+| GAP-01 | Phase 56 | Complete |
+| GAP-02 | Phase 56 | Complete |
+| GAP-03 | Phase 56 | Complete |
+| GAP-04 | Phase 56 | Complete |
+| GAP-05 | Phase 56 | Complete |
 | CLAIM-01 | Phase 57 | Pending |
 | CLAIM-02 | Phase 57 | Pending |
 | CLAIM-03 | Phase 57 | Pending |
