@@ -166,6 +166,22 @@ _CALL_CLASSIFIERS: tuple[tuple[set[str], _CallClassification], ...] = (
         ),
     ),
     (
+        {"conv1d", "conv2d", "conv3d"},
+        _CallClassification(
+            OpFamily.CONVOLUTION,
+            EstimateConfidence.SUPPORTED,
+            "recognized convolution operation",
+        ),
+    ),
+    (
+        {"embedding", "gather", "index_select", "take"},
+        _CallClassification(
+            OpFamily.EMBEDDING_POSITIONAL,
+            EstimateConfidence.SUPPORTED,
+            "recognized embedding or gather memory-bound operation",
+        ),
+    ),
+    (
         {"sum", "mean", "amax", "max", "amin", "min", "var", "std"},
         _CallClassification(
             OpFamily.REDUCTION,
@@ -277,7 +293,7 @@ def build_bound_graph(definition: Definition, workload: Workload) -> BoundGraph:
     nodes, extracted_tensors, edges, extractor_warnings = extractor.extract(tree)
     warnings.extend(extractor_warnings)
 
-    return _annotate_attention_graph(BoundGraph(
+    return _annotate_family_graph(BoundGraph(
         definition=definition.name,
         workload_uuid=workload.uuid,
         nodes=nodes,
@@ -428,7 +444,7 @@ def _try_fx_bound_graph(
     if not nodes:
         return None
 
-    return _annotate_attention_graph(BoundGraph(
+    return _annotate_family_graph(BoundGraph(
         definition=definition.name,
         workload_uuid=workload.uuid,
         nodes=tuple(nodes),
@@ -579,7 +595,15 @@ def _fx_node_attributes(
     target_dtype = _target_dtype_from_values(leaf_name, node.args[1:], node.kwargs)
     if target_dtype is not None:
         attributes["target_dtype"] = target_dtype
+    if classification.op_family == OpFamily.CONVOLUTION:
+        attributes.update(_convolution_attributes(leaf_name, node.args, node.kwargs, node))
+    if classification.op_family == OpFamily.EMBEDDING_POSITIONAL:
+        attributes.update(_memory_bound_call_attributes(leaf_name, node.args, node.kwargs, node))
     return attributes
+
+
+def _annotate_family_graph(graph: BoundGraph) -> BoundGraph:
+    return _annotate_memory_bound_graph(_annotate_attention_graph(graph))
 
 
 def _first_input_shape(
@@ -743,6 +767,100 @@ def _annotate_attention_graph(graph: BoundGraph) -> BoundGraph:
         warnings.append("unsupported_operator:dynamic_attention_axes")
 
     return replace(graph, nodes=tuple(nodes), warnings=tuple(dict.fromkeys(warnings)))
+
+
+def _annotate_memory_bound_graph(graph: BoundGraph) -> BoundGraph:
+    nodes: list[BoundGraphNode] = []
+    warnings = list(graph.warnings)
+    for node in graph.nodes:
+        if node.op_family == OpFamily.EMBEDDING_POSITIONAL:
+            nodes.append(_annotate_lookup_node(graph, node))
+            continue
+        memory_subrole = _elementwise_memory_subrole(graph, node)
+        if memory_subrole is not None:
+            nodes.append(
+                replace(
+                    node,
+                    op_family=OpFamily.EMBEDDING_POSITIONAL,
+                    attributes={
+                        **node.attributes,
+                        "memory_subrole": memory_subrole,
+                        "output_shape": _node_output_shape(graph, node),
+                    },
+                    confidence=EstimateConfidence.SUPPORTED,
+                    rationale=f"recognized {memory_subrole} memory-bound structure",
+                )
+            )
+            continue
+        nodes.append(node)
+    return replace(graph, nodes=tuple(nodes), warnings=tuple(dict.fromkeys(warnings)))
+
+
+def _annotate_lookup_node(graph: BoundGraph, node: BoundGraphNode) -> BoundGraphNode:
+    leaf_name = node.op_name.rsplit(".", maxsplit=1)[-1]
+    attributes = dict(node.attributes)
+    if "memory_subrole" not in attributes:
+        attributes["memory_subrole"] = (
+            "embedding_lookup" if leaf_name == "embedding" else "gather_lookup"
+        )
+    index_tensor_id, table_tensor_id = _lookup_tensor_ids(node, leaf_name)
+    index_shape: tuple[int, ...] | None = None
+    if index_tensor_id is not None:
+        attributes["index_tensor_id"] = index_tensor_id
+        index_tensor = graph.tensors.get(index_tensor_id)
+        if index_tensor is not None:
+            attributes["index_dtype"] = index_tensor.dtype
+            attributes["index_shape"] = index_tensor.shape
+            index_shape = index_tensor.shape
+    if table_tensor_id is not None:
+        attributes["table_tensor_id"] = table_tensor_id
+        table_tensor = graph.tensors.get(table_tensor_id)
+        if table_tensor is not None:
+            attributes["table_shape"] = table_tensor.shape
+    output_shape = _node_output_shape(graph, node)
+    attributes["output_shape"] = output_shape if index_shape is not None else None
+    if output_shape is not None and index_shape is not None:
+        attributes["selected_elements"] = int(_shape_numel(output_shape))
+    elif index_shape is None:
+        attributes.pop("selected_elements", None)
+    return replace(node, attributes=attributes)
+
+
+def _lookup_tensor_ids(node: BoundGraphNode, leaf_name: str) -> tuple[str | None, str | None]:
+    if leaf_name == "embedding" and len(node.input_tensor_ids) >= 2:
+        return node.input_tensor_ids[0], node.input_tensor_ids[1]
+    if leaf_name in {"gather", "index_select", "take"} and len(node.input_tensor_ids) >= 2:
+        return node.input_tensor_ids[-1], node.input_tensor_ids[0]
+    return None, node.input_tensor_ids[0] if node.input_tensor_ids else None
+
+
+def _node_output_shape(
+    graph: BoundGraph,
+    node: BoundGraphNode,
+) -> tuple[int, ...] | None:
+    if not node.output_tensor_ids:
+        return None
+    output_tensor = graph.tensors.get(node.output_tensor_ids[0])
+    return output_tensor.shape if output_tensor is not None else None
+
+
+def _elementwise_memory_subrole(
+    graph: BoundGraph,
+    node: BoundGraphNode,
+) -> str | None:
+    if node.op_family != OpFamily.ELEMENTWISE:
+        return None
+    names = {
+        graph.tensors[tensor_id].name.lower()
+        for tensor_id in node.input_tensor_ids
+        if tensor_id in graph.tensors
+    }
+    source = node.source_expression.lower()
+    if any("pos" in name or "position" in name for name in names):
+        return "positional_add"
+    if any(name in {"sin", "cos"} or "rotary" in name for name in names) or "rotary" in source:
+        return "rotary_like"
+    return None
 
 
 def _attention_qk_dims(graph: BoundGraph, node: BoundGraphNode) -> dict[str, int] | None:
@@ -1207,7 +1325,77 @@ def _ast_call_attributes(
     )
     if target_dtype is not None:
         attributes["target_dtype"] = target_dtype
+    if classification.op_family == OpFamily.CONVOLUTION:
+        attributes.update(_convolution_attributes(leaf_name, node.args, keyword_values, None))
+    if classification.op_family == OpFamily.EMBEDDING_POSITIONAL:
+        attributes.update(_memory_bound_call_attributes(leaf_name, node.args, keyword_values, None))
     return attributes
+
+
+def _convolution_attributes(
+    leaf_name: str,
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
+    node: Any | None,
+) -> dict[str, object]:
+    dimensionality = {"conv1d": 1, "conv2d": 2, "conv3d": 3}.get(leaf_name)
+    if dimensionality is None:
+        return {}
+    output_shape = _fx_tensor_meta(node)[0] if node is not None else None
+    attrs: dict[str, object] = {"dimensionality": dimensionality}
+    for name, position in (("stride", 3), ("padding", 4), ("dilation", 5), ("groups", 6)):
+        value = _literal_value(kwargs[name]) if name in kwargs else _arg_literal(args, position)
+        if value is not _MISSING:
+            attrs[name] = (
+                int(value)
+                if name == "groups" and isinstance(value, int)
+                else _normalize_spatial_tuple(value, dimensionality)
+            )
+    if output_shape is not None and len(output_shape) >= dimensionality + 2:
+        attrs["output_spatial"] = tuple(int(dim) for dim in output_shape[-dimensionality:])
+    return attrs
+
+
+def _memory_bound_call_attributes(
+    leaf_name: str,
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
+    node: Any | None,
+) -> dict[str, object]:
+    output_shape = _fx_tensor_meta(node)[0] if node is not None else None
+    subrole = "embedding_lookup" if leaf_name == "embedding" else "gather_lookup"
+    attrs: dict[str, object] = {"memory_subrole": subrole}
+    if output_shape is not None:
+        attrs["output_shape"] = output_shape
+        attrs["selected_elements"] = int(_shape_numel(output_shape))
+    dim = _literal_value(kwargs["dim"]) if "dim" in kwargs else _arg_literal(args, 1)
+    if dim is not _MISSING and isinstance(dim, int):
+        attrs["dim"] = dim
+        attrs["axis_source"] = "attribute"
+    return attrs
+
+
+def _arg_literal(args: tuple[Any, ...], index: int) -> object:
+    if index >= len(args):
+        return _MISSING
+    return _literal_value(args[index])
+
+
+def _normalize_spatial_tuple(value: object, dimensionality: int) -> tuple[int, ...] | object:
+    if isinstance(value, int):
+        return tuple(value for _ in range(dimensionality))
+    if isinstance(value, tuple) and len(value) == dimensionality and all(
+        isinstance(item, int) for item in value
+    ):
+        return tuple(int(item) for item in value)
+    return value
+
+
+def _shape_numel(shape: tuple[int, ...]) -> int:
+    result = 1
+    for dim in shape:
+        result *= int(dim)
+    return result
 
 
 def _literal_value(value: Any) -> object:

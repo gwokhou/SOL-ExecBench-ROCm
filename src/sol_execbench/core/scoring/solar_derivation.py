@@ -370,6 +370,22 @@ def classify_solar_confidence(
         )
         missing.extend(attention_missing)
         warning_prefixes.extend(attention_warnings)
+    if family_value == OpFamily.CONVOLUTION.value:
+        convolution_missing, convolution_warnings = _convolution_confidence_evidence(
+            nodes,
+            estimates,
+            subrole_names,
+        )
+        missing.extend(convolution_missing)
+        warning_prefixes.extend(convolution_warnings)
+    if family_value == OpFamily.EMBEDDING_POSITIONAL.value:
+        memory_missing, memory_warnings = _embedding_positional_confidence_evidence(
+            nodes,
+            estimates,
+            subrole_names,
+        )
+        missing.extend(memory_missing)
+        warning_prefixes.extend(memory_warnings)
 
     confidence = _worst_estimate_confidence(estimates)
     if family_value == OpFamily.UNSUPPORTED.value or not nodes or not subrole_names:
@@ -1057,6 +1073,10 @@ def _subroles_for_group(
 ) -> tuple[SolarSubroleEvidence, ...]:
     if family == OpFamily.ATTENTION.value:
         return _attention_subroles(nodes, tensor_evidence_by_id)
+    if family == OpFamily.CONVOLUTION.value:
+        return _convolution_subroles(nodes, tensor_evidence_by_id)
+    if family == OpFamily.EMBEDDING_POSITIONAL.value:
+        return _embedding_positional_subroles(nodes, tensor_evidence_by_id)
     if family in {OpFamily.GEMM.value, OpFamily.LINEAR_PROJECTION.value}:
         return _linear_subroles(nodes, tensor_evidence_by_id)
     if family in {
@@ -1183,6 +1203,69 @@ def _attention_confidence_evidence(
     return missing, warnings
 
 
+def _convolution_confidence_evidence(
+    nodes: tuple[BoundGraphNode, ...],
+    estimates: tuple[OperatorWorkEstimate, ...],
+    subrole_names: tuple[str, ...],
+) -> tuple[list[str], list[str]]:
+    missing: list[str] = []
+    warnings: list[str] = []
+    subroles = set(subrole_names)
+    required_subroles = {"input", "weight", "output", "convolution_metadata"}
+    missing.extend(f"convolution_subrole:{name}" for name in sorted(required_subroles - subroles))
+    for node in nodes:
+        for key in ("dimensionality", "stride", "padding", "dilation", "groups", "output_spatial"):
+            if key not in node.attributes:
+                missing.append(f"convolution:{key}")
+                warnings.append(f"inexact_operator:convolution_missing_{key}")
+    for estimate in estimates:
+        for warning in estimate.warnings:
+            if warning.startswith("inexact_operator:convolution_missing_"):
+                missing.append(
+                    "convolution:" + warning.removeprefix("inexact_operator:convolution_missing_")
+                )
+                warnings.append(warning)
+        if estimate.confidence != EstimateConfidence.UNSUPPORTED and not estimate.formula_inputs:
+            missing.append(f"convolution_formula_inputs:{estimate.node_id}")
+        if estimate.total_bytes <= 0.0:
+            missing.append(f"convolution_bytes:{estimate.node_id}")
+    return missing, warnings
+
+
+def _embedding_positional_confidence_evidence(
+    nodes: tuple[BoundGraphNode, ...],
+    estimates: tuple[OperatorWorkEstimate, ...],
+    subrole_names: tuple[str, ...],
+) -> tuple[list[str], list[str]]:
+    missing: list[str] = []
+    warnings: list[str] = []
+    if not subrole_names:
+        missing.append("embedding_positional_subrole:memory_bound")
+    for node in nodes:
+        subrole = str(node.attributes.get("memory_subrole") or "")
+        if subrole in {"embedding_lookup", "gather_lookup"}:
+            for key in ("index_tensor_id", "index_dtype", "table_tensor_id", "table_shape", "output_shape", "selected_elements"):
+                if key not in node.attributes or node.attributes.get(key) is None:
+                    missing.append(f"embedding_positional:{key}")
+                    warnings.append(f"inexact_operator:embedding_positional_missing_{key}")
+        if subrole == "rotary_like" and len(node.input_tensor_ids) < 2:
+            missing.append("embedding_positional:rotary_axes")
+            warnings.append("inexact_operator:embedding_positional_missing_rotary_axes")
+    for estimate in estimates:
+        for warning in estimate.warnings:
+            if warning.startswith("inexact_operator:embedding_positional_missing_"):
+                missing.append(
+                    "embedding_positional:"
+                    + warning.removeprefix("inexact_operator:embedding_positional_missing_")
+                )
+                warnings.append(warning)
+        if estimate.confidence != EstimateConfidence.UNSUPPORTED and not estimate.formula_inputs:
+            missing.append(f"embedding_positional_formula_inputs:{estimate.node_id}")
+        if estimate.total_bytes <= 0.0:
+            missing.append(f"embedding_positional_bytes:{estimate.node_id}")
+    return missing, warnings
+
+
 def _linear_subroles(
     nodes: tuple[BoundGraphNode, ...],
     tensor_evidence_by_id: dict[str, SolarTensorEvidence],
@@ -1225,6 +1308,77 @@ def _linear_subroles(
                     tensor_evidence_by_id=tensor_evidence_by_id,
                 )
             )
+    return tuple(sorted(subroles, key=lambda item: item.name))
+
+
+def _convolution_subroles(
+    nodes: tuple[BoundGraphNode, ...],
+    tensor_evidence_by_id: dict[str, SolarTensorEvidence],
+) -> tuple[SolarSubroleEvidence, ...]:
+    subroles: list[SolarSubroleEvidence] = []
+    for node in sorted(nodes, key=lambda item: item.node_id):
+        if node.input_tensor_ids:
+            subroles.append(
+                _subrole_from_tensor_ids(
+                    name="input",
+                    node=node,
+                    tensor_ids=(node.input_tensor_ids[0],),
+                    tensor_evidence_by_id=tensor_evidence_by_id,
+                )
+            )
+        if len(node.input_tensor_ids) > 1:
+            subroles.append(
+                _subrole_from_tensor_ids(
+                    name="weight",
+                    node=node,
+                    tensor_ids=(node.input_tensor_ids[1],),
+                    tensor_evidence_by_id=tensor_evidence_by_id,
+                )
+            )
+        if len(node.input_tensor_ids) > 2:
+            subroles.append(
+                _subrole_from_tensor_ids(
+                    name="bias",
+                    node=node,
+                    tensor_ids=tuple(node.input_tensor_ids[2:]),
+                    tensor_evidence_by_id=tensor_evidence_by_id,
+                )
+            )
+        if node.output_tensor_ids:
+            subroles.append(
+                _subrole_from_tensor_ids(
+                    name="output",
+                    node=node,
+                    tensor_ids=node.output_tensor_ids,
+                    tensor_evidence_by_id=tensor_evidence_by_id,
+                )
+            )
+        subroles.append(
+            _subrole_from_tensor_ids(
+                name="convolution_metadata",
+                node=node,
+                tensor_ids=_node_tensor_ids(node),
+                tensor_evidence_by_id=tensor_evidence_by_id,
+            )
+        )
+    return tuple(sorted(subroles, key=lambda item: item.name))
+
+
+def _embedding_positional_subroles(
+    nodes: tuple[BoundGraphNode, ...],
+    tensor_evidence_by_id: dict[str, SolarTensorEvidence],
+) -> tuple[SolarSubroleEvidence, ...]:
+    subroles: list[SolarSubroleEvidence] = []
+    for node in sorted(nodes, key=lambda item: item.node_id):
+        name = str(node.attributes.get("memory_subrole") or node.op_name or "memory_bound")
+        subroles.append(
+            _subrole_from_tensor_ids(
+                name=name,
+                node=node,
+                tensor_ids=_node_tensor_ids(node),
+                tensor_evidence_by_id=tensor_evidence_by_id,
+            )
+        )
     return tuple(sorted(subroles, key=lambda item: item.name))
 
 

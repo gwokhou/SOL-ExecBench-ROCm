@@ -71,6 +71,10 @@ def estimate_bound_work(graph: BoundGraph) -> tuple[OperatorWorkEstimate, ...]:
 def _estimate_node(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstimate:
     if node.op_family == OpFamily.ATTENTION:
         return _attention_estimate(graph, node)
+    if node.op_family == OpFamily.CONVOLUTION:
+        return _convolution_estimate(graph, node)
+    if node.op_family == OpFamily.EMBEDDING_POSITIONAL:
+        return _embedding_positional_estimate(graph, node)
     if node.op_family in {OpFamily.GEMM, OpFamily.LINEAR_PROJECTION}:
         return _gemm_estimate(graph, node)
     if node.op_family == OpFamily.ELEMENTWISE:
@@ -357,6 +361,220 @@ def _gemm_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstim
         ),
         axis_source="tensor_shapes",
         warnings=tuple(warnings),
+    )
+
+
+def _convolution_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstimate:
+    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(graph, node)
+    read_bytes = _sum_tensor_bytes(input_tensors, "read", warnings, rationale_parts)
+    write_bytes = _sum_tensor_bytes(output_tensors, "write", warnings, rationale_parts)
+    total_bytes = read_bytes + write_bytes
+    dims, missing = _convolution_dims(input_tensors, output_tensors, node)
+    warnings.extend(f"inexact_operator:convolution_missing_{item}" for item in missing)
+    rationale_parts.extend(f"missing convolution {item}" for item in missing)
+    if dims is None:
+        return OperatorWorkEstimate(
+            node_id=node.node_id,
+            op_family=OpFamily.CONVOLUTION,
+            op_name=node.op_name,
+            formula_kind="convolution_flops",
+            formula="2*N*C_out*output_spatial_elements*(C_in/groups)*kernel_elements",
+            formula_inputs={},
+            flops=0.0,
+            read_bytes=read_bytes,
+            write_bytes=write_bytes,
+            intermediate_bytes=0.0,
+            movement_bytes=0.0,
+            total_bytes=total_bytes,
+            confidence=EstimateConfidence.INEXACT,
+            rationale=_join_rationale(
+                "convolution semantics recognized but static metadata is incomplete",
+                rationale_parts,
+            ),
+            warnings=tuple(dict.fromkeys(warnings)),
+        )
+
+    flops = float(
+        2
+        * dims["N"]
+        * dims["C_out"]
+        * dims["output_spatial_elements"]
+        * (dims["C_in"] // dims["groups"])
+        * dims["kernel_elements"]
+    )
+    return OperatorWorkEstimate(
+        node_id=node.node_id,
+        op_family=OpFamily.CONVOLUTION,
+        op_name=node.op_name,
+        formula_kind="convolution_flops",
+        formula="2*N*C_out*output_spatial_elements*(C_in/groups)*kernel_elements",
+        formula_inputs=dims,
+        flops=flops,
+        read_bytes=read_bytes,
+        write_bytes=write_bytes,
+        intermediate_bytes=0.0,
+        movement_bytes=0.0,
+        total_bytes=total_bytes,
+        confidence=EstimateConfidence.SUPPORTED if not warnings else EstimateConfidence.INEXACT,
+        rationale=_join_rationale(
+            "convolution FLOPs estimated from input, weight, output, and grouping metadata",
+            rationale_parts,
+        ),
+        axis_source="tensor_shapes",
+        warnings=tuple(dict.fromkeys(warnings)),
+    )
+
+
+def _embedding_positional_estimate(
+    graph: BoundGraph,
+    node: BoundGraphNode,
+) -> OperatorWorkEstimate:
+    subrole = str(node.attributes.get("memory_subrole") or "")
+    if subrole in {"embedding_lookup", "gather_lookup"}:
+        return _lookup_memory_estimate(graph, node, subrole=subrole)
+    return _visible_memory_estimate(graph, node, subrole=subrole or "memory_bound")
+
+
+def _lookup_memory_estimate(
+    graph: BoundGraph,
+    node: BoundGraphNode,
+    *,
+    subrole: str,
+) -> OperatorWorkEstimate:
+    warnings: list[str] = []
+    rationale_parts: list[str] = []
+    index_tensor = graph.tensors.get(str(node.attributes.get("index_tensor_id") or ""))
+    table_tensor = graph.tensors.get(str(node.attributes.get("table_tensor_id") or ""))
+    output_tensors = _node_tensors(graph, node.output_tensor_ids)
+    output_tensor = output_tensors[0] if output_tensors else None
+    missing: list[str] = []
+    if index_tensor is None:
+        missing.append("index_tensor")
+    if table_tensor is None:
+        missing.append("table_tensor")
+    output_shape = node.attributes.get("output_shape")
+    if output_tensor is None or output_tensor.shape is None or output_shape is None:
+        missing.append("output_shape")
+    if index_tensor is None or _dtype_bytes(index_tensor.dtype) is None:
+        missing.append("index_dtype")
+    if table_tensor is None or _dtype_bytes(table_tensor.dtype) is None:
+        missing.append("table_dtype")
+
+    index_elements = _tensor_numel(index_tensor) if index_tensor is not None else None
+    selected_elements = (
+        int(node.attributes["selected_elements"])
+        if isinstance(node.attributes.get("selected_elements"), int)
+        else None
+    )
+    if index_elements is None:
+        missing.append("index_shape")
+    if selected_elements is None:
+        missing.append("selected_elements")
+    warnings.extend(f"inexact_operator:embedding_positional_missing_{item}" for item in missing)
+    rationale_parts.extend(f"missing embedding/gather {item}" for item in missing)
+
+    index_bytes = (
+        float(index_elements * _dtype_bytes(index_tensor.dtype))
+        if index_tensor is not None
+        and index_elements is not None
+        and _dtype_bytes(index_tensor.dtype) is not None
+        else 0.0
+    )
+    selected_read_bytes = (
+        float(selected_elements * _dtype_bytes(table_tensor.dtype))
+        if table_tensor is not None
+        and selected_elements is not None
+        and _dtype_bytes(table_tensor.dtype) is not None
+        else 0.0
+    )
+    write_bytes = _sum_tensor_bytes(output_tensors, "write", warnings, rationale_parts)
+    read_bytes = index_bytes + selected_read_bytes
+    total_bytes = read_bytes + write_bytes
+    formula_inputs: dict[str, object] = {}
+    confidence = EstimateConfidence.INEXACT
+    axis_source: str | None = None
+    if not missing:
+        formula_inputs = {
+            "index_elements": int(index_elements or 0),
+            "selected_elements": int(selected_elements or 0),
+            "index_dtype": index_tensor.dtype if index_tensor is not None else None,
+            "table_dtype": table_tensor.dtype if table_tensor is not None else None,
+            "memory_subrole": subrole,
+        }
+        confidence = EstimateConfidence.SUPPORTED if not warnings else EstimateConfidence.INEXACT
+        axis_source = "tensor_shapes"
+    return OperatorWorkEstimate(
+        node_id=node.node_id,
+        op_family=OpFamily.EMBEDDING_POSITIONAL,
+        op_name=node.op_name,
+        formula_kind="embedding_positional_bytes",
+        formula="index_bytes+selected_element_bytes+output_bytes",
+        formula_inputs=formula_inputs,
+        flops=0.0,
+        read_bytes=read_bytes,
+        write_bytes=write_bytes,
+        intermediate_bytes=0.0,
+        movement_bytes=0.0,
+        total_bytes=total_bytes,
+        confidence=confidence,
+        rationale=_join_rationale(
+            "memory-bound lookup counts index bytes and selected table elements",
+            rationale_parts,
+        ),
+        axis_source=axis_source,
+        movement_kind=subrole,
+        warnings=tuple(dict.fromkeys(warnings)),
+    )
+
+
+def _visible_memory_estimate(
+    graph: BoundGraph,
+    node: BoundGraphNode,
+    *,
+    subrole: str,
+) -> OperatorWorkEstimate:
+    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(graph, node)
+    read_bytes = _sum_tensor_bytes(input_tensors, "read", warnings, rationale_parts)
+    write_bytes = _sum_tensor_bytes(output_tensors, "write", warnings, rationale_parts)
+    output_elements = _sum_tensor_numel(output_tensors, "output", warnings, rationale_parts)
+    missing: list[str] = []
+    if output_elements is None:
+        missing.append("output_shape")
+    if subrole == "rotary_like" and len(input_tensors) < 2:
+        missing.append("rotary_axes")
+    warnings.extend(f"inexact_operator:embedding_positional_missing_{item}" for item in missing)
+    total_bytes = read_bytes + write_bytes
+    formula_inputs: dict[str, object] = {}
+    axis_source: str | None = None
+    confidence = EstimateConfidence.INEXACT
+    if not missing:
+        formula_inputs = {
+            "output_elements": int(output_elements or 0),
+            "memory_subrole": subrole,
+        }
+        axis_source = "tensor_shapes"
+        confidence = EstimateConfidence.SUPPORTED if not warnings else EstimateConfidence.INEXACT
+    return OperatorWorkEstimate(
+        node_id=node.node_id,
+        op_family=OpFamily.EMBEDDING_POSITIONAL,
+        op_name=node.op_name,
+        formula_kind="embedding_positional_bytes",
+        formula="read_bytes+write_bytes",
+        formula_inputs=formula_inputs,
+        flops=0.0,
+        read_bytes=read_bytes,
+        write_bytes=write_bytes,
+        intermediate_bytes=0.0,
+        movement_bytes=read_bytes + write_bytes if subrole == "rotary_like" else 0.0,
+        total_bytes=total_bytes + (read_bytes + write_bytes if subrole == "rotary_like" else 0.0),
+        confidence=confidence,
+        rationale=_join_rationale(
+            f"{subrole} memory-bound evidence estimated from visible tensor movement",
+            rationale_parts,
+        ),
+        axis_source=axis_source,
+        movement_kind=subrole,
+        warnings=tuple(dict.fromkeys(warnings)),
     )
 
 
@@ -780,6 +998,74 @@ def _infer_gemm_dims(
             "K": int(lhs_shape[-1]),
         }
     return None
+
+
+def _convolution_dims(
+    input_tensors: tuple[BoundTensor, ...],
+    output_tensors: tuple[BoundTensor, ...],
+    node: BoundGraphNode,
+) -> tuple[dict[str, int] | None, list[str]]:
+    missing: list[str] = []
+    dimensionality = node.attributes.get("dimensionality")
+    if not isinstance(dimensionality, int) or dimensionality not in {1, 2, 3}:
+        missing.append("dimensionality")
+    for key in ("stride", "padding", "dilation", "groups", "output_spatial"):
+        if key not in node.attributes:
+            missing.append(key)
+    if len(input_tensors) < 2:
+        missing.append("input_or_weight")
+        return None, missing
+    if not output_tensors:
+        missing.append("output")
+        return None, missing
+    input_shape = input_tensors[0].shape
+    weight_shape = input_tensors[1].shape
+    output_shape = output_tensors[0].shape
+    if input_shape is None:
+        missing.append("input_shape")
+    if weight_shape is None:
+        missing.append("kernel_shape")
+    if output_shape is None:
+        missing.append("output_shape")
+    groups = node.attributes.get("groups")
+    if not isinstance(groups, int) or groups <= 0:
+        missing.append("groups")
+    output_spatial = node.attributes.get("output_spatial")
+    if not isinstance(output_spatial, tuple):
+        missing.append("output_spatial")
+    if missing:
+        return None, list(dict.fromkeys(missing))
+    assert isinstance(dimensionality, int)
+    assert isinstance(groups, int)
+    assert isinstance(output_spatial, tuple)
+    assert input_shape is not None and weight_shape is not None and output_shape is not None
+    if (
+        len(input_shape) != dimensionality + 2
+        or len(weight_shape) != dimensionality + 2
+        or len(output_shape) != dimensionality + 2
+        or len(output_spatial) != dimensionality
+    ):
+        return None, list(dict.fromkeys([*missing, "dimensionality_shape_match"]))
+    batch = int(input_shape[0])
+    input_channels = int(input_shape[1])
+    output_channels = int(output_shape[1])
+    kernel_elements = int(prod(weight_shape[2:]))
+    if input_channels % groups != 0:
+        return None, list(dict.fromkeys([*missing, "groups"]))
+    if int(weight_shape[0]) != output_channels:
+        return None, list(dict.fromkeys([*missing, "kernel_shape"]))
+    expected_channels_per_group = input_channels // groups
+    if int(weight_shape[1]) != expected_channels_per_group:
+        return None, list(dict.fromkeys([*missing, "groups"]))
+    return {
+        "N": batch,
+        "C_in": input_channels,
+        "C_out": output_channels,
+        "groups": groups,
+        "output_spatial_elements": int(prod(output_spatial)),
+        "kernel_elements": kernel_elements,
+        "dimensionality": dimensionality,
+    }, []
 
 
 def _attention_dims_from_node_or_shapes(
