@@ -114,6 +114,7 @@ class SolarSemanticGroupEvidence:
     subroles: tuple[SolarSubroleEvidence, ...]
     confidence: EstimateConfidence | str
     status: str
+    required_evidence: tuple[str, ...]
     missing_evidence: tuple[str, ...]
     warning_prefixes: tuple[str, ...]
     source: SolarEvidenceSource
@@ -127,6 +128,7 @@ class SolarSemanticGroupEvidence:
             "subroles": [subrole.to_dict() for subrole in self.subroles],
             "confidence": _confidence_value(self.confidence),
             "status": self.status,
+            "required_evidence": list(self.required_evidence),
             "missing_evidence": list(self.missing_evidence),
             "warning_prefixes": list(self.warning_prefixes),
             "source": self.source.to_dict(),
@@ -367,6 +369,7 @@ def _group_from_dict(payload: Any, index: int) -> SolarSemanticGroupEvidence:
             "subroles",
             "confidence",
             "status",
+            "required_evidence",
             "missing_evidence",
             "warning_prefixes",
             "source",
@@ -390,6 +393,7 @@ def _group_from_dict(payload: Any, index: int) -> SolarSemanticGroupEvidence:
         ),
         confidence=_parse_confidence(raw, "confidence", source=source),
         status=status,
+        required_evidence=_parse_str_tuple(raw, "required_evidence", source=source),
         missing_evidence=_parse_str_tuple(raw, "missing_evidence", source=source),
         warning_prefixes=_parse_str_tuple(raw, "warning_prefixes", source=source),
         source=_evidence_source_from_dict(
@@ -564,6 +568,10 @@ def _semantic_group_evidence(
                 subroles=subroles,
                 confidence=classification.confidence,
                 status=classification.status,
+                required_evidence=_required_evidence_for_group(
+                    related_tensors,
+                    ordered_estimates,
+                ),
                 missing_evidence=classification.missing_evidence,
                 warning_prefixes=classification.warning_prefixes,
                 source=source,
@@ -571,6 +579,32 @@ def _semantic_group_evidence(
             )
         )
     return tuple(groups)
+
+
+def _required_evidence_for_group(
+    tensors: tuple[SolarTensorEvidence, ...],
+    estimates: tuple[OperatorWorkEstimate, ...],
+) -> tuple[str, ...]:
+    required = []
+    for tensor in tensors:
+        if tensor.shape is not None:
+            required.append(f"shape:{tensor.tensor_id}")
+        if tensor.dtype and tensor.dtype != "unknown":
+            required.append(f"dtype:{tensor.tensor_id}")
+        if tensor.semantic_axes:
+            required.append(f"semantic_axes:{tensor.tensor_id}")
+        if tensor.source.kind and tensor.source.detail:
+            required.append(f"source:{tensor.tensor_id}")
+    for estimate in estimates:
+        if estimate.formula_inputs:
+            required.append(f"formula_inputs:{estimate.node_id}")
+        if estimate.formula and estimate.formula != "0":
+            required.append(f"formula:{estimate.node_id}")
+        if estimate.total_bytes > 0.0:
+            required.append(f"bytes:{estimate.node_id}")
+        if estimate.axis_source is not None:
+            required.append(f"axis:{estimate.node_id}")
+    return _unique_sorted(required)
 
 
 def _first_estimate_node_id(estimates: list[OperatorWorkEstimate]) -> str:
