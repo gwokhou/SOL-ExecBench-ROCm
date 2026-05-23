@@ -28,16 +28,30 @@ from .manifest import (
     build_dataset_manifest,
     write_dataset_manifest,
 )
+from .inventory import (
+    DatasetInventory,
+    InventoryDenominators,
+    ProblemInventoryRecord,
+    WorkloadInventoryRecord,
+    build_dataset_inventory,
+    write_dataset_inventory,
+)
 
 __all__ = [
     "DEFAULT_CATEGORIES",
     "DatasetLayout",
     "DatasetManifest",
     "DatasetManifestSource",
+    "DatasetInventory",
+    "InventoryDenominators",
     "LayoutCategory",
     "LayoutDiagnostic",
+    "ProblemInventoryRecord",
+    "WorkloadInventoryRecord",
     "build_dataset_manifest",
+    "build_dataset_inventory",
     "inspect_dataset_layout",
     "validate_categories",
     "write_dataset_manifest",
+    "write_dataset_inventory",
 ]
