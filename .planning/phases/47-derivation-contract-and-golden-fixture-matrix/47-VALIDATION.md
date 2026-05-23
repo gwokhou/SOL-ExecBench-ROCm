@@ -30,7 +30,7 @@ created: 2026-05-23
 - **After every task commit:** Run `uv run pytest tests/sol_execbench/test_solar_derivation_contract.py -n 0`
 - **After every plan wave:** Run `uv run pytest tests/sol_execbench/test_solar_derivation_contract.py tests/sol_execbench/test_public_contract_guardrails.py -n 0`
 - **Before `$gsd-verify-work`:** Full suite must be green
-- **Max feedback latency:** 60 seconds
+- **Max feedback latency:** 30 seconds
 
 ---
 
@@ -64,7 +64,7 @@ All phase behaviors have automated verification.
 - [x] Sampling continuity: no 3 consecutive tasks without automated verify
 - [x] Wave 0 covers all MISSING references
 - [x] No watch-mode flags
-- [x] Feedback latency < 60s
+- [x] Feedback latency < 30s
 - [x] `nyquist_compliant: true` set in frontmatter
 
 **Approval:** approved 2026-05-23
