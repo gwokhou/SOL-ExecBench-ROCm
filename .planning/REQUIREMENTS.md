@@ -36,8 +36,8 @@
 - [x] **TEST-01**: Golden derivation fixtures cover attention, MoE, convolution, SSM/Mamba, embedding or positional patterns, and linear projection.
 - [x] **TEST-02**: Negative and degradation fixtures cover dynamic, partial, unsupported, taxonomy-only, and missing-metadata cases.
 - [x] **TEST-03**: Sidecar parse and serialize round-trip tests cover every new machine-verifiable derivation evidence field.
-- [ ] **TEST-04**: Public contract guardrails prove canonical schemas, trace JSONL, primary CLI behavior, and existing public benchmark semantics remain unchanged.
-- [ ] **TEST-05**: Claim guardrails prevent v1.10 artifacts from implying paper benchmark parity, NVIDIA Blackwell or B200 equivalence, hosted leaderboard readiness, or new real-hardware validation.
+- [x] **TEST-04**: Public contract guardrails prove canonical schemas, trace JSONL, primary CLI behavior, and existing public benchmark semantics remain unchanged.
+- [x] **TEST-05**: Claim guardrails prevent v1.10 artifacts from implying paper benchmark parity, NVIDIA Blackwell or B200 equivalence, hosted leaderboard readiness, or new real-hardware validation.
 
 ## Future Requirements
 
@@ -85,8 +85,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TEST-01 | Phase 47 | Complete |
 | TEST-02 | Phase 47 | Complete |
 | TEST-03 | Phase 51 | Complete |
-| TEST-04 | Phase 52 | Pending |
-| TEST-05 | Phase 52 | Pending |
+| TEST-04 | Phase 52 | Complete |
+| TEST-05 | Phase 52 | Complete |
 
 **Coverage:**
 - v1.10 requirements: 21 total

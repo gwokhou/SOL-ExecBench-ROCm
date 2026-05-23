@@ -72,7 +72,7 @@ NVIDIA Blackwell/B200 equivalence, and new framework dependencies.
   aggregate state, sidecar fields, and AMD-native score eligibility
   machine-verifiable.
 
-- [ ] **Phase 52: Dataset Runner And Public Contract Closure** - Close v1.10
+- [x] **Phase 52: Dataset Runner And Public Contract Closure** - Close v1.10 (completed 2026-05-23)
   through dataset-runner integration, documentation, and public claim
   guardrails.
 
@@ -320,11 +320,11 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 52-02-PLAN.md — Document v1.10 sidecar consumption and claim boundaries.
+- [x] 52-02-PLAN.md — Document v1.10 sidecar consumption and claim boundaries.
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 52-03-PLAN.md — Close public contract, claim guardrail, and full regression coverage.
+- [x] 52-03-PLAN.md — Close public contract, claim guardrail, and full regression coverage.
 
 ## Progress
 
@@ -335,7 +335,7 @@ Plans:
 | 49. High-Confidence Family Modeling | 4/4 | Complete    | 2026-05-23 |
 | 50. Degraded Complex Family Modeling | 3/3 | Complete    | 2026-05-23 |
 | 51. Sidecar Coverage And Score Guards | 3/3 | Complete    | 2026-05-23 |
-| 52. Dataset Runner And Public Contract Closure | 1/3 | In Progress|  |
+| 52. Dataset Runner And Public Contract Closure | 3/3 | Complete   | 2026-05-23 |
 
 ## Requirements Coverage
 
@@ -360,8 +360,8 @@ Plans:
 | TEST-01 | Phase 47 | Complete |
 | TEST-02 | Phase 47 | Complete |
 | TEST-03 | Phase 51 | Pending |
-| TEST-04 | Phase 52 | Pending |
-| TEST-05 | Phase 52 | Pending |
+| TEST-04 | Phase 52 | Complete |
+| TEST-05 | Phase 52 | Complete |
 
 **Coverage:**
 
