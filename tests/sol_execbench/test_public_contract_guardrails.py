@@ -492,12 +492,55 @@ def test_v1_11_inventory_readiness_fields_remain_sidecar_only():
             assert field not in text
 
 
+def test_v1_11_execution_closure_fields_remain_sidecar_only():
+    definition, workload, trace = _sample_definition_workload_trace()
+    forbidden = (
+        "sol_execbench.execution_closure.v1",
+        "execution_closure",
+        "closure_status",
+        "skipped_existing_pass",
+        "attempted_passed",
+        "attempted_failed",
+        "missing_trace",
+        "derived_evidence_missing",
+        "bounded_ready_subset_execution",
+        "full_235_problem_validation",
+        "leaderboard_result",
+    )
+
+    for payload in (
+        definition.model_dump(mode="json"),
+        workload.model_dump(mode="json"),
+        trace.model_dump(mode="json"),
+    ):
+        text = json.dumps(payload, sort_keys=True)
+        for field in forbidden:
+            assert field not in text
+
+
+def test_v1_11_execution_closure_docs_keep_bounded_claim_boundary():
+    docs = (REPO_ROOT / "docs/analysis.md").read_text()
+
+    assert "--execution-closure" in docs
+    assert "bounded local execution audit" in docs
+    assert "not full 235-problem validation" in docs
+    assert "not paper parity" in docs
+    assert "not a leaderboard result" in docs
+
+
 def test_primary_cli_does_not_expose_v1_11_dataset_inspection_options():
     result = CliRunner().invoke(cli, ["--help"])
     assert result.exit_code == 0
     help_text = result.output
 
-    for option in ("--inventory", "--readiness", "--ready-subset", "--dataset-root"):
+    for option in (
+        "--inventory",
+        "--readiness",
+        "--ready-subset",
+        "--execution-closure",
+        "--dataset-manifest",
+        "--dataset-root",
+    ):
         assert option not in help_text
 
 

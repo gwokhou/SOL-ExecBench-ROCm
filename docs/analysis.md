@@ -51,6 +51,27 @@ Readiness means a workload is ready to attempt local ROCm execution. It does
 not mean the workload passed execution, was scored, completed full validation,
 or reached paper parity.
 
+Run a bounded ready subset and write an execution-closure sidecar:
+
+```bash
+uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
+  --ready-subset out/ready_subset.json \
+  --readiness out/readiness.json \
+  --dataset-manifest out/dataset_manifest.json \
+  --limit 5 \
+  --max-workloads 1 \
+  --execution-closure out/execution_closure.json
+```
+
+When `--ready-subset` is supplied, the runner filters execution to the ready
+problem/workload refs, still invokes the primary `sol-execbench` subprocess
+path, and writes temporary filtered workload files only under the selected
+output directory. `execution_closure.json` joins ready-subset selection,
+optional readiness blockers, traces, summaries, skipped-existing-pass states,
+missing traces, failures, and derived evidence refs. The closure sidecar is a
+bounded local execution audit. It is not full 235-problem validation,
+not paper parity, and not a leaderboard result.
+
 Dataset runs write per-problem traces under category/problem subdirectories of
 the selected output directory and write `summary.json` directly under that
 output directory. The default output directory is `out/`.
