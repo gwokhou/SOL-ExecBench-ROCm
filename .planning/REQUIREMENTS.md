@@ -177,11 +177,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GAP-03 | Phase 56 | Complete |
 | GAP-04 | Phase 56 | Complete |
 | GAP-05 | Phase 56 | Complete |
-| CLAIM-01 | Phase 57 | Pending |
-| CLAIM-02 | Phase 57 | Pending |
-| CLAIM-03 | Phase 57 | Pending |
-| CLAIM-04 | Phase 57 | Pending |
-| CLAIM-05 | Phase 57 | Pending |
+| CLAIM-01 | Phase 57 | Complete |
+| CLAIM-02 | Phase 57 | Complete |
+| CLAIM-03 | Phase 57 | Complete |
+| CLAIM-04 | Phase 57 | Complete |
+| CLAIM-05 | Phase 57 | Complete |
 
 **Coverage:**
 - v1.11 requirements: 29 total
