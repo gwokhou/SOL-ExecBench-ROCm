@@ -368,6 +368,63 @@ def test_dataset_runner_generates_reports_for_skipped_existing_traces(
     assert sidecar["source_boundary"]["candidate_solution_execution"] is False
 
 
+def test_dataset_runner_reruns_failed_existing_traces_before_reports(
+    tmp_path,
+    monkeypatch,
+):
+    dataset_root = tmp_path / "dataset"
+    problem_dir = dataset_root / "L1" / "matmul_demo"
+    problem_dir.mkdir(parents=True)
+    (problem_dir / "definition.json").write_text(json.dumps(_matmul_definition()))
+    _write_matmul_workload(problem_dir / "workload.jsonl")
+
+    output_dir = tmp_path / "out"
+    trace_dir = output_dir / "L1" / "matmul_demo"
+    trace_dir.mkdir(parents=True)
+    failed_trace = _matmul_trace_payload()
+    failed_trace[0]["evaluation"] = {
+        "status": "RUNTIME_ERROR",
+        "environment": {"hardware": "AMD gfx1200", "libs": {}},
+        "timestamp": "2026-05-22T00:00:00Z",
+        "correctness": None,
+        "performance": None,
+    }
+    (trace_dir / "traces.json").write_text(json.dumps(failed_trace))
+
+    report_path = tmp_path / "reports" / "amd-score.json"
+    solar_dir = tmp_path / "solar-sidecars"
+    calls = 0
+
+    def run_cli(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return _matmul_trace_payload()
+
+    monkeypatch.setattr(run_dataset, "run_cli", run_cli)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--output",
+            str(output_dir),
+            "--amd-score-report",
+            str(report_path),
+            "--solar-derivation",
+            str(solar_dir),
+        ],
+    )
+
+    run_dataset.main()
+
+    report = json.loads(report_path.read_text())
+
+    assert calls == 1
+    assert report["scored_count"] == 1
+    assert (solar_dir / "matmul_demo.matmul-workload.solar-derivation.json").exists()
+
+
 def test_dataset_helper_collects_source_specific_timing_evidence(tmp_path):
     problem_output_dir = tmp_path / "out" / "L1" / "triton_problem"
     problem_output_dir.mkdir(parents=True)
