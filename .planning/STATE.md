@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.10
 milestone_name: Paper-Aligned SOLAR Automatic Derivation
 status: executing
-stopped_at: Completed 48-02-PLAN.md; next step is 48-03-PLAN.md.
-last_updated: "2026-05-23T05:19:51.455Z"
+stopped_at: Completed 48-03-PLAN.md; next step is 48-04-PLAN.md.
+last_updated: "2026-05-23T05:26:11Z"
 last_activity: 2026-05-23
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 10
-  completed_plans: 8
-  percent: 80
+  completed_plans: 9
+  percent: 90
 ---
 
 # Project State
@@ -26,17 +26,17 @@ See: `.planning/PROJECT.md` (updated 2026-05-23)
 ## Current Position
 
 Phase: 48 (extraction-pipeline-and-semantic-provenance) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-05-23
 
-Progress: [████████░░] 80%
+Progress: [█████████░] 90%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 8
+- Total plans completed: 9
 - Average duration: n/a
 - Total execution time: 0.0 hours
 
@@ -45,7 +45,7 @@ Progress: [████████░░] 80%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 47. Derivation Contract And Golden Fixture Matrix | 6 | - | - |
-| 48. Extraction Pipeline And Semantic Provenance | 2 | 8min | 4min |
+| 48. Extraction Pipeline And Semantic Provenance | 3 | 13min | 4min |
 | 49. High-Confidence Family Modeling | TBD | - | - |
 | 50. Degraded Complex Family Modeling | TBD | - | - |
 | 51. Sidecar Coverage And Score Guards | TBD | - | - |
@@ -71,6 +71,8 @@ Decisions are logged in PROJECT.md. Recent decisions affecting current work:
 - 48-01 reused the existing EstimateConfidence vocabulary while serializing confidence as JSON-safe strings.
 - 48-02 builds SOLAR derivation evidence only from Definition, Workload, BoundGraph, and OperatorWorkEstimate inputs.
 - 48-02 keeps candidate solution execution explicitly outside the evidence builder boundary.
+- 48-03 keeps SOLAR confidence classification pure and maps supported, inexact, and unsupported evidence to scored, degraded, and unscored states conservatively.
+- 48-03 uses graph semantics for subrole provenance while retaining estimate provenance at the semantic-group level.
 
 ### Pending Todos
 
@@ -94,6 +96,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-23T05:19:51.224Z
-Stopped at: Completed 48-02-PLAN.md; next step is 48-03-PLAN.md.
+Last session: 2026-05-23T05:26:11Z
+Stopped at: Completed 48-03-PLAN.md; next step is 48-04-PLAN.md.
 Resume file: None

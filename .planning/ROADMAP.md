@@ -155,7 +155,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 48-03-PLAN.md — Add deterministic semantic grouping and confidence/status rules.
+- [x] 48-03-PLAN.md — Add deterministic semantic grouping and confidence/status rules.
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
