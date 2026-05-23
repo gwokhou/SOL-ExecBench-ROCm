@@ -2,17 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.9
 milestone_name: AMD SOL/SOLAR Bound Modeling Completion
-current_phase: complete
-status: milestone_complete
-last_updated: 2026-05-23T02:43:26.713Z
-last_activity: 2026-05-23 -- Phase 46 complete; v1.9 milestone complete
+current_phase: Complete
+status: completed
+last_updated: "2026-05-23T02:57:02.371Z"
+last_activity: 2026-05-23 — Milestone v1.9 completed and archived
 progress:
   total_phases: 6
   completed_phases: 6
   total_plans: 17
   completed_plans: 17
   percent: 100
-stopped_at: Milestone complete (Phase 46 was final phase)
 ---
 
 # Project State
@@ -20,11 +19,11 @@ stopped_at: Milestone complete (Phase 46 was final phase)
 **Project:** SOL ExecBench ROCm Port
 **Initialized:** 2026-05-21
 **Current phase:** Complete
-**Status:** Milestone complete
+**Status:** v1.9 milestone complete
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (updated 2026-05-22)
+See: `.planning/PROJECT.md` (updated 2026-05-23)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 **Current focus:** Milestone complete
@@ -44,8 +43,8 @@ See: `.planning/config.json`
 
 See: `.planning/ROADMAP.md`
 
-v1.9 AMD SOL/SOLAR Bound Modeling Completion is active with phases 41-46.
-Next phase: none; v1.9 milestone is complete.
+No milestone is active. v1.9 AMD SOL/SOLAR Bound Modeling Completion is
+archived with phases 41-46.
 
 ## Memory
 
@@ -83,6 +82,10 @@ Next phase: none; v1.9 milestone is complete.
 - v1.8 roadmap archived in `.planning/milestones/v1.8-ROADMAP.md`.
 - v1.8 audit archived in `.planning/milestones/v1.8-MILESTONE-AUDIT.md`.
 - v1.8 phase execution history archived in `.planning/milestones/v1.8-phases/`.
+- v1.9 requirements archived in `.planning/milestones/v1.9-REQUIREMENTS.md`.
+- v1.9 roadmap archived in `.planning/milestones/v1.9-ROADMAP.md`.
+- v1.9 audit archived in `.planning/milestones/v1.9-MILESTONE-AUDIT.md`.
+- v1.9 phase execution history archived in `.planning/milestones/v1.9-phases/`.
 
 ## Deferred Items
 
@@ -94,14 +97,14 @@ Items acknowledged and deferred at milestone close on 2026-05-21:
 
 ## Next Action
 
-Run `$gsd-complete-milestone` when ready to archive v1.9.
+Run `$gsd-new-milestone` when ready to define the next milestone.
 
 ## Current Position
 
-Phase: v1.9 — COMPLETE
-Plan: All planned phases complete
-Status: Milestone complete
-Last activity: 2026-05-23
+Phase: Milestone v1.9 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-05-23 — Milestone v1.9 completed and archived
 
 ## Quick Tasks Completed
 
@@ -111,4 +114,4 @@ Last activity: 2026-05-23
 
 ## Operator Next Steps
 
-- Run `$gsd-complete-milestone` when ready to archive v1.9.
+- Start the next milestone with /gsd-new-milestone
