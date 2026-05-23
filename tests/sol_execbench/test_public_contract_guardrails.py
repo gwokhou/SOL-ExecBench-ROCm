@@ -23,6 +23,7 @@ from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.scoring.amd_score import (
     CDNA3_NO_VALIDATION_WARNING,
     DEGRADED_SOL_BOUND_WARNING,
+    UNSCORED_SOL_BOUND_WARNING,
     build_amd_native_suite_report,
     score_amd_native_workload,
 )
@@ -35,6 +36,7 @@ from sol_execbench.core.scoring.amd_sol_v2 import build_amd_sol_bound_v2_artifac
 from sol_execbench.core.scoring.amd_hardware_models import HardwareValidationStatus
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.scoring import solar_derivation as solar_derivation_module
+from sol_execbench.core.scoring.solar_derivation import SolarAggregateStatus
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 COMPATIBILITY_INVENTORY = REPO_ROOT / "docs/internal/v1_4_compatibility_inventory.md"
@@ -62,6 +64,14 @@ PHASE50_INTERNAL_EVIDENCE_NAMES = (
     "route:static_cardinality",
     "recurrence:state_shape",
     "recurrence:update_parameters",
+)
+PHASE51_SCORE_INTERNAL_EVIDENCE_REFS = (
+    "solar_derivation",
+    "coverage_summary",
+    "aggregate_status",
+    "formula_evidence",
+    "byte_evidence",
+    "bound_evidence",
 )
 
 
@@ -467,6 +477,72 @@ def test_importing_solar_derivation_keeps_amd_native_score_eligibility_unchanged
     assert "formula_evidence" not in v2_score.to_dict()["evidence_refs"]
     assert "byte_evidence" not in v2_score.to_dict()["evidence_refs"]
     assert "bound_evidence" not in v2_score.to_dict()["evidence_refs"]
+
+
+def test_solar_score_guard_does_not_expose_internal_evidence_refs_or_claims():
+    definition = Definition(
+        name="matmul_demo",
+        axes={
+            "M": {"type": "var"},
+            "K": {"type": "const", "value": 4},
+            "N": {"type": "const", "value": 8},
+        },
+        inputs={
+            "a": {"shape": ["M", "K"], "dtype": "float32"},
+            "b": {"shape": ["K", "N"], "dtype": "float32"},
+        },
+        outputs={"out": {"shape": ["M", "N"], "dtype": "float32"}},
+        reference="def run(a, b):\n    return a @ b",
+    )
+    workload = Workload(
+        axes={"M": 2},
+        inputs={"a": {"type": "random"}, "b": {"type": "random"}},
+        uuid="matmul-workload",
+    )
+    artifact = build_amd_sol_bound_artifact(
+        definition,
+        workload,
+        default_amd_hardware_models()["gfx1200"],
+    )
+
+    unscored = score_amd_native_workload(
+        artifact,
+        measured_latency_ms=1.0,
+        baseline_latency_ms=2.0,
+        timing_evidence_ref="timing.json",
+        sol_bound_ref="sol.json",
+        solar_derivation=SolarAggregateStatus(
+            status="unscored",
+            score_eligible=False,
+            reason="test unscored aggregate",
+            group_ids=("group-1",),
+            node_ids=("node-1",),
+            warnings=("aggregate_unscored:unsupported semantic evidence",),
+        ),
+    ).to_dict()
+    degraded = score_amd_native_workload(
+        artifact,
+        measured_latency_ms=1.0,
+        baseline_latency_ms=2.0,
+        timing_evidence_ref="timing.json",
+        sol_bound_ref="sol.json",
+        solar_derivation=SolarAggregateStatus(
+            status="degraded",
+            score_eligible=True,
+            reason="test degraded aggregate",
+            group_ids=("group-1",),
+            node_ids=("node-1",),
+            warnings=("aggregate_degraded:incomplete semantic evidence",),
+        ),
+    ).to_dict()
+
+    assert unscored["claim_level"] == "amd-native-derived"
+    assert degraded["claim_level"] == "amd-native-derived"
+    assert UNSCORED_SOL_BOUND_WARNING in unscored["warnings"]
+    assert DEGRADED_SOL_BOUND_WARNING in degraded["warnings"]
+    for payload in (unscored, degraded):
+        for field in PHASE51_SCORE_INTERNAL_EVIDENCE_REFS:
+            assert field not in payload["evidence_refs"]
 
 
 def test_v1_9_derived_artifacts_remain_noncanonical():
