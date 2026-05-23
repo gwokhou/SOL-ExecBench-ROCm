@@ -82,6 +82,18 @@ def test_v2_artifact_serializes_required_sidecar_fields():
     assert payload["aggregate_bound"]["status"] == "degraded"
     assert payload["coverage_summary"]["worst_confidence"] == "supported"
     assert "model_validation:gfx1200:provisional" in payload["warnings"]
+    for solar_derivation_field in (
+        "solar_derivation",
+        "aggregate_status",
+        "score_eligible",
+        "degraded_node_ids",
+        "unsupported_node_ids",
+        "estimated_node_ids",
+        "formula_evidence",
+        "byte_evidence",
+        "bound_evidence",
+    ):
+        assert solar_derivation_field not in repr(payload)
     with pytest.raises(FrozenInstanceError):
         artifact.definition = "changed"  # type: ignore[misc]
 

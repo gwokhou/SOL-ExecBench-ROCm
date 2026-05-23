@@ -69,10 +69,51 @@ PHASE51_SCORE_INTERNAL_EVIDENCE_REFS = (
     "solar_derivation",
     "coverage_summary",
     "aggregate_status",
+    "family_counts",
+    "status_counts",
+    "degraded_node_ids",
+    "unsupported_node_ids",
+    "estimated_node_ids",
+    "score_eligible",
     "formula_evidence",
     "byte_evidence",
     "bound_evidence",
 )
+PHASE51_INTERNAL_PUBLIC_BOUNDARY_FIELDS = (
+    *PHASE51_SCORE_INTERNAL_EVIDENCE_REFS,
+    "missing_patterns",
+    "unsupported_patterns",
+    "provenance",
+    "source_boundary",
+    "candidate_solution_execution",
+)
+PHASE51_SOLAR_ONLY_ARTIFACT_FIELDS = (
+    "solar_derivation",
+    "aggregate_status",
+    "family_counts",
+    "status_counts",
+    "degraded_node_ids",
+    "unsupported_node_ids",
+    "estimated_node_ids",
+    "score_eligible",
+    "formula_evidence",
+    "byte_evidence",
+    "bound_evidence",
+)
+
+
+def _json_object_keys(value: object) -> set[str]:
+    if isinstance(value, dict):
+        keys = set(value)
+        for nested in value.values():
+            keys.update(_json_object_keys(nested))
+        return keys
+    if isinstance(value, list):
+        keys: set[str] = set()
+        for nested in value:
+            keys.update(_json_object_keys(nested))
+        return keys
+    return set()
 
 
 def test_solution_json_contract_accepts_existing_rocm_shape():
@@ -223,6 +264,14 @@ def test_v1_10_solar_derivation_fields_remain_noncanonical():
         "formula_evidence",
         "byte_evidence",
         "bound_evidence",
+        "coverage_summary",
+        "aggregate_status",
+        "family_counts",
+        "status_counts",
+        "degraded_node_ids",
+        "unsupported_node_ids",
+        "estimated_node_ids",
+        "score_eligible",
         "convolution_flops",
         "embedding_positional_bytes",
         "output_spatial",
@@ -241,7 +290,7 @@ def test_v1_10_solar_derivation_fields_remain_noncanonical():
             assert field not in repr(payload)
 
     canonical_trace_jsonl = json.dumps(trace.model_dump(mode="json"), sort_keys=True)
-    for field in PHASE50_INTERNAL_EVIDENCE_NAMES:
+    for field in (*PHASE50_INTERNAL_EVIDENCE_NAMES, *PHASE51_INTERNAL_PUBLIC_BOUNDARY_FIELDS):
         assert field not in canonical_trace_jsonl
 
 
@@ -278,9 +327,9 @@ def test_amd_sol_artifacts_may_keep_existing_bound_fields_while_solar_fields_sta
     assert "compute_bound_ms" in repr(v2_payload)
     for payload in (v1_payload, v2_payload):
         assert "solar_derivation" not in payload
-        assert "formula_evidence" not in repr(payload)
-        assert "byte_evidence" not in repr(payload)
-        assert "bound_evidence" not in repr(payload)
+        payload_keys = _json_object_keys(payload)
+        for field in PHASE51_SOLAR_ONLY_ARTIFACT_FIELDS:
+            assert field not in payload_keys
 
 
 def test_primary_cli_does_not_expose_v1_10_solar_derivation_options():
@@ -300,6 +349,7 @@ def test_primary_cli_does_not_expose_v1_10_solar_derivation_options():
         "--solar-provenance",
         "--derive-solar-sidecar",
         *PHASE50_INTERNAL_EVIDENCE_NAMES,
+        *PHASE51_INTERNAL_PUBLIC_BOUNDARY_FIELDS,
     ):
         assert option not in help_text
 
@@ -410,10 +460,8 @@ def test_degraded_complex_family_score_eligibility_ignores_solar_sidecars():
         assert score.supported is True
         assert score.claim_level == "amd-native-derived"
         assert DEGRADED_SOL_BOUND_WARNING in score.warnings
-        assert "solar_derivation" not in score.evidence_refs
-        assert "formula_evidence" not in score.evidence_refs
-        assert "byte_evidence" not in score.evidence_refs
-        assert "bound_evidence" not in score.evidence_refs
+        for field in PHASE51_SCORE_INTERNAL_EVIDENCE_REFS:
+            assert field not in score.evidence_refs
 
 
 def test_importing_solar_derivation_keeps_amd_native_score_eligibility_unchanged():
@@ -467,16 +515,14 @@ def test_importing_solar_derivation_keeps_amd_native_score_eligibility_unchanged
     assert v2_score.supported is True
     assert v1_score.to_dict()["claim_level"] == "amd-native-derived"
     assert v2_score.to_dict()["claim_level"] == "amd-native-derived"
-    assert "solar_derivation" not in v1_score.to_dict()["evidence_refs"]
-    assert "solar_derivation" not in v2_score.to_dict()["evidence_refs"]
-    assert "solar_derivation" not in v1_artifact.to_dict()
-    assert "solar_derivation" not in v2_artifact.to_dict()
-    assert "formula_evidence" not in v1_score.to_dict()["evidence_refs"]
-    assert "byte_evidence" not in v1_score.to_dict()["evidence_refs"]
-    assert "bound_evidence" not in v1_score.to_dict()["evidence_refs"]
-    assert "formula_evidence" not in v2_score.to_dict()["evidence_refs"]
-    assert "byte_evidence" not in v2_score.to_dict()["evidence_refs"]
-    assert "bound_evidence" not in v2_score.to_dict()["evidence_refs"]
+    for field in PHASE51_SCORE_INTERNAL_EVIDENCE_REFS:
+        assert field not in v1_score.to_dict()["evidence_refs"]
+        assert field not in v2_score.to_dict()["evidence_refs"]
+    v1_artifact_keys = _json_object_keys(v1_artifact.to_dict())
+    v2_artifact_keys = _json_object_keys(v2_artifact.to_dict())
+    for field in PHASE51_SOLAR_ONLY_ARTIFACT_FIELDS:
+        assert field not in v1_artifact_keys
+        assert field not in v2_artifact_keys
 
 
 def test_solar_score_guard_does_not_expose_internal_evidence_refs_or_claims():
@@ -647,7 +693,10 @@ def test_definition_workload_trace_schemas_do_not_include_derived_artifact_field
     assert "read_bytes" not in definition.model_dump(mode="json")
     assert "movement_bytes" not in definition.model_dump(mode="json")
     assert "operator_work_estimates" not in definition.model_dump(mode="json")
-    assert "coverage_summary" not in definition.model_dump(mode="json")
+    for field in PHASE51_INTERNAL_PUBLIC_BOUNDARY_FIELDS:
+        assert field not in definition.model_dump(mode="json")
+        assert field not in workload.model_dump(mode="json")
+        assert field not in trace.model_dump(mode="json")
     assert "aggregate_bound" not in definition.model_dump(mode="json")
     assert "hardware_model_ref" not in definition.model_dump(mode="json")
     assert "hardware_model" not in workload.model_dump(mode="json")
@@ -657,7 +706,6 @@ def test_definition_workload_trace_schemas_do_not_include_derived_artifact_field
     assert "read_bytes" not in workload.model_dump(mode="json")
     assert "movement_bytes" not in workload.model_dump(mode="json")
     assert "operator_work_estimates" not in workload.model_dump(mode="json")
-    assert "coverage_summary" not in workload.model_dump(mode="json")
     assert "aggregate_bound" not in workload.model_dump(mode="json")
     assert "hardware_model_ref" not in workload.model_dump(mode="json")
     assert "bound_graph" not in trace.model_dump(mode="json")
@@ -668,7 +716,6 @@ def test_definition_workload_trace_schemas_do_not_include_derived_artifact_field
     assert "read_bytes" not in trace.model_dump(mode="json")
     assert "movement_bytes" not in trace.model_dump(mode="json")
     assert "operator_work_estimates" not in trace.model_dump(mode="json")
-    assert "coverage_summary" not in trace.model_dump(mode="json")
     assert "aggregate_bound" not in trace.model_dump(mode="json")
     assert "hardware_model_ref" not in trace.model_dump(mode="json")
 
