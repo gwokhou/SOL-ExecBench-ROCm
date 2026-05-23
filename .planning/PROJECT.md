@@ -15,20 +15,22 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
 ## Current State
 
-**Shipped version:** v1.8 ROCm Library Ecosystem Completion,
-completed 2026-05-22.
+**Shipped version:** v1.9 AMD SOL/SOLAR Bound Modeling Completion,
+completed 2026-05-23.
 
-**Current milestone:** v1.9 AMD SOL/SOLAR Bound Modeling Completion.
+**Current milestone:** none. The project is ready for the next milestone
+definition.
 
-**Latest milestone outcome:** MIOpen, Composable Kernel, and rocWMMA now have
-scoped native ROCm public examples, dependency diagnostics, native staging
-tests, support-status documentation, and RDNA 4 E2E registrations.
+**Latest milestone outcome:** the AMD SOL/SOLAR bound pipeline now has strict
+hardware model artifacts, a structured bound graph IR, rich operator FLOP/byte
+and movement estimates, v2 bound sidecars with coverage semantics, AMD-native
+score/dataset integration, documentation, guardrails, and RDNA 4 validation
+evidence.
 
-**Next milestone goals:** complete the AMD SOL/SOLAR bound modeling pipeline so
-bound artifacts are structured, auditable, score-integrated, and validated on
-RDNA 4. Candidate future work remains CDNA 3 / MI300X real-hardware
-validation, CDNA 4 validation, FP8 behavior on MI300X, original paper dataset
-extraction, and broader paper-parity work beyond bound modeling.
+**Next milestone goals:** to be defined. Candidate future work remains CDNA 3 /
+MI300X real-hardware validation, CDNA 4 validation, FP8 behavior on MI300X,
+original paper dataset extraction, and broader paper-parity work beyond bound
+modeling.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline.
 Milestones v1.1-v1.6 added CDNA 3 code/schema support, maintained residue
@@ -42,9 +44,10 @@ and MI300X validation-readiness guardrails.
 The v1.8 milestone completed the remaining ROCm library ecosystem replacements
 for RDNA 4 scope by adding MIOpen, CK, and rocWMMA public examples and claim
 guardrails.
-Within v1.9, Phase 43 completed auditable operator FLOP, byte, and movement
-modeling over the structured bound graph while preserving the legacy AMD SOL v1
-adapter and public-contract guardrails.
+The v1.9 milestone completed the AMD SOL/SOLAR bound modeling pipeline for RDNA
+4 scope by adding strict hardware model artifacts, a structured bound graph IR,
+auditable operator estimates, v2 sidecars, coverage semantics, score/dataset
+integration, documentation, and claim guardrails.
 
 Validation status:
 
@@ -53,7 +56,7 @@ Validation status:
 - CDNA 3 (`gfx94*`) full adapted suite validation remains deferred by user
   decision and must be completed before claiming CDNA 3 hardware validation.
 
-## Current Milestone: v1.9 AMD SOL/SOLAR Bound Modeling Completion
+## Recently Shipped Milestone: v1.9 AMD SOL/SOLAR Bound Modeling Completion
 
 **Goal:** Make the ROCm port's AMD SOL bound pipeline credible, structured,
 auditable, and broad enough to support paper-style SOL scoring on the current
@@ -158,11 +161,17 @@ ROCm path, with validation scoped to RDNA 4 only.
   rationale, and legacy v1 `WorkEstimate` adaptation for GEMM/BMM, elementwise,
   activation, reduction, normalization, softmax, data movement, and dtype
   conversion families - v1.9 Phase 43.
+- AMD SOL/SOLAR bound modeling now has strict AMD hardware model artifacts,
+  structured bound graph IR extraction, rich operator estimates, v2 bound
+  sidecars, coverage/warning semantics, AMD-native score and dataset
+  integration, documentation, and public-contract guardrails - v1.9.
+- v1.9 validation claims are scoped to RDNA 4 (`gfx1200`); CDNA 3 / MI300X
+  real-hardware validation and CDNA 4 validation remain deferred - v1.9.
 
 ### Active
 
-- Continue v1.9 AMD SOL/SOLAR bound modeling with v2 bound artifacts, coverage
-  semantics, score integration, documentation, and RDNA 4 validation evidence.
+- No active milestone requirements. Define the next milestone with
+  `$gsd-new-milestone`.
 
 ### Out of Scope
 
@@ -195,10 +204,10 @@ contains the HIP-aware build and eval subprocess scripts.
 
 Current high-risk areas are deeper AMD SOL/SOLAR bound modeling, real
 MI300X/CDNA3 hardware validation, FP8 evidence, and original-paper dataset
-extraction. v1.9 intentionally focuses on the modeling pipeline, not commercial
-GPU validation. No CDNA 3 / MI300X validation claim should be made until a full
-adapted suite run and required environment evidence are archived in a later
-milestone.
+extraction. v1.9 completed the local modeling pipeline for RDNA 4 scope, not
+commercial GPU validation. No CDNA 3 / MI300X validation claim should be made
+until a full adapted suite run and required environment evidence are archived
+in a later milestone.
 
 The v1.8 milestone was scoped to RDNA 4 validation only. CDNA 3 and CDNA 4
 library validation remain intentionally deferred; current artifacts preserve
@@ -241,8 +250,8 @@ schema, documentation, and no-claim guardrails for those architectures.
 | Prioritize baseline, timing, reward-hack, and ROCm libraries | User marked scoring baseline, evaluation timing loop, reward-hack defenses, and ROCm library migration as the implementation priorities. | Validated in v1.7 |
 | Defer NVFP4/MXFP4 validation | User noted MI300X can validate FP8 later, but no hardware is available for NVFP4/MXFP4 validation now. | Deferred |
 | Complete ROCm library replacement ecosystem on RDNA 4 | User requested the next milestone focus on thoroughly resolving incomplete ROCm library replacements, and clarified only RDNA 4 validation is in scope. | Validated in v1.8 |
-| Focus v1.9 on AMD SOL/SOLAR bound modeling | User requested the next milestone completely solve AMD SOL/SOLAR bound modeling, with validation scoped to RDNA 4. | Pending in v1.9 |
-| Defer CDNA 3 / MI300X and CDNA 4 validation from v1.9 | User clarified CDNA 3 validation and MI300X real-hardware validation should be treated as one deferred item, and CDNA 4 remains deferred. | Pending in v1.9 |
+| Focus v1.9 on AMD SOL/SOLAR bound modeling | User requested the next milestone completely solve AMD SOL/SOLAR bound modeling, with validation scoped to RDNA 4. | Validated in v1.9 |
+| Defer CDNA 3 / MI300X and CDNA 4 validation from v1.9 | User clarified CDNA 3 validation and MI300X real-hardware validation should be treated as one deferred item, and CDNA 4 remains deferred. | Validated in v1.9 |
 
 ## Evolution
 
@@ -262,4 +271,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-22 after v1.9 milestone start*
+*Last updated: 2026-05-23 after v1.9 milestone completion*

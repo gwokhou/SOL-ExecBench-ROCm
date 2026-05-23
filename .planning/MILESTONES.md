@@ -1,5 +1,46 @@
 # Milestones
 
+## v1.9 AMD SOL/SOLAR Bound Modeling Completion (Shipped: 2026-05-23)
+
+**Delivered:** strict AMD hardware model artifacts, structured bound graph IR,
+auditable operator FLOP/byte/movement modeling, v2 AMD SOL bound sidecars,
+coverage semantics, score/dataset integration, documentation, guardrails, and
+RDNA 4 validation evidence.
+
+**Phases completed:** 6 phases, 17 plans, 21 tasks
+
+**Key accomplishments:**
+
+- Added strict packaged/external AMD hardware model loading with RDNA 4
+  `gfx1200` defaults, validation-status metadata, and public-contract
+  guardrails.
+
+- Structured AMD bound graph IR with paper-aligned operation families and workload-bound tensor metadata
+- Dynamic-trace-first bound graph extraction with AST fallback, dataflow edges, and explicit unsupported evidence
+- AMD SOL compatibility facade now consumes structured bound graph evidence while preserving public contracts
+- BoundGraph nodes now have a rich per-operator estimate contract with formula, byte bucket, confidence, rationale, and unsupported evidence fields.
+- GEMM, batched GEMM, elementwise, and activation nodes now emit auditable FLOP formulas and node-local read/write byte evidence.
+- Reduction, normalization, softmax, data movement, and dtype conversion nodes now expose conservative formula and byte evidence from graph attributes.
+- Legacy AMD SOL v1 bounds now consume rich operator estimates while preserving WorkEstimate fields, artifact schema, canonical schemas, and primary CLI behavior.
+- Added AMD SOL bound artifact v2 sidecars with graph, estimate, per-op bound,
+  aggregate bound, hardware model, coverage, and deterministic warning
+  evidence.
+- Wired v2 bound artifacts into AMD-native workload and suite score reports
+  without mutating canonical trace JSONL.
+- Documented artifact semantics, confidence labels, unsupported/inexact
+  degradation, and RDNA 4-only validation scope.
+- Added claim guardrails against NVIDIA B200/SOLAR/leaderboard equivalence and
+  premature CDNA 3 / MI300X or CDNA 4 validation claims.
+
+**Known gaps:**
+
+- CDNA 3 / MI300X real-hardware validation remains deferred.
+- CDNA 4 validation remains deferred.
+- Original paper model-to-subgraph extraction and broader upstream SOLAR parity
+  remain future work.
+
+---
+
 ## v1.8 ROCm Library Ecosystem Completion (Shipped: 2026-05-22)
 
 **Delivered:** MIOpen, Composable Kernel, and rocWMMA are now scoped supported
