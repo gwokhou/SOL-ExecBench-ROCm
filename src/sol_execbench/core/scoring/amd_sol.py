@@ -7,30 +7,20 @@ from __future__ import annotations
 
 import ast
 from dataclasses import dataclass
-from enum import Enum
 from math import prod
 
 from sol_execbench.core.data.definition import DType, Definition
 from sol_execbench.core.data.workload import Workload
+from sol_execbench.core.scoring.amd_hardware_models import (
+    AmdHardwareModel,
+    EstimateConfidence,
+    HardwareValidationStatus as HardwareValidationStatus,
+    default_amd_hardware_models as load_default_amd_hardware_models,
+)
+from sol_execbench.core.scoring.amd_bound_graph import BoundGraphNode, OpFamily, build_bound_graph
 
 
 AMD_SOL_SCHEMA_VERSION = "sol_execbench.amd_sol_bound.v1"
-
-
-class EstimateConfidence(str, Enum):
-    """Confidence level for graph and work estimates."""
-
-    SUPPORTED = "supported"
-    INEXACT = "inexact"
-    UNSUPPORTED = "unsupported"
-
-
-class HardwareValidationStatus(str, Enum):
-    """Validation state for hardware model entries."""
-
-    VALIDATED = "validated"
-    PROVISIONAL = "provisional"
-    UNVALIDATED = "unvalidated"
 
 
 @dataclass(frozen=True)
@@ -70,30 +60,6 @@ class WorkEstimate:
             "bytes_accessed": self.bytes_accessed,
             "confidence": self.confidence.value,
             "rationale": self.rationale,
-        }
-
-
-@dataclass(frozen=True)
-class AmdHardwareModel:
-    """Architecture-specific AMD SOL model input."""
-
-    architecture: str
-    dtype_or_path: str
-    peak_tflops: float
-    memory_bandwidth_gbps: float
-    source: str
-    confidence: EstimateConfidence
-    validation_status: HardwareValidationStatus
-
-    def to_dict(self) -> dict[str, object]:
-        return {
-            "architecture": self.architecture,
-            "dtype_or_path": self.dtype_or_path,
-            "peak_tflops": self.peak_tflops,
-            "memory_bandwidth_gbps": self.memory_bandwidth_gbps,
-            "source": self.source,
-            "confidence": self.confidence.value,
-            "validation_status": self.validation_status.value,
         }
 
 
@@ -183,34 +149,20 @@ class AmdSolCoverageSummary:
 
 def default_amd_hardware_models() -> dict[str, AmdHardwareModel]:
     """Return built-in AMD hardware model entries."""
-    return {
-        "gfx1200": AmdHardwareModel(
-            architecture="gfx1200",
-            dtype_or_path="bf16/fp32 mixed benchmark path",
-            peak_tflops=48.0,
-            memory_bandwidth_gbps=640.0,
-            source="project provisional RDNA4 model input; validate before publication",
-            confidence=EstimateConfidence.INEXACT,
-            validation_status=HardwareValidationStatus.PROVISIONAL,
-        ),
-        "gfx942": AmdHardwareModel(
-            architecture="gfx942",
-            dtype_or_path="bf16/fp32 mixed benchmark path",
-            peak_tflops=1300.0,
-            memory_bandwidth_gbps=5300.0,
-            source="CDNA3 scaffold only; real hardware validation excluded from v1.5",
-            confidence=EstimateConfidence.INEXACT,
-            validation_status=HardwareValidationStatus.UNVALIDATED,
-        ),
-    }
+    return load_default_amd_hardware_models()
 
 
 def extract_graph(definition: Definition) -> tuple[GraphNode, ...]:
     """Extract a conservative operation graph from reference code."""
-    tree = ast.parse(definition.reference, mode="exec")
-    visitor = _GraphVisitor()
-    visitor.visit(tree)
-    return tuple(visitor.nodes)
+    try:
+        workload = _minimal_workload_for_definition(definition)
+        bound_graph = build_bound_graph(definition, workload)
+        return tuple(_graph_node_from_bound_node(node) for node in bound_graph.nodes)
+    except Exception:
+        tree = ast.parse(definition.reference, mode="exec")
+        visitor = _GraphVisitor()
+        visitor.visit(tree)
+        return tuple(visitor.nodes)
 
 
 def estimate_work(
@@ -357,6 +309,42 @@ def build_amd_sol_bound_artifact(
         work_estimates=work_estimates,
         op_bounds=op_bounds,
     )
+
+
+def _minimal_workload_for_definition(definition: Definition) -> Workload:
+    axes = {name: 1 for name in definition.var_axes}
+    return Workload(
+        axes=axes,
+        inputs={name: {"type": "random"} for name in definition.inputs},
+        uuid=f"{definition.name}-graph-extraction",
+    )
+
+
+def _graph_node_from_bound_node(node: BoundGraphNode) -> GraphNode:
+    return GraphNode(
+        node_id=node.node_id,
+        op_type=_legacy_op_type(node.op_family),
+        expression=node.source_expression,
+        confidence=node.confidence,
+        rationale=node.rationale,
+    )
+
+
+def _legacy_op_type(op_family: OpFamily) -> str:
+    if op_family in {OpFamily.GEMM, OpFamily.LINEAR_PROJECTION}:
+        return "matmul"
+    if op_family == OpFamily.MLP_ACTIVATION:
+        return "activation"
+    if op_family == OpFamily.DTYPE_CONVERSION:
+        return "data_movement"
+    return {
+        OpFamily.NORMALIZATION: "normalization",
+        OpFamily.SOFTMAX: "softmax",
+        OpFamily.REDUCTION: "reduction",
+        OpFamily.ELEMENTWISE: "elementwise",
+        OpFamily.DATA_MOVEMENT: "data_movement",
+        OpFamily.UNSUPPORTED: "unsupported",
+    }.get(op_family, "unsupported")
 
 
 class _GraphVisitor(ast.NodeVisitor):

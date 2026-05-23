@@ -314,7 +314,10 @@ def _warnings_for_artifact(artifact: AmdSolBoundArtifact) -> list[str]:
     ):
         warnings.append(UNSUPPORTED_EVIDENCE_WARNING)
 
-    if artifact.hardware_model.validation_status != HardwareValidationStatus.VALIDATED:
+    if (
+        artifact.hardware_model.hardware_validation_status != HardwareValidationStatus.VALIDATED
+        or artifact.hardware_model.model_validation_status != HardwareValidationStatus.VALIDATED
+    ):
         warnings.append(UNVALIDATED_HARDWARE_WARNING)
 
     if artifact.hardware_model.architecture.startswith("gfx94"):
