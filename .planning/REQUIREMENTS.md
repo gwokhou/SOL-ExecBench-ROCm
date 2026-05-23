@@ -167,11 +167,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | READY-03 | Phase 54 | Complete |
 | READY-04 | Phase 54 | Complete |
 | READY-05 | Phase 54 | Complete |
-| EXEC-01 | Phase 55 | Pending |
-| EXEC-02 | Phase 55 | Pending |
-| EXEC-03 | Phase 55 | Pending |
-| EXEC-04 | Phase 55 | Pending |
-| EXEC-05 | Phase 55 | Pending |
+| EXEC-01 | Phase 55 | Complete |
+| EXEC-02 | Phase 55 | Complete |
+| EXEC-03 | Phase 55 | Complete |
+| EXEC-04 | Phase 55 | Complete |
+| EXEC-05 | Phase 55 | Complete |
 | GAP-01 | Phase 56 | Pending |
 | GAP-02 | Phase 56 | Pending |
 | GAP-03 | Phase 56 | Pending |
