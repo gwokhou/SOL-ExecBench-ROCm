@@ -1,0 +1,199 @@
+from __future__ import annotations
+
+from sol_execbench.core.data.definition import Definition
+from sol_execbench.core.data.workload import Workload
+from sol_execbench.core.scoring.amd_bound_estimates import estimate_bound_work
+from sol_execbench.core.scoring.amd_bound_graph import OpFamily, build_bound_graph
+from sol_execbench.core.scoring.solar_derivation import (
+    build_solar_derivation_evidence,
+    solar_derivation_from_dict,
+)
+
+
+def _attention_definition(*, mask: bool = False) -> Definition:
+    inputs = {
+        "q": {"shape": ["batch", "heads", "sequence_q", "head_dim"], "dtype": "float32"},
+        "k": {"shape": ["batch", "heads", "sequence_k", "head_dim"], "dtype": "float32"},
+        "v": {"shape": ["batch", "heads", "sequence_k", "head_dim"], "dtype": "float32"},
+        "w_o": {"shape": ["head_dim", "head_dim"], "dtype": "float32"},
+    }
+    if mask:
+        inputs["mask"] = {
+            "shape": ["batch", "heads", "sequence_q", "sequence_k"],
+            "dtype": "float32",
+        }
+    reference = (
+        "import torch\n\n"
+        "def run(q, k, v, w_o):\n"
+        "    scores = q @ k.transpose(-2, -1)\n"
+        "    probs = torch.softmax(scores, dim=-1)\n"
+        "    return (probs @ v) @ w_o\n"
+    )
+    if mask:
+        reference = (
+            "import torch\n\n"
+            "def run(q, k, v, w_o, mask):\n"
+            "    scores = q @ k.transpose(-2, -1)\n"
+            "    scores = scores + mask\n"
+            "    probs = torch.softmax(scores, dim=-1)\n"
+            "    return (probs @ v) @ w_o\n"
+        )
+    return Definition(
+        name="attention_demo",
+        axes={
+            "batch": {"type": "var"},
+            "heads": {"type": "const", "value": 4},
+            "sequence_q": {"type": "const", "value": 16},
+            "sequence_k": {"type": "const", "value": 16},
+            "head_dim": {"type": "const", "value": 32},
+        },
+        inputs=inputs,
+        outputs={
+            "out": {
+                "shape": ["batch", "heads", "sequence_q", "head_dim"],
+                "dtype": "float32",
+            }
+        },
+        reference=reference,
+    )
+
+
+def _attention_workload(*, mask: bool = False) -> Workload:
+    inputs = {
+        "q": {"type": "random"},
+        "k": {"type": "random"},
+        "v": {"type": "random"},
+        "w_o": {"type": "random"},
+    }
+    if mask:
+        inputs["mask"] = {"type": "random"}
+    return Workload(axes={"batch": 2}, inputs=inputs, uuid="attention-workload")
+
+
+def test_attention_sidecar_records_subroles_formula_bytes_and_bounds():
+    evidence = build_solar_derivation_evidence(
+        _attention_definition(),
+        _attention_workload(),
+    )
+    payload = solar_derivation_from_dict(evidence.to_dict()).to_dict()
+    group = next(group for group in payload["groups"] if group["family"] == "attention")
+
+    assert group["status"] == "scored"
+    assert group["confidence"] == "supported"
+    assert [subrole["name"] for subrole in group["subroles"]] == [
+        "k_projection",
+        "output_projection",
+        "pv_aggregation",
+        "q_projection",
+        "qk_scores",
+        "softmax",
+        "v_projection",
+    ]
+    formula_by_role = {
+        subrole["name"]: next(
+            item
+            for item in group["formula_evidence"]
+            if item["node_id"] == subrole["node_ids"][0]
+        )
+        for subrole in group["subroles"]
+        if subrole["name"] in {"qk_scores", "softmax", "pv_aggregation", "output_projection"}
+    }
+    assert formula_by_role["qk_scores"]["formula_kind"] == "attention_scores_flops"
+    assert formula_by_role["qk_scores"]["formula_inputs"] == {
+        "B": 2,
+        "H": 4,
+        "D": 32,
+        "S_k": 16,
+        "S_q": 16,
+    }
+    assert formula_by_role["softmax"]["formula_kind"] == "attention_softmax_flops"
+    assert formula_by_role["pv_aggregation"]["formula_kind"] == "attention_pv_flops"
+    assert formula_by_role["output_projection"]["formula_kind"] == "gemm_flops"
+    assert len(group["byte_evidence"]) == len(group["formula_evidence"])
+    assert len(group["bound_evidence"]) == len(group["formula_evidence"])
+    assert group["missing_evidence"] == []
+
+
+def test_attention_partial_mask_degrades_with_mask_semantics_missing():
+    evidence = build_solar_derivation_evidence(
+        _attention_definition(mask=True),
+        _attention_workload(mask=True),
+    )
+    group = next(group for group in evidence.groups if group.family == "attention")
+
+    assert group.status == "degraded"
+    assert group.confidence.value == "inexact"
+    assert "mask:semantics" in group.missing_evidence
+    assert "mask:sparsity" in group.missing_evidence
+    assert any(
+        warning.startswith("inexact_operator:attention_mask")
+        for warning in group.warning_prefixes
+    )
+    assert any(subrole.name == "scale_or_mask" for subrole in group.subroles)
+
+
+def test_attention_dynamic_sequence_axes_are_unscored_without_fabricated_subroles():
+    definition = Definition(
+        name="dynamic_attention",
+        axes={
+            "batch": {"type": "var"},
+            "heads": {"type": "const", "value": 4},
+            "head_dim": {"type": "const", "value": 32},
+        },
+        inputs={
+            "q": {"shape": ["batch", "heads", "head_dim"], "dtype": "float32"},
+            "k": {"shape": ["batch", "heads", "head_dim"], "dtype": "float32"},
+            "v": {"shape": ["batch", "heads", "head_dim"], "dtype": "float32"},
+            "lengths": {"shape": ["batch"], "dtype": "int64"},
+        },
+        outputs={"out": {"shape": ["batch", "heads", "head_dim"], "dtype": "float32"}},
+        reference=(
+            "import torch\n\n"
+            "def run(q, k, v, lengths):\n"
+            "    n = int(lengths.max().item())\n"
+            "    return torch.softmax(q[:, :n] @ k[:, :n].transpose(-2, -1), dim=-1) @ v[:, :n]\n"
+        ),
+    )
+    workload = Workload(
+        axes={"batch": 2},
+        inputs={
+            "q": {"type": "random"},
+            "k": {"type": "random"},
+            "v": {"type": "random"},
+            "lengths": {"type": "random"},
+        },
+        uuid="dynamic-attention-workload",
+    )
+
+    evidence = build_solar_derivation_evidence(definition, workload)
+    group = next(group for group in evidence.groups if group.family == "attention")
+
+    assert group.status == "unscored"
+    assert group.confidence.value == "unsupported"
+    assert "axis:static_sequence" in group.missing_evidence
+    assert "shape:sequence_q" in group.missing_evidence
+    assert "shape:sequence_k" in group.missing_evidence
+    assert not any(subrole.name == "q_projection" for subrole in group.subroles)
+
+
+def test_attention_estimates_keep_projection_family_inside_attention_group():
+    graph = build_bound_graph(_attention_definition(), _attention_workload())
+    estimates = estimate_bound_work(graph)
+
+    attention_nodes = [node for node in graph.nodes if node.op_family == OpFamily.ATTENTION]
+    attention_estimates = [
+        estimate for estimate in estimates if estimate.op_family == OpFamily.ATTENTION
+    ]
+
+    assert {node.attributes.get("subrole") for node in attention_nodes} >= {
+        "qk_scores",
+        "softmax",
+        "pv_aggregation",
+        "output_projection",
+    }
+    assert {estimate.formula_kind for estimate in attention_estimates} >= {
+        "attention_scores_flops",
+        "attention_softmax_flops",
+        "attention_pv_flops",
+        "gemm_flops",
+    }
