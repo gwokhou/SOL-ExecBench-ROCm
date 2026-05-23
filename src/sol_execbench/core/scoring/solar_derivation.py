@@ -250,6 +250,114 @@ class SolarConfidenceClassification:
 
 
 @dataclass(frozen=True)
+class SolarCoverageSourceRef:
+    """Group/node-tied provenance reference for SOLAR coverage fields."""
+
+    group_id: str
+    node_id: str | None
+    tensor_id: str | None
+    kind: str
+    detail: str
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "group_id": self.group_id,
+            "node_id": self.node_id,
+            "tensor_id": self.tensor_id,
+            "kind": self.kind,
+            "detail": self.detail,
+        }
+
+
+@dataclass(frozen=True)
+class SolarFamilyCoverage:
+    """Family-local coverage counts derived from semantic groups."""
+
+    family: str
+    group_count: int
+    status_counts: dict[str, int]
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "family": self.family,
+            "group_count": self.group_count,
+            "status_counts": _ordered_status_counts(self.status_counts),
+        }
+
+
+@dataclass(frozen=True)
+class SolarCoveragePattern:
+    """Missing or unsupported coverage pattern with affected provenance."""
+
+    pattern: str
+    group_ids: tuple[str, ...]
+    node_ids: tuple[str, ...]
+    sources: tuple[SolarCoverageSourceRef, ...]
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "pattern": self.pattern,
+            "group_ids": list(self.group_ids),
+            "node_ids": list(self.node_ids),
+            "sources": [source.to_dict() for source in self.sources],
+        }
+
+
+@dataclass(frozen=True)
+class SolarCoverageSummary:
+    """Machine-readable SOLAR sidecar coverage summary."""
+
+    family_counts: dict[str, int]
+    status_counts: dict[str, int]
+    families: tuple[SolarFamilyCoverage, ...]
+    missing_patterns: tuple[SolarCoveragePattern, ...]
+    unsupported_patterns: tuple[SolarCoveragePattern, ...]
+    degraded_node_ids: tuple[str, ...]
+    unsupported_node_ids: tuple[str, ...]
+    estimated_node_ids: tuple[str, ...]
+    provenance: tuple[SolarCoverageSourceRef, ...]
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "family_counts": dict(sorted(self.family_counts.items())),
+            "status_counts": _ordered_status_counts(self.status_counts),
+            "families": [family.to_dict() for family in self.families],
+            "missing_patterns": [
+                pattern.to_dict() for pattern in self.missing_patterns
+            ],
+            "unsupported_patterns": [
+                pattern.to_dict() for pattern in self.unsupported_patterns
+            ],
+            "degraded_node_ids": list(self.degraded_node_ids),
+            "unsupported_node_ids": list(self.unsupported_node_ids),
+            "estimated_node_ids": list(self.estimated_node_ids),
+            "provenance": [source.to_dict() for source in self.provenance],
+        }
+
+
+@dataclass(frozen=True)
+class SolarAggregateStatus:
+    """Aggregate score state for SOLAR derivation evidence."""
+
+    status: str
+    score_eligible: bool
+    reason: str
+    group_ids: tuple[str, ...]
+    node_ids: tuple[str, ...]
+    warnings: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "status": self.status,
+            "score_eligible": self.score_eligible,
+            "reason": self.reason,
+            "group_ids": list(self.group_ids),
+            "node_ids": list(self.node_ids),
+            "warnings": list(self.warnings),
+        }
+
+
+@dataclass(frozen=True)
 class SolarDerivationEvidence:
     """Stable internal SOLAR derivation evidence sidecar."""
 
@@ -263,6 +371,8 @@ class SolarDerivationEvidence:
     derived: bool = True
 
     def to_dict(self) -> dict[str, object]:
+        coverage_summary = _coverage_for_groups(self.groups)
+        aggregate_status = _aggregate_status_for_groups(self.groups, self.warnings)
         return {
             "schema_version": self.schema_version,
             "derived": self.derived,
@@ -272,6 +382,8 @@ class SolarDerivationEvidence:
             "tensors": [tensor.to_dict() for tensor in self.tensors],
             "warnings": list(self.warnings),
             "source_boundary": dict(self.source_boundary),
+            "coverage_summary": coverage_summary.to_dict(),
+            "aggregate_status": aggregate_status.to_dict(),
         }
 
 
@@ -455,20 +567,25 @@ def solar_derivation_from_dict(payload: dict[str, Any]) -> SolarDerivationEviden
     """Parse an internal SOLAR derivation evidence sidecar payload."""
     if not isinstance(payload, dict):
         raise ValueError("SOLAR derivation evidence payload must be an object")
-    _require_exact_keys(
-        payload,
-        {
-            "schema_version",
-            "derived",
-            "definition",
-            "workload_uuid",
-            "groups",
-            "tensors",
-            "warnings",
-            "source_boundary",
-        },
-        source="SOLAR derivation evidence",
-    )
+    legacy_keys = {
+        "schema_version",
+        "derived",
+        "definition",
+        "workload_uuid",
+        "groups",
+        "tensors",
+        "warnings",
+        "source_boundary",
+    }
+    phase51_keys = legacy_keys | {"coverage_summary", "aggregate_status"}
+    raw_keys = set(payload)
+    if raw_keys == legacy_keys:
+        has_phase51_fields = False
+    elif raw_keys == phase51_keys:
+        has_phase51_fields = True
+    else:
+        _require_exact_keys(payload, phase51_keys, source="SOLAR derivation evidence")
+        has_phase51_fields = True
     schema_version = _parse_str(
         payload, "schema_version", source="SOLAR derivation evidence"
     )
@@ -481,29 +598,43 @@ def solar_derivation_from_dict(payload: dict[str, Any]) -> SolarDerivationEviden
     if not isinstance(derived, bool):
         raise ValueError("SOLAR derivation evidence.derived must be a boolean")
 
+    groups = tuple(
+        _group_from_dict(raw, index)
+        for index, raw in enumerate(
+            _parse_list(payload, "groups", source="SOLAR derivation evidence")
+        )
+    )
+    warnings = tuple(
+        _parse_str_item(item, source=f"warnings[{index}]")
+        for index, item in enumerate(
+            _parse_list(payload, "warnings", source="SOLAR derivation evidence")
+        )
+    )
+    if has_phase51_fields:
+        _coverage_summary_from_dict(
+            _parse_dict(
+                payload, "coverage_summary", source="SOLAR derivation evidence"
+            )
+        )
+        _aggregate_status_from_dict(
+            _parse_dict(
+                payload, "aggregate_status", source="SOLAR derivation evidence"
+            )
+        )
+
     return SolarDerivationEvidence(
         definition=_parse_str(payload, "definition", source="SOLAR derivation evidence"),
         workload_uuid=_parse_str(
             payload, "workload_uuid", source="SOLAR derivation evidence"
         ),
-        groups=tuple(
-            _group_from_dict(raw, index)
-            for index, raw in enumerate(
-                _parse_list(payload, "groups", source="SOLAR derivation evidence")
-            )
-        ),
+        groups=groups,
         tensors=tuple(
             _tensor_from_dict(raw, index)
             for index, raw in enumerate(
                 _parse_list(payload, "tensors", source="SOLAR derivation evidence")
             )
         ),
-        warnings=tuple(
-            _parse_str_item(item, source=f"warnings[{index}]")
-            for index, item in enumerate(
-                _parse_list(payload, "warnings", source="SOLAR derivation evidence")
-            )
-        ),
+        warnings=warnings,
         source_boundary=_source_boundary_from_dict(
             _parse_dict(payload, "source_boundary", source="SOLAR derivation evidence")
         ),
@@ -535,10 +666,7 @@ def _group_from_dict(payload: Any, index: int) -> SolarSemanticGroupEvidence:
         },
         source=source,
     )
-    status = _parse_str(raw, "status", source=source)
-    if status not in SOLAR_DERIVATION_STATUSES:
-        valid = ", ".join(sorted(SOLAR_DERIVATION_STATUSES))
-        raise ValueError(f"{source}.status has invalid status '{status}', expected one of: {valid}")
+    status = _parse_status(raw, "status", source=source)
     return SolarSemanticGroupEvidence(
         family=_parse_str(raw, "family", source=source),
         group_id=_parse_str(raw, "group_id", source=source),
@@ -802,6 +930,132 @@ def _source_boundary_from_dict(payload: dict[str, Any]) -> dict[str, bool]:
             raise ValueError(f"source_boundary.{key} must be a boolean")
         parsed[key] = value
     return parsed
+
+
+def _coverage_summary_from_dict(payload: dict[str, Any]) -> SolarCoverageSummary:
+    source = "coverage_summary"
+    _require_exact_keys(
+        payload,
+        {
+            "family_counts",
+            "status_counts",
+            "families",
+            "missing_patterns",
+            "unsupported_patterns",
+            "degraded_node_ids",
+            "unsupported_node_ids",
+            "estimated_node_ids",
+            "provenance",
+        },
+        source=source,
+    )
+    return SolarCoverageSummary(
+        family_counts=_parse_count_map(payload, "family_counts", source=source),
+        status_counts=_parse_status_count_map(payload, "status_counts", source=source),
+        families=tuple(
+            _family_coverage_from_dict(item, index)
+            for index, item in enumerate(_parse_list(payload, "families", source=source))
+        ),
+        missing_patterns=tuple(
+            _coverage_pattern_from_dict(item, index, field="missing_patterns")
+            for index, item in enumerate(
+                _parse_list(payload, "missing_patterns", source=source)
+            )
+        ),
+        unsupported_patterns=tuple(
+            _coverage_pattern_from_dict(item, index, field="unsupported_patterns")
+            for index, item in enumerate(
+                _parse_list(payload, "unsupported_patterns", source=source)
+            )
+        ),
+        degraded_node_ids=_parse_str_tuple(payload, "degraded_node_ids", source=source),
+        unsupported_node_ids=_parse_str_tuple(
+            payload, "unsupported_node_ids", source=source
+        ),
+        estimated_node_ids=_parse_str_tuple(payload, "estimated_node_ids", source=source),
+        provenance=tuple(
+            _coverage_source_ref_from_dict(item, index, field="provenance")
+            for index, item in enumerate(_parse_list(payload, "provenance", source=source))
+        ),
+    )
+
+
+def _family_coverage_from_dict(payload: Any, index: int) -> SolarFamilyCoverage:
+    source = f"coverage_summary.families[{index}]"
+    raw = _ensure_dict(payload, source=source)
+    _require_exact_keys(raw, {"family", "group_count", "status_counts"}, source=source)
+    return SolarFamilyCoverage(
+        family=_parse_str(raw, "family", source=source),
+        group_count=_parse_non_negative_int(raw, "group_count", source=source),
+        status_counts=_parse_status_count_map(raw, "status_counts", source=source),
+    )
+
+
+def _coverage_pattern_from_dict(
+    payload: Any,
+    index: int,
+    *,
+    field: str,
+) -> SolarCoveragePattern:
+    source = f"coverage_summary.{field}[{index}]"
+    raw = _ensure_dict(payload, source=source)
+    _require_exact_keys(
+        raw,
+        {"pattern", "group_ids", "node_ids", "sources"},
+        source=source,
+    )
+    return SolarCoveragePattern(
+        pattern=_parse_str(raw, "pattern", source=source),
+        group_ids=_parse_str_tuple(raw, "group_ids", source=source),
+        node_ids=_parse_str_tuple(raw, "node_ids", source=source),
+        sources=tuple(
+            _coverage_source_ref_from_dict(item, source_index, field=f"{field}[{index}].sources")
+            for source_index, item in enumerate(_parse_list(raw, "sources", source=source))
+        ),
+    )
+
+
+def _coverage_source_ref_from_dict(
+    payload: Any,
+    index: int,
+    *,
+    field: str,
+) -> SolarCoverageSourceRef:
+    source = f"coverage_summary.{field}[{index}]"
+    raw = _ensure_dict(payload, source=source)
+    _require_exact_keys(
+        raw,
+        {"group_id", "node_id", "tensor_id", "kind", "detail"},
+        source=source,
+    )
+    return SolarCoverageSourceRef(
+        group_id=_parse_str(raw, "group_id", source=source),
+        node_id=_parse_optional_str(raw, "node_id", source=source),
+        tensor_id=_parse_optional_str(raw, "tensor_id", source=source),
+        kind=_parse_str(raw, "kind", source=source),
+        detail=_parse_str(raw, "detail", source=source),
+    )
+
+
+def _aggregate_status_from_dict(payload: dict[str, Any]) -> SolarAggregateStatus:
+    source = "aggregate_status"
+    _require_exact_keys(
+        payload,
+        {"status", "score_eligible", "reason", "group_ids", "node_ids", "warnings"},
+        source=source,
+    )
+    status = _parse_status(payload, "status", source=source)
+    score_eligible = payload["score_eligible"]
+    if not isinstance(score_eligible, bool):
+        raise ValueError("aggregate_status.score_eligible must be a boolean")
+    return SolarAggregateStatus(
+        status=status,
+        score_eligible=score_eligible,
+        reason=_parse_str(payload, "reason", source=source),
+        group_ids=_parse_str_tuple(payload, "group_ids", source=source),
+        node_ids=_parse_str_tuple(payload, "node_ids", source=source),
+        warnings=_parse_str_tuple(payload, "warnings", source=source),
+    )
 
 
 def _tensor_evidence(
@@ -1806,6 +2060,207 @@ def _tensor_has_semantic_axes(tensor: BoundTensor | SolarTensorEvidence) -> bool
     return False
 
 
+def _coverage_for_groups(
+    groups: tuple[SolarSemanticGroupEvidence, ...],
+) -> SolarCoverageSummary:
+    family_counts: dict[str, int] = {}
+    status_counts = _empty_status_counts()
+    family_status_counts: dict[str, dict[str, int]] = {}
+    missing_patterns: dict[str, list[SolarSemanticGroupEvidence]] = {}
+    unsupported_patterns: dict[str, list[SolarSemanticGroupEvidence]] = {}
+    degraded_node_ids: list[str] = []
+    unsupported_node_ids: list[str] = []
+    estimated_node_ids: list[str] = []
+    provenance: list[SolarCoverageSourceRef] = []
+
+    for group in sorted(groups, key=lambda item: item.group_id):
+        family_counts[group.family] = family_counts.get(group.family, 0) + 1
+        status_counts[group.status] = status_counts.get(group.status, 0) + 1
+        family_counts_for_status = family_status_counts.setdefault(
+            group.family, _empty_status_counts()
+        )
+        family_counts_for_status[group.status] = (
+            family_counts_for_status.get(group.status, 0) + 1
+        )
+        provenance.extend(_coverage_source_refs_for_group(group))
+        if group.status == "degraded":
+            degraded_node_ids.extend(group.node_ids)
+        elif group.status == "unscored":
+            unsupported_node_ids.extend(group.node_ids)
+        for pattern in group.missing_evidence:
+            missing_patterns.setdefault(pattern, []).append(group)
+        for warning in group.warning_prefixes:
+            if warning.startswith("unsupported_operator:"):
+                unsupported_patterns.setdefault(warning, []).append(group)
+        for evidence in (
+            *group.formula_evidence,
+            *group.byte_evidence,
+            *group.bound_evidence,
+        ):
+            estimated_node_ids.append(evidence.node_id)
+
+    families = tuple(
+        SolarFamilyCoverage(
+            family=family,
+            group_count=count,
+            status_counts=family_status_counts.get(family, _empty_status_counts()),
+        )
+        for family, count in sorted(family_counts.items())
+    )
+    return SolarCoverageSummary(
+        family_counts=dict(sorted(family_counts.items())),
+        status_counts=_ordered_status_counts(status_counts),
+        families=families,
+        missing_patterns=_coverage_patterns_from_groups(missing_patterns),
+        unsupported_patterns=_coverage_patterns_from_groups(unsupported_patterns),
+        degraded_node_ids=_unique_sorted(degraded_node_ids),
+        unsupported_node_ids=_unique_sorted(unsupported_node_ids),
+        estimated_node_ids=_unique_sorted(estimated_node_ids),
+        provenance=tuple(sorted(set(provenance), key=_coverage_source_ref_key)),
+    )
+
+
+def _coverage_patterns_from_groups(
+    pattern_groups: dict[str, list[SolarSemanticGroupEvidence]],
+) -> tuple[SolarCoveragePattern, ...]:
+    patterns: list[SolarCoveragePattern] = []
+    for pattern, groups in sorted(pattern_groups.items()):
+        sorted_groups = tuple(sorted(groups, key=lambda item: item.group_id))
+        node_ids: list[str] = []
+        sources: list[SolarCoverageSourceRef] = []
+        for group in sorted_groups:
+            node_ids.extend(group.node_ids)
+            sources.append(_coverage_primary_source_ref_for_group(group))
+        patterns.append(
+            SolarCoveragePattern(
+                pattern=pattern,
+                group_ids=tuple(group.group_id for group in sorted_groups),
+                node_ids=_unique_sorted(node_ids),
+                sources=tuple(sorted(set(sources), key=_coverage_source_ref_key)),
+            )
+        )
+    return tuple(patterns)
+
+
+def _coverage_source_refs_for_group(
+    group: SolarSemanticGroupEvidence,
+) -> tuple[SolarCoverageSourceRef, ...]:
+    refs = [_coverage_source_ref(group.group_id, group.source)]
+    refs.extend(
+        _coverage_source_ref(group.group_id, subrole.source)
+        for subrole in group.subroles
+    )
+    refs.extend(
+        _coverage_source_ref(group.group_id, evidence.source)
+        for evidence in group.formula_evidence
+    )
+    refs.extend(
+        _coverage_source_ref(group.group_id, evidence.source)
+        for evidence in group.byte_evidence
+    )
+    refs.extend(
+        _coverage_source_ref(group.group_id, evidence.source)
+        for evidence in group.bound_evidence
+    )
+    return tuple(sorted(set(refs), key=_coverage_source_ref_key))
+
+
+def _coverage_primary_source_ref_for_group(
+    group: SolarSemanticGroupEvidence,
+) -> SolarCoverageSourceRef:
+    for evidence in group.formula_evidence:
+        return SolarCoverageSourceRef(
+            group_id=group.group_id,
+            node_id=evidence.node_id,
+            tensor_id=evidence.source.tensor_id,
+            kind=evidence.source.kind,
+            detail=f"{evidence.formula_kind}:{evidence.formula}",
+        )
+    for evidence in group.byte_evidence:
+        return _coverage_source_ref(group.group_id, evidence.source)
+    for evidence in group.bound_evidence:
+        return _coverage_source_ref(group.group_id, evidence.source)
+    return _coverage_source_ref(group.group_id, group.source)
+
+
+def _coverage_source_ref(
+    group_id: str,
+    source: SolarEvidenceSource,
+) -> SolarCoverageSourceRef:
+    return SolarCoverageSourceRef(
+        group_id=group_id,
+        node_id=source.node_id,
+        tensor_id=source.tensor_id,
+        kind=source.kind,
+        detail=source.detail,
+    )
+
+
+def _coverage_source_ref_key(
+    ref: SolarCoverageSourceRef,
+) -> tuple[str, str, str, str, str]:
+    return (
+        ref.group_id,
+        ref.node_id or "",
+        ref.tensor_id or "",
+        ref.kind,
+        ref.detail,
+    )
+
+
+def _aggregate_status_for_groups(
+    groups: tuple[SolarSemanticGroupEvidence, ...],
+    warnings: tuple[str, ...],
+) -> SolarAggregateStatus:
+    if not groups:
+        return SolarAggregateStatus(
+            status="unscored",
+            score_eligible=False,
+            reason="no semantic groups were derived",
+            group_ids=(),
+            node_ids=(),
+            warnings=(),
+        )
+    group_ids = _unique_sorted([group.group_id for group in groups])
+    node_ids = _unique_sorted([node_id for group in groups for node_id in group.node_ids])
+    aggregate_warnings = _unique_sorted(
+        [
+            *warnings,
+            *(
+                warning
+                for group in groups
+                for warning in group.warning_prefixes
+            ),
+        ]
+    )
+    if any(group.status == "unscored" for group in groups):
+        return SolarAggregateStatus(
+            status="unscored",
+            score_eligible=False,
+            reason="one or more semantic groups are unsupported",
+            group_ids=group_ids,
+            node_ids=node_ids,
+            warnings=aggregate_warnings,
+        )
+    if any(group.status == "degraded" for group in groups):
+        return SolarAggregateStatus(
+            status="degraded",
+            score_eligible=False,
+            reason="one or more semantic groups have incomplete evidence",
+            group_ids=group_ids,
+            node_ids=node_ids,
+            warnings=aggregate_warnings,
+        )
+    return SolarAggregateStatus(
+        status="scored",
+        score_eligible=True,
+        reason="all semantic groups are score eligible",
+        group_ids=group_ids,
+        node_ids=node_ids,
+        warnings=aggregate_warnings,
+    )
+
+
 def _derivation_warnings(
     graph: BoundGraph,
     estimates: tuple[OperatorWorkEstimate, ...],
@@ -1862,6 +2317,17 @@ def _worse_confidence(
 
 def _unique_sorted(items: tuple[str, ...] | list[str]) -> tuple[str, ...]:
     return tuple(sorted(dict.fromkeys(items)))
+
+
+def _empty_status_counts() -> dict[str, int]:
+    return {status: 0 for status in sorted(SOLAR_DERIVATION_STATUSES)}
+
+
+def _ordered_status_counts(status_counts: dict[str, int]) -> dict[str, int]:
+    return {
+        status: int(status_counts.get(status, 0))
+        for status in sorted(SOLAR_DERIVATION_STATUSES)
+    }
 
 
 def _default_source_boundary() -> dict[str, bool]:
@@ -1973,6 +2439,44 @@ def _parse_str_map(
     return parsed
 
 
+def _parse_count_map(
+    payload: dict[str, Any],
+    key: str,
+    *,
+    source: str,
+) -> dict[str, int]:
+    value = _parse_dict(payload, key, source=source)
+    parsed: dict[str, int] = {}
+    for raw_key, raw_value in value.items():
+        if not isinstance(raw_key, str) or not raw_key:
+            raise ValueError(f"{source}.{key} keys must be non-empty strings")
+        if type(raw_value) is not int:
+            raise ValueError(f"{source}.{key}.{raw_key} must be an integer")
+        if raw_value < 0:
+            raise ValueError(f"{source}.{key}.{raw_key} must be non-negative")
+        parsed[raw_key] = raw_value
+    return dict(sorted(parsed.items()))
+
+
+def _parse_status_count_map(
+    payload: dict[str, Any],
+    key: str,
+    *,
+    source: str,
+) -> dict[str, int]:
+    value = _parse_dict(payload, key, source=source)
+    _require_exact_keys(value, SOLAR_DERIVATION_STATUSES, source=f"{source}.{key}")
+    parsed: dict[str, int] = {}
+    for status in sorted(SOLAR_DERIVATION_STATUSES):
+        count = value[status]
+        if type(count) is not int:
+            raise ValueError(f"{source}.{key}.{status} must be an integer")
+        if count < 0:
+            raise ValueError(f"{source}.{key}.{status} must be non-negative")
+        parsed[status] = count
+    return parsed
+
+
 def _ensure_json_scalar(value: object, *, source: str) -> None:
     if value is None or isinstance(value, str):
         return
@@ -2001,6 +2505,20 @@ def _parse_non_negative_float(
     if parsed < 0.0:
         raise ValueError(f"{source}.{key} must be non-negative")
     return parsed
+
+
+def _parse_non_negative_int(
+    payload: dict[str, Any],
+    key: str,
+    *,
+    source: str,
+) -> int:
+    value = payload[key]
+    if type(value) is not int:
+        raise ValueError(f"{source}.{key} must be an integer")
+    if value < 0:
+        raise ValueError(f"{source}.{key} must be non-negative")
+    return value
 
 
 def _parse_shape(
@@ -2038,6 +2556,21 @@ def _parse_confidence(
         raise ValueError(
             f"{source}.{key} has invalid confidence '{raw}', expected one of: {valid_values}"
         ) from exc
+
+
+def _parse_status(
+    payload: dict[str, Any],
+    key: str,
+    *,
+    source: str,
+) -> str:
+    status = _parse_str(payload, key, source=source)
+    if status not in SOLAR_DERIVATION_STATUSES:
+        valid = ", ".join(sorted(SOLAR_DERIVATION_STATUSES))
+        raise ValueError(
+            f"{source}.{key} has invalid status '{status}', expected one of: {valid}"
+        )
+    return status
 
 
 def _confidence_value(confidence: EstimateConfidence | str) -> str:
