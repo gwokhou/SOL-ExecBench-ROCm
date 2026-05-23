@@ -41,16 +41,16 @@ ExecBench.
 
 ### Hardware Model Artifacts
 
-- [ ] **HW-01**: Maintainer can load versioned AMD hardware model JSON artifacts
+- [x] **HW-01**: Maintainer can load versioned AMD hardware model JSON artifacts
   with architecture, dtype/path, peak compute, memory bandwidth, clock policy or
   assumptions, source, confidence, validation status, and evidence references.
-- [ ] **HW-02**: Invalid hardware model artifacts fail with clear errors for
+- [x] **HW-02**: Invalid hardware model artifacts fail with clear errors for
   missing provenance, non-positive numeric values, unknown validation status, or
   architecture mismatches.
-- [ ] **HW-03**: RDNA 4 (`gfx1200`) is the only validation target for v1.9
+- [x] **HW-03**: RDNA 4 (`gfx1200`) is the only validation target for v1.9
   model artifacts; CDNA 3 / MI300X and CDNA 4 model entries remain unvalidated
   or deferred unless future milestones provide evidence.
-- [ ] **HW-04**: Built-in fallback hardware models, if retained, are labeled
+- [x] **HW-04**: Built-in fallback hardware models, if retained, are labeled
   provisional or unvalidated and use the same validation path as external JSON
   artifacts.
 
@@ -85,7 +85,7 @@ ExecBench.
 
 ### Public Contracts And Documentation
 
-- [ ] **DOC-01**: Canonical trace JSONL, primary `sol-execbench` CLI behavior,
+- [x] **DOC-01**: Canonical trace JSONL, primary `sol-execbench` CLI behavior,
   and public definition/workload/solution schemas remain unchanged by v1.9
   bound modeling.
 - [ ] **DOC-02**: Documentation explains AMD SOL bound artifact v2 semantics,
@@ -159,10 +159,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MODEL-03 | Phase 43 | Complete |
 | MODEL-04 | Phase 43 | Complete |
 | MODEL-05 | Phase 43 | Complete |
-| HW-01 | Phase 41 | Pending |
-| HW-02 | Phase 41 | Pending |
-| HW-03 | Phase 41 | Pending |
-| HW-04 | Phase 41 | Pending |
+| HW-01 | Phase 41 | Complete |
+| HW-02 | Phase 41 | Complete |
+| HW-03 | Phase 41 | Complete |
+| HW-04 | Phase 41 | Complete |
 | BOUND-01 | Phase 44 | Pending |
 | BOUND-02 | Phase 44 | Pending |
 | BOUND-03 | Phase 44 | Pending |
@@ -171,7 +171,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SCORE-02 | Phase 45 | Pending |
 | SCORE-03 | Phase 45 | Pending |
 | SCORE-04 | Phase 45 | Pending |
-| DOC-01 | Phase 41 | Pending |
+| DOC-01 | Phase 41 | Complete |
 | DOC-02 | Phase 46 | Pending |
 | DOC-03 | Phase 46 | Pending |
 | VAL-01 | Phase 46 | Pending |

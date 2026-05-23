@@ -47,9 +47,9 @@ the current ROCm path, with validation scoped to RDNA 4 only.
 
 | Phase | Name | Goal | Requirements |
 | --- | --- | --- | --- |
-| 41 | Bound Model Contract And Hardware Artifacts | Establish the v2 bound artifact contract, hardware model JSON loader, and public-contract guardrails before changing estimators. | HW-01, HW-02, HW-03, HW-04, DOC-01 |
-| 42 | 3/3 | Complete    | 2026-05-23 |
-| 43 | 4/4 | Complete    | 2026-05-23 |
+| 41 | Bound Model Contract And Hardware Artifacts | Complete 2026-05-23: Established strict AMD hardware model JSON loading, packaged RDNA 4 defaults, split validation statuses, and public-contract guardrails. | HW-01, HW-02, HW-03, HW-04, DOC-01 |
+| 42 | Structured Bound Graph IR | Complete 2026-05-23: Introduced stable workload-aware bound graph IR, tensor metadata, edges, and unsupported/inexact evidence. | IR-01, IR-02, IR-03, IR-04 |
+| 43 | Operator FLOP/Byte/Movement Modeling | Complete 2026-05-23: Added rich per-node FLOP, byte, movement, formula, confidence, and legacy adapter evidence. | MODEL-01, MODEL-02, MODEL-03, MODEL-04, MODEL-05 |
 | 44 | Bound Artifact V2 And Coverage Semantics | Serialize/load v2 SOL bound sidecars and make coverage, confidence, warnings, and aggregate bounds deterministic. | BOUND-01, BOUND-02, BOUND-03, BOUND-04 |
 | 45 | AMD Score And Dataset Integration | Wire v2 bound artifacts into AMD-native workload/suite score reports and optional dataset sidecar output. | SCORE-01, SCORE-02, SCORE-03, SCORE-04 |
 | 46 | Documentation And RDNA 4 Validation Closure | Complete docs, claim guardrails, golden tests, and RDNA 4 validation evidence for the modeling pipeline. | DOC-02, DOC-03, VAL-01, VAL-02, VAL-03, VAL-04 |
@@ -63,20 +63,20 @@ for v1.9.
 
 **Requirements:** HW-01, HW-02, HW-03, HW-04, DOC-01
 
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 
 Plans:
 **Wave 1**
 
-- [ ] 41-01-PLAN.md — Create strict packaged/external AMD hardware model JSON loaders.
+- [x] 41-01-PLAN.md — Create strict packaged/external AMD hardware model JSON loaders.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 41-02-PLAN.md — Wire v2 hardware model defaults into AMD SOL and score compatibility surfaces.
+- [x] 41-02-PLAN.md — Wire v2 hardware model defaults into AMD SOL and score compatibility surfaces.
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 41-03-PLAN.md — Lock public contract, CLI, schema, Trace, and claim guardrails.
+- [x] 41-03-PLAN.md — Lock public contract, CLI, schema, Trace, and claim guardrails.
 
 **Success criteria:**
 
@@ -233,19 +233,19 @@ validation evidence.
 
 | Requirement | Phase | Status |
 | --- | --- | --- |
-| IR-01 | Phase 42 | Pending |
-| IR-02 | Phase 42 | Pending |
-| IR-03 | Phase 42 | Pending |
-| IR-04 | Phase 42 | Pending |
-| MODEL-01 | Phase 43 | Pending |
-| MODEL-02 | Phase 43 | Pending |
-| MODEL-03 | Phase 43 | Pending |
-| MODEL-04 | Phase 43 | Pending |
-| MODEL-05 | Phase 43 | Pending |
-| HW-01 | Phase 41 | Pending |
-| HW-02 | Phase 41 | Pending |
-| HW-03 | Phase 41 | Pending |
-| HW-04 | Phase 41 | Pending |
+| IR-01 | Phase 42 | Complete |
+| IR-02 | Phase 42 | Complete |
+| IR-03 | Phase 42 | Complete |
+| IR-04 | Phase 42 | Complete |
+| MODEL-01 | Phase 43 | Complete |
+| MODEL-02 | Phase 43 | Complete |
+| MODEL-03 | Phase 43 | Complete |
+| MODEL-04 | Phase 43 | Complete |
+| MODEL-05 | Phase 43 | Complete |
+| HW-01 | Phase 41 | Complete |
+| HW-02 | Phase 41 | Complete |
+| HW-03 | Phase 41 | Complete |
+| HW-04 | Phase 41 | Complete |
 | BOUND-01 | Phase 44 | Pending |
 | BOUND-02 | Phase 44 | Pending |
 | BOUND-03 | Phase 44 | Pending |
@@ -254,7 +254,7 @@ validation evidence.
 | SCORE-02 | Phase 45 | Pending |
 | SCORE-03 | Phase 45 | Pending |
 | SCORE-04 | Phase 45 | Pending |
-| DOC-01 | Phase 41 | Pending |
+| DOC-01 | Phase 41 | Complete |
 | DOC-02 | Phase 46 | Pending |
 | DOC-03 | Phase 46 | Pending |
 | VAL-01 | Phase 46 | Pending |
