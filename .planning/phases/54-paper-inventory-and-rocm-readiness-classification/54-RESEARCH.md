@@ -601,22 +601,30 @@ This split keeps the parser, classifier, and CLI side effects separable and make
 | A6 | NVIDIA-only static detection can be based on a compatibility allowlist plus clear runtime/tooling hints. | Common Pitfalls / Tests | False positives or false negatives may require refining reason codes. |
 | A7 | Three implementation plans are the best split. | Plan-Shaping Recommendation | Planner may merge or split differently based on wave sizing. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should ready-subset materialize filtered workload files in Phase 54?**
    - What we know: Phase 54 is sidecar-only and Phase 55 owns execution. [VERIFIED: .planning/ROADMAP.md]
    - What's unclear: Whether Phase 55 runner changes are simpler with prefiltered JSONL files.
-   - Recommendation: Do not materialize filtered workload files in Phase 54; let Phase 55 adapt `scripts/run_dataset.py` or create transient filtered files. [ASSUMED]
+   - Resolution: Do not materialize filtered workload files in Phase 54. The
+     ready-subset artifact will reference problem paths and workload UUID/row
+     indices only; Phase 55 owns execution-time filtering. [ASSUMED]
 
 2. **How aggressive should NVIDIA-only static detection be?**
    - What we know: PyTorch ROCm legitimately exposes HIP devices through `torch.cuda`. [VERIFIED: docs/rocm_timing.md]
    - What's unclear: The public dataset may contain CUDA strings that are comments, compatibility names, or true blockers.
-   - Recommendation: Start with explicit reason codes and conservative allowlist; avoid broad grep-only blocking. [ASSUMED]
+   - Resolution: Use explicit reason codes and a conservative allowlist. Do not
+     block solely on documented compatibility strings such as `torch.cuda`;
+     reserve `unsupported_nvidia_only_path` for clear CUDA/NVIDIA runtime or
+     tooling dependency hints. [ASSUMED]
 
 3. **Should safetensors tensor keys be statically verified?**
    - What we know: Runtime loader verifies keys, shapes, and dtypes when loading files. [VERIFIED: src/sol_execbench/core/bench/io.py]
    - What's unclear: Phase 54 may not have all blob roots or may not want to open large assets.
-   - Recommendation: Verify path existence only by default; record key as required evidence and classify missing asset as blocker. [ASSUMED]
+   - Resolution: Verify safetensors path existence only by default. Record the
+     tensor key as required evidence; classify missing files as
+     `runtime_blocked` and leave key/shape/dtype runtime validation to later
+     execution. [ASSUMED]
 
 ## Sources
 
