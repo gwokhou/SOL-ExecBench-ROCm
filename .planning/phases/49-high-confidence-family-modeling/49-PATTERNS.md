@@ -286,7 +286,7 @@ else:
     rationale = "logical view evidence with zero movement bytes"
 ```
 
-**Apply to Phase 49:** add estimate helpers for promoted high-confidence families in `amd_bound_estimates.py`, then route from `_estimate_node()` after existing family branches. Use `formula_kind` values such as `attention_flops`, `convolution_flops`, `embedding_positional_bytes`, and `linear_projection_flops` only when required inputs are visible. For linear projection, reuse GEMM-compatible logic where dimensions are explicit. For memory-bound families, keep `flops=0.0` if appropriate but still emit dtype-aware `read_bytes`, `write_bytes`, `intermediate_bytes`, `movement_bytes`, and `total_bytes`.
+**Apply to Phase 49:** add estimate helpers for promoted high-confidence families in `amd_bound_estimates.py`, then route from `_estimate_node()` after existing family branches. Use `formula_kind` values such as `attention_flops`, `convolution_flops`, and `embedding_positional_bytes` only when required inputs are visible. For linear projection, preserve first-class `op_family="linear_projection"` while reusing the GEMM-compatible `formula_kind="gemm_flops"` logic where dimensions are explicit. For memory-bound families, keep `flops=0.0` if appropriate but still emit dtype-aware `read_bytes`, `write_bytes`, `intermediate_bytes`, `movement_bytes`, and `total_bytes`.
 
 ### Graph Family Classification
 

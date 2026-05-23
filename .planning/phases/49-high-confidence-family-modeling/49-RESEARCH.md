@@ -404,7 +404,7 @@ if estimate.total_bytes <= 0.0:
 |--------------|------------------|--------------|--------|
 | Unsupported placeholders for attention/convolution/embedding families | Phase 49 should emit high-confidence family estimates for complete visible metadata | Phase 49 planned | Planner should replace `test_out_of_scope_families_are_explicit_unsupported_estimates` expectations for Phase 49 families only. [VERIFIED: `tests/sol_execbench/test_amd_bound_estimates.py`] |
 | Formula and byte data only in AMD SOL v2 estimates | Phase 49 should surface parseable formula/byte evidence in SOLAR derivation sidecars | Phase 49 planned | Enables MODEL-01/MODEL-02 without canonical schema changes. [VERIFIED: requirements and code] |
-| Generic GEMM support for linear projection | First-class `linear_projection` semantic family with GEMM-compatible formulas | Partially present before Phase 49 | Preserve `op_family="linear_projection"` while using `gemm_flops` or family-specific `linear_projection_flops` deterministically. [VERIFIED: `amd_bound_graph.py`, `amd_bound_estimates.py`] |
+| Generic GEMM support for linear projection | First-class `linear_projection` semantic family with GEMM-compatible formulas | Partially present before Phase 49 | Preserve `op_family="linear_projection"` and reuse `formula_kind="gemm_flops"` with explicit linear-projection family identity in sidecar evidence. [VERIFIED: `amd_bound_graph.py`, `amd_bound_estimates.py`] |
 | Score eligibility handled by AMD SOL v1/v2 artifacts | Phase 49 internal evidence remains sidecar-only; eligibility changes are Phase 51 | Phase 49 boundary | Do not wire SOLAR evidence into AMD-native scoring yet. [VERIFIED: `49-CONTEXT.md`] |
 
 **Deprecated/outdated:**
@@ -418,17 +418,15 @@ if estimate.total_bytes <= 0.0:
 | A1 | Convolution group/dilation mistakes are a common source of wrong FLOP estimates. | Common Pitfalls | Planner may under-prioritize group/depthwise/dilation tests. |
 | A2 | Embedding/gather memory should count selected/indexed rows rather than the full table. | Common Pitfalls | Byte evidence could overstate memory traffic and degrade SOL bound quality. |
 
-## Open Questions
+## Resolved Planning Decisions
 
-1. **Should linear projection formula kind remain `gemm_flops` or become `linear_projection_flops`?**
+1. **Linear projection formula kind remains `gemm_flops`.**
    - What we know: Existing `_gemm_estimate()` returns `gemm_flops` for both `GEMM` and `LINEAR_PROJECTION`. [VERIFIED: `amd_bound_estimates.py`]
-   - What's unclear: MODEL-01 asks for family-specific formula kind; using `gemm_flops` preserves reuse but may be less family-specific. [VERIFIED: `.planning/REQUIREMENTS.md`]
-   - Recommendation: Use `linear_projection_flops` only in sidecar formula evidence while keeping numeric inference shared with GEMM, or include `formula_family="linear_projection"` with `formula_kind="gemm_flops"`. [ASSUMED]
+   - Decision: Keep `formula_kind="gemm_flops"` for linear projection and record the first-class family identity separately through `op_family="linear_projection"` / group family evidence. This keeps the implementation aligned with the paper's GEMM-compatible projection semantics without inventing a duplicate formula kind.
 
-2. **Where should per-op bound evidence live inside `SolarDerivationEvidence`?**
+2. **Per-op bound evidence lives inside semantic groups.**
    - What we know: `amd_sol_v2` op bounds are sidecar dataclasses, while Phase 48 groups are semantic sidecar records. [VERIFIED: `amd_sol_v2.py`, `solar_derivation.py`]
-   - What's unclear: Whether planner prefers group-level bound evidence or top-level per-node bound evidence.
-   - Recommendation: Prefer top-level tuple keyed by `node_id` to avoid duplicating bound records across family groups. [ASSUMED]
+   - Decision: Attach per-op formula, byte, and bound evidence inside each `SolarSemanticGroupEvidence` record. Phase 48 already groups estimates deterministically by family and node ID, so this avoids adding a new top-level reporting surface before Phase 51.
 
 ## Environment Availability
 
