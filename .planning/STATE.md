@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.10
 milestone_name: Paper-Aligned SOLAR Automatic Derivation
 status: planning
-stopped_at: Completed 49-01-PLAN.md
-last_updated: "2026-05-23T06:38:19.520Z"
+stopped_at: Completed 49-02-PLAN.md
+last_updated: "2026-05-23T06:44:38.695Z"
 last_activity: 2026-05-23
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 14
-  completed_plans: 11
-  percent: 33
+  completed_plans: 12
+  percent: 86
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: `.planning/PROJECT.md` (updated 2026-05-23)
 ## Current Position
 
 Phase: 49
-Plan: Not started
-Status: Ready to plan
+Plan: 03
+Status: Ready to execute
 Last activity: 2026-05-23
 
-Progress: [████████░░] 79%
+Progress: [█████████░] 86%
 
 ## Performance Metrics
 
@@ -58,6 +58,7 @@ Progress: [████████░░] 79%
 
 *Updated after each plan completion*
 | Phase 49 P01 | 6min | 3 tasks | 3 files |
+| Phase 49 P02 | 4min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -77,6 +78,9 @@ Decisions are logged in PROJECT.md. Recent decisions affecting current work:
 - [Phase 48]: Keep Phase 47 fixture expectations as data-only inputs and round-trip them through Phase 48 evidence without executing fixture references.
 - [Phase 48]: Add required_evidence to the internal SOLAR semantic group sidecar for exact fixture-contract preservation while keeping public schemas unchanged.
 - [Phase 48]: Keep Phase 48 evidence names and CLI switches excluded from canonical public schemas, trace JSONL, and primary sol-execbench help.
+- [Phase 49]: Supported GEMM-compatible estimates record axis_source=tensor_shapes so SOLAR confidence can distinguish complete shape provenance from incomplete metadata.
+- [Phase 49]: Visible linear projection bias tensors are represented as group-local subrole evidence without changing canonical schemas or score eligibility.
+- [Phase 49]: Linear projection remains op_family=linear_projection while using formula_kind=gemm_flops and formula=2*M*N*K.
 
 ### Pending Todos
 
@@ -100,6 +104,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-23T06:38:19.514Z
-Stopped at: Completed 49-01-PLAN.md
+Last session: 2026-05-23T06:44:38.445Z
+Stopped at: Completed 49-02-PLAN.md
 Resume file: None
