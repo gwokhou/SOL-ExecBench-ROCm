@@ -111,9 +111,9 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 47-03-PLAN.md — Add attention and MoE fixture batches.
-- [ ] 47-04-PLAN.md — Add convolution and SSM/Mamba fixture batches.
-- [ ] 47-05-PLAN.md — Add embedding/positional and linear projection fixture batches.
+- [x] 47-03-PLAN.md — Add attention and MoE fixture batches.
+- [x] 47-04-PLAN.md — Add convolution and SSM/Mamba fixture batches.
+- [x] 47-05-PLAN.md — Add embedding/positional and linear projection fixture batches.
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -257,7 +257,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 47. Derivation Contract And Golden Fixture Matrix | 2/6 | In Progress|  |
+| 47. Derivation Contract And Golden Fixture Matrix | 5/6 | In Progress|  |
 | 48. Extraction Pipeline And Semantic Provenance | 0/TBD | Not started | - |
 | 49. High-Confidence Family Modeling | 0/TBD | Not started | - |
 | 50. Degraded Complex Family Modeling | 0/TBD | Not started | - |
