@@ -41,6 +41,7 @@ import shutil
 import subprocess
 import sys
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sol_execbench.core.bench.config import BenchmarkConfig
@@ -74,6 +75,16 @@ ROOT = Path(__file__).resolve().parent.parent
 CATEGORIES = {"L1", "L2", "FlashInfer-Bench", "Quant"}
 
 _SAFE_SIDECAR_COMPONENT = re.compile(r"[^A-Za-z0-9_.-]+")
+EXECUTION_CLOSURE_SCHEMA_VERSION = "sol_execbench.execution_closure.v1"
+EXECUTION_CLOSURE_STATUSES = {
+    "not_attempted",
+    "filtered",
+    "skipped_existing_pass",
+    "attempted_passed",
+    "attempted_failed",
+    "missing_trace",
+    "derived_evidence_missing",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -609,6 +620,342 @@ def _extend_derived_reports_for_problem(
 
 
 # ---------------------------------------------------------------------------
+# Ready-subset execution closure
+# ---------------------------------------------------------------------------
+
+
+def _utc_timestamp() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _load_json_sidecar(path: Path) -> dict:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _problem_id_for(benchmark_root: Path, problem_dir: Path) -> str:
+    try:
+        return problem_dir.relative_to(benchmark_root).as_posix()
+    except ValueError:
+        return f"{problem_dir.parent.name}/{problem_dir.name}"
+
+
+def _workload_key(uuid: str | None, row_index: int | None) -> tuple[str, str | int]:
+    if uuid:
+        return ("uuid", uuid)
+    return ("row_index", int(row_index or 0))
+
+
+def _read_workload_rows(workload_path: Path) -> list[tuple[int, dict, str]]:
+    rows: list[tuple[int, dict, str]] = []
+    for row_index, line in enumerate(workload_path.read_text().splitlines()):
+        if not line.strip():
+            continue
+        rows.append((row_index, json.loads(line), line))
+    return rows
+
+
+def _ready_problem_map(ready_subset: dict | None) -> dict[str, dict]:
+    if ready_subset is None:
+        return {}
+    return {
+        str(problem["problem_id"]): problem
+        for problem in ready_subset.get("problems", [])
+    }
+
+
+def _readiness_workload_map(readiness: dict | None) -> dict[tuple[str, tuple[str, str | int]], dict]:
+    if readiness is None:
+        return {}
+    indexed: dict[tuple[str, tuple[str, str | int]], dict] = {}
+    for workload in readiness.get("workloads", []):
+        key = _workload_key(workload.get("workload_uuid"), workload.get("row_index"))
+        indexed[(str(workload.get("problem_id")), key)] = workload
+    return indexed
+
+
+def _manifest_checksum(manifest: dict | None) -> str | None:
+    if manifest is None:
+        return None
+    checksum = manifest.get("manifest_checksum")
+    if isinstance(checksum, dict):
+        return checksum.get("value")
+    if isinstance(checksum, str):
+        return checksum
+    return None
+
+
+def _sidecar_checksum(payload: dict | None, key: str) -> str | None:
+    if payload is None:
+        return None
+    value = payload.get(key)
+    if isinstance(value, dict):
+        return value.get("value")
+    if isinstance(value, str):
+        return value
+    return None
+
+
+def _git_commit() -> str | None:
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip() or None
+
+
+def _relative_ref(path: Path, base: Path) -> str:
+    try:
+        return path.relative_to(base).as_posix()
+    except ValueError:
+        return str(path)
+
+
+def _closure_record(
+    *,
+    category: str,
+    problem_id: str,
+    problem_path: str,
+    workload_uuid: str | None,
+    row_index: int,
+    closure_status: str,
+    readiness: dict | None = None,
+    filter_reasons: list[str] | None = None,
+    trace_ref: str | None = None,
+    summary_ref: str | None = None,
+    cli_log_ref: str | None = None,
+    solution_ref: str | None = None,
+    evidence_refs: dict[str, str] | None = None,
+    evidence_gaps: list[str] | None = None,
+    trace_status: str | None = None,
+    notes: list[str] | None = None,
+) -> dict:
+    if closure_status not in EXECUTION_CLOSURE_STATUSES:
+        raise ValueError(f"unknown execution closure status: {closure_status}")
+    reasons = readiness.get("reasons", []) if readiness else []
+    return {
+        "category": category,
+        "problem_id": problem_id,
+        "problem_path": problem_path,
+        "workload_uuid": workload_uuid,
+        "row_index": row_index,
+        "readiness_status": readiness.get("status") if readiness else None,
+        "readiness_reason_codes": [
+            reason.get("code") for reason in reasons if isinstance(reason, dict)
+        ],
+        "closure_status": closure_status,
+        "filter_reasons": sorted(filter_reasons or []),
+        "trace_status": trace_status,
+        "trace_ref": trace_ref,
+        "summary_ref": summary_ref,
+        "cli_log_ref": cli_log_ref,
+        "solution_ref": solution_ref,
+        "evidence_refs": dict(sorted((evidence_refs or {}).items())),
+        "evidence_gaps": sorted(evidence_gaps or []),
+        "notes": notes or [],
+    }
+
+
+def _selected_workload_rows(
+    workload_path: Path,
+    workload_refs: list[dict],
+    *,
+    max_workloads: int | None,
+) -> tuple[list[str], list[dict], list[dict], list[dict]]:
+    rows = _read_workload_rows(workload_path)
+    by_uuid = {
+        str(payload.get("uuid")): (row_index, payload, line)
+        for row_index, payload, line in rows
+        if payload.get("uuid")
+    }
+    by_row = {row_index: (row_index, payload, line) for row_index, payload, line in rows}
+
+    selected: list[tuple[int, dict, str, dict]] = []
+    missing: list[dict] = []
+    seen: set[tuple[str, str | int]] = set()
+    for ref in workload_refs:
+        uuid = ref.get("uuid")
+        row_index = int(ref.get("row_index", 0))
+        key = _workload_key(uuid, row_index)
+        if key in seen:
+            continue
+        seen.add(key)
+        match = by_uuid.get(str(uuid)) if uuid else None
+        if match is None:
+            match = by_row.get(row_index)
+        if match is None:
+            missing.append(ref)
+            continue
+        selected.append((*match, ref))
+
+    selected.sort(key=lambda item: item[0])
+    capped = selected
+    cap_filtered: list[dict] = []
+    if max_workloads is not None and len(selected) > max_workloads:
+        capped = selected[:max_workloads]
+        cap_filtered = [item[3] for item in selected[max_workloads:]]
+
+    return [item[2] for item in capped], [item[3] for item in capped], cap_filtered, missing
+
+
+def _trace_map(traces: list[dict]) -> dict[tuple[str, str | int], dict]:
+    indexed: dict[tuple[str, str | int], dict] = {}
+    for row_index, trace in enumerate(traces):
+        workload = trace.get("workload") or {}
+        key = _workload_key(workload.get("uuid"), row_index)
+        indexed[key] = trace
+    return indexed
+
+
+def _trace_status(trace: dict | None) -> str | None:
+    if not trace:
+        return None
+    evaluation = trace.get("evaluation") or {}
+    return evaluation.get("status", "UNKNOWN")
+
+
+def _closure_status_for_trace(trace: dict | None, *, skipped: bool = False) -> str:
+    status = _trace_status(trace)
+    if status is None:
+        return "missing_trace"
+    if skipped and status == "PASSED":
+        return "skipped_existing_pass"
+    return "attempted_passed" if status == "PASSED" else "attempted_failed"
+
+
+def _derived_evidence_for_workload(
+    *,
+    definition_name: str,
+    workload_uuid: str | None,
+    problem_output_dir: Path,
+    output_dir: Path,
+    amd_score_report: Path | None,
+    sol_bound_artifact_dir: Path | None,
+    solar_derivation_dir: Path | None,
+    timing_evidence_dir: Path | None,
+    category: str,
+) -> tuple[dict[str, str], list[str]]:
+    refs: dict[str, str] = {}
+    gaps: list[str] = []
+    if amd_score_report is not None:
+        report_path = amd_score_report.resolve()
+        refs["amd_score"] = _relative_ref(report_path, output_dir)
+    if workload_uuid:
+        sidecar_stem = _safe_sidecar_stem(definition_name, workload_uuid)
+        if sol_bound_artifact_dir is not None:
+            path = sol_bound_artifact_dir / f"{sidecar_stem}.amd-sol-v2.json"
+            if path.exists():
+                refs["amd_sol_bound"] = _relative_ref(path, output_dir)
+            else:
+                gaps.append("amd_sol_bound_missing")
+        if solar_derivation_dir is not None:
+            path = solar_derivation_dir / f"{sidecar_stem}.solar-derivation.json"
+            if path.exists():
+                refs["solar_derivation"] = _relative_ref(path, output_dir)
+            else:
+                gaps.append("solar_derivation_missing")
+    if timing_evidence_dir is not None:
+        path = timing_evidence_dir.resolve() / category / f"{problem_output_dir.name}.timing.json"
+        if path.exists():
+            refs["timing_evidence"] = _relative_ref(path, output_dir)
+        else:
+            gaps.append("timing_evidence_missing")
+    return refs, gaps
+
+
+def _closure_status_with_evidence(
+    status: str,
+    evidence_gaps: list[str],
+) -> str:
+    if evidence_gaps and status in {
+        "attempted_passed",
+        "attempted_failed",
+        "skipped_existing_pass",
+    }:
+        return "derived_evidence_missing"
+    return status
+
+
+def _closure_totals(records: list[dict]) -> dict[str, int]:
+    totals = {
+        "records": len(records),
+        "attempted": 0,
+        "passed": 0,
+        "failed": 0,
+        "filtered": 0,
+        "not_attempted": 0,
+        "derived_evidence_missing": 0,
+    }
+    for record in records:
+        status = record["closure_status"]
+        totals[status] = totals.get(status, 0) + 1
+        if status in {"attempted_passed", "attempted_failed", "missing_trace", "derived_evidence_missing"}:
+            totals["attempted"] += 1
+        if status == "attempted_passed" or record.get("trace_status") == "PASSED":
+            totals["passed"] += 1
+        if status in {"attempted_failed", "missing_trace"} or (
+            record.get("trace_status") not in {None, "PASSED"}
+        ):
+            totals["failed"] += 1
+        if status == "filtered":
+            totals["filtered"] += 1
+        if status == "not_attempted":
+            totals["not_attempted"] += 1
+        if status == "derived_evidence_missing":
+            totals["derived_evidence_missing"] += 1
+    return dict(sorted(totals.items()))
+
+
+def _write_execution_closure(
+    *,
+    path: Path,
+    records: list[dict],
+    provenance: dict,
+    filters: dict,
+) -> None:
+    totals = _closure_totals(records)
+    if totals["attempted"] == 0:
+        status = "no_ready_workloads"
+    elif totals["failed"] or totals["derived_evidence_missing"]:
+        status = "completed_with_failures"
+    else:
+        status = "completed"
+    payload = {
+        "schema_version": EXECUTION_CLOSURE_SCHEMA_VERSION,
+        "created_at": _utc_timestamp(),
+        "status": status,
+        "provenance": provenance,
+        "totals": totals,
+        "filters": filters,
+        "records": sorted(
+            records,
+            key=lambda record: (
+                record["problem_id"],
+                record["row_index"],
+                record.get("workload_uuid") or "",
+                record["closure_status"],
+            ),
+        ),
+        "claim_boundary": {
+            "bounded_ready_subset_execution": True,
+            "full_235_problem_validation": False,
+            "paper_parity": False,
+            "leaderboard_result": False,
+        },
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -754,6 +1101,33 @@ def main():
         default="unknown",
         help="GPU architecture string recorded in timing evidence, e.g. gfx942.",
     )
+    ap.add_argument(
+        "--ready-subset",
+        type=Path,
+        default=None,
+        help="Phase 54 ready_subset.json used to bound dataset execution.",
+    )
+    ap.add_argument(
+        "--readiness",
+        type=Path,
+        default=None,
+        help="Optional Phase 54 readiness.json used to enrich closure blockers.",
+    )
+    ap.add_argument(
+        "--execution-closure",
+        type=Path,
+        default=None,
+        help=(
+            "Path for execution_closure.json. Defaults to "
+            "<output>/execution_closure.json when --ready-subset is supplied."
+        ),
+    )
+    ap.add_argument(
+        "--dataset-manifest",
+        type=Path,
+        default=None,
+        help="Optional dataset manifest JSON used for closure provenance.",
+    )
     args = ap.parse_args()
 
     problems_dir = args.problems_dir.resolve()
@@ -763,6 +1137,32 @@ def main():
 
     output_dir = args.output.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
+    execution_closure_path = (
+        args.execution_closure.resolve()
+        if args.execution_closure is not None
+        else output_dir / "execution_closure.json"
+        if args.ready_subset is not None
+        else None
+    )
+
+    ready_subset = (
+        _load_json_sidecar(args.ready_subset.resolve())
+        if args.ready_subset is not None
+        else None
+    )
+    readiness = (
+        _load_json_sidecar(args.readiness.resolve())
+        if args.readiness is not None
+        else None
+    )
+    dataset_manifest = (
+        _load_json_sidecar(args.dataset_manifest.resolve())
+        if args.dataset_manifest is not None
+        else None
+    )
+    ready_problems = _ready_problem_map(ready_subset)
+    readiness_by_workload = _readiness_workload_map(readiness)
+    closure_records: list[dict] = []
 
     # Auto-detect: single problem dir vs. dataset root
     is_single_problem = (problems_dir / "definition.json").exists() and (
@@ -774,11 +1174,72 @@ def main():
         print(f"Single problem: {problems_dir.name}")
     else:
         problems = discover_problems(problems_dir, args.category)
-        if args.limit:
+        if ready_subset is not None:
+            discovered_by_id = {
+                _problem_id_for(problems_dir, problem_dir): problem_dir
+                for problem_dir in problems
+            }
+            category_filter = set(args.category or [])
+            selected_ids: list[str] = []
+            for problem_id, problem_ref in ready_problems.items():
+                reason: list[str] = []
+                if category_filter and problem_ref.get("category") not in category_filter:
+                    reason.append("category_filter")
+                elif problem_id not in discovered_by_id:
+                    reason.append("problem_not_discovered")
+                else:
+                    selected_ids.append(problem_id)
+                    continue
+                for workload_ref in problem_ref.get("workloads", []):
+                    readiness_record = readiness_by_workload.get(
+                        (problem_id, _workload_key(workload_ref.get("uuid"), workload_ref.get("row_index")))
+                    )
+                    closure_records.append(
+                        _closure_record(
+                            category=str(problem_ref.get("category")),
+                            problem_id=problem_id,
+                            problem_path=str(problem_ref.get("problem_path")),
+                            workload_uuid=workload_ref.get("uuid"),
+                            row_index=int(workload_ref.get("row_index", 0)),
+                            closure_status="filtered",
+                            readiness=readiness_record,
+                            filter_reasons=reason,
+                        )
+                    )
+            limited_ids = selected_ids
+            if args.limit:
+                limited_ids = selected_ids[: args.limit]
+                filtered_ids = set(selected_ids[args.limit :])
+                for problem_id in selected_ids[args.limit :]:
+                    problem_ref = ready_problems[problem_id]
+                    for workload_ref in problem_ref.get("workloads", []):
+                        readiness_record = readiness_by_workload.get(
+                            (problem_id, _workload_key(workload_ref.get("uuid"), workload_ref.get("row_index")))
+                        )
+                        closure_records.append(
+                            _closure_record(
+                                category=str(problem_ref.get("category")),
+                                problem_id=problem_id,
+                                problem_path=str(problem_ref.get("problem_path")),
+                                workload_uuid=workload_ref.get("uuid"),
+                                row_index=int(workload_ref.get("row_index", 0)),
+                                closure_status="filtered",
+                                readiness=readiness_record,
+                                filter_reasons=["problem_limit"],
+                            )
+                        )
+                problems = [
+                    discovered_by_id[problem_id]
+                    for problem_id in limited_ids
+                    if problem_id not in filtered_ids
+                ]
+            else:
+                problems = [discovered_by_id[problem_id] for problem_id in limited_ids]
+        elif args.limit:
             problems = problems[: args.limit]
 
         print(f"Discovered {len(problems)} problems under {problems_dir}")
-        if not problems:
+        if not problems and ready_subset is None:
             print("No problems found. Check the directory path.")
             sys.exit(1)
 
@@ -815,9 +1276,68 @@ def main():
         if args.scoring_baseline is not None
         else None
     )
+    provenance = {
+        "command_args": sys.argv[1:],
+        "dataset_root": str(problems_dir),
+        "selected_categories": args.category,
+        "limit": args.limit,
+        "max_workloads": args.max_workloads,
+        "timeout": args.timeout,
+        "warmup_runs": benchmark_config.warmup_runs,
+        "iterations": benchmark_config.iterations,
+        "lock_clocks": benchmark_config.lock_clocks,
+        "rerun": args.rerun,
+        "keep_staging": args.keep_staging,
+        "verbose": args.verbose,
+        "solution_mode": "named" if args.solution_name else "reference",
+        "solution_name": args.solution_name,
+        "output_dir": str(output_dir),
+        "summary_path": str(output_dir / "summary.json"),
+        "ready_subset_path": str(args.ready_subset.resolve()) if args.ready_subset else None,
+        "ready_subset_checksum": _sidecar_checksum(ready_subset, "ready_subset_checksum"),
+        "readiness_path": str(args.readiness.resolve()) if args.readiness else None,
+        "readiness_checksum": (
+            _sidecar_checksum(readiness, "readiness_checksum")
+            or (ready_subset or {}).get("readiness_checksum")
+        ),
+        "dataset_manifest_path": str(args.dataset_manifest.resolve()) if args.dataset_manifest else None,
+        "dataset_manifest_checksum": _manifest_checksum(dataset_manifest),
+        "git_commit": _git_commit(),
+        "config_path": str(config_path) if config_path else None,
+        "benchmark_config": {
+            "warmup_runs": benchmark_config.warmup_runs,
+            "iterations": benchmark_config.iterations,
+            "lock_clocks": benchmark_config.lock_clocks,
+        },
+        "derived_evidence": {
+            "amd_score_report": str(args.amd_score_report.resolve()) if args.amd_score_report else None,
+            "amd_sol_bound_dir": str(args.amd_sol_bound_dir.resolve()) if args.amd_sol_bound_dir else None,
+            "solar_derivation": str(args.solar_derivation.resolve()) if args.solar_derivation else None,
+            "timing_evidence_dir": str(args.timing_evidence_dir.resolve()) if args.timing_evidence_dir else None,
+        },
+    }
+
+    if ready_subset is not None and not problems:
+        _write_execution_closure(
+            path=execution_closure_path or (output_dir / "execution_closure.json"),
+            records=closure_records,
+            provenance=provenance,
+            filters={
+                "ready_subset": True,
+                "category": args.category,
+                "limit": args.limit,
+                "max_workloads": args.max_workloads,
+            },
+        )
+        print(f"Execution closure saved to {execution_closure_path}")
+        return
+
+    attempted_ready_keys: set[tuple[str, tuple[str, str | int]]] = set()
     for i, problem_dir in enumerate(problems):
         problem_name = problem_dir.name
         category = problem_dir.parent.name
+        problem_id = _problem_id_for(problems_dir, problem_dir)
+        problem_ref = ready_problems.get(problem_id)
         print(f"\n[{i + 1}/{len(problems)}] {category}/{problem_name}")
 
         definition_path = problem_dir / "definition.json"
@@ -825,6 +1345,52 @@ def main():
 
         problem_output_dir = output_dir / category / problem_name
         traces_path = problem_output_dir / "traces.json"
+        definition_payload = json.loads(definition_path.read_text())
+        selected_workload_refs: list[dict] | None = None
+        if problem_ref is not None:
+            problem_output_dir.mkdir(parents=True, exist_ok=True)
+            selected_lines, selected_workload_refs, cap_filtered, missing_refs = (
+                _selected_workload_rows(
+                    workload_path,
+                    list(problem_ref.get("workloads", [])),
+                    max_workloads=args.max_workloads,
+                )
+            )
+            filtered_workload_path = problem_output_dir / "workload.jsonl"
+            filtered_workload_path.write_text("\n".join(selected_lines) + ("\n" if selected_lines else ""))
+            workload_path = filtered_workload_path
+            for workload_ref in cap_filtered:
+                key = _workload_key(workload_ref.get("uuid"), workload_ref.get("row_index"))
+                readiness_record = readiness_by_workload.get((problem_id, key))
+                closure_records.append(
+                    _closure_record(
+                        category=category,
+                        problem_id=problem_id,
+                        problem_path=str(problem_ref.get("problem_path")),
+                        workload_uuid=workload_ref.get("uuid"),
+                        row_index=int(workload_ref.get("row_index", 0)),
+                        closure_status="filtered",
+                        readiness=readiness_record,
+                        filter_reasons=["max_workloads_cap"],
+                    )
+                )
+            for workload_ref in missing_refs:
+                key = _workload_key(workload_ref.get("uuid"), workload_ref.get("row_index"))
+                readiness_record = readiness_by_workload.get((problem_id, key))
+                closure_records.append(
+                    _closure_record(
+                        category=category,
+                        problem_id=problem_id,
+                        problem_path=str(problem_ref.get("problem_path")),
+                        workload_uuid=workload_ref.get("uuid"),
+                        row_index=int(workload_ref.get("row_index", 0)),
+                        closure_status="filtered",
+                        readiness=readiness_record,
+                        filter_reasons=["workload_not_found"],
+                    )
+                )
+            if not selected_workload_refs:
+                continue
 
         # Skip problems that already have passing results unless --rerun
         if not args.rerun and traces_path.exists():
@@ -849,6 +1415,48 @@ def main():
                     )
                 print("  Skipping (already passed). Use --rerun to re-evaluate.")
                 summaries.append(summary)
+                if selected_workload_refs is not None:
+                    trace_by_key = _trace_map(traces)
+                    for workload_ref in selected_workload_refs:
+                        key = _workload_key(
+                            workload_ref.get("uuid"), workload_ref.get("row_index")
+                        )
+                        attempted_ready_keys.add((problem_id, key))
+                        trace = trace_by_key.get(key)
+                        evidence_refs, evidence_gaps = _derived_evidence_for_workload(
+                            definition_name=str(definition_payload["name"]),
+                            workload_uuid=workload_ref.get("uuid"),
+                            problem_output_dir=problem_output_dir,
+                            output_dir=output_dir,
+                            amd_score_report=args.amd_score_report,
+                            sol_bound_artifact_dir=args.amd_sol_bound_dir,
+                            solar_derivation_dir=args.solar_derivation,
+                            timing_evidence_dir=args.timing_evidence_dir,
+                            category=category,
+                        )
+                        status = _closure_status_with_evidence(
+                            _closure_status_for_trace(trace, skipped=True),
+                            evidence_gaps,
+                        )
+                        closure_records.append(
+                            _closure_record(
+                                category=category,
+                                problem_id=problem_id,
+                                problem_path=str(problem_ref.get("problem_path")),
+                                workload_uuid=workload_ref.get("uuid"),
+                                row_index=int(workload_ref.get("row_index", 0)),
+                                closure_status=status,
+                                readiness=readiness_by_workload.get((problem_id, key)),
+                                trace_ref=_relative_ref(traces_path, output_dir),
+                                summary_ref="summary.json",
+                                solution_ref=_relative_ref(problem_output_dir / "solution.json", output_dir)
+                                if (problem_output_dir / "solution.json").exists()
+                                else None,
+                                evidence_refs=evidence_refs,
+                                evidence_gaps=evidence_gaps,
+                                trace_status=_trace_status(trace),
+                            )
+                        )
                 continue
             print(f"  Re-running (previous run had {summary['failed']} failures).")
 
@@ -856,9 +1464,14 @@ def main():
         if problem_output_dir.exists():
             shutil.rmtree(problem_output_dir)
         problem_output_dir.mkdir(parents=True, exist_ok=True)
+        if selected_workload_refs is not None:
+            workload_path = problem_output_dir / "workload.jsonl"
+            workload_path.write_text(
+                "\n".join(selected_lines) + ("\n" if selected_lines else "")
+            )
 
-        # Truncate workloads if --max-workloads is set
-        if args.max_workloads is not None:
+        # Truncate workloads if --max-workloads is set outside ready-subset mode.
+        if args.max_workloads is not None and selected_workload_refs is None:
             lines = workload_path.read_text().splitlines()
             if len(lines) > args.max_workloads:
                 truncated_path = problem_output_dir / "workload.jsonl"
@@ -866,7 +1479,7 @@ def main():
                 workload_path = truncated_path
 
         # Load definition to build the reference solution
-        definition = json.loads(definition_path.read_text())
+        definition = definition_payload
 
         # Use named solution file if present, otherwise fall back to reference
         if args.solution_name:
@@ -912,6 +1525,30 @@ def main():
                     "failure_reasons": ["CLI returned no output"],
                 }
             )
+            if selected_workload_refs is not None:
+                cli_log = problem_output_dir / f"{job_name}_cli.log"
+                for workload_ref in selected_workload_refs:
+                    key = _workload_key(
+                        workload_ref.get("uuid"), workload_ref.get("row_index")
+                    )
+                    attempted_ready_keys.add((problem_id, key))
+                    closure_records.append(
+                        _closure_record(
+                            category=category,
+                            problem_id=problem_id,
+                            problem_path=str(problem_ref.get("problem_path")),
+                            workload_uuid=workload_ref.get("uuid"),
+                            row_index=int(workload_ref.get("row_index", 0)),
+                            closure_status="attempted_failed",
+                            readiness=readiness_by_workload.get((problem_id, key)),
+                            summary_ref="summary.json",
+                            cli_log_ref=_relative_ref(cli_log, output_dir)
+                            if cli_log.exists()
+                            else None,
+                            solution_ref=_relative_ref(solution_path, output_dir),
+                            notes=["CLI returned no traces"],
+                        )
+                    )
             continue
 
         # Save raw traces
@@ -955,6 +1592,44 @@ def main():
             )
             print(f"  Timing evidence saved under {timing_root / category}")
 
+        if selected_workload_refs is not None:
+            trace_by_key = _trace_map(traces)
+            for workload_ref in selected_workload_refs:
+                key = _workload_key(workload_ref.get("uuid"), workload_ref.get("row_index"))
+                attempted_ready_keys.add((problem_id, key))
+                trace = trace_by_key.get(key)
+                evidence_refs, evidence_gaps = _derived_evidence_for_workload(
+                    definition_name=str(definition_payload["name"]),
+                    workload_uuid=workload_ref.get("uuid"),
+                    problem_output_dir=problem_output_dir,
+                    output_dir=output_dir,
+                    amd_score_report=args.amd_score_report,
+                    sol_bound_artifact_dir=args.amd_sol_bound_dir,
+                    solar_derivation_dir=args.solar_derivation,
+                    timing_evidence_dir=args.timing_evidence_dir,
+                    category=category,
+                )
+                status = _closure_status_with_evidence(
+                    _closure_status_for_trace(trace), evidence_gaps
+                )
+                closure_records.append(
+                    _closure_record(
+                        category=category,
+                        problem_id=problem_id,
+                        problem_path=str(problem_ref.get("problem_path")),
+                        workload_uuid=workload_ref.get("uuid"),
+                        row_index=int(workload_ref.get("row_index", 0)),
+                        closure_status=status,
+                        readiness=readiness_by_workload.get((problem_id, key)),
+                        trace_ref=_relative_ref(traces_path, output_dir),
+                        summary_ref="summary.json",
+                        solution_ref=_relative_ref(solution_path, output_dir),
+                        evidence_refs=evidence_refs,
+                        evidence_gaps=evidence_gaps,
+                        trace_status=_trace_status(trace),
+                    )
+                )
+
         # Inspect
         summary = inspect_traces(traces, f"{category}/{problem_name}")
         summaries.append(summary)
@@ -990,6 +1665,43 @@ def main():
         )
         report_path.write_text(json.dumps(report.to_dict(), indent=2))
         print(f"AMD-native score report saved to {report_path}")
+
+    if execution_closure_path is not None:
+        if readiness is not None:
+            for workload in readiness.get("workloads", []):
+                key = _workload_key(
+                    workload.get("workload_uuid"), workload.get("row_index")
+                )
+                problem_id = str(workload.get("problem_id"))
+                if workload.get("status") == "ready" or (
+                    problem_id,
+                    key,
+                ) in attempted_ready_keys:
+                    continue
+                closure_records.append(
+                    _closure_record(
+                        category=str(workload.get("category")),
+                        problem_id=problem_id,
+                        problem_path=str(workload.get("problem_path")),
+                        workload_uuid=workload.get("workload_uuid"),
+                        row_index=int(workload.get("row_index", 0)),
+                        closure_status="not_attempted",
+                        readiness=workload,
+                        filter_reasons=["readiness_blocked"],
+                    )
+                )
+        _write_execution_closure(
+            path=execution_closure_path,
+            records=closure_records,
+            provenance=provenance,
+            filters={
+                "ready_subset": args.ready_subset is not None,
+                "category": args.category,
+                "limit": args.limit,
+                "max_workloads": args.max_workloads,
+            },
+        )
+        print(f"Execution closure saved to {execution_closure_path}")
 
 
 if __name__ == "__main__":
