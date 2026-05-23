@@ -696,8 +696,6 @@ def _ssm_visible_formula_inputs(
         formula_inputs["batch"] = int(input_tensors[0].shape[0])
     elif isinstance(node.attributes.get("batch_size"), int):
         formula_inputs["batch"] = int(node.attributes["batch_size"])
-    if "batch" not in formula_inputs and isinstance(node.attributes.get("sequence_length"), int):
-        formula_inputs["batch"] = 1
     return formula_inputs
 
 
