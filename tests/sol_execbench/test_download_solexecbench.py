@@ -120,3 +120,27 @@ def test_verify_only_writes_manifest_without_downloading(tmp_path, monkeypatch):
 def test_unknown_category_is_rejected(tmp_path):
     with pytest.raises(ValueError, match="unknown SOL-ExecBench category"):
         download_solexecbench.main(["--category", "CUDA", "--output-root", str(tmp_path)])
+
+
+@pytest.mark.parametrize("unsafe_name", ["../escape", "/tmp/escape", "", ".", ".."])
+def test_downloader_rejects_unsafe_remote_problem_names(
+    tmp_path, monkeypatch, unsafe_name
+):
+    monkeypatch.setattr(
+        download_solexecbench,
+        "load_dataset",
+        lambda *args, **kwargs: [_row(name=unsafe_name)],
+    )
+
+    rc = download_solexecbench.main(
+        ["--category", "L1", "--output-root", str(tmp_path / "dataset")]
+    )
+
+    assert rc == 1
+    assert not (tmp_path / "escape" / "definition.json").exists()
+
+
+def test_download_data_shell_fails_fast():
+    script = (REPO_ROOT / "scripts" / "download_data.sh").read_text(encoding="utf-8")
+
+    assert "set -euo pipefail" in script

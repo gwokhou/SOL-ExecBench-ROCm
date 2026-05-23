@@ -23,3 +23,5 @@ bash -n scripts/download_data.sh
 ```
 
 Result: `10 passed`; shell syntax valid.
+Follow-up code review fixes added unsafe remote problem-name rejection and
+fail-fast shell wrapper coverage; the focused downloader suite now has 10 tests.

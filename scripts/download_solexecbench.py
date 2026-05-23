@@ -49,6 +49,13 @@ def _build_definition(row: dict) -> dict:
     return definition
 
 
+def _safe_problem_name(name: str) -> str:
+    path = Path(name)
+    if path.is_absolute() or path.name != name or name in {"", ".", ".."}:
+        raise ValueError(f"unsafe SOL-ExecBench problem name: {name!r}")
+    return name
+
+
 def _write_text_if_changed(path: Path, content: str, *, force: bool = False) -> str:
     data = content.encode("utf-8")
     if path.exists():
@@ -103,7 +110,7 @@ def _process_subset(
     written = 0
     unchanged = 0
     for row in ds:
-        name = row["name"]
+        name = _safe_problem_name(row["name"])
         problem_dir = output_root / subset / name
 
         # definition.json
