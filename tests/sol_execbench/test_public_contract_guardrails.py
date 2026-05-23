@@ -100,6 +100,32 @@ PHASE51_SOLAR_ONLY_ARTIFACT_FIELDS = (
     "byte_evidence",
     "bound_evidence",
 )
+CANONICAL_DEFINITION_KEYS = {
+    "name",
+    "op_type",
+    "axes",
+    "custom_inputs_entrypoint",
+    "inputs",
+    "outputs",
+    "reference",
+    "description",
+    "hf_id",
+}
+CANONICAL_WORKLOAD_KEYS = {"axes", "inputs", "uuid", "tolerance"}
+CANONICAL_TRACE_KEYS = {"definition", "workload", "solution", "evaluation"}
+PUBLIC_SCORE_EVIDENCE_REF_KEYS = {
+    "trace",
+    "timing",
+    "sol_bound",
+    "baseline",
+    "hardware_model",
+}
+DERIVED_REPORT_EVIDENCE_REF_KEYS = {
+    "formula",
+    "hardware_model",
+    "coverage",
+    "score_eligibility",
+}
 
 
 def _json_object_keys(value: object) -> set[str]:
@@ -114,6 +140,24 @@ def _json_object_keys(value: object) -> set[str]:
             keys.update(_json_object_keys(nested))
         return keys
     return set()
+
+
+def _sample_definition_workload_trace() -> tuple[Definition, Workload, Trace]:
+    definition = Definition(
+        name="demo",
+        axes={"N": {"type": "var"}},
+        inputs={"x": {"shape": ["N"], "dtype": "float32"}},
+        outputs={"out": {"shape": ["N"], "dtype": "float32"}},
+        reference="def run(x):\n    return x",
+    )
+    workload = Workload(axes={"N": 16}, inputs={"x": {"type": "random"}}, uuid="w1")
+    trace = Trace(
+        definition="demo",
+        workload=workload,
+        solution="solution",
+        evaluation=None,
+    )
+    return definition, workload, trace
 
 
 def test_solution_json_contract_accepts_existing_rocm_shape():
@@ -158,6 +202,32 @@ def test_trace_jsonl_contract_accepts_existing_workload_only_trace():
     assert dumped["solution"] is None
     assert dumped["evaluation"] is None
     assert dumped["workload"]["uuid"] == "w1"
+
+
+def test_canonical_definition_workload_trace_top_level_keys_are_exact():
+    definition, workload, trace = _sample_definition_workload_trace()
+
+    assert set(definition.model_dump(mode="json")) == CANONICAL_DEFINITION_KEYS
+    assert set(workload.model_dump(mode="json")) == CANONICAL_WORKLOAD_KEYS
+    assert set(trace.model_dump(mode="json")) == CANONICAL_TRACE_KEYS
+
+
+def test_canonical_trace_jsonl_excludes_derived_report_key_space():
+    _, _, trace = _sample_definition_workload_trace()
+    payload = trace.model_dump(mode="json")
+    serialized = json.dumps(payload, sort_keys=True)
+    forbidden_keys = {
+        "derived_evidence_refs",
+        "formula",
+        "coverage",
+        "score_eligibility",
+        *DERIVED_REPORT_EVIDENCE_REF_KEYS,
+        *PHASE51_INTERNAL_PUBLIC_BOUNDARY_FIELDS,
+    }
+
+    assert _json_object_keys(payload).isdisjoint(forbidden_keys)
+    for key in forbidden_keys:
+        assert key not in serialized
 
 
 def test_cli_help_preserves_existing_public_options():
@@ -352,6 +422,56 @@ def test_primary_cli_does_not_expose_v1_10_solar_derivation_options():
         *PHASE51_INTERNAL_PUBLIC_BOUNDARY_FIELDS,
     ):
         assert option not in help_text
+
+
+def test_public_score_evidence_refs_keep_exact_established_key_space():
+    definition = Definition(
+        name="matmul_demo",
+        axes={
+            "M": {"type": "var"},
+            "K": {"type": "const", "value": 4},
+            "N": {"type": "const", "value": 8},
+        },
+        inputs={
+            "a": {"shape": ["M", "K"], "dtype": "float32"},
+            "b": {"shape": ["K", "N"], "dtype": "float32"},
+        },
+        outputs={"out": {"shape": ["M", "N"], "dtype": "float32"}},
+        reference="def run(a, b):\n    return a @ b",
+    )
+    workload = Workload(
+        axes={"M": 2},
+        inputs={"a": {"type": "random"}, "b": {"type": "random"}},
+        uuid="matmul-workload",
+    )
+    artifact = build_amd_sol_bound_artifact(
+        definition,
+        workload,
+        default_amd_hardware_models()["gfx1200"],
+    )
+
+    payload = score_amd_native_workload(
+        artifact,
+        measured_latency_ms=1.0,
+        baseline_latency_ms=2.0,
+        trace_ref="traces/matmul.json",
+        timing_evidence_ref="timing/matmul.json",
+        sol_bound_ref="bounds/matmul.json",
+        baseline_ref="baseline/matmul.json",
+        hardware_model_ref="default_amd_hardware_models.gfx1200",
+        derived_evidence_refs={
+            "formula": "solar/matmul.json#groups.formula_evidence",
+            "hardware_model": "default_amd_hardware_models.gfx1200",
+            "coverage": "solar/matmul.json#coverage_summary",
+            "score_eligibility": "solar/matmul.json#aggregate_status",
+        },
+    ).to_dict()
+
+    assert set(payload["evidence_refs"]) == PUBLIC_SCORE_EVIDENCE_REF_KEYS
+    assert set(payload["derived_evidence_refs"]) == DERIVED_REPORT_EVIDENCE_REF_KEYS
+    assert set(payload["evidence_refs"]).isdisjoint(
+        {"formula", "coverage", "score_eligibility"}
+    )
 
 
 def test_degraded_complex_family_score_eligibility_ignores_solar_sidecars():
