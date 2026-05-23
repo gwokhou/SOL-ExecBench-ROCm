@@ -1,0 +1,21 @@
+{
+  "case_id": "convolution_unsupported_dynamic_kernel",
+  "family": "convolution",
+  "fixture_class": "unsupported",
+  "negative_category": "dynamic",
+  "description": "Convolution kernel shape is created dynamically and cannot be statically bounded.",
+  "source_kind": "reference_snippet",
+  "reference": "def run(x, kernel_size): w = make_kernel(kernel_size); return torch.nn.functional.conv2d(x, w)",
+  "workload_axes": {"batch": 4, "channels_in": 16, "height": 28, "width": 28},
+  "expectation": {
+    "expected_family": "convolution",
+    "expected_subroles": ["input", "weight"],
+    "expected_confidence": "unsupported",
+    "expected_status": "unscored",
+    "required_evidence": ["shape:input"],
+    "missing_evidence": ["shape:kernel", "conv:output_spatial"],
+    "warning_prefixes": ["unsupported_operator:convolution_dynamic_kernel", "aggregate_unscored:convolution"],
+    "degradation_rationale": "Dynamic kernel construction hides required convolution metadata."
+  },
+  "scope_boundary": {"paper_scale_dataset": false, "hosted_leaderboard_ready": false, "nvidia_blackwell_b200_equivalence": false, "real_hardware_validation": false}
+}

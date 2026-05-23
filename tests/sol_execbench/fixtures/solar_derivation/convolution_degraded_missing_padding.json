@@ -1,0 +1,21 @@
+{
+  "case_id": "convolution_degraded_missing_padding",
+  "family": "convolution",
+  "fixture_class": "degraded",
+  "negative_category": "missing_metadata",
+  "description": "Convolution input and weight are visible, but padding/layout metadata is incomplete.",
+  "source_kind": "reference_snippet",
+  "reference": "def run(x, w, padding): return torch.nn.functional.conv2d(x, w, padding=padding)",
+  "workload_axes": {"batch": 4, "channels_in": 16, "channels_out": 32, "height": 28, "width": 28, "kernel_h": 3, "kernel_w": 3},
+  "expectation": {
+    "expected_family": "convolution",
+    "expected_subroles": ["input", "weight", "padding", "output_spatial"],
+    "expected_confidence": "inexact",
+    "expected_status": "degraded",
+    "required_evidence": ["shape:input", "shape:weight"],
+    "missing_evidence": ["conv:padding", "conv:output_spatial"],
+    "warning_prefixes": ["inexact_operator:convolution_missing_padding", "aggregate_degraded:convolution"],
+    "degradation_rationale": "Padding is parameterized rather than statically derivable."
+  },
+  "scope_boundary": {"paper_scale_dataset": false, "hosted_leaderboard_ready": false, "nvidia_blackwell_b200_equivalence": false, "real_hardware_validation": false}
+}
