@@ -636,3 +636,96 @@ def test_bound_estimates_do_not_mutate_public_schema_payloads():
         assert "read_bytes" not in payload
         assert "movement_bytes" not in payload
         assert "bound_estimates" not in payload
+
+
+def test_attention_score_and_pv_estimates_use_attention_formula_inputs():
+    tensors = {
+        "input:q": BoundTensor(
+            tensor_id="input:q",
+            name="q",
+            role=BoundTensorRole.INPUT,
+            shape=(2, 4, 16, 32),
+            dtype="float32",
+            producer_node_id=None,
+            source="test",
+        ),
+        "input:k_t": BoundTensor(
+            tensor_id="input:k_t",
+            name="k_t",
+            role=BoundTensorRole.INPUT,
+            shape=(2, 4, 32, 16),
+            dtype="float32",
+            producer_node_id=None,
+            source="test",
+        ),
+        "tmp:scores": BoundTensor(
+            tensor_id="tmp:scores",
+            name="scores",
+            role=BoundTensorRole.INTERMEDIATE,
+            shape=(2, 4, 16, 16),
+            dtype="float32",
+            producer_node_id="op_qk",
+            source="test",
+        ),
+        "input:v": BoundTensor(
+            tensor_id="input:v",
+            name="v",
+            role=BoundTensorRole.INPUT,
+            shape=(2, 4, 16, 32),
+            dtype="float32",
+            producer_node_id=None,
+            source="test",
+        ),
+        "tmp:context": BoundTensor(
+            tensor_id="tmp:context",
+            name="context",
+            role=BoundTensorRole.INTERMEDIATE,
+            shape=(2, 4, 16, 32),
+            dtype="float32",
+            producer_node_id="op_pv",
+            source="test",
+        ),
+    }
+    graph = BoundGraph(
+        definition="attention_estimates",
+        workload_uuid="w1",
+        nodes=(
+            BoundGraphNode(
+                node_id="op_qk",
+                op_family=OpFamily.ATTENTION,
+                op_name="@",
+                source_expression="q @ k_t",
+                input_tensor_ids=("input:q", "input:k_t"),
+                output_tensor_ids=("tmp:scores",),
+                attributes={"subrole": "qk_scores"},
+                confidence=EstimateConfidence.SUPPORTED,
+                rationale="recognized attention score matmul",
+            ),
+            BoundGraphNode(
+                node_id="op_pv",
+                op_family=OpFamily.ATTENTION,
+                op_name="@",
+                source_expression="probs @ v",
+                input_tensor_ids=("tmp:scores", "input:v"),
+                output_tensor_ids=("tmp:context",),
+                attributes={"subrole": "pv_aggregation"},
+                confidence=EstimateConfidence.SUPPORTED,
+                rationale="recognized attention PV aggregation",
+            ),
+        ),
+        tensors=tensors,
+        edges=(),
+        warnings=(),
+    )
+
+    qk, pv = estimate_bound_work(graph)
+
+    assert qk.formula_kind == "attention_scores_flops"
+    assert qk.formula == "2*B*H*S_q*S_k*D"
+    assert qk.formula_inputs == {"B": 2, "H": 4, "S_q": 16, "S_k": 16, "D": 32}
+    assert qk.axis_source == "tensor_shapes"
+    assert qk.confidence == EstimateConfidence.SUPPORTED
+    assert pv.formula_kind == "attention_pv_flops"
+    assert pv.formula_inputs == {"B": 2, "H": 4, "S_q": 16, "S_k": 16, "D": 32}
+    assert pv.flops == qk.flops
+    assert pv.total_bytes > 0.0

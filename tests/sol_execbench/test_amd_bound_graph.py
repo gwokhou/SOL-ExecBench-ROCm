@@ -309,3 +309,62 @@ def test_public_scoring_exports_include_bound_graph_api():
 
     assert ExportedBoundGraph is BoundGraph
     assert exported_builder is build_bound_graph
+
+
+def test_attention_graph_marks_visible_subroles_and_metadata():
+    definition = Definition(
+        name="attention_graph_demo",
+        axes={
+            "B": {"type": "const", "value": 2},
+            "H": {"type": "const", "value": 4},
+            "S": {"type": "const", "value": 16},
+            "D": {"type": "const", "value": 32},
+        },
+        inputs={
+            "q": {"shape": ["B", "H", "S", "D"], "dtype": "float32"},
+            "k": {"shape": ["B", "H", "S", "D"], "dtype": "float32"},
+            "v": {"shape": ["B", "H", "S", "D"], "dtype": "float32"},
+            "w_o": {"shape": ["D", "D"], "dtype": "float32"},
+        },
+        outputs={"out": {"shape": ["B", "H", "S", "D"], "dtype": "float32"}},
+        reference=(
+            "import torch\n\n"
+            "def run(q, k, v, w_o):\n"
+            "    scores = q @ k.transpose(-2, -1)\n"
+            "    probs = torch.softmax(scores, dim=-1)\n"
+            "    return (probs @ v) @ w_o\n"
+        ),
+    )
+    workload = Workload(
+        axes={},
+        inputs={
+            "q": {"type": "random"},
+            "k": {"type": "random"},
+            "v": {"type": "random"},
+            "w_o": {"type": "random"},
+        },
+        uuid="attention-graph-workload",
+    )
+
+    graph = build_bound_graph(definition, workload)
+    attention_nodes = [node for node in graph.nodes if node.op_family == OpFamily.ATTENTION]
+
+    assert {node.attributes.get("subrole") for node in attention_nodes} >= {
+        "qk_scores",
+        "softmax",
+        "pv_aggregation",
+        "output_projection",
+    }
+    qk_scores = next(
+        node for node in attention_nodes if node.attributes.get("subrole") == "qk_scores"
+    )
+    softmax = next(
+        node for node in attention_nodes if node.attributes.get("subrole") == "softmax"
+    )
+    assert qk_scores.attributes["sequence_q"] == 16
+    assert qk_scores.attributes["sequence_k"] == 16
+    assert qk_scores.attributes["heads"] == 4
+    assert qk_scores.attributes["head_dim"] == 32
+    assert qk_scores.attributes["mask_semantics"] == "not_applicable"
+    assert softmax.attributes["axis"] == -1
+    assert softmax.attributes["axis_source"] == "attribute"
