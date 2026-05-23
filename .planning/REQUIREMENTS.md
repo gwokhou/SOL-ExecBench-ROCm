@@ -1,0 +1,193 @@
+# Requirements: SOL ExecBench ROCm Port v1.11
+
+**Defined:** 2026-05-23
+**Milestone:** v1.11 Paper Dataset Parity Inventory and ROCm Execution Closure
+**Core Value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on
+AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL
+ExecBench.
+
+## v1.11 Requirements
+
+### Dataset Contract
+
+- [ ] **DATA-01**: Maintainer can verify the public SOL-ExecBench dataset root
+  contains the expected `L1`, `L2`, `Quant`, and `FlashInfer-Bench` category
+  directories without running GPU evaluation.
+- [ ] **DATA-02**: Maintainer can generate an acquisition or local-layout
+  manifest that records dataset source, category set, root path, revision or
+  local provenance, discovered counts, and manifest checksum.
+- [ ] **DATA-03**: Maintainer can run the dataset downloader idempotently with
+  explicit category selection and output-root behavior while preserving
+  downloaded benchmark data outside committed source files.
+- [ ] **DATA-04**: Maintainer can distinguish acquisition/layout completion
+  from ROCm readiness, execution success, and paper-level validation in
+  machine-readable metadata.
+
+### Paper Inventory
+
+- [ ] **INV-01**: Maintainer can generate a machine-readable inventory for every
+  discovered problem and workload using the current Pydantic `Definition` and
+  `Workload` contracts.
+- [ ] **INV-02**: Inventory records category, problem path, workload UUIDs,
+  workload count, input/output dtypes, input kinds, custom input usage,
+  safetensors usage, reference availability, and solution-file availability.
+- [ ] **INV-03**: Inventory records forward/backward and operation-family hints
+  when they are explicitly present or conservatively derived, and marks unknown
+  values without fabricating paper metadata.
+- [ ] **INV-04**: Inventory exposes category-level and suite-level denominators
+  for discovered problems, parsed problems, parsed workloads, schema failures,
+  and missing required files.
+- [ ] **INV-05**: Inventory generation is deterministic: repeated runs over the
+  same dataset root produce stable ordering, stable identifiers, and stable JSON
+  shape.
+
+### ROCm Readiness
+
+- [ ] **READY-01**: Maintainer can classify every inventoried problem or
+  workload into deterministic readiness statuses including `ready`,
+  `schema_input_blocked`, `dtype_blocked`, `custom_input_blocked`,
+  `runtime_blocked`, `unsupported_nvidia_only_path`, and
+  `needs_hardware_evidence`.
+- [ ] **READY-02**: Readiness records stable reason codes, evidence paths, and
+  suggested next actions for each blocked, deferred, or ready item.
+- [ ] **READY-03**: Readiness treats custom inputs and safetensors as explicit
+  asset/evaluator requirements and never silently substitutes random data for
+  parity-oriented inventory or execution closure.
+- [ ] **READY-04**: Readiness distinguishes schema-known dtype support,
+  input-generation support, reference-execution support, candidate-execution
+  support, and hardware-validation evidence for low-precision and Quant paths.
+- [ ] **READY-05**: Maintainer can generate a ready-subset manifest from
+  readiness results without modifying canonical dataset files.
+
+### Execution Closure
+
+- [ ] **EXEC-01**: Maintainer can run a bounded ready subset through the existing
+  `scripts/run_dataset.py` and primary `sol-execbench` subprocess evaluation
+  path without introducing a second benchmark runner.
+- [ ] **EXEC-02**: Ready-subset execution can be constrained by category, limit,
+  workload cap, timeout, warmup, iteration count, rerun policy, and existing
+  derived-evidence flags.
+- [ ] **EXEC-03**: Execution closure report joins readiness results to canonical
+  traces, `summary.json`, CLI logs, skipped-existing-pass states, missing trace
+  states, failures, and not-attempted items.
+- [ ] **EXEC-04**: Execution closure can reference existing AMD-native score
+  reports, AMD SOL v2 sidecars, SOLAR derivation sidecars, and timing evidence
+  without mutating canonical trace JSONL.
+- [ ] **EXEC-05**: Execution closure records enough provenance to interpret the
+  run, including command arguments, dataset manifest checksum, git commit,
+  solution mode or solution name, and relevant benchmark config.
+
+### Parity Gap Report
+
+- [ ] **GAP-01**: Maintainer can generate a Markdown and JSON parity gap report
+  from acquisition, inventory, readiness, and execution-closure artifacts.
+- [ ] **GAP-02**: Gap report summarizes complete denominators by category and
+  suite: discovered, parsed, ready, blocked, not attempted, skipped, attempted,
+  passed, failed, scored, degraded, and unscored.
+- [ ] **GAP-03**: Gap report groups blockers by stable reason code and includes
+  concrete next actions for schema/input, dtype, custom-input, safetensors,
+  runtime, NVIDIA-only, and hardware-evidence gaps.
+- [ ] **GAP-04**: Gap report includes evidence-completeness summaries that
+  distinguish plain execution, trace evidence, timing evidence, AMD-native
+  score evidence, AMD SOL evidence, and SOLAR derivation evidence.
+- [ ] **GAP-05**: Gap report references source artifacts by safe deterministic
+  paths and avoids unsafe path traversal or ambiguous sidecar names.
+
+### Claim Guardrails
+
+- [ ] **CLAIM-01**: Public docs and generated reports state that v1.11 inventory
+  completion is not full 235-problem ROCm validation.
+- [ ] **CLAIM-02**: Public docs and generated reports state that ready-subset
+  execution is not NVIDIA B200, hosted leaderboard, upstream SOLAR, or original
+  124-model extraction parity.
+- [ ] **CLAIM-03**: Public docs and generated reports state that CDNA 3 /
+  MI300X, CDNA 4, NVFP4, and MXFP4 hardware validation remain deferred unless
+  future evidence explicitly proves otherwise.
+- [ ] **CLAIM-04**: Public contract tests prove canonical `definition.json`,
+  `workload.jsonl`, `solution.json`, trace JSONL, primary `sol-execbench` CLI
+  behavior, AMD SOL v2 sidecars, and SOLAR derivation sidecars remain stable
+  unless a deliberate schema migration is planned.
+- [ ] **CLAIM-05**: Tests cover v1.11 report wording so inventory, readiness,
+  execution closure, and derived AMD-native scores cannot be presented as
+  leaderboard-ready paper results.
+
+## Future Requirements
+
+### Full Validation
+
+- **VAL-01**: Maintainer can execute and validate the full public 235-problem
+  suite on appropriate AMD hardware with archived environment and timing
+  evidence.
+- **VAL-02**: Maintainer can perform CDNA 3 / MI300X full-suite validation with
+  dedicated hardware evidence.
+- **VAL-03**: Maintainer can perform CDNA 4 validation after a supported CDNA 4
+  environment is available.
+- **VAL-04**: Maintainer can validate FP8, NVFP4, and MXFP4 hardware semantics
+  only when suitable AMD hardware and software support are available.
+
+### Upstream Dataset And SOLAR Parity
+
+- **UP-01**: Maintainer can reproduce the original 124-model /
+  7,400-subgraph extraction and curation pipeline.
+- **UP-02**: Maintainer can compare this ROCm port's SOLAR-like derivation
+  artifacts against upstream NVlabs/SOLAR artifacts on golden examples.
+- **UP-03**: Maintainer can publish hosted leaderboard or remote submission
+  service semantics if that becomes a product goal.
+
+## Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| Full 235-problem real-hardware validation | v1.11 focuses on inventory, readiness, bounded execution closure, and gap reporting; full-suite validation requires separate runtime and hardware commitment. |
+| Original 124-model / 7,400-subgraph regeneration | v1.11 works from the public dataset surface, not the paper's extraction pipeline. |
+| Upstream NVlabs/SOLAR equivalence | v1.11 may consume existing SOLAR derivation sidecars but does not reopen the SOLAR analysis architecture. |
+| Hosted leaderboard or remote submission service | v1.11 is a local audit and execution-closure workflow. |
+| CDNA 3 / MI300X, CDNA 4, NVFP4, or MXFP4 validation claims | These require hardware evidence outside this milestone's scope. |
+| CUDA/NVIDIA runtime restoration | This project remains a ROCm-only port. |
+| Mutating public dataset files or canonical trace JSONL | v1.11 artifacts must remain sidecar-only and opt-in. |
+| New dataframe/database/reporting framework | Research found the existing stack and stdlib JSON/Markdown sufficient. |
+
+## Traceability
+
+Which phases cover which requirements. Updated during roadmap creation.
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| DATA-01 | TBD | Pending |
+| DATA-02 | TBD | Pending |
+| DATA-03 | TBD | Pending |
+| DATA-04 | TBD | Pending |
+| INV-01 | TBD | Pending |
+| INV-02 | TBD | Pending |
+| INV-03 | TBD | Pending |
+| INV-04 | TBD | Pending |
+| INV-05 | TBD | Pending |
+| READY-01 | TBD | Pending |
+| READY-02 | TBD | Pending |
+| READY-03 | TBD | Pending |
+| READY-04 | TBD | Pending |
+| READY-05 | TBD | Pending |
+| EXEC-01 | TBD | Pending |
+| EXEC-02 | TBD | Pending |
+| EXEC-03 | TBD | Pending |
+| EXEC-04 | TBD | Pending |
+| EXEC-05 | TBD | Pending |
+| GAP-01 | TBD | Pending |
+| GAP-02 | TBD | Pending |
+| GAP-03 | TBD | Pending |
+| GAP-04 | TBD | Pending |
+| GAP-05 | TBD | Pending |
+| CLAIM-01 | TBD | Pending |
+| CLAIM-02 | TBD | Pending |
+| CLAIM-03 | TBD | Pending |
+| CLAIM-04 | TBD | Pending |
+| CLAIM-05 | TBD | Pending |
+
+**Coverage:**
+- v1.11 requirements: 29 total
+- Mapped to phases: 0
+- Unmapped: 29
+
+---
+*Requirements defined: 2026-05-23*
+*Last updated: 2026-05-23 after v1.11 requirements definition*
