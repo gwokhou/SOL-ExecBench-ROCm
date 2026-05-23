@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from sol_execbench.core.data.definition import Definition
@@ -22,6 +23,7 @@ from sol_execbench.core.scoring.amd_sol import (
     extract_graph,
     summarize_amd_sol_coverage,
 )
+from sol_execbench.core.scoring.amd_hardware_models import load_amd_hardware_model
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -66,7 +68,8 @@ def test_matmul_bound_artifact_records_graph_work_hardware_and_bounds():
     assert artifact.aggregate_sol_bound_ms == artifact.op_bounds[0].sol_bound_ms
     assert payload["coverage_summary"]["supported_ops"] == 1
     assert payload["hardware_model"]["architecture"] == "gfx1200"
-    assert payload["hardware_model"]["validation_status"] == "provisional"
+    assert payload["hardware_model"]["hardware_validation_status"] == "validated"
+    assert payload["hardware_model"]["model_validation_status"] == "provisional"
 
 
 def test_elementwise_work_estimate_is_inexact_and_auditable():
@@ -96,7 +99,7 @@ def test_elementwise_work_estimate_is_inexact_and_auditable():
     assert "one operation per output element" in estimates[0].rationale
 
 
-def test_unsupported_ops_stay_visible_instead_of_getting_silent_scores():
+def test_unsupported_ops_stay_visible_instead_of_getting_silent_scores(tmp_path: Path):
     definition = Definition(
         name="unsupported_demo",
         axes={"N": {"type": "var"}},
@@ -109,15 +112,16 @@ def test_unsupported_ops_stay_visible_instead_of_getting_silent_scores():
         inputs={"x": {"type": "random"}},
         uuid="unsupported-workload",
     )
-    hardware = default_amd_hardware_models()["gfx942"]
+    hardware = _cdna3_model(tmp_path)
 
     artifact = build_amd_sol_bound_artifact(definition, workload, hardware)
 
     assert artifact.graph_nodes[0].op_type == "unsupported"
     assert artifact.work_estimates[0].confidence == EstimateConfidence.UNSUPPORTED
     assert artifact.op_bounds[0].confidence == EstimateConfidence.UNSUPPORTED
-    assert artifact.hardware_model.validation_status == HardwareValidationStatus.UNVALIDATED
-    assert artifact.hardware_model.source.endswith("excluded from v1.5")
+    assert artifact.hardware_model.model_validation_status == HardwareValidationStatus.UNVALIDATED
+    assert artifact.hardware_model.hardware_validation_status == HardwareValidationStatus.UNVALIDATED
+    assert artifact.hardware_model.source.endswith("CDNA3 scaffold for phase 45")
 
 
 def test_coverage_summary_counts_supported_inexact_and_unsupported_ops():
@@ -230,3 +234,26 @@ def test_analysis_docs_require_amd_sol_bound_artifact_before_reporting_scores():
     assert "AMD SOL bound artifact" in text
     assert "before reporting AMD-native scores" in text
     assert "supported, inexact, and unsupported" in text
+
+
+def _cdna3_model(path: Path):
+    hardware_path = path / "cdna3-model.json"
+    hardware_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "sol_execbench.amd_hardware_model.v2",
+                "architecture": "gfx942",
+                "dtype_or_path": "bf16/fp32 mixed benchmark path",
+                "peak_tflops": 1300.0,
+                "memory_bandwidth_gbps": 5300.0,
+                "clock_assumptions": ["CDNA3 scaffold for phase 45"],
+                "source": "CDNA3 scaffold for phase 45",
+                "confidence": "inexact",
+                "hardware_validation_status": "unvalidated",
+                "model_validation_status": "unvalidated",
+                "evidence_refs": ["docs/internal/mi300x_validation_readiness.md"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return load_amd_hardware_model(hardware_path)

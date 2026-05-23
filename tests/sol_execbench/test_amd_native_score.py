@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from sol_execbench.core.data.definition import Definition
@@ -33,6 +34,7 @@ from sol_execbench.core.scoring.amd_sol import (
     build_amd_sol_bound_artifact,
     default_amd_hardware_models,
 )
+from sol_execbench.core.scoring.amd_hardware_models import load_amd_hardware_model
 from sol_execbench.sol_score import sol_score
 
 
@@ -64,7 +66,30 @@ def _matmul_artifact():
     )
 
 
-def _unsupported_cdna3_artifact():
+def _cdna3_model(tmp_path):
+    path = tmp_path / "cdna3-model.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": "sol_execbench.amd_hardware_model.v2",
+                "architecture": "gfx942",
+                "dtype_or_path": "bf16/fp32 mixed benchmark path",
+                "peak_tflops": 1300.0,
+                "memory_bandwidth_gbps": 5300.0,
+                "clock_assumptions": ["CDNA3 scaffold for phase 45"],
+                "source": "CDNA3 scaffold for phase 45",
+                "confidence": "inexact",
+                "hardware_validation_status": "unvalidated",
+                "model_validation_status": "unvalidated",
+                "evidence_refs": ["docs/internal/mi300x_validation_readiness.md"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return load_amd_hardware_model(path)
+
+
+def _unsupported_cdna3_artifact(tmp_path: Path):
     definition = Definition(
         name="unsupported_demo",
         axes={"N": {"type": "var"}},
@@ -78,7 +103,7 @@ def _unsupported_cdna3_artifact():
         uuid="unsupported-workload",
     )
     return build_amd_sol_bound_artifact(
-        definition, workload, default_amd_hardware_models()["gfx942"]
+        definition, workload, _cdna3_model(tmp_path)
     )
 
 
@@ -134,9 +159,9 @@ def test_suite_report_is_derived_and_preserves_evidence_references():
     assert payload["scores"][0]["evidence_refs"]["sol_bound"] == "sol/matmul.json"
 
 
-def test_unsupported_cdna3_score_carries_no_validation_guardrails():
+def test_unsupported_cdna3_score_carries_no_validation_guardrails(tmp_path):
     report = score_amd_native_workload(
-        _unsupported_cdna3_artifact(),
+        _unsupported_cdna3_artifact(tmp_path),
         measured_latency_ms=1.0,
         baseline_latency_ms=2.0,
         timing_evidence_ref="timing/exp.json",

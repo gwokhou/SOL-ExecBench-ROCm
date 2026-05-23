@@ -161,9 +161,8 @@ silently present benchmark-relative data as hardware validation.
 
 ## AMD-Native Score Interpretation
 
-The original SOL-Score formula is preserved for compatibility, but the original
-published interpretation is anchored to NVIDIA B200/SOLAR data. In this ROCm
-port:
+The original SOL-Score formula is preserved for compatibility, but this ROCm
+port is not an NVIDIA/B200/SOLAR equivalence study. In this ROCm port:
 
 1. `sol_score()` remains a formula helper.
 2. Baseline comparison reports are baseline-relative by default.
@@ -171,10 +170,11 @@ port:
    recorded hardware evidence, and documentation of which architecture and
    clock policy the model covers.
 4. AMD-native scoring requires an AMD SOL bound artifact with graph nodes,
-   FLOP/byte evidence, hardware model source, confidence, and validation status
+   FLOP/byte evidence, hardware model source, confidence, and split validation
+   states (`hardware_validation_status`, `model_validation_status`)
    before reporting AMD-native scores.
 5. CDNA 3 claims additionally require real `gfx94*` full-suite validation
-   evidence, which is not part of the v1.6 milestone.
+   evidence, which is not part of the v1.9 milestone.
 
 AMD-native score reports are derived artifacts. They can reference trace timing,
 ROCm timing evidence, baseline summaries, and AMD SOL bound artifacts, but they

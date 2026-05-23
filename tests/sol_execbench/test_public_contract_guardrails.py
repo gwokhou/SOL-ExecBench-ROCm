@@ -25,10 +25,10 @@ from sol_execbench.core.scoring.amd_score import (
 )
 from sol_execbench.core.scoring.amd_sol import (
     EstimateConfidence,
-    HardwareValidationStatus,
     build_amd_sol_bound_artifact,
     default_amd_hardware_models,
 )
+from sol_execbench.core.scoring.amd_hardware_models import HardwareValidationStatus
 from sol_execbench.core.data.definition import Definition
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -112,11 +112,16 @@ def test_primary_cli_does_not_expose_v1_6_derived_workflow_options():
         "--rocprofv3",
         "--timing-evidence",
         "--sol-bound",
+        "--bound-graph",
+        "--extract-bound-graph",
+        "--hardware-model",
+        "--amd-hardware-model",
+        "--hardware-model-path",
     ):
         assert additive_non_primary_option not in help_text
 
 
-def test_v1_6_derived_artifacts_remain_noncanonical():
+def test_v1_9_derived_artifacts_remain_noncanonical():
     policy = select_timing_policy(TimingSourceType.HIP_NATIVE)
     timing = Rocprofv3TimingEvidence(
         tool_version="rocprofv3 7.0.0",
@@ -141,14 +146,16 @@ def test_v1_6_derived_artifacts_remain_noncanonical():
     assert suite.to_dict()["canonical_output"] == "trace_jsonl"
 
 
-def test_v1_6_claim_guardrails_keep_cdna3_and_nvidia_equivalence_out_of_scope():
+def test_v1_9_claim_guardrails_keep_cdna3_and_nvidia_equivalence_out_of_scope():
     project = Path(".planning/PROJECT.md").read_text()
     requirements = Path(".planning/REQUIREMENTS.md").read_text()
     analysis = Path("docs/analysis.md").read_text()
 
-    assert "Performing real CDNA 3 `gfx94*` full-suite hardware validation in v1.6" in project
-    assert "Real CDNA3 `gfx94*` full-suite validation" in requirements
+    assert "CDNA 3 (`gfx94*`) full adapted suite validation remains deferred" in project
+    assert "CDNA 3 / MI300X real-hardware validation" in requirements
     assert "not NVIDIA B200, SOLAR, or leaderboard equivalence claims" in analysis
+    assert "hardware_validation_status" in analysis
+    assert "model_validation_status" in analysis
 
 
 def test_hardware_model_evidence_survives_bound_and_score_artifacts():
@@ -184,10 +191,41 @@ def test_hardware_model_evidence_survives_bound_and_score_artifacts():
     assert payload["hardware_model"]["source"]
     assert payload["hardware_model"]["confidence"] == EstimateConfidence.INEXACT.value
     assert (
-        payload["hardware_model"]["validation_status"]
+        payload["hardware_model"]["model_validation_status"]
         == HardwareValidationStatus.PROVISIONAL.value
     )
+    assert "validation_status" not in payload["hardware_model"]
     assert score.evidence_refs["hardware_model"] == "default_amd_hardware_models.gfx1200"
+
+
+def test_definition_workload_trace_schemas_do_not_include_derived_artifact_fields():
+    definition = Definition(
+        name="demo",
+        axes={"N": {"type": "var"}},
+        inputs={"x": {"shape": ["N"], "dtype": "float32"}},
+        outputs={"out": {"shape": ["N"], "dtype": "float32"}},
+        reference="def run(x):\n    return x",
+    )
+    workload = Workload(axes={"N": 16}, inputs={"x": {"type": "random"}}, uuid="w1")
+    trace = Trace(
+        definition="demo",
+        workload=workload,
+        solution="solution",
+        evaluation=None,
+    )
+
+    assert "hardware_model" not in definition.model_dump(mode="json")
+    assert "bound_graph" not in definition.model_dump(mode="json")
+    assert "graph_nodes" not in definition.model_dump(mode="json")
+    assert "op_family" not in definition.model_dump(mode="json")
+    assert "op_bounds" not in definition.model_dump(mode="json")
+    assert "hardware_model" not in workload.model_dump(mode="json")
+    assert "bound_graph" not in workload.model_dump(mode="json")
+    assert "op_family" not in workload.model_dump(mode="json")
+    assert "bound_graph" not in trace.model_dump(mode="json")
+    assert "graph_nodes" not in trace.model_dump(mode="json")
+    assert "op_family" not in trace.model_dump(mode="json")
+    assert "amd_native" not in trace.model_dump(mode="json")
 
 
 def test_v1_4_compatibility_inventory_covers_public_contracts():
