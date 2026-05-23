@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -21,6 +22,7 @@ from sol_execbench.core.data.trace import Trace
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.scoring.amd_score import (
     CDNA3_NO_VALIDATION_WARNING,
+    DEGRADED_SOL_BOUND_WARNING,
     build_amd_native_suite_report,
     score_amd_native_workload,
 )
@@ -41,6 +43,26 @@ if TEST_DIR not in sys.path:
     sys.path.insert(0, TEST_DIR)
 
 from solar_derivation_fixtures import load_solar_derivation_fixtures  # noqa: E402
+
+
+PHASE50_INTERNAL_EVIDENCE_NAMES = (
+    "moe_static_route_flops",
+    "moe_dynamic_route_bytes",
+    "ssm_mamba_static_scan_flops",
+    "ssm_mamba_degraded_scan_bytes",
+    "inexact_operator:moe_dynamic_routing",
+    "unsupported_operator:moe_taxonomy_only",
+    "inexact_operator:ssm_missing_recurrence",
+    "unsupported_operator:ssm_custom_scan",
+    "aggregate_degraded:moe",
+    "aggregate_degraded:ssm_mamba",
+    "aggregate_unscored:moe",
+    "aggregate_unscored:ssm_mamba",
+    "route:top_k",
+    "route:static_cardinality",
+    "recurrence:state_shape",
+    "recurrence:update_parameters",
+)
 
 
 def test_solution_json_contract_accepts_existing_rocm_shape():
@@ -196,6 +218,7 @@ def test_v1_10_solar_derivation_fields_remain_noncanonical():
         "output_spatial",
         "selected_elements",
         "index_dtype",
+        *PHASE50_INTERNAL_EVIDENCE_NAMES,
     )
 
     for payload in (
@@ -206,6 +229,10 @@ def test_v1_10_solar_derivation_fields_remain_noncanonical():
         for field in forbidden:
             assert field not in payload
             assert field not in repr(payload)
+
+    canonical_trace_jsonl = json.dumps(trace.model_dump(mode="json"), sort_keys=True)
+    for field in PHASE50_INTERNAL_EVIDENCE_NAMES:
+        assert field not in canonical_trace_jsonl
 
 
 def test_amd_sol_artifacts_may_keep_existing_bound_fields_while_solar_fields_stay_sidecar_only():
@@ -262,8 +289,121 @@ def test_primary_cli_does_not_expose_v1_10_solar_derivation_options():
         "--solar-confidence",
         "--solar-provenance",
         "--derive-solar-sidecar",
+        *PHASE50_INTERNAL_EVIDENCE_NAMES,
     ):
         assert option not in help_text
+
+
+def test_degraded_complex_family_score_eligibility_ignores_solar_sidecars():
+    cases = (
+        (
+            Definition(
+                name="moe_dynamic_route",
+                axes={
+                    "tokens": {"type": "const", "value": 128},
+                    "hidden": {"type": "const", "value": 256},
+                    "experts": {"type": "const", "value": 8},
+                },
+                inputs={
+                    "x": {"shape": ["tokens", "hidden"], "dtype": "float16"},
+                    "router": {"shape": ["hidden", "experts"], "dtype": "float16"},
+                    "expert_weights": {
+                        "shape": ["experts", "hidden", "hidden"],
+                        "dtype": "float16",
+                    },
+                    "threshold": {"shape": None, "dtype": "float16"},
+                },
+                outputs={"out": {"shape": ["tokens", "hidden"], "dtype": "float16"}},
+                reference=(
+                    "def run(x, router, expert_weights, threshold):\n"
+                    "    scores = router(x)\n"
+                    "    chosen = scores > threshold\n"
+                    "    return dispatch_dynamic(x, expert_weights, chosen)\n"
+                ),
+            ),
+            Workload(
+                axes={},
+                inputs={
+                    "x": {"type": "random"},
+                    "router": {"type": "random"},
+                    "expert_weights": {"type": "random"},
+                    "threshold": {"type": "random"},
+                },
+                uuid="moe-dynamic-workload",
+            ),
+            "moe_dynamic_route_bytes",
+        ),
+        (
+            Definition(
+                name="ssm_mamba_missing_recurrence",
+                axes={
+                    "batch": {"type": "const", "value": 2},
+                    "sequence": {"type": "const", "value": 64},
+                    "hidden": {"type": "const", "value": 128},
+                    "one": {"type": "const", "value": 1},
+                    "kernel": {"type": "const", "value": 3},
+                },
+                inputs={
+                    "x": {"shape": ["batch", "sequence", "hidden"], "dtype": "float16"},
+                    "w_in": {"shape": ["hidden", "hidden"], "dtype": "float16"},
+                    "conv_weight": {
+                        "shape": ["hidden", "one", "kernel"],
+                        "dtype": "float16",
+                    },
+                    "params": {"shape": ["hidden"], "dtype": "float16"},
+                    "w_out": {"shape": ["hidden", "hidden"], "dtype": "float16"},
+                },
+                outputs={
+                    "out": {
+                        "shape": ["batch", "sequence", "hidden"],
+                        "dtype": "float16",
+                    }
+                },
+                reference=(
+                    "def run(x, w_in, conv_weight, params, w_out):\n"
+                    "    z = in_proj(x, w_in)\n"
+                    "    z = depthwise_conv(z, conv_weight)\n"
+                    "    y = selective_scan(z, params)\n"
+                    "    return out_proj(y, w_out)\n"
+                ),
+            ),
+            Workload(
+                axes={},
+                inputs={
+                    "x": {"type": "random"},
+                    "w_in": {"type": "random"},
+                    "conv_weight": {"type": "random"},
+                    "params": {"type": "random"},
+                    "w_out": {"type": "random"},
+                },
+                uuid="ssm-mamba-workload",
+            ),
+            "ssm_mamba_degraded_scan_bytes",
+        ),
+    )
+    hardware = default_amd_hardware_models()["gfx1200"]
+
+    for definition, workload, formula_kind in cases:
+        artifact = build_amd_sol_bound_v2_artifact(definition, workload, hardware)
+        score = score_amd_native_workload(
+            artifact,
+            measured_latency_ms=1.0,
+            baseline_latency_ms=2.0,
+            hardware_model_ref="default_amd_hardware_models.gfx1200",
+        )
+
+        assert artifact.aggregate_bound.status == "degraded"
+        assert any(
+            estimate["formula_kind"] == formula_kind
+            for estimate in artifact.operator_work_estimates
+        )
+        assert score.supported is True
+        assert score.claim_level == "amd-native-derived"
+        assert DEGRADED_SOL_BOUND_WARNING in score.warnings
+        assert "solar_derivation" not in score.evidence_refs
+        assert "formula_evidence" not in score.evidence_refs
+        assert "byte_evidence" not in score.evidence_refs
+        assert "bound_evidence" not in score.evidence_refs
 
 
 def test_importing_solar_derivation_keeps_amd_native_score_eligibility_unchanged():
