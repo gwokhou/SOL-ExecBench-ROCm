@@ -20,6 +20,7 @@ from sol_execbench.core.bench.timing_policy import (
 from sol_execbench.core.data.solution import Solution
 from sol_execbench.core.data.trace import Trace
 from sol_execbench.core.data.workload import Workload
+from sol_execbench.core.dataset import DatasetManifestSource, build_dataset_manifest
 from sol_execbench.core.scoring.amd_score import (
     CDNA3_NO_VALIDATION_WARNING,
     DEGRADED_SOL_BOUND_WARNING,
@@ -422,6 +423,48 @@ def test_primary_cli_does_not_expose_v1_10_solar_derivation_options():
         *PHASE51_INTERNAL_PUBLIC_BOUNDARY_FIELDS,
     ):
         assert option not in help_text
+
+
+def test_v1_11_dataset_manifest_keeps_acquisition_claim_boundary(tmp_path):
+    problem_dir = tmp_path / "L1" / "demo"
+    problem_dir.mkdir(parents=True)
+    (problem_dir / "definition.json").write_text("{}\n", encoding="utf-8")
+    (problem_dir / "workload.jsonl").write_text('{"uuid":"w"}\n', encoding="utf-8")
+
+    manifest = build_dataset_manifest(
+        tmp_path,
+        categories=("L1",),
+        source=DatasetManifestSource(revision="main"),
+        created_at="2026-05-23T00:00:00Z",
+    )
+    boundary = manifest.claim_boundary
+
+    assert boundary.acquisition_or_layout_complete is True
+    assert boundary.rocm_readiness is False
+    assert boundary.execution_success is False
+    assert boundary.paper_level_validation is False
+    assert boundary.hosted_leaderboard_parity is False
+    assert boundary.upstream_solar_equivalence is False
+
+
+def test_v1_11_dataset_docs_do_not_overclaim_acquisition_layout():
+    docs = "\n".join(
+        [
+            (REPO_ROOT / "docs/GETTING-STARTED.md").read_text(),
+            (REPO_ROOT / "docs/analysis.md").read_text(),
+        ]
+    )
+
+    assert "data/SOL-ExecBench/benchmark" in docs
+    assert "acquisition/layout" in docs
+    for expected_boundary in (
+        "does not prove ROCm readiness",
+        "execution success",
+        "paper-level validation",
+        "hosted leaderboard parity",
+        "upstream SOLAR equivalence",
+    ):
+        assert expected_boundary in docs
 
 
 def test_public_score_evidence_refs_keep_exact_established_key_space():
