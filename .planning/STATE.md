@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.10
 milestone_name: Paper-Aligned SOLAR Automatic Derivation
-status: executing
-stopped_at: Completed 48-03-PLAN.md; next step is 48-04-PLAN.md.
-last_updated: "2026-05-23T05:26:11Z"
+status: verifying
+stopped_at: Completed 48-04-PLAN.md
+last_updated: "2026-05-23T05:35:06.576Z"
 last_activity: 2026-05-23
 progress:
   total_phases: 6
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 10
-  completed_plans: 9
-  percent: 90
+  completed_plans: 10
+  percent: 100
 ---
 
 # Project State
@@ -27,10 +27,10 @@ See: `.planning/PROJECT.md` (updated 2026-05-23)
 
 Phase: 48 (extraction-pipeline-and-semantic-provenance) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-05-23
 
-Progress: [█████████░] 90%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -57,6 +57,7 @@ Progress: [█████████░] 90%
 - Trend: n/a
 
 *Updated after each plan completion*
+| Phase 48 P4 | 4min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -73,6 +74,9 @@ Decisions are logged in PROJECT.md. Recent decisions affecting current work:
 - 48-02 keeps candidate solution execution explicitly outside the evidence builder boundary.
 - 48-03 keeps SOLAR confidence classification pure and maps supported, inexact, and unsupported evidence to scored, degraded, and unscored states conservatively.
 - 48-03 uses graph semantics for subrole provenance while retaining estimate provenance at the semantic-group level.
+- [Phase 48]: Keep Phase 47 fixture expectations as data-only inputs and round-trip them through Phase 48 evidence without executing fixture references.
+- [Phase 48]: Add required_evidence to the internal SOLAR semantic group sidecar for exact fixture-contract preservation while keeping public schemas unchanged.
+- [Phase 48]: Keep Phase 48 evidence names and CLI switches excluded from canonical public schemas, trace JSONL, and primary sol-execbench help.
 
 ### Pending Todos
 
@@ -96,6 +100,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-23T05:26:11Z
-Stopped at: Completed 48-03-PLAN.md; next step is 48-04-PLAN.md.
+Last session: 2026-05-23T05:35:06.570Z
+Stopped at: Completed 48-04-PLAN.md
 Resume file: None

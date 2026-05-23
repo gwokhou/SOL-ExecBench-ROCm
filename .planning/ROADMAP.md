@@ -57,7 +57,7 @@ NVIDIA Blackwell/B200 equivalence, and new framework dependencies.
   the v1.10 derivation contract and fixture coverage before expanding
   extraction behavior.
 
-- [ ] **Phase 48: Extraction Pipeline And Semantic Provenance** - Add the
+- [x] **Phase 48: Extraction Pipeline And Semantic Provenance** - Add the (completed 2026-05-23)
   shared extraction infrastructure for compound groups, subroles, provenance,
   and deterministic confidence.
 
@@ -159,7 +159,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 48-04-PLAN.md — Close fixture-driven coverage and public contract guardrails.
+- [x] 48-04-PLAN.md — Close fixture-driven coverage and public contract guardrails.
 
 ### Phase 49: High-Confidence Family Modeling
 
@@ -275,7 +275,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 47. Derivation Contract And Golden Fixture Matrix | 6/6 | Complete | 2026-05-23 |
-| 48. Extraction Pipeline And Semantic Provenance | 2/4 | In Progress|  |
+| 48. Extraction Pipeline And Semantic Provenance | 4/4 | Complete   | 2026-05-23 |
 | 49. High-Confidence Family Modeling | 0/TBD | Not started | - |
 | 50. Degraded Complex Family Modeling | 0/TBD | Not started | - |
 | 51. Sidecar Coverage And Score Guards | 0/TBD | Not started | - |
