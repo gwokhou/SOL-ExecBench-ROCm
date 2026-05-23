@@ -870,40 +870,31 @@ def _annotate_moe_graph(graph: BoundGraph) -> BoundGraph:
             )
         )
 
-    route_top_k = next(
-        (
-            node.attributes.get("route_top_k")
-            for node in nodes
-            if node.op_family == OpFamily.MOE
-            and node.attributes.get("subrole") == "top_k"
-            and isinstance(node.attributes.get("route_top_k"), int)
-        ),
-        None,
-    )
-    if route_top_k is not None:
-        routed_nodes: list[BoundGraphNode] = []
-        for node in nodes:
-            if (
-                node.op_family == OpFamily.MOE
-                and node.attributes.get("subrole") == "dispatch"
-                and "route_top_k" not in node.attributes
-                and not node.attributes.get("missing_route_metadata")
-            ):
-                routed_nodes.append(
-                    replace(
-                        node,
-                        attributes={
-                            **node.attributes,
-                            "route_top_k": route_top_k,
-                            "route_cardinality_source": "topk.k",
-                        },
-                        confidence=EstimateConfidence.SUPPORTED,
-                        rationale="recognized MoE dispatch with visible static top-k route",
-                    )
+    routed_nodes: list[BoundGraphNode] = []
+    for node in nodes:
+        if (
+            node.op_family == OpFamily.MOE
+            and node.attributes.get("subrole") == "dispatch"
+            and "route_top_k" not in node.attributes
+            and not node.attributes.get("missing_route_metadata")
+        ):
+            route_attrs = _moe_route_metadata_from_dispatch_input(graph, nodes, node)
+            attrs = {**node.attributes, **route_attrs}
+            routed_nodes.append(
+                replace(
+                    node,
+                    attributes=attrs,
+                    confidence=(
+                        EstimateConfidence.SUPPORTED
+                        if _moe_node_has_static_route(attrs)
+                        else EstimateConfidence.INEXACT
+                    ),
+                    rationale=_moe_rationale(attrs),
                 )
-            else:
-                routed_nodes.append(node)
-        nodes = routed_nodes
+            )
+        else:
+            routed_nodes.append(node)
+    nodes = routed_nodes
 
     return replace(graph, nodes=tuple(nodes), warnings=tuple(dict.fromkeys(warnings)))
 
@@ -1139,6 +1130,25 @@ def _moe_route_metadata_from_topk(node: BoundGraphNode) -> dict[str, object]:
         return {
             "route_top_k": int(node.attributes["route_top_k"]),
             "route_cardinality_source": "topk.k",
+        }
+    return {"missing_route_metadata": ("route:top_k", "route:static_cardinality")}
+
+
+def _moe_route_metadata_from_dispatch_input(
+    graph: BoundGraph,
+    nodes: list[BoundGraphNode],
+    node: BoundGraphNode,
+) -> dict[str, object]:
+    route_producer = _producer_node_for_input(graph, nodes, node, input_index=2)
+    if (
+        route_producer is not None
+        and route_producer.op_family == OpFamily.MOE
+        and route_producer.attributes.get("subrole") == "top_k"
+        and isinstance(route_producer.attributes.get("route_top_k"), int)
+    ):
+        return {
+            "route_top_k": int(route_producer.attributes["route_top_k"]),
+            "route_cardinality_source": f"{route_producer.node_id}.topk.k",
         }
     return {"missing_route_metadata": ("route:top_k", "route:static_cardinality")}
 

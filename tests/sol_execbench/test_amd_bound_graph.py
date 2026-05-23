@@ -130,6 +130,101 @@ def test_moe_visible_static_route_nodes_record_subroles_and_metadata():
     assert dispatch.confidence == EstimateConfidence.SUPPORTED
 
 
+def test_moe_dispatch_uses_top_k_from_consumed_route_tensor():
+    definition = Definition(
+        name="moe_route_binding",
+        axes={
+            "tokens": {"type": "const", "value": 128},
+            "hidden": {"type": "const", "value": 256},
+            "experts": {"type": "const", "value": 8},
+        },
+        inputs={
+            "x": {"shape": ["tokens", "hidden"], "dtype": "float16"},
+            "router": {"shape": ["hidden", "experts"], "dtype": "float16"},
+            "expert_weights": {"shape": ["experts", "hidden", "hidden"], "dtype": "float16"},
+        },
+        outputs={"out": {"shape": ["tokens", "hidden"], "dtype": "float16"}},
+        reference=(
+            "import torch\n\n"
+            "def run(x, router, expert_weights):\n"
+            "    scores = router(x)\n"
+            "    unused = torch.topk(scores, k=1, dim=-1)\n"
+            "    gates = torch.topk(scores, k=4, dim=-1)\n"
+            "    return dispatch_and_combine(x, expert_weights, gates)\n"
+        ),
+    )
+    workload = Workload(
+        axes={},
+        inputs={
+            "x": {"type": "random"},
+            "router": {"type": "random"},
+            "expert_weights": {"type": "random"},
+        },
+        uuid="moe-route-binding-workload",
+    )
+
+    graph = build_bound_graph(definition, workload)
+    dispatch = next(
+        node
+        for node in graph.nodes
+        if node.op_family == OpFamily.MOE and node.attributes.get("subrole") == "dispatch"
+    )
+
+    assert dispatch.attributes["route_top_k"] == 4
+    assert dispatch.attributes["route_cardinality_source"].endswith(".topk.k")
+    assert dispatch.confidence == EstimateConfidence.SUPPORTED
+
+
+def test_moe_dispatch_does_not_inherit_unrelated_top_k():
+    definition = Definition(
+        name="moe_unrelated_route",
+        axes={
+            "tokens": {"type": "const", "value": 128},
+            "hidden": {"type": "const", "value": 256},
+            "experts": {"type": "const", "value": 8},
+            "route": {"type": "const", "value": 2},
+        },
+        inputs={
+            "x": {"shape": ["tokens", "hidden"], "dtype": "float16"},
+            "router": {"shape": ["hidden", "experts"], "dtype": "float16"},
+            "expert_weights": {"shape": ["experts", "hidden", "hidden"], "dtype": "float16"},
+            "chosen": {"shape": ["tokens", "route"], "dtype": "int64"},
+        },
+        outputs={"out": {"shape": ["tokens", "hidden"], "dtype": "float16"}},
+        reference=(
+            "import torch\n\n"
+            "def run(x, router, expert_weights, chosen):\n"
+            "    scores = router(x)\n"
+            "    unused = torch.topk(scores, k=1, dim=-1)\n"
+            "    return dispatch_and_combine(x, expert_weights, chosen)\n"
+        ),
+    )
+    workload = Workload(
+        axes={},
+        inputs={
+            "x": {"type": "random"},
+            "router": {"type": "random"},
+            "expert_weights": {"type": "random"},
+            "chosen": {"type": "random"},
+        },
+        uuid="moe-unrelated-route-workload",
+    )
+
+    graph = build_bound_graph(definition, workload)
+    dispatch = next(
+        node
+        for node in graph.nodes
+        if node.op_family == OpFamily.MOE and node.attributes.get("subrole") == "dispatch"
+    )
+
+    assert "route_top_k" not in dispatch.attributes
+    assert dispatch.attributes["missing_route_metadata"] == (
+        "route:top_k",
+        "route:static_cardinality",
+    )
+    assert dispatch.confidence == EstimateConfidence.INEXACT
+
+
 def test_moe_dynamic_route_records_missing_static_metadata_without_defaults():
     definition = Definition(
         name="moe_dynamic_route",

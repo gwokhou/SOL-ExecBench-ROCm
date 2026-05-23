@@ -452,6 +452,90 @@ def test_ssm_mamba_missing_recurrence_estimate_degrades_to_visible_bytes():
     assert "state" not in estimate.formula_inputs
 
 
+def test_ssm_mamba_missing_scan_input_shape_does_not_fabricate_batch():
+    node = BoundGraphNode(
+        node_id="op_scan",
+        op_family=OpFamily.SSM_MAMBA,
+        op_name="selective_scan",
+        source_expression="selective_scan(x, state, a, b)",
+        input_tensor_ids=("input:x", "input:state", "input:a", "input:b"),
+        output_tensor_ids=("output:y",),
+        attributes={
+            "subrole": "scan",
+            "sequence_length": 64,
+            "hidden_size": 128,
+            "state_shape": (128, 16),
+            "state_update_parameters": ("input:state", "input:a", "input:b"),
+            "recurrence_source": "visible_scan_parameters",
+        },
+        confidence=EstimateConfidence.SUPPORTED,
+        rationale="recognized scan with incomplete input shape",
+    )
+    graph = BoundGraph(
+        definition="ssm_missing_batch_shape",
+        workload_uuid="w1",
+        nodes=(node,),
+        tensors={
+            "input:x": BoundTensor(
+                tensor_id="input:x",
+                name="x",
+                role=BoundTensorRole.INPUT,
+                shape=None,
+                dtype="float16",
+                producer_node_id=None,
+                source="test",
+            ),
+            "input:state": BoundTensor(
+                tensor_id="input:state",
+                name="state",
+                role=BoundTensorRole.INPUT,
+                shape=(128, 16),
+                dtype="float16",
+                producer_node_id=None,
+                source="test",
+            ),
+            "input:a": BoundTensor(
+                tensor_id="input:a",
+                name="a",
+                role=BoundTensorRole.INPUT,
+                shape=(128, 16),
+                dtype="float16",
+                producer_node_id=None,
+                source="test",
+            ),
+            "input:b": BoundTensor(
+                tensor_id="input:b",
+                name="b",
+                role=BoundTensorRole.INPUT,
+                shape=(128, 16),
+                dtype="float16",
+                producer_node_id=None,
+                source="test",
+            ),
+            "output:y": BoundTensor(
+                tensor_id="output:y",
+                name="y",
+                role=BoundTensorRole.OUTPUT,
+                shape=(2, 64, 128),
+                dtype="float16",
+                producer_node_id="op_scan",
+                source="test",
+            ),
+        },
+        edges=(),
+        warnings=(),
+    )
+
+    estimate = estimate_bound_work(graph)[0]
+
+    assert estimate.formula_kind == "ssm_mamba_degraded_scan_bytes"
+    assert "batch" not in estimate.formula_inputs
+    assert estimate.formula_inputs == {"sequence": 64, "hidden": 128}
+    assert estimate.flops == 0.0
+    assert estimate.confidence == EstimateConfidence.INEXACT
+    assert "inexact_operator:ssm_missing_recurrence" in estimate.warnings
+
+
 def test_ssm_mamba_custom_scan_estimate_remains_unsupported_without_fabricated_state():
     from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
 
