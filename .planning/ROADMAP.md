@@ -280,7 +280,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 51-02-PLAN.md — Integrate SOLAR aggregate status with AMD-native score guards.
+- [x] 51-02-PLAN.md — Integrate SOLAR aggregate status with AMD-native score guards.
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -321,7 +321,7 @@ Plans:
 | 48. Extraction Pipeline And Semantic Provenance | 4/4 | Complete    | 2026-05-23 |
 | 49. High-Confidence Family Modeling | 4/4 | Complete    | 2026-05-23 |
 | 50. Degraded Complex Family Modeling | 3/3 | Complete    | 2026-05-23 |
-| 51. Sidecar Coverage And Score Guards | 1/3 | In Progress | 2026-05-23 |
+| 51. Sidecar Coverage And Score Guards | 2/3 | In Progress | 2026-05-23 |
 | 52. Dataset Runner And Public Contract Closure | 0/TBD | Not started | - |
 
 ## Requirements Coverage
