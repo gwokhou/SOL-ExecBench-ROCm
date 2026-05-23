@@ -1,231 +1,352 @@
-# Architecture Research: AMD SOL/SOLAR Bound Modeling Completion
+# Architecture Research: v1.10 Paper-Aligned SOLAR Derivation
 
-**Project:** SOL ExecBench ROCm Port v1.9
-**Domain:** Derived AMD SOL/SOLAR bound modeling for ROCm benchmark scoring
-**Researched:** 2026-05-22
-**Overall confidence:** HIGH for integration boundaries, MEDIUM for exact model formulas until operator golden cases are specified.
+**Project:** SOL ExecBench ROCm Port  
+**Domain:** AMD-native SOL/SOLAR bound derivation sidecar pipeline  
+**Researched:** 2026-05-23  
+**Overall confidence:** HIGH for repository integration boundaries, MEDIUM for paper-alignment details because only the arXiv abstract was used as the paper baseline.
 
 ## Executive Summary
 
-The new bound-modeling work should integrate as a derived scoring subsystem under `src/sol_execbench/core/scoring/`, not as part of the benchmark execution path. The public benchmark contract remains `definition.json`, `workload.jsonl`, `solution.json`, and canonical `Trace` JSONL from `src/sol_execbench/core/data/trace.py`. AMD SOL/SOLAR artifacts are sidecar evidence consumed by AMD-native score reports, and they must never be embedded into, backfilled into, or required for canonical trace emission.
+v1.10 should integrate paper-aligned SOLAR derivation by extending the existing scoring sidecar pipeline, not by changing the benchmark execution path. The current architecture already has the correct backbone: canonical evaluation produces trace JSONL, optional dataset/reporting code derives AMD SOL v2 sidecars from `Definition` and `Workload`, and AMD-native score reports consume those sidecars plus measured trace timing and baseline latency. That shape preserves the project constraint that canonical trace JSONL, public schemas, and primary `sol-execbench` CLI behavior remain stable.
 
-The existing `amd_sol.py` already proves the right boundary: it builds `AmdSolBoundArtifact` from a `Definition`, `Workload`, and `AmdHardwareModel`, while `amd_score.py` consumes that artifact plus traces and baselines to produce guarded `AmdNativeScore` / `AmdNativeSuiteReport`. v1.9 should keep that external API shape but split the internals into focused modules for IR extraction, operator estimation, hardware-model loading, artifact serialization, and coverage/confidence reporting.
+The paper baseline from arXiv 2603.19173 is that SOLAR computes analytical hardware-grounded Speed-of-Light bounds, and SOL Score measures how much of the gap between a release-defined scoring baseline and the hardware SOL bound a candidate closes. For this ROCm milestone, the architecture should therefore focus on automatic derivation evidence and coverage evidence: richer workload graph extraction, family-specific estimates, hardware-bound sidecars, and guarded score eligibility. It should not add 124-model/235-problem extraction, new real-hardware validation, or a hosted leaderboard.
 
-The highest-value architectural move is replacing the current AST visitor plus hard-coded hardware defaults with a small, typed pipeline:
+The recommended integration point is a new internal SOLAR derivation layer inside `src/sol_execbench/core/scoring/` that sits between `amd_bound_graph.py` and `amd_sol_v2.py`. `amd_bound_graph.py` should continue to own workload-bound graph IR extraction, but it needs family-specific extractors and normalization helpers. `amd_bound_estimates.py` should remain the estimate facade but delegate to per-family estimator modules. `amd_sol_v2.py` should remain the stable sidecar builder/parser and aggregate coverage gate, with additive fields only if required for derivation coverage. `amd_score.py` should stay a consumer of sidecar aggregate state and must not duplicate derivation logic.
 
-`Definition.reference + Workload -> BoundGraph -> WorkEstimate[] -> HardwareModel -> BoundArtifact -> AmdNativeScore`.
+## Current Architecture Relevant To SOLAR
 
-The dataset runner should be modified only at the optional derived-report layer. `scripts/run_dataset.py --amd-score-report` can load hardware model artifacts, emit per-workload SOL bound sidecars, and reference them from the suite report. The benchmark CLI and `Trace` schema should not change.
+```text
+Canonical benchmark path:
+definition/workload/solution/config
+  -> ProblemPackager
+  -> isolated eval_driver subprocess
+  -> canonical Trace JSONL
 
-## Public-Contract Boundaries
+Derived scoring path:
+Definition + Workload + AmdHardwareModel
+  -> build_bound_graph()
+  -> estimate_bound_work()
+  -> build_amd_sol_bound_v2_artifact()
+  -> score_amd_native_trace_workload()
+  -> optional dataset suite report and sidecars
+```
 
-| Boundary | Status | Rule |
+The current derived path is already separated from the execution path:
+
+| Existing component | Current role | v1.10 role |
 | --- | --- | --- |
-| `Trace` JSONL in `src/sol_execbench/core/data/trace.py` | Unchanged | Do not add SOL fields, schema versions, coverage, or hardware models to canonical traces. |
-| Primary `sol-execbench` CLI | Unchanged by default | It should continue to emit trace JSONL only. No SOL artifact generation in the hot benchmark path unless a later explicit CLI flag is designed. |
-| `definition.json` / `workload.jsonl` / `solution.json` | Unchanged | Bound modeling reads validated models and must not require new public schema fields. |
-| `AmdNativeSuiteReport` | Modified derived contract | It may gain evidence references and scoring warnings, but remains a derived report with `canonical_output: trace_jsonl`. |
-| AMD SOL bound artifacts | New/modified derived contract | Version independently from public benchmark schemas. Store as JSON sidecars with explicit `schema_version`, `derived: true`, model source, confidence, and coverage. |
-| Hardware model artifacts | New derived input contract | Version independently and load explicitly; built-in fallback may exist but must be labeled provisional. |
+| `src/sol_execbench/core/scoring/amd_bound_graph.py` | Builds `BoundGraph` from `Definition.reference` and concrete `Workload`, using torch.fx first and AST fallback. | Extend into richer SOLAR workload graph extraction, while preserving `BoundGraph.to_dict()` compatibility or evolving it additively. |
+| `src/sol_execbench/core/scoring/amd_bound_estimates.py` | Converts `BoundGraphNode` objects into FLOP/byte/movement estimates for common families. | Become the dispatcher to family-specific estimators; avoid growing one monolithic estimator file. |
+| `src/sol_execbench/core/scoring/amd_sol_v2.py` | Builds/parses AMD SOL v2 sidecars with graph, estimates, per-op bounds, aggregate status, warnings, and coverage. | Remain the stable artifact boundary for SOLAR derivation evidence and score eligibility. |
+| `src/sol_execbench/core/scoring/amd_score.py` | Computes guarded AMD-native scores from trace timing, baseline latency, and SOL artifacts. | Consume aggregate sidecar status only; do not inspect extractor internals. |
+| `src/sol_execbench/core/scoring/amd_hardware_models.py` | Loads strict AMD hardware models with validation/confidence metadata. | Continue as hardware input contract; no new hardware validation claims in v1.10. |
+| `scripts/run_dataset.py` | Optional dataset runner builds AMD SOL v2 sidecars and AMD score reports. | Add optional SOLAR coverage/derivation outputs here, preserving default benchmark CLI behavior. |
 
-## Recommended Module Structure
+## Recommended Component Boundaries
+
+### 1. SOLAR Extraction Layer
+
+Add focused modules under `src/sol_execbench/core/scoring/`:
+
+```text
+solar_extraction.py          # orchestration: Definition + Workload -> BoundGraph
+solar_patterns.py            # reusable graph pattern definitions
+solar_shape.py               # workload-bound shape, dtype, axis, and broadcast evidence helpers
+solar_coverage.py            # extraction/estimate coverage summaries and gates
+```
+
+`amd_bound_graph.py` can either import these helpers or be gradually split so existing public imports continue to work:
+
+```python
+def build_bound_graph(definition: Definition, workload: Workload) -> BoundGraph:
+    return derive_solar_bound_graph(definition, workload)
+```
+
+This keeps the existing integration surface stable while making room for family-specific extraction. The important boundary is that extraction consumes only canonical problem inputs, especially `Definition.reference`, declared input/output schemas, axes, and concrete `Workload`. It must not consume solution code or measured trace latency, because SOLAR bounds are analytical targets independent of candidate performance.
+
+### 2. Family-Specific Estimator Layer
+
+Split estimator logic by operation family:
+
+```text
+solar_estimates/
+  __init__.py                # estimate_bound_work dispatcher
+  gemm.py
+  attention.py
+  moe.py
+  convolution.py
+  ssm_mamba.py
+  embedding_positional.py
+  normalization.py
+  pointwise.py
+  movement.py
+```
+
+`OperatorWorkEstimate` should remain the common estimate object. Additive evidence fields should be routed through existing `formula_kind`, `formula`, `formula_inputs`, `warnings`, `confidence`, and `rationale` first. Only add new serialized fields when they are needed for machine-verifiable coverage and cannot be represented in the existing fields.
+
+Recommended new family responsibilities:
+
+| Family | Extraction responsibility | Estimate responsibility | Confidence default |
+| --- | --- | --- | --- |
+| Attention | Detect QK, scale/mask/softmax, PV, GQA/MQA grouping, causal/window masks when visible in reference. | FLOPs for QK and PV, bytes for Q/K/V/O and mask/read-write movement, intermediate logits/probability evidence. | SUPPORTED only when dimensions and attention structure are explicit; otherwise INEXACT. |
+| MoE | Detect top-k routing, expert projection groups, token dispatch/combine, expert count and capacity when inferable. | Routed GEMM FLOPs, routing/dispatch bytes, combine bytes, sparse activation evidence. | INEXACT unless top-k, expert shapes, and route cardinality are explicit. |
+| Convolution | Detect `conv1d/2d/3d`, stride, padding, dilation, groups, batch/channel/spatial dimensions. | Standard convolution FLOPs and input/filter/output byte traffic. | SUPPORTED when shape and parameters are explicit. |
+| SSM/Mamba | Detect scan/selective state update patterns, causal recurrence, projection pre/post steps. | Separate projection FLOPs from recurrence/scan estimates, with explicit recurrence warnings. | INEXACT by default; SUPPORTED only for recognized formulas with complete state dimensions. |
+| Embedding/positional | Detect embedding lookup, gather, rotary/positional transform, index tensors. | Mostly memory/read traffic with low FLOP transforms for positional operations. | INEXACT if index cardinality or reuse is unknown. |
+| Linear projection | Keep GEMM-compatible path but preserve semantic family for attention/MLP/MoE projections. | Delegate to GEMM formula with projection context in `formula_inputs`. | SUPPORTED when GEMM dims are known. |
+
+### 3. Coverage Evidence Layer
+
+The current `AmdSolV2CoverageSummary` counts total, supported, inexact, unsupported operations and confidence by family. v1.10 should extend coverage evidence so reports can distinguish "recognized but degraded" from "not extracted".
+
+Recommended coverage model, preferably additive in the v2 sidecar:
+
+```text
+coverage_summary:
+  total_ops
+  supported_ops
+  inexact_ops
+  unsupported_ops
+  op_family_counts
+  confidence_counts_by_family
+  worst_confidence
+  extraction:
+    source: torch.fx | ast | mixed | failed
+    pattern_hits_by_family: {...}
+    missing_pattern_families: [...]
+    unsupported_operator_names: [...]
+  estimate:
+    estimated_node_ids: [...]
+    unestimated_node_ids: [...]
+    degraded_node_ids: [...]
+```
+
+If schema stability is a concern, add this as a new `derivation_coverage` field in `AmdSolBoundV2Artifact` rather than changing existing coverage fields. The parser should require it only after a schema version bump. For v1.10, a schema bump to `sol_execbench.amd_sol_bound.v3` is justified only if the roadmap requires strict parsing of new coverage fields. Otherwise, keep v2 and make coverage additive only in nested dictionaries that existing code tolerates.
+
+### 4. Score Boundary
+
+`amd_score.py` should remain intentionally narrow:
+
+```text
+Trace measured latency + baseline latency + sidecar aggregate SOL bound
+  -> SOL Score or unscored/degraded warning
+```
+
+The score layer should not inspect attention/MoE/convolution details. It should rely on:
+
+| Sidecar state | Score behavior |
+| --- | --- |
+| `aggregate_bound.status == "scored"` | Score can be computed if trace and baseline timing are complete. |
+| `aggregate_bound.status == "degraded"` | Score may compute but must retain degraded/provisional warnings. |
+| `aggregate_bound.status == "unscored"` | Score must be `None`; warnings must explain unsupported or missing evidence. |
+
+This preserves the current guardrail that partial SOLAR coverage cannot silently inflate AMD-native scores.
+
+## Data Flow For v1.10
+
+```text
+Inputs:
+  Definition.reference
+  Definition input/output schemas
+  Workload axes
+  AmdHardwareModel
+  Optional canonical Trace JSONL and scoring baseline
+
+Derivation:
+  1. Build workload-bound tensor declarations from Definition + Workload.
+  2. Trace reference with torch.fx when possible.
+  3. Fall back to AST extraction for unsupported dynamic trace cases.
+  4. Normalize graph nodes into paper-aligned families.
+  5. Apply family-specific pattern extraction for attention, MoE, convolution,
+     SSM/Mamba, embedding/positional, linear projection, and existing families.
+  6. Estimate FLOPs, read/write bytes, intermediate bytes, movement bytes,
+     formula inputs, confidence, and rationale per node.
+  7. Convert estimates plus hardware model into per-op compute/memory SOL bounds.
+  8. Aggregate operation bounds and coverage into scored/degraded/unscored state.
+  9. Write sidecar evidence and optional suite coverage report.
+
+Scoring:
+  10. Combine canonical Trace latency, release baseline latency, and aggregate
+      SOL bound through existing AMD-native score report code.
+```
+
+Critical separation:
+
+```text
+SOLAR derivation never changes:
+  - definition.json schema
+  - workload.jsonl schema
+  - solution.json schema
+  - Trace JSONL schema
+  - eval_driver behavior
+  - default sol-execbench CLI output
+```
+
+## New vs Modified Components
 
 ### New Components
 
-| Module | Classes / Functions | Responsibility |
+| Component | Purpose | Build priority |
 | --- | --- | --- |
-| `src/sol_execbench/core/scoring/amd_sol/ir.py` | `BoundGraph`, `BoundNode`, `BoundEdge`, `TensorRef`, `OpKind`, `GraphConfidence` | Typed graph/IR extracted from reference code and resolved workload shapes. |
-| `src/sol_execbench/core/scoring/amd_sol/extract.py` | `extract_bound_graph(definition, workload)` | Convert `Definition.reference` plus workload axes into a normalized operation graph. This replaces the current private `_GraphVisitor` as the public internal entry point. |
-| `src/sol_execbench/core/scoring/amd_sol/estimates.py` | `WorkEstimate`, `MemoryMovementEstimate`, `estimate_work(graph, definition, workload)` | Produce auditable FLOP, byte, read/write, and movement estimates per node. |
-| `src/sol_execbench/core/scoring/amd_sol/hardware.py` | `AmdHardwareModel`, `HardwareValidationStatus`, `load_amd_hardware_models(path)`, `select_hardware_model(models, arch, dtype_or_path)` | Load versioned hardware models from JSON artifacts and keep provisional defaults isolated. |
-| `src/sol_execbench/core/scoring/amd_sol/artifact.py` | `AmdSolBoundArtifact`, `AmdSolCoverageSummary`, `build_amd_sol_bound_artifact(...)`, `load_amd_sol_bound_artifact(path)` | Own artifact schema versioning, serialization, loading, and backward-compatible construction. |
-| `src/sol_execbench/core/scoring/amd_sol/operators.py` | operator estimator registry | Encapsulate formulas for matmul, elementwise, reductions, normalization, softmax, transpose/view/data movement, and unsupported fallback. |
-| `src/sol_execbench/core/scoring/amd_sol/coverage.py` | `summarize_coverage(...)` | Aggregate supported/inexact/unsupported counts and operation-family coverage. |
-| `src/sol_execbench/core/scoring/amd_sol/schema.py` | constants and migration helpers | Define `sol_execbench.amd_sol_bound.v2` and hardware model schema versions. |
-
-Keep `src/sol_execbench/core/scoring/amd_sol.py` temporarily as a compatibility facade if avoiding import churn matters. It can re-export the new classes and functions, then later be retired after internal imports move to the package.
+| `solar_shape.py` | Shared shape/dtype/axis/broadcast/intermediate evidence helpers. | 1 |
+| `solar_patterns.py` | Declarative operation-pattern recognizers for paper-aligned families. | 2 |
+| `solar_extraction.py` | Orchestrates fx/AST extraction and family normalization. | 2 |
+| `solar_estimates/attention.py` | Attention-specific analytical work and bytes. | 3 |
+| `solar_estimates/convolution.py` | Convolution work/byte formulas. | 3 |
+| `solar_estimates/embedding_positional.py` | Embedding, gather, RoPE/positional movement and FLOPs. | 3 |
+| `solar_estimates/moe.py` | Routing, expert projection, dispatch/combine estimates. | 4 |
+| `solar_estimates/ssm_mamba.py` | Selective scan/state-space evidence and degraded estimates. | 4 |
+| `solar_coverage.py` | Coverage classification, missing-family evidence, aggregate gates. | 5 |
+| Optional `scripts/derive_solar_bounds.py` | Batch derivation without running hardware evaluation. | 6 |
 
 ### Modified Components
 
-| Component | Modification |
-| --- | --- |
-| `src/sol_execbench/core/scoring/amd_score.py` | Consume v2 artifacts without needing to know extraction details. Keep `score_amd_native_trace_workload(trace, artifact, ...)` as the core integration function. Add warnings for missing artifact version, provisional hardware, inexact coverage, and unsupported op families. |
-| `scripts/run_dataset.py` | Add optional flags for hardware model path and SOL artifact output directory. Generate sidecars only when `--amd-score-report` or explicit SOL output is requested. Reference sidecar paths in `evidence_refs["sol_bound"]` and `evidence_refs["hardware_model"]`. |
-| `docs/analysis.md` | Document that AMD-native score reports require derived SOL bound artifacts and that unsupported/inexact coverage limits claims. |
-| `docs/ARCHITECTURE.md` | Add a short derived-scoring data-flow section showing trace JSONL remains canonical and SOL artifacts are sidecars. |
-| `docs/rocm.md` or a new `docs/amd_sol_bounds.md` | Document hardware model artifacts, validation status, RDNA 4 scope, and CDNA 3/CDNA 4 deferral. |
-| `tests/sol_execbench/test_amd_sol_bounds.py` | Move or expand into focused tests for IR extraction, formulas, artifact loading, versioning, and no-trace-mutation guardrails. |
-| `tests/sol_execbench/test_run_dataset_amd_score.py` | Add artifact-output and hardware-model-loading coverage for dataset report integration. |
-
-### Unchanged Components
-
-| Component | Why unchanged |
-| --- | --- |
-| `src/sol_execbench/core/data/trace.py` | Canonical trace schema is the primary public output contract and already has a guardrail test proving SOL artifacts do not mutate traces. |
-| `src/sol_execbench/driver/templates/eval_driver.py` | Bound modeling derives from definitions, workloads, traces, baselines, and hardware models after execution. The evaluation subprocess should not need scoring knowledge. |
-| `src/sol_execbench/driver/problem_packager.py` | No staging change is needed because bound artifacts are post-processing outputs, not candidate execution inputs. |
-| `src/sol_execbench/cli/main.py` | Keep primary benchmark behavior stable. Add a separate CLI later only if there is a clear user workflow; do not overload trace emission. |
-
-## Recommended Data Flow
-
-### Benchmark Path, Unchanged
-
-```text
-definition.json + workload.jsonl + solution.json
-  -> ProblemPackager
-  -> build_ext.py if native ROCm
-  -> eval_driver.py subprocess
-  -> canonical Trace JSONL
-```
-
-### Derived Bound And Score Path
-
-```text
-Definition + Workload
-  -> extract_bound_graph()
-  -> estimate_work()
-  -> load/select AmdHardwareModel
-  -> build AmdSolBoundArtifact JSON sidecar
-
-Trace JSONL + AmdSolBoundArtifact + optional ScoringBaselineArtifact
-  -> score_amd_native_trace_workload()
-  -> AmdNativeSuiteReport JSON
-```
-
-The artifact reference key should be stable:
-
-```text
-(definition_name, workload_uuid, hardware_model_id, artifact_schema_version)
-```
-
-Using only `workload_uuid` is convenient but too weak once the dataset runner may process multiple definitions or architectures in one output tree.
-
-## Artifact Loading And Storage
-
-### Hardware Model Artifacts
-
-Store hardware model inputs as explicit JSON, for example:
-
-```text
-data/amd_hardware_models/gfx1200.json
-```
-
-Recommended fields:
-
-```json
-{
-  "schema_version": "sol_execbench.amd_hardware_model.v1",
-  "architecture": "gfx1200",
-  "model_id": "gfx1200-rdna4-v1",
-  "dtype_or_path": "fp32/bf16 benchmark path",
-  "peak_tflops": 48.0,
-  "memory_bandwidth_gbps": 640.0,
-  "source": "project RDNA4 validation input",
-  "validation_status": "validated",
-  "confidence": "supported",
-  "validation_scope": "RDNA 4 only",
-  "notes": []
-}
-```
-
-`default_amd_hardware_models()` can remain as a fallback, but it should call the same parser used for JSON artifacts and mark any fallback as `provisional` or `unvalidated`. Do not silently treat built-ins as release-grade validation.
-
-### SOL Bound Artifacts
-
-Store one artifact per workload or one JSON report with a top-level artifact array. Per-workload JSON is easier to diff and reference:
-
-```text
-out/amd_sol_bounds/<category>/<problem>/<workload_uuid>.amd_sol_bound.json
-```
-
-The artifact should include:
-
-- `schema_version` such as `sol_execbench.amd_sol_bound.v2`.
-- `derived: true`.
-- `definition`, `workload_uuid`, and optional `workload_axes`.
-- `hardware_model_ref` and embedded minimal hardware summary.
-- `graph` with nodes, op kinds, tensor refs, and confidence.
-- `work_estimates` with FLOPs, bytes read, bytes written, total bytes, memory movement category, confidence, and formula rationale.
-- `op_bounds` with compute, memory, aggregate bound, limiting resource, and confidence.
-- `coverage_summary` with supported/inexact/unsupported counts by op family.
-- `warnings` suitable for report propagation.
-
-Avoid embedding full trace payloads in SOL artifacts. Use references only.
-
-## Schema Versioning
-
-Use independent versions:
-
-| Schema | Current / Proposed | Owner |
+| Component | Modification | Boundary |
 | --- | --- | --- |
-| Canonical trace | Existing public model, no v1.9 change | `core/data/trace.py` |
-| AMD SOL bound artifact | `sol_execbench.amd_sol_bound.v2` | `core/scoring/amd_sol/artifact.py` |
-| AMD hardware model | `sol_execbench.amd_hardware_model.v1` | `core/scoring/amd_sol/hardware.py` |
-| AMD-native score report | Existing `sol_execbench.amd_native_score.v1`, only bump if JSON shape changes incompatibly | `core/scoring/amd_score.py` |
+| `amd_bound_graph.py` | Delegate to SOLAR extraction helpers; add family-specific node attributes; keep existing `build_bound_graph` import path. | Internal scoring only. |
+| `amd_bound_estimates.py` | Turn into dispatcher or compatibility facade over `solar_estimates`. | Existing `estimate_bound_work(graph)` remains. |
+| `amd_sol_v2.py` | Add derivation coverage evidence and stricter aggregate gates. | Sidecar-only schema, no canonical schemas. |
+| `amd_score.py` | Possibly add warning mapping for new coverage statuses. | No derivation internals. |
+| `scripts/run_dataset.py` | Add opt-in coverage sidecar/report output, possibly build sidecars even without score report. | No default CLI behavior changes. |
+| Tests under `tests/sol_execbench/` | Golden graph, estimator, sidecar parser, score guardrail, and public-contract tests. | CPU-friendly where possible. |
+| Docs | Explain derived SOLAR evidence and non-claims. | Must preserve no-leaderboard/no-B200-equivalence language. |
 
-Prefer additive changes for score reports. If `AmdNativeSuiteReport.to_dict()` gains only optional evidence or warning fields, keep v1. If required fields or interpretation changes, bump to v2 and provide loader tests.
+## Suggested Phase Order
 
-## Test Layout
+1. **Derivation Contract And Golden Fixtures**
+   - Define the v1.10 SOLAR derivation contract: input sources, output sidecar fields, confidence states, coverage gates, and non-goals.
+   - Add small golden fixtures for attention, convolution, embedding/positional, MoE, and SSM/Mamba reference snippets.
+   - Rationale: the rest of the milestone needs stable expected evidence before estimators grow.
 
-| Test File | Coverage |
-| --- | --- |
-| `tests/sol_execbench/core/scoring/test_amd_sol_ir.py` | AST/reference extraction into typed graph nodes for matmul, elementwise, reductions, normalization, softmax, data movement, and unsupported calls. |
-| `tests/sol_execbench/core/scoring/test_amd_sol_estimates.py` | Golden FLOP/byte/memory-movement estimates for common SOL ExecBench families. |
-| `tests/sol_execbench/core/scoring/test_amd_hardware_models.py` | JSON load/validation, provisional fallback, RDNA 4 validation metadata, CDNA 3/CDNA 4 no-claim guardrails. |
-| `tests/sol_execbench/core/scoring/test_amd_sol_artifacts.py` | Artifact `to_dict()` / loader round trips, schema version checks, evidence refs, coverage summaries. |
-| `tests/sol_execbench/test_amd_native_score.py` | Score integration warnings and no mutation of `Trace`. |
-| `tests/sol_execbench/test_run_dataset_amd_score.py` | Dataset runner writes sidecars, loads hardware models, links evidence refs, and leaves trace files unchanged. |
-| `tests/sol_execbench/test_public_contract_guardrails.py` | Assert trace docs/schema and primary CLI output stay free of AMD SOL artifact fields. |
-| `tests/sol_execbench/test_trace_reporting_and_score_guardrails.py` | Claim-level warnings for unsupported/inexact/provisional/CDNA-deferred evidence. |
+2. **Extraction Infrastructure**
+   - Extract shape/dtype/axis helpers from `amd_bound_graph.py`.
+   - Add pattern recognizers and family-specific node attributes.
+   - Preserve `build_bound_graph(definition, workload)`.
+   - Rationale: richer families need graph evidence before numerical formulas are credible.
 
-Golden tests should use tiny synthetic definitions first, then a small set of existing samples such as matmul, RMSNorm, softmax-like, and linear backward. RDNA 4 validation can be an integration gate for artifact generation plus report production, but most formula tests should be hardware-free.
+3. **High-Confidence Estimator Families**
+   - Implement convolution, embedding/positional, and linear projection refinements first.
+   - Extend attention QK/softmax/PV derivation for explicit tensor shapes.
+   - Rationale: these are formula-stable and give immediate coverage gains with lower ambiguity.
 
-## Documentation Plan
+4. **Degraded Complex Families**
+   - Implement MoE and SSM/Mamba with explicit degraded defaults.
+   - Require unsupported or inexact states when routing cardinality, expert shapes, recurrence dimensions, or scan semantics are not machine-verifiable.
+   - Rationale: these are important paper-aligned families but most likely to overclaim.
 
-| Document | Change |
-| --- | --- |
-| `docs/ARCHITECTURE.md` | Add derived AMD SOL/SOLAR scoring sidecar flow and explicit public-contract boundary. |
-| `docs/analysis.md` | Explain score prerequisites: canonical trace, scoring baseline or fallback, SOL bound artifact, hardware model, and timing evidence. |
-| `docs/amd_sol_bounds.md` | New focused doc for artifact schemas, hardware model fields, confidence levels, supported op families, and RDNA 4 validation scope. |
-| `docs/internal/mi300x_validation_readiness.md` | Keep CDNA 3 / MI300X validation deferred; mention that v1.9 only prepares model slots and no hardware claim. |
-| `README.md` or `docs/GETTING-STARTED.md` | Only add a short pointer to derived AMD-native scoring if user-facing workflow changes. |
+5. **Sidecar Coverage And Score Guards**
+   - Add derivation coverage evidence to AMD SOL sidecars.
+   - Tighten aggregate status rules so unsupported extraction blocks scoring, and degraded estimates stay visibly provisional.
+   - Update `amd_score.py` only for warning propagation.
+   - Rationale: coverage evidence is the core v1.10 deliverable and protects reports from partial derivation misuse.
 
-## Suggested Build Order
+6. **Dataset Runner Integration And Docs**
+   - Add opt-in sidecar/coverage reporting in `scripts/run_dataset.py`, independent of real hardware validation.
+   - Document how to produce derivation coverage without claiming new hardware validation.
+   - Rationale: operational integration should happen after the sidecar contract is stable.
 
-1. **Contract guardrails first** - Add tests asserting canonical `Trace` JSONL, primary CLI JSON output, and public data schemas remain unchanged. This prevents accidental scoring data leakage into benchmark output.
-2. **Hardware model loader** - Implement versioned hardware model parsing and RDNA 4 artifact fixtures before formula work, because every bound artifact needs a validated or provisional model source.
-3. **IR extraction package** - Split the current AST visitor into typed graph extraction with stable node IDs, op kinds, tensor/shape context, and unsupported-node preservation.
-4. **Operator estimators** - Add golden estimates for matmul, elementwise, reduction, normalization/RMSNorm, softmax, transpose/view/data movement, and unsupported fallback. Prefer explicit inexact confidence over silent precision.
-5. **Bound artifact v2** - Build/load JSON sidecars from graph, estimates, hardware models, and coverage summaries. Keep a facade so existing `build_amd_sol_bound_artifact()` callers continue working.
-6. **Score integration** - Update `amd_score.py` to consume v2 artifacts and propagate coverage/hardware warnings while preserving `Trace` immutability.
-7. **Dataset runner integration** - Add optional sidecar output and hardware model flags to `scripts/run_dataset.py`; wire evidence refs into `--amd-score-report`.
-8. **Docs and claim guardrails** - Document artifact schema, RDNA 4 scope, CDNA deferral, and unsupported/inexact degradation behavior.
-9. **RDNA 4 validation pass** - Run unit tests plus a small RDNA 4 dataset/sample pass that emits trace JSONL, bound artifacts, and AMD-native report. Archive evidence as derived artifacts, not canonical trace changes.
+7. **Public Contract Guardrails**
+   - Add tests proving canonical trace JSONL, public schemas, CLI help/default output, and evaluation isolation did not change.
+   - Add static docs/tests for deferred scope: no 124-model extraction, no new real-hardware validation, no hosted leaderboard.
+   - Rationale: this milestone is easy to accidentally expand beyond its intended boundary.
+
+## Patterns To Follow
+
+### Pattern: Sidecar-Only Derivation
+
+**What:** SOLAR derivation produces evidence artifacts separate from canonical evaluation traces.  
+**When:** Any new graph, coverage, formula, or bound evidence is needed.  
+**Example:**
+
+```python
+artifact = build_amd_sol_bound_v2_artifact(
+    definition,
+    workload,
+    hardware_model,
+    hardware_model_ref="default_amd_hardware_models.gfx1200",
+)
+score = score_amd_native_trace_workload(trace, artifact, baseline_artifact=baseline)
+```
+
+### Pattern: Confidence-First Estimation
+
+**What:** Every extracted node must produce either supported, inexact, or unsupported evidence with rationale.  
+**When:** Estimator cannot prove the full analytical formula from reference/workload structure.  
+**Example:** MoE top-k routing without explicit expert cardinality should produce an `INEXACT` estimate or `UNSUPPORTED` estimate, not a silent dense GEMM approximation.
+
+### Pattern: Stable Facade, Internal Split
+
+**What:** Keep existing public internal call sites like `build_bound_graph` and `estimate_bound_work`, but move implementation into focused modules.  
+**When:** Refactoring `amd_bound_graph.py` and `amd_bound_estimates.py` for family-specific logic.  
+**Benefit:** Existing dataset/reporting paths keep working while the implementation becomes testable by family.
 
 ## Anti-Patterns To Avoid
 
-### Mutating Canonical Trace JSONL
+### Anti-Pattern: Putting SOLAR Fields In Trace JSONL
 
-Adding `sol_bound`, `hardware_model`, `coverage`, or score fields to `Trace` would break the public benchmark output. Keep all such data in sidecars and score reports.
+**Why bad:** Trace JSONL is the canonical evaluation output. Adding derivation evidence there changes public behavior and couples analytical bounds to runtime execution.
 
-### Treating Missing Bounds As Zero-Cost
+**Instead:** Write SOLAR evidence as AMD SOL sidecars and suite reports.
 
-Unsupported operations should produce `unsupported` confidence, warnings, and unscored or guarded scores. A missing or unsupported bound must not become `0.0 ms` in a way that improves score.
+### Anti-Pattern: Solution-Aware Bounds
 
-### Hard-Coding Release Claims In Formulas
+**Why bad:** SOLAR bounds are hardware-grounded analytical targets. Reading candidate solution code to derive bounds would make the target mutable and reward-hackable.
 
-Hardware model validation status belongs in hardware model artifacts, not in operator formulas. Formula code should compute estimates; claim code should read confidence and validation metadata.
+**Instead:** Derive from `Definition`, `Workload`, and hardware model only.
 
-### Running Bound Modeling In The Eval Subprocess
+### Anti-Pattern: Dense Fallback For Sparse/MoE/SSM
 
-`eval_driver.py` is for correctness and timing under isolation. Bound modeling is deterministic post-processing over validated definitions/workloads/traces and should stay outside the user-code subprocess.
+**Why bad:** Treating unknown sparse routing or recurrence as dense supported work can inflate or deflate SOL bounds while appearing complete.
 
-## Sources Consulted
+**Instead:** Emit degraded or unscored evidence with explicit missing dimensions and unsupported operator names.
 
-- `.planning/PROJECT.md` - v1.9 scope, RDNA 4 validation boundary, CDNA deferrals.
-- `.planning/codebase/ARCHITECTURE.md` - current layered architecture and public-contract constraints.
-- `src/sol_execbench/core/scoring/amd_sol.py` - current bound artifact, AST extractor, hard-coded hardware model, and estimator baseline.
-- `src/sol_execbench/core/scoring/amd_score.py` - current derived AMD-native score integration and warning behavior.
-- `scripts/run_dataset.py` - optional derived AMD score report integration point.
-- `src/sol_execbench/core/data/trace.py` - canonical trace schema boundary.
-- `docs/ARCHITECTURE.md` - user-facing system shape and derived reporting layer.
+### Anti-Pattern: Hardware Validation By Derivation
+
+**Why bad:** Better analytical coverage is not new hardware validation.
+
+**Instead:** Keep hardware model validation statuses unchanged and preserve CDNA 3/CDNA 4 deferral language.
+
+## Scalability Considerations
+
+| Concern | Small fixtures | Dataset-scale local runs | Future full paper-scale extraction |
+| --- | --- | --- | --- |
+| Extraction cost | In-process fx/AST per workload is fine. | Cache parsed reference and per-axis shape helpers by definition/workload UUID. | Add batch derivation command with resumable sidecar writes. |
+| Sidecar size | Full graph evidence is useful. | Sidecars can grow; keep report summaries separate from full per-workload evidence. | Consider compressed artifacts or manifest indexing if needed. |
+| Testability | Golden unit tests per family. | Contract tests for dataset runner opt-in outputs. | Add fixture packs only after extraction scope expands beyond v1.10. |
+| Hardware assumptions | Packaged `gfx1200` model. | Hardware model ref stays explicit in every sidecar. | Add new model artifacts only with separate validation evidence. |
+
+## Roadmap Implications
+
+The roadmap should build from contracts to extraction to estimates to reporting. Starting with sidecar coverage gates is tempting, but coverage without richer family extraction would only repackage current partial modeling. Starting with complex families like MoE or SSM is also risky because their formulas require strong missing-evidence behavior.
+
+Recommended milestone phase structure:
+
+1. Contract and fixtures.
+2. Extraction/shape infrastructure.
+3. Stable high-confidence families: convolution, embedding/positional, linear projection, attention core.
+4. Complex degraded families: MoE and SSM/Mamba.
+5. Sidecar coverage and score guardrails.
+6. Dataset-runner/docs integration.
+7. Public-contract and no-claim guardrails.
+
+## Research Flags For Later Phases
+
+| Topic | Why it needs deeper validation | Suggested phase |
+| --- | --- | --- |
+| Attention pattern matching | Reference code may express attention through matmul, einsum, `scaled_dot_product_attention`, masking, or custom reshapes. | Extraction infrastructure and attention estimator phases. |
+| MoE routing formulas | Sparse token routing can depend on runtime index distributions that are not visible from static shapes alone. | Complex degraded families phase. |
+| SSM/Mamba formulas | Selective scan structure may not be reliably inferable from arbitrary Python reference code. | Complex degraded families phase. |
+| Sidecar schema version | Additive v2 fields may be enough, but strict parser guarantees may require v3. | Sidecar coverage phase. |
+| Paper parity terminology | The paper targets NVIDIA Blackwell and CUDA; ROCm reports must say AMD-native derived evidence, not B200/SOLAR equivalence. | Docs and guardrails phase. |
+
+## Sources
+
+- Repository project context: `.planning/PROJECT.md` (HIGH confidence for current milestone scope and constraints).
+- Repository architecture: `docs/ARCHITECTURE.md` (HIGH confidence for canonical CLI, driver, and trace boundaries).
+- Existing extraction and IR: `src/sol_execbench/core/scoring/amd_bound_graph.py` (HIGH confidence).
+- Existing estimator facade: `src/sol_execbench/core/scoring/amd_bound_estimates.py` (HIGH confidence).
+- Existing sidecar contract: `src/sol_execbench/core/scoring/amd_sol_v2.py` (HIGH confidence).
+- Existing score reports: `src/sol_execbench/core/scoring/amd_score.py` (HIGH confidence).
+- Existing hardware model contract: `src/sol_execbench/core/scoring/amd_hardware_models.py` (HIGH confidence).
+- Existing dataset integration: `scripts/run_dataset.py` (HIGH confidence).
+- arXiv 2603.19173 abstract: `https://arxiv.org/abs/2603.19173` (MEDIUM confidence for paper baseline because only abstract-level claims were used).

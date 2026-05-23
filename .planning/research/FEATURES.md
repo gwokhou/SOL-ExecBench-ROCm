@@ -1,134 +1,187 @@
 # Feature Landscape
 
-**Domain:** AMD SOL/SOLAR bound modeling for SOL ExecBench ROCm
-**Milestone:** v1.9 AMD SOL/SOLAR Bound Modeling Completion
-**Researched:** 2026-05-22
-**Overall confidence:** HIGH for repo-local requirements and current implementation dependencies; MEDIUM for exact operator-priority ordering until real dataset coverage is sampled.
+**Domain:** Paper-aligned SOLAR automatic derivation for SOL ExecBench ROCm
+**Milestone:** v1.10 论文级完整 SOLAR 自动推导
+**Researched:** 2026-05-23
+**Overall confidence:** HIGH for repo-local capability gaps and milestone scope; MEDIUM for exact paper-family priority beyond the arXiv abstract because v1.10 explicitly excludes full paper dataset extraction.
 
 ## Scope Decision
 
-v1.9 should complete the modeling pipeline, not broaden the validation claim surface. The product behavior should be: every AMD-native score is backed by a derived, auditable AMD SOL bound artifact; every artifact exposes graph, work, bound, hardware-model, confidence, and coverage evidence; unsupported or inexact analysis remains visible and guarded; RDNA 4 is the only validation target for milestone completion.
+v1.10 should make the AMD SOL/SOLAR pipeline look honest at the derivation layer: given a SOL ExecBench definition and workload, the code should automatically derive richer hardware-bound evidence for paper-relevant kernel families, expose what was recognized, explain every FLOP/byte/movement estimate, and deterministically degrade to inexact or unscored states when coverage is incomplete. It should not claim that the ROCm port reproduces the original paper's full 124-model/235-problem benchmark, NVIDIA Blackwell target, or new AMD hardware validation.
 
-The current implementation already has `GraphNode`, `WorkEstimate`, `AmdHardwareModel`, `OpSolBound`, `AmdSolBoundArtifact`, coverage summaries, and AMD-native score reports in `src/sol_execbench/core/scoring/amd_sol.py` and `src/sol_execbench/core/scoring/amd_score.py`. v1.9 should evolve these from a conservative AST visitor into a stable modeling subsystem with explicit IR semantics, external hardware artifacts, golden fixtures, and report integration.
+The arXiv 2603.19173 abstract frames the paper baseline as analytically derived hardware-grounded SOL bounds from SOLAR, SOL Score reporting against those bounds, broad real-world kernel coverage across model families, and robustness guardrails for agentic optimizer evaluation. For this ROCm milestone, the actionable subset is automatic derivation and score-evidence honesty on AMD: broader extraction/modeling for attention, MoE, convolution, SSM/Mamba, embedding/positional, and linear projection patterns; stronger artifact coverage semantics; and guardrails that prevent partial derivation from looking complete.
+
+Current code already has a useful v1.9 foundation:
+
+- `BoundGraph` IR with tensor metadata, dependency edges, confidence, rationale, dynamic `torch.fx` tracing with AST fallback, and an `OpFamily` taxonomy that already names the paper-aligned families.
+- Operator estimates for GEMM/BMM, linear projection via GEMM behavior, elementwise, activation, reduction, normalization, softmax, data movement, and dtype conversion.
+- v2 AMD SOL sidecars with graph, estimate, op-bound, aggregate-bound, hardware-model, coverage, and warning evidence.
+- AMD-native score reports that propagate degraded/unscored states and claim-level warnings.
+
+The v1.10 feature line is therefore not "add SOLAR docs"; it is "turn taxonomy placeholders and simple local patterns into code-real automatic derivation paths, while making every unsupported gap machine-visible."
 
 ## Table Stakes
 
-Features users and roadmap consumers should expect. Missing any of these leaves the bound-modeling milestone incomplete.
+Features users and roadmap consumers should expect. Missing any of these leaves v1.10 incomplete.
 
-| Feature | Why Expected | Complexity | Dependencies / Notes |
-|---------|--------------|------------|----------------------|
-| Structured AMD SOL graph/IR schema | Bound artifacts need stable, inspectable structure beyond raw AST-derived expressions. | High | Extend `GraphNode` into a normalized IR with node IDs, op family, tensor roles, shape/dtype evidence, dependency edges, confidence, and rationale. Keep artifact derived and separate from canonical trace JSONL. |
-| Explicit operator-family coverage table | Maintainers need to know which SOL ExecBench operations are modeled directly, conservatively, or not at all. | Medium | Build on `_CALL_ANALYZERS` coverage for matmul, reductions, normalization, softmax, activations, and data movement. Add tests asserting coverage summaries and labels. |
-| Matmul/GEMM exact-ish modeling | Matrix multiply is a core benchmark family and current `SUPPORTED` path. | Medium | Preserve `2 * output_elements * reduction_dim` evidence, but make K-dimension inference robust for batched matmul and named axis shapes. |
-| Elementwise and activation modeling | Common fused and unfused kernels need at least conservative FLOP/byte bounds. | Medium | Keep inexact labels unless formulas are specific. Cover add/sub/mul/div/pow, relu, gelu, silu, sigmoid, tanh, exp, sqrt, rsqrt with per-output-element formulas and dtype-aware bytes. |
-| Reduction and normalization modeling | Softmax, RMSNorm, layer norm, reductions are common in model workloads. | High | Model max/sum/mean/var/std/norm/rms_norm/layer_norm/group_norm with pass counts, reduction axes, output shape, read/write bytes, and `INEXACT` confidence unless exact formulas are encoded. |
-| Softmax/log-softmax modeling | Softmax-like operations are prominent and already documented as conservative. | Medium | Keep multi-pass estimate evidence: max, exp, sum, normalization, writeback. Label conservative when fusion or implementation details are unknown. |
-| Data movement evidence | SOL bounds must not pretend views/transposes/reshapes are compute, but memory movement can dominate real kernels. | High | Distinguish zero-copy views from materializing movement when evidence allows. Track bytes read, bytes written, and "logical view only" vs "materialized/contiguous" confidence. |
-| FLOP, byte, and memory-movement breakdown | Roadmap explicitly needs auditable FLOP/byte/memory movement evidence. | High | Split current `bytes_accessed` into read bytes, write bytes, optional intermediate bytes, total bytes, and memory movement rationale. Preserve aggregate compatibility or migrate with schema versioning. |
-| Per-node bound calculation | Users need to see compute bound, memory bound, limiting resource, and aggregate bound. | Medium | Current `OpSolBound` already does this. v1.9 should verify no unsupported zero-bound node can silently make an optimistic aggregate. |
-| Artifact-level confidence and coverage | Score reports need a single summary that reflects unsupported/inexact content. | Medium | Extend current `coverage_summary` with worst confidence, scored eligibility, counts by op family, and unsupported expressions. |
-| Unsupported/inexact degradation behavior | Quality gate requires graceful degradation, not invented precision. | Medium | Unsupported nodes stay in graph and work estimates; scores become guarded or unscored based on policy. Inexact nodes may score only with warnings and claim-level downgrade. |
-| External hardware model artifacts | Project goal explicitly says hardware models should not rely only on hard-coded provisional defaults. | High | Add versioned JSON artifacts for `gfx1200` RDNA 4 model inputs with source, dtype/path, bandwidth, peak values, validation status, clock policy, and provenance. Keep `gfx94*` entries unvalidated/deferred. |
-| Hardware model loader and validation | External artifacts need schema checks and clear failure modes. | Medium | Add Pydantic/dataclass parser, reject missing architecture, non-positive peak/bandwidth, unknown validation status, and mismatched requested architecture. |
-| RDNA 4 validation metadata | v1.9 completion is RDNA 4 only. | Medium | Allow `gfx1200` model entries to be marked validated only when evidence files and tests exist. Do not promote CDNA 3 / MI300X or CDNA 4. |
-| AMD-native score integration | Bound modeling must feed the existing derived AMD score report path. | Medium | Continue using `score_amd_native_workload()` / trace workflow. Score output must include bound, hardware model, timing, baseline, confidence, and warnings. |
-| Canonical trace immutability | Existing public contract must not change. | Low | Existing tests assert AMD SOL artifacts and scores do not mutate `Trace`. Keep all new fields in derived artifacts/reports. |
-| Dataset report integration | Maintainers need suite-level reporting for benchmark batches. | Medium | `scripts/run_dataset.py` already creates AMD score reports. v1.9 should include SOL artifact references and coverage summaries per workload. |
-| Golden bound fixtures | Modeling changes must be regression-testable. | Medium | Add deterministic fixtures for matmul, batched matmul, elementwise chain, reduction, softmax, normalization, transpose/reshape, and unsupported op. Assert exact graph, FLOP, byte, bound, confidence, and warnings. |
-| Documentation and claim guardrails | Users must understand what AMD SOL/SOLAR means in this ROCm fork. | Medium | Update `docs/analysis.md` and parity/score docs with artifact schema, confidence labels, hardware model provenance, RDNA 4-only validation, and no NVIDIA B200/SOLAR/leaderboard equivalence. |
+| Feature | Why Expected | Complexity | Requirements Notes |
+|---------|--------------|------------|--------------------|
+| Automatic paper-family extraction coverage | The milestone goal says attention, MoE, convolution, SSM/Mamba, embedding/positional, and linear projection need explicit extraction and estimation paths rather than taxonomy-only placeholders. | High | Extend `build_bound_graph()` classification and extraction beyond the current simple call list. Each new family needs at least one deterministic fixture that produces a non-unsupported `OpFamily` node from reference/workload structure. |
+| Attention derivation path | Attention is central to language, diffusion, vision, audio, video, and hybrid model workloads named by the paper baseline. | High | Recognize Q/K/V projections, QK matmul, scale, mask/add, softmax, AV matmul, and output projection where present. Emit either a compound `attention` node with child evidence or a linked subgraph with `attention_group_id`; unsupported masks/dropout/control flow must degrade explicitly. |
+| MoE derivation path | Mixture-of-experts is a paper-relevant real-world model family and has distinct routing/top-k/scatter/gather/expert GEMM behavior. | High | Recognize router logits, top-k/argmax-like selection, gating weights, gather/scatter/dispatch, expert projection/GEMM, combine. Mark routing capacity, sparse dispatch, or dynamic expert counts as `INEXACT` unless fully resolved. |
+| Convolution derivation path | Vision/diffusion workloads require convolution coverage; treating convolution as unsupported makes broad-kernel claims hollow. | High | Recognize `conv1d`, `conv2d`, `conv3d`, module call names if trace exposes them, stride/padding/dilation/groups, kernel shape, batch/channel/output dimensions. Estimate FLOPs and bytes with grouped/depthwise-specific formulas. |
+| SSM/Mamba derivation path | The current taxonomy names SSM/Mamba, and the v1.10 scope explicitly calls it out. | High | Recognize scan/selective-scan style compositions conservatively: projections, depthwise conv, recurrent/scan movement, gating, elementwise update, output projection. If true recurrence/scan length cannot be derived, retain visible inexact/unsupported evidence instead of collapsing to elementwise only. |
+| Embedding and positional derivation path | Embedding/positional work is common in model frontends and can be memory-bound. | Medium | Recognize embedding lookup, gather/index_select/take, positional add/rotary/sinusoidal patterns when statically visible. Model bytes and movement separately from FLOPs; unsupported dynamic indexing remains visible. |
+| Linear projection as a first-class family | Current estimates model `linear` with GEMM-like behavior, but v1.10 needs user-visible family evidence, not just generic GEMM. | Medium | Preserve `linear_projection` in graph and estimates with projection-specific formula kind and rationale while using GEMM math where valid. Capture bias add as explicit elementwise or projection attribute. |
+| Compound-family grouping evidence | Paper-aligned derivation should show workload structure, not only a flat list of primitive calls. | High | Add stable grouping metadata such as `group_id`, `parent_family`, `subrole`, or equivalent fields inside derived sidecars. Do not mutate canonical `Trace` or public schemas. |
+| Rich formula evidence for every new family | SOLAR derives hardware-grounded bounds; users need inspectable formula inputs, not opaque labels. | High | Each new estimator must emit `formula_kind`, `formula`, `formula_inputs`, FLOPs, read/write/intermediate/movement/total bytes, confidence, rationale, and warnings. Unsupported placeholders are not enough for table-stakes families. |
+| Shape, dtype, and axis provenance | Automatic derivation is only reviewable if estimates can be traced back to definition/workload axes and tensor metadata. | Medium | Carry resolved dimensions, tensor IDs, axis sources, dtype widths, and source expressions through new family estimates. Missing metadata should downgrade confidence and add warnings. |
+| Deterministic unsupported/inexact degradation | Honest paper alignment depends on not fabricating precision. | Medium | Known semantics with incomplete metadata become `INEXACT`; unknown operations or unresolved key effects become `UNSUPPORTED`; aggregate bounds become `degraded` or `unscored` by deterministic policy. |
+| Family-aware score eligibility | AMD-native reports must protect users from treating partial SOLAR derivation as complete. | Medium | Extend v2 coverage/aggregate evidence so reports can say which required families were modeled, inexact, unsupported, or absent. Unsupported evidence should prevent SOL Score computation for that workload unless policy explicitly allows guarded degraded scoring. |
+| Machine-verifiable complete/degraded/unscored states | The milestone asks for complete, degraded, and unscored states that are machine-verifiable. | Medium | Keep `aggregate_bound.status`, `scored`, `reason`, `worst_confidence`, family counts, and warnings parseable. Add tests for round-trip parsing and score behavior for each state. |
+| Golden derivation fixtures | Roadmap requirements need code-real acceptance criteria. | Medium | Add small deterministic fixtures for attention, MoE, convolution, SSM/Mamba, embedding/positional, linear projection, and a mixed unsupported case. Assert graph families, formulas, warnings, coverage, aggregate status, and score behavior. |
+| Public contract isolation | SOLAR derivation is a sidecar/scoring subsystem, not a canonical benchmark output change. | Low | Keep new evidence in derived AMD SOL v2+ artifacts or compatible sidecars. Guardrails should prove `definition.json`, `workload.jsonl`, `solution.json`, canonical trace JSONL, and primary CLI behavior remain stable. |
+| Robustness guardrail propagation | The paper baseline mentions sandboxing, clock locking, cache clearing, subprocess isolation, and static checks; the ROCm port already has many runtime guardrails. v1.10 must ensure derivation results do not weaken them. | Medium | Do not create bypass paths that import untrusted solution code during derivation. Preserve existing reward-hack/static-analysis and score-claim warnings. Add derivation-specific guardrails against unsupported-op omission and overclaim language. |
 
 ## Differentiators
 
-Features that make the capability more credible than a simple roofline calculator. These are valuable, but should follow the table-stakes foundation.
+Features that would make v1.10 more credible than merely adding formulas for a few calls. These are valuable if table-stakes items are underway.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| Operator IR with dependency edges | Makes fused expressions and multi-stage references auditable instead of just a flat call list. | High | Useful for later fusion-aware bounds and per-node evidence visualization. |
-| Shape/dtype provenance per estimate | Lets reviewers trace every FLOP and byte number back to definition/workload axes. | Medium | Store resolved axes, tensor shapes, dtypes, and formula inputs in each estimate or linked evidence block. |
-| Memory traffic classification | Distinguishes input read, output write, temporary materialization, view-only movement, and dtype conversion. | High | Important for transpose/contiguous/reshape and normalization/softmax passes. |
-| Eligibility policy object | Makes "scored", "guarded scored", and "unscored" deterministic and testable. | Medium | Current score code computes with unsupported warnings. v1.9 can make policy explicit without changing canonical traces. |
-| Suite coverage dashboard fields | Helps dataset reports show how much of a run has direct, inexact, or unsupported evidence. | Medium | Add scored/unscored counts, op coverage percentages, worst confidence, and top unsupported op families. |
-| Versioned hardware model registry | Allows future RDNA/CDNA model updates without code edits. | Medium | Prefer checked-in JSON under a data/config path over hard-coded defaults. Built-ins can remain as fallback for tests. |
-| Golden JSON snapshots | Gives roadmap and review a stable artifact contract. | Low | Use small checked-in expected artifacts; tolerate only deliberate schema-version migrations. |
-| Methodology documentation with examples | Makes the feature usable by researchers, not just callable by tests. | Medium | Include one worked example for matmul and one for softmax/normalization showing formulas and confidence labels. |
+| Pattern-level recognizers over raw call matching | Captures model-family semantics such as attention and MoE even when implemented as primitive PyTorch operations. | High | Prefer deterministic graph-pattern passes over adding many aliases to `_CALL_CLASSIFIERS`. This is the clearest path from v1.9 local operator modeling to SOLAR-like derivation. |
+| Hierarchical sidecar view | Lets reviewers inspect both compound families and primitive child operations. | Medium | Useful for attention/MoE/SSM where a single family contains matmul, softmax, movement, and elementwise subroles. |
+| Coverage inventory by required family | Makes the roadmap and users see exactly how paper-aligned coverage changed. | Medium | Report per-workload and suite-level counts for attention, MoE, convolution, SSM/Mamba, embedding/positional, linear projection, and primitive families. |
+| Confidence thresholds configurable for derived reports | Supports strict research workflows without changing derivation output. | Medium | Example: allow reports to require all table-stakes families supported, or permit inexact families with warnings. Keep default conservative. |
+| Family-specific rationale templates | Improves auditability and test stability. | Low | Rationale should state why attention/MoE/conv/SSM was recognized and which assumptions made the estimate inexact. |
+| Minimal internal derivation CLI or helper API | Helps maintainers inspect a single definition/workload without running a full benchmark. | Medium | Only add if it stays derived/internal or opt-in; do not alter primary `sol-execbench` defaults. |
+| Negative golden fixtures | Proves honesty by showing malformed/ambiguous patterns become inexact or unscored. | Low | Include dynamic control flow, unknown custom calls, unresolved shapes, dynamic indexing, and partial attention patterns. |
 
 ## Anti-Features
 
-Features to explicitly not build in v1.9.
+Features to explicitly not build in v1.10.
 
 | Anti-Feature | Why Avoid | What to Do Instead |
 |--------------|-----------|-------------------|
-| CDNA 3 / MI300X validation claims | User explicitly deferred CDNA 3 / MI300X real-hardware validation. | Keep `gfx94*` hardware models unvalidated/provisional and warning-gated. |
-| CDNA 4 validation claims | User explicitly deferred CDNA 4 validation. | Do not add validated `gfx12xx`/future CDNA 4 claims without separate evidence. |
-| NVIDIA B200, SOLAR, or leaderboard equivalence | This ROCm fork preserves formulas where useful but cannot claim original hardware equivalence. | Use `amd-native-derived` claim language and clear derived-report guardrails. |
-| Mutating canonical trace JSONL | Public trace schemas are preserved across prior milestones. | Emit bound and score data as derived artifacts only. |
-| Silent unsupported-op omission | Dropping unknown ops makes optimistic SOL bounds look complete. | Keep unsupported nodes visible with zero/unknown work, warnings, and unscored or guarded score behavior. |
-| Treating all bytes as exact DRAM traffic | Static modeling cannot know cache behavior, fusion, or implementation-specific movement from reference code alone. | Label estimates as logical bytes or conservative movement evidence with confidence. |
-| Fully precise fused-kernel modeling from Python reference AST | Reference code is semantic, not necessarily implementation IR. | Model semantic work and memory evidence; use profiler evidence only as separate timing/correlation input. |
-| Full original 124-model extraction pipeline | Explicitly deferred unless only needed as reference context. | Use targeted fixtures and sampled dataset cases for v1.9 validation. |
-| New primary CLI behavior or schema surface | The score/bound pipeline is already opt-in and derived. | Integrate through existing dataset and score-report paths. |
-| Broad ROCm library performance benchmarking | v1.8 handled library ecosystem support; v1.9 is modeling. | Use library examples only as golden/modeling fixtures if they exercise target op families. |
+| Original paper 124-model / 235-problem extraction | User explicitly excluded dataset extraction and curation from v1.10. Building it would expand scope and delay derivation correctness. | Use targeted synthetic and small real-shaped fixtures that exercise derivation families. |
+| New real-hardware validation claims | User explicitly excluded new real-hardware validation. Current validation remains RDNA 4-scoped from prior work; CDNA 3/MI300X and CDNA 4 remain deferred. | Keep hardware validation status in artifacts and warnings. Do not promote unvalidated architectures. |
+| Hosted leaderboard or submission service | User explicitly excluded a hosted leaderboard. | Keep reports local and derived. |
+| NVIDIA Blackwell/B200 equivalence | The paper targets NVIDIA Blackwell GPUs; this ROCm port produces AMD-native derived evidence. | Continue using `amd-native-derived` claim language and no-equivalence guardrails. |
+| Docs-only SOLAR alignment | The user asked for code-real capabilities, not claims. | Require extractor, estimator, artifact, score-report, and test changes for each table-stakes family. |
+| Taxonomy-only family support | `OpFamily` already contains attention/MoE/convolution/SSM/embedding labels; labels without extraction and estimates do not satisfy v1.10. | Every claimed family needs recognizer coverage, estimate evidence, and golden tests. |
+| Silent primitive fallback for compound patterns | Flattening attention or MoE into primitive matmul/elementwise nodes hides missing paper-family derivation. | Preserve primitive evidence but add grouping/family evidence or explicit "compound not recognized" warnings. |
+| Optimistic zero-cost unsupported nodes | Zeroing unsupported work can make SOL bounds too low and scores misleading. | Unsupported evidence must affect aggregate status and score eligibility. |
+| Cache/fusion/performance inference from reference code alone | Reference semantics do not prove implementation cache behavior or fusion strategy. | Keep estimates semantic/logical with confidence labels; profiler timing remains separate evidence. |
+| Canonical trace/schema mutation | Existing public contracts are intentionally stable. | Emit all SOLAR derivation data as sidecars or opt-in derived reports. |
+| Importing or executing submitted solution code for derivation | Derivation should be based on reference/workload structure, not untrusted candidate code. | Keep derivation on definitions/reference functions and existing safe harness boundaries. |
 
-## Supported Operator Families
+## Feature Categories for REQUIREMENTS.md
 
-Recommended v1.9 coverage target:
+Use these categories directly when drafting v1.10 requirements.
 
-| Family | Initial Status | v1.9 Behavior | Confidence Target |
-|--------|----------------|---------------|-------------------|
-| Matmul / mm / bmm / `@` | Existing supported | Direct FLOP formula, dtype-aware bytes, batched shape support. | `SUPPORTED` for simple dense cases; `INEXACT` for ambiguous/broadcasted cases. |
-| Elementwise arithmetic | Existing inexact | One or more ops per output element; chain remains visible as separate or fused IR nodes. | `INEXACT` unless exact expression count is encoded. |
-| Activations | Existing inexact | Per-output formulas by activation family where useful; otherwise conservative one-op or multi-op estimate. | `INEXACT`. |
-| Reductions | Existing inexact | Axis-aware read/write and operation count for sum/mean/min/max/var/std. | `INEXACT`; `SUPPORTED` only for simple sum/max if formula is exact and tested. |
-| Normalization | Existing inexact | Multi-pass estimate for mean/variance or RMS plus scale/apply; expose intermediate/movement rationale. | `INEXACT`. |
-| Softmax / log-softmax | Existing inexact | Multi-pass max/exp/sum/div/write formula; axis-aware shape evidence. | `INEXACT`. |
-| Data movement / views | Existing inexact | Classify view-only vs materializing operations; bytes are zero/logical/materialized according to evidence. | `INEXACT`; `SUPPORTED` for provably zero-copy metadata-only views if represented. |
-| Unsupported complex ops | Existing unsupported | Preserve visible unsupported node and make score/report degradation deterministic. | `UNSUPPORTED`. |
+### DERIVE: Automatic Extraction
+
+| Requirement Category | Capability |
+|----------------------|------------|
+| DERIVE-ATTN | Detect attention structures from reference/workload graph evidence, including Q/K/V projections, score matmul, softmax, value matmul, and output projection where present. |
+| DERIVE-MOE | Detect MoE routing, expert selection, dispatch/gather/scatter, expert projection/GEMM, gating, and combine patterns where statically visible. |
+| DERIVE-CONV | Detect convolution calls/modules with dimensional parameters and derive output dimensions from workload axes. |
+| DERIVE-SSM | Detect SSM/Mamba-like projection, depthwise convolution, scan/update, gating, and output projection structures conservatively. |
+| DERIVE-EMBED | Detect embedding/positional/gather/rotary-like memory-bound structures. |
+| DERIVE-LINEAR | Preserve linear projection as a first-class family with projection-specific evidence. |
+| DERIVE-GROUP | Attach compound-family grouping/subrole metadata without breaking existing graph nodes and edges. |
+
+### MODEL: Work And Bound Evidence
+
+| Requirement Category | Capability |
+|----------------------|------------|
+| MODEL-FORMULA | Emit formula kind, formula string, and formula inputs for each newly supported family. |
+| MODEL-BYTES | Emit read, write, intermediate, movement, and total byte evidence with dtype-aware widths. |
+| MODEL-PROVENANCE | Link formulas and bytes to tensor IDs, source expressions, axes, shapes, dtypes, and attribute sources. |
+| MODEL-CONFIDENCE | Apply supported/inexact/unsupported confidence consistently by family and metadata completeness. |
+| MODEL-BOUND | Convert new family estimates into compute, memory, limiting resource, per-op SOL bound, and aggregate bound evidence. |
+
+### REPORT: Honesty And Score Semantics
+
+| Requirement Category | Capability |
+|----------------------|------------|
+| REPORT-COVERAGE | Report family-aware coverage counts and worst confidence for required paper families and primitive families. |
+| REPORT-STATUS | Preserve machine-verifiable `scored`, `degraded`, and `unscored` states with parseable reasons. |
+| REPORT-SCORE | Prevent SOL Score computation when required SOL bound evidence is unscored; warn when evidence is degraded. |
+| REPORT-CLAIMS | Keep AMD-native derived language and no NVIDIA/B200/SOLAR/leaderboard/hardware-validation equivalence warnings. |
+| REPORT-REFS | Preserve evidence references for trace, timing, SOL bound sidecar, baseline, and hardware model. |
+
+### TEST: Verification Fixtures
+
+| Requirement Category | Capability |
+|----------------------|------------|
+| TEST-GOLDEN-FAMILIES | Golden fixtures for attention, MoE, convolution, SSM/Mamba, embedding/positional, and linear projection. |
+| TEST-DEGRADATION | Fixtures proving partial or ambiguous derivation becomes inexact, degraded, unsupported, or unscored as appropriate. |
+| TEST-ROUNDTRIP | Sidecar parse/serialize tests for new fields and coverage summaries. |
+| TEST-SCORE | AMD-native score tests for complete, degraded, and unscored SOLAR evidence. |
+| TEST-CONTRACT | Guardrails proving canonical schemas, trace JSONL, and primary CLI behavior are unchanged. |
+
+## Supported Family Targets
+
+| Family | Current v1.9 State | v1.10 Target | Confidence Target |
+|--------|--------------------|--------------|-------------------|
+| Attention | Taxonomy label exists; primitives like GEMM/softmax/elementwise can be modeled separately. | Recognize and group attention structure; estimate QK/AV/projection FLOPs, softmax passes, mask/add bytes, and movement. | `INEXACT` by default; `SUPPORTED` only for simple fully resolved dense cases if tests prove formula completeness. |
+| MoE | Taxonomy label exists; no explicit estimator. | Recognize routing/expert/dispatch/combine patterns and expose sparse/dynamic assumptions. | Usually `INEXACT`; `UNSUPPORTED` for unresolved dynamic routing effects. |
+| Convolution | Taxonomy label exists; no explicit estimator. | Estimate conv FLOPs/bytes for common 1D/2D/3D grouped/depthwise shapes. | `SUPPORTED` for fully resolved standard conv formulas; `INEXACT` for ambiguous module metadata. |
+| SSM/Mamba | Taxonomy label exists; no explicit estimator. | Recognize conservative SSM/Mamba subgraphs and model projections, depthwise conv, scan/update, gating, and movement. | `INEXACT`; `UNSUPPORTED` for opaque custom scan kernels. |
+| Embedding/positional | Taxonomy label exists; no explicit estimator. | Model memory-bound lookup/gather/positional/rotary patterns with low FLOPs and explicit bytes. | `INEXACT`; `SUPPORTED` only for static resolved lookup byte formulas. |
+| Linear projection | Recognized and estimated through GEMM-like path. | Preserve first-class projection family, bias evidence, and projection-specific formulas. | `SUPPORTED` for fully resolved dense projection; `INEXACT` when bias/broadcast metadata is incomplete. |
+| Existing primitive families | Implemented for GEMM, BMM, elementwise, activation, reduction, normalization, softmax, data movement, dtype conversion. | Keep stable and use as child evidence for compound families. | Preserve existing confidence behavior unless richer formulas justify upgrades. |
 
 ## Feature Dependencies
 
 ```text
-External hardware model schema -> Hardware model loader -> Bound artifact provenance -> Score report evidence refs
-Structured graph/IR -> Operator-family analyzers -> FLOP/byte/movement estimates -> Per-node bounds -> Coverage summary
-Confidence labels -> Unsupported/inexact policy -> Score integration warnings/unscored states -> Dataset report summaries
-Golden fixtures -> Regression tests -> Documentation examples -> Roadmap acceptance evidence
-Canonical trace immutability -> Derived artifacts/reports only -> Public contract guardrail tests
+Reference/workload graph evidence
+  -> Primitive extraction
+  -> Compound-family pattern recognition
+  -> Family/subrole grouping metadata
+  -> Family-specific work estimates
+  -> Per-op and aggregate AMD SOL bounds
+  -> Coverage/status/score eligibility
+  -> AMD-native score report warnings
+
+Shape/dtype/axis provenance
+  -> Formula inputs
+  -> Byte buckets
+  -> Confidence decisions
+  -> Degraded/unscored status reasons
+
+Golden family fixtures
+  -> Sidecar round-trip tests
+  -> Score status tests
+  -> Public contract guardrails
+  -> Requirements acceptance evidence
 ```
 
 ## MVP Recommendation
 
 Prioritize:
 
-1. Structured graph/IR and schema-versioned artifact contract.
-2. FLOP/byte/memory movement evidence for matmul, elementwise, reductions, normalization, softmax, and data movement.
-3. Explicit confidence/degradation policy wired into AMD-native score reports.
-4. External `gfx1200` hardware model artifact with RDNA 4 validation metadata and schema tests.
-5. Golden fixtures and docs that prove artifact behavior without changing canonical trace JSONL.
+1. Add compound-family metadata and coverage/status semantics first, so every later recognizer has a stable place to report evidence.
+2. Implement linear projection, convolution, and embedding/positional next because their formulas are tractable and unblock visible breadth.
+3. Implement attention recognition as grouped primitive evidence with conservative formulas; this is the most important paper-alignment signal.
+4. Implement MoE and SSM/Mamba conservatively with explicit inexact/unsupported degradation for dynamic parts.
+5. Wire all new family evidence through v2 sidecars, AMD-native score eligibility, round-trip parsing, and golden tests.
 
 Defer:
 
-- CDNA 3 / MI300X and CDNA 4 validation: out of milestone scope.
-- Exact cache/fusion modeling: requires implementation/profiler correlation beyond static semantic bounds.
-- Full paper dataset extraction: unnecessary for the modeling contract unless later roadmap phases need paper-scale coverage analysis.
-
-## Test Strategy
-
-| Test Area | Required Coverage |
-|-----------|-------------------|
-| IR extraction | Stable node IDs, op families, expressions, shape/dtype evidence, dependency edges, unsupported node retention. |
-| Work estimates | Exact expected FLOP/byte/movement values for small synthetic workloads. |
-| Confidence labels | Supported/inexact/unsupported counts and worst-confidence summaries. |
-| Hardware models | Valid external `gfx1200` model loads; invalid schema is rejected; `gfx94*` remains unvalidated/deferred. |
-| Score integration | Missing/unsupported/inexact bound evidence produces warnings or unscored states; evidence refs survive report serialization. |
-| Trace contract | Canonical `Trace.model_dump()` is unchanged before/after bound and score generation. |
-| Dataset integration | AMD score report includes per-workload SOL refs and aggregate coverage without requiring full dataset execution. |
-| Documentation guardrails | Docs contain RDNA 4-only validation language and no NVIDIA/B200/SOLAR equivalence claims. |
+- Full original-paper extraction pipeline: out of scope.
+- New RDNA/CDNA hardware validation: out of scope.
+- Exact implementation-level fusion/cache modeling: not derivable from semantic reference code alone.
+- Hosted leaderboard behavior: out of scope.
 
 ## Sources
 
-- `.planning/PROJECT.md` - v1.9 goals, RDNA 4-only validation scope, CDNA 3/CDNA 4 deferrals.
-- `docs/analysis.md` - current AMD-native score and AMD SOL coverage semantics.
-- `docs/original_parity.md` - preserved public surfaces and out-of-scope NVIDIA leaderboard equivalence.
-- `src/sol_execbench/core/scoring/amd_sol.py` - current graph, work estimate, hardware model, bound artifact, and coverage implementation.
-- `src/sol_execbench/core/scoring/amd_score.py` - current derived AMD-native scoring, warnings, and evidence refs.
-- `tests/sol_execbench/test_amd_sol_bounds.py` - current bound artifact and confidence coverage tests.
-- `tests/sol_execbench/test_amd_native_score.py` - current score integration and guardrail tests.
+- `https://arxiv.org/abs/2603.19173` - paper abstract baseline: hardware-grounded SOL bounds from SOLAR, broad real-world kernel families, SOL Score, and robustness guardrails. Confidence: HIGH for abstract-level scope.
+- `.planning/PROJECT.md` - v1.10 milestone goal, explicit target families, and deferred dataset/hardware/leaderboard scope. Confidence: HIGH.
+- `.planning/MILESTONES.md` - v1.9 delivered foundation and known gaps. Confidence: HIGH.
+- `src/sol_execbench/core/scoring/amd_bound_graph.py` - current BoundGraph IR, taxonomy, FX/AST extraction, and unsupported evidence behavior. Confidence: HIGH.
+- `src/sol_execbench/core/scoring/amd_bound_estimates.py` - current estimator coverage and explicit unsupported status for attention, MoE, SSM/Mamba, convolution, and embedding/positional families. Confidence: HIGH.
+- `src/sol_execbench/core/scoring/amd_sol_v2.py` - v2 sidecar aggregate status, coverage summary, warning, and parse/serialize semantics. Confidence: HIGH.
+- `src/sol_execbench/core/scoring/amd_score.py` - AMD-native score warning and unscored/degraded behavior. Confidence: HIGH.
+- `tests/sol_execbench/test_amd_bound_graph.py` and `tests/sol_execbench/test_amd_bound_estimates.py` - current golden coverage for graph extraction and estimates, plus proof that named paper families are taxonomy-only/unsupported today. Confidence: HIGH.

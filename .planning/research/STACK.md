@@ -1,151 +1,154 @@
 # Technology Stack
 
 **Project:** SOL ExecBench ROCm Port
-**Milestone:** v1.9 AMD SOL/SOLAR Bound Modeling Completion
-**Researched:** 2026-05-22
-**Scope:** RDNA 4 bound-modeling completion only. CDNA 3 / MI300X and CDNA 4 validation remain deferred.
-**Overall confidence:** HIGH for repository integration points; MEDIUM for final operator formulas until phase-specific golden cases are selected.
+**Milestone:** v1.10 paper-aligned SOLAR automatic derivation
+**Researched:** 2026-05-23
+**Scope:** SOLAR derivation only. No 124-model / 235-problem extraction, no new real-hardware validation, no hosted leaderboard.
+**Overall confidence:** HIGH for repository integration points; MEDIUM for exact per-family formulas until phase golden cases are selected.
 
 ## Recommendation
 
-Do not add a new framework dependency for v1.9. The right stack is the existing Python 3.12 stdlib + Pydantic v2 + frozen dataclass artifact pattern already used by `src/sol_execbench/core/scoring/amd_sol.py`, `src/sol_execbench/core/scoring/amd_score.py`, and `src/sol_execbench/core/scoring/baseline_artifact.py`.
+Do not add a new framework dependency. v1.10 should turn the current AMD SOL/SOLAR path into an automatic derivation system by extending the existing stack:
 
-The structural change should be an internal scorer/analyzer split:
+| Layer | Keep / Add | Decision |
+|-------|------------|----------|
+| Source extraction | Keep stdlib `ast`; keep best-effort `torch.fx.symbolic_trace` + `ShapeProp` | Use FX for traceable PyTorch references and tensor metadata, then use AST as deterministic fallback and source-of-truth audit trail. |
+| Symbolic shape analysis | Add a small local resolver | Resolve shapes from `Definition.get_input_shapes()`, `Definition.get_output_shapes()`, workload axes, FX `tensor_meta`, and simple AST shape expressions. Do not add `sympy`. |
+| Operator derivation | Add local pattern/decomposition modules | Map reference structure into explicit `BoundGraphNode` families for attention, MoE, convolution, SSM/Mamba, embedding/positional, and linear projection. |
+| Work formulas | Extend `amd_bound_estimates.py` | Implement per-family FLOP, read/write, intermediate, movement, confidence, and rationale formulas over `BoundGraph`, not raw source strings. |
+| Artifact/reporting | Keep `amd_sol_v2.py`, `amd_score.py`, `scripts/run_dataset.py` | Continue emitting sidecar evidence and guarded AMD-native score reports; keep canonical trace JSONL unchanged. |
 
-1. Keep canonical trace JSONL unchanged.
-2. Replace the current single-file AST-only estimator path with a small local analyzer package under `src/sol_execbench/core/scoring/amd_sol/` or closely scoped sibling modules.
-3. Add a typed local operation IR that records source expressions, tensor roles, shape formulas, operation formulas, confidence, and unsupported reasons.
-4. Externalize AMD hardware model inputs as versioned JSON artifacts loaded with stdlib `json` and validated with existing typed model patterns.
-5. Emit derived AMD SOL bound artifacts v2 and feed them into the existing AMD-native score report path through `score_amd_native_trace_workload()` and `scripts/run_dataset.py --amd-score-report`.
+The arXiv 2603.19173 abstract frames SOLAR as a pipeline for analytically deriving hardware-grounded SOL bounds and SOL Score as a measure of closing the gap between a release-defined baseline and the hardware SOL bound. For this ROCm milestone, only that derivation concept should be mapped to AMD. Do not import the paper's NVIDIA Blackwell, BF16/FP8/NVFP4 hardware claims into ROCm score semantics.
 
 ## Recommended Stack Additions
 
-### Core Python Libraries
+### Local Modules
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| Python stdlib `ast` | Python 3.12+ | Parse `Definition.reference` into a source-level operation graph | Already used in `Definition` validation and current AMD SOL extraction; sufficient for local Python reference code without parser dependencies. |
-| Python stdlib `json` | Python 3.12+ | Load hardware model and bound artifact JSON | Matches `baseline_artifact.py`; avoids YAML/TOML dependency churn and keeps artifacts easy to diff. |
-| Python stdlib `dataclasses` | Python 3.12+ | Internal IR and derived artifact objects | Current scoring modules use frozen dataclasses with `to_dict()`; preserve the local style for non-public derived evidence. |
-| Pydantic v2 | Existing project dependency | Validate public or semi-public artifact loaders where stronger input validation is needed | Already used for canonical data schemas. Use it for hardware model artifact validation if loader errors must be schema-like; do not introduce Marshmallow, attrs, or msgspec. |
-| Pytest | Existing dev dependency | Golden operator/model/report tests | Existing tests already cover `amd_sol`, `amd_score`, dataset integration, and public guardrails. |
-| Ruff | Existing dev dependency | Style and formatting | Required by repository conventions. |
+| Module | Purpose | Why |
+|--------|---------|-----|
+| `src/sol_execbench/core/scoring/amd_symbolic_shapes.py` | Workload-aware shape/dtype resolver for axis values, FX `tensor_meta`, AST literals, tuple/list expressions, `x.shape[i]`, `x.size(i)`, reshape/view arguments, and simple arithmetic. | Current extraction has concrete input/output shapes but no reusable resolver for derived intermediate dimensions. This is the highest-leverage addition. |
+| `src/sol_execbench/core/scoring/amd_derivation_patterns.py` | Declarative pattern registry mapping FX/AST call names and operator sequences to `OpFamily`, attributes, and confidence. | Avoids turning `_CALL_CLASSIFIERS` into a long ad hoc table and makes family coverage auditable. |
+| `src/sol_execbench/core/scoring/amd_operator_formulas.py` | Per-family formula helpers consumed by `amd_bound_estimates.py`, or a closely scoped internal section if the file stays small. | Keeps extraction separate from accounting. Formula outputs should remain `OperatorWorkEstimate`. |
+| Existing `amd_bound_graph.py` | Extend, do not replace. | It already has `BoundTensor`, `BoundEdge`, `BoundGraphNode`, `OpFamily`, FX tracing, AST fallback, warnings, and JSON-safe serialization. |
+| Existing `amd_bound_estimates.py` | Extend dispatch for currently unsupported families. | It already owns FLOP/byte/movement evidence and the unsupported degradation contract. |
+| Existing `amd_sol_v2.py` | Preserve v2 sidecar schema if possible; add only backward-compatible fields through existing dictionaries. | Score reports already understand `scored`, `degraded`, and `unscored`. Schema churn is unnecessary unless coverage semantics cannot be expressed. |
 
-### Local Analyzer Modules
+### Python And PyTorch APIs
 
-| Module | Responsibility | Notes |
-|--------|----------------|-------|
-| `core/scoring/amd_sol_ir.py` or `core/scoring/amd_sol/ir.py` | Define `SolOpNode`, tensor refs, formulas, memory roles, and confidence enums | Prefer frozen dataclasses. Keep enum values compatible with existing `supported`, `inexact`, `unsupported` labels. |
-| `core/scoring/amd_sol_parser.py` or `core/scoring/amd_sol/parser.py` | Convert `Definition.reference` AST into IR nodes | Keep this AST-based. Add explicit handlers for call chains, returns, tuple outputs, `torch.*`, `F.*`, tensor methods, and binary operators. |
-| `core/scoring/amd_sol_formulas.py` or `core/scoring/amd_sol/formulas.py` | Compute FLOPs, element counts, bytes, and pass counts from `Definition`, `Workload`, and IR | Move current `estimate_work()` heuristics here and make each operator formula auditable. |
-| `core/scoring/amd_hardware.py` or `core/scoring/amd_sol/hardware.py` | Load and validate hardware model JSON artifacts | Replaces `default_amd_hardware_models()` as the primary path while keeping it as a compatibility fallback if needed. |
-| `core/scoring/amd_sol.py` | Public compatibility facade | Preserve imports such as `build_amd_sol_bound_artifact()` and `default_amd_hardware_models()` to reduce downstream churn. |
+| API | Use | Guardrail |
+|-----|-----|-----------|
+| `ast.parse`, `ast.NodeVisitor` | Deterministic source fallback, call-chain extraction, return binding, assignment tracking, simple expression evaluation. | Use `visit_Constant`, not deprecated visitor names. Keep traversal order explicit for assignments and returns. |
+| `torch.fx.symbolic_trace` | Capture common PyTorch reference functions without writing a parser for every tensor method. | FX does not support input-dependent dynamic control flow; failed tracing must keep deterministic `dynamic_trace_failed` fallback semantics. |
+| `torch.fx.passes.shape_prop.ShapeProp` | Populate node tensor metadata from CPU sample inputs. | Keep CPU zero tensors and small metadata-only propagation; do not require ROCm hardware for derivation tests. |
+| FX `node.meta["tensor_meta"]` | Get concrete intermediate shape/dtype evidence when available. | Treat missing metadata as inexact, not fatal. |
+| `operator` module targets | Recognize binary arithmetic, matmul, comparisons, indexing-related operations. | Preserve unsupported nodes instead of dropping them. |
 
-Either a package directory or sibling modules is acceptable. A package directory is cleaner if v1.9 adds more than two new files; a facade file keeps existing imports stable.
+Do not adopt `torch.fx.experimental.symbolic_shapes`, `FakeTensorMode`, `torch.export`, ONNX, MLIR, Dynamo internals, or Triton parser infrastructure for v1.10. They may become useful later, but this milestone needs deterministic analysis of small `Definition.reference` functions with no new runtime dependency or compiler-stack commitment.
 
-### Data Artifacts
+## Implementation Patterns
 
-| Artifact | Format | Schema Version | Purpose | Recommendation |
-|----------|--------|----------------|---------|----------------|
-| AMD hardware model | JSON | `sol_execbench.amd_hardware_model.v1` | Architecture, dtype/path peaks, memory bandwidth, clock policy, source, validation status, and notes | Add `data/amd_hardware_models/gfx1200.json` or `src/sol_execbench/data/amd_hardware_models/gfx1200.json` depending on whether it is packaged. For runtime defaults, package it under `src/sol_execbench/data/` and load via `importlib.resources`. |
-| AMD SOL bound artifact | JSON dict emitted from dataclasses | `sol_execbench.amd_sol_bound.v2` | Per-workload graph, work, memory movement, hardware model ref, aggregate bound, and coverage | Version bump is warranted because v1.9 changes artifact semantics from shallow graph nodes to structured IR and explicit memory evidence. |
-| AMD-native score report | JSON dict emitted from dataclasses | Keep `sol_execbench.amd_native_score.v1` unless fields change | Suite/workload score output | Prefer reusing existing `evidence_refs` and warnings. Bump only if the score JSON shape changes. |
-| Baseline artifact | Existing JSON | Keep `sol_execbench.scoring_baseline.v1` | Release-defined baseline timing | No change needed for bound modeling. |
+### 1. Extract, Then Classify, Then Estimate
 
-Hardware model JSON should include enough provenance for audits:
+Keep the pipeline explicit:
 
-```json
+```text
+Definition + Workload
+  -> build_bound_graph()
+  -> pattern/decomposition enrichment
+  -> estimate_bound_work()
+  -> build_amd_sol_bound_v2_artifact()
+  -> score_amd_native_trace_workload()
+```
+
+`build_bound_graph()` should remain the single entry point. Add helper stages inside it rather than creating a separate public derivation API.
+
+### 2. Use Family-Specific Decompositions
+
+Represent high-level families as one family node with enough attributes to audit the formula, not as opaque taxonomy placeholders.
+
+| Family | Extraction Pattern | Estimate Pattern |
+|--------|--------------------|------------------|
+| Attention | Q/K/V linear projections, `matmul(q, k^T)`, scale, softmax, dropout/no-op if inference, `matmul(prob, v)`, output projection. Recognize `scaled_dot_product_attention` as a direct family node. | Record QK GEMM, softmax passes, PV GEMM, projection GEMM, read/write/intermediate bytes, sequence/head dimensions, and mask/dropout caveats. |
+| MoE | Router/top-k, expert gather/scatter, per-expert linear/MLP, combine weights. | Inexact unless active expert count and routing shape are statically known. Account routing movement and expert GEMM upper/lower bound evidence. |
+| Convolution | `torch.nn.functional.conv*`, `torch.conv*`, module call names from FX, and AST `F.conv2d`. | Use N/C/H/W, output shape, kernel, stride, padding, dilation, groups. FLOPs = output elements * kernel volume * input channels per group * 2. |
+| SSM/Mamba | `cumsum`, scan-like recurrences, selective scan function names, depthwise conv + projection patterns. | Usually inexact. Capture projection GEMMs, depthwise conv, scan pass count, state bytes, and unsupported warning for value-dependent recurrence if dimensions cannot be proven. |
+| Embedding/positional | `embedding`, indexing/gather, arange/position id creation, rotary/sin/cos patterns. | Mostly memory movement plus elementwise rotation. Distinguish lookup bytes from generated positional tensors. |
+| Linear projection | `linear`, `matmul + bias`, `@`, `einsum` forms equivalent to GEMM. | Supported when M/N/K are resolved; inexact when transpose/broadcast semantics are inferred but not proven. |
+
+### 3. Make Shape Evidence First-Class
+
+Add shape evidence to `BoundGraphNode.attributes` rather than changing node fields:
+
+```python
 {
-  "schema_version": "sol_execbench.amd_hardware_model.v1",
-  "architecture": "gfx1200",
-  "model_name": "RDNA 4 validation target",
-  "dtype_paths": [
-    {
-      "dtype_or_path": "bf16/fp32 mixed benchmark path",
-      "peak_tflops": 48.0,
-      "memory_bandwidth_gbps": 640.0,
-      "source": "project provisional RDNA4 model input; validate before publication",
-      "confidence": "inexact",
-      "validation_status": "provisional"
-    }
-  ],
-  "clock_policy": "documented benchmark clock policy",
-  "validation_scope": "RDNA 4 only"
+    "trace_source": "torch.fx" | "ast",
+    "shape_source": "fx_tensor_meta" | "definition_workload" | "ast_symbolic" | "missing",
+    "symbolic_dims": {"B": 8, "S": 2048, "H": 4096},
+    "formula_dims": {"M": 16384, "N": 4096, "K": 4096},
+    "layout_notes": ["rhs_transposed"],
 }
 ```
 
-Keep numbers provisional unless backed by recorded RDNA 4 evidence. Do not add MI300X/CDNA 3 artifacts as validated inputs in v1.9.
+This keeps the v2 sidecar JSON-compatible and lets `amd_bound_estimates.py` consume richer evidence without a schema rewrite.
 
-## IR Requirements
+### 4. Preserve Degradation Semantics
 
-The local IR should be purpose-built, not a general graph framework. Each node should record:
+Every recognized but partially modeled family should produce an `OperatorWorkEstimate` with `EstimateConfidence.INEXACT`, a non-empty rationale, and deterministic warnings. Truly unknown semantics should remain `EstimateConfidence.UNSUPPORTED`, making the aggregate `unscored` through the existing `amd_sol_v2.py` logic.
 
-| Field | Why |
-|-------|-----|
-| `node_id` | Stable evidence refs in artifacts and tests. |
-| `op_type` | Operator family: `matmul`, `elementwise`, `reduction`, `normalization`, `softmax`, `data_movement`, `unsupported`. |
-| `source_expression` | Auditable link back to reference code. |
-| `inputs` / `outputs` | Needed for byte accounting and multi-output references. |
-| `shape_exprs` / resolved shapes | Needed for workload-specific FLOP and byte formulas. |
-| `formula` | Human-readable formula such as `2*M*N*K` or `5*numel`. |
-| `memory_reads` / `memory_writes` | Explicit movement evidence instead of one global tensor byte estimate. |
-| `confidence` and `rationale` | Existing score guardrails depend on supported/inexact/unsupported degradation. |
-
-Do not use `networkx`, `sympy`, `torch.fx`, ONNX, MLIR, or Triton parser infrastructure for v1.9. They add dependency and semantic overhead without matching the repository's current source of truth: small Python reference functions embedded in `definition.json`.
+This is more paper-aligned than silently scoring partial graphs: SOLAR-style bounds are useful only when the evidence chain says what was modeled and what was not.
 
 ## Integration Points
 
-| Existing File | v1.9 Change |
-|---------------|-------------|
-| `src/sol_execbench/core/scoring/amd_sol.py` | Convert to facade or split internals while preserving `build_amd_sol_bound_artifact()`. Emit v2 artifacts with explicit formula and memory evidence. |
-| `src/sol_execbench/core/scoring/amd_score.py` | Keep score formula path. Add warnings only if v2 introduces new confidence states or hardware-model validation outcomes. Preserve `evidence_refs`. |
-| `src/sol_execbench/core/scoring/baseline_artifact.py` | No structural change. Use as the model for simple JSON loader style. |
-| `src/sol_execbench/core/data/definition.py` | No public schema change. Reuse `Definition.get_resolved_axes_values()`, input/output shape helpers, and existing AST validation. |
-| `scripts/run_dataset.py` | Add optional hardware model artifact path only if needed. Otherwise default to packaged RDNA 4 model and keep `--amd-score-report` as the integration point. |
-| `docs/analysis.md` | Document v2 bound artifact shape, hardware model provenance, unsupported/inexact degradation, and RDNA 4-only validation scope. |
-
-Avoid adding fields to canonical trace JSONL. All new bound-modeling evidence belongs in derived artifacts and score reports.
-
-## Tests
-
-Add focused tests rather than broad integration churn:
-
-| Test Area | Location | Required Coverage |
-|-----------|----------|-------------------|
-| Parser/IR golden cases | `tests/sol_execbench/test_amd_sol_bounds.py` or new `test_amd_sol_ir.py` | Matmul, matmul epilogue, elementwise chains, reductions, softmax, normalization, views/reshapes, tuple outputs, unsupported calls. |
-| Formula accounting | `tests/sol_execbench/test_amd_sol_bounds.py` | FLOP formulas, read/write bytes, aggregate bound, limiting resource, confidence summaries. |
-| Hardware model loader | New or existing scoring test | Valid RDNA 4 provisional artifact, invalid schema, non-positive peak/bandwidth rejection, CDNA 3 unvalidated warning preservation. |
-| Score integration | `tests/sol_execbench/test_amd_native_score.py` | v2 artifact still scores through existing report path; unsupported/inexact warnings remain mandatory. |
-| Dataset integration | `tests/sol_execbench/test_run_dataset_amd_score.py` | Packaged/default hardware model evidence refs survive report generation. |
-| Public guardrails | `tests/sol_execbench/test_public_contract_guardrails.py` | Canonical trace payload unchanged; no NVIDIA/B200/SOLAR leaderboard claim language. |
-| Docs guardrails | Existing docs tests if present | `docs/analysis.md` says derived artifacts only and RDNA 4 validation only. |
-
-Recommended validation commands:
-
-```bash
-uv run pytest tests/sol_execbench/test_amd_sol_bounds.py tests/sol_execbench/test_amd_native_score.py tests/sol_execbench/test_run_dataset_amd_score.py tests/sol_execbench/test_public_contract_guardrails.py
-uv run ruff check src/sol_execbench/core/scoring tests/sol_execbench/test_amd_sol_bounds.py tests/sol_execbench/test_amd_native_score.py tests/sol_execbench/test_run_dataset_amd_score.py
-```
+| File | v1.10 Work |
+|------|------------|
+| `src/sol_execbench/core/scoring/amd_bound_graph.py` | Extend `_CALL_CLASSIFIERS`, FX node attributes, and `_AstBoundGraphExtractor` with pattern registry hooks, shape evidence, module/function aliases, and sequence recognition. |
+| `src/sol_execbench/core/scoring/amd_bound_estimates.py` | Add dispatch handlers for `ATTENTION`, `MOE`, `CONVOLUTION`, `SSM_MAMBA`, and `EMBEDDING_POSITIONAL`; improve `LINEAR_PROJECTION` beyond generic GEMM where bias/broadcast/projection semantics are explicit. |
+| `src/sol_execbench/core/scoring/amd_sol_v2.py` | Keep aggregate states. Consider adding coverage detail only via existing `warnings`, `coverage_summary`, and `operator_work_estimates` dictionaries unless a schema bump is unavoidable. |
+| `src/sol_execbench/core/scoring/amd_score.py` | No formula change. Ensure degraded/unscored sidecars still block or warn exactly as today. |
+| `scripts/run_dataset.py` | Keep current `--amd-score-report` / `--amd-sol-bound-dir` integration. Do not add dataset extraction workflows. Optionally add a derivation-only dry-run later if needed, but not as core stack. |
+| Tests | Add focused CPU-only golden tests for graph extraction, shape evidence, per-family formulas, aggregate states, and dataset sidecar writing. |
 
 ## What Not To Add
 
 | Do Not Add | Reason |
 |------------|--------|
-| `networkx` | The needed graph is small, linear-ish, and evidence-oriented; dataclasses are enough. |
-| `sympy` | Shape formulas already resolve through project helpers; symbolic algebra would expand scope and dependency surface. |
-| `pandas` / `polars` | JSON artifacts and pytest assertions do not require dataframe tooling. |
-| YAML/TOML config dependencies | JSON is already used for trace, baseline, solution, and artifact contracts. |
-| `torch.fx` / ONNX export | The source of truth is reference Python in `Definition.reference`, not an executed PyTorch module graph. FX also risks runtime/device side effects. |
-| New canonical trace fields | Violates the milestone quality gate; derived bound and score artifacts are the correct layer. |
-| CDNA 3 / MI300X validated hardware models | Explicitly out of v1.9 scope. Keep only unvalidated/provisional scaffolding if needed for guardrail tests. |
-| NVIDIA SOLAR/B200 compatibility layer | The project must avoid leaderboard-equivalence claims. AMD-native score reports remain derived ROCm interpretation artifacts. |
+| New dataset/model extraction pipeline | Explicitly out of v1.10 scope. Use existing problem `definition.json` and `workload.jsonl`. |
+| Real-hardware validation harness changes | Existing profiler/timing paths are enough; this milestone is derivation-only. |
+| Hosted leaderboard or submission service | Out of scope and would blur AMD-native derived evidence with public leaderboard claims. |
+| `sympy` | Simple integer shape expressions and workload axes are enough; symbolic algebra would add dependency and failure modes. |
+| `networkx` | `BoundGraph` already provides the small evidence graph needed. |
+| ONNX / MLIR / `torch.export` / Dynamo internals | Too much semantic and dependency surface for small embedded reference functions. |
+| CUDA/NVIDIA compatibility layer | ROCm-only project; paper hardware claims must not be mapped onto AMD reports. |
+| New canonical trace fields | Bound and score evidence belongs in sidecars and AMD-native reports. |
+| Validated CDNA 3 / MI300X / CDNA 4 claims | Validation is explicitly deferred. Keep model status provisional unless evidence already exists. |
+
+## Suggested Validation
+
+```bash
+uv run pytest \
+  tests/sol_execbench/test_amd_bound_graph.py \
+  tests/sol_execbench/test_amd_bound_estimates.py \
+  tests/sol_execbench/test_amd_sol_v2.py \
+  tests/sol_execbench/test_amd_native_score.py \
+  tests/sol_execbench/test_run_dataset_amd_score.py \
+  tests/sol_execbench/test_public_contract_guardrails.py
+
+uv run --with ruff ruff check \
+  src/sol_execbench/core/scoring \
+  tests/sol_execbench/test_amd_bound_graph.py \
+  tests/sol_execbench/test_amd_bound_estimates.py \
+  tests/sol_execbench/test_amd_sol_v2.py
+```
 
 ## Sources
 
-- `.planning/PROJECT.md` - v1.9 scope, RDNA 4 validation boundary, deferred CDNA 3/CDNA 4 work.
-- `src/sol_execbench/core/scoring/amd_sol.py` - current AST graph extraction, work estimates, hardware defaults, bound artifact shape.
-- `src/sol_execbench/core/scoring/amd_score.py` - AMD-native score integration, warning behavior, evidence refs.
-- `src/sol_execbench/core/scoring/baseline_artifact.py` - local JSON artifact loader pattern.
-- `src/sol_execbench/core/data/definition.py` - canonical definition schema, AST validation, shape/dtype source.
-- `docs/analysis.md` - trace immutability, AMD-native score interpretation, coverage semantics.
-- `tests/sol_execbench/test_amd_sol_bounds.py`, `tests/sol_execbench/test_amd_native_score.py`, `tests/sol_execbench/test_run_dataset_amd_score.py`, `tests/sol_execbench/test_public_contract_guardrails.py` - existing coverage and guardrail locations.
+- Repository: `.planning/PROJECT.md` - v1.10 SOLAR derivation scope and explicit deferrals.
+- Repository: `src/sol_execbench/core/scoring/amd_bound_graph.py` - current BoundGraph IR, FX trace path, AST fallback, operator family enum, warnings.
+- Repository: `src/sol_execbench/core/scoring/amd_bound_estimates.py` - current per-node FLOP/byte/movement estimate contract and unsupported fallback.
+- Repository: `src/sol_execbench/core/scoring/amd_sol_v2.py` - sidecar schema, coverage summary, scored/degraded/unscored aggregate semantics.
+- Repository: `src/sol_execbench/core/scoring/amd_score.py` - AMD-native score warnings, evidence refs, degraded/unscored handling.
+- Repository: `scripts/run_dataset.py` - dataset report integration and sidecar writing path.
+- Paper baseline: https://arxiv.org/abs/2603.19173 - SOL-ExecBench abstract, SOLAR-derived hardware SOL bounds, SOL Score, and NVIDIA Blackwell benchmark scope.
+- Official docs: https://docs.pytorch.org/docs/stable/fx.html - FX symbolic tracing, IR, ShapeProp, and dynamic-control-flow limitations. Confidence: HIGH.
+- Official docs: https://docs.python.org/3/library/ast.html - Python AST parsing and `NodeVisitor` traversal APIs. Confidence: HIGH.
+- Official docs: https://docs.pytorch.org/docs/2.9/torch.compiler_fake_tensor.html - FakeTensor/dynamic-shape context; useful background but not recommended for this milestone. Confidence: MEDIUM because it is compiler-internals-oriented.
