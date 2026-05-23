@@ -147,7 +147,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 48-01-PLAN.md — Create the internal evidence model and strict parser/serializer.
+- [x] 48-01-PLAN.md — Create the internal evidence model and strict parser/serializer.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -275,7 +275,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 47. Derivation Contract And Golden Fixture Matrix | 6/6 | Complete | 2026-05-23 |
-| 48. Extraction Pipeline And Semantic Provenance | 0/4 | Not started | - |
+| 48. Extraction Pipeline And Semantic Provenance | 1/4 | In Progress|  |
 | 49. High-Confidence Family Modeling | 0/TBD | Not started | - |
 | 50. Degraded Complex Family Modeling | 0/TBD | Not started | - |
 | 51. Sidecar Coverage And Score Guards | 0/TBD | Not started | - |

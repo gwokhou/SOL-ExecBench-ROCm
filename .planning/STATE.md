@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.10
 milestone_name: Paper-Aligned SOLAR Automatic Derivation
 status: executing
-stopped_at: Roadmap created; next step is `$gsd-plan-phase 47`.
-last_updated: "2026-05-23T04:20:50.245Z"
-last_activity: 2026-05-23
+stopped_at: Completed 48-01-PLAN.md; next step is 48-02-PLAN.md.
+last_updated: "2026-05-23T05:12:40.740Z"
+last_activity: 2026-05-23 -- Completed 48-01 SOLAR derivation evidence contract
 progress:
   total_phases: 6
   completed_phases: 1
-  total_plans: 6
-  completed_plans: 6
-  percent: 17
+  total_plans: 10
+  completed_plans: 7
+  percent: 70
 ---
 
 # Project State
@@ -21,22 +21,22 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-23)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Phase 48: Extraction Pipeline And Semantic Provenance
+**Current focus:** Phase 48 — extraction-pipeline-and-semantic-provenance
 
 ## Current Position
 
-Phase: 48 of 52 (Extraction Pipeline And Semantic Provenance)
-Plan: TBD
-Status: Ready to plan
-Last activity: 2026-05-23 -- Phase 47 completed
+Phase: 48 (extraction-pipeline-and-semantic-provenance) — EXECUTING
+Plan: 2 of 4
+Status: Ready to execute
+Last activity: 2026-05-23 -- Completed 48-01 SOLAR derivation evidence contract
 
-Progress: [██░░░░░░░░] 17%
+Progress: [███████░░░] 70%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 6
+- Total plans completed: 7
 - Average duration: n/a
 - Total execution time: 0.0 hours
 
@@ -45,7 +45,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 47. Derivation Contract And Golden Fixture Matrix | 6 | - | - |
-| 48. Extraction Pipeline And Semantic Provenance | TBD | - | - |
+| 48. Extraction Pipeline And Semantic Provenance | 1 | 4min | 4min |
 | 49. High-Confidence Family Modeling | TBD | - | - |
 | 50. Degraded Complex Family Modeling | TBD | - | - |
 | 51. Sidecar Coverage And Score Guards | TBD | - | - |
@@ -67,6 +67,8 @@ Decisions are logged in PROJECT.md. Recent decisions affecting current work:
 - v1.10 scope is SOLAR derivation only.
 - Preserve canonical trace JSONL, public schemas, primary CLI behavior, and AMD-native-derived claim boundaries.
 - Defer 124-model/235-problem extraction, MI300X/CDNA3/CDNA4 validation, NVFP4/MXFP4 validation, hosted leaderboard, NVIDIA Blackwell/B200 equivalence, and new framework dependencies.
+- 48-01 kept SOLAR derivation evidence internal and sidecar-only with explicit source_boundary booleans.
+- 48-01 reused the existing EstimateConfidence vocabulary while serializing confidence as JSON-safe strings.
 
 ### Pending Todos
 
@@ -90,6 +92,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-23
-Stopped at: Roadmap created; next step is `$gsd-plan-phase 47`.
+Last session: 2026-05-23T05:12:40.733Z
+Stopped at: Completed 48-01-PLAN.md; next step is 48-02-PLAN.md.
 Resume file: None

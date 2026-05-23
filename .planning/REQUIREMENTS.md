@@ -14,13 +14,13 @@
 - [ ] **DERIVE-04**: The derivation pipeline can conservatively recognize SSM/Mamba-like projection, depthwise convolution, scan or state update, gating, and output projection patterns, with degraded evidence when recurrence semantics are incomplete.
 - [ ] **DERIVE-05**: The derivation pipeline can recognize embedding, positional, gather, and rotary-like memory-bound structures with index and output-shape evidence.
 - [ ] **DERIVE-06**: The derivation pipeline treats linear projection as a first-class semantic family while reusing GEMM-compatible formulas when dimensions are explicit.
-- [ ] **DERIVE-07**: The derivation pipeline emits compound-family grouping, subrole, and provenance metadata without mutating canonical trace JSONL or public benchmark schemas.
+- [x] **DERIVE-07**: The derivation pipeline emits compound-family grouping, subrole, and provenance metadata without mutating canonical trace JSONL or public benchmark schemas.
 
 ### Modeling
 
 - [ ] **MODEL-01**: Each newly promoted family emits a family-specific formula kind, formula text, and formula input map.
 - [ ] **MODEL-02**: Each newly promoted family emits dtype-aware read, write, intermediate, movement, and total byte evidence.
-- [ ] **MODEL-03**: Formula and byte evidence carries tensor shape, dtype, semantic-axis, and extraction-source provenance.
+- [x] **MODEL-03**: Formula and byte evidence carries tensor shape, dtype, semantic-axis, and extraction-source provenance.
 - [ ] **MODEL-04**: The estimator applies deterministic supported, inexact, and unsupported confidence rules based on metadata completeness and recognized semantics.
 - [ ] **MODEL-05**: Family estimates convert into per-operation compute bound, memory bound, limiting resource, and SOL-bound evidence.
 
@@ -72,10 +72,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DERIVE-04 | Phase 50 | Pending |
 | DERIVE-05 | Phase 49 | Pending |
 | DERIVE-06 | Phase 49 | Pending |
-| DERIVE-07 | Phase 48 | Pending |
+| DERIVE-07 | Phase 48 | Complete |
 | MODEL-01 | Phase 49 | Pending |
 | MODEL-02 | Phase 49 | Pending |
-| MODEL-03 | Phase 48 | Pending |
+| MODEL-03 | Phase 48 | Complete |
 | MODEL-04 | Phase 48 | Pending |
 | MODEL-05 | Phase 49 | Pending |
 | REPORT-01 | Phase 51 | Pending |
