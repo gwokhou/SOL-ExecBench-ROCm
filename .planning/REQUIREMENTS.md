@@ -8,7 +8,7 @@
 
 ### Derivation
 
-- [ ] **DERIVE-01**: The derivation pipeline can recognize structurally visible attention patterns, including Q/K/V projections, QK score computation, scale or mask handling, softmax, PV value aggregation, and output projection, with explicit degradation when axes or mask semantics are incomplete.
+- [x] **DERIVE-01**: The derivation pipeline can recognize structurally visible attention patterns, including Q/K/V projections, QK score computation, scale or mask handling, softmax, PV value aggregation, and output projection, with explicit degradation when axes or mask semantics are incomplete.
 - [ ] **DERIVE-02**: The derivation pipeline can conservatively recognize MoE routing, top-k selection, expert projection, token dispatch, and combine patterns, with dynamic routing evidence recorded when static cardinality is incomplete.
 - [ ] **DERIVE-03**: The derivation pipeline can recognize convolution patterns for 1D, 2D, and 3D convolution, including grouped or depthwise convolution metadata, stride, padding, dilation, and output spatial dimensions.
 - [ ] **DERIVE-04**: The derivation pipeline can conservatively recognize SSM/Mamba-like projection, depthwise convolution, scan or state update, gating, and output projection patterns, with degraded evidence when recurrence semantics are incomplete.
@@ -66,7 +66,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DERIVE-01 | Phase 49 | Pending |
+| DERIVE-01 | Phase 49 | Complete |
 | DERIVE-02 | Phase 50 | Pending |
 | DERIVE-03 | Phase 49 | Pending |
 | DERIVE-04 | Phase 50 | Pending |

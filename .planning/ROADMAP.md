@@ -204,7 +204,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 49-03-PLAN.md — Derive explicit attention formula-backed evidence and degradation.
+- [x] 49-03-PLAN.md — Derive explicit attention formula-backed evidence and degradation.
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -293,7 +293,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 47. Derivation Contract And Golden Fixture Matrix | 6/6 | Complete | 2026-05-23 |
 | 48. Extraction Pipeline And Semantic Provenance | 4/4 | Complete    | 2026-05-23 |
-| 49. High-Confidence Family Modeling | 2/4 | In Progress|  |
+| 49. High-Confidence Family Modeling | 3/4 | In Progress|  |
 | 50. Degraded Complex Family Modeling | 0/TBD | Not started | - |
 | 51. Sidecar Coverage And Score Guards | 0/TBD | Not started | - |
 | 52. Dataset Runner And Public Contract Closure | 0/TBD | Not started | - |
