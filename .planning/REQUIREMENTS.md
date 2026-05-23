@@ -21,7 +21,7 @@
 - [ ] **MODEL-01**: Each newly promoted family emits a family-specific formula kind, formula text, and formula input map.
 - [ ] **MODEL-02**: Each newly promoted family emits dtype-aware read, write, intermediate, movement, and total byte evidence.
 - [x] **MODEL-03**: Formula and byte evidence carries tensor shape, dtype, semantic-axis, and extraction-source provenance.
-- [ ] **MODEL-04**: The estimator applies deterministic supported, inexact, and unsupported confidence rules based on metadata completeness and recognized semantics.
+- [x] **MODEL-04**: The estimator applies deterministic supported, inexact, and unsupported confidence rules based on metadata completeness and recognized semantics.
 - [ ] **MODEL-05**: Family estimates convert into per-operation compute bound, memory bound, limiting resource, and SOL-bound evidence.
 
 ### Reporting
@@ -76,7 +76,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MODEL-01 | Phase 49 | Pending |
 | MODEL-02 | Phase 49 | Pending |
 | MODEL-03 | Phase 48 | Complete |
-| MODEL-04 | Phase 48 | Pending |
+| MODEL-04 | Phase 48 | Complete |
 | MODEL-05 | Phase 49 | Pending |
 | REPORT-01 | Phase 51 | Pending |
 | REPORT-02 | Phase 51 | Pending |
