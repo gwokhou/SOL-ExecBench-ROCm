@@ -17,12 +17,15 @@ from sol_execbench.core.scoring.amd_sol import (
     AMD_SOL_SCHEMA_VERSION,
     EstimateConfidence,
     HardwareValidationStatus,
+    WorkEstimate,
     build_amd_sol_bound_artifact,
     default_amd_hardware_models,
     estimate_work,
     extract_graph,
     summarize_amd_sol_coverage,
 )
+from sol_execbench.core.scoring.amd_bound_estimates import estimate_bound_work
+from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
 from sol_execbench.core.scoring.amd_hardware_models import load_amd_hardware_model
 
 
@@ -70,6 +73,10 @@ def test_matmul_bound_artifact_records_graph_work_hardware_and_bounds():
     assert payload["hardware_model"]["architecture"] == "gfx1200"
     assert payload["hardware_model"]["hardware_validation_status"] == "validated"
     assert payload["hardware_model"]["model_validation_status"] == "provisional"
+    assert "formula_inputs" not in json.dumps(payload)
+    assert "read_bytes" not in json.dumps(payload)
+    assert "movement_bytes" not in json.dumps(payload)
+    assert "operator_work_estimates" not in json.dumps(payload)
 
 
 def test_elementwise_work_estimate_is_inexact_and_auditable():
@@ -91,11 +98,13 @@ def test_elementwise_work_estimate_is_inexact_and_auditable():
 
     graph = extract_graph(definition)
     estimates = estimate_work(definition, workload, graph)
+    rich_estimates = estimate_bound_work(build_bound_graph(definition, workload))
 
     assert graph[0].op_type == "elementwise"
     assert estimates[0].confidence == EstimateConfidence.INEXACT
     assert estimates[0].flops == 16.0
     assert estimates[0].bytes_accessed == 192.0
+    assert estimates[0].bytes_accessed == rich_estimates[0].total_bytes
     assert "one operation per output element" in estimates[0].rationale
 
 
@@ -118,10 +127,35 @@ def test_unsupported_ops_stay_visible_instead_of_getting_silent_scores(tmp_path:
 
     assert artifact.graph_nodes[0].op_type == "unsupported"
     assert artifact.work_estimates[0].confidence == EstimateConfidence.UNSUPPORTED
+    assert artifact.work_estimates[0].bytes_accessed == 0.0
     assert artifact.op_bounds[0].confidence == EstimateConfidence.UNSUPPORTED
     assert artifact.hardware_model.model_validation_status == HardwareValidationStatus.UNVALIDATED
     assert artifact.hardware_model.hardware_validation_status == HardwareValidationStatus.UNVALIDATED
     assert artifact.hardware_model.source.endswith("CDNA3 scaffold for phase 45")
+
+
+def test_legacy_work_estimate_fields_are_unchanged_and_adapt_rich_totals():
+    definition = _matmul_definition()
+    workload = Workload(
+        axes={"M": 2},
+        inputs={"a": {"type": "random"}, "b": {"type": "random"}},
+        uuid="matmul-workload",
+    )
+    graph = extract_graph(definition)
+
+    estimates = estimate_work(definition, workload, graph)
+    rich_estimates = estimate_bound_work(build_bound_graph(definition, workload))
+
+    assert tuple(WorkEstimate.__dataclass_fields__) == (
+        "node_id",
+        "flops",
+        "bytes_accessed",
+        "confidence",
+        "rationale",
+    )
+    assert estimates[0].node_id == rich_estimates[0].node_id
+    assert estimates[0].flops == 128.0
+    assert estimates[0].bytes_accessed == rich_estimates[0].total_bytes
 
 
 def test_coverage_summary_counts_supported_inexact_and_unsupported_ops():
