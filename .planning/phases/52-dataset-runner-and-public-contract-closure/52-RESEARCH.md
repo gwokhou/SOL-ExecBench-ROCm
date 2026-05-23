@@ -385,16 +385,16 @@ Source: `src/sol_execbench/core/scoring/amd_score.py:140-153`. [VERIFIED: repo]
 |---|-------|---------|---------------|
 | A1 | No assumptions were needed; findings are based on repository files and executed local commands. | All | N/A |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Should Phase 52 support reading pre-existing SOLAR sidecars or only writing them?**
+1. **RESOLVED: Phase 52 writes and passes through generated SOLAR sidecars only.**
    - What we know: The scorer accepts parsed SOLAR guard objects and the runner already writes derived sidecars for AMD SOL v2. [VERIFIED: repo `src/sol_execbench/core/scoring/amd_score.py:233-305`, `scripts/run_dataset.py:498-506`]
-   - What's unclear: The context allows exact option names at planner discretion, but does not lock whether sidecars are generated, consumed, or both. [VERIFIED: repo `.planning/phases/52-dataset-runner-and-public-contract-closure/52-CONTEXT.md`]
-   - Recommendation: Prioritize write-and-pass-through from canonical inputs; add read-existing only if needed for local report workflows. [VERIFIED: repo `src/sol_execbench/core/scoring/solar_derivation.py:390-397`]
-2. **Where should report-only internal SOLAR refs live?**
+   - Decision: Implement deterministic runner-generated SOLAR derivation sidecars from canonical `Definition` and active `Workload` records, then pass those parsed sidecars into AMD-native scoring by workload UUID. Do not add a read-existing SOLAR sidecar directory in Phase 52; that would be a separate interoperability feature if later needed. [RESOLVED]
+   - Rationale: Build-and-pass-through is enough for REPORT-04 and avoids ambiguous precedence between generated and supplied sidecars. [VERIFIED: repo `src/sol_execbench/core/scoring/solar_derivation.py:390-397`]
+2. **RESOLVED: Report-only internal SOLAR refs live in `derived_evidence_refs`.**
    - What we know: Existing public `evidence_refs` keys are stable and counted by `evidence_summary`. [VERIFIED: repo `src/sol_execbench/core/scoring/amd_score.py:124-153`]
-   - What's unclear: The context allows a derived report-specific internal field if explicitly scoped and guarded. [VERIFIED: repo `.planning/phases/52-dataset-runner-and-public-contract-closure/52-CONTEXT.md`]
-   - Recommendation: Add a suite-level or per-score `internal_evidence_refs` / `derived_evidence_refs` field only in AMD-native derived reports, then assert it never appears in canonical models/traces. [VERIFIED: repo `tests/sol_execbench/test_public_contract_guardrails.py`]
+   - Decision: Add a derived-report-only `derived_evidence_refs` field for SOLAR derivation references and score-eligibility evidence. Keep public `AmdNativeScore.evidence_refs` keys unchanged and assert `derived_evidence_refs` never appears in canonical models or trace JSONL. [RESOLVED]
+   - Rationale: The name is explicit about derived-report scope and avoids overloading established public score `evidence_refs`. [VERIFIED: repo `tests/sol_execbench/test_public_contract_guardrails.py`]
 
 ## Environment Availability
 
