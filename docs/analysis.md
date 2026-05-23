@@ -21,6 +21,21 @@ Run a dataset batch:
 uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark --limit 5
 ```
 
+Before running dataset batches, the local public dataset layout can be checked
+with a sidecar acquisition/layout manifest:
+
+```bash
+python scripts/download_solexecbench.py \
+  --verify-only \
+  --output-root data/SOL-ExecBench/benchmark \
+  --manifest out/dataset_manifest.json
+```
+
+The manifest records dataset source, selected categories, shallow counts,
+checksums, diagnostics, and claim-boundary fields. Acquisition/layout completion
+does not prove ROCm readiness, execution success, paper-level validation, hosted
+leaderboard parity, or upstream SOLAR equivalence.
+
 Dataset runs write per-problem traces under category/problem subdirectories of
 the selected output directory and write `summary.json` directly under that
 output directory. The default output directory is `out/`.

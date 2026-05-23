@@ -24,7 +24,6 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from sol_execbench.core.dataset import (  # noqa: E402
-    DEFAULT_CATEGORIES,
     DatasetManifestSource,
     build_dataset_manifest,
     validate_categories,

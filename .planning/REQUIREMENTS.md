@@ -142,7 +142,7 @@ ExecBench.
 | Original 124-model / 7,400-subgraph regeneration | v1.11 works from the public dataset surface, not the paper's extraction pipeline. |
 | Upstream NVlabs/SOLAR equivalence | v1.11 may consume existing SOLAR derivation sidecars but does not reopen the SOLAR analysis architecture. |
 | Hosted leaderboard or remote submission service | v1.11 is a local audit and execution-closure workflow. |
-| CDNA 3 / MI300X, CDNA 4, NVFP4, or MXFP4 validation claims | These require hardware evidence outside this milestone's scope. |
+| CDNA 3 / MI300X real-hardware validation, CDNA 4, NVFP4, or MXFP4 validation claims | These require hardware evidence outside this milestone's scope. |
 | CUDA/NVIDIA runtime restoration | This project remains a ROCm-only port. |
 | Mutating public dataset files or canonical trace JSONL | v1.11 artifacts must remain sidecar-only and opt-in. |
 | New dataframe/database/reporting framework | Research found the existing stack and stdlib JSON/Markdown sufficient. |
@@ -153,10 +153,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DATA-01 | Phase 53 | Pending |
-| DATA-02 | Phase 53 | Pending |
-| DATA-03 | Phase 53 | Pending |
-| DATA-04 | Phase 53 | Pending |
+| DATA-01 | Phase 53 | Complete |
+| DATA-02 | Phase 53 | Complete |
+| DATA-03 | Phase 53 | Complete |
+| DATA-04 | Phase 53 | Complete |
 | INV-01 | Phase 54 | Pending |
 | INV-02 | Phase 54 | Pending |
 | INV-03 | Phase 54 | Pending |

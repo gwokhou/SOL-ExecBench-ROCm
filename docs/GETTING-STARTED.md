@@ -67,10 +67,25 @@ pip install "huggingface-hub[cli]"
 ./scripts/download_data.sh
 ```
 
+The SOL-ExecBench downloader writes the public benchmark layout to
+`data/SOL-ExecBench/benchmark` by default. To verify or record the local layout
+without running GPU evaluation, emit an acquisition/layout manifest:
+
+```bash
+python scripts/download_solexecbench.py \
+  --verify-only \
+  --output-root data/SOL-ExecBench/benchmark \
+  --manifest out/dataset_manifest.json
+```
+
+This manifest is a sidecar acquisition/layout artifact. It does not prove ROCm readiness,
+execution success, paper-level validation, hosted leaderboard parity, or
+upstream SOLAR equivalence.
+
 Then run a small dataset batch:
 
 ```bash
-uv run scripts/run_dataset.py data/benchmark --limit 5
+uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark --limit 5
 ```
 
 ## Optional Docker Setup

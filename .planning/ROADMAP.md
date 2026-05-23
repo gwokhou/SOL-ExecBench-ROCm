@@ -54,7 +54,7 @@ next.
 
 ## Active Milestone: v1.11 Paper Dataset Parity Inventory and ROCm Execution Closure
 
-### Phase 53: Dataset Contract And Acquisition Metadata
+### Phase 53: Dataset Contract And Acquisition Metadata (completed 2026-05-23)
 
 **Goal:** Establish a reproducible dataset acquisition and local-layout contract
 for the public SOL-ExecBench benchmark categories without implying ROCm
@@ -153,7 +153,7 @@ leaderboard parity, upstream SOLAR parity, or unsupported hardware validation.
 
 | Milestone | Phases | Plans | Status | Shipped |
 |-----------|--------|-------|--------|---------|
-| v1.11 Paper Dataset Parity Inventory and ROCm Execution Closure | 53-57 | 0/0 | Planning | - |
+| v1.11 Paper Dataset Parity Inventory and ROCm Execution Closure | 53-57 | 3/3 | In Progress | - |
 | v1.10 Paper-Aligned SOLAR Automatic Derivation | 47-52 | 23/23 | Complete | 2026-05-23 |
 | v1.9 AMD SOL/SOLAR Bound Modeling Completion | 41-46 | 17/17 | Complete | 2026-05-23 |
 | v1.8 ROCm Library Ecosystem Completion | 36-40 | 5/5 | Complete | 2026-05-22 |
