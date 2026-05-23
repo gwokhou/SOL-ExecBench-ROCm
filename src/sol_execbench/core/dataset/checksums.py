@@ -1,0 +1,75 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Deterministic checksum helpers for dataset sidecar metadata."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from pathlib import Path
+
+CANONICAL_PROBLEM_FILES: tuple[str, ...] = (
+    "definition.json",
+    "reference.py",
+    "workload.jsonl",
+)
+"""Problem files included in category checksums when present."""
+
+
+def sha256_bytes(data: bytes) -> str:
+    """Return the sha256 hex digest for *data*."""
+
+    return hashlib.sha256(data).hexdigest()
+
+
+def sha256_file(path: Path) -> str:
+    """Return the sha256 hex digest for one file."""
+
+    return sha256_bytes(path.read_bytes())
+
+
+def stable_json_checksum(payload: object) -> str:
+    """Return a stable sha256 over a JSON-serializable payload."""
+
+    encoded = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    ).encode("utf-8")
+    return sha256_bytes(encoded)
+
+
+def checksum_category(category_dir: Path) -> str | None:
+    """Hash canonical problem files below *category_dir* in deterministic order."""
+
+    if not category_dir.is_dir():
+        return None
+
+    records: list[dict[str, object]] = []
+    for problem_dir in sorted(path for path in category_dir.iterdir() if path.is_dir()):
+        for filename in CANONICAL_PROBLEM_FILES:
+            path = problem_dir / filename
+            if path.is_file():
+                records.append(
+                    {
+                        "path": path.relative_to(category_dir).as_posix(),
+                        "size_bytes": path.stat().st_size,
+                        "sha256": sha256_file(path),
+                    }
+                )
+
+    return stable_json_checksum(records)
