@@ -75,6 +75,140 @@ def test_op_family_taxonomy_includes_paper_aligned_families():
     } <= values
 
 
+def test_moe_visible_static_route_nodes_record_subroles_and_metadata():
+    definition = Definition(
+        name="moe_static_route",
+        axes={
+            "tokens": {"type": "const", "value": 128},
+            "hidden": {"type": "const", "value": 256},
+            "experts": {"type": "const", "value": 8},
+        },
+        inputs={
+            "x": {"shape": ["tokens", "hidden"], "dtype": "float16"},
+            "router": {"shape": ["hidden", "experts"], "dtype": "float16"},
+            "expert_weights": {"shape": ["experts", "hidden", "hidden"], "dtype": "float16"},
+        },
+        outputs={"out": {"shape": ["tokens", "hidden"], "dtype": "float16"}},
+        reference=(
+            "import torch\n\n"
+            "def run(x, router, expert_weights):\n"
+            "    scores = router(x)\n"
+            "    gates = torch.topk(scores, k=2, dim=-1)\n"
+            "    return dispatch_and_combine(x, expert_weights, gates)\n"
+        ),
+    )
+    workload = Workload(
+        axes={},
+        inputs={
+            "x": {"type": "random"},
+            "router": {"type": "random"},
+            "expert_weights": {"type": "random"},
+        },
+        uuid="moe-static-workload",
+    )
+
+    graph = build_bound_graph(definition, workload)
+    moe_nodes = [node for node in graph.nodes if node.op_family == OpFamily.MOE]
+
+    assert {node.attributes.get("subrole") for node in moe_nodes} == {
+        "router",
+        "top_k",
+        "dispatch",
+    }
+    dispatch = next(node for node in moe_nodes if node.attributes.get("subrole") == "dispatch")
+    top_k = next(node for node in moe_nodes if node.attributes.get("subrole") == "top_k")
+    assert dispatch.attributes["moe_subroles"] == (
+        "dispatch",
+        "expert_projection",
+        "combine",
+    )
+    assert top_k.attributes["route_top_k"] == 2
+    assert top_k.attributes["route_cardinality_source"] == "topk.k"
+    assert dispatch.attributes["expert_count"] == 8
+    assert dispatch.attributes["token_count"] == 128
+    assert dispatch.attributes["hidden_size"] == 256
+    assert dispatch.confidence == EstimateConfidence.SUPPORTED
+
+
+def test_moe_dynamic_route_records_missing_static_metadata_without_defaults():
+    definition = Definition(
+        name="moe_dynamic_route",
+        axes={
+            "tokens": {"type": "const", "value": 128},
+            "hidden": {"type": "const", "value": 256},
+            "experts": {"type": "const", "value": 8},
+        },
+        inputs={
+            "x": {"shape": ["tokens", "hidden"], "dtype": "float16"},
+            "router": {"shape": ["hidden", "experts"], "dtype": "float16"},
+            "expert_weights": {"shape": ["experts", "hidden", "hidden"], "dtype": "float16"},
+            "threshold": {"shape": None, "dtype": "float16"},
+        },
+        outputs={"out": {"shape": ["tokens", "hidden"], "dtype": "float16"}},
+        reference=(
+            "def run(x, router, expert_weights, threshold):\n"
+            "    scores = router(x)\n"
+            "    chosen = scores > threshold\n"
+            "    return dispatch_dynamic(x, expert_weights, chosen)\n"
+        ),
+    )
+    workload = Workload(
+        axes={},
+        inputs={
+            "x": {"type": "random"},
+            "router": {"type": "random"},
+            "expert_weights": {"type": "random"},
+            "threshold": {"type": "random"},
+        },
+        uuid="moe-dynamic-workload",
+    )
+
+    graph = build_bound_graph(definition, workload)
+    dispatch = next(
+        node
+        for node in graph.nodes
+        if node.op_family == OpFamily.MOE and node.attributes.get("subrole") == "dispatch"
+    )
+
+    assert dispatch.confidence == EstimateConfidence.INEXACT
+    assert dispatch.attributes["missing_route_metadata"] == (
+        "route:top_k",
+        "route:static_cardinality",
+    )
+    assert "route_top_k" not in dispatch.attributes
+    assert dispatch.attributes["expert_count"] == 8
+    assert "inexact_operator:moe_dynamic_routing" in graph.warnings
+
+
+def test_moe_taxonomy_only_call_is_unsupported_without_fabricated_subroles():
+    definition = Definition(
+        name="moe_taxonomy_only",
+        axes={
+            "tokens": {"type": "const", "value": 128},
+            "hidden": {"type": "const", "value": 256},
+        },
+        inputs={
+            "x": {"shape": ["tokens", "hidden"], "dtype": "float16"},
+            "opaque_moe": {"shape": ["hidden", "hidden"], "dtype": "float16"},
+        },
+        outputs={"out": {"shape": ["tokens", "hidden"], "dtype": "float16"}},
+        reference="def run(x, opaque_moe):\n    return opaque_moe(x)\n",
+    )
+    workload = Workload(
+        axes={},
+        inputs={"x": {"type": "random"}, "opaque_moe": {"type": "random"}},
+        uuid="moe-taxonomy-workload",
+    )
+
+    graph = build_bound_graph(definition, workload)
+
+    assert graph.nodes[0].op_family == OpFamily.MOE
+    assert graph.nodes[0].confidence == EstimateConfidence.UNSUPPORTED
+    assert "subrole" not in graph.nodes[0].attributes
+    assert graph.nodes[0].attributes["taxonomy_only"] is True
+    assert "unsupported_operator:moe_taxonomy_only" in graph.warnings
+
+
 def test_definition_and_workload_produce_deterministic_tensor_metadata():
     graph = build_bound_graph(_matmul_definition(), _matmul_workload())
     repeated = build_bound_graph(_matmul_definition(), _matmul_workload())
