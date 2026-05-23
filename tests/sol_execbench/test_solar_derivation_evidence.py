@@ -22,8 +22,11 @@ from sol_execbench.core.scoring.amd_bound_graph import (
 from sol_execbench.core.scoring.amd_hardware_models import EstimateConfidence
 from sol_execbench.core.scoring.solar_derivation import (
     SOLAR_DERIVATION_SCHEMA_VERSION,
+    SolarBoundEvidence,
+    SolarByteEvidence,
     SolarDerivationEvidence,
     SolarEvidenceSource,
+    SolarFormulaEvidence,
     SolarSemanticGroupEvidence,
     SolarSubroleEvidence,
     SolarTensorEvidence,
@@ -81,6 +84,47 @@ def _contract_artifact() -> SolarDerivationEvidence:
         warning_prefixes=(),
         source=_source(kind="definition", detail="reference structure"),
         rationale="Required attention subrole evidence is present.",
+        formula_evidence=(
+            SolarFormulaEvidence(
+                node_id="op_1",
+                family="attention",
+                formula_kind="attention_scores_flops",
+                formula="2*B*H*S_q*S_k*D",
+                formula_inputs={"B": 2, "H": 4, "S_q": 16, "S_k": 16, "D": 32},
+                source=_source(kind="estimate", detail="operator work", node_id="op_1"),
+                confidence="supported",
+                rationale="QK score FLOPs derived from semantic axes.",
+            ),
+        ),
+        byte_evidence=(
+            SolarByteEvidence(
+                node_id="op_1",
+                family="attention",
+                read_bytes=8192.0,
+                write_bytes=4096.0,
+                intermediate_bytes=0.0,
+                movement_bytes=0.0,
+                total_bytes=12288.0,
+                dtype_inputs={"q": "float16", "k": "float16", "scores": "float32"},
+                tensor_ids=("q", "k", "scores"),
+                source=_source(kind="estimate", detail="operator bytes", node_id="op_1"),
+                confidence="supported",
+                rationale="Bytes derived from query, key, and score tensors.",
+            ),
+        ),
+        bound_evidence=(
+            SolarBoundEvidence(
+                node_id="op_1",
+                family="attention",
+                compute_bound_ms=0.001,
+                memory_bound_ms=0.002,
+                limiting_resource="memory",
+                sol_bound_ms=0.002,
+                source=_source(kind="estimate", detail="AMD SOL v2 math", node_id="op_1"),
+                confidence="supported",
+                rationale="Memory bound exceeds compute bound.",
+            ),
+        ),
     )
     q_tensor = SolarTensorEvidence(
         tensor_id="q",
@@ -137,6 +181,11 @@ def test_solar_derivation_round_trip_preserves_provenance():
     assert solar_derivation_from_dict(artifact.to_dict()).to_dict() == artifact.to_dict()
     assert payload["groups"][0]["node_ids"] == ["op_1", "op_2"]
     assert payload["groups"][0]["subroles"][0]["tensor_ids"] == ["q", "k", "scores"]
+    assert payload["groups"][0]["formula_evidence"][0]["formula_kind"] == (
+        "attention_scores_flops"
+    )
+    assert payload["groups"][0]["byte_evidence"][0]["total_bytes"] == 12288.0
+    assert payload["groups"][0]["bound_evidence"][0]["limiting_resource"] == "memory"
     assert payload["tensors"][0]["shape"] == [2, 4, 16, 32]
     assert payload["tensors"][0]["semantic_axes"] == [
         "batch",
@@ -189,6 +238,18 @@ def test_solar_derivation_parser_rejects_missing_required_fields():
             ("groups", 0, "subroles", 0),
             r"groups\[0\]\.subroles\[0\] contains unknown field\(s\): extra_claim",
         ),
+        (
+            ("groups", 0, "formula_evidence", 0),
+            r"groups\[0\]\.formula_evidence\[0\] contains unknown field\(s\): extra_claim",
+        ),
+        (
+            ("groups", 0, "byte_evidence", 0),
+            r"groups\[0\]\.byte_evidence\[0\] contains unknown field\(s\): extra_claim",
+        ),
+        (
+            ("groups", 0, "bound_evidence", 0),
+            r"groups\[0\]\.bound_evidence\[0\] contains unknown field\(s\): extra_claim",
+        ),
         (("tensors", 0), r"tensors\[0\] contains unknown field\(s\): extra_claim"),
         (
             ("tensors", 0, "source"),
@@ -239,6 +300,21 @@ def test_solar_derivation_parser_rejects_invalid_schema_version():
             ("groups", 0, "subroles", 0, "confidence"),
             "partial",
             r"groups\[0\]\.subroles\[0\]\.confidence has invalid confidence 'partial'",
+        ),
+        (
+            ("groups", 0, "formula_evidence", 0, "confidence"),
+            "partial",
+            r"groups\[0\]\.formula_evidence\[0\]\.confidence has invalid confidence 'partial'",
+        ),
+        (
+            ("groups", 0, "byte_evidence", 0, "confidence"),
+            "partial",
+            r"groups\[0\]\.byte_evidence\[0\]\.confidence has invalid confidence 'partial'",
+        ),
+        (
+            ("groups", 0, "bound_evidence", 0, "confidence"),
+            "partial",
+            r"groups\[0\]\.bound_evidence\[0\]\.confidence has invalid confidence 'partial'",
         ),
     ],
 )
@@ -300,6 +376,58 @@ def test_solar_derivation_parser_rejects_invalid_shape_dimensions(
 ):
     payload = _contract_payload()
     payload["tensors"][0]["shape"] = shape
+
+    with pytest.raises(ValueError, match=expected_error):
+        solar_derivation_from_dict(payload)
+
+
+@pytest.mark.parametrize(
+    ("path", "expected_error"),
+    [
+        (
+            ("groups", 0, "formula_evidence", 0, "formula"),
+            r"groups\[0\]\.formula_evidence\[0\]\.formula must be non-empty",
+        ),
+        (
+            ("groups", 0, "byte_evidence", 0, "read_bytes"),
+            r"groups\[0\]\.byte_evidence\[0\]\.read_bytes must be non-negative",
+        ),
+        (
+            ("groups", 0, "byte_evidence", 0, "total_bytes"),
+            r"groups\[0\]\.byte_evidence\[0\]\.total_bytes must be numeric",
+        ),
+        (
+            ("groups", 0, "bound_evidence", 0, "compute_bound_ms"),
+            r"groups\[0\]\.bound_evidence\[0\]\.compute_bound_ms must be non-negative",
+        ),
+        (
+            ("groups", 0, "bound_evidence", 0, "sol_bound_ms"),
+            r"groups\[0\]\.bound_evidence\[0\]\.sol_bound_ms must be finite",
+        ),
+        (
+            ("groups", 0, "bound_evidence", 0, "limiting_resource"),
+            r"groups\[0\]\.bound_evidence\[0\]\.limiting_resource has invalid value 'network'",
+        ),
+    ],
+)
+def test_solar_derivation_parser_rejects_malformed_sidecar_evidence(
+    path: tuple[object, ...],
+    expected_error: str,
+):
+    payload = _contract_payload()
+    target = payload
+    for key in path[:-1]:
+        target = target[key]
+    if path[-1] == "formula":
+        target[path[-1]] = ""
+    elif path[-1] == "total_bytes":
+        target[path[-1]] = "many"
+    elif path[-1] == "sol_bound_ms":
+        target[path[-1]] = float("inf")
+    elif path[-1] == "limiting_resource":
+        target[path[-1]] = "network"
+    else:
+        target[path[-1]] = -1.0
 
     with pytest.raises(ValueError, match=expected_error):
         solar_derivation_from_dict(payload)
@@ -574,14 +702,57 @@ def test_derive_solar_evidence_records_tensor_shape_dtype_axis_and_sources():
     payload = solar_derivation_from_dict(evidence.to_dict()).to_dict()
 
     tensor = next(item for item in payload["tensors"] if item["tensor_id"] == "input:a")
+    group = payload["groups"][0]
     assert tensor["shape"] == [2, 4]
     assert tensor["dtype"] == "float32"
     assert tensor["semantic_axes"] == ["M", "K"]
     assert tensor["source"]["kind"] == "definition"
     assert tensor["source"]["tensor_id"] == "input:a"
-    assert payload["groups"][0]["node_ids"] == ["op_1"]
-    assert payload["groups"][0]["source"]["kind"] == "estimate"
-    assert payload["groups"][0]["subroles"][0]["source"]["kind"] == "ast"
+    assert group["node_ids"] == ["op_1"]
+    assert group["source"]["kind"] == "estimate"
+    assert group["subroles"][0]["source"]["kind"] == "ast"
+    assert group["formula_evidence"] == [
+        {
+            "node_id": "op_1",
+            "family": "gemm",
+            "formula_kind": "gemm_flops",
+            "formula": "2*M*N*K",
+            "formula_inputs": {"K": 4, "M": 2, "N": 8},
+            "source": {
+                "kind": "estimate",
+                "detail": "gemm_flops:2*M*N*K",
+                "node_id": "op_1",
+                "tensor_id": None,
+            },
+            "confidence": "supported",
+            "rationale": "GEMM FLOPs estimated from tensor shapes",
+        }
+    ]
+    assert group["byte_evidence"][0]["read_bytes"] == 96.0
+    assert group["byte_evidence"][0]["write_bytes"] == 64.0
+    assert group["byte_evidence"][0]["intermediate_bytes"] == 0.0
+    assert group["byte_evidence"][0]["movement_bytes"] == 0.0
+    assert group["byte_evidence"][0]["total_bytes"] == 160.0
+    assert group["byte_evidence"][0]["dtype_inputs"] == {
+        "input:a": "float32",
+        "input:b": "float32",
+        "output:out": "float32",
+    }
+    assert group["byte_evidence"][0]["tensor_ids"] == [
+        "input:a",
+        "input:b",
+        "output:out",
+    ]
+    assert group["bound_evidence"][0]["compute_bound_ms"] >= 0.0
+    assert group["bound_evidence"][0]["memory_bound_ms"] >= 0.0
+    assert group["bound_evidence"][0]["sol_bound_ms"] == max(
+        group["bound_evidence"][0]["compute_bound_ms"],
+        group["bound_evidence"][0]["memory_bound_ms"],
+    )
+    assert group["bound_evidence"][0]["limiting_resource"] in {"compute", "memory"}
+    assert "formula_evidence:op_1" in group["required_evidence"]
+    assert "byte_evidence:op_1" in group["required_evidence"]
+    assert "bound_evidence:op_1" in group["required_evidence"]
     assert "graph_warning:graph_warning_demo" in payload["warnings"]
     assert "estimate_warning:op_1:estimate_warning_demo" in payload["warnings"]
 
@@ -885,6 +1056,15 @@ def test_semantic_groups_serialize_in_deterministic_order():
         "group:linear_projection:2",
     ]
     for group in first["groups"]:
+        assert group["formula_evidence"] == sorted(
+            group["formula_evidence"], key=lambda item: item["node_id"]
+        )
+        assert group["byte_evidence"] == sorted(
+            group["byte_evidence"], key=lambda item: item["node_id"]
+        )
+        assert group["bound_evidence"] == sorted(
+            group["bound_evidence"], key=lambda item: item["node_id"]
+        )
         assert group["subroles"] == sorted(
             group["subroles"], key=lambda subrole: subrole["name"]
         )

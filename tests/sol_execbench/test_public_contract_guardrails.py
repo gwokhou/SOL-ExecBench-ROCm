@@ -188,6 +188,13 @@ def test_v1_10_solar_derivation_fields_remain_noncanonical():
         "missing_evidence",
         "warning_prefixes",
         "scope_boundary",
+        "formula_evidence",
+        "byte_evidence",
+        "bound_evidence",
+        "compute_bound_ms",
+        "memory_bound_ms",
+        "sol_bound_ms",
+        "limiting_resource",
     )
 
     for payload in (
@@ -275,6 +282,12 @@ def test_importing_solar_derivation_keeps_amd_native_score_eligibility_unchanged
     assert "solar_derivation" not in v2_score.to_dict()["evidence_refs"]
     assert "solar_derivation" not in v1_artifact.to_dict()
     assert "solar_derivation" not in v2_artifact.to_dict()
+    assert "formula_evidence" not in v1_score.to_dict()["evidence_refs"]
+    assert "byte_evidence" not in v1_score.to_dict()["evidence_refs"]
+    assert "bound_evidence" not in v1_score.to_dict()["evidence_refs"]
+    assert "formula_evidence" not in v2_score.to_dict()["evidence_refs"]
+    assert "byte_evidence" not in v2_score.to_dict()["evidence_refs"]
+    assert "bound_evidence" not in v2_score.to_dict()["evidence_refs"]
 
 
 def test_v1_9_derived_artifacts_remain_noncanonical():
