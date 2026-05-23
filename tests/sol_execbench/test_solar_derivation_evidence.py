@@ -26,6 +26,7 @@ from sol_execbench.core.scoring.solar_derivation import (
     SolarSubroleEvidence,
     SolarTensorEvidence,
     build_solar_derivation_evidence,
+    classify_solar_confidence,
     derive_solar_derivation_evidence,
     solar_derivation_from_dict,
 )
@@ -386,3 +387,292 @@ def test_builder_does_not_accept_or_execute_candidate_solution_code():
     evidence = build_solar_derivation_evidence(definition, _matmul_workload())
 
     assert evidence.source_boundary["candidate_solution_execution"] is False
+
+
+def _projection_graph(
+    *,
+    node_id: str = "op_1",
+    family: OpFamily = OpFamily.LINEAR_PROJECTION,
+    missing_output_axis: bool = False,
+    unsupported: bool = False,
+) -> BoundGraph:
+    input_shape = (2, 4)
+    weight_shape = (4, 8)
+    output_shape = None if unsupported else (2, 8)
+    output_source = "tmp:linear" if missing_output_axis else "definition.outputs"
+    return BoundGraph(
+        definition="semantic_group_demo",
+        workload_uuid="semantic-group-workload",
+        nodes=(
+            BoundGraphNode(
+                node_id=node_id,
+                op_family=family,
+                op_name="linear" if family != OpFamily.UNSUPPORTED else "custom_op",
+                source_expression="torch.nn.functional.linear(x, w)",
+                input_tensor_ids=("input:x", "input:w"),
+                output_tensor_ids=("output:y",),
+                attributes={"trace_source": "ast"},
+                confidence=(
+                    EstimateConfidence.UNSUPPORTED
+                    if unsupported
+                    else EstimateConfidence.SUPPORTED
+                ),
+                rationale="recognized linear projection"
+                if not unsupported
+                else "unsupported operation",
+            ),
+        ),
+        tensors={
+            "input:x": BoundTensor(
+                tensor_id="input:x",
+                name="x",
+                role=BoundTensorRole.INPUT,
+                shape=input_shape,
+                dtype="float32",
+                producer_node_id=None,
+                source="definition.inputs",
+            ),
+            "input:w": BoundTensor(
+                tensor_id="input:w",
+                name="w",
+                role=BoundTensorRole.INPUT,
+                shape=weight_shape,
+                dtype="float32",
+                producer_node_id=None,
+                source="definition.inputs",
+            ),
+            "output:y": BoundTensor(
+                tensor_id="output:y",
+                name="y",
+                role=BoundTensorRole.OUTPUT,
+                shape=output_shape,
+                dtype="unknown" if unsupported else "float32",
+                producer_node_id=node_id,
+                source=output_source,
+            ),
+        },
+        edges=(),
+        warnings=(),
+    )
+
+
+def _projection_definition() -> Definition:
+    return Definition(
+        name="semantic_group_demo",
+        axes={
+            "B": {"type": "const", "value": 2},
+            "K": {"type": "const", "value": 4},
+            "N": {"type": "const", "value": 8},
+        },
+        inputs={
+            "x": {"shape": ["B", "K"], "dtype": "float32"},
+            "w": {"shape": ["K", "N"], "dtype": "float32"},
+        },
+        outputs={"y": {"shape": ["B", "N"], "dtype": "float32"}},
+        reference="def run(x, w):\n    return x @ w",
+    )
+
+
+def _projection_estimate(
+    *,
+    node_id: str = "op_1",
+    family: OpFamily = OpFamily.LINEAR_PROJECTION,
+    confidence: EstimateConfidence = EstimateConfidence.SUPPORTED,
+    formula_inputs: dict[str, object] | None = None,
+    axis_source: str | None = "workload.axes",
+    total_bytes: float = 160.0,
+    warnings: tuple[str, ...] = (),
+) -> OperatorWorkEstimate:
+    return OperatorWorkEstimate(
+        node_id=node_id,
+        op_family=family,
+        op_name="linear" if family != OpFamily.UNSUPPORTED else "custom_op",
+        formula_kind="gemm_flops" if family != OpFamily.UNSUPPORTED else "unsupported",
+        formula="2*M*N*K" if family != OpFamily.UNSUPPORTED else "0",
+        formula_inputs=formula_inputs
+        if formula_inputs is not None
+        else {"M": 2, "N": 8, "K": 4},
+        flops=128.0 if family != OpFamily.UNSUPPORTED else 0.0,
+        read_bytes=96.0 if total_bytes else 0.0,
+        write_bytes=64.0 if total_bytes else 0.0,
+        intermediate_bytes=0.0,
+        movement_bytes=0.0,
+        total_bytes=total_bytes,
+        confidence=confidence,
+        rationale="GEMM FLOPs estimated from tensor shapes",
+        axis_source=axis_source,
+        warnings=warnings,
+    )
+
+
+def test_confidence_rules_map_complete_evidence_to_supported_scored():
+    definition = _projection_definition()
+    graph = _projection_graph()
+    estimate = _projection_estimate()
+
+    classified = classify_solar_confidence(
+        family=OpFamily.LINEAR_PROJECTION,
+        nodes=graph.nodes,
+        tensors=tuple(graph.tensors.values()),
+        estimates=(estimate,),
+        subrole_names=("input", "weight_or_rhs", "output"),
+    )
+
+    assert classified.confidence == EstimateConfidence.SUPPORTED
+    assert classified.status == "scored"
+    assert classified.missing_evidence == ()
+    assert classified.warning_prefixes == ()
+    assert classified.rationale
+
+    evidence = derive_solar_derivation_evidence(
+        definition, _matmul_workload(), graph, (estimate,)
+    )
+    group = evidence.groups[0]
+    assert group.confidence == EstimateConfidence.SUPPORTED
+    assert group.status == "scored"
+    assert group.subroles
+    assert [subrole.name for subrole in group.subroles] == [
+        "input",
+        "weight_or_rhs",
+        "output",
+    ]
+
+
+def test_confidence_rules_map_incomplete_visible_evidence_to_inexact_degraded():
+    definition = _projection_definition()
+    graph = _projection_graph(missing_output_axis=True)
+    estimate = _projection_estimate(
+        confidence=EstimateConfidence.INEXACT,
+        axis_source=None,
+        warnings=("inexact_operator:linear_projection_missing_axis",),
+    )
+
+    evidence = derive_solar_derivation_evidence(
+        definition, _matmul_workload(), graph, (estimate,)
+    )
+    group = evidence.groups[0]
+
+    assert group.confidence == EstimateConfidence.INEXACT
+    assert group.status == "degraded"
+    assert group.missing_evidence
+    assert any(item.startswith("axis:") for item in group.missing_evidence)
+    assert any(
+        warning.startswith("inexact_operator:") for warning in group.warning_prefixes
+    )
+    assert any(
+        warning.startswith("aggregate_degraded:")
+        for warning in group.warning_prefixes
+    )
+    assert group.rationale
+
+
+def test_confidence_rules_are_conservative_for_ambiguous_groups():
+    definition = _projection_definition()
+    graph = _projection_graph(
+        node_id="op_unsupported",
+        family=OpFamily.UNSUPPORTED,
+        unsupported=True,
+    )
+    estimate = _projection_estimate(
+        node_id="op_unsupported",
+        family=OpFamily.UNSUPPORTED,
+        confidence=EstimateConfidence.UNSUPPORTED,
+        formula_inputs={},
+        axis_source=None,
+        total_bytes=0.0,
+        warnings=("unsupported_operator:custom_op",),
+    )
+
+    classified = classify_solar_confidence(
+        family=OpFamily.UNSUPPORTED,
+        nodes=graph.nodes,
+        tensors=tuple(graph.tensors.values()),
+        estimates=(estimate,),
+        subrole_names=(),
+    )
+    evidence = derive_solar_derivation_evidence(
+        definition, _matmul_workload(), graph, (estimate,)
+    )
+    group = evidence.groups[0]
+
+    assert classified.confidence != EstimateConfidence.SUPPORTED
+    assert classified.status != "scored"
+    assert group.confidence == EstimateConfidence.UNSUPPORTED
+    assert group.status == "unscored"
+    assert group.confidence != EstimateConfidence.SUPPORTED
+    assert group.status != "scored"
+    assert group.missing_evidence
+    assert any(
+        warning.startswith("unsupported_operator:")
+        for warning in group.warning_prefixes
+    )
+    assert any(
+        warning.startswith("aggregate_unscored:")
+        for warning in group.warning_prefixes
+    )
+    assert group.rationale
+
+
+def test_semantic_groups_serialize_in_deterministic_order():
+    definition = _projection_definition()
+    graph = BoundGraph(
+        definition="semantic_group_demo",
+        workload_uuid="semantic-group-workload",
+        nodes=(
+            *_projection_graph(node_id="op_b").nodes,
+            *_projection_graph(node_id="op_a", family=OpFamily.SOFTMAX).nodes,
+        ),
+        tensors={
+            **_projection_graph(node_id="op_b").tensors,
+            "input:s": BoundTensor(
+                tensor_id="input:s",
+                name="s",
+                role=BoundTensorRole.INPUT,
+                shape=(2, 8),
+                dtype="float32",
+                producer_node_id=None,
+                source="definition.inputs",
+            ),
+            "output:s": BoundTensor(
+                tensor_id="output:s",
+                name="s_out",
+                role=BoundTensorRole.OUTPUT,
+                shape=(2, 8),
+                dtype="float32",
+                producer_node_id="op_a",
+                source="tmp:softmax",
+            ),
+        },
+        edges=(),
+        warnings=("z_warning", "a_warning"),
+    )
+    estimates = (
+        _projection_estimate(node_id="op_b"),
+        _projection_estimate(
+            node_id="op_a",
+            family=OpFamily.SOFTMAX,
+            confidence=EstimateConfidence.INEXACT,
+            formula_inputs={"input_elements": 16},
+            warnings=("inexact_operator:softmax_missing_axis",),
+        ),
+    )
+
+    first = derive_solar_derivation_evidence(
+        definition, _matmul_workload(), graph, estimates
+    ).to_dict()
+    second = derive_solar_derivation_evidence(
+        definition, _matmul_workload(), graph, tuple(reversed(estimates))
+    ).to_dict()
+
+    assert first["groups"] == second["groups"]
+    assert first["warnings"] == second["warnings"]
+    assert [group["group_id"] for group in first["groups"]] == [
+        "group:softmax:1",
+        "group:linear_projection:2",
+    ]
+    for group in first["groups"]:
+        assert group["subroles"] == sorted(
+            group["subroles"], key=lambda subrole: subrole["name"]
+        )
+        assert group["missing_evidence"] == sorted(group["missing_evidence"])
+        assert group["warning_prefixes"] == sorted(group["warning_prefixes"])
