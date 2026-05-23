@@ -336,17 +336,15 @@ elif solar_aggregate_status is not None and solar_aggregate_status.status == "de
 |---|-------|---------|---------------|
 | A1 | The implementation may use an optional keyword-only score guard argument rather than a new public artifact type. | Architecture Patterns | Planner may need to choose a different internal call shape if maintainers prefer a separate adapter helper. |
 
-## Open Questions
+## Resolved Planning Decisions
 
-1. **Should `solar_derivation_from_dict()` remain backward-compatible with Phase 48-50 sidecars lacking new Phase 51 fields?**
+1. **Parser remains strict but accepts legacy Phase 48-50 payloads through normalization.**
    - What we know: Existing tests currently build payloads without coverage fields, and strict exact-key parsing rejects unknown fields. [VERIFIED: tests/sol_execbench/test_solar_derivation_evidence.py]
-   - What's unclear: Phase 51 can either bump/require the new internal schema shape or provide a compatibility normalization path for older in-repo sidecars. [ASSUMED]
-   - Recommendation: Prefer strict new required fields because the sidecar schema version stays internal and tests can update fixtures; add explicit migration only if existing persisted sidecars must be read. [ASSUMED]
+   - Decision: Keep exact-key parsing for every normalized schema shape, but allow `solar_derivation_from_dict()` to normalize older Phase 48-50 payloads that lack Phase 51 coverage fields by recomputing coverage from parsed groups. Unknown fields remain rejected.
 
-2. **Should score guard evidence refs include a SOLAR sidecar reference?**
+2. **Internal score guard evidence refs may include SOLAR derivation coverage refs; public presentation remains Phase 52.**
    - What we know: Phase 51 says avoid public schema drift, while Phase 52 owns final evidence-reference and public reporting closure. [VERIFIED: .planning/phases/51-sidecar-coverage-and-score-guards/51-CONTEXT.md]
-   - What's unclear: Whether an internal score report may include a `solar_derivation` evidence ref before Phase 52. [ASSUMED]
-   - Recommendation: Do not add `solar_derivation` to AMD-native score `evidence_refs` in Phase 51; keep the guard internal and let Phase 52 decide public report evidence references. [ASSUMED]
+   - Decision: Phase 51 may add internal `solar_derivation` evidence references needed for score guards, as long as they remain sidecar/internal and do not change canonical schemas, primary CLI, canonical trace JSONL, or public report presentation. Phase 52 owns docs and runner-facing presentation.
 
 ## Environment Availability
 
