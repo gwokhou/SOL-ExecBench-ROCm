@@ -10,15 +10,15 @@ ExecBench.
 
 ### Bound Graph And IR
 
-- [ ] **IR-01**: Maintainer can build a structured AMD SOL bound graph from a
+- [x] **IR-01**: Maintainer can build a structured AMD SOL bound graph from a
   `Definition` and `Workload` without changing canonical benchmark schemas.
-- [ ] **IR-02**: Maintainer can inspect each bound graph node's stable ID,
+- [x] **IR-02**: Maintainer can inspect each bound graph node's stable ID,
   operation family, source expression, tensor roles, resolved shapes, dtypes,
   confidence, and rationale.
-- [ ] **IR-03**: Maintainer can see unsupported or ambiguous reference-code
+- [x] **IR-03**: Maintainer can see unsupported or ambiguous reference-code
   constructs preserved as explicit unsupported/inexact graph evidence instead
   of being silently dropped.
-- [ ] **IR-04**: Existing callers of `build_amd_sol_bound_artifact()` and
+- [x] **IR-04**: Existing callers of `build_amd_sol_bound_artifact()` and
   related scoring imports continue to work through a compatibility facade.
 
 ### Operator Modeling
@@ -150,10 +150,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 | --- | --- | --- |
-| IR-01 | Phase 42 | Pending |
-| IR-02 | Phase 42 | Pending |
-| IR-03 | Phase 42 | Pending |
-| IR-04 | Phase 42 | Pending |
+| IR-01 | Phase 42 | Complete |
+| IR-02 | Phase 42 | Complete |
+| IR-03 | Phase 42 | Complete |
+| IR-04 | Phase 42 | Complete |
 | MODEL-01 | Phase 43 | Pending |
 | MODEL-02 | Phase 43 | Pending |
 | MODEL-03 | Phase 43 | Pending |
