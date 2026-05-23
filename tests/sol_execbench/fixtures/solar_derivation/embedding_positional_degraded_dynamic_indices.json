@@ -1,0 +1,21 @@
+{
+  "case_id": "embedding_positional_degraded_dynamic_indices",
+  "family": "embedding_positional",
+  "fixture_class": "degraded",
+  "negative_category": "dynamic",
+  "description": "Embedding lookup is visible, but runtime-generated indices prevent exact reuse/cardinality evidence.",
+  "source_kind": "reference_snippet",
+  "reference": "def run(logits, table): ids = torch.argmax(logits, dim=-1); return table[ids]",
+  "workload_axes": {"batch": 2, "sequence": 32, "vocab": 32000, "embedding_dim": 128},
+  "expectation": {
+    "expected_family": "embedding_positional",
+    "expected_subroles": ["embedding_lookup", "index_tensor", "table_read"],
+    "expected_confidence": "inexact",
+    "expected_status": "degraded",
+    "required_evidence": ["shape:table", "shape:output"],
+    "missing_evidence": ["index:static_cardinality", "index:reuse"],
+    "warning_prefixes": ["inexact_operator:embedding_dynamic_indices", "aggregate_degraded:embedding_positional"],
+    "degradation_rationale": "Indices are generated from runtime logits rather than workload metadata."
+  },
+  "scope_boundary": {"paper_scale_dataset": false, "hosted_leaderboard_ready": false, "nvidia_blackwell_b200_equivalence": false, "real_hardware_validation": false}
+}
