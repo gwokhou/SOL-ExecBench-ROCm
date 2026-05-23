@@ -49,7 +49,7 @@ the current ROCm path, with validation scoped to RDNA 4 only.
 | --- | --- | --- | --- |
 | 41 | Bound Model Contract And Hardware Artifacts | Establish the v2 bound artifact contract, hardware model JSON loader, and public-contract guardrails before changing estimators. | HW-01, HW-02, HW-03, HW-04, DOC-01 |
 | 42 | 3/3 | Complete    | 2026-05-23 |
-| 43 | Operator FLOP/Byte/Movement Modeling | Implement auditable formulas and memory-movement evidence for core operator families. | MODEL-01, MODEL-02, MODEL-03, MODEL-04, MODEL-05 |
+| 43 | 4/4 | Complete    | 2026-05-23 |
 | 44 | Bound Artifact V2 And Coverage Semantics | Serialize/load v2 SOL bound sidecars and make coverage, confidence, warnings, and aggregate bounds deterministic. | BOUND-01, BOUND-02, BOUND-03, BOUND-04 |
 | 45 | AMD Score And Dataset Integration | Wire v2 bound artifacts into AMD-native workload/suite score reports and optional dataset sidecar output. | SCORE-01, SCORE-02, SCORE-03, SCORE-04 |
 | 46 | Documentation And RDNA 4 Validation Closure | Complete docs, claim guardrails, golden tests, and RDNA 4 validation evidence for the modeling pipeline. | DOC-02, DOC-03, VAL-01, VAL-02, VAL-03, VAL-04 |
