@@ -1,187 +1,348 @@
 # Feature Landscape
 
-**Domain:** Paper-aligned SOLAR automatic derivation for SOL ExecBench ROCm
-**Milestone:** v1.10 论文级完整 SOLAR 自动推导
+**Domain:** Public SOL-ExecBench dataset parity inventory and ROCm execution closure
+**Milestone:** v1.11 Paper Dataset Parity Inventory and ROCm Execution Closure
 **Researched:** 2026-05-23
-**Overall confidence:** HIGH for repo-local capability gaps and milestone scope; MEDIUM for exact paper-family priority beyond the arXiv abstract because v1.10 explicitly excludes full paper dataset extraction.
+**Overall confidence:** HIGH for repo-local feature recommendations and scope boundaries; MEDIUM for exact upstream dataset field availability until the Hugging Face dataset is inspected in the target environment.
 
 ## Scope Decision
 
-v1.10 should make the AMD SOL/SOLAR pipeline look honest at the derivation layer: given a SOL ExecBench definition and workload, the code should automatically derive richer hardware-bound evidence for paper-relevant kernel families, expose what was recognized, explain every FLOP/byte/movement estimate, and deterministically degrade to inexact or unscored states when coverage is incomplete. It should not claim that the ROCm port reproduces the original paper's full 124-model/235-problem benchmark, NVIDIA Blackwell target, or new AMD hardware validation.
+v1.11 should make the public `nvidia/SOL-ExecBench` dataset concrete in this ROCm port. The milestone is not about proving every paper result on AMD hardware. It is about giving users and maintainers a trustworthy local surface for acquiring or checking the public dataset layout, counting what is present, classifying each problem's ROCm readiness, running small ready subsets through the existing ROCm runner, and producing explicit gap reports.
 
-The arXiv 2603.19173 abstract frames the paper baseline as analytically derived hardware-grounded SOL bounds from SOLAR, SOL Score reporting against those bounds, broad real-world kernel coverage across model families, and robustness guardrails for agentic optimizer evaluation. For this ROCm milestone, the actionable subset is automatic derivation and score-evidence honesty on AMD: broader extraction/modeling for attention, MoE, convolution, SSM/Mamba, embedding/positional, and linear projection patterns; stronger artifact coverage semantics; and guardrails that prevent partial derivation from looking complete.
+The existing repository already provides useful execution and evidence primitives:
 
-Current code already has a useful v1.9 foundation:
+- `scripts/download_solexecbench.py` downloads Hugging Face configs `L1`, `L2`, `Quant`, and `FlashInfer-Bench` into `data/benchmark/<category>/<problem>/` with `definition.json`, `reference.py`, and `workload.jsonl`.
+- `scripts/run_dataset.py` discovers the same four categories, supports category filters, limits, workload truncation, resumable skips, custom solution selection, timing controls, ROCm timing evidence, AMD-native score reports, AMD SOL v2 sidecars, and SOLAR derivation sidecars.
+- Existing docs define the canonical artifact split: traces stay canonical, while AMD score reports, SOL bounds, SOLAR derivation evidence, timing evidence, and baseline reports are derived artifacts.
+- Existing tests cover derived score report generation, safe sidecar naming, report generation from skipped passing traces, rerun behavior for failed traces, and source-specific timing evidence.
 
-- `BoundGraph` IR with tensor metadata, dependency edges, confidence, rationale, dynamic `torch.fx` tracing with AST fallback, and an `OpFamily` taxonomy that already names the paper-aligned families.
-- Operator estimates for GEMM/BMM, linear projection via GEMM behavior, elementwise, activation, reduction, normalization, softmax, data movement, and dtype conversion.
-- v2 AMD SOL sidecars with graph, estimate, op-bound, aggregate-bound, hardware-model, coverage, and warning evidence.
-- AMD-native score reports that propagate degraded/unscored states and claim-level warnings.
+The v1.11 feature line should therefore add a dataset-management layer around those primitives. Users should be able to answer: "Do I have the expected public dataset shape?", "What problems are present and what fields do they use?", "Which problems can run on this ROCm port now?", "What ready subset actually closed through execution?", and "Which gaps remain without overclaiming paper parity?"
 
-The v1.10 feature line is therefore not "add SOLAR docs"; it is "turn taxonomy placeholders and simple local patterns into code-real automatic derivation paths, while making every unsupported gap machine-visible."
+## User-Facing Feature Contract
+
+Users should experience v1.11 as a local audit-and-run workflow:
+
+1. Acquire or point at the public dataset.
+2. Verify the dataset has the expected category and per-problem layout.
+3. Generate an inventory JSON/Markdown report with counts and problem traits.
+4. Generate ROCm readiness classifications with actionable reasons.
+5. Run ready subsets in small batches through existing dataset execution.
+6. Read a parity gap report that separates completed inventory/closure from blocked or explicitly out-of-scope paper parity items.
+
+The preferred interface can be either new focused scripts or options on existing scripts, but the artifacts should be stable and machine-readable. The most natural fit is to keep `download_solexecbench.py` focused on acquisition, keep `run_dataset.py` focused on execution, and add inventory/report helpers that consume the same on-disk dataset layout.
+
+## Operator-Facing Feature Contract
+
+Operators need deterministic artifacts they can archive with a milestone:
+
+- `layout_report.json`: category presence, problem directories found, required file presence, malformed files, and dataset root metadata.
+- `paper_inventory.json`: one entry per discovered problem with category, name, counts, dtypes, workload/input traits, reference and solution availability, and static flags.
+- `rocm_readiness.json`: one entry per problem with readiness status, blocking reasons, evidence fields, and suggested next action.
+- `ready_subset.json`: selected runnable problem list derived from readiness statuses and optional category/limit filters.
+- `execution_closure.json`: joined view of ready subset membership and run results from `summary.json`, trace paths, AMD score report paths, sidecar paths, timing evidence paths, and unresolved execution failures.
+- `parity_gap_report.md` and/or `.json`: human-readable and machine-readable summary of inventory completion, runnable closure, readiness blockers, and explicit claim guardrails.
+
+These should be derived artifacts under an output directory such as `out/dataset-parity/` by default. They should not modify `definition.json`, `workload.jsonl`, `solution.json`, canonical trace JSON, or public schemas.
 
 ## Table Stakes
 
-Features users and roadmap consumers should expect. Missing any of these leaves v1.10 incomplete.
+Features users and maintainers should expect. Missing any of these leaves v1.11 incomplete.
 
-| Feature | Why Expected | Complexity | Requirements Notes |
-|---------|--------------|------------|--------------------|
-| Automatic paper-family extraction coverage | The milestone goal says attention, MoE, convolution, SSM/Mamba, embedding/positional, and linear projection need explicit extraction and estimation paths rather than taxonomy-only placeholders. | High | Extend `build_bound_graph()` classification and extraction beyond the current simple call list. Each new family needs at least one deterministic fixture that produces a non-unsupported `OpFamily` node from reference/workload structure. |
-| Attention derivation path | Attention is central to language, diffusion, vision, audio, video, and hybrid model workloads named by the paper baseline. | High | Recognize Q/K/V projections, QK matmul, scale, mask/add, softmax, AV matmul, and output projection where present. Emit either a compound `attention` node with child evidence or a linked subgraph with `attention_group_id`; unsupported masks/dropout/control flow must degrade explicitly. |
-| MoE derivation path | Mixture-of-experts is a paper-relevant real-world model family and has distinct routing/top-k/scatter/gather/expert GEMM behavior. | High | Recognize router logits, top-k/argmax-like selection, gating weights, gather/scatter/dispatch, expert projection/GEMM, combine. Mark routing capacity, sparse dispatch, or dynamic expert counts as `INEXACT` unless fully resolved. |
-| Convolution derivation path | Vision/diffusion workloads require convolution coverage; treating convolution as unsupported makes broad-kernel claims hollow. | High | Recognize `conv1d`, `conv2d`, `conv3d`, module call names if trace exposes them, stride/padding/dilation/groups, kernel shape, batch/channel/output dimensions. Estimate FLOPs and bytes with grouped/depthwise-specific formulas. |
-| SSM/Mamba derivation path | The current taxonomy names SSM/Mamba, and the v1.10 scope explicitly calls it out. | High | Recognize scan/selective-scan style compositions conservatively: projections, depthwise conv, recurrent/scan movement, gating, elementwise update, output projection. If true recurrence/scan length cannot be derived, retain visible inexact/unsupported evidence instead of collapsing to elementwise only. |
-| Embedding and positional derivation path | Embedding/positional work is common in model frontends and can be memory-bound. | Medium | Recognize embedding lookup, gather/index_select/take, positional add/rotary/sinusoidal patterns when statically visible. Model bytes and movement separately from FLOPs; unsupported dynamic indexing remains visible. |
-| Linear projection as a first-class family | Current estimates model `linear` with GEMM-like behavior, but v1.10 needs user-visible family evidence, not just generic GEMM. | Medium | Preserve `linear_projection` in graph and estimates with projection-specific formula kind and rationale while using GEMM math where valid. Capture bias add as explicit elementwise or projection attribute. |
-| Compound-family grouping evidence | Paper-aligned derivation should show workload structure, not only a flat list of primitive calls. | High | Add stable grouping metadata such as `group_id`, `parent_family`, `subrole`, or equivalent fields inside derived sidecars. Do not mutate canonical `Trace` or public schemas. |
-| Rich formula evidence for every new family | SOLAR derives hardware-grounded bounds; users need inspectable formula inputs, not opaque labels. | High | Each new estimator must emit `formula_kind`, `formula`, `formula_inputs`, FLOPs, read/write/intermediate/movement/total bytes, confidence, rationale, and warnings. Unsupported placeholders are not enough for table-stakes families. |
-| Shape, dtype, and axis provenance | Automatic derivation is only reviewable if estimates can be traced back to definition/workload axes and tensor metadata. | Medium | Carry resolved dimensions, tensor IDs, axis sources, dtype widths, and source expressions through new family estimates. Missing metadata should downgrade confidence and add warnings. |
-| Deterministic unsupported/inexact degradation | Honest paper alignment depends on not fabricating precision. | Medium | Known semantics with incomplete metadata become `INEXACT`; unknown operations or unresolved key effects become `UNSUPPORTED`; aggregate bounds become `degraded` or `unscored` by deterministic policy. |
-| Family-aware score eligibility | AMD-native reports must protect users from treating partial SOLAR derivation as complete. | Medium | Extend v2 coverage/aggregate evidence so reports can say which required families were modeled, inexact, unsupported, or absent. Unsupported evidence should prevent SOL Score computation for that workload unless policy explicitly allows guarded degraded scoring. |
-| Machine-verifiable complete/degraded/unscored states | The milestone asks for complete, degraded, and unscored states that are machine-verifiable. | Medium | Keep `aggregate_bound.status`, `scored`, `reason`, `worst_confidence`, family counts, and warnings parseable. Add tests for round-trip parsing and score behavior for each state. |
-| Golden derivation fixtures | Roadmap requirements need code-real acceptance criteria. | Medium | Add small deterministic fixtures for attention, MoE, convolution, SSM/Mamba, embedding/positional, linear projection, and a mixed unsupported case. Assert graph families, formulas, warnings, coverage, aggregate status, and score behavior. |
-| Public contract isolation | SOLAR derivation is a sidecar/scoring subsystem, not a canonical benchmark output change. | Low | Keep new evidence in derived AMD SOL v2+ artifacts or compatible sidecars. Guardrails should prove `definition.json`, `workload.jsonl`, `solution.json`, canonical trace JSONL, and primary CLI behavior remain stable. |
-| Robustness guardrail propagation | The paper baseline mentions sandboxing, clock locking, cache clearing, subprocess isolation, and static checks; the ROCm port already has many runtime guardrails. v1.10 must ensure derivation results do not weaken them. | Medium | Do not create bypass paths that import untrusted solution code during derivation. Preserve existing reward-hack/static-analysis and score-claim warnings. Add derivation-specific guardrails against unsupported-op omission and overclaim language. |
+| Feature | Why Expected | Complexity | Dependencies on Existing Capabilities |
+|---------|--------------|------------|---------------------------------------|
+| Public dataset acquisition command remains usable | The milestone starts with public dataset acquisition/layout checks; users need a supported path from Hugging Face to local files. | Low | Build on `scripts/download_solexecbench.py`, `datasets.load_dataset`, `REPO_ID = "nvidia/SOL-ExecBench"`, and categories `L1`, `L2`, `Quant`, `FlashInfer-Bench`. |
+| Acquisition is idempotent and auditable | Dataset downloads may be interrupted or rerun. Operators need to know whether files were written, skipped, or overwritten. | Medium | Add summary output and optional manifest without changing generated problem files. |
+| Layout verification for dataset root | Users may already have a dataset checkout. The tool should validate the existing root instead of requiring a fresh download. | Medium | Reuse `run_dataset.discover_problems()` category semantics and required files `definition.json` plus `workload.jsonl`; additionally check `reference.py` because downloader writes it. |
+| Category-level completeness checks | The paper public dataset surface is organized by four categories; absence or misspelling should be visible immediately. | Low | Use the shared category set `L1`, `L2`, `Quant`, `FlashInfer-Bench`. Report present, missing, empty, and extra category-like directories. |
+| Per-problem required file checks | A problem is not runnable or inventory-complete without schema/workload/reference data. | Low | Check `definition.json`, `workload.jsonl`, `reference.py`; optionally `solution.json` or named solution files when present. |
+| JSON parse and schema-load checks | Layout presence is insufficient if files are malformed or incompatible with current Pydantic models. | Medium | Use `Definition` and `Workload` model loading from `sol_execbench.core.data`. Mark model validation failures as `schema/input blocked`. |
+| Workload counting | Inventory must state how many workloads each problem contains and whether `--max-workloads` would be needed for small closure runs. | Low | Read `workload.jsonl` line by line using the existing workload contract. |
+| Problem count summaries by category | Paper parity inventory requires counts before execution claims. | Low | Count discovered valid/invalid problems per category and total. Do not hard-code a pass/fail expectation unless official dataset metadata is available at runtime. |
+| Inventory includes core identifiers | Operators need stable keys for joins across inventory, readiness, execution, and gap reports. | Low | Include `category`, `problem_name`, `definition.name`, dataset-relative path, and workload UUID list or count. |
+| Inventory includes dtype coverage | Dtype support is a likely ROCm blocker, especially for quantized and FlashInfer-derived problems. | Medium | Extract dtypes from definition inputs/outputs and workload descriptors where available. Classify unsupported or unknown dtypes separately from runtime failures. |
+| Inventory includes forward/backward indicators | The milestone explicitly asks for forward/backward indicators. | Medium | Infer from problem name, description, axes, input/output names, or reference code markers. Mark as `unknown` when evidence is insufficient rather than guessing. |
+| Inventory includes custom input usage | Custom input generation is a first-class compatibility risk. | Medium | Read `custom_inputs_entrypoint` from definitions and workload input descriptor types. |
+| Inventory includes safetensors usage | FlashInfer traces may require external safetensors assets and environment lookup. | Medium | Detect safetensors/file-backed descriptors and reference `FLASHINFER_TRACE_DIR` expectation from configuration docs. |
+| Inventory includes reference availability | `run_dataset.py` defaults to wrapping `definition.reference`; missing reference code currently causes a skip. | Low | Record `definition.reference` present/non-empty and `reference.py` present/non-empty. |
+| Inventory includes solution availability | Some closure runs may use problem-local `solution.py` or `solution.json`; reports should distinguish reference-only closure from candidate-solution closure. | Low | Check common names and any requested `--solution-name`; align with `build_solution_for_problem()`. |
+| Readiness status per problem | The milestone explicitly asks for per-problem ROCm compatibility classification. | Medium | Create deterministic status enum and evidence reasons from layout, schema, dtype, custom input, safetensors, solution/reference, and prior execution output. |
+| Status: `ready` | A problem is structurally valid and eligible for a small ROCm run using reference or selected solution path. | Medium | Requires valid layout, schema-loadable definition/workloads, usable reference or selected solution, and no known static blockers. |
+| Status: `schema/input blocked` | Invalid JSON, schema mismatch, unresolved workload descriptors, or missing required files should block before GPU execution. | Medium | Use model validation errors and layout checks. |
+| Status: `dtype blocked` | Unsupported dtype requirements should be visible before spending GPU time. | Medium | Compare inventory dtypes against known ROCm/PyTorch/Triton/HIP support policy in this repo. Keep unknown dtype support conservative. |
+| Status: `custom-input blocked` | Problems depending on custom input entrypoints or nonstandard generators may require adapter work. | Medium | Detect `custom_inputs_entrypoint` and unsupported workload input descriptor forms. |
+| Status: `runtime blocked` | Structurally valid problems that fail under the ROCm runner need a distinct post-execution status. | Medium | Join `summary.json`, per-problem traces, and saved CLI logs from `run_dataset.py`. |
+| Status: `unsupported NVIDIA-only path` | CUDA/NVIDIA library assumptions should not be mislabeled as generic runtime failures. | Medium | Static scan of reference/solution metadata and source text for CUDA-only package/API/library markers. Keep this scoped to evidence present in dataset files. |
+| Status: `needs hardware evidence` | Some problems may run structurally but require real hardware/profiler evidence before stronger claims. | Medium | Use trace environment, `--timing-evidence-dir`, AMD score report, SOL bound, and SOLAR sidecar presence to distinguish execution from validated evidence. |
+| Reason codes and suggested actions | A status without a reason is not actionable for operators. | Medium | Include stable `reason_codes`, message, evidence path, and `next_action` fields. |
+| Ready subset selection | Execution closure should operate on classified ready problems, not arbitrary first-N discovery. | Medium | Produce `ready_subset.json` or support passing inventory/readiness output into `run_dataset.py`; retain existing `--category`, `--limit`, and `--max-workloads` semantics. |
+| Small-batch execution closure | The milestone asks ready problems to run in small batches, not full paper-scale validation by default. | Low | Use existing `run_dataset.py --category`, `--limit`, `--max-workloads`, `--iterations`, `--warmup-runs`, `--rerun`, and output behavior. |
+| Closure captures canonical traces | Execution closure must preserve the existing trace contract. | Low | Use `run_dataset.py` per-problem `traces.json` outputs; do not add inventory fields to trace JSON. |
+| Closure captures `summary.json` | Operators need suite-level pass/fail counts. | Low | Existing runner writes `summary.json`; closure should join against it. |
+| Closure can emit AMD-native score report | v1.11 should preserve recent scoring and derivation surfaces for ready subset runs. | Low | Use existing `--amd-score-report`, `--scoring-baseline`, `--amd-sol-bound-dir`, and `--solar-derivation`. |
+| Closure can emit timing evidence | Some statuses should distinguish plain execution from profiler-backed evidence. | Low | Use existing `--timing-evidence-dir`, `--timing-tool-version`, and `--gpu-architecture`. |
+| Resumable closure behavior | Operators should not rerun passed problems accidentally. | Low | Keep existing skip-passed behavior and `--rerun` override; reports should note when traces came from a previous run. |
+| Execution failure classification | Runtime failures should be grouped by actionable class, not just displayed as log snippets. | Medium | Parse trace `evaluation.status`, failure logs, and saved CLI logs. Map to runtime, correctness, timeout, environment, missing asset, or unknown failure buckets. |
+| Parity gap report | The milestone requires gap reports distinguishing inventory completion from validation and leaderboard claims. | Medium | Generate Markdown for humans and JSON for automation from layout, inventory, readiness, and closure artifacts. |
+| Claim guardrails in every report | Reports must not imply full 235-problem validation, upstream SOLAR parity, B200 equivalence, hosted leaderboard readiness, original 124-model regeneration, or CDNA3 hardware validation. | Low | Reuse wording from `docs/original_parity.md`, `docs/analysis.md`, and `.planning/PROJECT.md`. |
+| Tests for inventory and readiness | This is a data/reporting milestone; schema regressions will be subtle without tests. | Medium | Add tests next to `tests/sol_execbench/test_run_dataset_amd_score.py` or new focused files using temporary dataset fixtures. |
+| Docs with exact workflow | Users need commands for acquisition, inventory, ready subset run, and gap report interpretation. | Low | Update existing analysis/config/parity docs; keep the command examples local and ROCm-scoped. |
+
+## Inventory Fields
+
+The inventory should be boring, stable, and easy to join with run outputs. Recommended per-problem fields:
+
+| Field | Type | Purpose | Complexity |
+|-------|------|---------|------------|
+| `schema_version` | string | Version the inventory contract. | Low |
+| `dataset_root` | string | Absolute or invocation-relative root inspected. | Low |
+| `category` | string | One of `L1`, `L2`, `Quant`, `FlashInfer-Bench`. | Low |
+| `problem_name` | string | Directory name and display key. | Low |
+| `definition_name` | string or null | Name loaded from `definition.json`. | Low |
+| `relative_path` | string | Stable dataset-relative path. | Low |
+| `required_files` | object | Presence and parse status for `definition.json`, `workload.jsonl`, `reference.py`. | Low |
+| `extra_files` | list | Optional solution/assets discovered without treating them as required. | Low |
+| `workload_count` | integer | Number of non-empty workload JSONL records. | Low |
+| `workload_uuids_sample` | list | Small sample for debugging and report joins. | Low |
+| `input_count` / `output_count` | integer | Basic signature complexity. | Low |
+| `input_dtypes` / `output_dtypes` | list | Dtype coverage and blockers. | Medium |
+| `axis_names` | list | Shape parameter visibility. | Low |
+| `forward_backward` | enum | `forward`, `backward`, `both`, or `unknown`. | Medium |
+| `custom_inputs_entrypoint` | string or null | Explicit custom input hook from definition. | Low |
+| `custom_input_usage` | boolean/object | Whether workload descriptors require nonstandard generation. | Medium |
+| `safetensors_usage` | boolean/object | Whether external safetensors/file-backed assets are referenced. | Medium |
+| `flashinfer_trace_dependency` | boolean | Whether `FLASHINFER_TRACE_DIR` is likely required. | Medium |
+| `reference_available` | object | Definition and file reference availability. | Low |
+| `solution_available` | object | Presence of local `solution.json`, `solution.py`, or requested solution name. | Low |
+| `static_source_flags` | list | CUDA-only, file asset, dynamic loader, or unsupported API markers found during static inspection. | Medium |
+| `inventory_status` | enum | `complete`, `partial`, or `invalid`. | Low |
+| `inventory_errors` | list | Parse/schema/layout errors. | Low |
+
+Do not require every inference field to be perfect in the first implementation. It is better to emit `unknown` with evidence than to classify incorrectly.
+
+## Readiness Status Semantics
+
+Recommended status enum, ordered by when the status is usually discovered:
+
+| Status | Meaning | Typical Evidence | Next Action |
+|--------|---------|------------------|-------------|
+| `ready` | The problem is layout-valid, schema-valid, has a usable reference or selected solution, and has no known static ROCm blocker. | Valid files, valid `Definition` and `Workload` parse, supported dtypes, no blocking custom inputs/assets. | Include in ready subset execution. |
+| `schema/input blocked` | Required files are missing, malformed, schema-invalid, or workload input descriptors cannot be interpreted by current code. | JSON decode errors, Pydantic validation errors, empty workload, missing definition/workload/reference. | Fix downloader/layout adapter or add schema/input compatibility. |
+| `dtype blocked` | Problem requires dtype behavior not supported or not safely claimable on current ROCm path. | Definition/workload dtypes outside supported policy; quant dtype unsupported in PyTorch ROCm or local runner. | Add dtype handling or mark as intentionally unsupported. |
+| `custom-input blocked` | Problem depends on custom input generation not implemented in the ROCm port. | `custom_inputs_entrypoint`, unsupported workload descriptor type, opaque file-backed generator. | Add a safe custom input adapter or skip with explicit report. |
+| `runtime blocked` | Static checks passed, but execution failed, timed out, produced no traces, or failed correctness/performance collection. | `summary.json`, trace statuses, CLI logs, timeout logs. | Debug runner/reference/assets/environment for that problem. |
+| `unsupported NVIDIA-only path` | Dataset problem or solution path depends on CUDA/NVIDIA-only APIs or libraries that are out of scope for this ROCm-only fork. | Static source flags for CUDA modules, CUDA C++ language metadata, NVIDIA library-only calls. | Record as parity gap; only pursue if a ROCm replacement is milestone-approved. |
+| `needs hardware evidence` | The problem can be structurally classified or may execute, but stronger closure requires trace/profiler/AMD score/SOL sidecar evidence on target hardware. | Missing traces, missing timing evidence, missing SOL/SOLAR sidecars, unknown GPU architecture, unvalidated CDNA3 evidence. | Run ready subset with required evidence flags on supported hardware. |
+
+Status precedence should be deterministic. A practical order is:
+
+```text
+layout/schema failure
+  -> schema/input blocked
+unsupported dtype
+  -> dtype blocked
+unsupported custom input or required external asset not available
+  -> custom-input blocked
+NVIDIA-only static path
+  -> unsupported NVIDIA-only path
+no run evidence yet but structurally runnable
+  -> ready
+execution attempted and failed
+  -> runtime blocked
+execution passed but required evidence missing for a stronger claim
+  -> needs hardware evidence
+execution passed with requested evidence
+  -> ready with closure evidence, or closed in execution_closure.json
+```
+
+`ready` should mean "ready to attempt local ROCm execution", not "paper parity proven."
+
+## Execution Closure Behavior
+
+Execution closure should be a join across readiness and existing runner outputs, not a second benchmark runner.
+
+| Behavior | Expected Result | Complexity | Existing Dependency |
+|----------|-----------------|------------|---------------------|
+| Select only ready problems | Avoid spending time on known-blocked problems. | Medium | New readiness artifact plus existing `discover_problems()` style ordering. |
+| Preserve category and limit filters | Operators can close one category or small sample at a time. | Low | Existing `--category`, `--limit`, and `--max-workloads`. |
+| Use existing reference wrapping by default | Public dataset closure should not require candidate solutions. | Low | Existing `build_reference_solution()` and fallback to `definition.reference`. |
+| Support named solution closure | Operators can test problem-local solutions when present. | Low | Existing `--solution-name` behavior. |
+| Save traces per problem | Canonical execution evidence remains unchanged. | Low | Existing `out/<category>/<problem>/traces.json`. |
+| Save suite summary | Closure has pass/fail counts. | Low | Existing `summary.json`. |
+| Save CLI failure logs | Runtime blockers have evidence. | Low | Existing `_save_cli_log()`. |
+| Generate optional AMD reports and sidecars | Ready subset closure can include recent v1.9/v1.10 derived evidence. | Low | Existing `--amd-score-report`, `--amd-sol-bound-dir`, `--solar-derivation`. |
+| Generate optional timing evidence | Operators can distinguish plain execution from profiler-backed closure. | Low | Existing `--timing-evidence-dir`. |
+| Join outputs into `execution_closure.json` | Reports can say exactly which ready problems passed, failed, skipped, or lack evidence. | Medium | New report builder consuming runner outputs. |
+| Mark closure scope explicitly | Prevent "small subset passed" from becoming "dataset validated." | Low | Gap report claim guardrails. |
+
+Recommended closure statuses:
+
+| Closure Status | Meaning |
+|----------------|---------|
+| `not_attempted` | Problem was ready but not included in this closure run. |
+| `passed` | All emitted traces passed for the selected workloads. |
+| `failed` | At least one trace failed correctness/runtime status. |
+| `no_trace` | Runner produced no parseable trace. |
+| `skipped_existing_pass` | Existing passing traces were reused by default runner behavior. |
+| `blocked_before_run` | Readiness prevented inclusion. |
+| `evidence_incomplete` | Execution passed but requested AMD score/SOL/SOLAR/timing evidence is missing or unscored. |
+
+## Parity Gap Reports
+
+The parity gap report is the main user-facing artifact for the milestone. It should answer what was completed without drifting into out-of-scope claims.
+
+Required sections:
+
+| Section | Contents | Complexity |
+|---------|----------|------------|
+| Dataset Layout Summary | Dataset root, categories present/missing, total discovered problems, invalid layouts. | Low |
+| Inventory Summary | Counts by category, dtype coverage, forward/backward indicators, custom input usage, safetensors usage, reference availability, solution availability. | Medium |
+| ROCm Readiness Summary | Counts by readiness status and top reason codes. | Medium |
+| Ready Subset Closure | Which ready problems were run, workload limits, iterations/warmups, pass/fail/no-trace/skipped counts, output paths. | Medium |
+| Evidence Summary | Trace count, summary path, AMD score report path, SOL bound sidecar count, SOLAR derivation sidecar count, timing evidence count. | Medium |
+| Gap Table | Problem-level blockers with status, reason, evidence path, and next action. | Medium |
+| Claim Boundaries | Explicit statements that inventory completion is not full 235-problem validation, not original 124-model regeneration, not upstream SOLAR parity, not hosted leaderboard readiness, and not CDNA3 hardware validation. | Low |
+
+The Markdown report should be concise enough to read in a PR. The JSON report should preserve the full per-problem records for automation.
 
 ## Differentiators
 
-Features that would make v1.10 more credible than merely adding formulas for a few calls. These are valuable if table-stakes items are underway.
+Valuable features that improve operator confidence but should not displace table stakes.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| Pattern-level recognizers over raw call matching | Captures model-family semantics such as attention and MoE even when implemented as primitive PyTorch operations. | High | Prefer deterministic graph-pattern passes over adding many aliases to `_CALL_CLASSIFIERS`. This is the clearest path from v1.9 local operator modeling to SOLAR-like derivation. |
-| Hierarchical sidecar view | Lets reviewers inspect both compound families and primitive child operations. | Medium | Useful for attention/MoE/SSM where a single family contains matmul, softmax, movement, and elementwise subroles. |
-| Coverage inventory by required family | Makes the roadmap and users see exactly how paper-aligned coverage changed. | Medium | Report per-workload and suite-level counts for attention, MoE, convolution, SSM/Mamba, embedding/positional, linear projection, and primitive families. |
-| Confidence thresholds configurable for derived reports | Supports strict research workflows without changing derivation output. | Medium | Example: allow reports to require all table-stakes families supported, or permit inexact families with warnings. Keep default conservative. |
-| Family-specific rationale templates | Improves auditability and test stability. | Low | Rationale should state why attention/MoE/conv/SSM was recognized and which assumptions made the estimate inexact. |
-| Minimal internal derivation CLI or helper API | Helps maintainers inspect a single definition/workload without running a full benchmark. | Medium | Only add if it stays derived/internal or opt-in; do not alter primary `sol-execbench` defaults. |
-| Negative golden fixtures | Proves honesty by showing malformed/ambiguous patterns become inexact or unscored. | Low | Include dynamic control flow, unknown custom calls, unresolved shapes, dynamic indexing, and partial attention patterns. |
+| Stable reason-code taxonomy | Makes gap trends measurable across runs and releases. | Medium | Prefer codes such as `missing_reference`, `invalid_workload_json`, `unsupported_dtype_float8`, `custom_inputs_entrypoint`, `missing_flashinfer_trace`, `cuda_only_import`, `cli_no_trace`, `trace_runtime_error`. |
+| Markdown plus JSON parity reports | Humans can review PR artifacts while automation can diff JSON. | Low | Generate both from the same data model. |
+| Diff mode between two inventories | Helps show milestone progress without rerunning everything. | Medium | Compare previous and current `paper_inventory.json` plus `rocm_readiness.json`. |
+| Ready subset manifest consumable by runner | Keeps inventory selection and execution in sync. | Medium | Could be a file of dataset-relative problem paths or JSON records. |
+| Evidence completeness score | Useful operator signal for "executed only" versus "executed with trace, timing, AMD score, SOL bound, SOLAR derivation." | Medium | Keep it local and descriptive; do not convert to leaderboard score. |
+| FlashInfer asset diagnostics | Saves time by checking `FLASHINFER_TRACE_DIR` and safetensors references before execution. | Medium | Especially useful for `FlashInfer-Bench`; should warn, not hide the dependency. |
+| Failure clustering | Makes large gap reports readable by grouping repeated schema/runtime/dtype causes. | Medium | Use deterministic reason codes and first log excerpts. |
+| Reproducibility header | Captures command, repo version, Python, ROCm/PyTorch environment when available. | Low | Can reuse trace environment when execution occurs. |
+| Minimal fixture dataset for tests | Lets CI validate layout/inventory/readiness/report logic without downloading Hugging Face data. | Low | Use temporary `L1`, `Quant`, and `FlashInfer-Bench` fixtures. |
 
 ## Anti-Features
 
-Features to explicitly not build in v1.10.
+Features to explicitly not build for v1.11.
 
 | Anti-Feature | Why Avoid | What to Do Instead |
 |--------------|-----------|-------------------|
-| Original paper 124-model / 235-problem extraction | User explicitly excluded dataset extraction and curation from v1.10. Building it would expand scope and delay derivation correctness. | Use targeted synthetic and small real-shaped fixtures that exercise derivation families. |
-| New real-hardware validation claims | User explicitly excluded new real-hardware validation. Current validation remains RDNA 4-scoped from prior work; CDNA 3/MI300X and CDNA 4 remain deferred. | Keep hardware validation status in artifacts and warnings. Do not promote unvalidated architectures. |
-| Hosted leaderboard or submission service | User explicitly excluded a hosted leaderboard. | Keep reports local and derived. |
-| NVIDIA Blackwell/B200 equivalence | The paper targets NVIDIA Blackwell GPUs; this ROCm port produces AMD-native derived evidence. | Continue using `amd-native-derived` claim language and no-equivalence guardrails. |
-| Docs-only SOLAR alignment | The user asked for code-real capabilities, not claims. | Require extractor, estimator, artifact, score-report, and test changes for each table-stakes family. |
-| Taxonomy-only family support | `OpFamily` already contains attention/MoE/convolution/SSM/embedding labels; labels without extraction and estimates do not satisfy v1.10. | Every claimed family needs recognizer coverage, estimate evidence, and golden tests. |
-| Silent primitive fallback for compound patterns | Flattening attention or MoE into primitive matmul/elementwise nodes hides missing paper-family derivation. | Preserve primitive evidence but add grouping/family evidence or explicit "compound not recognized" warnings. |
-| Optimistic zero-cost unsupported nodes | Zeroing unsupported work can make SOL bounds too low and scores misleading. | Unsupported evidence must affect aggregate status and score eligibility. |
-| Cache/fusion/performance inference from reference code alone | Reference semantics do not prove implementation cache behavior or fusion strategy. | Keep estimates semantic/logical with confidence labels; profiler timing remains separate evidence. |
-| Canonical trace/schema mutation | Existing public contracts are intentionally stable. | Emit all SOLAR derivation data as sidecars or opt-in derived reports. |
-| Importing or executing submitted solution code for derivation | Derivation should be based on reference/workload structure, not untrusted candidate code. | Keep derivation on definitions/reference functions and existing safe harness boundaries. |
-
-## Feature Categories for REQUIREMENTS.md
-
-Use these categories directly when drafting v1.10 requirements.
-
-### DERIVE: Automatic Extraction
-
-| Requirement Category | Capability |
-|----------------------|------------|
-| DERIVE-ATTN | Detect attention structures from reference/workload graph evidence, including Q/K/V projections, score matmul, softmax, value matmul, and output projection where present. |
-| DERIVE-MOE | Detect MoE routing, expert selection, dispatch/gather/scatter, expert projection/GEMM, gating, and combine patterns where statically visible. |
-| DERIVE-CONV | Detect convolution calls/modules with dimensional parameters and derive output dimensions from workload axes. |
-| DERIVE-SSM | Detect SSM/Mamba-like projection, depthwise convolution, scan/update, gating, and output projection structures conservatively. |
-| DERIVE-EMBED | Detect embedding/positional/gather/rotary-like memory-bound structures. |
-| DERIVE-LINEAR | Preserve linear projection as a first-class family with projection-specific evidence. |
-| DERIVE-GROUP | Attach compound-family grouping/subrole metadata without breaking existing graph nodes and edges. |
-
-### MODEL: Work And Bound Evidence
-
-| Requirement Category | Capability |
-|----------------------|------------|
-| MODEL-FORMULA | Emit formula kind, formula string, and formula inputs for each newly supported family. |
-| MODEL-BYTES | Emit read, write, intermediate, movement, and total byte evidence with dtype-aware widths. |
-| MODEL-PROVENANCE | Link formulas and bytes to tensor IDs, source expressions, axes, shapes, dtypes, and attribute sources. |
-| MODEL-CONFIDENCE | Apply supported/inexact/unsupported confidence consistently by family and metadata completeness. |
-| MODEL-BOUND | Convert new family estimates into compute, memory, limiting resource, per-op SOL bound, and aggregate bound evidence. |
-
-### REPORT: Honesty And Score Semantics
-
-| Requirement Category | Capability |
-|----------------------|------------|
-| REPORT-COVERAGE | Report family-aware coverage counts and worst confidence for required paper families and primitive families. |
-| REPORT-STATUS | Preserve machine-verifiable `scored`, `degraded`, and `unscored` states with parseable reasons. |
-| REPORT-SCORE | Prevent SOL Score computation when required SOL bound evidence is unscored; warn when evidence is degraded. |
-| REPORT-CLAIMS | Keep AMD-native derived language and no NVIDIA/B200/SOLAR/leaderboard/hardware-validation equivalence warnings. |
-| REPORT-REFS | Preserve evidence references for trace, timing, SOL bound sidecar, baseline, and hardware model. |
-
-### TEST: Verification Fixtures
-
-| Requirement Category | Capability |
-|----------------------|------------|
-| TEST-GOLDEN-FAMILIES | Golden fixtures for attention, MoE, convolution, SSM/Mamba, embedding/positional, and linear projection. |
-| TEST-DEGRADATION | Fixtures proving partial or ambiguous derivation becomes inexact, degraded, unsupported, or unscored as appropriate. |
-| TEST-ROUNDTRIP | Sidecar parse/serialize tests for new fields and coverage summaries. |
-| TEST-SCORE | AMD-native score tests for complete, degraded, and unscored SOLAR evidence. |
-| TEST-CONTRACT | Guardrails proving canonical schemas, trace JSONL, and primary CLI behavior are unchanged. |
-
-## Supported Family Targets
-
-| Family | Current v1.9 State | v1.10 Target | Confidence Target |
-|--------|--------------------|--------------|-------------------|
-| Attention | Taxonomy label exists; primitives like GEMM/softmax/elementwise can be modeled separately. | Recognize and group attention structure; estimate QK/AV/projection FLOPs, softmax passes, mask/add bytes, and movement. | `INEXACT` by default; `SUPPORTED` only for simple fully resolved dense cases if tests prove formula completeness. |
-| MoE | Taxonomy label exists; no explicit estimator. | Recognize routing/expert/dispatch/combine patterns and expose sparse/dynamic assumptions. | Usually `INEXACT`; `UNSUPPORTED` for unresolved dynamic routing effects. |
-| Convolution | Taxonomy label exists; no explicit estimator. | Estimate conv FLOPs/bytes for common 1D/2D/3D grouped/depthwise shapes. | `SUPPORTED` for fully resolved standard conv formulas; `INEXACT` for ambiguous module metadata. |
-| SSM/Mamba | Taxonomy label exists; no explicit estimator. | Recognize conservative SSM/Mamba subgraphs and model projections, depthwise conv, scan/update, gating, and movement. | `INEXACT`; `UNSUPPORTED` for opaque custom scan kernels. |
-| Embedding/positional | Taxonomy label exists; no explicit estimator. | Model memory-bound lookup/gather/positional/rotary patterns with low FLOPs and explicit bytes. | `INEXACT`; `SUPPORTED` only for static resolved lookup byte formulas. |
-| Linear projection | Recognized and estimated through GEMM-like path. | Preserve first-class projection family, bias evidence, and projection-specific formulas. | `SUPPORTED` for fully resolved dense projection; `INEXACT` when bias/broadcast metadata is incomplete. |
-| Existing primitive families | Implemented for GEMM, BMM, elementwise, activation, reduction, normalization, softmax, data movement, dtype conversion. | Keep stable and use as child evidence for compound families. | Preserve existing confidence behavior unless richer formulas justify upgrades. |
+| Upstream SOLAR full parity claim | User explicitly excluded upstream SOLAR full parity. The ROCm port has AMD-native derived evidence, not NVIDIA paper-equivalent SOLAR. | Report local SOL/SOLAR sidecar coverage and guard claim language. |
+| Original 124-model regeneration | User explicitly excluded original model/subgraph regeneration. It is much larger than dataset inventory. | Inventory the public dataset as acquired; do not recreate paper extraction. |
+| Full 235-problem validation as a milestone requirement | User excluded full validation unless environment and runtime budget happen to allow it. Making it table stakes would block the milestone. | Support small ready-subset closure and report unattempted scope honestly. |
+| Hosted leaderboard | User explicitly excluded hosted leaderboard. | Produce local reports and derived artifacts only. |
+| CDNA3 hardware validation claim | User explicitly excluded CDNA3 hardware validation as in-scope. Existing project state says CDNA3 schema/build/docs support exists but full adapted-suite validation remains deferred. | Mark CDNA3 runs as requiring separate evidence; do not present CDNA3 closure as validated unless a future milestone supplies it. |
+| CUDA/NVIDIA runtime restoration | This is a ROCm-only fork, and docs classify NVIDIA runtime compatibility as out of scope. | Classify NVIDIA-only paths and suggest ROCm replacements only when scoped. |
+| Mutating public dataset files during inventory | Inventory should be an audit, not a migration that changes downloaded data. | Write derived reports under `out/` or another output directory. |
+| Adding inventory fields to canonical traces | Trace JSONL is the stable execution contract. | Keep inventory, readiness, closure, and gap data in separate derived artifacts. |
+| Treating reference-solution pass as optimized benchmark parity | Running `definition.reference` proves compatibility/execution, not optimized leaderboard performance. | Label closure as reference-based unless a selected solution/baseline is provided. |
+| Treating missing data as success | Unknown forward/backward, unknown dtype, missing optional assets, or uninspected custom inputs should not become `ready` by default. | Emit `unknown`, blocker, or `needs hardware evidence` with reason codes. |
+| Hard-failing on extra files or categories | Public dataset packaging may include extras. | Report extras as warnings unless they conflict with required layout. |
+| Network dependency in normal tests | CI and local tests should not require Hugging Face access. | Use fixture datasets for tests; keep live acquisition as optional/manual. |
 
 ## Feature Dependencies
 
 ```text
-Reference/workload graph evidence
-  -> Primitive extraction
-  -> Compound-family pattern recognition
-  -> Family/subrole grouping metadata
-  -> Family-specific work estimates
-  -> Per-op and aggregate AMD SOL bounds
-  -> Coverage/status/score eligibility
-  -> AMD-native score report warnings
+Dataset acquisition or existing dataset root
+  -> layout verification
+  -> JSON/Pydantic schema validation
+  -> paper_inventory.json
+  -> rocm_readiness.json
+  -> ready_subset.json
+  -> run_dataset.py execution for selected ready problems
+  -> summary.json + traces.json + optional derived evidence
+  -> execution_closure.json
+  -> parity_gap_report.md/json
 
-Shape/dtype/axis provenance
-  -> Formula inputs
-  -> Byte buckets
-  -> Confidence decisions
-  -> Degraded/unscored status reasons
+Definition/workload fields
+  -> dtype coverage
+  -> forward/backward inference
+  -> custom input and safetensors detection
+  -> readiness status and reason codes
 
-Golden family fixtures
-  -> Sidecar round-trip tests
-  -> Score status tests
-  -> Public contract guardrails
-  -> Requirements acceptance evidence
+Existing run_dataset outputs
+  -> runtime blocker classification
+  -> ready subset closure status
+  -> AMD score/SOL/SOLAR/timing evidence completeness
 ```
 
 ## MVP Recommendation
 
 Prioritize:
 
-1. Add compound-family metadata and coverage/status semantics first, so every later recognizer has a stable place to report evidence.
-2. Implement linear projection, convolution, and embedding/positional next because their formulas are tractable and unblock visible breadth.
-3. Implement attention recognition as grouped primitive evidence with conservative formulas; this is the most important paper-alignment signal.
-4. Implement MoE and SSM/Mamba conservatively with explicit inexact/unsupported degradation for dynamic parts.
-5. Wire all new family evidence through v2 sidecars, AMD-native score eligibility, round-trip parsing, and golden tests.
+1. Layout verification and inventory generation for the four public categories, including required file checks, schema/workload parse checks, counts, dtypes, reference availability, custom input, safetensors, and forward/backward indicators.
+2. Deterministic readiness classification with the exact statuses requested by the milestone: `ready`, `schema/input blocked`, `dtype blocked`, `custom-input blocked`, `runtime blocked`, `unsupported NVIDIA-only path`, and `needs hardware evidence`.
+3. Ready subset manifest generation and small-batch closure using existing `run_dataset.py` behavior, preserving traces, `summary.json`, AMD score report, AMD SOL sidecars, SOLAR derivation sidecars, and timing evidence options.
+4. Parity gap report generation that joins inventory, readiness, and execution closure, with explicit claim guardrails.
+5. Focused tests with temporary dataset fixtures for layout, inventory fields, readiness precedence, closure joins, and report guardrail wording.
 
 Defer:
 
-- Full original-paper extraction pipeline: out of scope.
-- New RDNA/CDNA hardware validation: out of scope.
-- Exact implementation-level fusion/cache modeling: not derivable from semantic reference code alone.
-- Hosted leaderboard behavior: out of scope.
+- Dataset-wide optimized solution performance campaigns.
+- Full paper 235-problem validation.
+- Original paper model/subgraph regeneration.
+- Upstream SOLAR equivalence.
+- Hosted leaderboard service.
+- CDNA3 hardware validation claims.
+
+## Suggested Artifact Contracts
+
+These contracts are intentionally derived and can evolve behind schema versions.
+
+```json
+{
+  "schema_version": "sol_execbench.paper_inventory.v1",
+  "dataset_root": "data/benchmark",
+  "categories": {
+    "L1": {"problems": 0, "invalid": 0},
+    "L2": {"problems": 0, "invalid": 0},
+    "Quant": {"problems": 0, "invalid": 0},
+    "FlashInfer-Bench": {"problems": 0, "invalid": 0}
+  },
+  "problems": []
+}
+```
+
+```json
+{
+  "schema_version": "sol_execbench.rocm_readiness.v1",
+  "problems": [
+    {
+      "category": "L1",
+      "problem_name": "example",
+      "status": "ready",
+      "reason_codes": [],
+      "next_action": "include_in_ready_subset"
+    }
+  ]
+}
+```
+
+```json
+{
+  "schema_version": "sol_execbench.execution_closure.v1",
+  "scope": {
+    "categories": ["L1"],
+    "limit": 5,
+    "max_workloads": 1,
+    "solution_mode": "definition_reference"
+  },
+  "outputs": {
+    "summary": "out/summary.json",
+    "amd_score_report": null,
+    "amd_sol_bound_dir": null,
+    "solar_derivation_dir": null,
+    "timing_evidence_dir": null
+  },
+  "problems": []
+}
+```
 
 ## Sources
 
-- `https://arxiv.org/abs/2603.19173` - paper abstract baseline: hardware-grounded SOL bounds from SOLAR, broad real-world kernel families, SOL Score, and robustness guardrails. Confidence: HIGH for abstract-level scope.
-- `.planning/PROJECT.md` - v1.10 milestone goal, explicit target families, and deferred dataset/hardware/leaderboard scope. Confidence: HIGH.
-- `.planning/MILESTONES.md` - v1.9 delivered foundation and known gaps. Confidence: HIGH.
-- `src/sol_execbench/core/scoring/amd_bound_graph.py` - current BoundGraph IR, taxonomy, FX/AST extraction, and unsupported evidence behavior. Confidence: HIGH.
-- `src/sol_execbench/core/scoring/amd_bound_estimates.py` - current estimator coverage and explicit unsupported status for attention, MoE, SSM/Mamba, convolution, and embedding/positional families. Confidence: HIGH.
-- `src/sol_execbench/core/scoring/amd_sol_v2.py` - v2 sidecar aggregate status, coverage summary, warning, and parse/serialize semantics. Confidence: HIGH.
-- `src/sol_execbench/core/scoring/amd_score.py` - AMD-native score warning and unscored/degraded behavior. Confidence: HIGH.
-- `tests/sol_execbench/test_amd_bound_graph.py` and `tests/sol_execbench/test_amd_bound_estimates.py` - current golden coverage for graph extraction and estimates, plus proof that named paper families are taxonomy-only/unsupported today. Confidence: HIGH.
+- `.planning/PROJECT.md` - v1.11 goal, target features, explicit deferrals, current validation boundaries. Confidence: HIGH.
+- `scripts/download_solexecbench.py` - current acquisition path, Hugging Face repo/config names, generated layout. Confidence: HIGH for local script behavior.
+- `scripts/run_dataset.py` - category discovery, execution controls, resumable behavior, trace/summary outputs, AMD score/SOL/SOLAR/timing evidence options. Confidence: HIGH.
+- `docs/analysis.md` - trace workflow, dataset run outputs, timing evidence, AMD-native score semantics, SOL/SOLAR sidecar semantics, claim boundaries. Confidence: HIGH.
+- `docs/original_parity.md` - original public surface mapping, ROCm substitutions, out-of-scope NVIDIA/leaderboard/CDNA validation claims. Confidence: HIGH.
+- `docs/CONFIGURATION.md` - environment variables including `FLASHINFER_TRACE_DIR`, benchmark config defaults, CLI defaults, ROCm runtime assumptions. Confidence: HIGH.
+- `tests/sol_execbench/test_run_dataset_amd_score.py` - existing test coverage for report generation, sidecar safety, skipped/rerun behavior, timing evidence payloads. Confidence: HIGH.
