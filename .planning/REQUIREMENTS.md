@@ -70,16 +70,16 @@ ExecBench.
 
 ### Score And Dataset Integration
 
-- [ ] **SCORE-01**: AMD-native score reports consume v2 bound artifacts and
+- [x] **SCORE-01**: AMD-native score reports consume v2 bound artifacts and
   preserve trace, timing, SOL-bound, baseline, and hardware-model evidence
   references.
-- [ ] **SCORE-02**: Unsupported, inexact, provisional hardware, missing bound,
+- [x] **SCORE-02**: Unsupported, inexact, provisional hardware, missing bound,
   and `reference_latency` fallback states propagate deterministic warnings or
   unscored states into workload and suite reports.
-- [ ] **SCORE-03**: Dataset runs can optionally emit or reference AMD SOL bound
+- [x] **SCORE-03**: Dataset runs can optionally emit or reference AMD SOL bound
   sidecars when producing `--amd-score-report`, without changing primary trace
   JSONL output.
-- [ ] **SCORE-04**: Suite reports expose scored/unscored counts and
+- [x] **SCORE-04**: Suite reports expose scored/unscored counts and
   baseline-source or evidence-summary information sufficient to avoid release
   score misuse.
 
@@ -167,10 +167,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BOUND-02 | Phase 44 | Complete |
 | BOUND-03 | Phase 44 | Complete |
 | BOUND-04 | Phase 44 | Complete |
-| SCORE-01 | Phase 45 | Pending |
-| SCORE-02 | Phase 45 | Pending |
-| SCORE-03 | Phase 45 | Pending |
-| SCORE-04 | Phase 45 | Pending |
+| SCORE-01 | Phase 45 | Complete |
+| SCORE-02 | Phase 45 | Complete |
+| SCORE-03 | Phase 45 | Complete |
+| SCORE-04 | Phase 45 | Complete |
 | DOC-01 | Phase 41 | Complete |
 | DOC-02 | Phase 46 | Pending |
 | DOC-03 | Phase 46 | Pending |
