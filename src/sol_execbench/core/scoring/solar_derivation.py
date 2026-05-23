@@ -362,6 +362,15 @@ def classify_solar_confidence(
             missing.append(f"axis:{estimate.node_id}")
         warning_prefixes.extend(estimate.warnings)
 
+    if family_value == OpFamily.ATTENTION.value:
+        attention_missing, attention_warnings = _attention_confidence_evidence(
+            nodes,
+            estimates,
+            subrole_names,
+        )
+        missing.extend(attention_missing)
+        warning_prefixes.extend(attention_warnings)
+
     confidence = _worst_estimate_confidence(estimates)
     if family_value == OpFamily.UNSUPPORTED.value or not nodes or not subrole_names:
         confidence = EstimateConfidence.UNSUPPORTED
@@ -371,6 +380,8 @@ def classify_solar_confidence(
     status = _status_for_confidence(confidence)
     if confidence == EstimateConfidence.INEXACT:
         warning_prefixes.append(f"inexact_operator:{family_value}")
+        if family_value == OpFamily.ATTENTION.value:
+            warning_prefixes.append("aggregate_degraded:attention")
         warning_prefixes.append("aggregate_degraded:incomplete semantic evidence")
         rationale = (
             f"{family_value} semantics are visible but metadata is incomplete: "
@@ -378,6 +389,8 @@ def classify_solar_confidence(
         )
     elif confidence == EstimateConfidence.UNSUPPORTED:
         warning_prefixes.append(f"unsupported_operator:{family_value}")
+        if family_value == OpFamily.ATTENTION.value:
+            warning_prefixes.append("aggregate_unscored:attention")
         warning_prefixes.append("aggregate_unscored:unsupported semantic evidence")
         rationale = (
             f"{family_value} evidence is unsupported for scoring: "
@@ -1042,6 +1055,8 @@ def _subroles_for_group(
     nodes: tuple[BoundGraphNode, ...],
     tensor_evidence_by_id: dict[str, SolarTensorEvidence],
 ) -> tuple[SolarSubroleEvidence, ...]:
+    if family == OpFamily.ATTENTION.value:
+        return _attention_subroles(nodes, tensor_evidence_by_id)
     if family in {OpFamily.GEMM.value, OpFamily.LINEAR_PROJECTION.value}:
         return _linear_subroles(nodes, tensor_evidence_by_id)
     if family in {
@@ -1055,6 +1070,117 @@ def _subroles_for_group(
     }:
         return _op_name_subroles(nodes, tensor_evidence_by_id)
     return ()
+
+
+def _attention_subroles(
+    nodes: tuple[BoundGraphNode, ...],
+    tensor_evidence_by_id: dict[str, SolarTensorEvidence],
+) -> tuple[SolarSubroleEvidence, ...]:
+    subroles: list[SolarSubroleEvidence] = []
+    qk_node = next(
+        (node for node in nodes if node.attributes.get("subrole") == "qk_scores"),
+        None,
+    )
+    pv_node = next(
+        (node for node in nodes if node.attributes.get("subrole") == "pv_aggregation"),
+        None,
+    )
+    if qk_node is not None and len(qk_node.input_tensor_ids) >= 2:
+        subroles.append(
+            _subrole_from_tensor_ids(
+                name="q_projection",
+                node=qk_node,
+                tensor_ids=(qk_node.input_tensor_ids[0],),
+                tensor_evidence_by_id=tensor_evidence_by_id,
+            )
+        )
+        subroles.append(
+            _subrole_from_tensor_ids(
+                name="k_projection",
+                node=qk_node,
+                tensor_ids=(qk_node.input_tensor_ids[1],),
+                tensor_evidence_by_id=tensor_evidence_by_id,
+            )
+        )
+    if pv_node is not None and len(pv_node.input_tensor_ids) >= 2:
+        subroles.append(
+            _subrole_from_tensor_ids(
+                name="v_projection",
+                node=pv_node,
+                tensor_ids=(pv_node.input_tensor_ids[1],),
+                tensor_evidence_by_id=tensor_evidence_by_id,
+            )
+        )
+    for node in sorted(nodes, key=lambda item: item.node_id):
+        subrole = node.attributes.get("subrole")
+        if not isinstance(subrole, str) or subrole in {
+            "dynamic_attention_axes",
+        }:
+            continue
+        subroles.append(
+            _subrole_from_tensor_ids(
+                name=subrole,
+                node=node,
+                tensor_ids=_node_tensor_ids(node),
+                tensor_evidence_by_id=tensor_evidence_by_id,
+            )
+        )
+    return tuple(sorted(subroles, key=lambda item: item.name))
+
+
+def _attention_confidence_evidence(
+    nodes: tuple[BoundGraphNode, ...],
+    estimates: tuple[OperatorWorkEstimate, ...],
+    subrole_names: tuple[str, ...],
+) -> tuple[list[str], list[str]]:
+    missing: list[str] = []
+    warnings: list[str] = []
+    subroles = set(subrole_names)
+    node_subroles = {
+        str(node.attributes.get("subrole"))
+        for node in nodes
+        if node.attributes.get("subrole") is not None
+    }
+    if "dynamic_attention_axes" in node_subroles:
+        missing.extend(("axis:static_sequence", "shape:sequence_q", "shape:sequence_k"))
+        warnings.append("unsupported_operator:dynamic_attention_axes")
+        return missing, warnings
+
+    required = {
+        "q_projection",
+        "k_projection",
+        "v_projection",
+        "qk_scores",
+        "softmax",
+        "pv_aggregation",
+    }
+    missing.extend(f"attention_subrole:{name}" for name in sorted(required - subroles))
+    if "output_projection" not in subroles:
+        missing.append("attention_subrole:output_projection")
+
+    softmax_nodes = [
+        node for node in nodes if node.attributes.get("subrole") == "softmax"
+    ]
+    if not softmax_nodes or all(node.attributes.get("axis") is None for node in softmax_nodes):
+        missing.append("axis:softmax")
+    if any(node.attributes.get("mask_semantics") == "partial" for node in nodes):
+        missing.extend(("mask:semantics", "mask:sparsity"))
+        warnings.append("inexact_operator:attention_mask")
+
+    attention_estimates = [
+        estimate
+        for estimate in estimates
+        if estimate.op_family == OpFamily.ATTENTION
+        and estimate.confidence != EstimateConfidence.UNSUPPORTED
+    ]
+    if not attention_estimates:
+        missing.append("estimate:attention")
+    for estimate in attention_estimates:
+        if not estimate.formula_inputs:
+            missing.append(f"attention_formula_inputs:{estimate.node_id}")
+        if estimate.total_bytes <= 0.0:
+            missing.append(f"attention_bytes:{estimate.node_id}")
+    return missing, warnings
 
 
 def _linear_subroles(
