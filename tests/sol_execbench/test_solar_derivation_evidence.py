@@ -187,6 +187,24 @@ def test_solar_derivation_round_trip_preserves_provenance():
     )
     assert payload["groups"][0]["byte_evidence"][0]["total_bytes"] == 12288.0
     assert payload["groups"][0]["bound_evidence"][0]["limiting_resource"] == "memory"
+    assert payload["coverage_summary"]["family_counts"] == {"attention": 1}
+    assert payload["coverage_summary"]["status_counts"] == {
+        "degraded": 0,
+        "scored": 1,
+        "unscored": 0,
+    }
+    assert payload["coverage_summary"]["estimated_node_ids"] == ["op_1"]
+    assert payload["coverage_summary"]["provenance"][0]["group_id"] == (
+        "attention_group_1"
+    )
+    assert payload["aggregate_status"] == {
+        "status": "scored",
+        "score_eligible": True,
+        "reason": "all semantic groups are score eligible",
+        "group_ids": ["attention_group_1"],
+        "node_ids": ["op_1", "op_2"],
+        "warnings": ["inexact_operator:attention_mask"],
+    }
     assert payload["tensors"][0]["shape"] == [2, 4, 16, 32]
     assert payload["tensors"][0]["semantic_axes"] == [
         "batch",
@@ -260,6 +278,22 @@ def test_solar_derivation_parser_rejects_missing_required_fields():
             ("source_boundary",),
             r"source_boundary contains unknown field\(s\): extra_claim",
         ),
+        (
+            ("coverage_summary",),
+            r"coverage_summary contains unknown field\(s\): extra_claim",
+        ),
+        (
+            ("coverage_summary", "families", 0),
+            r"coverage_summary\.families\[0\] contains unknown field\(s\): extra_claim",
+        ),
+        (
+            ("coverage_summary", "provenance", 0),
+            r"coverage_summary\.provenance\[0\] contains unknown field\(s\): extra_claim",
+        ),
+        (
+            ("aggregate_status",),
+            r"aggregate_status contains unknown field\(s\): extra_claim",
+        ),
     ],
 )
 def test_solar_derivation_parser_rejects_unknown_schema_fields(
@@ -326,6 +360,11 @@ def test_solar_derivation_parser_rejects_invalid_schema_version():
             r"groups\[0\]\.status has invalid status 'queued'",
         ),
         (
+            ("aggregate_status", "status"),
+            "queued",
+            r"aggregate_status\.status has invalid status 'queued'",
+        ),
+        (
             ("groups", 0, "subroles", 0, "confidence"),
             "partial",
             r"groups\[0\]\.subroles\[0\]\.confidence has invalid confidence 'partial'",
@@ -390,6 +429,190 @@ def test_solar_derivation_source_boundary_records_sidecar_only_inputs():
         match="source_boundary.candidate_solution_execution must be a boolean",
     ):
         solar_derivation_from_dict(non_bool_boundary)
+
+
+def test_solar_derivation_legacy_sidecars_parse_and_recompute_coverage():
+    legacy_payload = _contract_payload()
+    del legacy_payload["coverage_summary"]
+    del legacy_payload["aggregate_status"]
+
+    parsed = solar_derivation_from_dict(legacy_payload)
+    normalized = parsed.to_dict()
+
+    assert normalized["coverage_summary"]["family_counts"] == {"attention": 1}
+    assert normalized["coverage_summary"]["status_counts"] == {
+        "degraded": 0,
+        "scored": 1,
+        "unscored": 0,
+    }
+    assert normalized["aggregate_status"]["status"] == "scored"
+    assert normalized["aggregate_status"]["score_eligible"] is True
+
+
+def test_solar_derivation_empty_groups_are_unscored_not_missing_coverage():
+    evidence = SolarDerivationEvidence(
+        definition="empty_demo",
+        workload_uuid="empty-workload",
+        groups=(),
+        tensors=(),
+        warnings=(),
+        source_boundary={
+            "canonical_trace_jsonl": False,
+            "public_schema": False,
+            "candidate_solution_execution": False,
+        },
+    )
+    payload = solar_derivation_from_dict(evidence.to_dict()).to_dict()
+
+    assert payload["coverage_summary"]["family_counts"] == {}
+    assert payload["coverage_summary"]["status_counts"] == {
+        "degraded": 0,
+        "scored": 0,
+        "unscored": 0,
+    }
+    assert payload["aggregate_status"] == {
+        "status": "unscored",
+        "score_eligible": False,
+        "reason": "no semantic groups were derived",
+        "group_ids": [],
+        "node_ids": [],
+        "warnings": [],
+    }
+
+
+def test_solar_derivation_coverage_tracks_degraded_unsupported_and_missing_patterns():
+    degraded = _contract_artifact().groups[0]
+    degraded = SolarSemanticGroupEvidence(
+        family=degraded.family,
+        group_id=degraded.group_id,
+        node_ids=degraded.node_ids,
+        subroles=degraded.subroles,
+        confidence="inexact",
+        status="degraded",
+        required_evidence=degraded.required_evidence,
+        missing_evidence=("axis:op_1", "mask:semantics"),
+        warning_prefixes=("aggregate_degraded:attention",),
+        source=degraded.source,
+        rationale=degraded.rationale,
+        formula_evidence=degraded.formula_evidence,
+        byte_evidence=degraded.byte_evidence,
+        bound_evidence=degraded.bound_evidence,
+    )
+    unsupported = SolarSemanticGroupEvidence(
+        family="unsupported",
+        group_id="unsupported_group_1",
+        node_ids=("op_unsupported",),
+        subroles=(),
+        confidence="unsupported",
+        status="unscored",
+        required_evidence=(),
+        missing_evidence=("family:recognized", "estimate:op_unsupported"),
+        warning_prefixes=("unsupported_operator:custom_op",),
+        source=_source(
+            kind="ast",
+            detail="custom_op(x)",
+            node_id="op_unsupported",
+        ),
+        rationale="Unsupported custom operation.",
+    )
+    evidence = SolarDerivationEvidence(
+        definition="coverage_demo",
+        workload_uuid="coverage-workload",
+        groups=(unsupported, degraded),
+        tensors=(),
+        warnings=("aggregate_unscored:unsupported semantic evidence",),
+        source_boundary={
+            "canonical_trace_jsonl": False,
+            "public_schema": False,
+            "candidate_solution_execution": False,
+        },
+    )
+
+    payload = solar_derivation_from_dict(evidence.to_dict()).to_dict()
+
+    assert payload["aggregate_status"]["status"] == "unscored"
+    assert payload["aggregate_status"]["score_eligible"] is False
+    assert payload["aggregate_status"]["group_ids"] == [
+        "attention_group_1",
+        "unsupported_group_1",
+    ]
+    assert payload["coverage_summary"]["degraded_node_ids"] == ["op_1", "op_2"]
+    assert payload["coverage_summary"]["unsupported_node_ids"] == ["op_unsupported"]
+    assert payload["coverage_summary"]["estimated_node_ids"] == ["op_1"]
+    assert payload["coverage_summary"]["missing_patterns"] == [
+        {
+            "pattern": "axis:op_1",
+            "group_ids": ["attention_group_1"],
+            "node_ids": ["op_1", "op_2"],
+            "sources": [
+                {
+                    "group_id": "attention_group_1",
+                    "node_id": "op_1",
+                    "tensor_id": None,
+                    "kind": "estimate",
+                    "detail": "attention_scores_flops:2*B*H*S_q*S_k*D",
+                }
+            ],
+        },
+        {
+            "pattern": "estimate:op_unsupported",
+            "group_ids": ["unsupported_group_1"],
+            "node_ids": ["op_unsupported"],
+            "sources": [
+                {
+                    "group_id": "unsupported_group_1",
+                    "node_id": "op_unsupported",
+                    "tensor_id": None,
+                    "kind": "ast",
+                    "detail": "custom_op(x)",
+                }
+            ],
+        },
+        {
+            "pattern": "family:recognized",
+            "group_ids": ["unsupported_group_1"],
+            "node_ids": ["op_unsupported"],
+            "sources": [
+                {
+                    "group_id": "unsupported_group_1",
+                    "node_id": "op_unsupported",
+                    "tensor_id": None,
+                    "kind": "ast",
+                    "detail": "custom_op(x)",
+                }
+            ],
+        },
+        {
+            "pattern": "mask:semantics",
+            "group_ids": ["attention_group_1"],
+            "node_ids": ["op_1", "op_2"],
+            "sources": [
+                {
+                    "group_id": "attention_group_1",
+                    "node_id": "op_1",
+                    "tensor_id": None,
+                    "kind": "estimate",
+                    "detail": "attention_scores_flops:2*B*H*S_q*S_k*D",
+                }
+            ],
+        },
+    ]
+    assert payload["coverage_summary"]["unsupported_patterns"] == [
+        {
+            "pattern": "unsupported_operator:custom_op",
+            "group_ids": ["unsupported_group_1"],
+            "node_ids": ["op_unsupported"],
+            "sources": [
+                {
+                    "group_id": "unsupported_group_1",
+                    "node_id": "op_unsupported",
+                    "tensor_id": None,
+                    "kind": "ast",
+                    "detail": "custom_op(x)",
+                }
+            ],
+        }
+    ]
 
 
 @pytest.mark.parametrize(
