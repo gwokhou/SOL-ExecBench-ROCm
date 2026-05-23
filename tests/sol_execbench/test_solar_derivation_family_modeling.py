@@ -20,6 +20,27 @@ def _load_fixture(name: str) -> dict[str, object]:
     return json.loads((FIXTURE_DIR / name).read_text(encoding="utf-8"))
 
 
+def _expectation(name: str) -> dict[str, object]:
+    expectation = _load_fixture(name)["expectation"]
+    assert isinstance(expectation, dict)
+    return expectation
+
+
+def _assert_group_matches_fixture(
+    group,
+    expectation: dict[str, object],
+) -> None:
+    assert group.status == expectation["expected_status"]
+    assert group.confidence.value == expectation["expected_confidence"]
+    assert [subrole.name for subrole in group.subroles] == expectation[
+        "expected_subroles"
+    ]
+    if expectation["expected_status"] == "scored":
+        assert set(expectation["required_evidence"]) <= set(group.required_evidence)
+    assert set(expectation["missing_evidence"]) <= set(group.missing_evidence)
+    assert set(expectation["warning_prefixes"]) <= set(group.warning_prefixes)
+
+
 def _attention_definition(*, mask: bool = False) -> Definition:
     inputs = {
         "q": {"shape": ["batch", "heads", "sequence_q", "head_dim"], "dtype": "float32"},
@@ -240,41 +261,34 @@ def _ssm_mamba_workload(*, missing_recurrence: bool = False, custom_scan: bool =
 
 
 def test_ssm_mamba_static_sidecar_matches_positive_fixture_contract():
-    fixture = _load_fixture("ssm_mamba_positive.json")
-    expectation = fixture["expectation"]
+    expectation = _expectation("ssm_mamba_positive.json")
     evidence = build_solar_derivation_evidence(_ssm_mamba_definition(), _ssm_mamba_workload())
     group = next(group for group in evidence.groups if group.family == "ssm_mamba")
 
-    assert group.status == expectation["expected_status"]
-    assert group.confidence.value == expectation["expected_confidence"]
-    assert [subrole.name for subrole in group.subroles] == expectation["expected_subroles"]
-    for required in expectation["required_evidence"]:
-        assert required in group.required_evidence
+    _assert_group_matches_fixture(group, expectation)
     assert group.missing_evidence == ()
     assert group.warning_prefixes == ()
-    assert {item.formula_kind for item in group.formula_evidence} >= {
+    assert [item.formula_kind for item in group.formula_evidence] == [
+        "ssm_mamba_visible_subrole_bytes",
+        "ssm_mamba_visible_subrole_bytes",
         "ssm_mamba_static_scan_flops",
-    }
+        "ssm_mamba_visible_subrole_bytes",
+        "ssm_mamba_visible_subrole_bytes",
+        "ssm_mamba_visible_subrole_bytes",
+    ]
     assert any(item.total_bytes > 0.0 for item in group.byte_evidence)
     assert group.bound_evidence
 
 
 def test_ssm_mamba_missing_recurrence_sidecar_matches_degraded_fixture_contract():
-    fixture = _load_fixture("ssm_mamba_degraded_missing_recurrence.json")
-    expectation = fixture["expectation"]
+    expectation = _expectation("ssm_mamba_degraded_missing_recurrence.json")
     evidence = build_solar_derivation_evidence(
         _ssm_mamba_definition(missing_recurrence=True),
         _ssm_mamba_workload(missing_recurrence=True),
     )
     group = next(group for group in evidence.groups if group.family == "ssm_mamba")
 
-    assert group.status == expectation["expected_status"]
-    assert group.confidence.value == expectation["expected_confidence"]
-    assert [subrole.name for subrole in group.subroles] == expectation["expected_subroles"]
-    for missing in expectation["missing_evidence"]:
-        assert missing in group.missing_evidence
-    for warning in expectation["warning_prefixes"]:
-        assert warning in group.warning_prefixes
+    _assert_group_matches_fixture(group, expectation)
     assert any(
         item.formula_kind == "ssm_mamba_degraded_scan_bytes"
         for item in group.formula_evidence
@@ -283,38 +297,26 @@ def test_ssm_mamba_missing_recurrence_sidecar_matches_degraded_fixture_contract(
 
 
 def test_ssm_mamba_custom_scan_sidecar_matches_unsupported_fixture_contract():
-    fixture = _load_fixture("ssm_mamba_unsupported_custom_scan.json")
-    expectation = fixture["expectation"]
+    expectation = _expectation("ssm_mamba_unsupported_custom_scan.json")
     evidence = build_solar_derivation_evidence(
         _ssm_mamba_definition(custom_scan=True),
         _ssm_mamba_workload(custom_scan=True),
     )
     group = next(group for group in evidence.groups if group.family == "ssm_mamba")
 
-    assert group.status == expectation["expected_status"]
-    assert group.confidence.value == expectation["expected_confidence"]
-    assert [subrole.name for subrole in group.subroles] == expectation["expected_subroles"]
-    for missing in expectation["missing_evidence"]:
-        assert missing in group.missing_evidence
-    for warning in expectation["warning_prefixes"]:
-        assert warning in group.warning_prefixes
+    _assert_group_matches_fixture(group, expectation)
     assert not any(subrole.name == "state_update" for subrole in group.subroles)
 
 
 def test_moe_static_route_sidecar_matches_positive_fixture_contract():
-    fixture = _load_fixture("moe_positive.json")
-    expectation = fixture["expectation"]
+    expectation = _expectation("moe_positive.json")
     evidence = build_solar_derivation_evidence(_moe_definition(), _moe_workload())
     group = next(group for group in evidence.groups if group.family == "moe")
 
-    assert group.status == expectation["expected_status"]
-    assert group.confidence.value == expectation["expected_confidence"]
-    assert [subrole.name for subrole in group.subroles] == expectation["expected_subroles"]
-    for required in expectation["required_evidence"]:
-        assert required in group.required_evidence
+    _assert_group_matches_fixture(group, expectation)
     assert group.missing_evidence == ()
     assert group.warning_prefixes == ()
-    assert {item.formula_kind for item in group.formula_evidence} >= {
+    assert {item.formula_kind for item in group.formula_evidence} == {
         "moe_static_route_flops",
         "moe_dynamic_route_bytes",
     }
@@ -323,21 +325,14 @@ def test_moe_static_route_sidecar_matches_positive_fixture_contract():
 
 
 def test_moe_dynamic_route_sidecar_matches_degraded_fixture_contract():
-    fixture = _load_fixture("moe_degraded_dynamic_routing.json")
-    expectation = fixture["expectation"]
+    expectation = _expectation("moe_degraded_dynamic_routing.json")
     evidence = build_solar_derivation_evidence(
         _moe_definition(dynamic=True),
         _moe_workload(dynamic=True),
     )
     group = next(group for group in evidence.groups if group.family == "moe")
 
-    assert group.status == expectation["expected_status"]
-    assert group.confidence.value == expectation["expected_confidence"]
-    assert [subrole.name for subrole in group.subroles] == expectation["expected_subroles"]
-    for missing in expectation["missing_evidence"]:
-        assert missing in group.missing_evidence
-    for warning in expectation["warning_prefixes"]:
-        assert warning in group.warning_prefixes
+    _assert_group_matches_fixture(group, expectation)
     assert any(
         item.formula_kind == "moe_dynamic_route_bytes"
         for item in group.formula_evidence
@@ -345,21 +340,15 @@ def test_moe_dynamic_route_sidecar_matches_degraded_fixture_contract():
 
 
 def test_moe_taxonomy_only_sidecar_matches_unsupported_fixture_contract():
-    fixture = _load_fixture("moe_unsupported_taxonomy_only.json")
-    expectation = fixture["expectation"]
+    expectation = _expectation("moe_unsupported_taxonomy_only.json")
     evidence = build_solar_derivation_evidence(
         _moe_definition(taxonomy_only=True),
         _moe_workload(taxonomy_only=True),
     )
     group = next(group for group in evidence.groups if group.family == "moe")
 
-    assert group.status == expectation["expected_status"]
-    assert group.confidence.value == expectation["expected_confidence"]
+    _assert_group_matches_fixture(group, expectation)
     assert group.subroles == ()
-    for missing in expectation["missing_evidence"]:
-        assert missing in group.missing_evidence
-    for warning in expectation["warning_prefixes"]:
-        assert warning in group.warning_prefixes
 
 
 def test_attention_sidecar_records_subroles_formula_bytes_and_bounds():
