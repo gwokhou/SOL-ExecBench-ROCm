@@ -42,6 +42,9 @@ and MI300X validation-readiness guardrails.
 The v1.8 milestone completed the remaining ROCm library ecosystem replacements
 for RDNA 4 scope by adding MIOpen, CK, and rocWMMA public examples and claim
 guardrails.
+Within v1.9, Phase 43 completed auditable operator FLOP, byte, and movement
+modeling over the structured bound graph while preserving the legacy AMD SOL v1
+adapter and public-contract guardrails.
 
 Validation status:
 
@@ -150,12 +153,16 @@ ROCm path, with validation scoped to RDNA 4 only.
   examples or kept explicitly as PyTorch compatibility examples - v1.8.
 - v1.8 library validation claims are scoped to RDNA 4; CDNA 3 and CDNA 4
   validation remain deferred - v1.8.
+- AMD SOL/SOLAR operator modeling now provides rich per-node formulas, formula
+  inputs, read/write/intermediate/movement/total byte evidence, confidence,
+  rationale, and legacy v1 `WorkEstimate` adaptation for GEMM/BMM, elementwise,
+  activation, reduction, normalization, softmax, data movement, and dtype
+  conversion families - v1.9 Phase 43.
 
 ### Active
 
-- Upgrade AMD SOL/SOLAR bound modeling with a structured graph/IR, broader
-  operator coverage, auditable FLOP/byte/memory evidence, external hardware
-  model artifacts, AMD-native score integration, and RDNA 4 validation.
+- Continue v1.9 AMD SOL/SOLAR bound modeling with v2 bound artifacts, coverage
+  semantics, score integration, documentation, and RDNA 4 validation evidence.
 
 ### Out of Scope
 
