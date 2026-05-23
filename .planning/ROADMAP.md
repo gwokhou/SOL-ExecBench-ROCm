@@ -61,7 +61,7 @@ NVIDIA Blackwell/B200 equivalence, and new framework dependencies.
   shared extraction infrastructure for compound groups, subroles, provenance,
   and deterministic confidence.
 
-- [ ] **Phase 49: High-Confidence Family Modeling** - Promote linear
+- [x] **Phase 49: High-Confidence Family Modeling** - Promote linear (completed 2026-05-23)
   projection, convolution, embedding/positional, and explicit attention into
   formula-backed SOLAR families.
 
@@ -208,7 +208,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 49-04-PLAN.md — Derive convolution and memory-bound family evidence with guardrails.
+- [x] 49-04-PLAN.md — Derive convolution and memory-bound family evidence with guardrails.
 
 ### Phase 50: Degraded Complex Family Modeling
 
@@ -293,7 +293,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 47. Derivation Contract And Golden Fixture Matrix | 6/6 | Complete | 2026-05-23 |
 | 48. Extraction Pipeline And Semantic Provenance | 4/4 | Complete    | 2026-05-23 |
-| 49. High-Confidence Family Modeling | 3/4 | In Progress|  |
+| 49. High-Confidence Family Modeling | 4/4 | Complete   | 2026-05-23 |
 | 50. Degraded Complex Family Modeling | 0/TBD | Not started | - |
 | 51. Sidecar Coverage And Score Guards | 0/TBD | Not started | - |
 | 52. Dataset Runner And Public Contract Closure | 0/TBD | Not started | - |

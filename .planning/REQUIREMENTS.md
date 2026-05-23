@@ -10,9 +10,9 @@
 
 - [x] **DERIVE-01**: The derivation pipeline can recognize structurally visible attention patterns, including Q/K/V projections, QK score computation, scale or mask handling, softmax, PV value aggregation, and output projection, with explicit degradation when axes or mask semantics are incomplete.
 - [ ] **DERIVE-02**: The derivation pipeline can conservatively recognize MoE routing, top-k selection, expert projection, token dispatch, and combine patterns, with dynamic routing evidence recorded when static cardinality is incomplete.
-- [ ] **DERIVE-03**: The derivation pipeline can recognize convolution patterns for 1D, 2D, and 3D convolution, including grouped or depthwise convolution metadata, stride, padding, dilation, and output spatial dimensions.
+- [x] **DERIVE-03**: The derivation pipeline can recognize convolution patterns for 1D, 2D, and 3D convolution, including grouped or depthwise convolution metadata, stride, padding, dilation, and output spatial dimensions.
 - [ ] **DERIVE-04**: The derivation pipeline can conservatively recognize SSM/Mamba-like projection, depthwise convolution, scan or state update, gating, and output projection patterns, with degraded evidence when recurrence semantics are incomplete.
-- [ ] **DERIVE-05**: The derivation pipeline can recognize embedding, positional, gather, and rotary-like memory-bound structures with index and output-shape evidence.
+- [x] **DERIVE-05**: The derivation pipeline can recognize embedding, positional, gather, and rotary-like memory-bound structures with index and output-shape evidence.
 - [x] **DERIVE-06**: The derivation pipeline treats linear projection as a first-class semantic family while reusing GEMM-compatible formulas when dimensions are explicit.
 - [x] **DERIVE-07**: The derivation pipeline emits compound-family grouping, subrole, and provenance metadata without mutating canonical trace JSONL or public benchmark schemas.
 
@@ -68,9 +68,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | DERIVE-01 | Phase 49 | Complete |
 | DERIVE-02 | Phase 50 | Pending |
-| DERIVE-03 | Phase 49 | Pending |
+| DERIVE-03 | Phase 49 | Complete |
 | DERIVE-04 | Phase 50 | Pending |
-| DERIVE-05 | Phase 49 | Pending |
+| DERIVE-05 | Phase 49 | Complete |
 | DERIVE-06 | Phase 49 | Complete |
 | DERIVE-07 | Phase 48 | Complete |
 | MODEL-01 | Phase 49 | Complete |
