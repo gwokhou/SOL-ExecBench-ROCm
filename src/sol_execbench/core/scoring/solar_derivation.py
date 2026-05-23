@@ -8,6 +8,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from sol_execbench.core.data.definition import Definition
+from sol_execbench.core.data.workload import Workload
+from sol_execbench.core.scoring.amd_bound_estimates import (
+    OperatorWorkEstimate,
+    estimate_bound_work,
+)
+from sol_execbench.core.scoring.amd_bound_graph import (
+    BoundGraph,
+    BoundGraphNode,
+    BoundTensor,
+    build_bound_graph,
+)
 from sol_execbench.core.scoring.amd_hardware_models import EstimateConfidence
 
 
@@ -144,6 +156,43 @@ class SolarDerivationEvidence:
             "warnings": list(self.warnings),
             "source_boundary": dict(self.source_boundary),
         }
+
+
+def build_solar_derivation_evidence(
+    definition: Definition,
+    workload: Workload,
+) -> SolarDerivationEvidence:
+    """Build internal SOLAR derivation evidence from canonical problem inputs."""
+    graph = build_bound_graph(definition, workload)
+    estimates = estimate_bound_work(graph)
+    return derive_solar_derivation_evidence(definition, workload, graph, estimates)
+
+
+def derive_solar_derivation_evidence(
+    definition: Definition,
+    workload: Workload,
+    graph: BoundGraph,
+    estimates: tuple[OperatorWorkEstimate, ...],
+) -> SolarDerivationEvidence:
+    """Derive SOLAR evidence from a prebuilt bound graph and operator estimates."""
+    nodes_by_id = {node.node_id: node for node in graph.nodes}
+    tensors = tuple(
+        _tensor_evidence(definition, workload, graph, tensor)
+        for _, tensor in sorted(graph.tensors.items())
+    )
+    groups = tuple(
+        _group_evidence(estimate, nodes_by_id.get(estimate.node_id))
+        for estimate in estimates
+    )
+    warnings = _derivation_warnings(graph, estimates)
+    return SolarDerivationEvidence(
+        definition=definition.name,
+        workload_uuid=workload.uuid,
+        groups=groups,
+        tensors=tensors,
+        warnings=warnings,
+        source_boundary=_default_source_boundary(),
+    )
 
 
 def solar_derivation_from_dict(payload: dict[str, Any]) -> SolarDerivationEvidence:
@@ -339,6 +388,193 @@ def _source_boundary_from_dict(payload: dict[str, Any]) -> dict[str, bool]:
             raise ValueError(f"source_boundary.{key} must be a boolean")
         parsed[key] = value
     return parsed
+
+
+def _tensor_evidence(
+    definition: Definition,
+    workload: Workload,
+    graph: BoundGraph,
+    tensor: BoundTensor,
+) -> SolarTensorEvidence:
+    missing_evidence = []
+    if tensor.shape is None:
+        missing_evidence.append(f"shape:{tensor.tensor_id}")
+    if not tensor.dtype or tensor.dtype == "unknown":
+        missing_evidence.append(f"dtype:{tensor.tensor_id}")
+    semantic_axes = _semantic_axes_for_tensor(definition, workload, tensor)
+    if tensor.shape is not None and not semantic_axes:
+        missing_evidence.append(f"semantic_axes:{tensor.tensor_id}")
+    return SolarTensorEvidence(
+        tensor_id=tensor.tensor_id,
+        name=tensor.name,
+        shape=tensor.shape,
+        dtype=tensor.dtype,
+        semantic_axes=semantic_axes,
+        source=_source_for_tensor(graph, tensor),
+        producer_node_id=tensor.producer_node_id,
+        missing_evidence=tuple(missing_evidence),
+    )
+
+
+def _group_evidence(
+    estimate: OperatorWorkEstimate,
+    node: BoundGraphNode | None,
+) -> SolarSemanticGroupEvidence:
+    node_ids = (estimate.node_id,)
+    tensor_ids = _node_tensor_ids(node)
+    missing_evidence = tuple(_missing_evidence_for_estimate(estimate))
+    source = SolarEvidenceSource(
+        kind="estimate",
+        detail=f"{estimate.formula_kind}:{estimate.formula}",
+        node_id=estimate.node_id,
+        tensor_id=None,
+    )
+    subrole = SolarSubroleEvidence(
+        name=estimate.formula_kind,
+        node_ids=node_ids,
+        tensor_ids=tensor_ids,
+        source=source,
+        confidence=estimate.confidence,
+        rationale=estimate.rationale,
+        missing_evidence=missing_evidence,
+    )
+    return SolarSemanticGroupEvidence(
+        family=estimate.op_family.value,
+        group_id=f"{estimate.op_family.value}:{estimate.node_id}",
+        node_ids=node_ids,
+        subroles=(subrole,),
+        confidence=estimate.confidence,
+        status=_status_for_confidence(estimate.confidence),
+        missing_evidence=missing_evidence,
+        warning_prefixes=tuple(estimate.warnings),
+        source=source,
+        rationale=estimate.rationale,
+    )
+
+
+def _source_for_tensor(graph: BoundGraph, tensor: BoundTensor) -> SolarEvidenceSource:
+    producer = (
+        graph.nodes_by_id[tensor.producer_node_id]
+        if hasattr(graph, "nodes_by_id") and tensor.producer_node_id
+        else None
+    )
+    if producer is None and tensor.producer_node_id is not None:
+        producer = next(
+            (node for node in graph.nodes if node.node_id == tensor.producer_node_id),
+            None,
+        )
+    kind = _source_kind_for_tensor(tensor, producer)
+    return SolarEvidenceSource(
+        kind=kind,
+        detail=tensor.source,
+        node_id=tensor.producer_node_id,
+        tensor_id=tensor.tensor_id,
+    )
+
+
+def _source_kind_for_tensor(
+    tensor: BoundTensor,
+    producer: BoundGraphNode | None,
+) -> str:
+    if tensor.source.startswith("definition."):
+        return "definition"
+    if tensor.source.startswith("workload."):
+        return "workload"
+    if producer is not None and producer.attributes.get("trace_source") == "torch.fx":
+        return "fx"
+    if tensor.source.startswith("tmp:") and producer is not None:
+        return _source_kind_for_node(producer)
+    return "ast"
+
+
+def _source_kind_for_node(node: BoundGraphNode) -> str:
+    if node.attributes.get("trace_source") == "torch.fx":
+        return "fx"
+    return "ast"
+
+
+def _semantic_axes_for_tensor(
+    definition: Definition,
+    workload: Workload,
+    tensor: BoundTensor,
+) -> tuple[str, ...]:
+    spec = definition.inputs.get(tensor.name) or definition.outputs.get(tensor.name)
+    if spec is not None and spec.shape is not None:
+        return tuple(str(axis) for axis in spec.shape)
+    if tensor.shape is None:
+        return ()
+    matched_axes = _axes_matching_shape(definition, workload, tensor.shape)
+    if len(matched_axes) == len(tensor.shape):
+        return matched_axes
+    return ()
+
+
+def _axes_matching_shape(
+    definition: Definition,
+    workload: Workload,
+    shape: tuple[int, ...],
+) -> tuple[str, ...]:
+    axis_values = _axis_values(definition, workload)
+    axes: list[str] = []
+    for dim in shape:
+        matching = [name for name, value in axis_values.items() if value == dim]
+        if not matching:
+            return ()
+        axes.append(matching[0])
+    return tuple(axes)
+
+
+def _axis_values(definition: Definition, workload: Workload) -> dict[str, int]:
+    values = {name: int(value) for name, value in workload.axes.items()}
+    for name, axis in definition.axes.items():
+        if getattr(axis, "type", None) == "const":
+            values[name] = int(axis.value)
+    return values
+
+
+def _node_tensor_ids(node: BoundGraphNode | None) -> tuple[str, ...]:
+    if node is None:
+        return ()
+    return tuple(dict.fromkeys((*node.input_tensor_ids, *node.output_tensor_ids)))
+
+
+def _missing_evidence_for_estimate(estimate: OperatorWorkEstimate) -> list[str]:
+    missing = []
+    if estimate.confidence == EstimateConfidence.UNSUPPORTED:
+        missing.append(f"estimate:{estimate.node_id}")
+    for warning in estimate.warnings:
+        if "missing" in warning:
+            missing.append(warning)
+    return list(dict.fromkeys(missing))
+
+
+def _derivation_warnings(
+    graph: BoundGraph,
+    estimates: tuple[OperatorWorkEstimate, ...],
+) -> tuple[str, ...]:
+    warnings = [f"graph_warning:{warning}" for warning in graph.warnings]
+    for estimate in estimates:
+        warnings.extend(
+            f"estimate_warning:{estimate.node_id}:{warning}"
+            for warning in estimate.warnings
+        )
+    return tuple(dict.fromkeys(warnings))
+
+
+def _status_for_confidence(confidence: EstimateConfidence) -> str:
+    if confidence == EstimateConfidence.SUPPORTED:
+        return "scored"
+    if confidence == EstimateConfidence.INEXACT:
+        return "degraded"
+    return "unscored"
+
+
+def _default_source_boundary() -> dict[str, bool]:
+    return {
+        "canonical_trace_jsonl": False,
+        "public_schema": False,
+        "candidate_solution_execution": False,
+    }
 
 
 def _require_keys(payload: dict[str, Any], required: frozenset[str] | set[str], *, source: str) -> None:
