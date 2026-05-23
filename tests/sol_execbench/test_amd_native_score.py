@@ -38,6 +38,7 @@ from sol_execbench.core.scoring.amd_sol import (
 )
 from sol_execbench.core.scoring.amd_sol_v2 import build_amd_sol_bound_v2_artifact
 from sol_execbench.core.scoring.amd_hardware_models import load_amd_hardware_model
+from sol_execbench.core.scoring.solar_derivation import SolarAggregateStatus
 from sol_execbench.sol_score import sol_score
 
 
@@ -158,6 +159,21 @@ def _unsupported_artifact_v2():
     )
 
 
+def _solar_aggregate_status(
+    status: str,
+    *,
+    warnings: tuple[str, ...] = (),
+) -> SolarAggregateStatus:
+    return SolarAggregateStatus(
+        status=status,
+        score_eligible=status == "scored",
+        reason=f"test {status} aggregate status",
+        group_ids=(f"{status}-group",),
+        node_ids=(f"{status}-node",),
+        warnings=warnings,
+    )
+
+
 def test_amd_native_workload_score_uses_existing_sol_score_formula():
     artifact = _matmul_artifact()
 
@@ -187,6 +203,71 @@ def test_amd_native_workload_score_uses_existing_sol_score_formula():
     }
     assert report.supported is True
     assert UNVALIDATED_HARDWARE_WARNING in report.warnings
+
+
+def test_solar_unscored_aggregate_suppresses_workload_score():
+    artifact = _matmul_artifact()
+
+    report = score_amd_native_workload(
+        artifact,
+        measured_latency_ms=1.5,
+        baseline_latency_ms=2.0,
+        solar_derivation=_solar_aggregate_status(
+            "unscored",
+            warnings=("aggregate_unscored:unsupported semantic evidence",),
+        ),
+    )
+
+    assert report.score is None
+    assert report.supported is False
+    assert report.claim_level == AMD_SCORE_CLAIM_LEVEL
+    assert UNSCORED_SOL_BOUND_WARNING in report.warnings
+    assert "aggregate_unscored:unsupported semantic evidence" in report.warnings
+    assert INCOMPLETE_EVIDENCE_WARNING not in report.warnings
+    assert "solar_derivation" not in report.evidence_refs
+
+
+def test_solar_degraded_aggregate_preserves_numeric_workload_score():
+    artifact = _matmul_artifact()
+
+    report = score_amd_native_workload(
+        artifact,
+        measured_latency_ms=1.5,
+        baseline_latency_ms=2.0,
+        solar_derivation=_solar_aggregate_status(
+            "degraded",
+            warnings=("aggregate_degraded:incomplete semantic evidence",),
+        ),
+    )
+
+    assert report.score == sol_score(
+        t_k=1.5,
+        t_b=2.0,
+        t_sol=artifact.aggregate_sol_bound_ms,
+    )
+    assert report.supported is True
+    assert DEGRADED_SOL_BOUND_WARNING in report.warnings
+    assert "aggregate_degraded:incomplete semantic evidence" in report.warnings
+    assert "solar_derivation" not in report.evidence_refs
+
+
+def test_absent_solar_derivation_preserves_existing_workload_score_behavior():
+    artifact = _matmul_artifact()
+
+    report = score_amd_native_workload(
+        artifact,
+        measured_latency_ms=1.5,
+        baseline_latency_ms=2.0,
+        solar_derivation=None,
+    )
+
+    assert report.score == sol_score(
+        t_k=1.5,
+        t_b=2.0,
+        t_sol=artifact.aggregate_sol_bound_ms,
+    )
+    assert DEGRADED_SOL_BOUND_WARNING not in report.warnings
+    assert UNSCORED_SOL_BOUND_WARNING not in report.warnings
 
 
 def test_suite_report_is_derived_and_preserves_evidence_references():
@@ -324,6 +405,40 @@ def test_trace_workflow_scores_from_canonical_trace_without_mutation():
         "hardware_model": "artifact.hardware_model",
     }
     assert trace.model_dump(mode="json") == before
+
+
+def test_trace_workflow_forwards_solar_unscored_aggregate_guard():
+    artifact = _matmul_artifact()
+    trace = Trace(
+        definition=artifact.definition,
+        workload=Workload(
+            axes={"M": 2},
+            inputs={"a": {"type": "random"}, "b": {"type": "random"}},
+            uuid=artifact.workload_uuid,
+        ),
+        solution="solution",
+        evaluation=Evaluation(
+            status=EvaluationStatus.PASSED,
+            environment=Environment(hardware="AMD gfx1200", libs={}),
+            timestamp="2026-05-22T00:00:00Z",
+            correctness=Correctness(),
+            performance=Performance(
+                latency_ms=1.5,
+                reference_latency_ms=2.0,
+                speedup_factor=1.333,
+            ),
+        ),
+    )
+
+    score = score_amd_native_trace_workload(
+        trace,
+        artifact,
+        solar_derivation=_solar_aggregate_status("unscored"),
+    )
+
+    assert score.score is None
+    assert score.supported is False
+    assert UNSCORED_SOL_BOUND_WARNING in score.warnings
 
 
 def test_trace_workflow_prefers_release_scoring_baseline_artifact():
@@ -468,6 +583,79 @@ def test_suite_workflow_builds_scores_from_trace_and_artifact_maps():
 
     assert payload["scored_count"] == 1
     assert payload["scores"][0]["evidence_refs"]["trace"] == "traces.json"
+
+
+def test_suite_workflow_applies_solar_guards_by_workload_uuid():
+    artifact = _matmul_artifact()
+    trace = Trace(
+        definition=artifact.definition,
+        workload=Workload(
+            axes={"M": 2},
+            inputs={"a": {"type": "random"}, "b": {"type": "random"}},
+            uuid=artifact.workload_uuid,
+        ),
+        solution="solution",
+        evaluation=Evaluation(
+            status=EvaluationStatus.PASSED,
+            environment=Environment(hardware="AMD gfx1200", libs={}),
+            timestamp="2026-05-22T00:00:00Z",
+            correctness=Correctness(),
+            performance=Performance(
+                latency_ms=1.5,
+                reference_latency_ms=2.0,
+                speedup_factor=1.333,
+            ),
+        ),
+    )
+
+    suite = build_amd_native_suite_report_from_traces(
+        [trace],
+        {artifact.workload_uuid: artifact},
+        solar_derivations_by_workload_uuid={
+            artifact.workload_uuid: _solar_aggregate_status("unscored")
+        },
+    )
+
+    assert suite.scores[0].score is None
+    assert suite.scores[0].supported is False
+    assert UNSCORED_SOL_BOUND_WARNING in suite.scores[0].warnings
+
+
+def test_suite_workflow_missing_solar_guard_entry_is_neutral():
+    artifact = _matmul_artifact()
+    trace = Trace(
+        definition=artifact.definition,
+        workload=Workload(
+            axes={"M": 2},
+            inputs={"a": {"type": "random"}, "b": {"type": "random"}},
+            uuid=artifact.workload_uuid,
+        ),
+        solution="solution",
+        evaluation=Evaluation(
+            status=EvaluationStatus.PASSED,
+            environment=Environment(hardware="AMD gfx1200", libs={}),
+            timestamp="2026-05-22T00:00:00Z",
+            correctness=Correctness(),
+            performance=Performance(
+                latency_ms=1.5,
+                reference_latency_ms=2.0,
+                speedup_factor=1.333,
+            ),
+        ),
+    )
+
+    suite = build_amd_native_suite_report_from_traces(
+        [trace],
+        {artifact.workload_uuid: artifact},
+        solar_derivations_by_workload_uuid={},
+    )
+
+    assert suite.scores[0].score == sol_score(
+        t_k=1.5,
+        t_b=2.0,
+        t_sol=artifact.aggregate_sol_bound_ms,
+    )
+    assert UNSCORED_SOL_BOUND_WARNING not in suite.scores[0].warnings
 
 
 def test_analysis_docs_describe_derived_score_reports_and_no_equivalence_claims():
