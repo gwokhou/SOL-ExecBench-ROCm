@@ -112,11 +112,15 @@ def test_primary_cli_does_not_expose_v1_6_derived_workflow_options():
         "--rocprofv3",
         "--timing-evidence",
         "--sol-bound",
+        "--sol-bound-v2",
         "--bound-graph",
         "--extract-bound-graph",
         "--bound-estimates",
         "--formula-inputs",
         "--movement-bytes",
+        "--operator-work-estimates",
+        "--coverage-summary",
+        "--aggregate-bound",
         "--hardware-model",
         "--amd-hardware-model",
         "--hardware-model-path",
@@ -226,6 +230,9 @@ def test_definition_workload_trace_schemas_do_not_include_derived_artifact_field
     assert "read_bytes" not in definition.model_dump(mode="json")
     assert "movement_bytes" not in definition.model_dump(mode="json")
     assert "operator_work_estimates" not in definition.model_dump(mode="json")
+    assert "coverage_summary" not in definition.model_dump(mode="json")
+    assert "aggregate_bound" not in definition.model_dump(mode="json")
+    assert "hardware_model_ref" not in definition.model_dump(mode="json")
     assert "hardware_model" not in workload.model_dump(mode="json")
     assert "bound_graph" not in workload.model_dump(mode="json")
     assert "op_family" not in workload.model_dump(mode="json")
@@ -233,6 +240,9 @@ def test_definition_workload_trace_schemas_do_not_include_derived_artifact_field
     assert "read_bytes" not in workload.model_dump(mode="json")
     assert "movement_bytes" not in workload.model_dump(mode="json")
     assert "operator_work_estimates" not in workload.model_dump(mode="json")
+    assert "coverage_summary" not in workload.model_dump(mode="json")
+    assert "aggregate_bound" not in workload.model_dump(mode="json")
+    assert "hardware_model_ref" not in workload.model_dump(mode="json")
     assert "bound_graph" not in trace.model_dump(mode="json")
     assert "graph_nodes" not in trace.model_dump(mode="json")
     assert "op_family" not in trace.model_dump(mode="json")
@@ -241,6 +251,9 @@ def test_definition_workload_trace_schemas_do_not_include_derived_artifact_field
     assert "read_bytes" not in trace.model_dump(mode="json")
     assert "movement_bytes" not in trace.model_dump(mode="json")
     assert "operator_work_estimates" not in trace.model_dump(mode="json")
+    assert "coverage_summary" not in trace.model_dump(mode="json")
+    assert "aggregate_bound" not in trace.model_dump(mode="json")
+    assert "hardware_model_ref" not in trace.model_dump(mode="json")
 
 
 def test_v1_4_compatibility_inventory_covers_public_contracts():
