@@ -26,6 +26,10 @@ from .amd_bound_graph import (
     OpFamily,
     build_bound_graph,
 )
+from .amd_bound_estimates import (
+    OperatorWorkEstimate,
+    estimate_bound_work,
+)
 from .amd_hardware_models import (
     AMD_HARDWARE_MODEL_SCHEMA_VERSION,
     amd_hardware_model_from_dict,
@@ -78,6 +82,7 @@ __all__ = [
     "HardwareValidationStatus",
     "OpFamily",
     "OpSolBound",
+    "OperatorWorkEstimate",
     "ScoringBaselineArtifact",
     "ScoringBaselineEntry",
     "WorkEstimate",
@@ -89,6 +94,7 @@ __all__ = [
     "build_amd_sol_bound_artifact",
     "default_amd_hardware_models",
     "estimate_work",
+    "estimate_bound_work",
     "extract_graph",
     "load_scoring_baseline_artifact",
     "scoring_baseline_artifact_from_dict",
