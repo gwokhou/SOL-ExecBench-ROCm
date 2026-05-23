@@ -23,19 +23,19 @@ ExecBench.
 
 ### Operator Modeling
 
-- [ ] **MODEL-01**: Maintainer can generate auditable FLOP formulas and evidence
+- [x] **MODEL-01**: Maintainer can generate auditable FLOP formulas and evidence
   for dense matmul, batched matmul, and `@`/`torch.mm`/`torch.matmul` style
   operations.
-- [ ] **MODEL-02**: Maintainer can generate conservative FLOP and byte evidence
+- [x] **MODEL-02**: Maintainer can generate conservative FLOP and byte evidence
   for elementwise arithmetic and activation chains with explicit confidence
   labels.
-- [ ] **MODEL-03**: Maintainer can generate axis-aware conservative evidence
+- [x] **MODEL-03**: Maintainer can generate axis-aware conservative evidence
   for reductions, normalization/RMSNorm/layer-norm-like patterns, and
   softmax/log-softmax-like patterns.
-- [ ] **MODEL-04**: Maintainer can distinguish logical views from estimated
+- [x] **MODEL-04**: Maintainer can distinguish logical views from estimated
   materialized data movement for reshape, transpose, contiguous, broadcast, and
   dtype-conversion-like operations where reference evidence supports it.
-- [ ] **MODEL-05**: Maintainer can inspect per-node read bytes, write bytes,
+- [x] **MODEL-05**: Maintainer can inspect per-node read bytes, write bytes,
   intermediate or movement bytes, total estimated bytes, formula inputs, and
   rationale.
 
@@ -154,11 +154,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | IR-02 | Phase 42 | Complete |
 | IR-03 | Phase 42 | Complete |
 | IR-04 | Phase 42 | Complete |
-| MODEL-01 | Phase 43 | Pending |
-| MODEL-02 | Phase 43 | Pending |
-| MODEL-03 | Phase 43 | Pending |
-| MODEL-04 | Phase 43 | Pending |
-| MODEL-05 | Phase 43 | Pending |
+| MODEL-01 | Phase 43 | Complete |
+| MODEL-02 | Phase 43 | Complete |
+| MODEL-03 | Phase 43 | Complete |
+| MODEL-04 | Phase 43 | Complete |
+| MODEL-05 | Phase 43 | Complete |
 | HW-01 | Phase 41 | Pending |
 | HW-02 | Phase 41 | Pending |
 | HW-03 | Phase 41 | Pending |
