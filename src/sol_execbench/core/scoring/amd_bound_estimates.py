@@ -565,8 +565,8 @@ def _visible_memory_estimate(
         read_bytes=read_bytes,
         write_bytes=write_bytes,
         intermediate_bytes=0.0,
-        movement_bytes=read_bytes + write_bytes if subrole == "rotary_like" else 0.0,
-        total_bytes=total_bytes + (read_bytes + write_bytes if subrole == "rotary_like" else 0.0),
+        movement_bytes=0.0,
+        total_bytes=total_bytes,
         confidence=confidence,
         rationale=_join_rationale(
             f"{subrole} memory-bound evidence estimated from visible tensor movement",
@@ -988,6 +988,14 @@ def _infer_gemm_dims(
         return None
     if len(lhs_shape) == 2 and len(rhs_shape) == 2 and len(out_shape) >= 2:
         return {"M": int(lhs_shape[-2]), "N": int(out_shape[-1]), "K": int(lhs_shape[-1])}
+    if len(lhs_shape) >= 3 and len(rhs_shape) == 2 and len(out_shape) >= 3:
+        batch = prod(out_shape[:-2])
+        return {
+            "B": int(batch),
+            "M": int(out_shape[-2]),
+            "N": int(out_shape[-1]),
+            "K": int(lhs_shape[-1]),
+        }
     if len(lhs_shape) >= 3 and len(rhs_shape) >= 3 and len(out_shape) >= 3:
         batch_dims = out_shape[:-2]
         batch = prod(batch_dims)
