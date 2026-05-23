@@ -19,3 +19,6 @@ uv run pytest tests/sol_execbench/test_dataset_inventory_readiness.py -n 0 -x
 ```
 
 Result: `9 passed`.
+Follow-up code review fixes added NVIDIA-only reference hint detection and safe
+safetensors path-boundary checks; focused inventory/readiness coverage now has
+13 tests.

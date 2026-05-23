@@ -254,19 +254,64 @@ def test_readiness_does_not_block_torch_cuda_compatibility_text(tmp_path):
     assert readiness.workloads[0].status == "ready"
 
 
+def test_readiness_blocks_nvidia_only_reference_runtime_hints(tmp_path):
+    _write_problem(
+        tmp_path,
+        "L1",
+        "cupy_problem",
+        definition=_definition(
+            name="cupy_problem",
+            reference="import cupy\n\ndef run(x):\n    return cupy.asarray(x)\n",
+        ),
+    )
+    inventory = build_dataset_inventory(tmp_path, categories=("L1",), created_at="2026-05-23T00:00:00Z")
+
+    readiness = classify_rocm_readiness(inventory, dataset_root=tmp_path, created_at="2026-05-23T00:00:00Z")
+
+    assert inventory.problems[0].definition is not None
+    assert "cupy" in inventory.problems[0].definition.reference_runtime_hints
+    assert readiness.workloads[0].status == "unsupported_nvidia_only_path"
+    assert readiness.workloads[0].reasons[0].code == "nvidia_cuda_runtime_hint"
+
+
+def test_readiness_blocks_safetensors_paths_outside_dataset_root(tmp_path):
+    for name, path in {"absolute": "/tmp/outside.safetensors", "parent": "../outside.safetensors"}.items():
+        _write_problem(
+            tmp_path,
+            "L1",
+            name,
+            workloads=[_workload("safetensors", path=path, tensor_key="x")],
+        )
+    inventory = build_dataset_inventory(tmp_path, categories=("L1",), created_at="2026-05-23T00:00:00Z")
+
+    readiness = classify_rocm_readiness(inventory, dataset_root=tmp_path, created_at="2026-05-23T00:00:00Z")
+
+    assert {record.status for record in readiness.workloads} == {"runtime_blocked"}
+    assert {record.reasons[0].code for record in readiness.workloads} == {
+        "safetensors_path_outside_dataset_root"
+    }
+
+
 def test_ready_subset_includes_only_ready_workloads(tmp_path):
-    _write_problem(tmp_path, "L1", "ready_problem")
+    ready_dir = _write_problem(tmp_path, "L1", "ready_problem")
     _write_problem(tmp_path, "L1", "blocked_problem", workloads=[_workload("safetensors", path="missing.safetensors", tensor_key="x")])
     inventory = build_dataset_inventory(tmp_path, categories=("L1",), created_at="2026-05-23T00:00:00Z")
     readiness = classify_rocm_readiness(inventory, dataset_root=tmp_path, created_at="2026-05-23T00:00:00Z")
+    definition_before = (ready_dir / "definition.json").read_text(encoding="utf-8")
+    workload_before = (ready_dir / "workload.jsonl").read_text(encoding="utf-8")
 
     subset = build_ready_subset(readiness, dataset_root=tmp_path, created_at="2026-05-23T00:00:00Z")
+    second = build_ready_subset(readiness, dataset_root=tmp_path, created_at="2026-05-23T00:00:00Z")
 
     assert subset.included_workloads == 1
     assert subset.excluded_workloads == 1
     assert [problem.problem_id for problem in subset.problems] == ["L1/ready_problem"]
     assert subset.claim_boundary.execution_success is False
     assert subset.claim_boundary.paper_level_validation is False
+    assert subset.to_json() == second.to_json()
+    assert subset.ready_subset_checksum == second.ready_subset_checksum
+    assert (ready_dir / "definition.json").read_text(encoding="utf-8") == definition_before
+    assert (ready_dir / "workload.jsonl").read_text(encoding="utf-8") == workload_before
 
 
 def test_inspect_dataset_cli_writes_requested_sidecars(tmp_path):

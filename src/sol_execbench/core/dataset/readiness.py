@@ -32,8 +32,6 @@ LOW_PRECISION_DTYPES = {
     "float4_e2m1",
     "float4_e2m1fn_x2",
 }
-NVIDIA_BLOCKER_HINTS = ("cupy", "cuda.c", "cuda runtime", "nvrtc", "cublas", "cutlass")
-
 
 class ReadinessReason(BaseModel):
     code: str
@@ -101,9 +99,7 @@ def _worst_status(statuses: list[str]) -> str:
 
 
 def _reference_has_nvidia_blocker(problem: ProblemInventoryRecord) -> bool:
-    # Static and conservative: avoid blocking documented torch.cuda compatibility.
-    text = f"{problem.definition.name if problem.definition else ''} {problem.schema_failure or ''}".lower()
-    return any(hint in text for hint in NVIDIA_BLOCKER_HINTS)
+    return bool(problem.definition and problem.definition.reference_runtime_hints)
 
 
 def _low_precision_or_quant(problem: ProblemInventoryRecord, workload: WorkloadInventoryRecord) -> bool:
@@ -139,14 +135,33 @@ def classify_workload_readiness(
         reasons.append(_reason("custom_input_requires_evaluator_support", "Custom input generation requires evaluator support and must not be random-substituted.", "Use execution-time custom input support or exclude from ready subset.", problem.problem_path))
     else:
         missing_safetensors = []
+        dataset_root_resolved = Path(dataset_root).resolve()
         for ref in workload.safetensors_refs:
-            if not (dataset_root / ref["path"]).exists():
-                missing_safetensors.append(ref)
+            raw_path = Path(ref["path"])
+            reason_code = "safetensors_asset_missing"
+            if raw_path.is_absolute():
+                reason_code = "safetensors_path_outside_dataset_root"
+                missing_safetensors.append((ref, reason_code))
+                continue
+            candidate = (dataset_root_resolved / raw_path).resolve()
+            if not candidate.is_relative_to(dataset_root_resolved):
+                reason_code = "safetensors_path_outside_dataset_root"
+                missing_safetensors.append((ref, reason_code))
+                continue
+            if not candidate.exists():
+                missing_safetensors.append((ref, reason_code))
         if missing_safetensors:
             status = "runtime_blocked"
             layers.input_generation = "needs_asset"
-            for ref in missing_safetensors:
-                reasons.append(_reason("safetensors_asset_missing", f"Missing safetensors asset {ref['path']} for key {ref['tensor_key']}.", "Acquire asset or configure blob root before execution.", ref["path"]))
+            for ref, reason_code in missing_safetensors:
+                reasons.append(
+                    _reason(
+                        reason_code,
+                        f"Safetensors asset {ref['path']} for key {ref['tensor_key']} is unavailable inside the dataset root.",
+                        "Acquire asset inside the dataset root or configure a safe blob root before execution.",
+                        ref["path"],
+                    )
+                )
         elif _low_precision_or_quant(problem, workload):
             status = "needs_hardware_evidence"
             layers.hardware_validation = "needed"

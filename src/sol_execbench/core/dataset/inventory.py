@@ -74,6 +74,7 @@ class ProblemDefinitionInventory(BaseModel):
     input_shapes: dict[str, list[str] | None] = Field(default_factory=dict)
     output_shapes: dict[str, list[str] | None] = Field(default_factory=dict)
     custom_inputs_entrypoint: str | None = None
+    reference_runtime_hints: list[str] = Field(default_factory=list)
 
 
 class ProblemInventoryRecord(BaseModel):
@@ -157,7 +158,17 @@ def _direction(definition: Definition) -> tuple[str, str]:
     return "unknown", "unknown"
 
 
-def _definition_record(definition: Definition) -> ProblemDefinitionInventory:
+NVIDIA_RUNTIME_HINTS = ("cupy", "cuda.c", "cuda runtime", "nvrtc", "cublas", "cutlass")
+
+
+def _reference_runtime_hints(definition: Definition, reference_path: Path | None) -> list[str]:
+    text = definition.reference.lower()
+    if reference_path is not None and reference_path.is_file():
+        text += "\n" + reference_path.read_text(encoding="utf-8").lower()
+    return sorted(hint for hint in NVIDIA_RUNTIME_HINTS if hint in text)
+
+
+def _definition_record(definition: Definition, reference_path: Path | None) -> ProblemDefinitionInventory:
     family, family_source = _op_family(definition)
     direction, direction_source = _direction(definition)
     return ProblemDefinitionInventory(
@@ -172,6 +183,7 @@ def _definition_record(definition: Definition) -> ProblemDefinitionInventory:
         input_shapes={name: spec.shape for name, spec in definition.inputs.items()},
         output_shapes={name: spec.shape for name, spec in definition.outputs.items()},
         custom_inputs_entrypoint=definition.custom_inputs_entrypoint,
+        reference_runtime_hints=_reference_runtime_hints(definition, reference_path),
     )
 
 
@@ -251,14 +263,34 @@ def build_dataset_inventory(
             if missing:
                 cat_denoms.missing_required_files += len(missing)
                 diagnostics.append(InventoryDiagnostic(code="missing_required_file", category=category, problem_path=problem_path, message=", ".join(missing)))
-                problems.append(ProblemInventoryRecord(category=category, problem_id=problem_path, problem_path=problem_path, definition_path=_rel(definition_path, root), workload_path=_rel(workload_path, root), schema_status="missing_required_file", schema_failure=", ".join(missing)))
+                problems.append(
+                    ProblemInventoryRecord(
+                        category=category,
+                        problem_id=problem_path,
+                        problem_path=problem_path,
+                        definition_path=_rel(definition_path, root),
+                        workload_path=_rel(workload_path, root),
+                        schema_status="missing_required_file",
+                        schema_failure=", ".join(missing),
+                    )
+                )
                 continue
 
             definition, failure = _load_definition(definition_path)
             if definition is None:
                 cat_denoms.schema_failures += 1
                 diagnostics.append(InventoryDiagnostic(code="definition_schema_failure", category=category, problem_path=problem_path, message=failure or "definition parse failed"))
-                problems.append(ProblemInventoryRecord(category=category, problem_id=problem_path, problem_path=problem_path, definition_path=_rel(definition_path, root), workload_path=_rel(workload_path, root), schema_status="schema_failure", schema_failure=failure))
+                problems.append(
+                    ProblemInventoryRecord(
+                        category=category,
+                        problem_id=problem_path,
+                        problem_path=problem_path,
+                        definition_path=_rel(definition_path, root),
+                        workload_path=_rel(workload_path, root),
+                        schema_status="schema_failure",
+                        schema_failure=failure,
+                    )
+                )
                 continue
 
             workloads: list[WorkloadInventoryRecord] = []
@@ -276,7 +308,24 @@ def build_dataset_inventory(
 
             cat_denoms.parsed_problems += 1
             reference_path = problem_dir / "reference.py"
-            problems.append(ProblemInventoryRecord(category=category, problem_id=problem_path, problem_path=problem_path, definition_path=_rel(definition_path, root), workload_path=_rel(workload_path, root), reference_path=_rel(reference_path, root) if reference_path.exists() else None, reference_available=reference_path.exists() or bool(definition.reference), solution_files=_solution_files(problem_dir), schema_status="parsed", definition=_definition_record(definition), workload_count=len(workloads), workloads=workloads))
+            problems.append(
+                ProblemInventoryRecord(
+                    category=category,
+                    problem_id=problem_path,
+                    problem_path=problem_path,
+                    definition_path=_rel(definition_path, root),
+                    workload_path=_rel(workload_path, root),
+                    reference_path=_rel(reference_path, root)
+                    if reference_path.exists()
+                    else None,
+                    reference_available=reference_path.exists() or bool(definition.reference),
+                    solution_files=_solution_files(problem_dir),
+                    schema_status="parsed",
+                    definition=_definition_record(definition, reference_path),
+                    workload_count=len(workloads),
+                    workloads=workloads,
+                )
+            )
 
         total.add(cat_denoms)
         category_records.append(CategoryInventoryRecord(name=category, denominators=cat_denoms))
