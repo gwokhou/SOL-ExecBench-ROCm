@@ -18,8 +18,7 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 **Shipped version:** v1.9 AMD SOL/SOLAR Bound Modeling Completion,
 completed 2026-05-23.
 
-**Current milestone:** none. The project is ready for the next milestone
-definition.
+**Current milestone:** v1.10 论文级完整 SOLAR 自动推导.
 
 **Latest milestone outcome:** the AMD SOL/SOLAR bound pipeline now has strict
 hardware model artifacts, a structured bound graph IR, rich operator FLOP/byte
@@ -27,10 +26,10 @@ and movement estimates, v2 bound sidecars with coverage semantics, AMD-native
 score/dataset integration, documentation, guardrails, and RDNA 4 validation
 evidence.
 
-**Next milestone goals:** to be defined. Candidate future work remains CDNA 3 /
-MI300X real-hardware validation, CDNA 4 validation, FP8 behavior on MI300X,
-original paper dataset extraction, and broader paper-parity work beyond bound
-modeling.
+**Next milestone goals:** upgrade the AMD SOL/SOLAR derived bound pipeline from
+partial local operator modeling to a paper-aligned automatic SOLAR derivation
+system for the ROCm port, while keeping dataset extraction and real hardware
+validation out of scope for this milestone.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline.
 Milestones v1.1-v1.6 added CDNA 3 code/schema support, maintained residue
@@ -55,6 +54,32 @@ Validation status:
 - CDNA 3 (`gfx940`, `gfx941`, `gfx942`) is supported by schema/build/docs.
 - CDNA 3 (`gfx94*`) full adapted suite validation remains deferred by user
   decision and must be completed before claiming CDNA 3 hardware validation.
+
+## Current Milestone: v1.10 论文级完整 SOLAR 自动推导
+
+**Goal:** Upgrade the AMD SOL/SOLAR derived bound pipeline into a
+paper-aligned automatic SOLAR derivation system that can extract richer
+workload graphs, model currently unsupported operation families, produce
+auditable hardware-bound evidence, and protect score reports from partial
+coverage misuse.
+
+**Target features:**
+- Extend BoundGraph/SOLAR IR so attention, MoE, convolution, SSM/Mamba,
+  embedding/positional, and linear projection families have explicit extraction
+  and estimation paths instead of taxonomy-only placeholders.
+- Derive FLOP, byte, movement, intermediate, confidence, and rationale evidence
+  from reference/workload structure with deterministic unsupported/inexact
+  degradation.
+- Strengthen AMD SOL v2 sidecars and AMD-native score reports so complete,
+  degraded, and unscored states are machine-verifiable.
+- Preserve ROCm-only scope, canonical trace JSONL, public schemas, and primary
+  CLI behavior.
+
+**Explicitly deferred:**
+- Original-paper 124-model / 235-problem extraction and curation pipeline.
+- MI300X/CDNA 3 and CDNA 4 real-hardware validation.
+- NVFP4/MXFP4 hardware validation.
+- Official hosted leaderboard or submission service.
 
 ## Recently Shipped Milestone: v1.9 AMD SOL/SOLAR Bound Modeling Completion
 
@@ -170,8 +195,9 @@ ROCm path, with validation scoped to RDNA 4 only.
 
 ### Active
 
-- No active milestone requirements. Define the next milestone with
-  `$gsd-new-milestone`.
+- Define and implement v1.10 paper-aligned automatic SOLAR derivation for the
+  ROCm port, scoped to SOLAR extraction/modeling/coverage/score evidence rather
+  than dataset extraction or new real-hardware validation.
 
 ### Out of Scope
 
@@ -202,12 +228,12 @@ torchvision at ROCm wheels. The package remains a Python CLI benchmark runner:
 files and injects AMD architecture flags, and `src/sol_execbench/driver/templates/`
 contains the HIP-aware build and eval subprocess scripts.
 
-Current high-risk areas are deeper AMD SOL/SOLAR bound modeling, real
-MI300X/CDNA3 hardware validation, FP8 evidence, and original-paper dataset
-extraction. v1.9 completed the local modeling pipeline for RDNA 4 scope, not
-commercial GPU validation. No CDNA 3 / MI300X validation claim should be made
-until a full adapted suite run and required environment evidence are archived
-in a later milestone.
+Current high-risk areas are paper-aligned AMD SOL/SOLAR automatic derivation,
+real MI300X/CDNA3 hardware validation, FP8 evidence, and original-paper dataset
+extraction. v1.10 intentionally focuses on the SOLAR derivation system itself,
+not dataset-scale extraction or commercial GPU validation. No CDNA 3 / MI300X
+validation claim should be made until a full adapted suite run and required
+environment evidence are archived in a later milestone.
 
 The v1.8 milestone was scoped to RDNA 4 validation only. CDNA 3 and CDNA 4
 library validation remain intentionally deferred; current artifacts preserve
@@ -252,6 +278,7 @@ schema, documentation, and no-claim guardrails for those architectures.
 | Complete ROCm library replacement ecosystem on RDNA 4 | User requested the next milestone focus on thoroughly resolving incomplete ROCm library replacements, and clarified only RDNA 4 validation is in scope. | Validated in v1.8 |
 | Focus v1.9 on AMD SOL/SOLAR bound modeling | User requested the next milestone completely solve AMD SOL/SOLAR bound modeling, with validation scoped to RDNA 4. | Validated in v1.9 |
 | Defer CDNA 3 / MI300X and CDNA 4 validation from v1.9 | User clarified CDNA 3 validation and MI300X real-hardware validation should be treated as one deferred item, and CDNA 4 remains deferred. | Validated in v1.9 |
+| Scope v1.10 to SOLAR derivation only | User chose to upgrade "论文级完整 SOLAR 自动推导" as a new milestone while excluding dataset extraction and real-hardware validation from the milestone boundary. | Pending in v1.10 |
 
 ## Evolution
 
@@ -271,4 +298,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-23 after v1.9 milestone completion*
+*Last updated: 2026-05-23 after v1.10 milestone start*

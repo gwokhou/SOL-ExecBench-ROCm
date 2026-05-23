@@ -1,32 +1,31 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.9
-milestone_name: AMD SOL/SOLAR Bound Modeling Completion
-current_phase: Complete
-status: completed
-last_updated: "2026-05-23T02:57:02.371Z"
-last_activity: 2026-05-23 — Milestone v1.9 completed and archived
+milestone: v1.10
+milestone_name: 论文级完整 SOLAR 自动推导
+status: planning
+last_updated: "2026-05-23T03:20:50.711Z"
+last_activity: 2026-05-23
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 17
-  completed_plans: 17
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 **Project:** SOL ExecBench ROCm Port
 **Initialized:** 2026-05-21
-**Current phase:** Complete
-**Status:** v1.9 milestone complete
+**Current phase:** Not started
+**Status:** v1.10 defining requirements
 
 ## Project Reference
 
 See: `.planning/PROJECT.md` (updated 2026-05-23)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Milestone complete
+**Current focus:** v1.10 paper-aligned SOLAR automatic derivation
 
 ## Workflow Settings
 
@@ -43,8 +42,9 @@ See: `.planning/config.json`
 
 See: `.planning/ROADMAP.md`
 
-No milestone is active. v1.9 AMD SOL/SOLAR Bound Modeling Completion is
-archived with phases 41-46.
+v1.10 论文级完整 SOLAR 自动推导 is active and currently defining
+requirements. v1.9 AMD SOL/SOLAR Bound Modeling Completion is archived with
+phases 41-46.
 
 ## Memory
 
@@ -97,14 +97,15 @@ Items acknowledged and deferred at milestone close on 2026-05-21:
 
 ## Next Action
 
-Run `$gsd-new-milestone` when ready to define the next milestone.
+Continue `$gsd-new-milestone` research, requirements, and roadmap creation for
+v1.10.
 
 ## Current Position
 
-Phase: Milestone v1.9 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-05-23 — Milestone v1.9 completed and archived
+Status: Defining requirements
+Last activity: 2026-05-23 — Milestone v1.10 started
 
 ## Quick Tasks Completed
 
