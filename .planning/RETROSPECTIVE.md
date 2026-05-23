@@ -355,6 +355,80 @@
 
 ---
 
+## Milestone: v1.10 - Paper-Aligned SOLAR Automatic Derivation
+
+**Shipped:** 2026-05-23
+**Phases:** 6 | **Plans:** 23 | **Tasks:** 41
+
+### What Was Built
+
+- Sidecar-only SOLAR derivation contract and fixture matrix covering positive,
+  degraded, unsupported, and negative family cases.
+- Internal SOLAR evidence builder with semantic groups, tensor/source
+  provenance, strict parser behavior, and conservative confidence/status rules.
+- Formula, byte, and AMD SOL-style bound evidence for linear projection,
+  attention, convolution, embedding/positional/gather, and rotary-like memory
+  structures.
+- Conservative MoE and SSM/Mamba evidence paths that preserve degraded and
+  unscored semantics without fabricating dynamic routing or recurrence data.
+- Coverage summaries, aggregate scored/degraded/unscored sidecar status,
+  AMD-native score guards, and dataset-runner generated SOLAR sidecars with
+  report-only `derived_evidence_refs`.
+- Public contract, claim-boundary, and sidecar filename traversal guardrails for
+  the v1.10 reporting surface.
+
+### What Worked
+
+- The phase sequence matched the evidence stack: contract, extraction,
+  high-confidence families, degraded complex families, sidecar/status reporting,
+  then runner/docs/guardrails.
+- Review/fix loops caught semantic and security issues that tests initially
+  missed, especially degraded score eligibility and sidecar filename traversal.
+- Keeping all SOLAR fields sidecar-only allowed the implementation to become
+  richer without changing canonical trace JSONL or primary CLI behavior.
+
+### What Was Inefficient
+
+- One documentation executor stalled after writing docs, requiring manual
+  takeover and verification.
+- `gsd-sdk` milestone completion archived files but left ROADMAP/PROJECT
+  evolution and audit movement for manual cleanup.
+- Auto-generated milestone accomplishments contained noisy test-fix lines and
+  still need manual cleanup for polished release notes.
+
+### Patterns Established
+
+- SOLAR derivation should derive from canonical `Definition` and `Workload`
+  inputs, not candidate execution or timing results.
+- Degraded evidence may remain score-eligible when numeric AMD-native inputs
+  are complete, but must carry deterministic warnings and parseable status.
+- New report evidence belongs in derived-report-only metadata, not public score
+  `evidence_refs` or canonical trace fields.
+- File names derived from benchmark identifiers must use safe deterministic
+  path components before writing sidecars.
+
+### Key Lessons
+
+1. Paper-aligned automatic derivation needs strict evidence contracts as much as
+   family recognition: provenance, formulas, byte buckets, confidence, and
+   status all need parser coverage.
+2. "No public contract drift" should be protected both positively and
+   negatively: exact-key tests for canonical surfaces, and explicit no-claim
+   phrase tests for documentation.
+3. Dataset-runner skip paths are part of derived-report correctness; already
+   passing traces still need sidecar/report generation when report flags are
+   requested.
+
+### Cost Observations
+
+- Model mix: not recorded.
+- Sessions: one autonomous milestone continuation with executor/reviewer/fixer
+  agents plus main-thread verification.
+- Notable: final gates included 196 Phase 51 tests, 169 Phase 52 tests, Ruff
+  checks, clean re-reviews, and a PASS milestone audit.
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -367,6 +441,7 @@
 | v1.7 | 1 | 5 | Added baseline/timing/reward-hack/library/MI300X readiness hardening before real commercial GPU validation |
 | v1.8 | 1 | 5 | Completed scoped ROCm library replacement support for RDNA 4 and added Nyquist validation artifacts |
 | v1.9 | 1+ | 6 | Completed the RDNA 4-scoped AMD SOL/SOLAR bound modeling evidence chain from hardware model through score report |
+| v1.10 | 1+ | 6 | Completed paper-aligned automatic SOLAR derivation sidecars, score guards, dataset-runner report integration, and claim guardrails |
 
 ### Cumulative Quality
 
@@ -378,6 +453,7 @@
 | v1.7 | 67 focused audit tests passed | v1.7 requirements 21/21 complete | MI300X/CDNA3 full-suite validation; FP8 real-hardware validation; paper extraction; full SOLAR parity |
 | v1.8 | 41 focused tests passed; ruff clean; Docker entrypoint syntax passed | v1.8 requirements 23/23 complete | CDNA 3/CDNA 4 library validation; complete local ROCm development headers for native E2E |
 | v1.9 | 40 focused AMD bound/model/score/contract tests passed; `uv build` passed | v1.9 requirements 28/28 complete | CDNA 3 / MI300X real-hardware validation; CDNA 4 validation; paper extraction; broader upstream SOLAR parity |
+| v1.10 | 196 Phase 51 tests and 169 Phase 52 tests passed; Ruff clean; milestone audit PASS | v1.10 requirements 21/21 complete | Paper-scale 124-model/235-problem extraction; MI300X/CDNA3/CDNA4 validation; NVFP4/MXFP4 validation; hosted leaderboard |
 
 ### Top Lessons
 
@@ -388,3 +464,5 @@
    examples, tests, and scope-specific docs.
 5. Derived scoring artifacts need explicit degradation semantics so unsupported
    evidence cannot inflate reported AMD-native scores.
+6. Rich derived sidecars should remain isolated from canonical benchmark
+   contracts and backed by exact parser, public-key, and claim-boundary tests.
