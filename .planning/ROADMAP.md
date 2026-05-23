@@ -117,7 +117,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 47-06-PLAN.md — Add full matrix tests and public claim-boundary guardrails.
+- [x] 47-06-PLAN.md — Add full matrix tests and public claim-boundary guardrails.
 
 ### Phase 48: Extraction Pipeline And Semantic Provenance
 
@@ -257,7 +257,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 47. Derivation Contract And Golden Fixture Matrix | 5/6 | In Progress|  |
+| 47. Derivation Contract And Golden Fixture Matrix | 6/6 | Complete | 2026-05-23 |
 | 48. Extraction Pipeline And Semantic Provenance | 0/TBD | Not started | - |
 | 49. High-Confidence Family Modeling | 0/TBD | Not started | - |
 | 50. Degraded Complex Family Modeling | 0/TBD | Not started | - |
@@ -284,8 +284,8 @@ Plans:
 | REPORT-02 | Phase 51 | Pending |
 | REPORT-03 | Phase 51 | Pending |
 | REPORT-04 | Phase 52 | Pending |
-| TEST-01 | Phase 47 | Pending |
-| TEST-02 | Phase 47 | Pending |
+| TEST-01 | Phase 47 | Complete |
+| TEST-02 | Phase 47 | Complete |
 | TEST-03 | Phase 51 | Pending |
 | TEST-04 | Phase 52 | Pending |
 | TEST-05 | Phase 52 | Pending |
