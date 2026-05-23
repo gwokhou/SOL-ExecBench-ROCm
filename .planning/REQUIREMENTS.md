@@ -56,16 +56,16 @@ ExecBench.
 
 ### Bound Artifacts And Coverage
 
-- [ ] **BOUND-01**: Maintainer can serialize and load AMD SOL bound artifact v2
+- [x] **BOUND-01**: Maintainer can serialize and load AMD SOL bound artifact v2
   sidecars containing schema version, derived marker, workload identity, graph,
   work estimates, operation bounds, aggregate bound, hardware model reference,
   warnings, and coverage summary.
-- [ ] **BOUND-02**: Maintainer can inspect per-operation compute bound, memory
+- [x] **BOUND-02**: Maintainer can inspect per-operation compute bound, memory
   bound, limiting resource, confidence, and rationale.
-- [ ] **BOUND-03**: Coverage summaries report supported, inexact, and
+- [x] **BOUND-03**: Coverage summaries report supported, inexact, and
   unsupported operation counts by family and expose worst confidence for the
   artifact.
-- [ ] **BOUND-04**: Aggregate bounds never treat unsupported or missing evidence
+- [x] **BOUND-04**: Aggregate bounds never treat unsupported or missing evidence
   as hidden zero-cost work without warnings or unscored degradation.
 
 ### Score And Dataset Integration
@@ -163,10 +163,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HW-02 | Phase 41 | Complete |
 | HW-03 | Phase 41 | Complete |
 | HW-04 | Phase 41 | Complete |
-| BOUND-01 | Phase 44 | Pending |
-| BOUND-02 | Phase 44 | Pending |
-| BOUND-03 | Phase 44 | Pending |
-| BOUND-04 | Phase 44 | Pending |
+| BOUND-01 | Phase 44 | Complete |
+| BOUND-02 | Phase 44 | Complete |
+| BOUND-03 | Phase 44 | Complete |
+| BOUND-04 | Phase 44 | Complete |
 | SCORE-01 | Phase 45 | Pending |
 | SCORE-02 | Phase 45 | Pending |
 | SCORE-03 | Phase 45 | Pending |

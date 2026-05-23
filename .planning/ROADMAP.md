@@ -50,7 +50,7 @@ the current ROCm path, with validation scoped to RDNA 4 only.
 | 41 | Bound Model Contract And Hardware Artifacts | Complete 2026-05-23: Established strict AMD hardware model JSON loading, packaged RDNA 4 defaults, split validation statuses, and public-contract guardrails. | HW-01, HW-02, HW-03, HW-04, DOC-01 |
 | 42 | Structured Bound Graph IR | Complete 2026-05-23: Introduced stable workload-aware bound graph IR, tensor metadata, edges, and unsupported/inexact evidence. | IR-01, IR-02, IR-03, IR-04 |
 | 43 | Operator FLOP/Byte/Movement Modeling | Complete 2026-05-23: Added rich per-node FLOP, byte, movement, formula, confidence, and legacy adapter evidence. | MODEL-01, MODEL-02, MODEL-03, MODEL-04, MODEL-05 |
-| 44 | Bound Artifact V2 And Coverage Semantics | Serialize/load v2 SOL bound sidecars and make coverage, confidence, warnings, and aggregate bounds deterministic. | BOUND-01, BOUND-02, BOUND-03, BOUND-04 |
+| 44 | Bound Artifact V2 And Coverage Semantics | Complete 2026-05-23: Added v2 AMD SOL bound sidecars with strict loading, rich estimate evidence, aggregate scoring state, coverage summaries, deterministic warnings, and compatibility guardrails. | BOUND-01, BOUND-02, BOUND-03, BOUND-04 |
 | 45 | AMD Score And Dataset Integration | Wire v2 bound artifacts into AMD-native workload/suite score reports and optional dataset sidecar output. | SCORE-01, SCORE-02, SCORE-03, SCORE-04 |
 | 46 | Documentation And RDNA 4 Validation Closure | Complete docs, claim guardrails, golden tests, and RDNA 4 validation evidence for the modeling pipeline. | DOC-02, DOC-03, VAL-01, VAL-02, VAL-03, VAL-04 |
 
@@ -246,10 +246,10 @@ validation evidence.
 | HW-02 | Phase 41 | Complete |
 | HW-03 | Phase 41 | Complete |
 | HW-04 | Phase 41 | Complete |
-| BOUND-01 | Phase 44 | Pending |
-| BOUND-02 | Phase 44 | Pending |
-| BOUND-03 | Phase 44 | Pending |
-| BOUND-04 | Phase 44 | Pending |
+| BOUND-01 | Phase 44 | Complete |
+| BOUND-02 | Phase 44 | Complete |
+| BOUND-03 | Phase 44 | Complete |
+| BOUND-04 | Phase 44 | Complete |
 | SCORE-01 | Phase 45 | Pending |
 | SCORE-02 | Phase 45 | Pending |
 | SCORE-03 | Phase 45 | Pending |

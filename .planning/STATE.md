@@ -2,24 +2,24 @@
 gsd_state_version: 1.0
 milestone: v1.9
 milestone_name: AMD SOL/SOLAR Bound Modeling Completion
-current_phase: 44
+current_phase: 45
 status: ready_to_plan
-last_updated: 2026-05-23T02:20:00.000Z
-last_activity: 2026-05-23 -- Phase 41-43 tracking reconciled; ready to discuss Phase 44
+last_updated: 2026-05-23T02:33:01.622Z
+last_activity: 2026-05-23 -- Phase 44 complete; ready to plan Phase 45
 progress:
   total_phases: 6
-  completed_phases: 3
-  total_plans: 10
-  completed_plans: 10
-  percent: 50
-stopped_at: Phase 43 complete (4/4) — ready to discuss Phase 44
+  completed_phases: 4
+  total_plans: 14
+  completed_plans: 14
+  percent: 67
+stopped_at: Phase 44 complete (4/4) — ready to discuss Phase 45
 ---
 
 # Project State
 
 **Project:** SOL ExecBench ROCm Port
 **Initialized:** 2026-05-21
-**Current phase:** 44
+**Current phase:** 45
 **Status:** Ready to plan
 
 ## Project Reference
@@ -27,7 +27,7 @@ stopped_at: Phase 43 complete (4/4) — ready to discuss Phase 44
 See: `.planning/PROJECT.md` (updated 2026-05-22)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Phase 44 — bound artifact v2 and coverage semantics
+**Current focus:** Phase 45 — amd score and dataset integration
 
 ## Workflow Settings
 
@@ -45,7 +45,7 @@ See: `.planning/config.json`
 See: `.planning/ROADMAP.md`
 
 v1.9 AMD SOL/SOLAR Bound Modeling Completion is active with phases 41-46.
-Next phase: Phase 44, Bound Artifact V2 And Coverage Semantics.
+Next phase: Phase 45, AMD Score And Dataset Integration.
 
 ## Memory
 
@@ -94,13 +94,13 @@ Items acknowledged and deferred at milestone close on 2026-05-21:
 
 ## Next Action
 
-Plan Phase 43 with `$gsd-plan-phase 43`.
+Plan Phase 45 with `$gsd-plan-phase 45`.
 
 ## Current Position
 
-Phase: 44 (bound-artifact-v2-and-coverage-semantics) — NOT STARTED
+Phase: 45 (amd-score-and-dataset-integration) — NOT STARTED
 Plan: Not started
-Status: Ready to discuss
+Status: Ready to plan
 Last activity: 2026-05-23
 
 ## Quick Tasks Completed
@@ -111,4 +111,4 @@ Last activity: 2026-05-23
 
 ## Operator Next Steps
 
-- Discuss Phase 44 with `$gsd-discuss-phase 44`.
+- Plan Phase 45 with `$gsd-plan-phase 45`.
