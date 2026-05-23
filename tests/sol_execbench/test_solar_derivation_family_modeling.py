@@ -197,3 +197,185 @@ def test_attention_estimates_keep_projection_family_inside_attention_group():
         "attention_pv_flops",
         "gemm_flops",
     }
+
+
+def test_convolution_sidecar_records_subroles_formula_bytes_and_bounds():
+    definition = Definition(
+        name="conv3d_sidecar_demo",
+        axes={
+            "B": {"type": "const", "value": 1},
+            "C": {"type": "const", "value": 2},
+            "O": {"type": "const", "value": 4},
+            "D": {"type": "const", "value": 5},
+            "H": {"type": "const", "value": 6},
+            "W": {"type": "const", "value": 6},
+            "KD": {"type": "const", "value": 3},
+            "OH": {"type": "const", "value": 4},
+            "OW": {"type": "const", "value": 4},
+        },
+        inputs={
+            "x": {"shape": ["B", "C", "D", "H", "W"], "dtype": "float32"},
+            "weight": {"shape": ["O", "C", "KD", "KD", "KD"], "dtype": "float32"},
+            "bias": {"shape": ["O"], "dtype": "float32"},
+        },
+        outputs={"out": {"shape": ["B", "O", "KD", "OH", "OW"], "dtype": "float32"}},
+        reference=(
+            "import torch.nn.functional as F\n\n"
+            "def run(x, weight, bias):\n"
+            "    return F.conv3d(x, weight, bias, stride=(1, 1, 1), padding=(0, 0, 0), "
+            "dilation=(1, 1, 1), groups=1)\n"
+        ),
+    )
+    workload = Workload(
+        axes={},
+        inputs={
+            "x": {"type": "random"},
+            "weight": {"type": "random"},
+            "bias": {"type": "random"},
+        },
+        uuid="conv3d-sidecar-workload",
+    )
+
+    evidence = build_solar_derivation_evidence(definition, workload)
+    group = next(group for group in evidence.groups if group.family == "convolution")
+
+    assert group.status == "scored"
+    assert group.confidence.value == "supported"
+    assert [subrole.name for subrole in group.subroles] == [
+        "bias",
+        "convolution_metadata",
+        "input",
+        "output",
+        "weight",
+    ]
+    assert group.formula_evidence[0].formula_kind == "convolution_flops"
+    assert group.byte_evidence[0].total_bytes > 0.0
+    assert group.bound_evidence[0].limiting_resource in {"compute", "memory"}
+    assert group.missing_evidence == ()
+
+
+def test_convolution_missing_padding_degrades_with_explicit_missing_evidence():
+    definition = Definition(
+        name="conv_missing_padding",
+        axes={
+            "B": {"type": "const", "value": 1},
+            "C": {"type": "const", "value": 2},
+            "O": {"type": "const", "value": 4},
+            "L": {"type": "const", "value": 8},
+            "K": {"type": "const", "value": 3},
+            "OL": {"type": "const", "value": 6},
+        },
+        inputs={
+            "x": {"shape": ["B", "C", "L"], "dtype": "float32"},
+            "weight": {"shape": ["O", "C", "K"], "dtype": "float32"},
+        },
+        outputs={"out": {"shape": ["B", "O", "OL"], "dtype": "float32"}},
+        reference=(
+            "import torch.nn.functional as F\n\n"
+            "def run(x, weight):\n"
+            "    return F.conv1d(x, weight, stride=1, dilation=1, groups=1)\n"
+        ),
+    )
+    workload = Workload(
+        axes={},
+        inputs={"x": {"type": "random"}, "weight": {"type": "random"}},
+        uuid="conv-missing-padding-workload",
+    )
+
+    evidence = build_solar_derivation_evidence(definition, workload)
+    group = next(group for group in evidence.groups if group.family == "convolution")
+
+    assert group.status == "degraded"
+    assert group.confidence.value == "inexact"
+    assert "convolution:padding" in group.missing_evidence
+    assert any(
+        warning.startswith("inexact_operator:convolution_missing_padding")
+        for warning in group.warning_prefixes
+    )
+
+
+def test_embedding_positional_sidecar_records_memory_bound_evidence():
+    definition = Definition(
+        name="embedding_sidecar_demo",
+        axes={
+            "T": {"type": "const", "value": 32},
+            "N": {"type": "const", "value": 4},
+            "D": {"type": "const", "value": 8},
+        },
+        inputs={
+            "table": {"shape": ["T", "D"], "dtype": "float16"},
+            "indices": {"shape": ["N"], "dtype": "int64"},
+            "x": {"shape": ["N", "D"], "dtype": "float16"},
+            "pos": {"shape": ["N", "D"], "dtype": "float16"},
+            "sin": {"shape": ["N", "D"], "dtype": "float16"},
+            "cos": {"shape": ["N", "D"], "dtype": "float16"},
+        },
+        outputs={"out": {"shape": ["N", "D"], "dtype": "float16"}},
+        reference=(
+            "import torch\n"
+            "import torch.nn.functional as F\n\n"
+            "def run(table, indices, x, pos, sin, cos):\n"
+            "    token = F.embedding(indices, table)\n"
+            "    rotated = (x * cos) + (x * sin)\n"
+            "    return x + pos + token + rotated\n"
+        ),
+    )
+    workload = Workload(
+        axes={},
+        inputs={
+            "table": {"type": "random"},
+            "indices": {"type": "random"},
+            "x": {"type": "random"},
+            "pos": {"type": "random"},
+            "sin": {"type": "random"},
+            "cos": {"type": "random"},
+        },
+        uuid="embedding-sidecar-workload",
+    )
+
+    evidence = build_solar_derivation_evidence(definition, workload)
+    group = next(group for group in evidence.groups if group.family == "embedding_positional")
+
+    assert group.status == "scored"
+    assert group.confidence.value == "supported"
+    assert {"embedding_lookup", "positional_add", "rotary_like"} <= {
+        subrole.name for subrole in group.subroles
+    }
+    assert {item.formula_kind for item in group.formula_evidence} == {
+        "embedding_positional_bytes"
+    }
+    assert all(item.total_bytes > 0.0 for item in group.byte_evidence)
+    assert all(item.limiting_resource == "memory" for item in group.bound_evidence)
+
+
+def test_embedding_dynamic_indices_degrade_without_selected_byte_fabrication():
+    definition = Definition(
+        name="embedding_dynamic_indices",
+        axes={
+            "T": {"type": "const", "value": 32},
+            "D": {"type": "const", "value": 8},
+        },
+        inputs={
+            "table": {"shape": ["T", "D"], "dtype": "float16"},
+            "indices": {"shape": None, "dtype": "int64"},
+        },
+        outputs={"out": {"shape": None, "dtype": "float16"}},
+        reference=(
+            "import torch.nn.functional as F\n\n"
+            "def run(table, indices):\n"
+            "    return F.embedding(indices, table)\n"
+        ),
+    )
+    workload = Workload(
+        axes={},
+        inputs={"table": {"type": "random"}, "indices": {"type": "random"}},
+        uuid="embedding-dynamic-workload",
+    )
+
+    evidence = build_solar_derivation_evidence(definition, workload)
+    group = next(group for group in evidence.groups if group.family == "embedding_positional")
+
+    assert group.status == "degraded"
+    assert group.confidence.value == "inexact"
+    assert "embedding_positional:output_shape" in group.missing_evidence
+    assert "embedding_positional:selected_elements" in group.missing_evidence

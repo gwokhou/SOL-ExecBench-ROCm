@@ -191,10 +191,11 @@ def test_v1_10_solar_derivation_fields_remain_noncanonical():
         "formula_evidence",
         "byte_evidence",
         "bound_evidence",
-        "compute_bound_ms",
-        "memory_bound_ms",
-        "sol_bound_ms",
-        "limiting_resource",
+        "convolution_flops",
+        "embedding_positional_bytes",
+        "output_spatial",
+        "selected_elements",
+        "index_dtype",
     )
 
     for payload in (
@@ -205,6 +206,44 @@ def test_v1_10_solar_derivation_fields_remain_noncanonical():
         for field in forbidden:
             assert field not in payload
             assert field not in repr(payload)
+
+
+def test_amd_sol_artifacts_may_keep_existing_bound_fields_while_solar_fields_stay_sidecar_only():
+    definition = Definition(
+        name="matmul_demo",
+        axes={
+            "M": {"type": "var"},
+            "K": {"type": "const", "value": 4},
+            "N": {"type": "const", "value": 8},
+        },
+        inputs={
+            "a": {"shape": ["M", "K"], "dtype": "float32"},
+            "b": {"shape": ["K", "N"], "dtype": "float32"},
+        },
+        outputs={"out": {"shape": ["M", "N"], "dtype": "float32"}},
+        reference="def run(a, b):\n    return a @ b",
+    )
+    workload = Workload(
+        axes={"M": 2},
+        inputs={"a": {"type": "random"}, "b": {"type": "random"}},
+        uuid="matmul-workload",
+    )
+    hardware = default_amd_hardware_models()["gfx1200"]
+    v1_payload = build_amd_sol_bound_artifact(definition, workload, hardware).to_dict()
+    v2_payload = build_amd_sol_bound_v2_artifact(
+        definition,
+        workload,
+        hardware,
+        hardware_model_ref="default_amd_hardware_models.gfx1200",
+    ).to_dict()
+
+    assert "compute_bound_ms" in repr(v1_payload)
+    assert "compute_bound_ms" in repr(v2_payload)
+    for payload in (v1_payload, v2_payload):
+        assert "solar_derivation" not in payload
+        assert "formula_evidence" not in repr(payload)
+        assert "byte_evidence" not in repr(payload)
+        assert "bound_evidence" not in repr(payload)
 
 
 def test_primary_cli_does_not_expose_v1_10_solar_derivation_options():
