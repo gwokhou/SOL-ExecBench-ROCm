@@ -88,25 +88,25 @@ ExecBench.
 - [x] **DOC-01**: Canonical trace JSONL, primary `sol-execbench` CLI behavior,
   and public definition/workload/solution schemas remain unchanged by v1.9
   bound modeling.
-- [ ] **DOC-02**: Documentation explains AMD SOL bound artifact v2 semantics,
+- [x] **DOC-02**: Documentation explains AMD SOL bound artifact v2 semantics,
   hardware model provenance, confidence labels, unsupported/inexact degradation,
   and RDNA 4-only validation scope.
-- [ ] **DOC-03**: Documentation and guardrail tests prevent NVIDIA B200,
+- [x] **DOC-03**: Documentation and guardrail tests prevent NVIDIA B200,
   upstream SOLAR, leaderboard-equivalence, CDNA 3 / MI300X validation, and CDNA
   4 validation claims from appearing in v1.9 outputs or docs.
 
 ### Validation
 
-- [ ] **VAL-01**: Golden tests cover IR extraction and bound artifacts for
+- [x] **VAL-01**: Golden tests cover IR extraction and bound artifacts for
   matmul, batched matmul, elementwise chains, activation, reduction,
   normalization, softmax, data movement, dtype conversion, tuple outputs, and
   unsupported operations.
-- [ ] **VAL-02**: Score integration tests cover complete, inexact, unsupported,
+- [x] **VAL-02**: Score integration tests cover complete, inexact, unsupported,
   missing baseline, reference-latency fallback, provisional hardware, and
   failed-trace cases.
-- [ ] **VAL-03**: Public-contract tests prove canonical traces and primary CLI
+- [x] **VAL-03**: Public-contract tests prove canonical traces and primary CLI
   output are unchanged by bound artifact and score generation.
-- [ ] **VAL-04**: RDNA 4 validation evidence records focused unit tests and a
+- [x] **VAL-04**: RDNA 4 validation evidence records focused unit tests and a
   small derived-report/sample run that emits trace JSONL, bound artifacts, and
   AMD-native score output.
 
@@ -172,12 +172,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SCORE-03 | Phase 45 | Complete |
 | SCORE-04 | Phase 45 | Complete |
 | DOC-01 | Phase 41 | Complete |
-| DOC-02 | Phase 46 | Pending |
-| DOC-03 | Phase 46 | Pending |
-| VAL-01 | Phase 46 | Pending |
-| VAL-02 | Phase 46 | Pending |
-| VAL-03 | Phase 46 | Pending |
-| VAL-04 | Phase 46 | Pending |
+| DOC-02 | Phase 46 | Complete |
+| DOC-03 | Phase 46 | Complete |
+| VAL-01 | Phase 46 | Complete |
+| VAL-02 | Phase 46 | Complete |
+| VAL-03 | Phase 46 | Complete |
+| VAL-04 | Phase 46 | Complete |
 
 **Coverage:**
 - v1.9 requirements: 28 total
