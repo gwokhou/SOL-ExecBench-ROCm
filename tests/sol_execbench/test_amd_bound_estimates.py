@@ -574,11 +574,8 @@ def test_contiguous_and_dtype_conversion_count_movement_bytes():
 
 def test_out_of_scope_families_are_explicit_unsupported_estimates():
     for family in (
-        OpFamily.ATTENTION,
         OpFamily.MOE,
         OpFamily.SSM_MAMBA,
-        OpFamily.CONVOLUTION,
-        OpFamily.EMBEDDING_POSITIONAL,
     ):
         graph = _single_node_graph(_unsupported_node(family))
 
@@ -589,6 +586,223 @@ def test_out_of_scope_families_are_explicit_unsupported_estimates():
         assert estimate.total_bytes == 0.0
         assert estimate.formula_kind == "unsupported"
         assert estimate.warnings == ("unsupported_family:torch.linalg.inv",)
+
+
+def test_convolution_estimate_accounts_for_grouped_depthwise_formula_and_bytes():
+    node = BoundGraphNode(
+        node_id="op_conv",
+        op_family=OpFamily.CONVOLUTION,
+        op_name="conv2d",
+        source_expression="F.conv2d(x, weight, bias, groups=4)",
+        input_tensor_ids=("input:x", "input:weight", "input:bias"),
+        output_tensor_ids=("output:y",),
+        attributes={
+            "dimensionality": 2,
+            "stride": (1, 1),
+            "padding": (1, 1),
+            "dilation": (1, 1),
+            "groups": 4,
+            "output_spatial": (8, 8),
+        },
+        confidence=EstimateConfidence.SUPPORTED,
+        rationale="recognized convolution",
+    )
+    graph = BoundGraph(
+        definition="depthwise_conv",
+        workload_uuid="w1",
+        nodes=(node,),
+        tensors={
+            "input:x": BoundTensor(
+                tensor_id="input:x",
+                name="x",
+                role=BoundTensorRole.INPUT,
+                shape=(2, 4, 8, 8),
+                dtype="float16",
+                producer_node_id=None,
+                source="test",
+            ),
+            "input:weight": BoundTensor(
+                tensor_id="input:weight",
+                name="weight",
+                role=BoundTensorRole.INPUT,
+                shape=(4, 1, 3, 3),
+                dtype="float16",
+                producer_node_id=None,
+                source="test",
+            ),
+            "input:bias": BoundTensor(
+                tensor_id="input:bias",
+                name="bias",
+                role=BoundTensorRole.INPUT,
+                shape=(4,),
+                dtype="float16",
+                producer_node_id=None,
+                source="test",
+            ),
+            "output:y": BoundTensor(
+                tensor_id="output:y",
+                name="y",
+                role=BoundTensorRole.OUTPUT,
+                shape=(2, 4, 8, 8),
+                dtype="float16",
+                producer_node_id="op_conv",
+                source="test",
+            ),
+        },
+        edges=(),
+        warnings=(),
+    )
+
+    estimate = estimate_bound_work(graph)[0]
+
+    assert estimate.formula_kind == "convolution_flops"
+    assert estimate.formula == "2*N*C_out*output_spatial_elements*(C_in/groups)*kernel_elements"
+    assert estimate.formula_inputs == {
+        "N": 2,
+        "C_in": 4,
+        "C_out": 4,
+        "groups": 4,
+        "output_spatial_elements": 64,
+        "kernel_elements": 9,
+        "dimensionality": 2,
+    }
+    assert estimate.flops == 9216.0
+    assert estimate.total_bytes > 0.0
+    assert estimate.axis_source == "tensor_shapes"
+    assert estimate.confidence == EstimateConfidence.SUPPORTED
+
+
+def test_incomplete_convolution_degrades_without_fabricated_formula_inputs():
+    node = BoundGraphNode(
+        node_id="op_conv",
+        op_family=OpFamily.CONVOLUTION,
+        op_name="conv2d",
+        source_expression="F.conv2d(x, weight)",
+        input_tensor_ids=("input:x", "input:weight"),
+        output_tensor_ids=("output:y",),
+        attributes={
+            "dimensionality": 2,
+            "stride": (1, 1),
+            "dilation": (1, 1),
+            "groups": 1,
+        },
+        confidence=EstimateConfidence.SUPPORTED,
+        rationale="recognized convolution",
+    )
+    graph = BoundGraph(
+        definition="incomplete_conv",
+        workload_uuid="w1",
+        nodes=(node,),
+        tensors={
+            "input:x": BoundTensor(
+                tensor_id="input:x",
+                name="x",
+                role=BoundTensorRole.INPUT,
+                shape=(2, 4, 8, 8),
+                dtype="float16",
+                producer_node_id=None,
+                source="test",
+            ),
+            "input:weight": BoundTensor(
+                tensor_id="input:weight",
+                name="weight",
+                role=BoundTensorRole.INPUT,
+                shape=(8, 4, 3, 3),
+                dtype="unknown",
+                producer_node_id=None,
+                source="test",
+            ),
+            "output:y": BoundTensor(
+                tensor_id="output:y",
+                name="y",
+                role=BoundTensorRole.OUTPUT,
+                shape=None,
+                dtype="float16",
+                producer_node_id="op_conv",
+                source="test",
+            ),
+        },
+        edges=(),
+        warnings=(),
+    )
+
+    estimate = estimate_bound_work(graph)[0]
+
+    assert estimate.formula_kind == "convolution_flops"
+    assert estimate.formula_inputs == {}
+    assert estimate.flops == 0.0
+    assert estimate.axis_source is None
+    assert estimate.confidence == EstimateConfidence.INEXACT
+    assert "inexact_operator:convolution_missing_padding" in estimate.warnings
+    assert "inexact_operator:convolution_missing_output_spatial" in estimate.warnings
+
+
+def test_embedding_lookup_estimate_counts_indices_and_selected_elements_not_dense_table():
+    node = BoundGraphNode(
+        node_id="op_embedding",
+        op_family=OpFamily.EMBEDDING_POSITIONAL,
+        op_name="embedding",
+        source_expression="F.embedding(indices, table)",
+        input_tensor_ids=("input:indices", "input:table"),
+        output_tensor_ids=("output:y",),
+        attributes={
+            "memory_subrole": "embedding_lookup",
+            "index_tensor_id": "input:indices",
+            "table_tensor_id": "input:table",
+            "index_dtype": "int64",
+            "table_shape": (1024, 16),
+            "output_shape": (4, 16),
+            "selected_elements": 64,
+        },
+        confidence=EstimateConfidence.SUPPORTED,
+        rationale="recognized embedding lookup",
+    )
+    graph = BoundGraph(
+        definition="embedding_estimate",
+        workload_uuid="w1",
+        nodes=(node,),
+        tensors={
+            "input:indices": BoundTensor(
+                tensor_id="input:indices",
+                name="indices",
+                role=BoundTensorRole.INPUT,
+                shape=(4,),
+                dtype="int64",
+                producer_node_id=None,
+                source="test",
+            ),
+            "input:table": BoundTensor(
+                tensor_id="input:table",
+                name="table",
+                role=BoundTensorRole.INPUT,
+                shape=(1024, 16),
+                dtype="float16",
+                producer_node_id=None,
+                source="test",
+            ),
+            "output:y": BoundTensor(
+                tensor_id="output:y",
+                name="y",
+                role=BoundTensorRole.OUTPUT,
+                shape=(4, 16),
+                dtype="float16",
+                producer_node_id="op_embedding",
+                source="test",
+            ),
+        },
+        edges=(),
+        warnings=(),
+    )
+
+    estimate = estimate_bound_work(graph)[0]
+
+    assert estimate.formula_kind == "embedding_positional_bytes"
+    assert estimate.formula_inputs["index_elements"] == 4
+    assert estimate.formula_inputs["selected_elements"] == 64
+    assert estimate.read_bytes == 160.0
+    assert estimate.write_bytes == 128.0
+    assert estimate.total_bytes == 288.0
+    assert estimate.confidence == EstimateConfidence.SUPPORTED
 
 
 def test_public_scoring_exports_include_bound_estimate_api():
