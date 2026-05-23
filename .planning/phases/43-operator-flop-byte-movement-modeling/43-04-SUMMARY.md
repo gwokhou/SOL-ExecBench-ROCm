@@ -51,12 +51,14 @@ completed: 2026-05-23
 
 - Updated `amd_sol.estimate_work()` to build a `BoundGraph`, call `estimate_bound_work()`, and adapt each rich estimate to legacy `WorkEstimate`.
 - Preserved old whole-definition estimation as an explicit fallback with fallback rationale.
+- Added fallback protection when caller-provided legacy graph nodes do not align with the rebuilt rich bound graph.
 - Added compatibility tests proving legacy `bytes_accessed` equals rich `total_bytes` and `WorkEstimate` fields remain unchanged.
 - Strengthened v1 artifact and public contract guardrails so rich estimate fields do not leak into v1 payloads, canonical schemas, or primary CLI help.
 
 ## Task Commits
 
 1. **Legacy SOL adapter and guardrails** - `b4a69c8` (feat)
+2. **Legacy graph-node alignment fallback** - this summary update commit (fix)
 
 ## Files Created/Modified
 
@@ -71,7 +73,7 @@ Followed the plan: `estimate_bound_work()` is now the evidence source, while `es
 
 ## Deviations from Plan
 
-None - plan executed as written.
+One compatibility edge was tightened during review: `estimate_work()` now falls back to the legacy estimator if caller-provided `graph_nodes` do not align with the rebuilt rich graph. This preserves the v1 API invariant that returned estimates correspond to the supplied legacy graph nodes.
 
 ## Issues Encountered
 
@@ -83,8 +85,8 @@ None - no external service configuration required.
 
 ## Verification
 
-- `uv run pytest tests/sol_execbench/test_amd_sol_bounds.py tests/sol_execbench/test_amd_bound_estimates.py -x` - passed, 24 tests.
-- `uv run pytest tests/sol_execbench/test_amd_bound_graph.py tests/sol_execbench/test_amd_bound_estimates.py tests/sol_execbench/test_amd_sol_bounds.py tests/sol_execbench/test_public_contract_guardrails.py -x` - passed, 49 tests.
+- `uv run pytest tests/sol_execbench/test_amd_sol_bounds.py tests/sol_execbench/test_amd_bound_estimates.py -x` - passed, 25 tests.
+- `uv run pytest tests/sol_execbench/test_amd_bound_graph.py tests/sol_execbench/test_amd_bound_estimates.py tests/sol_execbench/test_amd_sol_bounds.py tests/sol_execbench/test_public_contract_guardrails.py -x` - passed, 50 tests.
 - `uv run --with ruff ruff check src/sol_execbench/core/scoring/amd_bound_graph.py src/sol_execbench/core/scoring/amd_bound_estimates.py src/sol_execbench/core/scoring/amd_sol.py src/sol_execbench/core/scoring/__init__.py tests/sol_execbench/test_amd_bound_estimates.py tests/sol_execbench/test_amd_bound_graph.py tests/sol_execbench/test_amd_sol_bounds.py tests/sol_execbench/test_public_contract_guardrails.py` - passed.
 
 ## Next Phase Readiness

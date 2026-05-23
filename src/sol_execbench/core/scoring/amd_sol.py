@@ -177,9 +177,17 @@ def estimate_work(
     """Estimate FLOPs and bytes for graph nodes."""
     try:
         bound_graph = build_bound_graph(definition, workload)
+        rich_estimates = estimate_bound_work(bound_graph)
+        if graph_nodes and len(graph_nodes) != len(rich_estimates):
+            raise ValueError(
+                "legacy graph node count does not match rich bound estimate count"
+            )
         return tuple(
-            _work_estimate_from_rich_estimate(estimate)
-            for estimate in estimate_bound_work(bound_graph)
+            _work_estimate_from_rich_estimate(
+                estimate,
+                node_id=graph_nodes[index].node_id if graph_nodes else estimate.node_id,
+            )
+            for index, estimate in enumerate(rich_estimates)
         )
     except Exception as exc:
         return _legacy_estimate_work(
@@ -303,9 +311,13 @@ def _legacy_estimate_work(
     return tuple(estimates)
 
 
-def _work_estimate_from_rich_estimate(estimate: OperatorWorkEstimate) -> WorkEstimate:
+def _work_estimate_from_rich_estimate(
+    estimate: OperatorWorkEstimate,
+    *,
+    node_id: str,
+) -> WorkEstimate:
     return WorkEstimate(
-        node_id=estimate.node_id,
+        node_id=node_id,
         flops=estimate.flops,
         bytes_accessed=estimate.total_bytes,
         confidence=estimate.confidence,

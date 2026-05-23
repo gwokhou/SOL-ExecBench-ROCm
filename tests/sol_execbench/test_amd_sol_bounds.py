@@ -158,6 +158,29 @@ def test_legacy_work_estimate_fields_are_unchanged_and_adapt_rich_totals():
     assert estimates[0].bytes_accessed == rich_estimates[0].total_bytes
 
 
+def test_legacy_estimate_work_falls_back_when_graph_nodes_do_not_align():
+    definition = _matmul_definition()
+    workload = Workload(
+        axes={"M": 2},
+        inputs={"a": {"type": "random"}, "b": {"type": "random"}},
+        uuid="matmul-workload",
+    )
+    graph = extract_graph(definition)
+    extra_graph_node = graph[0].__class__(
+        node_id="op_extra",
+        op_type="unsupported",
+        expression="extra()",
+        confidence=EstimateConfidence.UNSUPPORTED,
+        rationale="test mismatch",
+    )
+
+    estimates = estimate_work(definition, workload, (*graph, extra_graph_node))
+
+    assert len(estimates) == 2
+    assert estimates[0].node_id == "op_1"
+    assert "legacy fallback" in estimates[0].rationale
+
+
 def test_coverage_summary_counts_supported_inexact_and_unsupported_ops():
     definition = Definition(
         name="coverage_demo",
