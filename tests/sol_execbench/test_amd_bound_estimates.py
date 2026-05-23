@@ -255,6 +255,66 @@ def test_linear_projection_preserves_family_with_gemm_formula_and_dtype_bytes():
     assert estimate.confidence == EstimateConfidence.SUPPORTED
 
 
+def test_batched_linear_projection_with_2d_weight_uses_batched_gemm_formula():
+    node = BoundGraphNode(
+        node_id="op_linear",
+        op_family=OpFamily.LINEAR_PROJECTION,
+        op_name="linear",
+        source_expression="torch.nn.functional.linear(x, weight)",
+        input_tensor_ids=("input:x", "input:weight"),
+        output_tensor_ids=("output:y",),
+        attributes={},
+        confidence=EstimateConfidence.SUPPORTED,
+        rationale="recognized batched linear projection",
+    )
+    graph = BoundGraph(
+        definition="batched_linear_projection",
+        workload_uuid="w1",
+        nodes=(node,),
+        tensors={
+            "input:x": BoundTensor(
+                tensor_id="input:x",
+                name="x",
+                role=BoundTensorRole.INPUT,
+                shape=(2, 3, 4),
+                dtype="float16",
+                producer_node_id=None,
+                source="definition.inputs",
+            ),
+            "input:weight": BoundTensor(
+                tensor_id="input:weight",
+                name="weight",
+                role=BoundTensorRole.INPUT,
+                shape=(8, 4),
+                dtype="float16",
+                producer_node_id=None,
+                source="definition.inputs",
+            ),
+            "output:y": BoundTensor(
+                tensor_id="output:y",
+                name="y",
+                role=BoundTensorRole.OUTPUT,
+                shape=(2, 3, 8),
+                dtype="float16",
+                producer_node_id="op_linear",
+                source="definition.outputs",
+            ),
+        },
+        edges=(),
+        warnings=(),
+    )
+
+    estimate = estimate_bound_work(graph)[0]
+
+    assert estimate.op_family == OpFamily.LINEAR_PROJECTION
+    assert estimate.formula_kind == "batched_gemm_flops"
+    assert estimate.formula == "2*B*M*N*K"
+    assert estimate.formula_inputs == {"B": 2, "M": 3, "N": 8, "K": 4}
+    assert estimate.flops == 384.0
+    assert estimate.axis_source == "tensor_shapes"
+    assert estimate.confidence == EstimateConfidence.SUPPORTED
+
+
 def test_incomplete_linear_projection_degrades_without_fabricated_formula_or_bytes():
     node = BoundGraphNode(
         node_id="op_linear",
@@ -802,6 +862,75 @@ def test_embedding_lookup_estimate_counts_indices_and_selected_elements_not_dens
     assert estimate.read_bytes == 160.0
     assert estimate.write_bytes == 128.0
     assert estimate.total_bytes == 288.0
+    assert estimate.confidence == EstimateConfidence.SUPPORTED
+
+
+def test_rotary_like_estimate_does_not_double_count_movement_bytes():
+    node = BoundGraphNode(
+        node_id="op_rotary",
+        op_family=OpFamily.EMBEDDING_POSITIONAL,
+        op_name="rotary_like",
+        source_expression="(x * cos) + (x * sin)",
+        input_tensor_ids=("input:x", "input:cos", "input:sin"),
+        output_tensor_ids=("output:y",),
+        attributes={"memory_subrole": "rotary_like"},
+        confidence=EstimateConfidence.SUPPORTED,
+        rationale="recognized visible rotary-like structure",
+    )
+    graph = BoundGraph(
+        definition="rotary_like_estimate",
+        workload_uuid="w1",
+        nodes=(node,),
+        tensors={
+            "input:x": BoundTensor(
+                tensor_id="input:x",
+                name="x",
+                role=BoundTensorRole.INPUT,
+                shape=(2, 4),
+                dtype="float16",
+                producer_node_id=None,
+                source="test",
+            ),
+            "input:cos": BoundTensor(
+                tensor_id="input:cos",
+                name="cos",
+                role=BoundTensorRole.INPUT,
+                shape=(2, 4),
+                dtype="float16",
+                producer_node_id=None,
+                source="test",
+            ),
+            "input:sin": BoundTensor(
+                tensor_id="input:sin",
+                name="sin",
+                role=BoundTensorRole.INPUT,
+                shape=(2, 4),
+                dtype="float16",
+                producer_node_id=None,
+                source="test",
+            ),
+            "output:y": BoundTensor(
+                tensor_id="output:y",
+                name="y",
+                role=BoundTensorRole.OUTPUT,
+                shape=(2, 4),
+                dtype="float16",
+                producer_node_id="op_rotary",
+                source="test",
+            ),
+        },
+        edges=(),
+        warnings=(),
+    )
+
+    estimate = estimate_bound_work(graph)[0]
+
+    assert estimate.formula_kind == "embedding_positional_bytes"
+    assert estimate.movement_kind == "rotary_like"
+    assert estimate.read_bytes == 48.0
+    assert estimate.write_bytes == 16.0
+    assert estimate.movement_bytes == 0.0
+    assert estimate.total_bytes == estimate.read_bytes + estimate.write_bytes
     assert estimate.confidence == EstimateConfidence.SUPPORTED
 
 
