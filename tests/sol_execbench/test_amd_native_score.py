@@ -38,7 +38,12 @@ from sol_execbench.core.scoring.amd_sol import (
 )
 from sol_execbench.core.scoring.amd_sol_v2 import build_amd_sol_bound_v2_artifact
 from sol_execbench.core.scoring.amd_hardware_models import load_amd_hardware_model
-from sol_execbench.core.scoring.solar_derivation import SolarAggregateStatus
+from sol_execbench.core.scoring.solar_derivation import (
+    SolarAggregateStatus,
+    SolarDerivationEvidence,
+    SolarEvidenceSource,
+    SolarSemanticGroupEvidence,
+)
 from sol_execbench.sol_score import sol_score
 
 
@@ -166,11 +171,45 @@ def _solar_aggregate_status(
 ) -> SolarAggregateStatus:
     return SolarAggregateStatus(
         status=status,
-        score_eligible=status == "scored",
+        score_eligible=status != "unscored",
         reason=f"test {status} aggregate status",
         group_ids=(f"{status}-group",),
         node_ids=(f"{status}-node",),
         warnings=warnings,
+    )
+
+
+def _degraded_solar_derivation() -> SolarDerivationEvidence:
+    return SolarDerivationEvidence(
+        definition="matmul_demo",
+        workload_uuid="matmul-workload",
+        groups=(
+            SolarSemanticGroupEvidence(
+                family="matmul",
+                group_id="matmul_group_1",
+                node_ids=("matmul_1",),
+                subroles=(),
+                confidence="inexact",
+                status="degraded",
+                required_evidence=("shape:M",),
+                missing_evidence=("axis:M",),
+                warning_prefixes=("aggregate_degraded:matmul",),
+                source=SolarEvidenceSource(
+                    kind="definition",
+                    detail="reference matmul",
+                    node_id="matmul_1",
+                    tensor_id=None,
+                ),
+                rationale="Matmul evidence is semantically incomplete.",
+            ),
+        ),
+        tensors=(),
+        warnings=("aggregate_degraded:incomplete semantic evidence",),
+        source_boundary={
+            "canonical_trace_jsonl": False,
+            "public_schema": False,
+            "candidate_solution_execution": False,
+        },
     )
 
 
@@ -249,6 +288,32 @@ def test_solar_degraded_aggregate_preserves_numeric_workload_score():
     assert DEGRADED_SOL_BOUND_WARNING in report.warnings
     assert "aggregate_degraded:incomplete semantic evidence" in report.warnings
     assert "solar_derivation" not in report.evidence_refs
+
+
+def test_derived_solar_degraded_sidecar_preserves_numeric_workload_score():
+    artifact = _matmul_artifact()
+    solar_derivation = _degraded_solar_derivation()
+    aggregate_status = solar_derivation.to_dict()["aggregate_status"]
+
+    report = score_amd_native_workload(
+        artifact,
+        measured_latency_ms=1.5,
+        baseline_latency_ms=2.0,
+        solar_derivation=solar_derivation,
+    )
+
+    assert aggregate_status["status"] == "degraded"
+    assert aggregate_status["score_eligible"] is True
+    assert report.score == sol_score(
+        t_k=1.5,
+        t_b=2.0,
+        t_sol=artifact.aggregate_sol_bound_ms,
+    )
+    assert report.supported is True
+    assert DEGRADED_SOL_BOUND_WARNING in report.warnings
+    assert "aggregate_degraded:incomplete semantic evidence" in report.warnings
+    assert "aggregate_degraded:matmul" in report.warnings
+    assert INCOMPLETE_EVIDENCE_WARNING not in report.warnings
 
 
 def test_absent_solar_derivation_preserves_existing_workload_score_behavior():
