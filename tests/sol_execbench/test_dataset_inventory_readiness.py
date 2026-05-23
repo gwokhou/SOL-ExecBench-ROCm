@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from sol_execbench.core.dataset import build_dataset_inventory
+from sol_execbench.core.dataset import build_dataset_inventory, classify_rocm_readiness
 
 
 def _definition(
@@ -158,3 +158,84 @@ def test_inventory_json_is_deterministic(tmp_path):
     assert first.to_json() == second.to_json()
     assert first.inventory_checksum is not None
     assert first.inventory_checksum.value == second.inventory_checksum.value
+
+
+def test_readiness_marks_random_workload_ready(tmp_path):
+    _write_problem(tmp_path, "L1", "ready_problem")
+    inventory = build_dataset_inventory(tmp_path, categories=("L1",), created_at="2026-05-23T00:00:00Z")
+
+    readiness = classify_rocm_readiness(inventory, dataset_root=tmp_path, created_at="2026-05-23T00:00:00Z")
+
+    assert readiness.workloads[0].status == "ready"
+    assert readiness.workloads[0].reasons[0].code == "ready_to_attempt_rocm_execution"
+    assert readiness.problems[0].status == "ready"
+
+
+def test_readiness_blocks_custom_inputs_and_missing_safetensors(tmp_path):
+    custom_definition = _definition(
+        name="custom_problem",
+        reference="def make_inputs(axes, device):\n    return {}\ndef run(x):\n    return x\n",
+        custom_entrypoint="make_inputs",
+    )
+    _write_problem(tmp_path, "L1", "custom_problem", definition=custom_definition, workloads=[_workload("custom")])
+    _write_problem(
+        tmp_path,
+        "L1",
+        "safetensors_problem",
+        workloads=[_workload("safetensors", path="missing.safetensors", tensor_key="x")],
+    )
+    inventory = build_dataset_inventory(tmp_path, categories=("L1",), created_at="2026-05-23T00:00:00Z")
+
+    readiness = classify_rocm_readiness(inventory, dataset_root=tmp_path, created_at="2026-05-23T00:00:00Z")
+
+    statuses = {record.problem_id: record.status for record in readiness.workloads}
+    assert statuses["L1/custom_problem"] == "custom_input_blocked"
+    assert statuses["L1/safetensors_problem"] == "runtime_blocked"
+    reason_codes = {record.reasons[0].code for record in readiness.workloads}
+    assert "custom_input_requires_evaluator_support" in reason_codes
+    assert "safetensors_asset_missing" in reason_codes
+
+
+def test_readiness_marks_quant_and_low_precision_as_needing_hardware_evidence(tmp_path):
+    _write_problem(tmp_path, "Quant", "quant_problem")
+    _write_problem(tmp_path, "L1", "fp8_problem", definition=_definition(name="fp8_problem", dtype="float8_e4m3fn"))
+    inventory = build_dataset_inventory(tmp_path, categories=("L1", "Quant"), created_at="2026-05-23T00:00:00Z")
+
+    readiness = classify_rocm_readiness(inventory, dataset_root=tmp_path, created_at="2026-05-23T00:00:00Z")
+
+    statuses = {record.problem_id: record.status for record in readiness.workloads}
+    assert statuses["Quant/quant_problem"] == "needs_hardware_evidence"
+    assert statuses["L1/fp8_problem"] == "needs_hardware_evidence"
+    assert all(record.layered_evidence.hardware_validation == "needed" for record in readiness.workloads)
+
+
+def test_readiness_blocks_schema_failure_and_is_deterministic(tmp_path):
+    bad_dir = tmp_path / "L1" / "bad"
+    bad_dir.mkdir(parents=True)
+    (bad_dir / "definition.json").write_text('{"name":"bad"}\n', encoding="utf-8")
+    (bad_dir / "workload.jsonl").write_text("{}\n", encoding="utf-8")
+    inventory = build_dataset_inventory(tmp_path, categories=("L1",), created_at="2026-05-23T00:00:00Z")
+
+    first = classify_rocm_readiness(inventory, dataset_root=tmp_path, created_at="2026-05-23T00:00:00Z")
+    second = classify_rocm_readiness(inventory, dataset_root=tmp_path, created_at="2026-05-23T00:00:00Z")
+
+    assert first.workloads[0].status == "schema_input_blocked"
+    assert first.to_json() == second.to_json()
+    assert first.readiness_checksum is not None
+
+
+def test_readiness_does_not_block_torch_cuda_compatibility_text(tmp_path):
+    _write_problem(
+        tmp_path,
+        "L1",
+        "compat_problem",
+        definition=_definition(
+            name="compat_problem",
+            reference="def run(x):\n    # torch.cuda is the PyTorch ROCm compatibility namespace\n    return x\n",
+        ),
+    )
+    inventory = build_dataset_inventory(tmp_path, categories=("L1",), created_at="2026-05-23T00:00:00Z")
+
+    readiness = classify_rocm_readiness(inventory, dataset_root=tmp_path, created_at="2026-05-23T00:00:00Z")
+
+    assert readiness.workloads[0].status == "ready"

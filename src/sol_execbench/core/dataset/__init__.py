@@ -36,6 +36,12 @@ from .inventory import (
     build_dataset_inventory,
     write_dataset_inventory,
 )
+from .readiness import (
+    DatasetReadiness,
+    WorkloadReadinessRecord,
+    classify_rocm_readiness,
+    write_dataset_readiness,
+)
 
 __all__ = [
     "DEFAULT_CATEGORIES",
@@ -43,15 +49,19 @@ __all__ = [
     "DatasetManifest",
     "DatasetManifestSource",
     "DatasetInventory",
+    "DatasetReadiness",
     "InventoryDenominators",
     "LayoutCategory",
     "LayoutDiagnostic",
     "ProblemInventoryRecord",
     "WorkloadInventoryRecord",
+    "WorkloadReadinessRecord",
     "build_dataset_manifest",
     "build_dataset_inventory",
+    "classify_rocm_readiness",
     "inspect_dataset_layout",
     "validate_categories",
     "write_dataset_manifest",
     "write_dataset_inventory",
+    "write_dataset_readiness",
 ]
