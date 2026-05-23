@@ -913,11 +913,12 @@ def test_contiguous_and_dtype_conversion_count_movement_bytes():
     assert "dtype conversion" in conversion.rationale
 
 
-def test_out_of_scope_families_are_explicit_unsupported_estimates():
-    for family in (
-        OpFamily.MOE,
-        OpFamily.SSM_MAMBA,
-    ):
+def test_complex_families_keep_specific_unsupported_estimate_warnings():
+    expected_warnings = {
+        OpFamily.MOE: ("unsupported_operator:moe_taxonomy_only",),
+        OpFamily.SSM_MAMBA: ("unsupported_operator:ssm_custom_scan",),
+    }
+    for family, warnings in expected_warnings.items():
         graph = _single_node_graph(_unsupported_node(family))
 
         estimate = estimate_bound_work(graph)[0]
@@ -926,7 +927,7 @@ def test_out_of_scope_families_are_explicit_unsupported_estimates():
         assert estimate.flops == 0.0
         assert estimate.total_bytes == 0.0
         assert estimate.formula_kind == "unsupported"
-        assert estimate.warnings == ("unsupported_family:torch.linalg.inv",)
+        assert estimate.warnings == warnings
 
 
 def test_convolution_estimate_accounts_for_grouped_depthwise_formula_and_bytes():
