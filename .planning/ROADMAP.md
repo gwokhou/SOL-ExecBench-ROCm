@@ -53,7 +53,7 @@ NVIDIA Blackwell/B200 equivalence, and new framework dependencies.
 
 ## Phases
 
-- [ ] **Phase 47: Derivation Contract And Golden Fixture Matrix** - Establish
+- [x] **Phase 47: Derivation Contract And Golden Fixture Matrix** - Establish
   the v1.10 derivation contract and fixture coverage before expanding
   extraction behavior.
 
