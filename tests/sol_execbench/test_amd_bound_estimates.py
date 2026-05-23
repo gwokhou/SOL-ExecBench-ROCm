@@ -190,6 +190,135 @@ def test_batched_matmul_estimate_records_batch_formula_inputs():
     assert estimate.confidence == EstimateConfidence.SUPPORTED
 
 
+def test_linear_projection_preserves_family_with_gemm_formula_and_dtype_bytes():
+    node = BoundGraphNode(
+        node_id="op_linear",
+        op_family=OpFamily.LINEAR_PROJECTION,
+        op_name="linear",
+        source_expression="torch.nn.functional.linear(x, weight)",
+        input_tensor_ids=("input:x", "input:weight"),
+        output_tensor_ids=("output:y",),
+        attributes={},
+        confidence=EstimateConfidence.SUPPORTED,
+        rationale="recognized linear projection",
+    )
+    graph = BoundGraph(
+        definition="linear_projection",
+        workload_uuid="w1",
+        nodes=(node,),
+        tensors={
+            "input:x": BoundTensor(
+                tensor_id="input:x",
+                name="x",
+                role=BoundTensorRole.INPUT,
+                shape=(2, 4),
+                dtype="float16",
+                producer_node_id=None,
+                source="definition.inputs",
+            ),
+            "input:weight": BoundTensor(
+                tensor_id="input:weight",
+                name="weight",
+                role=BoundTensorRole.INPUT,
+                shape=(8, 4),
+                dtype="float16",
+                producer_node_id=None,
+                source="definition.inputs",
+            ),
+            "output:y": BoundTensor(
+                tensor_id="output:y",
+                name="y",
+                role=BoundTensorRole.OUTPUT,
+                shape=(2, 8),
+                dtype="float16",
+                producer_node_id="op_linear",
+                source="definition.outputs",
+            ),
+        },
+        edges=(),
+        warnings=(),
+    )
+
+    estimate = estimate_bound_work(graph)[0]
+    payload = estimate.to_dict()
+
+    assert estimate.op_family == OpFamily.LINEAR_PROJECTION
+    assert payload["op_family"] == "linear_projection"
+    assert estimate.formula_kind == "gemm_flops"
+    assert estimate.formula == "2*M*N*K"
+    assert estimate.formula_inputs == {"M": 2, "N": 8, "K": 4}
+    assert estimate.flops == 128.0
+    assert estimate.read_bytes == 80.0
+    assert estimate.write_bytes == 32.0
+    assert estimate.total_bytes == 112.0
+    assert estimate.axis_source == "tensor_shapes"
+    assert estimate.confidence == EstimateConfidence.SUPPORTED
+
+
+def test_incomplete_linear_projection_degrades_without_fabricated_formula_or_bytes():
+    node = BoundGraphNode(
+        node_id="op_linear",
+        op_family=OpFamily.LINEAR_PROJECTION,
+        op_name="linear",
+        source_expression="torch.nn.functional.linear(x, weight)",
+        input_tensor_ids=("input:x", "input:weight"),
+        output_tensor_ids=("output:y",),
+        attributes={},
+        confidence=EstimateConfidence.SUPPORTED,
+        rationale="recognized linear projection",
+    )
+    graph = BoundGraph(
+        definition="linear_projection_incomplete",
+        workload_uuid="w1",
+        nodes=(node,),
+        tensors={
+            "input:x": BoundTensor(
+                tensor_id="input:x",
+                name="x",
+                role=BoundTensorRole.INPUT,
+                shape=(2, 4),
+                dtype="float16",
+                producer_node_id=None,
+                source="definition.inputs",
+            ),
+            "input:weight": BoundTensor(
+                tensor_id="input:weight",
+                name="weight",
+                role=BoundTensorRole.INPUT,
+                shape=(8, 4),
+                dtype="unknown",
+                producer_node_id=None,
+                source="definition.inputs",
+            ),
+            "output:y": BoundTensor(
+                tensor_id="output:y",
+                name="y",
+                role=BoundTensorRole.OUTPUT,
+                shape=None,
+                dtype="float16",
+                producer_node_id="op_linear",
+                source="definition.outputs",
+            ),
+        },
+        edges=(),
+        warnings=(),
+    )
+
+    estimate = estimate_bound_work(graph)[0]
+
+    assert estimate.op_family == OpFamily.LINEAR_PROJECTION
+    assert estimate.formula_kind == "gemm_flops"
+    assert estimate.formula == "2*M*N*K"
+    assert estimate.formula_inputs == {}
+    assert estimate.flops == 0.0
+    assert estimate.write_bytes == 0.0
+    assert estimate.total_bytes == estimate.read_bytes == 16.0
+    assert estimate.axis_source is None
+    assert estimate.confidence == EstimateConfidence.INEXACT
+    assert "inexact_bytes:missing_dtype:input:weight" in estimate.warnings
+    assert "inexact_bytes:missing_shape:output:y" in estimate.warnings
+
+
 def test_elementwise_and_activation_chain_estimates_stay_per_node():
     from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
 
