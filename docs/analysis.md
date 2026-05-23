@@ -216,6 +216,44 @@ coverage summary. This is the ROCm port's AMD-local analog of the paper's
 graph/evidence/SOL-analyzer artifact boundary; it is not an upstream NVIDIA
 B200 or full SOLAR reproduction claim.
 
+For v1.10 SOLAR derivation evidence, add `--solar-derivation` alongside the
+AMD-native report and AMD SOL bound sidecar options:
+
+```bash
+uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
+  --limit 5 \
+  --amd-score-report out/amd-score-report.json \
+  --amd-sol-bound-dir out/amd-sol-bounds \
+  --solar-derivation out/solar-derivation
+```
+
+This local workflow produces three artifact layers:
+
+- canonical `traces.json`: the benchmark trace JSONL output for each problem.
+  The canonical trace JSONL remains unchanged by `--amd-score-report`,
+  `--amd-sol-bound-dir`, and `--solar-derivation`.
+- AMD SOL v2 sidecars under `--amd-sol-bound-dir`: derived AMD roofline and
+  work-estimate inputs used for AMD-native score eligibility.
+- SOLAR derivation sidecars under `--solar-derivation`: paper-aligned automatic
+  SOLAR derivation evidence for the ROCm port, generated from `Definition`,
+  `Workload`, reference-visible source, and other static evidence. The
+  derivation boundary does not use candidate solution execution or benchmark
+  timing to create formulas.
+- AMD-native score reports at `--amd-score-report`: opt-in local derived
+  reports that consume canonical traces plus derived sidecars and expose
+  workload score state, warnings, and audit references.
+
+Inspect `coverage_summary` to understand how many operation groups are
+supported, inexact, or unsupported. Inspect `aggregate_status` before treating
+any score as usable: `scored` is eligible for AMD-native score output,
+`degraded` is an auditable provisional state with warnings, and `unscored`
+means score eligibility failed and the AMD-native score is intentionally
+omitted. Report warnings explain the guard that produced the state. Report
+entries also carry `derived_evidence_refs` for formula evidence, hardware model
+evidence, coverage, and score eligibility; these refs are derived-report-only
+metadata and do not change public trace fields or the canonical `evidence_refs`
+shape.
+
 For release-defined scoring, provide an optimized scoring baseline artifact:
 
 ```bash
@@ -279,6 +317,24 @@ Hardware model payloads carry both `hardware_validation_status` and
 target. CDNA 3 / MI300X real-hardware validation and CDNA 4 validation remain
 future work; reports must not present those paths as validated in this
 milestone.
+
+## v1.10 Claim Boundaries
+
+v1.10 derived sidecars and reports support the local
+`claim_level: amd-native-derived` interpretation. They provide paper-aligned
+automatic SOLAR derivation evidence for this ROCm port, but they are not
+paper-scale 124-model / 235-problem extraction, not upstream SOLAR parity, not
+NVIDIA B200 or Blackwell equivalence, not hosted leaderboard readiness, and not
+new real-hardware validation. They also do not claim CDNA 3 / MI300X
+validation, CDNA 4 validation, NVFP4 validation, MXFP4 validation, or any new
+hardware validation beyond the evidence explicitly recorded in the local
+artifacts.
+
+Use these artifacts as auditable AMD ROCm derived evidence. Do not present
+`coverage_summary`, `aggregate_status`, `derived_evidence_refs`, or score
+eligibility as proof of original-paper parity, upstream SOLAR parity, Blackwell
+or B200 equivalence, leaderboard readiness, or benchmark-scale hardware
+validation.
 
 ## AMD SOL Coverage Semantics
 
