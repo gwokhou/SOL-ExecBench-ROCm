@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "Downloading SOL-ExecBench dataset..."
-python scripts/download_solexecbench.py
+python scripts/download_solexecbench.py --output-root data/SOL-ExecBench/benchmark
 echo "Done"
 echo ""
 
