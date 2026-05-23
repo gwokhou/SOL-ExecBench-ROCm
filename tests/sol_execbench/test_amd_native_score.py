@@ -393,6 +393,41 @@ def test_trace_workflow_marks_missing_bound_as_unscored():
     assert score.evidence_refs == {"trace": "traces.json"}
 
 
+def test_trace_workflow_marks_failed_trace_as_unscored():
+    artifact = _matmul_artifact_v2()
+    trace = Trace(
+        definition=artifact.definition,
+        workload=Workload(
+            axes={"M": 2},
+            inputs={"a": {"type": "random"}, "b": {"type": "random"}},
+            uuid=artifact.workload_uuid,
+        ),
+        solution="solution",
+        evaluation=Evaluation(
+            status=EvaluationStatus.RUNTIME_ERROR,
+            environment=Environment(hardware="AMD gfx1200", libs={}),
+            timestamp="2026-05-23T00:00:00Z",
+            correctness=None,
+            performance=None,
+        ),
+    )
+
+    score = score_amd_native_trace_workload(
+        trace,
+        artifact,
+        trace_ref="traces.json",
+        sol_bound_ref="sol/matmul.amd-sol-v2.json",
+    )
+
+    assert score.supported is False
+    assert score.score is None
+    assert score.measured_latency_ms is None
+    assert score.baseline_latency_ms is None
+    assert INCOMPLETE_EVIDENCE_WARNING in score.warnings
+    assert score.evidence_refs["trace"] == "traces.json"
+    assert score.evidence_refs["sol_bound"] == "sol/matmul.amd-sol-v2.json"
+
+
 def test_suite_workflow_builds_scores_from_trace_and_artifact_maps():
     artifact = _matmul_artifact()
     trace = Trace(
