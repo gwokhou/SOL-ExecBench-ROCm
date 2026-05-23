@@ -1,0 +1,21 @@
+{
+  "case_id": "moe_positive_static_topk",
+  "family": "moe",
+  "fixture_class": "positive",
+  "negative_category": null,
+  "description": "Static top-k MoE route with explicit expert count, token count, expert shape, dispatch, and combine roles.",
+  "source_kind": "reference_snippet",
+  "reference": "def run(x, router, experts): gates = torch.topk(router(x), k=2, dim=-1); return dispatch_and_combine(x, experts, gates)",
+  "workload_axes": {"tokens": 128, "hidden": 256, "experts": 8, "top_k": 2},
+  "expectation": {
+    "expected_family": "moe",
+    "expected_subroles": ["router", "top_k", "dispatch", "expert_projection", "combine"],
+    "expected_confidence": "supported",
+    "expected_status": "scored",
+    "required_evidence": ["shape:tokens", "shape:hidden", "shape:experts", "route:top_k"],
+    "missing_evidence": [],
+    "warning_prefixes": [],
+    "degradation_rationale": null
+  },
+  "scope_boundary": {"paper_scale_dataset": false, "hosted_leaderboard_ready": false, "nvidia_blackwell_b200_equivalence": false, "real_hardware_validation": false}
+}

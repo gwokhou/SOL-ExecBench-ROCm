@@ -1,0 +1,21 @@
+{
+  "case_id": "moe_degraded_dynamic_routing",
+  "family": "moe",
+  "fixture_class": "degraded",
+  "negative_category": "dynamic",
+  "description": "MoE route is visible but per-token expert cardinality is dynamic.",
+  "source_kind": "reference_snippet",
+  "reference": "def run(x, router, experts, threshold): chosen = router(x) > threshold; return dispatch_dynamic(x, experts, chosen)",
+  "workload_axes": {"tokens": 128, "hidden": 256, "experts": 8},
+  "expectation": {
+    "expected_family": "moe",
+    "expected_subroles": ["router", "dispatch", "expert_projection", "combine"],
+    "expected_confidence": "inexact",
+    "expected_status": "degraded",
+    "required_evidence": ["shape:tokens", "shape:hidden", "shape:experts"],
+    "missing_evidence": ["route:top_k", "route:static_cardinality"],
+    "warning_prefixes": ["inexact_operator:moe_dynamic_routing", "aggregate_degraded:moe"],
+    "degradation_rationale": "Routing cardinality depends on thresholded runtime scores."
+  },
+  "scope_boundary": {"paper_scale_dataset": false, "hosted_leaderboard_ready": false, "nvidia_blackwell_b200_equivalence": false, "real_hardware_validation": false}
+}
