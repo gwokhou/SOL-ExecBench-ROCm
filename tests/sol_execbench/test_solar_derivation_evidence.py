@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import copy
+import sys
+from pathlib import Path
 
 import pytest
 
@@ -29,6 +31,16 @@ from sol_execbench.core.scoring.solar_derivation import (
     classify_solar_confidence,
     derive_solar_derivation_evidence,
     solar_derivation_from_dict,
+)
+
+TEST_DIR = str(Path(__file__).resolve().parent)
+if TEST_DIR not in sys.path:
+    sys.path.insert(0, TEST_DIR)
+
+from solar_derivation_fixtures import (  # noqa: E402
+    REQUIRED_SCOPE_BOUNDARY,
+    TARGET_FAMILIES,
+    load_solar_derivation_fixtures,
 )
 
 
@@ -64,6 +76,7 @@ def _contract_artifact() -> SolarDerivationEvidence:
         subroles=(qk_scores,),
         confidence="supported",
         status="scored",
+        required_evidence=("shape:batch", "shape:sequence_q", "shape:sequence_k"),
         missing_evidence=(),
         warning_prefixes=(),
         source=_source(kind="definition", detail="reference structure"),
@@ -238,6 +251,154 @@ def test_solar_derivation_source_boundary_records_sidecar_only_inputs():
         match="source_boundary.candidate_solution_execution must be a boolean",
     ):
         solar_derivation_from_dict(non_bool_boundary)
+
+
+def _fixture_evidence_payload(fixture: dict[str, object]) -> dict[str, object]:
+    expectation = fixture["expectation"]
+    assert isinstance(expectation, dict)
+    scope_boundary = fixture["scope_boundary"]
+    assert isinstance(scope_boundary, dict)
+    case_id = str(fixture["case_id"])
+    subroles = tuple(
+        SolarSubroleEvidence(
+            name=str(subrole),
+            node_ids=(f"{case_id}:{index}",),
+            tensor_ids=(),
+            source=SolarEvidenceSource(
+                kind=str(fixture["source_kind"]),
+                detail=f"fixture expectation:{case_id}:{subrole}",
+                node_id=f"{case_id}:{index}",
+                tensor_id=None,
+            ),
+            confidence=str(expectation["expected_confidence"]),
+            rationale=(
+                str(expectation["degradation_rationale"])
+                if expectation["degradation_rationale"] is not None
+                else "Fixture expectation is fully supported."
+            ),
+            missing_evidence=tuple(str(item) for item in expectation["missing_evidence"]),
+        )
+        for index, subrole in enumerate(expectation["expected_subroles"], start=1)
+    )
+    evidence = SolarDerivationEvidence(
+        definition=case_id,
+        workload_uuid=f"{case_id}:fixture-workload",
+        groups=(
+            SolarSemanticGroupEvidence(
+                family=str(expectation["expected_family"]),
+                group_id=f"fixture:{case_id}",
+                node_ids=tuple(subrole.node_ids[0] for subrole in subroles),
+                subroles=subroles,
+                confidence=str(expectation["expected_confidence"]),
+                status=str(expectation["expected_status"]),
+                required_evidence=tuple(
+                    str(item) for item in expectation["required_evidence"]
+                ),
+                missing_evidence=tuple(
+                    str(item) for item in expectation["missing_evidence"]
+                ),
+                warning_prefixes=tuple(
+                    str(item) for item in expectation["warning_prefixes"]
+                ),
+                source=SolarEvidenceSource(
+                    kind=str(fixture["source_kind"]),
+                    detail=f"fixture contract:{case_id}",
+                    node_id=None,
+                    tensor_id=None,
+                ),
+                rationale=(
+                    str(expectation["degradation_rationale"])
+                    if expectation["degradation_rationale"] is not None
+                    else "Fixture expectation is fully supported."
+                ),
+            ),
+        ),
+        tensors=(),
+        warnings=tuple(str(item) for item in expectation["warning_prefixes"]),
+        source_boundary={
+            "canonical_trace_jsonl": False,
+            "public_schema": False,
+            "candidate_solution_execution": False,
+        },
+    )
+
+    assert scope_boundary == {
+        "paper_scale_dataset": False,
+        "hosted_leaderboard_ready": False,
+        "nvidia_blackwell_b200_equivalence": False,
+        "real_hardware_validation": False,
+    }
+    return evidence.to_dict()
+
+
+def test_fixture_expectations_are_representable_as_derivation_evidence():
+    fixtures = load_solar_derivation_fixtures()
+    families: set[str] = set()
+    fixture_classes: set[str] = set()
+
+    for fixture in fixtures:
+        expectation = fixture["expectation"]
+        assert isinstance(expectation, dict)
+        parsed = solar_derivation_from_dict(_fixture_evidence_payload(fixture))
+        group = parsed.groups[0]
+        families.add(str(fixture["family"]))
+        fixture_classes.add(str(fixture["fixture_class"]))
+
+        assert group.family == expectation["expected_family"]
+        assert [subrole.name for subrole in group.subroles] == expectation[
+            "expected_subroles"
+        ]
+        assert group.confidence.value == expectation["expected_confidence"]
+        assert group.status == expectation["expected_status"]
+        assert list(group.required_evidence) == expectation["required_evidence"]
+        assert list(group.missing_evidence) == expectation["missing_evidence"]
+        assert list(group.warning_prefixes) == expectation["warning_prefixes"]
+        assert parsed.source_boundary == {
+            "canonical_trace_jsonl": False,
+            "public_schema": False,
+            "candidate_solution_execution": False,
+        }
+
+    assert families == TARGET_FAMILIES
+    assert fixture_classes >= {"positive", "degraded", "unsupported"}
+
+
+def test_degraded_and_unsupported_fixtures_require_missing_evidence():
+    fixtures = load_solar_derivation_fixtures()
+
+    for fixture in fixtures:
+        expectation = fixture["expectation"]
+        assert isinstance(expectation, dict)
+        parsed = solar_derivation_from_dict(_fixture_evidence_payload(fixture))
+        group = parsed.groups[0]
+
+        if fixture["fixture_class"] == "positive":
+            assert group.missing_evidence == ()
+            assert group.warning_prefixes == ()
+            continue
+
+        assert group.missing_evidence, fixture["case_id"]
+        assert group.warning_prefixes, fixture["case_id"]
+        assert group.status in {"degraded", "unscored"}
+        assert group.confidence.value in {"inexact", "unsupported"}
+
+
+def test_phase48_evidence_does_not_claim_paper_scale_or_hardware_validation():
+    fixtures = load_solar_derivation_fixtures()
+
+    for fixture in fixtures:
+        boundary = fixture["scope_boundary"]
+        assert isinstance(boundary, dict)
+        assert set(boundary) == REQUIRED_SCOPE_BOUNDARY
+        assert boundary["paper_scale_dataset"] is False
+        assert boundary["hosted_leaderboard_ready"] is False
+        assert boundary["nvidia_blackwell_b200_equivalence"] is False
+        assert boundary["real_hardware_validation"] is False
+
+        parsed = solar_derivation_from_dict(_fixture_evidence_payload(fixture))
+        assert parsed.source_boundary["canonical_trace_jsonl"] is False
+        assert parsed.source_boundary["public_schema"] is False
+        assert parsed.source_boundary["candidate_solution_execution"] is False
 
 
 def _matmul_definition() -> Definition:
