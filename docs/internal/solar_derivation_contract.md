@@ -6,23 +6,42 @@
 
 ## Claim Boundary
 
-This contract supports the v1.10 ROCm-port claim that maintainers have a
-paper-aligned, sidecar-only source of truth for SOLAR derivation fixture
-expectations before production extractor, formula, or score integration work
-changes behavior.
+This contract supports the v1.10 ROCm-port claim that maintainers have
+paper-aligned automatic SOLAR derivation evidence for this ROCm port through a
+sidecar-only source of truth for fixture expectations, extractor evidence,
+formula evidence, coverage, and score-eligibility refs.
 
-This contract is not paper-scale dataset extraction, not hosted leaderboard
-readiness, not NVIDIA Blackwell/B200 equivalence, and not new real-hardware
-validation. It also does not claim full upstream SOLAR equivalence, paper
-benchmark parity, MI300X validation, CDNA 3 validation, CDNA 4 validation, or
-new NVFP4/MXFP4 validation.
+This contract is not paper-scale dataset extraction, not the original
+124-model / 235-problem paper extraction, not hosted leaderboard readiness, not
+NVIDIA Blackwell/B200 equivalence, and not new real-hardware validation. It also
+does not claim full upstream SOLAR equivalence, paper benchmark parity, MI300X
+validation, CDNA 3 validation, CDNA 4 validation, or new NVFP4/MXFP4
+validation.
 
 No-claim phrases for guardrails:
 
 - not paper-scale dataset extraction
+- not original 124-model / 235-problem extraction
 - not hosted leaderboard readiness
 - not NVIDIA Blackwell/B200 equivalence
 - not new real-hardware validation
+- not upstream SOLAR parity
+- not CDNA 3 / MI300X / CDNA 4 validation
+- not NVFP4/MXFP4 validation
+
+## Derivation Source Boundary
+
+SOLAR derivation sidecars are derived from canonical `Definition` and
+`Workload` inputs plus reference-visible and static evidence available to the
+ROCm port's analyzer. The sidecar may record formula evidence, hardware-model
+refs, `coverage_summary`, `aggregate_status`, warnings, and score eligibility
+refs when those values can be justified from those static inputs.
+
+The derivation boundary excludes `candidate_solution_execution`, candidate
+solution execution, submitted kernel behavior, and timed benchmark results as
+sources for formula evidence. Timing and candidate results may appear in
+separate trace or AMD-native score contexts, but they must not be used to create
+SOLAR formula evidence.
 
 ## Sidecar-Only Artifact Rule
 
@@ -262,5 +281,6 @@ contract.
 
 Phase 52 may run dataset-level workflows against the implemented sidecars, but
 this document remains an internal contract and does not itself provide
-paper-scale extraction, hosted leaderboard readiness, NVIDIA Blackwell/B200
-equivalence, or new real-hardware validation.
+paper-scale extraction, original 124-model / 235-problem extraction, hosted
+leaderboard readiness, NVIDIA Blackwell/B200 equivalence, upstream SOLAR parity,
+or new real-hardware validation.
