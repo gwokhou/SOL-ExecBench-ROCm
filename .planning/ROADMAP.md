@@ -233,7 +233,20 @@ Plans:
      update semantics are incomplete instead of silently producing scored
      evidence.
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 50-01-PLAN.md — Add conservative MoE degraded family modeling.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 50-02-PLAN.md — Add conservative SSM/Mamba degraded family modeling.
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 50-03-PLAN.md — Close guardrails and regressions for degraded complex families.
 
 ### Phase 51: Sidecar Coverage And Score Guards
 
