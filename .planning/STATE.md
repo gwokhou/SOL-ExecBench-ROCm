@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v1.11
 milestone_name: Paper Dataset Parity Inventory and ROCm Execution Closure
 status: planning
-last_updated: "2026-05-23T12:13:36.233Z"
+last_updated: "2026-05-23T12:30:21Z"
 last_activity: 2026-05-23
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -20,14 +20,14 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-23)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Milestone complete
+**Current focus:** v1.11 planning: paper dataset parity inventory and ROCm execution closure
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 53-57 roadmap defined
 Plan: —
-Status: Defining requirements
-Last activity: 2026-05-23 — Milestone v1.11 started
+Status: Planning phase details
+Last activity: 2026-05-23 — v1.11 requirements defined and roadmap drafted
 
 ## Performance Metrics
 
@@ -47,6 +47,11 @@ Last activity: 2026-05-23 — Milestone v1.11 started
 | 50. Degraded Complex Family Modeling | 3 | - | - |
 | 51. Sidecar Coverage And Score Guards | 3 | - | - |
 | 52. Dataset Runner And Public Contract Closure | 3 | - | - |
+| 53. Dataset Contract And Acquisition Metadata | 0 | - | - |
+| 54. Paper Inventory And ROCm Readiness Classification | 0 | - | - |
+| 55. Ready Subset Selection And Bounded Execution Closure | 0 | - | - |
+| 56. Parity Gap Reporting And Evidence Review | 0 | - | - |
+| 57. Claim Guardrails, Docs, And Release Closure | 0 | - | - |
 
 **Recent Trend:**
 
@@ -112,7 +117,7 @@ Decisions are logged in PROJECT.md. Recent decisions affecting current work:
 
 ### Pending Todos
 
-None yet.
+None found.
 
 ### Blockers/Concerns
 
@@ -138,4 +143,4 @@ Resume file: None
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Confirm the v1.11 roadmap, then run `$gsd-discuss-phase 53`.
