@@ -154,6 +154,7 @@ def _gemm_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstim
             "GEMM FLOPs estimated from input/output tensor shapes",
             rationale_parts,
         ),
+        axis_source="tensor_shapes",
         warnings=tuple(warnings),
     )
 
