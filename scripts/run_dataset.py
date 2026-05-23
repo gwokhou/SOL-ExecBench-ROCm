@@ -59,9 +59,9 @@ from sol_execbench.core.scoring.baseline_artifact import (
     load_scoring_baseline_artifact,
 )
 from sol_execbench.core.scoring.amd_sol import (
-    build_amd_sol_bound_artifact,
     default_amd_hardware_models,
 )
+from sol_execbench.core.scoring.amd_sol_v2 import build_amd_sol_bound_v2_artifact
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -465,6 +465,7 @@ def build_amd_score_reports_for_problem(
     traces_payload: list[dict],
     trace_ref: str,
     baseline_artifact: ScoringBaselineArtifact | None = None,
+    sol_bound_artifact_dir: Path | None = None,
 ) -> list[AmdNativeScore]:
     """Build derived AMD-native scores for one dataset-run problem."""
     definition = Definition(**definition_payload)
@@ -485,17 +486,31 @@ def build_amd_score_reports_for_problem(
     for trace in traces:
         workload = workloads.get(trace.workload.uuid)
         artifact = (
-            build_amd_sol_bound_artifact(definition, workload, hardware_model)
+            build_amd_sol_bound_v2_artifact(
+                definition,
+                workload,
+                hardware_model,
+                hardware_model_ref=f"default_amd_hardware_models.{hardware_model_key}",
+            )
             if workload is not None
             else None
         )
+        sol_bound_ref = f"derived:{definition.name}:{trace.workload.uuid}:amd_sol_bound_v2"
+        if artifact is not None and sol_bound_artifact_dir is not None:
+            sol_bound_artifact_dir.mkdir(parents=True, exist_ok=True)
+            sidecar_path = (
+                sol_bound_artifact_dir
+                / f"{definition.name}.{trace.workload.uuid}.amd-sol-v2.json"
+            )
+            sidecar_path.write_text(json.dumps(artifact.to_dict(), indent=2))
+            sol_bound_ref = str(sidecar_path)
         scores.append(
             score_amd_native_trace_workload(
                 trace,
                 artifact,
                 trace_ref=trace_ref,
                 timing_evidence_ref=trace_ref,
-                sol_bound_ref=f"derived:{definition.name}:{trace.workload.uuid}:amd_sol_bound",
+                sol_bound_ref=sol_bound_ref,
                 baseline_ref=(
                     f"{baseline_artifact.source}#{definition.name}:{trace.workload.uuid}"
                     if baseline_artifact
@@ -615,6 +630,15 @@ def main():
             "Optional release-defined scoring baseline artifact JSON for "
             "--amd-score-report. Without it, reference latency is used as a "
             "provisional fallback."
+        ),
+    )
+    ap.add_argument(
+        "--amd-sol-bound-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Optional directory for derived AMD SOL bound v2 sidecars when "
+            "--amd-score-report is enabled."
         ),
     )
     ap.add_argument(
@@ -794,6 +818,7 @@ def main():
                     traces_payload=traces,
                     trace_ref=str(traces_path.relative_to(output_dir)),
                     baseline_artifact=scoring_baseline,
+                    sol_bound_artifact_dir=args.amd_sol_bound_dir,
                 )
             )
 
