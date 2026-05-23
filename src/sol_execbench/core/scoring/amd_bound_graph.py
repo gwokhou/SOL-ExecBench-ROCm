@@ -830,7 +830,9 @@ def _annotate_moe_graph(graph: BoundGraph) -> BoundGraph:
 
         attrs = {**node.attributes}
         subrole = attrs.get("subrole")
-        if subrole == "top_k":
+        if subrole == "router":
+            attrs.update(_moe_static_shape_metadata(graph, node))
+        elif subrole == "top_k":
             attrs.update(_moe_route_metadata_from_topk(node))
         elif subrole in {"dispatch", "expert_projection", "combine"}:
             attrs.update(_moe_static_shape_metadata(graph, node))
@@ -931,10 +933,13 @@ def _moe_static_shape_metadata(graph: BoundGraph, node: BoundGraphNode) -> dict[
         if tensor is None or tensor.shape is None:
             continue
         name = tensor.name.lower()
-        if len(tensor.shape) >= 2 and ("expert" not in attrs or "expert" in name):
+        if len(tensor.shape) >= 2:
             if "expert" in name and len(tensor.shape) >= 3:
                 attrs["expert_count"] = int(tensor.shape[0])
                 attrs["hidden_size"] = int(tensor.shape[-1])
+            elif "router" in name:
+                attrs["hidden_size"] = int(tensor.shape[0])
+                attrs["expert_count"] = int(tensor.shape[-1])
             elif "token_count" not in attrs:
                 attrs["token_count"] = int(tensor.shape[0])
                 attrs["hidden_size"] = int(tensor.shape[-1])

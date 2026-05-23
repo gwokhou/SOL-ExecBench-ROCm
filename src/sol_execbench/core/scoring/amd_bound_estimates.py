@@ -450,25 +450,32 @@ def _moe_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstima
     write_bytes = _sum_tensor_bytes(output_tensors, "write", warnings, rationale_parts)
     total_bytes = read_bytes + write_bytes
     if subrole != "dispatch":
+        formula_inputs = _moe_visible_formula_inputs(node)
+        confidence = (
+            EstimateConfidence.SUPPORTED
+            if formula_inputs and not warnings
+            else EstimateConfidence.INEXACT
+        )
         return OperatorWorkEstimate(
             node_id=node.node_id,
             op_family=OpFamily.MOE,
             op_name=node.op_name,
             formula_kind="moe_dynamic_route_bytes",
             formula="visible_route_bytes",
-            formula_inputs=_moe_visible_formula_inputs(node),
+            formula_inputs=formula_inputs,
             flops=0.0,
             read_bytes=read_bytes,
             write_bytes=write_bytes,
             intermediate_bytes=0.0,
             movement_bytes=0.0,
             total_bytes=total_bytes,
-            confidence=EstimateConfidence.INEXACT,
+            confidence=confidence,
             rationale=_join_rationale(
                 f"MoE {subrole or 'primitive'} has visible routing bytes only",
                 rationale_parts,
             ),
             movement_kind="moe_route",
+            axis_source="tensor_shapes" if formula_inputs else None,
             warnings=tuple(dict.fromkeys(warnings)),
         )
 

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.scoring.amd_bound_estimates import estimate_bound_work
@@ -8,6 +11,13 @@ from sol_execbench.core.scoring.solar_derivation import (
     build_solar_derivation_evidence,
     solar_derivation_from_dict,
 )
+
+
+FIXTURE_DIR = Path(__file__).parent / "fixtures" / "solar_derivation"
+
+
+def _load_fixture(name: str) -> dict[str, object]:
+    return json.loads((FIXTURE_DIR / name).read_text(encoding="utf-8"))
 
 
 def _attention_definition(*, mask: bool = False) -> Definition:
@@ -68,6 +78,136 @@ def _attention_workload(*, mask: bool = False) -> Workload:
     if mask:
         inputs["mask"] = {"type": "random"}
     return Workload(axes={"batch": 2}, inputs=inputs, uuid="attention-workload")
+
+
+def _moe_definition(*, dynamic: bool = False, taxonomy_only: bool = False) -> Definition:
+    if taxonomy_only:
+        return Definition(
+            name="moe_taxonomy_only",
+            axes={
+                "tokens": {"type": "const", "value": 128},
+                "hidden": {"type": "const", "value": 256},
+            },
+            inputs={
+                "x": {"shape": ["tokens", "hidden"], "dtype": "float16"},
+                "opaque_moe": {"shape": ["hidden", "hidden"], "dtype": "float16"},
+            },
+            outputs={"out": {"shape": ["tokens", "hidden"], "dtype": "float16"}},
+            reference="def run(x, opaque_moe):\n    return opaque_moe(x)\n",
+        )
+    inputs = {
+        "x": {"shape": ["tokens", "hidden"], "dtype": "float16"},
+        "router": {"shape": ["hidden", "experts"], "dtype": "float16"},
+        "expert_weights": {
+            "shape": ["experts", "hidden", "hidden"],
+            "dtype": "float16",
+        },
+    }
+    if dynamic:
+        inputs["threshold"] = {"shape": None, "dtype": "float16"}
+        reference = (
+            "def run(x, router, expert_weights, threshold):\n"
+            "    scores = router(x)\n"
+            "    chosen = scores > threshold\n"
+            "    return dispatch_dynamic(x, expert_weights, chosen)\n"
+        )
+    else:
+        reference = (
+            "import torch\n\n"
+            "def run(x, router, expert_weights):\n"
+            "    scores = router(x)\n"
+            "    gates = torch.topk(scores, k=2, dim=-1)\n"
+            "    return dispatch_and_combine(x, expert_weights, gates)\n"
+        )
+    return Definition(
+        name="moe_dynamic_route" if dynamic else "moe_static_route",
+        axes={
+            "tokens": {"type": "const", "value": 128},
+            "hidden": {"type": "const", "value": 256},
+            "experts": {"type": "const", "value": 8},
+        },
+        inputs=inputs,
+        outputs={"out": {"shape": ["tokens", "hidden"], "dtype": "float16"}},
+        reference=reference,
+    )
+
+
+def _moe_workload(*, dynamic: bool = False, taxonomy_only: bool = False) -> Workload:
+    if taxonomy_only:
+        return Workload(
+            axes={},
+            inputs={"x": {"type": "random"}, "opaque_moe": {"type": "random"}},
+            uuid="moe-taxonomy-workload",
+        )
+    inputs = {
+        "x": {"type": "random"},
+        "router": {"type": "random"},
+        "expert_weights": {"type": "random"},
+    }
+    if dynamic:
+        inputs["threshold"] = {"type": "random"}
+    return Workload(axes={}, inputs=inputs, uuid="moe-dynamic-workload" if dynamic else "moe-static-workload")
+
+
+def test_moe_static_route_sidecar_matches_positive_fixture_contract():
+    fixture = _load_fixture("moe_positive.json")
+    expectation = fixture["expectation"]
+    evidence = build_solar_derivation_evidence(_moe_definition(), _moe_workload())
+    group = next(group for group in evidence.groups if group.family == "moe")
+
+    assert group.status == expectation["expected_status"]
+    assert group.confidence.value == expectation["expected_confidence"]
+    assert [subrole.name for subrole in group.subroles] == expectation["expected_subroles"]
+    for required in expectation["required_evidence"]:
+        assert required in group.required_evidence
+    assert group.missing_evidence == ()
+    assert group.warning_prefixes == ()
+    assert {item.formula_kind for item in group.formula_evidence} >= {
+        "moe_static_route_flops",
+        "moe_dynamic_route_bytes",
+    }
+    assert any(item.total_bytes > 0.0 for item in group.byte_evidence)
+    assert group.bound_evidence
+
+
+def test_moe_dynamic_route_sidecar_matches_degraded_fixture_contract():
+    fixture = _load_fixture("moe_degraded_dynamic_routing.json")
+    expectation = fixture["expectation"]
+    evidence = build_solar_derivation_evidence(
+        _moe_definition(dynamic=True),
+        _moe_workload(dynamic=True),
+    )
+    group = next(group for group in evidence.groups if group.family == "moe")
+
+    assert group.status == expectation["expected_status"]
+    assert group.confidence.value == expectation["expected_confidence"]
+    assert [subrole.name for subrole in group.subroles] == expectation["expected_subroles"]
+    for missing in expectation["missing_evidence"]:
+        assert missing in group.missing_evidence
+    for warning in expectation["warning_prefixes"]:
+        assert warning in group.warning_prefixes
+    assert any(
+        item.formula_kind == "moe_dynamic_route_bytes"
+        for item in group.formula_evidence
+    )
+
+
+def test_moe_taxonomy_only_sidecar_matches_unsupported_fixture_contract():
+    fixture = _load_fixture("moe_unsupported_taxonomy_only.json")
+    expectation = fixture["expectation"]
+    evidence = build_solar_derivation_evidence(
+        _moe_definition(taxonomy_only=True),
+        _moe_workload(taxonomy_only=True),
+    )
+    group = next(group for group in evidence.groups if group.family == "moe")
+
+    assert group.status == expectation["expected_status"]
+    assert group.confidence.value == expectation["expected_confidence"]
+    assert group.subroles == ()
+    for missing in expectation["missing_evidence"]:
+        assert missing in group.missing_evidence
+    for warning in expectation["warning_prefixes"]:
+        assert warning in group.warning_prefixes
 
 
 def test_attention_sidecar_records_subroles_formula_bytes_and_bounds():

@@ -386,6 +386,14 @@ def classify_solar_confidence(
         )
         missing.extend(memory_missing)
         warning_prefixes.extend(memory_warnings)
+    if family_value == OpFamily.MOE.value:
+        moe_missing, moe_warnings = _moe_confidence_evidence(
+            nodes,
+            estimates,
+            subrole_names,
+        )
+        missing.extend(moe_missing)
+        warning_prefixes.extend(moe_warnings)
 
     confidence = _worst_estimate_confidence(estimates)
     if family_value == OpFamily.UNSUPPORTED.value or not nodes or not subrole_names:
@@ -398,6 +406,8 @@ def classify_solar_confidence(
         warning_prefixes.append(f"inexact_operator:{family_value}")
         if family_value == OpFamily.ATTENTION.value:
             warning_prefixes.append("aggregate_degraded:attention")
+        if family_value == OpFamily.MOE.value:
+            warning_prefixes.append("aggregate_degraded:moe")
         warning_prefixes.append("aggregate_degraded:incomplete semantic evidence")
         rationale = (
             f"{family_value} semantics are visible but metadata is incomplete: "
@@ -407,6 +417,8 @@ def classify_solar_confidence(
         warning_prefixes.append(f"unsupported_operator:{family_value}")
         if family_value == OpFamily.ATTENTION.value:
             warning_prefixes.append("aggregate_unscored:attention")
+        if family_value == OpFamily.MOE.value:
+            warning_prefixes.append("aggregate_unscored:moe")
         warning_prefixes.append("aggregate_unscored:unsupported semantic evidence")
         rationale = (
             f"{family_value} evidence is unsupported for scoring: "
@@ -863,6 +875,7 @@ def _semantic_group_evidence(
                 confidence=classification.confidence,
                 status=classification.status,
                 required_evidence=_required_evidence_for_group(
+                    family,
                     related_tensors,
                     ordered_estimates,
                     formula_evidence=formula_evidence,
@@ -882,6 +895,7 @@ def _semantic_group_evidence(
 
 
 def _required_evidence_for_group(
+    family: str,
     tensors: tuple[SolarTensorEvidence, ...],
     estimates: tuple[OperatorWorkEstimate, ...],
     *,
@@ -911,6 +925,17 @@ def _required_evidence_for_group(
     required.extend(f"formula_evidence:{evidence.node_id}" for evidence in formula_evidence)
     required.extend(f"byte_evidence:{evidence.node_id}" for evidence in byte_evidence)
     required.extend(f"bound_evidence:{evidence.node_id}" for evidence in bound_evidence)
+    if family == OpFamily.MOE.value:
+        for estimate in estimates:
+            if estimate.formula_kind == "moe_static_route_flops":
+                required.extend(("shape:tokens", "shape:hidden", "shape:experts", "route:top_k"))
+            elif estimate.formula_kind == "moe_dynamic_route_bytes":
+                if "tokens" in estimate.formula_inputs:
+                    required.append("shape:tokens")
+                if "hidden" in estimate.formula_inputs:
+                    required.append("shape:hidden")
+                if "experts" in estimate.formula_inputs:
+                    required.append("shape:experts")
     return _unique_sorted(required)
 
 
@@ -1077,6 +1102,8 @@ def _subroles_for_group(
         return _convolution_subroles(nodes, tensor_evidence_by_id)
     if family == OpFamily.EMBEDDING_POSITIONAL.value:
         return _embedding_positional_subroles(nodes, tensor_evidence_by_id)
+    if family == OpFamily.MOE.value:
+        return _moe_subroles(nodes, tensor_evidence_by_id)
     if family in {OpFamily.GEMM.value, OpFamily.LINEAR_PROJECTION.value}:
         return _linear_subroles(nodes, tensor_evidence_by_id)
     if family in {
@@ -1266,6 +1293,71 @@ def _embedding_positional_confidence_evidence(
     return missing, warnings
 
 
+def _moe_confidence_evidence(
+    nodes: tuple[BoundGraphNode, ...],
+    estimates: tuple[OperatorWorkEstimate, ...],
+    subrole_names: tuple[str, ...],
+) -> tuple[list[str], list[str]]:
+    missing: list[str] = []
+    warnings: list[str] = []
+    if any(node.attributes.get("taxonomy_only") for node in nodes):
+        missing.extend(
+            (
+                "subrole:router",
+                "subrole:expert_projection",
+                "subrole:dispatch",
+                "subrole:combine",
+            )
+        )
+        warnings.append("unsupported_operator:moe_taxonomy_only")
+        return missing, warnings
+
+    subroles = set(subrole_names)
+    required = {"router", "dispatch", "expert_projection", "combine"}
+    missing.extend(f"subrole:{name}" for name in sorted(required - subroles))
+    if "top_k" not in subroles:
+        missing.append("route:top_k")
+    dispatch_nodes = [
+        node for node in nodes if node.attributes.get("subrole") == "dispatch"
+    ]
+    if not dispatch_nodes:
+        missing.append("route:static_cardinality")
+    for node in dispatch_nodes:
+        if not isinstance(node.attributes.get("token_count"), int):
+            missing.append("shape:tokens")
+        if not isinstance(node.attributes.get("hidden_size"), int):
+            missing.append("shape:hidden")
+        if not isinstance(node.attributes.get("expert_count"), int):
+            missing.append("shape:experts")
+        if not isinstance(node.attributes.get("route_top_k"), int):
+            missing.append("route:top_k")
+            missing.append("route:static_cardinality")
+            warnings.append("inexact_operator:moe_dynamic_routing")
+        for item in node.attributes.get("missing_route_metadata", ()):
+            if isinstance(item, str):
+                missing.append(item)
+                if item == "route:top_k":
+                    warnings.append("inexact_operator:moe_missing_top_k")
+                elif item == "route:static_cardinality":
+                    warnings.append("inexact_operator:moe_missing_static_cardinality")
+    for estimate in estimates:
+        for warning in estimate.warnings:
+            if warning.startswith("inexact_operator:moe_") or warning.startswith(
+                "unsupported_operator:moe_"
+            ):
+                warnings.append(warning)
+        if estimate.formula_kind == "moe_static_route_flops":
+            for key, evidence_name in (
+                ("tokens", "shape:tokens"),
+                ("hidden", "shape:hidden"),
+                ("experts", "shape:experts"),
+                ("top_k", "route:top_k"),
+            ):
+                if key not in estimate.formula_inputs:
+                    missing.append(evidence_name)
+    return missing, warnings
+
+
 def _linear_subroles(
     nodes: tuple[BoundGraphNode, ...],
     tensor_evidence_by_id: dict[str, SolarTensorEvidence],
@@ -1380,6 +1472,47 @@ def _embedding_positional_subroles(
             )
         )
     return tuple(sorted(subroles, key=lambda item: item.name))
+
+
+def _moe_subroles(
+    nodes: tuple[BoundGraphNode, ...],
+    tensor_evidence_by_id: dict[str, SolarTensorEvidence],
+) -> tuple[SolarSubroleEvidence, ...]:
+    subroles: list[SolarSubroleEvidence] = []
+    seen: set[tuple[str, str]] = set()
+    for node in sorted(nodes, key=lambda item: item.node_id):
+        if node.attributes.get("taxonomy_only"):
+            continue
+        names: list[str] = []
+        subrole = node.attributes.get("subrole")
+        if isinstance(subrole, str):
+            names.append(subrole)
+        for name in node.attributes.get("moe_subroles", ()):
+            if isinstance(name, str):
+                names.append(name)
+        for name in dict.fromkeys(names):
+            key = (name, node.node_id)
+            if key in seen:
+                continue
+            seen.add(key)
+            subroles.append(
+                _subrole_from_tensor_ids(
+                    name=name,
+                    node=node,
+                    tensor_ids=_node_tensor_ids(node),
+                    tensor_evidence_by_id=tensor_evidence_by_id,
+                )
+            )
+    order = {
+        "router": 0,
+        "top_k": 1,
+        "dispatch": 2,
+        "expert_projection": 3,
+        "combine": 4,
+    }
+    return tuple(
+        sorted(subroles, key=lambda item: (order.get(item.name, 99), item.name))
+    )
 
 
 def _op_name_subroles(
