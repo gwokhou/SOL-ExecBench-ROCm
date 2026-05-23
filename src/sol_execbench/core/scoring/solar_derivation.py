@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import isfinite
 from typing import Any
 
 from sol_execbench.core.data.definition import Definition
@@ -22,11 +23,16 @@ from sol_execbench.core.scoring.amd_bound_graph import (
     OpFamily,
     build_bound_graph,
 )
-from sol_execbench.core.scoring.amd_hardware_models import EstimateConfidence
+from sol_execbench.core.scoring.amd_hardware_models import (
+    EstimateConfidence,
+    default_amd_hardware_models,
+)
 
 
 SOLAR_DERIVATION_SCHEMA_VERSION = "sol_execbench.solar_derivation.v1"
+SOLAR_DEFAULT_AMD_HARDWARE_MODEL_REF = "default_amd_hardware_models.gfx1200"
 SOLAR_DERIVATION_STATUSES = frozenset({"scored", "degraded", "unscored"})
+SOLAR_BOUND_LIMITING_RESOURCES = frozenset({"compute", "memory", "none"})
 SOLAR_DERIVATION_SOURCE_BOUNDARY_FIELDS = frozenset(
     {
         "canonical_trace_jsonl",
@@ -105,6 +111,94 @@ class SolarSubroleEvidence:
 
 
 @dataclass(frozen=True)
+class SolarFormulaEvidence:
+    """Group-local formula evidence derived from an operator work estimate."""
+
+    node_id: str
+    family: str
+    formula_kind: str
+    formula: str
+    formula_inputs: dict[str, object]
+    source: SolarEvidenceSource
+    confidence: EstimateConfidence | str
+    rationale: str
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "node_id": self.node_id,
+            "family": self.family,
+            "formula_kind": self.formula_kind,
+            "formula": self.formula,
+            "formula_inputs": dict(sorted(self.formula_inputs.items())),
+            "source": self.source.to_dict(),
+            "confidence": _confidence_value(self.confidence),
+            "rationale": self.rationale,
+        }
+
+
+@dataclass(frozen=True)
+class SolarByteEvidence:
+    """Group-local byte evidence derived from an operator work estimate."""
+
+    node_id: str
+    family: str
+    read_bytes: float
+    write_bytes: float
+    intermediate_bytes: float
+    movement_bytes: float
+    total_bytes: float
+    dtype_inputs: dict[str, str]
+    tensor_ids: tuple[str, ...]
+    source: SolarEvidenceSource
+    confidence: EstimateConfidence | str
+    rationale: str
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "node_id": self.node_id,
+            "family": self.family,
+            "read_bytes": self.read_bytes,
+            "write_bytes": self.write_bytes,
+            "intermediate_bytes": self.intermediate_bytes,
+            "movement_bytes": self.movement_bytes,
+            "total_bytes": self.total_bytes,
+            "dtype_inputs": dict(sorted(self.dtype_inputs.items())),
+            "tensor_ids": list(self.tensor_ids),
+            "source": self.source.to_dict(),
+            "confidence": _confidence_value(self.confidence),
+            "rationale": self.rationale,
+        }
+
+
+@dataclass(frozen=True)
+class SolarBoundEvidence:
+    """Group-local AMD SOL-style bound evidence for one operator."""
+
+    node_id: str
+    family: str
+    compute_bound_ms: float
+    memory_bound_ms: float
+    limiting_resource: str
+    sol_bound_ms: float
+    source: SolarEvidenceSource
+    confidence: EstimateConfidence | str
+    rationale: str
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "node_id": self.node_id,
+            "family": self.family,
+            "compute_bound_ms": self.compute_bound_ms,
+            "memory_bound_ms": self.memory_bound_ms,
+            "limiting_resource": self.limiting_resource,
+            "sol_bound_ms": self.sol_bound_ms,
+            "source": self.source.to_dict(),
+            "confidence": _confidence_value(self.confidence),
+            "rationale": self.rationale,
+        }
+
+
+@dataclass(frozen=True)
 class SolarSemanticGroupEvidence:
     """Compound-family semantic grouping evidence for SOLAR derivation."""
 
@@ -119,6 +213,9 @@ class SolarSemanticGroupEvidence:
     warning_prefixes: tuple[str, ...]
     source: SolarEvidenceSource
     rationale: str
+    formula_evidence: tuple[SolarFormulaEvidence, ...] = ()
+    byte_evidence: tuple[SolarByteEvidence, ...] = ()
+    bound_evidence: tuple[SolarBoundEvidence, ...] = ()
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -133,6 +230,11 @@ class SolarSemanticGroupEvidence:
             "warning_prefixes": list(self.warning_prefixes),
             "source": self.source.to_dict(),
             "rationale": self.rationale,
+            "formula_evidence": [
+                evidence.to_dict() for evidence in self.formula_evidence
+            ],
+            "byte_evidence": [evidence.to_dict() for evidence in self.byte_evidence],
+            "bound_evidence": [evidence.to_dict() for evidence in self.bound_evidence],
         }
 
 
@@ -374,6 +476,9 @@ def _group_from_dict(payload: Any, index: int) -> SolarSemanticGroupEvidence:
             "warning_prefixes",
             "source",
             "rationale",
+            "formula_evidence",
+            "byte_evidence",
+            "bound_evidence",
         },
         source=source,
     )
@@ -399,6 +504,155 @@ def _group_from_dict(payload: Any, index: int) -> SolarSemanticGroupEvidence:
         source=_evidence_source_from_dict(
             _parse_dict(raw, "source", source=source), source=f"{source}.source"
         ),
+        rationale=_parse_str(raw, "rationale", source=source),
+        formula_evidence=tuple(
+            _formula_evidence_from_dict(item, evidence_index, group_index=index)
+            for evidence_index, item in enumerate(
+                _parse_list(raw, "formula_evidence", source=source)
+            )
+        ),
+        byte_evidence=tuple(
+            _byte_evidence_from_dict(item, evidence_index, group_index=index)
+            for evidence_index, item in enumerate(
+                _parse_list(raw, "byte_evidence", source=source)
+            )
+        ),
+        bound_evidence=tuple(
+            _bound_evidence_from_dict(item, evidence_index, group_index=index)
+            for evidence_index, item in enumerate(
+                _parse_list(raw, "bound_evidence", source=source)
+            )
+        ),
+    )
+
+
+def _formula_evidence_from_dict(
+    payload: Any,
+    index: int,
+    *,
+    group_index: int,
+) -> SolarFormulaEvidence:
+    source = f"groups[{group_index}].formula_evidence[{index}]"
+    raw = _ensure_dict(payload, source=source)
+    _require_exact_keys(
+        raw,
+        {
+            "node_id",
+            "family",
+            "formula_kind",
+            "formula",
+            "formula_inputs",
+            "source",
+            "confidence",
+            "rationale",
+        },
+        source=source,
+    )
+    return SolarFormulaEvidence(
+        node_id=_parse_str(raw, "node_id", source=source),
+        family=_parse_str(raw, "family", source=source),
+        formula_kind=_parse_str(raw, "formula_kind", source=source),
+        formula=_parse_str(raw, "formula", source=source),
+        formula_inputs=_parse_object_map(raw, "formula_inputs", source=source),
+        source=_evidence_source_from_dict(
+            _parse_dict(raw, "source", source=source), source=f"{source}.source"
+        ),
+        confidence=_parse_confidence(raw, "confidence", source=source),
+        rationale=_parse_str(raw, "rationale", source=source),
+    )
+
+
+def _byte_evidence_from_dict(
+    payload: Any,
+    index: int,
+    *,
+    group_index: int,
+) -> SolarByteEvidence:
+    source = f"groups[{group_index}].byte_evidence[{index}]"
+    raw = _ensure_dict(payload, source=source)
+    _require_exact_keys(
+        raw,
+        {
+            "node_id",
+            "family",
+            "read_bytes",
+            "write_bytes",
+            "intermediate_bytes",
+            "movement_bytes",
+            "total_bytes",
+            "dtype_inputs",
+            "tensor_ids",
+            "source",
+            "confidence",
+            "rationale",
+        },
+        source=source,
+    )
+    return SolarByteEvidence(
+        node_id=_parse_str(raw, "node_id", source=source),
+        family=_parse_str(raw, "family", source=source),
+        read_bytes=_parse_non_negative_float(raw, "read_bytes", source=source),
+        write_bytes=_parse_non_negative_float(raw, "write_bytes", source=source),
+        intermediate_bytes=_parse_non_negative_float(
+            raw, "intermediate_bytes", source=source
+        ),
+        movement_bytes=_parse_non_negative_float(raw, "movement_bytes", source=source),
+        total_bytes=_parse_non_negative_float(raw, "total_bytes", source=source),
+        dtype_inputs=_parse_str_map(raw, "dtype_inputs", source=source),
+        tensor_ids=_parse_str_tuple(raw, "tensor_ids", source=source),
+        source=_evidence_source_from_dict(
+            _parse_dict(raw, "source", source=source), source=f"{source}.source"
+        ),
+        confidence=_parse_confidence(raw, "confidence", source=source),
+        rationale=_parse_str(raw, "rationale", source=source),
+    )
+
+
+def _bound_evidence_from_dict(
+    payload: Any,
+    index: int,
+    *,
+    group_index: int,
+) -> SolarBoundEvidence:
+    source = f"groups[{group_index}].bound_evidence[{index}]"
+    raw = _ensure_dict(payload, source=source)
+    _require_exact_keys(
+        raw,
+        {
+            "node_id",
+            "family",
+            "compute_bound_ms",
+            "memory_bound_ms",
+            "limiting_resource",
+            "sol_bound_ms",
+            "source",
+            "confidence",
+            "rationale",
+        },
+        source=source,
+    )
+    limiting_resource = _parse_str(raw, "limiting_resource", source=source)
+    if limiting_resource not in SOLAR_BOUND_LIMITING_RESOURCES:
+        valid = ", ".join(sorted(SOLAR_BOUND_LIMITING_RESOURCES))
+        raise ValueError(
+            f"{source}.limiting_resource has invalid value "
+            f"'{limiting_resource}', expected one of: {valid}"
+        )
+    return SolarBoundEvidence(
+        node_id=_parse_str(raw, "node_id", source=source),
+        family=_parse_str(raw, "family", source=source),
+        compute_bound_ms=_parse_non_negative_float(
+            raw, "compute_bound_ms", source=source
+        ),
+        memory_bound_ms=_parse_non_negative_float(
+            raw, "memory_bound_ms", source=source
+        ),
+        limiting_resource=limiting_resource,
+        sol_bound_ms=_parse_non_negative_float(raw, "sol_bound_ms", source=source),
+        source=_evidence_source_from_dict(
+            _parse_dict(raw, "source", source=source), source=f"{source}.source"
+        ),
+        confidence=_parse_confidence(raw, "confidence", source=source),
         rationale=_parse_str(raw, "rationale", source=source),
     )
 
@@ -564,6 +818,13 @@ def _semantic_group_evidence(
             subrole_names=tuple(subrole.name for subrole in subroles),
         )
         source = _source_for_group(family, ordered_estimates, nodes)
+        formula_evidence = _formula_evidence_for_estimates(ordered_estimates)
+        byte_evidence = _byte_evidence_for_estimates(
+            ordered_estimates,
+            nodes_by_id=nodes_by_id,
+            tensor_evidence_by_id=tensor_evidence_by_id,
+        )
+        bound_evidence = _bound_evidence_for_estimates(ordered_estimates)
         groups.append(
             SolarSemanticGroupEvidence(
                 family=family,
@@ -575,11 +836,17 @@ def _semantic_group_evidence(
                 required_evidence=_required_evidence_for_group(
                     related_tensors,
                     ordered_estimates,
+                    formula_evidence=formula_evidence,
+                    byte_evidence=byte_evidence,
+                    bound_evidence=bound_evidence,
                 ),
                 missing_evidence=classification.missing_evidence,
                 warning_prefixes=classification.warning_prefixes,
                 source=source,
                 rationale=classification.rationale,
+                formula_evidence=formula_evidence,
+                byte_evidence=byte_evidence,
+                bound_evidence=bound_evidence,
             )
         )
     return tuple(groups)
@@ -588,6 +855,10 @@ def _semantic_group_evidence(
 def _required_evidence_for_group(
     tensors: tuple[SolarTensorEvidence, ...],
     estimates: tuple[OperatorWorkEstimate, ...],
+    *,
+    formula_evidence: tuple[SolarFormulaEvidence, ...] = (),
+    byte_evidence: tuple[SolarByteEvidence, ...] = (),
+    bound_evidence: tuple[SolarBoundEvidence, ...] = (),
 ) -> tuple[str, ...]:
     required = []
     for tensor in tensors:
@@ -608,7 +879,121 @@ def _required_evidence_for_group(
             required.append(f"bytes:{estimate.node_id}")
         if estimate.axis_source is not None:
             required.append(f"axis:{estimate.node_id}")
+    required.extend(f"formula_evidence:{evidence.node_id}" for evidence in formula_evidence)
+    required.extend(f"byte_evidence:{evidence.node_id}" for evidence in byte_evidence)
+    required.extend(f"bound_evidence:{evidence.node_id}" for evidence in bound_evidence)
     return _unique_sorted(required)
+
+
+def _formula_evidence_for_estimates(
+    estimates: tuple[OperatorWorkEstimate, ...],
+) -> tuple[SolarFormulaEvidence, ...]:
+    evidence = [
+        SolarFormulaEvidence(
+            node_id=estimate.node_id,
+            family=estimate.op_family.value,
+            formula_kind=estimate.formula_kind,
+            formula=estimate.formula,
+            formula_inputs=dict(estimate.formula_inputs),
+            source=SolarEvidenceSource(
+                kind="estimate",
+                detail=f"{estimate.formula_kind}:{estimate.formula}",
+                node_id=estimate.node_id,
+                tensor_id=None,
+            ),
+            confidence=estimate.confidence,
+            rationale=estimate.rationale,
+        )
+        for estimate in estimates
+        if estimate.formula and estimate.formula != "0"
+    ]
+    return tuple(sorted(evidence, key=lambda item: item.node_id))
+
+
+def _byte_evidence_for_estimates(
+    estimates: tuple[OperatorWorkEstimate, ...],
+    *,
+    nodes_by_id: dict[str, BoundGraphNode],
+    tensor_evidence_by_id: dict[str, SolarTensorEvidence],
+) -> tuple[SolarByteEvidence, ...]:
+    evidence: list[SolarByteEvidence] = []
+    for estimate in estimates:
+        if estimate.total_bytes <= 0.0:
+            continue
+        node = nodes_by_id.get(estimate.node_id)
+        tensor_ids = _node_tensor_ids(node)
+        dtype_inputs = {
+            tensor_id: tensor_evidence_by_id[tensor_id].dtype
+            for tensor_id in tensor_ids
+            if tensor_id in tensor_evidence_by_id
+        }
+        evidence.append(
+            SolarByteEvidence(
+                node_id=estimate.node_id,
+                family=estimate.op_family.value,
+                read_bytes=estimate.read_bytes,
+                write_bytes=estimate.write_bytes,
+                intermediate_bytes=estimate.intermediate_bytes,
+                movement_bytes=estimate.movement_bytes,
+                total_bytes=estimate.total_bytes,
+                dtype_inputs=dtype_inputs,
+                tensor_ids=tensor_ids,
+                source=SolarEvidenceSource(
+                    kind="estimate",
+                    detail=f"{estimate.movement_kind or 'bytes'}:{estimate.total_bytes}",
+                    node_id=estimate.node_id,
+                    tensor_id=None,
+                ),
+                confidence=estimate.confidence,
+                rationale=estimate.rationale,
+            )
+        )
+    return tuple(sorted(evidence, key=lambda item: item.node_id))
+
+
+def _bound_evidence_for_estimates(
+    estimates: tuple[OperatorWorkEstimate, ...],
+) -> tuple[SolarBoundEvidence, ...]:
+    hardware_model = default_amd_hardware_models()["gfx1200"]
+    evidence: list[SolarBoundEvidence] = []
+    for estimate in estimates:
+        compute_bound_ms = (
+            estimate.flops / (hardware_model.peak_tflops * 1_000_000_000_000.0) * 1000.0
+            if hardware_model.peak_tflops > 0.0
+            else 0.0
+        )
+        memory_bound_ms = (
+            estimate.total_bytes
+            / (hardware_model.memory_bandwidth_gbps * 1_000_000_000.0)
+            * 1000.0
+            if hardware_model.memory_bandwidth_gbps > 0.0
+            else 0.0
+        )
+        if hardware_model.peak_tflops <= 0.0 and hardware_model.memory_bandwidth_gbps <= 0.0:
+            limiting_resource = "none"
+        else:
+            limiting_resource = (
+                "compute" if compute_bound_ms >= memory_bound_ms else "memory"
+            )
+        evidence.append(
+            SolarBoundEvidence(
+                node_id=estimate.node_id,
+                family=estimate.op_family.value,
+                compute_bound_ms=compute_bound_ms,
+                memory_bound_ms=memory_bound_ms,
+                limiting_resource=limiting_resource,
+                sol_bound_ms=max(compute_bound_ms, memory_bound_ms),
+                source=SolarEvidenceSource(
+                    kind="estimate",
+                    detail=f"amd_sol_v2:{SOLAR_DEFAULT_AMD_HARDWARE_MODEL_REF}",
+                    node_id=estimate.node_id,
+                    tensor_id=None,
+                ),
+                confidence=estimate.confidence,
+                rationale=estimate.rationale,
+            )
+        )
+    return tuple(sorted(evidence, key=lambda item: item.node_id))
 
 
 def _first_estimate_node_id(estimates: list[OperatorWorkEstimate]) -> str:
@@ -997,6 +1382,71 @@ def _parse_str_tuple(payload: dict[str, Any], key: str, *, source: str) -> tuple
         _parse_str_item(item, source=f"{source}.{key}[{index}]")
         for index, item in enumerate(_parse_list(payload, key, source=source))
     )
+
+
+def _parse_object_map(
+    payload: dict[str, Any],
+    key: str,
+    *,
+    source: str,
+) -> dict[str, object]:
+    value = _parse_dict(payload, key, source=source)
+    parsed: dict[str, object] = {}
+    for raw_key, raw_value in value.items():
+        if not isinstance(raw_key, str):
+            raise ValueError(f"{source}.{key} keys must be strings")
+        _ensure_json_scalar(raw_value, source=f"{source}.{key}.{raw_key}")
+        parsed[raw_key] = raw_value
+    return parsed
+
+
+def _parse_str_map(
+    payload: dict[str, Any],
+    key: str,
+    *,
+    source: str,
+) -> dict[str, str]:
+    value = _parse_dict(payload, key, source=source)
+    parsed: dict[str, str] = {}
+    for raw_key, raw_value in value.items():
+        if not isinstance(raw_key, str):
+            raise ValueError(f"{source}.{key} keys must be strings")
+        if not isinstance(raw_value, str):
+            raise ValueError(f"{source}.{key}.{raw_key} must be a string")
+        if not raw_value:
+            raise ValueError(f"{source}.{key}.{raw_key} must be non-empty")
+        parsed[raw_key] = raw_value
+    return parsed
+
+
+def _ensure_json_scalar(value: object, *, source: str) -> None:
+    if value is None or isinstance(value, str):
+        return
+    if type(value) in {int, float, bool}:
+        if isinstance(value, float) and not isfinite(value):
+            raise ValueError(f"{source} must be finite")
+        return
+    raise ValueError(f"{source} must be a JSON scalar")
+
+
+def _parse_non_negative_float(
+    payload: dict[str, Any],
+    key: str,
+    *,
+    source: str,
+) -> float:
+    value = payload[key]
+    if isinstance(value, bool):
+        raise ValueError(f"{source}.{key} must be numeric")
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{source}.{key} must be numeric") from exc
+    if not isfinite(parsed):
+        raise ValueError(f"{source}.{key} must be finite")
+    if parsed < 0.0:
+        raise ValueError(f"{source}.{key} must be non-negative")
+    return parsed
 
 
 def _parse_shape(
