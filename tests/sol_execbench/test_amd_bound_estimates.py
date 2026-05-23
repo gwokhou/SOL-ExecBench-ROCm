@@ -322,6 +322,155 @@ def test_moe_taxonomy_only_estimate_remains_unsupported_without_formula_inputs()
     assert estimate.warnings == ("unsupported_operator:moe_taxonomy_only",)
 
 
+def _ssm_mamba_definition(*, missing_recurrence: bool = False, custom_scan: bool = False) -> Definition:
+    if custom_scan:
+        return Definition(
+            name="ssm_mamba_custom_scan",
+            axes={
+                "batch": {"type": "const", "value": 2},
+                "sequence": {"type": "const", "value": 64},
+                "hidden": {"type": "const", "value": 128},
+            },
+            inputs={
+                "x": {"shape": ["batch", "sequence", "hidden"], "dtype": "float16"},
+                "opaque_scan": {"shape": ["hidden", "hidden"], "dtype": "float16"},
+            },
+            outputs={"out": {"shape": ["batch", "sequence", "hidden"], "dtype": "float16"}},
+            reference="def run(x, opaque_scan):\n    return opaque_scan(x)\n",
+        )
+    inputs = {
+        "x": {"shape": ["batch", "sequence", "hidden"], "dtype": "float16"},
+        "w_in": {"shape": ["hidden", "hidden"], "dtype": "float16"},
+        "conv_weight": {"shape": ["hidden", "one", "kernel"], "dtype": "float16"},
+    }
+    if missing_recurrence:
+        inputs["params"] = {"shape": ["hidden"], "dtype": "float16"}
+        inputs["w_out"] = {"shape": ["hidden", "hidden"], "dtype": "float16"}
+        reference = (
+            "def run(x, w_in, conv_weight, params, w_out):\n"
+            "    z = in_proj(x, w_in)\n"
+            "    z = depthwise_conv(z, conv_weight)\n"
+            "    y = selective_scan(z, params)\n"
+            "    return out_proj(y, w_out)\n"
+        )
+    else:
+        inputs.update(
+            {
+                "a": {"shape": ["hidden", "state"], "dtype": "float16"},
+                "b": {"shape": ["hidden", "state"], "dtype": "float16"},
+                "c": {"shape": ["hidden", "state"], "dtype": "float16"},
+                "w_out": {"shape": ["hidden", "hidden"], "dtype": "float16"},
+            }
+        )
+        reference = (
+            "def run(x, w_in, conv_weight, a, b, c, w_out):\n"
+            "    z = in_proj(x, w_in)\n"
+            "    z = depthwise_conv(z, conv_weight)\n"
+            "    y = selective_scan(z, a, b, c)\n"
+            "    y = gate(y)\n"
+            "    return out_proj(y, w_out)\n"
+        )
+    return Definition(
+        name="ssm_mamba_missing_recurrence" if missing_recurrence else "ssm_mamba_static",
+        axes={
+            "batch": {"type": "const", "value": 2},
+            "sequence": {"type": "const", "value": 64},
+            "hidden": {"type": "const", "value": 128},
+            "state": {"type": "const", "value": 16},
+            "one": {"type": "const", "value": 1},
+            "kernel": {"type": "const", "value": 3},
+        },
+        inputs=inputs,
+        outputs={"out": {"shape": ["batch", "sequence", "hidden"], "dtype": "float16"}},
+        reference=reference,
+    )
+
+
+def _ssm_mamba_workload(*, missing_recurrence: bool = False, custom_scan: bool = False) -> Workload:
+    if custom_scan:
+        return Workload(
+            axes={},
+            inputs={"x": {"type": "random"}, "opaque_scan": {"type": "random"}},
+            uuid="ssm-custom-workload",
+        )
+    inputs = {
+        "x": {"type": "random"},
+        "w_in": {"type": "random"},
+        "conv_weight": {"type": "random"},
+    }
+    if missing_recurrence:
+        inputs.update({"params": {"type": "random"}, "w_out": {"type": "random"}})
+    else:
+        inputs.update(
+            {
+                "a": {"type": "random"},
+                "b": {"type": "random"},
+                "c": {"type": "random"},
+                "w_out": {"type": "random"},
+            }
+        )
+    return Workload(axes={}, inputs=inputs, uuid="ssm-mamba-workload")
+
+
+def test_ssm_mamba_static_scan_estimate_locks_formula_kind_and_inputs():
+    from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
+
+    estimates = estimate_bound_work(build_bound_graph(_ssm_mamba_definition(), _ssm_mamba_workload()))
+    estimate = next(item for item in estimates if item.formula_kind == "ssm_mamba_static_scan_flops")
+
+    assert estimate.formula == "2*batch*sequence*hidden*state"
+    assert estimate.formula_inputs == {
+        "batch": 2,
+        "sequence": 64,
+        "hidden": 128,
+        "state": 16,
+    }
+    assert estimate.flops == float(2 * 2 * 64 * 128 * 16)
+    assert estimate.total_bytes > 0.0
+    assert estimate.axis_source == "tensor_shapes"
+    assert estimate.confidence == EstimateConfidence.SUPPORTED
+
+
+def test_ssm_mamba_missing_recurrence_estimate_degrades_to_visible_bytes():
+    from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
+
+    estimates = estimate_bound_work(
+        build_bound_graph(
+            _ssm_mamba_definition(missing_recurrence=True),
+            _ssm_mamba_workload(missing_recurrence=True),
+        )
+    )
+    estimate = next(item for item in estimates if item.op_name == "selective_scan")
+
+    assert estimate.formula_kind == "ssm_mamba_degraded_scan_bytes"
+    assert estimate.formula == "visible_scan_bytes"
+    assert estimate.formula_inputs == {"batch": 2, "sequence": 64, "hidden": 128}
+    assert estimate.flops == 0.0
+    assert estimate.total_bytes > 0.0
+    assert estimate.confidence == EstimateConfidence.INEXACT
+    assert "inexact_operator:ssm_missing_recurrence" in estimate.warnings
+    assert "state" not in estimate.formula_inputs
+
+
+def test_ssm_mamba_custom_scan_estimate_remains_unsupported_without_fabricated_state():
+    from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
+
+    estimates = estimate_bound_work(
+        build_bound_graph(
+            _ssm_mamba_definition(custom_scan=True),
+            _ssm_mamba_workload(custom_scan=True),
+        )
+    )
+    estimate = next(item for item in estimates if item.op_family == OpFamily.SSM_MAMBA)
+
+    assert estimate.formula_kind == "unsupported"
+    assert estimate.formula_inputs == {}
+    assert estimate.flops == 0.0
+    assert estimate.total_bytes == 0.0
+    assert estimate.confidence == EstimateConfidence.UNSUPPORTED
+    assert estimate.warnings == ("unsupported_operator:ssm_custom_scan",)
+
+
 def test_linear_projection_preserves_family_with_gemm_formula_and_dtype_bytes():
     node = BoundGraphNode(
         node_id="op_linear",
