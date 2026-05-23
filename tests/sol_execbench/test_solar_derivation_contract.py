@@ -11,7 +11,9 @@ from pathlib import Path
 
 import pytest
 
-sys.path.append(str(Path(__file__).resolve().parent))
+TEST_DIR = str(Path(__file__).resolve().parent)
+if TEST_DIR not in sys.path:
+    sys.path.insert(0, TEST_DIR)
 
 from solar_derivation_fixtures import (  # noqa: E402
     REQUIRED_SCOPE_BOUNDARY,
@@ -128,6 +130,74 @@ def test_positive_fixture_requires_null_degradation_rationale():
     )
 
     validate_solar_derivation_fixture(fixture, source="fixture")
+
+
+def test_fixture_validator_rejects_true_scope_boundary_claim():
+    fixture = _valid_fixture()
+    boundary = dict(fixture["scope_boundary"])
+    boundary["hosted_leaderboard_ready"] = True
+    fixture["scope_boundary"] = boundary
+
+    with pytest.raises(
+        ValueError,
+        match=r"fixture\.scope_boundary\.hosted_leaderboard_ready must be false",
+    ):
+        validate_solar_derivation_fixture(fixture, source="fixture")
+
+
+@pytest.mark.parametrize(
+    ("fixture_class", "confidence", "status", "expected_error"),
+    [
+        (
+            "positive",
+            "unsupported",
+            "unscored",
+            r"expected_confidence must be supported",
+        ),
+        (
+            "degraded",
+            "supported",
+            "scored",
+            r"expected_confidence must be inexact",
+        ),
+        (
+            "unsupported",
+            "inexact",
+            "degraded",
+            r"expected_confidence must be unsupported",
+        ),
+        (
+            "negative",
+            "unsupported",
+            "scored",
+            r"expected_status must be unscored",
+        ),
+    ],
+)
+def test_fixture_validator_rejects_class_state_mismatches(
+    fixture_class,
+    confidence,
+    status,
+    expected_error,
+):
+    fixture = _valid_fixture()
+    fixture["fixture_class"] = fixture_class
+    fixture["negative_category"] = None if fixture_class == "positive" else "partial"
+    fixture["expectation"] = dict(
+        fixture["expectation"],
+        expected_confidence=confidence,
+        expected_status=status,
+        missing_evidence=[] if fixture_class == "positive" else ["shape:dynamic_axis"],
+        warning_prefixes=[]
+        if fixture_class == "positive"
+        else ["inexact_operator:fixture_state"],
+        degradation_rationale=None
+        if fixture_class == "positive"
+        else "Fixture state mismatch should be rejected before execution.",
+    )
+
+    with pytest.raises(ValueError, match=expected_error):
+        validate_solar_derivation_fixture(fixture, source="fixture")
 
 
 def test_fixture_loader_does_not_execute_reference_text(tmp_path):

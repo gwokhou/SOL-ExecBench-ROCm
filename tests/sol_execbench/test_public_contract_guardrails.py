@@ -34,7 +34,9 @@ from sol_execbench.core.data.definition import Definition
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 COMPATIBILITY_INVENTORY = REPO_ROOT / "docs/internal/v1_4_compatibility_inventory.md"
-sys.path.append(str(Path(__file__).resolve().parent))
+TEST_DIR = str(Path(__file__).resolve().parent)
+if TEST_DIR not in sys.path:
+    sys.path.insert(0, TEST_DIR)
 
 from solar_derivation_fixtures import load_solar_derivation_fixtures  # noqa: E402
 

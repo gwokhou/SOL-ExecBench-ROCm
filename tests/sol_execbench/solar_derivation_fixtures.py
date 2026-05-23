@@ -62,6 +62,12 @@ VALID_NEGATIVE_CATEGORIES = frozenset(
 )
 VALID_CONFIDENCES = frozenset({"supported", "inexact", "unsupported"})
 VALID_STATUSES = frozenset({"scored", "degraded", "unscored"})
+EXPECTED_STATES_BY_FIXTURE_CLASS = {
+    "positive": ("supported", "scored"),
+    "degraded": ("inexact", "degraded"),
+    "unsupported": ("unsupported", "unscored"),
+    "negative": ("unsupported", "unscored"),
+}
 VALID_WARNING_PREFIXES = (
     "graph_warning:",
     "estimate_warning:",
@@ -132,6 +138,8 @@ def validate_solar_derivation_fixture(payload: Any, *, source: str) -> None:
     for key in sorted(REQUIRED_SCOPE_BOUNDARY):
         if not isinstance(scope_boundary[key], bool):
             raise ValueError(f"{source}.scope_boundary.{key} must be a boolean")
+        if scope_boundary[key] is not False:
+            raise ValueError(f"{source}.scope_boundary.{key} must be false")
 
 
 def _validate_expectation(
@@ -152,6 +160,19 @@ def _validate_expectation(
     _require_value(confidence, VALID_CONFIDENCES, source=f"{source}.expected_confidence")
     status = _parse_non_empty_str(expectation, "expected_status", source=source)
     _require_value(status, VALID_STATUSES, source=f"{source}.expected_status")
+    expected_confidence, expected_status = EXPECTED_STATES_BY_FIXTURE_CLASS[
+        fixture_class
+    ]
+    if confidence != expected_confidence:
+        raise ValueError(
+            f"{source}.expected_confidence must be {expected_confidence} "
+            f"for {fixture_class} fixtures"
+        )
+    if status != expected_status:
+        raise ValueError(
+            f"{source}.expected_status must be {expected_status} "
+            f"for {fixture_class} fixtures"
+        )
 
     _parse_str_list(
         expectation,

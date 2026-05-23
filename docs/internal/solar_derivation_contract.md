@@ -101,7 +101,7 @@ machine-readable contract case with this shape:
   "case_id": "attention_positive_dense_qkv",
   "family": "attention",
   "fixture_class": "positive",
-  "category": "positive",
+  "negative_category": null,
   "description": "Dense self-attention with explicit Q/K/V, softmax, PV, and output projection.",
   "source_kind": "reference_snippet",
   "reference": "def run(q, k, v, w_o): ...",
@@ -136,8 +136,8 @@ machine-readable contract case with this shape:
   },
   "scope_boundary": {
     "paper_scale_dataset": false,
-    "leaderboard_ready": false,
-    "nvidia_b200_equivalence": false,
+    "hosted_leaderboard_ready": false,
+    "nvidia_blackwell_b200_equivalence": false,
     "real_hardware_validation": false
   }
 }
@@ -148,7 +148,7 @@ Required top-level fields:
 - `case_id`
 - `family`
 - `fixture_class`
-- `category`
+- `negative_category`
 - `description`
 - `source_kind`
 - `reference`
@@ -170,8 +170,8 @@ Required expectation fields:
 Required scope-boundary fields:
 
 - `paper_scale_dataset`
-- `leaderboard_ready`
-- `nvidia_b200_equivalence`
+- `hosted_leaderboard_ready`
+- `nvidia_blackwell_b200_equivalence`
 - `real_hardware_validation`
 
 All scope-boundary values must be `false` for Phase 47 fixtures.
