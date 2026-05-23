@@ -1,130 +1,97 @@
-# Research Summary: v1.9 AMD SOL/SOLAR Bound Modeling Completion
+# Research Summary: v1.10 Paper-Aligned SOLAR Derivation
 
-**Synthesized:** 2026-05-22
-**Scope:** RDNA 4-only validation for AMD SOL/SOLAR bound modeling. CDNA 3 /
-MI300X real-hardware validation, CDNA 4 validation, and NVFP4/MXFP4 hardware
-validation remain deferred.
+**Milestone:** v1.10 paper-aligned SOLAR automatic derivation  
+**Researched:** 2026-05-23  
+**Scope:** SOLAR derivation only; no dataset extraction, new hardware validation, hosted leaderboard, or NVIDIA paper-equivalence claims.
 
-## Executive Summary
+## Decision Summary
 
-v1.9 should complete the AMD SOL/SOLAR bound-modeling pipeline as a derived
-scoring subsystem, not as part of benchmark execution. Canonical trace JSONL,
-the primary `sol-execbench` CLI, and public problem schemas should remain
-unchanged. New evidence belongs in sidecar AMD SOL bound artifacts, external
-hardware model artifacts, and derived AMD-native score reports.
-
-The implementation should not add a new graph or symbolic math dependency.
-Use the existing stack: Python 3.12 stdlib `ast`/`json`, dataclasses, Pydantic
-v2 where schema validation is useful, pytest, and Ruff. The main architectural
-change is splitting the current `amd_sol.py` path into a typed local IR,
-extractor, operator estimators, hardware model loader, artifact layer, coverage
-summary, and compatibility facade.
-
-## Stack Additions
-
-- No new framework dependency is recommended.
-- Keep AST parsing as the first frontend, but do not let raw AST become the
-  modeling contract.
-- Add focused local scoring modules for:
-  - structured bound graph / IR,
-  - operator formula and memory accounting,
-  - AMD hardware model JSON loading and validation,
-  - bound artifact v2 serialization and compatibility,
-  - coverage and confidence rollups.
-- Use versioned JSON artifacts for hardware models and SOL bounds.
-- Keep `amd_score.py` and `scripts/run_dataset.py --amd-score-report` as the
-  score/report integration surface.
-
-## Feature Table Stakes
-
-- Structured AMD SOL graph/IR with stable node IDs, op families, tensor roles,
-  shape/dtype evidence, dependencies, confidence, and source rationale.
-- Explicit operator-family coverage for matmul/bmm, elementwise arithmetic,
-  activations, reductions, normalization/RMSNorm/layer norm, softmax/log-softmax,
-  data movement/view-like operations, and unsupported calls.
-- Auditable FLOP, byte, read/write, intermediate, and memory-movement estimates
-  per node.
-- Per-node compute bound, memory bound, limiting resource, and aggregate bound.
-- Artifact-level confidence and coverage summaries, including worst confidence
-  and unsupported/inexact counts.
-- Deterministic unsupported/inexact degradation behavior in AMD-native score
-  reports.
-- External RDNA 4 hardware model artifact with source, architecture, dtype/path,
-  clock policy or assumptions, confidence, validation status, and evidence refs.
-- Golden tests for parser, formulas, artifact serialization, score integration,
-  dataset report integration, and public-contract guardrails.
-- Documentation that clearly states RDNA 4-only v1.9 validation and no NVIDIA
-  B200/SOLAR/leaderboard equivalence claim.
-
-## Recommended Architecture
-
-The target data flow is:
+v1.10 should extend the existing AMD-native derived SOL/SOLAR sidecar pipeline instead of changing canonical benchmark execution. The repository already has the correct architectural boundary:
 
 ```text
-Definition + Workload
-  -> extract_bound_graph()
-  -> estimate_work()
-  -> load/select AmdHardwareModel
-  -> build AmdSolBoundArtifact JSON sidecar
-
-Trace JSONL + AmdSolBoundArtifact + optional ScoringBaselineArtifact
-  -> score_amd_native_trace_workload()
-  -> AmdNativeSuiteReport JSON
+Definition + Workload + AmdHardwareModel
+  -> BoundGraph
+  -> OperatorWorkEstimate
+  -> AMD SOL sidecar
+  -> guarded AMD-native score/report
 ```
 
-Suggested module split:
+The milestone should make that derivation path substantially more paper-aligned by adding automatic extraction, family-specific formula evidence, coverage evidence, and score eligibility guards for the paper-relevant operation families. It should preserve canonical `definition.json`, `workload.jsonl`, trace JSONL, solution schemas, and primary CLI behavior.
 
-| Area | Responsibility |
-| --- | --- |
-| IR | `BoundGraph`, `BoundNode`, tensor refs, op kind, confidence metadata. |
-| Extractor | Convert `Definition.reference` and workload axes into normalized graph nodes. |
-| Operators | Formula registry for matmul, elementwise, reductions, normalization, softmax, data movement, unsupported fallback. |
-| Estimates | FLOP, byte, memory-movement, and rationale generation. |
-| Hardware | Versioned AMD hardware model artifact loading and validation. |
-| Artifact | AMD SOL bound artifact v2 build/load/serialize APIs. |
-| Coverage | Supported/inexact/unsupported summaries and score eligibility inputs. |
-| Facade | Preserve existing imports like `build_amd_sol_bound_artifact()`. |
+## Recommended Technical Shape
 
-## Guardrails
+- Add focused internal scoring modules rather than a new framework dependency.
+- Keep `build_bound_graph()` and `estimate_bound_work()` as compatibility facades.
+- Use existing Python/torch tooling: `ast`, best-effort `torch.fx.symbolic_trace`, FX shape propagation, and explicit fallback warnings.
+- Add small local helpers for symbolic shape evidence, pattern recognition, family formulas, and coverage gates.
+- Keep derivation evidence in sidecars and opt-in reports; do not mutate canonical benchmark artifacts.
+- Avoid ONNX, MLIR, Dynamo, `sympy`, `networkx`, or dataset-extraction machinery in this milestone.
 
-- Do not mutate canonical `Trace` JSONL.
-- Do not add bound or score fields to `definition.json`, `workload.jsonl`, or
-  `solution.json`.
-- Do not run bound modeling inside `eval_driver.py`.
-- Do not silently drop unsupported operations.
-- Do not treat provisional hardware model numbers as hardware-validation claims.
-- Do not present `reference_latency` fallback as release-defined optimized
-  baseline scoring.
-- Do not claim CDNA 3 / MI300X, CDNA 4, NVIDIA B200, upstream SOLAR, or
-  leaderboard equivalence in v1.9.
+## Required Feature Families
 
-## Key Risks And Mitigations
+The researched table stakes are:
 
-| Risk | Mitigation |
-| --- | --- |
-| Overclaiming AMD scores | Preserve `amd-native-derived` language, warning propagation, docs guardrails, and public-contract tests. |
-| Under-modeled memory traffic | Split logical bytes from estimated traffic; record read/write/intermediate/movement rationale. |
-| Unsupported ops look complete | Keep unsupported nodes visible and force score warnings or unscored states. |
-| Brittle AST parsing | Normalize into IR, add alias/method/chained/multi-output/unsupported fixtures, fail closed. |
-| Hardware model folklore | Externalize versioned hardware models with provenance and validation status. |
-| Score/baseline misuse | Surface baseline-source counts and require scoring-baseline artifacts for release-style scores. |
-| Public schema drift | Keep all new evidence in derived sidecars and score reports. |
-| Test blind spots | Add golden positive and negative cases plus RDNA 4 validation closure evidence. |
+- Attention: Q/K/V, QK, scaling/masking, softmax, PV, output projection, and explicit degradation when axes or mask semantics are missing.
+- MoE: routing, top-k, expert projections, dispatch/combine movement, and conservative inexact defaults.
+- Convolution: 1D/2D/3D, grouped/depthwise metadata, stride, padding, dilation, and output spatial formulas.
+- SSM/Mamba: projection, depthwise convolution, scan/state update, gating, and output projection with conservative degraded evidence.
+- Embedding/positional: gather/index traffic, positional transforms, and memory-bound evidence.
+- Linear projection: first-class semantic family while reusing GEMM-compatible formulas when dimensions are explicit.
+- Compound grouping: family-level grouping and subrole evidence without hiding unsupported child work.
 
-## Roadmap Implications
+## Modeling Requirements
 
-Recommended build order:
+Each promoted family needs more than taxonomy:
 
-1. Contract guardrails and hardware model artifact foundation.
-2. Structured graph/IR extraction.
-3. Operator FLOP/byte/memory-movement estimators.
-4. Bound artifact v2 and coverage semantics.
-5. AMD score and dataset report integration.
-6. Documentation, golden fixtures, and RDNA 4 validation closure.
+- family-specific formula kind, formula text, and formula inputs;
+- dtype-aware read, write, intermediate, movement, and total byte evidence;
+- tensor shape, dtype, semantic axis, and extraction-source provenance;
+- deterministic confidence rules for supported, inexact, and unsupported states;
+- per-op compute, memory, limiting-resource, and SOL-bound evidence;
+- machine-verifiable warnings and rationales for degradation.
 
-## Source Research Files
+## Reporting And Guardrails
+
+The sidecar/report layer should expose:
+
+- family-aware coverage and extraction provenance;
+- skipped, missing, unsupported, degraded, and estimated node evidence;
+- aggregate states of `scored`, `degraded`, and `unscored`;
+- `None` score behavior for unscored SOLAR evidence;
+- retained warnings for degraded and provisional evidence;
+- explicit claim boundaries: AMD-native derived evidence, not paper benchmark parity or hardware validation.
+
+## Minimum Validation Gates
+
+- Golden fixtures for attention, MoE, convolution, SSM/Mamba, embedding/positional, and linear projection.
+- Negative/degradation fixtures for dynamic, partial, unsupported, and taxonomy-only cases.
+- Sidecar parse/serialize round-trip tests for any new evidence fields.
+- Score guard tests proving unsupported derivation cannot produce a normal SOL Score.
+- Public contract guardrails proving canonical schemas, trace JSONL, and primary CLI behavior remain unchanged.
+- Documentation and static checks preventing leaderboard, B200, paper-equivalent, or new-hardware-validation overclaims.
+
+## Recommended Phase Shape
+
+1. Derivation contract and golden fixture matrix.
+2. Extraction frontend, semantic shape provenance, and pattern infrastructure.
+3. High-confidence family modeling: linear projection, convolution, embedding/positional, explicit attention.
+4. Degraded complex family modeling: MoE and SSM/Mamba.
+5. Sidecar coverage, aggregate bound, and score guard integration.
+6. Dataset-runner integration, documentation, and public contract closure.
+
+## Explicit Exclusions
+
+- Original paper-scale 124-model / 235-problem extraction.
+- MI300X, CDNA3, CDNA4, NVFP4, or MXFP4 real-hardware validation.
+- Hosted leaderboard or submission service.
+- NVIDIA Blackwell/B200 equivalence.
+- Importing or executing submitted solution code for derivation.
+- Changing canonical public benchmark schemas or primary CLI defaults.
+
+## Sources
 
 - `.planning/research/STACK.md`
 - `.planning/research/FEATURES.md`
 - `.planning/research/ARCHITECTURE.md`
 - `.planning/research/PITFALLS.md`
+- arXiv 2603.19173 abstract, submitted 2026-03-19: https://arxiv.org/abs/2603.19173
