@@ -131,7 +131,7 @@ readiness, execution, scoring, and evidence gaps by category and suite.
   AMD-native score, AMD SOL, and SOLAR derivation evidence.
 - Artifact references use safe deterministic paths.
 
-### Phase 57: Claim Guardrails, Docs, And Release Closure
+### Phase 57: Claim Guardrails, Docs, And Release Closure (completed 2026-05-23)
 
 **Goal:** Prevent v1.11 artifacts from being presented as full paper validation,
 leaderboard parity, upstream SOLAR parity, or unsupported hardware validation.
@@ -153,7 +153,7 @@ leaderboard parity, upstream SOLAR parity, or unsupported hardware validation.
 
 | Milestone | Phases | Plans | Status | Shipped |
 |-----------|--------|-------|--------|---------|
-| v1.11 Paper Dataset Parity Inventory and ROCm Execution Closure | 53-57 | 6/6 | In Progress | - |
+| v1.11 Paper Dataset Parity Inventory and ROCm Execution Closure | 53-57 | 14/14 | Complete | 2026-05-23 |
 | v1.10 Paper-Aligned SOLAR Automatic Derivation | 47-52 | 23/23 | Complete | 2026-05-23 |
 | v1.9 AMD SOL/SOLAR Bound Modeling Completion | 41-46 | 17/17 | Complete | 2026-05-23 |
 | v1.8 ROCm Library Ecosystem Completion | 36-40 | 5/5 | Complete | 2026-05-22 |

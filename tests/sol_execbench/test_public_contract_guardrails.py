@@ -540,6 +540,23 @@ def test_v1_11_parity_gap_docs_keep_bounded_claim_boundary():
     assert "not hosted leaderboard readiness" in docs
 
 
+def test_v1_11_release_closure_summarizes_remaining_claim_gaps():
+    doc = (REPO_ROOT / "docs/v1_11_release_closure.md").read_text()
+
+    for expected in (
+        "not full 235-problem ROCm validation",
+        "not original 124-model",
+        "not upstream SOLAR parity",
+        "not NVIDIA B200 or Blackwell equivalence",
+        "not hosted leaderboard readiness",
+        "MI300X / CDNA 3 full-suite validation",
+        "CDNA 4 validation",
+        "NVFP4 and MXFP4 validation",
+        "sidecar-only",
+    ):
+        assert expected in doc
+
+
 def test_primary_cli_does_not_expose_v1_11_dataset_inspection_options():
     result = CliRunner().invoke(cli, ["--help"])
     assert result.exit_code == 0
