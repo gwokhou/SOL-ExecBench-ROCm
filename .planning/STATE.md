@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.10
 milestone_name: Paper-Aligned SOLAR Automatic Derivation
-status: ready_to_plan
-stopped_at: Phase 50 complete (3/3) — ready to discuss Phase 51
-last_updated: 2026-05-23T08:37:34.571Z
+status: in_progress
+stopped_at: Completed 51-01-PLAN.md
+last_updated: "2026-05-23T09:05:08.128Z"
 last_activity: 2026-05-23
 progress:
   total_phases: 6
   completed_phases: 4
-  total_plans: 17
-  completed_plans: 17
-  percent: 67
+  total_plans: 20
+  completed_plans: 18
+  percent: 90
 ---
 
 # Project State
@@ -26,17 +26,17 @@ See: `.planning/PROJECT.md` (updated 2026-05-23)
 ## Current Position
 
 Phase: 51
-Plan: Not started
-Status: Ready to plan
+Plan: 02
+Status: Ready for 51-02
 Last activity: 2026-05-23
 
-Progress: [███████░░░] 67%
+Progress: [█████████░] 90%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 17
+- Total plans completed: 18
 - Average duration: n/a
 - Total execution time: 0.0 hours
 
@@ -64,6 +64,7 @@ Progress: [███████░░░] 67%
 | Phase 50 P01 | 8min | 3 tasks | 6 files |
 | Phase 50 P02 | 11min | 3 tasks | 6 files |
 | Phase 50 P03 | 6min | 3 tasks | 4 files |
+| Phase 51 P01 | 5min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -98,6 +99,8 @@ Decisions are logged in PROJECT.md. Recent decisions affecting current work:
 - [Phase 50]: SSM/Mamba scan estimates use deterministic formula kinds `ssm_mamba_static_scan_flops` and `ssm_mamba_degraded_scan_bytes`.
 - [Phase 50]: Phase 50 internal formula kinds and warning names remain sidecar-only and absent from public schemas, primary CLI help, and canonical trace JSONL.
 - [Phase 50]: Degraded MoE and SSM/Mamba evidence does not add SOLAR sidecar references to AMD-native score eligibility.
+- [Phase 51]: SOLAR coverage and aggregate status are computed from existing semantic groups and warnings only.
+- [Phase 51]: Phase 48-50 sidecar payloads remain parseable by exact legacy top-level keys, with Phase 51 fields recomputed on serialization.
 
 ### Pending Todos
 
@@ -121,6 +124,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-23T08:19:27.491Z
-Stopped at: Completed 50-03-PLAN.md
+Last session: 2026-05-23T09:05:08.121Z
+Stopped at: Completed 51-01-PLAN.md
 Resume file: None
