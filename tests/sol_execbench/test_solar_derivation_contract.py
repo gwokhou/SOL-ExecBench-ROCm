@@ -14,6 +14,10 @@ import pytest
 sys.path.append(str(Path(__file__).resolve().parent))
 
 from solar_derivation_fixtures import (  # noqa: E402
+    REQUIRED_SCOPE_BOUNDARY,
+    TARGET_FAMILIES,
+    VALID_NEGATIVE_CATEGORIES,
+    VALID_WARNING_PREFIXES,
     load_solar_derivation_fixtures,
     validate_solar_derivation_fixture,
 )
@@ -135,3 +139,66 @@ def test_fixture_loader_does_not_execute_reference_text(tmp_path):
     load_solar_derivation_fixtures(tmp_path)
 
     assert not marker.exists()
+
+
+def test_fixture_matrix_covers_required_families_and_classes():
+    fixtures = load_solar_derivation_fixtures()
+
+    assert len(fixtures) >= 18
+    for family in sorted(TARGET_FAMILIES):
+        family_fixtures = [
+            fixture for fixture in fixtures if fixture["family"] == family
+        ]
+        classes = {fixture["fixture_class"] for fixture in family_fixtures}
+        assert family_fixtures, family
+        assert "positive" in classes, family
+        assert "degraded" in classes, family
+        assert classes & {"unsupported", "negative"}, family
+
+
+def test_fixture_matrix_covers_negative_and_degraded_cases():
+    fixtures = load_solar_derivation_fixtures()
+    categories = {
+        fixture["negative_category"]
+        for fixture in fixtures
+        if fixture["negative_category"] is not None
+    }
+    statuses = {fixture["expectation"]["expected_status"] for fixture in fixtures}
+
+    assert categories >= VALID_NEGATIVE_CATEGORIES
+    assert statuses >= {"scored", "degraded", "unscored"}
+
+
+def test_negative_and_degraded_fixtures_have_executable_expectations():
+    fixtures = load_solar_derivation_fixtures()
+    checked = 0
+    for fixture in fixtures:
+        if fixture["fixture_class"] == "positive":
+            continue
+        checked += 1
+        expectation = fixture["expectation"]
+        case_id = fixture["case_id"]
+        assert expectation["expected_status"] in {"degraded", "unscored"}, case_id
+        assert expectation["missing_evidence"], case_id
+        assert expectation["warning_prefixes"], case_id
+        assert expectation["degradation_rationale"], case_id
+        assert all(
+            warning.startswith(VALID_WARNING_PREFIXES)
+            for warning in expectation["warning_prefixes"]
+        ), case_id
+    assert checked >= 12
+
+
+def test_fixture_scope_boundaries_are_false():
+    fixtures = load_solar_derivation_fixtures()
+
+    for fixture in fixtures:
+        boundary = fixture["scope_boundary"]
+        case_id = fixture["case_id"]
+        assert set(boundary) == REQUIRED_SCOPE_BOUNDARY, case_id
+        assert boundary == {
+            "paper_scale_dataset": False,
+            "hosted_leaderboard_ready": False,
+            "nvidia_blackwell_b200_equivalence": False,
+            "real_hardware_validation": False,
+        }, case_id

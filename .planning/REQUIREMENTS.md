@@ -53,7 +53,7 @@
 | Feature | Reason |
 |---------|--------|
 | Original 124-model / 235-problem extraction | v1.10 focuses on automatic SOLAR derivation inside the ROCm fork, not paper-scale dataset construction. |
-| MI300X, CDNA 3, CDNA 4, NVFP4, or MXFP4 validation | Real-hardware validation is explicitly deferred from this milestone. |
+| MI300X, CDNA 3, CDNA 4, NVFP4, or MXFP4 validation | Real-hardware validation is explicitly deferred from this milestone, including CDNA 3 / MI300X real-hardware validation. |
 | Hosted leaderboard or submission service | The milestone targets local derivation artifacts and reports only. |
 | NVIDIA Blackwell or B200 equivalence | The ROCm fork must not claim equivalence with the paper's NVIDIA target hardware. |
 | New framework dependencies such as ONNX, MLIR, Dynamo, sympy, or networkx | Research recommends extending the existing Python, FX, AST, and local scoring stack. |
