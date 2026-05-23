@@ -1,5 +1,29 @@
 # Milestones
 
+## v1.10 Paper-Aligned SOLAR Automatic Derivation (Shipped: 2026-05-23)
+
+**Phases completed:** 6 phases, 23 plans, 41 tasks
+
+**Key accomplishments:**
+
+- Added the sidecar-only v1.10 SOLAR derivation contract, fixture matrix, and
+  strict parser/serializer coverage for semantic provenance.
+- Built SOLAR derivation evidence from canonical `Definition` and `Workload`
+  inputs without candidate execution, with deterministic supported, degraded,
+  and unscored confidence classification.
+- Promoted high-confidence families into formula/byte/bound-backed SOLAR
+  evidence: linear projection, attention, convolution, embedding/positional,
+  gather, and rotary-like memory-bound structures.
+- Added conservative MoE and SSM/Mamba evidence paths with explicit degraded or
+  unscored behavior when routing, recurrence, or metadata is incomplete.
+- Added machine-verifiable `coverage_summary` and `aggregate_status` sidecars,
+  AMD-native score guards, and strict round-trip/malformed-field tests.
+- Integrated generated SOLAR sidecars into dataset-runner derived reports using
+  `derived_evidence_refs`, while preserving canonical trace JSONL, public score
+  `evidence_refs`, primary CLI behavior, and claim boundaries.
+
+---
+
 ## v1.9 AMD SOL/SOLAR Bound Modeling Completion (Shipped: 2026-05-23)
 
 **Delivered:** strict AMD hardware model artifacts, structured bound graph IR,
@@ -25,10 +49,13 @@ RDNA 4 validation evidence.
 - Added AMD SOL bound artifact v2 sidecars with graph, estimate, per-op bound,
   aggregate bound, hardware model, coverage, and deterministic warning
   evidence.
+
 - Wired v2 bound artifacts into AMD-native workload and suite score reports
   without mutating canonical trace JSONL.
+
 - Documented artifact semantics, confidence labels, unsupported/inexact
   degradation, and RDNA 4-only validation scope.
+
 - Added claim guardrails against NVIDIA B200/SOLAR/leaderboard equivalence and
   premature CDNA 3 / MI300X or CDNA 4 validation claims.
 
