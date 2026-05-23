@@ -316,7 +316,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 52-01-PLAN.md — Integrate dataset-runner SOLAR sidecars/reports and preserve skipped-trace report generation.
+- [x] 52-01-PLAN.md — Integrate dataset-runner SOLAR sidecars/reports and preserve skipped-trace report generation.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -335,7 +335,7 @@ Plans:
 | 49. High-Confidence Family Modeling | 4/4 | Complete    | 2026-05-23 |
 | 50. Degraded Complex Family Modeling | 3/3 | Complete    | 2026-05-23 |
 | 51. Sidecar Coverage And Score Guards | 3/3 | Complete    | 2026-05-23 |
-| 52. Dataset Runner And Public Contract Closure | 0/3 | Not started | - |
+| 52. Dataset Runner And Public Contract Closure | 1/3 | In Progress|  |
 
 ## Requirements Coverage
 
@@ -356,7 +356,7 @@ Plans:
 | REPORT-01 | Phase 51 | Pending |
 | REPORT-02 | Phase 51 | Pending |
 | REPORT-03 | Phase 51 | Pending |
-| REPORT-04 | Phase 52 | Pending |
+| REPORT-04 | Phase 52 | Complete |
 | TEST-01 | Phase 47 | Complete |
 | TEST-02 | Phase 47 | Complete |
 | TEST-03 | Phase 51 | Pending |

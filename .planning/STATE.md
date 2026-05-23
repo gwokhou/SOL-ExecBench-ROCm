@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.10
 milestone_name: Paper-Aligned SOLAR Automatic Derivation
-status: ready_to_plan
-stopped_at: Phase 51 complete (3/3) — ready to discuss Phase 52
-last_updated: 2026-05-23T09:43:43.185Z
+status: in_progress
+stopped_at: Completed 52-01-PLAN.md
+last_updated: "2026-05-23T10:15:19.716Z"
 last_activity: 2026-05-23
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 20
-  completed_plans: 20
-  percent: 83
+  total_plans: 23
+  completed_plans: 21
+  percent: 91
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: `.planning/PROJECT.md` (updated 2026-05-23)
 ## Current Position
 
 Phase: 52
-Plan: Not started
-Status: Ready to plan
+Plan: 02
+Status: Ready to execute
 Last activity: 2026-05-23
 
-Progress: [████████░░] 83%
+Progress: [█████████░] 91%
 
 ## Performance Metrics
 
@@ -67,6 +67,7 @@ Progress: [████████░░] 83%
 | Phase 51 P01 | 5min | 3 tasks | 3 files |
 | Phase 51 P02 | 6min | 3 tasks | 4 files |
 | Phase 51 P03 | 5min | 3 tasks | 4 files |
+| Phase 52 P01 | 6min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -107,6 +108,9 @@ Decisions are logged in PROJECT.md. Recent decisions affecting current work:
 - [Phase 51]: Explicit SOLAR aggregate status unscored suppresses AMD-native score output — Plan 51-02 REPORT-03 score guard
 - [Phase 51]: Keep Phase 51 coverage and aggregate fields sidecar-only; do not add public schemas, CLI flags, report fields, dependencies, GPU checks, or candidate execution.
 - [Phase 51]: Treat AMD SOL v2 coverage_summary as an existing artifact field while guarding exact SOLAR sidecar keys from leaking into v2 payloads.
+- [Phase 52]: Derived report audit refs live in AmdNativeScore.derived_evidence_refs, leaving public evidence_refs keys unchanged.
+- [Phase 52]: The dataset-runner skip branch builds requested derived artifacts before continuing when existing traces already pass.
+- [Phase 52]: Generated SOLAR derivation sidecars are built and immediately parsed through the existing sidecar parser before scoring.
 
 ### Pending Todos
 
@@ -130,6 +134,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-23T09:20:43.053Z
-Stopped at: Completed 51-03-PLAN.md
+Last session: 2026-05-23T10:15:19.709Z
+Stopped at: Completed 52-01-PLAN.md
 Resume file: None

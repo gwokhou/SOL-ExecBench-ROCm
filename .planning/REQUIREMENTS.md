@@ -29,7 +29,7 @@
 - [x] **REPORT-01**: SOLAR sidecars report family-aware coverage, extraction provenance, missing patterns, unsupported patterns, degraded nodes, and estimated nodes.
 - [x] **REPORT-02**: Aggregate SOLAR evidence remains machine-verifiable through parseable `scored`, `degraded`, and `unscored` states.
 - [x] **REPORT-03**: AMD-native scoring returns `None` for unscored SOLAR evidence and preserves warnings for degraded SOLAR evidence.
-- [ ] **REPORT-04**: Derived reports preserve AMD-native-derived claim boundaries and include evidence references for formulas, hardware models, coverage, and score eligibility.
+- [x] **REPORT-04**: Derived reports preserve AMD-native-derived claim boundaries and include evidence references for formulas, hardware models, coverage, and score eligibility.
 
 ### Validation
 
@@ -81,7 +81,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | REPORT-01 | Phase 51 | Complete |
 | REPORT-02 | Phase 51 | Complete |
 | REPORT-03 | Phase 51 | Complete |
-| REPORT-04 | Phase 52 | Pending |
+| REPORT-04 | Phase 52 | Complete |
 | TEST-01 | Phase 47 | Complete |
 | TEST-02 | Phase 47 | Complete |
 | TEST-03 | Phase 51 | Complete |
