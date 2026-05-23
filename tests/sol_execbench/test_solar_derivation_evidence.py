@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import copy
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -269,6 +270,34 @@ def test_solar_derivation_round_trip_preserves_provenance():
         "sequence_q",
         "sequence_k",
     )
+
+
+def test_degraded_aggregate_status_remains_score_eligible():
+    base = _contract_artifact()
+    degraded_group = replace(
+        base.groups[0],
+        confidence="inexact",
+        status="degraded",
+        missing_evidence=("axis:op_1",),
+        warning_prefixes=("aggregate_degraded:attention",),
+    )
+    evidence = SolarDerivationEvidence(
+        definition=base.definition,
+        workload_uuid=base.workload_uuid,
+        groups=(degraded_group,),
+        tensors=base.tensors,
+        warnings=("aggregate_degraded:incomplete semantic evidence",),
+        source_boundary=base.source_boundary,
+    )
+
+    payload = solar_derivation_from_dict(evidence.to_dict()).to_dict()
+
+    assert payload["aggregate_status"]["status"] == "degraded"
+    assert payload["aggregate_status"]["score_eligible"] is True
+    assert payload["aggregate_status"]["warnings"] == [
+        "aggregate_degraded:attention",
+        "aggregate_degraded:incomplete semantic evidence",
+    ]
 
 
 def test_solar_derivation_parser_rejects_missing_required_fields():
@@ -892,6 +921,52 @@ def test_solar_derivation_parser_rejects_malformed_phase51_fields(
     payload["coverage_summary"]["unsupported_patterns"] = degraded_payload[
         "coverage_summary"
     ]["unsupported_patterns"]
+    mutate(payload)
+
+    with pytest.raises(ValueError, match=expected_error):
+        solar_derivation_from_dict(payload)
+
+
+@pytest.mark.parametrize(
+    ("mutate", "expected_error"),
+    [
+        (
+            lambda payload: payload["coverage_summary"]["family_counts"].__setitem__(
+                "attention", 2
+            ),
+            r"coverage_summary does not match semantic groups",
+        ),
+        (
+            lambda payload: payload["coverage_summary"]["status_counts"].__setitem__(
+                "scored", 0
+            ),
+            r"coverage_summary does not match semantic groups",
+        ),
+        (
+            lambda payload: payload["coverage_summary"]["families"][0][
+                "status_counts"
+            ].__setitem__("degraded", 1),
+            r"coverage_summary does not match semantic groups",
+        ),
+        (
+            lambda payload: payload["aggregate_status"].__setitem__(
+                "status", "degraded"
+            ),
+            r"aggregate_status does not match semantic groups and warnings",
+        ),
+        (
+            lambda payload: payload["aggregate_status"]["warnings"].append(
+                "aggregate_degraded:tampered"
+            ),
+            r"aggregate_status does not match semantic groups and warnings",
+        ),
+    ],
+)
+def test_solar_derivation_parser_rejects_semantic_phase51_mismatches(
+    mutate,
+    expected_error: str,
+):
+    payload = _contract_payload()
     mutate(payload)
 
     with pytest.raises(ValueError, match=expected_error):

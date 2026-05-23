@@ -611,16 +611,24 @@ def solar_derivation_from_dict(payload: dict[str, Any]) -> SolarDerivationEviden
         )
     )
     if has_phase51_fields:
-        _coverage_summary_from_dict(
+        provided_coverage = _coverage_summary_from_dict(
             _parse_dict(
                 payload, "coverage_summary", source="SOLAR derivation evidence"
             )
         )
-        _aggregate_status_from_dict(
+        provided_aggregate = _aggregate_status_from_dict(
             _parse_dict(
                 payload, "aggregate_status", source="SOLAR derivation evidence"
             )
         )
+        expected_coverage = _coverage_for_groups(groups)
+        if provided_coverage.to_dict() != expected_coverage.to_dict():
+            raise ValueError("coverage_summary does not match semantic groups")
+        expected_aggregate = _aggregate_status_for_groups(groups, warnings)
+        if provided_aggregate.to_dict() != expected_aggregate.to_dict():
+            raise ValueError(
+                "aggregate_status does not match semantic groups and warnings"
+            )
 
     return SolarDerivationEvidence(
         definition=_parse_str(payload, "definition", source="SOLAR derivation evidence"),
@@ -2245,7 +2253,7 @@ def _aggregate_status_for_groups(
     if any(group.status == "degraded" for group in groups):
         return SolarAggregateStatus(
             status="degraded",
-            score_eligible=False,
+            score_eligible=True,
             reason="one or more semantic groups have incomplete evidence",
             group_ids=group_ids,
             node_ids=node_ids,
