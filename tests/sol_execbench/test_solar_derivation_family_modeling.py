@@ -149,6 +149,158 @@ def _moe_workload(*, dynamic: bool = False, taxonomy_only: bool = False) -> Work
     return Workload(axes={}, inputs=inputs, uuid="moe-dynamic-workload" if dynamic else "moe-static-workload")
 
 
+def _ssm_mamba_definition(*, missing_recurrence: bool = False, custom_scan: bool = False) -> Definition:
+    if custom_scan:
+        return Definition(
+            name="ssm_mamba_custom_scan",
+            axes={
+                "batch": {"type": "const", "value": 2},
+                "sequence": {"type": "const", "value": 64},
+                "hidden": {"type": "const", "value": 128},
+            },
+            inputs={
+                "x": {"shape": ["batch", "sequence", "hidden"], "dtype": "float16"},
+                "opaque_scan": {"shape": ["hidden", "hidden"], "dtype": "float16"},
+            },
+            outputs={"out": {"shape": ["batch", "sequence", "hidden"], "dtype": "float16"}},
+            reference="def run(x, opaque_scan):\n    return opaque_scan(x)\n",
+        )
+    inputs = {
+        "x": {"shape": ["batch", "sequence", "hidden"], "dtype": "float16"},
+        "w_in": {"shape": ["hidden", "hidden"], "dtype": "float16"},
+        "conv_weight": {"shape": ["hidden", "one", "kernel"], "dtype": "float16"},
+    }
+    if missing_recurrence:
+        inputs["params"] = {"shape": ["hidden"], "dtype": "float16"}
+        inputs["w_out"] = {"shape": ["hidden", "hidden"], "dtype": "float16"}
+        reference = (
+            "def run(x, w_in, conv_weight, params, w_out):\n"
+            "    z = in_proj(x, w_in)\n"
+            "    z = depthwise_conv(z, conv_weight)\n"
+            "    y = selective_scan(z, params)\n"
+            "    return out_proj(y, w_out)\n"
+        )
+    else:
+        inputs.update(
+            {
+                "a": {"shape": ["hidden", "state"], "dtype": "float16"},
+                "b": {"shape": ["hidden", "state"], "dtype": "float16"},
+                "c": {"shape": ["hidden", "state"], "dtype": "float16"},
+                "w_out": {"shape": ["hidden", "hidden"], "dtype": "float16"},
+            }
+        )
+        reference = (
+            "def run(x, w_in, conv_weight, a, b, c, w_out):\n"
+            "    z = in_proj(x, w_in)\n"
+            "    z = depthwise_conv(z, conv_weight)\n"
+            "    y = selective_scan(z, a, b, c)\n"
+            "    y = gate(y)\n"
+            "    return out_proj(y, w_out)\n"
+        )
+    return Definition(
+        name="ssm_mamba_missing_recurrence" if missing_recurrence else "ssm_mamba_static",
+        axes={
+            "batch": {"type": "const", "value": 2},
+            "sequence": {"type": "const", "value": 64},
+            "hidden": {"type": "const", "value": 128},
+            "state": {"type": "const", "value": 16},
+            "one": {"type": "const", "value": 1},
+            "kernel": {"type": "const", "value": 3},
+        },
+        inputs=inputs,
+        outputs={"out": {"shape": ["batch", "sequence", "hidden"], "dtype": "float16"}},
+        reference=reference,
+    )
+
+
+def _ssm_mamba_workload(*, missing_recurrence: bool = False, custom_scan: bool = False) -> Workload:
+    if custom_scan:
+        return Workload(
+            axes={},
+            inputs={"x": {"type": "random"}, "opaque_scan": {"type": "random"}},
+            uuid="ssm-custom-workload",
+        )
+    inputs = {
+        "x": {"type": "random"},
+        "w_in": {"type": "random"},
+        "conv_weight": {"type": "random"},
+    }
+    if missing_recurrence:
+        inputs.update({"params": {"type": "random"}, "w_out": {"type": "random"}})
+    else:
+        inputs.update(
+            {
+                "a": {"type": "random"},
+                "b": {"type": "random"},
+                "c": {"type": "random"},
+                "w_out": {"type": "random"},
+            }
+        )
+    return Workload(axes={}, inputs=inputs, uuid="ssm-mamba-workload")
+
+
+def test_ssm_mamba_static_sidecar_matches_positive_fixture_contract():
+    fixture = _load_fixture("ssm_mamba_positive.json")
+    expectation = fixture["expectation"]
+    evidence = build_solar_derivation_evidence(_ssm_mamba_definition(), _ssm_mamba_workload())
+    group = next(group for group in evidence.groups if group.family == "ssm_mamba")
+
+    assert group.status == expectation["expected_status"]
+    assert group.confidence.value == expectation["expected_confidence"]
+    assert [subrole.name for subrole in group.subroles] == expectation["expected_subroles"]
+    for required in expectation["required_evidence"]:
+        assert required in group.required_evidence
+    assert group.missing_evidence == ()
+    assert group.warning_prefixes == ()
+    assert {item.formula_kind for item in group.formula_evidence} >= {
+        "ssm_mamba_static_scan_flops",
+    }
+    assert any(item.total_bytes > 0.0 for item in group.byte_evidence)
+    assert group.bound_evidence
+
+
+def test_ssm_mamba_missing_recurrence_sidecar_matches_degraded_fixture_contract():
+    fixture = _load_fixture("ssm_mamba_degraded_missing_recurrence.json")
+    expectation = fixture["expectation"]
+    evidence = build_solar_derivation_evidence(
+        _ssm_mamba_definition(missing_recurrence=True),
+        _ssm_mamba_workload(missing_recurrence=True),
+    )
+    group = next(group for group in evidence.groups if group.family == "ssm_mamba")
+
+    assert group.status == expectation["expected_status"]
+    assert group.confidence.value == expectation["expected_confidence"]
+    assert [subrole.name for subrole in group.subroles] == expectation["expected_subroles"]
+    for missing in expectation["missing_evidence"]:
+        assert missing in group.missing_evidence
+    for warning in expectation["warning_prefixes"]:
+        assert warning in group.warning_prefixes
+    assert any(
+        item.formula_kind == "ssm_mamba_degraded_scan_bytes"
+        for item in group.formula_evidence
+    )
+    assert not any(subrole.name == "state_update" for subrole in group.subroles)
+
+
+def test_ssm_mamba_custom_scan_sidecar_matches_unsupported_fixture_contract():
+    fixture = _load_fixture("ssm_mamba_unsupported_custom_scan.json")
+    expectation = fixture["expectation"]
+    evidence = build_solar_derivation_evidence(
+        _ssm_mamba_definition(custom_scan=True),
+        _ssm_mamba_workload(custom_scan=True),
+    )
+    group = next(group for group in evidence.groups if group.family == "ssm_mamba")
+
+    assert group.status == expectation["expected_status"]
+    assert group.confidence.value == expectation["expected_confidence"]
+    assert [subrole.name for subrole in group.subroles] == expectation["expected_subroles"]
+    for missing in expectation["missing_evidence"]:
+        assert missing in group.missing_evidence
+    for warning in expectation["warning_prefixes"]:
+        assert warning in group.warning_prefixes
+    assert not any(subrole.name == "state_update" for subrole in group.subroles)
+
+
 def test_moe_static_route_sidecar_matches_positive_fixture_contract():
     fixture = _load_fixture("moe_positive.json")
     expectation = fixture["expectation"]
