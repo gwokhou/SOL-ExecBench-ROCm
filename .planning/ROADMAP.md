@@ -48,7 +48,7 @@ the current ROCm path, with validation scoped to RDNA 4 only.
 | Phase | Name | Goal | Requirements |
 | --- | --- | --- | --- |
 | 41 | Bound Model Contract And Hardware Artifacts | Establish the v2 bound artifact contract, hardware model JSON loader, and public-contract guardrails before changing estimators. | HW-01, HW-02, HW-03, HW-04, DOC-01 |
-| 42 | Structured Bound Graph IR | Replace raw AST-centric extraction with a typed, inspectable IR while preserving existing facade imports. | IR-01, IR-02, IR-03, IR-04 |
+| 42 | 3/3 | Complete    | 2026-05-23 |
 | 43 | Operator FLOP/Byte/Movement Modeling | Implement auditable formulas and memory-movement evidence for core operator families. | MODEL-01, MODEL-02, MODEL-03, MODEL-04, MODEL-05 |
 | 44 | Bound Artifact V2 And Coverage Semantics | Serialize/load v2 SOL bound sidecars and make coverage, confidence, warnings, and aggregate bounds deterministic. | BOUND-01, BOUND-02, BOUND-03, BOUND-04 |
 | 45 | AMD Score And Dataset Integration | Wire v2 bound artifacts into AMD-native workload/suite score reports and optional dataset sidecar output. | SCORE-01, SCORE-02, SCORE-03, SCORE-04 |
@@ -99,22 +99,22 @@ code can consume without depending on raw AST details.
 
 **Requirements:** IR-01, IR-02, IR-03, IR-04
 
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 
 Plans:
 **Wave 1**
 
-- [ ] 42-01-PLAN.md — Create structured AMD bound graph IR contract, taxonomy,
+- [x] 42-01-PLAN.md — Create structured AMD bound graph IR contract, taxonomy,
   serialization, and AST fallback evidence.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 42-02-PLAN.md — Implement workload-aware dynamic-trace-first extraction,
+- [x] 42-02-PLAN.md — Implement workload-aware dynamic-trace-first extraction,
   dataflow edges, and explicit unsupported/inexact evidence.
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 42-03-PLAN.md — Wire the new IR through AMD SOL compatibility facades and
+- [x] 42-03-PLAN.md — Wire the new IR through AMD SOL compatibility facades and
   public-contract guardrails.
 
 **Success criteria:**
