@@ -180,6 +180,40 @@ def test_solar_derivation_parser_rejects_missing_required_fields():
         solar_derivation_from_dict(bad_tensor)
 
 
+@pytest.mark.parametrize(
+    ("path", "expected_error"),
+    [
+        ((), r"SOLAR derivation evidence contains unknown field\(s\): extra_claim"),
+        (("groups", 0), r"groups\[0\] contains unknown field\(s\): extra_claim"),
+        (
+            ("groups", 0, "subroles", 0),
+            r"groups\[0\]\.subroles\[0\] contains unknown field\(s\): extra_claim",
+        ),
+        (("tensors", 0), r"tensors\[0\] contains unknown field\(s\): extra_claim"),
+        (
+            ("tensors", 0, "source"),
+            r"tensors\[0\]\.source contains unknown field\(s\): extra_claim",
+        ),
+        (
+            ("source_boundary",),
+            r"source_boundary contains unknown field\(s\): extra_claim",
+        ),
+    ],
+)
+def test_solar_derivation_parser_rejects_unknown_schema_fields(
+    path: tuple[object, ...],
+    expected_error: str,
+):
+    payload = _contract_payload()
+    target = payload
+    for key in path:
+        target = target[key]
+    target["extra_claim"] = "not allowed"
+
+    with pytest.raises(ValueError, match=expected_error):
+        solar_derivation_from_dict(payload)
+
+
 def test_solar_derivation_parser_rejects_invalid_schema_version():
     payload = _contract_payload()
     payload["schema_version"] = "sol_execbench.solar_derivation.v2"
@@ -251,6 +285,24 @@ def test_solar_derivation_source_boundary_records_sidecar_only_inputs():
         match="source_boundary.candidate_solution_execution must be a boolean",
     ):
         solar_derivation_from_dict(non_bool_boundary)
+
+
+@pytest.mark.parametrize(
+    ("shape", "expected_error"),
+    [
+        ([True, 4], r"tensors\[0\]\.shape\[0\] must be an integer"),
+        ([-1, 4], r"tensors\[0\]\.shape\[0\] must be non-negative"),
+    ],
+)
+def test_solar_derivation_parser_rejects_invalid_shape_dimensions(
+    shape: list[object],
+    expected_error: str,
+):
+    payload = _contract_payload()
+    payload["tensors"][0]["shape"] = shape
+
+    with pytest.raises(ValueError, match=expected_error):
+        solar_derivation_from_dict(payload)
 
 
 def _fixture_evidence_payload(fixture: dict[str, object]) -> dict[str, object]:

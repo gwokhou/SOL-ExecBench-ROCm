@@ -300,7 +300,7 @@ def solar_derivation_from_dict(payload: dict[str, Any]) -> SolarDerivationEviden
     """Parse an internal SOLAR derivation evidence sidecar payload."""
     if not isinstance(payload, dict):
         raise ValueError("SOLAR derivation evidence payload must be an object")
-    _require_keys(
+    _require_exact_keys(
         payload,
         {
             "schema_version",
@@ -360,7 +360,7 @@ def solar_derivation_from_dict(payload: dict[str, Any]) -> SolarDerivationEviden
 def _group_from_dict(payload: Any, index: int) -> SolarSemanticGroupEvidence:
     source = f"groups[{index}]"
     raw = _ensure_dict(payload, source=source)
-    _require_keys(
+    _require_exact_keys(
         raw,
         {
             "family",
@@ -411,7 +411,7 @@ def _subrole_from_dict(
 ) -> SolarSubroleEvidence:
     source = f"groups[{group_index}].subroles[{index}]"
     raw = _ensure_dict(payload, source=source)
-    _require_keys(
+    _require_exact_keys(
         raw,
         {
             "name",
@@ -440,7 +440,7 @@ def _subrole_from_dict(
 def _tensor_from_dict(payload: Any, index: int) -> SolarTensorEvidence:
     source = f"tensors[{index}]"
     raw = _ensure_dict(payload, source=source)
-    _require_keys(
+    _require_exact_keys(
         raw,
         {
             "tensor_id",
@@ -473,7 +473,7 @@ def _evidence_source_from_dict(
     *,
     source: str,
 ) -> SolarEvidenceSource:
-    _require_keys(payload, {"kind", "detail", "node_id", "tensor_id"}, source=source)
+    _require_exact_keys(payload, {"kind", "detail", "node_id", "tensor_id"}, source=source)
     return SolarEvidenceSource(
         kind=_parse_str(payload, "kind", source=source),
         detail=_parse_str(payload, "detail", source=source),
@@ -483,7 +483,11 @@ def _evidence_source_from_dict(
 
 
 def _source_boundary_from_dict(payload: dict[str, Any]) -> dict[str, bool]:
-    _require_keys(payload, SOLAR_DERIVATION_SOURCE_BOUNDARY_FIELDS, source="source_boundary")
+    _require_exact_keys(
+        payload,
+        SOLAR_DERIVATION_SOURCE_BOUNDARY_FIELDS,
+        source="source_boundary",
+    )
     parsed: dict[str, bool] = {}
     for key in sorted(SOLAR_DERIVATION_SOURCE_BOUNDARY_FIELDS):
         value = payload[key]
@@ -935,6 +939,18 @@ def _require_keys(payload: dict[str, Any], required: frozenset[str] | set[str], 
             raise ValueError(f"{source} missing required field: {key}")
 
 
+def _require_exact_keys(
+    payload: dict[str, Any],
+    allowed: frozenset[str] | set[str],
+    *,
+    source: str,
+) -> None:
+    unknown = sorted(set(payload) - set(allowed))
+    if unknown:
+        raise ValueError(f"{source} contains unknown field(s): {', '.join(unknown)}")
+    _require_keys(payload, allowed, source=source)
+
+
 def _parse_dict(payload: dict[str, Any], key: str, *, source: str) -> dict[str, Any]:
     return _ensure_dict(payload[key], source=f"{source}.{key}")
 
@@ -996,8 +1012,10 @@ def _parse_shape(
         raise ValueError(f"{source}.{key} must be a list or null")
     shape: list[int] = []
     for index, item in enumerate(value):
-        if not isinstance(item, int):
+        if type(item) is not int:
             raise ValueError(f"{source}.{key}[{index}] must be an integer")
+        if item < 0:
+            raise ValueError(f"{source}.{key}[{index}] must be non-negative")
         shape.append(item)
     return tuple(shape)
 
