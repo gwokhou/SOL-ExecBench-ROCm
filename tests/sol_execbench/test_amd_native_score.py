@@ -17,8 +17,10 @@ from sol_execbench.core.scoring.amd_score import (
     AMD_SCORE_CLAIM_LEVEL,
     AMD_SCORE_SCHEMA_VERSION,
     CDNA3_NO_VALIDATION_WARNING,
+    DEGRADED_SOL_BOUND_WARNING,
     INCOMPLETE_EVIDENCE_WARNING,
     REFERENCE_BASELINE_WARNING,
+    UNSCORED_SOL_BOUND_WARNING,
     UNSUPPORTED_EVIDENCE_WARNING,
     UNVALIDATED_HARDWARE_WARNING,
     build_amd_native_suite_report,
@@ -34,6 +36,7 @@ from sol_execbench.core.scoring.amd_sol import (
     build_amd_sol_bound_artifact,
     default_amd_hardware_models,
 )
+from sol_execbench.core.scoring.amd_sol_v2 import build_amd_sol_bound_v2_artifact
 from sol_execbench.core.scoring.amd_hardware_models import load_amd_hardware_model
 from sol_execbench.sol_score import sol_score
 
@@ -63,6 +66,34 @@ def _matmul_artifact():
     )
     return build_amd_sol_bound_artifact(
         definition, workload, default_amd_hardware_models()["gfx1200"]
+    )
+
+
+def _matmul_artifact_v2():
+    definition = Definition(
+        name="matmul_demo",
+        axes={
+            "M": {"type": "var"},
+            "K": {"type": "const", "value": 4},
+            "N": {"type": "const", "value": 8},
+        },
+        inputs={
+            "a": {"shape": ["M", "K"], "dtype": "float32"},
+            "b": {"shape": ["K", "N"], "dtype": "float32"},
+        },
+        outputs={"out": {"shape": ["M", "N"], "dtype": "float32"}},
+        reference="def run(a, b):\n    return a @ b",
+    )
+    workload = Workload(
+        axes={"M": 2},
+        inputs={"a": {"type": "random"}, "b": {"type": "random"}},
+        uuid="matmul-workload",
+    )
+    return build_amd_sol_bound_v2_artifact(
+        definition,
+        workload,
+        default_amd_hardware_models()["gfx1200"],
+        hardware_model_ref="default_amd_hardware_models.gfx1200",
     )
 
 
@@ -104,6 +135,26 @@ def _unsupported_cdna3_artifact(tmp_path: Path):
     )
     return build_amd_sol_bound_artifact(
         definition, workload, _cdna3_model(tmp_path)
+    )
+
+
+def _unsupported_artifact_v2():
+    definition = Definition(
+        name="unsupported_demo",
+        axes={"N": {"type": "var"}},
+        inputs={"x": {"shape": ["N", "N"], "dtype": "float32"}},
+        outputs={"out": {"shape": ["N", "N"], "dtype": "float32"}},
+        reference="import torch\n\ndef run(x):\n    return torch.linalg.inv(x)",
+    )
+    workload = Workload(
+        axes={"N": 4},
+        inputs={"x": {"type": "random"}},
+        uuid="unsupported-workload",
+    )
+    return build_amd_sol_bound_v2_artifact(
+        definition,
+        workload,
+        default_amd_hardware_models()["gfx1200"],
     )
 
 
@@ -156,7 +207,49 @@ def test_suite_report_is_derived_and_preserves_evidence_references():
     assert payload["scored_count"] == 1
     assert payload["unscored_count"] == 0
     assert payload["mean_score"] == score.score
+    assert payload["evidence_summary"]["timing"] == 1
+    assert payload["evidence_summary"]["sol_bound"] == 1
     assert payload["scores"][0]["evidence_refs"]["sol_bound"] == "sol/matmul.json"
+
+
+def test_v2_degraded_artifact_scores_with_deterministic_warnings():
+    artifact = _matmul_artifact_v2()
+
+    report = score_amd_native_workload(
+        artifact,
+        measured_latency_ms=1.5,
+        baseline_latency_ms=2.0,
+        sol_bound_ref="sol/matmul.amd-sol-v2.json",
+        hardware_model_ref="default_amd_hardware_models.gfx1200",
+    )
+
+    assert report.score == sol_score(
+        t_k=1.5,
+        t_b=2.0,
+        t_sol=artifact.aggregate_bound.sol_bound_ms,
+    )
+    assert report.supported is True
+    assert DEGRADED_SOL_BOUND_WARNING in report.warnings
+    assert "aggregate_degraded:inexact or provisional evidence present" in report.warnings
+    assert report.evidence_refs["sol_bound"] == "sol/matmul.amd-sol-v2.json"
+    assert report.evidence_refs["hardware_model"] == "default_amd_hardware_models.gfx1200"
+
+
+def test_v2_unscored_artifact_omits_score_and_preserves_bound_warning():
+    artifact = _unsupported_artifact_v2()
+
+    report = score_amd_native_workload(
+        artifact,
+        measured_latency_ms=1.0,
+        baseline_latency_ms=2.0,
+        sol_bound_ref="sol/unsupported.amd-sol-v2.json",
+    )
+
+    assert report.score is None
+    assert report.supported is False
+    assert report.sol_bound_ms == artifact.aggregate_bound.sol_bound_ms
+    assert UNSCORED_SOL_BOUND_WARNING in report.warnings
+    assert "aggregate_unscored:unsupported operation evidence present" in report.warnings
 
 
 def test_unsupported_cdna3_score_carries_no_validation_guardrails(tmp_path):

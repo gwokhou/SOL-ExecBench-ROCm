@@ -16,6 +16,7 @@ from sol_execbench.core.scoring.amd_sol import (
     EstimateConfidence,
     HardwareValidationStatus,
 )
+from sol_execbench.core.scoring.amd_sol_v2 import AmdSolBoundV2Artifact
 from sol_execbench.core.scoring.baseline_artifact import ScoringBaselineArtifact
 from sol_execbench.sol_score import sol_score
 
@@ -40,6 +41,14 @@ UNVALIDATED_HARDWARE_WARNING = (
 CDNA3_NO_VALIDATION_WARNING = (
     "CDNA3 full-suite validation has not been recorded for this ROCm port; do "
     "not present this report as a CDNA3 hardware-validation claim."
+)
+UNSCORED_SOL_BOUND_WARNING = (
+    "AMD-native score was not computed because AMD SOL bound evidence is marked "
+    "unscored."
+)
+DEGRADED_SOL_BOUND_WARNING = (
+    "AMD-native score uses degraded AMD SOL bound evidence; treat the score as "
+    "provisional derived evidence."
 )
 
 
@@ -107,6 +116,22 @@ class AmdNativeSuiteReport:
                     unique.append(warning)
         return tuple(unique)
 
+    @property
+    def evidence_summary(self) -> dict[str, int]:
+        """Count evidence reference coverage by reference kind."""
+        summary = {
+            "trace": 0,
+            "timing": 0,
+            "sol_bound": 0,
+            "baseline": 0,
+            "hardware_model": 0,
+        }
+        for score in self.scores:
+            for key in summary:
+                if key in score.evidence_refs:
+                    summary[key] += 1
+        return summary
+
     def to_dict(self) -> dict[str, object]:
         scored_count = sum(1 for score in self.scores if score.score is not None)
         return {
@@ -118,12 +143,13 @@ class AmdNativeSuiteReport:
             "unscored_count": len(self.scores) - scored_count,
             "warnings": list(self.warnings),
             "baseline_summary": self.baseline_summary,
+            "evidence_summary": self.evidence_summary,
             "scores": [score.to_dict() for score in self.scores],
         }
 
 
 def score_amd_native_workload(
-    artifact: AmdSolBoundArtifact,
+    artifact: AmdSolBoundArtifact | AmdSolBoundV2Artifact,
     *,
     measured_latency_ms: float | None,
     baseline_latency_ms: float | None,
@@ -135,7 +161,7 @@ def score_amd_native_workload(
     hardware_model_ref: str | None = None,
 ) -> AmdNativeScore:
     """Build a guarded AMD-native score for one workload."""
-    sol_bound_ms = artifact.aggregate_sol_bound_ms
+    sol_bound_ms = _artifact_sol_bound_ms(artifact)
     warnings = _warnings_for_artifact(artifact)
     if baseline_source == "reference_latency":
         warnings.append(REFERENCE_BASELINE_WARNING)
@@ -148,7 +174,10 @@ def score_amd_native_workload(
     )
 
     score_value = None
-    if _has_complete_numeric_inputs(
+    if isinstance(artifact, AmdSolBoundV2Artifact) and not artifact.aggregate_bound.scored:
+        if UNSCORED_SOL_BOUND_WARNING not in warnings:
+            warnings.append(UNSCORED_SOL_BOUND_WARNING)
+    elif _has_complete_numeric_inputs(
         measured_latency_ms=measured_latency_ms,
         baseline_latency_ms=baseline_latency_ms,
         sol_bound_ms=sol_bound_ms,
@@ -191,7 +220,7 @@ def build_amd_native_suite_report(
 
 def score_amd_native_trace_workload(
     trace: Trace,
-    artifact: AmdSolBoundArtifact | None,
+    artifact: AmdSolBoundArtifact | AmdSolBoundV2Artifact | None,
     *,
     trace_ref: str | None = None,
     timing_evidence_ref: str | None = None,
@@ -264,7 +293,7 @@ def score_amd_native_trace_workload(
 
 def build_amd_native_suite_report_from_traces(
     traces: Iterable[Trace],
-    artifacts_by_workload_uuid: dict[str, AmdSolBoundArtifact],
+    artifacts_by_workload_uuid: dict[str, AmdSolBoundArtifact | AmdSolBoundV2Artifact],
     *,
     evidence_refs_by_workload_uuid: dict[str, dict[str, str]] | None = None,
     baseline_artifact: ScoringBaselineArtifact | None = None,
@@ -306,7 +335,27 @@ def _has_complete_numeric_inputs(
     )
 
 
-def _warnings_for_artifact(artifact: AmdSolBoundArtifact) -> list[str]:
+def _artifact_sol_bound_ms(
+    artifact: AmdSolBoundArtifact | AmdSolBoundV2Artifact,
+) -> float:
+    if isinstance(artifact, AmdSolBoundV2Artifact):
+        return artifact.aggregate_bound.sol_bound_ms
+    return artifact.aggregate_sol_bound_ms
+
+
+def _warnings_for_artifact(
+    artifact: AmdSolBoundArtifact | AmdSolBoundV2Artifact,
+) -> list[str]:
+    if isinstance(artifact, AmdSolBoundV2Artifact):
+        warnings = list(artifact.warnings)
+        if artifact.aggregate_bound.status == "degraded":
+            warnings.append(DEGRADED_SOL_BOUND_WARNING)
+        elif artifact.aggregate_bound.status == "unscored":
+            warnings.append(UNSCORED_SOL_BOUND_WARNING)
+        if artifact.hardware_model.architecture.startswith("gfx94"):
+            warnings.append(CDNA3_NO_VALIDATION_WARNING)
+        return _unique(warnings)
+
     warnings: list[str] = []
     if any(
         estimate.confidence == EstimateConfidence.UNSUPPORTED
@@ -324,6 +373,16 @@ def _warnings_for_artifact(artifact: AmdSolBoundArtifact) -> list[str]:
         warnings.append(CDNA3_NO_VALIDATION_WARNING)
 
     return warnings
+
+
+def _unique(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    unique: list[str] = []
+    for value in values:
+        if value not in seen:
+            seen.add(value)
+            unique.append(value)
+    return unique
 
 
 def _evidence_refs(

@@ -88,7 +88,11 @@ def test_dataset_helper_builds_derived_amd_score_report(tmp_path):
         == "trace.evaluation.performance.reference_latency_ms"
     )
     assert report["scores"][0]["evidence_refs"]["hardware_model"].endswith("gfx1200")
+    assert report["scores"][0]["evidence_refs"]["sol_bound"].endswith(
+        ":amd_sol_bound_v2"
+    )
     assert report["scores"][0]["baseline_source"] == "reference_latency"
+    assert report["evidence_summary"]["sol_bound"] == 1
 
 
 def test_dataset_helper_uses_scoring_baseline_artifact(tmp_path):
@@ -166,6 +170,70 @@ def test_dataset_helper_uses_scoring_baseline_artifact(tmp_path):
     assert payload["scores"][0]["evidence_refs"]["baseline"] == (
         "baselines/v1.7.json#matmul_demo:matmul-workload"
     )
+
+
+def test_dataset_helper_can_emit_v2_sol_bound_sidecars(tmp_path):
+    definition = {
+        "name": "matmul_demo",
+        "axes": {
+            "M": {"type": "var"},
+            "K": {"type": "const", "value": 4},
+            "N": {"type": "const", "value": 8},
+        },
+        "inputs": {
+            "a": {"shape": ["M", "K"], "dtype": "float32"},
+            "b": {"shape": ["K", "N"], "dtype": "float32"},
+        },
+        "outputs": {"out": {"shape": ["M", "N"], "dtype": "float32"}},
+        "reference": "def run(a, b):\n    return a @ b",
+    }
+    workload_path = tmp_path / "workload.jsonl"
+    workload_path.write_text(
+        json.dumps(
+            {
+                "uuid": "matmul-workload",
+                "axes": {"M": 2},
+                "inputs": {"a": {"type": "random"}, "b": {"type": "random"}},
+            }
+        )
+    )
+    traces = [
+        {
+            "definition": "matmul_demo",
+            "workload": {
+                "uuid": "matmul-workload",
+                "axes": {"M": 2},
+                "inputs": {"a": {"type": "random"}, "b": {"type": "random"}},
+            },
+            "solution": "solution",
+            "evaluation": {
+                "status": "PASSED",
+                "environment": {"hardware": "AMD gfx1200", "libs": {}},
+                "timestamp": "2026-05-22T00:00:00Z",
+                "correctness": {},
+                "performance": {
+                    "latency_ms": 1.5,
+                    "reference_latency_ms": 2.0,
+                    "speedup_factor": 1.333,
+                },
+            },
+        }
+    ]
+    sidecar_dir = tmp_path / "sol-bounds"
+
+    scores = build_amd_score_reports_for_problem(
+        definition_payload=definition,
+        workload_path=workload_path,
+        traces_payload=traces,
+        trace_ref="L1/matmul_demo/traces.json",
+        sol_bound_artifact_dir=sidecar_dir,
+    )
+
+    sidecar_path = sidecar_dir / "matmul_demo.matmul-workload.amd-sol-v2.json"
+    sidecar = json.loads(sidecar_path.read_text())
+    assert sidecar["schema_version"] == "sol_execbench.amd_sol_bound.v2"
+    assert sidecar["operator_work_estimates"][0]["formula_kind"] == "gemm_flops"
+    assert scores[0].evidence_refs["sol_bound"] == str(sidecar_path)
 
 
 def test_dataset_helper_marks_missing_workload_bound_as_unscored(tmp_path):
