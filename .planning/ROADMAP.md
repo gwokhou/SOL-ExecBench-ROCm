@@ -106,7 +106,7 @@ NVIDIA Blackwell/B200 equivalence, and new framework dependencies.
 Plans:
 **Wave 1**
 
-- [ ] 47-01-PLAN.md — Write the sidecar-only SOLAR derivation contract.
+- [x] 47-01-PLAN.md — Write the sidecar-only SOLAR derivation contract.
 - [ ] 47-02-PLAN.md — Add the fixture loader and loader-only schema tests.
 
 **Wave 2** *(blocked on Wave 1 completion)*
@@ -257,7 +257,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 47. Derivation Contract And Golden Fixture Matrix | 0/6 | Not started | - |
+| 47. Derivation Contract And Golden Fixture Matrix | 1/6 | In Progress|  |
 | 48. Extraction Pipeline And Semantic Provenance | 0/TBD | Not started | - |
 | 49. High-Confidence Family Modeling | 0/TBD | Not started | - |
 | 50. Degraded Complex Family Modeling | 0/TBD | Not started | - |
