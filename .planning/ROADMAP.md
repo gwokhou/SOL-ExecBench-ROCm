@@ -142,7 +142,24 @@ Plans:
   4. Existing primary `sol-execbench` behavior and canonical benchmark schemas
      remain unchanged while sidecar-only evidence expands.
 
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 48-01-PLAN.md — Create the internal evidence model and strict parser/serializer.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 48-02-PLAN.md — Build evidence from bound graph and estimate provenance without candidate solution execution.
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 48-03-PLAN.md — Add deterministic semantic grouping and confidence/status rules.
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 48-04-PLAN.md — Close fixture-driven coverage and public contract guardrails.
 
 ### Phase 49: High-Confidence Family Modeling
 
@@ -258,7 +275,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 47. Derivation Contract And Golden Fixture Matrix | 6/6 | Complete | 2026-05-23 |
-| 48. Extraction Pipeline And Semantic Provenance | 0/TBD | Not started | - |
+| 48. Extraction Pipeline And Semantic Provenance | 0/4 | Not started | - |
 | 49. High-Confidence Family Modeling | 0/TBD | Not started | - |
 | 50. Degraded Complex Family Modeling | 0/TBD | Not started | - |
 | 51. Sidecar Coverage And Score Guards | 0/TBD | Not started | - |
