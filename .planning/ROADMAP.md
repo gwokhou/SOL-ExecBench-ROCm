@@ -68,7 +68,7 @@ NVIDIA Blackwell/B200 equivalence, and new framework dependencies.
 - [x] **Phase 50: Degraded Complex Family Modeling** - Add conservative MoE (completed 2026-05-23)
   and SSM/Mamba derivation paths with explicit degraded evidence.
 
-- [ ] **Phase 51: Sidecar Coverage And Score Guards** - Make coverage,
+- [x] **Phase 51: Sidecar Coverage And Score Guards** - Make coverage, (completed 2026-05-23)
   aggregate state, sidecar fields, and AMD-native score eligibility
   machine-verifiable.
 
@@ -284,7 +284,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 51-03-PLAN.md — Close parser, public-boundary, and full regression guardrails.
+- [x] 51-03-PLAN.md — Close parser, public-boundary, and full regression guardrails.
 
 ### Phase 52: Dataset Runner And Public Contract Closure
 
@@ -321,7 +321,7 @@ Plans:
 | 48. Extraction Pipeline And Semantic Provenance | 4/4 | Complete    | 2026-05-23 |
 | 49. High-Confidence Family Modeling | 4/4 | Complete    | 2026-05-23 |
 | 50. Degraded Complex Family Modeling | 3/3 | Complete    | 2026-05-23 |
-| 51. Sidecar Coverage And Score Guards | 2/3 | In Progress | 2026-05-23 |
+| 51. Sidecar Coverage And Score Guards | 3/3 | Complete   | 2026-05-23 |
 | 52. Dataset Runner And Public Contract Closure | 0/TBD | Not started | - |
 
 ## Requirements Coverage
