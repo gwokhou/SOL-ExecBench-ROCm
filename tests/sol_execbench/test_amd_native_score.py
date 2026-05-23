@@ -358,6 +358,44 @@ def test_suite_report_is_derived_and_preserves_evidence_references():
     assert payload["scores"][0]["evidence_refs"]["sol_bound"] == "sol/matmul.json"
 
 
+def test_suite_report_exposes_derived_evidence_refs_outside_public_refs():
+    score = score_amd_native_workload(
+        _matmul_artifact(),
+        measured_latency_ms=1.5,
+        baseline_latency_ms=2.0,
+        trace_ref="traces/matmul.json",
+        sol_bound_ref="sol/matmul.amd-sol-v2.json",
+        hardware_model_ref="default_amd_hardware_models.gfx1200",
+        derived_evidence_refs={
+            "formula": "solar/matmul.solar-derivation.json#groups.formula_evidence",
+            "hardware_model": "default_amd_hardware_models.gfx1200",
+            "coverage": "solar/matmul.solar-derivation.json#coverage_summary",
+            "score_eligibility": (
+                "solar/matmul.solar-derivation.json#aggregate_status"
+            ),
+        },
+    )
+
+    payload = build_amd_native_suite_report([score]).to_dict()
+    score_payload = payload["scores"][0]
+
+    assert score_payload["claim_level"] == AMD_SCORE_CLAIM_LEVEL
+    assert score_payload["evidence_refs"] == {
+        "trace": "traces/matmul.json",
+        "sol_bound": "sol/matmul.amd-sol-v2.json",
+        "hardware_model": "default_amd_hardware_models.gfx1200",
+    }
+    assert score_payload["derived_evidence_refs"] == {
+        "formula": "solar/matmul.solar-derivation.json#groups.formula_evidence",
+        "hardware_model": "default_amd_hardware_models.gfx1200",
+        "coverage": "solar/matmul.solar-derivation.json#coverage_summary",
+        "score_eligibility": "solar/matmul.solar-derivation.json#aggregate_status",
+    }
+    assert "formula" not in score_payload["evidence_refs"]
+    assert "coverage" not in score_payload["evidence_refs"]
+    assert "score_eligibility" not in score_payload["evidence_refs"]
+
+
 def test_v2_degraded_artifact_scores_with_deterministic_warnings():
     artifact = _matmul_artifact_v2()
 
