@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.10
-milestone_name: Paper-Aligned SOLAR Automatic Derivation
-status: Awaiting next milestone
-stopped_at: Completed 52-03-PLAN.md
-last_updated: "2026-05-23T11:54:48.110Z"
-last_activity: 2026-05-23 — Milestone v1.10 completed and archived
+milestone: v1.11
+milestone_name: Paper Dataset Parity Inventory and ROCm Execution Closure
+status: planning
+last_updated: "2026-05-23T12:13:36.233Z"
+last_activity: 2026-05-23
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 23
-  completed_plans: 23
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -25,10 +24,10 @@ See: `.planning/PROJECT.md` (updated 2026-05-23)
 
 ## Current Position
 
-Phase: Milestone v1.10 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-05-23 — Milestone v1.10 completed and archived
+Status: Defining requirements
+Last activity: 2026-05-23 — Milestone v1.11 started
 
 ## Performance Metrics
 

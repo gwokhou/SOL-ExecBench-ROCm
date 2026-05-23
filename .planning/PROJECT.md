@@ -18,7 +18,8 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 **Shipped version:** v1.10 Paper-Aligned SOLAR Automatic Derivation,
 completed 2026-05-23.
 
-**Current milestone:** none. Start the next milestone with `$gsd-new-milestone`.
+**Current milestone:** v1.11 Paper Dataset Parity Inventory and ROCm
+Execution Closure.
 
 **Latest milestone outcome:** the ROCm port now has paper-aligned automatic
 SOLAR derivation evidence for the scoped v1.10 families. The pipeline includes
@@ -28,7 +29,10 @@ SSM/Mamba-like evidence, machine-verifiable coverage and aggregate status,
 AMD-native score guards, dataset-runner generated SOLAR sidecars,
 `derived_evidence_refs`, documentation, and public/claim guardrails.
 
-**Next milestone goals:** not defined yet.
+**Next milestone goals:** make the paper's public benchmark dataset surface
+concrete and auditable in this ROCm port by adding acquisition/layout checks,
+machine-readable problem inventory, ROCm compatibility classification, small
+execution closure paths for ready problems, and parity gap reports.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline.
 Milestones v1.1-v1.6 added CDNA 3 code/schema support, maintained residue
@@ -84,6 +88,38 @@ coverage misuse.
 - MI300X/CDNA 3 and CDNA 4 real-hardware validation.
 - NVFP4/MXFP4 hardware validation.
 - Official hosted leaderboard or submission service.
+
+## Current Milestone: v1.11 Paper Dataset Parity Inventory and ROCm Execution Closure
+
+**Goal:** Turn the paper's public benchmark dataset into a concrete,
+auditable ROCm-port surface: acquired or layout-verified, counted, classified,
+diagnosed, runnable in small ready subsets, and reported with explicit parity
+and closure status.
+
+**Target features:**
+- Define and enforce the dataset acquisition/layout contract for the public
+  SOL-ExecBench benchmark categories: `L1`, `L2`, `Quant`, and
+  `FlashInfer-Bench`.
+- Generate a machine-readable paper parity inventory with problem counts,
+  categories, dtype coverage, forward/backward indicators, custom input and
+  safetensors usage, reference availability, and solution availability.
+- Classify each problem's ROCm readiness as ready, schema/input blocked, dtype
+  blocked, custom-input blocked, runtime blocked, unsupported NVIDIA-only path,
+  or needing hardware evidence.
+- Extend the dataset runner and reports so ready problems can run in small
+  batches and emit canonical traces, summary JSON, AMD-native score reports,
+  AMD SOL/SOLAR sidecars, and SOLAR derivation sidecars.
+- Produce a parity gap report with claim guardrails that distinguish inventory
+  completion from full 235-problem ROCm validation or leaderboard equivalence.
+
+**Explicitly deferred:**
+- Recreating the original 124-model / 7,400-subgraph extraction and curation
+  pipeline.
+- Full upstream NVlabs/SOLAR equivalence.
+- CDNA 3 / MI300X, CDNA 4, and NVFP4/MXFP4 real-hardware validation.
+- Hosted leaderboard or remote submission service.
+- Full 235-problem real-hardware validation unless this milestone discovers
+  the environment and runtime budget are sufficient.
 
 ## Recently Shipped Milestone: v1.9 AMD SOL/SOLAR Bound Modeling Completion
 
@@ -204,7 +240,9 @@ ROCm path, with validation scoped to RDNA 4 only.
 
 ### Active
 
-(None yet — define the next milestone with `$gsd-new-milestone`.)
+- Dataset acquisition/layout, paper parity inventory, ROCm compatibility
+  classification, ready-subset execution closure, and parity gap reporting for
+  v1.11.
 
 ### Out of Scope
 
@@ -225,6 +263,10 @@ ROCm path, with validation scoped to RDNA 4 only.
 - CDNA 4 hardware validation in v1.9 - explicitly deferred.
 - Full original 124-model extraction pipeline in v1.9 - deferred unless needed
   only as reference context for bound-modeling decisions.
+- Full upstream NVlabs/SOLAR equivalence in v1.11 - deferred so the milestone
+  can focus on public dataset parity inventory and ROCm execution closure.
+- Full 235-problem real-hardware validation in v1.11 - deferred unless the
+  environment and runtime budget are proven sufficient during the milestone.
 
 ## Context
 
@@ -287,6 +329,7 @@ schema, documentation, and no-claim guardrails for those architectures.
 | Focus v1.9 on AMD SOL/SOLAR bound modeling | User requested the next milestone completely solve AMD SOL/SOLAR bound modeling, with validation scoped to RDNA 4. | Validated in v1.9 |
 | Defer CDNA 3 / MI300X and CDNA 4 validation from v1.9 | User clarified CDNA 3 validation and MI300X real-hardware validation should be treated as one deferred item, and CDNA 4 remains deferred. | Validated in v1.9 |
 | Scope v1.10 to SOLAR derivation only | User chose to upgrade "论文级完整 SOLAR 自动推导" as a new milestone while excluding dataset extraction and real-hardware validation from the milestone boundary. | Validated in v1.10 |
+| Focus v1.11 on public dataset parity and execution closure | User requested the next milestone target "论文数据集 parity + ROCm execution closure" and then narrowed it to dataset acquisition/layout, inventory, compatibility classification, small ready-subset execution, and gap reporting. | Active in v1.11 |
 
 ## Evolution
 
@@ -306,4 +349,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-23 after v1.10 milestone completion*
+*Last updated: 2026-05-23 after v1.11 milestone start*
