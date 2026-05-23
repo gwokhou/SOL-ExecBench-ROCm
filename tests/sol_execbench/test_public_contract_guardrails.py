@@ -29,8 +29,10 @@ from sol_execbench.core.scoring.amd_sol import (
     build_amd_sol_bound_artifact,
     default_amd_hardware_models,
 )
+from sol_execbench.core.scoring.amd_sol_v2 import build_amd_sol_bound_v2_artifact
 from sol_execbench.core.scoring.amd_hardware_models import HardwareValidationStatus
 from sol_execbench.core.data.definition import Definition
+from sol_execbench.core.scoring import solar_derivation as solar_derivation_module
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 COMPATIBILITY_INVENTORY = REPO_ROOT / "docs/internal/v1_4_compatibility_inventory.md"
@@ -173,6 +175,14 @@ def test_v1_10_solar_derivation_fields_remain_noncanonical():
     )
     forbidden = (
         "solar_derivation",
+        "semantic_groups",
+        "semantic_axes",
+        "source_kind",
+        "source_detail",
+        "confidence_rationale",
+        "formula_provenance",
+        "byte_provenance",
+        "sol_execbench.solar_derivation.v1",
         "expected_subroles",
         "required_evidence",
         "missing_evidence",
@@ -187,6 +197,7 @@ def test_v1_10_solar_derivation_fields_remain_noncanonical():
     ):
         for field in forbidden:
             assert field not in payload
+            assert field not in repr(payload)
 
 
 def test_primary_cli_does_not_expose_v1_10_solar_derivation_options():
@@ -200,8 +211,70 @@ def test_primary_cli_does_not_expose_v1_10_solar_derivation_options():
         "--solar-fixtures",
         "--solar-contract",
         "--solar-sidecar",
+        "--semantic-provenance",
+        "--solar-evidence",
+        "--solar-confidence",
+        "--solar-provenance",
+        "--derive-solar-sidecar",
     ):
         assert option not in help_text
+
+
+def test_importing_solar_derivation_keeps_amd_native_score_eligibility_unchanged():
+    assert (
+        solar_derivation_module.SOLAR_DERIVATION_SCHEMA_VERSION
+        == "sol_execbench.solar_derivation.v1"
+    )
+
+    definition = Definition(
+        name="matmul_demo",
+        axes={
+            "M": {"type": "var"},
+            "K": {"type": "const", "value": 4},
+            "N": {"type": "const", "value": 8},
+        },
+        inputs={
+            "a": {"shape": ["M", "K"], "dtype": "float32"},
+            "b": {"shape": ["K", "N"], "dtype": "float32"},
+        },
+        outputs={"out": {"shape": ["M", "N"], "dtype": "float32"}},
+        reference="def run(a, b):\n    return a @ b",
+    )
+    workload = Workload(
+        axes={"M": 2},
+        inputs={"a": {"type": "random"}, "b": {"type": "random"}},
+        uuid="matmul-workload",
+    )
+    hardware = default_amd_hardware_models()["gfx1200"]
+    v1_artifact = build_amd_sol_bound_artifact(definition, workload, hardware)
+    v2_artifact = build_amd_sol_bound_v2_artifact(
+        definition,
+        workload,
+        hardware,
+        hardware_model_ref="default_amd_hardware_models.gfx1200",
+    )
+
+    v1_score = score_amd_native_workload(
+        v1_artifact,
+        measured_latency_ms=1.0,
+        baseline_latency_ms=2.0,
+        hardware_model_ref="default_amd_hardware_models.gfx1200",
+    )
+    v2_score = score_amd_native_workload(
+        v2_artifact,
+        measured_latency_ms=1.0,
+        baseline_latency_ms=2.0,
+        hardware_model_ref="default_amd_hardware_models.gfx1200",
+    )
+
+    assert v1_score.supported is True
+    assert v2_score.supported is True
+    assert v1_score.to_dict()["claim_level"] == "amd-native-derived"
+    assert v2_score.to_dict()["claim_level"] == "amd-native-derived"
+    assert "solar_derivation" not in v1_score.to_dict()["evidence_refs"]
+    assert "solar_derivation" not in v2_score.to_dict()["evidence_refs"]
+    assert "solar_derivation" not in v1_artifact.to_dict()
+    assert "solar_derivation" not in v2_artifact.to_dict()
 
 
 def test_v1_9_derived_artifacts_remain_noncanonical():
