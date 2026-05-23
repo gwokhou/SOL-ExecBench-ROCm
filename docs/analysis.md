@@ -72,6 +72,28 @@ missing traces, failures, and derived evidence refs. The closure sidecar is a
 bounded local execution audit. It is not full 235-problem validation,
 not paper parity, and not a leaderboard result.
 
+Generate a parity-gap JSON and Markdown report from the sidecars:
+
+```bash
+uv run scripts/report_parity_gaps.py \
+  --manifest out/dataset_manifest.json \
+  --inventory out/inventory.json \
+  --readiness out/readiness.json \
+  --ready-subset out/ready_subset.json \
+  --execution-closure out/execution_closure.json \
+  --amd-score-report out/amd-score-report.json \
+  --json-output out/parity_gap_report.json \
+  --markdown-output out/parity_gap_report.md
+```
+
+The parity-gap report summarizes discovered, parsed, ready, blocked,
+not-attempted, skipped, attempted, passed, failed, scored, degraded, and
+unscored denominators. It groups blockers by reason code with next actions and
+separates trace, timing, AMD-native score, AMD SOL, and SOLAR derivation
+evidence completeness. This report is a bounded local gap report,
+not full validation, not paper parity, not upstream SOLAR parity,
+not NVIDIA B200 or Blackwell equivalence, and not hosted leaderboard readiness.
+
 Dataset runs write per-problem traces under category/problem subdirectories of
 the selected output directory and write `summary.json` directly under that
 output directory. The default output directory is `out/`.

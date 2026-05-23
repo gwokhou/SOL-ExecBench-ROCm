@@ -528,6 +528,18 @@ def test_v1_11_execution_closure_docs_keep_bounded_claim_boundary():
     assert "not a leaderboard result" in docs
 
 
+def test_v1_11_parity_gap_docs_keep_bounded_claim_boundary():
+    docs = (REPO_ROOT / "docs/analysis.md").read_text()
+
+    assert "scripts/report_parity_gaps.py" in docs
+    assert "discovered, parsed, ready, blocked" in docs
+    assert "not full validation" in docs
+    assert "not paper parity" in docs
+    assert "not upstream SOLAR parity" in docs
+    assert "not NVIDIA B200 or" in docs
+    assert "not hosted leaderboard readiness" in docs
+
+
 def test_primary_cli_does_not_expose_v1_11_dataset_inspection_options():
     result = CliRunner().invoke(cli, ["--help"])
     assert result.exit_code == 0
