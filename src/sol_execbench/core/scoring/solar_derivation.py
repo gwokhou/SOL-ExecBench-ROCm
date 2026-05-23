@@ -394,6 +394,14 @@ def classify_solar_confidence(
         )
         missing.extend(moe_missing)
         warning_prefixes.extend(moe_warnings)
+    if family_value == OpFamily.SSM_MAMBA.value:
+        ssm_missing, ssm_warnings = _ssm_mamba_confidence_evidence(
+            nodes,
+            estimates,
+            subrole_names,
+        )
+        missing.extend(ssm_missing)
+        warning_prefixes.extend(ssm_warnings)
 
     confidence = _worst_estimate_confidence(estimates)
     if family_value == OpFamily.UNSUPPORTED.value or not nodes or not subrole_names:
@@ -408,6 +416,8 @@ def classify_solar_confidence(
             warning_prefixes.append("aggregate_degraded:attention")
         if family_value == OpFamily.MOE.value:
             warning_prefixes.append("aggregate_degraded:moe")
+        if family_value == OpFamily.SSM_MAMBA.value:
+            warning_prefixes.append("aggregate_degraded:ssm_mamba")
         warning_prefixes.append("aggregate_degraded:incomplete semantic evidence")
         rationale = (
             f"{family_value} semantics are visible but metadata is incomplete: "
@@ -419,6 +429,8 @@ def classify_solar_confidence(
             warning_prefixes.append("aggregate_unscored:attention")
         if family_value == OpFamily.MOE.value:
             warning_prefixes.append("aggregate_unscored:moe")
+        if family_value == OpFamily.SSM_MAMBA.value:
+            warning_prefixes.append("aggregate_unscored:ssm_mamba")
         warning_prefixes.append("aggregate_unscored:unsupported semantic evidence")
         rationale = (
             f"{family_value} evidence is unsupported for scoring: "
@@ -936,6 +948,15 @@ def _required_evidence_for_group(
                     required.append("shape:hidden")
                 if "experts" in estimate.formula_inputs:
                     required.append("shape:experts")
+    if family == OpFamily.SSM_MAMBA.value:
+        for estimate in estimates:
+            if estimate.formula_kind == "ssm_mamba_static_scan_flops":
+                required.extend(("shape:sequence", "shape:hidden", "shape:state", "subrole:scan"))
+            elif estimate.formula_kind == "ssm_mamba_degraded_scan_bytes":
+                if "sequence" in estimate.formula_inputs:
+                    required.append("shape:sequence")
+                if "hidden" in estimate.formula_inputs:
+                    required.append("shape:hidden")
     return _unique_sorted(required)
 
 
@@ -1104,6 +1125,8 @@ def _subroles_for_group(
         return _embedding_positional_subroles(nodes, tensor_evidence_by_id)
     if family == OpFamily.MOE.value:
         return _moe_subroles(nodes, tensor_evidence_by_id)
+    if family == OpFamily.SSM_MAMBA.value:
+        return _ssm_mamba_subroles(nodes, tensor_evidence_by_id)
     if family in {OpFamily.GEMM.value, OpFamily.LINEAR_PROJECTION.value}:
         return _linear_subroles(nodes, tensor_evidence_by_id)
     if family in {
@@ -1358,6 +1381,71 @@ def _moe_confidence_evidence(
     return missing, warnings
 
 
+def _ssm_mamba_confidence_evidence(
+    nodes: tuple[BoundGraphNode, ...],
+    estimates: tuple[OperatorWorkEstimate, ...],
+    subrole_names: tuple[str, ...],
+) -> tuple[list[str], list[str]]:
+    missing: list[str] = []
+    warnings: list[str] = []
+    if any(node.attributes.get("custom_scan") for node in nodes):
+        missing.extend(("subrole:recognized_scan", "shape:state", "recurrence:update_formula"))
+        warnings.append("unsupported_operator:ssm_custom_scan")
+        return missing, warnings
+
+    subroles = set(subrole_names)
+    if "scan" not in subroles:
+        missing.append("subrole:scan")
+    if not any(node.attributes.get("recognized_scan") is True for node in nodes):
+        missing.append("subrole:recognized_scan")
+
+    has_state_update = "state_update" in subroles
+    if not has_state_update:
+        missing.extend(("shape:state", "recurrence:update_formula"))
+        warnings.append("inexact_operator:ssm_missing_recurrence")
+
+    if has_state_update:
+        required = {
+            "input_projection",
+            "depthwise_convolution",
+            "scan",
+            "state_update",
+            "gating",
+            "output_projection",
+        }
+        missing.extend(f"subrole:{name}" for name in sorted(required - subroles))
+    for node in nodes:
+        subrole = node.attributes.get("subrole")
+        if subrole in {"scan", "state_update"}:
+            if not isinstance(node.attributes.get("sequence_length"), int):
+                missing.append("shape:sequence")
+            if not isinstance(node.attributes.get("hidden_size"), int):
+                missing.append("shape:hidden")
+        if subrole == "state_update":
+            if "state_shape" not in node.attributes:
+                missing.append("shape:state")
+            if "state_update_parameters" not in node.attributes:
+                missing.append("recurrence:update_formula")
+    for estimate in estimates:
+        for warning in estimate.warnings:
+            if warning.startswith("inexact_operator:ssm_") or warning.startswith(
+                "unsupported_operator:ssm_"
+            ):
+                warnings.append(warning)
+        if estimate.formula_kind == "ssm_mamba_static_scan_flops":
+            for key, evidence_name in (
+                ("sequence", "shape:sequence"),
+                ("hidden", "shape:hidden"),
+                ("state", "shape:state"),
+            ):
+                if key not in estimate.formula_inputs:
+                    missing.append(evidence_name)
+        elif estimate.formula_kind == "ssm_mamba_degraded_scan_bytes":
+            missing.extend(("shape:state", "recurrence:update_formula"))
+            warnings.append("inexact_operator:ssm_missing_recurrence")
+    return missing, warnings
+
+
 def _linear_subroles(
     nodes: tuple[BoundGraphNode, ...],
     tensor_evidence_by_id: dict[str, SolarTensorEvidence],
@@ -1509,6 +1597,50 @@ def _moe_subroles(
         "dispatch": 2,
         "expert_projection": 3,
         "combine": 4,
+    }
+    return tuple(
+        sorted(subroles, key=lambda item: (order.get(item.name, 99), item.name))
+    )
+
+
+def _ssm_mamba_subroles(
+    nodes: tuple[BoundGraphNode, ...],
+    tensor_evidence_by_id: dict[str, SolarTensorEvidence],
+) -> tuple[SolarSubroleEvidence, ...]:
+    has_state_update = any(
+        node.attributes.get("subrole") == "state_update" for node in nodes
+    )
+    subroles: list[SolarSubroleEvidence] = []
+    seen: set[tuple[str, str]] = set()
+    for node in sorted(nodes, key=lambda item: item.node_id):
+        subrole = node.attributes.get("subrole")
+        if not isinstance(subrole, str):
+            continue
+        if not has_state_update and subrole not in {
+            "input_projection",
+            "depthwise_convolution",
+            "scan",
+        }:
+            continue
+        key = (subrole, node.node_id)
+        if key in seen:
+            continue
+        seen.add(key)
+        subroles.append(
+            _subrole_from_tensor_ids(
+                name=subrole,
+                node=node,
+                tensor_ids=_node_tensor_ids(node),
+                tensor_evidence_by_id=tensor_evidence_by_id,
+            )
+        )
+    order = {
+        "input_projection": 0,
+        "depthwise_convolution": 1,
+        "scan": 2,
+        "state_update": 3,
+        "gating": 4,
+        "output_projection": 5,
     }
     return tuple(
         sorted(subroles, key=lambda item: (order.get(item.name, 99), item.name))
