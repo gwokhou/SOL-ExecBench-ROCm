@@ -472,22 +472,33 @@ This pattern is already used for AMD SOL v2 sidecar parsing and should be reused
 | A4 | New tests should be placed in `tests/sol_execbench/test_solar_derivation_evidence.py`. | Validation Architecture | Low; file name is discretionary. |
 | A5 | The schema version should be separate from AMD SOL v2, for example `sol_execbench.solar_derivation.v1`. | Recommended Implementation Strategy | Low; exact string is discretionary but must be unique. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should Phase 48 expose package-level imports from `sol_execbench.core.scoring`?**
    - What we know: Existing v2 artifacts and bound graph APIs are exported from `__init__.py`. [VERIFIED: src/sol_execbench/core/scoring/__init__.py]
    - What's unclear: Phase context says export only if later internal callers need package-level imports. [VERIFIED: .planning/phases/48-extraction-pipeline-and-semantic-provenance/48-CONTEXT.md]
    - Recommendation: Keep imports module-local in Phase 48 unless implementation tests need the public scoring package path. [ASSUMED]
+   - RESOLVED: Keep Phase 48 imports module-local. Do not add package-level
+     exports from `sol_execbench.core.scoring.__init__` unless a concrete
+     internal caller in the phase needs that import path.
 
 2. **How much fixture execution should Phase 48 attempt?**
    - What we know: Fixture JSON files contain reference snippets and workload axes, but not complete public `Definition` input/output schemas. [VERIFIED: tests/sol_execbench/fixtures/solar_derivation/attention_positive.json]
    - What's unclear: Whether plans should synthesize `Definition` objects for every fixture in Phase 48. [ASSUMED]
    - Recommendation: Validate all fixtures at the contract level and run extractor integration on representative hand-authored definitions for each confidence state. [ASSUMED]
+   - RESOLVED: Validate the full Phase 47 fixture matrix at the contract
+     level. Use representative hand-authored `Definition` / `Workload` cases
+     for extractor integration rather than synthesizing public schemas for
+     every fixture in Phase 48.
 
 3. **Should semantic axes be inferred from axis names, tensor dimension positions, or both?**
    - What we know: `Definition.axes`, `TensorSpec.shape`, and `Workload.axes` expose named axes and resolved concrete values. [VERIFIED: src/sol_execbench/core/data/definition.py] [VERIFIED: src/sol_execbench/core/data/workload.py]
    - What's unclear: The exact semantic-axis normalization vocabulary beyond fixture-required evidence strings. [ASSUMED]
    - Recommendation: Preserve raw axis names plus normalized fixture evidence strings, and avoid broad semantic renaming until later family formula phases. [ASSUMED]
+   - RESOLVED: Preserve raw axis names and dimension positions, and add only
+     conservative normalized semantic-axis labels needed for fixture evidence.
+     Do not introduce broad family-specific axis normalization until Phase 49
+     or Phase 50 formula work requires it.
 
 ## Sources
 

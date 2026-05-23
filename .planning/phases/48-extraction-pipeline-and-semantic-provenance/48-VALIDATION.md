@@ -39,9 +39,9 @@ created: 2026-05-23
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
 | 48-01-01 | 01 | 1 | DERIVE-07, MODEL-03 | T-48-01 | Strict sidecar parser rejects malformed evidence payloads. | unit | `uv run pytest tests/sol_execbench/test_solar_derivation_evidence.py -n 0 -x` | ❌ W0 | ⬜ pending |
-| 48-02-01 | 02 | 1 | DERIVE-07, MODEL-03 | T-48-02 | Builder derives only from definition/workload/graph inputs, not candidate solutions. | unit | `uv run pytest tests/sol_execbench/test_solar_derivation_evidence.py -n 0 -x` | ❌ W0 | ⬜ pending |
-| 48-03-01 | 03 | 2 | MODEL-04 | T-48-03 | Ambiguous evidence degrades to inexact or unsupported with missing evidence. | unit | `uv run pytest tests/sol_execbench/test_solar_derivation_evidence.py tests/sol_execbench/test_solar_derivation_contract.py -n 0 -x` | ❌ W0 | ⬜ pending |
-| 48-04-01 | 04 | 2 | DERIVE-07, MODEL-03, MODEL-04 | T-48-04 | Public schemas, canonical traces, and primary CLI remain free of derivation evidence fields. | guardrail | `uv run pytest tests/sol_execbench/test_public_contract_guardrails.py -n 0 -x` | ✅ | ⬜ pending |
+| 48-02-01 | 02 | 2 | DERIVE-07, MODEL-03 | T-48-02 | Builder derives only from definition/workload/graph inputs, not candidate solutions. | unit | `uv run pytest tests/sol_execbench/test_solar_derivation_evidence.py -n 0 -x` | ❌ W0 | ⬜ pending |
+| 48-03-01 | 03 | 3 | MODEL-04 | T-48-03 | Ambiguous evidence degrades to inexact or unsupported with missing evidence. | unit | `uv run pytest tests/sol_execbench/test_solar_derivation_evidence.py tests/sol_execbench/test_solar_derivation_contract.py -n 0 -x` | ❌ W0 | ⬜ pending |
+| 48-04-01 | 04 | 4 | DERIVE-07, MODEL-03, MODEL-04 | T-48-04 | Public schemas, canonical traces, and primary CLI remain free of derivation evidence fields. | guardrail | `uv run pytest tests/sol_execbench/test_public_contract_guardrails.py -n 0 -x` | ✅ | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
