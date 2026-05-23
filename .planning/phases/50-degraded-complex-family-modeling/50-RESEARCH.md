@@ -337,17 +337,15 @@ This mirrors existing attention/convolution family gates that add semantic missi
 | A2 | Specific SSM/Mamba subrole heuristics can be detected from names like selective_scan, depthwise_conv, gate, in_proj, and out_proj plus tensor flow. | SSM/Mamba Recognition | Planner should keep unsupported fallback for opaque or differently named references. |
 | A3 | Common MoE examples often use top-1/top-2, but implementation must not infer those values. | Common Pitfalls | Low risk because context already forbids fabrication; this is only explanatory. |
 
-## Open Questions
+## Resolved Planning Decisions
 
-1. **Exact formula kinds**
+1. **Formula-kind names are deterministic and family-scoped.**
    - What we know: formula/byte/bound evidence fields already exist and fixture expectations do not lock formula-kind names. [VERIFIED: Phase 50 context]
-   - What's unclear: final formula-kind strings for static MoE and SSM/Mamba estimates.
-   - Recommendation: choose deterministic names such as `moe_static_route_flops`, `moe_dynamic_route_bytes`, `ssm_mamba_static_scan_flops`, and `ssm_mamba_degraded_scan_bytes`; lock them in tests.
+   - Decision: Use deterministic names and lock them in tests: `moe_static_route_flops`, `moe_dynamic_route_bytes`, `ssm_mamba_static_scan_flops`, and `ssm_mamba_degraded_scan_bytes`. Planners may add narrower operation-specific names only if they remain parseable and family-scoped.
 
-2. **Supported SSM/Mamba threshold**
+2. **A scan call alone does not imply `state_update`.**
    - What we know: positive fixture expects `input_projection`, `depthwise_convolution`, `scan`, `state_update`, `gating`, and `output_projection`. [VERIFIED: SSM/Mamba positive fixture]
-   - What's unclear: whether a recognized `selective_scan` call alone implies `state_update`.
-   - Recommendation: do not infer `state_update` from an opaque scan call unless state shape and update parameters are visible; otherwise degrade or unscore.
+   - Decision: Do not infer `state_update` from an opaque or standalone scan call unless state shape and update parameters are visible. Otherwise emit degraded or unscored SSM/Mamba evidence with explicit missing recurrence/state evidence.
 
 ## Environment Availability
 
