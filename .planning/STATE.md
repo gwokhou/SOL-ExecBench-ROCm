@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.10
 milestone_name: Paper-Aligned SOLAR Automatic Derivation
 status: executing
-stopped_at: Completed 48-01-PLAN.md; next step is 48-02-PLAN.md.
-last_updated: "2026-05-23T05:12:40.740Z"
-last_activity: 2026-05-23 -- Completed 48-01 SOLAR derivation evidence contract
+stopped_at: Completed 48-02-PLAN.md; next step is 48-03-PLAN.md.
+last_updated: "2026-05-23T05:19:51.455Z"
+last_activity: 2026-05-23
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 10
-  completed_plans: 7
-  percent: 70
+  completed_plans: 8
+  percent: 80
 ---
 
 # Project State
@@ -26,17 +26,17 @@ See: `.planning/PROJECT.md` (updated 2026-05-23)
 ## Current Position
 
 Phase: 48 (extraction-pipeline-and-semantic-provenance) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
-Last activity: 2026-05-23 -- Completed 48-01 SOLAR derivation evidence contract
+Last activity: 2026-05-23
 
-Progress: [███████░░░] 70%
+Progress: [████████░░] 80%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 7
+- Total plans completed: 8
 - Average duration: n/a
 - Total execution time: 0.0 hours
 
@@ -45,7 +45,7 @@ Progress: [███████░░░] 70%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 47. Derivation Contract And Golden Fixture Matrix | 6 | - | - |
-| 48. Extraction Pipeline And Semantic Provenance | 1 | 4min | 4min |
+| 48. Extraction Pipeline And Semantic Provenance | 2 | 8min | 4min |
 | 49. High-Confidence Family Modeling | TBD | - | - |
 | 50. Degraded Complex Family Modeling | TBD | - | - |
 | 51. Sidecar Coverage And Score Guards | TBD | - | - |
@@ -69,6 +69,8 @@ Decisions are logged in PROJECT.md. Recent decisions affecting current work:
 - Defer 124-model/235-problem extraction, MI300X/CDNA3/CDNA4 validation, NVFP4/MXFP4 validation, hosted leaderboard, NVIDIA Blackwell/B200 equivalence, and new framework dependencies.
 - 48-01 kept SOLAR derivation evidence internal and sidecar-only with explicit source_boundary booleans.
 - 48-01 reused the existing EstimateConfidence vocabulary while serializing confidence as JSON-safe strings.
+- 48-02 builds SOLAR derivation evidence only from Definition, Workload, BoundGraph, and OperatorWorkEstimate inputs.
+- 48-02 keeps candidate solution execution explicitly outside the evidence builder boundary.
 
 ### Pending Todos
 
@@ -92,6 +94,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-23T05:12:40.733Z
-Stopped at: Completed 48-01-PLAN.md; next step is 48-02-PLAN.md.
+Last session: 2026-05-23T05:19:51.224Z
+Stopped at: Completed 48-02-PLAN.md; next step is 48-03-PLAN.md.
 Resume file: None

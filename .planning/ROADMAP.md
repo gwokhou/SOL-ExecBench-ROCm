@@ -151,7 +151,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 48-02-PLAN.md — Build evidence from bound graph and estimate provenance without candidate solution execution.
+- [x] 48-02-PLAN.md — Build evidence from bound graph and estimate provenance without candidate solution execution.
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -275,7 +275,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 47. Derivation Contract And Golden Fixture Matrix | 6/6 | Complete | 2026-05-23 |
-| 48. Extraction Pipeline And Semantic Provenance | 1/4 | In Progress|  |
+| 48. Extraction Pipeline And Semantic Provenance | 2/4 | In Progress|  |
 | 49. High-Confidence Family Modeling | 0/TBD | Not started | - |
 | 50. Degraded Complex Family Modeling | 0/TBD | Not started | - |
 | 51. Sidecar Coverage And Score Guards | 0/TBD | Not started | - |
