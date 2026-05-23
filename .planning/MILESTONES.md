@@ -1,5 +1,41 @@
 # Milestones
 
+## v1.11 Paper Dataset Parity Inventory and ROCm Execution Closure (Shipped: 2026-05-23)
+
+**Delivered:** acquisition/layout manifests, deterministic dataset inventory,
+ROCm readiness classification, ready-subset manifests, bounded execution
+closure, parity-gap JSON/Markdown reports, release-closure docs, and public
+claim guardrails for the paper dataset surface.
+
+**Phases completed:** 5 phases, 14 plans
+
+**Key accomplishments:**
+
+- Added public dataset acquisition/layout metadata with category counts,
+  checksums, idempotent downloader verification, and explicit claim boundaries.
+- Built deterministic paper inventory and ROCm readiness sidecars from
+  canonical `Definition` and `Workload` contracts, including blocker reason
+  codes and ready-subset manifests.
+- Extended `scripts/run_dataset.py` to execute bounded ready subsets through
+  the existing `sol-execbench` subprocess path and emit
+  `execution_closure.json`.
+- Added parity-gap JSON and Markdown reports that aggregate manifest,
+  inventory, readiness, execution closure, and derived AMD evidence.
+- Added release-closure documentation and guardrails preventing bounded
+  sidecar artifacts from being presented as full paper validation,
+  leaderboard parity, upstream SOLAR parity, or unsupported hardware
+  validation.
+
+**Known tech debt:**
+
+- No single automated fixture runs the full sidecar chain end to end.
+- Manifest/root/category/checksum consistency is provenance-only across
+  sidecar inputs.
+- `--readiness` remains optional for execution closure, so complete blocked
+  denominator accounting depends on using the documented command.
+
+---
+
 ## v1.10 Paper-Aligned SOLAR Automatic Derivation (Shipped: 2026-05-23)
 
 **Phases completed:** 6 phases, 23 plans, 41 tasks
@@ -8,16 +44,21 @@
 
 - Added the sidecar-only v1.10 SOLAR derivation contract, fixture matrix, and
   strict parser/serializer coverage for semantic provenance.
+
 - Built SOLAR derivation evidence from canonical `Definition` and `Workload`
   inputs without candidate execution, with deterministic supported, degraded,
   and unscored confidence classification.
+
 - Promoted high-confidence families into formula/byte/bound-backed SOLAR
   evidence: linear projection, attention, convolution, embedding/positional,
   gather, and rotary-like memory-bound structures.
+
 - Added conservative MoE and SSM/Mamba evidence paths with explicit degraded or
   unscored behavior when routing, recurrence, or metadata is incomplete.
+
 - Added machine-verifiable `coverage_summary` and `aggregate_status` sidecars,
   AMD-native score guards, and strict round-trip/malformed-field tests.
+
 - Integrated generated SOLAR sidecars into dataset-runner derived reports using
   `derived_evidence_refs`, while preserving canonical trace JSONL, public score
   `evidence_refs`, primary CLI behavior, and claim boundaries.
