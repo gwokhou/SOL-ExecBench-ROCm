@@ -52,6 +52,12 @@ uv run --with ruff ruff check src/sol_execbench/core/scoring/amd_bound_graph.py 
 
 Result: all checks passed.
 
+```text
+uv run pytest tests/sol_execbench/test_amd_hardware_models.py tests/sol_execbench/test_amd_native_score.py tests/sol_execbench/test_amd_bound_graph.py tests/sol_execbench/test_amd_sol_bounds.py tests/sol_execbench/test_public_contract_guardrails.py -x
+```
+
+Result: 49 passed.
+
 ## Human Verification
 
 None required.
