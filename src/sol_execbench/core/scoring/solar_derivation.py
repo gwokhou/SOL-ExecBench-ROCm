@@ -1081,6 +1081,15 @@ def _linear_subroles(
                     tensor_evidence_by_id=tensor_evidence_by_id,
                 )
             )
+        if len(node.input_tensor_ids) > 2:
+            subroles.append(
+                _subrole_from_tensor_ids(
+                    name="bias",
+                    node=node,
+                    tensor_ids=tuple(node.input_tensor_ids[2:]),
+                    tensor_evidence_by_id=tensor_evidence_by_id,
+                )
+            )
         if node.output_tensor_ids:
             subroles.append(
                 _subrole_from_tensor_ids(
