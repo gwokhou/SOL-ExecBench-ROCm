@@ -271,7 +271,20 @@ Plans:
   4. Sidecar parse and serialize round-trip tests cover every new
      machine-verifiable derivation evidence field.
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 51-01-PLAN.md — Create the SOLAR coverage aggregate sidecar model and parser.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 51-02-PLAN.md — Integrate SOLAR aggregate status with AMD-native score guards.
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 51-03-PLAN.md — Close parser, public-boundary, and full regression guardrails.
 
 ### Phase 52: Dataset Runner And Public Contract Closure
 
@@ -308,7 +321,7 @@ Plans:
 | 48. Extraction Pipeline And Semantic Provenance | 4/4 | Complete    | 2026-05-23 |
 | 49. High-Confidence Family Modeling | 4/4 | Complete    | 2026-05-23 |
 | 50. Degraded Complex Family Modeling | 3/3 | Complete    | 2026-05-23 |
-| 51. Sidecar Coverage And Score Guards | 0/TBD | Not started | - |
+| 51. Sidecar Coverage And Score Guards | 0/3 | Not started | - |
 | 52. Dataset Runner And Public Contract Closure | 0/TBD | Not started | - |
 
 ## Requirements Coverage
