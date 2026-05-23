@@ -12,6 +12,7 @@ import pytest
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.scoring.amd_bound_estimates import OperatorWorkEstimate
+from sol_execbench.core.scoring.amd_bound_estimates import estimate_bound_work
 from sol_execbench.core.scoring.amd_bound_graph import (
     BoundGraph,
     BoundGraphNode,
@@ -778,6 +779,7 @@ def _projection_graph(
     *,
     node_id: str = "op_1",
     family: OpFamily = OpFamily.LINEAR_PROJECTION,
+    include_bias: bool = False,
     missing_output_axis: bool = False,
     unsupported: bool = False,
 ) -> BoundGraph:
@@ -785,6 +787,48 @@ def _projection_graph(
     weight_shape = (4, 8)
     output_shape = None if unsupported else (2, 8)
     output_source = "tmp:linear" if missing_output_axis else "definition.outputs"
+    input_tensor_ids = (
+        ("input:x", "input:w", "input:b") if include_bias else ("input:x", "input:w")
+    )
+    tensors = {
+        "input:x": BoundTensor(
+            tensor_id="input:x",
+            name="x",
+            role=BoundTensorRole.INPUT,
+            shape=input_shape,
+            dtype="float32",
+            producer_node_id=None,
+            source="definition.inputs",
+        ),
+        "input:w": BoundTensor(
+            tensor_id="input:w",
+            name="w",
+            role=BoundTensorRole.INPUT,
+            shape=weight_shape,
+            dtype="float32",
+            producer_node_id=None,
+            source="definition.inputs",
+        ),
+        "output:y": BoundTensor(
+            tensor_id="output:y",
+            name="y",
+            role=BoundTensorRole.OUTPUT,
+            shape=output_shape,
+            dtype="unknown" if unsupported else "float32",
+            producer_node_id=node_id,
+            source=output_source,
+        ),
+    }
+    if include_bias:
+        tensors["input:b"] = BoundTensor(
+            tensor_id="input:b",
+            name="b",
+            role=BoundTensorRole.INPUT,
+            shape=(8,),
+            dtype="float32",
+            producer_node_id=None,
+            source="definition.inputs",
+        )
     return BoundGraph(
         definition="semantic_group_demo",
         workload_uuid="semantic-group-workload",
@@ -794,7 +838,7 @@ def _projection_graph(
                 op_family=family,
                 op_name="linear" if family != OpFamily.UNSUPPORTED else "custom_op",
                 source_expression="torch.nn.functional.linear(x, w)",
-                input_tensor_ids=("input:x", "input:w"),
+                input_tensor_ids=input_tensor_ids,
                 output_tensor_ids=("output:y",),
                 attributes={"trace_source": "ast"},
                 confidence=(
@@ -807,35 +851,7 @@ def _projection_graph(
                 else "unsupported operation",
             ),
         ),
-        tensors={
-            "input:x": BoundTensor(
-                tensor_id="input:x",
-                name="x",
-                role=BoundTensorRole.INPUT,
-                shape=input_shape,
-                dtype="float32",
-                producer_node_id=None,
-                source="definition.inputs",
-            ),
-            "input:w": BoundTensor(
-                tensor_id="input:w",
-                name="w",
-                role=BoundTensorRole.INPUT,
-                shape=weight_shape,
-                dtype="float32",
-                producer_node_id=None,
-                source="definition.inputs",
-            ),
-            "output:y": BoundTensor(
-                tensor_id="output:y",
-                name="y",
-                role=BoundTensorRole.OUTPUT,
-                shape=output_shape,
-                dtype="unknown" if unsupported else "float32",
-                producer_node_id=node_id,
-                source=output_source,
-            ),
-        },
+        tensors=tensors,
         edges=(),
         warnings=(),
     )
@@ -921,6 +937,66 @@ def test_confidence_rules_map_complete_evidence_to_supported_scored():
         "output",
         "weight_or_rhs",
     ]
+
+
+def test_linear_projection_sidecar_records_formula_bytes_bounds_and_bias_subrole():
+    definition = _projection_definition()
+    graph = _projection_graph(include_bias=True)
+    estimates = estimate_bound_work(graph)
+
+    evidence = derive_solar_derivation_evidence(
+        definition, _matmul_workload(), graph, estimates
+    )
+    payload = solar_derivation_from_dict(evidence.to_dict()).to_dict()
+    group = payload["groups"][0]
+
+    assert group["family"] == "linear_projection"
+    assert [subrole["name"] for subrole in group["subroles"]] == [
+        "bias",
+        "input",
+        "output",
+        "weight_or_rhs",
+    ]
+    assert group["formula_evidence"] == [
+        {
+            "node_id": "op_1",
+            "family": "linear_projection",
+            "formula_kind": "gemm_flops",
+            "formula": "2*M*N*K",
+            "formula_inputs": {"K": 4, "M": 2, "N": 8},
+            "source": {
+                "kind": "estimate",
+                "detail": "gemm_flops:2*M*N*K",
+                "node_id": "op_1",
+                "tensor_id": None,
+            },
+            "confidence": "supported",
+            "rationale": "GEMM FLOPs estimated from input/output tensor shapes",
+        }
+    ]
+    assert group["byte_evidence"][0]["family"] == "linear_projection"
+    assert group["byte_evidence"][0]["read_bytes"] == 192.0
+    assert group["byte_evidence"][0]["write_bytes"] == 64.0
+    assert group["byte_evidence"][0]["total_bytes"] == 256.0
+    assert group["byte_evidence"][0]["dtype_inputs"] == {
+        "input:b": "float32",
+        "input:w": "float32",
+        "input:x": "float32",
+        "output:y": "float32",
+    }
+    assert group["bound_evidence"][0]["family"] == "linear_projection"
+    assert group["bound_evidence"][0]["compute_bound_ms"] >= 0.0
+    assert group["bound_evidence"][0]["memory_bound_ms"] >= 0.0
+    assert group["bound_evidence"][0]["sol_bound_ms"] == max(
+        group["bound_evidence"][0]["compute_bound_ms"],
+        group["bound_evidence"][0]["memory_bound_ms"],
+    )
+    assert group["bound_evidence"][0]["limiting_resource"] in {"compute", "memory"}
+    assert "formula_evidence:op_1" in group["required_evidence"]
+    assert "byte_evidence:op_1" in group["required_evidence"]
+    assert "bound_evidence:op_1" in group["required_evidence"]
+    assert "axis:op_1" in group["required_evidence"]
+    assert group["missing_evidence"] == []
 
 
 def test_confidence_rules_map_incomplete_visible_evidence_to_inexact_degraded():
