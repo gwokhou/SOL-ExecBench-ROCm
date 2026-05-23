@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import importlib.util
 import subprocess
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -23,8 +24,8 @@ build_amd_score_reports_for_problem = run_dataset.build_amd_score_reports_for_pr
 collect_timing_evidence_for_problem = run_dataset.collect_timing_evidence_for_problem
 
 
-def test_dataset_helper_builds_derived_amd_score_report(tmp_path):
-    definition = {
+def _matmul_definition() -> dict:
+    return {
         "name": "matmul_demo",
         "axes": {
             "M": {"type": "var"},
@@ -38,21 +39,26 @@ def test_dataset_helper_builds_derived_amd_score_report(tmp_path):
         "outputs": {"out": {"shape": ["M", "N"], "dtype": "float32"}},
         "reference": "def run(a, b):\n    return a @ b",
     }
-    workload_path = tmp_path / "workload.jsonl"
-    workload_path.write_text(
+
+
+def _write_matmul_workload(path: Path, *, uuid: str = "matmul-workload") -> None:
+    path.write_text(
         json.dumps(
             {
-                "uuid": "matmul-workload",
+                "uuid": uuid,
                 "axes": {"M": 2},
                 "inputs": {"a": {"type": "random"}, "b": {"type": "random"}},
             }
         )
     )
-    traces = [
+
+
+def _matmul_trace_payload(*, uuid: str = "matmul-workload") -> list[dict]:
+    return [
         {
             "definition": "matmul_demo",
             "workload": {
-                "uuid": "matmul-workload",
+                "uuid": uuid,
                 "axes": {"M": 2},
                 "inputs": {"a": {"type": "random"}, "b": {"type": "random"}},
             },
@@ -70,6 +76,13 @@ def test_dataset_helper_builds_derived_amd_score_report(tmp_path):
             },
         }
     ]
+
+
+def test_dataset_helper_builds_derived_amd_score_report(tmp_path):
+    definition = _matmul_definition()
+    workload_path = tmp_path / "workload.jsonl"
+    _write_matmul_workload(workload_path)
+    traces = _matmul_trace_payload()
 
     scores = build_amd_score_reports_for_problem(
         definition_payload=definition,
@@ -93,6 +106,42 @@ def test_dataset_helper_builds_derived_amd_score_report(tmp_path):
     )
     assert report["scores"][0]["baseline_source"] == "reference_latency"
     assert report["evidence_summary"]["sol_bound"] == 1
+
+
+def test_dataset_helper_can_emit_generated_solar_derivation_sidecars(tmp_path):
+    definition = _matmul_definition()
+    workload_path = tmp_path / "workload.jsonl"
+    _write_matmul_workload(workload_path)
+    sidecar_dir = tmp_path / "solar-sidecars"
+
+    scores = build_amd_score_reports_for_problem(
+        definition_payload=definition,
+        workload_path=workload_path,
+        traces_payload=_matmul_trace_payload(),
+        trace_ref="L1/matmul_demo/traces.json",
+        solar_derivation_dir=sidecar_dir,
+    )
+
+    sidecar_path = sidecar_dir / "matmul_demo.matmul-workload.solar-derivation.json"
+    sidecar = json.loads(sidecar_path.read_text())
+    score_payload = scores[0].to_dict()
+
+    assert sidecar["coverage_summary"]["status_counts"]
+    assert sidecar["aggregate_status"]["status"] in {"scored", "degraded", "unscored"}
+    assert sidecar["source_boundary"]["candidate_solution_execution"] is False
+    assert score_payload["claim_level"] == "amd-native-derived"
+    assert "derived_evidence_refs" in score_payload
+    assert score_payload["derived_evidence_refs"]["formula"].endswith(
+        ".solar-derivation.json#groups.formula_evidence"
+    )
+    assert score_payload["derived_evidence_refs"]["coverage"].endswith(
+        ".solar-derivation.json#coverage_summary"
+    )
+    assert score_payload["derived_evidence_refs"]["score_eligibility"].endswith(
+        ".solar-derivation.json#aggregate_status"
+    )
+    assert "solar_derivation" not in score_payload["evidence_refs"]
+    assert "coverage" not in score_payload["evidence_refs"]
 
 
 def test_dataset_helper_uses_scoring_baseline_artifact(tmp_path):
@@ -268,6 +317,55 @@ def test_dataset_helper_marks_missing_workload_bound_as_unscored(tmp_path):
 
     assert scores[0].supported is False
     assert scores[0].sol_bound_ms is None
+
+
+def test_dataset_runner_generates_reports_for_skipped_existing_traces(
+    tmp_path,
+    monkeypatch,
+):
+    dataset_root = tmp_path / "dataset"
+    problem_dir = dataset_root / "L1" / "matmul_demo"
+    problem_dir.mkdir(parents=True)
+    (problem_dir / "definition.json").write_text(json.dumps(_matmul_definition()))
+    _write_matmul_workload(problem_dir / "workload.jsonl")
+
+    output_dir = tmp_path / "out"
+    trace_dir = output_dir / "L1" / "matmul_demo"
+    trace_dir.mkdir(parents=True)
+    (trace_dir / "traces.json").write_text(json.dumps(_matmul_trace_payload()))
+
+    report_path = tmp_path / "reports" / "amd-score.json"
+    solar_dir = tmp_path / "solar-sidecars"
+
+    def fail_run_cli(*args, **kwargs):
+        raise AssertionError("existing passing traces should skip CLI execution")
+
+    monkeypatch.setattr(run_dataset, "run_cli", fail_run_cli)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--output",
+            str(output_dir),
+            "--amd-score-report",
+            str(report_path),
+            "--solar-derivation",
+            str(solar_dir),
+        ],
+    )
+
+    run_dataset.main()
+
+    report = json.loads(report_path.read_text())
+    sidecar_path = solar_dir / "matmul_demo.matmul-workload.solar-derivation.json"
+    sidecar = json.loads(sidecar_path.read_text())
+
+    assert report["scored_count"] == 1
+    assert report["scores"][0]["workload_uuid"] == "matmul-workload"
+    assert report["scores"][0]["claim_level"] == "amd-native-derived"
+    assert sidecar["source_boundary"]["candidate_solution_execution"] is False
 
 
 def test_dataset_helper_collects_source_specific_timing_evidence(tmp_path):
