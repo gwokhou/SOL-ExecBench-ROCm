@@ -2,6 +2,9 @@
 
 ## Milestones
 
+- 🚧 **v1.10 Paper-Aligned SOLAR Automatic Derivation** — Phases 47-52
+  (active).
+
 - ✅ **v1.9 AMD SOL/SOLAR Bound Modeling Completion** — Phases 41-46
   (shipped 2026-05-23). See `.planning/milestones/v1.9-ROADMAP.md`.
 
@@ -37,247 +40,227 @@
 
 ## Current Position
 
-**Active milestone:** none. v1.9 is archived and the project is ready for the
-next milestone definition.
+**Active milestone:** v1.10 Paper-Aligned SOLAR Automatic Derivation.
 
-**Next action:** run `$gsd-new-milestone` to define the next focused milestone.
+**Milestone goal:** Upgrade the AMD SOL/SOLAR derived bound pipeline into a
+paper-aligned automatic SOLAR derivation system for the ROCm port, while
+preserving canonical trace JSONL, public schemas, primary CLI behavior, and
+AMD-native-derived claim boundaries.
 
-## v1.9 Phases
+**Explicitly deferred:** original-paper 124-model / 235-problem extraction,
+MI300X/CDNA 3/CDNA 4 validation, NVFP4/MXFP4 validation, hosted leaderboard,
+NVIDIA Blackwell/B200 equivalence, and new framework dependencies.
 
-| Phase | Name | Goal | Requirements |
-| --- | --- | --- | --- |
-| 41 | Bound Model Contract And Hardware Artifacts | Complete 2026-05-23: Established strict AMD hardware model JSON loading, packaged RDNA 4 defaults, split validation statuses, and public-contract guardrails. | HW-01, HW-02, HW-03, HW-04, DOC-01 |
-| 42 | Structured Bound Graph IR | Complete 2026-05-23: Introduced stable workload-aware bound graph IR, tensor metadata, edges, and unsupported/inexact evidence. | IR-01, IR-02, IR-03, IR-04 |
-| 43 | Operator FLOP/Byte/Movement Modeling | Complete 2026-05-23: Added rich per-node FLOP, byte, movement, formula, confidence, and legacy adapter evidence. | MODEL-01, MODEL-02, MODEL-03, MODEL-04, MODEL-05 |
-| 44 | Bound Artifact V2 And Coverage Semantics | Complete 2026-05-23: Added v2 AMD SOL bound sidecars with strict loading, rich estimate evidence, aggregate scoring state, coverage summaries, deterministic warnings, and compatibility guardrails. | BOUND-01, BOUND-02, BOUND-03, BOUND-04 |
-| 45 | AMD Score And Dataset Integration | Complete 2026-05-23: Wired v2 AMD SOL bound artifacts into AMD-native workload/suite score reports, deterministic degraded/unscored warnings, dataset sidecar refs, optional sidecar emission, and evidence summaries. | SCORE-01, SCORE-02, SCORE-03, SCORE-04 |
-| 46 | Documentation And RDNA 4 Validation Closure | Complete 2026-05-23: Documented v2 bound artifact semantics and RDNA4-only scope, added validation evidence, closure guardrails, golden coverage inventory checks, and failed-trace score coverage. | DOC-02, DOC-03, VAL-01, VAL-02, VAL-03, VAL-04 |
+## Phases
+
+- [ ] **Phase 47: Derivation Contract And Golden Fixture Matrix** - Establish
+  the v1.10 derivation contract and fixture coverage before expanding
+  extraction behavior.
+- [ ] **Phase 48: Extraction Pipeline And Semantic Provenance** - Add the
+  shared extraction infrastructure for compound groups, subroles, provenance,
+  and deterministic confidence.
+- [ ] **Phase 49: High-Confidence Family Modeling** - Promote linear
+  projection, convolution, embedding/positional, and explicit attention into
+  formula-backed SOLAR families.
+- [ ] **Phase 50: Degraded Complex Family Modeling** - Add conservative MoE
+  and SSM/Mamba derivation paths with explicit degraded evidence.
+- [ ] **Phase 51: Sidecar Coverage And Score Guards** - Make coverage,
+  aggregate state, sidecar fields, and AMD-native score eligibility
+  machine-verifiable.
+- [ ] **Phase 52: Dataset Runner And Public Contract Closure** - Close v1.10
+  through dataset-runner integration, documentation, and public claim
+  guardrails.
 
 ## Phase Details
 
-### Phase 41: Bound Model Contract And Hardware Artifacts
+### Phase 47: Derivation Contract And Golden Fixture Matrix
 
-**Goal:** Establish the artifact, hardware-model, and public-contract foundation
-for v1.9.
+**Goal**: Users and maintainers have a stable v1.10 SOLAR derivation contract and fixture matrix that define expected family recognition, degradation, and negative behavior before implementation expands.
 
-**Requirements:** HW-01, HW-02, HW-03, HW-04, DOC-01
+**Depends on**: Phase 46
 
-**Plans:** 3/3 plans complete
+**Requirements**: TEST-01, TEST-02
 
-Plans:
-**Wave 1**
+**Success Criteria** (what must be TRUE):
 
-- [x] 41-01-PLAN.md — Create strict packaged/external AMD hardware model JSON loaders.
+  1. Maintainer can inspect golden derivation fixtures for attention, MoE,
+     convolution, SSM/Mamba, embedding or positional patterns, and linear
+     projection.
+  2. Maintainer can inspect negative and degradation fixtures for dynamic,
+     partial, unsupported, taxonomy-only, and missing-metadata cases.
+  3. Fixture expectations identify the intended SOLAR state, supported family,
+     missing evidence, and degradation rationale for each case.
+  4. The fixture matrix preserves v1.10 scope boundaries and does not require
+     paper-scale dataset extraction or real hardware validation.
 
-**Wave 2** *(blocked on Wave 1 completion)*
+**Plans**: TBD
 
-- [x] 41-02-PLAN.md — Wire v2 hardware model defaults into AMD SOL and score compatibility surfaces.
+### Phase 48: Extraction Pipeline And Semantic Provenance
 
-**Wave 3** *(blocked on Wave 2 completion)*
+**Goal**: The derivation pipeline can produce compound-family grouping, subrole, shape, dtype, axis, source, and confidence evidence without changing canonical benchmark artifacts.
 
-- [x] 41-03-PLAN.md — Lock public contract, CLI, schema, Trace, and claim guardrails.
+**Depends on**: Phase 47
 
-**Success criteria:**
+**Requirements**: DERIVE-07, MODEL-03, MODEL-04
 
-1. Versioned AMD hardware model JSON artifacts can be loaded and validated with
-   clear errors for invalid provenance, values, status, or architecture.
+**Success Criteria** (what must be TRUE):
 
-2. RDNA 4 `gfx1200` is the only v1.9 validation target in model artifacts; CDNA
-   3 / MI300X and CDNA 4 remain explicitly unvalidated/deferred.
+  1. User can derive internal SOLAR evidence that records compound-family
+     grouping, subroles, and extraction provenance outside canonical trace
+     JSONL and public schemas.
+  2. User can inspect tensor shape, dtype, semantic-axis, and extraction-source
+     provenance for extracted formula and byte evidence.
+  3. User can distinguish supported, inexact, and unsupported derivation states
+     through deterministic confidence rules.
+  4. Existing primary `sol-execbench` behavior and canonical benchmark schemas
+     remain unchanged while sidecar-only evidence expands.
 
-3. Built-in fallback models, if retained, flow through the same validation path
-   and remain labeled provisional or unvalidated.
+**Plans**: TBD
 
-4. Tests prove canonical `Trace` JSONL, public schemas, and primary
-   `sol-execbench` output remain unchanged by the new derived artifacts.
+### Phase 49: High-Confidence Family Modeling
 
-### Phase 42: Structured Bound Graph IR
+**Goal**: Users can derive formula-backed SOLAR evidence for high-confidence families whose dimensions and memory behavior are visible from reference or workload structure.
 
-**Goal:** Introduce a stable bound graph/IR that downstream formula and artifact
-code can consume without depending on raw AST details.
+**Depends on**: Phase 48
 
-**Requirements:** IR-01, IR-02, IR-03, IR-04
+**Requirements**: DERIVE-01, DERIVE-03, DERIVE-05, DERIVE-06, MODEL-01, MODEL-02, MODEL-05
 
-**Plans:** 3/3 plans complete
+**Success Criteria** (what must be TRUE):
 
-Plans:
-**Wave 1**
+  1. User can derive explicit attention evidence for Q/K/V projections, QK
+     score computation, scale or mask handling, softmax, PV aggregation, and
+     output projection, with degradation when axes or mask semantics are
+     incomplete.
+  2. User can derive convolution evidence for 1D, 2D, and 3D convolution,
+     including grouped or depthwise metadata, stride, padding, dilation, and
+     output spatial dimensions.
+  3. User can derive embedding, positional, gather, rotary-like, and linear
+     projection evidence with shape, index, semantic role, and GEMM-compatible
+     formula reuse where dimensions are explicit.
+  4. Newly promoted high-confidence families emit family-specific formula
+     kinds, formula text, formula inputs, and dtype-aware read, write,
+     intermediate, movement, and total byte evidence.
+  5. Family estimates convert into per-operation compute bound, memory bound,
+     limiting resource, and SOL-bound evidence.
 
-- [x] 42-01-PLAN.md — Create structured AMD bound graph IR contract, taxonomy,
-  serialization, and AST fallback evidence.
+**Plans**: TBD
 
-**Wave 2** *(blocked on Wave 1 completion)*
+### Phase 50: Degraded Complex Family Modeling
 
-- [x] 42-02-PLAN.md — Implement workload-aware dynamic-trace-first extraction,
-  dataflow edges, and explicit unsupported/inexact evidence.
+**Goal**: Users can derive conservative, explicitly degraded SOLAR evidence for MoE and SSM/Mamba-like structures when static metadata is incomplete.
 
-**Wave 3** *(blocked on Wave 2 completion)*
+**Depends on**: Phase 49
 
-- [x] 42-03-PLAN.md — Wire the new IR through AMD SOL compatibility facades and
-  public-contract guardrails.
+**Requirements**: DERIVE-02, DERIVE-04
 
-**Success criteria:**
+**Success Criteria** (what must be TRUE):
 
-1. `Definition` and `Workload` inputs produce structured graph nodes with
-   stable IDs, op families, source expressions, tensor roles, shapes, dtypes,
-   confidence, and rationale.
+  1. User can derive MoE evidence for routing, top-k selection, expert
+     projection, token dispatch, and combine patterns.
+  2. MoE derivation records dynamic routing evidence and degraded confidence
+     when static cardinality or expert-selection metadata is incomplete.
+  3. User can derive SSM/Mamba-like evidence for projection, depthwise
+     convolution, scan or state update, gating, and output projection patterns.
+  4. SSM/Mamba derivation records degraded evidence when recurrence or state
+     update semantics are incomplete instead of silently producing scored
+     evidence.
 
-2. Unsupported or ambiguous source constructs remain visible as unsupported or
-   inexact graph evidence.
+**Plans**: TBD
 
-3. Existing public scoring imports, including `build_amd_sol_bound_artifact()`,
-   continue to work through a compatibility facade.
+### Phase 51: Sidecar Coverage And Score Guards
 
-4. Golden parser tests cover aliases, tensor methods, chained expressions,
-   tuple outputs, and unsupported constructs.
+**Goal**: Users can rely on SOLAR sidecars and AMD-native score reports to separate scored, degraded, and unscored derivation evidence without manual interpretation.
 
-### Phase 43: Operator FLOP/Byte/Movement Modeling
+**Depends on**: Phase 50
 
-**Goal:** Add auditable FLOP, byte, and memory-movement estimates for common
-SOL ExecBench operator families.
+**Requirements**: REPORT-01, REPORT-02, REPORT-03, TEST-03
 
-**Requirements:** MODEL-01, MODEL-02, MODEL-03, MODEL-04, MODEL-05
+**Success Criteria** (what must be TRUE):
 
-**Success criteria:**
+  1. User can inspect SOLAR sidecars for family-aware coverage, extraction
+     provenance, missing patterns, unsupported patterns, degraded nodes, and
+     estimated nodes.
+  2. User can parse aggregate SOLAR evidence into machine-verifiable `scored`,
+     `degraded`, and `unscored` states.
+  3. AMD-native scoring returns `None` for unscored SOLAR evidence and
+     preserves warnings for degraded SOLAR evidence.
+  4. Sidecar parse and serialize round-trip tests cover every new
+     machine-verifiable derivation evidence field.
 
-1. Matmul, batched matmul, and `@`/`torch.mm`/`torch.matmul` style operations
-   produce explicit FLOP formulas and dtype-aware byte evidence.
+**Plans**: TBD
 
-2. Elementwise arithmetic and activation chains produce conservative formulas
-   with confidence labels.
+### Phase 52: Dataset Runner And Public Contract Closure
 
-3. Reductions, normalization/RMSNorm/layer-norm-like patterns, and
-   softmax/log-softmax-like patterns produce axis-aware conservative evidence.
+**Goal**: Users can run v1.10 derivation through the intended reporting surfaces with documentation and guardrails that preserve public contracts and claim boundaries.
 
-4. View/data-movement operations distinguish logical view, materialized
-   movement, broadcast, contiguous, and dtype-conversion-like evidence where
-   detectable.
+**Depends on**: Phase 51
 
-5. Tests assert read bytes, write bytes, intermediate/movement bytes, total
-   bytes, formula inputs, and rationale for representative fixtures.
+**Requirements**: REPORT-04, TEST-04, TEST-05
 
-### Phase 44: Bound Artifact V2 And Coverage Semantics
+**Success Criteria** (what must be TRUE):
 
-**Goal:** Turn graph and estimate evidence into stable v2 AMD SOL bound
-sidecars with deterministic coverage and warning behavior.
+  1. Derived reports preserve AMD-native-derived claim boundaries and include
+     evidence references for formulas, hardware models, coverage, and score
+     eligibility.
+  2. Public contract guardrails prove canonical schemas, trace JSONL, primary
+     CLI behavior, and existing public benchmark semantics remain unchanged.
+  3. Claim guardrails prevent v1.10 artifacts from implying paper benchmark
+     parity, NVIDIA Blackwell or B200 equivalence, hosted leaderboard
+     readiness, or new real-hardware validation.
+  4. Dataset-runner and documentation surfaces explain how to consume v1.10
+     SOLAR sidecars without requiring paper-scale extraction or new hardware
+     validation.
 
-**Requirements:** BOUND-01, BOUND-02, BOUND-03, BOUND-04
+**Plans**: TBD
 
-**Success criteria:**
+## Progress
 
-1. AMD SOL bound artifact v2 sidecars serialize and load with schema version,
-   derived marker, workload identity, graph, estimates, op bounds, aggregate
-   bound, hardware model reference, warnings, and coverage summary.
-
-2. Every operation reports compute bound, memory bound, limiting resource,
-   confidence, and rationale.
-
-3. Coverage summaries report supported, inexact, unsupported counts by family
-   plus worst confidence.
-
-4. Unsupported or missing evidence cannot silently improve aggregate bounds;
-   warnings or unscored degradation are generated deterministically.
-
-### Phase 45: AMD Score And Dataset Integration
-
-**Goal:** Make v2 bound artifacts usable by AMD-native scoring and dataset
-reports without changing canonical traces.
-
-**Requirements:** SCORE-01, SCORE-02, SCORE-03, SCORE-04
-
-**Success criteria:**
-
-1. AMD-native score reports consume v2 artifacts and preserve trace, timing,
-   SOL-bound, baseline, and hardware-model evidence refs.
-
-2. Unsupported, inexact, provisional hardware, missing bound, failed trace, and
-   `reference_latency` fallback cases propagate deterministic warnings or
-   unscored states.
-
-3. Dataset runs can optionally emit or reference AMD SOL sidecars when
-   `--amd-score-report` is requested.
-
-4. Suite reports expose scored/unscored counts and baseline/evidence summaries
-   sufficient to avoid release score misuse.
-
-### Phase 46: Documentation And RDNA 4 Validation Closure
-
-**Goal:** Close v1.9 with user-facing docs, golden tests, and RDNA 4-scoped
-validation evidence.
-
-**Requirements:** DOC-02, DOC-03, VAL-01, VAL-02, VAL-03, VAL-04
-
-**Success criteria:**
-
-1. Documentation explains AMD SOL bound artifact v2 semantics, hardware model
-   provenance, confidence labels, unsupported/inexact degradation, and RDNA
-   4-only validation scope.
-
-2. Guardrail tests prevent NVIDIA B200, upstream SOLAR, leaderboard-equivalence,
-   CDNA 3 / MI300X validation, and CDNA 4 validation claims.
-
-3. Golden tests cover matmul, batched matmul, elementwise chains, activation,
-   reduction, normalization, softmax, data movement, dtype conversion, tuple
-   outputs, and unsupported operations.
-
-4. Score integration tests cover complete, inexact, unsupported, missing
-   baseline, reference-latency fallback, provisional hardware, and failed-trace
-   cases.
-
-5. RDNA 4 validation evidence records focused unit tests and a small
-   derived-report/sample run that emits trace JSONL, bound artifacts, and
-   AMD-native score output.
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 47. Derivation Contract And Golden Fixture Matrix | 0/TBD | Not started | - |
+| 48. Extraction Pipeline And Semantic Provenance | 0/TBD | Not started | - |
+| 49. High-Confidence Family Modeling | 0/TBD | Not started | - |
+| 50. Degraded Complex Family Modeling | 0/TBD | Not started | - |
+| 51. Sidecar Coverage And Score Guards | 0/TBD | Not started | - |
+| 52. Dataset Runner And Public Contract Closure | 0/TBD | Not started | - |
 
 ## Requirements Coverage
 
 | Requirement | Phase | Status |
 | --- | --- | --- |
-| IR-01 | Phase 42 | Complete |
-| IR-02 | Phase 42 | Complete |
-| IR-03 | Phase 42 | Complete |
-| IR-04 | Phase 42 | Complete |
-| MODEL-01 | Phase 43 | Complete |
-| MODEL-02 | Phase 43 | Complete |
-| MODEL-03 | Phase 43 | Complete |
-| MODEL-04 | Phase 43 | Complete |
-| MODEL-05 | Phase 43 | Complete |
-| HW-01 | Phase 41 | Complete |
-| HW-02 | Phase 41 | Complete |
-| HW-03 | Phase 41 | Complete |
-| HW-04 | Phase 41 | Complete |
-| BOUND-01 | Phase 44 | Complete |
-| BOUND-02 | Phase 44 | Complete |
-| BOUND-03 | Phase 44 | Complete |
-| BOUND-04 | Phase 44 | Complete |
-| SCORE-01 | Phase 45 | Complete |
-| SCORE-02 | Phase 45 | Complete |
-| SCORE-03 | Phase 45 | Complete |
-| SCORE-04 | Phase 45 | Complete |
-| DOC-01 | Phase 41 | Complete |
-| DOC-02 | Phase 46 | Complete |
-| DOC-03 | Phase 46 | Complete |
-| VAL-01 | Phase 46 | Complete |
-| VAL-02 | Phase 46 | Complete |
-| VAL-03 | Phase 46 | Complete |
-| VAL-04 | Phase 46 | Complete |
+| DERIVE-01 | Phase 49 | Pending |
+| DERIVE-02 | Phase 50 | Pending |
+| DERIVE-03 | Phase 49 | Pending |
+| DERIVE-04 | Phase 50 | Pending |
+| DERIVE-05 | Phase 49 | Pending |
+| DERIVE-06 | Phase 49 | Pending |
+| DERIVE-07 | Phase 48 | Pending |
+| MODEL-01 | Phase 49 | Pending |
+| MODEL-02 | Phase 49 | Pending |
+| MODEL-03 | Phase 48 | Pending |
+| MODEL-04 | Phase 48 | Pending |
+| MODEL-05 | Phase 49 | Pending |
+| REPORT-01 | Phase 51 | Pending |
+| REPORT-02 | Phase 51 | Pending |
+| REPORT-03 | Phase 51 | Pending |
+| REPORT-04 | Phase 52 | Pending |
+| TEST-01 | Phase 47 | Pending |
+| TEST-02 | Phase 47 | Pending |
+| TEST-03 | Phase 51 | Pending |
+| TEST-04 | Phase 52 | Pending |
+| TEST-05 | Phase 52 | Pending |
 
 **Coverage:**
 
-- v1.9 requirements: 28 total
-- Mapped to phases: 28
+- v1.10 requirements: 21 total
+- Mapped to phases: 21
 - Unmapped: 0
 
 ## Future Candidate Work
 
-- CDNA 3 / MI300X full adapted-suite validation.
-- FP8 behavior and performance validation on MI300X.
-- CDNA 3 and CDNA 4 validation for supported ROCm library examples and bound
-  model hardware inputs.
-
-- Profiler-backed performance comparison reports for supported ROCm library
-  examples.
-
-- Original paper model-to-subgraph extraction and curation pipeline adaptation.
-- Broader upstream SOLAR parity beyond v1.9 local IR and artifact contracts.
-- NVFP4/MXFP4-like validation if suitable AMD hardware support and methodology
-  become available.
+- Original paper-scale 124-model / 235-problem extraction and curation.
+- MI300X, CDNA 3, and CDNA 4 real-hardware validation.
+- NVFP4 and MXFP4 validation if a suitable AMD hardware path exists.
+- Hosted leaderboard or submission service.
+- NVIDIA Blackwell/B200 comparison methodology, if ever scoped as a separate
+  non-ROCm claim analysis effort.
