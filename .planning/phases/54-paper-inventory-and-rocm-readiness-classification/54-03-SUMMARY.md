@@ -21,4 +21,4 @@ uv run pytest tests/sol_execbench/test_dataset_contract.py tests/sol_execbench/t
 uv run --with ruff ruff check src/sol_execbench/core/dataset scripts/inspect_dataset.py tests/sol_execbench/test_dataset_inventory_readiness.py tests/sol_execbench/test_public_contract_guardrails.py
 ```
 
-Result: `54 passed`; Ruff passed.
+Result: `56 passed`; Ruff passed.

@@ -54,3 +54,6 @@ uv run --with ruff ruff check src/sol_execbench/core/dataset scripts/inspect_dat
   JSONL schema changed.
 - Readiness means ready to attempt local ROCm execution, not passed, scored,
   fully validated, or paper parity.
+- Code review findings were resolved: NVIDIA-only reference hints are detected,
+  safetensors paths cannot escape the dataset root during readiness probing, and
+  ready-subset determinism/non-mutation behavior is tested.
