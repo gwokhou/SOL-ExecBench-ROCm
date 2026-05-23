@@ -238,7 +238,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 50-01-PLAN.md — Add conservative MoE degraded family modeling.
+- [x] 50-01-PLAN.md — Add conservative MoE degraded family modeling.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -307,7 +307,7 @@ Plans:
 | 47. Derivation Contract And Golden Fixture Matrix | 6/6 | Complete | 2026-05-23 |
 | 48. Extraction Pipeline And Semantic Provenance | 4/4 | Complete    | 2026-05-23 |
 | 49. High-Confidence Family Modeling | 4/4 | Complete    | 2026-05-23 |
-| 50. Degraded Complex Family Modeling | 0/TBD | Not started | - |
+| 50. Degraded Complex Family Modeling | 1/3 | In progress | - |
 | 51. Sidecar Coverage And Score Guards | 0/TBD | Not started | - |
 | 52. Dataset Runner And Public Contract Closure | 0/TBD | Not started | - |
 
@@ -316,7 +316,7 @@ Plans:
 | Requirement | Phase | Status |
 | --- | --- | --- |
 | DERIVE-01 | Phase 49 | Pending |
-| DERIVE-02 | Phase 50 | Pending |
+| DERIVE-02 | Phase 50 | Complete |
 | DERIVE-03 | Phase 49 | Pending |
 | DERIVE-04 | Phase 50 | Pending |
 | DERIVE-05 | Phase 49 | Pending |

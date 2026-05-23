@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.10
 milestone_name: Paper-Aligned SOLAR Automatic Derivation
-status: ready_to_plan
-stopped_at: Phase 49 complete (4/4) — ready to discuss Phase 50
-last_updated: 2026-05-23T07:29:16.142Z
+status: executing
+stopped_at: Completed 50-01-PLAN.md
+last_updated: "2026-05-23T07:56:00Z"
 last_activity: 2026-05-23
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 14
-  completed_plans: 14
+  total_plans: 17
+  completed_plans: 15
   percent: 50
 ---
 
@@ -26,8 +26,8 @@ See: `.planning/PROJECT.md` (updated 2026-05-23)
 ## Current Position
 
 Phase: 50
-Plan: Not started
-Status: Ready to plan
+Plan: 02
+Status: Ready for next plan
 Last activity: 2026-05-23
 
 Progress: [█████░░░░░] 50%
@@ -36,7 +36,7 @@ Progress: [█████░░░░░] 50%
 
 **Velocity:**
 
-- Total plans completed: 14
+- Total plans completed: 15
 - Average duration: n/a
 - Total execution time: 0.0 hours
 
@@ -61,6 +61,7 @@ Progress: [█████░░░░░] 50%
 | Phase 49 P02 | 4min | 2 tasks | 4 files |
 | Phase 49 P03 | 7min | 2 tasks | 6 files |
 | Phase 49 P04 | 5min | 3 tasks | 8 files |
+| Phase 50 P01 | 8min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -87,6 +88,9 @@ Decisions are logged in PROJECT.md. Recent decisions affecting current work:
 - [Phase 49]: Partial mask tensors degrade attention evidence with mask:semantics and mask:sparsity rather than fabricating mask semantics.
 - [Phase 49]: Direct q/k/v tensor inputs are represented as attention projection subroles when the surrounding QK, softmax, and PV structure is statically visible.
 - [Phase 49]: Convolution and embedding/positional family evidence stays internal to SOLAR sidecars with selected-byte lookup estimates.
+- [Phase 50]: MoE estimates use deterministic formula kinds `moe_static_route_flops` and `moe_dynamic_route_bytes`.
+- [Phase 50]: Top-k, expert count, token count, and hidden size are included only when visible from parsed constants or tensor shapes.
+- [Phase 50]: Taxonomy-only MoE calls remain unscored with `unsupported_operator:moe_taxonomy_only`.
 
 ### Pending Todos
 
@@ -110,6 +114,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-23T07:15:17.780Z
-Stopped at: Completed 49-04-PLAN.md
+Last session: 2026-05-23T07:56:00Z
+Stopped at: Completed 50-01-PLAN.md
 Resume file: None
