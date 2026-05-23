@@ -17,6 +17,13 @@ validation. It also does not claim full upstream SOLAR equivalence, paper
 benchmark parity, MI300X validation, CDNA 3 validation, CDNA 4 validation, or
 new NVFP4/MXFP4 validation.
 
+No-claim phrases for guardrails:
+
+- not paper-scale dataset extraction
+- not hosted leaderboard readiness
+- not NVIDIA Blackwell/B200 equivalence
+- not new real-hardware validation
+
 ## Sidecar-Only Artifact Rule
 
 SOLAR derivation evidence belongs only in derived sidecars or explicitly opted

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from click.testing import CliRunner
@@ -33,6 +34,9 @@ from sol_execbench.core.data.definition import Definition
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 COMPATIBILITY_INVENTORY = REPO_ROOT / "docs/internal/v1_4_compatibility_inventory.md"
+sys.path.append(str(Path(__file__).resolve().parent))
+
+from solar_derivation_fixtures import load_solar_derivation_fixtures  # noqa: E402
 
 
 def test_solution_json_contract_accepts_existing_rocm_shape():
@@ -126,6 +130,76 @@ def test_primary_cli_does_not_expose_v1_6_derived_workflow_options():
         "--hardware-model-path",
     ):
         assert additive_non_primary_option not in help_text
+
+
+def test_v1_10_solar_derivation_contract_keeps_claim_boundaries():
+    contract = (REPO_ROOT / "docs/internal/solar_derivation_contract.md").read_text()
+
+    for expected in (
+        "sidecar-only",
+        "not paper-scale dataset extraction",
+        "not hosted leaderboard readiness",
+        "not NVIDIA Blackwell/B200 equivalence",
+        "not new real-hardware validation",
+    ):
+        assert expected in contract
+
+    for fixture in load_solar_derivation_fixtures():
+        boundary = fixture["scope_boundary"]
+        assert boundary["paper_scale_dataset"] is False, fixture["case_id"]
+        assert boundary["hosted_leaderboard_ready"] is False, fixture["case_id"]
+        assert (
+            boundary["nvidia_blackwell_b200_equivalence"] is False
+        ), fixture["case_id"]
+        assert boundary["real_hardware_validation"] is False, fixture["case_id"]
+
+
+def test_v1_10_solar_derivation_fields_remain_noncanonical():
+    definition = Definition(
+        name="demo",
+        axes={"N": {"type": "var"}},
+        inputs={"x": {"shape": ["N"], "dtype": "float32"}},
+        outputs={"out": {"shape": ["N"], "dtype": "float32"}},
+        reference="def run(x):\n    return x",
+    )
+    workload = Workload(axes={"N": 16}, inputs={"x": {"type": "random"}}, uuid="w1")
+    trace = Trace(
+        definition="demo",
+        workload=workload,
+        solution="solution",
+        evaluation=None,
+    )
+    forbidden = (
+        "solar_derivation",
+        "expected_subroles",
+        "required_evidence",
+        "missing_evidence",
+        "warning_prefixes",
+        "scope_boundary",
+    )
+
+    for payload in (
+        definition.model_dump(mode="json"),
+        workload.model_dump(mode="json"),
+        trace.model_dump(mode="json"),
+    ):
+        for field in forbidden:
+            assert field not in payload
+
+
+def test_primary_cli_does_not_expose_v1_10_solar_derivation_options():
+    result = CliRunner().invoke(cli, ["--help"])
+    assert result.exit_code == 0
+    help_text = result.output
+
+    for option in (
+        "--solar-derivation",
+        "--derive-solar",
+        "--solar-fixtures",
+        "--solar-contract",
+        "--solar-sidecar",
+    ):
+        assert option not in help_text
 
 
 def test_v1_9_derived_artifacts_remain_noncanonical():
