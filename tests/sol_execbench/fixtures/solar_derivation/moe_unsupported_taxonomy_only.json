@@ -1,0 +1,21 @@
+{
+  "case_id": "moe_unsupported_taxonomy_only",
+  "family": "moe",
+  "fixture_class": "unsupported",
+  "negative_category": "taxonomy_only",
+  "description": "The reference names MoE conceptually but exposes no router, expert, dispatch, or combine evidence.",
+  "source_kind": "reference_snippet",
+  "reference": "def run(x, opaque_moe): return opaque_moe(x)",
+  "workload_axes": {"tokens": 128, "hidden": 256},
+  "expectation": {
+    "expected_family": "moe",
+    "expected_subroles": [],
+    "expected_confidence": "unsupported",
+    "expected_status": "unscored",
+    "required_evidence": ["shape:tokens", "shape:hidden"],
+    "missing_evidence": ["subrole:router", "subrole:expert_projection", "subrole:dispatch", "subrole:combine"],
+    "warning_prefixes": ["unsupported_operator:moe_taxonomy_only", "aggregate_unscored:moe"],
+    "degradation_rationale": "A taxonomy label alone is not sufficient derivation evidence."
+  },
+  "scope_boundary": {"paper_scale_dataset": false, "hosted_leaderboard_ready": false, "nvidia_blackwell_b200_equivalence": false, "real_hardware_validation": false}
+}
