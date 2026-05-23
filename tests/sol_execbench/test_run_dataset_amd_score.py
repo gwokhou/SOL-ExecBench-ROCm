@@ -144,6 +144,47 @@ def test_dataset_helper_can_emit_generated_solar_derivation_sidecars(tmp_path):
     assert "coverage" not in score_payload["evidence_refs"]
 
 
+def test_dataset_helper_keeps_path_shaped_sidecars_under_requested_dirs(tmp_path):
+    definition = _matmul_definition()
+    definition["name"] = "../escape"
+    workload_uuid = "nested/name"
+    workload_path = tmp_path / "workload.jsonl"
+    _write_matmul_workload(workload_path, uuid=workload_uuid)
+    traces = _matmul_trace_payload(uuid=workload_uuid)
+    traces[0]["definition"] = definition["name"]
+    solar_dir = tmp_path / "solar-sidecars"
+    sol_bound_dir = tmp_path / "sol-bounds"
+
+    outside_parent = tmp_path / "escape.nested"
+    outside_parent.mkdir()
+
+    scores = build_amd_score_reports_for_problem(
+        definition_payload=definition,
+        workload_path=workload_path,
+        traces_payload=traces,
+        trace_ref="L1/escape/traces.json",
+        sol_bound_artifact_dir=sol_bound_dir,
+        solar_derivation_dir=solar_dir,
+    )
+
+    sidecar_stem = run_dataset._safe_sidecar_stem(definition["name"], workload_uuid)
+    solar_path = solar_dir / f"{sidecar_stem}.solar-derivation.json"
+    sol_bound_path = sol_bound_dir / f"{sidecar_stem}.amd-sol-v2.json"
+    score_payload = scores[0].to_dict()
+
+    assert solar_path.exists()
+    assert sol_bound_path.exists()
+    assert solar_path.resolve().is_relative_to(solar_dir.resolve())
+    assert sol_bound_path.resolve().is_relative_to(sol_bound_dir.resolve())
+    assert list(outside_parent.rglob("*.json")) == []
+    assert list(solar_dir.glob("*.solar-derivation.json")) == [solar_path]
+    assert list(sol_bound_dir.glob("*.amd-sol-v2.json")) == [sol_bound_path]
+    assert score_payload["derived_evidence_refs"]["formula"].startswith(
+        f"{solar_path}#"
+    )
+    assert score_payload["evidence_refs"]["sol_bound"] == str(sol_bound_path)
+
+
 def test_dataset_helper_uses_scoring_baseline_artifact(tmp_path):
     definition = {
         "name": "matmul_demo",

@@ -34,7 +34,9 @@ Usage:
 
 import argparse
 import ast
+import hashlib
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -70,6 +72,8 @@ from sol_execbench.core.scoring.solar_derivation import (
 ROOT = Path(__file__).resolve().parent.parent
 
 CATEGORIES = {"L1", "L2", "FlashInfer-Bench", "Quant"}
+
+_SAFE_SIDECAR_COMPONENT = re.compile(r"[^A-Za-z0-9_.-]+")
 
 
 # ---------------------------------------------------------------------------
@@ -462,6 +466,28 @@ def _hardware_model_key_from_traces(traces: list[Trace]) -> str:
     return "gfx1200"
 
 
+def _safe_sidecar_stem(*parts: str) -> str:
+    """Return a deterministic filename stem for untrusted benchmark identifiers."""
+    safe_parts: list[str] = []
+    changed = False
+    for part in parts:
+        raw = str(part)
+        safe = _SAFE_SIDECAR_COMPONENT.sub("_", raw)
+        safe = re.sub(r"_+", "_", safe).strip("._")
+        if not safe:
+            raise ValueError(f"unsafe sidecar identifier: {raw!r}")
+        changed = changed or safe != raw
+        safe_parts.append(safe)
+
+    safe_stem = ".".join(safe_parts)
+    if changed:
+        digest = hashlib.sha256(
+            "\0".join(str(part) for part in parts).encode()
+        ).hexdigest()[:12]
+        safe_stem = f"{safe_stem}.{digest}"
+    return safe_stem
+
+
 def build_amd_score_reports_for_problem(
     *,
     definition_payload: dict,
@@ -507,10 +533,8 @@ def build_amd_score_reports_for_problem(
         )
         if workload is not None and solar_derivation_dir is not None:
             solar_derivation_dir.mkdir(parents=True, exist_ok=True)
-            sidecar_path = (
-                solar_derivation_dir
-                / f"{definition.name}.{trace.workload.uuid}.solar-derivation.json"
-            )
+            sidecar_stem = _safe_sidecar_stem(definition.name, trace.workload.uuid)
+            sidecar_path = solar_derivation_dir / f"{sidecar_stem}.solar-derivation.json"
             generated = build_solar_derivation_evidence(definition, workload)
             sidecar_path.write_text(json.dumps(generated.to_dict(), indent=2))
             solar_derivation = solar_derivation_from_dict(
@@ -526,10 +550,8 @@ def build_amd_score_reports_for_problem(
         sol_bound_ref = f"derived:{definition.name}:{trace.workload.uuid}:amd_sol_bound_v2"
         if artifact is not None and sol_bound_artifact_dir is not None:
             sol_bound_artifact_dir.mkdir(parents=True, exist_ok=True)
-            sidecar_path = (
-                sol_bound_artifact_dir
-                / f"{definition.name}.{trace.workload.uuid}.amd-sol-v2.json"
-            )
+            sidecar_stem = _safe_sidecar_stem(definition.name, trace.workload.uuid)
+            sidecar_path = sol_bound_artifact_dir / f"{sidecar_stem}.amd-sol-v2.json"
             sidecar_path.write_text(json.dumps(artifact.to_dict(), indent=2))
             sol_bound_ref = str(sidecar_path)
         scores.append(
