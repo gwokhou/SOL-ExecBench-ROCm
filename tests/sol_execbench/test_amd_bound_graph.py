@@ -209,6 +209,184 @@ def test_moe_taxonomy_only_call_is_unsupported_without_fabricated_subroles():
     assert "unsupported_operator:moe_taxonomy_only" in graph.warnings
 
 
+def _ssm_mamba_definition(*, missing_recurrence: bool = False, custom_scan: bool = False) -> Definition:
+    if custom_scan:
+        return Definition(
+            name="ssm_mamba_custom_scan",
+            axes={
+                "batch": {"type": "const", "value": 2},
+                "sequence": {"type": "const", "value": 64},
+                "hidden": {"type": "const", "value": 128},
+            },
+            inputs={
+                "x": {"shape": ["batch", "sequence", "hidden"], "dtype": "float16"},
+                "opaque_scan": {"shape": ["hidden", "hidden"], "dtype": "float16"},
+            },
+            outputs={"out": {"shape": ["batch", "sequence", "hidden"], "dtype": "float16"}},
+            reference="def run(x, opaque_scan):\n    return opaque_scan(x)\n",
+        )
+    inputs = {
+        "x": {"shape": ["batch", "sequence", "hidden"], "dtype": "float16"},
+        "w_in": {"shape": ["hidden", "hidden"], "dtype": "float16"},
+        "conv_weight": {"shape": ["hidden", "one", "kernel"], "dtype": "float16"},
+    }
+    if missing_recurrence:
+        inputs["params"] = {"shape": ["hidden"], "dtype": "float16"}
+        inputs["w_out"] = {"shape": ["hidden", "hidden"], "dtype": "float16"}
+        reference = (
+            "def run(x, w_in, conv_weight, params, w_out):\n"
+            "    z = in_proj(x, w_in)\n"
+            "    z = depthwise_conv(z, conv_weight)\n"
+            "    y = selective_scan(z, params)\n"
+            "    return out_proj(y, w_out)\n"
+        )
+    else:
+        inputs.update(
+            {
+                "a": {"shape": ["hidden", "state"], "dtype": "float16"},
+                "b": {"shape": ["hidden", "state"], "dtype": "float16"},
+                "c": {"shape": ["hidden", "state"], "dtype": "float16"},
+                "w_out": {"shape": ["hidden", "hidden"], "dtype": "float16"},
+            }
+        )
+        reference = (
+            "def run(x, w_in, conv_weight, a, b, c, w_out):\n"
+            "    z = in_proj(x, w_in)\n"
+            "    z = depthwise_conv(z, conv_weight)\n"
+            "    y = selective_scan(z, a, b, c)\n"
+            "    y = gate(y)\n"
+            "    return out_proj(y, w_out)\n"
+        )
+    return Definition(
+        name="ssm_mamba_missing_recurrence" if missing_recurrence else "ssm_mamba_static",
+        axes={
+            "batch": {"type": "const", "value": 2},
+            "sequence": {"type": "const", "value": 64},
+            "hidden": {"type": "const", "value": 128},
+            "state": {"type": "const", "value": 16},
+            "one": {"type": "const", "value": 1},
+            "kernel": {"type": "const", "value": 3},
+        },
+        inputs=inputs,
+        outputs={"out": {"shape": ["batch", "sequence", "hidden"], "dtype": "float16"}},
+        reference=reference,
+    )
+
+
+def _ssm_mamba_workload(*, missing_recurrence: bool = False, custom_scan: bool = False) -> Workload:
+    if custom_scan:
+        return Workload(
+            axes={},
+            inputs={"x": {"type": "random"}, "opaque_scan": {"type": "random"}},
+            uuid="ssm-custom-workload",
+        )
+    inputs = {
+        "x": {"type": "random"},
+        "w_in": {"type": "random"},
+        "conv_weight": {"type": "random"},
+        "w_out": {"type": "random"},
+    }
+    if missing_recurrence:
+        inputs["params"] = {"type": "random"}
+    else:
+        inputs.update({"a": {"type": "random"}, "b": {"type": "random"}, "c": {"type": "random"}})
+    return Workload(axes={}, inputs=inputs, uuid="ssm-mamba-workload")
+
+
+def test_ssm_mamba_visible_chain_records_independent_subroles_and_state_metadata():
+    graph = build_bound_graph(_ssm_mamba_definition(), _ssm_mamba_workload())
+    ssm_nodes = [node for node in graph.nodes if node.op_family == OpFamily.SSM_MAMBA]
+
+    assert [node.attributes.get("subrole") for node in ssm_nodes] == [
+        "input_projection",
+        "depthwise_convolution",
+        "scan",
+        "state_update",
+        "gating",
+        "output_projection",
+    ]
+    state_update = next(node for node in ssm_nodes if node.attributes.get("subrole") == "state_update")
+    assert state_update.attributes["sequence_length"] == 64
+    assert state_update.attributes["hidden_size"] == 128
+    assert state_update.attributes["state_shape"] == (128, 16)
+    assert state_update.attributes["state_update_parameters"] == ("input:a", "input:b", "input:c")
+    assert state_update.attributes["recurrence_source"] == "visible_scan_parameters"
+
+
+def test_ssm_mamba_missing_recurrence_keeps_scan_without_state_update():
+    graph = build_bound_graph(
+        _ssm_mamba_definition(missing_recurrence=True),
+        _ssm_mamba_workload(missing_recurrence=True),
+    )
+    ssm_nodes = [node for node in graph.nodes if node.op_family == OpFamily.SSM_MAMBA]
+
+    assert [node.attributes.get("subrole") for node in ssm_nodes] == [
+        "input_projection",
+        "depthwise_convolution",
+        "scan",
+        "output_projection",
+    ]
+    scan = next(node for node in ssm_nodes if node.attributes.get("subrole") == "scan")
+    assert "state_shape" not in scan.attributes
+    assert "state_update_parameters" not in scan.attributes
+    assert "inexact_operator:ssm_missing_recurrence" in graph.warnings
+
+
+def test_ssm_mamba_custom_scan_records_scan_without_fabricated_state_update():
+    graph = build_bound_graph(
+        _ssm_mamba_definition(custom_scan=True),
+        _ssm_mamba_workload(custom_scan=True),
+    )
+    ssm_nodes = [node for node in graph.nodes if node.op_family == OpFamily.SSM_MAMBA]
+
+    assert [node.attributes.get("subrole") for node in ssm_nodes] == ["scan"]
+    assert ssm_nodes[0].confidence == EstimateConfidence.UNSUPPORTED
+    assert ssm_nodes[0].attributes["recognized_scan"] is False
+    assert "state_shape" not in ssm_nodes[0].attributes
+    assert "state_update_parameters" not in ssm_nodes[0].attributes
+    assert "unsupported_operator:ssm_custom_scan" in graph.warnings
+
+
+def test_depthwise_convolution_and_projections_without_scan_are_not_ssm_mamba():
+    definition = Definition(
+        name="conv_projection_without_scan",
+        axes={
+            "batch": {"type": "const", "value": 2},
+            "sequence": {"type": "const", "value": 64},
+            "hidden": {"type": "const", "value": 128},
+            "one": {"type": "const", "value": 1},
+            "kernel": {"type": "const", "value": 3},
+        },
+        inputs={
+            "x": {"shape": ["batch", "sequence", "hidden"], "dtype": "float16"},
+            "w_in": {"shape": ["hidden", "hidden"], "dtype": "float16"},
+            "conv_weight": {"shape": ["hidden", "one", "kernel"], "dtype": "float16"},
+            "w_out": {"shape": ["hidden", "hidden"], "dtype": "float16"},
+        },
+        outputs={"out": {"shape": ["batch", "sequence", "hidden"], "dtype": "float16"}},
+        reference=(
+            "def run(x, w_in, conv_weight, w_out):\n"
+            "    z = in_proj(x, w_in)\n"
+            "    z = depthwise_conv(z, conv_weight)\n"
+            "    return out_proj(z, w_out)\n"
+        ),
+    )
+    workload = Workload(
+        axes={},
+        inputs={
+            "x": {"type": "random"},
+            "w_in": {"type": "random"},
+            "conv_weight": {"type": "random"},
+            "w_out": {"type": "random"},
+        },
+        uuid="not-ssm-workload",
+    )
+
+    graph = build_bound_graph(definition, workload)
+
+    assert OpFamily.SSM_MAMBA not in {node.op_family for node in graph.nodes}
+
+
 def test_definition_and_workload_produce_deterministic_tensor_metadata():
     graph = build_bound_graph(_matmul_definition(), _matmul_workload())
     repeated = build_bound_graph(_matmul_definition(), _matmul_workload())
