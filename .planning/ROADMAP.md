@@ -56,17 +56,22 @@ NVIDIA Blackwell/B200 equivalence, and new framework dependencies.
 - [ ] **Phase 47: Derivation Contract And Golden Fixture Matrix** - Establish
   the v1.10 derivation contract and fixture coverage before expanding
   extraction behavior.
+
 - [ ] **Phase 48: Extraction Pipeline And Semantic Provenance** - Add the
   shared extraction infrastructure for compound groups, subroles, provenance,
   and deterministic confidence.
+
 - [ ] **Phase 49: High-Confidence Family Modeling** - Promote linear
   projection, convolution, embedding/positional, and explicit attention into
   formula-backed SOLAR families.
+
 - [ ] **Phase 50: Degraded Complex Family Modeling** - Add conservative MoE
   and SSM/Mamba derivation paths with explicit degraded evidence.
+
 - [ ] **Phase 51: Sidecar Coverage And Score Guards** - Make coverage,
   aggregate state, sidecar fields, and AMD-native score eligibility
   machine-verifiable.
+
 - [ ] **Phase 52: Dataset Runner And Public Contract Closure** - Close v1.10
   through dataset-runner integration, documentation, and public claim
   guardrails.
@@ -86,21 +91,32 @@ NVIDIA Blackwell/B200 equivalence, and new framework dependencies.
   1. Maintainer can inspect golden derivation fixtures for attention, MoE,
      convolution, SSM/Mamba, embedding or positional patterns, and linear
      projection.
+
   2. Maintainer can inspect negative and degradation fixtures for dynamic,
      partial, unsupported, taxonomy-only, and missing-metadata cases.
+
   3. Fixture expectations identify the intended SOLAR state, supported family,
      missing evidence, and degradation rationale for each case.
+
   4. The fixture matrix preserves v1.10 scope boundaries and does not require
      paper-scale dataset extraction or real hardware validation.
 
 **Plans**: 6 plans
 
 Plans:
+**Wave 1**
+
 - [ ] 47-01-PLAN.md — Write the sidecar-only SOLAR derivation contract.
 - [ ] 47-02-PLAN.md — Add the fixture loader and loader-only schema tests.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 47-03-PLAN.md — Add attention and MoE fixture batches.
 - [ ] 47-04-PLAN.md — Add convolution and SSM/Mamba fixture batches.
 - [ ] 47-05-PLAN.md — Add embedding/positional and linear projection fixture batches.
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 47-06-PLAN.md — Add full matrix tests and public claim-boundary guardrails.
 
 ### Phase 48: Extraction Pipeline And Semantic Provenance
@@ -116,10 +132,13 @@ Plans:
   1. User can derive internal SOLAR evidence that records compound-family
      grouping, subroles, and extraction provenance outside canonical trace
      JSONL and public schemas.
+
   2. User can inspect tensor shape, dtype, semantic-axis, and extraction-source
      provenance for extracted formula and byte evidence.
+
   3. User can distinguish supported, inexact, and unsupported derivation states
      through deterministic confidence rules.
+
   4. Existing primary `sol-execbench` behavior and canonical benchmark schemas
      remain unchanged while sidecar-only evidence expands.
 
@@ -139,15 +158,19 @@ Plans:
      score computation, scale or mask handling, softmax, PV aggregation, and
      output projection, with degradation when axes or mask semantics are
      incomplete.
+
   2. User can derive convolution evidence for 1D, 2D, and 3D convolution,
      including grouped or depthwise metadata, stride, padding, dilation, and
      output spatial dimensions.
+
   3. User can derive embedding, positional, gather, rotary-like, and linear
      projection evidence with shape, index, semantic role, and GEMM-compatible
      formula reuse where dimensions are explicit.
+
   4. Newly promoted high-confidence families emit family-specific formula
      kinds, formula text, formula inputs, and dtype-aware read, write,
      intermediate, movement, and total byte evidence.
+
   5. Family estimates convert into per-operation compute bound, memory bound,
      limiting resource, and SOL-bound evidence.
 
@@ -165,10 +188,13 @@ Plans:
 
   1. User can derive MoE evidence for routing, top-k selection, expert
      projection, token dispatch, and combine patterns.
+
   2. MoE derivation records dynamic routing evidence and degraded confidence
      when static cardinality or expert-selection metadata is incomplete.
+
   3. User can derive SSM/Mamba-like evidence for projection, depthwise
      convolution, scan or state update, gating, and output projection patterns.
+
   4. SSM/Mamba derivation records degraded evidence when recurrence or state
      update semantics are incomplete instead of silently producing scored
      evidence.
@@ -188,10 +214,13 @@ Plans:
   1. User can inspect SOLAR sidecars for family-aware coverage, extraction
      provenance, missing patterns, unsupported patterns, degraded nodes, and
      estimated nodes.
+
   2. User can parse aggregate SOLAR evidence into machine-verifiable `scored`,
      `degraded`, and `unscored` states.
+
   3. AMD-native scoring returns `None` for unscored SOLAR evidence and
      preserves warnings for degraded SOLAR evidence.
+
   4. Sidecar parse and serialize round-trip tests cover every new
      machine-verifiable derivation evidence field.
 
@@ -210,11 +239,14 @@ Plans:
   1. Derived reports preserve AMD-native-derived claim boundaries and include
      evidence references for formulas, hardware models, coverage, and score
      eligibility.
+
   2. Public contract guardrails prove canonical schemas, trace JSONL, primary
      CLI behavior, and existing public benchmark semantics remain unchanged.
+
   3. Claim guardrails prevent v1.10 artifacts from implying paper benchmark
      parity, NVIDIA Blackwell or B200 equivalence, hosted leaderboard
      readiness, or new real-hardware validation.
+
   4. Dataset-runner and documentation surfaces explain how to consume v1.10
      SOLAR sidecars without requiring paper-scale extraction or new hardware
      validation.
