@@ -66,33 +66,33 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DERIVE-01 | TBD | Pending |
-| DERIVE-02 | TBD | Pending |
-| DERIVE-03 | TBD | Pending |
-| DERIVE-04 | TBD | Pending |
-| DERIVE-05 | TBD | Pending |
-| DERIVE-06 | TBD | Pending |
-| DERIVE-07 | TBD | Pending |
-| MODEL-01 | TBD | Pending |
-| MODEL-02 | TBD | Pending |
-| MODEL-03 | TBD | Pending |
-| MODEL-04 | TBD | Pending |
-| MODEL-05 | TBD | Pending |
-| REPORT-01 | TBD | Pending |
-| REPORT-02 | TBD | Pending |
-| REPORT-03 | TBD | Pending |
-| REPORT-04 | TBD | Pending |
-| TEST-01 | TBD | Pending |
-| TEST-02 | TBD | Pending |
-| TEST-03 | TBD | Pending |
-| TEST-04 | TBD | Pending |
-| TEST-05 | TBD | Pending |
+| DERIVE-01 | Phase 49 | Pending |
+| DERIVE-02 | Phase 50 | Pending |
+| DERIVE-03 | Phase 49 | Pending |
+| DERIVE-04 | Phase 50 | Pending |
+| DERIVE-05 | Phase 49 | Pending |
+| DERIVE-06 | Phase 49 | Pending |
+| DERIVE-07 | Phase 48 | Pending |
+| MODEL-01 | Phase 49 | Pending |
+| MODEL-02 | Phase 49 | Pending |
+| MODEL-03 | Phase 48 | Pending |
+| MODEL-04 | Phase 48 | Pending |
+| MODEL-05 | Phase 49 | Pending |
+| REPORT-01 | Phase 51 | Pending |
+| REPORT-02 | Phase 51 | Pending |
+| REPORT-03 | Phase 51 | Pending |
+| REPORT-04 | Phase 52 | Pending |
+| TEST-01 | Phase 47 | Pending |
+| TEST-02 | Phase 47 | Pending |
+| TEST-03 | Phase 51 | Pending |
+| TEST-04 | Phase 52 | Pending |
+| TEST-05 | Phase 52 | Pending |
 
 **Coverage:**
 - v1.10 requirements: 21 total
-- Mapped to phases: 0
-- Unmapped: 21
+- Mapped to phases: 21
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-05-23*
-*Last updated: 2026-05-23 after initial definition*
+*Last updated: 2026-05-23 after roadmap creation*
