@@ -65,7 +65,7 @@ NVIDIA Blackwell/B200 equivalence, and new framework dependencies.
   projection, convolution, embedding/positional, and explicit attention into
   formula-backed SOLAR families.
 
-- [ ] **Phase 50: Degraded Complex Family Modeling** - Add conservative MoE
+- [x] **Phase 50: Degraded Complex Family Modeling** - Add conservative MoE (completed 2026-05-23)
   and SSM/Mamba derivation paths with explicit degraded evidence.
 
 - [ ] **Phase 51: Sidecar Coverage And Score Guards** - Make coverage,
@@ -246,7 +246,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 50-03-PLAN.md — Close guardrails and regressions for degraded complex families.
+- [x] 50-03-PLAN.md — Close guardrails and regressions for degraded complex families.
 
 ### Phase 51: Sidecar Coverage And Score Guards
 
@@ -307,7 +307,7 @@ Plans:
 | 47. Derivation Contract And Golden Fixture Matrix | 6/6 | Complete | 2026-05-23 |
 | 48. Extraction Pipeline And Semantic Provenance | 4/4 | Complete    | 2026-05-23 |
 | 49. High-Confidence Family Modeling | 4/4 | Complete    | 2026-05-23 |
-| 50. Degraded Complex Family Modeling | 2/3 | In Progress|  |
+| 50. Degraded Complex Family Modeling | 3/3 | Complete   | 2026-05-23 |
 | 51. Sidecar Coverage And Score Guards | 0/TBD | Not started | - |
 | 52. Dataset Runner And Public Contract Closure | 0/TBD | Not started | - |
 

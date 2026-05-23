@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.10
 milestone_name: Paper-Aligned SOLAR Automatic Derivation
 status: Ready for next plan
-stopped_at: Completed 50-02-PLAN.md
-last_updated: "2026-05-23T08:10:54.479Z"
+stopped_at: Completed 50-03-PLAN.md
+last_updated: "2026-05-23T08:20:05.137Z"
 last_activity: 2026-05-23
 progress:
   total_phases: 6
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 17
-  completed_plans: 16
-  percent: 94
+  completed_plans: 17
+  percent: 100
 ---
 
 # Project State
@@ -30,7 +30,7 @@ Plan: 03
 Status: Ready for next plan
 Last activity: 2026-05-23
 
-Progress: [█████████░] 94%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -63,6 +63,7 @@ Progress: [█████████░] 94%
 | Phase 49 P04 | 5min | 3 tasks | 8 files |
 | Phase 50 P01 | 8min | 3 tasks | 6 files |
 | Phase 50 P02 | 11min | 3 tasks | 6 files |
+| Phase 50 P03 | 6min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -95,6 +96,8 @@ Decisions are logged in PROJECT.md. Recent decisions affecting current work:
 - [Phase 50]: SSM/Mamba state update evidence requires visible state shape and update parameters.
 - [Phase 50]: Opaque custom scan calls remain unscored with scan evidence but no fabricated recurrence metadata.
 - [Phase 50]: SSM/Mamba scan estimates use deterministic formula kinds `ssm_mamba_static_scan_flops` and `ssm_mamba_degraded_scan_bytes`.
+- [Phase 50]: Phase 50 internal formula kinds and warning names remain sidecar-only and absent from public schemas, primary CLI help, and canonical trace JSONL.
+- [Phase 50]: Degraded MoE and SSM/Mamba evidence does not add SOLAR sidecar references to AMD-native score eligibility.
 
 ### Pending Todos
 
@@ -118,6 +121,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-23T08:10:54.472Z
-Stopped at: Completed 50-02-PLAN.md
+Last session: 2026-05-23T08:19:27.491Z
+Stopped at: Completed 50-03-PLAN.md
 Resume file: None
