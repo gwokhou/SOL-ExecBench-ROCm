@@ -42,6 +42,7 @@ from .readiness import (
     classify_rocm_readiness,
     write_dataset_readiness,
 )
+from .ready_subset import ReadySubset, build_ready_subset, write_ready_subset
 
 __all__ = [
     "DEFAULT_CATEGORIES",
@@ -54,14 +55,17 @@ __all__ = [
     "LayoutCategory",
     "LayoutDiagnostic",
     "ProblemInventoryRecord",
+    "ReadySubset",
     "WorkloadInventoryRecord",
     "WorkloadReadinessRecord",
     "build_dataset_manifest",
     "build_dataset_inventory",
     "classify_rocm_readiness",
+    "build_ready_subset",
     "inspect_dataset_layout",
     "validate_categories",
     "write_dataset_manifest",
     "write_dataset_inventory",
     "write_dataset_readiness",
+    "write_ready_subset",
 ]

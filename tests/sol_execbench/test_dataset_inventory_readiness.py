@@ -1,9 +1,22 @@
 from __future__ import annotations
 
 import json
+import importlib.util
 from pathlib import Path
 
-from sol_execbench.core.dataset import build_dataset_inventory, classify_rocm_readiness
+from sol_execbench.core.dataset import (
+    build_dataset_inventory,
+    build_ready_subset,
+    classify_rocm_readiness,
+)
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+INSPECT_DATASET_PATH = REPO_ROOT / "scripts" / "inspect_dataset.py"
+spec = importlib.util.spec_from_file_location("inspect_dataset", INSPECT_DATASET_PATH)
+assert spec is not None
+inspect_dataset = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+spec.loader.exec_module(inspect_dataset)
 
 
 def _definition(
@@ -239,3 +252,43 @@ def test_readiness_does_not_block_torch_cuda_compatibility_text(tmp_path):
     readiness = classify_rocm_readiness(inventory, dataset_root=tmp_path, created_at="2026-05-23T00:00:00Z")
 
     assert readiness.workloads[0].status == "ready"
+
+
+def test_ready_subset_includes_only_ready_workloads(tmp_path):
+    _write_problem(tmp_path, "L1", "ready_problem")
+    _write_problem(tmp_path, "L1", "blocked_problem", workloads=[_workload("safetensors", path="missing.safetensors", tensor_key="x")])
+    inventory = build_dataset_inventory(tmp_path, categories=("L1",), created_at="2026-05-23T00:00:00Z")
+    readiness = classify_rocm_readiness(inventory, dataset_root=tmp_path, created_at="2026-05-23T00:00:00Z")
+
+    subset = build_ready_subset(readiness, dataset_root=tmp_path, created_at="2026-05-23T00:00:00Z")
+
+    assert subset.included_workloads == 1
+    assert subset.excluded_workloads == 1
+    assert [problem.problem_id for problem in subset.problems] == ["L1/ready_problem"]
+    assert subset.claim_boundary.execution_success is False
+    assert subset.claim_boundary.paper_level_validation is False
+
+
+def test_inspect_dataset_cli_writes_requested_sidecars(tmp_path):
+    _write_problem(tmp_path / "dataset", "L1", "ready_problem")
+    out = tmp_path / "out"
+
+    rc = inspect_dataset.main(
+        [
+            "--dataset-root",
+            str(tmp_path / "dataset"),
+            "--category",
+            "L1",
+            "--inventory",
+            str(out / "inventory.json"),
+            "--readiness",
+            str(out / "readiness.json"),
+            "--ready-subset",
+            str(out / "ready_subset.json"),
+        ]
+    )
+
+    assert rc == 0
+    assert json.loads((out / "inventory.json").read_text())["schema_version"] == "sol_execbench.dataset_inventory.v1"
+    assert json.loads((out / "readiness.json").read_text())["schema_version"] == "sol_execbench.rocm_readiness.v1"
+    assert json.loads((out / "ready_subset.json").read_text())["schema_version"] == "sol_execbench.ready_subset.v1"

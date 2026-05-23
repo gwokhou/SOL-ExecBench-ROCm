@@ -72,7 +72,7 @@ execution parity.
 - Metadata and docs distinguish acquisition/layout completion from readiness,
   execution, and paper-level validation.
 
-### Phase 54: Paper Inventory And ROCm Readiness Classification
+### Phase 54: Paper Inventory And ROCm Readiness Classification (completed 2026-05-23)
 
 **Goal:** Generate a deterministic machine-readable inventory for every
 discovered problem/workload and classify ROCm readiness with explicit blockers
@@ -153,7 +153,7 @@ leaderboard parity, upstream SOLAR parity, or unsupported hardware validation.
 
 | Milestone | Phases | Plans | Status | Shipped |
 |-----------|--------|-------|--------|---------|
-| v1.11 Paper Dataset Parity Inventory and ROCm Execution Closure | 53-57 | 3/3 | In Progress | - |
+| v1.11 Paper Dataset Parity Inventory and ROCm Execution Closure | 53-57 | 6/6 | In Progress | - |
 | v1.10 Paper-Aligned SOLAR Automatic Derivation | 47-52 | 23/23 | Complete | 2026-05-23 |
 | v1.9 AMD SOL/SOLAR Bound Modeling Completion | 41-46 | 17/17 | Complete | 2026-05-23 |
 | v1.8 ROCm Library Ecosystem Completion | 36-40 | 5/5 | Complete | 2026-05-22 |
