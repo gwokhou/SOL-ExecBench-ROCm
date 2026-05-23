@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 echo "Downloading SOL-ExecBench dataset..."
 python scripts/download_solexecbench.py --output-root data/SOL-ExecBench/benchmark

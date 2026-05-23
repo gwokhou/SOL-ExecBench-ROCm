@@ -40,3 +40,5 @@ uv run --with ruff ruff check src/sol_execbench/core/dataset tests/sol_execbench
 - No public `definition.json`, `workload.jsonl`, `solution.json`, or trace JSONL
   schema was changed.
 - Later Phase 54-57 requirements remain pending.
+- Code review findings were resolved: unsafe remote problem-name path traversal
+  is rejected, and `scripts/download_data.sh` now fails fast.
