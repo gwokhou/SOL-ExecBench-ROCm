@@ -36,6 +36,21 @@ checksums, diagnostics, and claim-boundary fields. Acquisition/layout completion
 does not prove ROCm readiness, execution success, paper-level validation, hosted
 leaderboard parity, or upstream SOLAR equivalence.
 
+Generate static paper-inventory and ROCm-readiness sidecars:
+
+```bash
+uv run scripts/inspect_dataset.py \
+  --dataset-root data/SOL-ExecBench/benchmark \
+  --manifest out/dataset_manifest.json \
+  --inventory out/inventory.json \
+  --readiness out/readiness.json \
+  --ready-subset out/ready_subset.json
+```
+
+Readiness means a workload is ready to attempt local ROCm execution. It does
+not mean the workload passed execution, was scored, completed full validation,
+or reached paper parity.
+
 Dataset runs write per-problem traces under category/problem subdirectories of
 the selected output directory and write `summary.json` directly under that
 output directory. The default output directory is `out/`.

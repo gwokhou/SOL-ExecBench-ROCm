@@ -467,6 +467,40 @@ def test_v1_11_dataset_docs_do_not_overclaim_acquisition_layout():
         assert expected_boundary in docs
 
 
+def test_v1_11_inventory_readiness_fields_remain_sidecar_only():
+    definition = Definition(
+        name="demo",
+        axes={"N": {"type": "var"}},
+        inputs={"x": {"shape": ["N"], "dtype": "float32"}},
+        outputs={"out": {"shape": ["N"], "dtype": "float32"}},
+        reference="def run(x):\n    return x",
+    )
+    workload = Workload(axes={"N": 4}, inputs={"x": {"type": "random"}}, uuid="w")
+    trace = Trace(definition="demo", workload=workload, solution="solution", evaluation=None)
+    forbidden = (
+        "sol_execbench.dataset_inventory.v1",
+        "sol_execbench.rocm_readiness.v1",
+        "sol_execbench.ready_subset.v1",
+        "readiness_checksum",
+        "ready_subset_checksum",
+        "ready_to_attempt_rocm_execution",
+    )
+
+    for payload in (definition.model_dump(mode="json"), workload.model_dump(mode="json"), trace.model_dump(mode="json")):
+        text = json.dumps(payload, sort_keys=True)
+        for field in forbidden:
+            assert field not in text
+
+
+def test_primary_cli_does_not_expose_v1_11_dataset_inspection_options():
+    result = CliRunner().invoke(cli, ["--help"])
+    assert result.exit_code == 0
+    help_text = result.output
+
+    for option in ("--inventory", "--readiness", "--ready-subset", "--dataset-root"):
+        assert option not in help_text
+
+
 def test_public_score_evidence_refs_keep_exact_established_key_space():
     definition = Definition(
         name="matmul_demo",
