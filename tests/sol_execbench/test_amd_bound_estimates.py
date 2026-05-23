@@ -303,6 +303,146 @@ def test_all_key_tensors_unresolved_marks_known_operator_unsupported():
     assert "unresolved" in estimate.rationale
 
 
+def test_reduction_estimate_records_axis_and_conservative_formula():
+    from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
+
+    definition = Definition(
+        name="reduction_demo",
+        axes={"M": {"type": "const", "value": 2}, "N": {"type": "const", "value": 4}},
+        inputs={"x": {"shape": ["M", "N"], "dtype": "float32"}},
+        outputs={"out": {"shape": ["M"], "dtype": "float32"}},
+        reference="def run(x):\n    return x.sum(dim=1)",
+    )
+    workload = Workload(axes={}, inputs={"x": {"type": "random"}}, uuid="reduction-workload")
+
+    estimate = estimate_bound_work(build_bound_graph(definition, workload))[0]
+
+    assert estimate.formula_kind == "reduction_flops"
+    assert estimate.formula_inputs["input_elements"] == 8
+    assert estimate.formula_inputs["axis"] == 1
+    assert estimate.axis_source == "attribute"
+    assert estimate.confidence == EstimateConfidence.INEXACT
+    assert "conservative" in estimate.rationale
+
+
+def test_softmax_missing_axis_stays_inexact_with_missing_axis_evidence():
+    node = BoundGraphNode(
+        node_id="op_1",
+        op_family=OpFamily.SOFTMAX,
+        op_name="softmax",
+        source_expression="softmax(x)",
+        input_tensor_ids=("input:x",),
+        output_tensor_ids=("tmp:op_1:0",),
+        attributes={},
+        confidence=EstimateConfidence.INEXACT,
+        rationale="recognized softmax-like operation",
+    )
+    graph = BoundGraph(
+        definition="softmax_missing_axis",
+        workload_uuid="w1",
+        nodes=(node,),
+        tensors={
+            "input:x": BoundTensor(
+                tensor_id="input:x",
+                name="x",
+                role=BoundTensorRole.INPUT,
+                shape=(2, 4),
+                dtype="float32",
+                producer_node_id=None,
+                source="test",
+            ),
+            "tmp:op_1:0": BoundTensor(
+                tensor_id="tmp:op_1:0",
+                name="tmp",
+                role=BoundTensorRole.INTERMEDIATE,
+                shape=(2, 4),
+                dtype="float32",
+                producer_node_id="op_1",
+                source="test",
+            ),
+        },
+        edges=(),
+        warnings=(),
+    )
+
+    estimate = estimate_bound_work(graph)[0]
+
+    assert estimate.formula_kind == "softmax_flops"
+    assert estimate.axis_source == "missing"
+    assert estimate.formula_inputs["input_elements"] == 8
+    assert estimate.confidence == EstimateConfidence.INEXACT
+    assert "max, exp, sum, and normalize" in estimate.rationale
+
+
+def test_normalization_estimate_uses_conservative_pass_count():
+    from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
+
+    definition = Definition(
+        name="norm_demo",
+        axes={"N": {"type": "const", "value": 8}},
+        inputs={"x": {"shape": ["N"], "dtype": "float32"}},
+        outputs={"out": {"shape": ["N"], "dtype": "float32"}},
+        reference="def run(x):\n    return x.norm()",
+    )
+    workload = Workload(axes={}, inputs={"x": {"type": "random"}}, uuid="norm-workload")
+
+    estimate = estimate_bound_work(build_bound_graph(definition, workload))[0]
+
+    assert estimate.formula_kind == "normalization_flops"
+    assert estimate.formula_inputs["normalization_passes"] == 4
+    assert estimate.flops == 32.0
+    assert estimate.confidence == EstimateConfidence.INEXACT
+    assert "conservative" in estimate.rationale
+
+
+def test_logical_and_broadcast_views_have_zero_movement_bytes():
+    from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
+
+    definition = Definition(
+        name="views_demo",
+        axes={"N": {"type": "const", "value": 8}},
+        inputs={"x": {"shape": ["N"], "dtype": "float32"}},
+        outputs={"out": {"shape": ["N"], "dtype": "float32"}},
+        reference="def run(x):\n    return x.reshape(2, 4).expand(2, 4).reshape(8)",
+    )
+    workload = Workload(axes={}, inputs={"x": {"type": "random"}}, uuid="views-workload")
+
+    estimates = estimate_bound_work(build_bound_graph(definition, workload))
+    logical = next(estimate for estimate in estimates if estimate.movement_kind == "logical_view")
+    broadcast = next(estimate for estimate in estimates if estimate.movement_kind == "broadcast_view")
+
+    assert logical.movement_bytes == 0.0
+    assert "logical view" in logical.rationale
+    assert broadcast.movement_bytes == 0.0
+    assert "broadcast view" in broadcast.rationale
+
+
+def test_contiguous_and_dtype_conversion_count_movement_bytes():
+    from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
+
+    definition = Definition(
+        name="movement_conversion_demo",
+        axes={"N": {"type": "const", "value": 8}},
+        inputs={"x": {"shape": ["N"], "dtype": "float32"}},
+        outputs={"out": {"shape": ["N"], "dtype": "float16"}},
+        reference="import torch\n\ndef run(x):\n    return x.contiguous().to(torch.float16)",
+    )
+    workload = Workload(axes={}, inputs={"x": {"type": "random"}}, uuid="movement-workload")
+
+    estimates = estimate_bound_work(build_bound_graph(definition, workload))
+    contiguous = next(estimate for estimate in estimates if estimate.movement_kind == "materialized")
+    conversion = next(
+        estimate for estimate in estimates if estimate.movement_kind == "dtype_conversion"
+    )
+
+    assert contiguous.movement_bytes > 0.0
+    assert contiguous.formula_kind == "data_movement_bytes"
+    assert conversion.flops == 0.0
+    assert conversion.movement_bytes > 0.0
+    assert conversion.formula_inputs["target_dtype"] == "float16"
+    assert "dtype conversion" in conversion.rationale
+
+
 def test_out_of_scope_families_are_explicit_unsupported_estimates():
     for family in (
         OpFamily.ATTENTION,

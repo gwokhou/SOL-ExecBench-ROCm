@@ -263,6 +263,46 @@ def test_aliases_chained_expressions_and_tuple_outputs_are_visible():
     assert graph.tensors["output:total"].role == BoundTensorRole.OUTPUT
 
 
+def test_axis_dtype_and_movement_metadata_are_stored_in_attributes():
+    definition = Definition(
+        name="attribute_metadata_demo",
+        axes={"M": {"type": "const", "value": 2}, "N": {"type": "const", "value": 4}},
+        inputs={"x": {"shape": ["M", "N"], "dtype": "float32"}},
+        outputs={"out": {"shape": ["M", "N"], "dtype": "float16"}},
+        reference=(
+            "import torch\n\n"
+            "def run(x):\n"
+            "    y = torch.softmax(x, dim=-1)\n"
+            "    z = y.sum(dim=1)\n"
+            "    b = torch.broadcast_to(z[:, None], x.shape)\n"
+            "    c = b.contiguous()\n"
+            "    return c.to(torch.float16)\n"
+        ),
+    )
+    workload = Workload(axes={}, inputs={"x": {"type": "random"}}, uuid="metadata-workload")
+
+    graph = build_bound_graph(definition, workload)
+
+    softmax = next(node for node in graph.nodes if node.op_family == OpFamily.SOFTMAX)
+    reduction = next(node for node in graph.nodes if node.op_family == OpFamily.REDUCTION)
+    broadcast = next(
+        node
+        for node in graph.nodes
+        if node.attributes.get("movement_kind") == "broadcast_view"
+    )
+    contiguous = next(node for node in graph.nodes if node.op_name.endswith("contiguous"))
+    conversion = next(node for node in graph.nodes if node.op_family == OpFamily.DTYPE_CONVERSION)
+
+    assert softmax.attributes["dim"] == -1
+    assert softmax.attributes["axis_source"] == "attribute"
+    assert reduction.attributes["dim"] == 1
+    assert broadcast.attributes["movement_kind"] == "broadcast_view"
+    assert contiguous.attributes["movement_kind"] == "materialized"
+    assert conversion.attributes["target_dtype"] == "float16"
+    assert "dim" not in BoundGraphNode.__dataclass_fields__
+    assert "movement_kind" not in BoundGraphNode.__dataclass_fields__
+
+
 def test_public_scoring_exports_include_bound_graph_api():
     from sol_execbench.core.scoring import BoundGraph as ExportedBoundGraph
     from sol_execbench.core.scoring import build_bound_graph as exported_builder

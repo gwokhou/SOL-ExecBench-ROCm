@@ -227,6 +227,28 @@ _CALL_CLASSIFIERS: tuple[tuple[set[str], _CallClassification], ...] = (
     ),
 )
 
+_LOGICAL_VIEW_NAMES = {
+    "t",
+    "transpose",
+    "permute",
+    "view",
+    "reshape",
+    "flatten",
+    "unsqueeze",
+    "squeeze",
+}
+_BROADCAST_VIEW_NAMES = {"expand", "broadcast_to"}
+_MATERIALIZED_MOVEMENT_NAMES = {"contiguous"}
+_DTYPE_METHOD_TARGETS = {
+    "float": DType.FLOAT32.value,
+    "half": DType.FLOAT16.value,
+    "bfloat16": DType.BFLOAT16.value,
+    "double": DType.FLOAT64.value,
+    "bool": DType.BOOL.value,
+    "int": DType.INT32.value,
+    "long": DType.INT64.value,
+}
+
 
 def build_bound_graph(definition: Definition, workload: Workload) -> BoundGraph:
     """Build a structured bound graph for a concrete definition/workload pair."""
@@ -359,7 +381,10 @@ def _try_fx_bound_graph(
             source_expression=_fx_source_expression(fx_node),
             input_tensor_ids=input_tensor_ids,
             output_tensor_ids=(output_tensor_id,),
-            attributes={"trace_source": "torch.fx"},
+            attributes={
+                "trace_source": "torch.fx",
+                **_fx_node_attributes(fx_node, func_name, classification),
+            },
             confidence=classification.confidence,
             rationale=classification.rationale,
             conversion_status="not_converted",
@@ -530,6 +555,33 @@ def _fx_source_expression(node: Any) -> str:
     return f"{func_name}({args})"
 
 
+def _fx_node_attributes(
+    node: Any,
+    func_name: str,
+    classification: _CallClassification,
+) -> dict[str, object]:
+    attributes: dict[str, object] = {}
+    leaf_name = func_name.rsplit(".", maxsplit=1)[-1]
+    movement_kind = _movement_kind_for_name(leaf_name)
+    if movement_kind is not None:
+        attributes["movement_kind"] = movement_kind
+
+    if classification.op_family in {
+        OpFamily.REDUCTION,
+        OpFamily.NORMALIZATION,
+        OpFamily.SOFTMAX,
+    }:
+        axis = _axis_from_values(node.args[1:], node.kwargs)
+        if axis is not _MISSING:
+            attributes["dim"] = axis
+            attributes["axis_source"] = "attribute"
+
+    target_dtype = _target_dtype_from_values(leaf_name, node.args[1:], node.kwargs)
+    if target_dtype is not None:
+        attributes["target_dtype"] = target_dtype
+    return attributes
+
+
 def _first_input_shape(
     input_tensor_ids: tuple[str, ...],
     tensors: dict[str, BoundTensor],
@@ -624,6 +676,7 @@ class _AstBoundGraphExtractor:
                 input_tensor_ids=(),
                 confidence=EstimateConfidence.UNSUPPORTED,
                 rationale="unsupported dynamic control flow preserved as graph evidence",
+                attributes={},
             )
             self.warnings.append(f"unsupported_operator:{op_name}")
 
@@ -669,6 +722,7 @@ class _AstBoundGraphExtractor:
             input_tensor_ids=input_tensor_ids,
             confidence=confidence,
             rationale=rationale,
+            attributes={},
         )
 
     def _process_call(self, node: ast.Call) -> tuple[str, ...]:
@@ -691,6 +745,7 @@ class _AstBoundGraphExtractor:
                 input_tensor_ids=tuple(input_tensor_ids),
                 confidence=EstimateConfidence.UNSUPPORTED,
                 rationale="unsupported call preserved as graph evidence",
+                attributes={},
             )
 
         return self._append_node(
@@ -700,6 +755,7 @@ class _AstBoundGraphExtractor:
             input_tensor_ids=tuple(input_tensor_ids),
             confidence=classification.confidence,
             rationale=classification.rationale,
+            attributes=_ast_call_attributes(node, func_name, classification),
         )
 
     def _append_node(
@@ -710,15 +766,20 @@ class _AstBoundGraphExtractor:
         input_tensor_ids: tuple[str, ...],
         confidence: EstimateConfidence,
         rationale: str,
+        attributes: dict[str, object] | None,
     ) -> tuple[str, ...]:
         node_id = f"op_{len(self.nodes) + 1}"
         output_tensor_id = f"tmp:{node_id}:0"
+        node_attributes = attributes or {}
         output_tensor = BoundTensor(
             tensor_id=output_tensor_id,
             name=output_tensor_id,
             role=BoundTensorRole.INTERMEDIATE,
             shape=self._default_intermediate_shape(input_tensor_ids),
-            dtype=self._default_intermediate_dtype(input_tensor_ids),
+            dtype=str(
+                node_attributes.get("target_dtype")
+                or self._default_intermediate_dtype(input_tensor_ids)
+            ),
             producer_node_id=node_id,
             source=source_expression,
         )
@@ -730,7 +791,7 @@ class _AstBoundGraphExtractor:
             source_expression=source_expression,
             input_tensor_ids=tuple(dict.fromkeys(input_tensor_ids)),
             output_tensor_ids=(output_tensor_id,),
-            attributes={},
+            attributes=node_attributes,
             confidence=confidence,
             rationale=rationale,
             conversion_status="not_converted",
@@ -804,3 +865,128 @@ def _call_name(node: ast.AST) -> str:
     if isinstance(node, ast.Name):
         return node.id
     return ""
+
+
+_MISSING = object()
+
+
+def _movement_kind_for_name(leaf_name: str) -> str | None:
+    if leaf_name in _BROADCAST_VIEW_NAMES:
+        return "broadcast_view"
+    if leaf_name in _MATERIALIZED_MOVEMENT_NAMES:
+        return "materialized"
+    if leaf_name in _LOGICAL_VIEW_NAMES:
+        return "logical_view"
+    return None
+
+
+def _axis_from_values(args: tuple[Any, ...], kwargs: dict[str, Any]) -> object:
+    for name in ("dim", "axis"):
+        if name in kwargs:
+            return _literal_value(kwargs[name])
+    for arg in args:
+        value = _literal_value(arg)
+        if value is not _MISSING:
+            return value
+    return _MISSING
+
+
+def _target_dtype_from_values(
+    leaf_name: str,
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
+) -> str | None:
+    if leaf_name in _DTYPE_METHOD_TARGETS:
+        return _DTYPE_METHOD_TARGETS[leaf_name]
+    if leaf_name not in {"to", "type"}:
+        return None
+    if "dtype" in kwargs:
+        dtype = _normalize_dtype_value(kwargs["dtype"])
+        if dtype is not None:
+            return dtype
+    for arg in args:
+        dtype = _normalize_dtype_value(arg)
+        if dtype is not None:
+            return dtype
+    return None
+
+
+def _ast_call_attributes(
+    node: ast.Call,
+    func_name: str,
+    classification: _CallClassification,
+) -> dict[str, object]:
+    attributes: dict[str, object] = {}
+    leaf_name = func_name.rsplit(".", maxsplit=1)[-1]
+    movement_kind = _movement_kind_for_name(leaf_name)
+    if movement_kind is not None:
+        attributes["movement_kind"] = movement_kind
+
+    keyword_values = {keyword.arg: keyword.value for keyword in node.keywords if keyword.arg}
+    if classification.op_family in {
+        OpFamily.REDUCTION,
+        OpFamily.NORMALIZATION,
+        OpFamily.SOFTMAX,
+    }:
+        positional_args = tuple(node.args if isinstance(node.func, ast.Attribute) else node.args[1:])
+        axis = _axis_from_values(positional_args, keyword_values)
+        if axis is not _MISSING:
+            attributes["dim"] = axis
+            attributes["axis_source"] = "attribute"
+
+    target_dtype = _target_dtype_from_values(
+        leaf_name,
+        tuple(node.args if isinstance(node.func, ast.Attribute) else node.args[1:]),
+        keyword_values,
+    )
+    if target_dtype is not None:
+        attributes["target_dtype"] = target_dtype
+    return attributes
+
+
+def _literal_value(value: Any) -> object:
+    if isinstance(value, ast.Constant) and isinstance(value.value, (int, type(None))):
+        return value.value
+    if isinstance(value, ast.UnaryOp) and isinstance(value.op, ast.USub):
+        operand = _literal_value(value.operand)
+        if isinstance(operand, int):
+            return -operand
+    if isinstance(value, ast.Tuple | ast.List):
+        elements = tuple(_literal_value(element) for element in value.elts)
+        if all(element is None or isinstance(element, int) for element in elements):
+            return elements
+        return _MISSING
+    if value is None or isinstance(value, int):
+        return value
+    if isinstance(value, tuple | list) and all(item is None or isinstance(item, int) for item in value):
+        return tuple(value)
+    return _MISSING
+
+
+def _normalize_dtype_value(value: Any) -> str | None:
+    if isinstance(value, ast.Attribute):
+        return _normalize_dtype_name(value.attr)
+    if isinstance(value, ast.Constant) and isinstance(value.value, str):
+        return _normalize_dtype_name(value.value)
+    return _normalize_dtype_name(str(value).removeprefix("torch."))
+
+
+def _normalize_dtype_name(raw: str) -> str | None:
+    name = raw.removeprefix("torch.").lower()
+    aliases = {
+        "float": DType.FLOAT32.value,
+        "float32": DType.FLOAT32.value,
+        "half": DType.FLOAT16.value,
+        "float16": DType.FLOAT16.value,
+        "bfloat16": DType.BFLOAT16.value,
+        "double": DType.FLOAT64.value,
+        "float64": DType.FLOAT64.value,
+        "bool": DType.BOOL.value,
+        "int": DType.INT32.value,
+        "int32": DType.INT32.value,
+        "long": DType.INT64.value,
+        "int64": DType.INT64.value,
+        "int16": DType.INT16.value,
+        "int8": DType.INT8.value,
+    }
+    return aliases.get(name)
