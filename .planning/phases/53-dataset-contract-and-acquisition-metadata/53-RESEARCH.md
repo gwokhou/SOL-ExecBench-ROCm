@@ -462,22 +462,29 @@ Known threat patterns:
 | A4 | Manifest checksum should exclude or null its own checksum field. | Common Pitfalls / Code Examples | If a different canonicalization is selected, tests and consumers must use that exact algorithm. |
 | A5 | Stable alphabetical category ordering is acceptable. | Manifest Schema Considerations | If consumers require semantic ordering L1, L2, Quant, FlashInfer-Bench, manifests would need a different fixed order. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should `scripts/run_dataset.py` import the new category constants in Phase 53?**
    - What we know: the runner already has the right four-category set. [VERIFIED: scripts/run_dataset.py]
    - What's unclear: changing the runner may broaden Phase 53 beyond downloader/layout metadata. [ASSUMED]
-   - Recommendation: leave runner behavior unchanged unless planner includes a tiny constant-sharing task with regression tests. [ASSUMED]
+   - Resolution: leave runner behavior unchanged in Phase 53. The runner already
+     has the correct category set, and sharing constants can be handled later if
+     it becomes necessary for inventory or closure integration. [ASSUMED]
 
 2. **Should category checksums include every file or only canonical benchmark files?**
    - What we know: unknown files must not be deleted or overwritten. [VERIFIED: .planning/phases/53-dataset-contract-and-acquisition-metadata/53-CONTEXT.md]
    - What's unclear: including unknown files detects more drift but makes manifests sensitive to local sidecars. [ASSUMED]
-   - Recommendation: checksum canonical files by default and optionally count unknown entries as diagnostics without hashing them. [ASSUMED]
+   - Resolution: checksum canonical benchmark files only
+     (`definition.json`, `reference.py`, `workload.jsonl`) by default. Unknown
+     files are preserved and may be diagnosed later, but they should not make
+     manifests sensitive to local sidecars in Phase 53. [ASSUMED]
 
 3. **Should `download_data.sh` gain arguments or stay a simple wrapper?**
    - What we know: it currently runs the SOL-ExecBench downloader and then `hf download` for FlashInfer trace. [VERIFIED: scripts/download_data.sh]
    - What's unclear: shell argument forwarding can grow messy if every downloader option is mirrored. [ASSUMED]
-   - Recommendation: update default paths and mention direct Python downloader invocation for advanced category/manifest options. [ASSUMED]
+   - Resolution: keep `download_data.sh` simple. Align its SOL-ExecBench path
+     with the downloader default and leave advanced category/manifest behavior
+     on the Python downloader CLI. [ASSUMED]
 
 ## Sources
 
