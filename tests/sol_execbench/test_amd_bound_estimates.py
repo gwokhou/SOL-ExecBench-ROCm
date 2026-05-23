@@ -190,6 +190,138 @@ def test_batched_matmul_estimate_records_batch_formula_inputs():
     assert estimate.confidence == EstimateConfidence.SUPPORTED
 
 
+def test_moe_static_route_estimate_locks_formula_inputs_and_kind():
+    from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
+
+    definition = Definition(
+        name="moe_static_route",
+        axes={
+            "tokens": {"type": "const", "value": 128},
+            "hidden": {"type": "const", "value": 256},
+            "experts": {"type": "const", "value": 8},
+        },
+        inputs={
+            "x": {"shape": ["tokens", "hidden"], "dtype": "float16"},
+            "router": {"shape": ["hidden", "experts"], "dtype": "float16"},
+            "expert_weights": {"shape": ["experts", "hidden", "hidden"], "dtype": "float16"},
+        },
+        outputs={"out": {"shape": ["tokens", "hidden"], "dtype": "float16"}},
+        reference=(
+            "import torch\n\n"
+            "def run(x, router, expert_weights):\n"
+            "    scores = router(x)\n"
+            "    gates = torch.topk(scores, k=2, dim=-1)\n"
+            "    return dispatch_and_combine(x, expert_weights, gates)\n"
+        ),
+    )
+    workload = Workload(
+        axes={},
+        inputs={
+            "x": {"type": "random"},
+            "router": {"type": "random"},
+            "expert_weights": {"type": "random"},
+        },
+        uuid="moe-static-workload",
+    )
+
+    estimates = estimate_bound_work(build_bound_graph(definition, workload))
+    estimate = next(item for item in estimates if item.formula_kind == "moe_static_route_flops")
+
+    assert estimate.formula == "2*tokens*top_k*hidden*hidden"
+    assert estimate.formula_inputs == {
+        "tokens": 128,
+        "hidden": 256,
+        "experts": 8,
+        "top_k": 2,
+    }
+    assert estimate.flops == float(2 * 128 * 2 * 256 * 256)
+    assert estimate.total_bytes > 0.0
+    assert estimate.axis_source == "tensor_shapes"
+    assert estimate.confidence == EstimateConfidence.SUPPORTED
+
+
+def test_moe_dynamic_route_estimate_uses_visible_bytes_without_route_defaults():
+    from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
+
+    definition = Definition(
+        name="moe_dynamic_route",
+        axes={
+            "tokens": {"type": "const", "value": 128},
+            "hidden": {"type": "const", "value": 256},
+            "experts": {"type": "const", "value": 8},
+        },
+        inputs={
+            "x": {"shape": ["tokens", "hidden"], "dtype": "float16"},
+            "router": {"shape": ["hidden", "experts"], "dtype": "float16"},
+            "expert_weights": {"shape": ["experts", "hidden", "hidden"], "dtype": "float16"},
+            "threshold": {"shape": None, "dtype": "float16"},
+        },
+        outputs={"out": {"shape": ["tokens", "hidden"], "dtype": "float16"}},
+        reference=(
+            "def run(x, router, expert_weights, threshold):\n"
+            "    scores = router(x)\n"
+            "    chosen = scores > threshold\n"
+            "    return dispatch_dynamic(x, expert_weights, chosen)\n"
+        ),
+    )
+    workload = Workload(
+        axes={},
+        inputs={
+            "x": {"type": "random"},
+            "router": {"type": "random"},
+            "expert_weights": {"type": "random"},
+            "threshold": {"type": "random"},
+        },
+        uuid="moe-dynamic-workload",
+    )
+
+    estimates = estimate_bound_work(build_bound_graph(definition, workload))
+    estimate = next(
+        item
+        for item in estimates
+        if item.formula_kind == "moe_dynamic_route_bytes"
+        and item.op_name == "dispatch_dynamic"
+    )
+
+    assert estimate.formula == "visible_route_bytes"
+    assert estimate.formula_inputs == {"tokens": 128, "hidden": 256, "experts": 8}
+    assert "top_k" not in estimate.formula_inputs
+    assert estimate.flops == 0.0
+    assert estimate.total_bytes > 0.0
+    assert estimate.confidence == EstimateConfidence.INEXACT
+    assert "inexact_operator:moe_dynamic_routing" in estimate.warnings
+
+
+def test_moe_taxonomy_only_estimate_remains_unsupported_without_formula_inputs():
+    from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
+
+    definition = Definition(
+        name="moe_taxonomy_only",
+        axes={
+            "tokens": {"type": "const", "value": 128},
+            "hidden": {"type": "const", "value": 256},
+        },
+        inputs={
+            "x": {"shape": ["tokens", "hidden"], "dtype": "float16"},
+            "opaque_moe": {"shape": ["hidden", "hidden"], "dtype": "float16"},
+        },
+        outputs={"out": {"shape": ["tokens", "hidden"], "dtype": "float16"}},
+        reference="def run(x, opaque_moe):\n    return opaque_moe(x)\n",
+    )
+    workload = Workload(
+        axes={},
+        inputs={"x": {"type": "random"}, "opaque_moe": {"type": "random"}},
+        uuid="moe-taxonomy-workload",
+    )
+
+    estimate = estimate_bound_work(build_bound_graph(definition, workload))[0]
+
+    assert estimate.formula_kind == "unsupported"
+    assert estimate.formula_inputs == {}
+    assert estimate.confidence == EstimateConfidence.UNSUPPORTED
+    assert estimate.warnings == ("unsupported_operator:moe_taxonomy_only",)
+
+
 def test_linear_projection_preserves_family_with_gemm_formula_and_dtype_bytes():
     node = BoundGraphNode(
         node_id="op_linear",

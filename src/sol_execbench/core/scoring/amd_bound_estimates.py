@@ -75,6 +75,8 @@ def _estimate_node(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstim
         return _convolution_estimate(graph, node)
     if node.op_family == OpFamily.EMBEDDING_POSITIONAL:
         return _embedding_positional_estimate(graph, node)
+    if node.op_family == OpFamily.MOE:
+        return _moe_estimate(graph, node)
     if node.op_family in {OpFamily.GEMM, OpFamily.LINEAR_PROJECTION}:
         return _gemm_estimate(graph, node)
     if node.op_family == OpFamily.ELEMENTWISE:
@@ -433,6 +435,139 @@ def _embedding_positional_estimate(
     if subrole in {"embedding_lookup", "gather_lookup"}:
         return _lookup_memory_estimate(graph, node, subrole=subrole)
     return _visible_memory_estimate(graph, node, subrole=subrole or "memory_bound")
+
+
+def _moe_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstimate:
+    if node.confidence == EstimateConfidence.UNSUPPORTED or node.attributes.get("taxonomy_only"):
+        return _unsupported_estimate(
+            node,
+            rationale=node.rationale,
+            warnings=("unsupported_operator:moe_taxonomy_only",),
+        )
+    subrole = str(node.attributes.get("subrole") or "")
+    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(graph, node)
+    read_bytes = _sum_tensor_bytes(input_tensors, "read", warnings, rationale_parts)
+    write_bytes = _sum_tensor_bytes(output_tensors, "write", warnings, rationale_parts)
+    total_bytes = read_bytes + write_bytes
+    if subrole != "dispatch":
+        return OperatorWorkEstimate(
+            node_id=node.node_id,
+            op_family=OpFamily.MOE,
+            op_name=node.op_name,
+            formula_kind="moe_dynamic_route_bytes",
+            formula="visible_route_bytes",
+            formula_inputs=_moe_visible_formula_inputs(node),
+            flops=0.0,
+            read_bytes=read_bytes,
+            write_bytes=write_bytes,
+            intermediate_bytes=0.0,
+            movement_bytes=0.0,
+            total_bytes=total_bytes,
+            confidence=EstimateConfidence.INEXACT,
+            rationale=_join_rationale(
+                f"MoE {subrole or 'primitive'} has visible routing bytes only",
+                rationale_parts,
+            ),
+            movement_kind="moe_route",
+            warnings=tuple(dict.fromkeys(warnings)),
+        )
+
+    formula_inputs = _moe_visible_formula_inputs(node)
+    missing = _moe_missing_static_route_inputs(formula_inputs)
+    missing.extend(
+        item
+        for item in node.attributes.get("missing_route_metadata", ())
+        if isinstance(item, str)
+    )
+    if missing:
+        warnings.append("inexact_operator:moe_dynamic_routing")
+        warnings.extend(_moe_warning_for_missing(item) for item in missing)
+        return OperatorWorkEstimate(
+            node_id=node.node_id,
+            op_family=OpFamily.MOE,
+            op_name=node.op_name,
+            formula_kind="moe_dynamic_route_bytes",
+            formula="visible_route_bytes",
+            formula_inputs=formula_inputs,
+            flops=0.0,
+            read_bytes=read_bytes,
+            write_bytes=write_bytes,
+            intermediate_bytes=0.0,
+            movement_bytes=total_bytes,
+            total_bytes=total_bytes,
+            confidence=EstimateConfidence.INEXACT,
+            rationale=_join_rationale(
+                "MoE route is visible but static routing cardinality is incomplete",
+                rationale_parts,
+            ),
+            movement_kind="moe_dynamic_route",
+            warnings=tuple(dict.fromkeys(warnings)),
+        )
+
+    tokens = int(formula_inputs["tokens"])
+    hidden = int(formula_inputs["hidden"])
+    top_k = int(formula_inputs["top_k"])
+    flops = float(2 * tokens * top_k * hidden * hidden)
+    return OperatorWorkEstimate(
+        node_id=node.node_id,
+        op_family=OpFamily.MOE,
+        op_name=node.op_name,
+        formula_kind="moe_static_route_flops",
+        formula="2*tokens*top_k*hidden*hidden",
+        formula_inputs=formula_inputs,
+        flops=flops,
+        read_bytes=read_bytes,
+        write_bytes=write_bytes,
+        intermediate_bytes=0.0,
+        movement_bytes=0.0,
+        total_bytes=total_bytes,
+        confidence=EstimateConfidence.SUPPORTED if not warnings else EstimateConfidence.INEXACT,
+        rationale=_join_rationale(
+            "MoE static top-k route FLOPs estimated from source-backed route metadata",
+            rationale_parts,
+        ),
+        axis_source="tensor_shapes",
+        movement_kind="moe_static_route",
+        warnings=tuple(dict.fromkeys(warnings)),
+    )
+
+
+def _moe_visible_formula_inputs(node: BoundGraphNode) -> dict[str, object]:
+    formula_inputs: dict[str, object] = {}
+    mapping = {
+        "token_count": "tokens",
+        "hidden_size": "hidden",
+        "expert_count": "experts",
+        "route_top_k": "top_k",
+    }
+    for attribute_name, formula_name in mapping.items():
+        value = node.attributes.get(attribute_name)
+        if isinstance(value, int):
+            formula_inputs[formula_name] = int(value)
+    return formula_inputs
+
+
+def _moe_missing_static_route_inputs(formula_inputs: dict[str, object]) -> list[str]:
+    missing = []
+    if "tokens" not in formula_inputs:
+        missing.append("shape:tokens")
+    if "hidden" not in formula_inputs:
+        missing.append("shape:hidden")
+    if "experts" not in formula_inputs:
+        missing.append("shape:experts")
+    if "top_k" not in formula_inputs:
+        missing.append("route:top_k")
+    if "top_k" not in formula_inputs or "experts" not in formula_inputs:
+        missing.append("route:static_cardinality")
+    return list(dict.fromkeys(missing))
+
+
+def _moe_warning_for_missing(missing: str) -> str:
+    if missing == "route:top_k":
+        return "inexact_operator:moe_missing_top_k"
+    if missing == "route:static_cardinality":
+        return "inexact_operator:moe_missing_static_cardinality"
+    return "inexact_operator:moe_dynamic_routing"
 
 
 def _lookup_memory_estimate(
