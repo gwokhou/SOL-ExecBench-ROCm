@@ -62,6 +62,10 @@ from sol_execbench.core.scoring.amd_sol import (
     default_amd_hardware_models,
 )
 from sol_execbench.core.scoring.amd_sol_v2 import build_amd_sol_bound_v2_artifact
+from sol_execbench.core.scoring.solar_derivation import (
+    build_solar_derivation_evidence,
+    solar_derivation_from_dict,
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -466,6 +470,7 @@ def build_amd_score_reports_for_problem(
     trace_ref: str,
     baseline_artifact: ScoringBaselineArtifact | None = None,
     sol_bound_artifact_dir: Path | None = None,
+    solar_derivation_dir: Path | None = None,
 ) -> list[AmdNativeScore]:
     """Build derived AMD-native scores for one dataset-run problem."""
     definition = Definition(**definition_payload)
@@ -495,6 +500,29 @@ def build_amd_score_reports_for_problem(
             if workload is not None
             else None
         )
+        solar_derivation = None
+        derived_evidence_refs = None
+        solar_derivation_ref = (
+            f"derived:{definition.name}:{trace.workload.uuid}:solar_derivation"
+        )
+        if workload is not None and solar_derivation_dir is not None:
+            solar_derivation_dir.mkdir(parents=True, exist_ok=True)
+            sidecar_path = (
+                solar_derivation_dir
+                / f"{definition.name}.{trace.workload.uuid}.solar-derivation.json"
+            )
+            generated = build_solar_derivation_evidence(definition, workload)
+            sidecar_path.write_text(json.dumps(generated.to_dict(), indent=2))
+            solar_derivation = solar_derivation_from_dict(
+                json.loads(sidecar_path.read_text())
+            )
+            solar_derivation_ref = str(sidecar_path)
+            derived_evidence_refs = {
+                "formula": f"{solar_derivation_ref}#groups.formula_evidence",
+                "hardware_model": f"default_amd_hardware_models.{hardware_model_key}",
+                "coverage": f"{solar_derivation_ref}#coverage_summary",
+                "score_eligibility": f"{solar_derivation_ref}#aggregate_status",
+            }
         sol_bound_ref = f"derived:{definition.name}:{trace.workload.uuid}:amd_sol_bound_v2"
         if artifact is not None and sol_bound_artifact_dir is not None:
             sol_bound_artifact_dir.mkdir(parents=True, exist_ok=True)
@@ -520,9 +548,42 @@ def build_amd_score_reports_for_problem(
                 ),
                 baseline_artifact=baseline_artifact,
                 hardware_model_ref=f"default_amd_hardware_models.{hardware_model_key}",
+                solar_derivation=solar_derivation,
+                derived_evidence_refs=derived_evidence_refs,
             )
         )
     return scores
+
+
+def _extend_derived_reports_for_problem(
+    *,
+    amd_scores: list[AmdNativeScore],
+    definition_path: Path,
+    workload_path: Path,
+    traces_path: Path,
+    traces_payload: list[dict],
+    output_dir: Path,
+    baseline_artifact: ScoringBaselineArtifact | None,
+    sol_bound_artifact_dir: Path | None,
+    solar_derivation_dir: Path | None,
+) -> None:
+    """Append requested derived reports and materialize requested sidecars."""
+    trace_ref = (
+        str(traces_path.relative_to(output_dir))
+        if traces_path.is_relative_to(output_dir)
+        else str(traces_path)
+    )
+    amd_scores.extend(
+        build_amd_score_reports_for_problem(
+            definition_payload=json.loads(definition_path.read_text()),
+            workload_path=workload_path,
+            traces_payload=traces_payload,
+            trace_ref=trace_ref,
+            baseline_artifact=baseline_artifact,
+            sol_bound_artifact_dir=sol_bound_artifact_dir,
+            solar_derivation_dir=solar_derivation_dir,
+        )
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -642,6 +703,15 @@ def main():
         ),
     )
     ap.add_argument(
+        "--solar-derivation",
+        type=Path,
+        default=None,
+        help=(
+            "Optional directory for generated SOLAR derivation sidecars. "
+            "Sidecars are built from definition and workload inputs only."
+        ),
+    )
+    ap.add_argument(
         "--timing-evidence-dir",
         type=Path,
         default=None,
@@ -739,6 +809,22 @@ def main():
             traces = json.loads(traces_path.read_text())
             summary = inspect_traces(traces, f"{category}/{problem_name}")
             if summary["failed"] == 0:
+                if (
+                    args.amd_score_report is not None
+                    or args.amd_sol_bound_dir is not None
+                    or args.solar_derivation is not None
+                ):
+                    _extend_derived_reports_for_problem(
+                        amd_scores=amd_scores,
+                        definition_path=definition_path,
+                        workload_path=workload_path,
+                        traces_path=traces_path,
+                        traces_payload=traces,
+                        output_dir=output_dir,
+                        baseline_artifact=scoring_baseline,
+                        sol_bound_artifact_dir=args.amd_sol_bound_dir,
+                        solar_derivation_dir=args.solar_derivation,
+                    )
                 print("  Skipping (already passed). Use --rerun to re-evaluate.")
                 summaries.append(summary)
                 continue
@@ -810,16 +896,21 @@ def main():
         traces_path = problem_output_dir / "traces.json"
         traces_path.write_text(json.dumps(traces, indent=2))
 
-        if args.amd_score_report is not None:
-            amd_scores.extend(
-                build_amd_score_reports_for_problem(
-                    definition_payload=definition,
-                    workload_path=workload_path,
-                    traces_payload=traces,
-                    trace_ref=str(traces_path.relative_to(output_dir)),
-                    baseline_artifact=scoring_baseline,
-                    sol_bound_artifact_dir=args.amd_sol_bound_dir,
-                )
+        if (
+            args.amd_score_report is not None
+            or args.amd_sol_bound_dir is not None
+            or args.solar_derivation is not None
+        ):
+            _extend_derived_reports_for_problem(
+                amd_scores=amd_scores,
+                definition_path=definition_path,
+                workload_path=workload_path,
+                traces_path=traces_path,
+                traces_payload=traces,
+                output_dir=output_dir,
+                baseline_artifact=scoring_baseline,
+                sol_bound_artifact_dir=args.amd_sol_bound_dir,
+                solar_derivation_dir=args.solar_derivation,
             )
 
         if args.timing_evidence_dir is not None:

@@ -71,6 +71,7 @@ class AmdNativeScore:
     warnings: tuple[str, ...]
     baseline_source: str
     evidence_refs: dict[str, str] = field(default_factory=dict)
+    derived_evidence_refs: dict[str, str] = field(default_factory=dict)
 
     @property
     def supported(self) -> bool:
@@ -90,6 +91,7 @@ class AmdNativeScore:
             "baseline_source": self.baseline_source,
             "supported": self.supported,
             "evidence_refs": dict(self.evidence_refs),
+            "derived_evidence_refs": dict(self.derived_evidence_refs),
         }
 
 
@@ -165,6 +167,7 @@ def score_amd_native_workload(
     baseline_source: str = "scoring_baseline",
     hardware_model_ref: str | None = None,
     solar_derivation: SolarScoreGuard | None = None,
+    derived_evidence_refs: dict[str, str] | None = None,
 ) -> AmdNativeScore:
     """Build a guarded AMD-native score for one workload."""
     sol_bound_ms = _artifact_sol_bound_ms(artifact)
@@ -213,6 +216,7 @@ def score_amd_native_workload(
         warnings=tuple(warnings),
         baseline_source=baseline_source,
         evidence_refs=evidence_refs,
+        derived_evidence_refs=dict(derived_evidence_refs or {}),
     )
 
 
@@ -241,6 +245,7 @@ def score_amd_native_trace_workload(
     baseline_artifact: ScoringBaselineArtifact | None = None,
     hardware_model_ref: str | None = None,
     solar_derivation: SolarScoreGuard | None = None,
+    derived_evidence_refs: dict[str, str] | None = None,
 ) -> AmdNativeScore:
     """Build a guarded AMD-native score from a canonical trace and SOL artifact."""
     measured_latency_ms = None
@@ -289,6 +294,7 @@ def score_amd_native_trace_workload(
                 baseline_ref=baseline_ref,
                 hardware_model_ref=hardware_model_ref,
             ),
+            derived_evidence_refs=dict(derived_evidence_refs or {}),
         )
 
     return score_amd_native_workload(
@@ -302,6 +308,7 @@ def score_amd_native_trace_workload(
         baseline_source=baseline_source,
         hardware_model_ref=hardware_model_ref,
         solar_derivation=solar_derivation,
+        derived_evidence_refs=derived_evidence_refs,
     )
 
 
@@ -310,12 +317,14 @@ def build_amd_native_suite_report_from_traces(
     artifacts_by_workload_uuid: dict[str, AmdSolBoundArtifact | AmdSolBoundV2Artifact],
     *,
     evidence_refs_by_workload_uuid: dict[str, dict[str, str]] | None = None,
+    derived_evidence_refs_by_workload_uuid: dict[str, dict[str, str]] | None = None,
     solar_derivations_by_workload_uuid: dict[str, SolarScoreGuard] | None = None,
     baseline_artifact: ScoringBaselineArtifact | None = None,
     baseline_summary: dict[str, int] | None = None,
 ) -> AmdNativeSuiteReport:
     """Build a suite report from canonical traces and derived SOL artifacts."""
     evidence_refs_by_workload_uuid = evidence_refs_by_workload_uuid or {}
+    derived_evidence_refs_by_workload_uuid = derived_evidence_refs_by_workload_uuid or {}
     solar_derivations_by_workload_uuid = solar_derivations_by_workload_uuid or {}
     scores = []
     for trace in traces:
@@ -331,6 +340,9 @@ def build_amd_native_suite_report_from_traces(
                 baseline_artifact=baseline_artifact,
                 hardware_model_ref=refs.get("hardware_model"),
                 solar_derivation=solar_derivations_by_workload_uuid.get(
+                    trace.workload.uuid
+                ),
+                derived_evidence_refs=derived_evidence_refs_by_workload_uuid.get(
                     trace.workload.uuid
                 ),
             )
