@@ -18,6 +18,8 @@ from sol_execbench.core.scoring.amd_bound_graph import (
     BoundGraph,
     BoundGraphNode,
     BoundTensor,
+    BoundTensorRole,
+    OpFamily,
     build_bound_graph,
 )
 from sol_execbench.core.scoring.amd_hardware_models import EstimateConfidence
@@ -133,6 +135,17 @@ class SolarSemanticGroupEvidence:
 
 
 @dataclass(frozen=True)
+class SolarConfidenceClassification:
+    """Pure confidence/status decision for one SOLAR semantic group."""
+
+    confidence: EstimateConfidence
+    status: str
+    missing_evidence: tuple[str, ...]
+    warning_prefixes: tuple[str, ...]
+    rationale: str
+
+
+@dataclass(frozen=True)
 class SolarDerivationEvidence:
     """Stable internal SOLAR derivation evidence sidecar."""
 
@@ -180,9 +193,12 @@ def derive_solar_derivation_evidence(
         _tensor_evidence(definition, workload, graph, tensor)
         for _, tensor in sorted(graph.tensors.items())
     )
-    groups = tuple(
-        _group_evidence(estimate, nodes_by_id.get(estimate.node_id))
-        for estimate in estimates
+    tensor_evidence_by_id = {tensor.tensor_id: tensor for tensor in tensors}
+    groups = _semantic_group_evidence(
+        graph,
+        estimates,
+        nodes_by_id=nodes_by_id,
+        tensor_evidence_by_id=tensor_evidence_by_id,
     )
     warnings = _derivation_warnings(graph, estimates)
     return SolarDerivationEvidence(
@@ -192,6 +208,89 @@ def derive_solar_derivation_evidence(
         tensors=tensors,
         warnings=warnings,
         source_boundary=_default_source_boundary(),
+    )
+
+
+def classify_solar_confidence(
+    *,
+    family: OpFamily | str,
+    nodes: tuple[BoundGraphNode, ...],
+    tensors: tuple[BoundTensor | SolarTensorEvidence, ...],
+    estimates: tuple[OperatorWorkEstimate, ...],
+    subrole_names: tuple[str, ...],
+) -> SolarConfidenceClassification:
+    """Classify semantic group evidence without external side effects."""
+    family_value = family.value if isinstance(family, OpFamily) else str(family)
+    missing: list[str] = []
+    warning_prefixes: list[str] = []
+
+    if family_value == OpFamily.UNSUPPORTED.value:
+        missing.append("family:recognized")
+    if not nodes:
+        missing.append("node:visible")
+    if not subrole_names:
+        missing.append("subroles:core")
+    if not tensors:
+        missing.append("tensors:related")
+    for tensor in sorted(tensors, key=_tensor_id):
+        tensor_id = _tensor_id(tensor)
+        if _tensor_shape(tensor) is None:
+            missing.append(f"shape:{tensor_id}")
+        if not _tensor_dtype(tensor) or _tensor_dtype(tensor) == "unknown":
+            missing.append(f"dtype:{tensor_id}")
+        if not _tensor_has_semantic_axes(tensor):
+            missing.append(f"semantic_axes:{tensor_id}")
+        if not _tensor_has_source(tensor):
+            missing.append(f"source:{tensor_id}")
+
+    if not estimates:
+        missing.append("estimate:operator_work")
+    for estimate in sorted(estimates, key=lambda item: item.node_id):
+        if estimate.confidence == EstimateConfidence.UNSUPPORTED:
+            missing.append(f"estimate:{estimate.node_id}")
+        if not estimate.formula_inputs:
+            missing.append(f"formula_inputs:{estimate.node_id}")
+        if not estimate.formula or estimate.formula == "0":
+            missing.append(f"formula:{estimate.node_id}")
+        if estimate.total_bytes <= 0.0:
+            missing.append(f"bytes:{estimate.node_id}")
+        if estimate.axis_source is None:
+            missing.append(f"axis:{estimate.node_id}")
+        warning_prefixes.extend(estimate.warnings)
+
+    confidence = _worst_estimate_confidence(estimates)
+    if family_value == OpFamily.UNSUPPORTED.value or not nodes or not subrole_names:
+        confidence = EstimateConfidence.UNSUPPORTED
+    elif missing:
+        confidence = _worse_confidence(confidence, EstimateConfidence.INEXACT)
+
+    status = _status_for_confidence(confidence)
+    if confidence == EstimateConfidence.INEXACT:
+        warning_prefixes.append(f"inexact_operator:{family_value}")
+        warning_prefixes.append("aggregate_degraded:incomplete semantic evidence")
+        rationale = (
+            f"{family_value} semantics are visible but metadata is incomplete: "
+            f"{', '.join(_unique_sorted(missing))}"
+        )
+    elif confidence == EstimateConfidence.UNSUPPORTED:
+        warning_prefixes.append(f"unsupported_operator:{family_value}")
+        warning_prefixes.append("aggregate_unscored:unsupported semantic evidence")
+        rationale = (
+            f"{family_value} evidence is unsupported for scoring: "
+            f"{', '.join(_unique_sorted(missing))}"
+        )
+    else:
+        rationale = (
+            f"{family_value} evidence has visible family, core subroles, tensor "
+            "metadata, formula inputs, byte evidence, axis provenance, and source provenance"
+        )
+
+    return SolarConfidenceClassification(
+        confidence=confidence,
+        status=status,
+        missing_evidence=_unique_sorted(missing),
+        warning_prefixes=_unique_sorted(warning_prefixes),
+        rationale=rationale,
     )
 
 
@@ -416,39 +515,203 @@ def _tensor_evidence(
     )
 
 
-def _group_evidence(
-    estimate: OperatorWorkEstimate,
-    node: BoundGraphNode | None,
-) -> SolarSemanticGroupEvidence:
-    node_ids = (estimate.node_id,)
-    tensor_ids = _node_tensor_ids(node)
-    missing_evidence = tuple(_missing_evidence_for_estimate(estimate))
-    source = SolarEvidenceSource(
-        kind="estimate",
-        detail=f"{estimate.formula_kind}:{estimate.formula}",
-        node_id=estimate.node_id,
+def _semantic_group_evidence(
+    graph: BoundGraph,
+    estimates: tuple[OperatorWorkEstimate, ...],
+    *,
+    nodes_by_id: dict[str, BoundGraphNode],
+    tensor_evidence_by_id: dict[str, SolarTensorEvidence],
+) -> tuple[SolarSemanticGroupEvidence, ...]:
+    estimates_by_family: dict[str, list[OperatorWorkEstimate]] = {}
+    for estimate in estimates:
+        estimates_by_family.setdefault(estimate.op_family.value, []).append(estimate)
+
+    groups: list[SolarSemanticGroupEvidence] = []
+    for group_index, (family, family_estimates) in enumerate(
+        sorted(
+            estimates_by_family.items(),
+            key=lambda item: _first_estimate_node_id(item[1]),
+        ),
+        start=1,
+    ):
+        ordered_estimates = tuple(sorted(family_estimates, key=lambda item: item.node_id))
+        nodes = tuple(
+            nodes_by_id[estimate.node_id]
+            for estimate in ordered_estimates
+            if estimate.node_id in nodes_by_id
+        )
+        node_ids = tuple(node.node_id for node in nodes)
+        related_tensor_ids = _group_tensor_ids(nodes)
+        related_tensors = tuple(
+            tensor_evidence_by_id[tensor_id]
+            for tensor_id in related_tensor_ids
+            if tensor_id in tensor_evidence_by_id
+        )
+        subroles = _subroles_for_group(family, nodes, tensor_evidence_by_id)
+        classification = classify_solar_confidence(
+            family=family,
+            nodes=nodes,
+            tensors=related_tensors,
+            estimates=ordered_estimates,
+            subrole_names=tuple(subrole.name for subrole in subroles),
+        )
+        source = _source_for_group(family, ordered_estimates, nodes)
+        groups.append(
+            SolarSemanticGroupEvidence(
+                family=family,
+                group_id=f"group:{family}:{group_index}",
+                node_ids=node_ids,
+                subroles=subroles,
+                confidence=classification.confidence,
+                status=classification.status,
+                missing_evidence=classification.missing_evidence,
+                warning_prefixes=classification.warning_prefixes,
+                source=source,
+                rationale=classification.rationale,
+            )
+        )
+    return tuple(groups)
+
+
+def _first_estimate_node_id(estimates: list[OperatorWorkEstimate]) -> str:
+    return min(estimate.node_id for estimate in estimates)
+
+
+def _group_tensor_ids(nodes: tuple[BoundGraphNode, ...]) -> tuple[str, ...]:
+    tensor_ids: list[str] = []
+    for node in sorted(nodes, key=lambda item: item.node_id):
+        tensor_ids.extend(node.input_tensor_ids)
+        tensor_ids.extend(node.output_tensor_ids)
+    return tuple(dict.fromkeys(tensor_ids))
+
+
+def _source_for_group(
+    family: str,
+    estimates: tuple[OperatorWorkEstimate, ...],
+    nodes: tuple[BoundGraphNode, ...],
+) -> SolarEvidenceSource:
+    if estimates:
+        first = estimates[0]
+        return SolarEvidenceSource(
+            kind="estimate",
+            detail=f"{first.formula_kind}:{first.formula}",
+            node_id=first.node_id,
+            tensor_id=None,
+        )
+    if nodes:
+        first_node = nodes[0]
+        return SolarEvidenceSource(
+            kind=_source_kind_for_node(first_node),
+            detail=first_node.source_expression,
+            node_id=first_node.node_id,
+            tensor_id=None,
+        )
+    return SolarEvidenceSource(
+        kind="ast",
+        detail=f"unsupported group:{family}",
+        node_id=None,
         tensor_id=None,
     )
-    subrole = SolarSubroleEvidence(
-        name=estimate.formula_kind,
-        node_ids=node_ids,
-        tensor_ids=tensor_ids,
-        source=source,
-        confidence=estimate.confidence,
-        rationale=estimate.rationale,
-        missing_evidence=missing_evidence,
+
+
+def _subroles_for_group(
+    family: str,
+    nodes: tuple[BoundGraphNode, ...],
+    tensor_evidence_by_id: dict[str, SolarTensorEvidence],
+) -> tuple[SolarSubroleEvidence, ...]:
+    if family in {OpFamily.GEMM.value, OpFamily.LINEAR_PROJECTION.value}:
+        return _linear_subroles(nodes, tensor_evidence_by_id)
+    if family in {
+        OpFamily.SOFTMAX.value,
+        OpFamily.DATA_MOVEMENT.value,
+        OpFamily.DTYPE_CONVERSION.value,
+        OpFamily.REDUCTION.value,
+        OpFamily.ELEMENTWISE.value,
+        OpFamily.MLP_ACTIVATION.value,
+        OpFamily.NORMALIZATION.value,
+    }:
+        return _op_name_subroles(nodes, tensor_evidence_by_id)
+    return ()
+
+
+def _linear_subroles(
+    nodes: tuple[BoundGraphNode, ...],
+    tensor_evidence_by_id: dict[str, SolarTensorEvidence],
+) -> tuple[SolarSubroleEvidence, ...]:
+    subroles: list[SolarSubroleEvidence] = []
+    for node in sorted(nodes, key=lambda item: item.node_id):
+        if node.input_tensor_ids:
+            subroles.append(
+                _subrole_from_tensor_ids(
+                    name="input",
+                    node=node,
+                    tensor_ids=(node.input_tensor_ids[0],),
+                    tensor_evidence_by_id=tensor_evidence_by_id,
+                )
+            )
+        if len(node.input_tensor_ids) > 1:
+            subroles.append(
+                _subrole_from_tensor_ids(
+                    name="weight_or_rhs",
+                    node=node,
+                    tensor_ids=(node.input_tensor_ids[1],),
+                    tensor_evidence_by_id=tensor_evidence_by_id,
+                )
+            )
+        if node.output_tensor_ids:
+            subroles.append(
+                _subrole_from_tensor_ids(
+                    name="output",
+                    node=node,
+                    tensor_ids=node.output_tensor_ids,
+                    tensor_evidence_by_id=tensor_evidence_by_id,
+                )
+            )
+    return tuple(sorted(subroles, key=lambda item: item.name))
+
+
+def _op_name_subroles(
+    nodes: tuple[BoundGraphNode, ...],
+    tensor_evidence_by_id: dict[str, SolarTensorEvidence],
+) -> tuple[SolarSubroleEvidence, ...]:
+    subroles = [
+        _subrole_from_tensor_ids(
+            name=node.op_name or node.op_family.value,
+            node=node,
+            tensor_ids=_node_tensor_ids(node),
+            tensor_evidence_by_id=tensor_evidence_by_id,
+        )
+        for node in sorted(nodes, key=lambda item: item.node_id)
+    ]
+    return tuple(sorted(subroles, key=lambda item: item.name))
+
+
+def _subrole_from_tensor_ids(
+    *,
+    name: str,
+    node: BoundGraphNode,
+    tensor_ids: tuple[str, ...],
+    tensor_evidence_by_id: dict[str, SolarTensorEvidence],
+) -> SolarSubroleEvidence:
+    missing = tuple(
+        evidence
+        for tensor_id in tensor_ids
+        if tensor_id in tensor_evidence_by_id
+        for evidence in tensor_evidence_by_id[tensor_id].missing_evidence
     )
-    return SolarSemanticGroupEvidence(
-        family=estimate.op_family.value,
-        group_id=f"{estimate.op_family.value}:{estimate.node_id}",
-        node_ids=node_ids,
-        subroles=(subrole,),
-        confidence=estimate.confidence,
-        status=_status_for_confidence(estimate.confidence),
-        missing_evidence=missing_evidence,
-        warning_prefixes=tuple(estimate.warnings),
-        source=source,
-        rationale=estimate.rationale,
+    return SolarSubroleEvidence(
+        name=name,
+        node_ids=(node.node_id,),
+        tensor_ids=tuple(tensor_ids),
+        source=SolarEvidenceSource(
+            kind=_source_kind_for_node(node),
+            detail=node.source_expression,
+            node_id=node.node_id,
+            tensor_id=tensor_ids[0] if tensor_ids else None,
+        ),
+        confidence=node.confidence,
+        rationale=node.rationale,
+        missing_evidence=_unique_sorted(missing),
     )
 
 
@@ -538,14 +801,32 @@ def _node_tensor_ids(node: BoundGraphNode | None) -> tuple[str, ...]:
     return tuple(dict.fromkeys((*node.input_tensor_ids, *node.output_tensor_ids)))
 
 
-def _missing_evidence_for_estimate(estimate: OperatorWorkEstimate) -> list[str]:
-    missing = []
-    if estimate.confidence == EstimateConfidence.UNSUPPORTED:
-        missing.append(f"estimate:{estimate.node_id}")
-    for warning in estimate.warnings:
-        if "missing" in warning:
-            missing.append(warning)
-    return list(dict.fromkeys(missing))
+def _tensor_id(tensor: BoundTensor | SolarTensorEvidence) -> str:
+    return tensor.tensor_id
+
+
+def _tensor_shape(tensor: BoundTensor | SolarTensorEvidence) -> tuple[int, ...] | None:
+    return tensor.shape
+
+
+def _tensor_dtype(tensor: BoundTensor | SolarTensorEvidence) -> str:
+    return tensor.dtype
+
+
+def _tensor_has_source(tensor: BoundTensor | SolarTensorEvidence) -> bool:
+    if isinstance(tensor, SolarTensorEvidence):
+        return bool(tensor.source.kind and tensor.source.detail)
+    return bool(tensor.source)
+
+
+def _tensor_has_semantic_axes(tensor: BoundTensor | SolarTensorEvidence) -> bool:
+    if tensor.shape is None:
+        return False
+    if isinstance(tensor, SolarTensorEvidence):
+        return bool(tensor.semantic_axes)
+    if tensor.role in {BoundTensorRole.INPUT, BoundTensorRole.OUTPUT}:
+        return tensor.source.startswith(("definition.", "workload."))
+    return False
 
 
 def _derivation_warnings(
@@ -558,7 +839,17 @@ def _derivation_warnings(
             f"estimate_warning:{estimate.node_id}:{warning}"
             for warning in estimate.warnings
         )
-    return tuple(dict.fromkeys(warnings))
+        if estimate.confidence == EstimateConfidence.INEXACT:
+            warnings.append(f"inexact_operator:{estimate.node_id}:{estimate.op_family.value}")
+        elif estimate.confidence == EstimateConfidence.UNSUPPORTED:
+            warnings.append(
+                f"unsupported_operator:{estimate.node_id}:{estimate.op_family.value}"
+            )
+    if any(estimate.confidence == EstimateConfidence.UNSUPPORTED for estimate in estimates):
+        warnings.append("aggregate_unscored:unsupported semantic evidence")
+    elif any(estimate.confidence == EstimateConfidence.INEXACT for estimate in estimates):
+        warnings.append("aggregate_degraded:incomplete semantic evidence")
+    return _unique_sorted(warnings)
 
 
 def _status_for_confidence(confidence: EstimateConfidence) -> str:
@@ -567,6 +858,33 @@ def _status_for_confidence(confidence: EstimateConfidence) -> str:
     if confidence == EstimateConfidence.INEXACT:
         return "degraded"
     return "unscored"
+
+
+def _worst_estimate_confidence(
+    estimates: tuple[OperatorWorkEstimate, ...],
+) -> EstimateConfidence:
+    worst = EstimateConfidence.SUPPORTED
+    if not estimates:
+        return EstimateConfidence.UNSUPPORTED
+    for estimate in estimates:
+        worst = _worse_confidence(worst, estimate.confidence)
+    return worst
+
+
+def _worse_confidence(
+    left: EstimateConfidence,
+    right: EstimateConfidence,
+) -> EstimateConfidence:
+    ranks = {
+        EstimateConfidence.SUPPORTED: 0,
+        EstimateConfidence.INEXACT: 1,
+        EstimateConfidence.UNSUPPORTED: 2,
+    }
+    return left if ranks[left] >= ranks[right] else right
+
+
+def _unique_sorted(items: tuple[str, ...] | list[str]) -> tuple[str, ...]:
+    return tuple(sorted(dict.fromkeys(items)))
 
 
 def _default_source_boundary() -> dict[str, bool]:

@@ -367,7 +367,8 @@ def test_derive_solar_evidence_records_tensor_shape_dtype_axis_and_sources():
     assert tensor["source"]["kind"] == "definition"
     assert tensor["source"]["tensor_id"] == "input:a"
     assert payload["groups"][0]["node_ids"] == ["op_1"]
-    assert payload["groups"][0]["subroles"][0]["source"]["kind"] == "estimate"
+    assert payload["groups"][0]["source"]["kind"] == "estimate"
+    assert payload["groups"][0]["subroles"][0]["source"]["kind"] == "ast"
     assert "graph_warning:graph_warning_demo" in payload["warnings"]
     assert "estimate_warning:op_1:estimate_warning_demo" in payload["warnings"]
 
@@ -533,8 +534,8 @@ def test_confidence_rules_map_complete_evidence_to_supported_scored():
     assert group.subroles
     assert [subrole.name for subrole in group.subroles] == [
         "input",
-        "weight_or_rhs",
         "output",
+        "weight_or_rhs",
     ]
 
 
