@@ -17,6 +17,10 @@ from sol_execbench.core.scoring.amd_hardware_models import (
     HardwareValidationStatus as HardwareValidationStatus,
     default_amd_hardware_models as load_default_amd_hardware_models,
 )
+from sol_execbench.core.scoring.amd_bound_estimates import (
+    OperatorWorkEstimate,
+    estimate_bound_work,
+)
 from sol_execbench.core.scoring.amd_bound_graph import BoundGraphNode, OpFamily, build_bound_graph
 
 
@@ -171,6 +175,29 @@ def estimate_work(
     graph_nodes: tuple[GraphNode, ...],
 ) -> tuple[WorkEstimate, ...]:
     """Estimate FLOPs and bytes for graph nodes."""
+    try:
+        bound_graph = build_bound_graph(definition, workload)
+        return tuple(
+            _work_estimate_from_rich_estimate(estimate)
+            for estimate in estimate_bound_work(bound_graph)
+        )
+    except Exception as exc:
+        return _legacy_estimate_work(
+            definition,
+            workload,
+            graph_nodes,
+            fallback_reason=f"rich bound estimate failed: {exc}",
+        )
+
+
+def _legacy_estimate_work(
+    definition: Definition,
+    workload: Workload,
+    graph_nodes: tuple[GraphNode, ...],
+    *,
+    fallback_reason: str,
+) -> tuple[WorkEstimate, ...]:
+    """Legacy whole-definition estimator retained as explicit exceptional fallback."""
     axes = definition.get_resolved_axes_values(workload.axes)
     input_shapes = definition.get_input_shapes(workload.axes)
     output_shapes = definition.get_output_shapes(workload.axes)
@@ -188,7 +215,10 @@ def estimate_work(
                     flops=float(2 * output_numel * reduction_dim),
                     bytes_accessed=float(tensor_bytes),
                     confidence=EstimateConfidence.SUPPORTED,
-                    rationale="matmul FLOPs estimated as 2 * output elements * reduction dimension",
+                    rationale=(
+                        "legacy fallback: matmul FLOPs estimated as 2 * output "
+                        f"elements * reduction dimension ({fallback_reason})"
+                    ),
                 )
             )
         elif node.op_type in {"elementwise", "activation"} and output_numel:
@@ -198,7 +228,10 @@ def estimate_work(
                     flops=float(output_numel),
                     bytes_accessed=float(tensor_bytes),
                     confidence=EstimateConfidence.INEXACT,
-                    rationale=f"{node.op_type} work estimated as one operation per output element",
+                    rationale=(
+                        f"legacy fallback: {node.op_type} work estimated as one "
+                        f"operation per output element ({fallback_reason})"
+                    ),
                 )
             )
         elif node.op_type == "reduction" and (input_numel or output_numel):
@@ -208,7 +241,10 @@ def estimate_work(
                     flops=float(max(input_numel, output_numel)),
                     bytes_accessed=float(tensor_bytes),
                     confidence=EstimateConfidence.INEXACT,
-                    rationale="reduction work conservatively estimated from input elements",
+                    rationale=(
+                        "legacy fallback: reduction work conservatively estimated "
+                        f"from input elements ({fallback_reason})"
+                    ),
                 )
             )
         elif node.op_type == "normalization" and (input_numel or output_numel):
@@ -219,8 +255,9 @@ def estimate_work(
                     bytes_accessed=float(tensor_bytes),
                     confidence=EstimateConfidence.INEXACT,
                     rationale=(
-                        "normalization-like work conservatively estimates reductions, "
-                        "scaling, and elementwise application"
+                        "legacy fallback: normalization-like work conservatively "
+                        "estimates reductions, scaling, and elementwise application "
+                        f"({fallback_reason})"
                     ),
                 )
             )
@@ -232,8 +269,8 @@ def estimate_work(
                     bytes_accessed=float(tensor_bytes),
                     confidence=EstimateConfidence.INEXACT,
                     rationale=(
-                        "softmax-like work conservatively estimates max, exp, sum, "
-                        "and normalization passes"
+                        "legacy fallback: softmax-like work conservatively estimates "
+                        f"max, exp, sum, and normalization passes ({fallback_reason})"
                     ),
                 )
             )
@@ -244,7 +281,10 @@ def estimate_work(
                     flops=0.0,
                     bytes_accessed=float(tensor_bytes),
                     confidence=EstimateConfidence.INEXACT,
-                    rationale="data movement or view-like operation modeled as zero-FLOP tensor traffic",
+                    rationale=(
+                        "legacy fallback: data movement or view-like operation "
+                        f"modeled as zero-FLOP tensor traffic ({fallback_reason})"
+                    ),
                 )
             )
         else:
@@ -254,10 +294,23 @@ def estimate_work(
                     flops=0.0,
                     bytes_accessed=float(tensor_bytes),
                     confidence=EstimateConfidence.UNSUPPORTED,
-                    rationale=f"unsupported operation estimate for {node.op_type}",
+                    rationale=(
+                        f"legacy fallback: unsupported operation estimate for "
+                        f"{node.op_type} ({fallback_reason})"
+                    ),
                 )
             )
     return tuple(estimates)
+
+
+def _work_estimate_from_rich_estimate(estimate: OperatorWorkEstimate) -> WorkEstimate:
+    return WorkEstimate(
+        node_id=estimate.node_id,
+        flops=estimate.flops,
+        bytes_accessed=estimate.total_bytes,
+        confidence=estimate.confidence,
+        rationale=estimate.rationale,
+    )
 
 
 def summarize_amd_sol_coverage(

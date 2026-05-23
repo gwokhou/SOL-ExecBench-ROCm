@@ -275,7 +275,7 @@ def _softmax_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEs
         total_bytes=total_bytes,
         confidence=EstimateConfidence.INEXACT,
         rationale=_join_rationale(
-            "conservative softmax pass-count estimate covering max, exp, sum, and normalize",
+            "conservative softmax-like pass-count estimate covering max, exp, sum, and normalize",
             rationale_parts,
         ),
         axis_source=axis_source,
