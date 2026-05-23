@@ -69,6 +69,8 @@ def estimate_bound_work(graph: BoundGraph) -> tuple[OperatorWorkEstimate, ...]:
 
 
 def _estimate_node(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstimate:
+    if node.op_family == OpFamily.ATTENTION:
+        return _attention_estimate(graph, node)
     if node.op_family in {OpFamily.GEMM, OpFamily.LINEAR_PROJECTION}:
         return _gemm_estimate(graph, node)
     if node.op_family == OpFamily.ELEMENTWISE:
@@ -86,6 +88,205 @@ def _estimate_node(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstim
     if node.op_family == OpFamily.DTYPE_CONVERSION:
         return _dtype_conversion_estimate(graph, node)
     return _unsupported_estimate(node)
+
+
+def _attention_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstimate:
+    subrole = str(node.attributes.get("subrole") or "")
+    if node.confidence == EstimateConfidence.UNSUPPORTED:
+        return _unsupported_estimate(
+            node,
+            rationale=node.rationale,
+            warnings=("unsupported_operator:dynamic_attention_axes",),
+        )
+    if subrole == "qk_scores":
+        return _attention_matmul_estimate(
+            graph,
+            node,
+            formula_kind="attention_scores_flops",
+            formula="2*B*H*S_q*S_k*D",
+            rationale="attention QK score FLOPs estimated from tensor shapes",
+        )
+    if subrole == "pv_aggregation":
+        return _attention_matmul_estimate(
+            graph,
+            node,
+            formula_kind="attention_pv_flops",
+            formula="2*B*H*S_q*S_k*D",
+            rationale="attention PV aggregation FLOPs estimated from tensor shapes",
+        )
+    if subrole == "softmax":
+        return _attention_softmax_estimate(graph, node)
+    if subrole == "scale_or_mask":
+        return _attention_scale_or_mask_estimate(graph, node)
+    if subrole == "output_projection":
+        return _attention_output_projection_estimate(graph, node)
+    return _unsupported_estimate(
+        node,
+        rationale=f"unsupported attention subrole: {subrole or '<missing>'}",
+        warnings=(f"unsupported_operator:attention_{subrole or 'missing_subrole'}",),
+    )
+
+
+def _attention_matmul_estimate(
+    graph: BoundGraph,
+    node: BoundGraphNode,
+    *,
+    formula_kind: str,
+    formula: str,
+    rationale: str,
+) -> OperatorWorkEstimate:
+    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(graph, node)
+    read_bytes = _sum_tensor_bytes(input_tensors, "read", warnings, rationale_parts)
+    write_bytes = _sum_tensor_bytes(output_tensors, "write", warnings, rationale_parts)
+    dims = _attention_dims_from_node_or_shapes(input_tensors, output_tensors, node)
+    formula_inputs: dict[str, object] = {}
+    flops = 0.0
+    axis_source: str | None = None
+    if dims is None:
+        warnings.append("inexact_operator:attention_missing_dimensions")
+        rationale_parts.append("missing attention dimensions")
+        confidence = EstimateConfidence.INEXACT
+    else:
+        formula_inputs = dims
+        flops = float(2 * dims["B"] * dims["H"] * dims["S_q"] * dims["S_k"] * dims["D"])
+        confidence = EstimateConfidence.SUPPORTED if not warnings else EstimateConfidence.INEXACT
+        axis_source = "tensor_shapes"
+    total_bytes = read_bytes + write_bytes
+    return OperatorWorkEstimate(
+        node_id=node.node_id,
+        op_family=OpFamily.ATTENTION,
+        op_name=node.op_name,
+        formula_kind=formula_kind,
+        formula=formula,
+        formula_inputs=formula_inputs,
+        flops=flops,
+        read_bytes=read_bytes,
+        write_bytes=write_bytes,
+        intermediate_bytes=0.0,
+        movement_bytes=0.0,
+        total_bytes=total_bytes,
+        confidence=confidence,
+        rationale=_join_rationale(rationale, rationale_parts),
+        axis_source=axis_source,
+        warnings=tuple(dict.fromkeys(warnings)),
+    )
+
+
+def _attention_softmax_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstimate:
+    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(graph, node)
+    read_bytes = _sum_tensor_bytes(input_tensors, "read", warnings, rationale_parts)
+    write_bytes = _sum_tensor_bytes(output_tensors, "write", warnings, rationale_parts)
+    input_elements = _sum_tensor_numel(input_tensors, "input", warnings, rationale_parts) or 0
+    axis_source, axis = _axis_evidence(node)
+    if axis is None:
+        warnings.append("inexact_operator:attention_softmax_missing_axis")
+    dims = _attention_dims_from_attributes(node)
+    formula_inputs: dict[str, object] = {"input_elements": input_elements, "axis": axis}
+    if dims is not None:
+        formula_inputs.update(dims)
+    softmax_passes = 5
+    formula_inputs["softmax_passes"] = softmax_passes
+    total_bytes = read_bytes + write_bytes
+    return OperatorWorkEstimate(
+        node_id=node.node_id,
+        op_family=OpFamily.ATTENTION,
+        op_name=node.op_name,
+        formula_kind="attention_softmax_flops",
+        formula="softmax_passes*B*H*S_q*S_k",
+        formula_inputs=formula_inputs,
+        flops=float(softmax_passes * input_elements),
+        read_bytes=read_bytes,
+        write_bytes=write_bytes,
+        intermediate_bytes=0.0,
+        movement_bytes=0.0,
+        total_bytes=total_bytes,
+        confidence=EstimateConfidence.SUPPORTED if axis is not None and not warnings else EstimateConfidence.INEXACT,
+        rationale=_join_rationale(
+            "attention softmax pass-count estimate over score matrix",
+            rationale_parts,
+        ),
+        axis_source=axis_source,
+        warnings=tuple(dict.fromkeys(warnings)),
+    )
+
+
+def _attention_scale_or_mask_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstimate:
+    estimate = _pointwise_estimate(
+        graph,
+        node,
+        formula_kind="attention_mask_bytes",
+        formula="output_elements",
+        formula_inputs_extra={
+            "mask_semantics": node.attributes.get("mask_semantics"),
+        },
+        rationale="attention scale or mask handling estimated from visible tensor movement",
+    )
+    warnings = list(estimate.warnings)
+    confidence = estimate.confidence
+    if node.attributes.get("mask_semantics") == "partial":
+        warnings.extend(("inexact_operator:attention_mask", "inexact_mask:missing_sparsity"))
+        confidence = EstimateConfidence.INEXACT
+    return OperatorWorkEstimate(
+        node_id=estimate.node_id,
+        op_family=OpFamily.ATTENTION,
+        op_name=estimate.op_name,
+        formula_kind=estimate.formula_kind,
+        formula=estimate.formula,
+        formula_inputs=estimate.formula_inputs,
+        flops=estimate.flops,
+        read_bytes=estimate.read_bytes,
+        write_bytes=estimate.write_bytes,
+        intermediate_bytes=estimate.intermediate_bytes,
+        movement_bytes=estimate.movement_bytes,
+        total_bytes=estimate.total_bytes,
+        confidence=confidence,
+        rationale=estimate.rationale,
+        axis_source="tensor_shapes",
+        movement_kind=estimate.movement_kind,
+        warnings=tuple(dict.fromkeys(warnings)),
+    )
+
+
+def _attention_output_projection_estimate(
+    graph: BoundGraph,
+    node: BoundGraphNode,
+) -> OperatorWorkEstimate:
+    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(graph, node)
+    read_bytes = _sum_tensor_bytes(input_tensors, "read", warnings, rationale_parts)
+    write_bytes = _sum_tensor_bytes(output_tensors, "write", warnings, rationale_parts)
+    dims = _attention_output_projection_dims(input_tensors, output_tensors, node)
+    if dims is None:
+        warnings.append("inexact_operator:attention_output_projection_missing_shape")
+        formula_inputs: dict[str, object] = {}
+        flops = 0.0
+        axis_source = None
+        confidence = EstimateConfidence.INEXACT
+    else:
+        formula_inputs = dims
+        flops = float(2 * dims["M"] * dims["N"] * dims["K"])
+        axis_source = "tensor_shapes"
+        confidence = EstimateConfidence.SUPPORTED if not warnings else EstimateConfidence.INEXACT
+    return OperatorWorkEstimate(
+        node_id=node.node_id,
+        op_family=OpFamily.ATTENTION,
+        op_name=node.op_name,
+        formula_kind="gemm_flops",
+        formula="2*M*N*K",
+        formula_inputs=formula_inputs,
+        flops=flops,
+        read_bytes=read_bytes,
+        write_bytes=write_bytes,
+        intermediate_bytes=0.0,
+        movement_bytes=0.0,
+        total_bytes=read_bytes + write_bytes,
+        confidence=confidence,
+        rationale=_join_rationale(
+            "attention output projection uses GEMM-compatible estimate",
+            rationale_parts,
+        ),
+        axis_source=axis_source,
+        warnings=tuple(dict.fromkeys(warnings)),
+    )
 
 
 def _gemm_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstimate:
@@ -579,6 +780,88 @@ def _infer_gemm_dims(
             "K": int(lhs_shape[-1]),
         }
     return None
+
+
+def _attention_dims_from_node_or_shapes(
+    input_tensors: tuple[BoundTensor, ...],
+    output_tensors: tuple[BoundTensor, ...],
+    node: BoundGraphNode,
+) -> dict[str, int] | None:
+    dims = _attention_dims_from_attributes(node)
+    if dims is not None:
+        return dims
+    if len(input_tensors) < 2 or not output_tensors:
+        return None
+    lhs_shape = input_tensors[0].shape
+    rhs_shape = input_tensors[1].shape
+    out_shape = output_tensors[0].shape
+    if lhs_shape is None or rhs_shape is None or out_shape is None:
+        return None
+    if len(lhs_shape) != 4 or len(rhs_shape) != 4 or len(out_shape) != 4:
+        return None
+    subrole = str(node.attributes.get("subrole") or "")
+    if subrole == "qk_scores":
+        return {
+            "B": int(lhs_shape[0]),
+            "H": int(lhs_shape[1]),
+            "S_q": int(lhs_shape[2]),
+            "S_k": int(rhs_shape[3]),
+            "D": int(lhs_shape[3]),
+        }
+    if subrole == "pv_aggregation":
+        return {
+            "B": int(out_shape[0]),
+            "H": int(out_shape[1]),
+            "S_q": int(out_shape[2]),
+            "S_k": int(rhs_shape[2]),
+            "D": int(out_shape[3]),
+        }
+    return None
+
+
+def _attention_dims_from_attributes(node: BoundGraphNode) -> dict[str, int] | None:
+    keys = {
+        "B": "batch",
+        "H": "heads",
+        "S_q": "sequence_q",
+        "S_k": "sequence_k",
+        "D": "head_dim",
+    }
+    result: dict[str, int] = {}
+    for formula_name, attribute_name in keys.items():
+        value = node.attributes.get(attribute_name)
+        if not isinstance(value, int):
+            return None
+        result[formula_name] = value
+    return result
+
+
+def _attention_output_projection_dims(
+    input_tensors: tuple[BoundTensor, ...],
+    output_tensors: tuple[BoundTensor, ...],
+    node: BoundGraphNode,
+) -> dict[str, int] | None:
+    if len(input_tensors) < 2 or not output_tensors:
+        return None
+    lhs_shape = input_tensors[0].shape
+    rhs_shape = input_tensors[1].shape
+    out_shape = output_tensors[0].shape
+    if lhs_shape is None or rhs_shape is None or out_shape is None:
+        return None
+    if len(lhs_shape) == 4 and len(rhs_shape) == 2 and len(out_shape) == 4:
+        return {
+            "M": int(lhs_shape[0] * lhs_shape[1] * lhs_shape[2]),
+            "N": int(out_shape[-1]),
+            "K": int(lhs_shape[-1]),
+        }
+    dims = _attention_dims_from_attributes(node)
+    if dims is not None:
+        return {
+            "M": int(dims["B"] * dims["H"] * dims["S_q"]),
+            "N": int(dims["D"]),
+            "K": int(dims["D"]),
+        }
+    return _infer_gemm_dims(input_tensors, output_tensors)
 
 
 def _join_rationale(primary: str, details: list[str]) -> str:
