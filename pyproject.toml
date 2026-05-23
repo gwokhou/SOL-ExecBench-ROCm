@@ -62,6 +62,11 @@ exclude = [
 ignore = ["E741"]
 
 [[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+default = true
+
+[[tool.uv.index]]
 name = "pytorch-rocm71"
 url = "https://download.pytorch.org/whl/rocm7.1"
 explicit = true
