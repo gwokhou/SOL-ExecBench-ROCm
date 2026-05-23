@@ -15,24 +15,21 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
 ## Current State
 
-**Shipped version:** v1.10 Paper-Aligned SOLAR Automatic Derivation,
+**Shipped version:** v1.11 Paper Dataset Parity Inventory and ROCm Execution Closure,
 completed 2026-05-23.
 
-**Current milestone:** v1.11 Paper Dataset Parity Inventory and ROCm
-Execution Closure.
+**Current milestone:** none. Ready to plan v1.12.
 
-**Latest milestone outcome:** the ROCm port now has paper-aligned automatic
-SOLAR derivation evidence for the scoped v1.10 families. The pipeline includes
-a sidecar-only derivation contract, semantic provenance, formula/byte/bound
-evidence for high-confidence families, conservative degraded MoE and
-SSM/Mamba-like evidence, machine-verifiable coverage and aggregate status,
-AMD-native score guards, dataset-runner generated SOLAR sidecars,
-`derived_evidence_refs`, documentation, and public/claim guardrails.
+**Latest milestone outcome:** the ROCm port now has a concrete, auditable
+public SOL ExecBench dataset surface for the paper parity gap workflow:
+acquisition/layout manifests, deterministic inventory, ROCm readiness
+classification, ready-subset manifests, bounded execution closure,
+parity-gap reports, release-closure docs, and public claim guardrails.
 
-**Next milestone goals:** make the paper's public benchmark dataset surface
-concrete and auditable in this ROCm port by adding acquisition/layout checks,
-machine-readable problem inventory, ROCm compatibility classification, small
-execution closure paths for ready problems, and parity gap reports.
+**Next milestone goals:** choose the next gap from the remaining deferred work:
+full sidecar-chain hardening, full-suite hardware validation preparation,
+upstream SOLAR equivalence analysis, or another explicitly scoped ROCm port
+closure target.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline.
 Milestones v1.1-v1.6 added CDNA 3 code/schema support, maintained residue
@@ -55,6 +52,10 @@ derivation system by adding fixture contracts, semantic provenance,
 family-specific formula/byte/bound evidence, degraded complex-family evidence,
 coverage/status sidecars, score guards, dataset-runner report integration, and
 claim guardrails.
+The v1.11 milestone completed the paper dataset parity inventory and bounded
+execution-closure workflow by adding dataset acquisition/layout manifests,
+inventory/readiness/ready-subset sidecars, execution-closure reports,
+parity-gap reports, release-closure docs, and claim guardrails.
 
 Validation status:
 
@@ -89,7 +90,7 @@ coverage misuse.
 - NVFP4/MXFP4 hardware validation.
 - Official hosted leaderboard or submission service.
 
-## Current Milestone: v1.11 Paper Dataset Parity Inventory and ROCm Execution Closure
+## Recently Shipped Milestone: v1.11 Paper Dataset Parity Inventory and ROCm Execution Closure
 
 **Goal:** Turn the paper's public benchmark dataset into a concrete,
 auditable ROCm-port surface: acquired or layout-verified, counted, classified,
