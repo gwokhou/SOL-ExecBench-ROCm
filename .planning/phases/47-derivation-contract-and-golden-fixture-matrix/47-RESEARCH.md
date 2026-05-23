@@ -421,17 +421,17 @@ def test_solar_contract_preserves_v1_10_scope_boundaries():
 | A2 | Recommended fixture field names such as `fixture_class`, `expected_subroles`, and `scope_boundary` are acceptable. [ASSUMED] | Architecture Patterns / Code Examples | If naming preferences differ, rename consistently before implementation; locked semantic requirements stay the same. |
 | A3 | No production constant/type export is needed for Phase 47. [ASSUMED] | Standard Stack | If tests need canonical shared family/status constants, planner may add a pure export with no scoring behavior change. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Fixture granularity**
    - What we know: One file per case and grouped files are both allowed. [CITED: .planning/phases/47-derivation-contract-and-golden-fixture-matrix/47-CONTEXT.md]
-   - What's unclear: Maintainer preference for review ergonomics.
-   - Recommendation: Use one file per case for clearer coverage failures unless implementation finds excessive duplication.
+   - Resolution: Use one JSON file per fixture case for Phase 47. This keeps review diffs small, makes coverage failures identify the exact missing case, and matches the pattern mapper recommendation.
+   - RESOLVED: Planner and executor should use one file per case unless an existing same-name file forces a non-conflicting rename.
 
 2. **Exact positive expectation for MoE and SSM/Mamba**
    - What we know: Positive fixtures are required per target family class, but real modeling is deferred. [CITED: .planning/phases/47-derivation-contract-and-golden-fixture-matrix/47-CONTEXT.md]
-   - What's unclear: Whether "positive" for inherently complex families should mean eventual `inexact/degraded` or a narrowly supported static case.
-   - Recommendation: Define one narrowly static positive fixture and separate dynamic degraded fixtures for MoE and SSM/Mamba.
+   - Resolution: Define one narrowly static positive fixture for MoE and one narrowly static positive fixture for SSM/Mamba with `expected_confidence: "supported"` and `expected_status: "scored"`. Keep dynamic routing, missing recurrence metadata, and taxonomy-only behavior in separate degraded or unsupported fixtures.
+   - RESOLVED: Positive means the future derivation contract has enough explicit static metadata to be scored; complex real-world ambiguity is represented by separate degraded/unsupported cases.
 
 ## Environment Availability
 
