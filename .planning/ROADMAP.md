@@ -196,7 +196,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 49-01-PLAN.md — Create group-local formula, byte, and bound evidence contracts.
+- [x] 49-01-PLAN.md — Create group-local formula, byte, and bound evidence contracts.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -293,7 +293,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 47. Derivation Contract And Golden Fixture Matrix | 6/6 | Complete | 2026-05-23 |
 | 48. Extraction Pipeline And Semantic Provenance | 4/4 | Complete    | 2026-05-23 |
-| 49. High-Confidence Family Modeling | 0/TBD | Not started | - |
+| 49. High-Confidence Family Modeling | 1/4 | In Progress|  |
 | 50. Degraded Complex Family Modeling | 0/TBD | Not started | - |
 | 51. Sidecar Coverage And Score Guards | 0/TBD | Not started | - |
 | 52. Dataset Runner And Public Contract Closure | 0/TBD | Not started | - |
