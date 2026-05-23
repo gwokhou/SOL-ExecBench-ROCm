@@ -193,10 +193,59 @@ def test_solar_derivation_round_trip_preserves_provenance():
         "scored": 1,
         "unscored": 0,
     }
+    assert payload["coverage_summary"]["families"] == [
+        {
+            "family": "attention",
+            "group_count": 1,
+            "status_counts": {
+                "degraded": 0,
+                "scored": 1,
+                "unscored": 0,
+            },
+        }
+    ]
+    assert payload["coverage_summary"]["missing_patterns"] == []
+    assert payload["coverage_summary"]["unsupported_patterns"] == []
+    assert payload["coverage_summary"]["degraded_node_ids"] == []
+    assert payload["coverage_summary"]["unsupported_node_ids"] == []
     assert payload["coverage_summary"]["estimated_node_ids"] == ["op_1"]
-    assert payload["coverage_summary"]["provenance"][0]["group_id"] == (
-        "attention_group_1"
-    )
+    assert payload["coverage_summary"]["provenance"] == [
+        {
+            "group_id": "attention_group_1",
+            "node_id": "op_1",
+            "tensor_id": None,
+            "kind": "definition",
+            "detail": "reference structure",
+        },
+        {
+            "group_id": "attention_group_1",
+            "node_id": "op_1",
+            "tensor_id": None,
+            "kind": "estimate",
+            "detail": "AMD SOL v2 math",
+        },
+        {
+            "group_id": "attention_group_1",
+            "node_id": "op_1",
+            "tensor_id": None,
+            "kind": "estimate",
+            "detail": "operator bytes",
+        },
+        {
+            "group_id": "attention_group_1",
+            "node_id": "op_1",
+            "tensor_id": None,
+            "kind": "estimate",
+            "detail": "operator work",
+        },
+        {
+            "group_id": "attention_group_1",
+            "node_id": "op_1",
+            "tensor_id": None,
+            "kind": "fx",
+            "detail": "matmul node",
+        },
+    ]
     assert payload["aggregate_status"] == {
         "status": "scored",
         "score_eligible": True,
@@ -287,6 +336,22 @@ def test_solar_derivation_parser_rejects_missing_required_fields():
             r"coverage_summary\.families\[0\] contains unknown field\(s\): extra_claim",
         ),
         (
+            ("coverage_summary", "missing_patterns", 0),
+            r"coverage_summary\.missing_patterns\[0\] contains unknown field\(s\): extra_claim",
+        ),
+        (
+            ("coverage_summary", "missing_patterns", 0, "sources", 0),
+            r"coverage_summary\.missing_patterns\[0\]\.sources\[0\] contains unknown field\(s\): extra_claim",
+        ),
+        (
+            ("coverage_summary", "unsupported_patterns", 0),
+            r"coverage_summary\.unsupported_patterns\[0\] contains unknown field\(s\): extra_claim",
+        ),
+        (
+            ("coverage_summary", "unsupported_patterns", 0, "sources", 0),
+            r"coverage_summary\.unsupported_patterns\[0\]\.sources\[0\] contains unknown field\(s\): extra_claim",
+        ),
+        (
             ("coverage_summary", "provenance", 0),
             r"coverage_summary\.provenance\[0\] contains unknown field\(s\): extra_claim",
         ),
@@ -301,6 +366,40 @@ def test_solar_derivation_parser_rejects_unknown_schema_fields(
     expected_error: str,
 ):
     payload = _contract_payload()
+    if "missing_patterns" in path:
+        payload["coverage_summary"]["missing_patterns"] = [
+            {
+                "pattern": "axis:op_1",
+                "group_ids": ["attention_group_1"],
+                "node_ids": ["op_1"],
+                "sources": [
+                    {
+                        "group_id": "attention_group_1",
+                        "node_id": "op_1",
+                        "tensor_id": None,
+                        "kind": "estimate",
+                        "detail": "operator work",
+                    }
+                ],
+            }
+        ]
+    if "unsupported_patterns" in path:
+        payload["coverage_summary"]["unsupported_patterns"] = [
+            {
+                "pattern": "unsupported_operator:custom_op",
+                "group_ids": ["attention_group_1"],
+                "node_ids": ["op_1"],
+                "sources": [
+                    {
+                        "group_id": "attention_group_1",
+                        "node_id": "op_1",
+                        "tensor_id": None,
+                        "kind": "estimate",
+                        "detail": "operator work",
+                    }
+                ],
+            }
+        ]
     target = payload
     for key in path:
         target = target[key]
@@ -449,6 +548,19 @@ def test_solar_derivation_legacy_sidecars_parse_and_recompute_coverage():
     assert normalized["aggregate_status"]["score_eligible"] is True
 
 
+def test_solar_derivation_legacy_payload_must_have_exact_phase48_to_phase50_keys():
+    legacy_payload = _contract_payload()
+    del legacy_payload["coverage_summary"]
+    del legacy_payload["aggregate_status"]
+    legacy_payload["extra_claim"] = "not allowed"
+
+    with pytest.raises(
+        ValueError,
+        match=r"SOLAR derivation evidence contains unknown field\(s\): extra_claim",
+    ):
+        solar_derivation_from_dict(legacy_payload)
+
+
 def test_solar_derivation_empty_groups_are_unscored_not_missing_coverage():
     evidence = SolarDerivationEvidence(
         definition="empty_demo",
@@ -539,6 +651,35 @@ def test_solar_derivation_coverage_tracks_degraded_unsupported_and_missing_patte
     assert payload["coverage_summary"]["degraded_node_ids"] == ["op_1", "op_2"]
     assert payload["coverage_summary"]["unsupported_node_ids"] == ["op_unsupported"]
     assert payload["coverage_summary"]["estimated_node_ids"] == ["op_1"]
+    assert payload["coverage_summary"]["family_counts"] == {
+        "attention": 1,
+        "unsupported": 1,
+    }
+    assert payload["coverage_summary"]["status_counts"] == {
+        "degraded": 1,
+        "scored": 0,
+        "unscored": 1,
+    }
+    assert payload["coverage_summary"]["families"] == [
+        {
+            "family": "attention",
+            "group_count": 1,
+            "status_counts": {
+                "degraded": 1,
+                "scored": 0,
+                "unscored": 0,
+            },
+        },
+        {
+            "family": "unsupported",
+            "group_count": 1,
+            "status_counts": {
+                "degraded": 0,
+                "scored": 0,
+                "unscored": 1,
+            },
+        },
+    ]
     assert payload["coverage_summary"]["missing_patterns"] == [
         {
             "pattern": "axis:op_1",
@@ -613,6 +754,210 @@ def test_solar_derivation_coverage_tracks_degraded_unsupported_and_missing_patte
             ],
         }
     ]
+
+
+@pytest.mark.parametrize(
+    ("mutate", "expected_error"),
+    [
+        (
+            lambda payload: payload["aggregate_status"].__setitem__(
+                "score_eligible", "true"
+            ),
+            r"aggregate_status\.score_eligible must be a boolean",
+        ),
+        (
+            lambda payload: payload["coverage_summary"].__setitem__(
+                "family_counts", {"attention": True}
+            ),
+            r"coverage_summary\.family_counts\.attention must be an integer",
+        ),
+        (
+            lambda payload: payload["coverage_summary"].__setitem__(
+                "family_counts", {"attention": -1}
+            ),
+            r"coverage_summary\.family_counts\.attention must be non-negative",
+        ),
+        (
+            lambda payload: payload["coverage_summary"].__setitem__(
+                "status_counts",
+                {"degraded": 0, "scored": 1, "unscored": 0, "queued": 1},
+            ),
+            r"coverage_summary\.status_counts contains unknown field\(s\): queued",
+        ),
+        (
+            lambda payload: payload["coverage_summary"]["families"][0].__setitem__(
+                "group_count", True
+            ),
+            r"coverage_summary\.families\[0\]\.group_count must be an integer",
+        ),
+        (
+            lambda payload: payload["coverage_summary"]["families"][0].__setitem__(
+                "status_counts",
+                {"degraded": 0, "scored": 1, "unscored": 0, "queued": 1},
+            ),
+            r"coverage_summary\.families\[0\]\.status_counts contains unknown field\(s\): queued",
+        ),
+        (
+            lambda payload: payload["coverage_summary"].__setitem__(
+                "degraded_node_ids", "op_1"
+            ),
+            r"coverage_summary\.degraded_node_ids must be a list",
+        ),
+        (
+            lambda payload: payload["coverage_summary"].__setitem__(
+                "unsupported_node_ids", ["op_unsupported", 7]
+            ),
+            r"coverage_summary\.unsupported_node_ids\[1\] must be a string",
+        ),
+        (
+            lambda payload: payload["coverage_summary"].__setitem__(
+                "estimated_node_ids", ["op_1", ""]
+            ),
+            r"coverage_summary\.estimated_node_ids\[1\] must be non-empty",
+        ),
+        (
+            lambda payload: payload["coverage_summary"]["missing_patterns"][0].__setitem__(
+                "node_ids", "op_1"
+            ),
+            r"coverage_summary\.missing_patterns\[0\]\.node_ids must be a list",
+        ),
+        (
+            lambda payload: payload["coverage_summary"]["missing_patterns"][0][
+                "sources"
+            ][0].__setitem__("group_id", ""),
+            r"coverage_summary\.missing_patterns\[0\]\.sources\[0\]\.group_id must be non-empty",
+        ),
+        (
+            lambda payload: payload["coverage_summary"]["unsupported_patterns"][0][
+                "sources"
+            ][0].__setitem__("node_id", 7),
+            r"coverage_summary\.unsupported_patterns\[0\]\.sources\[0\]\.node_id must be a string",
+        ),
+        (
+            lambda payload: payload["coverage_summary"]["provenance"][0].__setitem__(
+                "detail", ""
+            ),
+            r"coverage_summary\.provenance\[0\]\.detail must be non-empty",
+        ),
+        (
+            lambda payload: payload["aggregate_status"].__setitem__(
+                "node_ids", "op_1"
+            ),
+            r"aggregate_status\.node_ids must be a list",
+        ),
+        (
+            lambda payload: payload["aggregate_status"].__setitem__(
+                "warnings", ["ok", None]
+            ),
+            r"aggregate_status\.warnings\[1\] must be a string",
+        ),
+    ],
+)
+def test_solar_derivation_parser_rejects_malformed_phase51_fields(
+    mutate,
+    expected_error: str,
+):
+    payload = _contract_payload()
+    degraded_payload = solar_derivation_from_dict(
+        SolarDerivationEvidence(
+            definition="coverage_demo",
+            workload_uuid="coverage-workload",
+            groups=(
+                SolarSemanticGroupEvidence(
+                    family="attention",
+                    group_id="attention_group_1",
+                    node_ids=("op_1",),
+                    subroles=(),
+                    confidence="inexact",
+                    status="degraded",
+                    required_evidence=(),
+                    missing_evidence=("axis:op_1",),
+                    warning_prefixes=("unsupported_operator:custom_op",),
+                    source=_source(kind="ast", detail="attention(x)", node_id="op_1"),
+                    rationale="Incomplete attention evidence.",
+                ),
+            ),
+            tensors=(),
+            warnings=("aggregate_degraded:incomplete semantic evidence",),
+            source_boundary={
+                "canonical_trace_jsonl": False,
+                "public_schema": False,
+                "candidate_solution_execution": False,
+            },
+        ).to_dict()
+    ).to_dict()
+    payload["coverage_summary"]["missing_patterns"] = degraded_payload[
+        "coverage_summary"
+    ]["missing_patterns"]
+    payload["coverage_summary"]["unsupported_patterns"] = degraded_payload[
+        "coverage_summary"
+    ]["unsupported_patterns"]
+    mutate(payload)
+
+    with pytest.raises(ValueError, match=expected_error):
+        solar_derivation_from_dict(payload)
+
+
+@pytest.mark.parametrize(
+    ("path", "expected_error"),
+    [
+        (
+            ("coverage_summary", "families", 0, "group_count"),
+            r"coverage_summary\.families\[0\] missing required field: group_count",
+        ),
+        (
+            ("coverage_summary", "missing_patterns", 0, "sources"),
+            r"coverage_summary\.missing_patterns\[0\] missing required field: sources",
+        ),
+        (
+            (
+                "coverage_summary",
+                "missing_patterns",
+                0,
+                "sources",
+                0,
+                "detail",
+            ),
+            r"coverage_summary\.missing_patterns\[0\]\.sources\[0\] missing required field: detail",
+        ),
+        (
+            ("coverage_summary", "provenance", 0, "kind"),
+            r"coverage_summary\.provenance\[0\] missing required field: kind",
+        ),
+        (
+            ("aggregate_status", "reason"),
+            r"aggregate_status missing required field: reason",
+        ),
+    ],
+)
+def test_solar_derivation_parser_rejects_missing_required_phase51_nested_fields(
+    path: tuple[object, ...],
+    expected_error: str,
+):
+    payload = _contract_payload()
+    payload["coverage_summary"]["missing_patterns"] = [
+        {
+            "pattern": "axis:op_1",
+            "group_ids": ["attention_group_1"],
+            "node_ids": ["op_1"],
+            "sources": [
+                {
+                    "group_id": "attention_group_1",
+                    "node_id": "op_1",
+                    "tensor_id": None,
+                    "kind": "estimate",
+                    "detail": "attention_scores_flops:2*B*H*S_q*S_k*D",
+                }
+            ],
+        }
+    ]
+    target = payload
+    for key in path[:-1]:
+        target = target[key]
+    del target[path[-1]]
+
+    with pytest.raises(ValueError, match=expected_error):
+        solar_derivation_from_dict(payload)
 
 
 @pytest.mark.parametrize(
