@@ -191,7 +191,24 @@ Plans:
   5. Family estimates convert into per-operation compute bound, memory bound,
      limiting resource, and SOL-bound evidence.
 
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 49-01-PLAN.md — Create group-local formula, byte, and bound evidence contracts.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 49-02-PLAN.md — Promote linear projection with GEMM-compatible formulas and bounds.
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 49-03-PLAN.md — Derive explicit attention formula-backed evidence and degradation.
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 49-04-PLAN.md — Derive convolution and memory-bound family evidence with guardrails.
 
 ### Phase 50: Degraded Complex Family Modeling
 
