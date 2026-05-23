@@ -276,6 +276,34 @@ def test_solar_derivation_parser_rejects_unknown_schema_fields(
         solar_derivation_from_dict(payload)
 
 
+@pytest.mark.parametrize(
+    "formula_kind",
+    [
+        "moe_static_route_flops",
+        "moe_dynamic_route_bytes",
+        "ssm_mamba_static_scan_flops",
+        "ssm_mamba_degraded_scan_bytes",
+    ],
+)
+def test_phase50_formula_kinds_remain_sidecar_values_not_schema_keys(
+    formula_kind: str,
+):
+    payload = _contract_payload()
+    payload["groups"][0]["formula_evidence"][0]["formula_kind"] = formula_kind
+
+    parsed = solar_derivation_from_dict(payload)
+
+    assert parsed.groups[0].formula_evidence[0].formula_kind == formula_kind
+
+    leaked = _contract_payload()
+    leaked[formula_kind] = True
+    with pytest.raises(
+        ValueError,
+        match=r"SOLAR derivation evidence contains unknown field\(s\):",
+    ):
+        solar_derivation_from_dict(leaked)
+
+
 def test_solar_derivation_parser_rejects_invalid_schema_version():
     payload = _contract_payload()
     payload["schema_version"] = "sol_execbench.solar_derivation.v2"
