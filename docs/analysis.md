@@ -198,6 +198,24 @@ references for each workload score, and keeps the output separate from canonical
 trace JSONL. Missing timing, baseline, or bound evidence is reported as an
 unscored guarded state rather than an invented score.
 
+To also materialize the derived AMD SOL bound artifact v2 sidecars used by the
+score report, provide a sidecar directory:
+
+```bash
+uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
+  --limit 5 \
+  --amd-score-report out/amd-score-report.json \
+  --amd-sol-bound-dir out/amd-sol-bounds
+```
+
+The sidecars use schema version `sol_execbench.amd_sol_bound.v2`. Each sidecar
+contains the derived marker, definition name, workload UUID, hardware model
+reference, hardware model payload, bound graph, rich operator work estimates,
+per-operation SOL bounds, aggregate bound state, deterministic warnings, and
+coverage summary. This is the ROCm port's AMD-local analog of the paper's
+graph/evidence/SOL-analyzer artifact boundary; it is not an upstream NVIDIA
+B200 or full SOLAR reproduction claim.
+
 For release-defined scoring, provide an optimized scoring baseline artifact:
 
 ```bash
@@ -229,6 +247,38 @@ fall back to `trace.evaluation.performance.reference_latency_ms`, but the score
 is labeled with `baseline_source: reference_latency` and carries a provisional
 baseline warning. Treat `baseline_source: scoring_baseline` as the release-style
 path; treat `reference_latency` as a development fallback.
+
+## AMD SOL Bound Artifact V2 Semantics
+
+The v2 AMD SOL bound artifact is a derived sidecar. It does not modify
+`Definition`, `Workload`, `Trace`, `Solution`, or primary `sol-execbench` CLI
+schemas. The artifact exists to make AMD-native score inputs auditable:
+
+- `bound_graph`: workload-bound operation and tensor evidence.
+- `operator_work_estimates`: per-operation formulas, FLOPs, byte buckets,
+  movement bytes, confidence, rationale, and warnings.
+- `op_bounds`: per-operation compute bound, memory bound, SOL bound, limiting
+  resource, confidence, and rationale.
+- `aggregate_bound`: the score-eligibility state for the workload.
+- `coverage_summary`: supported, inexact, and unsupported counts by operation
+  family plus worst confidence.
+- `warnings`: deterministic degradation categories for callers and reports.
+
+Aggregate status is conservative:
+
+- `scored`: all required operation and hardware evidence is supported and
+  validated.
+- `degraded`: evidence is usable for a provisional derived score but contains
+  inexact estimates or provisional hardware/model validation.
+- `unscored`: unsupported or missing bound evidence is present, so the
+  AMD-native workload score is omitted instead of treating missing work as
+  zero-cost.
+
+Hardware model payloads carry both `hardware_validation_status` and
+`model_validation_status`. For v1.9, RDNA 4 (`gfx1200`) is the only validation
+target. CDNA 3 / MI300X real-hardware validation and CDNA 4 validation remain
+future work; reports must not present those paths as validated in this
+milestone.
 
 ## AMD SOL Coverage Semantics
 
