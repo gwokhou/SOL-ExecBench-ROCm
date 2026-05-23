@@ -153,41 +153,41 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DATA-01 | TBD | Pending |
-| DATA-02 | TBD | Pending |
-| DATA-03 | TBD | Pending |
-| DATA-04 | TBD | Pending |
-| INV-01 | TBD | Pending |
-| INV-02 | TBD | Pending |
-| INV-03 | TBD | Pending |
-| INV-04 | TBD | Pending |
-| INV-05 | TBD | Pending |
-| READY-01 | TBD | Pending |
-| READY-02 | TBD | Pending |
-| READY-03 | TBD | Pending |
-| READY-04 | TBD | Pending |
-| READY-05 | TBD | Pending |
-| EXEC-01 | TBD | Pending |
-| EXEC-02 | TBD | Pending |
-| EXEC-03 | TBD | Pending |
-| EXEC-04 | TBD | Pending |
-| EXEC-05 | TBD | Pending |
-| GAP-01 | TBD | Pending |
-| GAP-02 | TBD | Pending |
-| GAP-03 | TBD | Pending |
-| GAP-04 | TBD | Pending |
-| GAP-05 | TBD | Pending |
-| CLAIM-01 | TBD | Pending |
-| CLAIM-02 | TBD | Pending |
-| CLAIM-03 | TBD | Pending |
-| CLAIM-04 | TBD | Pending |
-| CLAIM-05 | TBD | Pending |
+| DATA-01 | Phase 53 | Pending |
+| DATA-02 | Phase 53 | Pending |
+| DATA-03 | Phase 53 | Pending |
+| DATA-04 | Phase 53 | Pending |
+| INV-01 | Phase 54 | Pending |
+| INV-02 | Phase 54 | Pending |
+| INV-03 | Phase 54 | Pending |
+| INV-04 | Phase 54 | Pending |
+| INV-05 | Phase 54 | Pending |
+| READY-01 | Phase 54 | Pending |
+| READY-02 | Phase 54 | Pending |
+| READY-03 | Phase 54 | Pending |
+| READY-04 | Phase 54 | Pending |
+| READY-05 | Phase 54 | Pending |
+| EXEC-01 | Phase 55 | Pending |
+| EXEC-02 | Phase 55 | Pending |
+| EXEC-03 | Phase 55 | Pending |
+| EXEC-04 | Phase 55 | Pending |
+| EXEC-05 | Phase 55 | Pending |
+| GAP-01 | Phase 56 | Pending |
+| GAP-02 | Phase 56 | Pending |
+| GAP-03 | Phase 56 | Pending |
+| GAP-04 | Phase 56 | Pending |
+| GAP-05 | Phase 56 | Pending |
+| CLAIM-01 | Phase 57 | Pending |
+| CLAIM-02 | Phase 57 | Pending |
+| CLAIM-03 | Phase 57 | Pending |
+| CLAIM-04 | Phase 57 | Pending |
+| CLAIM-05 | Phase 57 | Pending |
 
 **Coverage:**
 - v1.11 requirements: 29 total
-- Mapped to phases: 0
-- Unmapped: 29
+- Mapped to phases: 29
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-05-23*
-*Last updated: 2026-05-23 after v1.11 requirements definition*
+*Last updated: 2026-05-23 after v1.11 roadmap mapping*
