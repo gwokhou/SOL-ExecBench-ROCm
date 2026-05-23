@@ -75,6 +75,16 @@ def _estimate_node(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstim
         return _elementwise_estimate(graph, node)
     if node.op_family == OpFamily.MLP_ACTIVATION:
         return _activation_estimate(graph, node)
+    if node.op_family == OpFamily.REDUCTION:
+        return _reduction_estimate(graph, node)
+    if node.op_family == OpFamily.NORMALIZATION:
+        return _normalization_estimate(graph, node)
+    if node.op_family == OpFamily.SOFTMAX:
+        return _softmax_estimate(graph, node)
+    if node.op_family == OpFamily.DATA_MOVEMENT:
+        return _data_movement_estimate(graph, node)
+    if node.op_family == OpFamily.DTYPE_CONVERSION:
+        return _dtype_conversion_estimate(graph, node)
     return _unsupported_estimate(node)
 
 
@@ -167,6 +177,179 @@ def _activation_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWor
         formula="activation_ops_per_element*output_elements",
         formula_inputs_extra={"activation_ops_per_element": 1},
         rationale="activation work conservatively estimated as one operation per output element",
+    )
+
+
+def _reduction_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstimate:
+    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(graph, node)
+    read_bytes = _sum_tensor_bytes(input_tensors, "read", warnings, rationale_parts)
+    write_bytes = _sum_tensor_bytes(output_tensors, "write", warnings, rationale_parts)
+    input_elements = _sum_tensor_numel(input_tensors, "input", warnings, rationale_parts) or 0
+    axis_source, axis = _axis_evidence(node)
+    formula_inputs: dict[str, object] = {"input_elements": input_elements, "axis": axis}
+    total_bytes = read_bytes + write_bytes
+    return OperatorWorkEstimate(
+        node_id=node.node_id,
+        op_family=node.op_family,
+        op_name=node.op_name,
+        formula_kind="reduction_flops",
+        formula="input_elements",
+        formula_inputs=formula_inputs,
+        flops=float(input_elements),
+        read_bytes=read_bytes,
+        write_bytes=write_bytes,
+        intermediate_bytes=0.0,
+        movement_bytes=0.0,
+        total_bytes=total_bytes,
+        confidence=EstimateConfidence.INEXACT,
+        rationale=_join_rationale(
+            "conservative reduction pass-count estimate over input elements",
+            rationale_parts,
+        ),
+        axis_source=axis_source,
+        warnings=tuple(dict.fromkeys(warnings)),
+    )
+
+
+def _normalization_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstimate:
+    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(graph, node)
+    read_bytes = _sum_tensor_bytes(input_tensors, "read", warnings, rationale_parts)
+    write_bytes = _sum_tensor_bytes(output_tensors, "write", warnings, rationale_parts)
+    input_elements = _sum_tensor_numel(input_tensors, "input", warnings, rationale_parts) or 0
+    axis_source, axis = _axis_evidence(node)
+    normalization_passes = 4
+    formula_inputs: dict[str, object] = {
+        "input_elements": input_elements,
+        "normalization_passes": normalization_passes,
+        "axis": axis,
+    }
+    total_bytes = read_bytes + write_bytes
+    return OperatorWorkEstimate(
+        node_id=node.node_id,
+        op_family=node.op_family,
+        op_name=node.op_name,
+        formula_kind="normalization_flops",
+        formula="normalization_passes*input_elements",
+        formula_inputs=formula_inputs,
+        flops=float(normalization_passes * input_elements),
+        read_bytes=read_bytes,
+        write_bytes=write_bytes,
+        intermediate_bytes=0.0,
+        movement_bytes=0.0,
+        total_bytes=total_bytes,
+        confidence=EstimateConfidence.INEXACT,
+        rationale=_join_rationale(
+            "conservative normalization pass-count estimate over input elements",
+            rationale_parts,
+        ),
+        axis_source=axis_source,
+        warnings=tuple(dict.fromkeys(warnings)),
+    )
+
+
+def _softmax_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstimate:
+    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(graph, node)
+    read_bytes = _sum_tensor_bytes(input_tensors, "read", warnings, rationale_parts)
+    write_bytes = _sum_tensor_bytes(output_tensors, "write", warnings, rationale_parts)
+    input_elements = _sum_tensor_numel(input_tensors, "input", warnings, rationale_parts) or 0
+    axis_source, axis = _axis_evidence(node)
+    softmax_passes = 5
+    formula_inputs: dict[str, object] = {
+        "input_elements": input_elements,
+        "softmax_passes": softmax_passes,
+        "axis": axis,
+    }
+    total_bytes = read_bytes + write_bytes
+    return OperatorWorkEstimate(
+        node_id=node.node_id,
+        op_family=node.op_family,
+        op_name=node.op_name,
+        formula_kind="softmax_flops",
+        formula="softmax_passes*input_elements",
+        formula_inputs=formula_inputs,
+        flops=float(softmax_passes * input_elements),
+        read_bytes=read_bytes,
+        write_bytes=write_bytes,
+        intermediate_bytes=0.0,
+        movement_bytes=0.0,
+        total_bytes=total_bytes,
+        confidence=EstimateConfidence.INEXACT,
+        rationale=_join_rationale(
+            "conservative softmax pass-count estimate covering max, exp, sum, and normalize",
+            rationale_parts,
+        ),
+        axis_source=axis_source,
+        warnings=tuple(dict.fromkeys(warnings)),
+    )
+
+
+def _data_movement_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstimate:
+    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(graph, node)
+    read_bytes = _sum_tensor_bytes(input_tensors, "read", warnings, rationale_parts)
+    write_bytes = _sum_tensor_bytes(output_tensors, "write", warnings, rationale_parts)
+    movement_kind = str(node.attributes.get("movement_kind") or _movement_kind_from_op_name(node))
+    if movement_kind == "materialized":
+        movement_bytes = read_bytes + write_bytes
+        rationale = "materialized data movement estimate for contiguous or copy-like operation"
+    elif movement_kind == "broadcast_view":
+        movement_bytes = 0.0
+        rationale = "broadcast view evidence with zero movement bytes"
+    else:
+        movement_kind = "logical_view"
+        movement_bytes = 0.0
+        rationale = "logical view evidence with zero movement bytes"
+    total_bytes = read_bytes + write_bytes + movement_bytes
+    return OperatorWorkEstimate(
+        node_id=node.node_id,
+        op_family=node.op_family,
+        op_name=node.op_name,
+        formula_kind="data_movement_bytes",
+        formula="movement_bytes",
+        formula_inputs={"movement_bytes": movement_bytes},
+        flops=0.0,
+        read_bytes=read_bytes,
+        write_bytes=write_bytes,
+        intermediate_bytes=0.0,
+        movement_bytes=movement_bytes,
+        total_bytes=total_bytes,
+        confidence=EstimateConfidence.INEXACT,
+        rationale=_join_rationale(rationale, rationale_parts),
+        movement_kind=movement_kind,
+        warnings=tuple(dict.fromkeys(warnings)),
+    )
+
+
+def _dtype_conversion_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstimate:
+    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(graph, node)
+    read_bytes = _sum_tensor_bytes(input_tensors, "read", warnings, rationale_parts)
+    write_bytes = _sum_tensor_bytes(output_tensors, "write", warnings, rationale_parts)
+    target_dtype = node.attributes.get("target_dtype") or _first_tensor_dtype(output_tensors)
+    if target_dtype is None or _dtype_bytes(str(target_dtype)) is None:
+        warnings.append("inexact_dtype_conversion:missing_target_dtype")
+        rationale_parts.append("missing target dtype for dtype conversion")
+    movement_bytes = read_bytes + write_bytes
+    total_bytes = read_bytes + write_bytes + movement_bytes
+    return OperatorWorkEstimate(
+        node_id=node.node_id,
+        op_family=node.op_family,
+        op_name=node.op_name,
+        formula_kind="dtype_conversion_bytes",
+        formula="read_bytes+write_bytes",
+        formula_inputs={
+            "read_bytes": read_bytes,
+            "write_bytes": write_bytes,
+            "target_dtype": str(target_dtype) if target_dtype is not None else None,
+        },
+        flops=0.0,
+        read_bytes=read_bytes,
+        write_bytes=write_bytes,
+        intermediate_bytes=0.0,
+        movement_bytes=movement_bytes,
+        total_bytes=total_bytes,
+        confidence=EstimateConfidence.INEXACT,
+        rationale=_join_rationale("dtype conversion movement estimate", rationale_parts),
+        movement_kind="dtype_conversion",
+        warnings=tuple(dict.fromkeys(warnings)),
     )
 
 
@@ -334,6 +517,42 @@ def _sum_tensor_numel(
             return None
         total += numel
     return total
+
+
+def _estimate_tensors(
+    graph: BoundGraph,
+    node: BoundGraphNode,
+) -> tuple[tuple[BoundTensor, ...], tuple[BoundTensor, ...], list[str], list[str]]:
+    return (
+        _node_tensors(graph, node.input_tensor_ids),
+        _node_tensors(graph, node.output_tensor_ids),
+        [],
+        [],
+    )
+
+
+def _axis_evidence(node: BoundGraphNode) -> tuple[str, object]:
+    if "dim" in node.attributes:
+        return str(node.attributes.get("axis_source") or "attribute"), node.attributes["dim"]
+    if "axis" in node.attributes:
+        return str(node.attributes.get("axis_source") or "attribute"), node.attributes["axis"]
+    return "missing", None
+
+
+def _movement_kind_from_op_name(node: BoundGraphNode) -> str:
+    leaf_name = node.op_name.rsplit(".", maxsplit=1)[-1]
+    if leaf_name in {"expand", "broadcast_to"}:
+        return "broadcast_view"
+    if leaf_name == "contiguous":
+        return "materialized"
+    return "logical_view"
+
+
+def _first_tensor_dtype(tensors: tuple[BoundTensor, ...]) -> str | None:
+    for tensor in tensors:
+        if tensor.dtype and tensor.dtype != "unknown":
+            return tensor.dtype
+    return None
 
 
 def _infer_gemm_dims(
