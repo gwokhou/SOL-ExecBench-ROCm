@@ -283,6 +283,78 @@
 
 ---
 
+## Milestone: v1.9 - AMD SOL/SOLAR Bound Modeling Completion
+
+**Shipped:** 2026-05-23
+**Phases:** 6 | **Plans:** 17 | **Tasks:** 21
+
+### What Was Built
+
+- Strict packaged and external AMD hardware model artifacts with RDNA 4
+  `gfx1200` defaults and explicit validation status metadata.
+- A structured bound graph IR with workload-aware tensor metadata, dataflow
+  edges, dynamic-trace-first extraction, AST fallback, and unsupported/inexact
+  evidence.
+- Rich operator FLOP, byte, and movement modeling for GEMM/BMM, elementwise,
+  activation, reduction, normalization, softmax, data movement, and dtype
+  conversion families.
+- AMD SOL bound artifact v2 sidecars with graph, estimates, per-op bounds,
+  aggregate bound, hardware model reference, coverage summaries, and warnings.
+- AMD-native score and dataset integration that consumes v2 sidecars while
+  preserving canonical trace JSONL and public schema contracts.
+- Documentation, guardrails, and RDNA 4 validation evidence for the v2 bound
+  pipeline and no-claim boundaries.
+
+### What Worked
+
+- Keeping v2 bound artifacts as derived sidecars let the milestone add
+  paper-aligned evidence without changing canonical traces.
+- Separating graph extraction, operator estimates, artifact serialization, and
+  score integration made each layer independently testable.
+- The user's repeated "keep it paper-consistent" constraint helped prioritize
+  explicit formulas, rationale, unsupported evidence, and claim guardrails over
+  optimistic scoring.
+
+### What Was Inefficient
+
+- Some phase summaries and validation files still lack machine-friendly
+  metadata, so the milestone audit recorded planning-artifact hygiene debt even
+  though implementation and verification passed.
+- The ROADMAP analyzer still expects a narrower completion marker than the
+  narrative completion rows used in this milestone.
+- Automatic milestone accomplishment extraction again produced noisy summary
+  lines and required manual cleanup in `MILESTONES.md`.
+
+### Patterns Established
+
+- Bound-model claims should move through a layered evidence chain: hardware
+  model -> graph IR -> operator estimate -> v2 sidecar -> score report.
+- Unsupported or inexact evidence must degrade scoring or warn deterministically
+  instead of silently improving aggregate bounds.
+- Hardware validation status belongs in artifacts, docs, and guardrail tests,
+  not just in prose.
+
+### Key Lessons
+
+1. Paper consistency for AMD SOL/SOLAR modeling is mostly an evidence-contract
+   problem: formulas, byte buckets, confidence, rationale, and unsupported
+   evidence need to be inspectable at every layer.
+2. RDNA 4-only validation scope works when deferred CDNA 3 / MI300X and CDNA 4
+   claims are guarded in code, docs, and tests.
+3. Planning metadata quality matters at milestone close; future phases should
+   keep summary frontmatter and validation task tables synchronized as work
+   lands.
+
+### Cost Observations
+
+- Model mix: not recorded.
+- Sessions: one autonomous milestone run plus audit, validation, and completion.
+- Notable: final validation included 40 focused AMD bound/model/score/contract
+  tests and `uv build`; the audit found 28/28 requirements satisfied with only
+  planning metadata hygiene debt.
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -294,6 +366,7 @@
 | v1.5 | 1 | 4 | Added AMD-native timing/SOL/scoring evidence layers while preserving public contracts |
 | v1.7 | 1 | 5 | Added baseline/timing/reward-hack/library/MI300X readiness hardening before real commercial GPU validation |
 | v1.8 | 1 | 5 | Completed scoped ROCm library replacement support for RDNA 4 and added Nyquist validation artifacts |
+| v1.9 | 1+ | 6 | Completed the RDNA 4-scoped AMD SOL/SOLAR bound modeling evidence chain from hardware model through score report |
 
 ### Cumulative Quality
 
@@ -304,6 +377,7 @@
 | v1.5 | 42 focused milestone tests passed; ruff clean | v1.5 requirements 20/20 complete | Real CDNA 3 hardware validation; broader AMD SOL operator coverage |
 | v1.7 | 67 focused audit tests passed | v1.7 requirements 21/21 complete | MI300X/CDNA3 full-suite validation; FP8 real-hardware validation; paper extraction; full SOLAR parity |
 | v1.8 | 41 focused tests passed; ruff clean; Docker entrypoint syntax passed | v1.8 requirements 23/23 complete | CDNA 3/CDNA 4 library validation; complete local ROCm development headers for native E2E |
+| v1.9 | 40 focused AMD bound/model/score/contract tests passed; `uv build` passed | v1.9 requirements 28/28 complete | CDNA 3 / MI300X real-hardware validation; CDNA 4 validation; paper extraction; broader upstream SOLAR parity |
 
 ### Top Lessons
 
@@ -312,3 +386,5 @@
 3. Engineering-practice borrowing should be protected by explicit public-contract tests.
 4. Support matrices should only use "supported" for categories with runnable
    examples, tests, and scope-specific docs.
+5. Derived scoring artifacts need explicit degradation semantics so unsupported
+   evidence cannot inflate reported AMD-native scores.
