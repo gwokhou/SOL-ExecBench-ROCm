@@ -18,11 +18,16 @@ from sol_execbench.core.scoring.amd_sol import (
 )
 from sol_execbench.core.scoring.amd_sol_v2 import AmdSolBoundV2Artifact
 from sol_execbench.core.scoring.baseline_artifact import ScoringBaselineArtifact
+from sol_execbench.core.scoring.solar_derivation import (
+    SolarAggregateStatus,
+    SolarDerivationEvidence,
+)
 from sol_execbench.sol_score import sol_score
 
 
 AMD_SCORE_SCHEMA_VERSION = "sol_execbench.amd_native_score.v1"
 AMD_SCORE_CLAIM_LEVEL = "amd-native-derived"
+SolarScoreGuard = SolarAggregateStatus | SolarDerivationEvidence
 UNSUPPORTED_EVIDENCE_WARNING = (
     "AMD-native score evidence contains unsupported operations; do not present "
     "the score as complete hardware-performance validation."
@@ -159,10 +164,15 @@ def score_amd_native_workload(
     baseline_ref: str | None = None,
     baseline_source: str = "scoring_baseline",
     hardware_model_ref: str | None = None,
+    solar_derivation: SolarScoreGuard | None = None,
 ) -> AmdNativeScore:
     """Build a guarded AMD-native score for one workload."""
     sol_bound_ms = _artifact_sol_bound_ms(artifact)
     warnings = _warnings_for_artifact(artifact)
+    solar_aggregate = _solar_aggregate_status(solar_derivation)
+    if solar_aggregate is not None:
+        warnings.extend(_warnings_for_solar_aggregate(solar_aggregate))
+        warnings = _unique(warnings)
     if baseline_source == "reference_latency":
         warnings.append(REFERENCE_BASELINE_WARNING)
     evidence_refs = _evidence_refs(
@@ -174,7 +184,9 @@ def score_amd_native_workload(
     )
 
     score_value = None
-    if isinstance(artifact, AmdSolBoundV2Artifact) and not artifact.aggregate_bound.scored:
+    if solar_aggregate is not None and solar_aggregate.status == "unscored":
+        score_value = None
+    elif isinstance(artifact, AmdSolBoundV2Artifact) and not artifact.aggregate_bound.scored:
         if UNSCORED_SOL_BOUND_WARNING not in warnings:
             warnings.append(UNSCORED_SOL_BOUND_WARNING)
     elif _has_complete_numeric_inputs(
@@ -228,6 +240,7 @@ def score_amd_native_trace_workload(
     baseline_ref: str | None = None,
     baseline_artifact: ScoringBaselineArtifact | None = None,
     hardware_model_ref: str | None = None,
+    solar_derivation: SolarScoreGuard | None = None,
 ) -> AmdNativeScore:
     """Build a guarded AMD-native score from a canonical trace and SOL artifact."""
     measured_latency_ms = None
@@ -288,6 +301,7 @@ def score_amd_native_trace_workload(
         baseline_ref=baseline_ref,
         baseline_source=baseline_source,
         hardware_model_ref=hardware_model_ref,
+        solar_derivation=solar_derivation,
     )
 
 
@@ -296,11 +310,13 @@ def build_amd_native_suite_report_from_traces(
     artifacts_by_workload_uuid: dict[str, AmdSolBoundArtifact | AmdSolBoundV2Artifact],
     *,
     evidence_refs_by_workload_uuid: dict[str, dict[str, str]] | None = None,
+    solar_derivations_by_workload_uuid: dict[str, SolarScoreGuard] | None = None,
     baseline_artifact: ScoringBaselineArtifact | None = None,
     baseline_summary: dict[str, int] | None = None,
 ) -> AmdNativeSuiteReport:
     """Build a suite report from canonical traces and derived SOL artifacts."""
     evidence_refs_by_workload_uuid = evidence_refs_by_workload_uuid or {}
+    solar_derivations_by_workload_uuid = solar_derivations_by_workload_uuid or {}
     scores = []
     for trace in traces:
         refs = evidence_refs_by_workload_uuid.get(trace.workload.uuid, {})
@@ -314,6 +330,9 @@ def build_amd_native_suite_report_from_traces(
                 baseline_ref=refs.get("baseline"),
                 baseline_artifact=baseline_artifact,
                 hardware_model_ref=refs.get("hardware_model"),
+                solar_derivation=solar_derivations_by_workload_uuid.get(
+                    trace.workload.uuid
+                ),
             )
         )
     return build_amd_native_suite_report(scores, baseline_summary=baseline_summary)
@@ -372,6 +391,35 @@ def _warnings_for_artifact(
     if artifact.hardware_model.architecture.startswith("gfx94"):
         warnings.append(CDNA3_NO_VALIDATION_WARNING)
 
+    return warnings
+
+
+def _solar_aggregate_status(
+    solar_derivation: SolarScoreGuard | None,
+) -> SolarAggregateStatus | None:
+    if solar_derivation is None:
+        return None
+    if isinstance(solar_derivation, SolarAggregateStatus):
+        return solar_derivation
+    payload = solar_derivation.to_dict()["aggregate_status"]
+    return SolarAggregateStatus(
+        status=str(payload["status"]),
+        score_eligible=bool(payload["score_eligible"]),
+        reason=str(payload["reason"]),
+        group_ids=tuple(str(group_id) for group_id in payload["group_ids"]),
+        node_ids=tuple(str(node_id) for node_id in payload["node_ids"]),
+        warnings=tuple(str(warning) for warning in payload["warnings"]),
+    )
+
+
+def _warnings_for_solar_aggregate(
+    aggregate_status: SolarAggregateStatus,
+) -> list[str]:
+    warnings = list(aggregate_status.warnings)
+    if aggregate_status.status == "degraded":
+        warnings.append(DEGRADED_SOL_BOUND_WARNING)
+    elif aggregate_status.status == "unscored":
+        warnings.append(UNSCORED_SOL_BOUND_WARNING)
     return warnings
 
 
