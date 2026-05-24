@@ -16,6 +16,12 @@
 """Data layer with strongly-typed dataclasses for SOL ExecBench."""
 
 from .definition import AxisConst, AxisSpec, AxisVar, Definition, TensorSpec
+from .contract import (
+    SOL_EXECBENCH_CONTRACT_SCHEMA_VERSION,
+    SOL_EXECBENCH_CONTRACT_VERSION,
+    EvaluatorContract,
+    build_evaluator_contract,
+)
 from .json_utils import (
     append_jsonl_file,
     load_json_file,
@@ -58,6 +64,11 @@ __all__ = [
     "AxisVar",
     "TensorSpec",
     "Definition",
+    # Contract types
+    "SOL_EXECBENCH_CONTRACT_SCHEMA_VERSION",
+    "SOL_EXECBENCH_CONTRACT_VERSION",
+    "EvaluatorContract",
+    "build_evaluator_contract",
     # Solution types
     "SourceFile",
     "BuildSpec",
