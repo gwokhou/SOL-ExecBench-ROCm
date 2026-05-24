@@ -1,105 +1,101 @@
 # Technology Stack
 
-**Analysis Date:** 2026-05-22
+**Analysis Date:** 2026-05-24
 
 ## Languages
 
 **Primary:**
-- Python 3.12+ - Package source, CLI, schemas, benchmark drivers, dataset scripts, and tests live under `src/sol_execbench/`, `scripts/`, and `tests/`; `pyproject.toml` requires `>=3.12,<3.14` and `.python-version` pins local development to `3.12`.
+- Python `>=3.12,<3.14` - Package, CLI, evaluator driver, dataset tooling, diagnostics, and tests under `src/sol_execbench/`, `scripts/`, and `tests/`.
 
 **Secondary:**
-- Bash - Docker launcher and entrypoint scripts in `scripts/run_docker.sh`, `scripts/download_data.sh`, and `docker/entrypoint.sh`.
-- HIP/C++ - User-submitted native solution sources are compiled through the staging template in `src/sol_execbench/driver/templates/build_ext.py`; examples live under `examples/hip_cpp/` and tests under `tests/sol_execbench/samples/`.
-- Triton Python - Triton ROCm examples live under `examples/triton/`, with dependency readiness covered by `tests/docker/dependencies/test_triton_rocm.py`.
-- JSON/JSONL - Benchmark definitions, workloads, solutions, traces, and configs are consumed by `src/sol_execbench/cli/main.py`, `src/sol_execbench/core/data/`, and `src/sol_execbench/driver/problem_packager.py`.
+- HIP/C++ - User solution sources compiled through the native extension path in `src/sol_execbench/driver/templates/build_ext.py`; examples live under `examples/hip_cpp/`, `examples/hipblas/`, `examples/miopen/`, `examples/ck/`, and `examples/rocwmma/`.
+- Shell - Docker and dataset helper scripts in `scripts/run_docker.sh`, `scripts/download_data.sh`, and `docker/entrypoint.sh`.
+- Markdown/JSON/JSONL - Public schemas and docs in `docs/`, sample problems in `tests/sol_execbench/samples/`, and benchmark data layouts under `data/`.
 
 ## Runtime
 
 **Environment:**
-- Python `>=3.12,<3.14` from `pyproject.toml`; `.python-version` records `3.12`.
-- ROCm runtime baseline is ROCm 7.0+ in docs, with the Docker image using `rocm/dev-ubuntu-24.04:7.1.1-complete` in `docker/Dockerfile`.
-- PyTorch ROCm exposes AMD GPU devices through the historical `torch.cuda` API; runtime checks appear in `README.md`, `src/sol_execbench/core/utils.py`, and `src/sol_execbench/driver/templates/eval_driver.py`.
-- Host/container ROCm tools required for full GPU evaluation include `hipcc`, `rocminfo`, `rocprofv3`, and `rocm-smi` or `amd-smi`, checked in `docker/Dockerfile`, `tests/docker/dependencies/test_rocm_runtime.py`, and `docs/rocm.md`.
+- Python `>=3.12,<3.14`, declared in `pyproject.toml`.
+- ROCm `>=7.0` host runtime, documented in `README.md` and `docs/rocm.md`.
+- PyTorch ROCm `2.10.0+rocm7.1` on Linux/Windows through the `pytorch-rocm71` uv index in `pyproject.toml`.
+- Docker runtime based on `rocm/dev-ubuntu-24.04:7.1.1-complete` in `docker/Dockerfile`.
 
 **Package Manager:**
-- `uv` - Project install and lock management via `uv.lock` and `pyproject.toml`; Docker copies `uv` `0.5.11` from `ghcr.io/astral-sh/uv:0.5.11` in `docker/Dockerfile`.
-- Lockfile: present as `uv.lock`.
-- Build backend: Hatchling via `[build-system]` in `pyproject.toml`.
+- `uv` - Dependency resolver and runner; lockfile is `uv.lock`.
+- Docker image copies `uv` from `ghcr.io/astral-sh/uv:0.5.11` in `docker/Dockerfile`.
+- Lockfile: present at `uv.lock`.
 
 ## Frameworks
 
 **Core:**
-- PyTorch `2.10.0+rocm7.1` on Linux/Windows, `2.10.0` elsewhere - Tensor runtime, reference execution, HIP-backed device events, and native extension builds; declared in `pyproject.toml` and locked in `uv.lock`.
-- torchvision `0.25.0+rocm7.1` on Linux/Windows, `0.25.0` elsewhere - PyTorch companion package declared in `pyproject.toml`.
-- Pydantic `2.12.5` - Strongly typed benchmark schemas in `src/sol_execbench/core/data/`.
-- Click `8.3.1` - CLI commands in `src/sol_execbench/cli/main.py` and `src/sol_execbench/cli/baseline.py`.
-- Rich `14.3.3` - CLI tables/progress output in `src/sol_execbench/cli/main.py`.
-- Triton ROCm `3.6.0` - Triton solution category and examples under `examples/triton/`.
-- safetensors `0.7.0` - Tensor input loading support referenced by package dependencies and benchmark data docs.
-- Hugging Face datasets `4.8.2` - SOL ExecBench dataset download script in `scripts/download_solexecbench.py`.
+- Click `>=8.0` / locked `8.3.1` - CLI commands in `src/sol_execbench/cli/main.py` and `src/sol_execbench/cli/baseline.py`.
+- Rich `>=13.0` / locked `14.3.3` - CLI tables and progress display in `src/sol_execbench/cli/main.py`.
+- Pydantic `>=2.12.5` / locked `2.12.5` - Public schema models in `src/sol_execbench/core/data/`.
+- PyTorch ROCm `2.10.0+rocm7.1` - Reference execution, user solution execution, timing, tensor IO, and native extension compilation in `src/sol_execbench/driver/templates/eval_driver.py` and `src/sol_execbench/driver/templates/build_ext.py`.
+- Triton ROCm `3.6.0` - Supported solution category for generated Triton kernels; timing policy routes Triton to `rocprofv3` in `src/sol_execbench/core/bench/timing_policy.py`.
+- Hugging Face Datasets `4.8.2` - Public benchmark dataset downloader in `scripts/download_solexecbench.py`.
 
 **Testing:**
-- pytest `9.0.2` - Test runner for `tests/`.
-- pytest-xdist `3.8.0` - Parallel test execution; `pyproject.toml` sets `addopts = "-n auto --dist loadgroup"`.
-- Ruff - Lint/format tool configured in `pyproject.toml`; command guidance is in `AGENTS.md`, `README.md`, and `docs/DEVELOPMENT.md`.
+- Pytest `>=9.0.2` / locked `9.0.2` - Test runner configured in `pyproject.toml`.
+- pytest-xdist `>=3.5` / locked `3.8.0` - Parallel test execution via `addopts = "-n auto --dist loadgroup"` in `pyproject.toml`.
 
 **Build/Dev:**
-- Hatchling - Python package build backend configured in `pyproject.toml`.
-- Ninja `1.13.0` - Native extension build helper declared in `pyproject.toml`.
-- `torch.utils.cpp_extension` - HIP/C++ build path in `src/sol_execbench/driver/templates/build_ext.py`.
-- Docker - ROCm GPU evaluation environment in `docker/Dockerfile` and `scripts/run_docker.sh`.
-- ROCm tools - `hipcc`, `rocminfo`, `rocm_agent_enumerator`, `rocm-smi`, `amd-smi`, and `rocprofv3` are called from `src/sol_execbench/driver/problem_packager.py`, `src/sol_execbench/core/bench/clock_lock.py`, `src/sol_execbench/core/bench/rocm_profiler.py`, and `src/sol_execbench/core/diagnostics.py`.
+- Hatchling - Python build backend declared in `pyproject.toml`.
+- Ruff - Lint and format tool configured in `pyproject.toml`; pre-commit uses `ruff-pre-commit` `v0.9.2` in `.pre-commit-config.yaml`.
+- Ninja `>=1.13.0` / locked `1.13.0` - Build acceleration for PyTorch native extensions.
+- `torch.utils.cpp_extension` - HIP/C++ extension build API used by `src/sol_execbench/driver/templates/build_ext.py`.
+- Docker - ROCm evaluation container defined by `docker/Dockerfile` and launched by `scripts/run_docker.sh`.
 
 ## Key Dependencies
 
 **Critical:**
-- `torch` `2.10.0+rocm7.1` - Required for tensor execution, HIP-backed timing, reference evaluation, and extension builds.
-- `triton-rocm` `3.6.0` - Required for Triton ROCm examples and solution execution on Linux.
-- `pydantic` `2.12.5` - Enforces public schemas for definitions, workloads, solutions, traces, and configuration.
-- `click` `8.3.1` and `rich` `14.3.3` - CLI interface and human-readable benchmark reporting.
-- `datasets` `4.8.2` - Downloads the upstream `nvidia/SOL-ExecBench` benchmark dataset in `scripts/download_solexecbench.py`.
-- `safetensors` `0.7.0` - Supports safetensors-backed benchmark inputs in `src/sol_execbench/core/bench/io.py`.
-- `ninja` `1.13.0` - Speeds and supports PyTorch native extension compilation.
+- `torch==2.10.0+rocm7.1` - Core ROCm tensor runtime and device API; code intentionally uses PyTorch's `torch.cuda` namespace for HIP-backed devices in `src/sol_execbench/driver/templates/eval_driver.py`.
+- `torchvision==0.25.0+rocm7.1` - Locked alongside PyTorch ROCm in `pyproject.toml` for compatibility.
+- `triton-rocm==3.6.0` - Triton ROCm solution support on Linux.
+- `pydantic>=2.12.5` - Schema validation for definitions, workloads, solutions, traces, contracts, and dataset manifests in `src/sol_execbench/core/data/` and `src/sol_execbench/core/dataset/`.
+- `click>=8.0` and `rich>=13.0` - User-facing command-line interface in `src/sol_execbench/cli/`.
+- `safetensors>=0.7.0` / locked `0.7.0` - Workload tensor blob loading in `src/sol_execbench/core/bench/io.py` and `src/sol_execbench/driver/templates/eval_driver.py`.
+- `datasets>=4.8.2` / locked `4.8.2` - Downloading `nvidia/SOL-ExecBench` in `scripts/download_solexecbench.py`.
+- `torch-c-dlpack-ext>=0.1.5` / locked `0.1.5` - Runtime dependency declared in `pyproject.toml` for DLPack extension support.
+- `apache-tvm-ffi>=0.1.9` / locked `0.1.9` - Runtime dependency declared in `pyproject.toml`.
 
 **Infrastructure:**
-- `torch-c-dlpack-ext` `0.1.5` - Runtime dependency declared for DLPack interop support in `pyproject.toml`.
-- `apache-tvm-ffi` `0.1.9` - Runtime dependency declared for TVM FFI support in `pyproject.toml`.
-- `torchvision` `0.25.0+rocm7.1` - Companion package resolved from the ROCm wheel index.
-- `pytest` and `pytest-xdist` - Development dependency group in `pyproject.toml`.
-- ROCm base image `rocm/dev-ubuntu-24.04:7.1.1-complete` - Containerized runtime in `docker/Dockerfile`.
-- `ghcr.io/astral-sh/uv:0.5.11` - Docker build source for the `uv` binary in `docker/Dockerfile`.
+- ROCm host tools: `rocminfo`, `rocm-smi` or `amd-smi`, `hipcc`, `rocm_agent_enumerator`, and `rocprofv3`; documented in `docs/rocm.md` and invoked from `src/sol_execbench/driver/problem_packager.py`, `src/sol_execbench/core/bench/clock_lock.py`, and `src/sol_execbench/core/bench/rocm_profiler.py`.
+- ROCm native libraries: hipBLAS, MIOpen, Composable Kernel, and rocWMMA; dependency expectations are documented in `docs/rocm_libraries.md` and checked by `src/sol_execbench/core/diagnostics.py`.
+- Docker GPU passthrough: `/dev/kfd`, `/dev/dri`, `video` group, unconfined seccomp, and host IPC in `docs/rocm.md` and `scripts/run_docker.sh`.
+- Hugging Face CLI: `hf download` for `flashinfer-ai/flashinfer-trace` in `scripts/download_data.sh`.
 
 ## Configuration
 
 **Environment:**
-- No `.env`, `.env.example`, or `.env.sample` files are present in the repository scan; `docs/CONFIGURATION.md` states there are no required package-level environment variables.
-- Docker runtime variables are defined in `docker/Dockerfile`: `ROCM_PATH=/opt/rocm`, `HIP_PATH=/opt/rocm`, `HIP_PLATFORM=amd`, `LD_LIBRARY_PATH=/opt/rocm/lib`, `UV_CACHE_DIR`, `UV_LINK_MODE`, `UV_COMPILE_BYTECODE`, `UV_PYTHON_DOWNLOADS`, `UV_PROJECT_ENVIRONMENT`, `PATH`, and `PYTHONPATH`.
-- `scripts/run_docker.sh` passes `FLASHINFER_TRACE_DIR`, `SOL_EXECBENCH_GPU_CLK_MHZ`, and `SOL_EXECBENCH_DRAM_CLK_MHZ` into the container.
-- `docker/entrypoint.sh` sets `SOL_EXECBENCH_CLOCKS_LOCKED` after trying to lock GPU clocks.
-- `src/sol_execbench/core/bench/clock_lock.py` reads optional `SOL_EXECBENCH_SCLK_LEVEL` and `SOL_EXECBENCH_MCLK_LEVEL` overrides.
-- `src/sol_execbench/cli/main.py` sets `PYTORCH_ALLOC_CONF=expandable_segments:True` for compile and evaluation subprocesses.
+- No required application-level `.env` file is detected or documented; `docs/CONFIGURATION.md` states configuration is via CLI flags, optional benchmark `config.json`, package config, Docker env vars, and ROCm env vars.
+- Container env vars are declared in `docker/Dockerfile`: `ROCM_PATH`, `HIP_PATH`, `HIP_PLATFORM`, `PATH`, `LD_LIBRARY_PATH`, `UV_CACHE_DIR`, `UV_LINK_MODE`, `UV_COMPILE_BYTECODE`, `UV_PYTHON_DOWNLOADS`, `UV_PROJECT_ENVIRONMENT`, and `PYTHONPATH`.
+- Runtime env vars include `FLASHINFER_TRACE_DIR` for safetensors lookup in `src/sol_execbench/driver/templates/eval_driver.py`, `SOL_EXECBENCH_CLOCKS_LOCKED` in `src/sol_execbench/core/bench/clock_lock.py`, `SOL_EXECBENCH_SCLK_LEVEL` and `SOL_EXECBENCH_MCLK_LEVEL` in `src/sol_execbench/core/bench/clock_lock.py`, and subprocess `PYTORCH_ALLOC_CONF=expandable_segments:True` in `src/sol_execbench/cli/main.py`.
+- Native extension builds set `PYTORCH_ROCM_ARCH` from solution target hardware when absent in `src/sol_execbench/driver/templates/build_ext.py`.
 
 **Build:**
-- `pyproject.toml` configures package metadata, console scripts, dependencies, dependency groups, pytest options, Ruff exclusions, and ROCm wheel indexes.
-- `uv.lock` pins resolved dependency versions.
-- `docker/Dockerfile` defines the ROCm evaluation image and installs dependencies with `uv sync --frozen --all-groups`.
-- `scripts/run_docker.sh` builds and runs the container with `/dev/kfd`, `/dev/dri`, `--group-add video`, `seccomp=unconfined`, `--ipc=host`, and project volume mounts.
-- `src/sol_execbench/driver/templates/build_ext.py` compiles HIP/C++ sources into `benchmark_kernel.so`.
-- `src/sol_execbench/core/bench/config/benchmark_config.py` provides benchmark defaults loaded from optional `config.json` files.
+- Python package metadata and dependency indexes: `pyproject.toml`.
+- Locked dependencies: `uv.lock`.
+- Docker image: `docker/Dockerfile`.
+- Docker wrapper: `scripts/run_docker.sh`.
+- Container entrypoint and clock lock lifecycle: `docker/entrypoint.sh`.
+- Pre-commit lint and DCO hook configuration: `.pre-commit-config.yaml`.
+- Benchmark config schema: `src/sol_execbench/core/bench/config/benchmark_config.py`.
 
 ## Platform Requirements
 
 **Development:**
-- Python 3.12+ and `uv`.
-- ROCm 7.0+ host for real GPU evaluation; PyTorch ROCm wheels are selected through `pyproject.toml`.
-- AMD GPU access through `/dev/kfd` and `/dev/dri` for Docker runs; `scripts/run_docker.sh` rejects Docker Desktop contexts because ROCm device passthrough requires a native Linux daemon.
-- HIP compiler and ROCm tools (`hipcc`, `rocminfo`, `rocprofv3`, `rocm-smi` or `amd-smi`) for native extension builds, diagnostics, profiling, and clock management.
+- Use Python `>=3.12,<3.14` with `uv sync --all-groups`.
+- Use a Linux host with ROCm `>=7.0`, AMD GPU device access, and ROCm tools for GPU evaluation.
+- Use native Linux Docker for container runs; Docker Desktop is rejected for ROCm passthrough per `docs/rocm.md` and `scripts/run_docker.sh`.
+- Use `hipcc` and ROCm development headers for native HIP/C++ and library examples.
+- Use `rocprofv3` for profiler-backed timing evidence in `src/sol_execbench/core/bench/rocm_profiler.py`.
 
 **Production:**
-- Not a deployed web/service production system; production-like use is local or containerized benchmark execution.
-- Docker target is `rocm/dev-ubuntu-24.04:7.1.1-complete` with mounted source and data directories.
-- Supported benchmark hardware targets in schemas are `gfx1200`, `gfx940`, `gfx941`, `gfx942`, and `LOCAL` in `src/sol_execbench/core/data/solution.py`; README states current local validation evidence covers RDNA 4 `gfx1200`, with CDNA 3 validation deferred.
+- Not a hosted web service. The production-like target is a local or containerized ROCm evaluation environment running `sol-execbench` on AMD GPUs.
+- Supported hardware metadata includes RDNA 4 (`gfx1200`) and CDNA 3 (`gfx940`, `gfx941`, `gfx942`) schema/build paths, with validation status documented in `docs/rocm.md`.
+- Benchmark assets are local filesystem data under `data/SOL-ExecBench/benchmark` and `data/flashinfer-trace`.
 
 ---
 
-*Stack analysis: 2026-05-22*
+*Stack analysis: 2026-05-24*
