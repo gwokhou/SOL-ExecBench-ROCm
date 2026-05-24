@@ -1,106 +1,104 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-05-22
+**Analysis Date:** 2026-05-24
 
 ## Naming Patterns
 
 **Files:**
-- Use lowercase `snake_case.py` for Python modules: `src/sol_execbench/core/bench/timing_policy.py`, `src/sol_execbench/core/scoring/baseline_artifact.py`.
-- Test files use `test_*.py` and mirror source areas where possible: `tests/sol_execbench/core/data/test_solution.py`, `tests/sol_execbench/driver/test_problem_packager.py`.
-- Template scripts in `src/sol_execbench/driver/templates/` are normal Python files named for the staged action: `build_ext.py`, `eval_driver.py`.
-- Example kernels and references use fixed names inside each example directory: `examples/triton/rmsnorm/kernel.py`, `examples/triton/rmsnorm/reference.py`.
+- Use `snake_case.py` for source and tests: `src/sol_execbench/core/bench/timing.py`, `src/sol_execbench/core/data/solution.py`, `tests/sol_execbench/test_rocm_profiler.py`.
+- Keep tests under the package area they exercise when possible: `tests/sol_execbench/core/data/test_solution.py` mirrors `src/sol_execbench/core/data/solution.py`; `tests/sol_execbench/driver/test_build_ext.py` mirrors `src/sol_execbench/driver/templates/build_ext.py`.
+- Template scripts live in `src/sol_execbench/driver/templates/` and are validated as executable Python by tests in `tests/sol_execbench/driver/`.
 
 **Functions:**
-- Use `snake_case` for public and private functions: `time_runnable()` in `src/sol_execbench/core/bench/timing.py`, `_get_local_gfx()` in `src/sol_execbench/driver/problem_packager.py`.
-- Prefix helper functions with `_` when module-private: `_load_solution()` in `src/sol_execbench/cli/main.py`, `_inject_offload_arch_flags()` in `src/sol_execbench/driver/problem_packager.py`.
-- Test helper factories use `_make_*`, `_load_*`, or `_run_*`: `_make_spec()` in `tests/sol_execbench/core/data/test_solution.py`, `_exec_build_ext()` in `tests/sol_execbench/driver/test_build_ext.py`.
-- Pydantic validators use explicit `_validate_*` or `_reject_*` names and decorators: `_validate_source_path()` and `_reject_legacy_languages()` in `src/sol_execbench/core/data/solution.py`.
+- Use `snake_case` for public and private functions: `bench_time_with_device_events()` in `src/sol_execbench/core/bench/timing.py`, `review_solution_sources()` in `src/sol_execbench/core/bench/reward_hack.py`, `_resolve_problem_dir()` in `src/sol_execbench/cli/main.py`.
+- Prefix module-private helpers with `_`: `_summarize_statistics()` in `src/sol_execbench/core/bench/timing.py`, `_match_rule()` in `src/sol_execbench/core/bench/reward_hack.py`, `_load_sample()` in `tests/sol_execbench/test_e2e.py`.
+- Use descriptive validator names on Pydantic models: `_validate_entry_point()`, `_validate_languages()`, and `_reject_legacy_compile_options()` in `src/sol_execbench/core/data/solution.py`.
 
 **Variables:**
-- Use `snake_case` for locals and fields: `compile_options`, `hip_cflags`, `output_dir`, `target_hardware`.
-- Constants use uppercase module-level names: `_CPP_LANGUAGES` in `src/sol_execbench/driver/problem_packager.py`, `ROCPROFV3_EXECUTABLE` in `src/sol_execbench/core/bench/rocm_profiler.py`.
-- Test data constants use leading underscores when private to a test module: `_DEFINITION_DICT`, `_WORKLOAD_DICTS`, `_HIP_SOLUTION_DICT` in `tests/sol_execbench/driver/test_problem_packager.py`.
-- Prefer concrete names over abbreviations except well-known ROCm terms: `gfx_arch`, `rocprofv3_available`, `kernel_duration_ms`.
+- Use `snake_case` for local variables and fields: `compile_timeout`, `output_file`, and `keep_staging` in `src/sol_execbench/cli/main.py`.
+- Use uppercase module constants for immutable fixtures, schemas, and lookup sets: `REQUIRED_CAPABILITIES` in `tests/sol_execbench/test_contract.py`, `_STATIC_RULES` in `src/sol_execbench/core/bench/reward_hack.py`, `_CPP_LANGUAGES` in `tests/sol_execbench/test_e2e.py`.
+- Use leading underscores for module-local constants that should not be imported as API: `_TEMPLATES_DIR` in `tests/sol_execbench/driver/test_eval_driver.py`, `_ELAPSED_TIME_ADDR` in `src/sol_execbench/core/bench/reward_hack.py`.
 
 **Types:**
-- Use `PascalCase` for classes, dataclasses, Pydantic models, and enums: `ProblemPackager`, `Rocprofv3TimingEvidence`, `SupportedLanguages`, `Definition`.
-- Enum classes use `PascalCase`; enum members are uppercase for symbolic options: `SupportedLanguages.HIP_CPP`, `SupportedHardware.GFX1200` in `src/sol_execbench/core/data/solution.py`.
-- Type aliases use `PascalCase` when exported: `NonEmptyString`, `NonNegativeInt` in `src/sol_execbench/core/data/base_model.py`.
-- Use built-in generic syntax and unions: `list[Workload]`, `dict[str, object]`, `Path | None`, visible throughout `src/sol_execbench/driver/problem_packager.py` and `src/sol_execbench/core/bench/rocm_profiler.py`.
+- Use `PascalCase` for classes, dataclasses, Pydantic models, and enums: `Definition` in `src/sol_execbench/core/data/definition.py`, `SourceReviewIssue` in `src/sol_execbench/core/bench/reward_hack.py`, `SupportedLanguages` in `src/sol_execbench/core/data/solution.py`.
+- Enum classes use `PascalCase`; enum members use uppercase names with string values: `SupportedLanguages.HIP_CPP = "hip_cpp"` in `src/sol_execbench/core/data/solution.py`.
+- Prefer Pydantic models for public JSON schemas and validation boundaries: `Definition`, `Workload`, `Solution`, and `Trace` under `src/sol_execbench/core/data/`.
+- Prefer `@dataclass(frozen=True)` for internal immutable records: `SourceReviewIssue` in `src/sol_execbench/core/bench/reward_hack.py`, `Rocprofv3CollectionRequest` in `src/sol_execbench/core/bench/rocm_profiler.py`, and scoring records in `src/sol_execbench/core/scoring/amd_score.py`.
 
 ## Code Style
 
 **Formatting:**
-- Use Ruff formatting via `uv run ruff format .`; Ruff excludes `data` and `examples` in `pyproject.toml`.
-- Target Python is `>=3.12,<3.14` in `pyproject.toml`; use Python 3.12 syntax, including `|` unions and generic built-ins.
-- Keep SPDX copyright and Apache-2.0 license headers at the top of source and test modules. Most files under `src/sol_execbench/` and `tests/sol_execbench/` include this header.
-- Add a concise module docstring after the license header for non-trivial modules: `src/sol_execbench/driver/problem_packager.py`, `src/sol_execbench/core/bench/rocm_profiler.py`, `tests/sol_execbench/test_e2e.py`.
+- Use Ruff formatting from `pyproject.toml`; no separate `.prettierrc`, `.eslintrc`, `ruff.toml`, `pytest.ini`, or `.coveragerc` is present.
+- Keep Python compatible with `requires-python = ">=3.12,<3.14"` in `pyproject.toml`.
+- Keep line wrapping and import formatting consistent with Ruff output. Existing code uses parenthesized multiline imports in `src/sol_execbench/core/__init__.py` and multiline assertions in tests such as `tests/sol_execbench/test_e2e.py`.
+- Preserve SPDX and Apache license headers in source and test files that already use them, such as `src/sol_execbench/core/data/definition.py` and `tests/conftest.py`.
 
 **Linting:**
-- Use Ruff via `uv run ruff check .`.
-- Ruff ignores `E741` in `pyproject.toml`; avoid ambiguous one-letter names anyway except short loop variables in local comprehensions.
-- Generated data, downloaded datasets, and examples are excluded from Ruff checks by `pyproject.toml`; keep production package style stricter than example code.
+- Ruff is configured in `pyproject.toml`.
+- Excluded paths are `.git`, `.venv`, `__pycache__`, `build`, `dist`, `*.egg-info`, `.ruff_cache`, `data`, and `examples`.
+- Ruff lint ignores `E741`; avoid adding ambiguous single-character names anyway unless matching nearby math-heavy code.
+- Run lint with `uv run --with ruff ruff check .`; run formatting with `uv run --with ruff ruff format .`.
 
 ## Import Organization
 
 **Order:**
-1. `from __future__ import annotations` when needed, immediately after the module docstring or license/docstring block: `src/sol_execbench/cli/main.py`, `tests/examples/test_examples.py`.
-2. Standard library imports: `json`, `subprocess`, `Path`, `dataclass`, `Sequence`.
-3. Third-party imports: `click`, `pytest`, `torch`, `pydantic`, `rich`.
-4. Local package imports: `from sol_execbench.core...` in tests, relative imports inside package modules such as `from ..core import ...` in `src/sol_execbench/cli/main.py`.
-5. `TYPE_CHECKING` imports stay guarded to avoid runtime dependency work: `src/sol_execbench/core/data/definition.py`.
+1. `from __future__ import annotations` where modern annotations are used, as in `src/sol_execbench/core/bench/timing.py` and `tests/sol_execbench/test_e2e.py`.
+2. Standard library imports: `json`, `subprocess`, `Path`, `dataclass`, `Enum`.
+3. Third-party imports: `click`, `pytest`, `pydantic`, `torch`, `rich`.
+4. Package imports from `sol_execbench` or relative imports inside the package.
+5. `TYPE_CHECKING` imports stay behind `if TYPE_CHECKING:` as in `src/sol_execbench/core/data/definition.py`.
 
 **Path Aliases:**
-- No custom import alias configuration is detected in `pyproject.toml`.
-- Use package-root imports in tests: `from sol_execbench.core import Definition`.
-- Use relative imports inside `src/sol_execbench/` when importing sibling package layers: `from .base_model import ...`, `from ..core import ...`.
+- No configured path aliases are detected. Use normal package imports rooted at `sol_execbench`, for example `from sol_execbench.core.data.solution import BuildSpec` in `tests/sol_execbench/core/data/test_solution.py`.
+- Inside package modules, short relative imports are common within the same layer: `from .base_model import BaseModelWithDocstrings` in `src/sol_execbench/core/data/definition.py`.
+- Public re-export modules use explicit `__all__` lists: `src/sol_execbench/__init__.py`, `src/sol_execbench/core/__init__.py`, and `src/sol_execbench/core/scoring/__init__.py`.
 
 ## Error Handling
 
 **Patterns:**
-- Use `ValueError` for schema, validation, parsing, and unsupported-option failures: `src/sol_execbench/core/data/solution.py`, `src/sol_execbench/core/data/definition.py`, `src/sol_execbench/core/bench/timing.py`.
-- Chain exceptions when converting parse errors into domain messages: `raise ValueError(...) from exc` in `src/sol_execbench/core/baseline.py` and `src/sol_execbench/core/data/definition.py`.
-- Use `RuntimeError` for evaluation/runtime failures and output normalization failures: `src/sol_execbench/core/bench/io.py`, `src/sol_execbench/driver/templates/eval_driver.py`.
-- Use `FileNotFoundError` for required generated artifacts: `benchmark_kernel.so` checks in `src/sol_execbench/driver/problem_packager.py` and `src/sol_execbench/driver/templates/build_ext.py`.
-- Use `click.ClickException` for CLI-facing invalid arguments or missing problem files: `src/sol_execbench/cli/main.py`.
-- Catch broad exceptions only at process/tooling boundaries where failure is intentionally converted to fallback behavior: ROCm tool detection in `src/sol_execbench/driver/problem_packager.py`, reward-hack isolation in `src/sol_execbench/core/bench/reward_hack.py`, diagnostics probing in `src/sol_execbench/core/diagnostics.py`.
-- Preserve ROCm migration guidance in validation messages. For example, CUDA/NVIDIA schema values are rejected with replacement guidance in `src/sol_execbench/core/data/solution.py`.
+- Raise `ValueError` for schema, argument, and semantic validation failures: `src/sol_execbench/core/data/definition.py`, `src/sol_execbench/core/data/solution.py`, `src/sol_execbench/core/bench/timing.py`, and `src/sol_execbench/core/scoring/amd_hardware_models.py`.
+- Chain parsing and conversion exceptions with `from exc` when preserving cause matters, as in `src/sol_execbench/core/baseline.py` and `src/sol_execbench/core/scoring/amd_hardware_models.py`.
+- Use domain-specific exception classes for security and benchmark integrity failures: `RewardHackDetected` in `src/sol_execbench/core/bench/reward_hack.py`.
+- Use `click.ClickException` for user-facing CLI validation in `src/sol_execbench/cli/main.py`.
+- Use structured failure status values rather than ad hoc strings across trace data: `EvaluationStatus` in `src/sol_execbench/core/data/trace.py`.
+- Suppress broad exceptions only at explicit environment-probe or best-effort diagnostic boundaries, such as ROCm availability checks in `tests/conftest.py` and utility probes in `src/sol_execbench/core/utils.py`.
 
 ## Logging
 
-**Framework:** `logging` for library internals; Rich/Click output for CLI; `print()` only in staged driver/template subprocesses.
+**Framework:** `logging`, Rich console output, subprocess stdout/stderr capture.
 
 **Patterns:**
-- Library modules that perform system operations log warnings instead of printing: `src/sol_execbench/core/bench/clock_lock.py`.
-- CLI output uses a module-level Rich `Console(stderr=True)` and `console.print()` for status, tables, and subprocess logs: `src/sol_execbench/cli/main.py`.
-- Staged subprocess templates emit machine-readable trace JSON on stdout and operational messages on stderr or explicit print paths: `src/sol_execbench/driver/templates/eval_driver.py`, `src/sol_execbench/driver/templates/build_ext.py`.
-- Do not add ad hoc `print()` calls to reusable package modules under `src/sol_execbench/core/`; return structured data or log instead.
+- Use module loggers for library code that needs logs: `logger = logging.getLogger(__name__)` in `src/sol_execbench/core/bench/clock_lock.py`.
+- Use Rich `Console(stderr=True)` for CLI status and result presentation in `src/sol_execbench/cli/main.py`.
+- Use plain `print()` only in standalone generated/executed scripts or JSON output paths where stdout is part of the contract: `src/sol_execbench/driver/templates/eval_driver.py`, `src/sol_execbench/driver/templates/build_ext.py`, and the `--json` branch in `src/sol_execbench/cli/main.py`.
+- Tests capture subprocess output and include `stdout`/`stderr` in assertion messages for debuggability, as in `tests/sol_execbench/test_e2e.py` and `tests/sol_execbench/driver/test_eval_driver.py`.
 
 ## Comments
 
 **When to Comment:**
-- Keep comments for ROCm compatibility context, subprocess phase boundaries, or subtle timing semantics: `src/sol_execbench/core/bench/timing.py`, `tests/examples/test_examples.py`.
-- Use short comments before non-obvious validation or staging behavior, such as source resolution in `src/sol_execbench/cli/main.py` and offload architecture injection in `src/sol_execbench/driver/problem_packager.py`.
-- Avoid comments that restate the line of code. Prefer docstrings for public behavior and tests for expected outcomes.
+- Use module docstrings to define purpose and execution context: `src/sol_execbench/cli/main.py`, `src/sol_execbench/core/bench/reward_hack.py`, and `tests/sol_execbench/driver/test_eval_driver.py`.
+- Use comments to identify phases, security boundaries, and non-obvious ROCm compatibility behavior: `src/sol_execbench/core/bench/timing.py`, `src/sol_execbench/core/bench/reward_hack.py`, and `tests/sol_execbench/test_e2e.py`.
+- Avoid comments that restate obvious code. Prefer comments before complex benchmark, subprocess, or security-sensitive blocks.
 
 **JSDoc/TSDoc:**
-- Not applicable; this is a Python repository.
-- Use Python docstrings on public functions, dataclasses, Pydantic models, validators, and test classes. Model fields often use attribute docstrings for JSON schema generation via `BaseModelWithDocstrings` in `src/sol_execbench/core/data/base_model.py`.
+- Not applicable; no TypeScript or JavaScript source is detected.
+- Python docstrings are common on public classes/functions and many test helpers. Use NumPy-style sections (`Parameters`, `Returns`, `Raises`) where surrounding code does, such as `src/sol_execbench/core/data/definition.py`.
+- Pydantic schema fields often use attribute docstrings through `BaseModelWithDocstrings` in `src/sol_execbench/core/data/base_model.py`; follow this pattern for new schema fields.
 
 ## Function Design
 
-**Size:** Keep pure helpers small and single-purpose. Larger orchestration functions are acceptable at subprocess or CLI boundaries, such as `cli()` in `src/sol_execbench/cli/main.py` and staged evaluation code in `src/sol_execbench/driver/templates/eval_driver.py`.
+**Size:** Keep helpers focused around one validation, conversion, or IO boundary. Larger modules such as `src/sol_execbench/core/scoring/solar_derivation.py` and `src/sol_execbench/core/scoring/amd_bound_graph.py` use many small private helpers to isolate parsing, classification, and validation substeps.
 
-**Parameters:** Use typed parameters and concrete containers. Prefer dependency injection for external commands or profiling runners, as in `collect_rocprofv3_timing(..., runner=runner)` in `src/sol_execbench/core/bench/rocm_profiler.py`.
+**Parameters:** Prefer typed parameters and explicit return types for production code. Use `Path` for filesystem paths, `Callable` for injectable runners, and `Literal` for constrained string options, as in `src/sol_execbench/core/bench/timing.py` and `src/sol_execbench/core/bench/rocm_profiler.py`.
 
-**Return Values:** Return structured domain objects or simple tuples/lists. Examples: `ProblemPackager.compile()` returns `(command, artifact_path)` in `src/sol_execbench/driver/problem_packager.py`; profiler helpers return dataclasses with `to_dict()` methods in `src/sol_execbench/core/bench/rocm_profiler.py`.
+**Return Values:** Return structured data instead of loosely shaped dictionaries at public boundaries. Use Pydantic models for public JSON contracts (`src/sol_execbench/core/data/trace.py`), dataclasses for internal records (`src/sol_execbench/core/bench/rocm_profiler.py`), and plain dictionaries only at serialization or fixture boundaries.
 
 ## Module Design
 
-**Exports:** Use package `__init__.py` files to expose public core types for ergonomic imports. Tests import `Definition`, `Solution`, `Trace`, and `BenchmarkConfig` from `sol_execbench.core`.
+**Exports:** Package boundary modules should import and list intended public symbols in `__all__`, as in `src/sol_execbench/core/__init__.py` and `src/sol_execbench/cli/__init__.py`.
 
-**Barrel Files:** Barrel-style exports are used in `src/sol_execbench/core/__init__.py`, `src/sol_execbench/core/data/__init__.py`, `src/sol_execbench/core/scoring/__init__.py`, and `src/sol_execbench/driver/__init__.py`. Add new public APIs there only when callers should import them from the package layer.
+**Barrel Files:** Barrel files are used sparingly for public API convenience. Keep implementation logic in leaf modules such as `src/sol_execbench/core/bench/io.py`, `src/sol_execbench/core/data/solution.py`, and `src/sol_execbench/core/scoring/amd_score.py`; expose selected symbols through package `__init__.py` files.
 
 ---
 
-*Convention analysis: 2026-05-22*
+*Convention analysis: 2026-05-24*
