@@ -1,5 +1,30 @@
 # Milestones
 
+## v1.12 Evaluator Contract Metadata and Boundary Guardrails (Shipped: 2026-05-25)
+
+**Delivered:** GPU-free evaluator contract metadata, `sol-execbench contract
+--json`, SOL-owned measured baseline registry namespace, SOL/HIP ownership
+boundary guardrails, and PR #1 shipping evidence.
+
+**Phases completed:** none — retroactive quick-task milestone
+
+**Key accomplishments:**
+
+- Added a versioned evaluator compatibility contract builder and public data
+  package export.
+- Exposed contract JSON through the primary CLI without requiring a problem
+  directory or GPU evaluation.
+- Preserved canonical trace JSONL by keeping contract-only fields out of trace
+  payloads.
+- Added guardrails that prevent SOL source from absorbing HIP-side agent/run
+  semantics.
+- Recorded that the work shipped through PR #1 into
+  `gwokhou/SOL-ExecBench-ROCm:main`, not NVIDIA upstream.
+
+**Known tech debt:** none identified for the scoped closure milestone.
+
+---
+
 ## v1.11 Paper Dataset Parity Inventory and ROCm Execution Closure (Shipped: 2026-05-23)
 
 **Delivered:** acquisition/layout manifests, deterministic dataset inventory,

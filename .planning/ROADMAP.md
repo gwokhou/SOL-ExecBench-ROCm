@@ -2,6 +2,10 @@
 
 ## Milestones
 
+- ✅ **v1.12 Evaluator Contract Metadata and Boundary Guardrails** —
+  retroactive quick-task milestone (shipped 2026-05-25). See
+  `.planning/milestones/v1.12-ROADMAP.md`.
+
 - ✅ **v1.11 Paper Dataset Parity Inventory and ROCm Execution Closure** —
   Phases 53-57 (shipped 2026-05-23). See
   `.planning/milestones/v1.11-ROADMAP.md`.
@@ -46,12 +50,13 @@
 
 **Active milestone:** none. Start the next milestone with `$gsd-new-milestone`.
 
-**Status:** v1.11 shipped and archived.
+**Status:** v1.12 shipped and archived.
 
 ## Progress
 
 | Milestone | Phases | Plans | Status | Shipped |
 |-----------|--------|-------|--------|---------|
+| v1.12 Evaluator Contract Metadata and Boundary Guardrails | none | quick task 260524-xb3 | Complete | 2026-05-25 |
 | v1.11 Paper Dataset Parity Inventory and ROCm Execution Closure | 53-57 | 14/14 | Complete | 2026-05-23 |
 | v1.10 Paper-Aligned SOLAR Automatic Derivation | 47-52 | 23/23 | Complete | 2026-05-23 |
 | v1.9 AMD SOL/SOLAR Bound Modeling Completion | 41-46 | 17/17 | Complete | 2026-05-23 |

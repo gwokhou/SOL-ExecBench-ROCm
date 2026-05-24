@@ -15,16 +15,15 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
 ## Current State
 
-**Shipped version:** v1.11 Paper Dataset Parity Inventory and ROCm Execution Closure,
-completed 2026-05-23.
+**Shipped version:** v1.12 Evaluator Contract Metadata and Boundary Guardrails,
+completed 2026-05-25.
 
-**Current milestone:** none. Ready to plan v1.12.
+**Current milestone:** none. Ready to plan v1.13.
 
-**Latest milestone outcome:** the ROCm port now has a concrete, auditable
-public SOL ExecBench dataset surface for the paper parity gap workflow:
-acquisition/layout manifests, deterministic inventory, ROCm readiness
-classification, ready-subset manifests, bounded execution closure,
-parity-gap reports, release-closure docs, and public claim guardrails.
+**Latest milestone outcome:** the ROCm port now exposes GPU-free evaluator
+contract metadata through `sol-execbench contract --json`, keeps contract-only
+metadata out of canonical trace JSONL, and records SOL/HIP ownership boundary
+guardrails for external consumers.
 
 **Next milestone goals:** choose the next gap from the remaining deferred work:
 full sidecar-chain hardening, full-suite hardware validation preparation,
@@ -56,6 +55,9 @@ The v1.11 milestone completed the paper dataset parity inventory and bounded
 execution-closure workflow by adding dataset acquisition/layout manifests,
 inventory/readiness/ready-subset sidecars, execution-closure reports,
 parity-gap reports, release-closure docs, and claim guardrails.
+The v1.12 milestone retroactively recorded the evaluator contract metadata and
+boundary guardrail work merged through PR #1, including `sol-execbench contract
+--json`, SOL-owned compatibility metadata, and HIP-side consumer boundaries.
 
 Validation status:
 

@@ -1,11 +1,11 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.11
-milestone_name: Paper Dataset Parity Inventory and ROCm Execution Closure
+milestone: v1.12
+milestone_name: Evaluator Contract Metadata and Boundary Guardrails
 status: Awaiting next milestone
-stopped_at: Completed v1.11 milestone archive
-last_updated: "2026-05-23T14:08:50.560Z"
-last_activity: 2026-05-24 - Completed quick task 260524-xb3: Fix PR base and prepare SOL evaluator contract branch for merge
+stopped_at: Completed v1.12 retroactive milestone archive
+last_updated: "2026-05-25T00:11:02.290+08:00"
+last_activity: 2026-05-25 - Backfilled v1.12 GSD milestone for evaluator contract PR
 progress:
   total_phases: 5
   completed_phases: 5
@@ -18,17 +18,17 @@ progress:
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (updated 2026-05-23)
+See: `.planning/PROJECT.md` (updated 2026-05-25)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** v1.11 milestone audit and completion
+**Current focus:** v1.12 milestone archive complete
 
 ## Current Position
 
-Phase: Milestone v1.11 complete
+Phase: Milestone v1.12 complete
 Plan: —
 Status: Awaiting next milestone
-Last activity: 2026-05-24 - Completed quick task 260524-xb3: Fix PR base and prepare SOL evaluator contract branch for merge
+Last activity: 2026-05-25 - Backfilled v1.12 GSD milestone for evaluator contract PR
 
 ## Performance Metrics
 
@@ -129,6 +129,7 @@ None active.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260524-xb3 | Fix PR base and prepare SOL evaluator contract branch for merge | 2026-05-24 | 5d4892d | [260524-xb3-fix-pr-base-and-prepare-sol-evaluator-co](./quick/260524-xb3-fix-pr-base-and-prepare-sol-evaluator-co/) |
+| 260525-097 | Backfill v1.12 GSD milestone for evaluator contract PR | 2026-05-25 | this commit | [260525-097-backfill-v1-12-gsd-milestone-for-evaluat](./quick/260525-097-backfill-v1-12-gsd-milestone-for-evaluat/) |
 
 ## Deferred Items
 
