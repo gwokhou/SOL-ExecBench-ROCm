@@ -2,10 +2,10 @@
 # Configuration
 
 SOL ExecBench ROCm Port has no required application-level `.env` file. Runtime
-behavior is configured through CLI flags, optional benchmark `config.json` files,
+behavior is configured through CLI flags, optional benchmark configuration files,
 package dependency configuration in `pyproject.toml`, and environment variables
-used by the Docker wrapper, entrypoint, evaluation driver, and ROCm clock-lock
-helpers.
+used by the Docker wrapper, Docker image, entrypoint, native build template,
+evaluation driver, and ROCm clock-lock helpers.
 
 ## Environment Variables
 
@@ -16,6 +16,8 @@ allocation behavior, and benchmark data lookup:
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
+| `IMAGE_NAME` | Optional Docker wrapper input | `sol-execbench` | Docker image repository/name used by `scripts/run_docker.sh`. |
+| `IMAGE_TAG` | Optional Docker wrapper input | `latest` | Docker image tag used by `scripts/run_docker.sh`. |
 | `ROCM_PATH` | Container-only | `/opt/rocm` | Path to the ROCm installation inside the Docker image. |
 | `HIP_PATH` | Container-only | `/opt/rocm` | Path used by HIP tooling in the Docker image. |
 | `HIP_PLATFORM` | Container-only | `amd` | Selects AMD HIP platform behavior inside the Docker image. |
@@ -34,9 +36,15 @@ allocation behavior, and benchmark data lookup:
 | `SOL_EXECBENCH_GPU_CLK_MHZ` | Optional passthrough | Empty when unset | Forwarded into the Docker container by `scripts/run_docker.sh`; no current Python source reads it. |
 | `SOL_EXECBENCH_DRAM_CLK_MHZ` | Optional passthrough | Empty when unset | Forwarded into the Docker container by `scripts/run_docker.sh`; no current Python source reads it. |
 | `PYTORCH_ALLOC_CONF` | Subprocess-only | `expandable_segments:True` | Set by the CLI for compilation and evaluation subprocesses. |
+| `PYTORCH_ROCM_ARCH` | Optional native-build override | Derived from `solution.spec.target_hardware` when unset | Overrides the ROCm GPU architecture list used by PyTorch extension compilation. |
 
 `docker/entrypoint.sh` also checks `FLASHINFER_TRACE_DIR` and warns if that
 directory is not mounted.
+
+The Docker image also accepts build arguments rather than environment variables:
+`HOST_UID`, `HOST_GID`, and `HOST_USER`. `scripts/run_docker.sh --build` passes
+the current `id -u`, `id -g`, and `whoami` values so files created in the
+container match the host user.
 
 ## Config File Format
 
@@ -75,9 +83,9 @@ dataclass. The validation rules are:
 | `iterations` | Must be greater than `0`. | `src/sol_execbench/core/bench/config/benchmark_config.py` |
 
 The CLI input files are required at runtime. A user must provide either a
-problem directory containing `definition.json` and `workload.jsonl`, or explicit
-`--definition` and `--workload` paths. A solution must come from either
-`--solution` or `solution.json` in the problem directory.
+problem directory containing the benchmark definition and workload files, or
+explicit `--definition` and `--workload` paths. A solution must come from
+either `--solution` or the conventional solution file in the problem directory.
 
 ## Defaults
 
@@ -105,12 +113,13 @@ The CLI defaults are:
 ## Per-Environment Overrides
 
 No separate development, staging, or production configuration files are present.
-For local runs, pass CLI flags or a benchmark `config.json`. For Docker runs,
+For local runs, pass CLI flags or a benchmark configuration file. For Docker runs,
 use `./scripts/run_docker.sh` so the container receives ROCm device access,
 repository mounts, and the runtime environment defined in `docker/Dockerfile`
 and `docker/entrypoint.sh`. The wrapper also forwards `FLASHINFER_TRACE_DIR`,
 `SOL_EXECBENCH_GPU_CLK_MHZ`, and `SOL_EXECBENCH_DRAM_CLK_MHZ` into the
-container.
+container, and reads `IMAGE_NAME` and `IMAGE_TAG` when selecting or building
+the Docker image.
 
 ## Dependency Configuration
 

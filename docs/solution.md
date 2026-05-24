@@ -38,9 +38,9 @@ rejected with migration guidance.
 | `triton` | `.py::function` | Triton ROCm kernels plus PyTorch. |
 | `hip_cpp` | `.hip`, `.cpp`, `.cc`, `.cxx`, `.c`, `.h`, or `.hpp` | HIP/C++ extension compiled through PyTorch. |
 | `hipblas` | Native C/C++ entry point | Supported hipBLAS-oriented category with runnable SGEMM example; see [ROCm library category readiness](rocm_libraries.md). |
-| `miopen` | Native C/C++ entry point | Candidate MIOpen-oriented category; see [ROCm library category readiness](rocm_libraries.md). |
-| `ck` | Native C/C++ entry point | Candidate Composable Kernel category; see [ROCm library category readiness](rocm_libraries.md). |
-| `rocwmma` | Native C/C++ entry point | Candidate rocWMMA category; see [ROCm library category readiness](rocm_libraries.md). |
+| `miopen` | Native C/C++ entry point | Supported MIOpen-oriented category with runnable example coverage; see [ROCm library category readiness](rocm_libraries.md). |
+| `ck` | Native C/C++ entry point | Supported Composable Kernel category with runnable example coverage; see [ROCm library category readiness](rocm_libraries.md). |
+| `rocwmma` | Native C/C++ entry point | Supported rocWMMA category with runnable example coverage; see [ROCm library category readiness](rocm_libraries.md). |
 
 Python languages (`pytorch`, `triton`) cannot be mixed with native C/C++
 languages in the same solution.
@@ -117,7 +117,8 @@ Solution JSON must use `hip_cflags`.
 
 ## Dependencies
 
-Dependencies are validated against the current environment. Common values:
+Dependencies are stored in solution metadata and included in solution hashing.
+Common values:
 
 | Dependency | Notes |
 | --- | --- |
@@ -128,9 +129,8 @@ Dependencies are validated against the current environment. Common values:
 | `ck` | Composable Kernel implementation category. |
 | `rocwmma` | rocWMMA implementation category. |
 
-The schema recognizes `hipblas`, `miopen`, `ck`, and `rocwmma`. `hipblas` has
-runnable public example coverage; the others remain candidate categories until
-they have operation-specific examples and tests. See
+The schema recognizes `hipblas`, `miopen`, `ck`, and `rocwmma`. These categories
+have operation-specific runnable examples and readiness documentation. See
 [ROCm library category readiness](rocm_libraries.md) for current support levels.
 
 ## Sources

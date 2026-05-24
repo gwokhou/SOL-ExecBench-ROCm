@@ -1,6 +1,6 @@
 # Definition Schema
 
-A **Definition** provides the formal specification for a computational workload — the operator's contract. It defines the axes, tensor shapes/dtypes, optional constraints, and a correct PyTorch reference implementation.
+A **Definition** provides the formal specification for a computational workload — the operator's contract. It defines the axes, tensor shapes/dtypes, optional custom input generation, and a correct PyTorch reference implementation.
 
 **Identity rule:** Two kernels share a Definition if and only if they have the same axes with the same roles (`const`/`var`) and the same `const` values.
 
@@ -20,15 +20,15 @@ A **Definition** provides the formal specification for a computational workload 
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `name` | string | Yes | Unique human-readable name. Convention: `{op_type}_{props}_{constants}` (e.g. `gqa_paged_decode_h32_kv8_d128_ps1`) |
+| `name` | string | Yes | Required non-empty human-readable name. Convention: `{op_type}_{props}_{constants}` (e.g. `gqa_paged_decode_h32_kv8_d128_ps1`) |
 | `op_type` | string | No* | Compute category. e.g. `gemm`, `rmsnorm`, `gqa_ragged`, `gqa_paged` |
 | `description` | string | No | Brief human-readable description |
 | `axes` | object | Yes | Map of symbolic axis names → `AxisConst`, `AxisVar`, or `AxisExpr` |
 | `inputs` | object | Yes | Named input tensors |
 | `outputs` | object | Yes | Named output tensors |
 | `reference` | string | Yes | PyTorch reference implementation (Python source as string) |
-| `constraints` | array[string] | No | Assertions relating axes (e.g. `"H_qo == H_kv * H_r"`) |
 | `custom_inputs_entrypoint` | string | No | Function name in `reference` that generates custom inputs — see below |
+| `hf_id` | string | No | Optional Hugging Face dataset identifier. |
 
 *`op_type` is optional in the server dataset (older entries may not have it).
 
@@ -112,7 +112,7 @@ Each key is a tensor name (matching what your `run()` function receives). Value:
 
 A Python source string containing the mathematical specification of the operator. Rules:
 - Must define a global function named `run` as entry point
-- Use explicit step-by-step PyTorch (avoid `torch.nn.functional` shortcuts — prefer clarity)
+- Prefer explicit step-by-step PyTorch for readability
 - Returns the output tensors
 
 ```python
@@ -137,16 +137,17 @@ When set, names a function defined in the `reference` code that generates proble
 **Function signature:**
 
 ```python
-def fn(axes_and_scalars: dict[str, int], device: torch.device) -> dict[str, torch.Tensor]:
+def fn(axes_and_scalars: dict[str, int | float | bool], device: torch.device) -> dict[str, torch.Tensor | int | float | bool]:
     """
     Args:
-        axes_and_scalars: All const axis values + scalar inputs from the workload.
-                          Keys are axis names (str), values are Python ints.
+        axes_and_scalars: Resolved const, var, and expr axes plus scalar inputs
+                          from the workload. Values may be ints, floats, or bools.
         device: The target GPU device. In this ROCm port, PyTorch still exposes
                 AMD GPUs through the `torch.cuda` compatibility namespace.
     Returns:
-        Dict mapping input names (matching Definition.inputs keys) to generated tensors.
-        Only needs to return the inputs that are marked 'custom' in the workload.
+        Dict mapping input names (matching Definition.inputs keys) to generated
+        tensors or scalar values. Only needs to return the inputs that are
+        marked 'custom' in the workload.
     """
 ```
 
@@ -166,7 +167,10 @@ def fn(axes_and_scalars: dict[str, int], device: torch.device) -> dict[str, torc
     "hidden_states": {"shape": ["T", "H"], "dtype": "bfloat16"},
     "router_indices": {"shape": ["T", "K"], "dtype": "int32"}
   },
-  "reference": "import torch\n\ndef generate_inputs(axes_and_scalars, device):\n    T = axes_and_scalars['T']\n    E = axes_and_scalars['E']\n    K = axes_and_scalars['K']\n    # router_indices must be valid expert indices\n    router_indices = torch.randint(0, E, (T, K), device=device, dtype=torch.int32)\n    return {'router_indices': router_indices}\n\ndef run(hidden_states, router_indices, output):\n    ..."
+  "outputs": {
+    "out": {"shape": ["T", "H"], "dtype": "bfloat16"}
+  },
+  "reference": "import torch\n\ndef generate_inputs(axes_and_scalars, device):\n    T = axes_and_scalars['T']\n    E = axes_and_scalars['E']\n    K = axes_and_scalars['K']\n    router_indices = torch.randint(0, E, (T, K), device=device, dtype=torch.int32)\n    return {'router_indices': router_indices}\n\ndef run(hidden_states, router_indices):\n    return hidden_states"
 }
 ```
 
@@ -219,7 +223,7 @@ def fn(axes_and_scalars: dict[str, int], device: torch.device) -> dict[str, torc
 }
 ```
 
-### GQA Attention with Constraints
+### GQA Attention
 
 ```json
 {
@@ -235,7 +239,6 @@ def fn(axes_and_scalars: dict[str, int], device: torch.device) -> dict[str, torc
     "D_qk":{"type": "const", "value": 128},
     "D_vo":{"type": "const", "value": 128}
   },
-  "constraints": ["H_qo == H_kv * H_r"],
   "inputs": {
     "q": {"shape": ["B", "Q", "H_qo", "D_qk"], "dtype": "float16"},
     "k": {"shape": ["B", "KV", "H_kv", "D_qk"], "dtype": "float16"},

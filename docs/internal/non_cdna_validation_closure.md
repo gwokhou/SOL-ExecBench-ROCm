@@ -35,5 +35,7 @@ validation because that work remains explicitly deferred.
 
 ## Remaining Deferred Item
 
-The only remaining project-level deferred item is real CDNA 3 `gfx94*` full
+The primary remaining CDNA-specific deferred item is real CDNA 3 `gfx94*` full
 adapted-suite validation and any hardware-validation claim that depends on it.
+Other non-CDNA or future-architecture validation items may remain tracked in
+separate release and analysis documents.

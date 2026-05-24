@@ -35,7 +35,7 @@ A small RDNA 4-scoped derived report run should emit:
 
 - canonical trace JSON under the dataset output directory;
 - AMD SOL bound artifact v2 sidecars under `out/amd-sol-bounds`;
-- AMD-native score report JSON at `out/amd-score-report.json`.
+- AMD-native score report JSON at the caller-provided report path.
 
 Example command:
 

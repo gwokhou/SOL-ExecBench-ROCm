@@ -98,7 +98,9 @@ Source: `src/sol_execbench/driver/templates/eval_driver.py`
 
 - The eval driver evaluates the staged solution metadata, definition, and
   workload JSONL files.
-- It emits JSONL `Trace` objects to stdout through the existing `_emit` path.
+- It emits normal workload JSONL `Trace` objects to stdout through the existing
+  `_emit` path; static source-review reward-hack traces use a direct stdout
+  print path in the same generated driver.
 - It preserves reward-hack detection, reference execution, user execution,
   shape/dtype checks, numerical correctness checks, timing, and environment
   capture semantics.
@@ -121,7 +123,8 @@ above:
 
 ## Phase 19 Non-Goals
 
-- Do not add public `sol-execbench` CLI options or subcommands.
+- Do not add public `sol-execbench` CLI options or subcommands as part of the
+  Phase 19 analysis work.
 - Do not change Pydantic public field names, required fields, or validation
   semantics.
 - Do not add fields to trace JSONL.

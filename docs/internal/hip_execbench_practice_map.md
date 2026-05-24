@@ -38,8 +38,8 @@ benchmark semantics remain owned by SOL ExecBench ROCm.
 
 - Adaptations must be internal helpers, tests, or documentation unless a later
   milestone explicitly approves a public contract change.
-- Existing `definition.json`, `workload.jsonl`, `solution.json`, and trace JSONL
-  formats are compatibility contracts.
+- Existing benchmark definition, workload, solution, and trace JSONL formats
+  are compatibility contracts.
 - SOL-Score-style output must not be presented as an AMD-native hardware claim
   until a dedicated AMD interpretation model is defined and validated.
 - Baseline comparison is baseline-relative by default. It may be used for local

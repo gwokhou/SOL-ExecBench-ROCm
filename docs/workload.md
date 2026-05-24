@@ -19,7 +19,7 @@ The evaluator runs your solution against every Workload in the problem's set —
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `uuid` | string | Yes | Unique identifier for this workload |
+| `uuid` | string | Yes | Required non-empty identifier for this workload |
 | `axes` | object | Yes | Map of `var` axis names → concrete integer values |
 | `inputs` | object | Yes | Map of input names → input descriptor (how to source the data) |
 | `tolerance` | object | No | Per-workload correctness bounds (defaults below) |
@@ -68,7 +68,7 @@ Load a specific tensor from a `.safetensors` file. Used for inputs with real-wor
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `path` | Yes | Relative path to the `.safetensors` file |
+| `path` | Yes | Path to the `.safetensors` file; relative paths are resolved against configured blob roots, while absolute paths are accepted as provided |
 | `tensor_key` | Yes | Key inside the safetensors container |
 
 ### `type: "custom"`
@@ -188,5 +188,5 @@ For each workload, the evaluator:
 3. Pre-allocates output tensors (shapes from Definition.outputs with resolved axes)
 4. Calls the solution with inputs in Definition order; preallocated outputs are
    appended only when `destination_passing_style` is true
-5. Compares outputs against `reference(*inputs)` for correctness
+5. Compares outputs against the loaded reference function for correctness
 6. Times the solution for performance

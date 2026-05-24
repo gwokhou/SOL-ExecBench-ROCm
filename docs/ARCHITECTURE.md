@@ -6,17 +6,22 @@ solutions on AMD ROCm hardware. It reads benchmark definitions, workload rows,
 solution metadata, and optional benchmark configuration, stages the solution in
 an isolated temporary directory, compiles native HIP/C++ implementations when
 needed, runs the generated evaluation driver, and emits typed trace records.
+Separate dataset and reporting helpers inspect downloaded benchmark assets,
+derive ROCm readiness sidecars, compare trace baselines, and build guarded
+AMD-native scoring artifacts.
 
 ## System Overview
 
 The project is organized as a layered Python package under
 `src/sol_execbench/`. The CLI layer handles user input, trace output, and
-baseline comparison commands. The core layer defines public data models,
-benchmark utilities, ROCm diagnostics, reporting, and AMD-native scoring
-helpers. The driver layer packages a problem into files and commands that run in
-a subprocess. The runtime boundary is deliberately process-based: solution code
-is copied into a staging directory and executed by generated driver scripts
-rather than imported directly into the CLI process.
+baseline comparison commands exposed by the `sol-execbench` and
+`sol-execbench-baseline` console scripts. The core layer defines public data
+models, benchmark utilities, dataset inventory/readiness helpers, ROCm
+diagnostics, reporting, and AMD-native scoring helpers. The driver layer
+packages a problem into files and commands that run in a subprocess. The
+runtime boundary is deliberately process-based: solution code is copied into a
+staging directory and executed by generated driver scripts rather than imported
+directly into the CLI process.
 
 ## Component Diagram
 
@@ -25,6 +30,7 @@ graph TD
     CLI["src/sol_execbench/cli/main.py"]
     Models["src/sol_execbench/core/data/"]
     Bench["src/sol_execbench/core/bench/"]
+    Dataset["src/sol_execbench/core/dataset/"]
     Scoring["src/sol_execbench/core/scoring/"]
     Packager["src/sol_execbench/driver/problem_packager.py"]
     Templates["src/sol_execbench/driver/templates/"]
@@ -40,6 +46,7 @@ graph TD
     CLI --> Trace
     CLI --> Baseline
     Baseline --> Trace
+    Dataset --> Models
     Reports --> Trace
     Scoring --> Trace
     Scoring --> Reports
@@ -71,6 +78,11 @@ graph TD
    `src/sol_execbench/core/baseline.py`, `src/sol_execbench/core/reporting.py`,
    and `src/sol_execbench/core/scoring/` to compare baselines and derive guarded
    AMD-native score reports.
+8. Dataset helper scripts such as `scripts/inspect_dataset.py` and
+   `scripts/report_parity_gaps.py` use `src/sol_execbench/core/dataset/` to
+   inspect benchmark layouts, produce inventory/readiness/ready-subset
+   sidecars, and render parity-gap reports from manifest, execution closure,
+   and AMD score evidence.
 
 ## Key Abstractions
 
@@ -85,6 +97,9 @@ graph TD
 | `time_runnable` | `src/sol_execbench/core/bench/timing.py` | Measures GPU runtime with PyTorch HIP-backed device events. |
 | `Trace` | `src/sol_execbench/core/data/trace.py` | Captures per-workload evaluation output and ROCm environment details. |
 | `Rocprofv3TimingEvidence` | `src/sol_execbench/core/bench/rocm_profiler.py` | Represents optional rocprofv3 timing evidence used for profiling validation paths. |
+| `DatasetInventory` | `src/sol_execbench/core/dataset/inventory.py` | Captures discovered benchmark categories, problem metadata, workloads, solution files, and dataset denominators. |
+| `DatasetReadiness` | `src/sol_execbench/core/dataset/readiness.py` | Classifies whether inventory records are ready for ROCm execution and records blocker reasons. |
+| `AmdSolBoundV2Artifact` | `src/sol_execbench/core/scoring/amd_sol_v2.py` | Stores derived AMD SOL bound sidecar data built from bound graphs, operator estimates, and packaged hardware models. |
 | `AmdNativeScore` | `src/sol_execbench/core/scoring/amd_score.py` | Stores guarded AMD-native scoring evidence derived from traces, baselines, and SOL-bound artifacts. |
 
 ## Directory Structure Rationale
@@ -92,7 +107,8 @@ graph TD
 ```text
 src/sol_execbench/
   cli/       Click entry points for benchmark evaluation and baseline comparison.
-  core/      Data models, scoring, diagnostics, correctness, timing, and reporting.
+  core/      Data models, dataset helpers, scoring, diagnostics, correctness, timing, and reporting.
+  data/      Packaged AMD hardware model JSON used by scoring helpers.
   driver/    Staging logic and generated subprocess templates.
 ```
 

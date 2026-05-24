@@ -44,8 +44,8 @@ uv run pytest tests/
 | `uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark --limit 5` | Run a small dataset batch. |
 | `uv run pytest tests/` | Run the full adapted pytest suite. |
 | `uv run pytest tests/sol_execbench/test_e2e.py` | Run one focused test file. |
-| `uv run ruff check .` | Run lint checks. |
-| `uv run ruff format .` | Format Python files. |
+| `uv run --with ruff ruff check .` | Run lint checks. |
+| `uv run --with ruff ruff format .` | Format Python files. |
 | `./scripts/run_docker.sh --build` | Build and enter the ROCm Docker environment. |
 
 There is no dedicated package build script in `pyproject.toml`; the package uses
@@ -68,8 +68,8 @@ Ruff is the configured linting and formatting tool. The configuration lives in
 Run style checks with:
 
 ```bash
-uv run ruff check .
-uv run ruff format .
+uv run --with ruff ruff check .
+uv run --with ruff ruff format .
 ```
 
 ## Branch Conventions
@@ -123,7 +123,10 @@ skip behavior in `tests/conftest.py`.
 | `src/sol_execbench/cli/` | Click command entry points and terminal reporting. |
 | `src/sol_execbench/core/data/` | Public schemas for definitions, workloads, solutions, traces, shapes, and dtypes. |
 | `src/sol_execbench/core/bench/` | Correctness, timing, clock locking, IO, and benchmark utilities. |
+| `src/sol_execbench/core/dataset/` | Dataset discovery and metadata helpers. |
+| `src/sol_execbench/core/scoring/` | AMD scoring, bound estimates, and derived evidence helpers. |
 | `src/sol_execbench/driver/` | Problem staging and generated compile/evaluation templates. |
+| `src/sol_execbench/data/` | Packaged AMD hardware model data. |
 | `tests/sol_execbench/` | Package-level unit, integration, and migration tests. |
 | `tests/examples/` | Example consistency coverage. |
 | `tests/docker/dependencies/` | Docker dependency readiness checks. |
