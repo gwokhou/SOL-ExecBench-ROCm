@@ -4,6 +4,7 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
 from click.testing import CliRunner
 
 from sol_execbench.cli.main import cli
@@ -40,6 +41,7 @@ from sol_execbench.core.scoring import solar_derivation as solar_derivation_modu
 from sol_execbench.core.scoring.solar_derivation import SolarAggregateStatus
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+PLANNING_ROOT = REPO_ROOT / ".planning"
 COMPATIBILITY_INVENTORY = REPO_ROOT / "docs/internal/v1_4_compatibility_inventory.md"
 TEST_DIR = str(Path(__file__).resolve().parent)
 if TEST_DIR not in sys.path:
@@ -218,7 +220,12 @@ def test_canonical_trace_jsonl_excludes_derived_report_key_space():
     payload = trace.model_dump(mode="json")
     serialized = json.dumps(payload, sort_keys=True)
     forbidden_keys = {
+        "baseline_export_fields",
+        "capabilities",
+        "compatibility_metadata_fields",
+        "contract_version",
         "derived_evidence_refs",
+        "failure_categories",
         "formula",
         "coverage",
         "score_eligibility",
@@ -250,6 +257,7 @@ def test_cli_help_preserves_existing_public_options():
         "--verbose",
     ):
         assert expected_option in help_text
+    assert "contract" in help_text
     for unexpected_option in ("diagnose", "profile", "hip-bench"):
         assert unexpected_option not in help_text
 
@@ -886,8 +894,12 @@ def test_v1_9_derived_artifacts_remain_noncanonical():
 
 
 def test_v1_9_claim_guardrails_keep_cdna3_and_nvidia_equivalence_out_of_scope():
-    project = Path(".planning/PROJECT.md").read_text()
-    requirements = Path(".planning/REQUIREMENTS.md").read_text()
+    if not (PLANNING_ROOT / "PROJECT.md").exists() or not (
+        PLANNING_ROOT / "REQUIREMENTS.md"
+    ).exists():
+        pytest.skip("SOL planning metadata is not present in this nested checkout")
+    project = (PLANNING_ROOT / "PROJECT.md").read_text()
+    requirements = (PLANNING_ROOT / "REQUIREMENTS.md").read_text()
     analysis = Path("docs/analysis.md").read_text()
 
     assert "CDNA 3 (`gfx94*`) full adapted suite validation remains deferred" in project
