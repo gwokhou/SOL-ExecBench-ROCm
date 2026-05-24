@@ -36,6 +36,7 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
+from ..core.data.contract import build_evaluator_contract
 from ..core import (
     Definition,
     Workload,
@@ -177,7 +178,9 @@ def _print_traces_table(traces: list[Trace]) -> None:
             console.print(log.rstrip())
 
 
-@click.command(context_settings={"help_option_names": ["-h", "--help"]})
+@click.command(
+    name="sol-execbench", context_settings={"help_option_names": ["-h", "--help"]}
+)
 @click.argument(
     "problem_dir", required=False, type=click.Path(exists=True, path_type=Path)
 )
@@ -227,7 +230,7 @@ def _print_traces_table(traces: list[Trace]) -> None:
     "--keep-staging", is_flag=True, help="Keep the staging directory after evaluation"
 )
 @click.option("--verbose", "-v", is_flag=True, help="Show subprocess output")
-def cli(
+def _evaluate_cli(
     problem_dir: Optional[Path],
     definition_file: Optional[Path],
     workload_file: Optional[Path],
@@ -248,6 +251,10 @@ def cli(
       1) Positional: sol-execbench <problem_dir> --solution sol.json
          (reads definition.json and workload.jsonl from problem_dir)
       2) Explicit:   sol-execbench --definition def.json --workload wkl.jsonl --solution sol.json
+
+    \b
+    Metadata:
+      sol-execbench contract --json
     """
     # Resolve definition + workloads
     if problem_dir:
@@ -388,6 +395,56 @@ def cli(
         t.evaluation and t.evaluation.status == EvaluationStatus.PASSED for t in traces
     )
     sys.exit(0 if all_passed else 1)
+
+
+@click.command("contract", context_settings={"help_option_names": ["-h", "--help"]})
+@click.option("--json", "json_output", is_flag=True, help="Print contract JSON")
+def _contract_cli(json_output: bool) -> None:
+    """Print the GPU-free evaluator compatibility contract."""
+
+    if not json_output:
+        raise click.ClickException("Only --json output is supported for contract")
+    payload = build_evaluator_contract().model_dump(mode="json")
+    click.echo(json.dumps(payload, sort_keys=True))
+
+
+class SolExecbenchCli(click.Command):
+    """Dispatch root evaluator calls and the contract metadata command."""
+
+    def main(
+        self,
+        args: list[str] | None = None,
+        prog_name: str | None = None,
+        complete_var: str | None = None,
+        standalone_mode: bool = True,
+        windows_expand_args: bool = True,
+        **extra: object,
+    ) -> object:
+        args = list(args) if args is not None else sys.argv[1:]
+        if args and args[0] == "contract":
+            contract_prog = f"{prog_name or self.name} contract"
+            return _contract_cli.main(
+                args=args[1:],
+                prog_name=contract_prog,
+                complete_var=complete_var,
+                standalone_mode=standalone_mode,
+                windows_expand_args=windows_expand_args,
+                **extra,
+            )
+        return _evaluate_cli.main(
+            args=args,
+            prog_name=prog_name or self.name,
+            complete_var=complete_var,
+            standalone_mode=standalone_mode,
+            windows_expand_args=windows_expand_args,
+            **extra,
+        )
+
+
+cli = SolExecbenchCli(
+    name="sol-execbench",
+    help="Evaluate solutions or print GPU-free evaluator contract metadata.",
+)
 
 
 if __name__ == "__main__":
