@@ -9,13 +9,13 @@ scope for this ROCm-only fork.
 
 | Original capability | NVIDIA implementation | ROCm disposition | Notes |
 | --- | --- | --- | --- |
-| Single-problem CLI | `sol-execbench <problem_dir> --solution solution.json` and explicit `--definition/--workload/--solution` mode | Ported | CLI shape is preserved; compile wording and runtime behavior are HIP/ROCm-specific. |
+| Single-problem CLI | `sol-execbench <problem_dir> --solution <solution-path>` and explicit `--definition/--workload/--solution` mode | Ported | CLI shape is preserved; compile wording and runtime behavior are HIP/ROCm-specific. |
 | CLI output controls | `--json`, `-o/--output`, `--verbose`, `--keep-staging`, timeouts | Ported | Trace JSONL remains the machine-readable contract. |
 | Clock locking | `--lock-clocks` via NVIDIA tooling | Replaced | ROCm uses `rocm-smi`; failure remains explicit when requested locking is unavailable. |
 | Dataset download | `scripts/download_data.sh` downloads SOL-ExecBench and FlashInfer Trace datasets | Ported | Dataset origin remains NVIDIA/Hugging Face; runtime support is ROCm-only. |
 | Dataset runner | `scripts/run_dataset.py` discovers L1, L2, FlashInfer-Bench, and Quant problems | Ported | Runner preserves reference/custom solution wrapping and JSONL trace parsing. |
-| Definition schema | `definition.json` Pydantic contract | Ported | Schema semantics are preserved for workload/reference evaluation. |
-| Workload schema | `workload.jsonl` Pydantic contract | Ported | UUID, axes, and input descriptor semantics are preserved. |
+| Definition schema | Benchmark definition Pydantic contract | Ported | Schema semantics are preserved for workload/reference evaluation. |
+| Workload schema | Workload JSONL Pydantic contract | Ported | UUID, axes, and input descriptor semantics are preserved. |
 | Solution schema | NVIDIA language/hardware metadata | Replaced | Public shape is preserved, but language/hardware enum values are ROCm-only. |
 | Trace schema | JSONL trace with workload, solution, evaluation, correctness, performance, environment | Ported | Environment fields report AMD/ROCm context. |
 | Reward-hack checks | Monkey-patch, thread injection, lazy output, and stream-style defenses | Ported | Defenses remain active under ROCm. |
@@ -51,8 +51,9 @@ scope for this ROCm-only fork.
 
 ## Remaining Non-CDNA Gaps To Close
 
-- AMD-native scoring or roofline interpretation must be defined before making
-  AMD hardware-performance claims.
+- AMD-native scoring and roofline interpretation are implemented as guarded
+  derived artifacts; remaining claims still require appropriate evidence and
+  validation scope.
 - Public baseline comparison must consume existing trace outputs without adding
   fields to trace JSONL.
 - ROCm library categories must be audited so documentation matches actual

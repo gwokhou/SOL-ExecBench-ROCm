@@ -14,7 +14,7 @@ downloaded benchmark assets belong in `data/`.
 ## Build, Test, and Development Commands
 
 - `uv sync --all-groups`: install runtime and development dependencies.
-- `uv run sol-execbench <problem_dir> --solution solution.json`: run the benchmark CLI.
+- `uv run sol-execbench <problem_dir> --solution <solution-path>`: run the benchmark CLI.
 - `uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark --limit 5`: run a small
   dataset batch.
 - `uv run pytest tests/`: run the full test suite.
@@ -107,7 +107,7 @@ while preserving the benchmark semantics and rigor of SOL ExecBench.
 ## Container
 ## Local Commands
 - `uv sync --all-groups` installs dependencies.
-- `uv run sol-execbench <problem_dir> --solution solution.json` runs one problem.
+- `uv run sol-execbench <problem_dir> --solution <solution-path>` runs one problem.
 - `uv run pytest tests/` runs tests.
 - `uv run --with ruff ruff check .` lints when Ruff is not already installed.
 - `uv run --with ruff ruff format .` formats when Ruff is not already installed.

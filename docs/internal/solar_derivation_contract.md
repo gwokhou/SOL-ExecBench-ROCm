@@ -48,8 +48,8 @@ SOLAR formula evidence.
 SOLAR derivation evidence belongs only in derived sidecars or explicitly opted
 in reports. The sidecar contract is internal and must not mutate:
 
-- canonical `definition.json`;
-- canonical `workload.jsonl`;
+- canonical benchmark definition input;
+- canonical workload JSONL input;
 - canonical trace JSONL;
 - public solution schemas;
 - primary `sol-execbench` CLI behavior or default output.

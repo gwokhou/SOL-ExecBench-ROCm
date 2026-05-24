@@ -28,6 +28,9 @@ markers in `pyproject.toml` and `tests/conftest.py` are:
 | `cpp` | Compiles HIP/C++ extensions and may be slow. |
 | `timing_serial` | GPU timing tests skipped by default; run explicitly with `-m timing_serial -n 0`. |
 | `requires_rocm` | Requires a ROCm GPU visible through PyTorch. |
+| `requires_rocm_dev` | Requires ROCm native extension development headers under `/opt/rocm`. |
+| `requires_ck` | Requires Composable Kernel headers under `/opt/rocm/include/ck/`. |
+| `requires_rocwmma` | Requires rocWMMA headers under `/opt/rocm/include/rocwmma/`. |
 | `requires_rdna4` | Requires an AMD RDNA 4 GPU such as `gfx1200`. |
 | `requires_cdna3` | Requires an AMD CDNA 3 GPU such as `gfx942`. |
 | `requires_cutile` | Legacy NVIDIA cuTile marker; skipped in this ROCm-only port. |
@@ -93,9 +96,11 @@ Existing test organization mirrors the source tree:
 | `tests/examples/` | Example file consistency and runnable example workflows. |
 
 Use markers for environment-sensitive coverage. Mark compiled extension tests
-with `cpp`, ROCm GPU tests with `requires_rocm`, architecture-specific tests
-with `requires_rdna4` or `requires_cdna3`, and timing tests that should not run
-under xdist with `timing_serial`.
+with `cpp`, ROCm GPU tests with `requires_rocm`, native header-dependent tests
+with `requires_rocm_dev`, Composable Kernel tests with `requires_ck`, rocWMMA
+tests with `requires_rocwmma`, architecture-specific tests with `requires_rdna4`
+or `requires_cdna3`, and timing tests that should not run under xdist with
+`timing_serial`.
 
 ## Coverage Requirements
 

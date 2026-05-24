@@ -21,7 +21,7 @@ without adding fields to canonical trace JSONL.
 | `triton` | `rocprofv3` | kernel activity | Aggregate post-warmup ROCm kernel activity rows for generated Triton kernels launched by the measured solution call | Triton timing is generated-kernel activity after compile/autotune warmup unless evidence explicitly says otherwise. |
 | `hip_native` | `rocprofv3` | kernel activity | Aggregate ROCm kernel activity rows launched by the measured solution call | HIP C++ and ROCm library categories are interpreted as native kernel or library device work inside the timing region. |
 | `mixed` | `device_events` fallback until runtime evidence is available | fallback event timing | Median HIP-backed PyTorch device event elapsed times | Mixed source timing needs runtime evidence before a profiler selection is accurate. |
-| `unknown` | unsupported | unsupported | No aggregation | No accurate timer can be selected until the source type is classified. |
+| `unknown` | unsupported | unsupported | unsupported until source type is classified | No accurate timer can be selected until the source type is classified. |
 
 ## Activity Domains
 
@@ -68,8 +68,8 @@ include:
 - `aggregation_rule`: how parsed timing rows were combined.
 - `backend`: the selected timer backend.
 - `interpretation`: what the duration means for the source type.
-- `parsed timing rows`: normalized rows used to compute the duration.
-- `fallback reason`: why fallback event timing was used, when applicable.
+- `parsed_rows`: normalized rows used to compute the duration.
+- `fallback_reason`: why fallback event timing was used, when applicable.
 
 Fallback evidence must be explicit. Event timing may be used when profiler
 evidence is unavailable or unsupported, but it must keep its backend, fallback

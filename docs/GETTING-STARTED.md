@@ -63,8 +63,7 @@ summary table.
 Download the benchmark assets when you need dataset-scale runs:
 
 ```bash
-pip install "huggingface-hub[cli]"
-./scripts/download_data.sh
+uv run --with "huggingface-hub[cli]" ./scripts/download_data.sh
 ```
 
 The SOL-ExecBench downloader writes the public benchmark layout to
@@ -72,7 +71,7 @@ The SOL-ExecBench downloader writes the public benchmark layout to
 without running GPU evaluation, emit an acquisition/layout manifest:
 
 ```bash
-python scripts/download_solexecbench.py \
+uv run python scripts/download_solexecbench.py \
   --verify-only \
   --output-root data/SOL-ExecBench/benchmark \
   --manifest out/dataset_manifest.json
@@ -110,7 +109,7 @@ Run a command inside the container:
 | PyTorch reports `torch.version.cuda` instead of `torch.version.hip`. | Re-run `uv sync --all-groups` and confirm the ROCm wheel indexes in `pyproject.toml` are reachable. |
 | `torch.cuda.is_available()` returns `False` on a ROCm host. | Confirm ROCm is installed, the current user can access `/dev/kfd` and `/dev/dri`, and the GPU is visible through ROCm tools. |
 | Docker cannot see the AMD GPU. | Use a native Linux Docker daemon and `./scripts/run_docker.sh`; Docker Desktop cannot correctly pass ROCm devices through. |
-| `./scripts/download_data.sh` cannot find `hf`. | Install the Hugging Face CLI with `pip install "huggingface-hub[cli]"`, then rerun the download script. |
+| `./scripts/download_data.sh` cannot find `hf`. | Run the downloader through `uv run --with "huggingface-hub[cli]" ./scripts/download_data.sh` so the Hugging Face CLI is available on `PATH`. |
 | HIP/C++ examples fail to compile. | Confirm ROCm compiler tools such as `hipcc` are available, or use the provided Docker image. |
 
 ## Next Steps

@@ -66,7 +66,7 @@ uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
 When `--ready-subset` is supplied, the runner filters execution to the ready
 problem/workload refs, still invokes the primary `sol-execbench` subprocess
 path, and writes temporary filtered workload files only under the selected
-output directory. `execution_closure.json` joins ready-subset selection,
+output directory. The execution-closure sidecar joins ready-subset selection,
 optional readiness blockers, traces, summaries, skipped-existing-pass states,
 missing traces, failures, and derived evidence refs. The closure sidecar is a
 bounded local execution audit. It is not full 235-problem validation,
@@ -95,8 +95,8 @@ not full validation, not paper parity, not upstream SOLAR parity,
 not NVIDIA B200 or Blackwell equivalence, and not hosted leaderboard readiness.
 
 Dataset runs write per-problem traces under category/problem subdirectories of
-the selected output directory and write `summary.json` directly under that
-output directory. The default output directory is `out/`.
+the selected output directory and write a run summary sidecar directly under
+that output directory. The default output directory is `out/`.
 
 For source-specific ROCm timing evidence, add a timing evidence directory and
 record the target architecture:
@@ -262,8 +262,8 @@ uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
   --amd-score-report out/amd-score-report.json
 ```
 
-The `out/amd-score-report.json` path is an example output path created by the
-dataset command.
+The AMD score report path is caller supplied; the path shown in the command
+above is only an example output location.
 
 The report is opt-in. It reads canonical trace output and derived AMD SOL bound
 inputs, records trace, timing, SOL-bound, baseline, and hardware-model evidence
@@ -302,7 +302,7 @@ uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
 
 This local workflow produces three artifact layers:
 
-- canonical `traces.json`: the benchmark trace JSONL output for each problem.
+- canonical trace JSONL files: the benchmark trace JSONL output for each problem.
   The canonical trace JSONL remains unchanged by `--amd-score-report`,
   `--amd-sol-bound-dir`, and `--solar-derivation`.
 - AMD SOL v2 sidecars under `--amd-sol-bound-dir`: derived AMD roofline and

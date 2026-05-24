@@ -15,7 +15,7 @@ library categories while rejecting legacy CUDA/NVIDIA runtime metadata.
 uv sync --all-groups
 
 # Run the CLI
-uv run sol-execbench <problem_dir> --solution solution.json
+uv run sol-execbench <problem_dir> --solution <solution-path>
 
 # Run all tests
 uv run pytest tests/
@@ -30,8 +30,8 @@ uv run pytest tests/ -k "test_correctness"
 uv run pytest tests/sol_execbench/test_e2e.py
 
 # Lint and format
-uv run ruff check .
-uv run ruff format .
+uv run --with ruff ruff check .
+uv run --with ruff ruff format .
 ```
 
 ## Architecture
