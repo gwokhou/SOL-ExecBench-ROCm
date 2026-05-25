@@ -77,6 +77,33 @@ This writes `traces.jsonl.environment.json`. Use
 The sidecar is reproducibility evidence only; it is not part of SOL/SOLAR
 correctness or scoring.
 
+## Optional Profiling Evidence
+
+v1.14 adds opt-in `rocprofv3` artifact collection for diagnosing anomalous or
+hardware-sensitive benchmark runs:
+
+```bash
+uv run sol-execbench examples/gemm --solution examples/gemm/solution.json \
+  --profile rocprofv3 --json -o traces.jsonl
+```
+
+Profiling is disabled by default. When enabled, SOL ExecBench writes profiler
+artifacts under `traces.jsonl.rocprofv3/` and writes diagnostic metadata to
+`traces.jsonl.profile.json`. The metadata records the profiler command,
+working directory, timeout, output locations, registered artifacts, exit status,
+and stdout/stderr tails.
+
+The profiling sidecar is optional evidence only. It does not add fields to
+canonical trace JSONL, does not change correctness status, and is not used as
+score authority. If `rocprofv3` is missing or the profiler command fails, the
+CLI records an unavailable or failed status and then runs the normal benchmark
+path.
+
+`rocprofv3` usually needs the same ROCm device access as benchmark execution:
+`/dev/kfd`, `/dev/dri`, the `video` group, and compatible host/container ROCm
+tools. In Docker, use the standard `./scripts/run_docker.sh` wrapper so those
+devices and security options are present.
+
 ## Docker
 
 Build and enter the ROCm container:

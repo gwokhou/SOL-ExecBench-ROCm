@@ -56,9 +56,9 @@
 
 ## Current Position
 
-**Active milestone:** v1.14 Optional rocprofv3 Profiling Evidence.
+**Active milestone:** none; v1.14 is complete.
 
-**Status:** v1.14 requirements and roadmap defined; ready to plan Phase 61.
+**Status:** v1.14 shipped 2026-05-25.
 
 **Next planned milestone:** static kernel evidence with RGA/code-object
 analysis and GPUOpen ISA classification remains future candidate work.
@@ -67,7 +67,7 @@ analysis and GPUOpen ISA classification remains future candidate work.
 
 ### Phase 61: Profiling Option and Command Provenance
 
-**Status:** Pending
+**Status:** Complete
 **Milestone:** v1.14 Optional rocprofv3 Profiling Evidence
 **Goal:** Introduce the opt-in CLI/config surface and profiler command builder.
 
@@ -80,7 +80,7 @@ analysis and GPUOpen ISA classification remains future candidate work.
 
 ### Phase 62: rocprofv3 Artifact Lifecycle
 
-**Status:** Pending
+**Status:** Complete
 **Milestone:** v1.14 Optional rocprofv3 Profiling Evidence
 **Goal:** Collect and register profiler artifacts in stable result metadata.
 
@@ -94,7 +94,7 @@ analysis and GPUOpen ISA classification remains future candidate work.
 
 ### Phase 63: Profiling Reports and Documentation
 
-**Status:** Pending
+**Status:** Complete
 **Milestone:** v1.14 Optional rocprofv3 Profiling Evidence
 **Goal:** Make profiling evidence understandable and operationally usable.
 
@@ -110,7 +110,7 @@ analysis and GPUOpen ISA classification remains future candidate work.
 | Milestone | Phases | Plans | Status | Shipped |
 |-----------|--------|-------|--------|---------|
 | v1.13 ROCm Runtime Evidence and Environment Diagnostics | 58-60 | 5/5 | Complete | 2026-05-25 |
-| v1.14 Optional rocprofv3 Profiling Evidence | 61-63 | 0/0 | Active | — |
+| v1.14 Optional rocprofv3 Profiling Evidence | 61-63 | 3/3 | Complete | 2026-05-25 |
 | v1.12 Evaluator Contract Metadata and Boundary Guardrails | none | quick task 260524-xb3 | Complete | 2026-05-25 |
 | v1.11 Paper Dataset Parity Inventory and ROCm Execution Closure | 53-57 | 14/14 | Complete | 2026-05-23 |
 | v1.10 Paper-Aligned SOLAR Automatic Derivation | 47-52 | 23/23 | Complete | 2026-05-23 |

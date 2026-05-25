@@ -25,6 +25,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -42,6 +43,12 @@ from ..core.environment import (
     build_environment_diagnostics,
     collect_environment_snapshot,
 )
+from ..core.bench.rocm_profiler import (
+    ROCPROFV3_EXECUTABLE,
+    Rocprofv3ProfileRequest,
+    Rocprofv3ProfileResult,
+    collect_rocprofv3_profile,
+)
 from ..core import (
     Definition,
     Workload,
@@ -56,6 +63,8 @@ console = Console(stderr=True)
 
 ENV_SNAPSHOT_ENABLE_ENV = "SOLEXECBENCH_ENV_SNAPSHOT"
 ENV_SNAPSHOT_PATH_ENV = "SOLEXECBENCH_ENV_SNAPSHOT_PATH"
+PROFILE_NONE = "none"
+PROFILE_ROCPROFV3 = "rocprofv3"
 
 
 def _load_definition(path: Path) -> Definition:
@@ -234,6 +243,105 @@ def _write_environment_snapshot_sidecar(
         return None
 
 
+def _profile_output_directory(output_file: Path | None, staging_dir: Path) -> Path:
+    """Return the profiler artifact directory for an evaluation run."""
+
+    if output_file is not None:
+        return output_file.with_name(f"{output_file.name}.rocprofv3")
+    return staging_dir / "rocprofv3"
+
+
+def _profile_sidecar_path(
+    output_file: Path | None,
+    profile_result: Rocprofv3ProfileResult,
+) -> Path:
+    """Return the profile metadata sidecar path for an evaluation run."""
+
+    if output_file is not None:
+        return output_file.with_name(f"{output_file.name}.profile.json")
+    return profile_result.output_directory / "profile.json"
+
+
+def _write_profile_sidecar(
+    output_file: Path | None,
+    profile_result: Rocprofv3ProfileResult | None,
+) -> Path | None:
+    """Write optional profiler metadata without changing trace JSONL."""
+
+    if profile_result is None:
+        return None
+
+    sidecar_path = _profile_sidecar_path(output_file, profile_result)
+    try:
+        sidecar_path.parent.mkdir(parents=True, exist_ok=True)
+        sidecar_path.write_text(
+            json.dumps(profile_result.to_dict(), sort_keys=True) + "\n"
+        )
+        console.print(f"[green]Saved profiling metadata to {sidecar_path}[/green]")
+        return sidecar_path
+    except Exception as exc:
+        console.print(f"[yellow]Profiling metadata skipped: {exc}[/yellow]")
+        return None
+
+
+def _run_evaluation_command(
+    eval_cmd: list[str],
+    *,
+    staging_dir: Path,
+    timeout: int,
+) -> subprocess.CompletedProcess[str]:
+    """Run the staged evaluation command with the standard ROCm allocator env."""
+
+    return subprocess.run(
+        eval_cmd,
+        cwd=staging_dir,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        env={**os.environ, "PYTORCH_ALLOC_CONF": "expandable_segments:True"},
+    )
+
+
+def _run_profiled_evaluation(
+    eval_cmd: list[str],
+    *,
+    staging_dir: Path,
+    output_file: Path | None,
+    timeout: int,
+) -> tuple[subprocess.CompletedProcess[str] | None, Rocprofv3ProfileResult]:
+    """Run evaluation under `rocprofv3`, returning normal execution on failure."""
+
+    output_directory = _profile_output_directory(output_file, staging_dir)
+    request = Rocprofv3ProfileRequest(
+        application_command=tuple(eval_cmd),
+        output_directory=output_directory,
+        output_file="profile",
+        working_directory=staging_dir,
+        timeout_seconds=timeout,
+    )
+    profile_result = collect_rocprofv3_profile(
+        request,
+        rocprofv3_available=shutil.which(ROCPROFV3_EXECUTABLE) is not None,
+        runner=lambda command, cwd, timeout_seconds: subprocess.run(
+            list(command),
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds,
+            env={**os.environ, "PYTORCH_ALLOC_CONF": "expandable_segments:True"},
+        ),
+    )
+    if profile_result.succeeded:
+        profiled_proc = subprocess.CompletedProcess(
+            args=list(profile_result.command),
+            returncode=profile_result.returncode or 0,
+            stdout=profile_result.stdout,
+            stderr=profile_result.stderr,
+        )
+        return profiled_proc, profile_result
+    return None, profile_result
+
+
 @click.command(
     name="sol-execbench", context_settings={"help_option_names": ["-h", "--help"]}
 )
@@ -285,6 +393,13 @@ def _write_environment_snapshot_sidecar(
 @click.option(
     "--keep-staging", is_flag=True, help="Keep the staging directory after evaluation"
 )
+@click.option(
+    "--profile",
+    type=click.Choice([PROFILE_NONE, PROFILE_ROCPROFV3]),
+    default=PROFILE_NONE,
+    show_default=True,
+    help="Collect optional diagnostic profiling artifacts",
+)
 @click.option("--verbose", "-v", is_flag=True, help="Show subprocess output")
 def _evaluate_cli(
     problem_dir: Optional[Path],
@@ -298,6 +413,7 @@ def _evaluate_cli(
     json_output: bool,
     lock_clocks: bool,
     keep_staging: bool,
+    profile: str,
     verbose: bool,
 ):
     """Evaluate a SOL-ExecBench solution on GPU.
@@ -395,6 +511,23 @@ def _evaluate_cli(
     # Phase 2: Evaluate
     eval_cmd = packager.execute()
 
+    profile_result: Rocprofv3ProfileResult | None = None
+    profiled_proc: subprocess.CompletedProcess[str] | None = None
+    if profile == PROFILE_ROCPROFV3:
+        console.print("[dim]Collecting optional rocprofv3 profiling evidence...[/dim]")
+        profiled_proc, profile_result = _run_profiled_evaluation(
+            eval_cmd,
+            staging_dir=staging_dir,
+            output_file=output_file,
+            timeout=timeout,
+        )
+        if profiled_proc is None:
+            reason = profile_result.skipped_reason or profile_result.failed_reason
+            console.print(
+                "[yellow]rocprofv3 profiling unavailable or failed; "
+                f"running normal evaluation. Reason: {reason}[/yellow]"
+            )
+
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
@@ -404,13 +537,10 @@ def _evaluate_cli(
             f"Evaluating {len(workloads)} workload(s)...", total=None
         )
 
-        proc = subprocess.run(
+        proc = profiled_proc or _run_evaluation_command(
             eval_cmd,
-            cwd=staging_dir,
-            capture_output=True,
-            text=True,
+            staging_dir=staging_dir,
             timeout=timeout,
-            env={**os.environ, "PYTORCH_ALLOC_CONF": "expandable_segments:True"},
         )
         progress.update(task, completed=True)
 
@@ -441,6 +571,7 @@ def _evaluate_cli(
         console.print(f"[green]Saved {len(traces)} traces to {output_file}[/green]")
 
     _write_environment_snapshot_sidecar(output_file)
+    _write_profile_sidecar(output_file, profile_result)
 
     if json_output:
         for t in traces:

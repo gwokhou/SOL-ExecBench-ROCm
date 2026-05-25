@@ -24,6 +24,7 @@ REQUIRED_CAPABILITIES = {
 }
 OPTIONAL_CAPABILITIES = {
     "runtime.evidence.v1",
+    "profiling.evidence.v1",
 }
 
 
@@ -42,7 +43,7 @@ def test_evaluator_contract_declares_required_capabilities():
     assert REQUIRED_CAPABILITIES.issubset(set(payload["capabilities"]))
 
 
-def test_evaluator_contract_advertises_optional_runtime_evidence_without_bump():
+def test_evaluator_contract_advertises_optional_evidence_without_bump():
     payload = build_evaluator_contract().model_dump(mode="json")
 
     assert OPTIONAL_CAPABILITIES.issubset(set(payload["capabilities"]))

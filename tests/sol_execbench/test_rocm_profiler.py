@@ -5,9 +5,13 @@ from collections.abc import Sequence
 
 from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3CollectionRequest,
+    Rocprofv3ProfileRequest,
+    build_rocprofv3_profile_command,
     build_rocprofv3_command,
     build_timing_evidence,
+    collect_rocprofv3_profile,
     collect_source_timing_evidence,
+    discover_rocprofv3_artifacts,
     collect_rocprofv3_timing,
     parse_rocprofv3_csv,
     select_default_timing,
@@ -46,6 +50,138 @@ def test_build_rocprofv3_command_places_application_after_separator():
         "timing",
     ]
     assert command[separator_index + 1 :] == ["uv", "run", "sol-execbench", "problem"]
+
+
+def test_build_rocprofv3_profile_command_prefers_rocpd_artifacts():
+    command = build_rocprofv3_profile_command(
+        ["python", "eval_driver.py"],
+        output_directory="out/profile",
+        output_file="profile",
+    )
+
+    separator_index = command.index("--")
+    assert command[:separator_index] == [
+        "rocprofv3",
+        "--kernel-trace",
+        "--hip-runtime-trace",
+        "--output-format",
+        "rocpd",
+        "--output-directory",
+        "out/profile",
+        "--output-file",
+        "profile",
+    ]
+    assert command[separator_index + 1 :] == ["python", "eval_driver.py"]
+
+
+def test_profile_artifact_discovery_classifies_rocpd_and_csv_outputs(tmp_path):
+    (tmp_path / "profile.rocpd").write_text("db")
+    (tmp_path / "profile_kernel.csv").write_text("kernel")
+    (tmp_path / "profile_agent_info.csv").write_text("agent")
+    (tmp_path / "unrelated.csv").write_text("skip")
+
+    artifacts = discover_rocprofv3_artifacts(tmp_path, "profile")
+
+    assert sorted(artifact.kind for artifact in artifacts) == [
+        "agent_info_csv",
+        "rocpd",
+        "trace_csv",
+    ]
+    assert all(artifact.size_bytes > 0 for artifact in artifacts)
+
+
+def test_profile_collection_records_success_metadata(tmp_path):
+    calls: list[list[str]] = []
+
+    def runner(
+        command: Sequence[str],
+        cwd,
+        timeout,
+    ) -> subprocess.CompletedProcess[str]:
+        calls.append(list(command))
+        (tmp_path / "profile.rocpd").write_text("profile db")
+        return subprocess.CompletedProcess(
+            args=list(command),
+            returncode=0,
+            stdout='{"definition": "demo"}\n',
+            stderr="profiler note",
+        )
+
+    request = Rocprofv3ProfileRequest(
+        application_command=("python", "eval_driver.py"),
+        output_directory=tmp_path,
+        output_file="profile",
+        working_directory=tmp_path,
+        timeout_seconds=30,
+    )
+
+    result = collect_rocprofv3_profile(request, runner=runner)
+    payload = result.to_dict()
+
+    assert result.succeeded is True
+    assert calls[0][-3:] == ["--", "python", "eval_driver.py"]
+    assert payload["schema_version"] == "sol_execbench.rocprofv3_profile.v1"
+    assert payload["diagnostic_only"] is True
+    assert payload["score_authority"] is False
+    assert payload["status"] == "success"
+    assert payload["working_directory"] == str(tmp_path)
+    assert payload["timeout_seconds"] == 30
+    assert payload["returncode"] == 0
+    assert payload["artifacts"][0]["kind"] == "rocpd"
+    assert payload["stderr_tail"] == "profiler note"
+
+
+def test_profile_collection_unavailable_is_nonfatal_metadata(tmp_path):
+    def runner(command: Sequence[str], cwd, timeout) -> subprocess.CompletedProcess[str]:
+        raise AssertionError(f"runner should not be called: {command}")
+
+    request = Rocprofv3ProfileRequest(
+        application_command=("python", "eval_driver.py"),
+        output_directory=tmp_path,
+        output_file="profile",
+    )
+
+    result = collect_rocprofv3_profile(
+        request,
+        rocprofv3_available=False,
+        runner=runner,
+    )
+
+    assert result.succeeded is False
+    assert result.status == "unavailable"
+    assert result.returncode is None
+    assert result.skipped_reason == "rocprofv3 is not available on PATH"
+    assert result.to_dict()["artifacts"] == []
+
+
+def test_profile_collection_failure_records_artifact_and_stderr_tail(tmp_path):
+    def runner(
+        command: Sequence[str],
+        cwd,
+        timeout,
+    ) -> subprocess.CompletedProcess[str]:
+        (tmp_path / "profile_kernel.csv").write_text("partial")
+        return subprocess.CompletedProcess(
+            args=list(command),
+            returncode=22,
+            stdout="",
+            stderr="profiler failed",
+        )
+
+    request = Rocprofv3ProfileRequest(
+        application_command=("python", "eval_driver.py"),
+        output_directory=tmp_path,
+        output_file="profile",
+    )
+
+    result = collect_rocprofv3_profile(request, runner=runner)
+    payload = result.to_dict()
+
+    assert result.status == "failed"
+    assert payload["returncode"] == 22
+    assert payload["failed_reason"] == "rocprofv3 command failed with exit code 22"
+    assert payload["stderr_tail"] == "profiler failed"
+    assert payload["artifacts"][0]["kind"] == "trace_csv"
 
 
 def test_parse_rocprofv3_csv_keeps_domains_separate():

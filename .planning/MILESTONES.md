@@ -1,5 +1,33 @@
 # Milestones
 
+## v1.14 Optional rocprofv3 Profiling Evidence (Shipped: 2026-05-25)
+
+**Delivered:** opt-in `rocprofv3` profiling artifacts for benchmark runs,
+profile command provenance, artifact registration, diagnostic sidecars,
+`profiling.evidence.v1` optional capability, and ROCm profiling documentation
+while preserving canonical trace JSONL, default execution, correctness, timing,
+scoring, and evaluator contract version `1.0`.
+
+**Phases completed:** 61-63 (3 phases, 3 plans)
+
+**Key accomplishments:**
+
+- Added `sol-execbench --profile rocprofv3` with default `--profile none`.
+- Added `sol_execbench.rocprofv3_profile.v1` profile sidecar metadata with
+  command, working directory, timeout, artifact paths, return code,
+  skipped/failed reasons, and stdout/stderr tails.
+- Registered `rocpd`, CSV trace, counter, agent-info, JSON, and unknown
+  profiler artifacts under stable output-derived paths.
+- Kept profiler absence or failure nonfatal by falling back to normal benchmark
+  execution.
+- Advertised optional `profiling.evidence.v1` without bumping the evaluator
+  contract.
+
+**Known tech debt:** static RGA/GPUOpen ISA analysis and ROCm Compute Profiler
+roofline workflows remain future work.
+
+---
+
 ## v1.13 ROCm Runtime Evidence and Environment Diagnostics (Shipped: 2026-05-25)
 
 **Delivered:** optional ROCm runtime environment snapshot evidence, opt-in
