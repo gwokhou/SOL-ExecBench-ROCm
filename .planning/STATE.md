@@ -95,6 +95,7 @@ Items acknowledged and carried forward from previous milestone close:
 |----------|------|--------|-------------|
 | Dataset extraction | Original paper 124-model / 235-problem extraction | Deferred | v1.10 scope |
 | Hardware validation | MI300X, CDNA 3, and CDNA 4 real-hardware validation | Deferred | v1.10 scope |
+| Compatibility validation | ROCm 7.0.x/7.1.x/7.2.x by GPU-generation validation matrix | Deferred | v1.16 follow-up discussion |
 | Hardware validation | NVFP4 and MXFP4 validation | Deferred | v1.10 scope |
 | Public service | Hosted leaderboard or submission service | Deferred | v1.10 scope |
 | Claims | NVIDIA Blackwell/B200 equivalence | Deferred | v1.10 scope |
