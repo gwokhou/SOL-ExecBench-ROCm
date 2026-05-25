@@ -13,23 +13,54 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import sys
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
+PathExists = Callable[[Path], bool]
 
-def _rocm_gpu_info() -> tuple[bool, str]:
-    """Return ROCm GPU availability and AMD gfx architecture."""
+_ROCM_DEVICE_NODES = (Path("/dev/kfd"), Path("/dev/dri"))
+
+
+def _missing_rocm_device_nodes(path_exists: PathExists | None = None) -> tuple[str, ...]:
+    """Return missing ROCm device nodes for Linux hardware test collection."""
+    if sys.platform != "linux":
+        return ()
+    exists = path_exists or Path.exists
+    return tuple(str(path) for path in _ROCM_DEVICE_NODES if not exists(path))
+
+
+def _rocm_device_node_skip_reason(missing_nodes: tuple[str, ...]) -> str:
+    return (
+        "ROCm device nodes unavailable in current execution environment: "
+        + ", ".join(missing_nodes)
+        + ". If this is a Codex or container sandbox, run GPU checks with ROCm "
+        "device passthrough."
+    )
+
+
+def _rocm_gpu_info(path_exists: PathExists | None = None) -> tuple[bool, str, str]:
+    """Return ROCm GPU availability, AMD gfx architecture, and skip reason."""
+    missing_nodes = _missing_rocm_device_nodes(path_exists)
+    if missing_nodes:
+        return False, "", _rocm_device_node_skip_reason(missing_nodes)
+
     try:
         import torch
 
-        if not torch.cuda.is_available() or getattr(torch.version, "hip", None) is None:
-            return False, ""
+        if getattr(torch.version, "hip", None) is None:
+            return False, "", "PyTorch is not a ROCm build"
+        if not torch.cuda.is_available():
+            return False, "", "ROCm GPU unavailable through PyTorch"
         props = torch.cuda.get_device_properties(0)
         arch = getattr(props, "gcnArchName", "") or getattr(props, "gfx_arch_name", "")
-        return True, str(arch).split(":", maxsplit=1)[0]
-    except (ImportError, RuntimeError, AttributeError):
-        return False, ""
+        return True, str(arch).split(":", maxsplit=1)[0], ""
+    except ImportError as exc:
+        return False, "", f"PyTorch import failed: {exc}"
+    except (RuntimeError, AttributeError) as exc:
+        return False, "", f"PyTorch ROCm probe failed: {exc}"
 
 
 def _has_rocm_dev_headers() -> bool:
@@ -99,7 +130,7 @@ def pytest_collection_modifyitems(
 
     Also skips timing_serial tests unless explicitly selected with -m.
     """
-    rocm_available, gfx_arch = _rocm_gpu_info()
+    rocm_available, gfx_arch, rocm_skip_reason = _rocm_gpu_info()
     rocm_dev_available = _has_rocm_dev_headers()
     ck_available = _has_ck_headers()
     rocwmma_available = _has_rocwmma_headers()
@@ -108,7 +139,7 @@ def pytest_collection_modifyitems(
     skip_timing = pytest.mark.skip(
         reason="timing_serial tests skipped by default; run with: pytest tests -m timing_serial -n 0"
     )
-    skip_no_rocm = pytest.mark.skip(reason="ROCm GPU unavailable through PyTorch")
+    skip_no_rocm = pytest.mark.skip(reason=rocm_skip_reason)
     skip_no_rocm_dev = pytest.mark.skip(reason="ROCm HIP development headers unavailable")
     skip_no_ck = pytest.mark.skip(reason="Composable Kernel headers unavailable")
     skip_no_rocwmma = pytest.mark.skip(reason="rocWMMA headers unavailable")

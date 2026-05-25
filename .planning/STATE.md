@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.14
 milestone_name: Optional rocprofv3 Profiling Evidence
 status: complete
-last_updated: "2026-05-25T10:32:46Z"
+last_updated: "2026-05-25T10:57:39Z"
 last_activity: 2026-05-25
 progress:
   total_phases: 3
@@ -27,7 +27,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-25)
 Phase: 63 complete
 Plan: 63-PLAN.md
 Status: Milestone complete
-Last activity: 2026-05-25 — v1.14 profiling evidence milestone shipped
+Last activity: 2026-05-25 — ROCm sandbox device-node skip diagnostics added
 
 ## Performance Metrics
 
@@ -132,6 +132,7 @@ None active.
 | 260525-ruff | Configure Ruff as a dev dependency | 2026-05-25 | this commit | [260525-configure-ruff-dev-dependency](./quick/260525-configure-ruff-dev-dependency/) |
 | 260525-ty | Configure Ty as a dev dependency | 2026-05-25 | this commit | [260525-configure-ty-dev-dependency](./quick/260525-configure-ty-dev-dependency/) |
 | 260525-fix-ty-s0-s1 | Fix Ty S0/S1 diagnostics | 2026-05-25 | this commit | [260525-fix-ty-s0-s1](./quick/260525-fix-ty-s0-s1/) |
+| 260525-q95 | Add ROCm device-node-aware skip reasons for Codex sandboxed test runs | 2026-05-25 | this commit | [260525-q95-add-rocm-device-node-aware-skip-reasons-](./quick/260525-q95-add-rocm-device-node-aware-skip-reasons-/) |
 
 ## Deferred Items
 

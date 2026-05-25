@@ -29,6 +29,8 @@ def test_pytest_markers_describe_rocm_hardware_semantics():
         assert phrase in pyproject
 
     marker_logic = [
+        "ROCm device nodes unavailable in current execution environment",
+        "Codex or container sandbox",
         "ROCm GPU unavailable through PyTorch",
         "requires AMD RDNA 4 ROCm GPU",
         "requires AMD CDNA 3 ROCm GPU",
