@@ -152,37 +152,37 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SKE-CONTRACT-01 | TBD | Pending |
-| SKE-CONTRACT-02 | TBD | Pending |
-| SKE-CONTRACT-03 | TBD | Pending |
-| SKE-CONTRACT-04 | TBD | Pending |
-| SKE-CONTRACT-05 | TBD | Pending |
-| SKE-ARTIFACT-01 | TBD | Pending |
-| SKE-ARTIFACT-02 | TBD | Pending |
-| SKE-ARTIFACT-03 | TBD | Pending |
-| SKE-ARTIFACT-04 | TBD | Pending |
-| SKE-ARTIFACT-05 | TBD | Pending |
-| SKE-EXTRACT-01 | TBD | Pending |
-| SKE-EXTRACT-02 | TBD | Pending |
-| SKE-EXTRACT-03 | TBD | Pending |
-| SKE-EXTRACT-04 | TBD | Pending |
-| SKE-EXTRACT-05 | TBD | Pending |
-| SKE-EXTRACT-06 | TBD | Pending |
-| SKE-CLI-01 | TBD | Pending |
-| SKE-CLI-02 | TBD | Pending |
-| SKE-CLI-03 | TBD | Pending |
-| SKE-CLI-04 | TBD | Pending |
-| SKE-DOCS-01 | TBD | Pending |
-| SKE-DOCS-02 | TBD | Pending |
-| SKE-DOCS-03 | TBD | Pending |
-| SKE-DOCS-04 | TBD | Pending |
-| SKE-DOCS-05 | TBD | Pending |
+| SKE-CONTRACT-01 | Phase 73 | Pending |
+| SKE-CONTRACT-02 | Phase 73 | Pending |
+| SKE-CONTRACT-03 | Phase 73 | Pending |
+| SKE-CONTRACT-04 | Phase 73 | Pending |
+| SKE-CONTRACT-05 | Phase 73 | Pending |
+| SKE-ARTIFACT-01 | Phase 74 | Pending |
+| SKE-ARTIFACT-02 | Phase 74 | Pending |
+| SKE-ARTIFACT-03 | Phase 74 | Pending |
+| SKE-ARTIFACT-04 | Phase 74 | Pending |
+| SKE-ARTIFACT-05 | Phase 74 | Pending |
+| SKE-EXTRACT-01 | Phase 75 | Pending |
+| SKE-EXTRACT-02 | Phase 75 | Pending |
+| SKE-EXTRACT-03 | Phase 75 | Pending |
+| SKE-EXTRACT-04 | Phase 75 | Pending |
+| SKE-EXTRACT-05 | Phase 75 | Pending |
+| SKE-EXTRACT-06 | Phase 75 | Pending |
+| SKE-CLI-01 | Phase 76 | Pending |
+| SKE-CLI-02 | Phase 76 | Pending |
+| SKE-CLI-03 | Phase 76 | Pending |
+| SKE-CLI-04 | Phase 76 | Pending |
+| SKE-DOCS-01 | Phase 77 | Pending |
+| SKE-DOCS-02 | Phase 77 | Pending |
+| SKE-DOCS-03 | Phase 77 | Pending |
+| SKE-DOCS-04 | Phase 77 | Pending |
+| SKE-DOCS-05 | Phase 77 | Pending |
 
 **Coverage:**
 - v1.17 requirements: 25 total
-- Mapped to phases: 0
-- Unmapped: 25
+- Mapped to phases: 25
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-05-25*
-*Last updated: 2026-05-25 after v1.17 requirements definition*
+*Last updated: 2026-05-25 after v1.17 roadmap creation*

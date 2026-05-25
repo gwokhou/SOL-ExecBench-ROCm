@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v1.17
 milestone_name: Static Kernel Evidence
-status: planning
-last_updated: "2026-05-25T15:05:18.238Z"
+status: roadmap-created
+last_updated: "2026-05-25T15:20:00.000Z"
 last_activity: 2026-05-25
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -20,21 +20,21 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-25)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** v1.16 archived; awaiting next milestone
+**Current focus:** v1.17 Static Kernel Evidence roadmap created; ready to plan Phase 73
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 73 of 77 (Static Evidence Contract And Guardrails)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-05-25 — Milestone v1.17 started
+Status: Roadmap created; ready to plan
+Last activity: 2026-05-25 — Created v1.17 roadmap with 5 active phases and 25/25 requirements mapped
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Current milestone plans completed: 5
-- Current milestone phases completed: 5
+- Current milestone plans completed: 0
+- Current milestone phases completed: 0
 - Average duration: n/a
 - Total execution time: n/a
 
@@ -42,17 +42,17 @@ Last activity: 2026-05-25 — Milestone v1.17 started
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 68. External ROCm Toolchain Research | 1 | complete | n/a |
-| 69. Toolchain Inventory And Lifecycle Model | 1 | complete | n/a |
-| 70. Capability Registry Schema | 1 | complete | n/a |
-| 71. Dynamic Probe And Routing Policy | 1 | complete | n/a |
-| 72. Toolchain Matrix Docs And Guardrails | 1 | complete | n/a |
+| 73. Static Evidence Contract And Guardrails | TBD | not started | n/a |
+| 74. Build Artifact Discovery And Manifest | TBD | not started | n/a |
+| 75. Routed Static Extractor Adapters | TBD | not started | n/a |
+| 76. CLI Sidecar Integration And Reports | TBD | not started | n/a |
+| 77. Documentation, Guardrails, And Live Validation | TBD | not started | n/a |
 
 **Recent Trend:**
 
 - Last milestone: v1.16 shipped on 2026-05-25
-- Trend: toolchain routing foundation complete; next likely work is v1.17
-  Static Kernel Evidence.
+- Trend: v1.17 is planned as five phases building from contract to discovery,
+  routed extractors, CLI/reporting, then docs/live validation.
 
 ## Accumulated Context
 
@@ -61,9 +61,11 @@ Last activity: 2026-05-25 — Milestone v1.17 started
 Decisions are logged in PROJECT.md. Recent decisions affecting current work:
 
 - v1.16 prioritizes ROCm toolchain research and capability routing before Static Kernel Evidence.
-- ROCm tool availability must be modeled by hardware generation, GPU architecture, ROCm version, artifact type, and evidence level.
-- Static Kernel Evidence is explicitly deferred to v1.17.
-- Routing decisions must not be treated as correctness, performance, paper-parity, or leaderboard authority.
+- v1.17 starts at Phase 73 because v1.16 ended at Phase 72.
+- Static Kernel Evidence remains opt-in, sidecar-only, and diagnostic.
+- Static extraction must use v1.16 routing, not ad hoc executable lookup.
+- Static evidence must not mutate canonical trace JSONL, correctness, timing,
+  scoring, default benchmark behavior, paper-parity, or leaderboard claims.
 - Detailed historical decisions are preserved in `.planning/PROJECT.md` and archived milestone artifacts.
 
 ### Pending Todos
@@ -72,7 +74,9 @@ None found.
 
 ### Blockers/Concerns
 
-None active.
+Live RDNA 4 validation depends on ROCm build tools plus device/runtime access.
+CDNA 3, CDNA 4, Triton, RGA-rich resource parsing, and paper-scale static
+coverage remain deferred unless direct evidence is produced in v1.17.
 
 ### Quick Tasks Completed
 
@@ -102,9 +106,9 @@ Items acknowledged and carried forward from previous milestone close:
 ## Session Continuity
 
 Last session: 2026-05-23T11:26:49.344Z
-Stopped at: Completed 52-03-PLAN.md
+Stopped at: Created v1.17 roadmap and requirement traceability
 Resume file: None
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Run /gsd-plan-phase 73
