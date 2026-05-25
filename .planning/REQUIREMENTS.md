@@ -32,20 +32,20 @@ roadmap phase.
 
 ### Artifacts
 
-- [ ] **SKE-ARTIFACT-01**: Operator can collect static evidence only from the
+- [x] **SKE-ARTIFACT-01**: Operator can collect static evidence only from the
   current HIP/C++ staging or build tree, starting with `benchmark_kernel.so`
   and opportunistically including code objects, HSACO files, object files, and
   compiler outputs exposed by that build.
-- [ ] **SKE-ARTIFACT-02**: Operator can persist discovered static artifacts
+- [x] **SKE-ARTIFACT-02**: Operator can persist discovered static artifacts
   into an output-derived evidence directory before temporary staging cleanup.
-- [ ] **SKE-ARTIFACT-03**: Operator can inspect an artifact manifest that
+- [x] **SKE-ARTIFACT-03**: Operator can inspect an artifact manifest that
   records artifact kind, source path, persisted path, SHA256, size, producer,
   target architecture when known, and inspectability for every registered
   artifact.
-- [ ] **SKE-ARTIFACT-04**: Maintainer can verify that static artifact discovery
+- [x] **SKE-ARTIFACT-04**: Maintainer can verify that static artifact discovery
   avoids global cache, ROCm install tree, and unrelated temporary-directory
   scans that could mix artifacts across benchmark runs.
-- [ ] **SKE-ARTIFACT-05**: Operator receives explicit unsupported or
+- [x] **SKE-ARTIFACT-05**: Operator receives explicit unsupported or
   unavailable states for solution paths without a stable v1.17 static artifact
   boundary, including Python/PyTorch eager, opaque external library, and
   unstable Triton-cache cases.
@@ -158,11 +158,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SKE-CONTRACT-03 | Phase 73 | Complete |
 | SKE-CONTRACT-04 | Phase 73 | Complete |
 | SKE-CONTRACT-05 | Phase 73 | Complete |
-| SKE-ARTIFACT-01 | Phase 74 | Pending |
-| SKE-ARTIFACT-02 | Phase 74 | Pending |
-| SKE-ARTIFACT-03 | Phase 74 | Pending |
-| SKE-ARTIFACT-04 | Phase 74 | Pending |
-| SKE-ARTIFACT-05 | Phase 74 | Pending |
+| SKE-ARTIFACT-01 | Phase 74 | Complete |
+| SKE-ARTIFACT-02 | Phase 74 | Complete |
+| SKE-ARTIFACT-03 | Phase 74 | Complete |
+| SKE-ARTIFACT-04 | Phase 74 | Complete |
+| SKE-ARTIFACT-05 | Phase 74 | Complete |
 | SKE-EXTRACT-01 | Phase 75 | Pending |
 | SKE-EXTRACT-02 | Phase 75 | Pending |
 | SKE-EXTRACT-03 | Phase 75 | Pending |

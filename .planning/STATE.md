@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.17
 milestone_name: Static Kernel Evidence
-status: executing
-stopped_at: Created v1.17 roadmap and requirement traceability
-last_updated: "2026-05-25T23:06:30.222Z"
-last_activity: 2026-05-25 -- Phase 74 execution started
+status: ready_to_plan
+stopped_at: Phase 74 complete (1/1) — ready to discuss Phase 75
+last_updated: 2026-05-26
+last_activity: 2026-05-26 -- Phase 74 complete
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 2
-  completed_plans: 1
-  percent: 20
+  completed_plans: 2
+  percent: 40
 ---
 
 # Project State
@@ -21,21 +21,21 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-25)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Phase 74 — Build Artifact Discovery And Manifest
+**Current focus:** Phase 75 — routed static extractor adapters
 
 ## Current Position
 
-Phase: 74 (Build Artifact Discovery And Manifest) — EXECUTING
-Plan: 1 of 1
-Status: Executing Phase 74
-Last activity: 2026-05-25 -- Phase 74 execution started
+Phase: 75
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-05-26
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Current milestone plans completed: 1
-- Current milestone phases completed: 1
+- Current milestone plans completed: 2
+- Current milestone phases completed: 2
 - Average duration: n/a
 - Total execution time: n/a
 
@@ -44,7 +44,7 @@ Last activity: 2026-05-25 -- Phase 74 execution started
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 73. Static Evidence Contract And Guardrails | 1 | complete | n/a |
-| 74. Build Artifact Discovery And Manifest | TBD | not started | n/a |
+| 74. Build Artifact Discovery And Manifest | 1 | complete | n/a |
 | 75. Routed Static Extractor Adapters | TBD | not started | n/a |
 | 76. CLI Sidecar Integration And Reports | TBD | not started | n/a |
 | 77. Documentation, Guardrails, And Live Validation | TBD | not started | n/a |
