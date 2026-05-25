@@ -23,18 +23,21 @@ def _which(binary: str) -> str | None:
     paths = {
         "rocprofv3": "/opt/rocm/bin/rocprofv3",
         "rocminfo": "/opt/rocm/bin/rocminfo",
+        "llvm-objdump": "/usr/bin/llvm-objdump",
+        "readelf": "/usr/bin/readelf",
     }
     return paths.get(binary)
 
 
-def test_default_registry_records_lifecycle_and_future_static_tools():
+def test_default_registry_records_lifecycle_and_static_tools():
     registry = {entry.tool_id: entry for entry in default_toolchain_registry()}
 
     assert registry["rocprofv3"].lifecycle == ToolLifecycle.ACTIVE
     assert registry["rocprofiler-systems"].lifecycle == ToolLifecycle.MIGRATED
     assert registry["rocprofiler-systems"].replacement_tool_id == "rocm-systems"
     assert registry["rga"].lifecycle == ToolLifecycle.PLANNED
-    assert registry["llvm-objdump"].lifecycle == ToolLifecycle.PLANNED
+    assert registry["llvm-objdump"].lifecycle == ToolLifecycle.ACTIVE
+    assert registry["readelf"].lifecycle == ToolLifecycle.ACTIVE
     assert ToolchainEvidenceLevel.STATIC in registry["rga"].evidence_levels
 
 
@@ -112,20 +115,30 @@ def test_routing_rejects_wrong_artifact_with_explicit_reason():
     assert report.decisions[0].reason_code == "unsupported_artifact"
 
 
-def test_static_tool_is_planned_not_selected_in_v1_16():
+def test_static_tools_are_routable_and_optional_candidates_remain_nonmandatory():
+    commands: list[list[str]] = []
+
+    def runner(command: list[str], timeout_seconds: float) -> ProbeCompletedProcess:
+        commands.append(command)
+        return ProbeCompletedProcess(returncode=0, stdout=f"{command[0]} ok")
+
     report = build_toolchain_routing_report(
         ToolchainRoutingRequest(
             evidence_level=ToolchainEvidenceLevel.STATIC,
             artifact_type=ToolchainArtifactType.ROCM_BINARY,
         ),
-        which=lambda binary: f"/usr/bin/{binary}",
+        runner=runner,
+        which=_which,
     )
 
-    assert report.selected_tool_id is None
+    assert report.selected_tool_id == "readelf"
     statuses = {decision.tool_id: decision.status for decision in report.decisions}
+    assert statuses["readelf"] == ToolchainStatus.AVAILABLE
+    assert statuses["llvm-objdump"] == ToolchainStatus.AVAILABLE
+    assert statuses["roc-objdump"] == ToolchainStatus.UNAVAILABLE
     assert statuses["rga"] == ToolchainStatus.PLANNED
-    assert statuses["llvm-objdump"] == ToolchainStatus.PLANNED
-    assert statuses["readelf"] == ToolchainStatus.PLANNED
+    assert ["readelf", "--version"] in commands
+    assert ["llvm-objdump", "--version"] in commands
 
 
 def test_toolchain_cli_prints_routing_json(monkeypatch):
