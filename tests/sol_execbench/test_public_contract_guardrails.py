@@ -228,6 +228,8 @@ def test_canonical_trace_jsonl_excludes_derived_report_key_space():
         "failure_categories",
         "formula",
         "coverage",
+        "runtime.evidence.v1",
+        "environment_snapshot",
         "score_eligibility",
         *DERIVED_REPORT_EVIDENCE_REF_KEYS,
         *PHASE51_INTERNAL_PUBLIC_BOUNDARY_FIELDS,

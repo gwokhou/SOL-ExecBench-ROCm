@@ -14,6 +14,19 @@
 # limitations under the License.
 
 from .bench.config import BenchmarkConfig, get_clock_preset
+from .environment import (
+    ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION,
+    EnvironmentEvidenceStatus,
+    EnvironmentSnapshot,
+    GpuEnvironmentSummary,
+    ProbeCompletedProcess,
+    PytorchRocmSummary,
+    RocmEnvironmentSummary,
+    ToolProbeResult,
+    collect_environment_snapshot,
+    collect_pytorch_rocm_summary,
+    probe_tool,
+)
 from .data import (
     AxisConst,
     AxisSpec,
@@ -69,6 +82,18 @@ __all__ = [
     "Evaluation",
     "EvaluationStatus",
     "Trace",
+    # Optional environment evidence
+    "ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION",
+    "EnvironmentEvidenceStatus",
+    "EnvironmentSnapshot",
+    "GpuEnvironmentSummary",
+    "ProbeCompletedProcess",
+    "PytorchRocmSummary",
+    "RocmEnvironmentSummary",
+    "ToolProbeResult",
+    "collect_environment_snapshot",
+    "collect_pytorch_rocm_summary",
+    "probe_tool",
     # Bench config
     "BenchmarkConfig",
     "get_clock_preset",
