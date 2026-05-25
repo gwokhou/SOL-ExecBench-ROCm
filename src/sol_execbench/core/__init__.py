@@ -16,6 +16,8 @@
 from .bench.config import BenchmarkConfig, get_clock_preset
 from .environment import (
     ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION,
+    EnvironmentCheckResult,
+    EnvironmentDiagnostics,
     EnvironmentEvidenceStatus,
     EnvironmentSnapshot,
     GpuEnvironmentSummary,
@@ -23,6 +25,7 @@ from .environment import (
     PytorchRocmSummary,
     RocmEnvironmentSummary,
     ToolProbeResult,
+    build_environment_diagnostics,
     collect_environment_snapshot,
     collect_pytorch_rocm_summary,
     probe_tool,
@@ -84,6 +87,8 @@ __all__ = [
     "Trace",
     # Optional environment evidence
     "ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION",
+    "EnvironmentCheckResult",
+    "EnvironmentDiagnostics",
     "EnvironmentEvidenceStatus",
     "EnvironmentSnapshot",
     "GpuEnvironmentSummary",
@@ -91,6 +96,7 @@ __all__ = [
     "PytorchRocmSummary",
     "RocmEnvironmentSummary",
     "ToolProbeResult",
+    "build_environment_diagnostics",
     "collect_environment_snapshot",
     "collect_pytorch_rocm_summary",
     "probe_tool",

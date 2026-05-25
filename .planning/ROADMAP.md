@@ -57,7 +57,7 @@
 
 **Active milestone:** v1.13 ROCm Runtime Evidence and Environment Diagnostics.
 
-**Status:** Phase 59 complete; ready to execute diagnostics CLI and preflight checks.
+**Status:** v1.13 implementation complete; milestone audit ready.
 
 **Next planned milestone:** v1.14 Optional rocprofv3 Profiling Evidence.
 
@@ -96,7 +96,7 @@ changing correctness or scoring semantics.
 
 ### Phase 60: Diagnostics CLI and Preflight Checks
 
-**Status:** Pending
+**Status:** Complete
 **Milestone:** v1.13 ROCm Runtime Evidence and Environment Diagnostics
 **Goal:** Provide a standalone way to diagnose ROCm, Docker, and GPU runtime
 readiness before running a full benchmark.
@@ -140,7 +140,7 @@ COMPAT-03
 
 | Milestone | Phases | Plans | Status | Shipped |
 |-----------|--------|-------|--------|---------|
-| v1.13 ROCm Runtime Evidence and Environment Diagnostics | 58-60 | 4/4 | Active | — |
+| v1.13 ROCm Runtime Evidence and Environment Diagnostics | 58-60 | 5/5 | Complete | — |
 | v1.14 Optional rocprofv3 Profiling Evidence | 61-63 | 0/0 | Planned | — |
 | v1.12 Evaluator Contract Metadata and Boundary Guardrails | none | quick task 260524-xb3 | Complete | 2026-05-25 |
 | v1.11 Paper Dataset Parity Inventory and ROCm Execution Closure | 53-57 | 14/14 | Complete | 2026-05-23 |
