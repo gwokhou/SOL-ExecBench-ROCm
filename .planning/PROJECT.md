@@ -15,25 +15,26 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
 ## Current State
 
-**Shipped version:** v1.15 Research-Grade ROCm Benchmark Release,
+**Shipped version:** v1.16 ROCm Toolchain Research and Capability Routing,
 completed 2026-05-25.
 
-**Current milestone:** v1.16 ROCm Toolchain Research and Capability Routing.
+**Current milestone:** v1.17 Static Kernel Evidence.
 
-**Latest milestone outcome:** the ROCm port now has explicit claim boundaries,
-a deterministic curated ROCm benchmark slice, researcher-facing workflows and
-cookbooks, a v1.15 release closure checklist, and guardrail tests that keep the
-research-preview surface distinct from paper parity, leaderboard readiness, and
-unsupported hardware validation claims.
+**Latest milestone outcome:** the ROCm port now has a research-backed ROCm
+toolchain routing model, a machine-readable capability registry, bounded
+dynamic probes, `sol-execbench toolchain --json`, and claim guardrails that
+keep routing availability distinct from correctness, performance, paper parity,
+leaderboard authority, and static analysis evidence.
 
-**Current milestone goal:** Research the fragmented ROCm toolchain ecosystem
-and establish a central capability registry plus routing policy so benchmark
-evidence paths can decide which tool is available, why a tool is unavailable,
-and which fallback or future milestone should own the evidence.
+**Current milestone goal:** Build static kernel evidence on top of the v1.16
+routing layer by capturing ROCm code objects or HSACO where available,
+extracting ISA and metadata through routed static tools, and reporting
+diagnostic compiler/static artifact evidence without mutating canonical trace
+JSONL or benchmark scoring semantics.
 
-**Next planned milestone:** static kernel evidence with code-object capture,
-ISA/metadata extraction, and compiler artifact reports is explicitly deferred
-to v1.17 after the routing layer is in place.
+**Next planned milestone:** to be determined after v1.17 closes; likely
+follow-ups include broader hardware validation, paper dataset parity, or deeper
+static-analysis classifications.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline.
 Milestones v1.1-v1.6 added CDNA 3 code/schema support, maintained residue
@@ -76,8 +77,43 @@ outcomes.
 The v1.15 milestone packaged the port into a bounded research preview by adding
 claim boundaries, a curated ROCm slice, researcher guide and cookbook workflows,
 release closure, and documentation guardrail tests.
+The v1.16 milestone researched ROCm's fragmented toolchain ecosystem and added
+a central capability registry plus dynamic routing reports so evidence paths can
+explain which tools are available, unavailable, planned, migrated, rejected, or
+deprecated without overclaiming benchmark authority.
 
-## Current Milestone: v1.16 ROCm Toolchain Research and Capability Routing
+## Current Milestone: v1.17 Static Kernel Evidence
+
+**Goal:** Add diagnostic static kernel evidence by capturing ROCm compiler
+artifacts, extracting ISA and metadata through routed static tools, and
+publishing sidecars and reports that remain separate from correctness,
+performance, paper-parity, and leaderboard claims.
+
+**Target features:**
+- Code-object or HSACO capture from ROCm solution builds where the current
+  build path exposes stable artifacts.
+- Static metadata and ISA extraction using routed tools such as RGA,
+  `llvm-objdump`, `roc-objdump`, or `readelf` when available.
+- A machine-readable `static_kernel_evidence.v1` sidecar with provenance,
+  artifact paths, selected tool, unavailable states, and classification
+  results.
+- Compiler/static artifact reports that researchers can inspect alongside
+  traces, profiles, and AMD-native derived score artifacts.
+- Documentation and claim guardrails that define static evidence as diagnostic
+  static-analysis evidence, not correctness, performance, paper-parity, or
+  leaderboard authority.
+
+**Explicitly deferred:**
+- Making static evidence mandatory for every benchmark run.
+- Treating static evidence as score, correctness, timing, or leaderboard
+  authority.
+- Full paper-scale 235-problem static artifact coverage unless the milestone
+  requirements explicitly include a bounded subset.
+- Full 235-problem paper parity, original 124-model extraction, hosted
+  leaderboard support, and full CDNA 3 / CDNA 4 validation remain out of this
+  milestone.
+
+## Recently Shipped Milestone: v1.16 ROCm Toolchain Research and Capability Routing
 
 **Goal:** Systematically research ROCm's fragmented toolchain ecosystem and
 build a capability routing model that tells the benchmark which tools are
@@ -100,10 +136,10 @@ artifact type, and evidence level.
 
 **Explicitly deferred:**
 - Static artifact capture, HSACO/code-object collection, ISA extraction,
-  `static_kernel_evidence.v1`, and compiler artifact reports are deferred to
+  `static_kernel_evidence.v1`, and compiler artifact reports were deferred to
   v1.17.
 - Full 235-problem paper parity, original 124-model extraction, hosted
-  leaderboard support, and full CDNA 3 / CDNA 4 validation remain out of this
+  leaderboard support, and full CDNA 3 / CDNA 4 validation remained out of this
   milestone.
 
 ## Recently Shipped Milestone: v1.15 Research-Grade ROCm Benchmark Release
@@ -458,4 +494,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-25 after v1.16 milestone start*
+*Last updated: 2026-05-25 after v1.17 milestone start*
