@@ -2,7 +2,7 @@
 gsd_state_version: 1.0
 milestone: v1.13
 milestone_name: ROCm Runtime Evidence and Environment Diagnostics
-status: planning
+status: Awaiting next milestone
 last_updated: "2026-05-25T07:17:59.347Z"
 last_activity: 2026-05-25
 progress:
@@ -26,8 +26,8 @@ See: `.planning/PROJECT.md` (updated 2026-05-25)
 
 Phase: Milestone v1.13 complete
 Plan: —
-Status: Ready for milestone audit
-Last activity: 2026-05-25 — Phase 60 completed
+Status: Awaiting next milestone
+Last activity: 2026-05-25 — v1.13 completed
 
 ## Performance Metrics
 

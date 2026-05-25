@@ -2,8 +2,9 @@
 
 ## Milestones
 
-- 🚧 **v1.13 ROCm Runtime Evidence and Environment Diagnostics** —
-  Phases 58-60 (active). See `.planning/milestones/v1.13-ROADMAP.md`.
+- ✅ **v1.13 ROCm Runtime Evidence and Environment Diagnostics** —
+  Phases 58-60 (shipped 2026-05-25). See
+  `.planning/milestones/v1.13-ROADMAP.md`.
 
 - 📌 **v1.14 Optional rocprofv3 Profiling Evidence** —
   Phases 61-63 (planned follow-up). See
@@ -55,9 +56,9 @@
 
 ## Current Position
 
-**Active milestone:** v1.13 ROCm Runtime Evidence and Environment Diagnostics.
+**Active milestone:** none. v1.13 shipped and archived.
 
-**Status:** v1.13 implementation complete; milestone audit ready.
+**Status:** v1.13 complete. v1.14 remains planned but not active.
 
 **Next planned milestone:** v1.14 Optional rocprofv3 Profiling Evidence.
 
@@ -140,7 +141,7 @@ COMPAT-03
 
 | Milestone | Phases | Plans | Status | Shipped |
 |-----------|--------|-------|--------|---------|
-| v1.13 ROCm Runtime Evidence and Environment Diagnostics | 58-60 | 5/5 | Complete | — |
+| v1.13 ROCm Runtime Evidence and Environment Diagnostics | 58-60 | 5/5 | Complete | 2026-05-25 |
 | v1.14 Optional rocprofv3 Profiling Evidence | 61-63 | 0/0 | Planned | — |
 | v1.12 Evaluator Contract Metadata and Boundary Guardrails | none | quick task 260524-xb3 | Complete | 2026-05-25 |
 | v1.11 Paper Dataset Parity Inventory and ROCm Execution Closure | 53-57 | 14/14 | Complete | 2026-05-23 |

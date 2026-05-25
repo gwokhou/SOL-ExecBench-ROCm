@@ -15,19 +15,16 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
 ## Current State
 
-**Shipped version:** v1.12 Evaluator Contract Metadata and Boundary Guardrails,
+**Shipped version:** v1.13 ROCm Runtime Evidence and Environment Diagnostics,
 completed 2026-05-25.
 
-**Current milestone:** v1.13 ROCm Runtime Evidence and Environment Diagnostics.
+**Current milestone:** none. v1.14 Optional rocprofv3 Profiling Evidence is
+planned but not active.
 
-**Latest milestone outcome:** the ROCm port now exposes GPU-free evaluator
-contract metadata through `sol-execbench contract --json`, keeps contract-only
-metadata out of canonical trace JSONL, and records SOL/HIP ownership boundary
-guardrails for external consumers.
-
-**Current milestone goal:** make benchmark runs reproducible and diagnosable by
-attaching optional ROCm/GPU environment evidence and fast preflight diagnostics
-without changing SOL ExecBench correctness, timing, scoring, or v1.12 consumer
+**Latest milestone outcome:** the ROCm port now has optional runtime
+environment snapshot evidence, opt-in benchmark run sidecars, and
+`sol-execbench doctor --json` diagnostics while preserving contract version
+`1.0`, canonical trace JSONL, correctness, timing, scoring, and v1.12 consumer
 defaults.
 
 **Next planned milestone:** v1.14 Optional rocprofv3 Profiling Evidence, scoped
@@ -67,30 +64,6 @@ focuses only on backward-compatible runtime environment evidence, diagnostic
 commands, and architecture-aware smoke/preflight checks. `rocprofv3` artifact
 collection is deferred to the planned v1.14 milestone, and static RGA/GPUOpen
 ISA analysis remains later candidate work.
-
-## Current Milestone: v1.13 ROCm Runtime Evidence and Environment Diagnostics
-
-**Goal:** Make benchmark runs reproducible and diagnosable by attaching ROCm/GPU
-environment evidence and fast preflight diagnostics without changing SOL
-ExecBench correctness, timing, scoring, or v1.12 consumer defaults.
-
-**Target features:**
-- Add optional run-level environment snapshots for ROCm version, GPU identity,
-  `gfx` target, visible devices, PyTorch ROCm metadata, and collection
-  provenance.
-- Add a standalone diagnostic CLI such as `sol-execbench doctor` or
-  `sol-execbench env-snapshot`.
-- Add lightweight ROCm/HIP preflight checks with architecture-aware skip
-  behavior for RDNA 4 and CDNA 3.
-- Preserve evaluator contract version `1.0`, primary CLI defaults, canonical
-  trace semantics, and scoring/correctness behavior.
-
-**Explicitly deferred:**
-- Optional `rocprofv3` profile artifact collection to v1.14.
-- RGA/code-object/static ISA analysis to a later static kernel evidence
-  milestone.
-- Contract version bump or consumer-side requirement that confirmed benchmark
-  claims must include environment evidence.
 
 Validation status:
 

@@ -1,5 +1,33 @@
 # Milestones
 
+## v1.13 ROCm Runtime Evidence and Environment Diagnostics (Shipped: 2026-05-25)
+
+**Delivered:** optional ROCm runtime environment snapshot evidence, opt-in
+benchmark run sidecars, `runtime.evidence.v1` contract capability,
+`sol-execbench doctor --json`, PyTorch ROCm preflight checks, and documentation
+while preserving canonical trace JSONL and contract version `1.0`.
+
+**Phases completed:** 58-60 (3 phases, 5 plans)
+
+**Key accomplishments:**
+
+- Added `sol_execbench.environment_snapshot.v1` evidence models and explicit
+  bounded probes for `amd-smi`, `rocminfo`, `rocm_agent_enumerator`, and
+  PyTorch ROCm metadata.
+- Added optional benchmark run sidecar output through
+  `SOLEXECBENCH_ENV_SNAPSHOT` and `SOLEXECBENCH_ENV_SNAPSHOT_PATH`.
+- Added `sol-execbench doctor --json` with structured tool, runtime, memory,
+  and event-timing readiness checks.
+- Advertised optional `runtime.evidence.v1` capability without bumping
+  evaluator contract version or making evidence mandatory.
+- Preserved canonical trace JSONL, correctness, timing, scoring, and primary
+  benchmark CLI defaults.
+
+**Known tech debt:** `rocprofv3` profiling artifacts are intentionally deferred
+to v1.14; static RGA/GPUOpen ISA analysis remains future work.
+
+---
+
 ## v1.12 Evaluator Contract Metadata and Boundary Guardrails (Shipped: 2026-05-25)
 
 **Delivered:** GPU-free evaluator contract metadata, `sol-execbench contract
