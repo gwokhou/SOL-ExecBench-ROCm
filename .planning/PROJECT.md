@@ -15,24 +15,25 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
 ## Current State
 
-**Shipped version:** v1.14 Optional rocprofv3 Profiling Evidence,
+**Shipped version:** v1.15 Research-Grade ROCm Benchmark Release,
 completed 2026-05-25.
 
-**Current milestone:** v1.15 Research-Grade ROCm Benchmark Release.
+**Current milestone:** v1.16 ROCm Toolchain Research and Capability Routing.
 
-**Latest milestone outcome:** the ROCm port now has opt-in `rocprofv3`
-profiling artifacts, diagnostic profile sidecars, command provenance, artifact
-registration, and optional `profiling.evidence.v1` contract capability while
-preserving contract version `1.0`, canonical trace JSONL, default execution,
-correctness, timing, scoring, and v1.12/v1.13 consumer defaults.
+**Latest milestone outcome:** the ROCm port now has explicit claim boundaries,
+a deterministic curated ROCm benchmark slice, researcher-facing workflows and
+cookbooks, a v1.15 release closure checklist, and guardrail tests that keep the
+research-preview surface distinct from paper parity, leaderboard readiness, and
+unsupported hardware validation claims.
 
-**Current milestone goal:** Package the ROCm port into a focused, credible
-research preview that GPU kernel researchers and deep developers can run,
-extend, reproduce, and cite without confusing it with NVIDIA B200 paper parity.
+**Current milestone goal:** Research the fragmented ROCm toolchain ecosystem
+and establish a central capability registry plus routing policy so benchmark
+evidence paths can decide which tool is available, why a tool is unavailable,
+and which fallback or future milestone should own the evidence.
 
-**Next planned milestone:** static kernel evidence with RGA/code-object
-analysis and GPUOpen ISA classification remains future candidate work after the
-research preview is usable.
+**Next planned milestone:** static kernel evidence with code-object capture,
+ISA/metadata extraction, and compiler artifact reports is explicitly deferred
+to v1.17 after the routing layer is in place.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline.
 Milestones v1.1-v1.6 added CDNA 3 code/schema support, maintained residue
@@ -72,8 +73,40 @@ enabled `rocprofv3` profiling command provenance, artifact registration,
 diagnostic sidecars, and reporting. Profiling remains diagnostic evidence only
 and does not change default benchmark execution or correctness/scoring
 outcomes.
+The v1.15 milestone packaged the port into a bounded research preview by adding
+claim boundaries, a curated ROCm slice, researcher guide and cookbook workflows,
+release closure, and documentation guardrail tests.
 
-## Current Milestone: v1.15 Research-Grade ROCm Benchmark Release
+## Current Milestone: v1.16 ROCm Toolchain Research and Capability Routing
+
+**Goal:** Systematically research ROCm's fragmented toolchain ecosystem and
+build a capability routing model that tells the benchmark which tools are
+available for a given hardware generation, GPU architecture, ROCm version,
+artifact type, and evidence level.
+
+**Target features:**
+- External research over ROCm Systems, ROCprofiler SDK, RGA/GPUOpen manuals,
+  HIP compiler documentation, LLVM/object tools, and repository migration
+  status.
+- A tool inventory and lifecycle model covering active, deprecated, migrated,
+  planned, and rejected tools.
+- A capability registry schema for tool, hardware generation, GPU architecture,
+  ROCm version, artifact type, evidence level, status, and reason fields.
+- A routing policy that combines static registry data with dynamic probes,
+  fallback decisions, and explicit unavailable or unsupported reasons.
+- Documentation, cookbook guidance, and claim guardrails for ROCm toolchain
+  availability without treating routing as correctness, performance, or
+  leaderboard authority.
+
+**Explicitly deferred:**
+- Static artifact capture, HSACO/code-object collection, ISA extraction,
+  `static_kernel_evidence.v1`, and compiler artifact reports are deferred to
+  v1.17.
+- Full 235-problem paper parity, original 124-model extraction, hosted
+  leaderboard support, and full CDNA 3 / CDNA 4 validation remain out of this
+  milestone.
+
+## Recently Shipped Milestone: v1.15 Research-Grade ROCm Benchmark Release
 
 **Goal:** Turn the current ROCm port into a small, complete, research-grade
 release that external GPU kernel researchers can understand, reproduce, cite,
@@ -327,8 +360,11 @@ ROCm path, with validation scoped to RDNA 4 only.
   larger paper-parity effort.
 - Hosted leaderboard support in v1.15 - deferred until the local evidence and
   claim model are stable enough for external submissions.
-- Static RGA/code-object/GPUOpen ISA analysis in v1.15 - deferred as the next
-  likely milestone after researcher usability is improved.
+- Static RGA/code-object/GPUOpen ISA analysis in v1.15 - deferred until after
+  v1.16 establishes ROCm toolchain capability routing.
+- Static kernel evidence in v1.16 - explicitly deferred to v1.17 so the
+  toolchain research, lifecycle model, registry, and routing policy can land
+  first.
 
 ## Context
 
@@ -351,10 +387,12 @@ The v1.8 milestone was scoped to RDNA 4 validation only. CDNA 3 and CDNA 4
 library validation remain intentionally deferred; current artifacts preserve
 schema, documentation, and no-claim guardrails for those architectures.
 
-After v1.14, the highest leverage next step is not full paper parity. The
-project needs a research-grade entry point: concise claim boundaries, a curated
-ROCm slice, end-to-end recipes, and a reproducibility bundle that shows exactly
-which artifacts support each current claim.
+After v1.15, the highest leverage next step is not full paper parity or static
+ISA extraction itself. The project needs a ROCm toolchain map and routing layer
+because ROCm Systems, ROCprofiler SDK, RGA/GPUOpen tools, HIP compiler
+metadata, LLVM object tools, and migrated/deprecated repositories expose
+different capabilities depending on ROCm version, hardware generation, GPU
+architecture, artifact type, and installation state.
 
 ## Constraints
 
@@ -398,6 +436,8 @@ which artifacts support each current claim.
 | Scope v1.10 to SOLAR derivation only | User chose to upgrade "论文级完整 SOLAR 自动推导" as a new milestone while excluding dataset extraction and real-hardware validation from the milestone boundary. | Validated in v1.10 |
 | Focus v1.11 on public dataset parity and execution closure | User requested the next milestone target "论文数据集 parity + ROCm execution closure" and then narrowed it to dataset acquisition/layout, inventory, compatibility classification, small ready-subset execution, and gap reporting. | Active in v1.11 |
 | Prioritize a research-grade ROCm preview before paper parity | User asked whether to push toward paper parity next; we chose a smaller complete release with claim boundaries, curated slice, researcher workflows, and reproducibility evidence before attempting full 235-problem parity. | Active in v1.15 |
+| Route ROCm tools before extracting static evidence | User noted ROCm tools are more fragmented than CUDA tools and requested per-tool hardware generation/model availability routing, including prepared and historical tools. | Active in v1.16 |
+| Defer static kernel evidence to v1.17 | User explicitly moved Static Kernel Evidence out of v1.16 so v1.16 can focus on external research, tool lifecycle, capability registry, and routing policy. | Active in v1.16 |
 
 ## Evolution
 
@@ -417,4 +457,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-25 after v1.15 milestone start*
+*Last updated: 2026-05-25 after v1.16 milestone start*

@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.15
-milestone_name: Research-Grade ROCm Benchmark Release
-status: Awaiting next milestone
-stopped_at: Completed 52-03-PLAN.md
-last_updated: "2026-05-25T12:25:37.931Z"
-last_activity: 2026-05-25 — Milestone v1.15 completed and archived
+milestone: v1.16
+milestone_name: ROCm Toolchain Research and Capability Routing
+status: planning
+last_updated: "2026-05-25T14:25:43.667Z"
+last_activity: 2026-05-25
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 4
-  completed_plans: 4
-  percent: 100
+  total_phases: 5
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -21,21 +20,21 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-25)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** planning the next milestone
+**Current focus:** v1.16 ROCm toolchain research and capability routing
 
 ## Current Position
 
-Phase: Milestone v1.15 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-05-25 — Milestone v1.15 completed and archived
+Status: Defining requirements
+Last activity: 2026-05-25 — Milestone v1.16 started
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Current milestone plans completed: 4
-- Current milestone phases completed: 4
+- Current milestone plans completed: 0
+- Current milestone phases completed: 0
 - Average duration: n/a
 - Total execution time: n/a
 
@@ -43,15 +42,16 @@ Last activity: 2026-05-25 — Milestone v1.15 completed and archived
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 64. Claim Boundary And Researcher Positioning | 1 | complete | n/a |
-| 65. Curated ROCm Benchmark Slice | 1 | complete | n/a |
-| 66. Researcher Workflows And Cookbooks | 1 | complete | n/a |
-| 67. Release Closure And Reproducibility Bundle | 1 | complete | n/a |
+| 68. External ROCm Toolchain Research | 0 | - | - |
+| 69. Toolchain Inventory And Lifecycle Model | 0 | - | - |
+| 70. Capability Registry Schema | 0 | - | - |
+| 71. Dynamic Probe And Routing Policy | 0 | - | - |
+| 72. Toolchain Matrix Docs And Guardrails | 0 | - | - |
 
 **Recent Trend:**
 
-- Last milestone: v1.14 shipped on 2026-05-25
-- Trend: v1.15 shipped as a bounded research-grade ROCm benchmark preview
+- Last milestone: v1.15 shipped on 2026-05-25
+- Trend: v1.16 started to establish ROCm toolchain routing before static evidence
 
 ## Accumulated Context
 
@@ -59,10 +59,10 @@ Last activity: 2026-05-25 — Milestone v1.15 completed and archived
 
 Decisions are logged in PROJECT.md. Recent decisions affecting current work:
 
-- v1.15 prioritizes a small, complete research-grade ROCm benchmark preview before paper-scale parity.
-- Current claims must distinguish ROCm-port evidence, AMD-native-derived evidence, and release-preview evidence.
-- The curated slice must be reproducible through existing benchmark paths and must not imply full 235-problem validation.
-- Static RGA/code-object/GPUOpen ISA analysis remains future candidate work after researcher usability improves.
+- v1.16 prioritizes ROCm toolchain research and capability routing before Static Kernel Evidence.
+- ROCm tool availability must be modeled by hardware generation, GPU architecture, ROCm version, artifact type, and evidence level.
+- Static Kernel Evidence is explicitly deferred to v1.17.
+- Routing decisions must not be treated as correctness, performance, paper-parity, or leaderboard authority.
 - Detailed historical decisions are preserved in `.planning/PROJECT.md` and archived milestone artifacts.
 
 ### Pending Todos
@@ -105,4 +105,4 @@ Resume file: None
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Start Phase 68 with /gsd-discuss-phase 68 or /gsd-plan-phase 68
