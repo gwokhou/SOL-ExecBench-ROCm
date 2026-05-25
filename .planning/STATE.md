@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.17
 milestone_name: Static Kernel Evidence
-status: ready_to_plan
-stopped_at: Phase 73 complete (1/1) — ready to discuss Phase 74
-last_updated: 2026-05-25T16:36:59.965Z
-last_activity: 2026-05-25 -- Phase 73 execution started
+status: executing
+stopped_at: Created v1.17 roadmap and requirement traceability
+last_updated: "2026-05-25T23:06:30.222Z"
+last_activity: 2026-05-25 -- Phase 74 execution started
 progress:
   total_phases: 5
   completed_phases: 1
-  total_plans: 1
+  total_plans: 2
   completed_plans: 1
   percent: 20
 ---
@@ -21,14 +21,14 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-25)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Phase 74 — build artifact discovery and manifest
+**Current focus:** Phase 74 — Build Artifact Discovery And Manifest
 
 ## Current Position
 
-Phase: 74
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-05-25
+Phase: 74 (Build Artifact Discovery And Manifest) — EXECUTING
+Plan: 1 of 1
+Status: Executing Phase 74
+Last activity: 2026-05-25 -- Phase 74 execution started
 
 ## Performance Metrics
 
