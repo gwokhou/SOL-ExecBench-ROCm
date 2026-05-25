@@ -1,5 +1,29 @@
 # Milestones
 
+## v1.16 ROCm Toolchain Research and Capability Routing (Shipped: 2026-05-25)
+
+**Phases completed:** 5 phases, 5 plans, 0 tasks
+
+**Key accomplishments:**
+
+- Added a research-backed ROCm toolchain routing model with lifecycle states
+  for active, migrated, deprecated, planned, rejected, and candidate tools.
+
+- Added a machine-readable capability registry keyed by evidence level,
+  artifact type, hardware generation, GPU architecture pattern, ROCm version,
+  status, reason, and source references.
+
+- Added bounded dynamic executable probes and explicit routing decisions that
+  select tools only when registry status and host availability agree.
+
+- Exposed `sol-execbench toolchain --json` for registry inspection and routing
+  reports without mutating canonical trace JSONL.
+
+- Documented ROCm toolchain availability, interpretation guidance, and claim
+  boundaries while deferring Static Kernel Evidence implementation to v1.17.
+
+---
+
 ## v1.15 Research-Grade ROCm Benchmark Release (Shipped: 2026-05-25)
 
 **Phases completed:** 4 phases, 4 plans, 0 tasks
@@ -8,12 +32,16 @@
 
 - Added explicit public claim boundaries for ROCm-port, runtime, profiling,
   AMD-native-derived, and research-preview evidence.
+
 - Defined a deterministic curated ROCm benchmark slice with artifact
   expectations and unsupported-scope boundaries.
+
 - Added researcher guide and cookbook workflows for kernel, compiler/backend,
   agent, and reproducibility researchers.
+
 - Added a v1.15 release closure checklist with result semantics, known gaps,
   and next-milestone direction.
+
 - Added documentation guardrail tests that protect the release-preview claim
   boundary.
 

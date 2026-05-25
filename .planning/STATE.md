@@ -2,9 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.16
 milestone_name: ROCm Toolchain Research and Capability Routing
-status: implementation-complete
-last_updated: "2026-05-25T15:00:00.000Z"
-last_activity: 2026-05-25
+status: awaiting-next-milestone
+stopped_at: v1.16 archived
+last_updated: "2026-05-25T15:10:00.000Z"
+last_activity: 2026-05-25 — Milestone v1.16 completed and archived
 progress:
   total_phases: 5
   completed_phases: 5
@@ -20,14 +21,14 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-25)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** v1.16 ROCm toolchain research and capability routing
+**Current focus:** v1.16 archived; awaiting next milestone
 
 ## Current Position
 
-Phase: 72. Toolchain Matrix Docs And Guardrails
-Plan: v1.16 ROCm toolchain routing implementation
-Status: Implementation complete; final verification in progress
-Last activity: 2026-05-25 — v1.16 autonomous implementation completed
+Phase: Milestone v1.16 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-05-25 — Milestone v1.16 completed and archived
 
 ## Performance Metrics
 
@@ -50,8 +51,9 @@ Last activity: 2026-05-25 — v1.16 autonomous implementation completed
 
 **Recent Trend:**
 
-- Last milestone: v1.15 shipped on 2026-05-25
-- Trend: v1.16 implementation complete, verification in progress
+- Last milestone: v1.16 shipped on 2026-05-25
+- Trend: toolchain routing foundation complete; next likely work is v1.17
+  Static Kernel Evidence.
 
 ## Accumulated Context
 
@@ -105,4 +107,4 @@ Resume file: None
 
 ## Operator Next Steps
 
-- Run final verification and commit the v1.16 toolchain routing implementation.
+- Start the next milestone with /gsd-new-milestone
