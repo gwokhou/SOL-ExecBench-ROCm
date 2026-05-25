@@ -1,0 +1,35 @@
+name: Python Quality
+
+on:
+  pull_request:
+  push:
+    branches: ["**"]
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  python-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: astral-sh/setup-uv@v6
+      - name: Install package
+        run: uv sync --locked --all-groups
+      - name: Run Ruff
+        run: uv run ruff check .
+      - name: Run Ty
+        run: uv run ty check
+      - name: Run CPU-safe tests
+        run: |
+          uv run pytest tests/sol_execbench \
+            --ignore=tests/sol_execbench/driver/test_eval_driver.py \
+            --ignore=tests/sol_execbench/test_e2e.py
+          uv run pytest tests/examples/test_examples.py -k consistency
