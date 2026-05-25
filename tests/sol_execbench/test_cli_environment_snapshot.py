@@ -7,6 +7,7 @@ from click.testing import CliRunner
 
 from sol_execbench.cli import main as cli_main
 from sol_execbench.cli.main import cli
+from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileResult
 from sol_execbench.core.environment import (
     EnvironmentCheckResult,
     EnvironmentDiagnostics,
@@ -103,6 +104,45 @@ def test_environment_snapshot_collection_failure_is_nonfatal(tmp_path: Path, mon
 
     assert written is None
     assert not sidecar.exists()
+
+
+def test_profile_sidecar_is_disabled_when_no_profile_result(tmp_path: Path):
+    output = tmp_path / "trace.jsonl"
+
+    written = cli_main._write_profile_sidecar(output, None)
+
+    assert written is None
+    assert not (tmp_path / "trace.jsonl.profile.json").exists()
+
+
+def test_profile_sidecar_records_diagnostic_metadata(tmp_path: Path):
+    output = tmp_path / "trace.jsonl"
+    result = Rocprofv3ProfileResult(
+        status="unavailable",
+        command=("rocprofv3", "--", "python", "eval_driver.py"),
+        output_directory=tmp_path / "trace.jsonl.rocprofv3",
+        output_file="profile",
+        skipped_reason="rocprofv3 is not available on PATH",
+        profiler_available=False,
+    )
+
+    written = cli_main._write_profile_sidecar(output, result)
+
+    assert written == tmp_path / "trace.jsonl.profile.json"
+    payload = json.loads(written.read_text())
+    assert payload["schema_version"] == "sol_execbench.rocprofv3_profile.v1"
+    assert payload["status"] == "unavailable"
+    assert payload["diagnostic_only"] is True
+    assert payload["score_authority"] is False
+    assert payload["skipped_reason"] == "rocprofv3 is not available on PATH"
+
+
+def test_profile_output_directory_tracks_trace_output(tmp_path: Path):
+    output = tmp_path / "run" / "trace.jsonl"
+
+    assert cli_main._profile_output_directory(output, tmp_path) == (
+        tmp_path / "run" / "trace.jsonl.rocprofv3"
+    )
 
 
 def test_doctor_cli_outputs_json_without_problem_directory(monkeypatch):

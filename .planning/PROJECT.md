@@ -15,20 +15,18 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
 ## Current State
 
-**Shipped version:** v1.13 ROCm Runtime Evidence and Environment Diagnostics,
+**Shipped version:** v1.14 Optional rocprofv3 Profiling Evidence,
 completed 2026-05-25.
 
-**Current milestone:** v1.14 Optional rocprofv3 Profiling Evidence.
+**Current milestone:** none; v1.14 is complete.
 
-**Latest milestone outcome:** the ROCm port now has optional runtime
-environment snapshot evidence, opt-in benchmark run sidecars, and
-`sol-execbench doctor --json` diagnostics while preserving contract version
-`1.0`, canonical trace JSONL, correctness, timing, scoring, and v1.12 consumer
-defaults.
+**Latest milestone outcome:** the ROCm port now has opt-in `rocprofv3`
+profiling artifacts, diagnostic profile sidecars, command provenance, artifact
+registration, and optional `profiling.evidence.v1` contract capability while
+preserving contract version `1.0`, canonical trace JSONL, default execution,
+correctness, timing, scoring, and v1.12/v1.13 consumer defaults.
 
-**Current milestone goal:** add opt-in `rocprofv3` profiling artifacts as
-benchmark evidence so anomalous or hardware-sensitive results can be diagnosed
-without changing correctness, timing, scoring, or default execution behavior.
+**Current milestone goal:** none active.
 
 **Next planned milestone:** static kernel evidence with RGA/code-object
 analysis and GPUOpen ISA classification remains future candidate work.
@@ -66,12 +64,13 @@ focuses only on backward-compatible runtime environment evidence, diagnostic
 commands, and architecture-aware smoke/preflight checks. `rocprofv3` artifact
 collection is deferred to the planned v1.14 milestone, and static RGA/GPUOpen
 ISA analysis remains later candidate work.
-The v1.14 milestone builds on that evidence surface by adding explicitly
-enabled `rocprofv3` profiling command provenance, artifact registration, and
-reporting. Profiling remains diagnostic evidence only and must not change
-default benchmark execution or correctness/scoring outcomes.
+The v1.14 milestone built on that evidence surface by adding explicitly
+enabled `rocprofv3` profiling command provenance, artifact registration,
+diagnostic sidecars, and reporting. Profiling remains diagnostic evidence only
+and does not change default benchmark execution or correctness/scoring
+outcomes.
 
-## Current Milestone: v1.14 Optional rocprofv3 Profiling Evidence
+## Recently Shipped Milestone: v1.14 Optional rocprofv3 Profiling Evidence
 
 **Goal:** Add opt-in `rocprofv3` profiling artifacts as benchmark evidence so
 anomalous or hardware-sensitive results can be diagnosed without changing

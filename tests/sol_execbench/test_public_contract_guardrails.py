@@ -256,11 +256,12 @@ def test_cli_help_preserves_existing_public_options():
         "--json",
         "--lock-clocks",
         "--keep-staging",
+        "--profile",
         "--verbose",
     ):
         assert expected_option in help_text
     assert "contract" in help_text
-    for unexpected_option in ("diagnose", "profile", "hip-bench"):
+    for unexpected_option in ("diagnose", "--rocprofv3", "hip-bench"):
         assert unexpected_option not in help_text
 
 

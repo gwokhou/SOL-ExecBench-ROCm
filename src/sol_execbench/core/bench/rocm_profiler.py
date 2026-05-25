@@ -25,7 +25,92 @@ from sol_execbench.core.reporting import CANONICAL_BENCHMARK_OUTPUT
 
 ROCPROFV3_EXECUTABLE = "rocprofv3"
 ROCPROFV3_EVIDENCE_SCHEMA_VERSION = "sol_execbench.rocprofv3_timing.v1"
+ROCPROFV3_PROFILE_SCHEMA_VERSION = "sol_execbench.rocprofv3_profile.v1"
 ProfilerRunner = Callable[[Sequence[str]], subprocess.CompletedProcess[str]]
+ProfileRunner = Callable[
+    [Sequence[str], Path | None, int | None], subprocess.CompletedProcess[str]
+]
+
+
+@dataclass(frozen=True)
+class Rocprofv3ProfileArtifact:
+    """One profiler artifact registered from a `rocprofv3` output directory."""
+
+    path: Path
+    kind: str
+    size_bytes: int
+
+    def to_dict(self) -> dict[str, object]:
+        """Return a JSON-serializable artifact payload."""
+        return {
+            "path": str(self.path),
+            "kind": self.kind,
+            "size_bytes": self.size_bytes,
+        }
+
+
+@dataclass(frozen=True)
+class Rocprofv3ProfileRequest:
+    """Request to collect optional diagnostic `rocprofv3` artifacts."""
+
+    application_command: tuple[str, ...]
+    output_directory: Path
+    output_file: str
+    working_directory: Path | None = None
+    executable: str = ROCPROFV3_EXECUTABLE
+    include_hip_runtime: bool = True
+    output_format: str = "rocpd"
+    timeout_seconds: int | None = None
+
+
+@dataclass(frozen=True)
+class Rocprofv3ProfileResult:
+    """Result metadata for optional `rocprofv3` artifact collection."""
+
+    status: str
+    command: tuple[str, ...]
+    output_directory: Path
+    output_file: str
+    artifacts: tuple[Rocprofv3ProfileArtifact, ...] = ()
+    returncode: int | None = None
+    stdout: str = ""
+    stderr: str = ""
+    skipped_reason: str | None = None
+    failed_reason: str | None = None
+    working_directory: Path | None = None
+    timeout_seconds: int | None = None
+    profiler_available: bool | None = None
+    schema_version: str = ROCPROFV3_PROFILE_SCHEMA_VERSION
+
+    @property
+    def succeeded(self) -> bool:
+        """Whether profiler collection completed with registered artifacts."""
+        return self.status == "success"
+
+    def to_dict(self) -> dict[str, object]:
+        """Return a JSON-serializable diagnostic sidecar payload."""
+        return {
+            "schema_version": self.schema_version,
+            "status": self.status,
+            "diagnostic_only": True,
+            "score_authority": False,
+            "command": list(self.command),
+            "working_directory": (
+                str(self.working_directory)
+                if self.working_directory is not None
+                else None
+            ),
+            "timeout_seconds": self.timeout_seconds,
+            "output_directory": str(self.output_directory),
+            "output_file": self.output_file,
+            "profiler_available": self.profiler_available,
+            "returncode": self.returncode,
+            "stdout_tail": _tail(self.stdout),
+            "stderr_tail": _tail(self.stderr),
+            "skipped_reason": self.skipped_reason,
+            "failed_reason": self.failed_reason,
+            "artifacts": [artifact.to_dict() for artifact in self.artifacts],
+        }
 
 
 @dataclass(frozen=True)
@@ -204,6 +289,153 @@ def build_rocprofv3_command(
     if include_hip_runtime:
         command.insert(2, "--hip-runtime-trace")
     return [*command, "--", *application_command]
+
+
+def build_rocprofv3_profile_command(
+    application_command: Sequence[str],
+    *,
+    output_directory: str,
+    output_file: str,
+    executable: str = ROCPROFV3_EXECUTABLE,
+    include_hip_runtime: bool = True,
+    output_format: str = "rocpd",
+) -> list[str]:
+    """Build a `rocprofv3` command for optional diagnostic artifacts."""
+    if not application_command:
+        raise ValueError("application_command must not be empty")
+
+    command = [
+        executable,
+        "--kernel-trace",
+        "--output-format",
+        output_format,
+        "--output-directory",
+        output_directory,
+        "--output-file",
+        output_file,
+    ]
+    if include_hip_runtime:
+        command.insert(2, "--hip-runtime-trace")
+    return [*command, "--", *application_command]
+
+
+def discover_rocprofv3_artifacts(
+    output_directory: Path,
+    output_file: str,
+) -> tuple[Rocprofv3ProfileArtifact, ...]:
+    """Register profiler artifacts produced for an output-file prefix."""
+    artifacts: list[Rocprofv3ProfileArtifact] = []
+    for path in sorted(output_directory.glob(f"{output_file}*")):
+        if not path.is_file():
+            continue
+        artifacts.append(
+            Rocprofv3ProfileArtifact(
+                path=path,
+                kind=_classify_profile_artifact(path),
+                size_bytes=path.stat().st_size,
+            )
+        )
+    return tuple(artifacts)
+
+
+def collect_rocprofv3_profile(
+    request: Rocprofv3ProfileRequest,
+    *,
+    rocprofv3_available: bool = True,
+    runner: ProfileRunner | None = None,
+) -> Rocprofv3ProfileResult:
+    """Collect optional `rocprofv3` artifacts without changing score semantics."""
+    command = build_rocprofv3_profile_command(
+        request.application_command,
+        output_directory=str(request.output_directory),
+        output_file=request.output_file,
+        executable=request.executable,
+        include_hip_runtime=request.include_hip_runtime,
+        output_format=request.output_format,
+    )
+    if not rocprofv3_available:
+        return Rocprofv3ProfileResult(
+            status="unavailable",
+            command=tuple(command),
+            output_directory=request.output_directory,
+            output_file=request.output_file,
+            skipped_reason=f"{request.executable} is not available on PATH",
+            working_directory=request.working_directory,
+            timeout_seconds=request.timeout_seconds,
+            profiler_available=False,
+        )
+
+    request.output_directory.mkdir(parents=True, exist_ok=True)
+    run = runner or _default_profile_runner
+    try:
+        completed = run(
+            command,
+            request.working_directory,
+            request.timeout_seconds,
+        )
+    except subprocess.TimeoutExpired as exc:
+        return Rocprofv3ProfileResult(
+            status="failed",
+            command=tuple(command),
+            output_directory=request.output_directory,
+            output_file=request.output_file,
+            stdout=exc.stdout or "",
+            stderr=exc.stderr or "",
+            failed_reason=(
+                f"rocprofv3 command timed out after {request.timeout_seconds} seconds"
+            ),
+            working_directory=request.working_directory,
+            timeout_seconds=request.timeout_seconds,
+            profiler_available=True,
+        )
+
+    artifacts = discover_rocprofv3_artifacts(
+        request.output_directory,
+        request.output_file,
+    )
+    if completed.returncode != 0:
+        return Rocprofv3ProfileResult(
+            status="failed",
+            command=tuple(command),
+            output_directory=request.output_directory,
+            output_file=request.output_file,
+            artifacts=artifacts,
+            returncode=completed.returncode,
+            stdout=completed.stdout or "",
+            stderr=completed.stderr or "",
+            failed_reason=f"rocprofv3 command failed with exit code {completed.returncode}",
+            working_directory=request.working_directory,
+            timeout_seconds=request.timeout_seconds,
+            profiler_available=True,
+        )
+    if not artifacts:
+        return Rocprofv3ProfileResult(
+            status="failed",
+            command=tuple(command),
+            output_directory=request.output_directory,
+            output_file=request.output_file,
+            returncode=completed.returncode,
+            stdout=completed.stdout or "",
+            stderr=completed.stderr or "",
+            failed_reason="rocprofv3 completed without registered artifacts",
+            working_directory=request.working_directory,
+            timeout_seconds=request.timeout_seconds,
+            profiler_available=True,
+        )
+
+    return Rocprofv3ProfileResult(
+        status="success",
+        command=tuple(command),
+        output_directory=request.output_directory,
+        output_file=request.output_file,
+        artifacts=artifacts,
+        returncode=completed.returncode,
+        stdout=completed.stdout or "",
+        stderr=completed.stderr or "",
+        working_directory=request.working_directory,
+        timeout_seconds=request.timeout_seconds,
+        profiler_available=True,
+    )
 
 
 def select_default_timing(
@@ -424,9 +656,46 @@ def _default_runner(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
     )
 
 
+def _default_profile_runner(
+    command: Sequence[str],
+    working_directory: Path | None,
+    timeout_seconds: int | None,
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        list(command),
+        check=False,
+        text=True,
+        capture_output=True,
+        cwd=working_directory,
+        timeout=timeout_seconds,
+    )
+
+
 def _find_rocprofv3_csv(output_directory: Path, output_file: str) -> Path | None:
     candidates = sorted(output_directory.glob(f"{output_file}*.csv"))
     return candidates[0] if candidates else None
+
+
+def _classify_profile_artifact(path: Path) -> str:
+    name = path.name.lower()
+    suffix = path.suffix.lower()
+    if suffix in {".db", ".sqlite", ".sqlite3", ".rocpd"}:
+        return "rocpd"
+    if suffix == ".csv":
+        if "agent" in name:
+            return "agent_info_csv"
+        if "counter" in name:
+            return "counter_csv"
+        return "trace_csv"
+    if suffix == ".json":
+        return "metadata_json"
+    return "other"
+
+
+def _tail(text: str, *, max_chars: int = 4096) -> str:
+    if len(text) <= max_chars:
+        return text
+    return text[-max_chars:]
 
 
 def _normalize_header(header: str | None) -> str:

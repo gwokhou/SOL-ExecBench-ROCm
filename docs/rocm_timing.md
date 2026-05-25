@@ -79,6 +79,29 @@ Canonical trace JSONL remains the benchmark output contract. Timing policy and
 profiler evidence are derived methodology artifacts unless a future phase adds
 an explicit documented output path.
 
+## Optional Profiling Artifacts
+
+Benchmark execution can collect diagnostic profiler artifacts with:
+
+```bash
+uv run sol-execbench <problem_dir> --solution solution.json \
+  --profile rocprofv3 -o traces.jsonl
+```
+
+This path is separate from benchmark timing authority. It records a
+`sol_execbench.rocprofv3_profile.v1` sidecar next to the trace output, prefers
+`rocpd` output for full-fidelity inspection, and registers any matching CSV
+artifacts that `rocprofv3` produces. The sidecar labels whether collection
+succeeded, was unavailable, or failed, and includes command provenance,
+working directory, timeout, artifact paths, return code, and stdout/stderr
+tails.
+
+The profile sidecar is diagnostic-only evidence. It must not be interpreted as
+canonical correctness, score, or trace JSONL data, and profiler failure must not
+turn an otherwise passing benchmark run into a correctness failure. When
+collection falls back or is skipped, the sidecar records an explicit fallback reason
+through `skipped_reason` or `failed_reason`.
+
 ## Live rocprofv3 Collection
 
 `src/sol_execbench/core/bench/rocm_profiler.py` provides a reusable live
