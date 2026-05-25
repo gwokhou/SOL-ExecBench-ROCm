@@ -25,6 +25,7 @@ REQUIRED_CAPABILITIES = {
 OPTIONAL_CAPABILITIES = {
     "runtime.evidence.v1",
     "profiling.evidence.v1",
+    "toolchain.routing.v1",
 }
 
 

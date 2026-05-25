@@ -44,6 +44,13 @@ from ..core.environment import (
     build_environment_diagnostics,
     collect_environment_snapshot,
 )
+from ..core.toolchain import (
+    ToolchainArtifactType,
+    ToolchainEvidenceLevel,
+    ToolchainRoutingRequest,
+    build_toolchain_routing_report,
+    default_toolchain_registry,
+)
 from ..core.bench.rocm_profiler import (
     ROCPROFV3_EXECUTABLE,
     Rocprofv3ProfileRequest,
@@ -609,6 +616,61 @@ def _doctor_cli(json_output: bool) -> None:
     click.echo(json.dumps(payload, sort_keys=True))
 
 
+@click.command("toolchain", context_settings={"help_option_names": ["-h", "--help"]})
+@click.option("--json", "json_output", is_flag=True, help="Print routing JSON")
+@click.option(
+    "--evidence-level",
+    type=click.Choice([level.value for level in ToolchainEvidenceLevel]),
+    default=ToolchainEvidenceLevel.PROFILING.value,
+    show_default=True,
+    help="Evidence level to route",
+)
+@click.option(
+    "--artifact-type",
+    type=click.Choice([artifact.value for artifact in ToolchainArtifactType]),
+    default=ToolchainArtifactType.EXECUTABLE_RUN.value,
+    show_default=True,
+    help="Artifact type to route",
+)
+@click.option("--gpu-arch", "gpu_architecture", help="GPU architecture such as gfx1200")
+@click.option("--hardware-generation", help="Hardware generation such as RDNA 4")
+@click.option("--rocm-version", help="ROCm version such as 7.0")
+@click.option(
+    "--list-registry",
+    is_flag=True,
+    help="Print registry entries instead of a routing decision",
+)
+def _toolchain_cli(
+    json_output: bool,
+    evidence_level: str,
+    artifact_type: str,
+    gpu_architecture: str | None,
+    hardware_generation: str | None,
+    rocm_version: str | None,
+    list_registry: bool,
+) -> None:
+    """Print ROCm toolchain routing diagnostics."""
+
+    if not json_output:
+        raise click.ClickException("Only --json output is supported for toolchain")
+    if list_registry:
+        payload = [
+            capability.model_dump(mode="json")
+            for capability in default_toolchain_registry()
+        ]
+        click.echo(json.dumps(payload, sort_keys=True))
+        return
+    request = ToolchainRoutingRequest(
+        evidence_level=ToolchainEvidenceLevel(evidence_level),
+        artifact_type=ToolchainArtifactType(artifact_type),
+        gpu_architecture=gpu_architecture,
+        hardware_generation=hardware_generation,
+        rocm_version=rocm_version,
+    )
+    payload = build_toolchain_routing_report(request).model_dump(mode="json")
+    click.echo(json.dumps(payload, sort_keys=True))
+
+
 class SolExecbenchCli(click.Command):
     """Dispatch root evaluator calls and the contract metadata command."""
 
@@ -642,6 +704,16 @@ class SolExecbenchCli(click.Command):
                 windows_expand_args=windows_expand_args,
                 **extra,
             )
+        if args and args[0] == "toolchain":
+            toolchain_prog = f"{prog_name or self.name} toolchain"
+            return _toolchain_cli.main(
+                args=args[1:],
+                prog_name=toolchain_prog,
+                complete_var=complete_var,
+                standalone_mode=standalone_mode,
+                windows_expand_args=windows_expand_args,
+                **extra,
+            )
         return _evaluate_cli.main(
             args=args,
             prog_name=prog_name or self.name,
@@ -654,7 +726,7 @@ class SolExecbenchCli(click.Command):
 
 cli = SolExecbenchCli(
     name="sol-execbench",
-    help="Evaluate solutions or print GPU-free evaluator contract metadata.",
+    help="Evaluate solutions or print GPU-free evaluator/toolchain metadata.",
 )
 
 

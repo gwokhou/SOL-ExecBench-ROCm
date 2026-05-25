@@ -104,3 +104,28 @@ def test_v1_15_release_closure_preserves_research_preview_boundary():
         "STATIC-01",
     ):
         assert required in text
+
+
+def test_rocm_toolchain_routing_docs_define_matrix_and_claim_boundaries():
+    text = _read_doc("docs/rocm_toolchain_routing.md")
+    claims = _read_doc("docs/CLAIMS.md")
+
+    for required in (
+        "Evidence Levels",
+        "Tool Lifecycle",
+        "Status Vocabulary",
+        "rocprofv3",
+        "rocprofiler-systems",
+        "ROCm Systems",
+        "RGA",
+        "llvm-objdump",
+        "Static Kernel Evidence remains a v1.17 milestone",
+    ):
+        assert required in text
+
+    for boundary in (
+        "Toolchain routing evidence",
+        "Toolchain routing as correctness, performance, static-kernel",
+        "Static Kernel Evidence in v1.16",
+    ):
+        assert boundary in claims
