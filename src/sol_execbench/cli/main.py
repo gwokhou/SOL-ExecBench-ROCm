@@ -37,6 +37,10 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
 from ..core.data.contract import build_evaluator_contract
+from ..core.environment import (
+    EnvironmentSnapshot,
+    collect_environment_snapshot,
+)
 from ..core import (
     Definition,
     Workload,
@@ -48,6 +52,9 @@ from ..core import (
 from ..driver import ProblemPackager
 
 console = Console(stderr=True)
+
+ENV_SNAPSHOT_ENABLE_ENV = "SOLEXECBENCH_ENV_SNAPSHOT"
+ENV_SNAPSHOT_PATH_ENV = "SOLEXECBENCH_ENV_SNAPSHOT_PATH"
 
 
 def _load_definition(path: Path) -> Definition:
@@ -176,6 +183,54 @@ def _print_traces_table(traces: list[Trace]) -> None:
         for idx, status, log in error_logs:
             console.print(f"\n[bold]Workload {idx}[/bold] ([red]{status}[/red]):")
             console.print(log.rstrip())
+
+
+def _environment_snapshot_sidecar_path(output_file: Path | None) -> Path | None:
+    """Return the optional environment snapshot sidecar path for this run."""
+
+    explicit = os.environ.get(ENV_SNAPSHOT_PATH_ENV)
+    if explicit:
+        return Path(explicit)
+    if os.environ.get(ENV_SNAPSHOT_ENABLE_ENV) == "1" and output_file is not None:
+        return output_file.with_name(f"{output_file.name}.environment.json")
+    return None
+
+
+def _write_environment_snapshot_sidecar(
+    output_file: Path | None,
+    *,
+    collector=collect_environment_snapshot,
+) -> Path | None:
+    """Write optional environment snapshot sidecar metadata.
+
+    Snapshot evidence is diagnostic only. Collection or serialization failures
+    are reported to stderr and never change benchmark correctness status.
+    """
+
+    sidecar_path = _environment_snapshot_sidecar_path(output_file)
+    if sidecar_path is None:
+        if os.environ.get(ENV_SNAPSHOT_ENABLE_ENV) == "1":
+            console.print(
+                "[yellow]Environment snapshot requested but no output path is available; "
+                f"set {ENV_SNAPSHOT_PATH_ENV} or use --output.[/yellow]"
+            )
+        return None
+
+    try:
+        snapshot = collector()
+        if isinstance(snapshot, EnvironmentSnapshot):
+            payload = snapshot.model_dump(mode="json")
+        elif hasattr(snapshot, "model_dump"):
+            payload = snapshot.model_dump(mode="json")
+        else:
+            payload = snapshot
+        sidecar_path.parent.mkdir(parents=True, exist_ok=True)
+        sidecar_path.write_text(json.dumps(payload, sort_keys=True) + "\n")
+        console.print(f"[green]Saved environment snapshot to {sidecar_path}[/green]")
+        return sidecar_path
+    except Exception as exc:
+        console.print(f"[yellow]Environment snapshot skipped: {exc}[/yellow]")
+        return None
 
 
 @click.command(
@@ -383,6 +438,8 @@ def _evaluate_cli(
             for t in traces:
                 f.write(json.dumps(t.model_dump(mode="json")) + "\n")
         console.print(f"[green]Saved {len(traces)} traces to {output_file}[/green]")
+
+    _write_environment_snapshot_sidecar(output_file)
 
     if json_output:
         for t in traces:
