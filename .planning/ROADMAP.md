@@ -6,8 +6,8 @@
   Phases 58-60 (shipped 2026-05-25). See
   `.planning/milestones/v1.13-ROADMAP.md`.
 
-- 📌 **v1.14 Optional rocprofv3 Profiling Evidence** —
-  Phases 61-63 (planned follow-up). See
+- 🚧 **v1.14 Optional rocprofv3 Profiling Evidence** —
+  Phases 61-63 (active). See
   `.planning/milestones/v1.14-ROADMAP.md`.
 
 - ✅ **v1.12 Evaluator Contract Metadata and Boundary Guardrails** —
@@ -56,84 +56,52 @@
 
 ## Current Position
 
-**Active milestone:** none. v1.13 shipped and archived.
+**Active milestone:** v1.14 Optional rocprofv3 Profiling Evidence.
 
-**Status:** v1.13 complete. v1.14 remains planned but not active.
+**Status:** v1.14 requirements and roadmap defined; ready to plan Phase 61.
 
-**Next planned milestone:** v1.14 Optional rocprofv3 Profiling Evidence.
+**Next planned milestone:** static kernel evidence with RGA/code-object
+analysis and GPUOpen ISA classification remains future candidate work.
 
 ## Active Phase Roadmap
 
-### Phase 58: Environment Snapshot Contract
-
-**Status:** Complete
-**Milestone:** v1.13 ROCm Runtime Evidence and Environment Diagnostics
-**Goal:** Define the internal data contract and collection boundary for runtime
-environment evidence.
-
-**Scope:**
-- Add environment snapshot models and serialization helpers.
-- Represent successful, unavailable, skipped, and failed collection outcomes.
-- Add bounded subprocess helpers for ROCm tool probes.
-- Expose optional `runtime.evidence.v1` capability without bumping contract
-  version.
-
-**Requirement IDs:** ENV-01, ENV-02, ENV-04, COMPAT-01, COMPAT-02
-
-### Phase 59: Benchmark Run Evidence Integration
-
-**Status:** Complete
-**Milestone:** v1.13 ROCm Runtime Evidence and Environment Diagnostics
-**Goal:** Attach environment snapshots to benchmark execution artifacts without
-changing correctness or scoring semantics.
-
-**Scope:**
-- Collect snapshots at run boundaries outside the measured timing window.
-- Persist snapshot metadata in optional result/run metadata.
-- Ensure canonical trace fields and public schemas remain stable.
-- Add guardrail tests for v1.12 compatibility and no scoring dependency.
-
-**Requirement IDs:** ENV-03, COMPAT-01, COMPAT-02, COMPAT-03
-
-### Phase 60: Diagnostics CLI and Preflight Checks
-
-**Status:** Complete
-**Milestone:** v1.13 ROCm Runtime Evidence and Environment Diagnostics
-**Goal:** Provide a standalone way to diagnose ROCm, Docker, and GPU runtime
-readiness before running a full benchmark.
-
-**Scope:**
-- Add `sol-execbench doctor` or `sol-execbench env-snapshot`.
-- Emit JSON output for tool availability and runtime readiness.
-- Add lightweight HIP/ROCm smoke checks with architecture-aware skip behavior.
-- Document local and Docker usage.
-
-**Requirement IDs:** DIAG-01, DIAG-02, DIAG-03, SMOKE-01, SMOKE-02, SMOKE-03,
-COMPAT-03
-
-## Planned Follow-up Phase Roadmap
-
 ### Phase 61: Profiling Option and Command Provenance
 
-**Status:** Planned
+**Status:** Pending
 **Milestone:** v1.14 Optional rocprofv3 Profiling Evidence
 **Goal:** Introduce the opt-in CLI/config surface and profiler command builder.
+
+**Scope:**
+- Add `--profile rocprofv3` or equivalent profile selection.
+- Validate profiler availability and output directory setup.
+- Record command provenance and skipped/unavailable states.
 
 **Requirement IDs:** PROF-01, PROF-02, PROF-03
 
 ### Phase 62: rocprofv3 Artifact Lifecycle
 
-**Status:** Planned
+**Status:** Pending
 **Milestone:** v1.14 Optional rocprofv3 Profiling Evidence
 **Goal:** Collect and register profiler artifacts in stable result metadata.
+
+**Scope:**
+- Prefer `rocpd` output when supported.
+- Register CSV trace/counter/agent-info outputs where available.
+- Preserve profiler exit status and stdout/stderr tails.
+- Add artifact cleanup/retention behavior consistent with existing run output.
 
 **Requirement IDs:** ART-01, ART-02, ART-03
 
 ### Phase 63: Profiling Reports and Documentation
 
-**Status:** Planned
+**Status:** Pending
 **Milestone:** v1.14 Optional rocprofv3 Profiling Evidence
 **Goal:** Make profiling evidence understandable and operationally usable.
+
+**Scope:**
+- Add reporting surfaces for profiler status and artifact locations.
+- Document Docker/local requirements, permissions, and troubleshooting.
+- Add tests for success, skipped, unavailable, and failed profile states.
 
 **Requirement IDs:** REPORT-01, REPORT-02, REPORT-03
 
@@ -142,7 +110,7 @@ COMPAT-03
 | Milestone | Phases | Plans | Status | Shipped |
 |-----------|--------|-------|--------|---------|
 | v1.13 ROCm Runtime Evidence and Environment Diagnostics | 58-60 | 5/5 | Complete | 2026-05-25 |
-| v1.14 Optional rocprofv3 Profiling Evidence | 61-63 | 0/0 | Planned | — |
+| v1.14 Optional rocprofv3 Profiling Evidence | 61-63 | 0/0 | Active | — |
 | v1.12 Evaluator Contract Metadata and Boundary Guardrails | none | quick task 260524-xb3 | Complete | 2026-05-25 |
 | v1.11 Paper Dataset Parity Inventory and ROCm Execution Closure | 53-57 | 14/14 | Complete | 2026-05-23 |
 | v1.10 Paper-Aligned SOLAR Automatic Derivation | 47-52 | 23/23 | Complete | 2026-05-23 |
