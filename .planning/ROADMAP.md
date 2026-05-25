@@ -83,7 +83,7 @@ performance, timing, scoring, paper-parity, and leaderboard claims.
 
 ## Phases
 
-- [ ] **Phase 73: Static Evidence Contract And Guardrails** - Define the
+- [x] **Phase 73: Static Evidence Contract And Guardrails** - Define the (completed 2026-05-25)
   `sol_execbench.static_kernel_evidence.v1` contract, authority boundaries,
   statuses, optional capability metadata, and no-mutation guardrails.
 - [ ] **Phase 74: Build Artifact Discovery And Manifest** - Capture stable
@@ -164,7 +164,7 @@ performance, timing, scoring, paper-parity, and leaderboard claims.
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 73. Static Evidence Contract And Guardrails | v1.17 | 0/TBD | Not started | - |
+| 73. Static Evidence Contract And Guardrails | v1.17 | 1/1 | Complete    | 2026-05-25 |
 | 74. Build Artifact Discovery And Manifest | v1.17 | 0/TBD | Not started | - |
 | 75. Routed Static Extractor Adapters | v1.17 | 0/TBD | Not started | - |
 | 76. CLI Sidecar Integration And Reports | v1.17 | 0/TBD | Not started | - |
