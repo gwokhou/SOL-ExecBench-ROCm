@@ -13,20 +13,20 @@ roadmap phase.
 
 ### Contract
 
-- [ ] **SKE-CONTRACT-01**: Maintainer can serialize and parse a strict
+- [x] **SKE-CONTRACT-01**: Maintainer can serialize and parse a strict
   `sol_execbench.static_kernel_evidence.v1` sidecar schema with stable status,
   reason-code, artifact, tool-run, and classification fields.
-- [ ] **SKE-CONTRACT-02**: Maintainer can represent static evidence authority
+- [x] **SKE-CONTRACT-02**: Maintainer can represent static evidence authority
   boundaries in the sidecar, with diagnostic-only semantics and explicit false
   authority for correctness, performance, timing, score, paper parity, and
   leaderboard claims.
-- [ ] **SKE-CONTRACT-03**: Maintainer can record aggregate and per-artifact
+- [x] **SKE-CONTRACT-03**: Maintainer can record aggregate and per-artifact
   static evidence states for collected, partial, unavailable, unsupported,
   failed, and skipped outcomes.
-- [ ] **SKE-CONTRACT-04**: Consumer can discover static evidence support
+- [x] **SKE-CONTRACT-04**: Consumer can discover static evidence support
   through evaluator contract optional capability metadata without changing the
   required evaluator contract version.
-- [ ] **SKE-CONTRACT-05**: Maintainer can verify that static evidence models
+- [x] **SKE-CONTRACT-05**: Maintainer can verify that static evidence models
   and sidecar helpers do not mutate canonical trace JSONL, correctness, timing,
   scoring, or default benchmark behavior.
 
@@ -153,11 +153,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SKE-CONTRACT-01 | Phase 73 | Pending |
-| SKE-CONTRACT-02 | Phase 73 | Pending |
-| SKE-CONTRACT-03 | Phase 73 | Pending |
-| SKE-CONTRACT-04 | Phase 73 | Pending |
-| SKE-CONTRACT-05 | Phase 73 | Pending |
+| SKE-CONTRACT-01 | Phase 73 | Complete |
+| SKE-CONTRACT-02 | Phase 73 | Complete |
+| SKE-CONTRACT-03 | Phase 73 | Complete |
+| SKE-CONTRACT-04 | Phase 73 | Complete |
+| SKE-CONTRACT-05 | Phase 73 | Complete |
 | SKE-ARTIFACT-01 | Phase 74 | Pending |
 | SKE-ARTIFACT-02 | Phase 74 | Pending |
 | SKE-ARTIFACT-03 | Phase 74 | Pending |
