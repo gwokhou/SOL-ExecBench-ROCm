@@ -300,7 +300,7 @@ def default_toolchain_registry() -> list[ToolchainCapability]:
         ToolchainCapability(
             tool_id="readelf",
             display_name="readelf",
-            lifecycle=ToolLifecycle.PLANNED,
+            lifecycle=ToolLifecycle.ACTIVE,
             evidence_levels=[ToolchainEvidenceLevel.STATIC],
             artifact_types=[
                 ToolchainArtifactType.ELF_OBJECT,
@@ -317,7 +317,7 @@ def default_toolchain_registry() -> list[ToolchainCapability]:
         ToolchainCapability(
             tool_id="llvm-objdump",
             display_name="LLVM objdump",
-            lifecycle=ToolLifecycle.PLANNED,
+            lifecycle=ToolLifecycle.ACTIVE,
             evidence_levels=[ToolchainEvidenceLevel.STATIC],
             artifact_types=[
                 ToolchainArtifactType.ELF_OBJECT,
