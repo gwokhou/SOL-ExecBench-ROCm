@@ -37,6 +37,11 @@ markers in `pyproject.toml` and `tests/conftest.py` are:
 | `requires_cdna3` | Requires an AMD CDNA 3 GPU such as `gfx942`. |
 | `requires_cutile` | Legacy NVIDIA cuTile marker; skipped in this ROCm-only port. |
 
+On Linux, `requires_rocm` collection first checks for `/dev/kfd` and `/dev/dri`.
+If those device nodes are hidden by the current execution environment, such as a
+Codex or container sandbox without ROCm device passthrough, the test is skipped
+with an explicit device-node diagnostic before PyTorch probes the GPU runtime.
+
 ## Running Tests
 
 Run the full suite:
@@ -80,6 +85,10 @@ Run Docker dependency checks from inside the ROCm container:
 ```bash
 uv run pytest tests/docker/dependencies/
 ```
+
+These Docker dependency checks intentionally remain hard readiness checks. They
+should run only where ROCm devices are passed through, and they may fail instead
+of skipping when `/dev/kfd` or `/dev/dri` is unavailable.
 
 ## Writing New Tests
 
