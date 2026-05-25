@@ -52,20 +52,20 @@ roadmap phase.
 
 ### Extractors
 
-- [ ] **SKE-EXTRACT-01**: Operator can route static extraction through the
+- [x] **SKE-EXTRACT-01**: Operator can route static extraction through the
   v1.16 toolchain routing layer instead of direct ad hoc executable lookup.
-- [ ] **SKE-EXTRACT-02**: Operator can run bounded `llvm-objdump` static
+- [x] **SKE-EXTRACT-02**: Operator can run bounded `llvm-objdump` static
   extraction when routing selects an available compatible tool.
-- [ ] **SKE-EXTRACT-03**: Operator can run bounded `readelf` metadata
+- [x] **SKE-EXTRACT-03**: Operator can run bounded `readelf` metadata
   extraction as a fallback or complementary static route when available.
-- [ ] **SKE-EXTRACT-04**: Operator can see route decisions, selected tools,
+- [x] **SKE-EXTRACT-04**: Operator can see route decisions, selected tools,
   unavailable tools, command provenance, timeout, return code, stdout/stderr
   tails, and raw output artifact paths for every attempted extractor.
-- [ ] **SKE-EXTRACT-05**: Maintainer can preserve raw extractor output and
+- [x] **SKE-EXTRACT-05**: Maintainer can preserve raw extractor output and
   derive only conservative normalized facts such as detected architecture,
   section or code-object presence, symbol inventory, ISA-output presence, and
   metadata-output presence.
-- [ ] **SKE-EXTRACT-06**: Operator receives nonfatal failed, partial, or
+- [x] **SKE-EXTRACT-06**: Operator receives nonfatal failed, partial, or
   unavailable sidecars when tools are missing, unsupported, time out, return
   nonzero, or produce unparseable output.
 
@@ -163,12 +163,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SKE-ARTIFACT-03 | Phase 74 | Complete |
 | SKE-ARTIFACT-04 | Phase 74 | Complete |
 | SKE-ARTIFACT-05 | Phase 74 | Complete |
-| SKE-EXTRACT-01 | Phase 75 | Pending |
-| SKE-EXTRACT-02 | Phase 75 | Pending |
-| SKE-EXTRACT-03 | Phase 75 | Pending |
-| SKE-EXTRACT-04 | Phase 75 | Pending |
-| SKE-EXTRACT-05 | Phase 75 | Pending |
-| SKE-EXTRACT-06 | Phase 75 | Pending |
+| SKE-EXTRACT-01 | Phase 75 | Complete |
+| SKE-EXTRACT-02 | Phase 75 | Complete |
+| SKE-EXTRACT-03 | Phase 75 | Complete |
+| SKE-EXTRACT-04 | Phase 75 | Complete |
+| SKE-EXTRACT-05 | Phase 75 | Complete |
+| SKE-EXTRACT-06 | Phase 75 | Complete |
 | SKE-CLI-01 | Phase 76 | Pending |
 | SKE-CLI-02 | Phase 76 | Pending |
 | SKE-CLI-03 | Phase 76 | Pending |

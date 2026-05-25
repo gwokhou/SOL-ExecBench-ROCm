@@ -89,7 +89,7 @@ performance, timing, scoring, paper-parity, and leaderboard claims.
 - [x] **Phase 74: Build Artifact Discovery And Manifest** - Capture stable (completed 2026-05-26)
   current-build static artifacts into durable output-derived evidence
   directories with an auditable manifest and explicit unsupported states.
-- [ ] **Phase 75: Routed Static Extractor Adapters** - Route static tools
+- [x] **Phase 75: Routed Static Extractor Adapters** - Route static tools (completed 2026-05-26)
   through the v1.16 toolchain layer, run bounded extractors, preserve raw
   outputs, and classify only conservative facts.
 - [ ] **Phase 76: CLI Sidecar Integration And Reports** - Expose opt-in
@@ -166,7 +166,7 @@ performance, timing, scoring, paper-parity, and leaderboard claims.
 |-------|-----------|----------------|--------|-----------|
 | 73. Static Evidence Contract And Guardrails | v1.17 | 1/1 | Complete    | 2026-05-25 |
 | 74. Build Artifact Discovery And Manifest | v1.17 | 1/1 | Complete    | 2026-05-26 |
-| 75. Routed Static Extractor Adapters | v1.17 | 0/TBD | Not started | - |
+| 75. Routed Static Extractor Adapters | v1.17 | 1/1 | Complete    | 2026-05-26 |
 | 76. CLI Sidecar Integration And Reports | v1.17 | 0/TBD | Not started | - |
 | 77. Documentation, Guardrails, And Live Validation | v1.17 | 0/TBD | Not started | - |
 | v1.16 ROCm Toolchain Research and Capability Routing | 68-72 | 5/5 | Complete | 2026-05-25 |
