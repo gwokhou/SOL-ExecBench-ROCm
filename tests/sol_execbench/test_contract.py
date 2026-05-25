@@ -22,6 +22,9 @@ REQUIRED_CAPABILITIES = {
     "compatibility.metadata.v1",
     "failure_categories.v1",
 }
+OPTIONAL_CAPABILITIES = {
+    "runtime.evidence.v1",
+}
 
 
 def test_evaluator_contract_versions_are_stable():
@@ -37,6 +40,13 @@ def test_evaluator_contract_declares_required_capabilities():
     payload = build_evaluator_contract().model_dump(mode="json")
 
     assert REQUIRED_CAPABILITIES.issubset(set(payload["capabilities"]))
+
+
+def test_evaluator_contract_advertises_optional_runtime_evidence_without_bump():
+    payload = build_evaluator_contract().model_dump(mode="json")
+
+    assert OPTIONAL_CAPABILITIES.issubset(set(payload["capabilities"]))
+    assert payload["contract_version"] == "1.0"
 
 
 def test_evaluator_contract_freezes_trace_status_and_field_groups():

@@ -76,6 +76,7 @@ def build_evaluator_contract() -> EvaluatorContract:
             "baseline.scoring_artifact.v1",
             "compatibility.metadata.v1",
             "failure_categories.v1",
+            "runtime.evidence.v1",
         ],
         trace_field_requirements={
             "top_level": ["definition", "workload", "solution", "evaluation"],

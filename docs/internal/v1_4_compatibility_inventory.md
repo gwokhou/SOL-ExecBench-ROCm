@@ -123,6 +123,7 @@ above:
 
 ## Phase 19 Non-Goals
 
+- Do not add public `sol-execbench` CLI options or subcommands.
 - Do not add public `sol-execbench` CLI options or subcommands as part of the
   Phase 19 analysis work.
 - Do not change Pydantic public field names, required fields, or validation

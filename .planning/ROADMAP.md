@@ -57,7 +57,7 @@
 
 **Active milestone:** v1.13 ROCm Runtime Evidence and Environment Diagnostics.
 
-**Status:** Phase 58 planned; ready to execute environment snapshot contract work.
+**Status:** Phase 58 complete; ready to plan Phase 59 benchmark run evidence integration.
 
 **Next planned milestone:** v1.14 Optional rocprofv3 Profiling Evidence.
 
@@ -65,7 +65,7 @@
 
 ### Phase 58: Environment Snapshot Contract
 
-**Status:** Planned
+**Status:** Complete
 **Milestone:** v1.13 ROCm Runtime Evidence and Environment Diagnostics
 **Goal:** Define the internal data contract and collection boundary for runtime
 environment evidence.
@@ -140,7 +140,7 @@ COMPAT-03
 
 | Milestone | Phases | Plans | Status | Shipped |
 |-----------|--------|-------|--------|---------|
-| v1.13 ROCm Runtime Evidence and Environment Diagnostics | 58-60 | 0/0 | Active | — |
+| v1.13 ROCm Runtime Evidence and Environment Diagnostics | 58-60 | 3/3 | Active | — |
 | v1.14 Optional rocprofv3 Profiling Evidence | 61-63 | 0/0 | Planned | — |
 | v1.12 Evaluator Contract Metadata and Boundary Guardrails | none | quick task 260524-xb3 | Complete | 2026-05-25 |
 | v1.11 Paper Dataset Parity Inventory and ROCm Execution Closure | 53-57 | 14/14 | Complete | 2026-05-23 |
