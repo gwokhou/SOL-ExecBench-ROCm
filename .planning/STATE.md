@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.13
-milestone_name: ROCm Runtime Evidence and Environment Diagnostics
-status: Awaiting next milestone
-last_updated: "2026-05-25T07:17:59.347Z"
+milestone: v1.14
+milestone_name: Optional rocprofv3 Profiling Evidence
+status: planning
+last_updated: "2026-05-25T07:46:34.274Z"
 last_activity: 2026-05-25
 progress:
   total_phases: 3
-  completed_phases: 3
-  total_plans: 5
-  completed_plans: 5
-  percent: 100
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -20,14 +20,14 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-25)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** v1.13 ROCm runtime evidence and environment diagnostics
+**Current focus:** v1.14 optional rocprofv3 profiling evidence
 
 ## Current Position
 
-Phase: Milestone v1.13 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-05-25 — v1.13 completed
+Status: Defining requirements
+Last activity: 2026-05-25 — Milestone v1.14 started
 
 ## Performance Metrics
 

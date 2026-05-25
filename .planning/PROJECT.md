@@ -18,8 +18,7 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 **Shipped version:** v1.13 ROCm Runtime Evidence and Environment Diagnostics,
 completed 2026-05-25.
 
-**Current milestone:** none. v1.14 Optional rocprofv3 Profiling Evidence is
-planned but not active.
+**Current milestone:** v1.14 Optional rocprofv3 Profiling Evidence.
 
 **Latest milestone outcome:** the ROCm port now has optional runtime
 environment snapshot evidence, opt-in benchmark run sidecars, and
@@ -27,9 +26,12 @@ environment snapshot evidence, opt-in benchmark run sidecars, and
 `1.0`, canonical trace JSONL, correctness, timing, scoring, and v1.12 consumer
 defaults.
 
-**Next planned milestone:** v1.14 Optional rocprofv3 Profiling Evidence, scoped
-to opt-in profiler artifacts and command provenance after the v1.13 runtime
-evidence surface is stable.
+**Current milestone goal:** add opt-in `rocprofv3` profiling artifacts as
+benchmark evidence so anomalous or hardware-sensitive results can be diagnosed
+without changing correctness, timing, scoring, or default execution behavior.
+
+**Next planned milestone:** static kernel evidence with RGA/code-object
+analysis and GPUOpen ISA classification remains future candidate work.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline.
 Milestones v1.1-v1.6 added CDNA 3 code/schema support, maintained residue
@@ -64,6 +66,31 @@ focuses only on backward-compatible runtime environment evidence, diagnostic
 commands, and architecture-aware smoke/preflight checks. `rocprofv3` artifact
 collection is deferred to the planned v1.14 milestone, and static RGA/GPUOpen
 ISA analysis remains later candidate work.
+The v1.14 milestone builds on that evidence surface by adding explicitly
+enabled `rocprofv3` profiling command provenance, artifact registration, and
+reporting. Profiling remains diagnostic evidence only and must not change
+default benchmark execution or correctness/scoring outcomes.
+
+## Current Milestone: v1.14 Optional rocprofv3 Profiling Evidence
+
+**Goal:** Add opt-in `rocprofv3` profiling artifacts as benchmark evidence so
+anomalous or hardware-sensitive results can be diagnosed without changing
+correctness, timing, scoring, or default execution behavior.
+
+**Target features:**
+- Add an explicit profiling option such as `--profile rocprofv3`.
+- Record profiler command provenance, availability, skipped/unavailable states,
+  exit status, and stdout/stderr tails.
+- Persist profiler artifacts with stable paths, preferring `rocpd` where
+  supported and CSV outputs where available.
+- Report profiling evidence as optional diagnostics, not correctness or score
+  authority.
+
+**Explicitly deferred:**
+- Making profiling mandatory for benchmark runs.
+- ROCm Compute Profiler roofline analysis.
+- RGA/code-object/static ISA analysis.
+- Contract version bump unless profiling becomes a required consumer contract.
 
 Validation status:
 
