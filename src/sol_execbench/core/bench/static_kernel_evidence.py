@@ -5,8 +5,11 @@
 
 from __future__ import annotations
 
+import hashlib
+import shutil
 from collections.abc import Sequence
 from enum import Enum
+from pathlib import Path
 from typing import Annotated, Literal
 
 from pydantic import BeforeValidator, ConfigDict, Field
@@ -153,6 +156,12 @@ class StaticKernelEvidenceArtifact(BaseModelWithDocstrings):
     """Artifact size when known."""
     sha256: str | None = None
     """Artifact digest when known."""
+    producer: str | None = None
+    """Producer that created or registered this artifact when known."""
+    target_architecture: str | None = None
+    """Target gfx architecture when known."""
+    inspectable: bool = False
+    """Whether later static tools may inspect this artifact."""
     classification: StaticKernelEvidenceClassification = Field(
         default_factory=StaticKernelEvidenceClassification
     )
@@ -323,3 +332,205 @@ def build_static_kernel_evidence_partial(
         status=StaticKernelEvidenceStatus.PARTIAL,
         reason_code=reason_code,
     )
+
+
+_PRIMARY_ARTIFACT_NAME = "benchmark_kernel.so"
+_COMPILER_OUTPUT_SUFFIXES = {".log", ".txt"}
+_STATIC_ARTIFACT_SUFFIXES = {
+    ".hsaco": "hsaco",
+    ".co": "code_object",
+    ".o": "object_file",
+}
+
+
+def collect_static_kernel_artifacts(
+    *,
+    build_directory: Path,
+    evidence_directory: Path,
+    primary_artifact_name: str = _PRIMARY_ARTIFACT_NAME,
+    sidecar_base_directory: Path | None = None,
+    producer: str = "hip_cpp_build",
+    target_architecture: str | None = None,
+) -> StaticKernelEvidenceSidecar:
+    """Persist current-build static artifacts into an evidence directory."""
+
+    build_root = build_directory.resolve()
+    if not build_root.is_dir():
+        return build_static_kernel_evidence_unavailable(
+            StaticKernelEvidenceReasonCode.ARTIFACT_UNAVAILABLE
+        )
+
+    primary_artifact = build_root / primary_artifact_name
+    if not _is_contained_file(primary_artifact, build_root):
+        return build_static_kernel_evidence_unavailable(
+            StaticKernelEvidenceReasonCode.ARTIFACT_UNAVAILABLE
+        )
+
+    evidence_root = evidence_directory.resolve()
+    sidecar_base = (
+        sidecar_base_directory.resolve()
+        if sidecar_base_directory is not None
+        else evidence_root
+    )
+    artifact_root = evidence_root / "artifacts"
+    artifact_root.mkdir(parents=True, exist_ok=True)
+
+    artifacts = [
+        _persist_static_artifact(
+            source_path=path,
+            build_root=build_root,
+            artifact_root=artifact_root,
+            sidecar_base=sidecar_base,
+            producer=producer,
+            target_architecture=target_architecture,
+        )
+        for path in _discover_static_artifact_paths(
+            build_root=build_root,
+            evidence_root=evidence_root,
+            primary_artifact_name=primary_artifact_name,
+        )
+    ]
+
+    if not artifacts:
+        return build_static_kernel_evidence_unavailable(
+            StaticKernelEvidenceReasonCode.ARTIFACT_UNAVAILABLE
+        )
+
+    return build_static_kernel_evidence_sidecar(
+        status=StaticKernelEvidenceStatus.COLLECTED,
+        reason_code=StaticKernelEvidenceReasonCode.STATIC_EVIDENCE_COLLECTED,
+        artifacts=artifacts,
+        classification=StaticKernelEvidenceClassification(
+            metadata_present=True,
+            detected_architectures=(
+                [target_architecture] if target_architecture is not None else []
+            ),
+        ),
+    )
+
+
+def _discover_static_artifact_paths(
+    *,
+    build_root: Path,
+    evidence_root: Path,
+    primary_artifact_name: str,
+) -> tuple[Path, ...]:
+    primary_artifact = build_root / primary_artifact_name
+    candidates: list[Path] = []
+    if _is_contained_file(primary_artifact, build_root):
+        candidates.append(primary_artifact.resolve())
+
+    for path in sorted(build_root.rglob("*")):
+        if not _is_contained_file(path, build_root):
+            continue
+        resolved = path.resolve()
+        if _is_relative_to(resolved, evidence_root):
+            continue
+        if resolved == primary_artifact.resolve():
+            continue
+        if _static_artifact_type(path) is None:
+            continue
+        candidates.append(resolved)
+
+    return tuple(dict.fromkeys(candidates))
+
+
+def _persist_static_artifact(
+    *,
+    source_path: Path,
+    build_root: Path,
+    artifact_root: Path,
+    sidecar_base: Path,
+    producer: str,
+    target_architecture: str | None,
+) -> StaticKernelEvidenceArtifact:
+    source_relative_path = source_path.resolve().relative_to(build_root)
+    persisted_path = artifact_root / source_relative_path
+    persisted_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source_path, persisted_path)
+
+    return StaticKernelEvidenceArtifact(
+        artifact_id=_artifact_id(source_relative_path),
+        artifact_type=_static_artifact_type(source_path) or "unknown",
+        status=StaticKernelEvidenceStatus.COLLECTED,
+        reason_code=StaticKernelEvidenceReasonCode.STATIC_EVIDENCE_COLLECTED,
+        source_path=source_relative_path.as_posix(),
+        persisted_path=_relative_path_string(persisted_path, sidecar_base),
+        size_bytes=persisted_path.stat().st_size,
+        sha256=_sha256_file(persisted_path),
+        producer=producer,
+        target_architecture=target_architecture,
+        inspectable=_is_inspectable_artifact(source_path),
+        classification=StaticKernelEvidenceClassification(
+            metadata_present=True,
+            detected_architectures=(
+                [target_architecture] if target_architecture is not None else []
+            ),
+        ),
+        source_references=[
+            StaticKernelEvidenceSourceReference(
+                kind="producer",
+                value=producer,
+                description="Build step that registered this current-build artifact.",
+            )
+        ],
+    )
+
+
+def _static_artifact_type(path: Path) -> str | None:
+    name = path.name
+    suffix = path.suffix
+    if name == _PRIMARY_ARTIFACT_NAME or (
+        name.startswith("benchmark_kernel") and suffix == ".so"
+    ):
+        return "shared_library"
+    if suffix in _STATIC_ARTIFACT_SUFFIXES:
+        return _STATIC_ARTIFACT_SUFFIXES[suffix]
+    if suffix in _COMPILER_OUTPUT_SUFFIXES and _is_compiler_output_name(name):
+        return "compiler_output"
+    return None
+
+
+def _is_compiler_output_name(name: str) -> bool:
+    normalized = name.lower()
+    return any(marker in normalized for marker in ("build", "compile", "compiler"))
+
+
+def _is_contained_file(path: Path, root: Path) -> bool:
+    try:
+        resolved = path.resolve(strict=True)
+    except FileNotFoundError:
+        return False
+    return resolved.is_file() and _is_relative_to(resolved, root)
+
+
+def _is_relative_to(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True
+
+
+def _artifact_id(relative_path: Path) -> str:
+    normalized = relative_path.as_posix().replace("/", "-")
+    return f"artifact-{normalized}"
+
+
+def _relative_path_string(path: Path, base: Path) -> str:
+    try:
+        return path.resolve().relative_to(base).as_posix()
+    except ValueError:
+        return path.resolve().as_posix()
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _is_inspectable_artifact(path: Path) -> bool:
+    return path.suffix in {".so", ".hsaco", ".co", ".o"}
