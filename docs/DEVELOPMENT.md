@@ -44,8 +44,8 @@ uv run pytest tests/
 | `uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark --limit 5` | Run a small dataset batch. |
 | `uv run pytest tests/` | Run the full adapted pytest suite. |
 | `uv run pytest tests/sol_execbench/test_e2e.py` | Run one focused test file. |
-| `uv run --with ruff ruff check .` | Run lint checks. |
-| `uv run --with ruff ruff format .` | Format Python files. |
+| `uv run ruff check .` | Run lint checks. |
+| `uv run ruff format .` | Format Python files. |
 | `./scripts/run_docker.sh --build` | Build and enter the ROCm Docker environment. |
 
 There is no dedicated package build script in `pyproject.toml`; the package uses
@@ -68,8 +68,8 @@ Ruff is the configured linting and formatting tool. The configuration lives in
 Run style checks with:
 
 ```bash
-uv run --with ruff ruff check .
-uv run --with ruff ruff format .
+uv run ruff check .
+uv run ruff format .
 ```
 
 ## Branch Conventions
