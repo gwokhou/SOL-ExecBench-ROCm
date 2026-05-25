@@ -126,6 +126,7 @@ The baseline comparison command is exposed separately as `sol-execbench-baseline
 - [Getting Started](docs/GETTING-STARTED.md): prerequisites, installation, first run, and setup issues.
 - [Claims](docs/CLAIMS.md): supported ROCm evidence claims, unsupported claims, and upgrade requirements.
 - [Curated ROCm slice](docs/curated_rocm_slice.md): bounded v1.15 benchmark slice, commands, and artifact expectations.
+- [ROCm toolchain routing](docs/rocm_toolchain_routing.md): tool lifecycle, capability routing, availability matrix, and claim boundaries.
 - [Researcher guide](docs/RESEARCHER-GUIDE.md): workflows for kernel, compiler/backend, agent, and reproducibility researchers.
 - [Cookbook](docs/COOKBOOK.md): copy-paste recipes for common ROCm benchmark tasks.
 - [v1.15 release closure](docs/v1_15_release_closure.md): reproducibility checklist, result semantics, and known gaps.

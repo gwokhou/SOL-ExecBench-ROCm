@@ -11,6 +11,7 @@ does not claim official leaderboard equivalence.
 | ROCm-port evidence | The CLI, schemas, isolated evaluation, correctness checks, reward-hack checks, trace JSONL, and selected examples run through ROCm-specific paths. | Passing tests for the touched surface, canonical trace examples, and ROCm environment documentation. |
 | Runtime evidence | A run was executed in a recorded ROCm environment. | Canonical trace JSONL plus optional `traces.jsonl.environment.json` or `sol-execbench doctor --json` output. |
 | Profiling evidence | A run produced diagnostic `rocprofv3` artifacts. | `--profile rocprofv3`, `traces.jsonl.profile.json`, registered artifact paths, and profiler status metadata. |
+| Toolchain routing evidence | The project selected or rejected ROCm tools for a requested evidence level based on registry entries and bounded probes. | `sol-execbench toolchain --json`, registry source refs, selected tool, fallback, status, and reason code. |
 | AMD-native-derived evidence | A score or bound report was derived from ROCm traces and AMD-side bound artifacts. | Canonical traces, AMD SOL bound sidecars, hardware model refs, score eligibility state, and warnings. |
 | Research-preview evidence | A curated benchmark slice was executed or audited under documented limits. | Slice definition, command transcript or expected commands, artifact list, pass/fail/skip/unavailable accounting, and known gaps. |
 
@@ -23,6 +24,10 @@ does not claim official leaderboard equivalence.
   evidence from that hardware class.
 - NVFP4 or MXFP4 validation without suitable AMD hardware evidence.
 - `rocprofv3` profiling as correctness or score authority.
+- Toolchain routing as correctness, performance, static-kernel, paper-parity,
+  or leaderboard authority.
+- Static Kernel Evidence in v1.16; code-object capture, ISA extraction, and
+  static evidence sidecars are deferred to v1.17.
 - Curated-slice results as paper-level benchmark results.
 
 ## Claim Upgrade Rules
@@ -51,4 +56,3 @@ Avoid ambiguous wording:
 - Do not say "SOLAR equivalent" for local AMD-derived sidecars.
 - Do not say "hardware validated" for schema/build support alone.
 - Do not say "score authority" for profiling sidecars.
-

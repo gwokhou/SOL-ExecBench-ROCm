@@ -110,6 +110,26 @@ out/cookbook/rmsnorm.profile.trace.jsonl.rocprofv3/
 If `rocprofv3` is unavailable, the profile sidecar records that status and the
 benchmark follows the normal path.
 
+## Recipe: Inspect ROCm Toolchain Routing
+
+```bash
+uv run sol-execbench toolchain --json \
+  --evidence-level profiling \
+  --artifact-type executable_run \
+  --gpu-arch gfx1200
+```
+
+Inspect the selected tool, status, fallback, and reason code. A successful
+routing decision means the toolchain path is available for that evidence level;
+it does not prove correctness, performance, static kernel evidence, or
+leaderboard readiness.
+
+List the built-in tool registry:
+
+```bash
+uv run sol-execbench toolchain --json --list-registry
+```
+
 ## Recipe: Generate AMD-Native Derived Evidence
 
 Use this recipe only when generating AMD-native score evidence from local

@@ -80,6 +80,7 @@ def build_evaluator_contract() -> EvaluatorContract:
             "failure_categories.v1",
             "runtime.evidence.v1",
             "profiling.evidence.v1",
+            "toolchain.routing.v1",
         ],
         trace_field_requirements={
             "top_level": ["definition", "workload", "solution", "evaluation"],
@@ -186,5 +187,6 @@ def build_evaluator_contract() -> EvaluatorContract:
             "HIP consumes this contract as external JSON and does not redefine benchmark truth.",
             "Contract metadata is emitted beside trace JSONL and is not part of Trace.",
             "Measured baseline registry evidence is distinct from SOL scoring baseline artifacts.",
+            "Toolchain routing reports availability and provenance only; it is not correctness, performance, or score authority.",
         ],
     )

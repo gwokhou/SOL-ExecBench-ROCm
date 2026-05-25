@@ -8,34 +8,34 @@
 
 ### External Research
 
-- [ ] **RESEARCH-01**: The project records external research over ROCm Systems, ROCprofiler SDK, RGA/GPUOpen manuals, HIP compiler documentation, LLVM/object tools, and relevant migrated or deprecated repositories.
-- [ ] **RESEARCH-02**: Research output identifies reusable information from manuals and repositories, including tool capabilities, output formats, lifecycle status, repository migration status, and known probe surfaces.
-- [ ] **RESEARCH-03**: Research output explicitly separates runtime, profiling, static/future, and derived-score evidence levels.
+- [x] **RESEARCH-01**: The project records external research over ROCm Systems, ROCprofiler SDK, RGA/GPUOpen manuals, HIP compiler documentation, LLVM/object tools, and relevant migrated or deprecated repositories.
+- [x] **RESEARCH-02**: Research output identifies reusable information from manuals and repositories, including tool capabilities, output formats, lifecycle status, repository migration status, and known probe surfaces.
+- [x] **RESEARCH-03**: Research output explicitly separates runtime, profiling, static/future, and derived-score evidence levels.
 
 ### Tool Inventory And Lifecycle
 
-- [ ] **TOOL-01**: The project defines a central inventory for current, historical, deprecated, migrated, planned, rejected, and candidate ROCm-related tools.
-- [ ] **TOOL-02**: Each tool entry can record source-of-truth references, replacement tool IDs, expected executable names, and lifecycle status.
-- [ ] **TOOL-03**: Historical or deprecated tools remain represented as aliases or lifecycle entries instead of being silently dropped.
+- [x] **TOOL-01**: The project defines a central inventory for current, historical, deprecated, migrated, planned, rejected, and candidate ROCm-related tools.
+- [x] **TOOL-02**: Each tool entry can record source-of-truth references, replacement tool IDs, expected executable names, and lifecycle status.
+- [x] **TOOL-03**: Historical or deprecated tools remain represented as aliases or lifecycle entries instead of being silently dropped.
 
 ### Capability Registry
 
-- [ ] **CAP-01**: The project defines a capability registry schema keyed by tool, hardware generation, GPU architecture pattern, ROCm version range, artifact type, and evidence level.
-- [ ] **CAP-02**: The registry status vocabulary includes `available`, `unavailable`, `unsupported_arch`, `unsupported_artifact`, `deprecated`, `migrated`, `planned`, `rejected`, and `failed`.
-- [ ] **CAP-03**: Registry entries can preserve reason codes and source references so unavailable or unsupported states are auditable.
+- [x] **CAP-01**: The project defines a capability registry schema keyed by tool, hardware generation, GPU architecture pattern, ROCm version range, artifact type, and evidence level.
+- [x] **CAP-02**: The registry status vocabulary includes `available`, `unavailable`, `unsupported_arch`, `unsupported_artifact`, `deprecated`, `migrated`, `planned`, `rejected`, and `failed`.
+- [x] **CAP-03**: Registry entries can preserve reason codes and source references so unavailable or unsupported states are auditable.
 
 ### Probe And Routing Policy
 
-- [ ] **ROUTE-01**: The project defines a routing policy that combines static registry facts with dynamic probes of executable presence, version output, ROCm root, GPU architecture, and tool dry-run/list behavior.
-- [ ] **ROUTE-02**: Routing decisions produce explicit selected tool, fallback tool, status, and reason fields without mutating canonical trace JSONL.
-- [ ] **ROUTE-03**: Runtime, profiling, static/future, and derived-score evidence paths share routing semantics while preserving their separate evidence authority.
-- [ ] **ROUTE-04**: Static Kernel Evidence extraction remains deferred to v1.17 and cannot be implemented as part of v1.16.
+- [x] **ROUTE-01**: The project defines a routing policy that combines static registry facts with dynamic probes of executable presence, version output, ROCm root, GPU architecture, and tool dry-run/list behavior.
+- [x] **ROUTE-02**: Routing decisions produce explicit selected tool, fallback tool, status, and reason fields without mutating canonical trace JSONL.
+- [x] **ROUTE-03**: Runtime, profiling, static/future, and derived-score evidence paths share routing semantics while preserving their separate evidence authority.
+- [x] **ROUTE-04**: Static Kernel Evidence extraction remains deferred to v1.17 and cannot be implemented as part of v1.16.
 
 ### Documentation And Guardrails
 
-- [ ] **DOC-01**: The project documents a ROCm toolchain availability matrix and explains how hardware generation, GPU architecture, ROCm version, artifact type, and installation state affect routing.
-- [ ] **DOC-02**: The project provides cookbook guidance for interpreting routing decisions and unavailable or unsupported reasons.
-- [ ] **DOC-03**: Claim guardrails prevent tool availability, routing success, or future static-evidence readiness from being described as correctness, performance, paper-parity, or leaderboard authority.
+- [x] **DOC-01**: The project documents a ROCm toolchain availability matrix and explains how hardware generation, GPU architecture, ROCm version, artifact type, and installation state affect routing.
+- [x] **DOC-02**: The project provides cookbook guidance for interpreting routing decisions and unavailable or unsupported reasons.
+- [x] **DOC-03**: Claim guardrails prevent tool availability, routing success, or future static-evidence readiness from being described as correctness, performance, paper-parity, or leaderboard authority.
 
 ## Future Requirements
 
@@ -69,22 +69,22 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RESEARCH-01 | Phase 68 | Pending |
-| RESEARCH-02 | Phase 68 | Pending |
-| RESEARCH-03 | Phase 68 | Pending |
-| TOOL-01 | Phase 69 | Pending |
-| TOOL-02 | Phase 69 | Pending |
-| TOOL-03 | Phase 69 | Pending |
-| CAP-01 | Phase 70 | Pending |
-| CAP-02 | Phase 70 | Pending |
-| CAP-03 | Phase 70 | Pending |
-| ROUTE-01 | Phase 71 | Pending |
-| ROUTE-02 | Phase 71 | Pending |
-| ROUTE-03 | Phase 71 | Pending |
-| ROUTE-04 | Phase 71 | Pending |
-| DOC-01 | Phase 72 | Pending |
-| DOC-02 | Phase 72 | Pending |
-| DOC-03 | Phase 72 | Pending |
+| RESEARCH-01 | Phase 68 | Complete |
+| RESEARCH-02 | Phase 68 | Complete |
+| RESEARCH-03 | Phase 68 | Complete |
+| TOOL-01 | Phase 69 | Complete |
+| TOOL-02 | Phase 69 | Complete |
+| TOOL-03 | Phase 69 | Complete |
+| CAP-01 | Phase 70 | Complete |
+| CAP-02 | Phase 70 | Complete |
+| CAP-03 | Phase 70 | Complete |
+| ROUTE-01 | Phase 71 | Complete |
+| ROUTE-02 | Phase 71 | Complete |
+| ROUTE-03 | Phase 71 | Complete |
+| ROUTE-04 | Phase 71 | Complete |
+| DOC-01 | Phase 72 | Complete |
+| DOC-02 | Phase 72 | Complete |
+| DOC-03 | Phase 72 | Complete |
 
 **Coverage:**
 - v1.16 requirements: 16 total
@@ -93,4 +93,4 @@
 
 ---
 *Requirements defined: 2026-05-25*
-*Last updated: 2026-05-25 after v1.16 milestone start*
+*Last updated: 2026-05-25 after v1.16 autonomous implementation*

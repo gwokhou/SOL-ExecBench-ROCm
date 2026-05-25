@@ -30,6 +30,21 @@ from .environment import (
     collect_pytorch_rocm_summary,
     probe_tool,
 )
+from .toolchain import (
+    TOOLCHAIN_ROUTING_SCHEMA_VERSION,
+    ToolLifecycle,
+    ToolchainArtifactType,
+    ToolchainCapability,
+    ToolchainEvidenceLevel,
+    ToolchainProbeResult,
+    ToolchainRoutingDecision,
+    ToolchainRoutingReport,
+    ToolchainRoutingRequest,
+    ToolchainStatus,
+    build_toolchain_routing_report,
+    default_toolchain_registry,
+    probe_toolchain_tool,
+)
 from .data import (
     AxisConst,
     AxisSpec,
@@ -100,6 +115,20 @@ __all__ = [
     "collect_environment_snapshot",
     "collect_pytorch_rocm_summary",
     "probe_tool",
+    # Optional toolchain routing evidence
+    "TOOLCHAIN_ROUTING_SCHEMA_VERSION",
+    "ToolLifecycle",
+    "ToolchainArtifactType",
+    "ToolchainCapability",
+    "ToolchainEvidenceLevel",
+    "ToolchainProbeResult",
+    "ToolchainRoutingDecision",
+    "ToolchainRoutingReport",
+    "ToolchainRoutingRequest",
+    "ToolchainStatus",
+    "build_toolchain_routing_report",
+    "default_toolchain_registry",
+    "probe_toolchain_tool",
     # Bench config
     "BenchmarkConfig",
     "get_clock_preset",

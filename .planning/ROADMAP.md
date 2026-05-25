@@ -70,7 +70,7 @@
 
 **Active milestone:** v1.16 ROCm Toolchain Research and Capability Routing.
 
-**Status:** defining requirements and roadmap.
+**Status:** implementation complete; final verification in progress.
 
 **Milestone goal:** build a research-backed ROCm toolchain capability routing
 foundation before implementing static kernel evidence in v1.17.
@@ -79,7 +79,7 @@ foundation before implementing static kernel evidence in v1.17.
 
 ### Phase 68: External ROCm Toolchain Research
 
-**Status:** Planned
+**Status:** Complete
 **Milestone:** v1.16 ROCm Toolchain Research and Capability Routing
 **Goal:** Gather and record primary-source research for ROCm Systems,
 ROCprofiler SDK, RGA/GPUOpen tools, HIP compiler docs, LLVM/object tools, and
@@ -101,7 +101,7 @@ repository migration status.
 
 ### Phase 69: Toolchain Inventory and Lifecycle Model
 
-**Status:** Planned
+**Status:** Complete
 **Milestone:** v1.16 ROCm Toolchain Research and Capability Routing
 **Goal:** Create a central tool inventory and lifecycle model for active,
 deprecated, migrated, planned, rejected, and candidate tools.
@@ -122,7 +122,7 @@ deprecated, migrated, planned, rejected, and candidate tools.
 
 ### Phase 70: Capability Registry Schema
 
-**Status:** Planned
+**Status:** Complete
 **Milestone:** v1.16 ROCm Toolchain Research and Capability Routing
 **Goal:** Define the schema for mapping tools to hardware generations, GPU
 architecture patterns, ROCm versions, artifact types, evidence levels, statuses,
@@ -144,7 +144,7 @@ reasons, and source references.
 
 ### Phase 71: Dynamic Probe and Routing Policy
 
-**Status:** Planned
+**Status:** Complete
 **Milestone:** v1.16 ROCm Toolchain Research and Capability Routing
 **Goal:** Define and implement routing semantics that combine static registry
 facts with host dynamic probes and explicit fallback decisions.
@@ -167,7 +167,7 @@ facts with host dynamic probes and explicit fallback decisions.
 
 ### Phase 72: Toolchain Matrix Docs and Guardrails
 
-**Status:** Planned
+**Status:** Complete
 **Milestone:** v1.16 ROCm Toolchain Research and Capability Routing
 **Goal:** Document the ROCm toolchain availability matrix, routing cookbook,
 and claim boundaries for routing evidence.
@@ -191,7 +191,7 @@ and claim boundaries for routing evidence.
 
 | Milestone | Phases | Plans | Status | Shipped |
 |-----------|--------|-------|--------|---------|
-| v1.16 ROCm Toolchain Research and Capability Routing | 68-72 | 0/5 | Active | - |
+| v1.16 ROCm Toolchain Research and Capability Routing | 68-72 | 5/5 | Active | - |
 | v1.15 Research-Grade ROCm Benchmark Release | 64-67 | 4/4 | Complete | 2026-05-25 |
 | v1.14 Optional rocprofv3 Profiling Evidence | 61-63 | 3/3 | Complete | 2026-05-25 |
 | v1.13 ROCm Runtime Evidence and Environment Diagnostics | 58-60 | 5/5 | Complete | 2026-05-25 |
