@@ -81,6 +81,7 @@ def build_evaluator_contract() -> EvaluatorContract:
             "runtime.evidence.v1",
             "profiling.evidence.v1",
             "toolchain.routing.v1",
+            "static_kernel_evidence.v1",
         ],
         trace_field_requirements={
             "top_level": ["definition", "workload", "solution", "evaluation"],
@@ -188,5 +189,6 @@ def build_evaluator_contract() -> EvaluatorContract:
             "Contract metadata is emitted beside trace JSONL and is not part of Trace.",
             "Measured baseline registry evidence is distinct from SOL scoring baseline artifacts.",
             "Toolchain routing reports availability and provenance only; it is not correctness, performance, or score authority.",
+            "Static kernel evidence is diagnostic sidecar metadata only; it is not correctness, performance, timing, score, paper-parity, or leaderboard authority.",
         ],
     )
