@@ -56,7 +56,7 @@ class BoundTensor:
     producer_node_id: str | None
     source: str
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "tensor_id": self.tensor_id,
             "name": self.name,
@@ -77,7 +77,7 @@ class BoundEdge:
     target_node_id: str
     role: str
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "edge_id": self.edge_id,
             "source_tensor_id": self.source_tensor_id,
@@ -96,13 +96,13 @@ class BoundGraphNode:
     source_expression: str
     input_tensor_ids: tuple[str, ...]
     output_tensor_ids: tuple[str, ...]
-    attributes: dict[str, object]
+    attributes: dict[str, Any]
     confidence: EstimateConfidence
     rationale: str
     einsum_hint: str | None = None
     conversion_status: str | None = None
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "node_id": self.node_id,
             "op_family": self.op_family.value,
@@ -130,7 +130,7 @@ class BoundGraph:
     warnings: tuple[str, ...]
     derived: bool = True
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "definition": self.definition,
             "workload_uuid": self.workload_uuid,
@@ -591,8 +591,8 @@ def _fx_node_attributes(
     node: Any,
     func_name: str,
     classification: _CallClassification,
-) -> dict[str, object]:
-    attributes: dict[str, object] = {}
+) -> dict[str, Any]:
+    attributes: dict[str, Any] = {}
     leaf_name = func_name.rsplit(".", maxsplit=1)[-1]
     movement_kind = _movement_kind_for_name(leaf_name)
     if movement_kind is not None:
@@ -1063,7 +1063,7 @@ def _producer_node_for_input(
 def _ssm_sequence_hidden_metadata(
     graph: BoundGraph,
     node: BoundGraphNode,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     if not node.input_tensor_ids:
         return {}
     tensor = graph.tensors.get(node.input_tensor_ids[0])
@@ -1080,7 +1080,7 @@ def _ssm_sequence_hidden_metadata(
 def _ssm_state_update_metadata(
     graph: BoundGraph,
     node: BoundGraphNode,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     parameter_ids = node.input_tensor_ids[1:]
     if len(parameter_ids) < 3:
         return {}
@@ -1125,7 +1125,7 @@ def _moe_rationale(attrs: dict[str, object]) -> str:
     return f"recognized MoE {attrs.get('subrole', 'primitive')} evidence"
 
 
-def _moe_route_metadata_from_topk(node: BoundGraphNode) -> dict[str, object]:
+def _moe_route_metadata_from_topk(node: BoundGraphNode) -> dict[str, Any]:
     if isinstance(node.attributes.get("route_top_k"), int):
         return {
             "route_top_k": int(node.attributes["route_top_k"]),
@@ -1138,7 +1138,7 @@ def _moe_route_metadata_from_dispatch_input(
     graph: BoundGraph,
     nodes: list[BoundGraphNode],
     node: BoundGraphNode,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     route_producer = _producer_node_for_input(graph, nodes, node, input_index=2)
     if (
         route_producer is not None
@@ -1153,7 +1153,7 @@ def _moe_route_metadata_from_dispatch_input(
     return {"missing_route_metadata": ("route:top_k", "route:static_cardinality")}
 
 
-def _moe_static_shape_metadata(graph: BoundGraph, node: BoundGraphNode) -> dict[str, object]:
+def _moe_static_shape_metadata(graph: BoundGraph, node: BoundGraphNode) -> dict[str, Any]:
     attrs: dict[str, object] = {}
     for tensor_id in node.input_tensor_ids:
         tensor = graph.tensors.get(tensor_id)
@@ -1529,7 +1529,7 @@ class _AstBoundGraphExtractor:
         input_tensor_ids: tuple[str, ...],
         confidence: EstimateConfidence,
         rationale: str,
-        attributes: dict[str, object] | None,
+        attributes: dict[str, Any] | None,
     ) -> tuple[str, ...]:
         node_id = f"op_{len(self.nodes) + 1}"
         output_tensor_id = f"tmp:{node_id}:0"
@@ -1678,8 +1678,8 @@ def _ast_call_attributes(
     node: ast.Call,
     func_name: str,
     classification: _CallClassification,
-) -> dict[str, object]:
-    attributes: dict[str, object] = {}
+) -> dict[str, Any]:
+    attributes: dict[str, Any] = {}
     leaf_name = func_name.rsplit(".", maxsplit=1)[-1]
     movement_kind = _movement_kind_for_name(leaf_name)
     if movement_kind is not None:
@@ -1704,18 +1704,19 @@ def _ast_call_attributes(
     )
     if target_dtype is not None:
         attributes["target_dtype"] = target_dtype
+    args = tuple(node.args)
     if classification.op_family == OpFamily.CONVOLUTION:
-        attributes.update(_convolution_attributes(leaf_name, node.args, keyword_values, None))
+        attributes.update(_convolution_attributes(leaf_name, args, keyword_values, None))
     if classification.op_family == OpFamily.EMBEDDING_POSITIONAL:
-        attributes.update(_memory_bound_call_attributes(leaf_name, node.args, keyword_values, None))
+        attributes.update(_memory_bound_call_attributes(leaf_name, args, keyword_values, None))
     if classification.op_family == OpFamily.MOE:
-        attributes.update(_moe_call_attributes(leaf_name, node.args, keyword_values))
+        attributes.update(_moe_call_attributes(leaf_name, args, keyword_values))
     if classification.op_family == OpFamily.SSM_MAMBA:
         attributes.update(_ssm_mamba_call_attributes(leaf_name))
     return attributes
 
 
-def _ssm_mamba_call_attributes(leaf_name: str) -> dict[str, object]:
+def _ssm_mamba_call_attributes(leaf_name: str) -> dict[str, Any]:
     if leaf_name.lower() in {"selective_scan", "mamba_scan", "ssm_scan"}:
         return {"subrole": "scan", "recognized_scan": True}
     return {}
@@ -1725,7 +1726,7 @@ def _moe_call_attributes(
     leaf_name: str,
     args: tuple[Any, ...],
     kwargs: dict[str, Any],
-) -> dict[str, object]:
+) -> dict[str, Any]:
     attrs: dict[str, object] = {}
     normalized = leaf_name.lower()
     if normalized == "router":
@@ -1746,7 +1747,7 @@ def _convolution_attributes(
     args: tuple[Any, ...],
     kwargs: dict[str, Any],
     node: Any | None,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     dimensionality = {"conv1d": 1, "conv2d": 2, "conv3d": 3}.get(leaf_name)
     if dimensionality is None:
         return {}
@@ -1770,7 +1771,7 @@ def _memory_bound_call_attributes(
     args: tuple[Any, ...],
     kwargs: dict[str, Any],
     node: Any | None,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     output_shape = _fx_tensor_meta(node)[0] if node is not None else None
     subrole = "embedding_lookup" if leaf_name == "embedding" else "gather_lookup"
     attrs: dict[str, object] = {"memory_subrole": subrole}
@@ -1793,10 +1794,13 @@ def _arg_literal(args: tuple[Any, ...], index: int) -> object:
 def _normalize_spatial_tuple(value: object, dimensionality: int) -> tuple[int, ...] | object:
     if isinstance(value, int):
         return tuple(value for _ in range(dimensionality))
-    if isinstance(value, tuple) and len(value) == dimensionality and all(
-        isinstance(item, int) for item in value
-    ):
-        return tuple(int(item) for item in value)
+    if isinstance(value, tuple) and len(value) == dimensionality:
+        normalized: list[int] = []
+        for item in value:
+            if not isinstance(item, int):
+                return value
+            normalized.append(item)
+        return tuple(normalized)
     return value
 
 

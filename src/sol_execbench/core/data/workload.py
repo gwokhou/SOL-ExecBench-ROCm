@@ -135,7 +135,7 @@ class Workload(BaseModelWithDocstrings):
             )
         return self
 
-    def get_scalar_inputs(self) -> dict[str, int]:
+    def get_scalar_inputs(self) -> dict[str, int | float | bool]:
         return {
             name: input.value
             for name, input in self.inputs.items()

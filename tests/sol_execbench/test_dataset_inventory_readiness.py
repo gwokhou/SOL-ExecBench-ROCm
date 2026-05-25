@@ -170,6 +170,7 @@ def test_inventory_json_is_deterministic(tmp_path):
 
     assert first.to_json() == second.to_json()
     assert first.inventory_checksum is not None
+    assert second.inventory_checksum is not None
     assert first.inventory_checksum.value == second.inventory_checksum.value
 
 

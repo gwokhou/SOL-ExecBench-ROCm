@@ -5,7 +5,6 @@ from dataclasses import FrozenInstanceError
 import pytest
 
 from sol_execbench.core.data.definition import Definition, DType
-from sol_execbench.core.data.trace import Trace
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.scoring import (
     OperatorWorkEstimate as ExportedOperatorWorkEstimate,
@@ -24,6 +23,7 @@ from sol_execbench.core.scoring.amd_bound_graph import (
     OpFamily,
 )
 from sol_execbench.core.scoring.amd_hardware_models import EstimateConfidence
+from sol_execbench_type_helpers import make_definition, make_trace, make_workload
 
 
 def _single_node_graph(node: BoundGraphNode) -> BoundGraph:
@@ -52,7 +52,7 @@ def _unsupported_node(op_family: OpFamily = OpFamily.UNSUPPORTED) -> BoundGraphN
 
 
 def _matmul_definition() -> Definition:
-    return Definition(
+    return make_definition(
         name="matmul_demo",
         axes={
             "M": {"type": "var"},
@@ -69,7 +69,7 @@ def _matmul_definition() -> Definition:
 
 
 def _matmul_workload() -> Workload:
-    return Workload(
+    return make_workload(
         axes={"M": 2},
         inputs={"a": {"type": "random"}, "b": {"type": "random"}},
         uuid="matmul-workload",
@@ -102,7 +102,7 @@ def test_operator_work_estimate_is_frozen_and_serializes_json_like_values():
     assert payload["formula_inputs"] == {}
     assert payload["warnings"] == ["unsupported_operator:torch.linalg.inv"]
     with pytest.raises(FrozenInstanceError):
-        estimate.flops = 1.0  # type: ignore[misc]
+        setattr(estimate, "flops", 1.0)
 
 
 def test_dtype_byte_widths_cover_public_dtype_contract():
@@ -160,7 +160,7 @@ def test_matmul_estimate_records_formula_inputs_flops_and_node_local_bytes():
 def test_batched_matmul_estimate_records_batch_formula_inputs():
     from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
 
-    definition = Definition(
+    definition = make_definition(
         name="bmm_demo",
         axes={
             "B": {"type": "var"},
@@ -175,7 +175,7 @@ def test_batched_matmul_estimate_records_batch_formula_inputs():
         outputs={"out": {"shape": ["B", "M", "N"], "dtype": "float32"}},
         reference="import torch\n\ndef run(a, b):\n    return torch.bmm(a, b)",
     )
-    workload = Workload(
+    workload = make_workload(
         axes={"B": 3},
         inputs={"a": {"type": "random"}, "b": {"type": "random"}},
         uuid="bmm-workload",
@@ -193,7 +193,7 @@ def test_batched_matmul_estimate_records_batch_formula_inputs():
 def test_moe_static_route_estimate_locks_formula_inputs_and_kind():
     from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
 
-    definition = Definition(
+    definition = make_definition(
         name="moe_static_route",
         axes={
             "tokens": {"type": "const", "value": 128},
@@ -214,7 +214,7 @@ def test_moe_static_route_estimate_locks_formula_inputs_and_kind():
             "    return dispatch_and_combine(x, expert_weights, gates)\n"
         ),
     )
-    workload = Workload(
+    workload = make_workload(
         axes={},
         inputs={
             "x": {"type": "random"},
@@ -243,7 +243,7 @@ def test_moe_static_route_estimate_locks_formula_inputs_and_kind():
 def test_moe_dynamic_route_estimate_uses_visible_bytes_without_route_defaults():
     from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
 
-    definition = Definition(
+    definition = make_definition(
         name="moe_dynamic_route",
         axes={
             "tokens": {"type": "const", "value": 128},
@@ -264,7 +264,7 @@ def test_moe_dynamic_route_estimate_uses_visible_bytes_without_route_defaults():
             "    return dispatch_dynamic(x, expert_weights, chosen)\n"
         ),
     )
-    workload = Workload(
+    workload = make_workload(
         axes={},
         inputs={
             "x": {"type": "random"},
@@ -295,7 +295,7 @@ def test_moe_dynamic_route_estimate_uses_visible_bytes_without_route_defaults():
 def test_moe_taxonomy_only_estimate_remains_unsupported_without_formula_inputs():
     from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
 
-    definition = Definition(
+    definition = make_definition(
         name="moe_taxonomy_only",
         axes={
             "tokens": {"type": "const", "value": 128},
@@ -308,7 +308,7 @@ def test_moe_taxonomy_only_estimate_remains_unsupported_without_formula_inputs()
         outputs={"out": {"shape": ["tokens", "hidden"], "dtype": "float16"}},
         reference="def run(x, opaque_moe):\n    return opaque_moe(x)\n",
     )
-    workload = Workload(
+    workload = make_workload(
         axes={},
         inputs={"x": {"type": "random"}, "opaque_moe": {"type": "random"}},
         uuid="moe-taxonomy-workload",
@@ -324,7 +324,7 @@ def test_moe_taxonomy_only_estimate_remains_unsupported_without_formula_inputs()
 
 def _ssm_mamba_definition(*, missing_recurrence: bool = False, custom_scan: bool = False) -> Definition:
     if custom_scan:
-        return Definition(
+        return make_definition(
             name="ssm_mamba_custom_scan",
             axes={
                 "batch": {"type": "const", "value": 2},
@@ -370,7 +370,7 @@ def _ssm_mamba_definition(*, missing_recurrence: bool = False, custom_scan: bool
             "    y = gate(y)\n"
             "    return out_proj(y, w_out)\n"
         )
-    return Definition(
+    return make_definition(
         name="ssm_mamba_missing_recurrence" if missing_recurrence else "ssm_mamba_static",
         axes={
             "batch": {"type": "const", "value": 2},
@@ -388,7 +388,7 @@ def _ssm_mamba_definition(*, missing_recurrence: bool = False, custom_scan: bool
 
 def _ssm_mamba_workload(*, missing_recurrence: bool = False, custom_scan: bool = False) -> Workload:
     if custom_scan:
-        return Workload(
+        return make_workload(
             axes={},
             inputs={"x": {"type": "random"}, "opaque_scan": {"type": "random"}},
             uuid="ssm-custom-workload",
@@ -409,7 +409,7 @@ def _ssm_mamba_workload(*, missing_recurrence: bool = False, custom_scan: bool =
                 "w_out": {"type": "random"},
             }
         )
-    return Workload(axes={}, inputs=inputs, uuid="ssm-mamba-workload")
+    return make_workload(axes={}, inputs=inputs, uuid="ssm-mamba-workload")
 
 
 def test_ssm_mamba_static_scan_estimate_locks_formula_kind_and_inputs():
@@ -747,7 +747,7 @@ def test_incomplete_linear_projection_degrades_without_fabricated_formula_or_byt
 def test_elementwise_and_activation_chain_estimates_stay_per_node():
     from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
 
-    definition = Definition(
+    definition = make_definition(
         name="chain_demo",
         axes={"N": {"type": "var"}},
         inputs={
@@ -757,7 +757,7 @@ def test_elementwise_and_activation_chain_estimates_stay_per_node():
         outputs={"out": {"shape": ["N"], "dtype": "float32"}},
         reference="import torch\n\ndef run(x, bias):\n    return torch.relu(x + bias)",
     )
-    workload = Workload(
+    workload = make_workload(
         axes={"N": 16},
         inputs={"x": {"type": "random"}, "bias": {"type": "random"}},
         uuid="chain-workload",
@@ -860,14 +860,14 @@ def test_all_key_tensors_unresolved_marks_known_operator_unsupported():
 def test_reduction_estimate_records_axis_and_conservative_formula():
     from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
 
-    definition = Definition(
+    definition = make_definition(
         name="reduction_demo",
         axes={"M": {"type": "const", "value": 2}, "N": {"type": "const", "value": 4}},
         inputs={"x": {"shape": ["M", "N"], "dtype": "float32"}},
         outputs={"out": {"shape": ["M"], "dtype": "float32"}},
         reference="def run(x):\n    return x.sum(dim=1)",
     )
-    workload = Workload(axes={}, inputs={"x": {"type": "random"}}, uuid="reduction-workload")
+    workload = make_workload(axes={}, inputs={"x": {"type": "random"}}, uuid="reduction-workload")
 
     estimate = estimate_bound_work(build_bound_graph(definition, workload))[0]
 
@@ -931,14 +931,14 @@ def test_softmax_missing_axis_stays_inexact_with_missing_axis_evidence():
 def test_normalization_estimate_uses_conservative_pass_count():
     from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
 
-    definition = Definition(
+    definition = make_definition(
         name="norm_demo",
         axes={"N": {"type": "const", "value": 8}},
         inputs={"x": {"shape": ["N"], "dtype": "float32"}},
         outputs={"out": {"shape": ["N"], "dtype": "float32"}},
         reference="def run(x):\n    return x.norm()",
     )
-    workload = Workload(axes={}, inputs={"x": {"type": "random"}}, uuid="norm-workload")
+    workload = make_workload(axes={}, inputs={"x": {"type": "random"}}, uuid="norm-workload")
 
     estimate = estimate_bound_work(build_bound_graph(definition, workload))[0]
 
@@ -952,14 +952,14 @@ def test_normalization_estimate_uses_conservative_pass_count():
 def test_logical_and_broadcast_views_have_zero_movement_bytes():
     from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
 
-    definition = Definition(
+    definition = make_definition(
         name="views_demo",
         axes={"N": {"type": "const", "value": 8}},
         inputs={"x": {"shape": ["N"], "dtype": "float32"}},
         outputs={"out": {"shape": ["N"], "dtype": "float32"}},
         reference="def run(x):\n    return x.reshape(2, 4).expand(2, 4).reshape(8)",
     )
-    workload = Workload(axes={}, inputs={"x": {"type": "random"}}, uuid="views-workload")
+    workload = make_workload(axes={}, inputs={"x": {"type": "random"}}, uuid="views-workload")
 
     estimates = estimate_bound_work(build_bound_graph(definition, workload))
     logical = next(estimate for estimate in estimates if estimate.movement_kind == "logical_view")
@@ -974,14 +974,14 @@ def test_logical_and_broadcast_views_have_zero_movement_bytes():
 def test_contiguous_and_dtype_conversion_count_movement_bytes():
     from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
 
-    definition = Definition(
+    definition = make_definition(
         name="movement_conversion_demo",
         axes={"N": {"type": "const", "value": 8}},
         inputs={"x": {"shape": ["N"], "dtype": "float32"}},
         outputs={"out": {"shape": ["N"], "dtype": "float16"}},
         reference="import torch\n\ndef run(x):\n    return x.contiguous().to(torch.float16)",
     )
-    workload = Workload(axes={}, inputs={"x": {"type": "random"}}, uuid="movement-workload")
+    workload = make_workload(axes={}, inputs={"x": {"type": "random"}}, uuid="movement-workload")
 
     estimates = estimate_bound_work(build_bound_graph(definition, workload))
     contiguous = next(estimate for estimate in estimates if estimate.movement_kind == "materialized")
@@ -1306,15 +1306,15 @@ def test_public_scoring_exports_include_bound_estimate_api():
 
 
 def test_bound_estimates_do_not_mutate_public_schema_payloads():
-    definition = Definition(
+    definition = make_definition(
         name="demo",
         axes={"N": {"type": "var"}},
         inputs={"x": {"shape": ["N"], "dtype": "float32"}},
         outputs={"out": {"shape": ["N"], "dtype": "float32"}},
         reference="def run(x):\n    return x",
     )
-    workload = Workload(axes={"N": 8}, inputs={"x": {"type": "random"}}, uuid="w1")
-    trace = Trace(definition="demo", workload=workload, solution=None, evaluation=None)
+    workload = make_workload(axes={"N": 8}, inputs={"x": {"type": "random"}}, uuid="w1")
+    trace = make_trace(definition="demo", workload=workload, solution=None, evaluation=None)
     graph = BoundGraph(
         definition="demo",
         workload_uuid="w1",

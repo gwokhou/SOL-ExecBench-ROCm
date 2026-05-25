@@ -8,6 +8,7 @@ from __future__ import annotations
 import statistics
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from typing import Any
 
 from sol_execbench.core.data.trace import EvaluationStatus, Trace
 from sol_execbench.core.reporting import CANONICAL_BENCHMARK_OUTPUT
@@ -78,7 +79,7 @@ class AmdNativeScore:
         """Whether the score has complete numeric inputs."""
         return self.score is not None
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "definition": self.definition,
             "workload_uuid": self.workload_uuid,
@@ -139,7 +140,7 @@ class AmdNativeSuiteReport:
                     summary[key] += 1
         return summary
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         scored_count = sum(1 for score in self.scores if score.score is not None)
         return {
             "schema_version": self.schema_version,
@@ -197,6 +198,9 @@ def score_amd_native_workload(
         baseline_latency_ms=baseline_latency_ms,
         sol_bound_ms=sol_bound_ms,
     ):
+        assert measured_latency_ms is not None
+        assert baseline_latency_ms is not None
+        assert sol_bound_ms is not None
         score_value = sol_score(
             t_k=measured_latency_ms,
             t_b=baseline_latency_ms,

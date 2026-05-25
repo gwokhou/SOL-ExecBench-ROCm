@@ -30,6 +30,7 @@ from sol_execbench.core import (
 )
 from sol_execbench.driver import problem_packager
 from sol_execbench.driver.problem_packager import ProblemPackager, _get_local_gfx
+from sol_execbench_type_helpers import JsonDict, make_definition, make_solution, make_workload
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -57,7 +58,7 @@ _WORKLOAD_DICTS = [
     },
 ]
 
-_PYTHON_SOLUTION_DICT = {
+_PYTHON_SOLUTION_DICT: JsonDict = {
     "name": "vecadd_python",
     "definition": "test_vecadd",
     "author": "test",
@@ -69,7 +70,7 @@ _PYTHON_SOLUTION_DICT = {
     "sources": [{"path": "kernel.py", "content": "def run(x, y):\n    return x + y\n"}],
 }
 
-_HIP_SOLUTION_DICT = {
+_HIP_SOLUTION_DICT: JsonDict = {
     "name": "vecadd_hip",
     "definition": "test_vecadd",
     "author": "test",
@@ -86,22 +87,22 @@ _HIP_SOLUTION_DICT = {
 
 @pytest.fixture
 def definition() -> Definition:
-    return Definition(**_DEFINITION_DICT)
+    return make_definition(**_DEFINITION_DICT)
 
 
 @pytest.fixture
 def workloads() -> list[Workload]:
-    return [Workload(**w) for w in _WORKLOAD_DICTS]
+    return [make_workload(**w) for w in _WORKLOAD_DICTS]
 
 
 @pytest.fixture
 def python_solution() -> Solution:
-    return Solution(**_PYTHON_SOLUTION_DICT)
+    return make_solution(**_PYTHON_SOLUTION_DICT)
 
 
 @pytest.fixture
 def hip_solution() -> Solution:
-    return Solution(**_HIP_SOLUTION_DICT)
+    return make_solution(**_HIP_SOLUTION_DICT)
 
 
 @pytest.fixture
@@ -222,7 +223,7 @@ class TestCompile:
                 "target_hardware": [target],
             },
         }
-        solution = Solution(**sol_dict)
+        solution = make_solution(**sol_dict)
         pkg = _make_packager(tmp_path, definition, workloads, solution, config)
         pkg.compile()
         sol = json.loads((pkg.output_dir / "solution.json").read_text())
@@ -239,7 +240,7 @@ class TestCompile:
                 "target_hardware": ["gfx1200", "gfx942"],
             },
         }
-        solution = Solution(**sol_dict)
+        solution = make_solution(**sol_dict)
         pkg = _make_packager(tmp_path, definition, workloads, solution, config)
         pkg.compile()
         sol = json.loads((pkg.output_dir / "solution.json").read_text())
@@ -256,7 +257,7 @@ class TestCompile:
                 "compile_options": {"hip_cflags": ["--offload-arch=gfx1200"]},
             },
         }
-        solution = Solution(**sol_dict)
+        solution = make_solution(**sol_dict)
         pkg = _make_packager(tmp_path, definition, workloads, solution, config)
         pkg.compile()
         sol = json.loads((pkg.output_dir / "solution.json").read_text())
@@ -274,7 +275,7 @@ class TestCompile:
             },
         }
         monkeypatch.setattr(problem_packager, "_get_local_gfx", lambda: "gfx1200")
-        solution = Solution(**sol_dict)
+        solution = make_solution(**sol_dict)
         pkg = _make_packager(tmp_path, definition, workloads, solution, config)
         pkg.compile()
         sol = json.loads((pkg.output_dir / "solution.json").read_text())

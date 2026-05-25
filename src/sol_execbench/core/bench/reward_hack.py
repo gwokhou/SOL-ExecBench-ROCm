@@ -89,7 +89,7 @@ class SourceReview:
             issue.severity == SourceReviewSeverity.BLOCK for issue in self.issues
         )
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable review payload."""
         return {
             "blocked": self.blocked,

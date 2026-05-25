@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -68,7 +69,7 @@ def _cast_to_fp4x2(x: torch.Tensor) -> torch.Tensor:
 
 
 def _rand_tensor(
-    shape: List[int], dtype: torch.dtype, device: torch.device
+    shape: Sequence[int], dtype: torch.dtype, device: torch.device
 ) -> torch.Tensor:
     if dtype in (torch.float32, torch.float16, torch.bfloat16):
         return torch.randn(shape, dtype=dtype, device=device)
@@ -333,7 +334,7 @@ def load_safetensors(
     safe_tensors: Dict[str, torch.Tensor] = {}
     loaded_files: Dict[str, Dict[str, torch.Tensor]] = {}
     for name, input_spec in workload.inputs.items():
-        if input_spec.type != "safetensors":
+        if not isinstance(input_spec, SafetensorsInput):
             continue
 
         path = input_spec.path
@@ -408,8 +409,10 @@ def gen_inputs(
                 raise RuntimeError(f"Missing required safetensors input '{name}'")
             t_cpu = safe_tensors[name]
             out.append(t_cpu.to(device=dev, non_blocking=True))
-        elif name in workload.inputs and isinstance(workload.inputs[name], ScalarInput):
-            out.append(workload.inputs[name].value)
+        elif name in workload.inputs and isinstance(
+            input_spec := workload.inputs[name], ScalarInput
+        ):
+            out.append(input_spec.value)
         elif name in workload.inputs and isinstance(workload.inputs[name], CustomInput):
             if custom_tensors is None or name not in custom_tensors:
                 raise RuntimeError(
@@ -426,13 +429,13 @@ def gen_inputs(
             shape = shapes[name]
 
             if shape is None:
-                value = _rand_tensor((), dtype, dev).item()
+                value = _rand_tensor([], dtype, dev).item()
             else:
                 value = _generate_heuristic_tensor(
                     name, tuple(shape), dtype, dev, spec.description
                 )
                 if value is None:
-                    value = _rand_tensor(shape, dtype, dev)
+                    value = _rand_tensor(list(shape), dtype, dev)
 
                 if is_sampling_operation(definition) and name == "probs":
                     value = torch.softmax(value, dim=-1)
@@ -510,7 +513,7 @@ def allocate_outputs(
 
     dtypes = definition.torch_output_dtypes
     return [
-        torch.zeros(shape, dtype=dtype, device=device)
+        torch.zeros([] if shape is None else shape, dtype=dtype, device=device)
         for shape, dtype in zip(output_shapes, dtypes)
     ]
 

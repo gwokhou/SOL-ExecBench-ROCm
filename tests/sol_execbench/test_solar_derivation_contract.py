@@ -11,6 +11,8 @@ from pathlib import Path
 
 import pytest
 
+from sol_execbench_type_helpers import JsonDict, json_dict
+
 TEST_DIR = str(Path(__file__).resolve().parent)
 if TEST_DIR not in sys.path:
     sys.path.insert(0, TEST_DIR)
@@ -25,7 +27,7 @@ from solar_derivation_fixtures import (  # noqa: E402
 )
 
 
-def _valid_fixture() -> dict[str, object]:
+def _valid_fixture() -> JsonDict:
     return {
         "case_id": "attention_degraded_partial_mask",
         "family": "attention",
@@ -212,7 +214,7 @@ def test_fixture_loader_does_not_execute_reference_text(tmp_path):
 
 
 def test_fixture_matrix_covers_required_families_and_classes():
-    fixtures = load_solar_derivation_fixtures()
+    fixtures = [json_dict(fixture) for fixture in load_solar_derivation_fixtures()]
 
     assert len(fixtures) >= 18
     for family in sorted(TARGET_FAMILIES):
@@ -227,26 +229,28 @@ def test_fixture_matrix_covers_required_families_and_classes():
 
 
 def test_fixture_matrix_covers_negative_and_degraded_cases():
-    fixtures = load_solar_derivation_fixtures()
+    fixtures = [json_dict(fixture) for fixture in load_solar_derivation_fixtures()]
     categories = {
         fixture["negative_category"]
         for fixture in fixtures
         if fixture["negative_category"] is not None
     }
-    statuses = {fixture["expectation"]["expected_status"] for fixture in fixtures}
+    statuses = {
+        json_dict(fixture["expectation"])["expected_status"] for fixture in fixtures
+    }
 
     assert categories >= VALID_NEGATIVE_CATEGORIES
     assert statuses >= {"scored", "degraded", "unscored"}
 
 
 def test_negative_and_degraded_fixtures_have_executable_expectations():
-    fixtures = load_solar_derivation_fixtures()
+    fixtures = [json_dict(fixture) for fixture in load_solar_derivation_fixtures()]
     checked = 0
     for fixture in fixtures:
         if fixture["fixture_class"] == "positive":
             continue
         checked += 1
-        expectation = fixture["expectation"]
+        expectation = json_dict(fixture["expectation"])
         case_id = fixture["case_id"]
         assert expectation["expected_status"] in {"degraded", "unscored"}, case_id
         assert expectation["missing_evidence"], case_id
@@ -260,10 +264,10 @@ def test_negative_and_degraded_fixtures_have_executable_expectations():
 
 
 def test_fixture_scope_boundaries_are_false():
-    fixtures = load_solar_derivation_fixtures()
+    fixtures = [json_dict(fixture) for fixture in load_solar_derivation_fixtures()]
 
     for fixture in fixtures:
-        boundary = fixture["scope_boundary"]
+        boundary = json_dict(fixture["scope_boundary"])
         case_id = fixture["case_id"]
         assert set(boundary) == REQUIRED_SCOPE_BOUNDARY, case_id
         assert boundary == {

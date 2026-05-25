@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 
 BASELINE_ARTIFACT_SCHEMA_VERSION = "sol_execbench.scoring_baseline.v1"
@@ -28,7 +28,7 @@ class ScoringBaselineEntry:
     def key(self) -> tuple[str, str]:
         return (self.definition, self.workload_uuid)
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         payload: dict[str, object] = {
             "definition": self.definition,
             "workload_uuid": self.workload_uuid,
@@ -63,7 +63,7 @@ class ScoringBaselineArtifact:
                 return entry
         return None
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "schema_version": self.schema_version,
             "derived": self.derived,
@@ -106,10 +106,11 @@ def scoring_baseline_artifact_from_dict(
     for index, raw in enumerate(entries_payload):
         if not isinstance(raw, dict):
             raise ValueError(f"baseline entry {index} must be an object")
+        raw_entry = cast(dict[str, Any], raw)
         try:
-            definition = str(raw["definition"])
-            workload_uuid = str(raw["workload_uuid"])
-            latency_ms = float(raw["latency_ms"])
+            definition = str(raw_entry["definition"])
+            workload_uuid = str(raw_entry["workload_uuid"])
+            latency_ms = float(raw_entry["latency_ms"])
         except KeyError as exc:
             raise ValueError(f"baseline entry {index} missing {exc.args[0]}") from exc
         if latency_ms <= 0.0:
@@ -119,8 +120,10 @@ def scoring_baseline_artifact_from_dict(
                 definition=definition,
                 workload_uuid=workload_uuid,
                 latency_ms=latency_ms,
-                solution=str(raw["solution"]) if raw.get("solution") else None,
-                source=str(raw["source"]) if raw.get("source") else None,
+                solution=(
+                    str(raw_entry["solution"]) if raw_entry.get("solution") else None
+                ),
+                source=str(raw_entry["source"]) if raw_entry.get("source") else None,
             )
         )
 

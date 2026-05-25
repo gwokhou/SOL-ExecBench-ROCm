@@ -54,11 +54,11 @@ def env_snapshot(device: str) -> "Environment":
     try:
         import torch.version as tv
 
-        if getattr(tv, "hip", None):
-            libs["hip"] = tv.hip
-            libs["rocm"] = tv.hip
-        elif getattr(tv, "cuda", None):
-            libs["cuda"] = tv.cuda
+        if hip_version := getattr(tv, "hip", None):
+            libs["hip"] = str(hip_version)
+            libs["rocm"] = str(hip_version)
+        elif cuda_version := getattr(tv, "cuda", None):
+            libs["cuda"] = str(cuda_version)
     except Exception:
         pass
     return Environment(hardware=hardware_from_device(device), libs=libs)

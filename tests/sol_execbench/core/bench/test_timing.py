@@ -34,6 +34,16 @@ from sol_execbench.core.bench.timing import (
 pytestmark = pytest.mark.timing_serial
 
 
+def _scalar_ms(value: int | float | list[int | float]) -> float:
+    assert isinstance(value, (int, float))
+    return float(value)
+
+
+def _series_ms(value: int | float | list[int | float]) -> list[float]:
+    assert isinstance(value, list)
+    return [float(item) for item in value]
+
+
 # ---------------------------------------------------------------------------
 # clone_args
 # ---------------------------------------------------------------------------
@@ -378,22 +388,22 @@ class TestBenchTimeWithCUDAEventsGPU:
         small = torch.randn(128, 128, device="cuda")
         large = torch.randn(4096, 4096, device="cuda")
 
-        ms_small = time_runnable(
+        ms_small = _scalar_ms(time_runnable(
             lambda a: torch.mm(a, a),
             [small],
             [],
             "cuda:0",
             warmup=warmup,
             rep=rep,
-        )
-        ms_large = time_runnable(
+        ))
+        ms_large = _scalar_ms(time_runnable(
             lambda a: torch.mm(a, a),
             [large],
             [],
             "cuda:0",
             warmup=warmup,
             rep=rep,
-        )
+        ))
 
         assert ms_large > ms_small, (
             f"Large kernel ({ms_large:.4f}ms) should be slower than small ({ms_small:.4f}ms)"
@@ -735,13 +745,13 @@ class TestTimeRunnable:
         b = torch.randn(size, size, device="cuda")
 
         # use default arguments to mimic the eval_driver pattern
-        times = time_runnable(
+        times = _series_ms(time_runnable(
             lambda a, b: torch.mm(a, b),
             [a, b],
             [],
             "cuda:0",
             return_mode="all",
-        )
+        ))
 
         spread_ratio = max(times) / min(times) if min(times) > 0 else float("inf")
 
@@ -814,10 +824,12 @@ class TestStreamHidingDetection:
             with torch.cuda.stream(stream):
                 return torch.mm(x, x)
 
-        ms_default = time_runnable(default_kernel, [a], [], "cuda:0", warmup=10, rep=50)
-        ms_hidden = time_runnable(
-            stream_hidden_kernel, [a], [], "cuda:0", warmup=10, rep=50
+        ms_default = _scalar_ms(
+            time_runnable(default_kernel, [a], [], "cuda:0", warmup=10, rep=50)
         )
+        ms_hidden = _scalar_ms(time_runnable(
+            stream_hidden_kernel, [a], [], "cuda:0", warmup=10, rep=50
+        ))
 
         ratio = ms_hidden / ms_default if ms_default > 0 else float("inf")
         assert 0.5 < ratio < 2.0, (
@@ -839,10 +851,12 @@ class TestStreamHidingDetection:
             torch.cuda.current_stream().wait_stream(stream)
             return result
 
-        ms_default = time_runnable(default_kernel, [a], [], "cuda:0", warmup=10, rep=50)
-        ms_hidden = time_runnable(
-            stream_hide_with_wait, [a], [], "cuda:0", warmup=10, rep=50
+        ms_default = _scalar_ms(
+            time_runnable(default_kernel, [a], [], "cuda:0", warmup=10, rep=50)
         )
+        ms_hidden = _scalar_ms(time_runnable(
+            stream_hide_with_wait, [a], [], "cuda:0", warmup=10, rep=50
+        ))
 
         ratio = ms_hidden / ms_default if ms_default > 0 else float("inf")
         assert 0.5 < ratio < 2.0, (
@@ -864,7 +878,9 @@ class TestStreamHidingDetection:
             with torch.cuda.stream(stream):
                 return torch.mm(x, x)
 
-        ms = time_runnable(stream_hidden_kernel, [a], [], "cuda:0", warmup=10, rep=50)
+        ms = _scalar_ms(
+            time_runnable(stream_hidden_kernel, [a], [], "cuda:0", warmup=10, rep=50)
+        )
 
         # 4096x4096 matmul takes ~0.9ms on RTX 4090; 0.1ms is a safe lower bound
         assert ms > 0.1, (

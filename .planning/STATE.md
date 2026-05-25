@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.14
 milestone_name: Optional rocprofv3 Profiling Evidence
 status: complete
-last_updated: "2026-05-25T07:57:35Z"
+last_updated: "2026-05-25T10:32:46Z"
 last_activity: 2026-05-25
 progress:
   total_phases: 3
@@ -131,6 +131,7 @@ None active.
 | 260525-097 | Backfill v1.12 GSD milestone for evaluator contract PR | 2026-05-25 | this commit | [260525-097-backfill-v1-12-gsd-milestone-for-evaluat](./quick/260525-097-backfill-v1-12-gsd-milestone-for-evaluat/) |
 | 260525-ruff | Configure Ruff as a dev dependency | 2026-05-25 | this commit | [260525-configure-ruff-dev-dependency](./quick/260525-configure-ruff-dev-dependency/) |
 | 260525-ty | Configure Ty as a dev dependency | 2026-05-25 | this commit | [260525-configure-ty-dev-dependency](./quick/260525-configure-ty-dev-dependency/) |
+| 260525-fix-ty-s0-s1 | Fix Ty S0/S1 diagnostics | 2026-05-25 | this commit | [260525-fix-ty-s0-s1](./quick/260525-fix-ty-s0-s1/) |
 
 ## Deferred Items
 

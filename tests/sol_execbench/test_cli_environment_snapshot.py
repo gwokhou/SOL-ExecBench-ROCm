@@ -70,6 +70,7 @@ def test_environment_snapshot_sidecar_can_be_derived_from_trace_output(
     )
 
     assert written == tmp_path / "trace.jsonl.environment.json"
+    assert written is not None
     assert json.loads(written.read_text())["collection_status"] == "available"
 
 
@@ -129,6 +130,7 @@ def test_profile_sidecar_records_diagnostic_metadata(tmp_path: Path):
     written = cli_main._write_profile_sidecar(output, result)
 
     assert written == tmp_path / "trace.jsonl.profile.json"
+    assert written is not None
     payload = json.loads(written.read_text())
     assert payload["schema_version"] == "sol_execbench.rocprofv3_profile.v1"
     assert payload["status"] == "unavailable"

@@ -17,6 +17,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import ConfigDict, Field
 
 from .base_model import BaseModelWithDocstrings
@@ -57,7 +59,7 @@ class EvaluatorContract(BaseModelWithDocstrings):
     source_boundary_claims: list[str]
     """Boundary statements that keep benchmark truth in SOL."""
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         """Return the JSON-compatible contract payload."""
         return self.model_dump(mode="json")
 

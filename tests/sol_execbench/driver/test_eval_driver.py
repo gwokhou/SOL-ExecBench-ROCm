@@ -38,6 +38,7 @@ from typing import Optional
 import pytest
 
 import sol_execbench.driver as _driver_pkg
+from sol_execbench_type_helpers import make_solution
 
 _TEMPLATES_DIR = Path(_driver_pkg.__file__).parent / "templates"
 
@@ -424,7 +425,6 @@ def test_static_source_review_blocks_precision_downgrade(tmp_path):
 
 def test_hip_cpp_sources_accept_pytorch_rocm_stream_api_text():
     """HIP/C++ files may use PyTorch's HIP-backed torch.cuda stream API text."""
-    from sol_execbench.core.data import Solution
 
     good_hip = {
         "name": "good_hip_stream",
@@ -451,7 +451,7 @@ def test_hip_cpp_sources_accept_pytorch_rocm_stream_api_text():
         ],
     }
     # Should NOT raise
-    Solution(**good_hip)
+    make_solution(**good_hip)
 
 
 # ---------------------------------------------------------------------------

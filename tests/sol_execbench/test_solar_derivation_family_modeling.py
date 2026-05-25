@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import Workload
@@ -11,16 +12,17 @@ from sol_execbench.core.scoring.solar_derivation import (
     build_solar_derivation_evidence,
     solar_derivation_from_dict,
 )
+from sol_execbench_type_helpers import JsonDict, make_definition, make_workload
 
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures" / "solar_derivation"
 
 
-def _load_fixture(name: str) -> dict[str, object]:
+def _load_fixture(name: str) -> JsonDict:
     return json.loads((FIXTURE_DIR / name).read_text(encoding="utf-8"))
 
 
-def _expectation(name: str) -> dict[str, object]:
+def _expectation(name: str) -> JsonDict:
     expectation = _load_fixture(name)["expectation"]
     assert isinstance(expectation, dict)
     return expectation
@@ -28,10 +30,10 @@ def _expectation(name: str) -> dict[str, object]:
 
 def _assert_group_matches_fixture(
     group,
-    expectation: dict[str, object],
+    expectation: JsonDict,
 ) -> None:
     assert group.status == expectation["expected_status"]
-    assert group.confidence.value == expectation["expected_confidence"]
+    assert group.confidence == expectation["expected_confidence"]
     assert [subrole.name for subrole in group.subroles] == expectation[
         "expected_subroles"
     ]
@@ -42,7 +44,7 @@ def _assert_group_matches_fixture(
 
 
 def _attention_definition(*, mask: bool = False) -> Definition:
-    inputs = {
+    inputs: dict[str, Any] = {
         "q": {"shape": ["batch", "heads", "sequence_q", "head_dim"], "dtype": "float32"},
         "k": {"shape": ["batch", "heads", "sequence_k", "head_dim"], "dtype": "float32"},
         "v": {"shape": ["batch", "heads", "sequence_k", "head_dim"], "dtype": "float32"},
@@ -69,7 +71,7 @@ def _attention_definition(*, mask: bool = False) -> Definition:
             "    probs = torch.softmax(scores, dim=-1)\n"
             "    return (probs @ v) @ w_o\n"
         )
-    return Definition(
+    return make_definition(
         name="attention_demo",
         axes={
             "batch": {"type": "var"},
@@ -90,7 +92,7 @@ def _attention_definition(*, mask: bool = False) -> Definition:
 
 
 def _attention_workload(*, mask: bool = False) -> Workload:
-    inputs = {
+    inputs: dict[str, Any] = {
         "q": {"type": "random"},
         "k": {"type": "random"},
         "v": {"type": "random"},
@@ -98,12 +100,12 @@ def _attention_workload(*, mask: bool = False) -> Workload:
     }
     if mask:
         inputs["mask"] = {"type": "random"}
-    return Workload(axes={"batch": 2}, inputs=inputs, uuid="attention-workload")
+    return make_workload(axes={"batch": 2}, inputs=inputs, uuid="attention-workload")
 
 
 def _moe_definition(*, dynamic: bool = False, taxonomy_only: bool = False) -> Definition:
     if taxonomy_only:
-        return Definition(
+        return make_definition(
             name="moe_taxonomy_only",
             axes={
                 "tokens": {"type": "const", "value": 128},
@@ -116,7 +118,7 @@ def _moe_definition(*, dynamic: bool = False, taxonomy_only: bool = False) -> De
             outputs={"out": {"shape": ["tokens", "hidden"], "dtype": "float16"}},
             reference="def run(x, opaque_moe):\n    return opaque_moe(x)\n",
         )
-    inputs = {
+    inputs: dict[str, Any] = {
         "x": {"shape": ["tokens", "hidden"], "dtype": "float16"},
         "router": {"shape": ["hidden", "experts"], "dtype": "float16"},
         "expert_weights": {
@@ -140,7 +142,7 @@ def _moe_definition(*, dynamic: bool = False, taxonomy_only: bool = False) -> De
             "    gates = torch.topk(scores, k=2, dim=-1)\n"
             "    return dispatch_and_combine(x, expert_weights, gates)\n"
         )
-    return Definition(
+    return make_definition(
         name="moe_dynamic_route" if dynamic else "moe_static_route",
         axes={
             "tokens": {"type": "const", "value": 128},
@@ -155,7 +157,7 @@ def _moe_definition(*, dynamic: bool = False, taxonomy_only: bool = False) -> De
 
 def _moe_workload(*, dynamic: bool = False, taxonomy_only: bool = False) -> Workload:
     if taxonomy_only:
-        return Workload(
+        return make_workload(
             axes={},
             inputs={"x": {"type": "random"}, "opaque_moe": {"type": "random"}},
             uuid="moe-taxonomy-workload",
@@ -167,12 +169,12 @@ def _moe_workload(*, dynamic: bool = False, taxonomy_only: bool = False) -> Work
     }
     if dynamic:
         inputs["threshold"] = {"type": "random"}
-    return Workload(axes={}, inputs=inputs, uuid="moe-dynamic-workload" if dynamic else "moe-static-workload")
+    return make_workload(axes={}, inputs=inputs, uuid="moe-dynamic-workload" if dynamic else "moe-static-workload")
 
 
 def _ssm_mamba_definition(*, missing_recurrence: bool = False, custom_scan: bool = False) -> Definition:
     if custom_scan:
-        return Definition(
+        return make_definition(
             name="ssm_mamba_custom_scan",
             axes={
                 "batch": {"type": "const", "value": 2},
@@ -218,7 +220,7 @@ def _ssm_mamba_definition(*, missing_recurrence: bool = False, custom_scan: bool
             "    y = gate(y)\n"
             "    return out_proj(y, w_out)\n"
         )
-    return Definition(
+    return make_definition(
         name="ssm_mamba_missing_recurrence" if missing_recurrence else "ssm_mamba_static",
         axes={
             "batch": {"type": "const", "value": 2},
@@ -236,7 +238,7 @@ def _ssm_mamba_definition(*, missing_recurrence: bool = False, custom_scan: bool
 
 def _ssm_mamba_workload(*, missing_recurrence: bool = False, custom_scan: bool = False) -> Workload:
     if custom_scan:
-        return Workload(
+        return make_workload(
             axes={},
             inputs={"x": {"type": "random"}, "opaque_scan": {"type": "random"}},
             uuid="ssm-custom-workload",
@@ -257,7 +259,7 @@ def _ssm_mamba_workload(*, missing_recurrence: bool = False, custom_scan: bool =
                 "w_out": {"type": "random"},
             }
         )
-    return Workload(axes={}, inputs=inputs, uuid="ssm-mamba-workload")
+    return make_workload(axes={}, inputs=inputs, uuid="ssm-mamba-workload")
 
 
 def test_ssm_mamba_static_sidecar_matches_positive_fixture_contract():
@@ -403,7 +405,7 @@ def test_attention_partial_mask_degrades_with_mask_semantics_missing():
     group = next(group for group in evidence.groups if group.family == "attention")
 
     assert group.status == "degraded"
-    assert group.confidence.value == "inexact"
+    assert group.confidence == "inexact"
     assert "mask:semantics" in group.missing_evidence
     assert "mask:sparsity" in group.missing_evidence
     assert any(
@@ -414,7 +416,7 @@ def test_attention_partial_mask_degrades_with_mask_semantics_missing():
 
 
 def test_attention_dynamic_sequence_axes_are_unscored_without_fabricated_subroles():
-    definition = Definition(
+    definition = make_definition(
         name="dynamic_attention",
         axes={
             "batch": {"type": "var"},
@@ -435,7 +437,7 @@ def test_attention_dynamic_sequence_axes_are_unscored_without_fabricated_subrole
             "    return torch.softmax(q[:, :n] @ k[:, :n].transpose(-2, -1), dim=-1) @ v[:, :n]\n"
         ),
     )
-    workload = Workload(
+    workload = make_workload(
         axes={"batch": 2},
         inputs={
             "q": {"type": "random"},
@@ -450,7 +452,7 @@ def test_attention_dynamic_sequence_axes_are_unscored_without_fabricated_subrole
     group = next(group for group in evidence.groups if group.family == "attention")
 
     assert group.status == "unscored"
-    assert group.confidence.value == "unsupported"
+    assert group.confidence == "unsupported"
     assert "axis:static_sequence" in group.missing_evidence
     assert "shape:sequence_q" in group.missing_evidence
     assert "shape:sequence_k" in group.missing_evidence
@@ -481,7 +483,7 @@ def test_attention_estimates_keep_projection_family_inside_attention_group():
 
 
 def test_convolution_sidecar_records_subroles_formula_bytes_and_bounds():
-    definition = Definition(
+    definition = make_definition(
         name="conv3d_sidecar_demo",
         axes={
             "B": {"type": "const", "value": 1},
@@ -507,7 +509,7 @@ def test_convolution_sidecar_records_subroles_formula_bytes_and_bounds():
             "dilation=(1, 1, 1), groups=1)\n"
         ),
     )
-    workload = Workload(
+    workload = make_workload(
         axes={},
         inputs={
             "x": {"type": "random"},
@@ -521,7 +523,7 @@ def test_convolution_sidecar_records_subroles_formula_bytes_and_bounds():
     group = next(group for group in evidence.groups if group.family == "convolution")
 
     assert group.status == "scored"
-    assert group.confidence.value == "supported"
+    assert group.confidence == "supported"
     assert [subrole.name for subrole in group.subroles] == [
         "bias",
         "convolution_metadata",
@@ -536,7 +538,7 @@ def test_convolution_sidecar_records_subroles_formula_bytes_and_bounds():
 
 
 def test_convolution_missing_padding_degrades_with_explicit_missing_evidence():
-    definition = Definition(
+    definition = make_definition(
         name="conv_missing_padding",
         axes={
             "B": {"type": "const", "value": 1},
@@ -557,7 +559,7 @@ def test_convolution_missing_padding_degrades_with_explicit_missing_evidence():
             "    return F.conv1d(x, weight, stride=1, dilation=1, groups=1)\n"
         ),
     )
-    workload = Workload(
+    workload = make_workload(
         axes={},
         inputs={"x": {"type": "random"}, "weight": {"type": "random"}},
         uuid="conv-missing-padding-workload",
@@ -567,7 +569,7 @@ def test_convolution_missing_padding_degrades_with_explicit_missing_evidence():
     group = next(group for group in evidence.groups if group.family == "convolution")
 
     assert group.status == "degraded"
-    assert group.confidence.value == "inexact"
+    assert group.confidence == "inexact"
     assert "convolution:padding" in group.missing_evidence
     assert any(
         warning.startswith("inexact_operator:convolution_missing_padding")
@@ -576,7 +578,7 @@ def test_convolution_missing_padding_degrades_with_explicit_missing_evidence():
 
 
 def test_embedding_positional_sidecar_records_memory_bound_evidence():
-    definition = Definition(
+    definition = make_definition(
         name="embedding_sidecar_demo",
         axes={
             "T": {"type": "const", "value": 32},
@@ -601,7 +603,7 @@ def test_embedding_positional_sidecar_records_memory_bound_evidence():
             "    return x + pos + token + rotated\n"
         ),
     )
-    workload = Workload(
+    workload = make_workload(
         axes={},
         inputs={
             "table": {"type": "random"},
@@ -618,7 +620,7 @@ def test_embedding_positional_sidecar_records_memory_bound_evidence():
     group = next(group for group in evidence.groups if group.family == "embedding_positional")
 
     assert group.status == "scored"
-    assert group.confidence.value == "supported"
+    assert group.confidence == "supported"
     assert {"embedding_lookup", "positional_add", "rotary_like"} <= {
         subrole.name for subrole in group.subroles
     }
@@ -630,7 +632,7 @@ def test_embedding_positional_sidecar_records_memory_bound_evidence():
 
 
 def test_embedding_dynamic_indices_degrade_without_selected_byte_fabrication():
-    definition = Definition(
+    definition = make_definition(
         name="embedding_dynamic_indices",
         axes={
             "T": {"type": "const", "value": 32},
@@ -647,7 +649,7 @@ def test_embedding_dynamic_indices_degrade_without_selected_byte_fabrication():
             "    return F.embedding(indices, table)\n"
         ),
     )
-    workload = Workload(
+    workload = make_workload(
         axes={},
         inputs={"table": {"type": "random"}, "indices": {"type": "random"}},
         uuid="embedding-dynamic-workload",
@@ -657,6 +659,6 @@ def test_embedding_dynamic_indices_degrade_without_selected_byte_fabrication():
     group = next(group for group in evidence.groups if group.family == "embedding_positional")
 
     assert group.status == "degraded"
-    assert group.confidence.value == "inexact"
+    assert group.confidence == "inexact"
     assert "embedding_positional:output_shape" in group.missing_evidence
     assert "embedding_positional:selected_elements" in group.missing_evidence

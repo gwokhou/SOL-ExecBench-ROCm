@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from .data.trace import EvaluationStatus, Trace
 from .scoring_guardrails import (
@@ -82,7 +83,8 @@ def compare_trace_baselines(
             continue
         key = (trace.definition, trace.workload.uuid)
         current = baselines_by_key.get(key)
-        if current is None or latency < _latency_ms(current):
+        current_latency = _latency_ms(current) if current is not None else None
+        if current_latency is None or latency < current_latency:
             baselines_by_key[key] = trace
 
     results: list[BaselineResult] = []
@@ -162,7 +164,7 @@ def format_baseline_comparison(comparison: BaselineComparison) -> str:
     return "\n".join(lines)
 
 
-def comparison_to_json(comparison: BaselineComparison) -> dict[str, object]:
+def comparison_to_json(comparison: BaselineComparison) -> dict[str, Any]:
     """Convert a comparison to a JSON-serializable object."""
     return {
         "claim_level": comparison.interpretation.claim_level,

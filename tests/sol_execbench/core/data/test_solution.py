@@ -12,6 +12,7 @@ from sol_execbench.core.data.solution import (
     SupportedHardware,
     SupportedLanguages,
 )
+from sol_execbench_type_helpers import make_build_spec
 
 
 def _make_spec(**overrides):
@@ -21,7 +22,7 @@ def _make_spec(**overrides):
         entry_point="kernel.py::run",
     )
     base.update(overrides)
-    return BuildSpec(**base)
+    return make_build_spec(**base)
 
 
 PYTHON_LANGUAGES = ["pytorch", "triton"]

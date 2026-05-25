@@ -212,7 +212,7 @@ class Definition(BaseModelWithDocstrings):
             tree = ast.parse(self.reference, mode="exec")
         except SyntaxError:
             # already caught by Definition's reference validator
-            return None
+            return self
 
         run_func = next(
             (n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "run"),
@@ -220,7 +220,7 @@ class Definition(BaseModelWithDocstrings):
         )
         if run_func is None:
             # already caught by Definition's reference validator
-            return None  
+            return self
 
         args = run_func.args
         param_names: list[str] = [a.arg for a in (args.posonlyargs or [])] + [
@@ -402,6 +402,8 @@ class Definition(BaseModelWithDocstrings):
         for (inp_name, inp_spec), inp_shape in zip(self.inputs.items(), input_shapes):
             if inp_spec.shape is None:  # scalar, no shape
                 continue
+            if inp_shape is None:
+                raise ValueError(f"Input '{inp_name}' expected shaped tensor, got scalar")
             if len(inp_spec.shape) != len(inp_shape):
                 raise ValueError(
                     f"Input '{inp_name}''s defined dimension is {len(inp_spec.shape)} but the "

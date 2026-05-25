@@ -28,6 +28,7 @@ import os
 import sys
 import types
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -75,9 +76,9 @@ def _exec_build_ext(
 
     # Stub torch.utils.cpp_extension so we don't need a real torch install
     mock_ext = MagicMock()
-    fake_torch = types.ModuleType("torch")
-    fake_torch_utils = types.ModuleType("torch.utils")
-    fake_torch_utils_cpp = types.ModuleType("torch.utils.cpp_extension")
+    fake_torch: Any = types.ModuleType("torch")
+    fake_torch_utils: Any = types.ModuleType("torch.utils")
+    fake_torch_utils_cpp: Any = types.ModuleType("torch.utils.cpp_extension")
     fake_torch_utils_cpp.load = mock_ext.load
     fake_torch.utils = fake_torch_utils
     fake_torch_utils.cpp_extension = fake_torch_utils_cpp

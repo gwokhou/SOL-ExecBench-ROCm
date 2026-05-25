@@ -213,6 +213,5 @@ class Trace(BaseModelWithDocstrings):
             True if this is a regular trace with successful evaluation status.
             False for workload traces or failed evaluations.
         """
-        return (
-            not self.is_workload_trace()
-        ) and self.evaluation.status == EvaluationStatus.PASSED
+        evaluation = self.evaluation
+        return evaluation is not None and evaluation.status == EvaluationStatus.PASSED

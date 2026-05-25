@@ -8,9 +8,10 @@ from __future__ import annotations
 import ast
 from dataclasses import dataclass
 from math import prod
+from typing import Any
 
 from sol_execbench.core.data.definition import DType, Definition
-from sol_execbench.core.data.workload import Workload
+from sol_execbench.core.data.workload import RandomInput, Workload
 from sol_execbench.core.scoring.amd_hardware_models import (
     AmdHardwareModel,
     EstimateConfidence,
@@ -37,7 +38,7 @@ class GraphNode:
     confidence: EstimateConfidence
     rationale: str
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "node_id": self.node_id,
             "op_type": self.op_type,
@@ -57,7 +58,7 @@ class WorkEstimate:
     confidence: EstimateConfidence
     rationale: str
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "node_id": self.node_id,
             "flops": self.flops,
@@ -79,7 +80,7 @@ class OpSolBound:
     confidence: EstimateConfidence
     rationale: str
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "node_id": self.node_id,
             "compute_bound_ms": self.compute_bound_ms,
@@ -114,7 +115,7 @@ class AmdSolBoundArtifact:
         """Derived coverage summary for this artifact."""
         return summarize_amd_sol_coverage(self.graph_nodes, self.work_estimates)
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "schema_version": self.schema_version,
             "derived": self.derived,
@@ -140,7 +141,7 @@ class AmdSolCoverageSummary:
     op_type_counts: dict[str, int]
     derived: bool = True
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "derived": self.derived,
             "total_ops": self.total_ops,
@@ -380,7 +381,7 @@ def _minimal_workload_for_definition(definition: Definition) -> Workload:
     axes = {name: 1 for name in definition.var_axes}
     return Workload(
         axes=axes,
-        inputs={name: {"type": "random"} for name in definition.inputs},
+        inputs={name: RandomInput() for name in definition.inputs},
         uuid=f"{definition.name}-graph-extraction",
     )
 

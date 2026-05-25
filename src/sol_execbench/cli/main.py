@@ -29,8 +29,9 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import click
 from rich.console import Console
@@ -613,13 +614,13 @@ class SolExecbenchCli(click.Command):
 
     def main(
         self,
-        args: list[str] | None = None,
+        args: Sequence[str] | None = None,
         prog_name: str | None = None,
         complete_var: str | None = None,
         standalone_mode: bool = True,
         windows_expand_args: bool = True,
-        **extra: object,
-    ) -> object:
+        **extra: Any,
+    ) -> Any:
         args = list(args) if args is not None else sys.argv[1:]
         if args and args[0] == "contract":
             contract_prog = f"{prog_name or self.name} contract"
