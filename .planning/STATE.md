@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.17
 milestone_name: Static Kernel Evidence
-status: ready_to_plan
-stopped_at: Phase 74 complete (1/1) — ready to discuss Phase 75
-last_updated: 2026-05-26
-last_activity: 2026-05-26 -- Phase 74 complete
+status: executing
+stopped_at: Created v1.17 roadmap and requirement traceability
+last_updated: "2026-05-25T23:18:51.167Z"
+last_activity: 2026-05-25 -- Phase 75 execution started
 progress:
   total_phases: 5
   completed_phases: 2
-  total_plans: 2
+  total_plans: 3
   completed_plans: 2
   percent: 40
 ---
@@ -21,14 +21,14 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-25)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Phase 75 — routed static extractor adapters
+**Current focus:** Phase 75 — Routed Static Extractor Adapters
 
 ## Current Position
 
-Phase: 75
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-05-26
+Phase: 75 (Routed Static Extractor Adapters) — EXECUTING
+Plan: 1 of 1
+Status: Executing Phase 75
+Last activity: 2026-05-25 -- Phase 75 execution started
 
 ## Performance Metrics
 
