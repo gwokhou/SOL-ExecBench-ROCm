@@ -26,6 +26,7 @@ OPTIONAL_CAPABILITIES = {
     "runtime.evidence.v1",
     "profiling.evidence.v1",
     "toolchain.routing.v1",
+    "static_kernel_evidence.v1",
 }
 
 
@@ -49,6 +50,20 @@ def test_evaluator_contract_advertises_optional_evidence_without_bump():
 
     assert OPTIONAL_CAPABILITIES.issubset(set(payload["capabilities"]))
     assert payload["contract_version"] == "1.0"
+    assert payload["trace_field_requirements"]["top_level"] == [
+        "definition",
+        "workload",
+        "solution",
+        "evaluation",
+    ]
+    assert "static_kernel_evidence" not in payload["trace_field_requirements"]
+    assert "static_kernel_evidence" not in payload["correctness_fields"]
+    assert "static_kernel_evidence" not in payload["timing_fields"]
+    assert "static_kernel_evidence" not in payload["scoring_fields"]
+    assert any(
+        "Static kernel evidence is diagnostic sidecar metadata only" in claim
+        for claim in payload["source_boundary_claims"]
+    )
 
 
 def test_evaluator_contract_freezes_trace_status_and_field_groups():
@@ -109,3 +124,4 @@ def test_contract_cli_json_outputs_builder_payload_without_problem_directory():
     assert payload == expected
     assert payload["schema_version"] == "sol_execbench.evaluator_contract.v1"
     assert REQUIRED_CAPABILITIES.issubset(set(payload["capabilities"]))
+    assert "static_kernel_evidence.v1" in payload["capabilities"]

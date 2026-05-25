@@ -236,6 +236,20 @@ def test_canonical_trace_jsonl_excludes_derived_report_key_space():
         "coverage",
         "runtime.evidence.v1",
         "environment_snapshot",
+        "static_kernel_evidence",
+        "static_kernel_evidence.v1",
+        "sol_execbench.static_kernel_evidence.v1",
+        "diagnostic_only",
+        "correctness_authority",
+        "performance_authority",
+        "timing_authority",
+        "score_authority",
+        "paper_parity_authority",
+        "leaderboard_authority",
+        "metadata_present",
+        "disassembly_present",
+        "detected_architectures",
+        "symbol_count",
         "score_eligibility",
         *DERIVED_REPORT_EVIDENCE_REF_KEYS,
         *PHASE51_INTERNAL_PUBLIC_BOUNDARY_FIELDS,
@@ -267,7 +281,15 @@ def test_cli_help_preserves_existing_public_options():
     ):
         assert expected_option in help_text
     assert "contract" in help_text
-    for unexpected_option in ("diagnose", "--rocprofv3", "hip-bench"):
+    for unexpected_option in (
+        "diagnose",
+        "--rocprofv3",
+        "hip-bench",
+        "--static-evidence",
+        "static-evidence",
+        "--static-evidence auto",
+        "--static-evidence none",
+    ):
         assert unexpected_option not in help_text
 
 
