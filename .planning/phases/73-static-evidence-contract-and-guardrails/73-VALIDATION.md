@@ -3,7 +3,7 @@ phase: 73
 slug: static-evidence-contract-and-guardrails
 status: draft
 nyquist_compliant: true
-wave_0_complete: false
+wave_0_complete: true
 created: 2026-05-25
 ---
 
@@ -38,7 +38,7 @@ created: 2026-05-25
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 73-01-01 | 01 | 0 | SKE-CONTRACT-01 | — | Reject malformed or unknown sidecar fields | unit | `UV_CACHE_DIR=/tmp/uv-cache uv run pytest tests/sol_execbench/test_static_kernel_evidence.py -q` | ❌ W0 | ⬜ pending |
+| 73-01-01 | 01 | 1 | SKE-CONTRACT-01 | — | Reject malformed or unknown sidecar fields | unit | `UV_CACHE_DIR=/tmp/uv-cache uv run pytest tests/sol_execbench/test_static_kernel_evidence.py -q` | ❌ | ⬜ pending |
 | 73-01-02 | 01 | 1 | SKE-CONTRACT-02 | — | Preserve diagnostic-only authority boundaries | unit | `UV_CACHE_DIR=/tmp/uv-cache uv run pytest tests/sol_execbench/test_static_kernel_evidence.py -q` | ❌ W0 | ⬜ pending |
 | 73-01-03 | 01 | 1 | SKE-CONTRACT-03 | — | Serialize stable status and reason-code outcomes | unit | `UV_CACHE_DIR=/tmp/uv-cache uv run pytest tests/sol_execbench/test_static_kernel_evidence.py -q` | ❌ W0 | ⬜ pending |
 | 73-01-04 | 01 | 1 | SKE-CONTRACT-04 | — | Add optional capability without contract bump | unit | `UV_CACHE_DIR=/tmp/uv-cache uv run pytest tests/sol_execbench/test_contract.py -q` | ✅ | ⬜ pending |
@@ -50,9 +50,9 @@ created: 2026-05-25
 
 ## Wave 0 Requirements
 
-- [ ] `tests/sol_execbench/test_static_kernel_evidence.py` — schema, authority, status, reason-code, and helper constructor tests for SKE-CONTRACT-01..03.
-- [ ] Confirm existing `tests/sol_execbench/test_contract.py` coverage is extended for SKE-CONTRACT-04.
-- [ ] Confirm existing public contract and score guardrail tests are extended for SKE-CONTRACT-05.
+Existing infrastructure covers all phase requirements. Phase 73 has one wave-1
+plan, and that plan creates the missing static evidence test file before
+implementation in TDD order.
 
 ---
 

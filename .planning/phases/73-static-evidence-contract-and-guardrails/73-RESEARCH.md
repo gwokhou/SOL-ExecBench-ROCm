@@ -391,17 +391,17 @@ def test_primary_cli_does_not_expose_static_evidence_before_phase_76():
 
 **If this table is empty:** All claims in this research were verified or cited; no user confirmation is needed before planning.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Should Phase 73 export new models from `sol_execbench.core.bench.__init__`?**
+1. **RESOLVED: Should Phase 73 export new models from `sol_execbench.core.bench.__init__`?**
    - What we know: Context says models should be importable from `sol_execbench.core.bench` or directly from the new module. [VERIFIED: .planning/phases/73-static-evidence-contract-and-guardrails/73-CONTEXT.md]
    - What's unclear: Existing `core/bench` package export policy was not inspected as a mandatory file. [VERIFIED: files_to_read scope]
-   - Recommendation: Planner should inspect `src/sol_execbench/core/bench/__init__.py`; export only stable model/helper names if that package already exposes public bench helpers. [VERIFIED: planner recommendation]
+   - Decision: Phase 73 should keep direct-module imports as the stable public path unless `src/sol_execbench/core/bench/__init__.py` already exports diagnostic bench helpers. If it exports nothing or does not exist, do not create a broad package export surface in this phase. [VERIFIED: planner resolution]
 
-2. **Exact reason-code vocabulary names**
+2. **RESOLVED: Exact reason-code vocabulary names**
    - What we know: Reason codes must be stable enum-like strings grouped by category. [VERIFIED: .planning/phases/73-static-evidence-contract-and-guardrails/73-CONTEXT.md]
    - What's unclear: The locked context does not prescribe exact reason-code strings. [VERIFIED: .planning/phases/73-static-evidence-contract-and-guardrails/73-CONTEXT.md]
-   - Recommendation: Use conservative starter codes matching phase boundaries: `static_evidence_not_requested`, `unsupported_solution_type`, `no_static_artifact_boundary`, `toolchain_unavailable`, `artifact_unavailable`, `extractor_failed`, `partial_artifact_metadata`, and test the complete enum set. [VERIFIED: planner recommendation]
+   - Decision: Use this exact starter vocabulary and test the complete enum set: `static_evidence_not_requested`, `static_evidence_collected`, `partial_artifact_metadata`, `partial_disassembly_only`, `partial_metadata_only`, `artifact_unavailable`, `toolchain_unavailable`, `unsupported_solution_type`, `unsupported_architecture`, `unsupported_artifact_type`, `extractor_failed`, `extractor_timeout`, and `parser_failed`. Values are category-prefixed by outcome family and future additions require deliberate test updates. [VERIFIED: planner resolution]
 
 ## Environment Availability
 
