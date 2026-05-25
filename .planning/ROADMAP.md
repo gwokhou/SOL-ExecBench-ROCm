@@ -105,6 +105,10 @@ No active phases. Completed v1.16 phase artifacts are archived under
 - v1.17 Static Kernel Evidence: code-object/HSACO capture, ISA/metadata
   extraction, extractor adapters, `static_kernel_evidence.v1`, and compiler
   artifact reports.
+- ROCm 7.0.x/7.1.x/7.2.x compatibility validation across supported GPU
+  generations. This is deferred because full matrix validation has high
+  hardware, environment, and calendar cost; near-term releases should keep
+  using explicit claim boundaries and toolchain diagnostics instead.
 - Original paper-scale 124-model / 235-problem extraction and curation.
 - MI300X, CDNA 3, and CDNA 4 real-hardware validation.
 - NVFP4 and MXFP4 validation if a suitable AMD hardware path exists.

@@ -437,6 +437,7 @@ architecture, artifact type, and installation state.
 | Focus v1.11 on public dataset parity and execution closure | User requested the next milestone target "论文数据集 parity + ROCm execution closure" and then narrowed it to dataset acquisition/layout, inventory, compatibility classification, small ready-subset execution, and gap reporting. | Active in v1.11 |
 | Prioritize a research-grade ROCm preview before paper parity | User asked whether to push toward paper parity next; we chose a smaller complete release with claim boundaries, curated slice, researcher workflows, and reproducibility evidence before attempting full 235-problem parity. | Active in v1.15 |
 | Route ROCm tools before extracting static evidence | User noted ROCm tools are more fragmented than CUDA tools and requested per-tool hardware generation/model availability routing, including prepared and historical tools. | Active in v1.16 |
+| Defer ROCm minor-version by GPU-generation matrix validation | User narrowed the possible compatibility discussion to ROCm 7.0.x/7.1.x/7.2.x but decided the full matrix still has high validation cost and long cycle time. Treat it as deferred compatibility validation rather than a near-term release gate. | Deferred |
 | Defer static kernel evidence to v1.17 | User explicitly moved Static Kernel Evidence out of v1.16 so v1.16 can focus on external research, tool lifecycle, capability registry, and routing policy. | Active in v1.16 |
 
 ## Evolution
