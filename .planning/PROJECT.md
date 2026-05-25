@@ -18,17 +18,21 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 **Shipped version:** v1.12 Evaluator Contract Metadata and Boundary Guardrails,
 completed 2026-05-25.
 
-**Current milestone:** none. Ready to plan v1.13.
+**Current milestone:** v1.13 ROCm Runtime Evidence and Environment Diagnostics.
 
 **Latest milestone outcome:** the ROCm port now exposes GPU-free evaluator
 contract metadata through `sol-execbench contract --json`, keeps contract-only
 metadata out of canonical trace JSONL, and records SOL/HIP ownership boundary
 guardrails for external consumers.
 
-**Next milestone goals:** choose the next gap from the remaining deferred work:
-full sidecar-chain hardening, full-suite hardware validation preparation,
-upstream SOLAR equivalence analysis, or another explicitly scoped ROCm port
-closure target.
+**Current milestone goal:** make benchmark runs reproducible and diagnosable by
+attaching optional ROCm/GPU environment evidence and fast preflight diagnostics
+without changing SOL ExecBench correctness, timing, scoring, or v1.12 consumer
+defaults.
+
+**Next planned milestone:** v1.14 Optional rocprofv3 Profiling Evidence, scoped
+to opt-in profiler artifacts and command provenance after the v1.13 runtime
+evidence surface is stable.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline.
 Milestones v1.1-v1.6 added CDNA 3 code/schema support, maintained residue
@@ -58,6 +62,35 @@ parity-gap reports, release-closure docs, and claim guardrails.
 The v1.12 milestone retroactively recorded the evaluator contract metadata and
 boundary guardrail work merged through PR #1, including `sol-execbench contract
 --json`, SOL-owned compatibility metadata, and HIP-side consumer boundaries.
+The v1.13 milestone starts from ROCm Systems/GPUOpen enhancement research and
+focuses only on backward-compatible runtime environment evidence, diagnostic
+commands, and architecture-aware smoke/preflight checks. `rocprofv3` artifact
+collection is deferred to the planned v1.14 milestone, and static RGA/GPUOpen
+ISA analysis remains later candidate work.
+
+## Current Milestone: v1.13 ROCm Runtime Evidence and Environment Diagnostics
+
+**Goal:** Make benchmark runs reproducible and diagnosable by attaching ROCm/GPU
+environment evidence and fast preflight diagnostics without changing SOL
+ExecBench correctness, timing, scoring, or v1.12 consumer defaults.
+
+**Target features:**
+- Add optional run-level environment snapshots for ROCm version, GPU identity,
+  `gfx` target, visible devices, PyTorch ROCm metadata, and collection
+  provenance.
+- Add a standalone diagnostic CLI such as `sol-execbench doctor` or
+  `sol-execbench env-snapshot`.
+- Add lightweight ROCm/HIP preflight checks with architecture-aware skip
+  behavior for RDNA 4 and CDNA 3.
+- Preserve evaluator contract version `1.0`, primary CLI defaults, canonical
+  trace semantics, and scoring/correctness behavior.
+
+**Explicitly deferred:**
+- Optional `rocprofv3` profile artifact collection to v1.14.
+- RGA/code-object/static ISA analysis to a later static kernel evidence
+  milestone.
+- Contract version bump or consumer-side requirement that confirmed benchmark
+  claims must include environment evidence.
 
 Validation status:
 
