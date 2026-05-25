@@ -33,6 +33,7 @@ dev = [
     "pytest>=9.0.2",
     "pytest-xdist>=3.5",
     "ruff>=0.4",
+    "ty>=0.0.39",
 ]
 
 [tool.pytest.ini_options]
@@ -61,6 +62,9 @@ exclude = [
 
 [tool.ruff.lint]
 ignore = ["E741"]
+
+[tool.ty.src]
+include = ["src", "tests"]
 
 [[tool.uv.index]]
 name = "pypi"

@@ -46,6 +46,7 @@ uv run pytest tests/
 | `uv run pytest tests/sol_execbench/test_e2e.py` | Run one focused test file. |
 | `uv run ruff check .` | Run lint checks. |
 | `uv run ruff format .` | Format Python files. |
+| `uv run ty check` | Run type checks over `src` and `tests`. |
 | `./scripts/run_docker.sh --build` | Build and enter the ROCm Docker environment. |
 
 There is no dedicated package build script in `pyproject.toml`; the package uses
@@ -55,6 +56,7 @@ Hatchling as its build backend.
 
 Ruff is the configured linting and formatting tool. The configuration lives in
 `pyproject.toml` under `[tool.ruff]` and `[tool.ruff.lint]`.
+Ty is the configured type checker. Its source roots live under `[tool.ty.src]`.
 
 - Use Python `>=3.12,<3.14`.
 - Use `snake_case` for modules, functions, and variables.
@@ -70,6 +72,7 @@ Run style checks with:
 ```bash
 uv run ruff check .
 uv run ruff format .
+uv run ty check
 ```
 
 ## Branch Conventions
@@ -98,7 +101,7 @@ The root `CONTRIBUTING.md` describes the contribution process. In practice:
   request from that branch.
 - Keep pull requests focused on one concern.
 - Include tests and documentation for new components.
-- Run relevant pytest and Ruff checks before requesting review.
+- Run relevant pytest, Ruff, and Ty checks before requesting review.
 - Sign commits with `git commit -s`.
 - Ensure local build and test logs are clean before submitting.
 - Document any ROCm hardware assumptions in tests or PR notes.
