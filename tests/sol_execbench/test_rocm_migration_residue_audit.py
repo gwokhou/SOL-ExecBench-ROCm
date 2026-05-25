@@ -79,6 +79,24 @@ def _classification(relative_path: str, line: str) -> str | None:
         return "legacy schema rejection or migration guidance"
     if relative_path.startswith(("docs/", "README.md")):
         return "user-facing unsupported feature or migration documentation"
+    if relative_path.startswith("src/sol_execbench/core/bench/reward_hack.py") and (
+        "cudaStream" in line or "torch\\.cuda\\.Stream" in line
+    ):
+        return "reward-hack detector covers HIP and CUDA stream abuse spellings"
+    if relative_path.startswith("src/sol_execbench/core/dataset/") and (
+        "NVIDIA" in line
+        or "nvidia" in line
+        or "CUDA" in line
+        or "cuda" in line
+        or "cublas" in line
+        or "cutlass" in line
+        or "nvrtc" in line
+    ):
+        return "dataset parity metadata preserves upstream NVIDIA boundary labels"
+    if relative_path.startswith("src/sol_execbench/core/environment.py") and (
+        "cuda_version" in line or "CUDA/HIP" in line
+    ):
+        return "environment snapshot records PyTorch CUDA/HIP compatibility metadata"
     if relative_path.startswith("scripts/download_solexecbench.py") and "nvidia/SOL-ExecBench" in line:
         return "upstream dataset repository identifier"
     if "requires_cutile" in line or "legacy NVIDIA cuTile marker" in line:
@@ -109,6 +127,48 @@ def _classification(relative_path: str, line: str) -> str | None:
         or "legacy" in line
     ):
         return "test assertion for rejected legacy CUDA/NVIDIA residue"
+    if relative_path.startswith("tests/sol_execbench/fixtures/solar_derivation/") and (
+        "nvidia_blackwell_b200_equivalence" in line
+    ):
+        return "SOLAR fixture claim-boundary field"
+    if relative_path.startswith("tests/sol_execbench/solar_derivation_fixtures.py") and (
+        "nvidia_blackwell_b200_equivalence" in line
+    ):
+        return "SOLAR fixture loader claim-boundary field"
+    if relative_path.startswith("tests/sol_execbench/test_download_solexecbench.py") and (
+        "nvidia/SOL-ExecBench" in line or "CUDA" in line
+    ):
+        return "upstream dataset downloader fixture"
+    if relative_path.startswith("tests/sol_execbench/test_dataset_contract.py") and "CUDA" in line:
+        return "dataset category rejection fixture"
+    if relative_path.startswith("tests/sol_execbench/test_dataset_inventory_readiness.py") and (
+        "nvidia" in line or "cuda" in line
+    ):
+        return "dataset readiness NVIDIA-only blocker fixture"
+    if relative_path.startswith("tests/sol_execbench/test_original_parity_docs.py"):
+        return "original NVIDIA parity documentation assertions"
+    if relative_path.startswith("tests/sol_execbench/test_public_contract_guardrails.py") and (
+        "NVIDIA" in line or "nvidia" in line or "solution_cuda" in line
+    ):
+        return "public contract claim-boundary assertions"
+    if relative_path.startswith("tests/sol_execbench/test_rocm_library_readiness_docs.py") and (
+        "nvidia" in line
+        or "cutlass" in line
+        or "cudnn" in line
+        or "cute_dsl" in line
+        or "cutile" in line
+    ):
+        return "former NVIDIA library compatibility fixture"
+    if relative_path.startswith("tests/sol_execbench/test_solar_derivation") and (
+        "nvidia_blackwell_b200_equivalence" in line
+    ):
+        return "SOLAR claim-boundary assertion"
+    if relative_path.startswith("tests/sol_execbench/test_amd_native_score.py") and "NVIDIA B200" in line:
+        return "AMD-native score claim-boundary assertion"
+    if relative_path.startswith("tests/sol_execbench/test_v1_9_validation_closure.py") and (
+        "NVIDIA" in line
+    ):
+        return "v1.9 validation claim-boundary assertion"
     if relative_path.startswith("tests/") and "REPLACEMENT" in line:
         return "test migration mapping fixture"
     if relative_path.startswith("tests/examples/test_examples.py") and (

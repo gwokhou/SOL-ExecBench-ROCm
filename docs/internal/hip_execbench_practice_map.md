@@ -3,8 +3,12 @@
 This note records which engineering practices from a separate hip-execbench
 project are worth adapting into SOL ExecBench ROCm. It is intentionally an
 adaptation map, not a porting plan:
-public problem formats, solution formats, CLI behavior, trace JSONL output, and
-benchmark semantics remain owned by SOL ExecBench ROCm.
+public `definition.json`, `solution.json`, workload formats, CLI behavior,
+trace JSONL output, and benchmark semantics remain owned by SOL ExecBench ROCm.
+
+Source evidence reviewed from hip-execbench included `src/profiler/router.ts`,
+`src/errors/index.ts`, `src/agent/builder.ts`, `src/baseline/comparator.ts`,
+`src/schemas/*.ts`, and `src/pipeline/statistics.ts`.
 
 ## Accepted Practices
 

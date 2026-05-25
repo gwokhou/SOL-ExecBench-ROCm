@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import json
-import os
 from pathlib import Path
 
 import torch.utils.cpp_extension as ext
@@ -22,6 +21,7 @@ import torch.utils.cpp_extension as ext
 from sol_execbench.core import Solution
 
 HERE = Path.cwd().resolve()
+ENVIRON = __import__("os").environ
 
 # Parse solution — validates sources (e.g. forbidden keywords) at compile time.
 solution = Solution(**json.loads((HERE / "solution.json").read_text()))
@@ -37,8 +37,8 @@ rocm_arches = [
     for target in solution.spec.target_hardware
     if target.value.startswith("gfx")
 ]
-if rocm_arches and "PYTORCH_ROCM_ARCH" not in os.environ:
-    os.environ["PYTORCH_ROCM_ARCH"] = ";".join(dict.fromkeys(rocm_arches))
+if rocm_arches and "PYTORCH_ROCM_ARCH" not in ENVIRON:
+    ENVIRON["PYTORCH_ROCM_ARCH"] = ";".join(dict.fromkeys(rocm_arches))
 
 # Collect HIP/C++ source files from current directory
 sources = [

@@ -54,6 +54,8 @@ scope for this ROCm-only fork.
 - AMD-native scoring and roofline interpretation are implemented as guarded
   derived artifacts; remaining claims still require appropriate evidence and
   validation scope.
+- AMD-native scoring or roofline interpretation is not a claim of NVIDIA B200
+  or leaderboard equivalence.
 - Public baseline comparison must consume existing trace outputs without adding
   fields to trace JSONL.
 - ROCm library categories must be audited so documentation matches actual

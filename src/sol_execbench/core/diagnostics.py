@@ -172,7 +172,7 @@ ROCM_LIBRARY_SPECS: dict[str, RocmLibrarySpec] = {
     "miopen": RocmLibrarySpec(
         name="MIOpen",
         headers=("miopen/miopen.h",),
-        libraries=("MIOpen", "miopen"),
+        libraries=("MIOpen",),
         packages=("miopen-hip", "miopen-hip-dev"),
         hint="Install MIOpen HIP development files from the ROCm distribution.",
     ),
