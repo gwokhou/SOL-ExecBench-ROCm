@@ -1,0 +1,96 @@
+# Requirements: SOL ExecBench ROCm Port v1.16
+
+**Defined:** 2026-05-25
+**Milestone:** v1.16 ROCm Toolchain Research and Capability Routing
+**Core Value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
+
+## v1.16 Requirements
+
+### External Research
+
+- [ ] **RESEARCH-01**: The project records external research over ROCm Systems, ROCprofiler SDK, RGA/GPUOpen manuals, HIP compiler documentation, LLVM/object tools, and relevant migrated or deprecated repositories.
+- [ ] **RESEARCH-02**: Research output identifies reusable information from manuals and repositories, including tool capabilities, output formats, lifecycle status, repository migration status, and known probe surfaces.
+- [ ] **RESEARCH-03**: Research output explicitly separates runtime, profiling, static/future, and derived-score evidence levels.
+
+### Tool Inventory And Lifecycle
+
+- [ ] **TOOL-01**: The project defines a central inventory for current, historical, deprecated, migrated, planned, rejected, and candidate ROCm-related tools.
+- [ ] **TOOL-02**: Each tool entry can record source-of-truth references, replacement tool IDs, expected executable names, and lifecycle status.
+- [ ] **TOOL-03**: Historical or deprecated tools remain represented as aliases or lifecycle entries instead of being silently dropped.
+
+### Capability Registry
+
+- [ ] **CAP-01**: The project defines a capability registry schema keyed by tool, hardware generation, GPU architecture pattern, ROCm version range, artifact type, and evidence level.
+- [ ] **CAP-02**: The registry status vocabulary includes `available`, `unavailable`, `unsupported_arch`, `unsupported_artifact`, `deprecated`, `migrated`, `planned`, `rejected`, and `failed`.
+- [ ] **CAP-03**: Registry entries can preserve reason codes and source references so unavailable or unsupported states are auditable.
+
+### Probe And Routing Policy
+
+- [ ] **ROUTE-01**: The project defines a routing policy that combines static registry facts with dynamic probes of executable presence, version output, ROCm root, GPU architecture, and tool dry-run/list behavior.
+- [ ] **ROUTE-02**: Routing decisions produce explicit selected tool, fallback tool, status, and reason fields without mutating canonical trace JSONL.
+- [ ] **ROUTE-03**: Runtime, profiling, static/future, and derived-score evidence paths share routing semantics while preserving their separate evidence authority.
+- [ ] **ROUTE-04**: Static Kernel Evidence extraction remains deferred to v1.17 and cannot be implemented as part of v1.16.
+
+### Documentation And Guardrails
+
+- [ ] **DOC-01**: The project documents a ROCm toolchain availability matrix and explains how hardware generation, GPU architecture, ROCm version, artifact type, and installation state affect routing.
+- [ ] **DOC-02**: The project provides cookbook guidance for interpreting routing decisions and unavailable or unsupported reasons.
+- [ ] **DOC-03**: Claim guardrails prevent tool availability, routing success, or future static-evidence readiness from being described as correctness, performance, paper-parity, or leaderboard authority.
+
+## Future Requirements
+
+### Static Kernel Evidence
+
+- **STATIC-01**: Capture HIP/C++, Triton ROCm, and PyTorch extension static build artifacts, including HSACO/code objects where available.
+- **STATIC-02**: Add extractor adapters for `readelf`, `llvm-objdump`, `roc-objdump`, RGA, and structured unavailable evidence.
+- **STATIC-03**: Emit `static_kernel_evidence.v1` sidecars without changing canonical trace JSONL.
+- **STATIC-04**: Generate researcher-facing static evidence reports that connect trace, runtime evidence, profiling evidence, AMD-native score reports, static artifacts, and routing decisions.
+
+### Paper And Hardware Parity
+
+- **PAPER-01**: Recreate or verify the original paper-scale 124-model / 235-problem extraction and curation pipeline.
+- **PAPER-02**: Run and report full 235-problem ROCm validation with complete denominator accounting.
+- **HW-01**: Complete CDNA 3 / MI300X full-suite validation with archived environment, clock, trace, timing, and score evidence.
+- **HW-02**: Add CDNA 4 validation when suitable hardware and ROCm support are available.
+
+## Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| Static Kernel Evidence implementation | Deferred to v1.17 so v1.16 can establish research-backed routing first. |
+| HSACO/code-object capture | Requires routing and artifact classification from v1.16 before implementation. |
+| RGA/objdump extractor adapters | Deferred to v1.17; v1.16 may document capabilities and planned routing only. |
+| Full 235-problem paper parity | Too broad for this milestone and unrelated to toolchain routing foundation. |
+| Original 124-model extraction and curation | Separate paper-parity effort. |
+| Hosted leaderboard | Premature until evidence and routing semantics are stable. |
+| Treating routing as score authority | Routing only reports tool availability and decision provenance. |
+
+## Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| RESEARCH-01 | Phase 68 | Pending |
+| RESEARCH-02 | Phase 68 | Pending |
+| RESEARCH-03 | Phase 68 | Pending |
+| TOOL-01 | Phase 69 | Pending |
+| TOOL-02 | Phase 69 | Pending |
+| TOOL-03 | Phase 69 | Pending |
+| CAP-01 | Phase 70 | Pending |
+| CAP-02 | Phase 70 | Pending |
+| CAP-03 | Phase 70 | Pending |
+| ROUTE-01 | Phase 71 | Pending |
+| ROUTE-02 | Phase 71 | Pending |
+| ROUTE-03 | Phase 71 | Pending |
+| ROUTE-04 | Phase 71 | Pending |
+| DOC-01 | Phase 72 | Pending |
+| DOC-02 | Phase 72 | Pending |
+| DOC-03 | Phase 72 | Pending |
+
+**Coverage:**
+- v1.16 requirements: 16 total
+- Mapped to phases: 16
+- Unmapped: 0
+
+---
+*Requirements defined: 2026-05-25*
+*Last updated: 2026-05-25 after v1.16 milestone start*
