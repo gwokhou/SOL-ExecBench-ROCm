@@ -127,10 +127,25 @@ file such as `.coveragerc`, `.nycrc`, or a pytest coverage threshold is present.
 
 ## CI Integration
 
-No `.github/workflows/` directory is present in this checkout, so no GitHub
-Actions test workflow is configured in the repository. Run the relevant local
-pytest, `uv run ruff check .`, and `uv run ty check` commands before submitting
-changes.
+The repository includes a GitHub Actions quality workflow at
+`.github/workflows/code-quality.yml`. It runs on pushes and pull requests across
+Python 3.12 and 3.13, installs with `uv sync --locked --all-groups`, then runs
+Ruff linting, Ty type checks, and CPU-safe pytest coverage:
+
+```bash
+uv run ruff check .
+uv run ty check
+uv run pytest tests/sol_execbench \
+  --ignore=tests/sol_execbench/driver/test_eval_driver.py \
+  --ignore=tests/sol_execbench/test_e2e.py
+uv run pytest tests/examples/test_examples.py -k consistency
+```
+
+The remote workflow intentionally excludes `tests/docker/dependencies/` because
+those tests validate real ROCm runtime, container, and device passthrough
+readiness. It also excludes eval-driver and end-to-end execution tests that
+expect a visible ROCm device for timing. Run those checks in a ROCm-capable
+Docker environment before merging hardware-sensitive changes.
 
 ## GPU And Docker Checks
 
