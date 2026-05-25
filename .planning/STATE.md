@@ -2,9 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.15
 milestone_name: Research-Grade ROCm Benchmark Release
-status: implementation-complete
-last_updated: "2026-05-25T13:00:00.000Z"
-last_activity: 2026-05-25
+status: Awaiting next milestone
+stopped_at: Completed 52-03-PLAN.md
+last_updated: "2026-05-25T12:25:37.931Z"
+last_activity: 2026-05-25 — Milestone v1.15 completed and archived
 progress:
   total_phases: 4
   completed_phases: 4
@@ -20,14 +21,14 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-25)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** v1.15 research-grade ROCm benchmark release
+**Current focus:** planning the next milestone
 
 ## Current Position
 
-Phase: 67. Release Closure And Reproducibility Bundle
-Plan: v1.15 release closure and documentation guardrails
-Status: Implementation complete; final verification in progress
-Last activity: 2026-05-25 — v1.15 autonomous implementation completed
+Phase: Milestone v1.15 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-05-25 — Milestone v1.15 completed and archived
 
 ## Performance Metrics
 
@@ -50,7 +51,7 @@ Last activity: 2026-05-25 — v1.15 autonomous implementation completed
 **Recent Trend:**
 
 - Last milestone: v1.14 shipped on 2026-05-25
-- Trend: v1.15 implementation complete, verification in progress
+- Trend: v1.15 shipped as a bounded research-grade ROCm benchmark preview
 
 ## Accumulated Context
 
@@ -104,4 +105,4 @@ Resume file: None
 
 ## Operator Next Steps
 
-- Run final verification and commit the v1.15 release bundle.
+- Start the next milestone with /gsd-new-milestone
