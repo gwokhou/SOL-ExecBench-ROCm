@@ -57,9 +57,84 @@
 
 **Active milestone:** v1.13 ROCm Runtime Evidence and Environment Diagnostics.
 
-**Status:** v1.13 requirements and roadmap defined; ready to plan Phase 58.
+**Status:** Phase 58 planned; ready to execute environment snapshot contract work.
 
 **Next planned milestone:** v1.14 Optional rocprofv3 Profiling Evidence.
+
+## Active Phase Roadmap
+
+### Phase 58: Environment Snapshot Contract
+
+**Status:** Planned
+**Milestone:** v1.13 ROCm Runtime Evidence and Environment Diagnostics
+**Goal:** Define the internal data contract and collection boundary for runtime
+environment evidence.
+
+**Scope:**
+- Add environment snapshot models and serialization helpers.
+- Represent successful, unavailable, skipped, and failed collection outcomes.
+- Add bounded subprocess helpers for ROCm tool probes.
+- Expose optional `runtime.evidence.v1` capability without bumping contract
+  version.
+
+**Requirement IDs:** ENV-01, ENV-02, ENV-04, COMPAT-01, COMPAT-02
+
+### Phase 59: Benchmark Run Evidence Integration
+
+**Status:** Pending
+**Milestone:** v1.13 ROCm Runtime Evidence and Environment Diagnostics
+**Goal:** Attach environment snapshots to benchmark execution artifacts without
+changing correctness or scoring semantics.
+
+**Scope:**
+- Collect snapshots at run boundaries outside the measured timing window.
+- Persist snapshot metadata in optional result/run metadata.
+- Ensure canonical trace fields and public schemas remain stable.
+- Add guardrail tests for v1.12 compatibility and no scoring dependency.
+
+**Requirement IDs:** ENV-03, COMPAT-01, COMPAT-02, COMPAT-03
+
+### Phase 60: Diagnostics CLI and Preflight Checks
+
+**Status:** Pending
+**Milestone:** v1.13 ROCm Runtime Evidence and Environment Diagnostics
+**Goal:** Provide a standalone way to diagnose ROCm, Docker, and GPU runtime
+readiness before running a full benchmark.
+
+**Scope:**
+- Add `sol-execbench doctor` or `sol-execbench env-snapshot`.
+- Emit JSON output for tool availability and runtime readiness.
+- Add lightweight HIP/ROCm smoke checks with architecture-aware skip behavior.
+- Document local and Docker usage.
+
+**Requirement IDs:** DIAG-01, DIAG-02, DIAG-03, SMOKE-01, SMOKE-02, SMOKE-03,
+COMPAT-03
+
+## Planned Follow-up Phase Roadmap
+
+### Phase 61: Profiling Option and Command Provenance
+
+**Status:** Planned
+**Milestone:** v1.14 Optional rocprofv3 Profiling Evidence
+**Goal:** Introduce the opt-in CLI/config surface and profiler command builder.
+
+**Requirement IDs:** PROF-01, PROF-02, PROF-03
+
+### Phase 62: rocprofv3 Artifact Lifecycle
+
+**Status:** Planned
+**Milestone:** v1.14 Optional rocprofv3 Profiling Evidence
+**Goal:** Collect and register profiler artifacts in stable result metadata.
+
+**Requirement IDs:** ART-01, ART-02, ART-03
+
+### Phase 63: Profiling Reports and Documentation
+
+**Status:** Planned
+**Milestone:** v1.14 Optional rocprofv3 Profiling Evidence
+**Goal:** Make profiling evidence understandable and operationally usable.
+
+**Requirement IDs:** REPORT-01, REPORT-02, REPORT-03
 
 ## Progress
 
