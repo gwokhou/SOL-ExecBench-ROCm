@@ -49,6 +49,34 @@ PY
 Expected result: `torch.version.hip` is set, `torch.version.cuda` is `None`,
 and the device reports an AMD architecture such as `gfx1200`.
 
+## Runtime Diagnostics
+
+v1.13 provides a standalone diagnostics command that does not require a problem
+directory or solution:
+
+```bash
+uv run sol-execbench doctor --json
+```
+
+The JSON payload reports ROCm tool availability, best-effort GPU identity,
+PyTorch ROCm runtime readiness, simple device memory behavior, and event timing
+readiness. Missing tools or unavailable GPUs are diagnostic statuses, not
+benchmark correctness failures.
+
+Benchmark runs can also emit an optional environment sidecar without changing
+trace JSONL:
+
+```bash
+SOLEXECBENCH_ENV_SNAPSHOT=1 \
+  uv run sol-execbench examples/gemm --solution examples/gemm/solution.json \
+  --json -o traces.jsonl
+```
+
+This writes `traces.jsonl.environment.json`. Use
+`SOLEXECBENCH_ENV_SNAPSHOT_PATH=/path/to/env.json` to choose an explicit path.
+The sidecar is reproducibility evidence only; it is not part of SOL/SOLAR
+correctness or scoring.
+
 ## Docker
 
 Build and enter the ROCm container:

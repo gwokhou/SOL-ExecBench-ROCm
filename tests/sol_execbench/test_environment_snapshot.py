@@ -5,10 +5,13 @@ from datetime import UTC, datetime
 
 from sol_execbench.core.environment import (
     ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION,
+    EnvironmentCheckResult,
+    EnvironmentDiagnostics,
     EnvironmentEvidenceStatus,
     EnvironmentSnapshot,
     ProbeCompletedProcess,
     ToolProbeResult,
+    build_environment_diagnostics,
     collect_environment_snapshot,
     probe_tool,
 )
@@ -155,3 +158,34 @@ def test_collect_environment_snapshot_handles_missing_tools():
         for result in snapshot.tools.values()
     )
 
+
+def test_build_environment_diagnostics_combines_snapshot_and_checks():
+    snapshot = EnvironmentSnapshot(
+        generated_at="2026-05-25T00:00:00+00:00",
+        collection_status=EnvironmentEvidenceStatus.UNAVAILABLE,
+        tools={
+            "rocminfo": ToolProbeResult(
+                tool="rocminfo",
+                command=["rocminfo"],
+                status=EnvironmentEvidenceStatus.UNAVAILABLE,
+            )
+        },
+    )
+    diagnostics = build_environment_diagnostics(
+        snapshot_collector=lambda: snapshot,
+        smoke_checker=lambda: [
+            EnvironmentCheckResult(
+                name="pytorch_rocm_runtime",
+                status=EnvironmentEvidenceStatus.SKIPPED,
+                message="skipped",
+            )
+        ],
+        now=lambda: datetime(2026, 5, 25, tzinfo=UTC),
+    )
+
+    assert isinstance(diagnostics, EnvironmentDiagnostics)
+    assert diagnostics.status == EnvironmentEvidenceStatus.UNAVAILABLE
+    assert [check.name for check in diagnostics.checks] == [
+        "tool:rocminfo",
+        "pytorch_rocm_runtime",
+    ]

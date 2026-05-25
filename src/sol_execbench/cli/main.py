@@ -39,6 +39,7 @@ from rich.table import Table
 from ..core.data.contract import build_evaluator_contract
 from ..core.environment import (
     EnvironmentSnapshot,
+    build_environment_diagnostics,
     collect_environment_snapshot,
 )
 from ..core import (
@@ -465,6 +466,17 @@ def _contract_cli(json_output: bool) -> None:
     click.echo(json.dumps(payload, sort_keys=True))
 
 
+@click.command("doctor", context_settings={"help_option_names": ["-h", "--help"]})
+@click.option("--json", "json_output", is_flag=True, help="Print diagnostics JSON")
+def _doctor_cli(json_output: bool) -> None:
+    """Print ROCm environment diagnostics."""
+
+    if not json_output:
+        raise click.ClickException("Only --json output is supported for doctor")
+    payload = build_environment_diagnostics().model_dump(mode="json")
+    click.echo(json.dumps(payload, sort_keys=True))
+
+
 class SolExecbenchCli(click.Command):
     """Dispatch root evaluator calls and the contract metadata command."""
 
@@ -483,6 +495,16 @@ class SolExecbenchCli(click.Command):
             return _contract_cli.main(
                 args=args[1:],
                 prog_name=contract_prog,
+                complete_var=complete_var,
+                standalone_mode=standalone_mode,
+                windows_expand_args=windows_expand_args,
+                **extra,
+            )
+        if args and args[0] == "doctor":
+            doctor_prog = f"{prog_name or self.name} doctor"
+            return _doctor_cli.main(
+                args=args[1:],
+                prog_name=doctor_prog,
                 complete_var=complete_var,
                 standalone_mode=standalone_mode,
                 windows_expand_args=windows_expand_args,

@@ -3,8 +3,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from click.testing import CliRunner
+
 from sol_execbench.cli import main as cli_main
+from sol_execbench.cli.main import cli
 from sol_execbench.core.environment import (
+    EnvironmentCheckResult,
+    EnvironmentDiagnostics,
     EnvironmentEvidenceStatus,
     EnvironmentSnapshot,
 )
@@ -99,3 +104,33 @@ def test_environment_snapshot_collection_failure_is_nonfatal(tmp_path: Path, mon
     assert written is None
     assert not sidecar.exists()
 
+
+def test_doctor_cli_outputs_json_without_problem_directory(monkeypatch):
+    diagnostics = EnvironmentDiagnostics(
+        generated_at="2026-05-25T00:00:00+00:00",
+        status=EnvironmentEvidenceStatus.AVAILABLE,
+        snapshot=_snapshot(),
+        checks=[
+            EnvironmentCheckResult(
+                name="pytorch_rocm_runtime",
+                status=EnvironmentEvidenceStatus.AVAILABLE,
+                message="ok",
+            )
+        ],
+    )
+    monkeypatch.setattr(cli_main, "build_environment_diagnostics", lambda: diagnostics)
+
+    result = CliRunner().invoke(cli, ["doctor", "--json"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["schema_version"] == "sol_execbench.environment_diagnostics.v1"
+    assert payload["snapshot"]["schema_version"] == "sol_execbench.environment_snapshot.v1"
+    assert payload["checks"][0]["name"] == "pytorch_rocm_runtime"
+
+
+def test_doctor_cli_rejects_non_json_mode():
+    result = CliRunner().invoke(cli, ["doctor"])
+
+    assert result.exit_code != 0
+    assert "Only --json output is supported for doctor" in result.output
