@@ -2,13 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.17
 milestone_name: Static Kernel Evidence
-status: roadmap-created
-last_updated: "2026-05-25T15:20:00.000Z"
-last_activity: 2026-05-25
+status: executing
+stopped_at: Created v1.17 roadmap and requirement traceability
+last_updated: "2026-05-25T15:49:07.951Z"
+last_activity: 2026-05-25 -- Phase 73 execution started
 progress:
   total_phases: 5
   completed_phases: 0
-  total_plans: 0
+  total_plans: 1
   completed_plans: 0
   percent: 0
 ---
@@ -20,14 +21,14 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-25)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** v1.17 Static Kernel Evidence roadmap created; ready to plan Phase 73
+**Current focus:** Phase 73 — Static Evidence Contract And Guardrails
 
 ## Current Position
 
-Phase: 73 of 77 (Static Evidence Contract And Guardrails)
-Plan: —
-Status: Roadmap created; ready to plan
-Last activity: 2026-05-25 — Created v1.17 roadmap with 5 active phases and 25/25 requirements mapped
+Phase: 73 (Static Evidence Contract And Guardrails) — EXECUTING
+Plan: 1 of 1
+Status: Executing Phase 73
+Last activity: 2026-05-25 -- Phase 73 execution started
 
 ## Performance Metrics
 
@@ -66,6 +67,7 @@ Decisions are logged in PROJECT.md. Recent decisions affecting current work:
 - Static extraction must use v1.16 routing, not ad hoc executable lookup.
 - Static evidence must not mutate canonical trace JSONL, correctness, timing,
   scoring, default benchmark behavior, paper-parity, or leaderboard claims.
+
 - Detailed historical decisions are preserved in `.planning/PROJECT.md` and archived milestone artifacts.
 
 ### Pending Todos
