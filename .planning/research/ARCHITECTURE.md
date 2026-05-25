@@ -1,564 +1,444 @@
-# Architecture Research: v1.11 Paper Dataset Parity Inventory and ROCm Execution Closure
+# Architecture Research: v1.17 Static Kernel Evidence
 
 **Project:** SOL ExecBench ROCm Port  
-**Domain:** Dataset parity inventory, ROCm readiness classification, and ready-subset execution reporting  
-**Researched:** 2026-05-23  
-**Overall confidence:** HIGH for repository integration boundaries and artifact placement; MEDIUM for exact upstream dataset field coverage until live Hugging Face rows are sampled during implementation.
+**Domain:** Diagnostic static compiler/kernel evidence for ROCm solution builds  
+**Researched:** 2026-05-25  
+**Overall confidence:** HIGH for repository integration boundaries and sidecar placement; MEDIUM for exact HSACO/code-object discovery behavior until tested against live PyTorch ROCm extension builds on RDNA 4 and CDNA 3.
 
 ## Executive Summary
 
-v1.11 should add a dataset inventory and parity reporting layer around the existing dataset acquisition and execution path. It should not alter public `Definition`, `Workload`, `Trace`, or `solution.json` schemas, and it should not change the primary `sol-execbench` CLI defaults. The existing architecture already separates canonical evaluation from derived evidence: `scripts/run_dataset.py` shells out to `sol-execbench`, writes per-problem traces and `summary.json`, and optionally emits AMD-native score reports, AMD SOL v2 sidecars, SOLAR derivation sidecars, and timing evidence.
+Static Kernel Evidence should integrate as an optional diagnostic evidence layer attached to the existing solution build path. It should not become part of canonical trace JSONL, correctness, timing, scoring, paper-parity, or leaderboard authority. The current architecture already has the right pattern: `sol-execbench` runs canonical evaluation, and optional environment/profiling metadata is written as separate sidecars beside `--output` or under the staging directory when no output path exists.
 
-The new work belongs in a dedicated core reporting package, with scripts acting as thin entry points. Inventory generation should inspect dataset layout and canonical problem files, validate them with existing Pydantic schemas where possible, and emit separate JSON reports. ROCm readiness classification should be a pure deterministic transform from file presence, schema parse results, dtype/custom-input/safetensors/reference/solution signals, and optional observed execution failures. Execution closure should then consume the inventory and run only ready or selected problems through the current runner pipeline.
+The correct insertion point is after `ProblemPackager.compile()` succeeds for HIP/C++-family solutions and before evaluation runs. At that point the staging directory contains normalized inputs, copied sources, injected offload-arch flags, `build_ext.py`, and `benchmark_kernel.so`. Static collection should inspect those build products and any discoverable ROCm compiler artifacts, route the best available static tool through `src/sol_execbench/core/toolchain.py`, and write a `sol_execbench.static_kernel_evidence.v1` sidecar.
 
-The most important boundary is that inventory and parity reports are sidecars, not benchmark traces. Canonical trace JSONL should remain "what happened when a solution ran against a workload"; parity inventory should answer "what exists, what is missing, what is blocked, and what evidence was produced." This keeps paper dataset parity auditable without turning derived reporting state into public benchmark schema.
+Build packaging should expose artifact discovery metadata, but it should not own static analysis. The new static evidence module should live under `src/sol_execbench/core/bench/` beside `rocm_profiler.py`, because it is diagnostic benchmark evidence rather than scoring, dataset inventory, or public trace data. The CLI should remain the orchestrator that chooses whether to collect static evidence, writes sidecars, and reports nonfatal unavailable states.
 
-## Current Architecture
+The v1.17 roadmap should build this in narrow vertical order: schema and artifact discovery first, routed extractors second, CLI sidecar integration third, reports/docs/guardrails last. Do not start with deep ISA classification. A useful first version is one that says: "static evidence requested; build artifact found; selected tool unavailable or available; command/provenance recorded; artifact paths registered; no score authority."
+
+## Existing Architecture Fit
 
 ```text
-Acquisition:
-  scripts/download_solexecbench.py
-    -> Hugging Face nvidia/SOL-ExecBench configs
-    -> data/benchmark/<category>/<problem>/
-       definition.json
-       reference.py
-       workload.jsonl
-
-Execution:
-  scripts/run_dataset.py
-    -> discover_problems()
-    -> build reference/custom solution JSON
-    -> sol-execbench --definition --workload --solution --json
-    -> out/<category>/<problem>/traces.json
-    -> out/summary.json
-
-Derived sidecars:
-  Definition + Workload + Trace
-    -> AMD SOL v2 sidecars
-    -> SOLAR derivation sidecars
-    -> AMD-native score report
-    -> optional rocprofv3 timing evidence
+Current HIP/C++ evaluation:
+  CLI
+    -> ProblemPackager(...)
+    -> packager.compile()
+       -> build_ext.py
+       -> torch.utils.cpp_extension.load(..., build_directory=staging_dir)
+       -> benchmark_kernel.so
+    -> packager.execute()
+       -> eval_driver.py
+       -> canonical Trace JSONL on stdout
+    -> optional sidecars:
+       -> traces.jsonl.environment.json
+       -> traces.jsonl.profile.json
 ```
 
-Relevant existing contracts:
+Recommended v1.17 integration:
 
-| Component | Existing responsibility | v1.11 implication |
+```text
+Static evidence requested:
+  packager.compile() success
+    -> discover build artifacts in staging_dir
+    -> build static routing request
+    -> select object/static tool from toolchain registry
+    -> run bounded extractor when available
+    -> write static evidence sidecar and raw extracted artifacts
+  packager.execute()
+    -> canonical Trace JSONL unchanged
+```
+
+The ordering matters. Static collection should run after compilation because the build products do not exist earlier. It should run before evaluation because it can register build provenance even if evaluation later fails. It should be nonfatal unless a future explicit validation command is added; the normal benchmark exit code must still be derived from workload evaluation status.
+
+## New Components
+
+| Component | Location | Responsibility | Boundary |
+| --- | --- | --- | --- |
+| `StaticKernelEvidenceRequest` | `src/sol_execbench/core/bench/static_kernel_evidence.py` | Input object for static collection: staging dir, primary build artifact, solution metadata, output directory, selected GPU arch, timeout, and routing dependency injection. | No subprocess evaluation; no trace parsing. |
+| `StaticKernelEvidenceResult` | `src/sol_execbench/core/bench/static_kernel_evidence.py` | Serializable sidecar model for status, provenance, route, artifacts, commands, stdout/stderr tails, classifications, and unavailable reasons. | Diagnostic-only fields only. |
+| `StaticKernelArtifact` | `src/sol_execbench/core/bench/static_kernel_evidence.py` | One registered build or extracted artifact with path, kind, size, sha256, and optional source relation. | Paths should be stable and preferably relative in reports. |
+| `discover_static_kernel_artifacts()` | `src/sol_execbench/core/bench/static_kernel_evidence.py` | Find `benchmark_kernel.so`, `.hsaco`, `.co`, object files, and likely PyTorch extension intermediates in staging/build directories. | Discovery only; do not assume every build exposes HSACO. |
+| `collect_static_kernel_evidence()` | `src/sol_execbench/core/bench/static_kernel_evidence.py` | Build routing request, run selected static extractor when available, register raw outputs, and return a result even for skipped/unavailable/failed states. | Must not raise for normal tool unavailability. |
+| Static report renderer | `src/sol_execbench/core/bench/static_kernel_evidence.py` or `src/sol_execbench/core/reporting.py` | Optional Markdown/text summary from the sidecar. | Reads sidecars; does not score. |
+
+Keep this as one module first. Split into `static_tools/` only if extractor-specific code becomes large enough to justify it.
+
+## Modified Components
+
+| Component | Modification | Rationale |
 | --- | --- | --- |
-| `src/sol_execbench/core/data/definition.py` | Validates canonical definition fields, tensor dtypes, reference syntax, `run()` parameters, and custom-input entrypoint. | Reuse for schema/readiness validation. Do not add inventory fields here. |
-| `src/sol_execbench/core/data/workload.py` | Validates workload axes, random/scalar/safetensors/custom input specs, and custom/non-custom exclusivity. | Reuse to classify custom input and safetensors usage. Do not add readiness fields here. |
-| `src/sol_execbench/core/data/trace.py` | Defines canonical evaluation records and status semantics. | Keep stable. Execution closure links to traces by path/ref. |
-| `scripts/download_solexecbench.py` | Downloads four public dataset configs and writes the local problem layout. | Add optional manifest/layout verification hooks or move reusable logic into a core dataset module. |
-| `scripts/run_dataset.py` | Discovers runnable problems, invokes the primary CLI, and emits traces plus optional derived sidecars. | Add optional inventory filtering and closure report wiring, but keep existing defaults. |
-| `src/sol_execbench/core/scoring/amd_score.py` | Builds guarded AMD-native suite reports from traces and sidecars. | Leave as scoring consumer. Inventory should reference score reports, not affect score math. |
-| `src/sol_execbench/core/scoring/solar_derivation.py` | Builds strict internal SOLAR derivation sidecars from `Definition` and `Workload`. | Reuse for closure artifacts. Do not merge parity state into SOLAR sidecars. |
+| `src/sol_execbench/cli/main.py` | Add `--static-evidence none|auto`, default `none`; add helper functions `_static_evidence_output_directory()`, `_static_evidence_sidecar_path()`, and `_write_static_evidence_sidecar()`. | Mirrors existing optional `--profile rocprofv3` sidecar pattern and keeps default evaluation unchanged. |
+| `src/sol_execbench/driver/problem_packager.py` | Add public build artifact helpers such as `is_native_solution`, `primary_build_artifact_path`, and `discover_build_artifacts()`; avoid using private `_is_cpp` from CLI for new behavior. | Lets static evidence inspect packaged build outputs without moving static logic into the packager. |
+| `src/sol_execbench/core/toolchain.py` | Promote static tools from `PLANNED` to `ACTIVE` or `CANDIDATE` where v1.17 implements them; preserve unavailable/unsupported statuses. Add artifact types only if needed, for example `CODE_OBJECT` or `SHARED_OBJECT_WITH_CODE_OBJECT`. | Static collection should reuse v1.16 routing instead of inventing a second tool selector. |
+| `src/sol_execbench/core/data/contract.py` | Add `static_kernel_evidence.v1` capability and boundary claims; keep trace field requirements unchanged. Bump contract version to `1.1` because downstream consumers can now detect a new sidecar capability. | Makes the new sidecar discoverable without mutating `Trace`. |
+| `src/sol_execbench/core/__init__.py` | Export static evidence models/helpers only if the project exports comparable optional evidence helpers there. | Keep import surface consistent. |
+| `docs/CLAIMS.md` | Add allowed "Static kernel evidence" claim and forbidden wording. Remove "deferred to v1.17" once implemented. | Prevents static artifacts from being overclaimed. |
+| `docs/ARCHITECTURE.md` and `docs/rocm_toolchain_routing.md` | Document sidecar flow and static routing status. | Keeps user-facing architecture aligned with implementation. |
 
-## Recommended Architecture
+## Data Flow
 
-```text
-data/benchmark/
-  L1/<problem>/
-  L2/<problem>/
-  Quant/<problem>/
-  FlashInfer-Bench/<problem>/
-
-Inventory path:
-  dataset layout
-    -> DatasetProblemRecord[]
-    -> ROCmReadinessClassification[]
-    -> PaperParityInventory
-    -> ParityGapReport
-
-Execution closure path:
-  PaperParityInventory + selected readiness states
-    -> ready problem list
-    -> existing run_dataset execution loop
-    -> canonical traces + summary.json
-    -> AMD score / AMD SOL v2 / SOLAR derivation / timing sidecars
-    -> ExecutionClosureReport
-    -> updated ParityGapReport with observed runtime evidence
-```
-
-Recommended module layout:
+### CLI Evaluation Flow
 
 ```text
-src/sol_execbench/core/dataset/
-  __init__.py
-  constants.py            # public categories, expected layout, schema version constants
-  discovery.py            # problem directory discovery and category normalization
-  inventory.py            # pure file/schema inspection and count aggregation
-  readiness.py            # ROCm readiness classification rules
-  reports.py              # parity gap and execution closure report dataclasses/parsers
-  contracts.py            # strict sidecar JSON parse/serialize helpers
+sol-execbench ... --solution solution.json -o traces.jsonl --static-evidence auto
+
+1. Load Definition, Workload, Solution, BenchmarkConfig.
+2. Create staging directory and ProblemPackager.
+3. If native HIP/C++ family:
+   a. packager.compile()
+   b. run build_ext.py
+   c. on compile failure: exit as today; optional static evidence is not written unless a later phase explicitly adds compile-failure evidence.
+   d. on compile success: collect static evidence from staging/build artifacts.
+4. Run evaluation normally.
+5. Write canonical trace JSONL exactly as today.
+6. Write optional environment/profile/static sidecars beside trace output.
+7. Exit 0 only if all workloads passed; static unavailable/failed does not change this.
 ```
 
-Script entry points:
+### Static Collection Flow
 
 ```text
-scripts/download_solexecbench.py
-  -> keep dataset download role
-  -> optionally write acquisition manifest
+StaticKernelEvidenceRequest
+  staging_dir
+  primary_artifact = staging_dir / "benchmark_kernel.so"
+  solution languages/target_hardware/compile_options
+  output_directory = traces.jsonl.static-kernel-evidence/ or staging_dir/static-kernel-evidence/
+  routing request = evidence_level=static, artifact_type=rocm_binary or elf_object
 
-scripts/run_dataset.py
-  -> keep execution role
-  -> optionally consume inventory / emit closure report
-
-scripts/inventory_solexecbench.py
-  -> new thin CLI for layout verification, inventory JSON, gap report JSON
+collect_static_kernel_evidence()
+  -> discover_static_kernel_artifacts()
+  -> build_toolchain_routing_report()
+  -> if selected tool available:
+       run bounded extraction command
+       write raw outputs under output_directory
+       classify extracted metadata conservatively
+     else:
+       return status="unavailable" or "skipped" with route decisions
+  -> StaticKernelEvidenceResult.to_dict()
 ```
 
-Keep the core implementation importable and testable without Hugging Face, ROCm, or subprocess execution. The scripts should mostly parse CLI arguments, call pure helpers, and write JSON.
+### Report Flow
 
-## New Modules
+```text
+static_kernel_evidence.v1 sidecar
+  -> optional markdown/text report
+  -> dataset or release closure can reference path later
+  -> scoring ignores it
+  -> canonical trace parser ignores it
+```
 
-| Module | Responsibility | Notes |
+## Stable Artifact Paths
+
+Use output-relative paths when `--output` is provided:
+
+```text
+traces.jsonl
+traces.jsonl.static-kernel-evidence.json
+traces.jsonl.static-kernel-evidence/
+  artifacts/
+    benchmark_kernel.so
+    <discovered>.hsaco
+    <discovered>.o
+  extracted/
+    llvm-objdump-disassemble.txt
+    readelf-headers.txt
+    rga-analysis.txt
+  report.md
+```
+
+Use staging-relative paths when no `--output` is provided:
+
+```text
+<staging_dir>/
+  benchmark_kernel.so
+  static-kernel-evidence/
+    static-kernel-evidence.json
+    artifacts/
+    extracted/
+    report.md
+```
+
+Sidecar path rule:
+
+| Context | Sidecar path | Artifact directory |
 | --- | --- | --- |
-| `src/sol_execbench/core/dataset/constants.py` | Define `PAPER_DATASET_CATEGORIES = ("L1", "L2", "Quant", "FlashInfer-Bench")` and sidecar schema versions. | Replace duplicate category constants in scripts over time. |
-| `src/sol_execbench/core/dataset/discovery.py` | Discover single problem dirs or dataset roots, preserving current `run_dataset.py` behavior. | Move or wrap `discover_problems()` here, then import from scripts. |
-| `src/sol_execbench/core/dataset/inventory.py` | Build per-problem inventory records from local files and schema parsing. | No subprocess or GPU dependency. |
-| `src/sol_execbench/core/dataset/readiness.py` | Classify each problem as ready or blocked with machine-readable reasons. | Pure function over inventory records and optional observed results. |
-| `src/sol_execbench/core/dataset/reports.py` | Build suite-level inventory, gap, and execution closure reports. | Dataclasses with `to_dict()` and strict parsers, matching scoring sidecar style. |
-| `scripts/inventory_solexecbench.py` | User-facing inventory/report command. | Additive script; does not affect `sol-execbench`. |
+| `--output traces.jsonl` | `traces.jsonl.static-kernel-evidence.json` | `traces.jsonl.static-kernel-evidence/` |
+| No `--output` and `--keep-staging` | `<staging>/static-kernel-evidence/static-kernel-evidence.json` | `<staging>/static-kernel-evidence/` |
+| No `--output` and no keep-staging | Collection may run for console diagnostics, but durable artifacts are not guaranteed. Prefer warning that static evidence needs `--output` or `--keep-staging`. |
 
-## Modified Modules
+The sidecar should store both absolute command working directories for provenance and stable relative artifact paths for reproducibility. If copying raw artifacts is expensive or risks mutating build products, register paths in place for staging output and copy only when writing beside `--output`.
 
-| Module | Modification | Boundary |
-| --- | --- | --- |
-| `scripts/download_solexecbench.py` | Add `--output`, `--category`, `--manifest`, and `--verify-layout` only if needed; reuse category constants. | Still only acquisition/layout. No evaluation. |
-| `scripts/run_dataset.py` | Import shared discovery; add optional `--inventory`, `--readiness ready`, `--closure-report`, and `--parity-gap-report` flags. | Existing invocation and output remain valid. |
-| `src/sol_execbench/core/scoring/amd_score.py` | No structural change expected. At most ensure report refs can be included from closure report. | Score layer must not inspect inventory state. |
-| `src/sol_execbench/core/scoring/solar_derivation.py` | No change expected. Continue generating sidecars from canonical inputs. | Keep sidecar contract independent of parity reports. |
-| Tests | Add dataset inventory/readiness/report tests and run_dataset filter tests. | Prefer CPU-only fixtures. |
-| Docs | Add internal dataset parity report documentation and claim guardrails. | Must distinguish inventory completion from full 235-problem ROCm validation. |
+## Sidecar Contract
 
-## Artifact Locations
+Schema version: `sol_execbench.static_kernel_evidence.v1`
 
-Recommended default outputs:
-
-```text
-out/dataset-parity/
-  acquisition-manifest.json
-  paper-parity-inventory.json
-  rocm-readiness.json
-  parity-gap-report.json
-  execution-closure-report.json
-
-out/<category>/<problem>/
-  traces.json
-  solution.json
-  *_cli.log
-
-out/amd-sol-v2/
-  <definition>.<workload>.amd-sol-v2.json
-
-out/solar-derivation/
-  <definition>.<workload>.solar-derivation.json
-
-out/timing-evidence/
-  <category>/<problem>.timing.json
-
-out/amd-score-report.json
-```
-
-Do not write inventory fields into:
-
-- `definition.json`
-- `workload.jsonl`
-- canonical trace JSONL / `traces.json`
-- `solution.json`
-- AMD SOL v2 sidecars
-- SOLAR derivation sidecars
-
-Those artifacts should instead be referenced from closure/gap reports using stable relative paths.
-
-## JSON Contracts
-
-### Acquisition Manifest
-
-Schema version: `sol_execbench.dataset_acquisition.v1`
-
-Purpose: record what was downloaded or layout-verified.
-
-Required top-level fields:
+Required top-level shape:
 
 ```json
 {
-  "schema_version": "sol_execbench.dataset_acquisition.v1",
-  "dataset": "nvidia/SOL-ExecBench",
-  "root": "data/benchmark",
-  "categories": ["L1", "L2", "Quant", "FlashInfer-Bench"],
+  "schema_version": "sol_execbench.static_kernel_evidence.v1",
+  "status": "success|skipped|unavailable|failed|unsupported",
+  "diagnostic_only": true,
+  "correctness_authority": false,
+  "performance_authority": false,
+  "score_authority": false,
+  "leaderboard_authority": false,
+  "canonical_trace_mutation": false,
   "generated_at": "ISO-8601",
-  "source": {
-    "kind": "huggingface|local_layout",
-    "repo_id": "nvidia/SOL-ExecBench",
-    "configs": ["L1", "L2", "Quant", "FlashInfer-Bench"]
+  "working_directory": "/tmp/sol_execbench_xxx",
+  "solution": {
+    "name": "solution name",
+    "languages": ["hip_cpp"],
+    "target_hardware": ["gfx1200"],
+    "compile_options": {}
   },
-  "category_counts": {"L1": 0, "L2": 0, "Quant": 0, "FlashInfer-Bench": 0},
+  "build": {
+    "primary_artifact": "benchmark_kernel.so",
+    "artifact_discovery_root": "/tmp/sol_execbench_xxx",
+    "compile_command": ["python", "build_ext.py"]
+  },
+  "routing": {
+    "schema_version": "sol_execbench.toolchain_routing.v1",
+    "selected_tool_id": "llvm-objdump"
+  },
+  "commands": [
+    {
+      "tool_id": "llvm-objdump",
+      "command": ["llvm-objdump", "--disassemble", "benchmark_kernel.so"],
+      "returncode": 0,
+      "stdout_path": "extracted/llvm-objdump-disassemble.txt",
+      "stderr_tail": ""
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "artifacts/benchmark_kernel.so",
+      "kind": "shared_object",
+      "size_bytes": 12345,
+      "sha256": "..."
+    }
+  ],
+  "classifications": {
+    "has_rocm_binary": true,
+    "has_disassembly": true,
+    "has_kernel_symbols": null,
+    "notes": []
+  },
+  "skipped_reason": null,
+  "failed_reason": null,
   "warnings": []
 }
 ```
 
-### Paper Parity Inventory
+Use `null` for unknown classification facts. Do not infer "no kernel symbols" from a failed or unavailable extractor.
 
-Schema version: `sol_execbench.paper_parity_inventory.v1`
+## CLI And API Surface
 
-Purpose: one machine-readable record per local public benchmark problem.
+### CLI
 
-Per-problem record:
+Add one option to the root evaluator command:
 
-```json
-{
-  "category": "L1",
-  "problem": "name",
-  "path": "data/benchmark/L1/name",
-  "definition_name": "name",
-  "files": {
-    "definition_json": true,
-    "workload_jsonl": true,
-    "reference_py": true,
-    "solution_json": false,
-    "solution_py": false
-  },
-  "schema": {
-    "definition_valid": true,
-    "workloads_valid": true,
-    "workload_count": 1,
-    "errors": []
-  },
-  "coverage": {
-    "dtypes": ["float16"],
-    "input_kinds": ["random"],
-    "uses_custom_inputs": false,
-    "uses_safetensors": false,
-    "has_forward_indicator": true,
-    "has_backward_indicator": false,
-    "op_type": "matmul"
-  },
-  "availability": {
-    "reference_available": true,
-    "solution_available": false
-  }
-}
+```bash
+uv run sol-execbench <problem_dir> \
+  --solution solution.json \
+  -o traces.jsonl \
+  --static-evidence auto
 ```
 
-Suite summary:
+Recommended values:
 
-```json
-{
-  "schema_version": "sol_execbench.paper_parity_inventory.v1",
-  "generated_at": "ISO-8601",
-  "dataset_root": "data/benchmark",
-  "expected_categories": ["L1", "L2", "Quant", "FlashInfer-Bench"],
-  "category_counts": {},
-  "total_problems": 0,
-  "records": []
-}
-```
-
-Forward/backward indicators should be conservative. Prefer explicit dataset fields if acquisition preserves them; otherwise derive from `definition.name`, `op_type`, description, and reference signatures with a `derived_indicator` warning. Do not overstate this as an upstream label unless it is actually present in the downloaded row.
-
-### ROCm Readiness Report
-
-Schema version: `sol_execbench.rocm_readiness.v1`
-
-Allowed readiness states:
-
-- `ready`
-- `schema_input_blocked`
-- `dtype_blocked`
-- `custom_input_blocked`
-- `runtime_blocked`
-- `unsupported_nvidia_only_path`
-- `needs_hardware_evidence`
-
-Per-problem record:
-
-```json
-{
-  "category": "L1",
-  "problem": "name",
-  "readiness": "ready",
-  "reasons": [],
-  "recommended_action": "run_small_batch",
-  "evidence": {
-    "inventory_ref": "paper-parity-inventory.json#records/L1/name",
-    "definition_ref": "data/benchmark/L1/name/definition.json",
-    "workload_ref": "data/benchmark/L1/name/workload.jsonl"
-  }
-}
-```
-
-Suggested classification rules:
-
-| State | Rule |
+| Value | Meaning |
 | --- | --- |
-| `schema_input_blocked` | Missing files, invalid `Definition`, invalid `Workload`, malformed JSON, mixed custom/non-custom inputs, unresolved workload axes. |
-| `dtype_blocked` | Definition or workload requires dtype unsupported by the ROCm port or current PyTorch ROCm path, especially paper-only low precision formats without implemented AMD support. |
-| `custom_input_blocked` | Custom input entrypoint is present but cannot be validated or safely executed in inventory-only mode. |
-| `unsupported_nvidia_only_path` | Reference or solution source imports CUDA/NVIDIA-only libraries or uses CUDA-only APIs with no ROCm replacement. |
-| `runtime_blocked` | A previous closure run produced compile/runtime/timeout failures. |
-| `needs_hardware_evidence` | Schema appears runnable, but no closure trace exists for the target hardware class. |
-| `ready` | Required files parse, reference exists, workloads parse, input kinds are supported, and no static NVIDIA-only blocker is detected. |
+| `none` | Default. Do not collect static evidence. |
+| `auto` | Attempt static evidence for native HIP/C++-family builds; write success, unavailable, unsupported, or failed sidecar; never alter benchmark scoring or pass/fail. |
 
-`ready` should mean "eligible for small closure execution," not "validated across all workloads and hardware."
+Do not add a "required" mode in the first implementation. A required mode would couple diagnostic tooling availability to benchmark execution and conflict with the milestone guardrail that unavailable states are nonfatal.
 
-### Execution Closure Report
+### Programmatic API
 
-Schema version: `sol_execbench.execution_closure.v1`
+Expose a small injectable API for tests and future dataset runners:
 
-Purpose: connect readiness to observed run artifacts.
-
-Required fields:
-
-```json
-{
-  "schema_version": "sol_execbench.execution_closure.v1",
-  "generated_at": "ISO-8601",
-  "dataset_root": "data/benchmark",
-  "output_root": "out",
-  "selection": {
-    "categories": ["L1"],
-    "readiness": ["ready"],
-    "limit": 5,
-    "max_workloads": 1
-  },
-  "summary": {
-    "selected_problems": 5,
-    "executed_problems": 5,
-    "passed_problems": 4,
-    "failed_problems": 1,
-    "trace_count": 5
-  },
-  "records": [
-    {
-      "category": "L1",
-      "problem": "name",
-      "readiness_before_run": "ready",
-      "execution_status": "passed|failed|skipped",
-      "trace_ref": "L1/name/traces.json",
-      "summary_ref": "summary.json#L1/name",
-      "amd_score_ref": "amd-score-report.json#scores/name",
-      "amd_sol_refs": [],
-      "solar_derivation_refs": [],
-      "timing_evidence_ref": null,
-      "warnings": []
-    }
-  ],
-  "claim_level": "inventory-and-small-batch-rocm-closure",
-  "non_claims": [
-    "not full 235-problem ROCm validation",
-    "not upstream SOLAR equivalence",
-    "not hosted leaderboard equivalence",
-    "not CDNA3 hardware validation unless separately evidenced"
-  ]
-}
+```python
+request = StaticKernelEvidenceRequest(
+    staging_dir=staging_dir,
+    primary_artifact=Path(artifact_path),
+    solution=solution,
+    output_directory=output_dir,
+    compile_command=cmd,
+)
+result = collect_static_kernel_evidence(request)
+sidecar_path.write_text(json.dumps(result.to_dict(), sort_keys=True) + "\n")
 ```
 
-### Parity Gap Report
+The collector should accept injectable `runner`, `which`, `routing_builder`, and `now` arguments, matching the existing testability style in `toolchain.py` and `rocm_profiler.py`.
 
-Schema version: `sol_execbench.parity_gap_report.v1`
+## Tool Routing Policy
 
-Purpose: aggregate missing inventory, blockers, and closure gaps.
+Use the existing `ToolchainRoutingRequest`:
 
-Required sections:
-
-```json
-{
-  "schema_version": "sol_execbench.parity_gap_report.v1",
-  "generated_at": "ISO-8601",
-  "inventory_ref": "paper-parity-inventory.json",
-  "readiness_ref": "rocm-readiness.json",
-  "closure_ref": "execution-closure-report.json",
-  "counts": {
-    "inventory_total": 0,
-    "ready": 0,
-    "blocked": 0,
-    "executed": 0,
-    "passed": 0,
-    "failed": 0
-  },
-  "gaps_by_category": {},
-  "gaps_by_reason": {},
-  "claim_guardrails": [],
-  "next_actions": []
-}
+```text
+evidence_level = static
+artifact_type = rocm_binary for HIP/C++ build products that may contain AMDGPU code objects
+artifact_type = elf_object for generic ELF/object metadata fallback
+gpu_architecture = first concrete solution target or locally detected gfx target when available
 ```
 
-## Data Flow Details
+Recommended extractor priority:
 
-### Inventory Build
+1. `llvm-objdump` for object/ELF disassembly and section visibility, because LLVM documentation defines it as an object-file and linked-image dumper with disassembly support.
+2. `readelf` for generic ELF metadata fallback, because it can inspect ELF headers/sections even when AMD-specific disassembly is unavailable.
+3. `roc-objdump` as a distribution-dependent ROCm candidate; route it explicitly but do not assume it exists.
+4. RGA as a richer binary-analysis route once live packaging confirms command-line behavior for the artifacts this project can produce. RGA is valuable, but it should not block the first sidecar because its supported modes and packaging differ from standard ROCm compiler tools.
 
-1. Discover categories from the expected public set: `L1`, `L2`, `Quant`, `FlashInfer-Bench`.
-2. For every problem directory, check file presence for `definition.json`, `workload.jsonl`, `reference.py`, `solution.json`, and `solution.py`.
-3. Parse `definition.json` with `Definition`.
-4. Parse every workload JSONL line with `Workload`.
-5. Compute inventory features:
-   - dtype set from `Definition.inputs` and `Definition.outputs`
-   - input kinds from workload input specs
-   - custom-input usage from `Definition.custom_inputs_entrypoint` and `CustomInput`
-   - safetensors usage from `SafetensorsInput`
-   - reference availability from `Definition.reference` and/or `reference.py`
-   - solution availability from local solution files
-   - op/category hints from `op_type`, name, description, and optional upstream fields if preserved
-6. Emit inventory JSON.
+This priority favors a minimum useful sidecar over waiting for full RGA interpretation. The sidecar can record RGA as unavailable/candidate while still preserving `llvm-objdump` or `readelf` evidence.
 
-### Readiness Classification
+## Component Boundaries
 
-1. Start from inventory record.
-2. If canonical files are missing or schema parsing failed, classify `schema_input_blocked`.
-3. If dtype set includes known unsupported low precision or packed formats for the current ROCm path, classify `dtype_blocked`.
-4. If custom input is present and there is no validated custom-input execution path for that pattern, classify `custom_input_blocked`.
-5. If static source scan finds CUDA/NVIDIA-only APIs in reference or solution files, classify `unsupported_nvidia_only_path`.
-6. If prior execution evidence exists with runtime failure, classify `runtime_blocked`.
-7. If runnable but no target-hardware trace evidence exists, classify `needs_hardware_evidence`.
-8. Otherwise classify `ready`.
-
-The classifier should support both strict mode and closure mode. In strict inventory mode, "needs hardware evidence" is acceptable for otherwise runnable problems. In execution selection mode, callers may choose to run both `ready` and `needs_hardware_evidence` records, but the report must preserve the distinction.
-
-### Execution Closure
-
-1. Load inventory/readiness report or build one in memory.
-2. Select records by category, readiness state, limit, and optional max workloads.
-3. Reuse `scripts/run_dataset.py` execution loop:
-   - build reference or custom solution
-   - call `sol-execbench --json`
-   - save `traces.json`
-   - inspect traces
-   - optionally emit AMD score, AMD SOL v2, SOLAR derivation, and timing evidence
-4. Write `execution-closure-report.json`.
-5. Update or generate `parity-gap-report.json`.
-
-Do not bypass `sol-execbench` for closure runs. The purpose of closure is to prove the existing public execution path can run selected public dataset problems.
-
-## Build Order
-
-1. **Dataset Contract and Discovery**
-   - Add `core/dataset/constants.py` and `core/dataset/discovery.py`.
-   - Move duplicate category/discovery behavior out of `scripts/run_dataset.py` behind compatible imports.
-   - Add tests that current dataset discovery behavior remains unchanged.
-
-2. **Inventory Records**
-   - Add `core/dataset/inventory.py` with strict dataclasses and `to_dict()`.
-   - Parse local fixture problem dirs through `Definition` and `Workload`.
-   - Emit `paper-parity-inventory.json`.
-
-3. **Readiness Classification**
-   - Add `core/dataset/readiness.py`.
-   - Implement deterministic blocker rules with reason codes.
-   - Add fixtures for missing files, invalid schema, safetensors, custom input, unsupported dtype, CUDA-only source, and ready problem.
-
-4. **Inventory CLI**
-   - Add `scripts/inventory_solexecbench.py`.
-   - Support `--dataset-root`, `--output-dir`, `--category`, `--json`, and `--gap-report`.
-   - Keep this separate from `sol-execbench`.
-
-5. **Runner Selection and Closure Report**
-   - Extend `scripts/run_dataset.py` with optional inventory/readiness filtering and `--closure-report`.
-   - Reuse existing sidecar options without changing defaults.
-   - Ensure skipped existing traces can still produce closure records and derived reports.
-
-6. **Gap Report and Claim Guardrails**
-   - Add `core/dataset/reports.py` aggregation.
-   - Add docs/tests that distinguish inventory completion, small-batch execution closure, full 235-problem validation, CDNA3 validation, upstream SOLAR equivalence, and leaderboard equivalence.
-
-7. **Acquisition Manifest**
-   - Extend `scripts/download_solexecbench.py` last, after inventory expectations are stable.
-   - Add manifest output for downloaded/local-layout verified datasets.
-
-## Patterns to Follow
-
-### Sidecar-Only Reporting
-
-**What:** Dataset parity, readiness, closure, and gap reports are separate JSON artifacts with their own schema versions.
-
-**Why:** The public benchmark contracts are already stable and narrow. Adding parity fields to traces or problem schemas would create compatibility churn and blur observed execution with derived reporting.
-
-### Pure Core, Thin Scripts
-
-**What:** Put discovery, inventory, classification, and report assembly in `src/sol_execbench/core/dataset/`; keep scripts as argument parsing and file writing.
-
-**Why:** CPU-only tests can cover most v1.11 behavior without Hugging Face, ROCm hardware, or subprocess execution.
-
-### Evidence References Instead of Embedding
-
-**What:** Closure and gap reports should link to traces, score reports, SOL sidecars, SOLAR derivation sidecars, and timing evidence by relative path and optional fragment.
-
-**Why:** Avoids duplicating large artifacts and keeps each sidecar contract independently parseable.
-
-### Conservative Classification
-
-**What:** When evidence is incomplete, classify as blocked or needing hardware evidence rather than ready.
-
-**Why:** The milestone goal is auditable parity, not maximizing the ready count.
-
-## Anti-Patterns to Avoid
-
-### Mutating Canonical Trace JSONL
-
-**What goes wrong:** Adding inventory/readiness/parity fields to `Trace` creates a public schema change.
-
-**Instead:** Put all parity metadata in sidecar reports that reference trace paths.
-
-### Expanding the Primary CLI
-
-**What goes wrong:** Adding dataset parity behavior to `sol-execbench` makes a single-problem evaluator responsible for dataset research workflows.
-
-**Instead:** Use `scripts/inventory_solexecbench.py` and optional `scripts/run_dataset.py` flags.
-
-### Treating Inventory as Validation
-
-**What goes wrong:** A complete inventory can be misread as a full ROCm benchmark pass.
-
-**Instead:** Reports must carry explicit claim levels and non-claims.
-
-### Running Blocked Problems Blindly
-
-**What goes wrong:** Batch runs spend time on known schema/dtype/custom-input blockers and produce noisy runtime failures.
-
-**Instead:** Run selected readiness states intentionally and preserve skipped/blocker evidence in closure reports.
-
-## Scalability Considerations
-
-| Concern | Small fixture set | Public dataset scale | Future full validation |
-| --- | --- | --- | --- |
-| Inventory parsing | In-memory list is fine. | In-memory list of hundreds of records is fine. | Keep JSONL option optional if records grow beyond paper dataset scale. |
-| Execution | Existing `--limit` and `--max-workloads`. | Add readiness filter to avoid known blockers. | Add resume/retry and per-category shards if full validation is attempted. |
-| Sidecars | Simple output dirs. | Use safe sidecar filenames already present in runner. | Add manifest index if sidecar count becomes hard to inspect. |
-| Hardware evidence | Usually absent. | Record `needs_hardware_evidence`. | Split reports by architecture, e.g. `gfx1200`, `gfx94*`. |
-| Claim control | Static docs/tests. | Report-level non-claims. | Require hardware-specific evidence manifests before validation claims. |
-
-## Testing Strategy
-
-Recommended focused tests:
-
-| Test file | Coverage |
+| Boundary | Rule |
 | --- | --- |
-| `tests/sol_execbench/test_dataset_discovery.py` | Shared discovery preserves current single-root and category behavior. |
-| `tests/sol_execbench/test_paper_parity_inventory.py` | Inventory fields, counts, dtype/input-kind/custom/safetensors/reference/solution detection. |
-| `tests/sol_execbench/test_rocm_readiness.py` | Every readiness state and reason code. |
-| `tests/sol_execbench/test_dataset_reports.py` | Strict schema versions, report aggregation, claim guardrails, artifact refs. |
-| `tests/sol_execbench/test_run_dataset_closure.py` | Runner filters by readiness and writes closure report using mocked CLI results. |
-| `tests/sol_execbench/test_public_contract_guardrails.py` | No new fields in canonical trace/definition/workload contracts; primary CLI remains stable. |
+| Canonical trace JSONL | Never add static fields to `Trace`, `Evaluation`, `Performance`, or `Correctness`. |
+| Score authority | Static evidence must not feed `src/sol_execbench/core/scoring/` in v1.17. |
+| Evaluation exit code | Static evidence unavailable/failed must not fail a benchmark run. Compile and evaluation failures behave as they do today. |
+| Packager | May expose build artifacts and artifact discovery roots; must not classify ISA or own tool subprocess logic. |
+| Toolchain routing | Selects/probes tools and records reasons; does not parse static evidence. |
+| Static collector | Parses/extracts static artifacts; depends on routing; returns explicit status for every path. |
+| Dataset/reporting | May reference static sidecars later; should not require them for existing dataset execution. |
+| Docs/claims | Must say diagnostic static evidence, not correctness, performance, paper parity, or leaderboard evidence. |
 
-Most tests should use temporary fixture problem directories. Avoid network and GPU dependencies except for explicit integration checks.
+## Native And Non-Native Coverage
 
-## Source-Grounded Confidence
+Initial implementation should support native HIP/C++-family solution categories:
 
-| Finding | Confidence | Basis |
+- `hip_cpp`
+- `hipblas`
+- `miopen`
+- `ck`
+- `rocwmma`
+
+For `pytorch` and `triton`, return `status="unsupported"` with a clear reason unless a stable artifact is discovered through an explicit future path. Triton can generate code artifacts, but the current packaging flow does not expose a stable build artifact boundary like `benchmark_kernel.so`; treating it as supported too early would make the sidecar unreliable.
+
+## Phase Build Order
+
+1. **Schema And Guardrails**
+   - Add `static_kernel_evidence.py` models with `to_dict()` serialization.
+   - Add contract capability `static_kernel_evidence.v1` and boundary claims.
+   - Add unit tests for diagnostic flags, status vocabulary, and no trace mutation.
+
+2. **Build Artifact Discovery**
+   - Add public packager helpers for native solution detection and primary artifact path.
+   - Implement discovery for `benchmark_kernel.so`, `.hsaco`, `.co`, `.o`, `.out`, and build intermediates under the staging directory.
+   - Add CPU-only tempdir tests with fixture files.
+
+3. **Routing And Extractors**
+   - Reuse `build_toolchain_routing_report()` for static evidence.
+   - Implement bounded extraction commands for `llvm-objdump` and `readelf` first.
+   - Keep `roc-objdump` and RGA represented through routing status until command behavior is validated with live artifacts.
+
+4. **CLI Sidecar Integration**
+   - Add `--static-evidence none|auto`.
+   - Collect after compile success and before evaluation.
+   - Write `traces.jsonl.static-kernel-evidence.json` and artifact directory.
+   - Ensure unavailable/failed static collection prints a warning and does not alter evaluation exit.
+
+5. **Reports And Documentation**
+   - Add optional Markdown/text summary renderer.
+   - Update `docs/ARCHITECTURE.md`, `docs/rocm_toolchain_routing.md`, `docs/CLAIMS.md`, and researcher guide references.
+   - Add docs guardrail tests for forbidden authority claims.
+
+6. **Live ROCm Validation**
+   - Run at least one RDNA 4 HIP/C++ example with `--static-evidence auto`.
+   - Archive sidecar and artifact tree shape.
+   - If CDNA 3 hardware is unavailable, label CDNA 3 static evidence support as schema/routing support only.
+
+## Tests To Add
+
+| Test Area | Recommended Coverage |
+| --- | --- |
+| Schema | `StaticKernelEvidenceResult.to_dict()` includes diagnostic-only booleans and no authority flags. |
+| Discovery | Finds primary `.so`, registers `.hsaco`/object fixtures, computes size and checksum deterministically. |
+| Routing | Static collector records `unavailable` when no static tool is on PATH. |
+| Extractor success | Inject fake runner and fake `which` to verify command, output file registration, stdout/stderr tails, and status. |
+| CLI | `--static-evidence auto` writes sidecar for native builds and does not write static fields into trace JSONL. |
+| Non-native | PyTorch/Triton solutions produce `unsupported` or `skipped` metadata without failure. |
+| Guardrails | Docs and contract tests reject wording that makes static evidence score/correctness/leaderboard authority. |
+
+## Pitfalls For Roadmap
+
+### Treating `benchmark_kernel.so` As Equivalent To HSACO
+
+PyTorch extension builds produce a shared object at a stable path today. Official HIP compiler documentation describes device code embedded into host objects and code objects or standalone `.hsaco` files, but this repository should not assume a standalone HSACO is always emitted. The sidecar should distinguish `shared_object`, `rocm_code_object`, `hsaco`, and `unknown_object`.
+
+### Making RGA The First Hard Dependency
+
+RGA is useful for binary analysis, and current GPUOpen documentation describes binary analysis mode for code-object binaries. However, the project already has a routing layer and can produce useful baseline evidence with generic object tools. Start with route-aware `llvm-objdump`/`readelf` extraction and add RGA as an enhancement once live artifacts confirm command-line behavior.
+
+### Mutating Trace Or Score Contracts
+
+Static evidence is attractive to correlate with performance, but v1.17 should not feed score reports or trace fields. Correlation reports can be a future derived artifact after static sidecars are stable.
+
+### Failing Benchmarks For Missing Tools
+
+Many ROCm environments will not have every object-inspection or GPUOpen tool installed. The sidecar must preserve `unavailable`, `unsupported`, and `failed` states as evidence, not turn them into benchmark failures.
+
+### Overclassifying ISA
+
+Do not build deep instruction taxonomy in the first milestone. Safe initial classifications are artifact presence, command success, disassembly presence, section/symbol text presence, selected tool, and warnings. Instruction-family classification needs separate validation.
+
+## Roadmap Implications
+
+Recommended phase structure:
+
+1. **Static Evidence Contract Foundation** - creates sidecar schema, diagnostic flags, contract capability token, and guardrails.
+   - Addresses: stable consumer contract.
+   - Avoids: trace/schema churn.
+
+2. **Build Artifact Discovery** - exposes packager artifact paths and registers stable artifacts.
+   - Addresses: connection from solution build to static evidence.
+   - Avoids: brittle CLI scanning with private packager details.
+
+3. **Routed Static Extraction** - wires `toolchain.py` static routes into a collector with nonfatal unavailable states.
+   - Addresses: current v1.16 routing layer becoming useful.
+   - Avoids: hard dependency on one external static tool.
+
+4. **CLI Sidecar And Reports** - adds `--static-evidence auto`, writes sidecar/artifact tree, and renders summary.
+   - Addresses: user-facing milestone feature.
+   - Avoids: changing default benchmark semantics.
+
+5. **Docs, Guardrails, Live Validation** - updates architecture/claims and captures bounded live evidence.
+   - Addresses: research-grade usability.
+   - Avoids: overclaiming static evidence authority.
+
+Phase ordering rationale:
+
+- Contract and artifact discovery must precede CLI integration because the CLI needs stable result objects and paths.
+- Routing/extractors must precede reports because reports should summarize real status vocabulary, not invented placeholders.
+- Documentation should land with tests after the behavior is concrete enough to guard.
+
+## Confidence Assessment
+
+| Area | Confidence | Notes |
 | --- | --- | --- |
-| Inventory should be sidecar-only | HIGH | Existing `Definition`, `Workload`, and `Trace` schemas are public execution contracts; project explicitly requires stability. |
-| Runner is the right execution closure integration point | HIGH | `scripts/run_dataset.py` already owns discovery, CLI subprocess execution, summary, traces, AMD score, SOL v2, SOLAR derivation, and timing evidence. |
-| New core dataset package is preferable to adding more script logic | HIGH | Existing runner is already large; pure helpers improve testability and keep scripts thin. |
-| Exact upstream row metadata for forward/backward indicators may need validation | MEDIUM | `download_solexecbench.py` currently preserves only selected row fields and does not retain all possible upstream metadata. |
-| Readiness states listed in the milestone are sufficient | MEDIUM-HIGH | States map cleanly to existing schema/input/runtime boundaries, but implementation may discover finer reason codes. |
+| Integration point | HIGH | Existing CLI compile/evaluate split and sidecar helpers make the after-compile hook clear. |
+| Component boundaries | HIGH | Existing environment/profile/toolchain patterns already separate diagnostic evidence from trace and score authority. |
+| Artifact paths | HIGH | Existing `--output` sidecar naming establishes the durable path pattern. |
+| Tool priority | MEDIUM | Official docs support `llvm-objdump`, readelf, HIP compiler code objects, and RGA binary analysis, but live artifact compatibility still needs validation. |
+| Contract update | HIGH | Capability token plus unchanged trace fields matches current evaluator contract design. |
+| HSACO discovery | MEDIUM | PyTorch ROCm extension builds may embed device code in the shared object; standalone HSACO discovery should be opportunistic. |
 
-## Open Questions For Implementation
+## Sources
 
-- Does the Hugging Face dataset expose explicit forward/backward indicators, or must they be derived from names/descriptions/reference code?
-- Should `download_solexecbench.py` preserve the original raw row metadata in an optional sidecar for auditability?
-- Which dtype values are considered "blocked" versus "needs hardware evidence" for ROCm >= 7.0 on RDNA 4 and CDNA 3?
-- Should custom-input problems be blocked by default until a fixture proves the entrypoint is safe and deterministic?
-- Should closure reports be architecture-specific from the start, or is hardware architecture captured only through trace environments until full validation work begins?
-
-## Recommended Roadmap Implication
-
-Build v1.11 in this order: shared discovery, inventory, readiness classification, inventory CLI, runner closure integration, gap reports, acquisition manifest. This order keeps all early work CPU-only and schema-focused, then plugs into the existing execution and scoring sidecar pipeline only after selection and report contracts are stable.
+- Repository project context: `.planning/PROJECT.md`
+- Current architecture: `docs/ARCHITECTURE.md`
+- Toolchain routing design: `docs/rocm_toolchain_routing.md`
+- CLI sidecar patterns: `src/sol_execbench/cli/main.py`
+- Build packaging path: `src/sol_execbench/driver/problem_packager.py`
+- PyTorch ROCm extension build template: `src/sol_execbench/driver/templates/build_ext.py`
+- Routing implementation: `src/sol_execbench/core/toolchain.py`
+- Profiling sidecar model: `src/sol_execbench/core/bench/rocm_profiler.py`
+- Evaluator contract: `src/sol_execbench/core/data/contract.py`
+- Claims guardrails: `docs/CLAIMS.md`
+- HIP compiler documentation: https://rocm.docs.amd.com/projects/HIP/en/latest/understand/compilers.html
+- ROCm compiler reference: https://rocm.docs.amd.com/projects/llvm-project/en/docs-7.2.3/reference/rocmcc.html
+- LLVM `llvm-objdump` command guide: https://llvm.org/docs/CommandGuide/llvm-objdump.html
+- Radeon GPU Analyzer manual: https://gpuopen.com/manuals/rga_manual/
+- Radeon GPU Analyzer help manual: https://gpuopen.com/manuals/rga_manual/help_manual/
+- GNU binutils `readelf` documentation: https://sourceware.org/binutils/docs/binutils/readelf.html

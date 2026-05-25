@@ -1,361 +1,367 @@
 # Domain Pitfalls
 
-**Domain:** SOL ExecBench public dataset parity inventory and ROCm execution closure  
-**Milestone:** v1.11 Paper Dataset Parity Inventory and ROCm Execution Closure  
-**Researched:** 2026-05-23  
-**Overall confidence:** HIGH for local integration risks from project docs, scripts, and tests; MEDIUM for public dataset-shape risks until the live Hugging Face dataset revision is inventoried and pinned.
+**Domain:** Static Kernel Evidence for the SOL ExecBench ROCm port  
+**Milestone:** v1.17 Static Kernel Evidence  
+**Researched:** 2026-05-25  
+**Overall confidence:** HIGH for repo-specific integration, artifact, test, and claim-boundary risks from local docs/tests/code; MEDIUM for ROCm tool packaging drift because executable names and feature availability vary by ROCm distribution and host image.
 
 ## Scope Boundary
 
-v1.11 should make the public SOL ExecBench benchmark dataset surface concrete in this ROCm port: acquire or verify layout, count problems, classify compatibility, run small ready subsets, emit canonical and derived artifacts, and report parity gaps. It must not claim full 235-problem validation, NVIDIA/B200 or leaderboard equivalence, upstream SOLAR parity, CDNA 3/MI300X validation, CDNA 4 validation, or NVFP4/MXFP4 hardware validation.
+v1.17 should add diagnostic static kernel evidence on top of the v1.16 toolchain routing layer. The intended output is separate sidecar/report evidence such as `static_kernel_evidence.v1`, routed tool provenance, captured artifact refs, ISA/metadata extraction status, parser warnings, and unavailable states.
 
-The key mistake to avoid is treating "inventory complete" as "benchmark parity validated." The correct closure artifact is a machine-readable status ledger with explicit blocked, skipped, unscored, and ready states.
+The milestone must not mutate canonical trace JSONL, change benchmark scoring, turn static evidence into correctness/performance authority, or make static evidence mandatory for every run. The current project already has this pattern for runtime snapshots, `rocprofv3` profiling sidecars, AMD-native score artifacts, and `toolchain.routing.v1`; Static Kernel Evidence should follow the same sidecar-first contract.
+
+## Future Phase Labels
+
+Use these roadmap phase labels when assigning prevention work:
+
+| Phase | Name | Pitfall Ownership |
+| --- | --- | --- |
+| Phase 1 | Static Evidence Contract And Claim Boundary | Sidecar schema, authority flags, docs/contract guardrails. |
+| Phase 2 | Artifact Capture And Build Integration | Capturing `.so`, code object, HSACO, build logs, compiler command provenance, temp/cache path handling. |
+| Phase 3 | Routed Extractor Adapters | Tool selection, bounded execution, unavailable states, stdout/stderr capture, version recording. |
+| Phase 4 | Parser And Classification Layer | ISA/metadata parsing, conservative classifiers, architecture-specific handling. |
+| Phase 5 | Reports And Researcher Workflow | Human-readable reports, artifact refs, curated examples, cookbook updates. |
+| Phase 6 | Verification Matrix And Guardrails | CPU-safe tests, sandbox behavior, ROCm hardware/container checks, doc no-claim tests. |
 
 ## Critical Pitfalls
 
-### Pitfall 1: Assuming Dataset Download Equals Paper Dataset Parity
+### Pitfall 1: Treating Tool Availability As Stable Across ROCm Images
 
-**What goes wrong:** The milestone downloads `nvidia/SOL-ExecBench` and reports success because local folders exist, without proving the dataset revision, category counts, required files, blob assets, and problem identities match the expected public benchmark surface.
+**What goes wrong:** The implementation assumes a fixed set of static tools is installed and named consistently, then fails or silently omits evidence when the local ROCm image has only some of RGA, `llvm-objdump`, `roc-objdump`, `readelf`, or LLVM tools under versioned paths.
 
-**Why it happens:** `scripts/download_solexecbench.py` currently calls `load_dataset(REPO_ID, name=subset, split="train")` for `L1`, `L2`, `Quant`, and `FlashInfer-Bench`, then writes only `definition.json`, `reference.py`, and `workload.jsonl` under `data/benchmark/<subset>/<problem>/`. It does not pin a dataset revision, write source metadata, verify expected counts, download external safetensors blobs, or preserve all row fields.
+**Why it happens:** v1.16 deliberately modeled static tools as `planned` or `candidate` in `src/sol_execbench/core/toolchain.py`. The current routing registry lists RGA, `llvm-objdump`, `roc-objdump`, and `readelf`, but static extraction has not yet proven which tools exist in the Docker image, host image, or CI environment. ROCm packaging also changes over time; some tools are generic LLVM/binutils tools, some are GPUOpen tools, and some may be absent from minimal runtime images.
 
-**Consequences:** The inventory can drift with upstream dataset changes, miss assets needed by workloads, or count a local partial download as paper parity. Later runs fail in ways that look like ROCm incompatibility but are actually acquisition/layout gaps.
-
-**Warning signs:**
-- Inventory has category counts but no Hugging Face repo id, revision/commit, split, row count, and acquisition timestamp.
-- `data/benchmark` and `data/SOL-ExecBench/benchmark` are both referenced in docs/scripts without a layout alias or migration check.
-- Problems with `safetensors` inputs are classified as runtime failures instead of asset-acquisition blocked.
-- Download script success is used as evidence for 235-problem validation.
-
-**Prevention strategy:**
-- Add a dataset manifest that records source repo, config, split, revision, row count, local output root, and per-problem file checksums.
-- Separate acquisition status from ROCm execution status: `downloaded`, `layout_valid`, `missing_blob`, `schema_invalid`, `ready_to_run`.
-- Verify category names exactly: `L1`, `L2`, `Quant`, `FlashInfer-Bench`.
-- Make count expectations configurable or derived from the pinned revision; fail closed on mismatches.
-- Document that public dataset inventory is not paper extraction parity and not full validation.
-
-**Detection:** A clean checkout can run the inventory command and reproduce the same manifest from the same dataset revision; if not, parity inventory is not auditable.
-
-**Future phase:** Phase 1: Dataset Acquisition And Layout Contract.
-
-### Pitfall 2: Letting Stale Documentation Drive Implementation Instead Of Current Code Contracts
-
-**What goes wrong:** v1.11 follows older docs or examples that mention outdated paths, CUDA-era assumptions, or previous milestone claims, while the current Pydantic models and runner enforce different contracts.
-
-**Why it happens:** The repository has accumulated docs across porting milestones. Current code keeps canonical `Definition`, `Workload`, and `Trace` key spaces guarded by tests, while docs still mention historical dataset paths and inherited NVIDIA-origin terms.
-
-**Consequences:** The inventory may classify valid current problems as invalid, or worse, mutate canonical schemas to make stale docs true.
+**Consequences:** Static evidence becomes brittle and environment-specific. Researchers see unexplained missing reports, or worse, the benchmark starts failing in environments where normal execution still works.
 
 **Warning signs:**
-- New inventory fields are added to `definition.json`, `workload.jsonl`, or trace JSONL.
-- CLI behavior changes instead of adding a sidecar/report path.
-- Docs are updated without tests in `test_public_contract_guardrails.py`.
-- README/getting-started paths and script defaults disagree without an explicit compatibility note.
+- Code calls `subprocess.run(["llvm-objdump", ...])` directly instead of going through routing/probe results.
+- Static extraction failure exits the main benchmark command when the run otherwise produced valid traces.
+- Reports say "static evidence unavailable" without tool id, command, path, version/probe output, status, and reason code.
+- Tests only cover a developer workstation where every tool happens to be installed.
 
 **Prevention strategy:**
-- Treat local Pydantic models and guardrail tests as source of truth for public contracts.
-- Put inventory, readiness, parity gaps, and derived scoring metadata in sidecars/reports only.
-- Add doc guardrails for v1.11 no-claim phrases and canonical schema non-mutation.
-- Update docs after code, using generated command examples from the implemented paths.
+- Promote static routes from `planned` only after adding explicit extractor adapters and tests for `available`, `unavailable`, `failed`, `unsupported_artifact`, and `unsupported_arch`.
+- Probe tools with bounded commands before extraction and persist the selected routing decision inside the static evidence sidecar.
+- Treat each extractor as optional diagnostic evidence. Missing tools must produce an `unavailable` sidecar, not a benchmark failure.
+- Record executable path, command, timeout, return code, stdout/stderr tails, and source refs exactly as profiling evidence does today.
 
-**Detection:** A diff to `Definition`, `Workload`, `Trace`, primary CLI help, or solution schema is required just to express inventory results. That is a public contract drift warning.
+**Verification guidance:**
+- Unit-test routing with fake `which`/runner functions for all static tools.
+- Add CLI or core tests that generate a static sidecar with no tools installed and assert benchmark trace output remains unchanged.
+- Add one ROCm-container check that validates the discovered static tool matrix, but keep it outside CPU-safe CI.
 
-**Future phase:** Phase 1: Contract Baseline; Phase 6: Documentation And Guardrail Closure.
+**Future phase:** Phase 3: Routed Extractor Adapters; Phase 6: Verification Matrix And Guardrails.
 
-### Pitfall 3: Collapsing Schema Drift Into Runtime Failure
+### Pitfall 2: Assuming PyTorch Extension Builds Expose Stable HSACO Files
 
-**What goes wrong:** Problems that do not parse current schemas are attempted in the runner and recorded as failed executions, obscuring whether the issue is schema drift, unsupported input descriptors, missing files, or real ROCm execution failure.
+**What goes wrong:** Static capture searches for a predictable `.hsaco` or code-object filename, but the current HIP/C++ path builds through `torch.utils.cpp_extension.load()` in `src/sol_execbench/driver/templates/build_ext.py`, uses the staging directory as `build_directory`, and finally normalizes only the extension output to `benchmark_kernel.so`.
 
-**Why it happens:** `scripts/run_dataset.py` discovers directories by `definition.json` and `workload.jsonl`, then later loads definitions and invokes the CLI. It is an execution helper, not a schema-drift inventory tool.
+**Why it happens:** The project currently needs a loadable Python extension, not compiler intermediate artifacts. PyTorch and HIP may create nested build products, platform-suffixed `.so` files, object files, temporary command files, or embedded code objects whose names and locations are not part of this repo's public contract.
 
-**Consequences:** The milestone produces noisy failure counts and cannot distinguish "public dataset shape changed" from "ROCm cannot run this problem."
+**Consequences:** Static evidence works on one host and disappears on another. The extractor may analyze the Python extension wrapper instead of the embedded GPU code object, or it may capture stale artifacts from a previous build.
 
 **Warning signs:**
-- Summary reports only `OK`/`FAIL`.
-- Validation errors, missing references, bad custom inputs, and dtype unsupported states appear as generic CLI logs.
-- Inventory lacks a stable readiness enum.
+- Static capture relies on `glob("*.hsaco")` and marks absence as an error.
+- Evidence records only `benchmark_kernel.so` and claims ISA was extracted from the actual kernel without proving a code-object section existed.
+- Tests assert exact intermediate filenames produced by PyTorch.
+- Build directory cleanup deletes artifacts before the sidecar can reference them.
 
 **Prevention strategy:**
-- Add a preflight inventory pass that parses every `definition.json` and every workload line with current models before any GPU execution.
-- Classify blockers before running: `schema_input_blocked`, `dtype_blocked`, `custom_input_blocked`, `asset_blocked`, `unsupported_nvidia_path`, `runtime_blocked`, `needs_hardware_evidence`, `ready`.
-- Store first error type, message, file path, and workload UUID without requiring a GPU.
-- Keep execution summaries separate from inventory summaries.
+- Define artifact capture tiers: `extension_shared_object`, `embedded_rocm_code_object`, `standalone_hsaco`, `build_log`, and `unavailable`.
+- Always preserve the compiled `benchmark_kernel.so` ref for HIP/C++ static evidence, even when standalone HSACO discovery fails.
+- Copy captured static artifacts to an evidence directory before staging cleanup, using stable sidecar-relative paths.
+- Record whether the artifact is direct code object evidence or fallback ELF/shared-object evidence; do not collapse them into one "HSACO captured" flag.
 
-**Detection:** A problem with a malformed workload line increments failed execution count instead of a schema-blocked inventory count.
+**Verification guidance:**
+- Add tests with a fake staging tree containing `.so`, `.o`, `.hsaco`, nested build files, and stale files; assert deterministic capture precedence.
+- Add a test where no standalone HSACO exists but `benchmark_kernel.so` does; expected status should be degraded or partial, not failed.
+- For live ROCm validation, inspect at least one HIP/C++ example and prove the report points to the artifact actually produced by that run.
 
-**Future phase:** Phase 2: Machine-Readable Inventory And Readiness Classification.
+**Future phase:** Phase 2: Artifact Capture And Build Integration.
 
-### Pitfall 4: Mishandling Custom Inputs And Safetensors As Ordinary Random Inputs
+### Pitfall 3: Losing Evidence Because Staging Directories Are Temporary
 
-**What goes wrong:** Dataset problems requiring `custom_inputs_entrypoint` or safetensors are treated as ready because their schema parses, but execution substitutes random inputs or cannot find blob files.
+**What goes wrong:** The sidecar references files under `tempfile.mkdtemp(prefix="sol_execbench_")` or PyTorch build paths that are deleted by `ProblemPackager.__del__()` unless `--keep-staging` is used.
 
-**Why it happens:** Workloads support `random`, `scalar`, `safetensors`, and `custom`. `Workload` rejects mixed custom and non-custom inputs, and `Definition` validates the named custom entrypoint. `load_safetensors()` resolves relative paths against blob roots and raises on missing files, tensor keys, shapes, or dtypes. The download script does not currently fetch blob assets.
+**Why it happens:** The current CLI intentionally creates disposable staging directories. Existing optional sidecars use paths next to the requested trace output or profiler output directory. Static capture must not depend on `--keep-staging` for evidence durability.
 
-**Consequences:** Correctness failures are misattributed to ROCm. Worse, random substitutes can make a problem appear runnable while not matching the public workload semantics.
+**Consequences:** Reports contain dead paths. Re-running or inspecting a completed benchmark cannot reproduce what was extracted, and downstream tools cannot archive evidence.
 
 **Warning signs:**
-- Inventory lists safetensors problems as ready without checking file existence and tensor keys.
-- `custom_inputs_entrypoint` is present but the referenced function is not classified separately.
-- A workload with `type: custom` is run with reference wrapping but no custom input readiness note.
-- FlashInfer trace problems fail only after GPU invocation.
+- `static_kernel_evidence.v1` stores absolute paths under `/tmp/sol_execbench_*`.
+- Evidence exists only when `--keep-staging` is set.
+- CPU tests pass because they inspect paths before cleanup, while real CLI users receive dangling refs.
 
 **Prevention strategy:**
-- Inventory each input descriptor type per problem and workload.
-- For safetensors, verify path resolution against explicit blob roots before execution; record `missing_safetensors`, `missing_tensor_key`, `shape_mismatch`, and `dtype_mismatch`.
-- For custom inputs, verify the entrypoint exists and classify whether the current evaluator can invoke it in the reference path.
-- Never replace safetensors/custom data with random data for parity runs.
+- Store static evidence beside the trace output, for example `<trace>.static.json` and `<trace>.static/`, matching profiler sidecar conventions.
+- If no output path is provided, write into a static subdirectory under staging but mark artifact refs as ephemeral unless explicitly copied.
+- Copy files before `ProblemPackager` can clean staging, and store checksums/sizes for copied artifacts.
+- Preserve raw absolute source paths only as provenance fields, not as the primary artifact refs.
 
-**Detection:** A parity run can pass with a problem whose workload references a missing `.safetensors` path. That indicates the run is not preserving dataset semantics.
+**Verification guidance:**
+- CLI test with `keep_staging=False`: after command completion, sidecar artifact refs should still exist outside staging.
+- Test no-output mode separately and assert the sidecar clearly labels artifacts as ephemeral or unavailable.
+- Add path-safety tests for output filenames with dots and nested directories, following profiler sidecar behavior.
 
-**Future phase:** Phase 2: Inventory Classification; Phase 3: Ready-Subset Execution Closure.
+**Future phase:** Phase 2: Artifact Capture And Build Integration; Phase 6: Verification Matrix And Guardrails.
 
-### Pitfall 5: Overstating Low-Precision DType Support
+### Pitfall 4: Polluting Global Caches Or Mixing Artifacts Across Tests
 
-**What goes wrong:** FP8, FP4, NVFP4, MXFP4, or quantized problems are classified as ROCm ready because dtype strings parse, even when PyTorch ROCm, AMD hardware, or the benchmark harness cannot validate equivalent semantics.
+**What goes wrong:** Static evidence scans PyTorch, HIP, or user cache directories globally and captures artifacts from previous builds, parallel pytest workers, or another solution with the same extension name.
 
-**Why it happens:** Current dtype mappings include `float8_e4m3fn`, `float8_e5m2`, `float4_e2m1`, and `float4_e2m1fn_x2`. Random generation has special FP8/FP4 paths, and docs explicitly defer NVFP4/MXFP4 validation. Parsing a dtype is not proof that the ROCm stack supports the paper's NVIDIA-oriented low-precision semantics.
+**Why it happens:** `build_ext.py` uses `name="benchmark_kernel"` for every HIP/C++ build and `build_directory=str(HERE)`. Tests already provide `tmp_cache_dir` to isolate `SOLEXECBENCH_CACHE_PATH`, but the main CLI uses a fresh temp staging dir, and static capture may be tempted to search broad cache locations.
 
-**Consequences:** Quant category reports can imply hardware validation or semantic equivalence that v1.11 explicitly must not claim.
+**Consequences:** Evidence becomes nondeterministic. A sidecar may point to the wrong kernel, wrong architecture, or stale code object while the current trace still corresponds to a different solution.
 
 **Warning signs:**
-- Inventory has a single `dtype_supported: true` flag.
-- `float4_e2m1` is treated as interchangeable with packed `float4_e2m1fn_x2`.
-- NVFP4/MXFP4 are mentioned without "not validated" or "blocked/pending evidence."
-- Quant problems contribute to an AMD-native score report without dtype guard warnings.
+- Capture code searches `~/.cache`, `/tmp`, `/opt/rocm`, or PyTorch extension cache recursively.
+- Sidecar lacks solution hash, staging dir, compile command, artifact mtime, size, or checksum.
+- Tests pass only when run serially; xdist causes collisions or flaky artifact counts.
 
 **Prevention strategy:**
-- Split dtype state into `schema_known`, `input_generation_supported`, `reference_execution_supported`, `candidate_execution_supported`, and `hardware_validation_status`.
-- Classify FP8 and FP4/NVFP4/MXFP4 separately; do not merge NVIDIA format names with AMD/PyTorch dtype names.
-- For Quant problems, require explicit evidence before `ready`; otherwise use `dtype_blocked` or `needs_hardware_evidence`.
-- Keep NVFP4/MXFP4 in no-claim guardrails unless future hardware validation exists.
+- Search only the current staging/build directory by default.
+- Require copied artifact checksum, size, source path, and capture timestamp.
+- Tie static sidecar entries to `definition`, `solution`, workload count, and compiled artifact path from the same CLI invocation.
+- Use the existing `tmp_cache_dir` pattern for tests that exercise cache-sensitive behavior.
 
-**Detection:** A report says "Quant ready" without listing dtype families and validation status per problem.
+**Verification guidance:**
+- Create two fake staging directories with different artifacts and assert only the current one is captured.
+- Run static-evidence tests under xdist-compatible constraints; avoid shared filenames outside `tmp_path`.
+- Add a regression test with stale files older than the current compile start time and verify they are either ignored or marked as stale.
 
-**Future phase:** Phase 2: Readiness Classification; Phase 5: Claim Guardrails.
+**Future phase:** Phase 2: Artifact Capture And Build Integration; Phase 6: Verification Matrix And Guardrails.
 
-### Pitfall 6: Treating Skipped Results As Passed Or Invisible
+### Pitfall 5: Overclaiming Static Evidence As Correctness, Performance, Or Score Authority
 
-**What goes wrong:** The runner skips already-passed results, missing references, missing solution files, or no-output CLI failures, but the final parity report counts only attempted problems and loses why other problems were skipped.
+**What goes wrong:** Documentation or reports imply that successful ISA extraction proves the kernel is correct, faster, paper-equivalent, hardware-validated, or leaderboard-ready.
 
-**Why it happens:** `run_dataset.py` skips existing passed traces unless `--rerun`, continues when no reference exists or a named solution file is missing, and appends failure summaries only for no trace output. This is practical for ad hoc batches but insufficient for parity closure.
+**Why it happens:** Static artifacts feel authoritative, especially when they include ISA, resource metadata, or compiler diagnostics. Existing docs explicitly forbid treating toolchain routing or profiling as correctness/performance authority, and v1.17 has the same boundary.
 
-**Consequences:** The milestone can undercount blocked problems and overstate closure. Reusing old traces may also mix incompatible code versions, dataset revisions, or config settings.
+**Consequences:** The project weakens its claim discipline and risks misleading researchers. Downstream consumers may use static evidence to rank submissions even when traces failed or were never run.
 
 **Warning signs:**
-- Summary denominator is `len(summaries)` rather than total inventory count.
-- "Skipping" appears in logs but not in JSON.
-- Existing traces are reused without recording code revision, dataset revision, config, and artifact freshness.
-- Problems with no reference are absent from output.
+- Sidecar fields named `validated`, `score`, `passed_static`, or `performance_class`.
+- Reports include "kernel uses expected ISA, therefore correct/optimized".
+- `docs/CLAIMS.md` is not updated with a new "Static kernel evidence" row.
+- Static evidence is added to `Trace`, `EvaluationStatus`, or scoring fields.
 
 **Prevention strategy:**
-- Add explicit machine-readable statuses: `not_attempted`, `skipped_existing_pass`, `skipped_missing_reference`, `skipped_missing_solution`, `cli_no_trace`, `failed`, `passed`.
-- Include all discovered/inventoried problems in the report denominator.
-- Require `--rerun` or artifact freshness checks for closure claims.
-- Keep execution closure claims scoped to small ready subsets, with attempted/passed/failed/skipped counts.
+- Use explicit authority flags in the sidecar: `diagnostic_only: true`, `correctness_authority: false`, `performance_authority: false`, `score_authority: false`, `leaderboard_authority: false`.
+- Define statuses like `captured`, `partial`, `unavailable`, `failed`, `unsupported`, and `not_requested`; avoid pass/fail language.
+- Keep static evidence references out of canonical trace JSONL and AMD-native scoring.
+- Add docs and no-claim tests for "not correctness", "not performance proof", "not paper parity", and "not leaderboard authority".
 
-**Detection:** The report cannot answer "How many total public problems were found, how many were not attempted, and why?"
+**Verification guidance:**
+- Contract/doc tests should fail if static evidence claims appear without diagnostic-only boundaries.
+- Serialization tests should assert authority flags are always false except `diagnostic_only`.
+- Existing trace schema tests should not require updates to accept static evidence fields.
 
-**Future phase:** Phase 3: Small Ready-Subset Execution; Phase 4: Parity Gap Reporting.
+**Future phase:** Phase 1: Static Evidence Contract And Claim Boundary; Phase 6: Verification Matrix And Guardrails.
 
-### Pitfall 7: Sidecar Path Safety Regressions
+### Pitfall 6: Building Brittle Parsers For ISA And Metadata Text
 
-**What goes wrong:** Problem names, workload UUIDs, or category names from an untrusted dataset are used directly in derived sidecar filenames or output paths, enabling path traversal, collisions, overwritten artifacts, or ambiguous evidence refs.
+**What goes wrong:** Parsers assume exact output formatting from RGA, `llvm-objdump`, `roc-objdump`, or `readelf` and break when a tool version changes column names, section order, target syntax, metadata keys, or warning text.
 
-**Why it happens:** `run_dataset.py` already has `_safe_sidecar_stem()` for AMD SOL and SOLAR derivation sidecars, but other outputs still use category/problem directory names and job-name slices. v1.11 will add inventory and parity sidecars, increasing the number of paths derived from dataset identifiers.
+**Why it happens:** Static tools produce human-oriented text, and ROCm/LLVM outputs are not guaranteed to be stable enough for strict line-position parsing. The current project already uses conservative parser patterns for `rocprofv3` CSV evidence; static parsers need the same discipline.
 
-**Consequences:** Reports can overwrite each other, escape intended output roots, or point evidence refs at misleading files.
+**Consequences:** Evidence classification becomes noisy, version-dependent, and hard to debug. A harmless tool formatting change may flip an evidence status from partial to failed.
 
 **Warning signs:**
-- New artifact paths concatenate raw `definition.name`, workload UUID, category, or problem directory names.
-- Sanitization strips unsafe characters without adding a digest.
-- Sidecars for different raw identifiers map to the same filename.
-- Relative evidence refs point outside the configured output directory.
+- Parser relies on fixed line numbers or exact whole-line strings.
+- Unknown metadata fields raise exceptions instead of being preserved.
+- Parser outputs only derived classifications and discards raw stdout/stderr/artifact refs.
+- Tests contain one golden output from one workstation only.
 
 **Prevention strategy:**
-- Reuse or generalize `_safe_sidecar_stem()` for every derived filename.
-- Keep output paths anchored under a resolved output root and verify `is_relative_to()`.
-- Add collision tests for names differing only by unsafe characters.
-- Store raw identifiers inside the JSON payload; use sanitized plus digest identifiers only for filenames.
+- Preserve raw extractor artifacts or bounded raw output refs alongside parsed summaries.
+- Parse for stable, minimal facts first: tool id/version, target gfx arch if present, sections/code-object presence, kernel symbol names if discoverable, and extraction warnings.
+- Treat unknown fields as warnings and include them in `parser_warnings`.
+- Keep classification conservative: absence of a parsed fact means `unknown`, not `false`.
 
-**Detection:** A problem named `../x`, `.`, `a/b`, `a:b`, or `a b` can create or reference files outside the output root or collide with another problem.
+**Verification guidance:**
+- Unit-test parsers with multiple fixture variants: missing sections, reordered sections, extra warnings, empty stdout, nonzero exit, and unknown metadata fields.
+- Fuzz small whitespace/order variations for critical parsers.
+- Add schema tests that require `raw_artifact_refs` or `raw_output_tail` when parsed facts are incomplete.
 
-**Future phase:** Phase 1: Artifact Contract; Phase 4: Report Generation.
+**Future phase:** Phase 4: Parser And Classification Layer.
 
-### Pitfall 8: Blowing The Runtime Budget With Paper-Scale Execution
+### Pitfall 7: Requiring GPUs For Static Evidence Tests That Should Be CPU-Safe
 
-**What goes wrong:** v1.11 attempts all workloads for all public problems with default warmups, iterations, and 300-second per-problem timeout, then stalls or produces partial local artifacts that look like a failed validation campaign.
+**What goes wrong:** The new test suite requires `/dev/kfd`, `/dev/dri`, PyTorch ROCm GPU visibility, `/opt/rocm`, or real HIP compilation for ordinary CI, causing the CPU-safe GitHub Actions workflow to fail or skip too much.
 
-**Why it happens:** The milestone wants execution closure, but it explicitly defers full 235-problem real-hardware validation unless environment and runtime budget are sufficient. `run_dataset.py` has `--limit`, `--max-workloads`, `--iterations`, `--warmup-runs`, and `--timeout`, but closure reporting must make sampled execution intentional.
+**Why it happens:** Static evidence sits near GPU build/runtime code, but many behaviors are pure path, schema, routing, parser, and report logic. Existing `tests/conftest.py` already separates `requires_rocm`, `requires_rocm_dev`, `requires_rdna4`, and `requires_cdna3` tests.
 
-**Consequences:** Long runs consume GPU time, mask inventory progress, and tempt maintainers to summarize incomplete attempts as validation.
+**Consequences:** CI either blocks on unavailable GPUs or loses meaningful coverage by marking broad tests as hardware-only.
 
 **Warning signs:**
-- Default execution plans do not specify `--limit`, `--max-workloads`, reduced iterations, or category filters.
-- The parity report lacks an execution profile: workload cap, warmups, iterations, timeout, GPU architecture, clock policy.
-- Failed long-running problems are not classified as `runtime_blocked`.
+- Parser/schema/path tests are marked `requires_rocm`.
+- Tests call real `hipcc`, `rocminfo`, or `torch.utils.cpp_extension.load()` when a fake file tree would cover the behavior.
+- GitHub Actions ignore list has to grow substantially to keep CPU CI green.
+- Test assertions depend on the host's actual static tool installation.
 
 **Prevention strategy:**
-- Define a small ready-subset execution profile for v1.11 and record it in every summary.
-- Run inventory for all problems, but execute only bounded ready subsets unless explicitly authorized.
-- Treat timeout as a classification signal, not just a failure.
-- Require separate evidence before claiming anything beyond "small ready subset executed."
+- Keep static sidecar model, capture planning, parser, and routing tests CPU-safe with fake runners and fake artifacts.
+- Reserve real compiler/tool invocation for narrowly marked `cpp`, `requires_rocm_dev`, or `requires_rocm` tests.
+- Add sandbox-specific unavailable-state tests using fake missing `/dev/kfd` and missing tools.
+- Do not make the main CLI require static evidence unless an explicit option requests it.
 
-**Detection:** A report has pass/fail counts but no run budget metadata or ready-subset selection rule.
+**Verification guidance:**
+- Run the same CPU-safe test subset documented in `docs/TESTING.md`.
+- Add a test that simulates no ROCm device nodes and no static tools; expected result is unavailable static evidence, not a crash.
+- Add one optional Docker/GPU validation command to docs for live extraction, separate from CI.
 
-**Future phase:** Phase 3: Bounded Execution Closure.
+**Future phase:** Phase 6: Verification Matrix And Guardrails.
 
-### Pitfall 9: Blurring Canonical Traces With Derived AMD SOL/SOLAR Artifacts
+### Pitfall 8: Making Cross-Architecture Claims From One GFX Target
 
-**What goes wrong:** Inventory, readiness, AMD SOL sidecars, SOLAR derivation sidecars, and AMD-native score reports are mixed into canonical traces or treated as required outputs for normal `sol-execbench` execution.
+**What goes wrong:** Static evidence captured on `gfx1200` is generalized to CDNA 3 (`gfx940`, `gfx941`, `gfx942`) or future CDNA 4 targets, or multi-arch builds are reported as if every embedded code object was inspected.
 
-**Why it happens:** v1.10 added sidecar workflows through the dataset runner. It is convenient to add more metadata to trace JSON, but guardrails require canonical trace JSONL to remain unchanged.
+**Why it happens:** The current packager injects `--offload-arch` for explicit target hardware and can include multiple targets. The project supports RDNA 4 and CDNA 3 in schema/build/docs, but CDNA 3 full hardware validation remains deferred. Static tools may show multiple targets, one target, or a host wrapper depending on artifact and extractor.
 
-**Consequences:** Public contracts drift, downstream tools break, and parity inventory becomes inseparable from optional ROCm analysis.
+**Consequences:** Reports overstate hardware coverage. A kernel may have static evidence for one architecture but not another, especially in multi-target builds.
 
 **Warning signs:**
-- Trace JSON contains `coverage_summary`, `derived_evidence_refs`, `inventory_status`, or `readiness`.
-- Primary CLI exposes dataset inventory or SOLAR sidecar options.
-- AMD-native score report is required for a basic dataset execution pass.
+- Sidecar has one top-level `gpu_architecture` field for a multi-target artifact.
+- Report says "CDNA 3 static evidence" based only on schema support or `--offload-arch=gfx942` injection.
+- Parser assumes `gfx*` in build logs equals the architecture actually present in the captured code object.
+- `LOCAL` target detection is used as proof of cross-architecture availability.
 
 **Prevention strategy:**
-- Keep `definition.json`, `workload.jsonl`, solution schemas, primary CLI, and canonical trace JSONL unchanged.
-- Emit inventory and parity reports as separate JSON/Markdown artifacts.
-- Keep AMD-native and SOLAR artifacts opt-in and derived.
-- Extend guardrail tests with v1.11 artifact names.
+- Model static evidence per artifact and per discovered/declared `gfx` target.
+- Distinguish `requested_arches`, `compile_arch_flags`, `discovered_code_object_arches`, and `validated_hardware_arch`.
+- For multi-target artifacts, report partial extraction per target and keep unknown targets explicit.
+- Keep CDNA 3/CDNA 4 language behind existing hardware-validation guardrails unless live evidence exists.
 
-**Detection:** Existing public contract guardrail tests must be relaxed to make v1.11 pass. That is a blocker unless a public contract change is explicitly approved.
+**Verification guidance:**
+- Unit-test solutions with `target_hardware=["gfx1200", "gfx942"]` and assert the sidecar can represent both targets independently.
+- Add parser fixtures with one discovered arch, multiple discovered arches, and no discovered arch.
+- Add doc guardrails that static evidence for one arch is not full hardware validation for another.
 
-**Future phase:** Phase 1: Contract Baseline; Phase 6: Guardrail Closure.
-
-### Pitfall 10: Claim Guardrails Lag Behind New Parity Language
-
-**What goes wrong:** Docs correctly guarded v1.10 SOLAR derivation claims, but v1.11 introduces new phrases such as "paper dataset parity", "execution closure", and "public benchmark surface" that can imply stronger validation.
-
-**Why it happens:** Existing tests look for v1.9/v1.10 forbidden claims. They may not catch "all 235 problems validated", "paper dataset parity achieved", "leaderboard equivalent", or "upstream SOLAR parity" phrased in v1.11 language.
-
-**Consequences:** Release notes or docs overclaim, especially around public dataset counts and ready-subset execution.
-
-**Warning signs:**
-- "Parity" appears without "inventory", "gap report", or "not full validation."
-- "Closure" appears without ready-subset denominator and deferred validations.
-- CDNA 3 / MI300X language changes from deferred to supported based on schema-only coverage.
-
-**Prevention strategy:**
-- Add v1.11-specific no-claim tests.
-- Required no-claim phrases should cover: not full 235-problem validation, not NVIDIA/B200/leaderboard equivalence, not upstream SOLAR parity, not CDNA 3/MI300X validation, not CDNA 4 validation, not NVFP4/MXFP4 validation.
-- Make reports separate `inventory_complete`, `ready_subset_executed`, and `full_validation_complete` fields; the last should be false for this milestone unless explicitly proven.
-
-**Detection:** A generated report can be quoted as "SOL ExecBench ROCm validates the paper dataset" without contradicting itself nearby.
-
-**Future phase:** Phase 5: Claim Guardrails; Phase 6: Documentation Closure.
+**Future phase:** Phase 1: Static Evidence Contract And Claim Boundary; Phase 4: Parser And Classification Layer; Phase 6: Verification Matrix And Guardrails.
 
 ## Moderate Pitfalls
 
-### Pitfall 11: Treating Unsupported NVIDIA-Only Solution Paths As ROCm Failures
+### Pitfall 9: Running Static Extractors On The Wrong Artifact Type
 
-**What goes wrong:** Original categories or solution metadata for CUDA C++, cuBLAS, cuDNN, CUTLASS, CuTe DSL, or cuTile are attempted as if ROCm should run them directly.
+**What goes wrong:** `readelf` or `llvm-objdump` is run on source files, build logs, Python modules, or the extension wrapper without recording that the artifact was not a direct ROCm binary/code object.
 
-**Prevention strategy:** Classify NVIDIA-only solution paths separately from reference PyTorch readiness. Use existing ROCm dispositions: HIP/C++ and selected ROCm libraries are supported where examples/tests exist; legacy NVIDIA runtimes are out of scope or compatibility-only.
+**Prevention strategy:** Use `ToolchainArtifactType` precisely. Require capture code to classify inputs as `ROCM_BINARY`, `ELF_OBJECT`, `HIP_COMPILER_OUTPUT`, or `TRITON_ARTIFACT`; unsupported combinations should produce `unsupported_artifact`.
 
-**Warning signs:** `cuda_cpp`, `cuda_cflags`, `cublas`, `cudnn`, `cutlass`, `cute_dsl`, or `cutile` appear in an execution failure bucket instead of `unsupported_nvidia_path`.
+**Warning signs:** Report says ISA extraction succeeded but the source artifact path ends in `.py`, `.json`, or `.log`.
 
-**Future phase:** Phase 2: Readiness Classification.
+**Verification guidance:** Tests should pass fake artifacts with different suffixes and assert extractor routing rejects unsupported types.
 
-### Pitfall 12: Losing Workload-Level Granularity
+**Future phase:** Phase 2: Artifact Capture And Build Integration; Phase 3: Routed Extractor Adapters.
 
-**What goes wrong:** A problem is marked ready or blocked based on one workload, hiding mixed states across workloads with different axes, dtypes, safetensors, custom inputs, or tolerances.
+### Pitfall 10: Ignoring Triton And Python Solution Boundaries
 
-**Prevention strategy:** Inventory at problem and workload granularity. Roll up problem status conservatively: a problem is fully ready only if every workload is ready under the selected execution profile.
+**What goes wrong:** Static evidence is advertised for every solution language, but the implemented capture path only covers HIP/C++ extension builds. Python/PyTorch and Triton solutions either produce no static artifacts or have different cache/extraction mechanics.
 
-**Warning signs:** The report has problem counts but no workload counts or UUID-level blocked reasons.
+**Prevention strategy:** Start with HIP/C++/ROCm-library extension artifacts where the current packager has a compile step. Report `not_applicable` or `not_implemented_for_language` for Python-only paths. Treat Triton static capture as a separate follow-up unless the milestone explicitly scopes it.
 
-**Future phase:** Phase 2: Inventory Schema.
+**Warning signs:** Static evidence option silently does nothing for Python solutions without a sidecar status.
 
-### Pitfall 13: Not Preserving Tolerance And Numerical Semantics
+**Verification guidance:** Add tests for HIP/C++ supported, Python not applicable, and Triton deferred statuses.
 
-**What goes wrong:** Readiness or execution closure ignores workload tolerance fields such as `max_atol`, `max_rtol`, `required_matched_ratio`, `max_error_cap`, and `allow_negative_inf`.
+**Future phase:** Phase 1: Static Evidence Contract And Claim Boundary; Phase 2: Artifact Capture And Build Integration.
 
-**Prevention strategy:** Include tolerance presence and non-default tolerance flags in inventory. Do not normalize or omit tolerances when truncating workloads for small runs.
+### Pitfall 11: Letting Extractor Timeouts Hang Benchmark Runs
 
-**Warning signs:** Truncated workload files omit trailing newline or tolerance data, or reports cannot identify problems that rely on special negative-infinity handling.
+**What goes wrong:** Static tools run without timeouts on large or malformed artifacts, delaying benchmark completion after evaluation already succeeded.
 
-**Future phase:** Phase 2: Inventory; Phase 3: Execution Closure.
+**Prevention strategy:** Reuse the v1.16 bounded probe pattern. Every extractor command should have a timeout, captured stderr/stdout tails, and `failed` or `timed_out` status that does not change trace correctness.
 
-### Pitfall 14: Reusing Old Trace Artifacts Across Code Or Dataset Revisions
+**Warning signs:** `subprocess.run(..., timeout=...)` is missing in extractor code.
 
-**What goes wrong:** `--rerun` defaults to false, so previously passed traces are reused even though code, dataset revision, workload cap, or scoring options changed.
+**Verification guidance:** Fake runner raises `TimeoutExpired`; sidecar should record failure and the CLI should complete normally.
 
-**Prevention strategy:** For closure runs, either require `--rerun` or record artifact freshness keys: git commit, dataset manifest checksum, command args, benchmark config, and solution hash.
+**Future phase:** Phase 3: Routed Extractor Adapters.
 
-**Warning signs:** Report says "skipped existing pass" without trace provenance or freshness comparison.
+### Pitfall 12: Reconstructing Compiler Commands From Logs Instead Of Recording Them
 
-**Future phase:** Phase 3: Execution Closure.
+**What goes wrong:** Reports infer compile flags and offload architectures by scraping verbose build output after the fact, missing injected flags or environment variables such as `PYTORCH_ROCM_ARCH`.
 
-### Pitfall 15: Confusing Reference Execution With Candidate Solution Validation
+**Prevention strategy:** Record compile intent before running the build: solution target hardware, injected `hip_cflags`, `PYTORCH_ROCM_ARCH`, compile command, build directory, and artifact path. Use logs as supporting evidence only.
 
-**What goes wrong:** Running references through the dataset runner is presented as candidate solution readiness or benchmark competitiveness.
+**Warning signs:** Sidecar has parsed `--offload-arch` but no copy of the normalized `solution.json` used for compile.
 
-**Prevention strategy:** Label reference-wrapper runs as harness/readiness smoke tests. Candidate solution validation requires explicit solution artifacts and separate claims.
+**Verification guidance:** Test explicit target, `LOCAL` target, and multi-target injection cases already covered in `test_problem_packager.py`, but assert static provenance records the normalized compile options.
 
-**Warning signs:** Reports use "solution passed" when the solution is `reference_<name>` generated by the runner.
+**Future phase:** Phase 2: Artifact Capture And Build Integration.
 
-**Future phase:** Phase 3: Execution Closure; Phase 5: Report Guardrails.
+### Pitfall 13: Sidecar Schema That Cannot Represent Partial Evidence
+
+**What goes wrong:** The schema has a single boolean like `available` or `captured`, so it cannot distinguish no tool, no artifact, extraction failed, parse failed, unsupported language, unsupported architecture, or partial metadata only.
+
+**Prevention strategy:** Design `static_kernel_evidence.v1` with independent sections for request, build provenance, captured artifacts, routing decisions, extractor runs, parsed metadata, classifications, warnings, and authority flags.
+
+**Warning signs:** Consumers need to read a human string to know why static evidence is missing.
+
+**Verification guidance:** Schema tests should cover at least `captured_full`, `captured_partial`, `artifact_unavailable`, `tool_unavailable`, `extractor_failed`, `parser_partial`, and `not_applicable`.
+
+**Future phase:** Phase 1: Static Evidence Contract And Claim Boundary.
+
+### Pitfall 14: Report Output That Encourages Comparing Static Metrics As Scores
+
+**What goes wrong:** Reports surface instruction counts, SGPR/VGPR counts, LDS usage, or occupancy-like metadata as ranking columns without context, making static evidence look like benchmark scoring.
+
+**Prevention strategy:** If metrics are exposed, label them as compiler diagnostics and put them in an "observed static metadata" section with warnings. Do not integrate them into AMD-native score reports or trace summaries.
+
+**Warning signs:** Report sorted by static metric, or static metrics displayed next to latency/speedup as if equivalent.
+
+**Verification guidance:** Docs and report snapshots should include "diagnostic only" near metric tables.
+
+**Future phase:** Phase 5: Reports And Researcher Workflow; Phase 6: Verification Matrix And Guardrails.
 
 ## Minor Pitfalls
 
-### Pitfall 16: Non-Deterministic Inventory Ordering
+### Pitfall 15: Unstable Absolute Paths In Golden Tests
 
-**What goes wrong:** Reports churn because filesystem or dataset iteration order changes.
+**What goes wrong:** Expected JSON fixtures include `/tmp/...`, user home directories, or full ROCm install paths, causing failures across machines.
 
-**Prevention strategy:** Sort categories, problem names, workload UUIDs, and JSON keys. Keep stable status enum order in summaries.
+**Prevention strategy:** Use relative artifact refs in sidecars and normalize source paths in tests. Preserve absolute paths only under provenance fields that tests compare with placeholders.
 
-**Future phase:** Phase 2: Inventory Schema.
+**Future phase:** Phase 6: Verification Matrix And Guardrails.
 
-### Pitfall 17: Ambiguous Path Names In Docs
+### Pitfall 16: Missing Documentation For Unavailable States
 
-**What goes wrong:** Users run commands against `data/SOL-ExecBench/benchmark` while the downloader writes `data/benchmark`, or vice versa.
+**What goes wrong:** Users see a missing static report and assume a benchmark failure.
 
-**Prevention strategy:** Choose one canonical v1.11 dataset root or support both with explicit detection and docs. Report the resolved root in every artifact.
+**Prevention strategy:** Update `docs/CLAIMS.md`, `docs/rocm_toolchain_routing.md`, `docs/TESTING.md`, and the cookbook/researcher guide with examples of unavailable, partial, and diagnostic-only static evidence.
 
-**Future phase:** Phase 1: Dataset Layout Contract; Phase 6: Docs.
+**Future phase:** Phase 5: Reports And Researcher Workflow.
 
-### Pitfall 18: Weak Failure Logs For CI Or Offline Review
+### Pitfall 17: Storing Huge Raw Dumps Inline In JSON
 
-**What goes wrong:** Human-readable CLI logs exist, but JSON reports omit stderr snippets, exception classes, and file paths needed to triage failures later.
+**What goes wrong:** Sidecars become enormous because full disassembly text is embedded directly in JSON.
 
-**Prevention strategy:** Store concise structured failure evidence in reports: phase, exception type, message, path, workload UUID, and remediation hint.
+**Prevention strategy:** Store large raw outputs as files under the static evidence artifact directory and include refs, checksums, sizes, and bounded text tails in JSON.
 
-**Future phase:** Phase 4: Parity Gap Reporting.
-
-### Pitfall 19: Inventory Ignores Licensing And Redistribution Boundaries
-
-**What goes wrong:** Downloaded benchmark assets or generated mirrors are treated as commit-ready project data.
-
-**Prevention strategy:** Keep downloaded datasets and blobs out of git. Record source and license metadata in manifests; do not commit public dataset payloads or proprietary kernels.
-
-**Future phase:** Phase 1: Acquisition Contract; Phase 6: Docs.
+**Future phase:** Phase 2: Artifact Capture And Build Integration; Phase 5: Reports And Researcher Workflow.
 
 ## Phase-Specific Warnings
 
 | Phase Topic | Likely Pitfall | Mitigation |
-|-------------|----------------|------------|
-| Dataset acquisition/layout | Download success mistaken for parity | Pin/record source revision, expected categories, counts, checksums, and blob availability |
-| Inventory schema | Runtime failures hide schema drift | Preflight parse all definitions/workloads and classify blockers before GPU execution |
-| Custom inputs/safetensors | Missing assets treated as ROCm failure | Verify custom entrypoints and safetensors paths/keys/shapes/dtypes explicitly |
-| DType classification | FP8/FP4 parse support overclaimed as hardware validation | Split schema, generation, execution, and hardware-validation states |
-| Small execution closure | Full dataset attempted without budget | Bound runs with category/limit/max-workloads/iterations/timeout and report the run profile |
-| Derived artifacts | Sidecars leak into canonical contracts | Keep inventory/score/SOLAR/AMD SOL outputs sidecar-only and opt-in |
-| Gap reports | Skipped problems disappear | Include every inventoried problem and workload in denominators with explicit statuses |
-| Claim guardrails | "Parity" implies full validation | Add v1.11 no-claim tests and report booleans for inventory vs execution vs full validation |
+| --- | --- | --- |
+| Sidecar contract | Overclaiming authority or using boolean-only status | Add authority flags, explicit status enums, and partial/unavailable states. |
+| Build integration | Temporary staging cleanup leaves dangling refs | Copy artifacts beside trace output before cleanup; record checksums. |
+| Artifact capture | Capturing stale cache files | Search current staging/build tree only; tie evidence to compile provenance. |
+| Tool routing | Direct subprocess calls bypass v1.16 routing | Route every extractor through registry/probe decisions and persist the decision. |
+| Parser layer | Text parser brittleness | Preserve raw outputs, parse minimal stable facts, warn on unknowns. |
+| Architecture support | One arch used as evidence for all AMD targets | Model requested/discovered/validated arch separately and per artifact. |
+| Test strategy | GPU/tool-dependent tests in CPU CI | Fake runners/artifacts for unit tests; mark live checks narrowly. |
+| Reporting | Static metadata treated as ranking signal | Keep reports diagnostic and separate from trace/scoring output. |
 
 ## Sources
 
-- `.planning/PROJECT.md` - v1.11 scope, explicit deferrals, and current validation boundary.
-- `docs/internal/solar_derivation_contract.md` - sidecar-only rule and no-claim vocabulary.
-- `docs/analysis.md` - dataset runner, timing evidence, AMD-native score, AMD SOL, and SOLAR sidecar semantics.
-- `docs/original_parity.md` - original public surface disposition and NVIDIA runtime out-of-scope items.
-- `docs/compliance.md` - unsupported NVIDIA runtime features, dependency families, and known gaps.
-- `scripts/download_solexecbench.py` - current Hugging Face download and local layout behavior.
-- `scripts/run_dataset.py` - current discovery, skip, execution, sidecar, and report behavior.
-- `tests/sol_execbench/test_public_contract_guardrails.py` - canonical schema, CLI, sidecar, and claim guardrails.
-- `tests/sol_execbench/test_v1_9_validation_closure.py` - validation-claim guardrails and RDNA 4/CDNA 3 boundaries.
+- Local: `.planning/PROJECT.md` and `.planning/STATE.md` for v1.17 scope and deferred claims. Confidence: HIGH.
+- Local: `.planning/milestones/v1.16-MILESTONE-AUDIT.md` for routing foundation and static-evidence deferral. Confidence: HIGH.
+- Local: `docs/CLAIMS.md` for claim boundaries and static evidence upgrade rule. Confidence: HIGH.
+- Local: `docs/TESTING.md` and `tests/conftest.py` for CPU-safe CI, ROCm markers, sandbox device-node skips, and cache isolation. Confidence: HIGH.
+- Local: `docs/rocm_toolchain_routing.md` and `tests/sol_execbench/test_toolchain_routing.py` for lifecycle/status vocabulary and planned/candidate static tools. Confidence: HIGH.
+- Local: `src/sol_execbench/driver/problem_packager.py`, `src/sol_execbench/driver/templates/build_ext.py`, and `src/sol_execbench/cli/main.py` for staging, PyTorch extension build, `benchmark_kernel.so`, temp directory cleanup, profiler sidecar precedent, and compile/evaluate flow. Confidence: HIGH.
+- AMD HIP compiler documentation: https://rocm.docs.amd.com/projects/HIP/en/develop/understand/compilers.html. Confidence: MEDIUM for current ROCm compiler/tool context.
+- Radeon GPU Analyzer manual: https://gpuopen.com/manuals/rga_manual/help_manual/. Confidence: MEDIUM for RGA command-line/static-analysis context.
+- LLVM `llvm-objdump` command guide: https://llvm.org/docs/CommandGuide/llvm-objdump.html. Confidence: MEDIUM for generic LLVM object-inspection behavior.
+- GNU `readelf` documentation: https://sourceware.org/binutils/docs/binutils/readelf.html. Confidence: MEDIUM for generic ELF metadata fallback behavior.

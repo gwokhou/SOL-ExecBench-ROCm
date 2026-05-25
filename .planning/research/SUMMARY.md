@@ -1,204 +1,210 @@
 # Project Research Summary
 
 **Project:** SOL ExecBench ROCm Port
-**Domain:** v1.11 public paper dataset parity inventory and ROCm execution closure
-**Milestone:** v1.11 Paper Dataset Parity Inventory and ROCm Execution Closure
-**Researched:** 2026-05-23
-**Confidence:** HIGH for repo-local stack, architecture, and scope; MEDIUM for exact upstream dataset counts until the live Hugging Face revision is inventoried and pinned.
+**Domain:** Static kernel/compiler evidence for ROCm benchmark runs
+**Milestone:** v1.17 Static Kernel Evidence
+**Researched:** 2026-05-25
+**Confidence:** HIGH for sidecar-first integration and repository boundaries; MEDIUM for exact static-tool output and live HSACO/code-object discovery until validated in the ROCm container.
 
 ## Executive Summary
 
-v1.11 is a dataset-management and evidence-closure milestone for the ROCm-only SOL ExecBench port. The product surface is not a new benchmark runner, leaderboard, or derivation engine; it is an auditable local workflow that acquires or verifies the public `nvidia/SOL-ExecBench` dataset categories, inventories every problem, classifies ROCm readiness, runs bounded ready subsets through the existing ROCm runner, and reports remaining parity gaps without overclaiming.
+v1.17 should add opt-in diagnostic static kernel evidence to the ROCm benchmark runner. The product is not a new evaluator or scoring system; it is a sidecar evidence layer that captures build artifacts from ROCm solution builds, routes available static-analysis tools through the v1.16 toolchain registry, extracts raw ISA/metadata where possible, and records explicit unavailable or unsupported states when evidence cannot be collected.
 
-The recommended approach is to add sidecar-only dataset reports around the existing downloader, Pydantic schemas, `sol-execbench` execution path, and `scripts/run_dataset.py`. Inventory, readiness, closure, and gap data should live in versioned JSON/Markdown artifacts, while canonical `definition.json`, `workload.jsonl`, solution schemas, trace JSONL, AMD SOL v2 sidecars, SOLAR derivation sidecars, and primary CLI behavior remain stable. v1.10 SOLAR derivation is existing context only: v1.11 may route ready subset runs through those existing sidecar flags, but it should not reopen SOLAR derivation architecture.
+The recommended implementation is a narrow sidecar pipeline attached to the existing HIP/C++ compile path: after `ProblemPackager.compile()` creates `benchmark_kernel.so` in the staging directory and before staging cleanup, discover stable build artifacts, copy or register bounded evidence artifacts beside the trace output, run routed extractors such as `llvm-objdump` and `readelf`, and write `sol_execbench.static_kernel_evidence.v1`. Canonical trace JSONL, correctness, timing, scoring, paper-parity, and leaderboard semantics must remain unchanged.
 
-The main risk is confusing "dataset inventory complete" or "small ready subset passed" with full paper parity. Mitigate this with deterministic readiness statuses, explicit denominators for discovered, blocked, skipped, attempted, passed, and failed problems, source/revision metadata, bounded run profiles, and claim guardrails stating that v1.11 is not full 235-problem ROCm validation, not upstream SOLAR equivalence, not leaderboard equivalence, not original 124-model extraction, and not CDNA3/CDNA4/NVFP4/MXFP4 hardware validation.
+The main risks are toolchain drift, unstable PyTorch ROCm build intermediates, temporary staging cleanup, and overclaiming static evidence. Mitigate them by keeping collection default-off and nonfatal, persisting routing decisions and raw outputs, modeling partial/unavailable states explicitly, copying durable artifacts outside temporary staging, and adding guardrails that static evidence is diagnostic only.
 
 ## Key Findings
 
-### Recommended Stack
+### Stack Additions
 
-v1.11 should avoid new framework dependencies. The existing Python 3.12+ package, Pydantic v2 schemas, Hugging Face Datasets downloader, safetensors loader, PyTorch ROCm/Triton ROCm execution stack, stdlib JSON/JSONL reporting, and `scripts/run_dataset.py` provide the right base. Add focused core modules and thin scripts rather than dataframe engines, databases, hosted services, or a second runner.
+No new Python framework, database, binary parser, or service dependency is recommended. v1.17 should use the existing Python 3.12 package, Pydantic v2 models, Click/Rich CLI patterns, stdlib `json`/`hashlib`/`subprocess`, and the v1.16 toolchain router.
 
 **Core technologies:**
-- Python `>=3.12,<3.14`: inventory scripts, report generation, deterministic file traversal, and testable core helpers.
-- Pydantic v2: load and validate existing `Definition` and `Workload` contracts for schema/readiness checks.
-- `datasets>=4.8.2`: continue loading `nvidia/SOL-ExecBench` configs `L1`, `L2`, `Quant`, and `FlashInfer-Bench`.
-- `safetensors>=0.7.0`: inspect and validate referenced tensor blobs without replacing existing execution-time loading behavior.
-- PyTorch ROCm, Triton ROCm, HIP/C++, ROCm libraries: keep existing execution support; classify readiness rather than expanding compiler/library scope.
-- stdlib `json`, `pathlib`, `argparse`, stable sorting, and hashing: dependency-free JSON/JSONL/Markdown artifacts that are easy to diff and archive.
+- Python stdlib: artifact walking, hashing, bounded subprocess execution, and JSON writing.
+- Pydantic v2: strict `static_kernel_evidence.v1` models and round-trip tests.
+- Existing Click/Rich CLI: explicit `--static-evidence none|auto` behavior and user-facing status.
+- Existing `src/sol_execbench/core/toolchain.py`: static route selection, probes, statuses, source refs, and unavailable reasons.
+- `llvm-objdump`: first general extractor for headers, symbols, offload info, and disassembly when available.
+- `readelf`: fallback for ELF headers, sections, notes, symbols, and metadata when ISA extraction is unavailable.
+- RGA and `roc-objdump`: candidate routes only; probe and record status, but do not make either mandatory.
 
-**Stack additions:**
-- Add `src/sol_execbench/core/dataset/` for constants, discovery, inventory, readiness, and report assembly.
-- Add `scripts/inventory_solexecbench.py` as a thin CLI for layout checks, inventory, readiness, and gap reports.
-- Extend `scripts/download_solexecbench.py` only for idempotent acquisition metadata, category selection, revision/output-root handling, and layout verification.
-- Extend `scripts/run_dataset.py` only for optional manifest/readiness filtering and execution-closure reporting, preserving current defaults.
+Recommended new module: `src/sol_execbench/core/bench/static_kernel_evidence.py` for request/result models, artifact discovery, extractor adapters, raw-output registration, conservative classification, and optional report rendering.
 
-### Expected Features
+### Table-Stakes Features
 
-**Must have (table stakes):**
-- Public dataset acquisition/layout contract for `L1`, `L2`, `Quant`, and `FlashInfer-Bench`.
-- Idempotent, auditable acquisition or local-root verification with repo/config/split/revision/count metadata.
-- Per-category and per-problem layout checks for `definition.json`, `workload.jsonl`, and `reference.py`, with optional solution/file asset detection.
-- JSON/Pydantic parse validation for definitions and every workload line before GPU execution.
-- Machine-readable paper inventory with problem counts, workload counts, dtypes, input kinds, forward/backward indicators, custom input usage, safetensors usage, reference availability, solution availability, and source/static flags.
-- Deterministic ROCm readiness classification: `ready`, `schema_input_blocked`, `dtype_blocked`, `custom_input_blocked`, `runtime_blocked`, `unsupported_nvidia_only_path`, and `needs_hardware_evidence`.
-- Stable reason codes, evidence paths, and suggested next actions for every blocked or deferred problem.
-- Ready subset manifest generation and bounded execution through existing `scripts/run_dataset.py`.
-- Execution closure report joining readiness to canonical traces, `summary.json`, CLI logs, AMD-native score reports, AMD SOL v2 sidecars, SOLAR derivation sidecars, and optional timing evidence.
-- Parity gap report in Markdown and JSON with explicit claim guardrails and complete denominators.
-- CPU-only fixture tests for layout, inventory fields, readiness precedence, sidecar path safety, closure joins, and report wording.
+**Must have:**
+- Explicit opt-in collection, default off, with `--static-evidence none|auto`.
+- Nonfatal behavior for missing tools, missing artifacts, unsupported solution types, parser failures, and timeouts.
+- `sol_execbench.static_kernel_evidence.v1` JSON sidecar with diagnostic-only authority flags.
+- Durable sidecar paths beside trace output, for example `traces.jsonl.static-kernel-evidence.json` and `traces.jsonl.static-kernel-evidence/`.
+- HIP/C++ artifact discovery from the current staging/build directory, starting with `benchmark_kernel.so` plus opportunistic `.hsaco`, `.co`, `.o`, `.out`, compiler intermediates, and raw tool outputs.
+- SHA256, size, kind, source path, persisted path, producer, and inspectability for every registered artifact.
+- Routed static-tool selection through v1.16, including all considered decisions and unavailable reasons.
+- Bounded extractor execution with command provenance, tool path/version, timeout, return code, raw output refs, and stdout/stderr tails.
+- Explicit aggregate and per-artifact statuses: collected, partial, unavailable, unsupported, failed, skipped.
+- No mutation of canonical trace JSONL, scoring reports, timing authority, or benchmark exit-code semantics.
+- Documentation and guardrail tests stating that static evidence is diagnostic only.
 
-**Should have (differentiators):**
-- Diff mode between inventories/readiness reports to show milestone progress.
-- Evidence completeness scoring that distinguishes plain execution from trace, timing, AMD score, AMD SOL, and SOLAR derivation evidence.
-- FlashInfer asset diagnostics for `FLASHINFER_TRACE_DIR` and safetensors path/key/shape/dtype checks.
-- Failure clustering by stable reason code.
-- Reproducibility headers with command, git commit, dataset manifest checksum, Python/ROCm/PyTorch metadata where available.
+**Should have:**
+- Minimal normalized metadata: detected `gfx*` targets, section/code-object presence, symbol inventory, raw ISA text path, and coarse `has_disassembly`/`has_metadata` booleans.
+- Markdown or console report summarizing evidence status, artifact manifest, tool routing, kernel inventory, unavailable states, and claim boundary.
+- Fixture corpus for `llvm-objdump`, `readelf`, `roc-objdump`, and RGA outputs so parser behavior is CPU-testable.
+- Optional package/version fingerprints for ROCm, LLVM, RGA, and compiler tools via routing/environment evidence.
 
-**Defer / out of scope:**
-- Full 235-problem real-hardware validation unless separately authorized and resourced.
-- Original 124-model / 7,400-subgraph extraction and curation pipeline.
-- Upstream NVlabs/SOLAR equivalence or NVIDIA/B200/leaderboard-equivalent claims.
-- Hosted leaderboard, API service, database, dashboard, or remote submission system.
-- CDNA3/MI300X, CDNA4, NVFP4, or MXFP4 hardware validation claims.
-- CUDA/NVIDIA runtime restoration, CUDA C++/cuBLAS/cuDNN/CUTLASS/CuTe/cuTile support, or new ROCm compiler/library expansions.
-- Mutating public dataset files, canonical traces, public schemas, or primary CLI defaults.
-- Treating reference-wrapper execution as optimized candidate-solution benchmark parity.
+### Deferred Scope
 
-### Architecture Approach
+Defer full RGA-first resource extraction, Triton cache capture, full paper-scale 235-problem static coverage, dataset-level static aggregation beyond simple sidecar counts, static/profile kernel-name correlation, deep instruction taxonomy, resource regression diffs, HTML/notebook reports, and any use of static evidence in scoring, correctness, timing, paper-parity, or leaderboard policy.
 
-The architecture should be sidecar-only and layered. Pure core helpers inspect dataset files, validate schemas, derive inventory features, classify readiness, and assemble reports. Scripts parse arguments and write artifacts. Execution closure reuses the existing dataset runner and `sol-execbench` subprocess boundary; it should not bypass the primary evaluation path or embed parity state into traces.
+Triton and Python/PyTorch-only solutions should return clear `unsupported_solution` or `no_stable_artifact` states in v1.17 unless a stable artifact boundary is proven during implementation. ROCm-library categories may be represented as native-adjacent only when a solution-owned artifact is available; otherwise record an opaque-library unsupported state.
 
-**Major components:**
-1. `core/dataset/constants.py` - public category set, report schema versions, expected layout constants.
-2. `core/dataset/discovery.py` - shared dataset/problem discovery compatible with existing `run_dataset.py` behavior.
-3. `core/dataset/inventory.py` - file presence checks, Pydantic validation, workload counting, dtype/input/custom/safetensors/reference/solution feature extraction.
-4. `core/dataset/readiness.py` - deterministic status and reason-code classification from inventory plus optional observed execution failures.
-5. `core/dataset/reports.py` - acquisition manifest, paper inventory, readiness, execution closure, parity gap report, and Markdown rendering.
-6. `scripts/inventory_solexecbench.py` - thin CLI for offline inventory/readiness/gap generation.
-7. `scripts/download_solexecbench.py` - existing downloader plus manifest/layout verification, not execution.
-8. `scripts/run_dataset.py` - existing execution loop plus optional ready-subset selection and closure report output.
+## Architecture And Data Flow
 
-**Primary data flow:**
+Static Kernel Evidence should be an optional diagnostic sidecar attached to the existing compile/evaluate lifecycle:
 
 ```text
-Dataset acquisition or existing dataset root
-  -> layout verification
-  -> Definition/Workload validation
-  -> paper_inventory.json
-  -> rocm_readiness.json
-  -> ready_subset.json
-  -> existing run_dataset.py execution
-  -> traces.json + summary.json + optional AMD/SOL/SOLAR/timing sidecars
-  -> execution_closure.json
-  -> parity_gap_report.md/json
+sol-execbench ... --solution solution.json -o traces.jsonl --static-evidence auto
+  -> load definition, workload, solution, and config
+  -> create staging directory and ProblemPackager
+  -> native HIP/C++ compile succeeds
+  -> discover static artifacts in the current staging/build tree
+  -> build ToolchainRoutingRequest(evidence_level=static, artifact_type=...)
+  -> run bounded routed extractor commands when tools are available
+  -> copy/register artifacts and raw outputs under traces.jsonl.static-kernel-evidence/
+  -> write traces.jsonl.static-kernel-evidence.json
+  -> execute benchmark normally
+  -> write canonical trace JSONL unchanged
 ```
 
-### Critical Pitfalls
+Major components:
 
-1. **Assuming download equals paper dataset parity** - record repo/config/split/revision/counts/checksums/blob availability and separate acquisition status from readiness and execution status.
-2. **Letting stale docs override current contracts** - treat existing Pydantic models, trace schemas, CLI behavior, and guardrail tests as source of truth; put v1.11 data in sidecars only.
-3. **Collapsing schema/input drift into runtime failure** - preflight every definition and workload with explicit `schema_input_blocked`, `dtype_blocked`, `custom_input_blocked`, `asset_blocked`, and `unsupported_nvidia_only_path` reasons before GPU execution.
-4. **Mishandling custom inputs and safetensors** - detect custom entrypoints and safetensors references, verify assets and tensor keys/shapes/dtypes where possible, and never substitute random data for parity runs.
-5. **Overstating low-precision dtype support** - distinguish schema-known, input-generation-supported, reference-execution-supported, candidate-execution-supported, and hardware-validated states, especially for FP8/FP4/NVFP4/MXFP4/Quant problems.
-6. **Treating skipped or reused traces as invisible success** - include `not_attempted`, `skipped_existing_pass`, missing reference/solution, no trace, failed, and evidence-incomplete states in closure denominators.
-7. **Blurring canonical traces with derived artifacts** - keep inventory, readiness, closure, AMD score, AMD SOL, SOLAR, and timing evidence as separate reports or sidecars with stable references.
-8. **Letting parity wording overclaim** - add v1.11-specific no-claim wording/tests for full validation, upstream SOLAR, leaderboard equivalence, CDNA3/CDNA4 validation, and low-precision hardware validation.
+1. `StaticKernelEvidenceRequest` - staging dir, primary artifact, solution metadata, output dir, target arch, timeout, compile provenance, and injected test dependencies.
+2. `StaticKernelEvidenceResult` - strict sidecar model with status, authority flags, routing report, artifacts, extractor runs, classifications, warnings, and reason codes.
+3. `discover_static_kernel_artifacts()` - current-staging-only discovery for `benchmark_kernel.so`, code objects, HSACO, object files, compiler outputs, and raw extracted artifacts.
+4. `collect_static_kernel_evidence()` - route static tools, run bounded extractors, persist raw outputs, classify conservatively, and return a result for success, partial, unsupported, unavailable, failed, or skipped.
+5. CLI sidecar helpers - derive output paths, invoke collection after compile success and before cleanup, write JSON/report files, and keep static failures nonfatal.
+6. Toolchain routing updates - promote implemented static routes from planned to active/candidate while preserving probe-gated availability and unsupported statuses.
 
-## Implications for Roadmap
+Boundary rules:
 
-Based on research, suggested phase structure:
+- The packager may expose native-solution checks and artifact roots, but it should not parse ISA or own extractor subprocess logic.
+- The router selects/probes tools and records reasons; it should not parse static evidence.
+- The collector owns artifact discovery, extraction, raw-output registration, and conservative parsing.
+- Trace, evaluation, scoring, dataset execution, and AMD SOL/SOLAR reports must ignore static evidence in v1.17.
 
-### Phase 1: Dataset Contract And Acquisition Metadata
-**Rationale:** All later counts and claims depend on a stable local dataset root, category set, source revision, and layout contract.
-**Delivers:** Shared category constants, discovery helpers, canonical v1.11 dataset root behavior, acquisition/local-layout manifest, downloader idempotency, category filters, and layout verification.
-**Addresses:** Public acquisition command, category completeness, required file checks, source metadata, out-of-git dataset handling.
-**Avoids:** Download-success-as-parity, ambiguous `data/benchmark` versus `data/SOL-ExecBench/benchmark`, licensing/redistribution mistakes, stale docs driving contracts.
+## Watch-Outs
 
-### Phase 2: Paper Inventory And ROCm Readiness Classification
-**Rationale:** The full public surface must be counted and classified before any execution attempt can be interpreted.
-**Delivers:** `paper_inventory.json`, `rocm_readiness.json`, reason-code taxonomy, workload-level records, dtype/input/custom/safetensors/reference/solution fields, forward/backward indicators, static NVIDIA-only flags, fixture tests.
-**Uses:** Pydantic `Definition`/`Workload`, safetensors helpers, stdlib JSON/JSONL, pure `core/dataset` modules.
-**Implements:** Inventory and readiness architecture components.
-**Avoids:** Schema drift hidden as runtime failure, custom/safetensors random substitution, dtype overclaims, workload-granularity loss.
+1. **Tool availability is not stable across ROCm images** - every extractor must go through routing/probes, record command provenance, and degrade to `unavailable` without failing the benchmark.
+2. **PyTorch ROCm builds may not expose standalone HSACO files** - always register `benchmark_kernel.so`, distinguish shared-object evidence from direct code-object/HSACO evidence, and treat missing HSACO as partial or unavailable, not fatal.
+3. **Temporary staging can leave dangling evidence paths** - copy durable evidence beside the trace before cleanup; use sidecar-relative paths and store absolute paths only as provenance.
+4. **Global cache scanning can mix artifacts across runs** - search only the current staging/build tree, tie artifacts to solution/build provenance, and avoid recursive scans of `~/.cache`, `/tmp`, or ROCm install trees.
+5. **Static evidence can be overclaimed** - use `diagnostic_only: true` and false authority flags for correctness, performance, timing, score, paper parity, and leaderboard claims.
+6. **Text parsers will be brittle if too ambitious** - preserve raw output, parse minimal stable facts first, label heuristics, and use `unknown` rather than false when a fact cannot be extracted.
+7. **CPU-safe tests should not require GPUs or live tools** - use fake runners, fake `which`, fixture artifacts, and narrow `requires_rocm`/`requires_rocm_dev` tests only for live validation.
+8. **One architecture is not evidence for all AMD targets** - model requested arches, compile flags, discovered code-object arches, and hardware validation separately per artifact.
 
-### Phase 3: Ready Subset Selection And Bounded Execution Closure
-**Rationale:** Closure should run only known-eligible problems under an explicit budget and through the existing benchmark path.
-**Delivers:** `ready_subset.json`, optional readiness filtering in `scripts/run_dataset.py`, small-batch run profiles, `execution_closure.json`, trace/summary/CLI-log joins, optional AMD score, AMD SOL v2, SOLAR derivation, and timing-evidence references.
-**Uses:** Existing `sol-execbench` CLI, `scripts/run_dataset.py`, existing sidecar flags.
-**Avoids:** Paper-scale runtime blowups, blind execution of blocked problems, skipped-results disappearing, reference execution being mislabeled as optimized solution validation.
+## Recommended Phase Ordering
 
-### Phase 4: Parity Gap Reporting And Evidence Review
-**Rationale:** Requirements and roadmap consumers need a single human and machine-readable ledger of what exists, what ran, what passed, and what remains blocked.
-**Delivers:** `parity_gap_report.md`, `parity_gap_report.json`, grouped blockers, evidence completeness summaries, per-category counts, per-reason counts, next actions, and artifact references.
-**Implements:** Report aggregation and Markdown/JSON contracts.
-**Avoids:** Incomplete denominators, weak failure evidence, sidecar path collisions, stale trace reuse without provenance.
+### Phase 1: Static Evidence Contract And Guardrails
 
-### Phase 5: Claim Guardrails, Docs, And Release Closure
-**Rationale:** v1.11 introduces "paper dataset parity" and "execution closure" language that can easily be misread as full validation.
-**Delivers:** Updated docs with exact workflow, report interpretation, out-of-scope boundaries, v1.11 no-claim tests, public contract guardrails, and examples for acquisition, inventory, readiness, ready subset execution, and gap reports.
-**Addresses:** Claim boundaries, user workflow, downstream roadmap clarity.
-**Avoids:** Full 235-problem validation claims, upstream SOLAR equivalence claims, leaderboard claims, CDNA3/CDNA4/NVFP4/MXFP4 validation claims, canonical schema drift.
+**Rationale:** Consumers and tests need a stable sidecar contract before CLI behavior or reports can be reliable.
+**Delivers:** Pydantic models, status/reason enums, authority flags, sidecar path rules, contract capability token, and no-trace/no-score guardrails.
+**Addresses:** `static_kernel_evidence.v1`, diagnostic-only semantics, partial/unavailable states.
+**Avoids:** Overclaiming, boolean-only schema, canonical trace mutation, score coupling.
+**Research flag:** Skip extra research; repo patterns and source docs are strong.
+
+### Phase 2: Build Artifact Discovery And Manifest
+
+**Rationale:** Extraction is only meaningful if artifacts are tied to the exact solution build and survive staging cleanup.
+**Delivers:** Packager helper APIs, native-solution coverage policy, current-staging discovery, artifact kinds, copied/persisted artifact tree, hashes, sizes, source/persisted paths, compile provenance.
+**Addresses:** HIP/C++ artifact capture and durable evidence archive.
+**Avoids:** Stale cache capture, dangling temp paths, assuming `benchmark_kernel.so` equals HSACO.
+**Research flag:** Needs implementation validation against at least one live ROCm PyTorch extension build.
+
+### Phase 3: Routed Static Extractor Adapters
+
+**Rationale:** v1.17 depends on v1.16 routing; direct `subprocess.run(["tool", ...])` calls would recreate the toolchain brittleness v1.16 solved.
+**Delivers:** Static routing requests, `llvm-objdump` and `readelf` extractors, optional `roc-objdump`/RGA route records, bounded command runner, raw output files, command provenance, metadata/disassembly presence classification.
+**Addresses:** routed static tool selection, nonfatal unavailable states, raw output preservation.
+**Avoids:** mandatory RGA, hanging extractors, unexplainable fallback behavior.
+**Research flag:** Needs deeper phase research or live fixture validation for RGA and `roc-objdump` before enabling rich parsing.
+
+### Phase 4: CLI Sidecar Integration And Reports
+
+**Rationale:** Once contract, discovery, and extractors exist, the main benchmark command can expose a coherent opt-in workflow.
+**Delivers:** `--static-evidence none|auto`, sidecar and evidence-directory writes beside trace output, no-output/keep-staging behavior, warnings that do not alter exit code, optional Markdown/text report.
+**Addresses:** user-facing v1.17 workflow and operator archive needs.
+**Avoids:** default behavior drift, trace/schema mutation, static failures breaking benchmark runs.
+**Research flag:** Skip extra research; reuse environment/profile sidecar precedent.
+
+### Phase 5: Documentation, Guardrails, And Live Validation
+
+**Rationale:** Static evidence is easy to misread; docs and tests must land with live examples and claim boundaries.
+**Delivers:** `docs/CLAIMS.md`, `docs/rocm_toolchain_routing.md`, architecture/researcher/cookbook updates, no-claim tests, CPU-safe fixture tests, one RDNA 4 live artifact validation record, CDNA 3 caveats if not hardware-validated.
+**Addresses:** researcher interpretation, release closure, validation boundaries.
+**Avoids:** claiming static evidence as correctness/performance/leaderboard authority or cross-architecture validation.
+**Research flag:** Needs live ROCm validation; CDNA 3 remains a validation gap unless hardware is available.
+
+### Phase 6: Optional Richer Classification
+
+**Rationale:** Instruction-family counts and resource hints are useful but should not block a correct v1.17 evidence surface.
+**Delivers:** Heuristic instruction families, resource hints when tools report them, parser fixture expansion, possible RGA resource extraction, optional sidecar diff helpers.
+**Addresses:** differentiator features only.
+**Avoids:** brittle parser-first implementation and static metrics being treated as scores.
+**Research flag:** Requires deeper research and fixture capture; treat as stretch or follow-up.
 
 ### Phase Ordering Rationale
 
-- Acquisition and layout must come first because every inventory count and readiness reason needs a known dataset root, category set, and source manifest.
-- Inventory and readiness must precede execution so schema, dtype, custom-input, safetensors, and NVIDIA-only blockers do not become noisy runtime failures.
-- Execution closure should follow readiness and stay bounded by category, limit, workload cap, iterations, timeout, and evidence flags.
-- Gap reporting should join all prior artifacts rather than duplicate their data, keeping canonical traces and scoring sidecars independently parseable.
-- Docs and guardrails should close the milestone after implementation so examples and no-claim language reflect actual commands and artifacts.
-
-### Research Flags
-
-Phases likely needing deeper research during planning:
-- **Phase 1:** Live Hugging Face dataset revision/count handling and whether external safetensors blobs require `huggingface_hub` or documented `hf` CLI setup.
-- **Phase 2:** Exact low-precision dtype policy for Quant/FlashInfer records and any live upstream fields that can support forward/backward indicators without inference.
-- **Phase 3:** Hardware/runtime evidence profile for the available ROCm environment, including whether closure runs should require `--rerun` or artifact freshness checks.
-
-Phases with standard patterns (skip research-phase unless implementation reveals surprises):
-- **Phase 4:** JSON/Markdown aggregation, stable reason-code grouping, and artifact-reference reports are straightforward once prior artifacts exist.
-- **Phase 5:** Documentation and guardrail tests follow established project patterns from earlier ROCm parity and SOL/SOLAR milestones.
+- Contract and guardrails come first because every later phase writes or interprets the sidecar.
+- Artifact discovery must precede extraction because extractor choice depends on artifact kind and target architecture.
+- Routed extractors must precede reports so reports summarize real route decisions and command outputs.
+- CLI integration should wait until the collector can always return a stable result, including unavailable and unsupported states.
+- Rich classifications should be last because raw outputs and minimal facts already satisfy the milestone while deeper parser semantics need live validation.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Repository already has the necessary dependencies and execution/reporting primitives; research strongly recommends no new framework dependency. Exact `huggingface_hub` need depends on implementation choice for FlashInfer blobs. |
-| Features | HIGH | Table stakes match `.planning/PROJECT.md` v1.11 target features and existing script/docs/test surfaces. Exact upstream dataset field availability remains MEDIUM until live inventory runs. |
-| Architecture | HIGH | Sidecar-only reporting, pure core plus thin scripts, and existing runner reuse align with current public-contract guardrails and prior milestone patterns. |
-| Pitfalls | HIGH | Local risks are well grounded in existing downloader/runner behavior, schema contracts, sidecar history, and guardrail tests. Dataset-shape risks remain MEDIUM until the pinned revision is inspected. |
+| Stack | HIGH | Existing Python/Pydantic/Click/toolchain-router stack is sufficient; official docs support `llvm-objdump`, `readelf`, HIP code objects, and RGA as optional. |
+| Features | HIGH | Repo-local milestone scope, v1.14 sidecar precedent, and v1.16 routing foundation strongly define table stakes and exclusions. |
+| Architecture | HIGH | Existing compile/evaluate split and environment/profile sidecar pattern make the insertion point clear. |
+| Artifact discovery | MEDIUM | `benchmark_kernel.so` is stable, but standalone HSACO/code-object intermediates from PyTorch ROCm builds must be validated live. |
+| Extractor behavior | MEDIUM | Generic object-tool behavior is documented; exact RGA/`roc-objdump` packaging and output shape are distribution-dependent. |
+| Pitfalls | HIGH | Risks are grounded in local code/docs/tests plus known ROCm tool packaging variability. |
 
-**Overall confidence:** HIGH for roadmap structure; MEDIUM for exact problem counts, upstream row fields, and blob availability until Phase 1/2 live validation.
+**Overall confidence:** HIGH for the roadmap shape; MEDIUM for exact live extractor and artifact details.
 
-### Gaps to Address
+### Gaps To Address
 
-- **Pinned dataset revision and expected counts:** Phase 1 should record or require the Hugging Face revision and derive/check counts from that revision rather than hard-coding unverified totals.
-- **Public dataset field preservation:** Phase 2 should inspect live rows to confirm whether forward/backward/op-type hints exist upstream or must be derived conservatively.
-- **Safetensors and FlashInfer blob acquisition:** Phase 1/2 should decide whether to keep `hf download` as documented setup or add explicit `huggingface_hub` dependency only if Python code imports it.
-- **Low-precision readiness policy:** Phase 2 should encode dtype readiness as layered evidence, not a boolean, especially for Quant, FP8, FP4, NVFP4, and MXFP4.
-- **Trace freshness for closure claims:** Phase 3 should record git commit, dataset manifest checksum, command args, workload caps, solution hash, and config metadata or require `--rerun` for closure runs.
-- **CDNA3/CDNA4 and full validation boundaries:** Phase 5 should ensure every report states these remain deferred unless future evidence explicitly proves them.
+- Live HIP/C++ artifact shape: validate one RDNA 4 build tree and record whether code objects are embedded in `.so`, emitted as `.hsaco`, or only visible through object metadata.
+- RGA command behavior: fixture-capture actual `rga --help`, version, and binary-analysis output before enabling rich resource parsing.
+- `roc-objdump` availability: probe in the project ROCm container and keep it optional unless packaging is proven stable.
+- Triton artifact stability: defer or explicitly mark unsupported until a stable ROCm/Triton cache-to-solution mapping exists.
+- CDNA 3 claims: keep schema/routing support separate from live CDNA 3 validation unless hardware checks are run.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- `.planning/PROJECT.md` - v1.11 goal, target features, explicit deferrals, current RDNA4/CDNA3 validation boundaries, and v1.10 as existing context.
-- `.planning/research/STACK.md` - recommended dependency posture, script integration points, stack additions, and what not to add.
-- `.planning/research/FEATURES.md` - table stakes, differentiators, anti-features, artifact contracts, and MVP recommendation.
-- `.planning/research/ARCHITECTURE.md` - sidecar-only architecture, module layout, JSON contracts, data flow, and build order.
-- `.planning/research/PITFALLS.md` - critical/moderate/minor pitfalls, phase warnings, and mitigation strategies.
-- `scripts/download_solexecbench.py` - current Hugging Face acquisition behavior and local problem layout.
-- `scripts/run_dataset.py` - existing discovery, execution controls, summaries, skips, traces, AMD score, AMD SOL, SOLAR derivation, and timing evidence options.
-- `src/sol_execbench/core/data/definition.py` and `src/sol_execbench/core/data/workload.py` - canonical schema contracts used for inventory validation.
-- `src/sol_execbench/core/data/trace.py` - canonical trace/evaluation schema that must remain stable.
-- `src/sol_execbench/core/bench/io.py` - safetensors, scalar, random, dtype, and custom input handling.
-- `tests/sol_execbench/test_public_contract_guardrails.py` and `tests/sol_execbench/test_run_dataset_amd_score.py` - existing guardrail and derived-report behavior to preserve.
 
-### Secondary (MEDIUM confidence)
-- Hugging Face Datasets documentation - confirms named-config and split loading patterns, but exact live dataset shape must be checked during implementation.
-- Safetensors documentation - confirms supported tensor loading model, but exact dataset blob availability depends on local acquisition setup.
+- `.planning/PROJECT.md` - v1.17 goal, target features, explicit deferrals, and milestone boundaries.
+- `.planning/research/STACK.md` - recommended stack additions, tool priorities, sidecar fields, and dependency exclusions.
+- `.planning/research/FEATURES.md` - user/operator feature contract, table stakes, differentiators, anti-features, and status semantics.
+- `.planning/research/ARCHITECTURE.md` - integration point, component boundaries, data flow, path rules, and phase build order.
+- `.planning/research/PITFALLS.md` - critical pitfalls, phase warnings, verification guidance, and guardrail strategy.
+- `src/sol_execbench/core/toolchain.py` - v1.16 routing schema, lifecycle/status vocabulary, static artifact types, and dynamic probes.
+- `src/sol_execbench/driver/problem_packager.py` and `src/sol_execbench/driver/templates/build_ext.py` - HIP/C++ staging and PyTorch ROCm extension build flow.
+- `src/sol_execbench/cli/main.py` - existing environment/profile sidecar pattern and CLI orchestration boundary.
+- `docs/CLAIMS.md` and `docs/rocm_toolchain_routing.md` - claim boundaries and routing documentation.
+
+### External (MEDIUM/HIGH confidence)
+
+- AMD HIP compiler documentation - HIP compiler/code-object concepts and ROCm binary context.
+- ROCm compiler reference - `hipcc`, `amdclang++`, `--offload-arch`, and offload architecture tooling.
+- LLVM AMDGPU usage documentation - AMDGPU code object and metadata background.
+- LLVM `llvm-objdump` command guide - object/final-image inspection, headers, symbols, disassembly, and offload visibility.
+- GNU binutils `readelf` documentation - ELF headers, sections, notes, and symbols.
+- GPUOpen Radeon GPU Analyzer manual/repository - RGA binary-analysis capability; local command/output validation still required.
 
 ---
-*Research completed: 2026-05-23*
+*Research completed: 2026-05-25*
 *Ready for roadmap: yes*
