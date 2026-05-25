@@ -19,6 +19,7 @@
 import pytest
 
 from sol_execbench.core.data.definition import Definition
+from sol_execbench_type_helpers import make_definition
 
 _REFERENCE = "def run(a): return a"
 
@@ -33,7 +34,7 @@ def _make(**overrides):
         reference=_REFERENCE,
     )
     base.update(overrides)
-    return Definition(**base)
+    return make_definition(**base)
 
 
 # ── get_resolved_axes_values ──────────────────────────────────────────────────

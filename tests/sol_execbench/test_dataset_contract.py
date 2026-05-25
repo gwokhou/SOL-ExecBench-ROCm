@@ -117,6 +117,7 @@ def test_manifest_is_deterministic_and_has_claim_boundary(tmp_path):
 
     assert first.to_json() == second.to_json()
     assert first.manifest_checksum is not None
+    assert second.manifest_checksum is not None
     assert first.manifest_checksum.value == second.manifest_checksum.value
     assert first.claim_boundary.acquisition_or_layout_complete is True
     assert first.claim_boundary.rocm_readiness is False

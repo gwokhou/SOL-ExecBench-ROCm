@@ -62,10 +62,13 @@ def check_tensor_sanity(
         ref_nonfinite = ref_nonfinite & ~both_neg_inf
         sol_nonfinite = sol_nonfinite & ~both_neg_inf
 
-    has_nonfinite = ref_nonfinite.any().item() or sol_nonfinite.any().item()
+    has_nonfinite = bool(ref_nonfinite.any().item()) or bool(
+        sol_nonfinite.any().item()
+    )
     if has_nonfinite:
         has_nan = (
-            torch.isnan(sol_tensor).any().item() or torch.isnan(ref_tensor).any().item()
+            bool(torch.isnan(sol_tensor).any().item())
+            or bool(torch.isnan(ref_tensor).any().item())
         )
         # has_inf is True only when there are Inf values but NO NaN values.
         # NaN takes priority because it's a stricter failure mode (Inf can

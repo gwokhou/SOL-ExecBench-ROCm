@@ -39,12 +39,12 @@ import pytest
 from sol_execbench.core import (
     BenchmarkConfig,
     Definition,
+    EvaluationStatus,
     Solution,
     Workload,
-    Trace,
-    EvaluationStatus,
 )
 from sol_execbench.driver.problem_packager import ProblemPackager
+from sol_execbench_type_helpers import make_definition, make_trace, make_workload
 
 _SAMPLES_DIR = Path(__file__).parent / "samples"
 
@@ -134,11 +134,13 @@ def _load_sample(
 ) -> tuple[Definition, Solution, list[Workload]]:
     """Load definition, solution, and workloads from a self-contained sample directory."""
     sample_dir = _SAMPLES_DIR / sample
-    definition = Definition(**json.loads((sample_dir / "definition.json").read_text()))
+    definition = make_definition(
+        **json.loads((sample_dir / "definition.json").read_text())
+    )
     sol_dict = json.loads((sample_dir / solution_file).read_text())
     solution = Solution(**sol_dict)
     workloads = [
-        Workload(**json.loads(line))
+        make_workload(**json.loads(line))
         for line in (sample_dir / "workload.jsonl").read_text().splitlines()
         if line.strip()
     ]
@@ -242,8 +244,8 @@ def test_e2e(tmp_path: Path, case: Sample):
     assert not failed, (
         f"{case.test_id}: {len(failed)}/{case.expected_count} workloads did not pass:\n"
         + "\n".join(
-            f"  [{t.evaluation.status.value}] uuid={t.workload.uuid}  "
-            f"log={t.evaluation.log}"
+            f"  [{t.evaluation.status.value if t.evaluation else '<missing>'}] "
+            f"uuid={t.workload.uuid}  log={t.evaluation.log if t.evaluation else ''}"
             for t in failed
         )
     )
@@ -253,6 +255,7 @@ def test_e2e(tmp_path: Path, case: Sample):
         assert trace.definition == definition.name
 
         ev = trace.evaluation
+        assert ev is not None, f"Trace missing evaluation (uuid={trace.workload.uuid})"
         assert ev.correctness is not None, (
             f"PASSED trace missing correctness (uuid={trace.workload.uuid})"
         )
@@ -282,8 +285,8 @@ def test_e2e(tmp_path: Path, case: Sample):
 def test_reward_hack_e2e(tmp_path: Path, case: EvilCase):
     """Evil solutions must produce REWARD_HACK traces with the expected log fragment."""
     evil_solution = _load_evil_sample(case.sample)
-    definition = Definition(**_EVIL_DEFINITION_DICT)
-    workloads = [Workload(**w) for w in _EVIL_WORKLOAD_DICTS]
+    definition = make_definition(**_EVIL_DEFINITION_DICT)
+    workloads = [make_workload(**w) for w in _EVIL_WORKLOAD_DICTS]
     config = BenchmarkConfig(lock_clocks=False, **case.config_overrides)
 
     pkg = ProblemPackager(
@@ -307,13 +310,15 @@ def test_reward_hack_e2e(tmp_path: Path, case: EvilCase):
     )
 
     for t in traces:
-        assert t.evaluation.status.value == "REWARD_HACK", (
-            f"{case.test_id}: expected REWARD_HACK, got {t.evaluation.status.value}; "
-            f"uuid={t.workload.uuid}  log={t.evaluation.log}"
+        ev = t.evaluation
+        assert ev is not None, f"{case.test_id}: trace missing evaluation"
+        assert ev.status.value == "REWARD_HACK", (
+            f"{case.test_id}: expected REWARD_HACK, got {ev.status.value}; "
+            f"uuid={t.workload.uuid}  log={ev.log}"
         )
-        assert case.expected_log_fragment in t.evaluation.log, (
+        assert case.expected_log_fragment in ev.log, (
             f"{case.test_id}: expected {case.expected_log_fragment!r} in log; "
-            f"got: {t.evaluation.log}"
+            f"got: {ev.log}"
         )
 
 
@@ -357,8 +362,10 @@ def test_cli_gqa_paged_decode(tmp_path: Path):
     assert len(lines) == 2, f"Expected 2 traces, got {len(lines)}"
 
     for line in lines:
-        trace = Trace(**json.loads(line))
-        assert trace.evaluation.status == EvaluationStatus.PASSED, (
+        trace = make_trace(**json.loads(line))
+        ev = trace.evaluation
+        assert ev is not None, f"Workload {trace.workload.uuid} missing evaluation"
+        assert ev.status == EvaluationStatus.PASSED, (
             f"Workload {trace.workload.uuid} did not pass: "
-            f"status={trace.evaluation.status.value} log={trace.evaluation.log}"
+            f"status={ev.status.value} log={ev.log}"
         )

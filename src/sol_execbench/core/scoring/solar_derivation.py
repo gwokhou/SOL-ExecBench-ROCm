@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from math import isfinite
 from typing import Any
 
-from sol_execbench.core.data.definition import Definition
+from sol_execbench.core.data.definition import AxisConst, Definition
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.scoring.amd_bound_estimates import (
     OperatorWorkEstimate,
@@ -51,7 +51,7 @@ class SolarEvidenceSource:
     node_id: str | None = None
     tensor_id: str | None = None
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "kind": self.kind,
             "detail": self.detail,
@@ -73,7 +73,7 @@ class SolarTensorEvidence:
     producer_node_id: str | None
     missing_evidence: tuple[str, ...] = ()
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "tensor_id": self.tensor_id,
             "name": self.name,
@@ -98,7 +98,7 @@ class SolarSubroleEvidence:
     rationale: str
     missing_evidence: tuple[str, ...] = ()
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "node_ids": list(self.node_ids),
@@ -118,12 +118,12 @@ class SolarFormulaEvidence:
     family: str
     formula_kind: str
     formula: str
-    formula_inputs: dict[str, object]
+    formula_inputs: dict[str, Any]
     source: SolarEvidenceSource
     confidence: EstimateConfidence | str
     rationale: str
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "node_id": self.node_id,
             "family": self.family,
@@ -153,7 +153,7 @@ class SolarByteEvidence:
     confidence: EstimateConfidence | str
     rationale: str
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "node_id": self.node_id,
             "family": self.family,
@@ -184,7 +184,7 @@ class SolarBoundEvidence:
     confidence: EstimateConfidence | str
     rationale: str
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "node_id": self.node_id,
             "family": self.family,
@@ -217,7 +217,7 @@ class SolarSemanticGroupEvidence:
     byte_evidence: tuple[SolarByteEvidence, ...] = ()
     bound_evidence: tuple[SolarBoundEvidence, ...] = ()
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "family": self.family,
             "group_id": self.group_id,
@@ -259,7 +259,7 @@ class SolarCoverageSourceRef:
     kind: str
     detail: str
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "group_id": self.group_id,
             "node_id": self.node_id,
@@ -277,7 +277,7 @@ class SolarFamilyCoverage:
     group_count: int
     status_counts: dict[str, int]
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "family": self.family,
             "group_count": self.group_count,
@@ -294,7 +294,7 @@ class SolarCoveragePattern:
     node_ids: tuple[str, ...]
     sources: tuple[SolarCoverageSourceRef, ...]
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "pattern": self.pattern,
             "group_ids": list(self.group_ids),
@@ -317,7 +317,7 @@ class SolarCoverageSummary:
     estimated_node_ids: tuple[str, ...]
     provenance: tuple[SolarCoverageSourceRef, ...]
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "family_counts": dict(sorted(self.family_counts.items())),
             "status_counts": _ordered_status_counts(self.status_counts),
@@ -346,7 +346,7 @@ class SolarAggregateStatus:
     node_ids: tuple[str, ...]
     warnings: tuple[str, ...]
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "status": self.status,
             "score_eligible": self.score_eligible,
@@ -370,7 +370,7 @@ class SolarDerivationEvidence:
     schema_version: str = SOLAR_DERIVATION_SCHEMA_VERSION
     derived: bool = True
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         coverage_summary = _coverage_for_groups(self.groups)
         aggregate_status = _aggregate_status_for_groups(self.groups, self.warnings)
         return {
@@ -1956,15 +1956,13 @@ def _subrole_from_tensor_ids(
 
 def _source_for_tensor(graph: BoundGraph, tensor: BoundTensor) -> SolarEvidenceSource:
     producer = (
-        graph.nodes_by_id[tensor.producer_node_id]
-        if hasattr(graph, "nodes_by_id") and tensor.producer_node_id
-        else None
-    )
-    if producer is None and tensor.producer_node_id is not None:
-        producer = next(
+        next(
             (node for node in graph.nodes if node.node_id == tensor.producer_node_id),
             None,
         )
+        if tensor.producer_node_id is not None
+        else None
+    )
     kind = _source_kind_for_tensor(tensor, producer)
     return SolarEvidenceSource(
         kind=kind,
@@ -2029,7 +2027,7 @@ def _axes_matching_shape(
 def _axis_values(definition: Definition, workload: Workload) -> dict[str, int]:
     values = {name: int(value) for name, value in workload.axes.items()}
     for name, axis in definition.axes.items():
-        if getattr(axis, "type", None) == "const":
+        if isinstance(axis, AxisConst):
             values[name] = int(axis.value)
     return values
 
@@ -2417,7 +2415,7 @@ def _parse_object_map(
     key: str,
     *,
     source: str,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     value = _parse_dict(payload, key, source=source)
     parsed: dict[str, object] = {}
     for raw_key, raw_value in value.items():

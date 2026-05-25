@@ -10,9 +10,7 @@ from sol_execbench.core.data.trace import (
     Evaluation,
     EvaluationStatus,
     Performance,
-    Trace,
 )
-from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.scoring.amd_sol import (
     AMD_SOL_SCHEMA_VERSION,
     EstimateConfidence,
@@ -27,13 +25,14 @@ from sol_execbench.core.scoring.amd_sol import (
 from sol_execbench.core.scoring.amd_bound_estimates import estimate_bound_work
 from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
 from sol_execbench.core.scoring.amd_hardware_models import load_amd_hardware_model
+from sol_execbench_type_helpers import make_definition, make_trace, make_workload
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _matmul_definition() -> Definition:
-    return Definition(
+    return make_definition(
         name="matmul_demo",
         axes={
             "M": {"type": "var"},
@@ -51,7 +50,7 @@ def _matmul_definition() -> Definition:
 
 def test_matmul_bound_artifact_records_graph_work_hardware_and_bounds():
     definition = _matmul_definition()
-    workload = Workload(
+    workload = make_workload(
         axes={"M": 2},
         inputs={"a": {"type": "random"}, "b": {"type": "random"}},
         uuid="matmul-workload",
@@ -80,7 +79,7 @@ def test_matmul_bound_artifact_records_graph_work_hardware_and_bounds():
 
 
 def test_elementwise_work_estimate_is_inexact_and_auditable():
-    definition = Definition(
+    definition = make_definition(
         name="add_demo",
         axes={"N": {"type": "var"}},
         inputs={
@@ -90,7 +89,7 @@ def test_elementwise_work_estimate_is_inexact_and_auditable():
         outputs={"out": {"shape": ["N"], "dtype": "float32"}},
         reference="def run(x, y):\n    return x + y",
     )
-    workload = Workload(
+    workload = make_workload(
         axes={"N": 16},
         inputs={"x": {"type": "random"}, "y": {"type": "random"}},
         uuid="add-workload",
@@ -109,14 +108,14 @@ def test_elementwise_work_estimate_is_inexact_and_auditable():
 
 
 def test_unsupported_ops_stay_visible_instead_of_getting_silent_scores(tmp_path: Path):
-    definition = Definition(
+    definition = make_definition(
         name="unsupported_demo",
         axes={"N": {"type": "var"}},
         inputs={"x": {"shape": ["N", "N"], "dtype": "float32"}},
         outputs={"out": {"shape": ["N", "N"], "dtype": "float32"}},
         reference="import torch\n\ndef run(x):\n    return torch.linalg.inv(x)",
     )
-    workload = Workload(
+    workload = make_workload(
         axes={"N": 4},
         inputs={"x": {"type": "random"}},
         uuid="unsupported-workload",
@@ -136,7 +135,7 @@ def test_unsupported_ops_stay_visible_instead_of_getting_silent_scores(tmp_path:
 
 def test_legacy_work_estimate_fields_are_unchanged_and_adapt_rich_totals():
     definition = _matmul_definition()
-    workload = Workload(
+    workload = make_workload(
         axes={"M": 2},
         inputs={"a": {"type": "random"}, "b": {"type": "random"}},
         uuid="matmul-workload",
@@ -160,7 +159,7 @@ def test_legacy_work_estimate_fields_are_unchanged_and_adapt_rich_totals():
 
 def test_legacy_estimate_work_falls_back_when_graph_nodes_do_not_align():
     definition = _matmul_definition()
-    workload = Workload(
+    workload = make_workload(
         axes={"M": 2},
         inputs={"a": {"type": "random"}, "b": {"type": "random"}},
         uuid="matmul-workload",
@@ -182,7 +181,7 @@ def test_legacy_estimate_work_falls_back_when_graph_nodes_do_not_align():
 
 
 def test_coverage_summary_counts_supported_inexact_and_unsupported_ops():
-    definition = Definition(
+    definition = make_definition(
         name="coverage_demo",
         axes={"N": {"type": "var"}},
         inputs={"x": {"shape": ["N"], "dtype": "float32"}},
@@ -195,7 +194,7 @@ def test_coverage_summary_counts_supported_inexact_and_unsupported_ops():
             "    return z.reshape(1)\n"
         ),
     )
-    workload = Workload(
+    workload = make_workload(
         axes={"N": 8},
         inputs={"x": {"type": "random"}},
         uuid="coverage-workload",
@@ -219,7 +218,7 @@ def test_coverage_summary_counts_supported_inexact_and_unsupported_ops():
 
 
 def test_reduction_data_movement_and_softmax_estimates_are_labeled():
-    definition = Definition(
+    definition = make_definition(
         name="softmax_demo",
         axes={"N": {"type": "var"}, "M": {"type": "const", "value": 4}},
         inputs={"x": {"shape": ["N", "M"], "dtype": "float32"}},
@@ -232,7 +231,7 @@ def test_reduction_data_movement_and_softmax_estimates_are_labeled():
             "    return z.reshape(x.shape)\n"
         ),
     )
-    workload = Workload(
+    workload = make_workload(
         axes={"N": 8},
         inputs={"x": {"type": "random"}},
         uuid="softmax-workload",
@@ -253,9 +252,9 @@ def test_reduction_data_movement_and_softmax_estimates_are_labeled():
 
 
 def test_amd_sol_artifacts_do_not_mutate_canonical_trace_payloads():
-    trace = Trace(
+    trace = make_trace(
         definition="matmul_demo",
-        workload=Workload(
+        workload=make_workload(
             axes={"M": 2},
             inputs={"a": {"type": "random"}, "b": {"type": "random"}},
             uuid="matmul-workload",

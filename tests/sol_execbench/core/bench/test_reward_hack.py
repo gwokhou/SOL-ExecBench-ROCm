@@ -16,6 +16,9 @@
 
 """Tests for sol_execbench.core.bench.reward_hack."""
 
+from types import SimpleNamespace
+from typing import Any
+
 import pytest
 import torch
 
@@ -126,7 +129,7 @@ class TestEvalIntegrity:
 
     def test_raises_when_function_replaced(self):
         original = lambda: None  # noqa: E731
-        ns = {"time_runnable": original}
+        ns: dict[str, Any] = {"time_runnable": original}
         snap = snapshot_critical_functions(ns, ["time_runnable"])
         ns["time_runnable"] = lambda *a, **kw: 0.001  # attacker replaces it
         with pytest.raises(RewardHackDetected, match="time_runnable.*monkey-patched"):
@@ -156,7 +159,7 @@ class TestEvalIntegrity:
         def real_time_runnable(fn, args, device, warmup=10, rep=50):
             return 1.0
 
-        ns = {"time_runnable": real_time_runnable}
+        ns: dict[str, Any] = {"time_runnable": real_time_runnable}
         snap = snapshot_critical_functions(ns, ["time_runnable"])
 
         # Simulate the attack: user code wraps time_runnable
@@ -175,18 +178,8 @@ class TestEvalIntegrity:
 
 
 def _solution_with_source(content: str, path: str = "kernel.py"):
-    class Source:
-        pass
-
-    class Solution:
-        pass
-
-    source = Source()
-    source.path = path
-    source.content = content
-    solution = Solution()
-    solution.sources = [source]
-    return solution
+    source = SimpleNamespace(path=path, content=content)
+    return SimpleNamespace(sources=[source])
 
 
 class TestStaticSourceReview:

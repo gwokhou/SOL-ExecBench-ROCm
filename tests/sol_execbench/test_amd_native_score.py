@@ -3,16 +3,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.trace import (
     Correctness,
     Environment,
     Evaluation,
     EvaluationStatus,
     Performance,
-    Trace,
 )
-from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.scoring.amd_score import (
     AMD_SCORE_CLAIM_LEVEL,
     AMD_SCORE_SCHEMA_VERSION,
@@ -38,6 +35,7 @@ from sol_execbench.core.scoring.amd_sol import (
 )
 from sol_execbench.core.scoring.amd_sol_v2 import build_amd_sol_bound_v2_artifact
 from sol_execbench.core.scoring.amd_hardware_models import load_amd_hardware_model
+from sol_execbench_type_helpers import make_definition, make_trace, make_workload
 from sol_execbench.core.scoring.solar_derivation import (
     SolarAggregateStatus,
     SolarDerivationEvidence,
@@ -51,7 +49,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _matmul_artifact():
-    definition = Definition(
+    definition = make_definition(
         name="matmul_demo",
         axes={
             "M": {"type": "var"},
@@ -65,7 +63,7 @@ def _matmul_artifact():
         outputs={"out": {"shape": ["M", "N"], "dtype": "float32"}},
         reference="def run(a, b):\n    return a @ b",
     )
-    workload = Workload(
+    workload = make_workload(
         axes={"M": 2},
         inputs={"a": {"type": "random"}, "b": {"type": "random"}},
         uuid="matmul-workload",
@@ -76,7 +74,7 @@ def _matmul_artifact():
 
 
 def _matmul_artifact_v2():
-    definition = Definition(
+    definition = make_definition(
         name="matmul_demo",
         axes={
             "M": {"type": "var"},
@@ -90,7 +88,7 @@ def _matmul_artifact_v2():
         outputs={"out": {"shape": ["M", "N"], "dtype": "float32"}},
         reference="def run(a, b):\n    return a @ b",
     )
-    workload = Workload(
+    workload = make_workload(
         axes={"M": 2},
         inputs={"a": {"type": "random"}, "b": {"type": "random"}},
         uuid="matmul-workload",
@@ -127,14 +125,14 @@ def _cdna3_model(tmp_path):
 
 
 def _unsupported_cdna3_artifact(tmp_path: Path):
-    definition = Definition(
+    definition = make_definition(
         name="unsupported_demo",
         axes={"N": {"type": "var"}},
         inputs={"x": {"shape": ["N", "N"], "dtype": "float32"}},
         outputs={"out": {"shape": ["N", "N"], "dtype": "float32"}},
         reference="import torch\n\ndef run(x):\n    return torch.linalg.inv(x)",
     )
-    workload = Workload(
+    workload = make_workload(
         axes={"N": 4},
         inputs={"x": {"type": "random"}},
         uuid="unsupported-workload",
@@ -145,14 +143,14 @@ def _unsupported_cdna3_artifact(tmp_path: Path):
 
 
 def _unsupported_artifact_v2():
-    definition = Definition(
+    definition = make_definition(
         name="unsupported_demo",
         axes={"N": {"type": "var"}},
         inputs={"x": {"shape": ["N", "N"], "dtype": "float32"}},
         outputs={"out": {"shape": ["N", "N"], "dtype": "float32"}},
         reference="import torch\n\ndef run(x):\n    return torch.linalg.inv(x)",
     )
-    workload = Workload(
+    workload = make_workload(
         axes={"N": 4},
         inputs={"x": {"type": "random"}},
         uuid="unsupported-workload",
@@ -465,9 +463,9 @@ def test_incomplete_score_inputs_are_reported_without_inventing_score():
 
 def test_trace_workflow_scores_from_canonical_trace_without_mutation():
     artifact = _matmul_artifact()
-    trace = Trace(
+    trace = make_trace(
         definition=artifact.definition,
-        workload=Workload(
+        workload=make_workload(
             axes={"M": 2},
             inputs={"a": {"type": "random"}, "b": {"type": "random"}},
             uuid=artifact.workload_uuid,
@@ -512,9 +510,9 @@ def test_trace_workflow_scores_from_canonical_trace_without_mutation():
 
 def test_trace_workflow_forwards_solar_unscored_aggregate_guard():
     artifact = _matmul_artifact()
-    trace = Trace(
+    trace = make_trace(
         definition=artifact.definition,
-        workload=Workload(
+        workload=make_workload(
             axes={"M": 2},
             inputs={"a": {"type": "random"}, "b": {"type": "random"}},
             uuid=artifact.workload_uuid,
@@ -546,9 +544,9 @@ def test_trace_workflow_forwards_solar_unscored_aggregate_guard():
 
 def test_trace_workflow_prefers_release_scoring_baseline_artifact():
     artifact = _matmul_artifact()
-    trace = Trace(
+    trace = make_trace(
         definition=artifact.definition,
-        workload=Workload(
+        workload=make_workload(
             axes={"M": 2},
             inputs={"a": {"type": "random"}, "b": {"type": "random"}},
             uuid=artifact.workload_uuid,
@@ -598,9 +596,9 @@ def test_trace_workflow_prefers_release_scoring_baseline_artifact():
 
 
 def test_trace_workflow_marks_missing_bound_as_unscored():
-    trace = Trace(
+    trace = make_trace(
         definition="missing_bound",
-        workload=Workload(axes={}, inputs={}, uuid="missing-bound-workload"),
+        workload=make_workload(axes={}, inputs={}, uuid="missing-bound-workload"),
     )
 
     score = score_amd_native_trace_workload(trace, None, trace_ref="traces.json")
@@ -613,9 +611,9 @@ def test_trace_workflow_marks_missing_bound_as_unscored():
 
 def test_trace_workflow_marks_failed_trace_as_unscored():
     artifact = _matmul_artifact_v2()
-    trace = Trace(
+    trace = make_trace(
         definition=artifact.definition,
-        workload=Workload(
+        workload=make_workload(
             axes={"M": 2},
             inputs={"a": {"type": "random"}, "b": {"type": "random"}},
             uuid=artifact.workload_uuid,
@@ -648,9 +646,9 @@ def test_trace_workflow_marks_failed_trace_as_unscored():
 
 def test_suite_workflow_builds_scores_from_trace_and_artifact_maps():
     artifact = _matmul_artifact()
-    trace = Trace(
+    trace = make_trace(
         definition=artifact.definition,
-        workload=Workload(
+        workload=make_workload(
             axes={"M": 2},
             inputs={"a": {"type": "random"}, "b": {"type": "random"}},
             uuid=artifact.workload_uuid,
@@ -690,9 +688,9 @@ def test_suite_workflow_builds_scores_from_trace_and_artifact_maps():
 
 def test_suite_workflow_applies_solar_guards_by_workload_uuid():
     artifact = _matmul_artifact()
-    trace = Trace(
+    trace = make_trace(
         definition=artifact.definition,
-        workload=Workload(
+        workload=make_workload(
             axes={"M": 2},
             inputs={"a": {"type": "random"}, "b": {"type": "random"}},
             uuid=artifact.workload_uuid,
@@ -726,9 +724,9 @@ def test_suite_workflow_applies_solar_guards_by_workload_uuid():
 
 def test_suite_workflow_missing_solar_guard_entry_is_neutral():
     artifact = _matmul_artifact()
-    trace = Trace(
+    trace = make_trace(
         definition=artifact.definition,
-        workload=Workload(
+        workload=make_workload(
             axes={"M": 2},
             inputs={"a": {"type": "random"}, "b": {"type": "random"}},
             uuid=artifact.workload_uuid,

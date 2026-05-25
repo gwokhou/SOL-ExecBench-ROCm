@@ -22,9 +22,10 @@ a REWARD_HACK trace.
 """
 
 import torch
+from typing import Any, cast
 
 # Patch at module level — before the driver calls check_monkey_patch().
-torch.cuda.Event.elapsed_time = lambda self, end: 0.0
+cast(Any, torch.cuda.Event).elapsed_time = lambda self, end: 0.0
 
 
 def run(x, y):

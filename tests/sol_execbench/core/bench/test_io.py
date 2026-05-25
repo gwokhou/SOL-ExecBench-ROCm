@@ -38,7 +38,7 @@ from sol_execbench.core.bench.io import (
     load_safetensors,
     normalize_outputs,
 )
-from sol_execbench.core.data import Definition, Workload
+from sol_execbench_type_helpers import make_definition, make_workload
 
 # ------------------------------------------------------------------
 # _rand_tensor
@@ -640,13 +640,13 @@ def _make_definition(**overrides):
         reference=_REFERENCE,
     )
     base.update(overrides)
-    return Definition(**base)
+    return make_definition(**base)
 
 
 def _make_workload(**overrides):
     base = dict(uuid="test-uuid", axes={"N": 4}, inputs={"a": {"type": "random"}})
     base.update(overrides)
-    return Workload(**base)
+    return make_workload(**base)
 
 
 # ------------------------------------------------------------------
@@ -742,7 +742,7 @@ class TestGenInputs:
             outputs={"b": {"shape": ["N"], "dtype": "float32"}},
             reference="def run(a, s): return a",
         )
-        wkl = Workload(
+        wkl = make_workload(
             uuid="u",
             axes={"N": 4},
             inputs={"a": {"type": "random"}, "s": {"type": "scalar", "value": 0.5}},
@@ -759,7 +759,7 @@ class TestGenInputs:
             outputs={"c": {"shape": ["N"], "dtype": "float32"}},
             reference="def run(a, b): return a",
         )
-        wkl = Workload(
+        wkl = make_workload(
             uuid="u",
             axes={"N": 4},
             inputs={
@@ -784,7 +784,7 @@ class TestGenInputs:
             custom_inputs_entrypoint="gen",
             reference="def run(a, b): return a\ndef gen(axes, device): return {}",
         )
-        wkl = Workload(
+        wkl = make_workload(
             uuid="u",
             axes={"N": 4},
             inputs={"a": {"type": "custom"}, "b": {"type": "custom"}},
@@ -805,7 +805,7 @@ class TestLoadSafetensors:
         st.save_file({"data": t}, tmp_path / "tensor.safetensors")
 
         d = _make_definition()
-        wkl = Workload(
+        wkl = make_workload(
             uuid="u",
             axes={"N": 4},
             inputs={
@@ -826,7 +826,7 @@ class TestLoadSafetensors:
         st.save_file({"data": t}, tmp_path / "tensor.safetensors")
 
         d = _make_definition()
-        wkl = Workload(
+        wkl = make_workload(
             uuid="u",
             axes={"N": 4},
             inputs={
@@ -844,7 +844,7 @@ class TestLoadSafetensors:
     def test_missing_file_raises(self, tmp_path):
         pytest.importorskip("safetensors")
         d = _make_definition()
-        wkl = Workload(
+        wkl = make_workload(
             uuid="u",
             axes={"N": 4},
             inputs={

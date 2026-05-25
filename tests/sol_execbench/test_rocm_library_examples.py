@@ -8,10 +8,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from sol_execbench.core.data import Definition, Workload
-from sol_execbench.core.data import Solution
 from sol_execbench.core.bench.config import BenchmarkConfig
 from sol_execbench.driver.problem_packager import ProblemPackager
+from sol_execbench_type_helpers import make_definition, make_solution, make_workload
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -55,7 +54,7 @@ def test_phase_4_example_and_sample_solutions_parse_under_rocm_schema():
     failures = []
     for path in paths:
         try:
-            Solution(**_load_solution(path))
+            make_solution(**_load_solution(path))
         except Exception as exc:
             failures.append(f"{path.relative_to(REPO_ROOT)}: {exc}")
     assert not failures, "Solutions failed ROCm schema parsing:\n" + "\n".join(failures)
@@ -136,7 +135,7 @@ def test_portable_public_examples_include_cdna3_metadata():
 def test_hipblas_public_example_is_runnable_native_category():
     path = REPO_ROOT / "examples/hipblas/gemm/solution_hipblas.json"
     data = _load_solution(path)
-    solution = Solution(**data)
+    solution = make_solution(**data)
 
     assert [language.value for language in solution.spec.languages] == ["hipblas"]
     assert solution.spec.destination_passing_style is False
@@ -150,7 +149,7 @@ def test_hipblas_public_example_is_runnable_native_category():
 def test_miopen_public_example_is_runnable_native_category():
     path = REPO_ROOT / "examples/miopen/softmax/solution_miopen.json"
     data = _load_solution(path)
-    solution = Solution(**data)
+    solution = make_solution(**data)
 
     assert [language.value for language in solution.spec.languages] == ["miopen"]
     assert solution.definition == "miopen_softmax_h4096"
@@ -166,7 +165,7 @@ def test_miopen_public_example_is_runnable_native_category():
 
 def test_miopen_solution_embeds_checked_in_source():
     example_dir = REPO_ROOT / "examples/miopen/softmax"
-    solution = Solution(**_load_solution(example_dir / "solution_miopen.json"))
+    solution = make_solution(**_load_solution(example_dir / "solution_miopen.json"))
 
     assert solution.sources[0].content == (example_dir / "main.cpp").read_text()
 
@@ -174,7 +173,7 @@ def test_miopen_solution_embeds_checked_in_source():
 def test_ck_public_example_is_runnable_native_category():
     path = REPO_ROOT / "examples/ck/gemm/solution_ck.json"
     data = _load_solution(path)
-    solution = Solution(**data)
+    solution = make_solution(**data)
 
     assert [language.value for language in solution.spec.languages] == ["ck"]
     assert solution.definition == "ck_gemm_n128_k128"
@@ -191,7 +190,7 @@ def test_ck_public_example_is_runnable_native_category():
 
 def test_ck_solution_embeds_checked_in_source():
     example_dir = REPO_ROOT / "examples/ck/gemm"
-    solution = Solution(**_load_solution(example_dir / "solution_ck.json"))
+    solution = make_solution(**_load_solution(example_dir / "solution_ck.json"))
 
     assert solution.sources[0].content == (example_dir / "kernel.hip").read_text()
 
@@ -199,7 +198,7 @@ def test_ck_solution_embeds_checked_in_source():
 def test_rocwmma_public_example_is_runnable_native_category():
     path = REPO_ROOT / "examples/rocwmma/gemm/solution_rocwmma.json"
     data = _load_solution(path)
-    solution = Solution(**data)
+    solution = make_solution(**data)
 
     assert [language.value for language in solution.spec.languages] == ["rocwmma"]
     assert solution.definition == "rocwmma_gemm_m16n16k16"
@@ -217,16 +216,16 @@ def test_rocwmma_public_example_is_runnable_native_category():
 
 def test_rocwmma_solution_embeds_checked_in_source():
     example_dir = REPO_ROOT / "examples/rocwmma/gemm"
-    solution = Solution(**_load_solution(example_dir / "solution_rocwmma.json"))
+    solution = make_solution(**_load_solution(example_dir / "solution_rocwmma.json"))
 
     assert solution.sources[0].content == (example_dir / "kernel.hip").read_text()
 
 
 def test_hipblas_example_stages_through_native_packager(tmp_path):
     example_dir = REPO_ROOT / "examples/hipblas/gemm"
-    definition = Definition(**_load_solution(example_dir / "definition.json"))
-    workload = Workload(**json.loads((example_dir / "workload.jsonl").read_text()))
-    solution = Solution(**_load_solution(example_dir / "solution_hipblas.json"))
+    definition = make_definition(**_load_solution(example_dir / "definition.json"))
+    workload = make_workload(**json.loads((example_dir / "workload.jsonl").read_text()))
+    solution = make_solution(**_load_solution(example_dir / "solution_hipblas.json"))
     packager = ProblemPackager(
         definition=definition,
         workloads=[workload],
@@ -248,9 +247,9 @@ def test_hipblas_example_stages_through_native_packager(tmp_path):
 
 def test_miopen_example_stages_through_native_packager(tmp_path):
     example_dir = REPO_ROOT / "examples/miopen/softmax"
-    definition = Definition(**_load_solution(example_dir / "definition.json"))
-    workload = Workload(**json.loads((example_dir / "workload.jsonl").read_text().splitlines()[0]))
-    solution = Solution(**_load_solution(example_dir / "solution_miopen.json"))
+    definition = make_definition(**_load_solution(example_dir / "definition.json"))
+    workload = make_workload(**json.loads((example_dir / "workload.jsonl").read_text().splitlines()[0]))
+    solution = make_solution(**_load_solution(example_dir / "solution_miopen.json"))
     packager = ProblemPackager(
         definition=definition,
         workloads=[workload],
@@ -273,9 +272,9 @@ def test_miopen_example_stages_through_native_packager(tmp_path):
 
 def test_ck_example_stages_through_native_packager(tmp_path):
     example_dir = REPO_ROOT / "examples/ck/gemm"
-    definition = Definition(**_load_solution(example_dir / "definition.json"))
-    workload = Workload(**json.loads((example_dir / "workload.jsonl").read_text().splitlines()[0]))
-    solution = Solution(**_load_solution(example_dir / "solution_ck.json"))
+    definition = make_definition(**_load_solution(example_dir / "definition.json"))
+    workload = make_workload(**json.loads((example_dir / "workload.jsonl").read_text().splitlines()[0]))
+    solution = make_solution(**_load_solution(example_dir / "solution_ck.json"))
     packager = ProblemPackager(
         definition=definition,
         workloads=[workload],
@@ -298,9 +297,9 @@ def test_ck_example_stages_through_native_packager(tmp_path):
 
 def test_rocwmma_example_stages_through_native_packager(tmp_path):
     example_dir = REPO_ROOT / "examples/rocwmma/gemm"
-    definition = Definition(**_load_solution(example_dir / "definition.json"))
-    workload = Workload(**json.loads((example_dir / "workload.jsonl").read_text().splitlines()[0]))
-    solution = Solution(**_load_solution(example_dir / "solution_rocwmma.json"))
+    definition = make_definition(**_load_solution(example_dir / "definition.json"))
+    workload = make_workload(**json.loads((example_dir / "workload.jsonl").read_text().splitlines()[0]))
+    solution = make_solution(**_load_solution(example_dir / "solution_rocwmma.json"))
     packager = ProblemPackager(
         definition=definition,
         workloads=[workload],
@@ -323,15 +322,15 @@ def test_rocwmma_example_stages_through_native_packager(tmp_path):
 
 def test_remaining_rocm_library_categories_stage_through_native_packager(tmp_path):
     example_dir = REPO_ROOT / "examples/hipblas/gemm"
-    definition = Definition(**_load_solution(example_dir / "definition.json"))
-    workload = Workload(**json.loads((example_dir / "workload.jsonl").read_text()))
+    definition = make_definition(**_load_solution(example_dir / "definition.json"))
+    workload = make_workload(**json.loads((example_dir / "workload.jsonl").read_text()))
 
     for language, source_path, include_text, link_flags in (
         ("miopen", "main.cpp", "#include <miopen/miopen.h>\n", ["-lMIOpen"]),
         ("ck", "kernel.hip", "#include <ck/ck.hpp>\n", []),
         ("rocwmma", "kernel.hip", "#include <rocwmma/rocwmma.hpp>\n", []),
     ):
-        solution = Solution(
+        solution = make_solution(
             **{
                 "name": f"staging_{language}",
                 "definition": definition.name,

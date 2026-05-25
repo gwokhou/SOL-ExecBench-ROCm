@@ -7,6 +7,7 @@ import copy
 import sys
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -36,6 +37,12 @@ from sol_execbench.core.scoring.solar_derivation import (
     classify_solar_confidence,
     derive_solar_derivation_evidence,
     solar_derivation_from_dict,
+)
+from sol_execbench_type_helpers import (
+    JsonDict,
+    json_dict,
+    make_definition,
+    make_workload,
 )
 
 TEST_DIR = str(Path(__file__).resolve().parent)
@@ -167,7 +174,7 @@ def _contract_artifact() -> SolarDerivationEvidence:
     )
 
 
-def _contract_payload() -> dict[str, object]:
+def _contract_payload() -> JsonDict:
     return _contract_artifact().to_dict()
 
 
@@ -391,7 +398,7 @@ def test_solar_derivation_parser_rejects_missing_required_fields():
     ],
 )
 def test_solar_derivation_parser_rejects_unknown_schema_fields(
-    path: tuple[object, ...],
+    path: tuple[str | int, ...],
     expected_error: str,
 ):
     payload = _contract_payload()
@@ -429,7 +436,7 @@ def test_solar_derivation_parser_rejects_unknown_schema_fields(
                 ],
             }
         ]
-    target = payload
+    target: Any = payload
     for key in path:
         target = target[key]
     target["extra_claim"] = "not allowed"
@@ -515,12 +522,12 @@ def test_solar_derivation_parser_rejects_invalid_schema_version():
     ],
 )
 def test_solar_derivation_parser_rejects_invalid_confidence_or_status(
-    path: tuple[object, ...],
+    path: tuple[str | int, ...],
     value: str,
     expected_error: str,
 ):
     payload = _contract_payload()
-    target = payload
+    target: Any = payload
     for key in path[:-1]:
         target = target[key]
     target[path[-1]] = value
@@ -1006,7 +1013,7 @@ def test_solar_derivation_parser_rejects_semantic_phase51_mismatches(
     ],
 )
 def test_solar_derivation_parser_rejects_missing_required_phase51_nested_fields(
-    path: tuple[object, ...],
+    path: tuple[str | int, ...],
     expected_error: str,
 ):
     payload = _contract_payload()
@@ -1026,7 +1033,7 @@ def test_solar_derivation_parser_rejects_missing_required_phase51_nested_fields(
             ],
         }
     ]
-    target = payload
+    target: Any = payload
     for key in path[:-1]:
         target = target[key]
     del target[path[-1]]
@@ -1083,11 +1090,11 @@ def test_solar_derivation_parser_rejects_invalid_shape_dimensions(
     ],
 )
 def test_solar_derivation_parser_rejects_malformed_sidecar_evidence(
-    path: tuple[object, ...],
+    path: tuple[str | int, ...],
     expected_error: str,
 ):
     payload = _contract_payload()
-    target = payload
+    target: Any = payload
     for key in path[:-1]:
         target = target[key]
     if path[-1] == "formula":
@@ -1105,10 +1112,10 @@ def test_solar_derivation_parser_rejects_malformed_sidecar_evidence(
         solar_derivation_from_dict(payload)
 
 
-def _fixture_evidence_payload(fixture: dict[str, object]) -> dict[str, object]:
-    expectation = fixture["expectation"]
+def _fixture_evidence_payload(fixture: JsonDict) -> JsonDict:
+    expectation = json_dict(fixture["expectation"])
     assert isinstance(expectation, dict)
-    scope_boundary = fixture["scope_boundary"]
+    scope_boundary = json_dict(fixture["scope_boundary"])
     assert isinstance(scope_boundary, dict)
     case_id = str(fixture["case_id"])
     subroles = tuple(
@@ -1184,12 +1191,12 @@ def _fixture_evidence_payload(fixture: dict[str, object]) -> dict[str, object]:
 
 
 def test_fixture_expectations_are_representable_as_derivation_evidence():
-    fixtures = load_solar_derivation_fixtures()
+    fixtures = [json_dict(fixture) for fixture in load_solar_derivation_fixtures()]
     families: set[str] = set()
     fixture_classes: set[str] = set()
 
     for fixture in fixtures:
-        expectation = fixture["expectation"]
+        expectation = json_dict(fixture["expectation"])
         assert isinstance(expectation, dict)
         parsed = solar_derivation_from_dict(_fixture_evidence_payload(fixture))
         group = parsed.groups[0]
@@ -1200,7 +1207,7 @@ def test_fixture_expectations_are_representable_as_derivation_evidence():
         assert [subrole.name for subrole in group.subroles] == expectation[
             "expected_subroles"
         ]
-        assert group.confidence.value == expectation["expected_confidence"]
+        assert group.confidence == expectation["expected_confidence"]
         assert group.status == expectation["expected_status"]
         assert list(group.required_evidence) == expectation["required_evidence"]
         assert list(group.missing_evidence) == expectation["missing_evidence"]
@@ -1216,10 +1223,10 @@ def test_fixture_expectations_are_representable_as_derivation_evidence():
 
 
 def test_degraded_and_unsupported_fixtures_require_missing_evidence():
-    fixtures = load_solar_derivation_fixtures()
+    fixtures = [json_dict(fixture) for fixture in load_solar_derivation_fixtures()]
 
     for fixture in fixtures:
-        expectation = fixture["expectation"]
+        expectation = json_dict(fixture["expectation"])
         assert isinstance(expectation, dict)
         parsed = solar_derivation_from_dict(_fixture_evidence_payload(fixture))
         group = parsed.groups[0]
@@ -1232,11 +1239,11 @@ def test_degraded_and_unsupported_fixtures_require_missing_evidence():
         assert group.missing_evidence, fixture["case_id"]
         assert group.warning_prefixes, fixture["case_id"]
         assert group.status in {"degraded", "unscored"}
-        assert group.confidence.value in {"inexact", "unsupported"}
+        assert group.confidence in {"inexact", "unsupported"}
 
 
 def test_phase48_evidence_does_not_claim_paper_scale_or_hardware_validation():
-    fixtures = load_solar_derivation_fixtures()
+    fixtures = [json_dict(fixture) for fixture in load_solar_derivation_fixtures()]
 
     for fixture in fixtures:
         boundary = fixture["scope_boundary"]
@@ -1254,7 +1261,7 @@ def test_phase48_evidence_does_not_claim_paper_scale_or_hardware_validation():
 
 
 def _matmul_definition() -> Definition:
-    return Definition(
+    return make_definition(
         name="solar_matmul_demo",
         axes={
             "M": {"type": "var"},
@@ -1271,7 +1278,7 @@ def _matmul_definition() -> Definition:
 
 
 def _matmul_workload() -> Workload:
-    return Workload(
+    return make_workload(
         axes={"M": 2},
         inputs={"a": {"type": "random"}, "b": {"type": "random"}},
         uuid="solar-matmul-workload",
@@ -1529,7 +1536,7 @@ def _projection_graph(
 
 
 def _projection_definition() -> Definition:
-    return Definition(
+    return make_definition(
         name="semantic_group_demo",
         axes={
             "B": {"type": "const", "value": 2},

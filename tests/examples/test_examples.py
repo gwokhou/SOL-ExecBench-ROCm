@@ -36,6 +36,7 @@ from sol_execbench.core import (
     Workload,
 )
 from sol_execbench.driver.problem_packager import ProblemPackager
+from sol_execbench_type_helpers import make_definition, make_solution, make_workload
 
 _EXAMPLES_DIR = Path(__file__).resolve().parent.parent.parent / "examples"
 
@@ -188,11 +189,11 @@ def _load_example(
 ) -> tuple[Definition, Solution, list[Workload]]:
     """Load definition, solution, and workloads from an example directory."""
     example_dir = _EXAMPLES_DIR / language / problem
-    definition = Definition(**json.loads((example_dir / "definition.json").read_text()))
+    definition = make_definition(**json.loads((example_dir / "definition.json").read_text()))
     sol_dict = json.loads((example_dir / solution_file).read_text())
-    solution = Solution(**sol_dict)
+    solution = make_solution(**sol_dict)
     workloads = [
-        Workload(**json.loads(line))
+        make_workload(**json.loads(line))
         for line in (example_dir / "workload.jsonl").read_text().splitlines()
         if line.strip()
     ]
@@ -272,8 +273,8 @@ def test_example(tmp_path: Path, case: Example):
     assert not failed, (
         f"{case.test_id}: {len(failed)}/{case.expected_count} workloads did not pass:\n"
         + "\n".join(
-            f"  [{t.evaluation.status.value}] uuid={t.workload.uuid}  "
-            f"log={t.evaluation.log}"
+            f"  [{t.evaluation.status.value if t.evaluation else '<missing>'}] "
+            f"uuid={t.workload.uuid}  log={t.evaluation.log if t.evaluation else ''}"
             for t in failed
         )
     )
@@ -283,6 +284,7 @@ def test_example(tmp_path: Path, case: Example):
         assert trace.definition == definition.name
 
         ev = trace.evaluation
+        assert ev is not None, f"Trace missing evaluation (uuid={trace.workload.uuid})"
         assert ev.correctness is not None, (
             f"PASSED trace missing correctness (uuid={trace.workload.uuid})"
         )

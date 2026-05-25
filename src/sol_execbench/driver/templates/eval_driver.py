@@ -33,7 +33,7 @@ import sys
 import threading
 import traceback
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional, cast
 
 # ── Redirect stdout → stderr BEFORE importing torch/triton ──────────────────
 # Saves the original stdout fd so we can print JSON to it later.
@@ -206,6 +206,8 @@ _ref_file = STAGING_DIR / "_reference.py"
 _ref_file.write_text(definition.reference)
 try:
     _ref_spec = importlib.util.spec_from_file_location("_reference", _ref_file)
+    if _ref_spec is None or _ref_spec.loader is None:
+        raise RuntimeError("Unable to create module spec for reference code")
     _ref_module = importlib.util.module_from_spec(_ref_spec)
     _ref_spec.loader.exec_module(_ref_module)
 except Exception as _ref_err:
@@ -254,6 +256,8 @@ if any(lang in _NATIVE_ROCM_LANGUAGES for lang in _solution.spec.languages):
     if not _so_path.exists():
         raise RuntimeError(f"benchmark_kernel.so not found at {_so_path}")
     _spec_obj = importlib.util.spec_from_file_location("benchmark_kernel", _so_path)
+    if _spec_obj is None or _spec_obj.loader is None:
+        raise RuntimeError(f"Unable to create module spec for {_so_path}")
     _user_mod = importlib.util.module_from_spec(_spec_obj)
     _spec_obj.loader.exec_module(_user_mod)
     user_fn = getattr(_user_mod, _entry_func_name)
@@ -270,8 +274,9 @@ else:
             "solution spec to compile on the compile server."
         )
 
-    _cpp_ext.load = _blocked_cpp_ext_load
-    _cpp_ext.load_inline = _blocked_cpp_ext_load
+    _cpp_ext_dynamic = cast(Any, _cpp_ext)
+    _cpp_ext_dynamic.load = _blocked_cpp_ext_load
+    _cpp_ext_dynamic.load_inline = _blocked_cpp_ext_load
 
     sys.path.insert(0, str(STAGING_DIR))
     _mod_name = (
@@ -439,7 +444,11 @@ for _workload in workloads:
     # Running multiple rounds catches non-deterministic bugs and input-dependent
     # correctness issues.  Structural checks (lazy outputs, shape/dtype) and
     # defense snapshots run on round 0 only; numerical checks run every round.
-    _custom_inputs_fn = ref_namespace.get(definition.custom_inputs_entrypoint)
+    _custom_inputs_fn = (
+        ref_namespace.get(definition.custom_inputs_entrypoint)
+        if definition.custom_inputs_entrypoint
+        else None
+    )
     _correctness_failed = False
     _threads_before = None
     _correctness = Correctness()
@@ -606,12 +615,14 @@ for _workload in workloads:
     if _reward_hack_check(_workload, check_monkey_patch):
         continue
 
+    assert _inputs is not None
+
     # -- User latency measurement --
     try:
         _timing_outputs = (
             allocate_outputs(definition, _resolved_axes, _device) if _dps else []
         )
-        _sol_latency_ms = time_runnable(
+        _sol_latency_raw = time_runnable(
             user_fn,
             _inputs,
             _timing_outputs,
@@ -619,6 +630,8 @@ for _workload in workloads:
             warmup=bench_config.warmup_runs,
             rep=bench_config.iterations,
         )
+        assert isinstance(_sol_latency_raw, (int, float))
+        _sol_latency_ms = float(_sol_latency_raw)
     except Exception as _e:
         _emit(
             Trace(
@@ -646,7 +659,7 @@ for _workload in workloads:
     _ref_latency_ms = 0.0
     if bench_config.benchmark_reference:
         try:
-            _ref_latency_ms = time_runnable(
+            _ref_latency_raw = time_runnable(
                 ref_fn,
                 _inputs,
                 [],
@@ -654,6 +667,8 @@ for _workload in workloads:
                 warmup=bench_config.warmup_runs,
                 rep=bench_config.iterations,
             )
+            assert isinstance(_ref_latency_raw, (int, float))
+            _ref_latency_ms = float(_ref_latency_raw)
         except Exception:
             pass
 

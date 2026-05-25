@@ -18,7 +18,6 @@ from sol_execbench.core.bench.timing_policy import (
     TimingSourceType,
     select_timing_policy,
 )
-from sol_execbench.core.data.solution import Solution
 from sol_execbench.core.data.trace import Trace
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.dataset import DatasetManifestSource, build_dataset_manifest
@@ -39,6 +38,13 @@ from sol_execbench.core.scoring.amd_hardware_models import HardwareValidationSta
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.scoring import solar_derivation as solar_derivation_module
 from sol_execbench.core.scoring.solar_derivation import SolarAggregateStatus
+from sol_execbench_type_helpers import (
+    json_dict,
+    make_definition,
+    make_solution,
+    make_trace,
+    make_workload,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PLANNING_ROOT = REPO_ROOT / ".planning"
@@ -133,7 +139,7 @@ DERIVED_REPORT_EVIDENCE_REF_KEYS = {
 
 def _json_object_keys(value: object) -> set[str]:
     if isinstance(value, dict):
-        keys = set(value)
+        keys = {str(key) for key in value}
         for nested in value.values():
             keys.update(_json_object_keys(nested))
         return keys
@@ -146,15 +152,15 @@ def _json_object_keys(value: object) -> set[str]:
 
 
 def _sample_definition_workload_trace() -> tuple[Definition, Workload, Trace]:
-    definition = Definition(
+    definition = make_definition(
         name="demo",
         axes={"N": {"type": "var"}},
         inputs={"x": {"shape": ["N"], "dtype": "float32"}},
         outputs={"out": {"shape": ["N"], "dtype": "float32"}},
         reference="def run(x):\n    return x",
     )
-    workload = Workload(axes={"N": 16}, inputs={"x": {"type": "random"}}, uuid="w1")
-    trace = Trace(
+    workload = make_workload(axes={"N": 16}, inputs={"x": {"type": "random"}}, uuid="w1")
+    trace = make_trace(
         definition="demo",
         workload=workload,
         solution="solution",
@@ -164,7 +170,7 @@ def _sample_definition_workload_trace() -> tuple[Definition, Workload, Trace]:
 
 
 def test_solution_json_contract_accepts_existing_rocm_shape():
-    solution = Solution(
+    solution = make_solution(
         name="demo",
         definition="demo_problem",
         author="tester",
@@ -186,7 +192,7 @@ def test_solution_json_contract_accepts_existing_rocm_shape():
 
 def test_workload_jsonl_contract_keeps_uuid_and_input_shape():
     raw = {"axes": {"n": 16}, "inputs": {"x": {"type": "random"}}, "uuid": "w1"}
-    workload = Workload(**raw)
+    workload = make_workload(**raw)
     assert workload.model_dump(mode="json")["uuid"] == "w1"
     assert workload.model_dump(mode="json")["inputs"]["x"]["type"] == "random"
 
@@ -198,7 +204,7 @@ def test_trace_jsonl_contract_accepts_existing_workload_only_trace():
         "solution": None,
         "evaluation": None,
     }
-    trace = Trace(**raw)
+    trace = make_trace(**raw)
     assert trace.is_workload_trace()
     dumped = trace.model_dump(mode="json")
     assert dumped["definition"] == raw["definition"]
@@ -304,7 +310,7 @@ def test_v1_10_solar_derivation_contract_keeps_claim_boundaries():
         assert expected in contract
 
     for fixture in load_solar_derivation_fixtures():
-        boundary = fixture["scope_boundary"]
+        boundary = json_dict(fixture["scope_boundary"])
         assert boundary["paper_scale_dataset"] is False, fixture["case_id"]
         assert boundary["hosted_leaderboard_ready"] is False, fixture["case_id"]
         assert (
@@ -314,15 +320,15 @@ def test_v1_10_solar_derivation_contract_keeps_claim_boundaries():
 
 
 def test_v1_10_solar_derivation_fields_remain_noncanonical():
-    definition = Definition(
+    definition = make_definition(
         name="demo",
         axes={"N": {"type": "var"}},
         inputs={"x": {"shape": ["N"], "dtype": "float32"}},
         outputs={"out": {"shape": ["N"], "dtype": "float32"}},
         reference="def run(x):\n    return x",
     )
-    workload = Workload(axes={"N": 16}, inputs={"x": {"type": "random"}}, uuid="w1")
-    trace = Trace(
+    workload = make_workload(axes={"N": 16}, inputs={"x": {"type": "random"}}, uuid="w1")
+    trace = make_trace(
         definition="demo",
         workload=workload,
         solution="solution",
@@ -377,7 +383,7 @@ def test_v1_10_solar_derivation_fields_remain_noncanonical():
 
 
 def test_amd_sol_artifacts_may_keep_existing_bound_fields_while_solar_fields_stay_sidecar_only():
-    definition = Definition(
+    definition = make_definition(
         name="matmul_demo",
         axes={
             "M": {"type": "var"},
@@ -391,7 +397,7 @@ def test_amd_sol_artifacts_may_keep_existing_bound_fields_while_solar_fields_sta
         outputs={"out": {"shape": ["M", "N"], "dtype": "float32"}},
         reference="def run(a, b):\n    return a @ b",
     )
-    workload = Workload(
+    workload = make_workload(
         axes={"M": 2},
         inputs={"a": {"type": "random"}, "b": {"type": "random"}},
         uuid="matmul-workload",
@@ -479,15 +485,15 @@ def test_v1_11_dataset_docs_do_not_overclaim_acquisition_layout():
 
 
 def test_v1_11_inventory_readiness_fields_remain_sidecar_only():
-    definition = Definition(
+    definition = make_definition(
         name="demo",
         axes={"N": {"type": "var"}},
         inputs={"x": {"shape": ["N"], "dtype": "float32"}},
         outputs={"out": {"shape": ["N"], "dtype": "float32"}},
         reference="def run(x):\n    return x",
     )
-    workload = Workload(axes={"N": 4}, inputs={"x": {"type": "random"}}, uuid="w")
-    trace = Trace(definition="demo", workload=workload, solution="solution", evaluation=None)
+    workload = make_workload(axes={"N": 4}, inputs={"x": {"type": "random"}}, uuid="w")
+    trace = make_trace(definition="demo", workload=workload, solution="solution", evaluation=None)
     forbidden = (
         "sol_execbench.dataset_inventory.v1",
         "sol_execbench.rocm_readiness.v1",
@@ -585,7 +591,7 @@ def test_primary_cli_does_not_expose_v1_11_dataset_inspection_options():
 
 
 def test_public_score_evidence_refs_keep_exact_established_key_space():
-    definition = Definition(
+    definition = make_definition(
         name="matmul_demo",
         axes={
             "M": {"type": "var"},
@@ -599,7 +605,7 @@ def test_public_score_evidence_refs_keep_exact_established_key_space():
         outputs={"out": {"shape": ["M", "N"], "dtype": "float32"}},
         reference="def run(a, b):\n    return a @ b",
     )
-    workload = Workload(
+    workload = make_workload(
         axes={"M": 2},
         inputs={"a": {"type": "random"}, "b": {"type": "random"}},
         uuid="matmul-workload",
@@ -637,7 +643,7 @@ def test_public_score_evidence_refs_keep_exact_established_key_space():
 def test_degraded_complex_family_score_eligibility_ignores_solar_sidecars():
     cases = (
         (
-            Definition(
+            make_definition(
                 name="moe_dynamic_route",
                 axes={
                     "tokens": {"type": "const", "value": 128},
@@ -661,7 +667,7 @@ def test_degraded_complex_family_score_eligibility_ignores_solar_sidecars():
                     "    return dispatch_dynamic(x, expert_weights, chosen)\n"
                 ),
             ),
-            Workload(
+            make_workload(
                 axes={},
                 inputs={
                     "x": {"type": "random"},
@@ -674,7 +680,7 @@ def test_degraded_complex_family_score_eligibility_ignores_solar_sidecars():
             "moe_dynamic_route_bytes",
         ),
         (
-            Definition(
+            make_definition(
                 name="ssm_mamba_missing_recurrence",
                 axes={
                     "batch": {"type": "const", "value": 2},
@@ -707,7 +713,7 @@ def test_degraded_complex_family_score_eligibility_ignores_solar_sidecars():
                     "    return out_proj(y, w_out)\n"
                 ),
             ),
-            Workload(
+            make_workload(
                 axes={},
                 inputs={
                     "x": {"type": "random"},
@@ -750,7 +756,7 @@ def test_importing_solar_derivation_keeps_amd_native_score_eligibility_unchanged
         == "sol_execbench.solar_derivation.v1"
     )
 
-    definition = Definition(
+    definition = make_definition(
         name="matmul_demo",
         axes={
             "M": {"type": "var"},
@@ -764,7 +770,7 @@ def test_importing_solar_derivation_keeps_amd_native_score_eligibility_unchanged
         outputs={"out": {"shape": ["M", "N"], "dtype": "float32"}},
         reference="def run(a, b):\n    return a @ b",
     )
-    workload = Workload(
+    workload = make_workload(
         axes={"M": 2},
         inputs={"a": {"type": "random"}, "b": {"type": "random"}},
         uuid="matmul-workload",
@@ -806,7 +812,7 @@ def test_importing_solar_derivation_keeps_amd_native_score_eligibility_unchanged
 
 
 def test_solar_score_guard_does_not_expose_internal_evidence_refs_or_claims():
-    definition = Definition(
+    definition = make_definition(
         name="matmul_demo",
         axes={
             "M": {"type": "var"},
@@ -820,7 +826,7 @@ def test_solar_score_guard_does_not_expose_internal_evidence_refs_or_claims():
         outputs={"out": {"shape": ["M", "N"], "dtype": "float32"}},
         reference="def run(a, b):\n    return a @ b",
     )
-    workload = Workload(
+    workload = make_workload(
         axes={"M": 2},
         inputs={"a": {"type": "random"}, "b": {"type": "random"}},
         uuid="matmul-workload",
@@ -913,7 +919,7 @@ def test_v1_9_claim_guardrails_keep_cdna3_and_nvidia_equivalence_out_of_scope():
 
 
 def test_hardware_model_evidence_survives_bound_and_score_artifacts():
-    definition = Definition(
+    definition = make_definition(
         name="matmul_demo",
         axes={
             "M": {"type": "var"},
@@ -927,7 +933,7 @@ def test_hardware_model_evidence_survives_bound_and_score_artifacts():
         outputs={"out": {"shape": ["M", "N"], "dtype": "float32"}},
         reference="def run(a, b):\n    return a @ b",
     )
-    workload = Workload(
+    workload = make_workload(
         axes={"M": 2},
         inputs={"a": {"type": "random"}, "b": {"type": "random"}},
         uuid="matmul-workload",
@@ -953,15 +959,15 @@ def test_hardware_model_evidence_survives_bound_and_score_artifacts():
 
 
 def test_definition_workload_trace_schemas_do_not_include_derived_artifact_fields():
-    definition = Definition(
+    definition = make_definition(
         name="demo",
         axes={"N": {"type": "var"}},
         inputs={"x": {"shape": ["N"], "dtype": "float32"}},
         outputs={"out": {"shape": ["N"], "dtype": "float32"}},
         reference="def run(x):\n    return x",
     )
-    workload = Workload(axes={"N": 16}, inputs={"x": {"type": "random"}}, uuid="w1")
-    trace = Trace(
+    workload = make_workload(axes={"N": 16}, inputs={"x": {"type": "random"}}, uuid="w1")
+    trace = make_trace(
         definition="demo",
         workload=workload,
         solution="solution",

@@ -192,7 +192,9 @@ def _shape_dict(shapes: dict[str, tuple[int, ...] | None]) -> dict[str, list[int
 
 
 def _workload_record(definition: Definition, workload: Workload, row_index: int) -> WorkloadInventoryRecord:
-    input_kinds = {name: spec.type for name, spec in workload.inputs.items()}
+    input_kinds: dict[str, str] = {
+        name: spec.type for name, spec in workload.inputs.items()
+    }
     counts = Counter(input_kinds.values())
     safetensors_refs = [
         {"input": name, "path": spec.path, "tensor_key": spec.tensor_key}
@@ -251,7 +253,7 @@ def build_dataset_inventory(
         cat_denoms = InventoryDenominators()
         category_dir = root / category
         if not category_dir.is_dir():
-            diagnostics.append(InventoryDiagnostic(code="missing_category", category=category, path=None, message=f"Missing category: {category}"))
+            diagnostics.append(InventoryDiagnostic(code="missing_category", category=category, message=f"Missing category: {category}"))
             category_records.append(CategoryInventoryRecord(name=category, denominators=cat_denoms))
             continue
         for problem_dir in sorted(path for path in category_dir.iterdir() if path.is_dir()):

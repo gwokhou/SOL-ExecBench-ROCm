@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import prod
+from typing import Any
 
 from sol_execbench.core.data.definition import DType
 from sol_execbench.core.scoring.amd_bound_graph import (
@@ -27,7 +28,7 @@ class OperatorWorkEstimate:
     op_name: str
     formula_kind: str
     formula: str
-    formula_inputs: dict[str, object]
+    formula_inputs: dict[str, Any]
     flops: float
     read_bytes: float
     write_bytes: float
@@ -40,7 +41,7 @@ class OperatorWorkEstimate:
     movement_kind: str | None = None
     warnings: tuple[str, ...] = ()
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize as JSON-safe derived estimate evidence."""
         return {
             "node_id": self.node_id,
@@ -147,7 +148,7 @@ def _attention_matmul_estimate(
     read_bytes = _sum_tensor_bytes(input_tensors, "read", warnings, rationale_parts)
     write_bytes = _sum_tensor_bytes(output_tensors, "write", warnings, rationale_parts)
     dims = _attention_dims_from_node_or_shapes(input_tensors, output_tensors, node)
-    formula_inputs: dict[str, object] = {}
+    formula_inputs: dict[str, Any] = {}
     flops = 0.0
     axis_source: str | None = None
     if dims is None:
@@ -189,7 +190,7 @@ def _attention_softmax_estimate(graph: BoundGraph, node: BoundGraphNode) -> Oper
     if axis is None:
         warnings.append("inexact_operator:attention_softmax_missing_axis")
     dims = _attention_dims_from_attributes(node)
-    formula_inputs: dict[str, object] = {"input_elements": input_elements, "axis": axis}
+    formula_inputs: dict[str, Any] = {"input_elements": input_elements, "axis": axis}
     if dims is not None:
         formula_inputs.update(dims)
     softmax_passes = 5
@@ -265,7 +266,7 @@ def _attention_output_projection_estimate(
     dims = _attention_output_projection_dims(input_tensors, output_tensors, node)
     if dims is None:
         warnings.append("inexact_operator:attention_output_projection_missing_shape")
-        formula_inputs: dict[str, object] = {}
+        formula_inputs: dict[str, Any] = {}
         flops = 0.0
         axis_source = None
         confidence = EstimateConfidence.INEXACT
@@ -541,8 +542,8 @@ def _moe_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstima
     )
 
 
-def _moe_visible_formula_inputs(node: BoundGraphNode) -> dict[str, object]:
-    formula_inputs: dict[str, object] = {}
+def _moe_visible_formula_inputs(node: BoundGraphNode) -> dict[str, Any]:
+    formula_inputs: dict[str, Any] = {}
     mapping = {
         "token_count": "tokens",
         "hidden_size": "hidden",
@@ -556,7 +557,7 @@ def _moe_visible_formula_inputs(node: BoundGraphNode) -> dict[str, object]:
     return formula_inputs
 
 
-def _moe_missing_static_route_inputs(formula_inputs: dict[str, object]) -> list[str]:
+def _moe_missing_static_route_inputs(formula_inputs: dict[str, Any]) -> list[str]:
     missing = []
     if "tokens" not in formula_inputs:
         missing.append("shape:tokens")
@@ -683,8 +684,8 @@ def _ssm_visible_formula_inputs(
     input_tensors: tuple[BoundTensor, ...],
     *,
     include_state: bool,
-) -> dict[str, object]:
-    formula_inputs: dict[str, object] = {}
+) -> dict[str, Any]:
+    formula_inputs: dict[str, Any] = {}
     if isinstance(node.attributes.get("sequence_length"), int):
         formula_inputs["sequence"] = int(node.attributes["sequence_length"])
     if isinstance(node.attributes.get("hidden_size"), int):
@@ -699,7 +700,7 @@ def _ssm_visible_formula_inputs(
     return formula_inputs
 
 
-def _ssm_missing_static_scan_inputs(formula_inputs: dict[str, object]) -> list[str]:
+def _ssm_missing_static_scan_inputs(formula_inputs: dict[str, Any]) -> list[str]:
     missing = []
     for key, evidence in (
         ("batch", "shape:batch"),
@@ -756,24 +757,26 @@ def _lookup_memory_estimate(
     warnings.extend(f"inexact_operator:embedding_positional_missing_{item}" for item in missing)
     rationale_parts.extend(f"missing embedding/gather {item}" for item in missing)
 
+    index_dtype_bytes = (
+        _dtype_bytes(index_tensor.dtype) if index_tensor is not None else None
+    )
+    table_dtype_bytes = (
+        _dtype_bytes(table_tensor.dtype) if table_tensor is not None else None
+    )
     index_bytes = (
-        float(index_elements * _dtype_bytes(index_tensor.dtype))
-        if index_tensor is not None
-        and index_elements is not None
-        and _dtype_bytes(index_tensor.dtype) is not None
+        float(index_elements * index_dtype_bytes)
+        if index_elements is not None and index_dtype_bytes is not None
         else 0.0
     )
     selected_read_bytes = (
-        float(selected_elements * _dtype_bytes(table_tensor.dtype))
-        if table_tensor is not None
-        and selected_elements is not None
-        and _dtype_bytes(table_tensor.dtype) is not None
+        float(selected_elements * table_dtype_bytes)
+        if selected_elements is not None and table_dtype_bytes is not None
         else 0.0
     )
     write_bytes = _sum_tensor_bytes(output_tensors, "write", warnings, rationale_parts)
     read_bytes = index_bytes + selected_read_bytes
     total_bytes = read_bytes + write_bytes
-    formula_inputs: dict[str, object] = {}
+    formula_inputs: dict[str, Any] = {}
     confidence = EstimateConfidence.INEXACT
     axis_source: str | None = None
     if not missing:
@@ -827,7 +830,7 @@ def _visible_memory_estimate(
         missing.append("rotary_axes")
     warnings.extend(f"inexact_operator:embedding_positional_missing_{item}" for item in missing)
     total_bytes = read_bytes + write_bytes
-    formula_inputs: dict[str, object] = {}
+    formula_inputs: dict[str, Any] = {}
     axis_source: str | None = None
     confidence = EstimateConfidence.INEXACT
     if not missing:
@@ -889,7 +892,7 @@ def _reduction_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWork
     write_bytes = _sum_tensor_bytes(output_tensors, "write", warnings, rationale_parts)
     input_elements = _sum_tensor_numel(input_tensors, "input", warnings, rationale_parts) or 0
     axis_source, axis = _axis_evidence(node)
-    formula_inputs: dict[str, object] = {"input_elements": input_elements, "axis": axis}
+    formula_inputs: dict[str, Any] = {"input_elements": input_elements, "axis": axis}
     total_bytes = read_bytes + write_bytes
     return OperatorWorkEstimate(
         node_id=node.node_id,
@@ -921,7 +924,7 @@ def _normalization_estimate(graph: BoundGraph, node: BoundGraphNode) -> Operator
     input_elements = _sum_tensor_numel(input_tensors, "input", warnings, rationale_parts) or 0
     axis_source, axis = _axis_evidence(node)
     normalization_passes = 4
-    formula_inputs: dict[str, object] = {
+    formula_inputs: dict[str, Any] = {
         "input_elements": input_elements,
         "normalization_passes": normalization_passes,
         "axis": axis,
@@ -957,7 +960,7 @@ def _softmax_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEs
     input_elements = _sum_tensor_numel(input_tensors, "input", warnings, rationale_parts) or 0
     axis_source, axis = _axis_evidence(node)
     softmax_passes = 5
-    formula_inputs: dict[str, object] = {
+    formula_inputs: dict[str, Any] = {
         "input_elements": input_elements,
         "softmax_passes": softmax_passes,
         "axis": axis,
@@ -1062,7 +1065,7 @@ def _pointwise_estimate(
     *,
     formula_kind: str,
     formula: str,
-    formula_inputs_extra: dict[str, object],
+    formula_inputs_extra: dict[str, Any],
     rationale: str,
 ) -> OperatorWorkEstimate:
     input_tensors = _node_tensors(graph, node.input_tensor_ids)
@@ -1083,7 +1086,7 @@ def _pointwise_estimate(
         output_elements = 0
         warnings.append(f"inexact_operator:{node.op_family.value}_missing_shape")
 
-    formula_inputs = {"output_elements": output_elements}
+    formula_inputs: dict[str, Any] = {"output_elements": output_elements}
     formula_inputs.update(formula_inputs_extra)
     flops = float(output_elements)
     if "activation_ops_per_element" in formula_inputs:

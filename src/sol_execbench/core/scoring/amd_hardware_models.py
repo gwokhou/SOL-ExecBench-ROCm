@@ -50,7 +50,7 @@ class AmdHardwareModel:
     evidence_refs: tuple[str, ...]
     schema_version: str = AMD_HARDWARE_MODEL_SCHEMA_VERSION
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize as JSON-safe payload."""
         payload = asdict(self)
         payload["confidence"] = self.confidence.value

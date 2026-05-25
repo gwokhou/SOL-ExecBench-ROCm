@@ -42,7 +42,7 @@ class AmdSolV2OpBound:
     rationale: str
     estimate_warnings: tuple[str, ...] = ()
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "node_id": self.node_id,
             "op_family": self.op_family,
@@ -67,7 +67,7 @@ class AmdSolV2AggregateBound:
     reason: str
     node_ids: tuple[str, ...]
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "status": self.status,
             "scored": self.scored,
@@ -89,7 +89,7 @@ class AmdSolV2CoverageSummary:
     confidence_counts_by_family: dict[str, dict[str, int]]
     worst_confidence: EstimateConfidence
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "total_ops": self.total_ops,
             "supported_ops": self.supported_ops,
@@ -121,7 +121,7 @@ class AmdSolBoundV2Artifact:
     schema_version: str = AMD_SOL_V2_SCHEMA_VERSION
     derived: bool = True
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "schema_version": self.schema_version,
             "derived": self.derived,

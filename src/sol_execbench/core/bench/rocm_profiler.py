@@ -12,6 +12,7 @@ from collections.abc import Callable
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from sol_execbench.core.bench.timing_policy import (
     TimingActivityDomain,
@@ -40,7 +41,7 @@ class Rocprofv3ProfileArtifact:
     kind: str
     size_bytes: int
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable artifact payload."""
         return {
             "path": str(self.path),
@@ -87,7 +88,7 @@ class Rocprofv3ProfileResult:
         """Whether profiler collection completed with registered artifacts."""
         return self.status == "success"
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable diagnostic sidecar payload."""
         return {
             "schema_version": self.schema_version,
@@ -133,7 +134,7 @@ class Rocprofv3TimingRow:
         normalized = _normalize_header(self.domain)
         return "kernel" in normalized
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable row payload."""
         return {
             "name": self.name,
@@ -173,7 +174,7 @@ class Rocprofv3TimingEvidence:
             row.duration_ms for row in self.parsed_rows if row.is_kernel_activity
         )
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable evidence payload."""
         return {
             "schema_version": self.schema_version,
@@ -205,7 +206,7 @@ class DefaultTimingSelection:
     fallback_applied: bool
     reason: str
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable selection payload."""
         return {
             "policy": self.policy.to_dict(),
@@ -250,7 +251,7 @@ class Rocprofv3CollectionResult:
         """Whether live profiler evidence was collected and parsed."""
         return self.evidence is not None and not self.selection.fallback_applied
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable collection result payload."""
         return {
             "profiler_collected": self.profiler_collected,
@@ -338,6 +339,14 @@ def discover_rocprofv3_artifacts(
     return tuple(artifacts)
 
 
+def _subprocess_text(value: str | bytes | None) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode(errors="replace")
+    return value
+
+
 def collect_rocprofv3_profile(
     request: Rocprofv3ProfileRequest,
     *,
@@ -379,8 +388,8 @@ def collect_rocprofv3_profile(
             command=tuple(command),
             output_directory=request.output_directory,
             output_file=request.output_file,
-            stdout=exc.stdout or "",
-            stderr=exc.stderr or "",
+            stdout=_subprocess_text(exc.stdout),
+            stderr=_subprocess_text(exc.stderr),
             failed_reason=(
                 f"rocprofv3 command timed out after {request.timeout_seconds} seconds"
             ),

@@ -29,10 +29,11 @@ from sol_execbench.core.scoring.amd_sol_v2 import (
     amd_sol_bound_v2_from_dict,
     build_amd_sol_bound_v2_artifact,
 )
+from sol_execbench_type_helpers import make_definition, make_workload
 
 
 def _matmul_definition() -> Definition:
-    return Definition(
+    return make_definition(
         name="matmul_demo",
         axes={
             "M": {"type": "var"},
@@ -49,7 +50,7 @@ def _matmul_definition() -> Definition:
 
 
 def _matmul_workload() -> Workload:
-    return Workload(
+    return make_workload(
         axes={"M": 2},
         inputs={"a": {"type": "random"}, "b": {"type": "random"}},
         uuid="matmul-workload",
@@ -95,7 +96,7 @@ def test_v2_artifact_serializes_required_sidecar_fields():
     ):
         assert solar_derivation_field not in repr(payload)
     with pytest.raises(FrozenInstanceError):
-        artifact.definition = "changed"  # type: ignore[misc]
+        setattr(artifact, "definition", "changed")
 
 
 def test_v2_round_trips_and_rejects_invalid_payloads():
@@ -163,7 +164,7 @@ def test_v2_matmul_bounds_are_derived_from_rich_estimates():
 
 
 def test_inexact_coverage_and_warning_semantics_are_deterministic():
-    definition = Definition(
+    definition = make_definition(
         name="inexact_demo",
         axes={"N": {"type": "var"}},
         inputs={"x": {"shape": ["N"], "dtype": "float32"}},
@@ -175,7 +176,7 @@ def test_inexact_coverage_and_warning_semantics_are_deterministic():
             "    return y.sum().reshape(1)\n"
         ),
     )
-    workload = Workload(
+    workload = make_workload(
         axes={"N": 8},
         inputs={"x": {"type": "random"}},
         uuid="inexact-workload",
@@ -215,14 +216,14 @@ def test_inexact_coverage_and_warning_semantics_are_deterministic():
 
 
 def test_unsupported_evidence_forces_unscored_aggregate():
-    definition = Definition(
+    definition = make_definition(
         name="unsupported_demo",
         axes={"N": {"type": "var"}},
         inputs={"x": {"shape": ["N", "N"], "dtype": "float32"}},
         outputs={"out": {"shape": ["N", "N"], "dtype": "float32"}},
         reference="import torch\n\ndef run(x):\n    return torch.linalg.inv(x)",
     )
-    workload = Workload(
+    workload = make_workload(
         axes={"N": 4},
         inputs={"x": {"type": "random"}},
         uuid="unsupported-workload",

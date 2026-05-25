@@ -12,10 +12,11 @@ from sol_execbench.core.scoring.amd_bound_graph import (
     build_bound_graph,
 )
 from sol_execbench.core.scoring.amd_hardware_models import EstimateConfidence
+from sol_execbench_type_helpers import make_definition, make_workload
 
 
 def _matmul_definition() -> Definition:
-    return Definition(
+    return make_definition(
         name="matmul_demo",
         axes={
             "M": {"type": "var"},
@@ -32,7 +33,7 @@ def _matmul_definition() -> Definition:
 
 
 def _matmul_workload() -> Workload:
-    return Workload(
+    return make_workload(
         axes={"M": 2},
         inputs={"a": {"type": "random"}, "b": {"type": "random"}},
         uuid="matmul-workload",
@@ -76,7 +77,7 @@ def test_op_family_taxonomy_includes_paper_aligned_families():
 
 
 def test_moe_visible_static_route_nodes_record_subroles_and_metadata():
-    definition = Definition(
+    definition = make_definition(
         name="moe_static_route",
         axes={
             "tokens": {"type": "const", "value": 128},
@@ -97,7 +98,7 @@ def test_moe_visible_static_route_nodes_record_subroles_and_metadata():
             "    return dispatch_and_combine(x, expert_weights, gates)\n"
         ),
     )
-    workload = Workload(
+    workload = make_workload(
         axes={},
         inputs={
             "x": {"type": "random"},
@@ -131,7 +132,7 @@ def test_moe_visible_static_route_nodes_record_subroles_and_metadata():
 
 
 def test_moe_dispatch_uses_top_k_from_consumed_route_tensor():
-    definition = Definition(
+    definition = make_definition(
         name="moe_route_binding",
         axes={
             "tokens": {"type": "const", "value": 128},
@@ -153,7 +154,7 @@ def test_moe_dispatch_uses_top_k_from_consumed_route_tensor():
             "    return dispatch_and_combine(x, expert_weights, gates)\n"
         ),
     )
-    workload = Workload(
+    workload = make_workload(
         axes={},
         inputs={
             "x": {"type": "random"},
@@ -171,12 +172,12 @@ def test_moe_dispatch_uses_top_k_from_consumed_route_tensor():
     )
 
     assert dispatch.attributes["route_top_k"] == 4
-    assert dispatch.attributes["route_cardinality_source"].endswith(".topk.k")
+    assert str(dispatch.attributes["route_cardinality_source"]).endswith(".topk.k")
     assert dispatch.confidence == EstimateConfidence.SUPPORTED
 
 
 def test_moe_dispatch_does_not_inherit_unrelated_top_k():
-    definition = Definition(
+    definition = make_definition(
         name="moe_unrelated_route",
         axes={
             "tokens": {"type": "const", "value": 128},
@@ -199,7 +200,7 @@ def test_moe_dispatch_does_not_inherit_unrelated_top_k():
             "    return dispatch_and_combine(x, expert_weights, chosen)\n"
         ),
     )
-    workload = Workload(
+    workload = make_workload(
         axes={},
         inputs={
             "x": {"type": "random"},
@@ -226,7 +227,7 @@ def test_moe_dispatch_does_not_inherit_unrelated_top_k():
 
 
 def test_moe_dynamic_route_records_missing_static_metadata_without_defaults():
-    definition = Definition(
+    definition = make_definition(
         name="moe_dynamic_route",
         axes={
             "tokens": {"type": "const", "value": 128},
@@ -247,7 +248,7 @@ def test_moe_dynamic_route_records_missing_static_metadata_without_defaults():
             "    return dispatch_dynamic(x, expert_weights, chosen)\n"
         ),
     )
-    workload = Workload(
+    workload = make_workload(
         axes={},
         inputs={
             "x": {"type": "random"},
@@ -276,7 +277,7 @@ def test_moe_dynamic_route_records_missing_static_metadata_without_defaults():
 
 
 def test_moe_taxonomy_only_call_is_unsupported_without_fabricated_subroles():
-    definition = Definition(
+    definition = make_definition(
         name="moe_taxonomy_only",
         axes={
             "tokens": {"type": "const", "value": 128},
@@ -289,7 +290,7 @@ def test_moe_taxonomy_only_call_is_unsupported_without_fabricated_subroles():
         outputs={"out": {"shape": ["tokens", "hidden"], "dtype": "float16"}},
         reference="def run(x, opaque_moe):\n    return opaque_moe(x)\n",
     )
-    workload = Workload(
+    workload = make_workload(
         axes={},
         inputs={"x": {"type": "random"}, "opaque_moe": {"type": "random"}},
         uuid="moe-taxonomy-workload",
@@ -306,7 +307,7 @@ def test_moe_taxonomy_only_call_is_unsupported_without_fabricated_subroles():
 
 def _ssm_mamba_definition(*, missing_recurrence: bool = False, custom_scan: bool = False) -> Definition:
     if custom_scan:
-        return Definition(
+        return make_definition(
             name="ssm_mamba_custom_scan",
             axes={
                 "batch": {"type": "const", "value": 2},
@@ -352,7 +353,7 @@ def _ssm_mamba_definition(*, missing_recurrence: bool = False, custom_scan: bool
             "    y = gate(y)\n"
             "    return out_proj(y, w_out)\n"
         )
-    return Definition(
+    return make_definition(
         name="ssm_mamba_missing_recurrence" if missing_recurrence else "ssm_mamba_static",
         axes={
             "batch": {"type": "const", "value": 2},
@@ -370,7 +371,7 @@ def _ssm_mamba_definition(*, missing_recurrence: bool = False, custom_scan: bool
 
 def _ssm_mamba_workload(*, missing_recurrence: bool = False, custom_scan: bool = False) -> Workload:
     if custom_scan:
-        return Workload(
+        return make_workload(
             axes={},
             inputs={"x": {"type": "random"}, "opaque_scan": {"type": "random"}},
             uuid="ssm-custom-workload",
@@ -385,7 +386,7 @@ def _ssm_mamba_workload(*, missing_recurrence: bool = False, custom_scan: bool =
         inputs["params"] = {"type": "random"}
     else:
         inputs.update({"a": {"type": "random"}, "b": {"type": "random"}, "c": {"type": "random"}})
-    return Workload(axes={}, inputs=inputs, uuid="ssm-mamba-workload")
+    return make_workload(axes={}, inputs=inputs, uuid="ssm-mamba-workload")
 
 
 def test_ssm_mamba_visible_chain_records_independent_subroles_and_state_metadata():
@@ -443,7 +444,7 @@ def test_ssm_mamba_custom_scan_records_scan_without_fabricated_state_update():
 
 
 def test_depthwise_convolution_and_projections_without_scan_are_not_ssm_mamba():
-    definition = Definition(
+    definition = make_definition(
         name="conv_projection_without_scan",
         axes={
             "batch": {"type": "const", "value": 2},
@@ -466,7 +467,7 @@ def test_depthwise_convolution_and_projections_without_scan_are_not_ssm_mamba():
             "    return out_proj(z, w_out)\n"
         ),
     )
-    workload = Workload(
+    workload = make_workload(
         axes={},
         inputs={
             "x": {"type": "random"},
@@ -506,14 +507,14 @@ def test_ast_fallback_classifies_matmul_and_keeps_stable_ids():
 
 
 def test_dtype_conversion_is_visible_instead_of_ignored():
-    definition = Definition(
+    definition = make_definition(
         name="dtype_conversion_demo",
         axes={"N": {"type": "var"}},
         inputs={"x": {"shape": ["N"], "dtype": "float32"}},
         outputs={"out": {"shape": ["N"], "dtype": "float32"}},
         reference="import torch\n\ndef run(x):\n    return torch.relu(x).to(torch.float32)",
     )
-    workload = Workload(axes={"N": 8}, inputs={"x": {"type": "random"}}, uuid="w1")
+    workload = make_workload(axes={"N": 8}, inputs={"x": {"type": "random"}}, uuid="w1")
 
     graph = build_bound_graph(definition, workload)
 
@@ -525,14 +526,14 @@ def test_dtype_conversion_is_visible_instead_of_ignored():
 
 
 def test_unsupported_calls_remain_visible_with_warnings():
-    definition = Definition(
+    definition = make_definition(
         name="unsupported_demo",
         axes={"N": {"type": "var"}},
         inputs={"x": {"shape": ["N", "N"], "dtype": "float32"}},
         outputs={"out": {"shape": ["N", "N"], "dtype": "float32"}},
         reference="import torch\n\ndef run(x):\n    return torch.linalg.inv(x)",
     )
-    workload = Workload(axes={"N": 4}, inputs={"x": {"type": "random"}}, uuid="w1")
+    workload = make_workload(axes={"N": 4}, inputs={"x": {"type": "random"}}, uuid="w1")
 
     graph = build_bound_graph(definition, workload)
 
@@ -544,7 +545,7 @@ def test_unsupported_calls_remain_visible_with_warnings():
 
 
 def test_dynamic_trace_failure_records_warning_but_keeps_fallback_evidence():
-    definition = Definition(
+    definition = make_definition(
         name="trace_failure_demo",
         axes={"N": {"type": "var"}},
         inputs={"x": {"shape": ["N"], "dtype": "float32"}},
@@ -556,7 +557,7 @@ def test_dynamic_trace_failure_records_warning_but_keeps_fallback_evidence():
             "    return torch.relu(x)\n"
         ),
     )
-    workload = Workload(axes={"N": 8}, inputs={"x": {"type": "random"}}, uuid="w1")
+    workload = make_workload(axes={"N": 8}, inputs={"x": {"type": "random"}}, uuid="w1")
 
     graph = build_bound_graph(definition, workload)
 
@@ -567,7 +568,7 @@ def test_dynamic_trace_failure_records_warning_but_keeps_fallback_evidence():
 
 
 def test_dynamic_control_flow_is_inexact_or_unsupported_evidence():
-    definition = Definition(
+    definition = make_definition(
         name="control_flow_demo",
         axes={"N": {"type": "var"}},
         inputs={"x": {"shape": ["N"], "dtype": "float32"}},
@@ -579,7 +580,7 @@ def test_dynamic_control_flow_is_inexact_or_unsupported_evidence():
             "    return x\n"
         ),
     )
-    workload = Workload(axes={"N": 8}, inputs={"x": {"type": "random"}}, uuid="w1")
+    workload = make_workload(axes={"N": 8}, inputs={"x": {"type": "random"}}, uuid="w1")
 
     graph = build_bound_graph(definition, workload)
 
@@ -590,7 +591,7 @@ def test_dynamic_control_flow_is_inexact_or_unsupported_evidence():
 
 
 def test_projection_residual_graph_has_edges_for_common_patterns():
-    definition = Definition(
+    definition = make_definition(
         name="projection_residual",
         axes={
             "B": {"type": "var"},
@@ -611,7 +612,7 @@ def test_projection_residual_graph_has_edges_for_common_patterns():
             "    return output\n"
         ),
     )
-    workload = Workload(
+    workload = make_workload(
         axes={"B": 2},
         inputs={
             "attn_output": {"type": "random"},
@@ -633,7 +634,7 @@ def test_projection_residual_graph_has_edges_for_common_patterns():
 
 
 def test_aliases_chained_expressions_and_tuple_outputs_are_visible():
-    definition = Definition(
+    definition = make_definition(
         name="alias_chain_tuple",
         axes={"N": {"type": "var"}},
         inputs={
@@ -652,7 +653,7 @@ def test_aliases_chained_expressions_and_tuple_outputs_are_visible():
             "    return y, z\n"
         ),
     )
-    workload = Workload(
+    workload = make_workload(
         axes={"N": 8},
         inputs={"x": {"type": "random"}, "bias": {"type": "random"}},
         uuid="tuple-workload",
@@ -671,7 +672,7 @@ def test_aliases_chained_expressions_and_tuple_outputs_are_visible():
 
 
 def test_axis_dtype_and_movement_metadata_are_stored_in_attributes():
-    definition = Definition(
+    definition = make_definition(
         name="attribute_metadata_demo",
         axes={"M": {"type": "const", "value": 2}, "N": {"type": "const", "value": 4}},
         inputs={"x": {"shape": ["M", "N"], "dtype": "float32"}},
@@ -686,7 +687,7 @@ def test_axis_dtype_and_movement_metadata_are_stored_in_attributes():
             "    return c.to(torch.float16)\n"
         ),
     )
-    workload = Workload(axes={}, inputs={"x": {"type": "random"}}, uuid="metadata-workload")
+    workload = make_workload(axes={}, inputs={"x": {"type": "random"}}, uuid="metadata-workload")
 
     graph = build_bound_graph(definition, workload)
 
@@ -719,7 +720,7 @@ def test_public_scoring_exports_include_bound_graph_api():
 
 
 def test_attention_graph_marks_visible_subroles_and_metadata():
-    definition = Definition(
+    definition = make_definition(
         name="attention_graph_demo",
         axes={
             "B": {"type": "const", "value": 2},
@@ -742,7 +743,7 @@ def test_attention_graph_marks_visible_subroles_and_metadata():
             "    return (probs @ v) @ w_o\n"
         ),
     )
-    workload = Workload(
+    workload = make_workload(
         axes={},
         inputs={
             "q": {"type": "random"},
@@ -778,7 +779,7 @@ def test_attention_graph_marks_visible_subroles_and_metadata():
 
 
 def test_convolution_graph_records_dimension_group_and_spatial_metadata():
-    definition = Definition(
+    definition = make_definition(
         name="conv2d_graph_demo",
         axes={
             "B": {"type": "const", "value": 2},
@@ -804,7 +805,7 @@ def test_convolution_graph_records_dimension_group_and_spatial_metadata():
             "dilation=(1, 1), groups=2)\n"
         ),
     )
-    workload = Workload(
+    workload = make_workload(
         axes={},
         inputs={
             "x": {"type": "random"},
@@ -828,7 +829,7 @@ def test_convolution_graph_records_dimension_group_and_spatial_metadata():
 
 
 def test_embedding_and_gather_graph_records_lookup_metadata():
-    definition = Definition(
+    definition = make_definition(
         name="embedding_gather_graph_demo",
         axes={
             "T": {"type": "const", "value": 16},
@@ -851,7 +852,7 @@ def test_embedding_and_gather_graph_records_lookup_metadata():
             "    return x + pos + token + gathered\n"
         ),
     )
-    workload = Workload(
+    workload = make_workload(
         axes={},
         inputs={
             "table": {"type": "random"},

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import statistics
 from dataclasses import dataclass, field
+from typing import Any
 
 from .data.trace import EvaluationStatus, Trace
 from .diagnostics import StageDiagnostic
@@ -36,7 +37,7 @@ class TraceRunSummary:
             return 0.0
         return self.passed / self.total
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable representation of the summary."""
         return {
             "total": self.total,
@@ -62,7 +63,7 @@ class DerivedEvidenceReport:
     derived: bool = True
     canonical_output: str = CANONICAL_BENCHMARK_OUTPUT
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable derived evidence payload."""
         return {
             "schema_version": self.schema_version,

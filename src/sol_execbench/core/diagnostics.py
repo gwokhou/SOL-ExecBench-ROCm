@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from collections.abc import Mapping
-from typing import Callable
+from typing import Any, Callable
 
 
 class DiagnosticStage(str, Enum):
@@ -95,7 +95,7 @@ class ValidationReadiness:
     acceptance_criteria: tuple[str, ...]
     blockers: tuple[str, ...] = ()
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable readiness payload."""
         return {
             "target_family": self.target_family,
