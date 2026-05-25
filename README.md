@@ -17,6 +17,11 @@ For GPU evaluation, run on a Linux host with ROCm-capable AMD hardware, ROCm dri
 ./scripts/run_docker.sh --build
 ```
 
+ROCm library example readiness is documented in [ROCm library notes](docs/rocm_libraries.md).
+The supported native library categories include hipBLAS, MIOpen, Composable Kernel,
+and rocWMMA. CDNA 3 support is schema/build/docs-ready until real hardware
+validation is recorded; CDNA 4 validation is also deferred.
+
 Optional benchmark assets can be downloaded into `data/`:
 
 ```bash
