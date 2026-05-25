@@ -130,6 +130,7 @@ None active.
 | 260524-xb3 | Fix PR base and prepare SOL evaluator contract branch for merge | 2026-05-24 | 5d4892d | [260524-xb3-fix-pr-base-and-prepare-sol-evaluator-co](./quick/260524-xb3-fix-pr-base-and-prepare-sol-evaluator-co/) |
 | 260525-097 | Backfill v1.12 GSD milestone for evaluator contract PR | 2026-05-25 | this commit | [260525-097-backfill-v1-12-gsd-milestone-for-evaluat](./quick/260525-097-backfill-v1-12-gsd-milestone-for-evaluat/) |
 | 260525-ruff | Configure Ruff as a dev dependency | 2026-05-25 | this commit | [260525-configure-ruff-dev-dependency](./quick/260525-configure-ruff-dev-dependency/) |
+| 260525-ty | Configure Ty as a dev dependency | 2026-05-25 | this commit | [260525-configure-ty-dev-dependency](./quick/260525-configure-ty-dev-dependency/) |
 
 ## Deferred Items
 

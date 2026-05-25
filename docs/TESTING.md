@@ -20,6 +20,7 @@ The `dev` dependency group in `pyproject.toml` includes:
 | `pytest` | `>=9.0.2` |
 | `pytest-xdist` | `>=3.5` |
 | `ruff` | `>=0.4` |
+| `ty` | `>=0.0.39` |
 
 Some tests require ROCm hardware or compiler support. The configured pytest
 markers in `pyproject.toml` and `tests/conftest.py` are:
@@ -119,7 +120,8 @@ file such as `.coveragerc`, `.nycrc`, or a pytest coverage threshold is present.
 
 No `.github/workflows/` directory is present in this checkout, so no GitHub
 Actions test workflow is configured in the repository. Run the relevant local
-pytest and `uv run ruff check .` commands before submitting changes.
+pytest, `uv run ruff check .`, and `uv run ty check` commands before submitting
+changes.
 
 ## GPU And Docker Checks
 

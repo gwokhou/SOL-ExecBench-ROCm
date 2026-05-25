@@ -22,7 +22,7 @@ locked in `uv.lock`. Important dependency families include:
 | Pydantic, Click, Rich | Schemas and CLI. |
 | safetensors, datasets | Benchmark input loading and dataset workflows. |
 | pytest, pytest-xdist | Test execution and parallelization tooling. |
-| `tool.ruff` configuration | Linting and formatting policy declared in `pyproject.toml`; Ruff itself is not declared as a package dependency in this checkout. |
+| Ruff, Ty | Development-time linting, formatting, and type checking. |
 
 Review each package's upstream license before redistributing binaries or
 container images that include those dependencies.
