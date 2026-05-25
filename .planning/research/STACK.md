@@ -1,27 +1,56 @@
 # Technology Stack
 
 **Project:** SOL ExecBench ROCm Port
-**Milestone:** v1.11 Paper Dataset Parity Inventory and ROCm Execution Closure
-**Researched:** 2026-05-23
-**Scope:** Public dataset acquisition/layout checks, paper parity inventory, per-problem ROCm compatibility classification, small ready-subset execution closure, JSON/JSONL reports, safetensors/custom-input handling, and dataset runner integration.
-**Overall confidence:** HIGH for repository integration points and dependency decisions; MEDIUM for exact public dataset counts until the inventory command is run against the live Hugging Face datasets.
+**Milestone:** v1.17 Static Kernel Evidence
+**Researched:** 2026-05-25
+**Scope:** Stack additions and integration points for capturing ROCm code
+objects / HSACO where available, extracting static ISA and metadata through
+routed tools, and publishing diagnostic sidecars without changing canonical
+trace JSONL, correctness, timing, scoring, paper-parity, or leaderboard
+semantics.
+**Overall confidence:** HIGH for repository integration points and sidecar
+architecture; HIGH for `llvm-objdump`, `readelf`, HIP compiler, and AMDGPU code
+object facts from official docs; MEDIUM for `roc-objdump` packaging because it
+is distribution-dependent and not well covered by current public ROCm docs.
 
 ## Recommendation
 
-Do not add a new framework dependency for v1.11. The milestone should harden and extend the existing Python package stack:
+Do not add a new Python framework or database dependency for v1.17. Add a
+small internal static-evidence module that reuses the v1.16 toolchain router,
+the existing HIP/C++ staging directory, and the established sidecar/report
+pattern.
 
-| Layer | Keep / Add | Decision |
-|-------|------------|----------|
-| Dataset access | Keep `datasets>=4.8.2`; optionally use `huggingface_hub` only through the existing `hf` CLI path or as a direct helper if already installed transitively. | `scripts/download_solexecbench.py` already uses `datasets.load_dataset("nvidia/SOL-ExecBench", name=<category>, split="train")`; make this auditable and resumable instead of adding a new acquisition system. |
-| Dataset categories | Keep local constants for `L1`, `L2`, `Quant`, `FlashInfer-Bench`. | These are already shared conceptually by the downloader and runner. v1.11 should centralize or mirror them deliberately and validate layout for all four. |
-| Schema validation | Keep Pydantic v2 models: `Definition`, `Workload`, `Trace`. | Inventory and classification should instantiate existing models and record validation failures, not create loose dict-only validators. |
-| JSON/JSONL reports | Keep stdlib `json` plus line-oriented JSONL helpers. | Reports are small metadata artifacts. `pandas`, `pyarrow`, `jsonlines`, SQLite, DuckDB, or dataframe libraries are unnecessary. |
-| Safetensors handling | Keep `safetensors>=0.7.0` and existing `load_safetensors()` behavior. | The evaluator already resolves and validates safetensors by path, tensor key, shape, and dtype. v1.11 needs inventory checks for missing blobs and unsupported layouts, not another loader. |
-| Custom inputs | Keep `custom_inputs_entrypoint` on `Definition` and `CustomInput` on `Workload`. | Classification should detect custom-input usage and whether the entrypoint exists/validates; execution should continue through the existing eval-driver path. |
-| Runner integration | Extend `scripts/run_dataset.py`; do not add a second runner. | The runner already discovers category/problem directories, truncates workloads, emits traces and summary JSON, and can generate AMD-native score reports, AMD SOL v2 sidecars, timing evidence, and SOLAR derivation sidecars. |
-| CLI output | Use existing Click/Rich only if adding package CLI commands; otherwise keep scripts with argparse. | v1.11 can be implemented as scripts first. Avoid broad CLI surface changes unless the phase explicitly needs `sol-execbench inventory`. |
+The stack shape should be:
 
-The strongest implementation shape is: **download/layout check -> inventory JSONL -> compatibility classification JSONL -> ready subset manifest -> existing dataset runner -> gap report JSON/Markdown**. Each step should be deterministic and file-based so results are auditable without changing canonical trace schemas.
+1. `ProblemPackager.compile()` produces `benchmark_kernel.so` in the staging
+   directory for HIP/C++ solutions.
+2. A new artifact collector scans that staging directory after successful
+   compile for stable generated files: `benchmark_kernel.so`, `*.hsaco`,
+   `*.o`, `*.out`, `*.hipfb`, `*.bc`, and relevant saved compiler
+   intermediates when present.
+3. A routed extractor selects static tools using
+   `build_toolchain_routing_report()` with `evidence_level=static` and artifact
+   types such as `rocm_binary`, `elf_object`, and `hip_compiler_output`.
+4. Extractors run bounded subprocess commands, store raw outputs under a
+   stable evidence directory, and summarize status, provenance, tool versions,
+   artifact hashes, section/symbol/ISA availability, and classification results
+   in `static_kernel_evidence.v1`.
+5. The CLI writes a sidecar next to the trace output, analogous to existing
+   environment and `rocprofv3` sidecars.
+
+Required output paths should be deterministic:
+
+| Artifact | Recommended path |
+|----------|------------------|
+| Static sidecar next to trace | `<trace>.static.json` |
+| Static evidence directory next to trace | `<trace>.static/` |
+| Static sidecar without `--output` | `<staging>/static/static.json` |
+| Raw extractor outputs | `<trace>.static/<artifact-stem>/<tool-id>.<kind>.txt` |
+| Captured compiler artifacts | `<trace>.static/artifacts/<original-name>` or relative references into kept staging |
+
+Prefer copying only small, relevant compiler artifacts into the evidence
+directory. For large or unstable staging trees, record paths, sizes, hashes, and
+classification instead of mirroring the full build directory.
 
 ## Recommended Stack
 
@@ -29,105 +58,200 @@ The strongest implementation shape is: **download/layout check -> inventory JSON
 
 | Technology | Version | Purpose | Why |
 |------------|---------|---------|-----|
-| Python | `>=3.12,<3.14` | Inventory scripts, downloader hardening, report generation, runner integration. | Already required by `pyproject.toml`; sufficient for typed dataclasses, pathlib, argparse, and stdlib JSON. |
-| Pydantic | `>=2.12.5` | Validate `definition.json`, `workload.jsonl`, and generated report models if new internal models are useful. | Existing public schemas already use Pydantic v2. Use those contracts directly for parity classification. |
-| Hugging Face Datasets | `>=4.8.2` | Load `nvidia/SOL-ExecBench` public dataset configs. | Existing downloader uses `datasets.load_dataset` with category configs and `split="train"`. Official docs support `load_dataset(path, name=..., split=...)` for Hub datasets. |
-| Safetensors | `>=0.7.0` | Load referenced safetensors blobs at execution time and inspect availability for inventory. | Already in runtime dependencies; existing evaluator uses `safetensors.torch.load_file`. |
-| PyTorch ROCm | `torch==2.10.0+rocm7.1` on Linux/Windows | Execute references/solutions and validate dtype/runtime readiness. | Existing ROCm execution baseline. Do not change for inventory work. |
-| Triton ROCm | `triton-rocm==3.6.0` on Linux | Existing solution category support. | Keep as-is; v1.11 classifies readiness, it does not expand compiler coverage. |
+| Python | `>=3.12,<3.14` | Static artifact discovery, bounded subprocess extraction, hashing, report generation. | Existing package baseline; stdlib is enough for file walking, subprocesses, JSON, and hashing. |
+| Pydantic | `>=2.12.5` | `StaticKernelEvidence`, `StaticArtifactRef`, `StaticExtractionResult`, and classification models. | Existing public and sidecar contracts use Pydantic v2. The sidecar should be strict and round-trippable. |
+| Click / Rich | Existing dependency | Add opt-in CLI flag and status messages. | The primary CLI already uses Click/Rich; no new CLI stack needed. |
+| stdlib `json` | Python bundled | Write sidecar and report payloads. | Keeps evidence files diffable and dependency-free. |
+| stdlib `hashlib` | Python bundled | SHA256 artifact provenance. | Static evidence must identify exactly which binary/object was inspected. |
+| stdlib `subprocess` | Python bundled | Bounded external tool execution. | Matches the v1.16 router and v1.14 profiler pattern. |
 
-### Reporting And Files
+### ROCm / Static Tools
 
-| Tool | Version | Purpose | Why |
-|------|---------|---------|-----|
-| stdlib `json` | Python bundled | Write summary JSON, inventory JSONL, classification JSONL, ready subset manifests, and gap reports. | Canonical traces and existing summaries are JSON. This keeps reports dependency-free and easy to diff. |
-| `pathlib` | Python bundled | Dataset layout traversal and relative path validation. | Existing scripts already use `Path`; needed for safe local layout checks. |
-| `argparse` | Python bundled | New script flags for inventory/classification, or extensions to existing scripts. | Existing dataset scripts use argparse. No need to introduce Click unless exposing a package console command. |
-| `hashlib` / stable sorting | Python bundled | Stable identifiers and deterministic report ordering. | Existing runner already uses safe sidecar names; inventory reports should be reproducible. |
-| Rich | `>=13.0` | Optional console tables if wired through package CLI. | Already a dependency, but machine-readable JSON/JSONL should remain primary. |
+| Tool | Required for v1.17? | Artifact types | Recommendation |
+|------|---------------------|----------------|----------------|
+| `llvm-objdump` | Required route, optional local availability | `rocm_binary`, `elf_object` | Promote from planned to active/candidate for static extraction. Use for headers, symbols, disassembly, and offload bundle inspection where supported. |
+| `readelf` | Required fallback route, optional local availability | `rocm_binary`, `elf_object` | Promote from planned to active/candidate fallback for ELF headers, sections, notes, symbols, and architecture-specific metadata. |
+| `rga` | Required route, optional local availability | Code object / HSACO, compiler output | Promote from planned to candidate. Use only when a precompiled AMD GPU code object is available and the local RGA binary supports the required mode. |
+| `roc-objdump` | Optional route | `rocm_binary`, `elf_object` | Keep as candidate and distribution-dependent. Probe and use if present, but do not make it required. |
+| `hipcc` / `amdclang++` | Existing indirect build tools | HIP compiler output | Do not call directly from the benchmark path for v1.17. Static capture should observe artifacts produced by PyTorch extension builds; optional saved-temporary flags may be passed through existing `hip_cflags`. |
+| `offload-arch` / `amdgpu-offload-arch` | Optional future helper | Executable/offload image requirements | Defer unless needed for richer compatibility diagnostics. The v1.17 minimum can use existing gfx detection and object metadata. |
 
-### Existing ROCm Execution Stack
+### Repository Integration Points
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| `sol-execbench` CLI | project local | Single-problem execution from definition/workload/solution. | `scripts/run_dataset.py` already shells to this CLI and parses strict JSON lines. Keep this as the execution boundary. |
-| `scripts/run_dataset.py` | project local | Ready-subset execution closure. | Add manifest/category filters and report stitching here rather than creating a parallel runner. |
-| `BenchmarkConfig` | project local | Small-batch execution settings: `warmup_runs`, `iterations`, `lock_clocks`, `seed`. | Existing config file path already supports reproducible quick runs. |
-| `rocprofv3` evidence helpers | ROCm toolchain | Optional timing evidence for ready problems. | Already integrated through `--timing-evidence-dir`; v1.11 should preserve it as optional evidence, not make it mandatory for inventory. |
+| File / Module | Stack change |
+|---------------|--------------|
+| `src/sol_execbench/core/toolchain.py` | Change static entries from `planned` to active/candidate where v1.17 implements extractors. Keep lifecycle/status explicit: `available`, `unavailable`, `failed`, `unsupported_artifact`, `unsupported_arch`. Add source refs for official docs. |
+| New `src/sol_execbench/core/static_evidence.py` | Add Pydantic models, artifact discovery, extractor command builders, bounded command runner, raw-output registration, and classification summarization. |
+| `src/sol_execbench/driver/problem_packager.py` | Keep compile contract returning `benchmark_kernel.so`. Add no broad rewrite. If needed, expose a small helper that returns candidate static artifact paths from `output_dir` after compile. |
+| `src/sol_execbench/driver/templates/build_ext.py` | Avoid direct changes unless artifact capture proves impossible. Prefer passing optional compiler flags through existing `compile_options.hip_cflags`. |
+| `src/sol_execbench/cli/main.py` | Add an explicit opt-in such as `--static-evidence` or `--static-evidence auto`; write sidecars after successful HIP/C++ compile and before staging cleanup. Static failure must be nonfatal. |
+| `src/sol_execbench/core/data/contract.py` | Advertise optional capability `static_kernel_evidence.v1`; do not bump evaluator contract version unless the public contract requires consumers to understand it. |
+| `docs/rocm_toolchain_routing.md` | Update static tools from deferred to implemented diagnostic routes and document fallback order. |
+| `docs/CLAIMS.md` / researcher docs | Add claim boundary: static evidence is compiler/static diagnostic evidence only. |
 
-## Recommended Local Additions
+## Artifact Capture Strategy
 
-### New Or Extended Scripts
+### HIP/C++ compiled extensions
 
-| File | Add / Extend | Purpose |
-|------|--------------|---------|
-| `scripts/download_solexecbench.py` | Extend | Add explicit output root flag, category selection, revision/report metadata, layout verification after download, and clear handling for already-downloaded categories. Keep `datasets.load_dataset`. |
-| `scripts/download_data.sh` | Extend lightly | Keep as convenience wrapper. Avoid making `hf` CLI mandatory for the SOL dataset path; reserve it for FlashInfer trace asset download unless replaced by a Python helper. |
-| `scripts/run_dataset.py` | Extend | Accept a ready-subset manifest or classification filter, preserve existing `--limit` and `--max-workloads`, and include inventory/classification references in summary JSON. |
-| `scripts/inventory_solexecbench.py` or `src/sol_execbench/core/dataset_inventory.py` | Add | Generate machine-readable inventory and compatibility classification without executing GPU workloads. Prefer a core module plus thin script if tests need direct imports. |
-| `docs/` parity page | Add or update | Document dataset root layout, acquisition commands, inventory outputs, readiness classes, and claim guardrails. |
+The existing stack compiles HIP/C++ solutions through
+`torch.utils.cpp_extension.load(..., build_directory=str(HERE), verbose=True)`
+and then renames the extension to `benchmark_kernel.so`. This gives v1.17 a
+controlled staging directory. Use it as the capture root.
 
-### New Internal Models
+Required collector behavior:
 
-Use Pydantic only if the model definitions stay small and directly serve validation. Otherwise dataclasses plus `dict` serialization are enough.
+| Step | Behavior |
+|------|----------|
+| Identify root | Use `ProblemPackager.output_dir` / CLI `staging_dir` after successful compile. |
+| Find primary binary | Always register `benchmark_kernel.so` if present. |
+| Find code objects | Glob for common ROCm outputs, especially `*.hsaco`, `*.o`, and generated files containing `gfx*`, `hipv`, or `amdgcn` in the name. |
+| Verify files | Record relative path, size, SHA256, suffix, first matching artifact type, and whether copied into evidence dir. |
+| Avoid overcapture | Do not copy source files, `solution.json`, workload data, Python cache, or the full build tree by default. |
+| Capture saved temps | Support users adding `--save-temps` or `-save-temps=cwd` through existing `compile_options.hip_cflags`; record whether saved temps were observed. Do not force these flags globally until compile stability is tested. |
 
-| Model | Suggested Fields | Purpose |
-|-------|------------------|---------|
-| `DatasetProblemInventory` | `category`, `problem`, `definition_path`, `workload_path`, `workload_count`, `input_types`, `dtypes`, `has_reference`, `has_solution_file`, `has_custom_inputs`, `has_safetensors`, `safetensors_refs`, `forward_backward_hint`, `validation_errors` | One JSONL row per problem. |
-| `RocmCompatibilityClassification` | `category`, `problem`, `status`, `reasons`, `blocking_inputs`, `blocking_dtypes`, `missing_safetensors`, `custom_input_status`, `runtime_probe_status`, `needs_hardware_evidence` | One JSONL row per problem; source of ready subset manifests and gap reports. |
-| `DatasetLayoutReport` | `repo_id`, `categories_expected`, `categories_found`, `problem_counts`, `missing_files`, `unexpected_files`, `flashinfer_trace_root`, `generated_at` | Dataset-level acquisition/layout status. |
-| `ReadySubsetManifest` | `problems`, `selection_policy`, `max_workloads`, `generated_from_inventory`, `generated_from_classification` | Input to `scripts/run_dataset.py` for small closure runs. |
+Static evidence should be best-effort. If only `benchmark_kernel.so` exists,
+emit an `available_artifact:no_code_object_found` or equivalent classification
+and still run generic ELF inspection against the `.so` if useful.
 
-Keep these as **derived reports**, not public benchmark schemas. They should not mutate `definition.json`, `workload.jsonl`, `solution.json`, or canonical trace JSONL.
+### Python / Triton solutions
 
-## Classification Logic
+Do not promise complete static evidence for Python/Triton solutions in v1.17.
+Triton has its own cache/artifact lifecycle and should be a future extension.
+For v1.17, emit `unsupported_solution_type` or `no_stable_artifact` unless a
+phase explicitly scopes Triton cache capture.
 
-The stack should support a deterministic classifier that can run without ROCm hardware, plus an optional runtime probe for ready candidates.
+## Extractor Stack
 
-| Status | Detection Inputs | Notes |
-|--------|------------------|-------|
-| `ready` | Valid `Definition`; all workloads parse; dtypes map through existing dtype helpers; no missing safetensors for selected roots; custom inputs have a valid entrypoint; no known NVIDIA-only import/path markers. | Eligible for small execution closure. |
-| `schema_input_blocked` | Pydantic validation errors, missing `definition.json`, missing `workload.jsonl`, bad JSON/JSONL, input names mismatch, custom mixed with non-custom. | Use existing model validation and record exact errors. |
-| `dtype_blocked` | Definition/workload requires dtype that current ROCm/PyTorch path cannot generate or execute reliably. | Existing dtype enum includes float8/float4 values; classification must distinguish schema support from runtime support. |
-| `custom_input_blocked` | Workload uses `custom`, but `Definition.custom_inputs_entrypoint` is missing, invalid, not defined, or fails a CPU/lightweight syntax check. | Do not execute arbitrary custom input code during pure inventory unless explicitly running a probe. |
-| `safetensors_blocked` | Workload references safetensors paths or keys not available under dataset/staging/`FLASHINFER_TRACE_DIR` roots. | Reuse `_resolve_blob_path` semantics for path matching; inspect keys only when files are present. |
-| `runtime_blocked` | Small probe via existing runner fails with runtime/compile/timeout errors. | Keep separate from static inventory. |
-| `unsupported_nvidia_only_path` | Reference/solution uses CUDA/NVIDIA-only APIs that the ROCm port intentionally does not support. | Static source scan plus execution failure details; avoid overclaiming from source scan alone. |
-| `needs_hardware_evidence` | Static checks pass but no ROCm execution trace exists for the problem/category/hardware target. | Important claim guardrail: inventory completion is not validation. |
+### `llvm-objdump`
 
-## Integration Points
+Use `llvm-objdump` as the primary general extractor when available:
 
-| File | v1.11 Work |
-|------|------------|
-| `pyproject.toml` | Prefer no dependency changes. If a direct FlashInfer trace Python downloader replaces the `hf` CLI, add `huggingface-hub` explicitly with a narrow lower bound instead of relying on transitive installation. |
-| `scripts/download_solexecbench.py` | Add flags: `--repo-id`, `--output-dir`, `--category`, `--revision`, `--layout-report`, `--overwrite/--skip-existing`. Preserve defaults for `nvidia/SOL-ExecBench` and the four public categories. |
-| `scripts/download_data.sh` | Keep wrapper behavior, but document that the Python downloader handles SOL-ExecBench while `hf download flashinfer-ai/flashinfer-trace --revision 1.0` handles optional trace blobs. |
-| `src/sol_execbench/core/data/definition.py` | Reuse `Definition` validation for inventory. Do not loosen public schema unless a live dataset incompatibility is proven and documented. |
-| `src/sol_execbench/core/data/workload.py` | Reuse `Workload` and input variants: `random`, `scalar`, `safetensors`, `custom`. Classification should summarize these variants by problem. |
-| `src/sol_execbench/core/bench/io.py` | Reuse safetensors path resolution and dtype/shape checks. Consider extracting `_resolve_blob_path` if inventory needs it without importing private helpers. |
-| `src/sol_execbench/driver/templates/eval_driver.py` | No major changes expected. Existing safetensors roots are staging dir plus `FLASHINFER_TRACE_DIR`; custom inputs already call `definition.custom_inputs_entrypoint`. |
-| `scripts/run_dataset.py` | Add manifest-driven problem selection and preserve sidecar flags: `--amd-score-report`, `--amd-sol-bound-dir`, `--solar-derivation`, `--timing-evidence-dir`. Summary JSON should include skipped/classification metadata when run from a manifest. |
-| `docs/definition.md` / `docs/workload.md` | Reference existing schema behavior in gap reports. Only update if inventory discovers paper dataset fields not reflected in docs. |
-| `docs/CONFIGURATION.md` | Update if v1.11 adds dataset root variables or changes FlashInfer trace acquisition. Prefer explicit CLI flags over new environment variables. |
+| Output | Candidate command |
+|--------|-------------------|
+| File/section/symbol headers | `llvm-objdump --all-headers <artifact>` |
+| Disassembly | `llvm-objdump --disassemble <artifact>` |
+| HIP/offload bundle details | `llvm-objdump --offloading <artifact>` when accepted by local version |
+| Version probe | `llvm-objdump --version` |
+
+Bound stdout/stderr tails in the sidecar and save full raw output to files under
+the static evidence directory. If disassembly exits nonzero but headers work,
+classify partial evidence rather than failing the benchmark.
+
+### `readelf`
+
+Use `readelf` as the metadata fallback:
+
+| Output | Candidate command |
+|--------|-------------------|
+| Header / program / section summary | `readelf --headers --wide <artifact>` |
+| Notes | `readelf --notes --wide <artifact>` |
+| Symbols | `readelf --symbols --wide <artifact>` |
+| Version probe | `readelf --version` |
+
+`readelf` should not be treated as an ISA disassembler. Its role is ELF
+metadata: code object ABI hints, machine/flags, sections, symbols, and notes.
+
+### RGA
+
+Use RGA as a candidate high-value route for precompiled AMD GPU code objects,
+not as a mandatory dependency. Official RGA docs describe binary analysis mode
+for loading AMD GPU Code Object binaries and producing disassembly/resource
+views. The repository should therefore probe RGA and record explicit
+unavailable/unsupported states instead of assuming it is installed in ROCm
+containers.
+
+Do not hard-code a single RGA CLI command from memory. Build the adapter around
+local `rga --help` / `rga --version` probes and tests with fixture runners, then
+document the exact supported command once validated in the project container.
+The sidecar should include the actual command used.
+
+### `roc-objdump`
+
+Keep `roc-objdump` as optional. If present, it can be tried before or after
+`llvm-objdump` depending on local behavior, but v1.17 should not depend on it
+for minimum evidence because current public ROCm documentation is sparse and
+packaging varies.
+
+## `static_kernel_evidence.v1` Sidecar
+
+Recommended top-level fields:
+
+| Field | Purpose |
+|-------|---------|
+| `schema_version` | `sol_execbench.static_kernel_evidence.v1` |
+| `generated_at` | UTC timestamp |
+| `diagnostic_only` | Always `true` |
+| `correctness_authority` | Always `false` |
+| `performance_authority` | Always `false` |
+| `score_authority` | Always `false` |
+| `leaderboard_authority` | Always `false` |
+| `canonical_trace_jsonl` | Always `false` |
+| `solution_name` / `languages` | Link evidence to solution class without changing trace schema |
+| `staging_dir` | Original compile staging directory, nullable if removed |
+| `evidence_dir` | Directory containing raw extraction outputs |
+| `routing_report` | Embedded or referenced v1.16 static routing report |
+| `artifacts` | Captured/inspected artifact refs with hash, size, type, relative path |
+| `extractions` | One result per tool/artifact/output kind |
+| `classification` | Summary status: `complete`, `partial`, `unavailable`, `unsupported`, `failed` |
+| `warnings` | Stable warning strings for missing code object, unsupported language, tool failure, etc. |
+
+Recommended extraction result fields:
+
+| Field | Purpose |
+|-------|---------|
+| `tool_id` / `tool_path` / `tool_version` | Provenance |
+| `artifact_ref` | Which file was inspected |
+| `command` | Exact bounded command |
+| `status` | `success`, `partial`, `unavailable`, `unsupported`, `failed`, `timeout` |
+| `returncode` | Process return code |
+| `timeout_seconds` | Bound used |
+| `stdout_tail` / `stderr_tail` | Bounded inline diagnostics |
+| `raw_output_path` | Full saved output |
+| `detected_kernel_symbols` | Best-effort symbol names |
+| `detected_gfx_arches` | Best-effort `gfx*` matches from metadata/output |
+| `has_isa` / `has_metadata` | Coarse evidence booleans |
+
+## Required Stack Changes
+
+| Area | Required change |
+|------|-----------------|
+| Tool routing | Activate static routes implemented in v1.17. Keep probe-gated selection; no static tool is assumed installed. |
+| Static models | Add sidecar Pydantic models and JSON serializer tests. |
+| CLI | Add explicit opt-in static evidence collection and sidecar path helpers. |
+| Artifact discovery | Add deterministic post-compile collector for HIP/C++ staging outputs. |
+| Extractors | Add bounded subprocess adapters for `llvm-objdump`, `readelf`, and optional RGA / `roc-objdump`. |
+| Reporting | Add raw output registration and sidecar summary; optionally add a small Markdown report generated from the sidecar. |
+| Contract metadata | Add optional capability only. |
+| Docs and guardrails | Update claims, routing docs, researcher docs, and tests that prevent static evidence from being described as score/correctness/performance authority. |
+
+## Optional / Future Tools
+
+| Tool / Capability | Recommendation |
+|-------------------|----------------|
+| `clang-offload-bundler` | Future helper for extracting embedded HIP offload bundles if `llvm-objdump --offloading` and build-tree capture are insufficient. Do not add in the minimum v1.17 stack. |
+| `llvm-readobj` / `llvm-readelf` | Future structured ELF alternative if `readelf` output parsing becomes fragile. Not needed for first sidecar. |
+| `offload-arch -f <binary>` | Future compatibility diagnostics for compiled offload images. Useful, but not required for sidecar MVP. |
+| Triton cache capture | Future milestone. It has separate cache invalidation and source-to-artifact mapping concerns. |
+| RGA resource/stat parsing | Future enhancement after raw RGA command behavior is validated in CI/container. v1.17 should capture raw outputs and coarse classifications first. |
+| YAML / MessagePack metadata parser | Future richer parser. For v1.17, prefer raw note/section output and coarse detection; do not add PyYAML/msgpack unless requirements demand semantic metadata parsing. |
 
 ## What Not To Add
 
 | Do Not Add | Reason |
 |------------|--------|
-| `pandas`, `polars`, `duckdb`, `sqlite-utils`, or `pyarrow` | Inventory and gap reports are modest JSON/JSONL artifacts; dataframe/storage engines add unnecessary dependency and packaging surface. |
-| `jsonlines` package | JSONL writing is simple and already handled line-by-line elsewhere. stdlib `json` is enough. |
-| New public trace fields | Canonical trace JSONL must remain stable. Put parity inventory, readiness, and gap data in derived reports. |
-| A new execution runner | `scripts/run_dataset.py` already has the correct execution boundary and sidecar integration. Extend it. |
-| A hosted leaderboard, API server, database, or dashboard | Explicitly out of milestone scope and would confuse inventory/closure with public leaderboard equivalence. |
-| New ROCm compiler/library dependencies | v1.11 classifies and closes ready subsets; it should not expand HIP/Triton/library support. |
-| `transformers`, model-loading libraries, or paper extraction tooling | The original 124-model extraction pipeline is explicitly deferred. Use the public dataset artifacts, not model reconstruction. |
-| Automatic execution of arbitrary custom input code during static inventory | Custom input code belongs in the existing isolated eval path or an explicit probe mode. Pure inventory should inspect schema/source structure without side effects. |
-| Treating Hugging Face CLI as an implicit package dependency | If `hf` remains required for FlashInfer trace download, document it. If Python code imports `huggingface_hub`, add it explicitly rather than relying on transitive dependencies. |
-| v1.10 SOLAR derivation rework | Existing sidecars are context only. v1.11 should route ready runs through existing sidecar flags, not reopen derivation architecture. |
+| New Python dependencies such as `pyelftools`, `capstone`, `lief`, `msgpack`, or `PyYAML` | v1.17 can use external ROCm/LLVM/binutils tools and raw outputs. Add parsers only when a later phase requires structured semantic analysis. |
+| A database, dataframe engine, or artifact index service | Sidecars and small raw files are enough. |
+| Mandatory RGA installation | RGA is valuable but not part of the guaranteed ROCm runtime in this repo. Probe it and mark unavailable when absent. |
+| Mandatory static evidence for every run | Explicitly out of milestone scope. Static evidence must be opt-in or best-effort diagnostic evidence. |
+| Trace JSONL fields | Canonical traces must remain stable. Use sidecars only. |
+| Score, timing, or correctness decisions based on ISA output | Static extraction can diagnose compiler artifacts, not prove runtime correctness or performance. |
+| Full paper-scale static coverage | Defer unless a later requirement explicitly asks for 235-problem static artifact closure. |
+| Direct replacement of PyTorch extension build with a custom `hipcc` pipeline | Too invasive for v1.17. Observe the existing build first; add custom compile paths only if later requirements need them. |
+| Automatic retention of all staging directories | Can leak large/generated files and user source. Keep staging only when requested; copy/register bounded evidence artifacts. |
 
 ## Installation
 
-No required dependency additions are recommended.
+No required Python dependency additions are recommended.
 
 Existing setup remains:
 
@@ -135,78 +259,113 @@ Existing setup remains:
 uv sync --all-groups
 ```
 
-Optional dataset asset setup remains script-driven:
+Static extractors are host tools. Document them as optional system/toolchain
+availability:
 
 ```bash
-uv run python scripts/download_solexecbench.py
-
-# Optional FlashInfer trace blobs when safetensors workloads reference them.
-pip install "huggingface-hub[cli]"
-hf download flashinfer-ai/flashinfer-trace --repo-type=dataset --revision 1.0 --local-dir data/flashinfer-trace
+llvm-objdump --version
+readelf --version
+rga --version
+roc-objdump --version
 ```
 
-If the phase replaces the shell-level `hf download` with Python code, prefer this single dependency addition:
+For richer compiler intermediates during development, users can pass saved-temp
+flags through existing solution compile options rather than changing package
+dependencies:
 
-```toml
-dependencies = [
-    "huggingface-hub>=1.0",
-]
+```json
+{
+  "compile_options": {
+    "hip_cflags": ["--save-temps"]
+  }
+}
 ```
 
-Only add it if a Python API is actually imported by repository code.
+Validate exact flag behavior in the ROCm container before making saved temps a
+documented default.
 
 ## Suggested Validation
 
-Static and unit validation:
+Focused unit tests:
 
 ```bash
-uv run pytest \
-  tests/sol_execbench/core/bench/test_io.py \
-  tests/sol_execbench/test_run_dataset_amd_score.py \
-  tests/sol_execbench/test_public_contract_guardrails.py
-
-uv run --with ruff ruff check \
-  scripts/download_solexecbench.py \
-  scripts/run_dataset.py \
-  src/sol_execbench/core/data \
-  src/sol_execbench/core/bench/io.py
+uv run pytest tests/sol_execbench/test_toolchain_routing.py
 ```
 
-Milestone-specific validation should add focused tests for:
+New v1.17 tests should cover:
 
-- Downloader category selection and layout reports.
-- Inventory JSONL generation from fixture categories.
-- Classification statuses for schema errors, missing safetensors, custom input blockers, dtype blockers, and ready problems.
-- Manifest-driven `scripts/run_dataset.py` execution with `--max-workloads 1`.
-- Gap report guardrails that separate "inventory complete" from "235-problem ROCm validated".
+- Static sidecar model round-trip and malformed payload rejection.
+- Artifact discovery from fixture staging trees containing `.so`, `.hsaco`,
+  `.o`, and irrelevant files.
+- `llvm-objdump`, `readelf`, RGA, and `roc-objdump` command-builder behavior
+  with fake runners.
+- Routing fallback when primary tools are unavailable.
+- Nonfatal static extraction failure during benchmark execution.
+- Sidecar paths for `--output` and no-output modes.
+- Guardrails that static evidence is not trace, score, correctness,
+  performance, paper-parity, or leaderboard authority.
 
-Small ready-subset smoke command after inventory exists:
+Representative smoke command after implementation:
 
 ```bash
-uv run scripts/run_dataset.py data/benchmark \
-  --category L1 \
-  --limit 5 \
-  --max-workloads 1 \
-  --iterations 1 \
-  --warmup-runs 0 \
-  --amd-score-report out/v1_11_ready_subset/amd-score.json \
-  --amd-sol-bound-dir out/v1_11_ready_subset/amd-sol-v2 \
-  --solar-derivation out/v1_11_ready_subset/solar-derivation
+uv run sol-execbench examples/hip_cpp/rmsnorm \
+  --solution examples/hip_cpp/rmsnorm/solution.json \
+  --static-evidence \
+  -o out/v1.17/hip_cpp_rmsnorm.trace.jsonl \
+  --keep-staging
+```
+
+Then inspect:
+
+```bash
+uv run sol-execbench toolchain --json \
+  --evidence-level static \
+  --artifact-type rocm_binary \
+  --gpu-arch gfx1200
 ```
 
 ## Sources
 
-- Repository: `.planning/PROJECT.md` - v1.11 milestone scope, target features, and explicit deferrals.
-- Repository: `pyproject.toml` - Python range, ROCm PyTorch/Triton pins, `datasets`, `safetensors`, Pydantic, Click, and Rich dependencies.
-- Repository: `scripts/download_solexecbench.py` - current `nvidia/SOL-ExecBench` acquisition path and category list.
-- Repository: `scripts/download_data.sh` - current wrapper and `flashinfer-ai/flashinfer-trace` CLI download.
-- Repository: `scripts/run_dataset.py` - existing dataset discovery, small batch controls, trace summaries, AMD-native score reports, AMD SOL v2 sidecars, SOLAR derivation sidecars, and timing evidence integration.
-- Repository: `src/sol_execbench/core/data/definition.py` - `Definition` schema, dtype enum, reference validation, and custom input entrypoint validation.
-- Repository: `src/sol_execbench/core/data/workload.py` - `Workload` schema and input variants: random, scalar, safetensors, custom.
-- Repository: `src/sol_execbench/core/data/trace.py` - canonical trace/evaluation schema and status vocabulary.
-- Repository: `src/sol_execbench/core/bench/io.py` - safetensors loading, path resolution, dtype/shape checks, custom input generation, and scalar/random input handling.
-- Repository: `src/sol_execbench/driver/templates/eval_driver.py` - execution-time safetensors roots and custom input invocation.
-- Repository docs: `docs/definition.md`, `docs/workload.md`, `docs/CONFIGURATION.md`, `docs/GETTING-STARTED.md` - public schema and dataset setup behavior.
-- Official docs: https://huggingface.co/docs/datasets/loading - `load_dataset` supports loading Hub datasets with named configs and splits. Confidence: HIGH.
-- Official docs: https://huggingface.co/docs/safetensors/index - safetensors Torch loading is the supported tensor-file path. Confidence: HIGH.
-- Official docs: https://docs.python.org/3/library/json.html - stdlib JSON serialization is sufficient for strict JSON and JSONL report writing. Confidence: HIGH.
+- Repository: `.planning/PROJECT.md` - v1.17 goal, target features, and
+  explicit deferrals.
+- Repository: `.planning/MILESTONES.md` - v1.16 shipped routing foundation and
+  v1.14/v1.15 sidecar precedent.
+- Repository: `.planning/milestones/v1.16-MILESTONE-AUDIT.md` - confirms
+  static capture/extraction was deferred to v1.17.
+- Repository: `docs/rocm_toolchain_routing.md` - current static tool lifecycle
+  entries and claim boundary.
+- Repository: `src/sol_execbench/core/toolchain.py` - routing models,
+  capability registry, probe behavior, and static artifact enums.
+- Repository: `src/sol_execbench/driver/problem_packager.py` and
+  `src/sol_execbench/driver/templates/build_ext.py` - HIP/C++ staging and
+  PyTorch extension build integration.
+- Repository: `src/sol_execbench/cli/main.py` - existing environment/profile
+  sidecar path pattern and benchmark execution lifecycle.
+- Official ROCm HIP compiler docs:
+  https://rocm.docs.amd.com/projects/HIP/en/latest/understand/compilers.html
+  - HIP supports offline compilation, host/device compilation, embedded device
+  code, and runtime compilation. Confidence: HIGH.
+- Official ROCm compiler reference:
+  https://rocm.docs.amd.com/projects/llvm-project/en/latest/reference/rocmcc.html
+  - ROCm compiler interfaces are `hipcc` and `amdclang++`; `--offload-arch`
+  targets AMD GPU architectures; `offload-arch -f` can query binary offload
+  requirements. Confidence: HIGH.
+- Official LLVM AMDGPU usage:
+  https://llvm.org/docs/AMDGPUUsage.html
+  - HIP/OpenMP embed code objects; code object V5 is default when not specified;
+  AMD HSA runtime requires `ET_DYN` code objects; metadata is carried in AMDGPU
+  note records for v3+. Confidence: HIGH.
+- Official LLVM `llvm-objdump` docs:
+  https://llvm.org/docs/CommandGuide/llvm-objdump.html
+  - supports object/final image inspection, headers, symbols, disassembly, and
+  `--offloading`. Confidence: HIGH.
+- Official GNU binutils `readelf` docs:
+  https://sourceware.org/binutils/docs/binutils/readelf.html
+  - supports ELF headers, sections, notes, symbols, dynamic info, and hex/string
+  section dumps. Confidence: HIGH.
+- GPUOpen RGA repository and manual:
+  https://github.com/GPUOpen-Tools/radeon_gpu_analyzer and
+  https://gpuopen.com/manuals/rga_manual/help_manual/
+  - RGA can analyze precompiled AMD GPU Code Object binaries and produce ISA
+  disassembly/resource information; CLI exists but exact command must be
+  validated locally. Confidence: MEDIUM-HIGH.
