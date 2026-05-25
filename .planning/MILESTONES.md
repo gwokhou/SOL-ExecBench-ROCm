@@ -1,5 +1,24 @@
 # Milestones
 
+## v1.15 Research-Grade ROCm Benchmark Release (Shipped: 2026-05-25)
+
+**Phases completed:** 4 phases, 4 plans, 0 tasks
+
+**Key accomplishments:**
+
+- Added explicit public claim boundaries for ROCm-port, runtime, profiling,
+  AMD-native-derived, and research-preview evidence.
+- Defined a deterministic curated ROCm benchmark slice with artifact
+  expectations and unsupported-scope boundaries.
+- Added researcher guide and cookbook workflows for kernel, compiler/backend,
+  agent, and reproducibility researchers.
+- Added a v1.15 release closure checklist with result semantics, known gaps,
+  and next-milestone direction.
+- Added documentation guardrail tests that protect the release-preview claim
+  boundary.
+
+---
+
 ## v1.14 Optional rocprofv3 Profiling Evidence (Shipped: 2026-05-25)
 
 **Delivered:** opt-in `rocprofv3` profiling artifacts for benchmark runs,
@@ -16,10 +35,13 @@ scoring, and evaluator contract version `1.0`.
 - Added `sol_execbench.rocprofv3_profile.v1` profile sidecar metadata with
   command, working directory, timeout, artifact paths, return code,
   skipped/failed reasons, and stdout/stderr tails.
+
 - Registered `rocpd`, CSV trace, counter, agent-info, JSON, and unknown
   profiler artifacts under stable output-derived paths.
+
 - Kept profiler absence or failure nonfatal by falling back to normal benchmark
   execution.
+
 - Advertised optional `profiling.evidence.v1` without bumping the evaluator
   contract.
 
@@ -42,12 +64,16 @@ while preserving canonical trace JSONL and contract version `1.0`.
 - Added `sol_execbench.environment_snapshot.v1` evidence models and explicit
   bounded probes for `amd-smi`, `rocminfo`, `rocm_agent_enumerator`, and
   PyTorch ROCm metadata.
+
 - Added optional benchmark run sidecar output through
   `SOLEXECBENCH_ENV_SNAPSHOT` and `SOLEXECBENCH_ENV_SNAPSHOT_PATH`.
+
 - Added `sol-execbench doctor --json` with structured tool, runtime, memory,
   and event-timing readiness checks.
+
 - Advertised optional `runtime.evidence.v1` capability without bumping
   evaluator contract version or making evidence mandatory.
+
 - Preserved canonical trace JSONL, correctness, timing, scoring, and primary
   benchmark CLI defaults.
 
@@ -68,12 +94,16 @@ boundary guardrails, and PR #1 shipping evidence.
 
 - Added a versioned evaluator compatibility contract builder and public data
   package export.
+
 - Exposed contract JSON through the primary CLI without requiring a problem
   directory or GPU evaluation.
+
 - Preserved canonical trace JSONL by keeping contract-only fields out of trace
   payloads.
+
 - Added guardrails that prevent SOL source from absorbing HIP-side agent/run
   semantics.
+
 - Recorded that the work shipped through PR #1 into
   `gwokhou/SOL-ExecBench-ROCm:main`, not NVIDIA upstream.
 
@@ -94,14 +124,18 @@ claim guardrails for the paper dataset surface.
 
 - Added public dataset acquisition/layout metadata with category counts,
   checksums, idempotent downloader verification, and explicit claim boundaries.
+
 - Built deterministic paper inventory and ROCm readiness sidecars from
   canonical `Definition` and `Workload` contracts, including blocker reason
   codes and ready-subset manifests.
+
 - Extended `scripts/run_dataset.py` to execute bounded ready subsets through
   the existing `sol-execbench` subprocess path and emit
   `execution_closure.json`.
+
 - Added parity-gap JSON and Markdown reports that aggregate manifest,
   inventory, readiness, execution closure, and derived AMD evidence.
+
 - Added release-closure documentation and guardrails preventing bounded
   sidecar artifacts from being presented as full paper validation,
   leaderboard parity, upstream SOLAR parity, or unsupported hardware
@@ -112,6 +146,7 @@ claim guardrails for the paper dataset surface.
 - No single automated fixture runs the full sidecar chain end to end.
 - Manifest/root/category/checksum consistency is provenance-only across
   sidecar inputs.
+
 - `--readiness` remains optional for execution closure, so complete blocked
   denominator accounting depends on using the documented command.
 
