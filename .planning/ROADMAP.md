@@ -66,7 +66,7 @@
 
 **Active milestone:** v1.15 Research-Grade ROCm Benchmark Release.
 
-**Status:** defining requirements and roadmap.
+**Status:** implementation complete; final verification in progress.
 
 **Milestone goal:** make the ROCm port usable as a small, complete,
 research-grade benchmark preview before attempting full paper parity.
@@ -75,7 +75,7 @@ research-grade benchmark preview before attempting full paper parity.
 
 ### Phase 64: Claim Boundary and Researcher Positioning
 
-**Status:** Planned
+**Status:** Complete
 **Milestone:** v1.15 Research-Grade ROCm Benchmark Release
 **Goal:** Make the project's current claims, non-claims, evidence requirements,
 and research positioning explicit and test-protected.
@@ -96,7 +96,7 @@ and research positioning explicit and test-protected.
 
 ### Phase 65: Curated ROCm Benchmark Slice
 
-**Status:** Planned
+**Status:** Complete
 **Milestone:** v1.15 Research-Grade ROCm Benchmark Release
 **Goal:** Define and exercise a representative, bounded ROCm benchmark slice
 that can be reproduced without implying full paper parity.
@@ -122,7 +122,7 @@ that can be reproduced without implying full paper parity.
 
 ### Phase 66: Researcher Workflows and Cookbooks
 
-**Status:** Planned
+**Status:** Complete
 **Milestone:** v1.15 Research-Grade ROCm Benchmark Release
 **Goal:** Give GPU kernel researchers and deep developers a direct path from
 first run to extending kernels, interpreting artifacts, and running agent or
@@ -147,7 +147,7 @@ compiler experiments.
 
 ### Phase 67: Release Closure and Reproducibility Bundle
 
-**Status:** Planned
+**Status:** Complete
 **Milestone:** v1.15 Research-Grade ROCm Benchmark Release
 **Goal:** Package the curated research preview into a reproducibility closure
 that records commands, artifacts, validation status, and remaining gaps.
@@ -171,7 +171,7 @@ that records commands, artifacts, validation status, and remaining gaps.
 
 | Milestone | Phases | Plans | Status | Shipped |
 |-----------|--------|-------|--------|---------|
-| v1.15 Research-Grade ROCm Benchmark Release | 64-67 | 0/4 | Active | - |
+| v1.15 Research-Grade ROCm Benchmark Release | 64-67 | 4/4 | Active | - |
 | v1.14 Optional rocprofv3 Profiling Evidence | 61-63 | 3/3 | Complete | 2026-05-25 |
 | v1.13 ROCm Runtime Evidence and Environment Diagnostics | 58-60 | 5/5 | Complete | 2026-05-25 |
 | v1.12 Evaluator Contract Metadata and Boundary Guardrails | none | quick task 260524-xb3 | Complete | 2026-05-25 |
