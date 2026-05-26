@@ -15,26 +15,22 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
 ## Current State
 
-**Shipped version:** v1.16 ROCm Toolchain Research and Capability Routing,
-completed 2026-05-25.
+**Shipped version:** v1.17 Static Kernel Evidence, completed 2026-05-26.
 
-**Current milestone:** v1.17 Static Kernel Evidence.
+**Current milestone:** none active.
 
-**Latest milestone outcome:** the ROCm port now has a research-backed ROCm
-toolchain routing model, a machine-readable capability registry, bounded
-dynamic probes, `sol-execbench toolchain --json`, and claim guardrails that
-keep routing availability distinct from correctness, performance, paper parity,
-leaderboard authority, and static analysis evidence.
+**Latest milestone outcome:** the ROCm port now has opt-in Static Kernel
+Evidence for HIP/C++ benchmark runs: a strict diagnostic sidecar contract,
+current-build artifact discovery, routed `llvm-objdump` and `readelf`
+extractors, CLI sidecar integration, documentation, claim guardrails, and a
+bounded RDNA 4 validation artifact.
 
-**Current milestone goal:** Build static kernel evidence on top of the v1.16
-routing layer by capturing ROCm code objects or HSACO where available,
-extracting ISA and metadata through routed static tools, and reporting
-diagnostic compiler/static artifact evidence without mutating canonical trace
-JSONL or benchmark scoring semantics.
+**Current milestone goal:** none. The next milestone should be defined with
+`$gsd-new-milestone`.
 
-**Next planned milestone:** to be determined after v1.17 closes; likely
-follow-ups include broader hardware validation, paper dataset parity, or deeper
-static-analysis classifications.
+**Next planned milestone:** to be determined. Candidate follow-ups include CDNA
+3/CDNA 4 live validation, Triton ROCm cache capture, RGA-rich static resource
+parsing, paper dataset parity, or deeper static-analysis classifications.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline.
 Milestones v1.1-v1.6 added CDNA 3 code/schema support, maintained residue
@@ -81,8 +77,12 @@ The v1.16 milestone researched ROCm's fragmented toolchain ecosystem and added
 a central capability registry plus dynamic routing reports so evidence paths can
 explain which tools are available, unavailable, planned, migrated, rejected, or
 deprecated without overclaiming benchmark authority.
+The v1.17 milestone added opt-in diagnostic Static Kernel Evidence by capturing
+current-build HIP/C++ artifacts, extracting bounded ISA and ELF metadata through
+routed static tools, publishing trace-adjacent sidecars, documenting claim
+boundaries, and recording bounded RDNA 4 validation.
 
-## Current Milestone: v1.17 Static Kernel Evidence
+## Recently Shipped Milestone: v1.17 Static Kernel Evidence
 
 **Goal:** Add diagnostic static kernel evidence by capturing ROCm compiler
 artifacts, extracting ISA and metadata through routed static tools, and
@@ -112,6 +112,12 @@ performance, paper-parity, and leaderboard claims.
 - Full 235-problem paper parity, original 124-model extraction, hosted
   leaderboard support, and full CDNA 3 / CDNA 4 validation remain out of this
   milestone.
+
+**Shipped outcome:** v1.17 delivered the sidecar contract, current-build
+artifact discovery, routed `llvm-objdump` / `readelf` extraction, CLI
+`--static-evidence auto`, public docs, claim guardrails, and a bounded RDNA 4
+validation artifact. CDNA 3/CDNA 4 live validation, Triton cache capture,
+RGA-rich parsing, and paper-scale static coverage remain deferred.
 
 ## Recently Shipped Milestone: v1.16 ROCm Toolchain Research and Capability Routing
 
@@ -494,4 +500,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-25 after v1.17 milestone start*
+*Last updated: 2026-05-26 after v1.17 milestone completion*

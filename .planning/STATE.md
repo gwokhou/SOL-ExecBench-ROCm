@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.17
 milestone_name: Static Kernel Evidence
-status: milestone_complete
-stopped_at: Milestone complete (Phase 77 was final phase)
-last_updated: 2026-05-26T02:38:28.194Z
-last_activity: 2026-05-26 -- Phase 77 execution started
+status: Awaiting next milestone
+stopped_at: Milestone v1.17 completed, audited, and archived
+last_updated: "2026-05-26T02:41:08.490Z"
+last_activity: 2026-05-26 — Milestone v1.17 completed and archived
 progress:
   total_phases: 5
   completed_phases: 5
@@ -18,17 +18,17 @@ progress:
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (updated 2026-05-25)
+See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 **Current focus:** Milestone complete
 
 ## Current Position
 
-Phase: 77
-Plan: Complete
-Status: Milestone complete
-Last activity: 2026-05-26
+Phase: Milestone v1.17 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-05-26 — Milestone v1.17 completed and archived
 
 ## Performance Metrics
 
@@ -52,8 +52,8 @@ Last activity: 2026-05-26
 **Recent Trend:**
 
 - Last milestone: v1.16 shipped on 2026-05-25
-- Trend: v1.17 is planned as five phases building from contract to discovery,
-  routed extractors, CLI/reporting, then docs/live validation.
+- Trend: v1.17 shipped five phases from contract to discovery, routed
+  extractors, CLI/reporting, then docs/live validation.
 
 ## Accumulated Context
 
@@ -76,9 +76,10 @@ None found.
 
 ### Blockers/Concerns
 
-Live RDNA 4 validation depends on ROCm build tools plus device/runtime access.
-CDNA 3, CDNA 4, Triton, RGA-rich resource parsing, and paper-scale static
-coverage remain deferred unless direct evidence is produced in v1.17.
+The bounded RDNA 4 run collected static evidence successfully, but benchmark
+correctness did not pass for the RMSNorm example. CDNA 3, CDNA 4, Triton,
+RGA-rich resource parsing, and paper-scale static coverage remain deferred
+unless direct evidence is produced in a later milestone.
 
 ### Quick Tasks Completed
 
@@ -104,13 +105,21 @@ Items acknowledged and carried forward from previous milestone close:
 | Hardware validation | NVFP4 and MXFP4 validation | Deferred | v1.10 scope |
 | Public service | Hosted leaderboard or submission service | Deferred | v1.10 scope |
 | Claims | NVIDIA Blackwell/B200 equivalence | Deferred | v1.10 scope |
+| Quick task metadata | 260524-xb3-fix-pr-base-and-prepare-sol-evaluator-co | Missing completion metadata acknowledged | v1.17 close audit |
+| Quick task metadata | 260525-097-backfill-v1-12-gsd-milestone-for-evaluat | Missing completion metadata acknowledged | v1.17 close audit |
+| Quick task metadata | 260525-audit-fix-remaining-suite-reds | Missing completion metadata acknowledged | v1.17 close audit |
+| Quick task metadata | 260525-configure-ruff-dev-dependency | Missing completion metadata acknowledged | v1.17 close audit |
+| Quick task metadata | 260525-configure-ty-dev-dependency | Missing completion metadata acknowledged | v1.17 close audit |
+| Quick task metadata | 260525-fix-ty-s0-s1 | Missing completion metadata acknowledged | v1.17 close audit |
+| Quick task metadata | 260525-q95-add-rocm-device-node-aware-skip-reasons- | Missing completion metadata acknowledged | v1.17 close audit |
+| Quick task metadata | 260525-qft-add-github-actions-code-quality-workflow | Missing completion metadata acknowledged | v1.17 close audit |
 
 ## Session Continuity
 
 Last session: 2026-05-23T11:26:49.344Z
-Stopped at: Created v1.17 roadmap and requirement traceability
+Stopped at: Milestone v1.17 completed, audited, and archived
 Resume file: None
 
 ## Operator Next Steps
 
-- Run milestone audit and completion/archive workflow for v1.17.
+- Start the next milestone with /gsd-new-milestone
