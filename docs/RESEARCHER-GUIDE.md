@@ -11,7 +11,7 @@ how to avoid overstating results.
 | GPU kernel author | Run one local example, then adapt a solution file. | `solution.json`, trace JSONL, correctness/performance fields. |
 | compiler/backend researcher | Inspect solution schemas, staging, and native build paths. | `docs/solution.md`, `src/sol_execbench/driver/`, HIP/Triton examples. |
 | agent kernel-optimization researcher | Use the isolated harness and reward-hack checks as the execution boundary. | trace JSONL, `REWARD_HACK` traces, baseline comparisons. |
-| benchmark/reproducibility researcher | Use the curated slice, environment sidecars, profiling sidecars, and closure reports. | `docs/curated_rocm_slice.md`, `docs/CLAIMS.md`, execution closure, parity gaps. |
+| benchmark/reproducibility researcher | Use the curated slice, environment sidecars, profiling sidecars, static evidence sidecars, and closure reports. | `docs/curated_rocm_slice.md`, `docs/static_kernel_evidence.md`, `docs/CLAIMS.md`, execution closure, parity gaps. |
 
 ## First Run
 
@@ -34,6 +34,7 @@ sidecars must not change trace JSONL semantics.
 | Trace JSONL | Workload correctness, measured latency, reference latency, environment fields. | Paper parity or hardware roofline validity. |
 | Environment sidecar | ROCm tools, device identity, PyTorch ROCm readiness, event timing readiness. | Correctness or score authority. |
 | Profile sidecar | `rocprofv3` command provenance, artifacts, status, stdout/stderr tails. | Correctness or SOL score authority. |
+| Static evidence sidecar | Current-build HIP/C++ artifacts, hashes, routed `llvm-objdump` / `readelf` records, bounded raw output paths, and diagnostic status. | Correctness, timing, score, paper parity, leaderboard readiness, CDNA 3/CDNA 4 validation, Triton cache coverage, RGA-rich resource parsing, or paper-scale static coverage. |
 | AMD SOL sidecar | Derived AMD bound graph, estimates, hardware model, and coverage state. | Upstream SOLAR equivalence. |
 | AMD score report | Guarded local AMD-native score interpretation. | NVIDIA B200 or leaderboard equivalence. |
 | Execution closure | Which scoped problems were attempted, skipped, blocked, passed, failed, or unscored. | Full 235-problem validation unless the denominator is actually complete. |
@@ -48,7 +49,9 @@ sidecars must not change trace JSONL semantics.
 4. Run the single-problem CLI and inspect correctness before interpreting
    latency.
 5. If the solution is native HIP/C++, use explicit AMD targets or `LOCAL`.
-6. Do not bypass reward-hack checks by loading hidden native extensions,
+6. Use `--static-evidence auto` when you need diagnostic build artifacts and
+   routed static extractor sidecars.
+7. Do not bypass reward-hack checks by loading hidden native extensions,
    external files, subprocesses, network calls, semantic caches, or hidden
    streams.
 
@@ -92,5 +95,7 @@ available to the evaluation policy.
 - Record ROCm version, PyTorch ROCm version, GPU architecture, and clock policy.
 - Keep canonical traces separate from sidecars.
 - Mark unavailable profiler, hardware, library, or score evidence explicitly.
+- Mark unavailable, unsupported, partial, failed, or skipped static evidence
+  explicitly.
 - Report denominator counts for any dataset or curated-slice result.
 - Link claims to `docs/CLAIMS.md`.
