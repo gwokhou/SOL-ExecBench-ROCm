@@ -71,16 +71,16 @@ roadmap phase.
 
 ### CLI And Reports
 
-- [ ] **SKE-CLI-01**: Operator can opt into static evidence collection from the
+- [x] **SKE-CLI-01**: Operator can opt into static evidence collection from the
   benchmark CLI with `--static-evidence auto`, while `--static-evidence none`
   remains the default.
-- [ ] **SKE-CLI-02**: Operator can find the static evidence JSON sidecar and
+- [x] **SKE-CLI-02**: Operator can find the static evidence JSON sidecar and
   evidence artifact directory beside the configured trace output path.
-- [ ] **SKE-CLI-03**: Operator can run benchmark evaluation normally when
+- [x] **SKE-CLI-03**: Operator can run benchmark evaluation normally when
   static evidence collection is skipped, unavailable, partial, or failed; static
   evidence must not change benchmark exit-code semantics except for invalid CLI
   usage.
-- [ ] **SKE-CLI-04**: Researcher can read a human-facing static evidence report
+- [x] **SKE-CLI-04**: Researcher can read a human-facing static evidence report
   or summary that explains aggregate status, artifact manifest, routing
   decisions, extracted metadata/ISA presence, unsupported states, and claim
   boundaries.
@@ -169,10 +169,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SKE-EXTRACT-04 | Phase 75 | Complete |
 | SKE-EXTRACT-05 | Phase 75 | Complete |
 | SKE-EXTRACT-06 | Phase 75 | Complete |
-| SKE-CLI-01 | Phase 76 | Pending |
-| SKE-CLI-02 | Phase 76 | Pending |
-| SKE-CLI-03 | Phase 76 | Pending |
-| SKE-CLI-04 | Phase 76 | Pending |
+| SKE-CLI-01 | Phase 76 | Complete |
+| SKE-CLI-02 | Phase 76 | Complete |
+| SKE-CLI-03 | Phase 76 | Complete |
+| SKE-CLI-04 | Phase 76 | Complete |
 | SKE-DOCS-01 | Phase 77 | Pending |
 | SKE-DOCS-02 | Phase 77 | Pending |
 | SKE-DOCS-03 | Phase 77 | Pending |
