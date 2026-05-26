@@ -9,8 +9,8 @@ does not claim official leaderboard equivalence.
 | Claim level | Allowed claim | Required evidence |
 | --- | --- | --- |
 | ROCm-port evidence | The CLI, schemas, isolated evaluation, correctness checks, reward-hack checks, trace JSONL, and selected examples run through ROCm-specific paths. | Passing tests for the touched surface, canonical trace examples, and ROCm environment documentation. |
-| Runtime evidence | A run was executed in a recorded ROCm environment. | Canonical trace JSONL plus optional `traces.jsonl.environment.json` or `sol-execbench doctor --json` output. |
-| Profiling evidence | A run produced diagnostic `rocprofv3` artifacts. | `--profile rocprofv3`, `traces.jsonl.profile.json`, registered artifact paths, and profiler status metadata. |
+| Runtime evidence | A run was executed in a recorded ROCm environment. | Canonical trace JSONL plus optional per-trace environment sidecar, for example `<trace>.environment.json`, or `sol-execbench doctor --json` output. |
+| Profiling evidence | A run produced diagnostic `rocprofv3` artifacts. | `--profile rocprofv3`, per-trace profile sidecar such as `<trace>.profile.json`, registered artifact paths, and profiler status metadata. |
 | Toolchain routing evidence | The project selected or rejected ROCm tools for a requested evidence level based on registry entries and bounded probes. | `sol-execbench toolchain --json`, registry source refs, selected tool, fallback, status, and reason code. |
 | Static Kernel Evidence | A HIP/C++ run produced diagnostic static build artifacts and bounded routed extractor outputs. | `--static-evidence auto`, `<trace>.static-evidence.json`, persisted artifact paths, `llvm-objdump` / `readelf` tool-run records, and diagnostic-only authority flags. |
 | AMD-native-derived evidence | A score or bound report was derived from ROCm traces and AMD-side bound artifacts. | Canonical traces, AMD SOL bound sidecars, hardware model refs, score eligibility state, and warnings. |

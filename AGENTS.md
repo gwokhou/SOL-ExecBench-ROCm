@@ -82,7 +82,7 @@ while preserving the benchmark semantics and rigor of SOL ExecBench.
 ### Constraints
 
 - **Platform**: ROCm >= 7.0 — the supported software baseline.
-- **Hardware**: RDNA 4 and CDNA 3 — both architectures must pass the adapted test suite.
+- **Hardware**: RDNA 4 and CDNA 3 — both architectures are project targets for the adapted test suite; RDNA 4 has recorded validation, while full CDNA 3 validation remains deferred.
 - **Compatibility**: Preserve SOL ExecBench benchmark semantics and public schemas unless a ROCm-specific change is unavoidable.
 - **Scope**: NVIDIA/CUDA paths may be removed instead of maintained as a dual backend.
 - **Licensing**: All retained and replacement code must comply with the repository LICENSE and third-party dependency obligations.

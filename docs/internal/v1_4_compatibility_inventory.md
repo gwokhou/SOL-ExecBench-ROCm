@@ -27,8 +27,8 @@ Source: `src/sol_execbench/cli/main.py`
   - `--verbose` / `-v`
 - Normal benchmark output remains trace JSONL when `--json` or `--output` is
   used. Rich table output remains the human-facing default.
-- Phase 19 does not add diagnostics, profiler, agent-report, or hip-execbench
-  subcommands to the `sol-execbench` CLI.
+- Current public CLI additions include `doctor`, `toolchain`, `--profile`,
+  `--static-evidence`, and contract dispatch.
 
 ## Definition Schema Contract
 
@@ -123,9 +123,10 @@ above:
 
 ## Phase 19 Non-Goals
 
-- Do not add public `sol-execbench` CLI options or subcommands.
-- Do not add public `sol-execbench` CLI options or subcommands as part of the
-  Phase 19 analysis work.
+- Historical Phase 19 analysis originally avoided public CLI additions; the
+  current CLI now includes public diagnostic and metadata surfaces.
+- Scope future compatibility analysis to preserving the current public
+  `sol-execbench` options and subcommands.
 - Do not change Pydantic public field names, required fields, or validation
   semantics.
 - Do not add fields to trace JSONL.

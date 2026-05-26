@@ -12,7 +12,8 @@ evaluation driver, and ROCm clock-lock helpers.
 No `.env.example`, `.env.sample`, or Node-style `process.env` configuration
 exists in this Python project. The repository does use Python and shell
 environment variables for Docker execution, ROCm clock locking, PyTorch
-allocation behavior, and benchmark data lookup:
+allocation behavior, benchmark data lookup, optional environment sidecars, and
+visible-device diagnostics:
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
@@ -37,6 +38,11 @@ allocation behavior, and benchmark data lookup:
 | `SOL_EXECBENCH_DRAM_CLK_MHZ` | Optional passthrough | Empty when unset | Forwarded into the Docker container by `scripts/run_docker.sh`; no current Python source reads it. |
 | `PYTORCH_ALLOC_CONF` | Subprocess-only | `expandable_segments:True` | Set by the CLI for compilation and evaluation subprocesses. |
 | `PYTORCH_ROCM_ARCH` | Optional native-build override | Derived from `solution.spec.target_hardware` when unset | Overrides the ROCm GPU architecture list used by PyTorch extension compilation. |
+| `SOLEXECBENCH_ENV_SNAPSHOT` | Optional | Disabled when unset | Set to `1` to write an environment snapshot sidecar next to `--output`, using the suffix `.environment.json`. |
+| `SOLEXECBENCH_ENV_SNAPSHOT_PATH` | Optional | Empty when unset | Explicit output path for the environment snapshot sidecar; when set, it is used even if `SOLEXECBENCH_ENV_SNAPSHOT` is unset. |
+| `HIP_VISIBLE_DEVICES` | Optional diagnostic input | Empty when unset | Captured in environment snapshots when present to record HIP-visible GPU filtering. |
+| `ROCR_VISIBLE_DEVICES` | Optional diagnostic input | Empty when unset | Captured in environment snapshots when present to record ROCr-visible GPU filtering. |
+| `HSA_OVERRIDE_GFX_VERSION` | Optional diagnostic input | Empty when unset | Captured in environment snapshots when present to record any forced HSA GPU architecture override. |
 
 `docker/entrypoint.sh` also checks `FLASHINFER_TRACE_DIR` and warns if that
 directory is not mounted.
@@ -123,8 +129,8 @@ the Docker image.
 
 ## Dependency Configuration
 
-`pyproject.toml` pins the package name, Python version range, console scripts,
-runtime dependencies, development dependencies, Ruff exclusions, pytest
+`pyproject.toml` defines the package name, Python version range, console scripts,
+declares runtime dependency constraints and development dependency constraints, Ruff exclusions, pytest
 markers, and ROCm wheel indexes. The project requires Python `>=3.12,<3.14`.
 On Linux and Windows, `torch` and `torchvision` resolve from the
 `pytorch-rocm71` index, and `triton-rocm` resolves from the PyTorch ROCm root

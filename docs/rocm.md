@@ -68,7 +68,7 @@ trace JSONL:
 
 ```bash
 SOLEXECBENCH_ENV_SNAPSHOT=1 \
-  uv run sol-execbench examples/gemm --solution examples/gemm/solution.json \
+  uv run sol-execbench examples/hip_cpp/rmsnorm --solution examples/hip_cpp/rmsnorm/solution_hip.json \
   --json -o traces.jsonl
 ```
 
@@ -83,7 +83,7 @@ v1.14 adds opt-in `rocprofv3` artifact collection for diagnosing anomalous or
 hardware-sensitive benchmark runs:
 
 ```bash
-uv run sol-execbench examples/gemm --solution examples/gemm/solution.json \
+uv run sol-execbench examples/hip_cpp/rmsnorm --solution examples/hip_cpp/rmsnorm/solution_hip.json \
   --profile rocprofv3 --json -o traces.jsonl
 ```
 

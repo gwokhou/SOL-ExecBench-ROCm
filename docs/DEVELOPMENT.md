@@ -27,7 +27,15 @@ uv sync --all-groups
 uv run pytest tests/
 ```
 
-4. Use the Docker environment for ROCm GPU evaluation when host setup is not
+4. Optional: install the repository pre-commit hooks if you want Ruff fixes,
+   Ruff formatting, and the DCO sign-off check to run before commits.
+
+```bash
+uv run --with pre-commit pre-commit install
+uv run --with pre-commit pre-commit install --hook-type commit-msg
+```
+
+5. Use the Docker environment for ROCm GPU evaluation when host setup is not
    already configured.
 
 ```bash
@@ -39,7 +47,7 @@ uv run pytest tests/
 | Command | Description |
 | --- | --- |
 | `uv sync --all-groups` | Install runtime and development dependencies. |
-| `uv run sol-execbench <problem_dir> --solution solution.json` | Run the benchmark CLI against one problem. |
+| `uv run sol-execbench <problem_dir> --solution <solution-path>` | Run the benchmark CLI against one problem. |
 | `uv run sol-execbench-baseline <problem_dir>` | Run the baseline CLI entry point. |
 | `uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark --limit 5` | Run a small dataset batch. |
 | `uv run pytest tests/` | Run the full adapted pytest suite. |
@@ -57,6 +65,8 @@ Hatchling as its build backend.
 Ruff is the configured linting and formatting tool. The configuration lives in
 `pyproject.toml` under `[tool.ruff]` and `[tool.ruff.lint]`.
 Ty is the configured type checker. Its source roots live under `[tool.ty.src]`.
+Pre-commit hooks in `.pre-commit-config.yaml` run Ruff lint fixes, Ruff
+formatting, and a local DCO sign-off check for commit messages.
 
 - Use Python `>=3.12,<3.14`.
 - Use `snake_case` for modules, functions, and variables.
@@ -75,12 +85,16 @@ uv run ruff format .
 uv run ty check
 ```
 
+The `Python Quality` GitHub Actions workflow runs `uv sync --locked --all-groups`,
+Ruff, Ty, and CPU-safe pytest checks for Python 3.12 and 3.13 on every push and
+pull request.
+
 ## Branch Conventions
 
-No branch naming convention is defined in repository configuration, and there is
-no `.github/PULL_REQUEST_TEMPLATE.md` file in this checkout. The contribution
-guide requires that changes start from an approved issue and that commit titles
-use this format:
+The current checkout is on `main`. No branch naming convention is defined in
+repository configuration, and there is no `.github/PULL_REQUEST_TEMPLATE.md`
+file in this checkout. The contribution guide requires that changes start from
+an approved issue and that commit titles use this format:
 
 ```text
 #<Issue Number> - <Commit Title>
@@ -102,19 +116,25 @@ The root `CONTRIBUTING.md` describes the contribution process. In practice:
 - Keep pull requests focused on one concern.
 - Include tests and documentation for new components.
 - Run relevant pytest, Ruff, and Ty checks before requesting review.
+- Expect the `Python Quality` workflow to run Ruff, Ty, and CPU-safe pytest
+  checks on the pull request.
 - Sign commits with `git commit -s`.
 - Ensure local build and test logs are clean before submitting.
 - Document any ROCm hardware assumptions in tests or PR notes.
 
 ## Test Markers For Development
 
-The pytest marker definitions live in `pyproject.toml`, with additional runtime
-skip behavior in `tests/conftest.py`.
+The pytest marker definitions are split between `pyproject.toml` and
+`tests/conftest.py`, with additional runtime skip behavior in `tests/conftest.py`.
 
 | Marker | Purpose |
 | --- | --- |
 | `cpp` | Marks tests that compile HIP/C++ extensions and require the ROCm compiler toolchain. |
+| `timing_serial` | Marks GPU timing tests that are skipped by default; run them with `pytest tests -m timing_serial -n 0`. |
 | `requires_rocm` | Marks tests that require a ROCm GPU visible through PyTorch. |
+| `requires_rocm_dev` | Marks tests that require ROCm native extension development headers under `/opt/rocm`. |
+| `requires_ck` | Marks tests that require Composable Kernel headers. |
+| `requires_rocwmma` | Marks tests that require rocWMMA headers. |
 | `requires_rdna4` | Marks tests that require an AMD RDNA 4 GPU such as `gfx1200`. |
 | `requires_cdna3` | Marks tests that require an AMD CDNA 3 GPU such as `gfx942`. |
 | `requires_cutile` | Legacy NVIDIA cuTile marker that is skipped in this ROCm-only port. |

@@ -6,22 +6,24 @@ solutions on AMD ROCm hardware. It reads benchmark definitions, workload rows,
 solution metadata, and optional benchmark configuration, stages the solution in
 an isolated temporary directory, compiles native HIP/C++ implementations when
 needed, runs the generated evaluation driver, and emits typed trace records.
-Separate dataset and reporting helpers inspect downloaded benchmark assets,
-derive ROCm readiness sidecars, compare trace baselines, and build guarded
+Separate dataset, diagnostics, toolchain-routing, reporting, and scoring helpers
+inspect downloaded benchmark assets, derive ROCm readiness sidecars, compare
+trace baselines, collect optional evidence sidecars, and build guarded
 AMD-native scoring artifacts.
 
 ## System Overview
 
 The project is organized as a layered Python package under
-`src/sol_execbench/`. The CLI layer handles user input, trace output, and
-baseline comparison commands exposed by the `sol-execbench` and
+`src/sol_execbench/`. The CLI layer handles user input, trace output,
+GPU-free contract metadata, ROCm diagnostics, toolchain routing, and baseline
+comparison commands exposed by the `sol-execbench` and
 `sol-execbench-baseline` console scripts. The core layer defines public data
 models, benchmark utilities, dataset inventory/readiness helpers, ROCm
-diagnostics, reporting, and AMD-native scoring helpers. The driver layer
-packages a problem into files and commands that run in a subprocess. The
-runtime boundary is deliberately process-based: solution code is copied into a
-staging directory and executed by generated driver scripts rather than imported
-directly into the CLI process.
+diagnostics, toolchain routing, reporting, and AMD-native scoring helpers. The
+driver layer packages a problem into files and commands that run in a
+subprocess. The runtime boundary is deliberately process-based: solution code
+is copied into a staging directory and executed by generated driver scripts
+rather than imported directly into the CLI process.
 
 ## Component Diagram
 
@@ -35,8 +37,8 @@ graph TD
     Packager["src/sol_execbench/driver/problem_packager.py"]
     Templates["src/sol_execbench/driver/templates/"]
     Trace["src/sol_execbench/core/data/trace.py"]
-    Reports["src/sol_execbench/core/reporting.py"]
-    Baseline["src/sol_execbench/core/baseline.py"]
+    Reporting["src/sol_execbench/core/reporting.py + baseline.py"]
+    Diagnostics["src/sol_execbench/core/environment.py + toolchain.py"]
 
     CLI --> Models
     CLI --> Packager
@@ -44,18 +46,21 @@ graph TD
     Templates --> Bench
     Templates --> Models
     CLI --> Trace
-    CLI --> Baseline
-    Baseline --> Trace
+    CLI --> Reporting
+    CLI --> Diagnostics
+    Bench --> Trace
     Dataset --> Models
-    Reports --> Trace
+    Reporting --> Trace
     Scoring --> Trace
-    Scoring --> Reports
+    Scoring --> Reporting
 ```
 
 ## Data Flow
 
-1. `src/sol_execbench/cli/main.py` resolves either a problem directory or
-   explicit benchmark definition, workload, solution, and optional config paths.
+1. `src/sol_execbench/cli/main.py` dispatches `contract`, `doctor`, and
+   `toolchain` subcommands directly to GPU-free metadata helpers. For normal
+   evaluation, it resolves either a problem directory or explicit benchmark
+   definition, workload, solution, and optional config paths.
 2. The CLI loads those input files into `Definition`, `Workload`, `Solution`,
    and `BenchmarkConfig` objects. `Trace` objects are constructed later from
    evaluation subprocess JSONL output.
@@ -66,19 +71,24 @@ graph TD
    CLI then runs it in the staging directory. The build template uses
    `torch.utils.cpp_extension.load()` with HIP compiler flags and produces
    `benchmark_kernel.so`.
-5. All solutions run through the generated evaluation driver based on
+5. Native builds can optionally produce diagnostic-only static kernel evidence
+   sidecars through `src/sol_execbench/core/bench/static_kernel_evidence.py`.
+   These sidecars are not correctness, performance, timing, scoring, paper
+   parity, or leaderboard authority.
+6. All solutions run through the generated evaluation driver based on
    `src/sol_execbench/driver/templates/eval_driver.py`. The generated driver
    imports the reference and candidate implementation, blocks dynamic
    `torch.utils.cpp_extension.load()` calls in Python solution code, checks
    reward-hack guardrails, runs correctness checks, measures latency, and prints
    trace JSONL.
-6. The CLI parses JSON lines into `Trace` objects, writes optional output, and
-   exits successfully only when every workload passes.
-7. Optional post-processing paths consume trace JSONL through
+7. The CLI parses JSON lines into `Trace` objects, writes optional output, can
+   write optional environment, rocprofv3 profile, and static-evidence sidecars,
+   and exits successfully only when every workload passes.
+8. Optional post-processing paths consume trace JSONL through
    `src/sol_execbench/core/baseline.py`, `src/sol_execbench/core/reporting.py`,
    and `src/sol_execbench/core/scoring/` to compare baselines and derive guarded
    AMD-native score reports.
-8. Dataset helper scripts such as `scripts/inspect_dataset.py` and
+9. Dataset helper scripts such as `scripts/inspect_dataset.py` and
    `scripts/report_parity_gaps.py` use `src/sol_execbench/core/dataset/` to
    inspect benchmark layouts, produce inventory/readiness/ready-subset
    sidecars, and render parity-gap reports from manifest, execution closure,
@@ -96,7 +106,11 @@ graph TD
 | `ProblemPackager` | `src/sol_execbench/driver/problem_packager.py` | Creates the staging directory contents and returns subprocess commands for compile and execute phases. |
 | `time_runnable` | `src/sol_execbench/core/bench/timing.py` | Measures GPU runtime with PyTorch HIP-backed device events. |
 | `Trace` | `src/sol_execbench/core/data/trace.py` | Captures per-workload evaluation output and ROCm environment details. |
+| `EnvironmentSnapshot` | `src/sol_execbench/core/environment.py` | Captures optional ROCm runtime, visible-device, tool-probe, and PyTorch ROCm evidence. |
+| `EnvironmentDiagnostics` | `src/sol_execbench/core/environment.py` | Packages `sol-execbench doctor --json` preflight checks and snapshot evidence. |
+| `ToolchainRoutingReport` | `src/sol_execbench/core/toolchain.py` | Describes the selected ROCm evidence tool for a requested artifact, evidence level, and hardware target. |
 | `Rocprofv3TimingEvidence` | `src/sol_execbench/core/bench/rocm_profiler.py` | Represents optional rocprofv3 timing evidence used for profiling validation paths. |
+| `StaticKernelEvidenceSidecar` | `src/sol_execbench/core/bench/static_kernel_evidence.py` | Stores diagnostic-only static kernel artifact metadata, extractor results, and conservative kernel classifications. |
 | `DatasetInventory` | `src/sol_execbench/core/dataset/inventory.py` | Captures discovered benchmark categories, problem metadata, workloads, solution files, and dataset denominators. |
 | `DatasetReadiness` | `src/sol_execbench/core/dataset/readiness.py` | Classifies whether inventory records are ready for ROCm execution and records blocker reasons. |
 | `AmdSolBoundV2Artifact` | `src/sol_execbench/core/scoring/amd_sol_v2.py` | Stores derived AMD SOL bound sidecar data built from bound graphs, operator estimates, and packaged hardware models. |
@@ -107,7 +121,7 @@ graph TD
 ```text
 src/sol_execbench/
   cli/       Click entry points for benchmark evaluation and baseline comparison.
-  core/      Data models, dataset helpers, scoring, diagnostics, correctness, timing, and reporting.
+  core/      Data models, dataset helpers, scoring, diagnostics, toolchain routing, correctness, timing, and reporting.
   data/      Packaged AMD hardware model JSON used by scoring helpers.
   driver/    Staging logic and generated subprocess templates.
 ```
@@ -130,9 +144,12 @@ Evaluation uses a temporary staging directory created by the CLI with
 inputs, benchmark configuration, solution source files, and driver templates
 into that directory before running subprocesses. HIP/C++ compilation is isolated
 to the staging directory and produces `benchmark_kernel.so`; Python and Triton
-solutions are evaluated by the generated evaluation-driver process. The staging
-directory is removed when the packager is garbage-collected unless the CLI runs
-with `--keep-staging`.
+solutions are evaluated by the generated evaluation-driver process. Normal
+evaluation subprocesses receive `PYTORCH_ALLOC_CONF=expandable_segments:True`.
+When requested, environment snapshots, rocprofv3 metadata, and static evidence
+are written as sidecar files without changing the trace JSONL schema. The
+staging directory is removed when the packager is garbage-collected unless the
+CLI runs with `--keep-staging`.
 
 ## ROCm-Specific Boundaries
 
@@ -150,3 +167,11 @@ from explicit `gfx*` targets or from local ROCm tooling when the solution target
 `src/sol_execbench/core/bench/rocm_profiler.py` collect and parse rocprofv3 CSV
 evidence, but the primary benchmark latency path remains PyTorch device-event
 timing.
+
+ROCm diagnostics and routing are intentionally separate from canonical trace
+records. `sol-execbench doctor --json` builds an `EnvironmentDiagnostics`
+payload from timeout-bounded probes such as `amd-smi`, `rocminfo`, and
+`rocm_agent_enumerator`, plus PyTorch ROCm smoke checks. `sol-execbench
+toolchain --json` uses the default toolchain registry in
+`src/sol_execbench/core/toolchain.py` to report which ROCm tool should supply a
+requested evidence level for a requested artifact type and hardware target.

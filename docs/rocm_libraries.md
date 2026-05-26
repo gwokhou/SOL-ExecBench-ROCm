@@ -11,7 +11,7 @@ to build that example.
 | Category | Schema value | Current status | Public example status | Notes |
 | --- | --- | --- | --- | --- |
 | HIP/C++ | `hip_cpp` | Supported | Runnable HIP examples exist under `examples/hip_cpp/` | Primary native extension path. |
-| hipBLAS / hipBLASLt | `hipblas` | Supported | Runnable SGEMM example exists under `examples/hipblas/gemm/` | BLAS/GEMM replacement path using the native ROCm build flow and `-lhipblas`. |
+| hipBLAS | `hipblas` | Supported | Runnable SGEMM example exists under `examples/hipblas/gemm/` | BLAS/GEMM replacement path using the native ROCm build flow and `-lhipblas`. |
 | MIOpen | `miopen` | Supported | Runnable softmax example exists under `examples/miopen/softmax/` | cuDNN-style softmax replacement path using the native ROCm build flow and `-lMIOpen`. |
 | Composable Kernel | `ck` | Supported | Runnable small GEMM example exists under `examples/ck/gemm/` | CUTLASS/CuTe-style replacement direction using CK headers and native ROCm execution. |
 | rocWMMA | `rocwmma` | Supported | Runnable matrix-core GEMM example exists under `examples/rocwmma/gemm/` | RDNA 4 matrix-core GEMM path using rocWMMA fragments. |

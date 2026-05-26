@@ -9,7 +9,7 @@ Port against a small benchmark problem.
 | Requirement | Version or Detail |
 | --- | --- |
 | Python | `3.12` from `.python-version`; `pyproject.toml` allows `>=3.12,<3.14` |
-| ROCm | ROCm 7.0 or newer for the project baseline; the Docker image uses `rocm/dev-ubuntu-24.04:7.1.1-complete` |
+| ROCm | ROCm 7.0 or newer for the project baseline; Linux installs resolve PyTorch ROCm 7.1 wheels, and the Docker image uses `rocm/dev-ubuntu-24.04:7.1.1-complete` |
 | GPU | AMD GPU visible to PyTorch ROCm |
 | Package manager | `uv` |
 | Optional container runtime | Native Linux Docker daemon with `/dev/kfd` and `/dev/dri` access |
@@ -106,7 +106,7 @@ Run a command inside the container:
 
 | Issue | Resolution |
 | --- | --- |
-| PyTorch reports `torch.version.cuda` instead of `torch.version.hip`. | Re-run `uv sync --all-groups` and confirm the ROCm wheel indexes in `pyproject.toml` are reachable. |
+| PyTorch reports `torch.version.cuda` instead of `torch.version.hip`. | Re-run `uv sync --all-groups`, confirm the ROCm wheel indexes in `pyproject.toml` are reachable, and use a host ROCm stack compatible with the ROCm 7.1 PyTorch wheels or the provided container. |
 | `torch.cuda.is_available()` returns `False` on a ROCm host. | Confirm ROCm is installed, the current user can access `/dev/kfd` and `/dev/dri`, and the GPU is visible through ROCm tools. |
 | Docker cannot see the AMD GPU. | Use a native Linux Docker daemon and `./scripts/run_docker.sh`; Docker Desktop cannot correctly pass ROCm devices through. |
 | `./scripts/download_data.sh` cannot find `hf`. | Run the downloader through `uv run --with "huggingface-hub[cli]" ./scripts/download_data.sh` so the Hugging Face CLI is available on `PATH`. |

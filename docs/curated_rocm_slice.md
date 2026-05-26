@@ -54,7 +54,7 @@ HIP/C++ example:
 
 ```bash
 uv run sol-execbench examples/hip_cpp/rmsnorm \
-  --solution examples/hip_cpp/rmsnorm/solution_hip_cpp.json \
+  --solution examples/hip_cpp/rmsnorm/solution_hip.json \
   --json \
   -o out/curated/hip_cpp_rmsnorm.trace.jsonl
 ```

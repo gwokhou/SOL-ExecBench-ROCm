@@ -37,7 +37,7 @@ sidecars must not change trace JSONL semantics.
 | Static evidence sidecar | Current-build HIP/C++ artifacts, hashes, routed `llvm-objdump` / `readelf` records, bounded raw output paths, and diagnostic status. | Correctness, timing, score, paper parity, leaderboard readiness, CDNA 3/CDNA 4 validation, Triton cache coverage, RGA-rich resource parsing, or paper-scale static coverage. |
 | AMD SOL sidecar | Derived AMD bound graph, estimates, hardware model, and coverage state. | Upstream SOLAR equivalence. |
 | AMD score report | Guarded local AMD-native score interpretation. | NVIDIA B200 or leaderboard equivalence. |
-| Execution closure | Which scoped problems were attempted, skipped, blocked, passed, failed, or unscored. | Full 235-problem validation unless the denominator is actually complete. |
+| Execution closure | Which scoped problems have closure statuses: `not_attempted`, `filtered`, `skipped_existing_pass`, `attempted_passed`, `attempted_failed`, `missing_trace`, or `derived_evidence_missing`. | Full 235-problem validation unless the denominator is actually complete. |
 
 ## Adding Or Adapting A Kernel
 

@@ -2,7 +2,7 @@
 
 A **Workload** makes a Definition concrete and executable by binding specific values to all variable axes and specifying where the input data comes from. It is the exact configuration under which a Solution is benchmarked.
 
-The evaluator runs your solution against every Workload in the problem's set — typically 16–48 workloads per problem.
+The evaluator runs your solution against every Workload in the problem's set; current sample workload files contain small sets.
 
 ---
 
@@ -180,7 +180,7 @@ For each workload, the evaluator:
 
 1. Binds `var` axes to their concrete values from `workload.axes`
 2. Generates/loads each input tensor according to its descriptor:
-   - `random` → `torch.randn(shape, dtype=dtype, device=device)` (or appropriate random for the dtype)
+   - `random` → heuristic name-based tensors when matched (for example norm weights, masks, or softmax-like tensors), otherwise `_rand_tensor()` fallback generation
    - `scalar` → the literal value
    - `safetensors` → loads tensor from file
    - `custom` → resolves the named custom input function from reference code
