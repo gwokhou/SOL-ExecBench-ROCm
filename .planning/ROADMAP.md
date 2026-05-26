@@ -74,7 +74,7 @@
 
 **Active milestone:** v1.17 Static Kernel Evidence.
 
-**Status:** roadmap created; ready to plan Phase 73.
+**Status:** milestone complete; ready for audit and archive.
 
 **Milestone goal:** Add diagnostic static kernel evidence by capturing ROCm
 compiler artifacts, extracting ISA and metadata through routed static tools,
@@ -95,7 +95,7 @@ performance, timing, scoring, paper-parity, and leaderboard claims.
 - [x] **Phase 76: CLI Sidecar Integration And Reports** - Expose opt-in (completed 2026-05-26)
   static evidence collection from the benchmark CLI, write sidecars beside
   traces, preserve benchmark exit semantics, and render human-facing summaries.
-- [ ] **Phase 77: Documentation, Guardrails, And Live Validation** - Document
+- [x] **Phase 77: Documentation, Guardrails, And Live Validation** - Document (completed 2026-05-26)
   interpretation and claim boundaries, add CPU-safe fixture tests, record one
   bounded RDNA 4 validation artifact when available, and mark deferred scopes.
 
@@ -168,7 +168,7 @@ performance, timing, scoring, paper-parity, and leaderboard claims.
 | 74. Build Artifact Discovery And Manifest | v1.17 | 1/1 | Complete    | 2026-05-26 |
 | 75. Routed Static Extractor Adapters | v1.17 | 1/1 | Complete    | 2026-05-26 |
 | 76. CLI Sidecar Integration And Reports | v1.17 | 1/1 | Complete    | 2026-05-26 |
-| 77. Documentation, Guardrails, And Live Validation | v1.17 | 0/TBD | Not started | - |
+| 77. Documentation, Guardrails, And Live Validation | v1.17 | 1/1 | Complete    | 2026-05-26 |
 | v1.16 ROCm Toolchain Research and Capability Routing | 68-72 | 5/5 | Complete | 2026-05-25 |
 | v1.15 Research-Grade ROCm Benchmark Release | 64-67 | 4/4 | Complete | 2026-05-25 |
 | v1.14 Optional rocprofv3 Profiling Evidence | 61-63 | 3/3 | Complete | 2026-05-25 |

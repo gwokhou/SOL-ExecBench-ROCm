@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.17
 milestone_name: Static Kernel Evidence
-status: executing
-stopped_at: Created v1.17 roadmap and requirement traceability
-last_updated: "2026-05-26T02:31:11.898Z"
+status: milestone_complete
+stopped_at: Milestone complete (Phase 77 was final phase)
+last_updated: 2026-05-26T02:38:28.194Z
 last_activity: 2026-05-26 -- Phase 77 execution started
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 5
-  completed_plans: 4
-  percent: 80
+  completed_plans: 5
+  percent: 100
 ---
 
 # Project State
@@ -21,21 +21,21 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-25)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Phase 77 — Documentation, Guardrails, And Live Validation
+**Current focus:** Milestone complete
 
 ## Current Position
 
-Phase: 77 (Documentation, Guardrails, And Live Validation) — EXECUTING
-Plan: 1 of 1
-Status: Executing Phase 77
-Last activity: 2026-05-26 -- Phase 77 execution started
+Phase: 77
+Plan: Complete
+Status: Milestone complete
+Last activity: 2026-05-26
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Current milestone plans completed: 4
-- Current milestone phases completed: 4
+- Current milestone plans completed: 5
+- Current milestone phases completed: 5
 - Average duration: n/a
 - Total execution time: n/a
 
@@ -47,7 +47,7 @@ Last activity: 2026-05-26 -- Phase 77 execution started
 | 74. Build Artifact Discovery And Manifest | 1 | complete | n/a |
 | 75. Routed Static Extractor Adapters | 1 | complete | n/a |
 | 76. CLI Sidecar Integration And Reports | 1 | complete | n/a |
-| 77. Documentation, Guardrails, And Live Validation | TBD | not started | n/a |
+| 77. Documentation, Guardrails, And Live Validation | 1 | complete | n/a |
 
 **Recent Trend:**
 
@@ -113,4 +113,4 @@ Resume file: None
 
 ## Operator Next Steps
 
-- Run /gsd-plan-phase 73
+- Run milestone audit and completion/archive workflow for v1.17.
