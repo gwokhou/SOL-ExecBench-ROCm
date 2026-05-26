@@ -1,199 +1,205 @@
 # Codebase Concerns
 
-**Analysis Date:** 2026-05-24
+**Analysis Date:** 2026-05-26
 
 ## Tech Debt
 
-**Generated evaluation driver is a large script template:**
-- Issue: The benchmark runtime is concentrated in a single generated script template that handles stdout redirection, reference execution, user-module import, reward-hack checks, correctness loops, timing, and trace emission.
-- Files: `src/sol_execbench/driver/templates/eval_driver.py`, `src/sol_execbench/driver/problem_packager.py`, `src/sol_execbench/cli/main.py`
-- Impact: Changes to evaluation semantics require editing a copied script boundary, and regressions can appear only after staging and subprocess execution. Shared logic cannot be imported directly without preserving the generated-driver isolation model.
-- Fix approach: Keep `eval_driver.py` behavior covered by subprocess-style tests in `tests/sol_execbench/driver/test_eval_driver.py`; extract only pure helpers into importable modules when the helper has no dependency on staging globals, fd redirection, or user-code import ordering.
+**Large scoring derivation modules:**
+- Issue: AMD SOL scoring is concentrated in very large modules that mix parsing, graph inference, work estimation, aggregation, warnings, and schema parsing.
+- Files: `src/sol_execbench/core/scoring/solar_derivation.py`, `src/sol_execbench/core/scoring/amd_bound_graph.py`, `src/sol_execbench/core/scoring/amd_bound_estimates.py`, `src/sol_execbench/core/scoring/amd_sol_v2.py`, `src/sol_execbench/core/scoring/amd_score.py`
+- Impact: New operation families, hardware models, or scoring warnings are easy to add inconsistently because validation, inference, and reporting logic are not isolated by concern.
+- Fix approach: Keep public artifact schemas stable, but split internal helpers by responsibility: graph extraction in `src/sol_execbench/core/scoring/amd_bound_graph.py`, per-family estimates in modules under `src/sol_execbench/core/scoring/`, and artifact parsing/serialization in thin contract modules.
 
-**Dataset runner mixes orchestration, filtering, scoring, closure, and evidence generation:**
-- Issue: `scripts/run_dataset.py` is over 1,700 lines and owns discovery, solution wrapping, CLI invocation, timing evidence, AMD score sidecars, ready-subset closure, and report writing.
-- Files: `scripts/run_dataset.py`, `tests/sol_execbench/test_run_dataset_execution_closure.py`, `tests/sol_execbench/test_run_dataset_amd_score.py`
-- Impact: Small changes to dataset execution can affect report formats, closure status accounting, and derived scoring output. It is hard to reason about partial runs and rerun behavior without reading distant helper functions.
-- Fix approach: Preserve the current CLI surface, but move cohesive units into package modules under `src/sol_execbench/core/dataset/` or `src/sol_execbench/core/scoring/`; keep script-level code as argument parsing and orchestration.
+**Dataset runner is an orchestration monolith:**
+- Issue: `scripts/run_dataset.py` owns CLI command construction, subprocess execution, filtering, closure records, score sidecar generation, timing evidence, summary writing, and rerun policy in one script.
+- Files: `scripts/run_dataset.py`
+- Impact: Changes to one execution mode can regress other modes, especially ready-subset filtering, skipped-existing traces, and derived evidence references.
+- Fix approach: Move reusable runner pieces into package code under `src/sol_execbench/core/dataset/` or `src/sol_execbench/core/reporting.py`, then keep `scripts/run_dataset.py` as argument parsing plus top-level orchestration.
 
-**Scoring and SOLAR derivation modules are dense, heuristic-heavy files:**
-- Issue: AMD bound graph extraction, per-operator estimates, and SOLAR derivation are implemented as large heuristic modules with many private helpers and fallback paths.
-- Files: `src/sol_execbench/core/scoring/amd_bound_graph.py`, `src/sol_execbench/core/scoring/amd_bound_estimates.py`, `src/sol_execbench/core/scoring/solar_derivation.py`, `src/sol_execbench/core/scoring/amd_sol.py`, `src/sol_execbench/core/scoring/amd_sol_v2.py`
-- Impact: Operation-family additions can silently change score eligibility, warning semantics, or derived evidence structure across many helpers. The code is test-covered, but still fragile because correctness depends on consistent warning names and evidence fields.
-- Fix approach: Add new operation support through focused fixtures in `tests/sol_execbench/test_amd_bound_graph.py`, `tests/sol_execbench/test_amd_bound_estimates.py`, and `tests/sol_execbench/test_solar_derivation_evidence.py`; avoid broad refactors that combine graph extraction, work estimation, and evidence serialization.
+**Legacy CUDA naming remains in ROCm compatibility paths:**
+- Issue: ROCm execution intentionally uses PyTorch's `torch.cuda` compatibility namespace, but CUDA/NVIDIA terms remain in API names, examples, tests, and sample filenames.
+- Files: `src/sol_execbench/core/bench/timing.py`, `src/sol_execbench/driver/templates/eval_driver.py`, `tests/sol_execbench/core/bench/test_timing.py`, `tests/sol_execbench/samples/flux_rope/solution_cuda.json`, `tests/sol_execbench/samples/rmsnorm/solution_cuda.json`, `docs/rocm_timing.md`
+- Impact: Maintainers can confuse intentional PyTorch ROCm compatibility with unsupported CUDA runtime support, and new tests may whitelist residue too broadly.
+- Fix approach: Preserve compatibility call sites where PyTorch requires `torch.cuda`, but name local abstractions with device/HIP terminology and add explicit comments/tests when CUDA spelling is intentionally retained.
 
-**Legacy naming remains in ROCm-compatible paths:**
-- Issue: ROCm timing and examples intentionally use PyTorch's `torch.cuda` compatibility namespace, and some test/example artifacts retain CUDA-oriented names.
-- Files: `src/sol_execbench/core/bench/timing.py`, `tests/sol_execbench/core/bench/test_timing.py`, `tests/sol_execbench/samples/rmsnorm/solution_cuda.json`, `tests/sol_execbench/samples/flux_rope/solution_cuda.json`, `docs/rocm_timing.md`
-- Impact: New contributors can mistake compatibility names for NVIDIA runtime support or remove necessary ROCm-compatible `torch.cuda` calls. Residue audits reduce this risk but do not remove the cognitive load.
-- Fix approach: Keep compatibility names documented in nearby comments and docs; when adding new ROCm code, prefer HIP/ROCm names unless the PyTorch API really is exposed only through `torch.cuda`.
+**Static source review is regex-based:**
+- Issue: Reward-hack static review uses regular expressions over comment-stripped source text and blocks broad patterns like file I/O, subprocess access, streams, caching, and precision casts.
+- Files: `src/sol_execbench/core/bench/reward_hack.py`, `src/sol_execbench/driver/templates/eval_driver.py`, `tests/sol_execbench/driver/test_eval_driver.py`, `tests/sol_execbench/core/bench/test_reward_hack.py`
+- Impact: The detector can both miss obfuscated Python/native behavior and block legitimate kernels whose source contains matching identifiers or safe helper code.
+- Fix approach: Keep the conservative blocklist for benchmark execution, but add AST-based Python checks for import/call patterns and separate native-source checks by language so exceptions can be reviewed without weakening all rules.
 
-**Reference-solution wrapping mutates source text to avoid static review:**
-- Issue: The dataset runner replaces the literal string `stream` with `strm` when wrapping reference/custom Python solutions.
-- Files: `scripts/run_dataset.py`, `src/sol_execbench/core/bench/reward_hack.py`
-- Impact: This can change semantics for legitimate code that uses `stream` in identifiers, strings, or comments. The workaround also couples dataset reference wrapping to reward-hack regex behavior.
-- Fix approach: Replace text mutation with source review modes or AST/token-aware checks. If mutation remains, keep explicit tests for source text where `stream` appears in string literals, comments, and variable names.
+**Hardware model validation status is hard-coded around gfx1200:**
+- Issue: Hardware model parsing only allows validated status for `gfx1200`; CDNA 3 architectures are forced to provisional/unvalidated status even though project constraints include CDNA 3.
+- Files: `src/sol_execbench/core/scoring/amd_hardware_models.py`, `src/sol_execbench/core/scoring/amd_sol_v2.py`, `src/sol_execbench/data/amd_hardware_models/`
+- Impact: CDNA 3 scoring remains degraded by construction until the hard-coded validation gate and packaged model payloads are updated.
+- Fix approach: Replace `VALIDATED_GFX1200_ONLY` with a data-driven allowlist in hardware model JSON and tests that validate `gfx940`, `gfx941`, and `gfx942` independently.
 
 ## Known Bugs
 
-**No concrete always-reproducing functional bug detected in the static scan:**
-- Symptoms: Not detected.
-- Files: `src/sol_execbench/`, `tests/sol_execbench/`
-- Trigger: Not applicable.
-- Workaround: Not applicable.
+**Static extractor timeout is reported as failed rather than timeout aggregate:**
+- Symptoms: Extractor timeouts become `FAILED` tool runs and can collapse aggregate evidence to a generic failure instead of a distinct timeout status.
+- Files: `src/sol_execbench/core/bench/static_kernel_evidence.py`
+- Trigger: Run static extraction with `llvm-objdump` or `readelf` exceeding `timeout_seconds`.
+- Workaround: Inspect `reason_code` for `extractor_timeout` in the static evidence sidecar.
 
-**ROCprof CSV parser can fail hard on malformed numeric fields:**
-- Symptoms: `_duration_ns()` converts CSV duration/start/end fields with `float(value)` and does not catch `ValueError`.
-- Files: `src/sol_execbench/core/bench/rocm_profiler.py`, `tests/sol_execbench/test_rocm_profiler.py`
-- Trigger: A `rocprofv3` CSV row with a recognized duration column containing a non-numeric value.
-- Workaround: Ensure profiler CSV inputs are generated by supported `rocprofv3` versions; add parser hardening before accepting external CSV fixtures.
+**Reference latency failures are silently ignored:**
+- Symptoms: When `benchmark_reference=True`, reference timing exceptions are swallowed and `reference_latency_ms` remains `0.0`, making `speedup_factor` `0.0` without an explicit trace warning.
+- Files: `src/sol_execbench/driver/templates/eval_driver.py`
+- Trigger: Reference function passes correctness but fails during the separate timing call.
+- Workaround: Treat zero reference latency as missing baseline evidence and prefer explicit scoring baseline artifacts from `src/sol_execbench/core/scoring/baseline_artifact.py`.
+
+**Readiness NVIDIA blocker detection is shallow:**
+- Symptoms: Dataset readiness only detects a small tuple of NVIDIA runtime hints such as `cupy`, `cuda.c`, `nvrtc`, `cublas`, and `cutlass`.
+- Files: `src/sol_execbench/core/dataset/inventory.py`, `src/sol_execbench/core/dataset/readiness.py`
+- Trigger: Canonical references contain other CUDA-only names or indirect imports not listed in `NVIDIA_RUNTIME_HINTS`.
+- Workaround: Run execution closure and static review before making readiness claims; do not rely on inventory readiness alone for full ROCm compatibility.
 
 ## Security Considerations
 
-**Untrusted solution code executes in a subprocess, not a sandbox:**
-- Risk: Python and native HIP/C++ submissions are imported and executed with the current process permissions inside the evaluation subprocess. Static review blocks common file/process/network/dynamic-loader patterns, but this is not OS-level isolation.
-- Files: `src/sol_execbench/driver/templates/eval_driver.py`, `src/sol_execbench/core/bench/reward_hack.py`, `src/sol_execbench/cli/main.py`, `src/sol_execbench/driver/templates/build_ext.py`
-- Current mitigation: Source paths reject absolute paths and `..` in `src/sol_execbench/core/data/solution.py`; Python submissions get static source review and blocked `torch.utils.cpp_extension.load/load_inline`; compilation/evaluation run in staging subprocesses with timeouts.
-- Recommendations: Run untrusted submissions only inside the Docker/GPU isolation path; add OS-level resource limits and a restricted filesystem/network profile if evaluating third-party code outside trusted CI.
+**Submitted code executes inside a Python subprocess with GPU and filesystem access:**
+- Risk: User solution and reference code are imported/executed from the staging directory; Python submissions can run arbitrary module import side effects before workload timing.
+- Files: `src/sol_execbench/driver/templates/eval_driver.py`, `src/sol_execbench/driver/problem_packager.py`, `src/sol_execbench/core/data/solution.py`
+- Current mitigation: Source paths reject absolute paths and `..`; static review blocks many Python process/network/file patterns; dynamic extension loading is patched out for Python submissions.
+- Recommendations: Run benchmark execution in a constrained container/user namespace, keep staging directories isolated, restrict network access during evaluation, and treat static source review as a policy layer rather than a sandbox.
 
-**Native compile flags are user-controlled:**
-- Risk: `CompileOptions.cflags`, `hip_cflags`, and `ld_flags` are passed into `torch.utils.cpp_extension.load()` for native ROCm submissions.
-- Files: `src/sol_execbench/core/data/solution.py`, `src/sol_execbench/driver/templates/build_ext.py`, `tests/sol_execbench/driver/test_build_ext.py`
-- Current mitigation: Compilation occurs in a staging directory and solution source paths are constrained; legacy CUDA option keys are rejected.
-- Recommendations: Treat native submissions as arbitrary code. If this runner is exposed to untrusted users, constrain compiler/linker flags to an allowlist or execute compilation in a disposable container with no sensitive mounts.
+**Native HIP/C++ compile options are user-controlled:**
+- Risk: `hip_cflags`, `cflags`, and `ld_flags` from solution metadata flow into the build template for native extensions.
+- Files: `src/sol_execbench/core/data/solution.py`, `src/sol_execbench/driver/templates/build_ext.py`, `src/sol_execbench/driver/problem_packager.py`
+- Current mitigation: Solution path traversal is rejected and CUDA-specific compile option names are rejected; native compilation is separated from Python runtime loading.
+- Recommendations: Add an allowlist or denylist for linker/compiler flags that can load unexpected libraries, write outside the build tree, or change runtime search paths.
 
-**Safetensors path resolution accepts paths outside staging when already absolute:**
-- Risk: Workload safetensors inputs can resolve to absolute paths if present in workload data. The readiness layer blocks unsafe dataset paths, but `load_safetensors()` itself does not enforce root containment.
-- Files: `src/sol_execbench/core/bench/io.py`, `src/sol_execbench/core/dataset/readiness.py`, `tests/sol_execbench/test_dataset_inventory_readiness.py`
-- Current mitigation: Dataset readiness tests cover paths outside the dataset root, and the eval driver prefers staging plus `FLASHINFER_TRACE_DIR` roots.
-- Recommendations: Keep root-containment validation close to workload ingestion for all external data paths. Do not call `load_safetensors()` on untrusted workload JSON without the readiness checks.
+**Docker image grants passwordless GPU clock tooling:**
+- Risk: Container users receive passwordless `amd-smi` or `rocm-smi` access for clock control.
+- Files: `docker/Dockerfile`, `src/sol_execbench/core/bench/clock_lock.py`, `scripts/run_docker.sh`
+- Current mitigation: Clock commands are narrowly used for ROCm clock locking and verification; `scripts/run_docker.sh` guards against Docker Desktop contexts.
+- Recommendations: Keep sudoers entries limited to exact tool paths, document host-level impact, and avoid expanding passwordless sudo beyond GPU clock tooling.
 
-**Reward-hack defense is regex and identity-snapshot based:**
-- Risk: Static source review and function identity snapshots block known exploit families but are not a complete malicious-code defense.
-- Files: `src/sol_execbench/core/bench/reward_hack.py`, `src/sol_execbench/driver/templates/eval_driver.py`, `tests/sol_execbench/core/bench/test_reward_hack.py`, `tests/sol_execbench/driver/test_eval_driver.py`
-- Current mitigation: The driver snapshots critical functions before user import, blocks common dynamic loading/process/network/file patterns, rejects tensor subclasses, and checks for thread count increases.
-- Recommendations: Treat `REWARD_HACK` checks as benchmark-integrity guardrails, not a security sandbox. Add focused tests for any newly discovered exploit pattern before broadening regexes.
+**Safetensors path resolution can load first matching partial-overlap path:**
+- Risk: `_resolve_blob_path` progressively strips leading path components and accepts the first existing match under configured blob roots.
+- Files: `src/sol_execbench/core/bench/io.py`, `src/sol_execbench/core/dataset/readiness.py`
+- Current mitigation: Dataset readiness rejects absolute safetensors refs and refs outside the dataset root; runtime roots are limited to staging and `FLASHINFER_TRACE_DIR`.
+- Recommendations: Prefer manifest-backed exact asset paths for release runs and record resolved safetensors paths in trace/evidence sidecars for auditability.
 
 ## Performance Bottlenecks
 
-**Correctness loop runs ten full input/reference/user rounds per workload:**
-- Problem: Every workload runs multiple correctness rounds before timing, and each round may generate fresh tensors and synchronize GPU work.
-- Files: `src/sol_execbench/driver/templates/eval_driver.py`, `src/sol_execbench/core/bench/io.py`, `src/sol_execbench/core/bench/correctness.py`
-- Cause: The loop is designed to catch nondeterminism and input-dependent errors.
-- Improvement path: Keep the default rigorous path for benchmark runs; expose any faster mode only as clearly non-canonical, and ensure trace metadata distinguishes it.
+**Timing allocator can allocate large per-workload pools:**
+- Problem: `ShiftingMemoryPoolAllocator` preallocates pools for every input and DPS output across `warmup + rep` iterations, with offset padding per iteration.
+- Files: `src/sol_execbench/core/bench/timing.py`, `src/sol_execbench/core/bench/io.py`, `src/sol_execbench/driver/templates/eval_driver.py`
+- Cause: The allocator intentionally changes `data_ptr` per iteration to reduce cache/keyed-output exploits.
+- Improvement path: Keep the anti-cheat property, but add memory budgeting and clearer errors when pool allocation would exceed available VRAM.
 
-**Timing intentionally synchronizes and clears cache around every measured iteration:**
-- Problem: Device-event timing creates event arrays, clears an L2-sized cache buffer, synchronizes around each iteration, and uses `ShiftingMemoryPoolAllocator` copies.
-- Files: `src/sol_execbench/core/bench/timing.py`, `src/sol_execbench/core/bench/io.py`, `tests/sol_execbench/core/bench/test_timing.py`
-- Cause: Benchmark semantics prioritize cold-cache timing and reward-hack resistance over raw throughput of the evaluator itself.
-- Improvement path: Do not optimize these costs away without changing benchmark semantics. Add profiler-backed evidence in `src/sol_execbench/core/bench/rocm_profiler.py` when source-specific kernel timing is required.
+**Correctness loop regenerates and executes ten rounds per workload:**
+- Problem: Every workload runs ten correctness rounds before timing, including reference execution and user execution each round.
+- Files: `src/sol_execbench/driver/templates/eval_driver.py`
+- Cause: Multiple rounds catch nondeterminism and input-dependent correctness bugs.
+- Improvement path: Preserve ten rounds for scored/release validation; allow clearly labeled quick modes for developer iteration that cannot produce benchmark claims.
 
-**Dataset execution is serial at the problem level:**
-- Problem: `scripts/run_dataset.py` invokes the CLI once per problem and waits for each subprocess before moving to the next.
-- Files: `scripts/run_dataset.py`, `src/sol_execbench/cli/main.py`
-- Cause: GPU evaluation, compilation, clock locking, and output sidecars are easier to keep deterministic when serialized.
-- Improvement path: If parallelism is added, shard by GPU or worker output root and make clock/profiler state explicit. Avoid sharing `out/`, timing evidence dirs, or staging dirs between concurrent runs.
+**Dataset execution invokes one CLI subprocess per problem:**
+- Problem: Dataset runs pay process startup, import, package staging, and optional compile overhead for each problem.
+- Files: `scripts/run_dataset.py`, `src/sol_execbench/driver/problem_packager.py`, `src/sol_execbench/cli/main.py`
+- Cause: Isolation is problem-level rather than suite-level.
+- Improvement path: Keep subprocess isolation for untrusted solutions, but cache validated staging/build artifacts by solution hash and add structured retry/resume around `scripts/run_dataset.py`.
 
 ## Fragile Areas
 
-**Evaluation import order and fd redirection:**
-- Files: `src/sol_execbench/driver/templates/eval_driver.py`, `src/sol_execbench/driver/problem_packager.py`
-- Why fragile: The driver redirects stdout before importing torch/triton, imports benchmark helpers after staging setup, snapshots integrity before user import, and writes JSON traces to the saved stdout fd. Reordering these blocks can corrupt JSON output or weaken reward-hack checks.
-- Safe modification: Preserve the order: redirect stdout, load problem/config, import helpers, static source review, exec reference, snapshot integrity, import user code, process workloads.
-- Test coverage: Use `tests/sol_execbench/driver/test_eval_driver.py` for subprocess behavior and `tests/sol_execbench/test_e2e.py` for end-to-end traces.
+**Reward-hack defenses are timing-critical and bypass-sensitive:**
+- Files: `src/sol_execbench/core/bench/reward_hack.py`, `src/sol_execbench/driver/templates/eval_driver.py`, `tests/sol_execbench/driver/test_eval_driver.py`
+- Why fragile: Integrity snapshots, monkey-patch detection, stream blocking, lazy-output checks, and thread counts depend on import order and specific Python/PyTorch behavior.
+- Safe modification: Change defenses only with adversarial regression tests in `tests/sol_execbench/driver/test_eval_driver.py` and `tests/sol_execbench/core/bench/test_reward_hack.py`.
+- Test coverage: Good coverage exists for known attacks, but obfuscated imports, native extension side effects, and non-thread async work need ongoing adversarial tests.
 
-**Source staging and cleanup lifecycle:**
-- Files: `src/sol_execbench/driver/problem_packager.py`, `src/sol_execbench/cli/main.py`
-- Why fragile: `ProblemPackager.__del__()` removes the staging directory unless `keep_output_dir` is set. Destructor-based cleanup is sensitive to object lifetime and debugging workflows.
-- Safe modification: Keep `--keep-staging` behavior intact and avoid adding long-lived references to `ProblemPackager` that change cleanup timing.
-- Test coverage: `tests/sol_execbench/driver/test_problem_packager.py` covers staging behavior; end-to-end cleanup timing remains mostly integration-level.
+**ROCm hardware tests are skipped by environment probes:**
+- Files: `tests/conftest.py`, `docs/TESTING.md`, `tests/examples/test_examples.py`, `tests/sol_execbench/test_e2e.py`
+- Why fragile: Missing `/dev/kfd`, `/dev/dri`, ROCm dev headers, CK headers, or rocWMMA headers silently converts important coverage to skips.
+- Safe modification: Always report pass/skip/fail counts for hardware validation, and run `requires_rocm`, `requires_rocm_dev`, `requires_rdna4`, and `requires_cdna3` jobs on matching hardware before release claims.
+- Test coverage: CPU-only CI can validate contracts but cannot validate GPU timing, native HIP extension behavior, or architecture-specific examples.
 
-**Hardware-gated tests can hide regressions on ordinary CI:**
-- Files: `tests/conftest.py`, `tests/examples/test_examples.py`, `tests/sol_execbench/core/bench/test_timing.py`, `tests/docker/dependencies/`
-- Why fragile: ROCm, ROCm-dev, CK, rocWMMA, RDNA4, CDNA3, and `timing_serial` tests are skipped unless the environment matches. Default `pytest` does not exercise full GPU timing or native extension behavior.
-- Safe modification: Keep CPU-safe contract tests for schema and helper logic, and run hardware-marked suites explicitly in ROCm CI before changing compile, timing, or example paths.
-- Test coverage: Strong unit coverage exists, but full semantic coverage requires ROCm hardware and selected marker runs.
+**Clock locking depends on host privileges and text parsing:**
+- Files: `src/sol_execbench/core/bench/clock_lock.py`, `docker/Dockerfile`, `docs/rocm.md`
+- Why fragile: `sudo -n rocm-smi` must work, DPM levels must match the device, and `_level_is_active` parses command output text.
+- Safe modification: Add hardware-backed tests or captured-output fixtures whenever changing parsing or preset logic.
+- Test coverage: Unit tests cover command construction/parsing, but real clock stability depends on the host GPU, driver, and container privileges.
 
-**Derived score eligibility depends on warnings and status strings:**
-- Files: `src/sol_execbench/core/scoring/amd_score.py`, `src/sol_execbench/core/scoring/amd_sol_v2.py`, `src/sol_execbench/core/scoring/solar_derivation.py`
-- Why fragile: Score eligibility is driven by string statuses such as `scored`, `degraded`, and `unscored`, plus warning prefixes like `unsupported_operator:*`.
-- Safe modification: Add or change warning names only with tests that verify score eligibility, aggregate status, and serialized sidecar fields.
-- Test coverage: `tests/sol_execbench/test_amd_native_score.py`, `tests/sol_execbench/test_amd_sol_v2.py`, and `tests/sol_execbench/test_solar_derivation_evidence.py` cover many cases but should be extended for every new operator family.
+**Derived AMD score claims rely on layered evidence discipline:**
+- Files: `src/sol_execbench/core/scoring/amd_score.py`, `src/sol_execbench/core/scoring/amd_sol_v2.py`, `src/sol_execbench/core/scoring/solar_derivation.py`, `docs/CLAIMS.md`
+- Why fragile: Scores can be numerically computed even when evidence is degraded, provisional, or unvalidated; warnings are the main guardrail preventing overclaiming.
+- Safe modification: Preserve warning propagation and claim-level fields whenever changing scoring formulas or artifact parsers.
+- Test coverage: Contract tests exist, but release claims still require artifact review against `docs/CLAIMS.md`.
 
 ## Scaling Limits
 
-**GPU memory and time scale with workload count and tensor sizes:**
-- Current capacity: CLI defaults to `warmup_runs=10`, `iterations=50`, and an evaluation subprocess timeout of 600 seconds in `src/sol_execbench/cli/main.py`; dataset runner defaults to 300 seconds per problem in `scripts/run_dataset.py`.
-- Limit: Large workloads, reference implementations, or native compilation can hit timeout or OOM even when the candidate kernel is correct.
-- Scaling path: Use `--max-workloads`, `--limit`, `--iterations`, `--warmup-runs`, and ready-subset inputs for bounded runs; use Docker/ROCm CI for full validation.
+**Full benchmark validation is hardware-bound:**
+- Current capacity: The public dataset target is full SOL ExecBench scale, while local commands commonly run bounded subsets via `scripts/run_dataset.py --limit`.
+- Limit: Full validation requires ROCm GPUs, device passthrough, optional static tooling, and long-running subprocess execution.
+- Scaling path: Use ready-subset manifests and execution closure sidecars to partition runs, then merge summaries and evidence by problem/workload IDs.
 
-**Derived sidecar generation grows with every traced workload:**
-- Current capacity: AMD SOL v2 and SOLAR derivation sidecars are generated per workload when requested.
-- Limit: Full dataset runs can produce many JSON sidecars and expensive graph/evidence derivations.
-- Scaling path: Write sidecars under dedicated artifact dirs and use `_safe_sidecar_stem()` naming from `scripts/run_dataset.py`; keep artifact generation optional for exploratory runs.
+**Static evidence extraction is bounded but serial per artifact/tool:**
+- Current capacity: Static extractors run with per-tool timeouts and bounded output tails.
+- Limit: Large binaries or missing tools produce partial/failed evidence and slow suite-level collection.
+- Scaling path: Parallelize extraction at the orchestrator level and persist route decisions so unavailable toolchains are not reprobed repeatedly.
 
-**Profiler-backed timing depends on external `rocprofv3`:**
-- Current capacity: `collect_source_timing_evidence()` can collect live CSV evidence when the selected timing policy uses `rocprofv3` and the tool is available.
-- Limit: Missing profiler, command failures, or missing CSV output fall back to explicit non-profiler metadata.
-- Scaling path: Keep fallback metadata visible in reports and run profiler evidence collection only where `rocprofv3` overhead and permissions are acceptable.
+**Packaged hardware model validation does not cover all supported architectures equally:**
+- Current capacity: `gfx1200` can be marked validated, while CDNA 3 remains provisional/unvalidated in the parser contract.
+- Limit: CDNA 3 score reports remain degraded and cannot support full validation claims.
+- Scaling path: Add validated hardware model payloads and evidence refs for `gfx940`, `gfx941`, and `gfx942`.
 
 ## Dependencies at Risk
 
-**Pinned ROCm wheel stack:**
-- Risk: `torch==2.10.0+rocm7.1`, `torchvision==0.25.0+rocm7.1`, and `triton-rocm==3.6.0` are tightly coupled to ROCm wheel indexes and supported platform markers.
-- Impact: Dependency resolution or runtime behavior can fail when ROCm wheel indexes change, when Python support moves, or when the local ROCm driver stack is mismatched.
-- Migration plan: Update pins through `pyproject.toml` and `uv.lock` together; verify `tests/docker/dependencies/`, `tests/examples/test_examples.py`, and ROCm-marked timing/native tests.
+**ROCm/PyTorch compatibility namespace:**
+- Risk: The project depends on PyTorch ROCm exposing AMD devices through `torch.cuda` APIs.
+- Impact: Timing, device detection, stream checks, and tests break if PyTorch changes compatibility behavior.
+- Migration plan: Keep a thin device-events abstraction in `src/sol_execbench/core/bench/timing.py` and isolate direct `torch.cuda` calls behind ROCm-named helpers.
 
-**External ROCm command-line tools:**
-- Risk: `rocm-smi`, `rocminfo`, `rocm_agent_enumerator`, `hipcc`, and `rocprofv3` are invoked by runtime, compile, diagnostics, and Docker checks.
-- Impact: Missing tools degrade clock locking, architecture detection, native builds, diagnostics, or profiler evidence.
-- Migration plan: Keep tool availability checks in `tests/docker/dependencies/`, `src/sol_execbench/core/bench/clock_lock.py`, `src/sol_execbench/driver/problem_packager.py`, and `src/sol_execbench/core/bench/rocm_profiler.py` explicit and fail with actionable messages.
+**ROCprofiler and ROCm toolchain binaries:**
+- Risk: `rocprofv3`, `llvm-objdump`, `readelf`, `rocm_agent_enumerator`, `rocminfo`, `rocm-smi`, and `amd-smi` availability varies by ROCm installation/container.
+- Impact: Timing evidence, static evidence, target detection, and clock locking degrade or fail.
+- Migration plan: Continue using `src/sol_execbench/core/toolchain.py` route decisions and include explicit unavailable/partial statuses in evidence sidecars.
 
-**Hugging Face dataset access path:**
-- Risk: Dataset download depends on the `datasets` package and the external SOL ExecBench dataset source.
-- Impact: Offline environments or upstream dataset changes can block local data refreshes.
-- Migration plan: Preserve manifest/checksum generation in `scripts/download_solexecbench.py` and dataset inventory checks under `src/sol_execbench/core/dataset/`.
+**Hugging Face datasets and external benchmark assets:**
+- Risk: Dataset download depends on `nvidia/SOL-ExecBench` and `flashinfer-ai/flashinfer-trace` availability/revisions.
+- Impact: Reproducibility and readiness denominators can drift without pinned revisions and manifests.
+- Migration plan: Require dataset manifests from `src/sol_execbench/core/dataset/manifest.py` for release evidence and pin revisions in scripted runs.
 
 ## Missing Critical Features
 
-**OS-level sandboxing for untrusted evaluation:**
-- Problem: The evaluator provides subprocess isolation and benchmark-integrity guardrails, but not a hardened sandbox.
-- Blocks: Safe multi-tenant execution of arbitrary third-party Python/HIP submissions on hosts with sensitive files or network access.
+**Real CDNA 3 validation closure:**
+- Problem: The codebase supports CDNA 3 markers and hardware enum values, but scoring hardware model validation is not complete for CDNA 3.
+- Blocks: Full CDNA 3 release claims and validated AMD-native score claims.
 
-**Automated full-matrix hardware validation in default test command:**
-- Problem: The default pytest run skips many GPU, timing, and architecture-specific tests unless hardware and markers are selected.
-- Blocks: Confidence that RDNA4 and CDNA3 behavior both remain valid after changes to timing, native compilation, examples, or hardware models.
+**Strict sandboxing for submitted Python/native code:**
+- Problem: Policy checks exist, but execution is still Python/native code in a subprocess with inherited environment and filesystem access.
+- Blocks: Safe operation on untrusted submissions outside a controlled container.
 
-**Direct ROCm API naming abstraction:**
-- Problem: Timing still exposes compatibility names such as `bench_time_with_cuda_events()` and methodology values like `cuda_events`/`cupti`.
-- Blocks: A fully ROCm-native public API surface; this is mostly naming debt, not runtime NVIDIA support.
+**Complete ROCm replacement coverage for former NVIDIA library categories:**
+- Problem: Some former NVIDIA categories are compatibility examples or candidate replacement paths rather than full native replacements.
+- Blocks: Claims of complete parity across CUTLASS/cuDNN/cuTile-era benchmark categories.
 
 ## Test Coverage Gaps
 
-**Security sandbox behavior is not OS-enforced:**
-- What's not tested: Filesystem, network, process, and native dynamic-loading escape attempts beyond the known static review patterns.
-- Files: `src/sol_execbench/core/bench/reward_hack.py`, `src/sol_execbench/driver/templates/eval_driver.py`, `tests/sol_execbench/core/bench/test_reward_hack.py`, `tests/sol_execbench/driver/test_eval_driver.py`
-- Risk: A new exploit pattern can bypass benchmark-integrity checks while still passing ordinary correctness tests.
+**GPU behavior depends on hardware-specific skipped tests:**
+- What's not tested: HIP extension compilation, device event timing, ROCm clock locking, RDNA 4 examples, CDNA 3 behavior, CK, and rocWMMA in CPU-only environments.
+- Files: `tests/conftest.py`, `tests/examples/test_examples.py`, `tests/sol_execbench/test_e2e.py`, `tests/docker/dependencies/`
+- Risk: Contract tests can pass while actual GPU execution is skipped.
 - Priority: High
 
-**Malformed profiler CSV and external tool oddities:**
-- What's not tested: Non-numeric duration fields and unusual but syntactically valid `rocprofv3` CSV headers/rows.
-- Files: `src/sol_execbench/core/bench/rocm_profiler.py`, `tests/sol_execbench/test_rocm_profiler.py`
-- Risk: Timing evidence generation can fail abruptly instead of emitting explicit fallback metadata.
-- Priority: Medium
-
-**Full dataset and hardware matrix coverage:**
-- What's not tested: Complete full-dataset execution across RDNA4 and CDNA3 in default local test runs.
-- Files: `scripts/run_dataset.py`, `tests/conftest.py`, `tests/examples/test_examples.py`, `tests/docker/dependencies/`
-- Risk: Changes can pass CPU-safe tests while breaking native HIP builds, ROCm library examples, clock locking, or device-event timing on one architecture.
+**Reward-hack coverage is adversarial but finite:**
+- What's not tested: Every obfuscation variant for dynamic imports, network/process access, native side effects, async GPU work outside Python thread counts, and source patterns that bypass regex matching.
+- Files: `src/sol_execbench/core/bench/reward_hack.py`, `tests/sol_execbench/driver/test_eval_driver.py`, `tests/sol_execbench/core/bench/test_reward_hack.py`
+- Risk: A malicious or over-optimized solution can evade detection and contaminate timing or correctness results.
 - Priority: High
 
-**Reference-source wrapping edge cases:**
-- What's not tested: Source text where replacing `stream` with `strm` changes code semantics while building reference/custom solutions.
-- Files: `scripts/run_dataset.py`, `tests/sol_execbench/test_run_dataset_execution_closure.py`, `tests/sol_execbench/test_run_dataset_amd_score.py`
-- Risk: Dataset reference runs can produce misleading failures or altered benchmark behavior.
+**Full dataset execution closure is not a default test:**
+- What's not tested: End-to-end validation across all downloaded benchmark problems, all workloads, derived evidence sidecars, and score reports.
+- Files: `scripts/run_dataset.py`, `src/sol_execbench/core/dataset/readiness.py`, `src/sol_execbench/core/dataset/inventory.py`, `tests/sol_execbench/test_run_dataset_execution_closure.py`
+- Risk: Small unit tests can pass while full-suite denominators, skipped-existing traces, or evidence references break.
+- Priority: High
+
+**Static evidence parser/extractor behavior relies heavily on fixtures:**
+- What's not tested: Real large HIP/ELF artifacts across all ROCm tool versions and architecture targets.
+- Files: `src/sol_execbench/core/bench/static_kernel_evidence.py`, `tests/sol_execbench/test_static_kernel_evidence.py`
+- Risk: Tool output format changes can reduce evidence quality without breaking core benchmark execution.
 - Priority: Medium
 
 ---
 
-*Concerns audit: 2026-05-24*
+*Concerns audit: 2026-05-26*
