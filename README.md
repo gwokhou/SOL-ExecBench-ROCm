@@ -25,7 +25,7 @@ validation is recorded; CDNA 4 validation is also deferred.
 Optional benchmark assets can be downloaded into `data/`:
 
 ```bash
-./scripts/download_data.sh
+uv run --with "huggingface-hub[cli]" ./scripts/download_data.sh
 ```
 
 ## Quick Start
@@ -117,9 +117,19 @@ Common options:
 | `--json` | Print trace JSON to stdout. |
 | `--lock-clocks` | Require GPU clocks to be locked before benchmarking. |
 | `--keep-staging` | Keep the staging directory after evaluation. |
+| `--profile {none,rocprofv3}` | Collect optional diagnostic profiling artifacts. |
+| `--static-evidence {none,auto}` | Collect optional diagnostic static kernel evidence. |
 | `-v`, `--verbose` | Show subprocess output. |
 
 The baseline comparison command is exposed separately as `sol-execbench-baseline`.
+
+Metadata and diagnostics subcommands:
+
+```bash
+uv run sol-execbench contract --json
+uv run sol-execbench doctor --json
+uv run sol-execbench toolchain --json
+```
 
 ## Documentation
 
@@ -139,6 +149,9 @@ The baseline comparison command is exposed separately as `sol-execbench-baseline
 - [Solution schema](docs/solution.md): ROCm-supported solution metadata.
 - [Trace schema](docs/trace.md): evaluation output format.
 - [ROCm notes](docs/rocm.md): host, Docker, and validation notes for ROCm evaluation.
+- [ROCm timing](docs/rocm_timing.md): HIP event timing and optional `rocprofv3` evidence.
+- [Static kernel evidence](docs/static_kernel_evidence.md): optional static HIP/C++ artifact sidecars and claim limits.
+- [Original parity](docs/original_parity.md): CUDA-to-ROCm parity boundaries and deferred validation claims.
 
 ## Contributing
 

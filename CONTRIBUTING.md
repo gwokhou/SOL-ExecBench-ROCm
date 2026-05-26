@@ -45,8 +45,11 @@ helper:
 - Do not commit local caches, build artifacts, downloaded benchmark datasets, or
   generated benchmark output.
 
-No GitHub Actions workflow is present in this checkout, so local pytest and Ruff
-results are the primary validation record for a pull request.
+The `Python Quality` GitHub Actions workflow in
+`.github/workflows/code-quality.yml` runs on pushes to all branches and on pull
+requests. It checks Python 3.12 and 3.13 with `uv sync --locked --all-groups`,
+`uv run ruff check .`, `uv run ty check`, CPU-safe package tests under
+`tests/sol_execbench/`, and `tests/examples/test_examples.py -k consistency`.
 
 ## PR Guidelines
 
@@ -56,8 +59,8 @@ results are the primary validation record for a pull request.
   `tests/sol_execbench/` and example workflow tests under `tests/examples/`.
 - Include documentation when adding or changing public commands, schemas,
   examples, or ROCm hardware assumptions.
-- Run the relevant pytest and Ruff commands before requesting review. For GPU
-  behavior, list the ROCm hardware and Docker checks you ran.
+- Run the relevant pytest, Ty, and Ruff commands before requesting review. For
+  GPU behavior, list the ROCm hardware and Docker checks you ran.
 - Use imperative commit titles in this format:
 
   ```text
@@ -72,6 +75,10 @@ results are the primary validation record for a pull request.
 
 The `.pre-commit-config.yaml` file includes a commit-message hook that checks for
 a `Signed-off-by:` line.
+
+No `.github/PULL_REQUEST_TEMPLATE.md` file is present in this checkout, so use
+the pull request description to summarize behavior changes, link the issue, and
+record the validation commands or GPU checks you ran.
 
 ## Issue Reporting
 

@@ -33,7 +33,7 @@ required evidence:
 
 ## Public Contract Boundary
 
-v1.11 sidecars do not modify canonical `definition.json`, `workload.jsonl`,
-`solution.json`, trace JSON, primary `sol-execbench` CLI behavior, AMD SOL v2
+v1.11 sidecars do not modify canonical problem-local `definition.json`, `workload.jsonl`,
+problem-local `solution.json`, trace JSON, primary `sol-execbench` CLI behavior, AMD SOL v2
 sidecars, or SOLAR derivation sidecars. New report and closure fields remain
 sidecar-only.

@@ -36,7 +36,7 @@ Use this checklist when reproducing v1.15 evidence.
 2. Confirm the GPU runtime and Python environment.
 
    ```bash
-   uv run sol-execbench environment --json
+   uv run sol-execbench doctor --json
    ```
 
 3. Run at least one smoke problem through the public evaluator path.
@@ -64,7 +64,7 @@ Use this checklist when reproducing v1.15 evidence.
    bound artifacts are present.
 
    ```bash
-   uv run sol-execbench-score amd --help
+   uv run sol-execbench-baseline --help
    ```
 
 ## Artifact Families

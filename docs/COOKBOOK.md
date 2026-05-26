@@ -26,14 +26,14 @@ head -n 1 out/cookbook/rmsnorm.trace.jsonl
 This recipe adds a HIP/C++ solution while keeping the benchmark problem stable.
 
 1. Copy the nearest example, such as `examples/hip_cpp/rmsnorm/`.
-2. Keep `definition.json` and `workload.jsonl` stable for comparison.
+2. Keep `<problem_dir>/definition.json` and `<problem_dir>/workload.jsonl` stable for comparison.
 3. Put native source in the solution JSON `sources` block.
 4. Use `languages: ["hip_cpp"]` and AMD target metadata.
 5. Run:
 
 ```bash
 uv run sol-execbench examples/hip_cpp/rmsnorm \
-  --solution examples/hip_cpp/rmsnorm/solution_hip_cpp.json \
+  --solution examples/hip_cpp/rmsnorm/solution_hip.json \
   --json \
   -o out/cookbook/hip_cpp_rmsnorm.trace.jsonl
 ```
@@ -58,7 +58,7 @@ uv run sol-execbench examples/triton/rmsnorm \
   -o out/curated/triton_rmsnorm.trace.jsonl
 
 uv run sol-execbench examples/hip_cpp/rmsnorm \
-  --solution examples/hip_cpp/rmsnorm/solution_hip_cpp.json \
+  --solution examples/hip_cpp/rmsnorm/solution_hip.json \
   --json \
   -o out/curated/hip_cpp_rmsnorm.trace.jsonl
 ```

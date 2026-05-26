@@ -6,9 +6,9 @@ adaptation map, not a porting plan:
 public `definition.json`, `solution.json`, workload formats, CLI behavior,
 trace JSONL output, and benchmark semantics remain owned by SOL ExecBench ROCm.
 
-Source evidence reviewed from hip-execbench included `src/profiler/router.ts`,
-`src/errors/index.ts`, `src/agent/builder.ts`, `src/baseline/comparator.ts`,
-`src/schemas/*.ts`, and `src/pipeline/statistics.ts`.
+Repository evidence reviewed for this adaptation includes `src/sol_execbench/core/bench/rocm_profiler.py`,
+`src/sol_execbench/core/diagnostics.py`, `src/sol_execbench/core/reporting.py`, `src/sol_execbench/core/baseline.py`,
+`src/sol_execbench/core/data/trace.py`, and `src/sol_execbench/core/scoring/amd_score.py`.
 
 ## Accepted Practices
 

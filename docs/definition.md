@@ -2,7 +2,7 @@
 
 A **Definition** provides the formal specification for a computational workload — the operator's contract. It defines the axes, tensor shapes/dtypes, optional custom input generation, and a correct PyTorch reference implementation.
 
-**Identity rule:** Two kernels share a Definition if and only if they have the same axes with the same roles (`const`/`var`) and the same `const` values.
+**Schema scope:** A Definition records the workload name, optional compute category, axes, input and output tensor specifications, reference implementation, optional custom input entrypoint, optional description, and optional Hugging Face source ID.
 
 ---
 
