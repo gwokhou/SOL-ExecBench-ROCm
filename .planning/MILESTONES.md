@@ -1,5 +1,37 @@
 # Milestones
 
+## v1.17 Static Kernel Evidence (Shipped: 2026-05-26)
+
+**Phases completed:** 5 phases, 5 plans, 0 tasks
+
+**Key accomplishments:**
+
+- Added the `sol_execbench.static_kernel_evidence.v1` diagnostic sidecar
+  contract with strict schema validation, explicit status vocabulary, and
+  authority flags that keep static evidence separate from correctness,
+  performance, timing, score, paper-parity, and leaderboard claims.
+
+- Added current-build HIP/C++ artifact discovery and persistence for
+  `benchmark_kernel.so`, object files, compiler outputs, and related
+  inspectable artifacts under output-derived evidence directories.
+
+- Routed static extraction through the v1.16 toolchain layer, with bounded
+  `llvm-objdump` and `readelf` tool runs, preserved raw outputs, route
+  provenance, and nonfatal unavailable/failed/partial sidecar states.
+
+- Exposed opt-in CLI collection through `--static-evidence auto`, while
+  keeping `--static-evidence none` as the default and preserving canonical
+  trace JSONL, benchmark exit semantics, and scoring behavior.
+
+- Published static evidence documentation, claim guardrails, researcher guide
+  updates, routing docs, CPU-safe documentation tests, and a bounded RDNA 4
+  validation artifact.
+
+**Known tech debt:** CDNA 3/CDNA 4 live validation, Triton ROCm cache capture,
+RGA-rich resource parsing, and paper-scale static coverage remain deferred.
+
+---
+
 ## v1.16 ROCm Toolchain Research and Capability Routing (Shipped: 2026-05-25)
 
 **Phases completed:** 5 phases, 5 plans, 0 tasks
