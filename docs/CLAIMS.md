@@ -12,6 +12,7 @@ does not claim official leaderboard equivalence.
 | Runtime evidence | A run was executed in a recorded ROCm environment. | Canonical trace JSONL plus optional `traces.jsonl.environment.json` or `sol-execbench doctor --json` output. |
 | Profiling evidence | A run produced diagnostic `rocprofv3` artifacts. | `--profile rocprofv3`, `traces.jsonl.profile.json`, registered artifact paths, and profiler status metadata. |
 | Toolchain routing evidence | The project selected or rejected ROCm tools for a requested evidence level based on registry entries and bounded probes. | `sol-execbench toolchain --json`, registry source refs, selected tool, fallback, status, and reason code. |
+| Static Kernel Evidence | A HIP/C++ run produced diagnostic static build artifacts and bounded routed extractor outputs. | `--static-evidence auto`, `<trace>.static-evidence.json`, persisted artifact paths, `llvm-objdump` / `readelf` tool-run records, and diagnostic-only authority flags. |
 | AMD-native-derived evidence | A score or bound report was derived from ROCm traces and AMD-side bound artifacts. | Canonical traces, AMD SOL bound sidecars, hardware model refs, score eligibility state, and warnings. |
 | Research-preview evidence | A curated benchmark slice was executed or audited under documented limits. | Slice definition, command transcript or expected commands, artifact list, pass/fail/skip/unavailable accounting, and known gaps. |
 
@@ -26,8 +27,13 @@ does not claim official leaderboard equivalence.
 - `rocprofv3` profiling as correctness or score authority.
 - Toolchain routing as correctness, performance, static-kernel, paper-parity,
   or leaderboard authority.
-- Static Kernel Evidence in v1.16; code-object capture, ISA extraction, and
-  static evidence sidecars are deferred to v1.17.
+- Static Kernel Evidence as correctness authority, performance authority,
+  timing authority, score authority, paper-parity authority, or leaderboard
+  authority.
+  In short: Static Kernel Evidence as correctness, performance, timing, score,
+  paper-parity, or leaderboard authority is not allowed.
+- Static Kernel Evidence as CDNA 3, CDNA 4, Triton cache, RGA-rich resource,
+  or paper-scale static coverage unless direct evidence is archived.
 - Curated-slice results as paper-level benchmark results.
 
 ## Claim Upgrade Rules
@@ -38,7 +44,7 @@ does not claim official leaderboard equivalence.
 | CDNA 3 hardware validation | Full adapted suite on real `gfx94*` hardware, environment sidecars, clock policy evidence, trace artifacts, and documented failures or skips. |
 | Upstream SOLAR parity | A side-by-side comparison against upstream SOLAR outputs for the scoped dataset and operator families. |
 | Leaderboard readiness | Stable submission format, hosted or reproducible scoring policy, hardware policy, anti-cheat policy, and release-defined baselines. |
-| Static kernel evidence | RGA/code-object/GPUOpen ISA artifacts linked to solution builds and interpreted by documented classification rules. |
+| Static kernel evidence | Trace-adjacent static sidecars, persisted current-build artifacts, routed extractor records, bounded raw outputs, and documented diagnostic-only interpretation rules. |
 
 ## Reporting Language
 
@@ -48,6 +54,8 @@ Use precise wording:
 - Say "AMD-native-derived score" only when the required sidecars and eligibility
   state exist.
 - Say "curated research preview" for bounded representative slices.
+- Say "Static Kernel Evidence" only for diagnostic static-analysis sidecars and
+  persisted artifacts.
 - Say "unscored" or "unavailable" when evidence is missing.
 
 Avoid ambiguous wording:
@@ -56,3 +64,6 @@ Avoid ambiguous wording:
 - Do not say "SOLAR equivalent" for local AMD-derived sidecars.
 - Do not say "hardware validated" for schema/build support alone.
 - Do not say "score authority" for profiling sidecars.
+- Do not say "correctness authority", "performance authority", "timing
+  authority", "score authority", "paper-parity authority", or "leaderboard
+  authority" for static evidence sidecars.

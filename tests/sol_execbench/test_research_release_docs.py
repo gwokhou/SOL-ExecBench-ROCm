@@ -17,6 +17,7 @@ def test_claims_doc_defines_allowed_and_unsupported_claims():
         "ROCm-port evidence",
         "Runtime evidence",
         "Profiling evidence",
+        "Static Kernel Evidence",
         "AMD-native-derived evidence",
         "Research-preview evidence",
     ):
@@ -40,7 +41,7 @@ def test_claims_doc_requires_evidence_before_claim_upgrades():
         "Full adapted suite on real `gfx94*` hardware",
         "side-by-side comparison against upstream SOLAR",
         "Stable submission format",
-        "RGA/code-object/GPUOpen ISA artifacts",
+        "Trace-adjacent static sidecars",
     ):
         assert required in text
 
@@ -119,13 +120,96 @@ def test_rocm_toolchain_routing_docs_define_matrix_and_claim_boundaries():
         "ROCm Systems",
         "RGA",
         "llvm-objdump",
-        "Static Kernel Evidence remains a v1.17 milestone",
+        "readelf",
+        "--static-evidence auto",
     ):
         assert required in text
 
     for boundary in (
         "Toolchain routing evidence",
         "Toolchain routing as correctness, performance, static-kernel",
-        "Static Kernel Evidence in v1.16",
+        "Static Kernel Evidence as correctness, performance, timing, score",
     ):
         assert boundary in claims
+
+
+def test_static_kernel_evidence_docs_define_usage_and_boundaries():
+    text = _read_doc("docs/static_kernel_evidence.md")
+    claims = _read_doc("docs/CLAIMS.md")
+    guide = _read_doc("docs/RESEARCHER-GUIDE.md")
+
+    for required in (
+        "--static-evidence auto",
+        "--static-evidence none",
+        "sol_execbench.static_kernel_evidence.v1",
+        "collected",
+        "partial",
+        "unavailable",
+        "unsupported",
+        "failed",
+        "skipped",
+        "llvm-objdump",
+        "readelf",
+        "diagnostic-only",
+    ):
+        assert required in text
+
+    for boundary in (
+        "correctness authority",
+        "performance authority",
+        "timing authority",
+        "score authority",
+        "paper-parity authority",
+        "leaderboard authority",
+    ):
+        assert boundary in text
+        assert boundary in claims or boundary.replace("-", " ") in claims
+
+    assert "docs/static_kernel_evidence.md" in guide
+
+
+def test_static_kernel_evidence_docs_keep_deferred_scope_explicit():
+    combined = "\n".join(
+        [
+            _read_doc("docs/static_kernel_evidence.md"),
+            _read_doc("docs/CLAIMS.md"),
+            _read_doc("docs/internal/v1_17_static_kernel_evidence_validation.md"),
+        ]
+    )
+
+    for deferred in (
+        "CDNA 3",
+        "CDNA 4",
+        "Triton ROCm cache capture",
+        "RGA-rich resource parsing",
+        "paper-scale static coverage",
+    ):
+        assert deferred in combined
+
+    forbidden_positive_claims = (
+        "CDNA 3 static evidence validation passed",
+        "CDNA 4 static evidence validation passed",
+        "Triton cache capture is supported",
+        "RGA-rich resource parsing is complete",
+        "paper-scale static coverage is complete",
+    )
+    for claim in forbidden_positive_claims:
+        assert claim not in combined
+
+
+def test_v1_17_static_evidence_validation_artifact_records_live_boundary():
+    text = _read_doc("docs/internal/v1_17_static_kernel_evidence_validation.md")
+
+    for required in (
+        "RDNA 4 `gfx1200`",
+        "static evidence collected",
+        "benchmark correctness did not pass",
+        "rmsnorm.trace.jsonl.static-evidence.json",
+        "artifact count",
+        "tool-run count",
+        "llvm-objdump",
+        "readelf",
+        "does not claim benchmark correctness",
+        "does not validate CDNA 3",
+    ):
+        assert required in text

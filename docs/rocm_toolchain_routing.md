@@ -4,7 +4,7 @@ ROCm tools are split across runtime, profiling, compiler, object-inspection,
 GPUOpen, and migrated repository surfaces. This project treats that split as an
 explicit benchmark concern. A routing decision should tell the user which tool
 is available for the requested evidence, why another tool is unavailable, and
-which future milestone owns deferred static evidence.
+which diagnostic surface consumes the route.
 
 ## Evidence Levels
 
@@ -12,7 +12,7 @@ which future milestone owns deferred static evidence.
 | --- | --- | --- |
 | Runtime | Device and runtime discovery. | `rocminfo`, `rocm_agent_enumerator`, `amd-smi`, `rocm-smi` |
 | Profiling | Diagnostic execution-time artifacts. | `rocprofv3`, `rocprofv3-avail` |
-| Static | Future code-object and ISA metadata. | RGA, `llvm-objdump`, `roc-objdump`, `readelf` |
+| Static | Diagnostic current-build artifact metadata and bounded extractor output. | RGA, `llvm-objdump`, `roc-objdump`, `readelf` |
 | Derived score | Derived AMD-side score and bound artifacts. | AMD SOL/SOLAR sidecars |
 
 Routing output is diagnostic metadata. It is not correctness authority,
@@ -44,7 +44,7 @@ components.
 | `unsupported_artifact` | The tool does not handle the requested artifact type. |
 | `deprecated` | The entry is retained for history but should not be selected. |
 | `migrated` | The entry moved to a replacement or source-of-truth repository. |
-| `planned` | The route is documented for future work, not selected in v1.16. |
+| `planned` | The route is documented for future work and not selected by current evidence collection. |
 | `rejected` | The tool is intentionally not used. |
 | `failed` | A bounded probe ran and failed. |
 
@@ -65,9 +65,9 @@ Print the built-in registry:
 uv run sol-execbench toolchain --json --list-registry
 ```
 
-Static evidence routes can be queried, but v1.16 should report them as
-`planned`, `candidate`, `unavailable`, or `unsupported_*` rather than producing
-static evidence:
+Static evidence routes can be queried directly. HIP/C++ benchmark runs can also
+consume active routes through `--static-evidence auto`, which writes diagnostic
+sidecars documented in `docs/static_kernel_evidence.md`:
 
 ```bash
 uv run sol-execbench toolchain --json \
@@ -86,10 +86,10 @@ uv run sol-execbench toolchain --json \
 | ROCm Systems | active | runtime/profiling | Repository source-of-truth signal, not a direct executable route. |
 | `rocminfo` | active | runtime | Runtime/device discovery. |
 | `rocm_agent_enumerator` | active | runtime | Architecture discovery. |
-| RGA | planned | static | Deferred to v1.17 Static Kernel Evidence. |
-| `llvm-objdump` | planned | static | Deferred object-inspection route. |
+| RGA | planned | static | Rich resource extraction is deferred until local packaging and parser evidence exist. |
+| `llvm-objdump` | active | static | Bounded object-inspection route for persisted HIP/C++ build artifacts. |
 | `roc-objdump` | candidate | static | Distribution-dependent object-inspection candidate. |
-| `readelf` | planned | static | Generic ELF metadata fallback for v1.17. |
+| `readelf` | active | static | Generic ELF metadata fallback for persisted HIP/C++ build artifacts. |
 
 ## Source References
 
@@ -114,9 +114,12 @@ Do not describe a successful routing decision as:
 
 - a correctness result,
 - performance proof,
-- static kernel evidence,
+- correctness, performance, timing, score, paper-parity, or leaderboard
+  authority for Static Kernel Evidence,
 - paper parity,
 - leaderboard readiness,
 - or hardware validation.
 
-Routing answers tool availability and provenance questions only. Static Kernel Evidence remains a v1.17 milestone.
+Routing answers tool availability and provenance questions only. Static Kernel
+Evidence consumes routing records as diagnostic metadata, not as correctness,
+performance, timing, score, paper-parity, or leaderboard authority.
