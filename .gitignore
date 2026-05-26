@@ -38,3 +38,4 @@ pytest*
 /out/
 .planning/config.json
 .planning/tmp/
+.artifacts/
