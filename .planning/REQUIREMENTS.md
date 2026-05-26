@@ -87,19 +87,19 @@ roadmap phase.
 
 ### Documentation And Validation
 
-- [ ] **SKE-DOCS-01**: Researcher can read documentation that explains how to
+- [x] **SKE-DOCS-01**: Researcher can read documentation that explains how to
   enable static evidence, interpret collected, partial, unavailable,
   unsupported, failed, and skipped states, and archive static sidecars.
-- [ ] **SKE-DOCS-02**: Researcher can read claim-boundary documentation stating
+- [x] **SKE-DOCS-02**: Researcher can read claim-boundary documentation stating
   that static evidence is diagnostic static-analysis evidence, not correctness,
   performance, timing, score, paper-parity, or leaderboard authority.
-- [ ] **SKE-DOCS-03**: Maintainer can run CPU-safe tests with fixture artifacts,
+- [x] **SKE-DOCS-03**: Maintainer can run CPU-safe tests with fixture artifacts,
   fake routed tools, and fake extractor outputs for schema, artifact discovery,
   extractor parsing, CLI sidecar writing, and claim guardrails.
-- [ ] **SKE-DOCS-04**: Maintainer can record a bounded live ROCm validation
+- [x] **SKE-DOCS-04**: Maintainer can record a bounded live ROCm validation
   artifact for at least one RDNA 4 HIP/C++ build when the execution environment
   exposes the required ROCm build tools and device/runtime access.
-- [ ] **SKE-DOCS-05**: Maintainer can document CDNA 3, CDNA 4, Triton, RGA-rich
+- [x] **SKE-DOCS-05**: Maintainer can document CDNA 3, CDNA 4, Triton, RGA-rich
   resource parsing, and paper-scale static coverage as unsupported, partial, or
   deferred unless this milestone produces direct evidence for those scopes.
 
@@ -173,11 +173,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SKE-CLI-02 | Phase 76 | Complete |
 | SKE-CLI-03 | Phase 76 | Complete |
 | SKE-CLI-04 | Phase 76 | Complete |
-| SKE-DOCS-01 | Phase 77 | Pending |
-| SKE-DOCS-02 | Phase 77 | Pending |
-| SKE-DOCS-03 | Phase 77 | Pending |
-| SKE-DOCS-04 | Phase 77 | Pending |
-| SKE-DOCS-05 | Phase 77 | Pending |
+| SKE-DOCS-01 | Phase 77 | Complete |
+| SKE-DOCS-02 | Phase 77 | Complete |
+| SKE-DOCS-03 | Phase 77 | Complete |
+| SKE-DOCS-04 | Phase 77 | Complete |
+| SKE-DOCS-05 | Phase 77 | Complete |
 
 **Coverage:**
 - v1.17 requirements: 25 total
@@ -186,4 +186,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-05-25*
-*Last updated: 2026-05-25 after v1.17 roadmap creation*
+*Last updated: 2026-05-26 after v1.17 completion*
