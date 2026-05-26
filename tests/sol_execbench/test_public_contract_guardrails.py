@@ -277,6 +277,7 @@ def test_cli_help_preserves_existing_public_options():
         "--lock-clocks",
         "--keep-staging",
         "--profile",
+        "--static-evidence",
         "--verbose",
     ):
         assert expected_option in help_text
@@ -285,10 +286,6 @@ def test_cli_help_preserves_existing_public_options():
         "diagnose",
         "--rocprofv3",
         "hip-bench",
-        "--static-evidence",
-        "static-evidence",
-        "--static-evidence auto",
-        "--static-evidence none",
     ):
         assert unexpected_option not in help_text
 
