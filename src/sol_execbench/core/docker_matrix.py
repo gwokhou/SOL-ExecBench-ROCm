@@ -14,6 +14,8 @@ from sol_execbench.core.compatibility import (
     MatrixCompatibilityReasonCode,
     MatrixCompatibilityStatus,
     MatrixContainerEvidence,
+    MatrixEntry,
+    MatrixExecutionDecision,
     MatrixGpuEvidence,
     MatrixHostEvidence,
     MatrixObservedEvidence,
@@ -106,10 +108,85 @@ class DockerTargetSelection(BaseModelWithDocstrings):
     """Whether this result came from an explicit unsafe/untested override."""
     status: MatrixCompatibilityStatus | None = None
     """Diagnostic Matrix status for unsafe/untested override selections."""
-    entry: object | None = None
+    entry: MatrixEntry | None = None
     """Diagnostic Matrix Entry for unsafe/untested override selections."""
-    decision: object | None = None
+    decision: MatrixExecutionDecision | None = None
     """Execution decision for unsafe/untested override selections."""
+
+
+class DockerPreflightObservation(BaseModelWithDocstrings):
+    """Structured host observations collected before Docker benchmark execution."""
+
+    model_config = _MODEL_CONFIG
+
+    docker_context: str | None = None
+    """Observed Docker context name."""
+    docker_host: str | None = None
+    """Observed Docker daemon host endpoint."""
+    dev_kfd_present: bool
+    """Whether `/dev/kfd` exists on the host."""
+    dev_kfd_accessible: bool
+    """Whether `/dev/kfd` is accessible to the preflight probe."""
+    dev_dri_present: bool
+    """Whether `/dev/dri` exists on the host."""
+    dev_dri_accessible: bool
+    """Whether `/dev/dri` is accessible to the preflight probe."""
+    gpu_accessible: bool | None = None
+    """Whether an optional GPU visibility probe could access the device."""
+    selected_target: DockerTargetManifestEntry
+    """Selected Docker Target for this preflight."""
+    image_repository: str
+    """Requested image repository for the selected Target."""
+    image_tag: str
+    """Requested image tag for the selected Target."""
+    image_digest: str | None = None
+    """Resolved image digest when available; absence is non-blocking evidence."""
+    build_args: dict[str, str]
+    """Docker build args associated with the selected Target."""
+    visible_device_environment: dict[str, str] = Field(default_factory=dict)
+    """Observed GPU visibility environment values."""
+
+
+class DockerPreflightResult(BaseModelWithDocstrings):
+    """Matrix-compatible classification for one Docker preflight observation."""
+
+    model_config = _MODEL_CONFIG
+
+    entry: MatrixEntry
+    """Diagnostic Matrix Entry produced by preflight classification."""
+    decision: MatrixExecutionDecision
+    """Pre-benchmark execution decision derived from the Matrix Entry."""
+    build_args: dict[str, str]
+    """Docker build args associated with the selected Target."""
+
+    def to_preview_payload(self) -> dict[str, Any]:
+        """Return shell-consumable JSON for preflight classification."""
+
+        entry_payload = self.entry.model_dump(mode="json")
+        decision_payload = self.decision.model_dump(mode="json")
+        target_payload = entry_payload["target"]
+        container_payload = entry_payload["observed"]["container"]
+        return {
+            "target_id": target_payload["target_id"],
+            "validation_scope": target_payload["validation_scope"],
+            "image_repository": container_payload["image_repository"],
+            "image_tag": container_payload["image_tag"],
+            "image_digest": container_payload["image_digest"],
+            "build_args": self.build_args,
+            "status": entry_payload["status"],
+            "reason_code": entry_payload["reason_code"],
+            "reason": entry_payload["reason"],
+            "benchmark_allowed": decision_payload["benchmark_allowed"],
+            "probes_allowed": decision_payload["probes_allowed"],
+            "smoke_allowed": decision_payload["smoke_allowed"],
+            "score_authority": decision_payload["score_authority"],
+            "paper_parity_authority": decision_payload["paper_parity_authority"],
+            "leaderboard_authority": decision_payload["leaderboard_authority"],
+            "container_user_space_validated": decision_payload[
+                "container_user_space_validated"
+            ],
+            "native_host_validated": decision_payload["native_host_validated"],
+        }
 
 
 def load_docker_target_manifest(
@@ -245,7 +322,7 @@ def select_docker_target(
 def _selection_entry_for_preview(selection: DockerTargetSelection):
     if selection.entry is not None and selection.decision is not None:
         return selection.entry, selection.decision
-    return _not_tested_selection(
+    preview_selection = _not_tested_selection(
         selection.target,
         reason=(
             "Declared Docker Target selection preview is diagnostic only; no "
@@ -253,15 +330,98 @@ def _selection_entry_for_preview(selection: DockerTargetSelection):
             "validation has been performed."
         ),
         unknown_override=False,
-    ).entry, _not_tested_selection(
-        selection.target,
-        reason=(
-            "Declared Docker Target selection preview is diagnostic only; no "
-            "runtime, container user-space, host, hardware, or benchmark "
-            "validation has been performed."
+    )
+    assert preview_selection.entry is not None
+    assert preview_selection.decision is not None
+    return preview_selection.entry, preview_selection.decision
+
+
+def _observed_device_nodes(observation: DockerPreflightObservation) -> list[str]:
+    nodes = []
+    if observation.dev_kfd_present and observation.dev_kfd_accessible:
+        nodes.append("/dev/kfd")
+    if observation.dev_dri_present and observation.dev_dri_accessible:
+        nodes.append("/dev/dri")
+    return nodes
+
+
+def _runtime_unavailable_reason(
+    observation: DockerPreflightObservation,
+) -> str | None:
+    docker_context = observation.docker_context or ""
+    docker_host = observation.docker_host or ""
+    if docker_context == "desktop-linux" or "/.docker/desktop/" in docker_host:
+        return (
+            f"Docker Desktop context {docker_context!r} ({docker_host}) cannot "
+            "provide native Linux ROCm device passthrough."
+        )
+    if not observation.dev_kfd_present:
+        return "/dev/kfd is missing on the host before Docker benchmark execution."
+    if not observation.dev_kfd_accessible:
+        return "/dev/kfd is not accessible before Docker benchmark execution."
+    if not observation.dev_dri_present:
+        return "/dev/dri is missing on the host before Docker benchmark execution."
+    if not observation.dev_dri_accessible:
+        return "/dev/dri is not accessible before Docker benchmark execution."
+    if observation.gpu_accessible is False:
+        return "GPU access is unavailable before Docker benchmark execution."
+    return None
+
+
+def classify_docker_preflight(
+    observation: DockerPreflightObservation,
+) -> DockerPreflightResult:
+    """Classify Docker runtime observations before benchmark execution."""
+
+    reason = _runtime_unavailable_reason(observation)
+    status = (
+        MatrixCompatibilityStatus.RUNTIME_UNAVAILABLE
+        if reason is not None
+        else MatrixCompatibilityStatus.NOT_TESTED
+    )
+    reason_code = (
+        MatrixCompatibilityReasonCode.ROCM_RUNTIME_UNAVAILABLE
+        if reason is not None
+        else MatrixCompatibilityReasonCode.TARGET_NOT_TESTED
+    )
+    if reason is None:
+        reason = (
+            "Docker preflight did not find runtime blockers, but no benchmark, "
+            "container user-space, host, or hardware validation has been "
+            "performed."
+        )
+    target = to_matrix_target(observation.selected_target)
+    entry = build_matrix_entry(
+        target=target,
+        observed=MatrixObservedEvidence(
+            host=MatrixHostEvidence(
+                device_nodes=_observed_device_nodes(observation),
+                source="docker_preflight",
+            ),
+            container=MatrixContainerEvidence(
+                image_repository=observation.image_repository,
+                image_tag=observation.image_tag,
+                image_digest=observation.image_digest,
+            ),
+            gpu=MatrixGpuEvidence(
+                device_count=1 if observation.gpu_accessible else None,
+                visible_device_environment=observation.visible_device_environment,
+            ),
         ),
-        unknown_override=False,
-    ).decision
+        status=status,
+        reason_code=reason_code,
+        reason=reason,
+        claim_boundary=MatrixClaimBoundary(
+            container_user_space_validated=False,
+            native_host_validated=False,
+            hardware_validated=False,
+        ),
+    )
+    return DockerPreflightResult(
+        entry=entry,
+        decision=classify_matrix_entry_for_execution(entry),
+        build_args=dict(observation.build_args),
+    )
 
 
 def preview_docker_target_selection(
