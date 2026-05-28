@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import json
 import os
 import subprocess
-import sys
 from pathlib import Path
 
 from sol_execbench.core.docker_matrix import load_docker_target_manifest
@@ -50,6 +50,26 @@ def _run_docker_preview(*args: str) -> subprocess.CompletedProcess[str]:
         **os.environ,
         "PYTHONPATH": str(REPO_ROOT / "src"),
         "SOL_EXECBENCH_RUN_DOCKER_DRY_RUN": "1",
+    }
+    return subprocess.run(
+        [str(RUN_DOCKER_SCRIPT), *args],
+        cwd=REPO_ROOT,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+
+def _run_docker_preflight(
+    *args: str,
+    **env_overrides: str,
+) -> subprocess.CompletedProcess[str]:
+    env = {
+        **os.environ,
+        "PYTHONPATH": str(REPO_ROOT / "src"),
+        "SOL_EXECBENCH_RUN_DOCKER_DRY_RUN": "1",
+        **env_overrides,
     }
     return subprocess.run(
         [str(RUN_DOCKER_SCRIPT), *args],
@@ -131,5 +151,79 @@ def test_run_docker_unknown_target_rejected_before_docker_commands() -> None:
 
     assert completed.returncode != 0
     assert "Unknown Docker Target" in completed.stderr
+    assert "docker build" not in completed.stdout
+    assert "docker run" not in completed.stdout
+
+
+def test_run_docker_preflight_only_emits_runtime_unavailable_diagnostics() -> None:
+    completed = _run_docker_preflight(
+        "--preflight-only",
+        SOL_EXECBENCH_DOCKER_CONTEXT="desktop-linux",
+        SOL_EXECBENCH_DOCKER_HOST="unix:///home/user/.docker/desktop/docker.sock",
+        SOL_EXECBENCH_DEV_KFD_PRESENT="true",
+        SOL_EXECBENCH_DEV_KFD_ACCESSIBLE="true",
+        SOL_EXECBENCH_DEV_DRI_PRESENT="true",
+        SOL_EXECBENCH_DEV_DRI_ACCESSIBLE="true",
+        SOL_EXECBENCH_GPU_ACCESSIBLE="false",
+    )
+
+    assert completed.returncode != 0
+    payload = json.loads(completed.stdout)
+    assert payload["status"] == "runtime_unavailable"
+    assert payload["reason_code"] == "rocm_runtime_unavailable"
+    assert payload["target_id"]
+    assert payload["image_repository"] == "rocm/dev-ubuntu-24.04"
+    assert payload["image_tag"] == "7.1.1-complete"
+    assert "image_digest" in payload
+    assert payload["image_digest"] is None
+    assert payload["build_args"]["ROCM_DOCKER_IMAGE"] == "rocm/dev-ubuntu-24.04"
+    assert payload["build_args"]["ROCM_DOCKER_TAG"] == "7.1.1-complete"
+    assert payload["benchmark_allowed"] is False
+    assert payload["score_authority"] is False
+    assert payload["paper_parity_authority"] is False
+    assert payload["leaderboard_authority"] is False
+    assert "docker build" not in completed.stdout
+    assert "docker run" not in completed.stdout
+
+
+def test_run_docker_runtime_unavailable_skips_build_and_run() -> None:
+    completed = _run_docker_preflight(
+        "--build",
+        SOL_EXECBENCH_DOCKER_CONTEXT="default",
+        SOL_EXECBENCH_DOCKER_HOST="unix:///var/run/docker.sock",
+        SOL_EXECBENCH_DEV_KFD_PRESENT="true",
+        SOL_EXECBENCH_DEV_KFD_ACCESSIBLE="true",
+        SOL_EXECBENCH_DEV_DRI_PRESENT="false",
+        SOL_EXECBENCH_DEV_DRI_ACCESSIBLE="false",
+    )
+
+    assert completed.returncode != 0
+    payload = json.loads(completed.stdout)
+    assert payload["status"] == "runtime_unavailable"
+    assert payload["reason_code"] == "rocm_runtime_unavailable"
+    assert "/dev/dri" in payload["reason"]
+    assert "docker build" not in completed.stdout
+    assert "docker run" not in completed.stdout
+
+
+def test_run_docker_preflight_only_available_exits_without_build_or_run() -> None:
+    completed = _run_docker_preflight(
+        "--preflight-only",
+        "--build",
+        SOL_EXECBENCH_DOCKER_CONTEXT="default",
+        SOL_EXECBENCH_DOCKER_HOST="unix:///var/run/docker.sock",
+        SOL_EXECBENCH_DEV_KFD_PRESENT="true",
+        SOL_EXECBENCH_DEV_KFD_ACCESSIBLE="true",
+        SOL_EXECBENCH_DEV_DRI_PRESENT="true",
+        SOL_EXECBENCH_DEV_DRI_ACCESSIBLE="true",
+        SOL_EXECBENCH_GPU_ACCESSIBLE="true",
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    payload = json.loads(completed.stdout)
+    assert payload["status"] == "not_tested"
+    assert payload["benchmark_allowed"] is False
+    assert payload["container_user_space_validated"] is False
+    assert payload["native_host_validated"] is False
     assert "docker build" not in completed.stdout
     assert "docker run" not in completed.stdout
