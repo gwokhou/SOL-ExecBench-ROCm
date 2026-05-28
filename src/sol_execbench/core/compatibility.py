@@ -179,6 +179,31 @@ class MatrixPythonDependencyEvidence(BaseModelWithDocstrings):
     """Observed Triton ROCm package or availability status."""
 
 
+class MatrixDependencyPolicyEvidence(BaseModelWithDocstrings):
+    """Declared PyTorch ROCm dependency policy for a Matrix Entry."""
+
+    model_config = _MATRIX_MODEL_CONFIG
+
+    policy_id: str
+    """Stable policy identifier tied to the selected Target."""
+    expected_local_version: str
+    """Expected PyTorch ROCm local-version tag, such as rocm7.1."""
+    uv_index_name: str
+    """uv index name expected to provide the PyTorch ROCm wheels."""
+    uv_index_url: str
+    """uv index URL expected to provide the PyTorch ROCm wheels."""
+    lock_strategy: str
+    """Dependency lock or workflow strategy for this Target policy."""
+    suggested_uv_command: str
+    """Auditable uv command or workflow users can run for this policy."""
+    triton_rocm_version: str
+    """Expected triton-rocm distribution version."""
+    triton_rocm_index_name: str
+    """uv index name expected to provide triton-rocm."""
+    triton_rocm_index_url: str
+    """uv index URL expected to provide triton-rocm."""
+
+
 class MatrixToolchainEvidence(BaseModelWithDocstrings):
     """Observed ROCm toolchain evidence for a compatibility Matrix Entry."""
 
@@ -220,6 +245,8 @@ class MatrixObservedEvidence(BaseModelWithDocstrings):
     """Observed container-scope evidence."""
     python_dependency: MatrixPythonDependencyEvidence | None = None
     """Observed Python dependency evidence."""
+    dependency_policy: MatrixDependencyPolicyEvidence | None = None
+    """Declared PyTorch ROCm dependency policy for the selected Target."""
     toolchain: MatrixToolchainEvidence | None = None
     """Observed ROCm toolchain evidence."""
     gpu: MatrixGpuEvidence | None = None

@@ -55,6 +55,8 @@ class DockerTargetManifestEntry(BaseModelWithDocstrings):
     """Requested Docker image tag."""
     pytorch_rocm_target: str | None = None
     """Expected PyTorch ROCm wheel target for later dependency phases."""
+    pytorch_dependency_policy: dict[str, str] | None = None
+    """Expected PyTorch ROCm wheel/index policy for this Target."""
     validation_scope: MatrixValidationScopeField
     """Validation scope for this Target."""
     intended_gpu_architecture: str | None = None

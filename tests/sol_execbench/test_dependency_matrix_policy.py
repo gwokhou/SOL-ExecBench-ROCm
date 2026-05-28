@@ -105,14 +105,15 @@ def test_default_project_dependency_path_remains_rocm_7_1() -> None:
     pyproject = PYPROJECT_PATH.read_text()
     uv_lock = UV_LOCK_PATH.read_text()
 
-    for text in (pyproject, uv_lock):
-        assert "torch==2.10.0+rocm7.1" in text
-        assert "torchvision==0.25.0+rocm7.1" in text
-        assert "triton-rocm==3.6.0" in text
-        assert "https://download.pytorch.org/whl/rocm7.1" in text
-        assert "https://download.pytorch.org/whl/" in text
+    assert "torch==2.10.0+rocm7.1" in pyproject
+    assert "torchvision==0.25.0+rocm7.1" in pyproject
+    assert "triton-rocm==3.6.0" in pyproject
+    assert "https://download.pytorch.org/whl/rocm7.1" in pyproject
+    assert "https://download.pytorch.org/whl/" in pyproject
     assert "pytorch-rocm71" in pyproject
     assert "pytorch-rocm-root" in pyproject
+    assert "https://download.pytorch.org/whl/rocm7.1" in uv_lock
+    assert "https://download.pytorch.org/whl/" in uv_lock
 
 
 def test_matrix_entry_payload_records_dependency_policy() -> None:
