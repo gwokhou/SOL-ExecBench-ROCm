@@ -196,3 +196,45 @@ def test_dependency_env_override_reports_probe_smoke_only_without_authority() ->
     assert payload["paper_parity_authority"] is False
     assert payload["leaderboard_authority"] is False
     assert "docker run" not in completed.stdout
+
+
+def test_dependency_override_allows_normal_dry_run_smoke_without_authority() -> None:
+    completed = _run_docker_dependency_preflight(
+        "--target",
+        "rocm-7.2.0-ubuntu-24.04-container",
+        "--allow-mixed-version-dependencies",
+        "--",
+        "sol-execbench",
+        "examples/pytorch/linear_backward",
+        **{
+            **_matching_default_dependency_env(),
+            "SOL_EXECBENCH_DEPENDENCY_CONTAINER_ROCM_USER_SPACE_VERSION": "7.2.0",
+            "SOL_EXECBENCH_DEPENDENCY_TOOLCHAIN_ROCM_VERSION": "7.2.0",
+        },
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert "+ docker run" in completed.stdout
+    assert "sol-execbench:rocm-7.2-complete" in completed.stdout
+    assert "sol-execbench examples/pytorch/linear_backward" in completed.stdout
+
+
+def test_missing_required_dependency_still_blocks_normal_dry_run_smoke() -> None:
+    completed = _run_docker_dependency_preflight(
+        "--allow-mixed-version-dependencies",
+        "--",
+        "sol-execbench",
+        "examples/pytorch/linear_backward",
+        **{
+            **_matching_default_dependency_env(),
+            "SOL_EXECBENCH_DEPENDENCY_TORCH_DISTRIBUTION_VERSION": "none",
+            "SOL_EXECBENCH_DEPENDENCY_TORCH_IMPORT_ERROR": (
+                "No module named 'torch'"
+            ),
+        },
+    )
+
+    assert completed.returncode != 0
+    payload = json.loads(completed.stdout)
+    assert payload["status"] == "pytorch_wheel_unavailable"
+    assert "docker run" not in completed.stdout
