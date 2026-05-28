@@ -1,28 +1,40 @@
 <!-- generated-by: gsd-doc-writer -->
 # SOL ExecBench ROCm Port
 
-SOL ExecBench ROCm Port is a ROCm-only Python benchmark package for researchers and developers evaluating GPU kernel solutions on AMD hardware.
+SOL ExecBench ROCm Port is a ROCm-only Python benchmark package for evaluating
+LLM-generated GPU kernels on AMD hardware. It keeps the original SOL ExecBench
+benchmark shape where practical, while replacing CUDA/NVIDIA execution paths
+with ROCm, HIP, Triton ROCm, and AMD-native scoring and evidence helpers.
+
+## Requirements
+
+- Python `>=3.12,<3.14`
+- `uv` for dependency and environment management
+- Linux with ROCm-capable AMD hardware for GPU evaluation
+- ROCm device access through `/dev/kfd` and `/dev/dri`
+- ROCm 7.x user-space tooling for native HIP/C++ and profiler paths
+- Docker, when using the provided ROCm container workflow
+
+The project dependency configuration resolves PyTorch `2.10.0+rocm7.1` and
+torchvision `0.25.0+rocm7.1` on Linux and Windows. On Linux it also resolves
+`triton-rocm==3.6.0`. The Docker target manifest records ROCm 7.0, 7.1, and
+7.2 container targets for compatibility and evidence workflows.
 
 ## Installation
 
-The project requires Python `>=3.12,<3.14` and uses `uv` for environment management. On Linux, the dependency set resolves PyTorch ROCm 7.1 wheels and `triton-rocm`.
+Install runtime and development dependencies:
 
 ```bash
 uv sync --all-groups
 ```
 
-For GPU evaluation, run on a Linux host with ROCm-capable AMD hardware, ROCm drivers, and access to `/dev/kfd` and `/dev/dri`. The Docker helper can build and enter the repository container:
+Build and enter the ROCm Docker environment:
 
 ```bash
 ./scripts/run_docker.sh --build
 ```
 
-ROCm library example readiness is documented in [ROCm library notes](docs/rocm_libraries.md).
-The supported native library categories include hipBLAS, MIOpen, Composable Kernel,
-and rocWMMA. CDNA 3 support is schema/build/docs-ready until real hardware
-validation is recorded; CDNA 4 validation is also deferred.
-
-Optional benchmark assets can be downloaded into `data/`:
+Optional benchmark assets belong under `data/` and can be downloaded with:
 
 ```bash
 uv run --with "huggingface-hub[cli]" ./scripts/download_data.sh
@@ -30,75 +42,43 @@ uv run --with "huggingface-hub[cli]" ./scripts/download_data.sh
 
 ## Quick Start
 
-1. Install dependencies.
+Run a small included PyTorch problem:
 
-   ```bash
-   uv sync --all-groups
-   ```
+```bash
+uv run sol-execbench examples/pytorch/gemma3_swiglu \
+  --solution examples/pytorch/gemma3_swiglu/solution_python.json
+```
 
-2. Run a local sample problem.
-
-   ```bash
-   uv run sol-execbench tests/sol_execbench/samples/rmsnorm \
-     --solution tests/sol_execbench/samples/rmsnorm/solution_triton.json
-   ```
-
-3. Write trace output when you need machine-readable results.
-
-   ```bash
-   uv run sol-execbench tests/sol_execbench/samples/linear_backward \
-     --solution tests/sol_execbench/samples/linear_backward/solution_python.json \
-     --output out/linear_backward.trace.jsonl
-   ```
-
-## Usage Examples
-
-Evaluate a problem directory that contains `definition.json` and `workload.jsonl`:
+Run a Triton ROCm sample:
 
 ```bash
 uv run sol-execbench examples/triton/rmsnorm \
   --solution examples/triton/rmsnorm/solution_triton.json
 ```
 
-Evaluate by passing the problem files explicitly:
+Write trace JSONL for later comparison:
 
 ```bash
-uv run sol-execbench \
-  --definition examples/pytorch/gemma3_swiglu/definition.json \
-  --workload examples/pytorch/gemma3_swiglu/workload.jsonl \
-  --solution examples/pytorch/gemma3_swiglu/solution_python.json
+uv run sol-execbench tests/sol_execbench/samples/linear_backward \
+  --solution tests/sol_execbench/samples/linear_backward/solution_python.json \
+  --output out/linear_backward.trace.jsonl
 ```
 
-Run a small dataset batch after downloading benchmark data:
+Run a small downloaded dataset batch:
 
 ```bash
 uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark --limit 5
 ```
 
-Compare candidate trace output against one or more baseline trace JSONL files:
+## CLI
 
-```bash
-uv run sol-execbench-baseline \
-  --candidate out/candidate.trace.jsonl \
-  --baseline out/baseline.trace.jsonl \
-  --format text
-```
-
-Print the GPU-free evaluator compatibility contract:
-
-```bash
-uv run sol-execbench contract --json
-```
-
-## CLI Reference
-
-Primary command:
+Evaluate a problem directory containing `definition.json` and `workload.jsonl`:
 
 ```bash
 uv run sol-execbench <problem_dir> --solution solution.json
 ```
 
-Equivalent explicit-file form:
+Or pass the problem files explicitly:
 
 ```bash
 uv run sol-execbench \
@@ -107,55 +87,97 @@ uv run sol-execbench \
   --solution solution.json
 ```
 
-Common options:
+Common evaluator options:
 
-| Flag | Description |
+| Flag | Purpose |
 | --- | --- |
-| `--compile-timeout` | HIP/C++ compilation timeout in seconds. |
-| `--timeout` | Evaluation subprocess timeout in seconds. |
+| `--config` | Load optional benchmark configuration JSON. |
+| `--compile-timeout` | Set HIP/C++ compilation timeout in seconds. |
+| `--timeout` | Set evaluation subprocess timeout in seconds. |
 | `-o`, `--output` | Write trace JSONL to a file. |
-| `--json` | Print trace JSON to stdout. |
+| `--json` | Print trace JSON lines to stdout. |
 | `--lock-clocks` | Require GPU clocks to be locked before benchmarking. |
-| `--keep-staging` | Keep the staging directory after evaluation. |
-| `--profile {none,rocprofv3}` | Collect optional diagnostic profiling artifacts. |
-| `--static-evidence {none,auto}` | Collect optional diagnostic static kernel evidence. |
-| `-v`, `--verbose` | Show subprocess output. |
+| `--keep-staging` | Preserve the temporary staging directory. |
+| `--profile rocprofv3` | Collect optional diagnostic `rocprofv3` profile artifacts. |
+| `--static-evidence auto` | Collect optional diagnostic static kernel evidence for native builds. |
+| `-v`, `--verbose` | Show subprocess output and staging details. |
 
-The baseline comparison command is exposed separately as `sol-execbench-baseline`.
-
-Metadata and diagnostics subcommands:
+Metadata and diagnostic subcommands:
 
 ```bash
 uv run sol-execbench contract --json
 uv run sol-execbench doctor --json
 uv run sol-execbench toolchain --json
+uv run sol-execbench toolchain --json --list-registry
 ```
+
+Compare trace JSONL against one or more baselines:
+
+```bash
+uv run sol-execbench-baseline \
+  --candidate out/candidate.trace.jsonl \
+  --baseline out/baseline.trace.jsonl \
+  --format text
+```
+
+## Supported Solution Categories
+
+The ROCm schema accepts Python/Triton categories and native ROCm categories:
+
+| Category | Notes |
+| --- | --- |
+| `pytorch` | Python implementation using PyTorch operators. |
+| `triton` | Triton ROCm implementation. |
+| `hip_cpp` | Native HIP/C++ implementation built through PyTorch extensions. |
+| `hipblas` | Native ROCm implementation backed by hipBLAS. |
+| `miopen` | Native ROCm implementation backed by MIOpen. |
+| `ck` | Native ROCm implementation using Composable Kernel. |
+| `rocwmma` | Native ROCm implementation using rocWMMA. |
+
+Legacy CUDA/NVIDIA schema values such as `cuda_cpp`, `cublas`, `cudnn`,
+`cutlass`, `cute_dsl`, and `cutile` are rejected with ROCm migration guidance.
 
 ## Documentation
 
 - [Getting Started](docs/GETTING-STARTED.md): prerequisites, installation, first run, and setup issues.
-- [Claims](docs/CLAIMS.md): supported ROCm evidence claims, unsupported claims, and upgrade requirements.
-- [Curated ROCm slice](docs/curated_rocm_slice.md): bounded v1.15 benchmark slice, commands, and artifact expectations.
-- [ROCm toolchain routing](docs/rocm_toolchain_routing.md): tool lifecycle, capability routing, availability matrix, and claim boundaries.
-- [Researcher guide](docs/RESEARCHER-GUIDE.md): workflows for kernel, compiler/backend, agent, and reproducibility researchers.
-- [Cookbook](docs/COOKBOOK.md): copy-paste recipes for common ROCm benchmark tasks.
-- [v1.15 release closure](docs/v1_15_release_closure.md): reproducibility checklist, result semantics, and known gaps.
-- [Architecture](docs/ARCHITECTURE.md): system overview, components, data flow, and key abstractions.
-- [Development](docs/DEVELOPMENT.md): local development commands, code style, branch conventions, and PR process.
-- [Testing](docs/TESTING.md): pytest setup, markers, coverage notes, and CI integration.
-- [Configuration](docs/CONFIGURATION.md): environment variables and runtime configuration.
-- [Definition schema](docs/definition.md): benchmark problem definitions.
-- [Workload schema](docs/workload.md): workload JSONL inputs and tolerances.
-- [Solution schema](docs/solution.md): ROCm-supported solution metadata.
-- [Trace schema](docs/trace.md): evaluation output format.
-- [ROCm notes](docs/rocm.md): host, Docker, and validation notes for ROCm evaluation.
-- [ROCm timing](docs/rocm_timing.md): HIP event timing and optional `rocprofv3` evidence.
-- [Static kernel evidence](docs/static_kernel_evidence.md): optional static HIP/C++ artifact sidecars and claim limits.
-- [Original parity](docs/original_parity.md): CUDA-to-ROCm parity boundaries and deferred validation claims.
+- [Architecture](docs/ARCHITECTURE.md): package layers, data flow, subprocess isolation, and ROCm boundaries.
+- [Development](docs/DEVELOPMENT.md): local setup, coding style, source areas, and PR process.
+- [Testing](docs/TESTING.md): pytest commands, markers, CI, and hardware-sensitive checks.
+- [Configuration](docs/CONFIGURATION.md): CLI flags, benchmark config, environment variables, and Docker settings.
+- [Researcher Guide](docs/RESEARCHER-GUIDE.md): workflows for kernel, compiler/backend, agent, and reproducibility researchers.
+- [Cookbook](docs/COOKBOOK.md): task-oriented commands for common benchmark workflows.
+- [ROCm Notes](docs/rocm.md): host, Docker, and validation notes.
+- [ROCm Timing](docs/rocm_timing.md): HIP event timing and optional profiler evidence.
+- [ROCm Toolchain Routing](docs/rocm_toolchain_routing.md): evidence tool selection and claim boundaries.
+- [Static Kernel Evidence](docs/static_kernel_evidence.md): diagnostic static artifact sidecars.
+- [Original Parity](docs/original_parity.md): CUDA-to-ROCm parity boundaries and deferred claims.
+
+Schema-specific references:
+
+- [Definition schema](docs/definition.md)
+- [Workload schema](docs/workload.md)
+- [Solution schema](docs/solution.md)
+- [Trace schema](docs/trace.md)
+
+## Development
+
+Run checks locally with:
+
+```bash
+uv run ruff check .
+uv run ty check
+uv run pytest tests/
+```
+
+GPU-sensitive checks use pytest markers such as `requires_rocm`,
+`requires_rocm_dev`, `requires_rdna4`, `requires_cdna3`, `requires_ck`,
+`requires_rocwmma`, and `timing_serial`.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Contributions should start from an
+approved GitHub issue, keep pull requests focused, include tests and
+documentation for public behavior changes, and use DCO-signed commits.
 
 ## License
 

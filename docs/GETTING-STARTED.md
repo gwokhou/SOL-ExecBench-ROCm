@@ -1,74 +1,116 @@
 <!-- generated-by: gsd-doc-writer -->
 # Getting Started
 
-This guide gets a local ROCm-capable checkout ready to run SOL ExecBench ROCm
-Port against a small benchmark problem.
+This guide prepares a checkout to run SOL ExecBench ROCm Port against the
+included sample problems and, when available, a ROCm-capable AMD GPU.
 
 ## Prerequisites
 
-| Requirement | Version or Detail |
+| Requirement | Detail |
 | --- | --- |
-| Python | `3.12` from `.python-version`; `pyproject.toml` allows `>=3.12,<3.14` |
-| ROCm | ROCm 7.0 or newer for the project baseline; Linux installs resolve PyTorch ROCm 7.1 wheels, and the Docker image uses `rocm/dev-ubuntu-24.04:7.1.1-complete` |
-| GPU | AMD GPU visible to PyTorch ROCm |
-| Package manager | `uv` |
-| Optional container runtime | Native Linux Docker daemon with `/dev/kfd` and `/dev/dri` access |
-| Optional dataset download | Hugging Face CLI command `hf` from `huggingface-hub[cli]` |
+| Python | `.python-version` uses Python 3.12; `pyproject.toml` allows `>=3.12,<3.14`. |
+| Package manager | `uv`. |
+| ROCm runtime | Required for live GPU evaluation. The project baseline is ROCm 7.x. |
+| GPU access | `/dev/kfd` and `/dev/dri` must be visible for ROCm hardware tests and evaluation. |
+| Optional Docker runtime | Native Linux Docker with ROCm device passthrough. |
+| Optional dataset download | Hugging Face CLI, available through `huggingface-hub[cli]`. |
 
-## Installation Steps
+On Linux and Windows, dependency resolution uses the PyTorch ROCm 7.1 index for
+`torch==2.10.0+rocm7.1` and `torchvision==0.25.0+rocm7.1`. On Linux,
+`triton-rocm==3.6.0` resolves from the PyTorch ROCm package root.
 
-1. Clone the repository.
-
-```bash
-git clone https://github.com/gwokhou/SOL-ExecBench-ROCm.git
-cd SOL-ExecBench-ROCm
-```
-
-2. Install runtime and development dependencies.
+## Install Dependencies
 
 ```bash
 uv sync --all-groups
 ```
 
-3. Confirm that PyTorch sees ROCm.
+Confirm the package entry points are available:
 
 ```bash
-uv run python - <<'PY'
-import torch
-print(torch.__version__)
-print(torch.version.hip)
-print(torch.version.cuda)
-print(torch.cuda.is_available())
-print(torch.cuda.get_device_properties(0).gcnArchName)
-PY
+uv run sol-execbench contract --json
+uv run sol-execbench doctor --json
 ```
 
-`torch.version.hip` should be set, and `torch.version.cuda` should be `None`.
+`contract` is GPU-free compatibility metadata. `doctor` probes ROCm tools and
+PyTorch ROCm availability and may report missing GPU access in sandboxed
+environments.
 
-## First Run
+## Check ROCm Visibility
 
-Run a small included problem with the CLI:
+On a ROCm host, PyTorch should report a HIP build and visible AMD device:
+
+```bash
+uv run python -c "import torch; print(torch.__version__); print(torch.version.hip); print(torch.cuda.is_available())"
+```
+
+If a device is visible, this also prints the detected architecture:
+
+```bash
+uv run python -c "import torch; print(torch.cuda.get_device_properties(0).gcnArchName)"
+```
+
+PyTorch ROCm intentionally exposes GPU APIs through the historical
+`torch.cuda` namespace.
+
+## First Benchmark Run
+
+Run an included PyTorch example:
 
 ```bash
 uv run sol-execbench examples/pytorch/gemma3_swiglu \
   --solution examples/pytorch/gemma3_swiglu/solution_python.json
 ```
 
-The command loads `definition.json`, `workload.jsonl`, and the supplied solution
-file from the example directory, evaluates each workload, and prints a Rich
-summary table.
+Run an included Triton ROCm example:
 
-## Optional Dataset Setup
+```bash
+uv run sol-execbench examples/triton/rmsnorm \
+  --solution examples/triton/rmsnorm/solution_triton.json
+```
 
-Download the benchmark assets when you need dataset-scale runs:
+Write trace JSONL:
+
+```bash
+uv run sol-execbench tests/sol_execbench/samples/linear_backward \
+  --solution tests/sol_execbench/samples/linear_backward/solution_python.json \
+  --output out/linear_backward.trace.jsonl
+```
+
+## Docker Path
+
+Build and enter the default ROCm Docker target:
+
+```bash
+./scripts/run_docker.sh --build
+```
+
+Run a benchmark command inside the container:
+
+```bash
+./scripts/run_docker.sh -- sol-execbench examples/pytorch/gemma3_swiglu \
+  --solution examples/pytorch/gemma3_swiglu/solution_python.json
+```
+
+Select a declared Docker target:
+
+```bash
+./scripts/run_docker.sh --target rocm-7.1.1 -- sol-execbench contract --json
+```
+
+The wrapper uses `docker/rocm-targets.json` to preview target images and
+dependency policies. It also performs runtime and dependency preflight checks
+before launching the container.
+
+## Dataset Setup
+
+Download benchmark assets into `data/`:
 
 ```bash
 uv run --with "huggingface-hub[cli]" ./scripts/download_data.sh
 ```
 
-The SOL-ExecBench downloader writes the public benchmark layout to
-`data/SOL-ExecBench/benchmark` by default. To verify or record the local layout
-without running GPU evaluation, emit an acquisition/layout manifest:
+Inspect or verify a local dataset layout without running GPU evaluation:
 
 ```bash
 uv run python scripts/download_solexecbench.py \
@@ -77,44 +119,30 @@ uv run python scripts/download_solexecbench.py \
   --manifest out/dataset_manifest.json
 ```
 
-This manifest is a sidecar acquisition/layout artifact. It does not prove ROCm readiness,
-execution success, paper-level validation, hosted leaderboard parity, or
-upstream SOLAR equivalence.
+This manifest is a sidecar acquisition/layout artifact. It does not prove ROCm
+readiness, execution success, paper-level validation, hosted leaderboard parity,
+or upstream SOLAR equivalence.
 
-Then run a small dataset batch:
+Run a bounded dataset batch:
 
 ```bash
 uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark --limit 5
 ```
 
-## Optional Docker Setup
-
-Build and enter the ROCm container:
-
-```bash
-./scripts/run_docker.sh --build
-```
-
-Run a command inside the container:
-
-```bash
-./scripts/run_docker.sh -- sol-execbench examples/pytorch/gemma3_swiglu \
-  --solution examples/pytorch/gemma3_swiglu/solution_python.json
-```
-
 ## Common Setup Issues
 
-| Issue | Resolution |
+| Symptom | Check |
 | --- | --- |
-| PyTorch reports `torch.version.cuda` instead of `torch.version.hip`. | Re-run `uv sync --all-groups`, confirm the ROCm wheel indexes in `pyproject.toml` are reachable, and use a host ROCm stack compatible with the ROCm 7.1 PyTorch wheels or the provided container. |
-| `torch.cuda.is_available()` returns `False` on a ROCm host. | Confirm ROCm is installed, the current user can access `/dev/kfd` and `/dev/dri`, and the GPU is visible through ROCm tools. |
-| Docker cannot see the AMD GPU. | Use a native Linux Docker daemon and `./scripts/run_docker.sh`; Docker Desktop cannot correctly pass ROCm devices through. |
-| `./scripts/download_data.sh` cannot find `hf`. | Run the downloader through `uv run --with "huggingface-hub[cli]" ./scripts/download_data.sh` so the Hugging Face CLI is available on `PATH`. |
-| HIP/C++ examples fail to compile. | Confirm ROCm compiler tools such as `hipcc` are available, or use the provided Docker image. |
+| `torch.version.hip` is empty | Confirm the ROCm wheel indexes in `pyproject.toml` were used during `uv sync --all-groups`. |
+| `torch.cuda.is_available()` is false | Check ROCm installation, GPU visibility, and access to `/dev/kfd` and `/dev/dri`. |
+| Hardware tests skip in a sandbox | Run GPU checks on a ROCm host or in Docker with ROCm device passthrough. |
+| HIP/C++ examples fail to compile | Confirm ROCm headers and `hipcc` are installed, or use the Docker image. |
+| Docker cannot see the GPU | Use native Linux Docker and the repository wrapper instead of Docker Desktop. |
+| Dataset download cannot find `hf` | Run through `uv run --with "huggingface-hub[cli]" ./scripts/download_data.sh`. |
 
 ## Next Steps
 
-- Read [Architecture](ARCHITECTURE.md) for the package layers and data flow.
-- Read [Configuration](CONFIGURATION.md) for CLI and benchmark settings.
-- Read [Development](DEVELOPMENT.md) before changing source code.
-- Read [Testing](TESTING.md) before running or adding tests.
+- Read [Architecture](ARCHITECTURE.md) for package layers and subprocess flow.
+- Read [Configuration](CONFIGURATION.md) before changing benchmark or Docker settings.
+- Read [Development](DEVELOPMENT.md) before editing code.
+- Read [Testing](TESTING.md) before running hardware-sensitive checks.
