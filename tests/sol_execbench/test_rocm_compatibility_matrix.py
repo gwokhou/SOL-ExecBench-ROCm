@@ -160,6 +160,16 @@ def test_matrix_report_rejects_status_counts_that_disagree_with_entries():
         )
 
 
+def test_matrix_report_rejects_omitted_status_counts_when_entries_exist():
+    entry = _representative_entry()
+
+    with pytest.raises(ValidationError, match="status_counts must match entries"):
+        RocmCompatibilityMatrixReport(
+            generated_at="2026-05-28T05:22:46Z",
+            entries=[entry],
+        )
+
+
 def test_matrix_report_rejects_negative_status_counts():
     with pytest.raises(ValidationError, match="negative counts"):
         RocmCompatibilityMatrixReport(

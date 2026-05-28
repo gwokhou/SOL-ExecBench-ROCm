@@ -423,7 +423,7 @@ class RocmCompatibilityMatrixReport(BaseModelWithDocstrings):
 
         if any(count < 0 for count in self.status_counts.values()):
             raise ValueError("status_counts cannot contain negative counts.")
-        if self.status_counts and self.status_counts != expected_counts:
+        if self.status_counts != expected_counts:
             raise ValueError("status_counts must match entries by status.")
 
         return self
