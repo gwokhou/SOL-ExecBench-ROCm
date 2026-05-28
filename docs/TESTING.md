@@ -90,6 +90,60 @@ These Docker dependency checks intentionally remain hard readiness checks. They
 should run only where ROCm devices are passed through, and they may fail instead
 of skipping when `/dev/kfd` or `/dev/dri` is unavailable.
 
+## ROCm Matrix Guardrails
+
+The ROCm Compatibility Matrix guardrails are CPU-safe by default. They cover
+status classification, reason-code classification, schema serialization,
+mixed-version blocking, claim flags, docs wording, Docker Target selection,
+default behavior preservation, unknown Target rejection, and wrapper command
+construction without requiring live ROCm hardware.
+
+Run the focused matrix guardrail suite:
+
+```bash
+UV_CACHE_DIR=/tmp/uv-cache uv run pytest \
+  tests/sol_execbench/test_rocm_compatibility_matrix.py \
+  tests/sol_execbench/test_matrix_claim_guardrails.py \
+  tests/sol_execbench/test_docker_matrix_targets.py \
+  tests/sol_execbench/test_docker_matrix_preflight.py \
+  tests/sol_execbench/test_run_docker_matrix_script.py \
+  tests/sol_execbench/test_dependency_matrix_policy.py \
+  tests/sol_execbench/test_dependency_matrix_classification.py \
+  tests/sol_execbench/test_dependency_matrix_cli.py \
+  tests/sol_execbench/test_run_docker_dependency_preflight.py \
+  tests/sol_execbench/test_runtime_evidence_reports.py \
+  tests/sol_execbench/test_run_docker_runtime_evidence.py \
+  tests/sol_execbench/test_rocm_matrix_docs.py -q
+```
+
+Run wrapper syntax and docs lint checks:
+
+```bash
+bash -n scripts/run_docker.sh
+UV_CACHE_DIR=/tmp/uv-cache uv run ruff check \
+  docs/CLAIMS.md docs/TESTING.md tests/sol_execbench/test_rocm_matrix_docs.py
+```
+
+The matrix guardrail suite intentionally uses injected observations, dry-run
+script execution, and sidecar assertions. It must not require Docker daemon
+access, `/dev/kfd`, `/dev/dri`, PyTorch ROCm imports, or a live GPU.
+
+Live ROCm validation is marker-gated. Use these checks only on a ROCm-capable
+Linux host or container with ROCm device passthrough:
+
+```bash
+uv run pytest tests -m requires_rocm -n 0
+uv run pytest tests -m requires_rdna4 -n 0
+uv run pytest tests -m requires_cdna3 -n 0
+```
+
+For v1.18 Matrix evidence, the current host ROCm 7.1.x environment may be
+recorded as observed evidence through compatibility sidecars. ROCm 7.0.x or
+ROCm 7.2.x native-host validation requires a matching host or separate machine;
+default validation does not require host reinstall for ROCm 7.0.x or ROCm 7.2.x.
+Docker rows for those Targets remain container ROCm user-space evidence on the
+recorded host driver/devices unless direct native-host evidence is archived.
+
 ## Writing New Tests
 
 Place new package tests under `tests/sol_execbench/` next to related coverage.

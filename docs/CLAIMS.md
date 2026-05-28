@@ -18,6 +18,41 @@ does not claim official leaderboard equivalence.
 
 Docker Matrix Entries may claim **container ROCm user-space validated on recorded host driver/devices** only; a Docker row is not native host ROCm validated without direct native-host validation evidence.
 
+## ROCm Compatibility Matrix
+
+The ROCm Compatibility Matrix is diagnostic sidecar evidence. It does not
+change canonical trace JSONL, correctness semantics, timing semantics, scoring
+schemas, benchmark defaults, or benchmark exit semantics.
+
+Each Matrix Entry has two different kinds of data:
+
+- **Target/requested values** identify the selected compatibility target, such
+  as the Target id, requested ROCm user-space version, Docker image repository
+  and tag, PyTorch ROCm wheel target, validation scope, and intended `gfx*`
+  architecture.
+- **Observed evidence** records what probes found at runtime, separated into
+  host, container, Python dependency, dependency policy, toolchain, and GPU
+  scopes.
+
+Target identity is required because observed values only become meaningful when
+compared with what was requested. A ROCm 7.1 PyTorch wheel observed while the
+Target requested ROCm 7.2 is a compatibility mismatch, not a benchmark
+correctness failure. Those mismatches are represented with bounded diagnostic
+statuses such as `mixed_version`, `pytorch_wheel_unavailable`,
+`runtime_unavailable`, or `not_tested`.
+
+Docker Matrix Entries validate **container ROCm user-space on recorded host
+driver/devices**. They do not prove native host ROCm validation. Native host
+validation requires direct native-host evidence for the requested host ROCm
+stack and must not be inferred from Docker image selection or container
+execution alone.
+
+Illegal mixed-version Targets are blocked by default before benchmark
+execution. The explicit mixed-version debug override may allow bounded probes or
+smoke diagnostics only; it cannot create `container_validated` or
+`host_validated` entries, score authority, paper-parity authority, or
+leaderboard authority.
+
 ## What Must Not Be Claimed Yet
 
 - NVIDIA B200, Blackwell, or official leaderboard parity.
@@ -37,6 +72,10 @@ Docker Matrix Entries may claim **container ROCm user-space validated on recorde
 - Static Kernel Evidence as CDNA 3, CDNA 4, Triton cache, RGA-rich resource,
   or paper-scale static coverage unless direct evidence is archived.
 - Curated-slice results as paper-level benchmark results.
+- Docker Matrix Entries as native host ROCm validation without direct
+  native-host evidence.
+- Mixed-version debug override output as clean validation, score authority,
+  paper-parity authority, or leaderboard authority.
 
 ## Claim Upgrade Rules
 
