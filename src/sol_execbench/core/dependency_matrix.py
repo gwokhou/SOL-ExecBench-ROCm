@@ -500,6 +500,53 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _observation_args_present(args: argparse.Namespace) -> bool:
+    return any(
+        getattr(args, name) is not None
+        for name in (
+            "torch_distribution_version",
+            "torch_version",
+            "torch_local_version",
+            "torch_rocm_target",
+            "torch_hip_version",
+            "torch_cuda_version",
+            "torch_device_available",
+            "torch_import_error",
+            "torchvision_distribution_version",
+            "triton_rocm_distribution_version",
+            "triton_rocm_status",
+            "container_rocm_user_space_version",
+            "hipcc_version",
+            "toolchain_rocm_version",
+        )
+    )
+
+
+def _observation_from_args(args: argparse.Namespace) -> PytorchDependencyObservation:
+    return PytorchDependencyObservation(
+        torch_distribution_version=_none_if_requested(args.torch_distribution_version),
+        torch_version=_none_if_requested(args.torch_version),
+        torch_local_version=_none_if_requested(args.torch_local_version),
+        torch_rocm_target=_none_if_requested(args.torch_rocm_target),
+        torch_hip_version=_none_if_requested(args.torch_hip_version),
+        torch_cuda_version=_none_if_requested(args.torch_cuda_version),
+        torch_device_available=args.torch_device_available,
+        torch_import_error=_none_if_requested(args.torch_import_error),
+        torchvision_distribution_version=_none_if_requested(
+            args.torchvision_distribution_version
+        ),
+        triton_rocm_distribution_version=_none_if_requested(
+            args.triton_rocm_distribution_version
+        ),
+        triton_rocm_status=_none_if_requested(args.triton_rocm_status),
+        container_rocm_user_space_version=_none_if_requested(
+            args.container_rocm_user_space_version
+        ),
+        hipcc_version=_none_if_requested(args.hipcc_version),
+        toolchain_rocm_version=_none_if_requested(args.toolchain_rocm_version),
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     """Emit shell-consumable PyTorch ROCm dependency Matrix JSON."""
 
@@ -507,29 +554,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "preflight":
         selection = select_docker_target(args.target, manifest_path=args.manifest)
         policy = load_docker_target_dependency_policy(selection.target)
-        observation = PytorchDependencyObservation(
-            torch_distribution_version=_none_if_requested(
-                args.torch_distribution_version
-            ),
-            torch_version=_none_if_requested(args.torch_version),
-            torch_local_version=_none_if_requested(args.torch_local_version),
-            torch_rocm_target=_none_if_requested(args.torch_rocm_target),
-            torch_hip_version=_none_if_requested(args.torch_hip_version),
-            torch_cuda_version=_none_if_requested(args.torch_cuda_version),
-            torch_device_available=args.torch_device_available,
-            torch_import_error=_none_if_requested(args.torch_import_error),
-            torchvision_distribution_version=_none_if_requested(
-                args.torchvision_distribution_version
-            ),
-            triton_rocm_distribution_version=_none_if_requested(
-                args.triton_rocm_distribution_version
-            ),
-            triton_rocm_status=_none_if_requested(args.triton_rocm_status),
-            container_rocm_user_space_version=_none_if_requested(
-                args.container_rocm_user_space_version
-            ),
-            hipcc_version=_none_if_requested(args.hipcc_version),
-            toolchain_rocm_version=_none_if_requested(args.toolchain_rocm_version),
+        observation = (
+            _observation_from_args(args)
+            if _observation_args_present(args)
+            else collect_pytorch_dependency_observation()
         )
         payload = classify_dependency_preflight(
             target=selection.target,

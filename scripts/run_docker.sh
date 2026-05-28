@@ -16,6 +16,7 @@
 #   IMAGE_TAG           Docker image tag     (default: latest)
 #   ROCM_DOCKER_IMAGE   Unsafe unknown-target override repository
 #   ROCM_DOCKER_TAG     Unsafe unknown-target override tag
+#   SOL_EXECBENCH_DEPENDENCY_*  Dependency preflight observation overrides for tests/debugging
 
 set -euo pipefail
 
@@ -76,6 +77,58 @@ preflight_override_present() {
         [ -n "${SOL_EXECBENCH_DEV_DRI_PRESENT:-}" ] ||
         [ -n "${SOL_EXECBENCH_DEV_DRI_ACCESSIBLE:-}" ] ||
         [ -n "${SOL_EXECBENCH_GPU_ACCESSIBLE:-}" ]
+}
+
+dependency_preflight_override_present() {
+    [ -n "${SOL_EXECBENCH_DEPENDENCY_TORCH_DISTRIBUTION_VERSION:-}" ] ||
+        [ -n "${SOL_EXECBENCH_DEPENDENCY_TORCH_VERSION:-}" ] ||
+        [ -n "${SOL_EXECBENCH_DEPENDENCY_TORCH_LOCAL_VERSION:-}" ] ||
+        [ -n "${SOL_EXECBENCH_DEPENDENCY_TORCH_ROCM_TARGET:-}" ] ||
+        [ -n "${SOL_EXECBENCH_DEPENDENCY_TORCH_HIP_VERSION:-}" ] ||
+        [ -n "${SOL_EXECBENCH_DEPENDENCY_TORCH_CUDA_VERSION:-}" ] ||
+        [ -n "${SOL_EXECBENCH_DEPENDENCY_TORCH_DEVICE_AVAILABLE:-}" ] ||
+        [ -n "${SOL_EXECBENCH_DEPENDENCY_TORCH_IMPORT_ERROR:-}" ] ||
+        [ -n "${SOL_EXECBENCH_DEPENDENCY_TORCHVISION_DISTRIBUTION_VERSION:-}" ] ||
+        [ -n "${SOL_EXECBENCH_DEPENDENCY_TRITON_ROCM_DISTRIBUTION_VERSION:-}" ] ||
+        [ -n "${SOL_EXECBENCH_DEPENDENCY_TRITON_ROCM_STATUS:-}" ] ||
+        [ -n "${SOL_EXECBENCH_DEPENDENCY_CONTAINER_ROCM_USER_SPACE_VERSION:-}" ] ||
+        [ -n "${SOL_EXECBENCH_DEPENDENCY_HIPCC_VERSION:-}" ] ||
+        [ -n "${SOL_EXECBENCH_DEPENDENCY_TOOLCHAIN_ROCM_VERSION:-}" ]
+}
+
+append_dependency_arg_from_env() {
+    local -n cmd_ref="$1"
+    local env_name="$2"
+    local flag="$3"
+    local value="${!env_name:-}"
+    if [ -n "${value}" ]; then
+        cmd_ref+=("${flag}" "${value}")
+    fi
+}
+
+classify_dependency_preflight_json() {
+    local cmd=(
+        python -m sol_execbench.core.dependency_matrix preflight
+        --manifest "${REPO_ROOT}/docker/rocm-targets.json"
+    )
+    if [ -n "${DOCKER_TARGET}" ]; then
+        cmd+=(--target "${DOCKER_TARGET}")
+    fi
+    append_dependency_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_TORCH_DISTRIBUTION_VERSION --torch-distribution-version
+    append_dependency_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_TORCH_VERSION --torch-version
+    append_dependency_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_TORCH_LOCAL_VERSION --torch-local-version
+    append_dependency_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_TORCH_ROCM_TARGET --torch-rocm-target
+    append_dependency_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_TORCH_HIP_VERSION --torch-hip-version
+    append_dependency_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_TORCH_CUDA_VERSION --torch-cuda-version
+    append_dependency_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_TORCH_DEVICE_AVAILABLE --torch-device-available
+    append_dependency_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_TORCH_IMPORT_ERROR --torch-import-error
+    append_dependency_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_TORCHVISION_DISTRIBUTION_VERSION --torchvision-distribution-version
+    append_dependency_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_TRITON_ROCM_DISTRIBUTION_VERSION --triton-rocm-distribution-version
+    append_dependency_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_TRITON_ROCM_STATUS --triton-rocm-status
+    append_dependency_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_CONTAINER_ROCM_USER_SPACE_VERSION --container-rocm-user-space-version
+    append_dependency_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_HIPCC_VERSION --hipcc-version
+    append_dependency_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_TOOLCHAIN_ROCM_VERSION --toolchain-rocm-version
+    PYTHONPATH="${REPO_ROOT}/src${PYTHONPATH:+:${PYTHONPATH}}" "${cmd[@]}"
 }
 
 docker_context_name() {
@@ -192,6 +245,28 @@ SELECTED_TARGET_ID="$(matrix_json_value "${TARGET_JSON}" "target_id")"
 if [[ "${SELECTED_TARGET_ID}" == unsafe-untested-* ]]; then
     echo "${TARGET_JSON}"
     exit 1
+fi
+
+if [ "${DRY_RUN}" != "1" ] || $PREFLIGHT_ONLY || dependency_preflight_override_present; then
+    DEPENDENCY_PREFLIGHT_JSON="$(classify_dependency_preflight_json)"
+    DEPENDENCY_PREFLIGHT_STATUS="$(matrix_json_value "${DEPENDENCY_PREFLIGHT_JSON}" "status")"
+    DEPENDENCY_PREFLIGHT_BENCHMARK_ALLOWED="$(matrix_json_value "${DEPENDENCY_PREFLIGHT_JSON}" "benchmark_allowed")"
+    if $PREFLIGHT_ONLY; then
+        if dependency_preflight_override_present; then
+            echo "${DEPENDENCY_PREFLIGHT_JSON}"
+            if [ "${DEPENDENCY_PREFLIGHT_STATUS}" = "mixed_version" ] ||
+                [ "${DEPENDENCY_PREFLIGHT_STATUS}" = "pytorch_wheel_unavailable" ] ||
+                [ "${DEPENDENCY_PREFLIGHT_BENCHMARK_ALLOWED}" != "True" ]; then
+                exit 1
+            fi
+            exit 0
+        fi
+    elif [ "${DEPENDENCY_PREFLIGHT_STATUS}" = "mixed_version" ] ||
+        [ "${DEPENDENCY_PREFLIGHT_STATUS}" = "pytorch_wheel_unavailable" ] ||
+        [ "${DEPENDENCY_PREFLIGHT_BENCHMARK_ALLOWED}" != "True" ]; then
+        echo "${DEPENDENCY_PREFLIGHT_JSON}"
+        exit 1
+    fi
 fi
 
 if [ "${DRY_RUN}" != "1" ] || $PREFLIGHT_ONLY || preflight_override_present; then
