@@ -107,3 +107,92 @@ def test_matching_default_dependency_stack_stops_only_on_clean_validation_policy
     assert payload["benchmark_allowed"] is False
     assert "docker build" not in completed.stdout
     assert "docker run" not in completed.stdout
+
+
+def test_help_documents_dependency_override_separately_from_unknown_target() -> None:
+    script = RUN_DOCKER_SCRIPT.read_text()
+
+    assert "--allow-mixed-version-dependencies" in script
+    assert "SOL_EXECBENCH_ALLOW_MIXED_VERSION_DEPENDENCIES" in script
+    assert "allow-unknown-target" in script
+    assert "dependency mismatch override" not in script.partition(
+        "--allow-unknown-target"
+    )[2].splitlines()[0]
+
+
+def test_unknown_target_override_does_not_allow_mixed_dependencies() -> None:
+    completed = _run_docker_dependency_preflight(
+        "--preflight-only",
+        "--target",
+        "rocm-7.2.0-ubuntu-24.04-container",
+        "--allow-unknown-target",
+        **{
+            **_matching_default_dependency_env(),
+            "SOL_EXECBENCH_DEPENDENCY_CONTAINER_ROCM_USER_SPACE_VERSION": "7.2.0",
+            "SOL_EXECBENCH_DEPENDENCY_TOOLCHAIN_ROCM_VERSION": "7.2.0",
+        },
+    )
+
+    assert completed.returncode != 0
+    payload = json.loads(completed.stdout)
+    assert payload["status"] == "mixed_version"
+    assert payload["reason_code"] == "target_observed_mismatch"
+    assert payload["probes_allowed"] is False
+    assert payload["smoke_allowed"] is False
+    assert payload["benchmark_allowed"] is False
+    assert "docker build" not in completed.stdout
+    assert "docker run" not in completed.stdout
+
+
+def test_dependency_override_reports_probe_smoke_only_without_authority() -> None:
+    completed = _run_docker_dependency_preflight(
+        "--preflight-only",
+        "--target",
+        "rocm-7.2.0-ubuntu-24.04-container",
+        "--allow-mixed-version-dependencies",
+        **{
+            **_matching_default_dependency_env(),
+            "SOL_EXECBENCH_DEPENDENCY_CONTAINER_ROCM_USER_SPACE_VERSION": "7.2.0",
+            "SOL_EXECBENCH_DEPENDENCY_TOOLCHAIN_ROCM_VERSION": "7.2.0",
+        },
+    )
+
+    assert completed.returncode != 0
+    payload = json.loads(completed.stdout)
+    assert payload["status"] == "mixed_version"
+    assert payload["probes_allowed"] is True
+    assert payload["smoke_allowed"] is True
+    assert payload["benchmark_allowed"] is False
+    assert payload["container_user_space_validated"] is False
+    assert payload["native_host_validated"] is False
+    assert payload["hardware_validated"] is False
+    assert payload["score_authority"] is False
+    assert payload["paper_parity_authority"] is False
+    assert payload["leaderboard_authority"] is False
+    assert "docker build" not in completed.stdout
+    assert "docker run" not in completed.stdout
+
+
+def test_dependency_env_override_reports_probe_smoke_only_without_authority() -> None:
+    completed = _run_docker_dependency_preflight(
+        "--preflight-only",
+        "--target",
+        "rocm-7.2.0-ubuntu-24.04-container",
+        **{
+            **_matching_default_dependency_env(),
+            "SOL_EXECBENCH_DEPENDENCY_CONTAINER_ROCM_USER_SPACE_VERSION": "7.2.0",
+            "SOL_EXECBENCH_DEPENDENCY_TOOLCHAIN_ROCM_VERSION": "7.2.0",
+            "SOL_EXECBENCH_ALLOW_MIXED_VERSION_DEPENDENCIES": "1",
+        },
+    )
+
+    assert completed.returncode != 0
+    payload = json.loads(completed.stdout)
+    assert payload["status"] == "mixed_version"
+    assert payload["probes_allowed"] is True
+    assert payload["smoke_allowed"] is True
+    assert payload["benchmark_allowed"] is False
+    assert payload["score_authority"] is False
+    assert payload["paper_parity_authority"] is False
+    assert payload["leaderboard_authority"] is False
+    assert "docker run" not in completed.stdout
