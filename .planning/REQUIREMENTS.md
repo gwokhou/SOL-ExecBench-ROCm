@@ -103,18 +103,18 @@
 | DEPS-05 | Phase 80 | Complete |
 | DEPS-06 | Phase 80 | Complete |
 | DEPS-07 | Phase 80 | Complete |
-| EVID-01 | Phase 81 | Pending |
-| EVID-02 | Phase 81 | Pending |
-| EVID-03 | Phase 81 | Pending |
-| EVID-04 | Phase 81 | Pending |
-| EVID-05 | Phase 81 | Pending |
-| EVID-06 | Phase 81 | Pending |
-| DOCS-01 | Phase 82 | Pending |
-| DOCS-02 | Phase 82 | Pending |
-| DOCS-03 | Phase 82 | Pending |
-| DOCS-04 | Phase 82 | Pending |
-| DOCS-05 | Phase 82 | Pending |
-| DOCS-06 | Phase 82 | Pending |
+| EVID-01 | Phase 81 | Complete |
+| EVID-02 | Phase 81 | Complete |
+| EVID-03 | Phase 81 | Complete |
+| EVID-04 | Phase 81 | Complete |
+| EVID-05 | Phase 81 | Complete |
+| EVID-06 | Phase 81 | Complete |
+| DOCS-01 | Phase 82 | Complete |
+| DOCS-02 | Phase 82 | Complete |
+| DOCS-03 | Phase 82 | Complete |
+| DOCS-04 | Phase 82 | Complete |
+| DOCS-05 | Phase 82 | Complete |
+| DOCS-06 | Phase 82 | Complete |
 
 **Coverage:**
 - v1 requirements: 30 total
