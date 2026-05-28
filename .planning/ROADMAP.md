@@ -145,7 +145,15 @@ Plans:
   4. User sees CPU, CUDA, wrong-index, wrong-ROCm, Triton, or toolchain mismatches classified as `mixed_version`.
   5. User is blocked from illegal mixed-version validation by default, while an explicit debug override can continue probes or smoke execution without eligibility for clean validation or authority claims.
 
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+**Wave 1**
+
+- [ ] 80-01-PLAN.md — Add Target-adjacent PyTorch ROCm dependency policy, strict dependency helper/classifier, CPU-safe policy/classification tests, and shell-consumable JSON while preserving the default ROCm 7.1 pyproject/uv path.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 80-02-PLAN.md — Wire dependency preflight into `scripts/run_docker.sh` so mixed-version dependency stacks block before Docker build/run by default, with an explicit debug override that cannot grant validation or authority.
 
 ### Phase 81: Runtime Evidence And Compatibility Reports
 
