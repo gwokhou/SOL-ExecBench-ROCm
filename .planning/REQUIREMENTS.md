@@ -35,12 +35,12 @@
 
 ### Runtime Evidence
 
-- [ ] **EVID-01**: Compatibility evidence records host-scope ROCm/driver/device-node evidence separately from container-scope ROCm user-space and toolchain evidence.
-- [ ] **EVID-02**: Compatibility evidence records Python runtime metadata, including `torch.__version__`, `torch.version.hip`, `torch.version.cuda`, PyTorch device availability, and `triton-rocm` status when installed.
-- [ ] **EVID-03**: Compatibility evidence records GPU metadata, including device count, device name, detected `gfx*` architecture, and visible-device environment variables when available.
-- [ ] **EVID-04**: The project emits per-Target compatibility JSON and an aggregate compatibility matrix JSON with status counts.
-- [ ] **EVID-05**: Runtime setup failures, dependency resolution failures, and benchmark correctness/performance results are reported as distinct evidence categories.
-- [ ] **EVID-06**: Compatibility sidecars do not mutate canonical trace JSONL, correctness semantics, timing semantics, scoring schemas, benchmark defaults, or benchmark exit semantics.
+- [x] **EVID-01**: Compatibility evidence records host-scope ROCm/driver/device-node evidence separately from container-scope ROCm user-space and toolchain evidence.
+- [x] **EVID-02**: Compatibility evidence records Python runtime metadata, including `torch.__version__`, `torch.version.hip`, `torch.version.cuda`, PyTorch device availability, and `triton-rocm` status when installed.
+- [x] **EVID-03**: Compatibility evidence records GPU metadata, including device count, device name, detected `gfx*` architecture, and visible-device environment variables when available.
+- [x] **EVID-04**: The project emits per-Target compatibility JSON and an aggregate compatibility matrix JSON with status counts.
+- [x] **EVID-05**: Runtime setup failures, dependency resolution failures, and benchmark correctness/performance results are reported as distinct evidence categories.
+- [x] **EVID-06**: Compatibility sidecars do not mutate canonical trace JSONL, correctness semantics, timing semantics, scoring schemas, benchmark defaults, or benchmark exit semantics.
 
 ### Documentation And Validation
 
