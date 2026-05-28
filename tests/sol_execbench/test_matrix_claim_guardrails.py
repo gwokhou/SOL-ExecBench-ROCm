@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 from pydantic import ValidationError
+from pathlib import Path
 
 from sol_execbench.core.compatibility import (
     MatrixClaimBoundary,
@@ -18,6 +19,9 @@ from sol_execbench.core.compatibility import (
     build_matrix_entry,
     classify_matrix_entry_for_execution,
 )
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _container_target() -> MatrixTarget:
@@ -277,3 +281,18 @@ def test_native_host_validated_rejects_missing_direct_host_evidence():
                 container=MatrixContainerEvidence(rocm_user_space_version="7.1.0")
             )
         )
+
+
+def test_matrix_contract_uses_target_and_matrix_entry_not_row_wording():
+    source = (REPO_ROOT / "src/sol_execbench/core/compatibility.py").read_text()
+
+    assert "Matrix Entry" in source
+    assert "Target" in source
+    assert "Row" not in source
+
+
+def test_container_claim_wording_does_not_overstate_native_host_validation():
+    claims = (REPO_ROOT / "docs/CLAIMS.md").read_text()
+
+    assert "container ROCm user-space validated on recorded host driver/devices" in claims
+    assert "Docker row is not native host ROCm validated" in claims
