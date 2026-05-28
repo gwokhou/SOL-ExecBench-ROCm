@@ -121,8 +121,15 @@ requires the native Linux Docker daemon. It runs containers with:
 - `--security-opt seccomp=unconfined`
 - `--ipc=host`
 
-The image is based on `rocm/dev-ubuntu-24.04:7.1.1-complete` and installs the
-project into `/venv`.
+The default declared target is based on
+`rocm/dev-ubuntu-24.04:7.1.1-complete` and builds the local image as
+`sol-execbench:rocm-7.1.1-complete`. The image installs the project into
+`/venv`. Non-default declared targets keep the same wrapper flow but pass
+target-specific Docker build arguments for the PyTorch ROCm wheel stack, such
+as `torch==2.10.0+rocm7.0` for ROCm 7.0 and `torch==2.11.0+rocm7.2` for ROCm
+7.2. Targets that are still classified as `not_tested` are blocked by default;
+use `--allow-untested-target-smoke` only for smoke/E2E diagnostics that should
+not be treated as validated Matrix evidence.
 
 ## ROCm Library Dependencies
 
@@ -146,6 +153,13 @@ examples.
 passwordless `sudo`. The implementation uses `rocm-smi` to set manual
 performance level and SCLK/MCLK DPM levels. If clock locking is unavailable,
 run without `--lock-clocks` for functional validation.
+
+On RDNA 4 `gfx1200`, ROCm can report the GPU in a low-power state while the
+selected MCLK DPM level remains supported but not currently active. In that
+case the clock-lock check treats MCLK as valid only when `rocm-smi -s` reports
+the requested MCLK level as a supported frequency level and the preceding
+`--setmclk` command succeeded. SCLK still requires the active level reported by
+`rocm-smi --showclocks` to match.
 
 Optional overrides:
 

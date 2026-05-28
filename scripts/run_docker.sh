@@ -2,7 +2,7 @@
 # Launch the sol-execbench Docker container with the right mounts.
 #
 # Usage:
-#   ./scripts/run_docker.sh [--build] [--target <id>] [--allow-unknown-target] [--allow-mixed-version-dependencies] [--preflight-only] [--compatibility-entry <path>] [--compatibility-matrix <path>] [docker-run-args...] [-- command...]
+#   ./scripts/run_docker.sh [--build] [--target <id>] [--allow-unknown-target] [--allow-mixed-version-dependencies] [--allow-untested-target-smoke] [--preflight-only] [--compatibility-entry <path>] [--compatibility-matrix <path>] [docker-run-args...] [-- command...]
 #
 # Examples:
 #   ./scripts/run_docker.sh                             # interactive shell
@@ -13,10 +13,12 @@
 #
 # Environment variables:
 #   IMAGE_NAME          Docker image name    (default: sol-execbench)
-#   IMAGE_TAG           Docker image tag     (default: latest)
+#   IMAGE_TAG           Docker image tag     (default: rocm-<selected ROCm Docker tag>)
 #   ROCM_DOCKER_IMAGE   Unsafe unknown-target override repository
 #   ROCM_DOCKER_TAG     Unsafe unknown-target override tag
 #   SOL_EXECBENCH_ALLOW_MIXED_VERSION_DEPENDENCIES=1  Allow dependency probe/smoke diagnostics for mixed-version stacks
+#   SOL_EXECBENCH_ALLOW_UNTESTED_TARGET_SMOKE=1       Allow not_tested Targets to run smoke/E2E without validation claims
+#   SOL_EXECBENCH_HOST_PYTHON  Optional host Python executable override for wrapper helper commands
 #   SOL_EXECBENCH_DEPENDENCY_*  Dependency preflight observation overrides for tests/debugging
 #   SOL_EXECBENCH_COMPATIBILITY_ENTRY  Optional per-Target compatibility JSON sidecar path
 #   SOL_EXECBENCH_COMPATIBILITY_MATRIX Optional aggregate compatibility matrix JSON path
@@ -26,18 +28,27 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 IMAGE_NAME="${IMAGE_NAME:-sol-execbench}"
-IMAGE_TAG="${IMAGE_TAG:-latest}"
-IMAGE="${IMAGE_NAME}:${IMAGE_TAG}"
+IMAGE_TAG="${IMAGE_TAG:-}"
 
 # Container-side paths (must match Dockerfile / entrypoint expectations)
 CONTAINER_PROJECT="/sol-execbench"
 DOCKER_TARGET=""
 ALLOW_UNKNOWN_TARGET=false
 ALLOW_MIXED_VERSION_DEPENDENCIES=false
+ALLOW_UNTESTED_TARGET_SMOKE=false
 PREFLIGHT_ONLY=false
 DRY_RUN="${SOL_EXECBENCH_RUN_DOCKER_DRY_RUN:-0}"
 COMPATIBILITY_ENTRY_PATH="${SOL_EXECBENCH_COMPATIBILITY_ENTRY:-}"
 COMPATIBILITY_MATRIX_PATH="${SOL_EXECBENCH_COMPATIBILITY_MATRIX:-}"
+
+run_host_python() {
+    local pythonpath="${REPO_ROOT}/src${PYTHONPATH:+:${PYTHONPATH}}"
+    if [ -n "${SOL_EXECBENCH_HOST_PYTHON:-}" ]; then
+        PYTHONPATH="${pythonpath}" "${SOL_EXECBENCH_HOST_PYTHON}" "$@"
+    else
+        PYTHONPATH="${pythonpath}" uv run python "$@"
+    fi
+}
 
 case "${SOL_EXECBENCH_ALLOW_MIXED_VERSION_DEPENDENCIES:-0}" in
     1 | true | TRUE | yes | YES)
@@ -45,8 +56,14 @@ case "${SOL_EXECBENCH_ALLOW_MIXED_VERSION_DEPENDENCIES:-0}" in
         ;;
 esac
 
+case "${SOL_EXECBENCH_ALLOW_UNTESTED_TARGET_SMOKE:-0}" in
+    1 | true | TRUE | yes | YES)
+        ALLOW_UNTESTED_TARGET_SMOKE=true
+        ;;
+esac
+
 matrix_json_value() {
-    python -c 'import json, sys; data=json.loads(sys.argv[1]); value=data; [value := value[part] for part in sys.argv[2].split(".")]; print(value)' "$1" "$2"
+    run_host_python -c 'import json, sys; data=json.loads(sys.argv[1]); value=data; [value := value[part] for part in sys.argv[2].split(".")]; print(value)' "$1" "$2"
 }
 
 bool_text() {
@@ -57,6 +74,20 @@ bool_text() {
     fi
 }
 
+preflight_blocked() {
+    local status="$1"
+    local benchmark_allowed="$2"
+    local hard_block_status="$3"
+    if [ "${status}" = "${hard_block_status}" ] ||
+        [ "${benchmark_allowed}" != "True" ]; then
+        if $ALLOW_UNTESTED_TARGET_SMOKE && [ "${status}" = "not_tested" ]; then
+            return 1
+        fi
+        return 0
+    fi
+    return 1
+}
+
 dev_dri_has_accessible_node() {
     [ -x /dev/dri ] || return 1
     find /dev/dri -maxdepth 1 -type c \( -name 'renderD*' -o -name 'card*' \) \
@@ -65,7 +96,7 @@ dev_dri_has_accessible_node() {
 
 resolve_docker_target_json() {
     local cmd=(
-        python -m sol_execbench.core.docker_matrix preview
+        -m sol_execbench.core.docker_matrix preview
         --manifest "${REPO_ROOT}/docker/rocm-targets.json"
     )
     if [ -n "${DOCKER_TARGET}" ]; then
@@ -78,7 +109,7 @@ resolve_docker_target_json() {
             --override-image-tag "${ROCM_DOCKER_TAG:-${DOCKER_TARGET}}"
         )
     fi
-    PYTHONPATH="${REPO_ROOT}/src${PYTHONPATH:+:${PYTHONPATH}}" "${cmd[@]}"
+    run_host_python "${cmd[@]}"
 }
 
 preflight_override_present() {
@@ -120,7 +151,7 @@ append_dependency_arg_from_env() {
 
 classify_dependency_preflight_json() {
     local cmd=(
-        python -m sol_execbench.core.dependency_matrix preflight
+        -m sol_execbench.core.dependency_matrix preflight
         --manifest "${REPO_ROOT}/docker/rocm-targets.json"
     )
     if [ -n "${DOCKER_TARGET}" ]; then
@@ -143,7 +174,7 @@ classify_dependency_preflight_json() {
     append_dependency_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_CONTAINER_ROCM_USER_SPACE_VERSION --container-rocm-user-space-version
     append_dependency_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_HIPCC_VERSION --hipcc-version
     append_dependency_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_TOOLCHAIN_ROCM_VERSION --toolchain-rocm-version
-    PYTHONPATH="${REPO_ROOT}/src${PYTHONPATH:+:${PYTHONPATH}}" "${cmd[@]}"
+    run_host_python "${cmd[@]}"
 }
 
 append_runtime_arg_from_env() {
@@ -175,7 +206,7 @@ write_compatibility_sidecars() {
     local cmd
     entry_path="$(compatibility_entry_output_path)"
     cmd=(
-        python -m sol_execbench.core.runtime_evidence collect-target
+        -m sol_execbench.core.runtime_evidence collect-target
         --manifest "${REPO_ROOT}/docker/rocm-targets.json"
         --output "${entry_path}"
     )
@@ -226,11 +257,10 @@ write_compatibility_sidecars() {
     elif [ -n "${2:-}" ]; then
         cmd+=(--failure-category dependency)
     fi
-    PYTHONPATH="${REPO_ROOT}/src${PYTHONPATH:+:${PYTHONPATH}}" "${cmd[@]}" >/dev/null
+    run_host_python "${cmd[@]}" >/dev/null
 
     if [ -n "${COMPATIBILITY_MATRIX_PATH}" ]; then
-        PYTHONPATH="${REPO_ROOT}/src${PYTHONPATH:+:${PYTHONPATH}}" \
-            python -m sol_execbench.core.runtime_evidence aggregate \
+        run_host_python -m sol_execbench.core.runtime_evidence aggregate \
             --output "${COMPATIBILITY_MATRIX_PATH}" "${entry_path}" >/dev/null
     fi
 }
@@ -279,7 +309,7 @@ classify_docker_preflight_json() {
     dev_dri_accessible="$(preflight_bool SOL_EXECBENCH_DEV_DRI_ACCESSIBLE "$(bool_text "$(dev_dri_has_accessible_node && echo 1 || echo 0)")")"
 
     cmd=(
-        python -m sol_execbench.core.docker_matrix preflight
+        -m sol_execbench.core.docker_matrix preflight
         --manifest "${REPO_ROOT}/docker/rocm-targets.json"
         --docker-context "${context_name}"
         --docker-host "${docker_host}"
@@ -294,7 +324,7 @@ classify_docker_preflight_json() {
     if [ -n "${SOL_EXECBENCH_GPU_ACCESSIBLE:-}" ]; then
         cmd+=(--gpu-accessible "${SOL_EXECBENCH_GPU_ACCESSIBLE}")
     fi
-    PYTHONPATH="${REPO_ROOT}/src${PYTHONPATH:+:${PYTHONPATH}}" "${cmd[@]}"
+    run_host_python "${cmd[@]}"
 }
 
 # Parse script flags, then split remaining args on "--"
@@ -326,6 +356,10 @@ while [ "$#" -gt 0 ]; do
                 ;;
             --allow-mixed-version-dependencies)
                 ALLOW_MIXED_VERSION_DEPENDENCIES=true
+                continue
+                ;;
+            --allow-untested-target-smoke)
+                ALLOW_UNTESTED_TARGET_SMOKE=true
                 continue
                 ;;
             --preflight-only)
@@ -367,6 +401,10 @@ TARGET_JSON="$(resolve_docker_target_json)"
 ROCM_DOCKER_IMAGE_SELECTED="$(matrix_json_value "${TARGET_JSON}" "build_args.ROCM_DOCKER_IMAGE")"
 ROCM_DOCKER_TAG_SELECTED="$(matrix_json_value "${TARGET_JSON}" "build_args.ROCM_DOCKER_TAG")"
 SELECTED_TARGET_ID="$(matrix_json_value "${TARGET_JSON}" "target_id")"
+if [ -z "${IMAGE_TAG}" ]; then
+    IMAGE_TAG="rocm-${ROCM_DOCKER_TAG_SELECTED}"
+fi
+IMAGE="${IMAGE_NAME}:${IMAGE_TAG}"
 
 if [[ "${SELECTED_TARGET_ID}" == unsafe-untested-* ]]; then
     echo "${TARGET_JSON}"
@@ -379,24 +417,21 @@ if [ "${DRY_RUN}" != "1" ] || $PREFLIGHT_ONLY || dependency_preflight_override_p
     DEPENDENCY_PREFLIGHT_BENCHMARK_ALLOWED="$(matrix_json_value "${DEPENDENCY_PREFLIGHT_JSON}" "benchmark_allowed")"
     if $PREFLIGHT_ONLY; then
         if dependency_preflight_override_present; then
-            if [ "${DEPENDENCY_PREFLIGHT_STATUS}" = "mixed_version" ] ||
-                [ "${DEPENDENCY_PREFLIGHT_STATUS}" = "pytorch_wheel_unavailable" ] ||
-                [ "${DEPENDENCY_PREFLIGHT_BENCHMARK_ALLOWED}" != "True" ]; then
+            if preflight_blocked "${DEPENDENCY_PREFLIGHT_STATUS}" "${DEPENDENCY_PREFLIGHT_BENCHMARK_ALLOWED}" "mixed_version" ||
+                [ "${DEPENDENCY_PREFLIGHT_STATUS}" = "pytorch_wheel_unavailable" ]; then
                 write_compatibility_sidecars "" "dependency"
             else
                 write_compatibility_sidecars "" ""
             fi
             echo "${DEPENDENCY_PREFLIGHT_JSON}"
-            if [ "${DEPENDENCY_PREFLIGHT_STATUS}" = "mixed_version" ] ||
-                [ "${DEPENDENCY_PREFLIGHT_STATUS}" = "pytorch_wheel_unavailable" ] ||
-                [ "${DEPENDENCY_PREFLIGHT_BENCHMARK_ALLOWED}" != "True" ]; then
+            if preflight_blocked "${DEPENDENCY_PREFLIGHT_STATUS}" "${DEPENDENCY_PREFLIGHT_BENCHMARK_ALLOWED}" "mixed_version" ||
+                [ "${DEPENDENCY_PREFLIGHT_STATUS}" = "pytorch_wheel_unavailable" ]; then
                 exit 1
             fi
             exit 0
         fi
-    elif [ "${DEPENDENCY_PREFLIGHT_STATUS}" = "mixed_version" ] ||
-        [ "${DEPENDENCY_PREFLIGHT_STATUS}" = "pytorch_wheel_unavailable" ] ||
-        [ "${DEPENDENCY_PREFLIGHT_BENCHMARK_ALLOWED}" != "True" ]; then
+    elif preflight_blocked "${DEPENDENCY_PREFLIGHT_STATUS}" "${DEPENDENCY_PREFLIGHT_BENCHMARK_ALLOWED}" "mixed_version" ||
+        [ "${DEPENDENCY_PREFLIGHT_STATUS}" = "pytorch_wheel_unavailable" ]; then
         write_compatibility_sidecars "" "dependency"
         echo "${DEPENDENCY_PREFLIGHT_JSON}"
         exit 1
@@ -409,21 +444,18 @@ if [ "${DRY_RUN}" != "1" ] || $PREFLIGHT_ONLY || preflight_override_present; the
     PREFLIGHT_BENCHMARK_ALLOWED="$(matrix_json_value "${PREFLIGHT_JSON}" "benchmark_allowed")"
     PREFLIGHT_REASON="$(matrix_json_value "${PREFLIGHT_JSON}" "reason")"
     if $PREFLIGHT_ONLY; then
-        if [ "${PREFLIGHT_STATUS}" = "runtime_unavailable" ] ||
-            [ "${PREFLIGHT_BENCHMARK_ALLOWED}" != "True" ]; then
+        if preflight_blocked "${PREFLIGHT_STATUS}" "${PREFLIGHT_BENCHMARK_ALLOWED}" "runtime_unavailable"; then
             write_compatibility_sidecars "${PREFLIGHT_REASON}" ""
         else
             write_compatibility_sidecars "" ""
         fi
         echo "${PREFLIGHT_JSON}"
-        if [ "${PREFLIGHT_STATUS}" = "runtime_unavailable" ] ||
-            [ "${PREFLIGHT_BENCHMARK_ALLOWED}" != "True" ]; then
+        if preflight_blocked "${PREFLIGHT_STATUS}" "${PREFLIGHT_BENCHMARK_ALLOWED}" "runtime_unavailable"; then
             exit 1
         fi
         exit 0
     fi
-    if [ "${PREFLIGHT_STATUS}" = "runtime_unavailable" ] ||
-        [ "${PREFLIGHT_BENCHMARK_ALLOWED}" != "True" ]; then
+    if preflight_blocked "${PREFLIGHT_STATUS}" "${PREFLIGHT_BENCHMARK_ALLOWED}" "runtime_unavailable"; then
         write_compatibility_sidecars "${PREFLIGHT_REASON}" ""
         echo "${PREFLIGHT_JSON}"
         exit 1
@@ -434,12 +466,22 @@ write_compatibility_sidecars "" ""
 
 # Build the image if requested
 if $BUILD; then
-    echo "+ docker build -t ${IMAGE} --build-arg ROCM_DOCKER_IMAGE=\"${ROCM_DOCKER_IMAGE_SELECTED}\" --build-arg ROCM_DOCKER_TAG=\"${ROCM_DOCKER_TAG_SELECTED}\" -f ${REPO_ROOT}/docker/Dockerfile ${REPO_ROOT}"
+    PYTORCH_TORCH_VERSION_SELECTED="$(matrix_json_value "${TARGET_JSON}" "build_args.PYTORCH_TORCH_VERSION")"
+    PYTORCH_TORCHVISION_VERSION_SELECTED="$(matrix_json_value "${TARGET_JSON}" "build_args.PYTORCH_TORCHVISION_VERSION")"
+    PYTORCH_ROCM_INDEX_URL_SELECTED="$(matrix_json_value "${TARGET_JSON}" "build_args.PYTORCH_ROCM_INDEX_URL")"
+    TRITON_ROCM_VERSION_SELECTED="$(matrix_json_value "${TARGET_JSON}" "build_args.TRITON_ROCM_VERSION")"
+    TRITON_ROCM_INDEX_URL_SELECTED="$(matrix_json_value "${TARGET_JSON}" "build_args.TRITON_ROCM_INDEX_URL")"
+    echo "+ docker build -t ${IMAGE} --build-arg ROCM_DOCKER_IMAGE=\"${ROCM_DOCKER_IMAGE_SELECTED}\" --build-arg ROCM_DOCKER_TAG=\"${ROCM_DOCKER_TAG_SELECTED}\" --build-arg PYTORCH_TORCH_VERSION=\"${PYTORCH_TORCH_VERSION_SELECTED}\" --build-arg PYTORCH_TORCHVISION_VERSION=\"${PYTORCH_TORCHVISION_VERSION_SELECTED}\" --build-arg PYTORCH_ROCM_INDEX_URL=\"${PYTORCH_ROCM_INDEX_URL_SELECTED}\" --build-arg TRITON_ROCM_VERSION=\"${TRITON_ROCM_VERSION_SELECTED}\" --build-arg TRITON_ROCM_INDEX_URL=\"${TRITON_ROCM_INDEX_URL_SELECTED}\" -f ${REPO_ROOT}/docker/Dockerfile ${REPO_ROOT}"
     if [ "${DRY_RUN}" != "1" ]; then
         docker build \
             -t "${IMAGE}" \
             --build-arg "ROCM_DOCKER_IMAGE=${ROCM_DOCKER_IMAGE_SELECTED}" \
             --build-arg "ROCM_DOCKER_TAG=${ROCM_DOCKER_TAG_SELECTED}" \
+            --build-arg "PYTORCH_TORCH_VERSION=${PYTORCH_TORCH_VERSION_SELECTED}" \
+            --build-arg "PYTORCH_TORCHVISION_VERSION=${PYTORCH_TORCHVISION_VERSION_SELECTED}" \
+            --build-arg "PYTORCH_ROCM_INDEX_URL=${PYTORCH_ROCM_INDEX_URL_SELECTED}" \
+            --build-arg "TRITON_ROCM_VERSION=${TRITON_ROCM_VERSION_SELECTED}" \
+            --build-arg "TRITON_ROCM_INDEX_URL=${TRITON_ROCM_INDEX_URL_SELECTED}" \
             --build-arg HOST_UID="$(id -u)" \
             --build-arg HOST_GID="$(id -g)" \
             --build-arg HOST_USER="$(whoami)" \

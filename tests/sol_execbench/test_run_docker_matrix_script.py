@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -27,6 +28,12 @@ def test_dockerfile_declares_rocm_base_args_before_first_from() -> None:
 
     assert "ARG ROCM_DOCKER_IMAGE=rocm/dev-ubuntu-24.04" in pre_from_lines
     assert "ARG ROCM_DOCKER_TAG=7.1.1-complete" in pre_from_lines
+    assert "ARG PYTORCH_TORCH_VERSION=2.10.0+rocm7.1" in pre_from_lines
+    assert "ARG PYTORCH_TORCHVISION_VERSION=0.25.0+rocm7.1" in pre_from_lines
+    assert (
+        "ARG PYTORCH_ROCM_INDEX_URL=https://download.pytorch.org/whl/rocm7.1"
+        in pre_from_lines
+    )
     assert lines[first_from_index] == (
         "FROM ${ROCM_DOCKER_IMAGE}:${ROCM_DOCKER_TAG} AS base"
     )
@@ -40,9 +47,20 @@ def test_dockerfile_keeps_existing_runtime_setup() -> None:
     assert "ARG HOST_UID=1000" in dockerfile
     assert "ARG HOST_GID=1000" in dockerfile
     assert "ARG HOST_USER=sol-execbench" in dockerfile
+    assert "uv pip install --python /venv/bin/python" in dockerfile
+    assert '"torch==${PYTORCH_TORCH_VERSION}"' in dockerfile
+    assert '"torchvision==${PYTORCH_TORCHVISION_VERSION}"' in dockerfile
+    assert '"triton-rocm==${TRITON_ROCM_VERSION}"' in dockerfile
     assert "COPY --from=ghcr.io/astral-sh/uv:0.5.11 /uv /usr/local/bin/uv" in dockerfile
     assert "COPY docker/entrypoint.sh /entrypoint.sh" in dockerfile
     assert 'ENTRYPOINT ["/entrypoint.sh"]' in dockerfile
+
+
+def test_dockerfile_allows_passwordless_rocm_smi_tools() -> None:
+    dockerfile = DOCKERFILE_PATH.read_text()
+
+    assert "for smi_tool in amd-smi rocm-smi" in dockerfile
+    assert "NOPASSWD: $(command -v \"${smi_tool}\")" in dockerfile
 
 
 def _run_docker_preview(*args: str) -> subprocess.CompletedProcess[str]:
@@ -87,14 +105,35 @@ def test_run_docker_help_mentions_target_flags() -> None:
     assert "--target <id>" in script
     assert "--allow-unknown-target" in script
     assert "--preflight-only" in script
+    assert "--allow-untested-target-smoke" in script
+
+
+def test_run_docker_host_helpers_use_uv_managed_python() -> None:
+    script = RUN_DOCKER_SCRIPT.read_text()
+
+    assert "uv run python" in script
+    assert "SOL_EXECBENCH_HOST_PYTHON" in script
+    assert not re.search(r'^\s*python\s+-m\s+sol_execbench', script, re.MULTILINE)
+    assert not re.search(r'^\s*python\s+-c\b', script, re.MULTILINE)
 
 
 def test_run_docker_default_build_preview_uses_rocm_7_1_build_args() -> None:
     completed = _run_docker_preview("--build")
 
     assert completed.returncode == 0, completed.stderr
+    assert "docker build -t sol-execbench:rocm-7.1.1-complete" in completed.stdout
     assert '--build-arg ROCM_DOCKER_IMAGE="rocm/dev-ubuntu-24.04"' in completed.stdout
     assert '--build-arg ROCM_DOCKER_TAG="7.1.1-complete"' in completed.stdout
+    assert '--build-arg PYTORCH_TORCH_VERSION="2.10.0+rocm7.1"' in completed.stdout
+    assert (
+        '--build-arg PYTORCH_TORCHVISION_VERSION="0.25.0+rocm7.1"'
+        in completed.stdout
+    )
+    assert (
+        '--build-arg PYTORCH_ROCM_INDEX_URL="https://download.pytorch.org/whl/rocm7.1"'
+        in completed.stdout
+    )
+    assert '--build-arg TRITON_ROCM_VERSION="3.6.0"' in completed.stdout
     assert "--device=/dev/kfd" in completed.stdout
     assert "--device=/dev/dri" in completed.stdout
     assert "--group-add video" in completed.stdout
@@ -115,11 +154,30 @@ def test_run_docker_declared_target_build_preview_uses_manifest_build_args() -> 
 
     assert completed.returncode == 0, completed.stderr
     assert (
+        f"docker build -t sol-execbench:rocm-{non_default.docker_image_tag}"
+        in completed.stdout
+    )
+    assert (
         f'--build-arg ROCM_DOCKER_IMAGE="{non_default.docker_image_repository}"'
         in completed.stdout
     )
     assert (
         f'--build-arg ROCM_DOCKER_TAG="{non_default.docker_image_tag}"'
+        in completed.stdout
+    )
+    assert (
+        '--build-arg PYTORCH_TORCH_VERSION="'
+        f'{non_default.pytorch_dependency_policy["torch_version"]}"'
+        in completed.stdout
+    )
+    assert (
+        '--build-arg PYTORCH_TORCHVISION_VERSION="'
+        f'{non_default.pytorch_dependency_policy["torchvision_version"]}"'
+        in completed.stdout
+    )
+    assert (
+        '--build-arg PYTORCH_ROCM_INDEX_URL="'
+        f'{non_default.pytorch_dependency_policy["uv_index_url"]}"'
         in completed.stdout
     )
 
@@ -143,7 +201,19 @@ def test_run_docker_target_flag_is_not_forwarded_to_docker_args_or_command() -> 
     )
     assert "--name matrix-test" in run_line
     assert "echo inside-container" in run_line
+    assert "sol-execbench:rocm-7.1.1-complete" in run_line
     assert "--target" not in run_line
+
+
+def test_run_docker_image_tag_env_overrides_target_tag() -> None:
+    completed = _run_docker_preflight(
+        "--build",
+        IMAGE_TAG="custom",
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert "docker build -t sol-execbench:custom" in completed.stdout
+    assert "sol-execbench:custom" in completed.stdout
 
 
 def test_run_docker_unknown_target_rejected_before_docker_commands() -> None:
@@ -229,6 +299,30 @@ def test_run_docker_preflight_only_available_exits_without_build_or_run() -> Non
     assert "docker run" not in completed.stdout
 
 
+def test_run_docker_preflight_only_allows_explicit_not_tested_smoke() -> None:
+    completed = _run_docker_preflight(
+        "--preflight-only",
+        "--allow-untested-target-smoke",
+        "--build",
+        SOL_EXECBENCH_DOCKER_CONTEXT="default",
+        SOL_EXECBENCH_DOCKER_HOST="unix:///var/run/docker.sock",
+        SOL_EXECBENCH_DEV_KFD_PRESENT="true",
+        SOL_EXECBENCH_DEV_KFD_ACCESSIBLE="true",
+        SOL_EXECBENCH_DEV_DRI_PRESENT="true",
+        SOL_EXECBENCH_DEV_DRI_ACCESSIBLE="true",
+        SOL_EXECBENCH_GPU_ACCESSIBLE="true",
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    payload = json.loads(completed.stdout)
+    assert payload["status"] == "not_tested"
+    assert payload["benchmark_allowed"] is False
+    assert payload["container_user_space_validated"] is False
+    assert payload["native_host_validated"] is False
+    assert "docker build" not in completed.stdout
+    assert "docker run" not in completed.stdout
+
+
 def test_run_docker_not_tested_preflight_blocks_normal_run() -> None:
     completed = _run_docker_preflight(
         "--",
@@ -248,6 +342,26 @@ def test_run_docker_not_tested_preflight_blocks_normal_run() -> None:
     assert payload["status"] == "not_tested"
     assert payload["benchmark_allowed"] is False
     assert "docker run" not in completed.stdout
+
+
+def test_run_docker_explicit_not_tested_smoke_reaches_dry_run_command() -> None:
+    completed = _run_docker_preflight(
+        "--allow-untested-target-smoke",
+        "--",
+        "sol-execbench",
+        "tests/sol_execbench/samples/rmsnorm",
+        SOL_EXECBENCH_DOCKER_CONTEXT="default",
+        SOL_EXECBENCH_DOCKER_HOST="unix:///var/run/docker.sock",
+        SOL_EXECBENCH_DEV_KFD_PRESENT="true",
+        SOL_EXECBENCH_DEV_KFD_ACCESSIBLE="true",
+        SOL_EXECBENCH_DEV_DRI_PRESENT="true",
+        SOL_EXECBENCH_DEV_DRI_ACCESSIBLE="true",
+        SOL_EXECBENCH_GPU_ACCESSIBLE="true",
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert "+ docker run" in completed.stdout
+    assert "sol-execbench tests/sol_execbench/samples/rmsnorm" in completed.stdout
 
 
 def test_run_docker_invalid_preflight_boolean_has_no_traceback() -> None:

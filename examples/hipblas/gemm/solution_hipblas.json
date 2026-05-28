@@ -19,10 +19,14 @@
     ],
     "destination_passing_style": false,
     "compile_options": {
+      "cflags": [
+        "-I/opt/rocm/include"
+      ],
       "hip_cflags": [
         "-O3"
       ],
       "ld_flags": [
+        "-L/opt/rocm/lib",
         "-lhipblas"
       ]
     }

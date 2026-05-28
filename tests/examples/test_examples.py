@@ -212,7 +212,7 @@ def _run_subprocess(cmd: list[str], cwd: Path) -> subprocess.CompletedProcess:
 
 
 def _mark_example(case: Example) -> list:
-    marks = [pytest.mark.xdist_group("serial")]
+    marks = [pytest.mark.xdist_group("serial"), pytest.mark.requires_rocm]
     for m in case.extra_markers:
         marks.append(getattr(pytest.mark, m))
     return marks

@@ -37,7 +37,7 @@ def test_manifest_declares_default_and_configured_rocm_complete_targets() -> Non
     )
     tags = {target.docker_image_tag for target in manifest.targets}
     assert any(tag.startswith("7.0.") and tag.endswith("-complete") for tag in tags)
-    assert any(tag.startswith("7.2.") and tag.endswith("-complete") for tag in tags)
+    assert any(tag.startswith("7.2") and tag.endswith("-complete") for tag in tags)
     assert {
         target.validation_scope for target in manifest.targets
     } == {MatrixValidationScope.CONTAINER_USER_SPACE}
@@ -76,6 +76,11 @@ def test_docker_build_args_use_requested_manifest_repository_and_tag() -> None:
     assert docker_build_args_for_target(selection.target) == {
         "ROCM_DOCKER_IMAGE": "rocm/dev-ubuntu-24.04",
         "ROCM_DOCKER_TAG": "7.1.1-complete",
+        "PYTORCH_TORCH_VERSION": "2.10.0+rocm7.1",
+        "PYTORCH_TORCHVISION_VERSION": "0.25.0+rocm7.1",
+        "PYTORCH_ROCM_INDEX_URL": "https://download.pytorch.org/whl/rocm7.1",
+        "TRITON_ROCM_VERSION": "3.6.0",
+        "TRITON_ROCM_INDEX_URL": "https://download.pytorch.org/whl/",
     }
 
 
@@ -120,6 +125,17 @@ def test_default_preview_json_is_shell_consumable_without_docker() -> None:
     assert payload["validation_scope"] == "container_user_space"
     assert payload["build_args"]["ROCM_DOCKER_IMAGE"] == "rocm/dev-ubuntu-24.04"
     assert payload["build_args"]["ROCM_DOCKER_TAG"] == "7.1.1-complete"
+    assert payload["build_args"]["PYTORCH_TORCH_VERSION"] == "2.10.0+rocm7.1"
+    assert payload["build_args"]["PYTORCH_TORCHVISION_VERSION"] == (
+        "0.25.0+rocm7.1"
+    )
+    assert payload["build_args"]["PYTORCH_ROCM_INDEX_URL"] == (
+        "https://download.pytorch.org/whl/rocm7.1"
+    )
+    assert payload["build_args"]["TRITON_ROCM_VERSION"] == "3.6.0"
+    assert payload["build_args"]["TRITON_ROCM_INDEX_URL"] == (
+        "https://download.pytorch.org/whl/"
+    )
     assert payload["status"] == "not_tested"
     assert payload["reason_code"] == "target_not_tested"
     assert payload["benchmark_allowed"] is False
@@ -145,6 +161,12 @@ def test_non_default_preview_json_selects_declared_target() -> None:
     assert payload["image_repository"] == non_default.docker_image_repository
     assert payload["image_tag"] == non_default.docker_image_tag
     assert payload["build_args"]["ROCM_DOCKER_TAG"] == non_default.docker_image_tag
+    assert payload["build_args"]["PYTORCH_TORCH_VERSION"] == (
+        non_default.pytorch_dependency_policy["torch_version"]
+    )
+    assert payload["build_args"]["PYTORCH_ROCM_INDEX_URL"] == (
+        non_default.pytorch_dependency_policy["uv_index_url"]
+    )
 
 
 def test_unknown_preview_rejected_without_override() -> None:

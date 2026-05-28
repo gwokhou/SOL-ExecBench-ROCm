@@ -114,10 +114,11 @@ The `--lock-clocks` CLI flag overrides the loaded config by setting
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `IMAGE_NAME` | `sol-execbench` | Local Docker image name. |
-| `IMAGE_TAG` | `latest` | Local Docker image tag. |
+| `IMAGE_TAG` | `rocm-${selected_docker_tag}` | Local Docker image tag. The default declared target currently builds `sol-execbench:rocm-7.1.1-complete`; set `IMAGE_TAG` to override. |
 | `ROCM_DOCKER_IMAGE` | `rocm/dev-ubuntu-24.04` for unknown-target override | Docker image repository override when unknown targets are explicitly allowed. |
 | `ROCM_DOCKER_TAG` | Selected target ID for unknown-target override | Docker image tag override when unknown targets are explicitly allowed. |
 | `SOL_EXECBENCH_ALLOW_MIXED_VERSION_DEPENDENCIES` | `0` | Allows dependency probe diagnostics for mixed-version stacks. |
+| `SOL_EXECBENCH_ALLOW_UNTESTED_TARGET_SMOKE` | `0` | Allows `not_tested` Targets to run smoke/E2E commands while preserving non-authoritative compatibility claims. |
 | `SOL_EXECBENCH_COMPATIBILITY_ENTRY` | Unset | Optional per-target compatibility JSON sidecar path. |
 | `SOL_EXECBENCH_COMPATIBILITY_MATRIX` | Unset | Optional aggregate compatibility matrix JSON path. |
 | `SOL_EXECBENCH_RUN_DOCKER_DRY_RUN` | `0` | Enables dry-run behavior used by tests and diagnostics. |
@@ -146,7 +147,12 @@ benchmark configuration.
 | `PYTHONPATH` | `/sol-execbench/src` |
 
 Docker build arguments include `ROCM_DOCKER_IMAGE`, `ROCM_DOCKER_TAG`,
-`HOST_UID`, `HOST_GID`, and `HOST_USER`.
+`PYTORCH_TORCH_VERSION`, `PYTORCH_TORCHVISION_VERSION`,
+`PYTORCH_ROCM_INDEX_URL`, `TRITON_ROCM_VERSION`, `TRITON_ROCM_INDEX_URL`,
+`HOST_UID`, `HOST_GID`, and `HOST_USER`. The wrapper derives the PyTorch and
+Triton build arguments from `docker/rocm-targets.json` so ROCm 7.0, 7.1, and
+7.2 images can install target-specific ROCm wheel stacks without changing the
+project lockfile.
 
 ## Optional Evidence Outputs
 

@@ -4,7 +4,18 @@
 
 ARG ROCM_DOCKER_IMAGE=rocm/dev-ubuntu-24.04
 ARG ROCM_DOCKER_TAG=7.1.1-complete
+ARG PYTORCH_TORCH_VERSION=2.10.0+rocm7.1
+ARG PYTORCH_TORCHVISION_VERSION=0.25.0+rocm7.1
+ARG PYTORCH_ROCM_INDEX_URL=https://download.pytorch.org/whl/rocm7.1
+ARG TRITON_ROCM_VERSION=3.6.0
+ARG TRITON_ROCM_INDEX_URL=https://download.pytorch.org/whl/
 FROM ${ROCM_DOCKER_IMAGE}:${ROCM_DOCKER_TAG} AS base
+
+ARG PYTORCH_TORCH_VERSION
+ARG PYTORCH_TORCHVISION_VERSION
+ARG PYTORCH_ROCM_INDEX_URL
+ARG TRITON_ROCM_VERSION
+ARG TRITON_ROCM_INDEX_URL
 
 ENV ROCM_PATH=/opt/rocm \
     HIP_PATH=/opt/rocm \
@@ -50,11 +61,11 @@ RUN if [ "${HOST_UID}" = "0" ]; then \
     fi && \
     mkdir -p /sol-execbench /venv /home/${HOST_USER}/.cache/uv && \
     chown -R ${HOST_UID}:${HOST_GID} /sol-execbench /venv /home/${HOST_USER} && \
-    if command -v amd-smi >/dev/null 2>&1; then \
-        echo "${RUN_USER} ALL=(ALL) NOPASSWD: $(command -v amd-smi)" >> /etc/sudoers; \
-    elif command -v rocm-smi >/dev/null 2>&1; then \
-        echo "${RUN_USER} ALL=(ALL) NOPASSWD: $(command -v rocm-smi)" >> /etc/sudoers; \
-    fi
+    for smi_tool in amd-smi rocm-smi; do \
+        if command -v "${smi_tool}" >/dev/null 2>&1; then \
+            echo "${RUN_USER} ALL=(ALL) NOPASSWD: $(command -v "${smi_tool}")" >> /etc/sudoers; \
+        fi; \
+    done
 
 # Copy and set up entrypoint while still root (avoid switching back)
 COPY docker/entrypoint.sh /entrypoint.sh
@@ -83,6 +94,17 @@ COPY --chown=${HOST_UID}:${HOST_GID} src/ ./src/
 # Install the project itself (creates the sol-execbench console script).
 RUN --mount=type=cache,target=/home/${HOST_USER}/.cache/uv,uid=${HOST_UID},gid=${HOST_GID} \
     uv sync --frozen --no-editable --all-groups
+
+# The checked-in lock is the default ROCm 7.1 stack. Non-default Docker targets
+# install their declared PyTorch ROCm wheels after the frozen sync so each image
+# matches its target user-space version without mutating the repository lock.
+RUN --mount=type=cache,target=/home/${HOST_USER}/.cache/uv,uid=${HOST_UID},gid=${HOST_GID} \
+    uv pip install --python /venv/bin/python \
+        --index-url "${PYTORCH_ROCM_INDEX_URL}" \
+        --extra-index-url "${TRITON_ROCM_INDEX_URL}" \
+        "torch==${PYTORCH_TORCH_VERSION}" \
+        "torchvision==${PYTORCH_TORCHVISION_VERSION}" \
+        "triton-rocm==${TRITON_ROCM_VERSION}"
 
 # Set runtime environment.
 # PYTHONPATH lets the volume-mounted src/ override the installed package at runtime.

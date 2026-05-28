@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
+from sol_execbench.core.bench import clock_lock as clock_lock_module
 from sol_execbench.core.bench.clock_lock import (
     are_clocks_locked,
     lock_clocks,
@@ -21,6 +22,11 @@ from sol_execbench.core.bench.config.device_config import (
 )
 
 _MODULE = "sol_execbench.core.bench.clock_lock"
+
+
+@pytest.fixture(autouse=True)
+def _mock_rocm_smi_path(monkeypatch):
+    monkeypatch.setattr(clock_lock_module.shutil, "which", lambda _tool: "rocm-smi")
 
 
 class TestProbeClockLockAvailable:
@@ -42,6 +48,21 @@ class TestProbeClockLockAvailable:
     def test_returns_false_when_rocm_smi_not_found(self):
         with patch(f"{_MODULE}.subprocess.run", side_effect=FileNotFoundError):
             assert probe_clock_lock_available() is False
+
+    def test_uses_resolved_rocm_smi_path(self, monkeypatch):
+        monkeypatch.setattr(
+            clock_lock_module.shutil,
+            "which",
+            lambda _tool: "/opt/rocm/bin/rocm-smi",
+        )
+        probe_result = MagicMock(returncode=0)
+        with patch(f"{_MODULE}.subprocess.run", return_value=probe_result) as mock_run:
+            assert probe_clock_lock_available() is True
+
+        mock_run.assert_called_once_with(
+            ["sudo", "-n", "/opt/rocm/bin/rocm-smi", "--showclocks"],
+            capture_output=True,
+        )
 
 
 class TestLockClocks:
@@ -170,6 +191,14 @@ class TestVerifyClocks:
         with patch(f"{_MODULE}.subprocess.run", return_value=result):
             assert verify_clocks(1, 1) is True
 
+    def test_same_line_clock_levels_match(self):
+        result = self._make_smi_result(
+            "GPU[0]\t\t: sclk clock level: 1: (0Mhz)\n"
+            "GPU[0]\t\t: mclk clock level: 0: (96Mhz)\n"
+        )
+        with patch(f"{_MODULE}.subprocess.run", return_value=result):
+            assert verify_clocks(1, 0) is True
+
     def test_sclk_mismatch_fails(self):
         result = self._make_smi_result(
             "sclk clock level:\n0: 500Mhz *\n1: 2500Mhz\n"
@@ -185,6 +214,42 @@ class TestVerifyClocks:
         )
         with patch(f"{_MODULE}.subprocess.run", return_value=result):
             assert verify_clocks(1, 1) is False
+
+    def test_supported_mclk_level_passes_when_low_power_keeps_active_level_low(self):
+        showclocks = self._make_smi_result(
+            "WARNING: AMD GPU device(s) is/are in a low-power state.\n"
+            "GPU[0]\t\t: sclk clock level: 1: (0Mhz)\n"
+            "GPU[0]\t\t: mclk clock level: 0: (96Mhz)\n"
+        )
+        supported = self._make_smi_result(
+            "GPU[0]\t\t: Supported mclk frequencies on GPU0\n"
+            "GPU[0]\t\t: 0: 96Mhz *\n"
+            "GPU[0]\t\t: 1: 456Mhz\n"
+            "GPU[0]\t\t: 2: 772Mhz\n"
+        )
+        with patch(
+            f"{_MODULE}.subprocess.run", side_effect=[showclocks, supported]
+        ) as mock_run:
+            assert verify_clocks(1, 1) is True
+
+        assert mock_run.call_args_list == [
+            call(["rocm-smi", "--showclocks"], capture_output=True, text=True),
+            call(["rocm-smi", "-s"], capture_output=True, text=True),
+        ]
+
+    def test_low_power_mclk_fallback_rejects_unsupported_level(self):
+        showclocks = self._make_smi_result(
+            "WARNING: AMD GPU device(s) is/are in a low-power state.\n"
+            "GPU[0]\t\t: sclk clock level: 1: (0Mhz)\n"
+            "GPU[0]\t\t: mclk clock level: 0: (96Mhz)\n"
+        )
+        supported = self._make_smi_result(
+            "GPU[0]\t\t: Supported mclk frequencies on GPU0\n"
+            "GPU[0]\t\t: 0: 96Mhz *\n"
+            "GPU[0]\t\t: 1: 456Mhz\n"
+        )
+        with patch(f"{_MODULE}.subprocess.run", side_effect=[showclocks, supported]):
+            assert verify_clocks(1, 5) is False
 
     def test_rocm_smi_not_found(self):
         with patch(f"{_MODULE}.subprocess.run", side_effect=FileNotFoundError):

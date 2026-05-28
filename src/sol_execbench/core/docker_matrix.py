@@ -219,10 +219,22 @@ def docker_build_args_for_target(
 ) -> dict[str, str]:
     """Return Dockerfile build args for the selected ROCm base image."""
 
-    return {
+    args = {
         "ROCM_DOCKER_IMAGE": target.docker_image_repository,
         "ROCM_DOCKER_TAG": target.docker_image_tag,
     }
+    policy = target.pytorch_dependency_policy or {}
+    if policy:
+        args.update(
+            {
+                "PYTORCH_TORCH_VERSION": policy.get("torch_version", ""),
+                "PYTORCH_TORCHVISION_VERSION": policy.get("torchvision_version", ""),
+                "PYTORCH_ROCM_INDEX_URL": policy.get("uv_index_url", ""),
+                "TRITON_ROCM_VERSION": policy.get("triton_rocm_version", ""),
+                "TRITON_ROCM_INDEX_URL": policy.get("triton_rocm_index_url", ""),
+            }
+        )
+    return args
 
 
 def _unsafe_override_entry(

@@ -74,3 +74,23 @@ def test_testing_docs_document_marker_gated_live_validation() -> None:
         r"ROCm 7\.0\.x or\s+ROCm 7\.2\.x native-host validation requires a matching host",
         text,
     )
+
+
+def test_testing_docs_include_compatibility_matrix_summary_table() -> None:
+    text = _text(TESTING)
+
+    assert "Compatibility Matrix Summary" in text
+    assert "Target id | Local image tag | Requested ROCm user-space" in text
+    assert "rocm-7.0.2-ubuntu-24.04-container" in text
+    assert "rocm-7.1.1-ubuntu-24.04-container" in text
+    assert "rocm-7.2.0-ubuntu-24.04-container" in text
+    assert "container_validated" in text
+    assert "runtime_probe_passed" in text
+    assert "dependency `mixed_version`" in text
+    assert "linear_backward` passed 3/3 workloads" in text
+    assert "--allow-untested-target-smoke" in text
+    assert "benchmark_allowed=false" in text
+    assert "target-specific PyTorch ROCm" in text
+    assert "rocm/dev-ubuntu-24.04:7.0.2-complete" in text
+    assert "rocm/dev-ubuntu-24.04:7.2-complete" in text
+    assert "sol-execbench:rocm-7.2-complete" in text

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
 import subprocess
 import time
 
@@ -29,11 +30,16 @@ logger = logging.getLogger(__name__)
 VERIFY_DELAY_S = 3
 
 
+def _rocm_smi_executable() -> str:
+    """Return the path sudoers rules are most likely to match."""
+    return shutil.which("rocm-smi") or "rocm-smi"
+
+
 def probe_clock_lock_available() -> bool:
     """Probe whether ROCm clock tooling is available via passwordless sudo."""
     try:
         probe = subprocess.run(
-            ["sudo", "-n", "rocm-smi", "--showclocks"],
+            ["sudo", "-n", _rocm_smi_executable(), "--showclocks"],
             capture_output=True,
         )
     except FileNotFoundError:
@@ -78,12 +84,12 @@ def lock_clocks(device_name: str) -> bool:
 
     try:
         subprocess.run(
-            ["sudo", "-n", "rocm-smi", "--setperflevel", "manual"],
+            ["sudo", "-n", _rocm_smi_executable(), "--setperflevel", "manual"],
             check=True,
             capture_output=True,
         )
         subprocess.run(
-            ["sudo", "-n", "rocm-smi", "--setsclk", str(sclk_level)],
+            ["sudo", "-n", _rocm_smi_executable(), "--setsclk", str(sclk_level)],
             check=True,
             capture_output=True,
         )
@@ -94,7 +100,7 @@ def lock_clocks(device_name: str) -> bool:
 
     try:
         subprocess.run(
-            ["sudo", "-n", "rocm-smi", "--setmclk", str(mclk_level)],
+            ["sudo", "-n", _rocm_smi_executable(), "--setmclk", str(mclk_level)],
             check=True,
             capture_output=True,
         )
@@ -121,6 +127,8 @@ def _level_is_active(stdout: str, clock_name: str, expected_level: int) -> bool:
         normalized = line.lower()
         if "clock level" in normalized:
             in_section = clock_name in normalized
+            if in_section and f"level: {expected}:" in normalized:
+                return True
             continue
         if not in_section:
             continue
@@ -131,11 +139,46 @@ def _level_is_active(stdout: str, clock_name: str, expected_level: int) -> bool:
     return False
 
 
+def _reports_low_power_state(*outputs: str) -> bool:
+    return any("low-power state" in output.lower() for output in outputs)
+
+
+def _level_is_supported(stdout: str, clock_name: str, expected_level: int) -> bool:
+    expected = str(expected_level)
+    in_section = False
+    for line in stdout.splitlines():
+        normalized = line.lower()
+        if f"supported {clock_name} frequencies" in normalized:
+            in_section = True
+            continue
+        if in_section and normalized.startswith("gpu[") and "supported" in normalized:
+            in_section = False
+        if in_section and f"{expected}:" in line:
+            return True
+    return False
+
+
+def _level_is_supported_by_rocm_smi(clock_name: str, expected_level: int) -> bool:
+    try:
+        result = subprocess.run(
+            [_rocm_smi_executable(), "-s"],
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        return False
+    return result.returncode == 0 and _level_is_supported(
+        result.stdout,
+        clock_name,
+        expected_level,
+    )
+
+
 def verify_clocks(expected_sclk_level: int, expected_mclk_level: int) -> bool:
     """Verify current ROCm SCLK and MCLK DPM levels via ``rocm-smi``."""
     try:
         result = subprocess.run(
-            ["rocm-smi", "--showclocks"],
+            [_rocm_smi_executable(), "--showclocks"],
             capture_output=True,
             text=True,
         )
@@ -153,6 +196,16 @@ def verify_clocks(expected_sclk_level: int, expected_mclk_level: int) -> bool:
 
     sclk_ok = _level_is_active(stdout, "sclk", expected_sclk_level)
     mclk_ok = _level_is_active(stdout, "mclk", expected_mclk_level)
+    if (
+        not mclk_ok
+        and _reports_low_power_state(result.stdout, result.stderr)
+        and _level_is_supported_by_rocm_smi("mclk", expected_mclk_level)
+    ):
+        logger.info(
+            "ROCm MCLK level %s is supported but not active in low-power state",
+            expected_mclk_level,
+        )
+        mclk_ok = True
     if not sclk_ok:
         logger.warning("ROCm SCLK level %s is not active", expected_sclk_level)
     if not mclk_ok:
@@ -163,8 +216,8 @@ def verify_clocks(expected_sclk_level: int, expected_mclk_level: int) -> bool:
 def unlock_clocks() -> None:
     """Reset ROCm clocks. Best-effort; errors are logged but not raised."""
     for command in (
-        ["sudo", "-n", "rocm-smi", "--resetclocks"],
-        ["sudo", "-n", "rocm-smi", "--setperflevel", "auto"],
+        ["sudo", "-n", _rocm_smi_executable(), "--resetclocks"],
+        ["sudo", "-n", _rocm_smi_executable(), "--setperflevel", "auto"],
     ):
         try:
             subprocess.run(command, capture_output=True)
