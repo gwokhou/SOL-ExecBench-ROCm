@@ -260,6 +260,42 @@ def test_canonical_trace_jsonl_excludes_derived_report_key_space():
         assert key not in serialized
 
 
+def test_v1_18_compatibility_matrix_fields_remain_sidecar_only():
+    definition, workload, trace = _sample_definition_workload_trace()
+    forbidden = (
+        "sol_execbench.rocm_compatibility_matrix.v1",
+        "MatrixEntry",
+        "target",
+        "observed",
+        "diagnostic_compatibility_evidence",
+        "container_user_space_validated",
+        "native_host_validated",
+        "MatrixTarget",
+        "MatrixObservedEvidence",
+        "requested_rocm_user_space_version",
+        "docker_image_repository",
+        "docker_image_tag",
+        "pytorch_rocm_target",
+        "validation_scope",
+        "host_validated",
+        "container_validated",
+        "mixed_version",
+        "pytorch_wheel_unavailable",
+        "runtime_unavailable",
+        "not_tested",
+    )
+
+    for payload in (
+        definition.model_dump(mode="json"),
+        workload.model_dump(mode="json"),
+        trace.model_dump(mode="json"),
+    ):
+        assert _json_object_keys(payload).isdisjoint(forbidden)
+        text = json.dumps(payload, sort_keys=True)
+        for field in forbidden:
+            assert field not in text
+
+
 def test_cli_help_preserves_existing_public_options():
     result = CliRunner().invoke(cli, ["--help"])
     assert result.exit_code == 0
