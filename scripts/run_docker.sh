@@ -36,6 +36,14 @@ matrix_json_value() {
     python -c 'import json, sys; data=json.loads(sys.argv[1]); value=data; [value := value[part] for part in sys.argv[2].split(".")]; print(value)' "$1" "$2"
 }
 
+bool_text() {
+    if [ "$1" = "1" ] || [ "$1" = "true" ]; then
+        echo "true"
+    else
+        echo "false"
+    fi
+}
+
 resolve_docker_target_json() {
     local cmd=(
         python -m sol_execbench.core.docker_matrix preview
@@ -54,40 +62,76 @@ resolve_docker_target_json() {
     PYTHONPATH="${REPO_ROOT}/src${PYTHONPATH:+:${PYTHONPATH}}" "${cmd[@]}"
 }
 
-require_rocm_host_docker() {
+preflight_override_present() {
+    [ -n "${SOL_EXECBENCH_DOCKER_CONTEXT:-}" ] ||
+        [ -n "${SOL_EXECBENCH_DOCKER_HOST:-}" ] ||
+        [ -n "${SOL_EXECBENCH_DEV_KFD_PRESENT:-}" ] ||
+        [ -n "${SOL_EXECBENCH_DEV_KFD_ACCESSIBLE:-}" ] ||
+        [ -n "${SOL_EXECBENCH_DEV_DRI_PRESENT:-}" ] ||
+        [ -n "${SOL_EXECBENCH_DEV_DRI_ACCESSIBLE:-}" ] ||
+        [ -n "${SOL_EXECBENCH_GPU_ACCESSIBLE:-}" ]
+}
+
+docker_context_name() {
+    if [ -n "${SOL_EXECBENCH_DOCKER_CONTEXT:-}" ]; then
+        echo "${SOL_EXECBENCH_DOCKER_CONTEXT}"
+    else
+        docker context show 2>/dev/null || true
+    fi
+}
+
+docker_context_host() {
+    if [ -n "${SOL_EXECBENCH_DOCKER_HOST:-}" ]; then
+        echo "${SOL_EXECBENCH_DOCKER_HOST}"
+    else
+        docker context inspect --format '{{ (index .Endpoints "docker").Host }}' 2>/dev/null || true
+    fi
+}
+
+preflight_bool() {
+    local env_name="$1"
+    local fallback="$2"
+    local value="${!env_name:-}"
+    if [ -n "${value}" ]; then
+        echo "${value}"
+    else
+        echo "${fallback}"
+    fi
+}
+
+classify_docker_preflight_json() {
     local context_name
     local docker_host
+    local dev_kfd_present
+    local dev_kfd_accessible
+    local dev_dri_present
+    local dev_dri_accessible
+    local cmd
 
-    context_name="$(docker context show 2>/dev/null || true)"
-    docker_host="$(docker context inspect --format '{{ (index .Endpoints "docker").Host }}' 2>/dev/null || true)"
+    context_name="$(docker_context_name)"
+    docker_host="$(docker_context_host)"
+    dev_kfd_present="$(preflight_bool SOL_EXECBENCH_DEV_KFD_PRESENT "$(bool_text "$([ -e /dev/kfd ] && echo 1 || echo 0)")")"
+    dev_kfd_accessible="$(preflight_bool SOL_EXECBENCH_DEV_KFD_ACCESSIBLE "$(bool_text "$([ -r /dev/kfd ] && echo 1 || echo 0)")")"
+    dev_dri_present="$(preflight_bool SOL_EXECBENCH_DEV_DRI_PRESENT "$(bool_text "$([ -d /dev/dri ] && echo 1 || echo 0)")")"
+    dev_dri_accessible="$(preflight_bool SOL_EXECBENCH_DEV_DRI_ACCESSIBLE "$(bool_text "$([ -r /dev/dri ] && echo 1 || echo 0)")")"
 
-    if [[ "${context_name}" == "desktop-linux" || "${docker_host}" == *"/.docker/desktop/"* ]]; then
-        cat >&2 <<EOF
-ERROR: Docker context '${context_name}' points to Docker Desktop (${docker_host}).
-
-ROCm device passthrough requires the native Linux Docker daemon so the
-container can see /dev/kfd and /dev/dri.
-
-Run:
-  docker context use default
-  unset DOCKER_HOST DOCKER_CONTEXT
-
-Then retry this script.
-EOF
-        exit 1
+    cmd=(
+        python -m sol_execbench.core.docker_matrix preflight
+        --manifest "${REPO_ROOT}/docker/rocm-targets.json"
+        --docker-context "${context_name}"
+        --docker-host "${docker_host}"
+        --dev-kfd-present "${dev_kfd_present}"
+        --dev-kfd-accessible "${dev_kfd_accessible}"
+        --dev-dri-present "${dev_dri_present}"
+        --dev-dri-accessible "${dev_dri_accessible}"
+    )
+    if [ -n "${DOCKER_TARGET}" ]; then
+        cmd+=(--target "${DOCKER_TARGET}")
     fi
-
-    if [ ! -e /dev/kfd ]; then
-        echo "ERROR: /dev/kfd is missing on the host. ROCm containers cannot access the AMD KFD device." >&2
-        echo "Check that the amdgpu/ROCm kernel driver is loaded and that rocminfo works on the host." >&2
-        exit 1
+    if [ -n "${SOL_EXECBENCH_GPU_ACCESSIBLE:-}" ]; then
+        cmd+=(--gpu-accessible "${SOL_EXECBENCH_GPU_ACCESSIBLE}")
     fi
-
-    if [ ! -d /dev/dri ]; then
-        echo "ERROR: /dev/dri is missing on the host. ROCm containers cannot access DRM render devices." >&2
-        echo "Check that the amdgpu DRM driver is loaded and that render nodes exist under /dev/dri." >&2
-        exit 1
-    fi
+    PYTHONPATH="${REPO_ROOT}/src${PYTHONPATH:+:${PYTHONPATH}}" "${cmd[@]}"
 }
 
 # Parse script flags, then split remaining args on "--"
@@ -137,9 +181,27 @@ done
 TARGET_JSON="$(resolve_docker_target_json)"
 ROCM_DOCKER_IMAGE_SELECTED="$(matrix_json_value "${TARGET_JSON}" "build_args.ROCM_DOCKER_IMAGE")"
 ROCM_DOCKER_TAG_SELECTED="$(matrix_json_value "${TARGET_JSON}" "build_args.ROCM_DOCKER_TAG")"
+SELECTED_TARGET_ID="$(matrix_json_value "${TARGET_JSON}" "target_id")"
 
-if [ "${DRY_RUN}" != "1" ]; then
-    require_rocm_host_docker
+if [[ "${SELECTED_TARGET_ID}" == unsafe-untested-* ]]; then
+    echo "${TARGET_JSON}"
+    exit 1
+fi
+
+if [ "${DRY_RUN}" != "1" ] || $PREFLIGHT_ONLY || preflight_override_present; then
+    PREFLIGHT_JSON="$(classify_docker_preflight_json)"
+    PREFLIGHT_STATUS="$(matrix_json_value "${PREFLIGHT_JSON}" "status")"
+    if $PREFLIGHT_ONLY; then
+        echo "${PREFLIGHT_JSON}"
+        if [ "${PREFLIGHT_STATUS}" = "runtime_unavailable" ]; then
+            exit 1
+        fi
+        exit 0
+    fi
+    if [ "${PREFLIGHT_STATUS}" = "runtime_unavailable" ]; then
+        echo "${PREFLIGHT_JSON}"
+        exit 1
+    fi
 fi
 
 # Build the image if requested
