@@ -13,7 +13,7 @@
 - [x] **MATRIX-03**: Matrix reports distinguish requested Target values from observed host, container, Python dependency, toolchain, and GPU evidence.
 - [x] **MATRIX-04**: Matrix reports support bounded statuses: `host_validated`, `container_validated`, `mixed_version`, `pytorch_wheel_unavailable`, `runtime_unavailable`, and `not_tested`.
 - [x] **MATRIX-05**: Matrix reports include claim flags that keep v1.18 compatibility evidence diagnostic-only and never grant score, paper-parity, or leaderboard authority.
-- [ ] **MATRIX-06**: `host_validated` is emitted only for direct native-host validation evidence, not for Docker user-space Matrix Entries.
+- [x] **MATRIX-06**: `host_validated` is emitted only for direct native-host validation evidence, not for Docker user-space Matrix Entries.
 
 ### Docker Matrix
 
@@ -90,7 +90,7 @@
 | MATRIX-03 | Phase 78 | Complete |
 | MATRIX-04 | Phase 78 | Complete |
 | MATRIX-05 | Phase 78 | Complete |
-| MATRIX-06 | Phase 78 | Pending |
+| MATRIX-06 | Phase 78 | Complete |
 | DOCKER-01 | Phase 79 | Pending |
 | DOCKER-02 | Phase 79 | Pending |
 | DOCKER-03 | Phase 79 | Pending |
