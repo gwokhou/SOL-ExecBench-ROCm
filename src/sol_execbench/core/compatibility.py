@@ -227,6 +227,18 @@ class MatrixClaimBoundary(BaseModelWithDocstrings):
 
     diagnostic_compatibility_evidence: Literal[True] = True
     """Matrix Entries are diagnostic compatibility evidence."""
+    score_authority: Literal[False] = False
+    """Compatibility Matrix Entries never grant benchmark score authority."""
+    paper_parity_authority: Literal[False] = False
+    """Compatibility Matrix Entries never grant paper-parity authority."""
+    leaderboard_authority: Literal[False] = False
+    """Compatibility Matrix Entries never grant leaderboard authority."""
+    container_user_space_validated: bool
+    """Whether container ROCm user-space validation evidence is present."""
+    native_host_validated: bool
+    """Whether direct native-host validation evidence is present."""
+    hardware_validated: bool
+    """Whether real hardware evidence for the intended architecture is present."""
 
 
 class MatrixEntry(BaseModelWithDocstrings):
@@ -248,6 +260,10 @@ class MatrixEntry(BaseModelWithDocstrings):
     """Stable reason code explaining the status."""
     reason: str
     """Human-readable diagnostic reason."""
+    claim_boundary: MatrixClaimBoundary
+    """Explicit diagnostic-only claim boundaries for this Matrix Entry."""
+    artifacts: list[MatrixArtifactReference] = Field(default_factory=list)
+    """Artifact references supporting this Matrix Entry."""
 
     def to_dict(self) -> dict[str, object]:
         """Return the JSON-compatible Matrix Entry payload."""
@@ -284,15 +300,17 @@ def build_matrix_entry(
     status: MatrixCompatibilityStatus | str,
     reason_code: MatrixCompatibilityReasonCode | str,
     reason: str,
+    claim_boundary: MatrixClaimBoundary,
     artifacts: Sequence[MatrixArtifactReference] = (),
 ) -> MatrixEntry:
     """Build a strict Matrix Entry from explicit Target and evidence inputs."""
 
-    del artifacts
     return MatrixEntry(
         target=target,
         observed=observed,
         status=status,
         reason_code=reason_code,
         reason=reason,
+        claim_boundary=claim_boundary,
+        artifacts=list(artifacts),
     )

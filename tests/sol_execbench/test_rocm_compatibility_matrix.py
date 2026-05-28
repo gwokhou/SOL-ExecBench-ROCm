@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from sol_execbench.core.compatibility import (
     ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION,
     MatrixArtifactReference,
+    MatrixClaimBoundary,
     MatrixCompatibilityReasonCode,
     MatrixCompatibilityStatus,
     MatrixContainerEvidence,
@@ -75,6 +76,11 @@ def _representative_entry() -> MatrixEntry:
         status=MatrixCompatibilityStatus.CONTAINER_VALIDATED,
         reason_code=MatrixCompatibilityReasonCode.CONTAINER_USER_SPACE_VALIDATED,
         reason="Container ROCm user-space matched the requested Target.",
+        claim_boundary=MatrixClaimBoundary(
+            container_user_space_validated=True,
+            native_host_validated=False,
+            hardware_validated=True,
+        ),
         artifacts=[
             MatrixArtifactReference(
                 artifact_id="compatibility-probe",
