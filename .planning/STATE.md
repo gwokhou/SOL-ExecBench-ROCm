@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.18
 milestone_name: ROCm Version Matrix via Docker
 status: executing
-stopped_at: Completed 79-02-PLAN.md
-last_updated: "2026-05-28T09:17:09.899Z"
-last_activity: 2026-05-28 -- Phase 80 planning complete
+stopped_at: Completed 80-01-PLAN.md
+last_updated: "2026-05-28T09:28:47.875Z"
+last_activity: 2026-05-28 -- Plan 80-01 completed
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 6
-  completed_plans: 4
-  percent: 40
+  completed_plans: 5
+  percent: 83
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-28)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Phase 80 — uv and pytorch rocm wheel coordination
+**Current focus:** Phase 80 — uv And PyTorch ROCm Wheel Coordination
 
 ## Current Position
 
-Phase: 80
-Plan: Not started
+Phase: 80 (uv And PyTorch ROCm Wheel Coordination) — EXECUTING
+Plan: 2 of 2
 Status: Ready to execute
-Last activity: 2026-05-28 -- Phase 80 planning complete
+Last activity: 2026-05-28 -- Plan 80-01 completed
 
-Progress: [██████████] 100%
+Progress: [████████░░] 83%
 
 ## Performance Metrics
 
@@ -62,6 +62,7 @@ Progress: [██████████] 100%
 | Phase 78 P2 | 6min | 3 tasks | 6 files |
 | Phase 79 P1 | 6min | 3 tasks | 4 files |
 | Phase 79 P2 | 8min | 3 tasks | 3 files |
+| Phase 80 P1 | 8min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,8 @@ Progress: [██████████] 100%
 - [Phase 79]: The Dockerfile keeps rocm/dev-ubuntu-24.04:7.1.1-complete as the default through pre-FROM build args.
 - [Phase 79]: The Docker wrapper resolves Target selection before host preflight so unknown Targets fail before Docker build/run.
 - [Phase 79]: Script tests use SOL_EXECBENCH_RUN_DOCKER_DRY_RUN=1 and env-injected observations to avoid live Docker or ROCm hardware.
+- [Phase 80]: Dependency policy is stored next to each declared Docker Target and serialized inside Matrix observed evidence. — Plan 80-01 needs auditable Target-adjacent PyTorch ROCm wheel/index policy and strict Matrix Entry evidence.
+- [Phase 80]: ROCm 7.1 remains the project-default uv path; ROCm 7.0 and 7.2 are explicit Target workflows only. — The plan preserves pyproject.toml and uv.lock while recording per-Target dependency workflows.
 
 ### Pending Todos
 
@@ -108,6 +111,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-28T06:43:38.046Z
-Stopped at: Completed 79-02-PLAN.md
+Last session: 2026-05-28T09:28:47.398Z
+Stopped at: Completed 80-01-PLAN.md
 Resume file: None
