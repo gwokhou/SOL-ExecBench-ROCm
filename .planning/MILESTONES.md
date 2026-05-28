@@ -1,5 +1,20 @@
 # Milestones
 
+## v1.18 ROCm Version Matrix via Docker (Shipped: 2026-05-28)
+
+**Phases completed:** 5 phases, 9 plans, 16 tasks
+
+**Key accomplishments:**
+
+- Strict ROCm compatibility Matrix Entry contract with bounded statuses, Target/observed evidence separation, artifact references, and diagnostic-only claim boundaries
+- Deterministic Matrix execution guardrails that block mixed-version validation, separate Docker and native-host claims, and keep compatibility evidence sidecar-only
+- Declared ROCm Docker Targets with deterministic selection, non-authoritative unknown overrides, runtime-unavailable preflight classification, and shell-consumable Matrix JSON
+- Dockerfile and wrapper integration for declared ROCm Target selection, selected build args, and runtime-unavailable preflight stops
+- Target-adjacent PyTorch ROCm wheel policy with Matrix Entry evidence, stack classification, and shell-consumable preflight JSON
+- Docker wrapper dependency preflight blocks illegal PyTorch ROCm stacks before build/run while preserving bounded debug semantics
+
+---
+
 ## v1.17 Static Kernel Evidence (Shipped: 2026-05-26)
 
 **Phases completed:** 5 phases, 5 plans, 0 tasks
