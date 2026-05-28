@@ -481,11 +481,11 @@ def _build_parser() -> argparse.ArgumentParser:
     preflight.add_argument("--target")
     preflight.add_argument("--docker-context")
     preflight.add_argument("--docker-host")
-    preflight.add_argument("--dev-kfd-present", required=True)
-    preflight.add_argument("--dev-kfd-accessible", required=True)
-    preflight.add_argument("--dev-dri-present", required=True)
-    preflight.add_argument("--dev-dri-accessible", required=True)
-    preflight.add_argument("--gpu-accessible")
+    preflight.add_argument("--dev-kfd-present", required=True, type=_parse_bool)
+    preflight.add_argument("--dev-kfd-accessible", required=True, type=_parse_bool)
+    preflight.add_argument("--dev-dri-present", required=True, type=_parse_bool)
+    preflight.add_argument("--dev-dri-accessible", required=True, type=_parse_bool)
+    preflight.add_argument("--gpu-accessible", type=_parse_bool)
     preflight.add_argument("--image-digest")
     return parser
 
@@ -516,17 +516,14 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "preflight":
         selection = select_docker_target(args.target, manifest_path=args.manifest)
-        gpu_accessible = (
-            None if args.gpu_accessible is None else _parse_bool(args.gpu_accessible)
-        )
         observation = DockerPreflightObservation(
             docker_context=args.docker_context,
             docker_host=args.docker_host,
-            dev_kfd_present=_parse_bool(args.dev_kfd_present),
-            dev_kfd_accessible=_parse_bool(args.dev_kfd_accessible),
-            dev_dri_present=_parse_bool(args.dev_dri_present),
-            dev_dri_accessible=_parse_bool(args.dev_dri_accessible),
-            gpu_accessible=gpu_accessible,
+            dev_kfd_present=args.dev_kfd_present,
+            dev_kfd_accessible=args.dev_kfd_accessible,
+            dev_dri_present=args.dev_dri_present,
+            dev_dri_accessible=args.dev_dri_accessible,
+            gpu_accessible=args.gpu_accessible,
             selected_target=selection.target,
             image_repository=selection.target.docker_image_repository,
             image_tag=selection.target.docker_image_tag,

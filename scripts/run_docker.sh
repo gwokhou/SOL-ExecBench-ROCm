@@ -44,6 +44,12 @@ bool_text() {
     fi
 }
 
+dev_dri_has_accessible_node() {
+    [ -x /dev/dri ] || return 1
+    find /dev/dri -maxdepth 1 -type c \( -name 'renderD*' -o -name 'card*' \) \
+        -readable -writable -print -quit 2>/dev/null | grep -q .
+}
+
 resolve_docker_target_json() {
     local cmd=(
         python -m sol_execbench.core.docker_matrix preview
@@ -111,9 +117,9 @@ classify_docker_preflight_json() {
     context_name="$(docker_context_name)"
     docker_host="$(docker_context_host)"
     dev_kfd_present="$(preflight_bool SOL_EXECBENCH_DEV_KFD_PRESENT "$(bool_text "$([ -e /dev/kfd ] && echo 1 || echo 0)")")"
-    dev_kfd_accessible="$(preflight_bool SOL_EXECBENCH_DEV_KFD_ACCESSIBLE "$(bool_text "$([ -r /dev/kfd ] && echo 1 || echo 0)")")"
+    dev_kfd_accessible="$(preflight_bool SOL_EXECBENCH_DEV_KFD_ACCESSIBLE "$(bool_text "$([ -r /dev/kfd ] && [ -w /dev/kfd ] && echo 1 || echo 0)")")"
     dev_dri_present="$(preflight_bool SOL_EXECBENCH_DEV_DRI_PRESENT "$(bool_text "$([ -d /dev/dri ] && echo 1 || echo 0)")")"
-    dev_dri_accessible="$(preflight_bool SOL_EXECBENCH_DEV_DRI_ACCESSIBLE "$(bool_text "$([ -r /dev/dri ] && echo 1 || echo 0)")")"
+    dev_dri_accessible="$(preflight_bool SOL_EXECBENCH_DEV_DRI_ACCESSIBLE "$(bool_text "$(dev_dri_has_accessible_node && echo 1 || echo 0)")")"
 
     cmd=(
         python -m sol_execbench.core.docker_matrix preflight
@@ -191,14 +197,17 @@ fi
 if [ "${DRY_RUN}" != "1" ] || $PREFLIGHT_ONLY || preflight_override_present; then
     PREFLIGHT_JSON="$(classify_docker_preflight_json)"
     PREFLIGHT_STATUS="$(matrix_json_value "${PREFLIGHT_JSON}" "status")"
+    PREFLIGHT_BENCHMARK_ALLOWED="$(matrix_json_value "${PREFLIGHT_JSON}" "benchmark_allowed")"
     if $PREFLIGHT_ONLY; then
         echo "${PREFLIGHT_JSON}"
-        if [ "${PREFLIGHT_STATUS}" = "runtime_unavailable" ]; then
+        if [ "${PREFLIGHT_STATUS}" = "runtime_unavailable" ] ||
+            [ "${PREFLIGHT_BENCHMARK_ALLOWED}" != "True" ]; then
             exit 1
         fi
         exit 0
     fi
-    if [ "${PREFLIGHT_STATUS}" = "runtime_unavailable" ]; then
+    if [ "${PREFLIGHT_STATUS}" = "runtime_unavailable" ] ||
+        [ "${PREFLIGHT_BENCHMARK_ALLOWED}" != "True" ]; then
         echo "${PREFLIGHT_JSON}"
         exit 1
     fi
