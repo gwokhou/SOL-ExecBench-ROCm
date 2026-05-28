@@ -2,100 +2,143 @@
 # Contributing
 
 Thank you for contributing to SOL ExecBench ROCm Port. This repository is a
-ROCm-only Python port of SOL ExecBench, so contributions should preserve the
-benchmark schemas and evaluation semantics unless a ROCm-specific change is
+ROCm-only Python port of SOL ExecBench, so changes should preserve public
+benchmark schemas and evaluation semantics unless a ROCm-specific difference is
 required.
+
+## Start From An Issue
+
+Contributions should start from an approved GitHub issue. Keep each pull
+request focused on one concern and link the issue in the PR description.
 
 ## Development Setup
 
-See [GETTING-STARTED.md](docs/GETTING-STARTED.md) for prerequisites and first-run
-instructions, and [DEVELOPMENT.md](docs/DEVELOPMENT.md) for local development
-setup.
-
-The short local setup path is:
+Install dependencies:
 
 ```bash
 uv sync --all-groups
-uv run pytest tests/
-uv run --with ruff ruff check .
 ```
 
-For ROCm GPU evaluation, use a ROCm-capable AMD system or the repository Docker
-helper:
+Run core checks:
+
+```bash
+uv run ruff check .
+uv run ty check
+uv run pytest tests/
+```
+
+For ROCm GPU evaluation, use a ROCm-capable AMD host or the Docker helper:
 
 ```bash
 ./scripts/run_docker.sh --build
 ```
 
+See [Getting Started](docs/GETTING-STARTED.md), [Development](docs/DEVELOPMENT.md),
+and [Testing](docs/TESTING.md) for more detail.
+
 ## Coding Standards
 
-- Use Python `>=3.12,<3.14`, as configured in `pyproject.toml`.
-- Run Ruff before submitting changes:
+- Use Python `>=3.12,<3.14`.
+- Follow Ruff formatting and linting.
+- Use `snake_case` for modules, functions, and variables.
+- Use `PascalCase` for classes, Pydantic models, and enum classes.
+- Keep changes consistent with nearby code.
+- Avoid broad refactors in focused fixes.
+- Do not commit local caches, virtual environments, build artifacts, downloaded
+  datasets, generated benchmark output, credentials, or proprietary kernels.
 
-  ```bash
-  uv run --with ruff ruff check .
-  uv run --with ruff ruff format .
-  ```
+Format and lint:
 
-- The Ruff pre-commit hooks are configured in `.pre-commit-config.yaml`; they
-  run Ruff lint fixes and formatting.
-- Keep changes consistent with nearby modules. Use `snake_case` for modules,
-  functions, and variables, and `PascalCase` for classes, Pydantic models, and
-  enum classes.
-- Do not commit local caches, build artifacts, downloaded benchmark datasets, or
-  generated benchmark output.
-
-The `Python Quality` GitHub Actions workflow in
-`.github/workflows/code-quality.yml` runs on pushes to all branches and on pull
-requests. It checks Python 3.12 and 3.13 with `uv sync --locked --all-groups`,
-`uv run ruff check .`, `uv run ty check`, CPU-safe package tests under
-`tests/sol_execbench/`, and `tests/examples/test_examples.py -k consistency`.
-
-## PR Guidelines
-
-- Start from an approved GitHub issue before opening a code contribution.
-- Keep each pull request focused on one concern.
-- Include tests for behavior changes. Place package tests under
-  `tests/sol_execbench/` and example workflow tests under `tests/examples/`.
-- Include documentation when adding or changing public commands, schemas,
-  examples, or ROCm hardware assumptions.
-- Run the relevant pytest, Ty, and Ruff commands before requesting review. For
-  GPU behavior, list the ROCm hardware and Docker checks you ran.
-- Use imperative commit titles in this format:
-
-  ```text
-  #<Issue Number> - <Commit Title>
-  ```
-
-- Sign commits with DCO sign-off:
-
-  ```bash
-  git commit -s -m "#123 - Fix trace parsing"
-  ```
-
-The `.pre-commit-config.yaml` file includes a commit-message hook that checks for
-a `Signed-off-by:` line.
-
-No `.github/PULL_REQUEST_TEMPLATE.md` file is present in this checkout, so use
-the pull request description to summarize behavior changes, link the issue, and
-record the validation commands or GPU checks you ran.
-
-## Issue Reporting
-
-Use GitHub Issues for bug reports and feature requests:
-
-```text
-https://github.com/gwokhou/SOL-ExecBench-ROCm/issues
+```bash
+uv run ruff format .
+uv run ruff check .
 ```
 
-No `.github/ISSUE_TEMPLATE/` directory is present in this checkout. Include the
-following information when reporting an issue:
+Type check:
 
-- A clear summary of the bug, feature request, or compatibility gap.
-- Steps to reproduce the behavior, including the command you ran.
-- Expected and actual behavior.
-- Python, PyTorch, ROCm, GPU architecture, and operating system details.
-- Relevant trace files, logs, or benchmark problem paths when available.
+```bash
+uv run ty check
+```
 
-Do not include proprietary kernels, credentials, Hugging Face tokens, downloaded
-datasets, or other private data in issues or pull requests.
+## Tests
+
+Place new package tests under `tests/sol_execbench/` near related coverage.
+Place example workflow tests under `tests/examples/`.
+
+Use environment-sensitive markers where appropriate:
+
+- `cpp`
+- `timing_serial`
+- `requires_rocm`
+- `requires_rocm_dev`
+- `requires_ck`
+- `requires_rocwmma`
+- `requires_rdna4`
+- `requires_cdna3`
+- `requires_cutile` for legacy NVIDIA-only coverage that should be skipped in
+  this ROCm-only port
+
+For hardware-sensitive changes, record the ROCm version, GPU architecture,
+container target if used, and exact test commands in the PR.
+
+## Documentation
+
+Update documentation when changing:
+
+- Public CLI behavior
+- Benchmark schemas
+- Solution language categories
+- Docker targets or runtime assumptions
+- ROCm hardware support claims
+- Scoring, timing, profiling, or evidence semantics
+- User-facing examples
+
+Use conservative wording for unvalidated hardware or infrastructure claims.
+
+## Commit Messages
+
+Use imperative commit titles in this project format:
+
+```text
+#<Issue Number> - <Commit Title>
+```
+
+Sign commits with DCO sign-off:
+
+```bash
+git commit -s -m "#123 - Fix trace parsing"
+```
+
+The repository pre-commit configuration includes a commit-message hook that
+checks for a `Signed-off-by:` line.
+
+## Pull Requests
+
+PRs should include:
+
+- Linked approved issue
+- Clear summary of behavior changes
+- Tests, lint, type checks, Docker checks, or GPU checks run
+- Documentation updates for public behavior changes
+- Hardware assumptions for ROCm-sensitive changes
+- Notes about any remaining validation gap
+
+The `Python Quality` GitHub Actions workflow runs `uv sync --locked
+--all-groups`, Ruff, Ty, CPU-safe package tests, and example consistency tests
+on Python 3.12 and 3.13.
+
+## Issue Reports
+
+When reporting a bug or compatibility gap, include:
+
+- Command run
+- Expected behavior
+- Actual behavior
+- Python version
+- PyTorch and ROCm versions
+- GPU architecture, such as `gfx1200` or `gfx942`
+- Operating system and container target, if relevant
+- Trace JSONL, sidecars, logs, or sample problem paths when safe to share
+
+Do not include credentials, Hugging Face tokens, proprietary kernels, private
+datasets, or other sensitive data.

@@ -1,64 +1,58 @@
 <!-- generated-by: gsd-doc-writer -->
 # Configuration
 
-SOL ExecBench ROCm Port has no required application-level `.env` file. Runtime
-behavior is configured through CLI flags, optional benchmark configuration files,
-package dependency configuration in `pyproject.toml`, and environment variables
-used by the Docker wrapper, Docker image, entrypoint, native build template,
-evaluation driver, and ROCm clock-lock helpers.
+SOL ExecBench ROCm Port is configured through CLI flags, optional benchmark
+configuration JSON, `pyproject.toml`, Docker wrapper inputs, and runtime
+environment variables. There is no required application-level `.env` file.
 
-## Environment Variables
+## CLI Flags
 
-No `.env.example`, `.env.sample`, or Node-style `process.env` configuration
-exists in this Python project. The repository does use Python and shell
-environment variables for Docker execution, ROCm clock locking, PyTorch
-allocation behavior, benchmark data lookup, optional environment sidecars, and
-visible-device diagnostics:
+Primary evaluator form:
 
-| Variable | Required | Default | Description |
-| --- | --- | --- | --- |
-| `IMAGE_NAME` | Optional Docker wrapper input | `sol-execbench` | Docker image repository/name used by `scripts/run_docker.sh`. |
-| `IMAGE_TAG` | Optional Docker wrapper input | `latest` | Docker image tag used by `scripts/run_docker.sh`. |
-| `ROCM_PATH` | Container-only | `/opt/rocm` | Path to the ROCm installation inside the Docker image. |
-| `HIP_PATH` | Container-only | `/opt/rocm` | Path used by HIP tooling in the Docker image. |
-| `HIP_PLATFORM` | Container-only | `amd` | Selects AMD HIP platform behavior inside the Docker image. |
-| `PATH` | Container-only | Includes `/opt/rocm/bin`, `/opt/rocm/llvm/bin`, and `/venv/bin` | Makes ROCm tools and the project virtual environment available. |
-| `LD_LIBRARY_PATH` | Container-only | `/opt/rocm/lib` | Makes ROCm shared libraries visible in the container. |
-| `UV_CACHE_DIR` | Container-only | `/home/${HOST_USER}/.cache/uv` | Cache location for `uv` during Docker builds. |
-| `UV_LINK_MODE` | Container-only | `copy` | Configures `uv` install behavior in the Docker build. |
-| `UV_COMPILE_BYTECODE` | Container-only | `1` | Enables bytecode compilation during `uv` sync in the Docker build. |
-| `UV_PYTHON_DOWNLOADS` | Container-only | `never` | Prevents Python downloads during Docker builds. |
-| `UV_PROJECT_ENVIRONMENT` | Container-only | `/venv` | Installs the project environment into `/venv`. |
-| `PYTHONPATH` | Container-only | `/sol-execbench/src` | Lets the mounted source tree override the installed package at runtime. |
-| `FLASHINFER_TRACE_DIR` | Optional | `/sol-execbench/data/flashinfer-trace` when launched through `scripts/run_docker.sh` | Adds downloaded FlashInfer trace safetensors to the evaluation driver's lookup roots. |
-| `SOL_EXECBENCH_CLOCKS_LOCKED` | Runtime state | `0` when unset | Set by `docker/entrypoint.sh` after clock-lock probing; evaluation treats `1` as locked. |
-| `SOL_EXECBENCH_SCLK_LEVEL` | Optional | Device preset from `src/sol_execbench/core/bench/config/device_config.py` when available | Overrides the ROCm SCLK DPM level used by `lock_clocks()`. |
-| `SOL_EXECBENCH_MCLK_LEVEL` | Optional | Device preset from `src/sol_execbench/core/bench/config/device_config.py` when available | Overrides the ROCm MCLK DPM level used by `lock_clocks()`. |
-| `SOL_EXECBENCH_GPU_CLK_MHZ` | Optional passthrough | Empty when unset | Forwarded into the Docker container by `scripts/run_docker.sh`; no current Python source reads it. |
-| `SOL_EXECBENCH_DRAM_CLK_MHZ` | Optional passthrough | Empty when unset | Forwarded into the Docker container by `scripts/run_docker.sh`; no current Python source reads it. |
-| `PYTORCH_ALLOC_CONF` | Subprocess-only | `expandable_segments:True` | Set by the CLI for compilation and evaluation subprocesses. |
-| `PYTORCH_ROCM_ARCH` | Optional native-build override | Derived from `solution.spec.target_hardware` when unset | Overrides the ROCm GPU architecture list used by PyTorch extension compilation. |
-| `SOLEXECBENCH_ENV_SNAPSHOT` | Optional | Disabled when unset | Set to `1` to write an environment snapshot sidecar next to `--output`, using the suffix `.environment.json`. |
-| `SOLEXECBENCH_ENV_SNAPSHOT_PATH` | Optional | Empty when unset | Explicit output path for the environment snapshot sidecar; when set, it is used even if `SOLEXECBENCH_ENV_SNAPSHOT` is unset. |
-| `HIP_VISIBLE_DEVICES` | Optional diagnostic input | Empty when unset | Captured in environment snapshots when present to record HIP-visible GPU filtering. |
-| `ROCR_VISIBLE_DEVICES` | Optional diagnostic input | Empty when unset | Captured in environment snapshots when present to record ROCr-visible GPU filtering. |
-| `HSA_OVERRIDE_GFX_VERSION` | Optional diagnostic input | Empty when unset | Captured in environment snapshots when present to record any forced HSA GPU architecture override. |
+```bash
+uv run sol-execbench <problem_dir> --solution solution.json
+```
 
-`docker/entrypoint.sh` also checks `FLASHINFER_TRACE_DIR` and warns if that
-directory is not mounted.
+Explicit input form:
 
-The Docker image also accepts build arguments rather than environment variables:
-`HOST_UID`, `HOST_GID`, and `HOST_USER`. `scripts/run_docker.sh --build` passes
-the current `id -u`, `id -g`, and `whoami` values so files created in the
-container match the host user.
+```bash
+uv run sol-execbench \
+  --definition definition.json \
+  --workload workload.jsonl \
+  --solution solution.json
+```
 
-## Config File Format
+| Flag | Default | Purpose |
+| --- | --- | --- |
+| `--definition` | None | Path to `definition.json` when not using a problem directory. |
+| `--workload` | None | Path to `workload.jsonl` when not using a problem directory. |
+| `--solution` | Conventional `solution.json` in problem directory when present | Path to solution JSON. |
+| `--config` | None | Optional benchmark config JSON. |
+| `--compile-timeout` | `120` | HIP/C++ compilation timeout in seconds. |
+| `--timeout` | `600` | Evaluation subprocess timeout in seconds. |
+| `-o`, `--output` | None | Trace JSONL output path. |
+| `--json` | Disabled | Print trace JSON lines to stdout. |
+| `--lock-clocks` | Disabled | Require GPU clocks to be locked. |
+| `--keep-staging` | Disabled | Preserve the temporary staging directory. |
+| `--profile` | `none` | Use `rocprofv3` for optional diagnostic profiling when set to `rocprofv3`. |
+| `--static-evidence` | `none` | Collect optional diagnostic static kernel evidence when set to `auto`. |
+| `-v`, `--verbose` | Disabled | Show subprocess output and staging details. |
 
-Benchmark configuration is optional. The CLI accepts `--config <path>` and
-loads it into `BenchmarkConfig` from
+Metadata and diagnostic subcommands require `--json`:
+
+```bash
+uv run sol-execbench contract --json
+uv run sol-execbench doctor --json
+uv run sol-execbench toolchain --json
+```
+
+`toolchain` also accepts `--evidence-level`, `--artifact-type`, `--gpu-arch`,
+`--hardware-generation`, `--rocm-version`, and `--list-registry`.
+
+## Benchmark Config JSON
+
+The optional `--config` file loads into `BenchmarkConfig` from
 `src/sol_execbench/core/bench/config/benchmark_config.py`.
-
-Minimal example:
 
 ```json
 {
@@ -70,68 +64,107 @@ Minimal example:
 }
 ```
 
-| Field | Default | Description |
+| Field | Default | Validation |
 | --- | --- | --- |
-| `warmup_runs` | `10` | Number of warmup executions before measured timing. |
-| `iterations` | `50` | Number of measured iterations. |
-| `lock_clocks` | `false` | Requires ROCm GPU clocks to be locked before benchmarking when enabled. |
-| `benchmark_reference` | `true` | Measures reference implementation latency when enabled. |
-| `seed` | `200` | Seed used by the generated evaluation driver. |
+| `warmup_runs` | `10` | Must be greater than or equal to `0`. |
+| `iterations` | `50` | Must be greater than `0`. |
+| `lock_clocks` | `false` | Boolean. |
+| `benchmark_reference` | `true` | Boolean. |
+| `seed` | `200` | Integer. |
 
-## Required Vs Optional Settings
+The `--lock-clocks` CLI flag overrides the loaded config by setting
+`lock_clocks` to `true`.
 
-All `BenchmarkConfig` fields are optional because defaults are defined in the
-dataclass. The validation rules are:
+## Package Configuration
 
-| Setting | Requirement | Source |
+`pyproject.toml` defines:
+
+- Package name `sol-execbench`
+- Version `1.0.2`
+- Python range `>=3.12,<3.14`
+- Console scripts `sol-execbench` and `sol-execbench-baseline`
+- Runtime dependencies, including PyTorch ROCm, torchvision ROCm, `triton-rocm`,
+  Pydantic, Click, Rich, datasets, and native build helpers
+- Development dependencies for pytest, pytest-xdist, Ruff, and Ty
+- Pytest markers
+- Ruff exclusions
+- Ty source roots
+- UV package indexes for PyPI, PyTorch ROCm 7.1, and the PyTorch ROCm package root
+
+## Runtime Environment Variables
+
+| Variable | Default | Used By | Purpose |
+| --- | --- | --- | --- |
+| `PYTORCH_ALLOC_CONF` | `expandable_segments:True` in compile/eval subprocesses | CLI subprocess launch | Sets PyTorch allocator behavior for staged compilation and evaluation. |
+| `PYTORCH_ROCM_ARCH` | Derived from solution targets when unset | Native build template and PyTorch extension build | Overrides ROCm architecture list for native builds. |
+| `SOLEXECBENCH_ENV_SNAPSHOT` | Unset | CLI | Set to `1` to write an environment snapshot next to `--output`. |
+| `SOLEXECBENCH_ENV_SNAPSHOT_PATH` | Unset | CLI | Explicit environment snapshot output path. |
+| `HIP_VISIBLE_DEVICES` | Unset | Environment snapshots and runtime evidence | Records HIP-visible device filtering. |
+| `ROCR_VISIBLE_DEVICES` | Unset | Environment snapshots and runtime evidence | Records ROCr-visible device filtering. |
+| `HSA_OVERRIDE_GFX_VERSION` | Unset | Environment snapshots | Records forced HSA architecture overrides. |
+| `SOL_EXECBENCH_CLOCKS_LOCKED` | `0` when unset | Clock-lock checks and Docker entrypoint | Records whether GPU clocks were locked by the entrypoint or helper. |
+| `SOL_EXECBENCH_SCLK_LEVEL` | Device preset when available | Clock-lock helper | Overrides selected SCLK DPM level. |
+| `SOL_EXECBENCH_MCLK_LEVEL` | Device preset when available | Clock-lock helper | Overrides selected MCLK DPM level. |
+| `FLASHINFER_TRACE_DIR` | `/sol-execbench/data/flashinfer-trace` under wrapper | Evaluation driver and Docker wrapper | Adds FlashInfer trace safetensors lookup root. |
+
+## Docker Wrapper Settings
+
+`scripts/run_docker.sh` reads these user-facing variables:
+
+| Variable | Default | Purpose |
 | --- | --- | --- |
-| `warmup_runs` | Must be greater than or equal to `0`. | `src/sol_execbench/core/bench/config/benchmark_config.py` |
-| `iterations` | Must be greater than `0`. | `src/sol_execbench/core/bench/config/benchmark_config.py` |
+| `IMAGE_NAME` | `sol-execbench` | Local Docker image name. |
+| `IMAGE_TAG` | `latest` | Local Docker image tag. |
+| `ROCM_DOCKER_IMAGE` | `rocm/dev-ubuntu-24.04` for unknown-target override | Docker image repository override when unknown targets are explicitly allowed. |
+| `ROCM_DOCKER_TAG` | Selected target ID for unknown-target override | Docker image tag override when unknown targets are explicitly allowed. |
+| `SOL_EXECBENCH_ALLOW_MIXED_VERSION_DEPENDENCIES` | `0` | Allows dependency probe diagnostics for mixed-version stacks. |
+| `SOL_EXECBENCH_COMPATIBILITY_ENTRY` | Unset | Optional per-target compatibility JSON sidecar path. |
+| `SOL_EXECBENCH_COMPATIBILITY_MATRIX` | Unset | Optional aggregate compatibility matrix JSON path. |
+| `SOL_EXECBENCH_RUN_DOCKER_DRY_RUN` | `0` | Enables dry-run behavior used by tests and diagnostics. |
 
-The CLI input files are required at runtime. A user must provide either a
-problem directory containing the benchmark definition and workload files, or
-explicit `--definition` and `--workload` paths. A solution must come from
-either `--solution` or the conventional solution file in the problem directory.
+The wrapper also supports many `SOL_EXECBENCH_DEPENDENCY_*` and
+`SOL_EXECBENCH_RUNTIME_*` override variables for dependency preflight,
+compatibility sidecars, and tests. These are diagnostic inputs, not normal
+benchmark configuration.
 
-## Defaults
+## Docker Image Settings
 
-The benchmark defaults are:
+`docker/Dockerfile` sets ROCm and `uv` environment defaults:
 
-| Setting | Default |
+| Variable | Default |
 | --- | --- |
-| `warmup_runs` | `10` |
-| `iterations` | `50` |
-| `lock_clocks` | `false` |
-| `benchmark_reference` | `true` |
-| `seed` | `200` |
+| `ROCM_PATH` | `/opt/rocm` |
+| `HIP_PATH` | `/opt/rocm` |
+| `HIP_PLATFORM` | `amd` |
+| `PATH` | Includes `/opt/rocm/bin`, `/opt/rocm/llvm/bin`, and `/venv/bin`. |
+| `LD_LIBRARY_PATH` | `/opt/rocm/lib` |
+| `UV_CACHE_DIR` | `/home/${HOST_USER}/.cache/uv` |
+| `UV_LINK_MODE` | `copy` |
+| `UV_COMPILE_BYTECODE` | `1` |
+| `UV_PYTHON_DOWNLOADS` | `never` |
+| `UV_PROJECT_ENVIRONMENT` | `/venv` |
+| `PYTHONPATH` | `/sol-execbench/src` |
 
-The CLI defaults are:
+Docker build arguments include `ROCM_DOCKER_IMAGE`, `ROCM_DOCKER_TAG`,
+`HOST_UID`, `HOST_GID`, and `HOST_USER`.
 
-| Option | Default |
-| --- | --- |
-| `--compile-timeout` | `120` seconds |
-| `--timeout` | `600` seconds |
-| `--json` | Disabled |
-| `--lock-clocks` | Disabled |
-| `--keep-staging` | Disabled |
-| `--verbose` | Disabled |
+## Optional Evidence Outputs
 
-## Per-Environment Overrides
+These settings create sidecars without changing trace JSONL schema:
 
-No separate development, staging, or production configuration files are present.
-For local runs, pass CLI flags or a benchmark configuration file. For Docker runs,
-use `./scripts/run_docker.sh` so the container receives ROCm device access,
-repository mounts, and the runtime environment defined in `docker/Dockerfile`
-and `docker/entrypoint.sh`. The wrapper also forwards `FLASHINFER_TRACE_DIR`,
-`SOL_EXECBENCH_GPU_CLK_MHZ`, and `SOL_EXECBENCH_DRAM_CLK_MHZ` into the
-container, and reads `IMAGE_NAME` and `IMAGE_TAG` when selecting or building
-the Docker image.
+- `--profile rocprofv3` writes profiler metadata next to `--output`, or under
+  the staging directory when no output file is provided.
+- `--static-evidence auto` writes static kernel evidence metadata for native
+  solution builds.
+- `SOLEXECBENCH_ENV_SNAPSHOT=1` writes an environment sidecar next to
+  `--output`.
+- `SOLEXECBENCH_ENV_SNAPSHOT_PATH=<path>` writes an environment sidecar to an
+  explicit path.
 
-## Dependency Configuration
+## Configuration Boundaries
 
-`pyproject.toml` defines the package name, Python version range, console scripts,
-declares runtime dependency constraints and development dependency constraints, Ruff exclusions, pytest
-markers, and ROCm wheel indexes. The project requires Python `>=3.12,<3.14`.
-On Linux and Windows, `torch` and `torchvision` resolve from the
-`pytorch-rocm71` index, and `triton-rocm` resolves from the PyTorch ROCm root
-index on Linux.
+No deployment, staging, or production config files are present. For local
+benchmark changes, use CLI flags or benchmark config JSON. For ROCm container
+runs, use `./scripts/run_docker.sh` so target selection, device mounting,
+dependency preflight, and compatibility sidecars stay aligned with repository
+logic.
