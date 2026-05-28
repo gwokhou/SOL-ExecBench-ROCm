@@ -17,7 +17,7 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
 **Shipped version:** v1.17 Static Kernel Evidence, completed 2026-05-26.
 
-**Current milestone:** none active.
+**Current milestone:** v1.18 ROCm Version Matrix via Docker.
 
 **Latest milestone outcome:** the ROCm port now has opt-in Static Kernel
 Evidence for HIP/C++ benchmark runs: a strict diagnostic sidecar contract,
@@ -25,12 +25,29 @@ current-build artifact discovery, routed `llvm-objdump` and `readelf`
 extractors, CLI sidecar integration, documentation, claim guardrails, and a
 bounded RDNA 4 validation artifact.
 
-**Current milestone goal:** none. The next milestone should be defined with
-`$gsd-new-milestone`.
+**Current milestone goal:** Expand ROCm version coverage through Docker-based
+user-space matrices while coordinating `uv`/PyTorch ROCm wheel selection,
+runtime evidence, compatibility reports, and claim guardrails.
 
-**Next planned milestone:** to be determined. Candidate follow-ups include CDNA
-3/CDNA 4 live validation, Triton ROCm cache capture, RGA-rich static resource
-parsing, paper dataset parity, or deeper static-analysis classifications.
+**Target features:**
+- Docker build and run workflows can select ROCm user-space versions such as
+  7.0.x, 7.1.x, and 7.2.x without requiring host reinstall.
+- `uv` dependency strategy records or selects matching PyTorch ROCm wheels and
+  detects mixed-version environments instead of silently validating the wrong
+  stack.
+- Runtime evidence records host ROCm, container ROCm user-space, PyTorch ROCm
+  build tag, Triton/hipcc/toolchain versions, GPU architecture, and PyTorch
+  device availability.
+- Compatibility matrix reports distinguish `host_validated`,
+  `container_validated`, `mixed_version`, `pytorch_wheel_unavailable`,
+  `runtime_unavailable`, and `not_tested` states.
+- Documentation and guardrails prevent container user-space validation from
+  being overstated as native host ROCm validation.
+
+**Next planned milestone:** to be determined after v1.18. Candidate follow-ups
+include CDNA 3/CDNA 4 live validation, Triton ROCm cache capture, RGA-rich
+static resource parsing, paper dataset parity, or deeper static-analysis
+classifications.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline.
 Milestones v1.1-v1.6 added CDNA 3 code/schema support, maintained residue

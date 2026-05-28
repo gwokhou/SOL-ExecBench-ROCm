@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.17
-milestone_name: Static Kernel Evidence
-status: Awaiting next milestone
-stopped_at: Milestone v1.17 completed, audited, and archived
-last_updated: "2026-05-26T02:41:08.490Z"
-last_activity: 2026-05-26 — Milestone v1.17 completed and archived
+milestone: v1.18
+milestone_name: ROCm Version Matrix via Docker
+status: planning
+last_updated: "2026-05-28T04:37:24.386Z"
+last_activity: 2026-05-28
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 5
-  completed_plans: 5
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -25,10 +24,10 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 ## Current Position
 
-Phase: Milestone v1.17 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-05-26 — Milestone v1.17 completed and archived
+Status: Defining requirements
+Last activity: 2026-05-28 — Milestone v1.18 started
 
 ## Performance Metrics
 
