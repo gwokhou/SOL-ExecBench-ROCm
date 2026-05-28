@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.18
 milestone_name: ROCm Version Matrix via Docker
-status: verifying
-stopped_at: Completed 80-02-PLAN.md
-last_updated: "2026-05-28T09:38:04.365Z"
+status: ready_to_plan
+stopped_at: Phase 80 complete (2/2) — ready to discuss Phase 81
+last_updated: 2026-05-28T09:50:18.991Z
 last_activity: 2026-05-28
 progress:
   total_phases: 5
@@ -21,13 +21,13 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-28)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Phase 80 — uv And PyTorch ROCm Wheel Coordination
+**Current focus:** Phase 81 — runtime evidence and compatibility reports
 
 ## Current Position
 
-Phase: 80 (uv And PyTorch ROCm Wheel Coordination) — EXECUTING
-Plan: 2 of 2
-Status: Phase complete — ready for verification
+Phase: 81
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-05-28
 
 Progress: [██████████] 100%
@@ -52,6 +52,7 @@ Progress: [██████████] 100%
 | 82. Validation Workflow, Docs, And CI Guardrails | 0/TBD | Not started | n/a |
 | 78 | 2 | - | - |
 | 79 | 2 | - | - |
+| 80 | 2 | - | - |
 
 **Recent Trend:**
 
