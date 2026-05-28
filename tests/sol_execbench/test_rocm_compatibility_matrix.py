@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from sol_execbench.core.compatibility import (
     ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION,
+    MatrixArtifactReference,
     MatrixCompatibilityReasonCode,
     MatrixCompatibilityStatus,
     MatrixContainerEvidence,
@@ -74,6 +75,15 @@ def _representative_entry() -> MatrixEntry:
         status=MatrixCompatibilityStatus.CONTAINER_VALIDATED,
         reason_code=MatrixCompatibilityReasonCode.CONTAINER_USER_SPACE_VALIDATED,
         reason="Container ROCm user-space matched the requested Target.",
+        artifacts=[
+            MatrixArtifactReference(
+                artifact_id="compatibility-probe",
+                kind="probe_json",
+                path="artifacts/compatibility.json",
+                uri="file://artifacts/compatibility.json",
+                description="Bounded compatibility probe payload.",
+            )
+        ],
     )
 
 
@@ -131,3 +141,46 @@ def test_matrix_report_contains_entries_and_status_counts():
     assert payload["entries"][0] == entry.model_dump(mode="json")
     assert payload["status_counts"] == {"container_validated": 1}
     assert report.to_dict() == payload
+
+
+def test_matrix_entry_carries_artifacts_and_diagnostic_claim_boundaries():
+    payload = _representative_entry().model_dump(mode="json")
+
+    assert payload["artifacts"] == [
+        {
+            "artifact_id": "compatibility-probe",
+            "kind": "probe_json",
+            "path": "artifacts/compatibility.json",
+            "uri": "file://artifacts/compatibility.json",
+            "description": "Bounded compatibility probe payload.",
+        }
+    ]
+    assert payload["claim_boundary"] == {
+        "diagnostic_compatibility_evidence": True,
+        "score_authority": False,
+        "paper_parity_authority": False,
+        "leaderboard_authority": False,
+        "container_user_space_validated": True,
+        "native_host_validated": False,
+        "hardware_validated": True,
+    }
+
+
+@pytest.mark.parametrize(
+    "authority_field",
+    ["score_authority", "paper_parity_authority", "leaderboard_authority"],
+)
+def test_matrix_claim_authority_flags_cannot_be_set_true(authority_field):
+    payload = _representative_entry().model_dump(mode="json")
+    payload["claim_boundary"][authority_field] = True
+
+    with pytest.raises(ValidationError):
+        MatrixEntry.model_validate(payload)
+
+
+def test_matrix_claim_validation_flags_are_explicit_booleans_not_reason_text():
+    payload = _representative_entry().model_dump(mode="json")
+    payload["claim_boundary"]["native_host_validated"] = "false"
+
+    with pytest.raises(ValidationError):
+        MatrixEntry.model_validate(payload)
