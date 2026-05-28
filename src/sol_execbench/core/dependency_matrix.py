@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import argparse
 import importlib.metadata
+import json
 import platform
+from pathlib import Path
+from typing import Any
 from typing import Literal
 
 from pydantic import ConfigDict
@@ -23,7 +27,12 @@ from sol_execbench.core.compatibility import (
     classify_matrix_entry_for_execution,
 )
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
-from sol_execbench.core.docker_matrix import DockerTargetManifestEntry, to_matrix_target
+from sol_execbench.core.docker_matrix import (
+    DEFAULT_DOCKER_TARGET_MANIFEST,
+    DockerTargetManifestEntry,
+    select_docker_target,
+    to_matrix_target,
+)
 
 
 _MODEL_CONFIG = ConfigDict(
@@ -109,6 +118,47 @@ class DependencyPreflightResult(BaseModelWithDocstrings):
     """Diagnostic Matrix Entry produced by dependency classification."""
     decision: MatrixExecutionDecision
     """Pre-benchmark execution decision derived from the Matrix Entry."""
+    policy: PytorchDependencyPolicy
+    """Selected Target dependency policy used for classification."""
+
+    def to_preview_payload(self) -> dict[str, Any]:
+        """Return shell-consumable JSON for dependency preflight classification."""
+
+        entry_payload = self.entry.model_dump(mode="json")
+        decision_payload = self.decision.model_dump(mode="json")
+        target_payload = entry_payload["target"]
+        policy_payload = entry_payload["observed"]["dependency_policy"]
+        claim_payload = entry_payload["claim_boundary"]
+        return {
+            "target_id": target_payload["target_id"],
+            "pytorch_rocm_target": target_payload["pytorch_rocm_target"],
+            "policy_id": policy_payload["policy_id"],
+            "wheel_availability": self.policy.wheel_availability,
+            "expected_local_version": policy_payload["expected_local_version"],
+            "uv_index_name": policy_payload["uv_index_name"],
+            "uv_index_url": policy_payload["uv_index_url"],
+            "lock_strategy": policy_payload["lock_strategy"],
+            "suggested_uv_command": policy_payload["suggested_uv_command"],
+            "torch_version": self.policy.torch_version,
+            "torchvision_version": self.policy.torchvision_version,
+            "triton_rocm_version": policy_payload["triton_rocm_version"],
+            "triton_rocm_index_name": policy_payload["triton_rocm_index_name"],
+            "triton_rocm_index_url": policy_payload["triton_rocm_index_url"],
+            "status": entry_payload["status"],
+            "reason_code": entry_payload["reason_code"],
+            "reason": entry_payload["reason"],
+            "benchmark_allowed": decision_payload["benchmark_allowed"],
+            "probes_allowed": decision_payload["probes_allowed"],
+            "smoke_allowed": decision_payload["smoke_allowed"],
+            "score_authority": decision_payload["score_authority"],
+            "paper_parity_authority": decision_payload["paper_parity_authority"],
+            "leaderboard_authority": decision_payload["leaderboard_authority"],
+            "container_user_space_validated": decision_payload[
+                "container_user_space_validated"
+            ],
+            "native_host_validated": decision_payload["native_host_validated"],
+            "hardware_validated": claim_payload["hardware_validated"],
+        }
 
 
 def load_docker_target_dependency_policy(
@@ -232,6 +282,7 @@ def classify_dependency_preflight(
             entry,
             allow_mixed_version_debug=allow_mixed_version_debug,
         ),
+        policy=policy,
     )
 
 
@@ -406,3 +457,90 @@ def _version_matches_expected(version: str | None, expected_local_version: str) 
     if version is None or expected is None:
         return True
     return version.startswith(expected)
+
+
+def _none_if_requested(value: str | None) -> str | None:
+    if value is None:
+        return None
+    if value.lower() in {"", "none", "null"}:
+        return None
+    return value
+
+
+def _parse_bool(value: str) -> bool:
+    normalized = value.lower()
+    if normalized in {"1", "true", "yes"}:
+        return True
+    if normalized in {"0", "false", "no"}:
+        return False
+    raise argparse.ArgumentTypeError(f"expected boolean value, got {value!r}")
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    preflight = subparsers.add_parser("preflight")
+    preflight.add_argument("--manifest", type=Path, default=DEFAULT_DOCKER_TARGET_MANIFEST)
+    preflight.add_argument("--target")
+    preflight.add_argument("--allow-mixed-version-debug", action="store_true")
+    preflight.add_argument("--torch-distribution-version")
+    preflight.add_argument("--torch-version")
+    preflight.add_argument("--torch-local-version")
+    preflight.add_argument("--torch-rocm-target")
+    preflight.add_argument("--torch-hip-version")
+    preflight.add_argument("--torch-cuda-version")
+    preflight.add_argument("--torch-device-available", type=_parse_bool)
+    preflight.add_argument("--torch-import-error")
+    preflight.add_argument("--torchvision-distribution-version")
+    preflight.add_argument("--triton-rocm-distribution-version")
+    preflight.add_argument("--triton-rocm-status")
+    preflight.add_argument("--container-rocm-user-space-version")
+    preflight.add_argument("--hipcc-version")
+    preflight.add_argument("--toolchain-rocm-version")
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Emit shell-consumable PyTorch ROCm dependency Matrix JSON."""
+
+    args = _build_parser().parse_args(argv)
+    if args.command == "preflight":
+        selection = select_docker_target(args.target, manifest_path=args.manifest)
+        policy = load_docker_target_dependency_policy(selection.target)
+        observation = PytorchDependencyObservation(
+            torch_distribution_version=_none_if_requested(
+                args.torch_distribution_version
+            ),
+            torch_version=_none_if_requested(args.torch_version),
+            torch_local_version=_none_if_requested(args.torch_local_version),
+            torch_rocm_target=_none_if_requested(args.torch_rocm_target),
+            torch_hip_version=_none_if_requested(args.torch_hip_version),
+            torch_cuda_version=_none_if_requested(args.torch_cuda_version),
+            torch_device_available=args.torch_device_available,
+            torch_import_error=_none_if_requested(args.torch_import_error),
+            torchvision_distribution_version=_none_if_requested(
+                args.torchvision_distribution_version
+            ),
+            triton_rocm_distribution_version=_none_if_requested(
+                args.triton_rocm_distribution_version
+            ),
+            triton_rocm_status=_none_if_requested(args.triton_rocm_status),
+            container_rocm_user_space_version=_none_if_requested(
+                args.container_rocm_user_space_version
+            ),
+            hipcc_version=_none_if_requested(args.hipcc_version),
+            toolchain_rocm_version=_none_if_requested(args.toolchain_rocm_version),
+        )
+        payload = classify_dependency_preflight(
+            target=selection.target,
+            policy=policy,
+            observation=observation,
+            allow_mixed_version_debug=args.allow_mixed_version_debug,
+        ).to_preview_payload()
+        print(json.dumps(payload, sort_keys=True))
+        return 0
+    raise AssertionError(f"unhandled command: {args.command}")
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
