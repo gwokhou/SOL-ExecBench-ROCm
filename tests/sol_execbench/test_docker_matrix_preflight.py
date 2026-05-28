@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -107,6 +110,51 @@ def test_preflight_result_payload_contains_build_args_and_decision_flags() -> No
     payload = result.to_preview_payload()
 
     assert payload["target_id"]
+    assert payload["image_repository"] == "rocm/dev-ubuntu-24.04"
+    assert payload["image_tag"] == "7.1.1-complete"
+    assert payload["image_digest"] is None
+    assert payload["build_args"]["ROCM_DOCKER_IMAGE"] == "rocm/dev-ubuntu-24.04"
+    assert payload["build_args"]["ROCM_DOCKER_TAG"] == "7.1.1-complete"
+    assert payload["status"] == "runtime_unavailable"
+    assert payload["reason_code"] == "rocm_runtime_unavailable"
+    assert payload["benchmark_allowed"] is False
+    assert payload["score_authority"] is False
+    assert payload["paper_parity_authority"] is False
+    assert payload["leaderboard_authority"] is False
+
+
+def test_module_main_emits_preflight_json_from_explicit_observations() -> None:
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "sol_execbench.core.docker_matrix",
+            "preflight",
+            "--manifest",
+            str(MANIFEST_PATH),
+            "--docker-context",
+            "desktop-linux",
+            "--docker-host",
+            "unix:///home/user/.docker/desktop/docker.sock",
+            "--dev-kfd-present",
+            "true",
+            "--dev-kfd-accessible",
+            "true",
+            "--dev-dri-present",
+            "true",
+            "--dev-dri-accessible",
+            "true",
+            "--gpu-accessible",
+            "false",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(completed.stdout)
+
+    assert payload["target_id"]
+    assert payload["validation_scope"] == "container_user_space"
     assert payload["image_repository"] == "rocm/dev-ubuntu-24.04"
     assert payload["image_tag"] == "7.1.1-complete"
     assert payload["image_digest"] is None
