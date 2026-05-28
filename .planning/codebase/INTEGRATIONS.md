@@ -1,41 +1,46 @@
 # External Integrations
 
-**Analysis Date:** 2026-05-26
+**Analysis Date:** 2026-05-28
 
 ## APIs & External Services
 
-**Dataset Acquisition:**
-- Hugging Face Datasets - Downloads the public `nvidia/SOL-ExecBench` dataset and writes local benchmark files.
-  - SDK/Client: `datasets.load_dataset` from the `datasets` package in `scripts/download_solexecbench.py`.
-  - Auth: None required by repository code; optional Hugging Face environment/CLI auth may be supplied externally for the `datasets` library.
-- Hugging Face Hub CLI - Downloads `flashinfer-ai/flashinfer-trace` into `data/flashinfer-trace`.
-  - SDK/Client: `hf download` invoked by `scripts/download_data.sh`; `docs/GETTING-STARTED.md` recommends `uv run --with "huggingface-hub[cli]" ./scripts/download_data.sh`.
-  - Auth: None required by repository code; any Hugging Face token handling is external to this repo.
+**Package Indexes:**
+- PyPI - default Python package index for `uv` dependency resolution.
+  - SDK/Client: `uv`
+  - Auth: Not detected; configured as `https://pypi.org/simple` in `pyproject.toml`.
+- PyTorch ROCm wheel indexes - ROCm-specific PyTorch, torchvision, and Triton ROCm wheels.
+  - SDK/Client: `uv`
+  - Auth: Not detected; configured as `https://download.pytorch.org/whl/rocm7.1` and `https://download.pytorch.org/whl/` in `pyproject.toml`.
 
-**Package Registries:**
-- PyPI - Default Python package index.
-  - SDK/Client: `uv` using the `pypi` index in `pyproject.toml`.
+**Dataset Hosting:**
+- Hugging Face Hub dataset `nvidia/SOL-ExecBench` - optional public benchmark dataset acquisition into `data/SOL-ExecBench/benchmark` through `scripts/download_solexecbench.py`.
+  - SDK/Client: `datasets.load_dataset` from the `datasets` package.
+  - Auth: Not detected in code; optional user-level Hugging Face credentials may be used by the Hugging Face tooling outside this repository.
+- Hugging Face Hub dataset `flashinfer-ai/flashinfer-trace` - optional trace blob download into `data/flashinfer-trace` through `scripts/download_data.sh`.
+  - SDK/Client: `hf` CLI from `huggingface-hub[cli]`.
+  - Auth: Not detected in code; optional user-level Hugging Face credentials may be used by the CLI outside this repository.
+
+**Container Registries:**
+- Docker Hub ROCm image `rocm/dev-ubuntu-24.04` - base image for GPU evaluation containers in `docker/Dockerfile` and `docker/rocm-targets.json`.
+  - SDK/Client: Docker CLI via `scripts/run_docker.sh`.
   - Auth: Not detected.
-- PyTorch ROCm wheel indexes - Resolve ROCm-specific `torch`, `torchvision`, and `triton-rocm` wheels.
-  - SDK/Client: `uv` using `https://download.pytorch.org/whl/rocm7.1` and `https://download.pytorch.org/whl/` configured in `pyproject.toml`.
-  - Auth: Not detected.
-- GitHub Container Registry - Provides the `uv` binary image during Docker builds.
-  - SDK/Client: Docker `COPY --from=ghcr.io/astral-sh/uv:0.5.11` in `docker/Dockerfile`.
-  - Auth: Not detected.
-- Docker image registry for ROCm base image - Provides `rocm/dev-ubuntu-24.04:7.1.1-complete`.
-  - SDK/Client: Docker build base image in `docker/Dockerfile`.
+- GitHub Container Registry image `ghcr.io/astral-sh/uv:0.5.11` - copies the `uv` binary into the Docker image in `docker/Dockerfile`.
+  - SDK/Client: Docker build.
   - Auth: Not detected.
 
-**Local ROCm Tooling:**
-- ROCm runtime discovery tools - Probe device and runtime availability.
-  - SDK/Client: `rocminfo`, `rocm_agent_enumerator`, `amd-smi`, and `rocm-smi` invoked from `src/sol_execbench/core/environment.py`, `src/sol_execbench/core/diagnostics.py`, and `docker/entrypoint.sh`.
-  - Auth: Local OS permissions for ROCm devices; no service auth.
-- ROCm profiling tools - Collect optional diagnostic profiling artifacts.
-  - SDK/Client: `rocprofv3` commands built and executed by `src/sol_execbench/core/bench/rocm_profiler.py` and exposed through `--profile rocprofv3` in `src/sol_execbench/cli/main.py`.
-  - Auth: Local executable availability; no service auth.
-- ROCm static evidence tools - Inspect native HIP/C++ build artifacts.
-  - SDK/Client: `llvm-objdump`, `readelf`, optional `roc-objdump`, and planned `rga` modeled in `src/sol_execbench/core/toolchain.py` and used by static evidence code in `src/sol_execbench/core/bench/static_kernel_evidence.py`.
-  - Auth: Local executable availability; no service auth.
+**ROCm Toolchain Services:**
+- Local ROCm runtime tools - runtime/device discovery through `amd-smi`, `rocminfo`, and `rocm_agent_enumerator` in `src/sol_execbench/core/environment.py`.
+  - SDK/Client: bounded `subprocess.run` probes.
+  - Auth: Local executable access only.
+- ROCm SMI - GPU clock locking and reset through `rocm-smi` in `src/sol_execbench/core/bench/clock_lock.py` and `docker/entrypoint.sh`.
+  - SDK/Client: `subprocess.run` with `sudo -n rocm-smi` for lock/reset operations.
+  - Auth: Local sudo permission configured in `docker/Dockerfile`.
+- ROCprofiler SDK `rocprofv3` - optional profiling and timing diagnostics in `src/sol_execbench/core/bench/rocm_profiler.py` and `src/sol_execbench/cli/main.py`.
+  - SDK/Client: `subprocess.run` around `rocprofv3`.
+  - Auth: Local executable access only.
+- Static object inspection tools - diagnostic static evidence routes for `llvm-objdump`, `roc-objdump`, `readelf`, and planned RGA support through `src/sol_execbench/core/toolchain.py` and `src/sol_execbench/core/bench/static_kernel_evidence.py`.
+  - SDK/Client: bounded local subprocess probes and extractors.
+  - Auth: Local executable access only.
 
 ## Data Storage
 
@@ -45,71 +50,83 @@
   - Client: Not applicable.
 
 **File Storage:**
-- Local filesystem only.
-  - Downloaded public benchmark data is written under `data/SOL-ExecBench/benchmark` by `scripts/download_solexecbench.py`.
-  - FlashInfer trace assets are written under `data/flashinfer-trace` by `scripts/download_data.sh`.
-  - CLI trace output and sidecars are written by `src/sol_execbench/cli/main.py` to user-provided `--output` paths, plus `.environment.json`, `.profile.json`, `.rocprofv3/`, and `.static-evidence` sidecars when enabled.
-  - Temporary staging directories are created with `tempfile.mkdtemp(prefix="sol_execbench_")` in `src/sol_execbench/cli/main.py`.
+- Local filesystem only for benchmark definitions, workloads, solutions, staged build directories, trace JSONL outputs, profiler sidecars, static evidence sidecars, environment snapshots, and downloaded dataset assets.
+- Dataset assets conventionally live under `data/`, with `data/SOL-ExecBench/benchmark` used by `scripts/download_solexecbench.py` and `data/flashinfer-trace` used by `scripts/download_data.sh` and `FLASHINFER_TRACE_DIR`.
+- Safetensors workload blobs are loaded from local paths by `src/sol_execbench/core/bench/io.py`.
 
 **Caching:**
-- `uv` cache is configured as `UV_CACHE_DIR=/home/${HOST_USER}/.cache/uv` in `docker/Dockerfile`.
-- PyTorch allocation behavior is configured with `PYTORCH_ALLOC_CONF=expandable_segments:True` for compile/evaluation subprocesses in `src/sol_execbench/cli/main.py`.
-- PyTorch and Triton runtime caches may be used by their libraries, but no external cache service is configured in this repository.
+- `uv` cache is used by local and Docker dependency installs; Docker defaults `UV_CACHE_DIR` to `/home/${HOST_USER}/.cache/uv` in `docker/Dockerfile`.
+- PyTorch extension builds use staging/build directories generated by `src/sol_execbench/driver/problem_packager.py` and `src/sol_execbench/driver/templates/build_ext.py`.
+- In-process safetensors file caching per workload load is implemented in `src/sol_execbench/core/bench/io.py`.
+- No external cache service is detected.
 
 ## Authentication & Identity
 
 **Auth Provider:**
 - Not detected.
-  - Implementation: The project is a local CLI benchmark runner. There are no web sessions, users, tokens, OAuth flows, or application-level identity providers in `src/sol_execbench/`.
+  - Implementation: No application authentication, user accounts, sessions, tokens, OAuth, SSO, or auth middleware are present in `src/sol_execbench/`.
+
+**Local Privilege Boundaries:**
+- Docker user identity is mapped from host UID/GID using `HOST_UID`, `HOST_GID`, and `HOST_USER` build args in `docker/Dockerfile`.
+- GPU clock control uses local sudo permissions for `amd-smi` or `rocm-smi` configured by `docker/Dockerfile` and invoked by `docker/entrypoint.sh` plus `src/sol_execbench/core/bench/clock_lock.py`.
 
 ## Monitoring & Observability
 
 **Error Tracking:**
-- None.
+- None. No SaaS error tracking client is detected.
 
 **Logs:**
-- CLI human output uses Rich tables/progress in `src/sol_execbench/cli/main.py`.
-- Evaluation subprocess stdout is reserved for trace JSONL and stderr receives non-JSON output in `src/sol_execbench/driver/templates/eval_driver.py`.
-- Runtime logs and failure messages are embedded in trace evaluation records through `src/sol_execbench/core/bench/utils.py`, `src/sol_execbench/core/reporting.py`, and `src/sol_execbench/core/data/trace.py`.
-- Optional environment diagnostics are emitted by `sol-execbench doctor --json` from `src/sol_execbench/cli/main.py` using `src/sol_execbench/core/environment.py`.
-- Optional profiler and static evidence sidecars are written by `src/sol_execbench/cli/main.py`.
+- CLI output uses Rich console rendering in `src/sol_execbench/cli/main.py`.
+- Evaluation subprocess stdout is parsed as trace JSONL and non-JSON output is kept as logs by `src/sol_execbench/driver/problem_packager.py`.
+- Evaluation driver redirects third-party/library stdout to stderr in `src/sol_execbench/driver/templates/eval_driver.py` so trace JSONL remains machine-readable.
+- Dataset batch runs save CLI logs and summaries through `scripts/run_dataset.py`.
+- Optional sidecars include environment snapshots from `src/sol_execbench/core/environment.py`, `rocprofv3` profile metadata from `src/sol_execbench/core/bench/rocm_profiler.py`, static kernel evidence from `src/sol_execbench/core/bench/static_kernel_evidence.py`, and compatibility/runtime evidence from `src/sol_execbench/core/runtime_evidence.py`.
 
 ## CI/CD & Deployment
 
 **Hosting:**
-- Not applicable. This repository packages a CLI and Dockerized local runner, not a hosted application.
+- Not detected for an application service.
+- Distribution packaging is a Python package configured in `pyproject.toml`.
+- GPU runtime deployment is a local Docker workflow via `docker/Dockerfile` and `scripts/run_docker.sh`.
 
 **CI Pipeline:**
-- GitHub Actions workflow `.github/workflows/code-quality.yml` runs on pull requests and pushes across Python `3.12` and `3.13`.
-- The workflow installs with `uv sync --locked --all-groups`, then runs `uv run ruff check .`, `uv run ty check`, CPU-safe `pytest` under `tests/sol_execbench/`, and example consistency tests from `tests/examples/test_examples.py`.
-- Local quality gates are `uv run pytest tests/`, Ruff, Ty, and Docker dependency smoke tests under `tests/docker/dependencies/`.
-- `.pre-commit-config.yaml` defines local Ruff and DCO hooks.
+- GitHub Actions workflow `.github/workflows/code-quality.yml`.
+- CI uses `actions/checkout@v4`, `actions/setup-python@v5`, and `astral-sh/setup-uv@v6`.
+- CI matrix runs Python `3.12` and `3.13`, installs with `uv sync --locked --all-groups`, runs `uv run ruff check .`, `uv run ty check`, and runs CPU-safe pytest subsets.
 
 ## Environment Configuration
 
 **Required env vars:**
-- None for basic CLI usage.
-- GPU/container execution expects ROCm device access and may use the following operational variables:
-- `FLASHINFER_TRACE_DIR` - Optional safetensors lookup root used by `src/sol_execbench/driver/templates/eval_driver.py`.
-- `SOL_EXECBENCH_CLOCKS_LOCKED` - Runtime state set by `docker/entrypoint.sh` and read by `src/sol_execbench/core/bench/clock_lock.py`.
-- `SOL_EXECBENCH_SCLK_LEVEL` and `SOL_EXECBENCH_MCLK_LEVEL` - Optional clock-lock overrides read by `src/sol_execbench/core/bench/clock_lock.py`.
-- `PYTORCH_ROCM_ARCH` - Optional native-build architecture override in `src/sol_execbench/driver/templates/build_ext.py`.
-- `PYTORCH_ALLOC_CONF` - Set by `src/sol_execbench/cli/main.py` for subprocess allocator behavior.
-- `SOLEXECBENCH_ENV_SNAPSHOT` and `SOLEXECBENCH_ENV_SNAPSHOT_PATH` - Optional environment snapshot controls in `src/sol_execbench/cli/main.py`.
+- None for CPU-safe CLI/schema/test usage.
+- ROCm GPU evaluation requires host/device state rather than app secrets: `/dev/kfd`, `/dev/dri`, ROCm drivers/tools, and PyTorch ROCm runtime visibility.
+
+**Operational env vars:**
+- `IMAGE_NAME`, `IMAGE_TAG`, `ROCM_DOCKER_IMAGE`, `ROCM_DOCKER_TAG` - Docker image selection in `scripts/run_docker.sh` and `docker/Dockerfile`.
+- `ROCM_PATH`, `HIP_PATH`, `HIP_PLATFORM`, `PATH`, `LD_LIBRARY_PATH` - ROCm runtime/tool path configuration in `docker/Dockerfile`.
+- `FLASHINFER_TRACE_DIR` - optional local FlashInfer trace directory used by `docker/entrypoint.sh`, `scripts/run_docker.sh`, and safetensors workload resolution.
+- `SOL_EXECBENCH_CLOCKS_LOCKED`, `SOL_EXECBENCH_SCLK_LEVEL`, `SOL_EXECBENCH_MCLK_LEVEL` - clock lock state/configuration used by `docker/entrypoint.sh` and `src/sol_execbench/core/bench/clock_lock.py`.
+- `PYTORCH_ALLOC_CONF` and `PYTORCH_ROCM_ARCH` - PyTorch allocator and ROCm architecture build behavior used by `src/sol_execbench/cli/main.py` and `src/sol_execbench/driver/templates/build_ext.py`.
+- `SOLEXECBENCH_ENV_SNAPSHOT` and `SOLEXECBENCH_ENV_SNAPSHOT_PATH` - optional environment sidecar controls in `src/sol_execbench/cli/main.py`.
+- `HIP_VISIBLE_DEVICES`, `ROCR_VISIBLE_DEVICES`, `HSA_OVERRIDE_GFX_VERSION` - captured as diagnostics in `src/sol_execbench/core/environment.py`.
+- `SOL_EXECBENCH_COMPATIBILITY_ENTRY`, `SOL_EXECBENCH_COMPATIBILITY_MATRIX`, `SOL_EXECBENCH_DEPENDENCY_*`, `SOL_EXECBENCH_RUNTIME_*`, `SOL_EXECBENCH_HOST_*`, and device-node override variables - Docker/matrix diagnostics in `scripts/run_docker.sh`.
 
 **Secrets location:**
-- Not detected.
-- No `.env`, `.env.example`, `.env.sample`, `credentials.*`, or secret files were detected in the repository scan.
-- `docs/CONFIGURATION.md` states there is no required application-level `.env` file.
+- No repository-managed secrets location detected.
+- `.env` / `.env.*` files are not required by the project and were not read.
+- Hugging Face or Docker credentials, if used, come from user-level external tooling configuration, not repository files.
 
 ## Webhooks & Callbacks
 
 **Incoming:**
-- None.
+- None. No HTTP server, webhook route, callback endpoint, or long-running service listener is detected in `src/sol_execbench/`.
 
 **Outgoing:**
-- None.
+- Hugging Face dataset download requests from `scripts/download_solexecbench.py` through `datasets.load_dataset`.
+- Hugging Face CLI dataset download requests from `scripts/download_data.sh`.
+- Package index requests to PyPI and PyTorch ROCm wheel indexes through `uv`.
+- Docker image pulls from Docker Hub and GitHub Container Registry through Docker.
+- No application-level outbound webhooks are detected.
 
 ---
 
-*Integration audit: 2026-05-26*
+*Integration audit: 2026-05-28*
