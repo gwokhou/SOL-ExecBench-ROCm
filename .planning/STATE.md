@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.18
 milestone_name: ROCm Version Matrix via Docker
-status: ready_for_milestone_audit
-stopped_at: Phase 82 complete (1/1) — ready for milestone audit
-last_updated: 2026-05-28T10:40:00.000Z
-last_activity: 2026-05-28
+status: Awaiting next milestone
+stopped_at: Completed 80-02-PLAN.md
+last_updated: "2026-05-28T11:46:07.267Z"
+last_activity: 2026-05-28 — Milestone v1.18 completed and archived
 progress:
   total_phases: 5
   completed_phases: 5
@@ -25,12 +25,10 @@ See: `.planning/PROJECT.md` (updated 2026-05-28)
 
 ## Current Position
 
-Phase: complete
-Plan: complete
-Status: Ready for milestone audit
-Last activity: 2026-05-28
-
-Progress: [██████████] 100%
+Phase: Milestone v1.18 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-05-28 — Milestone v1.18 completed and archived
 
 ## Performance Metrics
 
@@ -124,3 +122,7 @@ Items acknowledged and carried forward from previous milestone close:
 Last session: 2026-05-28T09:38:04.361Z
 Stopped at: Completed 80-02-PLAN.md
 Resume file: None
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone
