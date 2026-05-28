@@ -80,7 +80,7 @@
 ## Phases
 
 - [x] **Phase 78: Matrix Contract And Claim Guardrails** - Define diagnostic Matrix Entry semantics, bounded statuses, and claim boundaries. (completed 2026-05-28)
-- [ ] **Phase 79: Docker Matrix Selection And Preflight** - Let users select declared ROCm Docker targets with deterministic image and device preflight behavior.
+- [x] **Phase 79: Docker Matrix Selection And Preflight** - Let users select declared ROCm Docker targets with deterministic image and device preflight behavior. (completed 2026-05-28)
 - [ ] **Phase 80: uv And PyTorch ROCm Wheel Coordination** - Record and enforce per-target dependency policy so wrong or unavailable PyTorch ROCm stacks are classified before validation.
 - [ ] **Phase 81: Runtime Evidence And Compatibility Reports** - Collect scoped host/container/Python/toolchain/GPU evidence and emit per-target plus aggregate compatibility reports.
 - [ ] **Phase 82: Validation Workflow, Docs, And CI Guardrails** - Document claim boundaries and add CPU-safe, Docker-script, and marker-gated validation coverage.
@@ -130,7 +130,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 79-02-PLAN.md — Wire Docker Target selection into the Dockerfile and Docker wrapper script with CPU-safe script/static tests.
+- [x] 79-02-PLAN.md — Wire Docker Target selection into the Dockerfile and Docker wrapper script with CPU-safe script/static tests.
 
 ### Phase 80: uv And PyTorch ROCm Wheel Coordination
 
@@ -185,7 +185,7 @@ Phases execute in numeric order: 78 -> 79 -> 80 -> 81 -> 82
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 78. Matrix Contract And Claim Guardrails | v1.18 | 2/2 | Complete    | 2026-05-28 |
-| 79. Docker Matrix Selection And Preflight | v1.18 | 1/2 | In Progress|  |
+| 79. Docker Matrix Selection And Preflight | v1.18 | 2/2 | Complete   | 2026-05-28 |
 | 80. uv And PyTorch ROCm Wheel Coordination | v1.18 | 0/TBD | Not started | - |
 | 81. Runtime Evidence And Compatibility Reports | v1.18 | 0/TBD | Not started | - |
 | 82. Validation Workflow, Docs, And CI Guardrails | v1.18 | 0/TBD | Not started | - |

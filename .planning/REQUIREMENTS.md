@@ -18,7 +18,7 @@
 ### Docker Matrix
 
 - [x] **DOCKER-01**: The repository provides a checked-in ROCm Docker matrix manifest for declared Targets, initially covering configured `7.0.x`, `7.1.x`, and `7.2.x` logical Matrix Entries where usable Docker image tags are known.
-- [ ] **DOCKER-02**: `docker/Dockerfile` supports parameterized ROCm base image selection while preserving the current ROCm 7.1 default behavior.
+- [x] **DOCKER-02**: `docker/Dockerfile` supports parameterized ROCm base image selection while preserving the current ROCm 7.1 default behavior.
 - [x] **DOCKER-03**: `scripts/run_docker.sh` supports selecting a declared ROCm Target and rejects unknown Targets unless an explicit unsafe/untested override is supplied.
 - [x] **DOCKER-04**: Docker preflight checks classify missing `/dev/kfd`, missing `/dev/dri`, unsupported Docker context, and inaccessible GPU devices as `runtime_unavailable` before benchmark execution.
 - [x] **DOCKER-05**: Docker reports record exact requested image repository/tag and, when available, resolved image digest and build arguments.
@@ -92,7 +92,7 @@
 | MATRIX-05 | Phase 78 | Complete |
 | MATRIX-06 | Phase 78 | Complete |
 | DOCKER-01 | Phase 79 | Complete |
-| DOCKER-02 | Phase 79 | Pending |
+| DOCKER-02 | Phase 79 | Complete |
 | DOCKER-03 | Phase 79 | Complete |
 | DOCKER-04 | Phase 79 | Complete |
 | DOCKER-05 | Phase 79 | Complete |

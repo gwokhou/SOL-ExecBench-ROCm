@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.18
 milestone_name: ROCm Version Matrix via Docker
-status: executing
-stopped_at: Completed 79-01-PLAN.md
-last_updated: "2026-05-28T06:30:47.768Z"
-last_activity: 2026-05-28 -- Completed 79-01-PLAN.md
+status: verifying
+stopped_at: Completed 79-02-PLAN.md
+last_updated: "2026-05-28T06:43:38.052Z"
+last_activity: 2026-05-28
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 4
-  completed_plans: 3
-  percent: 75
+  completed_plans: 4
+  percent: 40
 ---
 
 # Project State
@@ -27,10 +27,10 @@ See: `.planning/PROJECT.md` (updated 2026-05-28)
 
 Phase: 79 (docker-matrix-selection-and-preflight) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute next plan
-Last activity: 2026-05-28 -- Completed 79-01-PLAN.md
+Status: Phase complete — ready for verification
+Last activity: 2026-05-28
 
-Progress: [████████░░] 75%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -60,6 +60,7 @@ Progress: [████████░░] 75%
 | Phase 78 P1 | 5min | 2 tasks | 2 files |
 | Phase 78 P2 | 6min | 3 tasks | 6 files |
 | Phase 79 P1 | 6min | 3 tasks | 4 files |
+| Phase 79 P2 | 8min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -80,6 +81,9 @@ Progress: [████████░░] 75%
 - [Phase 79]: Declared Docker Target selection is repo-owned JSON policy, not runtime Docker tag discovery.
 - [Phase 79]: Unknown Docker Targets require explicit unsafe/untested override and remain not_tested with authority fields false.
 - [Phase 79]: Docker preflight failures classify as runtime_unavailable before benchmark execution.
+- [Phase 79]: The Dockerfile keeps rocm/dev-ubuntu-24.04:7.1.1-complete as the default through pre-FROM build args.
+- [Phase 79]: The Docker wrapper resolves Target selection before host preflight so unknown Targets fail before Docker build/run.
+- [Phase 79]: Script tests use SOL_EXECBENCH_RUN_DOCKER_DRY_RUN=1 and env-injected observations to avoid live Docker or ROCm hardware.
 
 ### Pending Todos
 
@@ -103,6 +107,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-28T06:30:47.763Z
-Stopped at: Completed 79-01-PLAN.md
+Last session: 2026-05-28T06:43:38.046Z
+Stopped at: Completed 79-02-PLAN.md
 Resume file: None
