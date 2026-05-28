@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v1.18
 milestone_name: ROCm Version Matrix via Docker
 status: planning
-last_updated: "2026-05-28T04:37:24.386Z"
+last_updated: "2026-05-28"
 last_activity: 2026-05-28
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -17,24 +17,25 @@ progress:
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (updated 2026-05-26)
+See: `.planning/PROJECT.md` (updated 2026-05-28)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Milestone complete
+**Current focus:** Phase 78 - Matrix Contract And Claim Guardrails
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-05-28 — Milestone v1.18 started
+Phase: 78 of 82 (Matrix Contract And Claim Guardrails)
+Plan: TBD
+Status: Ready to plan
+Last activity: 2026-05-28 - Created v1.18 roadmap from 30 requirements
+
+Progress: [----------] 0%
 
 ## Performance Metrics
 
 **Velocity:**
-
-- Current milestone plans completed: 5
-- Current milestone phases completed: 5
+- Current milestone plans completed: 0
+- Current milestone phases completed: 0
 - Average duration: n/a
 - Total execution time: n/a
 
@@ -42,32 +43,25 @@ Last activity: 2026-05-28 — Milestone v1.18 started
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 73. Static Evidence Contract And Guardrails | 1 | complete | n/a |
-| 74. Build Artifact Discovery And Manifest | 1 | complete | n/a |
-| 75. Routed Static Extractor Adapters | 1 | complete | n/a |
-| 76. CLI Sidecar Integration And Reports | 1 | complete | n/a |
-| 77. Documentation, Guardrails, And Live Validation | 1 | complete | n/a |
+| 78. Matrix Contract And Claim Guardrails | 0/TBD | Not started | n/a |
+| 79. Docker Matrix Selection And Preflight | 0/TBD | Not started | n/a |
+| 80. uv And PyTorch ROCm Wheel Coordination | 0/TBD | Not started | n/a |
+| 81. Runtime Evidence And Compatibility Reports | 0/TBD | Not started | n/a |
+| 82. Validation Workflow, Docs, And CI Guardrails | 0/TBD | Not started | n/a |
 
 **Recent Trend:**
-
-- Last milestone: v1.16 shipped on 2026-05-25
-- Trend: v1.17 shipped five phases from contract to discovery, routed
-  extractors, CLI/reporting, then docs/live validation.
+- Last milestone: v1.17 shipped on 2026-05-26
+- Trend: v1.18 starts with five planned phases for Docker-based ROCm version matrix evidence.
 
 ## Accumulated Context
 
 ### Decisions
 
-Decisions are logged in PROJECT.md. Recent decisions affecting current work:
-
-- v1.16 prioritizes ROCm toolchain research and capability routing before Static Kernel Evidence.
-- v1.17 starts at Phase 73 because v1.16 ended at Phase 72.
-- Static Kernel Evidence remains opt-in, sidecar-only, and diagnostic.
-- Static extraction must use v1.16 routing, not ad hoc executable lookup.
-- Static evidence must not mutate canonical trace JSONL, correctness, timing,
-  scoring, default benchmark behavior, paper-parity, or leaderboard claims.
-
-- Detailed historical decisions are preserved in `.planning/PROJECT.md` and archived milestone artifacts.
+- v1.18 starts at Phase 78 because v1.17 ended at Phase 77.
+- v1.18 uses Target and Matrix Entry language for compatibility evidence.
+- Illegal mixed-version Targets are blocked during preflight by default.
+- Mixed-version debug override may continue probes or smoke only, without clean validation, score, paper-parity, or leaderboard claims.
+- Docker container validation must be described as container ROCm user-space validation on recorded host driver/devices, never native host validation.
 
 ### Pending Todos
 
@@ -75,22 +69,8 @@ None found.
 
 ### Blockers/Concerns
 
-The bounded RDNA 4 run collected static evidence successfully, but benchmark
-correctness did not pass for the RMSNorm example. CDNA 3, CDNA 4, Triton,
-RGA-rich resource parsing, and paper-scale static coverage remain deferred
-unless direct evidence is produced in a later milestone.
-
-### Quick Tasks Completed
-
-| # | Description | Date | Commit | Directory |
-|---|-------------|------|--------|-----------|
-| 260524-xb3 | Fix PR base and prepare SOL evaluator contract branch for merge | 2026-05-24 | 5d4892d | [260524-xb3-fix-pr-base-and-prepare-sol-evaluator-co](./quick/260524-xb3-fix-pr-base-and-prepare-sol-evaluator-co/) |
-| 260525-097 | Backfill v1.12 GSD milestone for evaluator contract PR | 2026-05-25 | this commit | [260525-097-backfill-v1-12-gsd-milestone-for-evaluat](./quick/260525-097-backfill-v1-12-gsd-milestone-for-evaluat/) |
-| 260525-ruff | Configure Ruff as a dev dependency | 2026-05-25 | this commit | [260525-configure-ruff-dev-dependency](./quick/260525-configure-ruff-dev-dependency/) |
-| 260525-ty | Configure Ty as a dev dependency | 2026-05-25 | this commit | [260525-configure-ty-dev-dependency](./quick/260525-configure-ty-dev-dependency/) |
-| 260525-fix-ty-s0-s1 | Fix Ty S0/S1 diagnostics | 2026-05-25 | this commit | [260525-fix-ty-s0-s1](./quick/260525-fix-ty-s0-s1/) |
-| 260525-q95 | Add ROCm device-node-aware skip reasons for Codex sandboxed test runs | 2026-05-25 | this commit | [260525-q95-add-rocm-device-node-aware-skip-reasons-](./quick/260525-q95-add-rocm-device-node-aware-skip-reasons-/) |
-| 260525-qft | Add GitHub Actions code-quality workflow matching hip-playground | 2026-05-25 | this commit | [260525-qft-add-github-actions-code-quality-workflow](./quick/260525-qft-add-github-actions-code-quality-workflow/) |
+- PyTorch ROCm wheel availability for ROCm 7.0.x and 7.2.x must be verified during Phase 80 planning/execution.
+- Host-driver/container compatibility, Triton ROCm readiness, and image digest capture remain implementation research items for Phases 79-81.
 
 ## Deferred Items
 
@@ -100,25 +80,11 @@ Items acknowledged and carried forward from previous milestone close:
 |----------|------|--------|-------------|
 | Dataset extraction | Original paper 124-model / 235-problem extraction | Deferred | v1.10 scope |
 | Hardware validation | MI300X, CDNA 3, and CDNA 4 real-hardware validation | Deferred | v1.10 scope |
-| Compatibility validation | ROCm 7.0.x/7.1.x/7.2.x by GPU-generation validation matrix | Deferred | v1.16 follow-up discussion |
-| Hardware validation | NVFP4 and MXFP4 validation | Deferred | v1.10 scope |
+| Native host matrix | Host reinstall or separate-host ROCm 7.0.x/7.1.x/7.2.x validation | Deferred | v1.18 scope |
 | Public service | Hosted leaderboard or submission service | Deferred | v1.10 scope |
-| Claims | NVIDIA Blackwell/B200 equivalence | Deferred | v1.10 scope |
-| Quick task metadata | 260524-xb3-fix-pr-base-and-prepare-sol-evaluator-co | Missing completion metadata acknowledged | v1.17 close audit |
-| Quick task metadata | 260525-097-backfill-v1-12-gsd-milestone-for-evaluat | Missing completion metadata acknowledged | v1.17 close audit |
-| Quick task metadata | 260525-audit-fix-remaining-suite-reds | Missing completion metadata acknowledged | v1.17 close audit |
-| Quick task metadata | 260525-configure-ruff-dev-dependency | Missing completion metadata acknowledged | v1.17 close audit |
-| Quick task metadata | 260525-configure-ty-dev-dependency | Missing completion metadata acknowledged | v1.17 close audit |
-| Quick task metadata | 260525-fix-ty-s0-s1 | Missing completion metadata acknowledged | v1.17 close audit |
-| Quick task metadata | 260525-q95-add-rocm-device-node-aware-skip-reasons- | Missing completion metadata acknowledged | v1.17 close audit |
-| Quick task metadata | 260525-qft-add-github-actions-code-quality-workflow | Missing completion metadata acknowledged | v1.17 close audit |
 
 ## Session Continuity
 
-Last session: 2026-05-23T11:26:49.344Z
-Stopped at: Milestone v1.17 completed, audited, and archived
+Last session: 2026-05-28
+Stopped at: v1.18 roadmap created and ready for Phase 78 planning
 Resume file: None
-
-## Operator Next Steps
-
-- Start the next milestone with /gsd-new-milestone
