@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.18
 milestone_name: ROCm Version Matrix via Docker
 status: executing
-stopped_at: v1.18 roadmap created and ready for Phase 78 planning
-last_updated: "2026-05-28T05:16:51.521Z"
-last_activity: 2026-05-28 -- Phase 78 planning complete
+stopped_at: Completed 78-01-PLAN.md
+last_updated: "2026-05-28T05:29:03.539Z"
+last_activity: 2026-05-28
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 2
-  completed_plans: 0
+  completed_plans: 1
   percent: 0
 ---
 
@@ -21,16 +21,16 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-28)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Phase 78 - Matrix Contract And Claim Guardrails
+**Current focus:** Phase 78 — matrix-contract-and-claim-guardrails
 
 ## Current Position
 
-Phase: 78 of 82 (Matrix Contract And Claim Guardrails)
-Plan: TBD
+Phase: 78 (matrix-contract-and-claim-guardrails) — EXECUTING
+Plan: 2 of 2
 Status: Ready to execute
-Last activity: 2026-05-28 -- Phase 78 planning complete
+Last activity: 2026-05-28
 
-Progress: [----------] 0%
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
@@ -56,6 +56,8 @@ Progress: [----------] 0%
 - Last milestone: v1.17 shipped on 2026-05-26
 - Trend: v1.18 starts with five planned phases for Docker-based ROCm version matrix evidence.
 
+| Phase 78 P1 | 5min | 2 tasks | 2 files |
+
 ## Accumulated Context
 
 ### Decisions
@@ -65,6 +67,9 @@ Progress: [----------] 0%
 - Illegal mixed-version Targets are blocked during preflight by default.
 - Mixed-version debug override may continue probes or smoke only, without clean validation, score, paper-parity, or leaderboard claims.
 - Docker container validation must be described as container ROCm user-space validation on recorded host driver/devices, never native host validation.
+- [Phase 78]: Target/requested values and observed host, container, Python dependency, toolchain, and GPU evidence are modeled as separate required objects.
+- [Phase 78]: Score, paper-parity, and leaderboard authority are literal false fields on every Matrix Entry claim boundary.
+- [Phase 78]: Compatibility Matrix Entries are strict sidecars separate from canonical trace, timing, scoring, and benchmark result schemas.
 
 ### Pending Todos
 
@@ -88,6 +93,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-28
-Stopped at: v1.18 roadmap created and ready for Phase 78 planning
+Last session: 2026-05-28T05:29:02.835Z
+Stopped at: Completed 78-01-PLAN.md
 Resume file: None
