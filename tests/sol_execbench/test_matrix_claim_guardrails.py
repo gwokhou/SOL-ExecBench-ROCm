@@ -265,6 +265,51 @@ def test_docker_container_validated_claims_container_user_space_not_native_host(
     assert payload["claim_boundary"]["native_host_validated"] is False
 
 
+def test_container_validated_rejects_native_host_scope():
+    with pytest.raises(ValidationError, match="container_user_space validation scope"):
+        build_matrix_entry(
+            target=_native_host_target(),
+            observed=_observed_container_stack(),
+            status=MatrixCompatibilityStatus.CONTAINER_VALIDATED,
+            reason_code=MatrixCompatibilityReasonCode.CONTAINER_USER_SPACE_VALIDATED,
+            reason="Container validation cannot be claimed from a native-host Target.",
+            claim_boundary=MatrixClaimBoundary(
+                container_user_space_validated=True,
+                native_host_validated=False,
+                hardware_validated=True,
+            ),
+        )
+
+
+def test_container_validated_rejects_missing_container_evidence():
+    with pytest.raises(ValidationError, match="observed container evidence"):
+        _entry(
+            status=MatrixCompatibilityStatus.CONTAINER_VALIDATED,
+            reason_code=MatrixCompatibilityReasonCode.CONTAINER_USER_SPACE_VALIDATED,
+            reason="Container validation requires container evidence.",
+            claim_boundary=MatrixClaimBoundary(
+                container_user_space_validated=True,
+                native_host_validated=False,
+                hardware_validated=True,
+            ),
+            observed=MatrixObservedEvidence(host=MatrixHostEvidence(rocm_version="7.1.0")),
+        )
+
+
+def test_container_validated_rejects_native_host_claim_flag():
+    with pytest.raises(ValidationError, match="native_host_validated=true"):
+        _entry(
+            status=MatrixCompatibilityStatus.CONTAINER_VALIDATED,
+            reason_code=MatrixCompatibilityReasonCode.CONTAINER_USER_SPACE_VALIDATED,
+            reason="Container validation cannot claim native-host validation.",
+            claim_boundary=MatrixClaimBoundary(
+                container_user_space_validated=True,
+                native_host_validated=True,
+                hardware_validated=True,
+            ),
+        )
+
+
 def test_native_host_validated_requires_direct_host_evidence():
     entry = _native_host_entry(observed=_observed_native_host_stack())
 
@@ -281,6 +326,22 @@ def test_native_host_validated_rejects_missing_direct_host_evidence():
             observed=MatrixObservedEvidence(
                 container=MatrixContainerEvidence(rocm_user_space_version="7.1.0")
             )
+        )
+
+
+def test_host_validated_rejects_container_claim_flag():
+    with pytest.raises(ValidationError, match="container_user_space_validated=true"):
+        build_matrix_entry(
+            target=_native_host_target(),
+            observed=_observed_native_host_stack(),
+            status=MatrixCompatibilityStatus.HOST_VALIDATED,
+            reason_code=MatrixCompatibilityReasonCode.HOST_NATIVE_VALIDATED,
+            reason="Native-host validation cannot claim container validation.",
+            claim_boundary=MatrixClaimBoundary(
+                container_user_space_validated=True,
+                native_host_validated=True,
+                hardware_validated=True,
+            ),
         )
 
 
