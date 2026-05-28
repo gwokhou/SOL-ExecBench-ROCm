@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
-from pathlib import Path
 
 from sol_execbench.core.compatibility import (
     MatrixClaimBoundary,

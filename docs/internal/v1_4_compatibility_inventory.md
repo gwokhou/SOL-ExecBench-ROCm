@@ -127,6 +127,7 @@ above:
   current CLI now includes public diagnostic and metadata surfaces.
 - Scope future compatibility analysis to preserving the current public
   `sol-execbench` options and subcommands.
+- Do not add public `sol-execbench` CLI options or subcommands.
 - Do not change Pydantic public field names, required fields, or validation
   semantics.
 - Do not add fields to trace JSONL.

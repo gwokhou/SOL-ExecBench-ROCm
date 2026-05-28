@@ -16,6 +16,8 @@ does not claim official leaderboard equivalence.
 | AMD-native-derived evidence | A score or bound report was derived from ROCm traces and AMD-side bound artifacts. | Canonical traces, AMD SOL bound sidecars, hardware model refs, score eligibility state, and warnings. |
 | Research-preview evidence | A curated benchmark slice was executed or audited under documented limits. | Slice definition, command transcript or expected commands, artifact list, pass/fail/skip/unavailable accounting, and known gaps. |
 
+Docker Matrix Entries may claim **container ROCm user-space validated on recorded host driver/devices** only; a Docker row is not native host ROCm validated without direct native-host validation evidence.
+
 ## What Must Not Be Claimed Yet
 
 - NVIDIA B200, Blackwell, or official leaderboard parity.
