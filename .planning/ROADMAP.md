@@ -81,7 +81,7 @@
 
 - [x] **Phase 78: Matrix Contract And Claim Guardrails** - Define diagnostic Matrix Entry semantics, bounded statuses, and claim boundaries. (completed 2026-05-28)
 - [x] **Phase 79: Docker Matrix Selection And Preflight** - Let users select declared ROCm Docker targets with deterministic image and device preflight behavior. (completed 2026-05-28)
-- [ ] **Phase 80: uv And PyTorch ROCm Wheel Coordination** - Record and enforce per-target dependency policy so wrong or unavailable PyTorch ROCm stacks are classified before validation.
+- [x] **Phase 80: uv And PyTorch ROCm Wheel Coordination** - Record and enforce per-target dependency policy so wrong or unavailable PyTorch ROCm stacks are classified before validation. (completed 2026-05-28)
 - [ ] **Phase 81: Runtime Evidence And Compatibility Reports** - Collect scoped host/container/Python/toolchain/GPU evidence and emit per-target plus aggregate compatibility reports.
 - [ ] **Phase 82: Validation Workflow, Docs, And CI Guardrails** - Document claim boundaries and add CPU-safe, Docker-script, and marker-gated validation coverage.
 
@@ -153,7 +153,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 80-02-PLAN.md — Wire dependency preflight into `scripts/run_docker.sh` so mixed-version dependency stacks block before Docker build/run by default, with an explicit debug override that cannot grant validation or authority.
+- [x] 80-02-PLAN.md — Wire dependency preflight into `scripts/run_docker.sh` so mixed-version dependency stacks block before Docker build/run by default, with an explicit debug override that cannot grant validation or authority.
 
 ### Phase 81: Runtime Evidence And Compatibility Reports
 
@@ -194,7 +194,7 @@ Phases execute in numeric order: 78 -> 79 -> 80 -> 81 -> 82
 |-------|-----------|----------------|--------|-----------|
 | 78. Matrix Contract And Claim Guardrails | v1.18 | 2/2 | Complete    | 2026-05-28 |
 | 79. Docker Matrix Selection And Preflight | v1.18 | 2/2 | Complete    | 2026-05-28 |
-| 80. uv And PyTorch ROCm Wheel Coordination | v1.18 | 1/2 | In Progress|  |
+| 80. uv And PyTorch ROCm Wheel Coordination | v1.18 | 2/2 | Complete   | 2026-05-28 |
 | 81. Runtime Evidence And Compatibility Reports | v1.18 | 0/TBD | Not started | - |
 | 82. Validation Workflow, Docs, And CI Guardrails | v1.18 | 0/TBD | Not started | - |
 

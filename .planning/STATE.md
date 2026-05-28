@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.18
 milestone_name: ROCm Version Matrix via Docker
-status: executing
-stopped_at: Completed 80-01-PLAN.md
-last_updated: "2026-05-28T09:28:47.875Z"
-last_activity: 2026-05-28 -- Plan 80-01 completed
+status: verifying
+stopped_at: Completed 80-02-PLAN.md
+last_updated: "2026-05-28T09:38:04.365Z"
+last_activity: 2026-05-28
 progress:
   total_phases: 5
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 6
-  completed_plans: 5
-  percent: 83
+  completed_plans: 6
+  percent: 60
 ---
 
 # Project State
@@ -27,10 +27,10 @@ See: `.planning/PROJECT.md` (updated 2026-05-28)
 
 Phase: 80 (uv And PyTorch ROCm Wheel Coordination) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
-Last activity: 2026-05-28 -- Plan 80-01 completed
+Status: Phase complete — ready for verification
+Last activity: 2026-05-28
 
-Progress: [████████░░] 83%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -63,6 +63,7 @@ Progress: [████████░░] 83%
 | Phase 79 P1 | 6min | 3 tasks | 4 files |
 | Phase 79 P2 | 8min | 3 tasks | 3 files |
 | Phase 80 P1 | 8min | 3 tasks | 7 files |
+| Phase 80 P2 | 5min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -88,6 +89,8 @@ Progress: [████████░░] 83%
 - [Phase 79]: Script tests use SOL_EXECBENCH_RUN_DOCKER_DRY_RUN=1 and env-injected observations to avoid live Docker or ROCm hardware.
 - [Phase 80]: Dependency policy is stored next to each declared Docker Target and serialized inside Matrix observed evidence. — Plan 80-01 needs auditable Target-adjacent PyTorch ROCm wheel/index policy and strict Matrix Entry evidence.
 - [Phase 80]: ROCm 7.1 remains the project-default uv path; ROCm 7.0 and 7.2 are explicit Target workflows only. — The plan preserves pyproject.toml and uv.lock while recording per-Target dependency workflows.
+- [Phase 80]: The Docker wrapper delegates dependency policy to dependency_matrix.py preflight JSON before Docker build/run.
+- [Phase 80]: Mixed-version dependency debug uses --allow-mixed-version-dependencies or SOL_EXECBENCH_ALLOW_MIXED_VERSION_DEPENDENCIES=1, separate from --allow-unknown-target, and grants no benchmark or authority claims.
 
 ### Pending Todos
 
@@ -111,6 +114,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-28T09:28:47.398Z
-Stopped at: Completed 80-01-PLAN.md
+Last session: 2026-05-28T09:38:04.361Z
+Stopped at: Completed 80-02-PLAN.md
 Resume file: None
