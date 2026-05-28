@@ -2,7 +2,7 @@
 # Launch the sol-execbench Docker container with the right mounts.
 #
 # Usage:
-#   ./scripts/run_docker.sh [--build] [--target <id>] [--allow-unknown-target] [--allow-mixed-version-dependencies] [--allow-untested-target-smoke] [--preflight-only] [--compatibility-entry <path>] [--compatibility-matrix <path>] [docker-run-args...] [-- command...]
+#   ./scripts/run_docker.sh [--build] [--target <id>] [--allow-unknown-target] [--allow-mixed-version-dependencies] [--allow-untested-target-smoke] [--record-container-validation] [--preflight-only] [--compatibility-entry <path>] [--compatibility-matrix <path>] [docker-run-args...] [-- command...]
 #
 # Examples:
 #   ./scripts/run_docker.sh                             # interactive shell
@@ -18,6 +18,7 @@
 #   ROCM_DOCKER_TAG     Unsafe unknown-target override tag
 #   SOL_EXECBENCH_ALLOW_MIXED_VERSION_DEPENDENCIES=1  Allow dependency probe/smoke diagnostics for mixed-version stacks
 #   SOL_EXECBENCH_ALLOW_UNTESTED_TARGET_SMOKE=1       Allow not_tested Targets to run smoke/E2E without validation claims
+#   SOL_EXECBENCH_RECORD_CONTAINER_VALIDATION=1       Record a successful wrapper benchmark as container_validated evidence
 #   SOL_EXECBENCH_HOST_PYTHON  Optional host Python executable override for wrapper helper commands
 #   SOL_EXECBENCH_DEPENDENCY_*  Dependency preflight observation overrides for tests/debugging
 #   SOL_EXECBENCH_COMPATIBILITY_ENTRY  Optional per-Target compatibility JSON sidecar path
@@ -36,6 +37,7 @@ DOCKER_TARGET=""
 ALLOW_UNKNOWN_TARGET=false
 ALLOW_MIXED_VERSION_DEPENDENCIES=false
 ALLOW_UNTESTED_TARGET_SMOKE=false
+RECORD_CONTAINER_VALIDATION=false
 PREFLIGHT_ONLY=false
 DRY_RUN="${SOL_EXECBENCH_RUN_DOCKER_DRY_RUN:-0}"
 COMPATIBILITY_ENTRY_PATH="${SOL_EXECBENCH_COMPATIBILITY_ENTRY:-}"
@@ -62,6 +64,12 @@ case "${SOL_EXECBENCH_ALLOW_UNTESTED_TARGET_SMOKE:-0}" in
         ;;
 esac
 
+case "${SOL_EXECBENCH_RECORD_CONTAINER_VALIDATION:-0}" in
+    1 | true | TRUE | yes | YES)
+        RECORD_CONTAINER_VALIDATION=true
+        ;;
+esac
+
 matrix_json_value() {
     run_host_python -c 'import json, sys; data=json.loads(sys.argv[1]); value=data; [value := value[part] for part in sys.argv[2].split(".")]; print(value)' "$1" "$2"
 }
@@ -81,6 +89,19 @@ preflight_blocked() {
     if [ "${status}" = "${hard_block_status}" ] ||
         [ "${benchmark_allowed}" != "True" ]; then
         if $ALLOW_UNTESTED_TARGET_SMOKE && [ "${status}" = "not_tested" ]; then
+            return 1
+        fi
+        return 0
+    fi
+    return 1
+}
+
+execution_preflight_blocked() {
+    local status="$1"
+    local benchmark_allowed="$2"
+    local hard_block_status="$3"
+    if preflight_blocked "${status}" "${benchmark_allowed}" "${hard_block_status}"; then
+        if $RECORD_CONTAINER_VALIDATION && [ "${status}" = "not_tested" ]; then
             return 1
         fi
         return 0
@@ -362,6 +383,10 @@ while [ "$#" -gt 0 ]; do
                 ALLOW_UNTESTED_TARGET_SMOKE=true
                 continue
                 ;;
+            --record-container-validation)
+                RECORD_CONTAINER_VALIDATION=true
+                continue
+                ;;
             --preflight-only)
                 PREFLIGHT_ONLY=true
                 continue
@@ -411,7 +436,7 @@ if [[ "${SELECTED_TARGET_ID}" == unsafe-untested-* ]]; then
     exit 1
 fi
 
-if [ "${DRY_RUN}" != "1" ] || $PREFLIGHT_ONLY || dependency_preflight_override_present; then
+if $PREFLIGHT_ONLY || dependency_preflight_override_present; then
     DEPENDENCY_PREFLIGHT_JSON="$(classify_dependency_preflight_json)"
     DEPENDENCY_PREFLIGHT_STATUS="$(matrix_json_value "${DEPENDENCY_PREFLIGHT_JSON}" "status")"
     DEPENDENCY_PREFLIGHT_BENCHMARK_ALLOWED="$(matrix_json_value "${DEPENDENCY_PREFLIGHT_JSON}" "benchmark_allowed")"
@@ -434,7 +459,7 @@ if [ "${DRY_RUN}" != "1" ] || $PREFLIGHT_ONLY || dependency_preflight_override_p
         write_compatibility_sidecars "" "dependency"
         echo "${DEPENDENCY_PREFLIGHT_JSON}"
         exit 1
-    elif preflight_blocked "${DEPENDENCY_PREFLIGHT_STATUS}" "${DEPENDENCY_PREFLIGHT_BENCHMARK_ALLOWED}" "mixed_version" &&
+    elif execution_preflight_blocked "${DEPENDENCY_PREFLIGHT_STATUS}" "${DEPENDENCY_PREFLIGHT_BENCHMARK_ALLOWED}" "mixed_version" &&
         ! { $ALLOW_MIXED_VERSION_DEPENDENCIES && [ "${DEPENDENCY_PREFLIGHT_STATUS}" = "mixed_version" ]; }; then
         write_compatibility_sidecars "" "dependency"
         echo "${DEPENDENCY_PREFLIGHT_JSON}"
@@ -459,14 +484,12 @@ if [ "${DRY_RUN}" != "1" ] || $PREFLIGHT_ONLY || preflight_override_present; the
         fi
         exit 0
     fi
-    if preflight_blocked "${PREFLIGHT_STATUS}" "${PREFLIGHT_BENCHMARK_ALLOWED}" "runtime_unavailable"; then
+    if execution_preflight_blocked "${PREFLIGHT_STATUS}" "${PREFLIGHT_BENCHMARK_ALLOWED}" "runtime_unavailable"; then
         write_compatibility_sidecars "${PREFLIGHT_REASON}" ""
         echo "${PREFLIGHT_JSON}"
         exit 1
     fi
 fi
-
-write_compatibility_sidecars "" ""
 
 # Build the image if requested
 if $BUILD; then
@@ -511,9 +534,8 @@ if [ -t 0 ] && [ -t 1 ]; then
     TTY_ARGS=(-it)
 fi
 
-DOCKER_CMD=(
+DOCKER_COMMON_ARGS=(
     docker run --rm
-    "${TTY_ARGS[@]}"
     --device=/dev/kfd
     --device=/dev/dri
     --group-add video
@@ -526,6 +548,82 @@ DOCKER_CMD=(
     -e "SOL_EXECBENCH_GPU_CLK_MHZ=${SOL_EXECBENCH_GPU_CLK_MHZ:-}"
     -e "SOL_EXECBENCH_DRAM_CLK_MHZ=${SOL_EXECBENCH_DRAM_CLK_MHZ:-}"
     "${DOCKER_ARGS[@]}"
+)
+
+container_repo_path() {
+    local path="$1"
+    case "${path}" in
+        "${REPO_ROOT}"/*)
+            echo "${CONTAINER_PROJECT}/${path#"${REPO_ROOT}/"}"
+            ;;
+        "${REPO_ROOT}")
+            echo "${CONTAINER_PROJECT}"
+            ;;
+        *)
+            echo "${path}"
+            ;;
+    esac
+}
+
+run_container_dependency_preflight_json() {
+    local cmd=(
+        "${DOCKER_COMMON_ARGS[@]}"
+        --entrypoint python
+        "${IMAGE}"
+        -m sol_execbench.core.dependency_matrix preflight
+        --manifest "${CONTAINER_PROJECT}/docker/rocm-targets.json"
+    )
+    if [ -n "${DOCKER_TARGET}" ]; then
+        cmd+=(--target "${DOCKER_TARGET}")
+    fi
+    "${cmd[@]}"
+}
+
+write_container_validated_sidecars() {
+    compatibility_sidecar_requested || return 0
+
+    local entry_path
+    local container_entry_path
+    local cmd
+    entry_path="$(compatibility_entry_output_path)"
+    container_entry_path="$(container_repo_path "${entry_path}")"
+    cmd=(
+        "${DOCKER_COMMON_ARGS[@]}"
+        --entrypoint python
+        "${IMAGE}"
+        -m sol_execbench.core.runtime_evidence collect-target
+        --manifest "${CONTAINER_PROJECT}/docker/rocm-targets.json"
+        --output "${container_entry_path}"
+        --container-validated
+        --dev-kfd-present "$(bool_text "$([ -e /dev/kfd ] && echo 1 || echo 0)")"
+        --dev-kfd-accessible "$(bool_text "$([ -r /dev/kfd ] && [ -w /dev/kfd ] && echo 1 || echo 0)")"
+        --dev-dri-present "$(bool_text "$([ -d /dev/dri ] && echo 1 || echo 0)")"
+        --dev-dri-accessible "$(bool_text "$(dev_dri_has_accessible_node && echo 1 || echo 0)")"
+    )
+    if [ -n "${DOCKER_TARGET}" ]; then
+        cmd+=(--target "${DOCKER_TARGET}")
+    fi
+    "${cmd[@]}" >/dev/null
+    if [ -n "${COMPATIBILITY_MATRIX_PATH}" ]; then
+        run_host_python -m sol_execbench.core.runtime_evidence aggregate \
+            --output "${COMPATIBILITY_MATRIX_PATH}" "${entry_path}" >/dev/null
+    fi
+}
+
+if [ "${DRY_RUN}" != "1" ] && $RECORD_CONTAINER_VALIDATION; then
+    CONTAINER_DEPENDENCY_PREFLIGHT_JSON="$(run_container_dependency_preflight_json)"
+    CONTAINER_DEPENDENCY_PREFLIGHT_STATUS="$(matrix_json_value "${CONTAINER_DEPENDENCY_PREFLIGHT_JSON}" "status")"
+    CONTAINER_DEPENDENCY_PREFLIGHT_BENCHMARK_ALLOWED="$(matrix_json_value "${CONTAINER_DEPENDENCY_PREFLIGHT_JSON}" "benchmark_allowed")"
+    if execution_preflight_blocked "${CONTAINER_DEPENDENCY_PREFLIGHT_STATUS}" "${CONTAINER_DEPENDENCY_PREFLIGHT_BENCHMARK_ALLOWED}" "mixed_version"; then
+        write_compatibility_sidecars "" "dependency"
+        echo "${CONTAINER_DEPENDENCY_PREFLIGHT_JSON}"
+        exit 1
+    fi
+fi
+
+DOCKER_CMD=(
+    "${DOCKER_COMMON_ARGS[@]}"
+    "${TTY_ARGS[@]}"
     "${IMAGE}"
     "${CMD[@]}"
 )
@@ -534,4 +632,16 @@ echo "+ ${DOCKER_CMD[*]}"
 if [ "${DRY_RUN}" = "1" ]; then
     exit 0
 fi
-exec "${DOCKER_CMD[@]}"
+set +e
+"${DOCKER_CMD[@]}"
+status="$?"
+set -e
+if [ "${status}" -eq 0 ]; then
+    if $RECORD_CONTAINER_VALIDATION; then
+        write_container_validated_sidecars
+    elif compatibility_sidecar_requested; then
+        write_compatibility_sidecars "" ""
+    fi
+    exit 0
+fi
+exit "${status}"

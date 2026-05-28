@@ -106,6 +106,7 @@ def test_run_docker_help_mentions_target_flags() -> None:
     assert "--allow-unknown-target" in script
     assert "--preflight-only" in script
     assert "--allow-untested-target-smoke" in script
+    assert "--record-container-validation" in script
 
 
 def test_run_docker_host_helpers_use_uv_managed_python() -> None:

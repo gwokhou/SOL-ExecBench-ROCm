@@ -113,7 +113,9 @@ def test_help_documents_dependency_override_separately_from_unknown_target() -> 
     script = RUN_DOCKER_SCRIPT.read_text()
 
     assert "--allow-mixed-version-dependencies" in script
+    assert "--record-container-validation" in script
     assert "SOL_EXECBENCH_ALLOW_MIXED_VERSION_DEPENDENCIES" in script
+    assert "SOL_EXECBENCH_RECORD_CONTAINER_VALIDATION" in script
     assert "allow-unknown-target" in script
     assert "dependency mismatch override" not in script.partition(
         "--allow-unknown-target"
@@ -237,4 +239,40 @@ def test_missing_required_dependency_still_blocks_normal_dry_run_smoke() -> None
     assert completed.returncode != 0
     payload = json.loads(completed.stdout)
     assert payload["status"] == "pytorch_wheel_unavailable"
+    assert "docker run" not in completed.stdout
+
+
+def test_record_container_validation_allows_matching_not_tested_dry_run() -> None:
+    completed = _run_docker_dependency_preflight(
+        "--record-container-validation",
+        "--",
+        "sol-execbench",
+        "examples/pytorch/linear_backward",
+        **_matching_default_dependency_env(),
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert "+ docker run" in completed.stdout
+    assert "sol-execbench:rocm-7.1.1-complete" in completed.stdout
+    assert "sol-execbench examples/pytorch/linear_backward" in completed.stdout
+
+
+def test_record_container_validation_still_blocks_mixed_dry_run() -> None:
+    completed = _run_docker_dependency_preflight(
+        "--record-container-validation",
+        "--target",
+        "rocm-7.2.0-ubuntu-24.04-container",
+        "--",
+        "sol-execbench",
+        "examples/pytorch/linear_backward",
+        **{
+            **_matching_default_dependency_env(),
+            "SOL_EXECBENCH_DEPENDENCY_CONTAINER_ROCM_USER_SPACE_VERSION": "7.2.0",
+            "SOL_EXECBENCH_DEPENDENCY_TOOLCHAIN_ROCM_VERSION": "7.2.0",
+        },
+    )
+
+    assert completed.returncode != 0
+    payload = json.loads(completed.stdout)
+    assert payload["status"] == "mixed_version"
     assert "docker run" not in completed.stdout

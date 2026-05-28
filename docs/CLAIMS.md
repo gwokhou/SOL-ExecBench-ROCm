@@ -47,13 +47,16 @@ validation requires direct native-host evidence for the requested host ROCm
 stack and must not be inferred from Docker image selection or container
 execution alone.
 
-As of the 2026-05-28 live check, the local Docker row
-`sol-execbench:rocm-7.1.1-complete` has container ROCm user-space evidence on
-the recorded RDNA 4 `gfx1200` host driver/devices: ROCm HIP
-`7.1.25424`, PyTorch `2.10.0+rocm7.1`, Triton `3.6.0`, visible
-`AMD Radeon Graphics`, `CLOCKS_LOCKED=1`, and the `linear_backward` Docker E2E
-smoke passing all 3 workloads. This remains Docker container evidence, not a
-native-host ROCm 7.1 hardware validation upgrade.
+As of the 2026-05-29 live checks, the local Docker rows for
+`sol-execbench:rocm-7.0.2-complete`, `sol-execbench:rocm-7.1.1-complete`, and
+`sol-execbench:rocm-7.2-complete` have container ROCm user-space evidence on the
+recorded RDNA 4 `gfx1200` host driver/devices. The 7.0.2 and 7.2 rows were
+recorded through `./scripts/run_docker.sh --record-container-validation`, which
+checks target-container dependency evidence before writing `container_validated`
+sidecars. ROCm 7.0.2 remains unlocked performance evidence with
+`CLOCKS_LOCKED=0`; ROCm 7.1.1 and 7.2 completed with `CLOCKS_LOCKED=1`. These
+remain Docker container evidence, not native-host ROCm hardware validation
+upgrades.
 
 Illegal mixed-version Targets are blocked by default before benchmark
 execution. The explicit mixed-version debug override may allow bounded probes or

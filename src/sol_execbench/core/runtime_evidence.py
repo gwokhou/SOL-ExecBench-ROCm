@@ -188,13 +188,16 @@ def build_dependency_observation(
         )
     ):
         observation = collect_pytorch_dependency_observation()
-        return observation.model_copy(
-            update={
+        updates = {
+            key: value
+            for key, value in {
                 "container_rocm_user_space_version": container_rocm_user_space_version,
                 "hipcc_version": hipcc_version,
                 "toolchain_rocm_version": toolchain_rocm_version,
-            }
-        )
+            }.items()
+            if value is not None
+        }
+        return observation.model_copy(update=updates)
     return PytorchDependencyObservation(
         torch_distribution_version=torch_distribution_version,
         torch_version=torch_version,
@@ -224,6 +227,7 @@ def build_runtime_matrix_entry(
     runtime_unavailable_reason: str | None = None,
     failure_evidence: list[RuntimeFailureEvidence] | None = None,
     allow_mixed_version_debug: bool = False,
+    container_validated: bool = False,
 ) -> MatrixEntry:
     """Build a diagnostic runtime Matrix Entry for one Docker Target."""
 
@@ -237,6 +241,15 @@ def build_runtime_matrix_entry(
         status = MatrixCompatibilityStatus.RUNTIME_UNAVAILABLE
         reason_code = MatrixCompatibilityReasonCode.ROCM_RUNTIME_UNAVAILABLE
         reason = runtime_unavailable_reason
+    elif container_validated and (
+        dependency_result.entry.status is MatrixCompatibilityStatus.NOT_TESTED
+    ):
+        status = MatrixCompatibilityStatus.CONTAINER_VALIDATED
+        reason_code = MatrixCompatibilityReasonCode.CONTAINER_USER_SPACE_VALIDATED
+        reason = (
+            "Target-specific Docker wrapper benchmark completed successfully with "
+            "matching container dependency and ROCm user-space evidence."
+        )
     else:
         status = dependency_result.entry.status
         reason_code = dependency_result.entry.reason_code
@@ -277,7 +290,9 @@ def build_runtime_matrix_entry(
         reason_code=reason_code,
         reason=reason,
         claim_boundary=MatrixClaimBoundary(
-            container_user_space_validated=False,
+            container_user_space_validated=(
+                status is MatrixCompatibilityStatus.CONTAINER_VALIDATED
+            ),
             native_host_validated=False,
             hardware_validated=False,
         ),
@@ -391,6 +406,7 @@ def _build_parser() -> argparse.ArgumentParser:
     collect.add_argument("--gfx-architecture")
     collect.add_argument("--visible-device-env", action="append", default=[])
     collect.add_argument("--runtime-unavailable-reason")
+    collect.add_argument("--container-validated", action="store_true")
     collect.add_argument(
         "--failure-category",
         action="append",
@@ -478,6 +494,7 @@ def _collect_target(args: argparse.Namespace) -> MatrixEntry:
         runtime_unavailable_reason=_none_if_requested(args.runtime_unavailable_reason),
         failure_evidence=_failure_evidence_from_args(args.failure_category),
         allow_mixed_version_debug=args.allow_mixed_version_debug,
+        container_validated=args.container_validated,
     )
 
 
