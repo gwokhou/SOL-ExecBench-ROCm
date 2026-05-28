@@ -149,6 +149,25 @@ def test_matrix_report_contains_entries_and_status_counts():
     assert report.to_dict() == payload
 
 
+def test_matrix_report_rejects_status_counts_that_disagree_with_entries():
+    entry = _representative_entry()
+
+    with pytest.raises(ValidationError, match="status_counts must match entries"):
+        RocmCompatibilityMatrixReport(
+            generated_at="2026-05-28T05:22:46Z",
+            entries=[entry],
+            status_counts={MatrixCompatibilityStatus.CONTAINER_VALIDATED: 2},
+        )
+
+
+def test_matrix_report_rejects_negative_status_counts():
+    with pytest.raises(ValidationError, match="negative counts"):
+        RocmCompatibilityMatrixReport(
+            generated_at="2026-05-28T05:22:46Z",
+            status_counts={MatrixCompatibilityStatus.CONTAINER_VALIDATED: -1},
+        )
+
+
 def test_matrix_entry_carries_artifacts_and_diagnostic_claim_boundaries():
     payload = _representative_entry().model_dump(mode="json")
 
@@ -170,6 +189,14 @@ def test_matrix_entry_carries_artifacts_and_diagnostic_claim_boundaries():
         "native_host_validated": False,
         "hardware_validated": True,
     }
+
+
+def test_matrix_artifact_reference_requires_path_or_uri():
+    with pytest.raises(ValidationError, match="requires path or uri"):
+        MatrixArtifactReference(
+            artifact_id="missing-location",
+            kind="probe_json",
+        )
 
 
 @pytest.mark.parametrize(
