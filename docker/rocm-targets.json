@@ -8,6 +8,20 @@
       "docker_image_repository": "rocm/dev-ubuntu-24.04",
       "docker_image_tag": "7.0.2-complete",
       "pytorch_rocm_target": "rocm7.0",
+      "pytorch_dependency_policy": {
+        "policy_id": "pytorch-2.10.0-rocm7.0-explicit",
+        "wheel_availability": "available",
+        "torch_version": "2.10.0+rocm7.0",
+        "torchvision_version": "0.25.0+rocm7.0",
+        "expected_local_version": "rocm7.0",
+        "uv_index_name": "pytorch-rocm70",
+        "uv_index_url": "https://download.pytorch.org/whl/rocm7.0",
+        "lock_strategy": "explicit_target_workflow",
+        "suggested_uv_command": "uv sync --index pytorch-rocm70=https://download.pytorch.org/whl/rocm7.0 --index pytorch-rocm-root=https://download.pytorch.org/whl/",
+        "triton_rocm_version": "3.6.0",
+        "triton_rocm_index_name": "pytorch-rocm-root",
+        "triton_rocm_index_url": "https://download.pytorch.org/whl/"
+      },
       "validation_scope": "container_user_space",
       "intended_gpu_architecture": null
     },
@@ -17,6 +31,20 @@
       "docker_image_repository": "rocm/dev-ubuntu-24.04",
       "docker_image_tag": "7.1.1-complete",
       "pytorch_rocm_target": "rocm7.1",
+      "pytorch_dependency_policy": {
+        "policy_id": "pytorch-2.10.0-rocm7.1-project-default",
+        "wheel_availability": "available",
+        "torch_version": "2.10.0+rocm7.1",
+        "torchvision_version": "0.25.0+rocm7.1",
+        "expected_local_version": "rocm7.1",
+        "uv_index_name": "pytorch-rocm71",
+        "uv_index_url": "https://download.pytorch.org/whl/rocm7.1",
+        "lock_strategy": "project_default",
+        "suggested_uv_command": "uv sync --all-groups using pyproject.toml sources pytorch-rocm71 and pytorch-rocm-root",
+        "triton_rocm_version": "3.6.0",
+        "triton_rocm_index_name": "pytorch-rocm-root",
+        "triton_rocm_index_url": "https://download.pytorch.org/whl/"
+      },
       "validation_scope": "container_user_space",
       "intended_gpu_architecture": null
     },
@@ -26,6 +54,20 @@
       "docker_image_repository": "rocm/dev-ubuntu-24.04",
       "docker_image_tag": "7.2.0-complete",
       "pytorch_rocm_target": "rocm7.2",
+      "pytorch_dependency_policy": {
+        "policy_id": "pytorch-2.11.0-rocm7.2-explicit",
+        "wheel_availability": "available",
+        "torch_version": "2.11.0+rocm7.2",
+        "torchvision_version": "0.26.0+rocm7.2",
+        "expected_local_version": "rocm7.2",
+        "uv_index_name": "pytorch-rocm72",
+        "uv_index_url": "https://download.pytorch.org/whl/rocm7.2",
+        "lock_strategy": "explicit_target_workflow",
+        "suggested_uv_command": "uv sync --index pytorch-rocm72=https://download.pytorch.org/whl/rocm7.2 --index pytorch-rocm-root=https://download.pytorch.org/whl/",
+        "triton_rocm_version": "3.6.0",
+        "triton_rocm_index_name": "pytorch-rocm-root",
+        "triton_rocm_index_url": "https://download.pytorch.org/whl/"
+      },
       "validation_scope": "container_user_space",
       "intended_gpu_architecture": null
     }
