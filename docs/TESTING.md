@@ -160,6 +160,42 @@ default validation does not require host reinstall for ROCm 7.0.x or ROCm 7.2.x.
 Docker rows for those Targets remain container ROCm user-space evidence on the
 recorded host driver/devices unless direct native-host evidence is archived.
 
+### Compatibility Matrix Summary
+
+| Target id | Local image tag | Requested ROCm user-space | Expected PyTorch ROCm stack | Current status | Recorded evidence |
+| --- | --- | --- | --- | --- | --- |
+| `rocm-7.0.2-ubuntu-24.04-container` | `sol-execbench:rocm-7.0.2-complete` | `7.0.2` | `torch==2.10.0+rocm7.0`, `torchvision==0.25.0+rocm7.0`, `triton-rocm==3.6.0` | `runtime_probe_passed`, dependency `mixed_version` in the current project venv | 2026-05-28 `rocm/dev-ubuntu-24.04:7.0.2-complete` runtime probe on the current host driver passed: `hipcc` reported HIP `7.0.51831`, `rocminfo` reported HSA Runtime `1.18` and RDNA 4 `gfx1200` / `AMD Radeon Graphics`. No project Docker E2E row recorded yet. |
+| `rocm-7.1.1-ubuntu-24.04-container` | `sol-execbench:rocm-7.1.1-complete` | `7.1.1` | `torch==2.10.0+rocm7.1`, `torchvision==0.25.0+rocm7.1`, `triton-rocm==3.6.0` | `container_validated` | 2026-05-28 live Docker E2E on RDNA 4 `gfx1200` / `AMD Radeon Graphics`; observed HIP `7.1.25424`; `CLOCKS_LOCKED=1`; `linear_backward` passed 3/3 workloads. |
+| `rocm-7.2.0-ubuntu-24.04-container` | `sol-execbench:rocm-7.2-complete` | `7.2.0` | `torch==2.11.0+rocm7.2`, `torchvision==0.26.0+rocm7.2`, `triton-rocm==3.6.0` | `runtime_probe_passed`, dependency `mixed_version` in the current project venv | 2026-05-28 `rocm/dev-ubuntu-24.04:7.2-complete` runtime probe on the current host driver passed: `hipcc` reported HIP `7.2.26015` / `roc-7.2.0`, `rocminfo` reported HSA Runtime `1.18` and RDNA 4 `gfx1200` / `AMD Radeon Graphics`. No project Docker E2E row recorded yet. |
+
+The `container_validated` row is container ROCm user-space evidence on the
+recorded host driver/devices. It does not upgrade ROCm 7.1.x to native-host
+validation. The `runtime_probe_passed` rows only show that the selected ROCm
+container user-space can load the current host driver/runtime and see the GPU.
+They are not clean project benchmark rows until their target-specific Python
+dependency stack is installed, dependency preflight is clean, and live Docker
+E2E is recorded. The Docker build now derives target-specific PyTorch ROCm
+wheel arguments from `docker/rocm-targets.json`; a rebuilt ROCm 7.0 or ROCm 7.2
+image can therefore install the intended stack without mutating the project
+lockfile. In the current host venv, ROCm 7.0 and ROCm 7.2 dependency probes
+still classify as dependency `mixed_version` because the installed stack is
+`torch==2.10.0+rocm7.1`.
+
+### E2E Execution Log
+
+| Date | Target | Path | Status | Evidence |
+| --- | --- | --- | --- | --- |
+| 2026-05-28 | `rocm-7.1.1-ubuntu-24.04-container` | `./scripts/run_docker.sh --target ... --compatibility-entry ... --compatibility-matrix ... -- sol-execbench examples/pytorch/linear_backward ...` | Blocked by default matrix guardrail | Wrapper wrote `.artifacts/e2e-260528/rocm-7.1.1-linear-wrapper.compatibility.json` and `.artifacts/e2e-260528/rocm-7.1.1-linear-wrapper.matrix.json`, then stopped before benchmark because dependency preflight status `not_tested` has `benchmark_allowed=false`. The guardrail remains the default behavior. |
+| 2026-05-28 | `rocm-7.1.1-ubuntu-24.04-container` | `./scripts/run_docker.sh --allow-untested-target-smoke --target ... --compatibility-entry ... --compatibility-matrix ... -- sol-execbench examples/pytorch/linear_backward ...` | Passed smoke, non-authoritative | Wrapper smoke ran through the explicit `not_tested` override and saved `.artifacts/e2e-260528/rocm-7.1.1-linear-wrapper-smoke.jsonl` with 3/3 `PASSED` workloads, HIP `7.1.25424`, PyTorch `2.10.0+rocm7.1`, Triton `3.6.0`, RDNA 4 `gfx1200` / `AMD Radeon Graphics`, and `CLOCKS_LOCKED=1`. The sidecar `.artifacts/e2e-260528/rocm-7.1.1-linear-wrapper-smoke.compatibility.json` remains `status=not_tested`, `benchmark_allowed=false`, and authority flags false. |
+| 2026-05-28 | `rocm-7.1.1-ubuntu-24.04-container` | Direct `docker run ... sol-execbench examples/pytorch/linear_backward ...` | Passed | `sol-execbench:rocm-7.1.1-complete` reported HIP `7.1.25424`, PyTorch `2.10.0+rocm7.1`, Triton `3.6.0`, RDNA 4 `gfx1200` / `AMD Radeon Graphics`, and `CLOCKS_LOCKED=1`; `.artifacts/e2e-260528/rocm-7.1.1-linear-direct.jsonl` contains 3/3 `PASSED` workloads. |
+| 2026-05-28 | `rocm-7.1.1-ubuntu-24.04-container` | Direct `docker run ... sol-execbench examples/hip_cpp/rmsnorm ... --static-evidence auto` | Passed | `sol-execbench:rocm-7.1.1-complete` compiled the HIP/C++ solution, reported `CLOCKS_LOCKED=1`, saved `.artifacts/e2e-260528/rocm-7.1.1-rmsnorm-hipcpp-direct.jsonl`, and collected `.artifacts/e2e-260528/rocm-7.1.1-rmsnorm-hipcpp-direct.jsonl.static-evidence.json`; 14/14 workloads `PASSED`. |
+| 2026-05-28 | `rocm-7.1.1-ubuntu-24.04-container` | Direct `docker run ... uv run scripts/run_dataset.py tests/sol_execbench/samples/linear_backward ...` | Passed | Dataset runner path completed on the repository sample problem with `CLOCKS_LOCKED=1`; `.artifacts/e2e-260528/run-dataset-linear/summary.json` reports 1 problem OK and 3/3 workloads passed. The full `data/SOL-ExecBench/benchmark --limit 5` batch remains not run because the benchmark dataset is not present under `data/` on this machine. |
+| 2026-05-28 | `rocm-7.0.2-ubuntu-24.04-container`, `rocm-7.2.0-ubuntu-24.04-container` | `SOL_EXECBENCH_RUN_DOCKER_DRY_RUN=1 ./scripts/run_docker.sh --build --target ...` plus dependency inspection | Build path fixed; clean E2E pending | Dry-run selects `sol-execbench:rocm-7.0.2-complete` and `sol-execbench:rocm-7.2-complete` base tags and now passes target-specific build args, including `torch==2.10.0+rocm7.0` for ROCm 7.0 and `torch==2.11.0+rocm7.2` for ROCm 7.2. Clean project E2E still requires rebuilding those images and recording live benchmark rows. |
+| 2026-05-28 | `rocm-7.1.1-ubuntu-24.04-container` | Direct `docker run ... sol-execbench examples/hipblas/gemm ...` | Passed after include/link fix | Initial run failed at native extension compilation because the example omitted ROCm include/library paths and `c++` could not find `hip/hip_runtime_api.h`. After adding `-I/opt/rocm/include` and `-L/opt/rocm/lib`, hipBLAS GEMM compiled and ran with `CLOCKS_LOCKED=1`; `.artifacts/e2e-260528/rocm-7.1.1-hipblas-gemm.jsonl` contains 1/1 `PASSED` workload. |
+| 2026-05-28 | `rocm-7.1.1-ubuntu-24.04-container` | Direct `docker run ... sol-execbench examples/miopen/softmax ...` | Passed | MIOpen softmax compiled and ran with `CLOCKS_LOCKED=1`; `.artifacts/e2e-260528/rocm-7.1.1-miopen-softmax.jsonl` contains 3/3 `PASSED` workloads. |
+| 2026-05-28 | `rocm-7.1.1-ubuntu-24.04-container` | Direct `docker run ... sol-execbench examples/ck/gemm ...` | Passed | Composable Kernel GEMM compiled and ran with `CLOCKS_LOCKED=1`; `.artifacts/e2e-260528/rocm-7.1.1-ck-gemm.jsonl` contains 3/3 `PASSED` workloads. |
+| 2026-05-28 | `rocm-7.1.1-ubuntu-24.04-container` | Direct `docker run ... sol-execbench examples/rocwmma/gemm ...` | Passed | rocWMMA GEMM compiled and ran with `CLOCKS_LOCKED=1`; `.artifacts/e2e-260528/rocm-7.1.1-rocwmma-gemm.jsonl` contains 3/3 `PASSED` workloads. |
+
 ## Test Organization
 
 | Area | Typical Coverage |

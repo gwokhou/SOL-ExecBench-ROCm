@@ -52,7 +52,7 @@
       "target_id": "rocm-7.2.0-ubuntu-24.04-container",
       "requested_rocm_user_space_version": "7.2.0",
       "docker_image_repository": "rocm/dev-ubuntu-24.04",
-      "docker_image_tag": "7.2.0-complete",
+      "docker_image_tag": "7.2-complete",
       "pytorch_rocm_target": "rocm7.2",
       "pytorch_dependency_policy": {
         "policy_id": "pytorch-2.11.0-rocm7.2-explicit",
