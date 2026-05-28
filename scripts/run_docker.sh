@@ -430,8 +430,12 @@ if [ "${DRY_RUN}" != "1" ] || $PREFLIGHT_ONLY || dependency_preflight_override_p
             fi
             exit 0
         fi
-    elif preflight_blocked "${DEPENDENCY_PREFLIGHT_STATUS}" "${DEPENDENCY_PREFLIGHT_BENCHMARK_ALLOWED}" "mixed_version" ||
-        [ "${DEPENDENCY_PREFLIGHT_STATUS}" = "pytorch_wheel_unavailable" ]; then
+    elif [ "${DEPENDENCY_PREFLIGHT_STATUS}" = "pytorch_wheel_unavailable" ]; then
+        write_compatibility_sidecars "" "dependency"
+        echo "${DEPENDENCY_PREFLIGHT_JSON}"
+        exit 1
+    elif preflight_blocked "${DEPENDENCY_PREFLIGHT_STATUS}" "${DEPENDENCY_PREFLIGHT_BENCHMARK_ALLOWED}" "mixed_version" &&
+        ! { $ALLOW_MIXED_VERSION_DEPENDENCIES && [ "${DEPENDENCY_PREFLIGHT_STATUS}" = "mixed_version" ]; }; then
         write_compatibility_sidecars "" "dependency"
         echo "${DEPENDENCY_PREFLIGHT_JSON}"
         exit 1

@@ -90,10 +90,14 @@ def test_testing_docs_include_compatibility_matrix_summary_table() -> None:
     assert "CLOCKS_LOCKED=1" in text
     assert "linear_backward` passed 3/3 workloads" in text
     assert "--allow-untested-target-smoke" in text
+    assert "--allow-mixed-version-dependencies" in text
     assert "benchmark_allowed=false" in text
+    assert "status=mixed_version" in text
     assert "target-specific PyTorch ROCm" in text
     assert "torch==2.10.0+rocm7.0" in text
     assert "torch==2.11.0+rocm7.2" in text
+    assert "rocm-7.2-linear-wrapper-smoke.jsonl" in text
+    assert "rocm-7.2-linear-wrapper-smoke.compatibility.json" in text
     assert "rocm/dev-ubuntu-24.04:7.0.2-complete" in text
     assert "rocm/dev-ubuntu-24.04:7.2-complete" in text
     assert "sol-execbench:rocm-7.2-complete" in text
