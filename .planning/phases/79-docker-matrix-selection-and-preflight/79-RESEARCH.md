@@ -395,22 +395,25 @@ def test_missing_dri_classifies_runtime_unavailable():
 | A3 | JSON manifest is slightly simpler than TOML for strict fixture comparison and shell-adjacent tooling. | Standard Stack | TOML may be more readable; either is acceptable under user discretion. |
 | A4 | Python preflight mode is the best way to keep shell behavior Matrix-compatible and CPU-testable. | Architecture Patterns / Pitfalls | If shell-only implementation is chosen, test coverage may need subprocess fixtures instead. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Which exact target ids should be public?**
+1. **RESOLVED: Which exact target ids should be public?**
    - What we know: Phase 79 needs configured 7.0.x, 7.1.x, and 7.2.x logical entries where usable image tags are known. [VERIFIED: .planning/REQUIREMENTS.md]
    - What's unclear: Whether ids should encode patch version and architecture, e.g. `rocm-7.1.1-container` versus `rocm-7.1-gfx1200-container`. [ASSUMED]
    - Recommendation: Use stable ids that include the logical ROCm family and validation scope; put exact patch tag in fields, not just the id. [ASSUMED]
+   - Resolution: Plans use stable logical Target ids with ROCm family and container validation scope, while exact patch image tags remain manifest fields. [RESOLVED: .planning/phases/79-docker-matrix-selection-and-preflight/79-01-PLAN.md]
 
-2. **Which 7.2.x tag should be declared initially?**
+2. **RESOLVED: Which 7.2.x tag should be declared initially?**
    - What we know: Docker Hub currently lists `7.2-complete`, `7.2.1-complete`, `7.2.2-complete`, and `7.2.3-complete`. [CITED: https://hub.docker.com/r/rocm/dev-ubuntu-24.04/tags]
    - What's unclear: The project has not pulled or validated these tags locally in this research turn. [VERIFIED: command output]
    - Recommendation: Declare the chosen tag as requested/auditable only, preferably the latest visible complete tag or a conservative patch selected by the user/planner, and do not claim live compatibility until Phase 81 evidence exists. [ASSUMED]
+   - Resolution: Plan 79-01 delegates the exact patch value to the checked-in manifest and explicitly treats it as requested/auditable Target data only, never as a validation claim. [RESOLVED: .planning/phases/79-docker-matrix-selection-and-preflight/79-01-PLAN.md]
 
-3. **Should Phase 79 emit a JSON sidecar or only command-preview/preflight output?**
+3. **RESOLVED: Should Phase 79 emit a JSON sidecar or only command-preview/preflight output?**
    - What we know: Full aggregate report emission is deferred to Phase 81, but Phase 79 must produce diagnostic Matrix-compatible evidence for preflight failures. [VERIFIED: .planning/phases/79-docker-matrix-selection-and-preflight/79-CONTEXT.md]
    - What's unclear: Exact artifact path and CLI output contract for Phase 79. [ASSUMED]
    - Recommendation: Add a minimal `--preflight-json <path>` or stdout JSON preview for tests, without wiring full report generation. [ASSUMED]
+   - Resolution: Plans require shell-consumable JSON/preview output from `sol_execbench.core.docker_matrix`, while full aggregate report emission remains deferred to Phase 81. [RESOLVED: .planning/phases/79-docker-matrix-selection-and-preflight/79-01-PLAN.md, .planning/phases/79-docker-matrix-selection-and-preflight/79-02-PLAN.md]
 
 ## Environment Availability
 
