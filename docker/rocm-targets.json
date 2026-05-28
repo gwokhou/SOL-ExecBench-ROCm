@@ -1,0 +1,33 @@
+{
+  "schema_version": "sol_execbench.rocm_docker_targets.v1",
+  "default_target_id": "rocm-7.1.1-ubuntu-24.04-container",
+  "targets": [
+    {
+      "target_id": "rocm-7.0.2-ubuntu-24.04-container",
+      "requested_rocm_user_space_version": "7.0.2",
+      "docker_image_repository": "rocm/dev-ubuntu-24.04",
+      "docker_image_tag": "7.0.2-complete",
+      "pytorch_rocm_target": "rocm7.0",
+      "validation_scope": "container_user_space",
+      "intended_gpu_architecture": null
+    },
+    {
+      "target_id": "rocm-7.1.1-ubuntu-24.04-container",
+      "requested_rocm_user_space_version": "7.1.1",
+      "docker_image_repository": "rocm/dev-ubuntu-24.04",
+      "docker_image_tag": "7.1.1-complete",
+      "pytorch_rocm_target": "rocm7.1",
+      "validation_scope": "container_user_space",
+      "intended_gpu_architecture": null
+    },
+    {
+      "target_id": "rocm-7.2.0-ubuntu-24.04-container",
+      "requested_rocm_user_space_version": "7.2.0",
+      "docker_image_repository": "rocm/dev-ubuntu-24.04",
+      "docker_image_tag": "7.2.0-complete",
+      "pytorch_rocm_target": "rocm7.2",
+      "validation_scope": "container_user_space",
+      "intended_gpu_architecture": null
+    }
+  ]
+}
