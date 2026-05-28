@@ -30,7 +30,7 @@
 - [x] **DEPS-03**: Missing or unsupported PyTorch ROCm wheels are classified as `pytorch_wheel_unavailable`, not as benchmark failures.
 - [x] **DEPS-04**: CPU, CUDA, wrong-index, or wrong-ROCm PyTorch wheels are detected from installed package metadata and runtime probes.
 - [x] **DEPS-05**: A requested Target whose observed PyTorch ROCm wheel, container ROCm user-space, Triton ROCm package, or toolchain version does not match policy is classified as `mixed_version`.
-- [ ] **DEPS-06**: Illegal `mixed_version` Targets are blocked during preflight before benchmark execution by default.
+- [x] **DEPS-06**: Illegal `mixed_version` Targets are blocked during preflight before benchmark execution by default.
 - [x] **DEPS-07**: An explicit mixed-version debug override may allow probes or smoke execution to continue, but the resulting entry must remain ineligible for `container_validated`, `host_validated`, score authority, paper-parity authority, or leaderboard authority.
 
 ### Runtime Evidence
@@ -101,7 +101,7 @@
 | DEPS-03 | Phase 80 | Complete |
 | DEPS-04 | Phase 80 | Complete |
 | DEPS-05 | Phase 80 | Complete |
-| DEPS-06 | Phase 80 | Pending |
+| DEPS-06 | Phase 80 | Complete |
 | DEPS-07 | Phase 80 | Complete |
 | EVID-01 | Phase 81 | Pending |
 | EVID-02 | Phase 81 | Pending |
