@@ -75,7 +75,7 @@
 
 **Active milestone:** v1.18 ROCm Version Matrix via Docker.
 
-**Status:** Phase 81 complete and verified. Next step: Phase 82 planning.
+**Status:** v1.18 phases complete and verified. Next step: milestone audit.
 
 ## Phases
 
@@ -83,7 +83,7 @@
 - [x] **Phase 79: Docker Matrix Selection And Preflight** - Let users select declared ROCm Docker targets with deterministic image and device preflight behavior. (completed 2026-05-28)
 - [x] **Phase 80: uv And PyTorch ROCm Wheel Coordination** - Record and enforce per-target dependency policy so wrong or unavailable PyTorch ROCm stacks are classified before validation. (completed 2026-05-28)
 - [x] **Phase 81: Runtime Evidence And Compatibility Reports** - Collect scoped host/container/Python/toolchain/GPU evidence and emit per-target plus aggregate compatibility reports. (completed 2026-05-28)
-- [ ] **Phase 82: Validation Workflow, Docs, And CI Guardrails** - Document claim boundaries and add CPU-safe, Docker-script, and marker-gated validation coverage.
+- [x] **Phase 82: Validation Workflow, Docs, And CI Guardrails** - Document claim boundaries and add CPU-safe, Docker-script, and marker-gated validation coverage. (completed 2026-05-28)
 
 ## Phase Details
 
@@ -191,7 +191,11 @@ Plans:
   4. User can run CPU-safe tests for status classification, reason-code classification, schema serialization, mixed-version blocking, claim flags, docs wording, Docker Target selection, default preservation, unknown Target rejection, and command construction.
   5. User can follow marker-gated live ROCm validation guidance that records the current host ROCm 7.1.x environment as observed evidence without requiring host reinstall for ROCm 7.0.x or 7.2.x.
 
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+**Wave 1**
+
+- [x] 82-01-PLAN.md — Document ROCm Matrix claim boundaries, CPU-safe guardrail commands, marker-gated live validation guidance, and docs wording tests.
 
 ## Progress
 
@@ -204,7 +208,7 @@ Phases execute in numeric order: 78 -> 79 -> 80 -> 81 -> 82
 | 79. Docker Matrix Selection And Preflight | v1.18 | 2/2 | Complete    | 2026-05-28 |
 | 80. uv And PyTorch ROCm Wheel Coordination | v1.18 | 2/2 | Complete    | 2026-05-28 |
 | 81. Runtime Evidence And Compatibility Reports | v1.18 | 2/2 | Complete    | 2026-05-28 |
-| 82. Validation Workflow, Docs, And CI Guardrails | v1.18 | 0/TBD | Not started | - |
+| 82. Validation Workflow, Docs, And CI Guardrails | v1.18 | 1/1 | Complete    | 2026-05-28 |
 
 ## Future Candidate Work
 

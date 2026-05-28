@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.18
 milestone_name: ROCm Version Matrix via Docker
-status: ready_to_plan
-stopped_at: Phase 81 complete (2/2) — ready to discuss Phase 82
-last_updated: 2026-05-28T10:20:00.000Z
+status: ready_for_milestone_audit
+stopped_at: Phase 82 complete (1/1) — ready for milestone audit
+last_updated: 2026-05-28T10:40:00.000Z
 last_activity: 2026-05-28
 progress:
   total_phases: 5
-  completed_phases: 4
-  total_plans: 8
-  completed_plans: 8
-  percent: 80
+  completed_phases: 5
+  total_plans: 9
+  completed_plans: 9
+  percent: 100
 ---
 
 # Project State
@@ -21,13 +21,13 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-28)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Phase 82 — validation workflow, docs, and CI guardrails
+**Current focus:** v1.18 milestone audit
 
 ## Current Position
 
-Phase: 82
-Plan: Not started
-Status: Ready to plan
+Phase: complete
+Plan: complete
+Status: Ready for milestone audit
 Last activity: 2026-05-28
 
 Progress: [██████████] 100%
@@ -95,6 +95,9 @@ Progress: [██████████] 100%
 - [Phase 81]: Runtime compatibility evidence is emitted only as explicit sidecars; default benchmark traces, score/timing/correctness schemas, defaults, and exit semantics remain unchanged.
 - [Phase 81]: Per-target sidecars and aggregate matrix reports reuse `sol_execbench.rocm_compatibility_matrix.v1` and keep host, container, Python dependency, dependency policy, toolchain, and GPU evidence in separate observed scopes.
 - [Phase 81]: Setup/runtime, dependency, benchmark correctness, and benchmark performance evidence are distinct diagnostic categories and are not converted into benchmark failures.
+- [Phase 82]: ROCm Matrix documentation now guards against overstating Docker container user-space evidence as native host validation.
+- [Phase 82]: CPU-safe Matrix guardrails are documented as the default validation path; live ROCm validation remains marker-gated.
+- [Phase 82]: Current host ROCm 7.1.x evidence may be recorded as observed evidence, while native-host ROCm 7.0.x/7.2.x validation requires matching hosts and is not a default reinstall requirement.
 
 ### Pending Todos
 
