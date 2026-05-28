@@ -2,7 +2,7 @@
 # Launch the sol-execbench Docker container with the right mounts.
 #
 # Usage:
-#   ./scripts/run_docker.sh [--build] [--target <id>] [--allow-unknown-target] [--allow-mixed-version-dependencies] [--preflight-only] [docker-run-args...] [-- command...]
+#   ./scripts/run_docker.sh [--build] [--target <id>] [--allow-unknown-target] [--allow-mixed-version-dependencies] [--preflight-only] [--compatibility-entry <path>] [--compatibility-matrix <path>] [docker-run-args...] [-- command...]
 #
 # Examples:
 #   ./scripts/run_docker.sh                             # interactive shell
@@ -18,6 +18,8 @@
 #   ROCM_DOCKER_TAG     Unsafe unknown-target override tag
 #   SOL_EXECBENCH_ALLOW_MIXED_VERSION_DEPENDENCIES=1  Allow dependency probe/smoke diagnostics for mixed-version stacks
 #   SOL_EXECBENCH_DEPENDENCY_*  Dependency preflight observation overrides for tests/debugging
+#   SOL_EXECBENCH_COMPATIBILITY_ENTRY  Optional per-Target compatibility JSON sidecar path
+#   SOL_EXECBENCH_COMPATIBILITY_MATRIX Optional aggregate compatibility matrix JSON path
 
 set -euo pipefail
 
@@ -34,6 +36,8 @@ ALLOW_UNKNOWN_TARGET=false
 ALLOW_MIXED_VERSION_DEPENDENCIES=false
 PREFLIGHT_ONLY=false
 DRY_RUN="${SOL_EXECBENCH_RUN_DOCKER_DRY_RUN:-0}"
+COMPATIBILITY_ENTRY_PATH="${SOL_EXECBENCH_COMPATIBILITY_ENTRY:-}"
+COMPATIBILITY_MATRIX_PATH="${SOL_EXECBENCH_COMPATIBILITY_MATRIX:-}"
 
 case "${SOL_EXECBENCH_ALLOW_MIXED_VERSION_DEPENDENCIES:-0}" in
     1 | true | TRUE | yes | YES)
@@ -142,6 +146,95 @@ classify_dependency_preflight_json() {
     PYTHONPATH="${REPO_ROOT}/src${PYTHONPATH:+:${PYTHONPATH}}" "${cmd[@]}"
 }
 
+append_runtime_arg_from_env() {
+    local -n cmd_ref="$1"
+    local env_name="$2"
+    local flag="$3"
+    local value="${!env_name:-}"
+    if [ -n "${value}" ]; then
+        cmd_ref+=("${flag}" "${value}")
+    fi
+}
+
+compatibility_sidecar_requested() {
+    [ -n "${COMPATIBILITY_ENTRY_PATH}" ] || [ -n "${COMPATIBILITY_MATRIX_PATH}" ]
+}
+
+compatibility_entry_output_path() {
+    if [ -n "${COMPATIBILITY_ENTRY_PATH}" ]; then
+        echo "${COMPATIBILITY_ENTRY_PATH}"
+    else
+        echo "${COMPATIBILITY_MATRIX_PATH}.entry.json"
+    fi
+}
+
+write_compatibility_sidecars() {
+    compatibility_sidecar_requested || return 0
+
+    local entry_path
+    local cmd
+    entry_path="$(compatibility_entry_output_path)"
+    cmd=(
+        python -m sol_execbench.core.runtime_evidence collect-target
+        --manifest "${REPO_ROOT}/docker/rocm-targets.json"
+        --output "${entry_path}"
+    )
+    if [ -n "${DOCKER_TARGET}" ]; then
+        cmd+=(--target "${DOCKER_TARGET}")
+    fi
+    if $ALLOW_MIXED_VERSION_DEPENDENCIES; then
+        cmd+=(--allow-mixed-version-debug)
+    fi
+    append_runtime_arg_from_env cmd SOL_EXECBENCH_HOST_ROCM_VERSION --host-rocm-version
+    append_runtime_arg_from_env cmd SOL_EXECBENCH_HOST_DRIVER_VERSION --host-driver-version
+    append_runtime_arg_from_env cmd SOL_EXECBENCH_DEV_KFD_PRESENT --dev-kfd-present
+    append_runtime_arg_from_env cmd SOL_EXECBENCH_DEV_KFD_ACCESSIBLE --dev-kfd-accessible
+    append_runtime_arg_from_env cmd SOL_EXECBENCH_DEV_DRI_PRESENT --dev-dri-present
+    append_runtime_arg_from_env cmd SOL_EXECBENCH_DEV_DRI_ACCESSIBLE --dev-dri-accessible
+    append_runtime_arg_from_env cmd SOL_EXECBENCH_IMAGE_DIGEST --image-digest
+    append_runtime_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_TORCH_DISTRIBUTION_VERSION --torch-distribution-version
+    append_runtime_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_TORCH_VERSION --torch-version
+    append_runtime_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_TORCH_LOCAL_VERSION --torch-local-version
+    append_runtime_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_TORCH_ROCM_TARGET --torch-rocm-target
+    append_runtime_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_TORCH_HIP_VERSION --torch-hip-version
+    append_runtime_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_TORCH_CUDA_VERSION --torch-cuda-version
+    append_runtime_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_TORCH_DEVICE_AVAILABLE --torch-device-available
+    append_runtime_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_TORCH_IMPORT_ERROR --torch-import-error
+    append_runtime_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_TORCHVISION_DISTRIBUTION_VERSION --torchvision-distribution-version
+    append_runtime_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_TRITON_ROCM_DISTRIBUTION_VERSION --triton-rocm-distribution-version
+    append_runtime_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_TRITON_ROCM_STATUS --triton-rocm-status
+    append_runtime_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_CONTAINER_ROCM_USER_SPACE_VERSION --container-rocm-user-space-version
+    append_runtime_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_HIPCC_VERSION --hipcc-version
+    append_runtime_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_TOOLCHAIN_ROCM_VERSION --toolchain-rocm-version
+    append_runtime_arg_from_env cmd SOL_EXECBENCH_RUNTIME_DEVICE_COUNT --device-count
+    append_runtime_arg_from_env cmd SOL_EXECBENCH_RUNTIME_DEVICE_NAME --device-name
+    append_runtime_arg_from_env cmd SOL_EXECBENCH_RUNTIME_GFX_ARCHITECTURE --gfx-architecture
+    if [ -n "${HIP_VISIBLE_DEVICES:-}" ]; then
+        cmd+=(--visible-device-env "HIP_VISIBLE_DEVICES=${HIP_VISIBLE_DEVICES}")
+    fi
+    if [ -n "${ROCR_VISIBLE_DEVICES:-}" ]; then
+        cmd+=(--visible-device-env "ROCR_VISIBLE_DEVICES=${ROCR_VISIBLE_DEVICES}")
+    fi
+    if [ -n "${CUDA_VISIBLE_DEVICES:-}" ]; then
+        cmd+=(--visible-device-env "CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}")
+    fi
+    if [ -n "${GPU_DEVICE_ORDINAL:-}" ]; then
+        cmd+=(--visible-device-env "GPU_DEVICE_ORDINAL=${GPU_DEVICE_ORDINAL}")
+    fi
+    if [ -n "${1:-}" ]; then
+        cmd+=(--runtime-unavailable-reason "$1" --failure-category setup_runtime)
+    elif [ -n "${2:-}" ]; then
+        cmd+=(--failure-category dependency)
+    fi
+    PYTHONPATH="${REPO_ROOT}/src${PYTHONPATH:+:${PYTHONPATH}}" "${cmd[@]}" >/dev/null
+
+    if [ -n "${COMPATIBILITY_MATRIX_PATH}" ]; then
+        PYTHONPATH="${REPO_ROOT}/src${PYTHONPATH:+:${PYTHONPATH}}" \
+            python -m sol_execbench.core.runtime_evidence aggregate \
+            --output "${COMPATIBILITY_MATRIX_PATH}" "${entry_path}" >/dev/null
+    fi
+}
+
 docker_context_name() {
     if [ -n "${SOL_EXECBENCH_DOCKER_CONTEXT:-}" ]; then
         echo "${SOL_EXECBENCH_DOCKER_CONTEXT}"
@@ -239,6 +332,24 @@ while [ "$#" -gt 0 ]; do
                 PREFLIGHT_ONLY=true
                 continue
                 ;;
+            --compatibility-entry)
+                if [ "$#" -eq 0 ]; then
+                    echo "ERROR: --compatibility-entry requires a path." >&2
+                    exit 2
+                fi
+                COMPATIBILITY_ENTRY_PATH="$1"
+                shift
+                continue
+                ;;
+            --compatibility-matrix)
+                if [ "$#" -eq 0 ]; then
+                    echo "ERROR: --compatibility-matrix requires a path." >&2
+                    exit 2
+                fi
+                COMPATIBILITY_MATRIX_PATH="$1"
+                shift
+                continue
+                ;;
             --)
                 seen_separator=true
                 continue
@@ -268,6 +379,13 @@ if [ "${DRY_RUN}" != "1" ] || $PREFLIGHT_ONLY || dependency_preflight_override_p
     DEPENDENCY_PREFLIGHT_BENCHMARK_ALLOWED="$(matrix_json_value "${DEPENDENCY_PREFLIGHT_JSON}" "benchmark_allowed")"
     if $PREFLIGHT_ONLY; then
         if dependency_preflight_override_present; then
+            if [ "${DEPENDENCY_PREFLIGHT_STATUS}" = "mixed_version" ] ||
+                [ "${DEPENDENCY_PREFLIGHT_STATUS}" = "pytorch_wheel_unavailable" ] ||
+                [ "${DEPENDENCY_PREFLIGHT_BENCHMARK_ALLOWED}" != "True" ]; then
+                write_compatibility_sidecars "" "dependency"
+            else
+                write_compatibility_sidecars "" ""
+            fi
             echo "${DEPENDENCY_PREFLIGHT_JSON}"
             if [ "${DEPENDENCY_PREFLIGHT_STATUS}" = "mixed_version" ] ||
                 [ "${DEPENDENCY_PREFLIGHT_STATUS}" = "pytorch_wheel_unavailable" ] ||
@@ -279,6 +397,7 @@ if [ "${DRY_RUN}" != "1" ] || $PREFLIGHT_ONLY || dependency_preflight_override_p
     elif [ "${DEPENDENCY_PREFLIGHT_STATUS}" = "mixed_version" ] ||
         [ "${DEPENDENCY_PREFLIGHT_STATUS}" = "pytorch_wheel_unavailable" ] ||
         [ "${DEPENDENCY_PREFLIGHT_BENCHMARK_ALLOWED}" != "True" ]; then
+        write_compatibility_sidecars "" "dependency"
         echo "${DEPENDENCY_PREFLIGHT_JSON}"
         exit 1
     fi
@@ -288,7 +407,14 @@ if [ "${DRY_RUN}" != "1" ] || $PREFLIGHT_ONLY || preflight_override_present; the
     PREFLIGHT_JSON="$(classify_docker_preflight_json)"
     PREFLIGHT_STATUS="$(matrix_json_value "${PREFLIGHT_JSON}" "status")"
     PREFLIGHT_BENCHMARK_ALLOWED="$(matrix_json_value "${PREFLIGHT_JSON}" "benchmark_allowed")"
+    PREFLIGHT_REASON="$(matrix_json_value "${PREFLIGHT_JSON}" "reason")"
     if $PREFLIGHT_ONLY; then
+        if [ "${PREFLIGHT_STATUS}" = "runtime_unavailable" ] ||
+            [ "${PREFLIGHT_BENCHMARK_ALLOWED}" != "True" ]; then
+            write_compatibility_sidecars "${PREFLIGHT_REASON}" ""
+        else
+            write_compatibility_sidecars "" ""
+        fi
         echo "${PREFLIGHT_JSON}"
         if [ "${PREFLIGHT_STATUS}" = "runtime_unavailable" ] ||
             [ "${PREFLIGHT_BENCHMARK_ALLOWED}" != "True" ]; then
@@ -298,10 +424,13 @@ if [ "${DRY_RUN}" != "1" ] || $PREFLIGHT_ONLY || preflight_override_present; the
     fi
     if [ "${PREFLIGHT_STATUS}" = "runtime_unavailable" ] ||
         [ "${PREFLIGHT_BENCHMARK_ALLOWED}" != "True" ]; then
+        write_compatibility_sidecars "${PREFLIGHT_REASON}" ""
         echo "${PREFLIGHT_JSON}"
         exit 1
     fi
 fi
+
+write_compatibility_sidecars "" ""
 
 # Build the image if requested
 if $BUILD; then
