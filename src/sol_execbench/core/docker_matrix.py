@@ -476,7 +476,27 @@ def _build_parser() -> argparse.ArgumentParser:
     preview.add_argument("--override-image-repository")
     preview.add_argument("--override-image-tag")
     preview.add_argument("--image-digest")
+    preflight = subparsers.add_parser("preflight")
+    preflight.add_argument("--manifest", type=Path, default=DEFAULT_DOCKER_TARGET_MANIFEST)
+    preflight.add_argument("--target")
+    preflight.add_argument("--docker-context")
+    preflight.add_argument("--docker-host")
+    preflight.add_argument("--dev-kfd-present", required=True)
+    preflight.add_argument("--dev-kfd-accessible", required=True)
+    preflight.add_argument("--dev-dri-present", required=True)
+    preflight.add_argument("--dev-dri-accessible", required=True)
+    preflight.add_argument("--gpu-accessible")
+    preflight.add_argument("--image-digest")
     return parser
+
+
+def _parse_bool(value: str) -> bool:
+    normalized = value.lower()
+    if normalized in {"1", "true", "yes"}:
+        return True
+    if normalized in {"0", "false", "no"}:
+        return False
+    raise argparse.ArgumentTypeError(f"expected boolean value, got {value!r}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -492,6 +512,28 @@ def main(argv: list[str] | None = None) -> int:
             override_image_tag=args.override_image_tag,
             image_digest=args.image_digest,
         )
+        print(json.dumps(payload, sort_keys=True))
+        return 0
+    if args.command == "preflight":
+        selection = select_docker_target(args.target, manifest_path=args.manifest)
+        gpu_accessible = (
+            None if args.gpu_accessible is None else _parse_bool(args.gpu_accessible)
+        )
+        observation = DockerPreflightObservation(
+            docker_context=args.docker_context,
+            docker_host=args.docker_host,
+            dev_kfd_present=_parse_bool(args.dev_kfd_present),
+            dev_kfd_accessible=_parse_bool(args.dev_kfd_accessible),
+            dev_dri_present=_parse_bool(args.dev_dri_present),
+            dev_dri_accessible=_parse_bool(args.dev_dri_accessible),
+            gpu_accessible=gpu_accessible,
+            selected_target=selection.target,
+            image_repository=selection.target.docker_image_repository,
+            image_tag=selection.target.docker_image_tag,
+            image_digest=args.image_digest,
+            build_args=docker_build_args_for_target(selection.target),
+        )
+        payload = classify_docker_preflight(observation).to_preview_payload()
         print(json.dumps(payload, sort_keys=True))
         return 0
     raise AssertionError(f"unhandled command: {args.command}")
