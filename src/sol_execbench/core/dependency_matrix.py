@@ -302,11 +302,11 @@ def _classify_observation(
             MatrixCompatibilityReasonCode.PYTORCH_ROCM_WHEEL_UNAVAILABLE,
             f"PyTorch ROCm wheels are declared unavailable by policy {policy.policy_id}.",
         )
-    if observation.torch_import_error and observation.torch_distribution_version is None:
+    if observation.torch_import_error:
         return (
             MatrixCompatibilityStatus.PYTORCH_WHEEL_UNAVAILABLE,
             MatrixCompatibilityReasonCode.PYTORCH_ROCM_WHEEL_UNAVAILABLE,
-            f"Required torch distribution is unavailable: {observation.torch_import_error}",
+            f"Required torch runtime could not be imported: {observation.torch_import_error}",
         )
     if observation.torch_distribution_version is None:
         return (
