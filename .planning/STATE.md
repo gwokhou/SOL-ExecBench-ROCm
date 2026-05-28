@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.18
 milestone_name: ROCm Version Matrix via Docker
 status: executing
-stopped_at: Completed 78-02-PLAN.md
-last_updated: "2026-05-28T06:22:24.686Z"
-last_activity: 2026-05-28 -- Phase 79 planning complete
+stopped_at: Completed 79-01-PLAN.md
+last_updated: "2026-05-28T06:30:47.768Z"
+last_activity: 2026-05-28 -- Completed 79-01-PLAN.md
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 4
-  completed_plans: 2
-  percent: 20
+  completed_plans: 3
+  percent: 75
 ---
 
 # Project State
@@ -21,32 +21,32 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-28)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Phase 79 — docker matrix selection and preflight
+**Current focus:** Phase 79 — docker-matrix-selection-and-preflight
 
 ## Current Position
 
-Phase: 79
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-05-28 -- Phase 79 planning complete
+Phase: 79 (docker-matrix-selection-and-preflight) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute next plan
+Last activity: 2026-05-28 -- Completed 79-01-PLAN.md
 
-Progress: [██████████] 100%
+Progress: [████████░░] 75%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Current milestone plans completed: 2
+- Current milestone plans completed: 3
 - Current milestone phases completed: 1
-- Average duration: 5.5min
-- Total execution time: 11min
+- Average duration: 5.7min
+- Total execution time: 17min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 78. Matrix Contract And Claim Guardrails | 2/2 | 11min | 5.5min |
-| 79. Docker Matrix Selection And Preflight | 0/TBD | Not started | n/a |
+| 79. Docker Matrix Selection And Preflight | 1/2 | 6min | 6min |
 | 80. uv And PyTorch ROCm Wheel Coordination | 0/TBD | Not started | n/a |
 | 81. Runtime Evidence And Compatibility Reports | 0/TBD | Not started | n/a |
 | 82. Validation Workflow, Docs, And CI Guardrails | 0/TBD | Not started | n/a |
@@ -59,6 +59,7 @@ Progress: [██████████] 100%
 
 | Phase 78 P1 | 5min | 2 tasks | 2 files |
 | Phase 78 P2 | 6min | 3 tasks | 6 files |
+| Phase 79 P1 | 6min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -76,6 +77,9 @@ Progress: [██████████] 100%
 - [Phase 78]: Docker/container scoped Matrix Entries cannot claim host_validated or native_host_validated=true.
 - [Phase 78]: Explicit mixed-version debug override allows probes and smoke execution only, while clean validation and authority flags remain false.
 - [Phase 78]: Compatibility matrix evidence remains sidecar-only and absent from canonical Definition, Workload, and Trace payloads.
+- [Phase 79]: Declared Docker Target selection is repo-owned JSON policy, not runtime Docker tag discovery.
+- [Phase 79]: Unknown Docker Targets require explicit unsafe/untested override and remain not_tested with authority fields false.
+- [Phase 79]: Docker preflight failures classify as runtime_unavailable before benchmark execution.
 
 ### Pending Todos
 
@@ -99,6 +103,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-28T05:38:04.175Z
-Stopped at: Completed 78-02-PLAN.md
+Last session: 2026-05-28T06:30:47.763Z
+Stopped at: Completed 79-01-PLAN.md
 Resume file: None
