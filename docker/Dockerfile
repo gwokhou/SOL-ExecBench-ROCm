@@ -2,7 +2,9 @@
 # Adds ROCm runtime, tooling, and python dependencies. Used for benchmarking.
 # =============================================================================
 
-FROM rocm/dev-ubuntu-24.04:7.1.1-complete AS base
+ARG ROCM_DOCKER_IMAGE=rocm/dev-ubuntu-24.04
+ARG ROCM_DOCKER_TAG=7.1.1-complete
+FROM ${ROCM_DOCKER_IMAGE}:${ROCM_DOCKER_TAG} AS base
 
 ENV ROCM_PATH=/opt/rocm \
     HIP_PATH=/opt/rocm \
