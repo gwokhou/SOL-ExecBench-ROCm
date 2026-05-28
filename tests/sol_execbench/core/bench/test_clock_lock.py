@@ -87,18 +87,21 @@ class TestLockClocks:
         assert mock_run.call_args_list[:3] == [
             call(
                 ["sudo", "-n", "rocm-smi", "--setperflevel", "manual"],
-                check=True,
                 capture_output=True,
+                check=True,
+                text=True,
             ),
             call(
                 ["sudo", "-n", "rocm-smi", "--setsclk", "1"],
-                check=True,
                 capture_output=True,
+                check=True,
+                text=True,
             ),
             call(
                 ["sudo", "-n", "rocm-smi", "--setmclk", "1"],
-                check=True,
                 capture_output=True,
+                check=True,
+                text=True,
             ),
         ]
 
@@ -121,14 +124,77 @@ class TestLockClocks:
         assert result is True
         assert mock_run.call_args_list[1] == call(
             ["sudo", "-n", "rocm-smi", "--setsclk", "2"],
-            check=True,
             capture_output=True,
+            check=True,
+            text=True,
         )
         assert mock_run.call_args_list[2] == call(
             ["sudo", "-n", "rocm-smi", "--setmclk", "3"],
-            check=True,
             capture_output=True,
+            check=True,
+            text=True,
         )
+
+    def test_returns_false_when_perflevel_reports_failure_with_zero_exit(self):
+        failed = MagicMock(
+            returncode=0,
+            stdout="ERROR: GPU[0]\t: Unable to set performance level to manual\n",
+            stderr="",
+        )
+
+        with patch(f"{_MODULE}.subprocess.run", return_value=failed) as mock_run:
+            result = lock_clocks("AMD Radeon gfx1200")
+
+        assert result is False
+        mock_run.assert_called_once_with(
+            ["sudo", "-n", "rocm-smi", "--setperflevel", "manual"],
+            capture_output=True,
+            check=True,
+            text=True,
+        )
+
+    def test_returns_false_and_unlocks_when_mclk_reports_failure_with_zero_exit(self):
+        ok = MagicMock(returncode=0, stdout="", stderr="")
+        failed = MagicMock(
+            returncode=0,
+            stdout="ERROR: GPU[0]\t: Unable to set mclk frequency\n",
+            stderr="",
+        )
+
+        with patch(
+            f"{_MODULE}.subprocess.run",
+            side_effect=[ok, ok, failed, ok, ok],
+        ) as mock_run:
+            result = lock_clocks("AMD Radeon gfx1200")
+
+        assert result is False
+        assert mock_run.call_args_list[:3] == [
+            call(
+                ["sudo", "-n", "rocm-smi", "--setperflevel", "manual"],
+                capture_output=True,
+                check=True,
+                text=True,
+            ),
+            call(
+                ["sudo", "-n", "rocm-smi", "--setsclk", "1"],
+                capture_output=True,
+                check=True,
+                text=True,
+            ),
+            call(
+                ["sudo", "-n", "rocm-smi", "--setmclk", "1"],
+                capture_output=True,
+                check=True,
+                text=True,
+            ),
+        ]
+        assert mock_run.call_args_list[3:] == [
+            call(["sudo", "-n", "rocm-smi", "--resetclocks"], capture_output=True),
+            call(
+                ["sudo", "-n", "rocm-smi", "--setperflevel", "auto"],
+                capture_output=True,
+            ),
+        ]
 
     def test_returns_false_when_sclk_lock_fails(self):
         import subprocess as sp
