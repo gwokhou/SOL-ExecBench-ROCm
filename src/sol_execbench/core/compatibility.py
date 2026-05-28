@@ -9,7 +9,7 @@ from collections.abc import Sequence
 from enum import Enum
 from typing import Annotated, Literal
 
-from pydantic import BeforeValidator, ConfigDict, Field
+from pydantic import BeforeValidator, ConfigDict, Field, model_validator
 
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 
@@ -268,6 +268,58 @@ class MatrixEntry(BaseModelWithDocstrings):
     def to_dict(self) -> dict[str, object]:
         """Return the JSON-compatible Matrix Entry payload."""
         return self.model_dump(mode="json")
+
+    @model_validator(mode="after")
+    def _validate_claim_boundaries(self) -> MatrixEntry:
+        target = self.target
+        claims = self.claim_boundary
+
+        if target.validation_scope is MatrixValidationScope.CONTAINER_USER_SPACE:
+            if self.status is MatrixCompatibilityStatus.HOST_VALIDATED:
+                raise ValueError(
+                    "Docker/container scoped Matrix Entries cannot use "
+                    "status=host_validated; use container_validated for "
+                    "container ROCm user-space validation."
+                )
+            if claims.native_host_validated:
+                raise ValueError(
+                    "Docker/container scoped Matrix Entries cannot set "
+                    "native_host_validated=true."
+                )
+            if (
+                self.status is MatrixCompatibilityStatus.CONTAINER_VALIDATED
+                and not claims.container_user_space_validated
+            ):
+                raise ValueError(
+                    "container_validated Docker/container scoped Matrix Entries "
+                    "must set container_user_space_validated=true."
+                )
+
+        if self.status is MatrixCompatibilityStatus.HOST_VALIDATED:
+            host = self.observed.host
+            has_direct_host_evidence = host is not None and bool(
+                host.rocm_version or host.driver_version
+            )
+            if target.validation_scope is not MatrixValidationScope.NATIVE_HOST:
+                raise ValueError(
+                    "host_validated requires native_host validation scope."
+                )
+            if not claims.native_host_validated:
+                raise ValueError(
+                    "host_validated requires native_host_validated=true."
+                )
+            if not has_direct_host_evidence:
+                raise ValueError(
+                    "host_validated requires direct native-host evidence with "
+                    "a ROCm or driver version."
+                )
+            if self.observed.container is not None:
+                raise ValueError(
+                    "host_validated requires direct native-host evidence, not "
+                    "Docker/container validation evidence."
+                )
+
+        return self
 
 
 class MatrixExecutionDecision(BaseModelWithDocstrings):
