@@ -8,11 +8,11 @@
 
 ### Matrix Contract
 
-- [ ] **MATRIX-01**: The project defines a `sol_execbench.rocm_compatibility_matrix.v1` diagnostic report contract with explicit Target, observed evidence, status, reason-code, artifact, and claim-boundary fields.
-- [ ] **MATRIX-02**: Each Matrix Entry has a stable **Target** identity that describes the requested validation configuration, including ROCm user-space version, Docker image/tag, PyTorch ROCm Target, validation scope, and intended GPU architecture when known.
-- [ ] **MATRIX-03**: Matrix reports distinguish requested Target values from observed host, container, Python dependency, toolchain, and GPU evidence.
-- [ ] **MATRIX-04**: Matrix reports support bounded statuses: `host_validated`, `container_validated`, `mixed_version`, `pytorch_wheel_unavailable`, `runtime_unavailable`, and `not_tested`.
-- [ ] **MATRIX-05**: Matrix reports include claim flags that keep v1.18 compatibility evidence diagnostic-only and never grant score, paper-parity, or leaderboard authority.
+- [x] **MATRIX-01**: The project defines a `sol_execbench.rocm_compatibility_matrix.v1` diagnostic report contract with explicit Target, observed evidence, status, reason-code, artifact, and claim-boundary fields.
+- [x] **MATRIX-02**: Each Matrix Entry has a stable **Target** identity that describes the requested validation configuration, including ROCm user-space version, Docker image/tag, PyTorch ROCm Target, validation scope, and intended GPU architecture when known.
+- [x] **MATRIX-03**: Matrix reports distinguish requested Target values from observed host, container, Python dependency, toolchain, and GPU evidence.
+- [x] **MATRIX-04**: Matrix reports support bounded statuses: `host_validated`, `container_validated`, `mixed_version`, `pytorch_wheel_unavailable`, `runtime_unavailable`, and `not_tested`.
+- [x] **MATRIX-05**: Matrix reports include claim flags that keep v1.18 compatibility evidence diagnostic-only and never grant score, paper-parity, or leaderboard authority.
 - [ ] **MATRIX-06**: `host_validated` is emitted only for direct native-host validation evidence, not for Docker user-space Matrix Entries.
 
 ### Docker Matrix
@@ -84,11 +84,11 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| MATRIX-01 | Phase 78 | Pending |
-| MATRIX-02 | Phase 78 | Pending |
-| MATRIX-03 | Phase 78 | Pending |
-| MATRIX-04 | Phase 78 | Pending |
-| MATRIX-05 | Phase 78 | Pending |
+| MATRIX-01 | Phase 78 | Complete |
+| MATRIX-02 | Phase 78 | Complete |
+| MATRIX-03 | Phase 78 | Complete |
+| MATRIX-04 | Phase 78 | Complete |
+| MATRIX-05 | Phase 78 | Complete |
 | MATRIX-06 | Phase 78 | Pending |
 | DOCKER-01 | Phase 79 | Pending |
 | DOCKER-02 | Phase 79 | Pending |
