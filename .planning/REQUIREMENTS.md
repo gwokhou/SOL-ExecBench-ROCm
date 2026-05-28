@@ -44,12 +44,12 @@
 
 ### Documentation And Validation
 
-- [ ] **DOCS-01**: Documentation explains that Docker Matrix Entries validate container ROCm user-space on the recorded host driver/devices and do not prove native host ROCm validation.
-- [ ] **DOCS-02**: Documentation explains Target/requested values versus observed host/container/Python/GPU evidence, including why Target is required for matrix interpretation.
-- [ ] **DOCS-03**: Documentation states that illegal mixed-version Targets are blocked by default and may only continue under explicit debug override without clean validation claims.
-- [ ] **DOCS-04**: CPU-safe tests cover status classification, reason-code classification, schema serialization, mixed-version blocking, claim flags, and docs wording guardrails.
-- [ ] **DOCS-05**: Docker/script tests cover Target selection, default behavior preservation, unknown Target rejection, and command construction without requiring live ROCm hardware.
-- [ ] **DOCS-06**: Live ROCm validation guidance is marker-gated and records the current host ROCm 7.1.x environment as observed evidence without requiring host reinstall for ROCm 7.0.x or 7.2.x.
+- [x] **DOCS-01**: Documentation explains that Docker Matrix Entries validate container ROCm user-space on the recorded host driver/devices and do not prove native host ROCm validation.
+- [x] **DOCS-02**: Documentation explains Target/requested values versus observed host/container/Python/GPU evidence, including why Target is required for matrix interpretation.
+- [x] **DOCS-03**: Documentation states that illegal mixed-version Targets are blocked by default and may only continue under explicit debug override without clean validation claims.
+- [x] **DOCS-04**: CPU-safe tests cover status classification, reason-code classification, schema serialization, mixed-version blocking, claim flags, and docs wording guardrails.
+- [x] **DOCS-05**: Docker/script tests cover Target selection, default behavior preservation, unknown Target rejection, and command construction without requiring live ROCm hardware.
+- [x] **DOCS-06**: Live ROCm validation guidance is marker-gated and records the current host ROCm 7.1.x environment as observed evidence without requiring host reinstall for ROCm 7.0.x or 7.2.x.
 
 ## Future Requirements
 
