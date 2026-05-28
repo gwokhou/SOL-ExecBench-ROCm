@@ -411,17 +411,15 @@ Source: current `pyproject.toml` and uv explicit-index docs. [VERIFIED: codebase
 |---|-------|---------|---------------|
 | A1 | `packaging.version` is available transitively if exact string checks need richer parsing. | Standard Stack | Low; planner can avoid by using exact local-tag checks only. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should ROCm 7.2 policy be recorded as available with explicit `torch 2.11/2.12 +rocm7.2`, or unavailable for the current default `torch 2.10` family?**
    - What we know: PyTorch ROCm 7.2 index lists `torch 2.11/2.12 +rocm7.2`, not `2.10.0+rocm7.2`. [VERIFIED: pip index versions]
-   - What's unclear: Whether this milestone wants v1 policy to recommend a newer per-Target stack or mark 7.2 clean validation dependency-ineligible until a later lock workflow. [ASSUMED]
-   - Recommendation: Record `wheel_availability="available_with_explicit_workflow"` and block clean validation under default dependencies. [VERIFIED: Phase 80 CONTEXT.md]
+   - Resolution: Record ROCm 7.2 as `available_with_explicit_workflow` using a newer supported torch/torchvision ROCm 7.2 family, but block clean validation under the default ROCm 7.1 project dependency path unless that explicit per-Target workflow is selected and recorded. [VERIFIED: Phase 80 CONTEXT.md]
 
 2. **Should ROCm 7.0 policy use `torch 2.10.0+rocm7.0` as an explicit workflow?**
    - What we know: PyTorch ROCm 7.0 index lists `torch 2.10.0+rocm7.0` and `torchvision 0.25.0+rocm7.0`. [VERIFIED: pip index versions]
-   - What's unclear: Whether the project wants a generated lock later or only command metadata in v1. [VERIFIED: Phase 80 CONTEXT.md]
-   - Recommendation: Record the explicit uv index/command metadata and keep default lock unchanged. [VERIFIED: Phase 80 CONTEXT.md]
+   - Resolution: Record the explicit ROCm 7.0 uv index/command metadata and keep the default lock unchanged in Phase 80. Do not generate a separate per-Target lockfile yet. [VERIFIED: Phase 80 CONTEXT.md]
 
 ## Environment Availability
 
