@@ -1,3 +1,9 @@
+---
+status: complete
+quick_id: 260525-audit-fix
+date: 2026-05-25
+---
+
 # Quick Audit Fix Summary: Remaining Suite Reds
 
 ## Delivered
