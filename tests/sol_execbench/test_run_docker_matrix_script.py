@@ -219,11 +219,50 @@ def test_run_docker_preflight_only_available_exits_without_build_or_run() -> Non
         SOL_EXECBENCH_GPU_ACCESSIBLE="true",
     )
 
-    assert completed.returncode == 0, completed.stderr
+    assert completed.returncode != 0
     payload = json.loads(completed.stdout)
     assert payload["status"] == "not_tested"
     assert payload["benchmark_allowed"] is False
     assert payload["container_user_space_validated"] is False
     assert payload["native_host_validated"] is False
     assert "docker build" not in completed.stdout
+    assert "docker run" not in completed.stdout
+
+
+def test_run_docker_not_tested_preflight_blocks_normal_run() -> None:
+    completed = _run_docker_preflight(
+        "--",
+        "sol-execbench",
+        "tests/sol_execbench/samples/rmsnorm",
+        SOL_EXECBENCH_DOCKER_CONTEXT="default",
+        SOL_EXECBENCH_DOCKER_HOST="unix:///var/run/docker.sock",
+        SOL_EXECBENCH_DEV_KFD_PRESENT="true",
+        SOL_EXECBENCH_DEV_KFD_ACCESSIBLE="true",
+        SOL_EXECBENCH_DEV_DRI_PRESENT="true",
+        SOL_EXECBENCH_DEV_DRI_ACCESSIBLE="true",
+        SOL_EXECBENCH_GPU_ACCESSIBLE="true",
+    )
+
+    assert completed.returncode != 0
+    payload = json.loads(completed.stdout)
+    assert payload["status"] == "not_tested"
+    assert payload["benchmark_allowed"] is False
+    assert "docker run" not in completed.stdout
+
+
+def test_run_docker_invalid_preflight_boolean_has_no_traceback() -> None:
+    completed = _run_docker_preflight(
+        "--preflight-only",
+        SOL_EXECBENCH_DOCKER_CONTEXT="default",
+        SOL_EXECBENCH_DOCKER_HOST="unix:///var/run/docker.sock",
+        SOL_EXECBENCH_DEV_KFD_PRESENT="true",
+        SOL_EXECBENCH_DEV_KFD_ACCESSIBLE="true",
+        SOL_EXECBENCH_DEV_DRI_PRESENT="true",
+        SOL_EXECBENCH_DEV_DRI_ACCESSIBLE="true",
+        SOL_EXECBENCH_GPU_ACCESSIBLE="maybe",
+    )
+
+    assert completed.returncode != 0
+    assert "expected boolean value" in completed.stderr
+    assert "Traceback" not in completed.stderr
     assert "docker run" not in completed.stdout

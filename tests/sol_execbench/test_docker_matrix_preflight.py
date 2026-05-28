@@ -166,3 +166,37 @@ def test_module_main_emits_preflight_json_from_explicit_observations() -> None:
     assert payload["score_authority"] is False
     assert payload["paper_parity_authority"] is False
     assert payload["leaderboard_authority"] is False
+
+
+def test_module_main_rejects_invalid_preflight_boolean_without_traceback() -> None:
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "sol_execbench.core.docker_matrix",
+            "preflight",
+            "--manifest",
+            str(MANIFEST_PATH),
+            "--docker-context",
+            "default",
+            "--docker-host",
+            "unix:///var/run/docker.sock",
+            "--dev-kfd-present",
+            "true",
+            "--dev-kfd-accessible",
+            "true",
+            "--dev-dri-present",
+            "true",
+            "--dev-dri-accessible",
+            "true",
+            "--gpu-accessible",
+            "maybe",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode != 0
+    assert "expected boolean value" in completed.stderr
+    assert "Traceback" not in completed.stderr
