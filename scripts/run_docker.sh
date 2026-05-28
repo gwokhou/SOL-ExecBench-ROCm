@@ -2,7 +2,7 @@
 # Launch the sol-execbench Docker container with the right mounts.
 #
 # Usage:
-#   ./scripts/run_docker.sh [--build] [--target <id>] [--allow-unknown-target] [--preflight-only] [docker-run-args...] [-- command...]
+#   ./scripts/run_docker.sh [--build] [--target <id>] [--allow-unknown-target] [--allow-mixed-version-dependencies] [--preflight-only] [docker-run-args...] [-- command...]
 #
 # Examples:
 #   ./scripts/run_docker.sh                             # interactive shell
@@ -16,6 +16,7 @@
 #   IMAGE_TAG           Docker image tag     (default: latest)
 #   ROCM_DOCKER_IMAGE   Unsafe unknown-target override repository
 #   ROCM_DOCKER_TAG     Unsafe unknown-target override tag
+#   SOL_EXECBENCH_ALLOW_MIXED_VERSION_DEPENDENCIES=1  Allow dependency probe/smoke diagnostics for mixed-version stacks
 #   SOL_EXECBENCH_DEPENDENCY_*  Dependency preflight observation overrides for tests/debugging
 
 set -euo pipefail
@@ -30,8 +31,15 @@ IMAGE="${IMAGE_NAME}:${IMAGE_TAG}"
 CONTAINER_PROJECT="/sol-execbench"
 DOCKER_TARGET=""
 ALLOW_UNKNOWN_TARGET=false
+ALLOW_MIXED_VERSION_DEPENDENCIES=false
 PREFLIGHT_ONLY=false
 DRY_RUN="${SOL_EXECBENCH_RUN_DOCKER_DRY_RUN:-0}"
+
+case "${SOL_EXECBENCH_ALLOW_MIXED_VERSION_DEPENDENCIES:-0}" in
+    1 | true | TRUE | yes | YES)
+        ALLOW_MIXED_VERSION_DEPENDENCIES=true
+        ;;
+esac
 
 matrix_json_value() {
     python -c 'import json, sys; data=json.loads(sys.argv[1]); value=data; [value := value[part] for part in sys.argv[2].split(".")]; print(value)' "$1" "$2"
@@ -113,6 +121,9 @@ classify_dependency_preflight_json() {
     )
     if [ -n "${DOCKER_TARGET}" ]; then
         cmd+=(--target "${DOCKER_TARGET}")
+    fi
+    if $ALLOW_MIXED_VERSION_DEPENDENCIES; then
+        cmd+=(--allow-mixed-version-debug)
     fi
     append_dependency_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_TORCH_DISTRIBUTION_VERSION --torch-distribution-version
     append_dependency_arg_from_env cmd SOL_EXECBENCH_DEPENDENCY_TORCH_VERSION --torch-version
@@ -218,6 +229,10 @@ while [ "$#" -gt 0 ]; do
                 ;;
             --allow-unknown-target)
                 ALLOW_UNKNOWN_TARGET=true
+                continue
+                ;;
+            --allow-mixed-version-dependencies)
+                ALLOW_MIXED_VERSION_DEPENDENCIES=true
                 continue
                 ;;
             --preflight-only)
