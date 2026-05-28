@@ -28,6 +28,13 @@ from .config.device_config import get_clock_preset
 logger = logging.getLogger(__name__)
 
 VERIFY_DELAY_S = 3
+ROCM_SMI_FAILURE_MARKERS = (
+    "unable to set performance level",
+    "unable to set sclk",
+    "unable to set mclk",
+    "failed to set",
+    "error:",
+)
 
 
 def _rocm_smi_executable() -> str:
@@ -45,6 +52,36 @@ def probe_clock_lock_available() -> bool:
     except FileNotFoundError:
         return False
     return probe.returncode == 0
+
+
+def _rocm_smi_command_failed(result: subprocess.CompletedProcess) -> str | None:
+    output_parts = []
+    for value in (result.stdout, result.stderr):
+        if not value:
+            continue
+        if isinstance(value, bytes):
+            output_parts.append(value.decode(errors="replace"))
+        else:
+            output_parts.append(str(value))
+    output = "\n".join(output_parts)
+    normalized = output.lower()
+    for marker in ROCM_SMI_FAILURE_MARKERS:
+        if marker in normalized:
+            return output.strip()
+    return None
+
+
+def _run_checked_rocm_smi(command: list[str]) -> subprocess.CompletedProcess:
+    result = subprocess.run(command, check=True, capture_output=True, text=True)
+    failure = _rocm_smi_command_failed(result)
+    if failure:
+        raise subprocess.CalledProcessError(
+            result.returncode,
+            command,
+            output=result.stdout,
+            stderr=result.stderr,
+        )
+    return result
 
 
 def lock_clocks(device_name: str) -> bool:
@@ -83,15 +120,11 @@ def lock_clocks(device_name: str) -> bool:
         return False
 
     try:
-        subprocess.run(
+        _run_checked_rocm_smi(
             ["sudo", "-n", _rocm_smi_executable(), "--setperflevel", "manual"],
-            check=True,
-            capture_output=True,
         )
-        subprocess.run(
+        _run_checked_rocm_smi(
             ["sudo", "-n", _rocm_smi_executable(), "--setsclk", str(sclk_level)],
-            check=True,
-            capture_output=True,
         )
         logger.info("ROCm SCLK locked to DPM level %s", sclk_level)
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
@@ -99,10 +132,8 @@ def lock_clocks(device_name: str) -> bool:
         return False
 
     try:
-        subprocess.run(
+        _run_checked_rocm_smi(
             ["sudo", "-n", _rocm_smi_executable(), "--setmclk", str(mclk_level)],
-            check=True,
-            capture_output=True,
         )
         logger.info("ROCm MCLK locked to DPM level %s", mclk_level)
     except (subprocess.CalledProcessError, FileNotFoundError) as e:

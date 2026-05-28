@@ -159,7 +159,9 @@ selected MCLK DPM level remains supported but not currently active. In that
 case the clock-lock check treats MCLK as valid only when `rocm-smi -s` reports
 the requested MCLK level as a supported frequency level and the preceding
 `--setmclk` command succeeded. SCLK still requires the active level reported by
-`rocm-smi --showclocks` to match.
+`rocm-smi --showclocks` to match. Some ROCm releases can print messages such
+as `Unable to set performance level to manual` while still returning exit code
+0; those outputs are treated as clock-lock failures.
 
 Optional overrides:
 
