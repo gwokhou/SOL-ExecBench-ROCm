@@ -97,7 +97,10 @@
   3. User can rely on the bounded status vocabulary: `host_validated`, `container_validated`, `mixed_version`, `pytorch_wheel_unavailable`, `runtime_unavailable`, and `not_tested`.
   4. User can verify that compatibility evidence is diagnostic-only and never grants score, paper-parity, or leaderboard authority.
   5. User never sees Docker container validation described as native host validation; `host_validated` requires direct native-host evidence.
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 78-01-PLAN.md — Define strict Matrix Entry contract, Target/observed evidence schema, bounded statuses, artifacts, and diagnostic claim flags.
+- [ ] 78-02-PLAN.md — Enforce mixed-version blocking, debug override limits, host/container claim separation, and sidecar-only public guardrails.
 
 ### Phase 79: Docker Matrix Selection And Preflight
 **Goal**: Users can select declared ROCm Docker Targets and get conservative preflight classification before benchmark execution.
