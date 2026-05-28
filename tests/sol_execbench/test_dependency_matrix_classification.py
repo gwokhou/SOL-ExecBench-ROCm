@@ -95,6 +95,26 @@ def test_unsupported_policy_is_pytorch_wheel_unavailable() -> None:
     _assert_policy_payload(result)
 
 
+def test_torch_import_error_blocks_even_when_metadata_matches_policy() -> None:
+    result = classify_dependency_preflight(
+        target=_target(),
+        policy=_default_policy(),
+        observation=_matching_observation(
+            torch_import_error="libamdhip64.so: cannot open shared object file"
+        ),
+    )
+
+    assert result.entry.status is MatrixCompatibilityStatus.PYTORCH_WHEEL_UNAVAILABLE
+    assert (
+        result.entry.reason_code
+        is MatrixCompatibilityReasonCode.PYTORCH_ROCM_WHEEL_UNAVAILABLE
+    )
+    assert "could not be imported" in result.entry.reason
+    assert "Dependency stack matches" not in result.entry.reason
+    _assert_no_authority(result)
+    _assert_policy_payload(result)
+
+
 @pytest.mark.parametrize(
     ("overrides", "reason_fragment"),
     [
