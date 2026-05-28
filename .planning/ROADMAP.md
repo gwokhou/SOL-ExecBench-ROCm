@@ -75,14 +75,14 @@
 
 **Active milestone:** v1.18 ROCm Version Matrix via Docker.
 
-**Status:** Phase 78 complete and ready for verification. Next step: Phase 79 planning.
+**Status:** Phase 81 complete and verified. Next step: Phase 82 planning.
 
 ## Phases
 
 - [x] **Phase 78: Matrix Contract And Claim Guardrails** - Define diagnostic Matrix Entry semantics, bounded statuses, and claim boundaries. (completed 2026-05-28)
 - [x] **Phase 79: Docker Matrix Selection And Preflight** - Let users select declared ROCm Docker targets with deterministic image and device preflight behavior. (completed 2026-05-28)
 - [x] **Phase 80: uv And PyTorch ROCm Wheel Coordination** - Record and enforce per-target dependency policy so wrong or unavailable PyTorch ROCm stacks are classified before validation. (completed 2026-05-28)
-- [ ] **Phase 81: Runtime Evidence And Compatibility Reports** - Collect scoped host/container/Python/toolchain/GPU evidence and emit per-target plus aggregate compatibility reports.
+- [x] **Phase 81: Runtime Evidence And Compatibility Reports** - Collect scoped host/container/Python/toolchain/GPU evidence and emit per-target plus aggregate compatibility reports. (completed 2026-05-28)
 - [ ] **Phase 82: Validation Workflow, Docs, And CI Guardrails** - Document claim boundaries and add CPU-safe, Docker-script, and marker-gated validation coverage.
 
 ## Phase Details
@@ -168,7 +168,15 @@ Plans:
   4. User can find per-Target compatibility JSON and an aggregate compatibility matrix JSON with status counts.
   5. User can distinguish setup failures, dependency failures, and benchmark correctness/performance results while canonical trace JSONL, scoring, timing, defaults, and exit semantics remain unchanged.
 
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+**Wave 1**
+
+- [x] 81-01-PLAN.md — Add runtime evidence collection, per-target compatibility sidecars, aggregate reports, diagnostic failure categories, and CPU-safe tests.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 81-02-PLAN.md — Wire explicit Docker wrapper sidecar and aggregate report output without changing default benchmark behavior.
 
 ### Phase 82: Validation Workflow, Docs, And CI Guardrails
 
@@ -195,7 +203,7 @@ Phases execute in numeric order: 78 -> 79 -> 80 -> 81 -> 82
 | 78. Matrix Contract And Claim Guardrails | v1.18 | 2/2 | Complete    | 2026-05-28 |
 | 79. Docker Matrix Selection And Preflight | v1.18 | 2/2 | Complete    | 2026-05-28 |
 | 80. uv And PyTorch ROCm Wheel Coordination | v1.18 | 2/2 | Complete    | 2026-05-28 |
-| 81. Runtime Evidence And Compatibility Reports | v1.18 | 0/TBD | Not started | - |
+| 81. Runtime Evidence And Compatibility Reports | v1.18 | 2/2 | Complete    | 2026-05-28 |
 | 82. Validation Workflow, Docs, And CI Guardrails | v1.18 | 0/TBD | Not started | - |
 
 ## Future Candidate Work

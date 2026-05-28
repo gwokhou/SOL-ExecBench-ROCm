@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.18
 milestone_name: ROCm Version Matrix via Docker
 status: ready_to_plan
-stopped_at: Phase 80 complete (2/2) — ready to discuss Phase 81
-last_updated: 2026-05-28T09:50:18.991Z
+stopped_at: Phase 81 complete (2/2) — ready to discuss Phase 82
+last_updated: 2026-05-28T10:20:00.000Z
 last_activity: 2026-05-28
 progress:
   total_phases: 5
-  completed_phases: 3
-  total_plans: 6
-  completed_plans: 6
-  percent: 60
+  completed_phases: 4
+  total_plans: 8
+  completed_plans: 8
+  percent: 80
 ---
 
 # Project State
@@ -21,11 +21,11 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-28)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Phase 81 — runtime evidence and compatibility reports
+**Current focus:** Phase 82 — validation workflow, docs, and CI guardrails
 
 ## Current Position
 
-Phase: 81
+Phase: 82
 Plan: Not started
 Status: Ready to plan
 Last activity: 2026-05-28
@@ -92,6 +92,9 @@ Progress: [██████████] 100%
 - [Phase 80]: ROCm 7.1 remains the project-default uv path; ROCm 7.0 and 7.2 are explicit Target workflows only. — The plan preserves pyproject.toml and uv.lock while recording per-Target dependency workflows.
 - [Phase 80]: The Docker wrapper delegates dependency policy to dependency_matrix.py preflight JSON before Docker build/run.
 - [Phase 80]: Mixed-version dependency debug uses --allow-mixed-version-dependencies or SOL_EXECBENCH_ALLOW_MIXED_VERSION_DEPENDENCIES=1, separate from --allow-unknown-target, and grants no benchmark or authority claims.
+- [Phase 81]: Runtime compatibility evidence is emitted only as explicit sidecars; default benchmark traces, score/timing/correctness schemas, defaults, and exit semantics remain unchanged.
+- [Phase 81]: Per-target sidecars and aggregate matrix reports reuse `sol_execbench.rocm_compatibility_matrix.v1` and keep host, container, Python dependency, dependency policy, toolchain, and GPU evidence in separate observed scopes.
+- [Phase 81]: Setup/runtime, dependency, benchmark correctness, and benchmark performance evidence are distinct diagnostic categories and are not converted into benchmark failures.
 
 ### Pending Todos
 
