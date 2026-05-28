@@ -176,7 +176,7 @@ Phases execute in numeric order: 78 -> 79 -> 80 -> 81 -> 82
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 78. Matrix Contract And Claim Guardrails | v1.18 | 2/2 | Complete   | 2026-05-28 |
+| 78. Matrix Contract And Claim Guardrails | v1.18 | 2/2 | Complete    | 2026-05-28 |
 | 79. Docker Matrix Selection And Preflight | v1.18 | 0/TBD | Not started | - |
 | 80. uv And PyTorch ROCm Wheel Coordination | v1.18 | 0/TBD | Not started | - |
 | 81. Runtime Evidence And Compatibility Reports | v1.18 | 0/TBD | Not started | - |
