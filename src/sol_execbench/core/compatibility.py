@@ -270,6 +270,37 @@ class MatrixEntry(BaseModelWithDocstrings):
         return self.model_dump(mode="json")
 
 
+class MatrixExecutionDecision(BaseModelWithDocstrings):
+    """Pre-benchmark execution decision derived from one Matrix Entry."""
+
+    model_config = _MATRIX_MODEL_CONFIG
+
+    status: MatrixCompatibilityStatusField
+    """Matrix Entry status used for the decision."""
+    reason_code: MatrixCompatibilityReasonCodeField
+    """Matrix Entry reason code used for the decision."""
+    benchmark_allowed: bool
+    """Whether full benchmark execution is allowed for clean validation."""
+    probes_allowed: bool
+    """Whether bounded diagnostic probes are allowed."""
+    smoke_allowed: bool
+    """Whether bounded smoke execution is allowed."""
+    reason: str
+    """Human-readable decision reason."""
+    diagnostic_compatibility_evidence: Literal[True] = True
+    """Execution decisions are diagnostic compatibility evidence."""
+    score_authority: Literal[False] = False
+    """Execution decisions never grant benchmark score authority."""
+    paper_parity_authority: Literal[False] = False
+    """Execution decisions never grant paper-parity authority."""
+    leaderboard_authority: Literal[False] = False
+    """Execution decisions never grant leaderboard authority."""
+    container_user_space_validated: bool
+    """Whether the decision permits a clean container user-space claim."""
+    native_host_validated: bool
+    """Whether the decision permits a clean native-host claim."""
+
+
 class RocmCompatibilityMatrixReport(BaseModelWithDocstrings):
     """Aggregate ROCm compatibility matrix report."""
 
@@ -313,4 +344,105 @@ def build_matrix_entry(
         reason=reason,
         claim_boundary=claim_boundary,
         artifacts=list(artifacts),
+    )
+
+
+def classify_matrix_entry_for_execution(
+    entry: MatrixEntry,
+    *,
+    allow_mixed_version_debug: bool = False,
+) -> MatrixExecutionDecision:
+    """Classify a Matrix Entry into deterministic pre-benchmark allowances."""
+
+    status = entry.status
+    reason_code = entry.reason_code
+    claims = entry.claim_boundary
+
+    if status is MatrixCompatibilityStatus.MIXED_VERSION:
+        if allow_mixed_version_debug:
+            return MatrixExecutionDecision(
+                status=status,
+                reason_code=reason_code,
+                benchmark_allowed=False,
+                probes_allowed=True,
+                smoke_allowed=True,
+                reason=(
+                    "Mixed-version Target is running under explicit debug override; "
+                    "diagnostic probes or smoke execution may continue, but clean "
+                    "validation and benchmark claims remain blocked."
+                ),
+                container_user_space_validated=False,
+                native_host_validated=False,
+            )
+        return MatrixExecutionDecision(
+            status=status,
+            reason_code=reason_code,
+            benchmark_allowed=False,
+            probes_allowed=False,
+            smoke_allowed=False,
+            reason=(
+                "Mixed-version Target is blocked before benchmark execution by "
+                "default; rerun only with an explicit debug override for probes "
+                "or smoke execution."
+            ),
+            container_user_space_validated=False,
+            native_host_validated=False,
+        )
+
+    if status is MatrixCompatibilityStatus.PYTORCH_WHEEL_UNAVAILABLE:
+        return MatrixExecutionDecision(
+            status=status,
+            reason_code=reason_code,
+            benchmark_allowed=False,
+            probes_allowed=True,
+            smoke_allowed=False,
+            reason=(
+                "Requested dependency stack is unavailable for this Target; this "
+                "is a compatibility classification, not a benchmark correctness "
+                "failure."
+            ),
+            container_user_space_validated=False,
+            native_host_validated=False,
+        )
+
+    if status is MatrixCompatibilityStatus.RUNTIME_UNAVAILABLE:
+        return MatrixExecutionDecision(
+            status=status,
+            reason_code=reason_code,
+            benchmark_allowed=False,
+            probes_allowed=True,
+            smoke_allowed=False,
+            reason=(
+                "Required ROCm runtime or device access is unavailable; this is a "
+                "runtime compatibility classification, not a benchmark correctness "
+                "failure."
+            ),
+            container_user_space_validated=False,
+            native_host_validated=False,
+        )
+
+    if status is MatrixCompatibilityStatus.NOT_TESTED:
+        return MatrixExecutionDecision(
+            status=status,
+            reason_code=reason_code,
+            benchmark_allowed=False,
+            probes_allowed=True,
+            smoke_allowed=False,
+            reason=(
+                "Target is not tested and remains non-authoritative; benchmark "
+                "eligibility is not implied."
+            ),
+            container_user_space_validated=False,
+            native_host_validated=False,
+        )
+
+    return MatrixExecutionDecision(
+        status=status,
+        reason_code=reason_code,
+        benchmark_allowed=True,
+        probes_allowed=True,
+        smoke_allowed=True,
+        reason=entry.reason,
+        container_user_space_validated=claims.container_user_space_validated,
+        native_host_validated=claims.native_host_validated,
     )
