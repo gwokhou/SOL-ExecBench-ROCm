@@ -2,6 +2,7 @@
 plan_id: 81-02
 status: completed
 completed_at: 2026-05-28
+requirements-completed: [EVID-01, EVID-02, EVID-03, EVID-04, EVID-05, EVID-06]
 ---
 
 # 81-02 Summary
