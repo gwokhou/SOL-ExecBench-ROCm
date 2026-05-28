@@ -122,7 +122,15 @@ Plans:
   3. User is blocked from unknown ROCm Targets unless they explicitly choose an unsafe or untested override.
   4. User receives `runtime_unavailable` before benchmark execution when Docker context, `/dev/kfd`, `/dev/dri`, or GPU device access is unavailable.
 
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+**Wave 1**
+
+- [ ] 79-01-PLAN.md — Create the declared Docker Target manifest plus pure Python Target selection, build-arg, unknown override, digest, and preflight classification helpers.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 79-02-PLAN.md — Wire Docker Target selection into the Dockerfile and Docker wrapper script with CPU-safe script/static tests.
 
 ### Phase 80: uv And PyTorch ROCm Wheel Coordination
 
