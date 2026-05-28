@@ -1,210 +1,209 @@
 # Project Research Summary
 
 **Project:** SOL ExecBench ROCm Port
-**Domain:** Static kernel/compiler evidence for ROCm benchmark runs
-**Milestone:** v1.17 Static Kernel Evidence
-**Researched:** 2026-05-25
-**Confidence:** HIGH for sidecar-first integration and repository boundaries; MEDIUM for exact static-tool output and live HSACO/code-object discovery until validated in the ROCm container.
+**Domain:** Docker-based ROCm user-space version compatibility matrix
+**Milestone:** v1.18 ROCm Version Matrix via Docker
+**Researched:** 2026-05-28
+**Confidence:** MEDIUM-HIGH
 
 ## Executive Summary
 
-v1.17 should add opt-in diagnostic static kernel evidence to the ROCm benchmark runner. The product is not a new evaluator or scoring system; it is a sidecar evidence layer that captures build artifacts from ROCm solution builds, routes available static-analysis tools through the v1.16 toolchain registry, extracts raw ISA/metadata where possible, and records explicit unavailable or unsupported states when evidence cannot be collected.
+v1.18 should add a Docker-based ROCm compatibility matrix for SOL ExecBench without changing benchmark semantics. This is diagnostic infrastructure: users select a ROCm container user-space row, coordinate the intended PyTorch ROCm wheel policy, run bounded runtime/toolchain probes, and archive machine-readable evidence that says exactly what was validated.
 
-The recommended implementation is a narrow sidecar pipeline attached to the existing HIP/C++ compile path: after `ProblemPackager.compile()` creates `benchmark_kernel.so` in the staging directory and before staging cleanup, discover stable build artifacts, copy or register bounded evidence artifacts beside the trace output, run routed extractors such as `llvm-objdump` and `readelf`, and write `sol_execbench.static_kernel_evidence.v1`. Canonical trace JSONL, correctness, timing, scoring, paper-parity, and leaderboard semantics must remain unchanged.
+The recommended approach is sidecar-first and conservative. Keep the current ROCm 7.1 Docker and `uv.lock` path as the default baseline, add an explicit matrix manifest for ROCm 7.0/7.1/7.2 rows, parameterize Docker build/run selection, and introduce a `sol_execbench.rocm_compatibility_matrix.v1` report separate from canonical trace JSONL. Docker scripts should provide requested coordinates; Python probes should record observed container, host, PyTorch, Triton, toolchain, and GPU evidence; the compatibility model should classify the row.
 
-The main risks are toolchain drift, unstable PyTorch ROCm build intermediates, temporary staging cleanup, and overclaiming static evidence. Mitigate them by keeping collection default-off and nonfatal, persisting routing decisions and raw outputs, modeling partial/unavailable states explicitly, copying durable artifacts outside temporary staging, and adding guardrails that static evidence is diagnostic only.
+The central risk is overclaiming. A Docker pass validates container ROCm user-space on the current host driver/devices; it does not prove native host ROCm validation, paper parity, score authority, or leaderboard eligibility. Mitigate this with strict status vocabulary, scoped evidence fields, claim-boundary booleans, stable reason codes, docs wording checks, and no silent fallback from missing PyTorch ROCm wheels to CPU/CUDA/wrong-index packages.
 
 ## Key Findings
 
 ### Stack Additions
 
-No new Python framework, database, binary parser, or service dependency is recommended. v1.17 should use the existing Python 3.12 package, Pydantic v2 models, Click/Rich CLI patterns, stdlib `json`/`hashlib`/`subprocess`, and the v1.16 toolchain router.
+v1.18 does not need a new package manager, service, or evaluator backend. It should extend the existing Python 3.12, Pydantic v2, Click/Rich, Docker, uv, PyTorch ROCm, Triton ROCm, and ROCm toolchain stack.
 
 **Core technologies:**
-- Python stdlib: artifact walking, hashing, bounded subprocess execution, and JSON writing.
-- Pydantic v2: strict `static_kernel_evidence.v1` models and round-trip tests.
-- Existing Click/Rich CLI: explicit `--static-evidence none|auto` behavior and user-facing status.
-- Existing `src/sol_execbench/core/toolchain.py`: static route selection, probes, statuses, source refs, and unavailable reasons.
-- `llvm-objdump`: first general extractor for headers, symbols, offload info, and disassembly when available.
-- `readelf`: fallback for ELF headers, sections, notes, symbols, and metadata when ISA extraction is unavailable.
-- RGA and `roc-objdump`: candidate routes only; probe and record status, but do not make either mandatory.
+- Docker ROCm selector: parameterize `docker/Dockerfile` and `scripts/run_docker.sh` with `ROCM_VERSION`, exact image/tag, and build/run marker env vars.
+- Matrix manifest: add a small checked-in source of truth, likely `docker/rocm-version-matrix.toml`, for logical rows, Docker tags, PyTorch ROCm index policy, expected wheel suffix, and default evidence state.
+- uv explicit indexes: keep PyTorch-family packages pinned to explicit ROCm indexes and keep PyPI as the generic default; do not rely on index order.
+- Compatibility models: add strict Pydantic report models, likely in a new `src/sol_execbench/core/compatibility.py`, while preserving `EnvironmentSnapshot` semantics.
+- Runtime probes: reuse/extend `doctor --json` and environment probe patterns for `hipcc`, `rocminfo`, `rocm_agent_enumerator`, optional `rocprofv3`, `torch.__version__`, `torch.version.hip`, `torch.version.cuda`, device availability, device name, and `gcnArchName`.
+- Reports: emit standalone or sidecar JSON plus concise human-readable output; do not mutate trace JSONL.
 
-Recommended new module: `src/sol_execbench/core/bench/static_kernel_evidence.py` for request/result models, artifact discovery, extractor adapters, raw-output registration, conservative classification, and optional report rendering.
+Critical version strategy: keep ROCm 7.1 as the canonical default lock until a per-row lock workflow is proven. Initial Docker rows should be exact `rocm/dev-ubuntu-24.04:*complete` tags for 7.0.x, 7.1.x, and 7.2.x, with 7.1 remaining the default.
 
-### Table-Stakes Features
+### Expected Features
 
-**Must have:**
-- Explicit opt-in collection, default off, with `--static-evidence none|auto`.
-- Nonfatal behavior for missing tools, missing artifacts, unsupported solution types, parser failures, and timeouts.
-- `sol_execbench.static_kernel_evidence.v1` JSON sidecar with diagnostic-only authority flags.
-- Durable sidecar paths beside trace output, for example `traces.jsonl.static-kernel-evidence.json` and `traces.jsonl.static-kernel-evidence/`.
-- HIP/C++ artifact discovery from the current staging/build directory, starting with `benchmark_kernel.so` plus opportunistic `.hsaco`, `.co`, `.o`, `.out`, compiler intermediates, and raw tool outputs.
-- SHA256, size, kind, source path, persisted path, producer, and inspectability for every registered artifact.
-- Routed static-tool selection through v1.16, including all considered decisions and unavailable reasons.
-- Bounded extractor execution with command provenance, tool path/version, timeout, return code, raw output refs, and stdout/stderr tails.
-- Explicit aggregate and per-artifact statuses: collected, partial, unavailable, unsupported, failed, skipped.
-- No mutation of canonical trace JSONL, scoring reports, timing authority, or benchmark exit-code semantics.
-- Documentation and guardrail tests stating that static evidence is diagnostic only.
+**Must have (table stakes):**
+- Select a configured ROCm Docker user-space version while preserving today’s default `./scripts/run_docker.sh --build` behavior.
+- Record requested vs observed container ROCm, host ROCm/driver context, PyTorch ROCm wheel identity, Triton ROCm state, toolchain evidence, GPU architecture, uv index/lock policy, and artifact refs.
+- Emit `compatibility-matrix.json` with one row per configured target and aggregate counts by state.
+- Emit per-entry `compatibility.json` sidecars with probe data, command/log refs, status, reason codes, and claim flags.
+- Support exact statuses: `host_validated`, `container_validated`, `mixed_version`, `pytorch_wheel_unavailable`, `runtime_unavailable`, `not_tested`.
+- Distinguish missing PyTorch wheels from runtime/device failures.
+- Detect CPU/CUDA/wrong-ROCm PyTorch wheels and classify them conservatively.
+- Preserve canonical trace JSONL, correctness, timing, scoring, paper-parity, and leaderboard semantics.
+- Provide CPU-safe unit/fixture tests for classification, serialization, command construction, and report rendering.
+- Update docs with explicit container-vs-host claim boundaries.
 
-**Should have:**
-- Minimal normalized metadata: detected `gfx*` targets, section/code-object presence, symbol inventory, raw ISA text path, and coarse `has_disassembly`/`has_metadata` booleans.
-- Markdown or console report summarizing evidence status, artifact manifest, tool routing, kernel inventory, unavailable states, and claim boundary.
-- Fixture corpus for `llvm-objdump`, `readelf`, `roc-objdump`, and RGA outputs so parser behavior is CPU-testable.
-- Optional package/version fingerprints for ROCm, LLVM, RGA, and compiler tools via routing/environment evidence.
+**Should have (differentiators):**
+- Docker image digest capture for reproducible evidence.
+- Native-host comparison row that can produce `host_validated` only from direct host probes.
+- Wheel availability preflight before expensive Docker builds.
+- JSON schema export or CLI schema output for external consumers.
+- Matrix diff/report helpers and per-architecture aggregation when evidence exists.
+- Bounded command transcript capture for Docker, uv, and probe commands.
 
-### Deferred Scope
+**Defer (v2+):**
+- Native ROCm host install/reinstall automation.
+- Full paper dataset validation across every ROCm version.
+- Score, leaderboard, or paper-parity policy changes.
+- CUDA/NVIDIA matrix support.
+- Arbitrary ROCm versions outside the declared manifest.
+- Docker-in-Docker, conda/mamba, Spack, Nix, or host driver management.
+- Full CDNA 3/CDNA 4 claims without archived hardware evidence.
 
-Defer full RGA-first resource extraction, Triton cache capture, full paper-scale 235-problem static coverage, dataset-level static aggregation beyond simple sidecar counts, static/profile kernel-name correlation, deep instruction taxonomy, resource regression diffs, HTML/notebook reports, and any use of static evidence in scoring, correctness, timing, paper-parity, or leaderboard policy.
+### Architecture Approach
 
-Triton and Python/PyTorch-only solutions should return clear `unsupported_solution` or `no_stable_artifact` states in v1.17 unless a stable artifact boundary is proven during implementation. ROCm-library categories may be represented as native-adjacent only when a solution-owned artifact is available; otherwise record an opaque-library unsupported state.
+Keep Docker orchestration at the script/Dockerfile boundary and compatibility classification inside Python. The evaluator should not call Docker, and Docker scripts should not be the source of truth for validation. Instead, scripts pass requested matrix coordinates into the container; Python probes collect observed evidence; compatibility models compare requested and observed values and write diagnostic reports.
 
-## Architecture And Data Flow
+**Major components:**
+1. Docker matrix configuration: checked-in rows for Docker image/tag, PyTorch ROCm index/tag policy, support status, and default claim state.
+2. Docker wrapper plumbing: `scripts/run_docker.sh --rocm` or equivalent, build args, image tags, native Linux Docker/device preflight, and container marker env vars.
+3. uv/PyTorch wheel coordination: explicit package-to-index policy, default ROCm 7.1 lock, per-row availability checks, and unavailable classification.
+4. Compatibility evidence models: scoped host/container/python/toolchain/GPU evidence, row status, reason codes, authority flags, and matrix summary counts.
+5. CLI/report surface: `sol-execbench compatibility --json` or `doctor --json` extension, optional trace-adjacent sidecar, and Markdown/Rich summary.
+6. Docs/tests guardrails: docs claim language, CPU-safe fixture tests, Docker script tests, and marker-gated live ROCm checks.
 
-Static Kernel Evidence should be an optional diagnostic sidecar attached to the existing compile/evaluate lifecycle:
+### Critical Pitfalls
 
-```text
-sol-execbench ... --solution solution.json -o traces.jsonl --static-evidence auto
-  -> load definition, workload, solution, and config
-  -> create staging directory and ProblemPackager
-  -> native HIP/C++ compile succeeds
-  -> discover static artifacts in the current staging/build tree
-  -> build ToolchainRoutingRequest(evidence_level=static, artifact_type=...)
-  -> run bounded routed extractor commands when tools are available
-  -> copy/register artifacts and raw outputs under traces.jsonl.static-kernel-evidence/
-  -> write traces.jsonl.static-kernel-evidence.json
-  -> execute benchmark normally
-  -> write canonical trace JSONL unchanged
-```
+1. **Treating container ROCm as host validation** - use `validation_scope`, scoped host/container evidence, and wording such as "container ROCm user-space validated on host driver X"; reserve `host_validated` for direct native runs.
+2. **Assuming any ROCm container works with the current host driver** - preflight Docker context, `/dev/kfd`, `/dev/dri`, `rocminfo`, PyTorch device visibility, memory copy, and event timing before benchmark execution.
+3. **Hardcoding image tags in multiple places** - use one matrix manifest plus Docker build args/env labels, and store exact image tag/digest/build args in reports.
+4. **Mixing PyTorch ROCm wheels and container user-space silently** - compare intended wheel target with `torch.__version__`, `torch.version.hip`, `torch.version.cuda`, and container ROCm evidence; classify mismatches as `mixed_version`.
+5. **Misusing uv indexes/lockfiles** - keep indexes explicit, do not pretend one frozen lock validates multiple wheel targets, and record per-row lock/index evidence.
+6. **Letting runtime setup failures look like benchmark regressions** - classify missing devices, Docker Desktop/rootless issues, unavailable wheels, and failed preflights before running benchmarks.
+7. **Reporting one pass/fail for the matrix** - require row-level denominators and aggregate counts; partial matrices must be readable and conservative.
 
-Major components:
+## Implications For Roadmap
 
-1. `StaticKernelEvidenceRequest` - staging dir, primary artifact, solution metadata, output dir, target arch, timeout, compile provenance, and injected test dependencies.
-2. `StaticKernelEvidenceResult` - strict sidecar model with status, authority flags, routing report, artifacts, extractor runs, classifications, warnings, and reason codes.
-3. `discover_static_kernel_artifacts()` - current-staging-only discovery for `benchmark_kernel.so`, code objects, HSACO, object files, compiler outputs, and raw extracted artifacts.
-4. `collect_static_kernel_evidence()` - route static tools, run bounded extractors, persist raw outputs, classify conservatively, and return a result for success, partial, unsupported, unavailable, failed, or skipped.
-5. CLI sidecar helpers - derive output paths, invoke collection after compile success and before cleanup, write JSON/report files, and keep static failures nonfatal.
-6. Toolchain routing updates - promote implemented static routes from planned to active/candidate while preserving probe-gated availability and unsupported statuses.
+Based on research, suggested phase structure:
 
-Boundary rules:
+### Phase 1: Matrix Contract And Claim Guardrails
 
-- The packager may expose native-solution checks and artifact roots, but it should not parse ISA or own extractor subprocess logic.
-- The router selects/probes tools and records reasons; it should not parse static evidence.
-- The collector owns artifact discovery, extraction, raw-output registration, and conservative parsing.
-- Trace, evaluation, scoring, dataset execution, and AMD SOL/SOLAR reports must ignore static evidence in v1.17.
+**Rationale:** Every later phase depends on stable report semantics and claim boundaries.
+**Delivers:** Pydantic status enums, reason-code taxonomy, `sol_execbench.rocm_compatibility_matrix.v1`, claim-boundary booleans, row/matrix summary models, fixture tests, and docs wording requirements.
+**Addresses:** Compatibility states, diagnostic-only authority, `not_tested` rows, aggregate counts, and container-vs-host wording.
+**Avoids:** Overclaiming Docker runs, trace/schema mutation, boolean-only pass/fail reports, and unscoped evidence.
 
-## Watch-Outs
+### Phase 2: Docker Matrix Selection And Preflight
 
-1. **Tool availability is not stable across ROCm images** - every extractor must go through routing/probes, record command provenance, and degrade to `unavailable` without failing the benchmark.
-2. **PyTorch ROCm builds may not expose standalone HSACO files** - always register `benchmark_kernel.so`, distinguish shared-object evidence from direct code-object/HSACO evidence, and treat missing HSACO as partial or unavailable, not fatal.
-3. **Temporary staging can leave dangling evidence paths** - copy durable evidence beside the trace before cleanup; use sidecar-relative paths and store absolute paths only as provenance.
-4. **Global cache scanning can mix artifacts across runs** - search only the current staging/build tree, tie artifacts to solution/build provenance, and avoid recursive scans of `~/.cache`, `/tmp`, or ROCm install trees.
-5. **Static evidence can be overclaimed** - use `diagnostic_only: true` and false authority flags for correctness, performance, timing, score, paper parity, and leaderboard claims.
-6. **Text parsers will be brittle if too ambitious** - preserve raw output, parse minimal stable facts first, label heuristics, and use `unknown` rather than false when a fact cannot be extracted.
-7. **CPU-safe tests should not require GPUs or live tools** - use fake runners, fake `which`, fixture artifacts, and narrow `requires_rocm`/`requires_rocm_dev` tests only for live validation.
-8. **One architecture is not evidence for all AMD targets** - model requested arches, compile flags, discovered code-object arches, and hardware validation separately per artifact.
+**Rationale:** Users need deterministic image selection before wheel/runtime evidence can be meaningful.
+**Delivers:** Matrix manifest, parameterized Dockerfile base image, `scripts/run_docker.sh` ROCm selector, build/run marker env vars, exact image tag recording, existing default preservation, Docker context/device checks, and unknown-row rejection.
+**Uses:** Docker `ARG`, `rocm/dev-ubuntu-24.04:*complete` images, `/dev/kfd`, `/dev/dri`, native Linux Docker checks.
+**Avoids:** Drift between docs/scripts/Dockerfile, Docker Desktop/rootless false failures, floating-tag claims, and unsupported arbitrary rows.
 
-## Recommended Phase Ordering
+### Phase 3: uv And PyTorch ROCm Wheel Coordination
 
-### Phase 1: Static Evidence Contract And Guardrails
+**Rationale:** The matrix is invalid if the selected container installs the wrong PyTorch backend.
+**Delivers:** Explicit PyTorch ROCm index rows, default ROCm 7.1 lock policy, wheel availability/preflight helper, lock/index evidence capture, local-version parsing, and `pytorch_wheel_unavailable` / `mixed_version` classification tests.
+**Uses:** uv explicit indexes and `[tool.uv.sources]`, PyTorch ROCm wheel indexes, `torch.__version__`, `torch.version.hip`, `torch.version.cuda`.
+**Avoids:** CPU/CUDA fallback, wrong-index resolution, assuming one `uv.lock` covers all rows, and hiding unavailable wheels as Docker build failures.
 
-**Rationale:** Consumers and tests need a stable sidecar contract before CLI behavior or reports can be reliable.
-**Delivers:** Pydantic models, status/reason enums, authority flags, sidecar path rules, contract capability token, and no-trace/no-score guardrails.
-**Addresses:** `static_kernel_evidence.v1`, diagnostic-only semantics, partial/unavailable states.
-**Avoids:** Overclaiming, boolean-only schema, canonical trace mutation, score coupling.
-**Research flag:** Skip extra research; repo patterns and source docs are strong.
+### Phase 4: Runtime Evidence And Compatibility Reports
 
-### Phase 2: Build Artifact Discovery And Manifest
+**Rationale:** Once requested coordinates and dependency policy exist, runtime probes can produce useful compatibility evidence.
+**Delivers:** Scoped host/container/python/toolchain/GPU probe collection, `compatibility --json` or `doctor --json` report surface, per-entry sidecars, matrix aggregate JSON, human report, optional smoke hook, and report artifact refs.
+**Implements:** Compatibility model comparison of requested-vs-observed container ROCm, host context, PyTorch ROCm tag, Triton readiness, native HIP/C++ build readiness, and GPU architecture.
+**Avoids:** Collapsing host/container tools, treating Triton as version-neutral, PyTorch-only smoke overclaims, and benchmark regressions caused by preflight failures.
 
-**Rationale:** Extraction is only meaningful if artifacts are tied to the exact solution build and survive staging cleanup.
-**Delivers:** Packager helper APIs, native-solution coverage policy, current-staging discovery, artifact kinds, copied/persisted artifact tree, hashes, sizes, source/persisted paths, compile provenance.
-**Addresses:** HIP/C++ artifact capture and durable evidence archive.
-**Avoids:** Stale cache capture, dangling temp paths, assuming `benchmark_kernel.so` equals HSACO.
-**Research flag:** Needs implementation validation against at least one live ROCm PyTorch extension build.
+### Phase 5: Validation Workflow, Docs, And CI Guardrails
 
-### Phase 3: Routed Static Extractor Adapters
-
-**Rationale:** v1.17 depends on v1.16 routing; direct `subprocess.run(["tool", ...])` calls would recreate the toolchain brittleness v1.16 solved.
-**Delivers:** Static routing requests, `llvm-objdump` and `readelf` extractors, optional `roc-objdump`/RGA route records, bounded command runner, raw output files, command provenance, metadata/disassembly presence classification.
-**Addresses:** routed static tool selection, nonfatal unavailable states, raw output preservation.
-**Avoids:** mandatory RGA, hanging extractors, unexplainable fallback behavior.
-**Research flag:** Needs deeper phase research or live fixture validation for RGA and `roc-objdump` before enabling rich parsing.
-
-### Phase 4: CLI Sidecar Integration And Reports
-
-**Rationale:** Once contract, discovery, and extractors exist, the main benchmark command can expose a coherent opt-in workflow.
-**Delivers:** `--static-evidence none|auto`, sidecar and evidence-directory writes beside trace output, no-output/keep-staging behavior, warnings that do not alter exit code, optional Markdown/text report.
-**Addresses:** user-facing v1.17 workflow and operator archive needs.
-**Avoids:** default behavior drift, trace/schema mutation, static failures breaking benchmark runs.
-**Research flag:** Skip extra research; reuse environment/profile sidecar precedent.
-
-### Phase 5: Documentation, Guardrails, And Live Validation
-
-**Rationale:** Static evidence is easy to misread; docs and tests must land with live examples and claim boundaries.
-**Delivers:** `docs/CLAIMS.md`, `docs/rocm_toolchain_routing.md`, architecture/researcher/cookbook updates, no-claim tests, CPU-safe fixture tests, one RDNA 4 live artifact validation record, CDNA 3 caveats if not hardware-validated.
-**Addresses:** researcher interpretation, release closure, validation boundaries.
-**Avoids:** claiming static evidence as correctness/performance/leaderboard authority or cross-architecture validation.
-**Research flag:** Needs live ROCm validation; CDNA 3 remains a validation gap unless hardware is available.
-
-### Phase 6: Optional Richer Classification
-
-**Rationale:** Instruction-family counts and resource hints are useful but should not block a correct v1.17 evidence surface.
-**Delivers:** Heuristic instruction families, resource hints when tools report them, parser fixture expansion, possible RGA resource extraction, optional sidecar diff helpers.
-**Addresses:** differentiator features only.
-**Avoids:** brittle parser-first implementation and static metrics being treated as scores.
-**Research flag:** Requires deeper research and fixture capture; treat as stretch or follow-up.
+**Rationale:** The matrix is only useful if users and release notes can read it without overstating coverage.
+**Delivers:** Documentation in `docs/CONFIGURATION.md`, `docs/TESTING.md`, `docs/rocm.md`, `docs/CLAIMS.md`, likely `docs/rocm_version_matrix.md`; CPU-safe tests; Dockerfile/script tests; marker-gated live ROCm tests for the default row; optional self-hosted AMD runner guidance; archived validation examples.
+**Addresses:** Claim language, CI limits, partial matrix interpretation, hardware-specific evidence boundaries, and remediation hints.
+**Avoids:** CI promising GPU validation it cannot run, build-only results being called runtime validation, and one architecture being generalized to all AMD GPUs.
 
 ### Phase Ordering Rationale
 
-- Contract and guardrails come first because every later phase writes or interprets the sidecar.
-- Artifact discovery must precede extraction because extractor choice depends on artifact kind and target architecture.
-- Routed extractors must precede reports so reports summarize real route decisions and command outputs.
-- CLI integration should wait until the collector can always return a stable result, including unavailable and unsupported states.
-- Rich classifications should be last because raw outputs and minimal facts already satisfy the milestone while deeper parser semantics need live validation.
+- Contract and claim boundaries come first because they define what every report can safely mean.
+- Docker selection must precede runtime evidence because evidence rows need deterministic requested coordinates.
+- uv/PyTorch coordination must land before live runtime claims because a ROCm container with the wrong wheel is a mixed stack, not a validated row.
+- Runtime report generation comes after probes and selectors so it can compare requested vs observed data.
+- Docs and validation close the loop because the main product value is trustworthy, auditable claim wording.
+
+### Research Flags
+
+Phases likely needing deeper research during planning:
+- **Phase 3:** exact PyTorch ROCm wheel availability for ROCm 7.0 and 7.2, Python 3.12/3.13 compatibility, and whether per-row locks or generated constraints are least costly.
+- **Phase 4:** live Triton ROCm compatibility, native HIP/C++ extension build readiness, and host-driver/container compatibility behavior across selected image tags.
+- **Phase 5:** CI/self-hosted AMD runner feasibility and any CDNA 3 validation plan.
+
+Phases with standard patterns (skip research-phase):
+- **Phase 1:** Pydantic sidecar contract, status enums, authority flags, and trace isolation follow existing repository patterns.
+- **Phase 2:** Dockerfile/script parameterization and device preflight are well-defined from current wrapper behavior.
+
+## Explicit Claim Boundary Language
+
+Use this wording in docs, reports, and release notes:
+
+- Passing Docker rows are **container ROCm user-space validated** on the recorded host driver/devices.
+- A Docker row is **not native host ROCm validated** unless the report came from a direct host validation mode.
+- Compatibility sidecars are **diagnostic compatibility evidence**. They are not correctness, timing, score, paper-parity, or leaderboard authority.
+- `torch.cuda` API names may appear in ROCm evidence because PyTorch exposes AMD GPUs through the CUDA-compatible namespace; this must not be described as CUDA/NVIDIA runtime support.
+- `mixed_version` means the requested ROCm row, container user-space, PyTorch ROCm wheel, Triton ROCm package, or host evidence do not align enough for a clean compatibility claim.
+- `pytorch_wheel_unavailable` means the dependency stack could not be resolved for the requested row; it is not a benchmark failure.
+- `runtime_unavailable` means the container/dependency stack could not access the required ROCm runtime or GPU devices; benchmark results should be absent or clearly separated.
+- Hardware validation is architecture-specific and requires archived device evidence for that `gfx*` target.
+
+Required claim flags for Docker compatibility entries:
+
+| Flag | Required Behavior |
+|------|-------------------|
+| `container_user_space_validated` | `true` only when the selected Docker entry passed required probes. |
+| `native_host_validated` | `true` only for direct host validation; normally `false` for Docker rows. |
+| `hardware_validated` | `true` only when real device evidence for that architecture is archived. |
+| `paper_parity_authority` | Always `false` for v1.18 compatibility sidecars. |
+| `score_authority` | Always `false`. |
+| `leaderboard_authority` | Always `false`. |
+| `diagnostic_compatibility_evidence` | Always `true` for these sidecars. |
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Existing Python/Pydantic/Click/toolchain-router stack is sufficient; official docs support `llvm-objdump`, `readelf`, HIP code objects, and RGA as optional. |
-| Features | HIGH | Repo-local milestone scope, v1.14 sidecar precedent, and v1.16 routing foundation strongly define table stakes and exclusions. |
-| Architecture | HIGH | Existing compile/evaluate split and environment/profile sidecar pattern make the insertion point clear. |
-| Artifact discovery | MEDIUM | `benchmark_kernel.so` is stable, but standalone HSACO/code-object intermediates from PyTorch ROCm builds must be validated live. |
-| Extractor behavior | MEDIUM | Generic object-tool behavior is documented; exact RGA/`roc-objdump` packaging and output shape are distribution-dependent. |
-| Pitfalls | HIGH | Risks are grounded in local code/docs/tests plus known ROCm tool packaging variability. |
+| Stack | MEDIUM-HIGH | Repo integration points are clear; exact Docker tags and PyTorch ROCm wheel availability must be verified during implementation. |
+| Features | HIGH | Table stakes, statuses, sidecars, and claim boundaries are strongly supported by repo patterns and milestone scope. |
+| Architecture | HIGH | Existing CLI, environment sidecars, doctor diagnostics, Docker wrapper, and reporting boundaries give a clear integration path. |
+| Pitfalls | HIGH | Risks are grounded in current code, Docker/ROCm runtime behavior, uv semantics, and existing claim-guardrail docs. |
 
-**Overall confidence:** HIGH for the roadmap shape; MEDIUM for exact live extractor and artifact details.
+**Overall confidence:** MEDIUM-HIGH
 
 ### Gaps To Address
 
-- Live HIP/C++ artifact shape: validate one RDNA 4 build tree and record whether code objects are embedded in `.so`, emitted as `.hsaco`, or only visible through object metadata.
-- RGA command behavior: fixture-capture actual `rga --help`, version, and binary-analysis output before enabling rich resource parsing.
-- `roc-objdump` availability: probe in the project ROCm container and keep it optional unless packaging is proven stable.
-- Triton artifact stability: defer or explicitly mark unsupported until a stable ROCm/Triton cache-to-solution mapping exists.
-- CDNA 3 claims: keep schema/routing support separate from live CDNA 3 validation unless hardware checks are run.
+- PyTorch ROCm wheel matrix: verify available torch/torchvision/triton-rocm versions for ROCm 7.0, 7.1, and 7.2 with Python `>=3.12,<3.14`.
+- Lockfile workflow: decide whether v1.18 uses only default ROCm 7.1 lock plus per-row checks, generated lock artifacts, or constraints.
+- Host-driver compatibility: record actual host driver/runtime evidence and validate which selected containers can run on the available host.
+- Triton ROCm readiness: test separately from PyTorch import/device availability.
+- Image digest capture: determine how reliably `scripts/run_docker.sh` can capture resolved digests for built/pulled images.
+- CDNA 3 coverage: keep claims deferred unless live CDNA 3 evidence is archived.
 
 ## Sources
 
 ### Primary (HIGH confidence)
 
-- `.planning/PROJECT.md` - v1.17 goal, target features, explicit deferrals, and milestone boundaries.
-- `.planning/research/STACK.md` - recommended stack additions, tool priorities, sidecar fields, and dependency exclusions.
-- `.planning/research/FEATURES.md` - user/operator feature contract, table stakes, differentiators, anti-features, and status semantics.
-- `.planning/research/ARCHITECTURE.md` - integration point, component boundaries, data flow, path rules, and phase build order.
-- `.planning/research/PITFALLS.md` - critical pitfalls, phase warnings, verification guidance, and guardrail strategy.
-- `src/sol_execbench/core/toolchain.py` - v1.16 routing schema, lifecycle/status vocabulary, static artifact types, and dynamic probes.
-- `src/sol_execbench/driver/problem_packager.py` and `src/sol_execbench/driver/templates/build_ext.py` - HIP/C++ staging and PyTorch ROCm extension build flow.
-- `src/sol_execbench/cli/main.py` - existing environment/profile sidecar pattern and CLI orchestration boundary.
-- `docs/CLAIMS.md` and `docs/rocm_toolchain_routing.md` - claim boundaries and routing documentation.
+- `.planning/research/STACK.md` - stack additions, version/dependency strategy, integration boundaries, risks, and exclusions.
+- `.planning/research/FEATURES.md` - table stakes, differentiators, out-of-scope items, status vocabulary, reason codes, and acceptance signals.
+- `.planning/research/ARCHITECTURE.md` - current integration points, proposed components, data flow, build order, and test strategy.
+- `.planning/research/PITFALLS.md` - critical pitfalls, phase placement, guardrails, and verification warnings.
+- Local repo files referenced by research: `pyproject.toml`, `docker/Dockerfile`, `scripts/run_docker.sh`, `src/sol_execbench/core/environment.py`, `src/sol_execbench/cli/main.py`, `docs/CLAIMS.md`, `docs/CONFIGURATION.md`, `docs/TESTING.md`, `docs/rocm.md`, `tests/docker/dependencies/`.
 
 ### External (MEDIUM/HIGH confidence)
 
-- AMD HIP compiler documentation - HIP compiler/code-object concepts and ROCm binary context.
-- ROCm compiler reference - `hipcc`, `amdclang++`, `--offload-arch`, and offload architecture tooling.
-- LLVM AMDGPU usage documentation - AMDGPU code object and metadata background.
-- LLVM `llvm-objdump` command guide - object/final-image inspection, headers, symbols, disassembly, and offload visibility.
-- GNU binutils `readelf` documentation - ELF headers, sections, notes, and symbols.
-- GPUOpen Radeon GPU Analyzer manual/repository - RGA binary-analysis capability; local command/output validation still required.
+- AMD ROCm Docker and container runtime documentation - host kernel/driver sharing, `/dev/kfd`, `/dev/dri`, Docker Desktop/rootless limitations, and driver/runtime compatibility caveats.
+- AMD Docker Hub `rocm/dev-ubuntu-24.04` tags - available ROCm dev image tags for selected rows.
+- PyTorch previous versions and ROCm wheel-index docs - ROCm wheel index patterns and current/default ROCm 7.1 install commands.
+- uv documentation - explicit indexes, package-to-index pinning, and index strategy behavior.
+- AMD ROCm PyTorch install docs - PyTorch/ROCm Docker install examples and validated image inventories.
 
 ---
-*Research completed: 2026-05-25*
+*Research completed: 2026-05-28*
 *Ready for roadmap: yes*
