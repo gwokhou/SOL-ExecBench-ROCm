@@ -167,14 +167,26 @@ class MatrixPythonDependencyEvidence(BaseModelWithDocstrings):
 
     python_version: str | None = None
     """Observed Python version."""
+    torch_distribution_version: str | None = None
+    """Observed installed torch distribution version."""
     torch_version: str | None = None
     """Observed torch.__version__ value."""
+    torch_local_version: str | None = None
+    """Observed torch local-version tag, such as rocm7.1."""
     torch_rocm_target: str | None = None
     """Observed PyTorch ROCm wheel target when known."""
     torch_hip_version: str | None = None
     """Observed torch.version.hip value."""
     torch_cuda_version: str | None = None
     """Observed torch.version.cuda value."""
+    torch_device_available: bool | None = None
+    """Whether PyTorch reported ROCm/CUDA device availability."""
+    torch_import_error: str | None = None
+    """Torch import error when runtime probing failed."""
+    torchvision_distribution_version: str | None = None
+    """Observed installed torchvision distribution version."""
+    triton_rocm_distribution_version: str | None = None
+    """Observed installed triton-rocm distribution version."""
     triton_rocm_status: str | None = None
     """Observed Triton ROCm package or availability status."""
 
@@ -211,6 +223,8 @@ class MatrixToolchainEvidence(BaseModelWithDocstrings):
 
     hipcc_version: str | None = None
     """Observed hipcc version output when available."""
+    toolchain_rocm_version: str | None = None
+    """Observed ROCm toolchain version when parsed separately."""
     rocm_agent_enumerator_version: str | None = None
     """Observed rocm_agent_enumerator version when available."""
     rocminfo_version: str | None = None
