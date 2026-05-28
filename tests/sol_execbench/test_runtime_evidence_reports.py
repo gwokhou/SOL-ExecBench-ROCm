@@ -7,6 +7,7 @@ from pathlib import Path
 
 from sol_execbench.core.data.trace import Trace
 from sol_execbench.core.docker_matrix import load_docker_target_manifest
+from sol_execbench.core import runtime_evidence
 from sol_execbench.core.runtime_evidence import (
     RuntimeFailureEvidence,
     build_aggregate_report,
@@ -47,6 +48,27 @@ def _matching_observation():
         hipcc_version="HIP version: 7.1.1",
         toolchain_rocm_version="7.1.1",
     )
+
+
+def test_dependency_observation_preserves_auto_collected_container_versions(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        runtime_evidence,
+        "collect_pytorch_dependency_observation",
+        lambda: build_dependency_observation(
+            torch_distribution_version="2.10.0+rocm7.1",
+            container_rocm_user_space_version="7.1.1",
+            hipcc_version="HIP version: 7.1.1",
+            toolchain_rocm_version="7.1.1",
+        ),
+    )
+
+    observation = build_dependency_observation()
+
+    assert observation.container_rocm_user_space_version == "7.1.1"
+    assert observation.hipcc_version == "HIP version: 7.1.1"
+    assert observation.toolchain_rocm_version == "7.1.1"
 
 
 def test_runtime_entry_keeps_observed_evidence_scopes_separate() -> None:
@@ -91,6 +113,21 @@ def test_runtime_entry_keeps_observed_evidence_scopes_separate() -> None:
     assert observed["gpu"]["device_name"] == "AMD Radeon"
     assert observed["gpu"]["gfx_architecture"] == "gfx1200"
     assert observed["gpu"]["visible_device_environment"] == {"HIP_VISIBLE_DEVICES": "0"}
+
+
+def test_runtime_entry_can_record_container_validation_after_success() -> None:
+    entry = build_runtime_matrix_entry(
+        target=_target(),
+        dependency_observation=_matching_observation(),
+        container_validated=True,
+    )
+    payload = entry.model_dump(mode="json")
+
+    assert payload["status"] == "container_validated"
+    assert payload["reason_code"] == "container_user_space_validated"
+    assert payload["claim_boundary"]["container_user_space_validated"] is True
+    assert payload["claim_boundary"]["native_host_validated"] is False
+    assert payload["claim_boundary"]["score_authority"] is False
 
 
 def test_writes_per_target_sidecar_and_aggregate_status_counts(tmp_path: Path) -> None:
@@ -207,6 +244,7 @@ def test_runtime_evidence_cli_collects_and_aggregates(tmp_path: Path) -> None:
             "HIP version: 7.1.1",
             "--toolchain-rocm-version",
             "7.1.1",
+            "--container-validated",
             "--device-count",
             "1",
             "--device-name",
@@ -224,6 +262,7 @@ def test_runtime_evidence_cli_collects_and_aggregates(tmp_path: Path) -> None:
     )
     payload = json.loads(collect.stdout)
     assert entry_path.is_file()
+    assert payload["status"] == "container_validated"
     assert payload["observed"]["gpu"]["gfx_architecture"] == "gfx1200"
     assert payload["artifacts"][0]["kind"] == "runtime_evidence_dependency"
 
@@ -243,7 +282,7 @@ def test_runtime_evidence_cli_collects_and_aggregates(tmp_path: Path) -> None:
     )
     report = json.loads(aggregate.stdout)
     assert report_path.is_file()
-    assert report["status_counts"] == {"not_tested": 1}
+    assert report["status_counts"] == {"container_validated": 1}
 
 
 def test_runtime_evidence_cli_rejects_invalid_boolean_without_traceback(

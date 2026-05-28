@@ -6,6 +6,7 @@ import argparse
 import importlib.metadata
 import json
 import platform
+import subprocess
 from pathlib import Path
 from typing import Any
 from typing import Literal
@@ -235,7 +236,38 @@ def collect_pytorch_dependency_observation() -> PytorchDependencyObservation:
         torchvision_distribution_version=torchvision_distribution_version,
         triton_rocm_distribution_version=triton_rocm_distribution_version,
         triton_rocm_status=triton_rocm_status,
+        container_rocm_user_space_version=_collect_rocm_version_file(),
+        hipcc_version=_collect_command_output(["hipcc", "--version"]),
+        toolchain_rocm_version=_collect_rocm_version_file(),
     )
+
+
+def _collect_rocm_version_file() -> str | None:
+    for path in (
+        Path("/opt/rocm/.info/version"),
+        Path("/opt/rocm/.info/version-dev"),
+    ):
+        try:
+            version = path.read_text(encoding="utf-8").strip()
+        except OSError:
+            continue
+        if version:
+            return version
+    return None
+
+
+def _collect_command_output(command: list[str]) -> str | None:
+    try:
+        completed = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return None
+    output = (completed.stdout or completed.stderr).strip()
+    return output or None
 
 
 def classify_dependency_preflight(

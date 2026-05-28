@@ -119,6 +119,7 @@ The `--lock-clocks` CLI flag overrides the loaded config by setting
 | `ROCM_DOCKER_TAG` | Selected target ID for unknown-target override | Docker image tag override when unknown targets are explicitly allowed. |
 | `SOL_EXECBENCH_ALLOW_MIXED_VERSION_DEPENDENCIES` | `0` | Allows dependency probe diagnostics for mixed-version stacks. |
 | `SOL_EXECBENCH_ALLOW_UNTESTED_TARGET_SMOKE` | `0` | Allows `not_tested` Targets to run smoke/E2E commands while preserving non-authoritative compatibility claims. |
+| `SOL_EXECBENCH_RECORD_CONTAINER_VALIDATION` | `0` | Records a successful target-container wrapper benchmark as `container_validated` compatibility evidence after verifying the dependency stack inside the selected image. |
 | `SOL_EXECBENCH_COMPATIBILITY_ENTRY` | Unset | Optional per-target compatibility JSON sidecar path. |
 | `SOL_EXECBENCH_COMPATIBILITY_MATRIX` | Unset | Optional aggregate compatibility matrix JSON path. |
 | `SOL_EXECBENCH_RUN_DOCKER_DRY_RUN` | `0` | Enables dry-run behavior used by tests and diagnostics. |
