@@ -84,14 +84,14 @@
 
 **Active milestone:** v1.20 Cross-Report Consistency and Evaluation Stability.
 
-**Status:** Phase 89 complete; ready to plan Phase 90.
+**Status:** Phase 90 complete; ready to plan Phase 91.
 
-**Next step:** Start Phase 90 with `/gsd-plan-phase 90`.
+**Next step:** Start Phase 91 with `/gsd-plan-phase 91`.
 
 ## Phases
 
 - [x] **Phase 89: Cross-Report Consistency Contract And Lint** - Researchers can detect contradictions across current evidence sidecars without changing benchmark contracts.
-- [ ] **Phase 90: Evaluation Stability Evidence** - Researchers can inspect timing quality, variance, clock policy, and backend risk through a sidecar-only stability report.
+- [x] **Phase 90: Evaluation Stability Evidence** - Researchers can inspect timing quality, variance, clock policy, and backend risk through a sidecar-only stability report.
 - [ ] **Phase 91: Claim Upgrade Rules And Authority Gates** - Researchers can evaluate whether evidence satisfies explicit prerequisites for stronger validation and authority claims.
 - [ ] **Phase 92: Trust Summary Integration** - Researchers can generate a concise JSON/Markdown trust summary that combines consistency, stability, closure, denominator, Matrix, score, and bound status.
 - [ ] **Phase 93: Documentation, Examples, And Guardrail Tests** - Public docs, fixtures, and CPU-safe/ROCm guardrails make v1.20 artifacts interpretable and claim-safe.
@@ -122,7 +122,9 @@
   3. Stability summaries compute deterministic dispersion metrics from existing timing evidence without changing trace JSONL or score behavior.
   4. A focused ROCm E2E path demonstrates real HIP/C++ or PyTorch ROCm timing evidence can emit or validate stability diagnostics.
   5. Documentation and tests preserve the boundary that stability supports interpretation but does not create correctness, score, paper-parity, native-host, or leaderboard authority.
-**Plans**: TBD
+**Plans**:
+  - [x] 90-01 Stability Report Contract
+  - [x] 90-02 Stability Script And Guardrails
 
 ### Phase 91: Claim Upgrade Rules And Authority Gates
 **Goal**: Researchers can evaluate machine-readable prerequisites for diagnostic-only, container-validated, native-host-validated, score-authoritative, paper-parity-candidate, and leaderboard-ready claims.
@@ -166,7 +168,7 @@ Phases execute in numeric order: 89 -> 90 -> 91 -> 92 -> 93.
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 89. Cross-Report Consistency Contract And Lint | 2/2 | Complete | 2026-05-31 |
-| 90. Evaluation Stability Evidence | 0/TBD | Not started | — |
+| 90. Evaluation Stability Evidence | 2/2 | Complete | 2026-05-31 |
 | 91. Claim Upgrade Rules And Authority Gates | 0/TBD | Not started | — |
 | 92. Trust Summary Integration | 0/TBD | Not started | — |
 | 93. Documentation, Examples, And Guardrail Tests | 0/TBD | Not started | — |
