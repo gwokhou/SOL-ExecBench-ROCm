@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.19
 milestone_name: Research Credibility Without New Hardware
 status: verifying
-stopped_at: Completed Phase 83
-last_updated: "2026-05-31T07:38:47.739Z"
-last_activity: 2026-05-31 - Completed Phase 83 with verification passed.
+stopped_at: Completed 84-01-PLAN.md
+last_updated: "2026-05-31T08:31:09.610Z"
+last_activity: 2026-05-31
 progress:
   total_phases: 6
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  total_plans: 4
+  completed_plans: 3
   percent: 17
 ---
 
@@ -27,10 +27,10 @@ See: `.planning/PROJECT.md` (updated 2026-05-31)
 
 Phase: 83 of 88 (Closure Contracts And Provenance Foundation)
 Plan: 2 of 2
-Status: Phase complete - verified
-Last activity: 2026-05-31 - Completed Phase 83 with verification passed.
+Status: Phase complete — ready for verification
+Last activity: 2026-05-31
 
-Progress: [██████████] 100%
+Progress: [████████░░] 75%
 
 ## Performance Metrics
 
@@ -58,6 +58,7 @@ Progress: [██████████] 100%
 
 | Phase 83 P01 | 403s | 2 tasks | 2 files |
 | Phase 83 P02 | 403s | 3 tasks | 4 files |
+| Phase 84 P01 | 352 | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -70,6 +71,8 @@ Progress: [██████████] 100%
 - Denominator, Matrix, Docker, and AMD SOL/SOLAR reports must keep paper parity, score authority, leaderboard authority, native-host validation, and new-hardware validation claims false unless future evidence upgrades them.
 - [Phase 83]: scripts/run_dataset.py delegates execution closure status, totals, record validation, report construction, and writing to core helpers without adding resume/reuse enforcement.
 - [Phase 83]: Execution closure remains a sidecar-only sol_execbench.execution_closure.v1 contract.
+- [Phase 84]: [Phase 84 Plan 01]: Paper denominator accounting remains a sidecar-only report and does not change canonical benchmark schemas.
+- [Phase 84]: [Phase 84 Plan 01]: Missing evidence is accounted as evidence_missing/deferred and never upgraded into validation, score, leaderboard, paper, SOLAR, native-host, or new-hardware authority.
 
 ### Pending Todos
 
@@ -91,6 +94,6 @@ None found.
 
 ## Session Continuity
 
-Last session: 2026-05-31T07:37:32.584Z
-Stopped at: Completed Phase 83
+Last session: 2026-05-31T08:31:09.128Z
+Stopped at: Completed 84-01-PLAN.md
 Resume file: None

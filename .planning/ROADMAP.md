@@ -117,7 +117,7 @@
   4. Researcher can read deterministic Markdown counts, evidence gaps, deferred buckets, and next-evidence hints with paper parity, upstream SOLAR parity, leaderboard authority, native-host validation, and new-hardware validation explicitly kept false.
 **Plans**: 2 plans
 Plans:
-- [ ] 84-01-PLAN.md — Core paper denominator sidecar contract, deterministic JSON, Markdown renderer, bounded source refs, and false claim boundaries.
+- [x] 84-01-PLAN.md — Core paper denominator sidecar contract, deterministic JSON, Markdown renderer, bounded source refs, and false claim boundaries.
 - [ ] 84-02-PLAN.md — Thin reporting script, dataset exports, script output tests, and public contract guardrails.
 
 ### Phase 85: Compatibility Matrix Schema Export And Semantic Diff
@@ -176,7 +176,7 @@ Phases execute in numeric order: 83 -> 84 -> 85 -> 86 -> 87 -> 88.
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 83. Closure Contracts And Provenance Foundation | 2/2 | Complete   | 2026-05-31 |
-| 84. Paper Denominator Accounting And Claim Boundaries | 0/TBD | Not started | - |
+| 84. Paper Denominator Accounting And Claim Boundaries | 1/2 | In Progress|  |
 | 85. Compatibility Matrix Schema Export And Semantic Diff | 0/TBD | Not started | - |
 | 86. Dataset Runner Hardening Integration | 0/TBD | Not started | - |
 | 87. AMD SOL/SOLAR Bound Sanity Evidence | 0/TBD | Not started | - |
