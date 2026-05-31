@@ -164,40 +164,40 @@ ExecBench.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CLOS-01 | TBD | Pending |
-| CLOS-02 | TBD | Pending |
-| CLOS-03 | TBD | Pending |
-| CLOS-04 | TBD | Pending |
-| DENOM-01 | TBD | Pending |
-| DENOM-02 | TBD | Pending |
-| DENOM-03 | TBD | Pending |
-| DENOM-04 | TBD | Pending |
-| DENOM-05 | TBD | Pending |
-| MATRIX-01 | TBD | Pending |
-| MATRIX-02 | TBD | Pending |
-| MATRIX-03 | TBD | Pending |
-| MATRIX-04 | TBD | Pending |
-| MATRIX-05 | TBD | Pending |
-| RUNNER-01 | TBD | Pending |
-| RUNNER-02 | TBD | Pending |
-| RUNNER-03 | TBD | Pending |
-| RUNNER-04 | TBD | Pending |
-| RUNNER-05 | TBD | Pending |
-| SANITY-01 | TBD | Pending |
-| SANITY-02 | TBD | Pending |
-| SANITY-03 | TBD | Pending |
-| SANITY-04 | TBD | Pending |
-| DOCS-01 | TBD | Pending |
-| DOCS-02 | TBD | Pending |
-| DOCS-03 | TBD | Pending |
-| DOCS-04 | TBD | Pending |
-| DOCS-05 | TBD | Pending |
+| CLOS-01 | Phase 83 | Pending |
+| CLOS-02 | Phase 83 | Pending |
+| CLOS-03 | Phase 83 | Pending |
+| CLOS-04 | Phase 83 | Pending |
+| DENOM-01 | Phase 84 | Pending |
+| DENOM-02 | Phase 84 | Pending |
+| DENOM-03 | Phase 84 | Pending |
+| DENOM-04 | Phase 84 | Pending |
+| DENOM-05 | Phase 84 | Pending |
+| MATRIX-01 | Phase 85 | Pending |
+| MATRIX-02 | Phase 85 | Pending |
+| MATRIX-03 | Phase 85 | Pending |
+| MATRIX-04 | Phase 85 | Pending |
+| MATRIX-05 | Phase 85 | Pending |
+| RUNNER-01 | Phase 86 | Pending |
+| RUNNER-02 | Phase 86 | Pending |
+| RUNNER-03 | Phase 86 | Pending |
+| RUNNER-04 | Phase 86 | Pending |
+| RUNNER-05 | Phase 86 | Pending |
+| SANITY-01 | Phase 87 | Pending |
+| SANITY-02 | Phase 87 | Pending |
+| SANITY-03 | Phase 87 | Pending |
+| SANITY-04 | Phase 87 | Pending |
+| DOCS-01 | Phase 88 | Pending |
+| DOCS-02 | Phase 88 | Pending |
+| DOCS-03 | Phase 88 | Pending |
+| DOCS-04 | Phase 88 | Pending |
+| DOCS-05 | Phase 88 | Pending |
 
 **Coverage:**
 - v1 requirements: 28 total
-- Mapped to phases: 0
-- Unmapped: 28
+- Mapped to phases: 28
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-05-31*
-*Last updated: 2026-05-31 after v1.19 research synthesis*
+*Last updated: 2026-05-31 after v1.19 roadmap creation*
