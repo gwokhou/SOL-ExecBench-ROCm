@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import ConfigDict, ValidationError
 
@@ -112,15 +112,15 @@ class MatrixReportDiff(BaseModelWithDocstrings):
 
     schema_version: str = ROCM_COMPATIBILITY_MATRIX_DIFF_SCHEMA_VERSION
     """Matrix diff artifact schema version."""
-    diagnostic_compatibility_evidence: bool = True
+    diagnostic_compatibility_evidence: Literal[True] = True
     """Diff output is diagnostic compatibility evidence only."""
-    score_authority: bool = False
+    score_authority: Literal[False] = False
     """Diff output never grants benchmark score authority."""
-    paper_parity_authority: bool = False
+    paper_parity_authority: Literal[False] = False
     """Diff output never grants paper-parity authority."""
-    leaderboard_authority: bool = False
+    leaderboard_authority: Literal[False] = False
     """Diff output never grants leaderboard authority."""
-    native_host_validation_authority: bool = False
+    native_host_validation_authority: Literal[False] = False
     """Diff output never upgrades container evidence to native-host validation."""
     old_report: MatrixReportRef
     """Old Matrix report reference."""
@@ -303,13 +303,25 @@ def _gpu_architecture_drift(
 
 
 def _image_dependency_drift(changes: dict[str, dict[str, Any]]) -> bool:
-    return any(
+    if any(
         group in changes
         for group in (
             "observed.container",
             "observed.python_dependency",
             "observed.dependency_policy",
         )
+    ):
+        return True
+    target_change = changes.get("target")
+    if target_change is None:
+        return False
+    old_target = target_change["old"] or {}
+    new_target = target_change["new"] or {}
+    return (
+        old_target.get("docker_image_repository")
+        != new_target.get("docker_image_repository")
+        or old_target.get("docker_image_tag")
+        != new_target.get("docker_image_tag")
     )
 
 
@@ -500,7 +512,13 @@ def load_matrix_report(path_or_payload: str | Path | dict[str, Any]) -> RocmComp
 def _markdown_value(value: Any) -> str:
     if value is None:
         return ""
-    return json.dumps(value, sort_keys=True)
+    return (
+        json.dumps(value, sort_keys=True)
+        .replace("\\", "\\\\")
+        .replace("|", "\\|")
+        .replace("\n", " ")
+        .replace("\r", " ")
+    )
 
 
 def matrix_report_diff_to_markdown(diff: MatrixReportDiff) -> str:
