@@ -53,7 +53,6 @@ from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.trace import Trace
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.dataset.execution_closure import (
-    EXECUTION_CLOSURE_SCHEMA_VERSION,
     ExecutionClosureReasonCode,
     ExecutionClosureRecord,
     ExecutionClosureStatus,
@@ -330,24 +329,31 @@ def run_cli(
     return traces
 
 
+_CLI_LOG_LIMIT = 64 * 1024
+
+
+def _bounded_cli_stream(value: str | bytes | None) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        text = value.decode(errors="replace")
+    else:
+        text = value
+    if len(text) <= _CLI_LOG_LIMIT:
+        return text
+    return text[:_CLI_LOG_LIMIT] + "\n[truncated CLI output]\n"
+
+
 def _save_cli_log(output_dir: Path, job_name: str, result: subprocess.CompletedProcess):
     """Write stdout/stderr from a failed CLI invocation to a log file."""
     log_path = output_dir / f"{job_name}_cli.log"
     parts = [
         f"exit code: {result.returncode}",
-        f"\n--- stdout ---\n{result.stdout}" if result.stdout else "",
-        f"\n--- stderr ---\n{result.stderr}" if result.stderr else "",
+        f"\n--- stdout ---\n{_bounded_cli_stream(result.stdout)}" if result.stdout else "",
+        f"\n--- stderr ---\n{_bounded_cli_stream(result.stderr)}" if result.stderr else "",
     ]
     log_path.write_text("\n".join(parts))
     print(f"Saved CLI log to {log_path}")
-
-
-def _timeout_stream_text(value: str | bytes | None) -> str:
-    if value is None:
-        return ""
-    if isinstance(value, bytes):
-        return value.decode(errors="replace")
-    return value
 
 
 def _save_cli_timeout_log(
@@ -359,8 +365,8 @@ def _save_cli_timeout_log(
     log_path = output_dir / f"{job_name}_cli.log"
     parts = [
         f"timeout after {exc.timeout} seconds",
-        f"\n--- stdout ---\n{_timeout_stream_text(exc.output)}" if exc.output else "",
-        f"\n--- stderr ---\n{_timeout_stream_text(exc.stderr)}" if exc.stderr else "",
+        f"\n--- stdout ---\n{_bounded_cli_stream(exc.output)}" if exc.output else "",
+        f"\n--- stderr ---\n{_bounded_cli_stream(exc.stderr)}" if exc.stderr else "",
     ]
     log_path.write_text("\n".join(parts))
     print(f"Saved CLI log to {log_path}")
@@ -369,10 +375,13 @@ def _save_cli_timeout_log(
 def _cli_failure_notes(cli_log: Path) -> list[str]:
     if not cli_log.exists():
         return ["CLI returned no traces"]
-    first_line = cli_log.read_text(errors="replace").splitlines()[0:1]
-    if not first_line:
+    try:
+        with cli_log.open(errors="replace") as handle:
+            message = handle.readline().strip()
+    except OSError:
         return ["CLI returned no traces"]
-    message = first_line[0]
+    if not message:
+        return ["CLI returned no traces"]
     if message.startswith("exit code: "):
         try:
             exit_code = int(message.removeprefix("exit code: ").strip())
@@ -1513,13 +1522,33 @@ def main():
             if not selected_workload_refs:
                 continue
 
-        # Skip problems that already have passing results only when prior closure provenance matches.
+        # Preserve ordinary resume behavior unless closure provenance is part of the contract.
         if not args.rerun and traces_path.exists():
             traces = json.loads(traces_path.read_text())
             summary = inspect_traces(traces, f"{category}/{problem_name}")
             if summary["failed"] == 0:
+                if execution_closure_path is None:
+                    if (
+                        args.amd_score_report is not None
+                        or args.amd_sol_bound_dir is not None
+                        or args.solar_derivation is not None
+                    ):
+                        _extend_derived_reports_for_problem(
+                            amd_scores=amd_scores,
+                            definition_path=definition_path,
+                            workload_path=workload_path,
+                            traces_path=traces_path,
+                            traces_payload=traces,
+                            output_dir=output_dir,
+                            baseline_artifact=scoring_baseline,
+                            sol_bound_artifact_dir=args.amd_sol_bound_dir,
+                            solar_derivation_dir=args.solar_derivation,
+                        )
+                    print("  Skipping (already passed). Use --rerun to re-evaluate.")
+                    summaries.append(summary)
+                    continue
                 prior_provenance, stale_mismatch = _prior_closure_provenance(
-                    output_dir / "execution_closure.json"
+                    execution_closure_path
                 )
                 reuse_mismatches = (
                     [stale_mismatch]
