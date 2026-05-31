@@ -197,12 +197,12 @@ def _entry(
     )
 
 
-def _report(entries):
+def _report(entries, *, generated_at: str = "2026-05-31T09:00:00Z"):
     counts: dict[MatrixCompatibilityStatus, int] = {}
     for entry in entries:
         counts[entry.status] = counts.get(entry.status, 0) + 1
     return RocmCompatibilityMatrixReport(
-        generated_at="2026-05-31T09:00:00Z",
+        generated_at=generated_at,
         entries=list(entries),
         status_counts=counts,
     )
@@ -327,6 +327,38 @@ def test_matrix_diff_normalizes_input_and_artifact_ordering():
     assert diff["entry_diffs"][0]["kind"] == "unchanged"
     assert diff["entry_diffs"][0]["semantic_changes"] == {}
     assert json.dumps(diff, sort_keys=True) == json.dumps(
+        diff_matrix_reports(old, new).to_dict(),
+        sort_keys=True,
+    )
+
+
+def test_matrix_diff_reports_clock_evidence_metadata_without_entry_churn():
+    entry = _entry("target-a")
+    old = _report([entry], generated_at="2026-05-31T09:00:00Z")
+    new = _report([entry], generated_at="2026-05-31T10:00:00Z")
+
+    diff = diff_matrix_reports(old, new)
+    payload = diff.to_dict()
+    markdown = matrix_report_diff_to_markdown(diff)
+
+    assert payload["summary_counts"] == {
+        "added": 0,
+        "changed": 0,
+        "removed": 0,
+        "unchanged": 1,
+    }
+    assert payload["entry_diffs"][0]["kind"] == "unchanged"
+    assert payload["entry_diffs"][0]["semantic_changes"] == {}
+    assert payload["report_semantic_changes"] == {
+        "clock_evidence_metadata": {
+            "old": {"generated_at": "2026-05-31T09:00:00Z"},
+            "new": {"generated_at": "2026-05-31T10:00:00Z"},
+        }
+    }
+    assert "clock_evidence_metadata" in markdown
+    assert "2026-05-31T09:00:00Z" in markdown
+    assert "2026-05-31T10:00:00Z" in markdown
+    assert json.dumps(payload, sort_keys=True) == json.dumps(
         diff_matrix_reports(old, new).to_dict(),
         sort_keys=True,
     )

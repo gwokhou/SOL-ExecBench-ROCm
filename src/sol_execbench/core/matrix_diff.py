@@ -128,6 +128,8 @@ class MatrixReportDiff(BaseModelWithDocstrings):
     """New Matrix report reference."""
     summary_counts: dict[str, int]
     """Counts by added, removed, unchanged, and changed buckets."""
+    report_semantic_changes: dict[str, dict[str, Any]] = {}
+    """Report-level semantic changes, such as clock/evidence metadata drift."""
     entry_diffs: list[MatrixEntryDiff]
     """Per-entry semantic diffs."""
 
@@ -345,6 +347,22 @@ def _report_ref(report: RocmCompatibilityMatrixReport, label: str) -> MatrixRepo
     )
 
 
+def _report_semantic_changes(
+    old_report: RocmCompatibilityMatrixReport,
+    new_report: RocmCompatibilityMatrixReport,
+) -> dict[str, dict[str, Any]]:
+    old_metadata = {"generated_at": old_report.generated_at}
+    new_metadata = {"generated_at": new_report.generated_at}
+    if old_metadata == new_metadata:
+        return {}
+    return {
+        "clock_evidence_metadata": {
+            "old": old_metadata,
+            "new": new_metadata,
+        }
+    }
+
+
 def _entry_diff(
     *,
     key: str,
@@ -461,6 +479,7 @@ def diff_matrix_reports(
         old_report=_report_ref(old_report, old_label),
         new_report=_report_ref(new_report, new_label),
         summary_counts=counts,
+        report_semantic_changes=_report_semantic_changes(old_report, new_report),
         entry_diffs=entry_diffs,
     )
 
@@ -502,6 +521,16 @@ def matrix_report_diff_to_markdown(diff: MatrixReportDiff) -> str:
     ]
     for bucket in ("changed", "added", "removed", "unchanged"):
         lines.append(f"| {bucket} | {diff.summary_counts[bucket]} |")
+
+    if diff.report_semantic_changes:
+        lines.extend(["", "## Report Semantic Changes", ""])
+        lines.extend(["| Group | Old | New |", "|---|---|---|"])
+        for group in sorted(diff.report_semantic_changes):
+            change = diff.report_semantic_changes[group]
+            lines.append(
+                f"| {group} | {_markdown_value(change['old'])} | "
+                f"{_markdown_value(change['new'])} |"
+            )
 
     lines.extend(["", "## Entry Diffs", ""])
     for entry_diff in sorted(
