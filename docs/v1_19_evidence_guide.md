@@ -47,7 +47,7 @@ relative trace/log refs and concise bounded notes.
 Example command shape:
 
 ```bash
-UV_CACHE_DIR=/tmp/uv-cache uv run scripts/run_dataset.py \
+UV_CACHE_DIR=out/v1_19_demo/uv-cache uv run scripts/run_dataset.py \
   data/SOL-ExecBench/benchmark \
   --limit 5 \
   --output-dir out/v1_19_demo/run-dataset \
@@ -66,8 +66,9 @@ Interpretation:
 
 What it cannot prove:
 
-- no full 235-problem paper validation unless all 235 scoped paper problems are
-  actually accounted for with required evidence
+- no full 235-problem paper validation by this sidecar alone; a paper-validation
+  claim requires a separately reviewed complete evidence bundle as described in
+  `docs/CLAIMS.md`
 - no score authority
 - no leaderboard readiness
 - no new-hardware validation
@@ -82,7 +83,7 @@ missing, deferred, filtered, or unavailable.
 Example command shape:
 
 ```bash
-UV_CACHE_DIR=/tmp/uv-cache uv run scripts/report_paper_denominator.py \
+UV_CACHE_DIR=out/v1_19_demo/uv-cache uv run scripts/report_paper_denominator.py \
   --manifest out/v1_19_demo/manifest.json \
   --inventory out/v1_19_demo/inventory.json \
   --readiness out/v1_19_demo/readiness.json \
@@ -102,8 +103,9 @@ Interpretation:
 
 What it cannot prove:
 
-- no full 235-problem paper validation when any denominator records or required
-  evidence are absent
+- no full 235-problem paper validation by this report alone; a paper-validation
+  claim requires a separately reviewed complete evidence bundle as described in
+  `docs/CLAIMS.md`
 - no upstream SOLAR parity
 - no native-host ROCm Matrix validation
 - no CDNA 3/MI300X/CDNA4 validation
@@ -117,7 +119,7 @@ without running Docker, probing hardware, or changing benchmark semantics.
 Example command shape:
 
 ```bash
-UV_CACHE_DIR=/tmp/uv-cache uv run scripts/export_matrix_schema.py \
+UV_CACHE_DIR=out/v1_19_demo/uv-cache uv run scripts/export_matrix_schema.py \
   --output-dir out/v1_19_demo/matrix-schema
 ```
 
@@ -142,7 +144,7 @@ JSON/Markdown describing status, severity, and semantic field changes.
 Example command shape:
 
 ```bash
-UV_CACHE_DIR=/tmp/uv-cache uv run scripts/diff_matrix_reports.py \
+UV_CACHE_DIR=out/v1_19_demo/uv-cache uv run scripts/diff_matrix_reports.py \
   --before out/v1_19_demo/matrix.before.json \
   --after out/v1_19_demo/matrix.after.json \
   --json-output out/v1_19_demo/matrix_diff.json \
@@ -173,11 +175,12 @@ internally consistent enough to discuss as bounded diagnostic evidence.
 Example command shape:
 
 ```bash
-UV_CACHE_DIR=/tmp/uv-cache uv run scripts/report_amd_bound_sanity.py \
+UV_CACHE_DIR=out/v1_19_demo/uv-cache uv run scripts/report_amd_bound_sanity.py \
   --trace out/v1_19_demo/traces/demo.trace.jsonl \
   --execution-closure out/v1_19_demo/execution_closure.json \
-  --paper-denominator out/v1_19_demo/paper_denominator.json \
-  --matrix-report out/v1_19_demo/matrix.json \
+  --amd-sol-artifact out/v1_19_demo/amd-sol/demo.amd-sol-v2.json \
+  --solar-artifact out/v1_19_demo/solar/demo.solar-derivation.json \
+  --compatibility-matrix out/v1_19_demo/matrix.json \
   --amd-score-report out/v1_19_demo/amd_score.json \
   --json-output out/v1_19_demo/amd_bound_sanity.json \
   --markdown-output out/v1_19_demo/amd_bound_sanity.md
@@ -204,13 +207,13 @@ What it cannot prove:
 Use focused docs and contract guardrails for v1.19 wording:
 
 ```bash
-UV_CACHE_DIR=/tmp/uv-cache uv run pytest \
+UV_CACHE_DIR=out/v1_19_demo/uv-cache uv run pytest \
   tests/sol_execbench/test_research_release_docs.py \
   tests/sol_execbench/test_rocm_matrix_docs.py \
   tests/sol_execbench/test_public_contract_guardrails.py::test_v1_19_paper_denominator_fields_remain_sidecar_only \
   tests/sol_execbench/test_public_contract_guardrails.py::test_v1_19_amd_bound_sanity_fields_remain_sidecar_only -q
 
-UV_CACHE_DIR=/tmp/uv-cache uv run ruff check \
+UV_CACHE_DIR=out/v1_19_demo/uv-cache uv run ruff check \
   tests/sol_execbench/test_research_release_docs.py
 ```
 

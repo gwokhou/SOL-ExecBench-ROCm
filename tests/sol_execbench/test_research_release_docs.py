@@ -274,3 +274,25 @@ def test_v1_19_guide_keeps_canonical_contract_semantics_unchanged():
         "sidecars/reports only",
     ):
         assert required in text
+
+
+def test_v1_19_guide_uses_unconditional_paper_validation_boundaries():
+    text = _read_doc(V1_19_GUIDE)
+
+    assert "no full 235-problem paper validation by this sidecar alone" in text
+    assert "no full 235-problem paper validation by this report alone" in text
+    assert "unless all 235 scoped paper problems" not in text
+    assert "when any denominator records or required evidence are absent" not in text
+
+
+def test_v1_19_guide_uses_relative_demo_paths_and_real_script_options():
+    text = _read_doc(V1_19_GUIDE)
+
+    for forbidden in ("/home/", "/tmp/", "/var/"):
+        assert forbidden not in text
+    assert "UV_CACHE_DIR=out/v1_19_demo/uv-cache" in text
+    assert "--compatibility-matrix out/v1_19_demo/matrix.json" in text
+    assert "--amd-sol-artifact out/v1_19_demo/amd-sol/demo.amd-sol-v2.json" in text
+    assert "--solar-artifact out/v1_19_demo/solar/demo.solar-derivation.json" in text
+    assert "--paper-denominator" not in text
+    assert "--matrix-report" not in text
