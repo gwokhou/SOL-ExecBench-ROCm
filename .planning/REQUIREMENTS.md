@@ -45,21 +45,21 @@ ExecBench.
 
 ### Compatibility Matrix Tooling
 
-- [ ] **MATRIX-01**: The project can export JSON Schema for
+- [x] **MATRIX-01**: The project can export JSON Schema for
   `MatrixEntry` and `RocmCompatibilityMatrixReport` from the strict Pydantic
   models, including schema identity/version metadata and extra-field behavior.
-- [ ] **MATRIX-02**: The project can diff two ROCm Compatibility Matrix reports
+- [x] **MATRIX-02**: The project can diff two ROCm Compatibility Matrix reports
   by Target identity and validation scope, reporting added, removed,
   unchanged, and changed entries.
-- [ ] **MATRIX-03**: Matrix diffs classify semantic changes across status,
+- [x] **MATRIX-03**: Matrix diffs classify semantic changes across status,
   reason code, requested Target values, observed host/container/Python
   dependency/toolchain/GPU evidence, dependency policy, Docker image metadata,
   clock/evidence metadata, artifact refs, and claim boundaries.
-- [ ] **MATRIX-04**: Matrix diff output includes machine-readable JSON and a
+- [x] **MATRIX-04**: Matrix diff output includes machine-readable JSON and a
   human-readable summary with severity-ranked transitions such as validation
   downgrade, mixed-version drift, runtime unavailability, image/dependency
   drift, GPU architecture drift, and claim-boundary escalation.
-- [ ] **MATRIX-05**: Matrix schema export and diff tooling remain diagnostic and
+- [x] **MATRIX-05**: Matrix schema export and diff tooling remain diagnostic and
   cannot convert Docker container evidence into native-host validation, score
   authority, paper-parity authority, or leaderboard authority.
 
@@ -173,11 +173,11 @@ ExecBench.
 | DENOM-03 | Phase 84 | Complete |
 | DENOM-04 | Phase 84 | Complete |
 | DENOM-05 | Phase 84 | Complete |
-| MATRIX-01 | Phase 85 | Pending |
-| MATRIX-02 | Phase 85 | Pending |
-| MATRIX-03 | Phase 85 | Pending |
-| MATRIX-04 | Phase 85 | Pending |
-| MATRIX-05 | Phase 85 | Pending |
+| MATRIX-01 | Phase 85 | Complete |
+| MATRIX-02 | Phase 85 | Complete |
+| MATRIX-03 | Phase 85 | Complete |
+| MATRIX-04 | Phase 85 | Complete |
+| MATRIX-05 | Phase 85 | Complete |
 | RUNNER-01 | Phase 86 | Pending |
 | RUNNER-02 | Phase 86 | Pending |
 | RUNNER-03 | Phase 86 | Pending |
