@@ -17,6 +17,14 @@ from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION = (
     "sol_execbench.rocm_compatibility_matrix.v1"
 )
+MATRIX_ENTRY_JSON_SCHEMA_ID = (
+    "https://sol-execbench.local/schemas/"
+    f"{ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION}.matrix_entry.schema.json"
+)
+ROCM_COMPATIBILITY_MATRIX_REPORT_JSON_SCHEMA_ID = (
+    "https://sol-execbench.local/schemas/"
+    f"{ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION}.report.schema.json"
+)
 _MATRIX_MODEL_CONFIG = ConfigDict(
     extra="forbid",
     frozen=True,
@@ -468,6 +476,49 @@ class RocmCompatibilityMatrixReport(BaseModelWithDocstrings):
             raise ValueError("status_counts must match entries by status.")
 
         return self
+
+
+def _matrix_json_schema_with_metadata(
+    schema: dict[str, object],
+    *,
+    schema_id: str,
+) -> dict[str, object]:
+    enriched = dict(schema)
+    enriched["$id"] = schema_id
+    enriched["schema_version"] = ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION
+    enriched["x-sol-execbench-schema-version"] = (
+        ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION
+    )
+    return enriched
+
+
+def export_matrix_entry_json_schema() -> dict[str, object]:
+    """Return the strict diagnostic Matrix Entry JSON Schema."""
+
+    return _matrix_json_schema_with_metadata(
+        MatrixEntry.model_json_schema(),
+        schema_id=MATRIX_ENTRY_JSON_SCHEMA_ID,
+    )
+
+
+def export_rocm_compatibility_matrix_report_json_schema() -> dict[str, object]:
+    """Return the strict ROCm Compatibility Matrix report JSON Schema."""
+
+    return _matrix_json_schema_with_metadata(
+        RocmCompatibilityMatrixReport.model_json_schema(),
+        schema_id=ROCM_COMPATIBILITY_MATRIX_REPORT_JSON_SCHEMA_ID,
+    )
+
+
+def export_matrix_json_schemas() -> dict[str, dict[str, object]]:
+    """Return the Matrix schemas exported for downstream diagnostic tooling."""
+
+    return {
+        "matrix_entry": export_matrix_entry_json_schema(),
+        "rocm_compatibility_matrix_report": (
+            export_rocm_compatibility_matrix_report_json_schema()
+        ),
+    }
 
 
 def build_matrix_entry(
