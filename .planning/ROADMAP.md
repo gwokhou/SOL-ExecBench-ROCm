@@ -90,7 +90,7 @@
 - [x] **Phase 84: Paper Denominator Accounting And Claim Boundaries** - Researchers can account for the public benchmark denominator and evidence gaps without claiming paper parity. (completed 2026-05-31)
 - [x] **Phase 85: Compatibility Matrix Schema Export And Semantic Diff** - Researchers and downstream tools can export Matrix schemas and compare Matrix reports semantically. (completed 2026-05-31)
 - [x] **Phase 86: Dataset Runner Hardening Integration** - Dataset runs classify closure outcomes and resume behavior consistently without changing default benchmark semantics. (completed 2026-05-31)
-- [ ] **Phase 87: AMD SOL/SOLAR Bound Sanity Evidence** - Researchers can inspect diagnostic AMD bound sanity over existing RDNA 4 and Docker evidence only.
+- [x] **Phase 87: AMD SOL/SOLAR Bound Sanity Evidence** - Researchers can inspect diagnostic AMD bound sanity over existing RDNA 4 and Docker evidence only. (completed 2026-05-31)
 - [ ] **Phase 88: Documentation, Examples, And Guardrail Tests** - Public docs, examples, and CPU-safe tests keep v1.19 evidence surfaces interpretable and claim-safe.
 
 ## Phase Details
@@ -163,7 +163,7 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [x] 87-01-PLAN.md — Core `amd_bound_sanity.v1` contract, report builder, Markdown renderer, and CPU-safe tests.
-- [ ] 87-02-PLAN.md — Thin report script and public contract guardrails for sidecar-only diagnostic scope.
+- [x] 87-02-PLAN.md — Thin report script and public contract guardrails for sidecar-only diagnostic scope.
 
 ### Phase 88: Documentation, Examples, And Guardrail Tests
 **Goal**: Researchers can understand, reproduce, and safely interpret v1.19 evidence surfaces through documentation, representative examples, and CPU-safe tests that preserve public contracts and claim boundaries.
@@ -188,5 +188,5 @@ Phases execute in numeric order: 83 -> 84 -> 85 -> 86 -> 87 -> 88.
 | 84. Paper Denominator Accounting And Claim Boundaries | 2/2 | Complete   | 2026-05-31 |
 | 85. Compatibility Matrix Schema Export And Semantic Diff | 2/2 | Complete   | 2026-05-31 |
 | 86. Dataset Runner Hardening Integration | 2/2 | Complete   | 2026-05-31 |
-| 87. AMD SOL/SOLAR Bound Sanity Evidence | 1/2 | In Progress|  |
+| 87. AMD SOL/SOLAR Bound Sanity Evidence | 2/2 | Complete   | 2026-05-31 |
 | 88. Documentation, Examples, And Guardrail Tests | 0/TBD | Not started | - |
