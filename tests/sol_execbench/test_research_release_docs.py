@@ -291,8 +291,14 @@ def test_v1_19_guide_uses_relative_demo_paths_and_real_script_options():
     for forbidden in ("/home/", "/tmp/", "/var/"):
         assert forbidden not in text
     assert "UV_CACHE_DIR=out/v1_19_demo/uv-cache" in text
+    assert "--json-out out/v1_19_demo/matrix_diff.json" in text
+    assert "--markdown-out out/v1_19_demo/matrix_diff.md" in text
     assert "--compatibility-matrix out/v1_19_demo/matrix.json" in text
     assert "--amd-sol-artifact out/v1_19_demo/amd-sol/demo.amd-sol-v2.json" in text
     assert "--solar-artifact out/v1_19_demo/solar/demo.solar-derivation.json" in text
+    assert "--before" not in text
+    assert "--after" not in text
+    assert "--json-output out/v1_19_demo/matrix_diff.json" not in text
+    assert "--markdown-output out/v1_19_demo/matrix_diff.md" not in text
     assert "--paper-denominator" not in text
     assert "--matrix-report" not in text

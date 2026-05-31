@@ -145,10 +145,10 @@ Example command shape:
 
 ```bash
 UV_CACHE_DIR=out/v1_19_demo/uv-cache uv run scripts/diff_matrix_reports.py \
-  --before out/v1_19_demo/matrix.before.json \
-  --after out/v1_19_demo/matrix.after.json \
-  --json-output out/v1_19_demo/matrix_diff.json \
-  --markdown-output out/v1_19_demo/matrix_diff.md
+  out/v1_19_demo/matrix.before.json \
+  out/v1_19_demo/matrix.after.json \
+  --json-out out/v1_19_demo/matrix_diff.json \
+  --markdown-out out/v1_19_demo/matrix_diff.md
 ```
 
 Interpretation:
