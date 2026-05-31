@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.19
 milestone_name: ROCm Port
 status: verifying
-stopped_at: Completed 86-02-PLAN.md
-last_updated: "2026-05-31T11:17:18.342Z"
+stopped_at: Completed 87-02-PLAN.md
+last_updated: "2026-05-31T11:22:25.837Z"
 last_activity: 2026-05-31
 progress:
   total_phases: 6
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 11
-  completed_plans: 10
-  percent: 67
+  completed_plans: 11
+  percent: 83
 ---
 
 # Project State
@@ -30,7 +30,7 @@ Plan: 2 of 2
 Status: Phase complete — ready for verification
 Last activity: 2026-05-31
 
-Progress: [█████████░] 91%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -64,6 +64,8 @@ Progress: [█████████░] 91%
 | Phase 85 P02 | 491 | 3 tasks | 4 files |
 | Phase 86 P01 | 358 | 3 tasks | 4 files |
 | Phase 86 P02 | 185 | 3 tasks | 4 files |
+| Phase 87 P02 | 265 | 3 tasks | 3 files |
+| Phase 87 P01 | 1069 | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -86,6 +88,10 @@ Progress: [█████████░] 91%
 - [Phase 85]: [Phase 85 Plan 02]: Matrix report diffs match entries by target_id plus validation_scope.
 - [Phase 86]: Raw CLI stdout/stderr remains in per-problem log files while execution_closure.json stores relative cli_log_ref plus concise notes. — Keeps closure sidecars bounded and avoids embedding raw logs or absolute temp paths.
 - [Phase 86]: Existing passing traces authorize skipped_existing_pass only when output/execution_closure.json contains matching provenance. — Prevents stale or tampered sidecars from authorizing clean reuse.
+- [Phase 87]: [Phase 87 Plan 02]: AMD bound sanity generation is exposed only as a research script, not as a primary sol-execbench CLI option or package entry point.
+- [Phase 87]: [Phase 87 Plan 02]: The report script loads only explicitly supplied JSON paths and delegates normalization, checksum, status, and rendering behavior to core helpers.
+- [Phase 87]: [Phase 87 Plan 01]: amd_bound_sanity.v1 remains a scoring sidecar/reporting artifact and does not modify score eligibility or canonical schemas.
+- [Phase 87]: [Phase 87 Plan 01]: Claim boundaries are literal false fields plus visible Markdown wording; provisional RDNA 4 risk is a risk flag, not validation.
 
 ### Pending Todos
 
@@ -106,6 +112,6 @@ None found.
 
 ## Session Continuity
 
-Last session: 2026-05-31T10:20:36.006Z
-Stopped at: Completed 86-02-PLAN.md
+Last session: 2026-05-31T11:22:12.784Z
+Stopped at: Completed 87-02-PLAN.md
 Resume file: None
