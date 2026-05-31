@@ -112,6 +112,12 @@ None.
 | Public service | Hosted leaderboard or remote submission service | Deferred | v1.19 scope |
 | Dependencies | PyTorch/ROCm dependency relocking or Docker privilege expansion | Deferred | v1.19 scope |
 
+## Quick Tasks Completed
+
+| Date | Quick Task | Result |
+|------|------------|--------|
+| 2026-05-31 | 260531-u2s add requires_rocm coverage for CLI and dataset runner GPU paths | Added 3 ROCm E2E regressions; `requires_rocm` now reports 17 passed. |
+
 ## Session Continuity
 
 Last session: 2026-05-31T12:17:09.178Z
