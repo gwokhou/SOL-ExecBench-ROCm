@@ -1,209 +1,215 @@
 # Project Research Summary
 
 **Project:** SOL ExecBench ROCm Port
-**Domain:** Docker-based ROCm user-space version compatibility matrix
-**Milestone:** v1.18 ROCm Version Matrix via Docker
-**Researched:** 2026-05-28
-**Confidence:** MEDIUM-HIGH
+**Domain:** ROCm benchmark research-credibility evidence infrastructure
+**Researched:** 2026-05-31
+**Confidence:** HIGH for repo-local stack, features, architecture, and pitfalls; MEDIUM for downstream external-CI schema needs and exact roadmap slicing
 
 ## Executive Summary
 
-v1.18 should add a Docker-based ROCm compatibility matrix for SOL ExecBench without changing benchmark semantics. This is diagnostic infrastructure: users select a ROCm container user-space row, coordinate the intended PyTorch ROCm wheel policy, run bounded runtime/toolchain probes, and archive machine-readable evidence that says exactly what was validated.
+v1.19 is a credibility milestone for an existing ROCm-only GPU benchmark port, not a runtime expansion. Expert implementations in this space preserve canonical benchmark contracts and add auditable, versioned evidence sidecars around them: strict schemas, deterministic JSON/Markdown reports, source checksums, bounded status vocabularies, and claim guardrails. The research consensus is clear: do not add CDNA 3, MI300X, CDNA 4, native-host validation, new services, databases, or new package dependencies for this milestone.
 
-The recommended approach is sidecar-first and conservative. Keep the current ROCm 7.1 Docker and `uv.lock` path as the default baseline, add an explicit matrix manifest for ROCm 7.0/7.1/7.2 rows, parameterize Docker build/run selection, and introduce a `sol_execbench.rocm_compatibility_matrix.v1` report separate from canonical trace JSONL. Docker scripts should provide requested coordinates; Python probes should record observed container, host, PyTorch, Triton, toolchain, and GPU evidence; the compatibility model should classify the row.
+The recommended approach is to build additive reporting and contract layers over existing v1.11 dataset inventory/readiness/closure artifacts, v1.18 ROCm Compatibility Matrix Entries, and v1.9-v1.10 AMD SOL/SOLAR sidecars. Use Python 3.12+, Pydantic v2, stdlib JSON/path/checksum helpers, existing Click/argparse entry points, pytest, Ruff, and Ty. Keep `Trace`, correctness, timing, evaluator subprocess behavior, and score authority unchanged.
 
-The central risk is overclaiming. A Docker pass validates container ROCm user-space on the current host driver/devices; it does not prove native host ROCm validation, paper parity, score authority, or leaderboard eligibility. Mitigate this with strict status vocabulary, scoped evidence fields, claim-boundary booleans, stable reason codes, docs wording checks, and no silent fallback from missing PyTorch ROCm wheels to CPU/CUDA/wrong-index packages.
+The main risk is overclaiming. A denominator report can look like paper parity, Docker Matrix rows can be mistaken for native-host validation, and AMD SOL/SOLAR sanity checks can be read as model validation. Mitigate this with explicit authority-false fields, separate ready/blocked/unsupported/deferred/evidence-missing buckets, semantic Matrix diffs, provenance checks for resumed traces, and docs/tests that enforce no paper parity, no leaderboard authority, no native-host upgrade from Docker evidence, and no new hardware validation.
 
 ## Key Findings
 
-### Stack Additions
+### Recommended Stack
 
-v1.18 does not need a new package manager, service, or evaluator backend. It should extend the existing Python 3.12, Pydantic v2, Click/Rich, Docker, uv, PyTorch ROCm, Triton ROCm, and ROCm toolchain stack.
+No new external runtime dependencies are recommended. v1.19 should use the existing Python/Pydantic/reporting stack to produce deterministic sidecars and human summaries. Pydantic models should remain the source of truth for public contracts, and JSON Schema export should be generated from those models rather than maintained by hand.
 
 **Core technologies:**
-- Docker ROCm selector: parameterize `docker/Dockerfile` and `scripts/run_docker.sh` with `ROCM_VERSION`, exact image/tag, and build/run marker env vars.
-- Matrix manifest: add a small checked-in source of truth, likely `docker/rocm-version-matrix.toml`, for logical rows, Docker tags, PyTorch ROCm index policy, expected wheel suffix, and default evidence state.
-- uv explicit indexes: keep PyTorch-family packages pinned to explicit ROCm indexes and keep PyPI as the generic default; do not rely on index order.
-- Compatibility models: add strict Pydantic report models, likely in a new `src/sol_execbench/core/compatibility.py`, while preserving `EnvironmentSnapshot` semantics.
-- Runtime probes: reuse/extend `doctor --json` and environment probe patterns for `hipcc`, `rocminfo`, `rocm_agent_enumerator`, optional `rocprofv3`, `torch.__version__`, `torch.version.hip`, `torch.version.cuda`, device availability, device name, and `gcnArchName`.
-- Reports: emit standalone or sidecar JSON plus concise human-readable output; do not mutate trace JSONL.
+- Python `>=3.12,<3.14`: pure report builders, CLIs, checksums, and tests.
+- Pydantic `>=2.12.5`: strict sidecar contracts, diff models, denominator reports, sanity reports, and `model_json_schema()` export.
+- JSON sidecars: machine-readable evidence that stays outside canonical trace JSONL.
+- Markdown reports: reviewer-facing summaries with explicit claim boundaries.
+- Click / argparse: expose public package commands through existing Click CLI where appropriate; keep narrow dataset/Docker tooling beside existing argparse scripts.
+- Rich: optional readable CLI tables; JSON remains the primary automation output.
+- pytest, Ruff, Ty: CPU-safe contract coverage, formatting/linting, and typed helper APIs.
 
-Critical version strategy: keep ROCm 7.1 as the canonical default lock until a per-row lock workflow is proven. Initial Docker rows should be exact `rocm/dev-ubuntu-24.04:*complete` tags for 7.0.x, 7.1.x, and 7.2.x, with 7.1 remaining the default.
+**Do not add:** pandas, DuckDB, SQLite, generic deep-diff libraries, hosted services, dashboards, new hardware probes, Docker privilege expansion, or PyTorch/ROCm dependency relocking.
 
 ### Expected Features
 
+v1.19 should let researchers audit what exists, what changed, what was attempted, and what remains unsupported or missing without inflating authority.
+
 **Must have (table stakes):**
-- Select a configured ROCm Docker user-space version while preserving today’s default `./scripts/run_docker.sh --build` behavior.
-- Record requested vs observed container ROCm, host ROCm/driver context, PyTorch ROCm wheel identity, Triton ROCm state, toolchain evidence, GPU architecture, uv index/lock policy, and artifact refs.
-- Emit `compatibility-matrix.json` with one row per configured target and aggregate counts by state.
-- Emit per-entry `compatibility.json` sidecars with probe data, command/log refs, status, reason codes, and claim flags.
-- Support exact statuses: `host_validated`, `container_validated`, `mixed_version`, `pytorch_wheel_unavailable`, `runtime_unavailable`, `not_tested`.
-- Distinguish missing PyTorch wheels from runtime/device failures.
-- Detect CPU/CUDA/wrong-ROCm PyTorch wheels and classify them conservatively.
-- Preserve canonical trace JSONL, correctness, timing, scoring, paper-parity, and leaderboard semantics.
-- Provide CPU-safe unit/fixture tests for classification, serialization, command construction, and report rendering.
-- Update docs with explicit container-vs-host claim boundaries.
+- Paper dataset denominator report with JSON and Markdown outputs, problem/workload rollups, source refs/checksums, and ready/blocked/unsupported/deferred/evidence-missing classifications.
+- Stable status and reason-code vocabulary that distinguishes missing evidence from benchmark failure.
+- Dataset-runner resume/manifest consistency checks, failure classification, and deterministic closure outputs.
+- Compatibility Matrix diff tooling with machine JSON and human summaries for status, dependency, image, runtime, clock/evidence, artifact, and claim-boundary changes.
+- Compatibility Matrix JSON Schema export for `MatrixEntry` and `RocmCompatibilityMatrixReport`.
+- AMD SOL/SOLAR bound sanity checks over existing RDNA 4/Docker evidence only, with provisional model-risk language.
+- Claim-boundary guardrails and CPU-safe tests for every new report.
 
-**Should have (differentiators):**
-- Docker image digest capture for reproducible evidence.
-- Native-host comparison row that can produce `host_validated` only from direct host probes.
-- Wheel availability preflight before expensive Docker builds.
-- JSON schema export or CLI schema output for external consumers.
-- Matrix diff/report helpers and per-architecture aggregation when evidence exists.
-- Bounded command transcript capture for Docker, uv, and probe commands.
+**Should have (competitive):**
+- Denominator ledger with problem-level and workload-level rollups by category, op family, readiness status, closure status, and evidence gap.
+- Claim-safe upgrade-readiness hints that say what evidence is missing before stronger claims are possible.
+- Severity-ranked Matrix diffs that highlight status downgrades, claim-boundary escalation, dependency/image drift, runtime unavailability, and GPU arch drift.
+- Schema bundle manifest for downstream evidence producers if external CI needs it.
+- Dataset-runner preflight mode for closure consistency.
+- Cross-report consistency checks spanning denominator, Matrix, closure, AMD score, SOL/SOLAR, and docs.
 
-**Defer (v2+):**
-- Native ROCm host install/reinstall automation.
-- Full paper dataset validation across every ROCm version.
-- Score, leaderboard, or paper-parity policy changes.
-- CUDA/NVIDIA matrix support.
-- Arbitrary ROCm versions outside the declared manifest.
-- Docker-in-Docker, conda/mamba, Spack, Nix, or host driver management.
-- Full CDNA 3/CDNA 4 claims without archived hardware evidence.
+**Defer (v2+ / separate milestone):**
+- Full public 235-problem real-hardware validation.
+- Native host ROCm matrix validation.
+- CDNA 3, MI300X, or CDNA 4 live validation.
+- Upstream SOLAR equivalence comparison.
+- Hosted leaderboard or remote submission workflow.
+- Original 124-model / 7,400-subgraph extraction reproduction.
 
 ### Architecture Approach
 
-Keep Docker orchestration at the script/Dockerfile boundary and compatibility classification inside Python. The evaluator should not call Docker, and Docker scripts should not be the source of truth for validation. Instead, scripts pass requested matrix coordinates into the container; Python probes collect observed evidence; compatibility models compare requested and observed values and write diagnostic reports.
+The architecture should remain sidecar-first and additive. New contracts belong near their owning evidence domains, with scripts acting as adapters and core package modules owning policy, validation, and deterministic serialization. Canonical traces remain read-only inputs for reports; they must not gain denominator, Matrix, or sanity fields.
 
 **Major components:**
-1. Docker matrix configuration: checked-in rows for Docker image/tag, PyTorch ROCm index/tag policy, support status, and default claim state.
-2. Docker wrapper plumbing: `scripts/run_docker.sh --rocm` or equivalent, build args, image tags, native Linux Docker/device preflight, and container marker env vars.
-3. uv/PyTorch wheel coordination: explicit package-to-index policy, default ROCm 7.1 lock, per-row availability checks, and unavailable classification.
-4. Compatibility evidence models: scoped host/container/python/toolchain/GPU evidence, row status, reason codes, authority flags, and matrix summary counts.
-5. CLI/report surface: `sol-execbench compatibility --json` or `doctor --json` extension, optional trace-adjacent sidecar, and Markdown/Rich summary.
-6. Docs/tests guardrails: docs claim language, CPU-safe fixture tests, Docker script tests, and marker-gated live ROCm checks.
+1. `core/dataset/execution_closure.py` — extracted closure models, status vocabulary, failure classification, provenance checks, totals, and deterministic output helpers.
+2. `core/dataset/denominator.py` — paper denominator accounting over inventory, readiness, ready subset, closure, score, SOL, and SOLAR sidecars.
+3. `core/compatibility_diff.py` — semantic ROCm Compatibility Matrix diff models and comparison logic.
+4. Compatibility schema helper/exporter — `model_json_schema()` output for public Matrix contracts and diff reports.
+5. `core/scoring/amd_sanity.py` — diagnostic AMD SOL/SOLAR sanity evidence over existing RDNA 4/Docker artifacts.
+6. `scripts/run_dataset.py` adapter changes — minimal wiring for hardened closure, classification, resume checks, and optional report emission.
+7. Docs and guardrail tests — public wording and authority boundaries for denominator, Matrix diff/schema, closure, and bound sanity artifacts.
 
 ### Critical Pitfalls
 
-1. **Treating container ROCm as host validation** - use `validation_scope`, scoped host/container evidence, and wording such as "container ROCm user-space validated on host driver X"; reserve `host_validated` for direct native runs.
-2. **Assuming any ROCm container works with the current host driver** - preflight Docker context, `/dev/kfd`, `/dev/dri`, `rocminfo`, PyTorch device visibility, memory copy, and event timing before benchmark execution.
-3. **Hardcoding image tags in multiple places** - use one matrix manifest plus Docker build args/env labels, and store exact image tag/digest/build args in reports.
-4. **Mixing PyTorch ROCm wheels and container user-space silently** - compare intended wheel target with `torch.__version__`, `torch.version.hip`, `torch.version.cuda`, and container ROCm evidence; classify mismatches as `mixed_version`.
-5. **Misusing uv indexes/lockfiles** - keep indexes explicit, do not pretend one frozen lock validates multiple wheel targets, and record per-row lock/index evidence.
-6. **Letting runtime setup failures look like benchmark regressions** - classify missing devices, Docker Desktop/rootless issues, unavailable wheels, and failed preflights before running benchmarks.
-7. **Reporting one pass/fail for the matrix** - require row-level denominators and aggregate counts; partial matrices must be readable and conservative.
+1. **Turning denominator accounting into paper parity** — keep denominator accounted-for separate from validation; include explicit false authority flags and separate status buckets.
+2. **Collapsing statuses into one skip bucket** — preserve ready, blocked, unsupported, deferred, evidence-missing, attempted-passed, and attempted-failed with reason codes and separate problem/workload rollups.
+3. **Creating conflicting sidecar sources of truth** — define artifact ownership and use refs/checksums in aggregate reports instead of duplicating full payloads.
+4. **Destabilizing `scripts/run_dataset.py`** — extract policy into tested core helpers and keep the runner’s default behavior unchanged unless closure/hardening options require new diagnostics.
+5. **Reusing stale traces during resume** — accept `skipped_existing_pass` only when manifest, ready subset, config, workload identity, solution mode, and evidence requirements match.
+6. **Producing noisy or misleading Matrix diffs** — compare validated models semantically, normalize volatile metadata, and severity-rank status, dependency, image, runtime, and authority changes.
+7. **Letting AMD SOL/SOLAR sanity become model validation** — report degraded, unsupported, unscored, and missing-evidence counts; keep upstream SOLAR parity and new hardware validation false.
+8. **Leaking sensitive evidence details** — use relative refs, checksums, bounded logs, and redaction; do not embed tokens, raw datasets, proprietary kernels, or unnecessary absolute paths.
 
-## Implications For Roadmap
+## Implications for Roadmap
 
 Based on research, suggested phase structure:
 
-### Phase 1: Matrix Contract And Claim Guardrails
+### Phase 1: Closure Contracts And Provenance Foundation
 
-**Rationale:** Every later phase depends on stable report semantics and claim boundaries.
-**Delivers:** Pydantic status enums, reason-code taxonomy, `sol_execbench.rocm_compatibility_matrix.v1`, claim-boundary booleans, row/matrix summary models, fixture tests, and docs wording requirements.
-**Addresses:** Compatibility states, diagnostic-only authority, `not_tested` rows, aggregate counts, and container-vs-host wording.
-**Avoids:** Overclaiming Docker runs, trace/schema mutation, boolean-only pass/fail reports, and unscoped evidence.
+**Rationale:** Denominator accounting depends on reliable execution-closure inputs, and `scripts/run_dataset.py` is the highest-regression-risk module.
 
-### Phase 2: Docker Matrix Selection And Preflight
+**Delivers:** Extracted `execution_closure` core module, strict closure record/report models, status vocabulary, failure classification enums, checksum/provenance validators, deterministic totals, and unit tests.
 
-**Rationale:** Users need deterministic image selection before wheel/runtime evidence can be meaningful.
-**Delivers:** Matrix manifest, parameterized Dockerfile base image, `scripts/run_docker.sh` ROCm selector, build/run marker env vars, exact image tag recording, existing default preservation, Docker context/device checks, and unknown-row rejection.
-**Uses:** Docker `ARG`, `rocm/dev-ubuntu-24.04:*complete` images, `/dev/kfd`, `/dev/dri`, native Linux Docker checks.
-**Avoids:** Drift between docs/scripts/Dockerfile, Docker Desktop/rootless false failures, floating-tag claims, and unsupported arbitrary rows.
+**Addresses:** Reproducible closure outputs, resume/manifest consistency checks, failure/evidence classification foundations.
 
-### Phase 3: uv And PyTorch ROCm Wheel Coordination
+**Avoids:** Runner destabilization, stale trace reuse, skip-bucket collapse, and sidecar drift.
 
-**Rationale:** The matrix is invalid if the selected container installs the wrong PyTorch backend.
-**Delivers:** Explicit PyTorch ROCm index rows, default ROCm 7.1 lock policy, wheel availability/preflight helper, lock/index evidence capture, local-version parsing, and `pytorch_wheel_unavailable` / `mixed_version` classification tests.
-**Uses:** uv explicit indexes and `[tool.uv.sources]`, PyTorch ROCm wheel indexes, `torch.__version__`, `torch.version.hip`, `torch.version.cuda`.
-**Avoids:** CPU/CUDA fallback, wrong-index resolution, assuming one `uv.lock` covers all rows, and hiding unavailable wheels as Docker build failures.
+### Phase 2: Paper Denominator Accounting And Claim Boundaries
 
-### Phase 4: Runtime Evidence And Compatibility Reports
+**Rationale:** This is the core v1.19 research-credibility deliverable and should build on stable closure semantics.
 
-**Rationale:** Once requested coordinates and dependency policy exist, runtime probes can produce useful compatibility evidence.
-**Delivers:** Scoped host/container/python/toolchain/GPU probe collection, `compatibility --json` or `doctor --json` report surface, per-entry sidecars, matrix aggregate JSON, human report, optional smoke hook, and report artifact refs.
-**Implements:** Compatibility model comparison of requested-vs-observed container ROCm, host context, PyTorch ROCm tag, Triton readiness, native HIP/C++ build readiness, and GPU architecture.
-**Avoids:** Collapsing host/container tools, treating Triton as version-neutral, PyTorch-only smoke overclaims, and benchmark regressions caused by preflight failures.
+**Delivers:** `paper_denominator_report.v1` JSON/Markdown reports with source refs/checksums, problem/workload/category rollups, explicit status/reason-code taxonomy, evidence gaps, and authority-false fields.
 
-### Phase 5: Validation Workflow, Docs, And CI Guardrails
+**Addresses:** Paper denominator status report, stable denominator vocabulary, evidence-missing separation, claim guardrails.
 
-**Rationale:** The matrix is only useful if users and release notes can read it without overstating coverage.
-**Delivers:** Documentation in `docs/CONFIGURATION.md`, `docs/TESTING.md`, `docs/rocm.md`, `docs/CLAIMS.md`, likely `docs/rocm_version_matrix.md`; CPU-safe tests; Dockerfile/script tests; marker-gated live ROCm tests for the default row; optional self-hosted AMD runner guidance; archived validation examples.
-**Addresses:** Claim language, CI limits, partial matrix interpretation, hardware-specific evidence boundaries, and remediation hints.
-**Avoids:** CI promising GPU validation it cannot run, build-only results being called runtime validation, and one architecture being generalized to all AMD GPUs.
+**Avoids:** Paper-parity overclaims, hidden unsupported/deferred buckets, and evidence gaps being counted as failures or successes.
+
+### Phase 3: Compatibility Matrix Schema Export And Semantic Diff
+
+**Rationale:** Schema export and diff share the existing Matrix Pydantic contract, and both are CPU-safe infrastructure work. Export first to publish the contract; diff second to compare validated reports.
+
+**Delivers:** Versioned JSON Schema files for public Matrix contracts, optional schema manifest, semantic Matrix diff JSON/Markdown, severity-ranked transitions, and tests for external payload boundaries.
+
+**Uses:** Pydantic `model_json_schema()`, stdlib JSON/path helpers, existing `MatrixEntry` and `RocmCompatibilityMatrixReport`.
+
+**Avoids:** Raw noisy diffs, accidental native-host authority from Docker rows, internal model leakage, and dependency drift being misclassified as benchmark failure.
+
+### Phase 4: Dataset Runner Hardening Integration
+
+**Rationale:** After closure policy is tested in core modules, runner changes can be contained to adapter wiring and mode-specific behavior.
+
+**Delivers:** Hardened `scripts/run_dataset.py` behavior for resume consistency, manifest/ready-subset mismatch detection, `skipped_existing_pass` provenance, log refs, no-trace classification, missing derived evidence, and stable closure writes.
+
+**Addresses:** Dataset-runner consistency, failure classification, reproducible closure outputs, evidence hygiene.
+
+**Avoids:** Default workflow regressions, stale output reuse, broad main-loop rewrites, and sensitive log/path leakage.
+
+### Phase 5: AMD SOL/SOLAR Bound Sanity Evidence
+
+**Rationale:** Bound sanity is a diagnostic capstone over existing AMD sidecars and should consume stable closure/denominator evidence rather than inventing new authority.
+
+**Delivers:** `amd_bound_sanity.v1` report with workload checks, status counts, degraded/unscored/unsupported/missing-evidence buckets, model-risk summary, source artifact refs, and explicit no-new-hardware claim boundary.
+
+**Addresses:** AMD SOL/SOLAR sanity on existing RDNA 4/Docker evidence, provisional model-risk reporting, score eligibility guardrails.
+
+**Avoids:** Upstream SOLAR equivalence claims, model-validation overclaims, hidden unscored workloads, and CDNA 3/MI300X/CDNA4 scope creep.
+
+### Phase 6: Documentation, Examples, And Guardrail Tests
+
+**Rationale:** Docs should reflect stable artifact contracts and are part of the product behavior for this milestone.
+
+**Delivers:** Updates to `docs/CLAIMS.md`, `docs/TESTING.md`, researcher docs, schema docs, report examples, and CPU-safe wording tests for denominator, Matrix diff/schema, runner closure, and bound sanity artifacts.
+
+**Addresses:** Claim-boundary guardrails, external producer expectations, no-new-hardware scope, evidence hygiene.
+
+**Avoids:** Documentation overclaims, artifact examples without boundaries, and downstream misuse of new reports.
 
 ### Phase Ordering Rationale
 
-- Contract and claim boundaries come first because they define what every report can safely mean.
-- Docker selection must precede runtime evidence because evidence rows need deterministic requested coordinates.
-- uv/PyTorch coordination must land before live runtime claims because a ROCm container with the wrong wheel is a mixed stack, not a validated row.
-- Runtime report generation comes after probes and selectors so it can compare requested vs observed data.
-- Docs and validation close the loop because the main product value is trustworthy, auditable claim wording.
+- Closure contracts come first because denominator and runner-hardening credibility depend on stable provenance and status semantics.
+- Denominator accounting should land before docs wording because it is the milestone’s primary claim surface and determines the vocabulary guardrails.
+- Matrix schema export and diff are isolated from dataset execution and can proceed as CPU-safe contract work.
+- Runner integration follows core helper extraction to keep changes in the large script mechanical and testable.
+- AMD SOL/SOLAR sanity comes after closure/denominator foundations so it can report exclusions and evidence gaps honestly.
+- Documentation and guardrails close the milestone after artifact semantics are fixed.
 
 ### Research Flags
 
 Phases likely needing deeper research during planning:
-- **Phase 3:** exact PyTorch ROCm wheel availability for ROCm 7.0 and 7.2, Python 3.12/3.13 compatibility, and whether per-row locks or generated constraints are least costly.
-- **Phase 4:** live Triton ROCm compatibility, native HIP/C++ extension build readiness, and host-driver/container compatibility behavior across selected image tags.
-- **Phase 5:** CI/self-hosted AMD runner feasibility and any CDNA 3 validation plan.
+- **Phase 4:** `scripts/run_dataset.py` has broad orchestration behavior; planning should inspect current resume, trace loading, score/SOL/SOLAR, and closure paths in detail.
+- **Phase 5:** AMD SOL/SOLAR sanity needs careful review of existing sidecar semantics, degraded statuses, and score eligibility wording.
+- **Phase 6:** Docs guardrails need current wording audits across claims/testing/researcher docs and tests.
 
 Phases with standard patterns (skip research-phase):
-- **Phase 1:** Pydantic sidecar contract, status enums, authority flags, and trace isolation follow existing repository patterns.
-- **Phase 2:** Dockerfile/script parameterization and device preflight are well-defined from current wrapper behavior.
-
-## Explicit Claim Boundary Language
-
-Use this wording in docs, reports, and release notes:
-
-- Passing Docker rows are **container ROCm user-space validated** on the recorded host driver/devices.
-- A Docker row is **not native host ROCm validated** unless the report came from a direct host validation mode.
-- Compatibility sidecars are **diagnostic compatibility evidence**. They are not correctness, timing, score, paper-parity, or leaderboard authority.
-- `torch.cuda` API names may appear in ROCm evidence because PyTorch exposes AMD GPUs through the CUDA-compatible namespace; this must not be described as CUDA/NVIDIA runtime support.
-- `mixed_version` means the requested ROCm row, container user-space, PyTorch ROCm wheel, Triton ROCm package, or host evidence do not align enough for a clean compatibility claim.
-- `pytorch_wheel_unavailable` means the dependency stack could not be resolved for the requested row; it is not a benchmark failure.
-- `runtime_unavailable` means the container/dependency stack could not access the required ROCm runtime or GPU devices; benchmark results should be absent or clearly separated.
-- Hardware validation is architecture-specific and requires archived device evidence for that `gfx*` target.
-
-Required claim flags for Docker compatibility entries:
-
-| Flag | Required Behavior |
-|------|-------------------|
-| `container_user_space_validated` | `true` only when the selected Docker entry passed required probes. |
-| `native_host_validated` | `true` only for direct host validation; normally `false` for Docker rows. |
-| `hardware_validated` | `true` only when real device evidence for that architecture is archived. |
-| `paper_parity_authority` | Always `false` for v1.18 compatibility sidecars. |
-| `score_authority` | Always `false`. |
-| `leaderboard_authority` | Always `false`. |
-| `diagnostic_compatibility_evidence` | Always `true` for these sidecars. |
+- **Phase 1:** Pydantic sidecar contracts, deterministic serialization, and checksum/provenance helpers are established repo patterns; implementation needs code inspection, not external research.
+- **Phase 2:** Dataset inventory/readiness/ready-subset/parity patterns are already local and well documented.
+- **Phase 3:** Pydantic schema export and semantic domain diffing are bounded, CPU-safe, and rely on existing Matrix models.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | MEDIUM-HIGH | Repo integration points are clear; exact Docker tags and PyTorch ROCm wheel availability must be verified during implementation. |
-| Features | HIGH | Table stakes, statuses, sidecars, and claim boundaries are strongly supported by repo patterns and milestone scope. |
-| Architecture | HIGH | Existing CLI, environment sidecars, doctor diagnostics, Docker wrapper, and reporting boundaries give a clear integration path. |
-| Pitfalls | HIGH | Risks are grounded in current code, Docker/ROCm runtime behavior, uv semantics, and existing claim-guardrail docs. |
+| Stack | HIGH | Repository stack, dependency versions, CLI patterns, Pydantic contracts, and test tools are directly supported by local files. |
+| Features | HIGH | Target features match `.planning/PROJECT.md` and existing v1.11/v1.18/v1.9-v1.10 artifact surfaces; external-CI schema details remain MEDIUM. |
+| Architecture | HIGH | Integration points are clear and align with existing sidecar-first architecture; exact phase count is MEDIUM because roadmap may merge or split work. |
+| Pitfalls | HIGH | Risks are grounded in existing docs, tests, and known hot spots such as runner complexity, claim guardrails, Docker/native-host boundaries, and AMD SOL/SOLAR authority. |
 
-**Overall confidence:** MEDIUM-HIGH
+**Overall confidence:** HIGH for the recommended roadmap direction; MEDIUM for exact downstream schema bundle requirements and final phase slicing.
 
-### Gaps To Address
+### Gaps to Address
 
-- PyTorch ROCm wheel matrix: verify available torch/torchvision/triton-rocm versions for ROCm 7.0, 7.1, and 7.2 with Python `>=3.12,<3.14`.
-- Lockfile workflow: decide whether v1.18 uses only default ROCm 7.1 lock plus per-row checks, generated lock artifacts, or constraints.
-- Host-driver compatibility: record actual host driver/runtime evidence and validate which selected containers can run on the available host.
-- Triton ROCm readiness: test separately from PyTorch import/device availability.
-- Image digest capture: determine how reliably `scripts/run_docker.sh` can capture resolved digests for built/pulled images.
-- CDNA 3 coverage: keep claims deferred unless live CDNA 3 evidence is archived.
+- External CI producer expectations are not yet concrete; start with Matrix Entry/report schema export and defer broader schema bundles until a consumer requires them.
+- Exact denominator rollup rules for mixed-status problems need implementation-time decisions and tests, especially when workloads within one problem have different readiness or evidence states.
+- Runner provenance comparison fields must be chosen by inspecting current output metadata and resume behavior so hardening does not break non-closure runs.
+- AMD SOL/SOLAR sanity thresholds and reason-code names need fixture-driven validation against existing RDNA 4/Docker sidecars.
+- Documentation examples must be checked after implementation so wording matches actual report fields and commands.
 
 ## Sources
 
 ### Primary (HIGH confidence)
 
-- `.planning/research/STACK.md` - stack additions, version/dependency strategy, integration boundaries, risks, and exclusions.
-- `.planning/research/FEATURES.md` - table stakes, differentiators, out-of-scope items, status vocabulary, reason codes, and acceptance signals.
-- `.planning/research/ARCHITECTURE.md` - current integration points, proposed components, data flow, build order, and test strategy.
-- `.planning/research/PITFALLS.md` - critical pitfalls, phase placement, guardrails, and verification warnings.
-- Local repo files referenced by research: `pyproject.toml`, `docker/Dockerfile`, `scripts/run_docker.sh`, `src/sol_execbench/core/environment.py`, `src/sol_execbench/cli/main.py`, `docs/CLAIMS.md`, `docs/CONFIGURATION.md`, `docs/TESTING.md`, `docs/rocm.md`, `tests/docker/dependencies/`.
+- `.planning/PROJECT.md` — v1.19 scope, no-new-hardware constraint, target features.
+- `.planning/research/STACK.md` — recommended stack, dependency/version boundaries, integration points.
+- `.planning/research/FEATURES.md` — table stakes, differentiators, anti-features, acceptance criteria.
+- `.planning/research/ARCHITECTURE.md` — system shape, component boundaries, data flow, build order.
+- `.planning/research/PITFALLS.md` — critical risks, phase mapping, evidence hygiene, recovery strategies.
+- `.planning/codebase/STACK.md` — existing Python, Pydantic, Click/Rich, PyTorch ROCm, Triton ROCm, Docker, pytest, Ruff, and Ty stack.
+- `.planning/codebase/CONCERNS.md` — runner risk, sidecar proliferation, docs guardrails, Docker/native-host claim boundaries.
+- `pyproject.toml` — dependency versions and development tooling.
+- `src/sol_execbench/core/compatibility.py` — Matrix contracts and claim-boundary fields.
+- `src/sol_execbench/core/dataset/` — inventory, readiness, ready-subset, parity/checksum patterns.
+- `scripts/run_dataset.py` — dataset execution, resume behavior, AMD score, SOL/SOLAR, timing, and closure integration.
+- `src/sol_execbench/core/scoring/amd_sol_v2.py` and `solar_derivation.py` — AMD SOL/SOLAR evidence contracts.
+- `docs/CLAIMS.md`, `docs/TESTING.md`, `docs/original_parity.md`, `docs/RESEARCHER-GUIDE.md` — public claim boundaries and evidence wording.
 
-### External (MEDIUM/HIGH confidence)
+### Secondary (MEDIUM confidence)
 
-- AMD ROCm Docker and container runtime documentation - host kernel/driver sharing, `/dev/kfd`, `/dev/dri`, Docker Desktop/rootless limitations, and driver/runtime compatibility caveats.
-- AMD Docker Hub `rocm/dev-ubuntu-24.04` tags - available ROCm dev image tags for selected rows.
-- PyTorch previous versions and ROCm wheel-index docs - ROCm wheel index patterns and current/default ROCm 7.1 install commands.
-- uv documentation - explicit indexes, package-to-index pinning, and index strategy behavior.
-- AMD ROCm PyTorch install docs - PyTorch/ROCm Docker install examples and validated image inventories.
+- Downstream external-CI and evidence-producer needs — inferred from Matrix schema export requirements, not yet from a concrete external consumer.
+- Exact phase split — inferred from dependency structure and risk grouping; roadmap may choose smaller implementation phases.
 
 ---
-*Research completed: 2026-05-28*
+*Research completed: 2026-05-31*
 *Ready for roadmap: yes*
