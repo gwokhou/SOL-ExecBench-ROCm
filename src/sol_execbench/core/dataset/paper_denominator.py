@@ -500,9 +500,35 @@ def build_paper_denominator_report(
 
     for category in inventory.get("categories", []):
         category_name = str(category.get("name", "unknown"))
-        rollup = _category_rollup(categories, category_name)
-        denoms = category.get("denominators", {})
-        rollup.problems += int(denoms.get("parsed_problems", 0))
+        _category_rollup(categories, category_name)
+
+    for problem in inventory.get("problems", []):
+        category = str(problem.get("category", "unknown"))
+        problem_id = str(problem.get("problem_id") or problem.get("problem_path") or "unknown")
+        problem_path = problem.get("problem_path")
+        _problem_rollup(
+            problems,
+            category=category,
+            problem_id=problem_id,
+            problem_path=str(problem_path) if problem_path else None,
+        )
+        for workload_record in problem.get("workloads", []):
+            workload_uuid = workload_record.get("uuid")
+            key = (
+                problem_id,
+                workload_record.get("row_index"),
+                str(workload_uuid) if workload_uuid else None,
+            )
+            workloads.setdefault(
+                key,
+                PaperDenominatorWorkload(
+                    category=category,
+                    problem_id=problem_id,
+                    problem_path=str(problem_path) if problem_path else None,
+                    workload_uuid=str(workload_uuid) if workload_uuid else None,
+                    row_index=workload_record.get("row_index"),
+                ),
+            )
 
     for record in readiness.get("workloads", []):
         category = str(record.get("category", "unknown"))
@@ -535,15 +561,23 @@ def build_paper_denominator_report(
             record.get("row_index"),
             str(record.get("workload_uuid")) if record.get("workload_uuid") else None,
         )
-        workloads[key] = PaperDenominatorWorkload(
-            category=category,
-            problem_id=problem_id,
-            problem_path=str(problem_path) if problem_path else None,
-            workload_uuid=str(record.get("workload_uuid")) if record.get("workload_uuid") else None,
-            row_index=record.get("row_index"),
-            readiness_status=str(record.get("status")) if record.get("status") else None,
-            states=PaperDenominatorStateTotals(**{state: 1}),
+        workload = workloads.setdefault(
+            key,
+            PaperDenominatorWorkload(
+                category=category,
+                problem_id=problem_id,
+                problem_path=str(problem_path) if problem_path else None,
+                workload_uuid=str(record.get("workload_uuid")) if record.get("workload_uuid") else None,
+                row_index=record.get("row_index"),
+            ),
         )
+        workload.category = category
+        workload.problem_id = problem_id
+        workload.problem_path = str(problem_path) if problem_path else None
+        workload.workload_uuid = str(record.get("workload_uuid")) if record.get("workload_uuid") else None
+        workload.row_index = record.get("row_index")
+        workload.readiness_status = str(record.get("status")) if record.get("status") else None
+        workload.states = PaperDenominatorStateTotals(**{state: 1})
 
     for record in execution_closure.get("records", []):
         category = str(record.get("category", "unknown"))
@@ -566,6 +600,11 @@ def build_paper_denominator_report(
                 row_index=record.get("row_index"),
             ),
         )
+        workload.category = category
+        workload.problem_id = problem_id
+        workload.problem_path = str(problem_path) if problem_path else None
+        workload.workload_uuid = str(record.get("workload_uuid")) if record.get("workload_uuid") else None
+        workload.row_index = record.get("row_index")
         workload.closure_status = status
         example_ref = _record_ref(record)
         if state:
@@ -656,6 +695,21 @@ def build_paper_denominator_report(
             example_ref="solar_artifacts",
             next_evidence="Attach bounded SOLAR derivation refs/checksums before upgrading claims.",
         )
+
+    for workload in workloads.values():
+        if any(getattr(workload.states, key) for key in DENOMINATOR_STATE_KEYS):
+            continue
+        workload.states.add("not_attempted")
+        for rollup in (
+            _category_rollup(categories, workload.category),
+            _problem_rollup(
+                problems,
+                category=workload.category,
+                problem_id=workload.problem_id,
+                problem_path=workload.problem_path,
+            ),
+        ):
+            rollup.states.add("not_attempted")
 
     for problem in problems.values():
         problem.rollup.problems = 1

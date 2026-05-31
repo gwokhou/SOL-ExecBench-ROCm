@@ -397,6 +397,54 @@ def test_paper_denominator_report_accounts_for_absent_optional_evidence_sources(
     assert payload["sources"]["solar_artifacts"] == []
 
 
+def test_paper_denominator_report_keeps_inventory_only_denominator_records():
+    inventory = {
+        "schema_version": "sol_execbench.dataset_inventory.v1",
+        "categories": [
+            {
+                "name": "L1",
+                "denominators": {
+                    "parsed_problems": 1,
+                    "parsed_workloads": 2,
+                },
+            }
+        ],
+        "problems": [
+            {
+                "category": "L1",
+                "problem_id": "L1/only_inventory",
+                "problem_path": "L1/only_inventory",
+                "workload_count": 2,
+                "workloads": [
+                    {"uuid": "w0", "row_index": 0},
+                    {"uuid": "w1", "row_index": 1},
+                ],
+            }
+        ],
+        "inventory_checksum": {"value": "inventory-sha"},
+    }
+    report = build_paper_denominator_report(
+        inventory=inventory,
+        readiness={"schema_version": "sol_execbench.rocm_readiness.v1", "workloads": []},
+        execution_closure={"schema_version": "sol_execbench.execution_closure.v1", "records": []},
+        created_at=CREATED_AT,
+    )
+    payload = report.model_dump(mode="json")
+
+    assert payload["suite"]["problems"] == 1
+    assert payload["suite"]["workloads"] == 2
+    assert payload["suite"]["states"]["not_attempted"] == 2
+    assert [problem["problem_id"] for problem in payload["problems"]] == [
+        "L1/only_inventory"
+    ]
+    assert {workload["workload_uuid"] for workload in payload["workloads"]} == {
+        "w0",
+        "w1",
+    }
+    assert payload["categories"][0]["rollup"]["problems"] == 1
+    assert payload["categories"][0]["rollup"]["workloads"] == 2
+
+
 def test_paper_denominator_report_uses_bounded_source_refs_only():
     payload = build_fixture_report().model_dump(mode="json")
     source = payload["sources"]["inventory"]
