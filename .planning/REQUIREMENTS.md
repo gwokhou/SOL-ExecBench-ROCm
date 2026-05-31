@@ -40,11 +40,11 @@ ExecBench.
 
 ### Documentation And Guardrails
 
-- [ ] **DOCS-01**: Documentation explains how to generate and interpret consistency lint, evaluation stability, claim-upgrade, and trust summary artifacts.
-- [ ] **DOCS-02**: Documentation states that v1.20 does not add full 235-problem paper validation, CDNA3/MI300X/CDNA4 validation, native-host Matrix authority, hosted leaderboard readiness, or upstream SOLAR parity.
-- [ ] **DOCS-03**: CPU-safe tests cover consistency contradictions, stability classification, claim-upgrade rejection, trust summary rendering, deterministic serialization, and docs claim-boundary wording.
-- [ ] **DOCS-04**: Public examples or fixtures show representative consistent, contradictory, noisy, and claim-blocked report shapes with bounded refs, checksums, and diagnostic-only wording.
-- [ ] **DOCS-05**: Existing public contracts remain stable: canonical Trace, Definition, Workload, Solution, correctness, timing, score, and evaluator contract semantics are unchanged by v1.20 evidence features.
+- [x] **DOCS-01**: Documentation explains how to generate and interpret consistency lint, evaluation stability, claim-upgrade, and trust summary artifacts.
+- [x] **DOCS-02**: Documentation states that v1.20 does not add full 235-problem paper validation, CDNA3/MI300X/CDNA4 validation, native-host Matrix authority, hosted leaderboard readiness, or upstream SOLAR parity.
+- [x] **DOCS-03**: CPU-safe tests cover consistency contradictions, stability classification, claim-upgrade rejection, trust summary rendering, deterministic serialization, and docs claim-boundary wording.
+- [x] **DOCS-04**: Public examples or fixtures show representative consistent, contradictory, noisy, and claim-blocked report shapes with bounded refs, checksums, and diagnostic-only wording.
+- [x] **DOCS-05**: Existing public contracts remain stable: canonical Trace, Definition, Workload, Solution, correctness, timing, score, and evaluator contract semantics are unchanged by v1.20 evidence features.
 
 ## Future Requirements
 
@@ -99,17 +99,17 @@ ExecBench.
 | TRUST-02 | Phase 92 | Complete |
 | TRUST-03 | Phase 92 | Complete |
 | TRUST-04 | Phase 92 | Complete |
-| DOCS-01 | Phase 93 | Pending |
-| DOCS-02 | Phase 93 | Pending |
-| DOCS-03 | Phase 93 | Pending |
-| DOCS-04 | Phase 93 | Pending |
-| DOCS-05 | Phase 93 | Pending |
+| DOCS-01 | Phase 93 | Complete |
+| DOCS-02 | Phase 93 | Complete |
+| DOCS-03 | Phase 93 | Complete |
+| DOCS-04 | Phase 93 | Complete |
+| DOCS-05 | Phase 93 | Complete |
 
 **Coverage:**
-- v1 requirements: 23 total, 18 complete
+- v1 requirements: 23 total, 23 complete
 - Mapped to phases: 23
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-05-31*
-*Last updated: 2026-05-31 after Phase 92 completion*
+*Last updated: 2026-05-31 after Phase 93 completion*

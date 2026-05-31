@@ -2,8 +2,8 @@
 
 ## Milestones
 
-- Planned **v1.20 Cross-Report Consistency and Evaluation Stability** -
-  Phases 89-93.
+- Complete **v1.20 Cross-Report Consistency and Evaluation Stability** -
+  Phases 89-93 (shipped 2026-05-31).
 
 - Complete **v1.19 Research Credibility Without New Hardware** -
   Phases 83-88 (shipped 2026-05-31). See
@@ -84,9 +84,9 @@
 
 **Active milestone:** v1.20 Cross-Report Consistency and Evaluation Stability.
 
-**Status:** Phase 92 complete; ready to plan Phase 93.
+**Status:** v1.20 phases complete; ready for milestone audit/archive.
 
-**Next step:** Start Phase 93 with `/gsd-plan-phase 93`.
+**Next step:** Run `/gsd-audit-milestone` or `/gsd-complete-milestone`.
 
 ## Phases
 
@@ -94,7 +94,7 @@
 - [x] **Phase 90: Evaluation Stability Evidence** - Researchers can inspect timing quality, variance, clock policy, and backend risk through a sidecar-only stability report.
 - [x] **Phase 91: Claim Upgrade Rules And Authority Gates** - Researchers can evaluate whether evidence satisfies explicit prerequisites for stronger validation and authority claims.
 - [x] **Phase 92: Trust Summary Integration** - Researchers can generate a concise JSON/Markdown trust summary that combines consistency, stability, closure, denominator, Matrix, score, and bound status.
-- [ ] **Phase 93: Documentation, Examples, And Guardrail Tests** - Public docs, fixtures, and CPU-safe/ROCm guardrails make v1.20 artifacts interpretable and claim-safe.
+- [x] **Phase 93: Documentation, Examples, And Guardrail Tests** - Public docs, fixtures, and CPU-safe/ROCm guardrails make v1.20 artifacts interpretable and claim-safe.
 
 ## Phase Details
 
@@ -162,7 +162,9 @@
   3. CPU-safe tests cover contradiction detection, stability classification, claim-upgrade rejection, trust summary rendering, deterministic serialization, and docs claim-boundary wording.
   4. Public examples or fixtures show consistent, contradictory, noisy, and claim-blocked report shapes with bounded refs, checksums, and diagnostic-only wording.
   5. Existing public contracts remain stable: canonical Trace, Definition, Workload, Solution, correctness, timing, score, and evaluator contract semantics are unchanged.
-**Plans**: TBD
+**Plans**:
+  - [x] 93-01 v1.20 Evidence Guide And Fixtures
+  - [x] 93-02 Final Guardrails And Milestone State
 
 ## Progress
 
@@ -175,9 +177,10 @@ Phases execute in numeric order: 89 -> 90 -> 91 -> 92 -> 93.
 | 90. Evaluation Stability Evidence | 2/2 | Complete | 2026-05-31 |
 | 91. Claim Upgrade Rules And Authority Gates | 2/2 | Complete | 2026-05-31 |
 | 92. Trust Summary Integration | 2/2 | Complete | 2026-05-31 |
-| 93. Documentation, Examples, And Guardrail Tests | 0/TBD | Not started | — |
+| 93. Documentation, Examples, And Guardrail Tests | 2/2 | Complete | 2026-05-31 |
 
 **Coverage:**
 - Requirements mapped: 23/23
+- Requirements complete: 23/23
 - Flow count: 5 phases
 - Residual blockers: 0
