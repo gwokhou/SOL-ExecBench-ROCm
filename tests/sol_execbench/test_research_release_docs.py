@@ -10,6 +10,23 @@ def _read_doc(path: str) -> str:
     return (REPO_ROOT / path).read_text()
 
 
+V1_19_GUIDE = "docs/v1_19_evidence_guide.md"
+V1_19_ENTRY_DOCS = (
+    "docs/CLAIMS.md",
+    "docs/TESTING.md",
+    "docs/RESEARCHER-GUIDE.md",
+)
+V1_19_NEGATIVE_CLAIMS = (
+    "no full 235-problem paper validation",
+    "no upstream SOLAR parity",
+    "no score authority",
+    "no leaderboard readiness",
+    "no CDNA 3/MI300X/CDNA4 validation",
+    "no native-host ROCm Matrix validation",
+    "no new-hardware validation",
+)
+
+
 def test_claims_doc_defines_allowed_and_unsupported_claims():
     text = _read_doc("docs/CLAIMS.md")
 
@@ -211,5 +228,49 @@ def test_v1_17_static_evidence_validation_artifact_records_live_boundary():
         "readelf",
         "does not claim benchmark correctness",
         "does not validate CDNA 3",
+    ):
+        assert required in text
+
+
+def test_v1_19_guide_is_linked_from_public_entry_docs():
+    for path in V1_19_ENTRY_DOCS:
+        text = _read_doc(path)
+        assert "docs/v1_19_evidence_guide.md" in text
+
+
+def test_v1_19_guide_names_evidence_surfaces_and_scripts():
+    text = _read_doc(V1_19_GUIDE)
+
+    for required in (
+        "execution closure",
+        "paper denominator report",
+        "Matrix schema export",
+        "Matrix semantic diff",
+        "AMD bound sanity",
+        "scripts/run_dataset.py",
+        "scripts/report_paper_denominator.py",
+        "scripts/export_matrix_schema.py",
+        "scripts/diff_matrix_reports.py",
+        "scripts/report_amd_bound_sanity.py",
+    ):
+        assert required in text
+
+
+def test_v1_19_docs_keep_required_negative_claim_boundaries_visible():
+    guide = _read_doc(V1_19_GUIDE)
+    linked_docs = "\n".join(_read_doc(path) for path in V1_19_ENTRY_DOCS)
+
+    for boundary in V1_19_NEGATIVE_CLAIMS:
+        assert boundary in guide
+        assert boundary in linked_docs
+
+
+def test_v1_19_guide_keeps_canonical_contract_semantics_unchanged():
+    text = _read_doc(V1_19_GUIDE)
+
+    for required in (
+        "canonical Trace, Definition, Workload, Solution",
+        "correctness, timing, score, and evaluator contract semantics are unchanged",
+        "sidecars/reports only",
     ):
         assert required in text
