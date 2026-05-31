@@ -142,6 +142,33 @@ UV_CACHE_DIR=/tmp/uv-cache uv run ruff check \
   docs/CLAIMS.md docs/TESTING.md tests/sol_execbench/test_rocm_matrix_docs.py
 ```
 
+## v1.19 Evidence Docs Guardrails
+
+The centralized v1.19 guide is `docs/v1_19_evidence_guide.md`. Its focused
+CPU-safe checks cover execution closure, paper denominator reports, Matrix
+schema export, Matrix semantic diff, AMD bound sanity, and public wording
+boundaries. v1.19 documentation has no full 235-problem paper validation, no
+upstream SOLAR parity, no score authority, no leaderboard readiness, no CDNA
+3/MI300X/CDNA4 validation, no native-host ROCm Matrix validation, and no
+new-hardware validation.
+
+Run the v1.19 documentation and sidecar-only contract checks:
+
+```bash
+UV_CACHE_DIR=/tmp/uv-cache uv run pytest \
+  tests/sol_execbench/test_research_release_docs.py \
+  tests/sol_execbench/test_rocm_matrix_docs.py \
+  tests/sol_execbench/test_public_contract_guardrails.py::test_v1_19_paper_denominator_fields_remain_sidecar_only \
+  tests/sol_execbench/test_public_contract_guardrails.py::test_v1_19_amd_bound_sanity_fields_remain_sidecar_only -q
+
+UV_CACHE_DIR=/tmp/uv-cache uv run ruff check \
+  tests/sol_execbench/test_research_release_docs.py
+```
+
+This command set does not run GPU probes, ROCm live validation, Docker builds,
+Docker containers, hardware-marker tests, dependency installs, or dependency
+relocking.
+
 ## Live ROCm Validation
 
 Live ROCm validation is marker-gated. Use these checks only on a ROCm-capable
