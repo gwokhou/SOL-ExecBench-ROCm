@@ -613,6 +613,76 @@ def test_v1_11_execution_closure_docs_keep_bounded_claim_boundary():
     assert "not a leaderboard result" in docs
 
 
+def test_v1_19_paper_denominator_fields_remain_sidecar_only():
+    definition, workload, trace = _sample_definition_workload_trace()
+    forbidden = (
+        "sol_execbench.paper_denominator_report.v1",
+        "paper_denominator",
+        "paper_denominator_checksum",
+        "PaperDenominatorReport",
+        "PaperDenominatorSourceRef",
+        "source_refs",
+        "amd_sol_artifacts",
+        "solar_artifacts",
+        "ready",
+        "blocked",
+        "unsupported",
+        "deferred",
+        "evidence_missing",
+        "filtered",
+        "skipped",
+        "not_attempted",
+        "paper_parity",
+        "upstream_solar_parity",
+        "leaderboard_authority",
+        "native_host_validation",
+        "new_hardware_validation",
+        "full_235_problem_validation",
+        "score_authority",
+    )
+
+    for payload in (
+        definition.model_dump(mode="json"),
+        workload.model_dump(mode="json"),
+        trace.model_dump(mode="json"),
+    ):
+        text = json.dumps(payload, sort_keys=True)
+        for field in forbidden:
+            assert field not in text
+
+    from sol_execbench.core.dataset.paper_denominator import PaperDenominatorClaimBoundary
+
+    sidecar_boundary = PaperDenominatorClaimBoundary().model_dump(mode="json")
+    for field in (
+        "paper_parity",
+        "upstream_solar_parity",
+        "leaderboard_authority",
+        "native_host_validation",
+        "new_hardware_validation",
+        "full_235_problem_validation",
+        "score_authority",
+    ):
+        assert sidecar_boundary[field] is False
+
+
+def test_primary_cli_does_not_expose_v1_19_paper_denominator_options():
+    result = CliRunner().invoke(cli, ["--help"])
+    assert result.exit_code == 0
+    help_text = result.output
+
+    for option in (
+        "--paper-denominator",
+        "--report-paper-denominator",
+        "--paper-denominator-report",
+        "--amd-sol-artifact",
+        "--solar-artifact",
+        "--created-at",
+        "paper_denominator",
+        "paper-denominator",
+    ):
+        assert option not in help_text
+
+
 def test_v1_11_parity_gap_docs_keep_bounded_claim_boundary():
     docs = (REPO_ROOT / "docs/analysis.md").read_text()
 
