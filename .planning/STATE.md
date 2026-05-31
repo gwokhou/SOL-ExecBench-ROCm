@@ -1,11 +1,11 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.19
-milestone_name: ROCm Port
-status: completed
+milestone_name: Research Credibility Without New Hardware
+status: Awaiting next milestone
 stopped_at: Completed 88-02-PLAN.md
-last_updated: "2026-05-31T12:18:05.350Z"
-last_activity: 2026-05-31 -- Phase 88 marked complete
+last_updated: "2026-05-31T13:16:51.787Z"
+last_activity: 2026-05-31 — Milestone v1.19 completed and archived
 progress:
   total_phases: 6
   completed_phases: 6
@@ -21,16 +21,14 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-31)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Phase 88: Documentation, Examples, And Guardrail Tests
+**Current focus:** Planning next milestone
 
 ## Current Position
 
-Phase: 88 — COMPLETE
-Plan: 2 of 2
-Status: Phase 88 complete
-Last activity: 2026-05-31 -- Phase 88 marked complete
-
-Progress: [██████████] 100%
+Phase: Milestone v1.19 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-05-31 — Milestone v1.19 completed and archived
 
 ## Performance Metrics
 
@@ -103,7 +101,7 @@ None found.
 
 ### Blockers/Concerns
 
-- AMD SOL/SOLAR sanity wording must avoid implying upstream SOLAR equivalence or hardware model validation.
+None.
 
 ## Deferred Items
 
@@ -119,3 +117,7 @@ None found.
 Last session: 2026-05-31T12:17:09.178Z
 Stopped at: Completed 88-02-PLAN.md
 Resume file: None
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone

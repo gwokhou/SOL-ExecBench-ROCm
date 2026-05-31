@@ -2,8 +2,9 @@
 
 ## Milestones
 
-- Planned **v1.19 Research Credibility Without New Hardware** -
-  Phases 83-88.
+- Complete **v1.19 Research Credibility Without New Hardware** -
+  Phases 83-88 (shipped 2026-05-31). See
+  `.planning/milestones/v1.19-ROADMAP.md`.
 
 - Complete **v1.18 ROCm Version Matrix via Docker** -
   Phases 78-82 (shipped 2026-05-28). See
@@ -78,118 +79,19 @@
 
 ## Current Position
 
-**Active milestone:** v1.19 Research Credibility Without New Hardware.
+**Active milestone:** None.
 
-**Status:** Roadmap created; ready to plan Phase 83.
+**Status:** v1.19 is shipped and archived.
 
-**Next step:** Start Phase 83 with `/gsd-plan-phase 83`.
+**Next step:** Start the next milestone with `$gsd-new-milestone`.
 
 ## Phases
 
-- [x] **Phase 83: Closure Contracts And Provenance Foundation** - Researchers get deterministic, CPU-safe execution-closure contracts and provenance checks for reusable evidence. (completed 2026-05-31)
-- [x] **Phase 84: Paper Denominator Accounting And Claim Boundaries** - Researchers can account for the public benchmark denominator and evidence gaps without claiming paper parity. (completed 2026-05-31)
-- [x] **Phase 85: Compatibility Matrix Schema Export And Semantic Diff** - Researchers and downstream tools can export Matrix schemas and compare Matrix reports semantically. (completed 2026-05-31)
-- [x] **Phase 86: Dataset Runner Hardening Integration** - Dataset runs classify closure outcomes and resume behavior consistently without changing default benchmark semantics. (completed 2026-05-31)
-- [x] **Phase 87: AMD SOL/SOLAR Bound Sanity Evidence** - Researchers can inspect diagnostic AMD bound sanity over existing RDNA 4 and Docker evidence only. (completed 2026-05-31)
-- [x] **Phase 88: Documentation, Examples, And Guardrail Tests** - Public docs, examples, and CPU-safe tests keep v1.19 evidence surfaces interpretable and claim-safe. (completed 2026-05-31)
-
-## Phase Details
-
-### Phase 83: Closure Contracts And Provenance Foundation
-**Goal**: Researchers have a strict, deterministic execution-closure sidecar contract that explains closure status, reason codes, totals, source refs, and evidence provenance without mutating canonical benchmark contracts.
-**Depends on**: Phase 82
-**Requirements**: CLOS-01, CLOS-02, CLOS-03, CLOS-04
-**Success Criteria** (what must be TRUE):
-  1. Researcher can validate and serialize closure records with deterministic ordering, totals, source refs, and provenance fields on CPU-only fixtures.
-  2. Researcher can distinguish attempted pass, attempted failure, not attempted, filtered, skipped existing pass, missing trace, missing derived evidence, and setup/runtime blockers using stable status and reason codes.
-  3. Researcher can detect manifest, readiness, ready-subset, workload identity, solution mode, and evidence-requirement mismatches before accepting existing traces as reusable.
-  4. Dataset tooling can call closure helper APIs without changing canonical Trace JSONL, correctness, timing, or score semantics.
-**Plans**: TBD
-
-### Phase 84: Paper Denominator Accounting And Claim Boundaries
-**Goal**: Researchers can produce a deterministic paper denominator report that accounts for ready, blocked, unsupported, deferred, attempted, filtered, skipped, and evidence-missing benchmark status without presenting the accounting as paper validation.
-**Depends on**: Phase 83
-**Requirements**: DENOM-01, DENOM-02, DENOM-03, DENOM-04, DENOM-05
-**Success Criteria** (what must be TRUE):
-  1. Researcher can generate `paper_denominator_report.v1` JSON that rolls up public benchmark denominator status by problem, workload, category, readiness, closure status, and evidence gap.
-  2. Researcher can inspect stable denominator reason codes that separate ready, blocked, unsupported, deferred, evidence-missing, attempted-passed, attempted-failed, filtered, skipped, and not-attempted states.
-  3. Report consumers can trace denominator conclusions back to source manifest, inventory, readiness, ready-subset, closure, AMD score, AMD SOL, and SOLAR artifacts by path/ref and checksum.
-  4. Researcher can read deterministic Markdown counts, evidence gaps, deferred buckets, and next-evidence hints with paper parity, upstream SOLAR parity, leaderboard authority, native-host validation, and new-hardware validation explicitly kept false.
-**Plans**: 2 plans
-Plans:
-- [x] 84-01-PLAN.md — Core paper denominator sidecar contract, deterministic JSON, Markdown renderer, bounded source refs, and false claim boundaries.
-- [x] 84-02-PLAN.md — Thin reporting script, dataset exports, script output tests, and public contract guardrails.
-
-### Phase 85: Compatibility Matrix Schema Export And Semantic Diff
-**Goal**: Researchers and downstream evidence producers can export strict Matrix JSON Schemas and compare ROCm Compatibility Matrix reports by semantic changes while preserving Docker/native-host and authority boundaries.
-**Depends on**: Phase 84
-**Requirements**: MATRIX-01, MATRIX-02, MATRIX-03, MATRIX-04, MATRIX-05
-**Success Criteria** (what must be TRUE):
-  1. Researcher can export JSON Schema for `MatrixEntry` and `RocmCompatibilityMatrixReport` with schema identity, version metadata, and strict extra-field behavior.
-  2. Researcher can diff two Matrix reports by Target identity and validation scope, seeing added, removed, unchanged, and changed entries.
-  3. Researcher can identify semantic Matrix changes across status, reason code, requested Target values, observed evidence, dependency policy, Docker image metadata, clock/evidence metadata, artifact refs, and claim boundaries.
-  4. Researcher can consume both JSON diff output and a severity-ranked human summary for validation downgrade, mixed-version drift, runtime unavailability, image/dependency drift, GPU architecture drift, and claim-boundary escalation.
-  5. Matrix schema and diff outputs remain diagnostic and cannot upgrade Docker container evidence into native-host validation, score authority, paper-parity authority, or leaderboard authority.
-**Plans**: 2 plans
-Plans:
-- [x] 85-01-PLAN.md — Matrix JSON Schema export helpers, thin script, deterministic output, and diagnostic-only schema boundaries.
-- [x] 85-02-PLAN.md — Semantic Matrix report diff helpers, JSON/Markdown output, severity categories, and claim-boundary guardrails.
-
-### Phase 86: Dataset Runner Hardening Integration
-**Goal**: Dataset runner executions reuse closure helpers to classify resume, reuse, skipped, failed, missing-evidence, and unattempted outcomes deterministically while preserving existing default execution behavior.
-**Depends on**: Phase 83
-**Requirements**: RUNNER-01, RUNNER-02, RUNNER-03, RUNNER-04, RUNNER-05
-**Success Criteria** (what must be TRUE):
-  1. Researcher can resume or reuse dataset output only when ready-subset, readiness, manifest, problem, workload, solution, and evidence provenance match the selected run configuration.
-  2. Researcher can see existing passing traces marked `skipped_existing_pass` only when provenance matches, while `--rerun` records a fresh attempt.
-  3. Researcher can inspect closure output that classifies build failures, runtime failures, timeouts, nonzero CLI exits, correctness failures, missing traces, missing derived evidence, and skipped/unattempted workloads with stable reason codes and bounded log refs.
-  4. Existing dataset runner defaults behave as before unless a mismatch, missing evidence, or explicit closure option requires a diagnostic stop or sidecar status.
-  5. Closure writes are deterministic and avoid credentials, proprietary kernels, raw dataset payloads, unnecessary absolute paths, and unbounded logs.
-**Plans**: 2 plans
-Plans:
-- [x] 86-01-PLAN.md — Provenance-gated existing-pass reuse, stale provenance diagnostics, and `--rerun` fresh-attempt behavior.
-- [x] 86-02-PLAN.md — Failure, missing-trace, missing-evidence, skipped, and unattempted closure classification with bounded refs/logs.
-
-### Phase 87: AMD SOL/SOLAR Bound Sanity Evidence
-**Goal**: Researchers can generate diagnostic AMD SOL/SOLAR bound sanity reports over existing RDNA 4 and Docker evidence while keeping score eligibility and hardware-validation claims unchanged.
-**Depends on**: Phase 84
-**Requirements**: SANITY-01, SANITY-02, SANITY-03, SANITY-04
-**Success Criteria** (what must be TRUE):
-  1. Researcher can generate `amd_bound_sanity.v1` over existing trace, closure, AMD SOL, SOLAR derivation, AMD score, and compatibility evidence refs/checksums.
-  2. Researcher can inspect artifact availability, aggregate statuses, coverage summaries, warnings, and evidence gaps for AMD SOL/SOLAR evidence.
-  3. Researcher can distinguish scored, degraded, unscored, unsupported, provisional, and missing-evidence states without changing AMD-native score semantics or score eligibility rules.
-  4. Bound sanity output surfaces provisional RDNA 4 model risk while explicitly avoiding upstream SOLAR equivalence, model-validation, paper-parity, leaderboard, CDNA 3, MI300X, CDNA 4, and native-host validation claims.
-  5. Bound sanity checks run without new hardware probes, Docker privilege changes, or dependency relocking.
-**Plans**: 2 plans
-Plans:
-- [x] 87-01-PLAN.md — Core `amd_bound_sanity.v1` contract, report builder, Markdown renderer, and CPU-safe tests.
-- [x] 87-02-PLAN.md — Thin report script and public contract guardrails for sidecar-only diagnostic scope.
-
-### Phase 88: Documentation, Examples, And Guardrail Tests
-**Goal**: Researchers can understand, reproduce, and safely interpret v1.19 evidence surfaces through documentation, representative examples, and CPU-safe tests that preserve public contracts and claim boundaries.
-**Depends on**: Phase 87
-**Requirements**: DOCS-01, DOCS-02, DOCS-03, DOCS-04, DOCS-05
-**Success Criteria** (what must be TRUE):
-  1. Researcher can follow docs to generate and interpret denominator reports, closure hardening outputs, Matrix schema exports, Matrix diffs, and AMD bound sanity reports.
-  2. Documentation states that v1.19 does not add full 235-problem paper validation, upstream SOLAR parity, score authority, leaderboard readiness, CDNA 3/MI300X/CDNA4 validation, or native-host ROCm Matrix validation.
-  3. CPU-safe tests cover denominator accounting, closure serialization/provenance, Matrix schema export, Matrix diff semantics, dataset-runner closure classification, AMD bound sanity reports, and docs wording guardrails.
-  4. Public examples or fixture reports show representative JSON/Markdown artifact shapes with bounded logs, relative refs, checksums, and explicit authority-false or diagnostic-only interpretation.
-  5. Existing public contracts remain stable: canonical Trace, Definition, Workload, Solution, correctness, timing, score, and evaluator contract semantics are unchanged by v1.19 reporting features.
-**Plans**: 2 plans
-Plans:
-- [x] 88-01-PLAN.md — Centralized v1.19 evidence guide, public docs links, CPU-safe docs wording guardrails, and claim-boundary preservation.
-- [x] 88-02-PLAN.md — Demo-only fixture reports, example wording guardrails, bounded refs/checksums, and sidecar-only public contract checks.
+No active phases. Historical phase details for v1.19 are archived in
+`.planning/milestones/v1.19-ROADMAP.md`.
 
 ## Progress
 
-**Execution Order:**
-Phases execute in numeric order: 83 -> 84 -> 85 -> 86 -> 87 -> 88.
-
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 83. Closure Contracts And Provenance Foundation | 2/2 | Complete   | 2026-05-31 |
-| 84. Paper Denominator Accounting And Claim Boundaries | 2/2 | Complete   | 2026-05-31 |
-| 85. Compatibility Matrix Schema Export And Semantic Diff | 2/2 | Complete   | 2026-05-31 |
-| 86. Dataset Runner Hardening Integration | 2/2 | Complete   | 2026-05-31 |
-| 87. AMD SOL/SOLAR Bound Sanity Evidence | 2/2 | Complete   | 2026-05-31 |
-| 88. Documentation, Examples, And Guardrail Tests | 2/2 | Complete   | 2026-05-31 |
+| Phase Range | Milestone | Plans Complete | Status | Completed |
+| --- | --- | ---: | --- | --- |
+| 83-88 | v1.19 Research Credibility Without New Hardware | 13/13 | Complete | 2026-05-31 |
