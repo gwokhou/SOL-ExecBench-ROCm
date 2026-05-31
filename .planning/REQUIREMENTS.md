@@ -84,18 +84,18 @@ ExecBench.
 
 ### AMD SOL/SOLAR Sanity
 
-- [ ] **SANITY-01**: The project emits an `amd_bound_sanity.v1` diagnostic
+- [x] **SANITY-01**: The project emits an `amd_bound_sanity.v1` diagnostic
   report over existing RDNA 4 and Docker evidence, summarizing AMD SOL/SOLAR
   artifact availability, aggregate statuses, coverage summaries, warnings, and
   evidence gaps.
-- [ ] **SANITY-02**: Bound sanity reports distinguish scored, degraded,
+- [x] **SANITY-02**: Bound sanity reports distinguish scored, degraded,
   unscored, unsupported, provisional, and missing-evidence states without
   changing AMD-native score semantics or score eligibility rules.
-- [ ] **SANITY-03**: Bound sanity reports surface provisional RDNA 4 hardware
+- [x] **SANITY-03**: Bound sanity reports surface provisional RDNA 4 hardware
   model or model-validation risk and explicitly avoid upstream SOLAR
   equivalence, model-validation, paper-parity, leaderboard, CDNA 3, MI300X,
   CDNA 4, or native-host validation claims.
-- [ ] **SANITY-04**: Bound sanity checks consume existing trace, closure,
+- [x] **SANITY-04**: Bound sanity checks consume existing trace, closure,
   AMD SOL, SOLAR derivation, AMD score, and compatibility evidence through
   refs/checksums and do not require new hardware probes, Docker privilege
   changes, or dependency relocking.
@@ -183,10 +183,10 @@ ExecBench.
 | RUNNER-03 | Phase 86 | Complete |
 | RUNNER-04 | Phase 86 | Complete |
 | RUNNER-05 | Phase 86 | Complete |
-| SANITY-01 | Phase 87 | Pending |
-| SANITY-02 | Phase 87 | Pending |
-| SANITY-03 | Phase 87 | Pending |
-| SANITY-04 | Phase 87 | Pending |
+| SANITY-01 | Phase 87 | Complete |
+| SANITY-02 | Phase 87 | Complete |
+| SANITY-03 | Phase 87 | Complete |
+| SANITY-04 | Phase 87 | Complete |
 | DOCS-01 | Phase 88 | Pending |
 | DOCS-02 | Phase 88 | Pending |
 | DOCS-03 | Phase 88 | Pending |

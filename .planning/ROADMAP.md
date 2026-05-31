@@ -162,7 +162,7 @@ Plans:
   5. Bound sanity checks run without new hardware probes, Docker privilege changes, or dependency relocking.
 **Plans**: 2 plans
 Plans:
-- [ ] 87-01-PLAN.md — Core `amd_bound_sanity.v1` contract, report builder, Markdown renderer, and CPU-safe tests.
+- [x] 87-01-PLAN.md — Core `amd_bound_sanity.v1` contract, report builder, Markdown renderer, and CPU-safe tests.
 - [ ] 87-02-PLAN.md — Thin report script and public contract guardrails for sidecar-only diagnostic scope.
 
 ### Phase 88: Documentation, Examples, And Guardrail Tests
@@ -188,5 +188,5 @@ Phases execute in numeric order: 83 -> 84 -> 85 -> 86 -> 87 -> 88.
 | 84. Paper Denominator Accounting And Claim Boundaries | 2/2 | Complete   | 2026-05-31 |
 | 85. Compatibility Matrix Schema Export And Semantic Diff | 2/2 | Complete   | 2026-05-31 |
 | 86. Dataset Runner Hardening Integration | 2/2 | Complete   | 2026-05-31 |
-| 87. AMD SOL/SOLAR Bound Sanity Evidence | 0/2 | Not started | - |
+| 87. AMD SOL/SOLAR Bound Sanity Evidence | 1/2 | In Progress|  |
 | 88. Documentation, Examples, And Guardrail Tests | 0/TBD | Not started | - |
