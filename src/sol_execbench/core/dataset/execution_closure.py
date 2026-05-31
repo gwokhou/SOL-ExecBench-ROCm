@@ -45,6 +45,8 @@ class ExecutionClosureReasonCode(str, Enum):
 
 
 class ExecutionClosureRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     category: str
     problem_id: str
     problem_path: str
@@ -71,7 +73,7 @@ class ExecutionClosureRecord(BaseModel):
 
 
 class ExecutionClosureProvenance(BaseModel):
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="forbid")
 
     command_args: list[str] = Field(default_factory=list)
     dataset_root: str | None = None
@@ -104,6 +106,8 @@ class ExecutionClosureProvenance(BaseModel):
 
 
 class ExecutionClosureProvenanceMismatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     field: str
     reason_code: ExecutionClosureReasonCode
     expected: Any = None
@@ -111,6 +115,8 @@ class ExecutionClosureProvenanceMismatch(BaseModel):
 
 
 class ExecutionClosureTotals(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     records: int = 0
     attempted: int = 0
     passed: int = 0
@@ -125,6 +131,8 @@ class ExecutionClosureTotals(BaseModel):
 
 
 class ExecutionClosureClaimBoundary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     bounded_ready_subset_execution: bool = True
     full_235_problem_validation: bool = False
     paper_parity: bool = False
@@ -136,6 +144,8 @@ class ExecutionClosureClaimBoundary(BaseModel):
 
 
 class ExecutionClosureReport(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     schema_version: str = EXECUTION_CLOSURE_SCHEMA_VERSION
     created_at: str
     status: str

@@ -713,10 +713,57 @@ def _git_commit() -> str | None:
 
 
 def _relative_ref(path: Path, base: Path) -> str:
+    path = path.resolve()
+    base = base.resolve()
     try:
         return path.relative_to(base).as_posix()
     except ValueError:
-        return str(path)
+        return path.name
+
+
+def _first_relative_ref(path: Path, *bases: Path) -> str:
+    for base in bases:
+        ref = _relative_ref(path, base)
+        if ref != path.resolve().name:
+            return ref
+    return path.resolve().name
+
+
+def _normalized_command_args(args: argparse.Namespace) -> list[str]:
+    normalized = [args.problems_dir.name]
+    if args.category:
+        normalized.extend(["--category", ",".join(args.category)])
+    if args.limit is not None:
+        normalized.extend(["--limit", str(args.limit)])
+    if args.max_workloads is not None:
+        normalized.extend(["--max-workloads", str(args.max_workloads)])
+    if args.timeout != 120:
+        normalized.extend(["--timeout", str(args.timeout)])
+    if args.solution_name:
+        normalized.extend(["--solution-name", args.solution_name])
+    if args.rerun:
+        normalized.append("--rerun")
+    if args.keep_staging:
+        normalized.append("--keep-staging")
+    if args.verbose:
+        normalized.append("--verbose")
+    if args.lock_clocks:
+        normalized.append("--lock-clocks")
+    for flag, value in (
+        ("--output", args.output),
+        ("--ready-subset", args.ready_subset),
+        ("--readiness", args.readiness),
+        ("--execution-closure", args.execution_closure),
+        ("--dataset-manifest", args.dataset_manifest),
+        ("--amd-score-report", args.amd_score_report),
+        ("--amd-sol-bound-dir", args.amd_sol_bound_dir),
+        ("--solar-derivation", args.solar_derivation),
+        ("--timing-evidence-dir", args.timing_evidence_dir),
+        ("--scoring-baseline", args.scoring_baseline),
+    ):
+        if value is not None:
+            normalized.extend([flag, Path(value).name])
+    return normalized
 
 
 def _closure_record(
@@ -1225,8 +1272,8 @@ def main():
         else None
     )
     provenance = {
-        "command_args": sys.argv[1:],
-        "dataset_root": str(problems_dir),
+        "command_args": _normalized_command_args(args),
+        "dataset_root": _first_relative_ref(problems_dir, ROOT),
         "selected_categories": args.category,
         "limit": args.limit,
         "max_workloads": args.max_workloads,
@@ -1239,29 +1286,57 @@ def main():
         "verbose": args.verbose,
         "solution_mode": "named" if args.solution_name else "reference",
         "solution_name": args.solution_name,
-        "output_dir": str(output_dir),
-        "summary_path": str(output_dir / "summary.json"),
-        "ready_subset_path": str(args.ready_subset.resolve()) if args.ready_subset else None,
+        "output_dir": _first_relative_ref(output_dir, ROOT),
+        "summary_path": _relative_ref(output_dir / "summary.json", output_dir),
+        "ready_subset_path": (
+            _first_relative_ref(args.ready_subset, ROOT, problems_dir, output_dir)
+            if args.ready_subset
+            else None
+        ),
         "ready_subset_checksum": _sidecar_checksum(ready_subset, "ready_subset_checksum"),
-        "readiness_path": str(args.readiness.resolve()) if args.readiness else None,
+        "readiness_path": (
+            _first_relative_ref(args.readiness, ROOT, problems_dir, output_dir)
+            if args.readiness
+            else None
+        ),
         "readiness_checksum": (
             _sidecar_checksum(readiness, "readiness_checksum")
             or (ready_subset or {}).get("readiness_checksum")
         ),
-        "dataset_manifest_path": str(args.dataset_manifest.resolve()) if args.dataset_manifest else None,
+        "dataset_manifest_path": (
+            _first_relative_ref(args.dataset_manifest, ROOT, problems_dir, output_dir)
+            if args.dataset_manifest
+            else None
+        ),
         "dataset_manifest_checksum": _manifest_checksum(dataset_manifest),
         "git_commit": _git_commit(),
-        "config_path": str(config_path) if config_path else None,
+        "config_path": _relative_ref(config_path, output_dir) if config_path else None,
         "benchmark_config": {
             "warmup_runs": benchmark_config.warmup_runs,
             "iterations": benchmark_config.iterations,
             "lock_clocks": benchmark_config.lock_clocks,
         },
         "derived_evidence": {
-            "amd_score_report": str(args.amd_score_report.resolve()) if args.amd_score_report else None,
-            "amd_sol_bound_dir": str(args.amd_sol_bound_dir.resolve()) if args.amd_sol_bound_dir else None,
-            "solar_derivation": str(args.solar_derivation.resolve()) if args.solar_derivation else None,
-            "timing_evidence_dir": str(args.timing_evidence_dir.resolve()) if args.timing_evidence_dir else None,
+            "amd_score_report": (
+                _first_relative_ref(args.amd_score_report, output_dir, ROOT)
+                if args.amd_score_report
+                else None
+            ),
+            "amd_sol_bound_dir": (
+                _first_relative_ref(args.amd_sol_bound_dir, output_dir, ROOT)
+                if args.amd_sol_bound_dir
+                else None
+            ),
+            "solar_derivation": (
+                _first_relative_ref(args.solar_derivation, output_dir, ROOT)
+                if args.solar_derivation
+                else None
+            ),
+            "timing_evidence_dir": (
+                _first_relative_ref(args.timing_evidence_dir, output_dir, ROOT)
+                if args.timing_evidence_dir
+                else None
+            ),
         },
     }
 
