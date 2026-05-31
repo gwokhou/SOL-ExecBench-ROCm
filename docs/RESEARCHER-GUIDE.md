@@ -11,7 +11,7 @@ how to avoid overstating results.
 | GPU kernel author | Run one local example, then adapt a solution file. | `solution.json`, trace JSONL, correctness/performance fields. |
 | compiler/backend researcher | Inspect solution schemas, staging, and native build paths. | `docs/solution.md`, `src/sol_execbench/driver/`, HIP/Triton examples. |
 | agent kernel-optimization researcher | Use the isolated harness and reward-hack checks as the execution boundary. | trace JSONL, `REWARD_HACK` traces, baseline comparisons. |
-| benchmark/reproducibility researcher | Use the curated slice, environment sidecars, profiling sidecars, static evidence sidecars, and closure reports. | `docs/curated_rocm_slice.md`, `docs/static_kernel_evidence.md`, `docs/CLAIMS.md`, execution closure, parity gaps. |
+| benchmark/reproducibility researcher | Use the curated slice, environment sidecars, profiling sidecars, static evidence sidecars, execution closure, and v1.19 sidecar reports. | `docs/curated_rocm_slice.md`, `docs/static_kernel_evidence.md`, `docs/v1_19_evidence_guide.md`, `docs/CLAIMS.md`, execution closure, paper denominator gaps, Matrix diagnostics, AMD bound sanity. |
 
 ## First Run
 
@@ -27,6 +27,14 @@ uv run sol-execbench tests/sol_execbench/samples/rmsnorm \
 Read the canonical trace first. It is the primary artifact. Derived reports and
 sidecars must not change trace JSONL semantics.
 
+For v1.19 evidence surfaces, start with `docs/v1_19_evidence_guide.md`. It
+collects the CPU-safe command shapes and interpretation rules for execution
+closure, paper denominator reports, Matrix schema export, Matrix semantic diff,
+and AMD bound sanity. These reports have no full 235-problem paper validation,
+no upstream SOLAR parity, no score authority, no leaderboard readiness, no CDNA
+3/MI300X/CDNA4 validation, no native-host ROCm Matrix validation, and no
+new-hardware validation.
+
 ## Interpreting Artifacts
 
 | Artifact | What it tells you | What it does not prove |
@@ -38,6 +46,10 @@ sidecars must not change trace JSONL semantics.
 | AMD SOL sidecar | Derived AMD bound graph, estimates, hardware model, and coverage state. | Upstream SOLAR equivalence. |
 | AMD score report | Guarded local AMD-native score interpretation. | NVIDIA B200 or leaderboard equivalence. |
 | Execution closure | Which scoped problems have closure statuses: `not_attempted`, `filtered`, `skipped_existing_pass`, `attempted_passed`, `attempted_failed`, `missing_trace`, or `derived_evidence_missing`. | Full 235-problem validation unless the denominator is actually complete. |
+| Paper denominator report | Bounded denominator accounting, source refs, checksums, evidence gaps, and false claim-boundary fields. | Paper parity, score authority, or leaderboard readiness. |
+| Matrix schema export | Strict Matrix JSON Schema shape for report validation. | Native-host ROCm Matrix validation or hardware validation. |
+| Matrix semantic diff | Diagnostic Matrix report drift, severity, and review context. | Score authority, leaderboard readiness, or clean hardware validation. |
+| AMD bound sanity report | Existing-evidence source refs, checksums, warnings, and bounded AMD/SOL/SOLAR consistency checks. | Upstream SOLAR parity, new-hardware validation, or score authority. |
 
 ## Adding Or Adapting A Kernel
 
@@ -98,4 +110,6 @@ available to the evaluation policy.
 - Mark unavailable, unsupported, partial, failed, or skipped static evidence
   explicitly.
 - Report denominator counts for any dataset or curated-slice result.
+- For v1.19 sidecars, keep source refs relative, checksums visible, logs
+  bounded, and authority fields false.
 - Link claims to `docs/CLAIMS.md`.

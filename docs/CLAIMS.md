@@ -6,6 +6,12 @@ does not claim official leaderboard equivalence.
 
 ## What Can Be Claimed Today
 
+For the centralized v1.19 guide to evidence surfaces, generation commands, and
+claim boundaries, see `docs/v1_19_evidence_guide.md`. v1.19 evidence has no
+full 235-problem paper validation, no upstream SOLAR parity, no score authority,
+no leaderboard readiness, no CDNA 3/MI300X/CDNA4 validation, no native-host ROCm
+Matrix validation, and no new-hardware validation.
+
 | Claim level | Allowed claim | Required evidence |
 | --- | --- | --- |
 | ROCm-port evidence | The CLI, schemas, isolated evaluation, correctness checks, reward-hack checks, trace JSONL, and selected examples run through ROCm-specific paths. | Passing tests for the touched surface, canonical trace examples, and ROCm environment documentation. |
@@ -13,6 +19,7 @@ does not claim official leaderboard equivalence.
 | Profiling evidence | A run produced diagnostic `rocprofv3` artifacts. | `--profile rocprofv3`, per-trace profile sidecar such as `<trace>.profile.json`, registered artifact paths, and profiler status metadata. |
 | Toolchain routing evidence | The project selected or rejected ROCm tools for a requested evidence level based on registry entries and bounded probes. | `sol-execbench toolchain --json`, registry source refs, selected tool, fallback, status, and reason code. |
 | Static Kernel Evidence | A HIP/C++ run produced diagnostic static build artifacts and bounded routed extractor outputs. | `--static-evidence auto`, `<trace>.static-evidence.json`, persisted artifact paths, `llvm-objdump` / `readelf` tool-run records, and diagnostic-only authority flags. |
+| v1.19 sidecar evidence | Execution closure, paper denominator, Matrix schema export, Matrix semantic diff, and AMD bound sanity artifacts were generated or inspected under bounded report semantics. | `docs/v1_19_evidence_guide.md`, explicit sidecar/report paths, relative source refs, checksums, false authority fields, and focused CPU-safe docs/contract guardrails. |
 | AMD-native-derived evidence | A score or bound report was derived from ROCm traces and AMD-side bound artifacts. | Canonical traces, AMD SOL bound sidecars, hardware model refs, score eligibility state, and warnings. |
 | Research-preview evidence | A curated benchmark slice was executed or audited under documented limits. | Slice definition, command transcript or expected commands, artifact list, pass/fail/skip/unavailable accounting, and known gaps. |
 
@@ -87,6 +94,9 @@ leaderboard authority.
   native-host evidence.
 - Mixed-version debug override output as clean validation, score authority,
   paper-parity authority, or leaderboard authority.
+- v1.19 sidecar/report evidence as full paper validation, upstream SOLAR parity,
+  score authority, leaderboard readiness, native-host ROCm Matrix validation,
+  CDNA 3/MI300X/CDNA4 validation, or new-hardware validation.
 
 ## Claim Upgrade Rules
 
