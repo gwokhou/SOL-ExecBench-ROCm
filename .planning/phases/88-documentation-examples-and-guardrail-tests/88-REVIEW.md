@@ -1,20 +1,10 @@
 ---
 phase: 88-documentation-examples-and-guardrail-tests
-reviewed: 2026-05-31T12:47:57Z
+reviewed: 2026-05-31T13:00:33Z
 depth: standard
-files_reviewed: 12
+files_reviewed: 2
 files_reviewed_list:
   - docs/v1_19_evidence_guide.md
-  - docs/examples/v1_19_evidence/execution_closure.demo.json
-  - docs/examples/v1_19_evidence/paper_denominator.demo.json
-  - docs/examples/v1_19_evidence/matrix_diff.demo.json
-  - docs/examples/v1_19_evidence/amd_bound_sanity.demo.json
-  - scripts/diff_matrix_reports.py
-  - src/sol_execbench/core/dataset/execution_closure.py
-  - src/sol_execbench/core/dataset/paper_denominator.py
-  - src/sol_execbench/core/matrix_diff.py
-  - src/sol_execbench/core/scoring/amd_bound_sanity.py
-  - tests/sol_execbench/test_v1_19_evidence_examples.py
   - tests/sol_execbench/test_research_release_docs.py
 findings:
   critical: 0
@@ -26,14 +16,16 @@ status: clean
 
 # Phase 88: Targeted Re-Review Report
 
-**Reviewed:** 2026-05-31T12:47:57Z
+**Reviewed:** 2026-05-31T13:00:33Z
 **Depth:** standard
-**Files Reviewed:** 12
+**Files Reviewed:** 2
 **Status:** clean
 
 ## Summary
 
-Targeted re-review of fix commit `a913349` (`#88 - Fix v1.19 evidence example audit gaps`) focused only on the two milestone integration audit blockers and whether the fixes introduced equally severe new issues. Both audit blockers are closed. No new Critical/Blocker or Warning findings were found within this requested scope.
+Targeted re-review of latest commit `d26bd65` (`#88 - Fix remaining v1.19 guide command gaps`) focused only on `docs/v1_19_evidence_guide.md`, `tests/sol_execbench/test_research_release_docs.py`, and the two remaining integration-check blockers. No source or hardware validation scope was expanded. `.omc/` was left untouched.
+
+Verdict: PASS. Both remaining guide command gaps are closed, and no new Critical/Blocker or Warning findings were found in the requested scope.
 
 ## Narrative Findings (AI reviewer)
 
@@ -41,24 +33,27 @@ All reviewed files meet the targeted quality bar. No findings.
 
 ## Audit Blocker Closure
 
-### BL-01: Matrix diff guide command mismatched script CLI
+### BL-01: `run_dataset.py` guide example used non-existent `--output-dir`
 
 **Status:** closed / PASS
-**Files:** `docs/v1_19_evidence_guide.md:147`, `scripts/diff_matrix_reports.py:23`, `scripts/diff_matrix_reports.py:27`, `tests/sol_execbench/test_research_release_docs.py:294`
-**Result:** The guide now invokes `scripts/diff_matrix_reports.py` with the actual positional `old_report`/`new_report` arguments and the real `--json-out` / `--markdown-out` options. The script parser defines those same options, and the docs guardrail rejects the old `--json-output`, `--markdown-output`, `--before`, and `--after` spellings.
+**Files:** `docs/v1_19_evidence_guide.md:50`, `docs/v1_19_evidence_guide.md:53`, `tests/sol_execbench/test_research_release_docs.py:294`, `tests/sol_execbench/test_research_release_docs.py:295`
+**Result:** The execution closure example now invokes `scripts/run_dataset.py` with the real `--output out/v1_19_demo/run-dataset` option. `scripts/run_dataset.py` defines `-o` / `--output` for the output directory and does not define `--output-dir`. The docs guardrail now asserts the correct example and rejects the stale `--output-dir out/v1_19_demo/run-dataset` spelling.
 
-### BL-02: Demo report fixtures failed strict report model validation
+### BL-02: `export_matrix_schema.py` guide example used `--output-dir` without `--model all`
 
 **Status:** closed / PASS
-**Files:** `docs/examples/v1_19_evidence/execution_closure.demo.json`, `docs/examples/v1_19_evidence/paper_denominator.demo.json`, `docs/examples/v1_19_evidence/matrix_diff.demo.json`, `docs/examples/v1_19_evidence/amd_bound_sanity.demo.json`, `tests/sol_execbench/test_v1_19_evidence_examples.py:105`
-**Result:** The four demo report fixtures now validate through the real strict contract models: `ExecutionClosureReport`, `PaperDenominatorReport`, `MatrixReportDiff`, and `AmdBoundSanityReport`. The corresponding model classes and nested models use `extra="forbid"`, so this covers unknown-field regressions rather than only checking schema marker strings.
+**Files:** `docs/v1_19_evidence_guide.md:122`, `docs/v1_19_evidence_guide.md:123`, `docs/v1_19_evidence_guide.md:124`, `tests/sol_execbench/test_research_release_docs.py:296`, `tests/sol_execbench/test_research_release_docs.py:297`
+**Result:** The Matrix schema export example now includes `--model all` before `--output-dir out/v1_19_demo/matrix-schema`. `scripts/export_matrix_schema.py` requires `--model all` for directory export and rejects `--output-dir` for single-model exports. The docs guardrail now asserts both the required model selector and the schema output directory.
 
 ## Verification
 
-- `uv run pytest tests/sol_execbench/test_v1_19_evidence_examples.py tests/sol_execbench/test_research_release_docs.py::test_v1_19_guide_uses_relative_demo_paths_and_real_script_options -q` - 7 passed.
+- `uv run pytest tests/sol_execbench/test_research_release_docs.py -q` - 15 passed.
+- `uv run ruff check tests/sol_execbench/test_research_release_docs.py` - passed.
+
+GPU, Docker, hardware-marker tests, dependency relocking, and `.omc/` inspection were intentionally not run for this targeted re-review.
 
 ---
 
-_Reviewed: 2026-05-31T12:47:57Z_
+_Reviewed: 2026-05-31T13:00:33Z_
 _Reviewer: the agent (gsd-code-reviewer)_
 _Depth: standard_
