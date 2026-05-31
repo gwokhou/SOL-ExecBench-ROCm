@@ -429,6 +429,71 @@
 
 ---
 
+## Milestone: v1.19 - Research Credibility Without New Hardware
+
+**Shipped:** 2026-05-31
+**Phases:** 6 | **Plans:** 13 | **Tasks:** 29
+
+### What Was Built
+
+- Strict execution closure contracts and provenance checks with deterministic
+  sidecar serialization.
+- Paper denominator reports that account for coverage and evidence gaps without
+  upgrading claims to paper parity.
+- Matrix schema export and semantic diff tooling with diagnostic-only
+  JSON/Markdown outputs.
+- Dataset-runner closure hardening for provenance-gated reuse, rerun behavior,
+  failure classification, and bounded logs.
+- AMD SOL/SOLAR bound sanity reports over existing evidence only.
+- v1.19 evidence guide, demo fixtures, strict model validation, and public
+  contract guardrails.
+
+### What Worked
+
+- Treating each credibility surface as a sidecar/report kept canonical
+  benchmark contracts stable while still improving auditability.
+- Repeated integration checks were effective at catching docs-to-real-CLI drift
+  before milestone close.
+- User scope boundaries around no new hardware validation kept the milestone
+  focused and prevented Docker, lockfile, and hardware-probe churn.
+
+### What Was Inefficient
+
+- Several docs/examples issues surfaced only during milestone-level integration
+  audit, after Phase 88 had already passed local verification.
+- Some early SUMMARY frontmatter omitted `requirements-completed`, which created
+  extra planning metadata cleanup during audit.
+- The Matrix diff and AMD bound sanity docs needed multiple command-shape and
+  wording passes to match the real parser/model surfaces exactly.
+
+### Patterns Established
+
+- Every researcher-facing command example should be guarded by a CPU-safe test
+  that checks the actual script option names.
+- Demo JSON fixtures should validate against the real Pydantic report models,
+  not only parse as JSON.
+- Sidecar docs should name non-authority explicitly and avoid implying inputs
+  that scripts do not consume.
+
+### Key Lessons
+
+1. Claim-boundary milestones need integration tests that connect docs, examples,
+   strict models, and script parsers, not just isolated unit tests.
+2. Planning metadata should be updated as part of each phase summary so
+   milestone audits can rely on three independent sources without repair work.
+3. "No new hardware validation" is a productive constraint when preserved
+   throughout tests, docs, examples, and verification notes.
+
+### Cost Observations
+
+- Model mix: not recorded.
+- Sessions: one autonomous milestone run with targeted subagent review,
+  verification, and integration passes.
+- Notable: late integration checks paid off by catching four command/example
+  mismatches before archival.
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution

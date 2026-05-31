@@ -15,33 +15,21 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
 ## Current State
 
-**Shipped version:** v1.18 ROCm Version Matrix via Docker, completed 2026-05-28.
+**Shipped version:** v1.19 Research Credibility Without New Hardware,
+completed 2026-05-31.
 
-**Current milestone:** v1.19 Research Credibility Without New Hardware.
+**Current milestone:** none; planning is ready for the next milestone.
 
-**Latest milestone outcome:** the ROCm port now has declared ROCm Docker
-Targets, target-specific PyTorch ROCm dependency policy, compatibility Matrix
-Entry sidecars, runtime evidence reports, and claim guardrails for Docker
-container user-space validation without overstating native host validation.
+**Latest milestone outcome:** the ROCm port now has deterministic execution
+closure contracts, paper denominator accounting, Matrix schema export and
+semantic diff tooling, hardened dataset-runner closure classification, AMD
+SOL/SOLAR bound sanity evidence, and researcher-facing docs/examples that keep
+all v1.19 evidence surfaces sidecar-only and claim-safe.
 
-**Current milestone goal:** Improve research credibility without expanding
-hardware validation by making paper dataset denominator status, compatibility
-matrix changes, dataset-runner behavior, and AMD SOL/SOLAR sanity evidence more
-auditable on the existing RDNA 4 and Docker evidence surface.
-
-**Target features:**
-- Paper dataset denominator accounting can explain which original benchmark
-  problems are ready, blocked, unsupported, deferred, or missing evidence
-  without claiming full paper parity.
-- Compatibility Matrix reports can be diffed across runs to highlight status,
-  dependency, image, clock, runtime, and evidence changes.
-- Compatibility Matrix JSON schemas can be exported for downstream CI and
-  external evidence producers.
-- Dataset-runner reports are hardened around failure classification, resume or
-  manifest consistency, and reproducible closure outputs.
-- AMD SOL/SOLAR bound sanity checks use existing RDNA 4 and Docker evidence to
-  clarify provisional model risk without adding CDNA 3, MI300X, or CDNA 4
-  validation scope.
+**Next planned milestone:** to be determined. Candidate follow-ups remain CDNA
+3/CDNA 4 live validation, Triton ROCm cache capture, RGA-rich static resource
+parsing, native host ROCm matrix validation, hosted/downstream evidence
+ingestion, or cross-report consistency linting.
 
 **Next planned milestone:** to be determined after v1.19. Candidate follow-ups
 remain CDNA 3/CDNA 4 live validation, Triton ROCm cache capture, RGA-rich static
@@ -100,8 +88,12 @@ boundaries, and recording bounded RDNA 4 validation.
 The v1.18 milestone added ROCm Docker version Matrix infrastructure, target
 selection, target-specific PyTorch ROCm dependency policy, runtime evidence and
 compatibility reports, and claim guardrails for container user-space validation.
+The v1.19 milestone added closure contracts, paper denominator accounting,
+Matrix schema/diff tooling, runner closure hardening, AMD bound sanity reports,
+and public docs/examples/guardrails for research credibility without expanding
+hardware validation.
 
-## Current Milestone: v1.19 Research Credibility Without New Hardware
+## Recently Shipped Milestone: v1.19 Research Credibility Without New Hardware
 
 **Goal:** Improve the ROCm port's research credibility without expanding
 hardware validation by making paper denominator status, compatibility-matrix
@@ -120,6 +112,13 @@ the existing RDNA 4 and Docker evidence surface.
 - Documentation and guardrail tests that keep curated, Docker, denominator, and
   bound-sanity evidence separate from paper parity, score authority, leaderboard
   authority, and native host validation.
+
+**Shipped outcome:** v1.19 delivered deterministic CPU-safe sidecar/reporting
+contracts and documentation for closure, denominator, Matrix, dataset-runner,
+and AMD SOL/SOLAR sanity evidence. Final milestone audit passed with 28/28
+requirements wired, 8/8 end-to-end flows complete, and no residual blockers or
+tech debt. No new hardware validation, Docker privilege expansion, or dependency
+relock was performed.
 
 ## Recently Shipped Milestone: v1.17 Static Kernel Evidence
 

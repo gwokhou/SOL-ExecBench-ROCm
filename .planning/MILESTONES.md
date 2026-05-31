@@ -1,5 +1,24 @@
 # Milestones
 
+## v1.19 Research Credibility Without New Hardware (Shipped: 2026-05-31)
+
+**Phases completed:** 6 phases, 13 plans, 29 tasks
+
+**Key accomplishments:**
+
+- Strict paper denominator sidecar with deterministic JSON, bounded source refs, checksum, and Markdown claim-boundary wording
+- Script-side paper denominator report generation with dataset exports and canonical contract guardrails
+- Strict MatrixEntry and RocmCompatibilityMatrixReport JSON Schema exports with deterministic script-side output and diagnostic-only boundaries
+- Deterministic semantic Matrix report diffs with severity-ranked JSON/Markdown output and diagnostic-only authority guardrails
+- Existing passing traces are reused only when prior execution-closure provenance matches the current selected run configuration
+- Runner closure records now classify nonzero CLI exits, timeouts, no-output failures, missing traces, and missing evidence with bounded sidecar diagnostics
+- Strict amd_bound_sanity.v1 sidecar models with existing-evidence diagnostic rollups, bounded refs, false authority boundaries, checksum, and deterministic Markdown
+- Thin AMD bound sanity report script with public contract guardrails proving the artifact stays sidecar-only and diagnostic-only
+- Central v1.19 evidence guide with public entry links and CPU-safe wording guardrails for sidecar-only evidence interpretation
+- Demo-only v1.19 evidence fixtures with focused tests for shape, bounded refs, checksums, and false authority boundaries
+
+---
+
 ## v1.18 ROCm Version Matrix via Docker (Shipped: 2026-05-28)
 
 **Phases completed:** 5 phases, 9 plans, 16 tasks
