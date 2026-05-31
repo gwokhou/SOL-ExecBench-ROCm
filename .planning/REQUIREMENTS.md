@@ -26,10 +26,10 @@ ExecBench.
 
 ### Claim Upgrade Rules
 
-- [ ] **CLAIM-01**: Project defines machine-readable claim-upgrade rules for diagnostic-only, container-validated, native-host-validated, score-authoritative, paper-parity-candidate, and leaderboard-ready states.
-- [ ] **CLAIM-02**: Claim-upgrade evaluation requires explicit supporting evidence refs and rejects upgrades when required closure, denominator, Matrix, runtime, stability, AMD score, AMD SOL/SOLAR, or hardware validation evidence is missing or contradictory.
-- [ ] **CLAIM-03**: Claim-upgrade output explains unmet prerequisites and next-evidence hints without changing report authority fields unless a future milestone explicitly implements the required validation evidence.
-- [ ] **CLAIM-04**: Existing v1.19 and earlier diagnostic artifacts remain authority-false by default unless claim-upgrade rules prove every required prerequisite.
+- [x] **CLAIM-01**: Project defines machine-readable claim-upgrade rules for diagnostic-only, container-validated, native-host-validated, score-authoritative, paper-parity-candidate, and leaderboard-ready states.
+- [x] **CLAIM-02**: Claim-upgrade evaluation requires explicit supporting evidence refs and rejects upgrades when required closure, denominator, Matrix, runtime, stability, AMD score, AMD SOL/SOLAR, or hardware validation evidence is missing or contradictory.
+- [x] **CLAIM-03**: Claim-upgrade output explains unmet prerequisites and next-evidence hints without changing report authority fields unless a future milestone explicitly implements the required validation evidence.
+- [x] **CLAIM-04**: Existing v1.19 and earlier diagnostic artifacts remain authority-false by default unless claim-upgrade rules prove every required prerequisite.
 
 ### Trust Summary
 
@@ -91,10 +91,10 @@ ExecBench.
 | STAB-03 | Phase 90 | Complete |
 | STAB-04 | Phase 90 | Complete |
 | STAB-05 | Phase 90 | Complete |
-| CLAIM-01 | Phase 91 | Pending |
-| CLAIM-02 | Phase 91 | Pending |
-| CLAIM-03 | Phase 91 | Pending |
-| CLAIM-04 | Phase 91 | Pending |
+| CLAIM-01 | Phase 91 | Complete |
+| CLAIM-02 | Phase 91 | Complete |
+| CLAIM-03 | Phase 91 | Complete |
+| CLAIM-04 | Phase 91 | Complete |
 | TRUST-01 | Phase 92 | Pending |
 | TRUST-02 | Phase 92 | Pending |
 | TRUST-03 | Phase 92 | Pending |
@@ -106,10 +106,10 @@ ExecBench.
 | DOCS-05 | Phase 93 | Pending |
 
 **Coverage:**
-- v1 requirements: 23 total, 10 complete
+- v1 requirements: 23 total, 14 complete
 - Mapped to phases: 23
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-05-31*
-*Last updated: 2026-05-31 after Phase 90 completion*
+*Last updated: 2026-05-31 after Phase 91 completion*

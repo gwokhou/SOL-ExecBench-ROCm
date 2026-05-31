@@ -876,6 +876,51 @@ def test_primary_cli_does_not_expose_v1_20_stability_options():
         assert option not in help_text
 
 
+def test_v1_20_claim_upgrade_fields_remain_sidecar_only():
+    definition, workload, trace = _sample_definition_workload_trace()
+    forbidden = (
+        "sol_execbench.claim_upgrade.v1",
+        "claim_upgrade",
+        "claim_upgrade_checksum",
+        "ClaimUpgradeReport",
+        "ClaimEvaluation",
+        "highest_eligible_claim",
+        "diagnostic_only",
+        "container_validated",
+        "native_host_validated",
+        "score_authoritative",
+        "paper_parity_candidate",
+        "leaderboard_ready",
+        "unmet_prerequisites",
+        "prerequisite_evaluation_only",
+        "mutates_source_authority",
+    )
+
+    for payload in (
+        definition.model_dump(mode="json"),
+        workload.model_dump(mode="json"),
+        trace.model_dump(mode="json"),
+    ):
+        text = json.dumps(payload, sort_keys=True)
+        for field in forbidden:
+            assert field not in text
+
+
+def test_primary_cli_does_not_expose_v1_20_claim_upgrade_options():
+    result = CliRunner().invoke(cli, ["--help"])
+    assert result.exit_code == 0
+    help_text = result.output
+
+    for option in (
+        "--claim-upgrade",
+        "--report-claim-upgrade",
+        "--hardware-validation",
+        "report_claim_upgrade",
+        "claim-upgrade",
+    ):
+        assert option not in help_text
+
+
 def test_v1_19_amd_bound_sanity_markdown_keeps_negative_boundaries_visible():
     from sol_execbench.core.scoring.amd_bound_sanity import (
         build_amd_bound_sanity_report,
