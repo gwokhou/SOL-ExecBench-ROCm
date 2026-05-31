@@ -1,306 +1,263 @@
 # Codebase Structure
 
-**Analysis Date:** 2026-05-28
+**Analysis Date:** 2026-05-31
 
 ## Directory Layout
 
 ```text
-[project-root]/
-+-- src/sol_execbench/        # Python package source
-|   +-- cli/                  # Click command entry points
-|   +-- core/                 # Schemas, benchmarking, scoring, dataset, environment logic
-|   |   +-- bench/            # Runtime benchmark helpers and evidence collection
-|   |   +-- data/             # Pydantic public contract models
-|   |   +-- dataset/          # Dataset layout, inventory, readiness, manifest utilities
-|   |   +-- scoring/          # AMD-native score and SOL-bound derivation
-|   +-- data/                 # Packaged static data such as AMD hardware models
-|   +-- driver/               # Staging packager and generated execution templates
-+-- tests/                    # Pytest coverage and fixtures
-|   +-- sol_execbench/        # Package-level unit/integration tests
-|   +-- examples/             # Example workflow tests
-|   +-- docker/               # Docker/dependency/runtime tests
-|   +-- samples/              # Test-only sample solutions
-+-- examples/                 # Runnable benchmark examples by solution category
-+-- scripts/                  # Dataset, batch, Docker, and reporting scripts
-+-- docs/                     # User, researcher, architecture, ROCm, and schema docs
-+-- docker/                   # ROCm Dockerfile, entrypoint, target manifest
-+-- data/                     # Downloaded benchmark assets
-+-- .planning/                # GSD project planning and codebase maps
-+-- pyproject.toml            # Packaging, dependencies, test markers, Ruff/Ty config
-+-- uv.lock                   # Locked dependency resolution
+SOL-ExecBench-ROCm/
++-- src/sol_execbench/              # Python package source
+|   +-- cli/                        # Click command entry points
+|   +-- core/                       # Benchmark schemas, execution helpers, scoring, reports
+|   |   +-- bench/                  # GPU execution primitives and evidence collection
+|   |   |   +-- config/             # Benchmark and device/clock config dataclasses
+|   |   +-- data/                   # Pydantic public contract models and JSON helpers
+|   |   +-- dataset/                # Dataset layout, manifest, readiness, parity, closure reports
+|   |   +-- scoring/                # AMD SOL bounds, hardware models, derived scores
+|   +-- data/                       # Packaged static data such as AMD hardware model JSON
+|   +-- driver/                     # Staging packager and copied subprocess templates
++-- tests/                          # Pytest suite
+|   +-- sol_execbench/              # Package unit/integration tests and sample problems
+|   +-- examples/                   # Example workflow tests
+|   +-- docker/                     # Container dependency/runtime tests
++-- scripts/                        # Dataset, report, Docker, and utility command scripts
++-- examples/                       # Runnable solution examples by language/library category
++-- docs/                           # User, developer, schema, ROCm, and release documentation
++-- docker/                         # ROCm container image, entrypoint, target config
++-- data/                           # Downloaded benchmark assets; only `.gitkeep` is committed
++-- .planning/                      # GSD project state and generated planning/codebase docs
++-- pyproject.toml                  # Package metadata, scripts, dependencies, tool config
++-- uv.lock                         # Locked dependency resolution
++-- AGENTS.md                       # Repository instructions for coding agents
++-- README.md                       # Project overview and usage
++-- SECURITY.md                     # Security policy
 ```
 
 ## Directory Purposes
 
 **`src/sol_execbench/`:**
-- Purpose: Installable Python package for SOL ExecBench ROCm.
-- Contains: Package exports, CLI, core domain logic, driver templates, packaged hardware-model data.
-- Key files: `src/sol_execbench/__init__.py`, `src/sol_execbench/sol_score.py`, `src/sol_execbench/core/__init__.py`.
+- Purpose: Installable Python package.
+- Contains: Public package exports, CLI package, core domain modules, packaged data, driver staging code.
+- Key files: `src/sol_execbench/__init__.py`, `src/sol_execbench/sol_score.py`.
 
 **`src/sol_execbench/cli/`:**
-- Purpose: User-facing command layer.
-- Contains: Main evaluator command and baseline comparison command.
+- Purpose: User-facing console commands.
+- Contains: Root evaluator CLI and baseline comparison CLI.
 - Key files: `src/sol_execbench/cli/main.py`, `src/sol_execbench/cli/baseline.py`, `src/sol_execbench/cli/__init__.py`.
 
 **`src/sol_execbench/core/`:**
-- Purpose: Shared domain logic used by CLI, generated drivers, scripts, and tests.
-- Contains: Public exports, baseline comparison helpers, diagnostics, environment snapshots, toolchain routing, Docker/dependency/runtime matrices, reporting, scoring guardrails.
+- Purpose: Core benchmark logic independent of command-line parsing.
+- Contains: Public re-export module, baseline comparison, compatibility matrices, environment/toolchain diagnostics, runtime evidence, reporting, dataset/scoring/bench/data packages.
 - Key files: `src/sol_execbench/core/__init__.py`, `src/sol_execbench/core/environment.py`, `src/sol_execbench/core/toolchain.py`, `src/sol_execbench/core/reporting.py`.
 
 **`src/sol_execbench/core/data/`:**
-- Purpose: Canonical public data schemas.
-- Contains: Pydantic models for definitions, solutions, workloads, traces, evaluator contract, dtype helpers, shape resolution, JSON utilities.
-- Key files: `src/sol_execbench/core/data/definition.py`, `src/sol_execbench/core/data/solution.py`, `src/sol_execbench/core/data/workload.py`, `src/sol_execbench/core/data/trace.py`, `src/sol_execbench/core/data/contract.py`.
+- Purpose: Schema-first public contract for benchmark inputs and outputs.
+- Contains: Pydantic models for definitions, workloads, solutions, traces, evaluator contract, dtypes, shapes, JSON utilities.
+- Key files: `src/sol_execbench/core/data/definition.py`, `src/sol_execbench/core/data/workload.py`, `src/sol_execbench/core/data/solution.py`, `src/sol_execbench/core/data/trace.py`, `src/sol_execbench/core/data/contract.py`.
 
 **`src/sol_execbench/core/bench/`:**
-- Purpose: Benchmark execution primitives.
-- Contains: Input/output tensor utilities, correctness checks, timing, clock locking, reward-hack detection, ROCm profiler support, static kernel evidence.
+- Purpose: GPU evaluation helpers used by the generated evaluation driver and CLI sidecars.
+- Contains: Input/output generation, correctness checks, timing, reward-hack defenses, clock locking, profiler integration, static kernel evidence.
 - Key files: `src/sol_execbench/core/bench/io.py`, `src/sol_execbench/core/bench/correctness.py`, `src/sol_execbench/core/bench/timing.py`, `src/sol_execbench/core/bench/reward_hack.py`, `src/sol_execbench/core/bench/rocm_profiler.py`, `src/sol_execbench/core/bench/static_kernel_evidence.py`.
 
 **`src/sol_execbench/core/bench/config/`:**
-- Purpose: Runtime benchmark configuration and device clock presets.
-- Contains: Benchmark config dataclass/model and device config helpers.
+- Purpose: Runtime benchmark and ROCm device/clock configuration.
+- Contains: Dataclasses and clock preset lookup.
 - Key files: `src/sol_execbench/core/bench/config/benchmark_config.py`, `src/sol_execbench/core/bench/config/device_config.py`.
 
 **`src/sol_execbench/core/dataset/`:**
-- Purpose: Dataset layout and readiness tooling.
-- Contains: Category definitions, checksum helpers, inventory models, layout inspectors, manifests, parity gap reports, readiness classifiers, ready subset helpers.
-- Key files: `src/sol_execbench/core/dataset/layout.py`, `src/sol_execbench/core/dataset/inventory.py`, `src/sol_execbench/core/dataset/manifest.py`, `src/sol_execbench/core/dataset/readiness.py`.
+- Purpose: Dataset inspection and release/readiness metadata.
+- Contains: Category validation, checksums, layout inspection, manifest generation, inventory, readiness, ready subsets, parity gaps, paper denominator, execution closure.
+- Key files: `src/sol_execbench/core/dataset/layout.py`, `src/sol_execbench/core/dataset/inventory.py`, `src/sol_execbench/core/dataset/readiness.py`, `src/sol_execbench/core/dataset/execution_closure.py`, `src/sol_execbench/core/dataset/manifest.py`.
 
 **`src/sol_execbench/core/scoring/`:**
-- Purpose: AMD hardware/SOL-bound derivation and guarded score reporting.
-- Contains: Bound estimates, bound graph, hardware models, AMD score reports, SOL derivation, baseline artifacts.
-- Key files: `src/sol_execbench/core/scoring/amd_score.py`, `src/sol_execbench/core/scoring/amd_sol.py`, `src/sol_execbench/core/scoring/amd_sol_v2.py`, `src/sol_execbench/core/scoring/baseline_artifact.py`, `src/sol_execbench/core/scoring/solar_derivation.py`.
+- Purpose: AMD-native derived score and SOL-bound logic.
+- Contains: AMD hardware model loading, bound graph and estimates, SOL artifacts, scoring baseline artifacts, guarded score reports, solar derivation.
+- Key files: `src/sol_execbench/core/scoring/amd_score.py`, `src/sol_execbench/core/scoring/amd_sol.py`, `src/sol_execbench/core/scoring/amd_sol_v2.py`, `src/sol_execbench/core/scoring/amd_hardware_models.py`, `src/sol_execbench/core/scoring/baseline_artifact.py`.
 
 **`src/sol_execbench/data/`:**
-- Purpose: Package data distributed with the library.
-- Contains: AMD hardware model JSON assets.
+- Purpose: Static data bundled with the package.
+- Contains: AMD hardware model JSON.
 - Key files: `src/sol_execbench/data/amd_hardware_models/gfx1200.json`.
 
 **`src/sol_execbench/driver/`:**
-- Purpose: Isolated staging and generated driver scripts for compilation/evaluation.
-- Contains: `ProblemPackager` and Python templates copied into temporary staging directories.
-- Key files: `src/sol_execbench/driver/problem_packager.py`, `src/sol_execbench/driver/templates/build_ext.py`, `src/sol_execbench/driver/templates/eval_driver.py`.
+- Purpose: Evaluation staging and generated subprocess templates.
+- Contains: `ProblemPackager`, template scripts copied into staging directories.
+- Key files: `src/sol_execbench/driver/problem_packager.py`, `src/sol_execbench/driver/templates/eval_driver.py`, `src/sol_execbench/driver/templates/build_ext.py`.
 
 **`tests/`:**
-- Purpose: Pytest test suite.
-- Contains: Package tests, driver tests, core subpackage tests, example tests, Docker/dependency checks, sample benchmark data.
-- Key files: `tests/conftest.py`, `tests/sol_execbench/test_e2e.py`, `tests/sol_execbench/driver/test_problem_packager.py`, `tests/examples/test_examples.py`, `tests/docker/dependencies/test_pytorch_rocm.py`.
-
-**`examples/`:**
-- Purpose: Runnable example problems organized by solution implementation family.
-- Contains: `definition.json`, `workload.jsonl`, solution JSON files, reference code, and kernel sources.
-- Key files: `examples/hip_cpp/rmsnorm/`, `examples/hipblas/gemm/`, `examples/miopen/softmax/`, `examples/triton/rmsnorm/`, `examples/pytorch/linear_backward/`.
+- Purpose: Pytest coverage for schemas, CLI behavior, driver templates, ROCm behavior, examples, Docker dependency checks, docs/report contracts.
+- Contains: `tests/sol_execbench/` package tests, `tests/examples/`, `tests/docker/`, fixtures and sample problem data.
+- Key files: `tests/conftest.py`, `tests/sol_execbench/test_e2e.py`, `tests/sol_execbench/driver/test_problem_packager.py`, `tests/examples/test_examples.py`.
 
 **`scripts/`:**
-- Purpose: Operational helpers outside the package console scripts.
-- Contains: Dataset download/inspection, parity reporting, batch execution, Docker launcher.
-- Key files: `scripts/run_dataset.py`, `scripts/download_solexecbench.py`, `scripts/inspect_dataset.py`, `scripts/report_parity_gaps.py`, `scripts/run_docker.sh`.
+- Purpose: Operational utilities outside the importable package.
+- Contains: Dataset downloader/runner/inspector, report generators, matrix utilities, Docker wrapper.
+- Key files: `scripts/run_dataset.py`, `scripts/download_solexecbench.py`, `scripts/inspect_dataset.py`, `scripts/run_docker.sh`.
+
+**`examples/`:**
+- Purpose: Runnable solution examples grouped by implementation category.
+- Contains: ROCm-native examples (`hip_cpp`, `hipblas`, `miopen`, `ck`, `rocwmma`), PyTorch/Triton examples, and legacy CUDA/NVIDIA category examples used for migration/parity context.
+- Key files: Example problem directories under `examples/hip_cpp/`, `examples/triton/`, `examples/pytorch/`, `examples/hipblas/`.
 
 **`docs/`:**
-- Purpose: User and project documentation.
-- Contains: Architecture, configuration, development, testing, researcher guide, schema docs, ROCm docs, claim boundaries, release closures.
-- Key files: `docs/ARCHITECTURE.md`, `docs/GETTING-STARTED.md`, `docs/TESTING.md`, `docs/rocm.md`, `docs/solution.md`, `docs/trace.md`.
+- Purpose: Human documentation for usage, schemas, ROCm migration, testing, evidence, and release closure.
+- Contains: Public docs and internal validation handoffs.
+- Key files: `docs/ARCHITECTURE.md`, `docs/GETTING-STARTED.md`, `docs/DEVELOPMENT.md`, `docs/TESTING.md`, `docs/definition.md`, `docs/solution.md`, `docs/trace.md`, `docs/rocm.md`.
 
 **`docker/`:**
-- Purpose: ROCm container support.
-- Contains: Dockerfile, entrypoint, and target matrix manifest.
+- Purpose: ROCm-capable evaluation environment.
+- Contains: Container image, entrypoint, target architecture metadata.
 - Key files: `docker/Dockerfile`, `docker/entrypoint.sh`, `docker/rocm-targets.json`.
 
 **`data/`:**
-- Purpose: Local benchmark datasets and downloaded assets.
-- Contains: Placeholder `.gitkeep`; generated/downloaded datasets belong here.
+- Purpose: Local downloaded benchmark assets.
+- Contains: `.gitkeep` only in source control; downloaded benchmark directories belong here.
 - Key files: `data/.gitkeep`.
-
-**`.planning/`:**
-- Purpose: GSD project planning artifacts and generated codebase intelligence.
-- Contains: Project state, milestones, phases, research notes, codebase maps.
-- Key files: `.planning/PROJECT.md`, `.planning/STATE.md`, `.planning/ROADMAP.md`, `.planning/codebase/ARCHITECTURE.md`, `.planning/codebase/STRUCTURE.md`.
 
 ## Key File Locations
 
 **Entry Points:**
-- `src/sol_execbench/cli/main.py`: Primary `sol-execbench` CLI and subcommand dispatcher.
-- `src/sol_execbench/cli/baseline.py`: `sol-execbench-baseline` CLI.
-- `scripts/run_dataset.py`: Batch runner over dataset problem directories.
-- `scripts/download_solexecbench.py`: Hugging Face dataset acquisition script.
-- `scripts/inspect_dataset.py`: Dataset inventory/readiness script.
-- `scripts/run_docker.sh`: ROCm Docker build/run wrapper.
-- `src/sol_execbench/core/docker_matrix.py`: Standalone CLI-style module for Docker target selection/preflight helpers.
-- `src/sol_execbench/core/dependency_matrix.py`: Standalone CLI-style module for dependency policy observations.
-- `src/sol_execbench/core/runtime_evidence.py`: Standalone CLI-style module for runtime evidence collection.
+- `pyproject.toml`: Declares console scripts `sol-execbench` and `sol-execbench-baseline`.
+- `src/sol_execbench/cli/main.py`: Root evaluator CLI and metadata subcommands.
+- `src/sol_execbench/cli/baseline.py`: Trace baseline comparison CLI.
+- `scripts/run_dataset.py`: Batch runner for single problems and dataset category roots.
+- `scripts/run_docker.sh`: Docker build/run wrapper.
 
 **Configuration:**
-- `pyproject.toml`: Build backend, package metadata, dependencies, console scripts, pytest markers, Ruff excludes, Ty config, uv indexes.
-- `uv.lock`: Dependency lockfile.
-- `.python-version`: Python version pin for local tooling.
-- `.pre-commit-config.yaml`: Pre-commit hooks.
-- `docker/rocm-targets.json`: Declared ROCm Docker target matrix.
-- `docker/Dockerfile`: ROCm container image build.
-- `docker/entrypoint.sh`: Runtime environment setup in container.
+- `pyproject.toml`: Python version, dependencies, console scripts, pytest markers, Ruff/Ty/uv config.
+- `.python-version`: Local Python version selector.
+- `.pre-commit-config.yaml`: Pre-commit hook configuration.
+- `docker/rocm-targets.json`: Docker/ROCm target metadata.
+- `src/sol_execbench/core/bench/config/benchmark_config.py`: Runtime benchmark defaults.
+- `src/sol_execbench/core/bench/config/device_config.py`: ROCm clock preset configuration.
 
 **Core Logic:**
-- `src/sol_execbench/core/data/definition.py`: Definition schema and reference-code validation.
-- `src/sol_execbench/core/data/solution.py`: Solution schema, ROCm language categories, source path validation, compile options.
-- `src/sol_execbench/core/data/workload.py`: Workload schema and input descriptors.
-- `src/sol_execbench/core/data/trace.py`: Evaluation/trace schema and status invariants.
-- `src/sol_execbench/core/bench/io.py`: Tensor generation, safetensors loading, output allocation/normalization.
-- `src/sol_execbench/core/bench/correctness.py`: Numerical error and tolerance checks.
-- `src/sol_execbench/core/bench/timing.py`: PyTorch ROCm event timing and memory-shifting allocator use.
-- `src/sol_execbench/core/bench/reward_hack.py`: Static and runtime defenses against benchmark cheating.
-- `src/sol_execbench/driver/problem_packager.py`: Staging directory contract and compile/evaluate command generation.
-- `src/sol_execbench/driver/templates/eval_driver.py`: Generated runtime evaluator.
-- `src/sol_execbench/driver/templates/build_ext.py`: Generated native extension builder.
-
-**Scoring And Evidence:**
-- `src/sol_execbench/core/scoring/amd_score.py`: Derived AMD-native workload and suite score reports.
-- `src/sol_execbench/core/scoring/amd_sol.py`: AMD SOL bound artifact model.
-- `src/sol_execbench/core/scoring/amd_sol_v2.py`: AMD SOL v2 bound artifact model.
-- `src/sol_execbench/core/scoring/baseline_artifact.py`: Release scoring baseline artifact.
-- `src/sol_execbench/core/scoring/solar_derivation.py`: SOLAR derivation evidence.
-- `src/sol_execbench/core/environment.py`: Optional ROCm runtime environment snapshots and doctor diagnostics.
-- `src/sol_execbench/core/bench/rocm_profiler.py`: Optional `rocprofv3` profile evidence.
-- `src/sol_execbench/core/bench/static_kernel_evidence.py`: Optional static kernel evidence sidecars.
-- `src/sol_execbench/core/toolchain.py`: Toolchain routing diagnostics.
+- `src/sol_execbench/core/data/definition.py`: Definition schema and shape/axis resolution.
+- `src/sol_execbench/core/data/workload.py`: Workload schema and input/tolerance specs.
+- `src/sol_execbench/core/data/solution.py`: Solution/build schema and ROCm language validation.
+- `src/sol_execbench/core/data/trace.py`: Canonical trace/evaluation output schema.
+- `src/sol_execbench/core/bench/io.py`: Input generation, safetensors loading, output allocation.
+- `src/sol_execbench/core/bench/correctness.py`: Numerical correctness and reproducible seed handling.
+- `src/sol_execbench/core/bench/timing.py`: HIP-backed PyTorch device-event timing.
+- `src/sol_execbench/core/bench/reward_hack.py`: Static and runtime reward-hack detection.
+- `src/sol_execbench/driver/problem_packager.py`: Staging and command generation.
+- `src/sol_execbench/driver/templates/eval_driver.py`: GPU-side evaluation process.
 
 **Testing:**
-- `tests/conftest.py`: ROCm marker registration and skip policy.
-- `tests/sol_execbench/core/data/`: Data model unit tests.
-- `tests/sol_execbench/core/bench/`: Benchmark primitive tests.
-- `tests/sol_execbench/driver/`: Packager/template tests.
-- `tests/sol_execbench/test_e2e.py`: End-to-end CLI and evaluation tests.
-- `tests/examples/test_examples.py`: Example problem tests.
-- `tests/docker/dependencies/`: Container dependency/runtime checks.
-- `tests/sol_execbench/samples/`: Test fixture problems and solution JSON files.
+- `tests/sol_execbench/`: Primary package tests.
+- `tests/sol_execbench/driver/`: Driver template and staging tests.
+- `tests/sol_execbench/samples/`: Sample problem fixtures used by tests.
+- `tests/examples/`: Example workflow tests.
+- `tests/docker/dependencies/`: Container and ROCm dependency tests.
 
 **Documentation:**
-- `README.md`: Project overview and basic usage.
-- `CONTRIBUTING.md`: Contribution workflow and DCO commit format.
-- `docs/DEVELOPMENT.md`: Development guidance.
-- `docs/TESTING.md`: Testing guidance.
-- `docs/ARCHITECTURE.md`: User-facing architecture documentation.
-- `docs/definition.md`, `docs/solution.md`, `docs/workload.md`, `docs/trace.md`: Public schema docs.
-- `docs/rocm.md`, `docs/rocm_timing.md`, `docs/rocm_libraries.md`, `docs/rocm_toolchain_routing.md`: ROCm-specific docs.
+- `README.md`: Project entry documentation.
+- `docs/`: Maintained public docs.
+- `.planning/codebase/`: Generated codebase maps consumed by GSD planning/execution commands.
 
 ## Naming Conventions
 
 **Files:**
-- Python modules use `snake_case.py`: `src/sol_execbench/core/scoring/amd_score.py`, `src/sol_execbench/core/dataset/ready_subset.py`.
-- Test files use `test_*.py`: `tests/sol_execbench/test_contract.py`, `tests/sol_execbench/core/bench/test_timing.py`.
-- Example problem files use fixed benchmark names: `definition.json`, `workload.jsonl`, `solution_*.json`, `kernel.py`, `kernel.hip`, `main.cpp`, `reference.py`.
-- Versioned JSON artifacts and sidecars use schema-specific names from the caller; keep deterministic JSON serialization in model/helper code.
-- Generated driver templates are regular Python files under `src/sol_execbench/driver/templates/` and are copied by filename into staging directories.
+- Python source modules use `snake_case.py`: `src/sol_execbench/core/scoring/amd_score.py`, `src/sol_execbench/core/dataset/paper_denominator.py`.
+- Test files use `test_*.py`: `tests/sol_execbench/test_contract.py`, `tests/examples/test_examples.py`.
+- Scripts use command-style `snake_case.py` or shell names: `scripts/run_dataset.py`, `scripts/run_docker.sh`.
+- Public docs use descriptive Markdown names: `docs/GETTING-STARTED.md`, `docs/static_kernel_evidence.md`.
+- Generated codebase docs use uppercase Markdown names: `.planning/codebase/ARCHITECTURE.md`, `.planning/codebase/STRUCTURE.md`.
 
 **Directories:**
-- Package subdirectories are domain nouns: `cli`, `core`, `driver`, `data`.
-- Core subdirectories follow bounded responsibilities: `bench`, `dataset`, `scoring`, `data`.
-- Examples are grouped by implementation category first, then operation: `examples/hip_cpp/rmsnorm`, `examples/hipblas/gemm`, `examples/triton/rmsnorm`.
-- Tests mirror package boundaries where practical: `tests/sol_execbench/core/data`, `tests/sol_execbench/core/bench`, `tests/sol_execbench/driver`.
-- Docker/dependency tests live under `tests/docker/dependencies`.
+- Package directories use lowercase snake_case where needed: `src/sol_execbench/`, `src/sol_execbench/core/`.
+- Benchmark example directories are grouped by implementation category: `examples/hip_cpp/`, `examples/triton/`, `examples/miopen/`.
+- Test sample directories mirror problem or exploit names: `tests/sol_execbench/samples/rmsnorm/`, `tests/sol_execbench/samples/evil_monkey_patch/`.
 
 ## Where to Add New Code
 
-**New CLI Option Or Subcommand:**
-- Primary code: `src/sol_execbench/cli/main.py` for evaluator metadata or execution behavior.
-- Baseline-specific code: `src/sol_execbench/cli/baseline.py`.
-- Tests: `tests/sol_execbench/test_contract.py`, `tests/sol_execbench/test_e2e.py`, or a focused `tests/sol_execbench/test_<feature>.py`.
+**New CLI Command:**
+- Primary code: add a Click command in `src/sol_execbench/cli/main.py` if it belongs under `sol-execbench`, or a sibling module in `src/sol_execbench/cli/` for a separate console script.
+- Tests: add command tests under `tests/sol_execbench/test_*cli*.py`.
+- Packaging: update `[project.scripts]` in `pyproject.toml` only for new top-level commands.
 
-**New Public Schema Field Or Model:**
-- Primary code: `src/sol_execbench/core/data/`.
-- Public export: `src/sol_execbench/core/data/__init__.py` and possibly `src/sol_execbench/core/__init__.py`.
-- Docs: `docs/definition.md`, `docs/solution.md`, `docs/workload.md`, `docs/trace.md`, or `docs/CONFIGURATION.md`.
-- Tests: `tests/sol_execbench/core/data/` and contract guardrails in `tests/sol_execbench/test_contract.py`.
+**New Schema Field or Contract Model:**
+- Primary code: add Pydantic model logic under `src/sol_execbench/core/data/`.
+- Tests: add model and public contract tests under `tests/sol_execbench/test_contract.py` or a focused `tests/sol_execbench/test_<schema>.py`.
+- Docs: update schema docs under `docs/definition.md`, `docs/workload.md`, `docs/solution.md`, or `docs/trace.md`.
 
-**New Benchmark Runtime Behavior:**
-- Input/output behavior: `src/sol_execbench/core/bench/io.py`.
-- Correctness behavior: `src/sol_execbench/core/bench/correctness.py`.
-- Timing behavior: `src/sol_execbench/core/bench/timing.py` and `src/sol_execbench/core/bench/timing_policy.py`.
-- Reward-hack defense: `src/sol_execbench/core/bench/reward_hack.py`.
-- Tests: `tests/sol_execbench/core/bench/` and end-to-end tests in `tests/sol_execbench/test_e2e.py`.
+**New Benchmark Execution Behavior:**
+- Primary code: put GPU execution primitives in `src/sol_execbench/core/bench/`.
+- Subprocess integration: wire execution behavior into `src/sol_execbench/driver/templates/eval_driver.py`.
+- Parent CLI integration: keep orchestration in `src/sol_execbench/cli/main.py`.
+- Tests: add unit tests under `tests/sol_execbench/core/bench/` or integration tests under `tests/sol_execbench/test_e2e.py`.
 
-**New Generated Evaluation Logic:**
-- Primary code: `src/sol_execbench/driver/templates/eval_driver.py`.
-- Staging command/source changes: `src/sol_execbench/driver/problem_packager.py`.
-- Native build changes: `src/sol_execbench/driver/templates/build_ext.py`.
-- Tests: `tests/sol_execbench/driver/` plus focused E2E coverage.
+**New Native ROCm Language or Library Category:**
+- Schema: update `SupportedLanguages` and validation in `src/sol_execbench/core/data/solution.py`.
+- Staging/compile: update `_CPP_LANGUAGES` and build handling in `src/sol_execbench/driver/problem_packager.py`.
+- Evaluation import: update native language handling in `src/sol_execbench/driver/templates/eval_driver.py`.
+- Examples: add examples under `examples/<category>/`.
+- Tests: add schema, packager, and example tests under `tests/sol_execbench/` and `tests/examples/`.
 
-**New Native ROCm Solution Category:**
-- Schema category: `src/sol_execbench/core/data/solution.py`.
-- Packager native-language set: `src/sol_execbench/driver/problem_packager.py`.
-- Evaluation native-language set: `src/sol_execbench/driver/templates/eval_driver.py`.
-- Examples: `examples/<category>/<operation>/`.
-- Tests: `tests/examples/test_examples.py`, `tests/sol_execbench/test_rocm_library_examples.py`, and any dependency checks under `tests/docker/dependencies/`.
+**New Dataset Report:**
+- Primary code: add reusable report logic in `src/sol_execbench/core/dataset/`.
+- Script wrapper: add a command script in `scripts/report_<name>.py`.
+- Tests: add focused report tests under `tests/sol_execbench/test_<report>.py`.
+- Docs: add or update report documentation under `docs/`.
 
-**New Evidence Sidecar:**
-- Primary model/helper: a focused module under `src/sol_execbench/core/` or `src/sol_execbench/core/bench/`.
-- CLI integration: sidecar path/write helper in `src/sol_execbench/cli/main.py`.
-- Batch integration: `scripts/run_dataset.py` if dataset-scale collection is needed.
-- Tests: focused tests under `tests/sol_execbench/` and docs guardrails if claims change.
-
-**New AMD Scoring Or SOL-Bound Logic:**
-- Primary code: `src/sol_execbench/core/scoring/`.
-- Packaged static data: `src/sol_execbench/data/amd_hardware_models/` when distributing hardware model JSON.
-- Tests: `tests/sol_execbench/test_amd_*.py`, `tests/sol_execbench/fixtures/solar_derivation/`.
-
-**New Dataset Tooling:**
-- Reusable logic: `src/sol_execbench/core/dataset/`.
-- User script: `scripts/`.
-- Tests: `tests/sol_execbench/test_dataset_*.py`, `tests/sol_execbench/test_download_solexecbench.py`, `tests/sol_execbench/test_parity_gap_report.py`.
-
-**New Docker Or Dependency Matrix Behavior:**
-- Target manifest: `docker/rocm-targets.json`.
-- Docker support: `docker/Dockerfile`, `docker/entrypoint.sh`, `scripts/run_docker.sh`.
-- Matrix logic: `src/sol_execbench/core/docker_matrix.py`, `src/sol_execbench/core/dependency_matrix.py`, `src/sol_execbench/core/runtime_evidence.py`.
-- Tests: `tests/sol_execbench/test_docker_matrix_*.py`, `tests/sol_execbench/test_dependency_matrix_*.py`, `tests/docker/dependencies/`.
+**New Scoring or Bound Logic:**
+- Primary code: add scoring implementation under `src/sol_execbench/core/scoring/`.
+- Static data: add hardware model data under `src/sol_execbench/data/amd_hardware_models/` when it is package data.
+- Tests: add scoring tests under `tests/sol_execbench/test_amd_*.py` or focused fixture-backed tests under `tests/sol_execbench/fixtures/`.
 
 **Utilities:**
-- Shared package helpers: `src/sol_execbench/core/utils.py` only for cross-cutting helpers that do not belong to a narrower module.
-- Dataset-specific helpers: `src/sol_execbench/core/dataset/`.
-- Scoring-specific helpers: `src/sol_execbench/core/scoring/`.
-- CLI-only helpers: keep private in `src/sol_execbench/cli/main.py` or `src/sol_execbench/cli/baseline.py`.
+- Shared importable helpers: use the closest domain package under `src/sol_execbench/core/`.
+- One-off operational tools: use `scripts/`.
+- Test-only helpers: use `tests/sol_execbench_type_helpers.py` or a focused helper next to tests.
 
 ## Special Directories
 
-**`data/`:**
-- Purpose: Downloaded benchmark datasets and generated dataset assets.
+**`.planning/`:**
+- Purpose: GSD workflow state, project plans, generated codebase maps, milestone artifacts.
 - Generated: Yes.
-- Committed: Only placeholders or intentionally curated small files; downloaded datasets are not committed.
+- Committed: Yes for planning artifacts relevant to project workflow.
+
+**`.artifacts/`:**
+- Purpose: Local validation/evidence artifacts from ROCm and dataset runs.
+- Generated: Yes.
+- Committed: No by default unless explicitly selected as evidence.
+
+**`data/`:**
+- Purpose: Downloaded SOL ExecBench benchmark assets.
+- Generated: Yes after download.
+- Committed: No, except `data/.gitkeep`.
 
 **`dist/`:**
-- Purpose: Built wheel/source distributions.
+- Purpose: Python build outputs.
 - Generated: Yes.
-- Committed: Existing build artifacts are present; do not add new build artifacts unless release workflow requires it.
+- Committed: No by default; existing wheel/sdist files are build artifacts.
 
-**`.planning/`:**
-- Purpose: GSD planning, milestone, phase, research, and codebase map artifacts.
-- Generated: Yes.
-- Committed: Yes, for planning artifacts managed by GSD.
+**`src/sol_execbench/driver/templates/`:**
+- Purpose: Source templates copied into staging directories and executed as standalone scripts.
+- Generated: No.
+- Committed: Yes.
 
-**`.uv-cache/`, `.pytest_cache/`, `.ruff_cache/`, `__pycache__/`:**
-- Purpose: Local tool caches.
-- Generated: Yes.
-- Committed: No.
+**`src/sol_execbench/data/amd_hardware_models/`:**
+- Purpose: Package data consumed by scoring/hardware model code.
+- Generated: No.
+- Committed: Yes.
 
 **`examples/`:**
-- Purpose: Source examples and compatibility fixtures.
+- Purpose: Runnable examples and migration category references.
 - Generated: No.
 - Committed: Yes.
 
 **`tests/sol_execbench/samples/`:**
-- Purpose: Test-only sample benchmark problems and solution fixtures.
+- Purpose: Test fixture problem directories and exploit samples.
 - Generated: No.
 - Committed: Yes.
 
-**`src/sol_execbench/driver/templates/`:**
-- Purpose: Runtime scripts copied into staging directories.
-- Generated: No.
-- Committed: Yes.
-
-**Temporary `sol_execbench_*` staging directories:**
-- Purpose: Per-run compile/evaluation workspaces created by `tempfile.mkdtemp()`.
+**`.venv/`, `.uv-cache/`, `.ruff_cache/`, `.pytest_cache/`, `__pycache__/`:**
+- Purpose: Local dependency, lint, pytest, and bytecode caches.
 - Generated: Yes.
 - Committed: No.
 
 ---
 
-*Structure analysis: 2026-05-28*
+*Structure analysis: 2026-05-31*
