@@ -132,7 +132,7 @@ Plans:
   5. Matrix schema and diff outputs remain diagnostic and cannot upgrade Docker container evidence into native-host validation, score authority, paper-parity authority, or leaderboard authority.
 **Plans**: 2 plans
 Plans:
-- [ ] 85-01-PLAN.md — Matrix JSON Schema export helpers, thin script, deterministic output, and diagnostic-only schema boundaries.
+- [x] 85-01-PLAN.md — Matrix JSON Schema export helpers, thin script, deterministic output, and diagnostic-only schema boundaries.
 - [ ] 85-02-PLAN.md — Semantic Matrix report diff helpers, JSON/Markdown output, severity categories, and claim-boundary guardrails.
 
 ### Phase 86: Dataset Runner Hardening Integration
@@ -180,7 +180,7 @@ Phases execute in numeric order: 83 -> 84 -> 85 -> 86 -> 87 -> 88.
 |-------|----------------|--------|-----------|
 | 83. Closure Contracts And Provenance Foundation | 2/2 | Complete   | 2026-05-31 |
 | 84. Paper Denominator Accounting And Claim Boundaries | 2/2 | Complete   | 2026-05-31 |
-| 85. Compatibility Matrix Schema Export And Semantic Diff | 0/TBD | Not started | - |
+| 85. Compatibility Matrix Schema Export And Semantic Diff | 1/2 | In Progress|  |
 | 86. Dataset Runner Hardening Integration | 0/TBD | Not started | - |
 | 87. AMD SOL/SOLAR Bound Sanity Evidence | 0/TBD | Not started | - |
 | 88. Documentation, Examples, And Guardrail Tests | 0/TBD | Not started | - |
