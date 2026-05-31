@@ -818,6 +818,41 @@ def test_v1_19_amd_bound_sanity_markdown_keeps_negative_boundaries_visible():
         assert expected in markdown
 
 
+def test_phase88_example_docs_keep_v1_19_surfaces_sidecar_only():
+    definition, workload, trace = _sample_definition_workload_trace()
+    examples_readme = (REPO_ROOT / "docs/examples/v1_19_evidence/README.md").read_text()
+
+    for expected in (
+        "demo-only",
+        "diagnostic-only",
+        "sidecars/reports only",
+        "canonical Trace, Definition, Workload, Solution",
+        "no score authority",
+        "no leaderboard readiness",
+        "no native-host ROCm Matrix validation",
+    ):
+        assert expected in examples_readme
+
+    for payload in (
+        definition.model_dump(mode="json"),
+        workload.model_dump(mode="json"),
+        trace.model_dump(mode="json"),
+    ):
+        text = json.dumps(payload, sort_keys=True)
+        for field in (
+            "sol_execbench.execution_closure.v1",
+            "sol_execbench.paper_denominator_report.v1",
+            "sol_execbench.rocm_compatibility_matrix_diff.v1",
+            "sol_execbench.amd_bound_sanity.v1",
+            "demo-only",
+            "diagnostic-only",
+            "paper_denominator",
+            "amd_bound_sanity",
+            "matrix_diff",
+        ):
+            assert field not in text
+
+
 def test_v1_11_parity_gap_docs_keep_bounded_claim_boundary():
     docs = (REPO_ROOT / "docs/analysis.md").read_text()
 
