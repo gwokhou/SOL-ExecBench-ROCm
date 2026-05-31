@@ -21,6 +21,8 @@ SOURCE_CHECKSUM_KEYS = (
     "execution_closure_checksum",
     "amd_native_score_checksum",
     "amd_score_checksum",
+    "amd_sol_checksum",
+    "solar_derivation_checksum",
     "matrix_checksum",
     "checksum",
 )
@@ -109,6 +111,8 @@ def build_trust_summary_report(
     paper_denominator: dict[str, Any] | None = None,
     matrix_report: dict[str, Any] | None = None,
     amd_score_report: dict[str, Any] | None = None,
+    amd_sol_report: dict[str, Any] | None = None,
+    solar_derivation: dict[str, Any] | None = None,
     amd_bound_sanity: dict[str, Any] | None = None,
     source_paths: dict[str, Path | None] | None = None,
     created_at: str | None = None,
@@ -122,6 +126,8 @@ def build_trust_summary_report(
         "paper_denominator": paper_denominator,
         "matrix_report": matrix_report,
         "amd_score_report": amd_score_report,
+        "amd_sol_report": amd_sol_report,
+        "solar_derivation": solar_derivation,
         "amd_bound_sanity": amd_bound_sanity,
     }
     outcomes = [
@@ -133,6 +139,8 @@ def build_trust_summary_report(
             paper_denominator=paper_denominator,
             matrix_report=matrix_report,
             amd_score_report=amd_score_report,
+            amd_sol_report=amd_sol_report,
+            solar_derivation=solar_derivation,
             amd_bound_sanity=amd_bound_sanity,
         ),
     ]
@@ -286,6 +294,8 @@ def _evidence_outcome(
     paper_denominator: dict[str, Any] | None,
     matrix_report: dict[str, Any] | None,
     amd_score_report: dict[str, Any] | None,
+    amd_sol_report: dict[str, Any] | None,
+    solar_derivation: dict[str, Any] | None,
     amd_bound_sanity: dict[str, Any] | None,
 ) -> TrustOutcome:
     missing = [
@@ -295,6 +305,8 @@ def _evidence_outcome(
             "paper_denominator": paper_denominator,
             "matrix_report": matrix_report,
             "amd_score_report": amd_score_report,
+            "amd_sol_report": amd_sol_report,
+            "solar_derivation": solar_derivation,
             "amd_bound_sanity": amd_bound_sanity,
         }.items()
         if payload is None

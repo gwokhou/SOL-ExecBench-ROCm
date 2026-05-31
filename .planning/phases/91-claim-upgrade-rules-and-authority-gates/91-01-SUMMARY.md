@@ -1,3 +1,8 @@
+---
+status: complete
+requirements-completed: [CLAIM-01, CLAIM-02, CLAIM-03, CLAIM-04]
+---
+
 # Phase 91 Plan 01 Summary: Claim Rule Contract
 
 **Status:** Complete
@@ -22,4 +27,3 @@
 
 - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest tests/sol_execbench/test_claim_upgrade.py tests/sol_execbench/test_claim_upgrade_script.py tests/sol_execbench/test_public_contract_guardrails.py -q`
 - `UV_CACHE_DIR=/tmp/uv-cache uv run ruff check src/sol_execbench/core/claim_upgrade.py scripts/report_claim_upgrade.py tests/sol_execbench/test_claim_upgrade.py tests/sol_execbench/test_claim_upgrade_script.py tests/sol_execbench/test_public_contract_guardrails.py`
-

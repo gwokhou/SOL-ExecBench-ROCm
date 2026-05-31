@@ -52,6 +52,7 @@ def test_v1_20_example_readme_references_existing_fixture_files():
     assert "../../v1_20_evidence_quality_guide.md" in readme
 
     for fixture in (
+        "trust_summary.consistent.demo.json",
         "consistency.contradictory.demo.json",
         "evaluation_stability.noisy.demo.json",
         "claim_upgrade.blocked.demo.json",
@@ -72,6 +73,9 @@ def test_v1_20_example_json_fixtures_validate_against_real_models():
     )
     TrustSummaryReport.model_validate(
         _json(EXAMPLES_DIR / "trust_summary.missing.demo.json")
+    )
+    TrustSummaryReport.model_validate(
+        _json(EXAMPLES_DIR / "trust_summary.consistent.demo.json")
     )
 
 
@@ -121,4 +125,3 @@ def test_v1_20_docs_keep_required_negative_claim_boundaries_visible():
         "score authority",
     ):
         assert expected in combined
-

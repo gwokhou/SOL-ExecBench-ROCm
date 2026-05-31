@@ -136,13 +136,14 @@ None.
 | 2026-05-31 | 260531-u2s add requires_rocm coverage for CLI and dataset runner GPU paths | Added 3 ROCm E2E regressions; `requires_rocm` now reports 17 passed. |
 | 2026-05-31 | 260531-uki add remaining requires_rocm e2e coverage | Added HIP/C++ CLI, static evidence, and run_dataset reuse/rerun E2E regressions; `requires_rocm` now reports 19 passed. |
 | 2026-05-31 | 260531-rdf add run_dataset closure e2e gaps | Added filtered, missing-workload, readiness-blocked, and stale-provenance ROCm E2E regressions; `requires_rocm` now reports 21 passed. |
+| 2026-05-31 | 20260531-fix-v120-audit-gaps | Fixed v1.20 audit blockers; v1.20 aggregate CPU-safe suite reports 74 passed and audit status is passed. |
 
 ## Session Continuity
 
-Last session: 2026-05-31T16:20:00.000Z
-Stopped at: Completed Phase 93
+Last session: 2026-05-31T16:05:00.000Z
+Stopped at: Fixed v1.20 audit gaps
 Resume file: None
 
 ## Operator Next Steps
 
-- Run /gsd-audit-milestone or /gsd-complete-milestone for v1.20
+- Run /gsd-complete-milestone v1.20
