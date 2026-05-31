@@ -67,3 +67,9 @@ None - plan executed as written.
 ## Known Stubs
 
 None.
+
+## Self-Check: PASSED
+
+- Found `src/sol_execbench/core/dataset/execution_closure.py`.
+- Found `tests/sol_execbench/test_execution_closure_contract.py`.
+- Found commit `d77c6fb`.
