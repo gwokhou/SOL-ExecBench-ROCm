@@ -102,21 +102,21 @@ ExecBench.
 
 ### Documentation And Guardrails
 
-- [ ] **DOCS-01**: Documentation explains the v1.19 evidence surfaces:
+- [x] **DOCS-01**: Documentation explains the v1.19 evidence surfaces:
   denominator report, closure hardening, Matrix schema export, Matrix diff, and
   AMD bound sanity, including how to generate and interpret each artifact.
-- [ ] **DOCS-02**: Claim-boundary docs explicitly state that v1.19 does not add
+- [x] **DOCS-02**: Claim-boundary docs explicitly state that v1.19 does not add
   full 235-problem paper validation, upstream SOLAR parity, score authority,
   leaderboard readiness, CDNA 3/MI300X/CDNA4 validation, or native-host ROCm
   matrix validation.
-- [ ] **DOCS-03**: CPU-safe tests cover denominator accounting, closure
+- [x] **DOCS-03**: CPU-safe tests cover denominator accounting, closure
   serialization/provenance, Matrix schema export, Matrix diff semantics,
   dataset-runner closure classification, AMD bound sanity reports, and docs
   wording guardrails.
-- [ ] **DOCS-04**: Public examples or fixture reports show representative
+- [x] **DOCS-04**: Public examples or fixture reports show representative
   JSON/Markdown artifact shapes with bounded logs, relative refs, checksums,
   and explicit authority-false or diagnostic-only interpretation.
-- [ ] **DOCS-05**: Existing public contracts remain stable: canonical Trace,
+- [x] **DOCS-05**: Existing public contracts remain stable: canonical Trace,
   Definition, Workload, Solution, correctness, timing, score, and evaluator
   contract semantics are unchanged by v1.19 reporting features.
 
@@ -187,11 +187,11 @@ ExecBench.
 | SANITY-02 | Phase 87 | Complete |
 | SANITY-03 | Phase 87 | Complete |
 | SANITY-04 | Phase 87 | Complete |
-| DOCS-01 | Phase 88 | Pending |
-| DOCS-02 | Phase 88 | Pending |
-| DOCS-03 | Phase 88 | Pending |
-| DOCS-04 | Phase 88 | Pending |
-| DOCS-05 | Phase 88 | Pending |
+| DOCS-01 | Phase 88 | Complete |
+| DOCS-02 | Phase 88 | Complete |
+| DOCS-03 | Phase 88 | Complete |
+| DOCS-04 | Phase 88 | Complete |
+| DOCS-05 | Phase 88 | Complete |
 
 **Coverage:**
 - v1 requirements: 28 total
