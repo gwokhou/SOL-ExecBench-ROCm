@@ -8,7 +8,9 @@ evidence refs and gaps without claiming an AMD SOL/SOLAR model validation.
 | Ref | Path | Checksum |
 | --- | --- | --- |
 | trace | `out/v1_19_demo/traces/demo.trace.jsonl` | `sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa` |
-| paper_denominator | `out/v1_19_demo/paper_denominator.json` | `sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb` |
+| execution_closure | `out/v1_19_demo/execution_closure.json` | `sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee` |
+| amd_score | `out/v1_19_demo/amd_score.json` | `sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb` |
+| compatibility_matrix | `out/v1_19_demo/matrix.json` | `sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd` |
 
 ## Boundaries
 
