@@ -300,7 +300,12 @@ def run_cli(
         verbose=verbose,
     )
 
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 60)
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 60)
+    except subprocess.TimeoutExpired as exc:
+        print(f"CLI timed out for {job_name}: {exc.timeout} seconds")
+        _save_cli_timeout_log(output_dir, job_name, exc)
+        return None
 
     # The CLI with --json prints one JSON trace per line to stdout.
     traces = []
@@ -311,6 +316,11 @@ def run_cli(
                 traces.append(json.loads(line))
             except json.JSONDecodeError:
                 continue
+
+    if result.returncode != 0:
+        print(f"CLI failed for {job_name}: exit code {result.returncode}")
+        _save_cli_log(output_dir, job_name, result)
+        return None
 
     if not traces:
         print(f"CLI failed for {job_name}: {result.stderr[:500]}")
@@ -330,6 +340,49 @@ def _save_cli_log(output_dir: Path, job_name: str, result: subprocess.CompletedP
     ]
     log_path.write_text("\n".join(parts))
     print(f"Saved CLI log to {log_path}")
+
+
+def _timeout_stream_text(value: str | bytes | None) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode(errors="replace")
+    return value
+
+
+def _save_cli_timeout_log(
+    output_dir: Path,
+    job_name: str,
+    exc: subprocess.TimeoutExpired,
+) -> None:
+    """Write stdout/stderr from a timed-out CLI invocation to a log file."""
+    log_path = output_dir / f"{job_name}_cli.log"
+    parts = [
+        f"timeout after {exc.timeout} seconds",
+        f"\n--- stdout ---\n{_timeout_stream_text(exc.output)}" if exc.output else "",
+        f"\n--- stderr ---\n{_timeout_stream_text(exc.stderr)}" if exc.stderr else "",
+    ]
+    log_path.write_text("\n".join(parts))
+    print(f"Saved CLI log to {log_path}")
+
+
+def _cli_failure_notes(cli_log: Path) -> list[str]:
+    if not cli_log.exists():
+        return ["CLI returned no traces"]
+    first_line = cli_log.read_text(errors="replace").splitlines()[0:1]
+    if not first_line:
+        return ["CLI returned no traces"]
+    message = first_line[0]
+    if message.startswith("exit code: "):
+        try:
+            exit_code = int(message.removeprefix("exit code: ").strip())
+        except ValueError:
+            return ["CLI returned no traces"]
+        if exit_code != 0:
+            return [f"CLI failed with exit code {exit_code}"]
+    if message.startswith("timeout after "):
+        return [f"CLI timed out after {message.removeprefix('timeout after ')}"]
+    return ["CLI returned no traces"]
 
 
 def collect_timing_evidence_for_problem(
@@ -1637,7 +1690,7 @@ def main():
                             if cli_log.exists()
                             else None,
                             solution_ref=_relative_ref(solution_path, output_dir),
-                            notes=["CLI returned no traces"],
+                            notes=_cli_failure_notes(cli_log),
                         )
                     )
             continue
