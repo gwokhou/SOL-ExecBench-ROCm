@@ -117,6 +117,7 @@ None.
 | Date | Quick Task | Result |
 |------|------------|--------|
 | 2026-05-31 | 260531-u2s add requires_rocm coverage for CLI and dataset runner GPU paths | Added 3 ROCm E2E regressions; `requires_rocm` now reports 17 passed. |
+| 2026-05-31 | 260531-uki add remaining requires_rocm e2e coverage | Added HIP/C++ CLI, static evidence, and run_dataset reuse/rerun E2E regressions; `requires_rocm` now reports 19 passed. |
 
 ## Session Continuity
 
