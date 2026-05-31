@@ -4,6 +4,10 @@ import json
 import re
 from pathlib import Path
 
+from sol_execbench.core.dataset.execution_closure import ExecutionClosureReport
+from sol_execbench.core.dataset.paper_denominator import PaperDenominatorReport
+from sol_execbench.core.matrix_diff import MatrixReportDiff
+from sol_execbench.core.scoring.amd_bound_sanity import AmdBoundSanityReport
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 EXAMPLES_DIR = REPO_ROOT / "docs/examples/v1_19_evidence"
@@ -98,6 +102,21 @@ def test_v1_19_example_json_fixtures_expose_expected_schema_markers():
             assert payload["schema_version"] == marker
 
 
+def test_v1_19_report_examples_validate_against_real_contract_models():
+    ExecutionClosureReport.model_validate_json(
+        _read_text(EXAMPLES_DIR / "execution_closure.demo.json")
+    )
+    PaperDenominatorReport.model_validate_json(
+        _read_text(EXAMPLES_DIR / "paper_denominator.demo.json")
+    )
+    MatrixReportDiff.model_validate_json(
+        _read_text(EXAMPLES_DIR / "matrix_diff.demo.json")
+    )
+    AmdBoundSanityReport.model_validate_json(
+        _read_text(EXAMPLES_DIR / "amd_bound_sanity.demo.json")
+    )
+
+
 def test_v1_19_example_refs_are_relative_bounded_and_checksum_backed():
     checksum_pattern = re.compile(r"^sha256:[0-9a-f]{64}$")
 
@@ -145,8 +164,9 @@ def test_v1_19_example_authority_flags_remain_false_or_diagnostic_only():
             "leaderboard_authority",
             "paper_parity_authority",
             "native_host_validation",
+            "native_host_validation_authority",
             "new_hardware_validation",
         ):
-            if authority in text:
+            if f'"{authority}"' in text:
                 assert f'"{authority}": false' in text
         assert "diagnostic" in text
