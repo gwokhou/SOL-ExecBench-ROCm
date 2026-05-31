@@ -89,6 +89,42 @@ def _write_prior_closure(
     write_execution_closure_report(report, path)
 
 
+def _matching_closure_provenance() -> dict:
+    return {
+        "dataset_root": "dataset",
+        "selected_categories": None,
+        "limit": None,
+        "max_workloads": None,
+        "timeout": 300,
+        "warmup_runs": 3,
+        "iterations": 10,
+        "lock_clocks": False,
+        "rerun": False,
+        "keep_staging": False,
+        "verbose": False,
+        "solution_mode": "reference",
+        "solution_name": None,
+        "output_dir": "out",
+        "summary_path": "summary.json",
+        "ready_subset_path": "ready_subset.json",
+        "ready_subset_checksum": "ready-sha",
+        "readiness_path": None,
+        "readiness_checksum": "readiness-sha",
+        "dataset_manifest_path": None,
+        "dataset_manifest_checksum": None,
+        "workload_identity_checksum": None,
+        "requested_evidence_requirements": [],
+        "config_path": None,
+        "benchmark_config": {},
+        "derived_evidence": {
+            "amd_score_report": None,
+            "amd_sol_bound_dir": None,
+            "solar_derivation": None,
+            "timing_evidence_dir": None,
+        },
+    }
+
+
 def _write_problem(dataset_root: Path, category: str, name: str, workloads: list[dict]) -> Path:
     problem_dir = dataset_root / category / name
     problem_dir.mkdir(parents=True)
@@ -441,39 +477,7 @@ def test_execution_closure_existing_pass_requires_matching_provenance(
     (trace_dir / "traces.json").write_text(json.dumps([_trace("selected-workload")]))
     _write_prior_closure(
         output_dir / "execution_closure.json",
-        provenance={
-            "dataset_root": "dataset",
-            "selected_categories": None,
-            "limit": None,
-            "max_workloads": None,
-            "timeout": 300,
-            "warmup_runs": 3,
-            "iterations": 10,
-            "lock_clocks": False,
-            "rerun": False,
-            "keep_staging": False,
-            "verbose": False,
-            "solution_mode": "reference",
-            "solution_name": None,
-            "output_dir": "out",
-            "summary_path": "summary.json",
-            "ready_subset_path": "ready_subset.json",
-            "ready_subset_checksum": "ready-sha",
-            "readiness_path": None,
-            "readiness_checksum": "readiness-sha",
-            "dataset_manifest_path": None,
-            "dataset_manifest_checksum": None,
-            "workload_identity_checksum": None,
-            "requested_evidence_requirements": [],
-            "config_path": None,
-            "benchmark_config": {},
-            "derived_evidence": {
-                "amd_score_report": None,
-                "amd_sol_bound_dir": None,
-                "solar_derivation": None,
-                "timing_evidence_dir": None,
-            },
-        },
+        provenance=_matching_closure_provenance(),
     )
 
     def fail_run_cli(*args, **kwargs):
@@ -496,6 +500,90 @@ def test_execution_closure_existing_pass_requires_matching_provenance(
     run_dataset.main()
 
     closure = json.loads((output_dir / "execution_closure.json").read_text())
+    assert closure["records"][0]["closure_status"] == "skipped_existing_pass"
+    assert closure["provenance_mismatches"] == []
+
+
+def test_dataset_run_existing_pass_without_closure_keeps_default_skip(
+    tmp_path,
+    monkeypatch,
+):
+    dataset_root = tmp_path / "dataset"
+    _write_problem(dataset_root, "L1", "matmul_demo", [_workload("selected-workload")])
+    output_dir = tmp_path / "out"
+    trace_dir = output_dir / "L1" / "matmul_demo"
+    trace_dir.mkdir(parents=True)
+    (trace_dir / "traces.json").write_text(json.dumps([_trace("selected-workload")]))
+
+    def fail_run_cli(*args, **kwargs):
+        raise AssertionError("default resume should skip an existing passing trace")
+
+    monkeypatch.setattr(run_dataset, "run_cli", fail_run_cli)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--output",
+            str(output_dir),
+        ],
+    )
+
+    run_dataset.main()
+
+    assert not (output_dir / "execution_closure.json").exists()
+
+
+def test_execution_closure_custom_path_authorizes_existing_pass_reuse(
+    tmp_path,
+    monkeypatch,
+):
+    dataset_root = tmp_path / "dataset"
+    _write_problem(dataset_root, "L1", "matmul_demo", [_workload("selected-workload")])
+    subset_path = _ready_subset(
+        tmp_path / "ready_subset.json",
+        problems=[
+            {
+                "category": "L1",
+                "problem_id": "L1/matmul_demo",
+                "problem_path": "L1/matmul_demo",
+                "workloads": [{"uuid": "selected-workload", "row_index": 0}],
+            }
+        ],
+    )
+    output_dir = tmp_path / "out"
+    trace_dir = output_dir / "L1" / "matmul_demo"
+    trace_dir.mkdir(parents=True)
+    (trace_dir / "traces.json").write_text(json.dumps([_trace("selected-workload")]))
+    custom_closure_path = tmp_path / "custom_execution_closure.json"
+    _write_prior_closure(
+        custom_closure_path,
+        provenance=_matching_closure_provenance(),
+    )
+
+    def fail_run_cli(*args, **kwargs):
+        raise AssertionError("custom prior closure provenance should permit reuse")
+
+    monkeypatch.setattr(run_dataset, "run_cli", fail_run_cli)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--ready-subset",
+            str(subset_path),
+            "--output",
+            str(output_dir),
+            "--execution-closure",
+            str(custom_closure_path),
+        ],
+    )
+
+    run_dataset.main()
+
+    closure = json.loads(custom_closure_path.read_text())
     assert closure["records"][0]["closure_status"] == "skipped_existing_pass"
     assert closure["provenance_mismatches"] == []
 
@@ -722,6 +810,44 @@ def test_execution_closure_classifies_cli_no_output_with_bounded_log_ref(
     assert str(tmp_path) not in closure_text
     assert "stdout from" not in closure_text
     assert "stderr from" not in closure_text
+
+
+def test_cli_failure_logs_are_bounded_and_notes_read_header_only(tmp_path):
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+    large_stdout = "a" * (run_dataset._CLI_LOG_LIMIT + 100)
+    large_stderr = "b" * (run_dataset._CLI_LOG_LIMIT + 100)
+    result = subprocess.CompletedProcess(
+        args=["sol-execbench"],
+        returncode=42,
+        stdout=large_stdout,
+        stderr=large_stderr,
+    )
+
+    run_dataset._save_cli_log(output_dir, "failed_job", result)
+
+    cli_log = output_dir / "failed_job_cli.log"
+    log_text = cli_log.read_text()
+    assert len(log_text) < len(large_stdout) + len(large_stderr)
+    assert "[truncated CLI output]" in log_text
+    assert run_dataset._cli_failure_notes(cli_log) == ["CLI failed with exit code 42"]
+
+
+def test_cli_timeout_logs_are_bounded(tmp_path):
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+    exc = subprocess.TimeoutExpired(
+        cmd=["sol-execbench"],
+        timeout=300,
+        output="a" * (run_dataset._CLI_LOG_LIMIT + 100),
+        stderr="b" * (run_dataset._CLI_LOG_LIMIT + 100),
+    )
+
+    run_dataset._save_cli_timeout_log(output_dir, "timeout_job", exc)
+
+    log_text = (output_dir / "timeout_job_cli.log").read_text()
+    assert len(log_text) < (run_dataset._CLI_LOG_LIMIT * 2) + 200
+    assert "[truncated CLI output]" in log_text
 
 
 def test_execution_closure_marks_selected_workload_without_trace_as_missing_trace(
