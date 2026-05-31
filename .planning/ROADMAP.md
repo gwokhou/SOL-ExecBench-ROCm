@@ -145,7 +145,10 @@ Plans:
   3. Researcher can inspect closure output that classifies build failures, runtime failures, timeouts, nonzero CLI exits, correctness failures, missing traces, missing derived evidence, and skipped/unattempted workloads with stable reason codes and bounded log refs.
   4. Existing dataset runner defaults behave as before unless a mismatch, missing evidence, or explicit closure option requires a diagnostic stop or sidecar status.
   5. Closure writes are deterministic and avoid credentials, proprietary kernels, raw dataset payloads, unnecessary absolute paths, and unbounded logs.
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 86-01-PLAN.md — Provenance-gated existing-pass reuse, stale provenance diagnostics, and `--rerun` fresh-attempt behavior.
+- [ ] 86-02-PLAN.md — Failure, missing-trace, missing-evidence, skipped, and unattempted closure classification with bounded refs/logs.
 
 ### Phase 87: AMD SOL/SOLAR Bound Sanity Evidence
 **Goal**: Researchers can generate diagnostic AMD SOL/SOLAR bound sanity reports over existing RDNA 4 and Docker evidence while keeping score eligibility and hardware-validation claims unchanged.
