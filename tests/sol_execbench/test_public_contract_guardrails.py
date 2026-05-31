@@ -688,6 +688,136 @@ def test_primary_cli_does_not_expose_v1_19_paper_denominator_options():
         assert option not in help_text
 
 
+def test_v1_19_amd_bound_sanity_fields_remain_sidecar_only():
+    definition, workload, trace = _sample_definition_workload_trace()
+    forbidden = (
+        "sol_execbench.amd_bound_sanity.v1",
+        "amd_bound_sanity",
+        "amd_bound_sanity_checksum",
+        "AmdBoundSanityReport",
+        "diagnostic_status",
+        "diagnostic_flags",
+        "status_totals",
+        "provisional_rdna4_model_risk",
+        "upstream_solar_equivalence",
+        "amd_sol_model_validation",
+        "solar_model_validation",
+        "paper_parity",
+        "leaderboard_authority",
+        "score_authority_upgrade",
+        "cdna3_validation",
+        "mi300x_validation",
+        "cdna4_validation",
+        "native_host_validation",
+        "new_hardware_validation",
+    )
+
+    for payload in (
+        definition.model_dump(mode="json"),
+        workload.model_dump(mode="json"),
+        trace.model_dump(mode="json"),
+    ):
+        text = json.dumps(payload, sort_keys=True)
+        for field in forbidden:
+            assert field not in text
+
+
+def test_v1_19_amd_bound_sanity_does_not_enter_amd_score_contracts():
+    from sol_execbench.core.scoring.amd_bound_sanity import (
+        AMD_BOUND_SANITY_SCHEMA_VERSION,
+        AmdBoundSanityClaimBoundary,
+    )
+
+    score_payload = build_amd_native_suite_report([]).to_dict()
+    text = json.dumps(score_payload, sort_keys=True)
+
+    for field in (
+        AMD_BOUND_SANITY_SCHEMA_VERSION,
+        "amd_bound_sanity",
+        "diagnostic_status",
+        "diagnostic_flags",
+        "provisional_rdna4_model_risk",
+        "score_authority_upgrade",
+    ):
+        assert field not in text
+
+    boundary = AmdBoundSanityClaimBoundary().model_dump(mode="json")
+    for field in (
+        "upstream_solar_equivalence",
+        "amd_sol_model_validation",
+        "solar_model_validation",
+        "paper_parity",
+        "leaderboard_authority",
+        "score_authority_upgrade",
+        "cdna3_validation",
+        "mi300x_validation",
+        "cdna4_validation",
+        "native_host_validation",
+        "new_hardware_validation",
+    ):
+        assert boundary[field] is False
+
+
+def test_primary_cli_does_not_expose_v1_19_amd_bound_sanity_options():
+    result = CliRunner().invoke(cli, ["--help"])
+    assert result.exit_code == 0
+    help_text = result.output
+
+    for option in (
+        "--amd-bound-sanity",
+        "--report-amd-bound-sanity",
+        "--amd-sol-artifact",
+        "--solar-artifact",
+        "--compatibility-matrix",
+        "--created-at",
+        "amd-bound-sanity",
+        "report_amd_bound_sanity",
+    ):
+        assert option not in help_text
+
+
+def test_v1_19_amd_bound_sanity_markdown_keeps_negative_boundaries_visible():
+    from sol_execbench.core.scoring.amd_bound_sanity import (
+        build_amd_bound_sanity_report,
+        render_amd_bound_sanity_markdown,
+    )
+
+    report = build_amd_bound_sanity_report(
+        execution_closure={
+            "schema_version": "sol_execbench.execution_closure.v1",
+            "records": [
+                {
+                    "category": "L1",
+                    "problem_id": "L1/demo",
+                    "workload_uuid": "w1",
+                    "closure_status": "derived_evidence_missing",
+                    "evidence_refs": {},
+                    "evidence_gaps": ["amd_sol_evidence_missing"],
+                }
+            ],
+        },
+        created_at="2026-05-31T00:00:00Z",
+    )
+    markdown = render_amd_bound_sanity_markdown(report)
+
+    for expected in (
+        "diagnostic existing evidence sanity report",
+        "not upstream SOLAR equivalence",
+        "not AMD SOL/SOLAR model validation",
+        "not paper parity",
+        "not leaderboard authority",
+        "not score authority upgrade",
+        "not CDNA 3 validation",
+        "not MI300X validation",
+        "not CDNA 4 validation",
+        "not native-host validation",
+        "not new-hardware validation",
+        "`upstream_solar_equivalence`: false",
+        "`score_authority_upgrade`: false",
+    ):
+        assert expected in markdown
+
+
 def test_v1_11_parity_gap_docs_keep_bounded_claim_boundary():
     docs = (REPO_ROOT / "docs/analysis.md").read_text()
 
@@ -1055,7 +1185,7 @@ def test_v1_9_claim_guardrails_keep_cdna3_and_nvidia_equivalence_out_of_scope():
     analysis = Path("docs/analysis.md").read_text()
 
     assert "CDNA 3 (`gfx94*`) full adapted suite validation remains deferred" in project
-    assert "CDNA 3 / MI300X real-hardware validation" in requirements
+    assert "CDNA 3, MI300X, CDNA 4, or native-host ROCm validation expansion" in requirements
     assert "not NVIDIA B200, SOLAR, or leaderboard equivalence claims" in analysis
     assert "hardware_validation_status" in analysis
     assert "model_validation_status" in analysis
