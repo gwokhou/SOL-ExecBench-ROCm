@@ -1,0 +1,41 @@
+{
+  "schema_version": "sol_execbench.paper_denominator_report.v1",
+  "created_at": "2026-05-31T00:00:00Z",
+  "demo_only": true,
+  "source_refs": [
+    {
+      "path": "out/v1_19_demo/inventory.json",
+      "ref": "inventory",
+      "schema_version": "sol_execbench.dataset_inventory.v1",
+      "checksum": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+    },
+    {
+      "path": "out/v1_19_demo/execution_closure.json",
+      "ref": "execution_closure",
+      "schema_version": "sol_execbench.execution_closure.v1",
+      "checksum": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+    }
+  ],
+  "denominator_summary": {
+    "total_records": 2,
+    "evidence_present": 1,
+    "evidence_missing": 1,
+    "deferred": 0
+  },
+  "evidence_gaps": [
+    {
+      "problem_id": "demo/problem-002",
+      "reason": "amd_bound_evidence_missing",
+      "next_evidence": "Generate bounded AMD bound evidence from explicit existing sidecars."
+    }
+  ],
+  "claim_boundary": {
+    "full_235_problem_paper_validation": false,
+    "upstream_solar_parity": false,
+    "score_authority": false,
+    "leaderboard_authority": false,
+    "native_host_validation": false,
+    "new_hardware_validation": false
+  },
+  "interpretation": "demo-only diagnostic-only denominator shape; no full 235-problem paper validation, no upstream SOLAR parity, no score authority, no leaderboard readiness, no CDNA 3/MI300X/CDNA4 validation, no native-host ROCm Matrix validation, no new-hardware validation"
+}
