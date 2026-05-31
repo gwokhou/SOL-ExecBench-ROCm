@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.20
 milestone_name: Cross-Report Consistency and Evaluation Stability
-status: planning
-last_updated: "2026-05-31T14:45:00.000Z"
+status: executing
+last_updated: "2026-05-31T15:20:00.000Z"
 last_activity: 2026-05-31
 progress:
   total_phases: 5
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  completed_phases: 1
+  total_plans: 2
+  completed_plans: 2
+  percent: 20
 ---
 
 # Project State
@@ -20,20 +20,20 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-31)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Phase 89 Cross-Report Consistency Contract And Lint
+**Current focus:** Phase 90 Evaluation Stability Evidence
 
 ## Current Position
 
-Phase: 89. Cross-Report Consistency Contract And Lint
+Phase: 90. Evaluation Stability Evidence
 Plan: —
-Status: Roadmap created; ready to plan Phase 89
-Last activity: 2026-05-31 — Milestone v1.20 roadmap created
+Status: Phase 89 complete; ready to plan Phase 90
+Last activity: 2026-05-31 — Phase 89 completed cross-report consistency contract, script, tests, and guardrails
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 0
+- Total plans completed: 2
 - Average duration: n/a
 - Total execution time: 0h
 
@@ -41,7 +41,7 @@ Last activity: 2026-05-31 — Milestone v1.20 roadmap created
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 89. Cross-Report Consistency Contract And Lint | 0/TBD | Not started | n/a |
+| 89. Cross-Report Consistency Contract And Lint | 2/2 | Complete | n/a |
 | 90. Evaluation Stability Evidence | 0/TBD | Not started | n/a |
 | 91. Claim Upgrade Rules And Authority Gates | 0/TBD | Not started | n/a |
 | 92. Trust Summary Integration | 0/TBD | Not started | n/a |
@@ -97,6 +97,8 @@ Last activity: 2026-05-31 — Milestone v1.20 roadmap created
 - v1.20 must not expand full 235-problem paper validation, CDNA3/MI300X/CDNA4 validation, native-host Matrix authority, hosted leaderboard readiness, or upstream SOLAR parity.
 - v1.20 evidence remains sidecar/reporting infrastructure and must not change canonical Trace, Definition, Workload, Solution, correctness, timing, scoring, or evaluator semantics.
 - Consistency, stability, claim-upgrade, and trust summary artifacts must remain diagnostic until future evidence satisfies explicit claim-upgrade prerequisites.
+- [Phase 89]: consistency_report.v1 remains a sidecar/reporting artifact and does not modify public CLI, Trace, Workload, Definition, timing, scoring, or evaluator contracts.
+- [Phase 89]: Consistency lint treats cross-report contradictions as diagnostic blockers/warnings; it does not upgrade score, paper-parity, leaderboard, native-host, or new-hardware authority.
 
 ### Pending Todos
 
@@ -129,10 +131,10 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-05-31T12:17:09.178Z
-Stopped at: Completed 88-02-PLAN.md
+Last session: 2026-05-31T15:20:00.000Z
+Stopped at: Completed Phase 89
 Resume file: None
 
 ## Operator Next Steps
 
-- Start Phase 89 with /gsd-plan-phase 89
+- Start Phase 90 with /gsd-plan-phase 90

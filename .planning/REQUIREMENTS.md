@@ -10,11 +10,11 @@ ExecBench.
 
 ### Cross-Report Consistency
 
-- [ ] **CONS-01**: Researcher can run a CPU-safe consistency check that loads execution closure, paper denominator, ROCm Compatibility Matrix, runtime evidence, static evidence, AMD score, AMD SOL/SOLAR, and AMD bound sanity refs without mutating canonical trace, score, timing, or public schema artifacts.
-- [ ] **CONS-02**: Consistency output detects contradictory status combinations across reports, including attempted/blocked denominator drift, Matrix runtime-unavailable versus attempted evidence, missing-derived-evidence versus scored reports, and stale or mismatched source refs/checksums.
-- [ ] **CONS-03**: Consistency findings use stable severity and reason-code vocabulary for blockers, warnings, informational notes, and claim-boundary violations.
-- [ ] **CONS-04**: Consistency reports are deterministic JSON plus Markdown summaries with bounded relative refs, checksums, and no embedded raw logs, proprietary kernels, credentials, or absolute temp paths.
-- [ ] **CONS-05**: Consistency tooling remains diagnostic-only and cannot upgrade Docker, runtime, static, denominator, or AMD SOL/SOLAR evidence into native-host validation, score authority, paper parity, or leaderboard authority.
+- [x] **CONS-01**: Researcher can run a CPU-safe consistency check that loads execution closure, paper denominator, ROCm Compatibility Matrix, runtime evidence, static evidence, AMD score, AMD SOL/SOLAR, and AMD bound sanity refs without mutating canonical trace, score, timing, or public schema artifacts.
+- [x] **CONS-02**: Consistency output detects contradictory status combinations across reports, including attempted/blocked denominator drift, Matrix runtime-unavailable versus attempted evidence, missing-derived-evidence versus scored reports, and stale or mismatched source refs/checksums.
+- [x] **CONS-03**: Consistency findings use stable severity and reason-code vocabulary for blockers, warnings, informational notes, and claim-boundary violations.
+- [x] **CONS-04**: Consistency reports are deterministic JSON plus Markdown summaries with bounded relative refs, checksums, and no embedded raw logs, proprietary kernels, credentials, or absolute temp paths.
+- [x] **CONS-05**: Consistency tooling remains diagnostic-only and cannot upgrade Docker, runtime, static, denominator, or AMD SOL/SOLAR evidence into native-host validation, score authority, paper parity, or leaderboard authority.
 
 ### Evaluation Stability
 
@@ -69,7 +69,7 @@ ExecBench.
 | Feature | Reason |
 |---------|--------|
 | Full 235-problem real-hardware validation | v1.20 audits evidence quality and consistency before expensive paper-scale runs. |
-| CDNA3/MI300X/CDNA4 or native-host validation expansion | Deferred to a later hardware milestone after consistency and stability gates exist. |
+| CDNA 3, MI300X, CDNA 4, or native-host ROCm validation expansion | Deferred to a later hardware milestone after consistency and stability gates exist. |
 | Hosted leaderboard or remote submission service | Requires separate submission isolation, anti-cheat, hardware authority, policy, and baseline work. |
 | Upstream SOLAR parity claim | v1.20 can check local evidence consistency but does not validate upstream SOLAR equivalence. |
 | Making stability evidence score authority | Stability supports interpretation; it does not change score semantics or eligibility. |
@@ -81,11 +81,11 @@ ExecBench.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CONS-01 | Phase 89 | Pending |
-| CONS-02 | Phase 89 | Pending |
-| CONS-03 | Phase 89 | Pending |
-| CONS-04 | Phase 89 | Pending |
-| CONS-05 | Phase 89 | Pending |
+| CONS-01 | Phase 89 | Complete |
+| CONS-02 | Phase 89 | Complete |
+| CONS-03 | Phase 89 | Complete |
+| CONS-04 | Phase 89 | Complete |
+| CONS-05 | Phase 89 | Complete |
 | STAB-01 | Phase 90 | Pending |
 | STAB-02 | Phase 90 | Pending |
 | STAB-03 | Phase 90 | Pending |
@@ -106,10 +106,10 @@ ExecBench.
 | DOCS-05 | Phase 93 | Pending |
 
 **Coverage:**
-- v1 requirements: 23 total
+- v1 requirements: 23 total, 5 complete
 - Mapped to phases: 23
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-05-31*
-*Last updated: 2026-05-31 after v1.20 roadmap creation*
+*Last updated: 2026-05-31 after Phase 89 completion*

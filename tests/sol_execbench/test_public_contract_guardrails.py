@@ -776,6 +776,56 @@ def test_primary_cli_does_not_expose_v1_19_amd_bound_sanity_options():
         assert option not in help_text
 
 
+def test_v1_20_consistency_report_fields_remain_sidecar_only():
+    definition, workload, trace = _sample_definition_workload_trace()
+    forbidden = (
+        "sol_execbench.consistency_report.v1",
+        "consistency_report",
+        "consistency_report_checksum",
+        "ConsistencyReport",
+        "ConsistencyFinding",
+        "sources_checked",
+        "finding_totals",
+        "denominator_closure_drift",
+        "matrix_runtime_unavailable_attempted",
+        "missing_derived_evidence_scored",
+        "source_ref_checksum_mismatch",
+        "claim_boundary_violation",
+        "diagnostic_only",
+        "score_authority",
+        "paper_parity",
+        "leaderboard_authority",
+        "native_host_validation",
+        "new_hardware_validation",
+    )
+
+    for payload in (
+        definition.model_dump(mode="json"),
+        workload.model_dump(mode="json"),
+        trace.model_dump(mode="json"),
+    ):
+        text = json.dumps(payload, sort_keys=True)
+        for field in forbidden:
+            assert field not in text
+
+
+def test_primary_cli_does_not_expose_v1_20_consistency_options():
+    result = CliRunner().invoke(cli, ["--help"])
+    assert result.exit_code == 0
+    help_text = result.output
+
+    for option in (
+        "--consistency-report",
+        "--report-consistency",
+        "--paper-denominator",
+        "--matrix-report",
+        "--created-at",
+        "report_consistency",
+        "consistency-report",
+    ):
+        assert option not in help_text
+
+
 def test_v1_19_amd_bound_sanity_markdown_keeps_negative_boundaries_visible():
     from sol_execbench.core.scoring.amd_bound_sanity import (
         build_amd_bound_sanity_report,
