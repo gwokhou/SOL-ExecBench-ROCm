@@ -1,5 +1,50 @@
 # Milestones
 
+## v1.20 Cross-Report Consistency and Evaluation Stability (Shipped: 2026-05-31)
+
+**Delivered:** local evidence-quality sidecars that make ROCm benchmark runs
+internally consistent, timing-quality aware, and explicit about which stronger
+claims remain blocked.
+
+**Phases completed:** 89-93 (5 phases, 10 plans)
+
+**Key accomplishments:**
+
+- Added `sol_execbench.consistency_report.v1` and
+  `scripts/report_consistency.py` for deterministic cross-report contradiction
+  checks across closure, denominator, Matrix, runtime/static evidence, AMD
+  score, AMD SOL/SOLAR, and bound sanity reports.
+- Added `sol_execbench.evaluation_stability.v1` and
+  `scripts/report_evaluation_stability.py` for timing-quality classification,
+  dispersion metrics, clock policy, backend, and profiling-overhead risk.
+- Added `sol_execbench.claim_upgrade.v1` and
+  `scripts/report_claim_upgrade.py` to evaluate diagnostic-only,
+  container/native-host validation, score-authority, paper-parity, and
+  leaderboard prerequisites without mutating source reports.
+- Added `sol_execbench.trust_summary.v1` and
+  `scripts/report_trust_summary.py` to combine consistency, stability,
+  claim-upgrade, and evidence completeness into bounded JSON/Markdown review
+  artifacts.
+- Published v1.20 evidence-quality docs and demo fixtures with CPU-safe
+  guardrail tests, a full cross-script E2E chain, and negative claim-boundary
+  wording.
+- Passed milestone audit with 23/23 requirements, 5/5 phases, 5/5 integration
+  checks, 5/5 flows, and no residual blockers or tech debt.
+
+**Stats:**
+- 76 files created/modified in the milestone range.
+- 5,775 insertions and 88 deletions across planning, source, scripts, tests,
+  docs, and examples.
+- 5 phases, 10 plans, 23 requirements.
+- Shipped on 2026-05-31.
+
+**Git range:** `c236c55` -> `b8eca35`
+
+**What's next:** define v1.21 from the deferred hardware-validation,
+paper-parity, profiling-diagnostics, or leaderboard-readiness frontier.
+
+---
+
 ## v1.19 Research Credibility Without New Hardware (Shipped: 2026-05-31)
 
 **Phases completed:** 6 phases, 13 plans, 29 tasks

@@ -15,20 +15,19 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
 ## Current State
 
-**Shipped version:** v1.19 Research Credibility Without New Hardware,
+**Shipped version:** v1.20 Cross-Report Consistency and Evaluation Stability,
 completed 2026-05-31.
 
-**Current milestone:** v1.20 Cross-Report Consistency and Evaluation
-Stability.
+**Current milestone:** none. The project is ready to define v1.21.
 
-**Latest milestone outcome:** the ROCm port now has deterministic execution
-closure contracts, paper denominator accounting, Matrix schema export and
-semantic diff tooling, hardened dataset-runner closure classification, AMD
-SOL/SOLAR bound sanity evidence, and researcher-facing docs/examples that keep
-all v1.19 evidence surfaces sidecar-only and claim-safe.
+**Latest milestone outcome:** the ROCm port now has deterministic consistency,
+stability, claim-upgrade, and trust-summary sidecars that review existing
+benchmark evidence without changing canonical Trace, Definition, Workload,
+Solution, correctness, timing, score, or evaluator semantics.
 
-**Current milestone goal:** make ROCm benchmark evidence internally consistent
-and timing-quality aware before expanding hardware validation.
+**Next milestone goal:** to be defined. Strong candidates are hardware
+validation expansion, paper-scale validation readiness, profiling diagnostics,
+or hosted leaderboard readiness.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline.
 Milestones v1.1-v1.6 added CDNA 3 code/schema support, maintained residue
@@ -86,8 +85,11 @@ The v1.19 milestone added closure contracts, paper denominator accounting,
 Matrix schema/diff tooling, runner closure hardening, AMD bound sanity reports,
 and public docs/examples/guardrails for research credibility without expanding
 hardware validation.
+The v1.20 milestone added cross-report consistency lint, evaluation stability
+diagnostics, claim-upgrade prerequisite gates, trust summaries, public
+evidence-quality docs/fixtures, and a full CPU-safe script-chain regression.
 
-## Current Milestone: v1.20 Cross-Report Consistency and Evaluation Stability
+## Recently Shipped Milestone: v1.20 Cross-Report Consistency and Evaluation Stability
 
 **Goal:** Make ROCm benchmark evidence internally consistent and timing-quality
 aware before expanding hardware validation.
@@ -111,6 +113,12 @@ aware before expanding hardware validation.
 - Full 235-problem paper validation, CDNA 3/MI300X/CDNA4 validation,
   native-host Matrix authority, hosted leaderboard readiness, and upstream
   SOLAR parity.
+
+**Shipped outcome:** v1.20 delivered local JSON/Markdown sidecars and scripts
+for consistency, timing stability, claim-upgrade prerequisites, and trust
+summaries. It also added docs, fixtures, guardrail tests, and a full
+cross-script E2E chain. Final milestone audit passed with 23/23 requirements,
+5/5 integration checks, 5/5 flows, and no residual blockers or tech debt.
 
 ## Recently Shipped Milestone: v1.19 Research Credibility Without New Hardware
 

@@ -494,6 +494,72 @@
 
 ---
 
+## Milestone: v1.20 - Cross-Report Consistency and Evaluation Stability
+
+**Shipped:** 2026-05-31
+**Phases:** 5 | **Plans:** 10 | **Tasks:** 23 requirements
+
+### What Was Built
+
+- Strict `consistency_report.v1` sidecars and a standalone consistency script
+  for contradiction checks across closure, denominator, Matrix, runtime/static
+  evidence, AMD score, AMD SOL/SOLAR, and bound sanity reports.
+- Strict `evaluation_stability.v1` sidecars and a standalone stability script
+  for timing-quality classification, dispersion metrics, clock policy, backend
+  state, and profiling-overhead risk.
+- Claim-upgrade rule reports that evaluate stronger claim prerequisites without
+  mutating source report authority fields.
+- Trust summaries that combine consistency, stability, claim-upgrade, evidence
+  completeness, source refs, checksums, and next steps into bounded review
+  artifacts.
+- v1.20 evidence-quality docs, demo fixtures, public contract guardrails, and a
+  full consistency -> stability -> claim-upgrade -> trust-summary E2E chain.
+
+### What Worked
+
+- Building local sidecars kept canonical benchmark schemas and evaluator
+  semantics stable while giving researchers stronger audit tools.
+- Milestone audit caught real integration gaps around AMD SOL/SOLAR propagation,
+  fixture coverage, verification artifacts, and public docs command wiring.
+- Adding a full cross-script E2E chain turned separate report builders into a
+  verified workflow rather than isolated utilities.
+
+### What Was Inefficient
+
+- Automatic milestone accomplishment extraction still produced generic
+  `Status:` entries, requiring manual rewrite during archival.
+- Some verification and validation artifacts were created after audit instead
+  of as part of each phase close.
+- Docs command wiring lagged implementation once AMD SOL/SOLAR became required
+  downstream evidence.
+
+### Patterns Established
+
+- Any evidence source accepted by an upstream sidecar should be propagated or
+  explicitly rejected by downstream claim and trust reports.
+- Public guide command examples need tests that inspect exact option names for
+  each script in the workflow.
+- Milestone audits should require verification, validation, fixtures, and
+  end-to-end command chains before archive.
+
+### Key Lessons
+
+1. Evidence-quality systems need chain tests, not only report-level unit tests.
+2. Claim gates should require both source refs and checksums for every evidence
+   type that can influence stronger authority language.
+3. Diagnostic-only wording is easier to preserve when examples, docs, models,
+   and public contract tests all share the same negative claim vocabulary.
+
+### Cost Observations
+
+- Model mix: not recorded.
+- Sessions: one autonomous milestone run plus audit/fix/close passes.
+- Notable: final closure included a passed milestone audit, 74 focused
+  evidence-quality tests, docs command regression tests, and open-artifact
+  cleanup before archival.
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -507,6 +573,8 @@
 | v1.8 | 1 | 5 | Completed scoped ROCm library replacement support for RDNA 4 and added Nyquist validation artifacts |
 | v1.9 | 1+ | 6 | Completed the RDNA 4-scoped AMD SOL/SOLAR bound modeling evidence chain from hardware model through score report |
 | v1.10 | 1+ | 6 | Completed paper-aligned automatic SOLAR derivation sidecars, score guards, dataset-runner report integration, and claim guardrails |
+| v1.19 | 1+ | 6 | Added sidecar evidence credibility surfaces without expanding hardware validation |
+| v1.20 | 1+ | 5 | Added consistency, stability, claim-upgrade, and trust-summary gates over existing evidence |
 
 ### Cumulative Quality
 
@@ -519,6 +587,8 @@
 | v1.8 | 41 focused tests passed; ruff clean; Docker entrypoint syntax passed | v1.8 requirements 23/23 complete | CDNA 3/CDNA 4 library validation; complete local ROCm development headers for native E2E |
 | v1.9 | 40 focused AMD bound/model/score/contract tests passed; `uv build` passed | v1.9 requirements 28/28 complete | CDNA 3 / MI300X real-hardware validation; CDNA 4 validation; paper extraction; broader upstream SOLAR parity |
 | v1.10 | 196 Phase 51 tests and 169 Phase 52 tests passed; Ruff clean; milestone audit PASS | v1.10 requirements 21/21 complete | Paper-scale 124-model/235-problem extraction; MI300X/CDNA3/CDNA4 validation; NVFP4/MXFP4 validation; hosted leaderboard |
+| v1.19 | 74 focused audit tests passed; Ruff clean | v1.19 requirements 28/28 complete | New hardware validation; paper-scale validation; hosted leaderboard |
+| v1.20 | 74 evidence-quality tests passed; docs regression passed; audit PASS | v1.20 requirements 23/23 complete | CDNA3/MI300X/CDNA4 validation; full paper validation; hosted leaderboard; profiling diagnostics |
 
 ### Top Lessons
 
@@ -531,3 +601,5 @@
    evidence cannot inflate reported AMD-native scores.
 6. Rich derived sidecars should remain isolated from canonical benchmark
    contracts and backed by exact parser, public-key, and claim-boundary tests.
+7. Evidence-quality milestones need verified end-to-end report chains so
+   downstream claim and trust reports cannot drift from upstream evidence inputs.
