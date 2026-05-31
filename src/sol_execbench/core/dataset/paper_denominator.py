@@ -719,6 +719,14 @@ def render_paper_denominator_markdown(report: PaperDenominatorReport) -> str:
             f"{gap['next_evidence']} |"
         )
 
+    lines.extend(["", "## Reason Buckets", "", "| Reason | Count | States | Examples |"])
+    lines.append("|--------|------:|--------|----------|")
+    for bucket in payload["reason_buckets"]:
+        lines.append(
+            f"| {bucket['reason_code']} | {bucket['count']} | "
+            f"{', '.join(bucket['states'])} | {', '.join(bucket['example_refs'])} |"
+        )
+
     lines.extend(["", "## Deferred Buckets", "", "| Reason | Count | Examples |"])
     lines.append("|--------|------:|----------|")
     for bucket in payload["reason_buckets"]:

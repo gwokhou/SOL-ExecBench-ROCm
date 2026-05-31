@@ -407,6 +407,8 @@ def test_paper_denominator_json_markdown_and_write_helpers_are_deterministic(tmp
     assert first.model_dump(mode="json")["report_checksum"]["value"]
     assert "# SOL ExecBench Paper Denominator Report" in first_markdown
     assert "denominator accounting and evidence-gap review only" in first_markdown
+    assert "## Reason Buckets" in first_markdown
+    assert "| timing_evidence_missing | 2 | evidence_missing |" in first_markdown
     assert "not paper validation" in first_markdown
     assert "not paper parity" in first_markdown
     assert "not upstream SOLAR parity" in first_markdown
