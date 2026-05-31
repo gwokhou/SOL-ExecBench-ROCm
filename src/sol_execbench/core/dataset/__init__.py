@@ -49,6 +49,12 @@ from .parity_gap import (
     render_parity_gap_markdown,
     write_parity_gap_reports,
 )
+from .paper_denominator import (
+    PaperDenominatorReport,
+    build_paper_denominator_report,
+    render_paper_denominator_markdown,
+    write_paper_denominator_reports,
+)
 
 __all__ = [
     "DEFAULT_CATEGORIES",
@@ -62,6 +68,7 @@ __all__ = [
     "LayoutDiagnostic",
     "ProblemInventoryRecord",
     "ParityGapReport",
+    "PaperDenominatorReport",
     "ReadySubset",
     "WorkloadInventoryRecord",
     "WorkloadReadinessRecord",
@@ -70,12 +77,15 @@ __all__ = [
     "classify_rocm_readiness",
     "build_ready_subset",
     "build_parity_gap_report",
+    "build_paper_denominator_report",
     "inspect_dataset_layout",
     "render_parity_gap_markdown",
+    "render_paper_denominator_markdown",
     "validate_categories",
     "write_dataset_manifest",
     "write_dataset_inventory",
     "write_dataset_readiness",
     "write_ready_subset",
     "write_parity_gap_reports",
+    "write_paper_denominator_reports",
 ]
