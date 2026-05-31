@@ -84,13 +84,13 @@
 
 **Active milestone:** v1.20 Cross-Report Consistency and Evaluation Stability.
 
-**Status:** Roadmap created; ready to plan Phase 89.
+**Status:** Phase 89 complete; ready to plan Phase 90.
 
-**Next step:** Start Phase 89 with `/gsd-plan-phase 89`.
+**Next step:** Start Phase 90 with `/gsd-plan-phase 90`.
 
 ## Phases
 
-- [ ] **Phase 89: Cross-Report Consistency Contract And Lint** - Researchers can detect contradictions across current evidence sidecars without changing benchmark contracts.
+- [x] **Phase 89: Cross-Report Consistency Contract And Lint** - Researchers can detect contradictions across current evidence sidecars without changing benchmark contracts.
 - [ ] **Phase 90: Evaluation Stability Evidence** - Researchers can inspect timing quality, variance, clock policy, and backend risk through a sidecar-only stability report.
 - [ ] **Phase 91: Claim Upgrade Rules And Authority Gates** - Researchers can evaluate whether evidence satisfies explicit prerequisites for stronger validation and authority claims.
 - [ ] **Phase 92: Trust Summary Integration** - Researchers can generate a concise JSON/Markdown trust summary that combines consistency, stability, closure, denominator, Matrix, score, and bound status.
@@ -108,7 +108,9 @@
   3. Researcher can consume stable severity and reason codes for blockers, warnings, informational notes, and claim-boundary violations.
   4. Researcher can write deterministic JSON and Markdown summaries with bounded relative refs, checksums, and no embedded raw logs, credentials, proprietary kernels, or absolute temp paths.
   5. Consistency lint remains diagnostic-only and cannot upgrade any evidence authority.
-**Plans**: TBD
+**Plans**:
+  - [x] 89-01 Consistency Report Contract
+  - [x] 89-02 Consistency Script And Guardrails
 
 ### Phase 90: Evaluation Stability Evidence
 **Goal**: Researchers can produce and interpret `evaluation_stability.v1` diagnostics that describe timing quality without changing canonical timing, correctness, scoring, or evaluator semantics.
@@ -163,7 +165,7 @@ Phases execute in numeric order: 89 -> 90 -> 91 -> 92 -> 93.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 89. Cross-Report Consistency Contract And Lint | 0/TBD | Not started | — |
+| 89. Cross-Report Consistency Contract And Lint | 2/2 | Complete | 2026-05-31 |
 | 90. Evaluation Stability Evidence | 0/TBD | Not started | — |
 | 91. Claim Upgrade Rules And Authority Gates | 0/TBD | Not started | — |
 | 92. Trust Summary Integration | 0/TBD | Not started | — |
