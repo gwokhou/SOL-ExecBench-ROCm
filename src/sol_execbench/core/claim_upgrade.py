@@ -29,6 +29,8 @@ SOURCE_CHECKSUM_KEYS = (
     "execution_closure_checksum",
     "amd_native_score_checksum",
     "amd_score_checksum",
+    "amd_sol_checksum",
+    "solar_derivation_checksum",
     "matrix_checksum",
     "checksum",
 )
@@ -143,11 +145,15 @@ def default_claim_rules() -> list[ClaimRule]:
             claim_level="score_authoritative",
             required_sources=[
                 "amd_score_report",
+                "amd_sol_report",
+                "solar_derivation",
                 "evaluation_stability",
                 "consistency_report",
             ],
             required_conditions=[
                 "score_evidence_present",
+                "amd_sol_evidence_present",
+                "solar_derivation_present",
                 "stable_timing",
                 "no_consistency_blockers",
             ],
@@ -157,12 +163,16 @@ def default_claim_rules() -> list[ClaimRule]:
             required_sources=[
                 "paper_denominator",
                 "amd_score_report",
+                "amd_sol_report",
+                "solar_derivation",
                 "amd_bound_sanity",
                 "hardware_validation",
             ],
             required_conditions=[
                 "full_suite_accounted",
                 "score_evidence_present",
+                "amd_sol_evidence_present",
+                "solar_derivation_present",
                 "bound_sanity_clean",
                 "native_host_validation_evidence",
             ],
@@ -187,6 +197,8 @@ def build_claim_upgrade_report(
     paper_denominator: dict[str, Any] | None = None,
     matrix_report: dict[str, Any] | None = None,
     amd_score_report: dict[str, Any] | None = None,
+    amd_sol_report: dict[str, Any] | None = None,
+    solar_derivation: dict[str, Any] | None = None,
     amd_bound_sanity: dict[str, Any] | None = None,
     hardware_validation: dict[str, Any] | None = None,
     source_paths: dict[str, Path | None] | None = None,
@@ -200,6 +212,8 @@ def build_claim_upgrade_report(
         "paper_denominator": paper_denominator,
         "matrix_report": matrix_report,
         "amd_score_report": amd_score_report,
+        "amd_sol_report": amd_sol_report,
+        "solar_derivation": solar_derivation,
         "amd_bound_sanity": amd_bound_sanity,
         "hardware_validation": hardware_validation,
     }
@@ -321,6 +335,10 @@ def _condition_met(condition: str, payloads: dict[str, dict[str, Any] | None]) -
         return not _matrix_runtime_unavailable(payloads.get("matrix_report"))
     if condition == "score_evidence_present":
         return bool(_score_records(payloads.get("amd_score_report")))
+    if condition == "amd_sol_evidence_present":
+        return _payload_present(payloads.get("amd_sol_report"))
+    if condition == "solar_derivation_present":
+        return _payload_present(payloads.get("solar_derivation"))
     if condition == "stable_timing":
         return _stability_clean(payloads.get("evaluation_stability"))
     if condition == "full_suite_accounted":
@@ -386,6 +404,26 @@ def _score_records(payload: dict[str, Any] | None) -> list[dict[str, Any]]:
     return []
 
 
+def _payload_present(payload: dict[str, Any] | None) -> bool:
+    if not payload:
+        return False
+    if _checksum(payload):
+        return True
+    return any(
+        key in payload
+        for key in (
+            "aggregate_bound",
+            "aggregate_status",
+            "bound_evidence",
+            "coverage_summary",
+            "formula_evidence",
+            "workloads",
+            "records",
+            "results",
+        )
+    )
+
+
 def _matrix_runtime_unavailable(payload: dict[str, Any] | None) -> bool:
     text = json.dumps(payload or {}, sort_keys=True).lower()
     return "runtime_unavailable" in text or "runtime unavailable" in text
@@ -418,6 +456,10 @@ def _next_evidence(items: list[str]) -> list[str]:
         "missing_source:hardware_validation": "Add native-host hardware validation evidence.",
         "missing_source:evaluation_stability": "Generate evaluation_stability.v1.",
         "missing_source:consistency_report": "Generate consistency_report.v1.",
+        "missing_source:amd_sol_report": "Provide AMD SOL bound evidence.",
+        "missing_source:solar_derivation": "Provide SOLAR derivation evidence.",
+        "condition:amd_sol_evidence_present": "Provide AMD SOL bound evidence.",
+        "condition:solar_derivation_present": "Provide SOLAR derivation evidence.",
         "condition:stable_timing": "Provide stable timing evidence with locked clocks or explain risk.",
         "condition:no_consistency_blockers": "Resolve consistency blockers first.",
         "condition:full_suite_accounted": "Account for the full benchmark denominator.",

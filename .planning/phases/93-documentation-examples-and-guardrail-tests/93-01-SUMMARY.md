@@ -1,3 +1,8 @@
+---
+status: complete
+requirements-completed: [DOCS-01, DOCS-02, DOCS-04]
+---
+
 # Phase 93 Plan 01 Summary: v1.20 Evidence Guide And Fixtures
 
 **Status:** Complete
@@ -20,4 +25,3 @@
 
 - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest tests/sol_execbench/test_consistency_report.py tests/sol_execbench/test_evaluation_stability.py tests/sol_execbench/test_claim_upgrade.py tests/sol_execbench/test_trust_summary.py tests/sol_execbench/test_v1_20_evidence_quality_docs.py tests/sol_execbench/test_public_contract_guardrails.py -q`
 - `UV_CACHE_DIR=/tmp/uv-cache uv run ruff check tests/sol_execbench/test_v1_20_evidence_quality_docs.py docs/v1_20_evidence_quality_guide.md docs/CLAIMS.md docs/RESEARCHER-GUIDE.md docs/TESTING.md`
-

@@ -47,6 +47,8 @@ def test_claim_upgrade_blocks_authority_when_evidence_is_missing_or_contradictor
     assert evaluations["container_validated"].eligible is False
     assert "consistency_blockers_present" in evaluations["container_validated"].blockers
     assert "condition:stable_timing" in evaluations["score_authoritative"].unmet_prerequisites
+    assert "missing_source:amd_sol_report" in evaluations["score_authoritative"].unmet_prerequisites
+    assert "missing_source:solar_derivation" in evaluations["score_authoritative"].unmet_prerequisites
     assert evaluations["native_host_validated"].next_evidence
 
 
@@ -72,6 +74,16 @@ def test_claim_upgrade_allows_container_and_score_when_prerequisites_are_clean()
         execution_closure={"records": [{"closure_status": "attempted_passed"}]},
         paper_denominator={"workloads": [{"workload_uuid": "w1"}]},
         amd_score_report={"scores": [{"workload_uuid": "w1", "score": 1.0}]},
+        amd_sol_report={
+            "schema_version": "sol_execbench.amd_sol_bound.v1",
+            "amd_sol_checksum": {"value": "amd-sol-real"},
+            "aggregate_bound": {"status": "scored"},
+        },
+        solar_derivation={
+            "schema_version": "sol_execbench.solar_derivation.v1",
+            "solar_derivation_checksum": {"value": "solar-real"},
+            "aggregate_status": "scored",
+        },
         created_at="2026-05-31T00:00:00Z",
     )
 
@@ -110,4 +122,3 @@ def test_claim_upgrade_markdown_keeps_negative_boundaries_visible():
         "`score_authority`: false",
     ):
         assert expected in markdown
-

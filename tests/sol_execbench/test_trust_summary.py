@@ -42,6 +42,14 @@ def test_trust_summary_separates_reviewable_and_blocked_outcomes():
         },
         matrix_report={"schema_version": "sol_execbench.rocm_matrix.v1"},
         amd_score_report={"schema_version": "sol_execbench.amd_native_score.v1"},
+        amd_sol_report={
+            "schema_version": "sol_execbench.amd_sol_bound.v1",
+            "amd_sol_checksum": {"value": "amd-sol-real"},
+        },
+        solar_derivation={
+            "schema_version": "sol_execbench.solar_derivation.v1",
+            "solar_derivation_checksum": {"value": "solar-real"},
+        },
         amd_bound_sanity={"schema_version": "sol_execbench.amd_bound_sanity.v1"},
         created_at="2026-05-31T00:00:00Z",
     )
@@ -54,6 +62,10 @@ def test_trust_summary_separates_reviewable_and_blocked_outcomes():
     assert outcomes["stable_enough_to_interpret"] == "stable_enough"
     assert outcomes["claim_upgrade"] == "score_authoritative"
     assert outcomes["evidence_completeness"] == "reviewable"
+    assert {source.source_id for source in report.sources} >= {
+        "amd_sol_report",
+        "solar_derivation",
+    }
 
 
 def test_trust_summary_reports_missing_and_blocked_next_steps():
@@ -102,4 +114,3 @@ def test_trust_summary_markdown_keeps_negative_boundaries_visible():
         "`paper_validation`: false",
     ):
         assert expected in markdown
-

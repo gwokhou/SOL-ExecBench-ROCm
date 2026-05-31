@@ -26,6 +26,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--paper-denominator", type=Path, default=None)
     parser.add_argument("--matrix-report", type=Path, default=None)
     parser.add_argument("--amd-score-report", type=Path, default=None)
+    parser.add_argument("--amd-sol-report", type=Path, default=None)
+    parser.add_argument("--solar-derivation", type=Path, default=None)
     parser.add_argument("--amd-bound-sanity", type=Path, default=None)
     parser.add_argument("--hardware-validation", type=Path, default=None)
     parser.add_argument("--json-out", "--json-output", dest="json_out", type=Path, required=True)
@@ -46,6 +48,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         paper_denominator=_optional_json(args.paper_denominator),
         matrix_report=_optional_json(args.matrix_report),
         amd_score_report=_optional_json(args.amd_score_report),
+        amd_sol_report=_optional_json(args.amd_sol_report),
+        solar_derivation=_optional_json(args.solar_derivation),
         amd_bound_sanity=_optional_json(args.amd_bound_sanity),
         hardware_validation=_optional_json(args.hardware_validation),
         source_paths={
@@ -55,6 +59,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             "paper_denominator": args.paper_denominator,
             "matrix_report": args.matrix_report,
             "amd_score_report": args.amd_score_report,
+            "amd_sol_report": args.amd_sol_report,
+            "solar_derivation": args.solar_derivation,
             "amd_bound_sanity": args.amd_bound_sanity,
             "hardware_validation": args.hardware_validation,
         },

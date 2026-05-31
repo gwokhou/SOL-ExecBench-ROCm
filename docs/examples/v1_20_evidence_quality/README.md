@@ -12,3 +12,10 @@ new-hardware validation.
 All paths are synthetic relative refs under `out/v1_20_demo/...`, and checksums
 are synthetic `sha256:` strings.
 
+Fixture set:
+
+- `trust_summary.consistent.demo.json`
+- `consistency.contradictory.demo.json`
+- `evaluation_stability.noisy.demo.json`
+- `claim_upgrade.blocked.demo.json`
+- `trust_summary.missing.demo.json`

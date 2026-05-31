@@ -1,3 +1,8 @@
+---
+status: complete
+requirements-completed: [STAB-01, STAB-02, STAB-03, STAB-04, STAB-05]
+---
+
 # Phase 90 Plan 02 Summary: Stability Script And Guardrails
 
 **Status:** Complete
@@ -22,4 +27,3 @@
 
 - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest tests/sol_execbench/test_evaluation_stability.py tests/sol_execbench/test_evaluation_stability_script.py tests/sol_execbench/test_public_contract_guardrails.py -q`
 - `UV_CACHE_DIR=/tmp/uv-cache uv run ruff check src/sol_execbench/core/evaluation_stability.py scripts/report_evaluation_stability.py tests/sol_execbench/test_evaluation_stability.py tests/sol_execbench/test_evaluation_stability_script.py tests/sol_execbench/test_public_contract_guardrails.py`
-
