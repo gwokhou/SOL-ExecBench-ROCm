@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.19
-milestone_name: milestone
-status: completed
-stopped_at: Completed 84-02-PLAN.md
-last_updated: "2026-05-31T08:35:33.930Z"
-last_activity: 2026-05-31 -- Phase 84 marked complete
+milestone_name: ROCm Port
+status: verifying
+stopped_at: Completed 85-01-PLAN.md
+last_updated: "2026-05-31T09:15:00.896Z"
+last_activity: 2026-05-31
 progress:
   total_phases: 6
   completed_phases: 2
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 6
+  completed_plans: 5
   percent: 33
 ---
 
@@ -27,10 +27,10 @@ See: `.planning/PROJECT.md` (updated 2026-05-31)
 
 Phase: 84 — COMPLETE
 Plan: 2 of 2
-Status: Phase 84 complete
-Last activity: 2026-05-31 -- Phase 84 marked complete
+Status: Phase complete — ready for verification
+Last activity: 2026-05-31
 
-Progress: [██████████] 100%
+Progress: [████████░░] 83%
 
 ## Performance Metrics
 
@@ -60,6 +60,7 @@ Progress: [██████████] 100%
 | Phase 83 P02 | 403s | 3 tasks | 4 files |
 | Phase 84 P01 | 352 | 3 tasks | 2 files |
 | Phase 84 P02 | 263 | 3 tasks | 4 files |
+| Phase 85 P01 | 215 | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -76,6 +77,8 @@ Progress: [██████████] 100%
 - [Phase 84]: [Phase 84 Plan 01]: Missing evidence is accounted as evidence_missing/deferred and never upgraded into validation, score, leaderboard, paper, SOLAR, native-host, or new-hardware authority.
 - [Phase 84]: [Phase 84 Plan 02]: Optional AMD SOL and SOLAR artifacts remain bounded source refs/checksums, not embedded payloads.
 - [Phase 84]: [Phase 84 Plan 02]: Paper denominator reports are exposed through a script and dataset helper exports, not primary sol-execbench CLI options.
+- [Phase 85]: [Phase 85 Plan 01]: Schema export remains script-side diagnostic tooling, not a primary sol-execbench CLI option.
+- [Phase 85]: [Phase 85 Plan 01]: Matrix schema exports are limited to MatrixEntry and RocmCompatibilityMatrixReport.
 
 ### Pending Todos
 
@@ -97,6 +100,6 @@ None found.
 
 ## Session Continuity
 
-Last session: 2026-05-31T08:35:01.068Z
-Stopped at: Completed 84-02-PLAN.md
+Last session: 2026-05-31T09:15:00.672Z
+Stopped at: Completed 85-01-PLAN.md
 Resume file: None
