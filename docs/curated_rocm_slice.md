@@ -8,8 +8,9 @@ not full 235-problem validation, and not leaderboard parity.
 
 Problems belong in the slice when they satisfy all required criteria:
 
-- They use repository-local examples or downloaded public dataset problems with
-  stable `definition.json`, `workload.jsonl`, and solution metadata.
+- They use repository-local examples or downloaded public dataset problem
+  directories with stable `definition.json`, `workload.jsonl`, and solution
+  metadata inside each problem directory.
 - They exercise an important solution path: PyTorch ROCm, Triton ROCm, HIP/C++,
   or a ROCm native library category.
 - They can run through the existing `sol-execbench` CLI or
@@ -115,4 +116,3 @@ uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
 | AMD SOL sidecars | Derived AMD bound inputs. | AMD-native-derived evidence only. |
 | AMD score report | Guarded local score interpretation. | Not B200, SOLAR, or leaderboard parity. |
 | execution closure | Bounded run accounting. | Not full 235-problem validation. |
-

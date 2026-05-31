@@ -15,8 +15,8 @@ downloaded benchmark assets belong in `data/`.
 
 - `uv sync --all-groups`: install runtime and development dependencies.
 - `uv run sol-execbench <problem_dir> --solution <solution-path>`: run the benchmark CLI.
-- `uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark --limit 5`: run a small
-  dataset batch.
+- `uv run scripts/run_dataset.py <downloaded-benchmark-dir> --limit 5`: run a small
+  dataset batch after downloading benchmark assets under `data/`.
 - `uv run pytest tests/`: run the full test suite.
 - `uv run pytest tests/sol_execbench/test_e2e.py`: run one test file.
 - `uv run --with ruff ruff check .`: lint the repository when Ruff is not already installed.

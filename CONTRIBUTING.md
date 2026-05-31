@@ -6,7 +6,7 @@ ROCm-only Python port of SOL ExecBench, so changes should preserve public
 benchmark schemas and evaluation semantics unless a ROCm-specific difference is
 required.
 
-## Start From An Issue
+## Start From an Issue
 
 Contributions should start from an approved GitHub issue. Keep each pull
 request focused on one concern and link the issue in the PR description.
@@ -38,8 +38,10 @@ and [Testing](docs/TESTING.md) for more detail.
 
 ## Coding Standards
 
-- Use Python `>=3.12,<3.14`.
-- Follow Ruff formatting and linting.
+- Use Python `>=3.12,<3.14`; `.python-version` pins local development to
+  Python 3.12.
+- Follow Ruff formatting and linting from `pyproject.toml`.
+- Run Ty type checks over `src` and `tests`.
 - Use `snake_case` for modules, functions, and variables.
 - Use `PascalCase` for classes, Pydantic models, and enum classes.
 - Keep changes consistent with nearby code.
@@ -58,6 +60,16 @@ Type check:
 
 ```bash
 uv run ty check
+```
+
+The `Python Quality` GitHub Actions workflow enforces Ruff, Ty, CPU-safe package
+tests, and example consistency tests on Python 3.12 and 3.13.
+
+Optional pre-commit setup installs Ruff hooks and the commit-message DCO check:
+
+```bash
+uv run --with pre-commit pre-commit install
+uv run --with pre-commit pre-commit install --hook-type commit-msg
 ```
 
 ## Tests
@@ -112,7 +124,7 @@ git commit -s -m "#123 - Fix trace parsing"
 The repository pre-commit configuration includes a commit-message hook that
 checks for a `Signed-off-by:` line.
 
-## Pull Requests
+## PR Guidelines
 
 PRs should include:
 
@@ -123,11 +135,14 @@ PRs should include:
 - Hardware assumptions for ROCm-sensitive changes
 - Notes about any remaining validation gap
 
+No repository PR template is currently present under `.github/`, so include
+these details directly in the pull request description.
+
 The `Python Quality` GitHub Actions workflow runs `uv sync --locked
 --all-groups`, Ruff, Ty, CPU-safe package tests, and example consistency tests
 on Python 3.12 and 3.13.
 
-## Issue Reports
+## Issue Reporting
 
 When reporting a bug or compatibility gap, include:
 
@@ -142,3 +157,6 @@ When reporting a bug or compatibility gap, include:
 
 Do not include credentials, Hugging Face tokens, proprietary kernels, private
 datasets, or other sensitive data.
+
+No repository issue templates are currently present under `.github/`, so include
+the relevant environment and reproduction details in the issue body.

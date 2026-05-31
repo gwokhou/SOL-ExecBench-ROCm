@@ -101,7 +101,7 @@ Each workload can specify its own tolerance for correctness checking via the `to
 | `max_error_cap` | float \| null | `null` | Hard ceiling on max absolute error (fails regardless of matched ratio) |
 | `allow_negative_inf` | bool | `false` | When true, matching `-inf` values in both output and reference are treated as correct and excluded from error computation |
 
-**Correctness formula** (torch.allclose style): An element passes if `|output - reference| <= max_atol + max_rtol * |reference|`. The workload passes if at least `required_matched_ratio` of all elements pass AND (if `max_error_cap` is set) the largest absolute error is below the cap.
+**Correctness formula** (torch.allclose style): An element passes if `|output - reference| <= max_atol + max_rtol * |reference|`. The workload passes if at least `required_matched_ratio` of all elements pass AND (if `max_error_cap` is set) the largest absolute error is less than or equal to the cap.
 
 **Negative infinity handling:** When `allow_negative_inf` is `true`, positions where both output and reference are `-inf` are treated as correct and excluded from the error computation. Positions where only one tensor has `-inf` still fail. `+inf` and `NaN` are unaffected by this flag.
 
