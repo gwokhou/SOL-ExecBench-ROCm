@@ -15,39 +15,38 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
 ## Current State
 
-**Shipped version:** v1.17 Static Kernel Evidence, completed 2026-05-26.
+**Shipped version:** v1.18 ROCm Version Matrix via Docker, completed 2026-05-28.
 
-**Current milestone:** v1.18 ROCm Version Matrix via Docker.
+**Current milestone:** v1.19 Research Credibility Without New Hardware.
 
-**Latest milestone outcome:** the ROCm port now has opt-in Static Kernel
-Evidence for HIP/C++ benchmark runs: a strict diagnostic sidecar contract,
-current-build artifact discovery, routed `llvm-objdump` and `readelf`
-extractors, CLI sidecar integration, documentation, claim guardrails, and a
-bounded RDNA 4 validation artifact.
+**Latest milestone outcome:** the ROCm port now has declared ROCm Docker
+Targets, target-specific PyTorch ROCm dependency policy, compatibility Matrix
+Entry sidecars, runtime evidence reports, and claim guardrails for Docker
+container user-space validation without overstating native host validation.
 
-**Current milestone goal:** Expand ROCm version coverage through Docker-based
-user-space matrices while coordinating `uv`/PyTorch ROCm wheel selection,
-runtime evidence, compatibility reports, and claim guardrails.
+**Current milestone goal:** Improve research credibility without expanding
+hardware validation by making paper dataset denominator status, compatibility
+matrix changes, dataset-runner behavior, and AMD SOL/SOLAR sanity evidence more
+auditable on the existing RDNA 4 and Docker evidence surface.
 
 **Target features:**
-- Docker build and run workflows can select ROCm user-space versions such as
-  7.0.x, 7.1.x, and 7.2.x without requiring host reinstall.
-- `uv` dependency strategy records or selects matching PyTorch ROCm wheels and
-  detects mixed-version environments instead of silently validating the wrong
-  stack.
-- Runtime evidence records host ROCm, container ROCm user-space, PyTorch ROCm
-  build tag, Triton/hipcc/toolchain versions, GPU architecture, and PyTorch
-  device availability.
-- Compatibility matrix reports distinguish `host_validated`,
-  `container_validated`, `mixed_version`, `pytorch_wheel_unavailable`,
-  `runtime_unavailable`, and `not_tested` states.
-- Documentation and guardrails prevent container user-space validation from
-  being overstated as native host ROCm validation.
+- Paper dataset denominator accounting can explain which original benchmark
+  problems are ready, blocked, unsupported, deferred, or missing evidence
+  without claiming full paper parity.
+- Compatibility Matrix reports can be diffed across runs to highlight status,
+  dependency, image, clock, runtime, and evidence changes.
+- Compatibility Matrix JSON schemas can be exported for downstream CI and
+  external evidence producers.
+- Dataset-runner reports are hardened around failure classification, resume or
+  manifest consistency, and reproducible closure outputs.
+- AMD SOL/SOLAR bound sanity checks use existing RDNA 4 and Docker evidence to
+  clarify provisional model risk without adding CDNA 3, MI300X, or CDNA 4
+  validation scope.
 
-**Next planned milestone:** to be determined after v1.18. Candidate follow-ups
-include CDNA 3/CDNA 4 live validation, Triton ROCm cache capture, RGA-rich
-static resource parsing, paper dataset parity, or deeper static-analysis
-classifications.
+**Next planned milestone:** to be determined after v1.19. Candidate follow-ups
+remain CDNA 3/CDNA 4 live validation, Triton ROCm cache capture, RGA-rich static
+resource parsing, native host ROCm matrix validation, or hosted/downstream
+evidence ingestion.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline.
 Milestones v1.1-v1.6 added CDNA 3 code/schema support, maintained residue
@@ -98,6 +97,29 @@ The v1.17 milestone added opt-in diagnostic Static Kernel Evidence by capturing
 current-build HIP/C++ artifacts, extracting bounded ISA and ELF metadata through
 routed static tools, publishing trace-adjacent sidecars, documenting claim
 boundaries, and recording bounded RDNA 4 validation.
+The v1.18 milestone added ROCm Docker version Matrix infrastructure, target
+selection, target-specific PyTorch ROCm dependency policy, runtime evidence and
+compatibility reports, and claim guardrails for container user-space validation.
+
+## Current Milestone: v1.19 Research Credibility Without New Hardware
+
+**Goal:** Improve the ROCm port's research credibility without expanding
+hardware validation by making paper denominator status, compatibility-matrix
+changes, dataset-runner closure, and AMD SOL/SOLAR sanity evidence auditable on
+the existing RDNA 4 and Docker evidence surface.
+
+**Target features:**
+- Paper dataset denominator accounting for ready, blocked, unsupported,
+  deferred, and evidence-missing benchmark problems.
+- Compatibility Matrix diff tooling and JSON schema export for downstream CI or
+  external evidence producers.
+- Dataset-runner hardening for failure classification, resume/manifest
+  consistency, and stable closure reporting.
+- AMD SOL/SOLAR bound sanity checks and documentation that clarify provisional
+  RDNA 4 model risk without adding new hardware-validation claims.
+- Documentation and guardrail tests that keep curated, Docker, denominator, and
+  bound-sanity evidence separate from paper parity, score authority, leaderboard
+  authority, and native host validation.
 
 ## Recently Shipped Milestone: v1.17 Static Kernel Evidence
 
@@ -387,8 +409,8 @@ ROCm path, with validation scoped to RDNA 4 only.
 
 ### Active
 
-- Claim-boundary, researcher guide, curated ROCm benchmark slice, cookbook, and
-  reproducibility closure work for v1.15.
+- Paper dataset denominator accounting, Matrix diff/schema export,
+  dataset-runner hardening, and AMD SOL/SOLAR sanity work for v1.19.
 
 ### Out of Scope
 
@@ -424,6 +446,15 @@ ROCm path, with validation scoped to RDNA 4 only.
 - Static kernel evidence in v1.16 - explicitly deferred to v1.17 so the
   toolchain research, lifecycle model, registry, and routing policy can land
   first.
+- CDNA 3 / MI300X and CDNA 4 real-hardware validation in v1.19 - explicitly
+  deferred by current user direction so the milestone can improve research
+  credibility without adding hardware-validation scope.
+- Native host ROCm 7.0.x / 7.1.x / 7.2.x validation in v1.19 - deferred so the
+  milestone can build audit/reporting infrastructure on existing Docker
+  container user-space evidence.
+- Full 235-problem paper validation, official leaderboard parity, and hosted
+  submission service in v1.19 - deferred until denominator accounting and
+  closure reporting are stronger.
 
 ## Context
 
@@ -452,6 +483,13 @@ because ROCm Systems, ROCprofiler SDK, RGA/GPUOpen tools, HIP compiler
 metadata, LLVM object tools, and migrated/deprecated repositories expose
 different capabilities depending on ROCm version, hardware generation, GPU
 architecture, artifact type, and installation state.
+
+After v1.18, the project has strong sidecar and claim-boundary infrastructure
+for ROCm compatibility evidence, including Docker container user-space rows for
+ROCm 7.0.x, 7.1.x, and 7.2.x on recorded RDNA 4 host devices. The next useful
+step is to make research claims easier to audit without requiring new hardware:
+paper denominator accounting, Matrix diff/schema tooling, dataset-runner
+closure hardening, and bounded AMD SOL/SOLAR sanity evidence.
 
 ## Constraints
 
@@ -498,6 +536,8 @@ architecture, artifact type, and installation state.
 | Route ROCm tools before extracting static evidence | User noted ROCm tools are more fragmented than CUDA tools and requested per-tool hardware generation/model availability routing, including prepared and historical tools. | Active in v1.16 |
 | Defer ROCm minor-version by GPU-generation matrix validation | User narrowed the possible compatibility discussion to ROCm 7.0.x/7.1.x/7.2.x but decided the full matrix still has high validation cost and long cycle time. Treat it as deferred compatibility validation rather than a near-term release gate. | Deferred |
 | Defer static kernel evidence to v1.17 | User explicitly moved Static Kernel Evidence out of v1.16 so v1.16 can focus on external research, tool lifecycle, capability registry, and routing policy. | Active in v1.16 |
+| Avoid expanding hardware validation in v1.19 | User explicitly does not want to expand CDNA 3, MI300X, CDNA 4, or native host ROCm matrix validation right now. | Active in v1.19 |
+| Improve research credibility without new hardware | User chose denominator accounting, Matrix diff/schema export, dataset-runner hardening, and AMD SOL/SOLAR sanity over additional hardware validation. | Active in v1.19 |
 
 ## Evolution
 
@@ -517,4 +557,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-26 after v1.17 milestone completion*
+*Last updated: 2026-05-31 after v1.19 milestone start*

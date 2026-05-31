@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.18
-milestone_name: ROCm Version Matrix via Docker
-status: Awaiting next milestone
-stopped_at: Completed 80-02-PLAN.md
-last_updated: "2026-05-28T11:46:07.267Z"
-last_activity: 2026-05-28 — Milestone v1.18 completed and archived
+milestone: v1.19
+milestone_name: Research Credibility Without New Hardware
+status: planning
+last_updated: "2026-05-31T07:04:44.624Z"
+last_activity: 2026-05-31
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 9
-  completed_plans: 9
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -25,10 +24,10 @@ See: `.planning/PROJECT.md` (updated 2026-05-28)
 
 ## Current Position
 
-Phase: Milestone v1.18 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-05-28 — Milestone v1.18 completed and archived
+Status: Defining requirements
+Last activity: 2026-05-31 — Milestone v1.19 started
 
 ## Performance Metrics
 
