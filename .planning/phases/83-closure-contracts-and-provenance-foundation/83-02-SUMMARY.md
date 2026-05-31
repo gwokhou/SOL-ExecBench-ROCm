@@ -28,6 +28,7 @@ key_files:
 decisions:
   - scripts/run_dataset.py delegates closure status, totals, record validation, report construction, and writing to core helpers.
   - Existing skipped-existing-pass behavior remains provenance-neutral; full mismatch enforcement stays deferred.
+requirements-completed: [CLOS-01, CLOS-02, CLOS-04]
 metrics:
   completed_date: 2026-05-31
   duration: in-progress

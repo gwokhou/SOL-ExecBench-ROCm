@@ -27,6 +27,7 @@ key_files:
 decisions:
   - Execution closure remains a sidecar-only sol_execbench.execution_closure.v1 contract.
   - Provenance mismatch helpers expose diagnostics without enforcing runner reuse policy in this phase.
+requirements-completed: [CLOS-01, CLOS-02, CLOS-03]
 metrics:
   completed_date: 2026-05-31
   duration: in-progress
