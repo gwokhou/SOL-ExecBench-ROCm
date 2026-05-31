@@ -170,7 +170,7 @@ What it cannot prove:
 
 AMD bound sanity consumes explicit existing evidence paths and produces
 `sol_execbench.amd_bound_sanity.v1` JSON/Markdown. It checks whether AMD SOL,
-SOLAR-derived, closure, denominator, Matrix, and score artifacts are
+SOLAR-derived, closure, Matrix, and score artifacts are
 internally consistent enough to discuss as bounded diagnostic evidence.
 
 Example command shape:
