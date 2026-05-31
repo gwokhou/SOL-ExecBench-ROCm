@@ -65,20 +65,20 @@ ExecBench.
 
 ### Dataset Runner Hardening
 
-- [ ] **RUNNER-01**: `scripts/run_dataset.py` uses closure helpers to enforce
+- [x] **RUNNER-01**: `scripts/run_dataset.py` uses closure helpers to enforce
   ready-subset, readiness, manifest, problem, workload, solution, and evidence
   provenance consistency when resuming or reusing existing output.
-- [ ] **RUNNER-02**: Existing passing traces are marked `skipped_existing_pass`
+- [x] **RUNNER-02**: Existing passing traces are marked `skipped_existing_pass`
   only when provenance matches the selected run configuration; `--rerun`
   forces reattempt and records fresh closure behavior.
-- [ ] **RUNNER-03**: Dataset runner closure output classifies build failures,
+- [x] **RUNNER-03**: Dataset runner closure output classifies build failures,
   runtime failures, timeouts, nonzero CLI exits, correctness failures, missing
   traces, missing derived evidence, and skipped/unattempted workloads with
   stable reason codes and bounded log refs.
-- [ ] **RUNNER-04**: Dataset runner hardening preserves existing default
+- [x] **RUNNER-04**: Dataset runner hardening preserves existing default
   execution behavior unless a mismatch, missing evidence, or explicit closure
   option requires a diagnostic stop or sidecar status.
-- [ ] **RUNNER-05**: Dataset runner closure writes remain deterministic and
+- [x] **RUNNER-05**: Dataset runner closure writes remain deterministic and
   avoid embedding credentials, proprietary kernels, raw dataset payloads,
   unnecessary absolute paths, or unbounded logs.
 
@@ -178,11 +178,11 @@ ExecBench.
 | MATRIX-03 | Phase 85 | Complete |
 | MATRIX-04 | Phase 85 | Complete |
 | MATRIX-05 | Phase 85 | Complete |
-| RUNNER-01 | Phase 86 | Pending |
-| RUNNER-02 | Phase 86 | Pending |
-| RUNNER-03 | Phase 86 | Pending |
-| RUNNER-04 | Phase 86 | Pending |
-| RUNNER-05 | Phase 86 | Pending |
+| RUNNER-01 | Phase 86 | Complete |
+| RUNNER-02 | Phase 86 | Complete |
+| RUNNER-03 | Phase 86 | Complete |
+| RUNNER-04 | Phase 86 | Complete |
+| RUNNER-05 | Phase 86 | Complete |
 | SANITY-01 | Phase 87 | Pending |
 | SANITY-02 | Phase 87 | Pending |
 | SANITY-03 | Phase 87 | Pending |
