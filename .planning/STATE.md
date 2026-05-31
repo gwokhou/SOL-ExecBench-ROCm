@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.20
 milestone_name: Cross-Report Consistency and Evaluation Stability
-status: executing
-last_updated: "2026-05-31T16:05:00.000Z"
+status: milestone-complete
+last_updated: "2026-05-31T16:20:00.000Z"
 last_activity: 2026-05-31
 progress:
   total_phases: 5
-  completed_phases: 4
-  total_plans: 8
-  completed_plans: 8
-  percent: 80
+  completed_phases: 5
+  total_plans: 10
+  completed_plans: 10
+  percent: 100
 ---
 
 # Project State
@@ -20,20 +20,20 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-31)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Phase 93 Documentation, Examples, And Guardrail Tests
+**Current focus:** v1.20 milestone audit/archive
 
 ## Current Position
 
-Phase: 93. Documentation, Examples, And Guardrail Tests
+Phase: —
 Plan: —
-Status: Phase 92 complete; ready to plan Phase 93
-Last activity: 2026-05-31 — Phase 92 completed trust summary contract, script, tests, and guardrails
+Status: v1.20 phases complete
+Last activity: 2026-05-31 — Phase 93 completed evidence-quality docs, examples, docs tests, and aggregate guardrails
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 8
+- Total plans completed: 10
 - Average duration: n/a
 - Total execution time: 0h
 
@@ -45,7 +45,7 @@ Last activity: 2026-05-31 — Phase 92 completed trust summary contract, script,
 | 90. Evaluation Stability Evidence | 2/2 | Complete | n/a |
 | 91. Claim Upgrade Rules And Authority Gates | 2/2 | Complete | n/a |
 | 92. Trust Summary Integration | 2/2 | Complete | n/a |
-| 93. Documentation, Examples, And Guardrail Tests | 0/TBD | Not started | n/a |
+| 93. Documentation, Examples, And Guardrail Tests | 2/2 | Complete | n/a |
 
 **Recent Trend:**
 
@@ -105,6 +105,8 @@ Last activity: 2026-05-31 — Phase 92 completed trust summary contract, script,
 - [Phase 91]: Claim levels are explicit and remain blocked when consistency, stability, denominator, score, Matrix, or hardware-validation evidence is missing or contradictory.
 - [Phase 92]: trust_summary.v1 combines evidence-quality sidecars into bounded review guidance with source refs/checksums only.
 - [Phase 92]: Trust summaries provide next steps for future CDNA3/MI300X/native-host/paper-scale validation without claiming those validations were performed.
+- [Phase 93]: v1.20 evidence-quality docs and fixtures are demo-only, bounded, and explicitly negative on paper, leaderboard, native-host, and new-hardware authority.
+- [Phase 93]: Public contract guardrails cover v1.20 consistency, stability, claim-upgrade, and trust-summary sidecars.
 
 ### Pending Todos
 
@@ -137,10 +139,10 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-05-31T16:05:00.000Z
-Stopped at: Completed Phase 92
+Last session: 2026-05-31T16:20:00.000Z
+Stopped at: Completed Phase 93
 Resume file: None
 
 ## Operator Next Steps
 
-- Start Phase 93 with /gsd-plan-phase 93
+- Run /gsd-audit-milestone or /gsd-complete-milestone for v1.20

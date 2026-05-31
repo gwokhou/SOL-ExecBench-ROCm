@@ -169,6 +169,24 @@ This command set does not run GPU probes, ROCm live validation, Docker builds,
 Docker containers, hardware-marker tests, dependency installs, or dependency
 relocking.
 
+## v1.20 Evidence Quality Docs Guardrails
+
+The centralized v1.20 guide is `docs/v1_20_evidence_quality_guide.md`. Its
+focused CPU-safe checks cover consistency lint, evaluation stability,
+claim-upgrade rejection, trust summary rendering, deterministic serialization,
+example fixtures, and public contract boundaries. v1.20 documentation has no
+full 235-problem paper validation, no CDNA3/MI300X/CDNA4 validation, no
+native-host Matrix authority, no hosted leaderboard readiness, no upstream
+SOLAR parity, and no new-hardware validation.
+
+Run the v1.20 documentation and sidecar-only contract checks:
+
+```bash
+UV_CACHE_DIR=/tmp/uv-cache uv run pytest \
+  tests/sol_execbench/test_v1_20_evidence_quality_docs.py \
+  tests/sol_execbench/test_public_contract_guardrails.py -q
+```
+
 ## Live ROCm Validation
 
 Live ROCm validation is marker-gated. Use these checks only on a ROCm-capable
