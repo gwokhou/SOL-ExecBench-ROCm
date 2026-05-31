@@ -160,7 +160,10 @@ Plans:
   3. Researcher can distinguish scored, degraded, unscored, unsupported, provisional, and missing-evidence states without changing AMD-native score semantics or score eligibility rules.
   4. Bound sanity output surfaces provisional RDNA 4 model risk while explicitly avoiding upstream SOLAR equivalence, model-validation, paper-parity, leaderboard, CDNA 3, MI300X, CDNA 4, and native-host validation claims.
   5. Bound sanity checks run without new hardware probes, Docker privilege changes, or dependency relocking.
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 87-01-PLAN.md — Core `amd_bound_sanity.v1` contract, report builder, Markdown renderer, and CPU-safe tests.
+- [ ] 87-02-PLAN.md — Thin report script and public contract guardrails for sidecar-only diagnostic scope.
 
 ### Phase 88: Documentation, Examples, And Guardrail Tests
 **Goal**: Researchers can understand, reproduce, and safely interpret v1.19 evidence surfaces through documentation, representative examples, and CPU-safe tests that preserve public contracts and claim boundaries.
@@ -185,5 +188,5 @@ Phases execute in numeric order: 83 -> 84 -> 85 -> 86 -> 87 -> 88.
 | 84. Paper Denominator Accounting And Claim Boundaries | 2/2 | Complete   | 2026-05-31 |
 | 85. Compatibility Matrix Schema Export And Semantic Diff | 2/2 | Complete   | 2026-05-31 |
 | 86. Dataset Runner Hardening Integration | 2/2 | Complete   | 2026-05-31 |
-| 87. AMD SOL/SOLAR Bound Sanity Evidence | 0/TBD | Not started | - |
+| 87. AMD SOL/SOLAR Bound Sanity Evidence | 0/2 | Not started | - |
 | 88. Documentation, Examples, And Guardrail Tests | 0/TBD | Not started | - |
