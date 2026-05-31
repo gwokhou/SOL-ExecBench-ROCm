@@ -130,7 +130,10 @@ Plans:
   3. Researcher can identify semantic Matrix changes across status, reason code, requested Target values, observed evidence, dependency policy, Docker image metadata, clock/evidence metadata, artifact refs, and claim boundaries.
   4. Researcher can consume both JSON diff output and a severity-ranked human summary for validation downgrade, mixed-version drift, runtime unavailability, image/dependency drift, GPU architecture drift, and claim-boundary escalation.
   5. Matrix schema and diff outputs remain diagnostic and cannot upgrade Docker container evidence into native-host validation, score authority, paper-parity authority, or leaderboard authority.
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 85-01-PLAN.md — Matrix JSON Schema export helpers, thin script, deterministic output, and diagnostic-only schema boundaries.
+- [ ] 85-02-PLAN.md — Semantic Matrix report diff helpers, JSON/Markdown output, severity categories, and claim-boundary guardrails.
 
 ### Phase 86: Dataset Runner Hardening Integration
 **Goal**: Dataset runner executions reuse closure helpers to classify resume, reuse, skipped, failed, missing-evidence, and unattempted outcomes deterministically while preserving existing default execution behavior.
