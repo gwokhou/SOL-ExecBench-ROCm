@@ -3,7 +3,7 @@
 This note records which engineering practices from a separate hip-execbench
 project are worth adapting into SOL ExecBench ROCm. It is intentionally an
 adaptation map, not a porting plan:
-public `definition.json`, `solution.json`, workload formats, CLI behavior,
+public benchmark problem schemas, solution metadata schemas, workload formats, CLI behavior,
 trace JSONL output, and benchmark semantics remain owned by SOL ExecBench ROCm.
 
 Repository evidence reviewed for this adaptation includes `src/sol_execbench/core/bench/rocm_profiler.py`,

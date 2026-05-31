@@ -2,8 +2,181 @@
 # Configuration
 
 SOL ExecBench ROCm Port is configured through CLI flags, optional benchmark
-configuration JSON, `pyproject.toml`, Docker wrapper inputs, and runtime
-environment variables. There is no required application-level `.env` file.
+configuration JSON, `pyproject.toml`, Docker target metadata, Docker wrapper
+inputs, and runtime environment variables. The repository does not contain a
+required application-level `.env` file.
+
+## Environment Variables
+
+No environment variable is required for normal host CLI startup. The variables
+below are optional runtime, Docker, diagnostic, or build inputs discovered in
+`src/`, `scripts/`, and `docker/`.
+
+| Variable | Required | Default | Description |
+| --- | --- | --- | --- |
+| `PYTORCH_ALLOC_CONF` | Optional | `expandable_segments:True` in compile/eval subprocesses | Set by the CLI subprocess launcher for staged PyTorch ROCm compilation and evaluation. |
+| `PYTORCH_ROCM_ARCH` | Optional | Derived from solution `target_hardware` when unset | Overrides the ROCm architecture list used by PyTorch extension builds. |
+| `SOLEXECBENCH_ENV_SNAPSHOT` | Optional | Unset | Set to `1` to write an environment snapshot sidecar next to `--output`. |
+| `SOLEXECBENCH_ENV_SNAPSHOT_PATH` | Optional | Unset | Explicit environment snapshot sidecar output path. |
+| `HIP_VISIBLE_DEVICES` | Optional | Unset | Device visibility filter recorded in environment and runtime evidence. |
+| `ROCR_VISIBLE_DEVICES` | Optional | Unset | ROCr device visibility filter recorded in environment and runtime evidence. |
+| `HSA_OVERRIDE_GFX_VERSION` | Optional | Unset | Forced HSA architecture override recorded in environment snapshots. |
+| `CUDA_VISIBLE_DEVICES` | Optional | Unset | Compatibility visibility variable recorded by Docker runtime evidence when present. |
+| `GPU_DEVICE_ORDINAL` | Optional | Unset | Compatibility visibility variable recorded by Docker runtime evidence when present. |
+| `SOL_EXECBENCH_CLOCKS_LOCKED` | Optional | `0` when unset | Set by `docker/entrypoint.sh` after clock-lock attempts; read by clock-lock checks. |
+| `SOL_EXECBENCH_SCLK_LEVEL` | Optional | Device preset when available | Overrides the SCLK DPM level used by the ROCm clock-lock helper. |
+| `SOL_EXECBENCH_MCLK_LEVEL` | Optional | Device preset when available | Overrides the MCLK DPM level used by the ROCm clock-lock helper. |
+| `FLASHINFER_TRACE_DIR` | Optional | `/sol-execbench/data/flashinfer-trace` under `scripts/run_docker.sh` | Adds the FlashInfer trace safetensors lookup root for evaluation. |
+| `IMAGE_NAME` | Optional | `sol-execbench` | Docker wrapper local image name. |
+| `IMAGE_TAG` | Optional | `rocm-<selected Docker tag>` | Docker wrapper local image tag. The default target resolves to `rocm-7.1.1-complete`. |
+| `ROCM_DOCKER_IMAGE` | Optional | `rocm/dev-ubuntu-24.04` for unknown-target override | Docker image repository override when `--allow-unknown-target` is used. |
+| `ROCM_DOCKER_TAG` | Optional | Selected target ID for unknown-target override | Docker image tag override when `--allow-unknown-target` is used. |
+| `SOL_EXECBENCH_ALLOW_MIXED_VERSION_DEPENDENCIES` | Optional | `0` | Allows dependency probe diagnostics for mixed-version stacks. |
+| `SOL_EXECBENCH_ALLOW_UNTESTED_TARGET_SMOKE` | Optional | `0` | Allows `not_tested` targets to run smoke/E2E commands without validation claims. |
+| `SOL_EXECBENCH_RECORD_CONTAINER_VALIDATION` | Optional | `0` | Records successful target-container wrapper benchmark evidence as `container_validated`. |
+| `SOL_EXECBENCH_HOST_PYTHON` | Optional | `uv run python` | Host Python executable override for Docker wrapper helper commands. |
+| `SOL_EXECBENCH_COMPATIBILITY_ENTRY` | Optional | Unset | Per-target compatibility JSON sidecar path. |
+| `SOL_EXECBENCH_COMPATIBILITY_MATRIX` | Optional | Unset | Aggregate compatibility matrix JSON path. |
+| `SOL_EXECBENCH_RUN_DOCKER_DRY_RUN` | Optional | `0` | Enables dry-run behavior in `scripts/run_docker.sh`. |
+| `SOL_EXECBENCH_DOCKER_CONTEXT` | Optional | `docker context show` output | Test/debug override for Docker context preflight evidence. |
+| `SOL_EXECBENCH_DOCKER_HOST` | Optional | `docker context inspect` output | Test/debug override for Docker host preflight evidence. |
+| `SOL_EXECBENCH_DEV_KFD_PRESENT` | Optional | Filesystem probe of `/dev/kfd` | Test/debug override for Docker runtime preflight evidence. |
+| `SOL_EXECBENCH_DEV_KFD_ACCESSIBLE` | Optional | Read/write probe of `/dev/kfd` | Test/debug override for Docker runtime preflight evidence. |
+| `SOL_EXECBENCH_DEV_DRI_PRESENT` | Optional | Filesystem probe of `/dev/dri` | Test/debug override for Docker runtime preflight evidence. |
+| `SOL_EXECBENCH_DEV_DRI_ACCESSIBLE` | Optional | Render/card device access probe under `/dev/dri` | Test/debug override for Docker runtime preflight evidence. |
+| `SOL_EXECBENCH_GPU_ACCESSIBLE` | Optional | Unset | Test/debug override for Docker runtime preflight GPU accessibility. |
+| `SOL_EXECBENCH_HOST_ROCM_VERSION` | Optional | Unset | Runtime evidence override for host ROCm version. |
+| `SOL_EXECBENCH_HOST_DRIVER_VERSION` | Optional | Unset | Runtime evidence override for host driver version. |
+| `SOL_EXECBENCH_IMAGE_DIGEST` | Optional | Unset | Runtime evidence override for container image digest. |
+| `SOL_EXECBENCH_RUNTIME_DEVICE_COUNT` | Optional | Unset | Runtime evidence override for device count. |
+| `SOL_EXECBENCH_RUNTIME_DEVICE_NAME` | Optional | Unset | Runtime evidence override for device name. |
+| `SOL_EXECBENCH_RUNTIME_GFX_ARCHITECTURE` | Optional | Unset | Runtime evidence override for gfx architecture. |
+| `SOL_EXECBENCH_GPU_CLK_MHZ` | Optional | Empty string in Docker wrapper environment | Forwarded into Docker runs for GPU clock diagnostics. |
+| `SOL_EXECBENCH_DRAM_CLK_MHZ` | Optional | Empty string in Docker wrapper environment | Forwarded into Docker runs for DRAM clock diagnostics. |
+| `SOL_EXECBENCH_DEPENDENCY_TORCH_DISTRIBUTION_VERSION` | Optional | Unset | Dependency preflight/runtime evidence override for installed Torch distribution version. |
+| `SOL_EXECBENCH_DEPENDENCY_TORCH_VERSION` | Optional | Unset | Dependency preflight/runtime evidence override for imported Torch version. |
+| `SOL_EXECBENCH_DEPENDENCY_TORCH_LOCAL_VERSION` | Optional | Unset | Dependency preflight/runtime evidence override for Torch local version suffix. |
+| `SOL_EXECBENCH_DEPENDENCY_TORCH_ROCM_TARGET` | Optional | Unset | Dependency preflight/runtime evidence override for expected ROCm wheel target. |
+| `SOL_EXECBENCH_DEPENDENCY_TORCH_HIP_VERSION` | Optional | Unset | Dependency preflight/runtime evidence override for `torch.version.hip`. |
+| `SOL_EXECBENCH_DEPENDENCY_TORCH_CUDA_VERSION` | Optional | Unset | Dependency preflight/runtime evidence override for `torch.version.cuda`. |
+| `SOL_EXECBENCH_DEPENDENCY_TORCH_DEVICE_AVAILABLE` | Optional | Unset | Dependency preflight/runtime evidence override for Torch device availability. |
+| `SOL_EXECBENCH_DEPENDENCY_TORCH_IMPORT_ERROR` | Optional | Unset | Dependency preflight/runtime evidence override for Torch import failure text. |
+| `SOL_EXECBENCH_DEPENDENCY_TORCHVISION_DISTRIBUTION_VERSION` | Optional | Unset | Dependency preflight/runtime evidence override for installed torchvision distribution version. |
+| `SOL_EXECBENCH_DEPENDENCY_TRITON_ROCM_DISTRIBUTION_VERSION` | Optional | Unset | Dependency preflight/runtime evidence override for installed `triton-rocm` distribution version. |
+| `SOL_EXECBENCH_DEPENDENCY_TRITON_ROCM_STATUS` | Optional | Unset | Dependency preflight/runtime evidence override for Triton ROCm status. |
+| `SOL_EXECBENCH_DEPENDENCY_CONTAINER_ROCM_USER_SPACE_VERSION` | Optional | Unset | Dependency preflight/runtime evidence override for container ROCm user-space version. |
+| `SOL_EXECBENCH_DEPENDENCY_HIPCC_VERSION` | Optional | Unset | Dependency preflight/runtime evidence override for `hipcc` version. |
+| `SOL_EXECBENCH_DEPENDENCY_TOOLCHAIN_ROCM_VERSION` | Optional | Unset | Dependency preflight/runtime evidence override for toolchain ROCm version. |
+| `ROCM_PATH` | Optional | `/opt/rocm` in Docker image | ROCm installation root in `docker/Dockerfile`. |
+| `HIP_PATH` | Optional | `/opt/rocm` in Docker image | HIP installation root in `docker/Dockerfile`. |
+| `HIP_PLATFORM` | Optional | `amd` in Docker image | HIP platform selector in `docker/Dockerfile`. |
+| `UV_CACHE_DIR` | Optional | `/home/${HOST_USER}/.cache/uv` in Docker image | UV cache directory in `docker/Dockerfile`. |
+| `UV_LINK_MODE` | Optional | `copy` in Docker image | UV link behavior in `docker/Dockerfile`. |
+| `UV_COMPILE_BYTECODE` | Optional | `1` in Docker image | Enables bytecode compilation in Docker installs. |
+| `UV_PYTHON_DOWNLOADS` | Optional | `never` in Docker image | Disables Python downloads during Docker installs. |
+| `UV_PROJECT_ENVIRONMENT` | Optional | `/venv` in Docker image | Docker image virtual environment path. |
+| `HOST_UID` | Optional | `1000` Docker build argument | Host user ID used when creating the Docker image user. |
+| `HOST_GID` | Optional | `1000` Docker build argument | Host group ID used when creating the Docker image group. |
+| `HOST_USER` | Optional | `sol-execbench` Docker build argument | Host user name used when creating the Docker image user. |
+| `PYTORCH_TORCH_VERSION` | Optional | `2.10.0+rocm7.1` Docker build argument | Torch wheel version installed in the Docker image. |
+| `PYTORCH_TORCHVISION_VERSION` | Optional | `0.25.0+rocm7.1` Docker build argument | Torchvision wheel version installed in the Docker image. |
+| `PYTORCH_ROCM_INDEX_URL` | Optional | `https://download.pytorch.org/whl/rocm7.1` Docker build argument | PyTorch ROCm wheel index URL. |
+| `TRITON_ROCM_VERSION` | Optional | `3.6.0` Docker build argument | `triton-rocm` wheel version installed in the Docker image. |
+| `TRITON_ROCM_INDEX_URL` | Optional | `https://download.pytorch.org/whl/` Docker build argument | Extra wheel index URL used for `triton-rocm`. |
+
+## Config File Format
+
+The benchmark evaluator accepts an optional JSON config file through
+`--config`. It is loaded into `BenchmarkConfig` from
+`src/sol_execbench/core/bench/config/benchmark_config.py`.
+
+```json
+{
+  "warmup_runs": 10,
+  "iterations": 50,
+  "lock_clocks": false,
+  "benchmark_reference": true,
+  "seed": 200
+}
+```
+
+| Field | Default | Description |
+| --- | --- | --- |
+| `warmup_runs` | `10` | Number of warmup runs before measurement. Must be greater than or equal to `0`. |
+| `iterations` | `50` | Number of timed iterations. Must be greater than `0`. |
+| `lock_clocks` | `false` | Whether evaluation requires clocks to be locked. |
+| `benchmark_reference` | `true` | Whether to benchmark the reference implementation. |
+| `seed` | `200` | Integer seed for benchmark input generation. |
+
+The Docker target manifest at `docker/rocm-targets.json` is another repository
+configuration file. It declares `default_target_id`,
+`requested_rocm_user_space_version`, Docker image tags, PyTorch ROCm wheel
+policies, and Triton ROCm wheel policies for supported container targets.
+
+## Required vs Optional Settings
+
+There are no required environment variables for starting the CLI. Required
+inputs are passed as files or positional arguments:
+
+- `sol-execbench <problem_dir>` requires `definition.json` and `workload.jsonl`
+  in the problem directory.
+- If no problem directory is used, `--definition` and `--workload` are required.
+- A solution must be supplied through `--solution` or by a conventional
+  `solution.json` in the problem directory.
+- `contract`, `doctor`, and `toolchain` subcommands only support `--json`
+  output and raise a Click exception without it.
+- `BenchmarkConfig.warmup_runs` must be `>= 0`; `iterations` must be `> 0`.
+- `scripts/run_docker.sh --target`, `--compatibility-entry`, and
+  `--compatibility-matrix` require argument values when those flags are used.
+
+Clock-lock settings are optional, but `--lock-clocks` changes behavior by
+forcing `BenchmarkConfig.lock_clocks = true`. If clocks are not locked,
+clock-sensitive evaluation paths can reject the run based on
+`SOL_EXECBENCH_CLOCKS_LOCKED`.
+
+## Defaults
+
+| Setting | Default | Source |
+| --- | --- | --- |
+| Benchmark warmup runs | `10` | `BenchmarkConfig.warmup_runs` |
+| Benchmark iterations | `50` | `BenchmarkConfig.iterations` |
+| Benchmark clock-lock requirement | `false` | `BenchmarkConfig.lock_clocks` |
+| Benchmark reference timing | `true` | `BenchmarkConfig.benchmark_reference` |
+| Benchmark seed | `200` | `BenchmarkConfig.seed` |
+| CLI compile timeout | `120` seconds | `--compile-timeout` option |
+| CLI evaluation timeout | `600` seconds | `--timeout` option |
+| CLI profiling mode | `none` | `--profile` option |
+| CLI static evidence mode | `none` | `--static-evidence` option |
+| Docker target | `rocm-7.1.1-ubuntu-24.04-container` | `docker/rocm-targets.json` |
+| Docker base image | `rocm/dev-ubuntu-24.04:7.1.1-complete` | Default Docker target and `docker/Dockerfile` |
+| Docker local image name | `sol-execbench` | `scripts/run_docker.sh` |
+| Docker local image tag | `rocm-<selected Docker tag>` | `scripts/run_docker.sh` |
+| Docker FlashInfer trace root | `/sol-execbench/data/flashinfer-trace` | `scripts/run_docker.sh` |
+| Python package version | `1.0.2` | `pyproject.toml` |
+| Python requirement | `>=3.12,<3.14` | `pyproject.toml` |
+| Default ROCm Torch wheel | `torch==2.10.0+rocm7.1` | `pyproject.toml` and Docker target metadata |
+| Default ROCm torchvision wheel | `torchvision==0.25.0+rocm7.1` | `pyproject.toml` and Docker target metadata |
+| Default Triton ROCm wheel | `triton-rocm==3.6.0` | `pyproject.toml` and Docker target metadata |
+
+## Per-Environment Overrides
+
+The repository does not define `.env.development`, `.env.production`, or
+`.env.test` files, and it does not contain deployment-specific configuration
+files. Use these source-backed override paths instead:
+
+- Host benchmark runs: pass CLI flags such as `--config`, `--compile-timeout`,
+  `--timeout`, `--output`, `--profile`, and `--static-evidence`.
+- Per-problem benchmark settings: place a `config.json` next to
+  `definition.json` and `workload.jsonl`, or pass a config file explicitly with
+  `--config`.
+- Docker ROCm stack selection: use `./scripts/run_docker.sh --target <id>` for
+  declared targets in `docker/rocm-targets.json`.
+- Docker image overrides for unknown targets: use `--allow-unknown-target` with
+  `ROCM_DOCKER_IMAGE` and `ROCM_DOCKER_TAG`.
+- Diagnostic and CI-style preflight overrides: set the
+  `SOL_EXECBENCH_DEPENDENCY_*`, `SOL_EXECBENCH_RUNTIME_*`,
+  `SOL_EXECBENCH_DEV_*`, `SOL_EXECBENCH_DOCKER_*`, and compatibility sidecar
+  variables listed above.
 
 ## CLI Flags
 
@@ -49,32 +222,6 @@ uv run sol-execbench toolchain --json
 `toolchain` also accepts `--evidence-level`, `--artifact-type`, `--gpu-arch`,
 `--hardware-generation`, `--rocm-version`, and `--list-registry`.
 
-## Benchmark Config JSON
-
-The optional `--config` file loads into `BenchmarkConfig` from
-`src/sol_execbench/core/bench/config/benchmark_config.py`.
-
-```json
-{
-  "warmup_runs": 10,
-  "iterations": 50,
-  "lock_clocks": false,
-  "benchmark_reference": true,
-  "seed": 200
-}
-```
-
-| Field | Default | Validation |
-| --- | --- | --- |
-| `warmup_runs` | `10` | Must be greater than or equal to `0`. |
-| `iterations` | `50` | Must be greater than `0`. |
-| `lock_clocks` | `false` | Boolean. |
-| `benchmark_reference` | `true` | Boolean. |
-| `seed` | `200` | Integer. |
-
-The `--lock-clocks` CLI flag overrides the loaded config by setting
-`lock_clocks` to `true`.
-
 ## Package Configuration
 
 `pyproject.toml` defines:
@@ -91,43 +238,26 @@ The `--lock-clocks` CLI flag overrides the loaded config by setting
 - Ty source roots
 - UV package indexes for PyPI, PyTorch ROCm 7.1, and the PyTorch ROCm package root
 
-## Runtime Environment Variables
-
-| Variable | Default | Used By | Purpose |
-| --- | --- | --- | --- |
-| `PYTORCH_ALLOC_CONF` | `expandable_segments:True` in compile/eval subprocesses | CLI subprocess launch | Sets PyTorch allocator behavior for staged compilation and evaluation. |
-| `PYTORCH_ROCM_ARCH` | Derived from solution targets when unset | Native build template and PyTorch extension build | Overrides ROCm architecture list for native builds. |
-| `SOLEXECBENCH_ENV_SNAPSHOT` | Unset | CLI | Set to `1` to write an environment snapshot next to `--output`. |
-| `SOLEXECBENCH_ENV_SNAPSHOT_PATH` | Unset | CLI | Explicit environment snapshot output path. |
-| `HIP_VISIBLE_DEVICES` | Unset | Environment snapshots and runtime evidence | Records HIP-visible device filtering. |
-| `ROCR_VISIBLE_DEVICES` | Unset | Environment snapshots and runtime evidence | Records ROCr-visible device filtering. |
-| `HSA_OVERRIDE_GFX_VERSION` | Unset | Environment snapshots | Records forced HSA architecture overrides. |
-| `SOL_EXECBENCH_CLOCKS_LOCKED` | `0` when unset | Clock-lock checks and Docker entrypoint | Records whether GPU clocks were locked by the entrypoint or helper. |
-| `SOL_EXECBENCH_SCLK_LEVEL` | Device preset when available | Clock-lock helper | Overrides selected SCLK DPM level. |
-| `SOL_EXECBENCH_MCLK_LEVEL` | Device preset when available | Clock-lock helper | Overrides selected MCLK DPM level. |
-| `FLASHINFER_TRACE_DIR` | `/sol-execbench/data/flashinfer-trace` under wrapper | Evaluation driver and Docker wrapper | Adds FlashInfer trace safetensors lookup root. |
-
 ## Docker Wrapper Settings
 
-`scripts/run_docker.sh` reads these user-facing variables:
+`scripts/run_docker.sh` supports:
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `IMAGE_NAME` | `sol-execbench` | Local Docker image name. |
-| `IMAGE_TAG` | `rocm-${selected_docker_tag}` | Local Docker image tag. The default declared target currently builds `sol-execbench:rocm-7.1.1-complete`; set `IMAGE_TAG` to override. |
-| `ROCM_DOCKER_IMAGE` | `rocm/dev-ubuntu-24.04` for unknown-target override | Docker image repository override when unknown targets are explicitly allowed. |
-| `ROCM_DOCKER_TAG` | Selected target ID for unknown-target override | Docker image tag override when unknown targets are explicitly allowed. |
-| `SOL_EXECBENCH_ALLOW_MIXED_VERSION_DEPENDENCIES` | `0` | Allows dependency probe diagnostics for mixed-version stacks. |
-| `SOL_EXECBENCH_ALLOW_UNTESTED_TARGET_SMOKE` | `0` | Allows `not_tested` Targets to run smoke/E2E commands while preserving non-authoritative compatibility claims. |
-| `SOL_EXECBENCH_RECORD_CONTAINER_VALIDATION` | `0` | Records a successful target-container wrapper benchmark as `container_validated` compatibility evidence after verifying the dependency stack inside the selected image. |
-| `SOL_EXECBENCH_COMPATIBILITY_ENTRY` | Unset | Optional per-target compatibility JSON sidecar path. |
-| `SOL_EXECBENCH_COMPATIBILITY_MATRIX` | Unset | Optional aggregate compatibility matrix JSON path. |
-| `SOL_EXECBENCH_RUN_DOCKER_DRY_RUN` | `0` | Enables dry-run behavior used by tests and diagnostics. |
+- `--build` to build the selected Docker image.
+- `--target <id>` to select a declared target from `docker/rocm-targets.json`.
+- `--allow-unknown-target` with `ROCM_DOCKER_IMAGE` and `ROCM_DOCKER_TAG`.
+- `--allow-mixed-version-dependencies` for mixed-version dependency diagnostics.
+- `--allow-untested-target-smoke` for non-authoritative smoke/E2E runs on
+  `not_tested` targets.
+- `--record-container-validation` to write container validation evidence after
+  successful wrapper execution.
+- `--preflight-only` to run preflight classification without launching the
+  benchmark command.
+- `--compatibility-entry <path>` and `--compatibility-matrix <path>` to write
+  compatibility sidecars.
 
-The wrapper also supports many `SOL_EXECBENCH_DEPENDENCY_*` and
-`SOL_EXECBENCH_RUNTIME_*` override variables for dependency preflight,
-compatibility sidecars, and tests. These are diagnostic inputs, not normal
-benchmark configuration.
+The wrapper derives PyTorch and Triton Docker build arguments from
+`docker/rocm-targets.json` so ROCm 7.0, 7.1, and 7.2 images can install
+target-specific ROCm wheel stacks without changing the project lockfile.
 
 ## Docker Image Settings
 
@@ -140,6 +270,7 @@ benchmark configuration.
 | `HIP_PLATFORM` | `amd` |
 | `PATH` | Includes `/opt/rocm/bin`, `/opt/rocm/llvm/bin`, and `/venv/bin`. |
 | `LD_LIBRARY_PATH` | `/opt/rocm/lib` |
+| `HOME` | `/home/${HOST_USER}` |
 | `UV_CACHE_DIR` | `/home/${HOST_USER}/.cache/uv` |
 | `UV_LINK_MODE` | `copy` |
 | `UV_COMPILE_BYTECODE` | `1` |
@@ -150,10 +281,7 @@ benchmark configuration.
 Docker build arguments include `ROCM_DOCKER_IMAGE`, `ROCM_DOCKER_TAG`,
 `PYTORCH_TORCH_VERSION`, `PYTORCH_TORCHVISION_VERSION`,
 `PYTORCH_ROCM_INDEX_URL`, `TRITON_ROCM_VERSION`, `TRITON_ROCM_INDEX_URL`,
-`HOST_UID`, `HOST_GID`, and `HOST_USER`. The wrapper derives the PyTorch and
-Triton build arguments from `docker/rocm-targets.json` so ROCm 7.0, 7.1, and
-7.2 images can install target-specific ROCm wheel stacks without changing the
-project lockfile.
+`HOST_UID`, `HOST_GID`, and `HOST_USER`.
 
 ## Optional Evidence Outputs
 

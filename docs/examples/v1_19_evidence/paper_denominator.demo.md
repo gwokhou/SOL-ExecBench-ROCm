@@ -7,8 +7,8 @@ diagnostic-only.
 
 | Ref | Path | Checksum |
 | --- | --- | --- |
-| inventory | `out/v1_19_demo/inventory.json` | `sha256:4444444444444444444444444444444444444444444444444444444444444444` |
-| execution_closure | `out/v1_19_demo/execution_closure.json` | `sha256:5555555555555555555555555555555555555555555555555555555555555555` |
+| inventory | Illustrative generated inventory output path, not checked in | `sha256:4444444444444444444444444444444444444444444444444444444444444444` |
+| execution_closure | Illustrative generated execution-closure output path, not checked in | `sha256:5555555555555555555555555555555555555555555555555555555555555555` |
 
 ## Boundaries
 

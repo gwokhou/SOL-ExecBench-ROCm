@@ -1,3 +1,4 @@
+<!-- generated-by: gsd-doc-writer -->
 # Researcher Guide
 
 This guide is for GPU kernel researchers and deep developers using the ROCm
@@ -8,7 +9,7 @@ how to avoid overstating results.
 
 | Role | Start with | Primary artifacts |
 | --- | --- | --- |
-| GPU kernel author | Run one local example, then adapt a solution file. | `solution.json`, trace JSONL, correctness/performance fields. |
+| GPU kernel author | Run one local example, then adapt a per-problem solution metadata file. | Per-problem solution metadata JSON, trace JSONL, correctness/performance fields. |
 | compiler/backend researcher | Inspect solution schemas, staging, and native build paths. | `docs/solution.md`, `src/sol_execbench/driver/`, HIP/Triton examples. |
 | agent kernel-optimization researcher | Use the isolated harness and reward-hack checks as the execution boundary. | trace JSONL, `REWARD_HACK` traces, baseline comparisons. |
 | benchmark/reproducibility researcher | Use the curated slice, environment sidecars, profiling sidecars, static evidence sidecars, execution closure, v1.19 sidecar reports, and v1.20 evidence-quality reports. | `docs/curated_rocm_slice.md`, `docs/static_kernel_evidence.md`, `docs/v1_19_evidence_guide.md`, `docs/v1_20_evidence_quality_guide.md`, `docs/CLAIMS.md`, execution closure, paper denominator gaps, Matrix diagnostics, AMD bound sanity, consistency, stability, claim-upgrade, and trust summary. |

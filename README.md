@@ -17,8 +17,8 @@ with ROCm, HIP, Triton ROCm, and AMD-native scoring and evidence helpers.
 
 The project dependency configuration resolves PyTorch `2.10.0+rocm7.1` and
 torchvision `0.25.0+rocm7.1` on Linux and Windows. On Linux it also resolves
-`triton-rocm==3.6.0`. The Docker target manifest records ROCm 7.0, 7.1, and
-7.2 container targets for compatibility and evidence workflows.
+`triton-rocm==3.6.0`. The Docker target manifest records ROCm 7.0.2, 7.1.1,
+and 7.2.0 container targets for compatibility and evidence workflows.
 
 ## Installation
 
@@ -70,7 +70,7 @@ Run a small downloaded dataset batch:
 uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark --limit 5
 ```
 
-## CLI
+## Usage Examples
 
 Evaluate a problem directory containing `definition.json` and `workload.jsonl`:
 

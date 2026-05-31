@@ -19,9 +19,11 @@ On Linux and Windows, dependency resolution uses the PyTorch ROCm 7.1 index for
 `torch==2.10.0+rocm7.1` and `torchvision==0.25.0+rocm7.1`. On Linux,
 `triton-rocm==3.6.0` resolves from the PyTorch ROCm package root.
 
-## Install Dependencies
+## Installation Steps
 
 ```bash
+git clone https://github.com/gwokhou/SOL-ExecBench-ROCm.git
+cd SOL-ExecBench-ROCm
 uv sync --all-groups
 ```
 
@@ -53,7 +55,7 @@ uv run python -c "import torch; print(torch.cuda.get_device_properties(0).gcnArc
 PyTorch ROCm intentionally exposes GPU APIs through the historical
 `torch.cuda` namespace.
 
-## First Benchmark Run
+## First Run
 
 Run an included PyTorch example:
 
@@ -95,7 +97,7 @@ Run a benchmark command inside the container:
 Select a declared Docker target:
 
 ```bash
-./scripts/run_docker.sh --target rocm-7.1.1 -- sol-execbench contract --json
+./scripts/run_docker.sh --target rocm-7.1.1-ubuntu-24.04-container -- sol-execbench contract --json
 ```
 
 The wrapper uses `docker/rocm-targets.json` to preview target images and

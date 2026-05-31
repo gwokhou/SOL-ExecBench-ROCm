@@ -40,7 +40,7 @@ The codebase has three layers:
 
 1. **CLI** (`src/sol_execbench/cli/main.py`) — Click-based CLI entry point (`sol-execbench`). Parses args, invokes the driver, displays Rich tables with results.
 
-2. **Driver** (`src/sol_execbench/driver/`) — Orchestrates evaluation. `ProblemPackager` stages problem files (definition, workloads, solution sources) into a temp directory, then runs compilation and evaluation as **subprocesses**. The eval driver template (`src/sol_execbench/driver/templates/eval_driver.py`) is the self-contained script that runs inside the subprocess; it imports torch, loads inputs, executes kernels, computes correctness/performance, and emits JSONL traces to stdout.
+2. **Driver** (`src/sol_execbench/driver/`) — Orchestrates evaluation. `ProblemPackager` stages problem files (definition, workloads, solution sources) into a temp directory and returns compile/evaluate commands; `src/sol_execbench/cli/main.py` runs those commands as **subprocesses**. The eval driver template (`src/sol_execbench/driver/templates/eval_driver.py`) is the self-contained script that runs inside the subprocess; it imports torch, loads inputs, executes kernels, computes correctness/performance, and emits JSONL traces to stdout.
 
 3. **Core** (`src/sol_execbench/core/`) — Package modules for data models, benchmarking, scoring, diagnostics, and reporting:
    - `src/sol_execbench/core/data/` — Pydantic v2 models for Definition, Solution, Workload, Trace, shapes, and dtypes.

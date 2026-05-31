@@ -5,7 +5,12 @@ Pytest is the project test framework. `pyproject.toml` configures
 `pytest-xdist` with `-n auto --dist loadgroup`, so full-suite runs execute in
 parallel by default.
 
-## Setup
+## Test Framework and Setup
+
+The development dependency group pins the test runner to `pytest>=9.0.2`
+and includes `pytest-xdist>=3.5` for parallel execution. `pyproject.toml`
+sets the default pytest options to `-n auto --dist loadgroup`, so tests run
+across available workers unless a command overrides xdist with `-n 0`.
 
 Install development dependencies:
 
@@ -15,7 +20,7 @@ uv sync --all-groups
 
 The development group includes `pytest`, `pytest-xdist`, `ruff`, and `ty`.
 
-## Core Commands
+## Running Tests
 
 Run the full suite:
 
@@ -247,7 +252,7 @@ ROCm 7.2 row completed with `CLOCKS_LOCKED=1`.
 | 2026-05-28 | `rocm-7.1.1-ubuntu-24.04-container` | Direct `docker run ... sol-execbench examples/ck/gemm ...` | Passed | Composable Kernel GEMM compiled and ran with `CLOCKS_LOCKED=1`; `.artifacts/e2e-260528/rocm-7.1.1-ck-gemm.jsonl` contains 3/3 `PASSED` workloads. |
 | 2026-05-28 | `rocm-7.1.1-ubuntu-24.04-container` | Direct `docker run ... sol-execbench examples/rocwmma/gemm ...` | Passed | rocWMMA GEMM compiled and ran with `CLOCKS_LOCKED=1`; `.artifacts/e2e-260528/rocm-7.1.1-rocwmma-gemm.jsonl` contains 3/3 `PASSED` workloads. |
 
-## Test Organization
+## Writing New Tests
 
 | Area | Typical Coverage |
 | --- | --- |
@@ -258,10 +263,19 @@ ROCm 7.2 row completed with `CLOCKS_LOCKED=1`.
 | `tests/examples/` | Example file consistency and runnable workflow coverage. |
 | `tests/docker/dependencies/` | ROCm runtime, HIP, PyTorch ROCm, Triton ROCm, and library dependency checks. |
 
-Use descriptive test names such as `test_rejects_invalid_solution_schema`, and
-place new tests next to related coverage.
+Use `test_*.py` file names and descriptive `test_*` function names such as
+`test_rejects_invalid_solution_schema`. Place new tests next to related
+coverage under `tests/sol_execbench/`, or under `tests/examples/` for example
+workflow coverage.
 
-## Coverage
+Shared test helpers live in `tests/conftest.py`,
+`tests/sol_execbench_type_helpers.py`, and
+`tests/sol_execbench/solar_derivation_fixtures.py`. Use `tmp_cache_dir` from
+`tests/conftest.py` when a test needs an isolated `SOLEXECBENCH_CACHE_PATH`,
+and use the typed model constructors in `tests/sol_execbench_type_helpers.py`
+for schema-heavy tests.
+
+## Coverage Requirements
 
 No coverage threshold is configured in `pyproject.toml`, and no coverage
 configuration file is present.
@@ -273,10 +287,11 @@ configuration file is present.
 | Functions | No threshold configured. |
 | Statements | No threshold configured. |
 
-## CI
+## CI Integration
 
 The `Python Quality` workflow runs on push and pull request for Python 3.12 and
-3.13:
+3.13. The workflow is defined in `.github/workflows/code-quality.yml` and uses
+the `python-tests` job:
 
 ```bash
 uv sync --locked --all-groups
