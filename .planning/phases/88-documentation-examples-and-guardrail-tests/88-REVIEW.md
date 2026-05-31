@@ -1,81 +1,61 @@
 ---
 phase: 88-documentation-examples-and-guardrail-tests
-reviewed: 2026-05-31T12:22:01Z
+reviewed: 2026-05-31T12:28:10Z
 depth: standard
-files_reviewed: 21
+files_reviewed: 3
 files_reviewed_list:
   - docs/v1_19_evidence_guide.md
-  - docs/CLAIMS.md
-  - docs/TESTING.md
-  - docs/RESEARCHER-GUIDE.md
-  - docs/examples/v1_19_evidence/README.md
-  - docs/examples/v1_19_evidence/execution_closure.demo.json
-  - docs/examples/v1_19_evidence/paper_denominator.demo.json
-  - docs/examples/v1_19_evidence/paper_denominator.demo.md
-  - docs/examples/v1_19_evidence/matrix_schema_export.demo.json
-  - docs/examples/v1_19_evidence/matrix_diff.demo.json
-  - docs/examples/v1_19_evidence/matrix_diff.demo.md
-  - docs/examples/v1_19_evidence/amd_bound_sanity.demo.json
-  - docs/examples/v1_19_evidence/amd_bound_sanity.demo.md
   - tests/sol_execbench/test_research_release_docs.py
-  - tests/sol_execbench/test_v1_19_evidence_examples.py
-  - tests/sol_execbench/test_public_contract_guardrails.py
-  - .planning/phases/88-documentation-examples-and-guardrail-tests/88-CONTEXT.md
-  - .planning/phases/88-documentation-examples-and-guardrail-tests/88-01-PLAN.md
-  - .planning/phases/88-documentation-examples-and-guardrail-tests/88-01-SUMMARY.md
-  - .planning/phases/88-documentation-examples-and-guardrail-tests/88-02-PLAN.md
-  - .planning/phases/88-documentation-examples-and-guardrail-tests/88-02-SUMMARY.md
+  - .planning/phases/88-documentation-examples-and-guardrail-tests/88-REVIEW.md
 findings:
   critical: 0
-  warning: 2
+  warning: 0
   info: 0
-  total: 2
-status: issues_found
+  total: 0
+status: clean
 ---
 
-# Phase 88: Code Review Report
+# Phase 88: Targeted Re-Review Report
 
-**Reviewed:** 2026-05-31T12:22:01Z
+**Reviewed:** 2026-05-31T12:28:10Z
 **Depth:** standard
-**Files Reviewed:** 21
-**Status:** issues_found
+**Files Reviewed:** 3
+**Status:** clean
 
 ## Summary
 
-Reviewed the Phase 88 public guide, linked docs, demo evidence fixtures, guardrail tests, and phase planning context for claim-boundary wording, demo-vs-validation ambiguity, absolute path/sensitive-log exposure, test gaps, and canonical contract/primary CLI risks.
+Targeted re-review of fix commit `8c2d29a` (`#88 - Tighten v1.19 evidence guide guardrails`) focused only on the two previous Phase 88 warnings and whether the fixes introduced equally severe new issues. Reviewed the v1.19 evidence guide, the research release docs guardrail tests, and the previous `88-REVIEW.md` findings.
 
-The implementation keeps canonical schemas, primary CLI, score semantics, evaluator semantics, and hardware-validation scope unchanged. The demo fixtures are clearly marked demo-only/diagnostic-only and avoid real hardware/performance payloads. Two documentation/test-boundary issues remain.
+The previous warning conditions are closed. The guide now keeps execution closure and paper denominator paper-validation wording unconditional, avoids `/tmp/uv-cache` in the central copyable commands, and uses the real `report_amd_bound_sanity.py` options. The added guardrails cover those boundaries without widening into hardware validation or changing business code.
 
 ## Narrative Findings (AI reviewer)
 
-## Warnings
+All reviewed files meet the targeted quality bar. No new Critical or Warning findings were found within the requested re-review scope.
 
-### WR-01: Conditional wording weakens the "cannot prove" paper-validation boundary
+## Previous Warning Closure
 
-**Classification:** WARNING
-**File:** `docs/v1_19_evidence_guide.md:69`
-**Issue:** In the "What it cannot prove" sections, the execution-closure bullet says "no full 235-problem paper validation unless all 235 scoped paper problems are actually accounted for with required evidence", and the paper-denominator bullet says "no full 235-problem paper validation when any denominator records or required evidence are absent" at line 105. Both are under a "cannot prove" heading, but the conditional wording creates a claim-boundary loophole: a reader can infer that execution closure or denominator reports alone become full paper validation once the denominator is complete. That contradicts the stronger Phase 88 boundary that sidecars/reports remain diagnostic and do not upgrade paper, score, leaderboard, or hardware authority by themselves.
-**Fix:** Make these bullets unconditional and point upgrades back to a separate evidence bundle, without adding any new hardware validation requirement. For example:
+### WR-01: Conditional paper-validation wording
 
-```markdown
-- no full 235-problem paper validation by this sidecar/report alone; a paper-validation claim requires the separately reviewed complete evidence bundle described in `docs/CLAIMS.md`
-```
+**Status:** closed / PASS
+**Files:** `docs/v1_19_evidence_guide.md:68`, `docs/v1_19_evidence_guide.md:104`, `tests/sol_execbench/test_research_release_docs.py:279`
+**Result:** The guide now says execution closure provides "no full 235-problem paper validation by this sidecar alone" and paper denominator provides "no full 235-problem paper validation by this report alone", with both pointing to a separately reviewed complete evidence bundle in `docs/CLAIMS.md`. The prior conditional phrases are removed and covered by `test_v1_19_guide_uses_unconditional_paper_validation_boundaries`.
 
-Apply the same wording style to both execution closure and paper denominator sections so "what it cannot prove" cannot be read as a conditional claim grant.
+### WR-02: `/tmp/uv-cache` and central guide path guardrail gap
 
-### WR-02: Absolute-path guardrail is scoped to examples while the central guide publishes `/tmp` command snippets
+**Status:** closed / PASS
+**Files:** `docs/v1_19_evidence_guide.md:50`, `docs/v1_19_evidence_guide.md:85`, `docs/v1_19_evidence_guide.md:122`, `docs/v1_19_evidence_guide.md:147`, `docs/v1_19_evidence_guide.md:178`, `docs/v1_19_evidence_guide.md:210`, `tests/sol_execbench/test_research_release_docs.py:289`
+**Result:** The central guide now uses `UV_CACHE_DIR=out/v1_19_demo/uv-cache` in the copyable command snippets and the docs test rejects `/home/`, `/tmp/`, and `/var/` in `docs/v1_19_evidence_guide.md`.
 
-**Classification:** WARNING
-**File:** `docs/v1_19_evidence_guide.md:50`
-**Issue:** The Phase 88 fixture tests explicitly reject `/home/`, `/tmp/`, and `/var/` in `docs/examples/v1_19_evidence/*`, but the central researcher-facing guide uses `UV_CACHE_DIR=/tmp/uv-cache` in every command block. This is not a secret leak, but it is still an absolute local path in the primary public guide, and the current tests would not catch it because `test_v1_19_example_wording_repeats_demo_and_negative_boundaries` only scans the examples directory. That leaves the absolute-path/public-doc boundary unenforced exactly where most readers will copy commands.
-**Fix:** Either remove `UV_CACHE_DIR` from the public guide snippets or use a relative demo cache path such as `.cache/uv` / `out/v1_19_demo/uv-cache`, then add a focused test that scans `docs/v1_19_evidence_guide.md` plus the example fixtures for disallowed absolute local path prefixes and raw `stdout`/`stderr` bodies. Keep the test CPU-safe and do not broaden it to hardware validation.
+## Additional Targeted Check
+
+The AMD bound sanity example now uses the actual script options: `--amd-sol-artifact`, `--solar-artifact`, and `--compatibility-matrix`. The removed `--paper-denominator` and `--matrix-report` options are explicitly rejected by the docs guardrail test, and the real options match `scripts/report_amd_bound_sanity.py`.
 
 ## Verification
 
-- `UV_CACHE_DIR=/tmp/uv-cache uv run pytest tests/sol_execbench/test_research_release_docs.py tests/sol_execbench/test_v1_19_evidence_examples.py tests/sol_execbench/test_public_contract_guardrails.py::test_v1_19_paper_denominator_fields_remain_sidecar_only tests/sol_execbench/test_public_contract_guardrails.py::test_primary_cli_does_not_expose_v1_19_paper_denominator_options tests/sol_execbench/test_public_contract_guardrails.py::test_v1_19_amd_bound_sanity_fields_remain_sidecar_only tests/sol_execbench/test_public_contract_guardrails.py::test_v1_19_amd_bound_sanity_does_not_enter_amd_score_contracts tests/sol_execbench/test_public_contract_guardrails.py::test_primary_cli_does_not_expose_v1_19_amd_bound_sanity_options tests/sol_execbench/test_public_contract_guardrails.py::test_phase88_example_docs_keep_v1_19_surfaces_sidecar_only -q` - 24 passed.
+- `uv run pytest tests/sol_execbench/test_research_release_docs.py -q` - 15 passed.
 
 ---
 
-_Reviewed: 2026-05-31T12:22:01Z_
+_Reviewed: 2026-05-31T12:28:10Z_
 _Reviewer: the agent (gsd-code-reviewer)_
 _Depth: standard_
