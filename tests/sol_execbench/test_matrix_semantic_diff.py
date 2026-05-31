@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import importlib.util
 import json
+import sys
 from pathlib import Path
 
 import pytest
+from click.testing import CliRunner
 
+from sol_execbench.cli.main import cli
 from sol_execbench.core.compatibility import (
     ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION,
     MatrixArtifactReference,
@@ -29,6 +33,19 @@ from sol_execbench.core.matrix_diff import (
     load_matrix_report,
     matrix_report_diff_to_markdown,
 )
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SCRIPT_PATH = REPO_ROOT / "scripts" / "diff_matrix_reports.py"
+
+
+def _load_script():
+    spec = importlib.util.spec_from_file_location("diff_matrix_reports", SCRIPT_PATH)
+    assert spec is not None
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
 
 
 def _target(
@@ -360,3 +377,68 @@ def test_load_matrix_report_validates_payload_and_rejects_authority_escalation(t
     path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(ValueError, match="invalid Matrix report"):
         load_matrix_report(path)
+
+
+def test_diff_matrix_reports_script_writes_deterministic_json_and_markdown(
+    tmp_path,
+    monkeypatch,
+):
+    module = _load_script()
+    old_path = tmp_path / "old.json"
+    new_path = tmp_path / "new.json"
+    json_out = tmp_path / "diff.json"
+    markdown_out = tmp_path / "diff.md"
+    old_path.write_text(
+        json.dumps(_report([_entry("target-a")]).model_dump(mode="json")),
+        encoding="utf-8",
+    )
+    new_path.write_text(
+        json.dumps(
+            _report(
+                [
+                    _entry(
+                        "target-a",
+                        status=MatrixCompatibilityStatus.MIXED_VERSION,
+                        reason_code=(
+                            MatrixCompatibilityReasonCode.TARGET_OBSERVED_MISMATCH
+                        ),
+                        reason="Observed PyTorch ROCm target drifted.",
+                        observed_pytorch="rocm7.0",
+                    )
+                ]
+            ).model_dump(mode="json")
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "diff_matrix_reports.py",
+            str(old_path),
+            str(new_path),
+            "--json-out",
+            str(json_out),
+            "--markdown-out",
+            str(markdown_out),
+        ],
+    )
+    assert module.main() == 0
+    first_json = json_out.read_text(encoding="utf-8")
+    first_markdown = markdown_out.read_text(encoding="utf-8")
+    assert module.main() == 0
+    assert json_out.read_text(encoding="utf-8") == first_json
+    assert markdown_out.read_text(encoding="utf-8") == first_markdown
+    assert "mixed_version_drift" in first_json
+    assert "Diagnostic-only ROCm Compatibility Matrix diff" in first_markdown
+
+
+def test_matrix_diff_script_is_not_primary_sol_execbench_cli_option():
+    module = _load_script()
+    assert "--json-out" in module.build_parser().format_help()
+
+    result = CliRunner().invoke(cli, ["--help"])
+    assert result.exit_code == 0
+    assert "diff_matrix_reports" not in result.output
+    assert "--json-out" not in result.output
