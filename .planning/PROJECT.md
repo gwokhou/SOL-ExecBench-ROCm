@@ -18,7 +18,8 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 **Shipped version:** v1.19 Research Credibility Without New Hardware,
 completed 2026-05-31.
 
-**Current milestone:** none; planning is ready for the next milestone.
+**Current milestone:** v1.20 Cross-Report Consistency and Evaluation
+Stability.
 
 **Latest milestone outcome:** the ROCm port now has deterministic execution
 closure contracts, paper denominator accounting, Matrix schema export and
@@ -26,15 +27,8 @@ semantic diff tooling, hardened dataset-runner closure classification, AMD
 SOL/SOLAR bound sanity evidence, and researcher-facing docs/examples that keep
 all v1.19 evidence surfaces sidecar-only and claim-safe.
 
-**Next planned milestone:** to be determined. Candidate follow-ups remain CDNA
-3/CDNA 4 live validation, Triton ROCm cache capture, RGA-rich static resource
-parsing, native host ROCm matrix validation, hosted/downstream evidence
-ingestion, or cross-report consistency linting.
-
-**Next planned milestone:** to be determined after v1.19. Candidate follow-ups
-remain CDNA 3/CDNA 4 live validation, Triton ROCm cache capture, RGA-rich static
-resource parsing, native host ROCm matrix validation, or hosted/downstream
-evidence ingestion.
+**Current milestone goal:** make ROCm benchmark evidence internally consistent
+and timing-quality aware before expanding hardware validation.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline.
 Milestones v1.1-v1.6 added CDNA 3 code/schema support, maintained residue
@@ -92,6 +86,31 @@ The v1.19 milestone added closure contracts, paper denominator accounting,
 Matrix schema/diff tooling, runner closure hardening, AMD bound sanity reports,
 and public docs/examples/guardrails for research credibility without expanding
 hardware validation.
+
+## Current Milestone: v1.20 Cross-Report Consistency and Evaluation Stability
+
+**Goal:** Make ROCm benchmark evidence internally consistent and timing-quality
+aware before expanding hardware validation.
+
+**Target features:**
+- Cross-report consistency lint across execution closure, paper denominator,
+  Matrix, runtime/static evidence, AMD score, AMD SOL/SOLAR, and docs claim
+  boundaries.
+- `evaluation_stability.v1` diagnostic sidecar for warmup/repeat counts,
+  timing distribution, clock policy, backend, variance, and profiling-overhead
+  risk.
+- Explicit claim-upgrade rules defining what evidence is required for
+  container/native-host validation, score authority, paper-parity candidate
+  status, and leaderboard readiness.
+- Researcher-facing trust summary that explains whether a run is internally
+  consistent, stable enough to interpret, and still diagnostic-only.
+- CPU-safe guardrail tests plus focused ROCm E2E coverage for real
+  timing/closure/stability paths.
+
+**Explicitly deferred:**
+- Full 235-problem paper validation, CDNA 3/MI300X/CDNA4 validation,
+  native-host Matrix authority, hosted leaderboard readiness, and upstream
+  SOLAR parity.
 
 ## Recently Shipped Milestone: v1.19 Research Credibility Without New Hardware
 
@@ -408,8 +427,8 @@ ROCm path, with validation scoped to RDNA 4 only.
 
 ### Active
 
-- Paper dataset denominator accounting, Matrix diff/schema export,
-  dataset-runner hardening, and AMD SOL/SOLAR sanity work for v1.19.
+- Cross-report consistency lint, evaluation stability evidence, claim-upgrade
+  rules, trust summary documentation, and guardrail tests for v1.20.
 
 ### Out of Scope
 
@@ -454,6 +473,11 @@ ROCm path, with validation scoped to RDNA 4 only.
 - Full 235-problem paper validation, official leaderboard parity, and hosted
   submission service in v1.19 - deferred until denominator accounting and
   closure reporting are stronger.
+- Full 235-problem paper validation, CDNA 3 / MI300X / CDNA 4 validation,
+  native-host Matrix authority, hosted leaderboard readiness, and upstream
+  SOLAR parity in v1.20 - deferred so this milestone can make current and
+  future evidence internally auditable before adding expensive validation
+  claims.
 
 ## Context
 
@@ -489,6 +513,11 @@ ROCm 7.0.x, 7.1.x, and 7.2.x on recorded RDNA 4 host devices. The next useful
 step is to make research claims easier to audit without requiring new hardware:
 paper denominator accounting, Matrix diff/schema tooling, dataset-runner
 closure hardening, and bounded AMD SOL/SOLAR sanity evidence.
+
+After v1.19, the project has many independent evidence sidecars and guardrail
+docs. The next useful step is to verify that those reports do not contradict
+each other and that real benchmark timing evidence is stable enough to interpret
+before using it to support stronger hardware, score, or paper-parity claims.
 
 ## Constraints
 
@@ -537,6 +566,7 @@ closure hardening, and bounded AMD SOL/SOLAR sanity evidence.
 | Defer static kernel evidence to v1.17 | User explicitly moved Static Kernel Evidence out of v1.16 so v1.16 can focus on external research, tool lifecycle, capability registry, and routing policy. | Active in v1.16 |
 | Avoid expanding hardware validation in v1.19 | User explicitly does not want to expand CDNA 3, MI300X, CDNA 4, or native host ROCm matrix validation right now. | Active in v1.19 |
 | Improve research credibility without new hardware | User chose denominator accounting, Matrix diff/schema export, dataset-runner hardening, and AMD SOL/SOLAR sanity over additional hardware validation. | Active in v1.19 |
+| Audit current evidence before expanding validation | User chose cross-report consistency and evaluation stability as the next milestone so future CDNA3/MI300X or paper-scale validation can rely on cleaner evidence. | Active in v1.20 |
 
 ## Evolution
 
@@ -556,4 +586,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-31 after v1.19 milestone start*
+*Last updated: 2026-05-31 after v1.20 milestone start*

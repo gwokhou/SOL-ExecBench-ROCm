@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.19
-milestone_name: Research Credibility Without New Hardware
-status: Awaiting next milestone
-stopped_at: Completed 88-02-PLAN.md
-last_updated: "2026-05-31T13:16:51.787Z"
-last_activity: 2026-05-31 — Milestone v1.19 completed and archived
+milestone: v1.20
+milestone_name: Cross-Report Consistency and Evaluation Stability
+status: planning
+last_updated: "2026-05-31T14:35:38.049Z"
+last_activity: 2026-05-31
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 13
-  completed_plans: 13
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -25,10 +24,10 @@ See: `.planning/PROJECT.md` (updated 2026-05-31)
 
 ## Current Position
 
-Phase: Milestone v1.19 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-05-31 — Milestone v1.19 completed and archived
+Status: Defining requirements
+Last activity: 2026-05-31 — Milestone v1.20 started
 
 ## Performance Metrics
 
