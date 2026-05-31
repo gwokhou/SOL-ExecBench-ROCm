@@ -50,7 +50,7 @@ Example command shape:
 UV_CACHE_DIR=out/v1_19_demo/uv-cache uv run scripts/run_dataset.py \
   data/SOL-ExecBench/benchmark \
   --limit 5 \
-  --output-dir out/v1_19_demo/run-dataset \
+  --output out/v1_19_demo/run-dataset \
   --execution-closure out/v1_19_demo/execution_closure.json
 ```
 
@@ -120,6 +120,7 @@ Example command shape:
 
 ```bash
 UV_CACHE_DIR=out/v1_19_demo/uv-cache uv run scripts/export_matrix_schema.py \
+  --model all \
   --output-dir out/v1_19_demo/matrix-schema
 ```
 
