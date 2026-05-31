@@ -175,7 +175,10 @@ Plans:
   3. CPU-safe tests cover denominator accounting, closure serialization/provenance, Matrix schema export, Matrix diff semantics, dataset-runner closure classification, AMD bound sanity reports, and docs wording guardrails.
   4. Public examples or fixture reports show representative JSON/Markdown artifact shapes with bounded logs, relative refs, checksums, and explicit authority-false or diagnostic-only interpretation.
   5. Existing public contracts remain stable: canonical Trace, Definition, Workload, Solution, correctness, timing, score, and evaluator contract semantics are unchanged by v1.19 reporting features.
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 88-01-PLAN.md — Centralized v1.19 evidence guide, public docs links, CPU-safe docs wording guardrails, and claim-boundary preservation.
+- [ ] 88-02-PLAN.md — Demo-only fixture reports, example wording guardrails, bounded refs/checksums, and sidecar-only public contract checks.
 
 ## Progress
 
@@ -189,4 +192,4 @@ Phases execute in numeric order: 83 -> 84 -> 85 -> 86 -> 87 -> 88.
 | 85. Compatibility Matrix Schema Export And Semantic Diff | 2/2 | Complete   | 2026-05-31 |
 | 86. Dataset Runner Hardening Integration | 2/2 | Complete   | 2026-05-31 |
 | 87. AMD SOL/SOLAR Bound Sanity Evidence | 2/2 | Complete   | 2026-05-31 |
-| 88. Documentation, Examples, And Guardrail Tests | 0/TBD | Not started | - |
+| 88. Documentation, Examples, And Guardrail Tests | 0/2 | Not started | - |
