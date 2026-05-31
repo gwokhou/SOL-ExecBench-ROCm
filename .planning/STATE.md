@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.19
 milestone_name: ROCm Port
-status: verifying
+status: completed
 stopped_at: Completed 87-02-PLAN.md
-last_updated: "2026-05-31T11:22:25.837Z"
-last_activity: 2026-05-31
+last_updated: "2026-05-31T11:22:56.857Z"
+last_activity: 2026-05-31 -- Phase 87 marked complete
 progress:
   total_phases: 6
   completed_phases: 5
@@ -25,10 +25,10 @@ See: `.planning/PROJECT.md` (updated 2026-05-31)
 
 ## Current Position
 
-Phase: 86 — COMPLETE
+Phase: 87 — COMPLETE
 Plan: 2 of 2
-Status: Phase complete — ready for verification
-Last activity: 2026-05-31
+Status: Phase 87 complete
+Last activity: 2026-05-31 -- Phase 87 marked complete
 
 Progress: [██████████] 100%
 
@@ -112,6 +112,6 @@ None found.
 
 ## Session Continuity
 
-Last session: 2026-05-31T11:22:12.784Z
+Last session: 2026-05-31T11:22:56.852Z
 Stopped at: Completed 87-02-PLAN.md
 Resume file: None
