@@ -431,3 +431,62 @@ def test_execution_closure_preserves_skipped_existing_pass_without_provenance_en
     closure = json.loads((output_dir / "execution_closure.json").read_text())
     assert closure["records"][0]["closure_status"] == "skipped_existing_pass"
     assert closure["provenance_mismatches"] == []
+
+
+def test_execution_closure_provenance_uses_bounded_refs(tmp_path, monkeypatch):
+    dataset_root = tmp_path / "dataset"
+    _write_problem(dataset_root, "L1", "matmul_demo", [_workload("selected-workload")])
+    subset_path = _ready_subset(
+        tmp_path / "ready_subset.json",
+        problems=[
+            {
+                "category": "L1",
+                "problem_id": "L1/matmul_demo",
+                "problem_path": "L1/matmul_demo",
+                "workloads": [{"uuid": "selected-workload", "row_index": 0}],
+            }
+        ],
+    )
+    readiness_path = _readiness(tmp_path / "readiness.json")
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps({"manifest_checksum": {"value": "manifest-sha"}}))
+    output_dir = tmp_path / "out"
+    score_path = tmp_path / "score.json"
+
+    def run_cli(*, workload_path: Path, **kwargs):
+        uuid = json.loads(workload_path.read_text().splitlines()[0])["uuid"]
+        return [_trace(uuid)]
+
+    monkeypatch.setattr(run_dataset, "run_cli", run_cli)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--ready-subset",
+            str(subset_path),
+            "--readiness",
+            str(readiness_path),
+            "--dataset-manifest",
+            str(manifest_path),
+            "--output",
+            str(output_dir),
+            "--amd-score-report",
+            str(score_path),
+        ],
+    )
+
+    run_dataset.main()
+
+    closure_text = (output_dir / "execution_closure.json").read_text()
+    closure = json.loads(closure_text)
+    assert str(tmp_path) not in closure_text
+    assert closure["provenance"]["dataset_root"] == "dataset"
+    assert closure["provenance"]["output_dir"] == "out"
+    assert closure["provenance"]["summary_path"] == "summary.json"
+    assert closure["provenance"]["ready_subset_path"] == "ready_subset.json"
+    assert closure["provenance"]["readiness_path"] == "readiness.json"
+    assert closure["provenance"]["dataset_manifest_path"] == "manifest.json"
+    assert closure["provenance"]["derived_evidence"]["amd_score_report"] == "score.json"
+    assert all(str(tmp_path) not in arg for arg in closure["provenance"]["command_args"])

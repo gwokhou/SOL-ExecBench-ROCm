@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+from pydantic import ValidationError
+
 from sol_execbench.core.dataset.execution_closure import (
     EXECUTION_CLOSURE_SCHEMA_VERSION,
     ExecutionClosureProvenance,
@@ -224,3 +227,29 @@ def test_report_checksum_ignores_checksum_field_and_changes_with_content(tmp_pat
     path = tmp_path / "execution_closure.json"
     write_execution_closure_report(report, path)
     assert json.loads(path.read_text())["execution_closure_checksum"] == report.execution_closure_checksum.model_dump(mode="json")
+
+
+def test_execution_closure_models_reject_unknown_fields():
+    with pytest.raises(ValidationError):
+        ExecutionClosureRecord(
+            category="L1",
+            problem_id="L1/p1",
+            problem_path="L1/p1",
+            row_index=0,
+            closure_status=ExecutionClosureStatus.ATTEMPTED_PASSED,
+            unexpected="value",
+        )
+
+    with pytest.raises(ValidationError):
+        ExecutionClosureProvenance(dataset_root="dataset", raw_payload={"too": "large"})
+
+    report = build_execution_closure_report(
+        records=[_record("L1/p1", 0, "w1", ExecutionClosureStatus.ATTEMPTED_PASSED)],
+        provenance=_provenance(),
+        filters={},
+        created_at="2026-05-31T00:00:00Z",
+    )
+    payload = report.model_dump(mode="json")
+    payload["extra_field"] = "not allowed"
+    with pytest.raises(ValidationError):
+        type(report)(**payload)
