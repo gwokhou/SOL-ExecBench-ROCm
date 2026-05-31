@@ -115,7 +115,10 @@
   2. Researcher can inspect stable denominator reason codes that separate ready, blocked, unsupported, deferred, evidence-missing, attempted-passed, attempted-failed, filtered, skipped, and not-attempted states.
   3. Report consumers can trace denominator conclusions back to source manifest, inventory, readiness, ready-subset, closure, AMD score, AMD SOL, and SOLAR artifacts by path/ref and checksum.
   4. Researcher can read deterministic Markdown counts, evidence gaps, deferred buckets, and next-evidence hints with paper parity, upstream SOLAR parity, leaderboard authority, native-host validation, and new-hardware validation explicitly kept false.
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 84-01-PLAN.md — Core paper denominator sidecar contract, deterministic JSON, Markdown renderer, bounded source refs, and false claim boundaries.
+- [ ] 84-02-PLAN.md — Thin reporting script, dataset exports, script output tests, and public contract guardrails.
 
 ### Phase 85: Compatibility Matrix Schema Export And Semantic Diff
 **Goal**: Researchers and downstream evidence producers can export strict Matrix JSON Schemas and compare ROCm Compatibility Matrix reports by semantic changes while preserving Docker/native-host and authority boundaries.
