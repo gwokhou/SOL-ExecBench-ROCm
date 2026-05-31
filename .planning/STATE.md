@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.19
 milestone_name: ROCm Port
 status: completed
-stopped_at: Completed 87-02-PLAN.md
-last_updated: "2026-05-31T11:22:56.857Z"
-last_activity: 2026-05-31 -- Phase 87 marked complete
+stopped_at: Completed 88-02-PLAN.md
+last_updated: "2026-05-31T12:18:05.350Z"
+last_activity: 2026-05-31 -- Phase 88 marked complete
 progress:
   total_phases: 6
-  completed_phases: 5
-  total_plans: 11
-  completed_plans: 11
-  percent: 83
+  completed_phases: 6
+  total_plans: 13
+  completed_plans: 13
+  percent: 100
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-31)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Phase 86: Dataset Runner Hardening Integration
+**Current focus:** Phase 88: Documentation, Examples, And Guardrail Tests
 
 ## Current Position
 
-Phase: 87 — COMPLETE
+Phase: 88 — COMPLETE
 Plan: 2 of 2
-Status: Phase 87 complete
-Last activity: 2026-05-31 -- Phase 87 marked complete
+Status: Phase 88 complete
+Last activity: 2026-05-31 -- Phase 88 marked complete
 
 Progress: [██████████] 100%
 
@@ -66,6 +66,8 @@ Progress: [██████████] 100%
 | Phase 86 P02 | 185 | 3 tasks | 4 files |
 | Phase 87 P02 | 265 | 3 tasks | 3 files |
 | Phase 87 P01 | 1069 | 3 tasks | 2 files |
+| Phase 88 P01 | 960 | 3 tasks | 5 files |
+| Phase 88 P02 | 780 | 2 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -92,6 +94,8 @@ Progress: [██████████] 100%
 - [Phase 87]: [Phase 87 Plan 02]: The report script loads only explicitly supplied JSON paths and delegates normalization, checksum, status, and rendering behavior to core helpers.
 - [Phase 87]: [Phase 87 Plan 01]: amd_bound_sanity.v1 remains a scoring sidecar/reporting artifact and does not modify score eligibility or canonical schemas.
 - [Phase 87]: [Phase 87 Plan 01]: Claim boundaries are literal false fields plus visible Markdown wording; provisional RDNA 4 risk is a risk flag, not validation.
+- [Phase 88]: [Phase 88]: v1.19 evidence guidance is centralized in docs/v1_19_evidence_guide.md and linked from CLAIMS, TESTING, and RESEARCHER-GUIDE.
+- [Phase 88]: [Phase 88]: v1.19 fixtures remain demo-only with synthetic checksums, relative refs, bounded log refs, diagnostic-only wording, and false authority fields.
 
 ### Pending Todos
 
@@ -112,6 +116,6 @@ None found.
 
 ## Session Continuity
 
-Last session: 2026-05-31T11:22:56.852Z
-Stopped at: Completed 87-02-PLAN.md
+Last session: 2026-05-31T12:17:09.178Z
+Stopped at: Completed 88-02-PLAN.md
 Resume file: None
