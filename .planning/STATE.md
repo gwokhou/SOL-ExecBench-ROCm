@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.19
 milestone_name: ROCm Port
-status: verifying
-stopped_at: Completed 85-01-PLAN.md
-last_updated: "2026-05-31T09:15:00.896Z"
-last_activity: 2026-05-31
+status: completed
+stopped_at: Completed 85-02-PLAN.md
+last_updated: "2026-05-31T09:23:00.344Z"
+last_activity: 2026-05-31 -- Phase 85 marked complete
 progress:
   total_phases: 6
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 6
-  completed_plans: 5
-  percent: 33
+  completed_plans: 6
+  percent: 50
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: `.planning/PROJECT.md` (updated 2026-05-31)
 
 ## Current Position
 
-Phase: 84 — COMPLETE
+Phase: 85 — COMPLETE
 Plan: 2 of 2
-Status: Phase complete — ready for verification
-Last activity: 2026-05-31
+Status: Phase 85 complete
+Last activity: 2026-05-31 -- Phase 85 marked complete
 
-Progress: [████████░░] 83%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -61,6 +61,7 @@ Progress: [████████░░] 83%
 | Phase 84 P01 | 352 | 3 tasks | 2 files |
 | Phase 84 P02 | 263 | 3 tasks | 4 files |
 | Phase 85 P01 | 215 | 3 tasks | 3 files |
+| Phase 85 P02 | 491 | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -79,6 +80,8 @@ Progress: [████████░░] 83%
 - [Phase 84]: [Phase 84 Plan 02]: Paper denominator reports are exposed through a script and dataset helper exports, not primary sol-execbench CLI options.
 - [Phase 85]: [Phase 85 Plan 01]: Schema export remains script-side diagnostic tooling, not a primary sol-execbench CLI option.
 - [Phase 85]: [Phase 85 Plan 01]: Matrix schema exports are limited to MatrixEntry and RocmCompatibilityMatrixReport.
+- [Phase 85]: [Phase 85 Plan 02]: Diff JSON and Markdown remain diagnostic-only with score, paper-parity, leaderboard, and native-host validation authority false.
+- [Phase 85]: [Phase 85 Plan 02]: Matrix report diffs match entries by target_id plus validation_scope.
 
 ### Pending Todos
 
@@ -100,6 +103,6 @@ None found.
 
 ## Session Continuity
 
-Last session: 2026-05-31T09:15:00.672Z
-Stopped at: Completed 85-01-PLAN.md
+Last session: 2026-05-31T09:22:49.590Z
+Stopped at: Completed 85-02-PLAN.md
 Resume file: None
