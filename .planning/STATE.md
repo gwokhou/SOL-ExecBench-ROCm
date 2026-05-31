@@ -20,14 +20,14 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-31)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** v1.20 milestone audit/archive
+**Current focus:** v1.20 milestone archive
 
 ## Current Position
 
 Phase: —
 Plan: —
-Status: v1.20 phases complete
-Last activity: 2026-05-31 — Phase 93 completed evidence-quality docs, examples, docs tests, and aggregate guardrails
+Status: v1.20 phases complete and milestone audit passed
+Last activity: 2026-05-31 — Fixed DOC-WIRE-01 and updated v1.20 milestone audit to passed
 
 ## Performance Metrics
 
@@ -137,11 +137,12 @@ None.
 | 2026-05-31 | 260531-uki add remaining requires_rocm e2e coverage | Added HIP/C++ CLI, static evidence, and run_dataset reuse/rerun E2E regressions; `requires_rocm` now reports 19 passed. |
 | 2026-05-31 | 260531-rdf add run_dataset closure e2e gaps | Added filtered, missing-workload, readiness-blocked, and stale-provenance ROCm E2E regressions; `requires_rocm` now reports 21 passed. |
 | 2026-05-31 | 20260531-fix-v120-audit-gaps | Fixed v1.20 audit blockers; v1.20 aggregate CPU-safe suite reports 74 passed and audit status is passed. |
+| 2026-05-31 | 260531-x41 fix v1.20 audit doc wiring tech debt | Added AMD SOL/SOLAR refs to the consistency guide command, required them in docs tests, and moved the audit status to passed. |
 
 ## Session Continuity
 
-Last session: 2026-05-31T16:05:00.000Z
-Stopped at: Fixed v1.20 audit gaps
+Last session: 2026-05-31T15:51:00.000Z
+Stopped at: Fixed v1.20 audit doc wiring tech debt
 Resume file: None
 
 ## Operator Next Steps

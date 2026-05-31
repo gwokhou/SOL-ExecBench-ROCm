@@ -25,6 +25,8 @@ UV_CACHE_DIR=out/v1_20_demo/uv-cache uv run scripts/report_consistency.py \
   --paper-denominator out/v1_20_demo/paper_denominator.json \
   --matrix-report out/v1_20_demo/matrix.json \
   --amd-score-report out/v1_20_demo/amd_score.json \
+  --amd-sol-report out/v1_20_demo/amd_sol.json \
+  --solar-derivation out/v1_20_demo/solar_derivation.json \
   --amd-bound-sanity out/v1_20_demo/amd_bound_sanity.json \
   --json-out out/v1_20_demo/consistency.json \
   --markdown-out out/v1_20_demo/consistency.md
