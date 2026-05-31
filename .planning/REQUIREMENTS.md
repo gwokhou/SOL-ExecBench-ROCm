@@ -25,21 +25,21 @@ ExecBench.
 
 ### Paper Denominator Accounting
 
-- [ ] **DENOM-01**: The project emits a `paper_denominator_report.v1` JSON
+- [x] **DENOM-01**: The project emits a `paper_denominator_report.v1` JSON
   sidecar that rolls up the public benchmark denominator by problem, workload,
   category, readiness status, closure status, and evidence gap.
-- [ ] **DENOM-02**: Denominator accounting separates ready, blocked,
+- [x] **DENOM-02**: Denominator accounting separates ready, blocked,
   unsupported, deferred, evidence-missing, attempted-passed,
   attempted-failed, filtered, skipped, and not-attempted states with stable
   reason codes.
-- [ ] **DENOM-03**: Denominator reports reference source manifest, inventory,
+- [x] **DENOM-03**: Denominator reports reference source manifest, inventory,
   readiness, ready-subset, closure, AMD score, AMD SOL, and SOLAR artifacts by
   path/ref and checksum instead of duplicating full sidecar payloads.
-- [ ] **DENOM-04**: Denominator reports include explicit claim-boundary fields
+- [x] **DENOM-04**: Denominator reports include explicit claim-boundary fields
   or equivalent wording that keep paper parity, upstream SOLAR parity,
   leaderboard authority, native host validation, and new hardware validation
   false unless future evidence satisfies those claim-upgrade rules.
-- [ ] **DENOM-05**: The project emits a deterministic Markdown summary of the
+- [x] **DENOM-05**: The project emits a deterministic Markdown summary of the
   denominator report for researcher review, including counts, evidence gaps,
   deferred buckets, and next-evidence hints without claiming validation.
 
@@ -168,11 +168,11 @@ ExecBench.
 | CLOS-02 | Phase 83 | Complete |
 | CLOS-03 | Phase 83 | Complete |
 | CLOS-04 | Phase 83 | Complete |
-| DENOM-01 | Phase 84 | Pending |
-| DENOM-02 | Phase 84 | Pending |
-| DENOM-03 | Phase 84 | Pending |
-| DENOM-04 | Phase 84 | Pending |
-| DENOM-05 | Phase 84 | Pending |
+| DENOM-01 | Phase 84 | Complete |
+| DENOM-02 | Phase 84 | Complete |
+| DENOM-03 | Phase 84 | Complete |
+| DENOM-04 | Phase 84 | Complete |
+| DENOM-05 | Phase 84 | Complete |
 | MATRIX-01 | Phase 85 | Pending |
 | MATRIX-02 | Phase 85 | Pending |
 | MATRIX-03 | Phase 85 | Pending |
