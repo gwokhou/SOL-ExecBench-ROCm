@@ -71,6 +71,71 @@ def _read_jsonl(path: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
 
+def _write_linear_backward_dataset(tmp_path: Path, *, workload_count: int = 1) -> Path:
+    dataset_root = tmp_path / "dataset"
+    problem_dir = dataset_root / "L1" / "linear_backward"
+    problem_dir.mkdir(parents=True)
+    for name in ("definition.json", "solution_python.json"):
+        shutil.copyfile(LINEAR_BACKWARD_EXAMPLE / name, problem_dir / name)
+    workloads = (LINEAR_BACKWARD_EXAMPLE / "workload.jsonl").read_text().splitlines()
+    (problem_dir / "workload.jsonl").write_text(
+        "\n".join(workloads[:workload_count]) + "\n"
+    )
+    return dataset_root
+
+
+def _linear_backward_workload_refs(count: int) -> list[dict[str, object]]:
+    refs: list[dict[str, object]] = []
+    for row_index, line in enumerate(
+        (LINEAR_BACKWARD_EXAMPLE / "workload.jsonl").read_text().splitlines()[:count]
+    ):
+        refs.append({"uuid": json.loads(line)["uuid"], "row_index": row_index})
+    return refs
+
+
+def _write_ready_subset(path: Path, workloads: list[dict[str, object]]) -> Path:
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": "sol_execbench.ready_subset.v1",
+                "created_at": "2026-05-31T00:00:00Z",
+                "dataset_root": "dataset",
+                "readiness_checksum": "rocm-readiness-sha",
+                "selected_categories": ["L1"],
+                "included_workloads": len(workloads),
+                "excluded_workloads": 0,
+                "problems": [
+                    {
+                        "category": "L1",
+                        "problem_id": "L1/linear_backward",
+                        "problem_path": "L1/linear_backward",
+                        "workloads": workloads,
+                    }
+                ],
+                "claim_boundary": {"ready_to_attempt_rocm_execution": bool(workloads)},
+                "ready_subset_checksum": {"value": "rocm-ready-sha"},
+            }
+        )
+    )
+    return path
+
+
+def _write_readiness(path: Path, workloads: list[dict[str, object]]) -> Path:
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": "sol_execbench.rocm_readiness.v1",
+                "created_at": "2026-05-31T00:00:00Z",
+                "selected_categories": ["L1"],
+                "problems": [],
+                "workloads": workloads,
+                "readiness_checksum": {"value": "rocm-readiness-sha"},
+            }
+        )
+    )
+    return path
+
+
 def test_sol_execbench_cli_runs_linear_backward_on_rocm(tmp_path: Path):
     problem_dir = _linear_backward_problem(tmp_path)
     trace_path = tmp_path / "linear_backward.trace.jsonl"
@@ -312,3 +377,133 @@ def test_run_dataset_reuses_existing_pass_and_rerun_attempts_fresh(
     assert rerun_closure["records"][0]["closure_status"] == "attempted_passed"
     assert rerun_closure["records"][0]["trace_status"] == "PASSED"
     assert rerun_closure["provenance"]["rerun"] is True
+
+
+def test_run_dataset_records_filters_missing_workloads_and_readiness_blockers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    dataset_root = _write_linear_backward_dataset(tmp_path, workload_count=2)
+    workload_refs = _linear_backward_workload_refs(2)
+    missing_ref = {"uuid": "missing-linear-backward-workload", "row_index": 99}
+    ready_subset_path = _write_ready_subset(
+        tmp_path / "ready_subset.json",
+        [*workload_refs, missing_ref],
+    )
+    blocked_readiness = {
+        "category": "L1",
+        "problem_id": "L1/blocked_demo",
+        "problem_path": "L1/blocked_demo",
+        "workload_uuid": "blocked-workload",
+        "row_index": 0,
+        "status": "runtime_blocked",
+        "reasons": [
+            {
+                "code": "safetensors_asset_missing",
+                "message": "missing",
+                "next_action": "acquire asset",
+            }
+        ],
+    }
+    readiness_path = _write_readiness(
+        tmp_path / "readiness.json",
+        [
+            {
+                "category": "L1",
+                "problem_id": "L1/linear_backward",
+                "problem_path": "L1/linear_backward",
+                "workload_uuid": workload_refs[0]["uuid"],
+                "row_index": 0,
+                "status": "ready",
+                "reasons": [
+                    {
+                        "code": "ready_to_attempt_rocm_execution",
+                        "message": "ready",
+                        "next_action": "run",
+                    }
+                ],
+            },
+            blocked_readiness,
+        ],
+    )
+    output_dir = tmp_path / "run-dataset"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--ready-subset",
+            str(ready_subset_path),
+            "--readiness",
+            str(readiness_path),
+            "--solution-name",
+            "solution_python.json",
+            "--max-workloads",
+            "1",
+            "--output",
+            str(output_dir),
+        ],
+    )
+
+    run_dataset.main()
+
+    closure = json.loads((output_dir / "execution_closure.json").read_text())
+    assert closure["status"] == "completed"
+    assert closure["totals"]["attempted_passed"] == 1
+    assert closure["totals"]["filtered"] == 2
+    assert closure["totals"]["not_attempted"] == 1
+    records = {
+        (record["workload_uuid"], record["closure_status"]): record
+        for record in closure["records"]
+    }
+    assert (workload_refs[0]["uuid"], "attempted_passed") in records
+    assert records[(workload_refs[1]["uuid"], "filtered")]["filter_reasons"] == [
+        "max_workloads_cap"
+    ]
+    assert records[("missing-linear-backward-workload", "filtered")][
+        "filter_reasons"
+    ] == ["workload_not_found"]
+    blocked = records[("blocked-workload", "not_attempted")]
+    assert blocked["readiness_status"] == "runtime_blocked"
+    assert blocked["readiness_reason_codes"] == ["safetensors_asset_missing"]
+
+
+def test_run_dataset_stale_closure_provenance_forces_fresh_rocm_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    dataset_root = _write_linear_backward_dataset(tmp_path)
+    ready_subset_path = _write_ready_subset(
+        tmp_path / "ready_subset.json",
+        _linear_backward_workload_refs(1),
+    )
+    output_dir = tmp_path / "run-dataset"
+    closure_path = tmp_path / "execution_closure.json"
+    base_argv = [
+        "run_dataset.py",
+        str(dataset_root),
+        "--ready-subset",
+        str(ready_subset_path),
+        "--solution-name",
+        "solution_python.json",
+        "--output",
+        str(output_dir),
+        "--execution-closure",
+        str(closure_path),
+    ]
+
+    monkeypatch.setattr(sys, "argv", base_argv)
+    run_dataset.main()
+    trace_path = output_dir / "L1" / "linear_backward" / "traces.json"
+    first_trace_mtime = trace_path.stat().st_mtime_ns
+    closure_path.write_text(json.dumps({"schema_version": "stale-without-provenance"}))
+
+    monkeypatch.setattr(sys, "argv", base_argv)
+    run_dataset.main()
+
+    closure = json.loads(closure_path.read_text())
+    assert trace_path.stat().st_mtime_ns > first_trace_mtime
+    assert closure["totals"]["attempted_passed"] == 1
+    assert closure["records"][0]["closure_status"] == "attempted_passed"
+    assert closure["provenance_mismatches"][0]["reason_code"] == "stale_provenance"
+    assert closure["provenance_mismatches"][0]["field"] == "execution_closure"
