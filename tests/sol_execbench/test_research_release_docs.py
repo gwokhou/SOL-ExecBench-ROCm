@@ -291,6 +291,10 @@ def test_v1_19_guide_uses_relative_demo_paths_and_real_script_options():
     for forbidden in ("/home/", "/tmp/", "/var/"):
         assert forbidden not in text
     assert "UV_CACHE_DIR=out/v1_19_demo/uv-cache" in text
+    assert "--output out/v1_19_demo/run-dataset" in text
+    assert "--output-dir out/v1_19_demo/run-dataset" not in text
+    assert "--model all" in text
+    assert "--output-dir out/v1_19_demo/matrix-schema" in text
     assert "--json-out out/v1_19_demo/matrix_diff.json" in text
     assert "--markdown-out out/v1_19_demo/matrix_diff.md" in text
     assert "--compatibility-matrix out/v1_19_demo/matrix.json" in text
