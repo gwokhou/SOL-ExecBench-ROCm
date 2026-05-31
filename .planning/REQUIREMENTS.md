@@ -18,11 +18,11 @@ ExecBench.
 
 ### Evaluation Stability
 
-- [ ] **STAB-01**: Project defines a strict `evaluation_stability.v1` sidecar model recording timing backend, warmup count, measured repeat count, runtime distribution, selected summary statistic, clock policy, synchronization policy, and source trace refs.
-- [ ] **STAB-02**: Stability classification distinguishes stable, noisy, insufficient-samples, missing-timing, clock-unlocked, profiler-overhead-risk, and backend-unsupported states with stable reason codes.
-- [ ] **STAB-03**: Stability reports compute deterministic variance/dispersion summaries from existing timing evidence without changing canonical trace JSONL, correctness, timing, score, or evaluator semantics.
-- [ ] **STAB-04**: ROCm E2E coverage demonstrates a real benchmark path can emit or validate stability evidence for representative HIP/C++ or PyTorch ROCm workloads.
-- [ ] **STAB-05**: Stability documentation explains that timing quality supports interpretation only and does not itself create correctness, score, paper-parity, native-host, or leaderboard authority.
+- [x] **STAB-01**: Project defines a strict `evaluation_stability.v1` sidecar model recording timing backend, warmup count, measured repeat count, runtime distribution, selected summary statistic, clock policy, synchronization policy, and source trace refs.
+- [x] **STAB-02**: Stability classification distinguishes stable, noisy, insufficient-samples, missing-timing, clock-unlocked, profiler-overhead-risk, and backend-unsupported states with stable reason codes.
+- [x] **STAB-03**: Stability reports compute deterministic variance/dispersion summaries from existing timing evidence without changing canonical trace JSONL, correctness, timing, score, or evaluator semantics.
+- [x] **STAB-04**: ROCm E2E coverage demonstrates a real benchmark path can emit or validate stability evidence for representative HIP/C++ or PyTorch ROCm workloads.
+- [x] **STAB-05**: Stability documentation explains that timing quality supports interpretation only and does not itself create correctness, score, paper-parity, native-host, or leaderboard authority.
 
 ### Claim Upgrade Rules
 
@@ -86,11 +86,11 @@ ExecBench.
 | CONS-03 | Phase 89 | Complete |
 | CONS-04 | Phase 89 | Complete |
 | CONS-05 | Phase 89 | Complete |
-| STAB-01 | Phase 90 | Pending |
-| STAB-02 | Phase 90 | Pending |
-| STAB-03 | Phase 90 | Pending |
-| STAB-04 | Phase 90 | Pending |
-| STAB-05 | Phase 90 | Pending |
+| STAB-01 | Phase 90 | Complete |
+| STAB-02 | Phase 90 | Complete |
+| STAB-03 | Phase 90 | Complete |
+| STAB-04 | Phase 90 | Complete |
+| STAB-05 | Phase 90 | Complete |
 | CLAIM-01 | Phase 91 | Pending |
 | CLAIM-02 | Phase 91 | Pending |
 | CLAIM-03 | Phase 91 | Pending |
@@ -106,10 +106,10 @@ ExecBench.
 | DOCS-05 | Phase 93 | Pending |
 
 **Coverage:**
-- v1 requirements: 23 total, 5 complete
+- v1 requirements: 23 total, 10 complete
 - Mapped to phases: 23
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-05-31*
-*Last updated: 2026-05-31 after Phase 89 completion*
+*Last updated: 2026-05-31 after Phase 90 completion*
