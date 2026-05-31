@@ -15,7 +15,6 @@ from pydantic import ConfigDict, ValidationError
 from sol_execbench.core.compatibility import (
     MatrixCompatibilityStatus,
     MatrixEntry,
-    MatrixValidationScope,
     RocmCompatibilityMatrixReport,
 )
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
