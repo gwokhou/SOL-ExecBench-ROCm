@@ -52,6 +52,15 @@ from sol_execbench.core.bench.rocm_profiler import (
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.trace import Trace
 from sol_execbench.core.data.workload import Workload
+from sol_execbench.core.dataset.execution_closure import (
+    EXECUTION_CLOSURE_SCHEMA_VERSION,
+    ExecutionClosureRecord,
+    ExecutionClosureStatus,
+    build_execution_closure_report,
+    closure_status_for_trace_status,
+    closure_status_with_evidence,
+    write_execution_closure_report,
+)
 from sol_execbench.core.scoring.amd_score import (
     AmdNativeScore,
     build_amd_native_suite_report,
@@ -75,16 +84,7 @@ ROOT = Path(__file__).resolve().parent.parent
 CATEGORIES = {"L1", "L2", "FlashInfer-Bench", "Quant"}
 
 _SAFE_SIDECAR_COMPONENT = re.compile(r"[^A-Za-z0-9_.-]+")
-EXECUTION_CLOSURE_SCHEMA_VERSION = "sol_execbench.execution_closure.v1"
-EXECUTION_CLOSURE_STATUSES = {
-    "not_attempted",
-    "filtered",
-    "skipped_existing_pass",
-    "attempted_passed",
-    "attempted_failed",
-    "missing_trace",
-    "derived_evidence_missing",
-}
+EXECUTION_CLOSURE_STATUSES = {status.value for status in ExecutionClosureStatus}
 
 
 # ---------------------------------------------------------------------------
@@ -738,30 +738,28 @@ def _closure_record(
     trace_status: str | None = None,
     notes: list[str] | None = None,
 ) -> dict:
-    if closure_status not in EXECUTION_CLOSURE_STATUSES:
-        raise ValueError(f"unknown execution closure status: {closure_status}")
     reasons = readiness.get("reasons", []) if readiness else []
-    return {
-        "category": category,
-        "problem_id": problem_id,
-        "problem_path": problem_path,
-        "workload_uuid": workload_uuid,
-        "row_index": row_index,
-        "readiness_status": readiness.get("status") if readiness else None,
-        "readiness_reason_codes": [
+    return ExecutionClosureRecord(
+        category=category,
+        problem_id=problem_id,
+        problem_path=problem_path,
+        workload_uuid=workload_uuid,
+        row_index=row_index,
+        readiness_status=readiness.get("status") if readiness else None,
+        readiness_reason_codes=[
             reason.get("code") for reason in reasons if isinstance(reason, dict)
         ],
-        "closure_status": closure_status,
-        "filter_reasons": sorted(filter_reasons or []),
-        "trace_status": trace_status,
-        "trace_ref": trace_ref,
-        "summary_ref": summary_ref,
-        "cli_log_ref": cli_log_ref,
-        "solution_ref": solution_ref,
-        "evidence_refs": dict(sorted((evidence_refs or {}).items())),
-        "evidence_gaps": sorted(evidence_gaps or []),
-        "notes": notes or [],
-    }
+        closure_status=ExecutionClosureStatus(closure_status),
+        filter_reasons=filter_reasons or [],
+        trace_status=trace_status,
+        trace_ref=trace_ref,
+        summary_ref=summary_ref,
+        cli_log_ref=cli_log_ref,
+        solution_ref=solution_ref,
+        evidence_refs=evidence_refs or {},
+        evidence_gaps=evidence_gaps or [],
+        notes=notes or [],
+    ).model_dump(mode="json")
 
 
 def _selected_workload_rows(
@@ -823,12 +821,7 @@ def _trace_status(trace: dict | None) -> str | None:
 
 
 def _closure_status_for_trace(trace: dict | None, *, skipped: bool = False) -> str:
-    status = _trace_status(trace)
-    if status is None:
-        return "missing_trace"
-    if skipped and status == "PASSED":
-        return "skipped_existing_pass"
-    return "attempted_passed" if status == "PASSED" else "attempted_failed"
+    return closure_status_for_trace_status(_trace_status(trace), skipped=skipped).value
 
 
 def _derived_evidence_for_workload(
@@ -875,43 +868,17 @@ def _closure_status_with_evidence(
     status: str,
     evidence_gaps: list[str],
 ) -> str:
-    if evidence_gaps and status in {
-        "attempted_passed",
-        "attempted_failed",
-        "skipped_existing_pass",
-    }:
-        return "derived_evidence_missing"
-    return status
+    return closure_status_with_evidence(ExecutionClosureStatus(status), evidence_gaps).value
 
 
 def _closure_totals(records: list[dict]) -> dict[str, int]:
-    totals = {
-        "records": len(records),
-        "attempted": 0,
-        "passed": 0,
-        "failed": 0,
-        "filtered": 0,
-        "not_attempted": 0,
-        "derived_evidence_missing": 0,
-    }
-    for record in records:
-        status = record["closure_status"]
-        totals[status] = totals.get(status, 0) + 1
-        if status in {"attempted_passed", "attempted_failed", "missing_trace", "derived_evidence_missing"}:
-            totals["attempted"] += 1
-        if status == "attempted_passed" or record.get("trace_status") == "PASSED":
-            totals["passed"] += 1
-        if status in {"attempted_failed", "missing_trace"} or (
-            record.get("trace_status") not in {None, "PASSED"}
-        ):
-            totals["failed"] += 1
-        if status == "filtered":
-            totals["filtered"] += 1
-        if status == "not_attempted":
-            totals["not_attempted"] += 1
-        if status == "derived_evidence_missing":
-            totals["derived_evidence_missing"] += 1
-    return dict(sorted(totals.items()))
+    report = build_execution_closure_report(
+        records=records,
+        provenance={},
+        filters={},
+        created_at="1970-01-01T00:00:00Z",
+    )
+    return report.totals.model_dump(mode="json")
 
 
 def _write_execution_closure(
@@ -921,38 +888,19 @@ def _write_execution_closure(
     provenance: dict,
     filters: dict,
 ) -> None:
-    totals = _closure_totals(records)
-    if totals["attempted"] == 0:
-        status = "no_ready_workloads"
-    elif totals["failed"] or totals["derived_evidence_missing"]:
-        status = "completed_with_failures"
-    else:
-        status = "completed"
-    payload = {
-        "schema_version": EXECUTION_CLOSURE_SCHEMA_VERSION,
-        "created_at": _utc_timestamp(),
-        "status": status,
-        "provenance": provenance,
-        "totals": totals,
-        "filters": filters,
-        "records": sorted(
-            records,
-            key=lambda record: (
-                record["problem_id"],
-                record["row_index"],
-                record.get("workload_uuid") or "",
-                record["closure_status"],
-            ),
-        ),
-        "claim_boundary": {
+    report = build_execution_closure_report(
+        records=records,
+        provenance=provenance,
+        filters=filters,
+        created_at=_utc_timestamp(),
+        claim_boundary={
             "bounded_ready_subset_execution": True,
             "full_235_problem_validation": False,
             "paper_parity": False,
             "leaderboard_result": False,
         },
-    }
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    )
+    write_execution_closure_report(report, path)
 
 
 # ---------------------------------------------------------------------------

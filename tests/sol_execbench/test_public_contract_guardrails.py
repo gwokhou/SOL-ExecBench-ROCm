@@ -569,15 +569,28 @@ def test_v1_11_execution_closure_fields_remain_sidecar_only():
     forbidden = (
         "sol_execbench.execution_closure.v1",
         "execution_closure",
+        "execution_closure_checksum",
+        "provenance_mismatches",
         "closure_status",
+        "trace_ref",
+        "source_refs",
         "skipped_existing_pass",
         "attempted_passed",
         "attempted_failed",
+        "setup_blocked",
+        "runtime_blocked",
         "missing_trace",
         "derived_evidence_missing",
+        "manifest_checksum_mismatch",
+        "readiness_checksum_mismatch",
+        "ready_subset_checksum_mismatch",
+        "workload_identity_mismatch",
+        "solution_mode_mismatch",
+        "evidence_requirement_mismatch",
         "bounded_ready_subset_execution",
         "full_235_problem_validation",
         "leaderboard_result",
+        "score_authority",
     )
 
     for payload in (
