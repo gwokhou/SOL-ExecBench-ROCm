@@ -47,6 +47,17 @@ def test_v1_20_guide_names_scripts_and_boundaries():
         assert expected in text
 
 
+def test_v1_20_consistency_example_includes_amd_sol_and_solar_refs():
+    text = GUIDE.read_text(encoding="utf-8")
+    consistency_block = text.split("scripts/report_consistency.py", maxsplit=1)[1].split(
+        "UV_CACHE_DIR=out/v1_20_demo/uv-cache uv run scripts/report_evaluation_stability.py",
+        maxsplit=1,
+    )[0]
+
+    assert "--amd-sol-report out/v1_20_demo/amd_sol.json" in consistency_block
+    assert "--solar-derivation out/v1_20_demo/solar_derivation.json" in consistency_block
+
+
 def test_v1_20_example_readme_references_existing_fixture_files():
     readme = (EXAMPLES_DIR / "README.md").read_text(encoding="utf-8")
     assert "../../v1_20_evidence_quality_guide.md" in readme
