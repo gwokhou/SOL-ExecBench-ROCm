@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.19
 milestone_name: ROCm Port
-status: completed
-stopped_at: Completed 85-02-PLAN.md
-last_updated: "2026-05-31T09:23:00.344Z"
-last_activity: 2026-05-31 -- Phase 85 marked complete
+status: verifying
+stopped_at: Completed 86-02-PLAN.md
+last_updated: "2026-05-31T10:20:46.895Z"
+last_activity: 2026-05-31
 progress:
   total_phases: 6
-  completed_phases: 3
-  total_plans: 6
-  completed_plans: 6
-  percent: 50
+  completed_phases: 4
+  total_plans: 9
+  completed_plans: 9
+  percent: 67
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-31)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Phase 83: Closure Contracts And Provenance Foundation
+**Current focus:** Phase 86: Dataset Runner Hardening Integration
 
 ## Current Position
 
-Phase: 85 — COMPLETE
+Phase: 86 — COMPLETE
 Plan: 2 of 2
-Status: Phase 85 complete
-Last activity: 2026-05-31 -- Phase 85 marked complete
+Status: Phase complete — ready for verification
+Last activity: 2026-05-31
 
 Progress: [██████████] 100%
 
@@ -62,6 +62,8 @@ Progress: [██████████] 100%
 | Phase 84 P02 | 263 | 3 tasks | 4 files |
 | Phase 85 P01 | 215 | 3 tasks | 3 files |
 | Phase 85 P02 | 491 | 3 tasks | 4 files |
+| Phase 86 P01 | 358 | 3 tasks | 4 files |
+| Phase 86 P02 | 185 | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -82,6 +84,8 @@ Progress: [██████████] 100%
 - [Phase 85]: [Phase 85 Plan 01]: Matrix schema exports are limited to MatrixEntry and RocmCompatibilityMatrixReport.
 - [Phase 85]: [Phase 85 Plan 02]: Diff JSON and Markdown remain diagnostic-only with score, paper-parity, leaderboard, and native-host validation authority false.
 - [Phase 85]: [Phase 85 Plan 02]: Matrix report diffs match entries by target_id plus validation_scope.
+- [Phase 86]: Raw CLI stdout/stderr remains in per-problem log files while execution_closure.json stores relative cli_log_ref plus concise notes. — Keeps closure sidecars bounded and avoids embedding raw logs or absolute temp paths.
+- [Phase 86]: Existing passing traces authorize skipped_existing_pass only when output/execution_closure.json contains matching provenance. — Prevents stale or tampered sidecars from authorizing clean reuse.
 
 ### Pending Todos
 
@@ -89,7 +93,6 @@ None found.
 
 ### Blockers/Concerns
 
-- Dataset runner hardening needs careful planning around current resume/reuse behavior to avoid default execution regressions.
 - AMD SOL/SOLAR sanity wording must avoid implying upstream SOLAR equivalence or hardware model validation.
 
 ## Deferred Items
@@ -103,6 +106,6 @@ None found.
 
 ## Session Continuity
 
-Last session: 2026-05-31T09:22:49.590Z
-Stopped at: Completed 85-02-PLAN.md
+Last session: 2026-05-31T10:20:36.006Z
+Stopped at: Completed 86-02-PLAN.md
 Resume file: None

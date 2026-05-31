@@ -89,7 +89,7 @@
 - [x] **Phase 83: Closure Contracts And Provenance Foundation** - Researchers get deterministic, CPU-safe execution-closure contracts and provenance checks for reusable evidence. (completed 2026-05-31)
 - [x] **Phase 84: Paper Denominator Accounting And Claim Boundaries** - Researchers can account for the public benchmark denominator and evidence gaps without claiming paper parity. (completed 2026-05-31)
 - [x] **Phase 85: Compatibility Matrix Schema Export And Semantic Diff** - Researchers and downstream tools can export Matrix schemas and compare Matrix reports semantically. (completed 2026-05-31)
-- [ ] **Phase 86: Dataset Runner Hardening Integration** - Dataset runs classify closure outcomes and resume behavior consistently without changing default benchmark semantics.
+- [x] **Phase 86: Dataset Runner Hardening Integration** - Dataset runs classify closure outcomes and resume behavior consistently without changing default benchmark semantics. (completed 2026-05-31)
 - [ ] **Phase 87: AMD SOL/SOLAR Bound Sanity Evidence** - Researchers can inspect diagnostic AMD bound sanity over existing RDNA 4 and Docker evidence only.
 - [ ] **Phase 88: Documentation, Examples, And Guardrail Tests** - Public docs, examples, and CPU-safe tests keep v1.19 evidence surfaces interpretable and claim-safe.
 
@@ -147,8 +147,8 @@ Plans:
   5. Closure writes are deterministic and avoid credentials, proprietary kernels, raw dataset payloads, unnecessary absolute paths, and unbounded logs.
 **Plans**: 2 plans
 Plans:
-- [ ] 86-01-PLAN.md — Provenance-gated existing-pass reuse, stale provenance diagnostics, and `--rerun` fresh-attempt behavior.
-- [ ] 86-02-PLAN.md — Failure, missing-trace, missing-evidence, skipped, and unattempted closure classification with bounded refs/logs.
+- [x] 86-01-PLAN.md — Provenance-gated existing-pass reuse, stale provenance diagnostics, and `--rerun` fresh-attempt behavior.
+- [x] 86-02-PLAN.md — Failure, missing-trace, missing-evidence, skipped, and unattempted closure classification with bounded refs/logs.
 
 ### Phase 87: AMD SOL/SOLAR Bound Sanity Evidence
 **Goal**: Researchers can generate diagnostic AMD SOL/SOLAR bound sanity reports over existing RDNA 4 and Docker evidence while keeping score eligibility and hardware-validation claims unchanged.
@@ -184,6 +184,6 @@ Phases execute in numeric order: 83 -> 84 -> 85 -> 86 -> 87 -> 88.
 | 83. Closure Contracts And Provenance Foundation | 2/2 | Complete   | 2026-05-31 |
 | 84. Paper Denominator Accounting And Claim Boundaries | 2/2 | Complete   | 2026-05-31 |
 | 85. Compatibility Matrix Schema Export And Semantic Diff | 2/2 | Complete   | 2026-05-31 |
-| 86. Dataset Runner Hardening Integration | 0/TBD | Not started | - |
+| 86. Dataset Runner Hardening Integration | 2/2 | Complete   | 2026-05-31 |
 | 87. AMD SOL/SOLAR Bound Sanity Evidence | 0/TBD | Not started | - |
 | 88. Documentation, Examples, And Guardrail Tests | 0/TBD | Not started | - |
