@@ -170,3 +170,21 @@ def test_v1_19_example_authority_flags_remain_false_or_diagnostic_only():
             if f'"{authority}"' in text:
                 assert f'"{authority}": false' in text
         assert "diagnostic" in text
+
+
+def test_amd_bound_sanity_example_uses_only_actual_script_inputs():
+    demo_markdown = _read_text(EXAMPLES_DIR / "amd_bound_sanity.demo.md")
+    demo_payload = _load_json("amd_bound_sanity.demo.json")
+    source_text = json.dumps(demo_payload["sources"], sort_keys=True)
+
+    for text in (demo_markdown, source_text):
+        assert "paper_denominator" not in text
+        assert "paper_denominator.json" not in text
+
+    for expected_ref in (
+        "trace",
+        "execution_closure",
+        "amd_score",
+        "compatibility_matrix",
+    ):
+        assert expected_ref in demo_markdown
