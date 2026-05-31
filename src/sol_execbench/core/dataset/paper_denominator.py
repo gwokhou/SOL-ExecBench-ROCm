@@ -36,6 +36,13 @@ EVIDENCE_KEYS = (
     "solar_derivation",
 )
 
+REQUIRED_RECORD_EVIDENCE_REFS = {
+    "timing_evidence": "timing_evidence_missing",
+    "amd_score": "amd_score_evidence_missing",
+    "amd_sol_bound": "amd_sol_evidence_missing",
+    "solar_derivation": "solar_derivation_missing",
+}
+
 CLAIM_BOUNDARY_TEXT = (
     "This report is denominator accounting and evidence-gap review only: "
     "not paper validation, not paper parity, not upstream SOLAR parity, "
@@ -319,6 +326,38 @@ def _next_evidence(reason_code: str) -> str:
     return f"Attach bounded {evidence} evidence refs/checksums before upgrading claims."
 
 
+def _add_missing_evidence(
+    *,
+    reason_groups: dict[str, dict[str, Any]],
+    evidence_groups: dict[tuple[str, str], dict[str, Any]],
+    reason_code: str,
+    example_ref: str,
+    next_evidence: str | None = None,
+) -> None:
+    _add_reason(
+        reason_groups,
+        reason_code=reason_code,
+        state="evidence_missing",
+        example_ref=example_ref,
+        next_evidence=next_evidence,
+    )
+    _add_evidence_gap(
+        evidence_groups,
+        reason_code=reason_code,
+        example_ref=example_ref,
+    )
+
+
+def _md_cell(value: object) -> str:
+    text = "" if value is None else str(value)
+    return (
+        text.replace("\\", "\\\\")
+        .replace("|", "\\|")
+        .replace("\n", " ")
+        .replace("\r", " ")
+    )
+
+
 def _add_reason(
     groups: dict[str, dict[str, Any]],
     *,
@@ -451,6 +490,8 @@ def build_paper_denominator_report(
     created_at: str | None = None,
 ) -> PaperDenominatorReport:
     source_paths = source_paths or {}
+    amd_sol_artifacts = amd_sol_artifacts or []
+    solar_artifacts = solar_artifacts or []
     categories: dict[str, PaperDenominatorRollup] = {}
     problems: dict[tuple[str, str], PaperDenominatorProblem] = {}
     workloads: dict[tuple[str, int | None, str | None], PaperDenominatorWorkload] = {}
@@ -545,10 +586,28 @@ def build_paper_denominator_report(
             _add_reason(reason_groups, reason_code=str(reason), state=state or status, example_ref=example_ref)
         for gap in record.get("evidence_gaps", []):
             gap_code = str(gap)
-            workload.evidence_gaps.append(gap_code)
-            _add_reason(reason_groups, reason_code=gap_code, state="evidence_missing", example_ref=example_ref)
-            _add_evidence_gap(evidence_groups, reason_code=gap_code, example_ref=example_ref)
-        if record.get("evidence_gaps"):
+            if gap_code not in workload.evidence_gaps:
+                workload.evidence_gaps.append(gap_code)
+            _add_missing_evidence(
+                reason_groups=reason_groups,
+                evidence_groups=evidence_groups,
+                reason_code=gap_code,
+                example_ref=example_ref,
+            )
+        evidence_refs = record.get("evidence_refs") or {}
+        if status not in {"filtered", "not_attempted"}:
+            for ref_key, reason_code in REQUIRED_RECORD_EVIDENCE_REFS.items():
+                if evidence_refs.get(ref_key):
+                    continue
+                if reason_code not in workload.evidence_gaps:
+                    workload.evidence_gaps.append(reason_code)
+                    _add_missing_evidence(
+                        reason_groups=reason_groups,
+                        evidence_groups=evidence_groups,
+                        reason_code=reason_code,
+                        example_ref=example_ref,
+                    )
+        if workload.evidence_gaps:
             for rollup in (
                 _category_rollup(categories, category),
                 _problem_rollup(
@@ -566,8 +625,54 @@ def build_paper_denominator_report(
         if score.get("supported") is not True:
             reason_code = "amd_score_evidence_missing"
             ref = str(uuid or score.get("definition") or "unknown")
-            _add_reason(reason_groups, reason_code=reason_code, state="evidence_missing", example_ref=ref)
-            _add_evidence_gap(evidence_groups, reason_code=reason_code, example_ref=ref)
+            _add_missing_evidence(
+                reason_groups=reason_groups,
+                evidence_groups=evidence_groups,
+                reason_code=reason_code,
+                example_ref=ref,
+            )
+
+    if amd_score_report is None:
+        _add_missing_evidence(
+            reason_groups=reason_groups,
+            evidence_groups=evidence_groups,
+            reason_code="amd_score_evidence_missing",
+            example_ref="amd_score_report",
+            next_evidence="Attach a bounded AMD score report ref/checksum before upgrading claims.",
+        )
+    if not amd_sol_artifacts:
+        _add_missing_evidence(
+            reason_groups=reason_groups,
+            evidence_groups=evidence_groups,
+            reason_code="amd_sol_evidence_missing",
+            example_ref="amd_sol_artifacts",
+            next_evidence="Attach bounded AMD SOL artifact refs/checksums before upgrading claims.",
+        )
+    if not solar_artifacts:
+        _add_missing_evidence(
+            reason_groups=reason_groups,
+            evidence_groups=evidence_groups,
+            reason_code="solar_derivation_missing",
+            example_ref="solar_artifacts",
+            next_evidence="Attach bounded SOLAR derivation refs/checksums before upgrading claims.",
+        )
+
+    for problem in problems.values():
+        problem.rollup.problems = 1
+        problem.rollup.workloads = sum(
+            1
+            for workload in workloads.values()
+            if workload.category == problem.category
+            and workload.problem_id == problem.problem_id
+        )
+
+    for category_rollup in categories.values():
+        category_rollup.problems = 0
+        category_rollup.workloads = 0
+    for problem in problems.values():
+        category_rollup = _category_rollup(categories, problem.category)
+        category_rollup.problems += 1
+        category_rollup.workloads += problem.rollup.workloads
 
     suite = _empty_rollup()
     category_reports = []
@@ -610,11 +715,11 @@ def build_paper_denominator_report(
                 checksum_keys=("amd_native_score_checksum", "amd_score_checksum", "report_checksum"),
             ),
             amd_sol_artifacts=sorted(
-                [_artifact_source(artifact) for artifact in amd_sol_artifacts or []],
+                [_artifact_source(artifact) for artifact in amd_sol_artifacts],
                 key=lambda source: (source.path or "", source.ref or ""),
             ),
             solar_artifacts=sorted(
-                [_artifact_source(artifact) for artifact in solar_artifacts or []],
+                [_artifact_source(artifact) for artifact in solar_artifacts],
                 key=lambda source: (source.path or "", source.ref or ""),
             ),
         ),
@@ -657,16 +762,16 @@ def _source_rows(payload: dict[str, Any]) -> list[str]:
     ):
         source = sources[name]
         rows.append(
-            f"| {name} | {source.get('schema_version') or ''} | "
-            f"{source.get('checksum') or ''} | {source.get('ref') or ''} | "
-            f"{source.get('path') or ''} |"
+            f"| {_md_cell(name)} | {_md_cell(source.get('schema_version'))} | "
+            f"{_md_cell(source.get('checksum'))} | {_md_cell(source.get('ref'))} | "
+            f"{_md_cell(source.get('path'))} |"
         )
     for name in ("amd_sol_artifacts", "solar_artifacts"):
         for source in sources[name]:
             rows.append(
-                f"| {name} | {source.get('schema_version') or ''} | "
-                f"{source.get('checksum') or ''} | {source.get('ref') or ''} | "
-                f"{source.get('path') or ''} |"
+                f"| {_md_cell(name)} | {_md_cell(source.get('schema_version'))} | "
+                f"{_md_cell(source.get('checksum'))} | {_md_cell(source.get('ref'))} | "
+                f"{_md_cell(source.get('path'))} |"
             )
     return rows
 
@@ -707,7 +812,7 @@ def render_paper_denominator_markdown(report: PaperDenominatorReport) -> str:
     for category in payload["categories"]:
         rollup = category["rollup"]
         lines.append(
-            f"| {category['name']} | {rollup['problems']} | {rollup['workloads']} | "
+            f"| {_md_cell(category['name'])} | {rollup['problems']} | {rollup['workloads']} | "
             f"{_state_row(rollup['states'])} |"
         )
 
@@ -715,16 +820,17 @@ def render_paper_denominator_markdown(report: PaperDenominatorReport) -> str:
     lines.append("|----------|--------|------:|---------------|")
     for gap in payload["evidence_gaps"]:
         lines.append(
-            f"| {gap['evidence']} | {gap['reason_code']} | {gap['count']} | "
-            f"{gap['next_evidence']} |"
+            f"| {_md_cell(gap['evidence'])} | {_md_cell(gap['reason_code'])} | {gap['count']} | "
+            f"{_md_cell(gap['next_evidence'])} |"
         )
 
     lines.extend(["", "## Reason Buckets", "", "| Reason | Count | States | Examples |"])
     lines.append("|--------|------:|--------|----------|")
     for bucket in payload["reason_buckets"]:
         lines.append(
-            f"| {bucket['reason_code']} | {bucket['count']} | "
-            f"{', '.join(bucket['states'])} | {', '.join(bucket['example_refs'])} |"
+            f"| {_md_cell(bucket['reason_code'])} | {bucket['count']} | "
+            f"{_md_cell(', '.join(bucket['states']))} | "
+            f"{_md_cell(', '.join(bucket['example_refs']))} |"
         )
 
     lines.extend(["", "## Deferred Buckets", "", "| Reason | Count | Examples |"])
@@ -732,16 +838,16 @@ def render_paper_denominator_markdown(report: PaperDenominatorReport) -> str:
     for bucket in payload["reason_buckets"]:
         if "deferred" in bucket["states"] or "evidence_missing" in bucket["states"]:
             lines.append(
-                f"| {bucket['reason_code']} | {bucket['count']} | "
-                f"{', '.join(bucket['example_refs'])} |"
+                f"| {_md_cell(bucket['reason_code'])} | {bucket['count']} | "
+                f"{_md_cell(', '.join(bucket['example_refs']))} |"
             )
 
     lines.extend(["", "## Next Evidence Hints", "", "| Reason | Next Evidence | Examples |"])
     lines.append("|--------|---------------|----------|")
     for hint in payload["next_evidence_hints"]:
         lines.append(
-            f"| {hint['reason_code']} | {hint['next_evidence']} | "
-            f"{', '.join(hint['example_refs'])} |"
+            f"| {_md_cell(hint['reason_code'])} | {_md_cell(hint['next_evidence'])} | "
+            f"{_md_cell(', '.join(hint['example_refs']))} |"
         )
 
     lines.extend(["", "## Sources", "", "| Source | Schema | Checksum | Ref | Path |"])
