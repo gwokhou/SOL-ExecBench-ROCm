@@ -5,6 +5,11 @@ import json
 import sys
 from pathlib import Path
 
+from sol_execbench.core.dataset.execution_closure import (
+    build_execution_closure_report,
+    write_execution_closure_report,
+)
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RUN_DATASET_PATH = REPO_ROOT / "scripts" / "run_dataset.py"
 spec = importlib.util.spec_from_file_location("run_dataset", RUN_DATASET_PATH)
@@ -56,6 +61,31 @@ def _trace(uuid: str, status: str = "PASSED") -> dict:
             },
         },
     }
+
+
+def _write_prior_closure(
+    path: Path,
+    *,
+    provenance: dict,
+    trace_status: str = "PASSED",
+) -> None:
+    report = build_execution_closure_report(
+        records=[
+            {
+                "category": "L1",
+                "problem_id": "L1/matmul_demo",
+                "problem_path": "L1/matmul_demo",
+                "workload_uuid": "selected-workload",
+                "row_index": 0,
+                "closure_status": "attempted_passed",
+                "trace_status": trace_status,
+            }
+        ],
+        provenance=provenance,
+        filters={"ready_subset": True},
+        created_at="2026-05-31T00:00:00Z",
+    )
+    write_execution_closure_report(report, path)
 
 
 def _write_problem(dataset_root: Path, category: str, name: str, workloads: list[dict]) -> Path:
@@ -387,7 +417,139 @@ def test_execution_closure_records_are_sorted_by_helper_contract(tmp_path, monke
     ]
 
 
-def test_execution_closure_preserves_skipped_existing_pass_without_provenance_enforcement(
+def test_execution_closure_existing_pass_requires_matching_provenance(
+    tmp_path,
+    monkeypatch,
+):
+    dataset_root = tmp_path / "dataset"
+    _write_problem(dataset_root, "L1", "matmul_demo", [_workload("selected-workload")])
+    subset_path = _ready_subset(
+        tmp_path / "ready_subset.json",
+        problems=[
+            {
+                "category": "L1",
+                "problem_id": "L1/matmul_demo",
+                "problem_path": "L1/matmul_demo",
+                "workloads": [{"uuid": "selected-workload", "row_index": 0}],
+            }
+        ],
+    )
+    output_dir = tmp_path / "out"
+    trace_dir = output_dir / "L1" / "matmul_demo"
+    trace_dir.mkdir(parents=True)
+    (trace_dir / "traces.json").write_text(json.dumps([_trace("selected-workload")]))
+    _write_prior_closure(
+        output_dir / "execution_closure.json",
+        provenance={
+            "dataset_root": "dataset",
+            "selected_categories": None,
+            "limit": None,
+            "max_workloads": None,
+            "timeout": 300,
+            "warmup_runs": 3,
+            "iterations": 10,
+            "lock_clocks": False,
+            "rerun": False,
+            "keep_staging": False,
+            "verbose": False,
+            "solution_mode": "reference",
+            "solution_name": None,
+            "output_dir": "out",
+            "summary_path": "summary.json",
+            "ready_subset_path": "ready_subset.json",
+            "ready_subset_checksum": "ready-sha",
+            "readiness_path": None,
+            "readiness_checksum": "readiness-sha",
+            "dataset_manifest_path": None,
+            "dataset_manifest_checksum": None,
+            "workload_identity_checksum": None,
+            "requested_evidence_requirements": [],
+            "config_path": None,
+            "benchmark_config": {},
+            "derived_evidence": {
+                "amd_score_report": None,
+                "amd_sol_bound_dir": None,
+                "solar_derivation": None,
+                "timing_evidence_dir": None,
+            },
+        },
+    )
+
+    def fail_run_cli(*args, **kwargs):
+        raise AssertionError("matching prior closure provenance should permit reuse")
+
+    monkeypatch.setattr(run_dataset, "run_cli", fail_run_cli)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--ready-subset",
+            str(subset_path),
+            "--output",
+            str(output_dir),
+        ],
+    )
+
+    run_dataset.main()
+
+    closure = json.loads((output_dir / "execution_closure.json").read_text())
+    assert closure["records"][0]["closure_status"] == "skipped_existing_pass"
+    assert closure["provenance_mismatches"] == []
+
+
+def test_execution_closure_existing_pass_without_prior_provenance_runs_fresh(
+    tmp_path,
+    monkeypatch,
+):
+    dataset_root = tmp_path / "dataset"
+    _write_problem(dataset_root, "L1", "matmul_demo", [_workload("selected-workload")])
+    subset_path = _ready_subset(
+        tmp_path / "ready_subset.json",
+        problems=[
+            {
+                "category": "L1",
+                "problem_id": "L1/matmul_demo",
+                "problem_path": "L1/matmul_demo",
+                "workloads": [{"uuid": "selected-workload", "row_index": 0}],
+            }
+        ],
+    )
+    output_dir = tmp_path / "out"
+    trace_dir = output_dir / "L1" / "matmul_demo"
+    trace_dir.mkdir(parents=True)
+    (trace_dir / "traces.json").write_text(json.dumps([_trace("selected-workload")]))
+    calls = 0
+
+    def run_cli(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return [_trace("selected-workload")]
+
+    monkeypatch.setattr(run_dataset, "run_cli", run_cli)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--ready-subset",
+            str(subset_path),
+            "--output",
+            str(output_dir),
+        ],
+    )
+
+    run_dataset.main()
+
+    closure = json.loads((output_dir / "execution_closure.json").read_text())
+    assert calls == 1
+    assert closure["records"][0]["closure_status"] == "attempted_passed"
+    assert closure["provenance_mismatches"][0]["reason_code"] == "stale_provenance"
+
+
+def test_execution_closure_existing_pass_mismatched_provenance_runs_fresh(
     tmp_path,
     monkeypatch,
 ):
@@ -409,10 +571,27 @@ def test_execution_closure_preserves_skipped_existing_pass_without_provenance_en
     trace_dir.mkdir(parents=True)
     (trace_dir / "traces.json").write_text(json.dumps([_trace("selected-workload")]))
 
-    def fail_run_cli(*args, **kwargs):
-        raise AssertionError("passing existing traces should be skipped")
+    _write_prior_closure(
+        output_dir / "execution_closure.json",
+        provenance={
+            "dataset_root": "dataset",
+            "solution_mode": "named",
+            "solution_name": "custom_solution.py",
+            "ready_subset_checksum": "old-ready-sha",
+            "readiness_checksum": "old-readiness-sha",
+            "dataset_manifest_checksum": "old-manifest-sha",
+            "workload_identity_checksum": "old-workload-sha",
+            "requested_evidence_requirements": ["amd_sol_bound"],
+        },
+    )
+    calls = 0
 
-    monkeypatch.setattr(run_dataset, "run_cli", fail_run_cli)
+    def run_cli(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return [_trace("selected-workload")]
+
+    monkeypatch.setattr(run_dataset, "run_cli", run_cli)
     monkeypatch.setattr(
         sys,
         "argv",
@@ -429,8 +608,163 @@ def test_execution_closure_preserves_skipped_existing_pass_without_provenance_en
     run_dataset.main()
 
     closure = json.loads((output_dir / "execution_closure.json").read_text())
-    assert closure["records"][0]["closure_status"] == "skipped_existing_pass"
-    assert closure["provenance_mismatches"] == []
+    assert calls == 1
+    assert closure["records"][0]["closure_status"] == "attempted_passed"
+    assert [
+        mismatch["reason_code"] for mismatch in closure["provenance_mismatches"]
+    ] == [
+        "readiness_checksum_mismatch",
+        "ready_subset_checksum_mismatch",
+        "workload_identity_mismatch",
+        "solution_mode_mismatch",
+        "solution_mismatch",
+        "evidence_requirement_mismatch",
+    ]
+
+
+def test_execution_closure_rerun_attempts_existing_pass(tmp_path, monkeypatch):
+    dataset_root = tmp_path / "dataset"
+    _write_problem(dataset_root, "L1", "matmul_demo", [_workload("selected-workload")])
+    subset_path = _ready_subset(
+        tmp_path / "ready_subset.json",
+        problems=[
+            {
+                "category": "L1",
+                "problem_id": "L1/matmul_demo",
+                "problem_path": "L1/matmul_demo",
+                "workloads": [{"uuid": "selected-workload", "row_index": 0}],
+            }
+        ],
+    )
+    output_dir = tmp_path / "out"
+    trace_dir = output_dir / "L1" / "matmul_demo"
+    trace_dir.mkdir(parents=True)
+    (trace_dir / "traces.json").write_text(json.dumps([_trace("selected-workload")]))
+    calls = 0
+
+    def run_cli(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return [_trace("selected-workload")]
+
+    monkeypatch.setattr(run_dataset, "run_cli", run_cli)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--ready-subset",
+            str(subset_path),
+            "--output",
+            str(output_dir),
+            "--rerun",
+        ],
+    )
+
+    run_dataset.main()
+
+    closure = json.loads((output_dir / "execution_closure.json").read_text())
+    assert calls == 1
+    assert closure["records"][0]["closure_status"] == "attempted_passed"
+    assert closure["records"][0]["trace_status"] == "PASSED"
+
+
+def test_execution_closure_classifies_cli_no_output_with_bounded_log_ref(
+    tmp_path,
+    monkeypatch,
+):
+    dataset_root = tmp_path / "dataset"
+    _write_problem(dataset_root, "L1", "matmul_demo", [_workload("selected-workload")])
+    subset_path = _ready_subset(
+        tmp_path / "ready_subset.json",
+        problems=[
+            {
+                "category": "L1",
+                "problem_id": "L1/matmul_demo",
+                "problem_path": "L1/matmul_demo",
+                "workloads": [{"uuid": "selected-workload", "row_index": 0}],
+            }
+        ],
+    )
+    output_dir = tmp_path / "out"
+
+    def run_cli(*, output_dir: Path, job_name: str, **kwargs):
+        (output_dir / f"{job_name}_cli.log").write_text(
+            f"stdout from {tmp_path}\nstderr from {tmp_path}"
+        )
+        return None
+
+    monkeypatch.setattr(run_dataset, "run_cli", run_cli)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--ready-subset",
+            str(subset_path),
+            "--output",
+            str(output_dir),
+        ],
+    )
+
+    run_dataset.main()
+
+    closure_text = (output_dir / "execution_closure.json").read_text()
+    closure = json.loads(closure_text)
+    record = closure["records"][0]
+    assert record["closure_status"] == "attempted_failed"
+    assert record["cli_log_ref"] == "L1/matmul_demo/ref_matmul_demo_cli.log"
+    assert record["notes"] == ["CLI returned no traces"]
+    assert str(tmp_path) not in closure_text
+    assert "stdout from" not in closure_text
+    assert "stderr from" not in closure_text
+
+
+def test_execution_closure_marks_selected_workload_without_trace_as_missing_trace(
+    tmp_path,
+    monkeypatch,
+):
+    dataset_root = tmp_path / "dataset"
+    _write_problem(dataset_root, "L1", "matmul_demo", [_workload("selected-workload")])
+    subset_path = _ready_subset(
+        tmp_path / "ready_subset.json",
+        problems=[
+            {
+                "category": "L1",
+                "problem_id": "L1/matmul_demo",
+                "problem_path": "L1/matmul_demo",
+                "workloads": [{"uuid": "selected-workload", "row_index": 0}],
+            }
+        ],
+    )
+    output_dir = tmp_path / "out"
+
+    def run_cli(*args, **kwargs):
+        return [_trace("other-workload")]
+
+    monkeypatch.setattr(run_dataset, "run_cli", run_cli)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--ready-subset",
+            str(subset_path),
+            "--output",
+            str(output_dir),
+        ],
+    )
+
+    run_dataset.main()
+
+    closure = json.loads((output_dir / "execution_closure.json").read_text())
+    record = closure["records"][0]
+    assert record["closure_status"] == "missing_trace"
+    assert record["trace_status"] is None
+    assert record["trace_ref"] == "L1/matmul_demo/traces.json"
 
 
 def test_execution_closure_provenance_uses_bounded_refs(tmp_path, monkeypatch):
