@@ -1,163 +1,117 @@
 ---
 phase: 84-paper-denominator-accounting-and-claim-boundaries
-reviewed: 2026-05-31T08:42:42Z
+reviewed: 2026-05-31T08:48:23Z
 depth: standard
-files_reviewed: 6
+files_reviewed: 2
 files_reviewed_list:
-  - scripts/report_paper_denominator.py
-  - src/sol_execbench/core/dataset/__init__.py
   - src/sol_execbench/core/dataset/paper_denominator.py
   - tests/sol_execbench/test_paper_denominator_report.py
-  - tests/sol_execbench/test_paper_denominator_script.py
-  - tests/sol_execbench/test_public_contract_guardrails.py
 findings:
-  critical: 2
-  warning: 2
+  critical: 1
+  warning: 0
   info: 0
-  total: 4
+  total: 1
 status: findings_found
 ---
 
 # Phase 84: Code Review Report
 
-**Reviewed:** 2026-05-31T08:42:42Z
+**Reviewed:** 2026-05-31T08:48:23Z
 **Depth:** standard
-**Files Reviewed:** 6
+**Files Reviewed:** 2
 **Status:** findings_found
 
 ## Summary
 
-Reviewed the Phase 84 paper denominator sidecar, script wrapper, dataset exports, and CPU-safe tests. The implementation is sidecar-only and the focused suite passes, but the report builder can under-report missing evidence and emit internally inconsistent denominator totals. Those are contract-level correctness failures for a report whose purpose is denominator accounting and claim-boundary discipline.
+Re-reviewed Phase 84 after commit `6de979f`, focusing on the prior CR-01, CR-02, WR-01, and WR-02 findings plus regressions from the fix. CR-01, WR-01, and WR-02 are resolved: absent optional sources now produce evidence-missing buckets, per-workload missing refs are accounted for closure records, the focused tests cover those cases, and Markdown table cells are escaped.
 
-Verification run during review:
+One blocker remains from CR-02. The new totals reconciliation makes suite/category/problem/workload totals match the currently emitted arrays, but it still does not seed denominator records from `inventory["problems"]` and nested `workloads`. Inventory-only denominator entries disappear from both emitted arrays and suite totals.
+
+Verification run:
 
 `UV_CACHE_DIR=/tmp/uv-cache uv run pytest tests/sol_execbench/test_paper_denominator_report.py tests/sol_execbench/test_paper_denominator_script.py tests/sol_execbench/test_public_contract_guardrails.py::test_v1_19_paper_denominator_fields_remain_sidecar_only tests/sol_execbench/test_public_contract_guardrails.py::test_primary_cli_does_not_expose_v1_19_paper_denominator_options -q`
 
-Result: `9 passed in 1.36s`
+Result: `11 passed in 1.36s`
 
 ## Narrative Findings (AI reviewer)
 
 ## Critical Issues
 
-### CR-01: BLOCKER - Missing Evidence Is Not Accounted When Optional Evidence Sources Are Absent
+### CR-01: BLOCKER - Inventory Denominator Problems And Workloads Can Still Disappear From The Report
 
-**File:** `src/sol_execbench/core/dataset/paper_denominator.py:546`
+**File:** `src/sol_execbench/core/dataset/paper_denominator.py:501`
 
-**Issue:** The builder only creates evidence-gap buckets from pre-existing `execution_closure.records[*].evidence_gaps` and unsupported AMD score rows. If `amd_score_report` is omitted, or if no `--amd-sol-artifact` / `--solar-artifact` is supplied, lines 607-619 still emit empty source refs but no `evidence_missing` state, reason bucket, evidence gap, or next-evidence hint. That violates the Phase 84 contract that missing AMD score, AMD SOL, SOLAR, timing, or trace evidence must become `evidence_missing` or `deferred`, never silently disappear.
+**Issue:** The fix still never seeds `problems` or `workloads` from `inventory["problems"]` and their nested `workloads`. Lines 501-505 briefly read category denominator problem counts, but lines 669-675 reset every category's `problems` and `workloads` to counts derived only from records created by the readiness and execution-closure sidecars. If inventory contains a parsed problem/workload that has no readiness or closure row, the report emits `suite.problems == 0`, `suite.workloads == 0`, `problems == []`, and `workloads == []` for that denominator entry.
 
-**Impact:** A researcher can generate a report with no AMD score/SOL/SOLAR sources and no corresponding gap. The report then understates missing evidence and can appear more complete than the bounded source refs justify.
+This keeps the core CR-02 correctness failure partially open. The current tests now assert `suite.problems == len(report.problems)` and `suite.workloads == len(report.workloads)`, but that only proves internal consistency after dropping inventory-only denominator entries. It does not prove that the paper denominator report covers the inventory denominator.
 
-**Fix:** After reading closure records and optional source refs, derive required evidence completeness from `trace_ref`, `evidence_refs`, `amd_score_report`, `amd_sol_artifacts`, and `solar_artifacts`. Add missing buckets for absent report-level sources and per-workload missing refs.
+Concrete repro:
 
 ```python
-required_refs = {
-    "timing": "timing_evidence",
-    "amd_score": "amd_score",
-    "amd_sol": "amd_sol_bound",
-    "solar_derivation": "solar_derivation",
-}
-for record in execution_closure.get("records", []):
-    if str(record.get("closure_status")) in {"filtered", "not_attempted"}:
-        continue
-    refs = record.get("evidence_refs", {})
-    for evidence, ref_key in required_refs.items():
-        if not refs.get(ref_key):
-            reason_code = f"{evidence}_evidence_missing"
-            example_ref = _record_ref(record)
-            _add_reason(
-                reason_groups,
-                reason_code=reason_code,
-                state="evidence_missing",
-                example_ref=example_ref,
-            )
-            _add_evidence_gap(
-                evidence_groups,
-                reason_code=reason_code,
-                example_ref=example_ref,
-            )
-            # also add evidence_missing to workload/category/problem rollups once
+report = build_paper_denominator_report(
+    inventory={
+        "schema_version": "sol_execbench.dataset_inventory.v1",
+        "categories": [
+            {"name": "L1", "denominators": {"parsed_problems": 1, "parsed_workloads": 2}},
+        ],
+        "problems": [
+            {
+                "category": "L1",
+                "problem_id": "L1/only_inventory",
+                "problem_path": "L1/only_inventory",
+                "workload_count": 2,
+                "workloads": [
+                    {"uuid": "w0", "row_index": 0},
+                    {"uuid": "w1", "row_index": 1},
+                ],
+            },
+        ],
+    },
+    readiness={"workloads": []},
+    execution_closure={"records": []},
+    created_at="2026-05-31T00:00:00Z",
+)
+assert report.suite.problems == 1
+assert report.suite.workloads == 2
 ```
 
-Also add tests where `amd_score_report=None`, `amd_sol_artifacts=[]`, and `solar_artifacts=[]` produce explicit missing-evidence buckets.
+Observed output from the current implementation: `{'problems': 0, 'workloads': 0, ...}`, `report.problems == []`, and `report.workloads == []`.
 
-### CR-02: BLOCKER - Suite Totals Diverge From Emitted Problem And Workload Records
-
-**File:** `src/sol_execbench/core/dataset/paper_denominator.py:460`
-
-**Issue:** Suite/category problem totals are seeded from inventory category denominators at lines 460-464, readiness workloads increment only readiness workload counts at lines 466-505, and closure records add new `PaperDenominatorProblem` / `PaperDenominatorWorkload` entries at lines 507-562 without incrementing corresponding workload totals. The current fixture report demonstrates the bug: `suite.problems == 3` and `suite.workloads == 4`, while the emitted `problems` and `workloads` arrays each contain 8 records.
-
-**Impact:** The report is internally contradictory. Markdown "Suite Counts" can disagree with the machine-readable record arrays and state buckets, making denominator accounting unreliable for researcher review.
-
-**Fix:** Normalize around one denominator source of truth. Seed problem/workload records from `inventory["problems"]` and their nested `workloads`, then merge readiness and closure attributes onto those records by stable `(problem_id, row_index, workload_uuid)` keys. Derive suite/category/problem/workload counts from the normalized records or from inventory denominators, but do not mix both without reconciliation.
+**Fix:** Normalize from inventory first, then merge readiness and closure attributes onto those records by stable keys. Category and suite problem/workload totals should be derived from the normalized inventory-backed records, not from whichever readiness/closure rows happen to exist.
 
 ```python
-# Pseudocode shape
 for problem in inventory.get("problems", []):
-    problem_rollup = _problem_rollup(...)
-    problem_rollup.problems = 1
+    category = str(problem.get("category", "unknown"))
+    problem_id = str(problem.get("problem_id") or problem.get("problem_path") or "unknown")
+    problem_path = str(problem.get("problem_path")) if problem.get("problem_path") else None
+    _problem_rollup(
+        problems,
+        category=category,
+        problem_id=problem_id,
+        problem_path=problem_path,
+    )
     for workload in problem.get("workloads", []):
-        key = _workload_key(problem["problem_id"], workload)
-        workloads[key] = PaperDenominatorWorkload(...)
-        problem_rollup.workloads += 1
-        _category_rollup(categories, category).workloads += 1
-
-# Later readiness/closure loops should update states only, not create extra
-# denominator records unless explicitly classified as out-of-inventory evidence.
+        key = (
+            problem_id,
+            workload.get("row_index"),
+            str(workload.get("uuid")) if workload.get("uuid") else None,
+        )
+        workloads.setdefault(
+            key,
+            PaperDenominatorWorkload(
+                category=category,
+                problem_id=problem_id,
+                problem_path=problem_path,
+                workload_uuid=str(workload.get("uuid")) if workload.get("uuid") else None,
+                row_index=workload.get("row_index"),
+            ),
+        )
 ```
 
-Add assertions that `suite.problems == len(report.problems)` and `suite.workloads == len(report.workloads)` for fixture inputs where every emitted record is in-scope.
-
-## Warnings
-
-### WR-01: WARNING - Tests Mask The Denominator Mismatch And Missing Optional Evidence Cases
-
-**File:** `tests/sol_execbench/test_paper_denominator_report.py:301`
-
-**Issue:** The main aggregation test asserts fixed suite totals and only checks that selected problem/workload IDs are a superset at lines 301-328. It does not assert exact problem/workload arrays or that suite totals reconcile with those arrays. The fixture also always supplies AMD score, AMD SOL, and SOLAR inputs at lines 276-288, so missing-source behavior is untested.
-
-**Impact:** The current tests pass while the report emits contradictory denominator totals and silently accepts absent optional evidence sources.
-
-**Fix:** Tighten the contract tests:
-
-```python
-payload = build_fixture_report().model_dump(mode="json")
-assert payload["suite"]["problems"] == len(payload["problems"])
-assert payload["suite"]["workloads"] == len(payload["workloads"])
-
-missing = build_paper_denominator_report(
-    inventory=inventory_fixture(),
-    readiness=readiness_fixture(),
-    execution_closure=execution_closure_fixture(),
-    amd_score_report=None,
-    amd_sol_artifacts=[],
-    solar_artifacts=[],
-    created_at=CREATED_AT,
-).model_dump(mode="json")
-assert "amd_score_evidence_missing" in {g["reason_code"] for g in missing["evidence_gaps"]}
-assert "amd_sol_evidence_missing" in {g["reason_code"] for g in missing["evidence_gaps"]}
-assert "solar_derivation_missing" in {g["reason_code"] for g in missing["evidence_gaps"]}
-```
-
-### WR-02: WARNING - Markdown Renderer Does Not Escape Untrusted Table Cells
-
-**File:** `src/sol_execbench/core/dataset/paper_denominator.py:659`
-
-**Issue:** Source paths/refs, reason codes, example refs, and next-evidence text are interpolated directly into Markdown table cells at lines 659-669 and 724-744. These values originate from local sidecar dictionaries and CLI paths. A value containing `|`, newlines, or Markdown control text can break table structure or inject misleading rows into the researcher-facing summary.
-
-**Impact:** The JSON remains structured, but the Markdown summary can be corrupted or misleading. This matters because Phase 84 explicitly makes Markdown a deterministic researcher review artifact with visible claim-boundary wording.
-
-**Fix:** Sanitize Markdown table cells before interpolation and add tests with paths/reasons containing pipes and newlines.
-
-```python
-def _md_cell(value: object) -> str:
-    text = "" if value is None else str(value)
-    return text.replace("\\", "\\\\").replace("|", "\\|").replace("\n", " ").replace("\r", " ")
-
-# Then use _md_cell(...) for every dynamic table cell.
-```
+Then add a regression test where inventory contains a parsed problem/workload not present in readiness or execution closure, and assert it remains in `report.problems`, `report.workloads`, category counts, and suite counts.
 
 ---
 
-_Reviewed: 2026-05-31T08:42:42Z_
+_Reviewed: 2026-05-31T08:48:23Z_
 _Reviewer: the agent (gsd-code-reviewer)_
 _Depth: standard_
