@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.20
 milestone_name: Cross-Report Consistency and Evaluation Stability
 status: executing
-last_updated: "2026-05-31T15:50:00.000Z"
+last_updated: "2026-05-31T16:05:00.000Z"
 last_activity: 2026-05-31
 progress:
   total_phases: 5
-  completed_phases: 3
-  total_plans: 6
-  completed_plans: 6
-  percent: 60
+  completed_phases: 4
+  total_plans: 8
+  completed_plans: 8
+  percent: 80
 ---
 
 # Project State
@@ -20,20 +20,20 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-31)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Phase 92 Trust Summary Integration
+**Current focus:** Phase 93 Documentation, Examples, And Guardrail Tests
 
 ## Current Position
 
-Phase: 92. Trust Summary Integration
+Phase: 93. Documentation, Examples, And Guardrail Tests
 Plan: —
-Status: Phase 91 complete; ready to plan Phase 92
-Last activity: 2026-05-31 — Phase 91 completed claim-upgrade rules, script, rejection tests, and guardrails
+Status: Phase 92 complete; ready to plan Phase 93
+Last activity: 2026-05-31 — Phase 92 completed trust summary contract, script, tests, and guardrails
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 6
+- Total plans completed: 8
 - Average duration: n/a
 - Total execution time: 0h
 
@@ -44,7 +44,7 @@ Last activity: 2026-05-31 — Phase 91 completed claim-upgrade rules, script, re
 | 89. Cross-Report Consistency Contract And Lint | 2/2 | Complete | n/a |
 | 90. Evaluation Stability Evidence | 2/2 | Complete | n/a |
 | 91. Claim Upgrade Rules And Authority Gates | 2/2 | Complete | n/a |
-| 92. Trust Summary Integration | 0/TBD | Not started | n/a |
+| 92. Trust Summary Integration | 2/2 | Complete | n/a |
 | 93. Documentation, Examples, And Guardrail Tests | 0/TBD | Not started | n/a |
 
 **Recent Trend:**
@@ -103,6 +103,8 @@ Last activity: 2026-05-31 — Phase 91 completed claim-upgrade rules, script, re
 - [Phase 90]: Stability classification supports interpretation only; it keeps correctness, score, paper-parity, leaderboard, native-host, and new-hardware authority false.
 - [Phase 91]: claim_upgrade.v1 evaluates prerequisites and next evidence only; it never mutates authority fields in source reports.
 - [Phase 91]: Claim levels are explicit and remain blocked when consistency, stability, denominator, score, Matrix, or hardware-validation evidence is missing or contradictory.
+- [Phase 92]: trust_summary.v1 combines evidence-quality sidecars into bounded review guidance with source refs/checksums only.
+- [Phase 92]: Trust summaries provide next steps for future CDNA3/MI300X/native-host/paper-scale validation without claiming those validations were performed.
 
 ### Pending Todos
 
@@ -135,10 +137,10 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-05-31T15:50:00.000Z
-Stopped at: Completed Phase 91
+Last session: 2026-05-31T16:05:00.000Z
+Stopped at: Completed Phase 92
 Resume file: None
 
 ## Operator Next Steps
 
-- Start Phase 92 with /gsd-plan-phase 92
+- Start Phase 93 with /gsd-plan-phase 93

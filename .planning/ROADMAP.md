@@ -84,16 +84,16 @@
 
 **Active milestone:** v1.20 Cross-Report Consistency and Evaluation Stability.
 
-**Status:** Phase 91 complete; ready to plan Phase 92.
+**Status:** Phase 92 complete; ready to plan Phase 93.
 
-**Next step:** Start Phase 92 with `/gsd-plan-phase 92`.
+**Next step:** Start Phase 93 with `/gsd-plan-phase 93`.
 
 ## Phases
 
 - [x] **Phase 89: Cross-Report Consistency Contract And Lint** - Researchers can detect contradictions across current evidence sidecars without changing benchmark contracts.
 - [x] **Phase 90: Evaluation Stability Evidence** - Researchers can inspect timing quality, variance, clock policy, and backend risk through a sidecar-only stability report.
 - [x] **Phase 91: Claim Upgrade Rules And Authority Gates** - Researchers can evaluate whether evidence satisfies explicit prerequisites for stronger validation and authority claims.
-- [ ] **Phase 92: Trust Summary Integration** - Researchers can generate a concise JSON/Markdown trust summary that combines consistency, stability, closure, denominator, Matrix, score, and bound status.
+- [x] **Phase 92: Trust Summary Integration** - Researchers can generate a concise JSON/Markdown trust summary that combines consistency, stability, closure, denominator, Matrix, score, and bound status.
 - [ ] **Phase 93: Documentation, Examples, And Guardrail Tests** - Public docs, fixtures, and CPU-safe/ROCm guardrails make v1.20 artifacts interpretable and claim-safe.
 
 ## Phase Details
@@ -148,7 +148,9 @@
   2. Trust summary clearly separates internally consistent, stable enough to interpret, evidence missing, diagnostic-only, and claim-upgrade-blocked outcomes.
   3. Trust summary references source reports by bounded refs and checksums rather than duplicating full payloads.
   4. Trust summary gives actionable next steps for CDNA3/MI300X/native-host/paper-scale validation while explicitly avoiding claims that v1.20 performed those validations.
-**Plans**: TBD
+**Plans**:
+  - [x] 92-01 Trust Summary Contract
+  - [x] 92-02 Trust Script And Guardrails
 
 ### Phase 93: Documentation, Examples, And Guardrail Tests
 **Goal**: Researchers can understand, reproduce, and safely interpret v1.20 evidence-quality artifacts through docs, fixtures, and guardrail tests.
@@ -172,7 +174,7 @@ Phases execute in numeric order: 89 -> 90 -> 91 -> 92 -> 93.
 | 89. Cross-Report Consistency Contract And Lint | 2/2 | Complete | 2026-05-31 |
 | 90. Evaluation Stability Evidence | 2/2 | Complete | 2026-05-31 |
 | 91. Claim Upgrade Rules And Authority Gates | 2/2 | Complete | 2026-05-31 |
-| 92. Trust Summary Integration | 0/TBD | Not started | — |
+| 92. Trust Summary Integration | 2/2 | Complete | 2026-05-31 |
 | 93. Documentation, Examples, And Guardrail Tests | 0/TBD | Not started | — |
 
 **Coverage:**

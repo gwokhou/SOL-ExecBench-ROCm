@@ -33,10 +33,10 @@ ExecBench.
 
 ### Trust Summary
 
-- [ ] **TRUST-01**: Researcher can generate a deterministic trust summary that combines consistency, stability, claim-upgrade, closure, denominator, Matrix, AMD score, and AMD SOL/SOLAR status into a concise JSON and Markdown review artifact.
-- [ ] **TRUST-02**: Trust summary clearly separates internally consistent, stable enough to interpret, evidence missing, diagnostic-only, and claim upgrade blocked outcomes.
-- [ ] **TRUST-03**: Trust summary references source reports by bounded refs and checksums rather than duplicating full payloads.
-- [ ] **TRUST-04**: Trust summary gives actionable next steps for future CDNA3/MI300X/native-host/paper-scale validation without claiming that v1.20 performed those validations.
+- [x] **TRUST-01**: Researcher can generate a deterministic trust summary that combines consistency, stability, claim-upgrade, closure, denominator, Matrix, AMD score, and AMD SOL/SOLAR status into a concise JSON and Markdown review artifact.
+- [x] **TRUST-02**: Trust summary clearly separates internally consistent, stable enough to interpret, evidence missing, diagnostic-only, and claim upgrade blocked outcomes.
+- [x] **TRUST-03**: Trust summary references source reports by bounded refs and checksums rather than duplicating full payloads.
+- [x] **TRUST-04**: Trust summary gives actionable next steps for future CDNA3/MI300X/native-host/paper-scale validation without claiming that v1.20 performed those validations.
 
 ### Documentation And Guardrails
 
@@ -95,10 +95,10 @@ ExecBench.
 | CLAIM-02 | Phase 91 | Complete |
 | CLAIM-03 | Phase 91 | Complete |
 | CLAIM-04 | Phase 91 | Complete |
-| TRUST-01 | Phase 92 | Pending |
-| TRUST-02 | Phase 92 | Pending |
-| TRUST-03 | Phase 92 | Pending |
-| TRUST-04 | Phase 92 | Pending |
+| TRUST-01 | Phase 92 | Complete |
+| TRUST-02 | Phase 92 | Complete |
+| TRUST-03 | Phase 92 | Complete |
+| TRUST-04 | Phase 92 | Complete |
 | DOCS-01 | Phase 93 | Pending |
 | DOCS-02 | Phase 93 | Pending |
 | DOCS-03 | Phase 93 | Pending |
@@ -106,10 +106,10 @@ ExecBench.
 | DOCS-05 | Phase 93 | Pending |
 
 **Coverage:**
-- v1 requirements: 23 total, 14 complete
+- v1 requirements: 23 total, 18 complete
 - Mapped to phases: 23
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-05-31*
-*Last updated: 2026-05-31 after Phase 91 completion*
+*Last updated: 2026-05-31 after Phase 92 completion*
