@@ -17,8 +17,14 @@ from sol_execbench.core.compatibility import (
     MatrixPythonDependencyEvidence,
     MatrixTarget,
     MatrixValidationScope,
+    RocmCompatibilityMatrixReport,
     build_matrix_entry,
     classify_matrix_entry_for_execution,
+)
+from sol_execbench.core.matrix_diff import (
+    MatrixDiffSeverity,
+    diff_matrix_reports,
+    matrix_report_diff_to_markdown,
 )
 
 
@@ -358,3 +364,47 @@ def test_container_claim_wording_does_not_overstate_native_host_validation():
 
     assert "container ROCm user-space validated on recorded host driver/devices" in claims
     assert "Docker row is not native host ROCm validated" in claims
+
+
+def test_matrix_diff_keeps_claim_boundary_escalation_diagnostic_only():
+    old_entry = _entry(
+        status=MatrixCompatibilityStatus.NOT_TESTED,
+        reason_code=MatrixCompatibilityReasonCode.TARGET_NOT_TESTED,
+        reason="Target has not been tested.",
+    )
+    new_entry = _entry(
+        status=MatrixCompatibilityStatus.CONTAINER_VALIDATED,
+        reason_code=MatrixCompatibilityReasonCode.CONTAINER_USER_SPACE_VALIDATED,
+        reason="Container ROCm user-space matched the requested Target.",
+        claim_boundary=MatrixClaimBoundary(
+            container_user_space_validated=True,
+            native_host_validated=False,
+            hardware_validated=True,
+        ),
+    )
+    old_report = RocmCompatibilityMatrixReport(
+        generated_at="2026-05-31T09:00:00Z",
+        entries=[old_entry],
+        status_counts={MatrixCompatibilityStatus.NOT_TESTED: 1},
+    )
+    new_report = RocmCompatibilityMatrixReport(
+        generated_at="2026-05-31T09:05:00Z",
+        entries=[new_entry],
+        status_counts={MatrixCompatibilityStatus.CONTAINER_VALIDATED: 1},
+    )
+
+    diff = diff_matrix_reports(old_report, new_report)
+    payload = diff.to_dict()
+    markdown = matrix_report_diff_to_markdown(diff)
+
+    assert payload["score_authority"] is False
+    assert payload["paper_parity_authority"] is False
+    assert payload["leaderboard_authority"] is False
+    assert payload["native_host_validation_authority"] is False
+    assert payload["entry_diffs"][0]["severity"] == (
+        MatrixDiffSeverity.CLAIM_BOUNDARY_ESCALATION.value
+    )
+    assert "Docker/container evidence does not imply native-host validation" in markdown
+    assert "score authority" in markdown
+    assert "paper-parity authority" in markdown
+    assert "leaderboard authority" in markdown
