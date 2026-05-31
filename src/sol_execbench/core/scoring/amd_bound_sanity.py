@@ -689,7 +689,7 @@ def _source_from_ref(
         path=_optional_str(value.get("path")),
         ref=_optional_str(value.get("ref")),
         schema_version=_optional_str(value.get("schema_version")),
-        checksum=_optional_str(value.get("checksum")) or _checksum(value),
+        checksum=_checksum(value),
     )
 
 

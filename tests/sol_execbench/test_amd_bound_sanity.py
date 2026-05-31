@@ -326,6 +326,22 @@ def test_sanity_01_report_builds_existing_evidence_summary():
     assert payload["report_checksum"]["value"]
 
 
+def test_sanity_source_refs_normalize_nested_checksum_values():
+    report = build_amd_bound_sanity_report(
+        trace_refs=[
+            {
+                "path": "trace.jsonl",
+                "ref": "trace:nested-checksum",
+                "schema_version": "sol_execbench.trace.v1",
+                "checksum": {"value": "trace-sha"},
+            }
+        ],
+        created_at=CREATED_AT,
+    )
+
+    assert report.sources.trace_refs[0].checksum == "trace-sha"
+
+
 def test_sanity_02_diagnostic_statuses_do_not_recompute_score_eligibility():
     payload = build_fixture_report().model_dump(mode="json")
     rows = {row["workload_uuid"]: row for row in payload["workloads"]}
