@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
+from pydantic import ValidationError
 
 from sol_execbench.cli.main import cli
 from sol_execbench.core.compatibility import (
@@ -29,6 +30,7 @@ from sol_execbench.core.compatibility import (
 )
 from sol_execbench.core.matrix_diff import (
     MatrixDiffSeverity,
+    MatrixReportDiff,
     diff_matrix_reports,
     load_matrix_report,
     matrix_report_diff_to_markdown,
@@ -394,6 +396,80 @@ def test_matrix_diff_markdown_is_severity_ranked_and_diagnostic_only():
     assert "paper-parity authority" in markdown
     assert "leaderboard authority" in markdown
     assert "runtime_unavailability" in markdown
+
+
+def test_matrix_diff_artifact_rejects_authority_flags():
+    payload = diff_matrix_reports(
+        _report([_entry("target-a")]),
+        _report([_entry("target-a")]),
+    ).to_dict()
+
+    for field, value in (
+        ("diagnostic_compatibility_evidence", False),
+        ("score_authority", True),
+        ("paper_parity_authority", True),
+        ("leaderboard_authority", True),
+        ("native_host_validation_authority", True),
+    ):
+        tampered = dict(payload)
+        tampered[field] = value
+        with pytest.raises(ValidationError):
+            MatrixReportDiff.model_validate(tampered)
+
+
+def test_matrix_diff_classifies_requested_docker_image_metadata_drift():
+    old = _report([_entry("target-a")])
+    new = _report(
+        [
+            _entry(
+                "target-a",
+                target_image_tag="7.1.1-complete",
+                observed_image_tag="7.1.0-complete",
+            )
+        ]
+    )
+
+    changed = diff_matrix_reports(old, new).to_dict()["entry_diffs"][0]
+
+    assert changed["kind"] == "changed"
+    assert "target" in changed["semantic_changes"]
+    assert "image_dependency_drift" in changed["severity_categories"]
+
+
+def test_matrix_diff_markdown_escapes_dynamic_table_cells():
+    old = _report(
+        [
+            _entry(
+                "target-a",
+                artifacts=[
+                    MatrixArtifactReference(
+                        artifact_id="probe",
+                        kind="probe_json",
+                        path="artifacts/old|probe.json",
+                    )
+                ],
+            )
+        ]
+    )
+    new = _report(
+        [
+            _entry(
+                "target-a",
+                artifacts=[
+                    MatrixArtifactReference(
+                        artifact_id="probe",
+                        kind="probe_json",
+                        path="artifacts/new|probe.json",
+                    )
+                ],
+            )
+        ]
+    )
+
+    markdown = matrix_report_diff_to_markdown(diff_matrix_reports(old, new))
+
+    assert "old\\|probe.json" in markdown
+    assert "new\\|probe.json" in markdown
 
 
 def test_load_matrix_report_validates_payload_and_rejects_authority_escalation(tmp_path):
