@@ -10,16 +10,16 @@ ExecBench.
 
 ### Closure Contracts
 
-- [ ] **CLOS-01**: Dataset execution closure has a strict, sidecar-only core
+- [x] **CLOS-01**: Dataset execution closure has a strict, sidecar-only core
   contract with deterministic record ordering, totals, source refs, and
   provenance fields.
-- [ ] **CLOS-02**: Closure status and reason-code vocabulary distinguishes
+- [x] **CLOS-02**: Closure status and reason-code vocabulary distinguishes
   attempted pass, attempted failure, not attempted, filtered, skipped existing
   pass, missing trace, missing derived evidence, and setup/runtime blockers.
-- [ ] **CLOS-03**: Closure provenance can detect manifest, readiness,
+- [x] **CLOS-03**: Closure provenance can detect manifest, readiness,
   ready-subset, workload identity, solution mode, and evidence-requirement
   mismatches before treating existing traces as reusable.
-- [ ] **CLOS-04**: Closure helpers expose CPU-safe validation and serialization
+- [x] **CLOS-04**: Closure helpers expose CPU-safe validation and serialization
   APIs that `scripts/run_dataset.py` can call without changing canonical trace
   JSONL, correctness, timing, or score semantics.
 
@@ -164,10 +164,10 @@ ExecBench.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CLOS-01 | Phase 83 | Pending |
-| CLOS-02 | Phase 83 | Pending |
-| CLOS-03 | Phase 83 | Pending |
-| CLOS-04 | Phase 83 | Pending |
+| CLOS-01 | Phase 83 | Complete |
+| CLOS-02 | Phase 83 | Complete |
+| CLOS-03 | Phase 83 | Complete |
+| CLOS-04 | Phase 83 | Complete |
 | DENOM-01 | Phase 84 | Pending |
 | DENOM-02 | Phase 84 | Pending |
 | DENOM-03 | Phase 84 | Pending |

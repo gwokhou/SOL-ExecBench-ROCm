@@ -86,7 +86,7 @@
 
 ## Phases
 
-- [ ] **Phase 83: Closure Contracts And Provenance Foundation** - Researchers get deterministic, CPU-safe execution-closure contracts and provenance checks for reusable evidence.
+- [x] **Phase 83: Closure Contracts And Provenance Foundation** - Researchers get deterministic, CPU-safe execution-closure contracts and provenance checks for reusable evidence. (completed 2026-05-31)
 - [ ] **Phase 84: Paper Denominator Accounting And Claim Boundaries** - Researchers can account for the public benchmark denominator and evidence gaps without claiming paper parity.
 - [ ] **Phase 85: Compatibility Matrix Schema Export And Semantic Diff** - Researchers and downstream tools can export Matrix schemas and compare Matrix reports semantically.
 - [ ] **Phase 86: Dataset Runner Hardening Integration** - Dataset runs classify closure outcomes and resume behavior consistently without changing default benchmark semantics.
@@ -172,7 +172,7 @@ Phases execute in numeric order: 83 -> 84 -> 85 -> 86 -> 87 -> 88.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 83. Closure Contracts And Provenance Foundation | 0/TBD | Not started | - |
+| 83. Closure Contracts And Provenance Foundation | 2/2 | Complete   | 2026-05-31 |
 | 84. Paper Denominator Accounting And Claim Boundaries | 0/TBD | Not started | - |
 | 85. Compatibility Matrix Schema Export And Semantic Diff | 0/TBD | Not started | - |
 | 86. Dataset Runner Hardening Integration | 0/TBD | Not started | - |

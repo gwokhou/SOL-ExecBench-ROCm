@@ -69,3 +69,10 @@ None - plan executed as written.
 ## Known Stubs
 
 None. Stub-pattern scan only matched intentional empty dictionaries and `None` values in tests and existing argparse defaults.
+
+## Self-Check: PASSED
+
+- Found `scripts/run_dataset.py`.
+- Found `tests/sol_execbench/test_run_dataset_execution_closure.py`.
+- Found `tests/sol_execbench/test_public_contract_guardrails.py`.
+- Found commit `7e4a7d8`.
