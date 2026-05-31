@@ -613,6 +613,7 @@ def test_execution_closure_existing_pass_mismatched_provenance_runs_fresh(
     assert [
         mismatch["reason_code"] for mismatch in closure["provenance_mismatches"]
     ] == [
+        "manifest_checksum_mismatch",
         "readiness_checksum_mismatch",
         "ready_subset_checksum_mismatch",
         "workload_identity_mismatch",

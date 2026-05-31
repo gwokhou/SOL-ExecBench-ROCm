@@ -54,11 +54,13 @@ from sol_execbench.core.data.trace import Trace
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.dataset.execution_closure import (
     EXECUTION_CLOSURE_SCHEMA_VERSION,
+    ExecutionClosureReasonCode,
     ExecutionClosureRecord,
     ExecutionClosureStatus,
     build_execution_closure_report,
     closure_status_for_trace_status,
     closure_status_with_evidence,
+    compare_execution_closure_provenance,
     write_execution_closure_report,
 )
 from sol_execbench.core.scoring.amd_score import (
@@ -918,6 +920,44 @@ def _closure_status_with_evidence(
     return closure_status_with_evidence(ExecutionClosureStatus(status), evidence_gaps).value
 
 
+def _requested_evidence_requirements(args: argparse.Namespace) -> list[str]:
+    requirements: list[str] = []
+    if args.amd_score_report is not None:
+        requirements.append("amd_score")
+    if args.amd_sol_bound_dir is not None:
+        requirements.append("amd_sol_bound")
+    if args.solar_derivation is not None:
+        requirements.append("solar_derivation")
+    if args.timing_evidence_dir is not None:
+        requirements.append("timing_evidence")
+    return requirements
+
+
+def _stale_provenance_mismatch(
+    *,
+    observed: str | None,
+) -> dict[str, object]:
+    return {
+        "field": "execution_closure",
+        "reason_code": ExecutionClosureReasonCode.STALE_PROVENANCE.value,
+        "expected": "matching execution_closure.json provenance",
+        "observed": observed,
+    }
+
+
+def _prior_closure_provenance(path: Path) -> tuple[dict | None, dict[str, object] | None]:
+    if not path.exists():
+        return None, _stale_provenance_mismatch(observed=None)
+    try:
+        payload = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None, _stale_provenance_mismatch(observed="unreadable")
+    provenance = payload.get("provenance") if isinstance(payload, dict) else None
+    if not isinstance(provenance, dict):
+        return None, _stale_provenance_mismatch(observed="missing provenance")
+    return provenance, None
+
+
 def _closure_totals(records: list[dict]) -> dict[str, int]:
     report = build_execution_closure_report(
         records=records,
@@ -934,6 +974,7 @@ def _write_execution_closure(
     records: list[dict],
     provenance: dict,
     filters: dict,
+    provenance_mismatches: list[dict] | None = None,
 ) -> None:
     report = build_execution_closure_report(
         records=records,
@@ -946,6 +987,7 @@ def _write_execution_closure(
             "paper_parity": False,
             "leaderboard_result": False,
         },
+        provenance_mismatches=provenance_mismatches,
     )
     write_execution_closure_report(report, path)
 
@@ -1158,6 +1200,7 @@ def main():
     ready_problems = _ready_problem_map(ready_subset)
     readiness_by_workload = _readiness_workload_map(readiness)
     closure_records: list[dict] = []
+    provenance_mismatches: list[dict] = []
 
     # Auto-detect: single problem dir vs. dataset root
     is_single_problem = (problems_dir / "definition.json").exists() and (
@@ -1309,6 +1352,7 @@ def main():
             else None
         ),
         "dataset_manifest_checksum": _manifest_checksum(dataset_manifest),
+        "requested_evidence_requirements": _requested_evidence_requirements(args),
         "git_commit": _git_commit(),
         "config_path": _relative_ref(config_path, output_dir) if config_path else None,
         "benchmark_config": {
@@ -1351,6 +1395,7 @@ def main():
                 "limit": args.limit,
                 "max_workloads": args.max_workloads,
             },
+            provenance_mismatches=provenance_mismatches,
         )
         print(f"Execution closure saved to {execution_closure_path}")
         return
@@ -1415,73 +1460,96 @@ def main():
             if not selected_workload_refs:
                 continue
 
-        # Skip problems that already have passing results unless --rerun
+        # Skip problems that already have passing results only when prior closure provenance matches.
         if not args.rerun and traces_path.exists():
             traces = json.loads(traces_path.read_text())
             summary = inspect_traces(traces, f"{category}/{problem_name}")
             if summary["failed"] == 0:
-                if (
-                    args.amd_score_report is not None
-                    or args.amd_sol_bound_dir is not None
-                    or args.solar_derivation is not None
-                ):
-                    _extend_derived_reports_for_problem(
-                        amd_scores=amd_scores,
-                        definition_path=definition_path,
-                        workload_path=workload_path,
-                        traces_path=traces_path,
-                        traces_payload=traces,
-                        output_dir=output_dir,
-                        baseline_artifact=scoring_baseline,
-                        sol_bound_artifact_dir=args.amd_sol_bound_dir,
-                        solar_derivation_dir=args.solar_derivation,
-                    )
-                print("  Skipping (already passed). Use --rerun to re-evaluate.")
-                summaries.append(summary)
-                if selected_workload_refs is not None:
-                    trace_by_key = _trace_map(traces)
-                    for workload_ref in selected_workload_refs:
-                        key = _workload_key(
-                            workload_ref.get("uuid"), workload_ref.get("row_index")
+                prior_provenance, stale_mismatch = _prior_closure_provenance(
+                    output_dir / "execution_closure.json"
+                )
+                reuse_mismatches = (
+                    [stale_mismatch]
+                    if stale_mismatch is not None
+                    else [
+                        mismatch.model_dump(mode="json")
+                        for mismatch in compare_execution_closure_provenance(
+                            provenance,
+                            prior_provenance or {},
                         )
-                        attempted_ready_keys.add((problem_id, key))
-                        trace = trace_by_key.get(key)
-                        evidence_refs, evidence_gaps = _derived_evidence_for_workload(
-                            definition_name=str(definition_payload["name"]),
-                            workload_uuid=workload_ref.get("uuid"),
-                            problem_output_dir=problem_output_dir,
+                    ]
+                )
+                if reuse_mismatches:
+                    provenance_mismatches.extend(reuse_mismatches)
+                    print("  Re-running (previous pass has stale closure provenance).")
+                else:
+                    if (
+                        args.amd_score_report is not None
+                        or args.amd_sol_bound_dir is not None
+                        or args.solar_derivation is not None
+                    ):
+                        _extend_derived_reports_for_problem(
+                            amd_scores=amd_scores,
+                            definition_path=definition_path,
+                            workload_path=workload_path,
+                            traces_path=traces_path,
+                            traces_payload=traces,
                             output_dir=output_dir,
-                            amd_score_report=args.amd_score_report,
+                            baseline_artifact=scoring_baseline,
                             sol_bound_artifact_dir=args.amd_sol_bound_dir,
                             solar_derivation_dir=args.solar_derivation,
-                            timing_evidence_dir=args.timing_evidence_dir,
-                            category=category,
                         )
-                        status = _closure_status_with_evidence(
-                            _closure_status_for_trace(trace, skipped=True),
-                            evidence_gaps,
-                        )
-                        closure_records.append(
-                            _closure_record(
-                                category=category,
-                                problem_id=problem_id,
-                                problem_path=str(problem_ref.get("problem_path")),
-                                workload_uuid=workload_ref.get("uuid"),
-                                row_index=int(workload_ref.get("row_index", 0)),
-                                closure_status=status,
-                                readiness=readiness_by_workload.get((problem_id, key)),
-                                trace_ref=_relative_ref(traces_path, output_dir),
-                                summary_ref="summary.json",
-                                solution_ref=_relative_ref(problem_output_dir / "solution.json", output_dir)
-                                if (problem_output_dir / "solution.json").exists()
-                                else None,
-                                evidence_refs=evidence_refs,
-                                evidence_gaps=evidence_gaps,
-                                trace_status=_trace_status(trace),
+                    print("  Skipping (already passed). Use --rerun to re-evaluate.")
+                    summaries.append(summary)
+                    if selected_workload_refs is not None:
+                        trace_by_key = _trace_map(traces)
+                        for workload_ref in selected_workload_refs:
+                            key = _workload_key(
+                                workload_ref.get("uuid"), workload_ref.get("row_index")
                             )
-                        )
-                continue
-            print(f"  Re-running (previous run had {summary['failed']} failures).")
+                            attempted_ready_keys.add((problem_id, key))
+                            trace = trace_by_key.get(key)
+                            evidence_refs, evidence_gaps = _derived_evidence_for_workload(
+                                definition_name=str(definition_payload["name"]),
+                                workload_uuid=workload_ref.get("uuid"),
+                                problem_output_dir=problem_output_dir,
+                                output_dir=output_dir,
+                                amd_score_report=args.amd_score_report,
+                                sol_bound_artifact_dir=args.amd_sol_bound_dir,
+                                solar_derivation_dir=args.solar_derivation,
+                                timing_evidence_dir=args.timing_evidence_dir,
+                                category=category,
+                            )
+                            status = _closure_status_with_evidence(
+                                _closure_status_for_trace(trace, skipped=True),
+                                evidence_gaps,
+                            )
+                            closure_records.append(
+                                _closure_record(
+                                    category=category,
+                                    problem_id=problem_id,
+                                    problem_path=str(problem_ref.get("problem_path")),
+                                    workload_uuid=workload_ref.get("uuid"),
+                                    row_index=int(workload_ref.get("row_index", 0)),
+                                    closure_status=status,
+                                    readiness=readiness_by_workload.get((problem_id, key)),
+                                    trace_ref=_relative_ref(traces_path, output_dir),
+                                    summary_ref="summary.json",
+                                    solution_ref=_relative_ref(problem_output_dir / "solution.json", output_dir)
+                                    if (problem_output_dir / "solution.json").exists()
+                                    else None,
+                                    evidence_refs=evidence_refs,
+                                    evidence_gaps=evidence_gaps,
+                                    trace_status=_trace_status(trace),
+                                )
+                            )
+                    continue
+            if summary["failed"] == 0:
+                pass
+            else:
+                print(f"  Re-running (previous run had {summary['failed']} failures).")
+        elif args.rerun and traces_path.exists():
+            print("  Re-running (--rerun requested).")
 
         # Clear previous run output
         if problem_output_dir.exists():
@@ -1723,6 +1791,7 @@ def main():
                 "limit": args.limit,
                 "max_workloads": args.max_workloads,
             },
+            provenance_mismatches=provenance_mismatches,
         )
         print(f"Execution closure saved to {execution_closure_path}")
 
