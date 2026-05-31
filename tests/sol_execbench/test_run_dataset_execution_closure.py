@@ -168,6 +168,20 @@ def test_ready_subset_runs_through_existing_run_cli_and_stages_workload(
         "selected-workload"
     ]
     assert closure["schema_version"] == "sol_execbench.execution_closure.v1"
+    assert set(closure) == {
+        "claim_boundary",
+        "created_at",
+        "execution_closure_checksum",
+        "filters",
+        "provenance",
+        "provenance_mismatches",
+        "records",
+        "schema_version",
+        "source_refs",
+        "status",
+        "totals",
+    }
+    assert closure["execution_closure_checksum"]["algorithm"] == "sha256"
     assert closure["status"] == "completed"
     assert closure["totals"]["attempted_passed"] == 1
     assert closure["records"][0]["closure_status"] == "attempted_passed"
@@ -318,3 +332,102 @@ def test_execution_closure_marks_missing_requested_derived_evidence(
     assert record["trace_status"] == "PASSED"
     assert record["closure_status"] == "derived_evidence_missing"
     assert record["evidence_gaps"] == ["timing_evidence_missing"]
+
+
+def test_execution_closure_records_are_sorted_by_helper_contract(tmp_path, monkeypatch):
+    dataset_root = tmp_path / "dataset"
+    _write_problem(dataset_root, "L1", "a_demo", [_workload("z-workload")])
+    _write_problem(dataset_root, "L1", "b_demo", [_workload("a-workload")])
+    subset_path = _ready_subset(
+        tmp_path / "ready_subset.json",
+        problems=[
+            {
+                "category": "L1",
+                "problem_id": "L1/b_demo",
+                "problem_path": "L1/b_demo",
+                "workloads": [{"uuid": "a-workload", "row_index": 0}],
+            },
+            {
+                "category": "L1",
+                "problem_id": "L1/a_demo",
+                "problem_path": "L1/a_demo",
+                "workloads": [{"uuid": "z-workload", "row_index": 0}],
+            },
+        ],
+    )
+    output_dir = tmp_path / "out"
+
+    def run_cli(*, workload_path: Path, **kwargs):
+        uuid = json.loads(workload_path.read_text().splitlines()[0])["uuid"]
+        return [_trace(uuid)]
+
+    monkeypatch.setattr(run_dataset, "run_cli", run_cli)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--ready-subset",
+            str(subset_path),
+            "--output",
+            str(output_dir),
+        ],
+    )
+
+    run_dataset.main()
+
+    closure = json.loads((output_dir / "execution_closure.json").read_text())
+    assert [
+        (record["problem_id"], record["row_index"], record["workload_uuid"], record["closure_status"])
+        for record in closure["records"]
+    ] == [
+        ("L1/a_demo", 0, "z-workload", "attempted_passed"),
+        ("L1/b_demo", 0, "a-workload", "attempted_passed"),
+    ]
+
+
+def test_execution_closure_preserves_skipped_existing_pass_without_provenance_enforcement(
+    tmp_path,
+    monkeypatch,
+):
+    dataset_root = tmp_path / "dataset"
+    _write_problem(dataset_root, "L1", "matmul_demo", [_workload("selected-workload")])
+    subset_path = _ready_subset(
+        tmp_path / "ready_subset.json",
+        problems=[
+            {
+                "category": "L1",
+                "problem_id": "L1/matmul_demo",
+                "problem_path": "L1/matmul_demo",
+                "workloads": [{"uuid": "selected-workload", "row_index": 0}],
+            }
+        ],
+    )
+    output_dir = tmp_path / "out"
+    trace_dir = output_dir / "L1" / "matmul_demo"
+    trace_dir.mkdir(parents=True)
+    (trace_dir / "traces.json").write_text(json.dumps([_trace("selected-workload")]))
+
+    def fail_run_cli(*args, **kwargs):
+        raise AssertionError("passing existing traces should be skipped")
+
+    monkeypatch.setattr(run_dataset, "run_cli", fail_run_cli)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--ready-subset",
+            str(subset_path),
+            "--output",
+            str(output_dir),
+        ],
+    )
+
+    run_dataset.main()
+
+    closure = json.loads((output_dir / "execution_closure.json").read_text())
+    assert closure["records"][0]["closure_status"] == "skipped_existing_pass"
+    assert closure["provenance_mismatches"] == []
