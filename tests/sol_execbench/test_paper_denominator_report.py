@@ -302,8 +302,8 @@ def test_paper_denominator_report_aggregates_required_rollups():
     payload = build_fixture_report().model_dump(mode="json")
 
     assert payload["schema_version"] == PAPER_DENOMINATOR_REPORT_SCHEMA_VERSION
-    assert payload["suite"]["problems"] == 3
-    assert payload["suite"]["workloads"] == 4
+    assert payload["suite"]["problems"] == len(payload["problems"]) == 8
+    assert payload["suite"]["workloads"] == len(payload["workloads"]) == 8
     assert payload["suite"]["states"]["ready"] == 2
     assert payload["suite"]["states"]["blocked"] == 1
     assert payload["suite"]["states"]["unsupported"] == 1
@@ -363,6 +363,40 @@ def test_paper_denominator_report_tracks_reasons_and_next_evidence():
     assert any("Attach" in hint["next_evidence"] for hint in payload["next_evidence_hints"])
 
 
+def test_paper_denominator_report_accounts_for_absent_optional_evidence_sources():
+    report = build_paper_denominator_report(
+        manifest={"schema_version": "sol_execbench.dataset_manifest.v1", "manifest_checksum": {"value": "manifest-sha"}},
+        inventory=inventory_fixture(),
+        readiness=readiness_fixture(),
+        ready_subset=ready_subset_fixture(),
+        execution_closure=execution_closure_fixture(),
+        amd_score_report=None,
+        amd_sol_artifacts=[],
+        solar_artifacts=[],
+        source_paths={
+            "manifest": Path("manifest.json"),
+            "inventory": Path("inventory.json"),
+            "readiness": Path("readiness.json"),
+            "ready_subset": Path("ready_subset.json"),
+            "execution_closure": Path("execution_closure.json"),
+        },
+        created_at=CREATED_AT,
+    )
+    payload = report.model_dump(mode="json")
+    reason_codes = {bucket["reason_code"] for bucket in payload["reason_buckets"]}
+    evidence_codes = {gap["reason_code"] for gap in payload["evidence_gaps"]}
+
+    assert "amd_score_evidence_missing" in reason_codes
+    assert "amd_sol_evidence_missing" in reason_codes
+    assert "solar_derivation_missing" in reason_codes
+    assert "amd_score_evidence_missing" in evidence_codes
+    assert "amd_sol_evidence_missing" in evidence_codes
+    assert "solar_derivation_missing" in evidence_codes
+    assert payload["sources"]["amd_score_report"]["path"] is None
+    assert payload["sources"]["amd_sol_artifacts"] == []
+    assert payload["sources"]["solar_artifacts"] == []
+
+
 def test_paper_denominator_report_uses_bounded_source_refs_only():
     payload = build_fixture_report().model_dump(mode="json")
     source = payload["sources"]["inventory"]
@@ -408,7 +442,7 @@ def test_paper_denominator_json_markdown_and_write_helpers_are_deterministic(tmp
     assert "# SOL ExecBench Paper Denominator Report" in first_markdown
     assert "denominator accounting and evidence-gap review only" in first_markdown
     assert "## Reason Buckets" in first_markdown
-    assert "| timing_evidence_missing | 2 | evidence_missing |" in first_markdown
+    assert "| timing_evidence_missing | 3 | evidence_missing |" in first_markdown
     assert "not paper validation" in first_markdown
     assert "not paper parity" in first_markdown
     assert "not upstream SOLAR parity" in first_markdown
@@ -433,3 +467,34 @@ def test_paper_denominator_models_reject_unknown_fields():
 
     with pytest.raises(ValidationError):
         PaperDenominatorReport(**payload)
+
+
+def test_paper_denominator_markdown_escapes_dynamic_table_cells():
+    report = build_paper_denominator_report(
+        manifest={"schema_version": "sol_execbench.dataset_manifest.v1", "manifest_checksum": {"value": "manifest-sha"}},
+        inventory=inventory_fixture(),
+        readiness=readiness_fixture(),
+        ready_subset=ready_subset_fixture(),
+        execution_closure=execution_closure_fixture(),
+        amd_score_report=amd_score_fixture(),
+        amd_sol_artifacts=[
+            {
+                "path": "artifacts/amd|sol\nbound.json",
+                "ref": "pass|bound",
+                "checksum": "amd-sol-sha",
+            }
+        ],
+        solar_artifacts=[
+            {
+                "path": "artifacts/solar|derivation.json",
+                "ref": "pass\nsolar",
+                "checksum": "solar-sha",
+            }
+        ],
+        created_at=CREATED_AT,
+    )
+    markdown = render_paper_denominator_markdown(report)
+
+    assert "artifacts/amd\\|sol bound.json" in markdown
+    assert "pass\\|bound" in markdown
+    assert "pass solar" in markdown
