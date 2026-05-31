@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v1.20
 milestone_name: Cross-Report Consistency and Evaluation Stability
 status: planning
-last_updated: "2026-05-31T14:35:38.049Z"
+last_updated: "2026-05-31T14:45:00.000Z"
 last_activity: 2026-05-31
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -20,14 +20,14 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-31)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Planning next milestone
+**Current focus:** Phase 89 Cross-Report Consistency Contract And Lint
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 89. Cross-Report Consistency Contract And Lint
 Plan: —
-Status: Defining requirements
-Last activity: 2026-05-31 — Milestone v1.20 started
+Status: Roadmap created; ready to plan Phase 89
+Last activity: 2026-05-31 — Milestone v1.20 roadmap created
 
 ## Performance Metrics
 
@@ -41,17 +41,16 @@ Last activity: 2026-05-31 — Milestone v1.20 started
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 83. Closure Contracts And Provenance Foundation | 0/TBD | Not started | n/a |
-| 84. Paper Denominator Accounting And Claim Boundaries | 0/TBD | Not started | n/a |
-| 85. Compatibility Matrix Schema Export And Semantic Diff | 0/TBD | Not started | n/a |
-| 86. Dataset Runner Hardening Integration | 0/TBD | Not started | n/a |
-| 87. AMD SOL/SOLAR Bound Sanity Evidence | 0/TBD | Not started | n/a |
-| 88. Documentation, Examples, And Guardrail Tests | 0/TBD | Not started | n/a |
+| 89. Cross-Report Consistency Contract And Lint | 0/TBD | Not started | n/a |
+| 90. Evaluation Stability Evidence | 0/TBD | Not started | n/a |
+| 91. Claim Upgrade Rules And Authority Gates | 0/TBD | Not started | n/a |
+| 92. Trust Summary Integration | 0/TBD | Not started | n/a |
+| 93. Documentation, Examples, And Guardrail Tests | 0/TBD | Not started | n/a |
 
 **Recent Trend:**
 
-- Last milestone: v1.18 shipped Phases 78-82 on 2026-05-28.
-- Trend: v1.19 starts with six standard-granularity phases focused on sidecar/reporting credibility without new hardware validation.
+- Last milestone: v1.19 shipped Phases 83-88 on 2026-05-31.
+- Trend: v1.20 starts with five standard-granularity phases focused on cross-report consistency, timing-quality diagnostics, claim-upgrade rules, trust summaries, and guardrails before new hardware validation.
 
 | Phase 83 P01 | 403s | 2 tasks | 2 files |
 | Phase 83 P02 | 403s | 3 tasks | 4 files |
@@ -93,6 +92,11 @@ Last activity: 2026-05-31 — Milestone v1.20 started
 - [Phase 87]: [Phase 87 Plan 01]: Claim boundaries are literal false fields plus visible Markdown wording; provisional RDNA 4 risk is a risk flag, not validation.
 - [Phase 88]: [Phase 88]: v1.19 evidence guidance is centralized in docs/v1_19_evidence_guide.md and linked from CLAIMS, TESTING, and RESEARCHER-GUIDE.
 - [Phase 88]: [Phase 88]: v1.19 fixtures remain demo-only with synthetic checksums, relative refs, bounded log refs, diagnostic-only wording, and false authority fields.
+- v1.20 starts at Phase 89 because v1.19 completed Phases 83-88.
+- v1.20 derives phases only from v1.20 requirements: consistency lint, evaluation stability, claim-upgrade rules, trust summary integration, and docs/tests.
+- v1.20 must not expand full 235-problem paper validation, CDNA3/MI300X/CDNA4 validation, native-host Matrix authority, hosted leaderboard readiness, or upstream SOLAR parity.
+- v1.20 evidence remains sidecar/reporting infrastructure and must not change canonical Trace, Definition, Workload, Solution, correctness, timing, scoring, or evaluator semantics.
+- Consistency, stability, claim-upgrade, and trust summary artifacts must remain diagnostic until future evidence satisfies explicit claim-upgrade prerequisites.
 
 ### Pending Todos
 
@@ -110,6 +114,10 @@ None.
 | Paper parity | Full 235-problem real-hardware validation and upstream SOLAR parity | Deferred | v1.19 scope |
 | Public service | Hosted leaderboard or remote submission service | Deferred | v1.19 scope |
 | Dependencies | PyTorch/ROCm dependency relocking or Docker privilege expansion | Deferred | v1.19 scope |
+| Hardware validation | CDNA 3, MI300X, CDNA 4, and native-host ROCm validation expansion | Deferred | v1.20 scope |
+| Paper parity | Full 235-problem real-hardware validation and upstream SOLAR parity | Deferred | v1.20 scope |
+| Public service | Hosted leaderboard or remote submission service | Deferred | v1.20 scope |
+| Dependencies | Dependency relocking, Docker privilege expansion, databases, dashboards, or remote services | Deferred | v1.20 scope |
 
 ## Quick Tasks Completed
 
@@ -127,4 +135,4 @@ Resume file: None
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Start Phase 89 with /gsd-plan-phase 89
