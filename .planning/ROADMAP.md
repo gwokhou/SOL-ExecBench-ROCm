@@ -87,7 +87,7 @@
 ## Phases
 
 - [x] **Phase 83: Closure Contracts And Provenance Foundation** - Researchers get deterministic, CPU-safe execution-closure contracts and provenance checks for reusable evidence. (completed 2026-05-31)
-- [ ] **Phase 84: Paper Denominator Accounting And Claim Boundaries** - Researchers can account for the public benchmark denominator and evidence gaps without claiming paper parity.
+- [x] **Phase 84: Paper Denominator Accounting And Claim Boundaries** - Researchers can account for the public benchmark denominator and evidence gaps without claiming paper parity. (completed 2026-05-31)
 - [ ] **Phase 85: Compatibility Matrix Schema Export And Semantic Diff** - Researchers and downstream tools can export Matrix schemas and compare Matrix reports semantically.
 - [ ] **Phase 86: Dataset Runner Hardening Integration** - Dataset runs classify closure outcomes and resume behavior consistently without changing default benchmark semantics.
 - [ ] **Phase 87: AMD SOL/SOLAR Bound Sanity Evidence** - Researchers can inspect diagnostic AMD bound sanity over existing RDNA 4 and Docker evidence only.
@@ -118,7 +118,7 @@
 **Plans**: 2 plans
 Plans:
 - [x] 84-01-PLAN.md — Core paper denominator sidecar contract, deterministic JSON, Markdown renderer, bounded source refs, and false claim boundaries.
-- [ ] 84-02-PLAN.md — Thin reporting script, dataset exports, script output tests, and public contract guardrails.
+- [x] 84-02-PLAN.md — Thin reporting script, dataset exports, script output tests, and public contract guardrails.
 
 ### Phase 85: Compatibility Matrix Schema Export And Semantic Diff
 **Goal**: Researchers and downstream evidence producers can export strict Matrix JSON Schemas and compare ROCm Compatibility Matrix reports by semantic changes while preserving Docker/native-host and authority boundaries.
@@ -176,7 +176,7 @@ Phases execute in numeric order: 83 -> 84 -> 85 -> 86 -> 87 -> 88.
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 83. Closure Contracts And Provenance Foundation | 2/2 | Complete   | 2026-05-31 |
-| 84. Paper Denominator Accounting And Claim Boundaries | 1/2 | In Progress|  |
+| 84. Paper Denominator Accounting And Claim Boundaries | 2/2 | Complete   | 2026-05-31 |
 | 85. Compatibility Matrix Schema Export And Semantic Diff | 0/TBD | Not started | - |
 | 86. Dataset Runner Hardening Integration | 0/TBD | Not started | - |
 | 87. AMD SOL/SOLAR Bound Sanity Evidence | 0/TBD | Not started | - |
