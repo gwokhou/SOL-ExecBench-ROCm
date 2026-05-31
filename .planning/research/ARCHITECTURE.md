@@ -1,282 +1,391 @@
-# Architecture Research: v1.18 ROCm Version Matrix via Docker
+# Architecture Research
 
-**Project:** SOL ExecBench ROCm Port
-**Scope:** Integration architecture for Docker-selectable ROCm user-space versions, uv/PyTorch ROCm wheel handling, compatibility evidence, reports, docs, and tests.
-**Researched:** 2026-05-28
-**Confidence:** HIGH for repository integration points, MEDIUM for exact future PyTorch ROCm wheel availability.
+**Domain:** ROCm benchmark research-credibility evidence infrastructure  
+**Project:** SOL ExecBench ROCm Port v1.19 Research Credibility Without New Hardware  
+**Researched:** 2026-05-31  
+**Confidence:** HIGH for repository integration points; MEDIUM for exact phase count because roadmap slicing may choose smaller or larger implementation phases.
 
-## Current Integration Points
+## Executive Recommendation
 
-### CLI and Sidecars
+v1.19 should integrate as an additive evidence/reporting layer around the existing dataset, Matrix, and scoring sidecar architecture. Do not change canonical `Trace` semantics, evaluator subprocess behavior, correctness rules, timing rules, or score authority. The safest architecture is to add focused core modules for the new contracts, then call them from the existing script/CLI surfaces that already own the relevant IO.
 
-- `src/sol_execbench/cli/main.py` is the right integration point for run-adjacent evidence because it already owns trace output paths and writes optional sidecars after evaluation.
-- Current sidecar pattern:
-  - trace JSONL remains canonical benchmark output.
-  - environment snapshots are opt-in and written as `<trace>.environment.json` through `SOL_EXECBENCH_ENVIRONMENT_SNAPSHOT*`.
-  - profiling and static kernel evidence are diagnostic sidecars and explicitly avoid score/correctness/timing authority.
-- `sol-execbench doctor --json` is the existing GPU/environment diagnostics command and should expose matrix-readiness diagnostics without requiring a benchmark run.
-- `sol-execbench contract --json` is the existing compatibility metadata surface and should carry claim-boundary text if v1.18 changes public evidence expectations.
+The main new package components should live near existing bounded domains:
 
-### Data Models
+- Denominator accounting: `src/sol_execbench/core/dataset/denominator.py`
+- Matrix diff and schema export: `src/sol_execbench/core/compatibility_diff.py` and small additions to `src/sol_execbench/core/compatibility.py`
+- Run-dataset hardening: focused helpers under `src/sol_execbench/core/dataset/execution_closure.py`, with thin adapter calls from `scripts/run_dataset.py`
+- AMD SOL/SOLAR sanity evidence: `src/sol_execbench/core/scoring/amd_sanity.py`
 
-- Canonical `Trace` models live in `src/sol_execbench/core/data/trace.py`. Do not add Docker matrix state to `Trace` or `Evaluation.environment` unless public benchmark semantics intentionally change.
-- Optional environment evidence lives in `src/sol_execbench/core/environment.py` with strict Pydantic payloads and injectable probe runners. This is the best home for host/container/PyTorch/toolchain version evidence.
-- Generic derived-report helpers live in `src/sol_execbench/core/reporting.py`. Compatibility matrix aggregation should follow this pattern: derived, trace-adjacent, and non-authoritative.
-- Tool availability/routing already lives in `src/sol_execbench/core/toolchain.py` and `src/sol_execbench/core/diagnostics.py`; use those only for toolchain checks, not Docker orchestration.
+Keep user-facing command exposure small. The primary CLI in `src/sol_execbench/cli/main.py` can expose GPU-free metadata/report commands if needed, but batch-run behavior should stay in `scripts/run_dataset.py` because it already owns dataset fan-out, resume behavior, derived evidence sidecars, and execution closure.
 
-### Docker Scripts
-
-- `docker/Dockerfile` currently pins `rocm/dev-ubuntu-24.04:7.1.1-complete` and runs `uv sync --frozen --all-groups`.
-- `scripts/run_docker.sh` owns image tag/name, build args, native Linux Docker checks, device passthrough, repository mount, and runtime env passthrough.
-- `docker/entrypoint.sh` owns container startup checks and clock locking before delegating to the user command.
-- Docker version selection should be implemented at this operational boundary, then reflected into package diagnostics through environment variables and probes. The core evaluator should not call Docker.
-
-### uv and PyTorch ROCm Wheels
-
-- `pyproject.toml` currently pins Linux/Windows PyTorch to `2.10.0+rocm7.1` and `torchvision` to `0.25.0+rocm7.1`, with `pytorch-rocm71` and root PyTorch wheel indexes.
-- v1.18 needs a project-owned selection/detection layer because Docker base ROCm user-space and PyTorch wheel tags can diverge.
-- Wheel availability is an external moving target. The architecture should support `available`, `unavailable`, and `unknown/not_tested` outcomes rather than assuming every ROCm Docker tag has a matching current PyTorch wheel.
-
-### Docs and Guardrails
-
-- Existing docs already distinguish ROCm claims, Docker usage, environment snapshots, profiling/static evidence, and original parity boundaries.
-- v1.18 must add an explicit boundary: container user-space validation is not the same as native host ROCm validation. Host kernel/driver compatibility still matters because `/dev/kfd` and `/dev/dri` are passed through from the host.
-
-## Proposed Components
-
-### 1. Docker Matrix Configuration
-
-**Modify:** `docker/Dockerfile`, `scripts/run_docker.sh`
-**Optional new file:** `docker/rocm-matrix.json`
-
-- Add `ARG ROCM_VERSION=7.1.1` and construct the base image as `rocm/dev-ubuntu-24.04:${ROCM_VERSION}-complete`.
-- Add `ROCM_VERSION`, `PYTORCH_ROCM_INDEX`, and `PYTORCH_ROCM_TAG` build args/env vars, but keep defaults matching the current repository state.
-- Make `scripts/run_docker.sh` accept a small, explicit flag such as `--rocm 7.1.1` and derive:
-  - image tag, for example `sol-execbench:rocm7.1.1`.
-  - Docker build arg `ROCM_VERSION=7.1.1`.
-  - PyTorch ROCm wheel selector env/build arg.
-- Prefer a checked-in mapping table over ad hoc shell string parsing:
-  - Docker ROCm user-space tag.
-  - expected PyTorch wheel index suffix/tag.
-  - support status: `supported`, `wheel_unavailable`, `experimental`, `not_tested`.
-
-**Why:** Docker matrix selection is operational infrastructure. Keeping it in Docker scripts avoids contaminating benchmark models with container mechanics.
-
-### 2. PyTorch ROCm Wheel Strategy
-
-**Modify:** `pyproject.toml`, `uv.lock`, `docker/Dockerfile`
-**Optional new script:** `scripts/check_pytorch_rocm_wheel.py`
-
-- Keep the default lockfile on one validated baseline for normal local development.
-- For Docker matrix builds, pass a selected PyTorch index through `uv` configuration rather than editing canonical project metadata at runtime.
-- If multiple ROCm wheels are officially available, represent them as named uv indexes in `pyproject.toml` and choose through build-time env/constraints.
-- If a requested matrix row has no matching wheel, fail early during Docker build or emit a `pytorch_wheel_unavailable` report row without pretending the environment was validated.
-
-**Why:** The repository needs reproducible default dependencies, but matrix Docker builds need controlled variant selection. Variant handling belongs to Docker build orchestration and diagnostics, not trace serialization.
-
-### 3. Compatibility Evidence Models
-
-**Modify:** `src/sol_execbench/core/environment.py`
-**New module likely:** `src/sol_execbench/core/compatibility.py`
-
-Add a small compatibility model family:
-
-- `RocmVersionEvidence`
-  - host driver/runtime evidence from host-side probes when available.
-  - container ROCm user-space evidence from `/opt/rocm/.info/version*`, `hipcc --version`, `rocminfo`, and environment variables.
-  - PyTorch evidence from `torch.__version__`, `torch.version.hip`, device availability, device name, and gfx target.
-  - Triton/toolchain evidence from `triton`, `triton-rocm`, `hipcc`, `rocprofv3`, `rocm_agent_enumerator`.
-- `CompatibilityMatrixRow`
-  - requested ROCm version.
-  - container image tag.
-  - selected/observed PyTorch ROCm tag.
-  - host ROCm evidence.
-  - container ROCm evidence.
-  - GPU architecture.
-  - status enum: `host_validated`, `container_validated`, `mixed_version`, `pytorch_wheel_unavailable`, `runtime_unavailable`, `not_tested`.
-  - warnings and claim boundaries.
-- `CompatibilityMatrixReport`
-  - schema version such as `sol_execbench.rocm_compatibility_matrix.v1`.
-  - generated timestamp.
-  - rows.
-  - `diagnostic_only=true`.
-  - authority booleans all false for correctness, timing, scoring, paper parity, and leaderboard claims.
-
-Keep this separate from `Trace`. `EnvironmentSnapshot` can embed detailed version evidence, while `CompatibilityMatrixReport` aggregates one or more snapshots into a researcher-facing report.
-
-### 4. CLI Surfaces
-
-**Modify:** `src/sol_execbench/cli/main.py`
-
-Recommended additions:
-
-- `sol-execbench doctor --json` includes compatibility checks derived from the current environment.
-- A focused command such as `sol-execbench compatibility --json` can emit the current row/report without running a benchmark.
-- Evaluation CLI may gain `--compatibility-report auto|none` only if reports must be trace-adjacent for benchmark runs. Default should be `none` or environment-gated to preserve current behavior.
-
-Do not make Docker matrix execution a `sol-execbench` subcommand. Let `scripts/run_docker.sh` run Docker and call `sol-execbench doctor --json` or `sol-execbench compatibility --json` inside the container.
-
-### 5. Docker-to-Evidence Handshake
-
-**Modify:** `scripts/run_docker.sh`, `docker/entrypoint.sh`, `src/sol_execbench/core/environment.py`
-
-Pass these environment variables into the container:
-
-- `SOL_EXECBENCH_REQUESTED_ROCM_VERSION`
-- `SOL_EXECBENCH_CONTAINER_IMAGE`
-- `SOL_EXECBENCH_PYTORCH_ROCM_INDEX`
-- `SOL_EXECBENCH_COMPATIBILITY_REPORT`
-
-The package records them as requested configuration, then separately records observed values from probes. Status is computed from requested-vs-observed evidence. This prevents shell scripts from being the source of truth for validation.
-
-### 6. Docs and Claim Guardrails
-
-**Modify:** `README.md`, `docs/rocm.md`, `docs/CONFIGURATION.md`, `docs/CLAIMS.md`
-**New doc likely:** `docs/rocm_version_matrix.md`
-
-Documentation should state:
-
-- how to build/run each supported Docker ROCm user-space image.
-- how PyTorch ROCm wheels are selected and what unavailable means.
-- what report files are produced.
-- why container validation is `container_validated` unless host-native evidence is separately collected.
-- that trace JSONL remains the canonical benchmark result, while compatibility reports are environment/reproducibility evidence.
-
-## Data Flow
+## Existing Architecture Baseline
 
 ```text
-User selects ROCm row
-  |
-  v
-scripts/run_docker.sh --rocm X.Y.Z
-  |
-  |-- validates native Linux Docker + /dev/kfd + /dev/dri
-  |-- derives image tag and wheel selector
-  |-- docker build --build-arg ROCM_VERSION --build-arg PYTORCH_ROCM_*
-  v
-Docker image
-  |
-  |-- base image supplies ROCm user-space
-  |-- uv installs selected/default PyTorch ROCm wheel
-  v
-docker/entrypoint.sh
-  |
-  |-- records requested env
-  |-- performs existing clock-lock startup behavior
-  v
-sol-execbench doctor/compatibility/evaluate
-  |
-  |-- core.environment probes observed ROCm/PyTorch/Triton/toolchain/GPU values
-  |-- core.compatibility classifies status
-  |-- CLI writes report sidecar or standalone JSON
-  v
-Artifacts
-  |
-  |-- trace.jsonl                         canonical benchmark output
-  |-- trace.jsonl.environment.json        optional environment evidence
-  |-- trace.jsonl.compatibility.json      optional diagnostic compatibility report
-  |-- matrix report JSON/Markdown         derived compatibility overview
+----------------------------------------------------------------
+| CLI / Script Entry Points                                     |
+| src/sol_execbench/cli/main.py                                 |
+| scripts/run_dataset.py                                       |
+----------------------------------------------------------------
+                              |
+                              v
+----------------------------------------------------------------
+| Core Evidence Domains                                         |
+| dataset/: manifest, inventory, readiness, ready_subset        |
+| compatibility.py: strict ROCm Matrix Entry/Report contracts   |
+| scoring/: AMD SOL/SOLAR and AMD-native derived score reports  |
+----------------------------------------------------------------
+                              |
+                              v
+----------------------------------------------------------------
+| Canonical Evaluator Boundary                                  |
+| core/data/Trace, driver/problem_packager.py, eval_driver.py   |
+| correctness/timing/reward-hack behavior                       |
+----------------------------------------------------------------
+                              |
+                              v
+----------------------------------------------------------------
+| Artifact Outputs                                              |
+| trace JSONL, sidecar JSON, docs claim tables, guardrail tests |
+----------------------------------------------------------------
 ```
 
-Rules:
+The important invariant is already present: `Trace` remains the canonical benchmark output, while optional compatibility, profiler, static evidence, score, dataset readiness, and closure artifacts are sidecars. v1.19 should follow that same invariant.
 
-- The generated evaluation driver continues to emit only strict trace JSONL.
-- Compatibility collection happens in the parent CLI or standalone diagnostic command after/beside evaluation.
-- `scripts/run_dataset.py` may pass through compatibility-report options and copy report paths into run closure metadata, but should not compute compatibility status itself.
-- Docker scripts provide requested matrix coordinates; Python probes provide observed evidence; the compatibility model compares them.
+## Recommended v1.19 System Shape
 
-## Build Order
+```text
+                                 -------------------------------
+                                 | Existing Trace JSONL         |
+                                 | core/data/trace.py           |
+                                 | NO v1.19 schema changes      |
+                                 -------------------------------
+                                                |
+                                                | read-only input
+                                                v
+--------------------------       -------------------------------       --------------------------
+| Dataset inventory      |       | Dataset runner / closure     |       | AMD SOL/SOLAR inputs   |
+| core/dataset/*.py      |------>| scripts/run_dataset.py       |------>| core/scoring/*.py      |
+| manifest/readiness     |       | thin orchestration only      |       | bound artifacts        |
+--------------------------       -------------------------------       --------------------------
+            |                                   |                                  |
+            v                                   v                                  v
+--------------------------       -------------------------------       --------------------------
+| denominator report     |       | hardened execution closure   |       | sanity evidence report |
+| core/dataset/           |       | core/dataset/                 |       | core/scoring/          |
+| denominator.py          |       | execution_closure.py          |       | amd_sanity.py          |
+--------------------------       -------------------------------       --------------------------
 
-1. **Schema and status vocabulary**
-   - Add compatibility evidence/report models and tests first.
-   - Lock status values: `host_validated`, `container_validated`, `mixed_version`, `pytorch_wheel_unavailable`, `runtime_unavailable`, `not_tested`.
-   - Add authority/claim-boundary fields from the start.
+--------------------------       -------------------------------       --------------------------
+| Matrix entries/reports  |------>| Matrix diff report          |------>| schema export JSON     |
+| core/compatibility.py   |       | core/compatibility_diff.py   |       | model_json_schema()    |
+--------------------------       -------------------------------       --------------------------
+```
 
-2. **Environment probe expansion**
-   - Extend `EnvironmentSnapshot` or add adjacent compatibility collection to record ROCm user-space version, PyTorch ROCm tag, Triton version, hipcc version, and requested Docker matrix env vars.
-   - Keep probe runners injectable and timeout-bounded.
+## Component Responsibilities
 
-3. **CLI diagnostic/report surface**
-   - Add `compatibility --json` or extend `doctor --json`.
-   - Add optional trace-adjacent compatibility sidecar only after standalone reporting works.
+| Component | New or Modified | Responsibility | Exact Integration Point |
+|-----------|-----------------|----------------|-------------------------|
+| Denominator report model | New | Summarize original paper dataset denominator status as ready, blocked, unsupported, deferred, missing evidence, attempted, passed, failed, and scored without implying paper parity. | Add `src/sol_execbench/core/dataset/denominator.py`; consume `DatasetInventory`, `DatasetReadiness`, `ReadySubset`, execution closure, AMD score, SOL/SOLAR sidecars. |
+| Dataset inventory/readiness | Existing, narrow extension only if needed | Continue owning static dataset parsing and ROCm readiness classification. | `src/sol_execbench/core/dataset/inventory.py`, `readiness.py`, `ready_subset.py`; do not duplicate inventory parsing in new code. |
+| Execution closure model/helper | New or extracted | Move closure status vocabulary, record construction, totals, manifest consistency checks, and deterministic output building out of the large runner. | Extract from `scripts/run_dataset.py` into `src/sol_execbench/core/dataset/execution_closure.py`; keep script CLI args and file writes in the script. |
+| Dataset runner adapter | Modified, minimal | Keep batch orchestration, solution construction, CLI invocation, resume behavior, and optional derived report flags. Use core helpers for status classification and report payloads. | `scripts/run_dataset.py`; avoid broad refactor. |
+| Matrix diff report | New | Compare two `RocmCompatibilityMatrixReport` or `MatrixEntry` payloads and classify status, target, dependency, image, runtime, clock/evidence, and artifact changes. | Add `src/sol_execbench/core/compatibility_diff.py`; validate inputs with `RocmCompatibilityMatrixReport` from `compatibility.py`. |
+| Matrix schema export | Modified, small | Export JSON Schema for `MatrixEntry`, `RocmCompatibilityMatrixReport`, and diff report so downstream CI/evidence producers can validate sidecars. | Add helper functions in `src/sol_execbench/core/compatibility.py` or a small `compatibility_schema.py`; expose through CLI/subcommand or `python -m` style module. |
+| Main CLI metadata dispatch | Modified only if public command is required | Add GPU-free commands such as `matrix schema` or `matrix diff` if roadmap wants `sol-execbench` exposure. | `src/sol_execbench/cli/main.py`; mirror existing `contract`, `doctor`, `toolchain` dispatch style. |
+| AMD SOL/SOLAR sanity evidence | New | Evaluate existing RDNA 4/Docker evidence against provisional AMD SOL/SOLAR model expectations and emit a diagnostic-only sanity report. | Add `src/sol_execbench/core/scoring/amd_sanity.py`; read existing AMD score, `amd_sol_v2`, `solar_derivation`, timing evidence, and compatibility sidecars. |
+| Claim guardrail docs/tests | Modified | Keep denominator, Matrix, closure, and sanity claims separate from paper parity, leaderboard authority, and new hardware validation. | `docs/CLAIMS.md`, `docs/TESTING.md`, focused tests under `tests/sol_execbench/`. |
 
-4. **Docker matrix plumbing**
-   - Parameterize Docker base image.
-   - Add `scripts/run_docker.sh --rocm`.
-   - Add matrix mapping and early failure/report behavior for unavailable PyTorch wheels.
+## Data Flow Changes
 
-5. **uv/PyTorch selection**
-   - Add uv index/source support for validated wheel rows.
-   - Keep default lock stable.
-   - Document and test mixed-version detection.
+### 1. Denominator Accounting Flow
 
-6. **Reports and dataset integration**
-   - Add matrix report generation and Markdown/JSON rendering.
-   - Let `scripts/run_dataset.py` attach/copy reports without changing trace parsing or scoring.
+```text
+dataset root
+  -> build_dataset_inventory()
+  -> classify_rocm_readiness()
+  -> build_ready_subset()
+  -> optional execution_closure.json from scripts/run_dataset.py
+  -> optional AMD score / SOL / SOLAR evidence sidecars
+  -> denominator report sidecar
+```
 
-7. **Docs and claim guardrails**
-   - Document commands and claim boundaries.
-   - Add doc tests ensuring Docker/container validation is not described as host-native validation.
+The denominator report should be a new sidecar contract, not a replacement for `parity_gap.py`. `src/sol_execbench/core/dataset/parity_gap.py` already aggregates several denominator-style counts, but v1.19 needs a clearer paper-denominator status vocabulary. Build on its source-loading and checksum patterns, but use a new schema version such as `sol_execbench.paper_denominator_report.v1`.
 
-## Test Strategy
+Recommended status mapping:
 
-### Unit Tests
+| Status | Meaning | Inputs |
+|--------|---------|--------|
+| `ready` | Static ROCm blockers absent; ready to attempt bounded execution. | `DatasetReadiness.workloads[].status == "ready"` |
+| `blocked` | Schema/input/runtime blockers prevent clean attempt. | readiness statuses such as `schema_input_blocked`, `custom_input_blocked`, `runtime_blocked` |
+| `unsupported` | NVIDIA-only or ROCm-unsupported path. | readiness reason `nvidia_cuda_runtime_hint` or explicit unsupported classifications |
+| `deferred` | In scope conceptually but outside current milestone/hardware evidence. | low precision, Quant, CDNA-only, or configured defer reason |
+| `missing_evidence` | Could be reported only if required sidecars are absent. | closure `derived_evidence_missing`, missing SOL/SOLAR/timing refs |
+| `attempted_passed` | Attempted and canonical trace passed. | execution closure |
+| `attempted_failed` | Attempted and canonical trace failed or no trace emitted. | execution closure |
 
-- `tests/sol_execbench/test_rocm_compatibility.py`
-  - report models round-trip strict JSON.
-  - status vocabulary is locked.
-  - authority booleans are false.
-  - requested-vs-observed matching yields `container_validated`.
-  - host/native evidence can yield `host_validated`.
-  - mismatched requested/container/PyTorch versions yields `mixed_version`.
-  - unavailable PyTorch wheel yields `pytorch_wheel_unavailable`.
-  - missing runtime/GPU/PyTorch availability yields `runtime_unavailable`.
-  - unexecuted rows stay `not_tested`.
+Keep category/problem/workload denominators explicit. The report should include source checksums for manifest, inventory, readiness, ready subset, execution closure, and derived evidence reports so readers can reconstruct the count path.
 
-- `tests/sol_execbench/test_environment_snapshot.py`
-  - expanded probes are injectable and GPU-free.
-  - ROCm version files and `hipcc --version` parsing are bounded and conservative.
-  - PyTorch ROCm build tag parsing handles `+rocm7.1`, missing tag, and import errors.
+### 2. Matrix Diff And Schema Export Flow
 
-- `tests/sol_execbench/test_cli_environment_snapshot.py`
-  - compatibility sidecar path tracks trace output.
-  - report writing is nonfatal and does not mutate trace JSONL.
-  - `doctor --json` or `compatibility --json` includes expected schema/status.
+```text
+old matrix JSON + new matrix JSON
+  -> validate as RocmCompatibilityMatrixReport
+  -> index entries by target_id + validation_scope + requested ROCm/user-space identity
+  -> compare stable fields
+  -> emit diagnostic diff sidecar
+```
 
-### Script Tests
+The diff should compare validated Pydantic models, not raw dicts. It should classify changes by field family:
 
-- Add shell/static tests for `scripts/run_docker.sh` parsing:
-  - `--rocm 7.1.1` produces expected image tag/build arg/env.
-  - unknown ROCm version fails with an actionable message.
-  - explicit Docker args and command splitting still work.
-- Add Dockerfile text tests:
-  - base image uses `ARG ROCM_VERSION`.
-  - current default remains the validated baseline.
-  - build args/env vars for PyTorch ROCm wheel selection are present.
+- Target changes: requested ROCm version, target id, validation scope, intended architecture.
+- Image changes: Docker repository, tag, digest.
+- Dependency changes: PyTorch/TorchVision/Triton versions, ROCm wheel target, policy IDs.
+- Runtime changes: host/container ROCm, HIP version, GPU arch/name/count, device availability.
+- Status changes: `MatrixCompatibilityStatus`, reason code, benchmark/probe/smoke decision.
+- Evidence changes: artifact refs added/removed, missing evidence, clock/evidence notes where represented in artifacts or linked sidecars.
 
-### Integration Tests
+Schema export should use Pydantic v2 `model_json_schema()` on strict models. The exported schema files should remain sidecar/report contracts, not public `Trace` contracts. A practical first target is:
 
-- Keep GPU integration tests marker-gated with `requires_rocm`.
-- Add one smoke path inside Docker for the default matrix row:
-  - `./scripts/run_docker.sh --build --rocm <default> -- sol-execbench doctor --json`
-  - `./scripts/run_docker.sh --rocm <default> -- uv run pytest tests/sol_execbench/test_rocm_compatibility.py`
-- Full matrix validation should produce report artifacts but remain opt-in because it depends on external images, wheel availability, host driver compatibility, and hardware access.
+- `MatrixEntry.model_json_schema()`
+- `RocmCompatibilityMatrixReport.model_json_schema()`
+- `RocmCompatibilityMatrixDiff.model_json_schema()`
 
-### Guardrail Tests
+The schema exporter can live in a small helper rather than bloating `compatibility.py`. If exposed through `sol-execbench`, follow the existing `contract`, `doctor`, and `toolchain` metadata-command dispatch in `src/sol_execbench/cli/main.py`.
 
-- Assert docs use `container_validated` and explain host dependency for `/dev/kfd` and `/dev/dri`.
-- Assert docs do not claim Docker user-space validation is native host ROCm validation.
-- Assert compatibility reports state they are diagnostic/reproducibility evidence, not correctness, timing, scoring, paper-parity, or leaderboard authority.
-- Assert canonical trace JSONL schema remains unchanged for v1.18 unless a deliberate contract version bump is separately approved.
+### 3. Run-Dataset Hardening Flow
 
-## Phase Split Suggestions
+`scripts/run_dataset.py` is already the correct orchestration boundary, but it is a large file. v1.19 should reduce risk by extracting deterministic policy and report-building pieces instead of moving the runner wholesale.
 
-1. **Contracts and probe architecture**: compatibility models, evidence probes, status classifier, unit tests.
-2. **CLI/report integration**: `doctor`/`compatibility` JSON, optional trace-adjacent report sidecar, nonfatal write behavior.
-3. **Docker and uv matrix plumbing**: Docker ARGs, `run_docker.sh --rocm`, wheel selection/detection, early unavailable states.
-4. **Matrix reports and dataset handoff**: report renderer, dataset-runner passthrough/copying, no scoring integration.
-5. **Docs and guardrails**: command docs, claim boundaries, doc tests, compatibility matrix examples.
+Recommended extraction:
 
-## Key Architectural Decision
+```text
+scripts/run_dataset.py
+  owns argparse, discovery, solution construction, subprocess invocation, artifact paths
+  calls:
+    core/dataset/execution_closure.py
+      - ExecutionClosureRecord Pydantic model
+      - ExecutionClosureReport Pydantic model
+      - failure classification vocabulary
+      - resume/manifest consistency validators
+      - closure totals
+      - deterministic serialization
+```
 
-Treat ROCm version matrix support as **environment compatibility evidence around the benchmark**, not as benchmark result data. Docker scripts select and label the environment, Python probes observe and classify it, reports preserve the evidence, and trace JSONL remains unchanged as the canonical benchmark execution contract.
+Hardening should add explicit classifications for cases currently collapsed into "CLI returned no traces" or broad attempted failures:
+
+- `cli_timeout`
+- `compile_failed`
+- `evaluation_nonzero_no_trace`
+- `trace_parse_failed`
+- `trace_missing_workload`
+- `manifest_checksum_mismatch`
+- `ready_subset_checksum_mismatch`
+- `resume_output_incomplete`
+- `derived_evidence_missing`
+
+The runner should still produce `summary.json`, per-problem `traces.json`, optional AMD score reports, and optional closure reports. The hardening artifact should make resume behavior reproducible by recording input checksums, selected workload refs, existing trace status, evidence refs, and why an existing pass was reused or rejected.
+
+### 4. AMD SOL/SOLAR Sanity Evidence Flow
+
+```text
+trace/performance evidence
+  + amd_sol_v2 sidecars
+  + solar_derivation sidecars
+  + AMD-native score report
+  + Matrix/runtime evidence
+  -> diagnostic sanity report
+```
+
+The sanity report should validate relationships and evidence completeness, not create new score authority. It should answer questions such as:
+
+- Is every scored workload linked to a SOL bound artifact and SOLAR derivation sidecar?
+- Are hardware model refs consistent with observed RDNA 4 evidence?
+- Are degraded SOLAR derivations counted separately from complete derivations?
+- Are performance/timing artifacts unlocked, missing, or container-only?
+- Are provisional model warnings present when evidence is RDNA 4/Docker-only?
+
+Recommended schema fields:
+
+- `schema_version`
+- `created_at`
+- `sources`
+- `workload_checks`
+- `status_counts`
+- `model_risk_summary`
+- `claim_boundary`
+
+Claim boundary flags should be explicit:
+
+- `diagnostic_sanity_evidence: true`
+- `score_authority: false`
+- `paper_parity_authority: false`
+- `leaderboard_authority: false`
+- `new_hardware_validation: false`
+- `cdna3_validated: false`
+- `cdna4_validated: false`
+
+## Build Order Recommendation
+
+1. **Extract/define closure contracts first**
+   - Create `src/sol_execbench/core/dataset/execution_closure.py`.
+   - Move the status vocabulary and deterministic report model out of `scripts/run_dataset.py`.
+   - Add unit tests for totals, status validation, checksum mismatch, and deterministic ordering.
+   - Rationale: denominator accounting depends on reliable closure inputs, and this reduces risk in the largest touched module.
+
+2. **Add denominator accounting**
+   - Create `src/sol_execbench/core/dataset/denominator.py`.
+   - Consume manifest/inventory/readiness/ready-subset/closure/score sidecars.
+   - Add tests with small fixture payloads covering ready, blocked, unsupported, deferred, missing evidence, attempted pass/fail.
+   - Rationale: this is the core milestone claim and should land before docs wording.
+
+3. **Add Matrix schema export**
+   - Add schema helper/exporter for `MatrixEntry` and `RocmCompatibilityMatrixReport`.
+   - Add tests that schemas include strict authority flags and status enums.
+   - Rationale: low runtime risk, builds directly on existing strict Pydantic models.
+
+4. **Add Matrix diff**
+   - Create `src/sol_execbench/core/compatibility_diff.py`.
+   - Compare validated reports by stable entry identity.
+   - Add tests for status changes, dependency changes, image changes, evidence additions/removals, and missing entries.
+   - Rationale: schema export establishes the contract; diff then gets its own contract.
+
+5. **Harden `scripts/run_dataset.py` with core helpers**
+   - Replace local closure helper logic with calls into `core/dataset/execution_closure.py`.
+   - Add failure classification around subprocess timeout, no traces, partial traces, resume consistency, and sidecar evidence checks.
+   - Rationale: do this after core contracts exist so script edits are mechanical and contained.
+
+6. **Add AMD SOL/SOLAR sanity evidence**
+   - Create `src/sol_execbench/core/scoring/amd_sanity.py`.
+   - Read existing derived sidecars and Matrix/runtime evidence.
+   - Add CPU-safe tests using fixture JSON; no new hardware validation.
+   - Rationale: this relies on denominator/closure evidence and should be positioned as a diagnostic capstone.
+
+7. **Docs and guardrails**
+   - Update `docs/CLAIMS.md`, `docs/TESTING.md`, researcher docs, and schema docs.
+   - Add wording tests for "paper parity", "leaderboard", "native host", "new hardware", "CDNA 3", and "CDNA 4" claims.
+   - Rationale: docs should reflect stable artifact contracts, not lead implementation.
+
+## Patterns To Follow
+
+### Pattern: Versioned Pydantic Sidecar Contracts
+
+**What:** Define strict Pydantic models with schema version constants, deterministic `to_json()` or `to_dict()` helpers, checksum fields where useful, and explicit claim boundaries.
+
+**Use for:** denominator reports, closure reports, Matrix diffs, schema export manifests, AMD sanity reports.
+
+**Why:** Existing code already uses this for dataset manifests, readiness, ready subsets, Matrix entries, and AMD scoring artifacts. It keeps reports auditable and testable without touching canonical trace.
+
+### Pattern: Script As Adapter, Core As Policy
+
+**What:** Keep `scripts/run_dataset.py` responsible for CLI arguments, paths, subprocess calls, and file writes. Move classification and payload construction to `src/sol_execbench/core/dataset/`.
+
+**Use for:** failure classification, resume consistency, closure totals, denominator source normalization.
+
+**Why:** The runner is a known large orchestration hotspot. Small extra branches in that file are acceptable; new policy clusters should be in tested core modules.
+
+### Pattern: Read Canonical Trace, Do Not Extend It
+
+**What:** v1.19 reports may read `Trace` payloads, but they must not add fields to `src/sol_execbench/core/data/trace.py` or reinterpret evaluator statuses.
+
+**Use for:** denominator pass/fail counts, AMD sanity checks, closure status.
+
+**Why:** `Trace` is the public benchmark contract. Research credibility artifacts are sidecars and reports.
+
+### Pattern: Source Checksums For Research Claims
+
+**What:** Every aggregate report should include source paths, schema versions, and checksums when available.
+
+**Use for:** denominator reports, Matrix diffs, AMD sanity reports.
+
+**Why:** v1.19 is about auditability. A count without source identity is hard to reproduce.
+
+## Anti-Patterns To Avoid
+
+### Mutating `Trace` For Denominator Or Sanity Fields
+
+**Why bad:** It changes the public benchmark contract and risks confusing diagnostic evidence with evaluator authority.
+
+**Do instead:** Add sidecar models under `core/dataset/`, `core/compatibility*`, or `core/scoring/`.
+
+### Adding A Second Dataset Discovery Implementation
+
+**Why bad:** It will drift from `build_dataset_inventory()`, readiness, and ready-subset semantics.
+
+**Do instead:** Consume `DatasetInventory`, `DatasetReadiness`, and `ReadySubset` payloads.
+
+### Broad Refactor Of `scripts/run_dataset.py`
+
+**Why bad:** The file combines CLI fan-out, trace interpretation, scoring, closure, timing evidence, and resume logic. Large reshaping will create regression risk.
+
+**Do instead:** Extract stable helper modules, then make small adapter edits.
+
+### Treating Matrix Diff As Validation Authority
+
+**Why bad:** Matrix entries are diagnostic compatibility evidence. A diff can explain changes, not upgrade benchmark, host, paper, or leaderboard claims.
+
+**Do instead:** Add explicit diff claim boundaries and preserve existing Matrix authority flags.
+
+### Letting AMD Sanity Evidence Become A New Score
+
+**Why bad:** The sanity report is a consistency and risk report over existing evidence. It must not create new SOL/SOLAR or leaderboard authority.
+
+**Do instead:** Keep sanity status separate from `AmdNativeScore` and make provisional model warnings visible.
+
+## Risk Containment
+
+| Risk | Containment |
+|------|-------------|
+| Large runner regression | Add core helpers first; keep `scripts/run_dataset.py` edits narrow and covered by dry-run/fixture tests. |
+| Claim overreach | Every new report has explicit authority flags set false for paper parity, leaderboard, score authority where applicable, native host validation, and new hardware validation. |
+| Denominator ambiguity | Store counts by category, problem, workload, and status; include source checksums and reason-code rollups. |
+| Matrix diff instability | Compare validated models by stable target identity and classify field families instead of emitting raw recursive diffs only. |
+| Sidecar proliferation | Use existing sidecar naming/schema patterns and document how denominator, closure, Matrix, and sanity reports relate. |
+| Hardware dependency creep | Keep all new tests CPU-safe with fixture JSON. Live ROCm/Docker evidence may be consumed but not required to validate core logic. |
+
+## Testing Implications
+
+Recommended focused tests:
+
+- `tests/sol_execbench/test_dataset_execution_closure.py`
+- `tests/sol_execbench/test_dataset_denominator_report.py`
+- `tests/sol_execbench/test_rocm_compatibility_matrix_schema.py`
+- `tests/sol_execbench/test_rocm_compatibility_matrix_diff.py`
+- `tests/sol_execbench/test_run_dataset_hardening.py`
+- `tests/sol_execbench/test_amd_sanity_evidence.py`
+- docs guardrails near existing Matrix and claims tests
+
+Core assertions:
+
+- New reports validate with Pydantic and serialize deterministically.
+- `Trace` schema and evaluator output remain unchanged.
+- Matrix authority flags remain false where existing contract requires them.
+- Denominator reports distinguish ready, blocked, unsupported, deferred, missing evidence, attempted pass, and attempted fail.
+- Dataset runner resume rejects or flags mismatched source checksums instead of silently reusing stale closure.
+- AMD sanity report can be built from fixture sidecars without ROCm hardware.
+
+## Roadmap Implications
+
+Suggested phase ordering:
+
+1. **Closure Contract Foundation** - Extract and test execution closure models/helpers from the runner.
+2. **Paper Denominator Accounting** - Build denominator reports from manifest/inventory/readiness/closure evidence.
+3. **Matrix Contract Utilities** - Add schema export, then Matrix diff.
+4. **Dataset Runner Hardening** - Wire new failure/resume classifications into `scripts/run_dataset.py`.
+5. **AMD SOL/SOLAR Sanity Evidence** - Add diagnostic consistency reports over existing RDNA 4/Docker evidence.
+6. **Docs And Guardrails** - Lock claim wording after artifact contracts exist.
+
+This order minimizes risk because each later phase consumes earlier sidecar contracts. The only phase that should touch large orchestration code materially is runner hardening, and even that should be mostly adapter wiring after the core helper exists.
+
+## Sources
+
+- `.planning/PROJECT.md`
+- `.planning/codebase/ARCHITECTURE.md`
+- `.planning/codebase/STRUCTURE.md`
+- `.planning/codebase/CONCERNS.md`
+- `src/sol_execbench/core/compatibility.py`
+- `src/sol_execbench/core/dataset/inventory.py`
+- `src/sol_execbench/core/dataset/readiness.py`
+- `src/sol_execbench/core/dataset/ready_subset.py`
+- `src/sol_execbench/core/dataset/parity_gap.py`
+- `scripts/run_dataset.py`
+- `src/sol_execbench/cli/main.py`
