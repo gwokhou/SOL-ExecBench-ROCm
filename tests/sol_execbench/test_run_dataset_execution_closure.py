@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -766,6 +767,113 @@ def test_execution_closure_marks_selected_workload_without_trace_as_missing_trac
     assert record["closure_status"] == "missing_trace"
     assert record["trace_status"] is None
     assert record["trace_ref"] == "L1/matmul_demo/traces.json"
+
+
+def test_execution_closure_classifies_cli_nonzero_exit_with_bounded_log_ref(
+    tmp_path,
+    monkeypatch,
+):
+    dataset_root = tmp_path / "dataset"
+    _write_problem(dataset_root, "L1", "matmul_demo", [_workload("selected-workload")])
+    subset_path = _ready_subset(
+        tmp_path / "ready_subset.json",
+        problems=[
+            {
+                "category": "L1",
+                "problem_id": "L1/matmul_demo",
+                "problem_path": "L1/matmul_demo",
+                "workloads": [{"uuid": "selected-workload", "row_index": 0}],
+            }
+        ],
+    )
+    output_dir = tmp_path / "out"
+
+    def failed_subprocess_run(*args, **kwargs):
+        return subprocess.CompletedProcess(
+            args=["sol-execbench"],
+            returncode=9,
+            stdout=json.dumps(_trace("selected-workload")) + "\n",
+            stderr=f"secret stderr from {tmp_path}",
+        )
+
+    monkeypatch.setattr(run_dataset.subprocess, "run", failed_subprocess_run)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--ready-subset",
+            str(subset_path),
+            "--output",
+            str(output_dir),
+        ],
+    )
+
+    run_dataset.main()
+
+    closure_text = (output_dir / "execution_closure.json").read_text()
+    closure = json.loads(closure_text)
+    record = closure["records"][0]
+    assert record["closure_status"] == "attempted_failed"
+    assert record["cli_log_ref"] == "L1/matmul_demo/ref_matmul_demo_cli.log"
+    assert record["notes"] == ["CLI failed with exit code 9"]
+    assert str(tmp_path) not in closure_text
+    assert "secret stderr" not in closure_text
+
+
+def test_execution_closure_classifies_cli_timeout_with_bounded_log_ref(
+    tmp_path,
+    monkeypatch,
+):
+    dataset_root = tmp_path / "dataset"
+    _write_problem(dataset_root, "L1", "matmul_demo", [_workload("selected-workload")])
+    subset_path = _ready_subset(
+        tmp_path / "ready_subset.json",
+        problems=[
+            {
+                "category": "L1",
+                "problem_id": "L1/matmul_demo",
+                "problem_path": "L1/matmul_demo",
+                "workloads": [{"uuid": "selected-workload", "row_index": 0}],
+            }
+        ],
+    )
+    output_dir = tmp_path / "out"
+
+    def timeout_subprocess_run(*args, **kwargs):
+        raise subprocess.TimeoutExpired(
+            cmd=["sol-execbench"],
+            timeout=360,
+            output=f"timeout stdout from {tmp_path}",
+            stderr=f"timeout stderr from {tmp_path}",
+        )
+
+    monkeypatch.setattr(run_dataset.subprocess, "run", timeout_subprocess_run)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--ready-subset",
+            str(subset_path),
+            "--output",
+            str(output_dir),
+        ],
+    )
+
+    run_dataset.main()
+
+    closure_text = (output_dir / "execution_closure.json").read_text()
+    closure = json.loads(closure_text)
+    record = closure["records"][0]
+    assert record["closure_status"] == "attempted_failed"
+    assert record["cli_log_ref"] == "L1/matmul_demo/ref_matmul_demo_cli.log"
+    assert record["notes"] == ["CLI timed out after 360 seconds"]
+    assert str(tmp_path) not in closure_text
+    assert "timeout stdout" not in closure_text
+    assert "timeout stderr" not in closure_text
 
 
 def test_execution_closure_provenance_uses_bounded_refs(tmp_path, monkeypatch):
