@@ -2,9 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.20
 milestone_name: Cross-Report Consistency and Evaluation Stability
-status: milestone-complete
-last_updated: "2026-05-31T16:20:00.000Z"
-last_activity: 2026-05-31
+status: Awaiting next milestone
+stopped_at: Fixed v1.20 audit doc wiring tech debt
+last_updated: "2026-05-31T15:57:36.042Z"
+last_activity: 2026-05-31 — Milestone v1.20 completed and archived
 progress:
   total_phases: 5
   completed_phases: 5
@@ -20,14 +21,14 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-31)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** v1.20 milestone archive
+**Current focus:** Planning next milestone
 
 ## Current Position
 
-Phase: —
+Phase: Milestone v1.20 complete
 Plan: —
-Status: v1.20 phases complete and milestone audit passed
-Last activity: 2026-05-31 — Fixed DOC-WIRE-01 and updated v1.20 milestone audit to passed
+Status: Awaiting next milestone
+Last activity: 2026-05-31 — Milestone v1.20 completed and archived
 
 ## Performance Metrics
 
@@ -129,6 +130,17 @@ None.
 | Public service | Hosted leaderboard or remote submission service | Deferred | v1.20 scope |
 | Dependencies | Dependency relocking, Docker privilege expansion, databases, dashboards, or remote services | Deferred | v1.20 scope |
 
+### Candidate Next-Milestone Frontiers
+
+- Hardware validation expansion: CDNA3/MI300X or CDNA4 live validation using
+  v1.20 consistency and stability artifacts as gates.
+- Paper parity: full 235-problem validation readiness with claim-upgrade checks
+  before any paper-parity candidate claim.
+- Profiling diagnostics: feed ROCm profiler or Instruction Roofline evidence
+  into stability and trust summaries.
+- Leaderboard readiness: submission isolation, anti-cheat, baseline policy, and
+  claim-gated trust summaries.
+
 ## Quick Tasks Completed
 
 | Date | Quick Task | Result |
@@ -147,4 +159,4 @@ Resume file: None
 
 ## Operator Next Steps
 
-- Run /gsd-complete-milestone v1.20
+- Start the next milestone with `$gsd-new-milestone`
