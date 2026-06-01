@@ -1,112 +1,180 @@
 # Requirements: SOL ExecBench ROCm Port
 
 **Defined:** 2026-06-01
-**Milestone:** v1.22 Concern Closure and Execution Boundary Hardening
+**Active Milestone:** v1.23 Evaluation Reliability and Security Hardening
+**Queued Milestone:** v1.24 Dataset Batch Run Trustworthiness
 **Core Value:** Evaluate LLM-generated GPU kernels correctly and reproducibly
 on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL
 ExecBench.
 
-## v1 Requirements
+## v1.23 Requirements
 
-### Dataset Runner Closure
+### Evaluation Failure Diagnostics
 
-- [x] **DATASET-01**: Maintainer can invoke dataset problem execution through an importable runner abstraction instead of direct subprocess orchestration embedded only in `scripts/run_dataset.py`.
-- [x] **DATASET-02**: Maintainer can construct solution wrapping and reference/custom Python source handling without global text replacement that mutates strings, comments, or legitimate identifiers.
-- [x] **DATASET-03**: Maintainer can write dataset summaries, score reports, timing evidence refs, and closure reports through package helpers with focused tests.
-- [x] **DATASET-04**: Dataset-scale runs preserve existing CLI behavior while exposing a safe seam for future scheduling or bounded CPU-side parallel report work.
+- [x] **EVAL-DIAG-01**: No-trace evaluation outcomes persist bounded stdout
+  and stderr diagnostics, or equivalent structured evidence, for nonzero
+  evaluation failures.
+- [x] **EVAL-DIAG-02**: CLI failure messages point users to persisted
+  diagnostics without requiring `--verbose` or manual staging inspection.
+- [x] **EVAL-DIAG-03**: Regression coverage includes non-JSON stdout, library
+  noise, nonzero exits, empty trace output, and canonical trace preservation.
 
-### Eval Driver Diagnostics
+### Staged User Import Isolation
 
-- [x] **EVAL-01**: Maintainer can test reference timing behavior through importable helpers without staging the full generated driver.
-- [x] **EVAL-02**: When reference benchmarking is requested and reference timing fails, traces, logs, or status semantics expose that failure explicitly instead of silently leaving `reference_latency_ms` at `0.0`.
-- [x] **EVAL-03**: Trace emission and stdout/stderr framing are covered by regression tests that prove user prints and noisy imports cannot corrupt JSONL output.
-- [x] **EVAL-04**: Correctness/timing orchestration remains benchmark-compatible while moving avoidable pure logic out of `eval_driver.py`.
+- [x] **EVAL-IMPORT-01**: Python solution sources are imported through
+  file-based `importlib` loading with unique generated module identities.
+- [x] **EVAL-IMPORT-02**: Supported simple-file and package-style entry paths
+  keep their existing behavior while avoiding collisions with `sys.modules`.
+- [x] **EVAL-IMPORT-03**: Regression tests prove staged user modules cannot
+  resolve to unintended existing modules when names collide.
 
-### Source Review And Boundary Evidence
+### Native Compile Option Guardrails
 
-- [x] **BOUNDARY-01**: Source-review tests cover additional process, file, import, native loader, stream, cache, and obfuscation bypass families.
-- [x] **BOUNDARY-02**: Python source review has an AST-aware or token-aware path for cases where regex scanning is too broad or too easy to bypass.
-- [x] **BOUNDARY-03**: Blocked or flagged source-review outcomes are represented as structured evidence in traces, sidecars, or logs without implying hard sandboxing.
-- [x] **BOUNDARY-04**: Public and developer docs clearly state that static review plus subprocess execution is not a hardened multi-tenant sandbox.
+- [x] **COMPILE-GUARD-01**: Dangerous compiler and linker options that can
+  reference host paths, response files, dynamic loaders, or unsafe link-time
+  behavior are rejected with clear validation errors.
+- [x] **COMPILE-GUARD-02**: Documented ROCm/HIP extension compile options used
+  by existing examples and tests remain accepted.
+- [x] **COMPILE-GUARD-03**: Solution schema and native build-template tests
+  cover accepted and rejected option classes.
 
-### Scoring And Evidence Fixtures
+### Eval Driver Responsibility Boundaries
 
-- [x] **SCORING-01**: SOLAR and AMD bound derivation have family-specific golden fixtures for representative operator families and fallback behavior.
-- [x] **SCORING-02**: Confidence/status transitions in SOLAR and AMD bound derivation are covered by focused tests independent of broad report shape tests.
-- [x] **SCORING-03**: Static kernel evidence can consume or produce an explicit artifact manifest when build outputs are known, reducing reliance on recursive build-tree scanning.
-- [x] **SCORING-04**: Static evidence and derived scoring changes preserve diagnostic-only authority and existing public sidecar contracts.
+- [x] **EVAL-BOUNDARY-01**: Correctness, timing, trace emission, source review,
+  and reward-hack boundary behavior are exposed through importable helpers
+  with focused tests.
+- [x] **EVAL-BOUNDARY-02**: The generated eval driver template is reduced to
+  staged wiring, subprocess-local setup, and integration glue.
+- [x] **EVAL-BOUNDARY-03**: Integrity snapshot coverage remains explicit for
+  every benchmark-critical helper reachable from staged execution.
+- [x] **EVAL-BOUNDARY-04**: Canonical Trace, Definition, Workload, Solution,
+  correctness, timing, score, and evaluator contract schemas remain unchanged
+  unless separately approved.
 
-### Dependency And Closure Guardrails
+## v1.24 Requirements
 
-- [x] **GUARD-01**: ROCm wheel, Docker target, and dependency-matrix policy consistency is guarded by tests or docs checks when target metadata changes.
-- [x] **GUARD-02**: Dataset closure provenance tests cover new sidecar refs, stale provenance combinations, and manifest/cache provenance behavior.
-- [x] **GUARD-03**: Hardware-marker skip behavior remains explicit so CPU-safe green runs cannot be mistaken for RDNA4/CDNA3/timing validation.
+### Dataset Reuse Policy Service
 
-### Concern Map Stewardship
+- [x] **DATASET-REUSE-01**: Dataset reuse decisions are computed by importable
+  helpers with explicit inputs for selected workloads, ready subsets,
+  provenance, rerun flags, and output paths.
+- [x] **DATASET-REUSE-02**: `scripts/run_dataset.py` delegates reuse and
+  stale-provenance policy instead of owning the decision matrix inline.
+- [x] **DATASET-REUSE-03**: Tests cover reuse, stale provenance, forced rerun,
+  partial-ready, missing-output, and missing-sidecar combinations.
 
-- [x] **DOCS-01**: `CONCERNS.md` preserves milestone-management context for recently narrowed, still actionable, accepted, and externally deferred concerns.
-- [x] **DOCS-02**: v1.22 completion updates `CONCERNS.md` so each in-scope item is marked fixed, narrowed, or carried forward with evidence.
-- [x] **DOCS-03**: Out-of-scope items remain explicit: CDNA3/MI300X/CDNA4 validation, paper-scale parity, leaderboard readiness, and complete hard sandboxing.
+### Dataset Closure And Evidence Completeness
+
+- [x] **DATASET-CLOSURE-01**: Closure records classify missing traces, missing
+  timing evidence, missing derived sidecars, skipped workloads, and nonzero CLI
+  outcomes without ambiguous success states.
+- [x] **DATASET-CLOSURE-02**: Summary, score, timing, and closure references
+  are assembled through package-level helpers rather than script-local path
+  coupling.
+- [x] **DATASET-CLOSURE-03**: Closure reports remain deterministic and
+  compatible with existing public sidecar contracts.
+
+### Dataset Failure-Mode Regression Matrix
+
+- [x] **DATASET-REGRESS-01**: Regression fixtures cover stale provenance,
+  selected ready subsets, missing derived sidecars, rerun flags, CLI
+  timeout/nonzero outcomes, and no-trace outputs.
+- [x] **DATASET-REGRESS-02**: Tests distinguish CPU-safe policy behavior from
+  live ROCm/GPU execution requirements.
+- [x] **DATASET-REGRESS-03**: Dataset runner documentation explains when reuse
+  is allowed, blocked, or reported as incomplete.
+
+### Deterministic Dataset Sharding Path
+
+- [x] **DATASET-SHARD-01**: A shard plan divides workloads deterministically
+  with stable shard identifiers and one trace file per shard.
+- [x] **DATASET-SHARD-02**: Merge rules preserve workload ordering,
+  provenance, duplicate detection, and incomplete-shard reporting.
+- [x] **DATASET-SHARD-03**: The first implementation or design artifact is
+  covered by tests and keeps default dataset CLI behavior compatible.
 
 ## Future Requirements
 
 ### Hardware Validation
 
-- **HW-01**: A future milestone can record full CDNA3/MI300X/CDNA4 or native-host validation on real hardware.
+- **HW-01**: A future milestone can record full CDNA3/MI300X/CDNA4 or
+  native-host validation on real hardware.
+
+### Native ROCm Example Maturity
+
+- **ROCM-EXAMPLE-01**: A future milestone can replace or validate every former
+  NVIDIA library-category placeholder with compiled native ROCm examples and
+  live toolchain evidence.
 
 ### Hardened Sandbox
 
-- **SANDBOX-01**: A future milestone can design a hardened OS/container runner for adversarial or multi-tenant submissions.
+- **SANDBOX-01**: A future milestone can design a hardened OS/container runner
+  for adversarial or multi-tenant submissions.
 
 ### Paper And Leaderboard Equivalence
 
-- **PAPER-01**: A future milestone can run full 235-problem paper-scale validation and upstream SOLAR comparison.
-- **LEADER-01**: A future milestone can design hosted leaderboard submission policy, isolation, and operations.
+- **PAPER-01**: A future milestone can run full 235-problem paper-scale
+  validation and upstream SOLAR comparison.
+- **LEADER-01**: A future milestone can design hosted leaderboard submission
+  policy, isolation, and operations.
 
 ### Dependency And Docker Policy
 
-- **DEP-01**: A future milestone can perform large PyTorch/ROCm relocking or Docker privilege redesign.
+- **DEP-01**: A future milestone can perform large PyTorch/ROCm relocking or
+  Docker privilege redesign.
+
+### Derived Scoring Modularization
+
+- **SCORING-MOD-01**: A future milestone can split large derived-scoring
+  modules by operator family while preserving score-authority boundaries.
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
 | Full CDNA3/MI300X/CDNA4 validation | Requires real hardware evidence, not code cleanup alone. |
-| Complete hard sandbox | Requires runner architecture and host isolation work beyond this milestone. |
+| CDNA 3, MI300X, CDNA 4, or native-host ROCm validation expansion | Remains deferred until real hardware evidence exists. |
+| Complete hard sandbox | Requires runner architecture and host isolation work beyond these near-term milestones. |
 | Paper-scale parity or leaderboard claims | Requires full validation evidence and policy/infrastructure. |
-| Canonical schema changes | This milestone should preserve Trace, Definition, Workload, Solution, timing, correctness, score, and evaluator contract schemas. |
+| Canonical schema changes | These milestones should preserve Trace, Definition, Workload, Solution, timing, correctness, score, and evaluator contract schemas. |
 | Large dependency relock | Deferred unless needed for focused consistency guardrails. |
+| Derived scoring modularization | Important but structurally separate from evaluation and dataset trustworthiness. |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DATASET-01 | Phase 100 | Complete |
-| DATASET-02 | Phase 100 | Complete |
-| DATASET-03 | Phase 100 | Complete |
-| DATASET-04 | Phase 100 | Complete |
-| EVAL-01 | Phase 101 | Complete |
-| EVAL-02 | Phase 101 | Complete |
-| EVAL-03 | Phase 101 | Complete |
-| EVAL-04 | Phase 101 | Complete |
-| BOUNDARY-01 | Phase 102 | Complete |
-| BOUNDARY-02 | Phase 102 | Complete |
-| BOUNDARY-03 | Phase 102 | Complete |
-| BOUNDARY-04 | Phase 102 | Complete |
-| SCORING-01 | Phase 103 | Complete |
-| SCORING-02 | Phase 103 | Complete |
-| SCORING-03 | Phase 103 | Complete |
-| SCORING-04 | Phase 103 | Complete |
-| GUARD-01 | Phase 104 | Complete |
-| GUARD-02 | Phase 104 | Complete |
-| GUARD-03 | Phase 104 | Complete |
-| DOCS-01 | Phase 105 | Complete |
-| DOCS-02 | Phase 105 | Complete |
-| DOCS-03 | Phase 105 | Complete |
+| EVAL-DIAG-01 | Phase 106 | Complete |
+| EVAL-DIAG-02 | Phase 106 | Complete |
+| EVAL-DIAG-03 | Phase 106 | Complete |
+| EVAL-IMPORT-01 | Phase 107 | Complete |
+| EVAL-IMPORT-02 | Phase 107 | Complete |
+| EVAL-IMPORT-03 | Phase 107 | Complete |
+| COMPILE-GUARD-01 | Phase 108 | Complete |
+| COMPILE-GUARD-02 | Phase 108 | Complete |
+| COMPILE-GUARD-03 | Phase 108 | Complete |
+| EVAL-BOUNDARY-01 | Phase 109 | Complete |
+| EVAL-BOUNDARY-02 | Phase 109 | Complete |
+| EVAL-BOUNDARY-03 | Phase 109 | Complete |
+| EVAL-BOUNDARY-04 | Phase 109 | Complete |
+| DATASET-REUSE-01 | Phase 110 | Complete |
+| DATASET-REUSE-02 | Phase 110 | Complete |
+| DATASET-REUSE-03 | Phase 110 | Complete |
+| DATASET-CLOSURE-01 | Phase 111 | Complete |
+| DATASET-CLOSURE-02 | Phase 111 | Complete |
+| DATASET-CLOSURE-03 | Phase 111 | Complete |
+| DATASET-REGRESS-01 | Phase 112 | Complete |
+| DATASET-REGRESS-02 | Phase 112 | Complete |
+| DATASET-REGRESS-03 | Phase 112 | Complete |
+| DATASET-SHARD-01 | Phase 113 | Complete |
+| DATASET-SHARD-02 | Phase 113 | Complete |
+| DATASET-SHARD-03 | Phase 113 | Complete |
 
 **Coverage:**
-- v1 requirements: 22 total
-- Mapped to phases: 22
+- v1.23 requirements: 13 total
+- v1.23 mapped to phases: 13
+- v1.24 requirements: 12 total
+- v1.24 mapped to phases: 12
 - Unmapped: 0
 
 ---
