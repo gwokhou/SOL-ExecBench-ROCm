@@ -18,7 +18,7 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 **Shipped version:** v1.25 Engineering Prerelease,
 completed 2026-06-01.
 
-**Current milestone:** None defined.
+**Current milestone:** v1.26 Public Prerelease and Research Preview.
 
 **Queued milestone:** None defined.
 
@@ -31,8 +31,9 @@ materials.
 trustworthy by centralizing reuse policy, closure/evidence completeness,
 failure-mode regression documentation, and deterministic sharding semantics.
 
-**Next milestone goal:** Not yet defined. Start the next milestone with
-`$gsd-new-milestone` when ready.
+**Next milestone goal:** Turn the v1.25 engineering prerelease materials into
+a public prerelease and research preview package with versioned evidence
+bundles, release-readiness gates, and bounded research-facing interpretation.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline.
 Milestones v1.1-v1.6 added CDNA 3 code/schema support, maintained residue
@@ -144,6 +145,33 @@ interpret without overstated research or hardware claims.
   sandboxing.
 - Large PyTorch/ROCm dependency relocking or Docker privilege-model redesign
   unless release validation exposes a blocking issue.
+
+## Current Milestone: v1.26 Public Prerelease and Research Preview
+
+**Goal:** Produce a publishable engineering prerelease and research preview
+package with versioned validation artifacts, release-readiness checks, and
+bounded research interpretation that matches the project's actual ROCm
+evidence.
+
+**Target features:**
+- A reproducible public prerelease artifact bundle generated from a clean
+  checkout or release tag.
+- Release-readiness gates that fail on missing validation reports, missing
+  artifact checksums, stale claim boundaries, or unreviewed known gaps.
+- A research preview evidence package that explains methodology, hardware
+  scope, benchmark limitations, SOL/AMD-derived evidence, and non-claims.
+- Public publishing materials for a GitHub prerelease or equivalent release
+  page, including links to artifacts, first-run docs, support matrix, and
+  claims.
+
+**Explicitly deferred:**
+- Full 235-problem paper-scale validation and upstream SOLAR parity.
+- MI300X/CDNA3 full-suite hardware validation unless complete real-hardware
+  evidence becomes available.
+- CDNA4 validation because suitable hardware is not currently accessible.
+- Hosted leaderboard, remote submission operations, and hard multi-tenant
+  sandboxing.
+- Rebranding as a stable benchmark authority release.
 
 ## Recently Shipped Milestone: v1.24 Dataset Batch Run Trustworthiness
 
