@@ -15,26 +15,24 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
 ## Current State
 
-**Shipped version:** v1.24 Dataset Batch Run Trustworthiness,
+**Shipped version:** v1.25 Engineering Prerelease,
 completed 2026-06-01.
 
-**Current milestone:** v1.25 Engineering Prerelease.
+**Current milestone:** None defined.
 
 **Queued milestone:** None defined.
 
-**Latest milestone outcome:** v1.24 made dataset-scale execution more
+**Latest milestone outcome:** v1.25 packaged the ROCm port for an engineering
+prerelease by adding bounded release-candidate validation, support-matrix
+boundaries, claim guardrails, first-run documentation, and release-candidate
+materials.
+
+**Previous milestone outcome:** v1.24 made dataset-scale execution more
 trustworthy by centralizing reuse policy, closure/evidence completeness,
 failure-mode regression documentation, and deterministic sharding semantics.
 
-**Previous milestone outcome:** v1.23 made single-problem evaluation more
-reliable, diagnosable, and maintainable by hardening no-trace diagnostics,
-staged Python imports, native compile option validation, and generated
-eval-driver responsibility boundaries.
-
-**Next milestone goal:** Prepare the current ROCm port for an engineering
-prerelease by validating release-candidate behavior, support-matrix wording,
-claim boundaries, release materials, and first-run user workflows without
-expanding paper-parity, leaderboard, CDNA4, or hard-sandbox claims.
+**Next milestone goal:** Not yet defined. Start the next milestone with
+`$gsd-new-milestone` when ready.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline.
 Milestones v1.1-v1.6 added CDNA 3 code/schema support, maintained residue
@@ -113,8 +111,14 @@ The v1.24 milestone hardened dataset batch trustworthiness by extracting reuse
 policy, centralizing closure/evidence record construction, documenting the
 failure-mode regression matrix, and adding deterministic sharding plan/merge
 helpers without changing default dataset CLI behavior.
+The v1.25 milestone packaged the ROCm port for an engineering prerelease by
+adding bounded release-candidate validation, a public support matrix, release
+claim guardrails, first-run documentation, and release-candidate materials
+while keeping paper validation, upstream SOLAR parity, leaderboard readiness,
+hard sandboxing, MI300X/CDNA3 full-suite validation, and CDNA4 validation out
+of scope.
 
-## Current Milestone: v1.25 Engineering Prerelease
+## Recently Shipped Milestone: v1.25 Engineering Prerelease
 
 **Goal:** Turn the v1.24 ROCm port state into an engineering prerelease /
 release-candidate package that external users can install, validate, and
