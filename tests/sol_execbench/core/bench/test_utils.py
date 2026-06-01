@@ -15,3 +15,51 @@
 
 
 """Tests for sol_execbench.core.bench.utils."""
+
+import torch
+
+from sol_execbench.core.bench.utils import call_and_collect_outputs
+from sol_execbench_type_helpers import make_definition
+
+
+def test_call_and_collect_outputs_normalizes_return_value_outputs():
+    outputs = call_and_collect_outputs(
+        lambda x: x + 1,
+        [torch.tensor([1.0, 2.0])],
+        destination_passing_style=False,
+        definition=None,
+        resolved_axes={},
+        device="cpu",
+        output_names=["out"],
+        output_dtypes={"out": torch.float32},
+    )
+
+    assert len(outputs) == 1
+    assert torch.equal(outputs[0], torch.tensor([2.0, 3.0]))
+
+
+def test_call_and_collect_outputs_supports_destination_passing_style():
+    definition = make_definition(
+        name="dps_demo",
+        axes={"N": {"type": "var"}},
+        inputs={"x": {"shape": ["N"], "dtype": "float32"}},
+        outputs={"out": {"shape": ["N"], "dtype": "float32"}},
+        reference="def run(x):\n    return x",
+    )
+
+    def run(x, out):
+        out.copy_(x + 1)
+
+    outputs = call_and_collect_outputs(
+        run,
+        [torch.tensor([1.0, 2.0])],
+        destination_passing_style=True,
+        definition=definition,
+        resolved_axes={"N": 2},
+        device="cpu",
+        output_names=["out"],
+        output_dtypes={"out": torch.float32},
+    )
+
+    assert len(outputs) == 1
+    assert torch.equal(outputs[0], torch.tensor([2.0, 3.0]))

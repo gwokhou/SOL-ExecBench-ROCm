@@ -146,6 +146,8 @@ _STATIC_RULES = (
             r"\bbase64\b|\bmarshal\.loads\b|\bpickle\.loads\b|\bctypes\.CDLL\b|"
             r"\bctypes\.cdll\b|\bdlopen\b|\btorch\.ops\.load_library\b|"
             r"\bload_inline\s*\(|\bcpp_extension\.load\s*\(|\bsubprocess\b|"
+            r"\b__import__\s*\(|\bimportlib\.(import_module|util)\b|"
+            r"\bgetattr\s*\(\s*os\s*,\s*['\"](system|popen|spawn[a-zA-Z_]*|exec[a-zA-Z_]*)['\"]\s*\)|"
             r"\bos\.(system|popen|spawn[a-zA-Z_]*|exec[a-zA-Z_]*)\s*\(|"
             r"\bpty\.spawn\s*\(|\bsocket\b|\burllib\b|\brequests\b)"
         ),

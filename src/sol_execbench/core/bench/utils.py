@@ -18,8 +18,11 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
+import torch
+
+from sol_execbench.core.bench.io import allocate_outputs, normalize_outputs
 from sol_execbench.core.data import (
     Correctness,
     Evaluation,
@@ -77,3 +80,34 @@ def make_eval(
         correctness=correctness,
         performance=performance,
     )
+
+
+def call_and_collect_outputs(
+    fn: Any,
+    inputs: list[Any],
+    *,
+    destination_passing_style: bool,
+    definition: Any,
+    resolved_axes: dict[str, Any],
+    device: str,
+    output_names: list[str],
+    output_dtypes: dict[str, torch.dtype],
+) -> list[torch.Tensor]:
+    """Call a benchmark function and normalize its outputs."""
+    if destination_passing_style:
+        outputs = allocate_outputs(definition, resolved_axes, device)
+        fn(*inputs, *outputs)
+        if torch.cuda.is_available():
+            torch.cuda.synchronize(device)
+        return outputs
+
+    result = fn(*inputs)
+    if torch.cuda.is_available():
+        torch.cuda.synchronize(device)
+    out_dict = normalize_outputs(
+        result,
+        device=torch.device(device),
+        output_names=output_names,
+        output_dtypes=output_dtypes,
+    )
+    return [out_dict[name] for name in output_names]

@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.20
 milestone_name: Cross-Report Consistency and Evaluation Stability
 status: Awaiting next milestone
-stopped_at: Fixed v1.20 audit doc wiring tech debt
-last_updated: "2026-05-31T15:57:36.042Z"
-last_activity: 2026-05-31 — Milestone v1.20 completed and archived
+stopped_at: Finished remaining codebase quick debt
+last_updated: "2026-06-01T11:10:48+08:00"
+last_activity: 2026-06-01 — Finished remaining codebase quick debt
 progress:
   total_phases: 5
   completed_phases: 5
@@ -28,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-31)
 Phase: Milestone v1.20 complete
 Plan: —
 Status: Awaiting next milestone
-Last activity: 2026-05-31 — Milestone v1.20 completed and archived
+Last activity: 2026-06-01 — Finished remaining codebase quick debt
 
 ## Performance Metrics
 
@@ -150,11 +150,12 @@ None.
 | 2026-05-31 | 260531-rdf add run_dataset closure e2e gaps | Added filtered, missing-workload, readiness-blocked, and stale-provenance ROCm E2E regressions; `requires_rocm` now reports 21 passed. |
 | 2026-05-31 | 20260531-fix-v120-audit-gaps | Fixed v1.20 audit blockers; v1.20 aggregate CPU-safe suite reports 74 passed and audit status is passed. |
 | 2026-05-31 | 260531-x41 fix v1.20 audit doc wiring tech debt | Added AMD SOL/SOLAR refs to the consistency guide command, required them in docs tests, and moved the audit status to passed. |
+| 2026-06-01 | 260601-q06 finish remaining codebase quick debt | Added CLI packager cleanup at known exits, extracted eval output invocation, extended reward-hack dynamic process blocking, and updated concerns. |
 
 ## Session Continuity
 
-Last session: 2026-05-31T15:51:00.000Z
-Stopped at: Fixed v1.20 audit doc wiring tech debt
+Last session: 2026-06-01T11:10:48+08:00
+Stopped at: Finished remaining codebase quick debt
 Resume file: None
 
 ## Operator Next Steps
