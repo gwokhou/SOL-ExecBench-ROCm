@@ -60,7 +60,8 @@
   2. When requested reference timing fails, traces, logs, or status semantics expose the failure explicitly instead of silently presenting `reference_latency_ms` as `0.0`.
   3. Regression tests prove user prints and noisy imports cannot corrupt trace JSONL output.
   4. Correctness and timing orchestration remains benchmark-compatible while avoidable pure logic moves out of `eval_driver.py`.
-**Plans**: TBD
+**Plans**:
+  - `101-01-PLAN.md` - Extract reference timing diagnostics and noisy-output JSONL framing tests.
 
 ### Phase 102: Source Review And Boundary Evidence
 **Goal**: Maintainers and users can see stronger static-review outcomes and boundary evidence without mistaking them for hard sandbox guarantees.
