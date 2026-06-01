@@ -40,7 +40,6 @@ import sys
 from pathlib import Path
 
 from sol_execbench.core.bench.config import BenchmarkConfig
-from sol_execbench.core.dataset.execution_closure import compare_execution_closure_provenance
 from sol_execbench.core.dataset.evidence_refs import (
     relative_ref as _relative_ref,
     safe_sidecar_stem as _safe_sidecar_stem,
@@ -48,8 +47,10 @@ from sol_execbench.core.dataset.evidence_refs import (
 from sol_execbench.core.dataset.run_closure import (
     closure_record as _build_closure_record,
     closure_totals as _build_closure_totals,
+    dataset_reuse_decision as _build_dataset_reuse_decision,
     derived_evidence_for_workload as _build_derived_evidence_for_workload,
     prior_closure_provenance as _load_prior_closure_provenance,
+    selected_workload_closure_record as _build_selected_workload_closure_record,
     stale_provenance_mismatch as _build_stale_provenance_mismatch,
     utc_timestamp as _build_utc_timestamp,
     write_execution_closure as _write_execution_closure_report,
@@ -389,8 +390,68 @@ def _prior_closure_provenance(path: Path) -> tuple[dict | None, dict[str, object
     return _load_prior_closure_provenance(path)
 
 
+def _dataset_reuse_decision(
+    *,
+    rerun: bool,
+    traces_path: Path,
+    failed_count: int,
+    execution_closure_path: Path | None,
+    provenance: dict,
+):
+    return _build_dataset_reuse_decision(
+        rerun=rerun,
+        traces_path=traces_path,
+        failed_count=failed_count,
+        execution_closure_path=execution_closure_path,
+        provenance=provenance,
+    )
+
+
 def _closure_totals(records: list[dict]) -> dict[str, int]:
     return _build_closure_totals(records)
+
+
+def _selected_workload_closure_record(
+    *,
+    category: str,
+    problem_id: str,
+    problem_path: str,
+    workload_uuid: str | None,
+    row_index: int,
+    readiness: dict | None,
+    trace: dict | None,
+    skipped: bool,
+    traces_path: Path,
+    summary_ref: str,
+    solution_path: Path | None,
+    output_dir: Path,
+    definition_name: str,
+    problem_output_dir: Path,
+    amd_score_report: Path | None,
+    sol_bound_artifact_dir: Path | None,
+    solar_derivation_dir: Path | None,
+    timing_evidence_dir: Path | None,
+) -> dict:
+    return _build_selected_workload_closure_record(
+        category=category,
+        problem_id=problem_id,
+        problem_path=problem_path,
+        workload_uuid=workload_uuid,
+        row_index=row_index,
+        readiness=readiness,
+        trace=trace,
+        skipped=skipped,
+        traces_path=traces_path,
+        summary_ref=summary_ref,
+        solution_path=solution_path,
+        output_dir=output_dir,
+        definition_name=definition_name,
+        problem_output_dir=problem_output_dir,
+        amd_score_report=amd_score_report,
+        sol_bound_artifact_dir=sol_bound_artifact_dir,
+        solar_derivation_dir=solar_derivation_dir,
+        timing_evidence_dir=timing_evidence_dir,
+    )
 
 
 def _write_execution_closure(
@@ -880,115 +941,75 @@ def main():
                 continue
 
         # Preserve ordinary resume behavior unless closure provenance is part of the contract.
-        if not args.rerun and traces_path.exists():
+        if traces_path.exists():
             traces = json.loads(traces_path.read_text())
             summary = inspect_traces(traces, f"{category}/{problem_name}")
-            if summary["failed"] == 0:
-                if execution_closure_path is None:
-                    if (
-                        args.amd_score_report is not None
-                        or args.amd_sol_bound_dir is not None
-                        or args.solar_derivation is not None
-                    ):
-                        _extend_derived_reports_for_problem(
-                            amd_scores=amd_scores,
-                            definition_path=definition_path,
-                            workload_path=workload_path,
-                            traces_path=traces_path,
-                            traces_payload=traces,
-                            output_dir=output_dir,
-                            baseline_artifact=scoring_baseline,
-                            sol_bound_artifact_dir=args.amd_sol_bound_dir,
-                            solar_derivation_dir=args.solar_derivation,
+            reuse_decision = _dataset_reuse_decision(
+                rerun=args.rerun,
+                traces_path=traces_path,
+                failed_count=int(summary["failed"]),
+                execution_closure_path=execution_closure_path,
+                provenance=provenance,
+            )
+            if reuse_decision.should_reuse:
+                if (
+                    args.amd_score_report is not None
+                    or args.amd_sol_bound_dir is not None
+                    or args.solar_derivation is not None
+                ):
+                    _extend_derived_reports_for_problem(
+                        amd_scores=amd_scores,
+                        definition_path=definition_path,
+                        workload_path=workload_path,
+                        traces_path=traces_path,
+                        traces_payload=traces,
+                        output_dir=output_dir,
+                        baseline_artifact=scoring_baseline,
+                        sol_bound_artifact_dir=args.amd_sol_bound_dir,
+                        solar_derivation_dir=args.solar_derivation,
+                    )
+                print("  Skipping (already passed). Use --rerun to re-evaluate.")
+                summaries.append(summary)
+                if selected_workload_refs is not None:
+                    trace_by_key = _trace_map(traces)
+                    for workload_ref in selected_workload_refs:
+                        key = _workload_key(
+                            workload_ref.get("uuid"), workload_ref.get("row_index")
                         )
-                    print("  Skipping (already passed). Use --rerun to re-evaluate.")
-                    summaries.append(summary)
-                    continue
-                prior_provenance, stale_mismatch = _prior_closure_provenance(
-                    execution_closure_path
-                )
-                reuse_mismatches = (
-                    [stale_mismatch]
-                    if stale_mismatch is not None
-                    else [
-                        mismatch.model_dump(mode="json")
-                        for mismatch in compare_execution_closure_provenance(
-                            provenance,
-                            prior_provenance or {},
-                        )
-                    ]
-                )
-                if reuse_mismatches:
-                    provenance_mismatches.extend(reuse_mismatches)
-                    print("  Re-running (previous pass has stale closure provenance).")
-                else:
-                    if (
-                        args.amd_score_report is not None
-                        or args.amd_sol_bound_dir is not None
-                        or args.solar_derivation is not None
-                    ):
-                        _extend_derived_reports_for_problem(
-                            amd_scores=amd_scores,
-                            definition_path=definition_path,
-                            workload_path=workload_path,
-                            traces_path=traces_path,
-                            traces_payload=traces,
-                            output_dir=output_dir,
-                            baseline_artifact=scoring_baseline,
-                            sol_bound_artifact_dir=args.amd_sol_bound_dir,
-                            solar_derivation_dir=args.solar_derivation,
-                        )
-                    print("  Skipping (already passed). Use --rerun to re-evaluate.")
-                    summaries.append(summary)
-                    if selected_workload_refs is not None:
-                        trace_by_key = _trace_map(traces)
-                        for workload_ref in selected_workload_refs:
-                            key = _workload_key(
-                                workload_ref.get("uuid"), workload_ref.get("row_index")
-                            )
-                            attempted_ready_keys.add((problem_id, key))
-                            trace = trace_by_key.get(key)
-                            evidence_refs, evidence_gaps = _derived_evidence_for_workload(
-                                definition_name=str(definition_payload["name"]),
+                        attempted_ready_keys.add((problem_id, key))
+                        trace = trace_by_key.get(key)
+                        closure_records.append(
+                            _selected_workload_closure_record(
+                                category=category,
+                                problem_id=problem_id,
+                                problem_path=str(problem_ref.get("problem_path")),
                                 workload_uuid=workload_ref.get("uuid"),
-                                problem_output_dir=problem_output_dir,
+                                row_index=int(workload_ref.get("row_index", 0)),
+                                readiness=readiness_by_workload.get((problem_id, key)),
+                                trace=trace,
+                                skipped=True,
+                                traces_path=traces_path,
+                                summary_ref="summary.json",
+                                solution_path=problem_output_dir / "solution.json",
                                 output_dir=output_dir,
+                                definition_name=str(definition_payload["name"]),
+                                problem_output_dir=problem_output_dir,
                                 amd_score_report=args.amd_score_report,
                                 sol_bound_artifact_dir=args.amd_sol_bound_dir,
                                 solar_derivation_dir=args.solar_derivation,
                                 timing_evidence_dir=args.timing_evidence_dir,
-                                category=category,
                             )
-                            status = _closure_status_with_evidence(
-                                _closure_status_for_trace(trace, skipped=True),
-                                evidence_gaps,
-                            )
-                            closure_records.append(
-                                _closure_record(
-                                    category=category,
-                                    problem_id=problem_id,
-                                    problem_path=str(problem_ref.get("problem_path")),
-                                    workload_uuid=workload_ref.get("uuid"),
-                                    row_index=int(workload_ref.get("row_index", 0)),
-                                    closure_status=status,
-                                    readiness=readiness_by_workload.get((problem_id, key)),
-                                    trace_ref=_relative_ref(traces_path, output_dir),
-                                    summary_ref="summary.json",
-                                    solution_ref=_relative_ref(problem_output_dir / "solution.json", output_dir)
-                                    if (problem_output_dir / "solution.json").exists()
-                                    else None,
-                                    evidence_refs=evidence_refs,
-                                    evidence_gaps=evidence_gaps,
-                                    trace_status=_trace_status(trace),
-                                )
-                            )
-                    continue
-            if summary["failed"] == 0:
-                pass
-            else:
+                        )
+                continue
+            if reuse_decision.provenance_mismatches:
+                provenance_mismatches.extend(
+                    list(reuse_decision.provenance_mismatches)
+                )
+                print("  Re-running (previous pass has stale closure provenance).")
+            elif reuse_decision.reason == "previous_failed":
                 print(f"  Re-running (previous run had {summary['failed']} failures).")
-        elif args.rerun and traces_path.exists():
-            print("  Re-running (--rerun requested).")
+            elif reuse_decision.reason == "rerun_requested":
+                print("  Re-running (--rerun requested).")
 
         # Clear previous run output
         if problem_output_dir.exists():
@@ -1128,35 +1149,26 @@ def main():
                 key = _workload_key(workload_ref.get("uuid"), workload_ref.get("row_index"))
                 attempted_ready_keys.add((problem_id, key))
                 trace = trace_by_key.get(key)
-                evidence_refs, evidence_gaps = _derived_evidence_for_workload(
-                    definition_name=str(definition_payload["name"]),
-                    workload_uuid=workload_ref.get("uuid"),
-                    problem_output_dir=problem_output_dir,
-                    output_dir=output_dir,
-                    amd_score_report=args.amd_score_report,
-                    sol_bound_artifact_dir=args.amd_sol_bound_dir,
-                    solar_derivation_dir=args.solar_derivation,
-                    timing_evidence_dir=args.timing_evidence_dir,
-                    category=category,
-                )
-                status = _closure_status_with_evidence(
-                    _closure_status_for_trace(trace), evidence_gaps
-                )
                 closure_records.append(
-                    _closure_record(
+                    _selected_workload_closure_record(
                         category=category,
                         problem_id=problem_id,
                         problem_path=str(problem_ref.get("problem_path")),
                         workload_uuid=workload_ref.get("uuid"),
                         row_index=int(workload_ref.get("row_index", 0)),
-                        closure_status=status,
                         readiness=readiness_by_workload.get((problem_id, key)),
-                        trace_ref=_relative_ref(traces_path, output_dir),
+                        trace=trace,
+                        skipped=False,
+                        traces_path=traces_path,
                         summary_ref="summary.json",
-                        solution_ref=_relative_ref(solution_path, output_dir),
-                        evidence_refs=evidence_refs,
-                        evidence_gaps=evidence_gaps,
-                        trace_status=_trace_status(trace),
+                        solution_path=solution_path,
+                        output_dir=output_dir,
+                        definition_name=str(definition_payload["name"]),
+                        problem_output_dir=problem_output_dir,
+                        amd_score_report=args.amd_score_report,
+                        sol_bound_artifact_dir=args.amd_sol_bound_dir,
+                        solar_derivation_dir=args.solar_derivation,
+                        timing_evidence_dir=args.timing_evidence_dir,
                     )
                 )
 
