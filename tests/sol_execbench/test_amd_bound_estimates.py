@@ -208,6 +208,37 @@ def test_batched_matmul_estimate_records_batch_formula_inputs():
     assert estimate.confidence == EstimateConfidence.SUPPORTED
 
 
+def test_reduction_family_golden_fixture_records_inexact_axis_evidence():
+    from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
+
+    definition = make_definition(
+        name="reduction_demo",
+        axes={
+            "M": {"type": "const", "value": 4},
+            "N": {"type": "const", "value": 8},
+        },
+        inputs={"x": {"shape": ["M", "N"], "dtype": "float32"}},
+        outputs={"out": {"shape": ["M"], "dtype": "float32"}},
+        reference="def run(x):\n    return x.sum(dim=-1)",
+    )
+    workload = make_workload(
+        axes={},
+        inputs={"x": {"type": "random"}},
+        uuid="reduction-workload",
+    )
+
+    estimate = estimate_bound_work(build_bound_graph(definition, workload))[0]
+
+    assert estimate.op_family == OpFamily.REDUCTION
+    assert estimate.formula_kind == "reduction_flops"
+    assert estimate.formula == "input_elements"
+    assert estimate.formula_inputs == {"input_elements": 32, "axis": -1}
+    assert estimate.flops == 32.0
+    assert estimate.total_bytes == 144.0
+    assert estimate.axis_source == "attribute"
+    assert estimate.confidence == EstimateConfidence.INEXACT
+
+
 def test_moe_static_route_estimate_locks_formula_inputs_and_kind():
     from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
 
