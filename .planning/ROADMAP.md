@@ -2,6 +2,8 @@
 
 ## Milestones
 
+- Active **v1.25 Engineering Prerelease** - Phases 114-118.
+
 - Complete **v1.24 Dataset Batch Run Trustworthiness** - Phases 110-113
   (shipped 2026-06-01). See `.planning/milestones/v1.24-ROADMAP.md`.
 
@@ -13,218 +15,132 @@
   Phases 100-105 (shipped 2026-06-01). See
   `.planning/milestones/v1.22-ROADMAP.md`.
 
-- Complete **v1.21 Codebase Debt Reduction and Execution Boundary
-  Hardening** - Phases 94-99 (shipped 2026-06-01). See
-  `.planning/milestones/v1.21-ROADMAP.md` when archived.
-
-- Complete **v1.20 Cross-Report Consistency and Evaluation Stability** -
-  Phases 89-93 (shipped 2026-05-31). See
-  `.planning/milestones/v1.20-ROADMAP.md`.
-
-- Complete **v1.19 Research Credibility Without New Hardware** -
-  Phases 83-88 (shipped 2026-05-31). See
-  `.planning/milestones/v1.19-ROADMAP.md`.
-
-- Earlier milestones v1.0-v1.18 are archived under `.planning/milestones/`.
+- Earlier milestones are archived under `.planning/milestones/`.
 
 ## Current Position
 
-**Active milestone:** None.
+**Active milestone:** v1.25 Engineering Prerelease.
 
-**Status:** v1.23 and v1.24 complete.
+**Status:** Ready to plan Phase 114.
 
-**Next step:** Define the next milestone when ready.
+**Milestone goal:** Turn the v1.24 ROCm port state into an engineering
+prerelease / release-candidate package that external users can install,
+validate, and interpret without overstated research or hardware claims.
+
+**Explicitly deferred:** full 235-problem paper-scale validation, upstream
+SOLAR parity, hosted leaderboard, hard multi-tenant sandboxing, large
+PyTorch/ROCm dependency relocking, Docker privilege-model redesign, MI300X/CDNA3
+full-suite validation without a complete evidence chain, and CDNA4 validation
+because suitable hardware is not currently accessible.
 
 ## Phases
 
-- [x] **Phase 106: Evaluation Failure Diagnostics** - Users and
-  maintainers can diagnose no-trace and noisy-output failures through bounded
-  stdout/stderr evidence without relying on verbose-only console output.
-  (completed 2026-06-01)
-- [x] **Phase 107: Staged User Import Isolation** - Python submissions are
-  loaded through unique file-based module identities so staged solution names
-  cannot collide with already-imported driver or dependency modules.
-  (completed 2026-06-01)
-- [x] **Phase 108: Native Compile Option Guardrails** - Native solution
-  compiler and linker options reject dangerous host/path/linker behavior while
-  preserving documented ROCm/HIP extension use cases.
-  (completed 2026-06-01)
-- [x] **Phase 109: Eval Driver Responsibility Boundaries** - The generated
-  eval driver delegates benchmark phases to tested importable helpers while
-  preserving canonical trace, correctness, timing, and reward-hack semantics.
-  (completed 2026-06-01)
-- [x] **Phase 110: Dataset Reuse Policy Service** - Dataset batch reuse and
-  stale-provenance decisions are owned by tested package services instead of
-  script-local branching.
-  (completed 2026-06-01)
-- [x] **Phase 111: Dataset Closure And Evidence Completeness** - Dataset
-  closure records, timing refs, derived sidecars, and missing-evidence states
-  are constructed through validated core helpers.
-  (completed 2026-06-01)
-- [x] **Phase 112: Dataset Failure-Mode Regression Matrix** - Stale
-  provenance, selected ready-subset workloads, rerun flags, missing sidecars,
-  and nonzero CLI outcomes have focused regression coverage.
-  (completed 2026-06-01)
-- [x] **Phase 113: Deterministic Dataset Sharding Path** - Dataset-scale
-  execution has a first deterministic shard and merge design that preserves
-  one trace file per shard and explicit merge rules.
-  (completed 2026-06-01)
+- [ ] **Phase 114: Release-Candidate Validation** - Maintainers can run and
+  interpret bounded prerelease validation across CPU-safe, ROCm/Docker smoke,
+  and dataset-slice checks.
+- [ ] **Phase 115: Support Matrix Boundaries** - Users can understand exactly
+  which ROCm hardware and environment evidence the prerelease supports.
+- [ ] **Phase 116: Claim Boundary Guardrails** - Release wording and checks
+  prevent accidental overclaims about parity, leaderboard readiness, sandboxing,
+  and unavailable hardware validation.
+- [ ] **Phase 117: First-Run User Path** - New users can install, run a
+  minimal example, inspect trace output, and diagnose common failures.
+- [ ] **Phase 118: Release Candidate Materials** - Maintainers have the
+  checklist, notes, and public documentation entry points needed to tag and
+  publish the engineering prerelease.
 
 ## Phase Details
 
-### Phase 106: Evaluation Failure Diagnostics
-**Goal**: Users and maintainers can diagnose no-trace, noisy-output, and
-nonzero evaluation failures through bounded persisted diagnostics.
-**Depends on**: Phase 105
-**Requirements**: EVAL-DIAG-01, EVAL-DIAG-02, EVAL-DIAG-03
+### Phase 114: Release-Candidate Validation
+**Goal**: Maintainers can validate the engineering prerelease through bounded,
+recorded release-candidate checks before publishing.
+**Depends on**: Phase 113
+**Requirements**: RCVAL-01, RCVAL-02, RCVAL-03, RCVAL-04
 **Success Criteria** (what must be TRUE):
-  1. No-trace evaluation outcomes persist bounded stdout and stderr sidecars or
-     equivalent structured diagnostic evidence.
-  2. CLI failure reporting points to the diagnostic evidence without requiring
-     `--verbose` or manual staging inspection.
-  3. Regression tests cover non-JSON stdout, library noise, nonzero exits, and
-     empty trace output without changing canonical trace JSONL.
-**Plans**:
-  - `106-01-PLAN.md` - Add bounded no-trace diagnostics and CLI failure
-    reporting.
+  1. Maintainer can run the CPU-safe release validation suite and review a
+     recorded pass/fail summary.
+  2. Maintainer can run focused ROCm/Docker smoke checks that capture
+     environment and clock-policy evidence.
+  3. Maintainer can run a bounded dataset slice that produces trace, closure,
+     trust, and known-gap artifacts.
+  4. Maintainer can classify every release-validation failure as blocking,
+     deferred, or diagnostic-only with an explicit next action.
+**Plans**: TBD
 
-### Phase 107: Staged User Import Isolation
-**Goal**: Python solution imports use unique staged module identities and do
-not depend on dotted names that can collide with `sys.modules`.
-**Depends on**: Phase 106
-**Requirements**: EVAL-IMPORT-01, EVAL-IMPORT-02, EVAL-IMPORT-03
+### Phase 115: Support Matrix Boundaries
+**Goal**: Users can interpret prerelease support accurately across RDNA 4,
+container user-space, MI300X/CDNA3, and unavailable CDNA4 validation.
+**Depends on**: Phase 114
+**Requirements**: SUPPORT-01, SUPPORT-02, SUPPORT-03, SUPPORT-04
 **Success Criteria** (what must be TRUE):
-  1. `load_user_function()` imports Python sources through a file-based
-     `importlib` path with a unique generated module name.
-  2. Package-style and simple-file solution entries keep their supported
-     behavior while avoiding collisions with previously imported modules.
-  3. Regression tests prove collisions such as `main.py::run` and package-like
-     module names cannot resolve to unintended existing modules.
-**Plans**:
-  - `107-01-PLAN.md` - Replace dotted staged imports with unique file-based
-    imports.
+  1. User can identify which RDNA 4 evidence is validated for the engineering
+     prerelease.
+  2. User can distinguish Docker/container user-space evidence from native-host
+     validation.
+  3. User can see that MI300X/CDNA3 full-suite validation is deferred unless a
+     complete evidence chain exists.
+  4. User can see that CDNA4 validation is unavailable because suitable hardware
+     is not currently accessible.
+**Plans**: TBD
 
-### Phase 108: Native Compile Option Guardrails
-**Goal**: Native solution compile options are constrained enough for trusted
-research evaluation while remaining compatible with documented ROCm extension
-builds.
-**Depends on**: Phase 107
-**Requirements**: COMPILE-GUARD-01, COMPILE-GUARD-02, COMPILE-GUARD-03
+### Phase 116: Claim Boundary Guardrails
+**Goal**: Release claims stay bounded to engineering-prerelease evidence and do
+not imply stronger research, service, parity, sandbox, or hardware authority.
+**Depends on**: Phase 115
+**Requirements**: CLAIM-01, CLAIM-02, CLAIM-03
 **Success Criteria** (what must be TRUE):
-  1. Dangerous compiler/linker options that reference host paths, dynamic
-     loaders, response files, or unsafe link-time behavior are rejected with
-     clear validation errors.
-  2. Allowed ROCm/HIP compile options used by examples and tests remain
-     accepted.
-  3. Schema and build-template tests cover accepted and rejected option
-     classes.
-**Plans**:
-  - `108-01-PLAN.md` - Add native compile option validation and tests.
+  1. User reading release docs cannot reasonably infer paper-parity, upstream
+     SOLAR parity, leaderboard, hard-sandbox, or CDNA4 validation claims.
+  2. Maintainer can run existing or updated claim-boundary checks that cover
+     prerelease wording.
+  3. User can tell which release artifacts are canonical, diagnostic-only,
+     provisional, or deferred.
+**Plans**: TBD
 
-### Phase 109: Eval Driver Responsibility Boundaries
-**Goal**: The generated driver becomes a thinner staged entry point while
-benchmark behavior remains compatible.
-**Depends on**: Phase 108
-**Requirements**: EVAL-BOUNDARY-01, EVAL-BOUNDARY-02, EVAL-BOUNDARY-03,
-EVAL-BOUNDARY-04
+### Phase 117: First-Run User Path
+**Goal**: New users can complete the documented first-run workflow and
+understand the first trace and common failure signals.
+**Depends on**: Phase 116
+**Requirements**: FIRST-01, FIRST-02, FIRST-03, FIRST-04
 **Success Criteria** (what must be TRUE):
-  1. Correctness, timing, trace emission, source review, and reward-hack
-     boundary behavior are exposed through importable helpers with focused
-     tests.
-  2. The generated template remains responsible only for staged wiring,
-     subprocess-local setup, and integration glue.
-  3. Integrity snapshot coverage remains explicit for every benchmark-critical
-     helper reachable from staged execution.
-  4. Public trace, correctness, timing, score, and evaluator contract schemas
-     remain unchanged unless a separate schema discussion approves a change.
-**Plans**:
-  - `109-01-PLAN.md` - Thin generated eval driver around tested benchmark
-    phase helpers.
+  1. New user can install dependencies and run a minimal example from documented
+     commands.
+  2. New user can generate canonical trace JSONL and interpret correctness,
+     latency, speedup, and environment fields.
+  3. New user can diagnose common failures using doctor output, sidecars,
+     no-trace diagnostics, and known limitations.
+  4. New user does not encounter NVIDIA/CUDA ambiguity in first-run docs except
+     where PyTorch ROCm compatibility names are intentional.
+**Plans**: TBD
 
-### Phase 110: Dataset Reuse Policy Service
-**Goal**: Dataset reuse and stale-provenance decisions are centralized in
-tested core services.
-**Depends on**: Phase 109
-**Requirements**: DATASET-REUSE-01, DATASET-REUSE-02, DATASET-REUSE-03
+### Phase 118: Release Candidate Materials
+**Goal**: Maintainers can package, tag, and publish the engineering prerelease
+with coherent release materials and public navigation.
+**Depends on**: Phase 117
+**Requirements**: REL-01, REL-02, REL-03
 **Success Criteria** (what must be TRUE):
-  1. Reuse decisions are computed by importable helpers with explicit inputs
-     for selected workloads, ready subsets, provenance, rerun flags, and
-     output paths.
-  2. `scripts/run_dataset.py` delegates policy decisions instead of owning the
-     decision matrix inline.
-  3. Tests cover reuse, stale provenance, forced rerun, partial-ready, and
-     missing-output combinations.
-**Plans**:
-  - `110-01-PLAN.md` - Extract dataset reuse policy into core helpers.
-
-### Phase 111: Dataset Closure And Evidence Completeness
-**Goal**: Dataset closure and evidence references are assembled through core
-helpers with explicit incomplete-state semantics.
-**Depends on**: Phase 110
-**Requirements**: DATASET-CLOSURE-01, DATASET-CLOSURE-02, DATASET-CLOSURE-03
-**Success Criteria** (what must be TRUE):
-  1. Closure records classify missing traces, missing timing evidence, missing
-     derived sidecars, skipped workloads, and nonzero CLI outcomes without
-     ambiguous success states.
-  2. Summary, score, timing, and closure references use package-level helpers
-     rather than script-local path coupling.
-  3. Closure reports remain deterministic and compatible with existing public
-     sidecar contracts.
-**Plans**:
-  - `111-01-PLAN.md` - Centralize dataset closure and evidence completeness
-    helpers.
-
-### Phase 112: Dataset Failure-Mode Regression Matrix
-**Goal**: Dataset runner failure modes have targeted tests that prevent silent
-stale evidence or incomplete closure reporting.
-**Depends on**: Phase 111
-**Requirements**: DATASET-REGRESS-01, DATASET-REGRESS-02, DATASET-REGRESS-03
-**Success Criteria** (what must be TRUE):
-  1. Regression fixtures cover stale provenance, selected ready subsets,
-     missing derived sidecars, rerun flags, CLI timeout/nonzero outcomes, and
-     no-trace outputs.
-  2. Tests distinguish CPU-safe policy behavior from live ROCm/GPU execution
-     requirements.
-  3. Dataset runner documentation explains when reuse is allowed, blocked, or
-     reported as incomplete.
-**Plans**:
-  - `112-01-PLAN.md` - Add dataset failure-mode regression coverage and docs.
-
-### Phase 113: Deterministic Dataset Sharding Path
-**Goal**: Dataset-scale runs have a deterministic sharding design that can
-reduce single-process pressure without weakening trace provenance.
-**Depends on**: Phase 112
-**Requirements**: DATASET-SHARD-01, DATASET-SHARD-02, DATASET-SHARD-03
-**Success Criteria** (what must be TRUE):
-  1. A shard plan can divide workloads deterministically with stable shard
-     identifiers and one trace file per shard.
-  2. Merge rules preserve workload ordering, provenance, duplicate detection,
-     and incomplete-shard reporting.
-  3. The first implementation or design artifact is covered by tests and keeps
-     default dataset CLI behavior compatible.
-**Plans**:
-  - `113-01-PLAN.md` - Define and test deterministic dataset shard and merge
-    semantics.
+  1. Maintainer can follow a prerelease checklist from clean tree to tagged
+     release candidate.
+  2. User can read release notes that summarize shipped capability, validation
+     evidence, known limitations, and deferred claims.
+  3. Public documentation points users to the support matrix, claim boundaries,
+     researcher guide, timing semantics, and troubleshooting entry points.
+**Plans**: TBD
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 106 -> 107 -> 108 -> 109, then queued
-milestone phases 110 -> 111 -> 112 -> 113.
+Phases execute in numeric order: 114 -> 115 -> 116 -> 117 -> 118.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 106. Evaluation Failure Diagnostics | 1/1 | Complete | 2026-06-01 |
-| 107. Staged User Import Isolation | 1/1 | Complete | 2026-06-01 |
-| 108. Native Compile Option Guardrails | 1/1 | Complete | 2026-06-01 |
-| 109. Eval Driver Responsibility Boundaries | 1/1 | Complete | 2026-06-01 |
-| 110. Dataset Reuse Policy Service | 1/1 | Complete | 2026-06-01 |
-| 111. Dataset Closure And Evidence Completeness | 1/1 | Complete | 2026-06-01 |
-| 112. Dataset Failure-Mode Regression Matrix | 1/1 | Complete | 2026-06-01 |
-| 113. Deterministic Dataset Sharding Path | 1/1 | Complete | 2026-06-01 |
+| 114. Release-Candidate Validation | 0/TBD | Not started | - |
+| 115. Support Matrix Boundaries | 0/TBD | Not started | - |
+| 116. Claim Boundary Guardrails | 0/TBD | Not started | - |
+| 117. First-Run User Path | 0/TBD | Not started | - |
+| 118. Release Candidate Materials | 0/TBD | Not started | - |
 
 **Coverage:**
-- v1.23 requirements complete: 13/13
-- v1.24 requirements complete: 12/12
-- Completed milestone flow count: 8 phases
-- Residual blockers: 0
+- v1.25 requirements mapped: 18/18
+- Orphaned requirements: 0
+- Duplicate requirement mappings: 0

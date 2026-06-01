@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v1.25
 milestone_name: Engineering Prerelease
-status: planning
-last_updated: "2026-06-01T09:52:52.133Z"
+status: ready_to_plan
+last_updated: "2026-06-01"
 last_activity: 2026-06-01
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -22,20 +22,22 @@ See: `.planning/PROJECT.md` (updated 2026-06-01)
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly
 on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL
 ExecBench.
-**Current focus:** v1.24 Dataset Batch Run Trustworthiness.
+**Current focus:** v1.25 Engineering Prerelease, starting with Phase 114
+Release-Candidate Validation.
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-06-01 — Milestone v1.25 started
+Phase: 114 of 118 (Release-Candidate Validation)
+Plan: Not planned yet
+Status: Ready to plan
+Last activity: 2026-06-01 - Roadmap created for v1.25 Engineering Prerelease
+
+Progress: [----------] 0%
 
 ## Performance Metrics
 
 **Velocity:**
-
-- Total plans completed: 8 across v1.23/v1.24
+- Total plans completed: 0 in v1.25
 - Average duration: n/a
 - Total execution time: 0h
 
@@ -43,53 +45,35 @@ Last activity: 2026-06-01 — Milestone v1.25 started
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 106. Evaluation Failure Diagnostics | 1/1 | Complete | n/a |
-| 107. Staged User Import Isolation | 1/1 | Complete | n/a |
-| 108. Native Compile Option Guardrails | 1/1 | Complete | n/a |
-| 109. Eval Driver Responsibility Boundaries | 1/1 | Complete | n/a |
-| 110. Dataset Reuse Policy Service | 1/1 | Complete | n/a |
-| 111. Dataset Closure And Evidence Completeness | 1/1 | Complete | n/a |
-| 112. Dataset Failure-Mode Regression Matrix | 1/1 | Complete | n/a |
-| 113. Deterministic Dataset Sharding Path | 1/1 | Complete | n/a |
-
-**Queued Next Milestone:**
-
-| Phase | Milestone | Status |
-|-------|-----------|--------|
-| 110. Dataset Reuse Policy Service | v1.24 | Queued |
-| 111. Dataset Closure And Evidence Completeness | v1.24 | Queued |
-| 112. Dataset Failure-Mode Regression Matrix | v1.24 | Queued |
-| 113. Deterministic Dataset Sharding Path | v1.24 | Queued |
+| 114. Release-Candidate Validation | 0/TBD | Not started | n/a |
+| 115. Support Matrix Boundaries | 0/TBD | Not started | n/a |
+| 116. Claim Boundary Guardrails | 0/TBD | Not started | n/a |
+| 117. First-Run User Path | 0/TBD | Not started | n/a |
+| 118. Release Candidate Materials | 0/TBD | Not started | n/a |
 
 **Recent Trend:**
-
-- Last milestone: v1.22 shipped Phases 100-105 on 2026-06-01.
-- Trend: v1.23 and v1.24 phases are complete and ready for milestone audit.
+- v1.24 shipped Phases 110-113 on 2026-06-01.
+- v1.25 starts from Phase 114 as an engineering prerelease /
+  release-candidate milestone.
 
 ## Accumulated Context
 
 ### Decisions
 
-Decisions are logged in PROJECT.md. Recent decisions affecting current work:
-
-- v1.23 starts at Phase 106 because v1.22 completed Phases 100-105.
-- v1.23 focuses on no-trace diagnostics, staged Python import isolation,
-  native compile option guardrails, and eval-driver responsibility boundaries.
-
-- v1.24 is queued for dataset reuse policy, closure/evidence completeness,
-  failure-mode regressions, and deterministic sharding semantics.
-
-- v1.23 and v1.24 must preserve canonical Trace, Definition, Workload,
-  Solution, timing, correctness, score, and evaluator contract schemas unless
-  separately approved.
-
-- v1.23 and v1.24 must not claim CDNA3, MI300X, CDNA4, native-host full-suite
-  validation, paper-scale parity, leaderboard readiness, or hard
-  multi-tenant sandboxing.
+- v1.25 starts at Phase 114 because v1.24 completed Phase 113.
+- v1.25 is an engineering prerelease / release-candidate milestone, not a
+  paper-scale validation or hosted-service milestone.
+- MI300X is the CDNA3 hardware target; MI300X and CDNA3 are not separate
+  validation targets.
+- CDNA4 validation is unavailable because suitable hardware is not currently
+  accessible.
+- Full 235-problem paper-scale validation, upstream SOLAR parity, hosted
+  leaderboard, hard sandboxing, large dependency relocking, and Docker
+  privilege redesign remain deferred unless explicitly reopened.
 
 ### Pending Todos
 
-- Define the next milestone when ready.
+- Plan Phase 114.
 
 ### Blockers/Concerns
 
@@ -99,21 +83,15 @@ None.
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| Dataset trustworthiness | Reuse policy, closure completeness, failure-mode matrix, and sharding | Queued | v1.24 |
-| Hardware validation | CDNA3, MI300X, CDNA4, and native-host full-suite validation | Deferred | v1.23 scope |
-| Native examples | Complete native ROCm validation for every former NVIDIA library category | Deferred | v1.23 scope |
-| Paper parity | Full 235-problem paper-scale validation and upstream SOLAR equivalence | Deferred | v1.23 scope |
-| Public service | Hosted leaderboard or remote submission service | Deferred | v1.23 scope |
-| Security | Complete hard sandbox and multi-tenant/adversarial submission isolation | Deferred | v1.23 scope |
-| Dependencies | Large PyTorch/ROCm relocking or Docker privilege-model redesign | Deferred | v1.23 scope |
-| Scoring structure | Full derived-scoring module split by operator family | Deferred | v1.23 scope |
+| Paper validation | Full 235-problem paper-scale validation and upstream SOLAR parity | Deferred | v1.25 scope |
+| Hardware validation | MI300X/CDNA3 full-suite validation without a complete evidence chain | Deferred | v1.25 scope |
+| Hardware validation | CDNA4 validation because suitable hardware is unavailable | Deferred | v1.25 scope |
+| Operations | Hosted leaderboard or remote submission service | Deferred | v1.25 scope |
+| Security | Hard sandbox or multi-tenant adversarial execution | Deferred | v1.25 scope |
+| Dependencies/Docker | Large PyTorch/ROCm relock or Docker privilege redesign | Deferred | v1.25 scope |
 
 ## Session Continuity
 
 Last session: 2026-06-01
-Stopped at: v1.23 and v1.24 complete.
+Stopped at: Roadmap created for v1.25.
 Resume file: None
-
-## Operator Next Steps
-
-- Run `$gsd-new-milestone` when ready to define the next milestone.
