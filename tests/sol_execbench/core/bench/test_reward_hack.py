@@ -237,6 +237,31 @@ class TestStaticSourceReview:
         assert review.blocked is True
         assert "unauthorized_file_or_loader" in {issue.rule for issue in review.issues}
 
+    def test_reports_dynamic_import_process_execution_patterns(self):
+        review = review_solution_sources(
+            _solution_with_source(
+                "def run(x):\n"
+                "    __import__('os').system('true')\n"
+                "    return x\n"
+            )
+        )
+
+        assert review.blocked is True
+        assert "unauthorized_file_or_loader" in {issue.rule for issue in review.issues}
+
+    def test_reports_getattr_os_process_execution_patterns(self):
+        review = review_solution_sources(
+            _solution_with_source(
+                "import os\n"
+                "def run(x):\n"
+                "    getattr(os, 'system')('true')\n"
+                "    return x\n"
+            )
+        )
+
+        assert review.blocked is True
+        assert "unauthorized_file_or_loader" in {issue.rule for issue in review.issues}
+
     def test_allows_plain_os_import_without_process_execution(self):
         review = review_solution_sources(
             _solution_with_source(

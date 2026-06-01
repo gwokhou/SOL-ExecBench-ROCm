@@ -668,6 +668,7 @@ def _evaluate_cli(
                 console.print(proc.stderr)
             if proc.stdout:
                 console.print(proc.stdout)
+            packager.close()
             sys.exit(1)
 
         console.print("[green]Compilation succeeded[/green]")
@@ -732,6 +733,7 @@ def _evaluate_cli(
         console.print("[red]Evaluation failed[/red]")
         if proc.stderr:
             console.print(proc.stderr)
+        packager.close()
         sys.exit(1)
 
     # Parse traces from stdout
@@ -741,6 +743,7 @@ def _evaluate_cli(
         console.print("[red]No traces produced[/red]")
         if proc.stderr:
             console.print(proc.stderr)
+        packager.close()
         sys.exit(1)
 
     # Output
@@ -760,6 +763,8 @@ def _evaluate_cli(
             print(json.dumps(t.model_dump(mode="json")))
     else:
         _print_traces_table(traces)
+
+    packager.close()
 
     # Exit code: 0 if all passed, 1 otherwise
     all_passed = all(

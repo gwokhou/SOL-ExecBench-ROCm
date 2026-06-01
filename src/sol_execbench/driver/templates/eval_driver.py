@@ -48,44 +48,6 @@ import torch  # noqa: E402 — must come after redirect
 STAGING_DIR = Path(__file__).parent.resolve()
 sys.path.insert(0, str(STAGING_DIR))
 
-
-# ── DPS helper ───────────────────────────────────────────────────────────────
-def _call_and_collect_outputs(
-    fn,
-    inputs,
-    dps,
-    definition,
-    resolved_axes,
-    device,
-    output_names,
-    output_dtypes_torch,
-):
-    """Call fn in the correct calling convention and return a list of output tensors.
-
-    DPS=True (destination-passing style):
-        fn(*inputs, *pre_allocated_outputs)  → outputs written in-place
-    DPS=False (return-value style):
-        result = fn(*inputs)  → normalize_outputs(result) → list of tensors
-    """
-    if dps:
-        outputs = allocate_outputs(definition, resolved_axes, device)
-        fn(*inputs, *outputs)
-        if torch.cuda.is_available():
-            torch.cuda.synchronize(device)
-        return outputs
-    else:
-        result = fn(*inputs)
-        if torch.cuda.is_available():
-            torch.cuda.synchronize(device)
-        out_dict = normalize_outputs(
-            result,
-            device=torch.device(device),
-            output_names=output_names,
-            output_dtypes=output_dtypes_torch,
-        )
-        return [out_dict[n] for n in output_names]
-
-
 # ── Load problem ─────────────────────────────────────────────────────────────
 def _load_problem() -> "tuple[dict, list[dict]]":
     """Load definition dict + workload dicts from staging directory."""
@@ -122,7 +84,6 @@ from sol_execbench.core.bench.io import (  # noqa: E402
     allocate_outputs,
     gen_inputs,
     load_safetensors,
-    normalize_outputs,
 )
 from sol_execbench.core.bench.reward_hack import (  # noqa: E402
     RewardHackDetected,
@@ -135,6 +96,7 @@ from sol_execbench.core.bench.reward_hack import (  # noqa: E402
 )
 from sol_execbench.core.bench.timing import time_runnable  # noqa: E402
 from sol_execbench.core.bench.utils import (  # noqa: E402
+    call_and_collect_outputs,
     make_eval,
 )
 from sol_execbench.core import (  # noqa: E402
@@ -229,10 +191,9 @@ _CRITICAL_NAMES = [
     "check_lazy_outputs",
     "check_thread_injection",
     "check_eval_integrity",
-    "_call_and_collect_outputs",
+    "call_and_collect_outputs",
     "gen_inputs",
     "allocate_outputs",
-    "normalize_outputs",
     "make_eval",
 ]
 _integrity_snapshot = snapshot_critical_functions(globals(), _CRITICAL_NAMES)
@@ -483,15 +444,15 @@ for _workload in workloads:
 
         # -- Run reference (always return-value style) to get ground-truth --
         try:
-            _ref_outputs = _call_and_collect_outputs(
+            _ref_outputs = call_and_collect_outputs(
                 ref_fn,
                 _inputs,
-                False,
-                definition,
-                _resolved_axes,
-                _device,
-                _output_names,
-                _output_dtypes_torch,
+                destination_passing_style=False,
+                definition=definition,
+                resolved_axes=_resolved_axes,
+                device=_device,
+                output_names=_output_names,
+                output_dtypes=_output_dtypes_torch,
             )
         except Exception as _e:
             _emit(
@@ -514,15 +475,15 @@ for _workload in workloads:
         # Round 0 also serves as a warmup call: JIT compilers (torch.compile,
         # Triton, CuTe DSL) spawn infrastructure threads on first call.
         try:
-            _user_outputs = _call_and_collect_outputs(
+            _user_outputs = call_and_collect_outputs(
                 user_fn,
                 _inputs,
-                _dps,
-                definition,
-                _resolved_axes,
-                _device,
-                _output_names,
-                _output_dtypes_torch,
+                destination_passing_style=_dps,
+                definition=definition,
+                resolved_axes=_resolved_axes,
+                device=_device,
+                output_names=_output_names,
+                output_dtypes=_output_dtypes_torch,
             )
         except Exception as _e:
             _emit(
