@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.22
 milestone_name: Concern Closure and Execution Boundary Hardening
-status: executing
-stopped_at: Phase 104 planned (1 plan) — ready to execute
-last_updated: "2026-06-01T05:52:05.538Z"
-last_activity: 2026-06-01 -- Phase 104 planning complete
+status: ready_to_plan
+stopped_at: Phase 104 complete (1/1) — ready to discuss Phase 105
+last_updated: 2026-06-01T05:56:46.007Z
+last_activity: 2026-06-01 -- Phase 104 complete
 progress:
   total_phases: 6
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 6
-  completed_plans: 5
-  percent: 67
+  completed_plans: 6
+  percent: 83
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-06-01)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Phase 104 — dependency and closure guardrails
+**Current focus:** Phase 105 — concern map stewardship
 
 ## Current Position
 
-Phase: 104 of 105 (dependency and closure guardrails)
+Phase: 105 of 105 (concern map stewardship)
 Plan: Not started
-Status: Ready to execute
-Last activity: 2026-06-01 -- Phase 104 planning complete
+Status: Ready to plan
+Last activity: 2026-06-01
 
 Progress: [..........] 0%
 
@@ -36,7 +36,7 @@ Progress: [..........] 0%
 
 **Velocity:**
 
-- Total plans completed: 5 in v1.22
+- Total plans completed: 6 in v1.22
 - Average duration: n/a
 - Total execution time: 0h
 
@@ -48,12 +48,13 @@ Progress: [..........] 0%
 | 101. Eval Driver Diagnostics And Framing | 1/1 | Complete | n/a |
 | 102. Source Review And Boundary Evidence | 0/1 | Ready to execute | n/a |
 | 103. Scoring And Static Evidence Fixtures | 1/1 | Complete | n/a |
-| 104. Dependency And Closure Guardrails | 0/1 | Ready to execute | n/a |
+| 104. Dependency And Closure Guardrails | 1/1 | Complete | n/a |
 | 105. Concern Map Stewardship | 0/TBD | Not started | n/a |
 | 100 | 2 | - | - |
 | 101 | 1 | - | - |
 | 102 | 1 | - | - |
 | 103 | 1 | - | - |
+| 104 | 1 | - | - |
 
 **Recent Trend:**
 
@@ -92,9 +93,9 @@ None.
 ## Session Continuity
 
 Last session: 2026-06-01
-Stopped at: Phase 104 planned; ready to execute.
+Stopped at: Phase 104 complete; ready to plan Phase 105.
 Resume file: None
 
 ## Operator Next Steps
 
-- Run `$gsd-execute-phase 104`.
+- Run `$gsd-plan-phase 105`.
