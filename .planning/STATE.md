@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.22
-milestone_name: Concern Closure and Execution Boundary Hardening
-status: milestone_complete
-stopped_at: Milestone complete (Phase 105 was final phase)
-last_updated: 2026-06-01T06:01:39.168Z
-last_activity: 2026-06-01 -- Phase 105 complete
+milestone: none
+milestone_name: none
+status: ready_for_next_milestone
+stopped_at: v1.23 and v1.24 complete and audited
+last_updated: 2026-06-01T00:00:00+08:00
+last_activity: 2026-06-01 -- v1.23 and v1.24 complete
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 7
-  completed_plans: 7
+  total_phases: 8
+  completed_phases: 8
+  total_plans: 8
+  completed_plans: 8
   percent: 100
 ---
 
@@ -20,23 +20,25 @@ progress:
 
 See: `.planning/PROJECT.md` (updated 2026-06-01)
 
-**Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Milestone complete
+**Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly
+on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL
+ExecBench.
+**Current focus:** v1.24 Dataset Batch Run Trustworthiness.
 
 ## Current Position
 
-Phase: 105 of 105 (concern map stewardship)
-Plan: Complete
-Status: Milestone complete
-Last activity: 2026-06-01
+Phase: none
+Plan: none
+Status: Ready for next milestone definition
+Last activity: 2026-06-01 -- v1.23 and v1.24 complete
 
-Progress: [..........] 0%
+Progress: [##########] 100%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 7 in v1.22
+- Total plans completed: 8 across v1.23/v1.24
 - Average duration: n/a
 - Total execution time: 0h
 
@@ -44,38 +46,50 @@ Progress: [..........] 0%
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 100. Dataset Runner Execution Seams | 2/2 | Complete | n/a |
-| 101. Eval Driver Diagnostics And Framing | 1/1 | Complete | n/a |
-| 102. Source Review And Boundary Evidence | 1/1 | Complete | n/a |
-| 103. Scoring And Static Evidence Fixtures | 1/1 | Complete | n/a |
-| 104. Dependency And Closure Guardrails | 1/1 | Complete | n/a |
-| 105. Concern Map Stewardship | 1/1 | Complete | n/a |
-| 100 | 2 | - | - |
-| 101 | 1 | - | - |
-| 102 | 1 | - | - |
-| 103 | 1 | - | - |
-| 104 | 1 | - | - |
-| 105 | 1 | - | - |
+| 106. Evaluation Failure Diagnostics | 1/1 | Complete | n/a |
+| 107. Staged User Import Isolation | 1/1 | Complete | n/a |
+| 108. Native Compile Option Guardrails | 1/1 | Complete | n/a |
+| 109. Eval Driver Responsibility Boundaries | 1/1 | Complete | n/a |
+| 110. Dataset Reuse Policy Service | 1/1 | Complete | n/a |
+| 111. Dataset Closure And Evidence Completeness | 1/1 | Complete | n/a |
+| 112. Dataset Failure-Mode Regression Matrix | 1/1 | Complete | n/a |
+| 113. Deterministic Dataset Sharding Path | 1/1 | Complete | n/a |
+
+**Queued Next Milestone:**
+
+| Phase | Milestone | Status |
+|-------|-----------|--------|
+| 110. Dataset Reuse Policy Service | v1.24 | Queued |
+| 111. Dataset Closure And Evidence Completeness | v1.24 | Queued |
+| 112. Dataset Failure-Mode Regression Matrix | v1.24 | Queued |
+| 113. Deterministic Dataset Sharding Path | v1.24 | Queued |
 
 **Recent Trend:**
 
-- Last milestone: v1.21 shipped Phases 94-99 on 2026-06-01.
-- Trend: v1.22 starts with standard-granularity phases focused on closing remaining code-actionable concerns while keeping hardware validation, hard sandboxing, paper parity, and leaderboard work deferred.
+- Last milestone: v1.22 shipped Phases 100-105 on 2026-06-01.
+- Trend: v1.23 and v1.24 phases are complete and ready for milestone audit.
 
 ## Accumulated Context
 
 ### Decisions
 
-Decisions are logged in PROJECT.md Key Decisions table. Recent decisions affecting current work:
+Decisions are logged in PROJECT.md. Recent decisions affecting current work:
 
-- v1.22 starts at Phase 100 because v1.21 completed Phases 94-99.
-- v1.22 derives phases only from v1.22 requirements in `.planning/REQUIREMENTS.md`.
-- v1.22 must preserve canonical Trace, Definition, Workload, Solution, timing, correctness, score, and evaluator contract schemas unless explicitly required.
-- v1.22 must not claim CDNA3, MI300X, CDNA4, native-host full-suite validation, paper-scale parity, leaderboard readiness, or hard multi-tenant sandboxing.
+- v1.23 starts at Phase 106 because v1.22 completed Phases 100-105.
+- v1.23 focuses on no-trace diagnostics, staged Python import isolation,
+  native compile option guardrails, and eval-driver responsibility boundaries.
+- v1.24 is queued for dataset reuse policy, closure/evidence completeness,
+  failure-mode regressions, and deterministic sharding semantics.
+- v1.23 and v1.24 must preserve canonical Trace, Definition, Workload,
+  Solution, timing, correctness, score, and evaluator contract schemas unless
+  separately approved.
+- v1.23 and v1.24 must not claim CDNA3, MI300X, CDNA4, native-host full-suite
+  validation, paper-scale parity, leaderboard readiness, or hard
+  multi-tenant sandboxing.
 
 ### Pending Todos
 
-None found.
+- Define the next milestone when ready.
 
 ### Blockers/Concerns
 
@@ -85,18 +99,21 @@ None.
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| Hardware validation | CDNA3, MI300X, CDNA4, and native-host full-suite validation | Deferred | v1.22 scope |
-| Paper parity | Full 235-problem paper-scale validation and upstream SOLAR equivalence | Deferred | v1.22 scope |
-| Public service | Hosted leaderboard or remote submission service | Deferred | v1.22 scope |
-| Security | Complete hard sandbox and multi-tenant/adversarial submission isolation | Deferred | v1.22 scope |
-| Dependencies | Large PyTorch/ROCm relocking or Docker privilege-model redesign | Deferred | v1.22 scope |
+| Dataset trustworthiness | Reuse policy, closure completeness, failure-mode matrix, and sharding | Queued | v1.24 |
+| Hardware validation | CDNA3, MI300X, CDNA4, and native-host full-suite validation | Deferred | v1.23 scope |
+| Native examples | Complete native ROCm validation for every former NVIDIA library category | Deferred | v1.23 scope |
+| Paper parity | Full 235-problem paper-scale validation and upstream SOLAR equivalence | Deferred | v1.23 scope |
+| Public service | Hosted leaderboard or remote submission service | Deferred | v1.23 scope |
+| Security | Complete hard sandbox and multi-tenant/adversarial submission isolation | Deferred | v1.23 scope |
+| Dependencies | Large PyTorch/ROCm relocking or Docker privilege-model redesign | Deferred | v1.23 scope |
+| Scoring structure | Full derived-scoring module split by operator family | Deferred | v1.23 scope |
 
 ## Session Continuity
 
 Last session: 2026-06-01
-Stopped at: v1.22 phases complete.
+Stopped at: v1.23 and v1.24 complete.
 Resume file: None
 
 ## Operator Next Steps
 
-- Run `$gsd-new-milestone` when ready.
+- Run `$gsd-new-milestone` when ready to define the next milestone.

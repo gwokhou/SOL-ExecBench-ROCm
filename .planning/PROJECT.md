@@ -15,22 +15,23 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
 ## Current State
 
-**Shipped version:** v1.22 Concern Closure and Execution Boundary Hardening,
+**Shipped version:** v1.24 Dataset Batch Run Trustworthiness,
 completed 2026-06-01.
 
-**Current milestone:** None. Ready for the next milestone definition.
+**Current milestone:** None defined.
 
-**Latest milestone outcome:** v1.22 closed or narrowed the remaining
-code-actionable concerns in `.planning/codebase/CONCERNS.md`: dataset runner
-execution seams, eval-driver timing diagnostics and framing, AST-aware source
-review with structured boundary evidence, scoring/static-evidence fixtures,
-dependency/closure/marker guardrails, and an updated concern status map. It
-preserved canonical Trace, Definition, Workload, Solution, correctness, timing,
-score, and evaluator contract schemas while keeping hardware validation,
-paper-scale parity, leaderboard readiness, and hard sandboxing explicitly
-deferred.
+**Queued milestone:** None defined.
 
-**Next milestone goal:** not defined yet.
+**Latest milestone outcome:** v1.24 made dataset-scale execution more
+trustworthy by centralizing reuse policy, closure/evidence completeness,
+failure-mode regression documentation, and deterministic sharding semantics.
+
+**Previous milestone outcome:** v1.23 made single-problem evaluation more
+reliable, diagnosable, and maintainable by hardening no-trace diagnostics,
+staged Python imports, native compile option validation, and generated
+eval-driver responsibility boundaries.
+
+**Next milestone goal:** Not yet defined.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline.
 Milestones v1.1-v1.6 added CDNA 3 code/schema support, maintained residue
@@ -101,8 +102,59 @@ evidence, scoring/static-evidence fixtures, dependency/closure/marker
 guardrails, and concern-map stewardship while preserving explicit deferred
 boundaries for hardware validation, paper parity, leaderboard readiness, and
 hard sandboxing.
+The v1.23 milestone hardened single-problem evaluation diagnostics, staged
+Python import isolation, native compile option validation, and eval-driver
+responsibility boundaries while preserving public contracts and deferred
+hardware/paper/leaderboard authority boundaries.
+The v1.24 milestone hardened dataset batch trustworthiness by extracting reuse
+policy, centralizing closure/evidence record construction, documenting the
+failure-mode regression matrix, and adding deterministic sharding plan/merge
+helpers without changing default dataset CLI behavior.
 
-## Current Milestone: v1.22 Concern Closure and Execution Boundary Hardening
+## Recently Shipped Milestone: v1.24 Dataset Batch Run Trustworthiness
+
+**Goal:** Make dataset-scale reuse, provenance, closure, failure reporting, and
+sharding auditable after the single-evaluation boundary has been tightened.
+
+**Shipped outcome:** Dataset reuse and stale-provenance decisions are now
+package-owned helpers; closure records classify missing trace and missing
+evidence states through shared helpers; failure-mode docs pin CPU-safe
+regression coverage; deterministic sharding helpers define stable shard ids,
+per-shard trace refs, ordered merges, duplicate detection, and incomplete-shard
+reporting.
+
+**Explicitly deferred:**
+- Remote dataset cache/index support beyond checksum-preserving local
+  provenance.
+- Parallel dataset process scheduling and live ROCm shard execution.
+- Hardware-validation, paper-scale parity, leaderboard readiness, and complete
+  hard sandboxing.
+
+## Recently Shipped Milestone: v1.23 Evaluation Reliability and Security Hardening
+
+**Goal:** Make single-problem evaluation more trustworthy, diagnosable, and
+maintainable before further dataset-scale or hardware-validation work.
+
+**Shipped outcome:**
+- Persist bounded stdout/stderr or equivalent structured diagnostics for
+  no-trace and noisy-output evaluation failures.
+- Load staged Python submissions through unique file-based module identities so
+  submitted filenames cannot collide with already-imported modules.
+- Reject dangerous native compiler/linker options while preserving documented
+  ROCm/HIP extension use cases.
+- Thin the generated eval driver by moving trace emission and reward-hack
+  boundary behavior into tested importable helpers.
+
+**Explicitly deferred:**
+- Complete OS/container hard sandboxing for untrusted or multi-tenant
+  submissions.
+- CDNA 3, MI300X, CDNA 4, or native-host full-suite hardware validation.
+- Full 235-problem paper-scale SOLAR, upstream SOLAR, hosted leaderboard, or
+  NVIDIA B200/Blackwell equivalence claims.
+- Canonical Trace, Definition, Workload, Solution, correctness, timing, score,
+  or evaluator contract schema changes unless separately approved.
+
+## Recently Shipped Milestone: v1.22 Concern Closure and Execution Boundary Hardening
 
 **Goal:** Fix the remaining code-actionable concerns in
 `.planning/codebase/CONCERNS.md` while preserving benchmark contracts and
@@ -110,24 +162,24 @@ explicitly deferring hardware-validation, paper-parity, leaderboard, and hard
 sandbox responsibilities that require external evidence or architecture.
 
 **Target features:**
-- Continue dataset runner closure by extracting solution wrapping, CLI
-  invocation, report writing, closure assembly, and runner scheduling seams from
-  `scripts/run_dataset.py`.
-- Continue generated eval-driver thinning by moving reference timing,
+- Continued dataset runner closure by extracting solution wrapping, CLI
+  invocation, report writing, closure assembly, and runner scheduling seams
+  from `scripts/run_dataset.py`.
+- Continued generated eval-driver thinning by moving reference timing,
   correctness/timing orchestration, trace emission, and stdout-framing behavior
   into importable helpers with focused tests.
-- Replace the `stream` to `strm` source rewriting workaround with token-aware
+- Replaced the `stream` to `strm` source rewriting workaround with token-aware
   or AST-aware handling plus regressions for comments, strings, and legitimate
   identifiers.
-- Make reference-timing failures explicit in traces, logs, or status semantics
+- Made reference-timing failures explicit in traces, logs, or status semantics
   when reference benchmarking is requested.
-- Expand source-review and reward-hack coverage toward AST/source-review
+- Expanded source-review and reward-hack coverage toward AST/source-review
   evidence while keeping the benchmark boundary clear.
-- Add family-specific golden fixtures and helper boundaries for SOLAR and AMD
+- Added family-specific golden fixtures and helper boundaries for SOLAR and AMD
   bound derivation.
-- Improve static-evidence artifact manifest and dataset closure provenance
+- Improved static-evidence artifact manifest and dataset closure provenance
   guardrails without changing diagnostic-only authority.
-- Restore `CONCERNS.md` milestone-management context so newly refreshed maps
+- Restored `CONCERNS.md` milestone-management context so refreshed concern maps
   preserve which concerns were narrowed, still actionable, or externally
   deferred.
 
@@ -137,8 +189,11 @@ sandbox responsibilities that require external evidence or architecture.
   NVIDIA B200/Blackwell equivalence claims.
 - Complete OS/container hard sandboxing for untrusted or multi-tenant
   submissions.
-- Large PyTorch/ROCm dependency relocking, Docker privilege-model redesign, or
-  public service infrastructure.
+- Large PyTorch/ROCm dependency relocking or Docker privilege-model redesign.
+
+**Shipped outcome:** v1.22 closed or narrowed the remaining code-actionable
+concern-map items while preserving canonical contracts and carrying external
+hardware, paper-scale, leaderboard, and hard-sandbox boundaries forward.
 
 ## Recently Shipped Milestone: v1.21 Codebase Debt Reduction and Execution Boundary Hardening
 
@@ -177,8 +232,8 @@ evidence.
 
 **Shipped outcome:** v1.21 narrowed major codebase concerns through focused
 helper extraction, boundary tests, and documentation updates. Remaining
-code-actionable concerns are carried into v1.22; hardware-validation,
-paper-scale parity, leaderboard, and hard sandbox work remain deferred.
+code-actionable concerns were carried into v1.22; hardware-validation,
+paper-scale parity, leaderboard, and hard sandbox work remained deferred.
 
 ## Recently Shipped Milestone: v1.20 Cross-Report Consistency and Evaluation Stability
 

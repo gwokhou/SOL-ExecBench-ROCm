@@ -1,5 +1,44 @@
 # Milestones
 
+## v1.24 Dataset Batch Run Trustworthiness (Shipped: 2026-06-01)
+
+**Delivered:** dataset-scale reuse, provenance, closure, failure-mode, and
+sharding trustworthiness improvements.
+
+**Phases completed:** 110-113 (4 phases)
+
+**Key accomplishments:**
+
+- Moved dataset reuse and stale-provenance decisions into importable core
+  helpers.
+- Centralized selected-workload closure record assembly, including trace refs,
+  summary refs, solution refs, and missing evidence states.
+- Documented and protected the dataset failure-mode regression matrix.
+- Added deterministic sharding and merge helpers with stable shard ids,
+  per-shard trace refs, duplicate detection, and incomplete-shard reporting.
+
+---
+
+## v1.23 Evaluation Reliability and Security Hardening (Shipped: 2026-06-01)
+
+**Delivered:** single-problem evaluation diagnostics, import isolation, native
+compile guardrails, and eval-driver boundary hardening.
+
+**Phases completed:** 106-109 (4 phases)
+
+**Key accomplishments:**
+
+- No-trace and noisy-output evaluation failures persist bounded diagnostics and
+  point CLI users to evidence without requiring verbose mode.
+- Python solution imports use unique file-based staged module identities to
+  avoid collisions with already-imported modules.
+- Native compile options reject dangerous host/path/linker behavior while
+  preserving documented ROCm/HIP extension use cases.
+- The generated eval driver delegates benchmark phases to tested importable
+  helpers while preserving canonical contracts and reward-hack boundaries.
+
+---
+
 ## v1.20 Cross-Report Consistency and Evaluation Stability (Shipped: 2026-05-31)
 
 **Delivered:** local evidence-quality sidecars that make ROCm benchmark runs

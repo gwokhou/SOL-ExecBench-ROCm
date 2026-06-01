@@ -2,6 +2,13 @@
 
 ## Milestones
 
+- Complete **v1.24 Dataset Batch Run Trustworthiness** - Phases 110-113
+  (shipped 2026-06-01). See `.planning/milestones/v1.24-ROADMAP.md`.
+
+- Complete **v1.23 Evaluation Reliability and Security Hardening** -
+  Phases 106-109 (shipped 2026-06-01). See
+  `.planning/milestones/v1.23-ROADMAP.md`.
+
 - Complete **v1.22 Concern Closure and Execution Boundary Hardening** -
   Phases 100-105 (shipped 2026-06-01). See
   `.planning/milestones/v1.22-ROADMAP.md`.
@@ -22,110 +29,202 @@
 
 ## Current Position
 
-**Active milestone:** None. v1.22 is archived.
+**Active milestone:** None.
 
-**Status:** Ready for next milestone definition.
+**Status:** v1.23 and v1.24 complete.
 
-**Next step:** Run `$gsd-new-milestone` when ready.
+**Next step:** Define the next milestone when ready.
 
 ## Phases
 
-- [x] **Phase 100: Dataset Runner Execution Seams** - Maintainers can change dataset execution, solution wrapping, reports, closure, and scheduling seams through importable helpers while preserving CLI behavior. (completed 2026-06-01)
-- [x] **Phase 101: Eval Driver Diagnostics And Framing** - Maintainers can test reference timing, orchestration, trace emission, and output framing through package helpers without weakening benchmark compatibility. (completed 2026-06-01)
-- [x] **Phase 102: Source Review And Boundary Evidence** - Maintainers and users get stronger source-review coverage and structured boundary evidence without implying hardened sandboxing. (completed 2026-06-01)
-- [x] **Phase 103: Scoring And Static Evidence Fixtures** - Maintainers can validate SOLAR, AMD bound, and static-evidence behavior through family-specific fixtures and explicit artifact manifests. (completed 2026-06-01)
-- [x] **Phase 104: Dependency And Closure Guardrails** - Maintainers can detect dependency-policy drift, closure-provenance regressions, and misleading hardware-marker outcomes. (completed 2026-06-01)
-- [x] **Phase 105: Concern Map Stewardship** - Maintainers can use `CONCERNS.md` as an accurate milestone-management map for fixed, narrowed, carried-forward, and externally deferred concerns. (completed 2026-06-01)
+- [x] **Phase 106: Evaluation Failure Diagnostics** - Users and
+  maintainers can diagnose no-trace and noisy-output failures through bounded
+  stdout/stderr evidence without relying on verbose-only console output.
+  (completed 2026-06-01)
+- [x] **Phase 107: Staged User Import Isolation** - Python submissions are
+  loaded through unique file-based module identities so staged solution names
+  cannot collide with already-imported driver or dependency modules.
+  (completed 2026-06-01)
+- [x] **Phase 108: Native Compile Option Guardrails** - Native solution
+  compiler and linker options reject dangerous host/path/linker behavior while
+  preserving documented ROCm/HIP extension use cases.
+  (completed 2026-06-01)
+- [x] **Phase 109: Eval Driver Responsibility Boundaries** - The generated
+  eval driver delegates benchmark phases to tested importable helpers while
+  preserving canonical trace, correctness, timing, and reward-hack semantics.
+  (completed 2026-06-01)
+- [x] **Phase 110: Dataset Reuse Policy Service** - Dataset batch reuse and
+  stale-provenance decisions are owned by tested package services instead of
+  script-local branching.
+  (completed 2026-06-01)
+- [x] **Phase 111: Dataset Closure And Evidence Completeness** - Dataset
+  closure records, timing refs, derived sidecars, and missing-evidence states
+  are constructed through validated core helpers.
+  (completed 2026-06-01)
+- [x] **Phase 112: Dataset Failure-Mode Regression Matrix** - Stale
+  provenance, selected ready-subset workloads, rerun flags, missing sidecars,
+  and nonzero CLI outcomes have focused regression coverage.
+  (completed 2026-06-01)
+- [x] **Phase 113: Deterministic Dataset Sharding Path** - Dataset-scale
+  execution has a first deterministic shard and merge design that preserves
+  one trace file per shard and explicit merge rules.
+  (completed 2026-06-01)
 
 ## Phase Details
 
-### Phase 100: Dataset Runner Execution Seams
-**Goal**: Maintainers can evolve dataset-scale execution through importable runner helpers while `scripts/run_dataset.py` preserves existing user-facing behavior.
-**Depends on**: Phase 99
-**Requirements**: DATASET-01, DATASET-02, DATASET-03, DATASET-04
+### Phase 106: Evaluation Failure Diagnostics
+**Goal**: Users and maintainers can diagnose no-trace, noisy-output, and
+nonzero evaluation failures through bounded persisted diagnostics.
+**Depends on**: Phase 105
+**Requirements**: EVAL-DIAG-01, EVAL-DIAG-02, EVAL-DIAG-03
 **Success Criteria** (what must be TRUE):
-  1. Maintainer can invoke dataset problem execution through a package runner abstraction instead of embedding subprocess orchestration only in `scripts/run_dataset.py`.
-  2. Maintainer can wrap reference and custom Python solutions without global source text replacement that mutates strings, comments, or legitimate identifiers.
-  3. Dataset summaries, score reports, timing evidence refs, and closure reports are written through package helpers with focused tests.
-  4. Dataset-scale CLI behavior remains compatible while exposing a safe seam for future scheduling or bounded CPU-side parallel report work.
+  1. No-trace evaluation outcomes persist bounded stdout and stderr sidecars or
+     equivalent structured diagnostic evidence.
+  2. CLI failure reporting points to the diagnostic evidence without requiring
+     `--verbose` or manual staging inspection.
+  3. Regression tests cover non-JSON stdout, library noise, nonzero exits, and
+     empty trace output without changing canonical trace JSONL.
 **Plans**:
-  - `100-01-PLAN.md` - Extract solution wrapping and subprocess invocation into package runner helpers.
-  - `100-02-PLAN.md` - Extract summary, score, timing, and closure report seams while preserving CLI compatibility.
+  - `106-01-PLAN.md` - Add bounded no-trace diagnostics and CLI failure
+    reporting.
 
-### Phase 101: Eval Driver Diagnostics And Framing
-**Goal**: Maintainers can diagnose reference timing and output-framing behavior through importable helpers while preserving staged evaluator semantics.
-**Depends on**: Phase 100
-**Requirements**: EVAL-01, EVAL-02, EVAL-03, EVAL-04
+### Phase 107: Staged User Import Isolation
+**Goal**: Python solution imports use unique staged module identities and do
+not depend on dotted names that can collide with `sys.modules`.
+**Depends on**: Phase 106
+**Requirements**: EVAL-IMPORT-01, EVAL-IMPORT-02, EVAL-IMPORT-03
 **Success Criteria** (what must be TRUE):
-  1. Maintainer can test reference timing behavior through package helpers without staging the full generated driver.
-  2. When requested reference timing fails, traces, logs, or status semantics expose the failure explicitly instead of silently presenting `reference_latency_ms` as `0.0`.
-  3. Regression tests prove user prints and noisy imports cannot corrupt trace JSONL output.
-  4. Correctness and timing orchestration remains benchmark-compatible while avoidable pure logic moves out of `eval_driver.py`.
+  1. `load_user_function()` imports Python sources through a file-based
+     `importlib` path with a unique generated module name.
+  2. Package-style and simple-file solution entries keep their supported
+     behavior while avoiding collisions with previously imported modules.
+  3. Regression tests prove collisions such as `main.py::run` and package-like
+     module names cannot resolve to unintended existing modules.
 **Plans**:
-  - `101-01-PLAN.md` - Extract reference timing diagnostics and noisy-output JSONL framing tests.
+  - `107-01-PLAN.md` - Replace dotted staged imports with unique file-based
+    imports.
 
-### Phase 102: Source Review And Boundary Evidence
-**Goal**: Maintainers and users can see stronger static-review outcomes and boundary evidence without mistaking them for hard sandbox guarantees.
-**Depends on**: Phase 101
-**Requirements**: BOUNDARY-01, BOUNDARY-02, BOUNDARY-03, BOUNDARY-04
+### Phase 108: Native Compile Option Guardrails
+**Goal**: Native solution compile options are constrained enough for trusted
+research evaluation while remaining compatible with documented ROCm extension
+builds.
+**Depends on**: Phase 107
+**Requirements**: COMPILE-GUARD-01, COMPILE-GUARD-02, COMPILE-GUARD-03
 **Success Criteria** (what must be TRUE):
-  1. Source-review tests cover additional process, file, import, native loader, stream, cache, and obfuscation bypass families.
-  2. Python source review uses an AST-aware or token-aware path for cases where regex scanning is too broad or too easy to bypass.
-  3. Blocked or flagged source-review outcomes appear as structured evidence in traces, sidecars, or logs.
-  4. Public and developer docs state that static review plus subprocess execution is not hardened multi-tenant sandboxing.
+  1. Dangerous compiler/linker options that reference host paths, dynamic
+     loaders, response files, or unsafe link-time behavior are rejected with
+     clear validation errors.
+  2. Allowed ROCm/HIP compile options used by examples and tests remain
+     accepted.
+  3. Schema and build-template tests cover accepted and rejected option
+     classes.
 **Plans**:
-  - `102-01-PLAN.md` - Add AST-aware source review, structured boundary evidence, and sandbox-boundary docs.
+  - `108-01-PLAN.md` - Add native compile option validation and tests.
 
-### Phase 103: Scoring And Static Evidence Fixtures
-**Goal**: Maintainers can validate scoring derivation and static-evidence changes against focused fixtures without changing public contracts or diagnostic authority.
-**Depends on**: Phase 102
-**Requirements**: SCORING-01, SCORING-02, SCORING-03, SCORING-04
+### Phase 109: Eval Driver Responsibility Boundaries
+**Goal**: The generated driver becomes a thinner staged entry point while
+benchmark behavior remains compatible.
+**Depends on**: Phase 108
+**Requirements**: EVAL-BOUNDARY-01, EVAL-BOUNDARY-02, EVAL-BOUNDARY-03,
+EVAL-BOUNDARY-04
 **Success Criteria** (what must be TRUE):
-  1. SOLAR and AMD bound derivation have family-specific golden fixtures for representative operator families and fallback behavior.
-  2. Confidence and status transitions in SOLAR and AMD bound derivation are covered independently of broad report-shape tests.
-  3. Static kernel evidence can consume or produce an explicit artifact manifest when build outputs are known.
-  4. Static evidence and derived scoring changes preserve diagnostic-only authority and existing public sidecar contracts.
+  1. Correctness, timing, trace emission, source review, and reward-hack
+     boundary behavior are exposed through importable helpers with focused
+     tests.
+  2. The generated template remains responsible only for staged wiring,
+     subprocess-local setup, and integration glue.
+  3. Integrity snapshot coverage remains explicit for every benchmark-critical
+     helper reachable from staged execution.
+  4. Public trace, correctness, timing, score, and evaluator contract schemas
+     remain unchanged unless a separate schema discussion approves a change.
 **Plans**:
-  - `103-01-PLAN.md` - Add focused scoring fixtures and static artifact manifest support.
+  - `109-01-PLAN.md` - Thin generated eval driver around tested benchmark
+    phase helpers.
 
-### Phase 104: Dependency And Closure Guardrails
-**Goal**: Maintainers can catch policy, provenance, and marker regressions before they create misleading ROCm validation signals.
-**Depends on**: Phase 103
-**Requirements**: GUARD-01, GUARD-02, GUARD-03
+### Phase 110: Dataset Reuse Policy Service
+**Goal**: Dataset reuse and stale-provenance decisions are centralized in
+tested core services.
+**Depends on**: Phase 109
+**Requirements**: DATASET-REUSE-01, DATASET-REUSE-02, DATASET-REUSE-03
 **Success Criteria** (what must be TRUE):
-  1. ROCm wheel, Docker target, and dependency-matrix policy consistency is guarded when target metadata changes.
-  2. Dataset closure provenance tests cover new sidecar refs, stale provenance combinations, and manifest/cache provenance behavior.
-  3. Hardware-marker skip behavior remains explicit so CPU-safe green runs cannot be mistaken for RDNA4, CDNA3, timing, MI300X, or CDNA4 validation.
+  1. Reuse decisions are computed by importable helpers with explicit inputs
+     for selected workloads, ready subsets, provenance, rerun flags, and
+     output paths.
+  2. `scripts/run_dataset.py` delegates policy decisions instead of owning the
+     decision matrix inline.
+  3. Tests cover reuse, stale provenance, forced rerun, partial-ready, and
+     missing-output combinations.
 **Plans**:
-  - `104-01-PLAN.md` - Add dependency policy, closure provenance, and marker guardrail tests.
+  - `110-01-PLAN.md` - Extract dataset reuse policy into core helpers.
 
-### Phase 105: Concern Map Stewardship
-**Goal**: Maintainers can use `CONCERNS.md` as a reliable status map for v1.22 concern closure and future deferred work.
-**Depends on**: Phase 104
-**Requirements**: DOCS-01, DOCS-02, DOCS-03
+### Phase 111: Dataset Closure And Evidence Completeness
+**Goal**: Dataset closure and evidence references are assembled through core
+helpers with explicit incomplete-state semantics.
+**Depends on**: Phase 110
+**Requirements**: DATASET-CLOSURE-01, DATASET-CLOSURE-02, DATASET-CLOSURE-03
 **Success Criteria** (what must be TRUE):
-  1. `CONCERNS.md` preserves milestone-management context for recently narrowed, still actionable, accepted, and externally deferred concerns.
-  2. v1.22 completion updates each in-scope concern as fixed, narrowed, or carried forward with evidence.
-  3. Out-of-scope items remain explicit: CDNA3, MI300X, CDNA4 validation, paper-scale parity, leaderboard readiness, and complete hard sandboxing.
+  1. Closure records classify missing traces, missing timing evidence, missing
+     derived sidecars, skipped workloads, and nonzero CLI outcomes without
+     ambiguous success states.
+  2. Summary, score, timing, and closure references use package-level helpers
+     rather than script-local path coupling.
+  3. Closure reports remain deterministic and compatible with existing public
+     sidecar contracts.
 **Plans**:
-  - `105-01-PLAN.md` - Update CONCERNS.md with v1.22 outcomes and deferred boundaries.
+  - `111-01-PLAN.md` - Centralize dataset closure and evidence completeness
+    helpers.
+
+### Phase 112: Dataset Failure-Mode Regression Matrix
+**Goal**: Dataset runner failure modes have targeted tests that prevent silent
+stale evidence or incomplete closure reporting.
+**Depends on**: Phase 111
+**Requirements**: DATASET-REGRESS-01, DATASET-REGRESS-02, DATASET-REGRESS-03
+**Success Criteria** (what must be TRUE):
+  1. Regression fixtures cover stale provenance, selected ready subsets,
+     missing derived sidecars, rerun flags, CLI timeout/nonzero outcomes, and
+     no-trace outputs.
+  2. Tests distinguish CPU-safe policy behavior from live ROCm/GPU execution
+     requirements.
+  3. Dataset runner documentation explains when reuse is allowed, blocked, or
+     reported as incomplete.
+**Plans**:
+  - `112-01-PLAN.md` - Add dataset failure-mode regression coverage and docs.
+
+### Phase 113: Deterministic Dataset Sharding Path
+**Goal**: Dataset-scale runs have a deterministic sharding design that can
+reduce single-process pressure without weakening trace provenance.
+**Depends on**: Phase 112
+**Requirements**: DATASET-SHARD-01, DATASET-SHARD-02, DATASET-SHARD-03
+**Success Criteria** (what must be TRUE):
+  1. A shard plan can divide workloads deterministically with stable shard
+     identifiers and one trace file per shard.
+  2. Merge rules preserve workload ordering, provenance, duplicate detection,
+     and incomplete-shard reporting.
+  3. The first implementation or design artifact is covered by tests and keeps
+     default dataset CLI behavior compatible.
+**Plans**:
+  - `113-01-PLAN.md` - Define and test deterministic dataset shard and merge
+    semantics.
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 100 -> 101 -> 102 -> 103 -> 104 -> 105.
+Phases execute in numeric order: 106 -> 107 -> 108 -> 109, then queued
+milestone phases 110 -> 111 -> 112 -> 113.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 100. Dataset Runner Execution Seams | 2/2 | Complete    | 2026-06-01 |
-| 101. Eval Driver Diagnostics And Framing | 1/1 | Complete    | 2026-06-01 |
-| 102. Source Review And Boundary Evidence | 1/1 | Complete    | 2026-06-01 |
-| 103. Scoring And Static Evidence Fixtures | 1/1 | Complete    | 2026-06-01 |
-| 104. Dependency And Closure Guardrails | 1/1 | Complete    | 2026-06-01 |
-| 105. Concern Map Stewardship | 1/1 | Complete    | 2026-06-01 |
+| 106. Evaluation Failure Diagnostics | 1/1 | Complete | 2026-06-01 |
+| 107. Staged User Import Isolation | 1/1 | Complete | 2026-06-01 |
+| 108. Native Compile Option Guardrails | 1/1 | Complete | 2026-06-01 |
+| 109. Eval Driver Responsibility Boundaries | 1/1 | Complete | 2026-06-01 |
+| 110. Dataset Reuse Policy Service | 1/1 | Complete | 2026-06-01 |
+| 111. Dataset Closure And Evidence Completeness | 1/1 | Complete | 2026-06-01 |
+| 112. Dataset Failure-Mode Regression Matrix | 1/1 | Complete | 2026-06-01 |
+| 113. Deterministic Dataset Sharding Path | 1/1 | Complete | 2026-06-01 |
 
 **Coverage:**
-- Requirements mapped: 22/22
-- Requirements complete: 22/22
-- Flow count: 6 phases
+- v1.23 requirements complete: 13/13
+- v1.24 requirements complete: 12/12
+- Completed milestone flow count: 8 phases
 - Residual blockers: 0
