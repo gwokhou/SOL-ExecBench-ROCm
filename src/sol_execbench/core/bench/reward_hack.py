@@ -23,6 +23,8 @@ detected.
 
 from __future__ import annotations
 
+import ast
+import json
 import re
 from dataclasses import dataclass
 from enum import Enum
@@ -103,7 +105,12 @@ class SourceReview:
             for issue in self.issues
             if issue.severity == SourceReviewSeverity.BLOCK
         ]
-        return "Static source review blocked submission: " + "; ".join(blocking)
+        evidence = json.dumps(self.to_dict(), sort_keys=True)
+        return (
+            "Static source review blocked submission: "
+            + "; ".join(blocking)
+            + f"; structured_evidence={evidence}"
+        )
 
 
 @dataclass(frozen=True)
@@ -166,6 +173,30 @@ _PRECISION_DOWNGRADE_RULE = _SourceRule(
     "precision downgrade is not allowed for float32 output contracts without explicit benchmark approval",
 )
 
+_RULE_BY_NAME = {
+    rule.rule: rule for rule in (*_STATIC_RULES, _PRECISION_DOWNGRADE_RULE)
+}
+
+_PROCESS_ATTRS = {"system", "popen"}
+_PROCESS_PREFIXES = ("spawn", "exec")
+_RISKY_IMPORT_ROOTS = {
+    "base64",
+    "ctypes",
+    "marshal",
+    "pickle",
+    "pty",
+    "requests",
+    "socket",
+    "subprocess",
+    "urllib",
+}
+_RISKY_FILE_CALLS = {"open", "Path"}
+_RISKY_DECODE_CALLS = {"eval", "exec", "compile", "__import__"}
+_RISKY_METHODS = {"read_text", "write_text", "load_library", "load", "load_inline"}
+_CACHE_METHODS = {"data_ptr", "tobytes"}
+_PRECISION_ATTRS = {"half", "bfloat16"}
+_PRECISION_DTYPE_NAMES = {"torch.float16", "torch.bfloat16", "tl.float16", "tl.bfloat16"}
+
 
 def review_solution_sources(
     solution: Any,
@@ -184,11 +215,209 @@ def review_solution_sources(
     for source in getattr(solution, "sources", []):
         path = str(getattr(source, "path", ""))
         content = str(getattr(source, "content", ""))
+        if path.endswith(".py"):
+            issues.extend(_match_python_source(path, content, float32_contract))
+        else:
+            for rule in _STATIC_RULES:
+                issues.extend(_match_rule(path, content, rule))
+            if float32_contract:
+                issues.extend(_match_rule(path, content, _PRECISION_DOWNGRADE_RULE))
+    return SourceReview(issues=tuple(issues))
+
+
+def _match_python_source(
+    path: str,
+    content: str,
+    float32_contract: bool,
+) -> Iterable[SourceReviewIssue]:
+    try:
+        tree = ast.parse(content)
+    except SyntaxError:
+        issues: list[SourceReviewIssue] = []
         for rule in _STATIC_RULES:
             issues.extend(_match_rule(path, content, rule))
         if float32_contract:
             issues.extend(_match_rule(path, content, _PRECISION_DOWNGRADE_RULE))
-    return SourceReview(issues=tuple(issues))
+        return tuple(issues)
+
+    visitor = _PythonSourceReviewVisitor(path, content, float32_contract)
+    visitor.visit(tree)
+    return tuple(visitor.issues)
+
+
+class _PythonSourceReviewVisitor(ast.NodeVisitor):
+    def __init__(self, path: str, content: str, float32_contract: bool) -> None:
+        self.path = path
+        self.content = content
+        self.float32_contract = float32_contract
+        self.issues: list[SourceReviewIssue] = []
+
+    def visit_Import(self, node: ast.Import) -> None:
+        for alias in node.names:
+            root = alias.name.split(".", maxsplit=1)[0]
+            if root in _RISKY_IMPORT_ROOTS:
+                self._add("unauthorized_file_or_loader", node, alias.name)
+        self.generic_visit(node)
+
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+        root = (node.module or "").split(".", maxsplit=1)[0]
+        if root in _RISKY_IMPORT_ROOTS:
+            self._add("unauthorized_file_or_loader", node, node.module or "")
+        self.generic_visit(node)
+
+    def visit_Assign(self, node: ast.Assign) -> None:
+        if any(_target_is_cache(target) for target in node.targets):
+            self._add("semantic_output_cache", node, self._node_source(node))
+        self.generic_visit(node)
+
+    def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+        if _target_is_cache(node.target):
+            self._add("semantic_output_cache", node, self._node_source(node))
+        self.generic_visit(node)
+
+    def visit_Global(self, node: ast.Global) -> None:
+        if any("cache" in name.lower() for name in node.names):
+            self._add("semantic_output_cache", node, ", ".join(node.names))
+        self.generic_visit(node)
+
+    def visit_Call(self, node: ast.Call) -> None:
+        name = _dotted_name(node.func)
+        if self._is_hidden_stream_call(name):
+            self._add("hidden_async_stream", node, name)
+        if self._is_cache_call(name):
+            self._add("semantic_output_cache", node, name)
+        if self._is_unauthorized_call(node, name):
+            self._add("unauthorized_file_or_loader", node, name or self._node_source(node))
+        if self.float32_contract and self._is_precision_downgrade_call(node, name):
+            self._add("precision_downgrade", node, name or self._node_source(node))
+        self.generic_visit(node)
+
+    def visit_Attribute(self, node: ast.Attribute) -> None:
+        if self.float32_contract and _dotted_name(node) in _PRECISION_DTYPE_NAMES:
+            self._add("precision_downgrade", node, self._node_source(node))
+        self.generic_visit(node)
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        self._check_decorators(node.decorator_list)
+        self.generic_visit(node)
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        self._check_decorators(node.decorator_list)
+        self.generic_visit(node)
+
+    def _is_hidden_stream_call(self, name: str) -> bool:
+        return name in {
+            "torch.cuda.Stream",
+            "torch.cuda.stream",
+            "torch.cuda.ExternalStream",
+        } or name.endswith(".wait_stream")
+
+    def _is_cache_call(self, name: str) -> bool:
+        return name in {"functools.lru_cache", "lru_cache", "hashlib.md5", "hashlib.sha1", "hashlib.sha256"} or name.endswith(
+            tuple(f".{method}" for method in _CACHE_METHODS)
+        )
+
+    def _is_unauthorized_call(self, node: ast.Call, name: str) -> bool:
+        if name in _RISKY_FILE_CALLS or name in _RISKY_DECODE_CALLS:
+            return True
+        if name in {
+            "importlib.import_module",
+            "importlib.util.spec_from_file_location",
+            "ctypes.CDLL",
+            "ctypes.cdll.LoadLibrary",
+            "marshal.loads",
+            "pickle.loads",
+            "base64.b64decode",
+            "pty.spawn",
+            "socket.socket",
+            "urllib.request.urlopen",
+            "requests.get",
+            "requests.post",
+            "requests.request",
+            "torch.ops.load_library",
+            "cpp_extension.load",
+            "load_inline",
+        }:
+            return True
+        if name.endswith(tuple(f".{method}" for method in _RISKY_METHODS)):
+            return True
+        if name.startswith("os.") and _is_process_attr(name.rsplit(".", 1)[-1]):
+            return True
+        return _is_risky_getattr_call(node)
+
+    def _is_precision_downgrade_call(self, node: ast.Call, name: str) -> bool:
+        if name.endswith(tuple(f".{attr}" for attr in _PRECISION_ATTRS)):
+            return True
+        if name.endswith(".to"):
+            return any(
+                _dotted_name(arg) in _PRECISION_DTYPE_NAMES for arg in node.args
+            ) or any(
+                _dotted_name(keyword.value) in _PRECISION_DTYPE_NAMES
+                for keyword in node.keywords
+            )
+        return False
+
+    def _check_decorators(self, decorators: list[ast.expr]) -> None:
+        for decorator in decorators:
+            name = _dotted_name(
+                decorator.func if isinstance(decorator, ast.Call) else decorator
+            )
+            if name in {"functools.lru_cache", "lru_cache"}:
+                self._add("semantic_output_cache", decorator, self._node_source(decorator))
+
+    def _add(self, rule_name: str, node: ast.AST, evidence: str) -> None:
+        rule = _RULE_BY_NAME[rule_name]
+        self.issues.append(
+            SourceReviewIssue(
+                path=self.path,
+                rule=rule.rule,
+                severity=rule.severity,
+                message=rule.message,
+                evidence=(evidence or self._node_source(node)).strip()[:120],
+            )
+        )
+
+    def _node_source(self, node: ast.AST) -> str:
+        return ast.get_source_segment(self.content, node) or ast.unparse(node)
+
+
+def _target_is_cache(target: ast.AST) -> bool:
+    if isinstance(target, ast.Name):
+        return "cache" in target.id.lower()
+    if isinstance(target, ast.Attribute):
+        return "cache" in target.attr.lower()
+    if isinstance(target, (ast.Tuple, ast.List)):
+        return any(_target_is_cache(elt) for elt in target.elts)
+    return False
+
+
+def _dotted_name(node: ast.AST) -> str:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        base = _dotted_name(node.value)
+        return f"{base}.{node.attr}" if base else node.attr
+    if isinstance(node, ast.Call) and _dotted_name(node.func) == "__import__":
+        if node.args and isinstance(node.args[0], ast.Constant):
+            if isinstance(node.args[0].value, str):
+                return node.args[0].value
+    return ""
+
+
+def _is_process_attr(attr: str) -> bool:
+    return attr in _PROCESS_ATTRS or attr.startswith(_PROCESS_PREFIXES)
+
+
+def _is_risky_getattr_call(node: ast.Call) -> bool:
+    if _dotted_name(node.func) != "getattr" or len(node.args) < 2:
+        return False
+    if not isinstance(node.args[1], ast.Constant) or not isinstance(
+        node.args[1].value, str
+    ):
+        return False
+    attr = node.args[1].value
+    base = _dotted_name(node.args[0])
+    return base == "os" and _is_process_attr(attr)
 
 
 def _match_rule(

@@ -102,6 +102,14 @@ Common evaluator options:
 | `--static-evidence auto` | Collect optional diagnostic static kernel evidence for native builds. |
 | `-v`, `--verbose` | Show subprocess output and staging details. |
 
+### Security Boundary
+
+SOL ExecBench stages and executes submitted solution code in a local
+subprocess, with static source review and runtime reward-hack checks before and
+during evaluation. These guardrails are not a hardened sandbox and are not a
+multi-tenant isolation boundary. Run untrusted submissions only inside an
+appropriate container, VM, or isolated ROCm host that you control.
+
 Metadata and diagnostic subcommands:
 
 ```bash
