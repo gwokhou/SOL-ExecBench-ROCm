@@ -1,5 +1,30 @@
 # Milestones
 
+## v1.25 Engineering Prerelease (Shipped: 2026-06-01)
+
+**Delivered:** bounded engineering prerelease materials for installing,
+validating, interpreting, and packaging the ROCm port without overclaiming
+research or hardware authority.
+
+**Phases completed:** 114-118 (5 phases)
+
+**Key accomplishments:**
+
+- Added release-candidate validation across CPU-safe checks, optional
+  ROCm/Docker smoke, and bounded dataset-slice workflows.
+- Published support boundaries for RDNA 4 evidence, Docker/container
+  user-space evidence, deferred MI300X/CDNA3 full-suite validation, and
+  unavailable CDNA4 validation.
+- Added release claim guardrails and v1.25 release notes classifying canonical,
+  diagnostic-only, provisional, deferred, and unavailable evidence.
+- Clarified the first-run user path for install, minimal trace generation,
+  trace interpretation, no-trace diagnostics, and PyTorch ROCm compatibility
+  wording.
+- Added prerelease checklist and README navigation for release-candidate
+  materials.
+
+---
+
 ## v1.24 Dataset Batch Run Trustworthiness (Shipped: 2026-06-01)
 
 **Delivered:** dataset-scale reuse, provenance, closure, failure-mode, and
