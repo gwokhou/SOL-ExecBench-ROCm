@@ -130,6 +130,11 @@ This boundary keeps solution code, generated driver code, native compilation
 artifacts, optional profiler output, static evidence artifacts, and imported
 reference code separate from the CLI process and repository checkout.
 
+The subprocess boundary and static source review are execution guardrails, not
+hard sandboxing. They should not be treated as multi-tenant isolation for
+adversarial submissions; untrusted code still needs an external isolation layer
+such as a container, VM, or dedicated ROCm host.
+
 ## ROCm Solution Boundary
 
 The accepted solution language categories are:

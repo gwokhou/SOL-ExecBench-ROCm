@@ -16,6 +16,7 @@
 
 """Tests for sol_execbench.core.bench.reward_hack."""
 
+import json
 from types import SimpleNamespace
 from typing import Any
 
@@ -262,6 +263,18 @@ class TestStaticSourceReview:
         assert review.blocked is True
         assert "unauthorized_file_or_loader" in {issue.rule for issue in review.issues}
 
+    def test_reports_getattr_dynamic_import_process_execution_patterns(self):
+        review = review_solution_sources(
+            _solution_with_source(
+                "def run(x):\n"
+                "    getattr(__import__('os'), 'system')('true')\n"
+                "    return x\n"
+            )
+        )
+
+        assert review.blocked is True
+        assert "unauthorized_file_or_loader" in {issue.rule for issue in review.issues}
+
     @pytest.mark.parametrize(
         "content",
         [
@@ -278,6 +291,48 @@ class TestStaticSourceReview:
         assert review.blocked is True
         assert "unauthorized_file_or_loader" in {issue.rule for issue in review.issues}
 
+    @pytest.mark.parametrize(
+        "content",
+        [
+            "import subprocess\ndef run(x):\n    return x\n",
+            "def run(x):\n    return eval('1')\n",
+            "def run(x):\n    return compile('1', '<x>', 'eval')\n",
+            "import ctypes\nlib = ctypes.cdll.LoadLibrary('/tmp/libx.so')\n",
+            "import urllib.request\ndef run(x):\n    return urllib.request.urlopen('http://localhost')\n",
+            "import requests\ndef run(x):\n    return requests.request('GET', 'http://localhost')\n",
+            "import torch\ns = torch.cuda.ExternalStream(1)\ndef run(x):\n    return x\n",
+            "def run(x):\n    cache = {}\n    return cache.setdefault(x.data_ptr(), x)\n",
+        ],
+    )
+    def test_reports_ast_detected_bypass_families(self, content):
+        review = review_solution_sources(_solution_with_source(content))
+
+        assert review.blocked is True
+
+    def test_ignores_blocked_words_inside_python_strings_and_comments(self):
+        review = review_solution_sources(
+            _solution_with_source(
+                "# subprocess open('/tmp/x') torch.cuda.Stream()\n"
+                "def run(x):\n"
+                "    note = \"ctypes.CDLL('/tmp/x') and x.data_ptr()\"\n"
+                "    return x + 1\n"
+            ),
+            output_dtypes={"out": torch.float32},
+        )
+
+        assert review.blocked is False
+
+    def test_blocking_message_includes_structured_review_evidence(self):
+        review = review_solution_sources(
+            _solution_with_source("def run(x):\n    return open('/tmp/x').read()\n")
+        )
+
+        message = review.format_blocking_message()
+        payload = message.split("structured_evidence=", maxsplit=1)[1]
+
+        assert review.blocked is True
+        assert json.loads(payload) == review.to_dict()
+
     def test_allows_plain_os_import_without_process_execution(self):
         review = review_solution_sources(
             _solution_with_source(
@@ -293,6 +348,19 @@ class TestStaticSourceReview:
     def test_reports_precision_downgrade_for_float32_outputs(self):
         review = review_solution_sources(
             _solution_with_source("def run(x):\n    return x.half().float()\n"),
+            output_dtypes={"out": torch.float32},
+        )
+
+        assert review.blocked is True
+        assert "precision_downgrade" in {issue.rule for issue in review.issues}
+
+    def test_reports_precision_downgrade_dtype_keyword_for_float32_outputs(self):
+        review = review_solution_sources(
+            _solution_with_source(
+                "import torch\n"
+                "def run(x):\n"
+                "    return x.to(dtype=torch.float16)\n"
+            ),
             output_dtypes={"out": torch.float32},
         )
 
