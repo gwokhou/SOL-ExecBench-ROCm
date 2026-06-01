@@ -120,6 +120,10 @@ uv run sol-execbench-baseline \
   --format text
 ```
 
+Baseline comparison accepts repeated `--baseline` inputs, `--format text|json`,
+`--output`, `--win-pct`, `--parity-pct`, and `--amd-native-claim` for guarded
+AMD-native reporting.
+
 ## Supported Solution Categories
 
 The ROCm schema accepts Python/Triton categories and native ROCm categories:

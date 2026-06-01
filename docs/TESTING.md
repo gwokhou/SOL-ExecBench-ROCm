@@ -7,8 +7,8 @@ parallel by default.
 
 ## Test Framework and Setup
 
-The development dependency group pins the test runner to `pytest>=9.0.2`
-and includes `pytest-xdist>=3.5` for parallel execution. `pyproject.toml`
+The development dependency group declares `pytest>=9.0.2`
+and `pytest-xdist>=3.5` for parallel execution. `pyproject.toml`
 sets the default pytest options to `-n auto --dist loadgroup`, so tests run
 across available workers unless a command overrides xdist with `-n 0`.
 
