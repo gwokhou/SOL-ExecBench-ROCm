@@ -23,9 +23,9 @@
 
 **Active milestone:** v1.22 Concern Closure and Execution Boundary Hardening.
 
-**Status:** Ready to plan Phase 100.
+**Status:** Ready to execute Phase 102.
 
-**Next step:** Run `$gsd-plan-phase 100`.
+**Next step:** Run `$gsd-execute-phase 102`.
 
 ## Phases
 
@@ -72,7 +72,8 @@
   2. Python source review uses an AST-aware or token-aware path for cases where regex scanning is too broad or too easy to bypass.
   3. Blocked or flagged source-review outcomes appear as structured evidence in traces, sidecars, or logs.
   4. Public and developer docs state that static review plus subprocess execution is not hardened multi-tenant sandboxing.
-**Plans**: TBD
+**Plans**:
+  - `102-01-PLAN.md` - Add AST-aware source review, structured boundary evidence, and sandbox-boundary docs.
 
 ### Phase 103: Scoring And Static Evidence Fixtures
 **Goal**: Maintainers can validate scoring derivation and static-evidence changes against focused fixtures without changing public contracts or diagnostic authority.
@@ -114,7 +115,7 @@ Phases execute in numeric order: 100 -> 101 -> 102 -> 103 -> 104 -> 105.
 |-------|----------------|--------|-----------|
 | 100. Dataset Runner Execution Seams | 2/2 | Complete    | 2026-06-01 |
 | 101. Eval Driver Diagnostics And Framing | 1/1 | Complete    | 2026-06-01 |
-| 102. Source Review And Boundary Evidence | 0/TBD | Not started | - |
+| 102. Source Review And Boundary Evidence | 0/1 | Ready to execute | - |
 | 103. Scoring And Static Evidence Fixtures | 0/TBD | Not started | - |
 | 104. Dependency And Closure Guardrails | 0/TBD | Not started | - |
 | 105. Concern Map Stewardship | 0/TBD | Not started | - |
