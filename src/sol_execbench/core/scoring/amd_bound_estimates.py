@@ -16,6 +16,10 @@ from sol_execbench.core.scoring.amd_bound_graph import (
     BoundTensor,
     OpFamily,
 )
+from sol_execbench.core.scoring.amd_bound_estimate_families import (
+    EstimateDispatchFamily,
+    estimate_dispatch_family,
+)
 from sol_execbench.core.scoring.amd_hardware_models import EstimateConfidence
 
 
@@ -70,31 +74,32 @@ def estimate_bound_work(graph: BoundGraph) -> tuple[OperatorWorkEstimate, ...]:
 
 
 def _estimate_node(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstimate:
-    if node.op_family == OpFamily.ATTENTION:
+    dispatch_family = estimate_dispatch_family(node.op_family)
+    if dispatch_family == EstimateDispatchFamily.ATTENTION:
         return _attention_estimate(graph, node)
-    if node.op_family == OpFamily.CONVOLUTION:
+    if dispatch_family == EstimateDispatchFamily.CONVOLUTION:
         return _convolution_estimate(graph, node)
-    if node.op_family == OpFamily.EMBEDDING_POSITIONAL:
+    if dispatch_family == EstimateDispatchFamily.EMBEDDING_POSITIONAL:
         return _embedding_positional_estimate(graph, node)
-    if node.op_family == OpFamily.MOE:
+    if dispatch_family == EstimateDispatchFamily.MOE:
         return _moe_estimate(graph, node)
-    if node.op_family == OpFamily.SSM_MAMBA:
+    if dispatch_family == EstimateDispatchFamily.SSM_MAMBA:
         return _ssm_mamba_estimate(graph, node)
-    if node.op_family in {OpFamily.GEMM, OpFamily.LINEAR_PROJECTION}:
+    if dispatch_family == EstimateDispatchFamily.GEMM:
         return _gemm_estimate(graph, node)
-    if node.op_family == OpFamily.ELEMENTWISE:
+    if dispatch_family == EstimateDispatchFamily.ELEMENTWISE:
         return _elementwise_estimate(graph, node)
-    if node.op_family == OpFamily.MLP_ACTIVATION:
+    if dispatch_family == EstimateDispatchFamily.ACTIVATION:
         return _activation_estimate(graph, node)
-    if node.op_family == OpFamily.REDUCTION:
+    if dispatch_family == EstimateDispatchFamily.REDUCTION:
         return _reduction_estimate(graph, node)
-    if node.op_family == OpFamily.NORMALIZATION:
+    if dispatch_family == EstimateDispatchFamily.NORMALIZATION:
         return _normalization_estimate(graph, node)
-    if node.op_family == OpFamily.SOFTMAX:
+    if dispatch_family == EstimateDispatchFamily.SOFTMAX:
         return _softmax_estimate(graph, node)
-    if node.op_family == OpFamily.DATA_MOVEMENT:
+    if dispatch_family == EstimateDispatchFamily.DATA_MOVEMENT:
         return _data_movement_estimate(graph, node)
-    if node.op_family == OpFamily.DTYPE_CONVERSION:
+    if dispatch_family == EstimateDispatchFamily.DTYPE_CONVERSION:
         return _dtype_conversion_estimate(graph, node)
     return _unsupported_estimate(node)
 

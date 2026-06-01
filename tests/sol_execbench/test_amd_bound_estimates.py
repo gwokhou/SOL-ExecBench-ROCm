@@ -15,6 +15,11 @@ from sol_execbench.core.scoring.amd_bound_estimates import (
     _dtype_bytes,
     estimate_bound_work,
 )
+from sol_execbench.core.scoring.amd_bound_estimate_families import (
+    EstimateDispatchFamily,
+    estimate_dispatch_family,
+    estimate_dispatch_groups,
+)
 from sol_execbench.core.scoring.amd_bound_graph import (
     BoundGraph,
     BoundGraphNode,
@@ -122,6 +127,19 @@ def test_dtype_byte_widths_cover_public_dtype_contract():
         DType.BOOL,
     ):
         assert _dtype_bytes(dtype) is not None
+
+
+def test_estimate_dispatch_groups_are_family_specific_and_directly_testable():
+    assert estimate_dispatch_family(OpFamily.ATTENTION) == EstimateDispatchFamily.ATTENTION
+    assert estimate_dispatch_family(OpFamily.GEMM) == EstimateDispatchFamily.GEMM
+    assert estimate_dispatch_family(OpFamily.LINEAR_PROJECTION) == EstimateDispatchFamily.GEMM
+    assert estimate_dispatch_family(OpFamily.ELEMENTWISE) == EstimateDispatchFamily.ELEMENTWISE
+    assert estimate_dispatch_family(OpFamily.DATA_MOVEMENT) == EstimateDispatchFamily.DATA_MOVEMENT
+    assert estimate_dispatch_family(OpFamily.UNSUPPORTED) == EstimateDispatchFamily.UNSUPPORTED
+
+    groups = estimate_dispatch_groups()
+    assert groups[EstimateDispatchFamily.GEMM] == ("gemm", "linear_projection")
+    assert "attention" in groups[EstimateDispatchFamily.ATTENTION]
 
 
 def test_estimate_bound_work_returns_one_unsupported_estimate_per_node():

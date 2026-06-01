@@ -11,6 +11,11 @@ from sol_execbench.core.scoring.amd_bound_graph import (
     OpFamily,
     build_bound_graph,
 )
+from sol_execbench.core.scoring.amd_bound_classification import (
+    classify_call,
+    dtype_method_target,
+    movement_kind_for_name,
+)
 from sol_execbench.core.scoring.amd_hardware_models import EstimateConfidence
 from sol_execbench_type_helpers import make_definition, make_workload
 
@@ -74,6 +79,23 @@ def test_op_family_taxonomy_includes_paper_aligned_families():
         "dtype_conversion",
         "unsupported",
     } <= values
+
+
+def test_call_classification_helpers_cover_representative_families():
+    assert classify_call("torch.matmul").op_family == OpFamily.GEMM.value
+    assert classify_call("torch.nn.functional.linear").op_family == OpFamily.LINEAR_PROJECTION.value
+    assert classify_call("torch.topk").op_family == OpFamily.MOE.value
+    assert classify_call("selective_scan").op_family == OpFamily.SSM_MAMBA.value
+    assert classify_call("unknown_custom_call") is None
+
+
+def test_movement_and_dtype_classification_helpers_are_directly_testable():
+    assert movement_kind_for_name("reshape") == "logical_view"
+    assert movement_kind_for_name("expand") == "broadcast_view"
+    assert movement_kind_for_name("contiguous") == "materialized"
+    assert movement_kind_for_name("matmul") is None
+    assert dtype_method_target("half") == "float16"
+    assert dtype_method_target("to") is None
 
 
 def test_moe_visible_static_route_nodes_record_subroles_and_metadata():

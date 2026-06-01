@@ -32,15 +32,15 @@
 **Active milestone:** v1.21 Codebase Debt Reduction and Execution Boundary
 Hardening.
 
-**Status:** Phase 95 complete; ready for Phase 96 planning.
+**Status:** Phase 96 complete; ready for Phase 97 planning.
 
-**Next step:** Run `$gsd-discuss-phase 96` or `$gsd-plan-phase 96`.
+**Next step:** Run `$gsd-discuss-phase 97` or `$gsd-plan-phase 97`.
 
 ## Phases
 
 - [x] **Phase 94: Dataset Runner Decomposition** - Maintainers can modify dataset execution, resume, closure, and derived evidence behavior through tested package helpers instead of a monolithic script.
 - [x] **Phase 95: Eval Driver Runtime Decomposition** - Maintainers can test more evaluator behavior in package modules while preserving staged template smoke coverage.
-- [ ] **Phase 96: AMD Bound Graph And Estimate Modularization** - Maintainers can change AMD bound graph extraction and estimate formulas by operation family with focused tests.
+- [x] **Phase 96: AMD Bound Graph And Estimate Modularization** - Maintainers can change AMD bound graph extraction and estimate formulas by operation family with focused tests.
 - [ ] **Phase 97: SOLAR Derivation And Static Evidence Modularization** - Maintainers can work on SOLAR derivation and static evidence through isolated provenance, parser, status, and rendering helpers.
 - [ ] **Phase 98: Execution Boundary Test Hardening** - Known fragile areas gain CPU-safe and ROCm-aware tests for reward-hack, clock/timing, static evidence, and dataset closure edge cases.
 - [ ] **Phase 99: Boundary Documentation And Final Concern Closure** - Public docs, guardrails, and `CONCERNS.md` accurately separate fixed debt, narrowed risks, accepted limits, and future external work.
@@ -84,8 +84,8 @@ Hardening.
   3. Existing AMD bound graph and estimate public outputs remain schema-compatible.
   4. Scoring tests prove no unintended authority or claim-boundary changes.
 **Plans**:
-  - [ ] 96-01 Bound Graph Responsibility Split
-  - [ ] 96-02 Estimate Formula Family Split
+  - [x] 96-01 Bound Graph Responsibility Split
+  - [x] 96-02 Estimate Formula Family Split
 
 ### Phase 97: SOLAR Derivation And Static Evidence Modularization
 **Goal**: Maintainers can work on SOLAR derivation and static evidence through smaller provenance, parser, status, and rendering units.
@@ -136,13 +136,13 @@ Phases execute in numeric order: 94 -> 95 -> 96 -> 97 -> 98 -> 99.
 |-------|----------------|--------|-----------|
 | 94. Dataset Runner Decomposition | 2/2 | Complete | 2026-06-01 |
 | 95. Eval Driver Runtime Decomposition | 2/2 | Complete | 2026-06-01 |
-| 96. AMD Bound Graph And Estimate Modularization | 0/2 | Planned | — |
+| 96. AMD Bound Graph And Estimate Modularization | 2/2 | Complete | 2026-06-01 |
 | 97. SOLAR Derivation And Static Evidence Modularization | 0/2 | Planned | — |
 | 98. Execution Boundary Test Hardening | 0/2 | Planned | — |
 | 99. Boundary Documentation And Final Concern Closure | 0/2 | Planned | — |
 
 **Coverage:**
 - Requirements mapped: 23/23
-- Requirements complete: 9/23
+- Requirements complete: 11/23
 - Flow count: 6 phases
 - Residual blockers: 0

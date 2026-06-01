@@ -44,6 +44,14 @@ class OpFamily(str, Enum):
     UNSUPPORTED = "unsupported"
 
 
+from sol_execbench.core.scoring.amd_bound_classification import (  # noqa: E402
+    CallClassification as _CallClassification,
+    classify_call as _classify_call,
+    dtype_method_target as _dtype_method_target,
+    movement_kind_for_name as _movement_kind_for_name,
+)
+
+
 @dataclass(frozen=True)
 class BoundTensor:
     """Tensor metadata bound to a concrete workload."""
@@ -145,143 +153,6 @@ class BoundGraph:
         }
 
 
-@dataclass(frozen=True)
-class _CallClassification:
-    op_family: OpFamily
-    confidence: EstimateConfidence
-    rationale: str
-
-
-_CALL_CLASSIFIERS: tuple[tuple[set[str], _CallClassification], ...] = (
-    (
-        {"matmul", "mm", "bmm"},
-        _CallClassification(OpFamily.GEMM, EstimateConfidence.SUPPORTED, "recognized matrix multiply"),
-    ),
-    (
-        {"linear", "in_proj", "out_proj"},
-        _CallClassification(
-            OpFamily.LINEAR_PROJECTION,
-            EstimateConfidence.SUPPORTED,
-            "recognized linear projection",
-        ),
-    ),
-    (
-        {"conv1d", "conv2d", "conv3d", "depthwise_conv"},
-        _CallClassification(
-            OpFamily.CONVOLUTION,
-            EstimateConfidence.SUPPORTED,
-            "recognized convolution operation",
-        ),
-    ),
-    (
-        {"embedding", "gather", "index_select", "take"},
-        _CallClassification(
-            OpFamily.EMBEDDING_POSITIONAL,
-            EstimateConfidence.SUPPORTED,
-            "recognized embedding or gather memory-bound operation",
-        ),
-    ),
-    (
-        {"router", "topk", "top_k", "dispatch_and_combine", "dispatch_dynamic"},
-        _CallClassification(
-            OpFamily.MOE,
-            EstimateConfidence.INEXACT,
-            "recognized visible MoE routing primitive",
-        ),
-    ),
-    (
-        {"sum", "mean", "amax", "max", "amin", "min", "var", "std"},
-        _CallClassification(
-            OpFamily.REDUCTION,
-            EstimateConfidence.INEXACT,
-            "recognized reduction with conservative later-modeling semantics",
-        ),
-    ),
-    (
-        {"layer_norm", "group_norm", "rms_norm", "norm", "rsqrt"},
-        _CallClassification(
-            OpFamily.NORMALIZATION,
-            EstimateConfidence.INEXACT,
-            "recognized normalization-like operation",
-        ),
-    ),
-    (
-        {"softmax", "log_softmax"},
-        _CallClassification(
-            OpFamily.SOFTMAX,
-            EstimateConfidence.INEXACT,
-            "recognized softmax-like operation",
-        ),
-    ),
-    (
-        {"relu", "gelu", "silu", "sigmoid", "tanh", "exp", "sqrt", "gate"},
-        _CallClassification(
-            OpFamily.MLP_ACTIVATION,
-            EstimateConfidence.INEXACT,
-            "recognized activation operation",
-        ),
-    ),
-    (
-        {"selective_scan", "mamba_scan", "ssm_scan"},
-        _CallClassification(
-            OpFamily.SSM_MAMBA,
-            EstimateConfidence.INEXACT,
-            "recognized SSM/Mamba selective scan primitive",
-        ),
-    ),
-    (
-        {
-            "t",
-            "transpose",
-            "permute",
-            "view",
-            "reshape",
-            "flatten",
-            "contiguous",
-            "unsqueeze",
-            "squeeze",
-            "expand",
-            "broadcast_to",
-        },
-        _CallClassification(
-            OpFamily.DATA_MOVEMENT,
-            EstimateConfidence.INEXACT,
-            "recognized view or data-movement operation",
-        ),
-    ),
-    (
-        {"to", "type", "float", "half", "bfloat16", "double", "bool", "int", "long"},
-        _CallClassification(
-            OpFamily.DTYPE_CONVERSION,
-            EstimateConfidence.INEXACT,
-            "recognized dtype conversion operation",
-        ),
-    ),
-)
-
-_LOGICAL_VIEW_NAMES = {
-    "t",
-    "transpose",
-    "permute",
-    "view",
-    "reshape",
-    "flatten",
-    "unsqueeze",
-    "squeeze",
-}
-_BROADCAST_VIEW_NAMES = {"expand", "broadcast_to"}
-_MATERIALIZED_MOVEMENT_NAMES = {"contiguous"}
-_DTYPE_METHOD_TARGETS = {
-    "float": DType.FLOAT32.value,
-    "half": DType.FLOAT16.value,
-    "bfloat16": DType.BFLOAT16.value,
-    "double": DType.FLOAT64.value,
-    "bool": DType.BOOL.value,
-    "int": DType.INT32.value,
-    "long": DType.INT64.value,
-}
-
-
 def build_bound_graph(definition: Definition, workload: Workload) -> BoundGraph:
     """Build a structured bound graph for a concrete definition/workload pair."""
     input_shapes = definition.get_input_shapes(workload.axes)
@@ -363,7 +234,7 @@ def _try_fx_bound_graph(
         if fx_node.op == "call_function" and fx_node.target is operator.matmul:
             func_name = "@"
             classification = _CallClassification(
-                OpFamily.GEMM,
+                OpFamily.GEMM.value,
                 EstimateConfidence.SUPPORTED,
                 "recognized traced matrix multiply",
             )
@@ -375,14 +246,14 @@ def _try_fx_bound_graph(
             operator.pow,
         }:
             classification = _CallClassification(
-                OpFamily.ELEMENTWISE,
+                OpFamily.ELEMENTWISE.value,
                 EstimateConfidence.INEXACT,
                 "recognized traced elementwise operation",
             )
         if classification is None:
             warnings.append(f"unsupported_operator:{func_name or '<unknown>'}")
             classification = _CallClassification(
-                OpFamily.UNSUPPORTED,
+                OpFamily.UNSUPPORTED.value,
                 EstimateConfidence.UNSUPPORTED,
                 "unsupported traced operation preserved as graph evidence",
             )
@@ -408,7 +279,7 @@ def _try_fx_bound_graph(
         )
         bound_node = BoundGraphNode(
             node_id=node_id,
-            op_family=classification.op_family,
+            op_family=_classification_family(classification),
             op_name=func_name,
             source_expression=_fx_source_expression(fx_node),
             input_tensor_ids=input_tensor_ids,
@@ -598,7 +469,8 @@ def _fx_node_attributes(
     if movement_kind is not None:
         attributes["movement_kind"] = movement_kind
 
-    if classification.op_family in {
+    op_family = _classification_family(classification)
+    if op_family in {
         OpFamily.REDUCTION,
         OpFamily.NORMALIZATION,
         OpFamily.SOFTMAX,
@@ -611,13 +483,13 @@ def _fx_node_attributes(
     target_dtype = _target_dtype_from_values(leaf_name, node.args[1:], node.kwargs)
     if target_dtype is not None:
         attributes["target_dtype"] = target_dtype
-    if classification.op_family == OpFamily.CONVOLUTION:
+    if op_family == OpFamily.CONVOLUTION:
         attributes.update(_convolution_attributes(leaf_name, node.args, node.kwargs, node))
-    if classification.op_family == OpFamily.EMBEDDING_POSITIONAL:
+    if op_family == OpFamily.EMBEDDING_POSITIONAL:
         attributes.update(_memory_bound_call_attributes(leaf_name, node.args, node.kwargs, node))
-    if classification.op_family == OpFamily.MOE:
+    if op_family == OpFamily.MOE:
         attributes.update(_moe_call_attributes(leaf_name, node.args, node.kwargs))
-    if classification.op_family == OpFamily.SSM_MAMBA:
+    if op_family == OpFamily.SSM_MAMBA:
         attributes.update(_ssm_mamba_call_attributes(leaf_name))
     return attributes
 
@@ -1512,7 +1384,7 @@ class _AstBoundGraphExtractor:
             )
 
         return self._append_node(
-            op_family=classification.op_family,
+            op_family=_classification_family(classification),
             op_name=func_name,
             source_expression=ast.unparse(node),
             input_tensor_ids=tuple(input_tensor_ids),
@@ -1613,14 +1485,6 @@ class _AstBoundGraphExtractor:
         return "unknown"
 
 
-def _classify_call(func_name: str) -> _CallClassification | None:
-    leaf_name = func_name.rsplit(".", maxsplit=1)[-1]
-    for names, classification in _CALL_CLASSIFIERS:
-        if leaf_name in names or func_name in names:
-            return classification
-    return None
-
-
 def _call_name(node: ast.AST) -> str:
     if isinstance(node, ast.Attribute):
         parent = _call_name(node.value)
@@ -1633,14 +1497,8 @@ def _call_name(node: ast.AST) -> str:
 _MISSING = object()
 
 
-def _movement_kind_for_name(leaf_name: str) -> str | None:
-    if leaf_name in _BROADCAST_VIEW_NAMES:
-        return "broadcast_view"
-    if leaf_name in _MATERIALIZED_MOVEMENT_NAMES:
-        return "materialized"
-    if leaf_name in _LOGICAL_VIEW_NAMES:
-        return "logical_view"
-    return None
+def _classification_family(classification: _CallClassification) -> OpFamily:
+    return OpFamily(classification.op_family)
 
 
 def _axis_from_values(args: tuple[Any, ...], kwargs: dict[str, Any]) -> object:
@@ -1659,8 +1517,9 @@ def _target_dtype_from_values(
     args: tuple[Any, ...],
     kwargs: dict[str, Any],
 ) -> str | None:
-    if leaf_name in _DTYPE_METHOD_TARGETS:
-        return _DTYPE_METHOD_TARGETS[leaf_name]
+    method_target = _dtype_method_target(leaf_name)
+    if method_target is not None:
+        return method_target
     if leaf_name not in {"to", "type"}:
         return None
     if "dtype" in kwargs:
@@ -1686,7 +1545,8 @@ def _ast_call_attributes(
         attributes["movement_kind"] = movement_kind
 
     keyword_values = {keyword.arg: keyword.value for keyword in node.keywords if keyword.arg}
-    if classification.op_family in {
+    op_family = _classification_family(classification)
+    if op_family in {
         OpFamily.REDUCTION,
         OpFamily.NORMALIZATION,
         OpFamily.SOFTMAX,
@@ -1705,13 +1565,13 @@ def _ast_call_attributes(
     if target_dtype is not None:
         attributes["target_dtype"] = target_dtype
     args = tuple(node.args)
-    if classification.op_family == OpFamily.CONVOLUTION:
+    if op_family == OpFamily.CONVOLUTION:
         attributes.update(_convolution_attributes(leaf_name, args, keyword_values, None))
-    if classification.op_family == OpFamily.EMBEDDING_POSITIONAL:
+    if op_family == OpFamily.EMBEDDING_POSITIONAL:
         attributes.update(_memory_bound_call_attributes(leaf_name, args, keyword_values, None))
-    if classification.op_family == OpFamily.MOE:
+    if op_family == OpFamily.MOE:
         attributes.update(_moe_call_attributes(leaf_name, args, keyword_values))
-    if classification.op_family == OpFamily.SSM_MAMBA:
+    if op_family == OpFamily.SSM_MAMBA:
         attributes.update(_ssm_mamba_call_attributes(leaf_name))
     return attributes
 
