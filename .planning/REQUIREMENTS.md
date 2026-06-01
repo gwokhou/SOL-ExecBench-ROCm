@@ -10,11 +10,11 @@ ExecBench.
 
 ### Dataset Runner Decomposition
 
-- [ ] **DATASET-01**: Maintainer can reason about dataset problem/workload selection through tested package helpers instead of mutable selection logic embedded only in `scripts/run_dataset.py`.
-- [ ] **DATASET-02**: Maintainer can load and evaluate run-state, resume, rerun, capped workload, ready-subset, and existing-output decisions through deterministic helpers with focused tests.
-- [ ] **DATASET-03**: Maintainer can construct closure/provenance records through package code that preserves bounded refs, stale-output checks, skipped statuses, and failure classification semantics.
-- [ ] **DATASET-04**: Maintainer can discover and attach derived evidence refs from trace/output roots without coupling report generation to the main execution loop.
-- [ ] **DATASET-05**: Existing `scripts/run_dataset.py` CLI behavior, output filenames, trace semantics, and public sidecar contracts remain backward-compatible after decomposition.
+- [x] **DATASET-01**: Maintainer can reason about dataset problem/workload selection through tested package helpers instead of mutable selection logic embedded only in `scripts/run_dataset.py`.
+- [x] **DATASET-02**: Maintainer can load and evaluate run-state, resume, rerun, capped workload, ready-subset, and existing-output decisions through deterministic helpers with focused tests.
+- [x] **DATASET-03**: Maintainer can construct closure/provenance records through package code that preserves bounded refs, stale-output checks, skipped statuses, and failure classification semantics.
+- [x] **DATASET-04**: Maintainer can discover and attach derived evidence refs from trace/output roots without coupling report generation to the main execution loop.
+- [x] **DATASET-05**: Existing `scripts/run_dataset.py` CLI behavior, output filenames, trace semantics, and public sidecar contracts remain backward-compatible after decomposition.
 
 ### Eval Driver Runtime Decomposition
 
@@ -81,11 +81,11 @@ ExecBench.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DATASET-01 | Phase 94 | Planned |
-| DATASET-02 | Phase 94 | Planned |
-| DATASET-03 | Phase 94 | Planned |
-| DATASET-04 | Phase 94 | Planned |
-| DATASET-05 | Phase 94 | Planned |
+| DATASET-01 | Phase 94 | Complete |
+| DATASET-02 | Phase 94 | Complete |
+| DATASET-03 | Phase 94 | Complete |
+| DATASET-04 | Phase 94 | Complete |
+| DATASET-05 | Phase 94 | Complete |
 | EVAL-01 | Phase 95 | Planned |
 | EVAL-02 | Phase 95 | Planned |
 | EVAL-03 | Phase 95 | Planned |
@@ -106,7 +106,7 @@ ExecBench.
 | DOCS-04 | Phase 99 | Planned |
 
 **Coverage:**
-- v1 requirements: 23 total, 0 complete
+- v1 requirements: 23 total, 5 complete
 - Mapped to phases: 23
 - Unmapped: 0
 

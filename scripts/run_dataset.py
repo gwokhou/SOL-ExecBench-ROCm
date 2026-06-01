@@ -39,7 +39,6 @@ import shutil
 import subprocess
 import sys
 from collections.abc import Sequence
-from datetime import UTC, datetime
 from pathlib import Path
 
 from sol_execbench.core.bench.config import BenchmarkConfig
@@ -50,20 +49,32 @@ from sol_execbench.core.bench.rocm_profiler import (
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.trace import Trace
 from sol_execbench.core.data.workload import Workload
-from sol_execbench.core.dataset.execution_closure import (
-    ExecutionClosureReasonCode,
-    ExecutionClosureRecord,
-    ExecutionClosureStatus,
-    build_execution_closure_report,
-    closure_status_for_trace_status,
-    closure_status_with_evidence,
-    compare_execution_closure_provenance,
-    write_execution_closure_report,
-)
+from sol_execbench.core.dataset.execution_closure import compare_execution_closure_provenance
 from sol_execbench.core.dataset.evidence_refs import (
-    build_derived_evidence_refs,
     relative_ref as _relative_ref,
     safe_sidecar_stem as _safe_sidecar_stem,
+)
+from sol_execbench.core.dataset.run_closure import (
+    closure_record as _build_closure_record,
+    closure_totals as _build_closure_totals,
+    derived_evidence_for_workload as _build_derived_evidence_for_workload,
+    prior_closure_provenance as _load_prior_closure_provenance,
+    stale_provenance_mismatch as _build_stale_provenance_mismatch,
+    utc_timestamp as _build_utc_timestamp,
+    write_execution_closure as _write_execution_closure_report,
+)
+from sol_execbench.core.dataset.run_state import (
+    closure_status_for_trace as _run_state_closure_status_for_trace,
+    closure_status_with_evidence as _run_state_closure_status_with_evidence,
+    discover_problems as _discover_problems,
+    read_workload_rows as _read_run_workload_rows,
+    readiness_workload_map as _build_readiness_workload_map,
+    ready_problem_map as _build_ready_problem_map,
+    requested_evidence_requirements as _build_requested_evidence_requirements,
+    selected_workload_rows as _select_run_workload_rows,
+    trace_map as _build_trace_map,
+    trace_status as _run_state_trace_status,
+    workload_key as _run_workload_key,
 )
 from sol_execbench.core.scoring.amd_score import (
     AmdNativeScore,
@@ -87,8 +98,6 @@ ROOT = Path(__file__).resolve().parent.parent
 
 CATEGORIES = {"L1", "L2", "FlashInfer-Bench", "Quant"}
 
-EXECUTION_CLOSURE_STATUSES = {status.value for status in ExecutionClosureStatus}
-
 
 # ---------------------------------------------------------------------------
 # Dataset discovery
@@ -103,23 +112,11 @@ def discover_problems(
     Each problem directory must contain definition.json and workload.jsonl.
     If *categories* is given (e.g. ["L1", "L2"]), only those sub-directories are searched.
     """
-    if categories:
-        roots = [benchmark_dir / c for c in categories]
-    else:
-        roots = sorted(
-            p for p in benchmark_dir.iterdir() if p.is_dir() and p.name in CATEGORIES
-        )
-
-    problems = []
-    for root in roots:
-        if not root.is_dir():
-            continue
-        for problem_dir in sorted(root.iterdir()):
-            defn = problem_dir / "definition.json"
-            wkl = problem_dir / "workload.jsonl"
-            if defn.exists() and wkl.exists():
-                problems.append(problem_dir)
-    return problems
+    return _discover_problems(
+        benchmark_dir,
+        categories,
+        known_categories=CATEGORIES,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -669,7 +666,7 @@ def _extend_derived_reports_for_problem(
 
 
 def _utc_timestamp() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return _build_utc_timestamp()
 
 
 def _load_json_sidecar(path: Path) -> dict:
@@ -684,37 +681,19 @@ def _problem_id_for(benchmark_root: Path, problem_dir: Path) -> str:
 
 
 def _workload_key(uuid: str | None, row_index: int | None) -> tuple[str, str | int]:
-    if uuid:
-        return ("uuid", uuid)
-    return ("row_index", int(row_index or 0))
+    return _run_workload_key(uuid, row_index)
 
 
 def _read_workload_rows(workload_path: Path) -> list[tuple[int, dict, str]]:
-    rows: list[tuple[int, dict, str]] = []
-    for row_index, line in enumerate(workload_path.read_text().splitlines()):
-        if not line.strip():
-            continue
-        rows.append((row_index, json.loads(line), line))
-    return rows
+    return _read_run_workload_rows(workload_path)
 
 
 def _ready_problem_map(ready_subset: dict | None) -> dict[str, dict]:
-    if ready_subset is None:
-        return {}
-    return {
-        str(problem["problem_id"]): problem
-        for problem in ready_subset.get("problems", [])
-    }
+    return _build_ready_problem_map(ready_subset)
 
 
 def _readiness_workload_map(readiness: dict | None) -> dict[tuple[str, tuple[str, str | int]], dict]:
-    if readiness is None:
-        return {}
-    indexed: dict[tuple[str, tuple[str, str | int]], dict] = {}
-    for workload in readiness.get("workloads", []):
-        key = _workload_key(workload.get("workload_uuid"), workload.get("row_index"))
-        indexed[(str(workload.get("problem_id")), key)] = workload
-    return indexed
+    return _build_readiness_workload_map(readiness)
 
 
 def _manifest_checksum(manifest: dict | None) -> str | None:
@@ -820,18 +799,14 @@ def _closure_record(
     trace_status: str | None = None,
     notes: list[str] | None = None,
 ) -> dict:
-    reasons = readiness.get("reasons", []) if readiness else []
-    return ExecutionClosureRecord(
+    return _build_closure_record(
         category=category,
         problem_id=problem_id,
         problem_path=problem_path,
         workload_uuid=workload_uuid,
         row_index=row_index,
-        readiness_status=readiness.get("status") if readiness else None,
-        readiness_reason_codes=[
-            reason.get("code") for reason in reasons if isinstance(reason, dict)
-        ],
-        closure_status=ExecutionClosureStatus(closure_status),
+        closure_status=closure_status,
+        readiness=readiness,
         filter_reasons=filter_reasons or [],
         trace_status=trace_status,
         trace_ref=trace_ref,
@@ -840,8 +815,8 @@ def _closure_record(
         solution_ref=solution_ref,
         evidence_refs=evidence_refs or {},
         evidence_gaps=evidence_gaps or [],
-        notes=notes or [],
-    ).model_dump(mode="json")
+        notes=notes,
+    )
 
 
 def _selected_workload_rows(
@@ -850,60 +825,23 @@ def _selected_workload_rows(
     *,
     max_workloads: int | None,
 ) -> tuple[list[str], list[dict], list[dict], list[dict]]:
-    rows = _read_workload_rows(workload_path)
-    by_uuid = {
-        str(payload.get("uuid")): (row_index, payload, line)
-        for row_index, payload, line in rows
-        if payload.get("uuid")
-    }
-    by_row = {row_index: (row_index, payload, line) for row_index, payload, line in rows}
-
-    selected: list[tuple[int, dict, str, dict]] = []
-    missing: list[dict] = []
-    seen: set[tuple[str, str | int]] = set()
-    for ref in workload_refs:
-        uuid = ref.get("uuid")
-        row_index = int(ref.get("row_index", 0))
-        key = _workload_key(uuid, row_index)
-        if key in seen:
-            continue
-        seen.add(key)
-        match = by_uuid.get(str(uuid)) if uuid else None
-        if match is None:
-            match = by_row.get(row_index)
-        if match is None:
-            missing.append(ref)
-            continue
-        selected.append((*match, ref))
-
-    selected.sort(key=lambda item: item[0])
-    capped = selected
-    cap_filtered: list[dict] = []
-    if max_workloads is not None and len(selected) > max_workloads:
-        capped = selected[:max_workloads]
-        cap_filtered = [item[3] for item in selected[max_workloads:]]
-
-    return [item[2] for item in capped], [item[3] for item in capped], cap_filtered, missing
+    return _select_run_workload_rows(
+        workload_path,
+        workload_refs,
+        max_workloads=max_workloads,
+    )
 
 
 def _trace_map(traces: list[dict]) -> dict[tuple[str, str | int], dict]:
-    indexed: dict[tuple[str, str | int], dict] = {}
-    for row_index, trace in enumerate(traces):
-        workload = trace.get("workload") or {}
-        key = _workload_key(workload.get("uuid"), row_index)
-        indexed[key] = trace
-    return indexed
+    return _build_trace_map(traces)
 
 
 def _trace_status(trace: dict | None) -> str | None:
-    if not trace:
-        return None
-    evaluation = trace.get("evaluation") or {}
-    return evaluation.get("status", "UNKNOWN")
+    return _run_state_trace_status(trace)
 
 
 def _closure_status_for_trace(trace: dict | None, *, skipped: bool = False) -> str:
-    return closure_status_for_trace_status(_trace_status(trace), skipped=skipped).value
+    return _run_state_closure_status_for_trace(trace, skipped=skipped)
 
 
 def _derived_evidence_for_workload(
@@ -918,7 +856,7 @@ def _derived_evidence_for_workload(
     timing_evidence_dir: Path | None,
     category: str,
 ) -> tuple[dict[str, str], list[str]]:
-    return build_derived_evidence_refs(
+    return _build_derived_evidence_for_workload(
         definition_name=definition_name,
         workload_uuid=workload_uuid,
         problem_output_dir=problem_output_dir,
@@ -935,55 +873,31 @@ def _closure_status_with_evidence(
     status: str,
     evidence_gaps: list[str],
 ) -> str:
-    return closure_status_with_evidence(ExecutionClosureStatus(status), evidence_gaps).value
+    return _run_state_closure_status_with_evidence(status, evidence_gaps)
 
 
 def _requested_evidence_requirements(args: argparse.Namespace) -> list[str]:
-    requirements: list[str] = []
-    if args.amd_score_report is not None:
-        requirements.append("amd_score")
-    if args.amd_sol_bound_dir is not None:
-        requirements.append("amd_sol_bound")
-    if args.solar_derivation is not None:
-        requirements.append("solar_derivation")
-    if args.timing_evidence_dir is not None:
-        requirements.append("timing_evidence")
-    return requirements
+    return _build_requested_evidence_requirements(
+        amd_score_report=args.amd_score_report,
+        amd_sol_bound_dir=args.amd_sol_bound_dir,
+        solar_derivation=args.solar_derivation,
+        timing_evidence_dir=args.timing_evidence_dir,
+    )
 
 
 def _stale_provenance_mismatch(
     *,
     observed: str | None,
 ) -> dict[str, object]:
-    return {
-        "field": "execution_closure",
-        "reason_code": ExecutionClosureReasonCode.STALE_PROVENANCE.value,
-        "expected": "matching execution_closure.json provenance",
-        "observed": observed,
-    }
+    return _build_stale_provenance_mismatch(observed=observed)
 
 
 def _prior_closure_provenance(path: Path) -> tuple[dict | None, dict[str, object] | None]:
-    if not path.exists():
-        return None, _stale_provenance_mismatch(observed=None)
-    try:
-        payload = json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError):
-        return None, _stale_provenance_mismatch(observed="unreadable")
-    provenance = payload.get("provenance") if isinstance(payload, dict) else None
-    if not isinstance(provenance, dict):
-        return None, _stale_provenance_mismatch(observed="missing provenance")
-    return provenance, None
+    return _load_prior_closure_provenance(path)
 
 
 def _closure_totals(records: list[dict]) -> dict[str, int]:
-    report = build_execution_closure_report(
-        records=records,
-        provenance={},
-        filters={},
-        created_at="1970-01-01T00:00:00Z",
-    )
-    return report.totals.model_dump(mode="json")
+    return _build_closure_totals(records)
 
 
 def _write_execution_closure(
@@ -994,20 +908,13 @@ def _write_execution_closure(
     filters: dict,
     provenance_mismatches: list[dict] | None = None,
 ) -> None:
-    report = build_execution_closure_report(
+    _write_execution_closure_report(
+        path=path,
         records=records,
         provenance=provenance,
         filters=filters,
-        created_at=_utc_timestamp(),
-        claim_boundary={
-            "bounded_ready_subset_execution": True,
-            "full_235_problem_validation": False,
-            "paper_parity": False,
-            "leaderboard_result": False,
-        },
         provenance_mismatches=provenance_mismatches,
     )
-    write_execution_closure_report(report, path)
 
 
 # ---------------------------------------------------------------------------

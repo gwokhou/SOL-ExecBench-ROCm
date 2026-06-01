@@ -32,13 +32,13 @@
 **Active milestone:** v1.21 Codebase Debt Reduction and Execution Boundary
 Hardening.
 
-**Status:** requirements and roadmap defined; ready for Phase 94 planning.
+**Status:** Phase 94 complete; ready for Phase 95 planning.
 
-**Next step:** Run `$gsd-discuss-phase 94` or `$gsd-plan-phase 94`.
+**Next step:** Run `$gsd-discuss-phase 95` or `$gsd-plan-phase 95`.
 
 ## Phases
 
-- [ ] **Phase 94: Dataset Runner Decomposition** - Maintainers can modify dataset execution, resume, closure, and derived evidence behavior through tested package helpers instead of a monolithic script.
+- [x] **Phase 94: Dataset Runner Decomposition** - Maintainers can modify dataset execution, resume, closure, and derived evidence behavior through tested package helpers instead of a monolithic script.
 - [ ] **Phase 95: Eval Driver Runtime Decomposition** - Maintainers can test more evaluator behavior in package modules while preserving staged template smoke coverage.
 - [ ] **Phase 96: AMD Bound Graph And Estimate Modularization** - Maintainers can change AMD bound graph extraction and estimate formulas by operation family with focused tests.
 - [ ] **Phase 97: SOLAR Derivation And Static Evidence Modularization** - Maintainers can work on SOLAR derivation and static evidence through isolated provenance, parser, status, and rendering helpers.
@@ -58,8 +58,8 @@ Hardening.
   4. Derived evidence discovery can run independently from the main execution loop and attach refs without changing public sidecar shapes.
   5. Existing run_dataset CLI contracts and representative tests continue to pass.
 **Plans**:
-  - [ ] 94-01 Selection And Run-State Helpers
-  - [ ] 94-02 Closure And Derived Evidence Helpers
+  - [x] 94-01 Selection And Run-State Helpers
+  - [x] 94-02 Closure And Derived Evidence Helpers
 
 ### Phase 95: Eval Driver Runtime Decomposition
 **Goal**: Maintainers can unit-test more eval-driver behavior before staging while the generated template remains the subprocess integration shell.
@@ -134,7 +134,7 @@ Phases execute in numeric order: 94 -> 95 -> 96 -> 97 -> 98 -> 99.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 94. Dataset Runner Decomposition | 0/2 | Planned | — |
+| 94. Dataset Runner Decomposition | 2/2 | Complete | 2026-06-01 |
 | 95. Eval Driver Runtime Decomposition | 0/2 | Planned | — |
 | 96. AMD Bound Graph And Estimate Modularization | 0/2 | Planned | — |
 | 97. SOLAR Derivation And Static Evidence Modularization | 0/2 | Planned | — |
@@ -143,6 +143,6 @@ Phases execute in numeric order: 94 -> 95 -> 96 -> 97 -> 98 -> 99.
 
 **Coverage:**
 - Requirements mapped: 23/23
-- Requirements complete: 0/23
+- Requirements complete: 5/23
 - Flow count: 6 phases
 - Residual blockers: 0
