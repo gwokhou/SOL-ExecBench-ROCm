@@ -127,6 +127,29 @@ def test_v1_25_release_notes_keep_claim_boundaries_visible():
         assert "diagnostic-only sidecar" in linked_doc
 
 
+def test_first_run_guide_covers_minimal_trace_and_troubleshooting():
+    getting_started = _read_doc("docs/GETTING-STARTED.md")
+
+    for required in (
+        "First-Run Checklist",
+        "uv sync --all-groups",
+        "uv run sol-execbench doctor --json",
+        "out/first-run.trace.jsonl",
+        "--output out/first-run.trace.jsonl",
+        "canonical Trace JSONL",
+        "`status`",
+        "`correctness`",
+        "`latency_ms`",
+        "`speedup_factor`",
+        "`environment`",
+        "no-trace diagnostics sidecar",
+        "known limitations",
+        "PyTorch ROCm compatibility namespace",
+        "not NVIDIA CUDA runtime support",
+    ):
+        assert required in getting_started
+
+
 def test_v1_21_docs_keep_debt_reduction_separate_from_external_claims():
     claims = _read_doc("docs/CLAIMS.md")
     development = _read_doc("docs/DEVELOPMENT.md")

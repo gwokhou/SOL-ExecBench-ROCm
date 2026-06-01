@@ -53,9 +53,30 @@ uv run python -c "import torch; print(torch.cuda.get_device_properties(0).gcnArc
 ```
 
 PyTorch ROCm intentionally exposes GPU APIs through the historical
-`torch.cuda` namespace.
+`torch.cuda` namespace. In this project that is a PyTorch ROCm compatibility namespace, not NVIDIA CUDA runtime support.
 
 ## First Run
+
+### First-Run Checklist
+
+Use this path for the smallest end-to-end smoke from a fresh checkout:
+
+1. Install dependencies with `uv sync --all-groups`.
+2. Confirm CLI metadata with `uv run sol-execbench contract --json`.
+3. Check ROCm visibility with `uv run sol-execbench doctor --json`.
+4. Run one included sample and write canonical Trace JSONL:
+
+```bash
+mkdir -p out
+uv run sol-execbench tests/sol_execbench/samples/linear_backward \
+  --solution tests/sol_execbench/samples/linear_backward/solution_python.json \
+  --output out/first-run.trace.jsonl
+```
+
+The output file `out/first-run.trace.jsonl` is the canonical benchmark trace
+for this first run. Optional environment, profile, static, Matrix, closure,
+consistency, claim-upgrade, trust-summary, and release-candidate validation
+files are sidecars; they do not replace canonical Trace JSONL.
 
 Run an included PyTorch example:
 
@@ -78,6 +99,27 @@ uv run sol-execbench tests/sol_execbench/samples/linear_backward \
   --solution tests/sol_execbench/samples/linear_backward/solution_python.json \
   --output out/linear_backward.trace.jsonl
 ```
+
+### Reading The First Trace
+
+Open `out/first-run.trace.jsonl` and inspect one JSON object per line:
+
+- `status` reports the evaluation outcome, such as `PASSED`,
+  `INCORRECT_NUMERICAL`, `COMPILE_ERROR`, `RUNTIME_ERROR`, or `TIMEOUT`.
+- `correctness` records numerical comparison fields such as
+  `max_relative_error`, `max_absolute_error`, `has_nan`, and `has_inf`.
+- `latency_ms` is the measured solution latency in milliseconds when the trace
+  passes.
+- `speedup_factor` is `reference_latency_ms / latency_ms` for the same workload
+  and hardware.
+- `environment` records the AMD/ROCm hardware and software context embedded in
+  the canonical Trace JSONL.
+
+If no parseable trace is produced, the CLI writes a bounded no-trace
+diagnostics sidecar next to the requested output path, for example
+`out/first-run.trace.jsonl.no-trace-diagnostics.json`. Treat that sidecar as
+diagnostic-only evidence and inspect its bounded stdout/stderr tails before
+rerunning.
 
 ## Docker Path
 
@@ -157,6 +199,19 @@ run.
 | Docker cannot see the GPU | Use native Linux Docker and the repository wrapper instead of Docker Desktop. |
 | Dataset download cannot find `hf` | Run through `uv run --with "huggingface-hub[cli]" ./scripts/download_data.sh`. |
 | Evaluation exits with no trace JSONL | Inspect the printed no-trace diagnostics sidecar path; it contains bounded stdout/stderr tails outside canonical trace JSONL. |
+| First-run output exists but performance is surprising | Review `evaluation.environment`, clock policy evidence, optional sidecars, and known limitations before treating the result as a performance claim. |
+
+Known limitations for the first run:
+
+- A passing sample trace is ROCm-port evidence for that local command only, not
+  full 235-problem paper validation.
+- Docker/container ROCm user-space evidence is not native-host validation.
+- MI300X/CDNA3 full-suite validation remains deferred without complete
+  real-hardware evidence, and CDNA4 validation is unavailable because suitable
+  hardware is not currently accessible.
+- PyTorch and some internal APIs may still contain CUDA-named compatibility
+  symbols; those names do not mean this ROCm-only port supports NVIDIA CUDA
+  runtime execution.
 
 ## Next Steps
 
