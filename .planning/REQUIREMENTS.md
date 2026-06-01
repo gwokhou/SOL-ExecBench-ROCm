@@ -41,13 +41,13 @@ ExecBench.
 
 ### First-Run User Path
 
-- [ ] **FIRST-01**: New user can install dependencies and run a minimal
+- [x] **FIRST-01**: New user can install dependencies and run a minimal
   example from documented commands.
-- [ ] **FIRST-02**: New user can generate canonical trace JSONL and interpret
+- [x] **FIRST-02**: New user can generate canonical trace JSONL and interpret
   correctness, latency, speedup, and environment fields.
-- [ ] **FIRST-03**: New user can diagnose common failures using doctor,
+- [x] **FIRST-03**: New user can diagnose common failures using doctor,
   sidecars, no-trace diagnostics, and known limitations.
-- [ ] **FIRST-04**: First-run docs avoid NVIDIA/CUDA ambiguity except where
+- [x] **FIRST-04**: First-run docs avoid NVIDIA/CUDA ambiguity except where
   PyTorch ROCm compatibility names are intentional.
 
 ### Release Materials
@@ -111,10 +111,10 @@ ExecBench.
 | CLAIM-01 | Phase 116 | Complete |
 | CLAIM-02 | Phase 116 | Complete |
 | CLAIM-03 | Phase 116 | Complete |
-| FIRST-01 | Phase 117 | Pending |
-| FIRST-02 | Phase 117 | Pending |
-| FIRST-03 | Phase 117 | Pending |
-| FIRST-04 | Phase 117 | Pending |
+| FIRST-01 | Phase 117 | Complete |
+| FIRST-02 | Phase 117 | Complete |
+| FIRST-03 | Phase 117 | Complete |
+| FIRST-04 | Phase 117 | Complete |
 | REL-01 | Phase 118 | Pending |
 | REL-02 | Phase 118 | Pending |
 | REL-03 | Phase 118 | Pending |

@@ -21,7 +21,7 @@
 
 **Active milestone:** v1.25 Engineering Prerelease.
 
-**Status:** Ready to plan Phase 117.
+**Status:** Ready to plan Phase 118.
 
 **Milestone goal:** Turn the v1.24 ROCm port state into an engineering
 prerelease / release-candidate package that external users can install,
@@ -45,8 +45,9 @@ because suitable hardware is not currently accessible.
   prevent accidental overclaims about parity, leaderboard readiness, sandboxing,
   and unavailable hardware validation.
   (completed 2026-06-01)
-- [ ] **Phase 117: First-Run User Path** - New users can install, run a
+- [x] **Phase 117: First-Run User Path** - New users can install, run a
   minimal example, inspect trace output, and diagnose common failures.
+  (completed 2026-06-01)
 - [ ] **Phase 118: Release Candidate Materials** - Maintainers have the
   checklist, notes, and public documentation entry points needed to tag and
   publish the engineering prerelease.
@@ -120,7 +121,9 @@ understand the first trace and common failure signals.
      no-trace diagnostics, and known limitations.
   4. New user does not encounter NVIDIA/CUDA ambiguity in first-run docs except
      where PyTorch ROCm compatibility names are intentional.
-**Plans**: TBD
+**Plans**:
+  - `117-01-PLAN.md` - Clarify first-run install, minimal trace generation,
+    trace interpretation, troubleshooting, and ROCm compatibility wording.
 
 ### Phase 118: Release Candidate Materials
 **Goal**: Maintainers can package, tag, and publish the engineering prerelease
@@ -146,11 +149,11 @@ Phases execute in numeric order: 114 -> 115 -> 116 -> 117 -> 118.
 | 114. Release-Candidate Validation | 1/1 | Complete | 2026-06-01 |
 | 115. Support Matrix Boundaries | 1/1 | Complete | 2026-06-01 |
 | 116. Claim Boundary Guardrails | 1/1 | Complete | 2026-06-01 |
-| 117. First-Run User Path | 0/TBD | Not started | - |
+| 117. First-Run User Path | 1/1 | Complete | 2026-06-01 |
 | 118. Release Candidate Materials | 0/TBD | Not started | - |
 
 **Coverage:**
 - v1.25 requirements mapped: 18/18
-- v1.25 requirements complete: 11/18
+- v1.25 requirements complete: 15/18
 - Orphaned requirements: 0
 - Duplicate requirement mappings: 0
