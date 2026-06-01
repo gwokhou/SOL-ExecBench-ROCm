@@ -38,9 +38,9 @@ ExecBench.
 
 ### Dependency And Closure Guardrails
 
-- [ ] **GUARD-01**: ROCm wheel, Docker target, and dependency-matrix policy consistency is guarded by tests or docs checks when target metadata changes.
-- [ ] **GUARD-02**: Dataset closure provenance tests cover new sidecar refs, stale provenance combinations, and manifest/cache provenance behavior.
-- [ ] **GUARD-03**: Hardware-marker skip behavior remains explicit so CPU-safe green runs cannot be mistaken for RDNA4/CDNA3/timing validation.
+- [x] **GUARD-01**: ROCm wheel, Docker target, and dependency-matrix policy consistency is guarded by tests or docs checks when target metadata changes.
+- [x] **GUARD-02**: Dataset closure provenance tests cover new sidecar refs, stale provenance combinations, and manifest/cache provenance behavior.
+- [x] **GUARD-03**: Hardware-marker skip behavior remains explicit so CPU-safe green runs cannot be mistaken for RDNA4/CDNA3/timing validation.
 
 ### Concern Map Stewardship
 
@@ -97,9 +97,9 @@ ExecBench.
 | SCORING-02 | Phase 103 | Complete |
 | SCORING-03 | Phase 103 | Complete |
 | SCORING-04 | Phase 103 | Complete |
-| GUARD-01 | Phase 104 | Pending |
-| GUARD-02 | Phase 104 | Pending |
-| GUARD-03 | Phase 104 | Pending |
+| GUARD-01 | Phase 104 | Complete |
+| GUARD-02 | Phase 104 | Complete |
+| GUARD-03 | Phase 104 | Complete |
 | DOCS-01 | Phase 105 | Pending |
 | DOCS-02 | Phase 105 | Pending |
 | DOCS-03 | Phase 105 | Pending |
