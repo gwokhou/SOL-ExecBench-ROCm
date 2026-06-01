@@ -326,6 +326,31 @@ def test_cli_help_preserves_existing_public_options():
         assert unexpected_option not in help_text
 
 
+def test_static_and_profile_docs_keep_diagnostic_only_authority_boundaries():
+    static_docs = (REPO_ROOT / "docs/static_kernel_evidence.md").read_text()
+    timing_docs = (REPO_ROOT / "docs/rocm_timing.md").read_text()
+    claims_docs = (REPO_ROOT / "docs/CLAIMS.md").read_text()
+
+    for docs in (static_docs, timing_docs):
+        for expected in (
+            "diagnostic",
+            "not correctness authority",
+            "performance authority",
+            "timing authority",
+            "score authority",
+            "paper-parity authority",
+            "leaderboard authority",
+        ):
+            assert expected in docs
+
+    for expected in (
+        "`rocprofv3` profiling as correctness or score authority",
+        "Static Kernel Evidence as correctness authority",
+        "Static Kernel Evidence as correctness, performance, timing, score",
+    ):
+        assert expected in claims_docs
+
+
 def test_primary_cli_does_not_expose_v1_6_derived_workflow_options():
     result = CliRunner().invoke(cli, ["--help"])
     assert result.exit_code == 0

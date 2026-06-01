@@ -66,7 +66,9 @@ The sidecar schema is `sol_execbench.static_kernel_evidence.v1`. It contains:
 
 ## Claim Boundaries
 
-Static Kernel Evidence is static-analysis evidence only. It is not:
+Static Kernel Evidence is diagnostic-only static-analysis evidence. It is not correctness authority, performance authority, timing authority, score authority, paper-parity authority, or leaderboard authority.
+
+It is not:
 
 - correctness authority
 - performance authority

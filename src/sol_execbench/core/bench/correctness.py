@@ -23,6 +23,7 @@ from typing import Optional, Tuple
 import torch
 
 from sol_execbench.core.data import Correctness
+from sol_execbench.core.data.trace import EvaluationStatus
 from sol_execbench.core.data.workload import ToleranceSpec
 
 
@@ -32,6 +33,19 @@ def set_seed(seed: int) -> None:
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
+
+
+def check_output_shape_dtype(
+    reference_outputs: list[torch.Tensor],
+    user_outputs: list[torch.Tensor],
+) -> EvaluationStatus | None:
+    """Return the first structural output mismatch status, if any."""
+    for ref_out, user_out in zip(reference_outputs, user_outputs):
+        if ref_out.shape != user_out.shape:
+            return EvaluationStatus.INCORRECT_SHAPE
+        if ref_out.dtype != user_out.dtype:
+            return EvaluationStatus.INCORRECT_DTYPE
+    return None
 
 
 def check_tensor_sanity(

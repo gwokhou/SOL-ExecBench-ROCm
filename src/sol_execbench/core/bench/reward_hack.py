@@ -146,7 +146,8 @@ _STATIC_RULES = (
             r"\bbase64\b|\bmarshal\.loads\b|\bpickle\.loads\b|\bctypes\.CDLL\b|"
             r"\bctypes\.cdll\b|\bdlopen\b|\btorch\.ops\.load_library\b|"
             r"\bload_inline\s*\(|\bcpp_extension\.load\s*\(|\bsubprocess\b|"
-            r"\bsocket\b|\burllib\b|\brequests\b)"
+            r"\bos\.(system|popen|spawn[a-zA-Z_]*|exec[a-zA-Z_]*)\s*\(|"
+            r"\bpty\.spawn\s*\(|\bsocket\b|\burllib\b|\brequests\b)"
         ),
         "file I/O, embedded payload decoding, dynamic native loading, or process/network access is not allowed in submitted sources",
     ),

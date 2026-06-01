@@ -224,6 +224,31 @@ class TestStaticSourceReview:
         assert review.blocked is True
         assert "unauthorized_file_or_loader" in {issue.rule for issue in review.issues}
 
+    def test_reports_os_process_execution_patterns(self):
+        review = review_solution_sources(
+            _solution_with_source(
+                "import os\n"
+                "def run(x):\n"
+                "    os.system('true')\n"
+                "    return x\n"
+            )
+        )
+
+        assert review.blocked is True
+        assert "unauthorized_file_or_loader" in {issue.rule for issue in review.issues}
+
+    def test_allows_plain_os_import_without_process_execution(self):
+        review = review_solution_sources(
+            _solution_with_source(
+                "import os\n"
+                "def run(x):\n"
+                "    _ = os.environ.get('UNUSED', '')\n"
+                "    return x\n"
+            )
+        )
+
+        assert review.blocked is False
+
     def test_reports_precision_downgrade_for_float32_outputs(self):
         review = review_solution_sources(
             _solution_with_source("def run(x):\n    return x.half().float()\n"),

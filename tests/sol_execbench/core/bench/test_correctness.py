@@ -13,10 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pytest
 import torch
+import pytest
 
-from sol_execbench.core.bench.correctness import compute_error_stats, set_seed
+from sol_execbench.core.bench.correctness import (
+    check_output_shape_dtype,
+    compute_error_stats,
+    set_seed,
+)
+from sol_execbench.core.data.trace import EvaluationStatus
 from sol_execbench.core.data.workload import ToleranceSpec
 
 
@@ -258,6 +263,30 @@ class TestComputeErrorStats:
         out = torch.tensor([1.0, 2.0], dtype=torch.float16)
         c, exceeds = compute_error_stats(out, ref, _spec())
         assert not exceeds
+
+
+class TestCheckOutputShapeDtype:
+    def test_returns_none_when_outputs_match(self):
+        ref = [torch.zeros(2, dtype=torch.float32)]
+        user = [torch.ones(2, dtype=torch.float32)]
+
+        assert check_output_shape_dtype(ref, user) is None
+
+    def test_returns_incorrect_shape_before_dtype(self):
+        ref = [torch.zeros((2, 2), dtype=torch.float32)]
+        user = [torch.zeros(4, dtype=torch.float16)]
+
+        assert (
+            check_output_shape_dtype(ref, user) == EvaluationStatus.INCORRECT_SHAPE
+        )
+
+    def test_returns_incorrect_dtype_when_shape_matches(self):
+        ref = [torch.zeros(2, dtype=torch.float32)]
+        user = [torch.zeros(2, dtype=torch.float16)]
+
+        assert (
+            check_output_shape_dtype(ref, user) == EvaluationStatus.INCORRECT_DTYPE
+        )
 
     def test_bfloat16_inputs(self):
         """bfloat16 inputs are upcast to float32 internally."""

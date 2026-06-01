@@ -34,9 +34,7 @@ Usage:
 
 import argparse
 import ast
-import hashlib
 import json
-import re
 import shutil
 import subprocess
 import sys
@@ -62,6 +60,11 @@ from sol_execbench.core.dataset.execution_closure import (
     compare_execution_closure_provenance,
     write_execution_closure_report,
 )
+from sol_execbench.core.dataset.evidence_refs import (
+    build_derived_evidence_refs,
+    relative_ref as _relative_ref,
+    safe_sidecar_stem as _safe_sidecar_stem,
+)
 from sol_execbench.core.scoring.amd_score import (
     AmdNativeScore,
     build_amd_native_suite_report,
@@ -84,7 +87,6 @@ ROOT = Path(__file__).resolve().parent.parent
 
 CATEGORIES = {"L1", "L2", "FlashInfer-Bench", "Quant"}
 
-_SAFE_SIDECAR_COMPONENT = re.compile(r"[^A-Za-z0-9_.-]+")
 EXECUTION_CLOSURE_STATUSES = {status.value for status in ExecutionClosureStatus}
 
 
@@ -541,28 +543,6 @@ def _hardware_model_key_from_traces(traces: list[Trace]) -> str:
     return "gfx1200"
 
 
-def _safe_sidecar_stem(*parts: str) -> str:
-    """Return a deterministic filename stem for untrusted benchmark identifiers."""
-    safe_parts: list[str] = []
-    changed = False
-    for part in parts:
-        raw = str(part)
-        safe = _SAFE_SIDECAR_COMPONENT.sub("_", raw)
-        safe = re.sub(r"_+", "_", safe).strip("._")
-        if not safe:
-            raise ValueError(f"unsafe sidecar identifier: {raw!r}")
-        changed = changed or safe != raw
-        safe_parts.append(safe)
-
-    safe_stem = ".".join(safe_parts)
-    if changed:
-        digest = hashlib.sha256(
-            "\0".join(str(part) for part in parts).encode()
-        ).hexdigest()[:12]
-        safe_stem = f"{safe_stem}.{digest}"
-    return safe_stem
-
-
 def build_amd_score_reports_for_problem(
     *,
     definition_payload: dict,
@@ -776,15 +756,6 @@ def _git_commit() -> str | None:
     return result.stdout.strip() or None
 
 
-def _relative_ref(path: Path, base: Path) -> str:
-    path = path.resolve()
-    base = base.resolve()
-    try:
-        return path.relative_to(base).as_posix()
-    except ValueError:
-        return path.name
-
-
 def _first_relative_ref(path: Path, *bases: Path) -> str:
     for base in bases:
         ref = _relative_ref(path, base)
@@ -947,32 +918,17 @@ def _derived_evidence_for_workload(
     timing_evidence_dir: Path | None,
     category: str,
 ) -> tuple[dict[str, str], list[str]]:
-    refs: dict[str, str] = {}
-    gaps: list[str] = []
-    if amd_score_report is not None:
-        report_path = amd_score_report.resolve()
-        refs["amd_score"] = _relative_ref(report_path, output_dir)
-    if workload_uuid:
-        sidecar_stem = _safe_sidecar_stem(definition_name, workload_uuid)
-        if sol_bound_artifact_dir is not None:
-            path = sol_bound_artifact_dir / f"{sidecar_stem}.amd-sol-v2.json"
-            if path.exists():
-                refs["amd_sol_bound"] = _relative_ref(path, output_dir)
-            else:
-                gaps.append("amd_sol_bound_missing")
-        if solar_derivation_dir is not None:
-            path = solar_derivation_dir / f"{sidecar_stem}.solar-derivation.json"
-            if path.exists():
-                refs["solar_derivation"] = _relative_ref(path, output_dir)
-            else:
-                gaps.append("solar_derivation_missing")
-    if timing_evidence_dir is not None:
-        path = timing_evidence_dir.resolve() / category / f"{problem_output_dir.name}.timing.json"
-        if path.exists():
-            refs["timing_evidence"] = _relative_ref(path, output_dir)
-        else:
-            gaps.append("timing_evidence_missing")
-    return refs, gaps
+    return build_derived_evidence_refs(
+        definition_name=definition_name,
+        workload_uuid=workload_uuid,
+        problem_output_dir=problem_output_dir,
+        output_dir=output_dir,
+        amd_score_report=amd_score_report,
+        sol_bound_artifact_dir=sol_bound_artifact_dir,
+        solar_derivation_dir=solar_derivation_dir,
+        timing_evidence_dir=timing_evidence_dir,
+        category=category,
+    )
 
 
 def _closure_status_with_evidence(

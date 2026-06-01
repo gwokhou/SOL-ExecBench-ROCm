@@ -96,11 +96,10 @@ succeeded, was unavailable, or failed, and includes command provenance,
 working directory, timeout, artifact paths, return code, and stdout/stderr
 tails.
 
-The profile sidecar is diagnostic-only evidence. It must not be interpreted as
-canonical correctness, score, or trace JSONL data, and profiler failure must not
-turn an otherwise passing benchmark run into a correctness failure. When
-collection falls back or is skipped, the sidecar records an explicit fallback reason
-through `skipped_reason` or `failed_reason`.
+The profile sidecar is diagnostic-only evidence. It is not correctness authority, performance authority, timing authority, score authority, paper-parity authority, leaderboard authority, or canonical trace JSONL data.
+Profiler failure must not turn an otherwise passing benchmark run into a
+correctness failure. When collection falls back or is skipped, the sidecar
+records an explicit fallback reason through `skipped_reason` or `failed_reason`.
 
 ## Live rocprofv3 Collection
 
