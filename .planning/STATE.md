@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: none
-milestone_name: none
-status: ready_for_next_milestone
-stopped_at: v1.23 and v1.24 complete and audited
-last_updated: 2026-06-01T00:00:00+08:00
-last_activity: 2026-06-01 -- v1.23 and v1.24 complete
+milestone: v1.25
+milestone_name: Engineering Prerelease
+status: planning
+last_updated: "2026-06-01T09:52:52.133Z"
+last_activity: 2026-06-01
 progress:
-  total_phases: 8
-  completed_phases: 8
-  total_plans: 8
-  completed_plans: 8
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -27,12 +26,10 @@ ExecBench.
 
 ## Current Position
 
-Phase: none
-Plan: none
-Status: Ready for next milestone definition
-Last activity: 2026-06-01 -- v1.23 and v1.24 complete
-
-Progress: [##########] 100%
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-06-01 — Milestone v1.25 started
 
 ## Performance Metrics
 
@@ -78,11 +75,14 @@ Decisions are logged in PROJECT.md. Recent decisions affecting current work:
 - v1.23 starts at Phase 106 because v1.22 completed Phases 100-105.
 - v1.23 focuses on no-trace diagnostics, staged Python import isolation,
   native compile option guardrails, and eval-driver responsibility boundaries.
+
 - v1.24 is queued for dataset reuse policy, closure/evidence completeness,
   failure-mode regressions, and deterministic sharding semantics.
+
 - v1.23 and v1.24 must preserve canonical Trace, Definition, Workload,
   Solution, timing, correctness, score, and evaluator contract schemas unless
   separately approved.
+
 - v1.23 and v1.24 must not claim CDNA3, MI300X, CDNA4, native-host full-suite
   validation, paper-scale parity, leaderboard readiness, or hard
   multi-tenant sandboxing.
