@@ -114,6 +114,7 @@ definition_dict, _workload_dicts = _load_problem()
 from sol_execbench.core.bench.clock_lock import are_clocks_locked  # noqa: E402
 from sol_execbench.core.bench.config import BenchmarkConfig  # noqa: E402
 from sol_execbench.core.bench.correctness import (  # noqa: E402
+    check_output_shape_dtype,
     compute_error_stats,
     set_seed,
 )
@@ -556,14 +557,7 @@ for _workload in workloads:
                 _correctness_failed = True
                 break
 
-            _shape_dtype_issue: Optional[EvaluationStatus] = None
-            for _ref_out, _usr_out in zip(_ref_outputs, _user_outputs):
-                if _ref_out.shape != _usr_out.shape:
-                    _shape_dtype_issue = EvaluationStatus.INCORRECT_SHAPE
-                    break
-                if _ref_out.dtype != _usr_out.dtype:
-                    _shape_dtype_issue = EvaluationStatus.INCORRECT_DTYPE
-                    break
+            _shape_dtype_issue = check_output_shape_dtype(_ref_outputs, _user_outputs)
 
             if _shape_dtype_issue is not None:
                 _emit(

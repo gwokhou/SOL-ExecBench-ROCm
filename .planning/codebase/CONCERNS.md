@@ -13,8 +13,8 @@
 **Dataset Runner Script Accretion:**
 - Issue: `scripts/run_dataset.py` combines CLI argument parsing, dataset selection, execution, resume behavior, trace inspection, closure provenance, derived evidence, scoring, report writing, and output cleanup in one large script.
 - Files: `scripts/run_dataset.py`
-- Impact: Resume behavior and provenance handling are fragile because execution, filtering, skipping, and derived-report extension share mutable local state. A small change to `--max-workloads`, `--rerun`, or scoring flags can change closure semantics.
-- Fix approach: Move reusable pieces into `src/sol_execbench/core/dataset/` modules: selection, run-state loading, closure record construction, derived evidence discovery, and output persistence. Keep `scripts/run_dataset.py` as orchestration only.
+- Impact: Resume behavior and provenance handling are fragile because execution, filtering, skipping, and derived-report extension share mutable local state. A small change to `--max-workloads`, `--rerun`, or scoring flags can change closure semantics. Derived evidence reference construction is now isolated in `sol_execbench.core.dataset.evidence_refs`, but the main runner state machine remains monolithic.
+- Fix approach: Continue moving reusable pieces into `src/sol_execbench/core/dataset/` modules: selection, run-state loading, closure record construction, derived evidence discovery, and output persistence. Keep `scripts/run_dataset.py` as orchestration only.
 
 **Compatibility Naming Debt From CUDA-era APIs:**
 - Issue: ROCm execution intentionally uses PyTorch's historical `torch.cuda` namespace and compatibility wrapper names such as `bench_time_with_cuda_events`.
@@ -22,17 +22,17 @@
 - Impact: New contributors can misread compatibility APIs as NVIDIA runtime support. The audit test classifies accepted residue, but every new CUDA/NVIDIA term requires explicit classification to avoid ambiguity.
 - Fix approach: Keep compatibility wrappers only at PyTorch API boundaries. Prefer ROCm-neutral names in new code (`device_events`, `hip`, `rocm`) and update `tests/sol_execbench/test_rocm_migration_residue_audit.py` whenever residue is intentional.
 
-**Destructor-Based Staging Cleanup:**
-- Issue: `ProblemPackager.__del__` deletes the staging directory when the object is collected.
+**ProblemPackager Staging Cleanup Still Has Destructor Fallback:**
+- Issue: `ProblemPackager` now supports explicit `close()` and context-manager cleanup, but `__del__` remains as a best-effort fallback for callers that do not close explicitly.
 - Files: `src/sol_execbench/driver/problem_packager.py`
-- Impact: Cleanup timing depends on Python object lifetime. Staging directories can persist after abnormal termination, or be removed earlier than expected if ownership changes.
-- Fix approach: Use an explicit context manager or caller-owned cleanup method for staging directories. Keep `keep_output_dir` behavior explicit in CLI and tests.
+- Impact: New callers can use deterministic cleanup, but legacy callers that rely on object collection still inherit Python object-lifetime timing. Staging directories can persist after abnormal termination.
+- Fix approach: Prefer `with ProblemPackager(...)` or explicit `close()` in new call sites. Gradually migrate existing callers away from destructor reliance while preserving `keep_output_dir` behavior.
 
 **Generated Driver Template Drift:**
 - Issue: Evaluation behavior lives in a copied template script rather than an importable runtime module.
 - Files: `src/sol_execbench/driver/templates/eval_driver.py`, `src/sol_execbench/driver/problem_packager.py`, `tests/sol_execbench/driver/test_eval_driver.py`
-- Impact: Template edits are harder to type-check and share with the rest of the package. Runtime failures appear only after staging and subprocess execution.
-- Fix approach: Keep the template thin and delegate most logic to importable functions under `src/sol_execbench/core/bench/` or `src/sol_execbench/driver/`. Add tests for the imported helpers and one template smoke test for integration.
+- Impact: Template edits are harder to type-check and share with the rest of the package. Runtime failures appear only after staging and subprocess execution. Shape/dtype structural output validation is now delegated to an importable helper, but most evaluation flow still lives in the template.
+- Fix approach: Continue thinning the template by moving small pure helpers under `src/sol_execbench/core/bench/` or `src/sol_execbench/driver/`. Add tests for each imported helper and keep template smoke tests for integration.
 
 ## Known Bugs
 
@@ -110,9 +110,9 @@
 
 **Reward-Hack Static Review Is Conservative Regex Matching:**
 - Files: `src/sol_execbench/core/bench/reward_hack.py`, `src/sol_execbench/driver/templates/eval_driver.py`, `tests/sol_execbench/core/bench/test_reward_hack.py`, `tests/sol_execbench/driver/test_eval_driver.py`
-- Why fragile: Regex scanning can false-positive valid code and miss obfuscated behavior. Comment stripping is intentionally simple. Runtime integrity checks protect selected Python function identities but do not provide process-level confinement.
+- Why fragile: Regex scanning can false-positive valid code and miss obfuscated behavior. Comment stripping is intentionally simple. Runtime integrity checks protect selected Python function identities but do not provide process-level confinement. Direct shell/process execution via common `os.*` and `pty.spawn` APIs is now covered by focused static tests, but obfuscated process access remains possible.
 - Safe modification: Add new blocked patterns only with tests showing both malicious and allowed cases. Prefer AST-based checks for Python when possible and document any intentional false positives.
-- Test coverage: Good unit and driver coverage exists for known attacks; coverage is only as complete as the known attack catalog.
+- Test coverage: Good unit and driver coverage exists for known attacks; coverage is only as complete as the known attack catalog and available GPU runtime for driver-level smoke tests.
 
 **Clock Locking Depends On Device Names, Sudoers, And ROCm SMI Output Text:**
 - Files: `src/sol_execbench/core/bench/clock_lock.py`, `docker/entrypoint.sh`, `src/sol_execbench/core/bench/config/device_config.py`, `tests/sol_execbench/core/bench/test_clock_lock.py`
@@ -128,9 +128,9 @@
 
 **Public Claim Guardrails Are Text-Based:**
 - Files: `tests/sol_execbench/test_v1_9_validation_closure.py`, `tests/sol_execbench/test_public_contract_guardrails.py`, `tests/sol_execbench/test_original_parity_docs.py`, `docs/CLAIMS.md`, `docs/analysis.md`
-- Why fragile: Tests enforce forbidden/required phrases, which helps prevent overclaims but can miss semantically equivalent wording.
+- Why fragile: Tests enforce forbidden/required phrases, which helps prevent overclaims but can miss semantically equivalent wording. Static Evidence and `rocprofv3` profile sidecar authority boundaries now have focused diagnostic-only guardrails, but new wording can still evade phrase-based checks.
 - Safe modification: When changing claims docs, update tests with explicit allowed and forbidden language. Keep hardware-validation status in structured reports where possible.
-- Test coverage: Good for known claim phrases; residual risk remains for new wording not covered by phrase guards.
+- Test coverage: Good for known claim phrases and diagnostic-only sidecar authority wording; residual risk remains for new wording not covered by phrase guards.
 
 **Static Kernel Evidence Is Diagnostic-Only And Toolchain-Sensitive:**
 - Files: `src/sol_execbench/core/bench/static_kernel_evidence.py`, `src/sol_execbench/core/toolchain.py`, `docs/internal/v1_17_static_kernel_evidence_validation.md`, `tests/sol_execbench/test_static_kernel_evidence.py`

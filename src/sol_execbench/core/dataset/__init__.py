@@ -16,6 +16,11 @@
 """Dataset acquisition and layout contract helpers."""
 
 from .categories import DEFAULT_CATEGORIES, validate_categories
+from .evidence_refs import (
+    build_derived_evidence_refs,
+    relative_ref,
+    safe_sidecar_stem,
+)
 from .layout import (
     DatasetLayout,
     LayoutCategory,
@@ -72,6 +77,7 @@ __all__ = [
     "ReadySubset",
     "WorkloadInventoryRecord",
     "WorkloadReadinessRecord",
+    "build_derived_evidence_refs",
     "build_dataset_manifest",
     "build_dataset_inventory",
     "classify_rocm_readiness",
@@ -81,6 +87,8 @@ __all__ = [
     "inspect_dataset_layout",
     "render_parity_gap_markdown",
     "render_paper_denominator_markdown",
+    "relative_ref",
+    "safe_sidecar_stem",
     "validate_categories",
     "write_dataset_manifest",
     "write_dataset_inventory",

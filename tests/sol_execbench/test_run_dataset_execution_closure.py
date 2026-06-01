@@ -10,6 +10,7 @@ from sol_execbench.core.dataset.execution_closure import (
     build_execution_closure_report,
     write_execution_closure_report,
 )
+from sol_execbench.core.dataset.evidence_refs import build_derived_evidence_refs
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RUN_DATASET_PATH = REPO_ROOT / "scripts" / "run_dataset.py"
@@ -399,6 +400,41 @@ def test_execution_closure_marks_missing_requested_derived_evidence(
     assert record["trace_status"] == "PASSED"
     assert record["closure_status"] == "derived_evidence_missing"
     assert record["evidence_gaps"] == ["timing_evidence_missing"]
+
+
+def test_build_derived_evidence_refs_reports_present_refs_and_missing_gaps(tmp_path):
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+    problem_output_dir = output_dir / "L1" / "matmul_demo"
+    problem_output_dir.mkdir(parents=True)
+    amd_score_report = output_dir / "amd-score.json"
+    amd_score_report.write_text("{}")
+    sol_bound_dir = output_dir / "sol-bounds"
+    sol_bound_dir.mkdir()
+    timing_dir = output_dir / "timing"
+    timing_problem_dir = timing_dir / "L1"
+    timing_problem_dir.mkdir(parents=True)
+    (timing_problem_dir / "matmul_demo.timing.json").write_text("{}")
+    (sol_bound_dir / "matmul_demo.selected-workload.amd-sol-v2.json").write_text("{}")
+
+    refs, gaps = build_derived_evidence_refs(
+        definition_name="matmul_demo",
+        workload_uuid="selected-workload",
+        problem_output_dir=problem_output_dir,
+        output_dir=output_dir,
+        amd_score_report=amd_score_report,
+        sol_bound_artifact_dir=sol_bound_dir,
+        solar_derivation_dir=output_dir / "missing-solar",
+        timing_evidence_dir=timing_dir,
+        category="L1",
+    )
+
+    assert refs == {
+        "amd_score": "amd-score.json",
+        "amd_sol_bound": "sol-bounds/matmul_demo.selected-workload.amd-sol-v2.json",
+        "timing_evidence": "timing/L1/matmul_demo.timing.json",
+    }
+    assert gaps == ["solar_derivation_missing"]
 
 
 def test_execution_closure_records_are_sorted_by_helper_contract(tmp_path, monkeypatch):

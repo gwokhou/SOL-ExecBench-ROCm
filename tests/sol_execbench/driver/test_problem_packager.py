@@ -116,6 +116,8 @@ def _make_packager(
     workloads: list[Workload],
     solution: Solution,
     config: BenchmarkConfig,
+    *,
+    keep_output_dir: bool = True,
 ) -> ProblemPackager:
     return ProblemPackager(
         definition=definition,
@@ -123,7 +125,7 @@ def _make_packager(
         solution=solution,
         config=config,
         output_dir=tmp_path / "staging",
-        keep_output_dir=True,
+        keep_output_dir=keep_output_dir,
     )
 
 
@@ -180,6 +182,77 @@ class TestInit:
         kernel = pkg.output_dir / "kernel.hip"
         assert kernel.exists()
         assert "HIP kernel" in kernel.read_text()
+
+
+class TestCleanup:
+    def test_close_removes_staging_when_not_kept(
+        self, tmp_path, definition, workloads, python_solution, config
+    ):
+        pkg = _make_packager(
+            tmp_path,
+            definition,
+            workloads,
+            python_solution,
+            config,
+            keep_output_dir=False,
+        )
+        output_dir = pkg.output_dir
+        assert output_dir.exists()
+
+        pkg.close()
+
+        assert not output_dir.exists()
+
+    def test_close_is_idempotent(
+        self, tmp_path, definition, workloads, python_solution, config
+    ):
+        pkg = _make_packager(
+            tmp_path,
+            definition,
+            workloads,
+            python_solution,
+            config,
+            keep_output_dir=False,
+        )
+
+        pkg.close()
+        pkg.close()
+
+        assert not pkg.output_dir.exists()
+
+    def test_close_preserves_staging_when_kept(
+        self, tmp_path, definition, workloads, python_solution, config
+    ):
+        pkg = _make_packager(
+            tmp_path,
+            definition,
+            workloads,
+            python_solution,
+            config,
+            keep_output_dir=True,
+        )
+        output_dir = pkg.output_dir
+
+        pkg.close()
+
+        assert output_dir.exists()
+
+    def test_context_manager_cleans_up(
+        self, tmp_path, definition, workloads, python_solution, config
+    ):
+        output_dir = tmp_path / "staging"
+
+        with ProblemPackager(
+            definition=definition,
+            workloads=workloads,
+            solution=python_solution,
+            config=config,
+            output_dir=output_dir,
+            keep_output_dir=False,
+        ) as pkg:
+            assert pkg.output_dir.exists()
+
+        assert not output_dir.exists()
 
 
 # ── compile() ─────────────────────────────────────────────────────────────────

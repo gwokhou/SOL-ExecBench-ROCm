@@ -103,6 +103,7 @@ class ProblemPackager:
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.keep_output_dir = keep_output_dir
+        self._closed = False
 
         self.definition = definition
         self.workloads = workloads
@@ -121,6 +122,19 @@ class ProblemPackager:
         self._write_sources()
 
     def __del__(self):
+        self.close()
+
+    def __enter__(self) -> "ProblemPackager":
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        self.close()
+
+    def close(self) -> None:
+        """Release the staging directory when this packager owns cleanup."""
+        if self._closed:
+            return
+        self._closed = True
         if not self.keep_output_dir:
             shutil.rmtree(self.output_dir, ignore_errors=True)
 

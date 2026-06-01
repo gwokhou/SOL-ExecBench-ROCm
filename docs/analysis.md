@@ -146,8 +146,8 @@ Before user code is imported, the evaluation driver statically reviews submitted
 source text for exploit patterns that can distort correctness or timing. Blocked
 patterns include non-default stream creation, data-pointer or content-keyed
 semantic caches, unauthorized file I/O, embedded payload decoding, dynamic native
-loading, subprocess or network access, and precision downgrades for float32
-output contracts.
+loading, subprocess or shell process execution, network access, and precision
+downgrades for float32 output contracts.
 
 The review emits `REWARD_HACK` traces with rule names such as
 `hidden_async_stream`, `semantic_output_cache`,
