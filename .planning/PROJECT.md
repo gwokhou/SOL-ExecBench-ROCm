@@ -18,7 +18,7 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 **Shipped version:** v1.24 Dataset Batch Run Trustworthiness,
 completed 2026-06-01.
 
-**Current milestone:** None defined.
+**Current milestone:** v1.25 Engineering Prerelease.
 
 **Queued milestone:** None defined.
 
@@ -31,7 +31,10 @@ reliable, diagnosable, and maintainable by hardening no-trace diagnostics,
 staged Python imports, native compile option validation, and generated
 eval-driver responsibility boundaries.
 
-**Next milestone goal:** Not yet defined.
+**Next milestone goal:** Prepare the current ROCm port for an engineering
+prerelease by validating release-candidate behavior, support-matrix wording,
+claim boundaries, release materials, and first-run user workflows without
+expanding paper-parity, leaderboard, CDNA4, or hard-sandbox claims.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline.
 Milestones v1.1-v1.6 added CDNA 3 code/schema support, maintained residue
@@ -110,6 +113,33 @@ The v1.24 milestone hardened dataset batch trustworthiness by extracting reuse
 policy, centralizing closure/evidence record construction, documenting the
 failure-mode regression matrix, and adding deterministic sharding plan/merge
 helpers without changing default dataset CLI behavior.
+
+## Current Milestone: v1.25 Engineering Prerelease
+
+**Goal:** Turn the v1.24 ROCm port state into an engineering prerelease /
+release-candidate package that external users can install, validate, and
+interpret without overstated research or hardware claims.
+
+**Target features:**
+- Release-candidate validation coverage for CPU-safe tests, focused ROCm/Docker
+  smoke checks, and a bounded dataset slice.
+- A clear support matrix that distinguishes RDNA 4 evidence, container
+  user-space evidence, MI300X/CDNA3 deferred full-suite validation, and
+  unavailable CDNA4 validation.
+- Release documentation and claim wording that prevent accidental paper-parity,
+  leaderboard, hard-sandbox, upstream SOLAR, or CDNA4 validation claims.
+- A polished first-run path for installation, example execution, trace
+  generation, result interpretation, and failure diagnosis.
+
+**Explicitly deferred:**
+- Full 235-problem paper-scale validation and upstream SOLAR parity.
+- MI300X/CDNA3 full-suite hardware validation unless a complete evidence chain
+  is produced separately.
+- CDNA4 validation because suitable hardware is not currently available.
+- Hosted leaderboard, remote submission operations, or hard multi-tenant
+  sandboxing.
+- Large PyTorch/ROCm dependency relocking or Docker privilege-model redesign
+  unless release validation exposes a blocking issue.
 
 ## Recently Shipped Milestone: v1.24 Dataset Batch Run Trustworthiness
 
