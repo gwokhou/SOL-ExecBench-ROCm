@@ -35,9 +35,9 @@ because suitable hardware is not currently accessible.
 
 ## Phases
 
-- [ ] **Phase 114: Release-Candidate Validation** - Maintainers can run and
+- [x] **Phase 114: Release-Candidate Validation** - Maintainers can run and
   interpret bounded prerelease validation across CPU-safe, ROCm/Docker smoke,
-  and dataset-slice checks.
+  and dataset-slice checks. (completed 2026-06-01)
 - [ ] **Phase 115: Support Matrix Boundaries** - Users can understand exactly
   which ROCm hardware and environment evidence the prerelease supports.
 - [ ] **Phase 116: Claim Boundary Guardrails** - Release wording and checks
@@ -65,7 +65,9 @@ recorded release-candidate checks before publishing.
      trust, and known-gap artifacts.
   4. Maintainer can classify every release-validation failure as blocking,
      deferred, or diagnostic-only with an explicit next action.
-**Plans**: TBD
+**Plans**:
+  - `114-01-PLAN.md` - Add bounded release-candidate validation wrapper,
+    docs, and CPU-safe regression coverage.
 
 ### Phase 115: Support Matrix Boundaries
 **Goal**: Users can interpret prerelease support accurately across RDNA 4,
@@ -134,7 +136,7 @@ Phases execute in numeric order: 114 -> 115 -> 116 -> 117 -> 118.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 114. Release-Candidate Validation | 0/TBD | Not started | - |
+| 114. Release-Candidate Validation | 1/1 | Complete | 2026-06-01 |
 | 115. Support Matrix Boundaries | 0/TBD | Not started | - |
 | 116. Claim Boundary Guardrails | 0/TBD | Not started | - |
 | 117. First-Run User Path | 0/TBD | Not started | - |
@@ -142,5 +144,6 @@ Phases execute in numeric order: 114 -> 115 -> 116 -> 117 -> 118.
 
 **Coverage:**
 - v1.25 requirements mapped: 18/18
+- v1.25 requirements complete: 4/18
 - Orphaned requirements: 0
 - Duplicate requirement mappings: 0
