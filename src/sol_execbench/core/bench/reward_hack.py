@@ -190,7 +190,7 @@ _RISKY_IMPORT_ROOTS = {
     "subprocess",
     "urllib",
 }
-_RISKY_FILE_CALLS = {"open", "Path"}
+_RISKY_FILE_CALLS = {"open", "Path", "pathlib.Path"}
 _RISKY_DECODE_CALLS = {"eval", "exec", "compile", "__import__"}
 _RISKY_METHODS = {"read_text", "write_text", "load_library", "load", "load_inline"}
 _CACHE_METHODS = {"data_ptr", "tobytes"}
@@ -251,18 +251,30 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
         self.content = content
         self.float32_contract = float32_contract
         self.issues: list[SourceReviewIssue] = []
+        self.aliases: dict[str, str] = {}
 
     def visit_Import(self, node: ast.Import) -> None:
         for alias in node.names:
             root = alias.name.split(".", maxsplit=1)[0]
+            local_name = alias.asname or root
+            self.aliases[local_name] = alias.name
             if root in _RISKY_IMPORT_ROOTS:
                 self._add("unauthorized_file_or_loader", node, alias.name)
         self.generic_visit(node)
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
-        root = (node.module or "").split(".", maxsplit=1)[0]
+        module = node.module or ""
+        root = module.split(".", maxsplit=1)[0]
         if root in _RISKY_IMPORT_ROOTS:
-            self._add("unauthorized_file_or_loader", node, node.module or "")
+            self._add("unauthorized_file_or_loader", node, module)
+        for alias in node.names:
+            if alias.name == "*":
+                continue
+            local_name = alias.asname or alias.name
+            imported_name = f"{module}.{alias.name}" if module else alias.name
+            self.aliases[local_name] = imported_name
+            if module == "os" and _is_process_attr(alias.name):
+                self._add("unauthorized_file_or_loader", node, imported_name)
         self.generic_visit(node)
 
     def visit_Assign(self, node: ast.Assign) -> None:
@@ -281,7 +293,7 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_Call(self, node: ast.Call) -> None:
-        name = _dotted_name(node.func)
+        name = self._resolved_name(node.func)
         if self._is_hidden_stream_call(name):
             self._add("hidden_async_stream", node, name)
         if self._is_cache_call(name):
@@ -293,7 +305,7 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_Attribute(self, node: ast.Attribute) -> None:
-        if self.float32_contract and _dotted_name(node) in _PRECISION_DTYPE_NAMES:
+        if self.float32_contract and self._resolved_name(node) in _PRECISION_DTYPE_NAMES:
             self._add("precision_downgrade", node, self._node_source(node))
         self.generic_visit(node)
 
@@ -339,31 +351,49 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
             "load_inline",
         }:
             return True
-        if name.endswith(tuple(f".{method}" for method in _RISKY_METHODS)):
+        if name in _RISKY_METHODS or name.endswith(
+            tuple(f".{method}" for method in _RISKY_METHODS)
+        ):
             return True
         if name.startswith("os.") and _is_process_attr(name.rsplit(".", 1)[-1]):
             return True
-        return _is_risky_getattr_call(node)
+        if name.startswith("subprocess.") or name.startswith("socket."):
+            return True
+        return self._is_risky_getattr_call(node)
 
     def _is_precision_downgrade_call(self, node: ast.Call, name: str) -> bool:
         if name.endswith(tuple(f".{attr}" for attr in _PRECISION_ATTRS)):
             return True
         if name.endswith(".to"):
             return any(
-                _dotted_name(arg) in _PRECISION_DTYPE_NAMES for arg in node.args
+                self._resolved_name(arg) in _PRECISION_DTYPE_NAMES for arg in node.args
             ) or any(
-                _dotted_name(keyword.value) in _PRECISION_DTYPE_NAMES
+                self._resolved_name(keyword.value) in _PRECISION_DTYPE_NAMES
                 for keyword in node.keywords
             )
         return False
 
     def _check_decorators(self, decorators: list[ast.expr]) -> None:
         for decorator in decorators:
-            name = _dotted_name(
+            name = self._resolved_name(
                 decorator.func if isinstance(decorator, ast.Call) else decorator
             )
             if name in {"functools.lru_cache", "lru_cache"}:
                 self._add("semantic_output_cache", decorator, self._node_source(decorator))
+
+    def _is_risky_getattr_call(self, node: ast.Call) -> bool:
+        if self._resolved_name(node.func) != "getattr" or len(node.args) < 2:
+            return False
+        if not isinstance(node.args[1], ast.Constant) or not isinstance(
+            node.args[1].value, str
+        ):
+            return False
+        attr = node.args[1].value
+        base = self._resolved_name(node.args[0])
+        return base == "os" and _is_process_attr(attr)
+
+    def _resolved_name(self, node: ast.AST) -> str:
+        return _resolve_alias(_dotted_name(node), self.aliases)
 
     def _add(self, rule_name: str, node: ast.AST, evidence: str) -> None:
         rule = _RULE_BY_NAME[rule_name]
@@ -404,20 +434,16 @@ def _dotted_name(node: ast.AST) -> str:
     return ""
 
 
+def _resolve_alias(name: str, aliases: dict[str, str]) -> str:
+    if not name:
+        return ""
+    head, sep, tail = name.partition(".")
+    resolved = aliases.get(head, head)
+    return f"{resolved}{sep}{tail}" if sep else resolved
+
+
 def _is_process_attr(attr: str) -> bool:
     return attr in _PROCESS_ATTRS or attr.startswith(_PROCESS_PREFIXES)
-
-
-def _is_risky_getattr_call(node: ast.Call) -> bool:
-    if _dotted_name(node.func) != "getattr" or len(node.args) < 2:
-        return False
-    if not isinstance(node.args[1], ast.Constant) or not isinstance(
-        node.args[1].value, str
-    ):
-        return False
-    attr = node.args[1].value
-    base = _dotted_name(node.args[0])
-    return base == "os" and _is_process_attr(attr)
 
 
 def _match_rule(

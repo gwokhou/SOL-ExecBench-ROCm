@@ -11,8 +11,8 @@
   invalid Python fallback cases.
 - Expanded detection for risky imports, direct file/process/network calls,
   dynamic imports, `getattr(__import__("os"), "system")`, native loader calls,
-  non-default stream calls, semantic cache patterns, decorator cache patterns,
-  and float32 precision downgrades.
+  import aliases, non-default stream calls, semantic cache patterns, decorator
+  cache patterns, and float32 precision downgrades.
 - Added structured `SourceReview.to_dict()` evidence to blocking messages under
   `structured_evidence=...`.
 - Added regression tests for AST-detected bypass families, string/comment false
@@ -23,7 +23,7 @@
 ## Verification
 
 - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest tests/sol_execbench/core/bench/test_reward_hack.py -q`
-  - 47 passed
+  - 51 passed
 - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest tests/sol_execbench/driver/test_eval_driver.py -q`
   - 20 passed
 - `UV_CACHE_DIR=/tmp/uv-cache uv run ruff check src/sol_execbench/core/bench/reward_hack.py tests/sol_execbench/core/bench/test_reward_hack.py`
@@ -38,4 +38,3 @@
 - BOUNDARY-03 complete: blocking messages include structured review evidence.
 - BOUNDARY-04 complete: README and architecture docs state the non-sandbox
   boundary.
-
