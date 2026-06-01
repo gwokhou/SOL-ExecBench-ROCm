@@ -18,10 +18,10 @@ ExecBench.
 
 ### Eval Driver Runtime Decomposition
 
-- [ ] **EVAL-01**: Maintainer can test eval-driver helper behavior in package unit tests before staging the generated template.
-- [ ] **EVAL-02**: Eval driver correctness setup, workload execution helpers, reward-hack check plumbing, and trace/evaluation construction are thinned where practical into importable runtime modules.
-- [ ] **EVAL-03**: Generated `eval_driver.py` remains responsible only for staging-directory orchestration, dynamic imports, subprocess execution context, and trace emission glue.
-- [ ] **EVAL-04**: Driver smoke tests continue to prove staged template behavior for PyTorch ROCm, HIP/C++ where available, reward-hack outcomes, and error-status priority.
+- [x] **EVAL-01**: Maintainer can test eval-driver helper behavior in package unit tests before staging the generated template.
+- [x] **EVAL-02**: Eval driver correctness setup, workload execution helpers, reward-hack check plumbing, and trace/evaluation construction are thinned where practical into importable runtime modules.
+- [x] **EVAL-03**: Generated `eval_driver.py` remains responsible only for staging-directory orchestration, dynamic imports, subprocess execution context, and trace emission glue.
+- [x] **EVAL-04**: Driver smoke tests continue to prove staged template behavior for PyTorch ROCm, HIP/C++ where available, reward-hack outcomes, and error-status priority.
 
 ### Analysis Module Decomposition
 
@@ -86,10 +86,10 @@ ExecBench.
 | DATASET-03 | Phase 94 | Complete |
 | DATASET-04 | Phase 94 | Complete |
 | DATASET-05 | Phase 94 | Complete |
-| EVAL-01 | Phase 95 | Planned |
-| EVAL-02 | Phase 95 | Planned |
-| EVAL-03 | Phase 95 | Planned |
-| EVAL-04 | Phase 95 | Planned |
+| EVAL-01 | Phase 95 | Complete |
+| EVAL-02 | Phase 95 | Complete |
+| EVAL-03 | Phase 95 | Complete |
+| EVAL-04 | Phase 95 | Complete |
 | ANALYSIS-01 | Phase 96 | Planned |
 | ANALYSIS-02 | Phase 96 | Planned |
 | ANALYSIS-03 | Phase 97 | Planned |
@@ -106,7 +106,7 @@ ExecBench.
 | DOCS-04 | Phase 99 | Planned |
 
 **Coverage:**
-- v1 requirements: 23 total, 5 complete
+- v1 requirements: 23 total, 9 complete
 - Mapped to phases: 23
 - Unmapped: 0
 
