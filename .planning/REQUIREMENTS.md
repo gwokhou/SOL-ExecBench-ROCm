@@ -99,29 +99,29 @@ ExecBench.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RCVAL-01 | TBD | Pending |
-| RCVAL-02 | TBD | Pending |
-| RCVAL-03 | TBD | Pending |
-| RCVAL-04 | TBD | Pending |
-| SUPPORT-01 | TBD | Pending |
-| SUPPORT-02 | TBD | Pending |
-| SUPPORT-03 | TBD | Pending |
-| SUPPORT-04 | TBD | Pending |
-| CLAIM-01 | TBD | Pending |
-| CLAIM-02 | TBD | Pending |
-| CLAIM-03 | TBD | Pending |
-| FIRST-01 | TBD | Pending |
-| FIRST-02 | TBD | Pending |
-| FIRST-03 | TBD | Pending |
-| FIRST-04 | TBD | Pending |
-| REL-01 | TBD | Pending |
-| REL-02 | TBD | Pending |
-| REL-03 | TBD | Pending |
+| RCVAL-01 | Phase 114 | Pending |
+| RCVAL-02 | Phase 114 | Pending |
+| RCVAL-03 | Phase 114 | Pending |
+| RCVAL-04 | Phase 114 | Pending |
+| SUPPORT-01 | Phase 115 | Pending |
+| SUPPORT-02 | Phase 115 | Pending |
+| SUPPORT-03 | Phase 115 | Pending |
+| SUPPORT-04 | Phase 115 | Pending |
+| CLAIM-01 | Phase 116 | Pending |
+| CLAIM-02 | Phase 116 | Pending |
+| CLAIM-03 | Phase 116 | Pending |
+| FIRST-01 | Phase 117 | Pending |
+| FIRST-02 | Phase 117 | Pending |
+| FIRST-03 | Phase 117 | Pending |
+| FIRST-04 | Phase 117 | Pending |
+| REL-01 | Phase 118 | Pending |
+| REL-02 | Phase 118 | Pending |
+| REL-03 | Phase 118 | Pending |
 
 **Coverage:**
 - v1.25 requirements: 18 total
-- Mapped to phases: 0
-- Unmapped: 18
+- Mapped to phases: 18
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-06-01*
