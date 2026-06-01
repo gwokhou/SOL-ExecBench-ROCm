@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.22
 milestone_name: Concern Closure and Execution Boundary Hardening
-status: ready_to_plan
-stopped_at: Phase 104 complete (1/1) — ready to discuss Phase 105
-last_updated: 2026-06-01T05:56:46.007Z
-last_activity: 2026-06-01 -- Phase 104 complete
+status: executing
+stopped_at: Phase 105 planned (1 plan) — ready to execute
+last_updated: "2026-06-01T05:58:23.071Z"
+last_activity: 2026-06-01 -- Phase 105 planning complete
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 6
+  total_plans: 7
   completed_plans: 6
   percent: 83
 ---
@@ -27,8 +27,8 @@ See: `.planning/PROJECT.md` (updated 2026-06-01)
 
 Phase: 105 of 105 (concern map stewardship)
 Plan: Not started
-Status: Ready to plan
-Last activity: 2026-06-01
+Status: Ready to execute
+Last activity: 2026-06-01 -- Phase 105 planning complete
 
 Progress: [..........] 0%
 
@@ -49,7 +49,7 @@ Progress: [..........] 0%
 | 102. Source Review And Boundary Evidence | 0/1 | Ready to execute | n/a |
 | 103. Scoring And Static Evidence Fixtures | 1/1 | Complete | n/a |
 | 104. Dependency And Closure Guardrails | 1/1 | Complete | n/a |
-| 105. Concern Map Stewardship | 0/TBD | Not started | n/a |
+| 105. Concern Map Stewardship | 0/1 | Ready to execute | n/a |
 | 100 | 2 | - | - |
 | 101 | 1 | - | - |
 | 102 | 1 | - | - |
@@ -93,9 +93,9 @@ None.
 ## Session Continuity
 
 Last session: 2026-06-01
-Stopped at: Phase 104 complete; ready to plan Phase 105.
+Stopped at: Phase 105 planned; ready to execute.
 Resume file: None
 
 ## Operator Next Steps
 
-- Run `$gsd-plan-phase 105`.
+- Run `$gsd-execute-phase 105`.

@@ -23,9 +23,9 @@
 
 **Active milestone:** v1.22 Concern Closure and Execution Boundary Hardening.
 
-**Status:** Ready to plan Phase 105.
+**Status:** Ready to execute Phase 105.
 
-**Next step:** Run `$gsd-plan-phase 105`.
+**Next step:** Run `$gsd-execute-phase 105`.
 
 ## Phases
 
@@ -106,7 +106,8 @@
   1. `CONCERNS.md` preserves milestone-management context for recently narrowed, still actionable, accepted, and externally deferred concerns.
   2. v1.22 completion updates each in-scope concern as fixed, narrowed, or carried forward with evidence.
   3. Out-of-scope items remain explicit: CDNA3, MI300X, CDNA4 validation, paper-scale parity, leaderboard readiness, and complete hard sandboxing.
-**Plans**: TBD
+**Plans**:
+  - `105-01-PLAN.md` - Update CONCERNS.md with v1.22 outcomes and deferred boundaries.
 
 ## Progress
 
@@ -120,7 +121,7 @@ Phases execute in numeric order: 100 -> 101 -> 102 -> 103 -> 104 -> 105.
 | 102. Source Review And Boundary Evidence | 1/1 | Complete    | 2026-06-01 |
 | 103. Scoring And Static Evidence Fixtures | 1/1 | Complete    | 2026-06-01 |
 | 104. Dependency And Closure Guardrails | 1/1 | Complete    | 2026-06-01 |
-| 105. Concern Map Stewardship | 0/TBD | Not started | - |
+| 105. Concern Map Stewardship | 0/1 | Ready to execute | - |
 
 **Coverage:**
 - Requirements mapped: 22/22
