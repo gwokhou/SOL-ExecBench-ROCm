@@ -102,3 +102,36 @@ def test_derived_evidence_for_workload_delegates_ref_and_gap_detection(tmp_path)
     assert refs["amd_score"] == "score.json"
     assert "amd_sol_bound_missing" in gaps
     assert "missing_solar_derivation" not in gaps
+
+
+def test_derived_evidence_for_workload_combines_present_refs_and_missing_gaps(tmp_path):
+    output_dir = tmp_path / "out"
+    problem_output_dir = output_dir / "L2" / "demo"
+    sol_dir = output_dir / "sol"
+    solar_dir = output_dir / "solar"
+    timing_dir = output_dir / "timing"
+    for path in (problem_output_dir, sol_dir, solar_dir, timing_dir / "L2"):
+        path.mkdir(parents=True)
+    score_report = output_dir / "score.json"
+    score_report.write_text("{}")
+    (sol_dir / "demo.w0.amd-sol-v2.json").write_text("{}")
+    (timing_dir / "L2" / "demo.timing.json").write_text("{}")
+
+    refs, gaps = derived_evidence_for_workload(
+        definition_name="demo",
+        workload_uuid="w0",
+        problem_output_dir=problem_output_dir,
+        output_dir=output_dir,
+        amd_score_report=score_report,
+        sol_bound_artifact_dir=sol_dir,
+        solar_derivation_dir=solar_dir,
+        timing_evidence_dir=timing_dir,
+        category="L2",
+    )
+
+    assert refs == {
+        "amd_score": "score.json",
+        "amd_sol_bound": "sol/demo.w0.amd-sol-v2.json",
+        "timing_evidence": "timing/L2/demo.timing.json",
+    }
+    assert gaps == ["solar_derivation_missing"]

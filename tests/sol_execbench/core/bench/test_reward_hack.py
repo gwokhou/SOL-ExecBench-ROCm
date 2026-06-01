@@ -262,6 +262,22 @@ class TestStaticSourceReview:
         assert review.blocked is True
         assert "unauthorized_file_or_loader" in {issue.rule for issue in review.issues}
 
+    @pytest.mark.parametrize(
+        "content",
+        [
+            "import pickle\npayload = pickle.loads(b'0')\ndef run(x):\n    return x\n",
+            "import importlib\nos = importlib.import_module('os')\ndef run(x):\n    return x\n",
+            "import socket\ndef run(x):\n    return x\n",
+            "from pathlib import Path\ndef run(x):\n    return Path('/tmp/x').read_text()\n",
+            "import torch\ndef run(x):\n    torch.ops.load_library('/tmp/libx.so')\n    return x\n",
+        ],
+    )
+    def test_reports_additional_file_network_loader_bypass_families(self, content):
+        review = review_solution_sources(_solution_with_source(content))
+
+        assert review.blocked is True
+        assert "unauthorized_file_or_loader" in {issue.rule for issue in review.issues}
+
     def test_allows_plain_os_import_without_process_execution(self):
         review = review_solution_sources(
             _solution_with_source(
