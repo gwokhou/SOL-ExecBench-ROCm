@@ -25,6 +25,17 @@ multi-tenant safety, CDNA3/MI300X validation, paper-scale SOLAR parity, hosted
 leaderboard authority, or one-for-one native ROCm replacement proof for every
 former NVIDIA library category. In particular, v1.21 does not provide hosted leaderboard authority.
 
+For v1.25 engineering-prerelease release notes, see
+`docs/v1_25_release_notes.md`. The canonical run artifact is Trace JSONL.
+Environment, profile, static, Matrix, closure, consistency,
+claim-upgrade, trust-summary, and release-candidate validation outputs are
+diagnostic-only sidecar evidence unless a narrower document gives them a more
+limited role. Bounded dataset slices and support-matrix rows are provisional
+prerelease evidence, not paper parity, upstream SOLAR parity, score authority,
+leaderboard readiness, hard-sandbox authority, native-host validation from
+Docker/container evidence, MI300X/CDNA3 full-suite validation, or CDNA4
+validation.
+
 | Claim level | Allowed claim | Required evidence |
 | --- | --- | --- |
 | ROCm-port evidence | The CLI, schemas, isolated evaluation, correctness checks, reward-hack checks, trace JSONL, and selected examples run through ROCm-specific paths. | Passing tests for the touched surface, canonical trace examples, and ROCm environment documentation. |
