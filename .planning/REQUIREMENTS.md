@@ -24,10 +24,10 @@ ExecBench.
 
 ### Source Review And Boundary Evidence
 
-- [ ] **BOUNDARY-01**: Source-review tests cover additional process, file, import, native loader, stream, cache, and obfuscation bypass families.
-- [ ] **BOUNDARY-02**: Python source review has an AST-aware or token-aware path for cases where regex scanning is too broad or too easy to bypass.
-- [ ] **BOUNDARY-03**: Blocked or flagged source-review outcomes are represented as structured evidence in traces, sidecars, or logs without implying hard sandboxing.
-- [ ] **BOUNDARY-04**: Public and developer docs clearly state that static review plus subprocess execution is not a hardened multi-tenant sandbox.
+- [x] **BOUNDARY-01**: Source-review tests cover additional process, file, import, native loader, stream, cache, and obfuscation bypass families.
+- [x] **BOUNDARY-02**: Python source review has an AST-aware or token-aware path for cases where regex scanning is too broad or too easy to bypass.
+- [x] **BOUNDARY-03**: Blocked or flagged source-review outcomes are represented as structured evidence in traces, sidecars, or logs without implying hard sandboxing.
+- [x] **BOUNDARY-04**: Public and developer docs clearly state that static review plus subprocess execution is not a hardened multi-tenant sandbox.
 
 ### Scoring And Evidence Fixtures
 
@@ -89,10 +89,10 @@ ExecBench.
 | EVAL-02 | Phase 101 | Complete |
 | EVAL-03 | Phase 101 | Complete |
 | EVAL-04 | Phase 101 | Complete |
-| BOUNDARY-01 | Phase 102 | Pending |
-| BOUNDARY-02 | Phase 102 | Pending |
-| BOUNDARY-03 | Phase 102 | Pending |
-| BOUNDARY-04 | Phase 102 | Pending |
+| BOUNDARY-01 | Phase 102 | Complete |
+| BOUNDARY-02 | Phase 102 | Complete |
+| BOUNDARY-03 | Phase 102 | Complete |
+| BOUNDARY-04 | Phase 102 | Complete |
 | SCORING-01 | Phase 103 | Pending |
 | SCORING-02 | Phase 103 | Pending |
 | SCORING-03 | Phase 103 | Pending |
