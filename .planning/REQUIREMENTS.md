@@ -1,115 +1,113 @@
 # Requirements: SOL ExecBench ROCm Port
 
 **Defined:** 2026-06-01
-**Milestone:** v1.21 Codebase Debt Reduction and Execution Boundary Hardening
+**Milestone:** v1.22 Concern Closure and Execution Boundary Hardening
 **Core Value:** Evaluate LLM-generated GPU kernels correctly and reproducibly
 on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL
 ExecBench.
 
 ## v1 Requirements
 
-### Dataset Runner Decomposition
+### Dataset Runner Closure
 
-- [x] **DATASET-01**: Maintainer can reason about dataset problem/workload selection through tested package helpers instead of mutable selection logic embedded only in `scripts/run_dataset.py`.
-- [x] **DATASET-02**: Maintainer can load and evaluate run-state, resume, rerun, capped workload, ready-subset, and existing-output decisions through deterministic helpers with focused tests.
-- [x] **DATASET-03**: Maintainer can construct closure/provenance records through package code that preserves bounded refs, stale-output checks, skipped statuses, and failure classification semantics.
-- [x] **DATASET-04**: Maintainer can discover and attach derived evidence refs from trace/output roots without coupling report generation to the main execution loop.
-- [x] **DATASET-05**: Existing `scripts/run_dataset.py` CLI behavior, output filenames, trace semantics, and public sidecar contracts remain backward-compatible after decomposition.
+- [ ] **DATASET-01**: Maintainer can invoke dataset problem execution through an importable runner abstraction instead of direct subprocess orchestration embedded only in `scripts/run_dataset.py`.
+- [ ] **DATASET-02**: Maintainer can construct solution wrapping and reference/custom Python source handling without global text replacement that mutates strings, comments, or legitimate identifiers.
+- [ ] **DATASET-03**: Maintainer can write dataset summaries, score reports, timing evidence refs, and closure reports through package helpers with focused tests.
+- [ ] **DATASET-04**: Dataset-scale runs preserve existing CLI behavior while exposing a safe seam for future scheduling or bounded CPU-side parallel report work.
 
-### Eval Driver Runtime Decomposition
+### Eval Driver Diagnostics
 
-- [x] **EVAL-01**: Maintainer can test eval-driver helper behavior in package unit tests before staging the generated template.
-- [x] **EVAL-02**: Eval driver correctness setup, workload execution helpers, reward-hack check plumbing, and trace/evaluation construction are thinned where practical into importable runtime modules.
-- [x] **EVAL-03**: Generated `eval_driver.py` remains responsible only for staging-directory orchestration, dynamic imports, subprocess execution context, and trace emission glue.
-- [x] **EVAL-04**: Driver smoke tests continue to prove staged template behavior for PyTorch ROCm, HIP/C++ where available, reward-hack outcomes, and error-status priority.
+- [ ] **EVAL-01**: Maintainer can test reference timing behavior through importable helpers without staging the full generated driver.
+- [ ] **EVAL-02**: When reference benchmarking is requested and reference timing fails, traces, logs, or status semantics expose that failure explicitly instead of silently leaving `reference_latency_ms` at `0.0`.
+- [ ] **EVAL-03**: Trace emission and stdout/stderr framing are covered by regression tests that prove user prints and noisy imports cannot corrupt JSONL output.
+- [ ] **EVAL-04**: Correctness/timing orchestration remains benchmark-compatible while moving avoidable pure logic out of `eval_driver.py`.
 
-### Analysis Module Decomposition
+### Source Review And Boundary Evidence
 
-- [x] **ANALYSIS-01**: AMD bound graph extraction separates graph construction, operator-family classification, and evidence annotation into smaller helpers with operation-family tests.
-- [x] **ANALYSIS-02**: AMD bound estimate formulas are grouped by family or responsibility so changes to one family can be tested without broad scoring regressions.
-- [x] **ANALYSIS-03**: SOLAR derivation separates semantic provenance, bound/formula derivation, coverage/status classification, and report rendering while preserving public sidecar schemas.
-- [x] **ANALYSIS-04**: Static kernel evidence separates artifact discovery, tool routing, raw-output parsing, bounded capture, and sidecar/report rendering behind focused helpers and fixtures.
-- [x] **ANALYSIS-05**: Refactors preserve existing AMD score, AMD SOL/SOLAR, static evidence, and claim-boundary behavior unless a requirement explicitly changes it.
+- [ ] **BOUNDARY-01**: Source-review tests cover additional process, file, import, native loader, stream, cache, and obfuscation bypass families.
+- [ ] **BOUNDARY-02**: Python source review has an AST-aware or token-aware path for cases where regex scanning is too broad or too easy to bypass.
+- [ ] **BOUNDARY-03**: Blocked or flagged source-review outcomes are represented as structured evidence in traces, sidecars, or logs without implying hard sandboxing.
+- [ ] **BOUNDARY-04**: Public and developer docs clearly state that static review plus subprocess execution is not a hardened multi-tenant sandbox.
 
-### Execution Boundary Hardening
+### Scoring And Evidence Fixtures
 
-- [x] **BOUNDARY-01**: Reward-hack tests cover additional known bypass families with malicious and allowed examples while preserving the documented regex/static-review limits.
-- [x] **BOUNDARY-02**: Clock and timing tests include representative ROCm SMI/device fixture outputs, unsupported/low-power states, and memory-pressure or timing-diagnostic guardrails that do not require real hardware.
-- [x] **BOUNDARY-03**: Static evidence tests cover partial, unavailable, failed, and toolchain-variant parser states using bounded fixtures.
-- [x] **BOUNDARY-04**: Dataset resume and closure tests cover stale traces, stale closure provenance, capped workloads, ready subsets, reruns, missing traces, and derived-evidence combinations.
-- [x] **BOUNDARY-05**: Trace/log and native-build-risk documentation explains what benchmark outputs may contain and when users must use external isolation or scrubbing before publishing.
+- [ ] **SCORING-01**: SOLAR and AMD bound derivation have family-specific golden fixtures for representative operator families and fallback behavior.
+- [ ] **SCORING-02**: Confidence/status transitions in SOLAR and AMD bound derivation are covered by focused tests independent of broad report shape tests.
+- [ ] **SCORING-03**: Static kernel evidence can consume or produce an explicit artifact manifest when build outputs are known, reducing reliance on recursive build-tree scanning.
+- [ ] **SCORING-04**: Static evidence and derived scoring changes preserve diagnostic-only authority and existing public sidecar contracts.
 
-### Documentation And Claim Guardrails
+### Dependency And Closure Guardrails
 
-- [x] **DOCS-01**: `CONCERNS.md` is updated at milestone completion to distinguish fixed, narrowed, accepted, and externally blocked concerns.
-- [x] **DOCS-02**: Public docs state that v1.21 reduces codebase debt and boundary ambiguity but does not add hard sandboxing, multi-tenant safety, CDNA3/MI300X validation, paper-scale parity, or leaderboard authority.
-- [x] **DOCS-03**: Tests guard against wording that turns diagnostic static evidence, profiler evidence, Docker/container evidence, or local AMD SOL/SOLAR interpretations into stronger claims.
-- [x] **DOCS-04**: Developer documentation explains the new helper/module boundaries for dataset execution, eval driver runtime, scoring derivation, and static evidence.
+- [ ] **GUARD-01**: ROCm wheel, Docker target, and dependency-matrix policy consistency is guarded by tests or docs checks when target metadata changes.
+- [ ] **GUARD-02**: Dataset closure provenance tests cover new sidecar refs, stale provenance combinations, and manifest/cache provenance behavior.
+- [ ] **GUARD-03**: Hardware-marker skip behavior remains explicit so CPU-safe green runs cannot be mistaken for RDNA4/CDNA3/timing validation.
+
+### Concern Map Stewardship
+
+- [ ] **DOCS-01**: `CONCERNS.md` preserves milestone-management context for recently narrowed, still actionable, accepted, and externally deferred concerns.
+- [ ] **DOCS-02**: v1.22 completion updates `CONCERNS.md` so each in-scope item is marked fixed, narrowed, or carried forward with evidence.
+- [ ] **DOCS-03**: Out-of-scope items remain explicit: CDNA3/MI300X/CDNA4 validation, paper-scale parity, leaderboard readiness, and complete hard sandboxing.
 
 ## Future Requirements
 
-### Hard Sandbox
-
-- **SANDBOX-01**: A future milestone can define a locked-down runner profile for adversarial or multi-tenant submissions with OS/container-level filesystem, network, process, and secret isolation.
-
 ### Hardware Validation
 
-- **HW-01**: A future milestone can record real CDNA3/MI300X/CDNA4 or native-host validation evidence gated by v1.20 consistency/stability and v1.21 boundary guardrails.
-- **HW-02**: CDNA 3, MI300X, CDNA 4, or native-host ROCm validation expansion remains deferred until real hardware evidence is recorded.
+- **HW-01**: A future milestone can record full CDNA3/MI300X/CDNA4 or native-host validation on real hardware.
+
+### Hardened Sandbox
+
+- **SANDBOX-01**: A future milestone can design a hardened OS/container runner for adversarial or multi-tenant submissions.
 
 ### Paper And Leaderboard Equivalence
 
-- **PAPER-01**: A future milestone can run paper-scale 235-problem validation and upstream SOLAR comparison only after evidence, hardware, and claim-upgrade prerequisites are satisfied.
-- **LEADER-01**: Hosted leaderboard readiness remains future work requiring sandboxing, policy, baseline authority, submission isolation, and operations infrastructure.
+- **PAPER-01**: A future milestone can run full 235-problem paper-scale validation and upstream SOLAR comparison.
+- **LEADER-01**: A future milestone can design hosted leaderboard submission policy, isolation, and operations.
 
 ### Dependency And Docker Policy
 
-- **DEP-01**: A future milestone can relock per ROCm target or redesign Docker privilege profiles if reproducibility or shared-runner safety becomes more important than current local benchmark ergonomics.
+- **DEP-01**: A future milestone can perform large PyTorch/ROCm relocking or Docker privilege redesign.
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Complete OS/container hard sandbox | Requires runner architecture, policy, and host isolation beyond benchmark helper refactors. |
-| CDNA 3, MI300X, CDNA 4, or native-host full-suite validation | Requires physical hardware evidence, not codebase debt reduction alone. |
-| Full 235-problem paper-scale validation or upstream SOLAR equivalence | Requires paper-scale runs and comparison evidence outside this debt-focused milestone. |
-| Hosted leaderboard or remote submission service | Requires sandboxing, anti-cheat, policy, baseline, and service infrastructure. |
-| One-for-one native ROCm replacement proof for all former NVIDIA categories | Requires broader native library workload coverage and hardware validation. |
-| Large PyTorch/ROCm dependency relocking or Docker privilege redesign | Deferred unless needed by focused tests or docs in this milestone. |
-| Changing canonical Trace, Definition, Workload, Solution, timing, correctness, score, or evaluator contract schemas | v1.21 is a refactor, test, and boundary milestone; public benchmark contracts remain stable. |
+| Full CDNA3/MI300X/CDNA4 validation | Requires real hardware evidence, not code cleanup alone. |
+| Complete hard sandbox | Requires runner architecture and host isolation work beyond this milestone. |
+| Paper-scale parity or leaderboard claims | Requires full validation evidence and policy/infrastructure. |
+| Canonical schema changes | This milestone should preserve Trace, Definition, Workload, Solution, timing, correctness, score, and evaluator contract schemas. |
+| Large dependency relock | Deferred unless needed for focused consistency guardrails. |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DATASET-01 | Phase 94 | Complete |
-| DATASET-02 | Phase 94 | Complete |
-| DATASET-03 | Phase 94 | Complete |
-| DATASET-04 | Phase 94 | Complete |
-| DATASET-05 | Phase 94 | Complete |
-| EVAL-01 | Phase 95 | Complete |
-| EVAL-02 | Phase 95 | Complete |
-| EVAL-03 | Phase 95 | Complete |
-| EVAL-04 | Phase 95 | Complete |
-| ANALYSIS-01 | Phase 96 | Complete |
-| ANALYSIS-02 | Phase 96 | Complete |
-| ANALYSIS-03 | Phase 97 | Complete |
-| ANALYSIS-04 | Phase 97 | Complete |
-| ANALYSIS-05 | Phase 97 | Complete |
-| BOUNDARY-01 | Phase 98 | Complete |
-| BOUNDARY-02 | Phase 98 | Complete |
-| BOUNDARY-03 | Phase 98 | Complete |
-| BOUNDARY-04 | Phase 98 | Complete |
-| BOUNDARY-05 | Phase 99 | Complete |
-| DOCS-01 | Phase 99 | Complete |
-| DOCS-02 | Phase 99 | Complete |
-| DOCS-03 | Phase 99 | Complete |
-| DOCS-04 | Phase 99 | Complete |
+| DATASET-01 | TBD | Pending |
+| DATASET-02 | TBD | Pending |
+| DATASET-03 | TBD | Pending |
+| DATASET-04 | TBD | Pending |
+| EVAL-01 | TBD | Pending |
+| EVAL-02 | TBD | Pending |
+| EVAL-03 | TBD | Pending |
+| EVAL-04 | TBD | Pending |
+| BOUNDARY-01 | TBD | Pending |
+| BOUNDARY-02 | TBD | Pending |
+| BOUNDARY-03 | TBD | Pending |
+| BOUNDARY-04 | TBD | Pending |
+| SCORING-01 | TBD | Pending |
+| SCORING-02 | TBD | Pending |
+| SCORING-03 | TBD | Pending |
+| SCORING-04 | TBD | Pending |
+| GUARD-01 | TBD | Pending |
+| GUARD-02 | TBD | Pending |
+| GUARD-03 | TBD | Pending |
+| DOCS-01 | TBD | Pending |
+| DOCS-02 | TBD | Pending |
+| DOCS-03 | TBD | Pending |
 
 **Coverage:**
-- v1 requirements: 23 total, 23 complete
-- Mapped to phases: 23
-- Unmapped: 0
+- v1 requirements: 22 total
+- Mapped to phases: 0
+- Unmapped: 22
 
 ---
 *Requirements defined: 2026-06-01*
