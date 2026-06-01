@@ -7,10 +7,10 @@ last_updated: "2026-06-01"
 last_activity: 2026-06-01
 progress:
   total_phases: 5
-  completed_phases: 2
-  total_plans: 2
-  completed_plans: 2
-  percent: 40
+  completed_phases: 3
+  total_plans: 3
+  completed_plans: 3
+  percent: 60
 ---
 
 # Project State
@@ -22,22 +22,22 @@ See: `.planning/PROJECT.md` (updated 2026-06-01)
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly
 on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL
 ExecBench.
-**Current focus:** v1.25 Engineering Prerelease, ready to plan Phase 116
-Claim Boundary Guardrails.
+**Current focus:** v1.25 Engineering Prerelease, ready to plan Phase 117
+First-Run User Path.
 
 ## Current Position
 
-Phase: 116 of 118 (Claim Boundary Guardrails)
+Phase: 117 of 118 (First-Run User Path)
 Plan: Not planned yet
 Status: Ready to plan
-Last activity: 2026-06-01 - Phase 115 completed
+Last activity: 2026-06-01 - Phase 116 completed
 
-Progress: [####------] 40%
+Progress: [######----] 60%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2 in v1.25
+- Total plans completed: 3 in v1.25
 - Average duration: n/a
 - Total execution time: 0h
 
@@ -47,7 +47,7 @@ Progress: [####------] 40%
 |-------|-------|-------|----------|
 | 114. Release-Candidate Validation | 1/1 | Complete | n/a |
 | 115. Support Matrix Boundaries | 1/1 | Complete | n/a |
-| 116. Claim Boundary Guardrails | 0/TBD | Not started | n/a |
+| 116. Claim Boundary Guardrails | 1/1 | Complete | n/a |
 | 117. First-Run User Path | 0/TBD | Not started | n/a |
 | 118. Release Candidate Materials | 0/TBD | Not started | n/a |
 
@@ -56,6 +56,8 @@ Progress: [####------] 40%
 - Phase 114 shipped a bounded release-candidate validation wrapper and docs.
 - Phase 115 clarified engineering prerelease support boundaries across RDNA 4,
   Docker/container ROCm user-space, MI300X/CDNA3, and unavailable CDNA4.
+- Phase 116 added v1.25 release notes and claim-boundary guardrails for
+  canonical, diagnostic-only, provisional, deferred, and unavailable evidence.
 
 ## Accumulated Context
 
@@ -74,7 +76,7 @@ Progress: [####------] 40%
 
 ### Pending Todos
 
-- Plan Phase 116.
+- Plan Phase 117.
 
 ### Blockers/Concerns
 
@@ -94,5 +96,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-06-01
-Stopped at: Phase 115 complete; ready to plan Phase 116.
+Stopped at: Phase 116 complete; ready to plan Phase 117.
 Resume file: None

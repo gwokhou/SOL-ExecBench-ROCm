@@ -21,7 +21,7 @@
 
 **Active milestone:** v1.25 Engineering Prerelease.
 
-**Status:** Ready to plan Phase 116.
+**Status:** Ready to plan Phase 117.
 
 **Milestone goal:** Turn the v1.24 ROCm port state into an engineering
 prerelease / release-candidate package that external users can install,
@@ -41,9 +41,10 @@ because suitable hardware is not currently accessible.
 - [x] **Phase 115: Support Matrix Boundaries** - Users can understand exactly
   which ROCm hardware and environment evidence the prerelease supports.
   (completed 2026-06-01)
-- [ ] **Phase 116: Claim Boundary Guardrails** - Release wording and checks
+- [x] **Phase 116: Claim Boundary Guardrails** - Release wording and checks
   prevent accidental overclaims about parity, leaderboard readiness, sandboxing,
   and unavailable hardware validation.
+  (completed 2026-06-01)
 - [ ] **Phase 117: First-Run User Path** - New users can install, run a
   minimal example, inspect trace output, and diagnose common failures.
 - [ ] **Phase 118: Release Candidate Materials** - Maintainers have the
@@ -101,7 +102,9 @@ not imply stronger research, service, parity, sandbox, or hardware authority.
      prerelease wording.
   3. User can tell which release artifacts are canonical, diagnostic-only,
      provisional, or deferred.
-**Plans**: TBD
+**Plans**:
+  - `116-01-PLAN.md` - Add v1.25 release notes, artifact authority classes,
+    and CPU-safe docs guardrails for claim boundaries.
 
 ### Phase 117: First-Run User Path
 **Goal**: New users can complete the documented first-run workflow and
@@ -142,12 +145,12 @@ Phases execute in numeric order: 114 -> 115 -> 116 -> 117 -> 118.
 |-------|----------------|--------|-----------|
 | 114. Release-Candidate Validation | 1/1 | Complete | 2026-06-01 |
 | 115. Support Matrix Boundaries | 1/1 | Complete | 2026-06-01 |
-| 116. Claim Boundary Guardrails | 0/TBD | Not started | - |
+| 116. Claim Boundary Guardrails | 1/1 | Complete | 2026-06-01 |
 | 117. First-Run User Path | 0/TBD | Not started | - |
 | 118. Release Candidate Materials | 0/TBD | Not started | - |
 
 **Coverage:**
 - v1.25 requirements mapped: 18/18
-- v1.25 requirements complete: 8/18
+- v1.25 requirements complete: 11/18
 - Orphaned requirements: 0
 - Duplicate requirement mappings: 0
