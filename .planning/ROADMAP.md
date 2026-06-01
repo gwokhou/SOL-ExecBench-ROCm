@@ -20,7 +20,7 @@
 
 **Active milestone:** v1.26 Public Prerelease and Research Preview.
 
-**Status:** Phase 119 complete; ready to plan Phase 120.
+**Status:** Phase 120 complete; ready to plan Phase 121.
 
 **Milestone goal:** Produce a publishable engineering prerelease and research
 preview package with versioned validation artifacts, release-readiness checks,
@@ -38,7 +38,7 @@ benchmark-authority claims.
 - [x] **Phase 119: Versioned Prerelease Artifact Bundle** - Maintainers can
   generate and inspect a versioned artifact bundle from a clean checkout or
   release tag.
-- [ ] **Phase 120: Release Readiness Gates** - Maintainers can run gates that
+- [x] **Phase 120: Release Readiness Gates** - Maintainers can run gates that
   block missing artifacts, stale claim boundaries, and unreviewed known gaps.
 - [ ] **Phase 121: Research Preview Evidence Package** - Researchers can read
   and trace the bounded methodology, evidence surfaces, and non-claims behind
@@ -74,7 +74,8 @@ claim-boundary regressions, or unreviewed known gaps.
   2. Gate verifies forbidden claim boundaries remain visible and unchanged.
   3. Gate reports every known gap as blocking, deferred, unavailable, or
      diagnostic-only before publishing.
-**Plans**: TBD
+**Plans**: 120-01-PLAN.md
+**Status**: Complete
 
 ### Phase 121: Research Preview Evidence Package
 **Goal**: Researchers can interpret the prerelease as a bounded research
@@ -111,13 +112,13 @@ Phases execute in numeric order: 119 -> 120 -> 121 -> 122.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 119. Versioned Prerelease Artifact Bundle | 0/TBD | Not started | - |
-| 120. Release Readiness Gates | 0/TBD | Not started | - |
+| 119. Versioned Prerelease Artifact Bundle | 1/1 | Complete | 2026-06-01 |
+| 120. Release Readiness Gates | 1/1 | Complete | 2026-06-01 |
 | 121. Research Preview Evidence Package | 0/TBD | Not started | - |
 | 122. Public Publishing Materials | 0/TBD | Not started | - |
 
 **Coverage:**
 - v1.26 requirements mapped: 12/12
-- v1.26 requirements complete: 0/12
+- v1.26 requirements complete: 6/12
 - Orphaned requirements: 0
 - Duplicate requirement mappings: 0

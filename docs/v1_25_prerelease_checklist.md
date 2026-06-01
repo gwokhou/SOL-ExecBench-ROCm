@@ -74,6 +74,14 @@ Review `prerelease_artifact_bundle.json`, `prerelease_artifact_bundle.md`, and
 to `canonical`, `diagnostic-only`, `provisional`, `deferred`, or `unavailable`
 authority classes.
 
+Run the prerelease readiness gate before preparing public release materials:
+
+```bash
+UV_CACHE_DIR=/tmp/uv-cache uv run scripts/check_prerelease_readiness.py \
+  --bundle-dir out/prerelease_artifact_bundle/v1.26.0-rc1 \
+  --output-dir out/prerelease_readiness/v1.26.0-rc1
+```
+
 ## 4. Review Claim Boundaries
 
 Review claim boundaries before tagging:
@@ -83,6 +91,7 @@ Review claim boundaries before tagging:
 - `docs/rocm.md`
 - `docs/release_candidate_validation.md`
 - `docs/prerelease_artifact_bundle.md`
+- `docs/prerelease_readiness.md`
 - `docs/GETTING-STARTED.md`
 
 Confirm the release still says:
