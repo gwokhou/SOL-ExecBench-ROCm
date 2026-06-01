@@ -331,6 +331,14 @@ class TestVerifyClocks:
         with patch(f"{_MODULE}.subprocess.run", return_value=result):
             assert verify_clocks(1, 1) is False
 
+    def test_unsupported_clock_output_without_active_levels_fails(self):
+        result = self._make_smi_result(
+            "GPU[0]\t\t: sclk clock level: N/A\n"
+            "GPU[0]\t\t: mclk clock level: unsupported\n"
+        )
+        with patch(f"{_MODULE}.subprocess.run", return_value=result):
+            assert verify_clocks(1, 1) is False
+
 
 class TestUnlockClocks:
     def test_resets_clocks_and_perf_level(self):

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.21
 milestone_name: Codebase Debt Reduction and Execution Boundary Hardening
 status: planning
-last_updated: "2026-06-01T03:51:18Z"
-last_activity: 2026-06-01 — Phase 97 complete
+last_updated: "2026-06-01T03:54:32Z"
+last_activity: 2026-06-01 — Phase 98 complete
 progress:
   total_phases: 6
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 12
-  completed_plans: 8
-  percent: 67
+  completed_plans: 10
+  percent: 83
 ---
 
 # Project State
@@ -24,10 +24,10 @@ See: `.planning/PROJECT.md` (updated 2026-06-01)
 
 ## Current Position
 
-Phase: 98 Execution Boundary Test Hardening
+Phase: 99 Boundary Documentation And Final Concern Closure
 Plan: —
-Status: Phase 97 complete; ready for Phase 98
-Last activity: 2026-06-01 — Phase 97 complete
+Status: Phase 98 complete; ready for Phase 99
+Last activity: 2026-06-01 — Phase 98 complete
 
 ## Performance Metrics
 
@@ -115,6 +115,7 @@ Last activity: 2026-06-01 — Phase 97 complete
 - [Phase 95]: Eval-driver staging and import setup moved into `sol_execbench.core.bench.eval_runtime`; `eval_driver.py` remains the subprocess integration shell for timing, trace emission, and execution-context behavior.
 - [Phase 96]: AMD bound graph classification and estimate dispatch taxonomy moved into focused helper modules; public bound graph and estimate schemas remain unchanged.
 - [Phase 97]: SOLAR derivation status/source-boundary helpers and static evidence extractor aggregation helpers were split out with focused tests; diagnostic-only sidecar authority remains unchanged.
+- [Phase 98]: Added CPU-safe boundary tests for reward-hack bypass families, unsupported ROCm SMI clock output, static evidence aggregate states, and dataset derived-evidence closure combinations.
 
 ### Pending Todos
 
@@ -168,8 +169,8 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-06-01T11:51:18+08:00
-Stopped at: Phase 97 complete
+Last session: 2026-06-01T11:54:32+08:00
+Stopped at: Phase 98 complete
 Resume file: None
 
 ## Operator Next Steps

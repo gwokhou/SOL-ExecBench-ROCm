@@ -32,9 +32,9 @@
 **Active milestone:** v1.21 Codebase Debt Reduction and Execution Boundary
 Hardening.
 
-**Status:** Phase 97 complete; ready for Phase 98 planning.
+**Status:** Phase 98 complete; ready for Phase 99 planning.
 
-**Next step:** Run `$gsd-discuss-phase 98` or `$gsd-plan-phase 98`.
+**Next step:** Run `$gsd-discuss-phase 99` or `$gsd-plan-phase 99`.
 
 ## Phases
 
@@ -42,7 +42,7 @@ Hardening.
 - [x] **Phase 95: Eval Driver Runtime Decomposition** - Maintainers can test more evaluator behavior in package modules while preserving staged template smoke coverage.
 - [x] **Phase 96: AMD Bound Graph And Estimate Modularization** - Maintainers can change AMD bound graph extraction and estimate formulas by operation family with focused tests.
 - [x] **Phase 97: SOLAR Derivation And Static Evidence Modularization** - Maintainers can work on SOLAR derivation and static evidence through isolated provenance, parser, status, and rendering helpers.
-- [ ] **Phase 98: Execution Boundary Test Hardening** - Known fragile areas gain CPU-safe and ROCm-aware tests for reward-hack, clock/timing, static evidence, and dataset closure edge cases.
+- [x] **Phase 98: Execution Boundary Test Hardening** - Known fragile areas gain CPU-safe and ROCm-aware tests for reward-hack, clock/timing, static evidence, and dataset closure edge cases.
 - [ ] **Phase 99: Boundary Documentation And Final Concern Closure** - Public docs, guardrails, and `CONCERNS.md` accurately separate fixed debt, narrowed risks, accepted limits, and future external work.
 
 ## Phase Details
@@ -110,8 +110,8 @@ Hardening.
   3. Static evidence tests cover partial, unavailable, failed, and parser-sensitive toolchain outputs through fixtures.
   4. Dataset resume/closure tests cover stale traces, stale closure provenance, capped workloads, ready subsets, reruns, missing traces, and derived evidence combinations.
 **Plans**:
-  - [ ] 98-01 Reward-Hack And Clock Timing Coverage
-  - [ ] 98-02 Static Evidence And Dataset Closure Coverage
+  - [x] 98-01 Reward-Hack And Clock Timing Coverage
+  - [x] 98-02 Static Evidence And Dataset Closure Coverage
 
 ### Phase 99: Boundary Documentation And Final Concern Closure
 **Goal**: Researchers and maintainers can see which `CONCERNS.md` items were fixed, narrowed, accepted, or deferred to external evidence/runner work.
@@ -138,11 +138,11 @@ Phases execute in numeric order: 94 -> 95 -> 96 -> 97 -> 98 -> 99.
 | 95. Eval Driver Runtime Decomposition | 2/2 | Complete | 2026-06-01 |
 | 96. AMD Bound Graph And Estimate Modularization | 2/2 | Complete | 2026-06-01 |
 | 97. SOLAR Derivation And Static Evidence Modularization | 2/2 | Complete | 2026-06-01 |
-| 98. Execution Boundary Test Hardening | 0/2 | Planned | — |
+| 98. Execution Boundary Test Hardening | 2/2 | Complete | 2026-06-01 |
 | 99. Boundary Documentation And Final Concern Closure | 0/2 | Planned | — |
 
 **Coverage:**
 - Requirements mapped: 23/23
-- Requirements complete: 14/23
+- Requirements complete: 18/23
 - Flow count: 6 phases
 - Residual blockers: 0

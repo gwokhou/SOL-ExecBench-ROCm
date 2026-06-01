@@ -33,10 +33,10 @@ ExecBench.
 
 ### Execution Boundary Hardening
 
-- [ ] **BOUNDARY-01**: Reward-hack tests cover additional known bypass families with malicious and allowed examples while preserving the documented regex/static-review limits.
-- [ ] **BOUNDARY-02**: Clock and timing tests include representative ROCm SMI/device fixture outputs, unsupported/low-power states, and memory-pressure or timing-diagnostic guardrails that do not require real hardware.
-- [ ] **BOUNDARY-03**: Static evidence tests cover partial, unavailable, failed, and toolchain-variant parser states using bounded fixtures.
-- [ ] **BOUNDARY-04**: Dataset resume and closure tests cover stale traces, stale closure provenance, capped workloads, ready subsets, reruns, missing traces, and derived-evidence combinations.
+- [x] **BOUNDARY-01**: Reward-hack tests cover additional known bypass families with malicious and allowed examples while preserving the documented regex/static-review limits.
+- [x] **BOUNDARY-02**: Clock and timing tests include representative ROCm SMI/device fixture outputs, unsupported/low-power states, and memory-pressure or timing-diagnostic guardrails that do not require real hardware.
+- [x] **BOUNDARY-03**: Static evidence tests cover partial, unavailable, failed, and toolchain-variant parser states using bounded fixtures.
+- [x] **BOUNDARY-04**: Dataset resume and closure tests cover stale traces, stale closure provenance, capped workloads, ready subsets, reruns, missing traces, and derived-evidence combinations.
 - [ ] **BOUNDARY-05**: Trace/log and native-build-risk documentation explains what benchmark outputs may contain and when users must use external isolation or scrubbing before publishing.
 
 ### Documentation And Claim Guardrails
@@ -95,10 +95,10 @@ ExecBench.
 | ANALYSIS-03 | Phase 97 | Complete |
 | ANALYSIS-04 | Phase 97 | Complete |
 | ANALYSIS-05 | Phase 97 | Complete |
-| BOUNDARY-01 | Phase 98 | Planned |
-| BOUNDARY-02 | Phase 98 | Planned |
-| BOUNDARY-03 | Phase 98 | Planned |
-| BOUNDARY-04 | Phase 98 | Planned |
+| BOUNDARY-01 | Phase 98 | Complete |
+| BOUNDARY-02 | Phase 98 | Complete |
+| BOUNDARY-03 | Phase 98 | Complete |
+| BOUNDARY-04 | Phase 98 | Complete |
 | BOUNDARY-05 | Phase 99 | Planned |
 | DOCS-01 | Phase 99 | Planned |
 | DOCS-02 | Phase 99 | Planned |
@@ -106,7 +106,7 @@ ExecBench.
 | DOCS-04 | Phase 99 | Planned |
 
 **Coverage:**
-- v1 requirements: 23 total, 14 complete
+- v1 requirements: 23 total, 18 complete
 - Mapped to phases: 23
 - Unmapped: 0
 
