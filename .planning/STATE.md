@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.22
 milestone_name: Concern Closure and Execution Boundary Hardening
-status: ready_to_plan
-stopped_at: Phase 102 complete (1/1) — ready to discuss Phase 103
-last_updated: 2026-06-01T05:42:20.799Z
-last_activity: 2026-06-01 -- Phase 102 complete
+status: executing
+stopped_at: Phase 103 planned (1 plan) — ready to execute
+last_updated: "2026-06-01T05:44:32.966Z"
+last_activity: 2026-06-01 -- Phase 103 planning complete
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 4
+  total_plans: 5
   completed_plans: 4
   percent: 50
 ---
@@ -27,8 +27,8 @@ See: `.planning/PROJECT.md` (updated 2026-06-01)
 
 Phase: 103 of 105 (scoring and static evidence fixtures)
 Plan: Not started
-Status: Ready to plan
-Last activity: 2026-06-01
+Status: Ready to execute
+Last activity: 2026-06-01 -- Phase 103 planning complete
 
 Progress: [..........] 0%
 
@@ -47,7 +47,7 @@ Progress: [..........] 0%
 | 100. Dataset Runner Execution Seams | 2/2 | Complete | n/a |
 | 101. Eval Driver Diagnostics And Framing | 1/1 | Complete | n/a |
 | 102. Source Review And Boundary Evidence | 0/1 | Ready to execute | n/a |
-| 103. Scoring And Static Evidence Fixtures | 0/TBD | Not started | n/a |
+| 103. Scoring And Static Evidence Fixtures | 0/1 | Ready to execute | n/a |
 | 104. Dependency And Closure Guardrails | 0/TBD | Not started | n/a |
 | 105. Concern Map Stewardship | 0/TBD | Not started | n/a |
 | 100 | 2 | - | - |
@@ -91,9 +91,9 @@ None.
 ## Session Continuity
 
 Last session: 2026-06-01
-Stopped at: Phase 102 planned; ready to execute.
+Stopped at: Phase 103 planned; ready to execute.
 Resume file: None
 
 ## Operator Next Steps
 
-- Run `$gsd-execute-phase 102`.
+- Run `$gsd-execute-phase 103`.
