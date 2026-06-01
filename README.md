@@ -70,6 +70,16 @@ Run a small downloaded dataset batch:
 uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark --limit 5
 ```
 
+For auditable ready-subset dataset runs, pass closure and evidence sidecars:
+
+```bash
+uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
+  --ready-subset out/ready_subset.json \
+  --readiness out/readiness.json \
+  --execution-closure out/execution_closure.json \
+  --limit 5
+```
+
 ## Usage Examples
 
 Evaluate a problem directory containing `definition.json` and `workload.jsonl`:
@@ -101,6 +111,11 @@ Common evaluator options:
 | `--profile rocprofv3` | Collect optional diagnostic `rocprofv3` profile artifacts. |
 | `--static-evidence auto` | Collect optional diagnostic static kernel evidence for native builds. |
 | `-v`, `--verbose` | Show subprocess output and staging details. |
+
+If evaluation exits without parseable trace JSONL, the CLI writes a bounded
+diagnostic-only no-trace sidecar next to `--output`, in the kept staging
+directory, or in the system temp directory. This sidecar records stdout/stderr
+tails and line counts; it is not canonical trace JSONL.
 
 ### Security Boundary
 
@@ -156,6 +171,7 @@ Legacy CUDA/NVIDIA schema values such as `cuda_cpp`, `cublas`, `cudnn`,
 - [Development](docs/DEVELOPMENT.md): local setup, coding style, source areas, and PR process.
 - [Testing](docs/TESTING.md): pytest commands, markers, CI, and hardware-sensitive checks.
 - [Configuration](docs/CONFIGURATION.md): CLI flags, benchmark config, environment variables, and Docker settings.
+- [Analysis](docs/analysis.md): trace analysis, dataset closure, failure-mode, and sharding semantics.
 - [Researcher Guide](docs/RESEARCHER-GUIDE.md): workflows for kernel, compiler/backend, agent, and reproducibility researchers.
 - [Cookbook](docs/COOKBOOK.md): task-oriented commands for common benchmark workflows.
 - [ROCm Notes](docs/rocm.md): host, Docker, and validation notes.
@@ -184,6 +200,15 @@ uv run pytest tests/
 GPU-sensitive checks use pytest markers such as `requires_rocm`,
 `requires_rocm_dev`, `requires_rdna4`, `requires_cdna3`, `requires_ck`,
 `requires_rocwmma`, and `timing_serial`.
+
+Focused CPU-safe checks for recent dataset trustworthiness helpers:
+
+```bash
+uv run pytest \
+  tests/sol_execbench/test_dataset_run_closure.py \
+  tests/sol_execbench/test_run_dataset_execution_closure.py \
+  tests/sol_execbench/test_dataset_sharding.py
+```
 
 ## Contributing
 
