@@ -26,7 +26,7 @@
   "overall_status": "claim_upgrade_blocked",
   "next_steps": [
     "Resolve consistency blocker findings.",
-    "Future CDNA3/MI300X/native-host/paper-scale validation needs explicit hardware evidence."
+    "Future CDNA3-family validation including MI300X (gfx942), native-host validation, and paper-scale validation need explicit hardware evidence."
   ],
   "claim_boundary": {
     "review_guidance_only": true,

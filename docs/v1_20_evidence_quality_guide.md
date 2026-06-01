@@ -64,8 +64,7 @@ UV_CACHE_DIR=out/v1_20_demo/uv-cache uv run scripts/report_trust_summary.py \
 
 ## Claim Boundary
 
-v1.20 does not add full 235-problem paper validation, CDNA3/MI300X/CDNA4 validation,
-native-host Matrix authority, hosted leaderboard readiness, or upstream SOLAR parity.
+v1.20 does not add full 235-problem paper validation, CDNA3-family validation including MI300X (`gfx942`), CDNA4 validation, native-host Matrix authority, hosted leaderboard readiness, or upstream SOLAR parity.
 It is not paper validation, not paper parity, not leaderboard authority,
 not native-host validation, and not new-hardware validation.
 

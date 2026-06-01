@@ -312,7 +312,10 @@ def _evidence_outcome(
         if payload is None
     ]
     next_steps = [f"Provide {name} evidence." for name in missing]
-    next_steps.append("Future CDNA3/MI300X/native-host/paper-scale validation needs explicit hardware evidence.")
+    next_steps.append(
+        "Future CDNA3-family validation including MI300X (gfx942), "
+        "native-host validation, and paper-scale validation need explicit hardware evidence."
+    )
     return TrustOutcome(
         key="evidence_completeness",
         status="evidence_missing" if missing else "reviewable",

@@ -289,7 +289,7 @@ def test_release_candidate_validation_docs_preserve_claim_boundaries():
         "hosted leaderboard readiness",
         "hard sandbox",
         "CDNA4 validation",
-        "MI300X/CDNA3 full-suite validation",
+        "full MI300X validation on the CDNA3 `gfx942` target",
     ):
         assert required in text
 

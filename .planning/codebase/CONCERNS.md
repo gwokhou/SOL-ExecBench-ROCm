@@ -164,7 +164,7 @@
 
 **CDNA 3 real-hardware closure is not complete:**
 - Problem: CDNA 3 support remains code/schema/readiness-level until full adapted suite validation is recorded.
-- Blocks: CDNA 3 hardware-validation claims and MI300X-level release claims.
+- Blocks: CDNA3-family hardware-validation claims, including MI300X (`gfx942`) release claims.
 
 ## Test Coverage Gaps
 

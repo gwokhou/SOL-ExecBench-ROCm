@@ -206,9 +206,10 @@ Known limitations for the first run:
 - A passing sample trace is ROCm-port evidence for that local command only, not
   full 235-problem paper validation.
 - Docker/container ROCm user-space evidence is not native-host validation.
-- MI300X/CDNA3 full-suite validation remains deferred without complete
-  real-hardware evidence, and CDNA4 validation is unavailable because suitable
-  hardware is not currently accessible.
+- MI300X is the concrete CDNA3 `gfx942` hardware target; full-suite MI300X
+  validation remains deferred without complete real-hardware evidence, and
+  CDNA4 validation is unavailable because suitable hardware is not currently
+  accessible.
 - PyTorch and some internal APIs may still contain CUDA-named compatibility
   symbols; those names do not mean this ROCm-only port supports NVIDIA CUDA
   runtime execution.

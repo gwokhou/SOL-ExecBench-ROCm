@@ -26,7 +26,8 @@ the project without stronger research or service claims.
 These are engineering-prerelease evidence surfaces. They do not create paper
 parity, upstream SOLAR parity, score authority, leaderboard readiness,
 hard-sandbox authority, native-host validation from container evidence, new
-hardware validation, MI300X/CDNA3 full-suite validation, or CDNA4 validation.
+hardware validation, full MI300X validation on the CDNA3 `gfx942` target, or
+CDNA4 validation.
 
 ## Artifact Authority
 
@@ -36,7 +37,7 @@ hardware validation, MI300X/CDNA3 full-suite validation, or CDNA4 validation.
 | Environment, profile, static, Matrix, closure, consistency, claim-upgrade, trust-summary, and release-candidate validation outputs | diagnostic-only sidecar | Reviewable evidence and diagnostics only; not correctness, timing, score, paper parity, leaderboard, or hardware-validation authority. |
 | Bounded dataset slices and prerelease support-matrix rows | provisional prerelease evidence | Useful for engineering prerelease review within the recorded scope; not full 235-problem paper validation. |
 | Full 235-problem paper validation, upstream SOLAR parity, hosted leaderboard readiness, and hard-sandbox authority | deferred | Outside this prerelease milestone. |
-| MI300X/CDNA3 full-suite validation | deferred | Requires a complete real-hardware evidence chain on the concrete CDNA3 target, MI300X (`gfx942`). |
+| Full MI300X validation on CDNA3 (`gfx942`) | deferred | Requires a complete real-hardware evidence chain on the concrete CDNA3 target, MI300X (`gfx942`). |
 | CDNA4 validation | unavailable | CDNA4 validation is unavailable because suitable hardware is not currently accessible. |
 
 ## Support Boundaries
@@ -62,8 +63,8 @@ hardware validation, MI300X/CDNA3 full-suite validation, or CDNA4 validation.
 
 - Full 235-problem paper validation and upstream SOLAR parity are deferred.
 - Hosted leaderboard readiness and hard multi-tenant sandboxing are deferred.
-- MI300X/CDNA3 full-suite validation is deferred until a complete real-hardware
-  evidence chain exists.
+- Full MI300X validation on the CDNA3 `gfx942` target is deferred until a
+  complete real-hardware evidence chain exists.
 - CDNA4 validation is unavailable because suitable hardware is not currently
   accessible.
 

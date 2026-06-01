@@ -16,7 +16,7 @@ V1_10_REQUIRED_NO_CLAIM_PHRASES = (
     "not NVIDIA B200 or Blackwell equivalence",
     "not hosted leaderboard readiness",
     "not new real-hardware validation",
-    "do not claim CDNA 3 / MI300X",
+    "do not claim CDNA3-family validation including MI300X",
     "CDNA 4 validation",
     "NVFP4 validation",
     "MXFP4 validation",
@@ -60,7 +60,7 @@ def test_analysis_docs_explain_v2_sidecars_and_rdna4_scope():
         "hardware_validation_status",
         "model_validation_status",
         "RDNA 4 (`gfx1200`) is the only validation",
-        "CDNA 3 / MI300X real-hardware validation and CDNA 4 validation",
+        "CDNA3-family real-hardware validation, including MI300X (`gfx942`), and CDNA 4 validation",
     ):
         assert expected in text
 
@@ -77,13 +77,13 @@ def test_v1_9_docs_do_not_make_forbidden_equivalence_or_validation_claims():
         "NVIDIA B200 equivalence is validated",
         "upstream SOLAR equivalence is validated",
         "leaderboard equivalence is validated",
-        "CDNA 3 / MI300X real-hardware validation is complete",
+        "CDNA3-family real-hardware validation including MI300X is complete",
         "CDNA 4 validation is complete",
     )
     for phrase in forbidden:
         assert phrase not in combined
     assert "not claim NVIDIA B200 equivalence" in combined
-    assert "CDNA 3 / MI300X real-hardware validation" in combined
+    assert "CDNA3-family real-hardware validation" in combined
     assert "CDNA 4 validation" in combined
 
 
@@ -106,7 +106,7 @@ def test_v1_10_docs_allow_historical_or_deferred_context_mentions():
     allowed_context = "\n".join(
         [
             "This is not NVIDIA B200 or Blackwell equivalence.",
-            "CDNA 3 / MI300X validation remains deferred.",
+            "CDNA3-family validation including MI300X remains deferred.",
             "NVFP4 validation and MXFP4 validation are not claimed.",
             "The original 124-model / 235-problem extraction is out of scope.",
             "Hosted leaderboard readiness is not provided by this milestone.",

@@ -39,7 +39,7 @@ def test_v1_20_guide_names_scripts_and_boundaries():
         "sol_execbench.claim_upgrade.v1",
         "sol_execbench.trust_summary.v1",
         "not add full 235-problem paper validation",
-        "CDNA3/MI300X/CDNA4 validation",
+        "CDNA3-family validation including MI300X (`gfx942`), CDNA4 validation",
         "native-host Matrix authority",
         "hosted leaderboard readiness",
         "upstream SOLAR parity",

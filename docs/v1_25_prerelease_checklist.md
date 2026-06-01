@@ -60,6 +60,20 @@ UV_CACHE_DIR=/tmp/uv-cache uv run scripts/release_candidate_validation.py \
   --dataset-limit 5
 ```
 
+For v1.26 and later public prerelease preparation, wrap the validation evidence
+in a versioned artifact bundle:
+
+```bash
+UV_CACHE_DIR=/tmp/uv-cache uv run scripts/build_prerelease_artifact_bundle.py \
+  --version v1.26.0-rc1 \
+  --output-dir out/prerelease_artifact_bundle/v1.26.0-rc1
+```
+
+Review `prerelease_artifact_bundle.json`, `prerelease_artifact_bundle.md`, and
+`SHA256SUMS` before publishing. The bundle maps artifacts and evidence surfaces
+to `canonical`, `diagnostic-only`, `provisional`, `deferred`, or `unavailable`
+authority classes.
+
 ## 4. Review Claim Boundaries
 
 Review claim boundaries before tagging:
@@ -68,6 +82,7 @@ Review claim boundaries before tagging:
 - `docs/CLAIMS.md`
 - `docs/rocm.md`
 - `docs/release_candidate_validation.md`
+- `docs/prerelease_artifact_bundle.md`
 - `docs/GETTING-STARTED.md`
 
 Confirm the release still says:
@@ -77,8 +92,9 @@ Confirm the release still says:
 - Bounded slices and support rows are provisional prerelease evidence.
 - Full paper validation, upstream SOLAR parity, leaderboard readiness, and hard
   sandbox authority are deferred.
-- MI300X/CDNA3 full-suite validation is deferred without complete real-hardware
-  evidence.
+- MI300X is the concrete CDNA3 `gfx942` hardware target, not a separate
+  architecture target; full-suite MI300X validation is deferred without complete
+  real-hardware evidence.
 - CDNA4 validation is unavailable because suitable hardware is not currently
   accessible.
 

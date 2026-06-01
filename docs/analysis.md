@@ -420,7 +420,7 @@ Aggregate status is conservative:
 
 Hardware model payloads carry both `hardware_validation_status` and
 `model_validation_status`. For v1.9, RDNA 4 (`gfx1200`) is the only validation
-target. CDNA 3 / MI300X real-hardware validation and CDNA 4 validation remain
+target. CDNA3-family real-hardware validation, including MI300X (`gfx942`), and CDNA 4 validation remain
 future work; reports must not present those paths as validated in this
 milestone.
 
@@ -431,7 +431,7 @@ v1.10 derived sidecars and reports support the local
 automatic SOLAR derivation evidence for this ROCm port, but they are not
 paper-scale 124-model / 235-problem extraction, not upstream SOLAR parity, not
 NVIDIA B200 or Blackwell equivalence, not hosted leaderboard readiness, and not
-new real-hardware validation. They also do not claim CDNA 3 / MI300X
+new real-hardware validation. They also do not claim CDNA3-family validation including MI300X (`gfx942`)
 validation, CDNA 4 validation, NVFP4 validation, MXFP4 validation, or any new
 hardware validation beyond the evidence explicitly recorded in the local
 artifacts.

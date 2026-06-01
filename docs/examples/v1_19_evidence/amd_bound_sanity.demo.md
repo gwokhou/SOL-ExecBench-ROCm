@@ -18,6 +18,6 @@ evidence refs and gaps without claiming an AMD SOL/SOLAR model validation.
 - no upstream SOLAR parity
 - no score authority
 - no leaderboard readiness
-- no CDNA 3/MI300X/CDNA4 validation
+- no CDNA3-family validation including MI300X and no CDNA4 validation
 - no native-host ROCm Matrix validation
 - no new-hardware validation

@@ -20,7 +20,7 @@
 
 **Active milestone:** v1.26 Public Prerelease and Research Preview.
 
-**Status:** Ready to plan Phase 119.
+**Status:** Phase 119 complete; ready to plan Phase 120.
 
 **Milestone goal:** Produce a publishable engineering prerelease and research
 preview package with versioned validation artifacts, release-readiness checks,
@@ -28,14 +28,14 @@ and bounded research interpretation that matches the project's actual ROCm
 evidence.
 
 **Explicitly deferred:** full 235-problem paper-scale validation, upstream
-SOLAR parity, hosted leaderboard, hard multi-tenant sandboxing, MI300X/CDNA3
-full-suite validation without complete real-hardware evidence, CDNA4
-validation while hardware is unavailable, and stable benchmark-authority
-claims.
+SOLAR parity, hosted leaderboard, hard multi-tenant sandboxing, full MI300X
+validation on the CDNA3 `gfx942` target without complete real-hardware
+evidence, CDNA4 validation while hardware is unavailable, and stable
+benchmark-authority claims.
 
 ## Phases
 
-- [ ] **Phase 119: Versioned Prerelease Artifact Bundle** - Maintainers can
+- [x] **Phase 119: Versioned Prerelease Artifact Bundle** - Maintainers can
   generate and inspect a versioned artifact bundle from a clean checkout or
   release tag.
 - [ ] **Phase 120: Release Readiness Gates** - Maintainers can run gates that
@@ -61,7 +61,8 @@ authority classification.
      environment evidence, and a manifest.
   3. User can map each artifact to canonical, diagnostic-only, provisional,
      deferred, or unavailable authority classes.
-**Plans**: TBD
+**Plans**: 119-01-PLAN.md
+**Status**: Complete
 
 ### Phase 120: Release Readiness Gates
 **Goal**: Maintainers can run prerelease gates that fail on missing evidence,

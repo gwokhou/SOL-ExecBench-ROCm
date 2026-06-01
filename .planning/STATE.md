@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.26
 milestone_name: Public Prerelease and Research Preview
-status: planning
-last_updated: "2026-06-01T15:04:39.223Z"
+status: executing
+last_updated: "2026-06-01T16:12:00.000Z"
 last_activity: 2026-06-01
 progress:
   total_phases: 4
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  completed_phases: 1
+  total_plans: 1
+  completed_plans: 1
+  percent: 25
 ---
 
 # Project State
@@ -23,16 +23,16 @@ See: `.planning/PROJECT.md` (updated 2026-06-01)
 on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL
 ExecBench.
 **Current focus:** v1.26 Public Prerelease and Research Preview, ready to plan
-Phase 119 Versioned Prerelease Artifact Bundle.
+Phase 120 Release Readiness Gates.
 
 ## Current Position
 
-Phase: 119 of 122 (Versioned Prerelease Artifact Bundle)
+Phase: 120 of 122 (Release Readiness Gates)
 Plan: Not planned yet
 Status: Ready to plan
-Last activity: 2026-06-01 — Milestone v1.26 roadmap created
+Last activity: 2026-06-01 — Phase 119 completed with prerelease artifact bundle workflow
 
-Progress: [----------] 0%
+Progress: [██--------] 25%
 
 ## Recent Trend
 
@@ -59,7 +59,7 @@ Progress: [----------] 0%
 
 ### Pending Todos
 
-- Plan Phase 119.
+- Plan Phase 120.
 
 ### Blockers/Concerns
 
@@ -70,7 +70,7 @@ None.
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
 | Paper validation | Full 235-problem paper-scale validation and upstream SOLAR parity | Deferred | v1.26 scope |
-| Hardware validation | MI300X/CDNA3 full-suite validation without a complete evidence chain | Deferred | v1.26 scope |
+| Hardware validation | Full MI300X validation on the CDNA3 `gfx942` target without a complete evidence chain | Deferred | v1.26 scope |
 | Hardware validation | CDNA4 validation because suitable hardware is unavailable | Deferred | v1.26 scope |
 | Operations | Hosted leaderboard or remote submission service | Deferred | v1.26 scope |
 | Security | Hard sandbox or multi-tenant adversarial execution | Deferred | v1.26 scope |

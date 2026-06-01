@@ -21,7 +21,7 @@ V1_19_NEGATIVE_CLAIMS = (
     "no upstream SOLAR parity",
     "no score authority",
     "no leaderboard readiness",
-    "no CDNA 3/MI300X/CDNA4 validation",
+    "no CDNA3-family validation including MI300X and no CDNA4 validation",
     "no native-host ROCm Matrix validation",
     "no new-hardware validation",
 )
@@ -92,7 +92,7 @@ def test_engineering_prerelease_support_matrix_boundaries():
     for required in (
         "support matrix",
         "Docker/container user-space evidence",
-        "MI300X/CDNA3 full-suite validation",
+        "full MI300X validation on the CDNA3 `gfx942` target",
         "CDNA4 validation",
     ):
         assert required in release_validation
@@ -115,7 +115,7 @@ def test_v1_25_release_notes_keep_claim_boundaries_visible():
         "upstream SOLAR parity",
         "leaderboard readiness",
         "hard-sandbox authority",
-        "MI300X/CDNA3 full-suite validation",
+        "Full MI300X validation on the CDNA3 `gfx942` target",
         "CDNA4 validation is unavailable",
         "Docker/container ROCm user-space evidence is not native-host validation",
     ):
