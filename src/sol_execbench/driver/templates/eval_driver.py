@@ -25,15 +25,13 @@ All non-JSON output (library messages, Triton JIT logs) goes to stderr.
 from __future__ import annotations
 
 import gc
-import importlib
-import importlib.util
 import json
 import os
 import sys
 import threading
 import traceback
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Optional
 
 # ── Redirect stdout → stderr BEFORE importing torch/triton ──────────────────
 # Saves the original stdout fd so we can print JSON to it later.
@@ -47,30 +45,6 @@ import torch  # noqa: E402 — must come after redirect
 # ── Staging directory ────────────────────────────────────────────────────────
 STAGING_DIR = Path(__file__).parent.resolve()
 sys.path.insert(0, str(STAGING_DIR))
-
-# ── Load problem ─────────────────────────────────────────────────────────────
-def _load_problem() -> "tuple[dict, list[dict]]":
-    """Load definition dict + workload dicts from staging directory."""
-    local_def = STAGING_DIR / "definition.json"
-    local_wkl = STAGING_DIR / "workload.jsonl"
-
-    if not local_def.exists():
-        raise RuntimeError(
-            "definition.json not found in staging directory — "
-            "client must supply definition and workloads inline"
-        )
-
-    definition = json.loads(local_def.read_text())
-    workloads: list[dict] = []
-    if local_wkl.exists():
-        for line in local_wkl.read_text().splitlines():
-            line = line.strip()
-            if line:
-                workloads.append(json.loads(line))
-    return definition, workloads
-
-
-definition_dict, _workload_dicts = _load_problem()
 
 # ── Imports from sol_execbench.core ─────────────────────────────────────────────
 from sol_execbench.core.bench.clock_lock import are_clocks_locked  # noqa: E402
@@ -94,6 +68,11 @@ from sol_execbench.core.bench.reward_hack import (  # noqa: E402
     review_solution_sources,
     snapshot_critical_functions,
 )
+from sol_execbench.core.bench.eval_runtime import (  # noqa: E402
+    load_reference_function,
+    load_staged_problem,
+    load_user_function,
+)
 from sol_execbench.core.bench.timing import time_runnable  # noqa: E402
 from sol_execbench.core.bench.utils import (  # noqa: E402
     call_and_collect_outputs,
@@ -105,11 +84,13 @@ from sol_execbench.core import (  # noqa: E402
     EvaluationStatus,
     Performance,
     Solution,
-    SupportedLanguages,
     Trace,
     Workload,
 )
 from sol_execbench.core.data.dtypes import dtype_str_to_torch_dtype  # noqa: E402
+
+# ── Load problem ─────────────────────────────────────────────────────────────
+definition_dict, _workload_dicts = load_staged_problem(STAGING_DIR)
 
 # ── Load config ───────────────────────────────────────────────────────────────
 _config_path = STAGING_DIR / "config.json"
@@ -163,23 +144,8 @@ if _source_review.blocked:
     sys.exit(0)
 
 # ── Exec reference code ───────────────────────────────────────────────────────
-# Write to a real file so decorators that call inspect.getsourcelines()
-# (e.g. @triton.jit) can read the source back.
-_ref_file = STAGING_DIR / "_reference.py"
-_ref_file.write_text(definition.reference)
-try:
-    _ref_spec = importlib.util.spec_from_file_location("_reference", _ref_file)
-    if _ref_spec is None or _ref_spec.loader is None:
-        raise RuntimeError("Unable to create module spec for reference code")
-    _ref_module = importlib.util.module_from_spec(_ref_spec)
-    _ref_spec.loader.exec_module(_ref_module)
-except Exception as _ref_err:
-    raise RuntimeError(f"Failed to exec reference code: {_ref_err}") from _ref_err
-
+_ref_module, ref_fn = load_reference_function(STAGING_DIR, definition.reference)
 ref_namespace = vars(_ref_module)
-ref_fn = ref_namespace.get("run")
-if ref_fn is None:
-    raise RuntimeError("Reference code does not define a top-level 'run' function")
 
 # ── Integrity snapshot (before user code import) ─────────────────────────────
 # Capture id() of every function that affects measurement or correctness.
@@ -201,51 +167,7 @@ _integrity_snapshot = snapshot_critical_functions(globals(), _CRITICAL_NAMES)
 _check_integrity = check_eval_integrity
 
 # ── Resolve user function ─────────────────────────────────────────────────────
-if "::" in _entry_point:
-    _entry_module_or_file, _entry_func_name = _entry_point.rsplit("::", 1)
-else:
-    _entry_module_or_file, _entry_func_name = _entry_point, "run"
-
-_NATIVE_ROCM_LANGUAGES = {
-    SupportedLanguages.HIP_CPP,
-    SupportedLanguages.HIPBLAS,
-    SupportedLanguages.MIOPEN,
-    SupportedLanguages.CK,
-    SupportedLanguages.ROCWMMA,
-}
-if any(lang in _NATIVE_ROCM_LANGUAGES for lang in _solution.spec.languages):
-    _so_path = STAGING_DIR / "benchmark_kernel.so"
-    if not _so_path.exists():
-        raise RuntimeError(f"benchmark_kernel.so not found at {_so_path}")
-    _spec_obj = importlib.util.spec_from_file_location("benchmark_kernel", _so_path)
-    if _spec_obj is None or _spec_obj.loader is None:
-        raise RuntimeError(f"Unable to create module spec for {_so_path}")
-    _user_mod = importlib.util.module_from_spec(_spec_obj)
-    _spec_obj.loader.exec_module(_user_mod)
-    user_fn = getattr(_user_mod, _entry_func_name)
-else:
-    # Block torch.utils.cpp_extension.load/load_inline on the GPU server.
-    # HIP/C++ compilation must go through the compile server
-    # (use a native language like "hip_cpp" in the solution spec).
-    import torch.utils.cpp_extension as _cpp_ext
-
-    def _blocked_cpp_ext_load(*args, **kwargs):
-        raise RuntimeError(
-            "torch.utils.cpp_extension.load() and load_inline() are not permitted "
-            'on the GPU server. Use a native HIP language (e.g. "hip_cpp") in your '
-            "solution spec to compile on the compile server."
-        )
-
-    _cpp_ext_dynamic = cast(Any, _cpp_ext)
-    _cpp_ext_dynamic.load = _blocked_cpp_ext_load
-    _cpp_ext_dynamic.load_inline = _blocked_cpp_ext_load
-
-    sys.path.insert(0, str(STAGING_DIR))
-    _mod_name = (
-        _entry_module_or_file.removesuffix(".py").replace("/", ".").replace(os.sep, ".")
-    )
-    _user_mod = importlib.import_module(_mod_name)
-    user_fn = getattr(_user_mod, _entry_func_name)
+user_fn = load_user_function(_solution, STAGING_DIR)
 
 # ── Safetensors blob roots ────────────────────────────────────────────────────
 # Priority: 1) staging dir (client-inlined blobs), 2) flashinfer-trace directory.

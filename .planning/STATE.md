@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.21
 milestone_name: Codebase Debt Reduction and Execution Boundary Hardening
 status: planning
-last_updated: "2026-06-01T03:16:53.841Z"
-last_activity: 2026-06-01 — Phase 94 complete
+last_updated: "2026-06-01T03:37:28Z"
+last_activity: 2026-06-01 — Phase 95 complete
 progress:
   total_phases: 6
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 12
-  completed_plans: 2
-  percent: 17
+  completed_plans: 4
+  percent: 33
 ---
 
 # Project State
@@ -24,10 +24,10 @@ See: `.planning/PROJECT.md` (updated 2026-06-01)
 
 ## Current Position
 
-Phase: 95 Eval Driver Runtime Decomposition
+Phase: 96 AMD Bound Graph And Estimate Modularization
 Plan: —
-Status: Phase 94 complete; ready for Phase 95
-Last activity: 2026-06-01 — Phase 94 complete
+Status: Phase 95 complete; ready for Phase 96
+Last activity: 2026-06-01 — Phase 95 complete
 
 ## Performance Metrics
 
@@ -112,6 +112,7 @@ Last activity: 2026-06-01 — Phase 94 complete
 - v1.21 must not claim hard sandboxing, multi-tenant safety, CDNA3/MI300X/CDNA4 validation, paper-scale SOLAR parity, hosted leaderboard readiness, or one-for-one native ROCm replacement proof for every former NVIDIA category.
 - v1.21 refactors and tests must preserve canonical Trace, Definition, Workload, Solution, timing, correctness, score, and evaluator contract schemas.
 - [Phase 94]: Dataset runner selection/run-state and closure/provenance helpers moved into `sol_execbench.core.dataset.run_state` and `sol_execbench.core.dataset.run_closure`; `scripts/run_dataset.py` retains thin compatibility wrappers and CLI orchestration.
+- [Phase 95]: Eval-driver staging and import setup moved into `sol_execbench.core.bench.eval_runtime`; `eval_driver.py` remains the subprocess integration shell for timing, trace emission, and execution-context behavior.
 
 ### Pending Todos
 
@@ -165,8 +166,8 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-06-01T11:16:53+08:00
-Stopped at: Phase 94 complete
+Last session: 2026-06-01T11:37:28+08:00
+Stopped at: Phase 95 complete
 Resume file: None
 
 ## Operator Next Steps

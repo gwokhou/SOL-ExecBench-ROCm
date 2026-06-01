@@ -32,14 +32,14 @@
 **Active milestone:** v1.21 Codebase Debt Reduction and Execution Boundary
 Hardening.
 
-**Status:** Phase 94 complete; ready for Phase 95 planning.
+**Status:** Phase 95 complete; ready for Phase 96 planning.
 
-**Next step:** Run `$gsd-discuss-phase 95` or `$gsd-plan-phase 95`.
+**Next step:** Run `$gsd-discuss-phase 96` or `$gsd-plan-phase 96`.
 
 ## Phases
 
 - [x] **Phase 94: Dataset Runner Decomposition** - Maintainers can modify dataset execution, resume, closure, and derived evidence behavior through tested package helpers instead of a monolithic script.
-- [ ] **Phase 95: Eval Driver Runtime Decomposition** - Maintainers can test more evaluator behavior in package modules while preserving staged template smoke coverage.
+- [x] **Phase 95: Eval Driver Runtime Decomposition** - Maintainers can test more evaluator behavior in package modules while preserving staged template smoke coverage.
 - [ ] **Phase 96: AMD Bound Graph And Estimate Modularization** - Maintainers can change AMD bound graph extraction and estimate formulas by operation family with focused tests.
 - [ ] **Phase 97: SOLAR Derivation And Static Evidence Modularization** - Maintainers can work on SOLAR derivation and static evidence through isolated provenance, parser, status, and rendering helpers.
 - [ ] **Phase 98: Execution Boundary Test Hardening** - Known fragile areas gain CPU-safe and ROCm-aware tests for reward-hack, clock/timing, static evidence, and dataset closure edge cases.
@@ -71,8 +71,8 @@ Hardening.
   3. Reward-hack check plumbing and evaluation construction preserve status priority and log behavior.
   4. Driver smoke tests continue to cover passing, invalid reference, reward-hack, runtime error, and template syntax paths.
 **Plans**:
-  - [ ] 95-01 Runtime Helper Extraction
-  - [ ] 95-02 Template Smoke And Status Guardrails
+  - [x] 95-01 Runtime Helper Extraction
+  - [x] 95-02 Template Smoke And Status Guardrails
 
 ### Phase 96: AMD Bound Graph And Estimate Modularization
 **Goal**: Maintainers can modify AMD bound graph and estimate behavior by operation family without broad unrelated scoring regressions.
@@ -135,7 +135,7 @@ Phases execute in numeric order: 94 -> 95 -> 96 -> 97 -> 98 -> 99.
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 94. Dataset Runner Decomposition | 2/2 | Complete | 2026-06-01 |
-| 95. Eval Driver Runtime Decomposition | 0/2 | Planned | — |
+| 95. Eval Driver Runtime Decomposition | 2/2 | Complete | 2026-06-01 |
 | 96. AMD Bound Graph And Estimate Modularization | 0/2 | Planned | — |
 | 97. SOLAR Derivation And Static Evidence Modularization | 0/2 | Planned | — |
 | 98. Execution Boundary Test Hardening | 0/2 | Planned | — |
@@ -143,6 +143,6 @@ Phases execute in numeric order: 94 -> 95 -> 96 -> 97 -> 98 -> 99.
 
 **Coverage:**
 - Requirements mapped: 23/23
-- Requirements complete: 5/23
+- Requirements complete: 9/23
 - Flow count: 6 phases
 - Residual blockers: 0
