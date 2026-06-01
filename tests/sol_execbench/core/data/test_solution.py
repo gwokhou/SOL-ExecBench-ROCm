@@ -7,7 +7,6 @@ import pytest
 from pydantic import ValidationError
 
 from sol_execbench.core.data.solution import (
-    BuildSpec,
     CompileOptions,
     SupportedHardware,
     SupportedLanguages,
@@ -185,3 +184,40 @@ class TestHardwareAndCompileOptions:
         )
         assert spec.compile_options is not None
         assert spec.compile_options.hip_cflags == ["--offload-arch=gfx1200"]
+
+    def test_documented_native_compile_options_remain_accepted(self):
+        spec = _make_spec(
+            languages=["hip_cpp"],
+            entry_point="kernel.hip::run",
+            compile_options={
+                "cflags": ["-Wall"],
+                "hip_cflags": ["-O3", "--offload-arch=gfx1200"],
+                "ld_flags": ["-lrocblas"],
+            },
+        )
+
+        assert spec.compile_options is not None
+        assert spec.compile_options.cflags == ["-Wall"]
+        assert spec.compile_options.hip_cflags == ["-O3", "--offload-arch=gfx1200"]
+        assert spec.compile_options.ld_flags == ["-lrocblas"]
+
+    @pytest.mark.parametrize(
+        ("field", "flag", "message"),
+        [
+            ("hip_cflags", "@/tmp/flags.rsp", "response file"),
+            ("cflags", "-I/usr/local/include", "host paths"),
+            ("cflags", "-isystem", "external path value"),
+            ("hip_cflags", "--sysroot=/opt/rocm", "host paths"),
+            ("hip_cflags", "-fplugin=/tmp/plugin.so", "host paths"),
+            ("ld_flags", "-L/usr/local/lib", "host paths"),
+            ("ld_flags", "-Wl,-rpath,/tmp/lib", "runtime linker paths"),
+            ("ld_flags", "-Wl,--dynamic-linker=/lib64/ld-linux-x86-64.so.2", "runtime linker paths"),
+        ],
+    )
+    def test_dangerous_native_compile_options_rejected(self, field, flag, message):
+        with pytest.raises(ValidationError, match=message):
+            _make_spec(
+                languages=["hip_cpp"],
+                entry_point="kernel.hip::run",
+                compile_options={field: [flag]},
+            )
