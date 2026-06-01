@@ -32,11 +32,11 @@ ExecBench.
 
 ### Claim Boundaries
 
-- [ ] **CLAIM-01**: Release docs prevent paper-parity, upstream SOLAR parity,
+- [x] **CLAIM-01**: Release docs prevent paper-parity, upstream SOLAR parity,
   leaderboard, hard-sandbox, and CDNA4 validation overclaims.
-- [ ] **CLAIM-02**: Existing claim-boundary tests or docs checks cover the
+- [x] **CLAIM-02**: Existing claim-boundary tests or docs checks cover the
   prerelease wording.
-- [ ] **CLAIM-03**: Release notes clearly state which artifacts are canonical,
+- [x] **CLAIM-03**: Release notes clearly state which artifacts are canonical,
   diagnostic-only, provisional, or deferred.
 
 ### First-Run User Path
@@ -108,9 +108,9 @@ ExecBench.
 | SUPPORT-02 | Phase 115 | Complete |
 | SUPPORT-03 | Phase 115 | Complete |
 | SUPPORT-04 | Phase 115 | Complete |
-| CLAIM-01 | Phase 116 | Pending |
-| CLAIM-02 | Phase 116 | Pending |
-| CLAIM-03 | Phase 116 | Pending |
+| CLAIM-01 | Phase 116 | Complete |
+| CLAIM-02 | Phase 116 | Complete |
+| CLAIM-03 | Phase 116 | Complete |
 | FIRST-01 | Phase 117 | Pending |
 | FIRST-02 | Phase 117 | Pending |
 | FIRST-03 | Phase 117 | Pending |
