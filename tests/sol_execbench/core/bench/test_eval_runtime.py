@@ -15,6 +15,7 @@ from sol_execbench.core.bench.eval_runtime import (
     load_reference_function,
     load_staged_problem,
     load_user_function,
+    measure_reference_latency,
     parse_entry_point,
     solution_uses_native_rocm,
 )
@@ -69,6 +70,57 @@ def test_load_reference_function_writes_real_module_file(tmp_path):
 def test_load_reference_function_requires_run(tmp_path):
     with pytest.raises(RuntimeError, match="does not define"):
         load_reference_function(tmp_path, "VALUE = 1\n")
+
+
+def test_measure_reference_latency_returns_float_latency():
+    def fake_time_fn(*args, **kwargs):
+        return 1.25
+
+    result = measure_reference_latency(
+        lambda x: x,
+        [1],
+        "cpu",
+        warmup=1,
+        rep=2,
+        time_fn=fake_time_fn,
+    )
+
+    assert result.latency_ms == 1.25
+    assert result.failure is None
+
+
+def test_measure_reference_latency_returns_failure_message_on_exception():
+    def fake_time_fn(*args, **kwargs):
+        raise RuntimeError("boom")
+
+    result = measure_reference_latency(
+        lambda x: x,
+        [1],
+        "cpu",
+        warmup=1,
+        rep=2,
+        time_fn=fake_time_fn,
+    )
+
+    assert result.latency_ms == 0.0
+    assert result.failure == "Reference timing failed: boom"
+
+
+def test_measure_reference_latency_rejects_non_numeric_latency():
+    def fake_time_fn(*args, **kwargs):
+        return "fast"
+
+    result = measure_reference_latency(
+        lambda x: x,
+        [1],
+        "cpu",
+        warmup=1,
+        rep=2,
+        time_fn=fake_time_fn,
+    )
+
+    assert result.latency_ms == 0.0
+    assert result.failure == "Reference timing returned non-numeric result: str"
 
 
 def test_load_user_function_imports_python_solution(tmp_path):

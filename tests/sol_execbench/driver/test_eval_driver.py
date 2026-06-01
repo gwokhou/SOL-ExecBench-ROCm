@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import Optional
 
 import pytest
+import torch
 
 import sol_execbench.driver as _driver_pkg
 from sol_execbench_type_helpers import make_solution
@@ -124,6 +125,24 @@ def _run_eval_driver(
     Returns:
         List of Trace dicts parsed from the driver's stdout.
     """
+    result = _run_eval_driver_process(
+        tmp_path,
+        kernel_code,
+        bench_config=bench_config,
+        extra_env=extra_env,
+        definition=definition,
+    )
+    return parse_eval_result(result.stdout, result.stderr)
+
+
+def _run_eval_driver_process(
+    tmp_path: Path,
+    kernel_code: str,
+    bench_config: Optional[dict] = None,
+    extra_env: Optional[dict] = None,
+    definition: Optional[dict] = None,
+) -> subprocess.CompletedProcess[str]:
+    """Run eval_driver.py and return the raw subprocess result."""
     (tmp_path / "eval_driver.py").write_text(build_driver())
     (tmp_path / "definition.json").write_text(
         json.dumps(definition if definition is not None else _MINIMAL_DEFINITION)
@@ -150,7 +169,7 @@ def _run_eval_driver(
     if extra_env:
         env.update(extra_env)
 
-    result = subprocess.run(
+    return subprocess.run(
         [sys.executable, "eval_driver.py"],
         cwd=tmp_path,
         env=env,
@@ -158,7 +177,6 @@ def _run_eval_driver(
         text=True,
         timeout=60,
     )
-    return parse_eval_result(result.stdout, result.stderr)
 
 
 # ---------------------------------------------------------------------------
@@ -183,6 +201,61 @@ def test_passing_solution(tmp_path):
     assert ev["status"] == "PASSED", (
         f"Expected PASSED, got {ev['status']}; log={ev.get('log')}"
     )
+
+
+def test_reference_timing_failure_is_explicit_when_requested(tmp_path):
+    """Reference timing failures should not silently look like a zero baseline."""
+    reference = (
+        "import torch\n"
+        "_calls = 0\n"
+        "def run(x, y):\n"
+        "    global _calls\n"
+        "    _calls += 1\n"
+        "    if _calls > 10:\n"
+        "        raise RuntimeError('reference timing boom')\n"
+        "    return x + y\n"
+    )
+    definition = {**_MINIMAL_DEFINITION, "reference": reference}
+    kernel = "import torch\ndef run(x, y):\n    return x + y\n"
+    traces = _run_eval_driver(
+        tmp_path,
+        kernel,
+        bench_config={
+            "lock_clocks": False,
+            "benchmark_reference": True,
+            "warmup_runs": 1,
+            "iterations": 1,
+        },
+        definition=definition,
+    )
+
+    assert len(traces) == 1
+    ev = traces[0]["evaluation"]
+    assert ev["status"] == "PASSED"
+    assert ev["performance"]["reference_latency_ms"] == 0.0
+    assert "Reference timing failed: reference timing boom" in ev.get("log", "")
+
+
+def test_noisy_user_stdout_stays_out_of_trace_jsonl(tmp_path):
+    """Import-time and run-time user prints must not corrupt stdout JSONL."""
+    kernel = (
+        "import torch\n"
+        "print('import noise from solution')\n"
+        "def run(x, y):\n"
+        "    print('run noise from solution')\n"
+        "    return x + y\n"
+    )
+
+    result = _run_eval_driver_process(tmp_path, kernel)
+    traces = parse_eval_result(result.stdout, result.stderr)
+
+    assert len(traces) == 1
+    assert traces[0]["evaluation"]["status"] == "PASSED"
+    assert all(json.loads(line) for line in result.stdout.splitlines() if line.strip())
+    assert "import noise from solution" not in result.stdout
+    assert "run noise from solution" not in result.stdout
+    assert "import noise from solution" in result.stderr
+    assert "run noise from solution" in result.stderr
 
 
 def test_monkey_patch_detected(tmp_path):
@@ -288,7 +361,10 @@ except ImportError:
     pass
 
 
-@pytest.mark.skipif(not _triton_available, reason="triton not installed")
+@pytest.mark.skipif(
+    not _triton_available or not torch.cuda.is_available(),
+    reason="triton or cuda device not available",
+)
 def test_triton_jit_reference(tmp_path):
     """Reference with @triton.jit must not crash the eval driver.
 

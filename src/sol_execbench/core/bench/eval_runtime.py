@@ -9,8 +9,10 @@ import importlib.util
 import json
 import os
 import sys
+import time
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from sol_execbench.core import Solution, SupportedLanguages
 
@@ -21,6 +23,86 @@ NATIVE_ROCM_LANGUAGES = {
     SupportedLanguages.CK,
     SupportedLanguages.ROCWMMA,
 }
+
+
+@dataclass(frozen=True)
+class ReferenceTimingResult:
+    """Result of timing the reference implementation for one workload."""
+
+    latency_ms: float
+    failure: str | None = None
+
+
+@dataclass(frozen=True)
+class TimingResult:
+    """Result of timing a callable for one workload."""
+
+    latency_ms: float
+    failure: str | None = None
+
+
+def _cpu_time_runnable(
+    fn: Callable[..., Any],
+    inputs: list[Any],
+    outputs: list[Any],
+    *,
+    warmup: int,
+    rep: int,
+) -> float:
+    for _ in range(warmup):
+        fn(*inputs, *outputs)
+
+    start = time.perf_counter()
+    for _ in range(rep):
+        fn(*inputs, *outputs)
+    elapsed = time.perf_counter() - start
+    return (elapsed / max(rep, 1)) * 1000.0
+
+
+def measure_latency(
+    fn: Callable[..., Any],
+    inputs: list[Any],
+    outputs: list[Any],
+    device: str,
+    *,
+    warmup: int,
+    rep: int,
+    time_fn: Callable[..., Any] | None = None,
+) -> TimingResult:
+    """Measure callable latency with a CPU fallback for subprocess tests."""
+    try:
+        if device == "cpu" and time_fn is None:
+            return TimingResult(
+                latency_ms=_cpu_time_runnable(
+                    fn,
+                    inputs,
+                    outputs,
+                    warmup=warmup,
+                    rep=rep,
+                )
+            )
+
+        if time_fn is None:
+            from sol_execbench.core.bench.timing import time_runnable
+
+            time_fn = time_runnable
+
+        latency_raw = time_fn(
+            fn,
+            inputs,
+            outputs,
+            device,
+            warmup=warmup,
+            rep=rep,
+        )
+        if not isinstance(latency_raw, (int, float)):
+            return TimingResult(
+                latency_ms=0.0,
+                failure=f"Timing returned non-numeric result: {type(latency_raw).__name__}",
+            )
+        return TimingResult(latency_ms=float(latency_raw))
+    except Exception as exc:
+        return TimingResult(latency_ms=0.0, failure=f"Timing failed: {exc}")
 
 
 def load_staged_problem(staging_dir: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -69,6 +151,42 @@ def load_reference_function(staging_dir: Path, reference_code: str) -> tuple[Any
     if ref_fn is None:
         raise RuntimeError("Reference code does not define a top-level 'run' function")
     return ref_module, ref_fn
+
+
+def measure_reference_latency(
+    ref_fn: Callable[..., Any],
+    inputs: list[Any],
+    device: str,
+    *,
+    warmup: int,
+    rep: int,
+    time_fn: Callable[..., Any] | None = None,
+) -> ReferenceTimingResult:
+    """Measure reference latency and return explicit diagnostics on failure."""
+    result = measure_latency(
+        ref_fn,
+        inputs,
+        [],
+        device,
+        warmup=warmup,
+        rep=rep,
+        time_fn=time_fn,
+    )
+    if result.failure is None:
+        return ReferenceTimingResult(latency_ms=result.latency_ms)
+    if result.failure.startswith("Timing returned non-numeric result: "):
+        return ReferenceTimingResult(
+            latency_ms=0.0,
+            failure=result.failure.replace(
+                "Timing returned non-numeric result",
+                "Reference timing returned non-numeric result",
+                1,
+            ),
+        )
+    return ReferenceTimingResult(
+        latency_ms=0.0,
+        failure=result.failure.replace("Timing failed", "Reference timing failed", 1),
+    )
 
 
 def solution_uses_native_rocm(solution: Solution) -> bool:
