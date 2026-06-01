@@ -81,33 +81,33 @@ ExecBench.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DATASET-01 | TBD | Pending |
-| DATASET-02 | TBD | Pending |
-| DATASET-03 | TBD | Pending |
-| DATASET-04 | TBD | Pending |
-| EVAL-01 | TBD | Pending |
-| EVAL-02 | TBD | Pending |
-| EVAL-03 | TBD | Pending |
-| EVAL-04 | TBD | Pending |
-| BOUNDARY-01 | TBD | Pending |
-| BOUNDARY-02 | TBD | Pending |
-| BOUNDARY-03 | TBD | Pending |
-| BOUNDARY-04 | TBD | Pending |
-| SCORING-01 | TBD | Pending |
-| SCORING-02 | TBD | Pending |
-| SCORING-03 | TBD | Pending |
-| SCORING-04 | TBD | Pending |
-| GUARD-01 | TBD | Pending |
-| GUARD-02 | TBD | Pending |
-| GUARD-03 | TBD | Pending |
-| DOCS-01 | TBD | Pending |
-| DOCS-02 | TBD | Pending |
-| DOCS-03 | TBD | Pending |
+| DATASET-01 | Phase 100 | Pending |
+| DATASET-02 | Phase 100 | Pending |
+| DATASET-03 | Phase 100 | Pending |
+| DATASET-04 | Phase 100 | Pending |
+| EVAL-01 | Phase 101 | Pending |
+| EVAL-02 | Phase 101 | Pending |
+| EVAL-03 | Phase 101 | Pending |
+| EVAL-04 | Phase 101 | Pending |
+| BOUNDARY-01 | Phase 102 | Pending |
+| BOUNDARY-02 | Phase 102 | Pending |
+| BOUNDARY-03 | Phase 102 | Pending |
+| BOUNDARY-04 | Phase 102 | Pending |
+| SCORING-01 | Phase 103 | Pending |
+| SCORING-02 | Phase 103 | Pending |
+| SCORING-03 | Phase 103 | Pending |
+| SCORING-04 | Phase 103 | Pending |
+| GUARD-01 | Phase 104 | Pending |
+| GUARD-02 | Phase 104 | Pending |
+| GUARD-03 | Phase 104 | Pending |
+| DOCS-01 | Phase 105 | Pending |
+| DOCS-02 | Phase 105 | Pending |
+| DOCS-03 | Phase 105 | Pending |
 
 **Coverage:**
 - v1 requirements: 22 total
-- Mapped to phases: 0
-- Unmapped: 22
+- Mapped to phases: 22
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-06-01*
