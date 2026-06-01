@@ -17,10 +17,10 @@ ExecBench.
 
 ### Eval Driver Diagnostics
 
-- [ ] **EVAL-01**: Maintainer can test reference timing behavior through importable helpers without staging the full generated driver.
-- [ ] **EVAL-02**: When reference benchmarking is requested and reference timing fails, traces, logs, or status semantics expose that failure explicitly instead of silently leaving `reference_latency_ms` at `0.0`.
-- [ ] **EVAL-03**: Trace emission and stdout/stderr framing are covered by regression tests that prove user prints and noisy imports cannot corrupt JSONL output.
-- [ ] **EVAL-04**: Correctness/timing orchestration remains benchmark-compatible while moving avoidable pure logic out of `eval_driver.py`.
+- [x] **EVAL-01**: Maintainer can test reference timing behavior through importable helpers without staging the full generated driver.
+- [x] **EVAL-02**: When reference benchmarking is requested and reference timing fails, traces, logs, or status semantics expose that failure explicitly instead of silently leaving `reference_latency_ms` at `0.0`.
+- [x] **EVAL-03**: Trace emission and stdout/stderr framing are covered by regression tests that prove user prints and noisy imports cannot corrupt JSONL output.
+- [x] **EVAL-04**: Correctness/timing orchestration remains benchmark-compatible while moving avoidable pure logic out of `eval_driver.py`.
 
 ### Source Review And Boundary Evidence
 
@@ -85,10 +85,10 @@ ExecBench.
 | DATASET-02 | Phase 100 | Complete |
 | DATASET-03 | Phase 100 | Complete |
 | DATASET-04 | Phase 100 | Complete |
-| EVAL-01 | Phase 101 | Pending |
-| EVAL-02 | Phase 101 | Pending |
-| EVAL-03 | Phase 101 | Pending |
-| EVAL-04 | Phase 101 | Pending |
+| EVAL-01 | Phase 101 | Complete |
+| EVAL-02 | Phase 101 | Complete |
+| EVAL-03 | Phase 101 | Complete |
+| EVAL-04 | Phase 101 | Complete |
 | BOUNDARY-01 | Phase 102 | Pending |
 | BOUNDARY-02 | Phase 102 | Pending |
 | BOUNDARY-03 | Phase 102 | Pending |
