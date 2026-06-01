@@ -98,6 +98,35 @@ def test_engineering_prerelease_support_matrix_boundaries():
         assert required in release_validation
 
 
+def test_v1_25_release_notes_keep_claim_boundaries_visible():
+    release_notes = _read_doc("docs/v1_25_release_notes.md")
+    claims = _read_doc("docs/CLAIMS.md")
+    release_validation = _read_doc("docs/release_candidate_validation.md")
+
+    for required in (
+        "engineering prerelease",
+        "Trace JSONL",
+        "canonical",
+        "diagnostic-only",
+        "provisional prerelease evidence",
+        "deferred",
+        "unavailable",
+        "paper parity",
+        "upstream SOLAR parity",
+        "leaderboard readiness",
+        "hard-sandbox authority",
+        "MI300X/CDNA3 full-suite validation",
+        "CDNA4 validation is unavailable",
+        "Docker/container ROCm user-space evidence is not native-host validation",
+    ):
+        assert required in release_notes
+
+    for linked_doc in (claims, release_validation):
+        assert "docs/v1_25_release_notes.md" in linked_doc
+        assert "canonical run artifact" in linked_doc
+        assert "diagnostic-only sidecar" in linked_doc
+
+
 def test_v1_21_docs_keep_debt_reduction_separate_from_external_claims():
     claims = _read_doc("docs/CLAIMS.md")
     development = _read_doc("docs/DEVELOPMENT.md")

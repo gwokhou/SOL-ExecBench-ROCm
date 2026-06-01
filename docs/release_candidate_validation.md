@@ -4,6 +4,8 @@ This guide defines the bounded engineering prerelease validation path for SOL
 ExecBench ROCm. It helps maintainers collect reviewable evidence before tagging
 a release candidate without upgrading that evidence into paper parity,
 leaderboard readiness, hard-sandbox authority, or new hardware validation.
+For the v1.25 release-claim boundary and artifact authority table, see
+`docs/v1_25_release_notes.md`.
 
 ## Command
 
@@ -111,4 +113,7 @@ It does not provide:
 
 Trace JSONL remains the canonical run artifact. Profile, static, environment,
 Matrix, closure, consistency, claim-upgrade, trust-summary, and release
-candidate validation summaries are sidecar evidence.
+candidate validation summaries are diagnostic-only sidecar evidence. Bounded
+dataset slices and support-matrix rows are provisional prerelease evidence, not
+paper, score, leaderboard, sandbox, native-host, MI300X/CDNA3 full-suite, or
+CDNA4 validation authority.
