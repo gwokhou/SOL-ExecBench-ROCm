@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.26
 milestone_name: Public Prerelease and Research Preview
-status: executing
-last_updated: "2026-06-01T16:52:00.000Z"
+status: auditing
+last_updated: "2026-06-01T17:08:00.000Z"
 last_activity: 2026-06-01
 progress:
   total_phases: 4
-  completed_phases: 3
-  total_plans: 3
-  completed_plans: 3
-  percent: 75
+  completed_phases: 4
+  total_plans: 4
+  completed_plans: 4
+  percent: 100
 ---
 
 # Project State
@@ -22,17 +22,17 @@ See: `.planning/PROJECT.md` (updated 2026-06-01)
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly
 on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL
 ExecBench.
-**Current focus:** v1.26 Public Prerelease and Research Preview, ready to plan
-Phase 122 Public Publishing Materials.
+**Current focus:** v1.26 Public Prerelease and Research Preview, ready for
+milestone audit.
 
 ## Current Position
 
 Phase: 122 of 122 (Public Publishing Materials)
-Plan: Not planned yet
-Status: Ready to plan
-Last activity: 2026-06-01 — Phase 121 completed with research preview evidence package
+Plan: Complete
+Status: Ready for milestone audit
+Last activity: 2026-06-01 — Phase 122 completed with public publishing materials
 
-Progress: [███████---] 75%
+Progress: [██████████] 100%
 
 ## Recent Trend
 
@@ -59,7 +59,7 @@ Progress: [███████---] 75%
 
 ### Pending Todos
 
-- Plan Phase 122.
+- Run milestone audit.
 
 ### Blockers/Concerns
 
