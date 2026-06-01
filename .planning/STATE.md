@@ -1,15 +1,15 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.25
-milestone_name: Engineering Prerelease
-status: ready_for_audit
+milestone: none
+milestone_name: none
+status: milestone_complete
 last_updated: "2026-06-01"
 last_activity: 2026-06-01
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 5
-  completed_plans: 5
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
   percent: 100
 ---
 
@@ -22,52 +22,28 @@ See: `.planning/PROJECT.md` (updated 2026-06-01)
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly
 on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL
 ExecBench.
-**Current focus:** v1.25 Engineering Prerelease, all phases complete and ready
-for milestone audit.
+**Current focus:** v1.25 Engineering Prerelease is complete. No active
+milestone is currently defined.
 
 ## Current Position
 
-Phase: 118 of 118 (Release Candidate Materials)
-Plan: 118-01 complete
-Status: Ready for milestone audit
-Last activity: 2026-06-01 - Phase 118 completed
+Phase: n/a
+Plan: n/a
+Status: Milestone complete
+Last activity: 2026-06-01 - v1.25 archived
 
 Progress: [##########] 100%
 
-## Performance Metrics
+## Recent Trend
 
-**Velocity:**
-- Total plans completed: 5 in v1.25
-- Average duration: n/a
-- Total execution time: 0h
-
-**By Phase:**
-
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| 114. Release-Candidate Validation | 1/1 | Complete | n/a |
-| 115. Support Matrix Boundaries | 1/1 | Complete | n/a |
-| 116. Claim Boundary Guardrails | 1/1 | Complete | n/a |
-| 117. First-Run User Path | 1/1 | Complete | n/a |
-| 118. Release Candidate Materials | 1/1 | Complete | n/a |
-
-**Recent Trend:**
+- v1.23 shipped Phases 106-109 on 2026-06-01.
 - v1.24 shipped Phases 110-113 on 2026-06-01.
-- Phase 114 shipped a bounded release-candidate validation wrapper and docs.
-- Phase 115 clarified engineering prerelease support boundaries across RDNA 4,
-  Docker/container ROCm user-space, MI300X/CDNA3, and unavailable CDNA4.
-- Phase 116 added v1.25 release notes and claim-boundary guardrails for
-  canonical, diagnostic-only, provisional, deferred, and unavailable evidence.
-- Phase 117 clarified the first-run user path, trace interpretation, no-trace
-  diagnostics, known limitations, and PyTorch ROCm compatibility wording.
-- Phase 118 added release-candidate checklist, release note navigation, README
-  entry points, and release-material guardrails.
+- v1.25 shipped Phases 114-118 on 2026-06-01.
 
 ## Accumulated Context
 
 ### Decisions
 
-- v1.25 starts at Phase 114 because v1.24 completed Phase 113.
 - v1.25 is an engineering prerelease / release-candidate milestone, not a
   paper-scale validation or hosted-service milestone.
 - MI300X is the CDNA3 hardware target; MI300X and CDNA3 are not separate
@@ -80,7 +56,7 @@ Progress: [##########] 100%
 
 ### Pending Todos
 
-- Run milestone audit.
+- Start the next milestone when ready.
 
 ### Blockers/Concerns
 
@@ -100,5 +76,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-06-01
-Stopped at: All v1.25 phases complete; ready for milestone audit.
+Stopped at: v1.25 complete and archived; ready for next milestone definition.
 Resume file: None
