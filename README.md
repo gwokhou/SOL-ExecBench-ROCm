@@ -166,6 +166,8 @@ Legacy CUDA/NVIDIA schema values such as `cuda_cpp`, `cublas`, `cudnn`,
 
 ## Documentation
 
+- [v1.25 Engineering Prerelease Notes](docs/v1_25_release_notes.md): shipped capability, validation evidence, known limitations, and deferred claims.
+- [v1.25 Prerelease Checklist](docs/v1_25_prerelease_checklist.md): maintainer checklist from clean tree to tagged release candidate.
 - [Getting Started](docs/GETTING-STARTED.md): prerequisites, installation, first run, and setup issues.
 - [Architecture](docs/ARCHITECTURE.md): package layers, data flow, subprocess isolation, and ROCm boundaries.
 - [Development](docs/DEVELOPMENT.md): local setup, coding style, source areas, and PR process.
@@ -175,10 +177,15 @@ Legacy CUDA/NVIDIA schema values such as `cuda_cpp`, `cublas`, `cudnn`,
 - [Researcher Guide](docs/RESEARCHER-GUIDE.md): workflows for kernel, compiler/backend, agent, and reproducibility researchers.
 - [Cookbook](docs/COOKBOOK.md): task-oriented commands for common benchmark workflows.
 - [ROCm Notes](docs/rocm.md): host, Docker, and validation notes.
+- [Claims](docs/CLAIMS.md): support, evidence, and forbidden claim boundaries.
 - [ROCm Timing](docs/rocm_timing.md): HIP event timing and optional profiler evidence.
 - [ROCm Toolchain Routing](docs/rocm_toolchain_routing.md): evidence tool selection and claim boundaries.
 - [Static Kernel Evidence](docs/static_kernel_evidence.md): diagnostic static artifact sidecars.
 - [Original Parity](docs/original_parity.md): CUDA-to-ROCm parity boundaries and deferred claims.
+
+For first-run troubleshooting, start with [Getting Started](docs/GETTING-STARTED.md)
+and then use [Configuration](docs/CONFIGURATION.md) for no-trace diagnostics,
+sidecar paths, Docker settings, and environment variables.
 
 Schema-specific references:
 

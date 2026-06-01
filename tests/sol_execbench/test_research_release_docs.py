@@ -150,6 +150,46 @@ def test_first_run_guide_covers_minimal_trace_and_troubleshooting():
         assert required in getting_started
 
 
+def test_v1_25_release_materials_cover_checklist_and_public_navigation():
+    checklist = _read_doc("docs/v1_25_prerelease_checklist.md")
+    release_notes = _read_doc("docs/v1_25_release_notes.md")
+    readme = _read_doc("README.md")
+
+    for required in (
+        "git status --short",
+        "UV_CACHE_DIR=/tmp/uv-cache uv run pytest",
+        "scripts/release_candidate_validation.py",
+        "Review claim boundaries",
+        "git tag -a v1.25.0-rc1",
+        "git push origin main --tags",
+    ):
+        assert required in checklist
+
+    for required in (
+        "Shipped Capability",
+        "Validation Evidence",
+        "Known Limitations",
+        "Deferred Claims",
+        "docs/v1_25_prerelease_checklist.md",
+        "docs/rocm_timing.md",
+        "docs/GETTING-STARTED.md",
+    ):
+        assert required in release_notes
+
+    for required in (
+        "v1.25 Engineering Prerelease",
+        "docs/v1_25_release_notes.md",
+        "docs/v1_25_prerelease_checklist.md",
+        "docs/rocm.md",
+        "docs/CLAIMS.md",
+        "docs/RESEARCHER-GUIDE.md",
+        "docs/rocm_timing.md",
+        "docs/GETTING-STARTED.md",
+        "troubleshooting",
+    ):
+        assert required in readme
+
+
 def test_v1_21_docs_keep_debt_reduction_separate_from_external_claims():
     claims = _read_doc("docs/CLAIMS.md")
     development = _read_doc("docs/DEVELOPMENT.md")

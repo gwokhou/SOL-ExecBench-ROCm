@@ -58,10 +58,25 @@ hardware validation, MI300X/CDNA3 full-suite validation, or CDNA4 validation.
 - No native-host ROCm validation should be inferred from Docker/container
   user-space evidence alone.
 
+## Deferred Claims
+
+- Full 235-problem paper validation and upstream SOLAR parity are deferred.
+- Hosted leaderboard readiness and hard multi-tenant sandboxing are deferred.
+- MI300X/CDNA3 full-suite validation is deferred until a complete real-hardware
+  evidence chain exists.
+- CDNA4 validation is unavailable because suitable hardware is not currently
+  accessible.
+
 ## Public Entry Points
 
+- `docs/v1_25_prerelease_checklist.md` for the maintainer release-candidate
+  checklist.
 - `docs/GETTING-STARTED.md` for first-run setup.
 - `docs/rocm.md` for ROCm support and hardware boundaries.
 - `docs/CLAIMS.md` for allowed and forbidden claim language.
 - `docs/release_candidate_validation.md` for prerelease validation commands.
 - `docs/RESEARCHER-GUIDE.md` for research workflow interpretation.
+- `docs/rocm_timing.md` for timing semantics and profiler evidence
+  boundaries.
+- `docs/CONFIGURATION.md` for troubleshooting flags, no-trace diagnostics, and
+  sidecar configuration.
