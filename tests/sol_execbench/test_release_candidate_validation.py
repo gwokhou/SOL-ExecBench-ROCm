@@ -1,0 +1,195 @@
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+from importlib.util import module_from_spec, spec_from_file_location
+from pathlib import Path
+
+import pytest
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SCRIPT_PATH = REPO_ROOT / "scripts/release_candidate_validation.py"
+SPEC = spec_from_file_location("release_candidate_validation", SCRIPT_PATH)
+assert SPEC is not None and SPEC.loader is not None
+release_candidate_validation = module_from_spec(SPEC)
+sys.modules[SPEC.name] = release_candidate_validation
+SPEC.loader.exec_module(release_candidate_validation)
+
+
+def _load_payload(output_dir: Path) -> dict:
+    return json.loads(
+        (output_dir / "release_candidate_validation.json").read_text(encoding="utf-8")
+    )
+
+
+def test_cpu_safe_validation_writes_json_and_markdown(tmp_path, monkeypatch):
+    def fake_run(command, **kwargs):
+        return subprocess.CompletedProcess(command, 0, stdout="ok", stderr="")
+
+    monkeypatch.setattr(release_candidate_validation.subprocess, "run", fake_run)
+
+    assert release_candidate_validation.main(["--output-dir", str(tmp_path)]) == 0
+
+    payload = _load_payload(tmp_path)
+    markdown = (tmp_path / "release_candidate_validation.md").read_text(encoding="utf-8")
+
+    assert payload["schema_version"] == "sol_execbench.release_candidate_validation.v1"
+    assert payload["overall_status"] == "passed"
+    assert payload["summary"]["passed"] == 1
+    assert payload["results"][0]["name"] == "cpu_safe_validation"
+    assert payload["results"][0]["status"] == "passed"
+    assert payload["results"][0]["classification"] == "diagnostic-only"
+    assert "Release Candidate Validation" in markdown
+    assert "engineering prerelease evidence only" in markdown
+
+
+def test_failing_cpu_safe_validation_is_blocking(tmp_path, monkeypatch):
+    def fake_run(command, **kwargs):
+        return subprocess.CompletedProcess(
+            command,
+            2,
+            stdout="failed",
+            stderr="SECRET_TOKEN=abc123",
+        )
+
+    monkeypatch.setattr(release_candidate_validation.subprocess, "run", fake_run)
+
+    assert release_candidate_validation.main(["--output-dir", str(tmp_path)]) == 1
+
+    payload = _load_payload(tmp_path)
+    result = payload["results"][0]
+    assert payload["overall_status"] == "blocking"
+    assert result["status"] == "failed"
+    assert result["classification"] == "blocking"
+    assert "Fix the failing CPU-safe validation command" in result["next_action"]
+    assert "abc123" not in result["stderr_tail"]
+    assert "<redacted>" in result["stderr_tail"]
+
+
+def test_rocm_smoke_records_deferred_skips_and_clock_policy(tmp_path, monkeypatch):
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        if "requires_rocm" in command:
+            return subprocess.CompletedProcess(command, 5, stdout="3 skipped requires_rocm", stderr="")
+        return subprocess.CompletedProcess(command, 0, stdout="{}", stderr="")
+
+    monkeypatch.setattr(release_candidate_validation.subprocess, "run", fake_run)
+    monkeypatch.setenv("SOL_EXECBENCH_CLOCKS_LOCKED", "1")
+    monkeypatch.setenv("SOL_EXECBENCH_GPU_CLK_MHZ", "2500")
+
+    assert (
+        release_candidate_validation.main(
+            ["--output-dir", str(tmp_path), "--include-rocm-smoke"]
+        )
+        == 0
+    )
+
+    payload = _load_payload(tmp_path)
+    by_name = {result["name"]: result for result in payload["results"]}
+    assert by_name["rocm_doctor"]["status"] == "passed"
+    assert by_name["rocm_pytest_smoke"]["classification"] == "deferred"
+    assert (
+        by_name["rocm_pytest_smoke"]["evidence"]["clock_policy"][
+            "SOL_EXECBENCH_CLOCKS_LOCKED"
+        ]
+        == "1"
+    )
+
+
+def test_docker_smoke_unavailable_is_deferred(tmp_path, monkeypatch):
+    def fake_run(command, **kwargs):
+        if command[0] == "./scripts/run_docker.sh":
+            raise FileNotFoundError(command[0])
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(release_candidate_validation.subprocess, "run", fake_run)
+
+    assert (
+        release_candidate_validation.main(
+            ["--output-dir", str(tmp_path), "--include-docker-smoke"]
+        )
+        == 0
+    )
+
+    payload = _load_payload(tmp_path)
+    docker = [result for result in payload["results"] if result["name"] == "docker_smoke"][0]
+    assert docker["status"] == "unavailable"
+    assert docker["classification"] == "deferred"
+    assert "Install or expose required command" in docker["next_action"]
+
+
+def test_dataset_slice_requires_positive_limit(tmp_path):
+    with pytest.raises(SystemExit, match="positive --dataset-limit"):
+        release_candidate_validation.main(
+            [
+                "--output-dir",
+                str(tmp_path),
+                "--include-dataset-slice",
+                "--dataset-dir",
+                "data/SOL-ExecBench/benchmark",
+                "--dataset-limit",
+                "0",
+            ]
+        )
+
+
+def test_dataset_slice_records_bounded_artifacts(tmp_path, monkeypatch):
+    def fake_run(command, **kwargs):
+        return subprocess.CompletedProcess(command, 0, stdout="ok", stderr="")
+
+    monkeypatch.setattr(release_candidate_validation.subprocess, "run", fake_run)
+
+    assert (
+        release_candidate_validation.main(
+            [
+                "--output-dir",
+                str(tmp_path),
+                "--include-dataset-slice",
+                "--dataset-dir",
+                "data/SOL-ExecBench/benchmark",
+                "--dataset-limit",
+                "5",
+            ]
+        )
+        == 0
+    )
+
+    payload = _load_payload(tmp_path)
+    by_name = {result["name"]: result for result in payload["results"]}
+    dataset = by_name["bounded_dataset_slice"]
+    assert dataset["evidence"]["dataset_limit"] == 5
+    assert "not full 235-problem paper validation" in dataset["evidence"][
+        "paper_scale_boundary"
+    ]
+    assert str(tmp_path / "execution_closure.json") in dataset["artifact_paths"]
+    assert str(tmp_path / "trust_summary.json") in by_name["trust_summary"][
+        "artifact_paths"
+    ]
+
+
+def test_release_candidate_validation_docs_preserve_claim_boundaries():
+    text = (REPO_ROOT / "docs/release_candidate_validation.md").read_text(encoding="utf-8")
+    script = (REPO_ROOT / "scripts/release_candidate_validation.py").read_text(
+        encoding="utf-8"
+    )
+
+    for required in (
+        "bounded engineering prerelease evidence",
+        "blocking",
+        "deferred",
+        "diagnostic-only",
+        "full 235-problem paper validation",
+        "upstream SOLAR parity",
+        "hosted leaderboard readiness",
+        "hard sandbox",
+        "CDNA4 validation",
+        "MI300X/CDNA3 full-suite validation",
+    ):
+        assert required in text
+
+    assert "SCHEMA_VERSION" in script
+    assert "full_235_problem_validation" in script
+    assert "mi300x_cdna3_full_suite_validated" in script
