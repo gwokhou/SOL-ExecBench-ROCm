@@ -97,9 +97,9 @@ Use these classifications when reviewing the summary:
 This validation path supports an **engineering prerelease** claim only. It
 should be interpreted alongside the support matrix in `docs/rocm.md`. In
 particular, Docker/container user-space evidence remains distinct from
-native-host validation, MI300X/CDNA3 full-suite validation requires complete
-real-hardware evidence, and CDNA4 validation is unavailable because suitable
-hardware is not currently accessible.
+native-host validation, full MI300X validation on the CDNA3 `gfx942` target
+requires complete real-hardware evidence, and CDNA4 validation is unavailable
+because suitable hardware is not currently accessible.
 
 It does not provide:
 
@@ -108,12 +108,13 @@ It does not provide:
 - hosted leaderboard readiness
 - hard sandbox or multi-tenant adversarial execution
 - CDNA4 validation, because suitable hardware is not currently accessible
-- MI300X/CDNA3 full-suite validation without complete real-hardware evidence
+- full MI300X validation on the CDNA3 `gfx942` target without complete
+  real-hardware evidence
 - native-host validation from Docker/container user-space evidence alone
 
 Trace JSONL remains the canonical run artifact. Profile, static, environment,
 Matrix, closure, consistency, claim-upgrade, trust-summary, and release
 candidate validation summaries are diagnostic-only sidecar evidence. Bounded
 dataset slices and support-matrix rows are provisional prerelease evidence, not
-paper, score, leaderboard, sandbox, native-host, MI300X/CDNA3 full-suite, or
-CDNA4 validation authority.
+paper, score, leaderboard, sandbox, native-host, full MI300X validation on the
+CDNA3 `gfx942` target, or CDNA4 validation authority.

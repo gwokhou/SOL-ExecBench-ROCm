@@ -21,7 +21,7 @@ This phase delivers a versioned prerelease artifact bundle workflow for maintain
 - Make every produced or referenced artifact map to one of the authority classes required by ARTIFACT-03.
 
 ### Evidence Boundaries
-- Preserve the current prerelease claim boundary: engineering prerelease only, not full 235-problem paper validation, upstream SOLAR parity, leaderboard readiness, hard sandbox evidence, CDNA4 validation, or full MI300X/CDNA3 validation.
+- Preserve the current prerelease claim boundary: engineering prerelease only, not full 235-problem paper validation, upstream SOLAR parity, leaderboard readiness, hard sandbox evidence, CDNA4 validation, or full MI300X validation on the CDNA3 `gfx942` target.
 - Treat command transcripts and environment evidence as diagnostic-only unless a later release gate promotes them.
 - Keep release validation summaries diagnostic-only evidence that can still block publication when the validation command fails.
 - Record missing optional hardware/dataset evidence as explicit known gaps.

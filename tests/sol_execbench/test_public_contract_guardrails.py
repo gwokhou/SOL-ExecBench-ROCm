@@ -1432,7 +1432,7 @@ def test_v1_9_claim_guardrails_keep_cdna3_and_nvidia_equivalence_out_of_scope():
     analysis = Path("docs/analysis.md").read_text()
 
     assert "CDNA 3 (`gfx94*`) full adapted suite validation remains deferred" in project
-    assert "CDNA 3, MI300X, CDNA 4, or native-host ROCm validation expansion" in requirements
+    assert "CDNA3-family, CDNA4, or native-host ROCm validation expansion" in requirements
     assert "MI300X is the CDNA3 hardware target rather than a separate architecture target" in requirements
     assert "not NVIDIA B200, SOLAR, or leaderboard equivalence claims" in analysis
     assert "hardware_validation_status" in analysis

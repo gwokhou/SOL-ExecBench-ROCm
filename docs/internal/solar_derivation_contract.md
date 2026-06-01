@@ -26,7 +26,7 @@ No-claim phrases for guardrails:
 - not NVIDIA Blackwell/B200 equivalence
 - not new real-hardware validation
 - not upstream SOLAR parity
-- not CDNA 3 / MI300X / CDNA 4 validation
+- not CDNA3-family validation including MI300X (`gfx942`), and not CDNA4 validation
 - not NVFP4/MXFP4 validation
 
 ## Derivation Source Boundary

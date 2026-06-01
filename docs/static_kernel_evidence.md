@@ -86,7 +86,7 @@ ready.
 The following remain unsupported, partial, or deferred unless direct evidence is
 recorded in a future artifact:
 
-- CDNA 3 / MI300X live hardware validation
+- CDNA3-family live hardware validation, including MI300X (`gfx942`)
 - CDNA 4 live hardware validation
 - Triton ROCm cache capture
 - RGA-rich resource parsing such as VGPR, SGPR, LDS, scratch, and occupancy-like

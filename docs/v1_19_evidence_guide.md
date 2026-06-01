@@ -15,7 +15,7 @@ Use the phrases below when describing v1.19 results:
 - no upstream SOLAR parity
 - no score authority
 - no leaderboard readiness
-- no CDNA 3/MI300X/CDNA4 validation
+- no CDNA3-family validation including MI300X and no CDNA4 validation
 - no native-host ROCm Matrix validation
 - no new-hardware validation
 
@@ -108,7 +108,7 @@ What it cannot prove:
   `docs/CLAIMS.md`
 - no upstream SOLAR parity
 - no native-host ROCm Matrix validation
-- no CDNA 3/MI300X/CDNA4 validation
+- no CDNA3-family validation including MI300X and no CDNA4 validation
 
 ## Matrix Schema Export
 
@@ -200,7 +200,7 @@ What it cannot prove:
 - no upstream SOLAR parity
 - no score authority
 - no leaderboard readiness
-- no CDNA 3/MI300X/CDNA4 validation
+- no CDNA3-family validation including MI300X and no CDNA4 validation
 - no new-hardware validation
 
 ## CPU-Safe Verification

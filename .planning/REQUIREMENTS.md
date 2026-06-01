@@ -10,11 +10,11 @@ ExecBench.
 
 ### Release Artifact Bundle
 
-- [ ] **ARTIFACT-01**: Maintainer can generate a versioned prerelease artifact
+- [x] **ARTIFACT-01**: Maintainer can generate a versioned prerelease artifact
   bundle from a clean checkout or release tag.
-- [ ] **ARTIFACT-02**: Maintainer can inspect checksums, command transcripts,
+- [x] **ARTIFACT-02**: Maintainer can inspect checksums, command transcripts,
   environment evidence, and validation summaries for the bundle.
-- [ ] **ARTIFACT-03**: User can download or locate the bundle and map each
+- [x] **ARTIFACT-03**: User can download or locate the bundle and map each
   artifact to its authority class: canonical, diagnostic-only, provisional,
   deferred, or unavailable.
 
@@ -24,7 +24,8 @@ ExecBench.
   that fails when required prerelease artifacts are missing.
 - [ ] **GATE-02**: Maintainer can verify that claim boundaries still reject
   paper parity, upstream SOLAR parity, leaderboard readiness, hard-sandbox
-  authority, unsupported MI300X/CDNA3 claims, and CDNA4 validation claims.
+  authority, unsupported claims that full MI300X validation on the CDNA3
+  `gfx942` target is complete, and CDNA4 validation claims.
 - [ ] **GATE-03**: Maintainer can see known gaps with explicit blocking,
   deferred, unavailable, or diagnostic-only status before publishing.
 
@@ -62,8 +63,9 @@ ExecBench.
 
 ### Hardware Validation
 
-- **MI300X-01**: A future milestone can run full MI300X/CDNA3 validation when a
-  complete real-hardware evidence chain is available.
+- **MI300X-01**: A future milestone can run full validation on MI300X, the
+  CDNA3 `gfx942` hardware target, when a complete real-hardware evidence chain
+  is available.
 - **CDNA4-01**: A future milestone can revisit CDNA4 validation when suitable
   hardware becomes available.
 
@@ -80,7 +82,8 @@ ExecBench.
 |---------|--------|
 | Full 235-problem paper-scale validation | Requires paper-scale execution and evidence beyond a prerelease/research-preview package. |
 | Upstream SOLAR parity | Requires side-by-side comparison against upstream SOLAR outputs. |
-| MI300X/CDNA3 full-suite validation | Deferred unless complete real-hardware evidence becomes available. |
+| CDNA3-family, CDNA4, or native-host ROCm validation expansion | Requires direct real-hardware or native-host evidence beyond this prerelease/research-preview package. MI300X is the CDNA3 hardware target rather than a separate architecture target. |
+| MI300X full-suite validation on CDNA3 (`gfx942`) | Requires real hardware evidence; deferred unless complete real-hardware evidence becomes available. |
 | CDNA4 validation | Suitable CDNA4 hardware is not currently accessible. |
 | Hosted leaderboard or remote submission service | Requires service operations, submission policy, and isolation design. |
 | Hard sandbox or multi-tenant adversarial execution | Requires OS/container isolation architecture beyond current harness hardening. |
@@ -90,9 +93,9 @@ ExecBench.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ARTIFACT-01 | Phase 119 | Pending |
-| ARTIFACT-02 | Phase 119 | Pending |
-| ARTIFACT-03 | Phase 119 | Pending |
+| ARTIFACT-01 | Phase 119 | Complete |
+| ARTIFACT-02 | Phase 119 | Complete |
+| ARTIFACT-03 | Phase 119 | Complete |
 | GATE-01 | Phase 120 | Pending |
 | GATE-02 | Phase 120 | Pending |
 | GATE-03 | Phase 120 | Pending |

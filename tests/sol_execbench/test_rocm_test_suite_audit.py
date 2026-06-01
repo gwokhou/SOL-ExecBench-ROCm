@@ -61,8 +61,8 @@ def test_hardware_markers_do_not_create_mi300x_or_cdna4_validation_shortcuts():
         assert "MI300X validation" not in content
         assert "CDNA4 validation" not in content
 
-    assert "No full CDNA 3 / MI300X validation artifact" in concerns
-    assert "CDNA3/MI300X/CDNA4 validation" in requirements
+    assert "CDNA3-family hardware-validation claims" in concerns
+    assert "CDNA3-family, CDNA4, or native-host ROCm validation expansion" in requirements
 
 
 def test_cdna3_schema_support_is_distinct_from_hardware_validation():
@@ -72,7 +72,7 @@ def test_cdna3_schema_support_is_distinct_from_hardware_validation():
     for target in ("gfx940", "gfx941", "gfx942"):
         assert target in solution_schema
 
-    assert "Full CDNA3/MI300X/CDNA4 validation" in requirements
+    assert "MI300X full-suite validation on CDNA3 (`gfx942`)" in requirements
     assert "Requires real hardware evidence" in requirements
 
 

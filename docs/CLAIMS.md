@@ -9,21 +9,23 @@ does not claim official leaderboard equivalence.
 For the centralized v1.19 guide to evidence surfaces, generation commands, and
 claim boundaries, see `docs/v1_19_evidence_guide.md`. v1.19 evidence has no
 full 235-problem paper validation, no upstream SOLAR parity, no score authority,
-no leaderboard readiness, no CDNA 3/MI300X/CDNA4 validation, no native-host ROCm
-Matrix validation, and no new-hardware validation.
+no leaderboard readiness, no CDNA3-family validation including MI300X and no CDNA4 validation,
+no native-host ROCm Matrix validation, and no new-hardware validation.
 
 For v1.20 evidence-quality gates, see
 `docs/v1_20_evidence_quality_guide.md`. v1.20 consistency, stability,
 claim-upgrade, and trust-summary reports are local diagnostic sidecars. They do
-not add full 235-problem paper validation, CDNA3/MI300X/CDNA4 validation,
-native-host Matrix authority, hosted leaderboard readiness, upstream SOLAR
-parity, score authority, or new-hardware validation.
+not add full 235-problem paper validation, CDNA3-family validation including
+MI300X (`gfx942`), CDNA4 validation, native-host Matrix authority, hosted
+leaderboard readiness, upstream SOLAR parity, score authority, or new-hardware
+validation.
 
 v1.21 reduces codebase debt and boundary ambiguity through helper extraction,
 CPU-safe guardrail tests, and clearer documentation. It does not add hard sandboxing,
-multi-tenant safety, CDNA3/MI300X validation, paper-scale SOLAR parity, hosted
-leaderboard authority, or one-for-one native ROCm replacement proof for every
-former NVIDIA library category. In particular, v1.21 does not provide hosted leaderboard authority.
+multi-tenant safety, CDNA3-family validation including MI300X (`gfx942`),
+paper-scale SOLAR parity, hosted leaderboard authority, or one-for-one native
+ROCm replacement proof for every former NVIDIA library category. In particular,
+v1.21 does not provide hosted leaderboard authority.
 
 For v1.25 engineering-prerelease release notes, see
 `docs/v1_25_release_notes.md`. The canonical run artifact is Trace JSONL.
@@ -33,8 +35,8 @@ diagnostic-only sidecar evidence unless a narrower document gives them a more
 limited role. Bounded dataset slices and support-matrix rows are provisional
 prerelease evidence, not paper parity, upstream SOLAR parity, score authority,
 leaderboard readiness, hard-sandbox authority, native-host validation from
-Docker/container evidence, MI300X/CDNA3 full-suite validation, or CDNA4
-validation.
+Docker/container evidence, full MI300X validation on the CDNA3 `gfx942` target,
+or CDNA4 validation.
 
 | Claim level | Allowed claim | Required evidence |
 | --- | --- | --- |
@@ -56,9 +58,9 @@ For v1.25 engineering-prerelease support wording:
 - RDNA 4 evidence is engineering-prerelease evidence only when backed by the
   recorded artifacts and commands for that host/scope.
 - Docker/container ROCm user-space evidence is not native-host validation.
-- MI300X is the concrete CDNA 3 hardware target (`gfx942`); full-suite
-  MI300X/CDNA3 validation remains deferred unless complete real-hardware
-  evidence exists.
+- MI300X is the concrete CDNA 3 hardware target (`gfx942`), not a separate
+  architecture target; full-suite MI300X validation remains deferred unless
+  complete real-hardware evidence exists.
 - CDNA4 validation is unavailable because suitable hardware is not currently
   accessible.
 
@@ -113,8 +115,9 @@ leaderboard authority.
 - NVIDIA B200, Blackwell, or official leaderboard parity.
 - Upstream NVlabs/SOLAR equivalence.
 - Full 124-model extraction or full 235-problem paper validation.
-- CDNA 3 / MI300X or CDNA 4 hardware validation without archived full-suite
-  evidence from that hardware class.
+- CDNA3-family hardware validation, including MI300X (`gfx942`), or CDNA4
+  hardware validation without archived full-suite evidence from that hardware
+  class.
 - CDNA4 validation while suitable CDNA4 hardware is not currently accessible.
 - NVFP4 or MXFP4 validation without suitable AMD hardware evidence.
 - `rocprofv3` profiling as correctness or score authority.
@@ -134,10 +137,11 @@ leaderboard authority.
   paper-parity authority, or leaderboard authority.
 - v1.19 sidecar/report evidence as full paper validation, upstream SOLAR parity,
   score authority, leaderboard readiness, native-host ROCm Matrix validation,
-  CDNA 3/MI300X/CDNA4 validation, or new-hardware validation.
+  CDNA3-family validation including MI300X (`gfx942`), CDNA4 validation, or
+  new-hardware validation.
 - v1.21 helper extraction, guardrail tests, or documentation updates as hard
-  sandboxing, multi-tenant safety, paper-scale SOLAR parity, CDNA3/MI300X
-  validation, or hosted leaderboard readiness.
+  sandboxing, multi-tenant safety, paper-scale SOLAR parity, CDNA3-family
+  validation including MI300X (`gfx942`), or hosted leaderboard readiness.
 
 ## Claim Upgrade Rules
 
