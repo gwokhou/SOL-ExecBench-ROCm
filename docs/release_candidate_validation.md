@@ -93,7 +93,13 @@ Use these classifications when reviewing the summary:
 ## Claim Boundaries
 
 This validation path supports an **engineering prerelease** claim only. It does
-not provide:
+should be interpreted alongside the support matrix in `docs/rocm.md`. In
+particular, Docker/container user-space evidence remains distinct from
+native-host validation, MI300X/CDNA3 full-suite validation requires complete
+real-hardware evidence, and CDNA4 validation is unavailable because suitable
+hardware is not currently accessible.
+
+It does not provide:
 
 - full 235-problem paper validation
 - upstream SOLAR parity

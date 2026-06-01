@@ -63,6 +63,41 @@ def test_claims_doc_requires_evidence_before_claim_upgrades():
         assert required in text
 
 
+def test_engineering_prerelease_support_matrix_boundaries():
+    rocm = _read_doc("docs/rocm.md")
+    claims = _read_doc("docs/CLAIMS.md")
+    release_validation = _read_doc("docs/release_candidate_validation.md")
+
+    for required in (
+        "Engineering Prerelease Support Matrix",
+        "RDNA 4",
+        "engineering-prerelease evidence",
+        "Docker/container ROCm user-space",
+        "not native-host validation",
+        "MI300X is the concrete CDNA 3 hardware target",
+        "gfx942",
+        "CDNA4 validation is unavailable",
+        "suitable hardware is not currently accessible",
+    ):
+        assert required in rocm
+
+    for required in (
+        "container ROCm user-space",
+        "not native-host validation",
+        "MI300X is the concrete CDNA 3 hardware target",
+        "CDNA4 validation is unavailable",
+    ):
+        assert required in claims
+
+    for required in (
+        "support matrix",
+        "Docker/container user-space evidence",
+        "MI300X/CDNA3 full-suite validation",
+        "CDNA4 validation",
+    ):
+        assert required in release_validation
+
+
 def test_v1_21_docs_keep_debt_reduction_separate_from_external_claims():
     claims = _read_doc("docs/CLAIMS.md")
     development = _read_doc("docs/DEVELOPMENT.md")
