@@ -23,9 +23,9 @@
 
 **Active milestone:** v1.22 Concern Closure and Execution Boundary Hardening.
 
-**Status:** Ready to execute Phase 105.
+**Status:** v1.22 phases complete.
 
-**Next step:** Run `$gsd-execute-phase 105`.
+**Next step:** Run milestone audit/completion when ready.
 
 ## Phases
 
@@ -34,7 +34,7 @@
 - [x] **Phase 102: Source Review And Boundary Evidence** - Maintainers and users get stronger source-review coverage and structured boundary evidence without implying hardened sandboxing. (completed 2026-06-01)
 - [x] **Phase 103: Scoring And Static Evidence Fixtures** - Maintainers can validate SOLAR, AMD bound, and static-evidence behavior through family-specific fixtures and explicit artifact manifests. (completed 2026-06-01)
 - [x] **Phase 104: Dependency And Closure Guardrails** - Maintainers can detect dependency-policy drift, closure-provenance regressions, and misleading hardware-marker outcomes. (completed 2026-06-01)
-- [ ] **Phase 105: Concern Map Stewardship** - Maintainers can use `CONCERNS.md` as an accurate milestone-management map for fixed, narrowed, carried-forward, and externally deferred concerns.
+- [x] **Phase 105: Concern Map Stewardship** - Maintainers can use `CONCERNS.md` as an accurate milestone-management map for fixed, narrowed, carried-forward, and externally deferred concerns. (completed 2026-06-01)
 
 ## Phase Details
 
@@ -121,7 +121,7 @@ Phases execute in numeric order: 100 -> 101 -> 102 -> 103 -> 104 -> 105.
 | 102. Source Review And Boundary Evidence | 1/1 | Complete    | 2026-06-01 |
 | 103. Scoring And Static Evidence Fixtures | 1/1 | Complete    | 2026-06-01 |
 | 104. Dependency And Closure Guardrails | 1/1 | Complete    | 2026-06-01 |
-| 105. Concern Map Stewardship | 0/1 | Ready to execute | - |
+| 105. Concern Map Stewardship | 1/1 | Complete    | 2026-06-01 |
 
 **Coverage:**
 - Requirements mapped: 22/22
