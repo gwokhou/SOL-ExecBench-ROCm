@@ -68,7 +68,7 @@ from sol_execbench.core.dataset.runner import (
     collect_timing_evidence_for_problem,
     inspect_traces,
     print_summary,
-    run_cli,
+    run_cli as _runner_run_cli,
     write_amd_score_report,
     write_summary_report,
 )
@@ -125,6 +125,31 @@ def discover_problems(
         benchmark_dir,
         categories,
         known_categories=CATEGORIES,
+    )
+
+
+def run_cli(
+    definition_path: Path,
+    workload_path: Path,
+    solution_path: Path,
+    output_dir: Path,
+    job_name: str,
+    timeout: int,
+    config_path: Path | None = None,
+    keep_staging: bool = False,
+    verbose: bool = False,
+) -> list[dict] | None:
+    """Compatibility wrapper for callers importing this script module."""
+    return _runner_run_cli(
+        definition_path=definition_path,
+        workload_path=workload_path,
+        solution_path=solution_path,
+        output_dir=output_dir,
+        job_name=job_name,
+        timeout=timeout,
+        config_path=config_path,
+        keep_staging=keep_staging,
+        verbose=verbose,
     )
 
 
