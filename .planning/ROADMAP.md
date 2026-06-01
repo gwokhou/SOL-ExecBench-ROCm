@@ -23,9 +23,9 @@
 
 **Active milestone:** v1.22 Concern Closure and Execution Boundary Hardening.
 
-**Status:** Ready to plan Phase 103.
+**Status:** Ready to execute Phase 103.
 
-**Next step:** Run `$gsd-plan-phase 103`.
+**Next step:** Run `$gsd-execute-phase 103`.
 
 ## Phases
 
@@ -84,7 +84,8 @@
   2. Confidence and status transitions in SOLAR and AMD bound derivation are covered independently of broad report-shape tests.
   3. Static kernel evidence can consume or produce an explicit artifact manifest when build outputs are known.
   4. Static evidence and derived scoring changes preserve diagnostic-only authority and existing public sidecar contracts.
-**Plans**: TBD
+**Plans**:
+  - `103-01-PLAN.md` - Add focused scoring fixtures and static artifact manifest support.
 
 ### Phase 104: Dependency And Closure Guardrails
 **Goal**: Maintainers can catch policy, provenance, and marker regressions before they create misleading ROCm validation signals.
@@ -116,7 +117,7 @@ Phases execute in numeric order: 100 -> 101 -> 102 -> 103 -> 104 -> 105.
 | 100. Dataset Runner Execution Seams | 2/2 | Complete    | 2026-06-01 |
 | 101. Eval Driver Diagnostics And Framing | 1/1 | Complete    | 2026-06-01 |
 | 102. Source Review And Boundary Evidence | 1/1 | Complete    | 2026-06-01 |
-| 103. Scoring And Static Evidence Fixtures | 0/TBD | Not started | - |
+| 103. Scoring And Static Evidence Fixtures | 0/1 | Ready to execute | - |
 | 104. Dependency And Closure Guardrails | 0/TBD | Not started | - |
 | 105. Concern Map Stewardship | 0/TBD | Not started | - |
 
