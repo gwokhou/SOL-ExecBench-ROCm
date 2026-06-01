@@ -23,9 +23,9 @@
 
 **Active milestone:** v1.22 Concern Closure and Execution Boundary Hardening.
 
-**Status:** Ready to plan Phase 104.
+**Status:** Ready to execute Phase 104.
 
-**Next step:** Run `$gsd-plan-phase 104`.
+**Next step:** Run `$gsd-execute-phase 104`.
 
 ## Phases
 
@@ -95,7 +95,8 @@
   1. ROCm wheel, Docker target, and dependency-matrix policy consistency is guarded when target metadata changes.
   2. Dataset closure provenance tests cover new sidecar refs, stale provenance combinations, and manifest/cache provenance behavior.
   3. Hardware-marker skip behavior remains explicit so CPU-safe green runs cannot be mistaken for RDNA4, CDNA3, timing, MI300X, or CDNA4 validation.
-**Plans**: TBD
+**Plans**:
+  - `104-01-PLAN.md` - Add dependency policy, closure provenance, and marker guardrail tests.
 
 ### Phase 105: Concern Map Stewardship
 **Goal**: Maintainers can use `CONCERNS.md` as a reliable status map for v1.22 concern closure and future deferred work.
@@ -118,7 +119,7 @@ Phases execute in numeric order: 100 -> 101 -> 102 -> 103 -> 104 -> 105.
 | 101. Eval Driver Diagnostics And Framing | 1/1 | Complete    | 2026-06-01 |
 | 102. Source Review And Boundary Evidence | 1/1 | Complete    | 2026-06-01 |
 | 103. Scoring And Static Evidence Fixtures | 1/1 | Complete    | 2026-06-01 |
-| 104. Dependency And Closure Guardrails | 0/TBD | Not started | - |
+| 104. Dependency And Closure Guardrails | 0/1 | Ready to execute | - |
 | 105. Concern Map Stewardship | 0/TBD | Not started | - |
 
 **Coverage:**
