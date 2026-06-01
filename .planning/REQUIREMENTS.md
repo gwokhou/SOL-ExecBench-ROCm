@@ -31,12 +31,12 @@ ExecBench.
 
 ### Research Preview Evidence
 
-- [ ] **RESEARCH-01**: Researcher can read a research preview report that
+- [x] **RESEARCH-01**: Researcher can read a research preview report that
   explains methodology, benchmark scope, hardware scope, evidence surfaces,
   and limitations.
-- [ ] **RESEARCH-02**: Researcher can distinguish SOL/AMD-derived evidence from
+- [x] **RESEARCH-02**: Researcher can distinguish SOL/AMD-derived evidence from
   upstream SOLAR parity, paper-scale validation, and leaderboard authority.
-- [ ] **RESEARCH-03**: Researcher can trace representative commands from
+- [x] **RESEARCH-03**: Researcher can trace representative commands from
   first-run examples through release validation and bounded dataset-slice
   evidence.
 
@@ -99,9 +99,9 @@ ExecBench.
 | GATE-01 | Phase 120 | Complete |
 | GATE-02 | Phase 120 | Complete |
 | GATE-03 | Phase 120 | Complete |
-| RESEARCH-01 | Phase 121 | Pending |
-| RESEARCH-02 | Phase 121 | Pending |
-| RESEARCH-03 | Phase 121 | Pending |
+| RESEARCH-01 | Phase 121 | Complete |
+| RESEARCH-02 | Phase 121 | Complete |
+| RESEARCH-03 | Phase 121 | Complete |
 | PUBLISH-01 | Phase 122 | Pending |
 | PUBLISH-02 | Phase 122 | Pending |
 | PUBLISH-03 | Phase 122 | Pending |
