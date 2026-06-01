@@ -40,9 +40,29 @@ def test_pytest_markers_describe_rocm_hardware_semantics():
     for phrase in marker_logic:
         assert phrase in conftest
 
+    assert "timing_serial tests skipped by default" in conftest
+    assert 'timing_selected = "timing_serial" in markexpr' in conftest
+    assert 'if "timing_serial" in item.keywords and not timing_selected' in conftest
+
     forbidden = ["requires_sm100", "sm_100", "Blackwell", "_gpu_sm_version"]
     for phrase in forbidden:
         assert phrase not in conftest
+
+
+def test_hardware_markers_do_not_create_mi300x_or_cdna4_validation_shortcuts():
+    pyproject = _read("pyproject.toml")
+    conftest = _read("tests/conftest.py")
+    concerns = _read(".planning/codebase/CONCERNS.md")
+    requirements = _read(".planning/REQUIREMENTS.md")
+
+    for content in (pyproject, conftest):
+        assert "requires_mi300x" not in content
+        assert "requires_cdna4" not in content
+        assert "MI300X validation" not in content
+        assert "CDNA4 validation" not in content
+
+    assert "No full CDNA 3 / MI300X validation artifact" in concerns
+    assert "CDNA3/MI300X/CDNA4 validation" in requirements
 
 
 def test_cdna3_schema_support_is_distinct_from_hardware_validation():
@@ -52,8 +72,8 @@ def test_cdna3_schema_support_is_distinct_from_hardware_validation():
     for target in ("gfx940", "gfx941", "gfx942"):
         assert target in solution_schema
 
-    assert "Real CDNA 3 hardware validation" in requirements
-    assert "deferred" in requirements
+    assert "Full CDNA3/MI300X/CDNA4 validation" in requirements
+    assert "Requires real hardware evidence" in requirements
 
 
 def test_native_language_groups_are_rocm_only():

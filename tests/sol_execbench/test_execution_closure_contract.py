@@ -199,6 +199,83 @@ def test_provenance_comparison_returns_stable_mismatch_diagnostics():
     ]
 
 
+def test_provenance_comparison_treats_evidence_requirements_as_order_insensitive():
+    expected = _provenance(
+        requested_evidence_requirements=(
+            "timing_evidence",
+            "amd_sol_bound",
+            "solar_derivation",
+        )
+    )
+    observed = _provenance(
+        requested_evidence_requirements=(
+            "solar_derivation",
+            "timing_evidence",
+            "amd_sol_bound",
+        )
+    )
+
+    assert compare_execution_closure_provenance(expected, observed) == []
+
+
+def test_report_records_sidecar_refs_and_cache_provenance_in_checksum():
+    base_provenance = _provenance(
+        derived_evidence={
+            "sidecars": {
+                "amd_score": "score/demo.amd-score.json",
+                "amd_sol_bound": "sol/demo.amd-sol-v2.json",
+                "solar_derivation": "solar/demo.solar.json",
+                "static_kernel_evidence": "static/demo.static.json",
+            },
+            "artifact_manifest": "static/artifact-manifest.json",
+            "cache": {
+                "enabled": True,
+                "cache_key": "definition=w1:config=a:git=abc123",
+            },
+        }
+    )
+    source_refs = {
+        "amd_score": "score/demo.amd-score.json",
+        "amd_sol_bound": "sol/demo.amd-sol-v2.json",
+        "artifact_manifest": "static/artifact-manifest.json",
+        "solar_derivation": "solar/demo.solar.json",
+        "static_kernel_evidence": "static/demo.static.json",
+        "timing_evidence": "timing/demo.timing.json",
+    }
+    report = build_execution_closure_report(
+        records=[_record("L1/p1", 0, "w1", ExecutionClosureStatus.ATTEMPTED_PASSED)],
+        provenance=base_provenance,
+        filters={},
+        source_refs=source_refs,
+        created_at="2026-05-31T00:00:00Z",
+    )
+    changed = build_execution_closure_report(
+        records=[_record("L1/p1", 0, "w1", ExecutionClosureStatus.ATTEMPTED_PASSED)],
+        provenance=base_provenance.model_copy(
+            update={
+                "derived_evidence": {
+                    **base_provenance.derived_evidence,
+                    "cache": {
+                        "enabled": True,
+                        "cache_key": "definition=w1:config=b:git=abc123",
+                    },
+                }
+            }
+        ),
+        filters={},
+        source_refs=source_refs,
+        created_at="2026-05-31T00:00:00Z",
+    )
+
+    payload = report.model_dump(mode="json")
+    assert payload["source_refs"] == dict(sorted(source_refs.items()))
+    assert payload["provenance"]["derived_evidence"]["artifact_manifest"] == (
+        "static/artifact-manifest.json"
+    )
+    assert payload["provenance"]["derived_evidence"]["cache"]["enabled"] is True
+    assert report.execution_closure_checksum != changed.execution_closure_checksum
+
+
 def test_report_checksum_ignores_checksum_field_and_changes_with_content(tmp_path: Path):
     report = build_execution_closure_report(
         records=[_record("L1/p1", 0, "w1", ExecutionClosureStatus.ATTEMPTED_PASSED)],

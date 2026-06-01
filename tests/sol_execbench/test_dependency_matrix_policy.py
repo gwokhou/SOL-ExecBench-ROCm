@@ -44,6 +44,7 @@ EXPECTED_POLICY_FIELDS = {
 
 def test_manifest_records_dependency_policy_for_every_declared_target() -> None:
     manifest = load_docker_target_manifest(MANIFEST_PATH)
+    policy_ids: set[str] = set()
 
     assert manifest.default_target_id == "rocm-7.1.1-ubuntu-24.04-container"
     assert manifest.targets_by_id[
@@ -55,7 +56,12 @@ def test_manifest_records_dependency_policy_for_every_declared_target() -> None:
     for target in manifest.targets:
         policy = load_docker_target_dependency_policy(target)
         assert set(policy.model_dump(mode="json")) == EXPECTED_POLICY_FIELDS
+        assert policy.policy_id not in policy_ids
+        policy_ids.add(policy.policy_id)
         assert policy.policy_id
+        assert target.pytorch_rocm_target == policy.expected_local_version
+        assert target.pytorch_rocm_target.replace(".", "") in policy.uv_index_name
+        assert policy.expected_local_version in policy.uv_index_url
         assert policy.suggested_uv_command
         assert policy.uv_index_url.startswith("https://download.pytorch.org/whl/")
         assert policy.triton_rocm_index_url == "https://download.pytorch.org/whl/"
@@ -114,6 +120,33 @@ def test_default_project_dependency_path_remains_rocm_7_1() -> None:
     assert "pytorch-rocm-root" in pyproject
     assert "https://download.pytorch.org/whl/rocm7.1" in uv_lock
     assert "https://download.pytorch.org/whl/" in uv_lock
+
+
+def test_default_docker_policy_matches_project_dependency_files() -> None:
+    selection = select_docker_target(None, manifest_path=MANIFEST_PATH)
+    policy = load_docker_target_dependency_policy(selection.target)
+    pyproject = PYPROJECT_PATH.read_text()
+    uv_lock = UV_LOCK_PATH.read_text()
+
+    assert policy.lock_strategy == "project_default"
+    for expected in (
+        f"torch=={policy.torch_version}",
+        f"torchvision=={policy.torchvision_version}",
+        f"triton-rocm=={policy.triton_rocm_version}",
+        policy.uv_index_name,
+        policy.uv_index_url,
+        policy.triton_rocm_index_name,
+        policy.triton_rocm_index_url,
+    ):
+        assert expected in pyproject
+
+    for expected in (
+        policy.torch_version,
+        policy.torchvision_version,
+        policy.uv_index_url,
+        policy.triton_rocm_index_url,
+    ):
+        assert expected in uv_lock
 
 
 def test_matrix_entry_payload_records_dependency_policy() -> None:
