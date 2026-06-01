@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
+from dataclasses import replace
 
 import pytest
 
@@ -28,6 +29,10 @@ from sol_execbench.core.scoring.amd_sol_v2 import (
     AmdSolBoundV2Artifact,
     amd_sol_bound_v2_from_dict,
     build_amd_sol_bound_v2_artifact,
+)
+from sol_execbench.core.scoring.amd_hardware_models import (
+    EstimateConfidence,
+    HardwareValidationStatus,
 )
 from sol_execbench_type_helpers import make_definition, make_workload
 
@@ -213,6 +218,29 @@ def test_inexact_coverage_and_warning_semantics_are_deterministic():
         workload,
         default_amd_hardware_models()["gfx1200"],
     ).warnings
+
+
+def test_validated_supported_evidence_produces_scored_aggregate():
+    hardware = replace(
+        default_amd_hardware_models()["gfx1200"],
+        confidence=EstimateConfidence.SUPPORTED,
+        hardware_validation_status=HardwareValidationStatus.VALIDATED,
+        model_validation_status=HardwareValidationStatus.VALIDATED,
+    )
+
+    artifact = build_amd_sol_bound_v2_artifact(
+        _matmul_definition(),
+        _matmul_workload(),
+        hardware,
+    )
+
+    assert artifact.aggregate_bound.status == "scored"
+    assert artifact.aggregate_bound.scored is True
+    assert artifact.coverage_summary.confidence_counts_by_family == {
+        "gemm": {"supported": 1, "inexact": 0, "unsupported": 0}
+    }
+    assert artifact.coverage_summary.worst_confidence == EstimateConfidence.SUPPORTED
+    assert artifact.warnings == ()
 
 
 def test_unsupported_evidence_forces_unscored_aggregate():

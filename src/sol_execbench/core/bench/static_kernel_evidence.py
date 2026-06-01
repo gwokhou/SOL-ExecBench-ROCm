@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import shutil
 import subprocess
 from collections.abc import Callable
@@ -370,6 +371,7 @@ def collect_static_kernel_artifacts(
     evidence_directory: Path,
     primary_artifact_name: str = _PRIMARY_ARTIFACT_NAME,
     sidecar_base_directory: Path | None = None,
+    artifact_manifest_path: Path | None = None,
     producer: str = "hip_cpp_build",
     target_architecture: str | None = None,
 ) -> StaticKernelEvidenceSidecar:
@@ -382,7 +384,9 @@ def collect_static_kernel_artifacts(
         )
 
     primary_artifact = build_root / primary_artifact_name
-    if not _is_contained_file(primary_artifact, build_root):
+    if artifact_manifest_path is None and not _is_contained_file(
+        primary_artifact, build_root
+    ):
         return build_static_kernel_evidence_unavailable(
             StaticKernelEvidenceReasonCode.ARTIFACT_UNAVAILABLE
         )
@@ -409,6 +413,7 @@ def collect_static_kernel_artifacts(
             build_root=build_root,
             evidence_root=evidence_root,
             primary_artifact_name=primary_artifact_name,
+            artifact_manifest_path=artifact_manifest_path,
         )
     ]
 
@@ -427,6 +432,10 @@ def collect_static_kernel_artifacts(
                 [target_architecture] if target_architecture is not None else []
             ),
         ),
+        source_references=_artifact_manifest_source_references(
+            artifact_manifest_path,
+            sidecar_base,
+        ),
     )
 
 
@@ -435,7 +444,15 @@ def _discover_static_artifact_paths(
     build_root: Path,
     evidence_root: Path,
     primary_artifact_name: str,
+    artifact_manifest_path: Path | None = None,
 ) -> tuple[Path, ...]:
+    if artifact_manifest_path is not None:
+        return _discover_manifest_static_artifact_paths(
+            build_root=build_root,
+            evidence_root=evidence_root,
+            artifact_manifest_path=artifact_manifest_path,
+        )
+
     primary_artifact = build_root / primary_artifact_name
     candidates: list[Path] = []
     if _is_contained_file(primary_artifact, build_root):
@@ -454,6 +471,65 @@ def _discover_static_artifact_paths(
         candidates.append(resolved)
 
     return tuple(dict.fromkeys(candidates))
+
+
+def _discover_manifest_static_artifact_paths(
+    *,
+    build_root: Path,
+    evidence_root: Path,
+    artifact_manifest_path: Path,
+) -> tuple[Path, ...]:
+    payload = json.loads(artifact_manifest_path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("Static artifact manifest must be a JSON object")
+    entries = payload.get("artifacts")
+    if not isinstance(entries, list):
+        raise ValueError("Static artifact manifest must contain an artifacts list")
+
+    candidates: list[Path] = []
+    for index, entry in enumerate(entries):
+        relative_path = _artifact_manifest_entry_path(entry, index)
+        if relative_path.is_absolute():
+            continue
+        path = build_root / relative_path
+        if not _is_contained_file(path, build_root):
+            continue
+        resolved = path.resolve()
+        if _is_relative_to(resolved, evidence_root):
+            continue
+        if _static_artifact_type(path) is None:
+            continue
+        candidates.append(resolved)
+
+    return tuple(dict.fromkeys(candidates))
+
+
+def _artifact_manifest_entry_path(entry: object, index: int) -> Path:
+    if isinstance(entry, str):
+        return Path(entry)
+    if isinstance(entry, dict):
+        value = entry.get("path")
+        if isinstance(value, str):
+            return Path(value)
+    raise ValueError(
+        f"Static artifact manifest artifacts[{index}] must be a path string "
+        "or an object with a path string"
+    )
+
+
+def _artifact_manifest_source_references(
+    artifact_manifest_path: Path | None,
+    sidecar_base: Path,
+) -> list[StaticKernelEvidenceSourceReference]:
+    if artifact_manifest_path is None:
+        return []
+    return [
+        StaticKernelEvidenceSourceReference(
+            kind="artifact_manifest",
+            value=_relative_path_string(artifact_manifest_path, sidecar_base),
+            description="Build artifact manifest used to select current-build static artifacts.",
+        )
+    ]
 
 
 def _persist_static_artifact(

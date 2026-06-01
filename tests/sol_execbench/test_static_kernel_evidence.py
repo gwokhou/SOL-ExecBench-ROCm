@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import shutil
 import subprocess
 
@@ -362,6 +363,61 @@ def test_static_artifact_collection_skips_nested_evidence_directory(tmp_path):
     assert [artifact.source_path for artifact in sidecar.artifacts] == [
         "benchmark_kernel.so"
     ]
+
+
+def test_static_artifact_collection_can_use_explicit_artifact_manifest(tmp_path):
+    build_dir = tmp_path / "staging"
+    evidence_dir = tmp_path / "evidence"
+    build_dir.mkdir()
+    files = {
+        "benchmark_kernel.so": b"shared",
+        "registered/kernel.hsaco": b"hsaco",
+        "unlisted/kernel.o": b"object",
+        "notes.md": b"ignored",
+    }
+    for relative_path, content in files.items():
+        path = build_dir / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+    manifest_path = tmp_path / "artifact-manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "sol_execbench.static_artifact_manifest.v1",
+                "artifacts": [
+                    {"path": "benchmark_kernel.so"},
+                    "registered/kernel.hsaco",
+                    {"path": "notes.md"},
+                    {"path": "../outside.hsaco"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    sidecar = collect_static_kernel_artifacts(
+        build_directory=build_dir,
+        evidence_directory=evidence_dir,
+        sidecar_base_directory=tmp_path,
+        artifact_manifest_path=manifest_path,
+    )
+    payload = sidecar.model_dump(mode="json")
+
+    assert [artifact["source_path"] for artifact in payload["artifacts"]] == [
+        "benchmark_kernel.so",
+        "registered/kernel.hsaco",
+    ]
+    assert payload["source_references"] == [
+        {
+            "kind": "artifact_manifest",
+            "value": "artifact-manifest.json",
+            "description": (
+                "Build artifact manifest used to select current-build static artifacts."
+            ),
+        }
+    ]
+    assert payload["score_authority"] is False
+    assert not (evidence_dir / "artifacts" / "unlisted" / "kernel.o").exists()
 
 
 def test_static_artifact_collection_reports_unavailable_without_primary_artifact(
