@@ -10,13 +10,13 @@ ExecBench.
 
 ### Release Candidate Validation
 
-- [ ] **RCVAL-01**: Maintainer can run the CPU-safe release validation suite
+- [x] **RCVAL-01**: Maintainer can run the CPU-safe release validation suite
   and get a recorded pass/fail summary.
-- [ ] **RCVAL-02**: Maintainer can run focused ROCm/Docker smoke checks with
+- [x] **RCVAL-02**: Maintainer can run focused ROCm/Docker smoke checks with
   recorded environment and clock-policy evidence.
-- [ ] **RCVAL-03**: Maintainer can run a bounded dataset slice and produce
+- [x] **RCVAL-03**: Maintainer can run a bounded dataset slice and produce
   trace, closure, trust, and known-gap artifacts.
-- [ ] **RCVAL-04**: Release validation failures are classified as blocking,
+- [x] **RCVAL-04**: Release validation failures are classified as blocking,
   deferred, or diagnostic-only with explicit next action.
 
 ### Support Matrix
@@ -100,10 +100,10 @@ ExecBench.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RCVAL-01 | Phase 114 | Pending |
-| RCVAL-02 | Phase 114 | Pending |
-| RCVAL-03 | Phase 114 | Pending |
-| RCVAL-04 | Phase 114 | Pending |
+| RCVAL-01 | Phase 114 | Complete |
+| RCVAL-02 | Phase 114 | Complete |
+| RCVAL-03 | Phase 114 | Complete |
+| RCVAL-04 | Phase 114 | Complete |
 | SUPPORT-01 | Phase 115 | Pending |
 | SUPPORT-02 | Phase 115 | Pending |
 | SUPPORT-03 | Phase 115 | Pending |
