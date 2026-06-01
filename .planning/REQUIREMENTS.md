@@ -25,8 +25,8 @@ ExecBench.
 
 ### Analysis Module Decomposition
 
-- [ ] **ANALYSIS-01**: AMD bound graph extraction separates graph construction, operator-family classification, and evidence annotation into smaller helpers with operation-family tests.
-- [ ] **ANALYSIS-02**: AMD bound estimate formulas are grouped by family or responsibility so changes to one family can be tested without broad scoring regressions.
+- [x] **ANALYSIS-01**: AMD bound graph extraction separates graph construction, operator-family classification, and evidence annotation into smaller helpers with operation-family tests.
+- [x] **ANALYSIS-02**: AMD bound estimate formulas are grouped by family or responsibility so changes to one family can be tested without broad scoring regressions.
 - [ ] **ANALYSIS-03**: SOLAR derivation separates semantic provenance, bound/formula derivation, coverage/status classification, and report rendering while preserving public sidecar schemas.
 - [ ] **ANALYSIS-04**: Static kernel evidence separates artifact discovery, tool routing, raw-output parsing, bounded capture, and sidecar/report rendering behind focused helpers and fixtures.
 - [ ] **ANALYSIS-05**: Refactors preserve existing AMD score, AMD SOL/SOLAR, static evidence, and claim-boundary behavior unless a requirement explicitly changes it.
@@ -90,8 +90,8 @@ ExecBench.
 | EVAL-02 | Phase 95 | Complete |
 | EVAL-03 | Phase 95 | Complete |
 | EVAL-04 | Phase 95 | Complete |
-| ANALYSIS-01 | Phase 96 | Planned |
-| ANALYSIS-02 | Phase 96 | Planned |
+| ANALYSIS-01 | Phase 96 | Complete |
+| ANALYSIS-02 | Phase 96 | Complete |
 | ANALYSIS-03 | Phase 97 | Planned |
 | ANALYSIS-04 | Phase 97 | Planned |
 | ANALYSIS-05 | Phase 97 | Planned |
@@ -106,7 +106,7 @@ ExecBench.
 | DOCS-04 | Phase 99 | Planned |
 
 **Coverage:**
-- v1 requirements: 23 total, 9 complete
+- v1 requirements: 23 total, 11 complete
 - Mapped to phases: 23
 - Unmapped: 0
 
