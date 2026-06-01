@@ -15,21 +15,22 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
 ## Current State
 
-**Shipped version:** v1.20 Cross-Report Consistency and Evaluation Stability,
-completed 2026-05-31.
+**Shipped version:** v1.21 Codebase Debt Reduction and Execution Boundary
+Hardening, completed 2026-06-01.
 
-**Current milestone:** v1.21 Codebase Debt Reduction and Execution Boundary
-Hardening.
+**Current milestone:** v1.22 Concern Closure and Execution Boundary Hardening.
 
-**Latest milestone outcome:** the ROCm port now has deterministic consistency,
-stability, claim-upgrade, and trust-summary sidecars that review existing
-benchmark evidence without changing canonical Trace, Definition, Workload,
-Solution, correctness, timing, score, or evaluator semantics.
+**Latest milestone outcome:** v1.21 narrowed major codebase debt by extracting
+dataset runner helpers, eval-driver runtime helpers, AMD bound/SOLAR/static
+evidence helpers, and focused execution-boundary tests while preserving
+canonical Trace, Definition, Workload, Solution, correctness, timing, score,
+and evaluator contract schemas.
 
-**Next milestone goal:** reduce codebase debt identified in
-`.planning/codebase/CONCERNS.md` and harden execution-boundary disclosures
-without claiming hard sandboxing, new hardware validation, paper-scale parity,
-or leaderboard readiness.
+**Next milestone goal:** close the remaining code-fixable concerns identified
+in `.planning/codebase/CONCERNS.md`, with emphasis on runner/evaluator
+maintainability, source-review precision, reference-timing diagnostics,
+scoring-fixture coverage, and preserving milestone-management context in the
+concerns map.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline.
 Milestones v1.1-v1.6 added CDNA 3 code/schema support, maintained residue
@@ -90,8 +91,50 @@ hardware validation.
 The v1.20 milestone added cross-report consistency lint, evaluation stability
 diagnostics, claim-upgrade prerequisite gates, trust summaries, public
 evidence-quality docs/fixtures, and a full CPU-safe script-chain regression.
+The v1.21 milestone reduced codebase debt and hardened execution boundaries by
+extracting dataset runner, eval-driver runtime, AMD/SOLAR, and static-evidence
+helpers; adding boundary regressions; and documenting which concerns remain
+externally deferred.
 
-## Current Milestone: v1.21 Codebase Debt Reduction and Execution Boundary Hardening
+## Current Milestone: v1.22 Concern Closure and Execution Boundary Hardening
+
+**Goal:** Fix the remaining code-actionable concerns in
+`.planning/codebase/CONCERNS.md` while preserving benchmark contracts and
+explicitly deferring hardware-validation, paper-parity, leaderboard, and hard
+sandbox responsibilities that require external evidence or architecture.
+
+**Target features:**
+- Continue dataset runner closure by extracting solution wrapping, CLI
+  invocation, report writing, closure assembly, and runner scheduling seams from
+  `scripts/run_dataset.py`.
+- Continue generated eval-driver thinning by moving reference timing,
+  correctness/timing orchestration, trace emission, and stdout-framing behavior
+  into importable helpers with focused tests.
+- Replace the `stream` to `strm` source rewriting workaround with token-aware
+  or AST-aware handling plus regressions for comments, strings, and legitimate
+  identifiers.
+- Make reference-timing failures explicit in traces, logs, or status semantics
+  when reference benchmarking is requested.
+- Expand source-review and reward-hack coverage toward AST/source-review
+  evidence while keeping the benchmark boundary clear.
+- Add family-specific golden fixtures and helper boundaries for SOLAR and AMD
+  bound derivation.
+- Improve static-evidence artifact manifest and dataset closure provenance
+  guardrails without changing diagnostic-only authority.
+- Restore `CONCERNS.md` milestone-management context so newly refreshed maps
+  preserve which concerns were narrowed, still actionable, or externally
+  deferred.
+
+**Explicitly deferred:**
+- CDNA 3, MI300X, CDNA 4, or native-host full-suite hardware validation.
+- Full 235-problem paper-scale SOLAR, upstream SOLAR, hosted leaderboard, or
+  NVIDIA B200/Blackwell equivalence claims.
+- Complete OS/container hard sandboxing for untrusted or multi-tenant
+  submissions.
+- Large PyTorch/ROCm dependency relocking, Docker privilege-model redesign, or
+  public service infrastructure.
+
+## Recently Shipped Milestone: v1.21 Codebase Debt Reduction and Execution Boundary Hardening
 
 **Goal:** Fix concerns that can be resolved through code, tests, documentation,
 and repeatable local verification while making benchmark responsibility
@@ -125,6 +168,11 @@ evidence.
 - One-for-one native ROCm replacement proof for every former NVIDIA library
   category.
 - Large PyTorch/ROCm dependency relocking or Docker privilege-model redesign.
+
+**Shipped outcome:** v1.21 narrowed major codebase concerns through focused
+helper extraction, boundary tests, and documentation updates. Remaining
+code-actionable concerns are carried into v1.22; hardware-validation,
+paper-scale parity, leaderboard, and hard sandbox work remain deferred.
 
 ## Recently Shipped Milestone: v1.20 Cross-Report Consistency and Evaluation Stability
 
