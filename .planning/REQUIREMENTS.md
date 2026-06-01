@@ -52,11 +52,11 @@ ExecBench.
 
 ### Release Materials
 
-- [ ] **REL-01**: Maintainer can follow a prerelease checklist from clean tree
+- [x] **REL-01**: Maintainer can follow a prerelease checklist from clean tree
   to tagged release candidate.
-- [ ] **REL-02**: Release notes summarize shipped capability, validation
+- [x] **REL-02**: Release notes summarize shipped capability, validation
   evidence, known limitations, and deferred claims.
-- [ ] **REL-03**: Public docs point users to support matrix, claims,
+- [x] **REL-03**: Public docs point users to support matrix, claims,
   researcher guide, timing semantics, and troubleshooting entry points.
 
 ## Future Requirements
@@ -115,9 +115,9 @@ ExecBench.
 | FIRST-02 | Phase 117 | Complete |
 | FIRST-03 | Phase 117 | Complete |
 | FIRST-04 | Phase 117 | Complete |
-| REL-01 | Phase 118 | Pending |
-| REL-02 | Phase 118 | Pending |
-| REL-03 | Phase 118 | Pending |
+| REL-01 | Phase 118 | Complete |
+| REL-02 | Phase 118 | Complete |
+| REL-03 | Phase 118 | Complete |
 
 **Coverage:**
 - v1.25 requirements: 18 total

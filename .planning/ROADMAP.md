@@ -21,7 +21,7 @@
 
 **Active milestone:** v1.25 Engineering Prerelease.
 
-**Status:** Ready to plan Phase 118.
+**Status:** All phases complete; ready for milestone audit.
 
 **Milestone goal:** Turn the v1.24 ROCm port state into an engineering
 prerelease / release-candidate package that external users can install,
@@ -48,9 +48,10 @@ because suitable hardware is not currently accessible.
 - [x] **Phase 117: First-Run User Path** - New users can install, run a
   minimal example, inspect trace output, and diagnose common failures.
   (completed 2026-06-01)
-- [ ] **Phase 118: Release Candidate Materials** - Maintainers have the
+- [x] **Phase 118: Release Candidate Materials** - Maintainers have the
   checklist, notes, and public documentation entry points needed to tag and
   publish the engineering prerelease.
+  (completed 2026-06-01)
 
 ## Phase Details
 
@@ -137,7 +138,9 @@ with coherent release materials and public navigation.
      evidence, known limitations, and deferred claims.
   3. Public documentation points users to the support matrix, claim boundaries,
      researcher guide, timing semantics, and troubleshooting entry points.
-**Plans**: TBD
+**Plans**:
+  - `118-01-PLAN.md` - Add prerelease checklist, release note navigation, README
+    entry points, and release-material guardrails.
 
 ## Progress
 
@@ -150,10 +153,10 @@ Phases execute in numeric order: 114 -> 115 -> 116 -> 117 -> 118.
 | 115. Support Matrix Boundaries | 1/1 | Complete | 2026-06-01 |
 | 116. Claim Boundary Guardrails | 1/1 | Complete | 2026-06-01 |
 | 117. First-Run User Path | 1/1 | Complete | 2026-06-01 |
-| 118. Release Candidate Materials | 0/TBD | Not started | - |
+| 118. Release Candidate Materials | 1/1 | Complete | 2026-06-01 |
 
 **Coverage:**
 - v1.25 requirements mapped: 18/18
-- v1.25 requirements complete: 15/18
+- v1.25 requirements complete: 18/18
 - Orphaned requirements: 0
 - Duplicate requirement mappings: 0

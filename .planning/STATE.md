@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.25
 milestone_name: Engineering Prerelease
-status: ready_to_plan
+status: ready_for_audit
 last_updated: "2026-06-01"
 last_activity: 2026-06-01
 progress:
   total_phases: 5
-  completed_phases: 4
-  total_plans: 4
-  completed_plans: 4
-  percent: 80
+  completed_phases: 5
+  total_plans: 5
+  completed_plans: 5
+  percent: 100
 ---
 
 # Project State
@@ -22,22 +22,22 @@ See: `.planning/PROJECT.md` (updated 2026-06-01)
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly
 on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL
 ExecBench.
-**Current focus:** v1.25 Engineering Prerelease, ready to plan Phase 118
-Release Candidate Materials.
+**Current focus:** v1.25 Engineering Prerelease, all phases complete and ready
+for milestone audit.
 
 ## Current Position
 
 Phase: 118 of 118 (Release Candidate Materials)
-Plan: Not planned yet
-Status: Ready to plan
-Last activity: 2026-06-01 - Phase 117 completed
+Plan: 118-01 complete
+Status: Ready for milestone audit
+Last activity: 2026-06-01 - Phase 118 completed
 
-Progress: [########--] 80%
+Progress: [##########] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4 in v1.25
+- Total plans completed: 5 in v1.25
 - Average duration: n/a
 - Total execution time: 0h
 
@@ -49,7 +49,7 @@ Progress: [########--] 80%
 | 115. Support Matrix Boundaries | 1/1 | Complete | n/a |
 | 116. Claim Boundary Guardrails | 1/1 | Complete | n/a |
 | 117. First-Run User Path | 1/1 | Complete | n/a |
-| 118. Release Candidate Materials | 0/TBD | Not started | n/a |
+| 118. Release Candidate Materials | 1/1 | Complete | n/a |
 
 **Recent Trend:**
 - v1.24 shipped Phases 110-113 on 2026-06-01.
@@ -60,6 +60,8 @@ Progress: [########--] 80%
   canonical, diagnostic-only, provisional, deferred, and unavailable evidence.
 - Phase 117 clarified the first-run user path, trace interpretation, no-trace
   diagnostics, known limitations, and PyTorch ROCm compatibility wording.
+- Phase 118 added release-candidate checklist, release note navigation, README
+  entry points, and release-material guardrails.
 
 ## Accumulated Context
 
@@ -78,7 +80,7 @@ Progress: [########--] 80%
 
 ### Pending Todos
 
-- Plan Phase 118.
+- Run milestone audit.
 
 ### Blockers/Concerns
 
@@ -98,5 +100,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-06-01
-Stopped at: Phase 117 complete; ready to plan Phase 118.
+Stopped at: All v1.25 phases complete; ready for milestone audit.
 Resume file: None
