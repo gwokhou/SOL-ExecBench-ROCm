@@ -72,8 +72,9 @@ from sol_execbench.core.bench.eval_runtime import (  # noqa: E402
     load_reference_function,
     load_staged_problem,
     load_user_function,
+    measure_latency,
+    measure_reference_latency,
 )
-from sol_execbench.core.bench.timing import time_runnable  # noqa: E402
 from sol_execbench.core.bench.utils import (  # noqa: E402
     call_and_collect_outputs,
     make_eval,
@@ -151,7 +152,7 @@ ref_namespace = vars(_ref_module)
 # Capture id() of every function that affects measurement or correctness.
 # Checked after user code import and after each user_fn() call.
 _CRITICAL_NAMES = [
-    "time_runnable",
+    "measure_latency",
     "compute_error_stats",
     "check_monkey_patch",
     "check_lazy_outputs",
@@ -433,7 +434,7 @@ for _workload in workloads:
                 break
 
             # Capture stable post-JIT thread count; the check after
-            # time_runnable will catch threads injected during timing.
+            # measure_latency will catch threads injected during timing.
             _threads_before = threading.active_count()
 
             if _reward_hack_check(_workload, check_lazy_outputs, _user_outputs):
@@ -499,7 +500,7 @@ for _workload in workloads:
         _timing_outputs = (
             allocate_outputs(definition, _resolved_axes, _device) if _dps else []
         )
-        _sol_latency_raw = time_runnable(
+        _sol_timing = measure_latency(
             user_fn,
             _inputs,
             _timing_outputs,
@@ -507,8 +508,9 @@ for _workload in workloads:
             warmup=bench_config.warmup_runs,
             rep=bench_config.iterations,
         )
-        assert isinstance(_sol_latency_raw, (int, float))
-        _sol_latency_ms = float(_sol_latency_raw)
+        if _sol_timing.failure is not None:
+            raise RuntimeError(_sol_timing.failure)
+        _sol_latency_ms = _sol_timing.latency_ms
     except Exception as _e:
         _emit(
             Trace(
@@ -534,20 +536,17 @@ for _workload in workloads:
     # -- Reference latency (for speedup factor) —always return-value style --
     # Inputs are cloned (not regenerated) since the reference cannot cheat.
     _ref_latency_ms = 0.0
+    _ref_timing_failure = None
     if bench_config.benchmark_reference:
-        try:
-            _ref_latency_raw = time_runnable(
-                ref_fn,
-                _inputs,
-                [],
-                _device,
-                warmup=bench_config.warmup_runs,
-                rep=bench_config.iterations,
-            )
-            assert isinstance(_ref_latency_raw, (int, float))
-            _ref_latency_ms = float(_ref_latency_raw)
-        except Exception:
-            pass
+        _ref_timing = measure_reference_latency(
+            ref_fn,
+            _inputs,
+            _device,
+            warmup=bench_config.warmup_runs,
+            rep=bench_config.iterations,
+        )
+        _ref_latency_ms = _ref_timing.latency_ms
+        _ref_timing_failure = _ref_timing.failure
 
     _speedup = _ref_latency_ms / _sol_latency_ms if _sol_latency_ms > 0 else 0.0
 
@@ -567,6 +566,7 @@ for _workload in workloads:
                     reference_latency_ms=_ref_latency_ms,
                     speedup_factor=_speedup,
                 ),
+                extra_msg=_ref_timing_failure,
             ),
         )
     )
