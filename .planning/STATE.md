@@ -4,13 +4,13 @@ milestone: v1.21
 milestone_name: Codebase Debt Reduction and Execution Boundary Hardening
 status: planning
 last_updated: "2026-06-01T03:16:53.841Z"
-last_activity: 2026-06-01
+last_activity: 2026-06-01 — Phase 94 complete
 progress:
   total_phases: 6
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 12
-  completed_plans: 0
-  percent: 0
+  completed_plans: 2
+  percent: 17
 ---
 
 # Project State
@@ -24,10 +24,10 @@ See: `.planning/PROJECT.md` (updated 2026-06-01)
 
 ## Current Position
 
-Phase: Not started (ready for Phase 94)
+Phase: 95 Eval Driver Runtime Decomposition
 Plan: —
-Status: Roadmap defined
-Last activity: 2026-06-01 — Milestone v1.21 roadmap created
+Status: Phase 94 complete; ready for Phase 95
+Last activity: 2026-06-01 — Phase 94 complete
 
 ## Performance Metrics
 
@@ -111,6 +111,7 @@ Last activity: 2026-06-01 — Milestone v1.21 roadmap created
 - v1.21 derives phases only from `.planning/codebase/CONCERNS.md` concerns that can be resolved through code, tests, docs, and repeatable local verification.
 - v1.21 must not claim hard sandboxing, multi-tenant safety, CDNA3/MI300X/CDNA4 validation, paper-scale SOLAR parity, hosted leaderboard readiness, or one-for-one native ROCm replacement proof for every former NVIDIA category.
 - v1.21 refactors and tests must preserve canonical Trace, Definition, Workload, Solution, timing, correctness, score, and evaluator contract schemas.
+- [Phase 94]: Dataset runner selection/run-state and closure/provenance helpers moved into `sol_execbench.core.dataset.run_state` and `sol_execbench.core.dataset.run_closure`; `scripts/run_dataset.py` retains thin compatibility wrappers and CLI orchestration.
 
 ### Pending Todos
 
@@ -165,7 +166,7 @@ None.
 ## Session Continuity
 
 Last session: 2026-06-01T11:16:53+08:00
-Stopped at: Milestone v1.21 roadmap created
+Stopped at: Phase 94 complete
 Resume file: None
 
 ## Operator Next Steps
