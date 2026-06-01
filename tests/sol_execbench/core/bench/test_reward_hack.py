@@ -302,6 +302,10 @@ class TestStaticSourceReview:
             "import requests\ndef run(x):\n    return requests.request('GET', 'http://localhost')\n",
             "import torch\ns = torch.cuda.ExternalStream(1)\ndef run(x):\n    return x\n",
             "def run(x):\n    cache = {}\n    return cache.setdefault(x.data_ptr(), x)\n",
+            "import os as runtime_os\ndef run(x):\n    runtime_os.system('true')\n    return x\n",
+            "from os import system as run_process\ndef run(x):\n    run_process('true')\n    return x\n",
+            "import torch as t\ns = t.cuda.Stream()\ndef run(x):\n    return x\n",
+            "from torch.cuda import Stream as HiddenStream\ns = HiddenStream()\n",
         ],
     )
     def test_reports_ast_detected_bypass_families(self, content):
