@@ -37,14 +37,14 @@ ExecBench.
 - [x] **BOUNDARY-02**: Clock and timing tests include representative ROCm SMI/device fixture outputs, unsupported/low-power states, and memory-pressure or timing-diagnostic guardrails that do not require real hardware.
 - [x] **BOUNDARY-03**: Static evidence tests cover partial, unavailable, failed, and toolchain-variant parser states using bounded fixtures.
 - [x] **BOUNDARY-04**: Dataset resume and closure tests cover stale traces, stale closure provenance, capped workloads, ready subsets, reruns, missing traces, and derived-evidence combinations.
-- [ ] **BOUNDARY-05**: Trace/log and native-build-risk documentation explains what benchmark outputs may contain and when users must use external isolation or scrubbing before publishing.
+- [x] **BOUNDARY-05**: Trace/log and native-build-risk documentation explains what benchmark outputs may contain and when users must use external isolation or scrubbing before publishing.
 
 ### Documentation And Claim Guardrails
 
-- [ ] **DOCS-01**: `CONCERNS.md` is updated at milestone completion to distinguish fixed, narrowed, accepted, and externally blocked concerns.
-- [ ] **DOCS-02**: Public docs state that v1.21 reduces codebase debt and boundary ambiguity but does not add hard sandboxing, multi-tenant safety, CDNA3/MI300X validation, paper-scale parity, or leaderboard authority.
-- [ ] **DOCS-03**: Tests guard against wording that turns diagnostic static evidence, profiler evidence, Docker/container evidence, or local AMD SOL/SOLAR interpretations into stronger claims.
-- [ ] **DOCS-04**: Developer documentation explains the new helper/module boundaries for dataset execution, eval driver runtime, scoring derivation, and static evidence.
+- [x] **DOCS-01**: `CONCERNS.md` is updated at milestone completion to distinguish fixed, narrowed, accepted, and externally blocked concerns.
+- [x] **DOCS-02**: Public docs state that v1.21 reduces codebase debt and boundary ambiguity but does not add hard sandboxing, multi-tenant safety, CDNA3/MI300X validation, paper-scale parity, or leaderboard authority.
+- [x] **DOCS-03**: Tests guard against wording that turns diagnostic static evidence, profiler evidence, Docker/container evidence, or local AMD SOL/SOLAR interpretations into stronger claims.
+- [x] **DOCS-04**: Developer documentation explains the new helper/module boundaries for dataset execution, eval driver runtime, scoring derivation, and static evidence.
 
 ## Future Requirements
 
@@ -55,6 +55,7 @@ ExecBench.
 ### Hardware Validation
 
 - **HW-01**: A future milestone can record real CDNA3/MI300X/CDNA4 or native-host validation evidence gated by v1.20 consistency/stability and v1.21 boundary guardrails.
+- **HW-02**: CDNA 3, MI300X, CDNA 4, or native-host ROCm validation expansion remains deferred until real hardware evidence is recorded.
 
 ### Paper And Leaderboard Equivalence
 
@@ -99,14 +100,14 @@ ExecBench.
 | BOUNDARY-02 | Phase 98 | Complete |
 | BOUNDARY-03 | Phase 98 | Complete |
 | BOUNDARY-04 | Phase 98 | Complete |
-| BOUNDARY-05 | Phase 99 | Planned |
-| DOCS-01 | Phase 99 | Planned |
-| DOCS-02 | Phase 99 | Planned |
-| DOCS-03 | Phase 99 | Planned |
-| DOCS-04 | Phase 99 | Planned |
+| BOUNDARY-05 | Phase 99 | Complete |
+| DOCS-01 | Phase 99 | Complete |
+| DOCS-02 | Phase 99 | Complete |
+| DOCS-03 | Phase 99 | Complete |
+| DOCS-04 | Phase 99 | Complete |
 
 **Coverage:**
-- v1 requirements: 23 total, 18 complete
+- v1 requirements: 23 total, 23 complete
 - Mapped to phases: 23
 - Unmapped: 0
 

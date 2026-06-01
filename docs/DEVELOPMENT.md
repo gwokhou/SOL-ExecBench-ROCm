@@ -98,6 +98,22 @@ artifacts, caches, and virtual environments.
 | `tests/examples/` | Example consistency and workflow coverage. |
 | `tests/docker/dependencies/` | Container dependency and ROCm runtime readiness checks. |
 
+## v1.21 Helper Boundaries
+
+v1.21 moved focused debt out of monolithic paths without changing public
+benchmark schemas.
+
+| Boundary | Helper modules | Still owned by orchestrator/template |
+| --- | --- | --- |
+| Dataset execution | `core.dataset.run_state`, `core.dataset.run_closure`, `core.dataset.evidence_refs` | `scripts/run_dataset.py` CLI parsing, subprocess invocation, and high-level loop flow. |
+| Eval driver runtime | `core.bench.eval_runtime` | `driver/templates/eval_driver.py` subprocess context, correctness/timing loop, trace emission, and integration smoke behavior. |
+| AMD bound analysis | `core.scoring.amd_bound_classification`, `core.scoring.amd_bound_estimate_families` | FX/AST graph extraction, family annotation, and formula bodies in existing scoring modules. |
+| SOLAR derivation | `core.scoring.solar_derivation_status` | Sidecar dataclasses, parser validation, semantic group construction, and rendering. |
+| Static evidence | `core.bench.static_kernel_status` | Artifact persistence, tool routing, bounded extractor execution, and sidecar model definitions. |
+
+These boundaries are maintainability aids. They are not security isolation,
+hardware validation, paper-scale parity evidence, or leaderboard authority.
+
 ## CLI And Runtime Notes
 
 The main console script is `sol-execbench`, backed by
