@@ -15,22 +15,22 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
 ## Current State
 
-**Shipped version:** v1.21 Codebase Debt Reduction and Execution Boundary
-Hardening, completed 2026-06-01.
+**Shipped version:** v1.22 Concern Closure and Execution Boundary Hardening,
+completed 2026-06-01.
 
-**Current milestone:** v1.22 Concern Closure and Execution Boundary Hardening.
+**Current milestone:** None. Ready for the next milestone definition.
 
-**Latest milestone outcome:** v1.21 narrowed major codebase debt by extracting
-dataset runner helpers, eval-driver runtime helpers, AMD bound/SOLAR/static
-evidence helpers, and focused execution-boundary tests while preserving
-canonical Trace, Definition, Workload, Solution, correctness, timing, score,
-and evaluator contract schemas.
+**Latest milestone outcome:** v1.22 closed or narrowed the remaining
+code-actionable concerns in `.planning/codebase/CONCERNS.md`: dataset runner
+execution seams, eval-driver timing diagnostics and framing, AST-aware source
+review with structured boundary evidence, scoring/static-evidence fixtures,
+dependency/closure/marker guardrails, and an updated concern status map. It
+preserved canonical Trace, Definition, Workload, Solution, correctness, timing,
+score, and evaluator contract schemas while keeping hardware validation,
+paper-scale parity, leaderboard readiness, and hard sandboxing explicitly
+deferred.
 
-**Next milestone goal:** close the remaining code-fixable concerns identified
-in `.planning/codebase/CONCERNS.md`, with emphasis on runner/evaluator
-maintainability, source-review precision, reference-timing diagnostics,
-scoring-fixture coverage, and preserving milestone-management context in the
-concerns map.
+**Next milestone goal:** not defined yet.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline.
 Milestones v1.1-v1.6 added CDNA 3 code/schema support, maintained residue
@@ -95,6 +95,12 @@ The v1.21 milestone reduced codebase debt and hardened execution boundaries by
 extracting dataset runner, eval-driver runtime, AMD/SOLAR, and static-evidence
 helpers; adding boundary regressions; and documenting which concerns remain
 externally deferred.
+The v1.22 milestone closed the remaining code-actionable concern-map items by
+finishing dataset runner seams, eval-driver diagnostics, source-review boundary
+evidence, scoring/static-evidence fixtures, dependency/closure/marker
+guardrails, and concern-map stewardship while preserving explicit deferred
+boundaries for hardware validation, paper parity, leaderboard readiness, and
+hard sandboxing.
 
 ## Current Milestone: v1.22 Concern Closure and Execution Boundary Hardening
 
