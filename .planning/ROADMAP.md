@@ -32,9 +32,9 @@
 **Active milestone:** v1.21 Codebase Debt Reduction and Execution Boundary
 Hardening.
 
-**Status:** Phase 98 complete; ready for Phase 99 planning.
+**Status:** Phase 99 complete; ready for milestone audit and cleanup.
 
-**Next step:** Run `$gsd-discuss-phase 99` or `$gsd-plan-phase 99`.
+**Next step:** Run milestone audit and completion cleanup.
 
 ## Phases
 
@@ -43,7 +43,7 @@ Hardening.
 - [x] **Phase 96: AMD Bound Graph And Estimate Modularization** - Maintainers can change AMD bound graph extraction and estimate formulas by operation family with focused tests.
 - [x] **Phase 97: SOLAR Derivation And Static Evidence Modularization** - Maintainers can work on SOLAR derivation and static evidence through isolated provenance, parser, status, and rendering helpers.
 - [x] **Phase 98: Execution Boundary Test Hardening** - Known fragile areas gain CPU-safe and ROCm-aware tests for reward-hack, clock/timing, static evidence, and dataset closure edge cases.
-- [ ] **Phase 99: Boundary Documentation And Final Concern Closure** - Public docs, guardrails, and `CONCERNS.md` accurately separate fixed debt, narrowed risks, accepted limits, and future external work.
+- [x] **Phase 99: Boundary Documentation And Final Concern Closure** - Public docs, guardrails, and `CONCERNS.md` accurately separate fixed debt, narrowed risks, accepted limits, and future external work.
 
 ## Phase Details
 
@@ -124,8 +124,8 @@ Hardening.
   4. Developer docs explain new module boundaries for dataset execution, eval driver runtime, scoring derivation, and static evidence.
   5. Final milestone audit can verify all v1.21 requirements are mapped, tested, and boundary-safe.
 **Plans**:
-  - [ ] 99-01 Docs And Claim Guardrails
-  - [ ] 99-02 Concern Closure And Milestone Audit Prep
+  - [x] 99-01 Docs And Claim Guardrails
+  - [x] 99-02 Concern Closure And Milestone Audit Prep
 
 ## Progress
 
@@ -139,10 +139,10 @@ Phases execute in numeric order: 94 -> 95 -> 96 -> 97 -> 98 -> 99.
 | 96. AMD Bound Graph And Estimate Modularization | 2/2 | Complete | 2026-06-01 |
 | 97. SOLAR Derivation And Static Evidence Modularization | 2/2 | Complete | 2026-06-01 |
 | 98. Execution Boundary Test Hardening | 2/2 | Complete | 2026-06-01 |
-| 99. Boundary Documentation And Final Concern Closure | 0/2 | Planned | — |
+| 99. Boundary Documentation And Final Concern Closure | 2/2 | Complete | 2026-06-01 |
 
 **Coverage:**
 - Requirements mapped: 23/23
-- Requirements complete: 18/23
+- Requirements complete: 23/23
 - Flow count: 6 phases
 - Residual blockers: 0

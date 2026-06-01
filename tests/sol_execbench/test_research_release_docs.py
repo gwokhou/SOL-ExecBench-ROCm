@@ -63,6 +63,33 @@ def test_claims_doc_requires_evidence_before_claim_upgrades():
         assert required in text
 
 
+def test_v1_21_docs_keep_debt_reduction_separate_from_external_claims():
+    claims = _read_doc("docs/CLAIMS.md")
+    development = _read_doc("docs/DEVELOPMENT.md")
+    concerns = _read_doc(".planning/codebase/CONCERNS.md")
+
+    for required in (
+        "v1.21 reduces codebase debt",
+        "does not add hard sandboxing",
+        "multi-tenant safety",
+        "paper-scale SOLAR parity",
+        "hosted leaderboard authority",
+    ):
+        assert required in claims
+
+    for helper in (
+        "core.dataset.run_state",
+        "core.bench.eval_runtime",
+        "core.scoring.amd_bound_classification",
+        "core.scoring.solar_derivation_status",
+        "core.bench.static_kernel_status",
+    ):
+        assert helper in development
+
+    for status in ("Narrowed", "Externally blocked/deferred"):
+        assert status in concerns
+
+
 def test_curated_slice_defines_scope_commands_and_artifacts():
     text = _read_doc("docs/curated_rocm_slice.md")
 

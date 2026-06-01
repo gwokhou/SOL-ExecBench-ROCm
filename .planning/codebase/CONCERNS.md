@@ -1,16 +1,29 @@
 # Codebase Concerns
 
 **Analysis Date:** 2026-05-31
+**v1.21 Update:** 2026-06-01
+
+## v1.21 Closure Status
+
+| Category | Status | Notes |
+| --- | --- | --- |
+| Dataset runner helper debt | Narrowed | Selection, run-state, closure, provenance, and derived-evidence refs now have package helpers and focused tests. The script remains the CLI orchestrator. |
+| Eval driver template drift | Narrowed | Staged problem/reference/user import setup moved to `core.bench.eval_runtime`; timing/correctness/trace glue remains in the subprocess template. |
+| AMD/SOLAR/static evidence monoliths | Narrowed | Classification, estimate dispatch, SOLAR status/boundary, and static extractor aggregate helpers are split out with focused tests. Parser/formula/extractor bodies remain substantial. |
+| Reward-hack, clock, static evidence, dataset closure tests | Narrowed | Additional CPU-safe guardrails cover known bypass families, unsupported clock output, static aggregate states, and derived-evidence closure combinations. |
+| Hard sandbox, multi-tenant safety, CDNA3/MI300X validation, paper-scale parity, hosted leaderboard readiness | Externally blocked/deferred | These require runner architecture, hardware evidence, paper-scale execution, policy, and operations work outside v1.21. |
 
 ## Tech Debt
 
 **Large Monolithic Analysis Modules:**
+- v1.21 status: Narrowed. Operation-family classification, estimate dispatch grouping, SOLAR status/source-boundary helpers, and static extractor aggregate status helpers are now separate modules with tests. Full parser/formula/extractor decomposition remains future work.
 - Issue: The AMD/SOLAR scoring and graph derivation logic is concentrated in very large files with many tightly coupled helper functions and implicit semantic rules.
 - Files: `src/sol_execbench/core/scoring/solar_derivation.py`, `src/sol_execbench/core/scoring/amd_bound_graph.py`, `src/sol_execbench/core/scoring/amd_bound_estimates.py`, `src/sol_execbench/core/bench/static_kernel_evidence.py`
 - Impact: Changes to one operation family, confidence rule, or evidence field can regress unrelated scoring paths. Review and test selection are harder because behavior is not isolated by operation family or evidence layer.
 - Fix approach: Split by responsibility: graph extraction, operator-family classification, bound formulas, evidence serialization, and aggregate report rendering. Keep public schemas stable and move family-specific behavior behind small pure helpers with focused tests in `tests/sol_execbench/test_amd_bound_graph.py`, `tests/sol_execbench/test_amd_bound_estimates.py`, and `tests/sol_execbench/test_solar_derivation_evidence.py`.
 
 **Dataset Runner Script Accretion:**
+- v1.21 status: Narrowed. Dataset selection/run-state and closure/provenance helpers now live under `sol_execbench.core.dataset`; `scripts/run_dataset.py` still owns CLI orchestration and subprocess execution.
 - Issue: `scripts/run_dataset.py` combines CLI argument parsing, dataset selection, execution, resume behavior, trace inspection, closure provenance, derived evidence, scoring, report writing, and output cleanup in one large script.
 - Files: `scripts/run_dataset.py`
 - Impact: Resume behavior and provenance handling are fragile because execution, filtering, skipping, and derived-report extension share mutable local state. A small change to `--max-workloads`, `--rerun`, or scoring flags can change closure semantics. Derived evidence reference construction is now isolated in `sol_execbench.core.dataset.evidence_refs`, but the main runner state machine remains monolithic.
@@ -29,6 +42,7 @@
 - Fix approach: Prefer `with ProblemPackager(...)` or explicit `close()` in new call sites. Gradually migrate existing callers away from destructor reliance while preserving `keep_output_dir` behavior.
 
 **Generated Driver Template Drift:**
+- v1.21 status: Narrowed. Staged problem loading, reference loading, entry-point parsing, native ROCm detection, dynamic extension blocking, and user function loading now live in `sol_execbench.core.bench.eval_runtime`.
 - Issue: Evaluation behavior lives in a copied template script rather than an importable runtime module.
 - Files: `src/sol_execbench/driver/templates/eval_driver.py`, `src/sol_execbench/driver/problem_packager.py`, `tests/sol_execbench/driver/test_eval_driver.py`
 - Impact: Template edits are harder to type-check and share with the rest of the package. Runtime failures appear only after staging and subprocess execution. Shape/dtype structural output validation and output-call normalization are now delegated to importable helpers, but most evaluation flow still lives in the template.

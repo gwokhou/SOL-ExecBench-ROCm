@@ -19,6 +19,12 @@ not add full 235-problem paper validation, CDNA3/MI300X/CDNA4 validation,
 native-host Matrix authority, hosted leaderboard readiness, upstream SOLAR
 parity, score authority, or new-hardware validation.
 
+v1.21 reduces codebase debt and boundary ambiguity through helper extraction,
+CPU-safe guardrail tests, and clearer documentation. It does not add hard sandboxing,
+multi-tenant safety, CDNA3/MI300X validation, paper-scale SOLAR parity, hosted
+leaderboard authority, or one-for-one native ROCm replacement proof for every
+former NVIDIA library category. In particular, v1.21 does not provide hosted leaderboard authority.
+
 | Claim level | Allowed claim | Required evidence |
 | --- | --- | --- |
 | ROCm-port evidence | The CLI, schemas, isolated evaluation, correctness checks, reward-hack checks, trace JSONL, and selected examples run through ROCm-specific paths. | Passing tests for the touched surface, canonical trace examples, and ROCm environment documentation. |
@@ -28,6 +34,7 @@ parity, score authority, or new-hardware validation.
 | Static Kernel Evidence | A HIP/C++ run produced diagnostic static build artifacts and bounded routed extractor outputs. | `--static-evidence auto`, `<trace>.static-evidence.json`, persisted artifact paths, `llvm-objdump` / `readelf` tool-run records, and diagnostic-only authority flags. |
 | v1.19 sidecar evidence | Execution closure, paper denominator, Matrix schema export, Matrix semantic diff, and AMD bound sanity artifacts were generated or inspected under bounded report semantics. | `docs/v1_19_evidence_guide.md`, explicit sidecar/report paths, relative source refs, checksums, false authority fields, and focused CPU-safe docs/contract guardrails. |
 | v1.20 evidence-quality review | Consistency, stability, claim-upgrade, and trust-summary artifacts were generated or inspected under bounded report semantics. | `docs/v1_20_evidence_quality_guide.md`, source refs, checksums, false authority fields, and CPU-safe docs/contract guardrails. |
+| v1.21 debt-reduction evidence | Dataset, evaluator, analysis, SOLAR/static evidence, and boundary tests were refactored or hardened under stable public schemas. | Focused helper tests, unchanged sidecar schemas, `CONCERNS.md` status categories, and explicit non-claim wording. |
 | AMD-native-derived evidence | A score or bound report was derived from ROCm traces and AMD-side bound artifacts. | Canonical traces, AMD SOL bound sidecars, hardware model refs, score eligibility state, and warnings. |
 | Research-preview evidence | A curated benchmark slice was executed or audited under documented limits. | Slice definition, command transcript or expected commands, artifact list, pass/fail/skip/unavailable accounting, and known gaps. |
 
@@ -105,6 +112,9 @@ leaderboard authority.
 - v1.19 sidecar/report evidence as full paper validation, upstream SOLAR parity,
   score authority, leaderboard readiness, native-host ROCm Matrix validation,
   CDNA 3/MI300X/CDNA4 validation, or new-hardware validation.
+- v1.21 helper extraction, guardrail tests, or documentation updates as hard
+  sandboxing, multi-tenant safety, paper-scale SOLAR parity, CDNA3/MI300X
+  validation, or hosted leaderboard readiness.
 
 ## Claim Upgrade Rules
 
