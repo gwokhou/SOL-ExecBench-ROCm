@@ -165,7 +165,11 @@ def _run_eval_driver_process(
     )
     (tmp_path / "config.json").write_text(json.dumps(cfg))
 
-    env = {**os.environ, "SOL_EXECBENCH_CLOCKS_LOCKED": "0"}
+    env = {
+        **os.environ,
+        "SOL_EXECBENCH_CLOCKS_LOCKED": "0",
+        "SOL_EXECBENCH_ALLOW_CPU_TIMING": "1",
+    }
     if extra_env:
         env.update(extra_env)
 
