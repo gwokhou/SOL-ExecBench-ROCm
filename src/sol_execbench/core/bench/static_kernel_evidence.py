@@ -17,6 +17,10 @@ from typing import Annotated, Literal
 from pydantic import BeforeValidator, ConfigDict, Field
 
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
+from sol_execbench.core.bench.static_kernel_status import (
+    aggregate_extractor_reason_value,
+    aggregate_extractor_status_value,
+)
 from sol_execbench.core.environment import ProbeCompletedProcess
 from sol_execbench.core.toolchain import (
     ProbeRunner,
@@ -924,45 +928,32 @@ def _reason_for_route_status(
 def _aggregate_extractor_status(
     tool_runs: Sequence[StaticKernelEvidenceToolRun],
 ) -> StaticKernelEvidenceStatus:
-    executable_runs = [run for run in tool_runs if run.command]
-    successes = [
-        run
-        for run in executable_runs
-        if run.status == StaticKernelEvidenceStatus.COLLECTED
-    ]
-    failures = [
-        run for run in executable_runs if run.status == StaticKernelEvidenceStatus.FAILED
-    ]
-    if successes and len(successes) == len(executable_runs):
-        return StaticKernelEvidenceStatus.COLLECTED
-    if successes:
-        return StaticKernelEvidenceStatus.PARTIAL
-    if failures and len(failures) == len(executable_runs):
-        return StaticKernelEvidenceStatus.FAILED
-    return StaticKernelEvidenceStatus.UNAVAILABLE
+    return aggregate_extractor_status_value(
+        tuple(tool_runs),
+        collected=StaticKernelEvidenceStatus.COLLECTED,
+        partial=StaticKernelEvidenceStatus.PARTIAL,
+        failed=StaticKernelEvidenceStatus.FAILED,
+        unavailable=StaticKernelEvidenceStatus.UNAVAILABLE,
+    )
 
 
 def _aggregate_extractor_reason(
     tool_runs: Sequence[StaticKernelEvidenceToolRun],
 ) -> StaticKernelEvidenceReasonCode:
     status = _aggregate_extractor_status(tool_runs)
-    if status == StaticKernelEvidenceStatus.COLLECTED:
-        return StaticKernelEvidenceReasonCode.STATIC_EVIDENCE_COLLECTED
-    if status == StaticKernelEvidenceStatus.PARTIAL:
-        if any(
-            run.reason_code == StaticKernelEvidenceReasonCode.PARTIAL_DISASSEMBLY_ONLY
-            for run in tool_runs
-        ):
-            return StaticKernelEvidenceReasonCode.PARTIAL_DISASSEMBLY_ONLY
-        return StaticKernelEvidenceReasonCode.PARTIAL_ARTIFACT_METADATA
-    if status == StaticKernelEvidenceStatus.FAILED:
-        if any(
-            run.reason_code == StaticKernelEvidenceReasonCode.EXTRACTOR_TIMEOUT
-            for run in tool_runs
-        ):
-            return StaticKernelEvidenceReasonCode.EXTRACTOR_TIMEOUT
-        return StaticKernelEvidenceReasonCode.EXTRACTOR_FAILED
-    return StaticKernelEvidenceReasonCode.TOOLCHAIN_UNAVAILABLE
+    return aggregate_extractor_reason_value(
+        tuple(tool_runs),
+        status=status,
+        collected_status=StaticKernelEvidenceStatus.COLLECTED,
+        partial_status=StaticKernelEvidenceStatus.PARTIAL,
+        failed_status=StaticKernelEvidenceStatus.FAILED,
+        collected_reason=StaticKernelEvidenceReasonCode.STATIC_EVIDENCE_COLLECTED,
+        partial_reason=StaticKernelEvidenceReasonCode.PARTIAL_ARTIFACT_METADATA,
+        partial_disassembly_reason=StaticKernelEvidenceReasonCode.PARTIAL_DISASSEMBLY_ONLY,
+        failed_reason=StaticKernelEvidenceReasonCode.EXTRACTOR_FAILED,
+        timeout_reason=StaticKernelEvidenceReasonCode.EXTRACTOR_TIMEOUT,
+        unavailable_reason=StaticKernelEvidenceReasonCode.TOOLCHAIN_UNAVAILABLE,
+    )
 
 
 def _classification_from_tool_runs(
