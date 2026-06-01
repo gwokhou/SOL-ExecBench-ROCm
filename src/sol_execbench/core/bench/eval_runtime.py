@@ -69,9 +69,13 @@ def measure_latency(
     rep: int,
     time_fn: Callable[..., Any] | None = None,
 ) -> TimingResult:
-    """Measure callable latency with a CPU fallback for subprocess tests."""
+    """Measure callable latency with an opt-in CPU fallback for subprocess tests."""
     try:
-        if device == "cpu" and time_fn is None:
+        if (
+            device == "cpu"
+            and time_fn is None
+            and os.environ.get("SOL_EXECBENCH_ALLOW_CPU_TIMING") == "1"
+        ):
             return TimingResult(
                 latency_ms=_cpu_time_runnable(
                     fn,
