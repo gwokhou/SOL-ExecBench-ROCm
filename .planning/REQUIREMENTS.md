@@ -42,12 +42,12 @@ ExecBench.
 
 ### Public Publishing Materials
 
-- [ ] **PUBLISH-01**: Maintainer can prepare a GitHub prerelease draft or
+- [x] **PUBLISH-01**: Maintainer can prepare a GitHub prerelease draft or
   equivalent public release page from repository docs.
-- [ ] **PUBLISH-02**: Public release materials link the artifact bundle,
+- [x] **PUBLISH-02**: Public release materials link the artifact bundle,
   support matrix, claim boundaries, first-run guide, timing semantics,
   researcher guide, and known limitations.
-- [ ] **PUBLISH-03**: Public release wording consistently describes the result
+- [x] **PUBLISH-03**: Public release wording consistently describes the result
   as an engineering prerelease and research preview, not a stable benchmark
   authority release.
 
@@ -102,9 +102,9 @@ ExecBench.
 | RESEARCH-01 | Phase 121 | Complete |
 | RESEARCH-02 | Phase 121 | Complete |
 | RESEARCH-03 | Phase 121 | Complete |
-| PUBLISH-01 | Phase 122 | Pending |
-| PUBLISH-02 | Phase 122 | Pending |
-| PUBLISH-03 | Phase 122 | Pending |
+| PUBLISH-01 | Phase 122 | Complete |
+| PUBLISH-02 | Phase 122 | Complete |
+| PUBLISH-03 | Phase 122 | Complete |
 
 **Coverage:**
 - v1.26 requirements: 12 total

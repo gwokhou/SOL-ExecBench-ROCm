@@ -20,7 +20,7 @@
 
 **Active milestone:** v1.26 Public Prerelease and Research Preview.
 
-**Status:** Phase 121 complete; ready to plan Phase 122.
+**Status:** All v1.26 phases complete; ready for milestone audit.
 
 **Milestone goal:** Produce a publishable engineering prerelease and research
 preview package with versioned validation artifacts, release-readiness checks,
@@ -43,7 +43,7 @@ benchmark-authority claims.
 - [x] **Phase 121: Research Preview Evidence Package** - Researchers can read
   and trace the bounded methodology, evidence surfaces, and non-claims behind
   the prerelease.
-- [ ] **Phase 122: Public Publishing Materials** - Maintainers can prepare a
+- [x] **Phase 122: Public Publishing Materials** - Maintainers can prepare a
   GitHub prerelease or equivalent public release page with correct links and
   bounded wording.
 
@@ -104,7 +104,8 @@ support boundaries, and research-preview wording.
      guide, timing semantics, researcher guide, and known limitations.
   3. Public wording consistently says engineering prerelease and research
      preview, not stable benchmark authority.
-**Plans**: TBD
+**Plans**: 122-01-PLAN.md
+**Status**: Complete
 
 ## Progress
 
@@ -116,10 +117,10 @@ Phases execute in numeric order: 119 -> 120 -> 121 -> 122.
 | 119. Versioned Prerelease Artifact Bundle | 1/1 | Complete | 2026-06-01 |
 | 120. Release Readiness Gates | 1/1 | Complete | 2026-06-01 |
 | 121. Research Preview Evidence Package | 1/1 | Complete | 2026-06-01 |
-| 122. Public Publishing Materials | 0/TBD | Not started | - |
+| 122. Public Publishing Materials | 1/1 | Complete | 2026-06-01 |
 
 **Coverage:**
 - v1.26 requirements mapped: 12/12
-- v1.26 requirements complete: 9/12
+- v1.26 requirements complete: 12/12
 - Orphaned requirements: 0
 - Duplicate requirement mappings: 0

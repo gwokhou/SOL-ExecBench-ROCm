@@ -168,6 +168,10 @@ Legacy CUDA/NVIDIA schema values such as `cuda_cpp`, `cublas`, `cudnn`,
 
 - [v1.25 Engineering Prerelease Notes](docs/v1_25_release_notes.md): shipped capability, validation evidence, known limitations, and deferred claims.
 - [v1.25 Prerelease Checklist](docs/v1_25_prerelease_checklist.md): maintainer checklist from clean tree to tagged release candidate.
+- [v1.26 Artifact Bundle](docs/prerelease_artifact_bundle.md): versioned prerelease artifact bundle generation and authority classes.
+- [v1.26 Readiness Gates](docs/prerelease_readiness.md): prerelease gate for required artifacts, checksums, claim boundaries, and known gaps.
+- [v1.26 Research Preview](docs/research_preview.md): methodology, evidence surfaces, representative commands, and non-claims.
+- [v1.26 Public Prerelease Guide](docs/public_prerelease.md): public release-page checklist and publishing wording.
 - [Getting Started](docs/GETTING-STARTED.md): prerequisites, installation, first run, and setup issues.
 - [Architecture](docs/ARCHITECTURE.md): package layers, data flow, subprocess isolation, and ROCm boundaries.
 - [Development](docs/DEVELOPMENT.md): local setup, coding style, source areas, and PR process.
