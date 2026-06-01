@@ -40,6 +40,17 @@ former NVIDIA library category. In particular, v1.21 does not provide hosted lea
 
 Docker Matrix Entries may claim **container ROCm user-space validated on recorded host driver/devices** only; a Docker row is not native host ROCm validated without direct native-host validation evidence.
 
+For v1.25 engineering-prerelease support wording:
+
+- RDNA 4 evidence is engineering-prerelease evidence only when backed by the
+  recorded artifacts and commands for that host/scope.
+- Docker/container ROCm user-space evidence is not native-host validation.
+- MI300X is the concrete CDNA 3 hardware target (`gfx942`); full-suite
+  MI300X/CDNA3 validation remains deferred unless complete real-hardware
+  evidence exists.
+- CDNA4 validation is unavailable because suitable hardware is not currently
+  accessible.
+
 ## ROCm Compatibility Matrix
 
 The ROCm Compatibility Matrix is diagnostic sidecar evidence. It does not
@@ -93,6 +104,7 @@ leaderboard authority.
 - Full 124-model extraction or full 235-problem paper validation.
 - CDNA 3 / MI300X or CDNA 4 hardware validation without archived full-suite
   evidence from that hardware class.
+- CDNA4 validation while suitable CDNA4 hardware is not currently accessible.
 - NVFP4 or MXFP4 validation without suitable AMD hardware evidence.
 - `rocprofv3` profiling as correctness or score authority.
 - Toolchain routing as correctness, performance, static-kernel, paper-parity,
