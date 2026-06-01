@@ -2,13 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.22
 milestone_name: Concern Closure and Execution Boundary Hardening
-status: ready_to_plan
-last_updated: "2026-06-01"
-last_activity: 2026-06-01
+status: executing
+stopped_at: v1.22 roadmap created; ready to plan Phase 100.
+last_updated: "2026-06-01T04:58:30.363Z"
+last_activity: 2026-06-01 -- Phase 100 planning complete
 progress:
   total_phases: 6
   completed_phases: 0
-  total_plans: 0
+  total_plans: 2
   completed_plans: 0
   percent: 0
 ---
@@ -26,14 +27,15 @@ See: `.planning/PROJECT.md` (updated 2026-06-01)
 
 Phase: 100 of 105 (Dataset Runner Execution Seams)
 Plan: TBD
-Status: Ready to plan
-Last activity: 2026-06-01 - Created v1.22 roadmap and requirement traceability.
+Status: Ready to execute
+Last activity: 2026-06-01 -- Phase 100 planning complete
 
 Progress: [..........] 0%
 
 ## Performance Metrics
 
 **Velocity:**
+
 - Total plans completed: 0 in v1.22
 - Average duration: n/a
 - Total execution time: 0h
@@ -42,7 +44,7 @@ Progress: [..........] 0%
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 100. Dataset Runner Execution Seams | 0/TBD | Not started | n/a |
+| 100. Dataset Runner Execution Seams | 0/2 | Ready to execute | n/a |
 | 101. Eval Driver Diagnostics And Framing | 0/TBD | Not started | n/a |
 | 102. Source Review And Boundary Evidence | 0/TBD | Not started | n/a |
 | 103. Scoring And Static Evidence Fixtures | 0/TBD | Not started | n/a |
@@ -50,6 +52,7 @@ Progress: [..........] 0%
 | 105. Concern Map Stewardship | 0/TBD | Not started | n/a |
 
 **Recent Trend:**
+
 - Last milestone: v1.21 shipped Phases 94-99 on 2026-06-01.
 - Trend: v1.22 starts with standard-granularity phases focused on closing remaining code-actionable concerns while keeping hardware validation, hard sandboxing, paper parity, and leaderboard work deferred.
 
@@ -90,4 +93,4 @@ Resume file: None
 
 ## Operator Next Steps
 
-- Run `$gsd-plan-phase 100`.
+- Run `$gsd-execute-phase 100`.
