@@ -37,17 +37,9 @@ import json
 import shutil
 import subprocess
 import sys
-from collections.abc import Sequence
 from pathlib import Path
 
 from sol_execbench.core.bench.config import BenchmarkConfig
-from sol_execbench.core.bench.rocm_profiler import (
-    ProfilerRunner,
-    collect_source_timing_evidence,
-)
-from sol_execbench.core.data.definition import Definition
-from sol_execbench.core.data.trace import Trace
-from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.dataset.execution_closure import compare_execution_closure_provenance
 from sol_execbench.core.dataset.evidence_refs import (
     relative_ref as _relative_ref,
@@ -67,11 +59,18 @@ from sol_execbench.core.dataset.runner import (
     _cli_failure_notes,
     _save_cli_log,
     _save_cli_timeout_log,
+    _extend_derived_reports_for_problem,
     build_cli_command,
     build_custom_solution,
     build_reference_solution,
     build_solution_for_problem,
+    build_amd_score_reports_for_problem,
+    collect_timing_evidence_for_problem,
+    inspect_traces,
+    print_summary,
     run_cli,
+    write_amd_score_report,
+    write_summary_report,
 )
 from sol_execbench.core.dataset.run_state import (
     closure_status_for_trace as _run_state_closure_status_for_trace,
@@ -88,25 +87,25 @@ from sol_execbench.core.dataset.run_state import (
 )
 from sol_execbench.core.scoring.amd_score import (
     AmdNativeScore,
-    build_amd_native_suite_report,
-    score_amd_native_trace_workload,
 )
 from sol_execbench.core.scoring.baseline_artifact import (
-    ScoringBaselineArtifact,
     load_scoring_baseline_artifact,
-)
-from sol_execbench.core.scoring.amd_sol import (
-    default_amd_hardware_models,
-)
-from sol_execbench.core.scoring.amd_sol_v2 import build_amd_sol_bound_v2_artifact
-from sol_execbench.core.scoring.solar_derivation import (
-    build_solar_derivation_evidence,
-    solar_derivation_from_dict,
 )
 
 ROOT = Path(__file__).resolve().parent.parent
 
 CATEGORIES = {"L1", "L2", "FlashInfer-Bench", "Quant"}
+
+_SCRIPT_COMPAT_EXPORTS = (
+    _CLI_LOG_LIMIT,
+    _safe_sidecar_stem,
+    _save_cli_log,
+    _save_cli_timeout_log,
+    build_cli_command,
+    build_custom_solution,
+    build_reference_solution,
+    build_amd_score_reports_for_problem,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -126,273 +125,6 @@ def discover_problems(
         benchmark_dir,
         categories,
         known_categories=CATEGORIES,
-    )
-
-
-def collect_timing_evidence_for_problem(
-    *,
-    definition_path: Path,
-    workload_path: Path,
-    solution_path: Path,
-    output_dir: Path,
-    timing_evidence_root: Path,
-    job_name: str,
-    solution: dict,
-    benchmark_config: BenchmarkConfig,
-    timeout: int,
-    config_path: Path | None = None,
-    keep_staging: bool = False,
-    verbose: bool = False,
-    tool_version: str = "rocprofv3",
-    gpu_architecture: str = "unknown",
-    rocprofv3_available: bool = True,
-    runner: ProfilerRunner | None = None,
-) -> dict[str, object]:
-    """Collect source-specific profiler timing evidence for a dataset problem."""
-    languages = solution.get("spec", {}).get("languages", [])
-    if isinstance(languages, str):
-        languages = [languages]
-    elif not isinstance(languages, Sequence):
-        languages = []
-    command = build_cli_command(
-        definition_path=definition_path,
-        workload_path=workload_path,
-        solution_path=solution_path,
-        timeout=timeout,
-        config_path=config_path,
-        keep_staging=keep_staging,
-        verbose=verbose,
-    )
-    evidence_dir = timing_evidence_root / output_dir.name
-    result = collect_source_timing_evidence(
-        application_command=command,
-        languages=tuple(str(language) for language in languages),
-        output_directory=evidence_dir,
-        output_file=job_name,
-        tool_version=tool_version,
-        gpu_architecture=gpu_architecture,
-        rocprofv3_available=rocprofv3_available,
-        runner=runner,
-        warmup_runs=benchmark_config.warmup_runs,
-        iterations=benchmark_config.iterations,
-        trial_count=1,
-        clock_locked=benchmark_config.lock_clocks,
-    )
-    payload = result.to_dict()
-    timing_evidence_root.mkdir(parents=True, exist_ok=True)
-    output_path = timing_evidence_root / f"{output_dir.name}.timing.json"
-    output_path.write_text(json.dumps(payload, indent=2))
-    return payload
-
-
-# ---------------------------------------------------------------------------
-# Trace inspection
-# ---------------------------------------------------------------------------
-
-
-def inspect_traces(traces: list[dict], problem_name: str) -> dict:
-    """Inspect traces for correctness.
-
-    Returns a summary dict with pass/fail counts and per-workload latencies.
-    """
-    total = len(traces)
-    passed = 0
-    failed = 0
-    latencies = []
-    failure_reasons = []
-
-    for trace in traces:
-        evaluation = trace.get("evaluation", {})
-        status = evaluation.get("status", "UNKNOWN")
-
-        if status == "PASSED":
-            passed += 1
-            perf = evaluation.get("performance") or {}
-            latency = perf.get("latency_ms")
-            if latency is not None:
-                latencies.append(latency)
-        else:
-            failed += 1
-            log = evaluation.get("log", "")
-            failure_reasons.append(f"  [{status}] {log[:200]}")
-
-    return {
-        "problem": problem_name,
-        "total": total,
-        "passed": passed,
-        "failed": failed,
-        "latencies_ms": latencies,
-        "failure_reasons": failure_reasons,
-    }
-
-
-def print_summary(summaries: list[dict]):
-    """Print a table summarizing all problem results."""
-    name_width = max((len(s["problem"]) for s in summaries), default=20)
-    name_width = max(name_width, 20)
-    row_width = name_width + 2 + 5 + 1 + 5 + 1 + 8
-
-    print("\n" + "=" * row_width)
-    print(f"{'Problem':<{name_width}}  {'Pass':>5} {'Fail':>5} {'Status':>8}")
-    print("-" * row_width)
-
-    total_problems = len(summaries)
-    all_passed = 0
-    any_failed = 0
-
-    for s in summaries:
-        name = s["problem"]
-        pass_count = s["passed"]
-        fail_count = s["failed"]
-
-        if fail_count == 0:
-            status = "OK"
-            all_passed += 1
-        else:
-            status = "FAIL"
-            any_failed += 1
-
-        print(f"{name:<{name_width}}  {pass_count:>5} {fail_count:>5} {status:>8}")
-
-    print("=" * row_width)
-    print(f"Total: {total_problems} problems | OK: {all_passed} | FAIL: {any_failed}")
-
-
-# ---------------------------------------------------------------------------
-# AMD-native derived score report
-# ---------------------------------------------------------------------------
-
-
-def _hardware_model_key_from_traces(traces: list[Trace]) -> str:
-    """Return the first known AMD gfx key found in trace environment strings."""
-    known = default_amd_hardware_models()
-    for trace in traces:
-        if trace.evaluation is None:
-            continue
-        hardware = trace.evaluation.environment.hardware
-        for key in known:
-            if key in hardware:
-                return key
-    return "gfx1200"
-
-
-def build_amd_score_reports_for_problem(
-    *,
-    definition_payload: dict,
-    workload_path: Path,
-    traces_payload: list[dict],
-    trace_ref: str,
-    baseline_artifact: ScoringBaselineArtifact | None = None,
-    sol_bound_artifact_dir: Path | None = None,
-    solar_derivation_dir: Path | None = None,
-) -> list[AmdNativeScore]:
-    """Build derived AMD-native scores for one dataset-run problem."""
-    definition = Definition(**definition_payload)
-    workloads = {
-        workload.uuid: workload
-        for workload in (
-            Workload(**json.loads(line))
-            for line in workload_path.read_text().splitlines()
-            if line.strip()
-        )
-    }
-    traces = [Trace(**trace) for trace in traces_payload]
-    hardware_models = default_amd_hardware_models()
-    hardware_model_key = _hardware_model_key_from_traces(traces)
-    hardware_model = hardware_models[hardware_model_key]
-    scores: list[AmdNativeScore] = []
-
-    for trace in traces:
-        workload = workloads.get(trace.workload.uuid)
-        artifact = (
-            build_amd_sol_bound_v2_artifact(
-                definition,
-                workload,
-                hardware_model,
-                hardware_model_ref=f"default_amd_hardware_models.{hardware_model_key}",
-            )
-            if workload is not None
-            else None
-        )
-        solar_derivation = None
-        derived_evidence_refs = None
-        solar_derivation_ref = (
-            f"derived:{definition.name}:{trace.workload.uuid}:solar_derivation"
-        )
-        if workload is not None and solar_derivation_dir is not None:
-            solar_derivation_dir.mkdir(parents=True, exist_ok=True)
-            sidecar_stem = _safe_sidecar_stem(definition.name, trace.workload.uuid)
-            sidecar_path = solar_derivation_dir / f"{sidecar_stem}.solar-derivation.json"
-            generated = build_solar_derivation_evidence(definition, workload)
-            sidecar_path.write_text(json.dumps(generated.to_dict(), indent=2))
-            solar_derivation = solar_derivation_from_dict(
-                json.loads(sidecar_path.read_text())
-            )
-            solar_derivation_ref = str(sidecar_path)
-            derived_evidence_refs = {
-                "formula": f"{solar_derivation_ref}#groups.formula_evidence",
-                "hardware_model": f"default_amd_hardware_models.{hardware_model_key}",
-                "coverage": f"{solar_derivation_ref}#coverage_summary",
-                "score_eligibility": f"{solar_derivation_ref}#aggregate_status",
-            }
-        sol_bound_ref = f"derived:{definition.name}:{trace.workload.uuid}:amd_sol_bound_v2"
-        if artifact is not None and sol_bound_artifact_dir is not None:
-            sol_bound_artifact_dir.mkdir(parents=True, exist_ok=True)
-            sidecar_stem = _safe_sidecar_stem(definition.name, trace.workload.uuid)
-            sidecar_path = sol_bound_artifact_dir / f"{sidecar_stem}.amd-sol-v2.json"
-            sidecar_path.write_text(json.dumps(artifact.to_dict(), indent=2))
-            sol_bound_ref = str(sidecar_path)
-        scores.append(
-            score_amd_native_trace_workload(
-                trace,
-                artifact,
-                trace_ref=trace_ref,
-                timing_evidence_ref=trace_ref,
-                sol_bound_ref=sol_bound_ref,
-                baseline_ref=(
-                    f"{baseline_artifact.source}#{definition.name}:{trace.workload.uuid}"
-                    if baseline_artifact
-                    and baseline_artifact.lookup(definition.name, trace.workload.uuid)
-                    is not None
-                    else "trace.evaluation.performance.reference_latency_ms"
-                ),
-                baseline_artifact=baseline_artifact,
-                hardware_model_ref=f"default_amd_hardware_models.{hardware_model_key}",
-                solar_derivation=solar_derivation,
-                derived_evidence_refs=derived_evidence_refs,
-            )
-        )
-    return scores
-
-
-def _extend_derived_reports_for_problem(
-    *,
-    amd_scores: list[AmdNativeScore],
-    definition_path: Path,
-    workload_path: Path,
-    traces_path: Path,
-    traces_payload: list[dict],
-    output_dir: Path,
-    baseline_artifact: ScoringBaselineArtifact | None,
-    sol_bound_artifact_dir: Path | None,
-    solar_derivation_dir: Path | None,
-) -> None:
-    """Append requested derived reports and materialize requested sidecars."""
-    trace_ref = (
-        str(traces_path.relative_to(output_dir))
-        if traces_path.is_relative_to(output_dir)
-        else str(traces_path)
-    )
-    amd_scores.extend(
-        build_amd_score_reports_for_problem(
-            definition_payload=json.loads(definition_path.read_text()),
-            workload_path=workload_path,
-            traces_payload=traces_payload,
-            trace_ref=trace_ref,
-            baseline_artifact=baseline_artifact,
-            sol_bound_artifact_dir=sol_bound_artifact_dir,
-            solar_derivation_dir=solar_derivation_dir,
-        )
     )
 
 
@@ -1062,6 +794,7 @@ def main():
         return
 
     attempted_ready_keys: set[tuple[str, tuple[str, str | int]]] = set()
+    # ROCm execution stays serial here; runner helpers provide the future scheduling seam.
     for i, problem_dir in enumerate(problems):
         problem_name = problem_dir.name
         category = problem_dir.parent.name
@@ -1417,25 +1150,20 @@ def main():
     print_summary(summaries)
 
     # Save summary JSON
-    summary_path = output_dir / "summary.json"
-    summary_path.write_text(json.dumps(summaries, indent=2))
+    summary_path = write_summary_report(output_dir, summaries)
     print(f"\nSummary saved to {summary_path}")
     print(f"Per-problem traces saved under {output_dir}")
 
     if args.amd_score_report is not None:
         report_path = args.amd_score_report.resolve()
-        report_path.parent.mkdir(parents=True, exist_ok=True)
-        report = build_amd_native_suite_report(
+        write_amd_score_report(
+            report_path,
             amd_scores,
-            baseline_summary={
-                "problems": len(summaries),
-                "scores": len(amd_scores),
-                "baseline_entries": (
-                    len(scoring_baseline.entries) if scoring_baseline else 0
-                ),
-            },
+            problem_count=len(summaries),
+            baseline_entry_count=len(scoring_baseline.entries)
+            if scoring_baseline
+            else 0,
         )
-        report_path.write_text(json.dumps(report.to_dict(), indent=2))
         print(f"AMD-native score report saved to {report_path}")
 
     if execution_closure_path is not None:
