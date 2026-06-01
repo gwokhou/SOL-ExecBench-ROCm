@@ -90,6 +90,7 @@ ExecBench.
 | Full 235-problem paper-scale validation | Requires paper-scale execution and evidence beyond an engineering prerelease. |
 | Upstream SOLAR parity | Requires side-by-side comparison against upstream SOLAR outputs and is not needed for prerelease packaging. |
 | MI300X/CDNA3 full-suite validation | Deferred unless a complete real-hardware evidence chain is produced separately. |
+| CDNA 3, MI300X, CDNA 4, or native-host ROCm validation expansion | Legacy guardrail wording remains excluded; for v1.25 interpretation, MI300X is the CDNA3 hardware target rather than a separate architecture target. |
 | CDNA4 validation | Suitable CDNA4 hardware is not currently available. |
 | Hosted leaderboard or remote submission service | Requires service operations, submission policy, and isolation design outside this prerelease. |
 | Hard sandbox or multi-tenant adversarial execution | Requires OS/container isolation architecture beyond the current benchmark harness. |
