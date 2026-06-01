@@ -33,7 +33,6 @@ Usage:
 """
 
 import argparse
-import ast
 import json
 import shutil
 import subprocess
@@ -62,6 +61,17 @@ from sol_execbench.core.dataset.run_closure import (
     stale_provenance_mismatch as _build_stale_provenance_mismatch,
     utc_timestamp as _build_utc_timestamp,
     write_execution_closure as _write_execution_closure_report,
+)
+from sol_execbench.core.dataset.runner import (
+    CLI_LOG_LIMIT as _CLI_LOG_LIMIT,
+    _cli_failure_notes,
+    _save_cli_log,
+    _save_cli_timeout_log,
+    build_cli_command,
+    build_custom_solution,
+    build_reference_solution,
+    build_solution_for_problem,
+    run_cli,
 )
 from sol_execbench.core.dataset.run_state import (
     closure_status_for_trace as _run_state_closure_status_for_trace,
@@ -117,280 +127,6 @@ def discover_problems(
         categories,
         known_categories=CATEGORIES,
     )
-
-
-# ---------------------------------------------------------------------------
-# Solution construction
-# ---------------------------------------------------------------------------
-
-
-def _infer_dps(code: str, definition: dict) -> bool:
-    """Infer destination-passing style by checking the ``run()`` signature.
-
-    If the last parameter of ``run()`` matches the last output name in the
-    definition, the solution writes into pre-allocated output buffers (DPS).
-    """
-    output_names = list(definition.get("outputs", {}).keys())
-    if not output_names:
-        return False
-
-    last_output = output_names[-1]
-
-    try:
-        tree = ast.parse(code)
-    except SyntaxError:
-        return False
-
-    for node in ast.walk(tree):
-        if (
-            isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-            and node.name == "run"
-        ):
-            args = node.args
-            # Last positional arg name
-            if args.args:
-                last_param = args.args[-1].arg
-                return last_param == last_output
-            break
-
-    return False
-
-
-def build_solution_for_problem(
-    definition: dict, problem_dir: Path, solution_name: str | None = None
-) -> dict:
-    """Build a solution for a problem directory.
-
-    If *solution_name* is given, looks for that file inside *problem_dir*.
-    ``.json`` files are loaded directly; ``.py`` files are wrapped as a custom
-    solution.  Falls back to the definition's reference code when the file does
-    not exist or *solution_name* is ``None``.
-    """
-    if solution_name is not None:
-        solution_file = problem_dir / solution_name
-        if solution_file.exists():
-            if solution_file.suffix == ".json":
-                print(f"  Using solution in {solution_file}...")
-                return json.loads(solution_file.read_text())
-            print(f"  Building solution from {solution_file}...")
-            return build_custom_solution(definition, solution_file)
-    print("  Building solution from Definition.reference...")
-    return build_reference_solution(definition)
-
-
-def build_custom_solution(definition: dict, solution_py: Path) -> dict:
-    """Wrap an external ``solution.py`` file as a Solution dict."""
-    name = definition["name"]
-    code = solution_py.read_text()
-    dps = _infer_dps(code, definition)
-    code = code.replace("stream", "strm")
-
-    return {
-        "name": f"custom_{name}",
-        "definition": name,
-        "author": "run_dataset",
-        "description": f"Custom solution from {solution_py.name}.",
-        "spec": {
-            "languages": ["pytorch"],
-            "target_hardware": ["LOCAL"],
-            "entry_point": "solution.py::run",
-            "dependencies": ["torch"],
-            "destination_passing_style": dps,
-        },
-        "sources": [
-            {
-                "path": "solution.py",
-                "content": code,
-            }
-        ],
-    }
-
-
-def build_reference_solution(definition: dict) -> dict:
-    """Construct a Solution dict that wraps the definition's reference code."""
-    name = definition["name"]
-    reference_code = definition["reference"]
-    dps = _infer_dps(reference_code, definition)
-
-    # Replace "stream" with "strm" to avoid tripping the SourceFile stream detector.
-    # The validator rejects any Python source containing the word "stream", but some
-    # reference implementations legitimately use it in variable names or comments.
-    reference_code = reference_code.replace("stream", "strm")
-
-    return {
-        "name": f"reference_{name}",
-        "definition": name,
-        "author": "run_dataset",
-        "description": "Identity solution: definition reference as-is.",
-        "spec": {
-            "languages": ["pytorch"],
-            "target_hardware": ["LOCAL"],
-            "entry_point": "reference.py::run",
-            "dependencies": ["torch"],
-            "destination_passing_style": dps,
-        },
-        "sources": [
-            {
-                "path": "reference.py",
-                "content": reference_code,
-            }
-        ],
-    }
-
-
-# ---------------------------------------------------------------------------
-# CLI invocation
-# ---------------------------------------------------------------------------
-
-
-def build_cli_command(
-    *,
-    definition_path: Path,
-    workload_path: Path,
-    solution_path: Path,
-    timeout: int,
-    config_path: Path | None = None,
-    keep_staging: bool = False,
-    verbose: bool = False,
-) -> list[str]:
-    """Build the `sol-execbench` command used by dataset runs."""
-    cmd = [
-        str(Path(sys.executable).parent / "sol-execbench"),
-        "--definition",
-        str(definition_path),
-        "--workload",
-        str(workload_path),
-        "--solution",
-        str(solution_path),
-        "--timeout",
-        str(timeout),
-        "--json",
-    ]
-
-    if config_path:
-        cmd.extend(["--config", str(config_path)])
-    if keep_staging:
-        cmd.append("--keep-staging")
-    if verbose:
-        cmd.append("--verbose")
-    return cmd
-
-
-def run_cli(
-    definition_path: Path,
-    workload_path: Path,
-    solution_path: Path,
-    output_dir: Path,
-    job_name: str,
-    timeout: int,
-    config_path: Path | None = None,
-    keep_staging: bool = False,
-    verbose: bool = False,
-) -> list[dict] | None:
-    """Invoke ``sol-execbench`` and return parsed trace dicts (or None on error)."""
-    cmd = build_cli_command(
-        definition_path=definition_path,
-        workload_path=workload_path,
-        solution_path=solution_path,
-        timeout=timeout,
-        config_path=config_path,
-        keep_staging=keep_staging,
-        verbose=verbose,
-    )
-
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 60)
-    except subprocess.TimeoutExpired as exc:
-        print(f"CLI timed out for {job_name}: {exc.timeout} seconds")
-        _save_cli_timeout_log(output_dir, job_name, exc)
-        return None
-
-    # The CLI with --json prints one JSON trace per line to stdout.
-    traces = []
-    for line in result.stdout.splitlines():
-        line = line.strip()
-        if line:
-            try:
-                traces.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue
-
-    if result.returncode != 0:
-        print(f"CLI failed for {job_name}: exit code {result.returncode}")
-        _save_cli_log(output_dir, job_name, result)
-        return None
-
-    if not traces:
-        print(f"CLI failed for {job_name}: {result.stderr[:500]}")
-        _save_cli_log(output_dir, job_name, result)
-        return None
-
-    return traces
-
-
-_CLI_LOG_LIMIT = 64 * 1024
-
-
-def _bounded_cli_stream(value: str | bytes | None) -> str:
-    if value is None:
-        return ""
-    if isinstance(value, bytes):
-        text = value.decode(errors="replace")
-    else:
-        text = value
-    if len(text) <= _CLI_LOG_LIMIT:
-        return text
-    return text[:_CLI_LOG_LIMIT] + "\n[truncated CLI output]\n"
-
-
-def _save_cli_log(output_dir: Path, job_name: str, result: subprocess.CompletedProcess):
-    """Write stdout/stderr from a failed CLI invocation to a log file."""
-    log_path = output_dir / f"{job_name}_cli.log"
-    parts = [
-        f"exit code: {result.returncode}",
-        f"\n--- stdout ---\n{_bounded_cli_stream(result.stdout)}" if result.stdout else "",
-        f"\n--- stderr ---\n{_bounded_cli_stream(result.stderr)}" if result.stderr else "",
-    ]
-    log_path.write_text("\n".join(parts))
-    print(f"Saved CLI log to {log_path}")
-
-
-def _save_cli_timeout_log(
-    output_dir: Path,
-    job_name: str,
-    exc: subprocess.TimeoutExpired,
-) -> None:
-    """Write stdout/stderr from a timed-out CLI invocation to a log file."""
-    log_path = output_dir / f"{job_name}_cli.log"
-    parts = [
-        f"timeout after {exc.timeout} seconds",
-        f"\n--- stdout ---\n{_bounded_cli_stream(exc.output)}" if exc.output else "",
-        f"\n--- stderr ---\n{_bounded_cli_stream(exc.stderr)}" if exc.stderr else "",
-    ]
-    log_path.write_text("\n".join(parts))
-    print(f"Saved CLI log to {log_path}")
-
-
-def _cli_failure_notes(cli_log: Path) -> list[str]:
-    if not cli_log.exists():
-        return ["CLI returned no traces"]
-    try:
-        with cli_log.open(errors="replace") as handle:
-            message = handle.readline().strip()
-    except OSError:
-        return ["CLI returned no traces"]
-    if not message:
-        return ["CLI returned no traces"]
-    if message.startswith("exit code: "):
-        try:
-            exit_code = int(message.removeprefix("exit code: ").strip())
-        except ValueError:
-            return ["CLI returned no traces"]
-        if exit_code != 0:
-            return [f"CLI failed with exit code {exit_code}"]
-    if message.startswith("timeout after "):
-        return [f"CLI timed out after {message.removeprefix('timeout after ')}"]
-    return ["CLI returned no traces"]
 
 
 def collect_timing_evidence_for_problem(
