@@ -44,9 +44,9 @@ ExecBench.
 
 ### Concern Map Stewardship
 
-- [ ] **DOCS-01**: `CONCERNS.md` preserves milestone-management context for recently narrowed, still actionable, accepted, and externally deferred concerns.
-- [ ] **DOCS-02**: v1.22 completion updates `CONCERNS.md` so each in-scope item is marked fixed, narrowed, or carried forward with evidence.
-- [ ] **DOCS-03**: Out-of-scope items remain explicit: CDNA3/MI300X/CDNA4 validation, paper-scale parity, leaderboard readiness, and complete hard sandboxing.
+- [x] **DOCS-01**: `CONCERNS.md` preserves milestone-management context for recently narrowed, still actionable, accepted, and externally deferred concerns.
+- [x] **DOCS-02**: v1.22 completion updates `CONCERNS.md` so each in-scope item is marked fixed, narrowed, or carried forward with evidence.
+- [x] **DOCS-03**: Out-of-scope items remain explicit: CDNA3/MI300X/CDNA4 validation, paper-scale parity, leaderboard readiness, and complete hard sandboxing.
 
 ## Future Requirements
 
@@ -100,9 +100,9 @@ ExecBench.
 | GUARD-01 | Phase 104 | Complete |
 | GUARD-02 | Phase 104 | Complete |
 | GUARD-03 | Phase 104 | Complete |
-| DOCS-01 | Phase 105 | Pending |
-| DOCS-02 | Phase 105 | Pending |
-| DOCS-03 | Phase 105 | Pending |
+| DOCS-01 | Phase 105 | Complete |
+| DOCS-02 | Phase 105 | Complete |
+| DOCS-03 | Phase 105 | Complete |
 
 **Coverage:**
 - v1 requirements: 22 total
