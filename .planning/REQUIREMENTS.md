@@ -31,10 +31,10 @@ ExecBench.
 
 ### Scoring And Evidence Fixtures
 
-- [ ] **SCORING-01**: SOLAR and AMD bound derivation have family-specific golden fixtures for representative operator families and fallback behavior.
-- [ ] **SCORING-02**: Confidence/status transitions in SOLAR and AMD bound derivation are covered by focused tests independent of broad report shape tests.
-- [ ] **SCORING-03**: Static kernel evidence can consume or produce an explicit artifact manifest when build outputs are known, reducing reliance on recursive build-tree scanning.
-- [ ] **SCORING-04**: Static evidence and derived scoring changes preserve diagnostic-only authority and existing public sidecar contracts.
+- [x] **SCORING-01**: SOLAR and AMD bound derivation have family-specific golden fixtures for representative operator families and fallback behavior.
+- [x] **SCORING-02**: Confidence/status transitions in SOLAR and AMD bound derivation are covered by focused tests independent of broad report shape tests.
+- [x] **SCORING-03**: Static kernel evidence can consume or produce an explicit artifact manifest when build outputs are known, reducing reliance on recursive build-tree scanning.
+- [x] **SCORING-04**: Static evidence and derived scoring changes preserve diagnostic-only authority and existing public sidecar contracts.
 
 ### Dependency And Closure Guardrails
 
@@ -93,10 +93,10 @@ ExecBench.
 | BOUNDARY-02 | Phase 102 | Complete |
 | BOUNDARY-03 | Phase 102 | Complete |
 | BOUNDARY-04 | Phase 102 | Complete |
-| SCORING-01 | Phase 103 | Pending |
-| SCORING-02 | Phase 103 | Pending |
-| SCORING-03 | Phase 103 | Pending |
-| SCORING-04 | Phase 103 | Pending |
+| SCORING-01 | Phase 103 | Complete |
+| SCORING-02 | Phase 103 | Complete |
+| SCORING-03 | Phase 103 | Complete |
+| SCORING-04 | Phase 103 | Complete |
 | GUARD-01 | Phase 104 | Pending |
 | GUARD-02 | Phase 104 | Pending |
 | GUARD-03 | Phase 104 | Pending |
