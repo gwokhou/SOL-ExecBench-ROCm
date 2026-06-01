@@ -85,6 +85,8 @@ PROFILE_NONE = "none"
 PROFILE_ROCPROFV3 = "rocprofv3"
 STATIC_EVIDENCE_NONE = "none"
 STATIC_EVIDENCE_AUTO = "auto"
+NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION = "sol_execbench.no_trace_diagnostics.v1"
+_DIAGNOSTIC_TAIL_LIMIT = 8192
 
 
 def _load_definition(path: Path) -> Definition:
@@ -116,6 +118,67 @@ def _load_config(path: Optional[Path]) -> BenchmarkConfig:
     if path is None:
         return BenchmarkConfig()
     return BenchmarkConfig(**json.loads(path.read_text()))
+
+
+def _diagnostic_tail(text: str, *, limit: int = _DIAGNOSTIC_TAIL_LIMIT) -> str:
+    """Return a bounded tail for diagnostic-only subprocess output."""
+    if len(text) <= limit:
+        return text
+    return text[-limit:]
+
+
+def _no_trace_diagnostics_sidecar_path(
+    output_file: Path | None,
+    staging_dir: Path,
+    *,
+    keep_staging: bool,
+) -> Path:
+    """Return a persisted diagnostic sidecar path for no-trace outcomes."""
+    if output_file is not None:
+        return output_file.with_name(f"{output_file.name}.no-trace-diagnostics.json")
+    if keep_staging:
+        return staging_dir / "no-trace-diagnostics.json"
+    return Path(tempfile.gettempdir()) / f"{staging_dir.name}.no-trace-diagnostics.json"
+
+
+def _write_no_trace_diagnostics_sidecar(
+    *,
+    output_file: Path | None,
+    staging_dir: Path,
+    keep_staging: bool,
+    reason: str,
+    returncode: int,
+    stdout: str,
+    stderr: str,
+) -> Path | None:
+    """Persist bounded diagnostic-only evidence for no-trace outcomes."""
+    sidecar_path = _no_trace_diagnostics_sidecar_path(
+        output_file,
+        staging_dir,
+        keep_staging=keep_staging,
+    )
+    payload = {
+        "schema_version": NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION,
+        "diagnostic_only": True,
+        "canonical_trace_jsonl": False,
+        "reason": reason,
+        "returncode": returncode,
+        "stdout_tail": _diagnostic_tail(stdout),
+        "stderr_tail": _diagnostic_tail(stderr),
+        "stdout_line_count": len(stdout.splitlines()),
+        "stderr_line_count": len(stderr.splitlines()),
+        "stdout_truncated": len(stdout) > _DIAGNOSTIC_TAIL_LIMIT,
+        "stderr_truncated": len(stderr) > _DIAGNOSTIC_TAIL_LIMIT,
+    }
+    try:
+        sidecar_path.parent.mkdir(parents=True, exist_ok=True)
+        sidecar_path.write_text(json.dumps(payload, sort_keys=True) + "\n")
+        return sidecar_path
+    except OSError as exc:
+        console.print(
+            f"[yellow]Failed to write no-trace diagnostics: {exc}[/yellow]"
+        )
+        return None
 
 
 def _resolve_problem_dir(
@@ -731,6 +794,19 @@ def _evaluate_cli(
 
     if proc.returncode != 0 and not proc.stdout.strip():
         console.print("[red]Evaluation failed[/red]")
+        diagnostic_path = _write_no_trace_diagnostics_sidecar(
+            output_file=output_file,
+            staging_dir=staging_dir,
+            keep_staging=keep_staging,
+            reason="evaluation_failed_no_stdout",
+            returncode=proc.returncode,
+            stdout=proc.stdout,
+            stderr=proc.stderr,
+        )
+        if diagnostic_path is not None:
+            console.print(
+                f"[yellow]Saved no-trace diagnostics to {diagnostic_path}[/yellow]"
+            )
         if proc.stderr:
             console.print(proc.stderr)
         packager.close()
@@ -741,6 +817,19 @@ def _evaluate_cli(
 
     if not traces:
         console.print("[red]No traces produced[/red]")
+        diagnostic_path = _write_no_trace_diagnostics_sidecar(
+            output_file=output_file,
+            staging_dir=staging_dir,
+            keep_staging=keep_staging,
+            reason="no_parseable_traces",
+            returncode=proc.returncode,
+            stdout=proc.stdout,
+            stderr=proc.stderr,
+        )
+        if diagnostic_path is not None:
+            console.print(
+                f"[yellow]Saved no-trace diagnostics to {diagnostic_path}[/yellow]"
+            )
         if proc.stderr:
             console.print(proc.stderr)
         packager.close()

@@ -218,6 +218,16 @@ class TestCompileOptions:
         mock = _exec_build_ext(tmp_path, {})
         assert mock.load.call_args.kwargs["extra_ldflags"] == []
 
+    def test_dangerous_compile_options_rejected_before_extension_load(self, tmp_path):
+        (tmp_path / "k.hip").write_text("")
+        (tmp_path / "benchmark_kernel.so").write_bytes(b"fake")
+
+        with pytest.raises(ValueError, match="runtime linker paths"):
+            _exec_build_ext(
+                tmp_path,
+                {"ld_flags": ["-Wl,-rpath,/tmp/lib"]},
+            )
+
 
 class TestIncludePaths:
     """Tests for extra_include_paths construction."""

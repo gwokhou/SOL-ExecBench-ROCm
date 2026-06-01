@@ -46,6 +46,97 @@ def test_environment_snapshot_sidecar_disabled_by_default(
     assert not output.with_name("trace.jsonl.environment.json").exists()
 
 
+def test_no_trace_diagnostics_sidecar_uses_trace_output_path(tmp_path: Path):
+    output = tmp_path / "traces.jsonl"
+    staging = tmp_path / "staging"
+
+    sidecar = cli_main._no_trace_diagnostics_sidecar_path(
+        output,
+        staging,
+        keep_staging=False,
+    )
+
+    assert sidecar == tmp_path / "traces.jsonl.no-trace-diagnostics.json"
+
+
+def test_no_trace_diagnostics_sidecar_survives_removed_staging(tmp_path: Path):
+    staging = tmp_path / "sol_execbench_demo"
+
+    sidecar = cli_main._no_trace_diagnostics_sidecar_path(
+        None,
+        staging,
+        keep_staging=False,
+    )
+
+    assert sidecar.parent != staging
+    assert sidecar.name == "sol_execbench_demo.no-trace-diagnostics.json"
+
+
+def test_no_trace_diagnostics_sidecar_keeps_staging_when_requested(tmp_path: Path):
+    staging = tmp_path / "sol_execbench_demo"
+
+    sidecar = cli_main._no_trace_diagnostics_sidecar_path(
+        None,
+        staging,
+        keep_staging=True,
+    )
+
+    assert sidecar == staging / "no-trace-diagnostics.json"
+
+
+def test_no_trace_diagnostics_sidecar_records_bounded_failure_output(tmp_path: Path):
+    output = tmp_path / "traces.jsonl"
+    staging = tmp_path / "staging"
+    stdout = "library noise\n" + ("x" * (cli_main._DIAGNOSTIC_TAIL_LIMIT + 10))
+    stderr = "runtime failed\n" + ("y" * (cli_main._DIAGNOSTIC_TAIL_LIMIT + 20))
+
+    written = cli_main._write_no_trace_diagnostics_sidecar(
+        output_file=output,
+        staging_dir=staging,
+        keep_staging=False,
+        reason="no_parseable_traces",
+        returncode=2,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert written == tmp_path / "traces.jsonl.no-trace-diagnostics.json"
+    payload = json.loads(written.read_text())
+    assert payload["schema_version"] == cli_main.NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION
+    assert payload["diagnostic_only"] is True
+    assert payload["canonical_trace_jsonl"] is False
+    assert payload["reason"] == "no_parseable_traces"
+    assert payload["returncode"] == 2
+    assert payload["stdout_tail"] == stdout[-cli_main._DIAGNOSTIC_TAIL_LIMIT :]
+    assert payload["stderr_tail"] == stderr[-cli_main._DIAGNOSTIC_TAIL_LIMIT :]
+    assert payload["stdout_truncated"] is True
+    assert payload["stderr_truncated"] is True
+    assert payload["stdout_line_count"] == 2
+    assert payload["stderr_line_count"] == 2
+
+
+def test_no_trace_diagnostics_sidecar_records_empty_stdout_failure(tmp_path: Path):
+    output = tmp_path / "traces.jsonl"
+    staging = tmp_path / "staging"
+
+    written = cli_main._write_no_trace_diagnostics_sidecar(
+        output_file=output,
+        staging_dir=staging,
+        keep_staging=False,
+        reason="evaluation_failed_no_stdout",
+        returncode=1,
+        stdout="",
+        stderr="Traceback: boom",
+    )
+
+    payload = json.loads(written.read_text())
+    assert payload["reason"] == "evaluation_failed_no_stdout"
+    assert payload["stdout_tail"] == ""
+    assert payload["stderr_tail"] == "Traceback: boom"
+    assert payload["stdout_truncated"] is False
+    assert payload["stderr_truncated"] is False
+
+
 def test_environment_snapshot_sidecar_uses_explicit_path(tmp_path: Path, monkeypatch):
     sidecar = tmp_path / "run" / "env.json"
     monkeypatch.setenv(cli_main.ENV_SNAPSHOT_PATH_ENV, str(sidecar))

@@ -79,6 +79,54 @@ class SupportedBindings(str, Enum):
     """PyTorch HIP/C++ extension binding."""
 
 
+_PATH_INJECTION_PREFIXES = (
+    "-I",
+    "-L",
+    "-B",
+    "-isystem",
+    "-idirafter",
+    "-iquote",
+    "-include",
+    "-imacros",
+    "--sysroot",
+    "-fplugin",
+)
+_PATH_INJECTION_EXACT_FLAGS = {
+    "-I",
+    "-L",
+    "-B",
+    "-isystem",
+    "-idirafter",
+    "-iquote",
+    "-include",
+    "-imacros",
+    "--sysroot",
+    "-Xlinker",
+}
+_LINKER_LOADER_MARKERS = (
+    "-Wl,-rpath",
+    "-Wl,--rpath",
+    "-Wl,-dynamic-linker",
+    "-Wl,--dynamic-linker",
+    "--dynamic-linker",
+    "-rpath",
+)
+
+
+def _validate_compile_flag(flag: str) -> None:
+    """Reject native compile flags that weaken the staging boundary."""
+    if "\x00" in flag:
+        raise ValueError("Compile option contains a NUL byte")
+    if flag.startswith("@") or ",@" in flag or "=@" in flag:
+        raise ValueError(f"Compile option uses a response file: {flag}")
+    if flag in _PATH_INJECTION_EXACT_FLAGS:
+        raise ValueError(f"Compile option requires an external path value: {flag}")
+    if any(flag.startswith(marker) for marker in _LINKER_LOADER_MARKERS):
+        raise ValueError(f"Compile option controls runtime linker paths: {flag}")
+    if any(flag.startswith(prefix) for prefix in _PATH_INJECTION_PREFIXES):
+        raise ValueError(f"Compile option can reference host paths: {flag}")
+
+
 class SourceFile(BaseModelWithDocstrings):
     """A single source code file in a solution implementation.
 
@@ -127,6 +175,14 @@ class CompileOptions(BaseModelWithDocstrings):
     """Extra flags passed to the HIP compiler. Defaults to -O3."""
     ld_flags: list[str] = Field(default_factory=list)
     """Extra flags passed to the linker."""
+
+    @field_validator("cflags", "hip_cflags", "ld_flags")
+    @classmethod
+    def _reject_dangerous_flags(cls, value: list[str]) -> list[str]:
+        """Reject flags that can escape staging or control dynamic loading."""
+        for flag in value:
+            _validate_compile_flag(flag)
+        return value
 
 
 class BuildSpec(BaseModelWithDocstrings):

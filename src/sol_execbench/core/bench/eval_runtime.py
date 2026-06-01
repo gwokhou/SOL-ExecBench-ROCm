@@ -4,17 +4,18 @@
 
 from __future__ import annotations
 
-import importlib
 import importlib.util
 import json
 import os
 import sys
 import time
+import types
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-from sol_execbench.core import Solution, SupportedLanguages
+from sol_execbench.core import Solution, SupportedLanguages, Trace
+from sol_execbench.core.bench.reward_hack import RewardHackDetected
 
 NATIVE_ROCM_LANGUAGES = {
     SupportedLanguages.HIP_CPP,
@@ -130,12 +131,77 @@ def load_staged_problem(staging_dir: Path) -> tuple[dict[str, Any], list[dict[st
     return definition, workloads
 
 
+def emit_trace_jsonl(trace: Trace, output: Any) -> None:
+    """Write one Trace as strictly valid JSONL to the provided output stream."""
+    print(
+        json.dumps(trace.model_dump(mode="json"), allow_nan=False),
+        file=output,
+        flush=True,
+    )
+
+
+def run_reward_hack_check(
+    check_fn: Callable[..., Any],
+    *args: Any,
+    suppress_errors: bool = False,
+) -> str | None:
+    """Run a reward-hack check and return the detected message, if any."""
+    try:
+        check_fn(*args)
+    except RewardHackDetected as exc:
+        return str(exc)
+    except Exception:
+        if not suppress_errors:
+            raise
+    return None
+
+
 def parse_entry_point(entry_point: str) -> tuple[str, str]:
     """Return module-or-file and function name from a solution entry point."""
     if "::" in entry_point:
         module_or_file, function_name = entry_point.rsplit("::", 1)
         return module_or_file, function_name
     return entry_point, "run"
+
+
+def _safe_module_part(value: str) -> str:
+    """Return a Python-identifier-safe module-name part."""
+    safe = "".join(ch if ch.isalnum() or ch == "_" else "_" for ch in value)
+    if not safe or safe[0].isdigit():
+        safe = f"_{safe}"
+    return safe
+
+
+def _staged_python_module_name(solution: Solution, entry_file: str) -> str:
+    """Return a unique module name for a staged Python solution entry file."""
+    entry_path = Path(entry_file)
+    path_parts = entry_path.with_suffix("").parts
+    safe_parts = [_safe_module_part(part) for part in path_parts]
+    root = f"_sol_execbench_user_{solution.hash()[:12]}"
+    return ".".join([root, *safe_parts])
+
+
+def _register_staged_package_chain(
+    module_name: str,
+    staging_dir: Path,
+    entry_path: Path,
+) -> None:
+    """Register synthetic parent packages for relative imports from entry files."""
+    parts = module_name.split(".")
+    if len(parts) <= 1:
+        return
+
+    package_dirs = [staging_dir]
+    package_dirs.extend(reversed(entry_path.parents[: len(parts) - 2]))
+
+    for index in range(1, len(parts)):
+        package_name = ".".join(parts[:index])
+        if package_name in sys.modules:
+            continue
+        package = types.ModuleType(package_name)
+        package.__package__ = package_name
+        package.__path__ = [str(package_dirs[index - 1])]  # type: ignore[attr-defined]
+        sys.modules[package_name] = package
 
 
 def load_reference_function(staging_dir: Path, reference_code: str) -> tuple[Any, Any]:
@@ -230,9 +296,18 @@ def load_user_function(solution: Solution, staging_dir: Path) -> Any:
         return getattr(user_mod, entry_func_name)
 
     block_cpp_extension_load()
-    sys.path.insert(0, str(staging_dir))
-    module_name = (
-        entry_module_or_file.removesuffix(".py").replace("/", ".").replace(os.sep, ".")
-    )
-    user_mod = importlib.import_module(module_name)
+    if str(staging_dir) not in sys.path:
+        sys.path.insert(0, str(staging_dir))
+
+    entry_path = staging_dir / entry_module_or_file
+    if not entry_path.exists():
+        raise RuntimeError(f"Entry source file not found at {entry_path}")
+    module_name = _staged_python_module_name(solution, entry_module_or_file)
+    _register_staged_package_chain(module_name, staging_dir, entry_path)
+    spec_obj = importlib.util.spec_from_file_location(module_name, entry_path)
+    if spec_obj is None or spec_obj.loader is None:
+        raise RuntimeError(f"Unable to create module spec for {entry_path}")
+    user_mod = importlib.util.module_from_spec(spec_obj)
+    sys.modules[module_name] = user_mod
+    spec_obj.loader.exec_module(user_mod)
     return getattr(user_mod, entry_func_name)

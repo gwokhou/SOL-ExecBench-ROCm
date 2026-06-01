@@ -6,19 +6,27 @@
 from __future__ import annotations
 
 import json
+import math
+import sys
+import types
+from io import StringIO
 
 import pytest
 
 from sol_execbench.core import Solution
 from sol_execbench.core.bench.eval_runtime import (
     block_cpp_extension_load,
+    emit_trace_jsonl,
     load_reference_function,
     load_staged_problem,
     load_user_function,
     measure_reference_latency,
     parse_entry_point,
+    run_reward_hack_check,
     solution_uses_native_rocm,
 )
+from sol_execbench.core.bench.reward_hack import RewardHackDetected
+from sol_execbench_type_helpers import make_trace, make_workload
 
 
 def _solution(entry_point: str = "kernel.py::run", languages: list[str] | None = None):
@@ -52,6 +60,56 @@ def test_load_staged_problem_reads_definition_and_workloads(tmp_path):
 def test_load_staged_problem_rejects_missing_definition(tmp_path):
     with pytest.raises(RuntimeError, match="definition.json not found"):
         load_staged_problem(tmp_path)
+
+
+def test_emit_trace_jsonl_writes_strict_trace_payload():
+    stream = StringIO()
+    trace = make_trace(
+        definition="demo",
+        solution="solution",
+        workload=make_workload(uuid="workload", axes={}, inputs={}),
+        evaluation=None,
+    )
+
+    emit_trace_jsonl(trace, stream)
+
+    payload = json.loads(stream.getvalue())
+    assert payload["definition"] == "demo"
+    assert payload["workload"]["uuid"] == "workload"
+
+
+def test_emit_trace_jsonl_rejects_non_finite_trace_values():
+    stream = StringIO()
+
+    class BadTrace:
+        def model_dump(self, *, mode):
+            assert mode == "json"
+            return {"bad": math.nan}
+
+    with pytest.raises(ValueError, match="Out of range float"):
+        emit_trace_jsonl(BadTrace(), stream)
+
+
+def test_run_reward_hack_check_returns_detected_message():
+    def check():
+        raise RewardHackDetected("patched timing")
+
+    assert run_reward_hack_check(check) == "patched timing"
+
+
+def test_run_reward_hack_check_suppresses_unexpected_errors_when_requested():
+    def check():
+        raise RuntimeError("diagnostic unavailable")
+
+    assert run_reward_hack_check(check, suppress_errors=True) is None
+
+
+def test_run_reward_hack_check_reraises_unexpected_errors_by_default():
+    def check():
+        raise RuntimeError("diagnostic unavailable")
+
+    with pytest.raises(RuntimeError, match="diagnostic unavailable"):
+        run_reward_hack_check(check)
 
 
 def test_parse_entry_point_defaults_to_run():
@@ -129,6 +187,47 @@ def test_load_user_function_imports_python_solution(tmp_path):
     fn = load_user_function(_solution(), tmp_path)
 
     assert fn(3) == 5
+
+
+def test_load_user_function_ignores_existing_simple_module_collision(tmp_path):
+    (tmp_path / "kernel.py").write_text("def run():\n    return 'staged'\n")
+    collision = types.ModuleType("kernel")
+    collision.run = lambda: "collision"
+    previous = sys.modules.get("kernel")
+    sys.modules["kernel"] = collision
+    try:
+        fn = load_user_function(_solution(), tmp_path)
+    finally:
+        if previous is None:
+            sys.modules.pop("kernel", None)
+        else:
+            sys.modules["kernel"] = previous
+
+    assert fn() == "staged"
+
+
+def test_load_user_function_ignores_existing_package_module_collision(tmp_path):
+    package_dir = tmp_path / "pkg"
+    package_dir.mkdir()
+    (package_dir / "helper.py").write_text("VALUE = 'staged'\n")
+    (package_dir / "kernel.py").write_text(
+        "from .helper import VALUE\n\n"
+        "def run():\n"
+        "    return VALUE\n"
+    )
+    collision = types.ModuleType("pkg.kernel")
+    collision.run = lambda: "collision"
+    previous = sys.modules.get("pkg.kernel")
+    sys.modules["pkg.kernel"] = collision
+    try:
+        fn = load_user_function(_solution(entry_point="pkg/kernel.py::run"), tmp_path)
+    finally:
+        if previous is None:
+            sys.modules.pop("pkg.kernel", None)
+        else:
+            sys.modules["pkg.kernel"] = previous
+
+    assert fn() == "staged"
 
 
 def test_solution_uses_native_rocm_and_missing_so_rejected(tmp_path):

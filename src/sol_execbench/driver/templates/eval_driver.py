@@ -69,11 +69,13 @@ from sol_execbench.core.bench.reward_hack import (  # noqa: E402
     snapshot_critical_functions,
 )
 from sol_execbench.core.bench.eval_runtime import (  # noqa: E402
+    emit_trace_jsonl,
     load_reference_function,
     load_staged_problem,
     load_user_function,
     measure_latency,
     measure_reference_latency,
+    run_reward_hack_check,
 )
 from sol_execbench.core.bench.utils import (  # noqa: E402
     call_and_collect_outputs,
@@ -137,11 +139,7 @@ if _source_review.blocked:
                 extra_msg=_static_msg,
             ),
         )
-        print(
-            json.dumps(_trace.model_dump(mode="json"), allow_nan=False),
-            file=_real_stdout,
-            flush=True,
-        )
+        emit_trace_jsonl(_trace, _real_stdout)
     sys.exit(0)
 
 # ── Exec reference code ───────────────────────────────────────────────────────
@@ -153,6 +151,8 @@ ref_namespace = vars(_ref_module)
 # Checked after user code import and after each user_fn() call.
 _CRITICAL_NAMES = [
     "measure_latency",
+    "emit_trace_jsonl",
+    "run_reward_hack_check",
     "compute_error_stats",
     "check_monkey_patch",
     "check_lazy_outputs",
@@ -186,32 +186,28 @@ def _emit(trace: Trace) -> None:
     raises ValueError immediately instead of producing the non-standard
     JavaScript literal ``NaN`` which strict JSON parsers silently reject.
     """
-    print(
-        json.dumps(trace.model_dump(mode="json"), allow_nan=False),
-        file=_real_stdout,
-        flush=True,
-    )
+    emit_trace_jsonl(trace, _real_stdout)
 
 
 def _reward_hack_check(workload, check_fn, *args, suppress_errors=False):
     """Run a reward-hack check; emit REWARD_HACK trace and return True if detected."""
-    try:
-        check_fn(*args)
-    except RewardHackDetected as e:
+    message = run_reward_hack_check(
+        check_fn,
+        *args,
+        suppress_errors=suppress_errors,
+    )
+    if message is not None:
         _emit(
             Trace(
                 definition=definition.name,
                 solution=_solution_name,
                 workload=workload,
                 evaluation=_make_eval(
-                    EvaluationStatus.REWARD_HACK, _device, None, extra_msg=str(e)
+                    EvaluationStatus.REWARD_HACK, _device, None, extra_msg=message
                 ),
             )
         )
         return True
-    except Exception:
-        if not suppress_errors:
-            raise
     return False
 
 
