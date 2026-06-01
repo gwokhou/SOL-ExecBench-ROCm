@@ -7,10 +7,10 @@ last_updated: "2026-06-01"
 last_activity: 2026-06-01
 progress:
   total_phases: 5
-  completed_phases: 1
-  total_plans: 1
-  completed_plans: 1
-  percent: 20
+  completed_phases: 2
+  total_plans: 2
+  completed_plans: 2
+  percent: 40
 ---
 
 # Project State
@@ -22,22 +22,22 @@ See: `.planning/PROJECT.md` (updated 2026-06-01)
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly
 on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL
 ExecBench.
-**Current focus:** v1.25 Engineering Prerelease, ready to plan Phase 115
-Support Matrix Boundaries.
+**Current focus:** v1.25 Engineering Prerelease, ready to plan Phase 116
+Claim Boundary Guardrails.
 
 ## Current Position
 
-Phase: 115 of 118 (Support Matrix Boundaries)
+Phase: 116 of 118 (Claim Boundary Guardrails)
 Plan: Not planned yet
 Status: Ready to plan
-Last activity: 2026-06-01 - Phase 114 completed
+Last activity: 2026-06-01 - Phase 115 completed
 
-Progress: [##--------] 20%
+Progress: [####------] 40%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1 in v1.25
+- Total plans completed: 2 in v1.25
 - Average duration: n/a
 - Total execution time: 0h
 
@@ -46,7 +46,7 @@ Progress: [##--------] 20%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 114. Release-Candidate Validation | 1/1 | Complete | n/a |
-| 115. Support Matrix Boundaries | 0/TBD | Not started | n/a |
+| 115. Support Matrix Boundaries | 1/1 | Complete | n/a |
 | 116. Claim Boundary Guardrails | 0/TBD | Not started | n/a |
 | 117. First-Run User Path | 0/TBD | Not started | n/a |
 | 118. Release Candidate Materials | 0/TBD | Not started | n/a |
@@ -54,6 +54,8 @@ Progress: [##--------] 20%
 **Recent Trend:**
 - v1.24 shipped Phases 110-113 on 2026-06-01.
 - Phase 114 shipped a bounded release-candidate validation wrapper and docs.
+- Phase 115 clarified engineering prerelease support boundaries across RDNA 4,
+  Docker/container ROCm user-space, MI300X/CDNA3, and unavailable CDNA4.
 
 ## Accumulated Context
 
@@ -72,7 +74,7 @@ Progress: [##--------] 20%
 
 ### Pending Todos
 
-- Plan Phase 115.
+- Plan Phase 116.
 
 ### Blockers/Concerns
 
@@ -92,5 +94,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-06-01
-Stopped at: Phase 114 complete; ready to plan Phase 115.
+Stopped at: Phase 115 complete; ready to plan Phase 116.
 Resume file: None

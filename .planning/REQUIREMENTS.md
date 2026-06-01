@@ -21,13 +21,13 @@ ExecBench.
 
 ### Support Matrix
 
-- [ ] **SUPPORT-01**: User can identify which RDNA 4 evidence is validated for
+- [x] **SUPPORT-01**: User can identify which RDNA 4 evidence is validated for
   the prerelease.
-- [ ] **SUPPORT-02**: User can distinguish Docker/container user-space
+- [x] **SUPPORT-02**: User can distinguish Docker/container user-space
   evidence from native-host validation.
-- [ ] **SUPPORT-03**: User can see that MI300X/CDNA3 full-suite validation is
+- [x] **SUPPORT-03**: User can see that MI300X/CDNA3 full-suite validation is
   deferred unless a complete evidence chain exists.
-- [ ] **SUPPORT-04**: User can see that CDNA4 validation is unavailable because
+- [x] **SUPPORT-04**: User can see that CDNA4 validation is unavailable because
   hardware is not currently accessible.
 
 ### Claim Boundaries
@@ -104,10 +104,10 @@ ExecBench.
 | RCVAL-02 | Phase 114 | Complete |
 | RCVAL-03 | Phase 114 | Complete |
 | RCVAL-04 | Phase 114 | Complete |
-| SUPPORT-01 | Phase 115 | Pending |
-| SUPPORT-02 | Phase 115 | Pending |
-| SUPPORT-03 | Phase 115 | Pending |
-| SUPPORT-04 | Phase 115 | Pending |
+| SUPPORT-01 | Phase 115 | Complete |
+| SUPPORT-02 | Phase 115 | Complete |
+| SUPPORT-03 | Phase 115 | Complete |
+| SUPPORT-04 | Phase 115 | Complete |
 | CLAIM-01 | Phase 116 | Pending |
 | CLAIM-02 | Phase 116 | Pending |
 | CLAIM-03 | Phase 116 | Pending |
