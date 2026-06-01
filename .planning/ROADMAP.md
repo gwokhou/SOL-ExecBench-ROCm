@@ -30,7 +30,7 @@
 ## Phases
 
 - [x] **Phase 100: Dataset Runner Execution Seams** - Maintainers can change dataset execution, solution wrapping, reports, closure, and scheduling seams through importable helpers while preserving CLI behavior. (completed 2026-06-01)
-- [ ] **Phase 101: Eval Driver Diagnostics And Framing** - Maintainers can test reference timing, orchestration, trace emission, and output framing through package helpers without weakening benchmark compatibility.
+- [x] **Phase 101: Eval Driver Diagnostics And Framing** - Maintainers can test reference timing, orchestration, trace emission, and output framing through package helpers without weakening benchmark compatibility. (completed 2026-06-01)
 - [ ] **Phase 102: Source Review And Boundary Evidence** - Maintainers and users get stronger source-review coverage and structured boundary evidence without implying hardened sandboxing.
 - [ ] **Phase 103: Scoring And Static Evidence Fixtures** - Maintainers can validate SOLAR, AMD bound, and static-evidence behavior through family-specific fixtures and explicit artifact manifests.
 - [ ] **Phase 104: Dependency And Closure Guardrails** - Maintainers can detect dependency-policy drift, closure-provenance regressions, and misleading hardware-marker outcomes.
@@ -113,7 +113,7 @@ Phases execute in numeric order: 100 -> 101 -> 102 -> 103 -> 104 -> 105.
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 100. Dataset Runner Execution Seams | 2/2 | Complete    | 2026-06-01 |
-| 101. Eval Driver Diagnostics And Framing | 0/TBD | Not started | - |
+| 101. Eval Driver Diagnostics And Framing | 1/1 | Complete    | 2026-06-01 |
 | 102. Source Review And Boundary Evidence | 0/TBD | Not started | - |
 | 103. Scoring And Static Evidence Fixtures | 0/TBD | Not started | - |
 | 104. Dependency And Closure Guardrails | 0/TBD | Not started | - |
