@@ -143,3 +143,21 @@ def test_run_cli_writes_log_for_timeout(tmp_path, monkeypatch):
     assert traces is None
     assert "timeout after 61 seconds" in log_path.read_text()
     assert runner.cli_failure_notes(log_path) == ["CLI timed out after 61 seconds"]
+
+
+def test_write_summary_report_uses_existing_summary_json_shape(tmp_path):
+    summaries = [
+        {
+            "problem": "L1/demo",
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "latencies_ms": [1.0],
+            "failure_reasons": [],
+        }
+    ]
+
+    summary_path = runner.write_summary_report(tmp_path, summaries)
+
+    assert summary_path == tmp_path / "summary.json"
+    assert json.loads(summary_path.read_text()) == summaries
