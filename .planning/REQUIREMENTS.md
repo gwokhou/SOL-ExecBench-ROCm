@@ -20,13 +20,13 @@ ExecBench.
 
 ### Release Readiness Gates
 
-- [ ] **GATE-01**: Maintainer can run a release-readiness command or checklist
+- [x] **GATE-01**: Maintainer can run a release-readiness command or checklist
   that fails when required prerelease artifacts are missing.
-- [ ] **GATE-02**: Maintainer can verify that claim boundaries still reject
+- [x] **GATE-02**: Maintainer can verify that claim boundaries still reject
   paper parity, upstream SOLAR parity, leaderboard readiness, hard-sandbox
   authority, unsupported claims that full MI300X validation on the CDNA3
   `gfx942` target is complete, and CDNA4 validation claims.
-- [ ] **GATE-03**: Maintainer can see known gaps with explicit blocking,
+- [x] **GATE-03**: Maintainer can see known gaps with explicit blocking,
   deferred, unavailable, or diagnostic-only status before publishing.
 
 ### Research Preview Evidence
@@ -96,9 +96,9 @@ ExecBench.
 | ARTIFACT-01 | Phase 119 | Complete |
 | ARTIFACT-02 | Phase 119 | Complete |
 | ARTIFACT-03 | Phase 119 | Complete |
-| GATE-01 | Phase 120 | Pending |
-| GATE-02 | Phase 120 | Pending |
-| GATE-03 | Phase 120 | Pending |
+| GATE-01 | Phase 120 | Complete |
+| GATE-02 | Phase 120 | Complete |
+| GATE-03 | Phase 120 | Complete |
 | RESEARCH-01 | Phase 121 | Pending |
 | RESEARCH-02 | Phase 121 | Pending |
 | RESEARCH-03 | Phase 121 | Pending |
