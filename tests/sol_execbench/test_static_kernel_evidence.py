@@ -24,6 +24,10 @@ from sol_execbench.core.bench.static_kernel_evidence import (
     collect_static_kernel_artifacts,
     run_static_kernel_extractors,
 )
+from sol_execbench.core.bench.static_kernel_status import (
+    aggregate_extractor_reason_value,
+    aggregate_extractor_status_value,
+)
 from sol_execbench.core.environment import ProbeCompletedProcess
 
 
@@ -51,6 +55,46 @@ EXPECTED_REASON_CODES = {
     "extractor_timeout",
     "parser_failed",
 }
+
+
+def _tool_run(
+    status: StaticKernelEvidenceStatus,
+    reason_code: StaticKernelEvidenceReasonCode,
+    *,
+    command: list[str] | None = None,
+) -> StaticKernelEvidenceToolRun:
+    return StaticKernelEvidenceToolRun(
+        tool_id="tool",
+        command=command or ["tool", "artifact"],
+        status=status,
+        reason_code=reason_code,
+    )
+
+
+def _aggregate_status(tool_runs: list[StaticKernelEvidenceToolRun]):
+    return aggregate_extractor_status_value(
+        tool_runs,
+        collected=StaticKernelEvidenceStatus.COLLECTED,
+        partial=StaticKernelEvidenceStatus.PARTIAL,
+        failed=StaticKernelEvidenceStatus.FAILED,
+        unavailable=StaticKernelEvidenceStatus.UNAVAILABLE,
+    )
+
+
+def _aggregate_reason(tool_runs: list[StaticKernelEvidenceToolRun]):
+    return aggregate_extractor_reason_value(
+        tool_runs,
+        status=_aggregate_status(tool_runs),
+        collected_status=StaticKernelEvidenceStatus.COLLECTED,
+        partial_status=StaticKernelEvidenceStatus.PARTIAL,
+        failed_status=StaticKernelEvidenceStatus.FAILED,
+        collected_reason=StaticKernelEvidenceReasonCode.STATIC_EVIDENCE_COLLECTED,
+        partial_reason=StaticKernelEvidenceReasonCode.PARTIAL_ARTIFACT_METADATA,
+        partial_disassembly_reason=StaticKernelEvidenceReasonCode.PARTIAL_DISASSEMBLY_ONLY,
+        failed_reason=StaticKernelEvidenceReasonCode.EXTRACTOR_FAILED,
+        timeout_reason=StaticKernelEvidenceReasonCode.EXTRACTOR_TIMEOUT,
+        unavailable_reason=StaticKernelEvidenceReasonCode.TOOLCHAIN_UNAVAILABLE,
+    )
 
 
 def _representative_sidecar() -> StaticKernelEvidenceSidecar:
@@ -113,6 +157,37 @@ def test_status_and_reason_code_vocabularies_are_locked():
     assert {status.value for status in StaticKernelEvidenceStatus} == EXPECTED_STATUSES
     assert {reason.value for reason in StaticKernelEvidenceReasonCode} == (
         EXPECTED_REASON_CODES
+    )
+
+
+def test_static_extractor_status_helpers_cover_aggregate_outcomes():
+    collected = _tool_run(
+        StaticKernelEvidenceStatus.COLLECTED,
+        StaticKernelEvidenceReasonCode.STATIC_EVIDENCE_COLLECTED,
+    )
+    failed = _tool_run(
+        StaticKernelEvidenceStatus.FAILED,
+        StaticKernelEvidenceReasonCode.EXTRACTOR_FAILED,
+    )
+    timeout = _tool_run(
+        StaticKernelEvidenceStatus.FAILED,
+        StaticKernelEvidenceReasonCode.EXTRACTOR_TIMEOUT,
+    )
+    unavailable = _tool_run(
+        StaticKernelEvidenceStatus.UNAVAILABLE,
+        StaticKernelEvidenceReasonCode.TOOLCHAIN_UNAVAILABLE,
+        command=[],
+    )
+
+    assert _aggregate_status([collected]) == StaticKernelEvidenceStatus.COLLECTED
+    assert _aggregate_status([collected, failed]) == StaticKernelEvidenceStatus.PARTIAL
+    assert _aggregate_status([failed, timeout]) == StaticKernelEvidenceStatus.FAILED
+    assert _aggregate_status([unavailable]) == StaticKernelEvidenceStatus.UNAVAILABLE
+    assert _aggregate_reason([collected, failed]) == (
+        StaticKernelEvidenceReasonCode.PARTIAL_ARTIFACT_METADATA
+    )
+    assert _aggregate_reason([failed, timeout]) == (
+        StaticKernelEvidenceReasonCode.EXTRACTOR_TIMEOUT
     )
 
 

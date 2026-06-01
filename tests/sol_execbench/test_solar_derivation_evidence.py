@@ -38,6 +38,12 @@ from sol_execbench.core.scoring.solar_derivation import (
     derive_solar_derivation_evidence,
     solar_derivation_from_dict,
 )
+from sol_execbench.core.scoring.solar_derivation_status import (
+    default_source_boundary,
+    ordered_status_counts,
+    status_for_confidence,
+    unique_sorted,
+)
 from sol_execbench_type_helpers import (
     JsonDict,
     json_dict,
@@ -1258,6 +1264,23 @@ def test_phase48_evidence_does_not_claim_paper_scale_or_hardware_validation():
         assert parsed.source_boundary["canonical_trace_jsonl"] is False
         assert parsed.source_boundary["public_schema"] is False
         assert parsed.source_boundary["candidate_solution_execution"] is False
+
+
+def test_solar_status_helpers_keep_boundary_and_ordering_stable():
+    assert status_for_confidence(EstimateConfidence.SUPPORTED) == "scored"
+    assert status_for_confidence(EstimateConfidence.INEXACT) == "degraded"
+    assert status_for_confidence(EstimateConfidence.UNSUPPORTED) == "unscored"
+    assert ordered_status_counts({"scored": 2, "queued": 9}) == {
+        "degraded": 0,
+        "scored": 2,
+        "unscored": 0,
+    }
+    assert unique_sorted(["b", "a", "b"]) == ("a", "b")
+    assert default_source_boundary() == {
+        "canonical_trace_jsonl": False,
+        "public_schema": False,
+        "candidate_solution_execution": False,
+    }
 
 
 def _matmul_definition() -> Definition:

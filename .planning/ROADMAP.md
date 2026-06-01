@@ -32,16 +32,16 @@
 **Active milestone:** v1.21 Codebase Debt Reduction and Execution Boundary
 Hardening.
 
-**Status:** Phase 96 complete; ready for Phase 97 planning.
+**Status:** Phase 97 complete; ready for Phase 98 planning.
 
-**Next step:** Run `$gsd-discuss-phase 97` or `$gsd-plan-phase 97`.
+**Next step:** Run `$gsd-discuss-phase 98` or `$gsd-plan-phase 98`.
 
 ## Phases
 
 - [x] **Phase 94: Dataset Runner Decomposition** - Maintainers can modify dataset execution, resume, closure, and derived evidence behavior through tested package helpers instead of a monolithic script.
 - [x] **Phase 95: Eval Driver Runtime Decomposition** - Maintainers can test more evaluator behavior in package modules while preserving staged template smoke coverage.
 - [x] **Phase 96: AMD Bound Graph And Estimate Modularization** - Maintainers can change AMD bound graph extraction and estimate formulas by operation family with focused tests.
-- [ ] **Phase 97: SOLAR Derivation And Static Evidence Modularization** - Maintainers can work on SOLAR derivation and static evidence through isolated provenance, parser, status, and rendering helpers.
+- [x] **Phase 97: SOLAR Derivation And Static Evidence Modularization** - Maintainers can work on SOLAR derivation and static evidence through isolated provenance, parser, status, and rendering helpers.
 - [ ] **Phase 98: Execution Boundary Test Hardening** - Known fragile areas gain CPU-safe and ROCm-aware tests for reward-hack, clock/timing, static evidence, and dataset closure edge cases.
 - [ ] **Phase 99: Boundary Documentation And Final Concern Closure** - Public docs, guardrails, and `CONCERNS.md` accurately separate fixed debt, narrowed risks, accepted limits, and future external work.
 
@@ -97,8 +97,8 @@ Hardening.
   3. Parser and status fixtures cover available, unavailable, failed, partial, and toolchain-variant states.
   4. Existing SOLAR/static evidence sidecar schemas and diagnostic-only authority boundaries are preserved.
 **Plans**:
-  - [ ] 97-01 SOLAR Derivation Responsibility Split
-  - [ ] 97-02 Static Evidence Responsibility Split
+  - [x] 97-01 SOLAR Derivation Responsibility Split
+  - [x] 97-02 Static Evidence Responsibility Split
 
 ### Phase 98: Execution Boundary Test Hardening
 **Goal**: Fragile execution-boundary areas have stronger CPU-safe and ROCm-aware regression coverage without claiming hard sandboxing or new hardware validation.
@@ -137,12 +137,12 @@ Phases execute in numeric order: 94 -> 95 -> 96 -> 97 -> 98 -> 99.
 | 94. Dataset Runner Decomposition | 2/2 | Complete | 2026-06-01 |
 | 95. Eval Driver Runtime Decomposition | 2/2 | Complete | 2026-06-01 |
 | 96. AMD Bound Graph And Estimate Modularization | 2/2 | Complete | 2026-06-01 |
-| 97. SOLAR Derivation And Static Evidence Modularization | 0/2 | Planned | — |
+| 97. SOLAR Derivation And Static Evidence Modularization | 2/2 | Complete | 2026-06-01 |
 | 98. Execution Boundary Test Hardening | 0/2 | Planned | — |
 | 99. Boundary Documentation And Final Concern Closure | 0/2 | Planned | — |
 
 **Coverage:**
 - Requirements mapped: 23/23
-- Requirements complete: 11/23
+- Requirements complete: 14/23
 - Flow count: 6 phases
 - Residual blockers: 0

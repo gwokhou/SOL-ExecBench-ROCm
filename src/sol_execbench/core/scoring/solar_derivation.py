@@ -27,19 +27,21 @@ from sol_execbench.core.scoring.amd_hardware_models import (
     EstimateConfidence,
     default_amd_hardware_models,
 )
+from sol_execbench.core.scoring.solar_derivation_status import (
+    SOLAR_DERIVATION_SOURCE_BOUNDARY_FIELDS,
+    SOLAR_DERIVATION_STATUSES,
+    default_source_boundary as _default_source_boundary_helper,
+    derivation_warnings as _build_derivation_warnings,
+    empty_status_counts as _empty_status_counts_helper,
+    ordered_status_counts as _ordered_status_counts_helper,
+    status_for_confidence as _status_for_confidence_helper,
+    unique_sorted as _unique_sorted_helper,
+)
 
 
 SOLAR_DERIVATION_SCHEMA_VERSION = "sol_execbench.solar_derivation.v1"
 SOLAR_DEFAULT_AMD_HARDWARE_MODEL_REF = "default_amd_hardware_models.gfx1200"
-SOLAR_DERIVATION_STATUSES = frozenset({"scored", "degraded", "unscored"})
 SOLAR_BOUND_LIMITING_RESOURCES = frozenset({"compute", "memory", "none"})
-SOLAR_DERIVATION_SOURCE_BOUNDARY_FIELDS = frozenset(
-    {
-        "canonical_trace_jsonl",
-        "public_schema",
-        "candidate_solution_execution",
-    }
-)
 
 
 @dataclass(frozen=True)
@@ -2271,31 +2273,11 @@ def _derivation_warnings(
     graph: BoundGraph,
     estimates: tuple[OperatorWorkEstimate, ...],
 ) -> tuple[str, ...]:
-    warnings = [f"graph_warning:{warning}" for warning in graph.warnings]
-    for estimate in estimates:
-        warnings.extend(
-            f"estimate_warning:{estimate.node_id}:{warning}"
-            for warning in estimate.warnings
-        )
-        if estimate.confidence == EstimateConfidence.INEXACT:
-            warnings.append(f"inexact_operator:{estimate.node_id}:{estimate.op_family.value}")
-        elif estimate.confidence == EstimateConfidence.UNSUPPORTED:
-            warnings.append(
-                f"unsupported_operator:{estimate.node_id}:{estimate.op_family.value}"
-            )
-    if any(estimate.confidence == EstimateConfidence.UNSUPPORTED for estimate in estimates):
-        warnings.append("aggregate_unscored:unsupported semantic evidence")
-    elif any(estimate.confidence == EstimateConfidence.INEXACT for estimate in estimates):
-        warnings.append("aggregate_degraded:incomplete semantic evidence")
-    return _unique_sorted(warnings)
+    return _build_derivation_warnings(graph.warnings, estimates)
 
 
 def _status_for_confidence(confidence: EstimateConfidence) -> str:
-    if confidence == EstimateConfidence.SUPPORTED:
-        return "scored"
-    if confidence == EstimateConfidence.INEXACT:
-        return "degraded"
-    return "unscored"
+    return _status_for_confidence_helper(confidence)
 
 
 def _worst_estimate_confidence(
@@ -2322,26 +2304,19 @@ def _worse_confidence(
 
 
 def _unique_sorted(items: tuple[str, ...] | list[str]) -> tuple[str, ...]:
-    return tuple(sorted(dict.fromkeys(items)))
+    return _unique_sorted_helper(items)
 
 
 def _empty_status_counts() -> dict[str, int]:
-    return {status: 0 for status in sorted(SOLAR_DERIVATION_STATUSES)}
+    return _empty_status_counts_helper()
 
 
 def _ordered_status_counts(status_counts: dict[str, int]) -> dict[str, int]:
-    return {
-        status: int(status_counts.get(status, 0))
-        for status in sorted(SOLAR_DERIVATION_STATUSES)
-    }
+    return _ordered_status_counts_helper(status_counts)
 
 
 def _default_source_boundary() -> dict[str, bool]:
-    return {
-        "canonical_trace_jsonl": False,
-        "public_schema": False,
-        "candidate_solution_execution": False,
-    }
+    return _default_source_boundary_helper()
 
 
 def _require_keys(payload: dict[str, Any], required: frozenset[str] | set[str], *, source: str) -> None:
