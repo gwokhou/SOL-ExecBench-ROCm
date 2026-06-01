@@ -94,6 +94,39 @@ evidence completeness. This report is a bounded local gap report,
 not full validation, not paper parity, not upstream SOLAR parity,
 not NVIDIA B200 or Blackwell equivalence, and not hosted leaderboard readiness.
 
+### Dataset Reuse And Failure-Mode Matrix
+
+Dataset batch reuse is allowed only when an existing trace file is present,
+the prior summary has no failed workloads, `--rerun` is not set, and any
+requested execution-closure provenance matches the current ready subset,
+readiness, manifest, solution, and derived-evidence requirements.
+
+The runner reports incomplete or blocked states through explicit closure
+records instead of treating them as successful passes:
+
+| Mode | Reuse/closure behavior | CPU-safe regression coverage |
+|------|------------------------|------------------------------|
+| stale provenance | Re-run the problem and record provenance mismatches. | yes |
+| selected ready subset | Stage only selected workloads and mark filtered or blocked refs. | yes |
+| missing derived sidecar | Mark the record `derived_evidence_missing`. | yes |
+| forced rerun | Ignore existing passed traces and attempt execution again. | yes |
+| CLI timeout or nonzero exit | Mark attempted failure with a bounded CLI log ref. | yes |
+| no trace output | Mark attempted failure or missing trace with bounded diagnostics. | yes |
+
+These regressions are intentionally CPU-safe because they exercise policy,
+path, provenance, and closure assembly. Live ROCm execution, profiler-backed
+timing collection, and hardware-specific timing quality still require the
+ROCm/Docker environment described in `docs/TESTING.md` and
+`docs/rocm_timing.md`.
+
+The first deterministic sharding contract lives in
+`sol_execbench.core.dataset.sharding`. It assigns workload refs by original input
+ordinal, gives each shard a stable id such as `shard-0000-of-0002`, and
+reserves one trace file ref per shard. The merge helper orders merged traces by
+original workload ordinal and reports duplicate workloads or incomplete shards
+explicitly. These helpers are a tested design path for future dataset-scale
+parallel execution; the default `scripts/run_dataset.py` CLI remains unchanged.
+
 Dataset runs write per-problem traces under category/problem subdirectories of
 the selected output directory and write a run summary sidecar directly under
 that output directory. The default output directory is `out/`.

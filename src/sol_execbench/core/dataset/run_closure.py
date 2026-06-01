@@ -6,17 +6,31 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from sol_execbench.core.dataset.evidence_refs import build_derived_evidence_refs
+from sol_execbench.core.dataset.evidence_refs import relative_ref
 from sol_execbench.core.dataset.execution_closure import (
     ExecutionClosureReasonCode,
     ExecutionClosureRecord,
     ExecutionClosureStatus,
     build_execution_closure_report,
+    closure_status_for_trace_status,
+    closure_status_with_evidence,
+    compare_execution_closure_provenance,
     write_execution_closure_report,
 )
+
+
+@dataclass(frozen=True)
+class DatasetReuseDecision:
+    """Decision for whether an existing dataset trace can be reused."""
+
+    should_reuse: bool
+    reason: str
+    provenance_mismatches: tuple[dict[str, Any], ...] = ()
 
 
 def utc_timestamp() -> str:
@@ -46,6 +60,48 @@ def prior_closure_provenance(path: Path) -> tuple[dict[str, Any] | None, dict[st
     if not isinstance(provenance, dict):
         return None, stale_provenance_mismatch(observed="missing provenance")
     return provenance, None
+
+
+def dataset_reuse_decision(
+    *,
+    rerun: bool,
+    traces_path: Path,
+    failed_count: int,
+    execution_closure_path: Path | None,
+    provenance: dict[str, Any],
+) -> DatasetReuseDecision:
+    """Return whether an existing dataset trace file should be reused."""
+    if not traces_path.exists():
+        return DatasetReuseDecision(should_reuse=False, reason="missing_traces")
+    if rerun:
+        return DatasetReuseDecision(should_reuse=False, reason="rerun_requested")
+    if failed_count:
+        return DatasetReuseDecision(should_reuse=False, reason="previous_failed")
+    if execution_closure_path is None:
+        return DatasetReuseDecision(should_reuse=True, reason="existing_pass")
+
+    prior_provenance, stale_mismatch = prior_closure_provenance(execution_closure_path)
+    if stale_mismatch is not None:
+        return DatasetReuseDecision(
+            should_reuse=False,
+            reason="stale_provenance",
+            provenance_mismatches=(dict(stale_mismatch),),
+        )
+
+    mismatches = tuple(
+        mismatch.model_dump(mode="json")
+        for mismatch in compare_execution_closure_provenance(
+            provenance,
+            prior_provenance or {},
+        )
+    )
+    if mismatches:
+        return DatasetReuseDecision(
+            should_reuse=False,
+            reason="stale_provenance",
+            provenance_mismatches=mismatches,
+        )
+    return DatasetReuseDecision(should_reuse=True, reason="matching_provenance")
 
 
 def closure_record(
@@ -153,4 +209,70 @@ def derived_evidence_for_workload(
         solar_derivation_dir=solar_derivation_dir,
         timing_evidence_dir=timing_evidence_dir,
         category=category,
+    )
+
+
+def _trace_status(trace: dict[str, Any] | None) -> str | None:
+    if not trace:
+        return None
+    evaluation = trace.get("evaluation") or {}
+    return evaluation.get("status", "UNKNOWN")
+
+
+def selected_workload_closure_record(
+    *,
+    category: str,
+    problem_id: str,
+    problem_path: str,
+    workload_uuid: str | None,
+    row_index: int,
+    readiness: dict[str, Any] | None,
+    trace: dict[str, Any] | None,
+    skipped: bool,
+    traces_path: Path,
+    summary_ref: str,
+    solution_path: Path | None,
+    output_dir: Path,
+    definition_name: str,
+    problem_output_dir: Path,
+    amd_score_report: Path | None,
+    sol_bound_artifact_dir: Path | None,
+    solar_derivation_dir: Path | None,
+    timing_evidence_dir: Path | None,
+) -> dict[str, Any]:
+    """Build a selected workload closure record with evidence completeness."""
+    evidence_refs, evidence_gaps = derived_evidence_for_workload(
+        definition_name=definition_name,
+        workload_uuid=workload_uuid,
+        problem_output_dir=problem_output_dir,
+        output_dir=output_dir,
+        amd_score_report=amd_score_report,
+        sol_bound_artifact_dir=sol_bound_artifact_dir,
+        solar_derivation_dir=solar_derivation_dir,
+        timing_evidence_dir=timing_evidence_dir,
+        category=category,
+    )
+    status = closure_status_with_evidence(
+        closure_status_for_trace_status(_trace_status(trace), skipped=skipped),
+        evidence_gaps,
+    )
+    solution_ref = (
+        relative_ref(solution_path, output_dir)
+        if solution_path is not None and solution_path.exists()
+        else None
+    )
+    return closure_record(
+        category=category,
+        problem_id=problem_id,
+        problem_path=problem_path,
+        workload_uuid=workload_uuid,
+        row_index=row_index,
+        closure_status=status.value,
+        readiness=readiness,
+        trace_ref=relative_ref(traces_path, output_dir),
+        summary_ref=summary_ref,
+        solution_ref=solution_ref,
+        evidence_refs=evidence_refs,
+        evidence_gaps=evidence_gaps,
+        trace_status=_trace_status(trace),
     )

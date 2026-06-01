@@ -48,6 +48,13 @@ from .readiness import (
     write_dataset_readiness,
 )
 from .ready_subset import ReadySubset, build_ready_subset, write_ready_subset
+from .sharding import (
+    DatasetShardMergeResult,
+    DatasetShardPlan,
+    DatasetShardWorkload,
+    merge_dataset_shard_traces,
+    plan_dataset_shards,
+)
 from .parity_gap import (
     ParityGapReport,
     build_parity_gap_report,
@@ -68,6 +75,9 @@ __all__ = [
     "DatasetManifestSource",
     "DatasetInventory",
     "DatasetReadiness",
+    "DatasetShardMergeResult",
+    "DatasetShardPlan",
+    "DatasetShardWorkload",
     "InventoryDenominators",
     "LayoutCategory",
     "LayoutDiagnostic",
@@ -82,6 +92,8 @@ __all__ = [
     "build_dataset_inventory",
     "classify_rocm_readiness",
     "build_ready_subset",
+    "merge_dataset_shard_traces",
+    "plan_dataset_shards",
     "build_parity_gap_report",
     "build_paper_denominator_report",
     "inspect_dataset_layout",
