@@ -64,6 +64,19 @@ Run Docker dependency checks inside the ROCm container:
 uv run pytest tests/docker/dependencies/
 ```
 
+Run recent evaluation and dataset trustworthiness regressions:
+
+```bash
+uv run pytest \
+  tests/sol_execbench/test_cli_environment_snapshot.py \
+  tests/sol_execbench/core/bench/test_eval_runtime.py \
+  tests/sol_execbench/core/data/test_solution.py \
+  tests/sol_execbench/test_dataset_run_closure.py \
+  tests/sol_execbench/test_run_dataset_execution_closure.py \
+  tests/sol_execbench/test_dataset_failure_mode_docs.py \
+  tests/sol_execbench/test_dataset_sharding.py -q
+```
+
 ## Markers
 
 Markers are registered in `pyproject.toml` and `tests/conftest.py`.
@@ -191,6 +204,38 @@ UV_CACHE_DIR=/tmp/uv-cache uv run pytest \
   tests/sol_execbench/test_v1_20_evidence_quality_docs.py \
   tests/sol_execbench/test_public_contract_guardrails.py -q
 ```
+
+## Evaluation And Dataset Trustworthiness Guardrails
+
+The recent CPU-safe guardrails cover:
+
+- bounded no-trace diagnostic sidecars and canonical trace JSONL preservation;
+- staged Python import identity collisions;
+- native compile option rejection for host path injection, response files, and
+  unsafe linker/runtime loader behavior;
+- eval-driver trace emission and reward-hack helper boundaries;
+- dataset reuse and stale-provenance decisions;
+- selected ready subsets, missing traces, missing derived evidence sidecars,
+  CLI timeout/nonzero/no-output closure states, and rerun behavior;
+- deterministic dataset sharding plan and merge semantics.
+
+Focused run:
+
+```bash
+uv run pytest \
+  tests/sol_execbench/test_cli_environment_snapshot.py \
+  tests/sol_execbench/core/bench/test_eval_runtime.py \
+  tests/sol_execbench/core/data/test_solution.py \
+  tests/sol_execbench/driver/test_build_ext.py \
+  tests/sol_execbench/test_dataset_run_closure.py \
+  tests/sol_execbench/test_run_dataset_execution_closure.py \
+  tests/sol_execbench/test_dataset_failure_mode_docs.py \
+  tests/sol_execbench/test_dataset_sharding.py -q
+```
+
+These tests do not prove live ROCm shard execution or full dataset validation.
+They exercise policy, provenance, path, diagnostic, and closure behavior without
+requiring GPU hardware.
 
 ## Live ROCm Validation
 

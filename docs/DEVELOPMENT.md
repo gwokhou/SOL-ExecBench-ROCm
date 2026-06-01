@@ -90,7 +90,7 @@ artifacts, caches, and virtual environments.
 | `src/sol_execbench/cli/` | Click entry points for evaluation, metadata, diagnostics, routing, and baseline comparison. |
 | `src/sol_execbench/core/data/` | Pydantic schemas for definitions, workloads, solutions, traces, shapes, dtypes, and contracts. |
 | `src/sol_execbench/core/bench/` | Correctness, timing, clock locking, reward-hack guardrails, profiler integration, static evidence, and IO helpers. |
-| `src/sol_execbench/core/dataset/` | Dataset layout, inventory, readiness, manifest, checksum, ready-subset, and parity-gap helpers. |
+| `src/sol_execbench/core/dataset/` | Dataset layout, inventory, readiness, manifest, checksum, ready-subset, reuse, closure, sharding, and parity-gap helpers. |
 | `src/sol_execbench/core/scoring/` | AMD scoring, bound estimates, bound graphs, hardware models, SOL derivation, and baseline artifacts. |
 | `src/sol_execbench/driver/` | Problem staging and generated compile/evaluation templates. |
 | `src/sol_execbench/data/` | Packaged AMD hardware model JSON. |
@@ -98,21 +98,32 @@ artifacts, caches, and virtual environments.
 | `tests/examples/` | Example consistency and workflow coverage. |
 | `tests/docker/dependencies/` | Container dependency and ROCm runtime readiness checks. |
 
-## v1.21 Helper Boundaries
+## Helper Boundaries
 
-v1.21 moved focused debt out of monolithic paths without changing public
-benchmark schemas.
+Recent milestones moved focused debt out of monolithic paths without changing
+public benchmark schemas.
 
 | Boundary | Helper modules | Still owned by orchestrator/template |
 | --- | --- | --- |
-| Dataset execution | `core.dataset.run_state`, `core.dataset.run_closure`, `core.dataset.evidence_refs` | `scripts/run_dataset.py` CLI parsing, subprocess invocation, and high-level loop flow. |
-| Eval driver runtime | `core.bench.eval_runtime` | `driver/templates/eval_driver.py` subprocess context, correctness/timing loop, trace emission, and integration smoke behavior. |
+| Dataset execution | `core.dataset.run_state`, `core.dataset.run_closure`, `core.dataset.evidence_refs`, `core.dataset.sharding` | `scripts/run_dataset.py` CLI parsing, serial subprocess invocation, and high-level loop flow. |
+| Eval driver runtime | `core.bench.eval_runtime` | `driver/templates/eval_driver.py` subprocess context, staged wiring, correctness/timing loop, and integration smoke behavior. |
 | AMD bound analysis | `core.scoring.amd_bound_classification`, `core.scoring.amd_bound_estimate_families` | FX/AST graph extraction, family annotation, and formula bodies in existing scoring modules. |
 | SOLAR derivation | `core.scoring.solar_derivation_status` | Sidecar dataclasses, parser validation, semantic group construction, and rendering. |
 | Static evidence | `core.bench.static_kernel_status` | Artifact persistence, tool routing, bounded extractor execution, and sidecar model definitions. |
 
 These boundaries are maintainability aids. They are not security isolation,
 hardware validation, paper-scale parity evidence, or leaderboard authority.
+
+Dataset helper additions include reuse policy decisions, stale-provenance
+mismatch normalization, selected-workload closure record assembly, evidence gap
+classification, and deterministic shard/merge semantics. The sharding helper is
+an importable design path; it does not add dataset CLI parallelism by itself.
+
+Eval-driver helper additions include strict trace JSONL emission and
+reward-hack boundary helpers. Python submissions are loaded through unique
+staged module identities to avoid collisions with already-imported modules.
+Native compile options are validated before extension loading to reject host
+path injection, response files, and unsafe runtime loader/linker behavior.
 
 ## CLI And Runtime Notes
 
@@ -126,6 +137,11 @@ Normal evaluation stages files into a temporary directory through
 `src/sol_execbench/driver/templates/eval_driver.py`; Python and Triton solutions
 run directly through the evaluation driver. Subprocesses receive
 `PYTORCH_ALLOC_CONF=expandable_segments:True`.
+
+When the evaluation subprocess exits without parseable trace JSONL,
+`src/sol_execbench/cli/main.py` writes a bounded diagnostic-only no-trace
+sidecar and prints its path. This sidecar is for debugging stdout/stderr
+framing failures and is deliberately separate from canonical trace JSONL.
 
 ## Test Markers
 

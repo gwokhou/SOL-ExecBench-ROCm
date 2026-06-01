@@ -62,12 +62,15 @@ graph TD
    returns the evaluation command. The CLI runs compile and evaluation commands
    as subprocesses with `PYTORCH_ALLOC_CONF=expandable_segments:True`.
 7. The generated evaluation driver imports reference and candidate code,
-   performs source and runtime guardrail checks, generates or loads workload
-   inputs, runs correctness and timing helpers, and prints one `Trace` JSON
+   performs source and runtime guardrail checks, imports user Python solutions
+   with unique staged module identities, generates or loads workload inputs,
+   runs correctness and timing helpers, and prints one `Trace` JSON
    object per workload to stdout.
 8. The CLI parses trace JSONL back into `Trace` models, writes optional trace,
    profiler, static-evidence, and environment sidecars, prints a Rich summary
    unless `--json` is selected, and exits nonzero when any workload fails.
+   If no parseable trace output exists, the CLI persists a bounded
+   diagnostic-only no-trace sidecar outside canonical trace JSONL.
 
 The root CLI also dispatches GPU-free metadata subcommands before normal
 evaluation: `contract`, `doctor`, and `toolchain`. The separate
@@ -90,6 +93,8 @@ for trace baseline comparison.
 | `RocmCompatibilityMatrixReport` | `src/sol_execbench/core/compatibility.py` | Models compatibility matrix entries, evidence, validation scope, and execution decisions. |
 | `DockerTargetManifest` | `src/sol_execbench/core/docker_matrix.py` | Models ROCm Docker targets and preflight evidence used by Docker tooling and tests. |
 | `TraceRunSummary` and `BaselineComparison` | `src/sol_execbench/core/reporting.py`, `src/sol_execbench/core/baseline.py` | Summarize trace runs and compare new traces against baseline traces. |
+| `DatasetReuseDecision` | `src/sol_execbench/core/dataset/run_closure.py` | Decides whether existing dataset traces can be reused based on rerun flags, failure counts, and execution-closure provenance. |
+| `DatasetShardPlan` and `DatasetShardMergeResult` | `src/sol_execbench/core/dataset/sharding.py` | Define deterministic workload shard assignment, per-shard trace refs, ordered trace merging, duplicate detection, and incomplete-shard reporting. |
 
 ## Directory Structure Rationale
 
@@ -153,6 +158,11 @@ keys with ROCm migration guidance. Native entry points must use `.hip`, `.cpp`,
 `.cc`, `.cxx`, `.c`, `.h`, or `.hpp`; Python and Triton entry points must use
 `.py`. Python and native categories cannot be mixed in one solution.
 
+Native compile options are intentionally constrained. Response files,
+host include/library path injection, runtime loader options, and unsafe linker
+path behavior are rejected during solution validation before native extension
+loading. Documented ROCm/HIP extension flags remain accepted.
+
 For native builds, `ProblemPackager` injects HIP offload architecture flags when
 no explicit architecture flag is present. It uses concrete `gfx*` hardware
 targets from solution metadata or probes local ROCm tooling when the target is
@@ -178,10 +188,18 @@ These sidecars do not change trace schema or correctness status.
 
 `src/sol_execbench/core/dataset/` supports dataset layout discovery, inventory,
 readiness, manifest, checksum, execution-closure, paper-denominator,
-ready-subset, category, and parity-gap workflows. Scripts such as
+ready-subset, category, parity-gap, reuse-policy, and deterministic sharding
+workflows. Scripts such as
 `scripts/download_solexecbench.py`, `scripts/inspect_dataset.py`,
 `scripts/report_paper_denominator.py`, `scripts/report_parity_gaps.py`, and
 `scripts/run_dataset.py` use those helpers.
+
+Dataset reuse and closure behavior is package-owned. `run_closure.py` computes
+reuse decisions, stale-provenance mismatches, selected-workload closure
+records, derived evidence refs, and missing-evidence states. `sharding.py`
+provides an importable design path for future parallel dataset execution while
+leaving the default `scripts/run_dataset.py` CLI behavior serial and
+compatible.
 
 `src/sol_execbench/core/scoring/` contains AMD hardware models, bound estimates,
 bound graphs, SOL derivation helpers, baseline artifacts, and AMD-native score

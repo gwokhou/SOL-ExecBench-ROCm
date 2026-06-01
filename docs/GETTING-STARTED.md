@@ -131,6 +131,21 @@ Run a bounded dataset batch:
 uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark --limit 5
 ```
 
+Run a bounded ready-subset batch with an execution-closure report:
+
+```bash
+uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
+  --ready-subset out/ready_subset.json \
+  --readiness out/readiness.json \
+  --execution-closure out/execution_closure.json \
+  --limit 5
+```
+
+The closure sidecar records attempted, skipped, filtered, missing-trace, and
+missing-evidence states. Existing passing traces are reused only when rerun is
+not requested and any prior closure provenance matches the current selected
+run.
+
 ## Common Setup Issues
 
 | Symptom | Check |
@@ -141,6 +156,7 @@ uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark --limit 5
 | HIP/C++ examples fail to compile | Confirm ROCm headers and `hipcc` are installed, or use the Docker image. |
 | Docker cannot see the GPU | Use native Linux Docker and the repository wrapper instead of Docker Desktop. |
 | Dataset download cannot find `hf` | Run through `uv run --with "huggingface-hub[cli]" ./scripts/download_data.sh`. |
+| Evaluation exits with no trace JSONL | Inspect the printed no-trace diagnostics sidecar path; it contains bounded stdout/stderr tails outside canonical trace JSONL. |
 
 ## Next Steps
 

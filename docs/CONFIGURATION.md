@@ -211,6 +211,13 @@ uv run sol-execbench \
 | `--static-evidence` | `none` | Collect optional diagnostic static kernel evidence when set to `auto`. |
 | `-v`, `--verbose` | Disabled | Show subprocess output and staging details. |
 
+No-trace diagnostic sidecars are not controlled by a separate flag. When an
+evaluation subprocess produces no parseable trace JSONL, the CLI writes a
+bounded diagnostic-only sidecar next to `--output`, in the kept staging
+directory, or in the system temp directory depending on the available path.
+That sidecar records stdout/stderr tails and line counts and is not canonical
+trace JSONL.
+
 Metadata and diagnostic subcommands require `--json`:
 
 ```bash
@@ -258,6 +265,28 @@ uv run sol-execbench toolchain --json
 The wrapper derives PyTorch and Triton Docker build arguments from
 `docker/rocm-targets.json` so ROCm 7.0, 7.1, and 7.2 images can install
 target-specific ROCm wheel stacks without changing the project lockfile.
+
+## Dataset Runner Options
+
+`scripts/run_dataset.py` accepts dataset-scale options outside the main
+`sol-execbench` Click command:
+
+| Flag | Purpose |
+| --- | --- |
+| `--ready-subset` | Bound execution to a previously generated ready-subset sidecar. |
+| `--readiness` | Enrich execution closure with readiness blocker records. |
+| `--execution-closure` | Write an execution-closure JSON sidecar; defaults under `--output` when `--ready-subset` is supplied. |
+| `--dataset-manifest` | Include dataset manifest provenance in closure checks. |
+| `--rerun` | Re-evaluate existing traces instead of reusing passing results. |
+| `--amd-score-report` | Write an opt-in AMD-native derived score report. |
+| `--amd-sol-bound-dir` | Materialize AMD SOL bound sidecars used by score reporting. |
+| `--solar-derivation` | Materialize SOLAR derivation sidecars. |
+| `--timing-evidence-dir` | Write source-specific ROCm timing evidence sidecars. |
+
+Existing traces are reused only when they exist, have no failed workloads,
+`--rerun` is not set, and any requested execution-closure provenance matches
+the current manifest, ready subset, readiness, solution, and derived-evidence
+requirements.
 
 ## Docker Image Settings
 

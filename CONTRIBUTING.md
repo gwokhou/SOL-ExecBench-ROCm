@@ -103,6 +103,7 @@ Update documentation when changing:
 - Docker targets or runtime assumptions
 - ROCm hardware support claims
 - Scoring, timing, profiling, or evidence semantics
+- Dataset reuse, execution-closure, failure-mode, or sharding semantics
 - User-facing examples
 
 Use conservative wording for unvalidated hardware or infrastructure claims.
