@@ -2,8 +2,9 @@
 
 ## Milestones
 
-- Active **v1.22 Concern Closure and Execution Boundary Hardening** -
-  Phases 100-105.
+- Complete **v1.22 Concern Closure and Execution Boundary Hardening** -
+  Phases 100-105 (shipped 2026-06-01). See
+  `.planning/milestones/v1.22-ROADMAP.md`.
 
 - Complete **v1.21 Codebase Debt Reduction and Execution Boundary
   Hardening** - Phases 94-99 (shipped 2026-06-01). See
@@ -21,11 +22,11 @@
 
 ## Current Position
 
-**Active milestone:** v1.22 Concern Closure and Execution Boundary Hardening.
+**Active milestone:** None. v1.22 is archived.
 
-**Status:** v1.22 phases complete.
+**Status:** Ready for next milestone definition.
 
-**Next step:** Run milestone audit/completion when ready.
+**Next step:** Run `$gsd-new-milestone` when ready.
 
 ## Phases
 
@@ -125,6 +126,6 @@ Phases execute in numeric order: 100 -> 101 -> 102 -> 103 -> 104 -> 105.
 
 **Coverage:**
 - Requirements mapped: 22/22
-- Requirements complete: 0/22
+- Requirements complete: 22/22
 - Flow count: 6 phases
 - Residual blockers: 0
