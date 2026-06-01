@@ -67,6 +67,40 @@ def test_failing_cpu_safe_validation_is_blocking(tmp_path, monkeypatch):
     assert "<redacted>" in result["stderr_tail"]
 
 
+def test_redaction_covers_common_credential_formats_and_log_tail_zero(
+    tmp_path,
+    monkeypatch,
+):
+    def fake_run(command, **kwargs):
+        return subprocess.CompletedProcess(
+            command,
+            2,
+            stdout="AWS_SECRET_ACCESS_KEY=abc\nAuthorization: Bearer bearer-token",
+            stderr="HF_TOKEN = hf_123\nGITHUB_TOKEN: ghp_123",
+        )
+
+    monkeypatch.setattr(release_candidate_validation.subprocess, "run", fake_run)
+
+    assert (
+        release_candidate_validation.main(
+            ["--output-dir", str(tmp_path), "--log-tail-chars", "0"]
+        )
+        == 1
+    )
+    result = _load_payload(tmp_path)["results"][0]
+    assert result["stdout_tail"] == ""
+    assert result["stderr_tail"] == ""
+
+    second = tmp_path / "second"
+    assert release_candidate_validation.main(["--output-dir", str(second)]) == 1
+    combined = json.dumps(_load_payload(second))
+    assert "abc" not in combined
+    assert "bearer-token" not in combined
+    assert "hf_123" not in combined
+    assert "ghp_123" not in combined
+    assert "<redacted>" in combined
+
+
 def test_rocm_smoke_records_deferred_skips_and_clock_policy(tmp_path, monkeypatch):
     calls: list[list[str]] = []
 
@@ -138,6 +172,9 @@ def test_dataset_slice_requires_positive_limit(tmp_path):
 
 def test_dataset_slice_records_bounded_artifacts(tmp_path, monkeypatch):
     def fake_run(command, **kwargs):
+        if "--execution-closure" in command:
+            closure_path = Path(command[command.index("--execution-closure") + 1])
+            closure_path.write_text("{}", encoding="utf-8")
         return subprocess.CompletedProcess(command, 0, stdout="ok", stderr="")
 
     monkeypatch.setattr(release_candidate_validation.subprocess, "run", fake_run)
@@ -168,6 +205,72 @@ def test_dataset_slice_records_bounded_artifacts(tmp_path, monkeypatch):
     assert str(tmp_path / "trust_summary.json") in by_name["trust_summary"][
         "artifact_paths"
     ]
+
+
+def test_dataset_command_override_must_preserve_bounded_guarantees(tmp_path):
+    base = [
+        "--output-dir",
+        str(tmp_path),
+        "--include-dataset-slice",
+        "--dataset-dir",
+        "data/SOL-ExecBench/benchmark",
+        "--dataset-limit",
+        "5",
+        "--dataset-command",
+    ]
+    with pytest.raises(SystemExit, match="bounded --limit"):
+        release_candidate_validation.main([*base, "uv", "run", "scripts/run_dataset.py"])
+
+    with pytest.raises(SystemExit, match="--rerun"):
+        release_candidate_validation.main(
+            [*base, "uv", "run", "scripts/run_dataset.py", "--limit=5"]
+        )
+
+    with pytest.raises(SystemExit, match="--execution-closure"):
+        release_candidate_validation.main(
+            [
+                *base,
+                "uv",
+                "run",
+                "scripts/run_dataset.py",
+                "--limit=5",
+                "--rerun",
+            ]
+        )
+
+
+def test_trust_summary_skipped_when_dataset_closure_missing(tmp_path, monkeypatch):
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        if "scripts/run_dataset.py" in command:
+            return subprocess.CompletedProcess(command, 3, stdout="missing data", stderr="")
+        return subprocess.CompletedProcess(command, 0, stdout="should not run", stderr="")
+
+    monkeypatch.setattr(release_candidate_validation.subprocess, "run", fake_run)
+
+    assert (
+        release_candidate_validation.main(
+            [
+                "--output-dir",
+                str(tmp_path),
+                "--include-dataset-slice",
+                "--dataset-dir",
+                "data/SOL-ExecBench/benchmark",
+                "--dataset-limit",
+                "5",
+            ]
+        )
+        == 0
+    )
+
+    payload = _load_payload(tmp_path)
+    by_name = {result["name"]: result for result in payload["results"]}
+    assert by_name["bounded_dataset_slice"]["status"] == "failed"
+    assert by_name["trust_summary"]["status"] == "skipped"
+    assert "execution_closure.json exists" in by_name["trust_summary"]["next_action"]
+    assert not any("scripts/report_trust_summary.py" in command for command in calls)
 
 
 def test_release_candidate_validation_docs_preserve_claim_boundaries():

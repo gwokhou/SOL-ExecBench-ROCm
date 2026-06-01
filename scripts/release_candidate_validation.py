@@ -36,7 +36,13 @@ DEFAULT_ROCM_PYTEST_COMMAND = ["uv", "run", "pytest", "-m", "requires_rocm", "-q
 DEFAULT_DOCKER_COMMAND = ["./scripts/run_docker.sh", "--dry-run"]
 
 TOKEN_PATTERN = re.compile(
-    r"(?i)(token|secret|password|passwd|apikey|api_key|credential)([=:]\s*)([^\s]+)"
+    r"(?ix)"
+    r"("
+    r"(?:[A-Z0-9_]*?(?:TOKEN|SECRET|PASSWORD|PASSWD|API[_-]?KEY|CREDENTIAL)[A-Z0-9_-]*?)"
+    r"|authorization"
+    r")"
+    r"(\s*:\s*bearer\s+|\s*[:=]\s*)"
+    r"([^\s'\"]+)"
 )
 
 
@@ -77,6 +83,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 command=_command_from_args(args.cpu_command, DEFAULT_CPU_COMMAND),
                 failure_classification="blocking",
                 failure_next_action="Fix the failing CPU-safe validation command before publishing.",
+                log_tail_chars=args.log_tail_chars,
             )
         )
 
@@ -92,6 +99,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             failure_classification="deferred",
             failure_next_action="Review ROCm runtime availability; this is optional smoke evidence for prerelease.",
             evidence=_clock_policy_evidence(),
+            log_tail_chars=args.log_tail_chars,
         )
         results.append(doctor_result)
         results.append(
@@ -101,6 +109,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 failure_classification=_optional_smoke_classification,
                 failure_next_action="Run on a ROCm-capable host or keep this prerelease evidence marked deferred.",
                 evidence=_clock_policy_evidence(),
+                log_tail_chars=args.log_tail_chars,
             )
         )
 
@@ -117,6 +126,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                         "paper parity, score authority, or leaderboard authority."
                     )
                 },
+                log_tail_chars=args.log_tail_chars,
             )
         )
 
@@ -125,7 +135,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             raise SystemExit("--include-dataset-slice requires --dataset-dir")
         if args.dataset_limit is None or args.dataset_limit <= 0:
             raise SystemExit("--include-dataset-slice requires positive --dataset-limit")
-        results.extend(_dataset_slice_results(args, output_dir))
+        results.extend(_dataset_slice_results(args, output_dir, args.log_tail_chars))
 
     payload = _build_payload(results)
     json_path = output_dir / "release_candidate_validation.json"
@@ -150,7 +160,7 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     parser.add_argument("--include-dataset-slice", action="store_true")
     parser.add_argument("--dataset-dir", type=Path, default=None)
     parser.add_argument("--dataset-limit", type=int, default=None)
-    parser.add_argument("--dataset-command", nargs="+", default=None)
+    parser.add_argument("--dataset-command", nargs=argparse.REMAINDER, default=None)
     parser.add_argument("--trust-summary-command", nargs="+", default=None)
     parser.add_argument("--log-tail-chars", type=int, default=DEFAULT_LOG_TAIL_CHARS)
     return parser.parse_args(argv)
@@ -163,24 +173,25 @@ def _command_from_args(value: list[str] | None, default: list[str]) -> list[str]
 def _dataset_slice_results(
     args: argparse.Namespace,
     output_dir: Path,
+    log_tail_chars: int,
 ) -> list[ValidationResult]:
     closure_path = output_dir / "execution_closure.json"
     trust_json = output_dir / "trust_summary.json"
     trust_md = output_dir / "trust_summary.md"
-    dataset_command = _command_from_args(
-        args.dataset_command,
-        [
-            "uv",
-            "run",
-            "scripts/run_dataset.py",
-            str(args.dataset_dir),
-            "--limit",
-            str(args.dataset_limit),
-            "--rerun",
-            "--execution-closure",
-            str(closure_path),
-        ],
-    )
+    default_dataset_command = [
+        "uv",
+        "run",
+        "scripts/run_dataset.py",
+        str(args.dataset_dir),
+        "--limit",
+        str(args.dataset_limit),
+        "--rerun",
+        "--execution-closure",
+        str(closure_path),
+    ]
+    dataset_command = _command_from_args(args.dataset_command, default_dataset_command)
+    if args.dataset_command:
+        _validate_dataset_command_override(dataset_command, args.dataset_limit)
     trust_command = _command_from_args(
         args.trust_summary_command,
         [
@@ -195,27 +206,54 @@ def _dataset_slice_results(
             str(trust_md),
         ],
     )
-    return [
-        _run_check(
-            name="bounded_dataset_slice",
-            command=dataset_command,
-            failure_classification="deferred",
-            failure_next_action="Review dataset assets/readiness; keep this prerelease evidence marked deferred until resolved.",
-            artifact_paths=[str(closure_path)],
-            evidence={
-                "dataset_dir": str(args.dataset_dir),
-                "dataset_limit": args.dataset_limit,
-                "paper_scale_boundary": "This bounded slice is not full 235-problem paper validation.",
-            },
-        ),
-        _run_check(
+    dataset_result = _run_check(
+        name="bounded_dataset_slice",
+        command=dataset_command,
+        failure_classification="deferred",
+        failure_next_action="Review dataset assets/readiness; keep this prerelease evidence marked deferred until resolved.",
+        artifact_paths=[str(closure_path)],
+        evidence={
+            "dataset_dir": str(args.dataset_dir),
+            "dataset_limit": args.dataset_limit,
+            "paper_scale_boundary": "This bounded slice is not full 235-problem paper validation.",
+        },
+        log_tail_chars=log_tail_chars,
+    )
+    if dataset_result.status == "passed" and closure_path.exists():
+        trust_result = _run_check(
             name="trust_summary",
             command=trust_command,
             failure_classification="diagnostic-only",
             failure_next_action="Generate trust summary after required input sidecars exist.",
             artifact_paths=[str(trust_json), str(trust_md)],
-        ),
-    ]
+            log_tail_chars=log_tail_chars,
+        )
+    else:
+        trust_result = _skipped_result(
+            name="trust_summary",
+            command=trust_command,
+            classification="diagnostic-only",
+            next_action="Generate trust summary after execution_closure.json exists.",
+        )
+    return [dataset_result, trust_result]
+
+
+def _validate_dataset_command_override(command: list[str], dataset_limit: int) -> None:
+    if not _command_has_option_value(command, "--limit", str(dataset_limit)):
+        raise SystemExit("--dataset-command must include the requested bounded --limit")
+    if "--rerun" not in command:
+        raise SystemExit("--dataset-command must include --rerun")
+    if "--execution-closure" not in command:
+        raise SystemExit("--dataset-command must write --execution-closure")
+
+
+def _command_has_option_value(command: list[str], option: str, value: str) -> bool:
+    for index, part in enumerate(command):
+        if part == option and index + 1 < len(command) and command[index + 1] == value:
+            return True
+        if part == f"{option}={value}":
+            return True
+    return False
 
 
 def _run_check(
@@ -226,6 +264,7 @@ def _run_check(
     failure_next_action: str,
     artifact_paths: list[str] | None = None,
     evidence: dict[str, object] | None = None,
+    log_tail_chars: int = DEFAULT_LOG_TAIL_CHARS,
 ) -> ValidationResult:
     started = time.monotonic()
     try:
@@ -245,14 +284,14 @@ def _run_check(
             next_action=f"Install or expose required command before collecting this evidence: {exc.filename}",
             duration_s=round(duration_s, 3),
             returncode=None,
-            stderr_tail=_tail(str(exc)),
+            stderr_tail=_tail(str(exc), log_tail_chars),
             artifact_paths=artifact_paths or [],
             evidence=evidence or {},
         )
 
     duration_s = time.monotonic() - started
-    stdout_tail = _tail(completed.stdout)
-    stderr_tail = _tail(completed.stderr)
+    stdout_tail = _tail(completed.stdout, log_tail_chars)
+    stderr_tail = _tail(completed.stderr, log_tail_chars)
     if completed.returncode == 0:
         return ValidationResult(
             name=name,
@@ -328,6 +367,8 @@ def _clock_policy_evidence() -> dict[str, object]:
 
 
 def _tail(value: str, limit: int = DEFAULT_LOG_TAIL_CHARS) -> str:
+    if limit <= 0:
+        return ""
     redacted = TOKEN_PATTERN.sub(lambda match: f"{match.group(1)}{match.group(2)}<redacted>", value)
     return redacted[-limit:]
 
