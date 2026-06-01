@@ -47,7 +47,9 @@
   2. Maintainer can wrap reference and custom Python solutions without global source text replacement that mutates strings, comments, or legitimate identifiers.
   3. Dataset summaries, score reports, timing evidence refs, and closure reports are written through package helpers with focused tests.
   4. Dataset-scale CLI behavior remains compatible while exposing a safe seam for future scheduling or bounded CPU-side parallel report work.
-**Plans**: TBD
+**Plans**:
+  - `100-01-PLAN.md` - Extract solution wrapping and subprocess invocation into package runner helpers.
+  - `100-02-PLAN.md` - Extract summary, score, timing, and closure report seams while preserving CLI compatibility.
 
 ### Phase 101: Eval Driver Diagnostics And Framing
 **Goal**: Maintainers can diagnose reference timing and output-framing behavior through importable helpers while preserving staged evaluator semantics.
