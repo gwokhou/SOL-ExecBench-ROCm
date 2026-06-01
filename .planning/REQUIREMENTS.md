@@ -10,10 +10,10 @@ ExecBench.
 
 ### Dataset Runner Closure
 
-- [ ] **DATASET-01**: Maintainer can invoke dataset problem execution through an importable runner abstraction instead of direct subprocess orchestration embedded only in `scripts/run_dataset.py`.
-- [ ] **DATASET-02**: Maintainer can construct solution wrapping and reference/custom Python source handling without global text replacement that mutates strings, comments, or legitimate identifiers.
-- [ ] **DATASET-03**: Maintainer can write dataset summaries, score reports, timing evidence refs, and closure reports through package helpers with focused tests.
-- [ ] **DATASET-04**: Dataset-scale runs preserve existing CLI behavior while exposing a safe seam for future scheduling or bounded CPU-side parallel report work.
+- [x] **DATASET-01**: Maintainer can invoke dataset problem execution through an importable runner abstraction instead of direct subprocess orchestration embedded only in `scripts/run_dataset.py`.
+- [x] **DATASET-02**: Maintainer can construct solution wrapping and reference/custom Python source handling without global text replacement that mutates strings, comments, or legitimate identifiers.
+- [x] **DATASET-03**: Maintainer can write dataset summaries, score reports, timing evidence refs, and closure reports through package helpers with focused tests.
+- [x] **DATASET-04**: Dataset-scale runs preserve existing CLI behavior while exposing a safe seam for future scheduling or bounded CPU-side parallel report work.
 
 ### Eval Driver Diagnostics
 
@@ -81,10 +81,10 @@ ExecBench.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DATASET-01 | Phase 100 | Pending |
-| DATASET-02 | Phase 100 | Pending |
-| DATASET-03 | Phase 100 | Pending |
-| DATASET-04 | Phase 100 | Pending |
+| DATASET-01 | Phase 100 | Complete |
+| DATASET-02 | Phase 100 | Complete |
+| DATASET-03 | Phase 100 | Complete |
+| DATASET-04 | Phase 100 | Complete |
 | EVAL-01 | Phase 101 | Pending |
 | EVAL-02 | Phase 101 | Pending |
 | EVAL-03 | Phase 101 | Pending |
