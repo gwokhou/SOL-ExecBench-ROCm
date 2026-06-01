@@ -1,34 +1,33 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.20
-milestone_name: Cross-Report Consistency and Evaluation Stability
-status: Awaiting next milestone
-stopped_at: Finished remaining codebase quick debt
-last_updated: "2026-06-01T11:10:48+08:00"
-last_activity: 2026-06-01 — Finished remaining codebase quick debt
+milestone: v1.21
+milestone_name: Codebase Debt Reduction and Execution Boundary Hardening
+status: planning
+last_updated: "2026-06-01T03:16:53.841Z"
+last_activity: 2026-06-01
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 10
-  completed_plans: 10
-  percent: 100
+  total_phases: 6
+  completed_phases: 0
+  total_plans: 12
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (updated 2026-05-31)
+See: `.planning/PROJECT.md` (updated 2026-06-01)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
-**Current focus:** Planning next milestone
+**Current focus:** v1.21 codebase debt reduction and execution boundary hardening
 
 ## Current Position
 
-Phase: Milestone v1.20 complete
+Phase: Not started (ready for Phase 94)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-06-01 — Finished remaining codebase quick debt
+Status: Roadmap defined
+Last activity: 2026-06-01 — Milestone v1.21 roadmap created
 
 ## Performance Metrics
 
@@ -108,6 +107,10 @@ Last activity: 2026-06-01 — Finished remaining codebase quick debt
 - [Phase 92]: Trust summaries provide next steps for future CDNA3/MI300X/native-host/paper-scale validation without claiming those validations were performed.
 - [Phase 93]: v1.20 evidence-quality docs and fixtures are demo-only, bounded, and explicitly negative on paper, leaderboard, native-host, and new-hardware authority.
 - [Phase 93]: Public contract guardrails cover v1.20 consistency, stability, claim-upgrade, and trust-summary sidecars.
+- v1.21 starts at Phase 94 because v1.20 completed Phases 89-93.
+- v1.21 derives phases only from `.planning/codebase/CONCERNS.md` concerns that can be resolved through code, tests, docs, and repeatable local verification.
+- v1.21 must not claim hard sandboxing, multi-tenant safety, CDNA3/MI300X/CDNA4 validation, paper-scale SOLAR parity, hosted leaderboard readiness, or one-for-one native ROCm replacement proof for every former NVIDIA category.
+- v1.21 refactors and tests must preserve canonical Trace, Definition, Workload, Solution, timing, correctness, score, and evaluator contract schemas.
 
 ### Pending Todos
 
@@ -129,15 +132,22 @@ None.
 | Paper parity | Full 235-problem real-hardware validation and upstream SOLAR parity | Deferred | v1.20 scope |
 | Public service | Hosted leaderboard or remote submission service | Deferred | v1.20 scope |
 | Dependencies | Dependency relocking, Docker privilege expansion, databases, dashboards, or remote services | Deferred | v1.20 scope |
+| Security | Complete hard sandbox and multi-tenant/adversarial submission isolation | Deferred | v1.21 scope |
+| Hardware validation | CDNA 3, MI300X, CDNA 4, and native-host full-suite validation | Deferred | v1.21 scope |
+| Paper parity | Full 235-problem paper-scale validation and upstream SOLAR equivalence | Deferred | v1.21 scope |
+| Public service | Hosted leaderboard or remote submission service | Deferred | v1.21 scope |
 
 ### Candidate Next-Milestone Frontiers
 
 - Hardware validation expansion: CDNA3/MI300X or CDNA4 live validation using
   v1.20 consistency and stability artifacts as gates.
+
 - Paper parity: full 235-problem validation readiness with claim-upgrade checks
   before any paper-parity candidate claim.
+
 - Profiling diagnostics: feed ROCm profiler or Instruction Roofline evidence
   into stability and trust summaries.
+
 - Leaderboard readiness: submission isolation, anti-cheat, baseline policy, and
   claim-gated trust summaries.
 
@@ -154,8 +164,8 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-06-01T11:10:48+08:00
-Stopped at: Finished remaining codebase quick debt
+Last session: 2026-06-01T11:16:53+08:00
+Stopped at: Milestone v1.21 roadmap created
 Resume file: None
 
 ## Operator Next Steps

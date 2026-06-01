@@ -18,16 +18,18 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 **Shipped version:** v1.20 Cross-Report Consistency and Evaluation Stability,
 completed 2026-05-31.
 
-**Current milestone:** none. The project is ready to define v1.21.
+**Current milestone:** v1.21 Codebase Debt Reduction and Execution Boundary
+Hardening.
 
 **Latest milestone outcome:** the ROCm port now has deterministic consistency,
 stability, claim-upgrade, and trust-summary sidecars that review existing
 benchmark evidence without changing canonical Trace, Definition, Workload,
 Solution, correctness, timing, score, or evaluator semantics.
 
-**Next milestone goal:** to be defined. Strong candidates are hardware
-validation expansion, paper-scale validation readiness, profiling diagnostics,
-or hosted leaderboard readiness.
+**Next milestone goal:** reduce codebase debt identified in
+`.planning/codebase/CONCERNS.md` and harden execution-boundary disclosures
+without claiming hard sandboxing, new hardware validation, paper-scale parity,
+or leaderboard readiness.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline.
 Milestones v1.1-v1.6 added CDNA 3 code/schema support, maintained residue
@@ -88,6 +90,41 @@ hardware validation.
 The v1.20 milestone added cross-report consistency lint, evaluation stability
 diagnostics, claim-upgrade prerequisite gates, trust summaries, public
 evidence-quality docs/fixtures, and a full CPU-safe script-chain regression.
+
+## Current Milestone: v1.21 Codebase Debt Reduction and Execution Boundary Hardening
+
+**Goal:** Fix concerns that can be resolved through code, tests, documentation,
+and repeatable local verification while making benchmark responsibility
+boundaries explicit for issues that require external isolation or hardware
+evidence.
+
+**Target features:**
+- Dataset runner decomposition so `scripts/run_dataset.py` delegates selection,
+  run-state, closure/provenance, derived evidence discovery, and output
+  persistence to tested package helpers.
+- Generated eval driver thinning so deterministic helper behavior moves into
+  importable runtime modules with focused unit tests while the template remains
+  a staging/subprocess integration shell.
+- Analysis module decomposition for AMD/SOLAR scoring and static kernel
+  evidence, isolating graph extraction, operation-family classification, bound
+  formulas, artifact/tool parsing, and report rendering behind smaller tested
+  helpers.
+- Execution-boundary hardening through additional reward-hack catalog tests,
+  clock/timing/static-evidence fixtures, dataset resume/closure combinations,
+  and explicit security/claim guardrails.
+- Documentation and public guardrails that separate benchmark-owned fixes from
+  responsibilities that require hard sandboxing, real hardware validation,
+  paper-scale evidence, or hosted leaderboard infrastructure.
+
+**Explicitly deferred:**
+- Complete OS/container hard sandboxing for untrusted or multi-tenant
+  submissions.
+- CDNA 3, MI300X, CDNA 4, or native-host full-suite hardware validation.
+- Full 235-problem paper-scale SOLAR, upstream SOLAR, hosted leaderboard, or
+  NVIDIA B200/Blackwell equivalence claims.
+- One-for-one native ROCm replacement proof for every former NVIDIA library
+  category.
+- Large PyTorch/ROCm dependency relocking or Docker privilege-model redesign.
 
 ## Recently Shipped Milestone: v1.20 Cross-Report Consistency and Evaluation Stability
 
@@ -527,6 +564,14 @@ docs. The next useful step is to verify that those reports do not contradict
 each other and that real benchmark timing evidence is stable enough to interpret
 before using it to support stronger hardware, score, or paper-parity claims.
 
+After v1.20, the project has strong evidence-quality sidecars and claim gates,
+but `.planning/codebase/CONCERNS.md` identifies maintainability and boundary
+debt in the dataset runner, generated evaluator template, AMD/SOLAR analysis
+modules, static evidence, and execution-boundary disclosures. The next useful
+step is to reduce that debt while preserving benchmark contracts and clearly
+deferring hard sandboxing, new hardware validation, paper-scale parity, and
+leaderboard readiness.
+
 ## Constraints
 
 - **Platform**: ROCm >= 7.0 is the supported software baseline.
@@ -575,6 +620,7 @@ before using it to support stronger hardware, score, or paper-parity claims.
 | Avoid expanding hardware validation in v1.19 | User explicitly does not want to expand CDNA 3, MI300X, CDNA 4, or native host ROCm matrix validation right now. | Active in v1.19 |
 | Improve research credibility without new hardware | User chose denominator accounting, Matrix diff/schema export, dataset-runner hardening, and AMD SOL/SOLAR sanity over additional hardware validation. | Active in v1.19 |
 | Audit current evidence before expanding validation | User chose cross-report consistency and evaluation stability as the next milestone so future CDNA3/MI300X or paper-scale validation can rely on cleaner evidence. | Active in v1.20 |
+| Fix codebase concerns before new validation claims | User chose a v1.21 milestone focused on codebase debt reduction and execution-boundary hardening from `CONCERNS.md`, while deferring hard sandboxing, CDNA3/MI300X validation, paper-scale parity, and leaderboard authority. | Active in v1.21 |
 
 ## Evolution
 
@@ -594,4 +640,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-31 after v1.20 milestone start*
+*Last updated: 2026-06-01 after v1.21 milestone start*
