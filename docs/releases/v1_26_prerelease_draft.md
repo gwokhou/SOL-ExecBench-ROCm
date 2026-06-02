@@ -18,6 +18,8 @@ release.
 
 ## What This Prerelease Contains
 
+- Provenance and compliance policy:
+  `docs/provenance.md`, `docs/compliance.md`.
 - A versioned prerelease artifact bundle workflow:
   `docs/prerelease_artifact_bundle.md`.
 - A prerelease readiness gate:
@@ -53,6 +55,16 @@ The attached bundle should include checksums, command transcripts, release
 validation output, environment evidence, known gaps, and authority-class
 mappings. The readiness report should be reviewed for blocking findings before
 publishing.
+
+## Attribution
+
+This prerelease is for the Apache-2.0 SOL ExecBench ROCm port. The upstream
+project is NVIDIA SOL-ExecBench. Retained or derivative upstream files preserve
+applicable NVIDIA notices, and independent ROCm work uses project attribution.
+The SOL-ExecBench paper is cited for benchmark and methodology context; it is
+not a file-level copyright assignment for independent ROCm work.
+
+This prerelease does not imply NVIDIA or AMD endorsement.
 
 ## Research Preview Scope
 
@@ -95,3 +107,5 @@ This prerelease does not claim:
 - v1.25 release notes: `docs/v1_25_release_notes.md`
 - Prerelease checklist: `docs/v1_25_prerelease_checklist.md`
 - Public publishing checklist: `docs/public_prerelease.md`
+- Provenance policy: `docs/provenance.md`
+- Compliance notes: `docs/compliance.md`

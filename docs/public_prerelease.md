@@ -44,6 +44,8 @@ UV_CACHE_DIR=/tmp/uv-cache uv run scripts/check_prerelease_readiness.py \
 
 Public materials must link:
 
+- `docs/provenance.md`
+- `docs/compliance.md`
 - `docs/prerelease_artifact_bundle.md`
 - `docs/prerelease_readiness.md`
 - `docs/research_preview.md`
@@ -62,11 +64,17 @@ Use this framing:
 > v1.26 is an engineering prerelease and research preview for the SOL ExecBench
 > ROCm port.
 
+Also state that this repository is an Apache-2.0 ROCm port of NVIDIA
+SOL-ExecBench. Retained or derivative upstream files preserve applicable
+NVIDIA notices; independent ROCm work uses project attribution. The
+SOL-ExecBench paper is the benchmark and methodology citation, not a
+file-level copyright assignment for independent ROCm work.
+
 Do not present it as a stable benchmark authority release. Do not claim full
 235-problem paper-scale validation, upstream SOLAR parity, hosted leaderboard
 readiness, hard-sandbox authority, native-host validation inferred from Docker,
 completed full MI300X validation on the CDNA3 `gfx942` target, or CDNA4
-validation.
+validation. Do not imply NVIDIA or AMD endorsement.
 
 MI300X is the concrete CDNA3 `gfx942` hardware target, not a separate
 architecture target. Full MI300X validation remains deferred until complete

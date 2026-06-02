@@ -7,10 +7,10 @@ last_updated: "2026-06-02T02:14:28.992Z"
 last_activity: 2026-06-02
 progress:
   total_phases: 4
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 4
-  completed_plans: 2
-  percent: 50
+  completed_plans: 3
+  percent: 75
 ---
 
 # Project State
@@ -22,14 +22,14 @@ See: `.planning/PROJECT.md` (updated 2026-06-01)
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly
 on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL
 ExecBench.
-**Current focus:** v1.27 Copyright Provenance Cleanup, ready to plan Phase 125.
+**Current focus:** v1.27 Copyright Provenance Cleanup, ready to plan Phase 126.
 
 ## Current Position
 
-Phase: 125 - Compliance And Attribution Documentation
+Phase: 126 - Provenance Guardrails And Release Gates
 Plan: —
 Status: Ready to plan
-Last activity: 2026-06-02 — Phase 124 completed
+Last activity: 2026-06-02 — Phase 125 completed
 
 ## Recent Trend
 
@@ -77,9 +77,9 @@ None.
 ## Session Continuity
 
 Last session: 2026-06-01
-Stopped at: Phase 124 complete; ready to plan Phase 125.
+Stopped at: Phase 125 complete; ready to plan Phase 126.
 Resume file: None
 
 ## Operator Next Steps
 
-- Start Phase 125 with /gsd-discuss-phase 125 or /gsd-plan-phase 125
+- Start Phase 126 with /gsd-discuss-phase 126 or /gsd-plan-phase 126

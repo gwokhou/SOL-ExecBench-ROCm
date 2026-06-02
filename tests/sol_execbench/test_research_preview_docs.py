@@ -14,6 +14,7 @@ def test_research_preview_covers_methodology_scope_evidence_and_limits():
 
     for required in (
         "## Methodology",
+        "## Attribution And Provenance",
         "## Benchmark Scope",
         "## Hardware Scope",
         "## Evidence Surfaces",
@@ -22,6 +23,21 @@ def test_research_preview_covers_methodology_scope_evidence_and_limits():
         "MI300X is the concrete CDNA3 hardware target",
         "CDNA4 validation is unavailable",
         "No full 235-problem paper-scale validation",
+        "not imply NVIDIA or AMD endorsement",
+    ):
+        assert required in text
+
+
+def test_research_preview_distinguishes_paper_citation_from_file_copyright():
+    text = _read("docs/research_preview.md")
+
+    for required in (
+        "NVIDIA SOL-ExecBench",
+        "independent ROCm work",
+        "The SOL-ExecBench paper is the benchmark and methodology citation",
+        "make every independent ROCm implementation file NVIDIA-owned",
+        "docs/provenance.md",
+        "provenance.toml",
     ):
         assert required in text
 

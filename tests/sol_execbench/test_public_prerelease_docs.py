@@ -17,6 +17,8 @@ def test_public_prerelease_guide_contains_publish_checklist_and_links():
         "scripts/check_prerelease_readiness.py",
         "docs/prerelease_artifact_bundle.md",
         "docs/prerelease_readiness.md",
+        "docs/provenance.md",
+        "docs/compliance.md",
         "docs/research_preview.md",
         "docs/rocm.md",
         "docs/CLAIMS.md",
@@ -39,6 +41,8 @@ def test_release_draft_has_required_assets_and_bounded_wording():
         "prerelease_readiness.json",
         "docs/prerelease_artifact_bundle.md",
         "docs/prerelease_readiness.md",
+        "docs/provenance.md",
+        "docs/compliance.md",
         "docs/research_preview.md",
         "docs/rocm.md",
         "docs/CLAIMS.md",
@@ -47,6 +51,8 @@ def test_release_draft_has_required_assets_and_bounded_wording():
         "docs/RESEARCHER-GUIDE.md",
         "MI300X is the concrete CDNA3 `gfx942` hardware target",
         "CDNA4 validation is unavailable",
+        "does not imply NVIDIA or AMD endorsement",
+        "not a file-level copyright assignment",
     ):
         assert required in text
 
@@ -66,7 +72,28 @@ def test_readme_links_v1_26_public_materials():
     for required in (
         "docs/prerelease_artifact_bundle.md",
         "docs/prerelease_readiness.md",
+        "docs/provenance.md",
+        "docs/compliance.md",
         "docs/research_preview.md",
         "docs/public_prerelease.md",
     ):
         assert required in text
+
+
+def test_public_materials_explain_provenance_and_non_endorsement():
+    public_guide = _read("docs/public_prerelease.md")
+    release_draft = _read("docs/releases/v1_26_prerelease_draft.md")
+
+    for text in (public_guide, release_draft):
+        for required in (
+            "Apache-2.0",
+            "NVIDIA",
+            "SOL-ExecBench",
+            "independent ROCm work",
+            "project attribution",
+            "file-level copyright",
+        ):
+            assert required in text
+
+    assert "Do not imply NVIDIA or AMD endorsement" in public_guide
+    assert "does not imply NVIDIA or AMD endorsement" in release_draft

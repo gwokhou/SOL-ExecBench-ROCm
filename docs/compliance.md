@@ -4,10 +4,19 @@
 
 This repository is distributed under Apache-2.0. See `LICENSE`.
 
-The port retains files derived from the original SOL ExecBench implementation
-and preserves existing SPDX headers and NVIDIA copyright notices where present.
-Those notices identify retained upstream material; they do not imply that this
-ROCm port supports NVIDIA runtime execution.
+This repository is a ROCm port of NVIDIA SOL-ExecBench. The port retains files
+derived from the original implementation and preserves NVIDIA copyright notices
+where they apply to upstream-retained or derivative material. Independent ROCm
+work uses project attribution. See `docs/provenance.md` and
+`provenance.toml` for the active provenance policy.
+
+NVIDIA notices identify retained upstream material. They do not imply NVIDIA
+endorsement, NVIDIA runtime support, or NVIDIA ownership of independent ROCm
+work added in this port. AMD product and ROCm references describe the target
+runtime ecosystem and do not imply AMD endorsement.
+
+The SOL-ExecBench paper is cited as benchmark and methodology context. Paper
+citation is separate from file-level source copyright ownership.
 
 ## Third-Party Dependencies
 
@@ -26,6 +35,19 @@ locked in `uv.lock`. Important dependency families include:
 
 Review each package's upstream license before redistributing binaries or
 container images that include those dependencies.
+
+## Attribution And Provenance
+
+Active file provenance is classified as:
+
+- upstream retained,
+- derivative modified,
+- independent ROCm work,
+- generated or planning material.
+
+Header handling follows `docs/provenance.md`. Prior blanket NVIDIA headers are
+corrected through ordinary commits; this project does not rewrite git history
+for ordinary metadata cleanup unless a separate legal review requires it.
 
 ## Unsupported NVIDIA Runtime Features
 

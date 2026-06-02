@@ -21,6 +21,17 @@ porting the execution stack to AMD ROCm. The primary methodology is:
 4. Keep every sidecar's authority boundary visible so reviewers can separate
    canonical benchmark output from diagnostic or provisional evidence.
 
+## Attribution And Provenance
+
+This preview is for the Apache-2.0 SOL ExecBench ROCm port. The upstream
+project is NVIDIA SOL-ExecBench; retained or derivative upstream files preserve
+applicable NVIDIA notices, while independent ROCm work uses this project's own
+attribution. See `docs/provenance.md` and `provenance.toml`.
+
+The SOL-ExecBench paper is the benchmark and methodology citation. It does not
+make every independent ROCm implementation file NVIDIA-owned. This preview does
+not imply NVIDIA or AMD endorsement.
+
 ## Benchmark Scope
 
 The research preview is scoped to the ROCm port's current benchmark harness,
