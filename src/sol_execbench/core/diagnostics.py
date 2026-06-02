@@ -224,7 +224,7 @@ MI300X_REQUIRED_ARTIFACTS: tuple[str, ...] = (
 )
 
 MI300X_FP8_READINESS: tuple[str, ...] = (
-    "MI300X/CDNA 3 can validate FP8 behavior once hardware access exists",
+    "MI300X, as a CDNA 3 GPU, can validate FP8 behavior once hardware access exists",
     "NVFP4/MXFP4 validation is deferred until a suitable AMD hardware and methodology path exists",
 )
 
@@ -368,7 +368,7 @@ def cdna3_validation_readiness(
 
 
 def mi300x_validation_claim_blockers(evidence: Mapping[str, object]) -> tuple[str, ...]:
-    """Return blockers that prevent marking MI300X/CDNA3 reports as validated.
+    """Return blockers that prevent marking MI300X-as-CDNA3 reports as validated.
 
     This pure guard is intentionally strict. It does not run hardware checks; it
     validates that a report has already recorded the minimum evidence required

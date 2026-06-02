@@ -15,7 +15,7 @@ validation evidence.
 ## Implementation Decisions
 
 - Keep documentation aligned with the original paper while explicitly avoiding
-  NVIDIA B200, upstream SOLAR, leaderboard-equivalence, CDNA 3 / MI300X
+  NVIDIA B200, upstream SOLAR, leaderboard-equivalence, MI300X-on-CDNA3
   validation, or CDNA 4 validation claims.
 - Treat RDNA 4 (`gfx1200`) as the only v1.9 validation target.
 - Add tests that audit docs and coverage inventory instead of adding broad

@@ -12,7 +12,7 @@
 - Public contract guardrails now cover CLI/help and documentation claims:
   - no `--hardware-model`, `--amd-hardware-model`, `--hardware-model-path`, `--sol-bound`, or `--amd-score-report` in primary help,
   - retained canonical trace/schema behavior,
-  - explicit non-equivalence phrasing for NVIDIA B200/SOLAR/leaderboard and deferred CDNA3/MI300X/CDNA4 validation.
+  - explicit non-equivalence phrasing for NVIDIA B200/SOLAR/leaderboard and deferred MI300X-on-CDNA3 and CDNA4 validation.
 
 ## Verification
 - `uv run pytest tests/sol_execbench/test_public_contract_guardrails.py -x`

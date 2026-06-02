@@ -193,7 +193,7 @@ The centralized v1.20 guide is `docs/v1_20_evidence_quality_guide.md`. Its
 focused CPU-safe checks cover consistency lint, evaluation stability,
 claim-upgrade rejection, trust summary rendering, deterministic serialization,
 example fixtures, and public contract boundaries. v1.20 documentation has no
-full 235-problem paper validation, no CDNA3-family validation including MI300X
+full 235-problem paper validation, no CDNA3-family validation, including MI300X,
 and no CDNA4 validation, no native-host Matrix authority, no hosted leaderboard
 readiness, no upstream SOLAR parity, and no new-hardware validation.
 
@@ -255,7 +255,7 @@ uv run pytest \
 NVIDIA SPDX notices are listed under `provenance.toml` and that cleanup
 candidates carry project attribution only. The prerelease readiness tests check
 required bundle artifacts, checksum behavior, forbidden claim boundaries,
-known-gap statuses, public MI300X/CDNA3 wording, unavailable CDNA4 wording, and
+known-gap statuses, public MI300X-as-CDNA3 wording, unavailable CDNA4 wording, and
 the provenance policy gate.
 
 ## Live ROCm Validation

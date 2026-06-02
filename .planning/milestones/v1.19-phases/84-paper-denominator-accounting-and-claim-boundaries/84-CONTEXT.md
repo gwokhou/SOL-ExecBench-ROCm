@@ -26,7 +26,7 @@ native-host validation, or new-hardware validation.
   native-host validation, and new-hardware validation explicitly false.
 - Treat the report as denominator accounting and evidence-gap review only, not
   full 235-problem paper validation or benchmark score authority.
-- Preserve v1.19 scope: no CDNA 3, MI300X, CDNA 4, native-host, Docker
+- Preserve v1.19 scope: no CDNA3-family including MI300X, CDNA 4, native-host, Docker
   privilege, dependency relock, or new hardware validation expansion.
 
 ### Status Classification And Evidence

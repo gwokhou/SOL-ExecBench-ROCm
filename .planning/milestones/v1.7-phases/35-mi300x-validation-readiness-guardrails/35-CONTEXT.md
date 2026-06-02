@@ -8,7 +8,7 @@
 The project supports CDNA 3 schema/build targets but has not run on real
 MI300X hardware. The milestone needed a concrete future validation handoff,
 explicit FP8/NVFP4 decisions, and a guard that prevents reports from upgrading
-MI300X/CDNA3 status without recorded full-suite evidence.
+MI300X-on-CDNA3 status without recorded full-suite evidence.
 
 ## Relevant Code
 
@@ -24,5 +24,5 @@ MI300X/CDNA3 status without recorded full-suite evidence.
 ## Constraints
 
 - Do not require real MI300X hardware during this phase.
-- Do not mark CDNA3/MI300X as hardware-validated.
+- Do not mark MI300X-on-CDNA3 as hardware-validated.
 - FP8 is future MI300X validation scope; NVFP4/MXFP4 remains deferred.

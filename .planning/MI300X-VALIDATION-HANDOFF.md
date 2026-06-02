@@ -48,4 +48,4 @@ uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
 - Environment records AMD Instinct MI300X and `gfx942`.
 - Clock locking is active and recorded.
 - `mi300x_validation_claim_blockers()` returns no blockers before any report or
-  support matrix marks MI300X/CDNA3 as hardware-validated.
+  support matrix marks MI300X as hardware-validated on CDNA3.

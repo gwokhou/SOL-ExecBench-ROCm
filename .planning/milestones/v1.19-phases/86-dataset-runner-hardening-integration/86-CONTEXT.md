@@ -103,7 +103,7 @@ the smallest runner changes needed to pass those tests.
 <deferred>
 ## Deferred Ideas
 
-- New hardware validation, native-host validation, CDNA 3, MI300X, and CDNA 4
+- New hardware validation, native-host validation, CDNA3-family including MI300X, and CDNA 4
   validation remain out of scope.
 - Paper denominator and Matrix reporting changes are complete in prior phases
   and should not be reworked here.

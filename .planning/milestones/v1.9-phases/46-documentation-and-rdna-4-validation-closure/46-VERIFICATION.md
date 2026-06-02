@@ -24,7 +24,7 @@ Passed.
   emission, hardware model provenance, coverage/confidence labels,
   degraded/unscored aggregate states, and RDNA 4-only validation scope.
 - Claim guardrails prevent NVIDIA B200, upstream SOLAR, leaderboard
-  equivalence, CDNA 3 / MI300X validation, and CDNA 4 validation claims.
+  equivalence, MI300X-on-CDNA3 validation, and CDNA 4 validation claims.
 - Golden coverage inventory covers matmul, batched matmul, elementwise chains,
   activations, reductions, normalization, softmax, data movement, dtype
   conversion, tuple outputs, and unsupported operations.

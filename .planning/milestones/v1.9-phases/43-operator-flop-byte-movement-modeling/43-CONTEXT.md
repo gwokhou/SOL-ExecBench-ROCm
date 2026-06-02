@@ -153,7 +153,7 @@ benchmark schemas, primary CLI behavior, canonical `Trace` JSONL, and the Phase
 ### Milestone And Phase Scope
 
 - `.planning/PROJECT.md` — v1.9 scope, RDNA 4 validation boundary, deferred
-  CDNA 3 / MI300X and CDNA 4 validation, and paper-alignment constraints.
+  MI300X-on-CDNA3 and CDNA 4 validation, and paper-alignment constraints.
 - `.planning/REQUIREMENTS.md` — Phase 43 MODEL-01 through MODEL-05 and
   downstream BOUND/SCORE/DOC/VAL constraints.
 - `.planning/ROADMAP.md` — Phase 43 goal, success criteria, and boundaries

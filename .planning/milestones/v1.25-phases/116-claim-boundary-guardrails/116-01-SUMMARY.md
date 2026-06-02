@@ -38,7 +38,7 @@ Result: `76 passed in 11.14s`.
 ## Requirement Closure
 
 - CLAIM-01: Complete. Release docs explicitly prevent paper-parity, upstream
-  SOLAR parity, leaderboard, hard-sandbox, MI300X/CDNA3 full-suite, and CDNA4
+  SOLAR parity, leaderboard, hard-sandbox, MI300X-on-CDNA3 full-suite, and CDNA4
   validation overclaims.
 - CLAIM-02: Complete. CPU-safe docs guardrails cover v1.25 prerelease wording.
 - CLAIM-03: Complete. Release notes classify canonical, diagnostic-only,

@@ -45,7 +45,7 @@
   draft, release-page checklist, artifact placeholders, support-boundary links,
   and known-limitations wording.
 
-- Corrected active MI300X/CDNA3 wording so MI300X is consistently described as
+- Corrected active MI300X-as-CDNA3 wording so MI300X is consistently described as
   the concrete CDNA3 `gfx942` hardware target, not a separate architecture peer.
 
 ---
@@ -64,7 +64,7 @@ research or hardware authority.
   ROCm/Docker smoke, and bounded dataset-slice workflows.
 
 - Published support boundaries for RDNA 4 evidence, Docker/container
-  user-space evidence, deferred MI300X/CDNA3 full-suite validation, and
+  user-space evidence, deferred MI300X full-suite validation on CDNA3, and
   unavailable CDNA4 validation.
 
 - Added release claim guardrails and v1.25 release notes classifying canonical,
@@ -483,11 +483,11 @@ RDNA 4 validation evidence.
   degradation, and RDNA 4-only validation scope.
 
 - Added claim guardrails against NVIDIA B200/SOLAR/leaderboard equivalence and
-  premature CDNA 3 / MI300X or CDNA 4 validation claims.
+  premature CDNA3-family validation claims, including MI300X, or CDNA 4 validation claims.
 
 **Known gaps:**
 
-- CDNA 3 / MI300X real-hardware validation remains deferred.
+- CDNA3-family real-hardware validation, including MI300X, remains deferred.
 - CDNA 4 validation remains deferred.
 - Original paper model-to-subgraph extraction and broader upstream SOLAR parity
   remain future work.
@@ -558,12 +558,12 @@ hipBLAS library example, and MI300X validation-readiness guardrails.
 - Promoted `hipblas` with a runnable SGEMM public example, native staging tests,
   docs, and candidate guardrails for MIOpen, CK, and rocWMMA.
 
-- Added MI300X/CDNA3 validation handoff docs, FP8/NVFP4 decision records, and
+- Added MI300X-on-CDNA3 validation handoff docs, FP8/NVFP4 decision records, and
   evidence gates that prevent premature hardware-validation claims.
 
 **Known gaps:**
 
-- Real AMD Instinct MI300X/CDNA3 full-suite validation remains deferred until
+- Real AMD Instinct MI300X full-suite validation on CDNA3 remains deferred until
   hardware access is available.
 
 - FP8 real validation waits for MI300X; NVFP4/MXFP4 remains deferred without a

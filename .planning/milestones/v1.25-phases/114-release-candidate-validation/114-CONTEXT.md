@@ -11,7 +11,7 @@ This phase creates a bounded release-candidate validation path for the
 engineering prerelease. It should let maintainers run CPU-safe checks,
 focused ROCm/Docker smoke checks, and a small dataset slice, then classify the
 results as blocking, deferred, or diagnostic-only. It should not expand paper
-parity, leaderboard, MI300X/CDNA3 full-suite, CDNA4, or hard-sandbox claims.
+parity, leaderboard, MI300X-on-CDNA3 full-suite, CDNA4, or hard-sandbox claims.
 
 </domain>
 
@@ -43,7 +43,7 @@ parity, leaderboard, MI300X/CDNA3 full-suite, CDNA4, or hard-sandbox claims.
 - RDNA 4 evidence can be prerelease evidence when direct artifacts exist.
 - Docker/container user-space validation remains distinct from native-host
   validation.
-- MI300X is the CDNA3 hardware target; MI300X/CDNA3 full-suite validation stays
+- MI300X is the CDNA3 hardware target; MI300X-on-CDNA3 full-suite validation stays
   deferred unless a complete real-hardware evidence chain exists.
 - CDNA4 validation is unavailable because suitable hardware is not currently
   accessible.
@@ -115,7 +115,7 @@ combination. Keep the implementation minimal and release-focused.
 ## Deferred Ideas
 
 - Full 235-problem paper-scale validation and upstream SOLAR parity.
-- MI300X/CDNA3 full-suite hardware validation without complete evidence.
+- MI300X-on-CDNA3 full-suite hardware validation without complete evidence.
 - CDNA4 validation while suitable hardware is unavailable.
 - Hosted leaderboard, remote submissions, and hard multi-tenant sandboxing.
 - Large PyTorch/ROCm dependency relocking or Docker privilege redesign unless

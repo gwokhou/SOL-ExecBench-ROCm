@@ -213,5 +213,5 @@ def test_mi300x_validation_claim_allows_complete_evidence():
 
     assert mi300x_validation_claim_blockers(evidence) == ()
     assert can_mark_mi300x_hardware_validated(evidence) is True
-    assert "MI300X/CDNA 3 can validate FP8" in MI300X_FP8_READINESS[0]
+    assert "MI300X, as a CDNA 3 GPU, can validate FP8" in MI300X_FP8_READINESS[0]
     assert "NVFP4/MXFP4 validation is deferred" in MI300X_FP8_READINESS[1]

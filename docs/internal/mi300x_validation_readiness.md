@@ -47,10 +47,10 @@ uv run scripts/run_dataset.py <path-to-SOL-ExecBench-benchmark> \
 - Dataset validation run completes with expected skips/deviations documented.
 - Environment evidence records MI300X and `gfx942`.
 - Clock locking is enabled and recorded.
-- Reports are not marked MI300X/CDNA3 hardware-validated unless
+- Reports are not marked MI300X hardware-validated as CDNA3 unless
   `mi300x_validation_claim_blockers()` returns no blockers.
 
 ## No-Claim Rule
 
-Until the evidence above exists, public docs and reports must say MI300X/CDNA3
+Until the evidence above exists, public docs and reports must say MI300X as CDNA3
 hardware validation is deferred. Readiness metadata is not a validation claim.

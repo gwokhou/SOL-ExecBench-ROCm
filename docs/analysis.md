@@ -431,7 +431,7 @@ v1.10 derived sidecars and reports support the local
 automatic SOLAR derivation evidence for this ROCm port, but they are not
 paper-scale 124-model / 235-problem extraction, not upstream SOLAR parity, not
 NVIDIA B200 or Blackwell equivalence, not hosted leaderboard readiness, and not
-new real-hardware validation. They also do not claim CDNA3-family validation including MI300X (`gfx942`)
+new real-hardware validation. They also do not claim CDNA3-family validation, including MI300X (`gfx942`)
 validation, CDNA 4 validation, NVFP4 validation, MXFP4 validation, or any new
 hardware validation beyond the evidence explicitly recorded in the local
 artifacts.

@@ -89,7 +89,7 @@
 | Full guardrail now | Add score-report/schema warning guardrails immediately too. | |
 
 **User's choice:** Runtime + claim docs.
-**Notes:** Phase 41 should block B200/SOLAR/leaderboard/CDNA3/MI300X/CDNA4 overclaims early, but full score integration remains Phase 45.
+**Notes:** Phase 41 should block B200/SOLAR/leaderboard/MI300X-on-CDNA3 and CDNA4 overclaims early, but full score integration remains Phase 45.
 
 ---
 

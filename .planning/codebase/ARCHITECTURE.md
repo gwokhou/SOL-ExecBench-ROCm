@@ -42,7 +42,7 @@ SOL ExecBench ROCm Port is a local benchmark package, not a hosted service. It e
 
 - Public solution schema supports ROCm categories and rejects legacy CUDA/NVIDIA categories.
 - The PyTorch device spelling may still use `cuda` because PyTorch ROCm exposes HIP devices through CUDA-compatible APIs.
-- Docker, docs, and readiness gates distinguish RDNA 4 recorded evidence, deferred MI300X/CDNA3 full-suite validation, and unavailable CDNA4 validation.
+- Docker, docs, and readiness gates distinguish RDNA 4 recorded evidence, deferred MI300X full-suite validation on CDNA3, and unavailable CDNA4 validation.
 - MI300X is the concrete CDNA3 `gfx942` hardware target, not a separate architecture peer.
 
 ## Extension Points

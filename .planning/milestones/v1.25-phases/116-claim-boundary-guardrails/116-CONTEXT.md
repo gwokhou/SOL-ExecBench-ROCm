@@ -13,7 +13,7 @@ requirements: [CLAIM-01, CLAIM-02, CLAIM-03]
 Keep v1.25 engineering-prerelease release wording bounded to the evidence this
 repository actually has. A reader should not infer paper parity, upstream SOLAR
 parity, leaderboard readiness, hard-sandbox authority, native-host validation
-from Docker/container evidence, CDNA4 validation, or completed MI300X/CDNA3
+from Docker/container evidence, CDNA4 validation, or completed MI300X-on-CDNA3
 full-suite validation.
 
 ## Inputs
@@ -38,7 +38,7 @@ full-suite validation.
   claim-upgrade, trust-summary, and release-candidate summaries are sidecar or
   diagnostic evidence unless a narrower document says otherwise.
 - MI300X is the concrete CDNA3 hardware target (`gfx942`); full-suite
-  MI300X/CDNA3 validation is deferred without a complete real-hardware evidence
+  MI300X-on-CDNA3 validation is deferred without a complete real-hardware evidence
   chain.
 - CDNA4 validation is unavailable because suitable hardware is not currently
   accessible.
@@ -67,7 +67,7 @@ full-suite validation.
 ## Deferred
 
 - Running full 235-problem paper validation.
-- Running MI300X/CDNA3 full-suite validation.
+- Running MI300X-on-CDNA3 full-suite validation.
 - Running CDNA4 validation.
 - Implementing hosted leaderboard or hard multi-tenant sandbox operations.
 - Changing trace, score, timing, Matrix, or validation schemas.

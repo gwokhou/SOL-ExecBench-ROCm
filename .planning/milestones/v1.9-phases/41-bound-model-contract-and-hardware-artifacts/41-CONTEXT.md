@@ -90,7 +90,7 @@ change.
 ### Milestone And Phase Scope
 
 - `.planning/PROJECT.md` — Project constraints, v1.9 scope, RDNA 4 validation
-  boundary, and deferred CDNA 3 / MI300X and CDNA 4 validation.
+  boundary, and deferred MI300X-on-CDNA3 and CDNA 4 validation.
 - `.planning/REQUIREMENTS.md` — Phase 41 requirements HW-01 through HW-04 and
   DOC-01, plus out-of-scope items.
 - `.planning/ROADMAP.md` — Phase 41 goal, success criteria, and downstream
@@ -180,7 +180,7 @@ change.
 - Score-report warning integration beyond contract compatibility is Phase 45
   scope.
 - Structured IR and operator formula work are Phases 42 and 43.
-- CDNA 3 / MI300X and CDNA 4 validation remain future milestone work.
+- MI300X-on-CDNA3 and CDNA 4 validation remain future milestone work.
 
 </deferred>
 

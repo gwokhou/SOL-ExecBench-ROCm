@@ -104,7 +104,7 @@ diff JSON/Markdown helpers plus a thin script and guardrails.
 - CI policy failure gates for Matrix diff severities remain future work.
 - Exporting additional sidecar schemas remains future work unless a downstream
   consumer needs them.
-- Native-host Matrix validation, CDNA 3, MI300X, and CDNA 4 validation remain
+- Native-host Matrix validation, CDNA3-family including MI300X, and CDNA 4 validation remain
   out of scope for v1.19.
 
 </deferred>

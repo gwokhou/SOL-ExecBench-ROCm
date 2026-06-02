@@ -81,5 +81,5 @@ modify canonical traces.
 
 - User-facing docs for score semantics belong to Phase 46.
 - RDNA 4 sample-run evidence belongs to Phase 46.
-- Full CDNA 3 / MI300X validation remains deferred.
+- Full MI300X-on-CDNA3 validation remains deferred.
 </deferred>

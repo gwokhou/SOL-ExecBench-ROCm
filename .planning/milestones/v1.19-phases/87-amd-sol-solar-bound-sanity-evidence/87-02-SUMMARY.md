@@ -74,7 +74,7 @@ completed: 2026-05-31
 
 **1. [Rule 1 - Bug] Updated stale hardware-boundary guardrail wording**
 - **Found during:** Task 3 final guardrail verification.
-- **Issue:** An existing guardrail expected the old phrase `CDNA 3 / MI300X real-hardware validation`, while current v1.19 requirements use `CDNA 3, MI300X, CDNA 4, or native-host ROCm validation expansion`.
+- **Issue:** An existing guardrail expected the old phrase `MI300X-on-CDNA3 real-hardware validation`, while current v1.19 requirements use `CDNA3-family including MI300X, CDNA 4, or native-host ROCm validation expansion`.
 - **Fix:** Updated the assertion to match the current requirements wording while preserving the same deferred-hardware-validation boundary.
 - **Files modified:** `tests/sol_execbench/test_public_contract_guardrails.py`
 - **Verification:** Focused public contract/script/core/score test command passed.

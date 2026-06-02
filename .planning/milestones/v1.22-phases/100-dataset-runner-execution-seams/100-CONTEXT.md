@@ -42,6 +42,6 @@ No specific requirements - infrastructure phase. Follow ROADMAP success criteria
 <deferred>
 ## Deferred Ideas
 - Hard sandbox/multi-tenant execution.
-- CDNA3/MI300X/CDNA4 or native-host validation.
+- MI300X-on-CDNA3 and CDNA4 or native-host validation.
 - Paper-scale parity and leaderboard readiness.
 </deferred>

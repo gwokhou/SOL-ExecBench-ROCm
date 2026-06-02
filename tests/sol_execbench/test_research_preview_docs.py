@@ -79,6 +79,6 @@ def test_researcher_guide_links_research_preview_entrypoint():
         "docs/research_preview.md",
         "docs/prerelease_artifact_bundle.md",
         "docs/prerelease_readiness.md",
-        "CDNA3-family validation including MI300X and no CDNA4 validation",
+        "CDNA3-family validation, including MI300X, and no CDNA4 validation",
     ):
         assert required in text

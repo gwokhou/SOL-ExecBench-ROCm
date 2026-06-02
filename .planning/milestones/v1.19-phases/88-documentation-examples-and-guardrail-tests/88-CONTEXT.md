@@ -43,7 +43,7 @@ change canonical benchmark contracts.
   `CLAIMS.md`, `TESTING.md`, and fixture examples.
 - Required negative statements: no full 235-problem paper validation, no
   upstream SOLAR parity, no score authority, no leaderboard readiness, no
-  CDNA3/MI300X/CDNA4 validation, no native-host ROCm Matrix validation, and no
+  MI300X-on-CDNA3 and CDNA4 validation, no native-host ROCm Matrix validation, and no
   new-hardware validation.
 - Avoid broad full-doc scans that create noisy false positives; focus on public
   v1.19 entry points and example artifacts.
@@ -110,7 +110,7 @@ should verify wording and fixture shape, not execute GPU/Docker validation.
 ## Deferred Ideas
 
 - Full 235-problem paper validation, upstream SOLAR equivalence comparison,
-  AMD SOL/SOLAR model validation, leaderboard readiness, CDNA 3, MI300X, CDNA 4,
+  AMD SOL/SOLAR model validation, leaderboard readiness, CDNA3-family including MI300X, CDNA 4,
   native-host validation, new hardware validation, Docker privilege changes,
   and dependency relocking remain out of scope.
 - Real RDNA 4 performance example publication remains out of scope for Phase

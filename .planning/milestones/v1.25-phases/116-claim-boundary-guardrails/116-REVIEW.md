@@ -39,7 +39,7 @@ Both were fixed before completion.
   evidence only.
 - Paper validation, upstream SOLAR parity, leaderboard readiness, and hard
   sandbox authority remain deferred.
-- MI300X/CDNA3 full-suite validation remains deferred; CDNA4 validation remains
+- MI300X-on-CDNA3 full-suite validation remains deferred; CDNA4 validation remains
   unavailable because suitable hardware is not currently accessible.
 
 ## Verification

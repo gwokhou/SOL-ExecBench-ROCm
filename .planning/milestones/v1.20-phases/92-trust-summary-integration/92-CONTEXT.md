@@ -12,6 +12,6 @@ into deterministic JSON/Markdown for researcher review.
   checksum and does not embed full payloads.
 - It separates internally consistent, stable enough to interpret, evidence
   missing, diagnostic-only, and claim-upgrade-blocked outcomes.
-- It gives next steps for CDNA3/MI300X/native-host/paper-scale validation
+- It gives next steps for MI300X-on-CDNA3, native-host/paper-scale validation
   without claiming those validations were performed.
 

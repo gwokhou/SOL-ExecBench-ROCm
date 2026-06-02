@@ -137,4 +137,4 @@
 - Full agentic extended-einsum conversion.
 - Full SOL Analyzer and Orojenesis-style data movement modeling.
 - Dataset and score-report integration.
-- CDNA 3 / MI300X and CDNA 4 validation.
+- MI300X-on-CDNA3 and CDNA 4 validation.

@@ -18,7 +18,7 @@ benchmark research and deep development:
 - AMD score and bound helpers separated from canonical Trace JSONL, with
   explicit unsupported and inexact cases.
 - Release gates for checksums, required artifacts, known gaps, forbidden
-  claims, CDNA3/MI300X scope, unavailable CDNA4 validation, and provenance.
+  claims, MI300X-as-CDNA3 scope, unavailable CDNA4 validation, and provenance.
 - Machine-readable provenance classes for upstream-retained, derivative, and
   independent ROCm files.
 

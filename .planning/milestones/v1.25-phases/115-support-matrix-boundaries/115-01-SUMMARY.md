@@ -12,12 +12,12 @@ requirements: [SUPPORT-01, SUPPORT-02, SUPPORT-03, SUPPORT-04]
 ## Completed Work
 
 - Added an engineering prerelease support matrix to `docs/rocm.md` covering
-  RDNA 4, Docker/container ROCm user-space, MI300X/CDNA3, and CDNA4.
+  RDNA 4, Docker/container ROCm user-space, MI300X-on-CDNA3, and CDNA4.
 - Clarified `docs/CLAIMS.md` so prerelease evidence cannot be read as native
   host validation, paper parity, upstream SOLAR parity, score authority,
   leaderboard readiness, hard-sandbox authority, or new hardware validation.
 - Updated `docs/release_candidate_validation.md` to point prerelease readers
-  back to the support matrix and repeat the concise container, MI300X/CDNA3,
+  back to the support matrix and repeat the concise container, MI300X-on-CDNA3,
   and CDNA4 boundaries.
 - Added focused documentation guardrails in
   `tests/sol_execbench/test_research_release_docs.py`.
