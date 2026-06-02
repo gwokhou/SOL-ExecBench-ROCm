@@ -53,6 +53,8 @@ work.
 
 ### Phase 125: Compliance And Attribution Documentation
 
+**Status:** Complete
+
 **Goal:** Align public compliance, attribution, release, and research-preview
 documentation with the provenance policy.
 
@@ -97,15 +99,15 @@ prevent future blanket header drift.
 | COPY-02 | Phase 124 | Complete |
 | COPY-03 | Phase 124 | Complete |
 | COPY-04 | Phase 124 | Complete |
-| COMP-01 | Phase 125 | Pending |
-| COMP-02 | Phase 125 | Pending |
-| COMP-03 | Phase 125 | Pending |
+| COMP-01 | Phase 125 | Complete |
+| COMP-02 | Phase 125 | Complete |
+| COMP-03 | Phase 125 | Complete |
 | GATE-01 | Phase 126 | Pending |
 | GATE-02 | Phase 126 | Pending |
 | GATE-03 | Phase 126 | Pending |
 
 **Coverage:** 13/13 v1.27 requirements mapped.
-**Progress:** 7/13 requirements complete; 2/4 phases complete.
+**Progress:** 10/13 requirements complete; 3/4 phases complete.
 
 ## Completed Milestones
 
@@ -122,6 +124,6 @@ prevent future blanket header drift.
 
 ## Current Position
 
-**Next up:** Phase 125 Compliance And Attribution Documentation.
+**Next up:** Phase 126 Provenance Guardrails And Release Gates.
 
-Start with `$gsd-discuss-phase 125` or `$gsd-plan-phase 125`.
+Start with `$gsd-discuss-phase 126` or `$gsd-plan-phase 126`.

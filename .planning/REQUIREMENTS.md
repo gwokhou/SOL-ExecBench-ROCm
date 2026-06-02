@@ -33,12 +33,12 @@ roadmap phase.
 
 ### Compliance Documentation
 
-- [ ] **COMP-01**: Public compliance docs explain the fork relationship to
+- [x] **COMP-01**: Public compliance docs explain the fork relationship to
   NVIDIA SOL-ExecBench, Apache-2.0 obligations, retained upstream notices, and
   project-owned ROCm contributions.
-- [ ] **COMP-02**: Public docs distinguish paper/method citation from
+- [x] **COMP-02**: Public docs distinguish paper/method citation from
   file-level source copyright ownership.
-- [ ] **COMP-03**: README, research preview, and release materials avoid
+- [x] **COMP-03**: README, research preview, and release materials avoid
   implying NVIDIA or AMD endorsement.
 
 ### Guardrails
@@ -91,9 +91,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | COPY-02 | Phase 124 | Complete |
 | COPY-03 | Phase 124 | Complete |
 | COPY-04 | Phase 124 | Complete |
-| COMP-01 | Phase 125 | Pending |
-| COMP-02 | Phase 125 | Pending |
-| COMP-03 | Phase 125 | Pending |
+| COMP-01 | Phase 125 | Complete |
+| COMP-02 | Phase 125 | Complete |
+| COMP-03 | Phase 125 | Complete |
 | GATE-01 | Phase 126 | Pending |
 | GATE-02 | Phase 126 | Pending |
 | GATE-03 | Phase 126 | Pending |

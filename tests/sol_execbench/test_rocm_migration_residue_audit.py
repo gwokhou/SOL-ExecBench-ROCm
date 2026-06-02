@@ -247,6 +247,10 @@ def _classification(relative_path: str, line: str) -> str | None:
         "NVIDIA" in line or "CUDA" in line
     ):
         return "research and release docs claim-boundary assertion"
+    if relative_path.startswith("tests/sol_execbench/test_public_prerelease_docs.py") and (
+        "NVIDIA" in line or "CUDA" in line
+    ):
+        return "public prerelease docs claim-boundary assertion"
     if relative_path.startswith("src/sol_execbench/core/utils.py") and (
         "is_cuda_available" in line or "list_cuda_devices" in line or "cuda" in line
     ):

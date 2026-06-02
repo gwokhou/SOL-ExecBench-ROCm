@@ -166,6 +166,8 @@ Legacy CUDA/NVIDIA schema values such as `cuda_cpp`, `cublas`, `cudnn`,
 
 ## Documentation
 
+- [Provenance Policy](docs/provenance.md): upstream attribution, project-owned ROCm work, SPDX header policy, and non-endorsement boundaries.
+- [Compliance](docs/compliance.md): Apache-2.0 license, third-party dependencies, unsupported NVIDIA runtime features, and known gaps.
 - [v1.25 Engineering Prerelease Notes](docs/v1_25_release_notes.md): shipped capability, validation evidence, known limitations, and deferred claims.
 - [v1.25 Prerelease Checklist](docs/v1_25_prerelease_checklist.md): maintainer checklist from clean tree to tagged release candidate.
 - [v1.26 Artifact Bundle](docs/prerelease_artifact_bundle.md): versioned prerelease artifact bundle generation and authority classes.
