@@ -7,21 +7,24 @@ benchmark shape where practical while replacing CUDA/NVIDIA execution paths
 with ROCm, HIP, Triton ROCm, ROCm library categories, AMD-oriented evidence
 tooling, and explicit validation-boundary guardrails.
 
-Compared with the original SOL ExecBench implementation, this port adds several
-independent ROCm-specific capabilities:
+Beyond the CUDA-to-ROCm execution adaptation, this repository adds independent
+infrastructure for making AMD benchmark evidence auditable:
 
-- ROCm solution schemas, migration guidance, and rejection of legacy
-  CUDA/NVIDIA runtime categories.
-- HIP/C++, Triton ROCm, hipBLAS, MIOpen, Composable Kernel, and rocWMMA example
-  paths.
-- ROCm Docker target compatibility checks across selected ROCm 7.x user-space
-  stacks.
-- Diagnostic `rocprofv3`, static-kernel, environment, and toolchain evidence
-  sidecars.
-- AMD-oriented scoring, bound-evidence, dataset closure, and trust-summary
-  helpers.
-- Prerelease artifact readiness gates, public claim-boundary checks, and
-  source-provenance policy tooling.
+- Trace-adjacent evidence sidecars for environment snapshots, `rocprofv3`
+  profiling, static kernel artifacts, ROCm toolchain routing, and compatibility
+  Matrix entries, with explicit authority classes for each artifact.
+- Dataset execution-closure, ready-subset, paper-denominator, parity-gap,
+  consistency, stability, claim-upgrade, and trust-summary reports for
+  explaining what was run, skipped, reused, blocked, or only diagnostically
+  observed.
+- AMD-oriented score and bound-evidence helpers that separate canonical Trace
+  JSONL from provisional AMD-native analysis and unsupported/inexact cases.
+- Release-readiness gates that check checksums, required artifacts, known gaps,
+  forbidden public claims, MI300X/CDNA3 wording, unavailable CDNA4 validation,
+  and source-provenance policy before publication.
+- A machine-readable provenance policy for distinguishing upstream-retained,
+  derivative-modified, and independent ROCm work without rewriting ordinary git
+  history.
 
 These additions are scoped as ROCm-port, engineering-prerelease, or
 research-preview evidence; they do not imply paper-level parity, upstream SOLAR
