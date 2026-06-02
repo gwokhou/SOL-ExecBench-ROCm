@@ -2,21 +2,23 @@
 # SOL ExecBench ROCm Port
 
 SOL ExecBench ROCm Port is an AMD ROCm-focused adaptation of SOL ExecBench for
-evaluating LLM-generated GPU kernels on AMD hardware. It preserves the original
-benchmark shape where practical while replacing CUDA/NVIDIA execution paths
-with ROCm, HIP, Triton ROCm, ROCm library categories, AMD-oriented evidence
-tooling, and explicit validation-boundary guardrails.
+ROCm ecosystem researchers and low-level GPU developers evaluating
+LLM-generated kernels on AMD hardware. It preserves the original benchmark
+shape where practical while replacing CUDA/NVIDIA execution paths with ROCm,
+HIP, Triton ROCm, ROCm library categories, AMD-oriented evidence tooling, and
+explicit validation-boundary guardrails.
 
-Beyond CUDA-to-ROCm execution, this repository adds independent evidence and
-release infrastructure:
+Beyond backend adaptation, this repository adds infrastructure for ROCm
+benchmark research and deep development:
 
-- Trace-adjacent sidecars for environment, `rocprofv3`, static-kernel,
-  toolchain, and ROCm compatibility evidence.
-- Dataset closure and denominator reports that distinguish attempted, skipped,
-  reused, blocked, unsupported, and diagnostic-only results.
-- AMD score and bound helpers kept separate from canonical Trace JSONL.
+- Trace-adjacent evidence for environment, `rocprofv3`, static-kernel,
+  toolchain routing, and ROCm compatibility checks.
+- Dataset accounting for ready subsets, execution closure, paper denominator,
+  parity gaps, consistency, stability, and trust summaries.
+- AMD score and bound helpers separated from canonical Trace JSONL, with
+  explicit unsupported and inexact cases.
 - Release gates for checksums, required artifacts, known gaps, forbidden
-  claims, MI300X/CDNA3 wording, CDNA4 unavailability, and provenance policy.
+  claims, CDNA3/MI300X scope, unavailable CDNA4 validation, and provenance.
 - Machine-readable provenance classes for upstream-retained, derivative, and
   independent ROCm files.
 
