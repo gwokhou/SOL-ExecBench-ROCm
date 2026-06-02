@@ -1,35 +1,20 @@
 <!-- generated-by: gsd-doc-writer -->
-# SOL ExecBench ROCm Port
 
-SOL ExecBench ROCm Port is an AMD ROCm-focused adaptation of SOL ExecBench for
-ROCm ecosystem researchers and low-level GPU developers evaluating
-LLM-generated kernels on AMD hardware. It preserves the original benchmark
-shape where practical while replacing CUDA/NVIDIA execution paths with ROCm,
-HIP, Triton ROCm, ROCm library categories, AMD-oriented evidence tooling, and
-explicit validation-boundary guardrails.
+# SOL ExecBench for ROCm
 
-Beyond backend adaptation, this repository adds infrastructure for ROCm
-benchmark research and deep development:
+The project is an AMD ROCm-focused adaptation of SOL ExecBench for ROCm ecosystem researchers and low-level GPU developers evaluating LLM-generated kernels on AMD hardware. It preserves the original benchmark shape where practical while replacing CUDA/NVIDIA execution paths with ROCm, HIP, Triton ROCm, ROCm library categories, AMD-oriented evidence tooling, and explicit validation-boundary guardrails.
 
-- Trace-adjacent evidence for environment, `rocprofv3`, static-kernel,
-  toolchain routing, and ROCm compatibility checks.
-- Dataset accounting for ready subsets, execution closure, paper denominator,
-  parity gaps, consistency, stability, and trust summaries.
-- AMD score and bound helpers separated from canonical Trace JSONL, with
-  explicit unsupported and inexact cases.
-- Release gates for checksums, required artifacts, known gaps, forbidden
-  claims, MI300X-as-CDNA3 scope, unavailable CDNA4 validation, and provenance.
-- Machine-readable provenance classes for upstream-retained, derivative, and
-  independent ROCm files.
+Beyond backend adaptation, this repository adds infrastructure for ROCm benchmark research and deep development:
 
-These additions are scoped as ROCm-port, engineering-prerelease, or
-research-preview evidence; they do not imply paper-level parity, upstream SOLAR
-equivalence, or leaderboard authority.
+- Trace-adjacent evidence for environment, `rocprofv3`, static-kernel, toolchain routing, and ROCm compatibility checks.
+- Dataset accounting for ready subsets, execution closure, paper denominator, parity gaps, consistency, stability, and trust summaries.
+- AMD score and bound helpers separated from canonical Trace JSONL, with explicit unsupported and inexact cases.
+- Release gates for checksums, required artifacts, known gaps, forbidden claims, MI300X-as-CDNA3 scope, unavailable CDNA4 validation, and provenance.
+- Machine-readable provenance classes for upstream-retained, derivative, and independent ROCm files.
 
-This project is independent and is not endorsed by NVIDIA or AMD. See
-[Provenance Policy](docs/provenance.md), [Compliance](docs/compliance.md), and
-[Claims](docs/CLAIMS.md) for upstream attribution, licensing, and validation
-boundaries.
+These additions are scoped as ROCm-port, engineering-prerelease, or research-preview evidence; they do not imply paper-level parity, upstream SOLAR equivalence, or leaderboard authority.
+
+This project is independent and is not endorsed by NVIDIA or AMD. See [Provenance Policy](docs/provenance.md), [Compliance](docs/compliance.md), and [Claims](docs/CLAIMS.md) for upstream attribution, licensing, and validation boundaries.
 
 ## Requirements
 
@@ -40,10 +25,7 @@ boundaries.
 - ROCm 7.x user-space tooling for native HIP/C++ and profiler paths
 - Docker, when using the provided ROCm container workflow
 
-The project dependency configuration resolves PyTorch `2.10.0+rocm7.1` and
-torchvision `0.25.0+rocm7.1` on Linux and Windows. On Linux it also resolves
-`triton-rocm==3.6.0`. The Docker target manifest records ROCm 7.0.2, 7.1.1,
-and 7.2.0 container targets for compatibility and evidence workflows.
+On Linux x86_64, the project dependency configuration resolves PyTorch `2.10.0+rocm7.1`, torchvision `0.25.0+rocm7.1`, and `triton-rocm==3.6.0`. Non-Linux and non-x86_64 environments use the non-ROCm PyTorch wheels for CPU-safe development tasks. The Docker target manifest records ROCm 7.0.2, 7.1.1, and 7.2.0 container targets for compatibility and evidence workflows.
 
 ## Installation
 
@@ -137,18 +119,11 @@ Common evaluator options:
 | `--static-evidence auto` | Collect optional diagnostic static kernel evidence for native builds. |
 | `-v`, `--verbose` | Show subprocess output and staging details. |
 
-If evaluation exits without parseable trace JSONL, the CLI writes a bounded
-diagnostic-only no-trace sidecar next to `--output`, in the kept staging
-directory, or in the system temp directory. This sidecar records stdout/stderr
-tails and line counts; it is not canonical trace JSONL.
+If evaluation exits without parseable trace JSONL, the CLI writes a bounded diagnostic-only no-trace sidecar next to `--output`, in the kept staging directory, or in the system temp directory. This sidecar records stdout/stderr tails and line counts; it is not canonical trace JSONL.
 
 ### Security Boundary
 
-SOL ExecBench stages and executes submitted solution code in a local
-subprocess, with static source review and runtime reward-hack checks before and
-during evaluation. These guardrails are not a hardened sandbox and are not a
-multi-tenant isolation boundary. Run untrusted submissions only inside an
-appropriate container, VM, or isolated ROCm host that you control.
+SOL ExecBench stages and executes submitted solution code in a local subprocess, with static source review and runtime reward-hack checks before and during evaluation. These guardrails are not a hardened sandbox and are not a multi-tenant isolation boundary. Run untrusted submissions only inside an appropriate container, VM, or isolated ROCm host that you control.
 
 Metadata and diagnostic subcommands:
 
@@ -168,9 +143,7 @@ uv run sol-execbench-baseline \
   --format text
 ```
 
-Baseline comparison accepts repeated `--baseline` inputs, `--format text|json`,
-`--output`, `--win-pct`, `--parity-pct`, and `--amd-native-claim` for guarded
-AMD-native reporting.
+Baseline comparison accepts repeated `--baseline` inputs, `--format text|json`, `--output`, `--win-pct`, `--parity-pct`, and `--amd-native-claim` for guarded AMD-native reporting.
 
 ## Supported Solution Categories
 
@@ -186,14 +159,11 @@ The ROCm schema accepts Python/Triton categories and native ROCm categories:
 | `ck` | Native ROCm implementation using Composable Kernel. |
 | `rocwmma` | Native ROCm implementation using rocWMMA. |
 
-See [ROCm library examples](docs/rocm_libraries.md) for library readiness,
-example coverage, and diagnostic boundaries.
-CDNA 3 library and native-category support is schema/build/docs support unless
-real CDNA 3 hardware evidence is recorded.
+See [ROCm library examples](docs/rocm_libraries.md) for library readiness, example coverage, and diagnostic boundaries.
+CDNA 3 library and native-category support is schema/build/docs support unless real CDNA 3 hardware evidence is recorded.
 CDNA 4 validation is also deferred because suitable hardware is unavailable.
 
-Legacy CUDA/NVIDIA schema values such as `cuda_cpp`, `cublas`, `cudnn`,
-`cutlass`, `cute_dsl`, and `cutile` are rejected with ROCm migration guidance.
+Legacy CUDA/NVIDIA schema values such as `cuda_cpp`, `cublas`, `cudnn`, `cutlass`, `cute_dsl`, and `cutile` are rejected with ROCm migration guidance.
 
 ## Documentation
 
@@ -220,9 +190,7 @@ Legacy CUDA/NVIDIA schema values such as `cuda_cpp`, `cublas`, `cudnn`,
 - [Static Kernel Evidence](docs/static_kernel_evidence.md): diagnostic static artifact sidecars.
 - [Original Parity](docs/original_parity.md): CUDA-to-ROCm parity boundaries and deferred claims.
 
-For first-run troubleshooting, start with [Getting Started](docs/GETTING-STARTED.md)
-and then use [Configuration](docs/CONFIGURATION.md) for no-trace diagnostics,
-sidecar paths, Docker settings, and environment variables.
+For first-run troubleshooting, start with [Getting Started](docs/GETTING-STARTED.md) and then use [Configuration](docs/CONFIGURATION.md) for no-trace diagnostics, sidecar paths, Docker settings, and environment variables.
 
 Schema-specific references:
 
@@ -241,9 +209,7 @@ uv run ty check
 uv run pytest tests/
 ```
 
-GPU-sensitive checks use pytest markers such as `requires_rocm`,
-`requires_rocm_dev`, `requires_rdna4`, `requires_cdna3`, `requires_ck`,
-`requires_rocwmma`, and `timing_serial`.
+GPU-sensitive checks use pytest markers such as `requires_rocm`, `requires_rocm_dev`, `requires_rdna4`, `requires_cdna3`, `requires_ck`, `requires_rocwmma`, and `timing_serial`.
 
 Focused CPU-safe checks for provenance and prerelease guardrails:
 
@@ -266,9 +232,7 @@ uv run pytest \
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Contributions should start from an
-approved GitHub issue, keep pull requests focused, include tests and
-documentation for public behavior changes, and use DCO-signed commits.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Contributions should start from an approved GitHub issue, keep pull requests focused, include tests and documentation for public behavior changes, and use DCO-signed commits.
 
 ## License
 

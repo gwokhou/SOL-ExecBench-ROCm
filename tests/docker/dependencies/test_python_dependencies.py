@@ -21,10 +21,22 @@ def test_rocm_dependency_sources():
     data = tomllib.loads(PYPROJECT.read_text())
 
     dependencies = data["project"]["dependencies"]
-    assert "torch==2.10.0; sys_platform != 'linux' and sys_platform != 'win32'" in dependencies
-    assert "torch==2.10.0+rocm7.1; sys_platform == 'linux' or sys_platform == 'win32'" in dependencies
-    assert "torchvision==0.25.0; sys_platform != 'linux' and sys_platform != 'win32'" in dependencies
-    assert "torchvision==0.25.0+rocm7.1; sys_platform == 'linux' or sys_platform == 'win32'" in dependencies
+    assert (
+        "torch==2.10.0; sys_platform != 'linux' or platform_machine != 'x86_64'"
+        in dependencies
+    )
+    assert (
+        "torch==2.10.0+rocm7.1; sys_platform == 'linux' and platform_machine == 'x86_64'"
+        in dependencies
+    )
+    assert (
+        "torchvision==0.25.0; sys_platform != 'linux' or platform_machine != 'x86_64'"
+        in dependencies
+    )
+    assert (
+        "torchvision==0.25.0+rocm7.1; sys_platform == 'linux' and platform_machine == 'x86_64'"
+        in dependencies
+    )
     for forbidden in FORBIDDEN:
         assert all(forbidden not in dep for dep in dependencies), forbidden
 
