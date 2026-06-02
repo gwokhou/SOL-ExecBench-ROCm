@@ -1,5 +1,31 @@
 # Milestones
 
+## v1.26 Public Prerelease and Research Preview (Shipped: 2026-06-02)
+
+**Phases completed:** 4 phases, 4 plans, 0 tasks
+
+**Key accomplishments:**
+
+- Added a versioned prerelease artifact bundle workflow with manifest,
+  Markdown summary, SHA-256 checksums, command transcripts, release validation
+  outputs, environment evidence, known gaps, and authority-class mappings.
+
+- Added prerelease readiness gates that fail missing required artifacts,
+  checksum drift, claim-boundary regressions, unknown authority classes, and
+  unreviewed known-gap statuses.
+
+- Published a research preview evidence package that separates canonical Trace
+  JSONL from diagnostic-only, provisional, deferred, and unavailable evidence.
+
+- Prepared public prerelease publishing materials, including a GitHub release
+  draft, release-page checklist, artifact placeholders, support-boundary links,
+  and known-limitations wording.
+
+- Corrected active MI300X/CDNA3 wording so MI300X is consistently described as
+  the concrete CDNA3 `gfx942` hardware target, not a separate architecture peer.
+
+---
+
 ## v1.25 Engineering Prerelease (Shipped: 2026-06-01)
 
 **Delivered:** bounded engineering prerelease materials for installing,
@@ -12,14 +38,18 @@ research or hardware authority.
 
 - Added release-candidate validation across CPU-safe checks, optional
   ROCm/Docker smoke, and bounded dataset-slice workflows.
+
 - Published support boundaries for RDNA 4 evidence, Docker/container
   user-space evidence, deferred MI300X/CDNA3 full-suite validation, and
   unavailable CDNA4 validation.
+
 - Added release claim guardrails and v1.25 release notes classifying canonical,
   diagnostic-only, provisional, deferred, and unavailable evidence.
+
 - Clarified the first-run user path for install, minimal trace generation,
   trace interpretation, no-trace diagnostics, and PyTorch ROCm compatibility
   wording.
+
 - Added prerelease checklist and README navigation for release-candidate
   materials.
 
@@ -36,8 +66,10 @@ sharding trustworthiness improvements.
 
 - Moved dataset reuse and stale-provenance decisions into importable core
   helpers.
+
 - Centralized selected-workload closure record assembly, including trace refs,
   summary refs, solution refs, and missing evidence states.
+
 - Documented and protected the dataset failure-mode regression matrix.
 - Added deterministic sharding and merge helpers with stable shard ids,
   per-shard trace refs, duplicate detection, and incomplete-shard reporting.
@@ -55,10 +87,13 @@ compile guardrails, and eval-driver boundary hardening.
 
 - No-trace and noisy-output evaluation failures persist bounded diagnostics and
   point CLI users to evidence without requiring verbose mode.
+
 - Python solution imports use unique file-based staged module identities to
   avoid collisions with already-imported modules.
+
 - Native compile options reject dangerous host/path/linker behavior while
   preserving documented ROCm/HIP extension use cases.
+
 - The generated eval driver delegates benchmark phases to tested importable
   helpers while preserving canonical contracts and reward-hack boundaries.
 
@@ -78,27 +113,34 @@ claims remain blocked.
   `scripts/report_consistency.py` for deterministic cross-report contradiction
   checks across closure, denominator, Matrix, runtime/static evidence, AMD
   score, AMD SOL/SOLAR, and bound sanity reports.
+
 - Added `sol_execbench.evaluation_stability.v1` and
   `scripts/report_evaluation_stability.py` for timing-quality classification,
   dispersion metrics, clock policy, backend, and profiling-overhead risk.
+
 - Added `sol_execbench.claim_upgrade.v1` and
   `scripts/report_claim_upgrade.py` to evaluate diagnostic-only,
   container/native-host validation, score-authority, paper-parity, and
   leaderboard prerequisites without mutating source reports.
+
 - Added `sol_execbench.trust_summary.v1` and
   `scripts/report_trust_summary.py` to combine consistency, stability,
   claim-upgrade, and evidence completeness into bounded JSON/Markdown review
   artifacts.
+
 - Published v1.20 evidence-quality docs and demo fixtures with CPU-safe
   guardrail tests, a full cross-script E2E chain, and negative claim-boundary
   wording.
+
 - Passed milestone audit with 23/23 requirements, 5/5 phases, 5/5 integration
   checks, 5/5 flows, and no residual blockers or tech debt.
 
 **Stats:**
+
 - 76 files created/modified in the milestone range.
 - 5,775 insertions and 88 deletions across planning, source, scripts, tests,
   docs, and examples.
+
 - 5 phases, 10 plans, 23 requirements.
 - Shipped on 2026-05-31.
 
