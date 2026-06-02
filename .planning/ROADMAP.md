@@ -72,6 +72,8 @@ documentation with the provenance policy.
 
 ### Phase 126: Provenance Guardrails And Release Gates
 
+**Status:** Complete
+
 **Goal:** Convert copyright/provenance cleanup into repeatable guardrails that
 prevent future blanket header drift.
 
@@ -102,12 +104,12 @@ prevent future blanket header drift.
 | COMP-01 | Phase 125 | Complete |
 | COMP-02 | Phase 125 | Complete |
 | COMP-03 | Phase 125 | Complete |
-| GATE-01 | Phase 126 | Pending |
-| GATE-02 | Phase 126 | Pending |
-| GATE-03 | Phase 126 | Pending |
+| GATE-01 | Phase 126 | Complete |
+| GATE-02 | Phase 126 | Complete |
+| GATE-03 | Phase 126 | Complete |
 
 **Coverage:** 13/13 v1.27 requirements mapped.
-**Progress:** 10/13 requirements complete; 3/4 phases complete.
+**Progress:** 13/13 requirements complete; 4/4 phases complete.
 
 ## Completed Milestones
 
@@ -124,6 +126,6 @@ prevent future blanket header drift.
 
 ## Current Position
 
-**Next up:** Phase 126 Provenance Guardrails And Release Gates.
+**Status:** All v1.27 phases complete. Ready for milestone audit.
 
-Start with `$gsd-discuss-phase 126` or `$gsd-plan-phase 126`.
+Run `$gsd-audit-milestone` before completing the milestone.

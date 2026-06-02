@@ -43,12 +43,12 @@ roadmap phase.
 
 ### Guardrails
 
-- [ ] **GATE-01**: NVIDIA/CUDA residue audit becomes provenance-aware and
+- [x] **GATE-01**: NVIDIA/CUDA residue audit becomes provenance-aware and
   rejects NVIDIA-only headers on independent ROCm files.
-- [ ] **GATE-02**: Prerelease readiness checks fail when provenance docs,
+- [x] **GATE-02**: Prerelease readiness checks fail when provenance docs,
   header policy, or allowed NVIDIA notice classifications are missing or
   inconsistent.
-- [ ] **GATE-03**: Tests protect against removing required NVIDIA notices from
+- [x] **GATE-03**: Tests protect against removing required NVIDIA notices from
   upstream-retained or derivative files.
 
 ## Future Requirements
@@ -94,13 +94,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | COMP-01 | Phase 125 | Complete |
 | COMP-02 | Phase 125 | Complete |
 | COMP-03 | Phase 125 | Complete |
-| GATE-01 | Phase 126 | Pending |
-| GATE-02 | Phase 126 | Pending |
-| GATE-03 | Phase 126 | Pending |
+| GATE-01 | Phase 126 | Complete |
+| GATE-02 | Phase 126 | Complete |
+| GATE-03 | Phase 126 | Complete |
 
 **Coverage:**
 - v1.27 requirements: 13 total
 - Mapped to phases: 13
+- Complete: 13
 - Unmapped: 0
 
 ---
