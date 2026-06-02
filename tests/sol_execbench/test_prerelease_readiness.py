@@ -237,3 +237,61 @@ def test_readiness_doc_claim_checks_cover_public_boundaries(tmp_path):
         )
         == 0
     )
+
+
+def test_provenance_policy_check_passes_for_repository_state():
+    findings = check_prerelease_readiness._check_provenance_policy(REPO_ROOT)
+
+    assert [finding for finding in findings if finding.status == "blocking"] == []
+
+
+def test_provenance_policy_check_blocks_missing_manifest(tmp_path):
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs/provenance.md").write_text(
+        "upstream retained derivative modified independent ROCm work not legal advice "
+        "not imply NVIDIA or AMD endorsement\n",
+        encoding="utf-8",
+    )
+
+    findings = check_prerelease_readiness._check_provenance_policy(tmp_path)
+
+    assert any(finding.id == "missing_provenance_manifest" for finding in findings)
+
+
+def test_provenance_policy_check_blocks_cleanup_candidate_with_nvidia_header(tmp_path):
+    source_path = tmp_path / "src/package/new_rocm.py"
+    source_path.parent.mkdir(parents=True)
+    source_path.write_text(
+        "\n".join(
+            (
+                check_prerelease_readiness.NVIDIA_HEADER,
+                "# SPDX-License-Identifier: Apache-2.0",
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs/provenance.md").write_text(
+        "upstream retained derivative modified independent ROCm work not legal advice "
+        "not imply NVIDIA or AMD endorsement\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "provenance.toml").write_text(
+        "\n".join(
+            (
+                "[nvidia_notice]",
+                "allowed = []",
+                'cleanup_candidates = ["src/package/new_rocm.py"]',
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    findings = check_prerelease_readiness._check_provenance_policy(tmp_path)
+
+    assert {finding.id for finding in findings} >= {
+        "unexpected_nvidia_notice",
+        "cleanup_candidate_header_mismatch",
+    }

@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import tomllib
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -16,6 +17,14 @@ from typing import Sequence
 SCHEMA_VERSION = "sol_execbench.prerelease_readiness.v1"
 BUNDLE_SCHEMA_VERSION = "sol_execbench.prerelease_artifact_bundle.v1"
 DEFAULT_OUTPUT_DIR = Path("out/prerelease_readiness")
+REPO_ROOT = Path(__file__).resolve().parents[1]
+PROVENANCE_MANIFEST_PATH = Path("provenance.toml")
+PROVENANCE_DOC_PATH = Path("docs/provenance.md")
+NVIDIA_HEADER = (
+    "# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. "
+    "All rights reserved."
+)
+PROJECT_HEADER = "# SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port"
 AUTHORITY_CLASSES = {
     "canonical",
     "diagnostic-only",
@@ -50,6 +59,13 @@ REQUIRED_DOC_PHRASES = {
         "CDNA4 validation is unavailable",
     ),
 }
+REQUIRED_PROVENANCE_DOC_PHRASES = (
+    "upstream retained",
+    "derivative modified",
+    "independent ROCm work",
+    "not legal advice",
+    "not imply NVIDIA or AMD endorsement",
+)
 
 
 @dataclass(frozen=True)
@@ -71,6 +87,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     checksum_path = bundle_dir / "SHA256SUMS"
     manifest = _load_json(manifest_path, findings)
     checksums = _load_checksums(checksum_path, findings)
+    findings.extend(_check_provenance_policy())
     if manifest:
         findings.extend(_check_manifest(manifest, bundle_dir, checksums))
         if not args.skip_doc_claim_checks:
@@ -399,6 +416,145 @@ def _check_doc_claims() -> list[Finding]:
     return findings
 
 
+def _check_provenance_policy(root: Path = REPO_ROOT) -> list[Finding]:
+    findings: list[Finding] = []
+    manifest_path = root / PROVENANCE_MANIFEST_PATH
+    doc_path = root / PROVENANCE_DOC_PATH
+
+    if not manifest_path.exists():
+        return [
+            Finding(
+                id="missing_provenance_manifest",
+                status="blocking",
+                category="provenance",
+                message="Missing provenance.toml.",
+                path=PROVENANCE_MANIFEST_PATH.as_posix(),
+            )
+        ]
+    try:
+        provenance = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
+    except tomllib.TOMLDecodeError as exc:
+        return [
+            Finding(
+                id="invalid_provenance_manifest",
+                status="blocking",
+                category="provenance",
+                message=f"provenance.toml is not valid TOML: {exc}",
+                path=PROVENANCE_MANIFEST_PATH.as_posix(),
+            )
+        ]
+
+    if not doc_path.exists():
+        findings.append(
+            Finding(
+                id="missing_provenance_doc",
+                status="blocking",
+                category="provenance",
+                message="Missing docs/provenance.md.",
+                path=PROVENANCE_DOC_PATH.as_posix(),
+            )
+        )
+    else:
+        doc_text = doc_path.read_text(encoding="utf-8").lower()
+        for phrase in REQUIRED_PROVENANCE_DOC_PHRASES:
+            if phrase.lower() not in doc_text:
+                findings.append(
+                    Finding(
+                        id="missing_provenance_doc_phrase",
+                        status="blocking",
+                        category="provenance",
+                        message=f"Missing provenance doc phrase: {phrase}",
+                        path=PROVENANCE_DOC_PATH.as_posix(),
+                    )
+                )
+
+    nvidia_notice = provenance.get("nvidia_notice")
+    if not isinstance(nvidia_notice, dict):
+        findings.append(
+            Finding(
+                id="missing_provenance_nvidia_notice_section",
+                status="blocking",
+                category="provenance",
+                message="provenance.toml must define [nvidia_notice].",
+                path=PROVENANCE_MANIFEST_PATH.as_posix(),
+            )
+        )
+        return findings
+
+    allowed = _string_set(nvidia_notice.get("allowed"))
+    cleanup_candidates = _string_set(nvidia_notice.get("cleanup_candidates"))
+    if allowed & cleanup_candidates:
+        findings.append(
+            Finding(
+                id="provenance_lists_overlap",
+                status="blocking",
+                category="provenance",
+                message="nvidia_notice.allowed and cleanup_candidates must not overlap.",
+                path=PROVENANCE_MANIFEST_PATH.as_posix(),
+            )
+        )
+
+    active_nvidia_headers = _active_nvidia_header_files(root)
+    unexpected = active_nvidia_headers - allowed
+    missing = allowed - active_nvidia_headers
+    if unexpected:
+        findings.append(
+            Finding(
+                id="unexpected_nvidia_notice",
+                status="blocking",
+                category="provenance",
+                message=f"Unexpected NVIDIA notices: {', '.join(sorted(unexpected))}.",
+                path=PROVENANCE_MANIFEST_PATH.as_posix(),
+            )
+        )
+    if missing:
+        findings.append(
+            Finding(
+                id="missing_allowed_nvidia_notice",
+                status="blocking",
+                category="provenance",
+                message=f"Allowed files missing NVIDIA notices: {', '.join(sorted(missing))}.",
+                path=PROVENANCE_MANIFEST_PATH.as_posix(),
+            )
+        )
+
+    for relative_path in sorted(allowed):
+        path = root / relative_path
+        if not path.exists():
+            findings.append(_missing_provenance_file(relative_path))
+            continue
+        lines = path.read_text(encoding="utf-8").splitlines()[:4]
+        if NVIDIA_HEADER not in lines or PROJECT_HEADER not in lines:
+            findings.append(
+                Finding(
+                    id="allowed_file_header_mismatch",
+                    status="blocking",
+                    category="provenance",
+                    message="Allowed NVIDIA notice file must contain NVIDIA and project attribution.",
+                    path=relative_path,
+                )
+            )
+
+    for relative_path in sorted(cleanup_candidates):
+        path = root / relative_path
+        if not path.exists():
+            findings.append(_missing_provenance_file(relative_path))
+            continue
+        lines = path.read_text(encoding="utf-8").splitlines()[:4]
+        if NVIDIA_HEADER in lines or PROJECT_HEADER not in lines:
+            findings.append(
+                Finding(
+                    id="cleanup_candidate_header_mismatch",
+                    status="blocking",
+                    category="provenance",
+                    message="Cleanup candidate must contain project attribution and no NVIDIA file attribution.",
+                    path=relative_path,
+                )
+            )
+
+    return findings
+
+
 def _build_payload(
     bundle_dir: Path,
     findings: list[Finding],
@@ -461,6 +617,34 @@ def _list_of_dicts(value: object) -> list[dict[str, object]]:
     if not isinstance(value, list):
         return []
     return [item for item in value if isinstance(item, dict)]
+
+
+def _string_set(value: object) -> set[str]:
+    if not isinstance(value, list):
+        return set()
+    return {item for item in value if isinstance(item, str)}
+
+
+def _active_nvidia_header_files(root: Path) -> set[str]:
+    files: set[str] = set()
+    for root_name in ("src", "scripts", "tests"):
+        root_path = root / root_name
+        if not root_path.exists():
+            continue
+        for path in root_path.rglob("*.py"):
+            if NVIDIA_HEADER in path.read_text(encoding="utf-8").splitlines()[:4]:
+                files.add(path.relative_to(root).as_posix())
+    return files
+
+
+def _missing_provenance_file(relative_path: str) -> Finding:
+    return Finding(
+        id="missing_provenance_file",
+        status="blocking",
+        category="provenance",
+        message=f"Provenance manifest references a missing file: {relative_path}.",
+        path=relative_path,
+    )
 
 
 def _resolve_artifact_path(bundle_dir: Path, path: Path) -> Path:

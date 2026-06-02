@@ -115,6 +115,10 @@ def _classification(relative_path: str, line: str) -> str | None:
         return "runtime evidence records PyTorch ROCm CUDA compatibility metadata"
     if relative_path.startswith("scripts/download_solexecbench.py") and "nvidia/SOL-ExecBench" in line:
         return "upstream dataset repository identifier"
+    if relative_path.startswith("scripts/check_prerelease_readiness.py") and (
+        "NVIDIA" in line or "nvidia" in line or "CUDA" in line
+    ):
+        return "prerelease readiness provenance and claim-boundary guardrail"
     if "requires_cutile" in line or "legacy NVIDIA cuTile marker" in line:
         return "legacy marker compatibility skip"
     if relative_path.startswith("examples/") and "solution_" in relative_path:
@@ -251,6 +255,10 @@ def _classification(relative_path: str, line: str) -> str | None:
         "NVIDIA" in line or "CUDA" in line
     ):
         return "public prerelease docs claim-boundary assertion"
+    if relative_path.startswith("tests/sol_execbench/test_prerelease_readiness.py") and (
+        "NVIDIA" in line or "nvidia" in line
+    ):
+        return "prerelease readiness provenance guardrail fixture"
     if relative_path.startswith("src/sol_execbench/core/utils.py") and (
         "is_cuda_available" in line or "list_cuda_devices" in line or "cuda" in line
     ):
