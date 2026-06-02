@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -33,7 +34,7 @@ def _default_policy() -> PytorchDependencyPolicy:
 
 
 def _matching_observation(**overrides: object) -> PytorchDependencyObservation:
-    values = {
+    values: dict[str, Any] = {
         "torch_distribution_version": "2.10.0+rocm7.1",
         "torch_version": "2.10.0+rocm7.1",
         "torch_local_version": "rocm7.1",
@@ -164,7 +165,9 @@ def test_matching_default_rocm_7_1_dependency_stack_is_not_tested() -> None:
     _assert_policy_payload(result)
 
 
-def test_mixed_version_debug_override_allows_probe_or_smoke_without_clean_claims() -> None:
+def test_mixed_version_debug_override_allows_probe_or_smoke_without_clean_claims() -> (
+    None
+):
     result = classify_dependency_preflight(
         target=_target(),
         policy=_default_policy(),

@@ -65,7 +65,9 @@ class DockerTargetManifestEntry(BaseModelWithDocstrings):
     @model_validator(mode="after")
     def _require_container_scope(self) -> DockerTargetManifestEntry:
         if self.validation_scope is not MatrixValidationScope.CONTAINER_USER_SPACE:
-            raise ValueError("Docker Target manifest entries must use container_user_space")
+            raise ValueError(
+                "Docker Target manifest entries must use container_user_space"
+            )
         return self
 
 
@@ -74,7 +76,7 @@ class DockerTargetManifest(BaseModelWithDocstrings):
 
     model_config = _MODEL_CONFIG
 
-    schema_version: Literal[ROCM_DOCKER_TARGETS_SCHEMA_VERSION]
+    schema_version: Literal["sol_execbench.rocm_docker_targets.v1"]
     """Docker Target manifest schema version."""
     default_target_id: str
     """Target id selected when the user does not pass a Target."""
@@ -484,14 +486,18 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
     preview = subparsers.add_parser("preview")
-    preview.add_argument("--manifest", type=Path, default=DEFAULT_DOCKER_TARGET_MANIFEST)
+    preview.add_argument(
+        "--manifest", type=Path, default=DEFAULT_DOCKER_TARGET_MANIFEST
+    )
     preview.add_argument("--target")
     preview.add_argument("--allow-unknown-target", action="store_true")
     preview.add_argument("--override-image-repository")
     preview.add_argument("--override-image-tag")
     preview.add_argument("--image-digest")
     preflight = subparsers.add_parser("preflight")
-    preflight.add_argument("--manifest", type=Path, default=DEFAULT_DOCKER_TARGET_MANIFEST)
+    preflight.add_argument(
+        "--manifest", type=Path, default=DEFAULT_DOCKER_TARGET_MANIFEST
+    )
     preflight.add_argument("--target")
     preflight.add_argument("--docker-context")
     preflight.add_argument("--docker-host")

@@ -13,7 +13,7 @@ from collections.abc import Callable
 from collections.abc import Sequence
 from enum import Enum
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal, cast
 
 from pydantic import BeforeValidator, ConfigDict, Field
 
@@ -222,7 +222,7 @@ class StaticKernelEvidenceSidecar(BaseModelWithDocstrings):
 
     model_config = _STATIC_MODEL_CONFIG
 
-    schema_version: Literal[STATIC_KERNEL_EVIDENCE_SCHEMA_VERSION] = (
+    schema_version: Literal["sol_execbench.static_kernel_evidence.v1"] = (
         STATIC_KERNEL_EVIDENCE_SCHEMA_VERSION
     )
     """Static kernel evidence schema version."""
@@ -280,8 +280,8 @@ def build_static_kernel_evidence_sidecar(
     """Build a strict static evidence sidecar without collecting artifacts."""
 
     return StaticKernelEvidenceSidecar(
-        status=status,
-        reason_code=reason_code,
+        status=StaticKernelEvidenceStatus(status),
+        reason_code=StaticKernelEvidenceReasonCode(reason_code),
         classification=classification or StaticKernelEvidenceClassification(),
         artifacts=list(artifacts),
         tool_runs=list(tool_runs),
@@ -508,7 +508,7 @@ def _artifact_manifest_entry_path(entry: object, index: int) -> Path:
     if isinstance(entry, str):
         return Path(entry)
     if isinstance(entry, dict):
-        value = entry.get("path")
+        value = cast(dict[str, Any], entry).get("path")
         if isinstance(value, str):
             return Path(value)
     raise ValueError(
@@ -777,7 +777,9 @@ def _route_static_tool(
     which: Which,
     timeout_seconds: float,
 ) -> ToolchainRoutingDecision | None:
-    effective_registry = list(registry) if registry is not None else default_toolchain_registry()
+    effective_registry = (
+        list(registry) if registry is not None else default_toolchain_registry()
+    )
     tool_registry = [entry for entry in effective_registry if entry.tool_id == tool_id]
     report = build_toolchain_routing_report(
         ToolchainRoutingRequest(

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 from pydantic import ValidationError
@@ -9,6 +10,7 @@ from pydantic import ValidationError
 from sol_execbench.core.scoring.amd_bound_sanity import (
     AMD_BOUND_SANITY_SCHEMA_VERSION,
     AmdBoundSanityReport,
+    AmdBoundSanitySourceRef,
     build_amd_bound_sanity_report,
     render_amd_bound_sanity_markdown,
     write_amd_bound_sanity_reports,
@@ -18,7 +20,7 @@ from sol_execbench.core.scoring.amd_bound_sanity import (
 CREATED_AT = "2026-05-31T00:00:00Z"
 
 
-def trace_ref_fixture() -> list[dict]:
+def trace_ref_fixture() -> list[AmdBoundSanitySourceRef | dict[str, Any] | str | Path]:
     return [
         {
             "path": "traces/scored.jsonl",
@@ -110,7 +112,10 @@ def execution_closure_fixture() -> dict:
                 "closure_status": "derived_evidence_missing",
                 "trace_ref": "traces/missing.jsonl",
                 "evidence_refs": {"amd_score": "score/missing.json"},
-                "evidence_gaps": ["amd_sol_evidence_missing", "solar_derivation_missing"],
+                "evidence_gaps": [
+                    "amd_sol_evidence_missing",
+                    "solar_derivation_missing",
+                ],
             },
         ],
     }
@@ -218,7 +223,9 @@ def amd_score_fixture() -> dict:
                 "workload_uuid": "unscored-workload",
                 "supported": False,
                 "score": None,
-                "warnings": ["AMD-native score was not computed because AMD SOL bound evidence is marked unscored."],
+                "warnings": [
+                    "AMD-native score was not computed because AMD SOL bound evidence is marked unscored."
+                ],
                 "evidence_refs": {"trace": "traces/unscored.jsonl"},
             },
             {
@@ -318,8 +325,16 @@ def test_sanity_01_report_builds_existing_evidence_summary():
         "checksum": "closure-sha",
     }
     assert payload["sources"]["compatibility_matrix"]["checksum"] == "matrix-sha"
-    assert payload["amd_sol_aggregate_statuses"] == {"degraded": 1, "scored": 1, "unscored": 2}
-    assert payload["solar_aggregate_statuses"] == {"degraded": 1, "scored": 1, "unscored": 2}
+    assert payload["amd_sol_aggregate_statuses"] == {
+        "degraded": 1,
+        "scored": 1,
+        "unscored": 2,
+    }
+    assert payload["solar_aggregate_statuses"] == {
+        "degraded": 1,
+        "scored": 1,
+        "unscored": 2,
+    }
     assert payload["coverage_summary"]["amd_score"]["trace"] == 4
     assert payload["coverage_summary"]["compatibility_matrix"]["validated"] == 1
     assert "suite warning" in payload["warnings"]
@@ -361,7 +376,9 @@ def test_sanity_02_diagnostic_statuses_do_not_recompute_score_eligibility():
     assert rows["unsupported-workload"]["diagnostic_status"] == "unsupported"
     assert rows["missing-workload"]["diagnostic_status"] == "missing_evidence"
     assert rows["unsupported-workload"]["amd_score_supported"] is False
-    assert rows["unsupported-workload"]["source_statuses"]["amd_score_supported"] is False
+    assert (
+        rows["unsupported-workload"]["source_statuses"]["amd_score_supported"] is False
+    )
     assert rows["unscored-workload"]["source_statuses"]["amd_sol_status"] == "unscored"
 
 
@@ -405,7 +422,9 @@ def test_sanity_04_missing_optional_evidence_becomes_gap_without_probes(monkeypa
     assert "amd_sol_evidence_missing" in reason_codes
     assert "solar_derivation_missing" in reason_codes
     assert "compatibility_matrix_missing" in reason_codes
-    assert all("Attach bounded" in gap["next_evidence"] for gap in payload["evidence_gaps"])
+    assert all(
+        "Attach bounded" in gap["next_evidence"] for gap in payload["evidence_gaps"]
+    )
     assert payload["artifact_availability"]["amd_sol_artifacts"] == 0
     assert payload["artifact_availability"]["solar_artifacts"] == 0
 
@@ -442,7 +461,9 @@ def test_sanity_markdown_and_write_helpers_are_deterministic(tmp_path):
 
     json_path = tmp_path / "amd_bound_sanity.json"
     markdown_path = tmp_path / "amd_bound_sanity.md"
-    write_amd_bound_sanity_reports(first, json_path=json_path, markdown_path=markdown_path)
+    write_amd_bound_sanity_reports(
+        first, json_path=json_path, markdown_path=markdown_path
+    )
 
     assert json_path.read_text(encoding="utf-8") == first_json
     assert markdown_path.read_text(encoding="utf-8") == first_markdown

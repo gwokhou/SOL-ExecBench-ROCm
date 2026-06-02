@@ -4,8 +4,8 @@ milestone: v1.27
 milestone_name: Copyright Provenance Cleanup
 status: Awaiting next milestone
 stopped_at: Phase 126 complete; ready for milestone audit.
-last_updated: "2026-06-02T03:33:00.671Z"
-last_activity: 2026-06-02 — Milestone v1.27 completed and archived
+last_updated: "2026-06-02T08:07:00Z"
+last_activity: 2026-06-02 — Quick task 260602-mbt added a git pre-push Ty check hook
 progress:
   total_phases: 4
   completed_phases: 4
@@ -38,6 +38,10 @@ Last activity: 2026-06-02 — Milestone v1.27 completed and archived
 - v1.24 shipped Phases 110-113 on 2026-06-01.
 - v1.25 shipped Phases 114-118 on 2026-06-01.
 - v1.26 shipped Phases 119-122 on 2026-06-02.
+- Quick task 260602-jjy fixed GitHub Actions Ty/CPU-safe CI failures on
+  2026-06-02.
+- Quick task 260602-mbt added a pre-commit-managed git pre-push Ty check hook
+  on 2026-06-02.
 
 ## Accumulated Context
 

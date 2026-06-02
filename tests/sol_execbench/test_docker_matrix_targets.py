@@ -29,18 +29,18 @@ def test_manifest_declares_default_and_configured_rocm_complete_targets() -> Non
     manifest = load_docker_target_manifest(MANIFEST_PATH)
 
     assert manifest.default_target_id
-    assert manifest.targets_by_id[manifest.default_target_id].docker_image_repository == (
-        "rocm/dev-ubuntu-24.04"
-    )
+    assert manifest.targets_by_id[
+        manifest.default_target_id
+    ].docker_image_repository == ("rocm/dev-ubuntu-24.04")
     assert manifest.targets_by_id[manifest.default_target_id].docker_image_tag == (
         "7.1.1-complete"
     )
     tags = {target.docker_image_tag for target in manifest.targets}
     assert any(tag.startswith("7.0.") and tag.endswith("-complete") for tag in tags)
     assert any(tag.startswith("7.2") and tag.endswith("-complete") for tag in tags)
-    assert {
-        target.validation_scope for target in manifest.targets
-    } == {MatrixValidationScope.CONTAINER_USER_SPACE}
+    assert {target.validation_scope for target in manifest.targets} == {
+        MatrixValidationScope.CONTAINER_USER_SPACE
+    }
 
     raw = MANIFEST_PATH.read_text()
     assert "rocm/dev-ubuntu-24.04" in raw
@@ -101,7 +101,9 @@ def test_unknown_target_override_is_not_tested_and_non_authoritative() -> None:
     assert selection.entry is not None
     assert selection.decision is not None
     assert selection.status is MatrixCompatibilityStatus.NOT_TESTED
-    assert selection.entry.reason_code is MatrixCompatibilityReasonCode.TARGET_NOT_TESTED
+    assert (
+        selection.entry.reason_code is MatrixCompatibilityReasonCode.TARGET_NOT_TESTED
+    )
     assert selection.decision.benchmark_allowed is False
     assert selection.decision.container_user_space_validated is False
     assert selection.decision.native_host_validated is False
@@ -126,9 +128,7 @@ def test_default_preview_json_is_shell_consumable_without_docker() -> None:
     assert payload["build_args"]["ROCM_DOCKER_IMAGE"] == "rocm/dev-ubuntu-24.04"
     assert payload["build_args"]["ROCM_DOCKER_TAG"] == "7.1.1-complete"
     assert payload["build_args"]["PYTORCH_TORCH_VERSION"] == "2.10.0+rocm7.1"
-    assert payload["build_args"]["PYTORCH_TORCHVISION_VERSION"] == (
-        "0.25.0+rocm7.1"
-    )
+    assert payload["build_args"]["PYTORCH_TORCHVISION_VERSION"] == ("0.25.0+rocm7.1")
     assert payload["build_args"]["PYTORCH_ROCM_INDEX_URL"] == (
         "https://download.pytorch.org/whl/rocm7.1"
     )
@@ -161,11 +161,14 @@ def test_non_default_preview_json_selects_declared_target() -> None:
     assert payload["image_repository"] == non_default.docker_image_repository
     assert payload["image_tag"] == non_default.docker_image_tag
     assert payload["build_args"]["ROCM_DOCKER_TAG"] == non_default.docker_image_tag
-    assert payload["build_args"]["PYTORCH_TORCH_VERSION"] == (
-        non_default.pytorch_dependency_policy["torch_version"]
+    assert non_default.pytorch_dependency_policy is not None
+    assert (
+        payload["build_args"]["PYTORCH_TORCH_VERSION"]
+        == (non_default.pytorch_dependency_policy["torch_version"])
     )
-    assert payload["build_args"]["PYTORCH_ROCM_INDEX_URL"] == (
-        non_default.pytorch_dependency_policy["uv_index_url"]
+    assert (
+        payload["build_args"]["PYTORCH_ROCM_INDEX_URL"]
+        == (non_default.pytorch_dependency_policy["uv_index_url"])
     )
 
 

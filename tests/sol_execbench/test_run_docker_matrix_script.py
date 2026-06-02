@@ -60,7 +60,7 @@ def test_dockerfile_allows_passwordless_rocm_smi_tools() -> None:
     dockerfile = DOCKERFILE_PATH.read_text()
 
     assert "for smi_tool in amd-smi rocm-smi" in dockerfile
-    assert "NOPASSWD: $(command -v \"${smi_tool}\")" in dockerfile
+    assert 'NOPASSWD: $(command -v "${smi_tool}")' in dockerfile
 
 
 def _run_docker_preview(*args: str) -> subprocess.CompletedProcess[str]:
@@ -114,8 +114,8 @@ def test_run_docker_host_helpers_use_uv_managed_python() -> None:
 
     assert "uv run python" in script
     assert "SOL_EXECBENCH_HOST_PYTHON" in script
-    assert not re.search(r'^\s*python\s+-m\s+sol_execbench', script, re.MULTILINE)
-    assert not re.search(r'^\s*python\s+-c\b', script, re.MULTILINE)
+    assert not re.search(r"^\s*python\s+-m\s+sol_execbench", script, re.MULTILINE)
+    assert not re.search(r"^\s*python\s+-c\b", script, re.MULTILINE)
 
 
 def test_run_docker_default_build_preview_uses_rocm_7_1_build_args() -> None:
@@ -127,8 +127,7 @@ def test_run_docker_default_build_preview_uses_rocm_7_1_build_args() -> None:
     assert '--build-arg ROCM_DOCKER_TAG="7.1.1-complete"' in completed.stdout
     assert '--build-arg PYTORCH_TORCH_VERSION="2.10.0+rocm7.1"' in completed.stdout
     assert (
-        '--build-arg PYTORCH_TORCHVISION_VERSION="0.25.0+rocm7.1"'
-        in completed.stdout
+        '--build-arg PYTORCH_TORCHVISION_VERSION="0.25.0+rocm7.1"' in completed.stdout
     )
     assert (
         '--build-arg PYTORCH_ROCM_INDEX_URL="https://download.pytorch.org/whl/rocm7.1"'
@@ -166,10 +165,10 @@ def test_run_docker_declared_target_build_preview_uses_manifest_build_args() -> 
         f'--build-arg ROCM_DOCKER_TAG="{non_default.docker_image_tag}"'
         in completed.stdout
     )
+    assert non_default.pytorch_dependency_policy is not None
     assert (
         '--build-arg PYTORCH_TORCH_VERSION="'
-        f'{non_default.pytorch_dependency_policy["torch_version"]}"'
-        in completed.stdout
+        f'{non_default.pytorch_dependency_policy["torch_version"]}"' in completed.stdout
     )
     assert (
         '--build-arg PYTORCH_TORCHVISION_VERSION="'
@@ -178,8 +177,7 @@ def test_run_docker_declared_target_build_preview_uses_manifest_build_args() -> 
     )
     assert (
         '--build-arg PYTORCH_ROCM_INDEX_URL="'
-        f'{non_default.pytorch_dependency_policy["uv_index_url"]}"'
-        in completed.stdout
+        f'{non_default.pytorch_dependency_policy["uv_index_url"]}"' in completed.stdout
     )
 
 
@@ -198,7 +196,9 @@ def test_run_docker_target_flag_is_not_forwarded_to_docker_args_or_command() -> 
 
     assert completed.returncode == 0, completed.stderr
     run_line = next(
-        line for line in completed.stdout.splitlines() if line.startswith("+ docker run")
+        line
+        for line in completed.stdout.splitlines()
+        if line.startswith("+ docker run")
     )
     assert "--name matrix-test" in run_line
     assert "echo inside-container" in run_line

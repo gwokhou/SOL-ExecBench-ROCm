@@ -14,9 +14,7 @@ from pydantic import BeforeValidator, ConfigDict, Field, model_validator
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 
 
-ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION = (
-    "sol_execbench.rocm_compatibility_matrix.v1"
-)
+ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION = "sol_execbench.rocm_compatibility_matrix.v1"
 MATRIX_ENTRY_JSON_SCHEMA_ID = (
     "https://sol-execbench.local/schemas/"
     f"{ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION}.matrix_entry.schema.json"
@@ -301,7 +299,7 @@ class MatrixEntry(BaseModelWithDocstrings):
 
     model_config = _MATRIX_MODEL_CONFIG
 
-    schema_version: Literal[ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION] = (
+    schema_version: Literal["sol_execbench.rocm_compatibility_matrix.v1"] = (
         ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION
     )
     """Compatibility Matrix Entry schema version."""
@@ -351,7 +349,10 @@ class MatrixEntry(BaseModelWithDocstrings):
                 )
 
         if self.status is MatrixCompatibilityStatus.CONTAINER_VALIDATED:
-            if target.validation_scope is not MatrixValidationScope.CONTAINER_USER_SPACE:
+            if (
+                target.validation_scope
+                is not MatrixValidationScope.CONTAINER_USER_SPACE
+            ):
                 raise ValueError(
                     "container_validated requires container_user_space "
                     "validation scope."
@@ -362,8 +363,7 @@ class MatrixEntry(BaseModelWithDocstrings):
                 )
             if not claims.container_user_space_validated:
                 raise ValueError(
-                    "container_validated requires "
-                    "container_user_space_validated=true."
+                    "container_validated requires container_user_space_validated=true."
                 )
             if claims.native_host_validated:
                 raise ValueError(
@@ -380,9 +380,7 @@ class MatrixEntry(BaseModelWithDocstrings):
                     "host_validated requires native_host validation scope."
                 )
             if not claims.native_host_validated:
-                raise ValueError(
-                    "host_validated requires native_host_validated=true."
-                )
+                raise ValueError("host_validated requires native_host_validated=true.")
             if not has_direct_host_evidence:
                 raise ValueError(
                     "host_validated requires direct native-host evidence with "
@@ -395,8 +393,7 @@ class MatrixEntry(BaseModelWithDocstrings):
                 )
             if claims.container_user_space_validated:
                 raise ValueError(
-                    "host_validated cannot set "
-                    "container_user_space_validated=true."
+                    "host_validated cannot set container_user_space_validated=true."
                 )
 
         if claims.container_user_space_validated and self.observed.container is None:
@@ -404,9 +401,7 @@ class MatrixEntry(BaseModelWithDocstrings):
                 "container_user_space_validated requires observed container evidence."
             )
         if claims.native_host_validated and self.observed.host is None:
-            raise ValueError(
-                "native_host_validated requires observed host evidence."
-            )
+            raise ValueError("native_host_validated requires observed host evidence.")
 
         return self
 
@@ -447,7 +442,7 @@ class RocmCompatibilityMatrixReport(BaseModelWithDocstrings):
 
     model_config = _MATRIX_MODEL_CONFIG
 
-    schema_version: Literal[ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION] = (
+    schema_version: Literal["sol_execbench.rocm_compatibility_matrix.v1"] = (
         ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION
     )
     """Compatibility matrix report schema version."""
@@ -536,8 +531,8 @@ def build_matrix_entry(
     return MatrixEntry(
         target=target,
         observed=observed,
-        status=status,
-        reason_code=reason_code,
+        status=MatrixCompatibilityStatus(status),
+        reason_code=MatrixCompatibilityReasonCode(reason_code),
         reason=reason,
         claim_boundary=claim_boundary,
         artifacts=list(artifacts),

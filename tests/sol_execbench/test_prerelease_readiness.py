@@ -21,7 +21,9 @@ def _sha256(path: Path) -> str:
 def _write_bundle(bundle_dir: Path, *, mutate: dict | None = None) -> dict:
     (bundle_dir / "release_candidate_validation").mkdir(parents=True)
     (bundle_dir / "transcripts").mkdir(parents=True)
-    (bundle_dir / "release_candidate_validation/release_candidate_validation.json").write_text(
+    (
+        bundle_dir / "release_candidate_validation/release_candidate_validation.json"
+    ).write_text(
         "{}\n",
         encoding="utf-8",
     )
@@ -66,7 +68,11 @@ def _write_bundle(bundle_dir: Path, *, mutate: dict | None = None) -> dict:
                 "authority_class": "provisional",
                 "status": "deferred",
             },
-            {"id": "paper_validation", "authority_class": "deferred", "status": "deferred"},
+            {
+                "id": "paper_validation",
+                "authority_class": "deferred",
+                "status": "deferred",
+            },
             {"id": "cdna4", "authority_class": "unavailable", "status": "unavailable"},
         ],
         "artifacts": [
@@ -87,7 +93,9 @@ def _write_bundle(bundle_dir: Path, *, mutate: dict | None = None) -> dict:
         ],
     }
     for artifact in manifest["artifacts"]:
-        path = bundle_dir / artifact["path"]
+        artifact_path = artifact["path"]
+        assert isinstance(artifact_path, str)
+        path = bundle_dir / artifact_path
         artifact["sha256"] = _sha256(path)
     if mutate:
         _deep_update(manifest, mutate)
@@ -110,7 +118,9 @@ def _deep_update(target: dict, updates: dict) -> None:
 
 
 def _load_report(output_dir: Path) -> dict:
-    return json.loads((output_dir / "prerelease_readiness.json").read_text(encoding="utf-8"))
+    return json.loads(
+        (output_dir / "prerelease_readiness.json").read_text(encoding="utf-8")
+    )
 
 
 def test_readiness_passes_for_complete_bundle(tmp_path):
@@ -143,7 +153,9 @@ def test_readiness_fails_when_required_artifact_missing(tmp_path):
     bundle_dir = tmp_path / "bundle"
     output_dir = tmp_path / "readiness"
     _write_bundle(bundle_dir)
-    (bundle_dir / "release_candidate_validation/release_candidate_validation.json").unlink()
+    (
+        bundle_dir / "release_candidate_validation/release_candidate_validation.json"
+    ).unlink()
 
     assert (
         check_prerelease_readiness.main(

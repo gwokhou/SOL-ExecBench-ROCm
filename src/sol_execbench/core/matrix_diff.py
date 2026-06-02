@@ -230,7 +230,10 @@ def _validation_downgraded(
 ) -> bool:
     old_status = old_payload["status"]
     new_status = new_payload["status"]
-    if old_status == MatrixCompatibilityStatus.HOST_VALIDATED.value and new_status != old_status:
+    if (
+        old_status == MatrixCompatibilityStatus.HOST_VALIDATED.value
+        and new_status != old_status
+    ):
         return True
     return _is_validated(old_status) and not _is_validated(new_status)
 
@@ -270,10 +273,8 @@ def _mixed_version_drift(
         != new_target.get("requested_rocm_user_space_version")
         or old_target.get("pytorch_rocm_target")
         != new_target.get("pytorch_rocm_target")
-        or old_python.get("torch_rocm_target")
-        != new_python.get("torch_rocm_target")
-        or old_python.get("torch_hip_version")
-        != new_python.get("torch_hip_version")
+        or old_python.get("torch_rocm_target") != new_python.get("torch_rocm_target")
+        or old_python.get("torch_hip_version") != new_python.get("torch_hip_version")
     )
 
 
@@ -295,11 +296,9 @@ def _gpu_architecture_drift(
     new_target = new_payload.get("target", {})
     old_gpu = old_payload.get("observed", {}).get("gpu") or {}
     new_gpu = new_payload.get("observed", {}).get("gpu") or {}
-    return (
-        old_target.get("intended_gpu_architecture")
-        != new_target.get("intended_gpu_architecture")
-        or old_gpu.get("gfx_architecture") != new_gpu.get("gfx_architecture")
-    )
+    return old_target.get("intended_gpu_architecture") != new_target.get(
+        "intended_gpu_architecture"
+    ) or old_gpu.get("gfx_architecture") != new_gpu.get("gfx_architecture")
 
 
 def _image_dependency_drift(changes: dict[str, dict[str, Any]]) -> bool:
@@ -317,12 +316,9 @@ def _image_dependency_drift(changes: dict[str, dict[str, Any]]) -> bool:
         return False
     old_target = target_change["old"] or {}
     new_target = target_change["new"] or {}
-    return (
-        old_target.get("docker_image_repository")
-        != new_target.get("docker_image_repository")
-        or old_target.get("docker_image_tag")
-        != new_target.get("docker_image_tag")
-    )
+    return old_target.get("docker_image_repository") != new_target.get(
+        "docker_image_repository"
+    ) or old_target.get("docker_image_tag") != new_target.get("docker_image_tag")
 
 
 def _severity_categories(
@@ -421,6 +417,7 @@ def diff_matrix_reports(
         _, target_id, validation_scope = _diff_key(representative)
 
         if old_entry is None:
+            assert new_entry is not None
             counts["added"] += 1
             entry_diffs.append(
                 _entry_diff(
@@ -496,7 +493,9 @@ def diff_matrix_reports(
     )
 
 
-def load_matrix_report(path_or_payload: str | Path | dict[str, Any]) -> RocmCompatibilityMatrixReport:
+def load_matrix_report(
+    path_or_payload: str | Path | dict[str, Any],
+) -> RocmCompatibilityMatrixReport:
     """Load and validate a ROCm Compatibility Matrix report."""
 
     if isinstance(path_or_payload, str | Path):
@@ -555,7 +554,9 @@ def matrix_report_diff_to_markdown(diff: MatrixReportDiff) -> str:
         diff.entry_diffs,
         key=lambda item: (_SEVERITY_RANK[item.severity], item.diff_key),
     ):
-        categories = ", ".join(category.value for category in entry_diff.severity_categories)
+        categories = ", ".join(
+            category.value for category in entry_diff.severity_categories
+        )
         lines.extend(
             [
                 f"### {entry_diff.diff_key}",

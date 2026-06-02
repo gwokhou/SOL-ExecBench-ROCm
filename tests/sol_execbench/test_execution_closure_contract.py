@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 from pydantic import ValidationError
@@ -42,7 +43,7 @@ def _record(
 
 
 def _provenance(**updates: object) -> ExecutionClosureProvenance:
-    payload = {
+    payload: dict[str, Any] = {
         "dataset_root": "data/SOL-ExecBench/benchmark",
         "dataset_manifest_checksum": "manifest-sha",
         "readiness_checksum": "readiness-sha",
@@ -93,11 +94,29 @@ def test_report_serialization_sorts_records_and_uses_stable_json_format():
 def test_totals_count_required_execution_closure_statuses():
     report = build_execution_closure_report(
         records=[
-            _record("L1/p1", 0, "w1", ExecutionClosureStatus.ATTEMPTED_PASSED, trace_status="PASSED"),
-            _record("L1/p2", 0, "w2", ExecutionClosureStatus.ATTEMPTED_FAILED, trace_status="FAILED"),
+            _record(
+                "L1/p1",
+                0,
+                "w1",
+                ExecutionClosureStatus.ATTEMPTED_PASSED,
+                trace_status="PASSED",
+            ),
+            _record(
+                "L1/p2",
+                0,
+                "w2",
+                ExecutionClosureStatus.ATTEMPTED_FAILED,
+                trace_status="FAILED",
+            ),
             _record("L1/p3", 0, "w3", ExecutionClosureStatus.FILTERED),
             _record("L1/p4", 0, "w4", ExecutionClosureStatus.NOT_ATTEMPTED),
-            _record("L1/p5", 0, "w5", ExecutionClosureStatus.SKIPPED_EXISTING_PASS, trace_status="PASSED"),
+            _record(
+                "L1/p5",
+                0,
+                "w5",
+                ExecutionClosureStatus.SKIPPED_EXISTING_PASS,
+                trace_status="PASSED",
+            ),
             _record("L1/p6", 0, "w6", ExecutionClosureStatus.MISSING_TRACE),
             _record(
                 "L1/p7",
@@ -158,17 +177,32 @@ def test_status_and_reason_vocabularies_are_phase_83_contracts():
 
 def test_status_mapping_and_evidence_gap_conversion():
     assert closure_status_for_trace_status(None) == ExecutionClosureStatus.MISSING_TRACE
-    assert closure_status_for_trace_status("PASSED", skipped=True) == ExecutionClosureStatus.SKIPPED_EXISTING_PASS
-    assert closure_status_for_trace_status("PASSED") == ExecutionClosureStatus.ATTEMPTED_PASSED
-    assert closure_status_for_trace_status("FAILED") == ExecutionClosureStatus.ATTEMPTED_FAILED
-    assert closure_status_with_evidence(
-        ExecutionClosureStatus.ATTEMPTED_PASSED,
-        ["timing_evidence_missing"],
-    ) == ExecutionClosureStatus.DERIVED_EVIDENCE_MISSING
-    assert closure_status_with_evidence(
-        ExecutionClosureStatus.FILTERED,
-        ["timing_evidence_missing"],
-    ) == ExecutionClosureStatus.FILTERED
+    assert (
+        closure_status_for_trace_status("PASSED", skipped=True)
+        == ExecutionClosureStatus.SKIPPED_EXISTING_PASS
+    )
+    assert (
+        closure_status_for_trace_status("PASSED")
+        == ExecutionClosureStatus.ATTEMPTED_PASSED
+    )
+    assert (
+        closure_status_for_trace_status("FAILED")
+        == ExecutionClosureStatus.ATTEMPTED_FAILED
+    )
+    assert (
+        closure_status_with_evidence(
+            ExecutionClosureStatus.ATTEMPTED_PASSED,
+            ["timing_evidence_missing"],
+        )
+        == ExecutionClosureStatus.DERIVED_EVIDENCE_MISSING
+    )
+    assert (
+        closure_status_with_evidence(
+            ExecutionClosureStatus.FILTERED,
+            ["timing_evidence_missing"],
+        )
+        == ExecutionClosureStatus.FILTERED
+    )
 
 
 def test_provenance_comparison_returns_stable_mismatch_diagnostics():
@@ -186,8 +220,7 @@ def test_provenance_comparison_returns_stable_mismatch_diagnostics():
     mismatches = compare_execution_closure_provenance(expected, observed)
 
     assert [
-        (mismatch.field, mismatch.reason_code.value)
-        for mismatch in mismatches
+        (mismatch.field, mismatch.reason_code.value) for mismatch in mismatches
     ] == [
         ("dataset_manifest_checksum", "manifest_checksum_mismatch"),
         ("readiness_checksum", "readiness_checksum_mismatch"),
@@ -276,13 +309,16 @@ def test_report_records_sidecar_refs_and_cache_provenance_in_checksum():
     assert report.execution_closure_checksum != changed.execution_closure_checksum
 
 
-def test_report_checksum_ignores_checksum_field_and_changes_with_content(tmp_path: Path):
+def test_report_checksum_ignores_checksum_field_and_changes_with_content(
+    tmp_path: Path,
+):
     report = build_execution_closure_report(
         records=[_record("L1/p1", 0, "w1", ExecutionClosureStatus.ATTEMPTED_PASSED)],
         provenance=_provenance(),
         filters={},
         created_at="2026-05-31T00:00:00Z",
     )
+    assert report.execution_closure_checksum is not None
     same_report = report.model_copy(
         update={
             "execution_closure_checksum": report.execution_closure_checksum.model_copy(
@@ -299,26 +335,34 @@ def test_report_checksum_ignores_checksum_field_and_changes_with_content(tmp_pat
 
     assert report.execution_closure_checksum is not None
     assert same_report.execution_closure_checksum == report.execution_closure_checksum
-    assert changed_report.execution_closure_checksum != report.execution_closure_checksum
+    assert (
+        changed_report.execution_closure_checksum != report.execution_closure_checksum
+    )
 
     path = tmp_path / "execution_closure.json"
     write_execution_closure_report(report, path)
-    assert json.loads(path.read_text())["execution_closure_checksum"] == report.execution_closure_checksum.model_dump(mode="json")
+    assert json.loads(path.read_text())[
+        "execution_closure_checksum"
+    ] == report.execution_closure_checksum.model_dump(mode="json")
 
 
 def test_execution_closure_models_reject_unknown_fields():
     with pytest.raises(ValidationError):
-        ExecutionClosureRecord(
-            category="L1",
-            problem_id="L1/p1",
-            problem_path="L1/p1",
-            row_index=0,
-            closure_status=ExecutionClosureStatus.ATTEMPTED_PASSED,
-            unexpected="value",
+        ExecutionClosureRecord.model_validate(
+            {
+                "category": "L1",
+                "problem_id": "L1/p1",
+                "problem_path": "L1/p1",
+                "row_index": 0,
+                "closure_status": ExecutionClosureStatus.ATTEMPTED_PASSED,
+                "unexpected": "value",
+            }
         )
 
     with pytest.raises(ValidationError):
-        ExecutionClosureProvenance(dataset_root="dataset", raw_payload={"too": "large"})
+        ExecutionClosureProvenance.model_validate(
+            {"dataset_root": "dataset", "raw_payload": {"too": "large"}}
+        )
 
     report = build_execution_closure_report(
         records=[_record("L1/p1", 0, "w1", ExecutionClosureStatus.ATTEMPTED_PASSED)],

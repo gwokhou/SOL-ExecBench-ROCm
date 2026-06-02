@@ -125,7 +125,9 @@ class EvaluationStabilityReport(BaseModel):
     sources: list[StabilitySourceRef]
     status_totals: StabilityStatusTotals
     workloads: list[StabilityWorkload]
-    claim_boundary: StabilityClaimBoundary = Field(default_factory=StabilityClaimBoundary)
+    claim_boundary: StabilityClaimBoundary = Field(
+        default_factory=StabilityClaimBoundary
+    )
     report_checksum: DatasetManifestChecksum | None = None
 
     def with_checksum(self) -> "EvaluationStabilityReport":
@@ -248,7 +250,9 @@ def write_evaluation_stability_reports(
     json_path.parent.mkdir(parents=True, exist_ok=True)
     markdown_path.parent.mkdir(parents=True, exist_ok=True)
     json_path.write_text(report.to_json(), encoding="utf-8")
-    markdown_path.write_text(render_evaluation_stability_markdown(report), encoding="utf-8")
+    markdown_path.write_text(
+        render_evaluation_stability_markdown(report), encoding="utf-8"
+    )
 
 
 def _build_workload(
@@ -295,7 +299,10 @@ def _reason_codes(
         reasons.append("insufficient_samples")
     if payload.get("clock_locked") is False:
         reasons.append("clock_unlocked")
-    if payload.get("fallback_applied") is True or backend in {"device_events", "pytorch_profiler"}:
+    if payload.get("fallback_applied") is True or backend in {
+        "device_events",
+        "pytorch_profiler",
+    }:
         reasons.append("profiler_overhead_risk")
     if (
         distribution.coefficient_of_variation is not None
@@ -318,7 +325,12 @@ def _duration_samples(payload: dict[str, Any]) -> list[float]:
     for key in ("runtime_ms_distribution", "durations_ms", "measurements_ms"):
         value = payload.get(key)
         if isinstance(value, list):
-            return [_positive_float(item) for item in value if _positive_float(item) is not None]
+            samples: list[float] = []
+            for item in value:
+                sample = _positive_float(item)
+                if sample is not None:
+                    samples.append(sample)
+            return samples
 
     rows = payload.get("parsed_rows")
     if isinstance(rows, list):
@@ -334,7 +346,9 @@ def _duration_samples(payload: dict[str, Any]) -> list[float]:
         if durations:
             return durations
 
-    duration = _positive_float(payload.get("kernel_duration_ms") or payload.get("runtime_ms"))
+    duration = _positive_float(
+        payload.get("kernel_duration_ms") or payload.get("runtime_ms")
+    )
     return [duration] if duration is not None else []
 
 
@@ -415,6 +429,8 @@ def _synchronization_policy(payload: dict[str, Any]) -> str:
 
 def _positive_float(value: object) -> float | None:
     if isinstance(value, bool) or value is None:
+        return None
+    if not isinstance(value, (int, float, str, bytes, bytearray)):
         return None
     try:
         parsed = float(value)

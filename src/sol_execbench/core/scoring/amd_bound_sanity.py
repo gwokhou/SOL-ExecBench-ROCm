@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -200,10 +200,13 @@ def load_json(path: Path) -> dict[str, Any]:
 
 def build_amd_bound_sanity_report(
     *,
-    trace_refs: list[AmdBoundSanitySourceRef | dict[str, Any] | str | Path] | None = None,
+    trace_refs: list[AmdBoundSanitySourceRef | dict[str, Any] | str | Path]
+    | None = None,
     execution_closure: dict[str, Any] | None = None,
-    amd_sol_artifacts: list[AmdBoundSanitySourceRef | dict[str, Any] | str | Path] | None = None,
-    solar_artifacts: list[AmdBoundSanitySourceRef | dict[str, Any] | str | Path] | None = None,
+    amd_sol_artifacts: list[AmdBoundSanitySourceRef | dict[str, Any] | str | Path]
+    | None = None,
+    solar_artifacts: list[AmdBoundSanitySourceRef | dict[str, Any] | str | Path]
+    | None = None,
     amd_score_report: dict[str, Any] | None = None,
     compatibility_matrix: dict[str, Any] | None = None,
     source_paths: dict[str, Path | None] | None = None,
@@ -252,7 +255,9 @@ def build_amd_bound_sanity_report(
         if artifact.get("coverage_summary") is not None:
             workload["coverage_summary"]["amd_sol"] = artifact["coverage_summary"]
         _extend_unique(workload["warnings"], _warnings_from(artifact))
-        if _is_degraded_status(status, artifact.get("coverage_summary"), workload["warnings"]):
+        if _is_degraded_status(
+            status, artifact.get("coverage_summary"), workload["warnings"]
+        ):
             workload["diagnostic_flags"].add("degraded")
         if status == "unscored":
             workload["diagnostic_flags"].add("unscored")
@@ -327,13 +332,29 @@ def build_amd_bound_sanity_report(
             )
 
     if amd_score_report is None:
-        _add_gap_group(evidence_gap_groups, reason_code="amd_score_evidence_missing", example_ref="amd_score_report")
+        _add_gap_group(
+            evidence_gap_groups,
+            reason_code="amd_score_evidence_missing",
+            example_ref="amd_score_report",
+        )
     if not amd_sol_artifacts:
-        _add_gap_group(evidence_gap_groups, reason_code="amd_sol_evidence_missing", example_ref="amd_sol_artifacts")
+        _add_gap_group(
+            evidence_gap_groups,
+            reason_code="amd_sol_evidence_missing",
+            example_ref="amd_sol_artifacts",
+        )
     if not solar_artifacts:
-        _add_gap_group(evidence_gap_groups, reason_code="solar_derivation_missing", example_ref="solar_artifacts")
+        _add_gap_group(
+            evidence_gap_groups,
+            reason_code="solar_derivation_missing",
+            example_ref="solar_artifacts",
+        )
     if compatibility_matrix is None:
-        _add_gap_group(evidence_gap_groups, reason_code="compatibility_matrix_missing", example_ref="compatibility_matrix")
+        _add_gap_group(
+            evidence_gap_groups,
+            reason_code="compatibility_matrix_missing",
+            example_ref="compatibility_matrix",
+        )
 
     rows = []
     totals = AmdBoundSanityStatusTotals()
@@ -342,7 +363,9 @@ def build_amd_bound_sanity_report(
         flags = set(raw["diagnostic_flags"]) or {"scored"}
         if raw["evidence_gaps"]:
             flags.add("missing_evidence")
-        primary_status = next(status for status in PRIMARY_STATUS_ORDER if status in flags)
+        primary_status = next(
+            status for status in PRIMARY_STATUS_ORDER if status in flags
+        )
         totals.add(primary_status)
         if "provisional" in flags and primary_status != "provisional":
             totals.add("provisional")
@@ -448,7 +471,9 @@ def render_amd_bound_sanity_markdown(report: AmdBoundSanityReport) -> str:
     for key, value in payload["artifact_availability"].items():
         lines.append(f"| {_md_cell(key)} | {_md_cell(value)} |")
 
-    lines.extend(["", "## Aggregate AMD SOL/SOLAR Statuses", "", "| Source | Status | Count |"])
+    lines.extend(
+        ["", "## Aggregate AMD SOL/SOLAR Statuses", "", "| Source | Status | Count |"]
+    )
     lines.append("|--------|--------|------:|")
     for status, count in payload["amd_sol_aggregate_statuses"].items():
         lines.append(f"| amd_sol | {_md_cell(status)} | {count} |")
@@ -462,7 +487,14 @@ def render_amd_bound_sanity_markdown(report: AmdBoundSanityReport) -> str:
             f"| {_md_cell(key)} | {_md_cell(json.dumps(value, sort_keys=True))} |"
         )
 
-    lines.extend(["", "## Workloads", "", "| Workload | Diagnostic | Flags | Source Statuses | Warnings |"])
+    lines.extend(
+        [
+            "",
+            "## Workloads",
+            "",
+            "| Workload | Diagnostic | Flags | Source Statuses | Warnings |",
+        ]
+    )
     lines.append("|----------|------------|-------|-----------------|----------|")
     for row in payload["workloads"]:
         lines.append(
@@ -478,7 +510,9 @@ def render_amd_bound_sanity_markdown(report: AmdBoundSanityReport) -> str:
     for warning in payload["warnings"][:25]:
         lines.append(f"| {_md_cell(warning)} |")
 
-    lines.extend(["", "## Evidence Gaps", "", "| Reason | Count | Examples | Next Evidence |"])
+    lines.extend(
+        ["", "## Evidence Gaps", "", "| Reason | Count | Examples | Next Evidence |"]
+    )
     lines.append("|--------|------:|----------|---------------|")
     for gap in payload["evidence_gaps"]:
         lines.append(
@@ -525,7 +559,9 @@ def _workload_seed(uuid: str, payload: dict[str, Any]) -> dict[str, Any]:
         "problem_path": _optional_str(payload.get("problem_path")),
         "definition": definition,
         "workload_uuid": uuid,
-        "row_index": payload.get("row_index") if isinstance(payload.get("row_index"), int) else None,
+        "row_index": payload.get("row_index")
+        if isinstance(payload.get("row_index"), int)
+        else None,
         "diagnostic_flags": set(),
         "source_statuses": {
             "closure_status": None,
@@ -570,7 +606,7 @@ def _artifact_uuid(payload: dict[str, Any]) -> str | None:
 
 
 def _dict_value(value: object) -> dict[str, Any]:
-    return value if isinstance(value, dict) else {}
+    return cast(dict[str, Any], value) if isinstance(value, dict) else {}
 
 
 def _optional_str(value: object) -> str | None:
@@ -636,9 +672,10 @@ def _is_degraded_status(
     if _contains_provisional(warnings):
         return True
     if isinstance(coverage_summary, dict):
-        if coverage_summary.get("inexact_ops", 0):
+        summary = cast(dict[str, Any], coverage_summary)
+        if summary.get("inexact_ops", 0):
             return True
-        if coverage_summary.get("worst_confidence") in {"inexact", "estimated"}:
+        if summary.get("worst_confidence") in {"inexact", "estimated"}:
             return True
     return False
 
@@ -649,7 +686,9 @@ def _contains_unsupported(values: list[str]) -> bool:
 
 def _contains_provisional(values: list[str]) -> bool:
     lowered = " ".join(values).lower()
-    return "provisional" in lowered or "rdna 4" in lowered or "model assumption" in lowered
+    return (
+        "provisional" in lowered or "rdna 4" in lowered or "model assumption" in lowered
+    )
 
 
 def _provisional_artifact(artifact: dict[str, Any]) -> bool:
@@ -661,7 +700,10 @@ def _provisional_artifact(artifact: dict[str, Any]) -> bool:
         str(hardware.get("hardware_validation_status", "")).lower(),
         str(hardware.get("model_validation_status", "")).lower(),
     }
-    return architecture in {"gfx1200", "rdna4", "rdna 4"} and "unvalidated" in validation_values
+    return (
+        architecture in {"gfx1200", "rdna4", "rdna 4"}
+        and "unvalidated" in validation_values
+    )
 
 
 def _source(
@@ -673,7 +715,9 @@ def _source(
     return AmdBoundSanitySourceRef(
         path=str(path) if path else None,
         ref=ref,
-        schema_version=_optional_str(payload.get("schema_version")) if payload else None,
+        schema_version=_optional_str(payload.get("schema_version"))
+        if payload
+        else None,
         checksum=_checksum(payload),
     )
 
@@ -712,7 +756,9 @@ def _coverage_summary(
     summary: dict[str, Any] = {}
     if amd_score_report and isinstance(amd_score_report.get("evidence_summary"), dict):
         summary["amd_score"] = _sorted_jsonable(amd_score_report["evidence_summary"])
-    if compatibility_matrix and isinstance(compatibility_matrix.get("status_counts"), dict):
+    if compatibility_matrix and isinstance(
+        compatibility_matrix.get("status_counts"), dict
+    ):
         summary["compatibility_matrix"] = _sorted_jsonable(
             compatibility_matrix["status_counts"]
         )
@@ -746,7 +792,9 @@ def _sorted_evidence_gaps(
 
 def _next_evidence(reason_code: str) -> str:
     if "amd_score" in reason_code:
-        return "Attach bounded AMD score evidence refs/checksums before upgrading claims."
+        return (
+            "Attach bounded AMD score evidence refs/checksums before upgrading claims."
+        )
     if "amd_sol" in reason_code:
         return "Attach bounded AMD SOL evidence refs/checksums before upgrading claims."
     if "solar" in reason_code:

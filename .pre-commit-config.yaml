@@ -14,3 +14,9 @@ repos:
         entry: "bash -c 'grep -q \"^Signed-off-by: \" \"$1\"' --"
         language: system
         stages: [commit-msg]
+      - id: ty-check
+        name: Ty Type Check
+        entry: uv run ty check
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
