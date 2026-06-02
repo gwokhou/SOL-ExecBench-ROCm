@@ -158,11 +158,11 @@ clock-sensitive evaluation paths can reject the run based on
 | Docker local image name | `sol-execbench` | `scripts/run_docker.sh` |
 | Docker local image tag | `rocm-<selected Docker tag>` | `scripts/run_docker.sh` |
 | Docker FlashInfer trace root | `/sol-execbench/data/flashinfer-trace` | `scripts/run_docker.sh` |
-| Python package version | `1.0.2` | `pyproject.toml` |
+| Python package version | `1.0.2` | `pyproject.toml`; separate from the v1.26 research-prerelease milestone tag |
 | Python requirement | `>=3.12,<3.14` | `pyproject.toml` |
-| Default ROCm Torch wheel | `torch==2.10.0+rocm7.1` | `pyproject.toml` and Docker target metadata |
-| Default ROCm torchvision wheel | `torchvision==0.25.0+rocm7.1` | `pyproject.toml` and Docker target metadata |
-| Default Triton ROCm wheel | `triton-rocm==3.6.0` | `pyproject.toml` and Docker target metadata |
+| Default ROCm Torch wheel | `torch==2.10.0+rocm7.1` | `pyproject.toml` Linux x86_64 marker and Docker target metadata |
+| Default ROCm torchvision wheel | `torchvision==0.25.0+rocm7.1` | `pyproject.toml` Linux x86_64 marker and Docker target metadata |
+| Default Triton ROCm wheel | `triton-rocm==3.6.0` | `pyproject.toml` Linux x86_64 marker and Docker target metadata |
 | Provenance policy document | `docs/provenance.md` | `provenance.toml` |
 
 ## Per-Environment Overrides
@@ -244,12 +244,13 @@ uv run sol-execbench toolchain --json
 `pyproject.toml` defines:
 
 - Package name `sol-execbench`
-- Version `1.0.2`
+- Version `1.0.2`, which is the Python package version rather than the v1.26
+  research-prerelease milestone tag
 - Python range `>=3.12,<3.14`
 - Console scripts `sol-execbench` and `sol-execbench-baseline`
 - Runtime dependencies, including PyTorch ROCm, torchvision ROCm, `triton-rocm`,
   Pydantic, Click, Rich, datasets, and native build helpers
-- Development dependencies for pytest, pytest-xdist, Ruff, and Ty
+- Development dependencies for pytest, pytest-xdist, Ruff, Ty, and pre-commit
 - Pytest markers
 - Ruff exclusions
 - Ty source roots

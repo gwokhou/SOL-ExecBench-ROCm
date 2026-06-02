@@ -65,13 +65,11 @@ uv run ty check
 The `Python Quality` GitHub Actions workflow enforces Ruff, Ty, CPU-safe package
 tests, and example consistency tests on Python 3.12 and 3.13.
 
-Optional pre-commit setup installs Ruff hooks, the commit-message DCO check,
+Default pre-commit setup installs Ruff hooks, the commit-message DCO check,
 and the pre-push Ty check:
 
 ```bash
-uv run --with pre-commit pre-commit install
-uv run --with pre-commit pre-commit install --hook-type commit-msg
-uv run --with pre-commit pre-commit install --hook-type pre-push
+uv run pre-commit install
 ```
 
 ## Tests
@@ -142,8 +140,8 @@ No repository PR template is currently present under `.github/`, so include
 these details directly in the pull request description.
 
 The `Python Quality` GitHub Actions workflow runs `uv sync --locked
---all-groups`, Ruff, Ty, CPU-safe package tests, and example consistency tests
-on Python 3.12 and 3.13.
+--all-groups --python <matrix-version>`, Ruff, Ty, CPU-safe package tests, and
+example consistency tests on Python 3.12 and 3.13.
 
 ## Issue Reporting
 

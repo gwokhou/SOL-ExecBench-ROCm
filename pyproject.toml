@@ -9,17 +9,17 @@ description = "ROCm-only port of SOL ExecBench for evaluating GPU kernel solutio
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
 dependencies = [
-    "torch==2.10.0; sys_platform != 'linux' and sys_platform != 'win32'",
-    "torch==2.10.0+rocm7.1; sys_platform == 'linux' or sys_platform == 'win32'",
-    "torchvision==0.25.0; sys_platform != 'linux' and sys_platform != 'win32'",
-    "torchvision==0.25.0+rocm7.1; sys_platform == 'linux' or sys_platform == 'win32'",
+    "torch==2.10.0; sys_platform != 'linux' or platform_machine != 'x86_64'",
+    "torch==2.10.0+rocm7.1; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "torchvision==0.25.0; sys_platform != 'linux' or platform_machine != 'x86_64'",
+    "torchvision==0.25.0+rocm7.1; sys_platform == 'linux' and platform_machine == 'x86_64'",
     "ninja>=1.13.0",
     "pydantic>=2.12.5",
     "safetensors>=0.7.0",
     "click>=8.0",
     "rich>=13.0",
     "datasets>=4.8.2",
-    "triton-rocm==3.6.0; sys_platform == 'linux'",
+    "triton-rocm==3.6.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
     "torch-c-dlpack-ext>=0.1.5",
     "apache-tvm-ffi>=0.1.9",
 ]
@@ -30,6 +30,7 @@ sol-execbench-baseline = "sol_execbench.cli.baseline:cli"
 
 [dependency-groups]
 dev = [
+    "pre-commit>=4.6.0",
     "pytest>=9.0.2",
     "pytest-xdist>=3.5",
     "ruff>=0.4",
@@ -48,6 +49,7 @@ markers = [
 
 [tool.ruff]
 # Exclude generated code from linting and formatting
+force-exclude = true
 exclude = [
     ".git",
     ".venv",
@@ -83,11 +85,11 @@ explicit = true
 
 [tool.uv.sources]
 torch = [
-  { index = "pytorch-rocm71", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+  { index = "pytorch-rocm71", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
 ]
 torchvision = [
-  { index = "pytorch-rocm71", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+  { index = "pytorch-rocm71", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
 ]
 triton-rocm = [
-  { index = "pytorch-rocm-root", marker = "sys_platform == 'linux'" },
+  { index = "pytorch-rocm-root", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
 ]

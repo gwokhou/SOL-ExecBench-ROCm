@@ -15,9 +15,10 @@ included sample problems and, when available, a ROCm-capable AMD GPU.
 | Optional Docker runtime | Native Linux Docker with ROCm device passthrough. |
 | Optional dataset download | Hugging Face CLI, available through `huggingface-hub[cli]`. |
 
-On Linux and Windows, dependency resolution uses the PyTorch ROCm 7.1 index for
-`torch==2.10.0+rocm7.1` and `torchvision==0.25.0+rocm7.1`. On Linux,
-`triton-rocm==3.6.0` resolves from the PyTorch ROCm package root.
+On Linux x86_64, dependency resolution uses the PyTorch ROCm 7.1 index for
+`torch==2.10.0+rocm7.1`, `torchvision==0.25.0+rocm7.1`, and
+`triton-rocm==3.6.0`. Non-Linux and non-x86_64 environments use non-ROCm
+PyTorch wheels for CPU-safe development tasks.
 
 ## Installation Steps
 

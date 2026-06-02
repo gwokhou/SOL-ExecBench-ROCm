@@ -4,8 +4,8 @@ milestone: v1.27
 milestone_name: Copyright Provenance Cleanup
 status: Awaiting next milestone
 stopped_at: Phase 126 complete; ready for milestone audit.
-last_updated: "2026-06-02T08:07:00Z"
-last_activity: 2026-06-02 — Quick task 260602-mbt added a git pre-push Ty check hook
+last_updated: "2026-06-02T08:45:00Z"
+last_activity: 2026-06-02 — Quick task 260602-msd removed unnecessary README prose line wrapping
 progress:
   total_phases: 4
   completed_phases: 4
@@ -42,6 +42,17 @@ Last activity: 2026-06-02 — Milestone v1.27 completed and archived
   2026-06-02.
 - Quick task 260602-mbt added a pre-commit-managed git pre-push Ty check hook
   on 2026-06-02.
+- Quick task 260602-miz made `pre-commit install` enable pre-commit,
+  commit-msg, and pre-push hooks by default on 2026-06-02.
+- Quick task 260602-mmo added `pre-commit` to the dev dependency group on
+  2026-06-02.
+- Quick task 260602-mqi fixed stale CI, Docker, pre-commit, dependency marker,
+  and documentation configuration on 2026-06-02.
+- Quick task 260602-mqr tightened hook locking, Ruff excludes, Docker runtime
+  dependency groups, Linux x86_64 ROCm markers, and configuration docs on
+  2026-06-02.
+- Quick task 260602-msd removed unnecessary README prose line wrapping while
+  preserving command formatting on 2026-06-02.
 
 ## Accumulated Context
 

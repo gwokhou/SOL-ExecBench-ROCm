@@ -24,12 +24,11 @@ uv run sol-execbench contract --json
 uv run pytest tests/
 ```
 
-Optional pre-commit setup:
+Default pre-commit setup installs the formatter/linter, DCO commit-message
+check, and pre-push Ty check:
 
 ```bash
-uv run --with pre-commit pre-commit install
-uv run --with pre-commit pre-commit install --hook-type commit-msg
-uv run --with pre-commit pre-commit install --hook-type pre-push
+uv run pre-commit install
 ```
 
 Use the Docker environment for ROCm GPU evaluation when host tooling is not
@@ -209,7 +208,7 @@ The `.github/workflows/code-quality.yml` workflow runs on pushes and pull
 requests for Python 3.12 and 3.13. It performs:
 
 ```bash
-uv sync --locked --all-groups
+uv sync --locked --all-groups --python <matrix-version>
 uv run ruff check .
 uv run ty check
 uv run pytest tests/sol_execbench \

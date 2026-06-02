@@ -43,7 +43,7 @@ ENV HOME=/home/${HOST_USER} \
     UV_CACHE_DIR=/home/${HOST_USER}/.cache/uv
 
 # Copy uv binary early (changes rarely)
-COPY --from=ghcr.io/astral-sh/uv:0.5.11 /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.11.18 /uv /usr/local/bin/uv
 
 # Create user and setup directories. ROCm base images may already contain UID
 # 1000, so reuse existing users/groups instead of assuming the host IDs are free.
@@ -86,14 +86,14 @@ COPY --chown=${HOST_UID}:${HOST_GID} pyproject.toml uv.lock README.md ./
 
 # Install base Python dependencies first (this is the slowest part - cache it well)
 RUN --mount=type=cache,target=/home/${HOST_USER}/.cache/uv,uid=${HOST_UID},gid=${HOST_GID} \
-    uv sync --frozen --no-install-project --all-groups
+    uv sync --frozen --no-install-project --no-dev
 
 # Copy source code (changes frequently - do this last)
 COPY --chown=${HOST_UID}:${HOST_GID} src/ ./src/
 
 # Install the project itself (creates the sol-execbench console script).
 RUN --mount=type=cache,target=/home/${HOST_USER}/.cache/uv,uid=${HOST_UID},gid=${HOST_GID} \
-    uv sync --frozen --no-editable --all-groups
+    uv sync --frozen --no-editable --no-dev
 
 # The checked-in lock is the default ROCm 7.1 stack. Non-default Docker targets
 # install their declared PyTorch ROCm wheels after the frozen sync so each image

@@ -47,11 +47,17 @@ def test_dockerfile_keeps_existing_runtime_setup() -> None:
     assert "ARG HOST_UID=1000" in dockerfile
     assert "ARG HOST_GID=1000" in dockerfile
     assert "ARG HOST_USER=sol-execbench" in dockerfile
+    assert "uv sync --frozen --no-install-project --no-dev" in dockerfile
+    assert "uv sync --frozen --no-editable --no-dev" in dockerfile
+    assert "uv sync --frozen --no-install-project --all-groups" not in dockerfile
+    assert "uv sync --frozen --no-editable --all-groups" not in dockerfile
     assert "uv pip install --python /venv/bin/python" in dockerfile
     assert '"torch==${PYTORCH_TORCH_VERSION}"' in dockerfile
     assert '"torchvision==${PYTORCH_TORCHVISION_VERSION}"' in dockerfile
     assert '"triton-rocm==${TRITON_ROCM_VERSION}"' in dockerfile
-    assert "COPY --from=ghcr.io/astral-sh/uv:0.5.11 /uv /usr/local/bin/uv" in dockerfile
+    assert (
+        "COPY --from=ghcr.io/astral-sh/uv:0.11.18 /uv /usr/local/bin/uv" in dockerfile
+    )
     assert "COPY docker/entrypoint.sh /entrypoint.sh" in dockerfile
     assert 'ENTRYPOINT ["/entrypoint.sh"]' in dockerfile
 
