@@ -34,6 +34,8 @@ which active files may retain NVIDIA copyright notices before bulk edits.
 
 ### Phase 124: SPDX Header Cleanup
 
+**Status:** Complete
+
 **Goal:** Apply provenance-based SPDX/copyright cleanup across active files
 without removing required upstream notices or misattributing independent ROCm
 work.
@@ -91,10 +93,10 @@ prevent future blanket header drift.
 | PROV-01 | Phase 123 | Complete |
 | PROV-02 | Phase 123 | Complete |
 | PROV-03 | Phase 123 | Complete |
-| COPY-01 | Phase 124 | Pending |
-| COPY-02 | Phase 124 | Pending |
-| COPY-03 | Phase 124 | Pending |
-| COPY-04 | Phase 124 | Pending |
+| COPY-01 | Phase 124 | Complete |
+| COPY-02 | Phase 124 | Complete |
+| COPY-03 | Phase 124 | Complete |
+| COPY-04 | Phase 124 | Complete |
 | COMP-01 | Phase 125 | Pending |
 | COMP-02 | Phase 125 | Pending |
 | COMP-03 | Phase 125 | Pending |
@@ -103,7 +105,7 @@ prevent future blanket header drift.
 | GATE-03 | Phase 126 | Pending |
 
 **Coverage:** 13/13 v1.27 requirements mapped.
-**Progress:** 3/13 requirements complete; 1/4 phases complete.
+**Progress:** 7/13 requirements complete; 2/4 phases complete.
 
 ## Completed Milestones
 
@@ -120,6 +122,6 @@ prevent future blanket header drift.
 
 ## Current Position
 
-**Next up:** Phase 124 SPDX Header Cleanup.
+**Next up:** Phase 125 Compliance And Attribution Documentation.
 
-Start with `$gsd-discuss-phase 124` or `$gsd-plan-phase 124`.
+Start with `$gsd-discuss-phase 125` or `$gsd-plan-phase 125`.

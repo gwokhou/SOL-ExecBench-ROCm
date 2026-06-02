@@ -69,9 +69,10 @@ carry the NVIDIA SPDX line and also exist at the same path in `upstream/main`.
 They are treated as upstream-retained or derivative-modified candidates.
 
 `provenance.toml` also lists `nvidia_notice.cleanup_candidates`: active files
-that currently carry a NVIDIA-only SPDX line but do not exist at the same
-upstream path. Phase 124 will remove or replace those headers unless direct
-review finds copied upstream expression that requires retaining the notice.
+identified in Phase 123 as carrying a NVIDIA-only SPDX line without existing at
+the same upstream path. Phase 124 replaces those headers with project
+attribution unless direct review finds copied upstream expression that requires
+retaining the notice.
 
 ## History Policy
 

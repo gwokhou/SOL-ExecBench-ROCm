@@ -22,13 +22,13 @@ roadmap phase.
 
 ### Copyright Cleanup
 
-- [ ] **COPY-01**: Upstream-retained files preserve applicable NVIDIA
+- [x] **COPY-01**: Upstream-retained files preserve applicable NVIDIA
   copyright and Apache-2.0 license notices.
-- [ ] **COPY-02**: Derivative modified files preserve applicable NVIDIA
+- [x] **COPY-02**: Derivative modified files preserve applicable NVIDIA
   notices and add this project's own attribution where appropriate.
-- [ ] **COPY-03**: Independent ROCm work no longer carries misleading
+- [x] **COPY-03**: Independent ROCm work no longer carries misleading
   NVIDIA-only file copyright attribution.
-- [ ] **COPY-04**: Generated, planning, and documentation files follow the
+- [x] **COPY-04**: Generated, planning, and documentation files follow the
   provenance policy without unnecessary source-style blanket headers.
 
 ### Compliance Documentation
@@ -87,10 +87,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PROV-01 | Phase 123 | Complete |
 | PROV-02 | Phase 123 | Complete |
 | PROV-03 | Phase 123 | Complete |
-| COPY-01 | Phase 124 | Pending |
-| COPY-02 | Phase 124 | Pending |
-| COPY-03 | Phase 124 | Pending |
-| COPY-04 | Phase 124 | Pending |
+| COPY-01 | Phase 124 | Complete |
+| COPY-02 | Phase 124 | Complete |
+| COPY-03 | Phase 124 | Complete |
+| COPY-04 | Phase 124 | Complete |
 | COMP-01 | Phase 125 | Pending |
 | COMP-02 | Phase 125 | Pending |
 | COMP-03 | Phase 125 | Pending |
