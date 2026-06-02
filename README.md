@@ -1,10 +1,16 @@
 <!-- generated-by: gsd-doc-writer -->
 # SOL ExecBench ROCm Port
 
-SOL ExecBench ROCm Port is a ROCm-only Python benchmark package for evaluating
-LLM-generated GPU kernels on AMD hardware. It keeps the original SOL ExecBench
-benchmark shape where practical, while replacing CUDA/NVIDIA execution paths
-with ROCm, HIP, Triton ROCm, and AMD-native scoring and evidence helpers.
+SOL ExecBench ROCm Port is an AMD ROCm-focused adaptation of SOL ExecBench for
+evaluating LLM-generated GPU kernels on AMD hardware. It preserves the original
+benchmark shape where practical while replacing CUDA/NVIDIA execution paths
+with ROCm, HIP, Triton ROCm, ROCm library categories, AMD-oriented evidence
+tooling, and explicit validation-boundary guardrails.
+
+This project is independent and is not endorsed by NVIDIA or AMD. See
+[Provenance Policy](docs/provenance.md), [Compliance](docs/compliance.md), and
+[Claims](docs/CLAIMS.md) for upstream attribution, licensing, and validation
+boundaries.
 
 ## Requirements
 
