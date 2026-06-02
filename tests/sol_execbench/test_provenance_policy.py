@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import tomllib
 from pathlib import Path
+from typing import Any
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -16,7 +17,7 @@ NVIDIA_HEADER = (
 PROJECT_HEADER = "# SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port"
 
 
-def _load_provenance() -> dict[str, object]:
+def _load_provenance() -> dict[str, Any]:
     return tomllib.loads(PROVENANCE_PATH.read_text(encoding="utf-8"))
 
 

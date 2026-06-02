@@ -9,7 +9,7 @@ import os
 from datetime import UTC
 from datetime import datetime
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal, Protocol, cast
 
 from pydantic import ConfigDict
 
@@ -57,18 +57,24 @@ VISIBLE_DEVICE_ENV_VARS = (
     "GPU_DEVICE_ORDINAL",
 )
 
+RuntimeFailureCategory = Literal[
+    "setup_runtime",
+    "dependency",
+    "benchmark_correctness",
+    "benchmark_performance",
+]
+
+
+class _ModelDumpable(Protocol):
+    def model_dump(self, *, mode: str) -> dict[str, Any]: ...
+
 
 class RuntimeFailureEvidence(BaseModelWithDocstrings):
     """Diagnostic failure category recorded outside canonical traces."""
 
     model_config = _MODEL_CONFIG
 
-    category: Literal[
-        "setup_runtime",
-        "dependency",
-        "benchmark_correctness",
-        "benchmark_performance",
-    ]
+    category: RuntimeFailureCategory
     """Diagnostic evidence category."""
     status: str
     """Category-specific status value."""
@@ -111,7 +117,9 @@ def collect_gpu_evidence(
                         props, "gfx_arch", None
                     )
                     if gfx_architecture is not None:
-                        gfx_architecture = str(gfx_architecture).split(":", maxsplit=1)[0]
+                        gfx_architecture = str(gfx_architecture).split(":", maxsplit=1)[
+                            0
+                        ]
             except (AttributeError, RuntimeError):
                 pass
 
@@ -321,7 +329,7 @@ def write_json_payload(path: Path, payload: object) -> Path:
     """Write deterministic JSON with a trailing newline."""
 
     if hasattr(payload, "model_dump"):
-        data = payload.model_dump(mode="json")
+        data = cast(_ModelDumpable, payload).model_dump(mode="json")
     else:
         data = payload
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -376,7 +384,9 @@ def _build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     collect = subparsers.add_parser("collect-target")
-    collect.add_argument("--manifest", type=Path, default=DEFAULT_DOCKER_TARGET_MANIFEST)
+    collect.add_argument(
+        "--manifest", type=Path, default=DEFAULT_DOCKER_TARGET_MANIFEST
+    )
     collect.add_argument("--target")
     collect.add_argument("--output", type=Path, required=True)
     collect.add_argument("--allow-mixed-version-debug", action="store_true")
@@ -437,7 +447,9 @@ def _visible_env_from_args(values: list[str]) -> dict[str, str]:
     return result
 
 
-def _failure_evidence_from_args(categories: list[str]) -> list[RuntimeFailureEvidence]:
+def _failure_evidence_from_args(
+    categories: list[RuntimeFailureCategory],
+) -> list[RuntimeFailureEvidence]:
     return [
         RuntimeFailureEvidence(category=category, status="recorded")
         for category in categories
@@ -508,7 +520,9 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(entry.model_dump(mode="json"), sort_keys=True))
         return 0
     if args.command == "aggregate":
-        report = build_aggregate_report([load_matrix_entry(path) for path in args.entries])
+        report = build_aggregate_report(
+            [load_matrix_entry(path) for path in args.entries]
+        )
         write_json_payload(args.output, report)
         print(json.dumps(report.model_dump(mode="json"), sort_keys=True))
         return 0

@@ -10,6 +10,7 @@ import math
 import sys
 import types
 from io import StringIO
+from typing import cast
 
 import pytest
 
@@ -26,22 +27,32 @@ from sol_execbench.core.bench.eval_runtime import (
     solution_uses_native_rocm,
 )
 from sol_execbench.core.bench.reward_hack import RewardHackDetected
+from sol_execbench.core.data.solution import (
+    BuildSpec,
+    SourceFile,
+    SupportedHardware,
+    SupportedLanguages,
+)
+from sol_execbench.core.data.trace import Trace
 from sol_execbench_type_helpers import make_trace, make_workload
 
 
 def _solution(entry_point: str = "kernel.py::run", languages: list[str] | None = None):
     source_path = entry_point.split("::", 1)[0]
+    spec_languages = [
+        SupportedLanguages(language) for language in (languages or ["pytorch"])
+    ]
     return Solution(
         name="demo",
         definition="demo",
         author="test",
-        spec={
-            "languages": languages or ["pytorch"],
-            "target_hardware": ["LOCAL"],
-            "entry_point": entry_point,
-            "destination_passing_style": False,
-        },
-        sources=[{"path": source_path, "content": "def run(x):\n    return x\n"}],
+        spec=BuildSpec(
+            languages=spec_languages,
+            target_hardware=[SupportedHardware.LOCAL],
+            entry_point=entry_point,
+            destination_passing_style=False,
+        ),
+        sources=[SourceFile(path=source_path, content="def run(x):\n    return x\n")],
     )
 
 
@@ -87,7 +98,7 @@ def test_emit_trace_jsonl_rejects_non_finite_trace_values():
             return {"bad": math.nan}
 
     with pytest.raises(ValueError, match="Out of range float"):
-        emit_trace_jsonl(BadTrace(), stream)
+        emit_trace_jsonl(cast(Trace, BadTrace()), stream)
 
 
 def test_run_reward_hack_check_returns_detected_message():
@@ -192,7 +203,7 @@ def test_load_user_function_imports_python_solution(tmp_path):
 def test_load_user_function_ignores_existing_simple_module_collision(tmp_path):
     (tmp_path / "kernel.py").write_text("def run():\n    return 'staged'\n")
     collision = types.ModuleType("kernel")
-    collision.run = lambda: "collision"
+    setattr(collision, "run", lambda: "collision")
     previous = sys.modules.get("kernel")
     sys.modules["kernel"] = collision
     try:
@@ -211,12 +222,10 @@ def test_load_user_function_ignores_existing_package_module_collision(tmp_path):
     package_dir.mkdir()
     (package_dir / "helper.py").write_text("VALUE = 'staged'\n")
     (package_dir / "kernel.py").write_text(
-        "from .helper import VALUE\n\n"
-        "def run():\n"
-        "    return VALUE\n"
+        "from .helper import VALUE\n\ndef run():\n    return VALUE\n"
     )
     collision = types.ModuleType("pkg.kernel")
-    collision.run = lambda: "collision"
+    setattr(collision, "run", lambda: "collision")
     previous = sys.modules.get("pkg.kernel")
     sys.modules["pkg.kernel"] = collision
     try:

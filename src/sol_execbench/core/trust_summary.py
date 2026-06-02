@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -190,7 +190,15 @@ def render_trust_summary_markdown(report: TrustSummaryReport) -> str:
             + " |"
         )
 
-    lines.extend(["", "## Sources", "", "| Source | Path | Schema | Checksum |", "| --- | --- | --- | --- |"])
+    lines.extend(
+        [
+            "",
+            "## Sources",
+            "",
+            "| Source | Path | Schema | Checksum |",
+            "| --- | --- | --- | --- |",
+        ]
+    )
     for source in report.sources:
         lines.append(
             "| "
@@ -236,7 +244,9 @@ def _consistency_outcome(payload: dict[str, Any] | None) -> TrustOutcome:
     return TrustOutcome(
         key="internally_consistent",
         status=status,
-        reason_codes=["no_consistency_blockers" if blockers == 0 else "consistency_blockers"],
+        reason_codes=[
+            "no_consistency_blockers" if blockers == 0 else "consistency_blockers"
+        ],
         next_steps=[] if blockers == 0 else ["Resolve consistency blocker findings."],
     )
 
@@ -249,7 +259,8 @@ def _stability_outcome(payload: dict[str, Any] | None) -> TrustOutcome:
             reason_codes=["evaluation_stability_missing"],
             next_steps=["Generate evaluation_stability.v1."],
         )
-    totals = payload.get("status_totals") if isinstance(payload.get("status_totals"), dict) else {}
+    raw_totals = payload.get("status_totals")
+    totals = cast(dict[str, Any], raw_totals) if isinstance(raw_totals, dict) else {}
     risky = [
         key
         for key in (
@@ -264,9 +275,15 @@ def _stability_outcome(payload: dict[str, Any] | None) -> TrustOutcome:
     ]
     return TrustOutcome(
         key="stable_enough_to_interpret",
-        status="stable_enough" if not risky and int(totals.get("stable") or 0) > 0 else "blocked",
+        status="stable_enough"
+        if not risky and int(totals.get("stable") or 0) > 0
+        else "blocked",
         reason_codes=["stable_timing"] if not risky else risky,
-        next_steps=[] if not risky else ["Collect stable timing evidence with documented clock and backend policy."],
+        next_steps=[]
+        if not risky
+        else [
+            "Collect stable timing evidence with documented clock and backend policy."
+        ],
     )
 
 
@@ -284,7 +301,9 @@ def _claim_outcome(payload: dict[str, Any] | None) -> TrustOutcome:
         key="claim_upgrade",
         status=status,
         reason_codes=[f"highest:{highest}"],
-        next_steps=[] if highest != "diagnostic_only" else ["Satisfy claim-upgrade prerequisites before stronger claims."],
+        next_steps=[]
+        if highest != "diagnostic_only"
+        else ["Satisfy claim-upgrade prerequisites before stronger claims."],
     )
 
 
@@ -319,7 +338,8 @@ def _evidence_outcome(
     return TrustOutcome(
         key="evidence_completeness",
         status="evidence_missing" if missing else "reviewable",
-        reason_codes=[f"missing:{name}" for name in missing] or ["required_refs_present"],
+        reason_codes=[f"missing:{name}" for name in missing]
+        or ["required_refs_present"],
         next_steps=next_steps if missing else next_steps[-1:],
     )
 
@@ -346,11 +366,15 @@ def _finding_total(payload: dict[str, Any], severity: str) -> int:
     )
 
 
-def _source_ref(source_id: str, payload: dict[str, Any], path: Path | None) -> TrustSourceRef:
+def _source_ref(
+    source_id: str, payload: dict[str, Any], path: Path | None
+) -> TrustSourceRef:
     return TrustSourceRef(
         source_id=source_id,
         path=str(path) if path else None,
-        schema_version=payload.get("schema_version") if isinstance(payload.get("schema_version"), str) else None,
+        schema_version=payload.get("schema_version")
+        if isinstance(payload.get("schema_version"), str)
+        else None,
         checksum=_checksum(payload),
     )
 

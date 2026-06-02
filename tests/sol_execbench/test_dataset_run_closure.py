@@ -43,7 +43,9 @@ def test_prior_closure_provenance_reports_stale_states(tmp_path):
 
     malformed = tmp_path / "bad.json"
     malformed.write_text("{")
-    assert prior_closure_provenance(malformed)[1]["observed"] == "unreadable"
+    _, mismatch = prior_closure_provenance(malformed)
+    assert mismatch is not None
+    assert mismatch["observed"] == "unreadable"
 
     valid = tmp_path / "closure.json"
     valid.write_text(json.dumps({"provenance": {"dataset_root": "dataset"}}))
@@ -151,9 +153,7 @@ def test_dataset_reuse_decision_reports_missing_prior_closure(tmp_path):
 
     assert decision.should_reuse is False
     assert decision.reason == "stale_provenance"
-    assert decision.provenance_mismatches == (
-        stale_provenance_mismatch(observed=None),
-    )
+    assert decision.provenance_mismatches == (stale_provenance_mismatch(observed=None),)
 
 
 def test_closure_totals_and_writer_preserve_claim_boundary(tmp_path):

@@ -384,12 +384,15 @@ def test_run_dataset_records_filters_missing_workloads_and_readiness_blockers(
 ):
     dataset_root = _write_linear_backward_dataset(tmp_path, workload_count=2)
     workload_refs = _linear_backward_workload_refs(2)
-    missing_ref = {"uuid": "missing-linear-backward-workload", "row_index": 99}
+    missing_ref: dict[str, object] = {
+        "uuid": "missing-linear-backward-workload",
+        "row_index": 99,
+    }
     ready_subset_path = _write_ready_subset(
         tmp_path / "ready_subset.json",
         [*workload_refs, missing_ref],
     )
-    blocked_readiness = {
+    blocked_readiness: dict[str, object] = {
         "category": "L1",
         "problem_id": "L1/blocked_demo",
         "problem_path": "L1/blocked_demo",

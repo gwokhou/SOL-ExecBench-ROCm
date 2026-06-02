@@ -110,7 +110,9 @@ def measure_latency(
         return TimingResult(latency_ms=0.0, failure=f"Timing failed: {exc}")
 
 
-def load_staged_problem(staging_dir: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+def load_staged_problem(
+    staging_dir: Path,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Load definition and workload payloads from an eval-driver staging directory."""
     definition_path = staging_dir / "definition.json"
     workload_path = staging_dir / "workload.jsonl"
@@ -261,7 +263,9 @@ def measure_reference_latency(
 
 def solution_uses_native_rocm(solution: Solution) -> bool:
     """Return whether a solution should load a compiled native ROCm module."""
-    return any(language in NATIVE_ROCM_LANGUAGES for language in solution.spec.languages)
+    return any(
+        language in NATIVE_ROCM_LANGUAGES for language in solution.spec.languages
+    )
 
 
 def block_cpp_extension_load() -> None:
@@ -275,9 +279,8 @@ def block_cpp_extension_load() -> None:
             "solution spec to compile on the compile server."
         )
 
-    cpp_ext_dynamic = cpp_ext
-    cpp_ext_dynamic.load = blocked_cpp_ext_load
-    cpp_ext_dynamic.load_inline = blocked_cpp_ext_load
+    setattr(cpp_ext, "load", blocked_cpp_ext_load)
+    setattr(cpp_ext, "load_inline", blocked_cpp_ext_load)
 
 
 def load_user_function(solution: Solution, staging_dir: Path) -> Any:

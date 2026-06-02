@@ -97,9 +97,7 @@ def plan_dataset_shards(
     if shard_count < 1:
         raise ValueError("shard_count must be at least 1")
 
-    shard_workloads: list[list[DatasetShardWorkload]] = [
-        [] for _ in range(shard_count)
-    ]
+    shard_workloads: list[list[DatasetShardWorkload]] = [[] for _ in range(shard_count)]
     for ordinal, ref in enumerate(workload_refs):
         workload = DatasetShardWorkload(
             ordinal=ordinal,
@@ -161,7 +159,10 @@ def merge_dataset_shard_traces(
         }
 
         for trace_index, trace in enumerate(traces):
-            workload = uuid_to_workload.get(_trace_uuid(trace))
+            trace_uuid = _trace_uuid(trace)
+            workload = (
+                uuid_to_workload.get(trace_uuid) if trace_uuid is not None else None
+            )
             if workload is None and trace_index < len(plan.workloads):
                 workload = plan.workloads[trace_index]
             if workload is None:

@@ -5,23 +5,33 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from collections.abc import Sequence
+from typing import Protocol, TypeVar
+
+
+_StatusT = TypeVar("_StatusT")
+_ReasonT = TypeVar("_ReasonT")
 
 
 class StaticToolRunLike(Protocol):
-    command: list[str]
-    status: object
-    reason_code: object
+    @property
+    def command(self) -> list[str]: ...
+
+    @property
+    def status(self) -> object: ...
+
+    @property
+    def reason_code(self) -> object: ...
 
 
 def aggregate_extractor_status_value(
-    tool_runs: list[StaticToolRunLike] | tuple[StaticToolRunLike, ...],
+    tool_runs: Sequence[StaticToolRunLike],
     *,
-    collected: object,
-    partial: object,
-    failed: object,
-    unavailable: object,
-) -> object:
+    collected: _StatusT,
+    partial: _StatusT,
+    failed: _StatusT,
+    unavailable: _StatusT,
+) -> _StatusT:
     """Return aggregate extractor status from individual tool runs."""
     executable_runs = [run for run in tool_runs if run.command]
     successes = [run for run in executable_runs if run.status == collected]
@@ -36,19 +46,19 @@ def aggregate_extractor_status_value(
 
 
 def aggregate_extractor_reason_value(
-    tool_runs: list[StaticToolRunLike] | tuple[StaticToolRunLike, ...],
+    tool_runs: Sequence[StaticToolRunLike],
     *,
     status: object,
     collected_status: object,
     partial_status: object,
     failed_status: object,
-    collected_reason: object,
-    partial_reason: object,
-    partial_disassembly_reason: object,
-    failed_reason: object,
-    timeout_reason: object,
-    unavailable_reason: object,
-) -> object:
+    collected_reason: _ReasonT,
+    partial_reason: _ReasonT,
+    partial_disassembly_reason: _ReasonT,
+    failed_reason: _ReasonT,
+    timeout_reason: _ReasonT,
+    unavailable_reason: _ReasonT,
+) -> _ReasonT:
     """Return aggregate extractor reason from aggregate status and tool runs."""
     if status == collected_status:
         return collected_reason

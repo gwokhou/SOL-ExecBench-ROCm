@@ -101,6 +101,7 @@ def test_no_trace_diagnostics_sidecar_records_bounded_failure_output(tmp_path: P
     )
 
     assert written == tmp_path / "traces.jsonl.no-trace-diagnostics.json"
+    assert written is not None
     payload = json.loads(written.read_text())
     assert payload["schema_version"] == cli_main.NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION
     assert payload["diagnostic_only"] is True
@@ -129,6 +130,7 @@ def test_no_trace_diagnostics_sidecar_records_empty_stdout_failure(tmp_path: Pat
         stderr="Traceback: boom",
     )
 
+    assert written is not None
     payload = json.loads(written.read_text())
     assert payload["reason"] == "evaluation_failed_no_stdout"
     assert payload["stdout_tail"] == ""
@@ -188,7 +190,9 @@ def test_environment_snapshot_request_without_output_path_is_nonfatal(monkeypatc
     assert calls == 0
 
 
-def test_environment_snapshot_collection_failure_is_nonfatal(tmp_path: Path, monkeypatch):
+def test_environment_snapshot_collection_failure_is_nonfatal(
+    tmp_path: Path, monkeypatch
+):
     sidecar = tmp_path / "env.json"
     monkeypatch.setenv(cli_main.ENV_SNAPSHOT_PATH_ENV, str(sidecar))
 
@@ -318,7 +322,9 @@ def test_static_evidence_auto_for_non_cpp_is_unsupported_sidecar(tmp_path: Path)
 
     assert sidecar is not None
     assert sidecar.status == StaticKernelEvidenceStatus.UNSUPPORTED
-    assert sidecar.reason_code == StaticKernelEvidenceReasonCode.UNSUPPORTED_SOLUTION_TYPE
+    assert (
+        sidecar.reason_code == StaticKernelEvidenceReasonCode.UNSUPPORTED_SOLUTION_TYPE
+    )
 
 
 def test_static_evidence_collection_failure_is_failed_sidecar(
@@ -364,7 +370,9 @@ def test_doctor_cli_outputs_json_without_problem_directory(monkeypatch):
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
     assert payload["schema_version"] == "sol_execbench.environment_diagnostics.v1"
-    assert payload["snapshot"]["schema_version"] == "sol_execbench.environment_snapshot.v1"
+    assert (
+        payload["snapshot"]["schema_version"] == "sol_execbench.environment_snapshot.v1"
+    )
     assert payload["checks"][0]["name"] == "pytorch_rocm_runtime"
 
 

@@ -18,6 +18,8 @@ focus: concerns
 - Hosted leaderboard readiness and score authority are not established.
 - Docker Matrix rows are container ROCm user-space evidence only; they are not native-host validation.
 - MI300X is the concrete CDNA3 `gfx942` target, but full-suite MI300X validation on CDNA3 remains deferred without archived real-hardware evidence.
+- CDNA3-family hardware-validation claims must remain deferred until real
+  full-suite `gfx94*` evidence is archived.
 - CDNA4 validation is unavailable because suitable hardware is not currently accessible.
 
 ## Execution Isolation

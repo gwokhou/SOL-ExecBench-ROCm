@@ -6,9 +6,14 @@ adaptation map, not a porting plan:
 public benchmark problem schemas, solution metadata schemas, workload formats, CLI behavior,
 trace JSONL output, and benchmark semantics remain owned by SOL ExecBench ROCm.
 
-Repository evidence reviewed for this adaptation includes `src/sol_execbench/core/bench/rocm_profiler.py`,
-`src/sol_execbench/core/diagnostics.py`, `src/sol_execbench/core/reporting.py`, `src/sol_execbench/core/baseline.py`,
-`src/sol_execbench/core/data/trace.py`, and `src/sol_execbench/core/scoring/amd_score.py`.
+Repository evidence reviewed for this adaptation includes hip-execbench source
+surfaces `src/profiler/router.ts`, `src/errors/index.ts`,
+`src/agent/builder.ts`, `src/baseline/comparator.ts`, `src/schemas/*.ts`, and
+`src/pipeline/statistics.ts`, mapped against SOL ExecBench ROCm surfaces
+`src/sol_execbench/core/bench/rocm_profiler.py`,
+`src/sol_execbench/core/diagnostics.py`, `src/sol_execbench/core/reporting.py`,
+`src/sol_execbench/core/baseline.py`, `src/sol_execbench/core/data/trace.py`,
+and `src/sol_execbench/core/scoring/amd_score.py`.
 
 ## Accepted Practices
 
@@ -42,8 +47,8 @@ Repository evidence reviewed for this adaptation includes `src/sol_execbench/cor
 
 - Adaptations must be internal helpers, tests, or documentation unless a later
   milestone explicitly approves a public contract change.
-- Existing benchmark definition, workload, solution, and trace JSONL formats
-  are compatibility contracts.
+- Existing benchmark `definition.json`, workload, `solution.json`, and trace
+  JSONL formats are compatibility contracts.
 - SOL-Score-style output must not be presented as an AMD-native hardware claim
   until a dedicated AMD interpretation model is defined and validated.
 - Baseline comparison is baseline-relative by default. It may be used for local

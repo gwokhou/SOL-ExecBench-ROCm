@@ -4,6 +4,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -25,7 +26,7 @@ MANIFEST_PATH = REPO_ROOT / "docker" / "rocm-targets.json"
 
 def _default_observation(**overrides: object) -> DockerPreflightObservation:
     selection = select_docker_target(None, manifest_path=MANIFEST_PATH)
-    values = {
+    values: dict[str, Any] = {
         "docker_context": "default",
         "docker_host": "unix:///var/run/docker.sock",
         "dev_kfd_present": True,
@@ -81,9 +82,7 @@ def test_preflight_records_requested_image_and_nullable_digest() -> None:
     result = classify_docker_preflight(_default_observation(dev_dri_present=False))
 
     assert result.entry.observed.container is not None
-    assert result.entry.observed.container.image_repository == (
-        "rocm/dev-ubuntu-24.04"
-    )
+    assert result.entry.observed.container.image_repository == ("rocm/dev-ubuntu-24.04")
     assert result.entry.observed.container.image_tag == "7.1.1-complete"
     assert result.entry.observed.container.image_digest is None
 

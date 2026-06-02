@@ -82,10 +82,19 @@ def test_op_family_taxonomy_includes_paper_aligned_families():
 
 
 def test_call_classification_helpers_cover_representative_families():
-    assert classify_call("torch.matmul").op_family == OpFamily.GEMM.value
-    assert classify_call("torch.nn.functional.linear").op_family == OpFamily.LINEAR_PROJECTION.value
-    assert classify_call("torch.topk").op_family == OpFamily.MOE.value
-    assert classify_call("selective_scan").op_family == OpFamily.SSM_MAMBA.value
+    matmul = classify_call("torch.matmul")
+    linear = classify_call("torch.nn.functional.linear")
+    topk = classify_call("torch.topk")
+    selective_scan = classify_call("selective_scan")
+
+    assert matmul is not None
+    assert linear is not None
+    assert topk is not None
+    assert selective_scan is not None
+    assert matmul.op_family == OpFamily.GEMM.value
+    assert linear.op_family == OpFamily.LINEAR_PROJECTION.value
+    assert topk.op_family == OpFamily.MOE.value
+    assert selective_scan.op_family == OpFamily.SSM_MAMBA.value
     assert classify_call("unknown_custom_call") is None
 
 
@@ -109,7 +118,10 @@ def test_moe_visible_static_route_nodes_record_subroles_and_metadata():
         inputs={
             "x": {"shape": ["tokens", "hidden"], "dtype": "float16"},
             "router": {"shape": ["hidden", "experts"], "dtype": "float16"},
-            "expert_weights": {"shape": ["experts", "hidden", "hidden"], "dtype": "float16"},
+            "expert_weights": {
+                "shape": ["experts", "hidden", "hidden"],
+                "dtype": "float16",
+            },
         },
         outputs={"out": {"shape": ["tokens", "hidden"], "dtype": "float16"}},
         reference=(
@@ -138,8 +150,12 @@ def test_moe_visible_static_route_nodes_record_subroles_and_metadata():
         "top_k",
         "dispatch",
     }
-    dispatch = next(node for node in moe_nodes if node.attributes.get("subrole") == "dispatch")
-    top_k = next(node for node in moe_nodes if node.attributes.get("subrole") == "top_k")
+    dispatch = next(
+        node for node in moe_nodes if node.attributes.get("subrole") == "dispatch"
+    )
+    top_k = next(
+        node for node in moe_nodes if node.attributes.get("subrole") == "top_k"
+    )
     assert dispatch.attributes["moe_subroles"] == (
         "dispatch",
         "expert_projection",
@@ -164,7 +180,10 @@ def test_moe_dispatch_uses_top_k_from_consumed_route_tensor():
         inputs={
             "x": {"shape": ["tokens", "hidden"], "dtype": "float16"},
             "router": {"shape": ["hidden", "experts"], "dtype": "float16"},
-            "expert_weights": {"shape": ["experts", "hidden", "hidden"], "dtype": "float16"},
+            "expert_weights": {
+                "shape": ["experts", "hidden", "hidden"],
+                "dtype": "float16",
+            },
         },
         outputs={"out": {"shape": ["tokens", "hidden"], "dtype": "float16"}},
         reference=(
@@ -190,7 +209,8 @@ def test_moe_dispatch_uses_top_k_from_consumed_route_tensor():
     dispatch = next(
         node
         for node in graph.nodes
-        if node.op_family == OpFamily.MOE and node.attributes.get("subrole") == "dispatch"
+        if node.op_family == OpFamily.MOE
+        and node.attributes.get("subrole") == "dispatch"
     )
 
     assert dispatch.attributes["route_top_k"] == 4
@@ -210,7 +230,10 @@ def test_moe_dispatch_does_not_inherit_unrelated_top_k():
         inputs={
             "x": {"shape": ["tokens", "hidden"], "dtype": "float16"},
             "router": {"shape": ["hidden", "experts"], "dtype": "float16"},
-            "expert_weights": {"shape": ["experts", "hidden", "hidden"], "dtype": "float16"},
+            "expert_weights": {
+                "shape": ["experts", "hidden", "hidden"],
+                "dtype": "float16",
+            },
             "chosen": {"shape": ["tokens", "route"], "dtype": "int64"},
         },
         outputs={"out": {"shape": ["tokens", "hidden"], "dtype": "float16"}},
@@ -237,7 +260,8 @@ def test_moe_dispatch_does_not_inherit_unrelated_top_k():
     dispatch = next(
         node
         for node in graph.nodes
-        if node.op_family == OpFamily.MOE and node.attributes.get("subrole") == "dispatch"
+        if node.op_family == OpFamily.MOE
+        and node.attributes.get("subrole") == "dispatch"
     )
 
     assert "route_top_k" not in dispatch.attributes
@@ -259,7 +283,10 @@ def test_moe_dynamic_route_records_missing_static_metadata_without_defaults():
         inputs={
             "x": {"shape": ["tokens", "hidden"], "dtype": "float16"},
             "router": {"shape": ["hidden", "experts"], "dtype": "float16"},
-            "expert_weights": {"shape": ["experts", "hidden", "hidden"], "dtype": "float16"},
+            "expert_weights": {
+                "shape": ["experts", "hidden", "hidden"],
+                "dtype": "float16",
+            },
             "threshold": {"shape": None, "dtype": "float16"},
         },
         outputs={"out": {"shape": ["tokens", "hidden"], "dtype": "float16"}},
@@ -285,7 +312,8 @@ def test_moe_dynamic_route_records_missing_static_metadata_without_defaults():
     dispatch = next(
         node
         for node in graph.nodes
-        if node.op_family == OpFamily.MOE and node.attributes.get("subrole") == "dispatch"
+        if node.op_family == OpFamily.MOE
+        and node.attributes.get("subrole") == "dispatch"
     )
 
     assert dispatch.confidence == EstimateConfidence.INEXACT
@@ -327,7 +355,9 @@ def test_moe_taxonomy_only_call_is_unsupported_without_fabricated_subroles():
     assert "unsupported_operator:moe_taxonomy_only" in graph.warnings
 
 
-def _ssm_mamba_definition(*, missing_recurrence: bool = False, custom_scan: bool = False) -> Definition:
+def _ssm_mamba_definition(
+    *, missing_recurrence: bool = False, custom_scan: bool = False
+) -> Definition:
     if custom_scan:
         return make_definition(
             name="ssm_mamba_custom_scan",
@@ -340,7 +370,9 @@ def _ssm_mamba_definition(*, missing_recurrence: bool = False, custom_scan: bool
                 "x": {"shape": ["batch", "sequence", "hidden"], "dtype": "float16"},
                 "opaque_scan": {"shape": ["hidden", "hidden"], "dtype": "float16"},
             },
-            outputs={"out": {"shape": ["batch", "sequence", "hidden"], "dtype": "float16"}},
+            outputs={
+                "out": {"shape": ["batch", "sequence", "hidden"], "dtype": "float16"}
+            },
             reference="def run(x, opaque_scan):\n    return opaque_scan(x)\n",
         )
     inputs = {
@@ -376,7 +408,9 @@ def _ssm_mamba_definition(*, missing_recurrence: bool = False, custom_scan: bool
             "    return out_proj(y, w_out)\n"
         )
     return make_definition(
-        name="ssm_mamba_missing_recurrence" if missing_recurrence else "ssm_mamba_static",
+        name="ssm_mamba_missing_recurrence"
+        if missing_recurrence
+        else "ssm_mamba_static",
         axes={
             "batch": {"type": "const", "value": 2},
             "sequence": {"type": "const", "value": 64},
@@ -391,7 +425,9 @@ def _ssm_mamba_definition(*, missing_recurrence: bool = False, custom_scan: bool
     )
 
 
-def _ssm_mamba_workload(*, missing_recurrence: bool = False, custom_scan: bool = False) -> Workload:
+def _ssm_mamba_workload(
+    *, missing_recurrence: bool = False, custom_scan: bool = False
+) -> Workload:
     if custom_scan:
         return make_workload(
             axes={},
@@ -407,7 +443,9 @@ def _ssm_mamba_workload(*, missing_recurrence: bool = False, custom_scan: bool =
     if missing_recurrence:
         inputs["params"] = {"type": "random"}
     else:
-        inputs.update({"a": {"type": "random"}, "b": {"type": "random"}, "c": {"type": "random"}})
+        inputs.update(
+            {"a": {"type": "random"}, "b": {"type": "random"}, "c": {"type": "random"}}
+        )
     return make_workload(axes={}, inputs=inputs, uuid="ssm-mamba-workload")
 
 
@@ -423,11 +461,17 @@ def test_ssm_mamba_visible_chain_records_independent_subroles_and_state_metadata
         "gating",
         "output_projection",
     ]
-    state_update = next(node for node in ssm_nodes if node.attributes.get("subrole") == "state_update")
+    state_update = next(
+        node for node in ssm_nodes if node.attributes.get("subrole") == "state_update"
+    )
     assert state_update.attributes["sequence_length"] == 64
     assert state_update.attributes["hidden_size"] == 128
     assert state_update.attributes["state_shape"] == (128, 16)
-    assert state_update.attributes["state_update_parameters"] == ("input:a", "input:b", "input:c")
+    assert state_update.attributes["state_update_parameters"] == (
+        "input:a",
+        "input:b",
+        "input:c",
+    )
     assert state_update.attributes["recurrence_source"] == "visible_scan_parameters"
 
 
@@ -596,10 +640,7 @@ def test_dynamic_control_flow_is_inexact_or_unsupported_evidence():
         inputs={"x": {"shape": ["N"], "dtype": "float32"}},
         outputs={"out": {"shape": ["N"], "dtype": "float32"}},
         reference=(
-            "def run(x):\n"
-            "    if x.shape[0] > 1:\n"
-            "        return x + x\n"
-            "    return x\n"
+            "def run(x):\n    if x.shape[0] > 1:\n        return x + x\n    return x\n"
         ),
     )
     workload = make_workload(axes={"N": 8}, inputs={"x": {"type": "random"}}, uuid="w1")
@@ -709,19 +750,27 @@ def test_axis_dtype_and_movement_metadata_are_stored_in_attributes():
             "    return c.to(torch.float16)\n"
         ),
     )
-    workload = make_workload(axes={}, inputs={"x": {"type": "random"}}, uuid="metadata-workload")
+    workload = make_workload(
+        axes={}, inputs={"x": {"type": "random"}}, uuid="metadata-workload"
+    )
 
     graph = build_bound_graph(definition, workload)
 
     softmax = next(node for node in graph.nodes if node.op_family == OpFamily.SOFTMAX)
-    reduction = next(node for node in graph.nodes if node.op_family == OpFamily.REDUCTION)
+    reduction = next(
+        node for node in graph.nodes if node.op_family == OpFamily.REDUCTION
+    )
     broadcast = next(
         node
         for node in graph.nodes
         if node.attributes.get("movement_kind") == "broadcast_view"
     )
-    contiguous = next(node for node in graph.nodes if node.op_name.endswith("contiguous"))
-    conversion = next(node for node in graph.nodes if node.op_family == OpFamily.DTYPE_CONVERSION)
+    contiguous = next(
+        node for node in graph.nodes if node.op_name.endswith("contiguous")
+    )
+    conversion = next(
+        node for node in graph.nodes if node.op_family == OpFamily.DTYPE_CONVERSION
+    )
 
     assert softmax.attributes["dim"] == -1
     assert softmax.attributes["axis_source"] == "attribute"
@@ -777,7 +826,9 @@ def test_attention_graph_marks_visible_subroles_and_metadata():
     )
 
     graph = build_bound_graph(definition, workload)
-    attention_nodes = [node for node in graph.nodes if node.op_family == OpFamily.ATTENTION]
+    attention_nodes = [
+        node for node in graph.nodes if node.op_family == OpFamily.ATTENTION
+    ]
 
     assert {node.attributes.get("subrole") for node in attention_nodes} >= {
         "qk_scores",
@@ -786,7 +837,9 @@ def test_attention_graph_marks_visible_subroles_and_metadata():
         "output_projection",
     }
     qk_scores = next(
-        node for node in attention_nodes if node.attributes.get("subrole") == "qk_scores"
+        node
+        for node in attention_nodes
+        if node.attributes.get("subrole") == "qk_scores"
     )
     softmax = next(
         node for node in attention_nodes if node.attributes.get("subrole") == "softmax"

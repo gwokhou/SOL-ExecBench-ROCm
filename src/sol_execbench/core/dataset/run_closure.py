@@ -48,7 +48,9 @@ def stale_provenance_mismatch(*, observed: str | None) -> dict[str, object]:
     }
 
 
-def prior_closure_provenance(path: Path) -> tuple[dict[str, Any] | None, dict[str, object] | None]:
+def prior_closure_provenance(
+    path: Path,
+) -> tuple[dict[str, Any] | None, dict[str, object] | None]:
     """Load prior execution-closure provenance or return a stale mismatch."""
     if not path.exists():
         return None, stale_provenance_mismatch(observed=None)
@@ -153,7 +155,7 @@ def closure_record(
 def closure_totals(records: list[dict[str, Any]]) -> dict[str, int]:
     """Return execution-closure totals for serialized records."""
     report = build_execution_closure_report(
-        records=records,
+        records=[*records],
         provenance={},
         filters={},
         created_at="1970-01-01T00:00:00Z",
@@ -171,7 +173,7 @@ def write_execution_closure(
 ) -> None:
     """Write the dataset runner execution-closure report."""
     report = build_execution_closure_report(
-        records=records,
+        records=[*records],
         provenance=provenance,
         filters=filters,
         created_at=utc_timestamp(),
@@ -181,7 +183,9 @@ def write_execution_closure(
             "paper_parity": False,
             "leaderboard_result": False,
         },
-        provenance_mismatches=provenance_mismatches,
+        provenance_mismatches=[*provenance_mismatches]
+        if provenance_mismatches is not None
+        else None,
     )
     write_execution_closure_report(report, path)
 

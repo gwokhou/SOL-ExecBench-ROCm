@@ -112,6 +112,10 @@ _LINKER_LOADER_MARKERS = (
     "--dynamic-linker",
     "-rpath",
 )
+_ALLOWED_ROCM_SYSTEM_PATH_FLAGS = {
+    "-I/opt/rocm/include",
+    "-L/opt/rocm/lib",
+}
 
 
 def _validate_compile_flag(flag: str) -> None:
@@ -124,6 +128,8 @@ def _validate_compile_flag(flag: str) -> None:
         raise ValueError(f"Compile option requires an external path value: {flag}")
     if any(flag.startswith(marker) for marker in _LINKER_LOADER_MARKERS):
         raise ValueError(f"Compile option controls runtime linker paths: {flag}")
+    if flag in _ALLOWED_ROCM_SYSTEM_PATH_FLAGS:
+        return
     if any(flag.startswith(prefix) for prefix in _PATH_INJECTION_PREFIXES):
         raise ValueError(f"Compile option can reference host paths: {flag}")
 

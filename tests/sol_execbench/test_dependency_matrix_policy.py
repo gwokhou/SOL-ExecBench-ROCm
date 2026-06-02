@@ -47,9 +47,10 @@ def test_manifest_records_dependency_policy_for_every_declared_target() -> None:
     policy_ids: set[str] = set()
 
     assert manifest.default_target_id == "rocm-7.1.1-ubuntu-24.04-container"
-    assert manifest.targets_by_id[
-        manifest.default_target_id
-    ].docker_image_repository == "rocm/dev-ubuntu-24.04"
+    assert (
+        manifest.targets_by_id[manifest.default_target_id].docker_image_repository
+        == "rocm/dev-ubuntu-24.04"
+    )
     assert manifest.targets_by_id[manifest.default_target_id].docker_image_tag == (
         "7.1.1-complete"
     )
@@ -60,6 +61,7 @@ def test_manifest_records_dependency_policy_for_every_declared_target() -> None:
         policy_ids.add(policy.policy_id)
         assert policy.policy_id
         assert target.pytorch_rocm_target == policy.expected_local_version
+        assert target.pytorch_rocm_target is not None
         assert target.pytorch_rocm_target.replace(".", "") in policy.uv_index_name
         assert policy.expected_local_version in policy.uv_index_url
         assert policy.suggested_uv_command

@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -317,7 +317,9 @@ def write_consistency_reports(
     markdown_path.write_text(render_consistency_markdown(report), encoding="utf-8")
 
 
-def _records(payload: dict[str, Any] | None, *, key: str = "records") -> list[dict[str, Any]]:
+def _records(
+    payload: dict[str, Any] | None, *, key: str = "records"
+) -> list[dict[str, Any]]:
     records = (payload or {}).get(key, [])
     if not isinstance(records, list):
         return []
@@ -527,7 +529,7 @@ def _embedded_source_checksums(payload: dict[str, Any]) -> dict[str, str]:
 
 def _source_ref_checksum(value: object) -> str | None:
     if isinstance(value, dict):
-        checksum = value.get("checksum")
+        checksum = cast(dict[str, Any], value).get("checksum")
         if isinstance(checksum, dict):
             nested = checksum.get("value")
             return nested if isinstance(nested, str) else None

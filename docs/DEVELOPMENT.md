@@ -29,6 +29,7 @@ Optional pre-commit setup:
 ```bash
 uv run --with pre-commit pre-commit install
 uv run --with pre-commit pre-commit install --hook-type commit-msg
+uv run --with pre-commit pre-commit install --hook-type pre-push
 ```
 
 Use the Docker environment for ROCm GPU evaluation when host tooling is not
