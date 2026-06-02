@@ -15,25 +15,27 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
 ## Current State
 
-**Shipped version:** v1.25 Engineering Prerelease,
-completed 2026-06-01.
+**Shipped version:** v1.26 Public Prerelease and Research Preview,
+completed 2026-06-02.
 
-**Current milestone:** v1.26 Public Prerelease and Research Preview.
+**Current milestone:** v1.27 Copyright Provenance Cleanup.
 
 **Queued milestone:** None defined.
 
-**Latest milestone outcome:** v1.25 packaged the ROCm port for an engineering
+**Latest milestone outcome:** v1.26 produced the public prerelease and research
+preview package with versioned artifact bundles, readiness gates, research
+preview evidence, public publishing materials, and corrected MI300X/CDNA3
+wording.
+
+**Previous milestone outcome:** v1.25 packaged the ROCm port for an engineering
 prerelease by adding bounded release-candidate validation, support-matrix
 boundaries, claim guardrails, first-run documentation, and release-candidate
 materials.
 
-**Previous milestone outcome:** v1.24 made dataset-scale execution more
-trustworthy by centralizing reuse policy, closure/evidence completeness,
-failure-mode regression documentation, and deterministic sharding semantics.
-
-**Next milestone goal:** Turn the v1.25 engineering prerelease materials into
-a public prerelease and research preview package with versioned evidence
-bundles, release-readiness gates, and bounded research-facing interpretation.
+**Next milestone goal:** Clean up release-facing copyright and provenance
+metadata so upstream NVIDIA-derived files retain required notices, independent
+ROCm work uses this project's own copyright attribution, and prerelease
+readiness gates prevent future blanket header drift.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline.
 Milestones v1.1-v1.6 added CDNA 3 code/schema support, maintained residue
@@ -118,6 +120,10 @@ claim guardrails, first-run documentation, and release-candidate materials
 while keeping paper validation, upstream SOLAR parity, leaderboard readiness,
 hard sandboxing, MI300X/CDNA3 full-suite validation, and CDNA4 validation out
 of scope.
+The v1.26 milestone turned that engineering prerelease into a public
+prerelease and research preview package by adding versioned artifact bundles,
+release-readiness gates, research-preview evidence, public publishing
+materials, and corrected MI300X/CDNA3 wording.
 
 ## Recently Shipped Milestone: v1.25 Engineering Prerelease
 
@@ -146,25 +152,30 @@ interpret without overstated research or hardware claims.
 - Large PyTorch/ROCm dependency relocking or Docker privilege-model redesign
   unless release validation exposes a blocking issue.
 
-## Current Milestone: v1.26 Public Prerelease and Research Preview
+## Current Milestone: v1.27 Copyright Provenance Cleanup
 
-**Goal:** Produce a publishable engineering prerelease and research preview
-package with versioned validation artifacts, release-readiness checks, and
-bounded research interpretation that matches the project's actual ROCm
-evidence.
+**Goal:** Complete release-facing copyright and provenance cleanup so the
+Apache-2.0 ROCm port accurately preserves upstream NVIDIA notices only where
+they apply and clearly attributes independent ROCm work to this project.
 
 **Target features:**
-- A reproducible public prerelease artifact bundle generated from a clean
-  checkout or release tag.
-- Release-readiness gates that fail on missing validation reports, missing
-  artifact checksums, stale claim boundaries, or unreviewed known gaps.
-- A research preview evidence package that explains methodology, hardware
-  scope, benchmark limitations, SOL/AMD-derived evidence, and non-claims.
-- Public publishing materials for a GitHub prerelease or equivalent release
-  page, including links to artifacts, first-run docs, support matrix, and
-  claims.
+- Provenance classification for active source, tests, scripts, docs, examples,
+  and release materials: upstream retained, derivative modified, independent
+  ROCm work, or generated/planning material.
+- SPDX/copyright header cleanup that preserves NVIDIA notices for upstream or
+  derivative files, adds project attribution where appropriate, and removes
+  misleading NVIDIA-only headers from independent work.
+- Compliance and provenance documentation that explains the fork relationship,
+  Apache-2.0 obligations, upstream attribution, paper citation boundaries, and
+  non-endorsement wording.
+- Provenance-aware residue and release-readiness gates that prevent future
+  blanket NVIDIA header drift in independent ROCm files.
 
 **Explicitly deferred:**
+- Git history rewriting for prior blanket copyright headers.
+- Relicensing away from Apache-2.0 or performing a full legal audit.
+- Performance optimization, new GPU validation, benchmark semantic changes, or
+  paper-scale validation.
 - Full 235-problem paper-scale validation and upstream SOLAR parity.
 - MI300X/CDNA3 full-suite hardware validation unless complete real-hardware
   evidence becomes available.
@@ -172,6 +183,18 @@ evidence.
 - Hosted leaderboard, remote submission operations, and hard multi-tenant
   sandboxing.
 - Rebranding as a stable benchmark authority release.
+
+## Recently Shipped Milestone: v1.26 Public Prerelease and Research Preview
+
+**Goal:** Produce a publishable engineering prerelease and research preview
+package with versioned validation artifacts, release-readiness checks, and
+bounded research interpretation that matches the project's actual ROCm
+evidence.
+
+**Shipped outcome:** v1.26 added a reproducible prerelease artifact bundle,
+readiness gates, research-preview evidence, and public release materials while
+keeping paper parity, leaderboard authority, hard sandboxing, full MI300X/CDNA3
+validation, and CDNA4 validation out of scope.
 
 ## Recently Shipped Milestone: v1.24 Dataset Batch Run Trustworthiness
 
