@@ -13,6 +13,7 @@ NVIDIA_HEADER = (
     "# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. "
     "All rights reserved."
 )
+PROJECT_HEADER = "# SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port"
 
 
 def _load_provenance() -> dict[str, object]:
@@ -31,6 +32,10 @@ def _active_nvidia_header_files() -> set[str]:
 
 def _has_nvidia_header(path: Path) -> bool:
     return NVIDIA_HEADER in path.read_text(encoding="utf-8").splitlines()[:4]
+
+
+def _has_project_header(path: Path) -> bool:
+    return PROJECT_HEADER in path.read_text(encoding="utf-8").splitlines()[:4]
 
 
 def test_provenance_manifest_defines_header_policy_classes() -> None:
@@ -60,22 +65,24 @@ def test_current_nvidia_headers_are_classified() -> None:
     cleanup_candidates = set(nvidia_notice["cleanup_candidates"])
 
     assert allowed.isdisjoint(cleanup_candidates)
-    assert _active_nvidia_header_files() == allowed | cleanup_candidates
+    assert _active_nvidia_header_files() == allowed
 
 
-def test_nvidia_notice_allowed_files_exist_and_currently_have_nvidia_header() -> None:
+def test_nvidia_notice_allowed_files_keep_nvidia_and_add_project_header() -> None:
     allowed = set(_load_provenance()["nvidia_notice"]["allowed"])
 
     for relative_path in sorted(allowed):
         path = REPO_ROOT / relative_path
         assert path.exists(), relative_path
         assert _has_nvidia_header(path), relative_path
+        assert _has_project_header(path), relative_path
 
 
-def test_nvidia_notice_cleanup_candidates_exist_and_currently_have_nvidia_header() -> None:
+def test_nvidia_notice_cleanup_candidates_have_project_header_only() -> None:
     cleanup_candidates = set(_load_provenance()["nvidia_notice"]["cleanup_candidates"])
 
     for relative_path in sorted(cleanup_candidates):
         path = REPO_ROOT / relative_path
         assert path.exists(), relative_path
-        assert _has_nvidia_header(path), relative_path
+        assert not _has_nvidia_header(path), relative_path
+        assert _has_project_header(path), relative_path

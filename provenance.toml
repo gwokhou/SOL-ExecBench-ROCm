@@ -179,6 +179,7 @@ cleanup_candidates = [
 ]
 
 [notes]
-phase_123_scope = "Classification only; Phase 124 applies header edits."
+phase_123_scope = "Classification only."
+phase_124_scope = "Header edits applied according to this manifest."
 history_rewrite = "Not planned for ordinary blanket header correction."
 legal_review = "This manifest is engineering provenance hygiene, not legal advice."

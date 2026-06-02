@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
 """Audit active CUDA/NVIDIA residue in the ROCm-only port."""
@@ -97,6 +97,22 @@ def _classification(relative_path: str, line: str) -> str | None:
         "cuda_version" in line or "CUDA/HIP" in line
     ):
         return "environment snapshot records PyTorch CUDA/HIP compatibility metadata"
+    if relative_path.startswith("scripts/run_docker.sh") and (
+        "SOL_EXECBENCH_DEPENDENCY_TORCH_CUDA_VERSION" in line or "CUDA_VISIBLE_DEVICES" in line
+    ):
+        return "Docker wrapper preserves PyTorch ROCm CUDA compatibility environment names"
+    if relative_path.startswith("src/sol_execbench/core/compatibility.py") and (
+        "torch_cuda_version" in line or "ROCm/CUDA" in line
+    ):
+        return "compatibility matrix records PyTorch ROCm CUDA compatibility metadata"
+    if relative_path.startswith("src/sol_execbench/core/dependency_matrix.py") and (
+        "torch_cuda_version" in line or "CUDA PyTorch runtime" in line or "--torch-cuda-version" in line
+    ):
+        return "dependency matrix records PyTorch ROCm CUDA compatibility metadata"
+    if relative_path.startswith("src/sol_execbench/core/runtime_evidence.py") and (
+        "torch_cuda_version" in line or "CUDA_VISIBLE_DEVICES" in line or "--torch-cuda-version" in line
+    ):
+        return "runtime evidence records PyTorch ROCm CUDA compatibility metadata"
     if relative_path.startswith("scripts/download_solexecbench.py") and "nvidia/SOL-ExecBench" in line:
         return "upstream dataset repository identifier"
     if "requires_cutile" in line or "legacy NVIDIA cuTile marker" in line:
@@ -203,6 +219,34 @@ def _classification(relative_path: str, line: str) -> str | None:
         return "ROCm library migration audit fixture or assertion"
     if relative_path.startswith("tests/sol_execbench/test_rocm_migration_residue_audit.py"):
         return "this audit's residue pattern or classification text"
+    if relative_path.startswith("tests/sol_execbench/test_provenance_policy.py") and (
+        "NVIDIA" in line or "nvidia" in line
+    ):
+        return "provenance policy test verifies retained upstream NVIDIA notices"
+    if relative_path.startswith("tests/sol_execbench/core/bench/test_reward_hack.py") and (
+        "cuda.Stream" in line
+    ):
+        return "reward-hack test fixture covers CUDA stream abuse spelling"
+    if relative_path.startswith("tests/sol_execbench/driver/test_eval_driver.py") and (
+        "cuda device not available" in line
+    ):
+        return "Triton compatibility skip reason uses CUDA device namespace"
+    if relative_path.startswith("tests/sol_execbench/test_dependency_matrix") and (
+        "torch_cuda_version" in line or "CUDA" in line or "--torch-cuda-version" in line
+    ):
+        return "dependency matrix test covers PyTorch ROCm CUDA compatibility metadata"
+    if relative_path.startswith("tests/sol_execbench/test_runtime_evidence") and (
+        "torch_cuda_version" in line or "--torch-cuda-version" in line
+    ):
+        return "runtime evidence test covers PyTorch ROCm CUDA compatibility metadata"
+    if relative_path.startswith("tests/sol_execbench/test_run_docker") and (
+        "SOL_EXECBENCH_DEPENDENCY_TORCH_CUDA_VERSION" in line
+    ):
+        return "Docker wrapper test covers PyTorch ROCm CUDA compatibility env var"
+    if relative_path.startswith("tests/sol_execbench/test_research") and (
+        "NVIDIA" in line or "CUDA" in line
+    ):
+        return "research and release docs claim-boundary assertion"
     if relative_path.startswith("src/sol_execbench/core/utils.py") and (
         "is_cuda_available" in line or "list_cuda_devices" in line or "cuda" in line
     ):
