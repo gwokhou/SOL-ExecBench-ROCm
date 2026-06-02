@@ -7,15 +7,25 @@ benchmark shape where practical while replacing CUDA/NVIDIA execution paths
 with ROCm, HIP, Triton ROCm, ROCm library categories, AMD-oriented evidence
 tooling, and explicit validation-boundary guardrails.
 
-Compared with the original SOL ExecBench implementation, this port includes
-independent ROCm-specific engineering: ROCm solution schemas and migration
-guidance, HIP/C++ and ROCm library examples, Docker target compatibility
-checks, `rocprofv3` and static-kernel diagnostic sidecars, AMD-native scoring
-and bound-evidence helpers, dataset execution-closure reports, prerelease
-artifact readiness gates, and source-provenance policy tooling. These additions
-are scoped as ROCm-port, engineering-prerelease, or research-preview evidence;
-they do not imply paper-level parity, upstream SOLAR equivalence, or leaderboard
-authority.
+Compared with the original SOL ExecBench implementation, this port adds several
+independent ROCm-specific capabilities:
+
+- ROCm solution schemas, migration guidance, and rejection of legacy
+  CUDA/NVIDIA runtime categories.
+- HIP/C++, Triton ROCm, hipBLAS, MIOpen, Composable Kernel, and rocWMMA example
+  paths.
+- ROCm Docker target compatibility checks across selected ROCm 7.x user-space
+  stacks.
+- Diagnostic `rocprofv3`, static-kernel, environment, and toolchain evidence
+  sidecars.
+- AMD-oriented scoring, bound-evidence, dataset closure, and trust-summary
+  helpers.
+- Prerelease artifact readiness gates, public claim-boundary checks, and
+  source-provenance policy tooling.
+
+These additions are scoped as ROCm-port, engineering-prerelease, or
+research-preview evidence; they do not imply paper-level parity, upstream SOLAR
+equivalence, or leaderboard authority.
 
 This project is independent and is not endorsed by NVIDIA or AMD. See
 [Provenance Policy](docs/provenance.md), [Compliance](docs/compliance.md), and
