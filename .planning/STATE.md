@@ -2,9 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.27
 milestone_name: Copyright Provenance Cleanup
-status: planning
-last_updated: "2026-06-02T02:14:28.992Z"
-last_activity: 2026-06-02
+status: Awaiting next milestone
+stopped_at: Phase 126 complete; ready for milestone audit.
+last_updated: "2026-06-02T03:33:00.671Z"
+last_activity: 2026-06-02 — Milestone v1.27 completed and archived
 progress:
   total_phases: 4
   completed_phases: 4
@@ -22,14 +23,14 @@ See: `.planning/PROJECT.md` (updated 2026-06-01)
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly
 on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL
 ExecBench.
-**Current focus:** v1.27 Copyright Provenance Cleanup, ready for milestone audit.
+**Current focus:** v1.27 Copyright Provenance Cleanup completed; awaiting next milestone.
 
 ## Current Position
 
 Phase: Milestone v1.27 complete
 Plan: —
-Status: Ready for milestone audit
-Last activity: 2026-06-02 — Phase 126 completed
+Status: Awaiting next milestone
+Last activity: 2026-06-02 — Milestone v1.27 completed and archived
 
 ## Recent Trend
 
@@ -82,4 +83,4 @@ Resume file: None
 
 ## Operator Next Steps
 
-- Run milestone audit, then complete and archive v1.27
+- Start the next milestone with /gsd-new-milestone

@@ -15,27 +15,24 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
 ## Current State
 
-**Shipped version:** v1.26 Public Prerelease and Research Preview,
+**Shipped version:** v1.27 Copyright Provenance Cleanup,
 completed 2026-06-02.
 
-**Current milestone:** v1.27 Copyright Provenance Cleanup.
+**Current milestone:** Awaiting next milestone.
 
 **Queued milestone:** None defined.
 
-**Latest milestone outcome:** v1.26 produced the public prerelease and research
-preview package with versioned artifact bundles, readiness gates, research
-preview evidence, public publishing materials, and corrected MI300X/CDNA3
-wording.
+**Latest milestone outcome:** v1.27 completed release-facing copyright and
+provenance cleanup by classifying active files, correcting SPDX attribution,
+documenting fork/paper/non-endorsement boundaries, and adding provenance-aware
+readiness guardrails.
 
-**Previous milestone outcome:** v1.25 packaged the ROCm port for an engineering
-prerelease by adding bounded release-candidate validation, support-matrix
-boundaries, claim guardrails, first-run documentation, and release-candidate
-materials.
+**Previous milestone outcome:** v1.26 produced the public prerelease and
+research preview package with versioned artifact bundles, readiness gates,
+research preview evidence, public publishing materials, and corrected
+MI300X/CDNA3 wording.
 
-**Next milestone goal:** Clean up release-facing copyright and provenance
-metadata so upstream NVIDIA-derived files retain required notices, independent
-ROCm work uses this project's own copyright attribution, and prerelease
-readiness gates prevent future blanket header drift.
+**Next milestone goal:** None defined.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline.
 Milestones v1.1-v1.6 added CDNA 3 code/schema support, maintained residue
@@ -124,6 +121,10 @@ The v1.26 milestone turned that engineering prerelease into a public
 prerelease and research preview package by adding versioned artifact bundles,
 release-readiness gates, research-preview evidence, public publishing
 materials, and corrected MI300X/CDNA3 wording.
+The v1.27 milestone completed release-facing copyright and provenance cleanup
+by adding a provenance policy and manifest, correcting SPDX file attribution,
+updating public compliance and attribution wording, and wiring provenance
+checks into prerelease readiness gates.
 
 ## Recently Shipped Milestone: v1.25 Engineering Prerelease
 
@@ -152,24 +153,16 @@ interpret without overstated research or hardware claims.
 - Large PyTorch/ROCm dependency relocking or Docker privilege-model redesign
   unless release validation exposes a blocking issue.
 
-## Current Milestone: v1.27 Copyright Provenance Cleanup
+## Recently Shipped Milestone: v1.27 Copyright Provenance Cleanup
 
 **Goal:** Complete release-facing copyright and provenance cleanup so the
 Apache-2.0 ROCm port accurately preserves upstream NVIDIA notices only where
 they apply and clearly attributes independent ROCm work to this project.
 
-**Target features:**
-- Provenance classification for active source, tests, scripts, docs, examples,
-  and release materials: upstream retained, derivative modified, independent
-  ROCm work, or generated/planning material.
-- SPDX/copyright header cleanup that preserves NVIDIA notices for upstream or
-  derivative files, adds project attribution where appropriate, and removes
-  misleading NVIDIA-only headers from independent work.
-- Compliance and provenance documentation that explains the fork relationship,
-  Apache-2.0 obligations, upstream attribution, paper citation boundaries, and
-  non-endorsement wording.
-- Provenance-aware residue and release-readiness gates that prevent future
-  blanket NVIDIA header drift in independent ROCm files.
+**Shipped outcome:** v1.27 added `provenance.toml` and
+`docs/provenance.md`, corrected file-level SPDX attribution according to
+provenance, updated public compliance/release/research wording, and added
+readiness/provenance tests that prevent future blanket NVIDIA header drift.
 
 **Explicitly deferred:**
 - Git history rewriting for prior blanket copyright headers.

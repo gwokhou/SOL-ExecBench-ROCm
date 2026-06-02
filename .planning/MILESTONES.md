@@ -1,5 +1,29 @@
 # Milestones
 
+## v1.27 Copyright Provenance Cleanup (Shipped: 2026-06-02)
+
+**Phases completed:** 4 phases, 4 plans, 0 tasks
+
+**Key accomplishments:**
+
+- Added a reviewable provenance policy and machine-readable
+  `provenance.toml` manifest that separates upstream-retained,
+  derivative-modified, independent ROCm, and generated/planning material.
+
+- Corrected file-level SPDX attribution so upstream/derivative files retain
+  NVIDIA notices with project attribution, while independent ROCm work uses
+  project attribution instead of misleading NVIDIA-only headers.
+
+- Updated compliance, README, research preview, public prerelease, and release
+  draft wording to distinguish fork attribution, paper citation, file-level
+  copyright ownership, and non-endorsement boundaries.
+
+- Added provenance-aware readiness and residue guardrails that fail missing
+  provenance docs, inconsistent NVIDIA notice allowlists, cleanup candidates
+  with NVIDIA attribution, or missing required upstream notices.
+
+---
+
 ## v1.26 Public Prerelease and Research Preview (Shipped: 2026-06-02)
 
 **Phases completed:** 4 phases, 4 plans, 0 tasks
