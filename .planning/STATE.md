@@ -22,8 +22,7 @@ See: `.planning/PROJECT.md` (updated 2026-06-01)
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly
 on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL
 ExecBench.
-**Current focus:** v1.26 Public Prerelease and Research Preview, ready for
-milestone audit.
+**Current focus:** v1.27 Copyright Provenance Cleanup, ready to plan Phase 123.
 
 ## Current Position
 
@@ -37,6 +36,7 @@ Last activity: 2026-06-02 — Milestone v1.27 roadmap created
 - v1.23 shipped Phases 106-109 on 2026-06-01.
 - v1.24 shipped Phases 110-113 on 2026-06-01.
 - v1.25 shipped Phases 114-118 on 2026-06-01.
+- v1.26 shipped Phases 119-122 on 2026-06-02.
 
 ## Accumulated Context
 
@@ -57,7 +57,7 @@ Last activity: 2026-06-02 — Milestone v1.27 roadmap created
 
 ### Pending Todos
 
-- Run milestone audit.
+None.
 
 ### Blockers/Concerns
 
@@ -77,7 +77,7 @@ None.
 ## Session Continuity
 
 Last session: 2026-06-01
-Stopped at: v1.26 initialized; ready to plan Phase 119.
+Stopped at: v1.27 initialized; ready to plan Phase 123.
 Resume file: None
 
 ## Operator Next Steps
