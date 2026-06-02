@@ -237,6 +237,27 @@ These tests do not prove live ROCm shard execution or full dataset validation.
 They exercise policy, provenance, path, diagnostic, and closure behavior without
 requiring GPU hardware.
 
+## Provenance And Prerelease Guardrails
+
+Recent CPU-safe release checks cover source attribution policy, prerelease
+artifact readiness, public-prerelease wording, and research-preview claim
+boundaries:
+
+```bash
+uv run pytest \
+  tests/sol_execbench/test_provenance_policy.py \
+  tests/sol_execbench/test_prerelease_readiness.py \
+  tests/sol_execbench/test_public_prerelease_docs.py \
+  tests/sol_execbench/test_research_preview_docs.py -q
+```
+
+`tests/sol_execbench/test_provenance_policy.py` checks that files retaining
+NVIDIA SPDX notices are listed under `provenance.toml` and that cleanup
+candidates carry project attribution only. The prerelease readiness tests check
+required bundle artifacts, checksum behavior, forbidden claim boundaries,
+known-gap statuses, public MI300X/CDNA3 wording, unavailable CDNA4 wording, and
+the provenance policy gate.
+
 ## Live ROCm Validation
 
 Live ROCm validation is marker-gated. Use these checks only on a ROCm-capable
