@@ -1,0 +1,184 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
+# SPDX-License-Identifier: Apache-2.0
+
+version = 1
+policy_doc = "docs/provenance.md"
+upstream_repository = "https://github.com/NVIDIA/SOL-ExecBench"
+upstream_ref = "upstream/main"
+project_attribution = "Copyright (c) 2026 contributors to SOL ExecBench ROCm Port"
+
+active_roots = [
+  "README.md",
+  "pyproject.toml",
+  "src",
+  "scripts",
+  "tests",
+  "docs",
+  "examples",
+  "docker",
+]
+
+[classes]
+upstream_retained = [
+  "Files copied verbatim or nearly verbatim from upstream SOL-ExecBench.",
+]
+derivative_modified = [
+  "Files retaining substantial upstream expression after ROCm adaptation.",
+  "Current exact-path upstream matches listed under nvidia_notice.allowed are treated as derivative-modified candidates until Phase 124 refines individual files.",
+]
+independent_rocm_work = [
+  "New ROCm/AMD evidence, scoring, release, Docker dependency, documentation, and test files absent from the same upstream path.",
+]
+generated_or_planning = [
+  ".planning/**",
+  "Generated reports and demo evidence fixtures under docs/examples/**.",
+]
+
+[header_policy]
+upstream_retained = "Keep applicable NVIDIA SPDX-FileCopyrightText and Apache-2.0 SPDX-License-Identifier."
+derivative_modified = "Keep applicable NVIDIA SPDX-FileCopyrightText, add project SPDX-FileCopyrightText when modified, and keep Apache-2.0 SPDX-License-Identifier."
+independent_rocm_work = "Use project SPDX-FileCopyrightText and Apache-2.0 SPDX-License-Identifier; do not use NVIDIA-only file copyright attribution."
+generated_or_planning = "Use project attribution only when source-style headers are appropriate; otherwise document provenance at the directory or artifact level."
+
+[nvidia_notice]
+allowed = [
+  "scripts/run_dataset.py",
+  "src/sol_execbench/__init__.py",
+  "src/sol_execbench/cli/__init__.py",
+  "src/sol_execbench/cli/main.py",
+  "src/sol_execbench/core/__init__.py",
+  "src/sol_execbench/core/bench/__init__.py",
+  "src/sol_execbench/core/bench/clock_lock.py",
+  "src/sol_execbench/core/bench/config/__init__.py",
+  "src/sol_execbench/core/bench/config/benchmark_config.py",
+  "src/sol_execbench/core/bench/config/device_config.py",
+  "src/sol_execbench/core/bench/correctness.py",
+  "src/sol_execbench/core/bench/io.py",
+  "src/sol_execbench/core/bench/reward_hack.py",
+  "src/sol_execbench/core/bench/timing.py",
+  "src/sol_execbench/core/bench/utils.py",
+  "src/sol_execbench/core/data/__init__.py",
+  "src/sol_execbench/core/data/base_model.py",
+  "src/sol_execbench/core/data/definition.py",
+  "src/sol_execbench/core/data/dtypes.py",
+  "src/sol_execbench/core/data/json_utils.py",
+  "src/sol_execbench/core/data/shapes.py",
+  "src/sol_execbench/core/data/solution.py",
+  "src/sol_execbench/core/data/trace.py",
+  "src/sol_execbench/core/data/workload.py",
+  "src/sol_execbench/core/utils.py",
+  "src/sol_execbench/driver/__init__.py",
+  "src/sol_execbench/driver/problem_packager.py",
+  "src/sol_execbench/driver/templates/build_ext.py",
+  "src/sol_execbench/driver/templates/eval_driver.py",
+  "tests/conftest.py",
+  "tests/examples/test_examples.py",
+  "tests/sol_execbench/core/__init__.py",
+  "tests/sol_execbench/core/bench/__init__.py",
+  "tests/sol_execbench/core/bench/test_clock_lock.py",
+  "tests/sol_execbench/core/bench/test_correctness.py",
+  "tests/sol_execbench/core/bench/test_io.py",
+  "tests/sol_execbench/core/bench/test_make_eval_clock_warn.py",
+  "tests/sol_execbench/core/bench/test_reward_hack.py",
+  "tests/sol_execbench/core/bench/test_timing.py",
+  "tests/sol_execbench/core/bench/test_utils.py",
+  "tests/sol_execbench/core/data/__init__.py",
+  "tests/sol_execbench/core/data/test_definition.py",
+  "tests/sol_execbench/core/data/test_dtypes.py",
+  "tests/sol_execbench/core/data/test_solution.py",
+  "tests/sol_execbench/core/data/test_workload.py",
+  "tests/sol_execbench/driver/test_build_ext.py",
+  "tests/sol_execbench/driver/test_eval_driver.py",
+  "tests/sol_execbench/driver/test_problem_packager.py",
+  "tests/sol_execbench/samples/evil_lazy_output/kernel.py",
+  "tests/sol_execbench/samples/evil_monkey_patch/kernel.py",
+  "tests/sol_execbench/samples/evil_thread_inject/kernel.py",
+  "tests/sol_execbench/test_e2e.py",
+]
+
+cleanup_candidates = [
+  "scripts/build_prerelease_artifact_bundle.py",
+  "scripts/check_prerelease_readiness.py",
+  "scripts/diff_matrix_reports.py",
+  "scripts/export_matrix_schema.py",
+  "scripts/release_candidate_validation.py",
+  "scripts/report_amd_bound_sanity.py",
+  "scripts/report_claim_upgrade.py",
+  "scripts/report_consistency.py",
+  "scripts/report_evaluation_stability.py",
+  "scripts/report_paper_denominator.py",
+  "scripts/report_parity_gaps.py",
+  "scripts/report_trust_summary.py",
+  "src/sol_execbench/cli/baseline.py",
+  "src/sol_execbench/core/baseline.py",
+  "src/sol_execbench/core/bench/eval_runtime.py",
+  "src/sol_execbench/core/bench/rocm_profiler.py",
+  "src/sol_execbench/core/bench/static_kernel_evidence.py",
+  "src/sol_execbench/core/bench/static_kernel_status.py",
+  "src/sol_execbench/core/bench/timing_policy.py",
+  "src/sol_execbench/core/claim_upgrade.py",
+  "src/sol_execbench/core/compatibility.py",
+  "src/sol_execbench/core/consistency.py",
+  "src/sol_execbench/core/data/contract.py",
+  "src/sol_execbench/core/dataset/__init__.py",
+  "src/sol_execbench/core/dataset/categories.py",
+  "src/sol_execbench/core/dataset/checksums.py",
+  "src/sol_execbench/core/dataset/evidence_refs.py",
+  "src/sol_execbench/core/dataset/execution_closure.py",
+  "src/sol_execbench/core/dataset/inventory.py",
+  "src/sol_execbench/core/dataset/layout.py",
+  "src/sol_execbench/core/dataset/manifest.py",
+  "src/sol_execbench/core/dataset/paper_denominator.py",
+  "src/sol_execbench/core/dataset/parity_gap.py",
+  "src/sol_execbench/core/dataset/readiness.py",
+  "src/sol_execbench/core/dataset/ready_subset.py",
+  "src/sol_execbench/core/dataset/run_closure.py",
+  "src/sol_execbench/core/dataset/run_state.py",
+  "src/sol_execbench/core/dataset/sharding.py",
+  "src/sol_execbench/core/diagnostics.py",
+  "src/sol_execbench/core/environment.py",
+  "src/sol_execbench/core/evaluation_stability.py",
+  "src/sol_execbench/core/matrix_diff.py",
+  "src/sol_execbench/core/reporting.py",
+  "src/sol_execbench/core/scoring/__init__.py",
+  "src/sol_execbench/core/scoring/amd_bound_classification.py",
+  "src/sol_execbench/core/scoring/amd_bound_estimate_families.py",
+  "src/sol_execbench/core/scoring/amd_bound_estimates.py",
+  "src/sol_execbench/core/scoring/amd_bound_graph.py",
+  "src/sol_execbench/core/scoring/amd_bound_sanity.py",
+  "src/sol_execbench/core/scoring/amd_hardware_models.py",
+  "src/sol_execbench/core/scoring/amd_score.py",
+  "src/sol_execbench/core/scoring/amd_sol.py",
+  "src/sol_execbench/core/scoring/amd_sol_v2.py",
+  "src/sol_execbench/core/scoring/baseline_artifact.py",
+  "src/sol_execbench/core/scoring/solar_derivation.py",
+  "src/sol_execbench/core/scoring/solar_derivation_status.py",
+  "src/sol_execbench/core/scoring_guardrails.py",
+  "src/sol_execbench/core/toolchain.py",
+  "src/sol_execbench/core/trust_summary.py",
+  "src/sol_execbench/data/__init__.py",
+  "src/sol_execbench/data/amd_hardware_models/__init__.py",
+  "tests/docker/dependencies/test_hip.py",
+  "tests/docker/dependencies/test_python_dependencies.py",
+  "tests/docker/dependencies/test_pytorch_rocm.py",
+  "tests/docker/dependencies/test_rocm_libraries.py",
+  "tests/docker/dependencies/test_rocm_runtime.py",
+  "tests/docker/dependencies/test_triton_rocm.py",
+  "tests/sol_execbench/core/bench/test_eval_runtime.py",
+  "tests/sol_execbench/solar_derivation_fixtures.py",
+  "tests/sol_execbench/test_dataset_contract.py",
+  "tests/sol_execbench/test_rocm_eval_timing_audit.py",
+  "tests/sol_execbench/test_rocm_library_examples.py",
+  "tests/sol_execbench/test_rocm_marker_device_nodes.py",
+  "tests/sol_execbench/test_rocm_migration_residue_audit.py",
+  "tests/sol_execbench/test_rocm_schema_build_audit.py",
+  "tests/sol_execbench/test_rocm_support_docs.py",
+  "tests/sol_execbench/test_rocm_test_suite_audit.py",
+  "tests/sol_execbench/test_solar_derivation_contract.py",
+  "tests/sol_execbench/test_solar_derivation_evidence.py",
+]
+
+[notes]
+phase_123_scope = "Classification only; Phase 124 applies header edits."
+history_rewrite = "Not planned for ordinary blanket header correction."
+legal_review = "This manifest is engineering provenance hygiene, not legal advice."

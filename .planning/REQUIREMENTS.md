@@ -12,12 +12,12 @@ roadmap phase.
 
 ### Provenance Classification
 
-- [ ] **PROV-01**: Maintainer can classify active source, tests, scripts, docs,
+- [x] **PROV-01**: Maintainer can classify active source, tests, scripts, docs,
   examples, Docker files, and release materials as upstream retained,
   derivative modified, independent ROCm work, or generated/planning material.
-- [ ] **PROV-02**: Maintainer can review a documented provenance policy that
+- [x] **PROV-02**: Maintainer can review a documented provenance policy that
   explains how each classification maps to SPDX/copyright headers.
-- [ ] **PROV-03**: Maintainer can identify which active files are allowed to
+- [x] **PROV-03**: Maintainer can identify which active files are allowed to
   retain NVIDIA copyright notices before any bulk header cleanup is applied.
 
 ### Copyright Cleanup
@@ -84,9 +84,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PROV-01 | Phase 123 | Pending |
-| PROV-02 | Phase 123 | Pending |
-| PROV-03 | Phase 123 | Pending |
+| PROV-01 | Phase 123 | Complete |
+| PROV-02 | Phase 123 | Complete |
+| PROV-03 | Phase 123 | Complete |
 | COPY-01 | Phase 124 | Pending |
 | COPY-02 | Phase 124 | Pending |
 | COPY-03 | Phase 124 | Pending |

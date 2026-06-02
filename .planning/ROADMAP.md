@@ -15,6 +15,8 @@ benchmark semantics.
 
 ### Phase 123: Provenance Classification Policy
 
+**Status:** Complete
+
 **Goal:** Establish a defensible provenance classification policy and identify
 which active files may retain NVIDIA copyright notices before bulk edits.
 
@@ -86,9 +88,9 @@ prevent future blanket header drift.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PROV-01 | Phase 123 | Pending |
-| PROV-02 | Phase 123 | Pending |
-| PROV-03 | Phase 123 | Pending |
+| PROV-01 | Phase 123 | Complete |
+| PROV-02 | Phase 123 | Complete |
+| PROV-03 | Phase 123 | Complete |
 | COPY-01 | Phase 124 | Pending |
 | COPY-02 | Phase 124 | Pending |
 | COPY-03 | Phase 124 | Pending |
@@ -101,6 +103,7 @@ prevent future blanket header drift.
 | GATE-03 | Phase 126 | Pending |
 
 **Coverage:** 13/13 v1.27 requirements mapped.
+**Progress:** 3/13 requirements complete; 1/4 phases complete.
 
 ## Completed Milestones
 
@@ -117,6 +120,6 @@ prevent future blanket header drift.
 
 ## Current Position
 
-**Next up:** Phase 123 Provenance Classification Policy.
+**Next up:** Phase 124 SPDX Header Cleanup.
 
-Start with `$gsd-discuss-phase 123` or `$gsd-plan-phase 123`.
+Start with `$gsd-discuss-phase 124` or `$gsd-plan-phase 124`.
