@@ -71,6 +71,8 @@ under `[tool.ty.src]`.
 - Avoid broad refactors in focused fixes.
 - Do not commit local caches, build artifacts, downloaded datasets, or generated
   benchmark output.
+- Keep source headers aligned with `provenance.toml` and
+  `docs/provenance.md` when adding, moving, or substantially rewriting files.
 
 Run style and type checks with:
 
@@ -124,6 +126,12 @@ reward-hack boundary helpers. Python submissions are loaded through unique
 staged module identities to avoid collisions with already-imported modules.
 Native compile options are validated before extension loading to reject host
 path injection, response files, and unsafe runtime loader/linker behavior.
+
+Provenance guardrails live outside the evaluator path. `provenance.toml`
+records the active source attribution classification, and
+`tests/sol_execbench/test_provenance_policy.py` verifies that current NVIDIA
+SPDX headers match the manifest. Header cleanup is ordinary source maintenance,
+not a benchmark behavior change.
 
 ## CLI And Runtime Notes
 
@@ -210,3 +218,13 @@ uv run pytest tests/examples/test_examples.py -k consistency
 ```
 
 The workflow intentionally avoids tests that need live ROCm GPU execution.
+
+CPU-safe provenance and prerelease guardrails can be run with:
+
+```bash
+uv run pytest \
+  tests/sol_execbench/test_provenance_policy.py \
+  tests/sol_execbench/test_prerelease_readiness.py \
+  tests/sol_execbench/test_public_prerelease_docs.py \
+  tests/sol_execbench/test_research_preview_docs.py -q
+```

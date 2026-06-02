@@ -166,14 +166,14 @@ Legacy CUDA/NVIDIA schema values such as `cuda_cpp`, `cublas`, `cudnn`,
 
 ## Documentation
 
-- [Provenance Policy](docs/provenance.md): upstream attribution, project-owned ROCm work, SPDX header policy, and non-endorsement boundaries.
+- [Provenance Policy](docs/provenance.md): upstream attribution, project-owned ROCm work, SPDX header policy, ordinary-commit history cleanup, and non-endorsement boundaries.
 - [Compliance](docs/compliance.md): Apache-2.0 license, third-party dependencies, unsupported NVIDIA runtime features, and known gaps.
 - [v1.25 Engineering Prerelease Notes](docs/v1_25_release_notes.md): shipped capability, validation evidence, known limitations, and deferred claims.
 - [v1.25 Prerelease Checklist](docs/v1_25_prerelease_checklist.md): maintainer checklist from clean tree to tagged release candidate.
-- [v1.26 Artifact Bundle](docs/prerelease_artifact_bundle.md): versioned prerelease artifact bundle generation and authority classes.
-- [v1.26 Readiness Gates](docs/prerelease_readiness.md): prerelease gate for required artifacts, checksums, claim boundaries, and known gaps.
-- [v1.26 Research Preview](docs/research_preview.md): methodology, evidence surfaces, representative commands, and non-claims.
-- [v1.26 Public Prerelease Guide](docs/public_prerelease.md): public release-page checklist and publishing wording.
+- [Prerelease Artifact Bundle](docs/prerelease_artifact_bundle.md): versioned prerelease artifact bundle generation and authority classes.
+- [Prerelease Readiness Gates](docs/prerelease_readiness.md): prerelease gate for required artifacts, checksums, claim boundaries, provenance policy, and known gaps.
+- [Research Preview](docs/research_preview.md): methodology, evidence surfaces, representative commands, and non-claims.
+- [Public Prerelease Guide](docs/public_prerelease.md): public release-page checklist and publishing wording.
 - [Getting Started](docs/GETTING-STARTED.md): prerequisites, installation, first run, and setup issues.
 - [Architecture](docs/ARCHITECTURE.md): package layers, data flow, subprocess isolation, and ROCm boundaries.
 - [Development](docs/DEVELOPMENT.md): local setup, coding style, source areas, and PR process.
@@ -213,6 +213,16 @@ uv run pytest tests/
 GPU-sensitive checks use pytest markers such as `requires_rocm`,
 `requires_rocm_dev`, `requires_rdna4`, `requires_cdna3`, `requires_ck`,
 `requires_rocwmma`, and `timing_serial`.
+
+Focused CPU-safe checks for provenance and prerelease guardrails:
+
+```bash
+uv run pytest \
+  tests/sol_execbench/test_provenance_policy.py \
+  tests/sol_execbench/test_prerelease_readiness.py \
+  tests/sol_execbench/test_public_prerelease_docs.py \
+  tests/sol_execbench/test_research_preview_docs.py -q
+```
 
 Focused CPU-safe checks for recent dataset trustworthiness helpers:
 

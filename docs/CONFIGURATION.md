@@ -113,6 +113,12 @@ configuration file. It declares `default_target_id`,
 `requested_rocm_user_space_version`, Docker image tags, PyTorch ROCm wheel
 policies, and Triton ROCm wheel policies for supported container targets.
 
+`provenance.toml` is the machine-readable source attribution policy. It
+classifies active files as upstream-retained, derivative-modified, independent
+ROCm work, or generated/planning material; defines header policy for each
+class; and lists files that may retain NVIDIA SPDX notices. The prerelease
+readiness gate consumes this manifest with `docs/provenance.md`.
+
 ## Required vs Optional Settings
 
 There are no required environment variables for starting the CLI. Required
@@ -157,6 +163,7 @@ clock-sensitive evaluation paths can reject the run based on
 | Default ROCm Torch wheel | `torch==2.10.0+rocm7.1` | `pyproject.toml` and Docker target metadata |
 | Default ROCm torchvision wheel | `torchvision==0.25.0+rocm7.1` | `pyproject.toml` and Docker target metadata |
 | Default Triton ROCm wheel | `triton-rocm==3.6.0` | `pyproject.toml` and Docker target metadata |
+| Provenance policy document | `docs/provenance.md` | `provenance.toml` |
 
 ## Per-Environment Overrides
 
@@ -177,6 +184,9 @@ files. Use these source-backed override paths instead:
   `SOL_EXECBENCH_DEPENDENCY_*`, `SOL_EXECBENCH_RUNTIME_*`,
   `SOL_EXECBENCH_DEV_*`, `SOL_EXECBENCH_DOCKER_*`, and compatibility sidecar
   variables listed above.
+- Source attribution policy: update `provenance.toml` and
+  `docs/provenance.md`; prior blanket header corrections are handled as
+  ordinary commits unless a separate legal review requires history rewriting.
 
 ## CLI Flags
 
