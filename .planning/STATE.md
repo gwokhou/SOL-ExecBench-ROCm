@@ -6,9 +6,9 @@ status: planning
 last_updated: "2026-06-02T02:14:28.992Z"
 last_activity: 2026-06-02
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
-  total_plans: 0
+  total_plans: 4
   completed_plans: 0
   percent: 0
 ---
@@ -27,10 +27,10 @@ milestone audit.
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 123 - Provenance Classification Policy
 Plan: —
-Status: Defining requirements
-Last activity: 2026-06-02 — Milestone v1.27 started
+Status: Ready to plan
+Last activity: 2026-06-02 — Milestone v1.27 roadmap created
 
 ## Recent Trend
 
@@ -82,4 +82,4 @@ Resume file: None
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Start Phase 123 with /gsd-discuss-phase 123 or /gsd-plan-phase 123
