@@ -138,7 +138,7 @@ semantics.
 - Claim-upgrade rules belong to Phase 91.
 - Trust summary integration belongs to Phase 92.
 - Public docs/examples across the whole v1.20 surface belong to Phase 93.
-- CDNA3/MI300X/CDNA4/native-host validation, full paper parity, upstream SOLAR
+- MI300X-on-CDNA3 and CDNA4/native-host validation, full paper parity, upstream SOLAR
   parity, and hosted leaderboard readiness remain outside v1.20.
 
 </deferred>

@@ -78,7 +78,7 @@ completed: 2026-06-01
 - `tests/sol_execbench/test_release_candidate_validation.py` - CPU-safe
   regression coverage.
 - `.planning/REQUIREMENTS.md` - Preserved legacy hardware-validation guardrail
-  wording while recording the MI300X/CDNA3 interpretation.
+  wording while recording the MI300X-on-CDNA3 interpretation.
 - `.planning/phases/114-release-candidate-validation/114-REVIEW.md` - Code
   review report with findings and remediation context.
 
@@ -138,7 +138,7 @@ no scope expansion.
 ## Issues Encountered
 
 - Existing public contract guardrails required a legacy out-of-scope phrase for
-  CDNA3/MI300X/CDNA4 validation. The requirements wording was updated to keep
+  MI300X-on-CDNA3 and CDNA4 validation. The requirements wording was updated to keep
   the old guardrail phrase while clarifying that MI300X is the CDNA3 hardware
   target for v1.25 interpretation.
 

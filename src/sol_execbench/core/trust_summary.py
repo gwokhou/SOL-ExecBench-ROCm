@@ -313,7 +313,7 @@ def _evidence_outcome(
     ]
     next_steps = [f"Provide {name} evidence." for name in missing]
     next_steps.append(
-        "Future CDNA3-family validation including MI300X (gfx942), "
+        "Future CDNA3-family validation, including MI300X (gfx942), "
         "native-host validation, and paper-scale validation need explicit hardware evidence."
     )
     return TrustOutcome(

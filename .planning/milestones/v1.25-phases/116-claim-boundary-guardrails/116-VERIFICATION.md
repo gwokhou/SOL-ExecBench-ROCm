@@ -27,7 +27,7 @@ Result: `76 passed in 11.14s`.
 ## Goal-Backward Assessment
 
 - CLAIM-01: Passed. Public release docs now reject paper parity, upstream SOLAR
-  parity, leaderboard readiness, hard-sandbox authority, MI300X/CDNA3
+  parity, leaderboard readiness, hard-sandbox authority, MI300X-on-CDNA3
   full-suite validation, and CDNA4 validation overclaims.
 - CLAIM-02: Passed. `tests/sol_execbench/test_research_release_docs.py`
   contains v1.25 release-note guardrails.

@@ -9,20 +9,20 @@ does not claim official leaderboard equivalence.
 For the centralized v1.19 guide to evidence surfaces, generation commands, and
 claim boundaries, see `docs/v1_19_evidence_guide.md`. v1.19 evidence has no
 full 235-problem paper validation, no upstream SOLAR parity, no score authority,
-no leaderboard readiness, no CDNA3-family validation including MI300X and no CDNA4 validation,
+no leaderboard readiness, no CDNA3-family validation, including MI300X, and no CDNA4 validation,
 no native-host ROCm Matrix validation, and no new-hardware validation.
 
 For v1.20 evidence-quality gates, see
 `docs/v1_20_evidence_quality_guide.md`. v1.20 consistency, stability,
 claim-upgrade, and trust-summary reports are local diagnostic sidecars. They do
-not add full 235-problem paper validation, CDNA3-family validation including
+not add full 235-problem paper validation, CDNA3-family validation, including
 MI300X (`gfx942`), CDNA4 validation, native-host Matrix authority, hosted
 leaderboard readiness, upstream SOLAR parity, score authority, or new-hardware
 validation.
 
 v1.21 reduces codebase debt and boundary ambiguity through helper extraction,
 CPU-safe guardrail tests, and clearer documentation. It does not add hard sandboxing,
-multi-tenant safety, CDNA3-family validation including MI300X (`gfx942`),
+multi-tenant safety, CDNA3-family validation, including MI300X (`gfx942`),
 paper-scale SOLAR parity, hosted leaderboard authority, or one-for-one native
 ROCm replacement proof for every former NVIDIA library category. In particular,
 v1.21 does not provide hosted leaderboard authority.
@@ -137,7 +137,7 @@ leaderboard authority.
   paper-parity authority, or leaderboard authority.
 - v1.19 sidecar/report evidence as full paper validation, upstream SOLAR parity,
   score authority, leaderboard readiness, native-host ROCm Matrix validation,
-  CDNA3-family validation including MI300X (`gfx942`), CDNA4 validation, or
+  CDNA3-family validation, including MI300X (`gfx942`), CDNA4 validation, or
   new-hardware validation.
 - v1.21 helper extraction, guardrail tests, or documentation updates as hard
   sandboxing, multi-tenant safety, paper-scale SOLAR parity, CDNA3-family

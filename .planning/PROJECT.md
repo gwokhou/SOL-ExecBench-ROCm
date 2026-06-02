@@ -30,7 +30,7 @@ readiness guardrails.
 **Previous milestone outcome:** v1.26 produced the public prerelease and
 research preview package with versioned artifact bundles, readiness gates,
 research preview evidence, public publishing materials, and corrected
-MI300X/CDNA3 wording.
+MI300X-as-CDNA3 wording.
 
 **Next milestone goal:** None defined.
 
@@ -115,12 +115,12 @@ The v1.25 milestone packaged the ROCm port for an engineering prerelease by
 adding bounded release-candidate validation, a public support matrix, release
 claim guardrails, first-run documentation, and release-candidate materials
 while keeping paper validation, upstream SOLAR parity, leaderboard readiness,
-hard sandboxing, MI300X/CDNA3 full-suite validation, and CDNA4 validation out
+hard sandboxing, MI300X full-suite validation on CDNA3, and CDNA4 validation out
 of scope.
 The v1.26 milestone turned that engineering prerelease into a public
 prerelease and research preview package by adding versioned artifact bundles,
 release-readiness gates, research-preview evidence, public publishing
-materials, and corrected MI300X/CDNA3 wording.
+materials, and corrected MI300X-as-CDNA3 wording.
 The v1.27 milestone completed release-facing copyright and provenance cleanup
 by adding a provenance policy and manifest, correcting SPDX file attribution,
 updating public compliance and attribution wording, and wiring provenance
@@ -136,7 +136,7 @@ interpret without overstated research or hardware claims.
 - Release-candidate validation coverage for CPU-safe tests, focused ROCm/Docker
   smoke checks, and a bounded dataset slice.
 - A clear support matrix that distinguishes RDNA 4 evidence, container
-  user-space evidence, MI300X/CDNA3 deferred full-suite validation, and
+  user-space evidence, deferred MI300X full-suite validation on CDNA3, and
   unavailable CDNA4 validation.
 - Release documentation and claim wording that prevent accidental paper-parity,
   leaderboard, hard-sandbox, upstream SOLAR, or CDNA4 validation claims.
@@ -145,7 +145,7 @@ interpret without overstated research or hardware claims.
 
 **Explicitly deferred:**
 - Full 235-problem paper-scale validation and upstream SOLAR parity.
-- MI300X/CDNA3 full-suite hardware validation unless a complete evidence chain
+- MI300X full-suite hardware validation on CDNA3 unless a complete evidence chain
   is produced separately.
 - CDNA4 validation because suitable hardware is not currently available.
 - Hosted leaderboard, remote submission operations, or hard multi-tenant
@@ -170,7 +170,7 @@ readiness/provenance tests that prevent future blanket NVIDIA header drift.
 - Performance optimization, new GPU validation, benchmark semantic changes, or
   paper-scale validation.
 - Full 235-problem paper-scale validation and upstream SOLAR parity.
-- MI300X/CDNA3 full-suite hardware validation unless complete real-hardware
+- MI300X full-suite hardware validation on CDNA3 unless complete real-hardware
   evidence becomes available.
 - CDNA4 validation because suitable hardware is not currently accessible.
 - Hosted leaderboard, remote submission operations, and hard multi-tenant
@@ -186,7 +186,7 @@ evidence.
 
 **Shipped outcome:** v1.26 added a reproducible prerelease artifact bundle,
 readiness gates, research-preview evidence, and public release materials while
-keeping paper parity, leaderboard authority, hard sandboxing, full MI300X/CDNA3
+keeping paper parity, leaderboard authority, hard sandboxing, full MI300X validation on CDNA3
 validation, and CDNA4 validation out of scope.
 
 ## Recently Shipped Milestone: v1.24 Dataset Batch Run Trustworthiness
@@ -226,7 +226,7 @@ maintainable before further dataset-scale or hardware-validation work.
 **Explicitly deferred:**
 - Complete OS/container hard sandboxing for untrusted or multi-tenant
   submissions.
-- CDNA 3, MI300X, CDNA 4, or native-host full-suite hardware validation.
+- CDNA3-family hardware validation, including MI300X, CDNA4, or native-host full-suite validation.
 - Full 235-problem paper-scale SOLAR, upstream SOLAR, hosted leaderboard, or
   NVIDIA B200/Blackwell equivalence claims.
 - Canonical Trace, Definition, Workload, Solution, correctness, timing, score,
@@ -262,7 +262,7 @@ sandbox responsibilities that require external evidence or architecture.
   deferred.
 
 **Explicitly deferred:**
-- CDNA 3, MI300X, CDNA 4, or native-host full-suite hardware validation.
+- CDNA3-family hardware validation, including MI300X, CDNA4, or native-host full-suite validation.
 - Full 235-problem paper-scale SOLAR, upstream SOLAR, hosted leaderboard, or
   NVIDIA B200/Blackwell equivalence claims.
 - Complete OS/container hard sandboxing for untrusted or multi-tenant
@@ -301,7 +301,7 @@ evidence.
 **Explicitly deferred:**
 - Complete OS/container hard sandboxing for untrusted or multi-tenant
   submissions.
-- CDNA 3, MI300X, CDNA 4, or native-host full-suite hardware validation.
+- CDNA3-family hardware validation, including MI300X, CDNA4, or native-host full-suite validation.
 - Full 235-problem paper-scale SOLAR, upstream SOLAR, hosted leaderboard, or
   NVIDIA B200/Blackwell equivalence claims.
 - One-for-one native ROCm replacement proof for every former NVIDIA library
@@ -334,7 +334,7 @@ aware before expanding hardware validation.
   timing/closure/stability paths.
 
 **Explicitly deferred:**
-- Full 235-problem paper validation, CDNA 3/MI300X/CDNA4 validation,
+- Full 235-problem paper validation, CDNA3-family validation, including MI300X, CDNA4 validation,
   native-host Matrix authority, hosted leaderboard readiness, and upstream
   SOLAR parity.
 
@@ -504,7 +504,7 @@ coverage misuse.
 
 **Explicitly deferred:**
 - Original-paper 124-model / 235-problem extraction and curation pipeline.
-- MI300X/CDNA 3 and CDNA 4 real-hardware validation.
+- MI300X real-hardware validation on CDNA 3 and CDNA 4 real-hardware validation.
 - NVFP4/MXFP4 hardware validation.
 - Official hosted leaderboard or submission service.
 
@@ -535,7 +535,7 @@ and closure status.
 - Recreating the original 124-model / 7,400-subgraph extraction and curation
   pipeline.
 - Full upstream NVlabs/SOLAR equivalence.
-- CDNA 3 / MI300X, CDNA 4, and NVFP4/MXFP4 real-hardware validation.
+- CDNA3-family real-hardware validation, including MI300X, CDNA 4, and NVFP4/MXFP4 real-hardware validation.
 - Hosted leaderboard or remote submission service.
 - Full 235-problem real-hardware validation unless this milestone discovers
   the environment and runtime budget are sufficient.
@@ -559,7 +559,7 @@ ROCm path, with validation scoped to RDNA 4 only.
   modeling pipeline.
 
 **Explicitly deferred:**
-- CDNA 3 / MI300X real-hardware validation.
+- CDNA3-family real-hardware validation, including MI300X.
 - CDNA 4 validation.
 - NVFP4/MXFP4 hardware validation unless a suitable AMD path is separately
   established.
@@ -631,7 +631,7 @@ ROCm path, with validation scoped to RDNA 4 only.
 - `hipblas` has a runnable public SGEMM example and native staging tests, while
   MIOpen, CK, and rocWMMA were documented candidate categories with
   overclaiming guardrails - v1.7.
-- MI300X/CDNA3 validation instructions, FP8/NVFP4 decision records, and
+- MI300X-as-CDNA3 validation instructions, FP8/NVFP4 decision records, and
   evidence gates for validation claims are implemented - v1.7.
 - MIOpen, Composable Kernel, and rocWMMA each have scoped native ROCm public
   examples, native staging tests, dependency diagnostics, RDNA 4 E2E
@@ -649,8 +649,9 @@ ROCm path, with validation scoped to RDNA 4 only.
   structured bound graph IR extraction, rich operator estimates, v2 bound
   sidecars, coverage/warning semantics, AMD-native score and dataset
   integration, documentation, and public-contract guardrails - v1.9.
-- v1.9 validation claims are scoped to RDNA 4 (`gfx1200`); CDNA 3 / MI300X
-  real-hardware validation and CDNA 4 validation remain deferred - v1.9.
+- v1.9 validation claims are scoped to RDNA 4 (`gfx1200`); CDNA3-family
+  real-hardware validation including MI300X and CDNA 4 validation remain
+  deferred - v1.9.
 - Paper-aligned automatic SOLAR derivation now has sidecar-only fixture
   contracts, semantic provenance, formula/byte/bound evidence for scoped
   families, degraded MoE and SSM/Mamba evidence, coverage/status sidecars,
@@ -676,7 +677,7 @@ ROCm path, with validation scoped to RDNA 4 only.
 - Completing full upstream SOLAR parity in v1.7 - explicitly deferred.
 - Claiming NVFP4/MXFP4 hardware validation without suitable AMD hardware
   evidence - explicitly deferred.
-- CDNA 3 / MI300X real-hardware validation in v1.9 - explicitly deferred so
+- CDNA3-family real-hardware validation, including MI300X, in v1.9 - explicitly deferred so
   the milestone can focus on modeling correctness and RDNA 4 validation.
 - CDNA 4 hardware validation in v1.9 - explicitly deferred.
 - Full original 124-model extraction pipeline in v1.9 - deferred unless needed
@@ -696,7 +697,7 @@ ROCm path, with validation scoped to RDNA 4 only.
 - Static kernel evidence in v1.16 - explicitly deferred to v1.17 so the
   toolchain research, lifecycle model, registry, and routing policy can land
   first.
-- CDNA 3 / MI300X and CDNA 4 real-hardware validation in v1.19 - explicitly
+- CDNA3-family real-hardware validation, including MI300X, and CDNA 4 real-hardware validation in v1.19 - explicitly
   deferred by current user direction so the milestone can improve research
   credibility without adding hardware-validation scope.
 - Native host ROCm 7.0.x / 7.1.x / 7.2.x validation in v1.19 - deferred so the
@@ -705,7 +706,7 @@ ROCm path, with validation scoped to RDNA 4 only.
 - Full 235-problem paper validation, official leaderboard parity, and hosted
   submission service in v1.19 - deferred until denominator accounting and
   closure reporting are stronger.
-- Full 235-problem paper validation, CDNA 3 / MI300X / CDNA 4 validation,
+- Full 235-problem paper validation, CDNA3-family validation, including MI300X, CDNA 4 validation,
   native-host Matrix authority, hosted leaderboard readiness, and upstream
   SOLAR parity in v1.20 - deferred so this milestone can make current and
   future evidence internally auditable before adding expensive validation
@@ -720,11 +721,11 @@ torchvision at ROCm wheels. The package remains a Python CLI benchmark runner:
 files and injects AMD architecture flags, and `src/sol_execbench/driver/templates/`
 contains the HIP-aware build and eval subprocess scripts.
 
-Current high-risk areas after v1.10 are real MI300X/CDNA3 hardware validation,
+Current high-risk areas after v1.10 are real MI300X hardware validation on CDNA3,
 CDNA 4 validation, FP8/NVFP4/MXFP4 evidence, hosted leaderboard/service
 behavior, and original-paper dataset extraction. v1.10 intentionally completed
 the local SOLAR derivation system itself, not dataset-scale extraction or
-commercial GPU validation. No CDNA 3 / MI300X validation claim should be made
+commercial GPU validation. No CDNA3-family validation claim, including MI300X, should be made
 until a full adapted suite run and required environment evidence are archived in
 a later milestone.
 
@@ -791,23 +792,23 @@ leaderboard readiness.
 | Keep CDNA 3 validation out of v1.6 | User said the next milestone's forced constraint still excludes CDNA 3 validation. | Validated in v1.6 |
 | Expose source-specific timer chimneys when needed | User required timing accuracy over one unified口径 for Triton, HIP, and PyTorch sources. | Validated in v1.6 |
 | Treat NVIDIA/B200 parity as non-scope | User clarified the project is ROCm-only and original NVIDIA hardware should not be counted as a missing feature. | Validated in v1.7 |
-| Use MI300X as commercial validation target | User selected AMD MI300X/CDNA3 as the later real-hardware validation example, including FP8 validation when available. | Validated in v1.7 readiness docs |
+| Use MI300X as commercial validation target | User selected AMD MI300X as the CDNA3 real-hardware validation example, including FP8 validation when available. | Validated in v1.7 readiness docs |
 | Defer dataset extraction and full SOLAR parity | User explicitly postponed the original paper's extraction pipeline and deeper SOLAR parity work. | Deferred |
 | Prioritize baseline, timing, reward-hack, and ROCm libraries | User marked scoring baseline, evaluation timing loop, reward-hack defenses, and ROCm library migration as the implementation priorities. | Validated in v1.7 |
 | Defer NVFP4/MXFP4 validation | User noted MI300X can validate FP8 later, but no hardware is available for NVFP4/MXFP4 validation now. | Deferred |
 | Complete ROCm library replacement ecosystem on RDNA 4 | User requested the next milestone focus on thoroughly resolving incomplete ROCm library replacements, and clarified only RDNA 4 validation is in scope. | Validated in v1.8 |
 | Focus v1.9 on AMD SOL/SOLAR bound modeling | User requested the next milestone completely solve AMD SOL/SOLAR bound modeling, with validation scoped to RDNA 4. | Validated in v1.9 |
-| Defer CDNA 3 / MI300X and CDNA 4 validation from v1.9 | User clarified CDNA 3 validation and MI300X real-hardware validation should be treated as one deferred item, and CDNA 4 remains deferred. | Validated in v1.9 |
+| Defer CDNA3-family and CDNA 4 validation from v1.9 | User clarified MI300X belongs to the CDNA3 validation scope rather than a separate architecture item, and CDNA 4 remains deferred. | Validated in v1.9 |
 | Scope v1.10 to SOLAR derivation only | User chose to upgrade "论文级完整 SOLAR 自动推导" as a new milestone while excluding dataset extraction and real-hardware validation from the milestone boundary. | Validated in v1.10 |
 | Focus v1.11 on public dataset parity and execution closure | User requested the next milestone target "论文数据集 parity + ROCm execution closure" and then narrowed it to dataset acquisition/layout, inventory, compatibility classification, small ready-subset execution, and gap reporting. | Active in v1.11 |
 | Prioritize a research-grade ROCm preview before paper parity | User asked whether to push toward paper parity next; we chose a smaller complete release with claim boundaries, curated slice, researcher workflows, and reproducibility evidence before attempting full 235-problem parity. | Active in v1.15 |
 | Route ROCm tools before extracting static evidence | User noted ROCm tools are more fragmented than CUDA tools and requested per-tool hardware generation/model availability routing, including prepared and historical tools. | Active in v1.16 |
 | Defer ROCm minor-version by GPU-generation matrix validation | User narrowed the possible compatibility discussion to ROCm 7.0.x/7.1.x/7.2.x but decided the full matrix still has high validation cost and long cycle time. Treat it as deferred compatibility validation rather than a near-term release gate. | Deferred |
 | Defer static kernel evidence to v1.17 | User explicitly moved Static Kernel Evidence out of v1.16 so v1.16 can focus on external research, tool lifecycle, capability registry, and routing policy. | Active in v1.16 |
-| Avoid expanding hardware validation in v1.19 | User explicitly does not want to expand CDNA 3, MI300X, CDNA 4, or native host ROCm matrix validation right now. | Active in v1.19 |
+| Avoid expanding hardware validation in v1.19 | User explicitly does not want to expand CDNA3-family validation, including MI300X, CDNA 4, or native host ROCm matrix validation right now. | Active in v1.19 |
 | Improve research credibility without new hardware | User chose denominator accounting, Matrix diff/schema export, dataset-runner hardening, and AMD SOL/SOLAR sanity over additional hardware validation. | Active in v1.19 |
-| Audit current evidence before expanding validation | User chose cross-report consistency and evaluation stability as the next milestone so future CDNA3/MI300X or paper-scale validation can rely on cleaner evidence. | Active in v1.20 |
-| Fix codebase concerns before new validation claims | User chose a v1.21 milestone focused on codebase debt reduction and execution-boundary hardening from `CONCERNS.md`, while deferring hard sandboxing, CDNA3/MI300X validation, paper-scale parity, and leaderboard authority. | Active in v1.21 |
+| Audit current evidence before expanding validation | User chose cross-report consistency and evaluation stability as the next milestone so future MI300X-on-CDNA3 or paper-scale validation can rely on cleaner evidence. | Active in v1.20 |
+| Fix codebase concerns before new validation claims | User chose a v1.21 milestone focused on codebase debt reduction and execution-boundary hardening from `CONCERNS.md`, while deferring hard sandboxing, MI300X-on-CDNA3 validation, paper-scale parity, and leaderboard authority. | Active in v1.21 |
 
 ## Evolution
 

@@ -128,7 +128,7 @@ benchmark schemas/CLI/Trace JSONL remain unchanged.
 ### Milestone And Phase Scope
 
 - `.planning/PROJECT.md` — v1.9 scope, RDNA 4 validation boundary, deferred
-  CDNA 3 / MI300X and CDNA 4 validation, and paper-parity constraints.
+  MI300X-on-CDNA3 and CDNA 4 validation, and paper-parity constraints.
 - `.planning/REQUIREMENTS.md` — Phase 42 requirements IR-01 through IR-04 and
   downstream MODEL/BOUND constraints.
 - `.planning/ROADMAP.md` — Phase 42 goal, success criteria, and downstream
@@ -231,7 +231,7 @@ benchmark schemas/CLI/Trace JSONL remain unchanged.
   modeling, and aggregate bound semantics remain Phase 43/44 or future scope.
 - Dataset runner flags, AMD score report integration, and optional sidecar
   emission remain Phase 45 scope.
-- CDNA 3 / MI300X real-hardware validation and CDNA 4 validation remain
+- MI300X-on-CDNA3 real-hardware validation and CDNA 4 validation remain
   deferred from v1.9.
 
 </deferred>

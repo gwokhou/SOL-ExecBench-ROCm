@@ -6,13 +6,18 @@ focus: concerns
 
 # Concerns
 
+## Status Map
+
+- Narrowed: code-actionable concerns are now mostly concentrated in generated-driver complexity, evidence authority drift, and regression coverage.
+- Externally blocked/deferred: full paper validation, MI300X validation on CDNA3, CDNA4 validation, native-host Matrix authority, hosted leaderboard readiness, and hard sandboxing require external evidence, hardware, or infrastructure.
+
 ## Release Claim Boundaries
 
 - Full 235-problem paper validation is not complete and must not be claimed.
 - Upstream NVlabs/SOLAR parity is not established and must not be claimed.
 - Hosted leaderboard readiness and score authority are not established.
 - Docker Matrix rows are container ROCm user-space evidence only; they are not native-host validation.
-- MI300X is the concrete CDNA3 `gfx942` target, but full-suite MI300X/CDNA3 validation remains deferred without archived real-hardware evidence.
+- MI300X is the concrete CDNA3 `gfx942` target, but full-suite MI300X validation on CDNA3 remains deferred without archived real-hardware evidence.
 - CDNA4 validation is unavailable because suitable hardware is not currently accessible.
 
 ## Execution Isolation
@@ -56,7 +61,7 @@ focus: concerns
 ## Suggested Milestone Candidates
 
 - Engineering stable prerelease hardening: run and archive full ROCm/Docker smoke evidence, generated driver e2e, prerelease readiness, and release candidate validation from a clean tree.
-- MI300X/CDNA3 validation milestone: run the adapted suite on real MI300X `gfx942`, archive environment, clock, trace, sidecar, and failure accounting evidence.
+- MI300X-on-CDNA3 validation milestone: run the adapted suite on real MI300X `gfx942`, archive environment, clock, trace, sidecar, and failure accounting evidence.
 - Research benchmark authority milestone: complete paper denominator execution, upstream SOLAR comparison, score eligibility review, and reproducible artifact bundle.
 - Execution-boundary hardening milestone: continue shrinking `eval_driver.py`, expand adversarial tests, and document residual sandbox limits.
 - Provenance stewardship milestone: rerun upstream comparison when upstream moves, update `provenance.toml`, and keep source headers aligned without rewriting git history unless legal counsel requires it.

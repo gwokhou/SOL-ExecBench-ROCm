@@ -51,13 +51,13 @@
       "status": "reviewable",
       "reason_codes": ["required_refs_present"],
       "next_steps": [
-        "Future CDNA3-family validation including MI300X (gfx942), native-host validation, and paper-scale validation need explicit hardware evidence."
+        "Future CDNA3-family validation, including MI300X (gfx942), native-host validation, and paper-scale validation need explicit hardware evidence."
       ]
     }
   ],
   "overall_status": "reviewable",
   "next_steps": [
-    "Future CDNA3-family validation including MI300X (gfx942), native-host validation, and paper-scale validation need explicit hardware evidence."
+    "Future CDNA3-family validation, including MI300X (gfx942), native-host validation, and paper-scale validation need explicit hardware evidence."
   ],
   "claim_boundary": {
     "review_guidance_only": true,

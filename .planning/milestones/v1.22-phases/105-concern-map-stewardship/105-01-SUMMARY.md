@@ -10,7 +10,7 @@
   deferred with Phase 100-104 evidence.
 - Updated dataset runner, eval-driver diagnostics, source-review, scoring/static
   evidence, dependency, closure provenance, and marker guardrail entries.
-- Preserved explicit deferred boundaries for CDNA3, MI300X, CDNA4 validation,
+- Preserved explicit deferred boundaries for CDNA3-family including MI300X, CDNA4 validation,
   paper-scale parity, upstream SOLAR equivalence, leaderboard readiness, hosted
   service operation, and complete hard sandboxing.
 

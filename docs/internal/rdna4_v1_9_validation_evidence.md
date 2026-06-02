@@ -9,7 +9,7 @@
 This evidence record supports the v1.9 ROCm-port claim that AMD SOL/SOLAR bound
 modeling artifacts are implemented and CPU-verified with RDNA 4-scoped hardware
 model metadata. It does not claim NVIDIA B200 equivalence, upstream SOLAR
-equivalence, leaderboard equivalence, CDNA3-family real-hardware validation including MI300X (`gfx942`),
+equivalence, leaderboard equivalence, CDNA3-family real-hardware validation, including MI300X (`gfx942`),
 or CDNA 4 validation.
 
 ## Focused Verification Commands

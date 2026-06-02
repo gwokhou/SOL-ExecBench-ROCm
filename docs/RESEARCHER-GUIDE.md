@@ -38,7 +38,7 @@ collects the CPU-safe command shapes and interpretation rules for execution
 closure, paper denominator reports, Matrix schema export, Matrix semantic diff,
 and AMD bound sanity. These reports have no full 235-problem paper validation,
 no upstream SOLAR parity, no score authority, no leaderboard readiness, no
-CDNA3-family validation including MI300X and no CDNA4 validation, no
+CDNA3-family validation, including MI300X, and no CDNA4 validation, no
 native-host ROCm Matrix validation, and no new-hardware validation.
 
 For v1.20 evidence-quality review, continue with

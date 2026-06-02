@@ -8,7 +8,7 @@
 ## Phase Boundary
 
 This phase makes prerelease support boundaries easy to interpret across RDNA 4,
-Docker/container user-space evidence, MI300X/CDNA3, and unavailable CDNA4
+Docker/container user-space evidence, MI300X-on-CDNA3, and unavailable CDNA4
 validation. It should update documentation and guardrails so users can
 distinguish evidence levels without implying new hardware validation.
 
@@ -33,7 +33,7 @@ distinguish evidence levels without implying new hardware validation.
   artifacts or prior milestone docs support it.
 - Docker/container user-space validation must remain distinct from native-host
   hardware validation.
-- MI300X/CDNA3 full-suite validation remains deferred unless a complete
+- MI300X-on-CDNA3 full-suite validation remains deferred unless a complete
   real-hardware evidence chain exists.
 - CDNA4 remains unavailable, not merely deferred by project priority.
 
@@ -76,7 +76,7 @@ schema unless existing code already has a natural place for it.
 
 ### Integration Points
 - Update `docs/rocm.md`, `docs/CLAIMS.md`, and any release/prerelease docs that
-  mention CDNA3/MI300X/CDNA4 support status.
+  mention MI300X-on-CDNA3 and CDNA4 support status.
 - Add or update tests in `tests/sol_execbench/` that read documentation and
   assert support-matrix wording.
 - Preserve compatibility with existing public contract guardrail tests.
@@ -87,10 +87,10 @@ schema unless existing code already has a natural place for it.
 ## Specific Ideas
 
 - Add a prerelease support matrix section or table with rows for RDNA 4,
-  Docker/container user-space, MI300X/CDNA3, and CDNA4.
+  Docker/container user-space, MI300X-on-CDNA3, and CDNA4.
 - Explicitly state that CDNA4 hardware is not currently accessible, so CDNA4 is
   unavailable for validation in this prerelease.
-- Clarify that MI300X is the CDNA3 validation target and full-suite MI300X/CDNA3
+- Clarify that MI300X is the CDNA3 validation target and full-suite MI300X-on-CDNA3
   validation remains deferred unless complete evidence is archived.
 
 </specifics>
@@ -98,7 +98,7 @@ schema unless existing code already has a natural place for it.
 <deferred>
 ## Deferred Ideas
 
-- Running MI300X/CDNA3 validation.
+- Running MI300X-on-CDNA3 validation.
 - Running CDNA4 validation while hardware is unavailable.
 - Adding native-host Matrix authority, paper parity, upstream SOLAR parity, or
   leaderboard readiness.

@@ -100,7 +100,7 @@ entries are not successful results and must remain in denominator accounting.
 | Full paper-scale 235-problem validation is not reproduced. | PAPER-02 |
 | Original 124-model extraction and curation are not reproduced. | PAPER-01 |
 | Local AMD SOLAR derivation is not compared against upstream SOLAR at paper scale. | PAPER-03 |
-| MI300X/CDNA 3 and CDNA 4 full-suite evidence is not archived. | HW-01, HW-02 |
+| MI300X full-suite evidence on CDNA 3 and CDNA 4 evidence are not archived. | HW-01, HW-02 |
 | Static kernel evidence is not collected with RGA or code-object analysis. | STATIC-01 |
 | Hosted leaderboard and submission service are not available. | SERV-01 |
 

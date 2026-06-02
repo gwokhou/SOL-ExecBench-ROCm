@@ -27,4 +27,4 @@
 ## Compatibility
 
 No validation claim was upgraded. The new evidence gate is pure and only
-permits an MI300X/CDNA3 validated status when required evidence is present.
+permits an MI300X-on-CDNA3 validated status when required evidence is present.

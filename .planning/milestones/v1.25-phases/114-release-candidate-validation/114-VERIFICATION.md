@@ -50,4 +50,4 @@ remain environment-dependent prerelease evidence paths.
 - The bounded dataset slice depends on local benchmark assets.
 - This phase deliberately does not provide paper parity, upstream SOLAR parity,
   hosted leaderboard readiness, hard sandbox authority, CDNA4 validation, or
-  MI300X/CDNA3 full-suite validation.
+  MI300X-on-CDNA3 full-suite validation.

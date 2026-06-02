@@ -46,7 +46,7 @@ focus: quality
 
 - Hardware tests are skipped automatically when `/dev/kfd`, `/dev/dri`, PyTorch ROCm, development headers, or architecture-specific GPUs are unavailable.
 - RDNA 4 has recorded validation evidence in project docs.
-- Full MI300X/CDNA3 validation remains deferred until a complete real-hardware evidence chain exists.
+- Full MI300X validation on CDNA3 remains deferred until a complete real-hardware evidence chain exists.
 - CDNA4 validation is unavailable because suitable hardware is not currently accessible.
 
 ## Common Commands

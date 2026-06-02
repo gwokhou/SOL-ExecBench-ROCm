@@ -32,7 +32,7 @@ One documentation typo was found and fixed locally before completion:
 - MI300X is treated as the concrete CDNA 3 hardware target (`gfx942`), not as a
   separate architecture target.
 - `gfx940`, `gfx941`, and `gfx942` remain CDNA 3 code/schema targets.
-- Full-suite MI300X/CDNA3 hardware validation remains deferred unless complete
+- Full-suite MI300X-on-CDNA3 hardware validation remains deferred unless complete
   real-hardware evidence exists.
 - CDNA4 validation is described as unavailable because suitable hardware is not
   currently accessible.

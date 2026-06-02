@@ -68,7 +68,7 @@ completed: 2026-05-31
 
 - Diagnostic status is derived into a separate sanity layer while source statuses and AMD score support remain visible as source evidence.
 - Provisional RDNA 4 model risk is represented as `provisional_rdna4_model_risk=true`, not as AMD SOL/SOLAR model validation.
-- Markdown includes visible negative wording for upstream SOLAR equivalence, model validation, paper parity, leaderboard authority, score authority upgrade, CDNA 3, MI300X, CDNA 4, native-host validation, and new-hardware validation.
+- Markdown includes visible negative wording for upstream SOLAR equivalence, model validation, paper parity, leaderboard authority, score authority upgrade, CDNA3-family including MI300X, CDNA 4, native-host validation, and new-hardware validation.
 
 ## Deviations from Plan
 

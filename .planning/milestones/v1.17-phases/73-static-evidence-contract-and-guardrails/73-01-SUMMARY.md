@@ -37,7 +37,7 @@ the contract stays sidecar-only.
 
 | Commit | Description |
 |--------|-------------|
-| `e98b522` | Added static evidence contract models, optional capability metadata, tests, guardrails, and restored the historical CDNA 3 / MI300X requirements boundary string expected by guardrail coverage. |
+| `e98b522` | Added static evidence contract models, optional capability metadata, tests, guardrails, and restored the historical MI300X-on-CDNA3 requirements boundary string expected by guardrail coverage. |
 
 ## Verification
 
@@ -65,7 +65,7 @@ Result: no matches.
 
 - The first focused pytest run exposed an existing historical guardrail that
   expected `.planning/REQUIREMENTS.md` to retain the exact phrase
-  `CDNA 3 / MI300X real-hardware validation`. The v1.17 requirements already
+  `MI300X-on-CDNA3 real-hardware validation`. The v1.17 requirements already
   preserved the boundary semantically; the exact phrase was restored in the
   out-of-scope table.
 - The original executor agent stalled after writing the new static evidence

@@ -59,7 +59,7 @@ created: 2026-05-23
 
 ## Manual-Only Verifications
 
-All Phase 41 behaviors have automated verification. Real RDNA 4 hardware validation is deferred to Phase 46; CDNA 3 / MI300X and CDNA 4 validation are outside v1.9 scope.
+All Phase 41 behaviors have automated verification. Real RDNA 4 hardware validation is deferred to Phase 46; MI300X-on-CDNA3 and CDNA 4 validation are outside v1.9 scope.
 
 ---
 

@@ -21,7 +21,7 @@ passed
 | TRUST-01 | 92-01, 92-02 | Trust summary combines consistency, stability, claim-upgrade, closure, denominator, Matrix, AMD score, AMD SOL/SOLAR, and bound status. | passed | `src/sol_execbench/core/trust_summary.py` and cross-script E2E test. |
 | TRUST-02 | 92-01 | Separates consistency, stability, evidence missing, diagnostic-only, and claim-upgrade-blocked outcomes. | passed | `tests/sol_execbench/test_trust_summary.py`. |
 | TRUST-03 | 92-01 | References source reports by bounded refs/checksums, including AMD SOL/SOLAR. | passed | Trust summary tests and cross-script E2E source-ref assertions. |
-| TRUST-04 | 92-01 | Gives next steps for CDNA3/MI300X/native-host/paper-scale validation without claiming validation. | passed | Trust summary tests and docs tests. |
+| TRUST-04 | 92-01 | Gives next steps for MI300X-on-CDNA3, native-host/paper-scale validation without claiming validation. | passed | Trust summary tests and docs tests. |
 
 ## Verification Commands
 

@@ -20,7 +20,7 @@ No blocking findings.
 
 - The gate fails on missing manifests, missing checksums, required artifact absence, checksum drift, unknown authority classes, forbidden truthy claim fields, and invalid known-gap statuses.
 - Known gaps with `deferred`, `unavailable`, or `diagnostic-only` statuses are surfaced in the report without silently blocking the command.
-- Public doc checks verify representative MI300X/CDNA3 relationship and CDNA4 unavailability wording.
+- Public doc checks verify representative MI300X-on-CDNA3 relationship and CDNA4 unavailability wording.
 
 ## Residual Risk
 

@@ -83,7 +83,7 @@ completed: 2026-05-28
 - `tests/sol_execbench/test_public_contract_guardrails.py` - Canonical payload compatibility-sidecar exclusion guardrail.
 - `docs/CLAIMS.md` - Docker Matrix container user-space claim boundary sentence.
 - `docs/internal/v1_4_compatibility_inventory.md` - Restored exact public CLI invariant phrase used by existing guardrail tests.
-- `.planning/REQUIREMENTS.md` - Restored exact CDNA 3 / MI300X deferred-validation phrase used by existing guardrail tests.
+- `.planning/REQUIREMENTS.md` - Restored exact MI300X-on-CDNA3 deferred-validation phrase used by existing guardrail tests.
 
 ## Decisions Made
 

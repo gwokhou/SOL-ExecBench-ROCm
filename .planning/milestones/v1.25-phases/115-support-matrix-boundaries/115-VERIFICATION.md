@@ -14,7 +14,7 @@ Status: passed
 
 Phase 115 delivers the planned support-matrix boundary update. Public docs now
 separate RDNA 4 engineering-prerelease evidence, Docker/container user-space
-evidence, MI300X/CDNA3 deferred full-suite validation, and unavailable CDNA4
+evidence, MI300X-on-CDNA3 deferred full-suite validation, and unavailable CDNA4
 validation.
 
 ## Checks Run
@@ -34,7 +34,7 @@ Result: `75 passed in 11.51s`.
   `docs/release_candidate_validation.md` keep Docker/container ROCm user-space
   evidence distinct from native-host validation.
 - SUPPORT-03: Passed. Public docs state MI300X is the concrete CDNA3 hardware
-  target (`gfx942`) and full-suite MI300X/CDNA3 validation remains deferred
+  target (`gfx942`) and full-suite MI300X-on-CDNA3 validation remains deferred
   without complete real-hardware evidence.
 - SUPPORT-04: Passed. Public docs state CDNA4 validation is unavailable because
   suitable hardware is not currently accessible.

@@ -75,7 +75,7 @@ change.
 - Score-report warning integration beyond contract compatibility is Phase 45
   scope.
 - Structured IR and operator formula work are Phases 42 and 43.
-- CDNA 3 / MI300X and CDNA 4 validation remain future milestone work.
+- MI300X-on-CDNA3 and CDNA 4 validation remain future milestone work.
 </user_constraints>
 
 <phase_requirements>
@@ -85,7 +85,7 @@ change.
 |----|-------------|------------------|
 | HW-01 | Load versioned AMD hardware model JSON artifacts with architecture, dtype/path, peak compute, memory bandwidth, clock policy or assumptions, source, confidence, validation status, and evidence references. [CITED: .planning/REQUIREMENTS.md] | Use a strict hardware artifact model plus loaders for packaged resources and external `Path` JSON. [VERIFIED: codebase grep] |
 | HW-02 | Invalid artifacts fail with clear errors for missing provenance, non-positive values, unknown status, or architecture mismatch. [CITED: .planning/REQUIREMENTS.md] | Add focused negative tests for missing provenance, <=0 numeric fields, enum errors, unknown fields, old `validation_status`, and filename/architecture mismatch. [VERIFIED: codebase grep] |
-| HW-03 | RDNA 4 `gfx1200` is the only v1.9 validation target; CDNA 3 / MI300X and CDNA 4 remain unvalidated or deferred. [CITED: .planning/REQUIREMENTS.md] | Package only `gfx1200.json` for v1.9 defaults and add guardrails rejecting validated CDNA 3/CDNA 4 claims in model artifacts. [CITED: .planning/ROADMAP.md] |
+| HW-03 | RDNA 4 `gfx1200` is the only v1.9 validation target; MI300X-on-CDNA3 and CDNA 4 remain unvalidated or deferred. [CITED: .planning/REQUIREMENTS.md] | Package only `gfx1200.json` for v1.9 defaults and add guardrails rejecting validated CDNA 3/CDNA 4 claims in model artifacts. [CITED: .planning/ROADMAP.md] |
 | HW-04 | Built-in fallback models, if retained, are provisional or unvalidated and use the same validation path as external JSON. [CITED: .planning/REQUIREMENTS.md] | Keep `default_amd_hardware_models()` as a facade over packaged JSON, not embedded constants. [CITED: .planning/phases/41-bound-model-contract-and-hardware-artifacts/41-CONTEXT.md] |
 | DOC-01 | Canonical trace JSONL, primary CLI behavior, and public definition/workload/solution schemas remain unchanged. [CITED: .planning/REQUIREMENTS.md] | Extend existing public-contract tests around `Trace.model_dump`, `CliRunner(... --help)`, and schema model dumps. [VERIFIED: codebase grep] |
 </phase_requirements>
@@ -348,7 +348,7 @@ assert trace.model_dump(mode="json") == before
 **What goes wrong:** A `gfx942` or CDNA 4 model enters defaults or gets marked validated because the enum permits it elsewhere. [ASSUMED]
 **Why it happens:** `SupportedHardware` already includes CDNA 3 schema targets, but model validation scope is narrower than solution schema support. [VERIFIED: codebase grep] [CITED: REQUIREMENTS.md]
 **How to avoid:** Phase 41 defaults should contain only `gfx1200`; if parser supports arbitrary architectures for external artifacts, validation status must reject validated CDNA 3/CDNA 4 claims for v1.9. [CITED: CONTEXT.md]
-**Warning signs:** `default_amd_hardware_models()["gfx942"]` still exists, or docs imply MI300X/CDNA3 model validation. [VERIFIED: codebase grep]
+**Warning signs:** `default_amd_hardware_models()["gfx942"]` still exists, or docs imply MI300X-on-CDNA3 model validation. [VERIFIED: codebase grep]
 
 ### Pitfall 4: Public Contract Tests Are Updated To Match Drift
 

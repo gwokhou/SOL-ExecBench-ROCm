@@ -114,7 +114,7 @@ through BOUND-04.
   graph/evidence conversion, not as a new unrelated estimator.
 - Treat unsupported or missing evidence as visible degradation, never as hidden
   zero-cost work.
-- Keep CDNA 3 / MI300X and CDNA 4 validation claims deferred; any hardware
+- Keep MI300X-on-CDNA3 and CDNA 4 validation claims deferred; any hardware
   status in artifacts must use the Phase 41 split validation fields.
 
 </specifics>

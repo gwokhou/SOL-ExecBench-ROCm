@@ -14,7 +14,7 @@ requirements-completed: [CONS-01, CONS-02, CONS-03, CONS-04, CONS-05]
 - Supported explicit input paths for execution closure, paper denominator, ROCm Matrix, runtime/static evidence, AMD score, AMD SOL/SOLAR, and AMD bound sanity reports.
 - Added script coverage that writes deterministic JSON and Markdown outputs from temporary sidecar inputs.
 - Extended public contract guardrails so the v1.20 consistency report remains outside canonical Definition, Workload, Trace, score, timing, and primary CLI surfaces.
-- Restored v1.20 requirement wording that keeps CDNA 3, MI300X, CDNA 4, and native-host ROCm validation expansion out of scope.
+- Restored v1.20 requirement wording that keeps CDNA3-family including MI300X, CDNA 4, and native-host ROCm validation expansion out of scope.
 
 ## Requirements Covered
 

@@ -212,7 +212,7 @@ CDNA3_NO_VALIDATION_WARNING = (
 )
 ```
 
-Update warning checks to use the v2 hardware/model validation fields. Keep warning strings focused on claim safety and avoid premature B200, SOLAR, leaderboard, CDNA 3 / MI300X, or CDNA 4 validation claims.
+Update warning checks to use the v2 hardware/model validation fields. Keep warning strings focused on claim safety and avoid premature B200, SOLAR, leaderboard, MI300X-on-CDNA3, or CDNA 4 validation claims.
 
 **Score construction pattern** (lines 125-175):
 ```python
@@ -566,7 +566,7 @@ assert "hardware validation remains deferred" in project
 assert "CDNA3 full-suite validation has not been recorded" in CDNA3_NO_VALIDATION_WARNING
 ```
 
-Extend these grep-style tests to block premature B200, upstream SOLAR, leaderboard-equivalence, CDNA 3 / MI300X validation, and CDNA 4 validation claims in v1.9 docs or outputs.
+Extend these grep-style tests to block premature B200, upstream SOLAR, leaderboard-equivalence, MI300X-on-CDNA3 validation, and CDNA 4 validation claims in v1.9 docs or outputs.
 
 ---
 

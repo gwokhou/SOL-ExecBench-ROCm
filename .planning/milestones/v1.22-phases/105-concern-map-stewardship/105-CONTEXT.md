@@ -13,7 +13,7 @@ This phase covers DOCS-01 through DOCS-03:
 - Preserve milestone-management context for fixed, narrowed, still actionable,
   accepted, and externally deferred concerns.
 - Update each v1.22 in-scope concern with evidence from Phases 100-104.
-- Keep out-of-scope items explicit: CDNA3, MI300X, CDNA4 validation,
+- Keep out-of-scope items explicit: CDNA3-family including MI300X, CDNA4 validation,
   paper-scale parity, leaderboard readiness, and complete hard sandboxing.
 
 ## Current Concern Map State
@@ -34,7 +34,7 @@ This phase covers DOCS-01 through DOCS-03:
 
 Externally deferred items remain valid and must not be marked fixed:
 
-- Full CDNA3, MI300X, and CDNA4 validation.
+- Full CDNA3-family including MI300X, and CDNA4 validation.
 - Full 235-problem paper-scale parity and upstream SOLAR equivalence.
 - Leaderboard readiness or hosted public service operation.
 - Complete hard sandboxing for multi-tenant adversarial submissions.

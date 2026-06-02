@@ -50,7 +50,7 @@ Trace JSONL, correctness, timing, score, and evaluator behavior.
   outputs.
 - Add source/contract guardrails if needed to prove closure fields remain
   sidecar-only and do not mutate canonical trace semantics.
-- Do not introduce live ROCm, Docker, CDNA 3, MI300X, CDNA 4, or native-host
+- Do not introduce live ROCm, Docker, CDNA3-family including MI300X, CDNA 4, or native-host
   validation requirements.
 
 ### the agent's Discretion

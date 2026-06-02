@@ -84,7 +84,7 @@ def test_trust_summary_reports_missing_and_blocked_next_steps():
     text = json.dumps(report.model_dump(mode="json"), sort_keys=True)
     assert "Resolve consistency blocker findings." in text
     assert "Generate evaluation_stability.v1." not in text
-    assert "Future CDNA3-family validation including MI300X (gfx942)" in text
+    assert "Future CDNA3-family validation, including MI300X (gfx942)" in text
 
 
 def test_trust_summary_report_is_strict_and_deterministic():

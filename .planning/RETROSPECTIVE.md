@@ -179,7 +179,7 @@
 - A runnable hipBLAS SGEMM public example with native staging tests and support
   docs distinguishing supported and candidate ROCm library categories.
 - MI300X validation handoff docs and evidence gates that prevent premature
-  CDNA3/MI300X hardware-validation claims.
+  MI300X-on-CDNA3 hardware-validation claims.
 
 ### What Worked
 
@@ -339,7 +339,7 @@
 1. Paper consistency for AMD SOL/SOLAR modeling is mostly an evidence-contract
    problem: formulas, byte buckets, confidence, rationale, and unsupported
    evidence need to be inspectable at every layer.
-2. RDNA 4-only validation scope works when deferred CDNA 3 / MI300X and CDNA 4
+2. RDNA 4-only validation scope works when deferred CDNA3-family validation, including MI300X, and CDNA 4
    claims are guarded in code, docs, and tests.
 3. Planning metadata quality matters at milestone close; future phases should
    keep summary frontmatter and validation task tables synchronized as work
@@ -583,12 +583,12 @@
 | v1.0 | 462 passed, 58 skipped on RDNA 4 | v1 requirements 38/39 complete, 1 deferred | TEST-05 CDNA 3 full-suite validation |
 | v1.2 | 16 focused tests passed; ruff clean | v1.2 requirements 14/14 complete | CDNA 3 real hardware validation; AMD-native scoring model |
 | v1.5 | 42 focused milestone tests passed; ruff clean | v1.5 requirements 20/20 complete | Real CDNA 3 hardware validation; broader AMD SOL operator coverage |
-| v1.7 | 67 focused audit tests passed | v1.7 requirements 21/21 complete | MI300X/CDNA3 full-suite validation; FP8 real-hardware validation; paper extraction; full SOLAR parity |
+| v1.7 | 67 focused audit tests passed | v1.7 requirements 21/21 complete | MI300X full-suite validation on CDNA3; FP8 real-hardware validation; paper extraction; full SOLAR parity |
 | v1.8 | 41 focused tests passed; ruff clean; Docker entrypoint syntax passed | v1.8 requirements 23/23 complete | CDNA 3/CDNA 4 library validation; complete local ROCm development headers for native E2E |
-| v1.9 | 40 focused AMD bound/model/score/contract tests passed; `uv build` passed | v1.9 requirements 28/28 complete | CDNA 3 / MI300X real-hardware validation; CDNA 4 validation; paper extraction; broader upstream SOLAR parity |
-| v1.10 | 196 Phase 51 tests and 169 Phase 52 tests passed; Ruff clean; milestone audit PASS | v1.10 requirements 21/21 complete | Paper-scale 124-model/235-problem extraction; MI300X/CDNA3/CDNA4 validation; NVFP4/MXFP4 validation; hosted leaderboard |
+| v1.9 | 40 focused AMD bound/model/score/contract tests passed; `uv build` passed | v1.9 requirements 28/28 complete | CDNA3-family real-hardware validation, including MI300X; CDNA 4 validation; paper extraction; broader upstream SOLAR parity |
+| v1.10 | 196 Phase 51 tests and 169 Phase 52 tests passed; Ruff clean; milestone audit PASS | v1.10 requirements 21/21 complete | Paper-scale 124-model/235-problem extraction; MI300X-on-CDNA3 validation; CDNA4 validation; NVFP4/MXFP4 validation; hosted leaderboard |
 | v1.19 | 74 focused audit tests passed; Ruff clean | v1.19 requirements 28/28 complete | New hardware validation; paper-scale validation; hosted leaderboard |
-| v1.20 | 74 evidence-quality tests passed; docs regression passed; audit PASS | v1.20 requirements 23/23 complete | CDNA3/MI300X/CDNA4 validation; full paper validation; hosted leaderboard; profiling diagnostics |
+| v1.20 | 74 evidence-quality tests passed; docs regression passed; audit PASS | v1.20 requirements 23/23 complete | MI300X-on-CDNA3 validation; CDNA4 validation; full paper validation; hosted leaderboard; profiling diagnostics |
 
 ### Top Lessons
 

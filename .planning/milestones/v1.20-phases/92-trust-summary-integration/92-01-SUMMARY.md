@@ -13,7 +13,7 @@ requirements-completed: [TRUST-01, TRUST-02, TRUST-03, TRUST-04]
 - Added `src/sol_execbench/core/trust_summary.py` with strict `sol_execbench.trust_summary.v1` models.
 - Summarized consistency, stability, claim-upgrade, evidence completeness, source refs, checksums, and next steps.
 - Kept source payloads bounded by path/schema/checksum refs instead of embedding full evidence.
-- Added explicit deferred validation guidance for CDNA3/MI300X/native-host/paper-scale work.
+- Added explicit deferred validation guidance for MI300X-on-CDNA3, native-host/paper-scale work.
 
 ## Requirements Covered
 
