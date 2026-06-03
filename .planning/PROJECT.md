@@ -18,7 +18,7 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 **Shipped version:** v1.27 Copyright Provenance Cleanup,
 completed 2026-06-02.
 
-**Current milestone:** Awaiting next milestone.
+**Current milestone:** v1.28 CDNA3 Test and Documentation Readiness.
 
 **Queued milestone:** None defined.
 
@@ -32,7 +32,9 @@ research preview package with versioned artifact bundles, readiness gates,
 research preview evidence, public publishing materials, and corrected
 MI300X-as-CDNA3 wording.
 
-**Next milestone goal:** None defined.
+**Next milestone goal:** Complete the real-CDNA3-ready test and documentation
+surface while keeping actual MI300X/gfx942 hardware execution deferred until
+future hardware access exists.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline.
 Milestones v1.1-v1.6 added CDNA 3 code/schema support, maintained residue
@@ -125,6 +127,39 @@ The v1.27 milestone completed release-facing copyright and provenance cleanup
 by adding a provenance policy and manifest, correcting SPDX file attribution,
 updating public compliance and attribution wording, and wiring provenance
 checks into prerelease readiness gates.
+
+The v1.28 milestone reopens the CDNA3 readiness frontier without changing the
+hardware-validation claim boundary. It should add actual `requires_cdna3` test
+entry points, validation commands, documentation, and CPU-safe guardrails, but
+the current machine is not expected to execute MI300X/gfx942 validation.
+
+## Current Milestone: v1.28 CDNA3 Test and Documentation Readiness
+
+**Goal:** Complete the CDNA3/gfx94* testing, documentation, and evidence
+readiness surface so the next real MI300X validation run has concrete commands,
+test entry points, and claim guardrails, while explicitly deferring actual
+hardware execution on the current machine.
+
+**Target features:**
+- Real `requires_cdna3` test coverage that exercises CDNA3-only hardware paths
+  when a `gfx94*` ROCm GPU is present and skips cleanly otherwise.
+- MI300X/gfx942 validation workflow documentation with commands, environment
+  capture, clock-lock evidence, dataset run evidence, trace artifacts, and
+  failure/skip reporting.
+- CPU-safe guardrails proving CDNA3 schema/build/readiness support cannot be
+  reported as completed CDNA3 hardware validation.
+- Public docs that distinguish CDNA3 test readiness from actual full-suite
+  hardware validation and describe how future validators should run and archive
+  evidence.
+
+**Explicitly deferred:**
+- Actual CDNA3/MI300X full-suite execution, because the current machine cannot
+  run a real `gfx94*` validation pass.
+- Upgrading any support matrix, score report, prerelease material, or research
+  preview to claim CDNA3 hardware validation before a complete evidence chain
+  exists.
+- CDNA4 validation, paper-scale 235-problem validation, upstream SOLAR parity,
+  hosted leaderboard operations, and hard multi-tenant sandboxing.
 
 ## Recently Shipped Milestone: v1.25 Engineering Prerelease
 
@@ -760,6 +795,14 @@ step is to reduce that debt while preserving benchmark contracts and clearly
 deferring hard sandboxing, new hardware validation, paper-scale parity, and
 leaderboard readiness.
 
+After v1.27, the main CDNA3 gap is not schema availability. The project already
+accepts `gfx940`, `gfx941`, and `gfx942` and already warns that MI300X/CDNA3
+full-suite validation is deferred. The next useful step is to make the
+deferred validation path real and testable: add concrete `requires_cdna3`
+tests, document the MI300X evidence chain, and protect reports/docs from
+upgrading readiness into a hardware-validation claim before a real `gfx94*`
+run is archived.
+
 ## Constraints
 
 - **Platform**: ROCm >= 7.0 is the supported software baseline.
@@ -809,6 +852,7 @@ leaderboard readiness.
 | Improve research credibility without new hardware | User chose denominator accounting, Matrix diff/schema export, dataset-runner hardening, and AMD SOL/SOLAR sanity over additional hardware validation. | Active in v1.19 |
 | Audit current evidence before expanding validation | User chose cross-report consistency and evaluation stability as the next milestone so future MI300X-on-CDNA3 or paper-scale validation can rely on cleaner evidence. | Active in v1.20 |
 | Fix codebase concerns before new validation claims | User chose a v1.21 milestone focused on codebase debt reduction and execution-boundary hardening from `CONCERNS.md`, while deferring hard sandboxing, MI300X-on-CDNA3 validation, paper-scale parity, and leaderboard authority. | Active in v1.21 |
+| Complete CDNA3 test readiness without hardware execution | User requested a new milestone to fill out real usable CDNA3 tests and docs, while acknowledging the current machine cannot execute the validation and actual hardware verification remains deferred. | Active in v1.28 |
 
 ## Evolution
 
@@ -828,4 +872,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-01 after v1.21 milestone start*
+*Last updated: 2026-06-04 after v1.28 milestone start*
