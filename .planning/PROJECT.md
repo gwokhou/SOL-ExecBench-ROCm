@@ -15,26 +15,24 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
 ## Current State
 
-**Shipped version:** v1.27 Copyright Provenance Cleanup,
-completed 2026-06-02.
+**Shipped version:** v1.28 CDNA3 Test and Documentation Readiness,
+completed 2026-06-04.
 
-**Current milestone:** v1.28 CDNA3 Test and Documentation Readiness.
+**Current milestone:** Awaiting next milestone.
 
 **Queued milestone:** None defined.
 
-**Latest milestone outcome:** v1.27 completed release-facing copyright and
+**Latest milestone outcome:** v1.28 completed CDNA3 test and documentation
+readiness by adding concrete `requires_cdna3` hardware-gated tests, expanding
+the MI300X evidence contract, preserving deferred-validation guardrails, and
+documenting public/contributor CDNA3 test readiness.
+
+**Previous milestone outcome:** v1.27 completed release-facing copyright and
 provenance cleanup by classifying active files, correcting SPDX attribution,
 documenting fork/paper/non-endorsement boundaries, and adding provenance-aware
 readiness guardrails.
 
-**Previous milestone outcome:** v1.26 produced the public prerelease and
-research preview package with versioned artifact bundles, readiness gates,
-research preview evidence, public publishing materials, and corrected
-MI300X-as-CDNA3 wording.
-
-**Next milestone goal:** Complete the real-CDNA3-ready test and documentation
-surface while keeping actual MI300X/gfx942 hardware execution deferred until
-future hardware access exists.
+**Next milestone goal:** None defined.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline.
 Milestones v1.1-v1.6 added CDNA 3 code/schema support, maintained residue
@@ -133,12 +131,17 @@ hardware-validation claim boundary. It should add actual `requires_cdna3` test
 entry points, validation commands, documentation, and CPU-safe guardrails, but
 the current machine is not expected to execute MI300X/gfx942 validation.
 
-## Current Milestone: v1.28 CDNA3 Test and Documentation Readiness
+## Recently Shipped Milestone: v1.28 CDNA3 Test and Documentation Readiness
 
 **Goal:** Complete the CDNA3/gfx94* testing, documentation, and evidence
 readiness surface so the next real MI300X validation run has concrete commands,
 test entry points, and claim guardrails, while explicitly deferring actual
 hardware execution on the current machine.
+
+**Shipped outcome:** v1.28 added a concrete `requires_cdna3` hardware-gated test
+surface, expanded MI300X evidence blockers and required artifacts, kept
+readiness separate from hardware validation through CPU-safe guardrails, and
+updated public/contributor docs for future CDNA3 testing.
 
 **Target features:**
 - Real `requires_cdna3` test coverage that exercises CDNA3-only hardware paths
@@ -872,4 +875,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-04 after v1.28 milestone start*
+*Last updated: 2026-06-04 after v1.28 milestone completion*
