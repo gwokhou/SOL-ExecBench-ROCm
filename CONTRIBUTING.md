@@ -90,8 +90,21 @@ Use environment-sensitive markers where appropriate:
 - `requires_cutile` for legacy NVIDIA-only coverage that should be skipped in
   this ROCm-only port
 
+Place future CDNA3-specific live tests near related package coverage under
+`tests/sol_execbench/` and mark them with both `requires_rocm` and
+`requires_cdna3` when they need a real `gfx94*` GPU. Use
+`tests/sol_execbench/test_cdna3_hardware_marker.py` as the minimal marker-gate
+pattern. CPU-safe tests may cover `gfx940`, `gfx941`, and `gfx942` schema or
+metadata behavior, but those tests must not claim hardware validation.
+
 For hardware-sensitive changes, record the ROCm version, GPU architecture,
 container target if used, and exact test commands in the PR.
+
+For MI300X/CDNA3 validation changes, also record whether the run produced the
+handoff evidence chain: full pytest log, dataset summary, environment report,
+clock-lock evidence, per-problem traces, ROCm timing evidence, AMD-native score
+report, FP8 status, and NVFP4/MXFP4 deferred status. Until that evidence exists,
+describe CDNA3 work as schema support, test readiness, or deferred validation.
 
 ## Documentation
 

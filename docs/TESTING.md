@@ -109,6 +109,19 @@ uv run pytest tests -m requires_cdna3 -n 0
 uv run pytest tests -m requires_rocm_dev -n 0
 ```
 
+For CDNA3 readiness specifically, the lightweight marker surface lives in
+`tests/sol_execbench/test_cdna3_hardware_marker.py`:
+
+```bash
+uv run pytest tests/sol_execbench/test_cdna3_hardware_marker.py -m requires_cdna3 -n 0
+```
+
+On non-CDNA3 hosts this command should skip the live hardware test with a
+reason such as `requires AMD CDNA 3 ROCm GPU` or the ROCm availability reason.
+That skip is expected on the current machine and is not a CDNA3 validation
+failure. Passing this marker test on `gfx94*` hardware proves the test gate is
+usable; it is still not full MI300X hardware-validation evidence.
+
 For native library categories, use marker-filtered runs for the installed
 headers:
 
@@ -268,6 +281,16 @@ uv run pytest tests -m requires_rocm -n 0
 uv run pytest tests -m requires_rdna4 -n 0
 uv run pytest tests -m requires_cdna3 -n 0
 ```
+
+CDNA3-only marker readiness can also be checked directly:
+
+```bash
+uv run pytest tests/sol_execbench/test_cdna3_hardware_marker.py -m requires_cdna3 -n 0
+```
+
+Interpret CDNA3 skips carefully: skipped tests on RDNA 4, macOS, or ROCm-less
+containers mean the host is not a `gfx94*` validation target. They do not
+upgrade or invalidate the deferred MI300X full-suite status.
 
 For Matrix evidence, the current host ROCm 7.1.x environment may be recorded as
 observed evidence through compatibility sidecars. ROCm 7.0.x or

@@ -79,7 +79,7 @@ cannot be mistaken for completed hardware validation.
 
 ### Phase 130: CDNA3 Public Documentation Closure
 
-**Status:** Pending
+**Status:** Complete
 
 **Goal:** Update public and contributor-facing documentation so users know how
 to run CDNA3 tests, interpret skips, add future CDNA3 coverage, and understand
@@ -113,13 +113,13 @@ the difference between readiness and validation.
 | CDNA3-GATE-02 | Phase 129 | Complete |
 | CDNA3-GATE-03 | Phase 129 | Complete |
 | CDNA3-GATE-04 | Phase 129 | Complete |
-| CDNA3-DOC-01 | Phase 130 | Pending |
-| CDNA3-DOC-02 | Phase 130 | Pending |
-| CDNA3-DOC-03 | Phase 130 | Pending |
-| CDNA3-DOC-04 | Phase 130 | Pending |
+| CDNA3-DOC-01 | Phase 130 | Complete |
+| CDNA3-DOC-02 | Phase 130 | Complete |
+| CDNA3-DOC-03 | Phase 130 | Complete |
+| CDNA3-DOC-04 | Phase 130 | Complete |
 
 **Coverage:** 16/16 v1.28 requirements mapped.
-**Progress:** 12/16 requirements complete; 3/4 phases complete.
+**Progress:** 16/16 requirements complete; 4/4 phases complete.
 
 ## Completed Milestones
 
@@ -160,7 +160,6 @@ the difference between readiness and validation.
 
 ## Current Position
 
-**Status:** Phase 129 complete. Ready to discuss or plan Phase 130.
+**Status:** All v1.28 phases complete. Ready for milestone audit.
 
-Run `$gsd-discuss-phase 130` to gather implementation context, or
-`$gsd-plan-phase 130` to plan directly.
+Run `$gsd-audit-milestone` before completing the milestone.

@@ -117,10 +117,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CDNA3-GATE-02 | Phase 129 | Complete |
 | CDNA3-GATE-03 | Phase 129 | Complete |
 | CDNA3-GATE-04 | Phase 129 | Complete |
-| CDNA3-DOC-01 | Phase 130 | Pending |
-| CDNA3-DOC-02 | Phase 130 | Pending |
-| CDNA3-DOC-03 | Phase 130 | Pending |
-| CDNA3-DOC-04 | Phase 130 | Pending |
+| CDNA3-DOC-01 | Phase 130 | Complete |
+| CDNA3-DOC-02 | Phase 130 | Complete |
+| CDNA3-DOC-03 | Phase 130 | Complete |
+| CDNA3-DOC-04 | Phase 130 | Complete |
 
 **Coverage:**
 - v1.28 requirements: 16 total
