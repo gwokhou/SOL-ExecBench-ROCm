@@ -1,5 +1,41 @@
 # Milestones
 
+## v1.28 CDNA3 Test and Documentation Readiness (Shipped: 2026-06-04)
+
+**Phases completed:** 127-130 (4 phases, 4 plans)
+
+**Key accomplishments:**
+
+- Added a concrete `requires_cdna3` hardware-gated pytest surface with
+  CPU-safe marker registration, `gfx94*` detection, skip-behavior, and
+  marker-use audit coverage.
+
+- Expanded the MI300X/gfx942 evidence contract with required artifacts,
+  validation result categories, blocker checks, FP8 readiness, and
+  NVFP4/MXFP4 deferral.
+
+- Preserved no-claim guardrails so CDNA3 schema/build/test readiness cannot be
+  reported as completed CDNA3 or MI300X hardware validation without complete
+  real-hardware evidence.
+
+- Updated testing, ROCm support, and contributor documentation to explain how
+  to run CDNA3 marker tests, interpret skips, add future CDNA3 tests, and
+  archive future MI300X evidence.
+
+**Explicitly deferred:**
+
+- Actual MI300X/gfx942 full-suite execution and dataset validation.
+- CDNA4 validation, paper-scale validation, upstream SOLAR parity, hosted
+  leaderboard authority, and hard multi-tenant sandboxing.
+
+---
+
+## v1.22 Roadmap: SOL ExecBench ROCm Port (Backfilled: 2026-06-03)
+
+**Note:** Synthesized from archive snapshot by `/gsd-health --backfill`. Original completion date unknown.
+
+---
+
 ## v1.27 Copyright Provenance Cleanup (Shipped: 2026-06-02)
 
 **Phases completed:** 4 phases, 4 plans, 0 tasks

@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.28
 milestone_name: CDNA3 Test and Documentation Readiness
-status: phases_complete
+status: Awaiting next milestone
 last_updated: "2026-06-04T00:00:00+08:00"
-last_activity: 2026-06-04 — Phase 130 completed; all v1.28 phases complete
+last_activity: 2026-06-04 — Milestone v1.28 completed and archived
 progress:
   total_phases: 4
   completed_phases: 4
@@ -22,14 +22,14 @@ See: `.planning/PROJECT.md` (updated 2026-06-01)
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly
 on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL
 ExecBench.
-**Current focus:** v1.28 CDNA3 Test and Documentation Readiness is planned.
+**Current focus:** v1.28 CDNA3 Test and Documentation Readiness completed; awaiting next milestone.
 
 ## Current Position
 
-Phase: Milestone v1.28 phases complete
+Phase: Milestone v1.28 complete
 Plan: —
-Status: Ready for milestone audit
-Last activity: 2026-06-04 — Phase 130 completed; all v1.28 phases complete
+Status: Awaiting next milestone
+Last activity: 2026-06-04 — Milestone v1.28 completed and archived
 
 ## Recent Trend
 
@@ -75,6 +75,7 @@ Last activity: 2026-06-04 — Phase 130 completed; all v1.28 phases complete
 - Phase 130 completed on 2026-06-04 with testing, ROCm support, and
   contributor documentation for CDNA3 marker readiness and deferred MI300X
   validation evidence.
+- Milestone v1.28 passed audit and was archived on 2026-06-04.
 
 ## Accumulated Context
 
@@ -119,10 +120,9 @@ None.
 ## Session Continuity
 
 Last session: 2026-06-04
-Stopped at: all v1.28 phases complete; ready for milestone audit.
+Stopped at: Milestone v1.28 complete.
 Resume file: None
 
 ## Operator Next Steps
 
-- Run `/gsd-audit-milestone`.
-- Then run `/gsd-complete-milestone v1.28` if the audit passes.
+- Start the next milestone with `/gsd-new-milestone`.
