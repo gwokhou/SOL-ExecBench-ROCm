@@ -4,13 +4,13 @@ milestone: v1.28
 milestone_name: CDNA3 Test and Documentation Readiness
 status: planning
 last_updated: "2026-06-04T00:00:00+08:00"
-last_activity: 2026-06-04 — Phase 127 completed
+last_activity: 2026-06-04 — Phase 128 completed
 progress:
   total_phases: 4
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 4
-  completed_plans: 1
-  percent: 25
+  completed_plans: 2
+  percent: 50
 ---
 
 # Project State
@@ -26,10 +26,10 @@ ExecBench.
 
 ## Current Position
 
-Phase: 128 MI300X Evidence Contract and Validation Handoff
+Phase: 129 Deferred-Execution Guardrails
 Plan: —
 Status: Ready for phase discussion or planning
-Last activity: 2026-06-04 — Phase 127 completed
+Last activity: 2026-06-04 — Phase 128 completed
 
 ## Recent Trend
 
@@ -68,6 +68,8 @@ Last activity: 2026-06-04 — Phase 127 completed
 - Phase 127 completed on 2026-06-04 with concrete `requires_cdna3` hardware
   marker tests, CPU-safe skip behavior checks, AST marker-use audit coverage,
   and CDNA3 metadata tests.
+- Phase 128 completed on 2026-06-04 with expanded MI300X evidence artifacts,
+  result categories, diagnostics blockers, and handoff/readiness documentation.
 
 ## Accumulated Context
 
@@ -112,10 +114,10 @@ None.
 ## Session Continuity
 
 Last session: 2026-06-04
-Stopped at: Phase 127 complete; ready for Phase 128.
+Stopped at: Phase 128 complete; ready for Phase 129.
 Resume file: None
 
 ## Operator Next Steps
 
-- Run `/gsd-discuss-phase 128` to gather implementation context.
-- Or run `/gsd-plan-phase 128` to plan Phase 128 directly.
+- Run `/gsd-discuss-phase 129` to gather implementation context.
+- Or run `/gsd-plan-phase 129` to plan Phase 129 directly.

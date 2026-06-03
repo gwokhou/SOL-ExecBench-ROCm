@@ -41,12 +41,27 @@ uv run scripts/run_dataset.py <path-to-SOL-ExecBench-benchmark> \
   the selected validation slice.
 - NVFP4/MXFP4 status: must remain `deferred_no_amd_path`.
 
+## Expected Result Categories
+
+The validation archive must classify and record:
+
+- expected skips
+- missing tools
+- functional failures
+- timing instability
+- missing evidence
+- FP8 validation
+- deferred quantization formats
+
 ## Acceptance Criteria
 
 - Full adapted pytest suite passes on real MI300X hardware.
 - Dataset validation run completes with expected skips/deviations documented.
 - Environment evidence records MI300X and `gfx942`.
 - Clock locking is enabled and recorded.
+- Per-problem traces, ROCm timing evidence, and AMD-native score report are
+  archived.
+- Expected result categories are present even when empty.
 - Reports are not marked MI300X hardware-validated as CDNA3 unless
   `mi300x_validation_claim_blockers()` returns no blockers.
 

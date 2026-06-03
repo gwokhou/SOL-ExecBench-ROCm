@@ -33,12 +33,17 @@ rocminfo | grep -E "Name: *gfx94|Marketing Name" || true
 - ROCm/HIP/PyTorch versions.
 - Full pytest command and final pass/skip/fail counts.
 - Expected skips and CDNA 3-specific deviations.
+- For MI300X (`gfx942`) validation, include clock-lock evidence, dataset
+  summary, per-problem traces, ROCm timing evidence, AMD-native score report,
+  FP8 status, NVFP4/MXFP4 deferred status, and expected result categories.
 
 ## Acceptance Criteria
 
 - Full adapted pytest suite completes successfully on a real CDNA 3 GPU.
 - Recorded environment reports `gfx94*`.
 - Support matrix claim is updated only after recorded evidence exists.
+- MI300X support status is not upgraded unless
+  `mi300x_validation_claim_blockers()` returns no blockers.
 
 ## No-Claim Guardrail
 

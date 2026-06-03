@@ -221,6 +221,21 @@ MI300X_REQUIRED_ARTIFACTS: tuple[str, ...] = (
     "run_dataset_summary",
     "environment_report",
     "clock_lock_evidence",
+    "per_problem_traces",
+    "rocm_timing_evidence",
+    "amd_native_score_report",
+    "fp8_validation_result",
+    "nvfp4_mxfp4_deferred_status",
+)
+
+MI300X_VALIDATION_RESULT_CATEGORIES: tuple[str, ...] = (
+    "expected_skips",
+    "missing_tools",
+    "functional_failures",
+    "timing_instability",
+    "missing_evidence",
+    "fp8_validation",
+    "deferred_quantization_formats",
 )
 
 MI300X_FP8_READINESS: tuple[str, ...] = (
@@ -396,6 +411,19 @@ def mi300x_validation_claim_blockers(evidence: Mapping[str, object]) -> tuple[st
     ]
     if missing_artifacts:
         blockers.append("missing validation artifacts: " + ", ".join(missing_artifacts))
+
+    result_categories = evidence.get("result_categories", ())
+    if not isinstance(result_categories, (list, tuple, set)):
+        result_categories = ()
+    missing_categories = [
+        category
+        for category in MI300X_VALIDATION_RESULT_CATEGORIES
+        if category not in result_categories
+    ]
+    if missing_categories:
+        blockers.append(
+            "missing validation result categories: " + ", ".join(missing_categories)
+        )
 
     fp8_status = evidence.get("fp8_validation")
     if fp8_status not in {"passed", "deferred_no_case"}:
