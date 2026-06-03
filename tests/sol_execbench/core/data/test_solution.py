@@ -158,6 +158,24 @@ class TestHardwareAndCompileOptions:
         spec = _make_spec(target_hardware=[target])
         assert spec.target_hardware == [SupportedHardware(target)]
 
+    @pytest.mark.parametrize("target", CDNA3_TARGETS)
+    def test_cdna3_native_offload_arch_metadata_is_accepted_without_validation_claim(
+        self, target
+    ):
+        spec = _make_spec(
+            languages=["hip_cpp"],
+            target_hardware=[target],
+            entry_point="kernel.hip::run",
+            compile_options={"hip_cflags": ["-O3", f"--offload-arch={target}"]},
+        )
+
+        assert spec.target_hardware == [SupportedHardware(target)]
+        assert spec.compile_options is not None
+        assert spec.compile_options.hip_cflags == [
+            "-O3",
+            f"--offload-arch={target}",
+        ]
+
     def test_compile_options_defaults_are_hip_minimal(self):
         opts = CompileOptions()
         assert opts.cflags == []
