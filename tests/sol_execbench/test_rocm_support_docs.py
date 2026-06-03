@@ -31,6 +31,25 @@ def test_docs_distinguish_cdna3_schema_support_from_hardware_validation():
     assert "code/schema support" in combined
     assert "hardware validation deferred" in combined
     assert "Do not claim" in combined
+    assert "CDNA3 test readiness is now concrete" in combined
+    assert "mi300x_validation_claim_blockers()" in combined
+
+
+def test_contributing_docs_explain_future_cdna3_test_and_evidence_rules():
+    contributing = _read("CONTRIBUTING.md")
+
+    for phrase in (
+        "requires_rocm` and",
+        "`requires_cdna3`",
+        "test_cdna3_hardware_marker.py",
+        "must not claim hardware validation",
+        "full pytest log",
+        "per-problem traces",
+        "ROCm timing evidence",
+        "AMD-native score",
+        "NVFP4/MXFP4 deferred status",
+    ):
+        assert phrase in contributing
 
 
 def test_cdna3_validation_handoff_defines_next_milestone_gate():

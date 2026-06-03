@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.28
 milestone_name: CDNA3 Test and Documentation Readiness
-status: planning
+status: phases_complete
 last_updated: "2026-06-04T00:00:00+08:00"
-last_activity: 2026-06-04 — Phase 129 completed
+last_activity: 2026-06-04 — Phase 130 completed; all v1.28 phases complete
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 4
-  completed_plans: 3
-  percent: 75
+  completed_plans: 4
+  percent: 100
 ---
 
 # Project State
@@ -26,10 +26,10 @@ ExecBench.
 
 ## Current Position
 
-Phase: 130 CDNA3 Public Documentation Closure
+Phase: Milestone v1.28 phases complete
 Plan: —
-Status: Ready for phase discussion or planning
-Last activity: 2026-06-04 — Phase 129 completed
+Status: Ready for milestone audit
+Last activity: 2026-06-04 — Phase 130 completed; all v1.28 phases complete
 
 ## Recent Trend
 
@@ -72,6 +72,9 @@ Last activity: 2026-06-04 — Phase 129 completed
   result categories, diagnostics blockers, and handoff/readiness documentation.
 - Phase 129 completed on 2026-06-04 with CPU-safe public contract guardrails
   preserving CDNA3 deferred-validation wording after readiness expansion.
+- Phase 130 completed on 2026-06-04 with testing, ROCm support, and
+  contributor documentation for CDNA3 marker readiness and deferred MI300X
+  validation evidence.
 
 ## Accumulated Context
 
@@ -116,10 +119,10 @@ None.
 ## Session Continuity
 
 Last session: 2026-06-04
-Stopped at: Phase 129 complete; ready for Phase 130.
+Stopped at: all v1.28 phases complete; ready for milestone audit.
 Resume file: None
 
 ## Operator Next Steps
 
-- Run `/gsd-discuss-phase 130` to gather implementation context.
-- Or run `/gsd-plan-phase 130` to plan Phase 130 directly.
+- Run `/gsd-audit-milestone`.
+- Then run `/gsd-complete-milestone v1.28` if the audit passes.

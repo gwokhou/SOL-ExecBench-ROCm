@@ -200,6 +200,14 @@ artifacts, and hardware/software environment details recorded before the
 support matrix is upgraded to hardware-validated. FP8 validation is expected on
 MI300X once hardware access exists; NVFP4/MXFP4 validation remains deferred.
 
+CDNA3 test readiness is now concrete but still bounded: the repository contains
+`tests/sol_execbench/test_cdna3_hardware_marker.py`, which is selected with
+`requires_cdna3` and runs only on `gfx94*` ROCm targets. A pass of that
+lightweight marker test confirms the CDNA3 test gate is usable; it is not a
+replacement for the full MI300X evidence chain. The status may change from
+readiness to hardware-validated only after the MI300X handoff artifacts exist
+and `mi300x_validation_claim_blockers()` returns no blockers.
+
 The v1.8 ROCm library ecosystem milestone uses RDNA 4 validation only.
 MI300X library validation remains future work, and CDNA4 validation is
 unavailable until suitable hardware is accessible.
