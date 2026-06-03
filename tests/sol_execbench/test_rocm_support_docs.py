@@ -34,7 +34,7 @@ def test_docs_distinguish_cdna3_schema_support_from_hardware_validation():
 
 
 def test_cdna3_validation_handoff_defines_next_milestone_gate():
-    handoff = _read(".planning/CDNA3-VALIDATION-HANDOFF.md")
+    handoff = _read(".planning/milestones/CDNA3-VALIDATION-HANDOFF.md")
 
     expected = [
         "uv run --no-sync pytest tests/",
@@ -48,7 +48,7 @@ def test_cdna3_validation_handoff_defines_next_milestone_gate():
 
 
 def test_mi300x_validation_handoff_defines_evidence_gate():
-    handoff = _read(".planning/MI300X-VALIDATION-HANDOFF.md")
+    handoff = _read(".planning/milestones/MI300X-VALIDATION-HANDOFF.md")
 
     expected = [
         "AMD Instinct MI300X",
@@ -56,6 +56,12 @@ def test_mi300x_validation_handoff_defines_evidence_gate():
         "ROCm >= 7.0",
         "--lock-clocks",
         "Evidence To Record",
+        "per-problem traces",
+        "ROCm timing evidence",
+        "AMD-native score report",
+        "Expected Result Categories",
+        "missing tools",
+        "timing instability",
         "FP8 validation result",
         "NVFP4/MXFP4 validation remains `deferred_no_amd_path`",
         "mi300x_validation_claim_blockers()",

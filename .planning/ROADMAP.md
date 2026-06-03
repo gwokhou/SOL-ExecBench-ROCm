@@ -36,7 +36,7 @@ registered marker.
 
 ### Phase 128: MI300X Evidence Contract and Validation Handoff
 
-**Status:** Pending
+**Status:** Complete
 
 **Goal:** Turn MI300X/gfx942 validation readiness into a concrete future-run
 contract covering commands, artifacts, environment capture, timing evidence,
@@ -105,10 +105,10 @@ the difference between readiness and validation.
 | CDNA3-TEST-02 | Phase 127 | Complete |
 | CDNA3-TEST-03 | Phase 127 | Complete |
 | CDNA3-TEST-04 | Phase 127 | Complete |
-| MI300X-EVID-01 | Phase 128 | Pending |
-| MI300X-EVID-02 | Phase 128 | Pending |
-| MI300X-EVID-03 | Phase 128 | Pending |
-| MI300X-EVID-04 | Phase 128 | Pending |
+| MI300X-EVID-01 | Phase 128 | Complete |
+| MI300X-EVID-02 | Phase 128 | Complete |
+| MI300X-EVID-03 | Phase 128 | Complete |
+| MI300X-EVID-04 | Phase 128 | Complete |
 | CDNA3-GATE-01 | Phase 129 | Pending |
 | CDNA3-GATE-02 | Phase 129 | Pending |
 | CDNA3-GATE-03 | Phase 129 | Pending |
@@ -119,7 +119,7 @@ the difference between readiness and validation.
 | CDNA3-DOC-04 | Phase 130 | Pending |
 
 **Coverage:** 16/16 v1.28 requirements mapped.
-**Progress:** 4/16 requirements complete; 1/4 phases complete.
+**Progress:** 8/16 requirements complete; 2/4 phases complete.
 
 ## Completed Milestones
 
@@ -160,7 +160,7 @@ the difference between readiness and validation.
 
 ## Current Position
 
-**Status:** Phase 127 complete. Ready to discuss or plan Phase 128.
+**Status:** Phase 128 complete. Ready to discuss or plan Phase 129.
 
-Run `$gsd-discuss-phase 128` to gather implementation context, or
-`$gsd-plan-phase 128` to plan directly.
+Run `$gsd-discuss-phase 129` to gather implementation context, or
+`$gsd-plan-phase 129` to plan directly.

@@ -6,6 +6,7 @@ from sol_execbench.core.diagnostics import (
     DiagnosticStage,
     MI300X_FP8_READINESS,
     MI300X_REQUIRED_ARTIFACTS,
+    MI300X_VALIDATION_RESULT_CATEGORIES,
     ROCM_LIBRARY_SPECS,
     ProfilerBackend,
     StageDiagnostic,
@@ -187,6 +188,7 @@ def test_mi300x_validation_claim_requires_complete_evidence():
             "clocks_locked": False,
             "full_suite_passed": False,
             "artifacts": [],
+            "result_categories": [],
             "fp8_validation": "missing",
             "nvfp4_mxfp4_validation": "passed",
         }
@@ -197,6 +199,9 @@ def test_mi300x_validation_claim_requires_complete_evidence():
     assert "gfx must be a CDNA 3 gfx94* target" in blockers
     assert "clock-lock evidence must record clocks_locked=True" in blockers
     assert any("missing validation artifacts" in blocker for blocker in blockers)
+    assert any(
+        "missing validation result categories" in blocker for blocker in blockers
+    )
 
 
 def test_mi300x_validation_claim_allows_complete_evidence():
@@ -207,11 +212,17 @@ def test_mi300x_validation_claim_allows_complete_evidence():
         "clocks_locked": True,
         "full_suite_passed": True,
         "artifacts": list(MI300X_REQUIRED_ARTIFACTS),
+        "result_categories": list(MI300X_VALIDATION_RESULT_CATEGORIES),
         "fp8_validation": "passed",
         "nvfp4_mxfp4_validation": "deferred_no_amd_path",
     }
 
     assert mi300x_validation_claim_blockers(evidence) == ()
     assert can_mark_mi300x_hardware_validated(evidence) is True
+    assert "per_problem_traces" in MI300X_REQUIRED_ARTIFACTS
+    assert "rocm_timing_evidence" in MI300X_REQUIRED_ARTIFACTS
+    assert "amd_native_score_report" in MI300X_REQUIRED_ARTIFACTS
+    assert "missing_tools" in MI300X_VALIDATION_RESULT_CATEGORIES
+    assert "timing_instability" in MI300X_VALIDATION_RESULT_CATEGORIES
     assert "MI300X, as a CDNA 3 GPU, can validate FP8" in MI300X_FP8_READINESS[0]
     assert "NVFP4/MXFP4 validation is deferred" in MI300X_FP8_READINESS[1]
