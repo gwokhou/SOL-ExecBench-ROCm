@@ -1575,9 +1575,15 @@ def test_public_example_paths_remain_hip_facing():
 
 
 def test_cdna3_validation_remains_deferred_in_docs():
-    handoff = Path(".planning/CDNA3-VALIDATION-HANDOFF.md").read_text()
+    handoff = Path(".planning/milestones/CDNA3-VALIDATION-HANDOFF.md").read_text()
     project = Path(".planning/PROJECT.md").read_text()
+    requirements = Path(".planning/REQUIREMENTS.md").read_text()
+    roadmap = Path(".planning/ROADMAP.md").read_text()
     assert "Status:** Deferred to next milestone" in handoff
-    assert "hardware validation remains deferred" in project
-    assert "v1.6" in project
+    assert "actual MI300X/gfx942 hardware execution deferred" in project
+    assert "actual full-suite" in project
+    assert "Actual CDNA3/MI300X full-suite execution in v1.28" in requirements
+    assert "does not claim CDNA3 hardware validation" in roadmap
+    assert "requires_cdna3" in roadmap
     assert "CDNA3 full-suite validation has not been recorded" in CDNA3_NO_VALIDATION_WARNING
+    assert "hardware-validation claim" in CDNA3_NO_VALIDATION_WARNING
