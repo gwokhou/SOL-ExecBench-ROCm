@@ -16,7 +16,7 @@ paper-scale validation.
 
 ### Phase 127: CDNA3 Hardware-Gated Test Surface
 
-**Status:** Pending
+**Status:** Complete
 
 **Goal:** Add concrete CDNA3-only pytest coverage and selection semantics so
 `requires_cdna3` is an actionable hardware-gated test path rather than only a
@@ -101,10 +101,10 @@ the difference between readiness and validation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CDNA3-TEST-01 | Phase 127 | Pending |
-| CDNA3-TEST-02 | Phase 127 | Pending |
-| CDNA3-TEST-03 | Phase 127 | Pending |
-| CDNA3-TEST-04 | Phase 127 | Pending |
+| CDNA3-TEST-01 | Phase 127 | Complete |
+| CDNA3-TEST-02 | Phase 127 | Complete |
+| CDNA3-TEST-03 | Phase 127 | Complete |
+| CDNA3-TEST-04 | Phase 127 | Complete |
 | MI300X-EVID-01 | Phase 128 | Pending |
 | MI300X-EVID-02 | Phase 128 | Pending |
 | MI300X-EVID-03 | Phase 128 | Pending |
@@ -119,7 +119,7 @@ the difference between readiness and validation.
 | CDNA3-DOC-04 | Phase 130 | Pending |
 
 **Coverage:** 16/16 v1.28 requirements mapped.
-**Progress:** 0/16 requirements complete; 0/4 phases complete.
+**Progress:** 4/16 requirements complete; 1/4 phases complete.
 
 ## Completed Milestones
 
@@ -160,8 +160,7 @@ the difference between readiness and validation.
 
 ## Current Position
 
-**Status:** v1.28 requirements and roadmap defined. Ready to discuss or plan
-Phase 127.
+**Status:** Phase 127 complete. Ready to discuss or plan Phase 128.
 
-Run `$gsd-discuss-phase 127` to gather implementation context, or
-`$gsd-plan-phase 127` to plan directly.
+Run `$gsd-discuss-phase 128` to gather implementation context, or
+`$gsd-plan-phase 128` to plan directly.

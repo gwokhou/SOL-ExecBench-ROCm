@@ -105,10 +105,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CDNA3-TEST-01 | Phase 127 | Pending |
-| CDNA3-TEST-02 | Phase 127 | Pending |
-| CDNA3-TEST-03 | Phase 127 | Pending |
-| CDNA3-TEST-04 | Phase 127 | Pending |
+| CDNA3-TEST-01 | Phase 127 | Complete |
+| CDNA3-TEST-02 | Phase 127 | Complete |
+| CDNA3-TEST-03 | Phase 127 | Complete |
+| CDNA3-TEST-04 | Phase 127 | Complete |
 | MI300X-EVID-01 | Phase 128 | Pending |
 | MI300X-EVID-02 | Phase 128 | Pending |
 | MI300X-EVID-03 | Phase 128 | Pending |

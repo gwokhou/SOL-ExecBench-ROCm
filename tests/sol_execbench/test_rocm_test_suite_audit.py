@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -12,6 +13,31 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def _read(path: str) -> str:
     return (ROOT / path).read_text()
+
+
+def _attr_path(node: ast.AST) -> str:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return f"{_attr_path(node.value)}.{node.attr}"
+    if isinstance(node, ast.Call):
+        return _attr_path(node.func)
+    return ""
+
+
+def _has_direct_cdna3_marked_test(path: Path) -> bool:
+    tree = ast.parse(path.read_text())
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+            continue
+        if not node.name.startswith("test_"):
+            continue
+        if any(
+            _attr_path(decorator) == "pytest.mark.requires_cdna3"
+            for decorator in node.decorator_list
+        ):
+            return True
+    return False
 
 
 def test_pytest_markers_describe_rocm_hardware_semantics():
@@ -62,7 +88,17 @@ def test_hardware_markers_do_not_create_mi300x_or_cdna4_validation_shortcuts():
         assert "CDNA4 validation" not in content
 
     assert "CDNA3-family hardware-validation claims" in concerns
-    assert "CDNA3-family, CDNA4, or native-host ROCm validation expansion" in requirements
+    assert "Claiming CDNA3 hardware validation" in requirements
+
+
+def test_cdna3_marker_has_concrete_hardware_gated_test_surface():
+    candidates = [
+        path
+        for path in (ROOT / "tests").rglob("test_*.py")
+        if path.name != "test_rocm_test_suite_audit.py"
+    ]
+
+    assert any(_has_direct_cdna3_marked_test(path) for path in candidates)
 
 
 def test_cdna3_schema_support_is_distinct_from_hardware_validation():
@@ -72,8 +108,8 @@ def test_cdna3_schema_support_is_distinct_from_hardware_validation():
     for target in ("gfx940", "gfx941", "gfx942"):
         assert target in solution_schema
 
-    assert "MI300X full-suite validation on CDNA3 (`gfx942`)" in requirements
-    assert "Requires real hardware evidence" in requirements
+    assert "Actual CDNA3/MI300X full-suite execution in v1.28" in requirements
+    assert "Requires complete real-hardware evidence" in requirements
 
 
 def test_native_language_groups_are_rocm_only():
