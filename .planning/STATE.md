@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.29
 milestone_name: Dataset Migration and Compliance
 status: planning
-last_updated: "2026-06-04T02:09:37.951Z"
+last_updated: "2026-06-04T02:17:57Z"
 last_activity: 2026-06-04
 progress:
   total_phases: 5
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  completed_phases: 1
+  total_plans: 1
+  completed_plans: 1
+  percent: 20
 ---
 
 # Project State
@@ -29,10 +29,10 @@ ROCm-equivalent low-precision semantics.
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Ready to plan Phase 131
-Last activity: 2026-06-04 — Milestone v1.29 requirements and roadmap defined
+Phase: 131 complete
+Plan: 131-01
+Status: Ready to plan Phase 132
+Last activity: 2026-06-04 — Phase 131 completed dataset license and provenance policy guardrails
 
 ## Recent Trend
 
@@ -91,6 +91,11 @@ Last activity: 2026-06-04 — Milestone v1.29 requirements and roadmap defined
   ROCm readiness classification, NVIDIA/Blackwell low-precision compatibility,
   and dataset-runner/public guardrails.
 
+- Phase 131 completed on 2026-06-04 with machine-readable dataset provenance
+  policy, redistribution classes, staged/release guardrails, prerelease
+  readiness integration, and docs preserving NVIDIA Evaluation Dataset License
+  and Apache-2.0 FlashInfer Trace boundaries.
+
 ## Accumulated Context
 
 ### Decisions
@@ -120,6 +125,10 @@ Last activity: 2026-06-04 — Milestone v1.29 requirements and roadmap defined
   dataset content; users must download and migrate that data locally under
   their own applicable license rights.
 
+- FlashInfer Trace provenance is tracked separately as Apache-2.0 content from
+  `flashinfer-ai/flashinfer-trace`; required notices must be preserved when
+  redistributing any FlashInfer Trace material.
+
 ### Pending Todos
 
 None.
@@ -145,9 +154,9 @@ None.
 ## Session Continuity
 
 Last session: 2026-06-04
-Stopped at: Milestone v1.29 started.
-Resume file: None
+Stopped at: Phase 131 complete.
+Resume file: .planning/phases/131-dataset-license-and-provenance-policy/131-VERIFICATION.md
 
 ## Operator Next Steps
 
-- Plan Phase 131 with `/gsd-plan-phase 131`.
+- Plan Phase 132 with `/gsd-plan-phase 132`.

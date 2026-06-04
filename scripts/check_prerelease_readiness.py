@@ -8,9 +8,11 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import sys
 import tomllib
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
+from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 from typing import Sequence
 
@@ -20,6 +22,7 @@ DEFAULT_OUTPUT_DIR = Path("out/prerelease_readiness")
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PROVENANCE_MANIFEST_PATH = Path("provenance.toml")
 PROVENANCE_DOC_PATH = Path("docs/provenance.md")
+DATASET_REDISTRIBUTION_SCRIPT_PATH = Path("scripts/check_dataset_redistribution.py")
 NVIDIA_HEADER = (
     "# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. "
     "All rights reserved."
@@ -90,6 +93,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     findings.extend(_check_provenance_policy())
     if manifest:
         findings.extend(_check_manifest(manifest, bundle_dir, checksums))
+        findings.extend(_check_dataset_release_redistribution(bundle_dir))
         if not args.skip_doc_claim_checks:
             findings.extend(_check_doc_claims())
 
@@ -469,6 +473,20 @@ def _check_provenance_policy(root: Path = REPO_ROOT) -> list[Finding]:
                 )
 
     nvidia_notice = provenance.get("nvidia_notice")
+    dataset_policy = provenance.get("dataset_policy")
+    if not isinstance(dataset_policy, dict):
+        findings.append(
+            Finding(
+                id="missing_dataset_policy",
+                status="blocking",
+                category="provenance",
+                message="provenance.toml must define [dataset_policy].",
+                path=PROVENANCE_MANIFEST_PATH.as_posix(),
+            )
+        )
+    else:
+        findings.extend(_check_dataset_policy(dataset_policy))
+
     if not isinstance(nvidia_notice, dict):
         findings.append(
             Finding(
@@ -553,6 +571,89 @@ def _check_provenance_policy(root: Path = REPO_ROOT) -> list[Finding]:
             )
 
     return findings
+
+
+def _check_dataset_policy(dataset_policy: dict[str, object]) -> list[Finding]:
+    findings: list[Finding] = []
+    if dataset_policy.get("schema_version") != "sol_execbench.dataset_provenance_policy.v1":
+        findings.append(
+            Finding(
+                id="dataset_policy_schema_mismatch",
+                status="blocking",
+                category="provenance",
+                message="Dataset policy schema must be sol_execbench.dataset_provenance_policy.v1.",
+                path=PROVENANCE_MANIFEST_PATH.as_posix(),
+            )
+        )
+    sources = _list_of_dicts(dataset_policy.get("sources"))
+    source_ids = {str(source.get("id", "")) for source in sources}
+    required_sources = {
+        "nvidia_sol_execbench",
+        "flashinfer_trace",
+        "generated_local_migration_artifacts",
+        "project_owned_rocm_code",
+    }
+    missing = required_sources - source_ids
+    if missing:
+        findings.append(
+            Finding(
+                id="dataset_policy_missing_sources",
+                status="blocking",
+                category="provenance",
+                message=f"Dataset policy missing sources: {', '.join(sorted(missing))}.",
+                path=PROVENANCE_MANIFEST_PATH.as_posix(),
+            )
+        )
+    nvidia_source = next(
+        (source for source in sources if source.get("id") == "nvidia_sol_execbench"),
+        None,
+    )
+    if nvidia_source is None:
+        return findings
+    if (
+        nvidia_source.get("license") != "NVIDIA Evaluation Dataset License"
+        or nvidia_source.get("repository_redistribution") is not False
+        or nvidia_source.get("release_bundle_redistribution") is not False
+    ):
+        findings.append(
+            Finding(
+                id="nvidia_dataset_boundary_mismatch",
+                status="blocking",
+                category="provenance",
+                message=(
+                    "NVIDIA SOL-ExecBench dataset policy must preserve NVIDIA Evaluation "
+                    "Dataset License and block repository/release redistribution."
+                ),
+                path=PROVENANCE_MANIFEST_PATH.as_posix(),
+            )
+        )
+    return findings
+
+
+def _check_dataset_release_redistribution(bundle_dir: Path) -> list[Finding]:
+    checker = _load_dataset_redistribution_checker()
+    policy = checker.load_dataset_policy(REPO_ROOT / PROVENANCE_MANIFEST_PATH)
+    return [
+        Finding(
+            id=f"restricted_dataset_in_release_bundle_{finding.source_id}",
+            status="blocking",
+            category="provenance",
+            message=finding.message,
+            path=finding.path,
+        )
+        for finding in checker.check_release_root(bundle_dir, policy)
+    ]
+
+
+def _load_dataset_redistribution_checker():
+    path = REPO_ROOT / DATASET_REDISTRIBUTION_SCRIPT_PATH
+    spec = spec_from_file_location("check_dataset_redistribution", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Could not load {path}")
+    module = module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 def _build_payload(

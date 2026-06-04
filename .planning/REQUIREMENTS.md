@@ -10,16 +10,16 @@ ExecBench.
 
 ### Dataset License And Provenance
 
-- [ ] **DATA-LIC-01**: Maintainer can distinguish `nvidia/SOL-ExecBench`,
+- [x] **DATA-LIC-01**: Maintainer can distinguish `nvidia/SOL-ExecBench`,
   `flashinfer-ai/flashinfer-trace`, generated local migration artifacts, and
   project-owned ROCm code through machine-readable provenance metadata.
-- [ ] **DATA-LIC-02**: Maintainer can identify which dataset artifacts may be
+- [x] **DATA-LIC-02**: Maintainer can identify which dataset artifacts may be
   committed, published, redistributed, generated locally, or excluded from
   release bundles.
-- [ ] **DATA-LIC-03**: Compliance checks fail if NVIDIA/SOL-ExecBench original
+- [x] **DATA-LIC-03**: Compliance checks fail if NVIDIA/SOL-ExecBench original
   or derivative dataset content is staged for repository or release
   redistribution.
-- [ ] **DATA-LIC-04**: Documentation preserves required license and attribution
+- [x] **DATA-LIC-04**: Documentation preserves required license and attribution
   boundaries for NVIDIA Evaluation Dataset License content and Apache-2.0
   FlashInfer Trace content.
 
@@ -141,10 +141,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DATA-LIC-01 | Phase 131 | Pending |
-| DATA-LIC-02 | Phase 131 | Pending |
-| DATA-LIC-03 | Phase 131 | Pending |
-| DATA-LIC-04 | Phase 131 | Pending |
+| DATA-LIC-01 | Phase 131 | Complete |
+| DATA-LIC-02 | Phase 131 | Complete |
+| DATA-LIC-03 | Phase 131 | Complete |
+| DATA-LIC-04 | Phase 131 | Complete |
 | DATA-MIG-01 | Phase 132 | Pending |
 | DATA-MIG-02 | Phase 132 | Pending |
 | DATA-MIG-03 | Phase 132 | Pending |

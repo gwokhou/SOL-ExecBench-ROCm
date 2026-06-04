@@ -307,3 +307,32 @@ def test_provenance_policy_check_blocks_cleanup_candidate_with_nvidia_header(tmp
         "unexpected_nvidia_notice",
         "cleanup_candidate_header_mismatch",
     }
+
+
+def test_readiness_blocks_restricted_nvidia_dataset_payload_in_bundle(tmp_path):
+    bundle_dir = tmp_path / "bundle"
+    output_dir = tmp_path / "readiness"
+    _write_bundle(bundle_dir)
+    restricted_path = (
+        bundle_dir / "data/SOL-ExecBench/benchmark/L1/problem/definition.json"
+    )
+    restricted_path.parent.mkdir(parents=True)
+    restricted_path.write_text("{}", encoding="utf-8")
+
+    assert (
+        check_prerelease_readiness.main(
+            [
+                "--bundle-dir",
+                str(bundle_dir),
+                "--output-dir",
+                str(output_dir),
+                "--skip-doc-claim-checks",
+            ]
+        )
+        == 1
+    )
+
+    report = _load_report(output_dir)
+    assert "restricted_dataset_in_release_bundle_nvidia_sol_execbench" in {
+        finding["id"] for finding in report["findings"]
+    }

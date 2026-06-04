@@ -16,7 +16,7 @@ redistribute NVIDIA dataset content.
 
 ### Phase 131: Dataset License and Provenance Policy
 
-**Status:** Pending
+**Status:** Complete
 
 **Goal:** Define enforceable source, license, provenance, and redistribution
 boundaries before any migrated dataset artifacts are generated or integrated.
@@ -120,10 +120,10 @@ DATA-DOC-01, DATA-DOC-02, DATA-DOC-03, DATA-DOC-04
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DATA-LIC-01 | Phase 131 | Pending |
-| DATA-LIC-02 | Phase 131 | Pending |
-| DATA-LIC-03 | Phase 131 | Pending |
-| DATA-LIC-04 | Phase 131 | Pending |
+| DATA-LIC-01 | Phase 131 | Complete |
+| DATA-LIC-02 | Phase 131 | Complete |
+| DATA-LIC-03 | Phase 131 | Complete |
+| DATA-LIC-04 | Phase 131 | Complete |
 | DATA-MIG-01 | Phase 132 | Pending |
 | DATA-MIG-02 | Phase 132 | Pending |
 | DATA-MIG-03 | Phase 132 | Pending |
@@ -146,7 +146,7 @@ DATA-DOC-01, DATA-DOC-02, DATA-DOC-03, DATA-DOC-04
 | DATA-DOC-04 | Phase 135 | Pending |
 
 **Coverage:** 24/24 v1.29 requirements mapped.
-**Progress:** 0/24 requirements complete; 0/5 phases complete.
+**Progress:** 4/24 requirements complete; 1/5 phases complete.
 
 ## Completed Milestones
 
@@ -173,6 +173,6 @@ DATA-DOC-01, DATA-DOC-02, DATA-DOC-03, DATA-DOC-04
 
 ## Current Position
 
-**Status:** Milestone v1.29 started. Ready to plan Phase 131.
+**Status:** Phase 131 complete. Ready to plan Phase 132.
 
-Run `$gsd-plan-phase 131` to start implementation planning.
+Run `$gsd-plan-phase 132` to start implementation planning.
