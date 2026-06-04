@@ -41,3 +41,9 @@ No active milestone is currently defined. Start the next milestone with
 ## Current Position
 
 **Status:** v1.29 shipped and archived. Awaiting next milestone definition.
+
+## Active Guardrails
+
+- CDNA3/MI300X hardware validation remains deferred until complete real
+  full-suite `gfx94*` evidence is archived; current CDNA3 work remains marker,
+  readiness, and documentation support, including `requires_cdna3` coverage.
