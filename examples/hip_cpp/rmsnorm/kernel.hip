@@ -5,29 +5,13 @@
 #include <string>
 
 /**
- * @brief Performs a sum-reduction within a single warp.
- *
- * Uses the __shfl_down_sync primitive for efficient, synchronization-free
- * communication between threads in a warp. All threads in the warp must call this function.
- *
- * @param val The float value each thread contributes to the sum.
- * @return The total sum, which is valid only in lane 0 of the warp.
- */
-__device__ inline float warp_reduce_sum(float val) {
-    for (int offset = 16; offset > 0; offset /= 2) {
-        val += __shfl_down_sync(0xFFFFFFFFFFFFFFFFULL, val, offset);
-    }
-    return val;
-}
-
-/**
  * @brief HIP kernel for RMS Normalization, optimized for hidden_size=4096.
  *
- * This kernel is specifically tailored for the gfx1200 architecture by using:
+ * This kernel uses a conservative shared-memory reduction for portability
+ * across ROCm wavefront sizes, including gfx1200 and gfx942:
  * - __hip_bfloat162 for vectorized memory access, doubling memory throughput.
  * - A large block size (1024 threads) to maximize parallelism.
- * - A two-stage reduction: a fast, parallel reduction in shared memory followed
- *   by an efficient warp-level reduction using shuffle instructions.
+ * - A block-wide reduction in shared memory without warp-size assumptions.
  * - All intermediate calculations are performed in FP32 for precision.
  * - Each block processes a single row (batch element), simplifying indexing and
  *   ensuring data locality.
@@ -79,26 +63,13 @@ __global__ void __launch_bounds__(1024, 1) rmsnorm_h4096_kernel(
     __syncthreads();
 
     // --- Step 2: Block-wide reduction in shared memory ---
-    // Reduce from 1024 -> 64 partial sums
-    for (unsigned int s = 512; s > 32; s >>= 1) {
+    // Avoid warp-size assumptions so the sample remains valid on CDNA3 wave64.
+    for (unsigned int s = blockDim.x / 2; s > 0; s >>= 1) {
         if (thread_idx < s) {
             s_sum[thread_idx] += s_sum[thread_idx + s];
         }
         __syncthreads();
     }
-    
-    // The first two warps (64 threads) perform the final reduction steps
-    if (thread_idx < 32) {
-        // First warp sums its own partial sum with the corresponding partial sum from the second warp
-        s_sum[thread_idx] += s_sum[thread_idx + 32];
-        
-        // Final reduction within the first warp using shuffle instructions
-        float warp_total_sum = warp_reduce_sum(s_sum[thread_idx]);
-        if (thread_idx == 0) {
-            s_sum[0] = warp_total_sum;
-        }
-    }
-    __syncthreads();
 
     // --- Step 3: Calculate inv_rms and broadcast via shared memory ---
     float inv_rms = s_sum[0]; // All threads read the final sum from thread 0's calculation

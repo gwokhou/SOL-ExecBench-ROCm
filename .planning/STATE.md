@@ -64,6 +64,18 @@ Last activity: 2026-06-04 — Milestone v1.29 completed and archived
   archived v1.27 phases and moving validation handoff files into the milestone
   archive on 2026-06-03.
 
+- Quick task 260604-cdna3-gfx942-validation-attempt-record recorded a real
+  `gfx942` CDNA3 validation attempt on 2026-06-04. The attempt confirmed ROCm
+  runtime readiness and CDNA3 marker behavior, but full validation remains
+  blocked by Triton static-review handling, a CPU-device synchronization bug,
+  and a HIP RMSNorm runtime failure on `gfx942`.
+
+- Quick task 260604-fix-cdna3-validation-blockers fixed the local blockers
+  identified by the `gfx942` attempt: CPU-device synchronization in
+  `call_and_collect_outputs`, Triton `triton.language.load` static-review
+  handling, and the RMSNorm HIP example's wave-size-specific reduction. CDNA3
+  validation still requires cloud revalidation before any claim upgrade.
+
 - v1.28 CDNA3 Test and Documentation Readiness started on 2026-06-04 with
   Phase 127-130 scoped for CDNA3 hardware-gated tests, MI300X evidence
   contracts, deferred-validation guardrails, and public documentation closure.

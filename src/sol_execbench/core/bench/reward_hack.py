@@ -331,6 +331,8 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
         )
 
     def _is_unauthorized_call(self, node: ast.Call, name: str) -> bool:
+        if name == "triton.language.load":
+            return False
         if name in _RISKY_FILE_CALLS or name in _RISKY_DECODE_CALLS:
             return True
         if name in {
