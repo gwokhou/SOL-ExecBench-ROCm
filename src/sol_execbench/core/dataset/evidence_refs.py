@@ -33,6 +33,18 @@ def safe_sidecar_stem(*parts: str) -> str:
     return safe_stem
 
 
+def sidecar_stem_for_workload(
+    definition_name: str,
+    workload_uuid: str,
+    *,
+    problem_namespace: str | None = None,
+) -> str:
+    """Return a sidecar stem scoped to a problem when a namespace is available."""
+    if problem_namespace:
+        return safe_sidecar_stem(problem_namespace, definition_name, workload_uuid)
+    return safe_sidecar_stem(definition_name, workload_uuid)
+
+
 def relative_ref(path: Path, base: Path) -> str:
     """Return a stable path reference relative to *base* when possible."""
     path = path.resolve()
@@ -61,7 +73,11 @@ def build_derived_evidence_refs(
     if amd_score_report is not None:
         refs["amd_score"] = relative_ref(amd_score_report.resolve(), output_dir)
     if workload_uuid:
-        sidecar_stem = safe_sidecar_stem(definition_name, workload_uuid)
+        sidecar_stem = sidecar_stem_for_workload(
+            definition_name,
+            workload_uuid,
+            problem_namespace=f"{category}/{problem_output_dir.name}",
+        )
         if sol_bound_artifact_dir is not None:
             path = sol_bound_artifact_dir / f"{sidecar_stem}.amd-sol-v2.json"
             if path.exists():

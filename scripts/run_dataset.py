@@ -35,9 +35,11 @@ Usage:
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from sol_execbench.core.bench.config import BenchmarkConfig
@@ -183,11 +185,43 @@ def _read_workload_rows(workload_path: Path) -> list[tuple[int, dict, str]]:
     return _read_run_workload_rows(workload_path)
 
 
+def _workload_prefix_lines(workload_path: Path, limit: int) -> tuple[list[str], bool]:
+    lines: list[str] = []
+    truncated = False
+    with workload_path.open(encoding="utf-8") as handle:
+        for index, line in enumerate(handle):
+            if index < limit:
+                lines.append(line.rstrip("\n"))
+            else:
+                truncated = True
+                break
+    return lines, truncated
+
+
+def _resolve_jobs(value: str, *, phase: str, problem_count: int) -> int:
+    if value == "auto":
+        requested = min(os.cpu_count() or 1, max(problem_count, 1), 8)
+    else:
+        try:
+            requested = int(value)
+        except ValueError as exc:
+            raise SystemExit("--jobs must be a positive integer or 'auto'") from exc
+    if requested < 1:
+        raise SystemExit("--jobs must be a positive integer or 'auto'")
+    if phase != "derived":
+        if requested > 1 or value == "auto":
+            print("Ignoring --jobs for GPU/profiler phases; execution remains serial.")
+        return 1
+    return min(requested, max(problem_count, 1))
+
+
 def _ready_problem_map(ready_subset: dict | None) -> dict[str, dict]:
     return _build_ready_problem_map(ready_subset)
 
 
-def _readiness_workload_map(readiness: dict | None) -> dict[tuple[str, tuple[str, str | int]], dict]:
+def _readiness_workload_map(
+    readiness: dict | None,
+) -> dict[tuple[str, tuple[str, str | int]], dict]:
     return _build_readiness_workload_map(readiness)
 
 
@@ -231,7 +265,9 @@ def _license_boundary_metadata(manifest: dict | None) -> dict:
     return {field: boundary[field] for field in fields if field in boundary}
 
 
-def _dataset_manifest_summary(manifest: dict | None, *, problems_dir: Path, output_dir: Path) -> dict:
+def _dataset_manifest_summary(
+    manifest: dict | None, *, problems_dir: Path, output_dir: Path
+) -> dict:
     if manifest is None:
         return {}
     source = manifest.get("source") if isinstance(manifest.get("source"), dict) else {}
@@ -243,7 +279,9 @@ def _dataset_manifest_summary(manifest: dict | None, *, problems_dir: Path, outp
     source_root = source.get("source_root")
     source_root_ref = None
     if isinstance(source_root, str) and source_root:
-        source_root_ref = _first_relative_ref(Path(source_root), ROOT, problems_dir, output_dir)
+        source_root_ref = _first_relative_ref(
+            Path(source_root), ROOT, problems_dir, output_dir
+        )
     return {
         "migration_kind": manifest.get("migration_kind"),
         "source_id": source.get("source_id"),
@@ -335,7 +373,9 @@ def _readiness_summary(readiness: dict | None) -> dict:
         for blocker in workload.get("blocker_reports", []):
             if isinstance(blocker, dict) and blocker.get("blocker_type") is not None:
                 blocker_type = str(blocker["blocker_type"])
-                blocker_type_counts[blocker_type] = blocker_type_counts.get(blocker_type, 0) + 1
+                blocker_type_counts[blocker_type] = (
+                    blocker_type_counts.get(blocker_type, 0) + 1
+                )
     return {
         "selected_categories": list(readiness.get("selected_categories") or []),
         "workloads": len(workloads),
@@ -400,6 +440,8 @@ def _normalized_command_args(args: argparse.Namespace) -> list[str]:
         normalized.extend(["--limit", str(args.limit)])
     if args.max_workloads is not None:
         normalized.extend(["--max-workloads", str(args.max_workloads)])
+    if str(args.jobs) != "1":
+        normalized.extend(["--jobs", str(args.jobs)])
     if args.timeout != 120:
         normalized.extend(["--timeout", str(args.timeout)])
     if args.solution_name:
@@ -526,10 +568,18 @@ def _closure_status_with_evidence(
 
 
 def _requested_evidence_requirements(args: argparse.Namespace) -> list[str]:
-    amd_score_report = args.amd_score_report if args.phase in {"all", "derived"} else None
-    amd_sol_bound_dir = args.amd_sol_bound_dir if args.phase in {"all", "derived"} else None
-    solar_derivation = args.solar_derivation if args.phase in {"all", "derived"} else None
-    timing_evidence_dir = args.timing_evidence_dir if args.phase in {"all", "timing"} else None
+    amd_score_report = (
+        args.amd_score_report if args.phase in {"all", "derived"} else None
+    )
+    amd_sol_bound_dir = (
+        args.amd_sol_bound_dir if args.phase in {"all", "derived"} else None
+    )
+    solar_derivation = (
+        args.solar_derivation if args.phase in {"all", "derived"} else None
+    )
+    timing_evidence_dir = (
+        args.timing_evidence_dir if args.phase in {"all", "timing"} else None
+    )
     return _build_requested_evidence_requirements(
         amd_score_report=amd_score_report,
         amd_sol_bound_dir=amd_sol_bound_dir,
@@ -545,7 +595,9 @@ def _stale_provenance_mismatch(
     return _build_stale_provenance_mismatch(observed=observed)
 
 
-def _prior_closure_provenance(path: Path) -> tuple[dict | None, dict[str, object] | None]:
+def _prior_closure_provenance(
+    path: Path,
+) -> tuple[dict | None, dict[str, object] | None]:
     return _load_prior_closure_provenance(path)
 
 
@@ -632,6 +684,165 @@ def _write_execution_closure(
     )
 
 
+def _run_existing_trace_derived_problem(
+    *,
+    problem_dir: Path,
+    index: int,
+    problem_count: int,
+    problems_dir: Path,
+    output_dir: Path,
+    problem_ref: dict | None,
+    readiness_by_workload: dict[tuple[str, tuple[str, str | int]], dict],
+    max_workloads: int | None,
+    amd_score_report: Path | None,
+    amd_sol_bound_dir: Path | None,
+    solar_derivation: Path | None,
+    timing_evidence_dir: Path | None,
+    scoring_baseline,
+) -> dict:
+    problem_name = problem_dir.name
+    category = problem_dir.parent.name
+    problem_id = _problem_id_for(problems_dir, problem_dir)
+    messages = [f"\n[{index + 1}/{problem_count}] {category}/{problem_name}"]
+    closure_records: list[dict] = []
+    attempted_ready_keys: set[tuple[str, tuple[str, str | int]]] = set()
+    amd_scores: list[AmdNativeScore] = []
+
+    definition_path = problem_dir / "definition.json"
+    workload_path = problem_dir / "workload.jsonl"
+    problem_output_dir = output_dir / category / problem_name
+    traces_path = problem_output_dir / "traces.json"
+    definition_payload = json.loads(definition_path.read_text())
+    selected_workload_refs: list[dict] | None = None
+
+    if problem_ref is not None:
+        problem_output_dir.mkdir(parents=True, exist_ok=True)
+        selected_lines, selected_workload_refs, cap_filtered, missing_refs = (
+            _selected_workload_rows(
+                workload_path,
+                list(problem_ref.get("workloads", [])),
+                max_workloads=max_workloads,
+            )
+        )
+        filtered_workload_path = problem_output_dir / "workload.jsonl"
+        filtered_workload_path.write_text(
+            "\n".join(selected_lines) + ("\n" if selected_lines else "")
+        )
+        workload_path = filtered_workload_path
+        for workload_ref in cap_filtered:
+            key = _workload_key(workload_ref.get("uuid"), workload_ref.get("row_index"))
+            closure_records.append(
+                _closure_record(
+                    category=category,
+                    problem_id=problem_id,
+                    problem_path=str(problem_ref.get("problem_path")),
+                    workload_uuid=workload_ref.get("uuid"),
+                    row_index=int(workload_ref.get("row_index", 0)),
+                    closure_status="filtered",
+                    readiness=readiness_by_workload.get((problem_id, key)),
+                    filter_reasons=["max_workloads_cap"],
+                )
+            )
+        for workload_ref in missing_refs:
+            key = _workload_key(workload_ref.get("uuid"), workload_ref.get("row_index"))
+            closure_records.append(
+                _closure_record(
+                    category=category,
+                    problem_id=problem_id,
+                    problem_path=str(problem_ref.get("problem_path")),
+                    workload_uuid=workload_ref.get("uuid"),
+                    row_index=int(workload_ref.get("row_index", 0)),
+                    closure_status="filtered",
+                    readiness=readiness_by_workload.get((problem_id, key)),
+                    filter_reasons=["workload_not_found"],
+                )
+            )
+        if not selected_workload_refs:
+            return {
+                "messages": messages,
+                "summary": None,
+                "amd_scores": amd_scores,
+                "closure_records": closure_records,
+                "attempted_ready_keys": attempted_ready_keys,
+            }
+
+    if not traces_path.exists():
+        messages.append("  Skipping (--phase derived requires existing traces).")
+        return {
+            "messages": messages,
+            "summary": None,
+            "amd_scores": amd_scores,
+            "closure_records": closure_records,
+            "attempted_ready_keys": attempted_ready_keys,
+        }
+    try:
+        traces = json.loads(traces_path.read_text())
+    except (OSError, json.JSONDecodeError):
+        messages.append("  Skipping (--phase derived found unreadable traces).")
+        return {
+            "messages": messages,
+            "summary": None,
+            "amd_scores": amd_scores,
+            "closure_records": closure_records,
+            "attempted_ready_keys": attempted_ready_keys,
+        }
+
+    summary = inspect_traces(traces, f"{category}/{problem_name}")
+    if (
+        amd_score_report is not None
+        or amd_sol_bound_dir is not None
+        or solar_derivation is not None
+    ):
+        _extend_derived_reports_for_problem(
+            amd_scores=amd_scores,
+            definition_path=definition_path,
+            workload_path=workload_path,
+            traces_path=traces_path,
+            traces_payload=traces,
+            output_dir=output_dir,
+            baseline_artifact=scoring_baseline,
+            sol_bound_artifact_dir=amd_sol_bound_dir,
+            solar_derivation_dir=solar_derivation,
+        )
+
+    if selected_workload_refs is not None:
+        trace_by_key = _trace_map(traces)
+        for workload_ref in selected_workload_refs:
+            key = _workload_key(workload_ref.get("uuid"), workload_ref.get("row_index"))
+            attempted_ready_keys.add((problem_id, key))
+            trace = trace_by_key.get(key)
+            closure_records.append(
+                _selected_workload_closure_record(
+                    category=category,
+                    problem_id=problem_id,
+                    problem_path=str(problem_ref.get("problem_path")),
+                    workload_uuid=workload_ref.get("uuid"),
+                    row_index=int(workload_ref.get("row_index", 0)),
+                    readiness=readiness_by_workload.get((problem_id, key)),
+                    trace=trace,
+                    skipped=True,
+                    traces_path=traces_path,
+                    summary_ref="summary.json",
+                    solution_path=problem_output_dir / "solution.json",
+                    output_dir=output_dir,
+                    definition_name=str(definition_payload["name"]),
+                    problem_output_dir=problem_output_dir,
+                    amd_score_report=amd_score_report,
+                    sol_bound_artifact_dir=amd_sol_bound_dir,
+                    solar_derivation_dir=solar_derivation,
+                    timing_evidence_dir=timing_evidence_dir,
+                )
+            )
+    messages.append("  Phase derived: reused existing traces.")
+    return {
+        "messages": messages,
+        "summary": summary,
+        "amd_scores": amd_scores,
+        "closure_records": closure_records,
+        "attempted_ready_keys": attempted_ready_keys,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -670,6 +881,15 @@ def main():
             "single-pass behavior; 'traces' runs GPU validation only, 'derived' "
             "builds AMD/SOLAR reports from existing traces, and 'timing' collects "
             "profiler timing evidence from existing traces."
+        ),
+    )
+    ap.add_argument(
+        "--jobs",
+        default="1",
+        help=(
+            "Parallel workers for safe CPU/I/O-only phases. Use a positive integer "
+            "or 'auto'. Only --phase derived uses more than one worker; GPU and "
+            "profiler phases remain serial."
         ),
     )
     ap.add_argument(
@@ -888,7 +1108,10 @@ def main():
             selected_ids: list[str] = []
             for problem_id, problem_ref in ready_problems.items():
                 reason: list[str] = []
-                if category_filter and problem_ref.get("category") not in category_filter:
+                if (
+                    category_filter
+                    and problem_ref.get("category") not in category_filter
+                ):
                     reason.append("category_filter")
                 elif problem_id not in discovered_by_id:
                     reason.append("problem_not_discovered")
@@ -897,7 +1120,12 @@ def main():
                     continue
                 for workload_ref in problem_ref.get("workloads", []):
                     readiness_record = readiness_by_workload.get(
-                        (problem_id, _workload_key(workload_ref.get("uuid"), workload_ref.get("row_index")))
+                        (
+                            problem_id,
+                            _workload_key(
+                                workload_ref.get("uuid"), workload_ref.get("row_index")
+                            ),
+                        )
                     )
                     closure_records.append(
                         _closure_record(
@@ -919,7 +1147,13 @@ def main():
                     problem_ref = ready_problems[problem_id]
                     for workload_ref in problem_ref.get("workloads", []):
                         readiness_record = readiness_by_workload.get(
-                            (problem_id, _workload_key(workload_ref.get("uuid"), workload_ref.get("row_index")))
+                            (
+                                problem_id,
+                                _workload_key(
+                                    workload_ref.get("uuid"),
+                                    workload_ref.get("row_index"),
+                                ),
+                            )
                         )
                         closure_records.append(
                             _closure_record(
@@ -947,6 +1181,10 @@ def main():
         if not problems and ready_subset is None:
             print("No problems found. Check the directory path.")
             sys.exit(1)
+
+    jobs = _resolve_jobs(str(args.jobs), phase=args.phase, problem_count=len(problems))
+    if args.phase == "derived" and jobs > 1:
+        print(f"Using {jobs} derived workers.")
 
     benchmark_config = BenchmarkConfig(
         warmup_runs=(
@@ -1003,7 +1241,9 @@ def main():
             if args.ready_subset
             else None
         ),
-        "ready_subset_checksum": _sidecar_checksum(ready_subset, "ready_subset_checksum"),
+        "ready_subset_checksum": _sidecar_checksum(
+            ready_subset, "ready_subset_checksum"
+        ),
         "ready_subset_summary": ready_subset_summary,
         "readiness_path": (
             _first_relative_ref(args.readiness, ROOT, problems_dir, output_dir)
@@ -1097,6 +1337,100 @@ def main():
     run_trace_phase = args.phase in {"all", "traces"}
     run_derived_phase = args.phase in {"all", "derived"}
     run_timing_phase = args.phase in {"all", "timing"}
+
+    if args.phase == "derived" and jobs > 1:
+        with ThreadPoolExecutor(max_workers=jobs) as executor:
+            results = executor.map(
+                lambda item: _run_existing_trace_derived_problem(
+                    problem_dir=item[1],
+                    index=item[0],
+                    problem_count=len(problems),
+                    problems_dir=problems_dir,
+                    output_dir=output_dir,
+                    problem_ref=ready_problems.get(
+                        _problem_id_for(problems_dir, item[1])
+                    ),
+                    readiness_by_workload=readiness_by_workload,
+                    max_workloads=args.max_workloads,
+                    amd_score_report=args.amd_score_report,
+                    amd_sol_bound_dir=args.amd_sol_bound_dir,
+                    solar_derivation=args.solar_derivation,
+                    timing_evidence_dir=None,
+                    scoring_baseline=scoring_baseline,
+                ),
+                enumerate(problems),
+            )
+            for result in results:
+                for message in result["messages"]:
+                    print(message)
+                if result["summary"] is not None:
+                    summaries.append(result["summary"])
+                amd_scores.extend(result["amd_scores"])
+                closure_records.extend(result["closure_records"])
+                attempted_ready_keys.update(result["attempted_ready_keys"])
+
+        print_summary(summaries)
+        summary_path = write_summary_report(output_dir, summaries)
+        print(f"\nSummary saved to {summary_path}")
+        print(f"Per-problem traces saved under {output_dir}")
+
+        if args.amd_score_report is not None:
+            report_path = args.amd_score_report.resolve()
+            write_amd_score_report(
+                report_path,
+                amd_scores,
+                problem_count=len(summaries),
+                baseline_entry_count=len(scoring_baseline.entries)
+                if scoring_baseline
+                else 0,
+            )
+            print(f"AMD-native score report saved to {report_path}")
+
+        if execution_closure_path is not None:
+            if readiness is not None:
+                for workload in readiness.get("workloads", []):
+                    key = _workload_key(
+                        workload.get("workload_uuid"), workload.get("row_index")
+                    )
+                    problem_id = str(workload.get("problem_id"))
+                    if (
+                        workload.get("status") == "ready"
+                        or (
+                            problem_id,
+                            key,
+                        )
+                        in attempted_ready_keys
+                    ):
+                        continue
+                    closure_records.append(
+                        _closure_record(
+                            category=str(workload.get("category")),
+                            problem_id=problem_id,
+                            problem_path=str(workload.get("problem_path")),
+                            workload_uuid=workload.get("workload_uuid"),
+                            row_index=int(workload.get("row_index", 0)),
+                            closure_status="not_attempted",
+                            readiness=workload,
+                            filter_reasons=["readiness_blocked"],
+                        )
+                    )
+            _write_execution_closure(
+                path=execution_closure_path,
+                records=closure_records,
+                provenance=provenance,
+                filters={
+                    "ready_subset": args.ready_subset is not None,
+                    "category": args.category,
+                    "limit": args.limit,
+                    "max_workloads": args.max_workloads,
+                    "jobs": jobs,
+                },
+                provenance_mismatches=provenance_mismatches,
+                source_refs=source_refs,
+            )
+            print(f"Execution closure saved to {execution_closure_path}")
+        return
+
     # ROCm execution stays serial here; runner helpers provide the future scheduling seam.
     for i, problem_dir in enumerate(problems):
         problem_name = problem_dir.name
@@ -1122,10 +1456,14 @@ def main():
                 )
             )
             filtered_workload_path = problem_output_dir / "workload.jsonl"
-            filtered_workload_path.write_text("\n".join(selected_lines) + ("\n" if selected_lines else ""))
+            filtered_workload_path.write_text(
+                "\n".join(selected_lines) + ("\n" if selected_lines else "")
+            )
             workload_path = filtered_workload_path
             for workload_ref in cap_filtered:
-                key = _workload_key(workload_ref.get("uuid"), workload_ref.get("row_index"))
+                key = _workload_key(
+                    workload_ref.get("uuid"), workload_ref.get("row_index")
+                )
                 readiness_record = readiness_by_workload.get((problem_id, key))
                 closure_records.append(
                     _closure_record(
@@ -1140,7 +1478,9 @@ def main():
                     )
                 )
             for workload_ref in missing_refs:
-                key = _workload_key(workload_ref.get("uuid"), workload_ref.get("row_index"))
+                key = _workload_key(
+                    workload_ref.get("uuid"), workload_ref.get("row_index")
+                )
                 readiness_record = readiness_by_workload.get((problem_id, key))
                 closure_records.append(
                     _closure_record(
@@ -1217,7 +1557,9 @@ def main():
                             gpu_architecture=args.gpu_architecture,
                         )
                         print(f"  Timing evidence saved under {timing_root / category}")
-                elif "reference" not in definition or not definition["reference"].strip():
+                elif (
+                    "reference" not in definition or not definition["reference"].strip()
+                ):
                     print("  Skipping timing: no reference code")
                 else:
                     solution = build_solution_for_problem(
@@ -1367,14 +1709,18 @@ def main():
                 provenance_mismatches.append(stale_trace_mismatch)
                 print("  Re-running (previous trace output is unreadable).")
             elif reuse_decision is not None and reuse_decision.provenance_mismatches:
-                provenance_mismatches.extend(
-                    list(reuse_decision.provenance_mismatches)
-                )
+                provenance_mismatches.extend(list(reuse_decision.provenance_mismatches))
                 print("  Re-running (previous output is stale or unreadable).")
-            elif reuse_decision is not None and reuse_decision.reason == "previous_failed":
+            elif (
+                reuse_decision is not None
+                and reuse_decision.reason == "previous_failed"
+            ):
                 failed = summary["failed"] if summary is not None else "unknown"
                 print(f"  Re-running (previous run had {failed} failures).")
-            elif reuse_decision is not None and reuse_decision.reason == "rerun_requested":
+            elif (
+                reuse_decision is not None
+                and reuse_decision.reason == "rerun_requested"
+            ):
                 print("  Re-running (--rerun requested).")
 
         # Clear previous run output
@@ -1389,8 +1735,8 @@ def main():
 
         # Truncate workloads if --max-workloads is set outside ready-subset mode.
         if args.max_workloads is not None and selected_workload_refs is None:
-            lines = workload_path.read_text().splitlines()
-            if len(lines) > args.max_workloads:
+            lines, truncated = _workload_prefix_lines(workload_path, args.max_workloads)
+            if truncated:
                 truncated_path = problem_output_dir / "workload.jsonl"
                 truncated_path.write_text("\n".join(lines[: args.max_workloads]))
                 workload_path = truncated_path
@@ -1550,7 +1896,9 @@ def main():
         if selected_workload_refs is not None:
             trace_by_key = _trace_map(traces)
             for workload_ref in selected_workload_refs:
-                key = _workload_key(workload_ref.get("uuid"), workload_ref.get("row_index"))
+                key = _workload_key(
+                    workload_ref.get("uuid"), workload_ref.get("row_index")
+                )
                 attempted_ready_keys.add((problem_id, key))
                 trace = trace_by_key.get(key)
                 closure_records.append(
@@ -1622,10 +1970,14 @@ def main():
                     workload.get("workload_uuid"), workload.get("row_index")
                 )
                 problem_id = str(workload.get("problem_id"))
-                if workload.get("status") == "ready" or (
-                    problem_id,
-                    key,
-                ) in attempted_ready_keys:
+                if (
+                    workload.get("status") == "ready"
+                    or (
+                        problem_id,
+                        key,
+                    )
+                    in attempted_ready_keys
+                ):
                     continue
                 closure_records.append(
                     _closure_record(

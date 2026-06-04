@@ -7,6 +7,7 @@ import io
 import json
 import subprocess
 import sys
+import tempfile
 import tokenize
 from collections.abc import Sequence
 from pathlib import Path
@@ -19,7 +20,7 @@ from sol_execbench.core.bench.rocm_profiler import (
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.trace import Trace
 from sol_execbench.core.data.workload import Workload
-from sol_execbench.core.dataset.evidence_refs import safe_sidecar_stem
+from sol_execbench.core.dataset.evidence_refs import sidecar_stem_for_workload
 from sol_execbench.core.scoring.amd_score import (
     AmdNativeScore,
     build_amd_native_suite_report,
@@ -206,42 +207,87 @@ def run_cli(
         verbose=verbose,
     )
 
+    output_dir.mkdir(parents=True, exist_ok=True)
+    stdout_path = _temporary_stream_path(output_dir, job_name, "stdout")
+    stderr_path = _temporary_stream_path(output_dir, job_name, "stderr")
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 60)
-    except subprocess.TimeoutExpired as exc:
-        print(f"CLI timed out for {job_name}: {exc.timeout} seconds")
-        save_cli_timeout_log(output_dir, job_name, exc)
-        return None
+        try:
+            with (
+                stdout_path.open("w", encoding="utf-8") as stdout_handle,
+                stderr_path.open(
+                    "w",
+                    encoding="utf-8",
+                ) as stderr_handle,
+            ):
+                result = subprocess.run(
+                    cmd,
+                    stdout=stdout_handle,
+                    stderr=stderr_handle,
+                    text=True,
+                    timeout=timeout + 60,
+                    check=False,
+                )
+            if result.stdout:
+                stdout_path.write_text(result.stdout, encoding="utf-8")
+            if result.stderr:
+                stderr_path.write_text(result.stderr, encoding="utf-8")
+        except subprocess.TimeoutExpired as exc:
+            if exc.output:
+                stdout_path.write_bytes(
+                    exc.output if isinstance(exc.output, bytes) else exc.output.encode()
+                )
+            if exc.stderr:
+                stderr_path.write_bytes(
+                    exc.stderr if isinstance(exc.stderr, bytes) else exc.stderr.encode()
+                )
+            print(f"CLI timed out for {job_name}: {exc.timeout} seconds")
+            save_cli_timeout_log_from_files(
+                output_dir,
+                job_name,
+                int(exc.timeout),
+                stdout_path,
+                stderr_path,
+            )
+            return None
 
-    traces = []
-    for line in result.stdout.splitlines():
-        line = line.strip()
-        if line:
-            try:
-                traces.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue
+        traces = _parse_trace_jsonl(stdout_path)
 
-    if result.returncode != 0:
-        print(f"CLI failed for {job_name}: exit code {result.returncode}")
-        save_cli_log(output_dir, job_name, result)
-        if traces:
-            return traces
-        return None
+        if result.returncode != 0:
+            print(f"CLI failed for {job_name}: exit code {result.returncode}")
+            save_cli_log_from_files(
+                output_dir,
+                job_name,
+                result.returncode,
+                stdout_path,
+                stderr_path,
+            )
+            if traces:
+                return traces
+            return None
 
-    if not traces:
-        print(f"CLI failed for {job_name}: {result.stderr[:500]}")
-        save_cli_log(output_dir, job_name, result)
-        return None
+        if not traces:
+            stderr_tail = bounded_file_stream(stderr_path)
+            print(f"CLI failed for {job_name}: {stderr_tail[:500]}")
+            save_cli_log_from_files(
+                output_dir,
+                job_name,
+                result.returncode,
+                stdout_path,
+                stderr_path,
+            )
+            return None
 
-    return traces
+        return traces
+    finally:
+        stdout_path.unlink(missing_ok=True)
+        stderr_path.unlink(missing_ok=True)
 
 
 CLI_LOG_LIMIT = 64 * 1024
 
 
 def bounded_cli_stream(value: str | bytes | None) -> str:
-    """Return a bounded text representation of captured CLI output."""
+    """Return a bounded tail representation of captured CLI output."""
     if value is None:
         return ""
     if isinstance(value, bytes):
@@ -250,7 +296,48 @@ def bounded_cli_stream(value: str | bytes | None) -> str:
         text = value
     if len(text) <= CLI_LOG_LIMIT:
         return text
-    return text[:CLI_LOG_LIMIT] + "\n[truncated CLI output]\n"
+    return "[truncated CLI output]\n" + text[-CLI_LOG_LIMIT:]
+
+
+def _temporary_stream_path(output_dir: Path, job_name: str, stream_name: str) -> Path:
+    with tempfile.NamedTemporaryFile(
+        prefix=f"{job_name}_{stream_name}_",
+        suffix=".log",
+        dir=output_dir,
+        delete=False,
+    ) as handle:
+        return Path(handle.name)
+
+
+def bounded_file_stream(path: Path) -> str:
+    """Return a bounded text representation of a captured stream file."""
+    try:
+        size = path.stat().st_size
+        with path.open("rb") as handle:
+            if size > CLI_LOG_LIMIT:
+                handle.seek(max(0, size - CLI_LOG_LIMIT))
+                data = handle.read()
+                return "[truncated CLI output]\n" + data.decode(errors="replace")
+            return handle.read().decode(errors="replace")
+    except OSError:
+        return ""
+
+
+def _parse_trace_jsonl(stdout_path: Path) -> list[dict]:
+    traces: list[dict] = []
+    try:
+        with stdout_path.open(encoding="utf-8", errors="replace") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    traces.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+    except OSError:
+        return []
+    return traces
 
 
 def save_cli_log(output_dir: Path, job_name: str, result: subprocess.CompletedProcess):
@@ -258,8 +345,32 @@ def save_cli_log(output_dir: Path, job_name: str, result: subprocess.CompletedPr
     log_path = output_dir / f"{job_name}_cli.log"
     parts = [
         f"exit code: {result.returncode}",
-        f"\n--- stdout ---\n{bounded_cli_stream(result.stdout)}" if result.stdout else "",
-        f"\n--- stderr ---\n{bounded_cli_stream(result.stderr)}" if result.stderr else "",
+        f"\n--- stdout ---\n{bounded_cli_stream(result.stdout)}"
+        if result.stdout
+        else "",
+        f"\n--- stderr ---\n{bounded_cli_stream(result.stderr)}"
+        if result.stderr
+        else "",
+    ]
+    log_path.write_text("\n".join(parts))
+    print(f"Saved CLI log to {log_path}")
+
+
+def save_cli_log_from_files(
+    output_dir: Path,
+    job_name: str,
+    returncode: int | None,
+    stdout_path: Path,
+    stderr_path: Path,
+) -> None:
+    """Write bounded stdout/stderr tails from captured stream files."""
+    log_path = output_dir / f"{job_name}_cli.log"
+    stdout = bounded_file_stream(stdout_path)
+    stderr = bounded_file_stream(stderr_path)
+    parts = [
+        f"exit code: {returncode}",
+        f"\n--- stdout ---\n{stdout}" if stdout else "",
+        f"\n--- stderr ---\n{stderr}" if stderr else "",
     ]
     log_path.write_text("\n".join(parts))
     print(f"Saved CLI log to {log_path}")
@@ -276,6 +387,26 @@ def save_cli_timeout_log(
         f"timeout after {exc.timeout} seconds",
         f"\n--- stdout ---\n{bounded_cli_stream(exc.output)}" if exc.output else "",
         f"\n--- stderr ---\n{bounded_cli_stream(exc.stderr)}" if exc.stderr else "",
+    ]
+    log_path.write_text("\n".join(parts))
+    print(f"Saved CLI log to {log_path}")
+
+
+def save_cli_timeout_log_from_files(
+    output_dir: Path,
+    job_name: str,
+    timeout: int,
+    stdout_path: Path,
+    stderr_path: Path,
+) -> None:
+    """Write bounded stdout/stderr tails after a timed-out CLI invocation."""
+    log_path = output_dir / f"{job_name}_cli.log"
+    stdout = bounded_file_stream(stdout_path)
+    stderr = bounded_file_stream(stderr_path)
+    parts = [
+        f"timeout after {timeout} seconds",
+        f"\n--- stdout ---\n{stdout}" if stdout else "",
+        f"\n--- stderr ---\n{stderr}" if stderr else "",
     ]
     log_path.write_text("\n".join(parts))
     print(f"Saved CLI log to {log_path}")
@@ -460,6 +591,7 @@ def build_amd_score_reports_for_problem(
     baseline_artifact: ScoringBaselineArtifact | None = None,
     sol_bound_artifact_dir: Path | None = None,
     solar_derivation_dir: Path | None = None,
+    sidecar_namespace: str | None = None,
 ) -> list[AmdNativeScore]:
     """Build derived AMD-native scores for one dataset-run problem."""
     definition = Definition(**definition_payload)
@@ -496,10 +628,17 @@ def build_amd_score_reports_for_problem(
         )
         if workload is not None and solar_derivation_dir is not None:
             solar_derivation_dir.mkdir(parents=True, exist_ok=True)
-            sidecar_stem = safe_sidecar_stem(definition.name, trace.workload.uuid)
-            sidecar_path = solar_derivation_dir / f"{sidecar_stem}.solar-derivation.json"
+            sidecar_stem = sidecar_stem_for_workload(
+                definition.name,
+                trace.workload.uuid,
+                problem_namespace=sidecar_namespace,
+            )
+            sidecar_path = (
+                solar_derivation_dir / f"{sidecar_stem}.solar-derivation.json"
+            )
             generated = build_solar_derivation_evidence(definition, workload)
-            sidecar_path.write_text(json.dumps(generated.to_dict(), indent=2))
+            generated_payload = generated.to_dict()
+            sidecar_path.write_text(json.dumps(generated_payload, indent=2))
             solar_derivation_ref = str(sidecar_path)
             derived_evidence_refs = {
                 "formula": f"{solar_derivation_ref}#groups.formula_evidence",
@@ -508,16 +647,20 @@ def build_amd_score_reports_for_problem(
                 "score_eligibility": f"{solar_derivation_ref}#aggregate_status",
             }
             try:
-                solar_derivation = solar_derivation_from_dict(
-                    json.loads(sidecar_path.read_text())
-                )
+                solar_derivation = solar_derivation_from_dict(generated_payload)
             except ValueError as exc:
                 solar_derivation = None
                 derived_evidence_refs["solar_derivation_parse_error"] = str(exc)
-        sol_bound_ref = f"derived:{definition.name}:{trace.workload.uuid}:amd_sol_bound_v2"
+        sol_bound_ref = (
+            f"derived:{definition.name}:{trace.workload.uuid}:amd_sol_bound_v2"
+        )
         if artifact is not None and sol_bound_artifact_dir is not None:
             sol_bound_artifact_dir.mkdir(parents=True, exist_ok=True)
-            sidecar_stem = safe_sidecar_stem(definition.name, trace.workload.uuid)
+            sidecar_stem = sidecar_stem_for_workload(
+                definition.name,
+                trace.workload.uuid,
+                problem_namespace=sidecar_namespace,
+            )
             sidecar_path = sol_bound_artifact_dir / f"{sidecar_stem}.amd-sol-v2.json"
             sidecar_path.write_text(json.dumps(artifact.to_dict(), indent=2))
             sol_bound_ref = str(sidecar_path)
@@ -562,6 +705,9 @@ def extend_derived_reports_for_problem(
         if traces_path.is_relative_to(output_dir)
         else str(traces_path)
     )
+    sidecar_namespace = str(Path(trace_ref).parent)
+    if sidecar_namespace == ".":
+        sidecar_namespace = None
     amd_scores.extend(
         build_amd_score_reports_for_problem(
             definition_payload=json.loads(definition_path.read_text()),
@@ -571,6 +717,7 @@ def extend_derived_reports_for_problem(
             baseline_artifact=baseline_artifact,
             sol_bound_artifact_dir=sol_bound_artifact_dir,
             solar_derivation_dir=solar_derivation_dir,
+            sidecar_namespace=sidecar_namespace,
         )
     )
 

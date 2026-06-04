@@ -20,6 +20,7 @@ from .evidence_refs import (
     build_derived_evidence_refs,
     relative_ref,
     safe_sidecar_stem,
+    sidecar_stem_for_workload,
 )
 from .layout import (
     DatasetLayout,
@@ -151,6 +152,7 @@ __all__ = [
     "render_paper_denominator_markdown",
     "relative_ref",
     "safe_sidecar_stem",
+    "sidecar_stem_for_workload",
     "validate_categories",
     "write_dataset_manifest",
     "write_dataset_inventory",

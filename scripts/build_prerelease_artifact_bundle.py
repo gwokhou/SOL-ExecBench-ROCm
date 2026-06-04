@@ -8,9 +8,13 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
+import shutil
 import subprocess
+import tempfile
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -45,6 +49,8 @@ TOKEN_PATTERN = re.compile(
     r"(\s*:\s*bearer\s+|\s*[:=]\s*)"
     r"([^\s'\"]+)"
 )
+_TOKEN_PREFIX_OVERLAP_CHARS = 512
+_TOKEN_VALUE_DELIMITERS = set(" \t\r\n'\"")
 
 
 @dataclass(frozen=True)
@@ -82,6 +88,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     transcripts: list[CommandTranscript] = []
     artifacts: list[BundleArtifact] = []
     known_gaps = _default_known_gaps()
+    checksum_cache: dict[Path, str] = {}
 
     release_command = _expand_command(
         _command_from_args(
@@ -120,7 +127,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             failure_next_action="Fix release-candidate validation before publishing.",
         )
         transcripts.append(result)
-        artifacts.extend(_release_validation_artifacts(release_validation_dir, result.status))
+        artifacts.extend(
+            _release_validation_artifacts(
+                release_validation_dir,
+                result.status,
+                checksum_cache=checksum_cache,
+            )
+        )
 
     environment_command = _expand_command(
         _command_from_args(args.environment_command, DEFAULT_ENVIRONMENT_COMMAND),
@@ -161,6 +174,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "Diagnostic environment evidence from sol-execbench doctor; "
                     "not timing, score, paper-parity, leaderboard, or hardware-validation authority."
                 ),
+                checksum_cache=checksum_cache,
             )
         )
 
@@ -173,10 +187,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                 authority_class="diagnostic-only",
                 status="present",
                 description=f"Command transcript for {transcript.name}.",
+                checksum_cache=checksum_cache,
             )
         )
 
-    artifacts.extend(_source_reference_artifacts(bundle_dir))
+    artifacts.extend(
+        _source_reference_artifacts(bundle_dir, checksum_cache=checksum_cache)
+    )
     authority_map = _authority_map()
     _validate_authority_classes(artifacts, authority_map)
 
@@ -196,9 +213,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     manifest_path = bundle_dir / "prerelease_artifact_bundle.json"
     markdown_path = bundle_dir / "prerelease_artifact_bundle.md"
-    manifest_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     markdown_path.write_text(_render_markdown(payload), encoding="utf-8")
-    _write_checksums(bundle_dir)
+    _write_checksums(bundle_dir, checksum_cache)
     return 1 if payload["overall_status"] == "blocking" else 0
 
 
@@ -248,23 +267,23 @@ def _run_command(
 ) -> CommandTranscript:
     started = time.monotonic()
     transcript_path = transcript_dir / f"{name}.json"
+    stdout_path = _temporary_stream_path(transcript_dir, name, "stdout")
+    stderr_path = _temporary_stream_path(transcript_dir, name, "stderr")
     try:
-        completed = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        completed = _run_command_to_files(command, stdout_path, stderr_path)
         duration_s = time.monotonic() - started
         status = "passed" if completed.returncode == 0 else "failed"
-        classification = "diagnostic-only" if status == "passed" else failure_classification
+        classification = (
+            "diagnostic-only" if status == "passed" else failure_classification
+        )
         next_action = "Review recorded artifacts before publishing."
         if status != "passed":
             next_action = failure_next_action
-        stdout_tail = _tail(completed.stdout, log_tail_chars)
-        stderr_tail = _tail(completed.stderr, log_tail_chars)
+        stdout_tail = _tail_file(stdout_path, log_tail_chars)
+        stderr_tail = _tail_file(stderr_path, log_tail_chars)
         if stdout_artifact is not None and completed.returncode == 0:
-            stdout_artifact.write_text(completed.stdout, encoding="utf-8")
+            stdout_artifact.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(stdout_path, stdout_artifact)
         returncode: int | None = completed.returncode
     except FileNotFoundError as exc:
         duration_s = time.monotonic() - started
@@ -274,6 +293,9 @@ def _run_command(
         stdout_tail = ""
         stderr_tail = _tail(str(exc), log_tail_chars)
         returncode = None
+    finally:
+        stdout_path.unlink(missing_ok=True)
+        stderr_path.unlink(missing_ok=True)
 
     transcript_payload = {
         "schema_version": f"{SCHEMA_VERSION}.command_transcript",
@@ -306,6 +328,8 @@ def _run_command(
 def _release_validation_artifacts(
     release_validation_dir: Path,
     command_status: str,
+    *,
+    checksum_cache: dict[Path, str],
 ) -> list[BundleArtifact]:
     status = "present" if command_status == "passed" else command_status
     return [
@@ -317,6 +341,7 @@ def _release_validation_artifacts(
             status=status,
             description="Machine-readable release-candidate validation summary.",
             required=True,
+            checksum_cache=checksum_cache,
         ),
         _file_artifact(
             id="release_candidate_validation_markdown",
@@ -326,11 +351,16 @@ def _release_validation_artifacts(
             status=status,
             description="Human-readable release-candidate validation summary.",
             required=True,
+            checksum_cache=checksum_cache,
         ),
     ]
 
 
-def _source_reference_artifacts(bundle_dir: Path) -> list[BundleArtifact]:
+def _source_reference_artifacts(
+    bundle_dir: Path,
+    *,
+    checksum_cache: dict[Path, str],
+) -> list[BundleArtifact]:
     refs = [
         (
             "claims_doc",
@@ -365,6 +395,7 @@ def _source_reference_artifacts(bundle_dir: Path) -> list[BundleArtifact]:
                 status="present" if path.exists() else "unavailable",
                 description=description,
                 required=required,
+                checksum_cache=checksum_cache,
             )
         )
     return artifacts
@@ -379,6 +410,7 @@ def _file_artifact(
     status: str,
     description: str,
     required: bool = False,
+    checksum_cache: dict[Path, str],
 ) -> BundleArtifact:
     if not path.exists():
         return BundleArtifact(
@@ -395,7 +427,7 @@ def _file_artifact(
         authority_class=authority_class,
         status=status,
         description=description,
-        sha256=_sha256(path),
+        sha256=_sha256_cached(path, checksum_cache),
         required=required,
     )
 
@@ -481,13 +513,17 @@ def _summary(
         "command_statuses": {
             "passed": sum(transcript.status == "passed" for transcript in transcripts),
             "failed": sum(transcript.status == "failed" for transcript in transcripts),
-            "unavailable": sum(transcript.status == "unavailable" for transcript in transcripts),
+            "unavailable": sum(
+                transcript.status == "unavailable" for transcript in transcripts
+            ),
         },
         "artifacts": len(artifacts),
         "artifact_statuses": {
             "present": sum(artifact.status == "present" for artifact in artifacts),
             "deferred": sum(artifact.status == "deferred" for artifact in artifacts),
-            "unavailable": sum(artifact.status == "unavailable" for artifact in artifacts),
+            "unavailable": sum(
+                artifact.status == "unavailable" for artifact in artifacts
+            ),
             "failed": sum(artifact.status == "failed" for artifact in artifacts),
         },
         "authority_classes": sorted(
@@ -506,12 +542,14 @@ def _overall_status(
         for transcript in transcripts
     )
     required_missing = any(
-        artifact.required and artifact.status not in {"present"} for artifact in artifacts
+        artifact.required and artifact.status not in {"present"}
+        for artifact in artifacts
     )
     if blocking_failed or required_missing:
         return "blocking"
     if any(
-        artifact.status in {"deferred", "unavailable", "failed"} for artifact in artifacts
+        artifact.status in {"deferred", "unavailable", "failed"}
+        for artifact in artifacts
     ) or any(transcript.status != "passed" for transcript in transcripts):
         return "review_needed"
     return "passed"
@@ -538,6 +576,43 @@ def _git_output(command: list[str]) -> str:
     return completed.stdout.strip()
 
 
+def _temporary_stream_path(transcript_dir: Path, name: str, stream_name: str) -> Path:
+    safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "_", name)
+    with tempfile.NamedTemporaryFile(
+        prefix=f"{safe_name}_{stream_name}_",
+        suffix=".log",
+        dir=transcript_dir,
+        delete=False,
+    ) as handle:
+        return Path(handle.name)
+
+
+def _run_command_to_files(
+    command: list[str],
+    stdout_path: Path,
+    stderr_path: Path,
+) -> subprocess.CompletedProcess[str]:
+    with (
+        stdout_path.open("w", encoding="utf-8") as stdout_handle,
+        stderr_path.open(
+            "w",
+            encoding="utf-8",
+        ) as stderr_handle,
+    ):
+        completed = subprocess.run(
+            command,
+            stdout=stdout_handle,
+            stderr=stderr_handle,
+            text=True,
+            check=False,
+        )
+    if completed.stdout:
+        stdout_path.write_text(completed.stdout, encoding="utf-8")
+    if completed.stderr:
+        stderr_path.write_text(completed.stderr, encoding="utf-8")
+    return completed
+
+
 def _validate_authority_classes(
     artifacts: list[BundleArtifact],
     authority_map: list[dict[str, object]],
@@ -552,15 +627,21 @@ def _validate_authority_classes(
         raise ValueError(f"authority map missing required classes: {sorted(missing)}")
 
 
-def _write_checksums(bundle_dir: Path) -> None:
+def _write_checksums(bundle_dir: Path, checksum_cache: dict[Path, str]) -> None:
     checksum_path = bundle_dir / "SHA256SUMS"
     files = sorted(
         path
         for path in bundle_dir.rglob("*")
         if path.is_file() and path.name != checksum_path.name
     )
-    lines = [f"{_sha256(path)}  {_relative_path(path, bundle_dir)}" for path in files]
-    checksum_path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+    _sha256_cached_many(files, checksum_cache)
+    lines = [
+        f"{_sha256_cached(path, checksum_cache)}  {_relative_path(path, bundle_dir)}"
+        for path in files
+    ]
+    checksum_path.write_text(
+        "\n".join(lines) + ("\n" if lines else ""), encoding="utf-8"
+    )
 
 
 def _render_markdown(payload: dict[str, object]) -> str:
@@ -642,11 +723,102 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _sha256_cached(path: Path, checksum_cache: dict[Path, str]) -> str:
+    resolved = path.resolve()
+    digest = checksum_cache.get(resolved)
+    if digest is None:
+        digest = _sha256(path)
+        checksum_cache[resolved] = digest
+    return digest
+
+
+def _sha256_cached_many(paths: list[Path], checksum_cache: dict[Path, str]) -> None:
+    missing = [path for path in paths if path.resolve() not in checksum_cache]
+    if not missing:
+        return
+    workers = min(os.cpu_count() or 1, len(missing), 8)
+    if workers <= 1:
+        for path in missing:
+            checksum_cache[path.resolve()] = _sha256(path)
+        return
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        for path, digest in zip(missing, executor.map(_sha256, missing), strict=True):
+            checksum_cache[path.resolve()] = digest
+
+
 def _tail(value: str, limit: int = DEFAULT_LOG_TAIL_CHARS) -> str:
     if limit <= 0:
         return ""
-    redacted = TOKEN_PATTERN.sub(lambda match: f"{match.group(1)}{match.group(2)}<redacted>", value)
+    redacted = TOKEN_PATTERN.sub(
+        lambda match: f"{match.group(1)}{match.group(2)}<redacted>", value
+    )
     return redacted[-limit:]
+
+
+def _append_tail(tail: str, text: str, limit: int) -> str:
+    if not text:
+        return tail
+    return (tail + text)[-limit:]
+
+
+def _redacted_tail_file(path: Path, limit: int) -> str:
+    tail = ""
+    pending = ""
+    in_secret = False
+    chunk_size = max(limit, 8192)
+
+    with path.open("rb") as handle:
+        for raw_chunk in iter(lambda: handle.read(chunk_size), b""):
+            text = raw_chunk.decode(errors="replace")
+            if in_secret:
+                delimiter_index = next(
+                    (
+                        index
+                        for index, char in enumerate(text)
+                        if char in _TOKEN_VALUE_DELIMITERS
+                    ),
+                    None,
+                )
+                if delimiter_index is None:
+                    continue
+                tail = _append_tail(tail, text[delimiter_index], limit)
+                text = text[delimiter_index + 1 :]
+                in_secret = False
+
+            pending += text
+            while pending:
+                match = TOKEN_PATTERN.search(pending)
+                if match is None:
+                    if len(pending) > _TOKEN_PREFIX_OVERLAP_CHARS:
+                        emit = pending[:-_TOKEN_PREFIX_OVERLAP_CHARS]
+                        tail = _append_tail(tail, emit, limit)
+                        pending = pending[-_TOKEN_PREFIX_OVERLAP_CHARS:]
+                    break
+
+                tail = _append_tail(tail, pending[: match.start()], limit)
+                tail = _append_tail(
+                    tail,
+                    f"{match.group(1)}{match.group(2)}<redacted>",
+                    limit,
+                )
+                if match.end() == len(pending):
+                    pending = ""
+                    in_secret = True
+                    break
+                pending = pending[match.end() :]
+
+    if not in_secret:
+        tail = _append_tail(tail, _tail(pending, max(limit, 8192)), limit)
+    return tail
+
+
+def _tail_file(path: Path, limit: int = DEFAULT_LOG_TAIL_CHARS) -> str:
+    if limit <= 0:
+        return ""
+    try:
+        return _redacted_tail_file(path, limit)
+    except OSError:
+        return ""
 
 
 def _relative_path(path: Path, root: Path) -> str:

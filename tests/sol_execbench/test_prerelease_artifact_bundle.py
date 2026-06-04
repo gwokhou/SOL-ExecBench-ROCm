@@ -43,7 +43,9 @@ def test_bundle_writes_manifest_transcripts_checksums_and_authority_map(
                 "# Release Candidate Validation\n",
                 encoding="utf-8",
             )
-            return subprocess.CompletedProcess(command, 0, stdout="validation ok", stderr="")
+            return subprocess.CompletedProcess(
+                command, 0, stdout="validation ok", stderr=""
+            )
         if command == ["uv", "run", "sol-execbench", "doctor", "--json"]:
             return subprocess.CompletedProcess(
                 command,
@@ -82,8 +84,12 @@ def test_bundle_writes_manifest_transcripts_checksums_and_authority_map(
     artifact_by_id = {artifact["id"]: artifact for artifact in manifest["artifacts"]}
     assert artifact_by_id["release_candidate_validation_json"]["status"] == "present"
     assert artifact_by_id["transcript_release_candidate_validation"]["sha256"]
-    assert artifact_by_id["environment_evidence"]["authority_class"] == "diagnostic-only"
-    assert "MI300X is the concrete CDNA3 `gfx942` hardware target" in json.dumps(manifest)
+    assert (
+        artifact_by_id["environment_evidence"]["authority_class"] == "diagnostic-only"
+    )
+    assert "MI300X is the concrete CDNA3 `gfx942` hardware target" in json.dumps(
+        manifest
+    )
     assert "not full 235-problem paper validation" in (
         tmp_path / "prerelease_artifact_bundle.md"
     ).read_text(encoding="utf-8")
@@ -99,7 +105,9 @@ def test_optional_environment_evidence_unavailable_does_not_block_bundle(
         if command[:2] == ["git", "describe"]:
             return subprocess.CompletedProcess(command, 1, stdout="", stderr="no tag")
         if command[:2] == ["git", "status"]:
-            return subprocess.CompletedProcess(command, 0, stdout=" M docs/CLAIMS.md\n", stderr="")
+            return subprocess.CompletedProcess(
+                command, 0, stdout=" M docs/CLAIMS.md\n", stderr=""
+            )
         if any(part.endswith("release_candidate_validation.py") for part in command):
             output_dir = Path(command[command.index("--output-dir") + 1])
             output_dir.mkdir(parents=True, exist_ok=True)
@@ -111,7 +119,9 @@ def test_optional_environment_evidence_unavailable_does_not_block_bundle(
                 "# Release Candidate Validation\n",
                 encoding="utf-8",
             )
-            return subprocess.CompletedProcess(command, 0, stdout="validation ok", stderr="")
+            return subprocess.CompletedProcess(
+                command, 0, stdout="validation ok", stderr=""
+            )
         if command == ["missing-doctor"]:
             raise FileNotFoundError("missing-doctor")
         raise AssertionError(f"unexpected command: {command}")
@@ -179,11 +189,36 @@ def test_failed_release_validation_blocks_and_redacts_transcript(
             encoding="utf-8"
         )
     )
-    release_artifact = {
-        artifact["id"]: artifact for artifact in manifest["artifacts"]
-    }["release_candidate_validation_json"]
+    release_artifact = {artifact["id"]: artifact for artifact in manifest["artifacts"]}[
+        "release_candidate_validation_json"
+    ]
     assert manifest["overall_status"] == "blocking"
     assert release_artifact["required"] is True
     assert release_artifact["status"] == "failed"
     assert "hf_secret" not in json.dumps(transcript)
     assert "<redacted>" in transcript["stderr_tail"]
+
+
+def test_tail_file_redacts_single_line_without_reading_by_line(tmp_path):
+    path = tmp_path / "huge.log"
+    path.write_text("x" * 20000 + " HF_TOKEN=secret-tail", encoding="utf-8")
+
+    tail = build_prerelease_artifact_bundle._tail_file(path, 200)
+
+    assert "secret-tail" not in tail
+    assert "<redacted>" in tail
+
+
+def test_tail_file_redacts_secret_value_split_across_chunks(tmp_path):
+    path = tmp_path / "split.log"
+    token = "HF_TOKEN=secret_split_tail"
+    path.write_text(
+        "x" * (8192 - len("HF_TOKEN=secret")) + token,
+        encoding="utf-8",
+    )
+
+    tail = build_prerelease_artifact_bundle._tail_file(path, 200)
+
+    assert "secret_split_tail" not in tail
+    assert "split_tail" not in tail
+    assert "<redacted>" in tail
