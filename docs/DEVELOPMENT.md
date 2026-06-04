@@ -110,7 +110,7 @@ public benchmark schemas.
 
 | Boundary | Helper modules | Still owned by orchestrator/template |
 | --- | --- | --- |
-| Dataset execution | `core.dataset.run_state`, `core.dataset.run_closure`, `core.dataset.evidence_refs`, `core.dataset.sharding` | `scripts/run_dataset.py` CLI parsing, serial subprocess invocation, and high-level loop flow. |
+| Dataset execution | `core.dataset.run_state`, `core.dataset.run_closure`, `core.dataset.evidence_refs`, `core.dataset.sharding` | `scripts/run_dataset.py` CLI parsing, serial ROCm GPU/profiler subprocess phases, derived-phase worker scheduling, and high-level loop flow. |
 | Eval driver runtime | `core.bench.eval_runtime` | `driver/templates/eval_driver.py` subprocess context, staged wiring, correctness/timing loop, and integration smoke behavior. |
 | AMD bound analysis | `core.scoring.amd_bound_classification`, `core.scoring.amd_bound_estimate_families` | FX/AST graph extraction, family annotation, and formula bodies in existing scoring modules. |
 | SOLAR derivation | `core.scoring.solar_derivation_status` | Sidecar dataclasses, parser validation, semantic group construction, and rendering. |
@@ -121,8 +121,10 @@ hardware validation, paper-scale parity evidence, or leaderboard authority.
 
 Dataset helper additions include reuse policy decisions, stale-provenance
 mismatch normalization, selected-workload closure record assembly, evidence gap
-classification, and deterministic shard/merge semantics. The sharding helper is
-an importable design path; it does not add dataset CLI parallelism by itself.
+classification, sidecar reference construction, and deterministic shard/merge
+semantics. The sharding helper is an importable design path; dataset CLI
+parallelism is deliberately limited to CPU/I/O-only `--phase derived --jobs`
+report generation from existing traces.
 
 Eval-driver helper additions include strict trace JSONL emission and
 reward-hack boundary helpers. Python submissions are loaded through unique

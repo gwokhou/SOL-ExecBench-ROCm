@@ -309,6 +309,8 @@ target-specific ROCm wheel stacks without changing the project lockfile.
 | `--execution-closure` | Write an execution-closure JSON sidecar; defaults under `--output` when `--ready-subset` is supplied. |
 | `--dataset-manifest` | Include dataset manifest provenance in closure checks. |
 | `--ready-subset` plus `--readiness` | Preserve ready-subset denominators, readiness classes, blocker codes, and exclusion reasons in closure records. |
+| `--phase all|traces|derived|timing` | Select the dataset pass. `all` preserves normal execution, `traces` runs GPU trace collection, `derived` rebuilds reports from existing traces, and `timing` collects profiler-backed timing evidence from existing traces. |
+| `--jobs <N>|auto` | Use parallel workers for safe CPU/I/O-only phases. Values greater than `1` are honored only with `--phase derived`; GPU and profiler phases remain serial. |
 | `--rerun` | Re-evaluate existing traces instead of reusing passing results. |
 | `--amd-score-report` | Write an opt-in AMD-native derived score report. |
 | `--amd-sol-bound-dir` | Materialize AMD SOL bound sidecars used by score reporting. |
@@ -319,6 +321,12 @@ Existing traces are reused only when they exist, have no failed workloads,
 `--rerun` is not set, and any requested execution-closure provenance matches
 the current manifest, ready subset, readiness, solution, and derived-evidence
 requirements.
+
+The `auto` job count uses the current CPU count capped by the number of selected
+problems and an internal upper bound. Derived sidecar names are scoped by
+problem path during dataset runs, so two problems with the same definition name
+and workload UUID do not overwrite each other's AMD SOL or SOLAR derivation
+files.
 
 ## Docker Image Settings
 

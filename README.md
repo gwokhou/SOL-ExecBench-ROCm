@@ -77,6 +77,16 @@ Run a small downloaded dataset batch:
 uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark --limit 5
 ```
 
+Rebuild CPU/I/O-only derived reports from existing traces without rerunning GPU
+evaluation:
+
+```bash
+uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
+  --phase derived \
+  --jobs auto \
+  --amd-score-report out/amd-score-report.json
+```
+
 Migrate locally downloaded SOL-ExecBench or FlashInfer Trace inputs into the
 repository benchmark layout without redistributing restricted source data:
 
@@ -240,6 +250,7 @@ Focused CPU-safe checks for recent dataset trustworthiness helpers:
 uv run pytest \
   tests/sol_execbench/test_dataset_run_closure.py \
   tests/sol_execbench/test_run_dataset_execution_closure.py \
+  tests/sol_execbench/test_run_dataset_amd_score.py \
   tests/sol_execbench/test_dataset_sharding.py
 ```
 

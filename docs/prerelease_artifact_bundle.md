@@ -45,7 +45,10 @@ The bundle writes:
 - `environment/`: diagnostic environment evidence when available.
 
 The manifest also records checksums for referenced source documents such as
-`docs/CLAIMS.md`.
+`docs/CLAIMS.md`. Bundle commands stream stdout and stderr to temporary files
+and retain only bounded redacted transcript tails in the manifest. `SHA256SUMS`
+is written in deterministic path order; missing file digests may be computed in
+parallel within a run, but the output ordering remains stable.
 
 The bundle must not contain NVIDIA SOL-ExecBench original dataset content or
 ROCm-migrated derivatives of that content. The prerelease readiness checker

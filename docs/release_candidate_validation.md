@@ -118,3 +118,9 @@ candidate validation summaries are diagnostic-only sidecar evidence. Bounded
 dataset slices and support-matrix rows are provisional prerelease evidence, not
 paper, score, leaderboard, sandbox, native-host, full MI300X validation on the
 CDNA3 `gfx942` target, or CDNA4 validation authority.
+
+Command stdout and stderr are streamed to temporary files while checks run.
+Only bounded redacted tails are copied into the validation JSON, and temporary
+stream files are removed after each check. Redaction is stateful across stream
+chunks so credential-like values split at chunk boundaries are not exposed in
+the recorded tail.

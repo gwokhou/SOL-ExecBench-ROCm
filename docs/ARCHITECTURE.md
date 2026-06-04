@@ -202,9 +202,10 @@ local to the operator's machine. Scripts such as
 Dataset reuse and closure behavior is package-owned. `run_closure.py` computes
 reuse decisions, stale-provenance mismatches, selected-workload closure
 records, derived evidence refs, and missing-evidence states. `sharding.py`
-provides an importable design path for future parallel dataset execution while
-leaving the default `scripts/run_dataset.py` CLI behavior serial and
-compatible.
+provides an importable design path for future workload-level dataset
+parallelism. `scripts/run_dataset.py` keeps ROCm GPU trace collection and
+profiler-backed timing serial, while allowing `--phase derived --jobs <N|auto>`
+to parallelize CPU/I/O-only report generation from existing traces.
 
 `src/sol_execbench/core/scoring/` contains AMD hardware models, bound estimates,
 bound graphs, SOL derivation helpers, baseline artifacts, and AMD-native score

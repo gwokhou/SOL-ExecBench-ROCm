@@ -35,6 +35,8 @@ def test_dataset_sharding_contract_documents_default_cli_boundary():
         "shard-0000-of-0002",
         "one trace file ref per shard",
         "duplicate workloads or incomplete shards",
-        "default `scripts/run_dataset.py` CLI remains unchanged",
+        "profiler-backed timing phases remain serial",
+        "--phase derived",
+        "CPU/I/O-only report generation",
     ):
         assert phrase in text

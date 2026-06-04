@@ -124,8 +124,11 @@ The first deterministic sharding contract lives in
 ordinal, gives each shard a stable id such as `shard-0000-of-0002`, and
 reserves one trace file ref per shard. The merge helper orders merged traces by
 original workload ordinal and reports duplicate workloads or incomplete shards
-explicitly. These helpers are a tested design path for future dataset-scale
-parallel execution; the default `scripts/run_dataset.py` CLI remains unchanged.
+explicitly. These helpers are a tested design path for future workload-level
+dataset-scale parallel execution. The default `scripts/run_dataset.py` trace and
+profiler-backed timing phases remain serial, while `--phase derived --jobs` can
+parallelize CPU/I/O-only report generation from existing traces without changing
+benchmark execution semantics.
 
 Dataset runs write per-problem traces under category/problem subdirectories of
 the selected output directory and write a run summary sidecar directly under
@@ -321,6 +324,11 @@ per-operation SOL bounds, aggregate bound state, deterministic warnings, and
 coverage summary. This is the ROCm port's AMD-local analog of the paper's
 graph/evidence/SOL-analyzer artifact boundary; it is not an upstream NVIDIA
 B200 or full SOLAR reproduction claim.
+
+During dataset runs, AMD SOL and SOLAR derivation sidecar filenames are scoped
+by problem path as well as definition name and workload UUID. This prevents two
+different problems with repeated benchmark identifiers from overwriting each
+other's derived evidence when `--phase derived --jobs` is used.
 
 For v1.10 SOLAR derivation evidence, add `--solar-derivation` alongside the
 AMD-native report and AMD SOL bound sidecar options:
