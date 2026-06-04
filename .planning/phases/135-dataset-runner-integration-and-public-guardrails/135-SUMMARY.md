@@ -34,7 +34,7 @@
 
 ## Deferred
 
-- Real CDNA3/MI300X and CDNA4 full-suite hardware validation remains deferred.
+- Real CDNA3 or CDNA4 full-suite hardware validation remains deferred.
 - FlashInfer CUDA-kernel ROCm tuning and performance comparison remains
   deferred.
 - Public redistribution of NVIDIA SOL-ExecBench original or migrated dataset

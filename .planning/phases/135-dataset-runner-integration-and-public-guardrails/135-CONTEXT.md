@@ -90,7 +90,7 @@ and requested evidence.
 <deferred>
 ## Deferred Ideas
 
-- Real CDNA3/MI300X full-suite execution.
+- Real CDNA3 or CDNA4 full-suite execution.
 - Real CDNA4/NVFP4 hardware validation or performance authority.
 - High-performance FlashInfer CUDA-kernel ROCm tuning.
 - Hosted leaderboard, remote submissions, or public dataset redistribution.
