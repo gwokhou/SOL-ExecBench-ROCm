@@ -33,6 +33,12 @@ from .manifest import (
     build_dataset_manifest,
     write_dataset_manifest,
 )
+from .migration import (
+    DatasetMigrationManifest,
+    migrate_flashinfer_trace,
+    migrate_sol_execbench,
+    write_migration_manifest,
+)
 from .inventory import (
     DatasetInventory,
     InventoryDenominators,
@@ -73,6 +79,7 @@ __all__ = [
     "DatasetLayout",
     "DatasetManifest",
     "DatasetManifestSource",
+    "DatasetMigrationManifest",
     "DatasetInventory",
     "DatasetReadiness",
     "DatasetShardMergeResult",
@@ -92,6 +99,8 @@ __all__ = [
     "build_dataset_inventory",
     "classify_rocm_readiness",
     "build_ready_subset",
+    "migrate_flashinfer_trace",
+    "migrate_sol_execbench",
     "merge_dataset_shard_traces",
     "plan_dataset_shards",
     "build_parity_gap_report",
@@ -104,6 +113,7 @@ __all__ = [
     "validate_categories",
     "write_dataset_manifest",
     "write_dataset_inventory",
+    "write_migration_manifest",
     "write_dataset_readiness",
     "write_ready_subset",
     "write_parity_gap_reports",
