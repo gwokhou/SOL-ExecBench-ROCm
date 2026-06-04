@@ -49,11 +49,20 @@ from .inventory import (
 )
 from .readiness import (
     DatasetReadiness,
+    DatasetReadinessClaimBoundary,
+    ReadinessBlockerReport,
+    ReadinessClass,
     WorkloadReadinessRecord,
     classify_rocm_readiness,
     write_dataset_readiness,
 )
-from .ready_subset import ReadySubset, build_ready_subset, write_ready_subset
+from .ready_subset import (
+    ReadySubset,
+    ReadySubsetDenominator,
+    ReadySubsetExclusionReason,
+    build_ready_subset,
+    write_ready_subset,
+)
 from .sharding import (
     DatasetShardMergeResult,
     DatasetShardPlan,
@@ -82,6 +91,7 @@ __all__ = [
     "DatasetMigrationManifest",
     "DatasetInventory",
     "DatasetReadiness",
+    "DatasetReadinessClaimBoundary",
     "DatasetShardMergeResult",
     "DatasetShardPlan",
     "DatasetShardWorkload",
@@ -92,6 +102,10 @@ __all__ = [
     "ParityGapReport",
     "PaperDenominatorReport",
     "ReadySubset",
+    "ReadySubsetDenominator",
+    "ReadySubsetExclusionReason",
+    "ReadinessBlockerReport",
+    "ReadinessClass",
     "WorkloadInventoryRecord",
     "WorkloadReadinessRecord",
     "build_derived_evidence_refs",

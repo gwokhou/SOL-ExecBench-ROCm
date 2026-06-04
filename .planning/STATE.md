@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.29
 milestone_name: Dataset Migration and Compliance
 status: planning
-last_updated: "2026-06-04T02:56:00Z"
+last_updated: "2026-06-04T03:20:00Z"
 last_activity: 2026-06-04
 progress:
   total_phases: 5
-  completed_phases: 2
-  total_plans: 2
-  completed_plans: 2
-  percent: 40
+  completed_phases: 3
+  total_plans: 3
+  completed_plans: 3
+  percent: 60
 ---
 
 # Project State
@@ -29,10 +29,10 @@ ROCm-equivalent low-precision semantics.
 
 ## Current Position
 
-Phase: 132 complete
-Plan: 132-01
-Status: Ready to plan Phase 133
-Last activity: 2026-06-04 — Phase 132 completed deterministic local dataset migration tooling
+Phase: 133 complete
+Plan: 133-01
+Status: Ready to plan Phase 134
+Last activity: 2026-06-04 — Phase 133 completed ROCm readiness classification and ready subset generation
 
 ## Recent Trend
 
@@ -101,6 +101,10 @@ Last activity: 2026-06-04 — Phase 132 completed deterministic local dataset mi
   refs, license-boundary metadata, and explicit blockers for missing blobs,
   safetensors refs, traces, and solutions.
 
+- Phase 133 completed on 2026-06-04 with static ROCm readiness classes,
+  deterministic blocker reports, auditable ready-subset denominator/exclusion
+  metadata, closure inputs, and claim-boundary guardrails.
+
 ## Accumulated Context
 
 ### Decisions
@@ -160,8 +164,8 @@ None.
 
 Last session: 2026-06-04
 Stopped at: Phase 132 complete.
-Resume file: .planning/phases/132-local-dataset-migration-pipeline/132-VERIFICATION.md
+Resume file: .planning/phases/133-rocm-readiness-classification-and-ready-subsets/133-VERIFICATION.md
 
 ## Operator Next Steps
 
-- Plan Phase 133 with `/gsd-plan-phase 133`.
+- Plan Phase 134 with `/gsd-plan-phase 134`.

@@ -40,16 +40,16 @@ ExecBench.
 
 ### ROCm Readiness Classification
 
-- [ ] **DATA-READY-01**: Maintainer can classify migrated workloads as
+- [x] **DATA-READY-01**: Maintainer can classify migrated workloads as
   PyTorch-compatible, ROCm-port-needed, FlashInfer-specific,
   NVFP4/Blackwell-specific, unsupported, or blocked by missing evidence.
-- [ ] **DATA-READY-02**: Maintainer can generate a ready subset for workloads
+- [x] **DATA-READY-02**: Maintainer can generate a ready subset for workloads
   that are safe to attempt on the current ROCm runner, with denominator and
   exclusion reasons preserved.
-- [ ] **DATA-READY-03**: Readiness reports expose migration blockers for CUDA
+- [x] **DATA-READY-03**: Readiness reports expose migration blockers for CUDA
   kernel dependencies, FlashInfer-specific runtime assumptions, NVIDIA-specific
   low-precision formats, missing workload blobs, and unsupported dtypes.
-- [ ] **DATA-READY-04**: CPU-safe tests prove readiness classification does not
+- [x] **DATA-READY-04**: CPU-safe tests prove readiness classification does not
   upgrade blocked, unvalidated, or hardware-specific workloads into validation
   claims.
 
@@ -149,10 +149,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DATA-MIG-02 | Phase 132 | Complete |
 | DATA-MIG-03 | Phase 132 | Complete |
 | DATA-MIG-04 | Phase 132 | Complete |
-| DATA-READY-01 | Phase 133 | Pending |
-| DATA-READY-02 | Phase 133 | Pending |
-| DATA-READY-03 | Phase 133 | Pending |
-| DATA-READY-04 | Phase 133 | Pending |
+| DATA-READY-01 | Phase 133 | Complete |
+| DATA-READY-02 | Phase 133 | Complete |
+| DATA-READY-03 | Phase 133 | Complete |
+| DATA-READY-04 | Phase 133 | Complete |
 | LOWP-ROCM-01 | Phase 134 | Pending |
 | LOWP-ROCM-02 | Phase 134 | Pending |
 | LOWP-ROCM-03 | Phase 134 | Pending |
