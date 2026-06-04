@@ -42,6 +42,9 @@ class ExecutionClosureReasonCode(str, Enum):
     SOLUTION_MISMATCH = "solution_mismatch"
     SOLUTION_MODE_MISMATCH = "solution_mode_mismatch"
     EVIDENCE_REQUIREMENT_MISMATCH = "evidence_requirement_mismatch"
+    SELECTION_MISMATCH = "selection_mismatch"
+    RUNTIME_CONFIG_MISMATCH = "runtime_config_mismatch"
+    GIT_COMMIT_MISMATCH = "git_commit_mismatch"
 
 
 class ExecutionClosureRecord(BaseModel):
@@ -296,12 +299,22 @@ def compare_execution_closure_provenance(
         observed if isinstance(observed, ExecutionClosureProvenance) else ExecutionClosureProvenance(**observed)
     )
     comparisons = (
+        ("dataset_root", ExecutionClosureReasonCode.SELECTION_MISMATCH),
+        ("selected_categories", ExecutionClosureReasonCode.SELECTION_MISMATCH),
+        ("limit", ExecutionClosureReasonCode.SELECTION_MISMATCH),
+        ("max_workloads", ExecutionClosureReasonCode.SELECTION_MISMATCH),
         ("dataset_manifest_checksum", ExecutionClosureReasonCode.MANIFEST_CHECKSUM_MISMATCH),
         ("readiness_checksum", ExecutionClosureReasonCode.READINESS_CHECKSUM_MISMATCH),
         ("ready_subset_checksum", ExecutionClosureReasonCode.READY_SUBSET_CHECKSUM_MISMATCH),
         ("workload_identity_checksum", ExecutionClosureReasonCode.WORKLOAD_IDENTITY_MISMATCH),
         ("solution_mode", ExecutionClosureReasonCode.SOLUTION_MODE_MISMATCH),
         ("solution_name", ExecutionClosureReasonCode.SOLUTION_MISMATCH),
+        ("timeout", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
+        ("warmup_runs", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
+        ("iterations", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
+        ("lock_clocks", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
+        ("benchmark_config", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
+        ("git_commit", ExecutionClosureReasonCode.GIT_COMMIT_MISMATCH),
         ("requested_evidence_requirements", ExecutionClosureReasonCode.EVIDENCE_REQUIREMENT_MISMATCH),
     )
     mismatches: list[ExecutionClosureProvenanceMismatch] = []

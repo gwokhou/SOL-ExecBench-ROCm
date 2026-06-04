@@ -725,7 +725,7 @@ def main():
                         )
                     )
             limited_ids = selected_ids
-            if args.limit:
+            if args.limit is not None:
                 limited_ids = selected_ids[: args.limit]
                 filtered_ids = set(selected_ids[args.limit :])
                 for problem_id in selected_ids[args.limit :]:
@@ -753,7 +753,7 @@ def main():
                 ]
             else:
                 problems = [discovered_by_id[problem_id] for problem_id in limited_ids]
-        elif args.limit:
+        elif args.limit is not None:
             problems = problems[: args.limit]
 
         print(f"Discovered {len(problems)} problems under {problems_dir}")
@@ -943,16 +943,25 @@ def main():
 
         # Preserve ordinary resume behavior unless closure provenance is part of the contract.
         if traces_path.exists():
-            traces = json.loads(traces_path.read_text())
-            summary = inspect_traces(traces, f"{category}/{problem_name}")
-            reuse_decision = _dataset_reuse_decision(
-                rerun=args.rerun,
-                traces_path=traces_path,
-                failed_count=int(summary["failed"]),
-                execution_closure_path=execution_closure_path,
-                provenance=provenance,
-            )
-            if reuse_decision.should_reuse:
+            stale_trace_mismatch: dict[str, object] | None = None
+            try:
+                traces = json.loads(traces_path.read_text())
+                summary = inspect_traces(traces, f"{category}/{problem_name}")
+                reuse_decision = _dataset_reuse_decision(
+                    rerun=args.rerun,
+                    traces_path=traces_path,
+                    failed_count=int(summary["failed"]),
+                    execution_closure_path=execution_closure_path,
+                    provenance=provenance,
+                )
+            except (OSError, json.JSONDecodeError):
+                traces = []
+                summary = None
+                reuse_decision = None
+                stale_trace_mismatch = _stale_provenance_mismatch(
+                    observed="unreadable traces"
+                )
+            if reuse_decision is not None and reuse_decision.should_reuse:
                 if (
                     args.amd_score_report is not None
                     or args.amd_sol_bound_dir is not None
@@ -1002,14 +1011,18 @@ def main():
                             )
                         )
                 continue
-            if reuse_decision.provenance_mismatches:
+            if stale_trace_mismatch is not None:
+                provenance_mismatches.append(stale_trace_mismatch)
+                print("  Re-running (previous trace output is unreadable).")
+            elif reuse_decision is not None and reuse_decision.provenance_mismatches:
                 provenance_mismatches.extend(
                     list(reuse_decision.provenance_mismatches)
                 )
-                print("  Re-running (previous pass has stale closure provenance).")
-            elif reuse_decision.reason == "previous_failed":
-                print(f"  Re-running (previous run had {summary['failed']} failures).")
-            elif reuse_decision.reason == "rerun_requested":
+                print("  Re-running (previous output is stale or unreadable).")
+            elif reuse_decision is not None and reuse_decision.reason == "previous_failed":
+                failed = summary["failed"] if summary is not None else "unknown"
+                print(f"  Re-running (previous run had {failed} failures).")
+            elif reuse_decision is not None and reuse_decision.reason == "rerun_requested":
                 print("  Re-running (--rerun requested).")
 
         # Clear previous run output
@@ -1038,10 +1051,48 @@ def main():
             solution_file = problem_dir / args.solution_name
             if not solution_file.exists():
                 print(f"  Skipping: {args.solution_name} not found")
+                if selected_workload_refs is not None:
+                    for workload_ref in selected_workload_refs:
+                        key = _workload_key(
+                            workload_ref.get("uuid"), workload_ref.get("row_index")
+                        )
+                        attempted_ready_keys.add((problem_id, key))
+                        closure_records.append(
+                            _closure_record(
+                                category=category,
+                                problem_id=problem_id,
+                                problem_path=str(problem_ref.get("problem_path")),
+                                workload_uuid=workload_ref.get("uuid"),
+                                row_index=int(workload_ref.get("row_index", 0)),
+                                closure_status="not_attempted",
+                                readiness=readiness_by_workload.get((problem_id, key)),
+                                filter_reasons=["missing_solution"],
+                                notes=[f"{args.solution_name} not found"],
+                            )
+                        )
                 continue
         else:
             if "reference" not in definition or not definition["reference"].strip():
                 print("  Skipping: no reference code")
+                if selected_workload_refs is not None:
+                    for workload_ref in selected_workload_refs:
+                        key = _workload_key(
+                            workload_ref.get("uuid"), workload_ref.get("row_index")
+                        )
+                        attempted_ready_keys.add((problem_id, key))
+                        closure_records.append(
+                            _closure_record(
+                                category=category,
+                                problem_id=problem_id,
+                                problem_path=str(problem_ref.get("problem_path")),
+                                workload_uuid=workload_ref.get("uuid"),
+                                row_index=int(workload_ref.get("row_index", 0)),
+                                closure_status="not_attempted",
+                                readiness=readiness_by_workload.get((problem_id, key)),
+                                filter_reasons=["missing_reference"],
+                                notes=["reference code not found"],
+                            )
+                        )
                 continue
 
         solution = build_solution_for_problem(

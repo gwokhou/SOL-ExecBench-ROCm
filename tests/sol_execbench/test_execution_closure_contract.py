@@ -172,6 +172,9 @@ def test_status_and_reason_vocabularies_are_phase_83_contracts():
         "solution_mismatch",
         "solution_mode_mismatch",
         "evidence_requirement_mismatch",
+        "selection_mismatch",
+        "runtime_config_mismatch",
+        "git_commit_mismatch",
     }
 
 
@@ -249,6 +252,46 @@ def test_provenance_comparison_treats_evidence_requirements_as_order_insensitive
     )
 
     assert compare_execution_closure_provenance(expected, observed) == []
+
+
+def test_provenance_comparison_rejects_runtime_and_selection_drift():
+    expected = _provenance(
+        selected_categories=["L1"],
+        limit=1,
+        max_workloads=2,
+        timeout=300,
+        warmup_runs=10,
+        iterations=50,
+        lock_clocks=False,
+        benchmark_config={"warmup_runs": 10, "iterations": 50, "lock_clocks": False},
+        git_commit="old-sha",
+    )
+    observed = _provenance(
+        selected_categories=["L2"],
+        limit=2,
+        max_workloads=3,
+        timeout=600,
+        warmup_runs=20,
+        iterations=100,
+        lock_clocks=True,
+        benchmark_config={"warmup_runs": 20, "iterations": 100, "lock_clocks": True},
+        git_commit="new-sha",
+    )
+
+    assert [
+        (mismatch.field, mismatch.reason_code.value)
+        for mismatch in compare_execution_closure_provenance(expected, observed)
+    ] == [
+        ("selected_categories", "selection_mismatch"),
+        ("limit", "selection_mismatch"),
+        ("max_workloads", "selection_mismatch"),
+        ("timeout", "runtime_config_mismatch"),
+        ("warmup_runs", "runtime_config_mismatch"),
+        ("iterations", "runtime_config_mismatch"),
+        ("lock_clocks", "runtime_config_mismatch"),
+        ("benchmark_config", "runtime_config_mismatch"),
+        ("git_commit", "git_commit_mismatch"),
+    ]
 
 
 def test_report_records_sidecar_refs_and_cache_provenance_in_checksum():
