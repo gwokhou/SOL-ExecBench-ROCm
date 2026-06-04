@@ -2,9 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.29
 milestone_name: Dataset Migration and Compliance
-status: verification
-last_updated: "2026-06-04T04:45:00Z"
-last_activity: 2026-06-04
+status: Awaiting next milestone
+stopped_at: Milestone v1.29 complete.
+last_updated: "2026-06-04T03:43:25.114Z"
+last_activity: 2026-06-04 — Milestone v1.29 completed and archived
 progress:
   total_phases: 5
   completed_phases: 5
@@ -22,17 +23,14 @@ See: `.planning/PROJECT.md` (updated 2026-06-04)
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly
 on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL
 ExecBench.
-**Current focus:** v1.29 Dataset Migration and Compliance is defining a
-legally safe local migration workflow for SOL-ExecBench and FlashInfer Trace,
-including readiness classification, runner integration, and unvalidated
-ROCm-equivalent low-precision semantics.
+**Current focus:** Awaiting next milestone definition.
 
 ## Current Position
 
-Phase: 135 complete
-Plan: 135-01
-Status: v1.29 phases ready for milestone audit
-Last activity: 2026-06-04 — Phase 135 integrated migrated dataset runner metadata and public guardrails
+Phase: Milestone v1.29 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-06-04 — Milestone v1.29 completed and archived
 
 ## Recent Trend
 
@@ -169,13 +167,18 @@ None.
 | Release authority | Stable benchmark authority release | Deferred | v1.26 scope |
 | Dataset redistribution | Publishing or hosting NVIDIA/SOL-ExecBench original or derivative dataset content | Deferred | v1.29 scope |
 | Hardware validation | Real CDNA4 validation or performance authority for NVFP4/Blackwell semantics | Deferred | v1.29 scope |
+| quick_task | 260531-rdf-add-run-dataset-closure-e2e-gaps | completed | v1.29 close artifact audit |
+| quick_task | 260531-uki-add-remaining-requires-rocm-e2e-coverage | completed | v1.29 close artifact audit |
+| quick_task | 260602-mqi-fix-stale-project-configuration-audit-fi | missing | v1.29 close artifact audit |
+| quick_task | 260602-mqr-fix-second-pass-configuration-audit-findings | missing | v1.29 close artifact audit |
+| quick_task | 260602-msd-unwrap-readme-prose-lines | missing | v1.29 close artifact audit |
 
 ## Session Continuity
 
 Last session: 2026-06-04
-Stopped at: Phase 132 complete.
-Resume file: .planning/phases/135-dataset-runner-integration-and-public-guardrails/135-VERIFICATION.md
+Stopped at: Milestone v1.29 complete.
+Resume file: .planning/milestones/v1.29-MILESTONE-AUDIT.md
 
 ## Operator Next Steps
 
-- Audit and complete v1.29 with `/gsd-audit-milestone`.
+- Start the next milestone with /gsd-new-milestone

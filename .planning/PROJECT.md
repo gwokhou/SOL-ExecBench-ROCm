@@ -15,27 +15,25 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
 ## Current State
 
-**Shipped version:** v1.28 CDNA3 Test and Documentation Readiness,
+**Shipped version:** v1.29 Dataset Migration and Compliance,
 completed 2026-06-04.
 
-**Current milestone:** v1.29 Dataset Migration and Compliance.
+**Current milestone:** None defined.
 
 **Queued milestone:** None defined.
 
-**Latest milestone outcome:** v1.28 completed CDNA3 test and documentation
+**Latest milestone outcome:** v1.29 completed local dataset migration and
+compliance by adding dataset provenance and redistribution guardrails,
+deterministic SOL-ExecBench and FlashInfer Trace migration commands, ROCm
+readiness classification, CPU-safe low-precision compatibility helpers, and
+runner closure/public documentation guardrails.
+
+**Previous milestone outcome:** v1.28 completed CDNA3 test and documentation
 readiness by adding concrete `requires_cdna3` hardware-gated tests, expanding
 the MI300X evidence contract, preserving deferred-validation guardrails, and
 documenting public/contributor CDNA3 test readiness.
 
-**Previous milestone outcome:** v1.27 completed release-facing copyright and
-provenance cleanup by classifying active files, correcting SPDX attribution,
-documenting fork/paper/non-endorsement boundaries, and adding provenance-aware
-readiness guardrails.
-
-**Next milestone goal:** Establish a legally safe, auditable local dataset
-migration pipeline for SOL-ExecBench and FlashInfer Trace on ROCm, including
-ready-subset classification, runner integration, and unvalidated ROCm
-equivalent implementations for NVIDIA/Blackwell low-precision semantics.
+**Next milestone goal:** Not yet defined.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline.
 Milestones v1.1-v1.6 added CDNA 3 code/schema support, maintained residue
@@ -134,15 +132,15 @@ hardware-validation claim boundary by adding actual `requires_cdna3` test entry
 points, validation commands, documentation, and CPU-safe guardrails while
 deferring real CDNA3 execution.
 
-The v1.29 milestone focuses on dataset migration and compliance. It should
-create a legally safe local migration workflow for `nvidia/SOL-ExecBench` and
-`flashinfer-ai/flashinfer-trace`, preserve source/license boundaries, generate
-ROCm readiness classifications and ready subsets, integrate migrated local
-datasets with the dataset runner, and implement ROCm-equivalent compatibility
-paths for NVIDIA/Blackwell low-precision semantics without claiming real CDNA4
-hardware validation.
+The v1.29 milestone completed dataset migration and compliance by creating a
+legally safe local migration workflow for `nvidia/SOL-ExecBench` and
+`flashinfer-ai/flashinfer-trace`, preserving source/license boundaries,
+generating ROCm readiness classifications and ready subsets, integrating
+migrated local datasets with the dataset runner, and implementing
+ROCm-equivalent compatibility paths for NVIDIA/Blackwell low-precision
+semantics without claiming real CDNA4 hardware validation.
 
-## Current Milestone: v1.29 Dataset Migration and Compliance
+## Latest Milestone: v1.29 Dataset Migration and Compliance
 
 **Goal:** Establish a legally safe, auditable local dataset migration workflow
 for SOL-ExecBench and FlashInfer Trace on ROCm, including ready-subset
@@ -906,8 +904,8 @@ ROCm-compatible data migration from real CDNA3/CDNA4 hardware validation.
 | Audit current evidence before expanding validation | User chose cross-report consistency and evaluation stability as the next milestone so future MI300X-on-CDNA3 or paper-scale validation can rely on cleaner evidence. | Active in v1.20 |
 | Fix codebase concerns before new validation claims | User chose a v1.21 milestone focused on codebase debt reduction and execution-boundary hardening from `CONCERNS.md`, while deferring hard sandboxing, MI300X-on-CDNA3 validation, paper-scale parity, and leaderboard authority. | Active in v1.21 |
 | Complete CDNA3 test readiness without hardware execution | User requested a new milestone to fill out real usable CDNA3 tests and docs, while acknowledging the current machine cannot execute the validation and actual hardware verification remains deferred. | Active in v1.28 |
-| Treat dataset migration as local-only for NVIDIA data | User asked about legal risk for SOL-ExecBench and FlashInfer Trace migration; NVIDIA/SOL-ExecBench redistribution is restricted, while FlashInfer Trace is Apache-2.0. | Active in v1.29 |
-| Implement low-precision compatibility without hardware validation | User clarified v1.29 may include complete ROCm-equivalent implementations for NVFP4/Blackwell semantics, but real validation depends on future CDNA4 hardware evidence. | Active in v1.29 |
+| Treat dataset migration as local-only for NVIDIA data | User asked about legal risk for SOL-ExecBench and FlashInfer Trace migration; NVIDIA/SOL-ExecBench redistribution is restricted, while FlashInfer Trace is Apache-2.0. | Validated in v1.29 |
+| Implement low-precision compatibility without hardware validation | User clarified v1.29 may include complete ROCm-equivalent implementations for NVFP4/Blackwell semantics, but real validation depends on future CDNA4 hardware evidence. | Validated in v1.29 |
 
 ## Evolution
 
@@ -927,4 +925,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-04 after v1.29 milestone start*
+*Last updated: 2026-06-04 after v1.29 milestone completion*
