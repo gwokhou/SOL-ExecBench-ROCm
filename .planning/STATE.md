@@ -130,6 +130,11 @@ Last activity: 2026-06-04 — Milestone v1.29 completed and archived
   summaries, blocker-visible execution closure rows, deterministic no-ready
   summaries, public-safe cookbook workflow docs, and CPU-safe guardrail tests.
 
+- Quick task 260604-vjx reduced heavyweight script memory and I/O overhead on
+  2026-06-04 by streaming long subprocess output to bounded logs, caching
+  prerelease checksums, avoiding redundant SOLAR sidecar rereads, and streaming
+  workload prefix reads while preserving benchmark execution semantics.
+
 ## Accumulated Context
 
 ### Decisions

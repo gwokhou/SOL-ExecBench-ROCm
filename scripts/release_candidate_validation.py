@@ -9,6 +9,7 @@ import argparse
 import json
 import os
 import re
+import tempfile
 import subprocess
 import time
 from dataclasses import asdict, dataclass, field
@@ -32,7 +33,15 @@ DEFAULT_CPU_COMMAND = [
     "-q",
 ]
 DEFAULT_DOCTOR_COMMAND = ["uv", "run", "sol-execbench", "doctor", "--json"]
-DEFAULT_ROCM_PYTEST_COMMAND = ["uv", "run", "pytest", "-m", "requires_rocm", "-q", "-rs"]
+DEFAULT_ROCM_PYTEST_COMMAND = [
+    "uv",
+    "run",
+    "pytest",
+    "-m",
+    "requires_rocm",
+    "-q",
+    "-rs",
+]
 DEFAULT_DOCKER_COMMAND = ["./scripts/run_docker.sh", "--dry-run"]
 
 TOKEN_PATTERN = re.compile(
@@ -44,6 +53,8 @@ TOKEN_PATTERN = re.compile(
     r"(\s*:\s*bearer\s+|\s*[:=]\s*)"
     r"([^\s'\"]+)"
 )
+_TOKEN_PREFIX_OVERLAP_CHARS = 512
+_TOKEN_VALUE_DELIMITERS = set(" \t\r\n'\"")
 
 
 @dataclass(frozen=True)
@@ -88,7 +99,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
 
     if args.include_rocm_smoke:
-        doctor_command = _command_from_args(args.rocm_doctor_command, DEFAULT_DOCTOR_COMMAND)
+        doctor_command = _command_from_args(
+            args.rocm_doctor_command, DEFAULT_DOCTOR_COMMAND
+        )
         rocm_pytest_command = _command_from_args(
             args.rocm_pytest_command,
             DEFAULT_ROCM_PYTEST_COMMAND,
@@ -134,13 +147,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.dataset_dir is None:
             raise SystemExit("--include-dataset-slice requires --dataset-dir")
         if args.dataset_limit is None or args.dataset_limit <= 0:
-            raise SystemExit("--include-dataset-slice requires positive --dataset-limit")
+            raise SystemExit(
+                "--include-dataset-slice requires positive --dataset-limit"
+            )
         results.extend(_dataset_slice_results(args, output_dir, args.log_tail_chars))
 
     payload = _build_payload(results)
     json_path = output_dir / "release_candidate_validation.json"
     markdown_path = output_dir / "release_candidate_validation.md"
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     markdown_path.write_text(_render_markdown(payload), encoding="utf-8")
     return 1 if payload["overall_status"] == "blocking" else 0
 
@@ -260,45 +277,63 @@ def _run_check(
     *,
     name: str,
     command: list[str],
-    failure_classification: str | Callable[[subprocess.CompletedProcess[str]], str],
+    failure_classification: str | Callable[["_CommandOutput"], str],
     failure_next_action: str,
     artifact_paths: list[str] | None = None,
     evidence: dict[str, object] | None = None,
     log_tail_chars: int = DEFAULT_LOG_TAIL_CHARS,
 ) -> ValidationResult:
     started = time.monotonic()
+    stdout_path = _temporary_stream_path(name, "stdout")
+    stderr_path = _temporary_stream_path(name, "stderr")
     try:
-        completed = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    except FileNotFoundError as exc:
-        duration_s = time.monotonic() - started
-        return ValidationResult(
-            name=name,
-            command=command,
-            status="unavailable",
-            classification="deferred",
-            next_action=f"Install or expose required command before collecting this evidence: {exc.filename}",
-            duration_s=round(duration_s, 3),
-            returncode=None,
-            stderr_tail=_tail(str(exc), log_tail_chars),
-            artifact_paths=artifact_paths or [],
-            evidence=evidence or {},
-        )
+        try:
+            completed = _run_command_to_files(command, stdout_path, stderr_path)
+        except FileNotFoundError as exc:
+            duration_s = time.monotonic() - started
+            return ValidationResult(
+                name=name,
+                command=command,
+                status="unavailable",
+                classification="deferred",
+                next_action=f"Install or expose required command before collecting this evidence: {exc.filename}",
+                duration_s=round(duration_s, 3),
+                returncode=None,
+                stderr_tail=_tail(str(exc), log_tail_chars),
+                artifact_paths=artifact_paths or [],
+                evidence=evidence or {},
+            )
 
-    duration_s = time.monotonic() - started
-    stdout_tail = _tail(completed.stdout, log_tail_chars)
-    stderr_tail = _tail(completed.stderr, log_tail_chars)
-    if completed.returncode == 0:
+        duration_s = time.monotonic() - started
+        stdout_tail = _tail_file(stdout_path, log_tail_chars)
+        stderr_tail = _tail_file(stderr_path, log_tail_chars)
+        if completed.returncode == 0:
+            return ValidationResult(
+                name=name,
+                command=command,
+                status="passed",
+                classification="diagnostic-only",
+                next_action="Review recorded artifacts before publishing.",
+                duration_s=round(duration_s, 3),
+                returncode=completed.returncode,
+                stdout_tail=stdout_tail,
+                stderr_tail=stderr_tail,
+                artifact_paths=artifact_paths or [],
+                evidence=evidence or {},
+            )
+        classification = (
+            failure_classification(
+                _CommandOutput(command, completed.returncode, stdout_path, stderr_path)
+            )
+            if callable(failure_classification)
+            else failure_classification
+        )
         return ValidationResult(
             name=name,
             command=command,
-            status="passed",
-            classification="diagnostic-only",
-            next_action="Review recorded artifacts before publishing.",
+            status="failed",
+            classification=classification,
+            next_action=failure_next_action,
             duration_s=round(duration_s, 3),
             returncode=completed.returncode,
             stdout_tail=stdout_tail,
@@ -306,29 +341,25 @@ def _run_check(
             artifact_paths=artifact_paths or [],
             evidence=evidence or {},
         )
-    classification = (
-        failure_classification(completed)
-        if callable(failure_classification)
-        else failure_classification
-    )
-    return ValidationResult(
-        name=name,
-        command=command,
-        status="failed",
-        classification=classification,
-        next_action=failure_next_action,
-        duration_s=round(duration_s, 3),
-        returncode=completed.returncode,
-        stdout_tail=stdout_tail,
-        stderr_tail=stderr_tail,
-        artifact_paths=artifact_paths or [],
-        evidence=evidence or {},
-    )
+    finally:
+        stdout_path.unlink(missing_ok=True)
+        stderr_path.unlink(missing_ok=True)
 
 
-def _optional_smoke_classification(completed: subprocess.CompletedProcess[str]) -> str:
-    combined = f"{completed.stdout}\n{completed.stderr}".lower()
-    if "skipped" in combined or "requires_rocm" in combined or "no rocm" in combined:
+@dataclass(frozen=True)
+class _CommandOutput:
+    args: list[str]
+    returncode: int
+    stdout_path: Path
+    stderr_path: Path
+
+
+def _optional_smoke_classification(completed: _CommandOutput) -> str:
+    if _output_contains_any(
+        completed.stdout_path,
+        completed.stderr_path,
+        ("skipped", "requires_rocm", "no rocm"),
+    ):
         return "deferred"
     return "diagnostic-only"
 
@@ -357,7 +388,9 @@ def _clock_policy_evidence() -> dict[str, object]:
         "SOL_EXECBENCH_DRAM_CLK_MHZ",
     )
     return {
-        "clock_policy": {key: os.environ.get(key) for key in keys if os.environ.get(key)},
+        "clock_policy": {
+            key: os.environ.get(key) for key in keys if os.environ.get(key)
+        },
         "authority_boundary": (
             "ROCm smoke evidence is diagnostic prerelease evidence, not full "
             "hardware validation, correctness authority, timing authority, "
@@ -369,21 +402,143 @@ def _clock_policy_evidence() -> dict[str, object]:
 def _tail(value: str, limit: int = DEFAULT_LOG_TAIL_CHARS) -> str:
     if limit <= 0:
         return ""
-    redacted = TOKEN_PATTERN.sub(lambda match: f"{match.group(1)}{match.group(2)}<redacted>", value)
+    redacted = TOKEN_PATTERN.sub(
+        lambda match: f"{match.group(1)}{match.group(2)}<redacted>", value
+    )
     return redacted[-limit:]
+
+
+def _append_tail(tail: str, text: str, limit: int) -> str:
+    if not text:
+        return tail
+    return (tail + text)[-limit:]
+
+
+def _redacted_tail_file(path: Path, limit: int) -> str:
+    tail = ""
+    pending = ""
+    in_secret = False
+    chunk_size = max(limit, 8192)
+
+    with path.open("rb") as handle:
+        for raw_chunk in iter(lambda: handle.read(chunk_size), b""):
+            text = raw_chunk.decode(errors="replace")
+            if in_secret:
+                delimiter_index = next(
+                    (
+                        index
+                        for index, char in enumerate(text)
+                        if char in _TOKEN_VALUE_DELIMITERS
+                    ),
+                    None,
+                )
+                if delimiter_index is None:
+                    continue
+                tail = _append_tail(tail, text[delimiter_index], limit)
+                text = text[delimiter_index + 1 :]
+                in_secret = False
+
+            pending += text
+            while pending:
+                match = TOKEN_PATTERN.search(pending)
+                if match is None:
+                    if len(pending) > _TOKEN_PREFIX_OVERLAP_CHARS:
+                        emit = pending[:-_TOKEN_PREFIX_OVERLAP_CHARS]
+                        tail = _append_tail(tail, emit, limit)
+                        pending = pending[-_TOKEN_PREFIX_OVERLAP_CHARS:]
+                    break
+
+                tail = _append_tail(tail, pending[: match.start()], limit)
+                tail = _append_tail(
+                    tail,
+                    f"{match.group(1)}{match.group(2)}<redacted>",
+                    limit,
+                )
+                if match.end() == len(pending):
+                    pending = ""
+                    in_secret = True
+                    break
+                pending = pending[match.end() :]
+
+    if not in_secret:
+        tail = _append_tail(tail, _tail(pending, max(limit, 8192)), limit)
+    return tail
+
+
+def _temporary_stream_path(name: str, stream_name: str) -> Path:
+    safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "_", name)
+    with tempfile.NamedTemporaryFile(
+        prefix=f"sol_execbench_{safe_name}_{stream_name}_",
+        suffix=".log",
+        delete=False,
+    ) as handle:
+        return Path(handle.name)
+
+
+def _run_command_to_files(
+    command: list[str],
+    stdout_path: Path,
+    stderr_path: Path,
+) -> subprocess.CompletedProcess[str]:
+    with (
+        stdout_path.open("w", encoding="utf-8") as stdout_handle,
+        stderr_path.open(
+            "w",
+            encoding="utf-8",
+        ) as stderr_handle,
+    ):
+        completed = subprocess.run(
+            command,
+            stdout=stdout_handle,
+            stderr=stderr_handle,
+            text=True,
+            check=False,
+        )
+    # Some tests monkeypatch subprocess.run and return captured text while
+    # ignoring stdout/stderr file handles. Mirror that text into the stream
+    # files so production and test paths exercise the same tail logic.
+    if completed.stdout:
+        stdout_path.write_text(completed.stdout, encoding="utf-8")
+    if completed.stderr:
+        stderr_path.write_text(completed.stderr, encoding="utf-8")
+    return completed
+
+
+def _tail_file(path: Path, limit: int = DEFAULT_LOG_TAIL_CHARS) -> str:
+    if limit <= 0:
+        return ""
+    try:
+        return _redacted_tail_file(path, limit)
+    except OSError:
+        return ""
+
+
+def _output_contains_any(
+    stdout_path: Path,
+    stderr_path: Path,
+    needles: tuple[str, ...],
+) -> bool:
+    for path in (stdout_path, stderr_path):
+        try:
+            with path.open(encoding="utf-8", errors="replace") as handle:
+                for line in handle:
+                    lowered = line.lower()
+                    if any(needle in lowered for needle in needles):
+                        return True
+        except OSError:
+            continue
+    return False
 
 
 def _build_payload(results: list[ValidationResult]) -> dict[str, object]:
     result_payload = [asdict(result) for result in results]
     blocking = [result for result in results if result.classification == "blocking"]
-    failed_blocking = [
-        result
-        for result in blocking
-        if result.status not in {"passed"}
-    ]
+    failed_blocking = [result for result in blocking if result.status not in {"passed"}]
     if failed_blocking:
         overall_status = "blocking"
-    elif any(result.status in {"failed", "unavailable", "skipped"} for result in results):
+    elif any(
+        result.status in {"failed", "unavailable", "skipped"} for result in results
+    ):
         overall_status = "review_needed"
     else:
         overall_status = "passed"

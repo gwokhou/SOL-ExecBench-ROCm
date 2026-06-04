@@ -36,10 +36,9 @@ def discover_problems(
         if not root.is_dir():
             continue
         for problem_dir in sorted(root.iterdir()):
-            if (
-                (problem_dir / "definition.json").exists()
-                and (problem_dir / "workload.jsonl").exists()
-            ):
+            if (problem_dir / "definition.json").exists() and (
+                problem_dir / "workload.jsonl"
+            ).exists():
                 problems.append(problem_dir)
     return problems
 
@@ -54,12 +53,14 @@ def workload_key(uuid: str | None, row_index: int | None) -> tuple[str, str | in
 def read_workload_rows(workload_path: Path) -> list[tuple[int, dict[str, Any], str]]:
     """Read non-empty workload JSONL rows as row-index, payload, raw-line tuples."""
     rows: list[tuple[int, dict[str, Any], str]] = []
-    for row_index, line in enumerate(workload_path.read_text().splitlines()):
-        if not line.strip():
-            continue
-        import json
+    with workload_path.open(encoding="utf-8") as handle:
+        for row_index, line in enumerate(handle):
+            line = line.rstrip("\n")
+            if not line.strip():
+                continue
+            import json
 
-        rows.append((row_index, json.loads(line), line))
+            rows.append((row_index, json.loads(line), line))
     return rows
 
 
@@ -99,7 +100,9 @@ def selected_workload_rows(
         for row_index, payload, line in rows
         if payload.get("uuid")
     }
-    by_row = {row_index: (row_index, payload, line) for row_index, payload, line in rows}
+    by_row = {
+        row_index: (row_index, payload, line) for row_index, payload, line in rows
+    }
 
     selected: list[tuple[int, dict[str, Any], str, dict[str, Any]]] = []
     missing: list[dict[str, Any]] = []
@@ -126,10 +129,17 @@ def selected_workload_rows(
         capped = selected[:max_workloads]
         cap_filtered = [item[3] for item in selected[max_workloads:]]
 
-    return [item[2] for item in capped], [item[3] for item in capped], cap_filtered, missing
+    return (
+        [item[2] for item in capped],
+        [item[3] for item in capped],
+        cap_filtered,
+        missing,
+    )
 
 
-def trace_map(traces: list[dict[str, Any]]) -> dict[tuple[str, str | int], dict[str, Any]]:
+def trace_map(
+    traces: list[dict[str, Any]],
+) -> dict[tuple[str, str | int], dict[str, Any]]:
     """Index traces by workload UUID when present, otherwise row index."""
     indexed: dict[tuple[str, str | int], dict[str, Any]] = {}
     for row_index, trace in enumerate(traces):
@@ -158,7 +168,9 @@ def closure_status_for_trace(
 
 def closure_status_with_evidence(status: str, evidence_gaps: list[str]) -> str:
     """Apply derived-evidence gaps to an execution-closure status."""
-    from sol_execbench.core.dataset.execution_closure import closure_status_with_evidence
+    from sol_execbench.core.dataset.execution_closure import (
+        closure_status_with_evidence,
+    )
 
     return closure_status_with_evidence(
         ExecutionClosureStatus(status),

@@ -10,7 +10,10 @@ from sol_execbench.core.dataset.execution_closure import (
     build_execution_closure_report,
     write_execution_closure_report,
 )
-from sol_execbench.core.dataset.evidence_refs import build_derived_evidence_refs
+from sol_execbench.core.dataset.evidence_refs import (
+    build_derived_evidence_refs,
+    sidecar_stem_for_workload,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RUN_DATASET_PATH = REPO_ROOT / "scripts" / "run_dataset.py"
@@ -142,7 +145,9 @@ def _matching_closure_provenance() -> dict:
     }
 
 
-def _write_problem(dataset_root: Path, category: str, name: str, workloads: list[dict]) -> Path:
+def _write_problem(
+    dataset_root: Path, category: str, name: str, workloads: list[dict]
+) -> Path:
     problem_dir = dataset_root / category / name
     problem_dir.mkdir(parents=True)
     (problem_dir / "definition.json").write_text(json.dumps(_definition()))
@@ -284,9 +289,9 @@ def test_ready_subset_runs_through_existing_run_cli_and_stages_workload(
 
     assert calls == [staged_workload]
     assert (problem_dir / "workload.jsonl").read_text() == original_workload
-    assert [json.loads(line)["uuid"] for line in staged_workload.read_text().splitlines()] == [
-        "selected-workload"
-    ]
+    assert [
+        json.loads(line)["uuid"] for line in staged_workload.read_text().splitlines()
+    ] == ["selected-workload"]
     assert closure["schema_version"] == "sol_execbench.execution_closure.v1"
     assert set(closure) == {
         "claim_boundary",
@@ -482,7 +487,12 @@ def test_build_derived_evidence_refs_reports_present_refs_and_missing_gaps(tmp_p
     timing_problem_dir = timing_dir / "L1"
     timing_problem_dir.mkdir(parents=True)
     (timing_problem_dir / "matmul_demo.timing.json").write_text("{}")
-    (sol_bound_dir / "matmul_demo.selected-workload.amd-sol-v2.json").write_text("{}")
+    sidecar_stem = sidecar_stem_for_workload(
+        "matmul_demo",
+        "selected-workload",
+        problem_namespace="L1/matmul_demo",
+    )
+    (sol_bound_dir / f"{sidecar_stem}.amd-sol-v2.json").write_text("{}")
 
     refs, gaps = build_derived_evidence_refs(
         definition_name="matmul_demo",
@@ -498,7 +508,7 @@ def test_build_derived_evidence_refs_reports_present_refs_and_missing_gaps(tmp_p
 
     assert refs == {
         "amd_score": "amd-score.json",
-        "amd_sol_bound": "sol-bounds/matmul_demo.selected-workload.amd-sol-v2.json",
+        "amd_sol_bound": f"sol-bounds/{sidecar_stem}.amd-sol-v2.json",
         "timing_evidence": "timing/L1/matmul_demo.timing.json",
     }
     assert gaps == ["solar_derivation_missing"]
@@ -549,7 +559,12 @@ def test_execution_closure_records_are_sorted_by_helper_contract(tmp_path, monke
 
     closure = json.loads((output_dir / "execution_closure.json").read_text())
     assert [
-        (record["problem_id"], record["row_index"], record["workload_uuid"], record["closure_status"])
+        (
+            record["problem_id"],
+            record["row_index"],
+            record["workload_uuid"],
+            record["closure_status"],
+        )
         for record in closure["records"]
     ] == [
         ("L1/a_demo", 0, "z-workload", "attempted_passed"),
@@ -920,8 +935,12 @@ def test_execution_closure_classifies_cli_no_output_with_bounded_log_ref(
 def test_cli_failure_logs_are_bounded_and_notes_read_header_only(tmp_path):
     output_dir = tmp_path / "out"
     output_dir.mkdir()
-    large_stdout = "a" * (run_dataset._CLI_LOG_LIMIT + 100)
-    large_stderr = "b" * (run_dataset._CLI_LOG_LIMIT + 100)
+    large_stdout = (
+        "stdout-head-" + "a" * (run_dataset._CLI_LOG_LIMIT + 100) + "stdout-tail"
+    )
+    large_stderr = (
+        "stderr-head-" + "b" * (run_dataset._CLI_LOG_LIMIT + 100) + "stderr-tail"
+    )
     result = subprocess.CompletedProcess(
         args=["sol-execbench"],
         returncode=42,
@@ -935,6 +954,10 @@ def test_cli_failure_logs_are_bounded_and_notes_read_header_only(tmp_path):
     log_text = cli_log.read_text()
     assert len(log_text) < len(large_stdout) + len(large_stderr)
     assert "[truncated CLI output]" in log_text
+    assert "stdout-tail" in log_text
+    assert "stderr-tail" in log_text
+    assert "stdout-head" not in log_text
+    assert "stderr-head" not in log_text
     assert run_dataset._cli_failure_notes(cli_log) == ["CLI failed with exit code 42"]
 
 
@@ -1229,4 +1252,6 @@ def test_execution_closure_provenance_uses_bounded_refs(tmp_path, monkeypatch):
         "ready_subset": "ready_subset.json",
     }
     assert closure["provenance"]["derived_evidence"]["amd_score_report"] == "score.json"
-    assert all(str(tmp_path) not in arg for arg in closure["provenance"]["command_args"])
+    assert all(
+        str(tmp_path) not in arg for arg in closure["provenance"]["command_args"]
+    )

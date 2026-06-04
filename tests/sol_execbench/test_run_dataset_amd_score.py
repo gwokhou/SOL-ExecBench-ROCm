@@ -8,6 +8,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from sol_execbench.core.bench.config import BenchmarkConfig
+from sol_execbench.core.dataset.evidence_refs import sidecar_stem_for_workload
 from sol_execbench.core.scoring.amd_score import build_amd_native_suite_report
 from sol_execbench.core.scoring.baseline_artifact import (
     scoring_baseline_artifact_from_dict,
@@ -112,6 +113,22 @@ def _write_matmul_ready_subset(path: Path) -> Path:
         )
     )
     return path
+
+
+def _dataset_sidecar_path(
+    sidecar_dir: Path,
+    *,
+    problem_id: str,
+    definition_name: str = "matmul_demo",
+    workload_uuid: str = "matmul-workload",
+    suffix: str = "solar-derivation",
+) -> Path:
+    stem = sidecar_stem_for_workload(
+        definition_name,
+        workload_uuid,
+        problem_namespace=problem_id,
+    )
+    return sidecar_dir / f"{stem}.{suffix}.json"
 
 
 def test_dataset_helper_builds_derived_amd_score_report(tmp_path):
@@ -474,7 +491,7 @@ def test_dataset_runner_generates_reports_for_skipped_existing_traces(
     run_dataset.main()
 
     report = json.loads(report_path.read_text())
-    sidecar_path = solar_dir / "matmul_demo.matmul-workload.solar-derivation.json"
+    sidecar_path = _dataset_sidecar_path(solar_dir, problem_id="L1/matmul_demo")
     sidecar = json.loads(sidecar_path.read_text())
 
     assert report["scored_count"] == 1
@@ -571,7 +588,124 @@ def test_dataset_runner_phase_derived_reuses_existing_traces_without_gpu(
 
     report = json.loads(report_path.read_text())
     assert report["scored_count"] == 1
-    assert (solar_dir / "matmul_demo.matmul-workload.solar-derivation.json").exists()
+    assert _dataset_sidecar_path(solar_dir, problem_id="L1/matmul_demo").exists()
+
+
+def test_dataset_runner_phase_derived_jobs_reuses_existing_traces_without_gpu(
+    tmp_path,
+    monkeypatch,
+):
+    dataset_root = _write_matmul_dataset(tmp_path)
+    second_problem = dataset_root / "L1" / "matmul_other"
+    second_problem.mkdir(parents=True)
+    second_definition = {**_matmul_definition(), "name": "matmul_other"}
+    (second_problem / "definition.json").write_text(json.dumps(second_definition))
+    _write_matmul_workload(second_problem / "workload.jsonl", uuid="other-workload")
+
+    output_dir = tmp_path / "out"
+    first_trace_dir = output_dir / "L1" / "matmul_demo"
+    first_trace_dir.mkdir(parents=True)
+    (first_trace_dir / "traces.json").write_text(json.dumps(_matmul_trace_payload()))
+    second_trace = _matmul_trace_payload(uuid="other-workload")
+    second_trace[0]["definition"] = "matmul_other"
+    second_trace_dir = output_dir / "L1" / "matmul_other"
+    second_trace_dir.mkdir(parents=True)
+    (second_trace_dir / "traces.json").write_text(json.dumps(second_trace))
+
+    report_path = tmp_path / "reports" / "amd-score.json"
+    solar_dir = tmp_path / "solar-sidecars"
+
+    def fail_run_cli(*args, **kwargs):
+        raise AssertionError("--phase derived --jobs must not run GPU validation")
+
+    monkeypatch.setattr(run_dataset, "run_cli", fail_run_cli)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--phase",
+            "derived",
+            "--jobs",
+            "2",
+            "--output",
+            str(output_dir),
+            "--amd-score-report",
+            str(report_path),
+            "--solar-derivation",
+            str(solar_dir),
+        ],
+    )
+
+    run_dataset.main()
+
+    report = json.loads(report_path.read_text())
+    assert report["scored_count"] == 2
+    assert _dataset_sidecar_path(solar_dir, problem_id="L1/matmul_demo").exists()
+    assert _dataset_sidecar_path(
+        solar_dir,
+        problem_id="L1/matmul_other",
+        definition_name="matmul_other",
+        workload_uuid="other-workload",
+    ).exists()
+
+
+def test_dataset_runner_phase_derived_jobs_keeps_sidecars_per_problem(
+    tmp_path,
+    monkeypatch,
+):
+    dataset_root = _write_matmul_dataset(tmp_path)
+    duplicate_problem = dataset_root / "L1" / "matmul_duplicate"
+    duplicate_problem.mkdir(parents=True)
+    (duplicate_problem / "definition.json").write_text(json.dumps(_matmul_definition()))
+    _write_matmul_workload(duplicate_problem / "workload.jsonl")
+
+    output_dir = tmp_path / "out"
+    for problem_name in ("matmul_demo", "matmul_duplicate"):
+        trace_dir = output_dir / "L1" / problem_name
+        trace_dir.mkdir(parents=True)
+        (trace_dir / "traces.json").write_text(json.dumps(_matmul_trace_payload()))
+
+    report_path = tmp_path / "reports" / "amd-score.json"
+    solar_dir = tmp_path / "solar-sidecars"
+
+    def fail_run_cli(*args, **kwargs):
+        raise AssertionError("--phase derived --jobs must not run GPU validation")
+
+    monkeypatch.setattr(run_dataset, "run_cli", fail_run_cli)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--phase",
+            "derived",
+            "--jobs",
+            "2",
+            "--output",
+            str(output_dir),
+            "--amd-score-report",
+            str(report_path),
+            "--solar-derivation",
+            str(solar_dir),
+        ],
+    )
+
+    run_dataset.main()
+
+    report = json.loads(report_path.read_text())
+    first_sidecar = _dataset_sidecar_path(solar_dir, problem_id="L1/matmul_demo")
+    second_sidecar = _dataset_sidecar_path(
+        solar_dir,
+        problem_id="L1/matmul_duplicate",
+    )
+
+    assert report["scored_count"] == 2
+    assert first_sidecar.exists()
+    assert second_sidecar.exists()
+    assert first_sidecar != second_sidecar
 
 
 def test_dataset_runner_phase_timing_reuses_existing_traces_without_gpu(
@@ -591,7 +725,9 @@ def test_dataset_runner_phase_timing_reuses_existing_traces_without_gpu(
 
     def collect_timing(**kwargs):
         calls.append(kwargs)
-        output_path = kwargs["timing_evidence_root"] / f"{kwargs['output_dir'].name}.timing.json"
+        output_path = (
+            kwargs["timing_evidence_root"] / f"{kwargs['output_dir'].name}.timing.json"
+        )
         kwargs["timing_evidence_root"].mkdir(parents=True, exist_ok=True)
         output_path.write_text(json.dumps({"profiler_collected": True}))
         return {"profiler_collected": True}
@@ -677,7 +813,7 @@ def test_dataset_runner_reruns_failed_existing_traces_before_reports(
 
     assert calls == 1
     assert report["scored_count"] == 1
-    assert (solar_dir / "matmul_demo.matmul-workload.solar-derivation.json").exists()
+    assert _dataset_sidecar_path(solar_dir, problem_id="L1/matmul_demo").exists()
 
 
 def test_dataset_runner_reruns_existing_pass_when_runtime_config_changes(
@@ -714,7 +850,9 @@ def test_dataset_runner_reruns_existing_pass_when_runtime_config_changes(
     closure = json.loads(closure_path.read_text())
     assert calls == 2
     assert closure["provenance_mismatches"][0]["field"] == "iterations"
-    assert closure["provenance_mismatches"][0]["reason_code"] == "runtime_config_mismatch"
+    assert (
+        closure["provenance_mismatches"][0]["reason_code"] == "runtime_config_mismatch"
+    )
 
 
 def test_dataset_runner_recovers_from_unreadable_existing_trace(
@@ -750,7 +888,9 @@ def test_dataset_runner_recovers_from_unreadable_existing_trace(
     run_dataset.main()
 
     assert calls == 1
-    assert json.loads((trace_dir / "traces.json").read_text()) == _matmul_trace_payload()
+    assert (
+        json.loads((trace_dir / "traces.json").read_text()) == _matmul_trace_payload()
+    )
 
 
 def test_dataset_runner_records_ready_subset_missing_named_solution(

@@ -32,7 +32,9 @@ def test_cpu_safe_validation_writes_json_and_markdown(tmp_path, monkeypatch):
     assert release_candidate_validation.main(["--output-dir", str(tmp_path)]) == 0
 
     payload = _load_payload(tmp_path)
-    markdown = (tmp_path / "release_candidate_validation.md").read_text(encoding="utf-8")
+    markdown = (tmp_path / "release_candidate_validation.md").read_text(
+        encoding="utf-8"
+    )
 
     assert payload["schema_version"] == "sol_execbench.release_candidate_validation.v1"
     assert payload["overall_status"] == "passed"
@@ -101,13 +103,69 @@ def test_redaction_covers_common_credential_formats_and_log_tail_zero(
     assert "<redacted>" in combined
 
 
+def test_tail_file_redacts_single_line_without_reading_by_line(tmp_path):
+    path = tmp_path / "huge.log"
+    path.write_text("x" * 20000 + " HF_TOKEN=secret-tail", encoding="utf-8")
+
+    tail = release_candidate_validation._tail_file(path, 200)
+
+    assert "secret-tail" not in tail
+    assert "<redacted>" in tail
+
+
+def test_tail_file_redacts_secret_value_split_across_chunks(tmp_path):
+    path = tmp_path / "split.log"
+    token = "HF_TOKEN=secret_split_tail"
+    path.write_text(
+        "x" * (8192 - len("HF_TOKEN=secret")) + token,
+        encoding="utf-8",
+    )
+
+    tail = release_candidate_validation._tail_file(path, 200)
+
+    assert "secret_split_tail" not in tail
+    assert "split_tail" not in tail
+    assert "<redacted>" in tail
+
+
+def test_run_check_cleans_temporary_stream_files_after_unexpected_error(monkeypatch):
+    created_paths: list[Path] = []
+
+    def fake_temp_path(name: str, stream_name: str) -> Path:
+        path = Path("/tmp") / f"sol-execbench-test-{name}-{stream_name}.log"
+        path.write_text("", encoding="utf-8")
+        created_paths.append(path)
+        return path
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("unexpected")
+
+    monkeypatch.setattr(
+        release_candidate_validation, "_temporary_stream_path", fake_temp_path
+    )
+    monkeypatch.setattr(release_candidate_validation, "_run_command_to_files", boom)
+
+    with pytest.raises(RuntimeError):
+        release_candidate_validation._run_check(
+            name="cleanup",
+            command=["demo"],
+            failure_classification="blocking",
+            failure_next_action="fix",
+        )
+
+    assert created_paths
+    assert all(not path.exists() for path in created_paths)
+
+
 def test_rocm_smoke_records_deferred_skips_and_clock_policy(tmp_path, monkeypatch):
     calls: list[list[str]] = []
 
     def fake_run(command, **kwargs):
         calls.append(command)
         if "requires_rocm" in command:
-            return subprocess.CompletedProcess(command, 5, stdout="3 skipped requires_rocm", stderr="")
+            return subprocess.CompletedProcess(
+                command, 5, stdout="3 skipped requires_rocm", stderr=""
+            )
         return subprocess.CompletedProcess(command, 0, stdout="{}", stderr="")
 
     monkeypatch.setattr(release_candidate_validation.subprocess, "run", fake_run)
@@ -149,7 +207,9 @@ def test_docker_smoke_unavailable_is_deferred(tmp_path, monkeypatch):
     )
 
     payload = _load_payload(tmp_path)
-    docker = [result for result in payload["results"] if result["name"] == "docker_smoke"][0]
+    docker = [
+        result for result in payload["results"] if result["name"] == "docker_smoke"
+    ][0]
     assert docker["status"] == "unavailable"
     assert docker["classification"] == "deferred"
     assert "Install or expose required command" in docker["next_action"]
@@ -198,13 +258,15 @@ def test_dataset_slice_records_bounded_artifacts(tmp_path, monkeypatch):
     by_name = {result["name"]: result for result in payload["results"]}
     dataset = by_name["bounded_dataset_slice"]
     assert dataset["evidence"]["dataset_limit"] == 5
-    assert "not full 235-problem paper validation" in dataset["evidence"][
-        "paper_scale_boundary"
-    ]
+    assert (
+        "not full 235-problem paper validation"
+        in dataset["evidence"]["paper_scale_boundary"]
+    )
     assert str(tmp_path / "execution_closure.json") in dataset["artifact_paths"]
-    assert str(tmp_path / "trust_summary.json") in by_name["trust_summary"][
-        "artifact_paths"
-    ]
+    assert (
+        str(tmp_path / "trust_summary.json")
+        in by_name["trust_summary"]["artifact_paths"]
+    )
 
 
 def test_dataset_command_override_must_preserve_bounded_guarantees(tmp_path):
@@ -219,7 +281,9 @@ def test_dataset_command_override_must_preserve_bounded_guarantees(tmp_path):
         "--dataset-command",
     ]
     with pytest.raises(SystemExit, match="bounded --limit"):
-        release_candidate_validation.main([*base, "uv", "run", "scripts/run_dataset.py"])
+        release_candidate_validation.main(
+            [*base, "uv", "run", "scripts/run_dataset.py"]
+        )
 
     with pytest.raises(SystemExit, match="--rerun"):
         release_candidate_validation.main(
@@ -245,8 +309,12 @@ def test_trust_summary_skipped_when_dataset_closure_missing(tmp_path, monkeypatc
     def fake_run(command, **kwargs):
         calls.append(command)
         if "scripts/run_dataset.py" in command:
-            return subprocess.CompletedProcess(command, 3, stdout="missing data", stderr="")
-        return subprocess.CompletedProcess(command, 0, stdout="should not run", stderr="")
+            return subprocess.CompletedProcess(
+                command, 3, stdout="missing data", stderr=""
+            )
+        return subprocess.CompletedProcess(
+            command, 0, stdout="should not run", stderr=""
+        )
 
     monkeypatch.setattr(release_candidate_validation.subprocess, "run", fake_run)
 
@@ -274,7 +342,9 @@ def test_trust_summary_skipped_when_dataset_closure_missing(tmp_path, monkeypatc
 
 
 def test_release_candidate_validation_docs_preserve_claim_boundaries():
-    text = (REPO_ROOT / "docs/release_candidate_validation.md").read_text(encoding="utf-8")
+    text = (REPO_ROOT / "docs/release_candidate_validation.md").read_text(
+        encoding="utf-8"
+    )
     script = (REPO_ROOT / "scripts/release_candidate_validation.py").read_text(
         encoding="utf-8"
     )

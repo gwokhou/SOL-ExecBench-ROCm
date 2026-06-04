@@ -8,8 +8,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import sys
 import tomllib
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from importlib.util import module_from_spec, spec_from_file_location
@@ -90,9 +92,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     checksum_path = bundle_dir / "SHA256SUMS"
     manifest = _load_json(manifest_path, findings)
     checksums = _load_checksums(checksum_path, findings)
+    checksum_cache: dict[Path, str] = {}
     findings.extend(_check_provenance_policy())
     if manifest:
-        findings.extend(_check_manifest(manifest, bundle_dir, checksums))
+        findings.extend(
+            _check_manifest(manifest, bundle_dir, checksums, checksum_cache)
+        )
         findings.extend(_check_dataset_release_redistribution(bundle_dir))
         if not args.skip_doc_claim_checks:
             findings.extend(_check_doc_claims())
@@ -100,7 +105,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     payload = _build_payload(bundle_dir, findings, manifest)
     json_path = args.output_dir / "prerelease_readiness.json"
     markdown_path = args.output_dir / "prerelease_readiness.md"
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     markdown_path.write_text(_render_markdown(payload), encoding="utf-8")
     return 1 if payload["overall_status"] == "blocking" else 0
 
@@ -191,6 +198,7 @@ def _check_manifest(
     manifest: dict[str, object],
     bundle_dir: Path,
     checksums: dict[str, str],
+    checksum_cache: dict[Path, str],
 ) -> list[Finding]:
     findings: list[Finding] = []
     if manifest.get("schema_version") != BUNDLE_SCHEMA_VERSION:
@@ -205,8 +213,8 @@ def _check_manifest(
     findings.extend(_check_authority_classes(manifest))
     findings.extend(_check_claim_boundary(manifest))
     findings.extend(_check_known_gaps(manifest))
-    findings.extend(_check_artifacts(manifest, bundle_dir))
-    findings.extend(_check_bundle_checksums(bundle_dir, checksums))
+    findings.extend(_check_artifacts(manifest, bundle_dir, checksum_cache))
+    findings.extend(_check_bundle_checksums(bundle_dir, checksums, checksum_cache))
     return findings
 
 
@@ -311,7 +319,11 @@ def _check_known_gaps(manifest: dict[str, object]) -> list[Finding]:
     return findings
 
 
-def _check_artifacts(manifest: dict[str, object], bundle_dir: Path) -> list[Finding]:
+def _check_artifacts(
+    manifest: dict[str, object],
+    bundle_dir: Path,
+    checksum_cache: dict[Path, str],
+) -> list[Finding]:
     findings: list[Finding] = []
     for artifact in _list_of_dicts(manifest.get("artifacts")):
         artifact_id = str(artifact.get("id", "unknown_artifact"))
@@ -344,7 +356,7 @@ def _check_artifacts(manifest: dict[str, object], bundle_dir: Path) -> list[Find
             continue
         expected_sha = artifact.get("sha256")
         if status == "present" and isinstance(expected_sha, str) and path.exists():
-            actual_sha = _sha256(path)
+            actual_sha = _sha256_cached(path, checksum_cache)
             if actual_sha != expected_sha:
                 findings.append(
                     Finding(
@@ -358,11 +370,19 @@ def _check_artifacts(manifest: dict[str, object], bundle_dir: Path) -> list[Find
     return findings
 
 
-def _check_bundle_checksums(bundle_dir: Path, checksums: dict[str, str]) -> list[Finding]:
+def _check_bundle_checksums(
+    bundle_dir: Path,
+    checksums: dict[str, str],
+    checksum_cache: dict[Path, str],
+) -> list[Finding]:
     findings: list[Finding] = []
+    files: list[Path] = []
     for path in sorted(bundle_dir.rglob("*")):
         if not path.is_file() or path.name == "SHA256SUMS":
             continue
+        files.append(path)
+    _sha256_cached_many(files, checksum_cache)
+    for path in files:
         rel_path = path.relative_to(bundle_dir).as_posix()
         expected = checksums.get(rel_path)
         if expected is None:
@@ -376,7 +396,7 @@ def _check_bundle_checksums(bundle_dir: Path, checksums: dict[str, str]) -> list
                 )
             )
             continue
-        actual = _sha256(path)
+        actual = _sha256_cached(path, checksum_cache)
         if actual != expected:
             findings.append(
                 Finding(
@@ -575,7 +595,10 @@ def _check_provenance_policy(root: Path = REPO_ROOT) -> list[Finding]:
 
 def _check_dataset_policy(dataset_policy: dict[str, object]) -> list[Finding]:
     findings: list[Finding] = []
-    if dataset_policy.get("schema_version") != "sol_execbench.dataset_provenance_policy.v1":
+    if (
+        dataset_policy.get("schema_version")
+        != "sol_execbench.dataset_provenance_policy.v1"
+    ):
         findings.append(
             Finding(
                 id="dataset_policy_schema_mismatch",
@@ -763,6 +786,29 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _sha256_cached(path: Path, checksum_cache: dict[Path, str]) -> str:
+    resolved = path.resolve()
+    digest = checksum_cache.get(resolved)
+    if digest is None:
+        digest = _sha256(path)
+        checksum_cache[resolved] = digest
+    return digest
+
+
+def _sha256_cached_many(paths: list[Path], checksum_cache: dict[Path, str]) -> None:
+    missing = [path for path in paths if path.resolve() not in checksum_cache]
+    if not missing:
+        return
+    workers = min(os.cpu_count() or 1, len(missing), 8)
+    if workers <= 1:
+        for path in missing:
+            checksum_cache[path.resolve()] = _sha256(path)
+        return
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        for path, digest in zip(missing, executor.map(_sha256, missing), strict=True):
+            checksum_cache[path.resolve()] = digest
 
 
 if __name__ == "__main__":
