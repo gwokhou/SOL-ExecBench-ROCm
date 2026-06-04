@@ -1,6 +1,154 @@
 # Roadmap: SOL ExecBench ROCm Port
 
-## Milestones
+## Current Milestone: v1.29 Dataset Migration and Compliance
+
+**Goal:** Establish a legally safe, auditable local dataset migration workflow
+for SOL-ExecBench and FlashInfer Trace on ROCm, including ready-subset
+execution, provenance/redistribution guardrails, and unvalidated ROCm equivalent
+implementations for NVIDIA/Blackwell low-precision semantics.
+
+**Scope boundary:** This milestone may implement complete compatibility code and
+interfaces for NVIDIA/Blackwell low-precision semantics, but it does not claim
+real CDNA4 validation, performance authority, paper parity, or permission to
+redistribute NVIDIA dataset content.
+
+## Phases
+
+### Phase 131: Dataset License and Provenance Policy
+
+**Status:** Pending
+
+**Goal:** Define enforceable source, license, provenance, and redistribution
+boundaries before any migrated dataset artifacts are generated or integrated.
+
+**Requirements:** DATA-LIC-01, DATA-LIC-02, DATA-LIC-03, DATA-LIC-04
+
+**Success criteria:**
+1. Machine-readable provenance distinguishes NVIDIA SOL-ExecBench, FlashInfer
+   Trace, generated local artifacts, and project-owned ROCm code.
+2. Redistribution policy classifies each artifact type as publishable,
+   local-only, generated-only, excluded, or release-bundle-blocked.
+3. CPU-safe guardrails fail if NVIDIA original or derivative dataset content is
+   staged for repository or release redistribution.
+4. Documentation preserves license and attribution boundaries for NVIDIA
+   Evaluation Dataset License and Apache-2.0 content.
+
+### Phase 132: Local Dataset Migration Pipeline
+
+**Status:** Pending
+
+**Goal:** Build deterministic local conversion tooling for downloaded
+SOL-ExecBench and FlashInfer Trace inputs without committing or redistributing
+restricted source dataset content.
+
+**Requirements:** DATA-MIG-01, DATA-MIG-02, DATA-MIG-03, DATA-MIG-04
+
+**Success criteria:**
+1. SOL-ExecBench rows can be converted locally into repository problem layout
+   with source identifiers, source revision, checksums, and license metadata.
+2. FlashInfer Trace definitions, workloads, solutions, and traces can be
+   normalized into ROCm runner-compatible local inputs.
+3. Migration manifests are deterministic and capture source dataset identity,
+   generated artifact refs, missing optional inputs, and blocker states.
+4. Tests cover absent blobs, safetensors refs, missing traces, and missing
+   solutions without silent denominator loss.
+
+### Phase 133: ROCm Readiness Classification and Ready Subsets
+
+**Status:** Pending
+
+**Goal:** Classify migrated workloads by ROCm readiness and produce auditable
+ready subsets and blocker reports for bounded execution.
+
+**Requirements:** DATA-READY-01, DATA-READY-02, DATA-READY-03, DATA-READY-04
+
+**Success criteria:**
+1. Classifier identifies PyTorch-compatible, ROCm-port-needed,
+   FlashInfer-specific, NVFP4/Blackwell-specific, unsupported, and blocked
+   workloads.
+2. Ready-subset generation preserves denominator, exclusion reasons, workload
+   identity, and closure inputs.
+3. Blocker reports expose CUDA kernel dependencies, FlashInfer runtime
+   assumptions, low-precision format dependencies, missing blobs, and
+   unsupported dtypes.
+4. CPU-safe guardrails prevent readiness classification from becoming hardware
+   validation, paper parity, or score authority.
+
+### Phase 134: NVIDIA/Blackwell Low-Precision ROCm Equivalence
+
+**Status:** Pending
+
+**Goal:** Implement ROCm-compatible abstractions for NVIDIA/Blackwell
+low-precision dataset semantics so migrated definitions have complete code
+paths while real CDNA4 validation remains deferred.
+
+**Requirements:** LOWP-ROCM-01, LOWP-ROCM-02, LOWP-ROCM-03, LOWP-ROCM-04
+
+**Success criteria:**
+1. Compatibility abstractions import and run in CPU-safe or mocked ROCm
+   contexts without requiring CDNA4 hardware.
+2. Implementations preserve tensor shapes, public entry points, packing and
+   unpacking semantics, scale metadata, and reference behavior needed by
+   migrated definitions.
+3. Generated evidence marks these paths as unvalidated on CDNA4 and blocks
+   performance or hardware equivalence claims.
+4. Tests cover semantic round trips, fallback behavior, and blocker reporting.
+
+### Phase 135: Dataset Runner Integration and Public Guardrails
+
+**Status:** Pending
+
+**Goal:** Integrate migrated datasets with `scripts/run_dataset.py`, execution
+closure, docs, and release guardrails so users can run bounded local ROCm
+dataset evaluations without overclaiming or redistributing restricted data.
+
+**Requirements:** DATA-RUN-01, DATA-RUN-02, DATA-RUN-03, DATA-RUN-04,
+DATA-DOC-01, DATA-DOC-02, DATA-DOC-03, DATA-DOC-04
+
+**Success criteria:**
+1. Dataset runner accepts migrated local roots, manifests, ready subsets, and
+   license-boundary metadata without regressing existing single-problem usage.
+2. Execution closure records source dataset, migration manifest, checksum,
+   license boundary, readiness status, blocker state, and evidence refs.
+3. Reuse policy treats migration manifest, readiness classification, solution
+   mode, and requested evidence drift as reasons to re-evaluate or reclassify.
+4. Docs and release gates explain local download/migration, forbidden NVIDIA
+   redistribution, unvalidated low-precision semantics, and deferred CDNA3/CDNA4
+   full-suite validation.
+
+## Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| DATA-LIC-01 | Phase 131 | Pending |
+| DATA-LIC-02 | Phase 131 | Pending |
+| DATA-LIC-03 | Phase 131 | Pending |
+| DATA-LIC-04 | Phase 131 | Pending |
+| DATA-MIG-01 | Phase 132 | Pending |
+| DATA-MIG-02 | Phase 132 | Pending |
+| DATA-MIG-03 | Phase 132 | Pending |
+| DATA-MIG-04 | Phase 132 | Pending |
+| DATA-READY-01 | Phase 133 | Pending |
+| DATA-READY-02 | Phase 133 | Pending |
+| DATA-READY-03 | Phase 133 | Pending |
+| DATA-READY-04 | Phase 133 | Pending |
+| LOWP-ROCM-01 | Phase 134 | Pending |
+| LOWP-ROCM-02 | Phase 134 | Pending |
+| LOWP-ROCM-03 | Phase 134 | Pending |
+| LOWP-ROCM-04 | Phase 134 | Pending |
+| DATA-RUN-01 | Phase 135 | Pending |
+| DATA-RUN-02 | Phase 135 | Pending |
+| DATA-RUN-03 | Phase 135 | Pending |
+| DATA-RUN-04 | Phase 135 | Pending |
+| DATA-DOC-01 | Phase 135 | Pending |
+| DATA-DOC-02 | Phase 135 | Pending |
+| DATA-DOC-03 | Phase 135 | Pending |
+| DATA-DOC-04 | Phase 135 | Pending |
+
+**Coverage:** 24/24 v1.29 requirements mapped.
+**Progress:** 0/24 requirements complete; 0/5 phases complete.
+
+## Completed Milestones
 
 - Complete **v1.28 CDNA3 Test and Documentation Readiness** - Phases 127-130
   (shipped 2026-06-04). See `.planning/milestones/v1.28-ROADMAP.md`.
@@ -25,12 +173,6 @@
 
 ## Current Position
 
-**Status:** Awaiting next milestone.
+**Status:** Milestone v1.29 started. Ready to plan Phase 131.
 
-v1.28 completed CDNA3 test and documentation readiness: concrete
-`requires_cdna3` hardware-gated tests, MI300X evidence contract and blocker
-gates, deferred-validation guardrails, and public/contributor docs. Actual
-MI300X/gfx942 hardware validation remains deferred until real hardware evidence
-exists.
-
-Start the next milestone with `$gsd-new-milestone`.
+Run `$gsd-plan-phase 131` to start implementation planning.
