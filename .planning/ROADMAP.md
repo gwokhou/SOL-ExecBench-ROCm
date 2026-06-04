@@ -76,7 +76,7 @@ ready subsets and blocker reports for bounded execution.
 
 ### Phase 134: NVIDIA/Blackwell Low-Precision ROCm Equivalence
 
-**Status:** Pending
+**Status:** Complete
 
 **Goal:** Implement ROCm-compatible abstractions for NVIDIA/Blackwell
 low-precision dataset semantics so migrated definitions have complete code
@@ -132,10 +132,10 @@ DATA-DOC-01, DATA-DOC-02, DATA-DOC-03, DATA-DOC-04
 | DATA-READY-02 | Phase 133 | Complete |
 | DATA-READY-03 | Phase 133 | Complete |
 | DATA-READY-04 | Phase 133 | Complete |
-| LOWP-ROCM-01 | Phase 134 | Pending |
-| LOWP-ROCM-02 | Phase 134 | Pending |
-| LOWP-ROCM-03 | Phase 134 | Pending |
-| LOWP-ROCM-04 | Phase 134 | Pending |
+| LOWP-ROCM-01 | Phase 134 | Complete |
+| LOWP-ROCM-02 | Phase 134 | Complete |
+| LOWP-ROCM-03 | Phase 134 | Complete |
+| LOWP-ROCM-04 | Phase 134 | Complete |
 | DATA-RUN-01 | Phase 135 | Pending |
 | DATA-RUN-02 | Phase 135 | Pending |
 | DATA-RUN-03 | Phase 135 | Pending |
@@ -146,7 +146,7 @@ DATA-DOC-01, DATA-DOC-02, DATA-DOC-03, DATA-DOC-04
 | DATA-DOC-04 | Phase 135 | Pending |
 
 **Coverage:** 24/24 v1.29 requirements mapped.
-**Progress:** 12/24 requirements complete; 3/5 phases complete.
+**Progress:** 16/24 requirements complete; 4/5 phases complete.
 
 ## Completed Milestones
 
@@ -173,6 +173,6 @@ DATA-DOC-01, DATA-DOC-02, DATA-DOC-03, DATA-DOC-04
 
 ## Current Position
 
-**Status:** Phase 133 complete. Ready to plan Phase 134.
+**Status:** Phase 134 complete. Ready to plan Phase 135.
 
 Run `$gsd-plan-phase 134` to start implementation planning.

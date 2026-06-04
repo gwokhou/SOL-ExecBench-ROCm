@@ -12,6 +12,10 @@ from pydantic import BaseModel, Field
 
 from .checksums import stable_json_checksum
 from .inventory import DatasetInventory, ProblemInventoryRecord, WorkloadInventoryRecord
+from .low_precision import (
+    CDNA4_VALIDATION_DEFERRED_CODE,
+    LOW_PRECISION_COMPATIBILITY_EVIDENCE_CODE,
+)
 from .manifest import DatasetManifestChecksum, utc_timestamp
 
 READINESS_SCHEMA_VERSION = "sol_execbench.rocm_readiness.v1"
@@ -415,15 +419,30 @@ def classify_workload_readiness(
             status = "needs_hardware_evidence"
             readiness_class = ReadinessClass.NVFP4_BLACKWELL_SPECIFIC
             layers.hardware_validation = "needed"
-            reasons.append(_reason("blackwell_low_precision_dependency", "NVFP4/Blackwell low-precision workload needs ROCm compatibility and hardware evidence before validation claims.", "Use Phase 134 compatibility paths and collect hardware evidence before validation claims.", problem.problem_path))
+            reasons.append(
+                _reason(
+                    LOW_PRECISION_COMPATIBILITY_EVIDENCE_CODE,
+                    "Phase 134 CPU semantic compatibility path is available for NVFP4/Blackwell low-precision metadata, packing, and fallback behavior.",
+                    "Use the compatibility path for migrated definitions, then collect CDNA4 hardware evidence before validation claims.",
+                    problem.problem_path,
+                )
+            )
+            reasons.append(
+                _reason(
+                    CDNA4_VALIDATION_DEFERRED_CODE,
+                    "NVFP4/Blackwell low-precision workload still needs CDNA4 hardware evidence before validation claims.",
+                    "Collect CDNA4 hardware evidence before validation or performance claims.",
+                    problem.problem_path,
+                )
+            )
             blockers.append(
                 _blocker(
-                    code="blackwell_low_precision_dependency",
+                    code=CDNA4_VALIDATION_DEFERRED_CODE,
                     blocker_type="low_precision_format_dependency",
                     problem=problem,
                     workload=workload,
-                    message="NVFP4/Blackwell low-precision workload needs ROCm compatibility and hardware evidence before validation claims.",
-                    next_action="Use Phase 134 compatibility paths and collect hardware evidence before validation claims.",
+                    message="NVFP4/Blackwell low-precision workload still needs CDNA4 hardware evidence before validation claims.",
+                    next_action="Collect CDNA4 hardware evidence before validation or performance claims.",
                     evidence_path=problem.problem_path,
                 )
             )
