@@ -1,59 +1,225 @@
----
-generated_at: 2026-06-02
-last_mapped_commit: 8019adc6295a78d4636037889245abcb3f9a52bb
-focus: quality
----
+# Coding Conventions
 
-# Conventions
+**Analysis Date:** 2026-06-04
 
-## Python Style
+## Naming Patterns
 
-- Python source targets Python 3.12+.
-- Ruff is the formatter/linter authority through `pyproject.toml`.
-- Project modules, functions, variables, and files use `snake_case`.
-- Classes, dataclasses, and Pydantic models use `PascalCase`.
-- Enum classes use `PascalCase`; enum values are string values used in public schemas.
-- Prefer local helper APIs over duplicating subprocess, JSON, checksum, and evidence logic.
+**Files:**
+- Python package modules use `snake_case.py` under `src/sol_execbench/`, for
+  example `src/sol_execbench/core/scoring/amd_bound_sanity.py` and
+  `src/sol_execbench/core/bench/static_kernel_evidence.py`.
+- Test files use `test_*.py` in a separate `tests/` tree that mirrors package
+  areas where useful, for example
+  `tests/sol_execbench/core/bench/test_eval_runtime.py` and
+  `tests/sol_execbench/driver/test_problem_packager.py`.
+- Example problem assets use stable benchmark filenames:
+  `definition.json`, `workload.jsonl`, `reference.py`, `kernel.py`,
+  `kernel.hip`, `main.cpp`, and `solution_<backend>.json`.
+- Generated data, downloaded benchmark assets, examples, and build/cache output
+  are not part of normal formatting or linting scope.
 
-## Source Headers
+**Functions:**
+- Functions use `snake_case`.
+- Internal helpers often use a leading underscore when they are module-local
+  implementation details, such as `_load_solution`,
+  `_write_no_trace_diagnostics_sidecar`, `_validate_compile_flag`, and
+  `_rocm_gpu_info`.
+- Validators in Pydantic models are named for the invariant they enforce, often
+  with `_validate_*` or `_reject_*`, for example `_validate_entry_point`,
+  `_reject_legacy_languages`, and `_reject_dangerous_flags`.
+- CLI and script wrappers keep compatibility functions with explicit names, such
+  as `discover_problems`, `run_cli`, and `build_cli_command`, while delegating
+  to package helpers where possible.
 
-- Source attribution follows `provenance.toml` and `docs/provenance.md`.
-- Upstream-retained and derivative-modified files keep applicable NVIDIA SPDX attribution.
-- Modified derivative files also carry project SPDX attribution.
-- Independent ROCm work carries project SPDX attribution only.
-- `.planning/` and generated evidence are not treated like source files unless a source-style header is appropriate.
+**Variables:**
+- Local variables use `snake_case`.
+- Module constants use `UPPER_SNAKE_CASE`, for example
+  `ENV_SNAPSHOT_ENABLE_ENV`, `PROFILE_ROCPROFV3`,
+  `NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION`, and `DERIVED_EVIDENCE_SCHEMA_VERSION`.
+- Private module constants use leading underscores when they are implementation
+  details, for example `_DIAGNOSTIC_TAIL_LIMIT`, `_ROCM_DEVICE_NODES`, and
+  `_CPP_LANGUAGES`.
+- Environment variable names are stored as constants and keep the external
+  spelling, such as `SOLEXECBENCH_ENV_SNAPSHOT` and
+  `SOLEXECBENCH_CACHE_PATH`.
 
-## Schema And Model Style
+**Types:**
+- Classes, dataclasses, Pydantic models, and enums use `PascalCase`, for example
+  `Solution`, `BuildSpec`, `TraceRunSummary`, `ReferenceTimingResult`,
+  `SupportedLanguages`, and `SupportedHardware`.
+- Enum names use `PascalCase`; enum members use `UPPER_SNAKE_CASE` with string
+  values that match public schema values, such as
+  `SupportedLanguages.HIP_CPP = "hip_cpp"` and
+  `SupportedHardware.GFX942 = "gfx942"`.
+- Public schema fields use stable JSON-oriented names and avoid unnecessary
+  churn because tests assert exact contracts in
+  `tests/sol_execbench/test_public_contract_guardrails.py`.
 
-- Public schema models live in `src/sol_execbench/core/data/`.
-- Pydantic validation is used for schema boundaries instead of ad hoc parsing.
-- ROCm migration constraints are enforced in model validators where possible, for example legacy CUDA/NVIDIA language rejection in `src/sol_execbench/core/data/solution.py`.
-- Public schema changes require docs and tests because examples, dataset scripts, and readiness gates consume these contracts.
+## Code Style
+
+**Formatting:**
+- Python 3.12+ style with Ruff configured in `pyproject.toml`.
+- Formatting command: `uv run --with ruff ruff format .`.
+- Ruff `force-exclude = true` excludes `.git`, `.venv`, caches, build output,
+  `data`, and `examples`.
+- The codebase uses type annotations heavily, `from __future__ import
+  annotations` in many modules, and explicit `Path` use for filesystem values.
+- Strings are generally double-quoted in formatted Python output.
+
+**Linting:**
+- Ruff is the lint tool, configured in `pyproject.toml`.
+- Lint command: `uv run --with ruff ruff check .`.
+- Ruff ignores `E741`; otherwise the project largely follows Ruff defaults.
+- Ty is configured for static type checking over `src` and `tests` via
+  `[tool.ty.src] include = ["src", "tests"]`.
+- Pre-commit is a development dependency and is used by project workflow, but
+  the source conventions are primarily Ruff and Ty shaped.
+
+## Import Organization
+
+**Order:**
+1. Future imports, when used, such as `from __future__ import annotations`.
+2. Standard library imports, grouped together.
+3. Third-party imports, such as `click`, `pytest`, `pydantic`, `rich`, and
+   `torch`.
+4. Internal `sol_execbench` imports.
+5. Relative imports inside package modules.
+
+**Grouping:**
+- Blank lines separate import groups.
+- Imports are usually explicit; wildcard imports are not a normal pattern.
+- TYPE_CHECKING guards are used for expensive or optional type-only imports,
+  for example `torch` in `src/sol_execbench/core/data/definition.py`.
+- Tests sometimes adjust `sys.path` for local helper modules, as in
+  `tests/sol_execbench/test_public_contract_guardrails.py`, but package imports
+  are preferred.
+
+**Path Aliases:**
+- No custom Python path aliases are configured.
+- Package code imports through `sol_execbench.*` or relative package imports.
+- Tests share factory helpers from `tests/sol_execbench_type_helpers.py`.
 
 ## Error Handling
 
-- CLI user-facing failures should use Click exceptions or clear Rich/console messages.
-- Subprocess failures are converted to bounded diagnostic logs and no-trace sidecars when Trace JSONL cannot be parsed.
-- Dataset runner failures persist bounded CLI logs through helpers in `src/sol_execbench/core/dataset/runner.py`.
-- Diagnostic reports should use explicit statuses such as `deferred`, `unavailable`, `diagnostic-only`, `unsupported`, or `blocking`.
+**Patterns:**
+- Schema and contract validation raises `ValueError` through Pydantic validators,
+  producing `ValidationError` at the caller boundary.
+- CLI-facing failures use `click.ClickException` for actionable user errors,
+  such as missing `definition.json` or `workload.jsonl` in a problem directory.
+- Runtime helper failures use `RuntimeError` with specific diagnostics when
+  staged files, entry points, references, or native artifacts are unavailable.
+- Subprocess output is captured and bounded before persistence; CLI diagnostics
+  use tail limits such as `_DIAGNOSTIC_TAIL_LIMIT`.
+- Expected benchmark failures are modeled in data objects where possible rather
+  than only through thrown exceptions. `TimingResult` and
+  `ReferenceTimingResult` carry `failure` strings alongside latency values.
 
-## Subprocess And Filesystem Boundaries
+**Error Types:**
+- Use `ValueError` for invalid user-provided schema values or unsafe compile
+  options.
+- Use `RuntimeError` for execution invariants that fail after staging, import,
+  timing, or native artifact lookup.
+- Use `OSError` handling around sidecar writes and filesystem persistence,
+  surfacing a warning rather than crashing when diagnostic sidecar output cannot
+  be written.
+- Preserve exception causes for import/exec failures where useful, for example
+  raising `RuntimeError(... ) from ref_err` in reference loading.
 
-- Benchmark execution happens in a staging directory created by `ProblemPackager`.
-- User solution source paths must be relative and must not contain parent traversal.
-- Native compile flags must not introduce response files, external include/library path injection, or runtime linker control.
-- The generated driver redirects non-JSON stdout to stderr before importing PyTorch/Triton so stdout remains strict JSONL.
+## Logging
 
-## Evidence Semantics
+**Framework:**
+- CLI output uses Rich via `Console(stderr=True)` and Rich tables/progress.
+- Scripts use normal terminal output and structured JSON sidecars where the
+  output is an artifact.
+- Tests generally assert returned objects, files, and subprocess output rather
+  than relying on logs.
 
-- Trace JSONL is canonical benchmark output.
-- Environment, profile, static-kernel, Matrix, closure, consistency, claim-upgrade, trust-summary, and release-candidate artifacts are sidecar evidence unless a specific document narrows their role.
-- Readiness gates should encode forbidden claims rather than relying only on prose.
-- Docker/container evidence must not be described as native-host validation.
+**Patterns:**
+- User-facing CLI summaries are formatted through Rich tables in
+  `src/sol_execbench/cli/main.py`.
+- Diagnostic evidence is persisted as JSON with explicit schema versions, for
+  example no-trace diagnostics and derived evidence reports.
+- Low-level pure helpers avoid logging; boundary layers format or persist
+  diagnostics.
 
-## Documentation
+## Comments
 
-- Public behavior changes should update relevant docs under `docs/` and README links.
-- Claim language must stay aligned with `docs/CLAIMS.md`.
-- MI300X should be described as the concrete CDNA3 `gfx942` target.
-- CDNA4 validation should be described as unavailable until suitable hardware is accessible.
+**When to Comment:**
+- Comments are used for boundaries, phases, and non-obvious compatibility
+  constraints, such as ROCm migration residue classification and staged
+  evaluation phases.
+- Short comments explain why compatibility names remain, such as PyTorch ROCm
+  using `torch.cuda` namespaces.
+- Avoid adding obvious comments to small helper functions.
+
+**Docstrings:**
+- Public modules, Pydantic models, dataclasses, validators, and helper functions
+  commonly have concise docstrings.
+- Pydantic schema fields often include docstring-style field documentation so
+  generated/public schemas remain explainable.
+- Tests use module and class docstrings to describe the contract under test,
+  for example `TestLanguageValidation` in
+  `tests/sol_execbench/core/data/test_solution.py`.
+
+**TODO Comments:**
+- No dominant TODO format was observed. Prefer issue-linked or phase-linked
+  follow-up notes when adding deferred work.
+
+## Function Design
+
+**Size:**
+- Pure helpers are kept small where possible, especially in scoring, reporting,
+  runtime, and dataset support modules.
+- Large CLI and dataset script modules are organized with many private helpers
+  and constants rather than deeply nested logic.
+- Cross-boundary behavior is usually factored into importable helpers so tests
+  can exercise it without invoking the full CLI.
+
+**Parameters:**
+- Keyword-only parameters are used for options and dependency injection, for
+  example `keep_staging`, `warmup`, `rep`, `time_fn`, and path-existence
+  probes.
+- `Path` is preferred over raw strings for filesystem APIs.
+- Dataclasses are used for small immutable result objects and test case
+  descriptors.
+
+**Return Values:**
+- Helpers return typed dataclasses, Pydantic models, tuples, dictionaries, or
+  lists rather than loosely shaped positional data when the shape matters.
+- Validation helpers return `self` in Pydantic `model_validator(mode="after")`
+  methods.
+- Some runtime helpers return explicit failure fields instead of throwing when a
+  failure is expected diagnostic data.
+
+## Module Design
+
+**Exports:**
+- Package entry points are exposed through `pyproject.toml` scripts:
+  `sol-execbench = "sol_execbench.cli:cli"` and
+  `sol-execbench-baseline = "sol_execbench.cli.baseline:cli"`.
+- `src/sol_execbench/core/__init__.py` and package `__init__.py` files provide
+  public import surfaces for core models and helpers.
+- Scripts in `scripts/` often retain compatibility exports while delegating
+  implementation to package modules under `src/sol_execbench/core/dataset/`.
+
+**Barrel Files:**
+- `__init__.py` modules are used as Python package barrels for public models and
+  subpackages.
+- Avoid adding circular imports through barrel files; package modules generally
+  import concrete dependencies directly.
+
+**Boundary Patterns:**
+- Public JSON schemas are guarded by Pydantic models and contract tests.
+- Subprocess execution is isolated through `ProblemPackager`, generated driver
+  templates, and importable runtime helpers.
+- ROCm-only migration boundaries are explicit: legacy CUDA/NVIDIA values are
+  rejected with guidance, while unavoidable compatibility namespaces are
+  documented and tested.
+- Security-sensitive staging rejects absolute paths, parent traversal, response
+  files, host path injection flags, runtime linker flags, and dynamic extension
+  compilation during user solution execution.
+
+---
+
+*Convention analysis: 2026-06-04*
+*Update when patterns change*
