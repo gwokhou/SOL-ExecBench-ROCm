@@ -76,6 +76,11 @@ Last activity: 2026-06-04 — Milestone v1.29 completed and archived
   handling, and the RMSNorm HIP example's wave-size-specific reduction. CDNA3
   validation still requires cloud revalidation before any claim upgrade.
 
+- CDNA3 `gfx942` cloud revalidation passed the full adapted pytest suite on
+  2026-06-04 at repository HEAD `0d6c3e1` with `1401 passed, 62 skipped`.
+  Broader MI300X benchmark-grade validation still requires dataset, clock-lock,
+  timing, AMD score, FP8, and deferred low-precision evidence.
+
 - v1.28 CDNA3 Test and Documentation Readiness started on 2026-06-04 with
   Phase 127-130 scoped for CDNA3 hardware-gated tests, MI300X evidence
   contracts, deferred-validation guardrails, and public documentation closure.

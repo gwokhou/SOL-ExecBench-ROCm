@@ -10,8 +10,13 @@ It does not record a CDNA 3 hardware-validation pass.
   real `gfx94*` hardware.
 - A real `gfx942` validation attempt on 2026-06-04 is recorded in
   [CDNA3 gfx942 Validation Attempt](cdna3_gfx942_validation_attempt.md). That
-  attempt did not pass the full adapted suite and does not upgrade CDNA3 or
-  MI300X support claims.
+  initial attempt did not pass the full adapted suite. Follow-up fixes were
+  re-run on `gfx942` at repository HEAD `0d6c3e1`, where the adapted pytest
+  suite passed with `1401 passed, 62 skipped`.
+- The pytest pass is CDNA3 `gfx942` adapted-suite validation evidence. It does
+  not by itself complete MI300X benchmark-grade validation because dataset,
+  clock-lock, timing, AMD score, FP8, and deferred low-precision status
+  evidence are still required.
 - Claim wording: `cdna3_readiness_implemented` is not the same as CDNA 3
   hardware validated.
 - Blocked or non-CDNA targets use `cdna3_hardware_validation_deferred`.
