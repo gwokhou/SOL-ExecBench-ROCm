@@ -1,5 +1,45 @@
 # Milestones
 
+## v1.29 Dataset Migration and Compliance (Shipped: 2026-06-04)
+
+**Phases completed:** 5 phases, 5 plans, 0 tasks
+
+**Key accomplishments:**
+
+- Added machine-readable provenance and redistribution guardrails for
+  NVIDIA/SOL-ExecBench, FlashInfer Trace, generated local migration artifacts,
+  and project-owned ROCm code.
+
+- Added deterministic local SOL-ExecBench and FlashInfer Trace migration
+  commands with manifests, checksums, source revisions, license-boundary
+  metadata, and explicit blocker states.
+
+- Added ROCm readiness classification and ready-subset generation that preserve
+  denominators, exclusion reasons, workload closure inputs, and no-claim
+  boundaries.
+
+- Added CPU-safe NVIDIA/Blackwell low-precision compatibility helpers for
+  NVFP4/MXFP4-like semantics with unvalidated-CDNA4 evidence markers.
+
+- Integrated migrated dataset manifests, readiness sidecars, and public
+  no-redistribution guardrails into `scripts/run_dataset.py`, closure reports,
+  and cookbook documentation.
+
+**Explicitly deferred:**
+
+- Real CDNA3 or CDNA4 full-suite execution without a complete hardware evidence
+  chain.
+- Real CDNA4 validation, performance authority, or hardware equivalence claims
+  for NVFP4/Blackwell semantics.
+- High-performance FlashInfer CUDA-kernel ROCm tuning and full performance
+  comparison.
+- Public redistribution of NVIDIA SOL-ExecBench original or migrated dataset
+  payloads.
+- Known deferred quick-task artifacts at close: 5 historical items recorded in
+  `.planning/STATE.md`.
+
+---
+
 ## v1.28 CDNA3 Test and Documentation Readiness (Shipped: 2026-06-04)
 
 **Phases completed:** 127-130 (4 phases, 4 plans)

@@ -560,6 +560,76 @@
 
 ---
 
+## Milestone: v1.29 — Dataset Migration and Compliance
+
+**Shipped:** 2026-06-04
+**Phases:** 5 | **Plans:** 5
+
+### What Was Built
+
+- Dataset source, license, provenance, and redistribution policy for
+  NVIDIA/SOL-ExecBench, FlashInfer Trace, generated local migration artifacts,
+  and project-owned ROCm code.
+- Deterministic local SOL-ExecBench and FlashInfer Trace migration commands
+  with manifests, checksums, source revisions, license boundaries, and blocker
+  states.
+- ROCm readiness classification and ready-subset generation preserving
+  denominators, blocker reports, closure inputs, and no-claim boundaries.
+- CPU-safe low-precision compatibility helpers for NVIDIA/Blackwell-style
+  NVFP4/MXFP4 semantics with explicit unvalidated-CDNA4 evidence markers.
+- Dataset runner closure integration that records migration, readiness,
+  license, blocker, and requested-evidence provenance without allowing public
+  redistribution of restricted dataset payloads.
+
+### What Worked
+
+- Running the five phases sequentially kept legal policy, migration, readiness,
+  compatibility, and runner integration layered cleanly.
+- CPU-safe synthetic fixtures were enough to verify migration contracts,
+  readiness blockers, low-precision semantics, and public guardrails without
+  needing external datasets or GPU hardware.
+- The milestone audit caught planning metadata drift in requirement checkboxes
+  and CDNA3/CDNA4 wording before archival.
+
+### What Was Inefficient
+
+- The milestone archive helper extracted generic date-only accomplishments, so
+  `MILESTONES.md` needed a manual rewrite.
+- The complete-milestone helper was accidentally invoked through two equivalent
+  command forms, which created a duplicate v1.29 milestone entry that needed
+  cleanup.
+- Open-artifact audit still reports historical quick-task artifacts that are
+  not current milestone blockers; they had to be explicitly acknowledged as
+  deferred at close.
+
+### Patterns Established
+
+- Dataset migration must stay local-only when upstream redistribution rights
+  are restricted; manifests and docs should prove source boundaries without
+  checking in payloads.
+- Readiness classification should preserve denominator accounting for blocked,
+  skipped, missing, and unvalidated workloads instead of silently dropping them.
+- Compatibility implementation is acceptable without hardware validation only
+  when every downstream report carries explicit unvalidated evidence markers.
+
+### Key Lessons
+
+1. Legal provenance and runner closure need to be connected by machine-readable
+   metadata, not just documentation.
+2. Hardware-specific semantic compatibility should have CPU-safe round-trip
+   tests plus separate hardware-evidence blockers.
+3. Public docs for dataset migration should phrase NVIDIA data handling as
+   user-managed local migration, not project redistribution.
+
+### Cost Observations
+
+- Model mix: parent plus worker agents; exact split not recorded.
+- Sessions: one autonomous milestone run plus local audit/close cleanup.
+- Notable: Phase 135 verified 74 focused runner, migration, readiness,
+  redistribution, prerelease, and public-doc tests.
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -575,6 +645,7 @@
 | v1.10 | 1+ | 6 | Completed paper-aligned automatic SOLAR derivation sidecars, score guards, dataset-runner report integration, and claim guardrails |
 | v1.19 | 1+ | 6 | Added sidecar evidence credibility surfaces without expanding hardware validation |
 | v1.20 | 1+ | 5 | Added consistency, stability, claim-upgrade, and trust-summary gates over existing evidence |
+| v1.29 | 1+ | 5 | Added local dataset migration, provenance, readiness subsets, low-precision compatibility, and runner guardrails without redistributing restricted data |
 
 ### Cumulative Quality
 
@@ -589,6 +660,7 @@
 | v1.10 | 196 Phase 51 tests and 169 Phase 52 tests passed; Ruff clean; milestone audit PASS | v1.10 requirements 21/21 complete | Paper-scale 124-model/235-problem extraction; MI300X-on-CDNA3 validation; CDNA4 validation; NVFP4/MXFP4 validation; hosted leaderboard |
 | v1.19 | 74 focused audit tests passed; Ruff clean | v1.19 requirements 28/28 complete | New hardware validation; paper-scale validation; hosted leaderboard |
 | v1.20 | 74 evidence-quality tests passed; docs regression passed; audit PASS | v1.20 requirements 23/23 complete | MI300X-on-CDNA3 validation; CDNA4 validation; full paper validation; hosted leaderboard; profiling diagnostics |
+| v1.29 | 74 Phase 135 focused tests passed; phase-specific suites passed; Ruff clean; milestone audit PASS | v1.29 requirements 24/24 complete | Real CDNA3 or CDNA4 full-suite execution; CDNA4 low-precision validation/performance authority; FlashInfer kernel performance tuning; NVIDIA dataset redistribution |
 
 ### Top Lessons
 
