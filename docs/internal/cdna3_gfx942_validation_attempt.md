@@ -127,3 +127,27 @@ After this attempt, quick task
 These are remediation changes only. CDNA3/MI300X validation remains blocked
 until the fixed code is re-run on real `gfx942` hardware and records a passing
 full evidence chain.
+
+## Pytest Revalidation Pass
+
+The fixed code was re-run on real `gfx942` hardware and the adapted pytest
+suite passed.
+
+- Repository HEAD: `0d6c3e1`
+- Hardware target: `gfx942`
+- Local artifact archive:
+  `/Users/guohaozhang/Downloads/cdna3-pytest-pass-artifacts.tgz`
+- Focused static-evidence CLI test:
+  `1 passed in 228.18s`
+- Full adapted pytest suite:
+  `1401 passed, 62 skipped in 878.99s`
+- Full-suite exit code: `0`
+
+This upgrades the internal status of the fixed code to CDNA3 `gfx942` adapted
+pytest validation passed.
+
+It does not by itself complete the broader MI300X evidence chain for
+benchmark-grade claims. Dataset validation, clock-lock evidence, timing
+evidence, AMD-native score reports, FP8 status, and NVFP4/MXFP4 deferred
+status still need to be recorded before broader MI300X/CDNA3 benchmark
+validation claims are upgraded.
