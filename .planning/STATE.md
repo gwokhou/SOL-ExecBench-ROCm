@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.29
 milestone_name: Dataset Migration and Compliance
-status: planning
-last_updated: "2026-06-04T04:10:00Z"
+status: verification
+last_updated: "2026-06-04T04:45:00Z"
 last_activity: 2026-06-04
 progress:
   total_phases: 5
-  completed_phases: 4
-  total_plans: 4
-  completed_plans: 4
-  percent: 80
+  completed_phases: 5
+  total_plans: 5
+  completed_plans: 5
+  percent: 100
 ---
 
 # Project State
@@ -29,10 +29,10 @@ ROCm-equivalent low-precision semantics.
 
 ## Current Position
 
-Phase: 134 complete
-Plan: 134-01
-Status: Ready to plan Phase 135
-Last activity: 2026-06-04 — Phase 134 completed CPU-safe NVIDIA/Blackwell low-precision ROCm compatibility abstractions
+Phase: 135 complete
+Plan: 135-01
+Status: v1.29 phases ready for milestone audit
+Last activity: 2026-06-04 — Phase 135 integrated migrated dataset runner metadata and public guardrails
 
 ## Recent Trend
 
@@ -110,6 +110,11 @@ Last activity: 2026-06-04 — Phase 134 completed CPU-safe NVIDIA/Blackwell low-
   unvalidated-CDNA4 evidence markers, readiness blocker integration, and
   semantic round-trip tests.
 
+- Phase 135 completed on 2026-06-04 with dataset runner migration-manifest
+  provenance, license-boundary metadata, readiness/ready-subset denominator
+  summaries, blocker-visible execution closure rows, deterministic no-ready
+  summaries, public-safe cookbook workflow docs, and CPU-safe guardrail tests.
+
 ## Accumulated Context
 
 ### Decisions
@@ -169,8 +174,8 @@ None.
 
 Last session: 2026-06-04
 Stopped at: Phase 132 complete.
-Resume file: .planning/phases/134-nvidia-blackwell-low-precision-rocm-equivalence/134-VERIFICATION.md
+Resume file: .planning/phases/135-dataset-runner-integration-and-public-guardrails/135-VERIFICATION.md
 
 ## Operator Next Steps
 
-- Plan Phase 135 with `/gsd-plan-phase 135`.
+- Audit and complete v1.29 with `/gsd-audit-milestone`.

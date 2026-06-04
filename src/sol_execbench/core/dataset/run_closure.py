@@ -127,6 +127,14 @@ def closure_record(
 ) -> dict[str, Any]:
     """Build one serialized execution-closure record."""
     reasons = readiness.get("reasons", []) if readiness else []
+    blockers = readiness.get("blocker_reports", []) if readiness else []
+    evidence_refs = {
+        str(blocker["code"]): str(blocker["evidence_path"])
+        for blocker in blockers
+        if isinstance(blocker, dict)
+        and blocker.get("code") is not None
+        and blocker.get("evidence_path") is not None
+    }
     return ExecutionClosureRecord(
         category=category,
         problem_id=problem_id,
@@ -134,11 +142,23 @@ def closure_record(
         workload_uuid=workload_uuid,
         row_index=row_index,
         readiness_status=readiness.get("status") if readiness else None,
+        readiness_class=readiness.get("readiness_class") if readiness else None,
         readiness_reason_codes=[
             reason["code"]
             for reason in reasons
             if isinstance(reason, dict) and reason.get("code") is not None
         ],
+        readiness_blocker_codes=[
+            blocker["code"]
+            for blocker in blockers
+            if isinstance(blocker, dict) and blocker.get("code") is not None
+        ],
+        readiness_blocker_types=[
+            blocker["blocker_type"]
+            for blocker in blockers
+            if isinstance(blocker, dict) and blocker.get("blocker_type") is not None
+        ],
+        readiness_evidence_refs=evidence_refs,
         closure_status=ExecutionClosureStatus(closure_status),
         filter_reasons=filter_reasons or [],
         trace_status=trace_status,
@@ -170,6 +190,7 @@ def write_execution_closure(
     provenance: dict[str, Any],
     filters: dict[str, Any],
     provenance_mismatches: list[dict[str, Any]] | None = None,
+    source_refs: dict[str, str] | None = None,
 ) -> None:
     """Write the dataset runner execution-closure report."""
     report = build_execution_closure_report(
@@ -186,6 +207,7 @@ def write_execution_closure(
         provenance_mismatches=[*provenance_mismatches]
         if provenance_mismatches is not None
         else None,
+        source_refs=source_refs,
     )
     write_execution_closure_report(report, path)
 

@@ -153,18 +153,18 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DATA-READY-02 | Phase 133 | Complete |
 | DATA-READY-03 | Phase 133 | Complete |
 | DATA-READY-04 | Phase 133 | Complete |
-| LOWP-ROCM-01 | Phase 134 | Pending |
-| LOWP-ROCM-02 | Phase 134 | Pending |
-| LOWP-ROCM-03 | Phase 134 | Pending |
-| LOWP-ROCM-04 | Phase 134 | Pending |
-| DATA-RUN-01 | Phase 135 | Pending |
-| DATA-RUN-02 | Phase 135 | Pending |
-| DATA-RUN-03 | Phase 135 | Pending |
-| DATA-RUN-04 | Phase 135 | Pending |
-| DATA-DOC-01 | Phase 135 | Pending |
-| DATA-DOC-02 | Phase 135 | Pending |
-| DATA-DOC-03 | Phase 135 | Pending |
-| DATA-DOC-04 | Phase 135 | Pending |
+| LOWP-ROCM-01 | Phase 134 | Complete |
+| LOWP-ROCM-02 | Phase 134 | Complete |
+| LOWP-ROCM-03 | Phase 134 | Complete |
+| LOWP-ROCM-04 | Phase 134 | Complete |
+| DATA-RUN-01 | Phase 135 | Complete |
+| DATA-RUN-02 | Phase 135 | Complete |
+| DATA-RUN-03 | Phase 135 | Complete |
+| DATA-RUN-04 | Phase 135 | Complete |
+| DATA-DOC-01 | Phase 135 | Complete |
+| DATA-DOC-02 | Phase 135 | Complete |
+| DATA-DOC-03 | Phase 135 | Complete |
+| DATA-DOC-04 | Phase 135 | Complete |
 
 **Coverage:**
 - v1.29 requirements: 24 total
@@ -173,4 +173,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-06-04*
-*Last updated: 2026-06-04 after v1.29 milestone start*
+*Last updated: 2026-06-04 after Phase 135 completion*

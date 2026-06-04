@@ -213,6 +213,158 @@ def _sidecar_checksum(payload: dict | None, key: str) -> str | None:
     return None
 
 
+def _license_boundary_metadata(manifest: dict | None) -> dict:
+    if manifest is None:
+        return {}
+    boundary = manifest.get("license_boundary")
+    if not isinstance(boundary, dict):
+        return {}
+    fields = (
+        "source_boundary",
+        "generated_artifact_source_id",
+        "license",
+        "redistribution_class",
+        "repository_redistribution",
+        "release_bundle_redistribution",
+        "attribution",
+    )
+    return {field: boundary[field] for field in fields if field in boundary}
+
+
+def _dataset_manifest_summary(manifest: dict | None, *, problems_dir: Path, output_dir: Path) -> dict:
+    if manifest is None:
+        return {}
+    source = manifest.get("source") if isinstance(manifest.get("source"), dict) else {}
+    denominators = (
+        manifest.get("denominators")
+        if isinstance(manifest.get("denominators"), dict)
+        else {}
+    )
+    source_root = source.get("source_root")
+    source_root_ref = None
+    if isinstance(source_root, str) and source_root:
+        source_root_ref = _first_relative_ref(Path(source_root), ROOT, problems_dir, output_dir)
+    return {
+        "migration_kind": manifest.get("migration_kind"),
+        "source_id": source.get("source_id"),
+        "repo_id": source.get("repo_id"),
+        "source_revision": source.get("revision"),
+        "source_root": source_root_ref,
+        "output_root": Path(str(manifest.get("output_root"))).name
+        if manifest.get("output_root") is not None
+        else None,
+        "selected_categories": list(manifest.get("selected_categories") or []),
+        "denominators": {
+            key: denominators.get(key)
+            for key in (
+                "discovered_problems",
+                "migrated_problems",
+                "generated_artifacts",
+                "blockers",
+                "warnings",
+            )
+            if key in denominators
+        },
+        "blocker_codes": sorted(
+            str(blocker.get("code"))
+            for blocker in manifest.get("blockers", [])
+            if isinstance(blocker, dict) and blocker.get("code") is not None
+        ),
+    }
+
+
+def _ready_subset_summary(ready_subset: dict | None) -> dict:
+    if ready_subset is None:
+        return {}
+    denominator = (
+        ready_subset.get("denominator")
+        if isinstance(ready_subset.get("denominator"), dict)
+        else {}
+    )
+    exclusions = [
+        exclusion
+        for exclusion in ready_subset.get("exclusions", [])
+        if isinstance(exclusion, dict)
+    ]
+    included_workloads = ready_subset.get("included_workloads")
+    if included_workloads is None:
+        included_workloads = denominator.get("included_workloads")
+    excluded_workloads = ready_subset.get("excluded_workloads")
+    if excluded_workloads is None:
+        excluded_workloads = denominator.get("excluded_workloads")
+    return {
+        "dataset_root": ready_subset.get("dataset_root"),
+        "selected_categories": list(ready_subset.get("selected_categories") or []),
+        "included_workloads": included_workloads,
+        "excluded_workloads": excluded_workloads,
+        "denominator": {
+            key: denominator.get(key)
+            for key in (
+                "total_workloads",
+                "included_workloads",
+                "excluded_workloads",
+                "blocked_workloads",
+            )
+            if key in denominator
+        },
+        "exclusion_reason_codes": sorted(
+            str(exclusion.get("reason_code"))
+            for exclusion in exclusions
+            if exclusion.get("reason_code") is not None
+        ),
+        "claim_boundary": ready_subset.get("claim_boundary") or {},
+    }
+
+
+def _readiness_summary(readiness: dict | None) -> dict:
+    if readiness is None:
+        return {}
+    workloads = [
+        workload
+        for workload in readiness.get("workloads", [])
+        if isinstance(workload, dict)
+    ]
+    status_counts: dict[str, int] = {}
+    class_counts: dict[str, int] = {}
+    blocker_type_counts: dict[str, int] = {}
+    for workload in workloads:
+        status = str(workload.get("status"))
+        status_counts[status] = status_counts.get(status, 0) + 1
+        readiness_class = str(workload.get("readiness_class"))
+        class_counts[readiness_class] = class_counts.get(readiness_class, 0) + 1
+        for blocker in workload.get("blocker_reports", []):
+            if isinstance(blocker, dict) and blocker.get("blocker_type") is not None:
+                blocker_type = str(blocker["blocker_type"])
+                blocker_type_counts[blocker_type] = blocker_type_counts.get(blocker_type, 0) + 1
+    return {
+        "selected_categories": list(readiness.get("selected_categories") or []),
+        "workloads": len(workloads),
+        "status_counts": dict(sorted(status_counts.items())),
+        "readiness_class_counts": dict(sorted(class_counts.items())),
+        "blocker_type_counts": dict(sorted(blocker_type_counts.items())),
+        "claim_boundary": readiness.get("claim_boundary") or {},
+    }
+
+
+def _source_refs(
+    *,
+    ready_subset_path: Path | None,
+    readiness_path: Path | None,
+    dataset_manifest_path: Path | None,
+    problems_dir: Path,
+    output_dir: Path,
+) -> dict[str, str]:
+    refs: dict[str, str] = {}
+    for key, path in (
+        ("ready_subset", ready_subset_path),
+        ("readiness", readiness_path),
+        ("dataset_manifest", dataset_manifest_path),
+    ):
+        if path is not None:
+            refs[key] = _first_relative_ref(path, ROOT, problems_dir, output_dir)
+    return refs
+
+
 def _git_commit() -> str | None:
     try:
         result = subprocess.run(
@@ -462,6 +614,7 @@ def _write_execution_closure(
     provenance: dict,
     filters: dict,
     provenance_mismatches: list[dict] | None = None,
+    source_refs: dict[str, str] | None = None,
 ) -> None:
     _write_execution_closure_report(
         path=path,
@@ -469,6 +622,7 @@ def _write_execution_closure(
         provenance=provenance,
         filters=filters,
         provenance_mismatches=provenance_mismatches,
+        source_refs=source_refs,
     )
 
 
@@ -677,6 +831,22 @@ def main():
         if args.dataset_manifest is not None
         else None
     )
+    dataset_manifest_summary = _dataset_manifest_summary(
+        dataset_manifest,
+        problems_dir=problems_dir,
+        output_dir=output_dir,
+    )
+    readiness_summary = _readiness_summary(readiness)
+    ready_subset_summary = _ready_subset_summary(ready_subset)
+    source_refs = _source_refs(
+        ready_subset_path=args.ready_subset.resolve() if args.ready_subset else None,
+        readiness_path=args.readiness.resolve() if args.readiness else None,
+        dataset_manifest_path=args.dataset_manifest.resolve()
+        if args.dataset_manifest
+        else None,
+        problems_dir=problems_dir,
+        output_dir=output_dir,
+    )
     ready_problems = _ready_problem_map(ready_subset)
     readiness_by_workload = _readiness_workload_map(readiness)
     closure_records: list[dict] = []
@@ -817,6 +987,7 @@ def main():
             else None
         ),
         "ready_subset_checksum": _sidecar_checksum(ready_subset, "ready_subset_checksum"),
+        "ready_subset_summary": ready_subset_summary,
         "readiness_path": (
             _first_relative_ref(args.readiness, ROOT, problems_dir, output_dir)
             if args.readiness
@@ -826,12 +997,18 @@ def main():
             _sidecar_checksum(readiness, "readiness_checksum")
             or (ready_subset or {}).get("readiness_checksum")
         ),
+        "readiness_summary": readiness_summary,
         "dataset_manifest_path": (
             _first_relative_ref(args.dataset_manifest, ROOT, problems_dir, output_dir)
             if args.dataset_manifest
             else None
         ),
         "dataset_manifest_checksum": _manifest_checksum(dataset_manifest),
+        "dataset_source_id": dataset_manifest_summary.get("source_id"),
+        "dataset_migration_kind": dataset_manifest_summary.get("migration_kind"),
+        "dataset_source_revision": dataset_manifest_summary.get("source_revision"),
+        "dataset_license_boundary": _license_boundary_metadata(dataset_manifest),
+        "dataset_manifest_summary": dataset_manifest_summary,
         "requested_evidence_requirements": _requested_evidence_requirements(args),
         "git_commit": _git_commit(),
         "config_path": _relative_ref(config_path, output_dir) if config_path else None,
@@ -865,6 +1042,23 @@ def main():
     }
 
     if ready_subset is not None and not problems:
+        if readiness is not None:
+            for workload in readiness.get("workloads", []):
+                if workload.get("status") == "ready":
+                    continue
+                closure_records.append(
+                    _closure_record(
+                        category=str(workload.get("category")),
+                        problem_id=str(workload.get("problem_id")),
+                        problem_path=str(workload.get("problem_path")),
+                        workload_uuid=workload.get("workload_uuid"),
+                        row_index=int(workload.get("row_index", 0)),
+                        closure_status="not_attempted",
+                        readiness=workload,
+                        filter_reasons=["readiness_blocked"],
+                    )
+                )
+        summary_path = write_summary_report(output_dir, summaries)
         _write_execution_closure(
             path=execution_closure_path or (output_dir / "execution_closure.json"),
             records=closure_records,
@@ -876,7 +1070,9 @@ def main():
                 "max_workloads": args.max_workloads,
             },
             provenance_mismatches=provenance_mismatches,
+            source_refs=source_refs,
         )
+        print(f"\nSummary saved to {summary_path}")
         print(f"Execution closure saved to {execution_closure_path}")
         return
 
@@ -1290,6 +1486,7 @@ def main():
                 "max_workloads": args.max_workloads,
             },
             provenance_mismatches=provenance_mismatches,
+            source_refs=source_refs,
         )
         print(f"Execution closure saved to {execution_closure_path}")
 

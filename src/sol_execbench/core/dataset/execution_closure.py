@@ -56,7 +56,11 @@ class ExecutionClosureRecord(BaseModel):
     workload_uuid: str | None = None
     row_index: int
     readiness_status: str | None = None
+    readiness_class: str | None = None
     readiness_reason_codes: list[str] = Field(default_factory=list)
+    readiness_blocker_codes: list[str] = Field(default_factory=list)
+    readiness_blocker_types: list[str] = Field(default_factory=list)
+    readiness_evidence_refs: dict[str, str] = Field(default_factory=dict)
     closure_status: ExecutionClosureStatus
     filter_reasons: list[str] = Field(default_factory=list)
     trace_status: str | None = None
@@ -71,6 +75,9 @@ class ExecutionClosureRecord(BaseModel):
     def model_post_init(self, __context: Any) -> None:
         self.filter_reasons.sort()
         self.readiness_reason_codes.sort()
+        self.readiness_blocker_codes.sort()
+        self.readiness_blocker_types.sort()
+        self.readiness_evidence_refs = dict(sorted(self.readiness_evidence_refs.items()))
         self.evidence_refs = dict(sorted(self.evidence_refs.items()))
         self.evidence_gaps.sort()
 
@@ -96,10 +103,17 @@ class ExecutionClosureProvenance(BaseModel):
     summary_path: str | None = None
     ready_subset_path: str | None = None
     ready_subset_checksum: str | None = None
+    ready_subset_summary: dict[str, Any] = Field(default_factory=dict)
     readiness_path: str | None = None
     readiness_checksum: str | None = None
+    readiness_summary: dict[str, Any] = Field(default_factory=dict)
     dataset_manifest_path: str | None = None
     dataset_manifest_checksum: str | None = None
+    dataset_source_id: str | None = None
+    dataset_migration_kind: str | None = None
+    dataset_source_revision: str | None = None
+    dataset_license_boundary: dict[str, Any] = Field(default_factory=dict)
+    dataset_manifest_summary: dict[str, Any] = Field(default_factory=dict)
     workload_identity_checksum: str | None = None
     requested_evidence_requirements: tuple[str, ...] = ()
     git_commit: str | None = None
@@ -304,8 +318,14 @@ def compare_execution_closure_provenance(
         ("limit", ExecutionClosureReasonCode.SELECTION_MISMATCH),
         ("max_workloads", ExecutionClosureReasonCode.SELECTION_MISMATCH),
         ("dataset_manifest_checksum", ExecutionClosureReasonCode.MANIFEST_CHECKSUM_MISMATCH),
+        ("dataset_source_id", ExecutionClosureReasonCode.MANIFEST_CHECKSUM_MISMATCH),
+        ("dataset_migration_kind", ExecutionClosureReasonCode.MANIFEST_CHECKSUM_MISMATCH),
+        ("dataset_license_boundary", ExecutionClosureReasonCode.MANIFEST_CHECKSUM_MISMATCH),
+        ("dataset_manifest_summary", ExecutionClosureReasonCode.MANIFEST_CHECKSUM_MISMATCH),
         ("readiness_checksum", ExecutionClosureReasonCode.READINESS_CHECKSUM_MISMATCH),
+        ("readiness_summary", ExecutionClosureReasonCode.READINESS_CHECKSUM_MISMATCH),
         ("ready_subset_checksum", ExecutionClosureReasonCode.READY_SUBSET_CHECKSUM_MISMATCH),
+        ("ready_subset_summary", ExecutionClosureReasonCode.READY_SUBSET_CHECKSUM_MISMATCH),
         ("workload_identity_checksum", ExecutionClosureReasonCode.WORKLOAD_IDENTITY_MISMATCH),
         ("solution_mode", ExecutionClosureReasonCode.SOLUTION_MODE_MISMATCH),
         ("solution_name", ExecutionClosureReasonCode.SOLUTION_MISMATCH),
