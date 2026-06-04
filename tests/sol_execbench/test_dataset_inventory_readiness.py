@@ -5,9 +5,15 @@ import importlib.util
 from pathlib import Path
 
 from sol_execbench.core.dataset import (
+    DatasetInventory,
+    InventoryDenominators,
+    ProblemInventoryRecord,
+    WorkloadInventoryRecord,
     build_dataset_inventory,
     build_ready_subset,
     classify_rocm_readiness,
+    migrate_flashinfer_trace,
+    migrate_sol_execbench,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -70,6 +76,14 @@ def _write_problem(
     if solution_file:
         (problem_dir / "solution.json").write_text("{}\n", encoding="utf-8")
     return problem_dir
+
+
+def _write_solution(problem_dir: Path, name: str, payload: dict | str) -> None:
+    if isinstance(payload, str):
+        text = payload
+    else:
+        text = json.dumps(payload, sort_keys=True) + "\n"
+    (problem_dir / name).write_text(text, encoding="utf-8")
 
 
 def test_inventory_records_problem_workload_metadata_and_denominators(tmp_path):
@@ -181,8 +195,13 @@ def test_readiness_marks_random_workload_ready(tmp_path):
     readiness = classify_rocm_readiness(inventory, dataset_root=tmp_path, created_at="2026-05-23T00:00:00Z")
 
     assert readiness.workloads[0].status == "ready"
+    assert readiness.workloads[0].readiness_class == "pytorch_compatible"
     assert readiness.workloads[0].reasons[0].code == "ready_to_attempt_rocm_execution"
     assert readiness.problems[0].status == "ready"
+    assert readiness.claim_boundary.ready_to_attempt_rocm_execution is True
+    assert readiness.claim_boundary.hardware_validation is False
+    assert readiness.claim_boundary.paper_level_validation is False
+    assert readiness.claim_boundary.score_authority is False
 
 
 def test_readiness_blocks_custom_inputs_and_missing_safetensors(tmp_path):
@@ -205,9 +224,16 @@ def test_readiness_blocks_custom_inputs_and_missing_safetensors(tmp_path):
     statuses = {record.problem_id: record.status for record in readiness.workloads}
     assert statuses["L1/custom_problem"] == "custom_input_blocked"
     assert statuses["L1/safetensors_problem"] == "runtime_blocked"
+    assert {record.readiness_class for record in readiness.workloads} == {
+        "blocked_missing_evidence"
+    }
     reason_codes = {record.reasons[0].code for record in readiness.workloads}
     assert "custom_input_requires_evaluator_support" in reason_codes
     assert "safetensors_asset_missing" in reason_codes
+    assert {blocker.blocker_type for blocker in readiness.blocker_reports} == {
+        "missing_blob",
+        "missing_evidence",
+    }
 
 
 def test_readiness_marks_quant_and_low_precision_as_needing_hardware_evidence(tmp_path):
@@ -220,6 +246,9 @@ def test_readiness_marks_quant_and_low_precision_as_needing_hardware_evidence(tm
     statuses = {record.problem_id: record.status for record in readiness.workloads}
     assert statuses["Quant/quant_problem"] == "needs_hardware_evidence"
     assert statuses["L1/fp8_problem"] == "needs_hardware_evidence"
+    classes = {record.problem_id: record.readiness_class for record in readiness.workloads}
+    assert classes["Quant/quant_problem"] == "nvfp4_blackwell_specific"
+    assert classes["L1/fp8_problem"] == "blocked_missing_evidence"
     assert all(record.layered_evidence.hardware_validation == "needed" for record in readiness.workloads)
 
 
@@ -272,7 +301,165 @@ def test_readiness_blocks_nvidia_only_reference_runtime_hints(tmp_path):
     assert inventory.problems[0].definition is not None
     assert "cupy" in inventory.problems[0].definition.reference_runtime_hints
     assert readiness.workloads[0].status == "unsupported_nvidia_only_path"
+    assert readiness.workloads[0].readiness_class == "rocm_port_needed"
     assert readiness.workloads[0].reasons[0].code == "nvidia_cuda_runtime_hint"
+
+
+def test_readiness_classifies_cuda_solution_as_rocm_port_needed(tmp_path):
+    problem_dir = _write_problem(tmp_path, "L1", "cuda_solution")
+    _write_solution(
+        problem_dir,
+        "solution_cuda.json",
+        {
+            "spec": {
+                "languages": ["cuda_cpp"],
+                "dependencies": ["cuda", "cublas"],
+            },
+            "sources": [{"path": "kernel.cu", "content": "__global__ void k() {}"}],
+        },
+    )
+    inventory = build_dataset_inventory(
+        tmp_path,
+        categories=("L1",),
+        created_at="2026-05-23T00:00:00Z",
+    )
+
+    readiness = classify_rocm_readiness(
+        inventory,
+        dataset_root=tmp_path,
+        created_at="2026-05-23T00:00:00Z",
+    )
+
+    record = readiness.workloads[0]
+    assert record.readiness_class == "rocm_port_needed"
+    assert record.status == "unsupported_nvidia_only_path"
+    assert record.blocker_reports[0].blocker_type == "cuda_kernel_dependency"
+    assert record.reasons[0].code == "cuda_solution_dependency"
+
+
+def test_readiness_classifies_flashinfer_migration_output(tmp_path):
+    source_root = tmp_path / "flashinfer_source"
+    output_root = tmp_path / "flashinfer_out"
+    problem_dir = _write_problem(
+        source_root,
+        "nested",
+        "decode",
+        solution_file=True,
+        reference_file=True,
+    )
+    (problem_dir / "trace.jsonl").write_text('{"status": "synthetic"}\n', encoding="utf-8")
+    migrate_flashinfer_trace(
+        source_root,
+        output_root,
+        created_at="2026-06-04T00:00:00Z",
+    )
+    inventory = build_dataset_inventory(
+        output_root,
+        categories=("FlashInfer-Bench",),
+        created_at="2026-05-23T00:00:00Z",
+    )
+
+    readiness = classify_rocm_readiness(
+        inventory,
+        dataset_root=output_root,
+        created_at="2026-05-23T00:00:00Z",
+    )
+
+    record = readiness.workloads[0]
+    assert record.readiness_class == "flashinfer_specific"
+    assert record.reasons[0].code == "flashinfer_runtime_assumption"
+    assert readiness.blocker_reports[0].blocker_type == "flashinfer_runtime_assumption"
+
+
+def test_readiness_classifies_blackwell_low_precision_dependency(tmp_path):
+    problem_dir = _write_problem(tmp_path, "L1", "blackwell_nvfp4_problem")
+    _write_solution(
+        problem_dir,
+        "solution.json",
+        {"sources": [{"path": "kernel.py", "content": "def run(x): return nvfp4(x)"}]},
+    )
+    inventory = build_dataset_inventory(
+        tmp_path,
+        categories=("L1",),
+        created_at="2026-05-23T00:00:00Z",
+    )
+
+    readiness = classify_rocm_readiness(
+        inventory,
+        dataset_root=tmp_path,
+        created_at="2026-05-23T00:00:00Z",
+    )
+
+    record = readiness.workloads[0]
+    assert record.readiness_class == "nvfp4_blackwell_specific"
+    assert record.reasons[0].code == "blackwell_low_precision_dependency"
+    assert record.blocker_reports[0].blocker_type == "low_precision_format_dependency"
+
+
+def test_readiness_classifies_unsupported_nvidia_dsl(tmp_path):
+    problem_dir = _write_problem(tmp_path, "L1", "cutile_problem")
+    _write_solution(
+        problem_dir,
+        "solution_cutile.json",
+        {"spec": {"languages": ["cutile"]}},
+    )
+    inventory = build_dataset_inventory(
+        tmp_path,
+        categories=("L1",),
+        created_at="2026-05-23T00:00:00Z",
+    )
+
+    readiness = classify_rocm_readiness(
+        inventory,
+        dataset_root=tmp_path,
+        created_at="2026-05-23T00:00:00Z",
+    )
+
+    record = readiness.workloads[0]
+    assert record.readiness_class == "unsupported"
+    assert record.reasons[0].code == "unsupported_nvidia_dsl"
+
+
+def test_readiness_reports_unsupported_dtype_blocker(tmp_path):
+    inventory = DatasetInventory(
+        created_at="2026-05-23T00:00:00Z",
+        root=tmp_path.as_posix(),
+        selected_categories=("L1",),
+        categories=[],
+        problems=[
+            ProblemInventoryRecord(
+                category="L1",
+                problem_id="L1/unsupported_dtype",
+                problem_path="L1/unsupported_dtype",
+                definition_path="L1/unsupported_dtype/definition.json",
+                workload_path="L1/unsupported_dtype/workload.jsonl",
+                schema_status="schema_failure",
+                schema_failure="Unsupported dtype 'uint4'",
+                workloads=[
+                    WorkloadInventoryRecord(
+                        uuid="bad-dtype",
+                        row_index=1,
+                        schema_status="schema_failure",
+                        schema_failure="Unsupported dtype 'uint4'",
+                    )
+                ],
+            )
+        ],
+        denominators=InventoryDenominators(schema_failures=1),
+        diagnostics=[],
+    )
+
+    readiness = classify_rocm_readiness(
+        inventory,
+        dataset_root=tmp_path,
+        created_at="2026-05-23T00:00:00Z",
+    )
+
+    record = readiness.workloads[0]
+    assert record.readiness_class == "unsupported"
+    assert record.status == "dtype_blocked"
+    assert record.reasons[0].code == "unsupported_dtype"
+    assert readiness.blocker_reports[0].blocker_type == "unsupported_dtype"
 
 
 def test_readiness_blocks_safetensors_paths_outside_dataset_root(tmp_path):
@@ -306,9 +493,19 @@ def test_ready_subset_includes_only_ready_workloads(tmp_path):
 
     assert subset.included_workloads == 1
     assert subset.excluded_workloads == 1
+    assert subset.denominator.total_workloads == 2
+    assert subset.denominator.included_workloads == 1
+    assert subset.denominator.excluded_workloads == 1
     assert [problem.problem_id for problem in subset.problems] == ["L1/ready_problem"]
+    included = subset.problems[0].workloads[0]
+    assert included.readiness_class == "pytorch_compatible"
+    assert included.closure_inputs["problem_id"] == "L1/ready_problem"
+    assert [item.problem_id for item in subset.exclusions] == ["L1/blocked_problem"]
+    assert subset.exclusions[0].reason_codes == ["safetensors_asset_missing"]
     assert subset.claim_boundary.execution_success is False
+    assert subset.claim_boundary.hardware_validation is False
     assert subset.claim_boundary.paper_level_validation is False
+    assert subset.claim_boundary.score_authority is False
     assert subset.to_json() == second.to_json()
     assert subset.ready_subset_checksum == second.ready_subset_checksum
     assert (ready_dir / "definition.json").read_text(encoding="utf-8") == definition_before
@@ -338,3 +535,46 @@ def test_inspect_dataset_cli_writes_requested_sidecars(tmp_path):
     assert json.loads((out / "inventory.json").read_text())["schema_version"] == "sol_execbench.dataset_inventory.v1"
     assert json.loads((out / "readiness.json").read_text())["schema_version"] == "sol_execbench.rocm_readiness.v1"
     assert json.loads((out / "ready_subset.json").read_text())["schema_version"] == "sol_execbench.ready_subset.v1"
+
+
+def test_sol_migration_output_readiness_preserves_missing_blob_blocker(tmp_path):
+    source_root = tmp_path / "source"
+    output_root = tmp_path / "out"
+    _write_problem(
+        source_root,
+        "L2",
+        "uses_blob",
+        workloads=[
+            _workload("safetensors", path="blobs/missing.safetensors", tensor_key="x")
+        ],
+        solution_file=True,
+    )
+    migrate_sol_execbench(
+        source_root,
+        output_root,
+        categories=("L2",),
+        created_at="2026-06-04T00:00:00Z",
+    )
+    inventory = build_dataset_inventory(
+        output_root,
+        categories=("L2",),
+        created_at="2026-05-23T00:00:00Z",
+    )
+
+    readiness = classify_rocm_readiness(
+        inventory,
+        dataset_root=output_root,
+        created_at="2026-05-23T00:00:00Z",
+    )
+    subset = build_ready_subset(
+        readiness,
+        dataset_root=output_root,
+        created_at="2026-05-23T00:00:00Z",
+    )
+
+    assert readiness.workloads[0].readiness_class == "blocked_missing_evidence"
+    assert readiness.blocker_reports[0].blocker_type == "missing_blob"
+    assert subset.included_workloads == 0
+    assert subset.excluded_workloads == 1
+    assert subset.exclusions[0].blocker_types == ["missing_blob"]
+    assert subset.claim_boundary.ready_to_attempt_rocm_execution is False
