@@ -1,227 +1,203 @@
----
-generated_at: 2026-06-04
-last_mapped_commit: ac6505f6511818160d36bc6935328ff0bd9468a6
-focus: concerns
-scope: full repo
----
+# Codebase Concerns
 
-# Concerns
+**Analysis Date:** 2026-06-04
 
-## Status Map
+## Tech Debt
 
-- Current state: v1.29 is shipped and archived as of 2026-06-04, and no active
-  milestone is defined.
-- Narrowed concerns are areas where recent helper extraction, CPU-safe
-  guardrails, or documentation contracts reduced risk but did not remove the
-  need for future validation.
-- Externally blocked/deferred concerns depend on unavailable hardware,
-  restricted datasets, paper-scale validation scope, or explicit project
-  non-goals rather than missing local implementation.
-- Highest-risk active surfaces are the generated evaluator, subprocess/native
-  build boundary, static reward-hack guardrails, dataset migration/closure
-  evidence, and proliferating derived authority reports.
-- Externally blocked or explicitly deferred concerns remain paper-scale
-  validation, upstream SOLAR parity, full MI300X/CDNA3 validation, CDNA4
-  validation, hosted leaderboard/service readiness, hard sandboxing, stable
-  benchmark authority, and NVIDIA dataset redistribution.
-- The working tree currently shows `.planning/codebase/*.md` as deleted before
-  this mapping pass. This file recreates only the requested concerns map and
-  does not resolve the other deleted codebase documents.
+**Dataset runner orchestration is large and stateful:**
+- Issue: `scripts/run_dataset.py` is a 2000+ line command script that owns CLI invocation, resume/reuse decisions, ready-subset filtering, closure records, AMD score sidecars, SOLAR sidecars, timing sidecars, summary output, and phase routing in one module.
+- Files: `scripts/run_dataset.py`, `src/sol_execbench/core/dataset/runner.py`, `src/sol_execbench/core/dataset/execution_closure.py`
+- Impact: Small changes to one concern can alter benchmark closure semantics, stale-output reuse, report provenance, or derived-evidence accounting. Regressions can look like valid skipped/reused results instead of runtime failures.
+- Fix approach: Keep behavior changes tightly scoped and add tests in `tests/sol_execbench/test_run_dataset_execution_closure.py`, `tests/sol_execbench/test_run_dataset_amd_score.py`, and `tests/examples/test_rocm_cli_paths.py`. Move reusable pure helpers into `src/sol_execbench/core/dataset/runner.py` before adding more branches to `scripts/run_dataset.py`.
 
-## Release Claim Boundaries
+**AMD SOL and SOLAR derivation logic is concentrated in very large modules:**
+- Issue: Bound graph extraction, work estimates, fallback estimation, and SOLAR evidence construction are implemented in large files with many local heuristics.
+- Files: `src/sol_execbench/core/scoring/solar_derivation.py`, `src/sol_execbench/core/scoring/amd_bound_graph.py`, `src/sol_execbench/core/scoring/amd_bound_estimates.py`, `src/sol_execbench/core/scoring/amd_sol.py`
+- Impact: Operator-family changes can silently alter reported bound confidence, score eligibility, or evidence gaps. Fallback paths in `src/sol_execbench/core/scoring/amd_sol.py` intentionally keep deriving estimates after rich extraction fails, so failures may degrade evidence rather than stop execution.
+- Fix approach: Treat scoring changes as contract changes. Add focused fixtures under `tests/sol_execbench/fixtures/solar_derivation/` and update tests such as `tests/sol_execbench/test_solar_derivation_evidence.py`, `tests/sol_execbench/test_amd_bound_estimates.py`, `tests/sol_execbench/test_amd_bound_graph.py`, and `tests/sol_execbench/test_amd_sol_bounds.py`.
 
-- Full 235-problem paper validation is not complete and must not be claimed.
-- Upstream NVlabs/SOLAR parity is not established and must not be claimed.
-- Hosted leaderboard readiness, score authority, and stable benchmark authority
-  are not established.
-- Docker Matrix rows are ROCm user-space/container evidence only; they are not
-  native-host validation or paper-equivalent evidence.
-- MI300X is the concrete CDNA3 `gfx942` target, but full-suite MI300X validation
-  remains deferred without archived real-hardware evidence.
-- CDNA3-family hardware-validation claims must remain deferred until real
-  full-suite `gfx94*` evidence is archived.
-- CDNA4 validation and performance authority remain unavailable because suitable
-  hardware is not currently accessible.
-- NVFP4/MXFP4/Blackwell-style low-precision paths are compatibility code and
-  readiness evidence, not CDNA4 validation.
+**Legacy CUDA-named compatibility APIs remain intentional but fragile:**
+- Issue: ROCm PyTorch exposes AMD devices through `torch.cuda`, so code still uses `torch.cuda.Event`, `torch.cuda.is_available()`, `torch.cuda.get_device_properties()`, and `cuda:0` device strings.
+- Files: `src/sol_execbench/core/bench/timing.py`, `src/sol_execbench/driver/templates/eval_driver.py`, `tests/conftest.py`, `docker/entrypoint.sh`, `src/sol_execbench/core/runtime_evidence.py`
+- Impact: Removing CUDA-named strings mechanically would break ROCm execution. Leaving unreviewed CUDA/NVIDIA residue can also reintroduce unsupported CUDA semantics.
+- Fix approach: Preserve PyTorch ROCm compatibility namespace usage only where covered by guardrail tests. Update `tests/sol_execbench/test_rocm_eval_timing_audit.py` and `tests/sol_execbench/test_rocm_migration_residue_audit.py` whenever changing runtime, timing, or diagnostics code.
 
-## Execution Isolation
+**Static reward-hack review is regex/AST heuristic based:**
+- Issue: `review_solution_sources()` blocks broad patterns for streams, file/process/network access, dynamic native loading, semantic caches, and precision downgrades.
+- Files: `src/sol_execbench/core/bench/reward_hack.py`, `src/sol_execbench/driver/templates/eval_driver.py`, `tests/sol_execbench/core/bench/test_reward_hack.py`, `tests/sol_execbench/driver/test_eval_driver.py`
+- Impact: False positives can reject valid submissions, and false negatives can compromise benchmark timing/correctness semantics. The checks are not a hard multi-tenant sandbox.
+- Fix approach: Add malicious and benign samples before changing rules. Keep static review messages structured because `REWARD_HACK` traces are part of public behavior.
 
-- The evaluator runs user-supplied Python, Triton, and native HIP/C++ code in a
-  subprocess, but this is not a hardened sandbox.
-- Reward-hack checks in `src/sol_execbench/core/bench/reward_hack.py` and the
-  generated driver are guardrails, not a multi-tenant security boundary.
-- Running untrusted submissions still requires an isolated ROCm host, VM, or
-  container with an explicit threat model.
-- Native compilation remains sensitive because source files and flags are
-  staged then passed to `torch.utils.cpp_extension`; compile flag validation in
-  `src/sol_execbench/core/data/solution.py` should stay strict when adding new
-  ROCm library categories.
-- `ProblemPackager._write_sources()` writes solution-provided relative paths
-  into the staging directory. Path traversal and absolute paths are blocked, but
-  future generated staging filenames must avoid collisions with allowed source
-  names.
-- The Docker image grants passwordless `amd-smi`/`rocm-smi` access when present
-  so clock tooling can work. That is operationally useful, but it should remain
-  documented as a privileged local evaluation environment, not a sandbox.
+**Generated evaluation driver duplicates runtime boundaries:**
+- Issue: The staged script `src/sol_execbench/driver/templates/eval_driver.py` imports many runtime helpers, redirects stdout, loads reference code, imports untrusted user code, performs reward-hack checks, and emits canonical JSONL.
+- Files: `src/sol_execbench/driver/templates/eval_driver.py`, `src/sol_execbench/core/bench/eval_runtime.py`, `src/sol_execbench/driver/problem_packager.py`
+- Impact: Driver changes can break subprocess JSONL parsing, stderr/stdout separation, staging cleanup, reward-hack status, or trace schema behavior. CI excludes `tests/sol_execbench/driver/test_eval_driver.py` from the default GitHub workflow.
+- Fix approach: Run `uv run pytest tests/sol_execbench/driver/test_eval_driver.py` for driver changes and add integration coverage when changing stdout redirection, module loading, or trace emission.
 
-## Generated Driver Complexity
+## Known Bugs
 
-- `src/sol_execbench/driver/templates/eval_driver.py` is still behavior-dense
-  and is the critical correctness/timing/reward-hack execution path.
-- stdout/stderr routing is fragile: strict Trace JSONL depends on redirecting
-  stdout to stderr before importing GPU libraries and writing canonical traces
-  through a saved file descriptor.
-- The driver performs source review, reference import, user import, integrity
-  snapshots, safetensors lookup, repeated correctness rounds, timing, thread
-  checks, and trace emission in one generated script. Small edits need focused
-  driver regression tests.
-- CPU fallback behavior is useful for tests but increases the chance that a
-  CPU-safe pass is misread as ROCm hardware validation.
-- Exceptions inside reference/user execution are captured into trace logs, but
-  non-trace subprocess failures still rely on bounded diagnostic sidecars and
-  stdout parsing heuristics.
+**No current deterministic code bug is recorded in source as an active FIXME:**
+- Symptoms: The repository contains deferred validation and guardrail notes, but no actionable `FIXME`/`TODO` marker in `src/` that directly names a known broken implementation.
+- Files: `src/sol_execbench/`, `tests/`, `docs/`
+- Trigger: Not applicable.
+- Workaround: Treat the fragile areas below as active risks even when tests pass.
 
-## Reward-Hack Guardrails
+**Timing fallback can hide profiler evidence loss:**
+- Symptoms: Optional `rocprofv3` profiling falls back to normal evaluation when unavailable or failed; timing evidence collection records fallback metadata instead of failing the benchmark by default.
+- Files: `src/sol_execbench/cli/main.py`, `src/sol_execbench/core/bench/rocm_profiler.py`, `docs/rocm_timing.md`
+- Trigger: Missing `rocprofv3`, nonzero profiler exit, timeout, or missing CSV artifacts.
+- Workaround: Inspect profile/timing sidecars and require `profiler_collected=true` or equivalent evidence before making kernel-activity timing claims.
 
-- Static source review intentionally blocks broad families: streams, caches,
-  file/process/network access, dynamic loading, embedded payload decoding, and
-  float32 precision downgrade.
-- These rules are conservative and can reject legitimate benchmark/reference
-  patterns. `run_dataset` currently renames exact `stream` identifiers before
-  static review, which is a fragile workaround around broad textual rules.
-- Static review is stronger for Python because it uses AST inspection; non-Python
-  sources still rely on pattern scanning after simple comment stripping.
-- The checks guard known exploit classes but cannot prove semantic honesty of an
-  arbitrary GPU kernel.
-- New legitimate ROCm APIs that require streams, external loaders, or caching
-  need careful policy decisions instead of ad hoc allow-list expansion.
+## Security Considerations
 
-## Timing And Performance Fragility
+**Evaluation executes submitted Python and native extensions locally:**
+- Risk: The evaluation driver imports user-provided Python modules and compiled `benchmark_kernel.so` files in a subprocess. Static checks block many known exploit patterns, but this is not a hard sandbox.
+- Files: `src/sol_execbench/driver/templates/eval_driver.py`, `src/sol_execbench/core/bench/eval_runtime.py`, `src/sol_execbench/core/bench/reward_hack.py`, `src/sol_execbench/driver/problem_packager.py`
+- Current mitigation: Static source review, `block_cpp_extension_load()`, reward-hack integrity checks, subprocess timeouts, staged execution, and stdout JSON isolation.
+- Recommendations: Do not expose this runner as a hosted multi-tenant service without OS/container sandboxing, network/file isolation, device isolation, and resource limits. Keep docs aligned with the deferred hard-sandbox boundary in `docs/CLAIMS.md` and `docs/RESEARCHER-GUIDE.md`.
 
-- Timing depends on HIP-backed PyTorch CUDA APIs, ROCm clocks, allocator state,
-  device synchronization semantics, and optional `rocprofv3` evidence.
-- `timing_serial` tests are skipped by default and require explicit selection,
-  so timing regressions can escape routine CPU-safe runs.
-- Clock-lock checks depend on environment variables, `amd-smi`/`rocm-smi`,
-  Docker entrypoint behavior, and host permissions.
-- `rocprofv3` profile/timing sidecars are diagnostic evidence only. They must
-  not be upgraded into correctness, score, or paper-parity authority.
-- Reference latency is optional through benchmark config; reports that use
-  speedup or AMD score fields must preserve whether reference timing was
-  actually collected and meaningful.
+**Native HIP/C++ compilation runs repository-provided build scripts against submitted sources:**
+- Risk: HIP/C++ solutions compile in a staging directory using `torch.utils.cpp_extension` and source-provided compile options.
+- Files: `src/sol_execbench/driver/problem_packager.py`, `src/sol_execbench/driver/templates/build_ext.py`, `src/sol_execbench/core/data/solution.py`
+- Current mitigation: Solution schema rejects legacy CUDA language/options, auto-injects ROCm offload arches, and stages sources under a temporary directory.
+- Recommendations: Review compile-option validation before allowing arbitrary external submissions. Treat `hip_cflags`, include paths, linked libraries, and native extension import as privileged local execution.
 
-## Hardware And Dependency Matrix
+**Dataset redistribution boundaries are policy-sensitive:**
+- Risk: NVIDIA SOL-ExecBench dataset rows, workloads, traces, solutions, blobs, and migrated derivatives are local-only and release-bundle-blocked.
+- Files: `docs/provenance.md`, `provenance.toml`, `scripts/check_dataset_redistribution.py`, `scripts/check_prerelease_readiness.py`
+- Current mitigation: Provenance policy, prerelease readiness checks, and redistribution guardrail scripts.
+- Recommendations: Do not add dataset-derived fixtures under `tests/` or `docs/examples/` unless provenance policy explicitly allows them. Use synthetic fixtures for tests.
 
-- The package lock targets PyTorch ROCm 7.1 on Linux x86_64, while Docker target
-  metadata spans multiple ROCm user-space versions. Mixed-version diagnostics
-  exist but cannot create clean validation authority.
-- ROCm device discovery depends on `/dev/kfd`, `/dev/dri`, PyTorch ROCm builds,
-  and `gcnArchName`/`gfx_arch_name` metadata.
-- `requires_rocm`, `requires_rocm_dev`, `requires_ck`, `requires_rocwmma`,
-  `requires_rdna4`, and `requires_cdna3` tests are marker-gated. This keeps CI
-  CPU-safe but leaves real GPU/native extension paths dependent on local or
-  Docker hardware runs.
-- CDNA3 tests verify marker behavior and readiness language without real full
-  validation unless executed on actual `gfx94*` hardware.
-- CDNA4/low-precision compatibility code has CPU-safe semantic coverage but no
-  real hardware or performance validation.
+## Performance Bottlenecks
 
-## Dataset And Provenance Boundaries
+**GPU timing uses serialized event timing with cache clearing:**
+- Problem: `time_runnable()` preallocates shifted arguments and uses PyTorch HIP-backed device events with synchronization around each measured iteration.
+- Files: `src/sol_execbench/core/bench/timing.py`, `src/sol_execbench/core/bench/io.py`, `tests/sol_execbench/core/bench/test_timing.py`
+- Cause: Benchmark semantics require fresh data pointers and cold-cache behavior, and PyTorch ROCm event timing is the canonical fallback path.
+- Improvement path: Do not remove synchronizations or cache clearing without benchmark-semantics review. Prefer optional diagnostic `rocprofv3` sidecars for kernel-activity evidence rather than changing canonical trace timing.
 
-- NVIDIA SOL-ExecBench source and migrated dataset payloads are local-only or
-  excluded under the current provenance policy; they must not be committed,
-  bundled, hosted, or redistributed by this project.
-- FlashInfer Trace has separate Apache-2.0 provenance and notice obligations;
-  it should not be conflated with NVIDIA SOL-ExecBench policy.
-- Migration manifests, readiness reports, ready subsets, execution closure, and
-  paper denominator reports are derived evidence and must preserve source IDs,
-  checksums, license boundaries, denominator accounting, blocker reasons, and
-  requested-evidence drift.
-- Dataset runner skip/reuse paths are correctness-sensitive because they can
-  silently change denominators if manifest, readiness, solution mode, timeout,
-  or evidence requests drift.
-- Full dataset execution remains bounded by local assets, hardware access,
-  safetensors/blob availability, and ROCm readiness blockers.
+**Dataset-scale execution is mostly serial for ROCm runs:**
+- Problem: `scripts/run_dataset.py` keeps the trace execution phase serial, while only the derived-only phase has `ThreadPoolExecutor` parallelism.
+- Files: `scripts/run_dataset.py`, `src/sol_execbench/core/dataset/runner.py`
+- Cause: GPU evaluation, staging directories, device access, logs, and closure provenance are sensitive to concurrent execution.
+- Improvement path: Add concurrency behind explicit scheduling controls, per-job output isolation, and closure-provenance tests. Avoid sharing a single GPU without explicit resource policy.
 
-## Scoring And Derived Evidence
+**Static evidence and profiler artifact collection can add substantial runtime and filesystem output:**
+- Problem: Static kernel evidence and `rocprofv3` profiling create sidecars and tool artifacts around evaluation.
+- Files: `src/sol_execbench/core/bench/static_kernel_evidence.py`, `src/sol_execbench/core/bench/rocm_profiler.py`, `src/sol_execbench/cli/main.py`
+- Cause: Tool invocation, artifact discovery, hashing, bounded output preservation, and profiler parsing happen outside the core trace path.
+- Improvement path: Keep these features opt-in and diagnostic-only. Add timeout and artifact-size tests when expanding extractors.
 
-- AMD-native scoring, AMD SOL bounds, SOLAR derivation evidence, bound graphs,
-  sanity reports, stability reports, consistency reports, claim-upgrade reports,
-  trust summaries, Matrix reports, and closure reports are derived authority
-  layers around canonical Trace JSONL.
-- These modules are large and domain-heavy; `solar_derivation.py`,
-  `amd_bound_graph.py`, and `amd_bound_estimates.py` are notable maintenance
-  hotspots.
-- Missing metadata, unsupported operators, ambiguous graph extraction, or
-  degraded model evidence must stay visible rather than becoming fabricated
-  supported estimates.
-- Any new sidecar/report needs explicit authority-class wording and tests so it
-  is not mistaken for benchmark score, paper parity, leaderboard readiness, or
-  hardware validation.
+## Fragile Areas
 
-## Legacy NVIDIA Residue
+**Benchmark trace and closure semantics:**
+- Files: `src/sol_execbench/core/data/trace.py`, `src/sol_execbench/core/data/contract.py`, `src/sol_execbench/core/dataset/execution_closure.py`, `src/sol_execbench/core/dataset/run_state.py`, `scripts/run_dataset.py`
+- Why fragile: Trace status, closure status, skipped-existing-pass handling, provenance mismatch records, and derived-evidence gaps all feed researcher claims.
+- Safe modification: Update contract guardrails in `tests/sol_execbench/test_public_contract_guardrails.py`, `tests/sol_execbench/test_execution_closure_contract.py`, and `tests/sol_execbench/test_dataset_run_state.py` with any schema or status change.
+- Test coverage: Broad CPU tests exist, but dataset-scale GPU evidence still needs hardware runs for full confidence.
 
-- CUDA/NVIDIA runtime values are rejected in ROCm schemas, but legacy examples,
-  samples, docs, tests, and attribution remain for migration, compatibility, or
-  provenance reasons.
-- Directories such as `examples/cutlass/`, `examples/cudnn/`,
-  `examples/cutile/`, and `examples/cute_dsl/` are legacy or compatibility
-  surfaces and should not be presented as supported ROCm runtime paths.
-- NVIDIA SPDX notices are tracked by `provenance.toml`; future cleanup must keep
-  source headers, allowed notice paths, cleanup candidates, and prerelease
-  guardrails synchronized.
-- Text searches for CUDA/NVIDIA terms remain noisy because many occurrences are
-  intentional claim boundaries, migration docs, or guardrail tests.
+**Input generation heuristics affect correctness comparability:**
+- Files: `src/sol_execbench/core/bench/io.py`, `src/sol_execbench/core/bench/correctness.py`, `tests/sol_execbench/core/bench/test_io.py`, `tests/sol_execbench/core/bench/test_correctness.py`
+- Why fragile: Heuristics generate masks, normalization weights, RoPE cos/sin tensors, SSM decays, softmax outputs, FP8, and FP4-like packed values. Small changes can make benchmark inputs easier, harder, or semantically different.
+- Safe modification: Add tests for each affected input name/dtype/shape pattern. Keep random data generation deterministic through `set_seed()` in `src/sol_execbench/core/bench/correctness.py`.
+- Test coverage: Unit coverage is strong for CPU-safe behavior; low-precision and GPU dtype behavior depends on ROCm/PyTorch support.
+
+**ROCm hardware markers can skip important tests silently on non-ROCm hosts:**
+- Files: `tests/conftest.py`, `pyproject.toml`, `.github/workflows/code-quality.yml`, `docs/TESTING.md`
+- Why fragile: `requires_rocm`, `requires_rocm_dev`, `requires_ck`, `requires_rocwmma`, `requires_rdna4`, `requires_cdna3`, and `timing_serial` markers intentionally skip outside suitable hardware or explicit marker selection.
+- Safe modification: When touching GPU behavior, run the relevant marked tests on a ROCm host with `/dev/kfd` and `/dev/dri`, and use `-m timing_serial -n 0` for timing-sensitive tests.
+- Test coverage: GitHub Actions runs CPU-safe tests on Ubuntu for Python 3.12/3.13 and ignores driver E2E tests in `.github/workflows/code-quality.yml`.
+
+**Docker target and dependency matrix can drift from Python dependency pins:**
+- Files: `pyproject.toml`, `uv.lock`, `docker/Dockerfile`, `docker/rocm-targets.json`, `scripts/run_docker.sh`, `src/sol_execbench/core/dependency_matrix.py`
+- Why fragile: The default project pins ROCm 7.1 PyTorch wheels, while Docker targets also model ROCm 7.0 and 7.2 explicit workflows. Non-default Docker images reinstall different PyTorch/Triton wheels after frozen sync.
+- Safe modification: Update `docker/rocm-targets.json`, `docker/Dockerfile`, `pyproject.toml`, and dependency preflight tests together. Run `tests/sol_execbench/test_dependency_matrix_policy.py`, `tests/sol_execbench/test_run_docker_dependency_preflight.py`, and `tests/sol_execbench/test_docker_matrix_targets.py`.
+- Test coverage: Preflight and script behavior are unit-tested, but actual image builds and GPU smoke checks require Docker and ROCm hardware.
+
+**Claim-boundary wording is part of the product contract:**
+- Files: `docs/CLAIMS.md`, `docs/RESEARCHER-GUIDE.md`, `docs/research_preview.md`, `scripts/build_prerelease_artifact_bundle.py`, `scripts/release_candidate_validation.py`, `src/sol_execbench/core/claim_upgrade.py`
+- Why fragile: Reports must not upgrade diagnostic evidence into paper parity, upstream SOLAR parity, score authority, leaderboard readiness, hard sandboxing, native-host validation, CDNA4 validation, or full MI300X validation without explicit evidence.
+- Safe modification: Run public docs and claim guardrail tests when editing evidence language: `tests/sol_execbench/test_public_contract_guardrails.py`, `tests/sol_execbench/test_research_release_docs.py`, and `tests/sol_execbench/test_prerelease_artifact_bundle.py`.
+- Test coverage: Wording guardrails are extensive but can become brittle when legitimate terminology changes.
+
+## Scaling Limits
+
+**Full paper-scale validation remains evidence-heavy:**
+- Current capacity: The code supports bounded slices, ready subsets, execution closure, per-problem traces, AMD-native reports, timing evidence, and paper denominator reports.
+- Limit: Full 235-problem validation requires complete denominator accounting, trace artifacts, failure analysis, score artifacts, reproducible commands, and hardware evidence.
+- Scaling path: Use `scripts/run_dataset.py` with explicit `--execution-closure`, `--ready-subset`, `--amd-score-report`, `--solar-derivation`, and `--timing-evidence-dir`; archive all sidecars and command provenance.
+
+**Hardware validation is architecture- and host-specific:**
+- Current capacity: RDNA 4 and CDNA 3 markers exist; docs record CDNA 3 `gfx942` adapted-suite evidence and MI300X benchmark-grade requirements.
+- Limit: MI300X validation needs exact GPU identity, `gfx942`, clock-lock evidence, dataset traces, timing evidence, AMD-native score report, FP8 status, and deferred NVFP4/MXFP4 status.
+- Scaling path: Follow `docs/internal/mi300x_validation_readiness.md` and `docs/internal/cdna3_validation_readiness.md`; do not treat marker readiness or Docker evidence as commercial GPU validation.
+
+**Local cache/build/output directories can grow quickly:**
+- Current capacity: Staging directories are temporary unless `--keep-staging` is set; dataset outputs and downloaded assets live under user-selected output dirs and `data/`.
+- Limit: Full runs with traces, static evidence, profiler artifacts, derived sidecars, and retained staging dirs can consume significant disk.
+- Scaling path: Keep generated datasets and outputs out of git; use bounded slices and cleanup output dirs before reruns when closure provenance permits.
+
+## Dependencies at Risk
+
+**ROCm PyTorch and Triton wheel availability is external and version-specific:**
+- Risk: `pyproject.toml` pins `torch==2.10.0+rocm7.1`, `torchvision==0.25.0+rocm7.1`, and `triton-rocm==3.6.0` for Linux x86_64; Docker target `rocm-7.2.0` declares PyTorch 2.11.0 ROCm 7.2 wheels.
+- Impact: Dependency resolution, Docker builds, and GPU behavior can break if wheel indexes or compatibility shift.
+- Migration plan: Update `pyproject.toml`, `uv.lock`, `docker/rocm-targets.json`, and dependency matrix tests in one change. Verify with `uv sync --all-groups`, Docker preflight tests, and a ROCm smoke run.
+
+**ROCm command-line tools are host/container dependent:**
+- Risk: `rocprofv3`, `rocminfo`, `rocm_agent_enumerator`, `amd-smi`, and `rocm-smi` may be missing, renamed, or permission-gated.
+- Impact: Profiling, environment evidence, offload-arch detection, clock locking, and Docker preflight can downgrade to unavailable/deferred states.
+- Migration plan: Keep tool use routed through `src/sol_execbench/core/toolchain.py`, `src/sol_execbench/core/environment.py`, `src/sol_execbench/core/bench/clock_lock.py`, and `src/sol_execbench/core/bench/rocm_profiler.py`; add explicit unavailable tests.
+
+**ROCm library examples depend on optional headers/libraries:**
+- Risk: CK, rocWMMA, MIOpen, hipBLAS, and HIP development headers may not exist on every ROCm host.
+- Impact: Example tests or native extension builds skip or fail depending on host packages.
+- Migration plan: Preserve marker-based skips in `tests/conftest.py`, document prerequisites in `docs/rocm.md`, and add Docker dependency tests under `tests/docker/dependencies/` when adding library support.
+
+## Missing Critical Features
+
+**Hard sandboxing for hostile submissions:**
+- Problem: The runner has reward-hack defenses but is not an isolation boundary for untrusted multi-tenant execution.
+- Blocks: Hosted leaderboard, remote submission service, and adversarial public execution.
+
+**Full 235-problem ROCm paper validation:**
+- Problem: Current docs distinguish bounded preview evidence and denominator accounting from paper parity.
+- Blocks: Paper-parity claims, leaderboard authority, and upstream SOLAR equivalence claims.
+
+**Complete MI300X benchmark-grade validation:**
+- Problem: CDNA 3 readiness and adapted-suite evidence are not the full MI300X evidence chain.
+- Blocks: Commercial MI300X validation claims until `docs/internal/mi300x_validation_readiness.md` requirements are satisfied.
+
+**RGA-rich static resource extraction and paper-scale static coverage:**
+- Problem: Static kernel evidence is diagnostic-only and currently bounded to routed extractor/artifact sidecars.
+- Blocks: Static evidence as performance, score, timing, or resource-usage authority.
 
 ## Test Coverage Gaps
 
-- Routine test coverage is intentionally CPU-safe and marker-gates GPU,
-  hardware-architecture, native extension, CK, rocWMMA, and timing surfaces.
-- Full driver e2e, native HIP/C++ builds, ROCm library examples, `rocprofv3`
-  behavior, clock locking, and real dataset batches need ROCm/Docker hardware
-  validation.
-- Existing adversarial tests cover known reward-hack classes, but the guardrail
-  model should be expanded whenever new solution APIs or timing policies are
-  added.
-- Public-contract and prerelease guardrail tests are essential because most
-  current risk is overclaiming derived evidence, not just functional failure.
-- Several project-state quick task artifacts are marked missing in
-  `.planning/STATE.md`; that is planning hygiene debt even though the latest
-  milestone audit passed.
+**GPU driver E2E is not part of default CI:**
+- What's not tested: Generated eval-driver execution, reward-hack subprocess behavior, native extension loading, and ROCm timing on actual devices.
+- Files: `.github/workflows/code-quality.yml`, `tests/sol_execbench/driver/test_eval_driver.py`, `tests/sol_execbench/test_e2e.py`
+- Risk: CPU-safe CI can pass while GPU subprocess behavior regresses.
+- Priority: High for changes under `src/sol_execbench/driver/`, `src/sol_execbench/core/bench/`, or `src/sol_execbench/cli/main.py`.
 
-## Operational Fragility
+**Timing and profiler behavior needs real ROCm hardware:**
+- What's not tested: Event timing stability, `rocprofv3` kernel activity CSV compatibility, clock lock effects, and non-default stream capture behavior across ROCm versions.
+- Files: `src/sol_execbench/core/bench/timing.py`, `src/sol_execbench/core/bench/rocm_profiler.py`, `src/sol_execbench/core/bench/clock_lock.py`, `tests/sol_execbench/core/bench/test_timing.py`
+- Risk: Timing sidecars or canonical latencies can be misleading on unsupported hardware/tool combinations.
+- Priority: High for timing, profiling, and scoring work.
 
-- `scripts/run_dataset.py` is large and mixes CLI orchestration, solution
-  wrapping, source sanitization, profiling evidence, closure construction,
-  readiness integration, and scoring sidecars.
-- `src/sol_execbench/cli/main.py` is also large and owns user-facing command
-  dispatch, staging lifecycle, compilation, execution, profiling, static
-  evidence, no-trace diagnostics, and output formatting.
-- Many subprocess paths capture bounded logs, but failures can still require
-  manual correlation across trace JSONL, no-trace diagnostics, profile sidecars,
-  static evidence sidecars, closure JSON, and Docker/preflight logs.
-- The package supports Python `>=3.12,<3.14` while depending on exact ROCm wheel
-  versions and platform markers. Dependency relocking should be treated as a
-  high-risk validation event.
+**Docker and ROCm Matrix validation is mostly preflight-tested:**
+- What's not tested: Real Docker image builds for every target and actual GPU execution inside each target.
+- Files: `docker/Dockerfile`, `docker/rocm-targets.json`, `scripts/run_docker.sh`, `tests/sol_execbench/test_run_docker_matrix_script.py`
+- Risk: Matrix entries can remain schema-valid while a target image or dependency stack breaks at runtime.
+- Priority: Medium to High before release or compatibility claims.
 
-## Suggested Milestone Candidates
+**Low-precision and architecture-specific behavior needs target hardware:**
+- What's not tested: FP8, FP4-like packed dtype behavior, CDNA3-specific behavior, RDNA4-specific behavior, CK/rocWMMA/MIOpen runtime behavior on representative GPUs.
+- Files: `src/sol_execbench/core/bench/io.py`, `tests/sol_execbench/test_low_precision_compatibility.py`, `tests/sol_execbench/test_cdna3_hardware_marker.py`, `examples/ck/gemm/`, `examples/rocwmma/gemm/`, `examples/miopen/softmax/`
+- Risk: Schema and CPU tests can pass while hardware support remains unavailable, skipped, or numerically unstable.
+- Priority: Medium for ordinary code changes, High before hardware-validation claims.
 
-- Hardening milestone: shrink `eval_driver.py`, move more reusable behavior into
-  importable helpers, and expand generated-driver regression tests for stdout
-  routing, source review, correctness rounds, and no-trace diagnostics.
-- Security boundary milestone: document and test the exact trust model for
-  untrusted submissions, source-path collisions, native build flags, Docker
-  privileges, file/network/process denial, and residual non-sandbox risks.
-- Hardware validation milestone: run and archive full MI300X/CDNA3 evidence on
-  real `gfx942`, including environment, clock, trace, sidecar, failure, and
-  denominator artifacts.
-- CDNA4/low-precision milestone: validate FP4/NVFP4/MXFP4-compatible paths on
-  actual CDNA4-class hardware before any performance or hardware-equivalence
-  claim.
-- Dataset authority milestone: execute a complete local migrated denominator
-  with readiness/closure/paper-denominator artifacts and explicit
-  redistribution-safe release notes.
-- Provenance stewardship milestone: reconcile remaining NVIDIA notice cleanup
-  candidates, legacy examples, and upstream comparison without rewriting history
-  or weakening license boundaries.
+---
+
+*Concerns audit: 2026-06-04*
