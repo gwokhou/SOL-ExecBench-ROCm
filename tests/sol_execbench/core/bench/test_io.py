@@ -751,6 +751,41 @@ class TestGenInputs:
         inputs = gen_inputs(d, wkl, "cpu")
         assert inputs[1] == 0.5
 
+    def test_custom_factory_values_override_random_workload_inputs(self):
+        d = _make_definition(
+            inputs={
+                "a": {"shape": ["N"], "dtype": "float32"},
+                "b": {"shape": ["N"], "dtype": "float32"},
+            },
+            outputs={"c": {"shape": ["N"], "dtype": "float32"}},
+            custom_inputs_entrypoint="gen",
+            reference=(
+                "def run(a, b): return a\n"
+                "def gen(axes, device):\n"
+                "    import torch\n"
+                "    return {\n"
+                "        'a': torch.full((axes['N'],), 3.0, device=device),\n"
+                "        'b': torch.full((axes['N'],), 4.0, device=device),\n"
+                "    }\n"
+            ),
+        )
+        wkl = make_workload(
+            uuid="u",
+            axes={"N": 4},
+            inputs={"a": {"type": "random"}, "b": {"type": "random"}},
+        )
+
+        def gen(axes, device):
+            return {
+                "a": torch.full((axes["N"],), 3.0, device=device),
+                "b": torch.full((axes["N"],), 4.0, device=device),
+            }
+
+        inputs = gen_inputs(d, wkl, "cpu", custom_inputs_fn=gen)
+
+        assert torch.equal(inputs[0], torch.full((4,), 3.0))
+        assert torch.equal(inputs[1], torch.full((4,), 4.0))
+
     def test_missing_safetensors_raises(self):
         d = _make_definition(
             inputs={
