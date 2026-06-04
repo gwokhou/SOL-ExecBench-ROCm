@@ -35,7 +35,7 @@ boundaries before any migrated dataset artifacts are generated or integrated.
 
 ### Phase 132: Local Dataset Migration Pipeline
 
-**Status:** Pending
+**Status:** Complete
 
 **Goal:** Build deterministic local conversion tooling for downloaded
 SOL-ExecBench and FlashInfer Trace inputs without committing or redistributing
@@ -124,10 +124,10 @@ DATA-DOC-01, DATA-DOC-02, DATA-DOC-03, DATA-DOC-04
 | DATA-LIC-02 | Phase 131 | Complete |
 | DATA-LIC-03 | Phase 131 | Complete |
 | DATA-LIC-04 | Phase 131 | Complete |
-| DATA-MIG-01 | Phase 132 | Pending |
-| DATA-MIG-02 | Phase 132 | Pending |
-| DATA-MIG-03 | Phase 132 | Pending |
-| DATA-MIG-04 | Phase 132 | Pending |
+| DATA-MIG-01 | Phase 132 | Complete |
+| DATA-MIG-02 | Phase 132 | Complete |
+| DATA-MIG-03 | Phase 132 | Complete |
+| DATA-MIG-04 | Phase 132 | Complete |
 | DATA-READY-01 | Phase 133 | Pending |
 | DATA-READY-02 | Phase 133 | Pending |
 | DATA-READY-03 | Phase 133 | Pending |
@@ -146,7 +146,7 @@ DATA-DOC-01, DATA-DOC-02, DATA-DOC-03, DATA-DOC-04
 | DATA-DOC-04 | Phase 135 | Pending |
 
 **Coverage:** 24/24 v1.29 requirements mapped.
-**Progress:** 4/24 requirements complete; 1/5 phases complete.
+**Progress:** 8/24 requirements complete; 2/5 phases complete.
 
 ## Completed Milestones
 

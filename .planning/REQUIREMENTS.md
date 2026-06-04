@@ -25,16 +25,16 @@ ExecBench.
 
 ### Local Dataset Migration Pipeline
 
-- [ ] **DATA-MIG-01**: Maintainer can run a local migration command that
+- [x] **DATA-MIG-01**: Maintainer can run a local migration command that
   converts downloaded SOL-ExecBench rows into the repository's benchmark
   problem layout without committing source dataset content.
-- [ ] **DATA-MIG-02**: Maintainer can run a local migration command that
+- [x] **DATA-MIG-02**: Maintainer can run a local migration command that
   normalizes FlashInfer Trace definitions, workloads, solutions, and traces into
   ROCm runner-compatible local inputs.
-- [ ] **DATA-MIG-03**: Migration outputs include deterministic manifests,
+- [x] **DATA-MIG-03**: Migration outputs include deterministic manifests,
   checksums, source dataset identifiers, source revisions, and license-boundary
   metadata.
-- [ ] **DATA-MIG-04**: Migration tooling handles absent optional blobs,
+- [x] **DATA-MIG-04**: Migration tooling handles absent optional blobs,
   safetensors inputs, traces, and solution records with explicit blocker states
   instead of silent omission.
 
@@ -145,10 +145,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DATA-LIC-02 | Phase 131 | Complete |
 | DATA-LIC-03 | Phase 131 | Complete |
 | DATA-LIC-04 | Phase 131 | Complete |
-| DATA-MIG-01 | Phase 132 | Pending |
-| DATA-MIG-02 | Phase 132 | Pending |
-| DATA-MIG-03 | Phase 132 | Pending |
-| DATA-MIG-04 | Phase 132 | Pending |
+| DATA-MIG-01 | Phase 132 | Complete |
+| DATA-MIG-02 | Phase 132 | Complete |
+| DATA-MIG-03 | Phase 132 | Complete |
+| DATA-MIG-04 | Phase 132 | Complete |
 | DATA-READY-01 | Phase 133 | Pending |
 | DATA-READY-02 | Phase 133 | Pending |
 | DATA-READY-03 | Phase 133 | Pending |
