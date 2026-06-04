@@ -78,6 +78,42 @@ def _matmul_trace_payload(*, uuid: str = "matmul-workload") -> list[dict]:
     ]
 
 
+def _write_matmul_dataset(tmp_path: Path) -> Path:
+    dataset_root = tmp_path / "dataset"
+    problem_dir = dataset_root / "L1" / "matmul_demo"
+    problem_dir.mkdir(parents=True)
+    (problem_dir / "definition.json").write_text(json.dumps(_matmul_definition()))
+    _write_matmul_workload(problem_dir / "workload.jsonl")
+    return dataset_root
+
+
+def _write_matmul_ready_subset(path: Path) -> Path:
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": "sol_execbench.ready_subset.v1",
+                "created_at": "2026-05-31T00:00:00Z",
+                "dataset_root": "dataset",
+                "readiness_checksum": "rocm-readiness-sha",
+                "selected_categories": ["L1"],
+                "included_workloads": 1,
+                "excluded_workloads": 0,
+                "problems": [
+                    {
+                        "category": "L1",
+                        "problem_id": "L1/matmul_demo",
+                        "problem_path": "L1/matmul_demo",
+                        "workloads": [{"uuid": "matmul-workload", "row_index": 0}],
+                    }
+                ],
+                "claim_boundary": {"ready_to_attempt_rocm_execution": True},
+                "ready_subset_checksum": {"value": "rocm-ready-sha"},
+            }
+        )
+    )
+    return path
+
+
 def test_dataset_helper_builds_derived_amd_score_report(tmp_path):
     definition = _matmul_definition()
     workload_path = tmp_path / "workload.jsonl"
@@ -464,6 +500,149 @@ def test_dataset_runner_reruns_failed_existing_traces_before_reports(
     assert calls == 1
     assert report["scored_count"] == 1
     assert (solar_dir / "matmul_demo.matmul-workload.solar-derivation.json").exists()
+
+
+def test_dataset_runner_reruns_existing_pass_when_runtime_config_changes(
+    tmp_path,
+    monkeypatch,
+):
+    dataset_root = _write_matmul_dataset(tmp_path)
+    output_dir = tmp_path / "out"
+    closure_path = tmp_path / "execution_closure.json"
+    calls = 0
+
+    def run_cli(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return _matmul_trace_payload()
+
+    monkeypatch.setattr(run_dataset, "run_cli", run_cli)
+    base_argv = [
+        "run_dataset.py",
+        str(dataset_root),
+        "--output",
+        str(output_dir),
+        "--execution-closure",
+        str(closure_path),
+    ]
+
+    monkeypatch.setattr(sys, "argv", base_argv)
+    run_dataset.main()
+    assert calls == 1
+
+    monkeypatch.setattr(sys, "argv", [*base_argv, "--iterations", "5"])
+    run_dataset.main()
+
+    closure = json.loads(closure_path.read_text())
+    assert calls == 2
+    assert closure["provenance_mismatches"][0]["field"] == "iterations"
+    assert closure["provenance_mismatches"][0]["reason_code"] == "runtime_config_mismatch"
+
+
+def test_dataset_runner_recovers_from_unreadable_existing_trace(
+    tmp_path,
+    monkeypatch,
+):
+    dataset_root = _write_matmul_dataset(tmp_path)
+    output_dir = tmp_path / "out"
+    trace_dir = output_dir / "L1" / "matmul_demo"
+    trace_dir.mkdir(parents=True)
+    (trace_dir / "traces.json").write_text("{not-json")
+    calls = 0
+
+    def run_cli(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return _matmul_trace_payload()
+
+    monkeypatch.setattr(run_dataset, "run_cli", run_cli)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--output",
+            str(output_dir),
+            "--execution-closure",
+            str(tmp_path / "execution_closure.json"),
+        ],
+    )
+
+    run_dataset.main()
+
+    assert calls == 1
+    assert json.loads((trace_dir / "traces.json").read_text()) == _matmul_trace_payload()
+
+
+def test_dataset_runner_records_ready_subset_missing_named_solution(
+    tmp_path,
+    monkeypatch,
+):
+    dataset_root = _write_matmul_dataset(tmp_path)
+    ready_subset = _write_matmul_ready_subset(tmp_path / "ready_subset.json")
+    closure_path = tmp_path / "execution_closure.json"
+
+    def fail_run_cli(*args, **kwargs):
+        raise AssertionError("missing solution must not invoke CLI")
+
+    monkeypatch.setattr(run_dataset, "run_cli", fail_run_cli)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--ready-subset",
+            str(ready_subset),
+            "--solution-name",
+            "missing_solution.json",
+            "--output",
+            str(tmp_path / "out"),
+            "--execution-closure",
+            str(closure_path),
+        ],
+    )
+
+    run_dataset.main()
+
+    closure = json.loads(closure_path.read_text())
+    assert closure["totals"]["not_attempted"] == 1
+    assert closure["records"][0]["closure_status"] == "not_attempted"
+    assert closure["records"][0]["filter_reasons"] == ["missing_solution"]
+
+
+def test_dataset_runner_limit_zero_selects_no_problems(tmp_path, monkeypatch):
+    dataset_root = _write_matmul_dataset(tmp_path)
+    ready_subset = _write_matmul_ready_subset(tmp_path / "ready_subset.json")
+    closure_path = tmp_path / "execution_closure.json"
+
+    def fail_run_cli(*args, **kwargs):
+        raise AssertionError("--limit 0 must not invoke CLI")
+
+    monkeypatch.setattr(run_dataset, "run_cli", fail_run_cli)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--ready-subset",
+            str(ready_subset),
+            "--limit",
+            "0",
+            "--output",
+            str(tmp_path / "out"),
+            "--execution-closure",
+            str(closure_path),
+        ],
+    )
+
+    run_dataset.main()
+
+    closure = json.loads(closure_path.read_text())
+    assert closure["totals"]["filtered"] == 1
+    assert closure["records"][0]["filter_reasons"] == ["problem_limit"]
 
 
 def test_dataset_helper_collects_source_specific_timing_evidence(tmp_path):
