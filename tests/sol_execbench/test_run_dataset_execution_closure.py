@@ -1000,7 +1000,7 @@ def test_execution_closure_marks_selected_workload_without_trace_as_missing_trac
     assert record["trace_ref"] == "L1/matmul_demo/traces.json"
 
 
-def test_execution_closure_classifies_cli_nonzero_exit_with_bounded_log_ref(
+def test_execution_closure_preserves_traces_from_cli_nonzero_exit(
     tmp_path,
     monkeypatch,
 ):
@@ -1046,9 +1046,14 @@ def test_execution_closure_classifies_cli_nonzero_exit_with_bounded_log_ref(
     closure_text = (output_dir / "execution_closure.json").read_text()
     closure = json.loads(closure_text)
     record = closure["records"][0]
-    assert record["closure_status"] == "attempted_failed"
-    assert record["cli_log_ref"] == "L1/matmul_demo/ref_matmul_demo_cli.log"
-    assert record["notes"] == ["CLI failed with exit code 9"]
+    traces = json.loads((output_dir / "L1" / "matmul_demo" / "traces.json").read_text())
+
+    assert traces == [_trace("selected-workload")]
+    assert record["closure_status"] == "attempted_passed"
+    assert record["trace_status"] == "PASSED"
+    assert record["trace_ref"] == "L1/matmul_demo/traces.json"
+    assert record["cli_log_ref"] is None
+    assert record["notes"] == []
     assert str(tmp_path) not in closure_text
     assert "secret stderr" not in closure_text
 

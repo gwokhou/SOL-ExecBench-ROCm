@@ -225,6 +225,8 @@ def run_cli(
     if result.returncode != 0:
         print(f"CLI failed for {job_name}: exit code {result.returncode}")
         save_cli_log(output_dir, job_name, result)
+        if traces:
+            return traces
         return None
 
     if not traces:
