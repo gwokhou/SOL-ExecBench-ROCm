@@ -399,6 +399,42 @@ class TestStaticSourceReview:
         assert review.blocked is True
         assert "precision_downgrade" in {issue.rule for issue in review.issues}
 
+    def test_allows_precision_casts_when_outputs_are_mixed_precision(self):
+        review = review_solution_sources(
+            _solution_with_source(
+                "import torch\n"
+                "def run(grad_output, weight):\n"
+                "    grad_x = grad_output.float() * weight\n"
+                "    grad_x_bf16 = grad_x.to(torch.bfloat16)\n"
+                "    grad_weight = grad_output.float().sum(dim=0)\n"
+                "    return grad_x_bf16, grad_weight\n"
+            ),
+            output_dtypes={
+                "grad_x": torch.bfloat16,
+                "grad_weight": torch.float32,
+            },
+        )
+
+        assert review.blocked is False
+        assert review.to_dict() == {"blocked": False, "issues": []}
+
+    def test_allows_model_kv_cache_tensor_assignments(self):
+        review = review_solution_sources(
+            _solution_with_source(
+                "import torch\n"
+                "def get_inputs(axes, device):\n"
+                "    grad_key_cache = torch.randn(1, 1, 16, 64, device=device)\n"
+                "    return {'grad_key_cache': grad_key_cache}\n"
+                "def run(key_cache, key_states):\n"
+                "    updated_key_cache = torch.cat([key_cache, key_states], dim=2)\n"
+                "    return updated_key_cache\n"
+            ),
+            output_dtypes={"updated_key_cache": torch.bfloat16},
+        )
+
+        assert review.blocked is False
+        assert review.to_dict() == {"blocked": False, "issues": []}
+
     def test_allows_legitimate_torch_compile_solution(self):
         review = review_solution_sources(
             _solution_with_source(
