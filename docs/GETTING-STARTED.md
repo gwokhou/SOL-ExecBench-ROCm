@@ -168,6 +168,20 @@ This manifest is a sidecar acquisition/layout artifact. It does not prove ROCm
 readiness, execution success, paper-level validation, hosted leaderboard parity,
 or upstream SOLAR equivalence.
 
+If you already have local source copies, migrate them into the benchmark layout
+with the CLI dataset commands:
+
+```bash
+uv run sol-execbench dataset migrate-sol data/SOL-ExecBench/source data/SOL-ExecBench/benchmark \
+  --manifest out/sol-migration-manifest.json
+uv run sol-execbench dataset migrate-flashinfer data/flashinfer-trace/source data/flashinfer-trace/benchmark \
+  --manifest out/flashinfer-migration-manifest.json
+```
+
+These commands write generated local artifacts and migration manifests. They do
+not grant permission to publish or redistribute NVIDIA SOL-ExecBench source
+dataset payloads or derivatives.
+
 Run a bounded dataset batch:
 
 ```bash

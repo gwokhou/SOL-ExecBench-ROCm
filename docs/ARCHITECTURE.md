@@ -73,7 +73,8 @@ graph TD
    diagnostic-only no-trace sidecar outside canonical trace JSONL.
 
 The root CLI also dispatches GPU-free metadata subcommands before normal
-evaluation: `contract`, `doctor`, and `toolchain`. The separate
+evaluation: `contract`, `doctor`, `toolchain`, and the local-only `dataset`
+migration command group. The separate
 `sol-execbench-baseline` entry point dispatches to `src/sol_execbench/cli/baseline.py`
 for trace baseline comparison.
 
@@ -187,9 +188,13 @@ These sidecars do not change trace schema or correctness status.
 ## Dataset, Scoring, And Reporting
 
 `src/sol_execbench/core/dataset/` supports dataset layout discovery, inventory,
-readiness, manifest, checksum, execution-closure, paper-denominator,
-ready-subset, category, parity-gap, reuse-policy, and deterministic sharding
-workflows. Scripts such as
+readiness, manifest, checksum, local migration, execution-closure,
+paper-denominator, ready-subset, category, low-precision compatibility,
+parity-gap, reuse-policy, and deterministic sharding workflows. The
+`sol-execbench dataset migrate-sol` and `sol-execbench dataset migrate-flashinfer`
+subcommands call the same migration helpers used by scripts and tests, write
+deterministic migration manifests, and keep restricted source dataset content
+local to the operator's machine. Scripts such as
 `scripts/download_solexecbench.py`, `scripts/inspect_dataset.py`,
 `scripts/report_paper_denominator.py`, `scripts/report_parity_gaps.py`, and
 `scripts/run_dataset.py` use those helpers.
@@ -229,6 +234,10 @@ The `contract`, `doctor`, and `toolchain` subcommands are dispatched by
   evidence level and artifact type.
 - `sol-execbench toolchain --json --list-registry` prints the default ROCm
   toolchain registry.
+- `sol-execbench dataset migrate-sol ...` and
+  `sol-execbench dataset migrate-flashinfer ...` convert locally downloaded
+  source datasets into local benchmark-layout artifacts plus migration
+  manifests.
 
 Docker-related diagnostics live in `src/sol_execbench/core/docker_matrix.py` and
 `src/sol_execbench/core/dependency_matrix.py`. They are used by Docker scripts
