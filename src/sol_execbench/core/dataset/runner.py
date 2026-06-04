@@ -498,9 +498,6 @@ def build_amd_score_reports_for_problem(
             sidecar_path = solar_derivation_dir / f"{sidecar_stem}.solar-derivation.json"
             generated = build_solar_derivation_evidence(definition, workload)
             sidecar_path.write_text(json.dumps(generated.to_dict(), indent=2))
-            solar_derivation = solar_derivation_from_dict(
-                json.loads(sidecar_path.read_text())
-            )
             solar_derivation_ref = str(sidecar_path)
             derived_evidence_refs = {
                 "formula": f"{solar_derivation_ref}#groups.formula_evidence",
@@ -508,6 +505,13 @@ def build_amd_score_reports_for_problem(
                 "coverage": f"{solar_derivation_ref}#coverage_summary",
                 "score_eligibility": f"{solar_derivation_ref}#aggregate_status",
             }
+            try:
+                solar_derivation = solar_derivation_from_dict(
+                    json.loads(sidecar_path.read_text())
+                )
+            except ValueError as exc:
+                solar_derivation = None
+                derived_evidence_refs["solar_derivation_parse_error"] = str(exc)
         sol_bound_ref = f"derived:{definition.name}:{trace.workload.uuid}:amd_sol_bound_v2"
         if artifact is not None and sol_bound_artifact_dir is not None:
             sol_bound_artifact_dir.mkdir(parents=True, exist_ok=True)

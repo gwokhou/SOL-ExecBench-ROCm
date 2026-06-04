@@ -180,6 +180,44 @@ def test_dataset_helper_can_emit_generated_solar_derivation_sidecars(tmp_path):
     assert "coverage" not in score_payload["evidence_refs"]
 
 
+def test_dataset_helper_keeps_scoring_when_solar_derivation_parse_fails(
+    tmp_path, monkeypatch
+):
+    definition = _matmul_definition()
+    workload_path = tmp_path / "workload.jsonl"
+    _write_matmul_workload(workload_path)
+    sidecar_dir = tmp_path / "solar-sidecars"
+
+    def fail_parse(_payload):
+        raise ValueError("formula_inputs.axis must be a JSON scalar")
+
+    monkeypatch.setitem(
+        build_amd_score_reports_for_problem.__globals__,
+        "solar_derivation_from_dict",
+        fail_parse,
+    )
+
+    scores = build_amd_score_reports_for_problem(
+        definition_payload=definition,
+        workload_path=workload_path,
+        traces_payload=_matmul_trace_payload(),
+        trace_ref="L1/matmul_demo/traces.json",
+        solar_derivation_dir=sidecar_dir,
+    )
+
+    score_payload = scores[0].to_dict()
+
+    assert scores[0].definition == "matmul_demo"
+    assert scores[0].supported is True
+    assert (
+        score_payload["derived_evidence_refs"]["solar_derivation_parse_error"]
+        == "formula_inputs.axis must be a JSON scalar"
+    )
+    assert score_payload["derived_evidence_refs"]["formula"].endswith(
+        ".solar-derivation.json#groups.formula_evidence"
+    )
+
+
 def test_dataset_helper_keeps_path_shaped_sidecars_under_requested_dirs(tmp_path):
     definition = _matmul_definition()
     definition["name"] = "../escape"
