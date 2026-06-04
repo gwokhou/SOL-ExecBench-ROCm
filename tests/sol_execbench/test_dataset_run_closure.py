@@ -24,13 +24,27 @@ def test_closure_record_extracts_readiness_reason_codes():
         closure_status="not_attempted",
         readiness={
             "status": "runtime_blocked",
+            "readiness_class": "blocked_missing_evidence",
             "reasons": [{"code": "missing_asset"}, {"message": "no code"}],
+            "blocker_reports": [
+                {
+                    "code": "missing_asset",
+                    "blocker_type": "missing_blob",
+                    "evidence_path": "L1/demo/workload.jsonl",
+                }
+            ],
         },
         filter_reasons=["readiness_blocked"],
     )
 
     assert record["readiness_status"] == "runtime_blocked"
+    assert record["readiness_class"] == "blocked_missing_evidence"
     assert record["readiness_reason_codes"] == ["missing_asset"]
+    assert record["readiness_blocker_codes"] == ["missing_asset"]
+    assert record["readiness_blocker_types"] == ["missing_blob"]
+    assert record["readiness_evidence_refs"] == {
+        "missing_asset": "L1/demo/workload.jsonl"
+    }
     assert record["filter_reasons"] == ["readiness_blocked"]
 
 

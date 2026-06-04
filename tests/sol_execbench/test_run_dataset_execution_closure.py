@@ -97,8 +97,8 @@ def _matching_closure_provenance() -> dict:
         "limit": None,
         "max_workloads": None,
         "timeout": 300,
-        "warmup_runs": 3,
-        "iterations": 10,
+        "warmup_runs": 10,
+        "iterations": 50,
         "lock_clocks": False,
         "rerun": False,
         "keep_staging": False,
@@ -109,14 +109,30 @@ def _matching_closure_provenance() -> dict:
         "summary_path": "summary.json",
         "ready_subset_path": "ready_subset.json",
         "ready_subset_checksum": "ready-sha",
+        "ready_subset_summary": {
+            "dataset_root": "dataset",
+            "selected_categories": ["L1"],
+            "included_workloads": 1,
+            "excluded_workloads": 0,
+            "denominator": {},
+            "exclusion_reason_codes": [],
+            "claim_boundary": {"ready_to_attempt_rocm_execution": True},
+        },
         "readiness_path": None,
         "readiness_checksum": "readiness-sha",
+        "readiness_summary": {},
         "dataset_manifest_path": None,
         "dataset_manifest_checksum": None,
+        "dataset_source_id": None,
+        "dataset_migration_kind": None,
+        "dataset_source_revision": None,
+        "dataset_license_boundary": {},
+        "dataset_manifest_summary": {},
         "workload_identity_checksum": None,
         "requested_evidence_requirements": [],
+        "git_commit": run_dataset._git_commit(),
         "config_path": None,
-        "benchmark_config": {},
+        "benchmark_config": {"warmup_runs": 10, "iterations": 50, "lock_clocks": False},
         "derived_evidence": {
             "amd_score_report": None,
             "amd_sol_bound_dir": None,
@@ -167,6 +183,7 @@ def _readiness(path: Path) -> Path:
                 "workload_uuid": "blocked-workload",
                 "row_index": 0,
                 "status": "runtime_blocked",
+                "readiness_class": "blocked_missing_evidence",
                 "reasons": [
                     {
                         "code": "safetensors_asset_missing",
@@ -174,8 +191,43 @@ def _readiness(path: Path) -> Path:
                         "next_action": "acquire asset",
                     }
                 ],
+                "blocker_reports": [
+                    {
+                        "code": "safetensors_asset_missing",
+                        "blocker_type": "missing_blob",
+                        "problem_id": "L1/blocked_demo",
+                        "problem_path": "L1/blocked_demo",
+                        "workload_uuid": "blocked-workload",
+                        "row_index": 0,
+                        "evidence_path": "L1/blocked_demo/workload.jsonl",
+                        "message": "missing",
+                        "next_action": "acquire asset",
+                    }
+                ],
             }
         ],
+        "blocker_reports": [
+            {
+                "code": "safetensors_asset_missing",
+                "blocker_type": "missing_blob",
+                "problem_id": "L1/blocked_demo",
+                "problem_path": "L1/blocked_demo",
+                "workload_uuid": "blocked-workload",
+                "row_index": 0,
+                "evidence_path": "L1/blocked_demo/workload.jsonl",
+                "message": "missing",
+                "next_action": "acquire asset",
+            }
+        ],
+        "claim_boundary": {
+            "ready_to_attempt_rocm_execution": False,
+            "execution_success": False,
+            "hardware_validation": False,
+            "paper_level_validation": False,
+            "hosted_leaderboard_parity": False,
+            "upstream_solar_equivalence": False,
+            "score_authority": False,
+        },
         "readiness_checksum": {"value": "readiness-sha"},
     }
     path.write_text(json.dumps(payload))
@@ -260,6 +312,7 @@ def test_ready_subset_reports_no_ready_workloads(tmp_path, monkeypatch):
     dataset_root = tmp_path / "dataset"
     _write_problem(dataset_root, "L1", "matmul_demo", [_workload("workload")])
     subset_path = _ready_subset(tmp_path / "ready_subset.json", problems=[])
+    readiness_path = _readiness(tmp_path / "readiness.json")
     output_dir = tmp_path / "out"
 
     def fail_run_cli(*args, **kwargs):
@@ -274,6 +327,8 @@ def test_ready_subset_reports_no_ready_workloads(tmp_path, monkeypatch):
             str(dataset_root),
             "--ready-subset",
             str(subset_path),
+            "--readiness",
+            str(readiness_path),
             "--output",
             str(output_dir),
         ],
@@ -283,7 +338,10 @@ def test_ready_subset_reports_no_ready_workloads(tmp_path, monkeypatch):
 
     closure = json.loads((output_dir / "execution_closure.json").read_text())
     assert closure["status"] == "no_ready_workloads"
-    assert closure["totals"]["records"] == 0
+    assert closure["totals"]["records"] == 1
+    assert closure["totals"]["not_attempted"] == 1
+    assert closure["records"][0]["filter_reasons"] == ["readiness_blocked"]
+    assert json.loads((output_dir / "summary.json").read_text()) == []
 
 
 def test_execution_closure_records_filters_and_readiness_blockers(
@@ -347,7 +405,16 @@ def test_execution_closure_records_filters_and_readiness_blockers(
     assert statuses[("two", "filtered")]["filter_reasons"] == ["max_workloads_cap"]
     blocked = statuses[("blocked-workload", "not_attempted")]
     assert blocked["readiness_status"] == "runtime_blocked"
+    assert blocked["readiness_class"] == "blocked_missing_evidence"
     assert blocked["readiness_reason_codes"] == ["safetensors_asset_missing"]
+    assert blocked["readiness_blocker_codes"] == ["safetensors_asset_missing"]
+    assert blocked["readiness_blocker_types"] == ["missing_blob"]
+    assert blocked["readiness_evidence_refs"] == {
+        "safetensors_asset_missing": "L1/blocked_demo/workload.jsonl"
+    }
+    assert closure["provenance"]["readiness_summary"]["blocker_type_counts"] == {
+        "missing_blob": 1
+    }
 
 
 def test_execution_closure_marks_missing_requested_derived_evidence(
@@ -735,9 +802,10 @@ def test_execution_closure_existing_pass_mismatched_provenance_runs_fresh(
     closure = json.loads((output_dir / "execution_closure.json").read_text())
     assert calls == 1
     assert closure["records"][0]["closure_status"] == "attempted_passed"
-    assert [
+    reason_codes = [
         mismatch["reason_code"] for mismatch in closure["provenance_mismatches"]
-    ] == [
+    ]
+    for reason_code in [
         "manifest_checksum_mismatch",
         "readiness_checksum_mismatch",
         "ready_subset_checksum_mismatch",
@@ -745,7 +813,8 @@ def test_execution_closure_existing_pass_mismatched_provenance_runs_fresh(
         "solution_mode_mismatch",
         "solution_mismatch",
         "evidence_requirement_mismatch",
-    ]
+    ]:
+        assert reason_code in reason_codes
 
 
 def test_execution_closure_rerun_attempts_existing_pass(tmp_path, monkeypatch):
@@ -1054,7 +1123,40 @@ def test_execution_closure_provenance_uses_bounded_refs(tmp_path, monkeypatch):
     )
     readiness_path = _readiness(tmp_path / "readiness.json")
     manifest_path = tmp_path / "manifest.json"
-    manifest_path.write_text(json.dumps({"manifest_checksum": {"value": "manifest-sha"}}))
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "sol_execbench.dataset_migration_manifest.v1",
+                "migration_kind": "sol_execbench",
+                "source": {
+                    "source_id": "nvidia_sol_execbench",
+                    "repo_id": "nvidia/SOL-ExecBench",
+                    "revision": "local-snapshot",
+                    "source_root": str(tmp_path / "restricted-source"),
+                },
+                "output_root": str(dataset_root),
+                "selected_categories": ["L1"],
+                "license_boundary": {
+                    "source_boundary": "NVIDIA Evaluation Dataset License",
+                    "generated_artifact_source_id": "generated_local_migration_artifacts",
+                    "license": "NVIDIA Evaluation Dataset License",
+                    "redistribution_class": "local-only",
+                    "repository_redistribution": False,
+                    "release_bundle_redistribution": False,
+                    "attribution": "NVIDIA SOL-ExecBench local migration",
+                },
+                "denominators": {
+                    "discovered_problems": 1,
+                    "migrated_problems": 1,
+                    "generated_artifacts": 2,
+                    "blockers": 0,
+                    "warnings": 0,
+                },
+                "blockers": [],
+                "manifest_checksum": {"value": "manifest-sha"},
+            }
+        )
+    )
     output_dir = tmp_path / "out"
     score_path = tmp_path / "score.json"
 
@@ -1093,5 +1195,33 @@ def test_execution_closure_provenance_uses_bounded_refs(tmp_path, monkeypatch):
     assert closure["provenance"]["ready_subset_path"] == "ready_subset.json"
     assert closure["provenance"]["readiness_path"] == "readiness.json"
     assert closure["provenance"]["dataset_manifest_path"] == "manifest.json"
+    assert closure["provenance"]["dataset_manifest_checksum"] == "manifest-sha"
+    assert closure["provenance"]["dataset_source_id"] == "nvidia_sol_execbench"
+    assert closure["provenance"]["dataset_migration_kind"] == "sol_execbench"
+    assert closure["provenance"]["dataset_source_revision"] == "local-snapshot"
+    assert closure["provenance"]["dataset_license_boundary"] == {
+        "attribution": "NVIDIA SOL-ExecBench local migration",
+        "generated_artifact_source_id": "generated_local_migration_artifacts",
+        "license": "NVIDIA Evaluation Dataset License",
+        "redistribution_class": "local-only",
+        "release_bundle_redistribution": False,
+        "repository_redistribution": False,
+        "source_boundary": "NVIDIA Evaluation Dataset License",
+    }
+    assert closure["provenance"]["dataset_manifest_summary"]["source_root"] == (
+        "restricted-source"
+    )
+    assert closure["provenance"]["dataset_manifest_summary"]["denominators"] == {
+        "blockers": 0,
+        "discovered_problems": 1,
+        "generated_artifacts": 2,
+        "migrated_problems": 1,
+        "warnings": 0,
+    }
+    assert closure["source_refs"] == {
+        "dataset_manifest": "manifest.json",
+        "readiness": "readiness.json",
+        "ready_subset": "ready_subset.json",
+    }
     assert closure["provenance"]["derived_evidence"]["amd_score_report"] == "score.json"
     assert all(str(tmp_path) not in arg for arg in closure["provenance"]["command_args"])

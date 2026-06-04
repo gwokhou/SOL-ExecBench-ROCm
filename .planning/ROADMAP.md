@@ -96,7 +96,7 @@ paths while real CDNA4 validation remains deferred.
 
 ### Phase 135: Dataset Runner Integration and Public Guardrails
 
-**Status:** Pending
+**Status:** Complete
 
 **Goal:** Integrate migrated datasets with `scripts/run_dataset.py`, execution
 closure, docs, and release guardrails so users can run bounded local ROCm
@@ -136,17 +136,17 @@ DATA-DOC-01, DATA-DOC-02, DATA-DOC-03, DATA-DOC-04
 | LOWP-ROCM-02 | Phase 134 | Complete |
 | LOWP-ROCM-03 | Phase 134 | Complete |
 | LOWP-ROCM-04 | Phase 134 | Complete |
-| DATA-RUN-01 | Phase 135 | Pending |
-| DATA-RUN-02 | Phase 135 | Pending |
-| DATA-RUN-03 | Phase 135 | Pending |
-| DATA-RUN-04 | Phase 135 | Pending |
-| DATA-DOC-01 | Phase 135 | Pending |
-| DATA-DOC-02 | Phase 135 | Pending |
-| DATA-DOC-03 | Phase 135 | Pending |
-| DATA-DOC-04 | Phase 135 | Pending |
+| DATA-RUN-01 | Phase 135 | Complete |
+| DATA-RUN-02 | Phase 135 | Complete |
+| DATA-RUN-03 | Phase 135 | Complete |
+| DATA-RUN-04 | Phase 135 | Complete |
+| DATA-DOC-01 | Phase 135 | Complete |
+| DATA-DOC-02 | Phase 135 | Complete |
+| DATA-DOC-03 | Phase 135 | Complete |
+| DATA-DOC-04 | Phase 135 | Complete |
 
 **Coverage:** 24/24 v1.29 requirements mapped.
-**Progress:** 16/24 requirements complete; 4/5 phases complete.
+**Progress:** 24/24 requirements complete; 5/5 phases complete.
 
 ## Completed Milestones
 
@@ -173,6 +173,4 @@ DATA-DOC-01, DATA-DOC-02, DATA-DOC-03, DATA-DOC-04
 
 ## Current Position
 
-**Status:** Phase 134 complete. Ready to plan Phase 135.
-
-Run `$gsd-plan-phase 134` to start implementation planning.
+**Status:** Phase 135 complete. v1.29 phases are ready for milestone audit.

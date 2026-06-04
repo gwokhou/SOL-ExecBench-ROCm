@@ -135,12 +135,36 @@ uv run sol-execbench toolchain --json --list-registry
 Use this recipe only when generating AMD-native score evidence from local
 readiness, timing, and bound artifacts.
 
-After downloading public benchmark data and creating readiness sidecars:
+For NVIDIA SOL-ExecBench evaluation data, first obtain the source dataset
+yourself under the applicable NVIDIA license terms. This repository does not
+redistribute original NVIDIA dataset rows, definitions, workloads, traces,
+solutions, blobs, or ROCm-migrated derivatives. Migrate the local copy into a
+local output root:
 
 ```bash
-uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
+uv run sol-execbench dataset migrate-sol \
+  /path/to/local/SOL-ExecBench \
+  data/local-sol-migrated \
+  --manifest out/local-sol-migration-manifest.json
+```
+
+FlashInfer Trace inputs use their separate Apache-2.0 provenance boundary:
+
+```bash
+uv run sol-execbench dataset migrate-flashinfer \
+  /path/to/local/flashinfer-trace \
+  data/local-flashinfer-migrated \
+  --manifest out/local-flashinfer-migration-manifest.json
+```
+
+After local migration and readiness/ready-subset generation, run a bounded
+local ROCm slice:
+
+```bash
+uv run scripts/run_dataset.py data/local-sol-migrated \
   --ready-subset out/ready_subset.json \
   --readiness out/readiness.json \
+  --dataset-manifest out/local-sol-migration-manifest.json \
   --limit 5 \
   --max-workloads 1 \
   --amd-score-report out/cookbook/amd-score-report.json \
@@ -149,5 +173,9 @@ uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
   --execution-closure out/cookbook/execution_closure.json
 ```
 
-Treat output as AMD-native-derived evidence, not NVIDIA B200, upstream SOLAR,
-leaderboard, or full paper parity.
+The execution closure records the migration manifest, checksum, license
+boundary, readiness classes, blocker reasons, skipped workloads, and requested
+evidence. Treat output as bounded AMD-native-derived evidence, not NVIDIA B200,
+upstream SOLAR, leaderboard, full paper parity, or CDNA3/CDNA4 full-suite
+hardware validation. NVFP4/Blackwell low-precision compatibility paths remain
+semantic compatibility evidence until real CDNA4 validation exists.

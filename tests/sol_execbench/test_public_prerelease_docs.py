@@ -97,3 +97,31 @@ def test_public_materials_explain_provenance_and_non_endorsement():
 
     assert "Do not imply NVIDIA or AMD endorsement" in public_guide
     assert "does not imply NVIDIA or AMD endorsement" in release_draft
+
+
+def test_dataset_runner_cookbook_preserves_local_only_dataset_boundaries():
+    text = _read("docs/COOKBOOK.md")
+    normalized = " ".join(text.split())
+
+    for required in (
+        "migrate-sol",
+        "migrate-flashinfer",
+        "--dataset-manifest",
+        "does not redistribute original NVIDIA dataset rows",
+        "ROCm-migrated derivatives",
+        "license boundary",
+        "readiness classes",
+        "skipped workloads",
+        "not NVIDIA B200",
+        "or CDNA3/CDNA4 full-suite hardware validation",
+        "NVFP4/Blackwell low-precision compatibility paths remain semantic compatibility evidence",
+    ):
+        assert required in normalized
+
+    for forbidden in (
+        "download NVIDIA SOL-ExecBench from this repository",
+        "CDNA4 validated",
+        "leaderboard ready",
+        "claims full paper parity",
+    ):
+        assert forbidden not in normalized
