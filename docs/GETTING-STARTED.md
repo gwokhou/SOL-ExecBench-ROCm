@@ -188,6 +188,16 @@ Run a bounded dataset batch:
 uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark --limit 5
 ```
 
+After traces exist, regenerate derived AMD reports without launching the GPU
+evaluator:
+
+```bash
+uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
+  --phase derived \
+  --jobs auto \
+  --amd-score-report out/amd-score-report.json
+```
+
 Run a bounded ready-subset batch with an execution-closure report:
 
 ```bash
@@ -201,7 +211,9 @@ uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
 The closure sidecar records attempted, skipped, filtered, missing-trace, and
 missing-evidence states. Existing passing traces are reused only when rerun is
 not requested and any prior closure provenance matches the current selected
-run.
+run. Multi-worker `--jobs` is honored only for `--phase derived`, which reuses
+existing trace files and materializes CPU/I/O-only reports; trace collection
+and profiler-backed timing remain serial.
 
 ## Common Setup Issues
 

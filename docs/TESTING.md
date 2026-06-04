@@ -234,6 +234,9 @@ The recent CPU-safe guardrails cover:
 - dataset reuse and stale-provenance decisions;
 - selected ready subsets, missing traces, missing derived evidence sidecars,
   CLI timeout/nonzero/no-output closure states, and rerun behavior;
+- file-backed bounded CLI logs, release/prerelease transcript redaction across
+  chunk boundaries, temporary stream cleanup, and non-GPU derived-phase
+  `--jobs` scheduling;
 - local SOL-ExecBench and FlashInfer Trace migration manifests, source
   revisions, checksum refs, missing-input blockers, and redistribution policy;
 - ROCm readiness classes, blocker reports, ready-subset denominators, and
@@ -252,6 +255,10 @@ uv run pytest \
   tests/sol_execbench/driver/test_build_ext.py \
   tests/sol_execbench/test_dataset_run_closure.py \
   tests/sol_execbench/test_run_dataset_execution_closure.py \
+  tests/sol_execbench/test_run_dataset_amd_score.py \
+  tests/sol_execbench/test_release_candidate_validation.py \
+  tests/sol_execbench/test_prerelease_artifact_bundle.py \
+  tests/sol_execbench/test_prerelease_readiness.py \
   tests/sol_execbench/test_dataset_failure_mode_docs.py \
   tests/sol_execbench/test_dataset_migration.py \
   tests/sol_execbench/test_dataset_inventory_readiness.py \

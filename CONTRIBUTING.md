@@ -117,6 +117,8 @@ Update documentation when changing:
 - ROCm hardware support claims
 - Scoring, timing, profiling, or evidence semantics
 - Dataset reuse, execution-closure, failure-mode, or sharding semantics
+- Dataset runner phase scheduling, bounded subprocess logging, release
+  transcript handling, or derived evidence sidecar naming
 - Dataset migration, readiness classification, ready-subset denominator,
   low-precision compatibility, or redistribution-boundary behavior
 - User-facing examples
