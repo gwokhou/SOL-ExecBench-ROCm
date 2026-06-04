@@ -55,44 +55,44 @@ ExecBench.
 
 ### NVIDIA/Blackwell Low-Precision ROCm Equivalence
 
-- [ ] **LOWP-ROCM-01**: Maintainer can import ROCm compatibility abstractions
+- [x] **LOWP-ROCM-01**: Maintainer can import ROCm compatibility abstractions
   for NVFP4/Blackwell-specific dataset semantics without requiring CDNA4
   hardware.
-- [ ] **LOWP-ROCM-02**: Compatibility implementations preserve public entry
+- [x] **LOWP-ROCM-02**: Compatibility implementations preserve public entry
   points, tensor shapes, packing/unpacking semantics, scale metadata, and
   reference behavior needed by migrated benchmark definitions.
-- [ ] **LOWP-ROCM-03**: Compatibility paths emit explicit unvalidated-CDNA4
+- [x] **LOWP-ROCM-03**: Compatibility paths emit explicit unvalidated-CDNA4
   evidence markers so they cannot be mistaken for performance or hardware
   validation.
-- [ ] **LOWP-ROCM-04**: Tests cover semantic round trips and blocker behavior
+- [x] **LOWP-ROCM-04**: Tests cover semantic round trips and blocker behavior
   on CPU-safe or mocked ROCm paths while deferring real CDNA4 execution.
 
 ### Dataset Runner Integration
 
-- [ ] **DATA-RUN-01**: `scripts/run_dataset.py` can consume locally migrated
+- [x] **DATA-RUN-01**: `scripts/run_dataset.py` can consume locally migrated
   dataset roots, ready subsets, manifests, and license-boundary metadata without
   changing existing single-problem behavior.
-- [ ] **DATA-RUN-02**: Execution closure records include migration source,
+- [x] **DATA-RUN-02**: Execution closure records include migration source,
   checksum, license-boundary, readiness, and blocker evidence for each selected
   workload.
-- [ ] **DATA-RUN-03**: Reuse and rerun decisions treat migration manifest,
+- [x] **DATA-RUN-03**: Reuse and rerun decisions treat migration manifest,
   readiness classification, solution mode, and requested evidence changes as
   provenance drift.
-- [ ] **DATA-RUN-04**: Dataset runner reports skipped, missing, blocked, and
+- [x] **DATA-RUN-04**: Dataset runner reports skipped, missing, blocked, and
   unvalidated low-precision workloads in the denominator rather than silently
   dropping them.
 
 ### Documentation And Guardrails
 
-- [ ] **DATA-DOC-01**: Documentation explains how to download source datasets,
+- [x] **DATA-DOC-01**: Documentation explains how to download source datasets,
   run local migration, generate ready subsets, and execute bounded ROCm runs.
-- [ ] **DATA-DOC-02**: Public docs state that NVIDIA/SOL-ExecBench content is
+- [x] **DATA-DOC-02**: Public docs state that NVIDIA/SOL-ExecBench content is
   not redistributed by this project and must be obtained and migrated locally by
   users with appropriate license rights.
-- [ ] **DATA-DOC-03**: Docs distinguish ROCm-compatible dataset migration,
+- [x] **DATA-DOC-03**: Docs distinguish ROCm-compatible dataset migration,
   low-precision semantic implementation, real CDNA3/CDNA4 validation, paper
   parity, and leaderboard authority.
-- [ ] **DATA-DOC-04**: Release and prerelease guardrails fail if migrated
+- [x] **DATA-DOC-04**: Release and prerelease guardrails fail if migrated
   NVIDIA dataset content is included in release bundles or if unvalidated
   low-precision compatibility is described as hardware-validated.
 
