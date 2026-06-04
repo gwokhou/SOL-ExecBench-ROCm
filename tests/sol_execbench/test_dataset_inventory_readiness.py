@@ -392,8 +392,13 @@ def test_readiness_classifies_blackwell_low_precision_dependency(tmp_path):
 
     record = readiness.workloads[0]
     assert record.readiness_class == "nvfp4_blackwell_specific"
-    assert record.reasons[0].code == "blackwell_low_precision_dependency"
+    assert [reason.code for reason in record.reasons] == [
+        "phase134_low_precision_cpu_semantics",
+        "cdna4_low_precision_hardware_validation_deferred",
+    ]
     assert record.blocker_reports[0].blocker_type == "low_precision_format_dependency"
+    assert record.blocker_reports[0].code == "cdna4_low_precision_hardware_validation_deferred"
+    assert record.status == "needs_hardware_evidence"
 
 
 def test_readiness_classifies_unsupported_nvidia_dsl(tmp_path):
