@@ -1459,6 +1459,30 @@ def test_derive_solar_evidence_records_tensor_shape_dtype_axis_and_sources():
     assert "estimate_warning:op_1:estimate_warning_demo" in payload["warnings"]
 
 
+def test_formula_inputs_round_trip_multi_axis_json_values():
+    definition = _projection_definition()
+    graph = _projection_graph()
+    estimates = (
+        _projection_estimate(
+            family=OpFamily.NORMALIZATION,
+            formula_inputs={
+                "input_elements": 16,
+                "axis": [1, 2],
+                "metadata": {"reduced_axes": [1, 2]},
+            },
+        ),
+    )
+
+    evidence = derive_solar_derivation_evidence(
+        definition, _matmul_workload(), graph, estimates
+    )
+    payload = solar_derivation_from_dict(evidence.to_dict()).to_dict()
+
+    formula_inputs = payload["groups"][0]["formula_evidence"][0]["formula_inputs"]
+    assert formula_inputs["axis"] == [1, 2]
+    assert formula_inputs["metadata"] == {"reduced_axes": [1, 2]}
+
+
 def test_builder_does_not_accept_or_execute_candidate_solution_code():
     import inspect
 

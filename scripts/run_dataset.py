@@ -392,6 +392,8 @@ def _first_relative_ref(path: Path, *bases: Path) -> str:
 
 def _normalized_command_args(args: argparse.Namespace) -> list[str]:
     normalized = [args.problems_dir.name]
+    if args.phase != "all":
+        normalized.extend(["--phase", args.phase])
     if args.category:
         normalized.extend(["--category", ",".join(args.category)])
     if args.limit is not None:
@@ -524,11 +526,15 @@ def _closure_status_with_evidence(
 
 
 def _requested_evidence_requirements(args: argparse.Namespace) -> list[str]:
+    amd_score_report = args.amd_score_report if args.phase in {"all", "derived"} else None
+    amd_sol_bound_dir = args.amd_sol_bound_dir if args.phase in {"all", "derived"} else None
+    solar_derivation = args.solar_derivation if args.phase in {"all", "derived"} else None
+    timing_evidence_dir = args.timing_evidence_dir if args.phase in {"all", "timing"} else None
     return _build_requested_evidence_requirements(
-        amd_score_report=args.amd_score_report,
-        amd_sol_bound_dir=args.amd_sol_bound_dir,
-        solar_derivation=args.solar_derivation,
-        timing_evidence_dir=args.timing_evidence_dir,
+        amd_score_report=amd_score_report,
+        amd_sol_bound_dir=amd_sol_bound_dir,
+        solar_derivation=solar_derivation,
+        timing_evidence_dir=timing_evidence_dir,
     )
 
 
@@ -654,6 +660,17 @@ def main():
         type=int,
         default=None,
         help="Max number of problems to evaluate.",
+    )
+    ap.add_argument(
+        "--phase",
+        choices=("all", "traces", "derived", "timing"),
+        default="all",
+        help=(
+            "Select the dataset pass to run. Default 'all' preserves the legacy "
+            "single-pass behavior; 'traces' runs GPU validation only, 'derived' "
+            "builds AMD/SOLAR reports from existing traces, and 'timing' collects "
+            "profiler timing evidence from existing traces."
+        ),
     )
     ap.add_argument(
         "-o",
@@ -1077,6 +1094,9 @@ def main():
         return
 
     attempted_ready_keys: set[tuple[str, tuple[str, str | int]]] = set()
+    run_trace_phase = args.phase in {"all", "traces"}
+    run_derived_phase = args.phase in {"all", "derived"}
+    run_timing_phase = args.phase in {"all", "timing"}
     # ROCm execution stays serial here; runner helpers provide the future scheduling seam.
     for i, problem_dir in enumerate(problems):
         problem_name = problem_dir.name
@@ -1137,6 +1157,134 @@ def main():
             if not selected_workload_refs:
                 continue
 
+        if not run_trace_phase:
+            if not traces_path.exists():
+                print(f"  Skipping (--phase {args.phase} requires existing traces).")
+                continue
+            try:
+                traces = json.loads(traces_path.read_text())
+            except (OSError, json.JSONDecodeError):
+                print(f"  Skipping (--phase {args.phase} found unreadable traces).")
+                continue
+
+            summary = inspect_traces(traces, f"{category}/{problem_name}")
+            summaries.append(summary)
+
+            if run_derived_phase and (
+                args.amd_score_report is not None
+                or args.amd_sol_bound_dir is not None
+                or args.solar_derivation is not None
+            ):
+                _extend_derived_reports_for_problem(
+                    amd_scores=amd_scores,
+                    definition_path=definition_path,
+                    workload_path=workload_path,
+                    traces_path=traces_path,
+                    traces_payload=traces,
+                    output_dir=output_dir,
+                    baseline_artifact=scoring_baseline,
+                    sol_bound_artifact_dir=args.amd_sol_bound_dir,
+                    solar_derivation_dir=args.solar_derivation,
+                )
+
+            if run_timing_phase and args.timing_evidence_dir is not None:
+                definition = definition_payload
+                if args.solution_name:
+                    solution_file = problem_dir / args.solution_name
+                    if not solution_file.exists():
+                        print(f"  Skipping timing: {args.solution_name} not found")
+                    else:
+                        solution = build_solution_for_problem(
+                            definition, problem_dir, args.solution_name
+                        )
+                        solution_path = problem_output_dir / "solution.json"
+                        solution_path.write_text(json.dumps(solution, indent=2))
+                        timing_root = args.timing_evidence_dir.resolve()
+                        collect_timing_evidence_for_problem(
+                            definition_path=definition_path,
+                            workload_path=workload_path,
+                            solution_path=solution_path,
+                            output_dir=problem_output_dir,
+                            timing_evidence_root=timing_root / category,
+                            job_name=f"ref_{problem_name[:40]}",
+                            solution=solution,
+                            benchmark_config=benchmark_config,
+                            timeout=args.timeout,
+                            config_path=config_path,
+                            keep_staging=args.keep_staging,
+                            verbose=args.verbose,
+                            tool_version=args.timing_tool_version,
+                            gpu_architecture=args.gpu_architecture,
+                        )
+                        print(f"  Timing evidence saved under {timing_root / category}")
+                elif "reference" not in definition or not definition["reference"].strip():
+                    print("  Skipping timing: no reference code")
+                else:
+                    solution = build_solution_for_problem(
+                        definition, problem_dir, args.solution_name
+                    )
+                    solution_path = problem_output_dir / "solution.json"
+                    solution_path.write_text(json.dumps(solution, indent=2))
+                    timing_root = args.timing_evidence_dir.resolve()
+                    collect_timing_evidence_for_problem(
+                        definition_path=definition_path,
+                        workload_path=workload_path,
+                        solution_path=solution_path,
+                        output_dir=problem_output_dir,
+                        timing_evidence_root=timing_root / category,
+                        job_name=f"ref_{problem_name[:40]}",
+                        solution=solution,
+                        benchmark_config=benchmark_config,
+                        timeout=args.timeout,
+                        config_path=config_path,
+                        keep_staging=args.keep_staging,
+                        verbose=args.verbose,
+                        tool_version=args.timing_tool_version,
+                        gpu_architecture=args.gpu_architecture,
+                    )
+                    print(f"  Timing evidence saved under {timing_root / category}")
+
+            if selected_workload_refs is not None:
+                trace_by_key = _trace_map(traces)
+                for workload_ref in selected_workload_refs:
+                    key = _workload_key(
+                        workload_ref.get("uuid"), workload_ref.get("row_index")
+                    )
+                    attempted_ready_keys.add((problem_id, key))
+                    trace = trace_by_key.get(key)
+                    closure_records.append(
+                        _selected_workload_closure_record(
+                            category=category,
+                            problem_id=problem_id,
+                            problem_path=str(problem_ref.get("problem_path")),
+                            workload_uuid=workload_ref.get("uuid"),
+                            row_index=int(workload_ref.get("row_index", 0)),
+                            readiness=readiness_by_workload.get((problem_id, key)),
+                            trace=trace,
+                            skipped=True,
+                            traces_path=traces_path,
+                            summary_ref="summary.json",
+                            solution_path=problem_output_dir / "solution.json",
+                            output_dir=output_dir,
+                            definition_name=str(definition_payload["name"]),
+                            problem_output_dir=problem_output_dir,
+                            amd_score_report=args.amd_score_report
+                            if run_derived_phase
+                            else None,
+                            sol_bound_artifact_dir=args.amd_sol_bound_dir
+                            if run_derived_phase
+                            else None,
+                            solar_derivation_dir=args.solar_derivation
+                            if run_derived_phase
+                            else None,
+                            timing_evidence_dir=args.timing_evidence_dir
+                            if run_timing_phase
+                            else None,
+                        )
+                    )
+            print(f"  Phase {args.phase}: reused existing traces.")
+            continue
+
         # Preserve ordinary resume behavior unless closure provenance is part of the contract.
         if traces_path.exists():
             stale_trace_mismatch: dict[str, object] | None = None
@@ -1158,7 +1306,7 @@ def main():
                     observed="unreadable traces"
                 )
             if reuse_decision is not None and reuse_decision.should_reuse:
-                if (
+                if run_derived_phase and (
                     args.amd_score_report is not None
                     or args.amd_sol_bound_dir is not None
                     or args.solar_derivation is not None
@@ -1200,10 +1348,18 @@ def main():
                                 output_dir=output_dir,
                                 definition_name=str(definition_payload["name"]),
                                 problem_output_dir=problem_output_dir,
-                                amd_score_report=args.amd_score_report,
-                                sol_bound_artifact_dir=args.amd_sol_bound_dir,
-                                solar_derivation_dir=args.solar_derivation,
-                                timing_evidence_dir=args.timing_evidence_dir,
+                                amd_score_report=args.amd_score_report
+                                if run_derived_phase
+                                else None,
+                                sol_bound_artifact_dir=args.amd_sol_bound_dir
+                                if run_derived_phase
+                                else None,
+                                solar_derivation_dir=args.solar_derivation
+                                if run_derived_phase
+                                else None,
+                                timing_evidence_dir=args.timing_evidence_dir
+                                if run_timing_phase
+                                else None,
                             )
                         )
                 continue
@@ -1354,7 +1510,7 @@ def main():
         traces_path = problem_output_dir / "traces.json"
         traces_path.write_text(json.dumps(traces, indent=2))
 
-        if (
+        if run_derived_phase and (
             args.amd_score_report is not None
             or args.amd_sol_bound_dir is not None
             or args.solar_derivation is not None
@@ -1371,7 +1527,7 @@ def main():
                 solar_derivation_dir=args.solar_derivation,
             )
 
-        if args.timing_evidence_dir is not None:
+        if run_timing_phase and args.timing_evidence_dir is not None:
             timing_root = args.timing_evidence_dir.resolve()
             collect_timing_evidence_for_problem(
                 definition_path=definition_path,
@@ -1413,10 +1569,18 @@ def main():
                         output_dir=output_dir,
                         definition_name=str(definition_payload["name"]),
                         problem_output_dir=problem_output_dir,
-                        amd_score_report=args.amd_score_report,
-                        sol_bound_artifact_dir=args.amd_sol_bound_dir,
-                        solar_derivation_dir=args.solar_derivation,
-                        timing_evidence_dir=args.timing_evidence_dir,
+                        amd_score_report=args.amd_score_report
+                        if run_derived_phase
+                        else None,
+                        sol_bound_artifact_dir=args.amd_sol_bound_dir
+                        if run_derived_phase
+                        else None,
+                        solar_derivation_dir=args.solar_derivation
+                        if run_derived_phase
+                        else None,
+                        timing_evidence_dir=args.timing_evidence_dir
+                        if run_timing_phase
+                        else None,
                     )
                 )
 
@@ -1439,7 +1603,7 @@ def main():
     print(f"\nSummary saved to {summary_path}")
     print(f"Per-problem traces saved under {output_dir}")
 
-    if args.amd_score_report is not None:
+    if run_derived_phase and args.amd_score_report is not None:
         report_path = args.amd_score_report.resolve()
         write_amd_score_report(
             report_path,

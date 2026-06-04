@@ -2396,7 +2396,7 @@ def _parse_object_map(
     for raw_key, raw_value in value.items():
         if not isinstance(raw_key, str):
             raise ValueError(f"{source}.{key} keys must be strings")
-        _ensure_json_scalar(raw_value, source=f"{source}.{key}.{raw_key}")
+        _ensure_json_value(raw_value, source=f"{source}.{key}.{raw_key}")
         parsed[raw_key] = raw_value
     return parsed
 
@@ -2458,14 +2458,24 @@ def _parse_status_count_map(
     return parsed
 
 
-def _ensure_json_scalar(value: object, *, source: str) -> None:
+def _ensure_json_value(value: object, *, source: str) -> None:
     if value is None or isinstance(value, str):
         return
     if type(value) in {int, float, bool}:
         if isinstance(value, float) and not isfinite(value):
             raise ValueError(f"{source} must be finite")
         return
-    raise ValueError(f"{source} must be a JSON scalar")
+    if isinstance(value, list):
+        for index, item in enumerate(value):
+            _ensure_json_value(item, source=f"{source}[{index}]")
+        return
+    if isinstance(value, dict):
+        for raw_key, raw_value in value.items():
+            if not isinstance(raw_key, str):
+                raise ValueError(f"{source} keys must be strings")
+            _ensure_json_value(raw_value, source=f"{source}.{raw_key}")
+        return
+    raise ValueError(f"{source} must be JSON-compatible")
 
 
 def _parse_non_negative_float(

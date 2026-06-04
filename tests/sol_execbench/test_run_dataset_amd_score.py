@@ -483,6 +483,146 @@ def test_dataset_runner_generates_reports_for_skipped_existing_traces(
     assert sidecar["source_boundary"]["candidate_solution_execution"] is False
 
 
+def test_dataset_runner_phase_traces_skips_derived_and_timing_outputs(
+    tmp_path,
+    monkeypatch,
+):
+    dataset_root = _write_matmul_dataset(tmp_path)
+    output_dir = tmp_path / "out"
+    report_path = tmp_path / "reports" / "amd-score.json"
+    solar_dir = tmp_path / "solar-sidecars"
+    timing_dir = tmp_path / "timing"
+    calls = 0
+
+    def run_cli(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return _matmul_trace_payload()
+
+    def fail_collect_timing(*args, **kwargs):
+        raise AssertionError("--phase traces must not collect timing evidence")
+
+    monkeypatch.setattr(run_dataset, "run_cli", run_cli)
+    monkeypatch.setattr(
+        run_dataset, "collect_timing_evidence_for_problem", fail_collect_timing
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--phase",
+            "traces",
+            "--output",
+            str(output_dir),
+            "--amd-score-report",
+            str(report_path),
+            "--solar-derivation",
+            str(solar_dir),
+            "--timing-evidence-dir",
+            str(timing_dir),
+        ],
+    )
+
+    run_dataset.main()
+
+    assert calls == 1
+    assert (output_dir / "L1" / "matmul_demo" / "traces.json").exists()
+    assert not report_path.exists()
+    assert not solar_dir.exists()
+    assert not timing_dir.exists()
+
+
+def test_dataset_runner_phase_derived_reuses_existing_traces_without_gpu(
+    tmp_path,
+    monkeypatch,
+):
+    dataset_root = _write_matmul_dataset(tmp_path)
+    output_dir = tmp_path / "out"
+    trace_dir = output_dir / "L1" / "matmul_demo"
+    trace_dir.mkdir(parents=True)
+    (trace_dir / "traces.json").write_text(json.dumps(_matmul_trace_payload()))
+    report_path = tmp_path / "reports" / "amd-score.json"
+    solar_dir = tmp_path / "solar-sidecars"
+
+    def fail_run_cli(*args, **kwargs):
+        raise AssertionError("--phase derived must not run GPU validation")
+
+    monkeypatch.setattr(run_dataset, "run_cli", fail_run_cli)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--phase",
+            "derived",
+            "--output",
+            str(output_dir),
+            "--amd-score-report",
+            str(report_path),
+            "--solar-derivation",
+            str(solar_dir),
+        ],
+    )
+
+    run_dataset.main()
+
+    report = json.loads(report_path.read_text())
+    assert report["scored_count"] == 1
+    assert (solar_dir / "matmul_demo.matmul-workload.solar-derivation.json").exists()
+
+
+def test_dataset_runner_phase_timing_reuses_existing_traces_without_gpu(
+    tmp_path,
+    monkeypatch,
+):
+    dataset_root = _write_matmul_dataset(tmp_path)
+    output_dir = tmp_path / "out"
+    trace_dir = output_dir / "L1" / "matmul_demo"
+    trace_dir.mkdir(parents=True)
+    (trace_dir / "traces.json").write_text(json.dumps(_matmul_trace_payload()))
+    timing_dir = tmp_path / "timing"
+    calls: list[dict] = []
+
+    def fail_run_cli(*args, **kwargs):
+        raise AssertionError("--phase timing must not run GPU validation")
+
+    def collect_timing(**kwargs):
+        calls.append(kwargs)
+        output_path = kwargs["timing_evidence_root"] / f"{kwargs['output_dir'].name}.timing.json"
+        kwargs["timing_evidence_root"].mkdir(parents=True, exist_ok=True)
+        output_path.write_text(json.dumps({"profiler_collected": True}))
+        return {"profiler_collected": True}
+
+    monkeypatch.setattr(run_dataset, "run_cli", fail_run_cli)
+    monkeypatch.setattr(
+        run_dataset, "collect_timing_evidence_for_problem", collect_timing
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--phase",
+            "timing",
+            "--output",
+            str(output_dir),
+            "--timing-evidence-dir",
+            str(timing_dir),
+        ],
+    )
+
+    run_dataset.main()
+
+    assert len(calls) == 1
+    assert calls[0]["output_dir"] == trace_dir
+    assert (trace_dir / "solution.json").exists()
+    assert (timing_dir / "L1" / "matmul_demo.timing.json").exists()
+
+
 def test_dataset_runner_reruns_failed_existing_traces_before_reports(
     tmp_path,
     monkeypatch,
