@@ -326,6 +326,13 @@ def test_cli_help_preserves_existing_public_options():
         assert unexpected_option not in help_text
 
 
+def test_cli_help_documents_hip_cpp_compile_timeout_option():
+    result = CliRunner().invoke(cli, ["--help"])
+    assert result.exit_code == 0
+    assert "--compile-timeout" in result.output
+    assert "Compilation timeout in seconds" in result.output
+
+
 def test_static_and_profile_docs_keep_diagnostic_only_authority_boundaries():
     static_docs = (REPO_ROOT / "docs/static_kernel_evidence.md").read_text()
     timing_docs = (REPO_ROOT / "docs/rocm_timing.md").read_text()
