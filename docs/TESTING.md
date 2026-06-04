@@ -74,6 +74,10 @@ uv run pytest \
   tests/sol_execbench/test_dataset_run_closure.py \
   tests/sol_execbench/test_run_dataset_execution_closure.py \
   tests/sol_execbench/test_dataset_failure_mode_docs.py \
+  tests/sol_execbench/test_dataset_migration.py \
+  tests/sol_execbench/test_dataset_inventory_readiness.py \
+  tests/sol_execbench/test_low_precision_compatibility.py \
+  tests/sol_execbench/test_dataset_redistribution_policy.py \
   tests/sol_execbench/test_dataset_sharding.py -q
 ```
 
@@ -230,6 +234,12 @@ The recent CPU-safe guardrails cover:
 - dataset reuse and stale-provenance decisions;
 - selected ready subsets, missing traces, missing derived evidence sidecars,
   CLI timeout/nonzero/no-output closure states, and rerun behavior;
+- local SOL-ExecBench and FlashInfer Trace migration manifests, source
+  revisions, checksum refs, missing-input blockers, and redistribution policy;
+- ROCm readiness classes, blocker reports, ready-subset denominators, and
+  no-hardware-validation claim boundaries;
+- CPU-safe NVFP4/MXFP4/E2M1 compatibility helpers with explicit unvalidated
+  CDNA4 evidence markers;
 - deterministic dataset sharding plan and merge semantics.
 
 Focused run:
@@ -243,6 +253,10 @@ uv run pytest \
   tests/sol_execbench/test_dataset_run_closure.py \
   tests/sol_execbench/test_run_dataset_execution_closure.py \
   tests/sol_execbench/test_dataset_failure_mode_docs.py \
+  tests/sol_execbench/test_dataset_migration.py \
+  tests/sol_execbench/test_dataset_inventory_readiness.py \
+  tests/sol_execbench/test_low_precision_compatibility.py \
+  tests/sol_execbench/test_dataset_redistribution_policy.py \
   tests/sol_execbench/test_dataset_sharding.py -q
 ```
 

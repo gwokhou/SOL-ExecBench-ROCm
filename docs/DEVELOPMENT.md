@@ -51,6 +51,8 @@ This is not a JavaScript project. Development commands are defined by
 | `uv run sol-execbench contract --json` | Print GPU-free evaluator compatibility metadata. |
 | `uv run sol-execbench doctor --json` | Print ROCm environment diagnostics. |
 | `uv run sol-execbench toolchain --json` | Print ROCm evidence-tool routing. |
+| `uv run sol-execbench dataset migrate-sol <source_root> <output_root>` | Migrate locally downloaded SOL-ExecBench inputs into local benchmark layout and write a migration manifest. |
+| `uv run sol-execbench dataset migrate-flashinfer <source_root> <output_root>` | Migrate locally downloaded FlashInfer Trace inputs into local benchmark layout and write a migration manifest. |
 | `uv run sol-execbench-baseline --candidate <file> --baseline <file>` | Compare trace JSONL files. |
 | `uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark --limit 5` | Run a small dataset batch. |
 | `uv run pytest tests/` | Run the full test suite. |
@@ -93,6 +95,7 @@ artifacts, caches, and virtual environments.
 | `src/sol_execbench/core/data/` | Pydantic schemas for definitions, workloads, solutions, traces, shapes, dtypes, and contracts. |
 | `src/sol_execbench/core/bench/` | Correctness, timing, clock locking, reward-hack guardrails, profiler integration, static evidence, and IO helpers. |
 | `src/sol_execbench/core/dataset/` | Dataset layout, inventory, readiness, manifest, checksum, ready-subset, reuse, closure, sharding, and parity-gap helpers. |
+| `src/sol_execbench/core/dataset/low_precision.py` | CPU-safe NVFP4/MXFP4/E2M1 compatibility helpers and unvalidated-CDNA4 evidence markers for migrated definitions. |
 | `src/sol_execbench/core/scoring/` | AMD scoring, bound estimates, bound graphs, hardware models, SOL derivation, and baseline artifacts. |
 | `src/sol_execbench/driver/` | Problem staging and generated compile/evaluation templates. |
 | `src/sol_execbench/data/` | Packaged AMD hardware model JSON. |
@@ -138,6 +141,9 @@ not a benchmark behavior change.
 The main console script is `sol-execbench`, backed by
 `sol_execbench.cli:cli`. The baseline comparison script is
 `sol-execbench-baseline`, backed by `sol_execbench.cli.baseline:cli`.
+The root CLI also dispatches `dataset migrate-sol` and
+`dataset migrate-flashinfer` for local-only dataset conversion into benchmark
+layout artifacts and migration manifests.
 
 Normal evaluation stages files into a temporary directory through
 `ProblemPackager`. HIP/C++ solutions compile with

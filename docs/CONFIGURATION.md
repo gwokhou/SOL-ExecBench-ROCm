@@ -239,6 +239,26 @@ uv run sol-execbench toolchain --json
 `toolchain` also accepts `--evidence-level`, `--artifact-type`, `--gpu-arch`,
 `--hardware-generation`, `--rocm-version`, and `--list-registry`.
 
+Local dataset migration subcommands live under the same `sol-execbench` entry
+point:
+
+```bash
+uv run sol-execbench dataset migrate-sol <source_root> <output_root> \
+  --category L1 --manifest out/sol-migration-manifest.json --json
+uv run sol-execbench dataset migrate-flashinfer <source_root> <output_root> \
+  --manifest out/flashinfer-migration-manifest.json --json
+```
+
+| Subcommand | Option | Purpose |
+| --- | --- | --- |
+| `dataset migrate-sol` | `--category` | Restrict SOL-ExecBench migration to one or more categories. |
+| `dataset migrate-sol` | `--source-revision` | Record the source dataset revision or local commit ref in the manifest. |
+| `dataset migrate-sol` | `--manifest` | Write the migration manifest to an explicit path. |
+| `dataset migrate-sol` | `--json` | Print the migration manifest JSON to stdout. |
+| `dataset migrate-flashinfer` | `--source-revision` | Record the FlashInfer Trace source revision or local commit ref in the manifest. |
+| `dataset migrate-flashinfer` | `--manifest` | Write the migration manifest to an explicit path. |
+| `dataset migrate-flashinfer` | `--json` | Print the migration manifest JSON to stdout. |
+
 ## Package Configuration
 
 `pyproject.toml` defines:
@@ -288,6 +308,7 @@ target-specific ROCm wheel stacks without changing the project lockfile.
 | `--readiness` | Enrich execution closure with readiness blocker records. |
 | `--execution-closure` | Write an execution-closure JSON sidecar; defaults under `--output` when `--ready-subset` is supplied. |
 | `--dataset-manifest` | Include dataset manifest provenance in closure checks. |
+| `--ready-subset` plus `--readiness` | Preserve ready-subset denominators, readiness classes, blocker codes, and exclusion reasons in closure records. |
 | `--rerun` | Re-evaluate existing traces instead of reusing passing results. |
 | `--amd-score-report` | Write an opt-in AMD-native derived score report. |
 | `--amd-sol-bound-dir` | Materialize AMD SOL bound sidecars used by score reporting. |

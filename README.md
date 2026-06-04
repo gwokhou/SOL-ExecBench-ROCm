@@ -77,6 +77,16 @@ Run a small downloaded dataset batch:
 uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark --limit 5
 ```
 
+Migrate locally downloaded SOL-ExecBench or FlashInfer Trace inputs into the
+repository benchmark layout without redistributing restricted source data:
+
+```bash
+uv run sol-execbench dataset migrate-sol data/SOL-ExecBench/source data/SOL-ExecBench/benchmark \
+  --manifest out/sol-migration-manifest.json
+uv run sol-execbench dataset migrate-flashinfer data/flashinfer-trace/source data/flashinfer-trace/benchmark \
+  --manifest out/flashinfer-migration-manifest.json
+```
+
 For auditable ready-subset dataset runs, pass closure and evidence sidecars:
 
 ```bash
@@ -132,6 +142,8 @@ uv run sol-execbench contract --json
 uv run sol-execbench doctor --json
 uv run sol-execbench toolchain --json
 uv run sol-execbench toolchain --json --list-registry
+uv run sol-execbench dataset migrate-sol --help
+uv run sol-execbench dataset migrate-flashinfer --help
 ```
 
 Compare trace JSONL against one or more baselines:
@@ -183,6 +195,7 @@ Legacy CUDA/NVIDIA schema values such as `cuda_cpp`, `cublas`, `cudnn`, `cutlass
 - [Analysis](docs/analysis.md): trace analysis, dataset closure, failure-mode, and sharding semantics.
 - [Researcher Guide](docs/RESEARCHER-GUIDE.md): workflows for kernel, compiler/backend, agent, and reproducibility researchers.
 - [Cookbook](docs/COOKBOOK.md): task-oriented commands for common benchmark workflows.
+- [Dataset provenance and local migration](docs/COOKBOOK.md): local-only SOL-ExecBench and FlashInfer Trace migration, manifest, readiness, and ready-subset workflows.
 - [ROCm Notes](docs/rocm.md): host, Docker, and validation notes.
 - [Claims](docs/CLAIMS.md): support, evidence, and forbidden claim boundaries.
 - [ROCm Timing](docs/rocm_timing.md): HIP event timing and optional profiler evidence.

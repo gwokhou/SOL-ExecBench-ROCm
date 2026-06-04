@@ -117,6 +117,8 @@ Update documentation when changing:
 - ROCm hardware support claims
 - Scoring, timing, profiling, or evidence semantics
 - Dataset reuse, execution-closure, failure-mode, or sharding semantics
+- Dataset migration, readiness classification, ready-subset denominator,
+  low-precision compatibility, or redistribution-boundary behavior
 - User-facing examples
 
 Use conservative wording for unvalidated hardware or infrastructure claims.
