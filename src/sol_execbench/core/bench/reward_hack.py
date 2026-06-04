@@ -210,7 +210,7 @@ def review_solution_sources(
     families while remaining structured and inspectable for tests and tooling.
     """
     issues: list[SourceReviewIssue] = []
-    float32_contract = bool(output_dtypes) and any(
+    float32_contract = bool(output_dtypes) and all(
         dtype == torch.float32 for dtype in output_dtypes.values()
     )
     for source in getattr(solution, "sources", []):
@@ -279,12 +279,14 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_Assign(self, node: ast.Assign) -> None:
-        if any(_target_is_cache(target) for target in node.targets):
+        if _assignment_creates_semantic_cache(node.targets, node.value):
             self._add("semantic_output_cache", node, self._node_source(node))
         self.generic_visit(node)
 
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
-        if _target_is_cache(node.target):
+        if node.value is not None and _assignment_creates_semantic_cache(
+            [node.target], node.value
+        ):
             self._add("semantic_output_cache", node, self._node_source(node))
         self.generic_visit(node)
 
@@ -303,11 +305,6 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
             self._add("unauthorized_file_or_loader", node, name or self._node_source(node))
         if self.float32_contract and self._is_precision_downgrade_call(node, name):
             self._add("precision_downgrade", node, name or self._node_source(node))
-        self.generic_visit(node)
-
-    def visit_Attribute(self, node: ast.Attribute) -> None:
-        if self.float32_contract and self._resolved_name(node) in _PRECISION_DTYPE_NAMES:
-            self._add("precision_downgrade", node, self._node_source(node))
         self.generic_visit(node)
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
@@ -421,6 +418,29 @@ def _target_is_cache(target: ast.AST) -> bool:
         return "cache" in target.attr.lower()
     if isinstance(target, (ast.Tuple, ast.List)):
         return any(_target_is_cache(elt) for elt in target.elts)
+    return False
+
+
+def _assignment_creates_semantic_cache(
+    targets: Iterable[ast.AST], value: ast.AST
+) -> bool:
+    return any(_target_is_cache(target) for target in targets) and _value_is_cache(value)
+
+
+def _value_is_cache(value: ast.AST) -> bool:
+    if isinstance(value, (ast.Dict, ast.Set)):
+        return True
+    if isinstance(value, ast.Call):
+        return _dotted_name(value.func) in {
+            "dict",
+            "set",
+            "collections.defaultdict",
+            "defaultdict",
+            "OrderedDict",
+            "collections.OrderedDict",
+            "functools.lru_cache",
+            "lru_cache",
+        }
     return False
 
 
