@@ -34,6 +34,101 @@ generated_or_planning = [
   "Generated reports and demo evidence fixtures under docs/examples/**.",
 ]
 
+[redistribution_classes]
+publishable = "May be committed and included in release bundles when the stated license and attribution requirements are preserved."
+local_only = "May exist only in a maintainer's local checkout or ignored data directory; do not commit or publish."
+generated_only = "May be generated locally from source material by users with applicable rights; do not treat the generated output as project source."
+excluded = "Must not be committed, checked in as fixtures, or redistributed by this project."
+release_bundle_blocked = "Must not be copied into prerelease or release artifact bundles."
+
+[dataset_policy]
+schema_version = "sol_execbench.dataset_provenance_policy.v1"
+policy_doc = "docs/provenance.md#dataset-license-and-redistribution-boundaries"
+guardrail = "scripts/check_dataset_redistribution.py"
+default_boundary = "Dataset source and migrated payloads are local inputs unless this manifest explicitly classifies them as publishable."
+
+[[dataset_policy.sources]]
+id = "nvidia_sol_execbench"
+name = "NVIDIA SOL-ExecBench evaluation dataset"
+origin_repository = "https://github.com/NVIDIA/SOL-ExecBench"
+license = "NVIDIA Evaluation Dataset License"
+provenance_class = "restricted_upstream_dataset"
+redistribution_class = "excluded"
+repository_redistribution = false
+release_bundle_redistribution = false
+attribution = "NVIDIA SOL-ExecBench; obtain from upstream under NVIDIA Evaluation Dataset License terms."
+path_globs = [
+  "data/SOL-ExecBench/**",
+  "data/sol-execbench/**",
+  "data/nvidia/SOL-ExecBench/**",
+  "data/migrated/SOL-ExecBench/**",
+  "data/migrated/nvidia-sol-execbench/**",
+  "out/**/SOL-ExecBench/**",
+  "out/**/nvidia-sol-execbench/**",
+]
+forbidden_content = [
+  "Original NVIDIA SOL-ExecBench rows, definitions, workloads, traces, solutions, and blobs.",
+  "ROCm-migrated dataset artifacts derived from NVIDIA SOL-ExecBench source rows or payloads.",
+]
+
+[[dataset_policy.sources]]
+id = "flashinfer_trace"
+name = "FlashInfer Trace"
+origin_repository = "https://github.com/flashinfer-ai/flashinfer-trace"
+license = "Apache-2.0"
+provenance_class = "apache_upstream_trace"
+redistribution_class = "publishable"
+repository_redistribution = true
+release_bundle_redistribution = true
+attribution = "FlashInfer Trace by flashinfer-ai/flashinfer-trace under Apache-2.0; retain required notices when redistributing."
+path_globs = [
+  "third_party/flashinfer-trace/**",
+  "data/flashinfer-trace/**",
+  "data/FlashInfer-Trace/**",
+]
+required_notices = [
+  "Apache-2.0 license text or reference",
+  "flashinfer-ai/flashinfer-trace attribution",
+]
+
+[[dataset_policy.sources]]
+id = "generated_local_migration_artifacts"
+name = "Generated local migration artifacts"
+origin_repository = "local generation from declared dataset sources"
+license = "inherits source dataset boundary"
+provenance_class = "generated_local_artifact"
+redistribution_class = "generated_only"
+repository_redistribution = false
+release_bundle_redistribution = false
+attribution = "Record source dataset id, source revision, checksums, and license boundary in migration manifests."
+path_globs = [
+  "data/migrated/**",
+  "out/**/migrated/**",
+  "out/**/dataset_migration/**",
+]
+forbidden_content = [
+  "Generated files whose source_boundary is nvidia_sol_execbench.",
+]
+
+[[dataset_policy.sources]]
+id = "project_owned_rocm_code"
+name = "Project-owned ROCm code and metadata"
+origin_repository = "SOL ExecBench ROCm Port"
+license = "Apache-2.0"
+provenance_class = "independent_rocm_work"
+redistribution_class = "publishable"
+repository_redistribution = true
+release_bundle_redistribution = true
+attribution = "Copyright (c) 2026 contributors to SOL ExecBench ROCm Port"
+path_globs = [
+  "src/**",
+  "scripts/**",
+  "tests/**",
+  "docs/**",
+  "examples/**",
+  "docker/**",
+]
+
 [header_policy]
 upstream_retained = "Keep applicable NVIDIA SPDX-FileCopyrightText and Apache-2.0 SPDX-License-Identifier."
 derivative_modified = "Keep applicable NVIDIA SPDX-FileCopyrightText, add project SPDX-FileCopyrightText when modified, and keep Apache-2.0 SPDX-License-Identifier."

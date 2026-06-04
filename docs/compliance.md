@@ -49,6 +49,29 @@ Header handling follows `docs/provenance.md`. Prior blanket NVIDIA headers are
 corrected through ordinary commits; this project does not rewrite git history
 for ordinary metadata cleanup unless a separate legal review requires it.
 
+## Dataset Redistribution
+
+NVIDIA SOL-ExecBench evaluation dataset content is not redistributed by this
+project. Original NVIDIA rows, definitions, workloads, traces, solutions, blobs,
+and ROCm-migrated derivatives must be obtained and generated locally by users
+with applicable rights under the NVIDIA Evaluation Dataset License. They must
+not be committed to the repository or included in release/prerelease bundles.
+
+FlashInfer Trace content is tracked separately as Apache-2.0 material from
+`flashinfer-ai/flashinfer-trace`. Redistribution of FlashInfer Trace material
+requires preserving Apache-2.0 license and attribution notices, and migration
+metadata must not collapse FlashInfer Trace provenance into the NVIDIA
+Evaluation Dataset License boundary.
+
+The enforceable source and redistribution matrix lives in `provenance.toml`.
+Run the CPU-safe guardrail before publishing or after staging dataset-related
+changes:
+
+```bash
+uv run scripts/check_dataset_redistribution.py --staged
+uv run scripts/check_dataset_redistribution.py --release-root out/prerelease_artifact_bundle
+```
+
 ## Unsupported NVIDIA Runtime Features
 
 This port is ROCm-only and does not support:

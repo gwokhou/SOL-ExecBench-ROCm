@@ -47,6 +47,13 @@ The bundle writes:
 The manifest also records checksums for referenced source documents such as
 `docs/CLAIMS.md`.
 
+The bundle must not contain NVIDIA SOL-ExecBench original dataset content or
+ROCm-migrated derivatives of that content. The prerelease readiness checker
+scans bundle paths using the dataset policy in `provenance.toml` and blocks
+release bundles that include restricted NVIDIA dataset payloads. FlashInfer
+Trace content remains a separate Apache-2.0 source boundary and must retain the
+required license and attribution notices when redistributed.
+
 ## Authority Classes
 
 Every artifact or evidence surface is mapped to one of these classes:

@@ -59,6 +59,47 @@ def test_provenance_manifest_defines_header_policy_classes() -> None:
     assert "project" in header_policy["independent_rocm_work"]
 
 
+def test_provenance_manifest_defines_dataset_redistribution_policy() -> None:
+    provenance = _load_provenance()
+
+    redistribution_classes = provenance["redistribution_classes"]
+    for expected in (
+        "publishable",
+        "local_only",
+        "generated_only",
+        "excluded",
+        "release_bundle_blocked",
+    ):
+        assert expected in redistribution_classes
+
+    dataset_policy = provenance["dataset_policy"]
+    assert dataset_policy["schema_version"] == "sol_execbench.dataset_provenance_policy.v1"
+    assert dataset_policy["guardrail"] == "scripts/check_dataset_redistribution.py"
+
+    sources = {source["id"]: source for source in dataset_policy["sources"]}
+    assert set(sources) == {
+        "nvidia_sol_execbench",
+        "flashinfer_trace",
+        "generated_local_migration_artifacts",
+        "project_owned_rocm_code",
+    }
+
+    nvidia_source = sources["nvidia_sol_execbench"]
+    assert nvidia_source["license"] == "NVIDIA Evaluation Dataset License"
+    assert nvidia_source["redistribution_class"] == "excluded"
+    assert nvidia_source["repository_redistribution"] is False
+    assert nvidia_source["release_bundle_redistribution"] is False
+
+    flashinfer_source = sources["flashinfer_trace"]
+    assert flashinfer_source["license"] == "Apache-2.0"
+    assert flashinfer_source["redistribution_class"] == "publishable"
+    assert "flashinfer-ai/flashinfer-trace" in flashinfer_source["attribution"]
+
+    generated_source = sources["generated_local_migration_artifacts"]
+    assert generated_source["redistribution_class"] == "generated_only"
+    assert generated_source["repository_redistribution"] is False
+
+
 def test_current_nvidia_headers_are_classified() -> None:
     provenance = _load_provenance()
     nvidia_notice = provenance["nvidia_notice"]
