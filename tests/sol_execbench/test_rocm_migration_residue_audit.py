@@ -162,9 +162,21 @@ def _classification(relative_path: str, line: str) -> str | None:
     if relative_path.startswith("tests/sol_execbench/test_dataset_contract.py") and "CUDA" in line:
         return "dataset category rejection fixture"
     if relative_path.startswith("tests/sol_execbench/test_dataset_inventory_readiness.py") and (
-        "nvidia" in line or "cuda" in line
+        "nvidia" in line or "cuda" in line or "cutile" in line
     ):
         return "dataset readiness NVIDIA-only blocker fixture"
+    if relative_path.startswith("tests/sol_execbench/test_dataset_migration.py") and (
+        "NVIDIA" in line or "nvidia" in line
+    ):
+        return "dataset migration provenance fixture"
+    if relative_path.startswith("tests/sol_execbench/test_dataset_redistribution_policy.py") and (
+        "NVIDIA" in line or "nvidia" in line
+    ):
+        return "dataset redistribution policy fixture"
+    if relative_path.startswith("tests/sol_execbench/test_run_dataset_execution_closure.py") and (
+        "NVIDIA" in line or "nvidia" in line
+    ):
+        return "dataset execution closure provenance fixture"
     if relative_path.startswith("tests/sol_execbench/test_original_parity_docs.py"):
         return "original NVIDIA parity documentation assertions"
     if relative_path.startswith("tests/sol_execbench/test_public_contract_guardrails.py") and (

@@ -11,6 +11,12 @@ scope: full repo
 
 - Current state: v1.29 is shipped and archived as of 2026-06-04, and no active
   milestone is defined.
+- Narrowed concerns are areas where recent helper extraction, CPU-safe
+  guardrails, or documentation contracts reduced risk but did not remove the
+  need for future validation.
+- Externally blocked/deferred concerns depend on unavailable hardware,
+  restricted datasets, paper-scale validation scope, or explicit project
+  non-goals rather than missing local implementation.
 - Highest-risk active surfaces are the generated evaluator, subprocess/native
   build boundary, static reward-hack guardrails, dataset migration/closure
   evidence, and proliferating derived authority reports.
