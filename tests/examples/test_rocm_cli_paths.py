@@ -198,6 +198,8 @@ def test_sol_execbench_cli_runs_hip_cpp_with_static_evidence_on_rocm(tmp_path: P
             str(problem_dir / "solution_hip.json"),
             "--output",
             str(trace_path),
+            "--compile-timeout",
+            "300",
             "--static-evidence",
             "auto",
             "--json",
