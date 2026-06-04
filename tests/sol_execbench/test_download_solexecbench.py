@@ -69,6 +69,27 @@ def test_downloader_honors_category_output_root_revision_and_manifest(tmp_path, 
     assert manifest["claim_boundary"]["rocm_readiness"] is False
 
 
+def test_downloader_normalizes_empty_hf_id_to_null(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        download_solexecbench,
+        "load_dataset",
+        lambda *args, **kwargs: [_row() | {"hf_id": ""}],
+    )
+    output_root = tmp_path / "dataset"
+
+    rc = download_solexecbench.main(
+        ["--category", "FlashInfer-Bench", "--output-root", str(output_root)]
+    )
+
+    assert rc == 0
+    definition = json.loads(
+        (output_root / "FlashInfer-Bench" / "matmul_demo" / "definition.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert definition["hf_id"] is None
+
+
 def test_downloader_reuses_identical_files_and_rejects_divergent_files(tmp_path, monkeypatch):
     monkeypatch.setattr(download_solexecbench, "load_dataset", lambda *args, **kwargs: [_row()])
     output_root = tmp_path / "dataset"

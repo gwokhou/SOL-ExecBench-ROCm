@@ -23,7 +23,7 @@ from enum import Enum
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Iterable, Literal, Optional, Union
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .base_model import BaseModelWithDocstrings, NonEmptyString, NonNegativeInt
 from .dtypes import dtype_str_to_torch_dtype
@@ -166,6 +166,14 @@ class Definition(BaseModelWithDocstrings):
     """Optional human-readable description of the kernel's purpose."""
     hf_id: Optional[NonEmptyString] = Field(default=None)
     """Optional HuggingFace model ID that the definition was sourced from."""
+
+    @field_validator("hf_id", mode="before")
+    @classmethod
+    def _normalize_empty_hf_id(cls, value: Any) -> Any:
+        """Treat empty dataset IDs as absent optional metadata."""
+        if value == "":
+            return None
+        return value
 
     @model_validator(mode="after")
     def _validate_reference_code(self) -> Definition:

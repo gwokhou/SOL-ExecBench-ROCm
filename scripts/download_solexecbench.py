@@ -34,11 +34,18 @@ REPO_ID = "nvidia/SOL-ExecBench"
 OUTPUT_DIR = ROOT / "data" / "SOL-ExecBench" / "benchmark"
 
 
+def _optional_nonempty(value: object) -> object | None:
+    """Return None for absent or empty optional dataset metadata."""
+    if value == "":
+        return None
+    return value
+
+
 def _build_definition(row: dict) -> dict:
     """Assemble a definition.json dict from a dataset row."""
     definition: dict = {
         "name": row["name"],
-        "hf_id": row.get("hf_id", None),
+        "hf_id": _optional_nonempty(row.get("hf_id", None)),
         "description": row["description"],
         "axes": json.loads(row["axes"]),
         "custom_inputs_entrypoint": row.get("custom_inputs_entrypoint", None),
