@@ -8,6 +8,10 @@ It does not record a CDNA 3 hardware-validation pass.
 - Readiness implementation: available through internal diagnostics helpers.
 - Hardware validation: deferred until a full adapted suite run is recorded on
   real `gfx94*` hardware.
+- A real `gfx942` validation attempt on 2026-06-04 is recorded in
+  [CDNA3 gfx942 Validation Attempt](cdna3_gfx942_validation_attempt.md). That
+  attempt did not pass the full adapted suite and does not upgrade CDNA3 or
+  MI300X support claims.
 - Claim wording: `cdna3_readiness_implemented` is not the same as CDNA 3
   hardware validated.
 - Blocked or non-CDNA targets use `cdna3_hardware_validation_deferred`.

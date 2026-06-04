@@ -327,6 +327,33 @@ class TestStaticSourceReview:
 
         assert review.blocked is False
 
+    def test_allows_triton_language_load_kernel_memory_reads(self):
+        review = review_solution_sources(
+            _solution_with_source(
+                "import triton\n"
+                "import triton.language as tl\n"
+                "@triton.jit\n"
+                "def kernel(x, offs):\n"
+                "    return tl.load(x + offs)\n"
+            )
+        )
+
+        assert review.blocked is False
+
+    def test_still_blocks_non_triton_load_methods(self):
+        review = review_solution_sources(
+            _solution_with_source(
+                "class Loader:\n"
+                "    def load(self):\n"
+                "        return 1\n"
+                "def run(x):\n"
+                "    return Loader().load()\n"
+            )
+        )
+
+        assert review.blocked is True
+        assert "unauthorized_file_or_loader" in {issue.rule for issue in review.issues}
+
     def test_blocking_message_includes_structured_review_evidence(self):
         review = review_solution_sources(
             _solution_with_source("def run(x):\n    return open('/tmp/x').read()\n")

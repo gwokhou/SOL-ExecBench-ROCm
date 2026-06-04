@@ -61,5 +61,5 @@ torch::Tensor run(
 // --- Pybind11 Module Definition ---
 // Exposes the 'run' function to Python, making it callable as a C++ extension.
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
-    m.def("run", &run, "RMSNorm kernel for hidden_size=4096 (BFloat16, HIP, gfx1200 Optimized)");
+    m.def("run", &run, "RMSNorm kernel for hidden_size=4096 (BFloat16, HIP, ROCm portable)");
 }

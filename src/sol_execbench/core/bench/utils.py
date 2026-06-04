@@ -95,19 +95,20 @@ def call_and_collect_outputs(
     output_dtypes: dict[str, torch.dtype],
 ) -> list[torch.Tensor]:
     """Call a benchmark function and normalize its outputs."""
+    torch_device = torch.device(device)
     if destination_passing_style:
         outputs = allocate_outputs(definition, resolved_axes, device)
         fn(*inputs, *outputs)
-        if torch.cuda.is_available():
+        if torch_device.type == "cuda" and torch.cuda.is_available():
             torch.cuda.synchronize(device)
         return outputs
 
     result = fn(*inputs)
-    if torch.cuda.is_available():
+    if torch_device.type == "cuda" and torch.cuda.is_available():
         torch.cuda.synchronize(device)
     out_dict = normalize_outputs(
         result,
-        device=torch.device(device),
+        device=torch_device,
         output_names=output_names,
         output_dtypes=output_dtypes,
     )
