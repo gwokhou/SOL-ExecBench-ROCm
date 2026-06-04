@@ -21,7 +21,7 @@ import json
 import shutil
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 from pydantic import BaseModel, Field
 
@@ -489,12 +489,12 @@ def _safetensors_blockers(
         if not isinstance(inputs, dict):
             continue
         for input_name, input_spec in sorted(inputs.items()):
-            if (
-                not isinstance(input_spec, dict)
-                or input_spec.get("type") != "safetensors"
-            ):
+            if not isinstance(input_spec, dict):
                 continue
-            raw_path = input_spec.get("path")
+            input_spec_payload = cast(dict[str, object], input_spec)
+            if input_spec_payload.get("type") != "safetensors":
+                continue
+            raw_path = input_spec_payload.get("path")
             if not isinstance(raw_path, str) or not raw_path:
                 blockers.append(
                     MigrationBlocker(
