@@ -295,6 +295,102 @@ def test_workload_shard_size_preserves_partial_traces_and_marks_failure(
     ]
 
 
+def test_timeout_overrides_apply_per_workload_shard(tmp_path, monkeypatch):
+    dataset_root = tmp_path / "dataset"
+    _write_problem(
+        dataset_root,
+        "L1",
+        "matmul_demo",
+        [_workload("one"), _workload("two")],
+    )
+    output_dir = tmp_path / "out"
+    overrides_path = tmp_path / "timeouts.json"
+    overrides_path.write_text(json.dumps({"workloads": {"two": 777}}))
+    timeouts: list[int] = []
+
+    def run_cli(*, workload_path: Path, timeout: int, **kwargs):
+        uuid = json.loads(workload_path.read_text())["uuid"]
+        timeouts.append(timeout)
+        return [_trace(uuid)]
+
+    monkeypatch.setattr(run_dataset, "run_cli", run_cli)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--output",
+            str(output_dir),
+            "--workload-shard-size",
+            "1",
+            "--timeout",
+            "300",
+            "--timeout-overrides",
+            str(overrides_path),
+        ],
+    )
+
+    run_dataset.main()
+
+    assert timeouts == [300, 777]
+
+
+def test_blob_precheck_uses_index_from_flashinfer_trace_dir(tmp_path, monkeypatch):
+    dataset_root = tmp_path / "dataset"
+    problem_dir = dataset_root / "FlashInfer-Bench" / "gqa_demo"
+    problem_dir.mkdir(parents=True)
+    (problem_dir / "definition.json").write_text(json.dumps(_definition("gqa_demo")))
+    ref = "data/flashinfer-trace/blob/workloads/gqa/example.safetensors"
+    (problem_dir / "workload.jsonl").write_text(
+        json.dumps(
+            {
+                "uuid": "has-blob",
+                "axes": {"M": 2},
+                "inputs": {
+                    "a": {"type": "safetensors", "path": ref, "tensor_key": "a"},
+                    "b": {"type": "random"},
+                },
+            }
+        )
+        + "\n"
+    )
+    trace_root = tmp_path / "flashinfer-trace"
+    blob = trace_root / "blob" / "workloads" / "gqa" / "example.safetensors"
+    blob.parent.mkdir(parents=True)
+    blob.write_bytes(b"demo")
+    output_dir = tmp_path / "out"
+    calls = 0
+
+    def run_cli(*, workload_path: Path, **kwargs):
+        nonlocal calls
+        calls += 1
+        return [_trace("has-blob")]
+
+    monkeypatch.setenv("FLASHINFER_TRACE_DIR", str(trace_root))
+    monkeypatch.setattr(run_dataset, "run_cli", run_cli)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--phase",
+            "traces",
+            "--execution-mode",
+            "pipeline",
+            "--output",
+            str(output_dir),
+        ],
+    )
+
+    run_dataset.main()
+
+    assert calls == 1
+    summary = json.loads((output_dir / "summary.json").read_text())
+    assert summary[0]["failed"] == 0
+
+
 def test_pipeline_trace_mode_preserves_summary_order_and_serial_gpu_invocations(
     tmp_path, monkeypatch
 ):
