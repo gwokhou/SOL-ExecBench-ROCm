@@ -172,6 +172,30 @@ def test_no_trace_diagnostics_sidecar_records_empty_stdout_failure(tmp_path: Pat
     assert payload["stderr_truncated"] is False
 
 
+def test_no_trace_diagnostics_filters_benign_amdgpu_ids_noise(tmp_path: Path):
+    output = tmp_path / "traces.jsonl"
+    staging = tmp_path / "staging"
+
+    written = cli_main._write_no_trace_diagnostics_sidecar(
+        output_file=output,
+        staging_dir=staging,
+        keep_staging=False,
+        reason="no_parseable_traces",
+        returncode=1,
+        stdout="",
+        stderr=(
+            "/opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory\n"
+            "real stderr\n"
+        ),
+    )
+
+    assert written is not None
+    payload = json.loads(written.read_text())
+    assert "amdgpu.ids" not in payload["stderr_tail"]
+    assert payload["stderr_tail"] == "real stderr\n"
+    assert payload["stderr_line_count"] == 1
+
+
 def test_environment_snapshot_sidecar_uses_explicit_path(tmp_path: Path, monkeypatch):
     sidecar = tmp_path / "run" / "env.json"
     monkeypatch.setenv(cli_main.ENV_SNAPSHOT_PATH_ENV, str(sidecar))

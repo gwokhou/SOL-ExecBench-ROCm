@@ -18,6 +18,7 @@ from sol_execbench.core.bench.rocm_profiler import (
     ProfilerRunner,
     collect_source_timing_evidence,
 )
+from sol_execbench.core.bench.stderr import filter_benign_rocm_stderr
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.trace import Trace
 from sol_execbench.core.data.workload import Workload
@@ -290,12 +291,7 @@ CLI_LOG_LIMIT = 64 * 1024
 
 def bounded_cli_stream(value: str | bytes | None) -> str:
     """Return a bounded tail representation of captured CLI output."""
-    if value is None:
-        return ""
-    if isinstance(value, bytes):
-        text = value.decode(errors="replace")
-    else:
-        text = value
+    text = filter_benign_rocm_stderr(value)
     if len(text) <= CLI_LOG_LIMIT:
         return text
     return "[truncated CLI output]\n" + text[-CLI_LOG_LIMIT:]
@@ -319,8 +315,9 @@ def bounded_file_stream(path: Path) -> str:
             if size > CLI_LOG_LIMIT:
                 handle.seek(max(0, size - CLI_LOG_LIMIT))
                 data = handle.read()
-                return "[truncated CLI output]\n" + data.decode(errors="replace")
-            return handle.read().decode(errors="replace")
+                text = filter_benign_rocm_stderr(data)
+                return "[truncated CLI output]\n" + text if text else ""
+            return filter_benign_rocm_stderr(handle.read())
     except OSError:
         return ""
 
