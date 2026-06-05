@@ -569,3 +569,15 @@ for _workload in workloads:
             ),
         )
     )
+
+# TorchInductor and ROCm runtimes can leave non-daemon worker threads alive after
+# all benchmark traces have been emitted.  The driver is a one-shot subprocess,
+# so flush the trace stream and terminate explicitly instead of letting teardown
+# hang validation jobs.
+try:
+    _real_stdout.flush()
+    sys.stderr.flush()
+    sys.stdout.flush()
+except Exception:
+    pass
+os._exit(0)
