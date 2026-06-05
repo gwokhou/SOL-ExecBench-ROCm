@@ -19,7 +19,8 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
+import os
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -31,6 +32,30 @@ from sol_execbench.core.data import (
 )
 from sol_execbench.core.data.workload import CustomInput, SafetensorsInput, ScalarInput
 from sol_execbench.core.data.dtypes import dtype_str_to_torch_dtype
+
+
+FLASHINFER_TRACE_ENV = "FLASHINFER_TRACE_DIR"
+
+
+def flashinfer_safetensors_env(
+    base_env: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    """Return subprocess env with local FlashInfer safetensors roots enabled.
+
+    FlashInfer workloads store safetensors paths as repo-relative
+    ``data/flashinfer-trace/...`` locations. Evaluation runs from a temporary staging
+    directory, so subprocesses need an additional root when the local trace checkout is
+    available. User-provided ``FLASHINFER_TRACE_DIR`` always wins.
+    """
+
+    env = dict(os.environ if base_env is None else base_env)
+    if env.get(FLASHINFER_TRACE_ENV):
+        return env
+
+    repo_root = Path(__file__).resolve().parents[4]
+    if (repo_root / "data" / "flashinfer-trace" / "blob").exists():
+        env[FLASHINFER_TRACE_ENV] = str(repo_root)
+    return env
 
 
 def _cast_to_fp4x2(x: torch.Tensor) -> torch.Tensor:

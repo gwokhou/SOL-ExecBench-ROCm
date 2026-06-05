@@ -52,6 +52,7 @@ from ..core.toolchain import (
     build_toolchain_routing_report,
     default_toolchain_registry,
 )
+from ..core.bench.io import flashinfer_safetensors_env
 from ..core.bench.rocm_profiler import (
     ROCPROFV3_EXECUTABLE,
     Rocprofv3ProfileRequest,
@@ -514,13 +515,16 @@ def _run_evaluation_command(
 ) -> subprocess.CompletedProcess[str]:
     """Run the staged evaluation command with the standard ROCm allocator env."""
 
+    env = flashinfer_safetensors_env(
+        {**os.environ, "PYTORCH_ALLOC_CONF": "expandable_segments:True"}
+    )
     return subprocess.run(
         eval_cmd,
         cwd=staging_dir,
         capture_output=True,
         text=True,
         timeout=timeout,
-        env={**os.environ, "PYTORCH_ALLOC_CONF": "expandable_segments:True"},
+        env=env,
     )
 
 
@@ -550,7 +554,9 @@ def _run_profiled_evaluation(
             capture_output=True,
             text=True,
             timeout=timeout_seconds,
-            env={**os.environ, "PYTORCH_ALLOC_CONF": "expandable_segments:True"},
+            env=flashinfer_safetensors_env(
+                {**os.environ, "PYTORCH_ALLOC_CONF": "expandable_segments:True"}
+            ),
         ),
     )
     if profile_result.succeeded:
@@ -723,7 +729,9 @@ def _evaluate_cli(
                 capture_output=True,
                 text=True,
                 timeout=compile_timeout,
-                env={**os.environ, "PYTORCH_ALLOC_CONF": "expandable_segments:True"},
+                env=flashinfer_safetensors_env(
+                    {**os.environ, "PYTORCH_ALLOC_CONF": "expandable_segments:True"}
+                ),
             )
             progress.update(task, completed=True)
 

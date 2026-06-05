@@ -172,7 +172,8 @@ _check_integrity = check_eval_integrity
 user_fn = load_user_function(_solution, STAGING_DIR)
 
 # ── Safetensors blob roots ────────────────────────────────────────────────────
-# Priority: 1) staging dir (client-inlined blobs), 2) flashinfer-trace directory.
+# Priority: 1) staging dir (client-inlined blobs), 2) configured repo/blob root.
+# FlashInfer workload paths may be repo-relative: data/flashinfer-trace/...
 _safetensors_roots = [STAGING_DIR]
 _benchmark_dir = os.environ.get("FLASHINFER_TRACE_DIR", None)
 if _benchmark_dir:

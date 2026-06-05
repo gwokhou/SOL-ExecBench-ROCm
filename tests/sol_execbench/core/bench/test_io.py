@@ -21,6 +21,7 @@ import pytest
 import torch
 
 from sol_execbench.core.bench.io import (
+    FLASHINFER_TRACE_ENV,
     ShiftingMemoryPoolAllocator,
     _cast_to_fp4x2,
     _generate_heuristic_tensor,
@@ -35,11 +36,18 @@ from sol_execbench.core.bench.io import (
     _is_weight_matrix,
     _rand_tensor,
     _resolve_blob_path,
+    flashinfer_safetensors_env,
     gen_inputs,
     load_safetensors,
     normalize_outputs,
 )
 from sol_execbench_type_helpers import make_definition, make_workload
+
+
+def test_flashinfer_safetensors_env_preserves_user_root():
+    env = flashinfer_safetensors_env({FLASHINFER_TRACE_ENV: "/custom/root"})
+
+    assert env[FLASHINFER_TRACE_ENV] == "/custom/root"
 
 # ------------------------------------------------------------------
 # _rand_tensor

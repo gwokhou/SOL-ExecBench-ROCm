@@ -46,6 +46,39 @@ def test_environment_snapshot_sidecar_disabled_by_default(
     assert not output.with_name("trace.jsonl.environment.json").exists()
 
 
+def test_run_evaluation_command_passes_flashinfer_env(tmp_path: Path, monkeypatch):
+    captured_env = None
+
+    def fake_env(base_env):
+        env = dict(base_env)
+        env["FLASHINFER_TRACE_DIR"] = "/repo"
+        return env
+
+    def fake_run(*args, **kwargs):
+        nonlocal captured_env
+        captured_env = kwargs["env"]
+        return cli_main.subprocess.CompletedProcess(
+            args=args[0],
+            returncode=0,
+            stdout="",
+            stderr="",
+        )
+
+    monkeypatch.setattr(cli_main, "flashinfer_safetensors_env", fake_env)
+    monkeypatch.setattr(cli_main.subprocess, "run", fake_run)
+
+    result = cli_main._run_evaluation_command(
+        ["python", "eval_driver.py"],
+        staging_dir=tmp_path,
+        timeout=30,
+    )
+
+    assert result.returncode == 0
+    assert captured_env is not None
+    assert captured_env["PYTORCH_ALLOC_CONF"] == "expandable_segments:True"
+    assert captured_env["FLASHINFER_TRACE_DIR"] == "/repo"
+
+
 def test_no_trace_diagnostics_sidecar_uses_trace_output_path(tmp_path: Path):
     output = tmp_path / "traces.jsonl"
     staging = tmp_path / "staging"
