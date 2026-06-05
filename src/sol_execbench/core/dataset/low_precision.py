@@ -18,6 +18,8 @@ LOW_PRECISION_COMPATIBILITY_FORMATS = (
 
 LOW_PRECISION_COMPATIBILITY_EVIDENCE_CODE = "phase134_low_precision_cpu_semantics"
 CDNA4_VALIDATION_DEFERRED_CODE = "cdna4_low_precision_hardware_validation_deferred"
+CDNA3_LOW_PRECISION_SKIP_CODE = "cdna3_low_precision_hardware_unsupported"
+CDNA3_GFX_ARCHITECTURES = ("gfx940", "gfx941", "gfx942")
 
 _E2M1_CODE_TO_VALUE = torch.tensor(
     [0.0, 0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 6.0, -0.0, -0.5, -1.0, -1.5, -2.0, -3.0, -4.0, -6.0],
@@ -121,6 +123,44 @@ def low_precision_unvalidated_evidence(format_name: str = "nvfp4") -> LowPrecisi
     return LowPrecisionCompatibilityEvidence(format_name=normalize_low_precision_format(format_name))
 
 
+def definition_uses_cdna4_low_precision(definition: dict[str, Any]) -> bool:
+    """Return whether a problem definition uses NVFP4/MXFP4-style FP4 formats."""
+
+    tokens: set[str] = set()
+    tokens.add(str(definition.get("name", "")))
+    tokens.add(str(definition.get("reference", "")))
+    for section_name in ("inputs", "outputs"):
+        section = definition.get(section_name, {})
+        if not isinstance(section, dict):
+            continue
+        for value in section.values():
+            if not isinstance(value, dict):
+                continue
+            tokens.add(str(value.get("dtype", "")))
+            tokens.add(str(value.get("description", "")))
+    return any(_contains_low_precision_token(token) for token in tokens)
+
+
+def should_skip_cdna4_low_precision_on_arch(
+    definition: dict[str, Any], gpu_architecture: str | None
+) -> bool:
+    """Return whether a CDNA3 run should skip CDNA4-only low-precision problems."""
+
+    arch = (gpu_architecture or "").lower()
+    return arch.startswith(CDNA3_GFX_ARCHITECTURES) and definition_uses_cdna4_low_precision(
+        definition
+    )
+
+
+def cdna4_low_precision_skip_reason(gpu_architecture: str | None) -> str:
+    arch = gpu_architecture or "unknown"
+    return (
+        f"{CDNA3_LOW_PRECISION_SKIP_CODE}: {arch} does not provide default "
+        "NVFP4/MXFP4 Quant validation support; run on CDNA4-class hardware for "
+        "hardware validation."
+    )
+
+
 def quantize_e2m1_codes(values: torch.Tensor, *, scale: float = 1.0) -> torch.Tensor:
     """Quantize float values to unsigned 4-bit E2M1 codes."""
 
@@ -222,6 +262,11 @@ def pack_low_precision_tensor(
         scale_metadata=scale_metadata,
         evidence=low_precision_unvalidated_evidence(normalized),
     )
+
+
+def _contains_low_precision_token(value: str) -> bool:
+    normalized = value.lower().replace("-", "_")
+    return any(token in normalized for token in LOW_PRECISION_COMPATIBILITY_FORMATS)
 
 
 def _packed_shape(shape: torch.Size | tuple[int, ...]) -> tuple[int, ...]:

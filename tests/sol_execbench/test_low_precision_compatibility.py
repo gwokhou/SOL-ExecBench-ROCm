@@ -6,12 +6,15 @@ import torch
 from sol_execbench.core.dataset import (
     CDNA4_VALIDATION_DEFERRED_CODE,
     LOW_PRECISION_COMPATIBILITY_EVIDENCE_CODE,
+    cdna4_low_precision_skip_reason,
     dequantize_e2m1_codes,
+    definition_uses_cdna4_low_precision,
     low_precision_unvalidated_evidence,
     normalize_low_precision_format,
     pack_e2m1_codes,
     pack_low_precision_tensor,
     quantize_e2m1_codes,
+    should_skip_cdna4_low_precision_on_arch,
     unpack_e2m1_codes,
 )
 
@@ -96,3 +99,44 @@ def test_scalar_low_precision_tensor_round_trips_shape():
     assert payload.unpack_codes().shape == ()
     assert payload.dequantize().shape == ()
     assert payload.dequantize().item() == 1.0
+
+
+def test_cdna3_low_precision_quant_skip_policy():
+    definition = {
+        "name": "033_nvfp4_moe_routing_with_topk_selection",
+        "inputs": {
+            "gate_weight_fp4": {
+                "dtype": "float4_e2m1fn_x2",
+                "description": "NVFP4 gate weight",
+            },
+            "hidden_states": {"dtype": "bfloat16"},
+        },
+        "outputs": {"router_logits": {"dtype": "float32"}},
+        "reference": "",
+    }
+
+    assert definition_uses_cdna4_low_precision(definition) is True
+    assert should_skip_cdna4_low_precision_on_arch(definition, "gfx942") is True
+    assert (
+        should_skip_cdna4_low_precision_on_arch(
+            definition, "gfx941:sramecc+:xnack-"
+        )
+        is True
+    )
+    assert should_skip_cdna4_low_precision_on_arch(definition, "gfx950") is False
+    assert should_skip_cdna4_low_precision_on_arch(definition, "unknown") is False
+    assert "cdna3_low_precision_hardware_unsupported" in cdna4_low_precision_skip_reason(
+        "gfx942"
+    )
+
+
+def test_cdna3_low_precision_skip_policy_ignores_non_fp4_quant():
+    definition = {
+        "name": "011_fp8_moe_gate_routing",
+        "inputs": {"hidden_states": {"dtype": "bfloat16"}},
+        "outputs": {"topk_weight": {"dtype": "float32"}},
+        "reference": "",
+    }
+
+    assert definition_uses_cdna4_low_precision(definition) is False
+    assert should_skip_cdna4_low_precision_on_arch(definition, "gfx942") is False

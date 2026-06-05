@@ -145,6 +145,33 @@ def _matching_closure_provenance() -> dict:
     }
 
 
+def test_skipped_problem_summary_records_cdna3_low_precision_reason():
+    summary = run_dataset._skipped_problem_summary(
+        "Quant/033_nvfp4_moe_routing_with_topk_selection",
+        "cdna3_low_precision_hardware_unsupported: gfx942 unsupported",
+    )
+
+    assert summary == {
+        "problem": "Quant/033_nvfp4_moe_routing_with_topk_selection",
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "latencies_ms": [],
+        "failure_reasons": [],
+        "skipped": 1,
+        "skip_reasons": [
+            "cdna3_low_precision_hardware_unsupported: gfx942 unsupported"
+        ],
+    }
+
+
+def test_effective_gpu_architecture_uses_environment_fallback(monkeypatch):
+    monkeypatch.setenv("SOL_EXECBENCH_RUNTIME_GFX_ARCHITECTURE", "gfx942")
+
+    assert run_dataset._effective_gpu_architecture("unknown") == "gfx942"
+    assert run_dataset._effective_gpu_architecture("gfx950") == "gfx950"
+
+
 def _write_problem(
     dataset_root: Path, category: str, name: str, workloads: list[dict]
 ) -> Path:
