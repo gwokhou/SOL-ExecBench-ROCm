@@ -59,6 +59,7 @@ from ..core.bench.rocm_profiler import (
     Rocprofv3ProfileResult,
     collect_rocprofv3_profile,
 )
+from ..core.bench.stderr import filter_benign_rocm_stderr
 from ..core.bench.static_kernel_evidence import (
     StaticKernelEvidenceReasonCode,
     StaticKernelEvidenceSidecar,
@@ -164,6 +165,7 @@ def _write_no_trace_diagnostics_sidecar(
         staging_dir,
         keep_staging=keep_staging,
     )
+    filtered_stderr = filter_benign_rocm_stderr(stderr)
     payload = {
         "schema_version": NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION,
         "diagnostic_only": True,
@@ -171,11 +173,11 @@ def _write_no_trace_diagnostics_sidecar(
         "reason": reason,
         "returncode": returncode,
         "stdout_tail": _diagnostic_tail(stdout),
-        "stderr_tail": _diagnostic_tail(stderr),
+        "stderr_tail": _diagnostic_tail(filtered_stderr),
         "stdout_line_count": len(stdout.splitlines()),
-        "stderr_line_count": len(stderr.splitlines()),
+        "stderr_line_count": len(filtered_stderr.splitlines()),
         "stdout_truncated": len(stdout) > _DIAGNOSTIC_TAIL_LIMIT,
-        "stderr_truncated": len(stderr) > _DIAGNOSTIC_TAIL_LIMIT,
+        "stderr_truncated": len(filtered_stderr) > _DIAGNOSTIC_TAIL_LIMIT,
     }
     try:
         sidecar_path.parent.mkdir(parents=True, exist_ok=True)
@@ -737,16 +739,18 @@ def _evaluate_cli(
 
         if proc.returncode != 0:
             console.print("[red]Compilation failed[/red]")
-            if proc.stderr:
-                console.print(proc.stderr)
+            filtered_stderr = filter_benign_rocm_stderr(proc.stderr)
+            if filtered_stderr:
+                console.print(filtered_stderr)
             if proc.stdout:
                 console.print(proc.stdout)
             packager.close()
             sys.exit(1)
 
         console.print("[green]Compilation succeeded[/green]")
-        if verbose and proc.stderr:
-            console.print(f"[dim]{proc.stderr}[/dim]")
+        filtered_stderr = filter_benign_rocm_stderr(proc.stderr)
+        if verbose and filtered_stderr:
+            console.print(f"[dim]{filtered_stderr}[/dim]")
 
         if static_evidence == STATIC_EVIDENCE_AUTO:
             static_evidence_result = _collect_static_evidence_for_cli(
@@ -799,8 +803,9 @@ def _evaluate_cli(
         )
         progress.update(task, completed=True)
 
-    if verbose and proc.stderr:
-        console.print(f"[dim]{proc.stderr}[/dim]")
+    filtered_stderr = filter_benign_rocm_stderr(proc.stderr)
+    if verbose and filtered_stderr:
+        console.print(f"[dim]{filtered_stderr}[/dim]")
 
     if proc.returncode != 0 and not proc.stdout.strip():
         console.print("[red]Evaluation failed[/red]")
@@ -817,8 +822,8 @@ def _evaluate_cli(
             console.print(
                 f"[yellow]Saved no-trace diagnostics to {diagnostic_path}[/yellow]"
             )
-        if proc.stderr:
-            console.print(proc.stderr)
+        if filtered_stderr:
+            console.print(filtered_stderr)
         packager.close()
         sys.exit(1)
 
@@ -840,8 +845,8 @@ def _evaluate_cli(
             console.print(
                 f"[yellow]Saved no-trace diagnostics to {diagnostic_path}[/yellow]"
             )
-        if proc.stderr:
-            console.print(proc.stderr)
+        if filtered_stderr:
+            console.print(filtered_stderr)
         packager.close()
         sys.exit(1)
 

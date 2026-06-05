@@ -152,6 +152,35 @@ def test_run_cli_writes_log_for_nonzero_exit(tmp_path, monkeypatch):
     assert runner.cli_failure_notes(log_path) == ["CLI failed with exit code 7"]
 
 
+def test_run_cli_log_filters_benign_amdgpu_ids_noise(tmp_path, monkeypatch):
+    def fake_run(*args, **kwargs):
+        return subprocess.CompletedProcess(
+            args=args[0],
+            returncode=7,
+            stdout="",
+            stderr=(
+                "/opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory\n"
+                "real stderr\n"
+            ),
+        )
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+
+    traces = runner.run_cli(
+        definition_path=Path("definition.json"),
+        workload_path=Path("workload.jsonl"),
+        solution_path=Path("solution.json"),
+        output_dir=tmp_path,
+        job_name="demo",
+        timeout=1,
+    )
+
+    log_text = (tmp_path / "demo_cli.log").read_text()
+    assert traces is None
+    assert "amdgpu.ids" not in log_text
+    assert "real stderr" in log_text
+
+
 def test_run_cli_writes_log_for_timeout(tmp_path, monkeypatch):
     def fake_run(*args, **kwargs):
         raise subprocess.TimeoutExpired(
