@@ -93,6 +93,39 @@ def test_run_cli_parses_jsonl_and_ignores_non_json_stdout(tmp_path, monkeypatch)
     assert traces == [trace]
 
 
+def test_run_cli_passes_flashinfer_safetensors_env(tmp_path, monkeypatch):
+    trace = {"evaluation": {"status": "PASSED"}}
+    captured_env = None
+
+    def fake_env():
+        return {"FLASHINFER_TRACE_DIR": "/repo"}
+
+    def fake_run(*args, **kwargs):
+        nonlocal captured_env
+        captured_env = kwargs["env"]
+        return subprocess.CompletedProcess(
+            args=args[0],
+            returncode=0,
+            stdout=json.dumps(trace) + "\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(runner, "flashinfer_safetensors_env", fake_env)
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+
+    traces = runner.run_cli(
+        definition_path=Path("definition.json"),
+        workload_path=Path("workload.jsonl"),
+        solution_path=Path("solution.json"),
+        output_dir=tmp_path,
+        job_name="demo",
+        timeout=1,
+    )
+
+    assert traces == [trace]
+    assert captured_env == {"FLASHINFER_TRACE_DIR": "/repo"}
+
+
 def test_run_cli_writes_log_for_nonzero_exit(tmp_path, monkeypatch):
     def fake_run(*args, **kwargs):
         return subprocess.CompletedProcess(

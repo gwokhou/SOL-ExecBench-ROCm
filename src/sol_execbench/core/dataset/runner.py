@@ -13,6 +13,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from sol_execbench.core.bench.config import BenchmarkConfig
+from sol_execbench.core.bench.io import flashinfer_safetensors_env
 from sol_execbench.core.bench.rocm_profiler import (
     ProfilerRunner,
     collect_source_timing_evidence,
@@ -226,6 +227,7 @@ def run_cli(
                     text=True,
                     timeout=timeout + 60,
                     check=False,
+                    env=flashinfer_safetensors_env(),
                 )
             if result.stdout:
                 stdout_path.write_text(result.stdout, encoding="utf-8")
