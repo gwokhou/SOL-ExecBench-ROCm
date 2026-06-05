@@ -93,6 +93,9 @@ class ExecutionClosureProvenance(BaseModel):
     limit: int | None = None
     max_workloads: int | None = None
     workload_shard_size: int | None = None
+    execution_mode: str = "serial"
+    prepare_jobs: int | None = None
+    gpu_jobs: int | None = None
     timeout: int | None = None
     warmup_runs: int | None = None
     iterations: int | None = None
@@ -369,6 +372,9 @@ def compare_execution_closure_provenance(
         ("solution_name", ExecutionClosureReasonCode.SOLUTION_MISMATCH),
         ("timeout", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
         ("workload_shard_size", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
+        ("execution_mode", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
+        ("prepare_jobs", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
+        ("gpu_jobs", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
         ("warmup_runs", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
         ("iterations", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
         ("lock_clocks", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
