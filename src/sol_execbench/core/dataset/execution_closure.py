@@ -97,6 +97,7 @@ class ExecutionClosureProvenance(BaseModel):
     prepare_jobs: int | None = None
     gpu_jobs: int | None = None
     timeout_policy: str = "record"
+    timeout_overrides: str | None = None
     blob_precheck: str = "fail"
     log_order: str = "completion"
     timeout: int | None = None
@@ -379,6 +380,7 @@ def compare_execution_closure_provenance(
         ("prepare_jobs", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
         ("gpu_jobs", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
         ("timeout_policy", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
+        ("timeout_overrides", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
         ("blob_precheck", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
         ("log_order", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
         ("warmup_runs", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),

@@ -306,9 +306,18 @@ def _safetensors_refs_for_workload_file(workload_path: Path) -> list[str]:
     return refs
 
 
-def _safetensors_ref_exists(raw_path: str) -> bool:
+def _safetensors_ref_exists(
+    raw_path: str, *, blob_index: "_SafetensorsBlobIndex | None" = None
+) -> bool:
     path = Path(raw_path)
     if path.is_absolute() or ".." in path.parts:
+        return False
+
+    parts = path.parts
+    if blob_index is not None:
+        for start in range(len(parts)):
+            if Path(*parts[start:]).as_posix() in blob_index.refs:
+                return True
         return False
 
     roots: list[Path] = []
@@ -317,7 +326,6 @@ def _safetensors_ref_exists(raw_path: str) -> bool:
         roots.append(Path(env_root))
     roots.append(ROOT)
 
-    parts = path.parts
     for root in roots:
         for start in range(len(parts)):
             if (root / Path(*parts[start:])).is_file():
@@ -325,14 +333,26 @@ def _safetensors_ref_exists(raw_path: str) -> bool:
     return False
 
 
-def _missing_safetensors_refs(workload_path: Path) -> list[str]:
+def _missing_safetensors_refs(
+    workload_path: Path, *, blob_index: "_SafetensorsBlobIndex | None" = None
+) -> list[str]:
     return sorted(
         {
             ref
             for ref in _safetensors_refs_for_workload_file(workload_path)
-            if not _safetensors_ref_exists(ref)
+            if not _safetensors_ref_exists(ref, blob_index=blob_index)
         }
     )
+
+
+def _problems_have_safetensors_refs(problems: list[Path]) -> bool:
+    for problem_dir in problems:
+        workload_path = problem_dir / "workload.jsonl"
+        if workload_path.exists() and _safetensors_refs_for_workload_file(
+            workload_path
+        ):
+            return True
+    return False
 
 
 def _resolve_jobs(value: str, *, phase: str, problem_count: int) -> int:
@@ -589,6 +609,8 @@ def _normalized_command_args(args: argparse.Namespace) -> list[str]:
         normalized.extend(["--gpu-jobs", str(args.gpu_jobs)])
     if args.timeout_policy != "record":
         normalized.extend(["--timeout-policy", args.timeout_policy])
+    if args.timeout_overrides is not None:
+        normalized.extend(["--timeout-overrides", Path(args.timeout_overrides).name])
     if args.blob_precheck != "fail":
         normalized.extend(["--blob-precheck", args.blob_precheck])
     if args.log_order != "completion":
@@ -999,6 +1021,7 @@ class _PipelineTracePreparedProblem:
     index: int
     problem_count: int
     problem_dir: Path
+    problem_id: str
     problem_name: str
     category: str
     definition_path: Path
@@ -1019,6 +1042,123 @@ class _PipelineTraceProblemResult:
     index: int
     messages: list[str]
     summary: dict | None
+
+
+@dataclass(frozen=True)
+class _SafetensorsBlobIndex:
+    refs: frozenset[str]
+    files: int = 0
+    total_bytes: int = 0
+
+
+@dataclass
+class _TraceInvocationResult:
+    traces: list[dict]
+    shard_failure_reasons: list[str]
+    messages: list[str]
+
+
+def _load_timeout_overrides(path: Path | None) -> dict:
+    if path is None:
+        return {}
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise SystemExit("--timeout-overrides must point to a JSON object")
+    return payload
+
+
+def _timeout_override_ref(path: Path | None, *, output_dir: Path) -> str | None:
+    if path is None:
+        return None
+    return _first_relative_ref(path, output_dir, ROOT)
+
+
+def _timeout_for_workload(
+    *,
+    workload: dict,
+    problem_id: str,
+    default_timeout: int,
+    timeout_overrides: dict,
+) -> int:
+    timeout = timeout_overrides.get("default", default_timeout)
+    problems = timeout_overrides.get("problems")
+    if isinstance(problems, dict) and problem_id in problems:
+        timeout = problems[problem_id]
+
+    uuid = workload.get("uuid")
+    workloads = timeout_overrides.get("workloads")
+    if isinstance(workloads, dict):
+        scoped_key = f"{problem_id}:{uuid}" if uuid is not None else None
+        if scoped_key is not None and scoped_key in workloads:
+            timeout = workloads[scoped_key]
+        elif uuid is not None and str(uuid) in workloads:
+            timeout = workloads[str(uuid)]
+
+    try:
+        timeout_int = int(timeout)
+    except (TypeError, ValueError) as exc:
+        raise SystemExit("timeout override values must be positive integers") from exc
+    if timeout_int < 1:
+        raise SystemExit("timeout override values must be positive integers")
+    return timeout_int
+
+
+def _timeout_for_workload_file(
+    *,
+    workload_path: Path,
+    problem_id: str,
+    default_timeout: int,
+    timeout_overrides: dict,
+) -> int:
+    timeouts: list[int] = []
+    for line in workload_path.read_text().splitlines():
+        if not line.strip():
+            continue
+        timeouts.append(
+            _timeout_for_workload(
+                workload=json.loads(line),
+                problem_id=problem_id,
+                default_timeout=default_timeout,
+                timeout_overrides=timeout_overrides,
+            )
+        )
+    return max(timeouts) if timeouts else default_timeout
+
+
+def _build_safetensors_blob_index() -> _SafetensorsBlobIndex:
+    roots: list[Path] = []
+    env_root = os.environ.get("FLASHINFER_TRACE_DIR")
+    if env_root:
+        roots.append(Path(env_root))
+    roots.append(ROOT / "data" / "flashinfer-trace")
+
+    refs: set[str] = set()
+    total_bytes = 0
+    files = 0
+    for root in roots:
+        if not root.exists():
+            continue
+        for path in root.rglob("*.safetensors"):
+            if not path.is_file():
+                continue
+            files += 1
+            try:
+                total_bytes += path.stat().st_size
+            except OSError:
+                pass
+            try:
+                rel = path.relative_to(root).as_posix()
+            except ValueError:
+                rel = path.name
+            refs.add(rel)
+            parts = Path(rel).parts
+            for start in range(len(parts)):
+                refs.add(Path(*parts[start:]).as_posix())
+    return _SafetensorsBlobIndex(
+        refs=frozenset(refs),
+        files=files,
+        total_bytes=total_bytes,
+    )
 
 
 def _resolve_prepare_jobs(value: str, *, problem_count: int) -> int:
@@ -1044,9 +1184,11 @@ def _prepare_pipeline_trace_problem(
     args: argparse.Namespace,
     effective_gpu_architecture: str,
     provenance: dict,
+    blob_index: _SafetensorsBlobIndex | None,
 ) -> _PipelineTracePreparedProblem:
     problem_name = problem_dir.name
     category = problem_dir.parent.name
+    problem_id = _problem_id_for(problems_dir, problem_dir)
     definition_path = problem_dir / "definition.json"
     workload_path = problem_dir / "workload.jsonl"
     problem_output_dir = output_dir / category / problem_name
@@ -1063,6 +1205,7 @@ def _prepare_pipeline_trace_problem(
             index=index,
             problem_count=problem_count,
             problem_dir=problem_dir,
+            problem_id=problem_id,
             problem_name=problem_name,
             category=category,
             definition_path=definition_path,
@@ -1099,6 +1242,7 @@ def _prepare_pipeline_trace_problem(
                 index=index,
                 problem_count=problem_count,
                 problem_dir=problem_dir,
+                problem_id=problem_id,
                 problem_name=problem_name,
                 category=category,
                 definition_path=definition_path,
@@ -1136,7 +1280,9 @@ def _prepare_pipeline_trace_problem(
             workload_path.write_text("\n".join(lines[: args.max_workloads]))
 
     if args.blob_precheck != "off":
-        missing_refs = _missing_safetensors_refs(workload_path)
+        missing_refs = _missing_safetensors_refs(
+            workload_path, blob_index=blob_index
+        )
         if missing_refs:
             message = (
                 "missing safetensors blobs: "
@@ -1149,6 +1295,7 @@ def _prepare_pipeline_trace_problem(
                     index=index,
                     problem_count=problem_count,
                     problem_dir=problem_dir,
+                    problem_id=problem_id,
                     problem_name=problem_name,
                     category=category,
                     definition_path=definition_path,
@@ -1181,6 +1328,7 @@ def _prepare_pipeline_trace_problem(
                 index=index,
                 problem_count=problem_count,
                 problem_dir=problem_dir,
+                problem_id=problem_id,
                 problem_name=problem_name,
                 category=category,
                 definition_path=definition_path,
@@ -1200,6 +1348,7 @@ def _prepare_pipeline_trace_problem(
             index=index,
             problem_count=problem_count,
             problem_dir=problem_dir,
+            problem_id=problem_id,
             problem_name=problem_name,
             category=category,
             definition_path=definition_path,
@@ -1221,6 +1370,7 @@ def _prepare_pipeline_trace_problem(
         index=index,
         problem_count=problem_count,
         problem_dir=problem_dir,
+        problem_id=problem_id,
         problem_name=problem_name,
         category=category,
         definition_path=definition_path,
@@ -1231,6 +1381,90 @@ def _prepare_pipeline_trace_problem(
         definition=definition,
         solution=solution,
         solution_path=solution_path,
+        messages=messages,
+    )
+
+
+def _run_trace_invocations(
+    *,
+    definition_path: Path,
+    workload_path: Path,
+    solution_path: Path,
+    output_dir: Path,
+    job_name: str,
+    definition: dict,
+    solution: dict,
+    problem_id: str,
+    args: argparse.Namespace,
+    config_path: Path | None,
+) -> _TraceInvocationResult:
+    workload_shards = _workload_shard_paths(
+        workload_path,
+        shard_size=args.workload_shard_size,
+        output_dir=output_dir,
+    )
+    traces: list[dict] = []
+    shard_failure_reasons: list[str] = []
+    messages: list[str] = []
+    if len(workload_shards) > 1:
+        messages.append(
+            f"  Running {len(workload_shards)} workload shards "
+            f"(--workload-shard-size {args.workload_shard_size})."
+        )
+    for shard_index, shard_workload_path in enumerate(workload_shards, start=1):
+        shard_job_name = (
+            job_name
+            if len(workload_shards) == 1
+            else f"{job_name}_shard{shard_index:04d}"
+        )
+        shard_timeout = _timeout_for_workload_file(
+            workload_path=shard_workload_path,
+            problem_id=problem_id,
+            default_timeout=args.timeout,
+            timeout_overrides=args.timeout_override_rules,
+        )
+        shard_traces = run_cli(
+            definition_path=definition_path,
+            workload_path=shard_workload_path,
+            solution_path=solution_path,
+            output_dir=output_dir,
+            job_name=shard_job_name,
+            timeout=shard_timeout,
+            config_path=config_path,
+            keep_staging=args.keep_staging,
+            verbose=args.verbose,
+        )
+        if shard_traces is None:
+            cli_log = output_dir / f"{shard_job_name}_cli.log"
+            notes = _cli_failure_notes(cli_log)
+            timeout_notes = [
+                note for note in notes if note.startswith("CLI timed out after ")
+            ]
+            if timeout_notes and args.timeout_policy == "record":
+                traces.extend(
+                    _timeout_traces_for_workload_file(
+                        definition_name=str(definition["name"]),
+                        workload_path=shard_workload_path,
+                        solution_name=str(solution["name"]),
+                        timeout_seconds=shard_timeout,
+                        log="; ".join(timeout_notes),
+                    )
+                )
+                continue
+            if len(workload_shards) == 1:
+                shard_failure_reasons.extend(notes)
+            else:
+                suffix = f" ({'; '.join(notes)})" if notes else ""
+                shard_failure_reasons.append(
+                    f"workload shard {shard_index}/{len(workload_shards)} "
+                    f"returned no traces{suffix}"
+                )
+            continue
+        traces.extend(shard_traces)
+
+    return _TraceInvocationResult(
+        traces=traces,
+        shard_failure_reasons=shard_failure_reasons,
         messages=messages,
     )
 
@@ -1252,62 +1486,21 @@ def _run_pipeline_trace_problem(
     assert prepared.solution is not None
     assert prepared.solution_path is not None
 
-    workload_shards = _workload_shard_paths(
-        prepared.workload_path,
-        shard_size=args.workload_shard_size,
+    invocation = _run_trace_invocations(
+        definition_path=prepared.definition_path,
+        workload_path=prepared.workload_path,
+        solution_path=prepared.solution_path,
         output_dir=prepared.problem_output_dir,
+        job_name=prepared.job_name,
+        definition=prepared.definition,
+        solution=prepared.solution,
+        problem_id=prepared.problem_id,
+        args=args,
+        config_path=config_path,
     )
-    traces: list[dict] = []
-    shard_failure_reasons: list[str] = []
-    if len(workload_shards) > 1:
-        messages.append(
-            f"  Running {len(workload_shards)} workload shards "
-            f"(--workload-shard-size {args.workload_shard_size})."
-        )
-    for shard_index, shard_workload_path in enumerate(workload_shards, start=1):
-        shard_job_name = (
-            prepared.job_name
-            if len(workload_shards) == 1
-            else f"{prepared.job_name}_shard{shard_index:04d}"
-        )
-        shard_traces = run_cli(
-            definition_path=prepared.definition_path,
-            workload_path=shard_workload_path,
-            solution_path=prepared.solution_path,
-            output_dir=prepared.problem_output_dir,
-            job_name=shard_job_name,
-            timeout=args.timeout,
-            config_path=config_path,
-            keep_staging=args.keep_staging,
-            verbose=args.verbose,
-        )
-        if shard_traces is None:
-            cli_log = prepared.problem_output_dir / f"{shard_job_name}_cli.log"
-            notes = _cli_failure_notes(cli_log)
-            timeout_notes = [
-                note for note in notes if note.startswith("CLI timed out after ")
-            ]
-            if timeout_notes and args.timeout_policy == "record":
-                traces.extend(
-                    _timeout_traces_for_workload_file(
-                        definition_name=str(prepared.definition["name"]),
-                        workload_path=shard_workload_path,
-                        solution_name=str(prepared.solution["name"]),
-                        timeout_seconds=args.timeout,
-                        log="; ".join(timeout_notes),
-                    )
-                )
-                continue
-            if len(workload_shards) == 1:
-                shard_failure_reasons.extend(notes)
-            else:
-                suffix = f" ({'; '.join(notes)})" if notes else ""
-                shard_failure_reasons.append(
-                    f"workload shard {shard_index}/{len(workload_shards)} "
-                    f"returned no traces{suffix}"
-                )
-            continue
-        traces.extend(shard_traces)
+    traces = invocation.traces
+    shard_failure_reasons = invocation.shard_failure_reasons
+    messages.extend(invocation.messages)
 
     if not traces and shard_failure_reasons:
         messages.append("  ERROR: CLI returned no traces")
@@ -1512,6 +1705,15 @@ def main():
         ),
     )
     ap.add_argument(
+        "--timeout-overrides",
+        type=Path,
+        default=None,
+        help=(
+            "Optional JSON object with per-problem or per-workload timeout "
+            "overrides. Supported keys: default, problems, workloads."
+        ),
+    )
+    ap.add_argument(
         "--blob-precheck",
         choices=("fail", "warn", "off"),
         default="fail",
@@ -1699,6 +1901,7 @@ def main():
                 "--execution-mode pipeline currently does not support "
                 "--ready-subset or --execution-closure"
             )
+    args.timeout_override_rules = _load_timeout_overrides(args.timeout_overrides)
 
     problems_dir = args.problems_dir.resolve()
     if not problems_dir.is_dir():
@@ -1855,6 +2058,16 @@ def main():
             f"Using pipeline trace scheduler "
             f"(prepare_jobs={prepare_jobs}, gpu_jobs={args.gpu_jobs})."
         )
+    blob_index = (
+        _build_safetensors_blob_index()
+        if args.blob_precheck != "off" and _problems_have_safetensors_refs(problems)
+        else None
+    )
+    if blob_index is not None:
+        print(
+            "Safetensors blob index: "
+            f"{blob_index.files} files, {blob_index.total_bytes / (1024**3):.2f} GiB"
+        )
 
     benchmark_config = BenchmarkConfig(
         warmup_runs=(
@@ -1900,6 +2113,9 @@ def main():
         "prepare_jobs": prepare_jobs if args.execution_mode == "pipeline" else None,
         "gpu_jobs": args.gpu_jobs if args.execution_mode == "pipeline" else None,
         "timeout_policy": args.timeout_policy,
+        "timeout_overrides": _timeout_override_ref(
+            args.timeout_overrides, output_dir=output_dir
+        ),
         "blob_precheck": args.blob_precheck,
         "log_order": args.log_order,
         "timeout": args.timeout,
@@ -2034,6 +2250,7 @@ def main():
                     args=args,
                     effective_gpu_architecture=effective_gpu_architecture,
                     provenance=provenance,
+                    blob_index=blob_index,
                 ): index
                 for index, problem_dir in enumerate(problems)
             }
@@ -2526,7 +2743,9 @@ def main():
                 workload_path = truncated_path
 
         if args.blob_precheck != "off":
-            missing_refs = _missing_safetensors_refs(workload_path)
+            missing_refs = _missing_safetensors_refs(
+                workload_path, blob_index=blob_index
+            )
             if missing_refs:
                 message = (
                     "missing safetensors blobs: "
@@ -2633,67 +2852,22 @@ def main():
 
         # Call sol-execbench CLI
         job_name = f"ref_{problem_name[:40]}"
-        workload_shards = _workload_shard_paths(
-            workload_path,
-            shard_size=args.workload_shard_size,
+        invocation = _run_trace_invocations(
+            definition_path=definition_path,
+            workload_path=workload_path,
+            solution_path=solution_path,
             output_dir=problem_output_dir,
+            job_name=job_name,
+            definition=definition,
+            solution=solution,
+            problem_id=problem_id,
+            args=args,
+            config_path=config_path,
         )
-        traces: list[dict] = []
-        shard_failure_reasons: list[str] = []
-        if len(workload_shards) > 1:
-            print(
-                f"  Running {len(workload_shards)} workload shards "
-                f"(--workload-shard-size {args.workload_shard_size})."
-            )
-        for shard_index, shard_workload_path in enumerate(workload_shards, start=1):
-            shard_job_name = (
-                job_name
-                if len(workload_shards) == 1
-                else f"{job_name}_shard{shard_index:04d}"
-            )
-            shard_traces = run_cli(
-                definition_path=definition_path,
-                workload_path=shard_workload_path,
-                solution_path=solution_path,
-                output_dir=problem_output_dir,
-                job_name=shard_job_name,
-                timeout=args.timeout,
-                config_path=config_path,
-                keep_staging=args.keep_staging,
-                verbose=args.verbose,
-            )
-            if shard_traces is None:
-                cli_log = problem_output_dir / f"{shard_job_name}_cli.log"
-                notes = _cli_failure_notes(cli_log)
-                timeout_notes = [
-                    note
-                    for note in notes
-                    if note.startswith("CLI timed out after ")
-                ]
-                synthesized_timeout_trace = False
-                if timeout_notes and args.timeout_policy == "record":
-                    traces.extend(
-                        _timeout_traces_for_workload_file(
-                            definition_name=str(definition["name"]),
-                            workload_path=shard_workload_path,
-                            solution_name=str(solution["name"]),
-                            timeout_seconds=args.timeout,
-                            log="; ".join(timeout_notes),
-                        )
-                    )
-                    synthesized_timeout_trace = True
-                if synthesized_timeout_trace:
-                    continue
-                if len(workload_shards) == 1:
-                    shard_failure_reasons.extend(notes)
-                else:
-                    suffix = f" ({'; '.join(notes)})" if notes else ""
-                    shard_failure_reasons.append(
-                        f"workload shard {shard_index}/{len(workload_shards)} "
-                        f"returned no traces{suffix}"
-                    )
-                continue
-            traces.extend(shard_traces)
+        traces = invocation.traces
+        shard_failure_reasons = invocation.shard_failure_reasons
+        for message in invocation.messages:
+            print(message)
 
         if not traces and shard_failure_reasons:
             print("  ERROR: CLI returned no traces")
