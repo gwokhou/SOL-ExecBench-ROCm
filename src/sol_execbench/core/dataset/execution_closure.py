@@ -77,7 +77,9 @@ class ExecutionClosureRecord(BaseModel):
         self.readiness_reason_codes.sort()
         self.readiness_blocker_codes.sort()
         self.readiness_blocker_types.sort()
-        self.readiness_evidence_refs = dict(sorted(self.readiness_evidence_refs.items()))
+        self.readiness_evidence_refs = dict(
+            sorted(self.readiness_evidence_refs.items())
+        )
         self.evidence_refs = dict(sorted(self.evidence_refs.items()))
         self.evidence_gaps.sort()
 
@@ -90,6 +92,7 @@ class ExecutionClosureProvenance(BaseModel):
     selected_categories: list[str] | None = None
     limit: int | None = None
     max_workloads: int | None = None
+    workload_shard_size: int | None = None
     timeout: int | None = None
     warmup_runs: int | None = None
     iterations: int | None = None
@@ -170,8 +173,12 @@ class ExecutionClosureReport(BaseModel):
     totals: ExecutionClosureTotals
     filters: dict[str, Any] = Field(default_factory=dict)
     records: list[ExecutionClosureRecord]
-    claim_boundary: ExecutionClosureClaimBoundary = Field(default_factory=ExecutionClosureClaimBoundary)
-    provenance_mismatches: list[ExecutionClosureProvenanceMismatch] = Field(default_factory=list)
+    claim_boundary: ExecutionClosureClaimBoundary = Field(
+        default_factory=ExecutionClosureClaimBoundary
+    )
+    provenance_mismatches: list[ExecutionClosureProvenanceMismatch] = Field(
+        default_factory=list
+    )
     source_refs: dict[str, str] = Field(default_factory=dict)
     execution_closure_checksum: DatasetManifestChecksum | None = None
 
@@ -211,7 +218,10 @@ def _closure_totals(records: list[ExecutionClosureRecord]) -> ExecutionClosureTo
             ExecutionClosureStatus.DERIVED_EVIDENCE_MISSING,
         }:
             totals.attempted += 1
-        if status == ExecutionClosureStatus.ATTEMPTED_PASSED or record.trace_status == "PASSED":
+        if (
+            status == ExecutionClosureStatus.ATTEMPTED_PASSED
+            or record.trace_status == "PASSED"
+        ):
             totals.passed += 1
         if status in {
             ExecutionClosureStatus.ATTEMPTED_FAILED,
@@ -236,11 +246,14 @@ def build_execution_closure_report(
     filters: dict[str, Any],
     created_at: str,
     claim_boundary: ExecutionClosureClaimBoundary | dict[str, Any] | None = None,
-    provenance_mismatches: list[ExecutionClosureProvenanceMismatch | dict[str, Any]] | None = None,
+    provenance_mismatches: list[ExecutionClosureProvenanceMismatch | dict[str, Any]]
+    | None = None,
     source_refs: dict[str, str] | None = None,
 ) -> ExecutionClosureReport:
     typed_records = [
-        record if isinstance(record, ExecutionClosureRecord) else ExecutionClosureRecord(**record)
+        record
+        if isinstance(record, ExecutionClosureRecord)
+        else ExecutionClosureRecord(**record)
         for record in records
     ]
     typed_records = sorted(typed_records, key=_record_sort_key)
@@ -307,35 +320,64 @@ def compare_execution_closure_provenance(
     observed: ExecutionClosureProvenance | dict[str, Any],
 ) -> list[ExecutionClosureProvenanceMismatch]:
     expected_model = (
-        expected if isinstance(expected, ExecutionClosureProvenance) else ExecutionClosureProvenance(**expected)
+        expected
+        if isinstance(expected, ExecutionClosureProvenance)
+        else ExecutionClosureProvenance(**expected)
     )
     observed_model = (
-        observed if isinstance(observed, ExecutionClosureProvenance) else ExecutionClosureProvenance(**observed)
+        observed
+        if isinstance(observed, ExecutionClosureProvenance)
+        else ExecutionClosureProvenance(**observed)
     )
     comparisons = (
         ("dataset_root", ExecutionClosureReasonCode.SELECTION_MISMATCH),
         ("selected_categories", ExecutionClosureReasonCode.SELECTION_MISMATCH),
         ("limit", ExecutionClosureReasonCode.SELECTION_MISMATCH),
         ("max_workloads", ExecutionClosureReasonCode.SELECTION_MISMATCH),
-        ("dataset_manifest_checksum", ExecutionClosureReasonCode.MANIFEST_CHECKSUM_MISMATCH),
+        (
+            "dataset_manifest_checksum",
+            ExecutionClosureReasonCode.MANIFEST_CHECKSUM_MISMATCH,
+        ),
         ("dataset_source_id", ExecutionClosureReasonCode.MANIFEST_CHECKSUM_MISMATCH),
-        ("dataset_migration_kind", ExecutionClosureReasonCode.MANIFEST_CHECKSUM_MISMATCH),
-        ("dataset_license_boundary", ExecutionClosureReasonCode.MANIFEST_CHECKSUM_MISMATCH),
-        ("dataset_manifest_summary", ExecutionClosureReasonCode.MANIFEST_CHECKSUM_MISMATCH),
+        (
+            "dataset_migration_kind",
+            ExecutionClosureReasonCode.MANIFEST_CHECKSUM_MISMATCH,
+        ),
+        (
+            "dataset_license_boundary",
+            ExecutionClosureReasonCode.MANIFEST_CHECKSUM_MISMATCH,
+        ),
+        (
+            "dataset_manifest_summary",
+            ExecutionClosureReasonCode.MANIFEST_CHECKSUM_MISMATCH,
+        ),
         ("readiness_checksum", ExecutionClosureReasonCode.READINESS_CHECKSUM_MISMATCH),
         ("readiness_summary", ExecutionClosureReasonCode.READINESS_CHECKSUM_MISMATCH),
-        ("ready_subset_checksum", ExecutionClosureReasonCode.READY_SUBSET_CHECKSUM_MISMATCH),
-        ("ready_subset_summary", ExecutionClosureReasonCode.READY_SUBSET_CHECKSUM_MISMATCH),
-        ("workload_identity_checksum", ExecutionClosureReasonCode.WORKLOAD_IDENTITY_MISMATCH),
+        (
+            "ready_subset_checksum",
+            ExecutionClosureReasonCode.READY_SUBSET_CHECKSUM_MISMATCH,
+        ),
+        (
+            "ready_subset_summary",
+            ExecutionClosureReasonCode.READY_SUBSET_CHECKSUM_MISMATCH,
+        ),
+        (
+            "workload_identity_checksum",
+            ExecutionClosureReasonCode.WORKLOAD_IDENTITY_MISMATCH,
+        ),
         ("solution_mode", ExecutionClosureReasonCode.SOLUTION_MODE_MISMATCH),
         ("solution_name", ExecutionClosureReasonCode.SOLUTION_MISMATCH),
         ("timeout", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
+        ("workload_shard_size", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
         ("warmup_runs", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
         ("iterations", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
         ("lock_clocks", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
         ("benchmark_config", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
         ("git_commit", ExecutionClosureReasonCode.GIT_COMMIT_MISMATCH),
-        ("requested_evidence_requirements", ExecutionClosureReasonCode.EVIDENCE_REQUIREMENT_MISMATCH),
+        (
+            "requested_evidence_requirements",
+            ExecutionClosureReasonCode.EVIDENCE_REQUIREMENT_MISMATCH,
+        ),
     )
     mismatches: list[ExecutionClosureProvenanceMismatch] = []
     for field, reason in comparisons:

@@ -228,6 +228,32 @@ def _workload_prefix_lines(workload_path: Path, limit: int) -> tuple[list[str], 
     return lines, truncated
 
 
+def _workload_shard_paths(
+    workload_path: Path,
+    *,
+    shard_size: int | None,
+    output_dir: Path,
+) -> list[Path]:
+    """Return workload JSONL paths, optionally split into fixed-size shards."""
+    if shard_size is None:
+        return [workload_path]
+    if shard_size <= 0:
+        raise ValueError("workload shard size must be positive")
+
+    lines = [line for line in workload_path.read_text().splitlines() if line.strip()]
+    if len(lines) <= shard_size:
+        return [workload_path]
+
+    shard_dir = output_dir / "workload_shards"
+    shard_dir.mkdir(parents=True, exist_ok=True)
+    shards: list[Path] = []
+    for start in range(0, len(lines), shard_size):
+        shard_path = shard_dir / f"workload_shard_{len(shards) + 1:04d}.jsonl"
+        shard_path.write_text("\n".join(lines[start : start + shard_size]) + "\n")
+        shards.append(shard_path)
+    return shards
+
+
 def _resolve_jobs(value: str, *, phase: str, problem_count: int) -> int:
     if value == "auto":
         requested = min(os.cpu_count() or 1, max(problem_count, 1), 8)
@@ -470,6 +496,8 @@ def _normalized_command_args(args: argparse.Namespace) -> list[str]:
         normalized.extend(["--limit", str(args.limit)])
     if args.max_workloads is not None:
         normalized.extend(["--max-workloads", str(args.max_workloads)])
+    if args.workload_shard_size is not None:
+        normalized.extend(["--workload-shard-size", str(args.workload_shard_size)])
     if str(args.jobs) != "1":
         normalized.extend(["--jobs", str(args.jobs)])
     if args.timeout != 120:
@@ -942,6 +970,16 @@ def main():
         help="Max number of workloads per problem. Truncates the workload file if exceeded.",
     )
     ap.add_argument(
+        "--workload-shard-size",
+        type=int,
+        default=None,
+        help=(
+            "Optional number of workloads per sol-execbench invocation. "
+            "When set, a problem workload file is split into temporary shards "
+            "and traces are merged back under the original problem."
+        ),
+    )
+    ap.add_argument(
         "--iterations",
         type=int,
         default=None,
@@ -1067,6 +1105,9 @@ def main():
         help="Optional dataset manifest JSON used for closure provenance.",
     )
     args = ap.parse_args()
+
+    if args.workload_shard_size is not None and args.workload_shard_size < 1:
+        ap.error("--workload-shard-size must be a positive integer")
 
     problems_dir = args.problems_dir.resolve()
     if not problems_dir.is_dir():
@@ -1255,6 +1296,7 @@ def main():
         "selected_categories": args.category,
         "limit": args.limit,
         "max_workloads": args.max_workloads,
+        "workload_shard_size": args.workload_shard_size,
         "timeout": args.timeout,
         "warmup_runs": benchmark_config.warmup_runs,
         "iterations": benchmark_config.iterations,
@@ -1355,6 +1397,7 @@ def main():
                 "category": args.category,
                 "limit": args.limit,
                 "max_workloads": args.max_workloads,
+                "workload_shard_size": args.workload_shard_size,
             },
             provenance_mismatches=provenance_mismatches,
             source_refs=source_refs,
@@ -1453,6 +1496,7 @@ def main():
                     "category": args.category,
                     "limit": args.limit,
                     "max_workloads": args.max_workloads,
+                    "workload_shard_size": args.workload_shard_size,
                     "jobs": jobs,
                 },
                 provenance_mismatches=provenance_mismatches,
@@ -1862,28 +1906,59 @@ def main():
 
         # Call sol-execbench CLI
         job_name = f"ref_{problem_name[:40]}"
-        traces = run_cli(
-            definition_path=definition_path,
-            workload_path=workload_path,
-            solution_path=solution_path,
+        workload_shards = _workload_shard_paths(
+            workload_path,
+            shard_size=args.workload_shard_size,
             output_dir=problem_output_dir,
-            job_name=job_name,
-            timeout=args.timeout,
-            config_path=config_path,
-            keep_staging=args.keep_staging,
-            verbose=args.verbose,
         )
+        traces: list[dict] = []
+        shard_failure_reasons: list[str] = []
+        if len(workload_shards) > 1:
+            print(
+                f"  Running {len(workload_shards)} workload shards "
+                f"(--workload-shard-size {args.workload_shard_size})."
+            )
+        for shard_index, shard_workload_path in enumerate(workload_shards, start=1):
+            shard_job_name = (
+                job_name
+                if len(workload_shards) == 1
+                else f"{job_name}_shard{shard_index:04d}"
+            )
+            shard_traces = run_cli(
+                definition_path=definition_path,
+                workload_path=shard_workload_path,
+                solution_path=solution_path,
+                output_dir=problem_output_dir,
+                job_name=shard_job_name,
+                timeout=args.timeout,
+                config_path=config_path,
+                keep_staging=args.keep_staging,
+                verbose=args.verbose,
+            )
+            if shard_traces is None:
+                cli_log = problem_output_dir / f"{shard_job_name}_cli.log"
+                notes = _cli_failure_notes(cli_log)
+                if len(workload_shards) == 1:
+                    shard_failure_reasons.extend(notes)
+                else:
+                    suffix = f" ({'; '.join(notes)})" if notes else ""
+                    shard_failure_reasons.append(
+                        f"workload shard {shard_index}/{len(workload_shards)} "
+                        f"returned no traces{suffix}"
+                    )
+                continue
+            traces.extend(shard_traces)
 
-        if traces is None:
+        if not traces and shard_failure_reasons:
             print("  ERROR: CLI returned no traces")
             summaries.append(
                 {
                     "problem": f"{category}/{problem_name}",
-                    "total": 0,
+                    "total": len(shard_failure_reasons),
                     "passed": 0,
-                    "failed": 1,
+                    "failed": len(shard_failure_reasons),
                     "latencies_ms": [],
-                    "failure_reasons": ["CLI returned no output"],
+                    "failure_reasons": shard_failure_reasons,
                 }
             )
             if selected_workload_refs is not None:
@@ -1907,7 +1982,7 @@ def main():
                             if cli_log.exists()
                             else None,
                             solution_ref=_relative_ref(solution_path, output_dir),
-                            notes=_cli_failure_notes(cli_log),
+                            notes=shard_failure_reasons,
                         )
                     )
             continue
@@ -1933,7 +2008,11 @@ def main():
                 solar_derivation_dir=args.solar_derivation,
             )
 
-        if run_timing_phase and args.timing_evidence_dir is not None:
+        if (
+            run_timing_phase
+            and args.timing_evidence_dir is not None
+            and not shard_failure_reasons
+        ):
             timing_root = args.timing_evidence_dir.resolve()
             collect_timing_evidence_for_problem(
                 definition_path=definition_path,
@@ -1994,6 +2073,10 @@ def main():
 
         # Inspect
         summary = inspect_traces(traces, f"{category}/{problem_name}")
+        if shard_failure_reasons:
+            summary["total"] += len(shard_failure_reasons)
+            summary["failed"] += len(shard_failure_reasons)
+            summary["failure_reasons"].extend(shard_failure_reasons)
         summaries.append(summary)
 
         status = "OK" if summary["failed"] == 0 else "FAIL"
@@ -2060,6 +2143,7 @@ def main():
                 "category": args.category,
                 "limit": args.limit,
                 "max_workloads": args.max_workloads,
+                "workload_shard_size": args.workload_shard_size,
             },
             provenance_mismatches=provenance_mismatches,
             source_refs=source_refs,

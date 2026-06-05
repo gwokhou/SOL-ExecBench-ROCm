@@ -99,6 +99,7 @@ def _matching_closure_provenance() -> dict:
         "selected_categories": None,
         "limit": None,
         "max_workloads": None,
+        "workload_shard_size": None,
         "timeout": 300,
         "warmup_runs": 10,
         "iterations": 50,
@@ -182,6 +183,110 @@ def _write_problem(
         "\n".join(json.dumps(workload) for workload in workloads) + "\n"
     )
     return problem_dir
+
+
+def test_workload_shard_size_splits_cli_invocations_and_merges_traces(
+    tmp_path, monkeypatch
+):
+    dataset_root = tmp_path / "dataset"
+    problem_dir = _write_problem(
+        dataset_root,
+        "L1",
+        "matmul_demo",
+        [_workload("one"), _workload("two"), _workload("three")],
+    )
+    output_dir = tmp_path / "out"
+    calls: list[list[str]] = []
+
+    def run_cli(*, workload_path: Path, **kwargs):
+        uuids = [
+            json.loads(line)["uuid"]
+            for line in workload_path.read_text().splitlines()
+            if line.strip()
+        ]
+        calls.append(uuids)
+        return [_trace(uuid) for uuid in uuids]
+
+    monkeypatch.setattr(run_dataset, "run_cli", run_cli)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--output",
+            str(output_dir),
+            "--workload-shard-size",
+            "2",
+        ],
+    )
+
+    run_dataset.main()
+
+    traces = json.loads((output_dir / "L1" / "matmul_demo" / "traces.json").read_text())
+    summary = json.loads((output_dir / "summary.json").read_text())
+
+    assert calls == [["one", "two"], ["three"]]
+    assert [trace["workload"]["uuid"] for trace in traces] == ["one", "two", "three"]
+    assert summary == [
+        {
+            "problem": "L1/matmul_demo",
+            "total": 3,
+            "passed": 3,
+            "failed": 0,
+            "latencies_ms": [1.0, 1.0, 1.0],
+            "failure_reasons": [],
+        }
+    ]
+    assert (problem_dir / "workload.jsonl").read_text().count("\n") == 3
+
+
+def test_workload_shard_size_preserves_partial_traces_and_marks_failure(
+    tmp_path, monkeypatch
+):
+    dataset_root = tmp_path / "dataset"
+    _write_problem(
+        dataset_root,
+        "L1",
+        "matmul_demo",
+        [_workload("one"), _workload("two"), _workload("three")],
+    )
+    output_dir = tmp_path / "out"
+
+    def run_cli(*, workload_path: Path, **kwargs):
+        uuid = json.loads(workload_path.read_text())["uuid"]
+        if uuid == "two":
+            log_path = kwargs["output_dir"] / f"{kwargs['job_name']}_cli.log"
+            log_path.write_text("timeout after 960 seconds\ncommand: demo\n")
+            return None
+        return [_trace(uuid)]
+
+    monkeypatch.setattr(run_dataset, "run_cli", run_cli)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--output",
+            str(output_dir),
+            "--workload-shard-size",
+            "1",
+        ],
+    )
+
+    run_dataset.main()
+
+    traces = json.loads((output_dir / "L1" / "matmul_demo" / "traces.json").read_text())
+    summary = json.loads((output_dir / "summary.json").read_text())[0]
+
+    assert [trace["workload"]["uuid"] for trace in traces] == ["one", "three"]
+    assert summary["total"] == 3
+    assert summary["passed"] == 2
+    assert summary["failed"] == 1
+    assert summary["failure_reasons"] == [
+        "workload shard 2/3 returned no traces (CLI timed out after 960 seconds)"
+    ]
 
 
 def _ready_subset(path: Path, *, problems: list[dict]) -> Path:
