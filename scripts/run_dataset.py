@@ -286,6 +286,55 @@ def _timeout_traces_for_workload_file(
     return traces
 
 
+def _safetensors_refs_for_workload_file(workload_path: Path) -> list[str]:
+    refs: list[str] = []
+    for line in workload_path.read_text().splitlines():
+        if not line.strip():
+            continue
+        workload = json.loads(line)
+        inputs = workload.get("inputs")
+        if not isinstance(inputs, dict):
+            continue
+        for input_spec in inputs.values():
+            if not isinstance(input_spec, dict):
+                continue
+            if input_spec.get("type") != "safetensors":
+                continue
+            path = input_spec.get("path")
+            if isinstance(path, str):
+                refs.append(path)
+    return refs
+
+
+def _safetensors_ref_exists(raw_path: str) -> bool:
+    path = Path(raw_path)
+    if path.is_absolute() or ".." in path.parts:
+        return False
+
+    roots: list[Path] = []
+    env_root = os.environ.get("FLASHINFER_TRACE_DIR")
+    if env_root:
+        roots.append(Path(env_root))
+    roots.append(ROOT)
+
+    parts = path.parts
+    for root in roots:
+        for start in range(len(parts)):
+            if (root / Path(*parts[start:])).is_file():
+                return True
+    return False
+
+
+def _missing_safetensors_refs(workload_path: Path) -> list[str]:
+    return sorted(
+        {
+            ref
+            for ref in _safetensors_refs_for_workload_file(workload_path)
+            if not _safetensors_ref_exists(ref)
+        }
+    )
+
+
 def _resolve_jobs(value: str, *, phase: str, problem_count: int) -> int:
     if value == "auto":
         requested = min(os.cpu_count() or 1, max(problem_count, 1), 8)
@@ -538,6 +587,12 @@ def _normalized_command_args(args: argparse.Namespace) -> list[str]:
         normalized.extend(["--prepare-jobs", str(args.prepare_jobs)])
     if args.gpu_jobs != 1:
         normalized.extend(["--gpu-jobs", str(args.gpu_jobs)])
+    if args.timeout_policy != "record":
+        normalized.extend(["--timeout-policy", args.timeout_policy])
+    if args.blob_precheck != "fail":
+        normalized.extend(["--blob-precheck", args.blob_precheck])
+    if args.log_order != "completion":
+        normalized.extend(["--log-order", args.log_order])
     if args.timeout != 120:
         normalized.extend(["--timeout", str(args.timeout)])
     if args.solution_name:
@@ -1080,6 +1135,44 @@ def _prepare_pipeline_trace_problem(
             workload_path = problem_output_dir / "workload.jsonl"
             workload_path.write_text("\n".join(lines[: args.max_workloads]))
 
+    if args.blob_precheck != "off":
+        missing_refs = _missing_safetensors_refs(workload_path)
+        if missing_refs:
+            message = (
+                "missing safetensors blobs: "
+                + ", ".join(missing_refs[:3])
+                + (" ..." if len(missing_refs) > 3 else "")
+            )
+            messages.append(f"  Blob precheck: {message}")
+            if args.blob_precheck == "fail":
+                return _PipelineTracePreparedProblem(
+                    index=index,
+                    problem_count=problem_count,
+                    problem_dir=problem_dir,
+                    problem_name=problem_name,
+                    category=category,
+                    definition_path=definition_path,
+                    workload_path=workload_path,
+                    problem_output_dir=problem_output_dir,
+                    traces_path=traces_path,
+                    job_name=f"ref_{problem_name[:40]}",
+                    definition=definition,
+                    solution=None,
+                    solution_path=None,
+                    messages=messages,
+                    summary={
+                        "problem": f"{category}/{problem_name}",
+                        "total": 1,
+                        "passed": 0,
+                        "failed": 1,
+                        "latencies_ms": [],
+                        "failure_reasons": [
+                            f"  [MISSING_SAFETENSORS] {message}"
+                        ],
+                    },
+                    run_required=False,
+                )
+
     if args.solution_name:
         solution_file = problem_dir / args.solution_name
         if not solution_file.exists():
@@ -1194,7 +1287,7 @@ def _run_pipeline_trace_problem(
             timeout_notes = [
                 note for note in notes if note.startswith("CLI timed out after ")
             ]
-            if timeout_notes:
+            if timeout_notes and args.timeout_policy == "record":
                 traces.extend(
                     _timeout_traces_for_workload_file(
                         definition_name=str(prepared.definition["name"]),
@@ -1247,6 +1340,89 @@ def _run_pipeline_trace_problem(
         messages=messages,
         summary=summary,
     )
+
+
+def _run_pipeline_post_trace_outputs(
+    *,
+    problems: list[Path],
+    output_dir: Path,
+    args: argparse.Namespace,
+    scoring_baseline,
+    amd_scores: list[AmdNativeScore],
+    benchmark_config: BenchmarkConfig,
+    config_path: Path | None,
+) -> None:
+    if not (
+        args.amd_score_report is not None
+        or args.amd_sol_bound_dir is not None
+        or args.solar_derivation is not None
+        or args.timing_evidence_dir is not None
+    ):
+        return
+
+    for problem_dir in problems:
+        problem_name = problem_dir.name
+        category = problem_dir.parent.name
+        definition_path = problem_dir / "definition.json"
+        problem_output_dir = output_dir / category / problem_name
+        prepared_workload_path = problem_output_dir / "workload.jsonl"
+        workload_path = (
+            prepared_workload_path
+            if prepared_workload_path.exists()
+            else problem_dir / "workload.jsonl"
+        )
+        traces_path = problem_output_dir / "traces.json"
+        if not traces_path.exists():
+            continue
+        try:
+            traces = json.loads(traces_path.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+
+        if (
+            args.amd_score_report is not None
+            or args.amd_sol_bound_dir is not None
+            or args.solar_derivation is not None
+        ):
+            _extend_derived_reports_for_problem(
+                amd_scores=amd_scores,
+                definition_path=definition_path,
+                workload_path=workload_path,
+                traces_path=traces_path,
+                traces_payload=traces,
+                output_dir=output_dir,
+                baseline_artifact=scoring_baseline,
+                sol_bound_artifact_dir=args.amd_sol_bound_dir,
+                solar_derivation_dir=args.solar_derivation,
+            )
+
+        if args.timing_evidence_dir is None:
+            continue
+        solution_path = problem_output_dir / "solution.json"
+        if not solution_path.exists():
+            continue
+        try:
+            solution = json.loads(solution_path.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        timing_root = args.timing_evidence_dir.resolve()
+        collect_timing_evidence_for_problem(
+            definition_path=definition_path,
+            workload_path=workload_path,
+            solution_path=solution_path,
+            output_dir=problem_output_dir,
+            timing_evidence_root=timing_root / category,
+            job_name=f"ref_{problem_name[:40]}",
+            solution=solution,
+            benchmark_config=benchmark_config,
+            timeout=args.timeout,
+            config_path=config_path,
+            keep_staging=args.keep_staging,
+            verbose=args.verbose,
+            tool_version=args.timing_tool_version,
+            gpu_architecture=args.gpu_architecture,
+        )
+        print(f"  Timing evidence saved under {timing_root / category}")
 
 
 # ---------------------------------------------------------------------------
@@ -1323,6 +1499,36 @@ def main():
         help=(
             "GPU evaluation workers for --execution-mode pipeline. Only 1 is "
             "currently supported to preserve benchmark isolation."
+        ),
+    )
+    ap.add_argument(
+        "--timeout-policy",
+        choices=("record", "fail"),
+        default="record",
+        help=(
+            "How dataset runs handle sol-execbench CLI timeouts. 'record' emits "
+            "TIMEOUT traces for the affected workload shard; 'fail' preserves "
+            "the no-trace failure."
+        ),
+    )
+    ap.add_argument(
+        "--blob-precheck",
+        choices=("fail", "warn", "off"),
+        default="fail",
+        help=(
+            "Precheck workload safetensors references before invoking GPU "
+            "evaluation. 'fail' records a problem failure without running the CLI, "
+            "'warn' logs missing refs and continues, and 'off' disables the check."
+        ),
+    )
+    ap.add_argument(
+        "--log-order",
+        choices=("completion", "problem"),
+        default="completion",
+        help=(
+            "Pipeline log ordering. 'completion' prints each problem as soon as "
+            "its GPU evaluation finishes; 'problem' buffers logs until earlier "
+            "problem indexes are available."
         ),
     )
     ap.add_argument(
@@ -1486,8 +1692,8 @@ def main():
     if args.gpu_jobs != 1:
         ap.error("--gpu-jobs currently only supports 1")
     if args.execution_mode == "pipeline":
-        if args.phase != "traces":
-            ap.error("--execution-mode pipeline currently requires --phase traces")
+        if args.phase not in {"traces", "all"}:
+            ap.error("--execution-mode pipeline currently requires --phase traces or all")
         if args.ready_subset is not None or args.execution_closure is not None:
             ap.error(
                 "--execution-mode pipeline currently does not support "
@@ -1693,6 +1899,9 @@ def main():
         "execution_mode": args.execution_mode,
         "prepare_jobs": prepare_jobs if args.execution_mode == "pipeline" else None,
         "gpu_jobs": args.gpu_jobs if args.execution_mode == "pipeline" else None,
+        "timeout_policy": args.timeout_policy,
+        "blob_precheck": args.blob_precheck,
+        "log_order": args.log_order,
         "timeout": args.timeout,
         "warmup_runs": benchmark_config.warmup_runs,
         "iterations": benchmark_config.iterations,
@@ -1812,6 +2021,7 @@ def main():
         pipeline_results: list[_PipelineTraceProblemResult | None] = [
             None for _ in problems
         ]
+        next_log_index = 0
         with ThreadPoolExecutor(max_workers=prepare_jobs) as executor:
             future_to_index = {
                 executor.submit(
@@ -1835,17 +2045,50 @@ def main():
                     config_path=config_path,
                 )
                 pipeline_results[result.index] = result
-                for message in result.messages:
-                    print(message)
+                if args.log_order == "completion":
+                    for message in result.messages:
+                        print(message)
+                else:
+                    while (
+                        next_log_index < len(pipeline_results)
+                        and pipeline_results[next_log_index] is not None
+                    ):
+                        buffered = pipeline_results[next_log_index]
+                        assert buffered is not None
+                        for message in buffered.messages:
+                            print(message)
+                        next_log_index += 1
 
         for result in pipeline_results:
             if result is not None and result.summary is not None:
                 summaries.append(result.summary)
 
+        if args.phase == "all":
+            _run_pipeline_post_trace_outputs(
+                problems=problems,
+                output_dir=output_dir,
+                args=args,
+                scoring_baseline=scoring_baseline,
+                amd_scores=amd_scores,
+                benchmark_config=benchmark_config,
+                config_path=config_path,
+            )
+
         print_summary(summaries)
         summary_path = write_summary_report(output_dir, summaries)
         print(f"\nSummary saved to {summary_path}")
         print(f"Per-problem traces saved under {output_dir}")
+        if args.phase == "all" and args.amd_score_report is not None:
+            report_path = args.amd_score_report.resolve()
+            write_amd_score_report(
+                report_path,
+                amd_scores,
+                problem_count=len(summaries),
+                baseline_entry_count=len(scoring_baseline.entries)
+                if scoring_baseline
+                else 0,
+            )
+            print(f"AMD-native score report saved to {report_path}")
         return
 
     if args.phase == "derived" and jobs > 1:
@@ -2282,6 +2525,53 @@ def main():
                 truncated_path.write_text("\n".join(lines[: args.max_workloads]))
                 workload_path = truncated_path
 
+        if args.blob_precheck != "off":
+            missing_refs = _missing_safetensors_refs(workload_path)
+            if missing_refs:
+                message = (
+                    "missing safetensors blobs: "
+                    + ", ".join(missing_refs[:3])
+                    + (" ..." if len(missing_refs) > 3 else "")
+                )
+                print(f"  Blob precheck: {message}")
+                if args.blob_precheck == "fail":
+                    summaries.append(
+                        {
+                            "problem": f"{category}/{problem_name}",
+                            "total": 1,
+                            "passed": 0,
+                            "failed": 1,
+                            "latencies_ms": [],
+                            "failure_reasons": [
+                                f"  [MISSING_SAFETENSORS] {message}"
+                            ],
+                        }
+                    )
+                    if selected_workload_refs is not None:
+                        for workload_ref in selected_workload_refs:
+                            key = _workload_key(
+                                workload_ref.get("uuid"),
+                                workload_ref.get("row_index"),
+                            )
+                            attempted_ready_keys.add((problem_id, key))
+                            closure_records.append(
+                                _closure_record(
+                                    category=category,
+                                    problem_id=problem_id,
+                                    problem_path=str(problem_ref.get("problem_path")),
+                                    workload_uuid=workload_ref.get("uuid"),
+                                    row_index=int(workload_ref.get("row_index", 0)),
+                                    closure_status="attempted_failed",
+                                    readiness=readiness_by_workload.get(
+                                        (problem_id, key)
+                                    ),
+                                    summary_ref="summary.json",
+                                    solution_ref=None,
+                                    notes=[message],
+                                )
+                            )
+                    continue
+
         # Load definition to build the reference solution
         definition = definition_payload
 
@@ -2381,7 +2671,7 @@ def main():
                     if note.startswith("CLI timed out after ")
                 ]
                 synthesized_timeout_trace = False
-                if timeout_notes:
+                if timeout_notes and args.timeout_policy == "record":
                     traces.extend(
                         _timeout_traces_for_workload_file(
                             definition_name=str(definition["name"]),

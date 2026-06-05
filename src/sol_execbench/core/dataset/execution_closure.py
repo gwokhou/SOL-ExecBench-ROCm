@@ -96,6 +96,9 @@ class ExecutionClosureProvenance(BaseModel):
     execution_mode: str = "serial"
     prepare_jobs: int | None = None
     gpu_jobs: int | None = None
+    timeout_policy: str = "record"
+    blob_precheck: str = "fail"
+    log_order: str = "completion"
     timeout: int | None = None
     warmup_runs: int | None = None
     iterations: int | None = None
@@ -375,6 +378,9 @@ def compare_execution_closure_provenance(
         ("execution_mode", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
         ("prepare_jobs", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
         ("gpu_jobs", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
+        ("timeout_policy", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
+        ("blob_precheck", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
+        ("log_order", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
         ("warmup_runs", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
         ("iterations", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
         ("lock_clocks", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
