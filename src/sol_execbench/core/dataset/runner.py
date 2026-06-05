@@ -543,13 +543,17 @@ def print_summary(summaries: list[dict]) -> None:
     total_problems = len(summaries)
     all_passed = 0
     any_failed = 0
+    skipped = 0
 
     for summary in summaries:
         name = summary["problem"]
         pass_count = summary["passed"]
         fail_count = summary["failed"]
 
-        if fail_count == 0:
+        if summary.get("skipped", 0):
+            status = "SKIP"
+            skipped += 1
+        elif fail_count == 0:
             status = "OK"
             all_passed += 1
         else:
@@ -559,7 +563,10 @@ def print_summary(summaries: list[dict]) -> None:
         print(f"{name:<{name_width}}  {pass_count:>5} {fail_count:>5} {status:>8}")
 
     print("=" * row_width)
-    print(f"Total: {total_problems} problems | OK: {all_passed} | FAIL: {any_failed}")
+    print(
+        f"Total: {total_problems} problems | OK: {all_passed} | "
+        f"FAIL: {any_failed} | SKIP: {skipped}"
+    )
 
 
 def write_summary_report(output_dir: Path, summaries: list[dict]) -> Path:

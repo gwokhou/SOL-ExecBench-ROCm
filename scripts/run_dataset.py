@@ -47,6 +47,10 @@ from sol_execbench.core.dataset.evidence_refs import (
     relative_ref as _relative_ref,
     safe_sidecar_stem as _safe_sidecar_stem,
 )
+from sol_execbench.core.dataset.low_precision import (
+    cdna4_low_precision_skip_reason as _cdna4_low_precision_skip_reason,
+    should_skip_cdna4_low_precision_on_arch as _should_skip_cdna4_low_precision_on_arch,
+)
 from sol_execbench.core.dataset.run_closure import (
     closure_record as _build_closure_record,
     closure_totals as _build_closure_totals,
@@ -130,6 +134,32 @@ def discover_problems(
         categories,
         known_categories=CATEGORIES,
     )
+
+
+def _skipped_problem_summary(problem: str, reason: str) -> dict:
+    return {
+        "problem": problem,
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "latencies_ms": [],
+        "failure_reasons": [],
+        "skipped": 1,
+        "skip_reasons": [reason],
+    }
+
+
+def _effective_gpu_architecture(gpu_architecture: str | None) -> str:
+    if gpu_architecture and gpu_architecture != "unknown":
+        return gpu_architecture
+    for env_name in (
+        "SOL_EXECBENCH_RUNTIME_GFX_ARCHITECTURE",
+        "PYTORCH_ROCM_ARCH",
+    ):
+        value = os.environ.get(env_name)
+        if value:
+            return value.split(";", maxsplit=1)[0]
+    return gpu_architecture or "unknown"
 
 
 def run_cli(
@@ -1432,6 +1462,7 @@ def main():
         return
 
     # ROCm execution stays serial here; runner helpers provide the future scheduling seam.
+    effective_gpu_architecture = _effective_gpu_architecture(args.gpu_architecture)
     for i, problem_dir in enumerate(problems):
         problem_name = problem_dir.name
         category = problem_dir.parent.name
@@ -1496,6 +1527,35 @@ def main():
                 )
             if not selected_workload_refs:
                 continue
+
+        if _should_skip_cdna4_low_precision_on_arch(
+            definition_payload, effective_gpu_architecture
+        ):
+            skip_reason = _cdna4_low_precision_skip_reason(effective_gpu_architecture)
+            print(f"  Skipping ({skip_reason}).")
+            summaries.append(
+                _skipped_problem_summary(f"{category}/{problem_name}", skip_reason)
+            )
+            if selected_workload_refs is not None:
+                for workload_ref in selected_workload_refs:
+                    key = _workload_key(
+                        workload_ref.get("uuid"), workload_ref.get("row_index")
+                    )
+                    attempted_ready_keys.add((problem_id, key))
+                    closure_records.append(
+                        _closure_record(
+                            category=category,
+                            problem_id=problem_id,
+                            problem_path=str(problem_ref.get("problem_path")),
+                            workload_uuid=workload_ref.get("uuid"),
+                            row_index=int(workload_ref.get("row_index", 0)),
+                            closure_status="filtered",
+                            readiness=readiness_by_workload.get((problem_id, key)),
+                            filter_reasons=["cdna3_low_precision_hardware_unsupported"],
+                            notes=[skip_reason],
+                        )
+                    )
+            continue
 
         if not run_trace_phase:
             if not traces_path.exists():
