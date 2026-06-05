@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -38,6 +39,7 @@ from ..core import (
     Trace,
     Workload,
 )
+from ..core.data.workload import SafetensorsInput
 
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
 
@@ -48,6 +50,10 @@ _CPP_LANGUAGES = {
     SupportedLanguages.CK,
     SupportedLanguages.ROCWMMA,
 }
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[3]
 
 
 def _first_gfx_target(lines: list[str]) -> str | None:
@@ -121,6 +127,7 @@ class ProblemPackager:
             json.dumps(dataclasses.asdict(config))
         )
         self._write_sources()
+        self._stage_safetensors_inputs()
 
     def __del__(self):
         self.close()
@@ -186,6 +193,46 @@ class ProblemPackager:
             dest = self.output_dir / src.path
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_text(src.content)
+
+    def _stage_safetensors_inputs(self) -> None:
+        """Expose repo-local safetensors blobs under their workload paths."""
+        for workload in self.workloads:
+            for input_spec in workload.inputs.values():
+                if not isinstance(input_spec, SafetensorsInput):
+                    continue
+                source, relative_path = self._resolve_stageable_safetensors(
+                    input_spec.path
+                )
+                if source is None or relative_path is None:
+                    continue
+                dest = self.output_dir / relative_path
+                if dest.exists() or dest.is_symlink():
+                    continue
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                try:
+                    dest.symlink_to(source)
+                except OSError:
+                    shutil.copy2(source, dest)
+
+    def _resolve_stageable_safetensors(
+        self, raw_path: str
+    ) -> tuple[Path | None, Path | None]:
+        path = Path(raw_path)
+        if path.is_absolute() or ".." in path.parts:
+            return None, None
+
+        roots = [_repo_root()]
+        env_root = os.environ.get("FLASHINFER_TRACE_DIR")
+        if env_root:
+            roots.insert(0, Path(env_root))
+
+        parts = path.parts
+        for root in roots:
+            for start in range(len(parts)):
+                source = root / Path(*parts[start:])
+                if source.is_file():
+                    return source.resolve(), path
+        return None, None
 
     def compile(self) -> tuple[list[str], str]:
         """Stage compilation files and return (command, artifact_path).

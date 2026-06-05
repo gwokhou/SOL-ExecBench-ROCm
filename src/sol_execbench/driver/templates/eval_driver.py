@@ -375,6 +375,7 @@ for _workload in workloads:
                 output_names=_output_names,
                 output_dtypes=_output_dtypes_torch,
             )
+            _ref_outputs = [_out.detach().clone() for _out in _ref_outputs]
         except Exception as _e:
             _emit(
                 Trace(

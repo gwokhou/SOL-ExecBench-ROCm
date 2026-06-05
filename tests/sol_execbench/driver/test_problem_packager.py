@@ -184,6 +184,99 @@ class TestInit:
         assert kernel.exists()
         assert "HIP kernel" in kernel.read_text()
 
+    def test_safetensors_blob_staged_from_repo_root(
+        self, tmp_path, definition, python_solution, config, monkeypatch
+    ):
+        repo_root = tmp_path / "repo"
+        blob_path = Path(
+            "data/flashinfer-trace/blob/workloads/gqa_paged/example.safetensors"
+        )
+        source = repo_root / blob_path
+        source.parent.mkdir(parents=True)
+        source.write_bytes(b"blob")
+        monkeypatch.setattr(problem_packager, "_repo_root", lambda: repo_root)
+
+        workloads = [
+            make_workload(
+                uuid="wkl-safetensors",
+                axes={},
+                inputs={
+                    "x": {
+                        "type": "safetensors",
+                        "path": blob_path.as_posix(),
+                        "tensor_key": "x",
+                    },
+                    "y": {"type": "random"},
+                },
+            )
+        ]
+
+        pkg = _make_packager(tmp_path, definition, workloads, python_solution, config)
+
+        staged = pkg.output_dir / blob_path
+        assert staged.exists()
+        assert staged.read_bytes() == b"blob"
+
+    def test_safetensors_blob_staged_from_flashinfer_trace_env(
+        self, tmp_path, definition, python_solution, config, monkeypatch
+    ):
+        trace_root = tmp_path / "flashinfer-trace"
+        blob_path = Path(
+            "data/flashinfer-trace/blob/workloads/gqa_paged/example.safetensors"
+        )
+        source = trace_root / "blob/workloads/gqa_paged/example.safetensors"
+        source.parent.mkdir(parents=True)
+        source.write_bytes(b"env-blob")
+        monkeypatch.setattr(problem_packager, "_repo_root", lambda: tmp_path / "repo")
+        monkeypatch.setenv("FLASHINFER_TRACE_DIR", trace_root.as_posix())
+
+        workloads = [
+            make_workload(
+                uuid="wkl-safetensors-env",
+                axes={},
+                inputs={
+                    "x": {
+                        "type": "safetensors",
+                        "path": blob_path.as_posix(),
+                        "tensor_key": "x",
+                    },
+                    "y": {"type": "random"},
+                },
+            )
+        ]
+
+        pkg = _make_packager(tmp_path, definition, workloads, python_solution, config)
+
+        staged = pkg.output_dir / blob_path
+        assert staged.exists()
+        assert staged.read_bytes() == b"env-blob"
+
+    def test_missing_safetensors_blob_does_not_block_packaging(
+        self, tmp_path, definition, python_solution, config, monkeypatch
+    ):
+        monkeypatch.setattr(problem_packager, "_repo_root", lambda: tmp_path / "repo")
+        blob_path = Path(
+            "data/flashinfer-trace/blob/workloads/gqa_paged/missing.safetensors"
+        )
+        workloads = [
+            make_workload(
+                uuid="wkl-missing-safetensors",
+                axes={},
+                inputs={
+                    "x": {
+                        "type": "safetensors",
+                        "path": blob_path.as_posix(),
+                        "tensor_key": "x",
+                    },
+                    "y": {"type": "random"},
+                },
+            )
+        ]
+
+        pkg = _make_packager(tmp_path, definition, workloads, python_solution, config)
+
+        assert not (pkg.output_dir / blob_path).exists()
+
 
 class TestCleanup:
     def test_close_removes_staging_when_not_kept(

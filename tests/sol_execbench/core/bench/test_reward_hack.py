@@ -377,16 +377,17 @@ class TestStaticSourceReview:
 
         assert review.blocked is False
 
-    def test_reports_precision_downgrade_for_float32_outputs(self):
+    def test_flags_precision_downgrade_for_float32_outputs_without_blocking(self):
         review = review_solution_sources(
             _solution_with_source("def run(x):\n    return x.half().float()\n"),
             output_dtypes={"out": torch.float32},
         )
 
-        assert review.blocked is True
-        assert "precision_downgrade" in {issue.rule for issue in review.issues}
+        assert review.blocked is False
+        assert [issue.rule for issue in review.issues] == ["precision_downgrade"]
+        assert {issue.severity.value for issue in review.issues} == {"flag"}
 
-    def test_reports_precision_downgrade_dtype_keyword_for_float32_outputs(self):
+    def test_flags_precision_downgrade_dtype_keyword_for_float32_outputs(self):
         review = review_solution_sources(
             _solution_with_source(
                 "import torch\n"
@@ -396,7 +397,7 @@ class TestStaticSourceReview:
             output_dtypes={"out": torch.float32},
         )
 
-        assert review.blocked is True
+        assert review.blocked is False
         assert "precision_downgrade" in {issue.rule for issue in review.issues}
 
     def test_allows_precision_casts_when_outputs_are_mixed_precision(self):
@@ -423,8 +424,9 @@ class TestStaticSourceReview:
             _solution_with_source(
                 "import torch\n"
                 "def get_inputs(axes, device):\n"
+                "    cache_len = axes['cache_len']\n"
                 "    grad_key_cache = torch.randn(1, 1, 16, 64, device=device)\n"
-                "    return {'grad_key_cache': grad_key_cache}\n"
+                "    return {'grad_key_cache': grad_key_cache, 'cache_len': cache_len}\n"
                 "def run(key_cache, key_states):\n"
                 "    updated_key_cache = torch.cat([key_cache, key_states], dim=2)\n"
                 "    return updated_key_cache\n"

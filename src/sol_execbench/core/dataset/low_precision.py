@@ -266,7 +266,15 @@ def pack_low_precision_tensor(
 
 def _contains_low_precision_token(value: str) -> bool:
     normalized = value.lower().replace("-", "_")
-    return any(token in normalized for token in LOW_PRECISION_COMPATIBILITY_FORMATS)
+    tokens = (
+        *LOW_PRECISION_COMPATIBILITY_FORMATS,
+        "float4",
+        "e2m1",
+        "float8_e4m3fn",
+        "scaled_gemm",
+        "_scaled_mm",
+    )
+    return any(token in normalized for token in tokens)
 
 
 def _packed_shape(shape: torch.Size | tuple[int, ...]) -> tuple[int, ...]:
