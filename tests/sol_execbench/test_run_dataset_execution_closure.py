@@ -4,6 +4,7 @@ import importlib.util
 import json
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from sol_execbench.core.dataset.execution_closure import (
@@ -333,6 +334,147 @@ def test_pipeline_trace_mode_preserves_summary_order_and_serial_gpu_invocations(
     assert [row["problem"] for row in summary] == ["L1/matmul_a", "L1/matmul_b"]
     assert (output_dir / "L1" / "matmul_a" / "traces.json").exists()
     assert (output_dir / "L1" / "matmul_b" / "traces.json").exists()
+
+
+def test_pipeline_all_mode_collects_timing_from_generated_traces(
+    tmp_path, monkeypatch
+):
+    dataset_root = tmp_path / "dataset"
+    _write_problem(dataset_root, "L1", "matmul_demo", [_workload("one")])
+    output_dir = tmp_path / "out"
+    timing_dir = tmp_path / "timing"
+    timing_calls: list[str] = []
+
+    def run_cli(*, workload_path: Path, **kwargs):
+        uuid = json.loads(workload_path.read_text().splitlines()[0])["uuid"]
+        return [_trace(uuid)]
+
+    def collect_timing_evidence_for_problem(*, job_name: str, **kwargs):
+        timing_calls.append(job_name)
+
+    monkeypatch.setattr(run_dataset, "run_cli", run_cli)
+    monkeypatch.setattr(
+        run_dataset,
+        "collect_timing_evidence_for_problem",
+        collect_timing_evidence_for_problem,
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--phase",
+            "all",
+            "--execution-mode",
+            "pipeline",
+            "--output",
+            str(output_dir),
+            "--timing-evidence-dir",
+            str(timing_dir),
+        ],
+    )
+
+    run_dataset.main()
+
+    assert timing_calls == ["ref_matmul_demo"]
+    assert (output_dir / "L1" / "matmul_demo" / "traces.json").exists()
+
+
+def test_blob_precheck_fails_before_gpu_invocation(tmp_path, monkeypatch):
+    dataset_root = tmp_path / "dataset"
+    problem_dir = dataset_root / "FlashInfer-Bench" / "gqa_demo"
+    problem_dir.mkdir(parents=True)
+    (problem_dir / "definition.json").write_text(json.dumps(_definition("gqa_demo")))
+    (problem_dir / "workload.jsonl").write_text(
+        json.dumps(
+            {
+                "uuid": "missing-blob",
+                "axes": {"M": 2},
+                "inputs": {
+                    "a": {
+                        "type": "safetensors",
+                        "path": "data/flashinfer-trace/blob/missing.safetensors",
+                        "tensor_key": "a",
+                    },
+                    "b": {"type": "random"},
+                },
+            }
+        )
+        + "\n"
+    )
+    output_dir = tmp_path / "out"
+
+    def fail_run_cli(*args, **kwargs):
+        raise AssertionError("missing safetensors should fail before GPU invocation")
+
+    monkeypatch.setattr(run_dataset, "run_cli", fail_run_cli)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--phase",
+            "traces",
+            "--execution-mode",
+            "pipeline",
+            "--output",
+            str(output_dir),
+        ],
+    )
+
+    run_dataset.main()
+
+    summary = json.loads((output_dir / "summary.json").read_text())
+    assert summary[0]["problem"] == "FlashInfer-Bench/gqa_demo"
+    assert summary[0]["failed"] == 1
+    assert "missing safetensors blobs" in summary[0]["failure_reasons"][0]
+
+
+def test_pipeline_problem_log_order_buffers_out_of_order_prepare(
+    tmp_path, monkeypatch, capsys
+):
+    dataset_root = tmp_path / "dataset"
+    _write_problem(dataset_root, "L1", "matmul_a", [_workload("a")])
+    _write_problem(dataset_root, "L1", "matmul_b", [_workload("b")])
+    output_dir = tmp_path / "out"
+    original_build_solution = run_dataset.build_solution_for_problem
+
+    def slow_first_build(definition, problem_dir, solution_name):
+        if problem_dir.name == "matmul_a":
+            time.sleep(0.05)
+        return original_build_solution(definition, problem_dir, solution_name)
+
+    def run_cli(*, workload_path: Path, **kwargs):
+        uuid = json.loads(workload_path.read_text().splitlines()[0])["uuid"]
+        return [_trace(uuid)]
+
+    monkeypatch.setattr(run_dataset, "build_solution_for_problem", slow_first_build)
+    monkeypatch.setattr(run_dataset, "run_cli", run_cli)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--phase",
+            "traces",
+            "--execution-mode",
+            "pipeline",
+            "--prepare-jobs",
+            "2",
+            "--log-order",
+            "problem",
+            "--output",
+            str(output_dir),
+        ],
+    )
+
+    run_dataset.main()
+
+    stdout = capsys.readouterr().out
+    assert stdout.index("[1/2] L1/matmul_a") < stdout.index("[2/2] L1/matmul_b")
 
 
 def _ready_subset(path: Path, *, problems: list[dict]) -> Path:
