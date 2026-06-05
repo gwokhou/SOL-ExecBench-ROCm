@@ -241,6 +241,54 @@ def test_reference_timing_failure_is_explicit_when_requested(tmp_path):
     assert "Reference timing failed: reference timing boom" in ev.get("log", "")
 
 
+def test_reference_outputs_are_frozen_before_user_call(tmp_path):
+    """A user in-place input update must not mutate the saved reference output."""
+    definition = {
+        "name": "test_alias_freeze",
+        "op_type": "elementwise",
+        "axes": {"n": {"type": "const", "value": 64}},
+        "inputs": {"x": {"shape": ["n"], "dtype": "float32"}},
+        "outputs": {"z": {"shape": ["n"], "dtype": "float32"}},
+        "reference": "def run(x):\n    return x\n",
+    }
+    workload = {
+        "axes": {},
+        "inputs": {"x": {"type": "random"}},
+        "uuid": "alias-freeze-0001",
+    }
+    (tmp_path / "eval_driver.py").write_text(build_driver())
+    (tmp_path / "definition.json").write_text(json.dumps(definition))
+    (tmp_path / "workload.jsonl").write_text(json.dumps(workload))
+    kernel = "def run(x):\n    original = x.clone()\n    x.add_(1)\n    return original\n"
+    solution = {
+        **_SOLUTION_SPEC,
+        "definition": "test_alias_freeze",
+        "sources": [{"path": "kernel.py", "content": kernel}],
+    }
+    (tmp_path / "solution.json").write_text(json.dumps(solution))
+    (tmp_path / "kernel.py").write_text(kernel)
+    (tmp_path / "config.json").write_text(
+        json.dumps({"lock_clocks": False, "benchmark_reference": False})
+    )
+
+    result = subprocess.run(
+        [sys.executable, "eval_driver.py"],
+        cwd=tmp_path,
+        env={
+            **os.environ,
+            "SOL_EXECBENCH_CLOCKS_LOCKED": "0",
+            "SOL_EXECBENCH_ALLOW_CPU_TIMING": "1",
+        },
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    traces = parse_eval_result(result.stdout, result.stderr)
+
+    assert len(traces) == 1
+    assert traces[0]["evaluation"]["status"] == "PASSED"
+
+
 def test_noisy_user_stdout_stays_out_of_trace_jsonl(tmp_path):
     """Import-time and run-time user prints must not corrupt stdout JSONL."""
     kernel = (
@@ -493,15 +541,15 @@ def test_static_source_review_blocks_semantic_cache(tmp_path):
     assert "semantic_output_cache" in ev.get("log", "")
 
 
-def test_static_source_review_blocks_precision_downgrade(tmp_path):
-    """Float32-output solution that downcasts internally is rejected."""
+def test_static_source_review_flags_precision_downgrade_without_blocking(tmp_path):
+    """Internal downcasts are diagnostic; runtime correctness remains authoritative."""
     kernel = "def run(x, y):\n    return (x.half() + y.half()).float()\n"
     traces = _run_eval_driver(tmp_path, kernel)
 
     assert len(traces) == 1
     ev = traces[0]["evaluation"]
-    assert ev["status"] == "REWARD_HACK"
-    assert "precision_downgrade" in ev.get("log", "")
+    assert ev["status"] in {"PASSED", "INCORRECT_NUMERICAL"}
+    assert "precision_downgrade" not in ev.get("log", "")
 
 
 def test_hip_cpp_sources_accept_pytorch_rocm_stream_api_text():

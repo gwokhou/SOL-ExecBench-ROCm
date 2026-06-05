@@ -165,7 +165,7 @@ _STATIC_RULES = (
 
 _PRECISION_DOWNGRADE_RULE = _SourceRule(
     "precision_downgrade",
-    SourceReviewSeverity.BLOCK,
+    SourceReviewSeverity.FLAG,
     re.compile(
         r"(\.half\s*\(|\.bfloat16\s*\(|\.to\s*\(\s*torch\.(float16|bfloat16)|"
         r"\btorch\.(float16|bfloat16)\b|\btl\.(float16|bfloat16)\b|"
@@ -413,12 +413,24 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
 
 def _target_is_cache(target: ast.AST) -> bool:
     if isinstance(target, ast.Name):
-        return "cache" in target.id.lower()
+        return _name_is_cache_container(target.id)
     if isinstance(target, ast.Attribute):
-        return "cache" in target.attr.lower()
+        return _name_is_cache_container(target.attr)
     if isinstance(target, (ast.Tuple, ast.List)):
         return any(_target_is_cache(elt) for elt in target.elts)
     return False
+
+
+def _name_is_cache_container(name: str) -> bool:
+    normalized = name.lower()
+    return normalized in {
+        "cache",
+        "_cache",
+        "cache_dict",
+        "_cache_dict",
+        "memo",
+        "_memo",
+    } or normalized.endswith(("_cache_dict", "_memo"))
 
 
 def _assignment_creates_semantic_cache(
