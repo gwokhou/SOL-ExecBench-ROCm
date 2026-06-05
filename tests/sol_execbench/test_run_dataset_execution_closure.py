@@ -280,12 +280,17 @@ def test_workload_shard_size_preserves_partial_traces_and_marks_failure(
     traces = json.loads((output_dir / "L1" / "matmul_demo" / "traces.json").read_text())
     summary = json.loads((output_dir / "summary.json").read_text())[0]
 
-    assert [trace["workload"]["uuid"] for trace in traces] == ["one", "three"]
+    assert [trace["workload"]["uuid"] for trace in traces] == ["one", "two", "three"]
+    assert [trace["evaluation"]["status"] for trace in traces] == [
+        "PASSED",
+        "TIMEOUT",
+        "PASSED",
+    ]
     assert summary["total"] == 3
     assert summary["passed"] == 2
     assert summary["failed"] == 1
     assert summary["failure_reasons"] == [
-        "workload shard 2/3 returned no traces (CLI timed out after 960 seconds)"
+        "  [TIMEOUT] timed out after 300 seconds: CLI timed out after 960 seconds"
     ]
 
 
@@ -1260,8 +1265,8 @@ def test_execution_closure_classifies_cli_timeout_with_bounded_log_ref(
     closure = json.loads(closure_text)
     record = closure["records"][0]
     assert record["closure_status"] == "attempted_failed"
-    assert record["cli_log_ref"] == "L1/matmul_demo/ref_matmul_demo_cli.log"
-    assert record["notes"] == ["CLI timed out after 360 seconds"]
+    assert record["trace_status"] == "TIMEOUT"
+    assert record["cli_log_ref"] is None
     assert str(tmp_path) not in closure_text
     assert "timeout stdout" not in closure_text
     assert "timeout stderr" not in closure_text

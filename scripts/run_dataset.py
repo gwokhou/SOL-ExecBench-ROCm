@@ -254,6 +254,37 @@ def _workload_shard_paths(
     return shards
 
 
+def _timeout_traces_for_workload_file(
+    *,
+    definition_name: str,
+    workload_path: Path,
+    solution_name: str,
+    timeout_seconds: int,
+    log: str,
+) -> list[dict]:
+    traces: list[dict] = []
+    for line in workload_path.read_text().splitlines():
+        if not line.strip():
+            continue
+        traces.append(
+            {
+                "definition": definition_name,
+                "workload": json.loads(line),
+                "solution": solution_name,
+                "evaluation": {
+                    "status": "TIMEOUT",
+                    "environment": {"hardware": "AMD ROCm", "libs": {}},
+                    "timestamp": _build_utc_timestamp(),
+                    "log": f"timed out after {timeout_seconds} seconds"
+                    + (f": {log}" if log else ""),
+                    "correctness": None,
+                    "performance": None,
+                },
+            }
+        )
+    return traces
+
+
 def _resolve_jobs(value: str, *, phase: str, problem_count: int) -> int:
     if value == "auto":
         requested = min(os.cpu_count() or 1, max(problem_count, 1), 8)
@@ -1938,6 +1969,25 @@ def main():
             if shard_traces is None:
                 cli_log = problem_output_dir / f"{shard_job_name}_cli.log"
                 notes = _cli_failure_notes(cli_log)
+                timeout_notes = [
+                    note
+                    for note in notes
+                    if note.startswith("CLI timed out after ")
+                ]
+                synthesized_timeout_trace = False
+                if timeout_notes:
+                    traces.extend(
+                        _timeout_traces_for_workload_file(
+                            definition_name=str(definition["name"]),
+                            workload_path=shard_workload_path,
+                            solution_name=str(solution["name"]),
+                            timeout_seconds=args.timeout,
+                            log="; ".join(timeout_notes),
+                        )
+                    )
+                    synthesized_timeout_trace = True
+                if synthesized_timeout_trace:
+                    continue
                 if len(workload_shards) == 1:
                     shard_failure_reasons.extend(notes)
                 else:
