@@ -294,6 +294,47 @@ def test_workload_shard_size_preserves_partial_traces_and_marks_failure(
     ]
 
 
+def test_pipeline_trace_mode_preserves_summary_order_and_serial_gpu_invocations(
+    tmp_path, monkeypatch
+):
+    dataset_root = tmp_path / "dataset"
+    _write_problem(dataset_root, "L1", "matmul_a", [_workload("a")])
+    _write_problem(dataset_root, "L1", "matmul_b", [_workload("b")])
+    output_dir = tmp_path / "out"
+    calls: list[str] = []
+
+    def run_cli(*, workload_path: Path, **kwargs):
+        uuid = json.loads(workload_path.read_text().splitlines()[0])["uuid"]
+        calls.append(uuid)
+        return [_trace(uuid)]
+
+    monkeypatch.setattr(run_dataset, "run_cli", run_cli)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--phase",
+            "traces",
+            "--execution-mode",
+            "pipeline",
+            "--prepare-jobs",
+            "2",
+            "--output",
+            str(output_dir),
+        ],
+    )
+
+    run_dataset.main()
+
+    summary = json.loads((output_dir / "summary.json").read_text())
+    assert sorted(calls) == ["a", "b"]
+    assert [row["problem"] for row in summary] == ["L1/matmul_a", "L1/matmul_b"]
+    assert (output_dir / "L1" / "matmul_a" / "traces.json").exists()
+    assert (output_dir / "L1" / "matmul_b" / "traces.json").exists()
+
+
 def _ready_subset(path: Path, *, problems: list[dict]) -> Path:
     payload = {
         "schema_version": "sol_execbench.ready_subset.v1",

@@ -39,7 +39,8 @@ import os
 import shutil
 import subprocess
 import sys
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from sol_execbench.core.bench.config import BenchmarkConfig
@@ -531,6 +532,12 @@ def _normalized_command_args(args: argparse.Namespace) -> list[str]:
         normalized.extend(["--workload-shard-size", str(args.workload_shard_size)])
     if str(args.jobs) != "1":
         normalized.extend(["--jobs", str(args.jobs)])
+    if args.execution_mode != "serial":
+        normalized.extend(["--execution-mode", args.execution_mode])
+    if str(args.prepare_jobs) != "auto":
+        normalized.extend(["--prepare-jobs", str(args.prepare_jobs)])
+    if args.gpu_jobs != 1:
+        normalized.extend(["--gpu-jobs", str(args.gpu_jobs)])
     if args.timeout != 120:
         normalized.extend(["--timeout", str(args.timeout)])
     if args.solution_name:
@@ -932,6 +939,316 @@ def _run_existing_trace_derived_problem(
     }
 
 
+@dataclass
+class _PipelineTracePreparedProblem:
+    index: int
+    problem_count: int
+    problem_dir: Path
+    problem_name: str
+    category: str
+    definition_path: Path
+    workload_path: Path
+    problem_output_dir: Path
+    traces_path: Path
+    job_name: str
+    definition: dict
+    solution: dict | None
+    solution_path: Path | None
+    messages: list[str] = field(default_factory=list)
+    summary: dict | None = None
+    run_required: bool = True
+
+
+@dataclass
+class _PipelineTraceProblemResult:
+    index: int
+    messages: list[str]
+    summary: dict | None
+
+
+def _resolve_prepare_jobs(value: str, *, problem_count: int) -> int:
+    if value == "auto":
+        requested = min(os.cpu_count() or 1, max(problem_count, 1), 8)
+    else:
+        try:
+            requested = int(value)
+        except ValueError as exc:
+            raise SystemExit("--prepare-jobs must be a positive integer or 'auto'") from exc
+    if requested < 1:
+        raise SystemExit("--prepare-jobs must be a positive integer or 'auto'")
+    return min(requested, max(problem_count, 1))
+
+
+def _prepare_pipeline_trace_problem(
+    *,
+    problem_dir: Path,
+    index: int,
+    problem_count: int,
+    problems_dir: Path,
+    output_dir: Path,
+    args: argparse.Namespace,
+    effective_gpu_architecture: str,
+    provenance: dict,
+) -> _PipelineTracePreparedProblem:
+    problem_name = problem_dir.name
+    category = problem_dir.parent.name
+    definition_path = problem_dir / "definition.json"
+    workload_path = problem_dir / "workload.jsonl"
+    problem_output_dir = output_dir / category / problem_name
+    traces_path = problem_output_dir / "traces.json"
+    definition = json.loads(definition_path.read_text())
+    messages = [f"\n[{index + 1}/{problem_count}] {category}/{problem_name}"]
+
+    if _should_skip_cdna4_low_precision_on_arch(
+        definition, effective_gpu_architecture
+    ):
+        skip_reason = _cdna4_low_precision_skip_reason(effective_gpu_architecture)
+        messages.append(f"  Skipping ({skip_reason}).")
+        return _PipelineTracePreparedProblem(
+            index=index,
+            problem_count=problem_count,
+            problem_dir=problem_dir,
+            problem_name=problem_name,
+            category=category,
+            definition_path=definition_path,
+            workload_path=workload_path,
+            problem_output_dir=problem_output_dir,
+            traces_path=traces_path,
+            job_name=f"ref_{problem_name[:40]}",
+            definition=definition,
+            solution=None,
+            solution_path=None,
+            messages=messages,
+            summary=_skipped_problem_summary(f"{category}/{problem_name}", skip_reason),
+            run_required=False,
+        )
+
+    if traces_path.exists():
+        try:
+            traces = json.loads(traces_path.read_text())
+            summary = inspect_traces(traces, f"{category}/{problem_name}")
+            reuse_decision = _dataset_reuse_decision(
+                rerun=args.rerun,
+                traces_path=traces_path,
+                failed_count=int(summary["failed"]),
+                execution_closure_path=None,
+                provenance=provenance,
+            )
+        except (OSError, json.JSONDecodeError):
+            summary = None
+            reuse_decision = None
+            messages.append("  Re-running (previous trace output is unreadable).")
+        if reuse_decision is not None and reuse_decision.should_reuse:
+            messages.append("  Skipping (already passed). Use --rerun to re-evaluate.")
+            return _PipelineTracePreparedProblem(
+                index=index,
+                problem_count=problem_count,
+                problem_dir=problem_dir,
+                problem_name=problem_name,
+                category=category,
+                definition_path=definition_path,
+                workload_path=workload_path,
+                problem_output_dir=problem_output_dir,
+                traces_path=traces_path,
+                job_name=f"ref_{problem_name[:40]}",
+                definition=definition,
+                solution=None,
+                solution_path=None,
+                messages=messages,
+                summary=summary,
+                run_required=False,
+            )
+        elif (
+            reuse_decision is not None
+            and reuse_decision.reason == "previous_failed"
+        ):
+            failed = summary["failed"] if summary is not None else "unknown"
+            messages.append(f"  Re-running (previous run had {failed} failures).")
+        elif (
+            reuse_decision is not None
+            and reuse_decision.reason == "rerun_requested"
+        ):
+            messages.append("  Re-running (--rerun requested).")
+
+    if problem_output_dir.exists():
+        shutil.rmtree(problem_output_dir)
+    problem_output_dir.mkdir(parents=True, exist_ok=True)
+
+    if args.max_workloads is not None:
+        lines, truncated = _workload_prefix_lines(workload_path, args.max_workloads)
+        if truncated:
+            workload_path = problem_output_dir / "workload.jsonl"
+            workload_path.write_text("\n".join(lines[: args.max_workloads]))
+
+    if args.solution_name:
+        solution_file = problem_dir / args.solution_name
+        if not solution_file.exists():
+            messages.append(f"  Skipping: {args.solution_name} not found")
+            return _PipelineTracePreparedProblem(
+                index=index,
+                problem_count=problem_count,
+                problem_dir=problem_dir,
+                problem_name=problem_name,
+                category=category,
+                definition_path=definition_path,
+                workload_path=workload_path,
+                problem_output_dir=problem_output_dir,
+                traces_path=traces_path,
+                job_name=f"ref_{problem_name[:40]}",
+                definition=definition,
+                solution=None,
+                solution_path=None,
+                messages=messages,
+                run_required=False,
+            )
+    elif "reference" not in definition or not definition["reference"].strip():
+        messages.append("  Skipping: no reference code")
+        return _PipelineTracePreparedProblem(
+            index=index,
+            problem_count=problem_count,
+            problem_dir=problem_dir,
+            problem_name=problem_name,
+            category=category,
+            definition_path=definition_path,
+            workload_path=workload_path,
+            problem_output_dir=problem_output_dir,
+            traces_path=traces_path,
+            job_name=f"ref_{problem_name[:40]}",
+            definition=definition,
+            solution=None,
+            solution_path=None,
+            messages=messages,
+            run_required=False,
+        )
+
+    solution = build_solution_for_problem(definition, problem_dir, args.solution_name)
+    solution_path = problem_output_dir / "solution.json"
+    solution_path.write_text(json.dumps(solution, indent=2))
+    return _PipelineTracePreparedProblem(
+        index=index,
+        problem_count=problem_count,
+        problem_dir=problem_dir,
+        problem_name=problem_name,
+        category=category,
+        definition_path=definition_path,
+        workload_path=workload_path,
+        problem_output_dir=problem_output_dir,
+        traces_path=traces_path,
+        job_name=f"ref_{problem_name[:40]}",
+        definition=definition,
+        solution=solution,
+        solution_path=solution_path,
+        messages=messages,
+    )
+
+
+def _run_pipeline_trace_problem(
+    *,
+    prepared: _PipelineTracePreparedProblem,
+    args: argparse.Namespace,
+    config_path: Path | None,
+) -> _PipelineTraceProblemResult:
+    messages = [*prepared.messages]
+    if not prepared.run_required:
+        return _PipelineTraceProblemResult(
+            index=prepared.index,
+            messages=messages,
+            summary=prepared.summary,
+        )
+
+    assert prepared.solution is not None
+    assert prepared.solution_path is not None
+
+    workload_shards = _workload_shard_paths(
+        prepared.workload_path,
+        shard_size=args.workload_shard_size,
+        output_dir=prepared.problem_output_dir,
+    )
+    traces: list[dict] = []
+    shard_failure_reasons: list[str] = []
+    if len(workload_shards) > 1:
+        messages.append(
+            f"  Running {len(workload_shards)} workload shards "
+            f"(--workload-shard-size {args.workload_shard_size})."
+        )
+    for shard_index, shard_workload_path in enumerate(workload_shards, start=1):
+        shard_job_name = (
+            prepared.job_name
+            if len(workload_shards) == 1
+            else f"{prepared.job_name}_shard{shard_index:04d}"
+        )
+        shard_traces = run_cli(
+            definition_path=prepared.definition_path,
+            workload_path=shard_workload_path,
+            solution_path=prepared.solution_path,
+            output_dir=prepared.problem_output_dir,
+            job_name=shard_job_name,
+            timeout=args.timeout,
+            config_path=config_path,
+            keep_staging=args.keep_staging,
+            verbose=args.verbose,
+        )
+        if shard_traces is None:
+            cli_log = prepared.problem_output_dir / f"{shard_job_name}_cli.log"
+            notes = _cli_failure_notes(cli_log)
+            timeout_notes = [
+                note for note in notes if note.startswith("CLI timed out after ")
+            ]
+            if timeout_notes:
+                traces.extend(
+                    _timeout_traces_for_workload_file(
+                        definition_name=str(prepared.definition["name"]),
+                        workload_path=shard_workload_path,
+                        solution_name=str(prepared.solution["name"]),
+                        timeout_seconds=args.timeout,
+                        log="; ".join(timeout_notes),
+                    )
+                )
+                continue
+            if len(workload_shards) == 1:
+                shard_failure_reasons.extend(notes)
+            else:
+                suffix = f" ({'; '.join(notes)})" if notes else ""
+                shard_failure_reasons.append(
+                    f"workload shard {shard_index}/{len(workload_shards)} "
+                    f"returned no traces{suffix}"
+                )
+            continue
+        traces.extend(shard_traces)
+
+    if not traces and shard_failure_reasons:
+        messages.append("  ERROR: CLI returned no traces")
+        return _PipelineTraceProblemResult(
+            index=prepared.index,
+            messages=messages,
+            summary={
+                "problem": f"{prepared.category}/{prepared.problem_name}",
+                "total": len(shard_failure_reasons),
+                "passed": 0,
+                "failed": len(shard_failure_reasons),
+                "latencies_ms": [],
+                "failure_reasons": shard_failure_reasons,
+            },
+        )
+
+    prepared.traces_path.write_text(json.dumps(traces, indent=2))
+    summary = inspect_traces(traces, f"{prepared.category}/{prepared.problem_name}")
+    if shard_failure_reasons:
+        summary["total"] += len(shard_failure_reasons)
+        summary["failed"] += len(shard_failure_reasons)
+        summary["failure_reasons"].extend(shard_failure_reasons)
+
+    status = "OK" if summary["failed"] == 0 else "FAIL"
+    messages.append(f"  {status}: {summary['passed']}/{summary['total']} passed")
+    for reason in summary["failure_reasons"][:3]:
+        messages.append(f"  {reason}")
+    return _PipelineTraceProblemResult(
+        index=prepared.index,
+        messages=messages,
+        summary=summary,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -979,6 +1296,33 @@ def main():
             "Parallel workers for safe CPU/I/O-only phases. Use a positive integer "
             "or 'auto'. Only --phase derived uses more than one worker; GPU and "
             "profiler phases remain serial."
+        ),
+    )
+    ap.add_argument(
+        "--execution-mode",
+        choices=("serial", "pipeline"),
+        default="serial",
+        help=(
+            "Execution scheduler. Default 'serial' preserves legacy ordering. "
+            "'pipeline' overlaps trace-stage CPU preparation with serial GPU "
+            "evaluation; it currently supports --phase traces only."
+        ),
+    )
+    ap.add_argument(
+        "--prepare-jobs",
+        default="auto",
+        help=(
+            "CPU preparation workers for --execution-mode pipeline. Use a positive "
+            "integer or 'auto'. GPU evaluation remains controlled by --gpu-jobs."
+        ),
+    )
+    ap.add_argument(
+        "--gpu-jobs",
+        type=int,
+        default=1,
+        help=(
+            "GPU evaluation workers for --execution-mode pipeline. Only 1 is "
+            "currently supported to preserve benchmark isolation."
         ),
     )
     ap.add_argument(
@@ -1139,6 +1483,16 @@ def main():
 
     if args.workload_shard_size is not None and args.workload_shard_size < 1:
         ap.error("--workload-shard-size must be a positive integer")
+    if args.gpu_jobs != 1:
+        ap.error("--gpu-jobs currently only supports 1")
+    if args.execution_mode == "pipeline":
+        if args.phase != "traces":
+            ap.error("--execution-mode pipeline currently requires --phase traces")
+        if args.ready_subset is not None or args.execution_closure is not None:
+            ap.error(
+                "--execution-mode pipeline currently does not support "
+                "--ready-subset or --execution-closure"
+            )
 
     problems_dir = args.problems_dir.resolve()
     if not problems_dir.is_dir():
@@ -1287,6 +1641,14 @@ def main():
     jobs = _resolve_jobs(str(args.jobs), phase=args.phase, problem_count=len(problems))
     if args.phase == "derived" and jobs > 1:
         print(f"Using {jobs} derived workers.")
+    prepare_jobs = _resolve_prepare_jobs(
+        str(args.prepare_jobs), problem_count=len(problems)
+    )
+    if args.execution_mode == "pipeline":
+        print(
+            f"Using pipeline trace scheduler "
+            f"(prepare_jobs={prepare_jobs}, gpu_jobs={args.gpu_jobs})."
+        )
 
     benchmark_config = BenchmarkConfig(
         warmup_runs=(
@@ -1328,6 +1690,9 @@ def main():
         "limit": args.limit,
         "max_workloads": args.max_workloads,
         "workload_shard_size": args.workload_shard_size,
+        "execution_mode": args.execution_mode,
+        "prepare_jobs": prepare_jobs if args.execution_mode == "pipeline" else None,
+        "gpu_jobs": args.gpu_jobs if args.execution_mode == "pipeline" else None,
         "timeout": args.timeout,
         "warmup_runs": benchmark_config.warmup_runs,
         "iterations": benchmark_config.iterations,
@@ -1441,6 +1806,47 @@ def main():
     run_trace_phase = args.phase in {"all", "traces"}
     run_derived_phase = args.phase in {"all", "derived"}
     run_timing_phase = args.phase in {"all", "timing"}
+
+    if args.execution_mode == "pipeline":
+        effective_gpu_architecture = _effective_gpu_architecture(args.gpu_architecture)
+        pipeline_results: list[_PipelineTraceProblemResult | None] = [
+            None for _ in problems
+        ]
+        with ThreadPoolExecutor(max_workers=prepare_jobs) as executor:
+            future_to_index = {
+                executor.submit(
+                    _prepare_pipeline_trace_problem,
+                    problem_dir=problem_dir,
+                    index=index,
+                    problem_count=len(problems),
+                    problems_dir=problems_dir,
+                    output_dir=output_dir,
+                    args=args,
+                    effective_gpu_architecture=effective_gpu_architecture,
+                    provenance=provenance,
+                ): index
+                for index, problem_dir in enumerate(problems)
+            }
+            for future in as_completed(future_to_index):
+                prepared = future.result()
+                result = _run_pipeline_trace_problem(
+                    prepared=prepared,
+                    args=args,
+                    config_path=config_path,
+                )
+                pipeline_results[result.index] = result
+                for message in result.messages:
+                    print(message)
+
+        for result in pipeline_results:
+            if result is not None and result.summary is not None:
+                summaries.append(result.summary)
+
+        print_summary(summaries)
+        summary_path = write_summary_report(output_dir, summaries)
+        print(f"\nSummary saved to {summary_path}")
+        print(f"Per-problem traces saved under {output_dir}")
+        return
 
     if args.phase == "derived" and jobs > 1:
         with ThreadPoolExecutor(max_workers=jobs) as executor:
