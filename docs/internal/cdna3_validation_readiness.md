@@ -46,6 +46,30 @@ rocminfo | grep -E "Name: *gfx94|Marketing Name" || true
   summary, per-problem traces, ROCm timing evidence, AMD-native score report,
   FP8 status, NVFP4/MXFP4 deferred status, and expected result categories.
 
+## Current Clock-Lock Blocker
+
+On 2026-06-05, a cloud `gfx942` validation run attempted to use
+`scripts/run_dataset.py --lock-clocks`. The benchmark correctly rejected the
+run because the server still reported unlocked clocks:
+
+```text
+Clocks locked: no
+lock_clocks=True but GPU clocks are not locked on this server
+```
+
+Manual `sudo rocm-smi --setperflevel manual` attempts did not transition the
+device out of:
+
+```text
+Performance Level: auto
+```
+
+This indicates the cloud host or scheduler currently prevents effective DPM
+clock locking from inside the validation session. Until the host can provide
+locked-clock evidence, CDNA3 functional validation should run without
+`--lock-clocks`, and timing output from that environment must be treated as
+unlocked-clock evidence rather than benchmark-grade locked-clock timing.
+
 ## Acceptance Criteria
 
 - Full adapted pytest suite completes successfully on a real CDNA 3 GPU.
