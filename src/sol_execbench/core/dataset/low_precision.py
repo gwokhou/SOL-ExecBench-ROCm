@@ -270,9 +270,6 @@ def _contains_low_precision_token(value: str) -> bool:
         *LOW_PRECISION_COMPATIBILITY_FORMATS,
         "float4",
         "e2m1",
-        "float8_e4m3fn",
-        "scaled_gemm",
-        "_scaled_mm",
     )
     return any(token in normalized for token in tokens)
 

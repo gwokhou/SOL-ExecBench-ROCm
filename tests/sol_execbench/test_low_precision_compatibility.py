@@ -142,7 +142,7 @@ def test_cdna3_low_precision_skip_policy_ignores_non_fp4_quant():
     assert should_skip_cdna4_low_precision_on_arch(definition, "gfx942") is False
 
 
-def test_cdna3_low_precision_skip_policy_detects_scaled_gemm_reference():
+def test_cdna3_low_precision_skip_policy_detects_nvfp4_scaled_gemm_problem():
     definition = {
         "name": "020_nvfp4_linear_layer",
         "inputs": {
@@ -155,3 +155,18 @@ def test_cdna3_low_precision_skip_policy_detects_scaled_gemm_reference():
 
     assert definition_uses_cdna4_low_precision(definition) is True
     assert should_skip_cdna4_low_precision_on_arch(definition, "gfx942") is True
+
+
+def test_cdna3_low_precision_skip_policy_does_not_skip_plain_fp8_scaled_gemm():
+    definition = {
+        "name": "001_fp8_attention_output_projection",
+        "inputs": {
+            "x": {"dtype": "bfloat16"},
+            "weight": {"dtype": "float8_e4m3fn"},
+        },
+        "outputs": {"out": {"dtype": "float32"}},
+        "reference": "return torch._scaled_mm(x, weight, scale_a, scale_b)",
+    }
+
+    assert definition_uses_cdna4_low_precision(definition) is False
+    assert should_skip_cdna4_low_precision_on_arch(definition, "gfx942") is False
