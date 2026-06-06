@@ -1394,6 +1394,24 @@ def test_cli_timeout_logs_are_bounded(tmp_path):
     assert "[truncated CLI output]" in log_text
 
 
+def test_cli_failure_notes_detects_inner_eval_driver_timeout(tmp_path):
+    cli_log = tmp_path / "failed_shard_cli.log"
+    cli_log.write_text(
+        "exit code: 1\n\n"
+        "--- stderr ---\n"
+        "Traceback (most recent call last):\n"
+        "  File \"/usr/lib/python3.12/subprocess.py\", line 1253, in _check_timeout\n"
+        "    raise TimeoutExpired(\n"
+        "subprocess.TimeoutExpired: Command '['python', 'eval_driver.py']' "
+        "timed out after 900 seconds\n",
+        encoding="utf-8",
+    )
+
+    assert run_dataset._cli_failure_notes(cli_log) == [
+        "CLI timed out after 900 seconds"
+    ]
+
+
 def test_execution_closure_marks_selected_workload_without_trace_as_missing_trace(
     tmp_path,
     monkeypatch,
