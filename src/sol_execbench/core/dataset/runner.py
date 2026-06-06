@@ -416,12 +416,23 @@ def cli_failure_notes(cli_log: Path) -> list[str]:
     if not cli_log.exists():
         return ["CLI returned no traces"]
     try:
-        with cli_log.open(errors="replace") as handle:
-            message = handle.readline().strip()
+        text = cli_log.read_text(errors="replace")
     except OSError:
         return ["CLI returned no traces"]
+    lines = text.splitlines()
+    message = lines[0].strip() if lines else ""
     if not message:
         return ["CLI returned no traces"]
+    timeout_marker = "subprocess.TimeoutExpired:"
+    if timeout_marker in text:
+        timeout_line = next(
+            (line.strip() for line in lines if timeout_marker in line),
+            "",
+        )
+        if "timed out after " in timeout_line:
+            timeout_value = timeout_line.rsplit("timed out after ", maxsplit=1)[1]
+            return [f"CLI timed out after {timeout_value}"]
+        return ["CLI timed out"]
     if message.startswith("exit code: "):
         try:
             exit_code = int(message.removeprefix("exit code: ").strip())
