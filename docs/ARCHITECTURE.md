@@ -23,8 +23,8 @@ graph TD
     Packager["driver/problem_packager.py"]
     Templates["driver/templates/"]
     Bench["core/bench/"]
-    Evidence["core/environment.py + toolchain.py + compatibility.py"]
-    Dataset["core/dataset/"]
+    Evidence["core/environment.py + diagnostics.py + toolchain.py + compatibility.py"]
+    Dataset["core/dataset/ + scripts/run_dataset.py"]
     Scoring["core/scoring/"]
     Reports["core/reporting.py + baseline.py + trust_summary.py"]
 
@@ -95,7 +95,9 @@ for trace baseline comparison.
 | `DockerTargetManifest` | `src/sol_execbench/core/docker_matrix.py` | Models ROCm Docker targets and preflight evidence used by Docker tooling and tests. |
 | `TraceRunSummary` and `BaselineComparison` | `src/sol_execbench/core/reporting.py`, `src/sol_execbench/core/baseline.py` | Summarize trace runs and compare new traces against baseline traces. |
 | `DatasetReuseDecision` | `src/sol_execbench/core/dataset/run_closure.py` | Decides whether existing dataset traces can be reused based on rerun flags, failure counts, and execution-closure provenance. |
+| Dataset runner helpers | `src/sol_execbench/core/dataset/runner.py` | Importable helpers used by `scripts/run_dataset.py` for solution wrapping, CLI subprocess invocation, trace parsing, timing evidence collection, and AMD score report generation. |
 | `DatasetShardPlan` and `DatasetShardMergeResult` | `src/sol_execbench/core/dataset/sharding.py` | Define deterministic workload shard assignment, per-shard trace refs, ordered trace merging, duplicate detection, and incomplete-shard reporting. |
+| Validation diagnostics | `src/sol_execbench/core/diagnostics.py` | CPU-safe ROCm readiness helpers, profiler routing readiness, CDNA 3 readiness metadata, and MI300X validation claim blockers. |
 
 ## Directory Structure Rationale
 
@@ -199,6 +201,15 @@ local to the operator's machine. Scripts such as
 `scripts/report_paper_denominator.py`, `scripts/report_parity_gaps.py`, and
 `scripts/run_dataset.py` use those helpers.
 
+Dataset-scale execution is split between an operator-facing script and
+package-owned helpers. `scripts/run_dataset.py` handles argument parsing,
+problem iteration, category selection, output layout, workload sharding files,
+skip decisions, and summary assembly. `src/sol_execbench/core/dataset/runner.py`
+contains the reusable implementation for building reference or custom
+solutions, invoking `sol-execbench` as a subprocess, parsing trace JSONL,
+capturing bounded CLI logs, collecting source timing evidence, and writing AMD
+score reports.
+
 Dataset reuse and closure behavior is package-owned. `run_closure.py` computes
 reuse decisions, stale-provenance mismatches, selected-workload closure
 records, derived evidence refs, and missing-evidence states. `sharding.py`
@@ -207,10 +218,13 @@ parallelism. `scripts/run_dataset.py` keeps ROCm GPU trace collection and
 profiler-backed timing serial, while allowing `--phase derived --jobs <N|auto>`
 to parallelize CPU/I/O-only report generation from existing traces.
 
-`src/sol_execbench/core/scoring/` contains AMD hardware models, bound estimates,
-bound graphs, SOL derivation helpers, baseline artifacts, and AMD-native score
-models. These helpers consume traces and evidence sidecars to produce guarded
-AMD-native reporting artifacts.
+`src/sol_execbench/core/scoring/` contains AMD hardware models, bound graphs,
+operator work estimates, AMD SOL bound artifacts, SOLAR derivation helpers,
+baseline artifacts, and AMD-native score models. These helpers consume traces,
+hardware-model records, optional timing evidence, SOL bound sidecars, and
+baseline artifacts to produce guarded AMD-native-derived reports. Missing,
+degraded, unsupported, or unvalidated evidence remains represented as warnings
+or unscored states rather than upgraded into hardware-performance validation.
 
 Release-quality reporting modules such as `src/sol_execbench/core/claim_upgrade.py`,
 `src/sol_execbench/core/consistency.py`,
@@ -245,3 +259,36 @@ Docker-related diagnostics live in `src/sol_execbench/core/docker_matrix.py` and
 and tests to describe target selection, dependency policy, observed PyTorch ROCm
 versions, and preflight status without coupling those checks to the evaluator
 subprocess.
+
+General ROCm diagnostics live in `src/sol_execbench/core/diagnostics.py`. This
+module contains CPU-safe tool and device-node probes, profiler readiness
+routing, CDNA 3 validation readiness metadata, and strict MI300X validation
+claim blockers. These helpers describe whether a target is ready to attempt
+validation or whether an existing evidence record can be upgraded; they do not
+run the full benchmark suite and do not create validation claims by themselves.
+
+## ROCm Evidence Boundaries
+
+Architecture-family support, product validation, and evidence sidecars are kept
+separate:
+
+- CDNA 3 is represented as the `gfx94*` architecture family. `gfx940`,
+  `gfx941`, and `gfx942` can appear in solution metadata and HIP offload flag
+  staging, but schema/build support is not hardware-validation evidence.
+- MI300X and MI308X are sibling CDNA 3 GPU products. Recorded evidence for this
+  port includes MI308X `gfx942` validation-infrastructure evidence, including
+  pytest and dataset-run evidence with known timeout blockers. That evidence is
+  not a full MI300X validation pass.
+- Full MI300X validation remains blocked until exact-hardware, full-suite,
+  clock-lock, timing, score, FP8, low-precision, and required artifact evidence
+  boundaries are satisfied.
+- NVFP4/MXFP4 Quant ROCm adaptation and hardware validation are deferred until
+  CDNA4-class hardware is available. CPU semantic low-precision helpers and
+  CDNA 3 skip reasons are compatibility/reporting aids, not CDNA4 hardware
+  validation.
+
+Trace JSONL remains the canonical benchmark output. Environment snapshots,
+`rocprofv3` profile metadata, static kernel evidence, Matrix entries,
+execution-closure reports, consistency reports, trust summaries, claim-upgrade
+reports, release-candidate summaries, and AMD-native score reports are bounded
+sidecar evidence with the authority declared by their schemas and docs.

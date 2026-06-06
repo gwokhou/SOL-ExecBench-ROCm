@@ -27,6 +27,18 @@ uv run ty check
 uv run pytest tests/
 ```
 
+The CI workflow uses the locked dependency set and a CPU-safe test subset:
+
+```bash
+uv sync --locked --all-groups --python <3.12-or-3.13>
+uv run ruff check .
+uv run ty check
+uv run pytest tests/sol_execbench \
+  --ignore=tests/sol_execbench/driver/test_eval_driver.py \
+  --ignore=tests/sol_execbench/test_e2e.py
+uv run pytest tests/examples/test_examples.py -k consistency
+```
+
 For ROCm GPU evaluation, use a ROCm-capable AMD host or the Docker helper:
 
 ```bash
@@ -77,7 +89,9 @@ uv run pre-commit install
 Place new package tests under `tests/sol_execbench/` near related coverage.
 Place example workflow tests under `tests/examples/`.
 
-Use environment-sensitive markers where appropriate:
+Use environment-sensitive markers where appropriate. Core marker names are
+declared in `pyproject.toml`; additional environment checks and skip behavior
+live in `tests/conftest.py`.
 
 - `cpp`
 - `timing_serial`
@@ -90,6 +104,25 @@ Use environment-sensitive markers where appropriate:
 - `requires_cutile` for legacy NVIDIA-only coverage that should be skipped in
   this ROCm-only port
 
+`timing_serial` tests are skipped by default. Run them explicitly and disable
+xdist for live timing checks:
+
+```bash
+uv run pytest tests -m timing_serial -n 0
+```
+
+Run ROCm, architecture, and native-library marker selections only on hosts or
+containers with the matching devices and headers:
+
+```bash
+uv run pytest tests -m requires_rocm -n 0
+uv run pytest tests -m requires_rdna4 -n 0
+uv run pytest tests -m requires_cdna3 -n 0
+uv run pytest tests -m requires_rocm_dev -n 0
+uv run pytest tests -m requires_ck -n 0
+uv run pytest tests -m requires_rocwmma -n 0
+```
+
 Place future CDNA3-specific live tests near related package coverage under
 `tests/sol_execbench/` and mark them with both `requires_rocm` and
 `requires_cdna3` when they need a real `gfx94*` GPU. Use
@@ -97,14 +130,23 @@ Place future CDNA3-specific live tests near related package coverage under
 pattern. CPU-safe tests may cover `gfx940`, `gfx941`, and `gfx942` schema or
 metadata behavior, but those tests must not claim hardware validation.
 
-For hardware-sensitive changes, record the ROCm version, GPU architecture,
-container target if used, and exact test commands in the PR.
+For hardware-sensitive changes, record the ROCm version, GPU architecture, GPU
+product, container target if used, exact test commands, ROCm timing evidence,
+AMD-native score, and any NVFP4/MXFP4 deferred status in the PR.
 
-For MI300X/CDNA3 validation changes, also record whether the run produced the
-handoff evidence chain: full pytest log, dataset summary, environment report,
-clock-lock evidence, per-problem traces, ROCm timing evidence, AMD-native score
-report, FP8 status, and NVFP4/MXFP4 deferred status. Until that evidence exists,
-describe CDNA3 work as schema support, test readiness, or deferred validation.
+Current CDNA3 evidence is MI308X (`gfx942`) validation infrastructure evidence,
+not MI300X validation. MI300X and MI308X are sibling GPU products under the
+CDNA3 architecture family and share `gfx942`, but do not describe MI308X runs
+as MI300X hardware validation. For any CDNA3 validation change, record whether
+the run produced the relevant evidence chain: full pytest log, dataset summary,
+environment report, clock-lock evidence, per-problem traces, ROCm timing evidence,
+AMD-native score report, FP8 status, and NVFP4/MXFP4 deferred status. Until that
+evidence exists for the exact claim, describe CDNA3 work as schema support, test
+readiness, infrastructure evidence, or deferred validation.
+
+NVFP4/MXFP4 Quant ROCm adaptation and hardware validation are deferred until
+CDNA4-class hardware is available. CDNA3 expected skips for those problems are
+not CPU validation, dequantized benchmark validation, or performance evidence.
 
 ## Documentation
 
@@ -124,6 +166,9 @@ Update documentation when changing:
 - User-facing examples
 
 Use conservative wording for unvalidated hardware or infrastructure claims.
+Do not infer native-host validation from Docker/container evidence, MI300X
+validation from MI308X evidence, CDNA4 validation without CDNA4-class hardware,
+or NVFP4/MXFP4 validation from expected skips.
 
 ## Commit Messages
 

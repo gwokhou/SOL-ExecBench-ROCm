@@ -9,10 +9,11 @@ Beyond backend adaptation, this repository adds infrastructure for ROCm benchmar
 - Trace-adjacent evidence for environment, `rocprofv3`, static-kernel, toolchain routing, and ROCm compatibility checks.
 - Dataset accounting for ready subsets, execution closure, paper denominator, parity gaps, consistency, stability, and trust summaries.
 - AMD score and bound helpers separated from canonical Trace JSONL, with explicit unsupported and inexact cases.
-- Release gates for checksums, required artifacts, known gaps, forbidden claims, MI300X-under-CDNA3 scope, unavailable CDNA4 validation, and provenance.
+- Release gates for checksums, required artifacts, known gaps, forbidden claims, MI308X/gfx942 infrastructure evidence, MI300X validation boundaries under CDNA3, unavailable CDNA4 validation, and provenance.
 - Machine-readable provenance classes for upstream-retained, derivative, and independent ROCm files.
 
 These additions are scoped as ROCm-port, engineering-prerelease, or research-preview evidence; they do not imply paper-level parity, upstream SOLAR equivalence, or leaderboard authority.
+Current CDNA3 evidence is MI308X (`gfx942`) validation infrastructure evidence, not MI300X validation. MI300X and MI308X are sibling GPU products under the CDNA3 architecture family and share `gfx942`, but they must not be treated as interchangeable hardware-validation claims. NVFP4/MXFP4 Quant ROCm adaptation and hardware validation remain deferred until suitable CDNA4-class hardware is available.
 
 This project is independent and is not endorsed by NVIDIA or AMD. See [Provenance Policy](docs/provenance.md), [Compliance](docs/compliance.md), and [Claims](docs/CLAIMS.md) for upstream attribution, licensing, and validation boundaries.
 
@@ -182,8 +183,9 @@ The ROCm schema accepts Python/Triton categories and native ROCm categories:
 | `rocwmma` | Native ROCm implementation using rocWMMA. |
 
 See [ROCm library examples](docs/rocm_libraries.md) for library readiness, example coverage, and diagnostic boundaries.
-CDNA 3 MI308X (`gfx942`) validation infrastructure evidence exists, but full MI300X hardware validation under the CDNA 3 family remains blocked by documented timeout shards and missing benchmark-grade MI300X evidence.
-CDNA 4 validation is also deferred because suitable hardware is unavailable.
+CDNA3 MI308X (`gfx942`) validation infrastructure evidence exists, including exercised adapted-suite and dataset paths with documented blockers, but this is not full MI300X hardware validation. MI300X and MI308X are sibling CDNA3 GPU products that share `gfx942`; full MI300X validation remains blocked until timeout, clock-lock, timing, score, FP8, low-precision, and exact-hardware evidence boundaries are resolved.
+NVFP4/MXFP4 Quant ROCm adaptation and hardware validation are deferred until CDNA4-class hardware is available. CDNA3 runs should treat those problems as documented hardware-unsupported skips, not CPU or dequantized benchmark validation.
+CDNA4 validation is also deferred because suitable hardware is unavailable.
 
 Legacy CUDA/NVIDIA schema values such as `cuda_cpp`, `cublas`, `cudnn`, `cutlass`, `cute_dsl`, and `cutile` are rejected with ROCm migration guidance.
 
