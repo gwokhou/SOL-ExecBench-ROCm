@@ -617,7 +617,7 @@ def _render_markdown(payload: dict[str, object]) -> str:
             "This artifact is engineering prerelease evidence only. It is not full "
             "235-problem paper validation, upstream SOLAR parity, hosted "
             "leaderboard readiness, hard sandbox evidence, CDNA4 validation, or "
-            "full MI300X validation on the CDNA3 gfx942 target.",
+            "full MI300X validation under CDNA3.",
             "",
         ]
     )

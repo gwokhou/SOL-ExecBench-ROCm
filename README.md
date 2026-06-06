@@ -9,7 +9,7 @@ Beyond backend adaptation, this repository adds infrastructure for ROCm benchmar
 - Trace-adjacent evidence for environment, `rocprofv3`, static-kernel, toolchain routing, and ROCm compatibility checks.
 - Dataset accounting for ready subsets, execution closure, paper denominator, parity gaps, consistency, stability, and trust summaries.
 - AMD score and bound helpers separated from canonical Trace JSONL, with explicit unsupported and inexact cases.
-- Release gates for checksums, required artifacts, known gaps, forbidden claims, MI300X-as-CDNA3 scope, unavailable CDNA4 validation, and provenance.
+- Release gates for checksums, required artifacts, known gaps, forbidden claims, MI300X-under-CDNA3 scope, unavailable CDNA4 validation, and provenance.
 - Machine-readable provenance classes for upstream-retained, derivative, and independent ROCm files.
 
 These additions are scoped as ROCm-port, engineering-prerelease, or research-preview evidence; they do not imply paper-level parity, upstream SOLAR equivalence, or leaderboard authority.
@@ -182,7 +182,7 @@ The ROCm schema accepts Python/Triton categories and native ROCm categories:
 | `rocwmma` | Native ROCm implementation using rocWMMA. |
 
 See [ROCm library examples](docs/rocm_libraries.md) for library readiness, example coverage, and diagnostic boundaries.
-CDNA 3 MI308X (`gfx942`) validation infrastructure evidence exists, but full CDNA3/MI300X hardware validation remains blocked by documented timeout shards and missing benchmark-grade MI300X evidence.
+CDNA 3 MI308X (`gfx942`) validation infrastructure evidence exists, but full MI300X hardware validation under the CDNA 3 family remains blocked by documented timeout shards and missing benchmark-grade MI300X evidence.
 CDNA 4 validation is also deferred because suitable hardware is unavailable.
 
 Legacy CUDA/NVIDIA schema values such as `cuda_cpp`, `cublas`, `cudnn`, `cutlass`, `cute_dsl`, and `cutile` are rejected with ROCm migration guidance.

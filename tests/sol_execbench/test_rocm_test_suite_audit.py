@@ -115,7 +115,7 @@ def test_cdna3_schema_support_is_distinct_from_hardware_validation():
     for target in ("gfx940", "gfx941", "gfx942"):
         assert target in solution_schema
 
-    assert "Actual CDNA3/MI300X full-suite execution in v1.28" in requirements
+    assert "Actual MI300X full-suite execution under CDNA3 in v1.28" in requirements
     assert "Requires complete real-hardware evidence" in requirements
 
 

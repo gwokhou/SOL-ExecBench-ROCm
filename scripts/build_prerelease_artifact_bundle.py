@@ -660,7 +660,7 @@ def _render_markdown(payload: dict[str, object]) -> str:
         "This bundle is engineering prerelease and research preview evidence only. "
         "It is not full 235-problem paper validation, upstream SOLAR parity, "
         "leaderboard readiness, hard-sandbox evidence, native-host validation "
-        "from Docker evidence, full MI300X validation on the CDNA3 `gfx942` target, "
+        "from Docker evidence, full validation of the MI300X GPU model under CDNA3, "
         "or CDNA4 validation.",
         "",
         "## Authority Classes",

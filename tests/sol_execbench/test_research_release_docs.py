@@ -74,7 +74,7 @@ def test_engineering_prerelease_support_matrix_boundaries():
         "engineering-prerelease evidence",
         "Docker/container ROCm user-space",
         "not native-host validation",
-        "MI300X remains a distinct CDNA 3 hardware-validation target",
+        "MI300X and MI308X are sibling GPU products",
         "MI308X (`gfx942`)",
         "gfx942",
         "CDNA4 validation is unavailable",
@@ -85,7 +85,7 @@ def test_engineering_prerelease_support_matrix_boundaries():
     for required in (
         "container ROCm user-space",
         "not native-host validation",
-        "MI300X remains a distinct CDNA 3 hardware-validation target",
+        "MI300X and MI308X are sibling GPU products",
         "recorded on MI308X",
         "CDNA4 validation is unavailable",
     ):
@@ -94,7 +94,7 @@ def test_engineering_prerelease_support_matrix_boundaries():
     for required in (
         "support matrix",
         "Docker/container user-space evidence",
-        "full MI300X validation on the CDNA3 `gfx942` target",
+        "full MI300X validation under CDNA3",
         "CDNA4 validation",
     ):
         assert required in release_validation
@@ -117,7 +117,7 @@ def test_v1_25_release_notes_keep_claim_boundaries_visible():
         "upstream SOLAR parity",
         "leaderboard readiness",
         "hard-sandbox authority",
-        "Full MI300X validation on the CDNA3 `gfx942` target",
+        "Full MI300X validation under CDNA3",
         "CDNA4 validation is unavailable",
         "Docker/container ROCm user-space evidence is not native-host validation",
     ):

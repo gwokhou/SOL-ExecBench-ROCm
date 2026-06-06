@@ -100,10 +100,13 @@ def test_cdna3_readiness_doc_is_not_hardware_validation_claim():
         "known timeout blockers",
         "cdna3_readiness_implemented",
         "cdna3_hardware_validation_deferred",
-        "must not say CDNA 3 or MI300X hardware",
+        "must not say CDNA 3 hardware validation or",
     ):
         assert phrase in readiness
-    assert "completed benchmark-grade CDNA3 or MI300X hardware-validation pass" in normalized
+    assert (
+        "completed benchmark-grade hardware-validation pass for the CDNA 3 family"
+        in normalized
+    )
     assert "uv run --no-sync pytest tests/" in readiness
     assert "gfx94*" in readiness
 

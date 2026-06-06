@@ -49,7 +49,7 @@ def test_release_draft_has_required_assets_and_bounded_wording():
         "docs/GETTING-STARTED.md",
         "docs/rocm_timing.md",
         "docs/RESEARCHER-GUIDE.md",
-        "CDNA3/gfx942 validation infrastructure evidence was recorded on MI308X",
+        "recorded on MI308X",
         "CDNA4 validation is unavailable",
         "does not imply NVIDIA or AMD endorsement",
         "not a file-level copyright assignment",

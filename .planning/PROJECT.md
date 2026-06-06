@@ -121,7 +121,7 @@ of scope.
 The v1.26 milestone turned that engineering prerelease into a public
 prerelease and research preview package by adding versioned artifact bundles,
 release-readiness gates, research-preview evidence, public publishing
-materials, and corrected MI300X-as-CDNA3 wording.
+materials, and corrected MI300X-under-CDNA3 wording.
 The v1.27 milestone completed release-facing copyright and provenance cleanup
 by adding a provenance policy and manifest, correcting SPDX file attribution,
 updating public compliance and attribution wording, and wiring provenance
@@ -203,7 +203,7 @@ updated public/contributor docs for future CDNA3 testing.
   evidence.
 
 **Explicitly deferred:**
-- Actual CDNA3/MI300X full-suite execution, because the current machine cannot
+- Actual MI300X full-suite execution under CDNA3, because the current machine cannot
   run a real `gfx94*` validation pass.
 - Upgrading any support matrix, score report, prerelease material, or research
   preview to claim CDNA3 hardware validation before a complete evidence chain
@@ -716,7 +716,7 @@ ROCm path, with validation scoped to RDNA 4 only.
 - `hipblas` has a runnable public SGEMM example and native staging tests, while
   MIOpen, CK, and rocWMMA were documented candidate categories with
   overclaiming guardrails - v1.7.
-- MI300X-as-CDNA3 validation instructions, FP8/NVFP4 decision records, and
+- MI300X-under-CDNA3 validation instructions, FP8/NVFP4 decision records, and
   evidence gates for validation claims are implemented - v1.7.
 - MIOpen, Composable Kernel, and rocWMMA each have scoped native ROCm public
   examples, native staging tests, dependency diagnostics, RDNA 4 E2E

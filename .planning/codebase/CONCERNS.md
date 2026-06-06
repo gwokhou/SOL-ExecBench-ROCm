@@ -130,7 +130,7 @@
 
 **Hardware validation is architecture- and host-specific:**
 - Status: Narrowed.
-- Current capacity: RDNA 4 and CDNA 3 markers exist; docs record MI308X (`gfx942`) pytest evidence, dataset-validation infrastructure evidence, expected Quant NVFP4/MXFP4 skips, known timeout blockers, and MI300X benchmark-grade requirements.
+- Current capacity: RDNA 4 and CDNA 3 markers exist; docs record MI308X (`gfx942`) pytest evidence, dataset-validation infrastructure evidence, expected Quant NVFP4/MXFP4 skips, known timeout blockers, and MI300X benchmark-grade requirements. Guardrails still block premature CDNA3-family hardware-validation claims.
 - Limit: MI300X validation needs exact MI300X GPU identity, `gfx942`, accepted timeout boundaries, clock-lock evidence, dataset traces, timing evidence, AMD-native score report, FP8 status, and deferred NVFP4/MXFP4 status. MI308X evidence exercises the shared `gfx942` code path but is not MI300X hardware validation.
 - Scaling path: Follow `docs/internal/mi300x_validation_readiness.md` and `docs/internal/cdna3_validation_readiness.md`; do not treat marker readiness or Docker evidence as commercial GPU validation.
 

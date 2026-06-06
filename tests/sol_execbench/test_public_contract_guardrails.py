@@ -1440,7 +1440,7 @@ def test_v1_9_claim_guardrails_keep_cdna3_and_nvidia_equivalence_out_of_scope():
 
     assert "CDNA 3 (`gfx94*`) full adapted suite validation remains deferred" in project
     assert "CDNA3-family, CDNA4, or native-host ROCm validation expansion" in requirements
-    assert "MI300X is the CDNA3 hardware target rather than a separate architecture target" in requirements
+    assert "MI300X and MI308X are sibling GPU products" in requirements
     assert "not NVIDIA B200, SOLAR, or leaderboard equivalence claims" in analysis
     assert "hardware_validation_status" in analysis
     assert "model_validation_status" in analysis
@@ -1593,10 +1593,10 @@ def test_cdna3_validation_remains_deferred_in_docs():
     roadmap = Path(".planning/ROADMAP.md").read_text()
     assert "known timeout blockers" in handoff
     assert "should not be used to claim zero failures" in handoff
-    assert "Actual CDNA3/MI300X full-suite execution" in project
+    assert "Actual MI300X full-suite execution under CDNA3" in project
     assert "current machine cannot" in project
     assert "actual full-suite" in project
-    assert "Actual CDNA3/MI300X full-suite execution in v1.28" in requirements
+    assert "Actual MI300X full-suite execution under CDNA3 in v1.28" in requirements
     assert "hardware validation remains deferred" in roadmap
     assert "requires_cdna3" in roadmap
     assert "CDNA3 full-suite validation has not been recorded" in CDNA3_NO_VALIDATION_WARNING

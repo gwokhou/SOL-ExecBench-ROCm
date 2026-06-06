@@ -98,8 +98,8 @@ This validation path supports an **engineering prerelease** claim only. It
 should be interpreted alongside the support matrix in `docs/rocm.md`. In
 particular, Docker/container user-space evidence remains distinct from
 native-host validation. CDNA3/gfx942 validation infrastructure evidence exists
-from MI308X (`gfx942`) runs, but full MI300X validation on the CDNA3 `gfx942`
-target remains blocked until timeout, clock-lock, timing, score, FP8,
+from MI308X (`gfx942`) runs, but full validation of the sibling MI300X GPU model
+under CDNA3 remains blocked until timeout, clock-lock, timing, score, FP8,
 low-precision, and exact-hardware evidence boundaries are resolved. CDNA4
 validation is unavailable because suitable hardware is not currently
 accessible.
@@ -111,7 +111,7 @@ It does not provide:
 - hosted leaderboard readiness
 - hard sandbox or multi-tenant adversarial execution
 - CDNA4 validation, because suitable hardware is not currently accessible
-- full MI300X validation on the CDNA3 `gfx942` target while timeout,
+- full MI300X validation under CDNA3 while timeout,
   clock-lock, timing, score, FP8, or low-precision evidence boundaries remain
   unresolved
 - native-host validation from Docker/container user-space evidence alone
@@ -120,8 +120,8 @@ Trace JSONL remains the canonical run artifact. Profile, static, environment,
 Matrix, closure, consistency, claim-upgrade, trust-summary, and release
 candidate validation summaries are diagnostic-only sidecar evidence. Bounded
 dataset slices and support-matrix rows are provisional prerelease evidence, not
-paper, score, leaderboard, sandbox, native-host, full MI300X validation on the
-CDNA3 `gfx942` target, or CDNA4 validation authority.
+paper, score, leaderboard, sandbox, native-host, full MI300X validation under
+CDNA3, or CDNA4 validation authority.
 
 Command stdout and stderr are streamed to temporary files while checks run.
 Only bounded redacted tails are copied into the validation JSON, and temporary

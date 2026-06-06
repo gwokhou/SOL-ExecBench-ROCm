@@ -96,7 +96,7 @@ The validation archive must classify and record:
 - Per-problem traces, ROCm timing evidence, and AMD-native score report are
   archived.
 - Expected result categories are present even when empty.
-- Reports are not marked MI300X hardware-validated as CDNA3 unless
+- Reports are not marked MI300X hardware-validated under CDNA3 unless
   `mi300x_validation_claim_blockers()` returns no blockers.
 
 ## No-Claim Rule
