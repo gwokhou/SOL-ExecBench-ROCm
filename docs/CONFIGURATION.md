@@ -16,6 +16,7 @@ below are optional runtime, Docker, diagnostic, or build inputs discovered in
 | --- | --- | --- | --- |
 | `PYTORCH_ALLOC_CONF` | Optional | `expandable_segments:True` in compile/eval subprocesses | Set by the CLI subprocess launcher for staged PyTorch ROCm compilation and evaluation. |
 | `PYTORCH_ROCM_ARCH` | Optional | Derived from solution `target_hardware` when unset | Overrides the ROCm architecture list used by PyTorch extension builds. |
+| `SOL_EXECBENCH_ALLOW_CPU_TIMING` | Optional | Unset | Test/debug escape hatch that lets evaluator timing proceed on CPU tensors when set to `1`; not a GPU validation setting. |
 | `SOLEXECBENCH_ENV_SNAPSHOT` | Optional | Unset | Set to `1` to write an environment snapshot sidecar next to `--output`. |
 | `SOLEXECBENCH_ENV_SNAPSHOT_PATH` | Optional | Unset | Explicit environment snapshot sidecar output path. |
 | `HIP_VISIBLE_DEVICES` | Optional | Unset | Device visibility filter recorded in environment and runtime evidence. |
@@ -112,6 +113,17 @@ The Docker target manifest at `docker/rocm-targets.json` is another repository
 configuration file. It declares `default_target_id`,
 `requested_rocm_user_space_version`, Docker image tags, PyTorch ROCm wheel
 policies, and Triton ROCm wheel policies for supported container targets.
+The current declared targets are:
+
+| Target ID | ROCm User Space | Docker Tag | PyTorch Policy |
+| --- | --- | --- | --- |
+| `rocm-7.0.2-ubuntu-24.04-container` | `7.0.2` | `7.0.2-complete` | `torch==2.10.0+rocm7.0`, `torchvision==0.25.0+rocm7.0`, `triton-rocm==3.6.0` |
+| `rocm-7.1.1-ubuntu-24.04-container` | `7.1.1` | `7.1.1-complete` | `torch==2.10.0+rocm7.1`, `torchvision==0.25.0+rocm7.1`, `triton-rocm==3.6.0` |
+| `rocm-7.2.0-ubuntu-24.04-container` | `7.2.0` | `7.2-complete` | `torch==2.11.0+rocm7.2`, `torchvision==0.26.0+rocm7.2`, `triton-rocm==3.6.0` |
+
+These targets describe container user-space and dependency policy. They do not,
+by themselves, make native-host, paper-parity, leaderboard, MI300X, CDNA4, or
+NVFP4/MXFP4 validation claims.
 
 `provenance.toml` is the machine-readable source attribution policy. It
 classifies active files as upstream-retained, derivative-modified, independent
@@ -153,6 +165,12 @@ clock-sensitive evaluation paths can reject the run based on
 | CLI evaluation timeout | `600` seconds | `--timeout` option |
 | CLI profiling mode | `none` | `--profile` option |
 | CLI static evidence mode | `none` | `--static-evidence` option |
+| Dataset runner output directory | `<repo_root>/out` | `scripts/run_dataset.py --output` |
+| Dataset runner timeout | `300` seconds per problem | `scripts/run_dataset.py --timeout` |
+| Dataset runner phase | `all` | `scripts/run_dataset.py --phase` |
+| Dataset runner execution mode | `serial` | `scripts/run_dataset.py --execution-mode` |
+| Baseline comparison win threshold | `2.0` percent | `sol-execbench-baseline --win-pct` |
+| Baseline comparison parity threshold | `5.0` percent | `sol-execbench-baseline --parity-pct` |
 | Docker target | `rocm-7.1.1-ubuntu-24.04-container` | `docker/rocm-targets.json` |
 | Docker base image | `rocm/dev-ubuntu-24.04:7.1.1-complete` | Default Docker target and `docker/Dockerfile` |
 | Docker local image name | `sol-execbench` | `scripts/run_docker.sh` |
@@ -176,6 +194,10 @@ files. Use these source-backed override paths instead:
 - Per-problem benchmark settings: place a `config.json` next to
   `definition.json` and `workload.jsonl`, or pass a config file explicitly with
   `--config`.
+- Dataset batch settings: pass `scripts/run_dataset.py` flags such as
+  `--phase`, `--limit`, `--max-workloads`, `--workload-shard-size`,
+  `--iterations`, `--warmup-runs`, `--timeout`, `--timeout-overrides`,
+  `--blob-precheck`, and `--lock-clocks`.
 - Docker ROCm stack selection: use `./scripts/run_docker.sh --target <id>` for
   declared targets in `docker/rocm-targets.json`.
 - Docker image overrides for unknown targets: use `--allow-unknown-target` with
@@ -258,6 +280,105 @@ uv run sol-execbench dataset migrate-flashinfer <source_root> <output_root> \
 | `dataset migrate-flashinfer` | `--source-revision` | Record the FlashInfer Trace source revision or local commit ref in the manifest. |
 | `dataset migrate-flashinfer` | `--manifest` | Write the migration manifest to an explicit path. |
 | `dataset migrate-flashinfer` | `--json` | Print the migration manifest JSON to stdout. |
+
+## Dataset Runner Options
+
+`scripts/run_dataset.py` runs a single problem directory or a dataset root with
+category subdirectories. It shells out to `sol-execbench` for trace collection
+and can also build derived AMD/SOLAR/timing reports from existing traces.
+
+```bash
+uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
+  --category L1 L2 --limit 5 -o out/dataset-smoke
+```
+
+| Option | Default | Purpose |
+| --- | --- | --- |
+| `--category` | None | Restrict to one or more of `L1`, `L2`, `FlashInfer-Bench`, or `Quant`. |
+| `--limit` | None | Maximum number of problems to evaluate. |
+| `--phase` | `all` | Run `all`, `traces`, `derived`, or `timing`. |
+| `--jobs` | `1` | Parallel workers for CPU/I/O-only phases; `auto` is accepted. |
+| `--execution-mode` | `serial` | Use `serial` ordering or `pipeline` for trace-stage CPU preparation overlapped with serial GPU evaluation. |
+| `--prepare-jobs` | `auto` | CPU preparation workers for pipeline mode. |
+| `--gpu-jobs` | `1` | GPU evaluation workers for pipeline mode; only `1` is currently accepted. |
+| `--timeout-policy` | `record` | Record timeout traces or fail on no-trace timeout behavior. |
+| `--timeout-overrides` | None | JSON object with `default`, `problems`, or `workloads` timeout overrides. |
+| `--blob-precheck` | `fail` | Precheck safetensors references with `fail`, `warn`, or `off`. |
+| `--log-order` | `completion` | Pipeline log ordering: `completion` or `problem`. |
+| `-o`, `--output` | `<repo_root>/out` | Output directory for traces and summary files. |
+| `--timeout` | `300` | Per-problem GPU evaluation timeout in seconds. |
+| `--max-workloads` | None | Limit workloads per problem by truncating the workload input for the run. |
+| `--workload-shard-size` | None | Split workload files into temporary shards with this many workloads per CLI invocation. |
+| `--iterations` | `BenchmarkConfig.iterations` | Override timed iterations in generated per-run config. |
+| `--warmup-runs` | `BenchmarkConfig.warmup_runs` | Override warmup runs in generated per-run config. |
+| `--lock-clocks` | Disabled | Require locked GPU clocks for benchmark and timing evidence. |
+| `--solution-name` | Definition reference | Use a named solution file in each problem directory. |
+| `--rerun` | Disabled | Re-evaluate problems that already have results. |
+| `--keep-staging` | Disabled | Preserve `sol-execbench` staging directories. |
+| `-v`, `--verbose` | Disabled | Pass verbose mode through to `sol-execbench`. |
+| `--amd-score-report` | None | Write a derived AMD-native suite score JSON report. |
+| `--scoring-baseline` | None | Use a release-defined scoring baseline artifact for AMD score reports. |
+| `--amd-sol-bound-dir` | None | Write derived AMD SOL bound v2 sidecars when score reporting is enabled. |
+| `--solar-derivation` | None | Write SOLAR derivation sidecars from definitions and workloads. |
+| `--timing-evidence-dir` | None | Write per-problem ROCm timing evidence JSON. |
+| `--timing-tool-version` | `rocprofv3` | Tool version string recorded in timing evidence. |
+| `--gpu-architecture` | `unknown` | GPU architecture string recorded in timing evidence. |
+| `--ready-subset` | None | Bound dataset execution to a ready-subset JSON. |
+| `--readiness` | None | Enrich execution-closure blockers from readiness JSON. |
+| `--execution-closure` | `<output>/execution_closure.json` when `--ready-subset` is supplied | Write execution closure JSON. |
+| `--dataset-manifest` | None | Dataset manifest JSON used for closure provenance. |
+
+`--execution-mode pipeline` currently supports `--phase traces` or `--phase all`,
+rejects `--ready-subset` and `--execution-closure`, and still requires
+`--gpu-jobs 1`. With `--phase all`, trace collection uses pipeline scheduling
+and derived/timing sidecars are produced after the serial GPU trace path.
+
+## Baseline Comparison CLI
+
+The package also exposes `sol-execbench-baseline` for comparing existing trace
+JSONL files. It does not run GPU evaluation.
+
+```bash
+uv run sol-execbench-baseline \
+  --candidate out/current/traces.jsonl \
+  --baseline out/baseline/traces.jsonl \
+  --format json --output out/baseline-comparison.json
+```
+
+| Flag | Default | Purpose |
+| --- | --- | --- |
+| `--candidate` | Required | Candidate trace JSONL file. |
+| `--baseline` | Required, repeatable | One or more baseline trace JSONL files. |
+| `--format` | `text` | Output `text` or `json`. |
+| `--output` | stdout | Optional output path. |
+| `--win-pct` | `2.0` | Candidate must beat baseline by at least this percentage to be a win. |
+| `--parity-pct` | `5.0` | Candidate within this percentage of baseline is parity. |
+| `--amd-native-claim` | Disabled | Label output as an AMD-native claim and emit guardrail warnings. |
+
+## Docker Wrapper Flags
+
+`./scripts/run_docker.sh` selects a declared ROCm Docker target, performs host
+and dependency preflights, optionally builds the image, and then runs a command
+inside the container. Arguments after `--` become the container command;
+arguments before `--` that are not wrapper flags are forwarded to `docker run`.
+
+```bash
+./scripts/run_docker.sh --target rocm-7.1.1-ubuntu-24.04-container -- \
+  sol-execbench tests/sol_execbench/samples/rmsnorm \
+    --solution tests/sol_execbench/samples/rmsnorm/solution_triton.json
+```
+
+| Flag | Purpose |
+| --- | --- |
+| `--build` | Build the selected local image before running. |
+| `--target <id>` | Select a declared target from `docker/rocm-targets.json`. |
+| `--allow-unknown-target` | Permit explicit `ROCM_DOCKER_IMAGE` and `ROCM_DOCKER_TAG` override selection. |
+| `--allow-mixed-version-dependencies` | Allow dependency probe/smoke diagnostics for mixed-version stacks. |
+| `--allow-untested-target-smoke` | Allow `not_tested` targets to run smoke/E2E commands without validation claims. |
+| `--record-container-validation` | Record successful wrapper benchmark evidence as `container_validated`. |
+| `--preflight-only` | Print preflight JSON and exit before Docker build/run. |
+| `--compatibility-entry <path>` | Write a per-target compatibility JSON sidecar. |
+| `--compatibility-matrix <path>` | Write or aggregate a compatibility matrix JSON report. |
 
 ## Package Configuration
 

@@ -10,7 +10,7 @@ included sample problems and, when available, a ROCm-capable AMD GPU.
 | --- | --- |
 | Python | `.python-version` uses Python 3.12; `pyproject.toml` allows `>=3.12,<3.14`. |
 | Package manager | `uv`. |
-| ROCm runtime | Required for live GPU evaluation. The project baseline is ROCm 7.x. |
+| ROCm runtime | Required for live GPU evaluation. The project baseline is ROCm >= 7.0. |
 | GPU access | `/dev/kfd` and `/dev/dri` must be visible for ROCm hardware tests and evaluation. |
 | Optional Docker runtime | Native Linux Docker with ROCm device passthrough. |
 | Optional dataset download | Hugging Face CLI, available through `huggingface-hub[cli]`. |
@@ -18,7 +18,8 @@ included sample problems and, when available, a ROCm-capable AMD GPU.
 On Linux x86_64, dependency resolution uses the PyTorch ROCm 7.1 index for
 `torch==2.10.0+rocm7.1`, `torchvision==0.25.0+rocm7.1`, and
 `triton-rocm==3.6.0`. Non-Linux and non-x86_64 environments use non-ROCm
-PyTorch wheels for CPU-safe development tasks.
+PyTorch wheels for CPU-safe development tasks such as schema checks,
+documentation work, and GPU-free CLI metadata commands.
 
 ## Installation Steps
 
@@ -35,13 +36,14 @@ uv run sol-execbench contract --json
 uv run sol-execbench doctor --json
 ```
 
-`contract` is GPU-free compatibility metadata. `doctor` probes ROCm tools and
-PyTorch ROCm availability and may report missing GPU access in sandboxed
-environments.
+`contract` is GPU-free compatibility metadata. `doctor` probes ROCm tools,
+PyTorch ROCm availability, and device visibility. It may report missing GPU
+access on CPU-only development machines, in restricted shells, or in containers
+without `/dev/kfd` and `/dev/dri` passthrough.
 
 ## Check ROCm Visibility
 
-On a ROCm host, PyTorch should report a HIP build and visible AMD device:
+On a ROCm host, PyTorch should report a HIP build and a visible AMD device:
 
 ```bash
 uv run python -c "import torch; print(torch.__version__); print(torch.version.hip); print(torch.cuda.is_available())"
@@ -53,14 +55,17 @@ If a device is visible, this also prints the detected architecture:
 uv run python -c "import torch; print(torch.cuda.get_device_properties(0).gcnArchName)"
 ```
 
-PyTorch ROCm intentionally exposes GPU APIs through the historical
-`torch.cuda` namespace. In this project that is a PyTorch ROCm compatibility namespace, not NVIDIA CUDA runtime support.
+For the current ROCm port targets, common architecture strings include RDNA 4
+`gfx1200` and CDNA3 `gfx942`. PyTorch ROCm intentionally exposes GPU APIs
+through the historical `torch.cuda` namespace. In this project that is a
+PyTorch ROCm compatibility namespace, not NVIDIA CUDA runtime support.
 
 ## First Run
 
 ### First-Run Checklist
 
-Use this path for the smallest end-to-end smoke from a fresh checkout:
+Use this path for the smallest end-to-end smoke from a fresh checkout on a
+ROCm-capable host:
 
 1. Install dependencies with `uv sync --all-groups`.
 2. Confirm CLI metadata with `uv run sol-execbench contract --json`.
@@ -77,7 +82,9 @@ uv run sol-execbench tests/sol_execbench/samples/linear_backward \
 The output file `out/first-run.trace.jsonl` is the canonical benchmark trace
 for this first run. Optional environment, profile, static, Matrix, closure,
 consistency, claim-upgrade, trust-summary, and release-candidate validation
-files are sidecars; they do not replace canonical Trace JSONL.
+files are sidecars; they do not replace canonical Trace JSONL. A passing trace
+shows that this local command completed on the recorded environment. It is not
+full-suite validation.
 
 Run an included PyTorch example:
 
@@ -105,16 +112,17 @@ uv run sol-execbench tests/sol_execbench/samples/linear_backward \
 
 Open `out/first-run.trace.jsonl` and inspect one JSON object per line:
 
-- `status` reports the evaluation outcome, such as `PASSED`,
-  `INCORRECT_NUMERICAL`, `COMPILE_ERROR`, `RUNTIME_ERROR`, or `TIMEOUT`.
-- `correctness` records numerical comparison fields such as
-  `max_relative_error`, `max_absolute_error`, `has_nan`, and `has_inf`.
-- `latency_ms` is the measured solution latency in milliseconds when the trace
-  passes.
-- `speedup_factor` is `reference_latency_ms / latency_ms` for the same workload
-  and hardware.
-- `environment` records the AMD/ROCm hardware and software context embedded in
-  the canonical Trace JSONL.
+- `evaluation.status` (`status`) reports the evaluation outcome, such as
+  `PASSED`, `INCORRECT_NUMERICAL`, `COMPILE_ERROR`, `RUNTIME_ERROR`, or
+  `TIMEOUT`.
+- `evaluation.correctness` (`correctness`) records numerical comparison fields
+  such as `max_relative_error`, `max_absolute_error`, `has_nan`, and `has_inf`.
+- `evaluation.performance.latency_ms` (`latency_ms`) is the measured solution
+  latency in milliseconds when the trace passes.
+- `evaluation.performance.speedup_factor` (`speedup_factor`) is
+  `reference_latency_ms / latency_ms` for the same workload and hardware.
+- `evaluation.environment` (`environment`) records the AMD/ROCm hardware and
+  software context embedded in the canonical Trace JSONL.
 
 If no parseable trace is produced, the CLI writes a bounded no-trace
 diagnostics sidecar next to the requested output path, for example
@@ -155,6 +163,19 @@ Download benchmark assets into `data/`:
 uv run --with "huggingface-hub[cli]" ./scripts/download_data.sh
 ```
 
+The wrapper downloads the public SOL-ExecBench dataset into
+`data/SOL-ExecBench/benchmark` and FlashInfer Trace files into
+`data/flashinfer-trace`. It requires network access and any Hugging Face access
+needed by the source repositories. To download only the SOL-ExecBench layout and
+write an acquisition manifest, use the Python downloader directly:
+
+```bash
+mkdir -p out
+uv run python scripts/download_solexecbench.py \
+  --output-root data/SOL-ExecBench/benchmark \
+  --manifest out/dataset_manifest.json
+```
+
 Inspect or verify a local dataset layout without running GPU evaluation:
 
 ```bash
@@ -180,7 +201,7 @@ uv run sol-execbench dataset migrate-flashinfer data/flashinfer-trace/source dat
 
 These commands write generated local artifacts and migration manifests. They do
 not grant permission to publish or redistribute NVIDIA SOL-ExecBench source
-dataset payloads or derivatives.
+dataset payloads, FlashInfer Trace source payloads, or derivatives.
 
 Run a bounded dataset batch:
 
@@ -240,6 +261,10 @@ Known limitations for the first run:
   FP8, low-precision, and exact-hardware evidence boundaries are resolved.
   CDNA4 validation is unavailable because suitable hardware is not currently
   accessible.
+- NVFP4/MXFP4 Quant ROCm adaptation and hardware validation are deferred until
+  CDNA4-class hardware is available. CDNA3 runs should treat those workloads as
+  documented hardware-unsupported skips, not CPU, dequantized, or paper-level
+  benchmark validation.
 - PyTorch and some internal APIs may still contain CUDA-named compatibility
   symbols; those names do not mean this ROCm-only port supports NVIDIA CUDA
   runtime execution.

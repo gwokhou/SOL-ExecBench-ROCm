@@ -83,7 +83,8 @@ uv run pytest \
 
 ## Markers
 
-Markers are registered in `pyproject.toml` and `tests/conftest.py`.
+Core markers are registered in `pyproject.toml`; environment-sensitive skip
+logic and additional markers are registered in `tests/conftest.py`.
 
 | Marker | Meaning |
 | --- | --- |
@@ -100,6 +101,10 @@ Markers are registered in `pyproject.toml` and `tests/conftest.py`.
 On Linux, `requires_rocm` collection first checks for `/dev/kfd` and
 `/dev/dri`. If those device nodes are not visible, the test is skipped with an
 explicit diagnostic before importing or probing PyTorch ROCm.
+`requires_rdna4` accepts detected `gfx12*` devices and `requires_cdna3` accepts
+detected `gfx94*` devices. There is no `requires_mi300x` or `requires_cdna4`
+shortcut marker; CDNA3-family and CDNA4 validation claims require the evidence
+listed in the claim and release guardrail docs.
 
 ## Hardware-Sensitive Tests
 
@@ -122,9 +127,13 @@ uv run pytest tests/sol_execbench/test_cdna3_hardware_marker.py -m requires_cdna
 
 On non-CDNA3 hosts this command should skip the live hardware test with a
 reason such as `requires AMD CDNA 3 ROCm GPU` or the ROCm availability reason.
-That skip is expected on the current machine and is not a CDNA3 validation
-failure. Passing this marker test on `gfx94*` hardware proves the test gate is
-usable; it is still not full MI300X hardware-validation evidence.
+That skip is expected on RDNA 4 hosts, macOS hosts, and ROCm-less containers;
+it is not a CDNA3 validation failure. Passing this marker test on `gfx94*`
+hardware proves the test gate is usable; it is still not full MI300X hardware-validation evidence.
+MI300X and MI308X are sibling GPU products under
+the CDNA3 architecture family and share the `gfx942` code path, but recorded
+MI308X/gfx942 validation-infrastructure evidence must not be reported as
+MI300X validation.
 
 For native library categories, use marker-filtered runs for the installed
 headers:
@@ -183,9 +192,9 @@ The centralized v1.19 guide is `docs/v1_19_evidence_guide.md`. Its focused
 CPU-safe checks cover execution closure, paper denominator reports, Matrix
 schema export, Matrix semantic diff, AMD bound sanity, and public wording
 boundaries. v1.19 documentation has no full 235-problem paper validation, no
-upstream SOLAR parity, no score authority, no leaderboard readiness, no CDNA
-3/MI300X/CDNA4 validation, no native-host ROCm Matrix validation, and no
-new-hardware validation.
+upstream SOLAR parity, no score authority, no leaderboard readiness, no full
+MI300X validation under CDNA3, no CDNA4 validation, no native-host ROCm Matrix
+validation, and no new-hardware validation.
 
 Run the v1.19 documentation and sidecar-only contract checks:
 
@@ -210,9 +219,11 @@ The centralized v1.20 guide is `docs/v1_20_evidence_quality_guide.md`. Its
 focused CPU-safe checks cover consistency lint, evaluation stability,
 claim-upgrade rejection, trust summary rendering, deterministic serialization,
 example fixtures, and public contract boundaries. v1.20 documentation has no
-full 235-problem paper validation, no CDNA3-family validation, including MI300X,
-and no CDNA4 validation, no native-host Matrix authority, no hosted leaderboard
-readiness, no upstream SOLAR parity, and no new-hardware validation.
+full 235-problem paper validation, no CDNA3-family validation, including MI300X
+(`gfx942`), CDNA4 validation, native-host Matrix authority, hosted leaderboard
+readiness, upstream SOLAR parity, or new-hardware validation. Recorded
+MI308X/gfx942 infrastructure evidence remains bounded to that sibling CDNA3
+product and does not upgrade MI300X claims.
 
 Run the v1.20 documentation and sidecar-only contract checks:
 
@@ -242,7 +253,7 @@ The recent CPU-safe guardrails cover:
 - ROCm readiness classes, blocker reports, ready-subset denominators, and
   no-hardware-validation claim boundaries;
 - CPU-safe NVFP4/MXFP4/E2M1 compatibility helpers with explicit unvalidated
-  CDNA4 evidence markers;
+  CDNA4 evidence markers and CDNA3 hardware-unsupported skip behavior;
 - deterministic dataset sharding plan and merge semantics.
 
 Focused run:
@@ -270,6 +281,9 @@ uv run pytest \
 These tests do not prove live ROCm shard execution or full dataset validation.
 They exercise policy, provenance, path, diagnostic, and closure behavior without
 requiring GPU hardware.
+They also do not validate NVFP4/MXFP4 Quant ROCm adaptation; that adaptation
+and hardware validation remain deferred until suitable CDNA4-class hardware is
+available.
 
 ## Provenance And Prerelease Guardrails
 
@@ -311,7 +325,9 @@ uv run pytest tests/sol_execbench/test_cdna3_hardware_marker.py -m requires_cdna
 
 Interpret CDNA3 skips carefully: skipped tests on RDNA 4, macOS, or ROCm-less
 containers mean the host is not a `gfx94*` validation target. They do not
-upgrade or invalidate the deferred MI300X full-suite status.
+upgrade or invalidate the deferred MI300X full-suite status. Passing CDNA3
+marker-gated tests on MI308X/gfx942 is validation-infrastructure evidence for
+that recorded sibling product, not a full MI300X hardware-validation pass.
 
 For Matrix evidence, the current host ROCm 7.1.x environment may be recorded as
 observed evidence through compatibility sidecars. ROCm 7.0.x or

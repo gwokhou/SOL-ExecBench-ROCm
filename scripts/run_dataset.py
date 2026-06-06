@@ -1674,7 +1674,7 @@ def main():
         help=(
             "Execution scheduler. Default 'serial' preserves legacy ordering. "
             "'pipeline' overlaps trace-stage CPU preparation with serial GPU "
-            "evaluation; it currently supports --phase traces only."
+            "evaluation; it currently supports --phase traces or all."
         ),
     )
     ap.add_argument(
