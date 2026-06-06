@@ -184,6 +184,12 @@ authority, or new hardware-validation claims.
 | MI300X GPU under CDNA 3 | MI300X and MI308X are sibling GPU products under the CDNA3 architecture family and share the `gfx942` code path; `gfx940`, `gfx941`, and `gfx942` remain CDNA 3 code/schema targets. | CDNA3 validation infrastructure evidence exists on MI308X (`gfx942`): pytest passed, the full dataset run executed, Quant NVFP4/MXFP4 skips were expected, and remaining non-skip blockers are timeout shards. | This is not a completed benchmark-grade MI300X hardware-validation claim because MI308X and MI300X hardware configurations differ, despite sharing `gfx942`. |
 | CDNA4 | Future CDNA4 class hardware | CDNA4 validation is unavailable because suitable hardware is not currently accessible. | CDNA4 is not a v1.25 validation target and should be reported as unavailable, not as validated or merely skipped. |
 
+NVFP4/MXFP4 Quant benchmark ROCm adaptation is deliberately deferred while no
+CDNA4-class hardware is available. The project does not replace CUDA-only
+scaled-matrix-multiply reference semantics with a dequantized fallback for
+benchmark validation; CDNA3 runs record these problems as expected
+`cdna3_low_precision_hardware_unsupported` skips instead.
+
 ## Hardware Status
 
 Validation recorded in this milestone:

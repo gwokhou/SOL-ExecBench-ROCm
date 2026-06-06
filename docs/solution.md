@@ -76,6 +76,11 @@ infrastructure is operational, but the remaining dataset timeout blockers and
 exact-hardware MI300X evidence requirements prevent a full MI300X validation
 claim under the CDNA 3 family.
 
+NVFP4/MXFP4 Quant benchmark ROCm adaptation is deferred until CDNA4-class
+hardware is available. CDNA3 validation should skip those problems with the
+documented hardware-unsupported reason instead of treating CPU or dequantized
+fallbacks as benchmark validation.
+
 ## Destination Passing Style
 
 Destination passing style is the default. The evaluator pre-allocates output
