@@ -97,9 +97,11 @@ Use these classifications when reviewing the summary:
 This validation path supports an **engineering prerelease** claim only. It
 should be interpreted alongside the support matrix in `docs/rocm.md`. In
 particular, Docker/container user-space evidence remains distinct from
-native-host validation, full MI300X validation on the CDNA3 `gfx942` target
-requires complete real-hardware evidence, and CDNA4 validation is unavailable
-because suitable hardware is not currently accessible.
+native-host validation. CDNA3/gfx942 validation infrastructure evidence exists,
+but full MI300X validation on the CDNA3 `gfx942` target remains blocked until
+timeout, clock-lock, timing, score, FP8, and low-precision evidence boundaries
+are resolved. CDNA4 validation is unavailable because suitable hardware is not
+currently accessible.
 
 It does not provide:
 
@@ -108,8 +110,9 @@ It does not provide:
 - hosted leaderboard readiness
 - hard sandbox or multi-tenant adversarial execution
 - CDNA4 validation, because suitable hardware is not currently accessible
-- full MI300X validation on the CDNA3 `gfx942` target without complete
-  real-hardware evidence
+- full MI300X validation on the CDNA3 `gfx942` target while timeout,
+  clock-lock, timing, score, FP8, or low-precision evidence boundaries remain
+  unresolved
 - native-host validation from Docker/container user-space evidence alone
 
 Trace JSONL remains the canonical run artifact. Profile, static, environment,

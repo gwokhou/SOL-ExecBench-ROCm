@@ -84,8 +84,9 @@ equivalence, or official leaderboard equivalence.
   artifacts and commands support the recorded scope.
 - Docker/container ROCm user-space evidence is not native-host validation.
 - MI300X is the concrete CDNA3 `gfx942` hardware target, not a separate
-  architecture target; full MI300X validation remains deferred without a
-  complete real-hardware evidence chain.
+  architecture target. CDNA3/gfx942 validation infrastructure evidence exists,
+  but full MI300X validation remains blocked until timeout, clock-lock, timing,
+  score, FP8, and low-precision evidence boundaries are resolved.
 - CDNA4 validation is unavailable because suitable hardware is not currently
   accessible.
 

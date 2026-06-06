@@ -37,7 +37,7 @@ CDNA4 validation.
 | Environment, profile, static, Matrix, closure, consistency, claim-upgrade, trust-summary, and release-candidate validation outputs | diagnostic-only sidecar | Reviewable evidence and diagnostics only; not correctness, timing, score, paper parity, leaderboard, or hardware-validation authority. |
 | Bounded dataset slices and prerelease support-matrix rows | provisional prerelease evidence | Useful for engineering prerelease review within the recorded scope; not full 235-problem paper validation. |
 | Full 235-problem paper validation, upstream SOLAR parity, hosted leaderboard readiness, and hard-sandbox authority | deferred | Outside this prerelease milestone. |
-| Full MI300X validation on CDNA3 (`gfx942`) | deferred | Requires a complete real-hardware evidence chain on the concrete CDNA3 target, MI300X (`gfx942`). |
+| Full MI300X validation on CDNA3 (`gfx942`) | blocked | CDNA3/gfx942 validation infrastructure evidence exists, but complete MI300X validation still requires accepted timeout boundaries, locked-clock timing evidence, score evidence, FP8 status, and low-precision claim boundaries. |
 | CDNA4 validation | unavailable | CDNA4 validation is unavailable because suitable hardware is not currently accessible. |
 
 ## Support Boundaries
@@ -63,8 +63,9 @@ CDNA4 validation.
 
 - Full 235-problem paper validation and upstream SOLAR parity are deferred.
 - Hosted leaderboard readiness and hard multi-tenant sandboxing are deferred.
-- Full MI300X validation on the CDNA3 `gfx942` target is deferred until a
-  complete real-hardware evidence chain exists.
+- Full MI300X validation on the CDNA3 `gfx942` target is blocked until timeout,
+  clock-lock, timing, score, FP8, and low-precision evidence boundaries are
+  resolved.
 - CDNA4 validation is unavailable because suitable hardware is not currently
   accessible.
 

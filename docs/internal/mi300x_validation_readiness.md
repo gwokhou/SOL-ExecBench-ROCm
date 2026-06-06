@@ -1,7 +1,9 @@
 # MI300X Validation Readiness
 
-This document is a readiness handoff for a future AMD Instinct MI300X validation
-run. It does not record a commercial GPU hardware-validation pass.
+This document is a readiness and status handoff for AMD Instinct MI300X
+validation. Current `gfx942` cloud runs provide CDNA3 pytest and dataset
+validation-infrastructure evidence, but they do not record a completed
+commercial GPU hardware-validation pass.
 
 ## Scope
 
@@ -11,6 +13,33 @@ run. It does not record a commercial GPU hardware-validation pass.
 - FP8: validate on MI300X once hardware access exists.
 - NVFP4/MXFP4: deferred; no AMD hardware-validation path is claimed in this
   project yet.
+
+## Current Evidence Status
+
+- CDNA3 pytest validation passed on real `gfx942` at repository HEAD `0d6c3e1`
+  with `1401 passed, 62 skipped`.
+- Full 235-problem dataset validation was run on `gfx942`. The corrected
+  interpretation is 220 complete passing problem traces, 15 expected Quant
+  NVFP4/MXFP4 CDNA3 skips, and 6 remaining timeout shards across 4 problems.
+- Nested `eval_driver.py` timeout classification was fixed in commit `2984c29`
+  and verified on
+  `FlashInfer-Bench/014_gqa_paged_prefill_causal_h32_kv4_d128_ps1`, which now
+  records `29 PASSED + 1 TIMEOUT` and summary `FAIL`.
+- Cloud clock locking remains blocked in the tested environment: the server
+  reported `Performance Level: auto` after manual `rocm-smi` attempts. Timing
+  from that environment is unlocked-clock evidence, not benchmark-grade
+  locked-clock timing.
+- Quant NVFP4/MXFP4 skips on CDNA3 are expected, not correctness failures.
+  Hardware validation for those formats requires CDNA4-class support.
+
+Remaining MI300X claim blockers:
+
+- Resolve or explicitly accept the 6 dataset timeout shards.
+- Record locked-clock evidence or keep timing claims bounded as unlocked-clock
+  evidence.
+- Archive timing evidence, AMD-native score report, FP8 status, and expected
+  result categories for the accepted validation scope.
+- Keep NVFP4/MXFP4 status as `deferred_no_amd_path` on CDNA3.
 
 ## Commands
 
@@ -56,7 +85,8 @@ The validation archive must classify and record:
 ## Acceptance Criteria
 
 - Full adapted pytest suite passes on real MI300X hardware.
-- Dataset validation run completes with expected skips/deviations documented.
+- Dataset validation run completes with expected skips/deviations documented and
+  no unaccepted non-skip failures.
 - Environment evidence records MI300X and `gfx942`.
 - Clock locking is enabled and recorded.
 - Per-problem traces, ROCm timing evidence, and AMD-native score report are
@@ -67,5 +97,8 @@ The validation archive must classify and record:
 
 ## No-Claim Rule
 
-Until the evidence above exists, public docs and reports must say MI300X as CDNA3
-hardware validation is deferred. Readiness metadata is not a validation claim.
+Until the evidence above exists, public docs and reports must say MI300X as
+CDNA3 has validation infrastructure evidence with known blockers, not a
+completed benchmark-grade hardware-validation claim.
+
+Readiness metadata is not a validation claim.

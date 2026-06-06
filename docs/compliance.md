@@ -104,11 +104,15 @@ tested, and validated on the relevant hardware class.
 
 ## Known Gaps
 
-- CDNA 3 full-suite validation is deferred. Do not claim CDNA 3 support until
-  the adapted test suite passes on `gfx94*`.
+- CDNA 3 `gfx942` validation infrastructure evidence exists: the adapted pytest
+  suite passed and a full dataset validation run completed with documented
+  timeout blockers and expected Quant NVFP4/MXFP4 skips. Do not claim full
+  CDNA3/MI300X hardware validation until those blockers and required
+  benchmark-grade evidence are resolved or explicitly bounded.
 - Explicit schema hardware values include `gfx1200`, `gfx940`, `gfx941`,
-  `gfx942`, and `LOCAL`. The `gfx94*` entries are code/schema support, not
-  hardware-validation evidence.
+  `gfx942`, and `LOCAL`. The `gfx94*` entries are code/schema support by
+  themselves; hardware-validation claims require archived real-hardware
+  evidence and accepted failure/skip boundaries.
 - Original SOL-Score references a NVIDIA B200 roofline model. Scores computed
   from that model are not an AMD hardware roofline claim.
 - Some examples remain PyTorch compatibility examples for former NVIDIA

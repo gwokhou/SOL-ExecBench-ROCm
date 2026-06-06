@@ -64,13 +64,16 @@ These values are not active ROCm schema values:
 | Value | Hardware class | Validation status |
 | --- | --- | --- |
 | `gfx1200` | RDNA 4 | Full adapted suite passed locally. |
-| `gfx940` | CDNA 3 | Code/schema support; real hardware validation deferred. |
-| `gfx941` | CDNA 3 | Code/schema support; real hardware validation deferred. |
-| `gfx942` | CDNA 3 | Code/schema support; real hardware validation deferred. |
+| `gfx940` | CDNA 3 | Code/schema support; no recorded hardware-validation pass on this exact target. |
+| `gfx941` | CDNA 3 | Code/schema support; no recorded hardware-validation pass on this exact target. |
+| `gfx942` | CDNA 3 | CDNA3 validation infrastructure evidence exists, including a passed pytest suite and a full dataset run with known timeout blockers; not a full hardware-validation pass. |
 | `LOCAL` | Local AMD GPU detected at packaging time | Uses the detected local AMD gfx target. |
 
 CDNA 3 entries allow solution metadata and HIP offload flag staging to target
-`gfx94*` devices. They are not hardware-validation evidence by themselves.
+`gfx94*` devices. Schema/build support is not hardware-validation evidence by
+itself. The recorded `gfx942` cloud runs show that CDNA3 validation
+infrastructure is operational, but the remaining dataset timeout blockers and
+MI300X evidence requirements prevent a full CDNA3/MI300X validation claim.
 
 ## Destination Passing Style
 

@@ -151,3 +151,42 @@ benchmark-grade claims. Dataset validation, clock-lock evidence, timing
 evidence, AMD-native score reports, FP8 status, and NVFP4/MXFP4 deferred
 status still need to be recorded before broader MI300X/CDNA3 benchmark
 validation claims are upgraded.
+
+## Dataset Validation Update
+
+The cloud `gfx942` environment later completed a full 235-problem dataset
+validation run after FlashInfer safetensors blob staging and CDNA3 low-precision
+skip handling were fixed. The uploaded validation log bundle has this corrected
+interpretation:
+
+- 235 problems were discovered and summarized.
+- 220 problems produced complete passing traces.
+- 15 Quant NVFP4/MXFP4 problems were skipped as expected on CDNA3 because
+  default NVFP4/MXFP4 hardware validation requires CDNA4-class support.
+- No remaining missing-safetensors blob failure was observed in the uploaded
+  full-validation logs.
+- Six workload shards produced nested `eval_driver.py` `TimeoutExpired` logs.
+  The original full-validation summary omitted those shards and therefore must
+  not be used to claim zero failures.
+
+Commit `2984c29` fixes nested timeout classification by recognizing
+`subprocess.TimeoutExpired` records inside saved CLI logs. A targeted rerun of
+`FlashInfer-Bench/014_gqa_paged_prefill_causal_h32_kv4_d128_ps1` after that fix
+confirmed the corrected behavior: 30 traces were emitted, with 29 `PASSED` and
+1 `TIMEOUT`, and the summary correctly reported `FAIL`.
+
+Known remaining non-skip dataset blockers:
+
+- `FlashInfer-Bench/014_gqa_paged_prefill_causal_h32_kv4_d128_ps1`: 1 timeout
+  shard, targeted rerun verified after `2984c29`.
+- `FlashInfer-Bench/019_mla_paged_prefill_causal_h16_ckv512_kpe64_ps1`: 3
+  timeout shards in the uploaded full-validation logs.
+- `L2/040_altup_predict_correction_cycle_backward`: 1 timeout shard in the
+  uploaded full-validation logs.
+- `L2/055_audio_encoder_conv_positional_layer_stack`: 1 timeout shard in the
+  uploaded full-validation logs.
+
+This upgrades the internal status from "no CDNA3 dataset validation attempt" to
+"CDNA3 dataset validation infrastructure operational with known timeout
+blockers." It still does not support a "full adapted dataset passed" or
+"benchmark-grade MI300X validated" claim.

@@ -1591,7 +1591,8 @@ def test_cdna3_validation_remains_deferred_in_docs():
         else Path(".planning/milestones/v1.28-REQUIREMENTS.md")
     ).read_text()
     roadmap = Path(".planning/ROADMAP.md").read_text()
-    assert "Status:** Deferred to next milestone" in handoff
+    assert "known timeout blockers" in handoff
+    assert "should not be used to claim zero failures" in handoff
     assert "Actual CDNA3/MI300X full-suite execution" in project
     assert "current machine cannot" in project
     assert "actual full-suite" in project

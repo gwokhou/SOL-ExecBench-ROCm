@@ -56,6 +56,8 @@ with its status:
 | `diagnostic-only` | Review context only; not release authority. |
 
 MI300X is the concrete CDNA3 `gfx942` hardware target, not a separate
-architecture target. Full MI300X validation remains deferred until complete
-real-hardware evidence exists. CDNA4 validation is unavailable because suitable
-hardware is not currently accessible.
+architecture target. CDNA3/gfx942 validation infrastructure evidence exists,
+but full MI300X validation remains blocked until timeout, clock-lock, timing,
+score, FP8, and low-precision evidence boundaries are resolved. CDNA4
+validation is unavailable because suitable hardware is not currently
+accessible.
