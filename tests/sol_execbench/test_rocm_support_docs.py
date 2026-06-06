@@ -34,6 +34,9 @@ def test_docs_distinguish_cdna3_schema_support_from_hardware_validation():
     assert "Do not claim" in combined
     assert "CDNA3 test readiness is now concrete" in combined
     assert "mi300x_validation_claim_blockers()" in combined
+    assert "NVFP4/MXFP4 Quant benchmark ROCm adaptation" in combined
+    assert "cdna3_low_precision_hardware_unsupported" in combined
+    assert "dequantized fallback" in combined
 
 
 def test_contributing_docs_explain_future_cdna3_test_and_evidence_rules():

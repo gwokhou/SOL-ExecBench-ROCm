@@ -110,6 +110,11 @@ tested, and validated on the relevant hardware class.
   claim full hardware validation for the MI300X GPU model under the CDNA 3
   family until those blockers and required benchmark-grade exact-hardware
   MI300X evidence are resolved or explicitly bounded.
+- NVFP4/MXFP4 Quant benchmark ROCm adaptation and hardware validation are
+  deferred because no CDNA4-class hardware is currently available. CDNA3 runs
+  should report these workloads as expected hardware-unsupported skips rather
+  than replacing benchmark reference semantics with portable dequantized
+  fallbacks.
 - Explicit schema hardware values include `gfx1200`, `gfx940`, `gfx941`,
   `gfx942`, and `LOCAL`. The `gfx94*` entries are code/schema support by
   themselves; hardware-validation claims require archived real-hardware

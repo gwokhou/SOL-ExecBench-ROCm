@@ -123,6 +123,9 @@ leaderboard authority.
   timeout/skip boundaries from that hardware class.
 - CDNA4 validation while suitable CDNA4 hardware is not currently accessible.
 - NVFP4 or MXFP4 validation without suitable AMD hardware evidence.
+- NVFP4/MXFP4 Quant benchmark ROCm adaptation or hardware validation while
+  CDNA4-class hardware is unavailable; CDNA3 expected skips are not validation
+  or performance evidence.
 - `rocprofv3` profiling as correctness or score authority.
 - Toolchain routing as correctness, performance, static-kernel, paper-parity,
   or leaderboard authority.
