@@ -76,12 +76,12 @@ readiness, hard-sandbox authority, native-host validation inferred from Docker,
 completed full MI300X validation on the CDNA3 `gfx942` target, or CDNA4
 validation. Do not imply NVIDIA or AMD endorsement.
 
-MI300X is the concrete CDNA3 `gfx942` hardware target, not a separate
-architecture target. CDNA3/gfx942 validation infrastructure evidence exists,
-but full MI300X validation remains blocked until timeout, clock-lock, timing,
-score, FP8, and low-precision evidence boundaries are resolved. CDNA4
-validation is unavailable because suitable hardware is not currently
-accessible.
+MI300X remains a distinct CDNA3 `gfx942` hardware-validation target. Current
+CDNA3/gfx942 validation infrastructure evidence was recorded on MI308X, not
+MI300X, so full MI300X validation remains blocked until timeout, clock-lock,
+timing, score, FP8, low-precision, and exact-hardware evidence boundaries are
+resolved. CDNA4 validation is unavailable because suitable hardware is not
+currently accessible.
 
 ## Known Limitations To Include
 

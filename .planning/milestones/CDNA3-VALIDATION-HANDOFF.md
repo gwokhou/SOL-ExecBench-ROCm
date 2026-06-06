@@ -58,8 +58,8 @@ rocminfo | grep -E "Name: *gfx94|Marketing Name" || true
 
 ## 2026-06-06 CDNA3 Full Validation Update
 
-Cloud validation on `gfx942` / CDNA3 completed against the 235-problem adapted
-dataset with the following interpretation:
+Cloud validation on MI308X (`gfx942`) / CDNA3 completed against the 235-problem
+adapted dataset with the following interpretation:
 
 - 235 problems were discovered and summarized.
 - 220 problems produced complete passing traces in the uploaded validation log
@@ -91,9 +91,11 @@ Known remaining CDNA3 validation blockers:
 
 The old full-validation summary should not be used to claim zero failures,
 because it predates the nested-timeout classification fix. The corrected
-interpretation is: CDNA3 validation infrastructure is operational, Quant
-NVFP4/MXFP4 skips are expected, and the remaining non-skip blockers are the
-recorded timeout shards above.
+interpretation is: CDNA3 validation infrastructure is operational on MI308X
+(`gfx942`), Quant NVFP4/MXFP4 skips are expected, and the remaining non-skip
+blockers are the recorded timeout shards above. MI308X and MI300X share the
+`gfx942` code path, but MI308X evidence is not benchmark-grade MI300X hardware
+validation because the hardware configurations differ.
 
 ## Acceptance Criteria
 

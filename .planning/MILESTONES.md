@@ -2,17 +2,20 @@
 
 ## Current CDNA3 Validation Status (Updated: 2026-06-06)
 
-CDNA3/gfx942 validation is no longer purely deferred. Real `gfx942` cloud runs
-recorded an adapted pytest pass and exercised the full 235-problem dataset
-validation path. The corrected dataset interpretation is 220 complete passing
-problem traces, 15 expected Quant NVFP4/MXFP4 CDNA3 skips, and 6 timeout shards
-across 4 problems. Nested `eval_driver.py` timeout classification was fixed and
-targeted verification confirmed timeout shards are now recorded as `TIMEOUT`
-traces and summary failures.
+CDNA3/gfx942 validation is no longer purely deferred. Real MI308X (`gfx942`)
+cloud runs recorded an adapted pytest pass and exercised the full 235-problem
+dataset validation path. The corrected dataset interpretation is 220 complete
+passing problem traces, 15 expected Quant NVFP4/MXFP4 CDNA3 skips, and 6
+timeout shards across 4 problems. Nested `eval_driver.py` timeout
+classification was fixed and targeted verification confirmed timeout shards are
+now recorded as `TIMEOUT` traces and summary failures.
 
 This is CDNA3 validation-infrastructure evidence with known blockers, not a
-completed full CDNA3/MI300X hardware-validation pass. Remaining blockers are
-documented in `.planning/milestones/CDNA3-VALIDATION-HANDOFF.md` and
+completed full CDNA3/MI300X hardware-validation pass. MI308X and MI300X share
+the `gfx942` code path, but the recorded MI308X evidence must not be reported
+as MI300X hardware validation because the hardware configurations differ.
+Remaining blockers are documented in
+`.planning/milestones/CDNA3-VALIDATION-HANDOFF.md` and
 `.planning/milestones/MI300X-VALIDATION-HANDOFF.md`.
 
 ## v1.29 Dataset Migration and Compliance (Shipped: 2026-06-04)

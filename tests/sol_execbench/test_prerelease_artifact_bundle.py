@@ -87,7 +87,7 @@ def test_bundle_writes_manifest_transcripts_checksums_and_authority_map(
     assert (
         artifact_by_id["environment_evidence"]["authority_class"] == "diagnostic-only"
     )
-    assert "MI300X is the concrete CDNA3 `gfx942` hardware target" in json.dumps(
+    assert "CDNA3/gfx942 validation infrastructure evidence was recorded on MI308X" in json.dumps(
         manifest
     )
     assert "not full 235-problem paper validation" in (

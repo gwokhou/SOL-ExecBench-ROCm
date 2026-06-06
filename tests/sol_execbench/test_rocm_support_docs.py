@@ -30,7 +30,7 @@ def test_docs_distinguish_cdna3_schema_support_from_hardware_validation():
 
     assert "code/schema support" in combined
     assert "validation infrastructure evidence exists" in combined
-    assert "not a full hardware-validation pass" in combined
+    assert "not a full MI300X hardware-validation pass" in combined
     assert "Do not claim" in combined
     assert "CDNA3 test readiness is now concrete" in combined
     assert "mi300x_validation_claim_blockers()" in combined
@@ -92,16 +92,18 @@ def test_mi300x_validation_handoff_defines_evidence_gate():
 
 def test_cdna3_readiness_doc_is_not_hardware_validation_claim():
     readiness = _read("docs/internal/cdna3_validation_readiness.md")
+    normalized = " ".join(readiness.split())
 
     for phrase in (
-        "do not constitute a completed benchmark-grade CDNA3 or MI300X",
+        "MI308X (`gfx942`)",
         "Dataset validation infrastructure",
         "known timeout blockers",
         "cdna3_readiness_implemented",
         "cdna3_hardware_validation_deferred",
-        "must not say CDNA 3 hardware validation fully passed",
+        "must not say CDNA 3 or MI300X hardware",
     ):
         assert phrase in readiness
+    assert "completed benchmark-grade CDNA3 or MI300X hardware-validation pass" in normalized
     assert "uv run --no-sync pytest tests/" in readiness
     assert "gfx94*" in readiness
 
@@ -111,6 +113,7 @@ def test_mi300x_readiness_doc_is_not_hardware_validation_claim():
 
     for phrase in (
         "do not record a completed",
+        "MI308X (`gfx942`)",
         "AMD Instinct MI300X",
         "ROCm >= 7.0",
         "FP8: validate on MI300X",

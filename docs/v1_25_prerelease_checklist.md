@@ -101,9 +101,10 @@ Confirm the release still says:
 - Bounded slices and support rows are provisional prerelease evidence.
 - Full paper validation, upstream SOLAR parity, leaderboard readiness, and hard
   sandbox authority are deferred.
-- MI300X is the concrete CDNA3 `gfx942` hardware target, not a separate
-  architecture target; full-suite MI300X validation is deferred without complete
-  real-hardware evidence.
+- MI300X remains a distinct CDNA3 `gfx942` hardware-validation target; current
+  CDNA3/gfx942 validation infrastructure evidence was recorded on MI308X, not
+  MI300X, and full-suite MI300X validation is deferred without complete
+  exact-hardware evidence.
 - CDNA4 validation is unavailable because suitable hardware is not currently
   accessible.
 

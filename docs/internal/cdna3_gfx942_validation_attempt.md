@@ -1,22 +1,23 @@
 # CDNA3 gfx942 Validation Attempt
 
-This document records a real `gfx942` CDNA3 validation attempt. It is not a
-CDNA3 hardware-validation pass.
+This document records real MI308X (`gfx942`) CDNA3 validation attempts. They
+exercise the shared `gfx942` code path but are not MI300X hardware-validation
+passes.
 
 ## Scope
 
 - Repository HEAD: `d56fadca35b73cb116918774ab945ebcadb1d601`
 - Remote workspace: `/mnt/workspace/SOL-ExecBench-ROCm`
 - Local artifact archive: `/Users/guohaozhang/Downloads/cdna3-validation-artifacts.tgz`
-- Hardware target: `gfx942`
+- Hardware target: MI308X (`gfx942`)
 - PyTorch: `2.10.0+rocm7.1`
 - HIP: `7.1.25424`
 - Validation date: 2026-06-04
 
 ## Environment Evidence
 
-The remote host reported a ROCm-visible `gfx942` device through multiple
-sources:
+The remote host reported a ROCm-visible MI308X (`gfx942`) device through
+multiple sources:
 
 - `rocm-smi --showproductname --showdriverversion --showhw`
 - `rocminfo`
@@ -103,10 +104,11 @@ its architecture assumptions on `gfx942`.
 
 ## Conclusion
 
-CDNA3 validation was attempted on real `gfx942` hardware, but full validation
-is blocked. Public and release-facing claims must continue to use deferred
-language for CDNA3/MI300X hardware validation until these blockers are fixed and
-a full passing evidence chain is recorded.
+CDNA3 validation was attempted on real MI308X (`gfx942`) hardware, but full
+validation is blocked. Public and release-facing claims must continue to use
+bounded language for CDNA3 and deferred language for MI300X hardware validation
+until these blockers are fixed and a full exact-hardware evidence chain is
+recorded.
 
 Do not update support matrices or prerelease claim flags to mark CDNA3,
 MI300X, Triton ROCm examples, or native HIP/C++ examples as fully validated
@@ -125,16 +127,16 @@ After this attempt, quick task
   shuffle assumptions.
 
 These are remediation changes only. CDNA3/MI300X validation remains blocked
-until the fixed code is re-run on real `gfx942` hardware and records a passing
+until the fixed code is re-run on real target hardware and records a passing
 full evidence chain.
 
 ## Pytest Revalidation Pass
 
-The fixed code was re-run on real `gfx942` hardware and the adapted pytest
-suite passed.
+The fixed code was re-run on real MI308X (`gfx942`) hardware and the adapted
+pytest suite passed.
 
 - Repository HEAD: `0d6c3e1`
-- Hardware target: `gfx942`
+- Hardware target: MI308X (`gfx942`)
 - Local artifact archive:
   `/Users/guohaozhang/Downloads/cdna3-pytest-pass-artifacts.tgz`
 - Focused static-evidence CLI test:
@@ -143,21 +145,22 @@ suite passed.
   `1401 passed, 62 skipped in 878.99s`
 - Full-suite exit code: `0`
 
-This upgrades the internal status of the fixed code to CDNA3 `gfx942` adapted
-pytest validation passed.
+This upgrades the internal status of the fixed code to MI308X (`gfx942`)
+adapted pytest validation passed.
 
 It does not by itself complete the broader MI300X evidence chain for
-benchmark-grade claims. Dataset validation, clock-lock evidence, timing
-evidence, AMD-native score reports, FP8 status, and NVFP4/MXFP4 deferred
-status still need to be recorded before broader MI300X/CDNA3 benchmark
-validation claims are upgraded.
+benchmark-grade claims. MI308X and MI300X share the `gfx942` code path but have
+different hardware configurations. Dataset validation, clock-lock evidence,
+timing evidence, AMD-native score reports, FP8 status, and NVFP4/MXFP4 deferred
+status still need to be recorded on exact MI300X hardware before broader
+MI300X benchmark validation claims are upgraded.
 
 ## Dataset Validation Update
 
-The cloud `gfx942` environment later completed a full 235-problem dataset
-validation run after FlashInfer safetensors blob staging and CDNA3 low-precision
-skip handling were fixed. The uploaded validation log bundle has this corrected
-interpretation:
+The cloud MI308X (`gfx942`) environment later completed a full 235-problem
+dataset validation run after FlashInfer safetensors blob staging and CDNA3
+low-precision skip handling were fixed. The uploaded validation log bundle has
+this corrected interpretation:
 
 - 235 problems were discovered and summarized.
 - 220 problems produced complete passing traces.
@@ -187,6 +190,6 @@ Known remaining non-skip dataset blockers:
   uploaded full-validation logs.
 
 This upgrades the internal status from "no CDNA3 dataset validation attempt" to
-"CDNA3 dataset validation infrastructure operational with known timeout
-blockers." It still does not support a "full adapted dataset passed" or
-"benchmark-grade MI300X validated" claim.
+"MI308X (`gfx942`) CDNA3 dataset validation infrastructure operational with
+known timeout blockers." It still does not support a "full adapted dataset
+passed" or "benchmark-grade MI300X validated" claim.

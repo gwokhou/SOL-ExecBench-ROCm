@@ -97,11 +97,12 @@ Use these classifications when reviewing the summary:
 This validation path supports an **engineering prerelease** claim only. It
 should be interpreted alongside the support matrix in `docs/rocm.md`. In
 particular, Docker/container user-space evidence remains distinct from
-native-host validation. CDNA3/gfx942 validation infrastructure evidence exists,
-but full MI300X validation on the CDNA3 `gfx942` target remains blocked until
-timeout, clock-lock, timing, score, FP8, and low-precision evidence boundaries
-are resolved. CDNA4 validation is unavailable because suitable hardware is not
-currently accessible.
+native-host validation. CDNA3/gfx942 validation infrastructure evidence exists
+from MI308X (`gfx942`) runs, but full MI300X validation on the CDNA3 `gfx942`
+target remains blocked until timeout, clock-lock, timing, score, FP8,
+low-precision, and exact-hardware evidence boundaries are resolved. CDNA4
+validation is unavailable because suitable hardware is not currently
+accessible.
 
 It does not provide:
 

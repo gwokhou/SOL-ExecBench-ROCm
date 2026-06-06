@@ -1,30 +1,31 @@
 # CDNA 3 Validation Readiness
 
 Phase 21 implemented readiness metadata for real CDNA 3 validation runs. Later
-`gfx942` cloud runs recorded CDNA3 pytest and dataset-infrastructure evidence,
-but they still do not constitute a completed benchmark-grade CDNA3 or MI300X
-hardware-validation pass.
+MI308X (`gfx942`) cloud runs recorded CDNA3 pytest and
+dataset-infrastructure evidence, but they still do not constitute a completed
+benchmark-grade CDNA3 or MI300X hardware-validation pass.
 
 ## Status
 
 - Readiness implementation: available through internal diagnostics helpers.
-- Pytest validation: recorded on real `gfx942` at repository HEAD `0d6c3e1`
-  with `1401 passed, 62 skipped`.
-- Dataset validation infrastructure: operational on real `gfx942`; full
+- Pytest validation: recorded on real MI308X (`gfx942`) at repository HEAD
+  `0d6c3e1` with `1401 passed, 62 skipped`.
+- Dataset validation infrastructure: operational on real MI308X (`gfx942`); full
   235-problem validation was run, with 220 complete passing problem traces, 15
   expected Quant NVFP4/MXFP4 CDNA3 skips, and known timeout blockers.
 - Benchmark-grade hardware validation: blocked until the timeout shards,
   clock-lock evidence, timing evidence, AMD score evidence, FP8 status, and
   low-precision claim boundary are resolved or explicitly accepted.
-- A real `gfx942` validation attempt on 2026-06-04 is recorded in
+- A real MI308X (`gfx942`) validation attempt on 2026-06-04 is recorded in
   [CDNA3 gfx942 Validation Attempt](cdna3_gfx942_validation_attempt.md). That
   initial attempt did not pass the full adapted suite. Follow-up fixes were
-  re-run on `gfx942` at repository HEAD `0d6c3e1`, where the adapted pytest
-  suite passed with `1401 passed, 62 skipped`.
-- The pytest pass is CDNA3 `gfx942` adapted-suite validation evidence. It does
-  not by itself complete MI300X benchmark-grade validation because dataset
-  timeout blockers, clock-lock, timing, AMD score, FP8, and deferred
-  low-precision status evidence are still required.
+  re-run on MI308X (`gfx942`) at repository HEAD `0d6c3e1`, where the adapted
+  pytest suite passed with `1401 passed, 62 skipped`.
+- The pytest pass is MI308X (`gfx942`) adapted-suite validation evidence. It
+  does not by itself complete MI300X benchmark-grade validation because MI308X
+  and MI300X hardware configurations differ and dataset timeout blockers,
+  clock-lock, timing, AMD score, FP8, and deferred low-precision status evidence
+  are still required.
 - Claim wording: `cdna3_readiness_implemented` is not the same as CDNA 3
   hardware validated.
 - Blocked or non-CDNA targets use `cdna3_hardware_validation_deferred`.
@@ -57,7 +58,7 @@ rocminfo | grep -E "Name: *gfx94|Marketing Name" || true
 
 ## Current Clock-Lock Blocker
 
-On 2026-06-05, a cloud `gfx942` validation run attempted to use
+On 2026-06-05, a cloud MI308X (`gfx942`) validation run attempted to use
 `scripts/run_dataset.py --lock-clocks`. The benchmark correctly rejected the
 run because the server still reported unlocked clocks:
 
@@ -93,5 +94,6 @@ unlocked-clock evidence rather than benchmark-grade locked-clock timing.
 ## No-Claim Guardrail
 
 Until the timeout, clock-lock, timing, score, and claim-boundary evidence exists,
-documentation must say CDNA3/gfx942 validation infrastructure is operational
-with known blockers, and must not say CDNA 3 hardware validation fully passed.
+documentation must say MI308X (`gfx942`) CDNA3 validation infrastructure is
+operational with known blockers, and must not say CDNA 3 or MI300X hardware
+validation fully passed.

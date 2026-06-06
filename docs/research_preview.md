@@ -49,7 +49,7 @@ but do not replace canonical traces.
 | Hardware scope | Research preview status | Interpretation |
 | --- | --- | --- |
 | RDNA4 `gfx1200` | Recorded prerelease evidence exists where archived commands and artifacts support the scope. | Engineering-prerelease evidence for the recorded host and commands only. |
-| MI300X on CDNA3 `gfx942` | Infrastructure evidence with known blockers. | MI300X is the concrete CDNA3 hardware target, not a separate architecture target. Pytest and full-dataset validation paths have run on `gfx942`, but timeout shards and missing benchmark-grade evidence prevent a full MI300X validation claim. |
+| MI300X on CDNA3 `gfx942` | Infrastructure evidence with known blockers. | Current CDNA3 evidence was recorded on MI308X (`gfx942`), not MI300X. MI300X remains a distinct validation target because its hardware configuration differs, even though it shares the `gfx942` code path. |
 | CDNA4 | Unavailable. | CDNA4 validation is unavailable because suitable hardware is not currently accessible. |
 | Docker/container ROCm user-space | Diagnostic compatibility evidence where recorded. | Container user-space evidence is not native-host validation. |
 
@@ -64,7 +64,7 @@ but do not replace canonical traces.
 | Bounded dataset slice | provisional | Scoped representative execution when denominator and closure are recorded. | Full 235-problem paper-scale validation. |
 | AMD SOL / AMD score sidecars | derived diagnostic evidence | Local AMD-native interpretation when required sidecars and eligibility state exist. | Upstream SOLAR parity or NVIDIA B200 equivalence. |
 | Environment, profile, static, Matrix, consistency, claim-upgrade, and trust-summary sidecars | diagnostic-only | Reproducibility and review context. | Correctness, timing, score, paper-parity, hardware-validation, or leaderboard authority. |
-| Full MI300X validation | blocked | Future real-hardware evidence target; current `gfx942` evidence records pytest pass, full-dataset execution, expected Quant skips, and timeout blockers. | Completed CDNA3 hardware validation today. |
+| Full MI300X validation | blocked | Future exact-hardware evidence target; current MI308X (`gfx942`) evidence records pytest pass, full-dataset execution, expected Quant skips, and timeout blockers. | Completed MI300X hardware validation today. |
 | CDNA4 validation | unavailable | Cannot currently be collected. | Validated CDNA4 support. |
 
 ## SOL/AMD-Derived Versus Upstream SOLAR
@@ -97,7 +97,8 @@ equivalence, official leaderboard equivalence, or paper-scale validation.
 - No native-host ROCm validation is inferred from Docker/container user-space
   evidence.
 - Full MI300X validation on the CDNA3 `gfx942` target remains blocked by known
-  timeout shards and missing benchmark-grade timing/score evidence, despite
-  operational CDNA3 validation infrastructure.
+  timeout shards and missing benchmark-grade timing/score evidence. Current
+  operational CDNA3 validation infrastructure evidence was recorded on MI308X,
+  not MI300X.
 - CDNA4 validation is unavailable because suitable hardware is not currently
   accessible.

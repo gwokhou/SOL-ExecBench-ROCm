@@ -74,7 +74,8 @@ def test_engineering_prerelease_support_matrix_boundaries():
         "engineering-prerelease evidence",
         "Docker/container ROCm user-space",
         "not native-host validation",
-        "MI300X is the concrete CDNA 3 hardware target",
+        "MI300X remains a distinct CDNA 3 hardware-validation target",
+        "MI308X (`gfx942`)",
         "gfx942",
         "CDNA4 validation is unavailable",
         "suitable hardware is not currently accessible",
@@ -84,7 +85,8 @@ def test_engineering_prerelease_support_matrix_boundaries():
     for required in (
         "container ROCm user-space",
         "not native-host validation",
-        "MI300X is the concrete CDNA 3 hardware target",
+        "MI300X remains a distinct CDNA 3 hardware-validation target",
+        "recorded on MI308X",
         "CDNA4 validation is unavailable",
     ):
         assert required in claims
