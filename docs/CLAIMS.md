@@ -35,8 +35,8 @@ diagnostic-only sidecar evidence unless a narrower document gives them a more
 limited role. Bounded dataset slices and support-matrix rows are provisional
 prerelease evidence, not paper parity, upstream SOLAR parity, score authority,
 leaderboard readiness, hard-sandbox authority, native-host validation from
-Docker/container evidence, full MI300X validation on the CDNA3 `gfx942` target,
-or CDNA4 validation.
+Docker/container evidence, full validation of the MI300X GPU model under
+CDNA3, or CDNA4 validation.
 
 | Claim level | Allowed claim | Required evidence |
 | --- | --- | --- |
@@ -59,11 +59,11 @@ For v1.25 engineering-prerelease support wording:
 - RDNA 4 evidence is engineering-prerelease evidence only when backed by the
   recorded artifacts and commands for that host/scope.
 - Docker/container ROCm user-space evidence is not native-host validation.
-- MI300X remains a distinct CDNA 3 hardware-validation target using the
-  `gfx942` code path. Current CDNA3/gfx942 validation infrastructure evidence
-  was recorded on MI308X, not MI300X, so full-suite MI300X validation remains
-  blocked until timeout, clock-lock, timing, score, FP8, low-precision, and
-  exact-hardware evidence boundaries are resolved.
+- MI300X and MI308X are sibling GPU products under the CDNA3 architecture
+  family and share the `gfx942` code path. Current CDNA3/gfx942 validation
+  infrastructure evidence was recorded on MI308X, not MI300X, so full-suite
+  MI300X validation remains blocked until timeout, clock-lock, timing, score,
+  FP8, low-precision, and exact-hardware evidence boundaries are resolved.
 - CDNA4 validation is unavailable because suitable hardware is not currently
   accessible.
 

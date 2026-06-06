@@ -73,8 +73,8 @@ CDNA 3 entries allow solution metadata and HIP offload flag staging to target
 `gfx94*` devices. Schema/build support is not hardware-validation evidence by
 itself. The recorded MI308X (`gfx942`) cloud runs show that CDNA3 validation
 infrastructure is operational, but the remaining dataset timeout blockers and
-exact-hardware MI300X evidence requirements prevent a full CDNA3/MI300X
-validation claim.
+exact-hardware MI300X evidence requirements prevent a full MI300X validation
+claim under the CDNA 3 family.
 
 ## Destination Passing Style
 

@@ -126,9 +126,9 @@ After this attempt, quick task
 - The HIP RMSNorm example now uses a shared-memory reduction without wave32
   shuffle assumptions.
 
-These are remediation changes only. CDNA3/MI300X validation remains blocked
-until the fixed code is re-run on real target hardware and records a passing
-full evidence chain.
+These are remediation changes only. A full hardware-validation claim for the
+MI300X GPU model under the CDNA 3 family remains blocked until the fixed code is
+re-run on exact target hardware and records a passing full evidence chain.
 
 ## Pytest Revalidation Pass
 

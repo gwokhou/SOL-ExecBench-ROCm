@@ -54,14 +54,15 @@ FORBIDDEN_TRUTHY_CLAIMS = {
 }
 REQUIRED_DOC_PHRASES = {
     "docs/CLAIMS.md": (
-        "MI300X remains a distinct CDNA 3 hardware-validation target",
+        "MI300X and MI308X are sibling GPU products",
         "recorded on MI308X",
         "CDNA4 validation is unavailable",
         "not native-host validation",
     ),
     "docs/prerelease_artifact_bundle.md": (
         "engineering prerelease and research preview evidence only",
-        "CDNA3/gfx942 validation infrastructure evidence was recorded on MI308X",
+        "MI300X and MI308X are sibling GPU products",
+        "recorded on MI308X",
         "CDNA4 validation is unavailable",
     ),
 }

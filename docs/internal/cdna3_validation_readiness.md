@@ -3,7 +3,8 @@
 Phase 21 implemented readiness metadata for real CDNA 3 validation runs. Later
 MI308X (`gfx942`) cloud runs recorded CDNA3 pytest and
 dataset-infrastructure evidence, but they still do not constitute a completed
-benchmark-grade CDNA3 or MI300X hardware-validation pass.
+benchmark-grade hardware-validation pass for the CDNA 3 family or for the
+MI300X GPU model under that family.
 
 ## Status
 
@@ -95,5 +96,5 @@ unlocked-clock evidence rather than benchmark-grade locked-clock timing.
 
 Until the timeout, clock-lock, timing, score, and claim-boundary evidence exists,
 documentation must say MI308X (`gfx942`) CDNA3 validation infrastructure is
-operational with known blockers, and must not say CDNA 3 or MI300X hardware
-validation fully passed.
+operational with known blockers, and must not say CDNA 3 hardware validation or
+MI300X hardware validation fully passed.

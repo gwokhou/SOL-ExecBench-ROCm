@@ -289,8 +289,8 @@ uv run pytest \
 NVIDIA SPDX notices are listed under `provenance.toml` and that cleanup
 candidates carry project attribution only. The prerelease readiness tests check
 required bundle artifacts, checksum behavior, forbidden claim boundaries,
-known-gap statuses, public MI300X-as-CDNA3 wording, unavailable CDNA4 wording, and
-the provenance policy gate.
+known-gap statuses, public MI300X-under-CDNA3 wording, unavailable CDNA4 wording,
+and the provenance policy gate.
 
 ## Live ROCm Validation
 

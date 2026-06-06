@@ -49,7 +49,7 @@ but do not replace canonical traces.
 | Hardware scope | Research preview status | Interpretation |
 | --- | --- | --- |
 | RDNA4 `gfx1200` | Recorded prerelease evidence exists where archived commands and artifacts support the scope. | Engineering-prerelease evidence for the recorded host and commands only. |
-| MI300X on CDNA3 `gfx942` | Infrastructure evidence with known blockers. | Current CDNA3 evidence was recorded on MI308X (`gfx942`), not MI300X. MI300X remains a distinct validation target because its hardware configuration differs, even though it shares the `gfx942` code path. |
+| MI300X GPU under CDNA3 `gfx942` | Infrastructure evidence with known blockers. | Current CDNA3 evidence was recorded on MI308X (`gfx942`), not MI300X. MI300X and MI308X are sibling GPU products under CDNA3 with different hardware configurations, even though they share the `gfx942` code path. |
 | CDNA4 | Unavailable. | CDNA4 validation is unavailable because suitable hardware is not currently accessible. |
 | Docker/container ROCm user-space | Diagnostic compatibility evidence where recorded. | Container user-space evidence is not native-host validation. |
 
@@ -96,9 +96,8 @@ equivalence, official leaderboard equivalence, or paper-scale validation.
 - No hard multi-tenant sandbox authority is claimed.
 - No native-host ROCm validation is inferred from Docker/container user-space
   evidence.
-- Full MI300X validation on the CDNA3 `gfx942` target remains blocked by known
-  timeout shards and missing benchmark-grade timing/score evidence. Current
-  operational CDNA3 validation infrastructure evidence was recorded on MI308X,
-  not MI300X.
+- Full MI300X validation under CDNA3 remains blocked by known timeout shards and
+  missing benchmark-grade timing/score evidence. Current operational CDNA3
+  validation infrastructure evidence was recorded on MI308X, not MI300X.
 - CDNA4 validation is unavailable because suitable hardware is not currently
   accessible.

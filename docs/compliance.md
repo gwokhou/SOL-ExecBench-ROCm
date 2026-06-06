@@ -107,9 +107,9 @@ tested, and validated on the relevant hardware class.
 - CDNA 3 MI308X (`gfx942`) validation infrastructure evidence exists: the
   adapted pytest suite passed and a full dataset validation run completed with
   documented timeout blockers and expected Quant NVFP4/MXFP4 skips. Do not
-  claim full CDNA3/MI300X hardware validation until those blockers and required
-  benchmark-grade exact-hardware MI300X evidence are resolved or explicitly
-  bounded.
+  claim full hardware validation for the MI300X GPU model under the CDNA 3
+  family until those blockers and required benchmark-grade exact-hardware
+  MI300X evidence are resolved or explicitly bounded.
 - Explicit schema hardware values include `gfx1200`, `gfx940`, `gfx941`,
   `gfx942`, and `LOCAL`. The `gfx94*` entries are code/schema support by
   themselves; hardware-validation claims require archived real-hardware

@@ -233,12 +233,13 @@ Known limitations for the first run:
 - A passing sample trace is ROCm-port evidence for that local command only, not
   full 235-problem paper validation.
 - Docker/container ROCm user-space evidence is not native-host validation.
-- MI300X remains a distinct CDNA3 `gfx942` hardware-validation target. Current
-  CDNA3/gfx942 validation infrastructure evidence was recorded on MI308X, not
-  MI300X, so full-suite MI300X validation remains blocked until timeout,
-  clock-lock, timing, score, FP8, low-precision, and exact-hardware evidence
-  boundaries are resolved. CDNA4 validation is unavailable because suitable
-  hardware is not currently accessible.
+- MI300X and MI308X are sibling GPU products under the CDNA3 architecture
+  family and share the `gfx942` code path. Current CDNA3/gfx942 validation
+  infrastructure evidence was recorded on MI308X, not MI300X, so full-suite
+  MI300X validation remains blocked until timeout, clock-lock, timing, score,
+  FP8, low-precision, and exact-hardware evidence boundaries are resolved.
+  CDNA4 validation is unavailable because suitable hardware is not currently
+  accessible.
 - PyTorch and some internal APIs may still contain CUDA-named compatibility
   symbols; those names do not mean this ROCm-only port supports NVIDIA CUDA
   runtime execution.

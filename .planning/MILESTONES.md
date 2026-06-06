@@ -11,9 +11,10 @@ classification was fixed and targeted verification confirmed timeout shards are
 now recorded as `TIMEOUT` traces and summary failures.
 
 This is CDNA3 validation-infrastructure evidence with known blockers, not a
-completed full CDNA3/MI300X hardware-validation pass. MI308X and MI300X share
-the `gfx942` code path, but the recorded MI308X evidence must not be reported
-as MI300X hardware validation because the hardware configurations differ.
+completed full hardware-validation pass for the MI300X GPU model under the
+CDNA 3 family. MI308X and MI300X are sibling GPU products that share the
+`gfx942` code path, but the recorded MI308X evidence must not be reported as
+MI300X hardware validation because the hardware configurations differ.
 Remaining blockers are documented in
 `.planning/milestones/CDNA3-VALIDATION-HANDOFF.md` and
 `.planning/milestones/MI300X-VALIDATION-HANDOFF.md`.
@@ -73,8 +74,8 @@ Remaining blockers are documented in
   NVFP4/MXFP4 deferral.
 
 - Preserved no-claim guardrails so CDNA3 schema/build/test readiness cannot be
-  reported as completed CDNA3 or MI300X hardware validation without complete
-  real-hardware evidence.
+  reported as completed hardware validation for any CDNA3 GPU model, including
+  MI300X, without complete real-hardware evidence.
 
 - Updated testing, ROCm support, and contributor documentation to explain how
   to run CDNA3 marker tests, interpret skips, add future CDNA3 tests, and
@@ -139,8 +140,9 @@ Remaining blockers are documented in
   draft, release-page checklist, artifact placeholders, support-boundary links,
   and known-limitations wording.
 
-- Corrected active MI300X-as-CDNA3 wording so MI300X is consistently described as
-  the concrete CDNA3 `gfx942` hardware target, not a separate architecture peer.
+- Corrected active MI300X-under-CDNA3 wording so MI300X is consistently
+  described as a concrete GPU model under the CDNA3 architecture family and as
+  a sibling product to MI308X on the shared `gfx942` code path.
 
 ---
 
