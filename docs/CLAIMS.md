@@ -50,6 +50,7 @@ or CDNA4 validation.
 | v1.21 debt-reduction evidence | Dataset, evaluator, analysis, SOLAR/static evidence, and boundary tests were refactored or hardened under stable public schemas. | Focused helper tests, unchanged sidecar schemas, `CONCERNS.md` status categories, and explicit non-claim wording. |
 | AMD-native-derived evidence | A score or bound report was derived from ROCm traces and AMD-side bound artifacts. | Canonical traces, AMD SOL bound sidecars, hardware model refs, score eligibility state, and warnings. |
 | Research-preview evidence | A curated benchmark slice was executed or audited under documented limits. | Slice definition, command transcript or expected commands, artifact list, pass/fail/skip/unavailable accounting, and known gaps. |
+| CDNA3/gfx942 infrastructure evidence | Real `gfx942` runs exercised the adapted pytest suite and full dataset validation path. | Archived environment details, pytest pass counts, dataset summary, per-problem traces, expected Quant NVFP4/MXFP4 skips, and documented timeout blockers. This is not full MI300X hardware validation. |
 
 Docker Matrix Entries may claim **container ROCm user-space validated on recorded host driver/devices** only; a Docker row is not native host ROCm validated without direct native-host validation evidence.
 
@@ -59,8 +60,9 @@ For v1.25 engineering-prerelease support wording:
   recorded artifacts and commands for that host/scope.
 - Docker/container ROCm user-space evidence is not native-host validation.
 - MI300X is the concrete CDNA 3 hardware target (`gfx942`), not a separate
-  architecture target; full-suite MI300X validation remains deferred unless
-  complete real-hardware evidence exists.
+  architecture target; CDNA3/gfx942 validation infrastructure evidence exists,
+  but full-suite MI300X validation remains blocked until timeout, clock-lock,
+  timing, score, FP8, and low-precision evidence boundaries are resolved.
 - CDNA4 validation is unavailable because suitable hardware is not currently
   accessible.
 
@@ -115,9 +117,9 @@ leaderboard authority.
 - NVIDIA B200, Blackwell, or official leaderboard parity.
 - Upstream NVlabs/SOLAR equivalence.
 - Full 124-model extraction or full 235-problem paper validation.
-- CDNA3-family hardware validation, including MI300X (`gfx942`), or CDNA4
-  hardware validation without archived full-suite evidence from that hardware
-  class.
+- Full CDNA3-family hardware validation, including MI300X (`gfx942`), or CDNA4
+  hardware validation without archived full-suite evidence and accepted
+  timeout/skip boundaries from that hardware class.
 - CDNA4 validation while suitable CDNA4 hardware is not currently accessible.
 - NVFP4 or MXFP4 validation without suitable AMD hardware evidence.
 - `rocprofv3` profiling as correctness or score authority.
@@ -148,7 +150,7 @@ leaderboard authority.
 | Desired upgraded claim | Evidence required before wording can change |
 | --- | --- |
 | Full ROCm paper validation | Complete 235-problem denominator accounting, execution closure, trace artifacts, failure analysis, score artifacts, and reproducible commands. |
-| CDNA 3 hardware validation | Full adapted suite on real `gfx94*` hardware, environment sidecars, clock policy evidence, trace artifacts, and documented failures or skips. |
+| CDNA 3 hardware validation | Full adapted suite on real `gfx94*` hardware, environment sidecars, clock policy evidence, trace artifacts, timing/score artifacts where claimed, and documented accepted failures or skips. |
 | Upstream SOLAR parity | A side-by-side comparison against upstream SOLAR outputs for the scoped dataset and operator families. |
 | Leaderboard readiness | Stable submission format, hosted or reproducible scoring policy, hardware policy, anti-cheat policy, and release-defined baselines. |
 | Static kernel evidence | Trace-adjacent static sidecars, persisted current-build artifacts, routed extractor records, bounded raw outputs, and documented diagnostic-only interpretation rules. |

@@ -29,7 +29,8 @@ def test_docs_distinguish_cdna3_schema_support_from_hardware_validation():
         assert target in combined
 
     assert "code/schema support" in combined
-    assert "hardware validation deferred" in combined
+    assert "validation infrastructure evidence exists" in combined
+    assert "not a full hardware-validation pass" in combined
     assert "Do not claim" in combined
     assert "CDNA3 test readiness is now concrete" in combined
     assert "mi300x_validation_claim_blockers()" in combined
@@ -93,10 +94,12 @@ def test_cdna3_readiness_doc_is_not_hardware_validation_claim():
     readiness = _read("docs/internal/cdna3_validation_readiness.md")
 
     for phrase in (
-        "does not record a CDNA 3 hardware-validation pass",
+        "do not constitute a completed benchmark-grade CDNA3 or MI300X",
+        "Dataset validation infrastructure",
+        "known timeout blockers",
         "cdna3_readiness_implemented",
         "cdna3_hardware_validation_deferred",
-        "must not say CDNA 3 hardware validation passed",
+        "must not say CDNA 3 hardware validation fully passed",
     ):
         assert phrase in readiness
     assert "uv run --no-sync pytest tests/" in readiness
@@ -107,11 +110,12 @@ def test_mi300x_readiness_doc_is_not_hardware_validation_claim():
     readiness = _read("docs/internal/mi300x_validation_readiness.md")
 
     for phrase in (
-        "does not record a commercial GPU hardware-validation pass",
+        "do not record a completed",
         "AMD Instinct MI300X",
         "ROCm >= 7.0",
         "FP8: validate on MI300X",
         "NVFP4/MXFP4: deferred",
+        "Remaining MI300X claim blockers",
         "mi300x_validation_claim_blockers()",
         "Readiness metadata is not a validation claim",
     ):

@@ -123,13 +123,15 @@
 ## Scaling Limits
 
 **Full paper-scale validation remains evidence-heavy:**
+- Status: Externally blocked/deferred.
 - Current capacity: The code supports bounded slices, ready subsets, execution closure, per-problem traces, AMD-native reports, timing evidence, and paper denominator reports.
 - Limit: Full 235-problem validation requires complete denominator accounting, trace artifacts, failure analysis, score artifacts, reproducible commands, and hardware evidence.
 - Scaling path: Use `scripts/run_dataset.py` with explicit `--execution-closure`, `--ready-subset`, `--amd-score-report`, `--solar-derivation`, and `--timing-evidence-dir`; archive all sidecars and command provenance.
 
 **Hardware validation is architecture- and host-specific:**
-- Current capacity: RDNA 4 and CDNA 3 markers exist; docs record CDNA 3 `gfx942` adapted-suite evidence and MI300X benchmark-grade requirements.
-- Limit: MI300X validation needs exact GPU identity, `gfx942`, clock-lock evidence, dataset traces, timing evidence, AMD-native score report, FP8 status, and deferred NVFP4/MXFP4 status.
+- Status: Narrowed.
+- Current capacity: RDNA 4 and CDNA 3 markers exist; docs record CDNA 3 `gfx942` pytest evidence, dataset-validation infrastructure evidence, expected Quant NVFP4/MXFP4 skips, known timeout blockers, and MI300X benchmark-grade requirements.
+- Limit: MI300X validation needs exact GPU identity, `gfx942`, accepted timeout boundaries, clock-lock evidence, dataset traces, timing evidence, AMD-native score report, FP8 status, and deferred NVFP4/MXFP4 status.
 - Scaling path: Follow `docs/internal/mi300x_validation_readiness.md` and `docs/internal/cdna3_validation_readiness.md`; do not treat marker readiness or Docker evidence as commercial GPU validation.
 
 **Local cache/build/output directories can grow quickly:**

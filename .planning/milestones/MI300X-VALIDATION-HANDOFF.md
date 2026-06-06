@@ -1,7 +1,8 @@
 # MI300X Validation Handoff
 
-**Status:** ready for future hardware execution; no MI300X validation pass is
-recorded.
+**Status:** CDNA3/gfx942 validation infrastructure evidence recorded with known
+timeout and timing blockers; no completed benchmark-grade MI300X validation
+pass is recorded.
 
 ## Required Hardware And Stack
 
@@ -43,6 +44,21 @@ uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
 The archive should include per-problem traces, ROCm timing evidence, and an
 AMD-native score report with stable relative paths from the run summary.
 
+## Current Evidence Status
+
+- Real `gfx942` pytest validation passed at repository HEAD `0d6c3e1` with
+  `1401 passed, 62 skipped`.
+- Full 235-problem dataset validation was run on `gfx942`. Corrected accounting
+  records 220 complete passing problem traces, 15 expected Quant NVFP4/MXFP4
+  CDNA3 skips, and 6 timeout shards across 4 problems.
+- Commit `2984c29` fixed nested `eval_driver.py` timeout classification.
+  Targeted verification on
+  `FlashInfer-Bench/014_gqa_paged_prefill_causal_h32_kv4_d128_ps1` emitted 30
+  traces: 29 `PASSED` and 1 `TIMEOUT`, with summary `FAIL`.
+- Clock locking remains a blocker on the tested cloud host because
+  `rocm-smi` continued to report `Performance Level: auto`; timing from that
+  environment is unlocked-clock evidence.
+
 ## Expected Result Categories
 
 Record all of these categories explicitly, even when the category has no
@@ -70,7 +86,7 @@ entries:
 - Environment records AMD Instinct MI300X and `gfx942`.
 - Clock locking is active and recorded.
 - Dataset summary, per-problem traces, ROCm timing evidence, and AMD-native
-  score report are archived.
+  score report are archived with no unaccepted non-skip failures.
 - Expected result categories are recorded.
 - `mi300x_validation_claim_blockers()` returns no blockers before any report or
   support matrix marks MI300X as hardware-validated on CDNA3.
