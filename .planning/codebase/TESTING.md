@@ -1,216 +1,93 @@
-# Testing Patterns
-
-**Analysis Date:** 2026-06-04
-
-## Test Framework
-
-**Runner:**
-- Pytest `>=9.0.2` from the `dev` dependency group in `pyproject.toml`.
-- Pytest-xdist `>=3.5` is enabled by default.
-- Config: `pyproject.toml` under `[tool.pytest.ini_options]`.
-
-**Assertion Library:**
-- Native `assert` statements and `pytest.raises`.
-- Pydantic validation tests assert `ValidationError` from `pydantic`, as in `tests/sol_execbench/core/data/test_solution.py`.
-
-**Run Commands:**
-```bash
-uv run pytest tests/                         # Run the full suite with configured xdist
-uv run pytest tests/sol_execbench/test_e2e.py # Run one test module
-uv run pytest tests -m timing_serial -n 0     # Run serial GPU timing tests normally skipped by conftest
-uv run pytest -m requires_rocm -q -rs         # Run ROCm hardware tests and show skip reasons
-uv run pytest tests/examples/test_rocm_cli_paths.py -q -rs # Run example ROCm CLI coverage
-uv run ty check                               # Type-check src and tests per pyproject.toml
-```
-
-## Test File Organization
-
-**Location:**
-- Package and feature tests live under `tests/sol_execbench/`.
-- Tests mirroring package subtrees live under paths such as `tests/sol_execbench/core/data/`, `tests/sol_execbench/core/bench/`, and `tests/sol_execbench/driver/`.
-- Example workflow tests live under `tests/examples/`.
-- Container dependency smoke tests live under `tests/docker/dependencies/`.
-- Test fixtures and sample problems live under `tests/sol_execbench/fixtures/`, `tests/sol_execbench/samples/`, and `tests/samples/`.
-
-**Naming:**
-- Use `test_*.py` for test files.
-- Use descriptive test functions that state expected behavior: `test_dangerous_native_compile_options_rejected`, `test_noisy_user_stdout_stays_out_of_trace_jsonl`, and `test_profile_collection_unavailable_is_nonfatal_metadata`.
-- Use test classes to group schema behavior without shared mutable state, as in `TestLanguageValidation`, `TestEntryPointSuffixValidation`, and `TestHardwareAndCompileOptions` in `tests/sol_execbench/core/data/test_solution.py`.
-
-**Structure:**
-```text
-tests/
-├── conftest.py                         # Custom ROCm markers and shared tmp cache fixture
-├── sol_execbench_type_helpers.py        # Typed Pydantic factory helpers
-├── sol_execbench/
-│   ├── core/data/test_*.py              # Schema and data contract tests
-│   ├── core/bench/test_*.py             # Runtime, timing, reward-hack, and IO tests
-│   ├── driver/test_*.py                 # Generated driver and packager tests
-│   ├── test_*.py                        # CLI, docs, dataset, scoring, matrix, and evidence tests
-│   ├── fixtures/                        # JSON fixture payloads
-│   └── samples/                         # Sample problem directories and malicious kernels
-├── examples/test_*.py                   # Example workflow tests
-└── docker/dependencies/test_*.py        # Container dependency checks
-```
-
-## Test Structure
-
-**Suite Organization:**
-```python
-@pytest.mark.parametrize(("field", "flag", "message"), [
-    ("hip_cflags", "@/tmp/flags.rsp", "response file"),
-    ("cflags", "-I/usr/local/include", "host paths"),
-])
-def test_dangerous_native_compile_options_rejected(field, flag, message):
-    with pytest.raises(ValidationError, match=message):
-        _make_spec(
-            languages=["hip_cpp"],
-            entry_point="kernel.hip::run",
-            compile_options={field: [flag]},
-        )
-```
-
-**Patterns:**
-- Put small local factory helpers near tests when data setup is feature-specific. Examples: `_make_spec` in `tests/sol_execbench/core/data/test_solution.py`, `_run_eval_driver_process` in `tests/sol_execbench/driver/test_eval_driver.py`, and `_matching_default_dependency_env` in `tests/sol_execbench/test_run_docker_dependency_preflight.py`.
-- Put reusable typed Pydantic factories in `tests/sol_execbench_type_helpers.py` (`make_solution`, `make_build_spec`, `make_trace`, `json_dict`, `typed`).
-- Use `tmp_path` for all generated files, staged problems, output bundles, and sidecars. Avoid writing into repo paths during tests unless the test is explicitly reading committed fixtures.
-- Assert full structured payloads or critical fields, not just truthiness. Examples: profiler metadata assertions in `tests/sol_execbench/test_rocm_profiler.py` and docker preflight JSON assertions in `tests/sol_execbench/test_run_docker_dependency_preflight.py`.
-- For scripts and CLIs, assert both exit code and absence/presence of dangerous command text. `tests/sol_execbench/test_run_docker_dependency_preflight.py` checks that blocked preflight paths do not print `docker build` or `docker run`.
-
-## Mocking
-
-**Framework:** Pytest `monkeypatch`, local fake classes, and injected runner callables. `unittest.mock` is not a dominant pattern.
-
-**Patterns:**
-```python
-def runner(command: Sequence[str], cwd, timeout) -> subprocess.CompletedProcess[str]:
-    calls.append(list(command))
-    (tmp_path / "profile.rocpd").write_text("profile db")
-    return subprocess.CompletedProcess(
-        args=list(command),
-        returncode=0,
-        stdout='{"definition": "demo"}\n',
-        stderr="profiler note",
-    )
-
-result = collect_rocprofv3_profile(request, runner=runner)
-```
-
-**What to Mock:**
-- Mock external command runners for profiler and toolchain logic. Use runner injection as in `tests/sol_execbench/test_rocm_profiler.py`.
-- Monkeypatch hardware detection helpers in `tests/conftest.py` when testing marker behavior, as in `tests/sol_execbench/test_cdna3_hardware_marker.py`.
-- Monkeypatch environment variables for Docker and timing policy tests, as in `tests/sol_execbench/test_run_docker_dependency_preflight.py` and `tests/sol_execbench/core/bench/test_make_eval_clock_warn.py`.
-- Use fake pytest config/item classes for collection hook tests instead of invoking pytest subprocesses. See `_FakeConfig` and `_FakeItem` in `tests/sol_execbench/test_cdna3_hardware_marker.py`.
-
-**What NOT to Mock:**
-- Do not mock Pydantic validation when testing schemas; instantiate real models through `model_validate` or typed helpers in `tests/sol_execbench_type_helpers.py`.
-- Do not mock generated driver syntax; parse the actual template with `ast.parse` in `tests/sol_execbench/driver/test_eval_driver.py`.
-- Do not mock JSONL trace parsing or staged file layouts in subprocess integration tests; write real `definition.json`, `workload.jsonl`, `solution.json`, and source files under `tmp_path`.
-
-## Fixtures and Factories
-
-**Test Data:**
-```python
-def make_solution(**kwargs: Any) -> Solution:
-    return Solution.model_validate(kwargs)
-```
-
-**Location:**
-- `tests/sol_execbench_type_helpers.py` contains reusable typed factories for Pydantic models.
-- `tests/conftest.py` contains shared pytest hooks and `tmp_cache_dir`, which sets `SOLEXECBENCH_CACHE_PATH` to `tmp_path / "cache"`.
-- Static JSON fixtures live under `tests/sol_execbench/fixtures/solar_derivation/`.
-- Sample problem directories live under `tests/sol_execbench/samples/` and `tests/samples/`.
-- Inline minimal problem payloads are acceptable for local subprocess tests, as shown by `_MINIMAL_DEFINITION`, `_MINIMAL_WORKLOAD`, and `_SOLUTION_SPEC` in `tests/sol_execbench/driver/test_eval_driver.py`.
-
-## Coverage
-
-**Requirements:** No numeric coverage target is enforced in `pyproject.toml`.
-
-**View Coverage:**
-```bash
-uv run pytest tests/ # Primary verification command; no coverage plugin is configured
-```
-
-## Test Types
-
-**Unit Tests:**
-- Schema and contract tests validate Pydantic fields, validators, enum values, and JSON schema behavior under `tests/sol_execbench/core/data/`.
-- Pure logic tests validate scoring, compatibility matrices, dataset layout/readiness, sharding, trust summaries, and evidence models under `tests/sol_execbench/test_*.py`.
-- Profiler command construction and CSV parsing tests live in `tests/sol_execbench/test_rocm_profiler.py`.
-
-**Integration Tests:**
-- Generated eval-driver subprocess tests live in `tests/sol_execbench/driver/test_eval_driver.py`; they write staging files, run `eval_driver.py` with `subprocess.run`, and parse canonical trace JSONL.
-- E2E problem/sample tests live in `tests/sol_execbench/test_e2e.py` and use `ProblemPackager` plus subprocesses.
-- CLI and example ROCm tests live in `tests/examples/test_rocm_cli_paths.py`.
-- Dataset, artifact bundle, release validation, and reporting script tests live under `tests/sol_execbench/test_*script*.py`, `tests/sol_execbench/test_*report*.py`, and `tests/sol_execbench/test_prerelease_artifact_bundle.py`.
-
-**E2E Tests:**
-- Pytest is the E2E runner; no separate browser or service E2E framework is used.
-- Use `pytest.mark.xdist_group("serial")` for tests that should not run concurrently because they use GPU state, subprocess staging, timing state, or global monkey-patch surfaces.
-- Use `pytest.mark.requires_rocm` for live ROCm GPU tests and pair with architecture markers when needed.
-
-## Markers
-
-- `requires_rocm`: tests require a ROCm GPU visible through PyTorch. Registered in `pyproject.toml` and `tests/conftest.py`.
-- `requires_rdna4`: tests require AMD RDNA 4 (`gfx12*`) hardware such as `gfx1200`.
-- `requires_cdna3`: tests require AMD CDNA 3 (`gfx94*`) hardware such as `gfx942`.
-- `requires_rocm_dev`: tests require ROCm HIP development headers under `/opt/rocm/include/hip/hip_runtime_api.h`; registered in `tests/conftest.py`.
-- `requires_ck`: tests require Composable Kernel headers under `/opt/rocm/include/ck/ck.hpp`; registered in `tests/conftest.py`.
-- `requires_rocwmma`: tests require rocWMMA headers under `/opt/rocm/include/rocwmma/rocwmma.hpp`; registered in `tests/conftest.py`.
-- `requires_cutile`: legacy NVIDIA cuTile marker; `tests/conftest.py` always skips it in this ROCm-only port.
-- `timing_serial`: GPU timing tests skipped by default unless selected with `-m timing_serial`; run with `-n 0`.
-- `xdist_group("serial")`: use for tests that need serialized execution under the default `-n auto --dist loadgroup`.
-
-## GPU, Container, and Profiler Patterns
-
-- Hardware availability is centralized in `tests/conftest.py`. Do not duplicate ROCm detection in individual tests unless testing detection itself.
-- `tests/conftest.py` first checks Linux device nodes `/dev/kfd` and `/dev/dri`, then checks `torch.version.hip`, `torch.cuda.is_available()`, and `gcnArchName`/`gfx_arch_name`.
-- Live dependency smoke tests under `tests/docker/dependencies/` assert tool presence and behavior with real subprocesses. For example, `tests/docker/dependencies/test_rocm_runtime.py` checks `rocminfo`, `hipcc`, `rocprofv3`, and `amd-smi`/`rocm-smi`.
-- Docker script policy tests use dry-run environment variables and assert JSON preflight policy without running Docker, as in `tests/sol_execbench/test_run_docker_dependency_preflight.py`.
-- Profiler tests distinguish diagnostic profile artifacts from score-authoritative timing evidence. `tests/sol_execbench/test_rocm_profiler.py` asserts `diagnostic_only`, `score_authority`, `fallback_applied`, `backend`, `kernel_duration_ms`, and artifact kind classification.
-- For `rocprofv3`, build commands with an explicit `--` separator before the application command. `test_build_rocprofv3_command_places_application_after_separator` in `tests/sol_execbench/test_rocm_profiler.py` is the pattern to preserve.
-
-## Common Patterns
-
-**Async Testing:**
-```python
-result = subprocess.run(
-    [sys.executable, "eval_driver.py"],
-    cwd=tmp_path,
-    env=env,
-    capture_output=True,
-    text=True,
-    timeout=60,
-)
-```
-
-**Error Testing:**
-```python
-with pytest.raises(ValidationError, match="cuda_cflags"):
-    _make_spec(
-        languages=["hip_cpp"],
-        entry_point="kernel.hip::run",
-        compile_options={"cuda_cflags": ["-O3"]},
-    )
-```
-
-**Subprocess Output Testing:**
-```python
-completed = _run_docker_dependency_preflight("--preflight-only", **env)
-assert completed.returncode != 0
-payload = json.loads(completed.stdout)
-assert payload["benchmark_allowed"] is False
-assert "docker run" not in completed.stdout
-```
-
-**Trace JSONL Testing:**
-```python
-traces = [json.loads(line) for line in result.stdout.splitlines() if line.strip()]
-assert traces[0]["evaluation"]["status"] == "PASSED"
-assert "run noise from solution" not in result.stdout
-assert "run noise from solution" in result.stderr
-```
-
+---
+last_mapped_commit: f4de6692ee7468e150c112e0cbdcc8842dd0c709
+mapped_at: 2026-06-06
 ---
 
-*Testing analysis: 2026-06-04*
+# Testing Patterns
+
+## Framework And Configuration
+
+Pytest is the test framework. `pyproject.toml` sets `addopts = "-n auto --dist loadgroup"`, so the suite runs with `pytest-xdist` by default. Tests that cannot safely run concurrently use `pytest.mark.xdist_group("serial")`, especially GPU/e2e paths in `tests/sol_execbench/test_e2e.py`, `tests/examples/test_examples.py`, and `tests/examples/test_rocm_cli_paths.py`.
+
+Configured markers in `pyproject.toml` include `cpp`, `requires_rocm`, `requires_rdna4`, `requires_cdna3`, and legacy `requires_cutile`. `tests/conftest.py` adds additional marker descriptions and collection-time skip logic for `timing_serial`, `requires_rocm_dev`, `requires_ck`, and `requires_rocwmma`.
+
+Default command patterns are:
+
+- `uv run pytest tests/` for the full suite.
+- `uv run pytest tests/sol_execbench/test_e2e.py` for one file.
+- `uv run pytest tests -m timing_serial -n 0` for timing tests that are skipped by default.
+- ROCm/GPU examples are marker-gated and require visible ROCm hardware and device nodes.
+
+## Test Layout
+
+Package tests live under `tests/sol_execbench/`, mirroring source areas where useful. Data schema tests are in `tests/sol_execbench/core/data/`, bench helper tests are in `tests/sol_execbench/core/bench/`, and driver tests are in `tests/sol_execbench/driver/`.
+
+Example workflow tests live under `tests/examples/`. `tests/examples/test_examples.py` validates checked-in examples under `examples/`, while `tests/examples/test_rocm_cli_paths.py` covers ROCm CLI and dataset-run flows.
+
+Docker dependency smoke tests live in `tests/docker/dependencies/`, including ROCm runtime, HIP compiler, PyTorch ROCm, Triton ROCm, and ROCm library checks.
+
+Fixture data is checked in under `tests/sol_execbench/samples/`, `tests/samples/`, and focused fixture directories such as `tests/sol_execbench/fixtures/solar_derivation/`. Tests commonly assert against real JSON, JSONL, and source snippets rather than broad synthetic mocks.
+
+## Test Naming And Organization
+
+Test names are descriptive and behavior-focused, for example `test_rejects_invalid_solution_schema`, `test_run_cli_writes_log_for_timeout`, `test_matrix_report_rejects_negative_status_counts`, and `test_builder_does_not_accept_or_execute_candidate_solution_code`.
+
+Related assertions are often grouped in classes for schema modules, such as `TestLanguageValidation`, `TestEntryPointSuffixValidation`, and `TestHardwareAndCompileOptions` in `tests/sol_execbench/core/data/test_solution.py`, or driver groups in `tests/sol_execbench/driver/test_problem_packager.py`.
+
+Parametrization is preferred for enum vocabularies, invalid values, examples, hardware targets, and compatibility matrices. Descriptor dataclasses such as `Sample`, `EvilCase`, and `Example` in `tests/sol_execbench/test_e2e.py` and `tests/examples/test_examples.py` make e2e parameter sets readable.
+
+## Fixtures And Helpers
+
+`tests/conftest.py` owns hardware and toolchain skip behavior. It probes Linux device nodes, PyTorch ROCm, detected `gfx` architecture, ROCm dev headers, CK headers, and rocWMMA headers, then marks tests during collection instead of failing at runtime.
+
+The shared `tmp_cache_dir` fixture in `tests/conftest.py` sets `SOLEXECBENCH_CACHE_PATH` to a per-test cache under `tmp_path`, preventing native build artifacts from leaking between tests.
+
+Tests use `tmp_path` heavily for staged problem directories, generated manifests, sidecars, trace files, and script outputs. Examples include `tests/sol_execbench/driver/test_problem_packager.py`, `tests/sol_execbench/test_dataset_runner.py`, `tests/sol_execbench/test_cli_environment_snapshot.py`, and `tests/sol_execbench/test_dataset_inventory_readiness.py`.
+
+Type-safe helper constructors live in `tests/sol_execbench_type_helpers.py` and are used throughout tests to construct Pydantic objects while preserving local schema expectations.
+
+Private helper functions inside test modules prepare sample problems, write JSON/JSONL fixtures, and normalize subprocess execution. Examples include `_load_sample` and `_run_subprocess` in `tests/sol_execbench/test_e2e.py`, `_load_example` in `tests/examples/test_examples.py`, and dataset-writing helpers in `tests/examples/test_rocm_cli_paths.py`.
+
+## Mocking And Isolation
+
+`monkeypatch` is the standard mocking tool. Tests patch subprocess runners, environment variables, module attributes, `sys.argv`, and external loaders. Representative files include `tests/sol_execbench/test_dataset_runner.py`, `tests/sol_execbench/test_download_solexecbench.py`, `tests/sol_execbench/test_cli_environment_snapshot.py`, `tests/examples/test_rocm_cli_paths.py`, and script tests for report generation.
+
+Subprocess-heavy unit tests usually inject or monkeypatch a runner rather than invoking real external tools. For example, `tests/sol_execbench/test_dataset_runner.py` patches `runner.subprocess.run`; `tests/sol_execbench/test_environment_snapshot.py` uses injected runners; release validation tests in `tests/sol_execbench/test_release_candidate_validation.py` monkeypatch command execution and artifact handling.
+
+Click commands are tested with `click.testing.CliRunner`, for example in `tests/sol_execbench/test_contract.py`, `tests/sol_execbench/test_matrix_schema_export.py`, `tests/sol_execbench/test_toolchain_routing.py`, `tests/sol_execbench/test_cli_environment_snapshot.py`, and `tests/examples/test_rocm_cli_paths.py`.
+
+Output capture uses pytest fixtures such as `capsys` for script output assertions, as in `tests/sol_execbench/test_dataset_runner.py` and `tests/sol_execbench/test_dataset_redistribution_policy.py`.
+
+Tests that intentionally manipulate import state clean up after themselves. `tests/sol_execbench/core/bench/test_eval_runtime.py` temporarily overrides `sys.modules` to verify staged module isolation, then restores the previous module state in `finally` blocks.
+
+## Assertion Patterns
+
+Validation tests assert both failure type and message fragments using `pytest.raises(..., match=...)`. This is common in schema and contract tests such as `tests/sol_execbench/core/data/test_solution.py`, `tests/sol_execbench/test_rocm_compatibility_matrix.py`, `tests/sol_execbench/test_solar_derivation_evidence.py`, and `tests/sol_execbench/test_download_solexecbench.py`.
+
+Artifact tests read generated JSON back and assert exact fields, deterministic ordering, status totals, source refs, checksums, and claim-boundary booleans. See `tests/sol_execbench/test_dataset_inventory_readiness.py`, `tests/sol_execbench/test_parity_gap_report.py`, `tests/sol_execbench/test_paper_denominator_script.py`, `tests/sol_execbench/test_amd_bound_sanity_script.py`, and `tests/sol_execbench/test_prerelease_artifact_bundle.py`.
+
+E2E tests assert subprocess return codes with captured stdout/stderr in failure messages, then parse canonical trace JSONL and assert every workload passed. This pattern is visible in `tests/sol_execbench/test_e2e.py` and `tests/examples/test_examples.py`.
+
+Documentation tests enforce public wording and claim boundaries by reading Markdown files directly. Examples include `tests/sol_execbench/test_rocm_matrix_docs.py`, `tests/sol_execbench/test_original_parity_docs.py`, `tests/sol_execbench/test_research_release_docs.py`, `tests/sol_execbench/test_public_prerelease_docs.py`, and `tests/sol_execbench/test_v1_20_evidence_quality_docs.py`.
+
+Security and boundary tests assert that code is not executed when parsing metadata. Examples include `tests/sol_execbench/test_solar_derivation_contract.py`, which verifies fixture loading does not execute reference text, and `tests/sol_execbench/test_solar_derivation_evidence.py`, which checks derivation builders do not accept or execute candidate solution code.
+
+## Hardware And Slow Test Patterns
+
+Hardware requirements are marker-gated instead of assumed. `requires_rocm` needs a ROCm GPU visible through PyTorch and supported architecture; `requires_rdna4` expects `gfx12*`; `requires_cdna3` expects `gfx94*`; `requires_rocm_dev` expects HIP headers; `requires_ck` and `requires_rocwmma` expect corresponding ROCm library headers.
+
+Legacy `requires_cutile` tests are skipped in this ROCm-only port. Tests retain this marker only to document compatibility boundaries and avoid accidentally treating NVIDIA-only paths as ROCm-supported.
+
+Native HIP/C++ and library examples use `cpp` plus more specific markers. `tests/examples/test_examples.py` marks MIOpen, CK, and rocWMMA cases with combinations of `cpp`, `requires_rocm`, `requires_rocm_dev`, `requires_rdna4`, `requires_ck`, or `requires_rocwmma`.
+
+GPU timing tests use `timing_serial` and are skipped unless explicitly selected with `-m timing_serial`. This prevents routine CPU-safe suites from depending on noisy wall-clock or GPU timing behavior.
+
+## Coverage Themes
+
+Schema coverage is broad for public contracts: data definitions, workloads, solutions, traces, dtype conversion, ROCm compatibility matrices, runtime evidence, dataset manifests, readiness, ready subsets, paper denominator reports, parity gap reports, claim upgrades, trust summaries, evaluation stability, and AMD scoring sidecars.
+
+Execution coverage spans unit-level bench helpers, packaging, native extension staging, CLI invocation, dataset runner behavior, e2e samples, reward-hack detection, static kernel evidence, ROCm profiling metadata, and no-trace diagnostics.
+
+ROCm migration coverage explicitly checks that public examples, docs, schema values, markers, and user-facing text avoid unsupported CUDA/NVIDIA claims except where retained as legacy compatibility boundaries. Relevant files include `tests/sol_execbench/test_rocm_library_examples.py`, `tests/sol_execbench/test_rocm_migration_residue_audit.py`, `tests/sol_execbench/test_rocm_test_suite_audit.py`, and `tests/sol_execbench/test_public_contract_guardrails.py`.
+
+Release and evidence quality coverage is artifact-oriented. Tests exercise scripts such as `scripts/report_paper_denominator.py`, `scripts/report_parity_gaps.py`, `scripts/report_amd_bound_sanity.py`, `scripts/report_evaluation_stability.py`, `scripts/report_claim_upgrade.py`, `scripts/check_prerelease_readiness.py`, `scripts/release_candidate_validation.py`, and `scripts/build_prerelease_artifact_bundle.py`.
