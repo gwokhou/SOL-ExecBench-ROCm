@@ -182,7 +182,7 @@ The ROCm schema accepts Python/Triton categories and native ROCm categories:
 | `rocwmma` | Native ROCm implementation using rocWMMA. |
 
 See [ROCm library examples](docs/rocm_libraries.md) for library readiness, example coverage, and diagnostic boundaries.
-CDNA 3 `gfx942` validation infrastructure evidence exists, but full CDNA3/MI300X hardware validation remains blocked by documented timeout shards and missing benchmark-grade evidence.
+CDNA 3 MI308X (`gfx942`) validation infrastructure evidence exists, but full CDNA3/MI300X hardware validation remains blocked by documented timeout shards and missing benchmark-grade MI300X evidence.
 CDNA 4 validation is also deferred because suitable hardware is unavailable.
 
 Legacy CUDA/NVIDIA schema values such as `cuda_cpp`, `cublas`, `cudnn`, `cutlass`, `cute_dsl`, and `cutile` are rejected with ROCm migration guidance.

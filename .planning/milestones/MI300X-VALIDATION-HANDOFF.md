@@ -1,8 +1,8 @@
 # MI300X Validation Handoff
 
-**Status:** CDNA3/gfx942 validation infrastructure evidence recorded with known
-timeout and timing blockers; no completed benchmark-grade MI300X validation
-pass is recorded.
+**Status:** MI308X (`gfx942`) validation infrastructure evidence recorded with
+known timeout and timing blockers; no completed benchmark-grade MI300X
+validation pass is recorded.
 
 ## Required Hardware And Stack
 
@@ -46,11 +46,11 @@ AMD-native score report with stable relative paths from the run summary.
 
 ## Current Evidence Status
 
-- Real `gfx942` pytest validation passed at repository HEAD `0d6c3e1` with
-  `1401 passed, 62 skipped`.
-- Full 235-problem dataset validation was run on `gfx942`. Corrected accounting
-  records 220 complete passing problem traces, 15 expected Quant NVFP4/MXFP4
-  CDNA3 skips, and 6 timeout shards across 4 problems.
+- Real MI308X (`gfx942`) pytest validation passed at repository HEAD `0d6c3e1`
+  with `1401 passed, 62 skipped`.
+- Full 235-problem dataset validation was run on MI308X (`gfx942`). Corrected
+  accounting records 220 complete passing problem traces, 15 expected Quant
+  NVFP4/MXFP4 CDNA3 skips, and 6 timeout shards across 4 problems.
 - Commit `2984c29` fixed nested `eval_driver.py` timeout classification.
   Targeted verification on
   `FlashInfer-Bench/014_gqa_paged_prefill_causal_h32_kv4_d128_ps1` emitted 30
@@ -58,6 +58,9 @@ AMD-native score report with stable relative paths from the run summary.
 - Clock locking remains a blocker on the tested cloud host because
   `rocm-smi` continued to report `Performance Level: auto`; timing from that
   environment is unlocked-clock evidence.
+- MI308X and MI300X share the `gfx942` code path, but the recorded MI308X
+  evidence is not a completed MI300X validation pass because the hardware
+  configurations differ.
 
 ## Expected Result Categories
 

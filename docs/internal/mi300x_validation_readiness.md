@@ -1,9 +1,9 @@
 # MI300X Validation Readiness
 
 This document is a readiness and status handoff for AMD Instinct MI300X
-validation. Current `gfx942` cloud runs provide CDNA3 pytest and dataset
-validation-infrastructure evidence, but they do not record a completed
-commercial GPU hardware-validation pass.
+validation. Current MI308X (`gfx942`) cloud runs provide CDNA3 pytest and
+dataset validation-infrastructure evidence, but they do not record a completed
+MI300X commercial GPU hardware-validation pass.
 
 ## Scope
 
@@ -16,11 +16,12 @@ commercial GPU hardware-validation pass.
 
 ## Current Evidence Status
 
-- CDNA3 pytest validation passed on real `gfx942` at repository HEAD `0d6c3e1`
-  with `1401 passed, 62 skipped`.
-- Full 235-problem dataset validation was run on `gfx942`. The corrected
-  interpretation is 220 complete passing problem traces, 15 expected Quant
-  NVFP4/MXFP4 CDNA3 skips, and 6 remaining timeout shards across 4 problems.
+- CDNA3 pytest validation passed on real MI308X (`gfx942`) at repository HEAD
+  `0d6c3e1` with `1401 passed, 62 skipped`.
+- Full 235-problem dataset validation was run on MI308X (`gfx942`). The
+  corrected interpretation is 220 complete passing problem traces, 15 expected
+  Quant NVFP4/MXFP4 CDNA3 skips, and 6 remaining timeout shards across 4
+  problems.
 - Nested `eval_driver.py` timeout classification was fixed in commit `2984c29`
   and verified on
   `FlashInfer-Bench/014_gqa_paged_prefill_causal_h32_kv4_d128_ps1`, which now
@@ -31,10 +32,13 @@ commercial GPU hardware-validation pass.
   locked-clock timing.
 - Quant NVFP4/MXFP4 skips on CDNA3 are expected, not correctness failures.
   Hardware validation for those formats requires CDNA4-class support.
+- MI308X and MI300X share the `gfx942` code path, but this evidence is not a
+  completed MI300X validation pass because the hardware configurations differ.
 
 Remaining MI300X claim blockers:
 
-- Resolve or explicitly accept the 6 dataset timeout shards.
+- Resolve or explicitly accept the 6 dataset timeout shards on exact MI300X
+  hardware.
 - Record locked-clock evidence or keep timing claims bounded as unlocked-clock
   evidence.
 - Archive timing evidence, AMD-native score report, FP8 status, and expected
@@ -97,8 +101,9 @@ The validation archive must classify and record:
 
 ## No-Claim Rule
 
-Until the evidence above exists, public docs and reports must say MI300X as
-CDNA3 has validation infrastructure evidence with known blockers, not a
-completed benchmark-grade hardware-validation claim.
+Until the evidence above exists, public docs and reports must say current
+CDNA3/gfx942 validation infrastructure evidence was recorded on MI308X with
+known blockers, not that MI300X has a completed benchmark-grade
+hardware-validation claim.
 
 Readiness metadata is not a validation claim.

@@ -473,8 +473,9 @@ def _default_known_gaps() -> list[dict[str, str]]:
             "id": "mi300x_cdna3_full_suite",
             "status": "deferred",
             "description": (
-                "MI300X is the concrete CDNA3 `gfx942` hardware target, "
-                "but full-suite MI300X validation remains deferred."
+                "CDNA3/gfx942 validation infrastructure evidence was recorded "
+                "on MI308X, not MI300X; full-suite MI300X validation remains "
+                "deferred."
             ),
         },
         {

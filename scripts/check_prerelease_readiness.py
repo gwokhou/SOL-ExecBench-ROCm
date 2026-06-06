@@ -54,13 +54,14 @@ FORBIDDEN_TRUTHY_CLAIMS = {
 }
 REQUIRED_DOC_PHRASES = {
     "docs/CLAIMS.md": (
-        "MI300X is the concrete CDNA 3 hardware target",
+        "MI300X remains a distinct CDNA 3 hardware-validation target",
+        "recorded on MI308X",
         "CDNA4 validation is unavailable",
         "not native-host validation",
     ),
     "docs/prerelease_artifact_bundle.md": (
         "engineering prerelease and research preview evidence only",
-        "MI300X is the concrete CDNA3 `gfx942` hardware target",
+        "CDNA3/gfx942 validation infrastructure evidence was recorded on MI308X",
         "CDNA4 validation is unavailable",
     ),
 }

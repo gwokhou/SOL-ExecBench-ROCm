@@ -20,7 +20,7 @@ def test_research_preview_covers_methodology_scope_evidence_and_limits():
         "## Evidence Surfaces",
         "## Limitations",
         "Trace JSONL is the canonical run artifact",
-        "MI300X is the concrete CDNA3 hardware target",
+        "Current CDNA3 evidence was recorded on MI308X",
         "CDNA4 validation is unavailable",
         "No full 235-problem paper-scale validation",
         "not imply NVIDIA or AMD endorsement",
