@@ -4,6 +4,20 @@ SOL ExecBench emits one JSON trace per workload. Use these traces as the
 primary analysis artifact, then use ROCm profiling tools for deeper kernel
 inspection when needed.
 
+## How To Read This Guide
+
+Use the first half of this guide for ordinary result analysis:
+
+- collect Trace JSONL,
+- inspect readiness, closure, timing, and profiling sidecars,
+- compare traces against baselines,
+- interpret correctness and latency fields.
+
+The AMD-native score sections are for derived, opt-in analysis. They explain
+how ROCm traces can feed AMD-side score and bound artifacts, but they do not
+change canonical Trace JSONL or create paper-parity, leaderboard, or hardware
+validation claims.
+
 ## Trace Collection
 
 Write JSONL traces from a single problem:
@@ -283,7 +297,7 @@ port is not an NVIDIA/B200/SOLAR equivalence study. In this ROCm port:
    states (`hardware_validation_status`, `model_validation_status`)
    before reporting AMD-native scores.
 5. CDNA 3 claims additionally require real `gfx94*` full-suite validation
-   evidence, which is not part of the v1.9 milestone.
+   evidence for the exact hardware claim.
 
 AMD-native score reports are derived artifacts. They can reference trace timing,
 ROCm timing evidence, baseline summaries, and AMD SOL bound artifacts, but they
@@ -427,22 +441,18 @@ Aggregate status is conservative:
   zero-cost.
 
 Hardware model payloads carry both `hardware_validation_status` and
-`model_validation_status`. For v1.9, RDNA 4 (`gfx1200`) is the only validation
-target. CDNA3-family real-hardware validation, including MI300X (`gfx942`), and CDNA 4 validation remain
-future work; reports must not present those paths as validated in this
-milestone.
+`model_validation_status`. Reports must not present CDNA3-family, MI300X,
+CDNA4, NVFP4, or MXFP4 paths as validated unless the required real-hardware
+evidence is recorded for that exact claim.
 
-## v1.10 Claim Boundaries
+## Derived Claim Boundaries
 
-v1.10 derived sidecars and reports support the local
+Derived sidecars and reports support the local
 `claim_level: amd-native-derived` interpretation. They provide paper-aligned
 automatic SOLAR derivation evidence for this ROCm port, but they are not
-paper-scale 124-model / 235-problem extraction, not upstream SOLAR parity, not
-NVIDIA B200 or Blackwell equivalence, not hosted leaderboard readiness, and not
-new real-hardware validation. They also do not claim CDNA3-family validation, including MI300X (`gfx942`)
-validation, CDNA 4 validation, NVFP4 validation, MXFP4 validation, or any new
-hardware validation beyond the evidence explicitly recorded in the local
-artifacts.
+paper-scale 124-model / 235-problem extraction, upstream SOLAR parity, NVIDIA
+B200 or Blackwell equivalence, hosted leaderboard readiness, or new
+real-hardware validation.
 
 Use these artifacts as auditable AMD ROCm derived evidence. Do not present
 `coverage_summary`, `aggregate_status`, `derived_evidence_refs`, or score

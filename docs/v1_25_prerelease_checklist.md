@@ -4,6 +4,13 @@ This checklist prepares a v1.25 engineering prerelease candidate. It documents
 the maintainer flow from a clean tree to a tagged release candidate; it does
 not publish a package or create a release by itself.
 
+Version labels in this document are intentionally specific:
+
+- `v1.25` refers to the engineering-prerelease milestone and release notes.
+- `v1.26.0-rc1` appears in later bundle/readiness commands because the public
+  prerelease packaging workflow was added after the v1.25 checklist.
+- The Python package version in `pyproject.toml` is separate from both labels.
+
 ## 1. Confirm Tree And Version Context
 
 ```bash

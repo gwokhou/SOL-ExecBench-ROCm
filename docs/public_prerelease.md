@@ -57,6 +57,10 @@ Public materials must link:
 - `docs/v1_25_release_notes.md`
 - `docs/v1_25_prerelease_checklist.md`
 
+The v1.25 links are historical engineering-prerelease context that the v1.26
+public review package still depends on. They are not the Python package
+version.
+
 ## Required Wording
 
 Use this framing:

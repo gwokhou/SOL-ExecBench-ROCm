@@ -1,8 +1,13 @@
 # Definition Schema
 
-A **Definition** provides the formal specification for a computational workload — the operator's contract. It defines the axes, tensor shapes/dtypes, optional custom input generation, and a correct PyTorch reference implementation.
+A **Definition** provides the formal specification for a computational workload:
+the operator's contract. It defines axes, tensor shapes and dtypes, optional
+custom input generation, and a correct PyTorch reference implementation.
 
-**Schema scope:** A Definition records the workload name, optional compute category, axes, input and output tensor specifications, reference implementation, optional custom input entrypoint, optional description, and optional Hugging Face source ID.
+**Schema scope:** A Definition records the workload name, optional compute
+category, axes, input and output tensor specifications, reference
+implementation, optional custom input entrypoint, optional description, and
+optional Hugging Face source ID.
 
 ---
 
@@ -98,7 +103,9 @@ Each key is a tensor name (matching what your `run()` function receives). Value:
 
 ### Supported `dtype` values
 
-`float64`, `float32`, `float16`, `bfloat16`, `float8_e4m3fn`, `float8_e5m2`, `float4_e2m1`, `float4_e2m1fn_x2`, `int64`, `int32`, `int16`, `int8`, `bool`
+`float64`, `float32`, `float16`, `bfloat16`, `float8_e4m3fn`,
+`float8_e5m2`, `float4_e2m1`, `float4_e2m1fn_x2`, `int64`, `int32`, `int16`,
+`int8`, `bool`
 
 ### Scalars vs 0-D Tensors
 
@@ -126,7 +133,9 @@ A Python source string containing the mathematical specification of the operator
 
 **Field:** `custom_inputs_entrypoint: Optional[str]`
 
-When set, names a function defined in the `reference` code that generates problem-specific bounded inputs. The evaluator calls this instead of generating random tensors for inputs marked `"type": "custom"` in a Workload.
+When set, names a function defined in the `reference` code that generates
+problem-specific bounded inputs. The evaluator calls this instead of generating
+random tensors for inputs marked `"type": "custom"` in a Workload.
 
 **Why it exists:** Some inputs have structural constraints that pure random generation can't satisfy:
 - Router indices (must be valid indices bounded by `num_experts`)

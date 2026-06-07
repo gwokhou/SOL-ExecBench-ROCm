@@ -6,6 +6,20 @@ configuration JSON, `pyproject.toml`, Docker target metadata, Docker wrapper
 inputs, and runtime environment variables. The repository does not contain a
 required application-level `.env` file.
 
+## How To Use This Reference
+
+Most users only need:
+
+- `--config`, `--compile-timeout`, `--timeout`, `--output`, `--profile`, and
+  `--static-evidence` for single benchmark runs.
+- `scripts/run_dataset.py` flags for dataset batches and derived reports.
+- `./scripts/run_docker.sh --target <id>` when selecting a ROCm container.
+
+The environment-variable table below is intentionally complete. Many variables
+are diagnostic or CI-style overrides used by tests, Docker preflight checks, or
+evidence sidecars. Treat them as reference material unless a command or failure
+message points you to one of them.
+
 ## Environment Variables
 
 No environment variable is required for normal host CLI startup. The variables
@@ -176,7 +190,7 @@ clock-sensitive evaluation paths can reject the run based on
 | Docker local image name | `sol-execbench` | `scripts/run_docker.sh` |
 | Docker local image tag | `rocm-<selected Docker tag>` | `scripts/run_docker.sh` |
 | Docker FlashInfer trace root | `/sol-execbench/data/flashinfer-trace` | `scripts/run_docker.sh` |
-| Python package version | `1.0.2` | `pyproject.toml`; separate from the v1.26 research-prerelease milestone tag |
+| Python package version | `1.0.2` | `pyproject.toml`; separate from milestone and prerelease labels |
 | Python requirement | `>=3.12,<3.14` | `pyproject.toml` |
 | Default ROCm Torch wheel | `torch==2.10.0+rocm7.1` | `pyproject.toml` Linux x86_64 marker and Docker target metadata |
 | Default ROCm torchvision wheel | `torchvision==0.25.0+rocm7.1` | `pyproject.toml` Linux x86_64 marker and Docker target metadata |
@@ -418,25 +432,21 @@ The wrapper derives PyTorch and Triton Docker build arguments from
 `docker/rocm-targets.json` so ROCm 7.0, 7.1, and 7.2 images can install
 target-specific ROCm wheel stacks without changing the project lockfile.
 
-## Dataset Runner Options
+## Dataset Runner Evidence Notes
 
-`scripts/run_dataset.py` accepts dataset-scale options outside the main
-`sol-execbench` Click command:
+The full dataset runner flag table appears above in
+[Dataset Runner Options](#dataset-runner-options). The most common evidence
+flags are:
 
-| Flag | Purpose |
-| --- | --- |
-| `--ready-subset` | Bound execution to a previously generated ready-subset sidecar. |
-| `--readiness` | Enrich execution closure with readiness blocker records. |
-| `--execution-closure` | Write an execution-closure JSON sidecar; defaults under `--output` when `--ready-subset` is supplied. |
-| `--dataset-manifest` | Include dataset manifest provenance in closure checks. |
-| `--ready-subset` plus `--readiness` | Preserve ready-subset denominators, readiness classes, blocker codes, and exclusion reasons in closure records. |
-| `--phase all|traces|derived|timing` | Select the dataset pass. `all` preserves normal execution, `traces` runs GPU trace collection, `derived` rebuilds reports from existing traces, and `timing` collects profiler-backed timing evidence from existing traces. |
-| `--jobs <N>|auto` | Use parallel workers for safe CPU/I/O-only phases. Values greater than `1` are honored only with `--phase derived`; GPU and profiler phases remain serial. |
-| `--rerun` | Re-evaluate existing traces instead of reusing passing results. |
-| `--amd-score-report` | Write an opt-in AMD-native derived score report. |
-| `--amd-sol-bound-dir` | Materialize AMD SOL bound sidecars used by score reporting. |
-| `--solar-derivation` | Materialize SOLAR derivation sidecars. |
-| `--timing-evidence-dir` | Write source-specific ROCm timing evidence sidecars. |
+- `--ready-subset` and `--readiness` to bound execution to ready workloads and
+  carry blocker reasons into closure records.
+- `--execution-closure` to write attempted, skipped, missing-trace, and
+  missing-evidence states.
+- `--dataset-manifest` to include migration or acquisition provenance in reuse
+  decisions.
+- `--amd-score-report`, `--amd-sol-bound-dir`, and `--solar-derivation` to
+  generate opt-in derived score and bound sidecars.
+- `--timing-evidence-dir` to write source-specific ROCm timing evidence.
 
 Existing traces are reused only when they exist, have no failed workloads,
 `--rerun` is not set, and any requested execution-closure provenance matches

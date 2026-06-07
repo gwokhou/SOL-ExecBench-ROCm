@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+from sol_execbench.core.dataset.evidence_refs import sidecar_stem_for_workload
 from sol_execbench.core.dataset.run_closure import (
     closure_record,
     closure_totals,
@@ -233,7 +234,12 @@ def test_derived_evidence_for_workload_combines_present_refs_and_missing_gaps(tm
         path.mkdir(parents=True)
     score_report = output_dir / "score.json"
     score_report.write_text("{}")
-    (sol_dir / "demo.w0.amd-sol-v2.json").write_text("{}")
+    sidecar_stem = sidecar_stem_for_workload(
+        "demo",
+        "w0",
+        problem_namespace="L2/demo",
+    )
+    (sol_dir / f"{sidecar_stem}.amd-sol-v2.json").write_text("{}")
     (timing_dir / "L2" / "demo.timing.json").write_text("{}")
 
     refs, gaps = derived_evidence_for_workload(
@@ -250,7 +256,7 @@ def test_derived_evidence_for_workload_combines_present_refs_and_missing_gaps(tm
 
     assert refs == {
         "amd_score": "score.json",
-        "amd_sol_bound": "sol/demo.w0.amd-sol-v2.json",
+        "amd_sol_bound": f"sol/{sidecar_stem}.amd-sol-v2.json",
         "timing_evidence": "timing/L2/demo.timing.json",
     }
     assert gaps == ["solar_derivation_missing"]

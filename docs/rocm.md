@@ -20,7 +20,11 @@ Quick host checks:
 rocminfo
 rocm-smi
 hipcc --version
-find /opt/rocm/include -maxdepth 3 \( -path '*hipblas/hipblas.h' -o -path '*miopen/miopen.h' -o -path '*ck/ck.hpp' -o -path '*rocwmma/rocwmma.hpp' \)
+find /opt/rocm/include -maxdepth 3 \
+  \( -path '*hipblas/hipblas.h' \
+  -o -path '*miopen/miopen.h' \
+  -o -path '*ck/ck.hpp' \
+  -o -path '*rocwmma/rocwmma.hpp' \)
 ```
 
 ## Python Environment

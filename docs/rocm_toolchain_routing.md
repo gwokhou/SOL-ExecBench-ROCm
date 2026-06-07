@@ -15,8 +15,9 @@ which diagnostic surface consumes the route.
 | Static | Diagnostic current-build artifact metadata and bounded extractor output. | RGA, `llvm-objdump`, `roc-objdump`, `readelf` |
 | Derived score | Derived AMD-side score and bound artifacts. | AMD SOL/SOLAR sidecars |
 
-Routing output is diagnostic metadata. It is not correctness authority,
-performance proof, paper parity, or leaderboard evidence.
+Routing output is diagnostic-only metadata using the authority-class vocabulary
+in `docs/CLAIMS.md`. It answers tool availability and provenance questions; it
+does not prove benchmark correctness or performance.
 
 ## Tool Lifecycle
 
@@ -110,16 +111,7 @@ uv run sol-execbench toolchain --json \
 
 ## Claim Boundary
 
-Do not describe a successful routing decision as:
-
-- a correctness result,
-- performance proof,
-- correctness, performance, timing, score, paper-parity, or leaderboard
-  authority for Static Kernel Evidence,
-- paper parity,
-- leaderboard readiness,
-- or hardware validation.
-
-Routing answers tool availability and provenance questions only. Static Kernel
-Evidence consumes routing records as diagnostic metadata, not as correctness,
-performance, timing, score, paper-parity, or leaderboard authority.
+Do not describe a successful routing decision as a correctness result,
+performance proof, paper-parity result, leaderboard readiness, or hardware
+validation. Static Kernel Evidence consumes routing records as diagnostic
+metadata only.
