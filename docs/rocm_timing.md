@@ -96,7 +96,11 @@ succeeded, was unavailable, or failed, and includes command provenance,
 working directory, timeout, artifact paths, return code, and stdout/stderr
 tails.
 
-The profile sidecar is diagnostic-only evidence. It is not correctness authority, performance authority, timing authority, score authority, paper-parity authority, leaderboard authority, or canonical trace JSONL data.
+The profile sidecar is diagnostic-only evidence using the authority-class
+vocabulary in `docs/CLAIMS.md`. It is not canonical trace JSONL data.
+In guardrail wording: it is not correctness authority, performance authority,
+timing authority, score authority, paper-parity authority, or
+leaderboard authority.
 Profiler failure must not turn an otherwise passing benchmark run into a
 correctness failure. When collection falls back or is skipped, the sidecar
 records an explicit fallback reason through `skipped_reason` or `failed_reason`.

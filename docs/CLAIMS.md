@@ -4,6 +4,24 @@ This project is an AMD ROCm port of SOL ExecBench. It preserves the benchmark
 shape where practical, but it is not the NVIDIA B200 paper implementation and
 does not claim official leaderboard equivalence.
 
+## How To Read Claim Boundaries
+
+Use this document as the source of truth for public wording. Other docs may say
+that an artifact is `canonical`, `diagnostic-only`, `provisional`, `deferred`,
+or `unavailable`; those labels mean:
+
+| Class | Meaning |
+| --- | --- |
+| `canonical` | Primary benchmark output. Today this means Trace JSONL. |
+| `diagnostic-only` | Useful for debugging, audit, or reproducibility, but not a correctness, timing, score, paper-parity, hardware-validation, or leaderboard claim by itself. |
+| `provisional` | Scoped prerelease or bounded-slice evidence that is useful within its recorded denominator and command context. |
+| `deferred` | A required claim or evidence path intentionally left for future work. |
+| `unavailable` | Evidence cannot currently be collected, such as CDNA4 validation without suitable hardware. |
+
+When a document says a sidecar is diagnostic-only, it does not need to repeat
+the full list of forbidden upgraded claims unless the local context adds a
+special restriction.
+
 ## What Can Be Claimed Today
 
 For the centralized v1.19 guide to evidence surfaces, generation commands, and
@@ -52,7 +70,9 @@ CDNA3, or CDNA4 validation.
 | Research-preview evidence | A curated benchmark slice was executed or audited under documented limits. | Slice definition, command transcript or expected commands, artifact list, pass/fail/skip/unavailable accounting, and known gaps. |
 | CDNA3/gfx942 infrastructure evidence | Real MI308X (`gfx942`) runs exercised the adapted pytest suite and full dataset validation path. | Archived environment details, pytest pass counts, dataset summary, per-problem traces, expected Quant NVFP4/MXFP4 skips, and documented timeout blockers. This is not full MI300X hardware validation because MI308X and MI300X have different hardware configurations despite sharing the `gfx942` code path. |
 
-Docker Matrix Entries may claim **container ROCm user-space validated on recorded host driver/devices** only; a Docker row is not native host ROCm validated without direct native-host validation evidence.
+Docker Matrix Entries may claim **container ROCm user-space validated on
+recorded host driver/devices** only. A Docker row is not native host ROCm
+validated without direct native-host validation evidence.
 
 For v1.25 engineering-prerelease support wording:
 

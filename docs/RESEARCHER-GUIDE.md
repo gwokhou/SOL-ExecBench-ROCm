@@ -7,13 +7,19 @@ how to avoid overstating results.
 
 ## Choose Your Path
 
-| Role | Start with | Primary artifacts |
+Start from the question you are trying to answer:
+
+| Question | Start with | Primary artifacts |
 | --- | --- | --- |
-| GPU kernel author | Run one local example, then adapt a per-problem solution metadata file. | Per-problem solution metadata JSON, trace JSONL, correctness/performance fields. |
-| compiler/backend researcher | Inspect solution schemas, staging, and native build paths. | `docs/solution.md`, `src/sol_execbench/driver/`, HIP/Triton examples. |
-| agent kernel-optimization researcher | Use the isolated harness and reward-hack checks as the execution boundary. | trace JSONL, `REWARD_HACK` traces, baseline comparisons. |
-| benchmark/reproducibility researcher | Use the curated slice, environment sidecars, profiling sidecars, static evidence sidecars, execution closure, v1.19 sidecar reports, and v1.20 evidence-quality reports. | `docs/curated_rocm_slice.md`, `docs/static_kernel_evidence.md`, `docs/v1_19_evidence_guide.md`, `docs/v1_20_evidence_quality_guide.md`, `docs/CLAIMS.md`, execution closure, paper denominator gaps, Matrix diagnostics, AMD bound sanity, consistency, stability, claim-upgrade, and trust summary. |
-| research preview reviewer | Start with the v1.26 research preview package, then inspect the bundle and readiness reports. | `docs/research_preview.md`, `docs/prerelease_artifact_bundle.md`, `docs/prerelease_readiness.md`, `docs/CLAIMS.md`. |
+| Did this kernel produce correct outputs and useful speedup on my AMD host? | Run one problem through `sol-execbench`, then inspect Trace JSONL. | Trace JSONL, correctness fields, latency, reference latency, environment fields. |
+| How do I add or adapt a kernel implementation? | Read `docs/solution.md`, then copy the closest example under `examples/` or `tests/sol_execbench/samples/`. | Solution JSON, staged source files, compile options, HIP/Triton examples. |
+| How does the harness stage and execute solutions? | Inspect `src/sol_execbench/driver/` and `src/sol_execbench/driver/templates/`. | Staging directory, generated driver, native build path, reward-hack traces. |
+| How reproducible is this dataset or slice result? | Run a bounded dataset batch with readiness and execution closure sidecars. | Trace JSONL, environment sidecars, execution closure, readiness, trust summaries. |
+| Can I review a public prerelease claim? | Start with `docs/research_preview.md`, then inspect artifact bundle and readiness outputs. | Prerelease bundle, readiness report, `docs/CLAIMS.md`, known-gap records. |
+
+These questions map to the common roles from earlier docs: GPU kernel author,
+compiler/backend researcher, agent kernel-optimization researcher,
+benchmark/reproducibility researcher, and research preview reviewer.
 
 ## First Run
 
@@ -30,22 +36,28 @@ Read the canonical trace first. It is the primary artifact. Derived reports and
 sidecars must not change trace JSONL semantics.
 
 For the v1.26 research preview, start with `docs/research_preview.md`. It maps
-methodology, benchmark scope, hardware scope, evidence surfaces, limitations,
-and representative commands to expected artifacts.
+methodology, scope, evidence surfaces, limitations, and representative commands
+to expected artifacts.
 
-For v1.19 evidence surfaces, continue with `docs/v1_19_evidence_guide.md`. It
-collects the CPU-safe command shapes and interpretation rules for execution
-closure, paper denominator reports, Matrix schema export, Matrix semantic diff,
-and AMD bound sanity. These reports have no full 235-problem paper validation,
-no upstream SOLAR parity, no score authority, no leaderboard readiness, no
-CDNA3-family validation, including MI300X, and no CDNA4 validation, no
-native-host ROCm Matrix validation, and no new-hardware validation.
+Use older evidence guides when you need their specific sidecars:
 
-For v1.20 evidence-quality review, continue with
-`docs/v1_20_evidence_quality_guide.md`. It covers consistency lint, evaluation
-stability, claim-upgrade rules, and trust summaries. These reports are
-sidecar-only and diagnostic; they do not create correctness, timing, score,
-paper-parity, native-host, new-hardware, or leaderboard authority.
+- `docs/static_kernel_evidence.md` covers diagnostic HIP/C++ build artifacts
+  collected with `--static-evidence auto`.
+- `docs/prerelease_artifact_bundle.md` covers the versioned public review
+  bundle.
+- `docs/prerelease_readiness.md` covers the readiness gate for missing
+  evidence, checksum drift, known gaps, and claim-boundary regressions.
+- `docs/v1_19_evidence_guide.md` covers execution closure, paper denominator
+  reports, Matrix schema export, Matrix semantic diff, and AMD bound sanity.
+- `docs/v1_20_evidence_quality_guide.md` covers consistency lint, evaluation
+  stability, claim-upgrade rules, and trust summaries.
+
+Those reports are sidecars and review aids. They do not replace canonical Trace
+JSONL or upgrade the project to paper parity, upstream SOLAR parity, score
+authority, leaderboard readiness, native-host validation, MI300X validation, or
+CDNA4 validation.
+For the older v1.19/v1.20 wording specifically, they provide no
+CDNA3-family validation, including MI300X, and no CDNA4 validation.
 
 ## Interpreting Artifacts
 

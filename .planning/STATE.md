@@ -135,6 +135,15 @@ Last activity: 2026-06-04 — Milestone v1.29 completed and archived
   prerelease checksums, avoiding redundant SOLAR sidecar rereads, and streaming
   workload prefix reads while preserving benchmark execution semantics.
 
+- Quick task 260607-ivd simplified README wording for developers and
+  researchers on 2026-06-07 by shortening dense prose, grouping the
+  documentation index, and preserving ROCm validation boundaries.
+
+- Quick task 260607-j8c improved README-linked documentation readability on
+  2026-06-07 by clarifying configuration/test/research entry points,
+  centralizing authority-class wording, reducing historical-log overload, and
+  preserving claim guardrails.
+
 ## Accumulated Context
 
 ### Decisions

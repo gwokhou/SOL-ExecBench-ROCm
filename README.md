@@ -2,20 +2,36 @@
 
 # SOL ExecBench for ROCm
 
-The project is an AMD ROCm-focused adaptation of SOL ExecBench for ROCm ecosystem researchers and low-level GPU developers evaluating LLM-generated kernels on AMD hardware. It preserves the original benchmark shape where practical while replacing CUDA/NVIDIA execution paths with ROCm, HIP, Triton ROCm, ROCm library categories, AMD-oriented evidence tooling, and explicit validation-boundary guardrails.
+This repository ports SOL ExecBench to the AMD ROCm stack. It is meant for
+researchers and low-level GPU developers who want to evaluate LLM-generated
+kernels on AMD hardware while staying close to the original SOL ExecBench
+benchmark shape.
 
-Beyond backend adaptation, this repository adds infrastructure for ROCm benchmark research and deep development:
+Beyond the required CUDA-to-ROCm adaptation, this port adds several research and
+engineering features that make AMD-side evaluation easier to audit:
 
-- Trace-adjacent evidence for environment, `rocprofv3`, static-kernel, toolchain routing, and ROCm compatibility checks.
-- Dataset accounting for ready subsets, execution closure, paper denominator, parity gaps, consistency, stability, and trust summaries.
-- AMD score and bound helpers separated from canonical Trace JSONL, with explicit unsupported and inexact cases.
-- Release gates for checksums, required artifacts, known gaps, forbidden claims, MI308X/gfx942 infrastructure evidence, MI300X validation boundaries under CDNA3, unavailable CDNA4 validation, and provenance.
-- Machine-readable provenance classes for upstream-retained, derivative, and independent ROCm files.
+- ROCm-native solution categories for HIP/C++, Triton ROCm, hipBLAS, MIOpen,
+  Composable Kernel, and rocWMMA.
+- AMD-oriented evidence collection for runtime environment, toolchain routing,
+  `rocprofv3`, static kernel artifacts, and ROCm compatibility checks.
+- Dataset readiness and execution accounting, including ready subsets, closure
+  reports, parity gaps, consistency checks, stability summaries, and trust
+  summaries.
+- AMD score and bound helpers that stay separate from canonical Trace JSONL, so
+  benchmark traces and derived ROCm analysis remain distinct.
+- Local migration workflows for SOL-ExecBench and FlashInfer Trace inputs, with
+  manifest and provenance metadata for auditable dataset handling.
+- Release and claim guardrails for checksums, required artifacts, known gaps,
+  unsupported cases, provenance classes, and forbidden public claims.
 
-These additions are scoped as ROCm-port, engineering-prerelease, or research-preview evidence; they do not imply paper-level parity, upstream SOLAR equivalence, or leaderboard authority.
-Current CDNA3 evidence is MI308X (`gfx942`) validation infrastructure evidence, not MI300X validation. MI300X and MI308X are sibling GPU products under the CDNA3 architecture family and share `gfx942`, but they must not be treated as interchangeable hardware-validation claims. NVFP4/MXFP4 Quant ROCm adaptation and hardware validation remain deferred until suitable CDNA4-class hardware is available.
+The goal is to make ROCm benchmark runs easier to reproduce, inspect, and
+compare without presenting the port as a new leaderboard authority or a
+paper-level parity result.
 
-This project is independent and is not endorsed by NVIDIA or AMD. See [Provenance Policy](docs/provenance.md), [Compliance](docs/compliance.md), and [Claims](docs/CLAIMS.md) for upstream attribution, licensing, and validation boundaries.
+This project is independent and is not endorsed by NVIDIA or AMD. See
+[Provenance Policy](docs/provenance.md), [Compliance](docs/compliance.md), and
+[Claims](docs/CLAIMS.md) for upstream attribution, licensing, validation
+boundaries, and hardware-specific claim limits.
 
 ## Requirements
 
@@ -26,7 +42,11 @@ This project is independent and is not endorsed by NVIDIA or AMD. See [Provenanc
 - ROCm 7.x user-space tooling for native HIP/C++ and profiler paths
 - Docker, when using the provided ROCm container workflow
 
-On Linux x86_64, the project dependency configuration resolves PyTorch `2.10.0+rocm7.1`, torchvision `0.25.0+rocm7.1`, and `triton-rocm==3.6.0`. Non-Linux and non-x86_64 environments use the non-ROCm PyTorch wheels for CPU-safe development tasks. The Docker target manifest records ROCm 7.0.2, 7.1.1, and 7.2.0 container targets for compatibility and evidence workflows.
+On Linux x86_64, dependencies resolve to PyTorch `2.10.0+rocm7.1`,
+torchvision `0.25.0+rocm7.1`, and `triton-rocm==3.6.0`. Other platforms use
+non-ROCm PyTorch wheels so CPU-safe development tasks still work. The Docker
+target manifest covers ROCm 7.0.2, 7.1.1, and 7.2.0 containers for compatibility
+and evidence workflows.
 
 ## Installation
 
@@ -50,14 +70,14 @@ uv run --with "huggingface-hub[cli]" ./scripts/download_data.sh
 
 ## Quick Start
 
-Run a small included PyTorch problem:
+Run one included PyTorch problem:
 
 ```bash
 uv run sol-execbench examples/pytorch/gemma3_swiglu \
   --solution examples/pytorch/gemma3_swiglu/solution_python.json
 ```
 
-Run a Triton ROCm sample:
+Run one Triton ROCm problem:
 
 ```bash
 uv run sol-execbench examples/triton/rmsnorm \
@@ -78,8 +98,7 @@ Run a small downloaded dataset batch:
 uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark --limit 5
 ```
 
-Rebuild CPU/I/O-only derived reports from existing traces without rerunning GPU
-evaluation:
+Rebuild derived reports from existing traces without rerunning GPU evaluation:
 
 ```bash
 uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
@@ -89,7 +108,7 @@ uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
 ```
 
 Migrate locally downloaded SOL-ExecBench or FlashInfer Trace inputs into the
-repository benchmark layout without redistributing restricted source data:
+repository benchmark layout:
 
 ```bash
 uv run sol-execbench dataset migrate-sol data/SOL-ExecBench/source data/SOL-ExecBench/benchmark \
@@ -98,7 +117,10 @@ uv run sol-execbench dataset migrate-flashinfer data/flashinfer-trace/source dat
   --manifest out/flashinfer-migration-manifest.json
 ```
 
-For auditable ready-subset dataset runs, pass closure and evidence sidecars:
+These commands organize local inputs. They do not redistribute restricted source
+data.
+
+For auditable ready-subset dataset runs, include closure and evidence sidecars:
 
 ```bash
 uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
@@ -140,11 +162,18 @@ Common evaluator options:
 | `--static-evidence auto` | Collect optional diagnostic static kernel evidence for native builds. |
 | `-v`, `--verbose` | Show subprocess output and staging details. |
 
-If evaluation exits without parseable trace JSONL, the CLI writes a bounded diagnostic-only no-trace sidecar next to `--output`, in the kept staging directory, or in the system temp directory. This sidecar records stdout/stderr tails and line counts; it is not canonical trace JSONL.
+If evaluation exits without parseable trace JSONL, the CLI writes a bounded
+diagnostic-only no-trace sidecar next to `--output`, in the kept staging
+directory, or in the system temp directory. This sidecar records stdout/stderr
+tails and line counts. It is not canonical trace JSONL.
 
 ### Security Boundary
 
-SOL ExecBench stages and executes submitted solution code in a local subprocess, with static source review and runtime reward-hack checks before and during evaluation. These guardrails are not a hardened sandbox and are not a multi-tenant isolation boundary. Run untrusted submissions only inside an appropriate container, VM, or isolated ROCm host that you control.
+SOL ExecBench stages and runs submitted solution code in a local subprocess. It
+uses static source review and runtime reward-hack checks, but these checks are
+not a hardened sandbox and are not a multi-tenant isolation boundary. Run
+untrusted submissions only inside a container, VM, or isolated ROCm host that
+you control.
 
 Metadata and diagnostic subcommands:
 
@@ -166,7 +195,9 @@ uv run sol-execbench-baseline \
   --format text
 ```
 
-Baseline comparison accepts repeated `--baseline` inputs, `--format text|json`, `--output`, `--win-pct`, `--parity-pct`, and `--amd-native-claim` for guarded AMD-native reporting.
+Baseline comparison accepts repeated `--baseline` inputs, `--format text|json`,
+`--output`, `--win-pct`, `--parity-pct`, and `--amd-native-claim` for guarded
+AMD-native reporting.
 
 ## Supported Solution Categories
 
@@ -182,40 +213,100 @@ The ROCm schema accepts Python/Triton categories and native ROCm categories:
 | `ck` | Native ROCm implementation using Composable Kernel. |
 | `rocwmma` | Native ROCm implementation using rocWMMA. |
 
-See [ROCm library examples](docs/rocm_libraries.md) for library readiness, example coverage, and diagnostic boundaries.
-CDNA3 MI308X (`gfx942`) validation infrastructure evidence exists, including exercised adapted-suite and dataset paths with documented blockers, but this is not full MI300X hardware validation. MI300X and MI308X are sibling CDNA3 GPU products that share `gfx942`; full MI300X validation remains blocked until timeout, clock-lock, timing, score, FP8, low-precision, and exact-hardware evidence boundaries are resolved.
-NVFP4/MXFP4 Quant ROCm adaptation and hardware validation are deferred until CDNA4-class hardware is available. CDNA3 runs should treat those problems as documented hardware-unsupported skips, not CPU or dequantized benchmark validation.
-CDNA4 validation is also deferred because suitable hardware is unavailable.
+See [ROCm library examples](docs/rocm_libraries.md) for library readiness,
+example coverage, and diagnostic boundaries.
 
-Legacy CUDA/NVIDIA schema values such as `cuda_cpp`, `cublas`, `cudnn`, `cutlass`, `cute_dsl`, and `cutile` are rejected with ROCm migration guidance.
+Validation status:
+
+- CDNA3 MI308X (`gfx942`) infrastructure evidence exists for adapted-suite and
+  dataset paths, with documented blockers.
+- This is not full MI300X hardware validation.
+- Full MI300X validation remains blocked until timeout, clock-lock, timing,
+  score, FP8, low-precision, and exact-hardware evidence boundaries are
+  resolved.
+- NVFP4/MXFP4 Quant ROCm adaptation and hardware validation are deferred until
+  CDNA4-class hardware is available.
+- CDNA3 runs should treat those problems as documented hardware-unsupported
+  skips, not CPU or dequantized benchmark validation.
+- CDNA4 validation is deferred because suitable hardware is unavailable.
+
+Legacy CUDA/NVIDIA schema values such as `cuda_cpp`, `cublas`, `cudnn`,
+`cutlass`, `cute_dsl`, and `cutile` are rejected with ROCm migration guidance.
+
+## Version Names
+
+The repository uses a few different version labels:
+
+- The Python package version comes from `pyproject.toml`.
+- Milestone labels such as `v1.25` or `v1.26` describe project planning and
+  release-readiness work.
+- Prerelease tags such as `v1.26.0-rc1` describe a public review package.
+
+When reading release docs, treat milestone and prerelease labels as evidence
+context. They do not change the benchmark schema or upgrade validation claims
+unless the cited artifacts and `docs/CLAIMS.md` say so.
 
 ## Documentation
 
-- [Provenance Policy](docs/provenance.md): upstream attribution, project-owned ROCm work, SPDX header policy, ordinary-commit history cleanup, and non-endorsement boundaries.
-- [Compliance](docs/compliance.md): Apache-2.0 license, third-party dependencies, unsupported NVIDIA runtime features, and known gaps.
-- [v1.25 Engineering Prerelease Notes](docs/v1_25_release_notes.md): shipped capability, validation evidence, known limitations, and deferred claims.
-- [v1.25 Prerelease Checklist](docs/v1_25_prerelease_checklist.md): maintainer checklist from clean tree to tagged release candidate.
-- [Prerelease Artifact Bundle](docs/prerelease_artifact_bundle.md): versioned prerelease artifact bundle generation and authority classes.
-- [Prerelease Readiness Gates](docs/prerelease_readiness.md): prerelease gate for required artifacts, checksums, claim boundaries, provenance policy, and known gaps.
-- [Research Preview](docs/research_preview.md): methodology, evidence surfaces, representative commands, and non-claims.
-- [Public Prerelease Guide](docs/public_prerelease.md): public release-page checklist and publishing wording.
-- [Getting Started](docs/GETTING-STARTED.md): prerequisites, installation, first run, and setup issues.
-- [Architecture](docs/ARCHITECTURE.md): package layers, data flow, subprocess isolation, and ROCm boundaries.
-- [Development](docs/DEVELOPMENT.md): local setup, coding style, source areas, and PR process.
-- [Testing](docs/TESTING.md): pytest commands, markers, CI, and hardware-sensitive checks.
-- [Configuration](docs/CONFIGURATION.md): CLI flags, benchmark config, environment variables, and Docker settings.
-- [Analysis](docs/analysis.md): trace analysis, dataset closure, failure-mode, and sharding semantics.
-- [Researcher Guide](docs/RESEARCHER-GUIDE.md): workflows for kernel, compiler/backend, agent, and reproducibility researchers.
-- [Cookbook](docs/COOKBOOK.md): task-oriented commands for common benchmark workflows.
-- [Dataset provenance and local migration](docs/COOKBOOK.md): local-only SOL-ExecBench and FlashInfer Trace migration, manifest, readiness, and ready-subset workflows.
-- [ROCm Notes](docs/rocm.md): host, Docker, and validation notes.
-- [Claims](docs/CLAIMS.md): support, evidence, and forbidden claim boundaries.
-- [ROCm Timing](docs/rocm_timing.md): HIP event timing and optional profiler evidence.
-- [ROCm Toolchain Routing](docs/rocm_toolchain_routing.md): evidence tool selection and claim boundaries.
-- [Static Kernel Evidence](docs/static_kernel_evidence.md): diagnostic static artifact sidecars.
-- [Original Parity](docs/original_parity.md): CUDA-to-ROCm parity boundaries and deferred claims.
+Start here:
 
-For first-run troubleshooting, start with [Getting Started](docs/GETTING-STARTED.md) and then use [Configuration](docs/CONFIGURATION.md) for no-trace diagnostics, sidecar paths, Docker settings, and environment variables.
+- [Getting Started](docs/GETTING-STARTED.md): prerequisites, installation, first
+  run, and setup issues.
+- [Cookbook](docs/COOKBOOK.md): task-oriented commands for common benchmark
+  workflows.
+- [Researcher Guide](docs/RESEARCHER-GUIDE.md): workflows for kernel,
+  compiler/backend, agent, and reproducibility researchers.
+- [Configuration](docs/CONFIGURATION.md): CLI flags, benchmark config,
+  environment variables, Docker settings, and no-trace diagnostics.
+
+Project and development references:
+
+- [Architecture](docs/ARCHITECTURE.md): package layers, data flow, subprocess
+  isolation, and ROCm boundaries.
+- [Development](docs/DEVELOPMENT.md): local setup, coding style, source areas,
+  and PR process.
+- [Testing](docs/TESTING.md): pytest commands, markers, CI, and
+  hardware-sensitive checks.
+- [Analysis](docs/analysis.md): trace analysis, dataset closure, failure modes,
+  and sharding.
+- [ROCm Notes](docs/rocm.md): host, Docker, and validation notes.
+
+Validation, release, and provenance:
+
+- [Claims](docs/CLAIMS.md): support, evidence, and forbidden claim boundaries.
+- [Provenance Policy](docs/provenance.md): upstream attribution, project-owned
+  ROCm work, SPDX policy, history cleanup, and non-endorsement boundaries.
+- [Compliance](docs/compliance.md): Apache-2.0 license, dependencies,
+  unsupported NVIDIA runtime features, and known gaps.
+- [Research Preview](docs/research_preview.md): methodology, evidence surfaces,
+  representative commands, and non-claims.
+- [v1.25 Engineering Prerelease Notes](docs/v1_25_release_notes.md): shipped
+  capability, validation evidence, known limitations, and deferred claims.
+- [v1.25 Prerelease Checklist](docs/v1_25_prerelease_checklist.md): maintainer
+  checklist from clean tree to tagged release candidate.
+- [Prerelease Artifact Bundle](docs/prerelease_artifact_bundle.md): prerelease
+  artifact bundle generation and authority classes.
+- [Prerelease Readiness Gates](docs/prerelease_readiness.md): required
+  artifacts, checksums, claim boundaries, provenance, and known gaps.
+- [Public Prerelease Guide](docs/public_prerelease.md): release-page checklist
+  and publishing wording.
+
+ROCm evidence details:
+
+- [ROCm Timing](docs/rocm_timing.md): HIP event timing and optional profiler
+  evidence.
+- [ROCm Toolchain Routing](docs/rocm_toolchain_routing.md): evidence tool
+  selection and claim boundaries.
+- [Static Kernel Evidence](docs/static_kernel_evidence.md): diagnostic static
+  artifact sidecars.
+- [Original Parity](docs/original_parity.md): CUDA-to-ROCm parity boundaries
+  and deferred claims.
+- [Dataset provenance and local migration](docs/COOKBOOK.md): local-only
+  SOL-ExecBench and FlashInfer Trace migration workflows.
+
+For first-run troubleshooting, start with [Getting Started](docs/GETTING-STARTED.md)
+and then use [Configuration](docs/CONFIGURATION.md) for no-trace diagnostics,
+sidecar paths, Docker settings, and environment variables.
 
 Schema-specific references:
 
@@ -234,7 +325,9 @@ uv run ty check
 uv run pytest tests/
 ```
 
-GPU-sensitive checks use pytest markers such as `requires_rocm`, `requires_rocm_dev`, `requires_rdna4`, `requires_cdna3`, `requires_ck`, `requires_rocwmma`, and `timing_serial`.
+GPU-sensitive checks use pytest markers such as `requires_rocm`,
+`requires_rocm_dev`, `requires_rdna4`, `requires_cdna3`, `requires_ck`,
+`requires_rocwmma`, and `timing_serial`.
 
 Focused CPU-safe checks for provenance and prerelease guardrails:
 
@@ -258,7 +351,9 @@ uv run pytest \
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Contributions should start from an approved GitHub issue, keep pull requests focused, include tests and documentation for public behavior changes, and use DCO-signed commits.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Contributions should start from an
+approved GitHub issue, keep pull requests focused, include tests and
+documentation for public behavior changes, and use DCO-signed commits.
 
 ## License
 

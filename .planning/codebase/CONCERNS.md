@@ -28,6 +28,12 @@ semantics meet untrusted code, real GPU hardware, and derived evidence:
   assets come from NVIDIA SOL-ExecBench and FlashInfer Trace. The repository has
   policy checks, but generated/local artifact boundaries need continued care.
 
+Concern status vocabulary from prior milestones is still active: code-actionable
+items may be marked `Narrowed` after helper extraction or guardrail coverage,
+while paper-scale validation, hosted authority, hard sandboxing, and
+hardware-validation authority remain `Externally blocked/deferred` until the
+required external evidence exists.
+
 ## Security And Isolation Concerns
 
 ### User Code Execution Is Inherently Unsafe
@@ -187,6 +193,11 @@ Risk:
 
 `.planning/quick/260604-cdna3-gfx942-validation-attempt-record/KNOWN_ISSUES.md`
 records active CDNA3/gfx942 issues from a full validation artifact:
+
+CDNA3-family hardware-validation claims require complete archived evidence.
+Markers, skip behavior, MI308X/gfx942 infrastructure evidence, and readiness
+documentation do not by themselves authorize MI300X benchmark-grade validation
+claims.
 
 - 209 problems total.
 - 170 OK and 39 FAIL at validation summary level.
