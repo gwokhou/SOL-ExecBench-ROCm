@@ -27,6 +27,8 @@ class ProfilerTimingEvidenceSummary(BaseModel):
     activity_domain: str | None = None
     csv_path: str | None = None
     kernel_duration_ms: float | None = None
+    kernel_activity_rows: int = 0
+    full_workload_coverage: bool = True
     fallback_reason: str | None = None
 
 
@@ -248,11 +250,7 @@ def _problem_status(
     readiness_status: str,
     evidence: ProfilerTimingEvidenceSummary | None,
 ) -> str:
-    if (
-        evidence is not None
-        and evidence.profiler_collected
-        and evidence.backend == "rocprofv3"
-    ):
+    if evidence is not None and _has_profiler_backed_kernel_activity(evidence):
         return "profiler_backed"
     if evidence is not None:
         return "timing_fallback"
@@ -300,10 +298,42 @@ def _load_timing_evidence_summary(path: Path) -> ProfilerTimingEvidenceSummary:
         activity_domain=str(activity_domain) if activity_domain is not None else None,
         csv_path=str(payload["csv_path"]) if payload.get("csv_path") else None,
         kernel_duration_ms=_float_or_none(evidence.get("kernel_duration_ms")),
+        kernel_activity_rows=_kernel_activity_rows(evidence),
+        full_workload_coverage=_full_workload_coverage(payload),
         fallback_reason=str(selection["reason"])
         if selection.get("reason") is not None
         else None,
     )
+
+
+def _has_profiler_backed_kernel_activity(
+    evidence: ProfilerTimingEvidenceSummary,
+) -> bool:
+    return (
+        evidence.profiler_collected
+        and evidence.backend == "rocprofv3"
+        and evidence.kernel_activity_rows > 0
+        and evidence.full_workload_coverage
+    )
+
+
+def _full_workload_coverage(payload: dict[str, Any]) -> bool:
+    metadata = payload.get("replacement_metadata")
+    if not isinstance(metadata, dict):
+        return True
+    return metadata.get("full_workload_coverage") is True
+
+
+def _kernel_activity_rows(evidence: dict[str, Any]) -> int:
+    parsed_rows = evidence.get("parsed_rows")
+    if isinstance(parsed_rows, list):
+        return sum(
+            1
+            for row in parsed_rows
+            if isinstance(row, dict) and row.get("is_kernel_activity") is True
+        )
+    duration = _float_or_none(evidence.get("kernel_duration_ms"))
+    return 1 if duration is not None and duration > 0 else 0
 
 
 def _float_or_none(value: Any) -> float | None:

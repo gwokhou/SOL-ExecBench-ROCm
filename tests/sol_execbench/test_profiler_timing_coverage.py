@@ -162,6 +162,44 @@ def test_profiler_timing_coverage_requires_expected_denominator(tmp_path):
     assert report.claim_boundary.full_profiler_backed_timing_coverage is False
 
 
+def test_profiler_timing_coverage_rejects_partial_replacement_sidecar(tmp_path):
+    dataset_root = tmp_path / "dataset"
+    _write_problem(dataset_root, "L1", "partial")
+    timing_dir = tmp_path / "timing"
+    _write_timing(
+        timing_dir / "L1" / "partial.timing.json",
+        {
+            "profiler_collected": True,
+            "selection": {"policy": {"backend": "rocprofv3"}},
+            "evidence": {
+                "backend": "rocprofv3",
+                "activity_domain": "kernel_activity",
+                "kernel_duration_ms": 1.25,
+                "parsed_rows": [{"is_kernel_activity": True}],
+            },
+            "replacement_metadata": {
+                "profiled_workload_count": 1,
+                "expected_workload_count": 2,
+                "full_workload_coverage": False,
+            },
+        },
+    )
+    inventory = build_dataset_inventory(dataset_root, categories=("L1",))
+    readiness = classify_rocm_readiness(inventory, dataset_root=dataset_root)
+
+    report = build_profiler_timing_coverage_report(
+        readiness,
+        dataset_root=dataset_root,
+        timing_evidence_dirs=(timing_dir,),
+        created_at="2026-06-08T00:00:00Z",
+    )
+
+    assert report.totals.profiler_backed_problems == 0
+    assert report.totals.fallback_timing_problems == 1
+    assert report.problems[0].evidence is not None
+    assert report.problems[0].evidence.full_workload_coverage is False
+
+
 def test_profiler_timing_coverage_markdown_summarizes_claim_boundary(tmp_path):
     dataset_root = tmp_path / "dataset"
     _write_problem(dataset_root, "L1", "only")

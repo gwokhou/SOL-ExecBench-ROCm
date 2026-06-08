@@ -2,8 +2,7 @@
 
 ## Milestones
 
-- Active **v1.32 RDNA4 Profiler Timing Coverage Closure** - Phase 148
-  completed; expanded timing-batch phase pending.
+- Active **v1.32 RDNA4 Profiler Timing Coverage Closure** - Phases 148-149.
   See `.planning/milestones/v1.32-ROADMAP.md`.
 - Complete **v1.31 RDNA4 Follow-Up Evidence Hardening** - Phases 142-147
   (shipped 2026-06-08). See `.planning/milestones/v1.31-ROADMAP.md`.
@@ -23,12 +22,11 @@
 
 ## Current Position
 
-**Status:** v1.32 active. Phase 148 completed; next expanded timing-batch
-phase pending.
+**Status:** v1.32 active. Phase 149 in progress.
 
 ### Phase 148: RDNA4 Profiler-Backed Timing Coverage Closure
 
-**Status:** Completed 2026-06-08.
+**Status:** Complete
 
 **Goal:** Account for profiler-backed `rocprofv3` timing coverage across the
 full 235-problem denominator before attempting expanded RDNA4 timing batches.
@@ -42,6 +40,23 @@ full 235-problem denominator before attempting expanded RDNA4 timing batches.
   timing sidecars.
 - CPU-safe tests preserving the claim boundary that fallback timing is not
   profiler-backed coverage.
+
+### Phase 149: RDNA4 Profiler-Backed Timing Batch Replacement
+
+**Status:** Blocked 2026-06-08.
+
+**Goal:** Replace the 121 RDNA4 fallback timing sidecars with explicit
+`rocprofv3` profiler-backed kernel activity timing sidecars where the current
+coverage ledger marks problems as `timing_fallback`.
+
+**Requirements:** RDNA4-PROF-COV-03, RDNA4-PROF-COV-04
+
+**Deliverables:**
+- Batch runner that profiles staged `eval_driver.py` directly for fallback
+  timing problems and writes replacement timing sidecars.
+- Resume/limit controls so long RDNA4 timing jobs can be run incrementally.
+- CPU-safe tests covering target selection, forced profiler policy, and
+  no-fallback replacement semantics.
 
 ## Active Guardrails
 
