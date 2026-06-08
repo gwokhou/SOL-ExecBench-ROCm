@@ -7,15 +7,19 @@ from sol_execbench.core.diagnostics import (
     MI300X_FP8_READINESS,
     MI300X_REQUIRED_ARTIFACTS,
     MI300X_VALIDATION_RESULT_CATEGORIES,
+    RDNA4_REQUIRED_ARTIFACTS,
+    RDNA4_VALIDATION_RESULT_CATEGORIES,
     ROCM_LIBRARY_SPECS,
     ProfilerBackend,
     StageDiagnostic,
     SolExecBenchError,
+    can_mark_rdna4_validation_upgraded,
     can_mark_mi300x_hardware_validated,
     cdna3_validation_readiness,
     classify_gfx,
     local_gfx_target,
     mi300x_validation_claim_blockers,
+    rdna4_validation_claim_blockers,
     rocm_library_diagnostics,
     rocm_library_readiness,
     rocm_tool_diagnostics,
@@ -226,3 +230,76 @@ def test_mi300x_validation_claim_allows_complete_evidence():
     assert "timing_instability" in MI300X_VALIDATION_RESULT_CATEGORIES
     assert "MI300X, as a CDNA 3 GPU, can validate FP8" in MI300X_FP8_READINESS[0]
     assert "NVFP4/MXFP4 validation is deferred" in MI300X_FP8_READINESS[1]
+
+
+def test_rdna4_validation_claim_blocks_current_bounded_v1_31_shape():
+    evidence = {
+        "gpu_name": "AMD Radeon RX 9060 XT",
+        "gfx": "gfx1200",
+        "rocm_version": "7.1.1",
+        "clocks_locked": True,
+        "profiler_backed_timing": False,
+        "full_paper_problem_count": 121,
+        "failed_workload_count": 146,
+        "derived_sidecar_blocker_count": 7,
+        "artifacts": list(RDNA4_REQUIRED_ARTIFACTS),
+        "result_categories": list(RDNA4_VALIDATION_RESULT_CATEGORIES),
+    }
+
+    blockers = rdna4_validation_claim_blockers(evidence)
+
+    assert can_mark_rdna4_validation_upgraded(evidence) is False
+    assert (
+        "profiler-backed rocprofv3 kernel activity timing must be recorded" in blockers
+    )
+    assert "full paper denominator must account for 235 problems" in blockers
+    assert "failed workload count must be zero for claim upgrade" in blockers
+    assert "derived sidecar blocker count must be zero for claim upgrade" in blockers
+    assert not any("missing validation artifacts" in blocker for blocker in blockers)
+    assert not any(
+        "missing validation result categories" in blocker for blocker in blockers
+    )
+
+
+def test_rdna4_validation_claim_requires_rdna4_target_and_artifacts():
+    blockers = rdna4_validation_claim_blockers(
+        {
+            "gpu_name": "",
+            "gfx": "gfx942",
+            "rocm_version": "",
+            "clocks_locked": False,
+            "profiler_backed_timing": False,
+            "artifacts": ["environment_sidecar"],
+            "result_categories": ["attempted_passed"],
+        }
+    )
+
+    assert "gpu_name must be recorded" in blockers
+    assert "gfx must be an RDNA 4 gfx12* target" in blockers
+    assert "rocm_version must be recorded" in blockers
+    assert "failed_workload_count must be recorded" in blockers
+    assert "derived_sidecar_blocker_count must be recorded" in blockers
+    assert any("missing validation artifacts" in blocker for blocker in blockers)
+    assert any(
+        "missing validation result categories" in blocker for blocker in blockers
+    )
+
+
+def test_rdna4_validation_claim_allows_complete_hypothetical_evidence():
+    evidence = {
+        "gpu_name": "AMD Radeon RX 9060 XT",
+        "gfx": "gfx1200",
+        "rocm_version": "7.1.1",
+        "clocks_locked": True,
+        "profiler_backed_timing": True,
+        "full_paper_problem_count": 235,
+        "failed_workload_count": 0,
+        "derived_sidecar_blocker_count": 0,
+        "artifacts": list(RDNA4_REQUIRED_ARTIFACTS),
+        "result_categories": list(RDNA4_VALIDATION_RESULT_CATEGORIES),
+    }
+
+    assert rdna4_validation_claim_blockers(evidence) == ()
+    assert can_mark_rdna4_validation_upgraded(evidence) is True
+    assert "profiler_backed_timing" in RDNA4_REQUIRED_ARTIFACTS
+    assert "derived_sidecar_memory_blockers" in RDNA4_VALIDATION_RESULT_CATEGORIES
