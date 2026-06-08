@@ -128,6 +128,88 @@ def test_batch_selects_fallback_targets_and_honors_resume(tmp_path):
     assert [target.problem_id for target in targets] == ["L1/two"]
 
 
+def test_batch_resume_skips_classified_partial_replacement(tmp_path):
+    dataset_root = tmp_path / "dataset"
+    source_timing = tmp_path / "fallback"
+    replacement = tmp_path / "replacement"
+    _write_problem(dataset_root, "L1", "one")
+    _write_fallback_timing(source_timing, "L1", "one")
+    existing = replacement / "L1" / "one.timing.json"
+    existing.parent.mkdir(parents=True)
+    existing.write_text(
+        json.dumps(
+            {
+                "profiler_collected": True,
+                "selection": {"policy": {"backend": "rocprofv3"}},
+                "evidence": {
+                    "backend": "rocprofv3",
+                    "parsed_rows": [{"is_kernel_activity": True}],
+                },
+                "replacement_metadata": {
+                    "replacement_status": "partial_profiler_backed",
+                    "profiled_workload_count": 1,
+                    "expected_workload_count": 2,
+                    "trace_status_counts": {"INVALID_REFERENCE": 1, "PASSED": 1},
+                    "full_workload_coverage": False,
+                    "workload_limit_applied": None,
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    coverage = _coverage(dataset_root, source_timing, replacement)
+
+    targets = batch.select_fallback_targets(
+        coverage,
+        replacement_timing_dir=replacement,
+        resume=True,
+    )
+
+    assert targets == []
+
+
+def test_batch_resume_keeps_workload_limited_partial_replacement(tmp_path):
+    dataset_root = tmp_path / "dataset"
+    source_timing = tmp_path / "fallback"
+    replacement = tmp_path / "replacement"
+    _write_problem(dataset_root, "L1", "one")
+    _write_fallback_timing(source_timing, "L1", "one")
+    existing = replacement / "L1" / "one.timing.json"
+    existing.parent.mkdir(parents=True)
+    existing.write_text(
+        json.dumps(
+            {
+                "profiler_collected": True,
+                "selection": {"policy": {"backend": "rocprofv3"}},
+                "evidence": {
+                    "backend": "rocprofv3",
+                    "parsed_rows": [{"is_kernel_activity": True}],
+                },
+                "replacement_metadata": {
+                    "replacement_status": "partial_profiler_backed",
+                    "profiled_workload_count": 1,
+                    "expected_workload_count": 2,
+                    "trace_status_counts": {"PASSED": 1},
+                    "full_workload_coverage": False,
+                    "workload_limit_applied": 1,
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    coverage = _coverage(dataset_root, source_timing, replacement)
+
+    targets = batch.select_fallback_targets(
+        coverage,
+        replacement_timing_dir=replacement,
+        resume=True,
+    )
+
+    assert [target.problem_id for target in targets] == ["L1/one"]
+
+
 def test_batch_writes_profiler_backed_replacement_sidecar(tmp_path):
     dataset_root = tmp_path / "dataset"
     source_timing = tmp_path / "fallback"
@@ -216,7 +298,7 @@ def test_batch_rejects_replacement_when_trace_status_is_not_passed(tmp_path):
         runner=runner,
     )
 
-    assert status == 1
+    assert status == 0
     sidecar = json.loads(
         (replacement / "L1" / "one.timing.json").read_text(encoding="utf-8")
     )
@@ -224,7 +306,8 @@ def test_batch_rejects_replacement_when_trace_status_is_not_passed(tmp_path):
     assert sidecar["replacement_metadata"]["all_workloads_passed"] is False
     summary = json.loads((output_dir / "batch-summary.json").read_text())
     assert summary["succeeded"] == 0
-    assert summary["failed"] == 1
+    assert summary["partial_profiler_backed"] == 1
+    assert summary["failed"] == 0
     assert (
         summary["results"][0]["fallback_reason"]
         == "replacement did not produce PASSED traces for every workload"

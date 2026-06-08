@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.32
 milestone_name: RDNA4 Profiler Timing Coverage Closure
-status: Active milestone, phase 149 blocked
-stopped_at: Phase 149 blocked on full-problem profiler replacement OOM.
-last_updated: "2026-06-08T08:25:00.000Z"
-last_activity: 2026-06-08 — Phase 149 runner added; full replacement blocked by first target INVALID_REFERENCE/OOM
+status: Active milestone, phase 150 complete
+stopped_at: Phase 150 complete; Phase 149 full replacement remains blocked.
+last_updated: "2026-06-08T09:05:00.000Z"
+last_activity: 2026-06-08 — Phase 150 classified the first real RDNA4 profiler replacement blocker as partial profiler-backed
 progress:
-  total_phases: 2
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 1
-  percent: 50
+  total_phases: 3
+  completed_phases: 2
+  total_plans: 3
+  completed_plans: 2
+  percent: 67
 ---
 
 # Project State
@@ -27,10 +27,10 @@ ExecBench.
 
 ## Current Position
 
-Phase: 149 — RDNA4 profiler-backed timing batch replacement
-Plan: 149-01
-Status: Blocked
-Last activity: 2026-06-08 — Phase 149 runner added; full replacement blocked by first target INVALID_REFERENCE/OOM
+Phase: 150 — RDNA4 profiler replacement classification
+Plan: 150-01
+Status: Complete
+Last activity: 2026-06-08 — Phase 150 classified the first real RDNA4 profiler replacement blocker as partial profiler-backed
 
 ## Recent Trend
 
@@ -201,6 +201,15 @@ Last activity: 2026-06-08 — Phase 149 runner added; full replacement blocked b
   keeps timing non-authoritative, and prevents paper-parity, upstream SOLAR,
   NVIDIA B200, leaderboard, CDNA3/MI300X, or CDNA4 claim upgrades.
 
+- Phase 149 blocked on 2026-06-08 after its first real full-problem
+  replacement attempt collected `rocprofv3` kernel rows but produced 19
+  `PASSED` traces and 1 `INVALID_REFERENCE` trace due to HIP OOM on the
+  16 GiB RDNA4 host.
+
+- Phase 150 started on 2026-06-08 to classify replacement attempts as full,
+  partial, or blocked while preserving the rule that only complete
+  profiler-backed sidecars count toward full timing coverage.
+
 ## Accumulated Context
 
 ### Decisions
@@ -250,6 +259,11 @@ Last activity: 2026-06-08 — Phase 149 runner added; full replacement blocked b
 
 - RDNA4 timing remains non-authoritative until clock-lock/reset coverage and
   profiler-backed timing collection are rerun.
+
+- The full Phase 149 replacement objective remains blocked. Phase 150 may
+  reduce the opaque fallback bucket by classifying partial and blocked
+  replacement attempts, but it must not count those attempts as complete
+  `profiler_backed` timing coverage.
 
 ### Quick Tasks Completed
 
