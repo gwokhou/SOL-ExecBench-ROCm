@@ -363,6 +363,38 @@ def test_live_collection_prefers_kernel_trace_csv(tmp_path):
     assert result.evidence.kernel_duration_ms == 0.007
 
 
+def test_live_collection_rejects_kernel_policy_without_kernel_rows(tmp_path):
+    def runner(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
+        (tmp_path / "timing_agent_info.csv").write_text("Name,Value\nagent,gfx1200\n")
+        (tmp_path / "timing_hip_api_trace.csv").write_text(
+            "Domain,Name,Start_Timestamp,End_Timestamp,Duration(ns)\n"
+            "HIP_RUNTIME_API,hipLaunchKernel,1,2,1\n"
+        )
+        return subprocess.CompletedProcess(
+            args=list(command),
+            returncode=0,
+            stdout="profiled",
+            stderr="",
+        )
+
+    request = Rocprofv3CollectionRequest(
+        application_command=("python", "eval_driver.py"),
+        output_directory=tmp_path,
+        output_file="timing",
+        policy=select_timing_policy(TimingSourceType.TRITON),
+        tool_version="rocprofv3 7.1.1",
+        gpu_architecture="gfx1200",
+    )
+
+    result = collect_rocprofv3_timing(request, runner=runner)
+
+    assert result.profiler_collected is False
+    assert result.evidence is None
+    assert result.selection.fallback_applied is True
+    assert result.csv_path == tmp_path / "timing_agent_info.csv"
+    assert "did not produce kernel activity rows" in result.selection.reason
+
+
 def test_live_collection_returns_fallback_for_non_rocprofv3_policy(tmp_path):
     def runner(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
         raise AssertionError(f"runner should not be called: {command}")

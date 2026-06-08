@@ -611,6 +611,27 @@ def collect_rocprofv3_timing(
         trial_count=request.trial_count,
         clock_locked=request.clock_locked,
     )
+    if (
+        request.policy.activity_domain == TimingActivityDomain.KERNEL_ACTIVITY
+        and not any(row.is_kernel_activity for row in evidence.parsed_rows)
+    ):
+        fallback = DefaultTimingSelection(
+            policy=select_timing_policy(
+                request.policy.source_type, profiler_available=False
+            ),
+            profiler_backed=False,
+            fallback_applied=True,
+            reason="rocprofv3 did not produce kernel activity rows",
+        )
+        return Rocprofv3CollectionResult(
+            evidence=None,
+            selection=fallback,
+            command=tuple(command),
+            csv_path=csv_path,
+            returncode=completed.returncode,
+            stdout=completed.stdout or "",
+            stderr=completed.stderr or "",
+        )
     return Rocprofv3CollectionResult(
         evidence=evidence,
         selection=selection,

@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.32
 milestone_name: RDNA4 Profiler Timing Coverage Closure
-status: Active milestone, phase 148 complete
-stopped_at: Phase 148 complete; expanded timing-batch phase pending.
-last_updated: "2026-06-08T07:35:00.000Z"
-last_activity: 2026-06-08 — Completed Phase 148: RDNA4 profiler-backed timing coverage closure
+status: Active milestone, phase 149 blocked
+stopped_at: Phase 149 blocked on full-problem profiler replacement OOM.
+last_updated: "2026-06-08T08:25:00.000Z"
+last_activity: 2026-06-08 — Phase 149 runner added; full replacement blocked by first target INVALID_REFERENCE/OOM
 progress:
-  total_phases: 1
+  total_phases: 2
   completed_phases: 1
-  total_plans: 1
+  total_plans: 2
   completed_plans: 1
-  percent: 100
+  percent: 50
 ---
 
 # Project State
@@ -27,10 +27,10 @@ ExecBench.
 
 ## Current Position
 
-Phase: 148 — RDNA4 profiler-backed timing coverage closure
-Plan: 148-01
-Status: Complete; expanded timing-batch phase pending
-Last activity: 2026-06-08 — Completed Phase 148: RDNA4 profiler-backed timing coverage closure
+Phase: 149 — RDNA4 profiler-backed timing batch replacement
+Plan: 149-01
+Status: Blocked
+Last activity: 2026-06-08 — Phase 149 runner added; full replacement blocked by first target INVALID_REFERENCE/OOM
 
 ## Recent Trend
 
