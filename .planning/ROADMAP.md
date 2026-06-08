@@ -2,6 +2,9 @@
 
 ## Milestones
 
+- Active **v1.32 RDNA4 Profiler Timing Coverage Closure** - Phase 148
+  completed; expanded timing-batch phase pending.
+  See `.planning/milestones/v1.32-ROADMAP.md`.
 - Complete **v1.31 RDNA4 Follow-Up Evidence Hardening** - Phases 142-147
   (shipped 2026-06-08). See `.planning/milestones/v1.31-ROADMAP.md`.
 - Complete **v1.30 RDNA4 Benchmark-Grade Validation Closure** - Phases 136-141
@@ -20,8 +23,25 @@
 
 ## Current Position
 
-**Status:** v1.31 completed and archived on 2026-06-08. Awaiting the next
-milestone definition.
+**Status:** v1.32 active. Phase 148 completed; next expanded timing-batch
+phase pending.
+
+### Phase 148: RDNA4 Profiler-Backed Timing Coverage Closure
+
+**Status:** Completed 2026-06-08.
+
+**Goal:** Account for profiler-backed `rocprofv3` timing coverage across the
+full 235-problem denominator before attempting expanded RDNA4 timing batches.
+
+**Requirements:** RDNA4-PROF-COV-01, RDNA4-PROF-COV-02
+
+**Deliverables:**
+- Problem-denominator profiler timing coverage report with explicit
+  profiler-backed, fallback, ready-missing, and readiness-blocked states.
+- Scripted report generation over `data/SOL-ExecBench/benchmark` and existing
+  timing sidecars.
+- CPU-safe tests preserving the claim boundary that fallback timing is not
+  profiler-backed coverage.
 
 ## Active Guardrails
 

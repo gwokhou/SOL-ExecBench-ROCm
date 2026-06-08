@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.31
-milestone_name: RDNA4 Follow-Up Evidence Hardening
-status: Awaiting next milestone
-stopped_at: Milestone v1.31 complete.
-last_updated: "2026-06-08T06:04:43.318Z"
-last_activity: 2026-06-08 — Completed quick task 260608-kum: fix RDNA4 profiler timing finalization
+milestone: v1.32
+milestone_name: RDNA4 Profiler Timing Coverage Closure
+status: Active milestone, phase 148 complete
+stopped_at: Phase 148 complete; expanded timing-batch phase pending.
+last_updated: "2026-06-08T07:35:00.000Z"
+last_activity: 2026-06-08 — Completed Phase 148: RDNA4 profiler-backed timing coverage closure
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 6
-  completed_plans: 6
+  total_phases: 1
+  completed_phases: 1
+  total_plans: 1
+  completed_plans: 1
   percent: 100
 ---
 
@@ -23,14 +23,14 @@ See: `.planning/PROJECT.md` (updated 2026-06-08)
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly
 on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL
 ExecBench.
-**Current focus:** v1.31 RDNA4 Follow-Up Evidence Hardening.
+**Current focus:** v1.32 RDNA4 Profiler Timing Coverage Closure.
 
 ## Current Position
 
-Phase: Milestone v1.31 complete
-Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-06-08 — Completed quick task 260608-kum: fix RDNA4 profiler timing finalization
+Phase: 148 — RDNA4 profiler-backed timing coverage closure
+Plan: 148-01
+Status: Complete; expanded timing-batch phase pending
+Last activity: 2026-06-08 — Completed Phase 148: RDNA4 profiler-backed timing coverage closure
 
 ## Recent Trend
 
