@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import csv
+import os
 import re
 import subprocess
 from collections.abc import Callable
@@ -660,11 +661,13 @@ def collect_source_timing_evidence(
 
 
 def _default_runner(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
+    env = {**os.environ, "SOL_EXECBENCH_GRACEFUL_EXIT": "1"}
     return subprocess.run(
         list(command),
         check=False,
         text=True,
         capture_output=True,
+        env=env,
     )
 
 
@@ -685,7 +688,12 @@ def _default_profile_runner(
 
 def _find_rocprofv3_csv(output_directory: Path, output_file: str) -> Path | None:
     candidates = sorted(output_directory.glob(f"{output_file}*.csv"))
-    return candidates[0] if candidates else None
+    if not candidates:
+        return None
+    for candidate in candidates:
+        if candidate.name.endswith("_kernel_trace.csv"):
+            return candidate
+    return candidates[0]
 
 
 def _classify_profile_artifact(path: Path) -> str:

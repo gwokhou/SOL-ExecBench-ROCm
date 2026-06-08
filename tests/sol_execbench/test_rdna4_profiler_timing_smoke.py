@@ -23,7 +23,7 @@ HIP_RUNTIME_API,hipLaunchKernel,900,5100,4200
 
 
 def test_rdna4_profiler_smoke_collects_triton_kernel_timing(tmp_path):
-    problem_dir = _write_problem(tmp_path)
+    problem_dir = REPO_ROOT / "examples/triton/rmsnorm"
     output_dir = tmp_path / "out"
     calls: list[list[str]] = []
 
@@ -62,6 +62,7 @@ def test_rdna4_profiler_smoke_collects_triton_kernel_timing(tmp_path):
     assert summary["status"] == "profiler_backed"
     assert summary["profiler_collected"] is True
     assert summary["languages"] == ["triton"]
+    assert "sol_execbench_rdna4_timing_" in summary["staging_dir"]
     assert summary["policy_backend"] == "rocprofv3"
     assert summary["activity_domain"] == "kernel_activity"
     assert summary["kernel_duration_ms"] == 0.004
@@ -71,7 +72,7 @@ def test_rdna4_profiler_smoke_collects_triton_kernel_timing(tmp_path):
 
 
 def test_rdna4_profiler_smoke_fails_without_profiler_backing(tmp_path):
-    problem_dir = _write_problem(tmp_path)
+    problem_dir = REPO_ROOT / "examples/triton/rmsnorm"
     output_dir = tmp_path / "out"
 
     def runner(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
@@ -102,35 +103,15 @@ def test_rdna4_profiler_smoke_fails_without_profiler_backing(tmp_path):
 
 
 def test_rdna4_profiler_smoke_rejects_empty_workload_limit(tmp_path):
-    problem_dir = _write_problem(tmp_path)
+    problem_dir = REPO_ROOT / "examples/triton/rmsnorm"
 
     try:
         smoke.run_smoke(
-            problem_dir=problem_dir, output_dir=tmp_path / "out", workload_limit=0
+            problem_dir=problem_dir,
+            output_dir=tmp_path / "out",
+            workload_limit=0,
         )
     except ValueError as exc:
         assert "workload_limit must be positive" in str(exc)
     else:
         raise AssertionError("expected workload limit validation failure")
-
-
-def _write_problem(root: Path) -> Path:
-    problem_dir = root / "problem"
-    problem_dir.mkdir()
-    (problem_dir / "definition.json").write_text("{}", encoding="utf-8")
-    (problem_dir / "workload.jsonl").write_text(
-        "\n".join(
-            [
-                '{"uuid": "w1", "axes": {}, "inputs": {}}',
-                '{"uuid": "w2", "axes": {}, "inputs": {}}',
-                '{"uuid": "w3", "axes": {}, "inputs": {}}',
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    (problem_dir / "solution_triton.json").write_text(
-        json.dumps({"spec": {"languages": ["triton"]}}),
-        encoding="utf-8",
-    )
-    return problem_dir

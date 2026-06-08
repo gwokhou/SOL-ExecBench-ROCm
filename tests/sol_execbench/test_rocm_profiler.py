@@ -298,6 +298,71 @@ def test_live_collection_invokes_runner_and_reads_generated_csv(tmp_path):
     assert payload["stdout"] == "profiled"
 
 
+def test_default_live_collection_requests_graceful_eval_driver_exit(
+    tmp_path, monkeypatch
+):
+    captured_env: dict[str, str] = {}
+
+    def fake_run(command, **kwargs):
+        captured_env.update(kwargs.get("env") or {})
+        (tmp_path / "timing_kernel_trace.csv").write_text(ROCPROFV3_CSV)
+        return subprocess.CompletedProcess(
+            args=list(command),
+            returncode=0,
+            stdout="profiled",
+            stderr="",
+        )
+
+    monkeypatch.setattr(
+        "sol_execbench.core.bench.rocm_profiler.subprocess.run", fake_run
+    )
+    request = Rocprofv3CollectionRequest(
+        application_command=("uv", "run", "sol-execbench", "problem"),
+        output_directory=tmp_path,
+        output_file="timing",
+        policy=select_timing_policy(TimingSourceType.TRITON),
+        tool_version="rocprofv3 7.1.1",
+        gpu_architecture="gfx1200",
+    )
+
+    result = collect_rocprofv3_timing(request)
+
+    assert result.profiler_collected is True
+    assert captured_env["SOL_EXECBENCH_GRACEFUL_EXIT"] == "1"
+
+
+def test_live_collection_prefers_kernel_trace_csv(tmp_path):
+    def runner(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
+        (tmp_path / "timing_agent_info.csv").write_text("Name,Value\nagent,gfx1200\n")
+        (tmp_path / "timing_hip_api_trace.csv").write_text(
+            "Domain,Name,Start_Timestamp,End_Timestamp,Duration(ns)\n"
+            "HIP_RUNTIME_API,hipLaunchKernel,1,2,1\n"
+        )
+        (tmp_path / "timing_kernel_trace.csv").write_text(ROCPROFV3_CSV)
+        return subprocess.CompletedProcess(
+            args=list(command),
+            returncode=0,
+            stdout="profiled",
+            stderr="",
+        )
+
+    request = Rocprofv3CollectionRequest(
+        application_command=("uv", "run", "sol-execbench", "problem"),
+        output_directory=tmp_path,
+        output_file="timing",
+        policy=select_timing_policy(TimingSourceType.TRITON),
+        tool_version="rocprofv3 7.1.1",
+        gpu_architecture="gfx1200",
+    )
+
+    result = collect_rocprofv3_timing(request, runner=runner)
+
+    assert result.profiler_collected is True
+    assert result.csv_path == tmp_path / "timing_kernel_trace.csv"
+    assert result.evidence is not None
+    assert result.evidence.kernel_duration_ms == 0.007
+
+
 def test_live_collection_returns_fallback_for_non_rocprofv3_policy(tmp_path):
     def runner(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
         raise AssertionError(f"runner should not be called: {command}")

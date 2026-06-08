@@ -7,8 +7,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
+import tempfile
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
@@ -18,7 +20,8 @@ from sol_execbench.core.bench.rocm_profiler import (
     ProfilerRunner,
     collect_source_timing_evidence,
 )
-from sol_execbench.core.dataset.runner import build_cli_command
+from sol_execbench.core import BenchmarkConfig, Definition, Solution, Workload
+from sol_execbench.driver import ProblemPackager
 
 DEFAULT_PROBLEM_DIR = Path("examples/triton/rmsnorm")
 DEFAULT_OUTPUT_DIR = Path("out/rdna4-profiler-backed-timing-smoke")
@@ -57,19 +60,24 @@ def run_smoke(
 
     solution = _load_json(solution_path)
     languages = _solution_languages(solution)
-    command = build_cli_command(
-        definition_path=definition_path,
-        workload_path=limited_workload,
-        solution_path=solution_path,
-        timeout=timeout,
+    staging_dir = Path(tempfile.mkdtemp(prefix="sol_execbench_rdna4_timing_"))
+    packager = ProblemPackager(
+        definition=Definition(**_load_json(definition_path)),
+        workloads=_load_workloads(limited_workload),
+        solution=Solution(**solution),
+        config=BenchmarkConfig(),
+        output_dir=staging_dir,
+        keep_output_dir=True,
     )
+    command = tuple(str(part) for part in packager.execute())
     available = (
         shutil.which(ROCPROFV3_EXECUTABLE) is not None
         if rocprofv3_available is None
         else rocprofv3_available
     )
 
-    timing_dir = output_dir / "rocprofv3"
+    timing_dir = (output_dir / "rocprofv3").resolve()
+    smoke_runner = runner or _staging_runner(staging_dir)
     result = collect_source_timing_evidence(
         application_command=command,
         languages=languages,
@@ -78,7 +86,7 @@ def run_smoke(
         tool_version=tool_version,
         gpu_architecture=gpu_architecture,
         rocprofv3_available=available,
-        runner=runner,
+        runner=smoke_runner,
         trial_count=1,
         clock_locked=clock_locked,
     )
@@ -91,6 +99,7 @@ def run_smoke(
         problem_dir=problem_dir,
         solution_path=solution_path,
         limited_workload=limited_workload,
+        staging_dir=staging_dir,
         workload_limit=workload_limit,
         languages=languages,
         rocprofv3_available=available,
@@ -118,6 +127,14 @@ def _load_json(path: Path) -> dict[str, Any]:
     return payload
 
 
+def _load_workloads(path: Path) -> list[Workload]:
+    workloads = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            workloads.append(Workload(**json.loads(line)))
+    return workloads
+
+
 def _solution_languages(solution: dict[str, Any]) -> tuple[str, ...]:
     languages = solution.get("spec", {}).get("languages", ())
     if isinstance(languages, str):
@@ -127,12 +144,38 @@ def _solution_languages(solution: dict[str, Any]) -> tuple[str, ...]:
     return ()
 
 
+def _staging_runner(staging_dir: Path) -> ProfilerRunner:
+    def run(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
+        env = {
+            **os.environ,
+            "PYTHONPATH": _pythonpath_with_src(),
+            "SOL_EXECBENCH_GRACEFUL_EXIT": "1",
+        }
+        return subprocess.run(
+            list(command),
+            cwd=staging_dir,
+            env=env,
+            check=False,
+            text=True,
+            capture_output=True,
+        )
+
+    return run
+
+
+def _pythonpath_with_src() -> str:
+    src = str(Path(__file__).resolve().parents[1] / "src")
+    existing = os.environ.get("PYTHONPATH")
+    return src if not existing else f"{src}{os.pathsep}{existing}"
+
+
 def _build_summary(
     *,
     command: Sequence[str],
     problem_dir: Path,
     solution_path: Path,
     limited_workload: Path,
+    staging_dir: Path,
     workload_limit: int,
     languages: Sequence[str],
     rocprofv3_available: bool,
@@ -142,15 +185,15 @@ def _build_summary(
     selection = timing_payload.get("selection") or {}
     policy = (selection.get("policy") or {}) if isinstance(selection, dict) else {}
     evidence = timing_payload.get("evidence") or {}
+    profiler_collected = timing_payload.get("profiler_collected") is True
     return {
         "schema_version": "sol_execbench.rdna4_profiler_timing_smoke.v1",
-        "status": "profiler_backed"
-        if timing_payload.get("profiler_collected") is True
-        else "fallback",
-        "profiler_collected": timing_payload.get("profiler_collected") is True,
+        "status": "profiler_backed" if profiler_collected else "fallback",
+        "profiler_collected": profiler_collected,
         "problem_dir": str(problem_dir),
         "solution_path": str(solution_path),
         "limited_workload": str(limited_workload),
+        "staging_dir": str(staging_dir),
         "workload_limit": workload_limit,
         "languages": list(languages),
         "rocprofv3_available": rocprofv3_available,
@@ -159,7 +202,9 @@ def _build_summary(
         "csv_path": timing_payload.get("csv_path"),
         "policy_backend": policy.get("backend"),
         "activity_domain": policy.get("activity_domain"),
-        "fallback_reason": selection.get("reason")
+        "fallback_reason": None
+        if profiler_collected
+        else selection.get("reason")
         if isinstance(selection, dict)
         else None,
         "kernel_duration_ms": evidence.get("kernel_duration_ms")

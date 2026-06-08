@@ -612,11 +612,14 @@ for _workload in workloads:
 # TorchInductor and ROCm runtimes can leave non-daemon worker threads alive after
 # all benchmark traces have been emitted.  The driver is a one-shot subprocess,
 # so flush the trace stream and terminate explicitly instead of letting teardown
-# hang validation jobs.
+# hang validation jobs. Profiler-backed timing runs need normal interpreter
+# teardown so profiler finalizers can write trace artifacts.
 try:
     _real_stdout.flush()
     sys.stderr.flush()
     sys.stdout.flush()
 except Exception:
     pass
+if os.environ.get("SOL_EXECBENCH_GRACEFUL_EXIT") == "1":
+    sys.exit(0)
 os._exit(0)
