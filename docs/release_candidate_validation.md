@@ -96,14 +96,15 @@ Use these classifications when reviewing the summary:
 
 This validation path supports an **engineering prerelease** claim only. It
 should be interpreted alongside the support matrix in `docs/rocm.md`. In
-the v1.30 RDNA4 evidence set, maintainers may cite a bounded RDNA4 `gfx1200`
+the v1.30/v1.31 RDNA4 evidence set, maintainers may cite a bounded RDNA4 `gfx1200`
 ready-subset result only with its denominator and blockers attached: 121 ready
 problems, 1907 attempted workloads, 1761 passed workloads, 146 failed
 workloads, 86 OK problems, 35 FAIL problems, 12 explicit `missing_trace`
-workload records, 1895 derived score records, 172 scored, 1723 unscored, and
-1839 AMD SOL/SOLAR sidecar pairs after 56 temporary long-tail sidecar
-exclusions. RDNA4 timing remains non-authoritative until clock-lock/reset
-sudoers coverage and profiler-backed timing evidence are rerun.
+workload records classified as `gpu_oom_no_trace`, 1895 derived score records,
+172 scored, 1723 unscored, and 1839 AMD SOL/SOLAR sidecar pairs after 56
+temporary long-tail sidecar exclusions. The v1.31 follow-up groups all 146
+failed workloads by failure class. RDNA4 timing remains non-authoritative until
+profiler-backed timing evidence is available.
 
 Long RDNA4 derived or dataset jobs should be launched through
 `scripts/run_derived_isolated.py --launch-mode systemd` or an equivalent

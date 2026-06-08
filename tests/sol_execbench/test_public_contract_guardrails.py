@@ -1669,6 +1669,8 @@ def test_phase_141_rdna4_public_claims_stay_bounded():
         "86 OK problems",
         "35 FAIL problems",
         "12 explicit `missing_trace`",
+        "classified as `gpu_oom_no_trace`",
+        "groups all 146 failed workloads by failure class",
         "1895 derived score records",
         "172 scored",
         "1723 unscored",

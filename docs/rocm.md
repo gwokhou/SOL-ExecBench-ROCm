@@ -159,19 +159,20 @@ performance level and SCLK/MCLK DPM levels. If clock locking is unavailable,
 run without `--lock-clocks` for functional validation.
 
 On RDNA 4 `gfx1200`, ROCm can report the GPU in a low-power state while the
-selected MCLK DPM level remains supported but not currently active. In that
-case the clock-lock check treats MCLK as valid only when `rocm-smi -s` reports
-the requested MCLK level as a supported frequency level and the preceding
-`--setmclk` command succeeded. SCLK still requires the active level reported by
-`rocm-smi --showclocks` to match. Some ROCm releases can print messages such
-as `Unable to set performance level to manual` while still returning exit code
-0; those outputs are treated as clock-lock failures.
+selected SCLK/MCLK DPM levels remain supported but not currently active. ROCm's
+clock-set API applies a frequency-level mask, so active clocks can still follow
+load-dependent low-power behavior within the accepted mask. In that case the
+clock-lock check treats a level as valid only when `rocm-smi -s` reports the
+requested level as supported and the preceding set command succeeded. Some ROCm
+releases can print messages such as `Unable to set performance level to manual`
+while still returning exit code 0; those outputs are treated as clock-lock
+failures.
 
 Optional overrides:
 
 ```bash
-export SOL_EXECBENCH_SCLK_LEVEL=1
-export SOL_EXECBENCH_MCLK_LEVEL=1
+export SOL_EXECBENCH_SCLK_LEVEL=2
+export SOL_EXECBENCH_MCLK_LEVEL=5
 ```
 
 ## Engineering Prerelease Support Matrix
@@ -183,7 +184,7 @@ authority, or new hardware-validation claims.
 
 | Support surface | Architecture or scope | Engineering prerelease status | Interpretation |
 | --- | --- | --- | --- |
-| RDNA 4 | `gfx1200` | v1.30 bounded ready-subset evidence exists: 121 ready problems, 1907 attempted workloads, 1761 passed workloads, 146 failed workloads, 86 OK problems, 35 FAIL problems, 12 explicit `missing_trace` records, 1895 derived score records, 172 scored, 1723 unscored, and 1839 AMD SOL/SOLAR sidecar pairs after 56 temporary sidecar exclusions. | Valid bounded RDNA4 evidence for the recorded host, commands, and artifacts; timing remains non-authoritative, and the result is not full 235-problem paper validation, upstream SOLAR parity, NVIDIA B200 equivalence, hosted leaderboard authority, CDNA3/MI300X validation, CDNA4 validation, or broader AMD hardware validation. |
+| RDNA 4 | `gfx1200` | v1.30/v1.31 bounded ready-subset evidence exists: 121 ready problems, 1907 attempted workloads, 1761 passed workloads, 146 failed workloads, 86 OK problems, 35 FAIL problems, 12 explicit `missing_trace` records classified as `gpu_oom_no_trace`, 1895 derived score records, 172 scored, 1723 unscored, and 1839 AMD SOL/SOLAR sidecar pairs after 56 temporary sidecar exclusions. | Valid bounded RDNA4 evidence for the recorded host, commands, and artifacts; v1.31 groups all 146 failed workloads by failure class, timing remains non-authoritative, and the result is not full 235-problem paper validation, upstream SOLAR parity, NVIDIA B200 equivalence, hosted leaderboard authority, CDNA3/MI300X validation, CDNA4 validation, or broader AMD hardware validation. |
 | Docker/container ROCm user-space | Declared ROCm container targets on recorded host driver/devices | Container user-space evidence can be recorded for selected ROCm targets. | Docker/container ROCm user-space evidence is not native-host validation and must not be used as native-host, score, paper-parity, or leaderboard authority. |
 | MI300X GPU under CDNA 3 | MI300X and MI308X are sibling GPU products under the CDNA3 architecture family and share the `gfx942` code path; `gfx940`, `gfx941`, and `gfx942` remain CDNA 3 code/schema targets. | CDNA3 validation infrastructure evidence exists on MI308X (`gfx942`): pytest passed, the full dataset run executed, Quant NVFP4/MXFP4 skips were expected, and remaining non-skip blockers are timeout shards. | This is not a completed benchmark-grade MI300X hardware-validation claim because MI308X and MI300X hardware configurations differ, despite sharing `gfx942`. |
 | CDNA4 | Future CDNA4 class hardware | CDNA4 validation is unavailable because suitable hardware is not currently accessible. | CDNA4 is not a v1.25 validation target and should be reported as unavailable, not as validated or merely skipped. |
@@ -200,7 +201,7 @@ Validation recorded in this milestone:
 
 | Hardware class | Architecture | Status |
 | --- | --- | --- |
-| RDNA 4 | `gfx1200` | v1.30 bounded ready-subset validation evidence exists with visible failures, missing traces, temporary sidecar exclusions, and non-authoritative timing blockers. |
+| RDNA 4 | `gfx1200` | v1.30/v1.31 bounded ready-subset validation evidence exists with visible classified failures, classified missing traces, temporary sidecar exclusions, and non-authoritative timing blockers. |
 | CDNA 3 | `gfx940`, `gfx941`, `gfx942` (`gfx94*`) | Code/schema support present. Real MI308X (`gfx942`) runs recorded a passed adapted pytest suite and an operational full-dataset validation path with known timeout blockers. Do not claim full MI300X hardware validation until those blockers and required exact-hardware MI300X evidence are resolved or explicitly bounded. |
 | CDNA 4 | future CDNA4 class targets | CDNA4 validation is unavailable because suitable hardware is not currently accessible. |
 

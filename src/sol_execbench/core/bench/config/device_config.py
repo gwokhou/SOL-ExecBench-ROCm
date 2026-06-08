@@ -31,9 +31,9 @@ class ClockPreset:
 
 
 CLOCK_LOCK_PRESETS: dict[str, ClockPreset] = {
-    "gfx1200": ClockPreset(sclk_level=1, mclk_level=1),
+    "gfx1200": ClockPreset(sclk_level=2, mclk_level=5),
     "gfx942": ClockPreset(sclk_level=1, mclk_level=1),
-    "AMD Radeon": ClockPreset(sclk_level=1, mclk_level=1),
+    "AMD Radeon": ClockPreset(sclk_level=2, mclk_level=5),
     "AMD Instinct": ClockPreset(sclk_level=1, mclk_level=1),
 }
 

@@ -10,7 +10,7 @@ import re
 import subprocess
 from collections.abc import Callable
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -461,10 +461,6 @@ def select_default_timing(
             reason="rocprofv3 is available for the selected timing policy",
         )
 
-    fallback_policy = select_timing_policy(
-        policy.source_type,
-        profiler_available=False,
-    )
     if policy.backend != TimingBackend.ROCPROFV3:
         reason = (
             f"selected policy backend is {policy.backend.value}, not rocprofv3 "
@@ -472,6 +468,13 @@ def select_default_timing(
         )
     else:
         reason = "rocprofv3 is unavailable for the selected timing policy"
+    fallback_policy = replace(
+        select_timing_policy(
+            policy.source_type,
+            profiler_available=False,
+        ),
+        reason=reason,
+    )
     return DefaultTimingSelection(
         policy=fallback_policy,
         profiler_backed=False,

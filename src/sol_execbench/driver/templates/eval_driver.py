@@ -213,6 +213,37 @@ def _reward_hack_check(workload, check_fn, *args, suppress_errors=False):
     return False
 
 
+def _tensor_storage_id(value):
+    if not isinstance(value, torch.Tensor):
+        return None
+    try:
+        return (
+            value.device.type,
+            value.device.index,
+            value.untyped_storage().data_ptr(),
+        )
+    except Exception:
+        return None
+
+
+def _tensor_aliases_any(value, candidates):
+    storage_id = _tensor_storage_id(value)
+    if storage_id is None:
+        return False
+    return any(storage_id == _tensor_storage_id(candidate) for candidate in candidates)
+
+
+def _stable_reference_outputs(outputs, inputs):
+    stable = []
+    for output in outputs:
+        detached = output.detach()
+        if _tensor_aliases_any(detached, inputs):
+            stable.append(detached.clone())
+        else:
+            stable.append(detached)
+    return stable
+
+
 # ── Evaluate each workload ────────────────────────────────────────────────────
 _device_name = torch.cuda.get_device_name(0) if torch.cuda.is_available() else ""
 
@@ -375,7 +406,7 @@ for _workload in workloads:
                 output_names=_output_names,
                 output_dtypes=_output_dtypes_torch,
             )
-            _ref_outputs = [_out.detach().clone() for _out in _ref_outputs]
+            _ref_outputs = _stable_reference_outputs(_ref_outputs, _inputs)
         except Exception as _e:
             _emit(
                 Trace(
@@ -485,6 +516,9 @@ for _workload in workloads:
             _correctness_failed = True
             break
 
+        _ref_outputs = None
+        _user_outputs = None
+
     if _correctness_failed:
         continue
 
@@ -493,6 +527,11 @@ for _workload in workloads:
         continue
 
     assert _inputs is not None
+    _ref_outputs = None
+    _user_outputs = None
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
     # -- User latency measurement --
     try:

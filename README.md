@@ -218,10 +218,13 @@ example coverage, and diagnostic boundaries.
 
 Validation status:
 
-- RDNA4 `gfx1200` bounded ready-subset evidence exists from v1.30 artifacts:
+- RDNA4 `gfx1200` bounded ready-subset evidence exists from v1.30/v1.31
+  artifacts:
   121 ready problems, 1907 attempted workloads, 1761 passed workloads, 146
   failed workloads, 86 OK problems, 35 FAIL problems, and 12 explicit
-  `missing_trace` workload records.
+  `missing_trace` workload records. The v1.31 follow-up classifies all 12
+  missing traces as `gpu_oom_no_trace` and groups all 146 failed workloads by
+  failure class without upgrading the claim boundary.
 - The RDNA4 derived evidence set contains 1895 score records, with 172 scored
   and 1723 unscored. AMD SOL v2 and SOLAR derivation sidecars cover 1839
   traces after 56 temporary long-tail sidecar exclusions, with zero unexcluded

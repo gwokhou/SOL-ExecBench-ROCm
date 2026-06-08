@@ -65,7 +65,23 @@ RUN if [ "${HOST_UID}" = "0" ]; then \
         if command -v "${smi_tool}" >/dev/null 2>&1; then \
             echo "${RUN_USER} ALL=(ALL) NOPASSWD: $(command -v "${smi_tool}")" >> /etc/sudoers; \
         fi; \
-    done
+    done && \
+    if command -v rocm-smi >/dev/null 2>&1; then \
+        ROCM_SMI="$(command -v rocm-smi)" && \
+        { \
+            echo "# SOL ExecBench ROCm clock commands"; \
+            echo "${RUN_USER} ALL=(root) NOPASSWD: ${ROCM_SMI} --showclocks, \\"; \
+            echo "    ${ROCM_SMI} -s, \\"; \
+            echo "    ${ROCM_SMI} --showperflevel, \\"; \
+            echo "    ${ROCM_SMI} --showclkfrq, \\"; \
+            echo "    ${ROCM_SMI} --setperflevel manual, \\"; \
+            echo "    ${ROCM_SMI} --setperflevel auto, \\"; \
+            echo "    ${ROCM_SMI} --setsclk *, \\"; \
+            echo "    ${ROCM_SMI} --setmclk *, \\"; \
+            echo "    ${ROCM_SMI} --resetclocks"; \
+        } > /etc/sudoers.d/sol-execbench-rocm-smi && \
+        chmod 0440 /etc/sudoers.d/sol-execbench-rocm-smi; \
+    fi
 
 # Copy and set up entrypoint while still root (avoid switching back)
 COPY docker/entrypoint.sh /entrypoint.sh

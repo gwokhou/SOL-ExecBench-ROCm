@@ -2,6 +2,7 @@
 
 ## Milestones
 
+- Start **v1.31 RDNA4 Follow-Up Evidence Hardening** - Phases 142-147.
 - Complete **v1.30 RDNA4 Benchmark-Grade Validation Closure** - Phases 136-141
   (shipped 2026-06-08). See `.planning/milestones/v1.30-ROADMAP.md`.
 - Complete **v1.29 Dataset Migration and Compliance** - Phases 131-135
@@ -18,10 +19,105 @@
 
 ## Current Position
 
-**Status:** v1.30 shipped and archived. No active milestone is currently
-defined.
+**Status:** Phase 147 completed on 2026-06-08 after memory and timing closure
+attempts. v1.31 is ready for completion.
 
-Start the next milestone with `$gsd-new-milestone`.
+### Phase 142: RDNA4 Clock Sudoers Coverage
+
+**Status:** Completed 2026-06-08.
+
+**Goal:** Provide and verify a host setup path for passwordless `rocm-smi`
+clock-lock/reset sudoers coverage.
+
+**Requirements:** RDNA4-FU-TIME-01
+
+**Deliverables:**
+- Host sudoers installer/checker for `rocm-smi` clock commands.
+- CPU-safe tests for generated sudoers content and command coverage.
+- Live host probe evidence where available.
+
+### Phase 143: RDNA4 Clock-Lock And Profiler Timing Rerun
+
+**Status:** Completed 2026-06-08.
+
+**Goal:** Rerun RDNA4 clock-lock and timing evidence after sudoers coverage is
+available, preserving explicit fallback/blocker classification.
+
+**Requirements:** RDNA4-FU-TIME-02, RDNA4-FU-TIME-03
+
+**Deliverables:**
+- RDNA4 clock preset and low-power mask-semantics verification fix.
+- Live clock-lock evidence with `SCLK=2`, `MCLK=5`, and successful reset.
+- 121 v1.31 timing sidecars with explicit fallback classification.
+
+### Phase 144: RDNA4 Derived Sidecar Exclusion Retry
+
+**Status:** Completed 2026-06-08.
+
+**Goal:** Retry the 56 temporary derived sidecar exclusions through isolated
+memory-capped execution and classify remaining memory blockers.
+
+**Requirements:** RDNA4-FU-DERIVED-01, RDNA4-FU-DERIVED-02
+
+**Deliverables:**
+- Targeted `--problem-id-file` retry support for `scripts/run_derived_isolated.py`.
+- v1.31 isolated retry evidence under `out/rdna4-derived-retry-v131/`.
+- Recovered/blocker classification for 10 temporary exclusion records across
+  8 problems, with 1 full problem recovery and 7 memory-blocked problem retries.
+- Host-bound verification context documenting the 32 GiB validation machine and
+  24G no-swap per-problem cap.
+
+### Phase 145: RDNA4 Missing Trace Root-Cause Triage
+
+**Status:** Completed 2026-06-08.
+
+**Goal:** Reproduce or classify the 12 `missing_trace` workload records.
+
+**Requirements:** RDNA4-FU-TRACE-01
+
+**Deliverables:**
+- v1.31 missing-trace triage evidence under
+  `out/rdna4-missing-trace-triage-v131/`.
+- Classification of all 12 rows as `gpu_oom_no_trace`, backed by per-workload
+  shard CLI logs.
+- Confirmation that target workload UUIDs are absent from merged trace files,
+  so Phase 138 closure status was correct but under-classified.
+
+### Phase 146: RDNA4 Failed Workload Triage And Claim Reassessment
+
+**Status:** Completed 2026-06-08.
+
+**Goal:** Classify the 146 failed RDNA4 workloads and keep public claims bounded
+until accepted closure exists.
+
+**Requirements:** RDNA4-FU-FAIL-01, RDNA4-FU-CLAIM-01
+
+**Deliverables:**
+- v1.31 failure-triage evidence under `out/rdna4-failure-triage-v131/`.
+- Seven failure classes covering all 146 failed RDNA4 workload records.
+- Public docs updated to mention v1.31 classifications while preserving bounded
+  RDNA4 claim limits.
+
+### Phase 147: RDNA4 Memory And Timing Closure Attempt
+
+**Status:** Completed 2026-06-08.
+
+**Goal:** Attempt to reduce RDNA4 validation memory pressure, identify why
+v1.31 timing sidecars remain PyTorch/device-event fallback, and only then
+record accepted residual boundaries before closing v1.31.
+
+**Requirements:** RDNA4-FU-TIME-04, RDNA4-FU-CLOSE-01
+
+**Deliverables:**
+- `eval_driver.py` memory optimization that avoids unconditional reference
+  output clones and releases correctness outputs before timing.
+- Regression coverage for reference-output/input aliasing correctness.
+- Targeted RDNA4 memory retry evidence under
+  `out/rdna4-phase147-memory-v131/`.
+- Timing fallback root-cause report under
+  `out/rdna4-phase147-timing-v131/`.
+- Closure handoff at `.planning/v1.31-CLOSURE-HANDOFF.md` with an explicit
+  no-claim-upgrade statement for v1.31 closure.
 
 ## Active Guardrails
 

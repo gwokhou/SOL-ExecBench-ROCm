@@ -18,7 +18,7 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 **Shipped version:** v1.30 RDNA4 Benchmark-Grade Validation Closure,
 completed 2026-06-08.
 
-**Current milestone:** None defined.
+**Current milestone:** v1.31 RDNA4 Follow-Up Evidence Hardening.
 
 **Queued milestone:** None defined.
 
@@ -36,7 +36,10 @@ deterministic SOL-ExecBench and FlashInfer Trace migration commands, ROCm
 readiness classification, CPU-safe low-precision compatibility helpers, and
 runner closure/public documentation guardrails.
 
-**Next milestone goal:** Not defined.
+**Next milestone goal:** Resolve RDNA4 follow-up issues in practical order:
+sudoers/clock coverage, authoritative timing path, temporary derived sidecar
+exclusions, missing traces, and failed workload classification. Historical
+open-artifact cleanup is excluded from this milestone.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline.
 Milestones v1.1-v1.6 added CDNA 3 code/schema support, maintained residue
@@ -152,10 +155,25 @@ SOL/SOLAR sidecar pairs after 56 temporary sidecar exclusions. RDNA4 timing
 remains non-authoritative until clock-lock/reset sudoers coverage and
 profiler-backed timing evidence are rerun.
 
-## Current Milestone
+## Current Milestone: v1.31 RDNA4 Follow-Up Evidence Hardening
 
-No active milestone is currently defined. Start the next milestone with
-`$gsd-new-milestone`.
+**Goal:** Resolve the remaining RDNA4 v1.30 follow-up issues, excluding
+historical open-artifact cleanup, in dependency order.
+
+**Target features:**
+- Passwordless sudoers coverage for `rocm-smi` clock-lock/reset commands.
+- RDNA4 clock-lock and profiler-backed timing rerun or explicit blocker
+  evidence.
+- Isolated retry/classification for the 56 temporary derived sidecar
+  exclusions.
+- Root-cause triage for the 12 `missing_trace` workload records.
+- Failure-class triage for the 146 failed RDNA4 workloads.
+
+**Key context:**
+- Long memory-heavy jobs must run through isolated systemd user units or the
+  existing derived isolated runner so OOM kills do not take down Codex.
+- Stronger RDNA4 public claims remain blocked until timing, derived exclusions,
+  missing traces, and failed workloads have accepted closure.
 - Research is skipped; this will be scoped from existing project evidence and
   validation machinery.
 - Existing deferred boundaries remain: no B200/SOLAR upstream equivalence, no
