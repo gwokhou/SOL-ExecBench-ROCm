@@ -1,5 +1,51 @@
 # Milestones
 
+## v1.30 RDNA4 Benchmark-Grade Validation Closure (Shipped: 2026-06-08)
+
+**Phases completed:** 6 phases, 6 plans, 0 tasks
+
+**Key accomplishments:**
+
+- Defined the RDNA4 `gfx1200` validation denominator and added explicit,
+  reversible long-tail exclusion configuration with denominator-visible
+  closure accounting.
+
+- Ran the bounded RDNA4 ready subset with complete accounting: 121 ready
+  problems, 1907 attempted workloads, 1761 passed workloads, 146 failed
+  workloads, 86 OK problems, 35 FAIL problems, and 12 explicit `missing_trace`
+  records.
+
+- Captured RDNA4 environment, clock-lock blocker, timing sidecar, and stability
+  evidence while preserving the non-authoritative timing boundary.
+
+- Generated AMD-native derived score evidence, AMD SOL/SOLAR sidecars, parity,
+  consistency, claim, trust, and bundle artifacts for the RDNA4 evidence set.
+
+- Added isolated per-problem derived-job execution via
+  `scripts/run_derived_isolated.py` and documented the `systemd-run --user`
+  memory/swap-cap rule to keep OOM-heavy jobs from taking down Codex.
+
+- Updated public documentation and guardrail tests so RDNA4 evidence remains
+  bounded and does not imply paper parity, upstream SOLAR parity, NVIDIA B200
+  equivalence, hosted leaderboard authority, CDNA3/MI300X validation, or CDNA4
+  validation.
+
+**Explicitly deferred:**
+
+- Authoritative RDNA4 timing until clock-lock/reset sudoers coverage and
+  profiler-backed timing evidence are rerun.
+- Investigation or acceptance of 146 failed RDNA4 workloads and 12 explicit
+  `missing_trace` records.
+- Revisit of 56 temporary derived sidecar exclusions after memory efficiency or
+  available memory improves.
+- Full 235-problem paper validation, upstream SOLAR parity, NVIDIA B200
+  equivalence, hosted leaderboard authority, CDNA3/MI300X validation, and CDNA4
+  validation.
+- Known deferred open artifacts at close: 9 historical items recorded in
+  `.planning/STATE.md`.
+
+---
+
 ## Current CDNA3 Validation Status (Updated: 2026-06-06)
 
 CDNA3/gfx942 validation is no longer purely deferred. Real MI308X (`gfx942`)
@@ -48,12 +94,16 @@ Remaining blockers are documented in
 
 - Real CDNA3 or CDNA4 full-suite execution without a complete hardware evidence
   chain.
+
 - Real CDNA4 validation, performance authority, or hardware equivalence claims
   for NVFP4/Blackwell semantics.
+
 - High-performance FlashInfer CUDA-kernel ROCm tuning and full performance
   comparison.
+
 - Public redistribution of NVIDIA SOL-ExecBench original or migrated dataset
   payloads.
+
 - Known deferred quick-task artifacts at close: 5 historical items recorded in
   `.planning/STATE.md`.
 

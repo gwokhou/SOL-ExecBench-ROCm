@@ -159,7 +159,9 @@ def _sample_definition_workload_trace() -> tuple[Definition, Workload, Trace]:
         outputs={"out": {"shape": ["N"], "dtype": "float32"}},
         reference="def run(x):\n    return x",
     )
-    workload = make_workload(axes={"N": 16}, inputs={"x": {"type": "random"}}, uuid="w1")
+    workload = make_workload(
+        axes={"N": 16}, inputs={"x": {"type": "random"}}, uuid="w1"
+    )
     trace = make_trace(
         definition="demo",
         workload=workload,
@@ -400,9 +402,9 @@ def test_v1_10_solar_derivation_contract_keeps_claim_boundaries():
         boundary = json_dict(fixture["scope_boundary"])
         assert boundary["paper_scale_dataset"] is False, fixture["case_id"]
         assert boundary["hosted_leaderboard_ready"] is False, fixture["case_id"]
-        assert (
-            boundary["nvidia_blackwell_b200_equivalence"] is False
-        ), fixture["case_id"]
+        assert boundary["nvidia_blackwell_b200_equivalence"] is False, fixture[
+            "case_id"
+        ]
         assert boundary["real_hardware_validation"] is False, fixture["case_id"]
 
 
@@ -414,7 +416,9 @@ def test_v1_10_solar_derivation_fields_remain_noncanonical():
         outputs={"out": {"shape": ["N"], "dtype": "float32"}},
         reference="def run(x):\n    return x",
     )
-    workload = make_workload(axes={"N": 16}, inputs={"x": {"type": "random"}}, uuid="w1")
+    workload = make_workload(
+        axes={"N": 16}, inputs={"x": {"type": "random"}}, uuid="w1"
+    )
     trace = make_trace(
         definition="demo",
         workload=workload,
@@ -465,7 +469,10 @@ def test_v1_10_solar_derivation_fields_remain_noncanonical():
             assert field not in repr(payload)
 
     canonical_trace_jsonl = json.dumps(trace.model_dump(mode="json"), sort_keys=True)
-    for field in (*PHASE50_INTERNAL_EVIDENCE_NAMES, *PHASE51_INTERNAL_PUBLIC_BOUNDARY_FIELDS):
+    for field in (
+        *PHASE50_INTERNAL_EVIDENCE_NAMES,
+        *PHASE51_INTERNAL_PUBLIC_BOUNDARY_FIELDS,
+    ):
         assert field not in canonical_trace_jsonl
 
 
@@ -580,7 +587,9 @@ def test_v1_11_inventory_readiness_fields_remain_sidecar_only():
         reference="def run(x):\n    return x",
     )
     workload = make_workload(axes={"N": 4}, inputs={"x": {"type": "random"}}, uuid="w")
-    trace = make_trace(definition="demo", workload=workload, solution="solution", evaluation=None)
+    trace = make_trace(
+        definition="demo", workload=workload, solution="solution", evaluation=None
+    )
     forbidden = (
         "sol_execbench.dataset_inventory.v1",
         "sol_execbench.rocm_readiness.v1",
@@ -590,7 +599,11 @@ def test_v1_11_inventory_readiness_fields_remain_sidecar_only():
         "ready_to_attempt_rocm_execution",
     )
 
-    for payload in (definition.model_dump(mode="json"), workload.model_dump(mode="json"), trace.model_dump(mode="json")):
+    for payload in (
+        definition.model_dump(mode="json"),
+        workload.model_dump(mode="json"),
+        trace.model_dump(mode="json"),
+    ):
         text = json.dumps(payload, sort_keys=True)
         for field in forbidden:
             assert field not in text
@@ -687,7 +700,9 @@ def test_v1_19_paper_denominator_fields_remain_sidecar_only():
         for field in forbidden:
             assert field not in text
 
-    from sol_execbench.core.dataset.paper_denominator import PaperDenominatorClaimBoundary
+    from sol_execbench.core.dataset.paper_denominator import (
+        PaperDenominatorClaimBoundary,
+    )
 
     sidecar_boundary = PaperDenominatorClaimBoundary().model_dump(mode="json")
     for field in (
@@ -1430,16 +1445,19 @@ def test_v1_9_derived_artifacts_remain_noncanonical():
 
 
 def test_v1_9_claim_guardrails_keep_cdna3_and_nvidia_equivalence_out_of_scope():
-    if not (PLANNING_ROOT / "PROJECT.md").exists() or not (
-        PLANNING_ROOT / "REQUIREMENTS.md"
-    ).exists():
+    if (
+        not (PLANNING_ROOT / "PROJECT.md").exists()
+        or not (PLANNING_ROOT / "REQUIREMENTS.md").exists()
+    ):
         pytest.skip("SOL planning metadata is not present in this nested checkout")
     project = (PLANNING_ROOT / "PROJECT.md").read_text()
     requirements = (PLANNING_ROOT / "REQUIREMENTS.md").read_text()
     analysis = Path("docs/analysis.md").read_text()
 
     assert "CDNA 3 (`gfx94*`) full adapted suite validation remains deferred" in project
-    assert "CDNA3-family, CDNA4, or native-host ROCm validation expansion" in requirements
+    assert (
+        "CDNA3-family, CDNA4, or native-host ROCm validation expansion" in requirements
+    )
     assert "MI300X and MI308X are sibling GPU products" in requirements
     assert "not NVIDIA B200, SOLAR, or leaderboard equivalence claims" in analysis
     assert "hardware_validation_status" in analysis
@@ -1483,7 +1501,9 @@ def test_hardware_model_evidence_survives_bound_and_score_artifacts():
         == HardwareValidationStatus.PROVISIONAL.value
     )
     assert "validation_status" not in payload["hardware_model"]
-    assert score.evidence_refs["hardware_model"] == "default_amd_hardware_models.gfx1200"
+    assert (
+        score.evidence_refs["hardware_model"] == "default_amd_hardware_models.gfx1200"
+    )
 
 
 def test_definition_workload_trace_schemas_do_not_include_derived_artifact_fields():
@@ -1494,7 +1514,9 @@ def test_definition_workload_trace_schemas_do_not_include_derived_artifact_field
         outputs={"out": {"shape": ["N"], "dtype": "float32"}},
         reference="def run(x):\n    return x",
     )
-    workload = make_workload(axes={"N": 16}, inputs={"x": {"type": "random"}}, uuid="w1")
+    workload = make_workload(
+        axes={"N": 16}, inputs={"x": {"type": "random"}}, uuid="w1"
+    )
     trace = make_trace(
         definition="demo",
         workload=workload,
@@ -1599,5 +1621,75 @@ def test_cdna3_validation_remains_deferred_in_docs():
     assert "Actual MI300X full-suite execution under CDNA3 in v1.28" in requirements
     assert "hardware validation remains deferred" in roadmap
     assert "requires_cdna3" in roadmap
-    assert "CDNA3 full-suite validation has not been recorded" in CDNA3_NO_VALIDATION_WARNING
+    assert (
+        "CDNA3 full-suite validation has not been recorded"
+        in CDNA3_NO_VALIDATION_WARNING
+    )
     assert "hardware-validation claim" in CDNA3_NO_VALIDATION_WARNING
+
+
+def test_phase_137_rdna4_category_evidence_stays_bounded():
+    phase_dir = Path(
+        ".planning/phases/137-rdna4-long-running-test-and-category-validation-orchestration"
+    )
+    evidence = json.loads((phase_dir / "137-EVIDENCE.json").read_text())
+    runbook = (phase_dir / "137-RDNA4-LONG-RUN-RUNBOOK.md").read_text()
+
+    assert evidence["target_architecture"] == "gfx1200"
+    assert evidence["claim_boundary"]["full_dataset_validation"] is False
+    assert evidence["claim_boundary"]["benchmark_grade_timing"] is False
+    assert evidence["claim_boundary"]["public_claim_upgrade"] is False
+    assert evidence["claim_boundary"]["cdna3_or_mi300x_validation"] is False
+    assert evidence["claim_boundary"]["cdna4_validation"] is False
+    assert (
+        evidence["preflight"]["uv_pytorch_probe"]["status"]
+        == "execution_environment_boundary"
+    )
+    assert "Do not terminate a healthy process solely due to elapsed time." in runbook
+    assert "Phase 138 dataset closure" in runbook
+
+
+def test_phase_141_rdna4_public_claims_stay_bounded():
+    docs = "\n".join(
+        path.read_text()
+        for path in (
+            Path("README.md"),
+            Path("docs/CLAIMS.md"),
+            Path("docs/research_preview.md"),
+            Path("docs/release_candidate_validation.md"),
+            Path("docs/rocm.md"),
+        )
+    )
+
+    for expected in (
+        "121 ready problems",
+        "1907 attempted workloads",
+        "1761 passed workloads",
+        "146 failed workloads",
+        "86 OK problems",
+        "35 FAIL problems",
+        "12 explicit `missing_trace`",
+        "1895 derived score records",
+        "172 scored",
+        "1723 unscored",
+        "1839 AMD SOL/SOLAR sidecar pairs",
+        "56 temporary",
+        "timing remains non-authoritative",
+        "clock-lock/reset sudoers coverage",
+        "PyTorch/device-event fallback",
+        "profiler-backed `rocprofv3`",
+        "scripts/run_derived_isolated.py --launch-mode systemd",
+        "MemoryMax",
+        "MemorySwapMax",
+    ):
+        assert expected in docs
+
+    for forbidden_boundary in (
+        "not full 235-problem paper validation",
+        "not upstream SOLAR parity",
+        "not NVIDIA B200 equivalence",
+        "not hosted leaderboard authority",
+        "not CDNA3/MI300X validation",
+        "not CDNA4 validation",
+    ):
+        assert forbidden_boundary in docs

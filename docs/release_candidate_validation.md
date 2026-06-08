@@ -96,6 +96,22 @@ Use these classifications when reviewing the summary:
 
 This validation path supports an **engineering prerelease** claim only. It
 should be interpreted alongside the support matrix in `docs/rocm.md`. In
+the v1.30 RDNA4 evidence set, maintainers may cite a bounded RDNA4 `gfx1200`
+ready-subset result only with its denominator and blockers attached: 121 ready
+problems, 1907 attempted workloads, 1761 passed workloads, 146 failed
+workloads, 86 OK problems, 35 FAIL problems, 12 explicit `missing_trace`
+workload records, 1895 derived score records, 172 scored, 1723 unscored, and
+1839 AMD SOL/SOLAR sidecar pairs after 56 temporary long-tail sidecar
+exclusions. RDNA4 timing remains non-authoritative until clock-lock/reset
+sudoers coverage and profiler-backed timing evidence are rerun.
+
+Long RDNA4 derived or dataset jobs should be launched through
+`scripts/run_derived_isolated.py --launch-mode systemd` or an equivalent
+transient `systemd-run --user` unit with `MemoryMax` and `MemorySwapMax` caps,
+then monitored through status/log files. This keeps OOM-heavy workloads from
+taking down the calling Codex/session process.
+
+In
 particular, Docker/container user-space evidence remains distinct from
 native-host validation. CDNA3/gfx942 validation infrastructure evidence exists
 from MI308X (`gfx942`) runs, but full validation of the sibling MI300X GPU model
@@ -108,6 +124,7 @@ It does not provide:
 
 - full 235-problem paper validation
 - upstream SOLAR parity
+- NVIDIA B200 equivalence
 - hosted leaderboard readiness
 - hard sandbox or multi-tenant adversarial execution
 - CDNA4 validation, because suitable hardware is not currently accessible

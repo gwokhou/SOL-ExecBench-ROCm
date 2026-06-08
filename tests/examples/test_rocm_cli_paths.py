@@ -474,6 +474,98 @@ def test_run_dataset_records_filters_missing_workloads_and_readiness_blockers(
     assert blocked["readiness_reason_codes"] == ["safetensors_asset_missing"]
 
 
+def test_run_dataset_records_long_tail_exclusions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    dataset_root = _write_linear_backward_dataset(tmp_path, workload_count=2)
+    workload_refs = _linear_backward_workload_refs(2)
+    ready_subset_path = _write_ready_subset(tmp_path / "ready_subset.json", workload_refs)
+    readiness_path = _write_readiness(
+        tmp_path / "readiness.json",
+        [
+            {
+                "category": "L1",
+                "problem_id": "L1/linear_backward",
+                "problem_path": "L1/linear_backward",
+                "workload_uuid": ref["uuid"],
+                "row_index": ref["row_index"],
+                "status": "ready",
+                "reasons": [
+                    {
+                        "code": "ready_to_attempt_rocm_execution",
+                        "message": "ready",
+                        "next_action": "run",
+                    }
+                ],
+            }
+            for ref in workload_refs
+        ],
+    )
+    exclusions_path = tmp_path / "long_tail_exclusions.json"
+    exclusions_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "sol_execbench.long_tail_exclusions.v1",
+                "description": "test exclusion",
+                "exclusions": [
+                    {
+                        "scope": "workload",
+                        "problem_id": "L1/linear_backward",
+                        "workload_uuid": workload_refs[1]["uuid"],
+                        "reason": "known long-tail shard from prior validation",
+                        "evidence_ref": ".planning/milestones/CDNA3-VALIDATION-HANDOFF.md",
+                        "owner": "validation",
+                    }
+                ],
+            }
+        )
+    )
+    output_dir = tmp_path / "run-dataset"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--ready-subset",
+            str(ready_subset_path),
+            "--readiness",
+            str(readiness_path),
+            "--long-tail-exclusions",
+            str(exclusions_path),
+            "--solution-name",
+            "solution_python.json",
+            "--output",
+            str(output_dir),
+        ],
+    )
+
+    run_dataset.main()
+
+    closure = json.loads((output_dir / "execution_closure.json").read_text())
+    assert closure["totals"]["attempted_passed"] == 1
+    assert closure["totals"]["excluded_long_tail"] == 1
+    assert closure["totals"]["passed"] == 1
+    records = {
+        (record["workload_uuid"], record["closure_status"]): record
+        for record in closure["records"]
+    }
+    excluded = records[(workload_refs[1]["uuid"], "excluded_long_tail")]
+    assert excluded["filter_reasons"] == ["long_tail_exclusion"]
+    assert excluded["evidence_refs"] == {
+        "long_tail_exclusion": ".planning/milestones/CDNA3-VALIDATION-HANDOFF.md"
+    }
+    assert closure["source_refs"]["long_tail_exclusions"] == (
+        "long_tail_exclusions.json"
+    )
+    assert closure["provenance"]["long_tail_exclusions_checksum"]
+    assert closure["provenance"]["long_tail_exclusions_summary"]["exclusions"] == 1
+    assert closure["provenance"]["long_tail_exclusions_summary"]["claim_boundary"][
+        "excluded_entries_are_passed"
+    ] is False
+
+
 def test_run_dataset_stale_closure_provenance_forces_fresh_rocm_run(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):

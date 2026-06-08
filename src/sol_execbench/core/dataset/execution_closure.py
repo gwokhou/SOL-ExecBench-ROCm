@@ -22,6 +22,7 @@ class ExecutionClosureStatus(str, Enum):
     ATTEMPTED_FAILED = "attempted_failed"
     NOT_ATTEMPTED = "not_attempted"
     FILTERED = "filtered"
+    EXCLUDED_LONG_TAIL = "excluded_long_tail"
     SKIPPED_EXISTING_PASS = "skipped_existing_pass"
     MISSING_TRACE = "missing_trace"
     DERIVED_EVIDENCE_MISSING = "derived_evidence_missing"
@@ -124,6 +125,9 @@ class ExecutionClosureProvenance(BaseModel):
     dataset_source_revision: str | None = None
     dataset_license_boundary: dict[str, Any] = Field(default_factory=dict)
     dataset_manifest_summary: dict[str, Any] = Field(default_factory=dict)
+    long_tail_exclusions_path: str | None = None
+    long_tail_exclusions_checksum: str | None = None
+    long_tail_exclusions_summary: dict[str, Any] = Field(default_factory=dict)
     workload_identity_checksum: str | None = None
     requested_evidence_requirements: tuple[str, ...] = ()
     git_commit: str | None = None
@@ -149,6 +153,7 @@ class ExecutionClosureTotals(BaseModel):
     passed: int = 0
     failed: int = 0
     filtered: int = 0
+    excluded_long_tail: int = 0
     not_attempted: int = 0
     skipped_existing_pass: int = 0
     missing_trace: int = 0
@@ -372,6 +377,11 @@ def compare_execution_closure_provenance(
             "workload_identity_checksum",
             ExecutionClosureReasonCode.WORKLOAD_IDENTITY_MISMATCH,
         ),
+        (
+            "long_tail_exclusions_checksum",
+            ExecutionClosureReasonCode.SELECTION_MISMATCH,
+        ),
+        ("long_tail_exclusions_summary", ExecutionClosureReasonCode.SELECTION_MISMATCH),
         ("solution_mode", ExecutionClosureReasonCode.SOLUTION_MODE_MISMATCH),
         ("solution_name", ExecutionClosureReasonCode.SOLUTION_MISMATCH),
         ("timeout", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),

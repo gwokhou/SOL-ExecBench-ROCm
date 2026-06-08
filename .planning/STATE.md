@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.29
-milestone_name: Dataset Migration and Compliance
+milestone: v1.30
+milestone_name: RDNA4 Benchmark-Grade Validation Closure
 status: Awaiting next milestone
-stopped_at: Milestone v1.29 complete.
-last_updated: "2026-06-04T03:43:25.114Z"
-last_activity: 2026-06-04 — Milestone v1.29 completed and archived
+stopped_at: Milestone v1.30 complete.
+last_updated: "2026-06-08T04:50:00.000Z"
+last_activity: 2026-06-08 — Milestone v1.30 completed and archived
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 5
-  completed_plans: 5
+  total_phases: 6
+  completed_phases: 6
+  total_plans: 6
+  completed_plans: 6
   percent: 100
 ---
 
@@ -18,19 +18,19 @@ progress:
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (updated 2026-06-04)
+See: `.planning/PROJECT.md` (updated 2026-06-08)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly
 on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL
 ExecBench.
-**Current focus:** Awaiting next milestone definition.
+**Current focus:** Awaiting next milestone.
 
 ## Current Position
 
-Phase: Milestone v1.29 complete
+Phase: Milestone v1.30 complete
 Plan: —
 Status: Awaiting next milestone
-Last activity: 2026-06-04 — Milestone v1.29 completed and archived
+Last activity: 2026-06-08 — Milestone v1.30 completed and archived
 
 ## Recent Trend
 
@@ -130,6 +130,51 @@ Last activity: 2026-06-04 — Milestone v1.29 completed and archived
   summaries, blocker-visible execution closure rows, deterministic no-ready
   summaries, public-safe cookbook workflow docs, and CPU-safe guardrail tests.
 
+- Phase 136 completed on 2026-06-07 with RDNA4 validation scope documentation,
+  default-off long-tail exclusion config for `scripts/run_dataset.py`,
+  `excluded_long_tail` closure accounting, provenance/source-ref wiring, and
+  CPU-safe guardrail tests preserving claim boundaries.
+
+- Phase 137 completed on 2026-06-07 with a long-running RDNA4 validation
+  runbook, host `gfx1200` preflight evidence, category guardrails, JUnit
+  artifacts, and an accepted execution-environment boundary showing that
+  `uv`/pytest could not access `/dev/kfd` or `/dev/dri` despite host ROCm
+  tools seeing the RDNA4 GPU.
+
+- Phase 138 blocked on 2026-06-07 before full dataset execution because
+  `data/SOL-ExecBench/benchmark` is absent and `uv run` cannot see ROCm device
+  nodes. See
+  `.planning/phases/138-rdna4-full-dataset-execution-and-denominator-closure/138-BLOCKED.md`.
+
+- Phase 138 blocker rechecked on 2026-06-07T15:41:14Z with the same result:
+  only `data/` exists, and `uv run` reports `/dev/kfd False`, `/dev/dri False`,
+  HIP `7.1.25424`, `torch.cuda.is_available() False`, and device count `0`.
+
+- Phase 138 completed on 2026-06-08 after the dataset was downloaded and an
+  escalated RDNA4 `uv run` environment executed all 121 ready problems. The
+  bounded ready-subset denominator contains 3957 workload records: 1907 ready
+  workloads attempted on RDNA4 and 2050 readiness-blocked workloads not
+  attempted. The execution result was 86 OK problems, 35 FAIL problems, 1761
+  passed workloads, 146 failed workloads, and complete closure accounting
+  including 12 explicit `missing_trace` workload records.
+
+- Phase 139 completed on 2026-06-08 with RDNA4 `gfx1200` environment evidence,
+  `rocprofv3` availability evidence, explicit clock-lock blocker
+  classification, 121 timing sidecars, and an evaluation stability report. GPU
+  SCLK/MCLK lock and reset commands still require a sudo password, likely due
+  incomplete sudoers coverage, so timing remains non-authoritative. All 121
+  timing sidecars selected PyTorch/device-event fallback rather than
+  profiler-backed `rocprofv3` kernel activity timing.
+
+- Phase 140 completed on 2026-06-08 with RDNA4 AMD-native score report
+  generation, 1839 AMD SOL v2 sidecars, 1839 SOLAR derivation sidecars,
+  paper-denominator/parity/AMD-bound/consistency/claim/trust reports, and
+  `out/rdna4-derived-reports/bundle/evidence-bundle.json`. Heavy derived
+  generation was moved into `scripts/run_derived_isolated.py` using
+  `systemd-run --user` with `MemoryMax=20G` and `MemorySwapMax=0`, preventing
+  OOM sidecar builders from taking down Codex. The Phase 140 bundle records 56
+  temporarily excluded sidecar workloads and zero unexcluded missing sidecars.
+
 - Quick task 260604-vjx reduced heavyweight script memory and I/O overhead on
   2026-06-04 by streaming long subprocess output to bounded logs, caching
   prerelease checksums, avoiding redundant SOLAR sidecar rereads, and streaming
@@ -143,6 +188,13 @@ Last activity: 2026-06-04 — Milestone v1.29 completed and archived
   2026-06-07 by clarifying configuration/test/research entry points,
   centralizing authority-class wording, reducing historical-log overload, and
   preserving claim guardrails.
+
+- Phase 141 completed on 2026-06-08 with public RDNA4 claim closure across
+  README, `docs/CLAIMS.md`, `docs/research_preview.md`,
+  `docs/release_candidate_validation.md`, and `docs/rocm.md`. The final public
+  wording cites the bounded `gfx1200` denominator and derived evidence counts,
+  keeps timing non-authoritative, and prevents paper-parity, upstream SOLAR,
+  NVIDIA B200, leaderboard, CDNA3/MI300X, or CDNA4 claim upgrades.
 
 ## Accumulated Context
 
@@ -179,11 +231,19 @@ Last activity: 2026-06-04 — Milestone v1.29 completed and archived
 
 ### Pending Todos
 
-None.
+- Start the next milestone with `$gsd-new-milestone` when ready.
 
 ### Blockers/Concerns
 
-None.
+- Phase 138 failures are real RDNA4 execution findings and must remain visible
+  in Phase 140 reports and Phase 141 public wording.
+
+- Phase 139 found that sudoers coverage is incomplete for exact GPU clock-lock
+  commands: `sudo rocm-smi --setsclk 2`, `sudo rocm-smi --setmclk 5`, and
+  `sudo rocm-smi --resetclocks`.
+
+- RDNA4 timing remains non-authoritative until clock-lock/reset coverage and
+  profiler-backed timing collection are rerun.
 
 ## Deferred Items
 
@@ -203,12 +263,21 @@ None.
 | quick_task | 260602-mqi-fix-stale-project-configuration-audit-fi | missing | v1.29 close artifact audit |
 | quick_task | 260602-mqr-fix-second-pass-configuration-audit-findings | missing | v1.29 close artifact audit |
 | quick_task | 260602-msd-unwrap-readme-prose-lines | missing | v1.29 close artifact audit |
+| debug | 260607-remote-ci-failure | unknown | v1.30 close artifact audit |
+| quick_task | 260602-mqi-fix-stale-project-configuration-audit-fi | missing | v1.30 close artifact audit |
+| quick_task | 260602-mqr-fix-second-pass-configuration-audit-findings | missing | v1.30 close artifact audit |
+| quick_task | 260602-msd-unwrap-readme-prose-lines | missing | v1.30 close artifact audit |
+| quick_task | 260604-vjx-scripts-benchmark | missing | v1.30 close artifact audit |
+| quick_task | 260605-port-nvfp4-reference-scaled-mm | unknown | v1.30 close artifact audit |
+| quick_task | 260606-clarify-cdna3-mi300x-hierarchy | unknown | v1.30 close artifact audit |
+| quick_task | 260606-clarify-mi308x-cdna3-validation-docs | unknown | v1.30 close artifact audit |
+| quick_task | 260606-wis-fix-current-pytest-failures-after-codeba | missing | v1.30 close artifact audit |
 
 ## Session Continuity
 
-Last session: 2026-06-04
-Stopped at: Milestone v1.29 complete.
-Resume file: .planning/milestones/v1.29-MILESTONE-AUDIT.md
+Last session: 2026-06-08
+Stopped at: Milestone v1.30 complete.
+Resume file: .planning/milestones/v1.30-MILESTONE-AUDIT.md
 
 ## Operator Next Steps
 

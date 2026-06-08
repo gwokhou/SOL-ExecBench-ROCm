@@ -69,6 +69,42 @@ def _trace(uuid: str, status: str = "PASSED") -> dict:
     }
 
 
+def test_derived_sidecar_exclusions_match_single_problem_alias(tmp_path):
+    problem_dir = tmp_path / "dataset" / "L1" / "matmul_demo"
+    problem_dir.mkdir(parents=True)
+    workload_path = problem_dir / "workload.jsonl"
+    workload_path.write_text(json.dumps(_workload("skip-me")) + "\n")
+    exclusions_path = tmp_path / "derived-long-tail.json"
+    exclusions_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "sol_execbench.long_tail_exclusions.v1",
+                "exclusions": [
+                    {
+                        "scope": "workload",
+                        "problem_id": "L1/matmul_demo",
+                        "workload_uuid": "skip-me",
+                        "row_index": 0,
+                        "reason": "derived sidecar long tail",
+                        "evidence_ref": "phase-140-log",
+                    }
+                ],
+            }
+        )
+    )
+
+    exclusions = run_dataset._load_long_tail_exclusions(exclusions_path)
+
+    assert run_dataset._derived_sidecar_exclusions_for_problem(
+        problem_id=".",
+        workload_path=workload_path,
+        long_tail_exclusions=exclusions,
+        workload_shard_size=None,
+    ) == {
+        "skip-me": "derived sidecar long tail (evidence: phase-140-log)",
+    }
+
+
 def _write_prior_closure(
     path: Path,
     *,
@@ -240,6 +276,96 @@ def test_workload_shard_size_splits_cli_invocations_and_merges_traces(
         }
     ]
     assert (problem_dir / "workload.jsonl").read_text().count("\n") == 3
+
+
+def test_long_tail_exclusions_filter_plain_dataset_and_write_closure(
+    tmp_path, monkeypatch
+):
+    dataset_root = tmp_path / "dataset"
+    _write_problem(
+        dataset_root,
+        "L1",
+        "matmul_demo",
+        [_workload("fast"), _workload("slow"), _workload("tail")],
+    )
+    output_dir = tmp_path / "out"
+    exclusions_path = tmp_path / "long_tail_exclusions.json"
+    exclusions_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "sol_execbench.long_tail_exclusions.v1",
+                "exclusions": [
+                    {
+                        "scope": "workload",
+                        "problem_id": "L1/matmul_demo",
+                        "workload_uuid": "slow",
+                        "reason": "known long-tail workload",
+                        "evidence_ref": (
+                            ".planning/milestones/CDNA3-VALIDATION-HANDOFF.md"
+                        ),
+                    },
+                    {
+                        "scope": "shard",
+                        "problem_id": "L1/matmul_demo",
+                        "shard_index": 2,
+                        "reason": "known long-tail shard",
+                        "evidence_ref": (
+                            "docs/internal/cdna3_gfx942_validation_attempt.md"
+                        ),
+                    },
+                ],
+            }
+        )
+    )
+    calls: list[list[str]] = []
+
+    def run_cli(*, workload_path: Path, **kwargs):
+        uuids = [
+            json.loads(line)["uuid"]
+            for line in workload_path.read_text().splitlines()
+            if line.strip()
+        ]
+        calls.append(uuids)
+        return [_trace(uuid) for uuid in uuids]
+
+    monkeypatch.setattr(run_dataset, "run_cli", run_cli)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--output",
+            str(output_dir),
+            "--long-tail-exclusions",
+            str(exclusions_path),
+            "--workload-shard-size",
+            "2",
+        ],
+    )
+
+    run_dataset.main()
+
+    closure = json.loads((output_dir / "execution_closure.json").read_text())
+    summary = json.loads((output_dir / "summary.json").read_text())
+
+    assert calls == [["fast"]]
+    assert summary[0]["passed"] == 1
+    assert closure["totals"]["attempted"] == 0
+    assert closure["totals"]["passed"] == 0
+    assert closure["totals"]["excluded_long_tail"] == 2
+    assert [record["workload_uuid"] for record in closure["records"]] == [
+        "slow",
+        "tail",
+    ]
+    assert closure["records"][0]["closure_status"] == "excluded_long_tail"
+    assert closure["records"][0]["evidence_refs"] == {
+        "long_tail_exclusion": ".planning/milestones/CDNA3-VALIDATION-HANDOFF.md"
+    }
+    assert closure["provenance"]["long_tail_exclusions_checksum"]
+    assert closure["source_refs"]["long_tail_exclusions"] == (
+        "long_tail_exclusions.json"
+    )
 
 
 def test_workload_shard_size_preserves_partial_traces_and_marks_failure(
@@ -432,9 +558,7 @@ def test_pipeline_trace_mode_preserves_summary_order_and_serial_gpu_invocations(
     assert (output_dir / "L1" / "matmul_b" / "traces.json").exists()
 
 
-def test_pipeline_all_mode_collects_timing_from_generated_traces(
-    tmp_path, monkeypatch
-):
+def test_pipeline_all_mode_collects_timing_from_generated_traces(tmp_path, monkeypatch):
     dataset_root = tmp_path / "dataset"
     _write_problem(dataset_root, "L1", "matmul_demo", [_workload("one")])
     output_dir = tmp_path / "out"
@@ -1400,7 +1524,7 @@ def test_cli_failure_notes_detects_inner_eval_driver_timeout(tmp_path):
         "exit code: 1\n\n"
         "--- stderr ---\n"
         "Traceback (most recent call last):\n"
-        "  File \"/usr/lib/python3.12/subprocess.py\", line 1253, in _check_timeout\n"
+        '  File "/usr/lib/python3.12/subprocess.py", line 1253, in _check_timeout\n'
         "    raise TimeoutExpired(\n"
         "subprocess.TimeoutExpired: Command '['python', 'eval_driver.py']' "
         "timed out after 900 seconds\n",

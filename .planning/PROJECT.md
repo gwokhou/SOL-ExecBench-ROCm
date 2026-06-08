@@ -15,25 +15,28 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
 ## Current State
 
-**Shipped version:** v1.29 Dataset Migration and Compliance,
-completed 2026-06-04.
+**Shipped version:** v1.30 RDNA4 Benchmark-Grade Validation Closure,
+completed 2026-06-08.
 
 **Current milestone:** None defined.
 
 **Queued milestone:** None defined.
 
-**Latest milestone outcome:** v1.29 completed local dataset migration and
+**Latest milestone outcome:** v1.30 completed bounded RDNA4 `gfx1200`
+validation closure by defining the ready-subset denominator, executing 121
+ready problems / 1907 attempted workloads with complete pass/fail/missing-trace
+accounting, collecting timing-context evidence with explicit non-authoritative
+clock/profiler blockers, generating AMD-derived score and SOL/SOLAR evidence
+bundles, isolating memory-heavy derived jobs, and closing public claim
+guardrails.
+
+**Previous milestone outcome:** v1.29 completed local dataset migration and
 compliance by adding dataset provenance and redistribution guardrails,
 deterministic SOL-ExecBench and FlashInfer Trace migration commands, ROCm
 readiness classification, CPU-safe low-precision compatibility helpers, and
 runner closure/public documentation guardrails.
 
-**Previous milestone outcome:** v1.28 completed CDNA3 test and documentation
-readiness by adding concrete `requires_cdna3` hardware-gated tests, expanding
-the MI300X evidence contract, preserving deferred-validation guardrails, and
-documenting public/contributor CDNA3 test readiness.
-
-**Next milestone goal:** Not yet defined.
+**Next milestone goal:** Not defined.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline.
 Milestones v1.1-v1.6 added CDNA 3 code/schema support, maintained residue
@@ -139,6 +142,31 @@ generating ROCm readiness classifications and ready subsets, integrating
 migrated local datasets with the dataset runner, and implementing
 ROCm-equivalent compatibility paths for NVIDIA/Blackwell low-precision
 semantics without claiming real CDNA4 hardware validation.
+
+The v1.30 milestone completed bounded RDNA4 `gfx1200` validation closure. The
+public result is intentionally bounded: 121 ready problems, 1907 attempted
+workloads, 1761 passed workloads, 146 failed workloads, 86 OK problems, 35
+FAIL problems, and 12 explicit `missing_trace` records. Derived evidence
+contains 1895 score records, 172 scored, 1723 unscored, and 1839 AMD
+SOL/SOLAR sidecar pairs after 56 temporary sidecar exclusions. RDNA4 timing
+remains non-authoritative until clock-lock/reset sudoers coverage and
+profiler-backed timing evidence are rerun.
+
+## Current Milestone
+
+No active milestone is currently defined. Start the next milestone with
+`$gsd-new-milestone`.
+- Research is skipped; this will be scoped from existing project evidence and
+  validation machinery.
+- Existing deferred boundaries remain: no B200/SOLAR upstream equivalence, no
+  leaderboard authority, no CDNA3/MI300X upgrade, and no CDNA4 claim.
+
+**Explicitly deferred:**
+- Claiming NVIDIA B200 equivalence, upstream SOLAR equivalence, hosted
+  leaderboard authority, or paper-parity authority.
+- Upgrading CDNA3/MI300X or CDNA4 validation claims from RDNA4 evidence.
+- Redistributing NVIDIA/SOL-ExecBench original or derivative dataset content.
+- Treating temporarily excluded long-tail shards as passed validation.
 
 ## Latest Milestone: v1.29 Dataset Migration and Compliance
 
@@ -854,7 +882,9 @@ ROCm-compatible data migration from real CDNA3/CDNA4 hardware validation.
 ## Constraints
 
 - **Platform**: ROCm >= 7.0 is the supported software baseline.
-- **Hardware**: RDNA 4 is validated; CDNA 3 is code/schema-supported but hardware validation remains deferred.
+- **Hardware**: RDNA 4 has scoped real-hardware evidence and is the target for
+  v1.30 benchmark-grade validation closure; CDNA 3 is code/schema-supported but
+  MI300X hardware validation remains bounded by separate evidence requirements.
 - **Compatibility**: Preserve SOL ExecBench benchmark semantics and public schemas unless a ROCm-specific change is unavoidable.
 - **Scope**: NVIDIA/CUDA runtime support is intentionally not maintained.
 - **Licensing**: All retained and replacement code must comply with the repository LICENSE and third-party dependency obligations.
@@ -906,6 +936,9 @@ ROCm-compatible data migration from real CDNA3/CDNA4 hardware validation.
 | Complete CDNA3 test readiness without hardware execution | User requested a new milestone to fill out real usable CDNA3 tests and docs, while acknowledging the current machine cannot execute the validation and actual hardware verification remains deferred. | Active in v1.28 |
 | Treat dataset migration as local-only for NVIDIA data | User asked about legal risk for SOL-ExecBench and FlashInfer Trace migration; NVIDIA/SOL-ExecBench redistribution is restricted, while FlashInfer Trace is Apache-2.0. | Validated in v1.29 |
 | Implement low-precision compatibility without hardware validation | User clarified v1.29 may include complete ROCm-equivalent implementations for NVFP4/Blackwell semantics, but real validation depends on future CDNA4 hardware evidence. | Validated in v1.29 |
+| Complete RDNA4 benchmark-grade validation | User selected v1.30 to turn existing RDNA4 `gfx1200` scoped evidence into full benchmark-grade validation with full dataset, timing, score, evidence-bundle, and claim-guardrail closure. | Active in v1.30 |
+| Preserve long-running validation jobs | User clarified that real validation may run for many hours; agents should poll and checkpoint rather than kill healthy processes solely because they are long-running. | Active in v1.30 |
+| Make long-tail exclusions explicit | User clarified that known super-long-tail shards should be temporarily excludable through `scripts/run_dataset.py` configuration while preserving denominator visibility and auditability. | Active in v1.30 |
 
 ## Evolution
 
@@ -925,4 +958,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-04 after v1.29 milestone completion*
+*Last updated: 2026-06-07 after v1.30 milestone start*

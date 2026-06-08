@@ -183,7 +183,7 @@ authority, or new hardware-validation claims.
 
 | Support surface | Architecture or scope | Engineering prerelease status | Interpretation |
 | --- | --- | --- | --- |
-| RDNA 4 | `gfx1200` | engineering-prerelease evidence exists through prior adapted-suite, library-example, Docker/container, and release-candidate validation artifacts where those artifacts are archived. | Valid prerelease evidence for the recorded host and commands; not full 235-problem paper validation or broader AMD hardware validation. |
+| RDNA 4 | `gfx1200` | v1.30 bounded ready-subset evidence exists: 121 ready problems, 1907 attempted workloads, 1761 passed workloads, 146 failed workloads, 86 OK problems, 35 FAIL problems, 12 explicit `missing_trace` records, 1895 derived score records, 172 scored, 1723 unscored, and 1839 AMD SOL/SOLAR sidecar pairs after 56 temporary sidecar exclusions. | Valid bounded RDNA4 evidence for the recorded host, commands, and artifacts; timing remains non-authoritative, and the result is not full 235-problem paper validation, upstream SOLAR parity, NVIDIA B200 equivalence, hosted leaderboard authority, CDNA3/MI300X validation, CDNA4 validation, or broader AMD hardware validation. |
 | Docker/container ROCm user-space | Declared ROCm container targets on recorded host driver/devices | Container user-space evidence can be recorded for selected ROCm targets. | Docker/container ROCm user-space evidence is not native-host validation and must not be used as native-host, score, paper-parity, or leaderboard authority. |
 | MI300X GPU under CDNA 3 | MI300X and MI308X are sibling GPU products under the CDNA3 architecture family and share the `gfx942` code path; `gfx940`, `gfx941`, and `gfx942` remain CDNA 3 code/schema targets. | CDNA3 validation infrastructure evidence exists on MI308X (`gfx942`): pytest passed, the full dataset run executed, Quant NVFP4/MXFP4 skips were expected, and remaining non-skip blockers are timeout shards. | This is not a completed benchmark-grade MI300X hardware-validation claim because MI308X and MI300X hardware configurations differ, despite sharing `gfx942`. |
 | CDNA4 | Future CDNA4 class hardware | CDNA4 validation is unavailable because suitable hardware is not currently accessible. | CDNA4 is not a v1.25 validation target and should be reported as unavailable, not as validated or merely skipped. |
@@ -200,7 +200,7 @@ Validation recorded in this milestone:
 
 | Hardware class | Architecture | Status |
 | --- | --- | --- |
-| RDNA 4 | `gfx1200` | v1.8 library example scope is RDNA 4 only. |
+| RDNA 4 | `gfx1200` | v1.30 bounded ready-subset validation evidence exists with visible failures, missing traces, temporary sidecar exclusions, and non-authoritative timing blockers. |
 | CDNA 3 | `gfx940`, `gfx941`, `gfx942` (`gfx94*`) | Code/schema support present. Real MI308X (`gfx942`) runs recorded a passed adapted pytest suite and an operational full-dataset validation path with known timeout blockers. Do not claim full MI300X hardware validation until those blockers and required exact-hardware MI300X evidence are resolved or explicitly bounded. |
 | CDNA 4 | future CDNA4 class targets | CDNA4 validation is unavailable because suitable hardware is not currently accessible. |
 

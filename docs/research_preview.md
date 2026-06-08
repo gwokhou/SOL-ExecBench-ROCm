@@ -48,7 +48,7 @@ but do not replace canonical traces.
 
 | Hardware scope | Research preview status | Interpretation |
 | --- | --- | --- |
-| RDNA4 `gfx1200` | Recorded prerelease evidence exists where archived commands and artifacts support the scope. | Engineering-prerelease evidence for the recorded host and commands only. |
+| RDNA4 `gfx1200` | v1.30 bounded ready-subset evidence exists: 121 ready problems, 1907 attempted workloads, 1761 passed workloads, 146 failed workloads, 86 OK problems, 35 FAIL problems, 12 explicit `missing_trace` workload records, 1895 derived score records, 172 scored, 1723 unscored, and 1839 AMD SOL/SOLAR sidecar pairs after 56 temporary sidecar exclusions. | Bounded RDNA4 evidence for the recorded host, commands, exclusions, and artifacts only. Timing remains non-authoritative because clock-lock/reset sudoers coverage is incomplete and timing used PyTorch/device-event fallback rather than profiler-backed `rocprofv3` kernel activity timing. |
 | MI300X GPU under CDNA3 `gfx942` | Infrastructure evidence with known blockers. | Current CDNA3 evidence was recorded on MI308X (`gfx942`), not MI300X. MI300X and MI308X are sibling GPU products under CDNA3 with different hardware configurations, even though they share the `gfx942` code path. |
 | CDNA4 | Unavailable. | CDNA4 validation is unavailable because suitable hardware is not currently accessible. |
 | Docker/container ROCm user-space | Diagnostic compatibility evidence where recorded. | Container user-space evidence is not native-host validation. |
@@ -92,8 +92,12 @@ equivalence, official leaderboard equivalence, or paper-scale validation.
 
 - No full 235-problem paper-scale validation is claimed.
 - No upstream SOLAR parity is claimed.
+- No NVIDIA B200 equivalence is claimed.
 - No hosted leaderboard readiness is claimed.
 - No hard multi-tenant sandbox authority is claimed.
+- RDNA4 timing is not authoritative until clock-lock/reset sudoers coverage and
+  profiler-backed timing evidence are rerun.
+- RDNA4 long-tail sidecar exclusions remain temporary, visible, and reversible.
 - No native-host ROCm validation is inferred from Docker/container user-space
   evidence.
 - Full MI300X validation under CDNA3 remains blocked by known timeout shards and
