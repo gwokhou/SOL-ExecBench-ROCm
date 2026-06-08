@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.31
 milestone_name: RDNA4 Follow-Up Evidence Hardening
-status: active
-stopped_at: timing fallback semantics clarified after Phase 147
-last_updated: "2026-06-08T05:58:00.000Z"
-last_activity: 2026-06-08 — Quick task 260608-jan clarified timing fallback semantics, documenting PyTorch/device-event fallback as source-policy fallback rather than `rocprofv3` tool failure and adding HIP native profiler-backed routing coverage.
+status: Awaiting next milestone
+stopped_at: Milestone v1.31 complete.
+last_updated: "2026-06-08T06:04:43.318Z"
+last_activity: 2026-06-08 — Milestone v1.31 completed and archived
 progress:
   total_phases: 6
   completed_phases: 6
@@ -27,13 +27,10 @@ ExecBench.
 
 ## Current Position
 
-Phase: v1.31 - RDNA4 Follow-Up Evidence Hardening
-Plan: all planned phases completed
-Status: Memory/timing closure attempt complete; fallback semantics clarified
-Last activity: 2026-06-08 — Quick task 260608-jan clarified that
-PyTorch/device-event timing sidecars are source-policy fallback, not
-`rocprofv3` availability failures, and added HIP native profiler-backed routing
-coverage.
+Phase: Milestone v1.31 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-06-08 — Milestone v1.31 completed and archived
 
 ## Recent Trend
 
@@ -269,18 +266,15 @@ coverage.
 | Hardware validation | Real CDNA4 validation or performance authority for NVFP4/Blackwell semantics | Deferred | v1.29 scope |
 | quick_task | 260531-rdf-add-run-dataset-closure-e2e-gaps | completed | v1.29 close artifact audit |
 | quick_task | 260531-uki-add-remaining-requires-rocm-e2e-coverage | completed | v1.29 close artifact audit |
-| quick_task | 260602-mqi-fix-stale-project-configuration-audit-fi | missing | v1.29 close artifact audit |
-| quick_task | 260602-mqr-fix-second-pass-configuration-audit-findings | missing | v1.29 close artifact audit |
-| quick_task | 260602-msd-unwrap-readme-prose-lines | missing | v1.29 close artifact audit |
-| debug | 260607-remote-ci-failure | unknown | v1.30 close artifact audit |
-| quick_task | 260602-mqi-fix-stale-project-configuration-audit-fi | missing | v1.30 close artifact audit |
-| quick_task | 260602-mqr-fix-second-pass-configuration-audit-findings | missing | v1.30 close artifact audit |
-| quick_task | 260602-msd-unwrap-readme-prose-lines | missing | v1.30 close artifact audit |
-| quick_task | 260604-vjx-scripts-benchmark | missing | v1.30 close artifact audit |
-| quick_task | 260605-port-nvfp4-reference-scaled-mm | unknown | v1.30 close artifact audit |
-| quick_task | 260606-clarify-cdna3-mi300x-hierarchy | unknown | v1.30 close artifact audit |
-| quick_task | 260606-clarify-mi308x-cdna3-validation-docs | unknown | v1.30 close artifact audit |
-| quick_task | 260606-wis-fix-current-pytest-failures-after-codeba | missing | v1.30 close artifact audit |
+| quick_task | 260602-mqi-fix-stale-project-configuration-audit-fi | resolved | v1.31 close artifact hygiene |
+| quick_task | 260602-mqr-fix-second-pass-configuration-audit-findings | resolved | v1.31 close artifact hygiene |
+| quick_task | 260602-msd-unwrap-readme-prose-lines | resolved | v1.31 close artifact hygiene |
+| debug | 260607-remote-ci-failure | resolved | v1.31 close artifact hygiene |
+| quick_task | 260604-vjx-scripts-benchmark | resolved | v1.31 close artifact hygiene |
+| quick_task | 260605-port-nvfp4-reference-scaled-mm | resolved | v1.31 close artifact hygiene |
+| quick_task | 260606-clarify-cdna3-mi300x-hierarchy | resolved | v1.31 close artifact hygiene |
+| quick_task | 260606-clarify-mi308x-cdna3-validation-docs | resolved | v1.31 close artifact hygiene |
+| quick_task | 260606-wis-fix-current-pytest-failures-after-codeba | resolved | v1.31 close artifact hygiene |
 
 ## Session Continuity
 

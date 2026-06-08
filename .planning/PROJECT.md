@@ -15,14 +15,21 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
 ## Current State
 
-**Shipped version:** v1.30 RDNA4 Benchmark-Grade Validation Closure,
+**Shipped version:** v1.31 RDNA4 Follow-Up Evidence Hardening,
 completed 2026-06-08.
 
-**Current milestone:** v1.31 RDNA4 Follow-Up Evidence Hardening.
+**Current milestone:** None active.
 
 **Queued milestone:** None defined.
 
-**Latest milestone outcome:** v1.30 completed bounded RDNA4 `gfx1200`
+**Latest milestone outcome:** v1.31 completed RDNA4 follow-up evidence
+hardening by fixing clock sudoers coverage, rerunning clock-lock/timing
+evidence, classifying timing fallback as PyTorch source-policy fallback,
+retrying temporary derived sidecar exclusions under memory caps, classifying
+all missing traces and failed workload records, attempting evaluator memory
+optimization, and resolving historical open GSD artifacts before close.
+
+**Previous milestone outcome:** v1.30 completed bounded RDNA4 `gfx1200`
 validation closure by defining the ready-subset denominator, executing 121
 ready problems / 1907 attempted workloads with complete pass/fail/missing-trace
 accounting, collecting timing-context evidence with explicit non-authoritative
@@ -30,16 +37,10 @@ clock/profiler blockers, generating AMD-derived score and SOL/SOLAR evidence
 bundles, isolating memory-heavy derived jobs, and closing public claim
 guardrails.
 
-**Previous milestone outcome:** v1.29 completed local dataset migration and
-compliance by adding dataset provenance and redistribution guardrails,
-deterministic SOL-ExecBench and FlashInfer Trace migration commands, ROCm
-readiness classification, CPU-safe low-precision compatibility helpers, and
-runner closure/public documentation guardrails.
-
-**Next milestone goal:** Resolve RDNA4 follow-up issues in practical order:
-sudoers/clock coverage, authoritative timing path, temporary derived sidecar
-exclusions, missing traces, and failed workload classification. Historical
-open-artifact cleanup is excluded from this milestone.
+**Next milestone goal:** Not defined. Candidate frontier work includes
+authoritative native/Triton profiler-backed timing evidence, memory-efficiency
+work for remaining RDNA4 OOM classes, targeted timeout reruns, and future
+CDNA3/MI300X or CDNA4 validation when suitable hardware evidence is available.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline.
 Milestones v1.1-v1.6 added CDNA 3 code/schema support, maintained residue

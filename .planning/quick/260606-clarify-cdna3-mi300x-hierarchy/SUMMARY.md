@@ -1,3 +1,10 @@
+---
+quick_id: 260606-clarify-cdna3-mi300x-hierarchy
+slug: clarify-cdna3-mi300x-hierarchy
+status: complete
+completed: 2026-06-06
+---
+
 # Clarify CDNA3 And MI300X Hierarchy Summary
 
 ## Status
