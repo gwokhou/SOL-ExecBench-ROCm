@@ -52,6 +52,13 @@ from sol_execbench.core.dataset.low_precision import (
     cdna4_low_precision_skip_reason as _cdna4_low_precision_skip_reason,
     should_skip_cdna4_low_precision_on_arch as _should_skip_cdna4_low_precision_on_arch,
 )
+from sol_execbench.core.dataset.long_tail_exclusions import (
+    LONG_TAIL_EXCLUSION_STATUS,
+    LongTailExclusionSidecar,
+    exclusion_closure_metadata as _long_tail_exclusion_closure_metadata,
+    load_long_tail_exclusions as _load_long_tail_exclusions,
+    split_excluded_workloads as _split_long_tail_excluded_workloads_core,
+)
 from sol_execbench.core.dataset.run_closure import (
     closure_record as _build_closure_record,
     closure_totals as _build_closure_totals,
@@ -548,6 +555,7 @@ def _source_refs(
     ready_subset_path: Path | None,
     readiness_path: Path | None,
     dataset_manifest_path: Path | None,
+    long_tail_exclusions_path: Path | None,
     problems_dir: Path,
     output_dir: Path,
 ) -> dict[str, str]:
@@ -556,6 +564,7 @@ def _source_refs(
         ("ready_subset", ready_subset_path),
         ("readiness", readiness_path),
         ("dataset_manifest", dataset_manifest_path),
+        ("long_tail_exclusions", long_tail_exclusions_path),
     ):
         if path is not None:
             refs[key] = _first_relative_ref(path, ROOT, problems_dir, output_dir)
@@ -611,6 +620,10 @@ def _normalized_command_args(args: argparse.Namespace) -> list[str]:
         normalized.extend(["--timeout-policy", args.timeout_policy])
     if args.timeout_overrides is not None:
         normalized.extend(["--timeout-overrides", Path(args.timeout_overrides).name])
+    if args.long_tail_exclusions is not None:
+        normalized.extend(
+            ["--long-tail-exclusions", Path(args.long_tail_exclusions).name]
+        )
     if args.blob_precheck != "fail":
         normalized.extend(["--blob-precheck", args.blob_precheck])
     if args.log_order != "completion":
@@ -694,6 +707,110 @@ def _selected_workload_rows(
         workload_refs,
         max_workloads=max_workloads,
     )
+
+
+def _split_long_tail_excluded_workloads(
+    *,
+    problem_id: str,
+    workload_refs: list[dict],
+    long_tail_exclusions: LongTailExclusionSidecar | None,
+    workload_shard_size: int | None,
+) -> tuple[list[dict], list[tuple[dict, object]]]:
+    return _split_long_tail_excluded_workloads_core(
+        problem_id=problem_id,
+        workload_refs=workload_refs,
+        exclusions=long_tail_exclusions.config if long_tail_exclusions else None,
+        workload_shard_size=workload_shard_size,
+    )
+
+
+def _filter_long_tail_workload_file(
+    *,
+    workload_path: Path,
+    filtered_workload_path: Path,
+    category: str,
+    problem_id: str,
+    problem_path: str,
+    long_tail_exclusions: LongTailExclusionSidecar | None,
+    workload_shard_size: int | None,
+) -> tuple[Path, list[dict], bool]:
+    """Filter a plain workload.jsonl by long-tail config and record exclusions."""
+    if long_tail_exclusions is None:
+        return workload_path, [], False
+
+    rows = _read_workload_rows(workload_path)
+    selected_lines: list[str] = []
+    closure_records: list[dict] = []
+    excluded_any = False
+    for row_index, payload, line in rows:
+        workload_uuid = payload.get("uuid")
+        entry = long_tail_exclusions.config.match_workload(
+            problem_id=problem_id,
+            workload_uuid=workload_uuid,
+            row_index=row_index,
+            workload_shard_size=workload_shard_size,
+        )
+        if entry is None:
+            selected_lines.append(line)
+            continue
+
+        excluded_any = True
+        metadata = _long_tail_exclusion_closure_metadata(entry)
+        closure_records.append(
+            _closure_record(
+                category=category,
+                problem_id=problem_id,
+                problem_path=problem_path,
+                workload_uuid=workload_uuid,
+                row_index=row_index,
+                closure_status=LONG_TAIL_EXCLUSION_STATUS,
+                filter_reasons=metadata["filter_reasons"],
+                evidence_refs=metadata["evidence_refs"],
+                notes=metadata["notes"],
+            )
+        )
+
+    if not excluded_any:
+        return workload_path, [], False
+
+    filtered_workload_path.parent.mkdir(parents=True, exist_ok=True)
+    filtered_workload_path.write_text(
+        "\n".join(selected_lines) + ("\n" if selected_lines else "")
+    )
+    return filtered_workload_path, closure_records, len(selected_lines) == 0
+
+
+def _derived_sidecar_exclusions_for_problem(
+    *,
+    problem_id: str,
+    workload_path: Path,
+    long_tail_exclusions: LongTailExclusionSidecar | None,
+    workload_shard_size: int | None,
+) -> dict[str, str]:
+    """Return workload UUIDs whose missing derived sidecars should not be built."""
+    if long_tail_exclusions is None:
+        return {}
+    problem_ids = {problem_id}
+    inferred_problem_id = (
+        f"{workload_path.parent.parent.name}/{workload_path.parent.name}"
+    )
+    problem_ids.add(inferred_problem_id)
+    exclusions: dict[str, str] = {}
+    for row_index, payload, _line in _read_workload_rows(workload_path):
+        workload_uuid = payload.get("uuid")
+        entry = None
+        for candidate_problem_id in problem_ids:
+            entry = long_tail_exclusions.config.match_workload(
+                problem_id=candidate_problem_id,
+                workload_uuid=workload_uuid,
+                row_index=row_index,
+                workload_shard_size=workload_shard_size,
+            )
+            if entry is not None:
+                break
+        if entry is not None and workload_uuid is not None:
+            exclusions[str(workload_uuid)] = entry.closure_note()
+    return exclusions
 
 
 def _trace_map(traces: list[dict]) -> dict[tuple[str, str | int], dict]:
@@ -872,6 +989,7 @@ def _run_existing_trace_derived_problem(
     solar_derivation: Path | None,
     timing_evidence_dir: Path | None,
     scoring_baseline,
+    derived_sidecar_exclusions: dict[str, str] | None = None,
 ) -> dict:
     problem_name = problem_dir.name
     category = problem_dir.parent.name
@@ -976,6 +1094,7 @@ def _run_existing_trace_derived_problem(
             baseline_artifact=scoring_baseline,
             sol_bound_artifact_dir=amd_sol_bound_dir,
             solar_derivation_dir=solar_derivation,
+            derived_sidecar_exclusions=derived_sidecar_exclusions,
         )
 
     if selected_workload_refs is not None:
@@ -1168,7 +1287,9 @@ def _resolve_prepare_jobs(value: str, *, problem_count: int) -> int:
         try:
             requested = int(value)
         except ValueError as exc:
-            raise SystemExit("--prepare-jobs must be a positive integer or 'auto'") from exc
+            raise SystemExit(
+                "--prepare-jobs must be a positive integer or 'auto'"
+            ) from exc
     if requested < 1:
         raise SystemExit("--prepare-jobs must be a positive integer or 'auto'")
     return min(requested, max(problem_count, 1))
@@ -1196,9 +1317,7 @@ def _prepare_pipeline_trace_problem(
     definition = json.loads(definition_path.read_text())
     messages = [f"\n[{index + 1}/{problem_count}] {category}/{problem_name}"]
 
-    if _should_skip_cdna4_low_precision_on_arch(
-        definition, effective_gpu_architecture
-    ):
+    if _should_skip_cdna4_low_precision_on_arch(definition, effective_gpu_architecture):
         skip_reason = _cdna4_low_precision_skip_reason(effective_gpu_architecture)
         messages.append(f"  Skipping ({skip_reason}).")
         return _PipelineTracePreparedProblem(
@@ -1257,16 +1376,10 @@ def _prepare_pipeline_trace_problem(
                 summary=summary,
                 run_required=False,
             )
-        elif (
-            reuse_decision is not None
-            and reuse_decision.reason == "previous_failed"
-        ):
+        elif reuse_decision is not None and reuse_decision.reason == "previous_failed":
             failed = summary["failed"] if summary is not None else "unknown"
             messages.append(f"  Re-running (previous run had {failed} failures).")
-        elif (
-            reuse_decision is not None
-            and reuse_decision.reason == "rerun_requested"
-        ):
+        elif reuse_decision is not None and reuse_decision.reason == "rerun_requested":
             messages.append("  Re-running (--rerun requested).")
 
     if problem_output_dir.exists():
@@ -1280,9 +1393,7 @@ def _prepare_pipeline_trace_problem(
             workload_path.write_text("\n".join(lines[: args.max_workloads]))
 
     if args.blob_precheck != "off":
-        missing_refs = _missing_safetensors_refs(
-            workload_path, blob_index=blob_index
-        )
+        missing_refs = _missing_safetensors_refs(workload_path, blob_index=blob_index)
         if missing_refs:
             message = (
                 "missing safetensors blobs: "
@@ -1313,9 +1424,7 @@ def _prepare_pipeline_trace_problem(
                         "passed": 0,
                         "failed": 1,
                         "latencies_ms": [],
-                        "failure_reasons": [
-                            f"  [MISSING_SAFETENSORS] {message}"
-                        ],
+                        "failure_reasons": [f"  [MISSING_SAFETENSORS] {message}"],
                     },
                     run_required=False,
                 )
@@ -1714,6 +1823,16 @@ def main():
         ),
     )
     ap.add_argument(
+        "--long-tail-exclusions",
+        type=Path,
+        default=None,
+        help=(
+            "Optional JSON config for temporarily excluding known long-tail "
+            "problems, workloads, or workload shards from execution while "
+            "preserving closure accounting."
+        ),
+    )
+    ap.add_argument(
         "--blob-precheck",
         choices=("fail", "warn", "off"),
         default="fail",
@@ -1895,13 +2014,24 @@ def main():
         ap.error("--gpu-jobs currently only supports 1")
     if args.execution_mode == "pipeline":
         if args.phase not in {"traces", "all"}:
-            ap.error("--execution-mode pipeline currently requires --phase traces or all")
+            ap.error(
+                "--execution-mode pipeline currently requires --phase traces or all"
+            )
         if args.ready_subset is not None or args.execution_closure is not None:
             ap.error(
                 "--execution-mode pipeline currently does not support "
                 "--ready-subset or --execution-closure"
             )
+        if args.long_tail_exclusions is not None:
+            ap.error(
+                "--execution-mode pipeline currently does not support "
+                "--long-tail-exclusions"
+            )
     args.timeout_override_rules = _load_timeout_overrides(args.timeout_overrides)
+    try:
+        long_tail_exclusions = _load_long_tail_exclusions(args.long_tail_exclusions)
+    except ValueError as exc:
+        ap.error(str(exc))
 
     problems_dir = args.problems_dir.resolve()
     if not problems_dir.is_dir():
@@ -1914,7 +2044,7 @@ def main():
         args.execution_closure.resolve()
         if args.execution_closure is not None
         else output_dir / "execution_closure.json"
-        if args.ready_subset is not None
+        if args.ready_subset is not None or args.long_tail_exclusions is not None
         else None
     )
 
@@ -1946,6 +2076,9 @@ def main():
         dataset_manifest_path=args.dataset_manifest.resolve()
         if args.dataset_manifest
         else None,
+        long_tail_exclusions_path=(
+            args.long_tail_exclusions.resolve() if args.long_tail_exclusions else None
+        ),
         problems_dir=problems_dir,
         output_dir=output_dir,
     )
@@ -1973,6 +2106,34 @@ def main():
             selected_ids: list[str] = []
             for problem_id, problem_ref in ready_problems.items():
                 reason: list[str] = []
+                workload_refs, long_tail_filtered = _split_long_tail_excluded_workloads(
+                    problem_id=problem_id,
+                    workload_refs=list(problem_ref.get("workloads", [])),
+                    long_tail_exclusions=long_tail_exclusions,
+                    workload_shard_size=args.workload_shard_size,
+                )
+                if long_tail_filtered:
+                    problem_ref["workloads"] = workload_refs
+                    for workload_ref, exclusion in long_tail_filtered:
+                        key = _workload_key(
+                            workload_ref.get("uuid"), workload_ref.get("row_index")
+                        )
+                        readiness_record = readiness_by_workload.get((problem_id, key))
+                        metadata = _long_tail_exclusion_closure_metadata(exclusion)
+                        closure_records.append(
+                            _closure_record(
+                                category=str(problem_ref.get("category")),
+                                problem_id=problem_id,
+                                problem_path=str(problem_ref.get("problem_path")),
+                                workload_uuid=workload_ref.get("uuid"),
+                                row_index=int(workload_ref.get("row_index", 0)),
+                                closure_status=LONG_TAIL_EXCLUSION_STATUS,
+                                readiness=readiness_record,
+                                filter_reasons=metadata["filter_reasons"],
+                                evidence_refs=metadata["evidence_refs"],
+                                notes=metadata["notes"],
+                            )
+                        )
                 if (
                     category_filter
                     and problem_ref.get("category") not in category_filter
@@ -1980,6 +2141,8 @@ def main():
                     reason.append("category_filter")
                 elif problem_id not in discovered_by_id:
                     reason.append("problem_not_discovered")
+                elif not problem_ref.get("workloads"):
+                    continue
                 else:
                     selected_ids.append(problem_id)
                     continue
@@ -2159,6 +2322,19 @@ def main():
         "dataset_source_revision": dataset_manifest_summary.get("source_revision"),
         "dataset_license_boundary": _license_boundary_metadata(dataset_manifest),
         "dataset_manifest_summary": dataset_manifest_summary,
+        "long_tail_exclusions_path": (
+            _first_relative_ref(
+                args.long_tail_exclusions, ROOT, problems_dir, output_dir
+            )
+            if args.long_tail_exclusions
+            else None
+        ),
+        "long_tail_exclusions_checksum": (
+            long_tail_exclusions.checksum if long_tail_exclusions is not None else None
+        ),
+        "long_tail_exclusions_summary": (
+            long_tail_exclusions.summary if long_tail_exclusions is not None else {}
+        ),
         "requested_evidence_requirements": _requested_evidence_requirements(args),
         "git_commit": _git_commit(),
         "config_path": _relative_ref(config_path, output_dir) if config_path else None,
@@ -2309,27 +2485,34 @@ def main():
         return
 
     if args.phase == "derived" and jobs > 1:
-        with ThreadPoolExecutor(max_workers=jobs) as executor:
-            results = executor.map(
-                lambda item: _run_existing_trace_derived_problem(
-                    problem_dir=item[1],
-                    index=item[0],
-                    problem_count=len(problems),
-                    problems_dir=problems_dir,
-                    output_dir=output_dir,
-                    problem_ref=ready_problems.get(
-                        _problem_id_for(problems_dir, item[1])
-                    ),
-                    readiness_by_workload=readiness_by_workload,
-                    max_workloads=args.max_workloads,
-                    amd_score_report=args.amd_score_report,
-                    amd_sol_bound_dir=args.amd_sol_bound_dir,
-                    solar_derivation=args.solar_derivation,
-                    timing_evidence_dir=None,
-                    scoring_baseline=scoring_baseline,
+
+        def run_derived_item(item):
+            problem_dir = item[1]
+            problem_id = _problem_id_for(problems_dir, problem_dir)
+            return _run_existing_trace_derived_problem(
+                problem_dir=problem_dir,
+                index=item[0],
+                problem_count=len(problems),
+                problems_dir=problems_dir,
+                output_dir=output_dir,
+                problem_ref=ready_problems.get(problem_id),
+                readiness_by_workload=readiness_by_workload,
+                max_workloads=args.max_workloads,
+                amd_score_report=args.amd_score_report,
+                amd_sol_bound_dir=args.amd_sol_bound_dir,
+                solar_derivation=args.solar_derivation,
+                timing_evidence_dir=None,
+                scoring_baseline=scoring_baseline,
+                derived_sidecar_exclusions=_derived_sidecar_exclusions_for_problem(
+                    problem_id=problem_id,
+                    workload_path=problem_dir / "workload.jsonl",
+                    long_tail_exclusions=long_tail_exclusions,
+                    workload_shard_size=args.workload_shard_size,
                 ),
-                enumerate(problems),
             )
+
+        with ThreadPoolExecutor(max_workers=jobs) as executor:
+            results = executor.map(run_derived_item, enumerate(problems))
             for result in results:
                 for message in result["messages"]:
                     print(message)
@@ -2468,7 +2651,12 @@ def main():
                 )
             if not selected_workload_refs:
                 continue
-
+        derived_sidecar_exclusions = _derived_sidecar_exclusions_for_problem(
+            problem_id=problem_id,
+            workload_path=workload_path,
+            long_tail_exclusions=long_tail_exclusions,
+            workload_shard_size=args.workload_shard_size,
+        )
         if _should_skip_cdna4_low_precision_on_arch(
             definition_payload, effective_gpu_architecture
         ):
@@ -2526,6 +2714,7 @@ def main():
                     baseline_artifact=scoring_baseline,
                     sol_bound_artifact_dir=args.amd_sol_bound_dir,
                     solar_derivation_dir=args.solar_derivation,
+                    derived_sidecar_exclusions=derived_sidecar_exclusions,
                 )
 
             if run_timing_phase and args.timing_evidence_dir is not None:
@@ -2664,6 +2853,7 @@ def main():
                         baseline_artifact=scoring_baseline,
                         sol_bound_artifact_dir=args.amd_sol_bound_dir,
                         solar_derivation_dir=args.solar_derivation,
+                        derived_sidecar_exclusions=derived_sidecar_exclusions,
                     )
                 print("  Skipping (already passed). Use --rerun to re-evaluate.")
                 summaries.append(summary)
@@ -2733,6 +2923,27 @@ def main():
             workload_path.write_text(
                 "\n".join(selected_lines) + ("\n" if selected_lines else "")
             )
+        elif long_tail_exclusions is not None:
+            workload_path, excluded_records, all_excluded = (
+                _filter_long_tail_workload_file(
+                    workload_path=workload_path,
+                    filtered_workload_path=problem_output_dir / "workload.jsonl",
+                    category=category,
+                    problem_id=problem_id,
+                    problem_path=_problem_id_for(problems_dir, problem_dir),
+                    long_tail_exclusions=long_tail_exclusions,
+                    workload_shard_size=args.workload_shard_size,
+                )
+            )
+            closure_records.extend(excluded_records)
+            if all_excluded:
+                print("  Skipping (all workloads excluded by --long-tail-exclusions).")
+                summaries.append(
+                    _skipped_problem_summary(
+                        f"{category}/{problem_name}", "long_tail_exclusion"
+                    )
+                )
+                continue
 
         # Truncate workloads if --max-workloads is set outside ready-subset mode.
         if args.max_workloads is not None and selected_workload_refs is None:
@@ -2761,9 +2972,7 @@ def main():
                             "passed": 0,
                             "failed": 1,
                             "latencies_ms": [],
-                            "failure_reasons": [
-                                f"  [MISSING_SAFETENSORS] {message}"
-                            ],
+                            "failure_reasons": [f"  [MISSING_SAFETENSORS] {message}"],
                         }
                     )
                     if selected_workload_refs is not None:
@@ -2926,6 +3135,7 @@ def main():
                 baseline_artifact=scoring_baseline,
                 sol_bound_artifact_dir=args.amd_sol_bound_dir,
                 solar_derivation_dir=args.solar_derivation,
+                derived_sidecar_exclusions=derived_sidecar_exclusions,
             )
 
         if (

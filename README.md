@@ -218,6 +218,22 @@ example coverage, and diagnostic boundaries.
 
 Validation status:
 
+- RDNA4 `gfx1200` bounded ready-subset evidence exists from v1.30 artifacts:
+  121 ready problems, 1907 attempted workloads, 1761 passed workloads, 146
+  failed workloads, 86 OK problems, 35 FAIL problems, and 12 explicit
+  `missing_trace` workload records.
+- The RDNA4 derived evidence set contains 1895 score records, with 172 scored
+  and 1723 unscored. AMD SOL v2 and SOLAR derivation sidecars cover 1839
+  traces after 56 temporary long-tail sidecar exclusions, with zero unexcluded
+  sidecars missing.
+- RDNA4 timing remains non-authoritative because clock-lock/reset sudoers
+  coverage is incomplete and timing sidecars used PyTorch/device-event fallback
+  rather than profiler-backed `rocprofv3` kernel activity timing.
+- Long RDNA4 derived or dataset jobs should be launched through
+  `scripts/run_derived_isolated.py --launch-mode systemd` or an equivalent
+  transient `systemd-run --user` unit with `MemoryMax` and `MemorySwapMax`
+  caps, then polled by status/log files. This prevents OOM-heavy workloads from
+  taking down the calling Codex/session process.
 - CDNA3 MI308X (`gfx942`) infrastructure evidence exists for adapted-suite and
   dataset paths, with documented blockers.
 - This is not full MI300X hardware validation.
@@ -326,8 +342,9 @@ uv run pytest tests/
 ```
 
 GPU-sensitive checks use pytest markers such as `requires_rocm`,
-`requires_rocm_dev`, `requires_rdna4`, `requires_cdna3`, `requires_ck`,
-`requires_rocwmma`, and `timing_serial`.
+`requires_rocm_dev`, `requires_rdna4` for RDNA 4, `requires_cdna3` for CDNA 3,
+`requires_ck`, `requires_rocwmma`, and `timing_serial`.
+CDNA 4 validation is also deferred until suitable hardware evidence exists.
 
 Focused CPU-safe checks for provenance and prerelease guardrails:
 

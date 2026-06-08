@@ -417,6 +417,112 @@ def test_dataset_helper_can_emit_v2_sol_bound_sidecars(tmp_path):
     assert scores[0].evidence_refs["sol_bound"] == str(sidecar_path)
 
 
+def test_dataset_helper_reuses_existing_derived_sidecars(tmp_path, monkeypatch):
+    definition = _matmul_definition()
+    workload_path = tmp_path / "workload.jsonl"
+    _write_matmul_workload(workload_path)
+    sol_bound_dir = tmp_path / "sol-bounds"
+    solar_dir = tmp_path / "solar-sidecars"
+
+    first_scores = build_amd_score_reports_for_problem(
+        definition_payload=definition,
+        workload_path=workload_path,
+        traces_payload=_matmul_trace_payload(),
+        trace_ref="L1/matmul_demo/traces.json",
+        sol_bound_artifact_dir=sol_bound_dir,
+        solar_derivation_dir=solar_dir,
+    )
+
+    def fail_sol_bound(*_args, **_kwargs):
+        raise AssertionError("existing AMD SOL sidecar should be reused")
+
+    def fail_solar(*_args, **_kwargs):
+        raise AssertionError("existing SOLAR sidecar should be reused")
+
+    def fail_full_parse(*_args, **_kwargs):
+        raise AssertionError("existing AMD SOL sidecar should use minimal parsing")
+
+    monkeypatch.setitem(
+        build_amd_score_reports_for_problem.__globals__,
+        "build_amd_sol_bound_v2_artifact",
+        fail_sol_bound,
+    )
+    monkeypatch.setitem(
+        build_amd_score_reports_for_problem.__globals__,
+        "build_solar_derivation_evidence",
+        fail_solar,
+    )
+    monkeypatch.setitem(
+        build_amd_score_reports_for_problem.__globals__,
+        "amd_sol_bound_v2_from_dict",
+        fail_full_parse,
+    )
+
+    reused_scores = build_amd_score_reports_for_problem(
+        definition_payload=definition,
+        workload_path=workload_path,
+        traces_payload=_matmul_trace_payload(),
+        trace_ref="L1/matmul_demo/traces.json",
+        sol_bound_artifact_dir=sol_bound_dir,
+        solar_derivation_dir=solar_dir,
+    )
+
+    assert reused_scores[0].score == first_scores[0].score
+    assert reused_scores[0].evidence_refs["sol_bound"].endswith(".amd-sol-v2.json")
+    assert (
+        reused_scores[0]
+        .derived_evidence_refs["formula"]
+        .endswith(".solar-derivation.json#groups.formula_evidence")
+    )
+
+
+def test_dataset_helper_can_skip_excluded_missing_derived_sidecars(
+    tmp_path, monkeypatch
+):
+    definition = _matmul_definition()
+    workload_path = tmp_path / "workload.jsonl"
+    _write_matmul_workload(workload_path)
+
+    def fail_sol_bound(*_args, **_kwargs):
+        raise AssertionError("excluded workload should not build AMD SOL sidecar")
+
+    def fail_solar(*_args, **_kwargs):
+        raise AssertionError("excluded workload should not build SOLAR sidecar")
+
+    monkeypatch.setitem(
+        build_amd_score_reports_for_problem.__globals__,
+        "build_amd_sol_bound_v2_artifact",
+        fail_sol_bound,
+    )
+    monkeypatch.setitem(
+        build_amd_score_reports_for_problem.__globals__,
+        "build_solar_derivation_evidence",
+        fail_solar,
+    )
+
+    scores = build_amd_score_reports_for_problem(
+        definition_payload=definition,
+        workload_path=workload_path,
+        traces_payload=_matmul_trace_payload(),
+        trace_ref="L1/matmul_demo/traces.json",
+        sol_bound_artifact_dir=tmp_path / "sol-bounds",
+        solar_derivation_dir=tmp_path / "solar-sidecars",
+        derived_sidecar_exclusions={
+            "matmul-workload": "known derived long-tail (evidence: phase-140)"
+        },
+    )
+
+    payload = scores[0].to_dict()
+
+    assert scores[0].supported is False
+    assert payload["derived_evidence_refs"] == {
+        "derived_sidecar_exclusion": "known derived long-tail (evidence: phase-140)",
+        "hardware_model": "default_amd_hardware_models.gfx1200",
+    }
+    assert not (tmp_path / "sol-bounds").exists()
+    assert not (tmp_path / "solar-sidecars").exists()
+
+
 def test_dataset_helper_marks_missing_workload_bound_as_unscored(tmp_path):
     definition = {
         "name": "add_demo",

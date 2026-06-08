@@ -128,7 +128,7 @@ def closure_record(
     """Build one serialized execution-closure record."""
     reasons = readiness.get("reasons", []) if readiness else []
     blockers = readiness.get("blocker_reports", []) if readiness else []
-    evidence_refs = {
+    readiness_evidence_refs = {
         str(blocker["code"]): str(blocker["evidence_path"])
         for blocker in blockers
         if isinstance(blocker, dict)
@@ -158,7 +158,7 @@ def closure_record(
             for blocker in blockers
             if isinstance(blocker, dict) and blocker.get("blocker_type") is not None
         ],
-        readiness_evidence_refs=evidence_refs,
+        readiness_evidence_refs=readiness_evidence_refs,
         closure_status=ExecutionClosureStatus(closure_status),
         filter_reasons=filter_reasons or [],
         trace_status=trace_status,
