@@ -1,11 +1,11 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.30
-milestone_name: RDNA4 Benchmark-Grade Validation Closure
-status: Awaiting next milestone
-stopped_at: Milestone v1.30 complete.
-last_updated: "2026-06-08T04:50:00.000Z"
-last_activity: 2026-06-08 — Milestone v1.30 completed and archived
+milestone: v1.31
+milestone_name: RDNA4 Follow-Up Evidence Hardening
+status: active
+stopped_at: timing fallback semantics clarified after Phase 147
+last_updated: "2026-06-08T05:58:00.000Z"
+last_activity: 2026-06-08 — Quick task 260608-jan clarified timing fallback semantics, documenting PyTorch/device-event fallback as source-policy fallback rather than `rocprofv3` tool failure and adding HIP native profiler-backed routing coverage.
 progress:
   total_phases: 6
   completed_phases: 6
@@ -23,14 +23,17 @@ See: `.planning/PROJECT.md` (updated 2026-06-08)
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly
 on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL
 ExecBench.
-**Current focus:** Awaiting next milestone.
+**Current focus:** v1.31 RDNA4 Follow-Up Evidence Hardening.
 
 ## Current Position
 
-Phase: Milestone v1.30 complete
-Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-06-08 — Milestone v1.30 completed and archived
+Phase: v1.31 - RDNA4 Follow-Up Evidence Hardening
+Plan: all planned phases completed
+Status: Memory/timing closure attempt complete; fallback semantics clarified
+Last activity: 2026-06-08 — Quick task 260608-jan clarified that
+PyTorch/device-event timing sidecars are source-policy fallback, not
+`rocprofv3` availability failures, and added HIP native profiler-backed routing
+coverage.
 
 ## Recent Trend
 
@@ -189,6 +192,11 @@ Last activity: 2026-06-08 — Milestone v1.30 completed and archived
   centralizing authority-class wording, reducing historical-log overload, and
   preserving claim guardrails.
 
+- Quick task 260608-jan clarified RDNA4 timing fallback semantics on
+  2026-06-08 by documenting source-policy fallback versus profiler-unavailable
+  fallback and adding HIP native source collection coverage for profiler-backed
+  `rocprofv3` timing.
+
 - Phase 141 completed on 2026-06-08 with public RDNA4 claim closure across
   README, `docs/CLAIMS.md`, `docs/research_preview.md`,
   `docs/release_candidate_validation.md`, and `docs/rocm.md`. The final public
@@ -231,7 +239,8 @@ Last activity: 2026-06-08 — Milestone v1.30 completed and archived
 
 ### Pending Todos
 
-- Start the next milestone with `$gsd-new-milestone` when ready.
+- Phase 143 must rerun RDNA4 clock-lock evidence and profiler-backed timing
+  checks now that `rocm-smi` sudoers coverage is complete.
 
 ### Blockers/Concerns
 

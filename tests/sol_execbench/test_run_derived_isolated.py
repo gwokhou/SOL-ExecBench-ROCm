@@ -73,6 +73,57 @@ def test_resume_skips_successful_status_entries(tmp_path):
     )
 
 
+def test_problem_id_file_filters_comments_and_blanks(tmp_path):
+    path = tmp_path / "targets.txt"
+    path.write_text("\n# comment\nL1/a\n\nL2/b\n")
+
+    assert run_derived_isolated.load_problem_id_filter(path) == {"L1/a", "L2/b"}
+
+
+def test_main_runs_only_problem_ids_from_file(tmp_path, monkeypatch):
+    dataset_root = tmp_path / "dataset"
+    first = _write_problem(dataset_root, "L1", "a")
+    _write_problem(dataset_root, "L1", "b")
+    targets = tmp_path / "targets.txt"
+    targets.write_text("L1/a\n")
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        return subprocess.CompletedProcess(args=command, returncode=0)
+
+    monkeypatch.setattr(run_derived_isolated.subprocess, "run", fake_run)
+
+    rc = run_derived_isolated.main(
+        [
+            str(dataset_root),
+            "-o",
+            str(tmp_path / "out"),
+            "--category",
+            "L1",
+            "--problem-id-file",
+            str(targets),
+            "--amd-sol-bound-dir",
+            str(tmp_path / "sol"),
+            "--solar-derivation",
+            str(tmp_path / "solar"),
+            "--status-jsonl",
+            str(tmp_path / "status.jsonl"),
+            "--log-file",
+            str(tmp_path / "derived.log"),
+        ]
+    )
+
+    assert rc == 0
+    assert len(calls) == 1
+    statuses = [
+        json.loads(line)
+        for line in (tmp_path / "status.jsonl").read_text().splitlines()
+    ]
+    assert [item["problem_id"] for item in statuses] == ["L1/a"]
+    assert str(first) in statuses[0]["command"]
+
+
 def test_main_records_per_problem_status_and_continues(tmp_path, monkeypatch):
     dataset_root = tmp_path / "dataset"
     first = _write_problem(dataset_root, "L1", "a")

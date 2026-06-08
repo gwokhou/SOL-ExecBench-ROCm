@@ -42,6 +42,21 @@ multiple kernels or ROCm library calls.
 the historical `torch.cuda.Event` namespace. It remains a compatibility and
 fallback path, but it must not be reported as profiler-backed kernel activity.
 
+There are two different reasons a timing sidecar can be fallback-labeled:
+
+- **Source-policy fallback**: the selected source policy is not raw
+  `rocprofv3` kernel activity timing. PyTorch reference solutions are the
+  important case: the source policy is PyTorch operator attribution, so default
+  dataset timing records device-event fallback unless a future PyTorch-specific
+  attribution path is explicitly validated.
+- **Profiler-unavailable fallback**: the selected source policy supports
+  `rocprofv3` kernel activity timing, but `rocprofv3` is unavailable, fails, or
+  does not produce parseable evidence.
+
+These cases must not be conflated. A PyTorch/device-event sidecar does not by
+itself prove that `rocprofv3` is missing or broken; it means the evidence source
+is not a native HIP, ROCm library, or Triton kernel-activity source.
+
 ## PyTorch ROCm Naming
 
 PyTorch ROCm intentionally exposes AMD GPU devices through `torch.cuda`
@@ -119,7 +134,8 @@ The adapter follows the same source-specific timing policy:
 - HIP native and Triton sources can collect `rocprofv3` kernel activity timing
   when the profiler is available.
 - PyTorch sources keep PyTorch operator-attribution semantics and do not
-  masquerade as raw kernel activity timing.
+  masquerade as raw kernel activity timing. A PyTorch fallback sidecar is
+  therefore a source-policy boundary, not a `rocprofv3` availability failure.
 - Mixed or unknown sources use explicit fallback or unsupported timing evidence
   until runtime evidence is specific enough to choose a more accurate timer.
 

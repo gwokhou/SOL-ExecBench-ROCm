@@ -93,13 +93,13 @@ class TestLockClocks:
                 text=True,
             ),
             call(
-                ["sudo", "-n", "rocm-smi", "--setsclk", "1"],
+                ["sudo", "-n", "rocm-smi", "--setsclk", "2"],
                 capture_output=True,
                 check=True,
                 text=True,
             ),
             call(
-                ["sudo", "-n", "rocm-smi", "--setmclk", "1"],
+                ["sudo", "-n", "rocm-smi", "--setmclk", "5"],
                 capture_output=True,
                 check=True,
                 text=True,
@@ -177,13 +177,13 @@ class TestLockClocks:
                 text=True,
             ),
             call(
-                ["sudo", "-n", "rocm-smi", "--setsclk", "1"],
+                ["sudo", "-n", "rocm-smi", "--setsclk", "2"],
                 capture_output=True,
                 check=True,
                 text=True,
             ),
             call(
-                ["sudo", "-n", "rocm-smi", "--setmclk", "1"],
+                ["sudo", "-n", "rocm-smi", "--setmclk", "5"],
                 capture_output=True,
                 check=True,
                 text=True,
@@ -304,6 +304,45 @@ class TestVerifyClocks:
             call(["rocm-smi", "-s"], capture_output=True, text=True),
         ]
 
+    def test_supported_sclk_level_passes_when_low_power_keeps_active_level_low(self):
+        showclocks = self._make_smi_result(
+            "WARNING: AMD GPU device(s) is/are in a low-power state.\n"
+            "GPU[0]\t\t: sclk clock level: 1: (0Mhz)\n"
+            "GPU[0]\t\t: mclk clock level: 5: (1258Mhz)\n"
+        )
+        supported = self._make_smi_result(
+            "GPU[0]\t\t: Supported sclk frequencies on GPU0\n"
+            "GPU[0]\t\t: 0: 500Mhz\n"
+            "GPU[0]\t\t: 1: 0Mhz *\n"
+            "GPU[0]\t\t: 2: 2780Mhz\n"
+            "GPU[0]\t\t: \n"
+            "GPU[0]\t\t: Supported mclk frequencies on GPU0\n"
+            "GPU[0]\t\t: 5: 1258Mhz *\n"
+        )
+        with patch(
+            f"{_MODULE}.subprocess.run", side_effect=[showclocks, supported]
+        ) as mock_run:
+            assert verify_clocks(2, 5) is True
+
+        assert mock_run.call_args_list == [
+            call(["rocm-smi", "--showclocks"], capture_output=True, text=True),
+            call(["rocm-smi", "-s"], capture_output=True, text=True),
+        ]
+
+    def test_low_power_sclk_fallback_rejects_unsupported_level(self):
+        showclocks = self._make_smi_result(
+            "WARNING: AMD GPU device(s) is/are in a low-power state.\n"
+            "GPU[0]\t\t: sclk clock level: 1: (0Mhz)\n"
+            "GPU[0]\t\t: mclk clock level: 5: (1258Mhz)\n"
+        )
+        supported = self._make_smi_result(
+            "GPU[0]\t\t: Supported sclk frequencies on GPU0\n"
+            "GPU[0]\t\t: 0: 500Mhz\n"
+            "GPU[0]\t\t: 1: 0Mhz *\n"
+        )
+        with patch(f"{_MODULE}.subprocess.run", side_effect=[showclocks, supported]):
+            assert verify_clocks(2, 5) is False
+
     def test_low_power_mclk_fallback_rejects_unsupported_level(self):
         showclocks = self._make_smi_result(
             "WARNING: AMD GPU device(s) is/are in a low-power state.\n"
@@ -376,7 +415,7 @@ class TestAreClocksLocked:
 class TestGetClockPreset:
     def test_gfx1200(self):
         preset = get_clock_preset("AMD Radeon gfx1200")
-        assert preset == ClockPreset(sclk_level=1, mclk_level=1)
+        assert preset == ClockPreset(sclk_level=2, mclk_level=5)
 
     def test_instinct(self):
         preset = get_clock_preset("AMD Instinct MI300X")

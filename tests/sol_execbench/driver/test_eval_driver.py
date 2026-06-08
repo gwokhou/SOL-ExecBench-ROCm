@@ -208,6 +208,23 @@ def test_passing_solution(tmp_path):
     )
 
 
+def test_reference_outputs_aliasing_inputs_are_stabilized(tmp_path):
+    """Reference outputs that alias inputs stay stable across user mutation."""
+    definition = {
+        **_MINIMAL_DEFINITION,
+        "name": "alias_reference",
+        "reference": "def run(x, y):\n    return x\n",
+    }
+    kernel = "def run(x, y):\n    x.add_(1)\n    return x\n"
+    traces = _run_eval_driver(tmp_path, kernel, definition=definition)
+
+    assert len(traces) == 1
+    ev = traces[0]["evaluation"]
+    assert ev["status"] == "INCORRECT_NUMERICAL", (
+        f"Expected INCORRECT_NUMERICAL, got {ev['status']}; log={ev.get('log')}"
+    )
+
+
 def test_reference_timing_failure_is_explicit_when_requested(tmp_path):
     """Reference timing failures should not silently look like a zero baseline."""
     reference = (
@@ -259,7 +276,9 @@ def test_reference_outputs_are_frozen_before_user_call(tmp_path):
     (tmp_path / "eval_driver.py").write_text(build_driver())
     (tmp_path / "definition.json").write_text(json.dumps(definition))
     (tmp_path / "workload.jsonl").write_text(json.dumps(workload))
-    kernel = "def run(x):\n    original = x.clone()\n    x.add_(1)\n    return original\n"
+    kernel = (
+        "def run(x):\n    original = x.clone()\n    x.add_(1)\n    return original\n"
+    )
     solution = {
         **_SOLUTION_SPEC,
         "definition": "test_alias_freeze",

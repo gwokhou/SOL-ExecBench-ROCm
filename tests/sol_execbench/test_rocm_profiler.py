@@ -132,7 +132,9 @@ def test_profile_collection_records_success_metadata(tmp_path):
 
 
 def test_profile_collection_unavailable_is_nonfatal_metadata(tmp_path):
-    def runner(command: Sequence[str], cwd, timeout) -> subprocess.CompletedProcess[str]:
+    def runner(
+        command: Sequence[str], cwd, timeout
+    ) -> subprocess.CompletedProcess[str]:
         raise AssertionError(f"runner should not be called: {command}")
 
     request = Rocprofv3ProfileRequest(
@@ -246,7 +248,7 @@ def test_default_timing_fallback_is_explicit_when_rocprofv3_unavailable():
     assert selection.fallback_applied is True
     assert selection.policy.backend == TimingBackend.DEVICE_EVENTS
     assert "rocprofv3 is unavailable" in selection.reason
-    assert selection.policy.reason == "profiler-backed timing is unavailable"
+    assert selection.policy.reason == selection.reason
 
 
 def test_pytorch_policy_does_not_masquerade_as_rocprofv3_kernel_activity():
@@ -257,6 +259,7 @@ def test_pytorch_policy_does_not_masquerade_as_rocprofv3_kernel_activity():
     assert selection.fallback_applied is True
     assert selection.policy.backend == TimingBackend.DEVICE_EVENTS
     assert "not rocprofv3 kernel activity timing" in selection.reason
+    assert selection.policy.reason == selection.reason
 
 
 def test_live_collection_invokes_runner_and_reads_generated_csv(tmp_path):
@@ -315,6 +318,7 @@ def test_live_collection_returns_fallback_for_non_rocprofv3_policy(tmp_path):
     assert result.selection.fallback_applied is True
     assert result.selection.policy.backend == TimingBackend.DEVICE_EVENTS
     assert "not rocprofv3 kernel activity timing" in result.selection.reason
+    assert result.selection.policy.reason == result.selection.reason
 
 
 def test_live_collection_labels_failed_profiler_as_fallback(tmp_path):
@@ -407,6 +411,38 @@ def test_source_collection_selects_triton_rocprofv3_and_records_run_config(tmp_p
     assert payload["iterations"] == 50
     assert payload["trial_count"] == 2
     assert payload["clock_locked"] is False
+
+
+def test_source_collection_selects_hip_native_rocprofv3(tmp_path):
+    calls: list[list[str]] = []
+
+    def runner(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
+        calls.append(list(command))
+        (tmp_path / "timing.csv").write_text(ROCPROFV3_CSV)
+        return subprocess.CompletedProcess(
+            args=list(command),
+            returncode=0,
+            stdout="profiled",
+            stderr="",
+        )
+
+    result = collect_source_timing_evidence(
+        application_command=("uv", "run", "sol-execbench", "problem"),
+        languages=("hip_cpp",),
+        output_directory=tmp_path,
+        output_file="timing",
+        tool_version="rocprofv3 7.0.0",
+        gpu_architecture="gfx1200",
+        runner=runner,
+    )
+
+    assert calls
+    assert result.profiler_collected is True
+    assert result.selection.profiler_backed is True
+    assert result.selection.policy.backend == TimingBackend.ROCPROFV3
+    assert result.evidence is not None
+    assert result.evidence.activity_domain.value == "kernel_activity"
+    assert result.evidence.backend.value == "rocprofv3"
 
 
 def test_source_collection_routes_pytorch_to_explicit_fallback(tmp_path):

@@ -229,6 +229,16 @@ def verify_clocks(expected_sclk_level: int, expected_mclk_level: int) -> bool:
     sclk_ok = _level_is_active(stdout, "sclk", expected_sclk_level)
     mclk_ok = _level_is_active(stdout, "mclk", expected_mclk_level)
     if (
+        not sclk_ok
+        and _reports_low_power_state(result.stdout, result.stderr)
+        and _level_is_supported_by_rocm_smi("sclk", expected_sclk_level)
+    ):
+        logger.info(
+            "ROCm SCLK level %s is supported but not active in low-power state",
+            expected_sclk_level,
+        )
+        sclk_ok = True
+    if (
         not mclk_ok
         and _reports_low_power_state(result.stdout, result.stderr)
         and _level_is_supported_by_rocm_smi("mclk", expected_mclk_level)

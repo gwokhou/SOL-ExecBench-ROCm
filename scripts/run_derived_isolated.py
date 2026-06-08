@@ -92,6 +92,19 @@ def load_completed(status_path: Path) -> set[str]:
     return completed
 
 
+def load_problem_id_filter(path: Path | None) -> set[str] | None:
+    """Load newline-delimited problem IDs for targeted retries."""
+    if path is None:
+        return None
+    problem_ids: set[str] = set()
+    for line in path.read_text(encoding="utf-8").splitlines():
+        value = line.strip()
+        if not value or value.startswith("#"):
+            continue
+        problem_ids.add(value)
+    return problem_ids
+
+
 def base_run_dataset_command(args: argparse.Namespace, problem_dir: Path) -> list[str]:
     command = [
         str(args.uv_bin),
@@ -258,6 +271,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--log-file", type=Path, required=True)
     parser.add_argument("--start-at")
     parser.add_argument("--start-after")
+    parser.add_argument(
+        "--problem-id-file",
+        type=Path,
+        help="Optional newline-delimited problem IDs to run, e.g. L1/problem_name.",
+    )
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--continue-on-failure", action="store_true")
     return parser.parse_args(argv)
@@ -266,11 +284,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     problems = discover_problems(args.benchmark_dir, args.category)
+    problem_id_filter = load_problem_id_filter(args.problem_id_file)
     completed = load_completed(args.status_jsonl) if args.resume else set()
     failures = 0
 
     for problem_dir in problems:
         problem_id = problem_id_for(args.benchmark_dir, problem_dir)
+        if problem_id_filter is not None and problem_id not in problem_id_filter:
+            continue
         if should_skip(
             problem_id,
             completed=completed,
