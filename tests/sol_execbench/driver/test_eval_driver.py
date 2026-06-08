@@ -195,6 +195,14 @@ def test_eval_driver_is_valid_python():
     ast.parse(source, filename="eval_driver.py")
 
 
+def test_eval_driver_supports_profiler_graceful_exit_switch():
+    """Profiler timing can request normal teardown without changing defaults."""
+    source = build_driver()
+
+    assert 'os.environ.get("SOL_EXECBENCH_GRACEFUL_EXIT") == "1"' in source
+    assert "sys.exit(0)\nos._exit(0)" in source
+
+
 @pytest.mark.xdist_group("serial")
 def test_passing_solution(tmp_path):
     """A correct vector-add kernel produces a PASSED trace."""
