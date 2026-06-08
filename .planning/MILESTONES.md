@@ -1,5 +1,47 @@
 # Milestones
 
+## v1.31 RDNA4 Follow-Up Evidence Hardening (Shipped: 2026-06-08)
+
+**Phases completed:** 6 phases, 6 plans, 0 tasks
+
+**Key accomplishments:**
+
+- Added auditable RDNA4 `rocm-smi` sudoers coverage for clock lock/reset
+  commands and captured live clock-lock evidence after the fix.
+
+- Reran RDNA4 timing sidecar generation and clarified that all 121 v1.31
+  sidecars remain non-authoritative PyTorch/device-event fallback because the
+  source policy is PyTorch reference-solution timing, not because `rocprofv3`
+  is unavailable.
+
+- Retried temporary derived sidecar exclusions through isolated memory-capped
+  execution, recovering one full problem and classifying seven remaining target
+  problems as memory blockers on the 32 GiB host / 16 GiB RDNA4 validation GPU.
+
+- Classified all 12 `missing_trace` workload records as `gpu_oom_no_trace` with
+  per-workload shard logs, then classified all 146 failed RDNA4 workload records
+  into seven concrete failure classes.
+
+- Reduced avoidable eval-driver memory retention by replacing unconditional
+  reference-output clones with alias-aware stabilization and releasing
+  correctness outputs before timing.
+
+- Resolved historical open GSD artifacts before close so v1.31 completion has
+  no open debug sessions, quick tasks, UAT gaps, verification gaps, or context
+  questions.
+
+**Explicitly deferred:**
+
+- Full RDNA4 paper-denominator validation and any claim upgrade beyond the
+  bounded v1.30/v1.31 `gfx1200` ready-subset evidence.
+- Authoritative profiler-backed RDNA4 timing until native HIP, ROCm library, or
+  Triton source timing sidecars can be collected and validated.
+- Remaining memory-heavy RDNA4 workload failures that exceed the current 16 GiB
+  validation GPU, unless memory efficiency work or larger-VRAM reruns change
+  the boundary.
+
+---
+
 ## v1.30 RDNA4 Benchmark-Grade Validation Closure (Shipped: 2026-06-08)
 
 **Phases completed:** 6 phases, 6 plans, 0 tasks
@@ -34,13 +76,17 @@
 
 - Authoritative RDNA4 timing until clock-lock/reset sudoers coverage and
   profiler-backed timing evidence are rerun.
+
 - Investigation or acceptance of 146 failed RDNA4 workloads and 12 explicit
   `missing_trace` records.
+
 - Revisit of 56 temporary derived sidecar exclusions after memory efficiency or
   available memory improves.
+
 - Full 235-problem paper validation, upstream SOLAR parity, NVIDIA B200
   equivalence, hosted leaderboard authority, CDNA3/MI300X validation, and CDNA4
   validation.
+
 - Known deferred open artifacts at close: 9 historical items recorded in
   `.planning/STATE.md`.
 

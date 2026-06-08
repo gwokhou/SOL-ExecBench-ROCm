@@ -1,3 +1,11 @@
+---
+quick_id: 260605-port-nvfp4-reference-scaled-mm
+slug: port-nvfp4-reference-scaled-mm
+status: complete
+completed: 2026-06-05
+outcome: abandoned
+---
+
 # Port NVFP4 Reference Scaled MM Summary
 
 ## Status

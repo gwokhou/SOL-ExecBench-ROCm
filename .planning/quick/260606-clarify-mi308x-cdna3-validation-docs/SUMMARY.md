@@ -1,3 +1,10 @@
+---
+quick_id: 260606-clarify-mi308x-cdna3-validation-docs
+slug: clarify-mi308x-cdna3-validation-docs
+status: complete
+completed: 2026-06-06
+---
+
 # Clarify MI308X CDNA3 Validation Evidence Summary
 
 ## Status

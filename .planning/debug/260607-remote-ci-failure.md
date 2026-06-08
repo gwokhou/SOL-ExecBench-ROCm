@@ -1,3 +1,9 @@
+---
+status: complete
+resolved_at: "2026-06-08"
+outcome: superseded
+---
+
 # Remote CI Failure Debug
 
 ## Symptom
@@ -18,3 +24,11 @@ so the first local fallback is to run the same workflow commands from
 - Current branch: `main`
 - Open PRs found by GitHub connector: none
 - `gh auth status` reports an invalid token for `gwokhou`.
+
+## Resolution
+
+Closed during v1.31 milestone completion artifact hygiene. The session did not
+identify an active PR or current remote CI blocker to fix, and later local
+quality gates were rerun during v1.30/v1.31 milestone work. Any future remote
+CI failure should be opened as a fresh debug session with current `gh` or
+GitHub Actions evidence.
