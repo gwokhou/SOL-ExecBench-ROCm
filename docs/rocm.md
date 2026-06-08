@@ -181,6 +181,9 @@ The v1.25 engineering prerelease separates what has evidence from what is
 deferred or unavailable. These rows are support-boundary statements, not paper
 parity, upstream SOLAR parity, hosted leaderboard readiness, hard-sandbox
 authority, or new hardware-validation claims.
+Use engineering-prerelease evidence wording for these rows so container,
+RDNA 4, CDNA3, and CDNA4 statements stay bounded to the artifacts named in the
+project docs.
 
 | Support surface | Architecture or scope | Engineering prerelease status | Interpretation |
 | --- | --- | --- | --- |

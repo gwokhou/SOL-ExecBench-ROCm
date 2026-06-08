@@ -15,19 +15,19 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
 ## Current State
 
-**Shipped version:** v1.31 RDNA4 Follow-Up Evidence Hardening,
-completed 2026-06-08.
+**Shipped version:** v1.32 RDNA4 Profiler Timing Coverage Closure,
+closed 2026-06-08.
 
-**Current milestone:** None active.
+**Current milestone:** v1.33 RDNA4 Benchmark-Grade Evidence Closure.
 
 **Queued milestone:** None defined.
 
-**Latest milestone outcome:** v1.31 completed RDNA4 follow-up evidence
-hardening by fixing clock sudoers coverage, rerunning clock-lock/timing
-evidence, classifying timing fallback as PyTorch source-policy fallback,
-retrying temporary derived sidecar exclusions under memory caps, classifying
-all missing traces and failed workload records, attempting evaluator memory
-optimization, and resolving historical open GSD artifacts before close.
+**Latest milestone outcome:** v1.32 completed RDNA4 profiler timing coverage
+closure by accounting for the 235-problem denominator, adding workload-sharded
+profiler aggregation, classifying partial profiler failures, and promoting
+diagnosed current-device reference/gen_inputs OOMs into
+`reference_oom_blocked` coverage without counting them as profiler-backed
+timing.
 
 **Previous milestone outcome:** v1.30 completed bounded RDNA4 `gfx1200`
 validation closure by defining the ready-subset denominator, executing 121
@@ -37,10 +37,9 @@ clock/profiler blockers, generating AMD-derived score and SOL/SOLAR evidence
 bundles, isolating memory-heavy derived jobs, and closing public claim
 guardrails.
 
-**Next milestone goal:** Not defined. Candidate frontier work includes
-authoritative native/Triton profiler-backed timing evidence, memory-efficiency
-work for remaining RDNA4 OOM classes, targeted timeout reruns, and future
-CDNA3/MI300X or CDNA4 validation when suitable hardware evidence is available.
+**Next milestone goal:** Harden RDNA4 benchmark-grade evidence by finalizing
+the denominator policy, memory readiness classifier, coverage recompute,
+`rocprofv3` timing evidence, clock-lock evidence, and release evidence bundle.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline.
 Milestones v1.1-v1.6 added CDNA 3 code/schema support, maintained residue
@@ -156,27 +155,30 @@ SOL/SOLAR sidecar pairs after 56 temporary sidecar exclusions. RDNA4 timing
 remains non-authoritative until clock-lock/reset sudoers coverage and
 profiler-backed timing evidence are rerun.
 
-## Current Milestone: v1.31 RDNA4 Follow-Up Evidence Hardening
+## Current Milestone: v1.33 RDNA4 Benchmark-Grade Evidence Closure
 
-**Goal:** Resolve the remaining RDNA4 v1.30 follow-up issues, excluding
-historical open-artifact cleanup, in dependency order.
+**Goal:** Turn bounded RDNA4 `gfx1200` evidence into a benchmark-grade evidence
+chain where denominator policy, memory blockers, profiler timing, clock-lock
+authority, and release bundle claims are explicit and reproducible.
 
 **Target features:**
-- Passwordless sudoers coverage for `rocm-smi` clock-lock/reset commands.
-- RDNA4 clock-lock and profiler-backed timing rerun or explicit blocker
-  evidence.
-- Isolated retry/classification for the 56 temporary derived sidecar
-  exclusions.
-- Root-cause triage for the 12 `missing_trace` workload records.
-- Failure-class triage for the 146 failed RDNA4 workloads.
+- RDNA4 `gfx1200` 16GB denominator policy hardening.
+- Memory/readiness classifier hardening for OOM, timeout, profiler, and
+  correctness/runtime blockers.
+- Recomputed RDNA4 coverage with claim-safe totals and blocker ledgers.
+- `rocprofv3` kernel activity timing closure for eligible included workloads.
+- Clock-lock/reset evidence for timing authority.
+- Release-grade RDNA4 evidence bundle and claim-upgrade review.
 
 **Key context:**
-- Long memory-heavy jobs must run through isolated systemd user units or the
-  existing derived isolated runner so OOM kills do not take down Codex.
-- Stronger RDNA4 public claims remain blocked until timing, derived exclusions,
-  missing traces, and failed workloads have accepted closure.
-- Research is skipped; this will be scoped from existing project evidence and
-  validation machinery.
+- Phase 162 already accounts for 61 `profiler_backed`, 10
+  `reference_oom_blocked`, 4 `profiler_blocked`, 46 `timing_fallback`, and 114
+  `readiness_blocked` problems.
+- Known oversized workloads should not be blindly rerun as full-problem
+  profiler jobs; policy and classifier hardening come first.
+- Profiler-backed timing and benchmark-grade timing authority remain separate:
+  `rocprofv3` evidence still needs clock-lock/reset evidence for authoritative
+  timing claims.
 - Existing deferred boundaries remain: no B200/SOLAR upstream equivalence, no
   leaderboard authority, no CDNA3/MI300X upgrade, and no CDNA4 claim.
 

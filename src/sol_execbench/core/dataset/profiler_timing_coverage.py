@@ -16,6 +16,11 @@ from .manifest import DatasetManifestChecksum, utc_timestamp
 from .readiness import DatasetReadiness
 
 PROFILER_TIMING_COVERAGE_SCHEMA_VERSION = "sol_execbench.profiler_timing_coverage.v1"
+OOM_LOG_MARKERS = (
+    "HIP out of memory",
+    "out of memory",
+    "Tried to allocate",
+)
 
 
 class ProfilerTimingEvidenceSummary(BaseModel):
@@ -34,6 +39,7 @@ class ProfilerTimingEvidenceSummary(BaseModel):
     trace_status_counts: dict[str, int] = Field(default_factory=dict)
     replacement_failure_reason: str | None = None
     fallback_reason: str | None = None
+    blocker_class: str | None = None
 
 
 class ProfilerTimingProblemCoverage(BaseModel):
@@ -57,6 +63,7 @@ class ProfilerTimingCoverageTotals(BaseModel):
     problem_denominator: int
     profiler_backed_problems: int = 0
     partial_profiler_backed_problems: int = 0
+    reference_oom_blocked_problems: int = 0
     profiler_blocked_problems: int = 0
     fallback_timing_problems: int = 0
     ready_missing_profiler_timing_problems: int = 0
@@ -85,6 +92,7 @@ class ProfilerTimingCoverageReport(BaseModel):
     readiness_checksum: str | None = None
     totals: ProfilerTimingCoverageTotals
     status_counts: dict[str, int]
+    blocker_class_counts: dict[str, int] = Field(default_factory=dict)
     problems: list[ProfilerTimingProblemCoverage]
     claim_boundary: ProfilerTimingCoverageClaimBoundary
     coverage_checksum: DatasetManifestChecksum | None = None
@@ -117,6 +125,7 @@ def build_profiler_timing_coverage_report(
     workload_reasons, workload_blockers = _problem_readiness_details(readiness)
     problems: list[ProfilerTimingProblemCoverage] = []
     counts: Counter[str] = Counter()
+    blocker_counts: Counter[str] = Counter()
 
     for problem in sorted(readiness.problems, key=lambda item: item.problem_id):
         evidence = _find_problem_timing_evidence(
@@ -126,6 +135,8 @@ def build_profiler_timing_coverage_report(
         )
         status = _problem_status(problem.status, evidence)
         counts[status] += 1
+        if evidence is not None and evidence.blocker_class:
+            blocker_counts[evidence.blocker_class] += 1
         problems.append(
             ProfilerTimingProblemCoverage(
                 category=problem.category,
@@ -150,6 +161,7 @@ def build_profiler_timing_coverage_report(
         problem_denominator=denominator,
         profiler_backed_problems=profiler_backed,
         partial_profiler_backed_problems=counts["partial_profiler_backed"],
+        reference_oom_blocked_problems=counts["reference_oom_blocked"],
         profiler_blocked_problems=counts["profiler_blocked"],
         fallback_timing_problems=counts["timing_fallback"],
         ready_missing_profiler_timing_problems=counts["ready_missing_profiler_timing"],
@@ -169,6 +181,7 @@ def build_profiler_timing_coverage_report(
         else None,
         totals=totals,
         status_counts=dict(sorted(counts.items())),
+        blocker_class_counts=dict(sorted(blocker_counts.items())),
         problems=problems,
         claim_boundary=ProfilerTimingCoverageClaimBoundary(
             problem_denominator_accounted=(
@@ -193,6 +206,7 @@ def render_profiler_timing_coverage_markdown(
         f"- Profiler-backed problems: `{totals.profiler_backed_problems}`",
         "- Partial profiler-backed problems: "
         f"`{totals.partial_profiler_backed_problems}`",
+        f"- Reference OOM-blocked problems: `{totals.reference_oom_blocked_problems}`",
         f"- Profiler-blocked problems: `{totals.profiler_blocked_problems}`",
         f"- Fallback timing problems: `{totals.fallback_timing_problems}`",
         "- Ready missing profiler timing problems: "
@@ -207,6 +221,18 @@ def render_profiler_timing_coverage_markdown(
     ]
     for status, count in sorted(report.status_counts.items()):
         lines.append(f"| {status} | {count} |")
+    if report.blocker_class_counts:
+        lines.extend(
+            [
+                "",
+                "## Blocker Classes",
+                "",
+                "| Blocker Class | Problems |",
+                "| --- | ---: |",
+            ]
+        )
+        for blocker_class, count in sorted(report.blocker_class_counts.items()):
+            lines.append(f"| {blocker_class} | {count} |")
     lines.extend(
         [
             "",
@@ -263,6 +289,8 @@ def _problem_status(
 ) -> str:
     if evidence is not None and _has_profiler_backed_kernel_activity(evidence):
         return "profiler_backed"
+    if evidence is not None and _is_memory_oom_blocker(evidence.blocker_class):
+        return "reference_oom_blocked"
     if evidence is not None and _has_partial_profiler_kernel_activity(evidence):
         return "partial_profiler_backed"
     if evidence is not None and _is_profiler_replacement_attempt(evidence):
@@ -329,6 +357,7 @@ def _load_timing_evidence_summary(path: Path) -> ProfilerTimingEvidenceSummary:
         fallback_reason=str(selection["reason"])
         if selection.get("reason") is not None
         else None,
+        blocker_class=_blocker_class(payload),
     )
 
 
@@ -378,6 +407,133 @@ def _trace_status_counts(metadata: dict[str, Any]) -> dict[str, int]:
         if isinstance(key, str) and count is not None:
             normalized[key] = count
     return dict(sorted(normalized.items()))
+
+
+def _blocker_class(payload: dict[str, Any]) -> str | None:
+    details = _failure_trace_details(payload)
+    if not any(detail.get("oom_detected") is True for detail in details):
+        return None
+    oom_phases = {
+        str(detail.get("phase"))
+        for detail in details
+        if detail.get("oom_detected") is True
+    }
+    trace_counts = _trace_status_counts(
+        payload.get("replacement_metadata")
+        if isinstance(payload.get("replacement_metadata"), dict)
+        else {}
+    )
+    source_workloads = _source_workloads(payload)
+    has_profiler_gap = "PROFILER_BLOCKED" in trace_counts or any(
+        workload.get("status") == "profiler_blocked" for workload in source_workloads
+    )
+    if "correctness" in oom_phases:
+        return "profiler_closure_oom_blocked"
+    if has_profiler_gap:
+        return "memory_oom_with_profiler_gap"
+    if "gen_inputs" in oom_phases:
+        return "gen_inputs_oom_blocked"
+    if "user_function" in oom_phases:
+        return "user_solution_oom"
+    return "reference_oom_blocked"
+
+
+def _failure_trace_details(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    source_workloads = _source_workloads(payload)
+    if source_workloads:
+        details: list[dict[str, Any]] = []
+        for workload in source_workloads:
+            replacement_path = workload.get("replacement_path")
+            slice_payload = (
+                _load_optional_json(Path(replacement_path))
+                if isinstance(replacement_path, str)
+                else None
+            )
+            details.extend(_payload_failure_details(slice_payload))
+        return details
+    return _payload_failure_details(payload)
+
+
+def _source_workloads(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    evidence = payload.get("evidence")
+    if not isinstance(evidence, dict):
+        return []
+    source = evidence.get("source_workloads")
+    if not isinstance(source, list):
+        return []
+    return [item for item in source if isinstance(item, dict)]
+
+
+def _payload_failure_details(payload: dict[str, Any] | None) -> list[dict[str, Any]]:
+    stdout = payload.get("stdout") if isinstance(payload, dict) else None
+    details: list[dict[str, Any]] = []
+    if isinstance(stdout, str):
+        for line in stdout.splitlines():
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(record, dict):
+                continue
+            evaluation = record.get("evaluation")
+            if not isinstance(evaluation, dict):
+                continue
+            status = evaluation.get("status")
+            if status == "PASSED" or not isinstance(status, str):
+                continue
+            log = str(evaluation.get("log") or "")
+            details.append(
+                {
+                    "status": status,
+                    "phase": _failure_phase(log),
+                    "oom_detected": _is_oom_log(log),
+                }
+            )
+    stderr = payload.get("stderr") if isinstance(payload, dict) else None
+    if isinstance(stderr, str) and _is_oom_log(stderr):
+        details.append(
+            {
+                "status": "PROFILER_BLOCKED",
+                "phase": _failure_phase(stderr),
+                "oom_detected": True,
+            }
+        )
+    return details
+
+
+def _load_optional_json(path: Path) -> dict[str, Any] | None:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _is_oom_log(log: str) -> bool:
+    return any(marker in log for marker in OOM_LOG_MARKERS)
+
+
+def _failure_phase(log: str) -> str:
+    if log.startswith("gen_inputs failed:"):
+        return "gen_inputs"
+    if log.startswith("Reference run() failed:"):
+        return "reference"
+    if log.startswith("User function failed:"):
+        return "user_function"
+    if "compute_error_stats" in log or "correctness.py" in log:
+        return "correctness"
+    return "unknown"
+
+
+def _is_memory_oom_blocker(blocker_class: str | None) -> bool:
+    return blocker_class in {
+        "reference_oom_blocked",
+        "gen_inputs_oom_blocked",
+        "user_solution_oom",
+        "profiler_closure_oom_blocked",
+        "memory_oom_with_profiler_gap",
+        "reference_oom_with_profiler_gap",
+    }
 
 
 def _kernel_activity_rows(evidence: dict[str, Any]) -> int:

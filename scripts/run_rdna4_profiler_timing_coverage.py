@@ -17,6 +17,7 @@ from sol_execbench.core.dataset import (
     validate_categories,
     write_profiler_timing_coverage_reports,
 )
+from sol_execbench.core.dataset.checksums import stable_json_checksum
 
 DEFAULT_DATASET_ROOT = Path("data/SOL-ExecBench/benchmark")
 DEFAULT_OUTPUT_DIR = Path("out/rdna4-profiler-timing-coverage")
@@ -63,6 +64,10 @@ def run_coverage(
                 "partial_profiler_backed_problems": (
                     report.totals.partial_profiler_backed_problems
                 ),
+                "reference_oom_blocked_problems": (
+                    report.totals.reference_oom_blocked_problems
+                ),
+                "blocker_class_counts": report.blocker_class_counts,
                 "profiler_blocked_problems": (report.totals.profiler_blocked_problems),
                 "fallback_timing_problems": report.totals.fallback_timing_problems,
                 "ready_missing_profiler_timing_problems": (
@@ -84,9 +89,62 @@ def run_coverage(
         + "\n",
         encoding="utf-8",
     )
+    (output_dir / "blocker-ledger.json").write_text(
+        json.dumps(build_blocker_ledger(report), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     if require_profiler_complete:
         return 0 if report.claim_boundary.full_profiler_backed_timing_coverage else 1
     return 0
+
+
+def build_blocker_ledger(report) -> dict:
+    """Build deterministic non-passing coverage ledger rows for review."""
+    rows = []
+    for problem in report.problems:
+        if problem.status == "profiler_backed":
+            continue
+        evidence = problem.evidence
+        rows.append(
+            {
+                "problem_id": problem.problem_id,
+                "category": problem.category,
+                "problem_path": problem.problem_path,
+                "status": problem.status,
+                "readiness_status": problem.readiness_status,
+                "workload_count": problem.workload_count,
+                "readiness_reason_codes": problem.readiness_reason_codes,
+                "readiness_blocker_types": problem.readiness_blocker_types,
+                "evidence_path": evidence.path if evidence is not None else None,
+                "blocker_class": (
+                    evidence.blocker_class if evidence is not None else None
+                ),
+                "trace_status_counts": (
+                    evidence.trace_status_counts if evidence is not None else {}
+                ),
+                "fallback_reason": evidence.fallback_reason if evidence else None,
+                "replacement_failure_reason": (
+                    evidence.replacement_failure_reason if evidence else None
+                ),
+            }
+        )
+    payload = {
+        "schema_version": "sol_execbench.rdna4_coverage_blocker_ledger.v1",
+        "coverage_checksum": (
+            report.coverage_checksum.value if report.coverage_checksum else None
+        ),
+        "problem_denominator": report.totals.problem_denominator,
+        "profiler_backed_problems": report.totals.profiler_backed_problems,
+        "status_counts": report.status_counts,
+        "blocker_class_counts": report.blocker_class_counts,
+        "claim_boundary": report.claim_boundary.model_dump(mode="json"),
+        "blocked_or_non_passing_count": len(rows),
+        "rows": sorted(rows, key=lambda item: (item["status"], item["problem_id"])),
+    }
+    payload["ledger_checksum"] = stable_json_checksum(
+        {**payload, "ledger_checksum": None}
+    )
+    return payload
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:

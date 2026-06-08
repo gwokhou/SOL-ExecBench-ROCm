@@ -161,6 +161,8 @@ Update documentation when changing:
 - Dataset reuse, execution-closure, failure-mode, or sharding semantics
 - Dataset runner phase scheduling, bounded subprocess logging, release
   transcript handling, or derived evidence sidecar naming
+- RDNA4 profiler-backed timing coverage, workload-sharded profiler manifests,
+  partial failure classification, or sharded closure audit semantics
 - Dataset migration, readiness classification, ready-subset denominator,
   low-precision compatibility, or redistribution-boundary behavior
 - User-facing examples

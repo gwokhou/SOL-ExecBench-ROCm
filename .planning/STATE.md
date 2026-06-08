@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.32
-milestone_name: RDNA4 Profiler Timing Coverage Closure
-status: Active milestone, phase 150 complete
-stopped_at: Phase 150 complete; Phase 149 full replacement remains blocked.
-last_updated: "2026-06-08T09:05:00.000Z"
-last_activity: 2026-06-08 — Phase 150 classified the first real RDNA4 profiler replacement blocker as partial profiler-backed
+milestone: v1.33
+milestone_name: RDNA4 Benchmark-Grade Evidence Closure
+status: Milestone v1.33 complete
+stopped_at: Milestone v1.33 complete with RDNA4 release evidence bundle and timing authority guardrails.
+last_updated: "2026-06-09T00:11:40.000Z"
+last_activity: 2026-06-09 — Phase 168 packaged RDNA4 release evidence bundle
 progress:
-  total_phases: 3
-  completed_phases: 2
-  total_plans: 3
-  completed_plans: 2
-  percent: 67
+  total_phases: 6
+  completed_phases: 6
+  total_plans: 6
+  completed_plans: 6
+  percent: 100
 ---
 
 # Project State
@@ -23,14 +23,14 @@ See: `.planning/PROJECT.md` (updated 2026-06-08)
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly
 on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL
 ExecBench.
-**Current focus:** v1.32 RDNA4 Profiler Timing Coverage Closure.
+**Current focus:** v1.33 RDNA4 Benchmark-Grade Evidence Closure.
 
 ## Current Position
 
-Phase: 150 — RDNA4 profiler replacement classification
-Plan: 150-01
-Status: Complete
-Last activity: 2026-06-08 — Phase 150 classified the first real RDNA4 profiler replacement blocker as partial profiler-backed
+Phase: —
+Plan: —
+Status: Milestone v1.33 complete
+Last activity: 2026-06-09 — Phase 168 packaged RDNA4 release evidence bundle
 
 ## Recent Trend
 
@@ -210,6 +210,80 @@ Last activity: 2026-06-08 — Phase 150 classified the first real RDNA4 profiler
   partial, or blocked while preserving the rule that only complete
   profiler-backed sidecars count toward full timing coverage.
 
+- Phase 159 planned on 2026-06-08 to replace unsafe full-problem profiler
+  timing attempts with workload-sharded execution, deterministic manifests, and
+  complete-workload aggregation into problem-level profiler-backed timing.
+
+- Phase 159 completed on 2026-06-08 with workload-sharded import-only
+  aggregation for `L1/037_flux_feedforward_gelu_approximate`. The final v2
+  evidence imported all 16 existing `rocprofv3` workload slices, produced a
+  problem-level profiler-backed aggregate sidecar, and moved coverage from
+  60/235 to 61/235 profiler-backed problems.
+
+- Phase 160 planned on 2026-06-08 to turn the Phase 159 single-problem
+  workload-sharded aggregation path into a generalized audit and closure
+  workflow for remaining partial/blocked profiler targets.
+
+- Phase 160 completed on 2026-06-08 with a conservative remaining-target
+  audit covering 14 partial/blocked profiler targets. A bounded real sharded
+  attempt on `L1/026_video_patch_embedding_projection` showed the target moves
+  from `profiler_blocked` to `partial_profiler_backed`, but not full
+  `profiler_backed`, because workloads produce `INVALID_REFERENCE`,
+  `RUNTIME_ERROR`, and one profiler-failed slice.
+
+- Phase 161 planned on 2026-06-08 to classify the remaining partial profiler
+  targets by correctness/runtime/profiler failure mode before spending more
+  profiler time on them.
+
+- Phase 161 completed on 2026-06-08 with a partial profiler failure
+  classification ledger. The 10 partial targets split into 6
+  `blocked_on_correctness`, 2 `blocked_on_runtime`, and 2
+  `blocked_on_mixed_failures`; no target remains in a missing-slice-only
+  closure bucket.
+
+- Phase 162 completed on 2026-06-08 by promoting diagnosed RDNA4
+  reference/gen_inputs OOM failures into the profiler timing denominator as
+  `reference_oom_blocked`. The latest 235-problem coverage report accounts for
+  61 `profiler_backed`, 10 `reference_oom_blocked`, 4 `profiler_blocked`, 46
+  `timing_fallback`, and 114 `readiness_blocked` problems.
+
+- Milestone v1.33 RDNA4 Benchmark-Grade Evidence Closure started on
+  2026-06-08 with six ordered phases: denominator policy hardening, memory
+  readiness classifier hardening, coverage recompute, `rocprofv3` timing
+  closure, clock-lock evidence, and release evidence bundle.
+
+- Phase 163 completed on 2026-06-08 with
+  `docs/internal/RDNA4-DENOMINATOR-POLICY.md`, a `docs/CLAIMS.md` policy link,
+  and CPU-safe regression coverage proving `reference_oom_blocked` is accounted
+  but not complete profiler-backed timing.
+
+- Phase 164 completed on 2026-06-08 with detailed blocker classes in profiler
+  timing coverage reports and partial failure ledgers, distinguishing reference
+  OOM, input-generation OOM, user-solution OOM, OOM plus profiler gaps,
+  timeout, profiler gaps, and non-OOM workload failures.
+
+- Phase 165 completed on 2026-06-08 by regenerating
+  `out/rdna4-coverage-recompute-20260608/` with 235 denominator rows, 61
+  profiler-backed problems, 174 non-passing/blocker ledger rows, and blocker
+  class counts for reference/input/user/profiler-gap OOM cases.
+
+- Phase 166 blocked on 2026-06-08. Full-problem and workload-sharded
+  `rocprofv3` closure attempts produced partial/profiler-blocked evidence for
+  `L1/028_hybrid_attention_mask_preparation` and
+  `L1/053_gaussian_topk_sparse_activation`; `L1/053` offset 9 still OOMs during
+  correctness error-stat computation on the current 16GB RDNA4 device.
+
+- Phase 166 completed on 2026-06-09 after accepting
+  `profiler_closure_oom_blocked` as a current-device blocker class. Accepted
+  coverage reports 61 `profiler_backed`, 13 `reference_oom_blocked`, 2
+  `profiler_blocked`, 45 `timing_fallback`, and 114 `readiness_blocked`
+  problems.
+
+- Phase 167 completed on 2026-06-09 with RDNA4 `rocm-smi`
+  clock-control/reset evidence. Manual/SCLK/MCLK commands and reset succeeded,
+  but observed clocks did not prove stable maximum-frequency lock, so RDNA4
+  timing remains below benchmark-grade authority.
+
 ## Accumulated Context
 
 ### Decisions
@@ -243,10 +317,23 @@ Last activity: 2026-06-08 — Phase 150 classified the first real RDNA4 profiler
   `flashinfer-ai/flashinfer-trace`; required notices must be preserved when
   redistributing any FlashInfer Trace material.
 
+### Roadmap Evolution
+
+- Phase 159 added: RDNA4 workload-sharded profiler-backed timing aggregation
+- Phase 160 added: RDNA4 generalized workload-sharded profiler closure
+- Phase 161 added: RDNA4 partial profiler failure classification
+- Phase 162 added: RDNA4 memory-footprint denominator policy
+- Phase 163 added: RDNA4 denominator policy hardening
+- Phase 164 added: RDNA4 memory readiness classifier hardening
+- Phase 165 added: RDNA4 coverage recompute
+- Phase 166 added: RDNA4 rocprof timing closure
+- Phase 167 added: RDNA4 clock-lock evidence
+- Phase 168 added: RDNA4 release evidence bundle
+
 ### Pending Todos
 
-- Phase 143 must rerun RDNA4 clock-lock evidence and profiler-backed timing
-  checks now that `rocm-smi` sudoers coverage is complete.
+- Audit and archive milestone v1.33 with `/gsd-audit-milestone` and
+  `/gsd-complete-milestone`.
 
 ### Blockers/Concerns
 
@@ -265,6 +352,15 @@ Last activity: 2026-06-08 — Phase 150 classified the first real RDNA4 profiler
   replacement attempts, but it must not count those attempts as complete
   `profiler_backed` timing coverage.
 
+- RDNA4 profiler OOM/timeout closure should no longer rely on serial timeout
+  escalation. Phase 159 should make workload-level execution and complete
+  aggregation the primary mitigation, with memory caps only as circuit breakers.
+
+- Phase 166 accepted current-device profiler-closure OOM blockers. Full
+  profiler-backed timing coverage remains false. Phase 167 recorded
+  clock-control and reset evidence, but observed clocks did not prove stable
+  maximum-frequency lock, so timing authority remains below benchmark-grade.
+
 ### Quick Tasks Completed
 
 | # | Description | Date | Commit | Directory |
@@ -272,6 +368,7 @@ Last activity: 2026-06-08 — Phase 150 classified the first real RDNA4 profiler
 | 260608-k79 | Improve RDNA4 validation completeness guardrails | 2026-06-08 | f354c32 | [260608-k79-rdna4-rdna4](./quick/260608-k79-rdna4-rdna4/) |
 | 260608-kjo | Add RDNA4 profiler-backed timing smoke slice | 2026-06-08 | 6615606 | [260608-kjo-rdna4-profiler-backed-timing-smoke-slice](./quick/260608-kjo-rdna4-profiler-backed-timing-smoke-slice/) |
 | 260608-kum | Fix RDNA4 profiler timing finalization | 2026-06-08 | a945fc5 | [260608-kum-rdna4-profiler-timing-smoke-eval-driver-](./quick/260608-kum-rdna4-profiler-timing-smoke-eval-driver-/) |
+| 260608-l01 | Add RDNA4 reference OOM classifier | 2026-06-08 | pending | [260608-l01-rdna4-reference-oom-classifier](./quick/260608-l01-rdna4-reference-oom-classifier/) |
 
 ## Deferred Items
 
@@ -306,4 +403,4 @@ Resume file: .planning/milestones/v1.30-MILESTONE-AUDIT.md
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Audit milestone v1.33 with `/gsd-audit-milestone`.
