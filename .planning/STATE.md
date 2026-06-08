@@ -5,7 +5,7 @@ milestone_name: RDNA4 Follow-Up Evidence Hardening
 status: Awaiting next milestone
 stopped_at: Milestone v1.31 complete.
 last_updated: "2026-06-08T06:04:43.318Z"
-last_activity: 2026-06-08 — Completed quick task 260608-kjo: add RDNA4 profiler-backed timing smoke slice
+last_activity: 2026-06-08 — Completed quick task 260608-kum: fix RDNA4 profiler timing finalization
 progress:
   total_phases: 6
   completed_phases: 6
@@ -30,7 +30,7 @@ ExecBench.
 Phase: Milestone v1.31 complete
 Plan: —
 Status: Awaiting next milestone
-Last activity: 2026-06-08 — Completed quick task 260608-kjo: add RDNA4 profiler-backed timing smoke slice
+Last activity: 2026-06-08 — Completed quick task 260608-kum: fix RDNA4 profiler timing finalization
 
 ## Recent Trend
 
@@ -257,6 +257,7 @@ Last activity: 2026-06-08 — Completed quick task 260608-kjo: add RDNA4 profile
 |---|-------------|------|--------|-----------|
 | 260608-k79 | Improve RDNA4 validation completeness guardrails | 2026-06-08 | f354c32 | [260608-k79-rdna4-rdna4](./quick/260608-k79-rdna4-rdna4/) |
 | 260608-kjo | Add RDNA4 profiler-backed timing smoke slice | 2026-06-08 | 6615606 | [260608-kjo-rdna4-profiler-backed-timing-smoke-slice](./quick/260608-kjo-rdna4-profiler-backed-timing-smoke-slice/) |
+| 260608-kum | Fix RDNA4 profiler timing finalization | 2026-06-08 | a945fc5 | [260608-kum-rdna4-profiler-timing-smoke-eval-driver-](./quick/260608-kum-rdna4-profiler-timing-smoke-eval-driver-/) |
 
 ## Deferred Items
 
