@@ -5,7 +5,7 @@ milestone_name: RDNA4 Follow-Up Evidence Hardening
 status: Awaiting next milestone
 stopped_at: Milestone v1.31 complete.
 last_updated: "2026-06-08T06:04:43.318Z"
-last_activity: 2026-06-08 — Milestone v1.31 completed and archived
+last_activity: 2026-06-08 — Completed quick task 260608-k79: improve RDNA4 validation completeness guardrails
 progress:
   total_phases: 6
   completed_phases: 6
@@ -30,7 +30,7 @@ ExecBench.
 Phase: Milestone v1.31 complete
 Plan: —
 Status: Awaiting next milestone
-Last activity: 2026-06-08 — Milestone v1.31 completed and archived
+Last activity: 2026-06-08 — Completed quick task 260608-k79: improve RDNA4 validation completeness guardrails
 
 ## Recent Trend
 
@@ -250,6 +250,12 @@ Last activity: 2026-06-08 — Milestone v1.31 completed and archived
 
 - RDNA4 timing remains non-authoritative until clock-lock/reset coverage and
   profiler-backed timing collection are rerun.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260608-k79 | Improve RDNA4 validation completeness guardrails | 2026-06-08 | f354c32 | [260608-k79-rdna4-rdna4](./quick/260608-k79-rdna4-rdna4/) |
 
 ## Deferred Items
 
