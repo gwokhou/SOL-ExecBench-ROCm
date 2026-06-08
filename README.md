@@ -107,6 +107,20 @@ uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
   --amd-score-report out/amd-score-report.json
 ```
 
+Build RDNA4 profiler-backed timing coverage from existing timing evidence:
+
+```bash
+uv run python scripts/run_rdna4_profiler_timing_coverage.py \
+  --timing-evidence-dir out/rdna4-profiler-workload-aggregate-20260608-v2/timing
+```
+
+For remaining partial or blocked RDNA4 profiler targets, the repository also
+contains operator scripts for workload-sharded profiler aggregation,
+partial-failure classification, and sharded-closure audit reports:
+`scripts/run_rdna4_profiler_timing_batch.py`,
+`scripts/run_rdna4_profiler_partial_failures.py`, and
+`scripts/run_rdna4_profiler_sharded_closure.py`.
+
 Migrate locally downloaded SOL-ExecBench or FlashInfer Trace inputs into the
 repository benchmark layout:
 

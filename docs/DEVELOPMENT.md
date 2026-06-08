@@ -65,6 +65,10 @@ and `/dev/dri`, ROCm user-space tooling, and a ROCm PyTorch build.
 | `uv run sol-execbench dataset migrate-flashinfer <source_root> <output_root>` | Convert locally downloaded FlashInfer Trace inputs into local benchmark layout. |
 | `uv run sol-execbench-baseline --candidate <file> --baseline <file>` | Compare trace JSONL files. |
 | `uv run scripts/run_dataset.py <downloaded-benchmark-dir> --limit 5` | Run a small downloaded dataset batch. |
+| `uv run python scripts/run_rdna4_profiler_timing_coverage.py` | Build RDNA4 profiler-backed timing coverage reports from timing sidecars. |
+| `uv run python scripts/run_rdna4_profiler_timing_batch.py --workload-sharded` | Profile missing RDNA4 workload slices independently and aggregate complete manifests. |
+| `uv run python scripts/run_rdna4_profiler_partial_failures.py` | Classify partial RDNA4 profiler-backed targets by failure mode and closure decision. |
+| `uv run python scripts/run_rdna4_profiler_sharded_closure.py` | Audit remaining partial or profiler-blocked targets for workload-sharded closure. |
 | `uv run pytest tests/` | Run the full test suite. |
 | `uv run --with ruff ruff check .` | Run lint checks when Ruff is not already installed in the environment. |
 | `uv run --with ruff ruff format .` | Format Python files when Ruff is not already installed in the environment. |
@@ -126,6 +130,7 @@ public benchmark schemas.
 | Boundary | Helper modules | Still owned by orchestrator/template |
 | --- | --- | --- |
 | Dataset execution | `core.dataset.run_state`, `core.dataset.run_closure`, `core.dataset.evidence_refs`, `core.dataset.sharding` | `scripts/run_dataset.py` CLI parsing, ROCm GPU/profiler subprocess phases, derived-phase worker scheduling, trace-stage pipeline scheduling, and high-level loop flow. |
+| RDNA4 profiler timing closure | `core.dataset.profiler_timing_coverage` | `scripts/run_rdna4_profiler_timing_batch.py` target selection, workload-slice staging, manifest import, profiler subprocess execution, and aggregate sidecar writing. |
 | Eval driver runtime | `core.bench.eval_runtime` | `driver/templates/eval_driver.py` subprocess context, staged wiring, correctness/timing loop, and integration smoke behavior. |
 | AMD bound analysis | `core.scoring.amd_bound_classification`, `core.scoring.amd_bound_estimate_families` | FX/AST graph extraction, family annotation, and formula bodies in existing scoring modules. |
 | SOLAR derivation | `core.scoring.solar_derivation_status` | Sidecar dataclasses, parser validation, semantic group construction, and rendering. |
@@ -205,6 +210,16 @@ Run ROCm container dependency checks inside the Docker environment:
 ```bash
 ./scripts/run_docker.sh --build
 ./scripts/run_docker.sh -- uv run pytest tests/docker/dependencies/
+```
+
+Run focused RDNA4 profiler timing closure regressions:
+
+```bash
+uv run pytest \
+  tests/sol_execbench/test_profiler_timing_coverage.py \
+  tests/sol_execbench/test_rdna4_profiler_timing_batch.py \
+  tests/sol_execbench/test_rdna4_profiler_partial_failures.py \
+  tests/sol_execbench/test_rdna4_profiler_sharded_closure.py -q
 ```
 
 Markers are registered in `pyproject.toml` and `tests/conftest.py`.

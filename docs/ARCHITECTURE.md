@@ -97,6 +97,7 @@ for trace baseline comparison.
 | `DatasetReuseDecision` | `src/sol_execbench/core/dataset/run_closure.py` | Decides whether existing dataset traces can be reused based on rerun flags, failure counts, and execution-closure provenance. |
 | Dataset runner helpers | `src/sol_execbench/core/dataset/runner.py` | Importable helpers used by `scripts/run_dataset.py` for solution wrapping, CLI subprocess invocation, trace parsing, timing evidence collection, and AMD score report generation. |
 | `DatasetShardPlan` and `DatasetShardMergeResult` | `src/sol_execbench/core/dataset/sharding.py` | Define deterministic workload shard assignment, per-shard trace refs, ordered trace merging, duplicate detection, and incomplete-shard reporting. |
+| `ProfilerTimingCoverageReport` | `src/sol_execbench/core/dataset/profiler_timing_coverage.py` | Classifies problem-level profiler timing evidence as profiler-backed, partial, profiler-blocked, fallback, ready-missing, reference-OOM-blocked, or readiness-blocked. |
 | Validation diagnostics | `src/sol_execbench/core/diagnostics.py` | CPU-safe ROCm readiness helpers, profiler routing readiness, CDNA 3 readiness metadata, and MI300X validation claim blockers. |
 
 ## Directory Structure Rationale
@@ -217,6 +218,17 @@ provides an importable design path for future workload-level dataset
 parallelism. `scripts/run_dataset.py` keeps ROCm GPU trace collection and
 profiler-backed timing serial, while allowing `--phase derived --jobs <N|auto>`
 to parallelize CPU/I/O-only report generation from existing traces.
+
+RDNA4 profiler-backed timing evidence has an additional operator layer:
+`scripts/run_rdna4_profiler_timing_coverage.py` renders denominator coverage
+from timing sidecars, `scripts/run_rdna4_profiler_timing_batch.py` can profile
+problem-level targets or workload slices, and
+`scripts/run_rdna4_profiler_partial_failures.py` plus
+`scripts/run_rdna4_profiler_sharded_closure.py` classify partial or blocked
+targets. Workload-sharded profiler aggregation writes per-problem manifests
+under `workload-manifests/`, per-workload timing sidecars under
+`workload-slices/`, and a problem-level aggregate sidecar only when complete
+workload evidence is available.
 
 `src/sol_execbench/core/scoring/` contains AMD hardware models, bound graphs,
 operator work estimates, AMD SOL bound artifacts, SOLAR derivation helpers,

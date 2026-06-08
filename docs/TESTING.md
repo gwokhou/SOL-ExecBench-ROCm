@@ -81,6 +81,16 @@ uv run pytest \
   tests/sol_execbench/test_dataset_sharding.py -q
 ```
 
+Run focused RDNA4 profiler-backed timing closure regressions:
+
+```bash
+uv run pytest \
+  tests/sol_execbench/test_profiler_timing_coverage.py \
+  tests/sol_execbench/test_rdna4_profiler_timing_batch.py \
+  tests/sol_execbench/test_rdna4_profiler_partial_failures.py \
+  tests/sol_execbench/test_rdna4_profiler_sharded_closure.py -q
+```
+
 ## Markers
 
 Core markers are registered in `pyproject.toml`; environment-sensitive skip
@@ -348,6 +358,12 @@ container ROCm user-space evidence only. They do not upgrade any target to
 native-host validation, paper parity, score authority, or leaderboard
 readiness.
 
+| Target id | Local image tag | Requested ROCm user-space | Evidence summary |
+| --- | --- | --- | --- |
+| `rocm-7.0.2-ubuntu-24.04-container` | `sol-execbench:rocm-7.0.2-complete` | 7.0.2 | `linear_backward` passed 3/3 workloads with `--record-container-validation`; trace `rocm-7.0.2-linear-wrapper-official.jsonl` and sidecar `rocm-7.0.2-linear-wrapper-official.compatibility.json` record container_validated evidence, but `CLOCKS_LOCKED=0` leaves performance unlocked. |
+| `rocm-7.1.1-ubuntu-24.04-container` | `sol-execbench:rocm-7.1.1-complete` | 7.1.1 | Default target with project-default target-specific PyTorch ROCm dependencies and `CLOCKS_LOCKED=1` when the recorded container-validation path succeeds. |
+| `rocm-7.2.0-ubuntu-24.04-container` | `sol-execbench:rocm-7.2-complete` | 7.2.0 | `linear_backward` passed 3/3 workloads with trace `rocm-7.2-linear-wrapper-official.jsonl` and sidecar `rocm-7.2-linear-wrapper-official.compatibility.json`; `CLOCKS_LOCKED=1` was recorded for official wrapper evidence. |
+
 Key interpretation points:
 
 - `container_validated` means the selected container target ran through the
@@ -357,6 +373,15 @@ Key interpretation points:
 - ROCm 7.1.1 and 7.2.0 container rows recorded `CLOCKS_LOCKED=1`.
 - Smoke runs through `--allow-untested-target-smoke` or
   `--allow-mixed-version-dependencies` are diagnostic and non-authoritative.
+- Mixed-version diagnostics can report `benchmark_allowed=false` with
+  `status=mixed_version`; those runs should not be upgraded into validation
+  claims.
+- ROCm 7.0 target-specific PyTorch ROCm smoke coverage uses
+  `torch==2.10.0+rocm7.0`; ROCm 7.2 target-specific PyTorch ROCm smoke
+  coverage uses `torch==2.11.0+rocm7.2`.
+- Non-authoritative ROCm 7.2 smoke artifacts may be named
+  `rocm-7.2-linear-wrapper-smoke.jsonl` and
+  `rocm-7.2-linear-wrapper-smoke.compatibility.json`.
 - Native-host validation requires direct native-host evidence for that ROCm
   stack; it cannot be inferred from Docker image selection or container runs.
 

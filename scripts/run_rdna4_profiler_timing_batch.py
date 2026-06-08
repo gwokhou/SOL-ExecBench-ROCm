@@ -46,6 +46,8 @@ DEFAULT_OUTPUT_DIR = Path("out/rdna4-profiler-backed-timing")
 DEFAULT_EXPECTED_PROBLEM_DENOMINATOR = 235
 DEFAULT_TOOL_VERSION = "rocprofv3"
 DEFAULT_GPU_ARCHITECTURE = "gfx1200"
+WORKLOAD_MANIFEST_SCHEMA_VERSION = "sol_execbench.rdna4_workload_profiler_manifest.v1"
+WORKLOAD_AGGREGATE_SCHEMA_VERSION = "sol_execbench.rdna4_workload_profiler_aggregate.v1"
 CLAIM_BOUNDARY = (
     "Profiler-backed RDNA4 timing replacement evidence only; not score "
     "authority, paper parity, leaderboard result, or broader hardware "
@@ -61,8 +63,16 @@ def run_batch(
     replacement_timing_dir: Path | None = None,
     limit: int | None = None,
     only_problem: Sequence[str] = (),
+    skip_problem: Sequence[str] = (),
+    mark_blocked_problem: Sequence[str] = (),
+    mark_blocked_only: bool = False,
     workload_limit: int | None = None,
+    workload_offset: int = 0,
+    workload_sharded: bool = False,
+    workload_slice_timing_dirs: Sequence[Path] = (),
+    workload_sharded_import_only: bool = False,
     timeout: int = 900,
+    temp_dir: Path | None = None,
     resume: bool = True,
     tool_version: str = DEFAULT_TOOL_VERSION,
     gpu_architecture: str = DEFAULT_GPU_ARCHITECTURE,
@@ -75,6 +85,12 @@ def run_batch(
         raise ValueError("limit must be positive when provided")
     if workload_limit is not None and workload_limit <= 0:
         raise ValueError("workload_limit must be positive when provided")
+    if workload_offset < 0:
+        raise ValueError("workload_offset must be non-negative")
+    if workload_sharded and workload_limit is not None:
+        raise ValueError("workload_sharded mode controls workload_limit internally")
+    if workload_sharded and workload_offset:
+        raise ValueError("workload_sharded mode profiles all manifest-missing offsets")
 
     replacement_root = replacement_timing_dir or output_dir / "timing"
     coverage = _build_coverage(
@@ -86,6 +102,7 @@ def run_batch(
         replacement_timing_dir=replacement_root,
         limit=limit,
         only_problem=only_problem,
+        skip_problem=skip_problem,
         resume=resume,
     )
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -96,22 +113,56 @@ def run_batch(
     )
 
     results: list[dict[str, Any]] = []
-    for target in targets:
-        results.append(
-            _profile_target(
-                target,
-                dataset_root=dataset_root,
-                replacement_timing_dir=replacement_root,
-                output_dir=output_dir,
-                workload_limit=workload_limit,
-                timeout=timeout,
-                tool_version=tool_version,
-                gpu_architecture=gpu_architecture,
-                clock_locked=clock_locked,
-                rocprofv3_available=available,
-                runner=runner,
-            )
-        )
+    marked_blocked = _mark_blocked_targets(
+        coverage,
+        replacement_timing_dir=replacement_root,
+        problem_ids=mark_blocked_problem,
+        reason="manual profiler block classification",
+    )
+    results.extend(marked_blocked)
+    marked_blocked_ids = {result["problem_id"] for result in marked_blocked}
+    if not mark_blocked_only:
+        for target in targets:
+            if target.problem_id in marked_blocked_ids:
+                continue
+            if workload_sharded:
+                results.append(
+                    _profile_target_workload_sharded(
+                        target,
+                        dataset_root=dataset_root,
+                        replacement_timing_dir=replacement_root,
+                        output_dir=output_dir,
+                        workload_limit=workload_limit,
+                        workload_offset=workload_offset,
+                        workload_slice_timing_dirs=workload_slice_timing_dirs,
+                        workload_sharded_import_only=workload_sharded_import_only,
+                        timeout=timeout,
+                        temp_dir=temp_dir,
+                        tool_version=tool_version,
+                        gpu_architecture=gpu_architecture,
+                        clock_locked=clock_locked,
+                        rocprofv3_available=available,
+                        runner=runner,
+                    )
+                )
+            else:
+                results.append(
+                    _profile_target(
+                        target,
+                        dataset_root=dataset_root,
+                        replacement_timing_dir=replacement_root,
+                        output_dir=output_dir,
+                        workload_limit=workload_limit,
+                        workload_offset=workload_offset,
+                        timeout=timeout,
+                        temp_dir=temp_dir,
+                        tool_version=tool_version,
+                        gpu_architecture=gpu_architecture,
+                        clock_locked=clock_locked,
+                        rocprofv3_available=available,
+                        runner=runner,
+                    )
+                )
 
     summary = _build_summary(
         coverage=coverage,
@@ -140,10 +191,12 @@ def select_fallback_targets(
     replacement_timing_dir: Path,
     limit: int | None = None,
     only_problem: Sequence[str] = (),
+    skip_problem: Sequence[str] = (),
     resume: bool = True,
 ) -> list[ProfilerTimingProblemCoverage]:
     """Select coverage rows whose fallback timing should be replaced."""
     only = set(only_problem)
+    skip = set(skip_problem)
     targets: list[ProfilerTimingProblemCoverage] = []
     for problem in coverage.problems:
         if problem.status not in {
@@ -153,6 +206,8 @@ def select_fallback_targets(
         }:
             continue
         if only and problem.problem_id not in only:
+            continue
+        if problem.problem_id in skip:
             continue
         replacement_path = _replacement_timing_path(
             replacement_timing_dir,
@@ -209,7 +264,9 @@ def _profile_target(
     replacement_timing_dir: Path,
     output_dir: Path,
     workload_limit: int | None,
+    workload_offset: int,
     timeout: int,
+    temp_dir: Path | None,
     tool_version: str,
     gpu_architecture: str,
     clock_locked: bool,
@@ -217,11 +274,21 @@ def _profile_target(
     runner: ProfilerRunner | None,
 ) -> dict[str, Any]:
     problem_dir = dataset_root / target.problem_path
-    staging_dir = Path(tempfile.mkdtemp(prefix="sol_execbench_rdna4_prof_batch_"))
-    profile_dir = (
-        output_dir / "rocprofv3" / target.category / Path(target.problem_path).name
+    if temp_dir is not None:
+        temp_dir.mkdir(parents=True, exist_ok=True)
+    staging_dir = Path(
+        tempfile.mkdtemp(
+            prefix="sol_execbench_rdna4_prof_batch_",
+            dir=temp_dir,
+        )
     )
-    output_file = Path(target.problem_path).name
+    problem_name = Path(target.problem_path).name
+    workload_slice_requested = workload_offset != 0 or workload_limit is not None
+    profile_dir = output_dir / "rocprofv3" / target.category / problem_name
+    output_file = problem_name
+    if workload_slice_requested:
+        profile_dir = profile_dir / f"workload-{workload_offset:04d}"
+        output_file = f"{problem_name}_workload_{workload_offset:04d}"
     replacement_path = _replacement_timing_path(
         replacement_timing_dir,
         target.category,
@@ -229,7 +296,11 @@ def _profile_target(
     )
     try:
         definition_payload = _load_json(problem_dir / "definition.json")
-        workloads = _load_workloads(problem_dir / "workload.jsonl", workload_limit)
+        workloads = _load_workloads(
+            problem_dir / "workload.jsonl",
+            limit=workload_limit,
+            offset=workload_offset,
+        )
         solution = build_reference_solution(definition_payload)
         packager = ProblemPackager(
             definition=Definition(**definition_payload),
@@ -258,61 +329,74 @@ def _profile_target(
             runner=batch_runner,
         )
     except subprocess.TimeoutExpired as exc:
-        return _target_failure(
+        return _write_blocked_sidecar(
             target,
             replacement_path=replacement_path,
             staging_dir=staging_dir,
             reason=f"rocprofv3 command timed out after {timeout} seconds",
+            workload_offset=workload_offset,
+            workload_limit=workload_limit,
             stdout=_subprocess_text(exc.stdout),
             stderr=_subprocess_text(exc.stderr),
         )
     except (OSError, ValueError) as exc:
-        return _target_failure(
+        return _write_blocked_sidecar(
             target,
             replacement_path=replacement_path,
             staging_dir=staging_dir,
             reason=str(exc),
+            workload_offset=workload_offset,
+            workload_limit=workload_limit,
         )
 
+    workload_slice_applied = workload_offset != 0 or (
+        workload_limit is not None and len(workloads) < target.workload_count
+    )
     trace_status_counts = _trace_status_counts(result.stdout)
     all_workloads_passed = (
-        len(workloads) >= target.workload_count
+        not workload_slice_applied
+        and len(workloads) >= target.workload_count
         and trace_status_counts.get("PASSED", 0) >= target.workload_count
         and sum(trace_status_counts.values()) >= target.workload_count
     )
     payload = result.to_dict()
+    if not isinstance(payload.get("evidence"), dict):
+        payload["evidence"] = {"backend": "rocprofv3", "parsed_rows": []}
     replacement_failure_reason = _replacement_failure_reason(
         profiler_collected=result.profiler_collected,
         all_workloads_passed=all_workloads_passed,
         selection_reason=result.selection.reason,
     )
-    payload["replacement_metadata"] = {
-        "schema_version": "sol_execbench.rdna4_profiler_timing_replacement.v1",
-        "problem_id": target.problem_id,
-        "replacement_status": _replacement_status(
-            profiler_collected=result.profiler_collected,
-            full_workload_coverage=all_workloads_passed,
-            kernel_activity_rows=_kernel_activity_rows(payload.get("evidence") or {}),
-        ),
-        "profiled_workload_count": len(workloads),
-        "expected_workload_count": target.workload_count,
-        "trace_status_counts": trace_status_counts,
-        "all_workloads_passed": all_workloads_passed,
-        "workload_limit_applied": workload_limit,
-        "full_workload_coverage": all_workloads_passed,
-        "failure_reason": replacement_failure_reason,
-    }
-    if result.profiler_collected:
-        replacement_path.parent.mkdir(parents=True, exist_ok=True)
-        replacement_path.write_text(
-            json.dumps(payload, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
     status = _replacement_status(
         profiler_collected=result.profiler_collected,
         full_workload_coverage=all_workloads_passed,
         kernel_activity_rows=_kernel_activity_rows(payload.get("evidence") or {}),
     )
+    payload["replacement_metadata"] = {
+        "schema_version": "sol_execbench.rdna4_profiler_timing_replacement.v1",
+        "problem_id": target.problem_id,
+        "replacement_status": status,
+        "profiled_workload_count": len(workloads),
+        "expected_workload_count": target.workload_count,
+        "trace_status_counts": trace_status_counts,
+        "all_workloads_passed": all_workloads_passed,
+        "workload_limit_applied": workload_limit if workload_slice_applied else None,
+        "workload_offset": workload_offset,
+        "workload_slice_applied": workload_slice_applied,
+        "workload_slice": {
+            "offset": workload_offset,
+            "limit": workload_limit,
+            "selected_workload_count": len(workloads),
+        },
+        "full_workload_coverage": all_workloads_passed,
+        "failure_reason": replacement_failure_reason,
+    }
+    if result.profiler_collected or status == "profiler_blocked":
+        replacement_path.parent.mkdir(parents=True, exist_ok=True)
+        replacement_path.write_text(
+            json.dumps(payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
     return {
         "problem_id": target.problem_id,
         "status": status,
@@ -320,6 +404,8 @@ def _profile_target(
         "staging_dir": str(staging_dir),
         "profiler_collected": result.profiler_collected,
         "full_workload_coverage": all_workloads_passed,
+        "workload_offset": workload_offset,
+        "workload_slice_applied": workload_slice_applied,
         "trace_status_counts": trace_status_counts,
         "csv_path": str(result.csv_path) if result.csv_path is not None else None,
         "fallback_reason": replacement_failure_reason,
@@ -327,11 +413,148 @@ def _profile_target(
     }
 
 
+def _profile_target_workload_sharded(
+    target: ProfilerTimingProblemCoverage,
+    *,
+    dataset_root: Path,
+    replacement_timing_dir: Path,
+    output_dir: Path,
+    workload_limit: int | None,
+    workload_offset: int,
+    workload_slice_timing_dirs: Sequence[Path],
+    workload_sharded_import_only: bool,
+    timeout: int,
+    temp_dir: Path | None,
+    tool_version: str,
+    gpu_architecture: str,
+    clock_locked: bool,
+    rocprofv3_available: bool,
+    runner: ProfilerRunner | None,
+) -> dict[str, Any]:
+    if workload_limit is not None or workload_offset:
+        raise ValueError("workload-sharded mode owns workload slicing")
+    problem_dir = dataset_root / target.problem_path
+    workload_refs = _load_workload_refs(problem_dir / "workload.jsonl")
+    manifest_path = _workload_manifest_path(output_dir, target)
+    manifest = _load_or_create_workload_manifest(
+        target=target,
+        dataset_root=dataset_root,
+        workload_refs=workload_refs,
+        manifest_path=manifest_path,
+        tool_version=tool_version,
+        gpu_architecture=gpu_architecture,
+        clock_locked=clock_locked,
+    )
+    _write_workload_manifest(manifest_path, manifest)
+    entries_by_index = {
+        entry.get("workload_index"): entry
+        for entry in manifest.get("workloads", [])
+        if isinstance(entry, dict)
+    }
+    imported_sidecars = _imported_workload_slice_sidecars(
+        target,
+        workload_slice_timing_dirs,
+    )
+    results: list[dict[str, Any]] = []
+    for ref in workload_refs:
+        index = ref["workload_index"]
+        existing = entries_by_index.get(index)
+        if _workload_manifest_entry_complete(existing):
+            continue
+        imported = imported_sidecars.get(index)
+        if imported is not None:
+            entry = _workload_manifest_entry(
+                ref,
+                result={
+                    "status": "partial_profiler_backed",
+                    "replacement_path": imported.as_posix(),
+                    "csv_path": _csv_path_from_sidecar(imported),
+                    "fallback_reason": None,
+                },
+                sidecar=_load_optional_json(imported),
+            )
+            _upsert_workload_manifest_entry(manifest, entry)
+            _write_workload_manifest(manifest_path, manifest)
+            if _workload_manifest_entry_complete(entry):
+                continue
+        if workload_sharded_import_only:
+            _upsert_workload_manifest_entry(
+                manifest,
+                {
+                    **ref,
+                    "status": "missing_imported_profiler_slice",
+                    "retryable": True,
+                    "profiler_collected": False,
+                    "backend": "rocprofv3",
+                    "trace_status_counts": {},
+                    "kernel_activity_rows": 0,
+                    "kernel_duration_ms": 0.0,
+                    "replacement_path": None,
+                    "csv_path": None,
+                    "failure_reason": (
+                        "no complete imported workload slice sidecar was found"
+                    ),
+                },
+            )
+            _write_workload_manifest(manifest_path, manifest)
+            continue
+        slice_timing_root = (
+            output_dir / "workload-slices" / f"workload-{index:04d}" / "timing"
+        )
+        result = _profile_target(
+            target,
+            dataset_root=dataset_root,
+            replacement_timing_dir=slice_timing_root,
+            output_dir=output_dir,
+            workload_limit=1,
+            workload_offset=index,
+            timeout=timeout,
+            temp_dir=temp_dir,
+            tool_version=tool_version,
+            gpu_architecture=gpu_architecture,
+            clock_locked=clock_locked,
+            rocprofv3_available=rocprofv3_available,
+            runner=runner,
+        )
+        results.append(result)
+        sidecar = _load_optional_json(Path(result["replacement_path"]))
+        entry = _workload_manifest_entry(ref, result=result, sidecar=sidecar)
+        _upsert_workload_manifest_entry(manifest, entry)
+        _write_workload_manifest(manifest_path, manifest)
+
+    aggregate = _write_workload_aggregate_sidecar(
+        target=target,
+        manifest=manifest,
+        replacement_path=_replacement_timing_path(
+            replacement_timing_dir,
+            target.category,
+            target.problem_path,
+        ),
+        tool_version=tool_version,
+        gpu_architecture=gpu_architecture,
+        clock_locked=clock_locked,
+    )
+    return {
+        "problem_id": target.problem_id,
+        "status": aggregate["status"],
+        "replacement_path": aggregate["replacement_path"],
+        "manifest_path": str(manifest_path),
+        "profiler_collected": aggregate["profiler_collected"],
+        "full_workload_coverage": aggregate["full_workload_coverage"],
+        "profiled_workload_count": aggregate["profiled_workload_count"],
+        "expected_workload_count": aggregate["expected_workload_count"],
+        "workload_sharded": True,
+        "workload_results": results,
+        "fallback_reason": aggregate["failure_reason"],
+        "returncode": None,
+    }
+
+
 def _target_failure(
     target: ProfilerTimingProblemCoverage,
     *,
     replacement_path: Path,
-    staging_dir: Path,
+    staging_dir: Path | None,
     reason: str,
     stdout: str = "",
     stderr: str = "",
@@ -340,7 +563,7 @@ def _target_failure(
         "problem_id": target.problem_id,
         "status": "profiler_blocked",
         "replacement_path": str(replacement_path),
-        "staging_dir": str(staging_dir),
+        "staging_dir": str(staging_dir) if staging_dir is not None else None,
         "profiler_collected": False,
         "csv_path": None,
         "fallback_reason": reason,
@@ -348,6 +571,97 @@ def _target_failure(
         "stderr_tail": stderr[-4096:],
         "returncode": None,
     }
+
+
+def _write_blocked_sidecar(
+    target: ProfilerTimingProblemCoverage,
+    *,
+    replacement_path: Path,
+    staging_dir: Path | None,
+    reason: str,
+    workload_offset: int = 0,
+    workload_limit: int | None = None,
+    stdout: str = "",
+    stderr: str = "",
+) -> dict[str, Any]:
+    workload_slice_applied = workload_offset != 0 or workload_limit is not None
+    payload = {
+        "profiler_collected": False,
+        "csv_path": None,
+        "selection": {
+            "reason": reason,
+            "policy": forced_pytorch_kernel_activity_policy().to_dict(),
+        },
+        "evidence": {
+            "backend": "rocprofv3",
+            "parsed_rows": [],
+        },
+        "replacement_metadata": {
+            "schema_version": "sol_execbench.rdna4_profiler_timing_replacement.v1",
+            "problem_id": target.problem_id,
+            "replacement_status": "profiler_blocked",
+            "profiled_workload_count": 0,
+            "expected_workload_count": target.workload_count,
+            "trace_status_counts": {},
+            "all_workloads_passed": False,
+            "workload_limit_applied": workload_limit,
+            "workload_offset": workload_offset,
+            "workload_slice_applied": workload_slice_applied,
+            "workload_slice": {
+                "offset": workload_offset,
+                "limit": workload_limit,
+                "selected_workload_count": 0,
+            },
+            "full_workload_coverage": False,
+            "failure_reason": reason,
+        },
+    }
+    replacement_path.parent.mkdir(parents=True, exist_ok=True)
+    replacement_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return _target_failure(
+        target,
+        replacement_path=replacement_path,
+        staging_dir=staging_dir,
+        reason=reason,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+
+def _mark_blocked_targets(
+    coverage: ProfilerTimingCoverageReport,
+    *,
+    replacement_timing_dir: Path,
+    problem_ids: Sequence[str],
+    reason: str,
+) -> list[dict[str, Any]]:
+    if not problem_ids:
+        return []
+    problems = {problem.problem_id: problem for problem in coverage.problems}
+    results: list[dict[str, Any]] = []
+    for problem_id in problem_ids:
+        target = problems.get(problem_id)
+        if target is None:
+            raise ValueError(
+                f"unknown problem for blocked classification: {problem_id}"
+            )
+        replacement_path = _replacement_timing_path(
+            replacement_timing_dir,
+            target.category,
+            target.problem_path,
+        )
+        results.append(
+            _write_blocked_sidecar(
+                target,
+                replacement_path=replacement_path,
+                staging_dir=None,
+                reason=reason,
+            )
+        )
+    return results
 
 
 def _replacement_timing_path(
@@ -358,6 +672,389 @@ def _replacement_timing_path(
     return replacement_timing_dir / category / f"{Path(problem_path).name}.timing.json"
 
 
+def _workload_manifest_path(
+    output_dir: Path,
+    target: ProfilerTimingProblemCoverage,
+) -> Path:
+    return (
+        output_dir
+        / "workload-manifests"
+        / target.category
+        / f"{Path(target.problem_path).name}.workload-profiler-manifest.json"
+    )
+
+
+def _load_workload_refs(path: Path) -> list[dict[str, Any]]:
+    refs: list[dict[str, Any]] = []
+    for index, line in enumerate(path.read_text(encoding="utf-8").splitlines()):
+        if not line.strip():
+            continue
+        payload = json.loads(line)
+        if not isinstance(payload, dict):
+            raise ValueError(f"expected workload JSON object at row {index}: {path}")
+        refs.append(
+            {
+                "workload_index": index,
+                "row_index": index,
+                "workload_uuid": (
+                    str(payload["uuid"]) if payload.get("uuid") is not None else None
+                ),
+            }
+        )
+    if not refs:
+        raise ValueError(f"workload file has no records: {path}")
+    return refs
+
+
+def _imported_workload_slice_sidecars(
+    target: ProfilerTimingProblemCoverage,
+    timing_dirs: Sequence[Path],
+) -> dict[int, Path]:
+    sidecars: dict[int, Path] = {}
+    for timing_dir in timing_dirs:
+        path = _replacement_timing_path(
+            timing_dir,
+            target.category,
+            target.problem_path,
+        )
+        payload = _load_optional_json(path)
+        if payload is None:
+            continue
+        metadata = (
+            payload.get("replacement_metadata")
+            if isinstance(payload.get("replacement_metadata"), dict)
+            else {}
+        )
+        if metadata.get("workload_slice_applied") is not True:
+            continue
+        offset = _int_value(metadata.get("workload_offset"))
+        if offset not in sidecars:
+            sidecars[offset] = path
+    return sidecars
+
+
+def _csv_path_from_sidecar(path: Path) -> str | None:
+    payload = _load_optional_json(path)
+    if payload is None or payload.get("csv_path") is None:
+        return None
+    return str(payload["csv_path"])
+
+
+def _load_or_create_workload_manifest(
+    *,
+    target: ProfilerTimingProblemCoverage,
+    dataset_root: Path,
+    workload_refs: Sequence[dict[str, Any]],
+    manifest_path: Path,
+    tool_version: str,
+    gpu_architecture: str,
+    clock_locked: bool,
+) -> dict[str, Any]:
+    if manifest_path.is_file():
+        payload = _load_json(manifest_path)
+        if payload.get("schema_version") != WORKLOAD_MANIFEST_SCHEMA_VERSION:
+            raise ValueError(f"unknown workload manifest schema: {manifest_path}")
+        if payload.get("problem_id") != target.problem_id:
+            raise ValueError(f"workload manifest problem mismatch: {manifest_path}")
+        payload["manifest_path"] = manifest_path.as_posix()
+        _normalize_workload_manifest(payload)
+        return payload
+    payload = {
+        "schema_version": WORKLOAD_MANIFEST_SCHEMA_VERSION,
+        "manifest_path": manifest_path.as_posix(),
+        "problem_id": target.problem_id,
+        "category": target.category,
+        "problem_path": target.problem_path,
+        "dataset_root": dataset_root.as_posix(),
+        "expected_workload_count": len(workload_refs),
+        "expected_workloads": list(workload_refs),
+        "tool_version": tool_version,
+        "gpu_architecture": gpu_architecture,
+        "clock_locked": clock_locked,
+        "workloads": [],
+    }
+    _normalize_workload_manifest(payload)
+    return payload
+
+
+def _normalize_workload_manifest(manifest: dict[str, Any]) -> None:
+    entries = manifest.get("workloads")
+    if not isinstance(entries, list):
+        manifest["workloads"] = []
+        return
+    for entry in entries:
+        if isinstance(entry, dict) and _workload_manifest_entry_complete(entry):
+            entry["status"] = "profiler_backed"
+            entry["retryable"] = False
+            entry["failure_reason"] = None
+
+
+def _write_workload_manifest(path: Path, manifest: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _workload_manifest_entry_complete(entry: object) -> bool:
+    return (
+        isinstance(entry, dict)
+        and entry.get("status") == "profiler_backed"
+        and entry.get("profiler_collected") is True
+        and _int_value(entry.get("kernel_activity_rows")) > 0
+        and _trace_status_counts_from_mapping(entry.get("trace_status_counts")).get(
+            "PASSED", 0
+        )
+        >= 1
+    )
+
+
+def _workload_manifest_entry(
+    ref: dict[str, Any],
+    *,
+    result: dict[str, Any],
+    sidecar: dict[str, Any] | None,
+) -> dict[str, Any]:
+    sidecar = sidecar or {}
+    evidence = (
+        sidecar.get("evidence") if isinstance(sidecar.get("evidence"), dict) else {}
+    )
+    metadata = (
+        sidecar.get("replacement_metadata")
+        if isinstance(sidecar.get("replacement_metadata"), dict)
+        else {}
+    )
+    trace_counts = _trace_status_counts_from_mapping(
+        metadata.get("trace_status_counts")
+    )
+    kernel_rows = _kernel_activity_rows(evidence)
+    profiler_collected = sidecar.get("profiler_collected") is True
+    passed = trace_counts.get("PASSED", 0) >= 1
+    status = (
+        "profiler_backed"
+        if profiler_collected
+        and evidence.get("backend") == "rocprofv3"
+        and kernel_rows > 0
+        and passed
+        else result["status"]
+    )
+    failure_reason = (
+        None
+        if status == "profiler_backed"
+        else (
+            metadata.get("failure_reason")
+            if metadata.get("failure_reason") is not None
+            else result.get("fallback_reason")
+        )
+    )
+    return {
+        **ref,
+        "status": status,
+        "retryable": status != "profiler_backed",
+        "profiler_collected": profiler_collected,
+        "backend": evidence.get("backend"),
+        "trace_status_counts": trace_counts,
+        "kernel_activity_rows": kernel_rows,
+        "kernel_duration_ms": _float_value(evidence.get("kernel_duration_ms")),
+        "replacement_path": result.get("replacement_path"),
+        "csv_path": result.get("csv_path"),
+        "failure_reason": failure_reason,
+    }
+
+
+def _upsert_workload_manifest_entry(
+    manifest: dict[str, Any],
+    entry: dict[str, Any],
+) -> None:
+    entries = [
+        item
+        for item in manifest.get("workloads", [])
+        if isinstance(item, dict)
+        and item.get("workload_index") != entry.get("workload_index")
+    ]
+    entries.append(entry)
+    manifest["workloads"] = sorted(
+        entries,
+        key=lambda item: int(item.get("workload_index", -1)),
+    )
+
+
+def _write_workload_aggregate_sidecar(
+    *,
+    target: ProfilerTimingProblemCoverage,
+    manifest: dict[str, Any],
+    replacement_path: Path,
+    tool_version: str,
+    gpu_architecture: str,
+    clock_locked: bool,
+) -> dict[str, Any]:
+    entries = [
+        entry for entry in manifest.get("workloads", []) if isinstance(entry, dict)
+    ]
+    expected = _int_value(manifest.get("expected_workload_count"))
+    complete_entries = [
+        entry for entry in entries if _workload_manifest_entry_complete(entry)
+    ]
+    trace_counts: dict[str, int] = {}
+    source_entries: list[dict[str, Any]] = []
+    parsed_rows: list[dict[str, Any]] = []
+    kernel_duration_ms = 0.0
+    for entry in entries:
+        for status, count in _trace_status_counts_from_mapping(
+            entry.get("trace_status_counts")
+        ).items():
+            trace_counts[status] = trace_counts.get(status, 0) + count
+        kernel_duration_ms += _float_value(entry.get("kernel_duration_ms"))
+        source_entries.append(
+            {
+                "workload_index": entry.get("workload_index"),
+                "workload_uuid": entry.get("workload_uuid"),
+                "status": entry.get("status"),
+                "replacement_path": entry.get("replacement_path"),
+                "csv_path": entry.get("csv_path"),
+                "kernel_activity_rows": entry.get("kernel_activity_rows"),
+                "kernel_duration_ms": entry.get("kernel_duration_ms"),
+                "failure_reason": (
+                    None
+                    if _workload_manifest_entry_complete(entry)
+                    else entry.get("failure_reason")
+                ),
+            }
+        )
+        parsed_rows.extend(_aggregate_rows_from_entry(entry))
+    full_workload_coverage = expected > 0 and len(complete_entries) == expected
+    profiler_collected = full_workload_coverage or any(
+        entry.get("profiler_collected") is True for entry in entries
+    )
+    status = _replacement_status(
+        profiler_collected=profiler_collected,
+        full_workload_coverage=full_workload_coverage,
+        kernel_activity_rows=len(parsed_rows),
+    )
+    failure_reason = None
+    if not full_workload_coverage:
+        failure_reason = (
+            "workload-sharded profiler manifest is incomplete or has failed workloads"
+        )
+    payload = {
+        "profiler_collected": profiler_collected,
+        "csv_path": None,
+        "selection": {
+            "reason": (
+                "complete workload-sharded rocprofv3 aggregation"
+                if full_workload_coverage
+                else failure_reason
+            ),
+            "policy": forced_pytorch_kernel_activity_policy().to_dict(),
+        },
+        "evidence": {
+            "schema_version": WORKLOAD_AGGREGATE_SCHEMA_VERSION,
+            "derived": True,
+            "backend": "rocprofv3",
+            "tool_version": tool_version,
+            "gpu_architecture": gpu_architecture,
+            "activity_domain": "kernel_activity",
+            "aggregation_rule": (
+                "sum kernel activity rows from independently profiled workloads"
+            ),
+            "interpretation": (
+                "problem-level timing aggregated from complete workload-sharded "
+                "rocprofv3 profiler evidence"
+            ),
+            "clock_locked": clock_locked,
+            "fallback_applied": False,
+            "kernel_duration_ms": kernel_duration_ms,
+            "parsed_rows": parsed_rows,
+            "source_manifest_path": manifest.get("manifest_path"),
+            "source_workloads": source_entries,
+        },
+        "replacement_metadata": {
+            "schema_version": "sol_execbench.rdna4_profiler_timing_replacement.v1",
+            "aggregation_schema_version": WORKLOAD_AGGREGATE_SCHEMA_VERSION,
+            "problem_id": target.problem_id,
+            "replacement_status": status,
+            "profiled_workload_count": len(complete_entries),
+            "expected_workload_count": expected,
+            "trace_status_counts": dict(sorted(trace_counts.items())),
+            "all_workloads_passed": full_workload_coverage,
+            "workload_limit_applied": None,
+            "workload_offset": 0,
+            "workload_slice_applied": False,
+            "workload_sharded_aggregation": True,
+            "manifest_path": manifest.get("manifest_path"),
+            "full_workload_coverage": full_workload_coverage,
+            "failure_reason": failure_reason,
+        },
+    }
+    payload["evidence"]["source_manifest_path"] = manifest.get("manifest_path")
+    payload["replacement_metadata"]["manifest_path"] = manifest.get("manifest_path")
+    replacement_path.parent.mkdir(parents=True, exist_ok=True)
+    replacement_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return {
+        "status": status,
+        "replacement_path": str(replacement_path),
+        "profiler_collected": profiler_collected,
+        "full_workload_coverage": full_workload_coverage,
+        "profiled_workload_count": len(complete_entries),
+        "expected_workload_count": expected,
+        "failure_reason": failure_reason,
+    }
+
+
+def _aggregate_rows_from_entry(entry: dict[str, Any]) -> list[dict[str, Any]]:
+    rows = _load_sidecar_rows(entry.get("replacement_path"))
+    if rows:
+        for row in rows:
+            row["workload_index"] = entry.get("workload_index")
+            row["workload_uuid"] = entry.get("workload_uuid")
+        return rows
+    count = _int_value(entry.get("kernel_activity_rows"))
+    duration = _float_value(entry.get("kernel_duration_ms"))
+    if count <= 0 or duration <= 0:
+        return []
+    return [
+        {
+            "name": "workload_sharded_kernel_activity",
+            "domain": "KERNEL_DISPATCH",
+            "duration_ns": duration * 1_000_000.0,
+            "duration_ms": duration,
+            "is_kernel_activity": True,
+            "raw": {},
+            "workload_index": entry.get("workload_index"),
+            "workload_uuid": entry.get("workload_uuid"),
+        }
+    ]
+
+
+def _load_sidecar_rows(path_value: object) -> list[dict[str, Any]]:
+    if not isinstance(path_value, str):
+        return []
+    payload = _load_optional_json(Path(path_value))
+    evidence = (
+        payload.get("evidence") if isinstance(payload.get("evidence"), dict) else {}
+    )
+    rows = evidence.get("parsed_rows")
+    if not isinstance(rows, list):
+        return []
+    return [
+        dict(row)
+        for row in rows
+        if isinstance(row, dict) and row.get("is_kernel_activity") is True
+    ]
+
+
+def _load_optional_json(path: Path) -> dict[str, Any] | None:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
 def _is_classified_replacement_sidecar(path: Path) -> bool:
     if not path.is_file():
         return False
@@ -365,15 +1062,19 @@ def _is_classified_replacement_sidecar(path: Path) -> bool:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return False
-    if not isinstance(payload, dict) or payload.get("profiler_collected") is not True:
+    if not isinstance(payload, dict):
         return False
     evidence = payload.get("evidence")
     if not isinstance(evidence, dict) or evidence.get("backend") != "rocprofv3":
         return False
     metadata = payload.get("replacement_metadata")
     if not isinstance(metadata, dict):
+        if payload.get("profiler_collected") is not True:
+            return False
         return _kernel_activity_rows(evidence) > 0
     if metadata.get("workload_limit_applied") is not None:
+        return False
+    if metadata.get("workload_slice_applied") is True:
         return False
     return metadata.get("replacement_status") in {
         "profiler_backed",
@@ -410,10 +1111,14 @@ def _load_json(path: Path) -> dict[str, Any]:
     return payload
 
 
-def _load_workloads(path: Path, limit: int | None) -> list[Workload]:
+def _load_workloads(
+    path: Path, *, limit: int | None, offset: int = 0
+) -> list[Workload]:
     workloads: list[Workload] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for index, line in enumerate(path.read_text(encoding="utf-8").splitlines()):
         if not line.strip():
+            continue
+        if index < offset:
             continue
         workloads.append(Workload(**json.loads(line)))
         if limit is not None and len(workloads) >= limit:
@@ -476,6 +1181,36 @@ def _trace_status_counts(stdout: str) -> dict[str, int]:
         if isinstance(status, str):
             counts[status] = counts.get(status, 0) + 1
     return dict(sorted(counts.items()))
+
+
+def _trace_status_counts_from_mapping(value: object) -> dict[str, int]:
+    if not isinstance(value, dict):
+        return {}
+    counts: dict[str, int] = {}
+    for key, count_value in value.items():
+        if isinstance(key, str):
+            count = _int_value(count_value)
+            if count:
+                counts[key] = count
+    return dict(sorted(counts.items()))
+
+
+def _int_value(value: object) -> int:
+    if isinstance(value, bool) or value is None:
+        return 0
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _float_value(value: object) -> float:
+    if isinstance(value, bool) or value is None:
+        return 0.0
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _replacement_failure_reason(
@@ -582,8 +1317,40 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--replacement-timing-dir", type=Path, default=None)
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--only-problem", action="append", default=[])
+    parser.add_argument("--skip-problem", action="append", default=[])
+    parser.add_argument("--skip-problem-file", type=Path, default=None)
+    parser.add_argument("--mark-blocked-problem", action="append", default=[])
+    parser.add_argument("--mark-blocked-only", action="store_true")
     parser.add_argument("--workload-limit", type=int, default=None)
+    parser.add_argument("--workload-offset", type=int, default=0)
+    parser.add_argument(
+        "--workload-sharded",
+        action="store_true",
+        help=(
+            "Profile each workload independently and aggregate only complete "
+            "profiler-backed workload manifests into problem-level timing."
+        ),
+    )
+    parser.add_argument(
+        "--workload-slice-timing-dir",
+        action="append",
+        type=Path,
+        default=[],
+        help=(
+            "Existing timing root containing diagnostic workload slice sidecars "
+            "to import before profiling missing workloads; may be repeated."
+        ),
+    )
+    parser.add_argument(
+        "--workload-sharded-import-only",
+        action="store_true",
+        help=(
+            "In workload-sharded mode, aggregate imported slice sidecars only "
+            "and do not profile missing workloads."
+        ),
+    )
     parser.add_argument("--timeout", type=int, default=900)
+    parser.add_argument("--temp-dir", type=Path, default=None)
     parser.add_argument("--resume", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--timing-tool-version", default=DEFAULT_TOOL_VERSION)
     parser.add_argument("--gpu-architecture", default=DEFAULT_GPU_ARCHITECTURE)
@@ -595,12 +1362,27 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def _load_problem_id_file(path: Path | None) -> tuple[str, ...]:
+    if path is None:
+        return ()
+    problem_ids: list[str] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        problem_ids.append(stripped)
+    return tuple(problem_ids)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     source_timing_dirs = (
         tuple(args.source_timing_dir)
         if args.source_timing_dir
         else (DEFAULT_SOURCE_TIMING_DIR,)
+    )
+    skip_problem = tuple(args.skip_problem) + _load_problem_id_file(
+        args.skip_problem_file
     )
     try:
         return run_batch(
@@ -610,8 +1392,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             replacement_timing_dir=args.replacement_timing_dir,
             limit=args.limit,
             only_problem=tuple(args.only_problem),
+            skip_problem=skip_problem,
+            mark_blocked_problem=tuple(args.mark_blocked_problem),
+            mark_blocked_only=args.mark_blocked_only,
             workload_limit=args.workload_limit,
+            workload_offset=args.workload_offset,
+            workload_sharded=args.workload_sharded,
+            workload_slice_timing_dirs=tuple(args.workload_slice_timing_dir),
+            workload_sharded_import_only=args.workload_sharded_import_only,
             timeout=args.timeout,
+            temp_dir=args.temp_dir,
             resume=args.resume,
             tool_version=args.timing_tool_version,
             gpu_architecture=args.gpu_architecture,

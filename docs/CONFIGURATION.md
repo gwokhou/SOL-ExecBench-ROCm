@@ -212,6 +212,13 @@ files. Use these source-backed override paths instead:
   `--phase`, `--limit`, `--max-workloads`, `--workload-shard-size`,
   `--iterations`, `--warmup-runs`, `--timeout`, `--timeout-overrides`,
   `--blob-precheck`, and `--lock-clocks`.
+- RDNA4 profiler timing closure settings: pass
+  `scripts/run_rdna4_profiler_timing_batch.py` flags such as
+  `--only-problem`, `--skip-problem`, `--skip-problem-file`,
+  `--mark-blocked-problem`, `--mark-blocked-only`, `--workload-limit`,
+  `--workload-offset`, `--workload-sharded`,
+  `--workload-slice-timing-dir`, `--workload-sharded-import-only`,
+  `--timeout`, and `--temp-dir`.
 - Docker ROCm stack selection: use `./scripts/run_docker.sh --target <id>` for
   declared targets in `docker/rocm-targets.json`.
 - Docker image overrides for unknown targets: use `--allow-unknown-target` with
@@ -393,6 +400,51 @@ arguments before `--` that are not wrapper flags are forwarded to `docker run`.
 | `--preflight-only` | Print preflight JSON and exit before Docker build/run. |
 | `--compatibility-entry <path>` | Write a per-target compatibility JSON sidecar. |
 | `--compatibility-matrix <path>` | Write or aggregate a compatibility matrix JSON report. |
+
+## RDNA4 Profiler Timing Operator Flags
+
+The RDNA4 profiler closure scripts are evidence-generation tools for existing
+dataset layouts and timing sidecars. They do not change canonical Trace JSONL
+or create score authority.
+
+`scripts/run_rdna4_profiler_timing_coverage.py` accepts:
+
+| Flag | Purpose |
+| --- | --- |
+| `--dataset-root` | Dataset benchmark root, defaulting to `data/SOL-ExecBench/benchmark`. |
+| `--output-dir` | Directory for `coverage.json`, `coverage.md`, and `coverage-summary.json`. |
+| `--timing-evidence-dir` | Timing sidecar root; may be repeated. |
+| `--category` | Dataset category filter; may be repeated. |
+| `--expected-problem-denominator` | Expected denominator, defaulting to `235`. |
+| `--no-expected-problem-denominator` | Disable fixed denominator recording. |
+| `--require-profiler-complete` | Exit nonzero unless every denominator problem has full profiler-backed timing. |
+
+`scripts/run_rdna4_profiler_timing_batch.py` accepts the same dataset/output
+roots plus target and workload controls:
+
+| Flag | Purpose |
+| --- | --- |
+| `--source-timing-dir` | Existing fallback timing sidecar root; may be repeated. |
+| `--replacement-timing-dir` | Destination for replacement timing sidecars. |
+| `--limit` | Limit selected targets. |
+| `--only-problem` | Include only a problem ID; may be repeated. |
+| `--skip-problem` | Skip a problem ID; may be repeated. |
+| `--skip-problem-file` | Read skipped problem IDs from a file. |
+| `--mark-blocked-problem` | Write a classified profiler-blocked sidecar for a problem ID. |
+| `--mark-blocked-only` | Only write requested blocked sidecars; do not profile other targets. |
+| `--workload-limit` | Profile a bounded workload slice for a selected problem. |
+| `--workload-offset` | Start workload-slice profiling at an offset. |
+| `--workload-sharded` | Profile each workload independently and aggregate complete manifests. |
+| `--workload-slice-timing-dir` | Import existing workload-slice timing roots before profiling missing slices. |
+| `--workload-sharded-import-only` | Aggregate imported slices without profiling missing workloads. |
+| `--timeout` | Per-profiler subprocess timeout in seconds. |
+| `--temp-dir` | Parent directory for profiler staging directories. |
+
+The classification scripts
+`scripts/run_rdna4_profiler_partial_failures.py` and
+`scripts/run_rdna4_profiler_sharded_closure.py` accept dataset root, output
+directory, timing evidence directories, and denominator controls. The sharded
+closure audit also accepts repeated `--target-status` values.
 
 ## Package Configuration
 
