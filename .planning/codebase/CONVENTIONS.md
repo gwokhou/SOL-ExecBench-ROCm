@@ -1,72 +1,134 @@
 ---
-last_mapped_commit: f4de6692ee7468e150c112e0cbdcc8842dd0c709
-mapped_at: 2026-06-06
+last_mapped_commit: dd5731c42d9f3d417acf552b3a02004cd5039df2
+last_mapped_date: 2026-06-08
+focus: quality
 ---
 
 # Coding Conventions
 
 ## Style Baseline
 
-The repository is a Python 3.12+ package rooted at `src/sol_execbench/`, with scripts in `scripts/` and tests in `tests/`. Formatting and linting are governed by Ruff in `pyproject.toml`: generated/downloaded content, `data/`, and `examples/` are excluded; `E741` is ignored. Type checking is configured through `tool.ty.src` for `src` and `tests`.
+The project is a Python 3.12+ package rooted at `src/sol_execbench/`, with CLIs in
+`src/sol_execbench/cli/`, scripts in `scripts/`, examples in `examples/`, and tests
+in `tests/`.
 
-Most source files use SPDX headers. Files retained from the original implementation often include both NVIDIA and ROCm-port contributor copyright lines, for example `src/sol_execbench/cli/main.py`, `src/sol_execbench/core/data/solution.py`, and `tests/examples/test_examples.py`. Newer ROCm-only files commonly use only the contributor SPDX lines, for example `scripts/check_prerelease_readiness.py` and `src/sol_execbench/core/dataset/readiness.py`.
+Ruff is the formatter and linter configured in `pyproject.toml`. It force-excludes
+generated/cache/build data plus `data/` and `examples/`, and currently ignores
+`E741`. Type checking is configured with `ty` over `src` and `tests`.
 
-`from __future__ import annotations` is common in newer modules and tests, especially CLI, dataset, environment, scoring, and script code such as `src/sol_execbench/cli/main.py`, `src/sol_execbench/core/environment.py`, `src/sol_execbench/core/dataset/runner.py`, and `scripts/release_candidate_validation.py`.
+Pre-commit hooks in `.pre-commit-config.yaml` run `uv run --locked ruff check --fix`,
+`uv run --locked ruff format`, a DCO sign-off check, and `uv run --locked ty check`
+on pre-push.
+
+Most source and test files use SPDX headers. Original-derived files often include
+both NVIDIA and ROCm-port contributor copyright lines, such as
+`src/sol_execbench/cli/main.py` and `tests/examples/test_examples.py`; newer
+ROCm-only files commonly use the contributor SPDX lines only, such as
+`src/sol_execbench/core/bench/eval_runtime.py`.
+
+## Python Style
+
+Use `from __future__ import annotations` in new Python modules unless there is a
+local reason not to. This is common in CLI, bench, dataset, script, and test code.
+
+Use `pathlib.Path` for filesystem paths. Load JSON with explicit
+`json.loads(path.read_text())`, parse JSONL line by line while skipping blank lines,
+and write deterministic artifacts with explicit parent creation where needed.
+
+Keep helpers small and local when they serve one module. Internal helpers are
+prefixed with `_`, for example `_load_solution` in `src/sol_execbench/cli/main.py`,
+`_safe_module_part` in `src/sol_execbench/core/bench/eval_runtime.py`, and
+`_missing_rocm_device_nodes` in `tests/conftest.py`.
+
+Prefer dependency injection for testable external behavior. Existing code accepts
+runner/time/probe callables in places such as `src/sol_execbench/core/bench/eval_runtime.py`
+and environment/report modules rather than hard-wiring all subprocess or timing calls.
 
 ## Naming
 
-Use `snake_case` for modules, functions, variables, helper functions, and fixture names. Internal helpers are prefixed with `_`, such as `_load_solution` in `src/sol_execbench/cli/main.py`, `_validate_compile_flag` in `src/sol_execbench/core/data/solution.py`, and `_missing_rocm_device_nodes` in `tests/conftest.py`.
+Use `snake_case` for modules, functions, variables, fixtures, and private helpers.
+Use `PascalCase` for classes, dataclasses, Pydantic models, and test grouping
+classes.
 
-Use `PascalCase` for classes, dataclasses, Pydantic models, and test classes. Examples include `BuildSpec`, `CompileOptions`, and `SupportedHardware` in `src/sol_execbench/core/data/solution.py`, `EnvironmentSnapshot` in `src/sol_execbench/core/environment.py`, and test groupings like `TestLanguageValidation` in `tests/sol_execbench/core/data/test_solution.py`.
+Enum classes use `PascalCase`; enum members use uppercase names with string values.
+ROCm vocabulary is explicit in public enums and constants, for example
+`SupportedLanguages.HIP_CPP`, `SupportedLanguages.MIOPEN`, `SupportedHardware.GFX1200`,
+and `SupportedHardware.GFX942` in `src/sol_execbench/core/data/solution.py`.
 
-Enum classes use `PascalCase`; enum members use uppercase names with string values. ROCm vocabulary is explicit, as in `SupportedLanguages.HIP_CPP`, `SupportedLanguages.MIOPEN`, `SupportedHardware.GFX1200`, and `SupportedHardware.GFX942` in `src/sol_execbench/core/data/solution.py`.
+Module constants are uppercase. CLI and evidence constants such as
+`ENV_SNAPSHOT_ENABLE_ENV`, `PROFILE_ROCPROFV3`, and
+`NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION` live in `src/sol_execbench/cli/main.py`;
+test sample roots such as `_SAMPLES_DIR` live near their users.
 
-Constants are uppercase at module scope, including CLI/env constants such as `ENV_SNAPSHOT_ENABLE_ENV`, `PROFILE_ROCPROFV3`, and `NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION` in `src/sol_execbench/cli/main.py`, and dataset/test constants like `_SAMPLES_DIR` in `tests/sol_execbench/test_e2e.py`.
+## Models And Contracts
 
-## Models And Data Contracts
+Public schemas use Pydantic v2. Shared base behavior and constrained aliases live in
+`src/sol_execbench/core/data/base_model.py`, including `BaseModelWithDocstrings`,
+`NonEmptyString`, and `NonNegativeInt`.
 
-Public schema objects use Pydantic v2. Shared aliases and base behavior live in `src/sol_execbench/core/data/base_model.py`, where `BaseModelWithDocstrings` enables `use_attribute_docstrings=True`, and aliases like `NonEmptyString` and `NonNegativeInt` wrap `Annotated` plus `Field` constraints.
+Schema validation is concentrated in `@field_validator` and `@model_validator`
+methods. `src/sol_execbench/core/data/definition.py` validates reference code,
+axis usage, and custom input entrypoints; `src/sol_execbench/core/data/solution.py`
+validates language, hardware, entry point, source path, and native compile options.
 
-Schema validation is concentrated in Pydantic validators. `src/sol_execbench/core/data/solution.py` uses `@field_validator` and `@model_validator` to reject legacy CUDA/NVIDIA language values, enforce entry point suffixes, validate source paths, and block unsafe native compile flags. Tests assert validation messages, so error text is part of the practical contract.
+Validation messages are treated as practical contract surface. Tests commonly assert
+`pytest.raises(..., match=...)`, so new errors should be specific and stable enough
+for users and tests.
 
-Report and evidence objects generally expose deterministic JSON methods using `model_dump(mode="json")`, `json.dumps(..., sort_keys=True)`, and often `indent=2` plus a trailing newline. This pattern appears in `src/sol_execbench/core/dataset/manifest.py`, `src/sol_execbench/core/dataset/readiness.py`, `src/sol_execbench/core/dataset/ready_subset.py`, `src/sol_execbench/core/dataset/paper_denominator.py`, and `src/sol_execbench/core/claim_upgrade.py`.
+Use dataclasses for internal descriptors and calculation inputs when Pydantic
+validation is unnecessary. Examples include runtime timing results in
+`src/sol_execbench/core/bench/eval_runtime.py` and e2e descriptor objects in
+`tests/sol_execbench/test_e2e.py`.
 
-Dataclasses are used for internal descriptors and simple immutable calculation inputs where Pydantic validation is not needed. Examples include frozen dataclasses in `src/sol_execbench/core/scoring/amd_score.py`, `src/sol_execbench/core/scoring/amd_hardware_models.py`, `src/sol_execbench/core/dataset/low_precision.py`, and test descriptors in `tests/examples/test_examples.py`.
+## CLI And Scripts
 
-## File And JSON Handling
+The main user CLI is Click-based in `src/sol_execbench/cli/main.py`, with Rich for
+tables and progress display. User misuse generally raises `click.ClickException`;
+script misuse commonly raises `SystemExit` with a concise message.
 
-Use `pathlib.Path` consistently for filesystem paths. CLI options use Click `path_type=Path` in `src/sol_execbench/cli/main.py`, scripts resolve repository roots with `Path(__file__).resolve()`, and tests use `tmp_path` for isolated staging.
+Subprocess calls use explicit argument lists, `capture_output=True`, `text=True`,
+and timeouts. This pattern appears in CLI evaluation paths, scripts such as
+`scripts/run_dataset.py`, and e2e tests.
 
-JSON and JSONL parsing is straightforward and explicit: `json.loads(path.read_text())` for JSON files, and line-by-line parsing with blank-line skips for JSONL. Examples include `_load_workloads` in `src/sol_execbench/cli/main.py`, `_load_sample` in `tests/sol_execbench/test_e2e.py`, and dataset runner logic in `src/sol_execbench/core/dataset/runner.py`.
-
-When writing machine-readable artifacts, prefer sorted deterministic output and explicit parent creation. Sidecar writers in `src/sol_execbench/cli/main.py` create parent directories before writing, while dataset/report modules such as `src/sol_execbench/core/dataset/manifest.py` and `src/sol_execbench/core/dataset/parity_gap.py` serialize stable JSON for reproducible tests and release artifacts.
-
-## CLI And Subprocess Patterns
-
-The primary CLI is Click-based in `src/sol_execbench/cli/main.py`, with Rich used for user-facing tables and status messages. CLI failure paths raise `click.ClickException` for user errors, for example missing problem inputs or unsupported output modes.
-
-Subprocess calls use explicit argument lists, `capture_output=True`, `text=True`, and timeouts. The CLI's `_run_evaluation_command` and compile/evaluate phases in `src/sol_execbench/cli/main.py` follow this pattern, as do tests and scripts such as `tests/examples/test_examples.py`, `tests/sol_execbench/test_dependency_matrix_cli.py`, and `scripts/run_dataset.py`.
-
-Subprocess output that may be diagnostic or noisy is bounded or filtered. `src/sol_execbench/cli/main.py` stores no-trace diagnostics with tail limits, filters benign ROCm stderr through `filter_benign_rocm_stderr`, and records sidecars rather than treating all auxiliary failures as benchmark failures.
-
-Scripts are usually importable modules with a `main(...)` function and a final `raise SystemExit(main())`, as in `scripts/export_matrix_schema.py`, `scripts/report_trust_summary.py`, `scripts/check_dataset_redistribution.py`, and `scripts/release_candidate_validation.py`.
+Scripts are usually importable modules with a `main(...)` function and a final
+`raise SystemExit(main())`, as in `scripts/export_matrix_schema.py`,
+`scripts/report_trust_summary.py`, and `scripts/release_candidate_validation.py`.
 
 ## Error Handling
 
-Schema and contract violations generally raise `ValueError` or Pydantic `ValidationError`. Examples include dtype validation in `src/sol_execbench/core/data/dtypes.py`, solution schema validation in `src/sol_execbench/core/data/solution.py`, hardware model loading in `src/sol_execbench/core/scoring/amd_hardware_models.py`, and matrix contracts in `src/sol_execbench/core/runtime_evidence.py`.
+Use `ValueError` or Pydantic validation errors for schema and contract violations.
+Use `RuntimeError` for runtime boundary failures such as missing staged files,
+failed dynamic imports, or native build errors.
 
-Runtime/evaluation boundary failures generally raise `RuntimeError` with contextual messages. Examples include missing staged files and failed dynamic imports in `src/sol_execbench/core/bench/eval_runtime.py`, missing outputs in `src/sol_execbench/core/bench/io.py`, and native build template errors in `src/sol_execbench/driver/templates/build_ext.py`.
+CLI-visible failures should be converted to `click.ClickException` where possible.
+Diagnostic-only failures should be bounded and recorded rather than allowed to
+overwrite benchmark truth.
 
-CLI-visible misuse raises `click.ClickException` in `src/sol_execbench/cli/main.py`; script argument misuse commonly raises `SystemExit` with a concise message, as in `scripts/run_dataset.py` and `scripts/release_candidate_validation.py`.
+Non-critical evidence collection is intentionally nonfatal. Environment snapshots,
+rocprofv3 metadata, static evidence, and optional external probes often return
+`None`, emit a warning, or write an unsupported/failed sidecar instead of failing
+the run.
 
-Non-critical evidence collection is deliberately nonfatal. Environment snapshots, profiling metadata, static evidence sidecars, optional probes, and missing external tools often catch `OSError`, `FileNotFoundError`, `ImportError`, `RuntimeError`, or broad `Exception`, then return `None`, record a failed/unsupported sidecar, or print a yellow diagnostic. See `src/sol_execbench/cli/main.py`, `src/sol_execbench/core/environment.py`, `src/sol_execbench/core/runtime_evidence.py`, and `src/sol_execbench/core/bench/rocm_profiler.py`.
+Security-sensitive validation is fail-closed. `src/sol_execbench/core/data/solution.py`
+rejects absolute paths, parent traversal, response files, unsafe compile/link flags,
+rpaths, and runtime linker overrides. Dataset and download code similarly checks
+unsafe names and paths.
 
-Security-sensitive validation is fail-closed. `src/sol_execbench/core/data/solution.py` rejects absolute paths, parent traversal, response files, sysroot/path-injection flags, rpaths, and runtime linker overrides. `scripts/download_solexecbench.py` rejects unsafe remote problem names, and dataset readiness checks in `src/sol_execbench/core/dataset/readiness.py` block safetensors paths outside the dataset root.
+## ROCm Port Rules
 
-## ROCm Port Conventions
+Prefer ROCm-only vocabulary in new code: HIP/C++, hipBLAS, MIOpen, Composable
+Kernel, rocWMMA, RDNA 4, CDNA 3, `gfx1200`, and `gfx94*`.
 
-ROCm-only vocabulary is preferred in new code and tests: HIP/C++, hipBLAS, MIOpen, Composable Kernel, rocWMMA, RDNA 4, CDNA 3, `gfx1200`, and `gfx94*`. Legacy CUDA/NVIDIA values are either rejected with migration guidance or retained only in compatibility tests and historical examples.
+Legacy CUDA/NVIDIA values are retained only for compatibility boundaries, migration
+tests, historical examples, or explicit rejection paths. Do not add new CUDA support
+surfaces unless the project scope changes.
 
-Validation claims are carefully bounded. Matrix, evidence, and release code separates target hardware, observed evidence, diagnostic evidence, container validation, native host validation, and claim authority. Relevant modules include `src/sol_execbench/core/runtime_evidence.py`, `src/sol_execbench/core/dependency_matrix.py`, `src/sol_execbench/core/docker_matrix.py`, and tests like `tests/sol_execbench/test_matrix_claim_guardrails.py`.
+Hardware behavior must be marker/probe-gated instead of assumed. `tests/conftest.py`
+is the central place for ROCm device-node, PyTorch ROCm, architecture, ROCm dev
+header, CK, and rocWMMA detection.
 
-Hardware-gated behavior should use existing marker and probe conventions rather than assuming a GPU. `tests/conftest.py` probes `/dev/kfd`, `/dev/dri`, PyTorch ROCm availability, ROCm dev headers, CK headers, rocWMMA headers, and detected `gfx` architecture before adding skip markers.
+Validation claims should separate target support, observed evidence, diagnostic
+evidence, container validation, host validation, and claim authority. Relevant
+modules include `src/sol_execbench/core/runtime_evidence.py`,
+`src/sol_execbench/core/dependency_matrix.py`, and
+`src/sol_execbench/core/docker_matrix.py`.
