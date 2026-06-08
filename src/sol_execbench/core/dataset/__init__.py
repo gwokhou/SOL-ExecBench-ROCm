@@ -113,6 +113,12 @@ from .paper_denominator import (
     render_paper_denominator_markdown,
     write_paper_denominator_reports,
 )
+from .profiler_timing_coverage import (
+    ProfilerTimingCoverageReport,
+    build_profiler_timing_coverage_report,
+    render_profiler_timing_coverage_markdown,
+    write_profiler_timing_coverage_reports,
+)
 
 __all__ = [
     "DEFAULT_CATEGORIES",
@@ -144,6 +150,7 @@ __all__ = [
     "ProblemInventoryRecord",
     "ParityGapReport",
     "PaperDenominatorReport",
+    "ProfilerTimingCoverageReport",
     "PackedLowPrecisionTensor",
     "ReadySubset",
     "ReadySubsetDenominator",
@@ -173,9 +180,11 @@ __all__ = [
     "quantize_e2m1_codes",
     "build_parity_gap_report",
     "build_paper_denominator_report",
+    "build_profiler_timing_coverage_report",
     "inspect_dataset_layout",
     "render_parity_gap_markdown",
     "render_paper_denominator_markdown",
+    "render_profiler_timing_coverage_markdown",
     "relative_ref",
     "safe_sidecar_stem",
     "sidecar_stem_for_workload",
@@ -190,4 +199,5 @@ __all__ = [
     "unpack_e2m1_codes",
     "write_parity_gap_reports",
     "write_paper_denominator_reports",
+    "write_profiler_timing_coverage_reports",
 ]
