@@ -60,6 +60,10 @@ def run_coverage(
                 "problem_denominator": report.totals.problem_denominator,
                 "expected_problem_denominator": report.expected_problem_denominator,
                 "profiler_backed_problems": report.totals.profiler_backed_problems,
+                "partial_profiler_backed_problems": (
+                    report.totals.partial_profiler_backed_problems
+                ),
+                "profiler_blocked_problems": (report.totals.profiler_blocked_problems),
                 "fallback_timing_problems": report.totals.fallback_timing_problems,
                 "ready_missing_profiler_timing_problems": (
                     report.totals.ready_missing_profiler_timing_problems

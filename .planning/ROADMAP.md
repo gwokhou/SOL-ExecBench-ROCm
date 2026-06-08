@@ -2,7 +2,7 @@
 
 ## Milestones
 
-- Active **v1.32 RDNA4 Profiler Timing Coverage Closure** - Phases 148-149.
+- Active **v1.32 RDNA4 Profiler Timing Coverage Closure** - Phases 148-150.
   See `.planning/milestones/v1.32-ROADMAP.md`.
 - Complete **v1.31 RDNA4 Follow-Up Evidence Hardening** - Phases 142-147
   (shipped 2026-06-08). See `.planning/milestones/v1.31-ROADMAP.md`.
@@ -22,7 +22,7 @@
 
 ## Current Position
 
-**Status:** v1.32 active. Phase 149 in progress.
+**Status:** v1.32 active. Phase 150 complete; Phase 149 full replacement remains blocked.
 
 ### Phase 148: RDNA4 Profiler-Backed Timing Coverage Closure
 
@@ -57,6 +57,25 @@ coverage ledger marks problems as `timing_fallback`.
 - Resume/limit controls so long RDNA4 timing jobs can be run incrementally.
 - CPU-safe tests covering target selection, forced profiler policy, and
   no-fallback replacement semantics.
+
+### Phase 150: RDNA4 Profiler Replacement Classification
+
+**Status:** Complete
+
+**Goal:** Convert the Phase 149 all-or-nothing replacement blocker into an
+auditable profiler replacement classification ledger across the same
+235-problem denominator.
+
+**Requirements:** RDNA4-PROF-COV-05, RDNA4-PROF-COV-06
+
+**Deliverables:**
+- Coverage statuses and totals for `partial_profiler_backed` and
+  `profiler_blocked` replacement attempts.
+- Batch metadata that records replacement status, workload counts, trace status
+  counts, and failure reason without counting partial evidence as complete
+  profiler-backed timing coverage.
+- Resume behavior that can skip already classified full-problem attempts while
+  still allowing workload-limited smoke artifacts to be retried.
 
 ## Active Guardrails
 

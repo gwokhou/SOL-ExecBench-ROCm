@@ -146,7 +146,11 @@ def select_fallback_targets(
     only = set(only_problem)
     targets: list[ProfilerTimingProblemCoverage] = []
     for problem in coverage.problems:
-        if problem.status != "timing_fallback":
+        if problem.status not in {
+            "timing_fallback",
+            "partial_profiler_backed",
+            "profiler_blocked",
+        }:
             continue
         if only and problem.problem_id not in only:
             continue
@@ -155,7 +159,7 @@ def select_fallback_targets(
             problem.category,
             problem.problem_path,
         )
-        if resume and _is_profiler_backed_sidecar(replacement_path):
+        if resume and _is_classified_replacement_sidecar(replacement_path):
             continue
         targets.append(problem)
         if limit is not None and len(targets) >= limit:
@@ -277,15 +281,26 @@ def _profile_target(
         and sum(trace_status_counts.values()) >= target.workload_count
     )
     payload = result.to_dict()
+    replacement_failure_reason = _replacement_failure_reason(
+        profiler_collected=result.profiler_collected,
+        all_workloads_passed=all_workloads_passed,
+        selection_reason=result.selection.reason,
+    )
     payload["replacement_metadata"] = {
         "schema_version": "sol_execbench.rdna4_profiler_timing_replacement.v1",
         "problem_id": target.problem_id,
+        "replacement_status": _replacement_status(
+            profiler_collected=result.profiler_collected,
+            full_workload_coverage=all_workloads_passed,
+            kernel_activity_rows=_kernel_activity_rows(payload.get("evidence") or {}),
+        ),
         "profiled_workload_count": len(workloads),
         "expected_workload_count": target.workload_count,
         "trace_status_counts": trace_status_counts,
         "all_workloads_passed": all_workloads_passed,
         "workload_limit_applied": workload_limit,
         "full_workload_coverage": all_workloads_passed,
+        "failure_reason": replacement_failure_reason,
     }
     if result.profiler_collected:
         replacement_path.parent.mkdir(parents=True, exist_ok=True)
@@ -293,21 +308,21 @@ def _profile_target(
             json.dumps(payload, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
-    profiler_backed = result.profiler_collected and all_workloads_passed
+    status = _replacement_status(
+        profiler_collected=result.profiler_collected,
+        full_workload_coverage=all_workloads_passed,
+        kernel_activity_rows=_kernel_activity_rows(payload.get("evidence") or {}),
+    )
     return {
         "problem_id": target.problem_id,
-        "status": "profiler_backed" if profiler_backed else "failed",
+        "status": status,
         "replacement_path": str(replacement_path),
         "staging_dir": str(staging_dir),
         "profiler_collected": result.profiler_collected,
         "full_workload_coverage": all_workloads_passed,
         "trace_status_counts": trace_status_counts,
         "csv_path": str(result.csv_path) if result.csv_path is not None else None,
-        "fallback_reason": _replacement_failure_reason(
-            profiler_collected=result.profiler_collected,
-            all_workloads_passed=all_workloads_passed,
-            selection_reason=result.selection.reason,
-        ),
+        "fallback_reason": replacement_failure_reason,
         "returncode": result.returncode,
     }
 
@@ -323,7 +338,7 @@ def _target_failure(
 ) -> dict[str, Any]:
     return {
         "problem_id": target.problem_id,
-        "status": "failed",
+        "status": "profiler_blocked",
         "replacement_path": str(replacement_path),
         "staging_dir": str(staging_dir),
         "profiler_collected": False,
@@ -343,7 +358,7 @@ def _replacement_timing_path(
     return replacement_timing_dir / category / f"{Path(problem_path).name}.timing.json"
 
 
-def _is_profiler_backed_sidecar(path: Path) -> bool:
+def _is_classified_replacement_sidecar(path: Path) -> bool:
     if not path.is_file():
         return False
     try:
@@ -353,12 +368,18 @@ def _is_profiler_backed_sidecar(path: Path) -> bool:
     if not isinstance(payload, dict) or payload.get("profiler_collected") is not True:
         return False
     evidence = payload.get("evidence")
-    return (
-        isinstance(evidence, dict)
-        and evidence.get("backend") == "rocprofv3"
-        and _kernel_activity_rows(evidence) > 0
-        and _full_workload_coverage(payload)
-    )
+    if not isinstance(evidence, dict) or evidence.get("backend") != "rocprofv3":
+        return False
+    metadata = payload.get("replacement_metadata")
+    if not isinstance(metadata, dict):
+        return _kernel_activity_rows(evidence) > 0
+    if metadata.get("workload_limit_applied") is not None:
+        return False
+    return metadata.get("replacement_status") in {
+        "profiler_backed",
+        "partial_profiler_backed",
+        "profiler_blocked",
+    }
 
 
 def _full_workload_coverage(payload: dict[str, Any]) -> bool:
@@ -470,6 +491,19 @@ def _replacement_failure_reason(
     return selection_reason
 
 
+def _replacement_status(
+    *,
+    profiler_collected: bool,
+    full_workload_coverage: bool,
+    kernel_activity_rows: int,
+) -> str:
+    if profiler_collected and full_workload_coverage and kernel_activity_rows > 0:
+        return "profiler_backed"
+    if profiler_collected and kernel_activity_rows > 0:
+        return "partial_profiler_backed"
+    return "profiler_blocked"
+
+
 def _build_summary(
     *,
     coverage: ProfilerTimingCoverageReport,
@@ -481,9 +515,18 @@ def _build_summary(
     rocprofv3_available: bool,
 ) -> dict[str, Any]:
     succeeded = sum(1 for result in results if result["status"] == "profiler_backed")
-    failed = sum(1 for result in results if result["status"] == "failed")
+    partial = sum(
+        1 for result in results if result["status"] == "partial_profiler_backed"
+    )
+    profiler_blocked = sum(
+        1 for result in results if result["status"] == "profiler_blocked"
+    )
+    failed = profiler_blocked
     fallback_or_missing = sum(
-        1 for result in results if result["status"] not in {"profiler_backed", "failed"}
+        1
+        for result in results
+        if result["status"]
+        not in {"profiler_backed", "partial_profiler_backed", "profiler_blocked"}
     )
     return {
         "schema_version": "sol_execbench.rdna4_profiler_timing_batch.v1",
@@ -491,6 +534,8 @@ def _build_summary(
         "coverage_fallback_timing_problems": coverage.totals.fallback_timing_problems,
         "selected_targets": len(selected_targets),
         "succeeded": succeeded,
+        "partial_profiler_backed": partial,
+        "profiler_blocked": profiler_blocked,
         "failed": failed,
         "fallback_or_missing": fallback_or_missing,
         "rocprofv3_available": rocprofv3_available,
@@ -509,6 +554,8 @@ def _render_summary_markdown(summary: dict[str, Any]) -> str:
             "",
             f"- Selected targets: `{summary['selected_targets']}`",
             f"- Succeeded: `{summary['succeeded']}`",
+            f"- Partial profiler-backed: `{summary['partial_profiler_backed']}`",
+            f"- Profiler-blocked: `{summary['profiler_blocked']}`",
             f"- Failed: `{summary['failed']}`",
             f"- Fallback or missing: `{summary['fallback_or_missing']}`",
             f"- Replacement timing dir: `{summary['replacement_timing_dir']}`",

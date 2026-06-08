@@ -29,6 +29,10 @@ class ProfilerTimingEvidenceSummary(BaseModel):
     kernel_duration_ms: float | None = None
     kernel_activity_rows: int = 0
     full_workload_coverage: bool = True
+    profiled_workload_count: int | None = None
+    expected_workload_count: int | None = None
+    trace_status_counts: dict[str, int] = Field(default_factory=dict)
+    replacement_failure_reason: str | None = None
     fallback_reason: str | None = None
 
 
@@ -52,6 +56,8 @@ class ProfilerTimingCoverageTotals(BaseModel):
 
     problem_denominator: int
     profiler_backed_problems: int = 0
+    partial_profiler_backed_problems: int = 0
+    profiler_blocked_problems: int = 0
     fallback_timing_problems: int = 0
     ready_missing_profiler_timing_problems: int = 0
     readiness_blocked_problems: int = 0
@@ -143,6 +149,8 @@ def build_profiler_timing_coverage_report(
     totals = ProfilerTimingCoverageTotals(
         problem_denominator=denominator,
         profiler_backed_problems=profiler_backed,
+        partial_profiler_backed_problems=counts["partial_profiler_backed"],
+        profiler_blocked_problems=counts["profiler_blocked"],
         fallback_timing_problems=counts["timing_fallback"],
         ready_missing_profiler_timing_problems=counts["ready_missing_profiler_timing"],
         readiness_blocked_problems=counts["readiness_blocked"],
@@ -183,6 +191,9 @@ def render_profiler_timing_coverage_markdown(
         "",
         f"- Problem denominator: `{totals.problem_denominator}`",
         f"- Profiler-backed problems: `{totals.profiler_backed_problems}`",
+        "- Partial profiler-backed problems: "
+        f"`{totals.partial_profiler_backed_problems}`",
+        f"- Profiler-blocked problems: `{totals.profiler_blocked_problems}`",
         f"- Fallback timing problems: `{totals.fallback_timing_problems}`",
         "- Ready missing profiler timing problems: "
         f"`{totals.ready_missing_profiler_timing_problems}`",
@@ -252,6 +263,10 @@ def _problem_status(
 ) -> str:
     if evidence is not None and _has_profiler_backed_kernel_activity(evidence):
         return "profiler_backed"
+    if evidence is not None and _has_partial_profiler_kernel_activity(evidence):
+        return "partial_profiler_backed"
+    if evidence is not None and _is_profiler_replacement_attempt(evidence):
+        return "profiler_blocked"
     if evidence is not None:
         return "timing_fallback"
     if readiness_status == "ready":
@@ -289,6 +304,11 @@ def _load_timing_evidence_summary(path: Path) -> ProfilerTimingEvidenceSummary:
     policy = (
         selection.get("policy") if isinstance(selection.get("policy"), dict) else {}
     )
+    metadata = (
+        payload.get("replacement_metadata")
+        if isinstance(payload.get("replacement_metadata"), dict)
+        else {}
+    )
     backend = evidence.get("backend") or policy.get("backend")
     activity_domain = evidence.get("activity_domain") or policy.get("activity_domain")
     return ProfilerTimingEvidenceSummary(
@@ -299,7 +319,13 @@ def _load_timing_evidence_summary(path: Path) -> ProfilerTimingEvidenceSummary:
         csv_path=str(payload["csv_path"]) if payload.get("csv_path") else None,
         kernel_duration_ms=_float_or_none(evidence.get("kernel_duration_ms")),
         kernel_activity_rows=_kernel_activity_rows(evidence),
-        full_workload_coverage=_full_workload_coverage(payload),
+        full_workload_coverage=_full_workload_coverage(metadata),
+        profiled_workload_count=_int_or_none(metadata.get("profiled_workload_count")),
+        expected_workload_count=_int_or_none(metadata.get("expected_workload_count")),
+        trace_status_counts=_trace_status_counts(metadata),
+        replacement_failure_reason=str(metadata["failure_reason"])
+        if metadata.get("failure_reason") is not None
+        else None,
         fallback_reason=str(selection["reason"])
         if selection.get("reason") is not None
         else None,
@@ -317,11 +343,41 @@ def _has_profiler_backed_kernel_activity(
     )
 
 
-def _full_workload_coverage(payload: dict[str, Any]) -> bool:
-    metadata = payload.get("replacement_metadata")
-    if not isinstance(metadata, dict):
+def _has_partial_profiler_kernel_activity(
+    evidence: ProfilerTimingEvidenceSummary,
+) -> bool:
+    return (
+        evidence.profiler_collected
+        and evidence.backend == "rocprofv3"
+        and evidence.kernel_activity_rows > 0
+        and not evidence.full_workload_coverage
+    )
+
+
+def _is_profiler_replacement_attempt(evidence: ProfilerTimingEvidenceSummary) -> bool:
+    return (
+        evidence.backend == "rocprofv3"
+        or evidence.profiled_workload_count is not None
+        or evidence.expected_workload_count is not None
+    )
+
+
+def _full_workload_coverage(metadata: dict[str, Any]) -> bool:
+    if not metadata:
         return True
     return metadata.get("full_workload_coverage") is True
+
+
+def _trace_status_counts(metadata: dict[str, Any]) -> dict[str, int]:
+    counts = metadata.get("trace_status_counts")
+    if not isinstance(counts, dict):
+        return {}
+    normalized: dict[str, int] = {}
+    for key, value in counts.items():
+        count = _int_or_none(value)
+        if isinstance(key, str) and count is not None:
+            normalized[key] = count
+    return dict(sorted(normalized.items()))
 
 
 def _kernel_activity_rows(evidence: dict[str, Any]) -> int:
@@ -341,5 +397,14 @@ def _float_or_none(value: Any) -> float | None:
         return None
     try:
         return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _int_or_none(value: Any) -> int | None:
+    if isinstance(value, bool) or value is None:
+        return None
+    try:
+        return int(value)
     except (TypeError, ValueError):
         return None
