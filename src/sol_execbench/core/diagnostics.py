@@ -216,6 +216,35 @@ CDNA3_ACCEPTANCE_CRITERIA: tuple[str, ...] = (
     "Support matrix claim is updated only after recorded evidence exists",
 )
 
+RDNA4_REQUIRED_ARTIFACTS: tuple[str, ...] = (
+    "environment_sidecar",
+    "execution_closure",
+    "per_problem_traces",
+    "clock_lock_evidence",
+    "timing_sidecars",
+    "profiler_backed_timing",
+    "amd_native_score_report",
+    "amd_sol_sidecars",
+    "solar_derivation_sidecars",
+    "derived_exclusion_retry",
+    "missing_trace_triage",
+    "failure_triage",
+    "claim_boundary_report",
+)
+
+RDNA4_VALIDATION_RESULT_CATEGORIES: tuple[str, ...] = (
+    "attempted_passed",
+    "reference_gpu_oom",
+    "input_generation_gpu_oom",
+    "execution_timeout",
+    "gpu_oom_no_trace",
+    "user_function_gpu_oom",
+    "timing_gpu_oom",
+    "incorrect_numerical",
+    "readiness_blocked",
+    "derived_sidecar_memory_blockers",
+)
+
 MI300X_REQUIRED_ARTIFACTS: tuple[str, ...] = (
     "pytest_full_suite_log",
     "run_dataset_summary",
@@ -438,6 +467,81 @@ def mi300x_validation_claim_blockers(evidence: Mapping[str, object]) -> tuple[st
 def can_mark_mi300x_hardware_validated(evidence: Mapping[str, object]) -> bool:
     """Return whether evidence is sufficient for an MI300X validation claim."""
     return not mi300x_validation_claim_blockers(evidence)
+
+
+def rdna4_validation_claim_blockers(evidence: Mapping[str, object]) -> tuple[str, ...]:
+    """Return blockers that prevent a stronger RDNA4 validation claim.
+
+    Current project evidence supports bounded RDNA4 `gfx1200` ready-subset
+    wording. This guard is for future claim upgrades and keeps full paper-scale,
+    authoritative timing, score, or broader hardware wording blocked until the
+    evidence record explicitly carries the missing pieces.
+    """
+    blockers: list[str] = []
+    gpu_name = str(evidence.get("gpu_name", ""))
+    gfx = str(evidence.get("gfx", ""))
+    if not gpu_name:
+        blockers.append("gpu_name must be recorded")
+    if classify_gfx(gfx) != "rdna4":
+        blockers.append("gfx must be an RDNA 4 gfx12* target")
+    if not evidence.get("rocm_version"):
+        blockers.append("rocm_version must be recorded")
+    if evidence.get("clocks_locked") is not True:
+        blockers.append("clock-lock evidence must record clocks_locked=True")
+    if evidence.get("profiler_backed_timing") is not True:
+        blockers.append(
+            "profiler-backed rocprofv3 kernel activity timing must be recorded"
+        )
+    if evidence.get("full_paper_problem_count") != 235:
+        blockers.append("full paper denominator must account for 235 problems")
+
+    failed_workload_count = _int_evidence(evidence.get("failed_workload_count"))
+    if failed_workload_count is None:
+        blockers.append("failed_workload_count must be recorded")
+    elif failed_workload_count != 0:
+        blockers.append("failed workload count must be zero for claim upgrade")
+
+    derived_blocker_count = _int_evidence(evidence.get("derived_sidecar_blocker_count"))
+    if derived_blocker_count is None:
+        blockers.append("derived_sidecar_blocker_count must be recorded")
+    elif derived_blocker_count != 0:
+        blockers.append("derived sidecar blocker count must be zero for claim upgrade")
+
+    artifacts = evidence.get("artifacts", ())
+    if not isinstance(artifacts, (list, tuple, set)):
+        artifacts = ()
+    missing_artifacts = [
+        artifact for artifact in RDNA4_REQUIRED_ARTIFACTS if artifact not in artifacts
+    ]
+    if missing_artifacts:
+        blockers.append("missing validation artifacts: " + ", ".join(missing_artifacts))
+
+    result_categories = evidence.get("result_categories", ())
+    if not isinstance(result_categories, (list, tuple, set)):
+        result_categories = ()
+    missing_categories = [
+        category
+        for category in RDNA4_VALIDATION_RESULT_CATEGORIES
+        if category not in result_categories
+    ]
+    if missing_categories:
+        blockers.append(
+            "missing validation result categories: " + ", ".join(missing_categories)
+        )
+    return tuple(blockers)
+
+
+def can_mark_rdna4_validation_upgraded(evidence: Mapping[str, object]) -> bool:
+    """Return whether RDNA4 evidence is sufficient for a stronger claim."""
+    return not rdna4_validation_claim_blockers(evidence)
+
+
+def _int_evidence(value: object) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    return None
 
 
 def rocm_tool_diagnostics(
