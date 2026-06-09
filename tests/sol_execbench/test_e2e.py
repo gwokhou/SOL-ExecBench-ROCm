@@ -31,11 +31,13 @@ Coverage (language-specific examples are in test_examples.py):
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
+import torch
 
 from sol_execbench.core import (
     BenchmarkConfig,
@@ -165,6 +167,10 @@ def _run_subprocess(cmd: list[str], cwd: Path) -> subprocess.CompletedProcess:
         capture_output=True,
         text=True,
         timeout=300,
+        env={
+            **os.environ,
+            "SOL_EXECBENCH_ALLOW_CPU_TIMING": "1",
+        },
     )
 
 
@@ -203,6 +209,9 @@ def _mark_case(case: Sample) -> list:
 )
 def test_e2e(tmp_path: Path, case: Sample):
     """End-to-end evaluation: load sample -> package -> compile (if C++) -> execute -> assert PASSED."""
+    if case.test_id == "triton_ref_vecadd_python" and not torch.cuda.is_available():
+        pytest.skip("Triton JIT reference e2e requires an active CUDA/HIP driver")
+
     definition, solution, workloads = _load_sample(case.sample, case.solution_file)
     config = BenchmarkConfig(lock_clocks=False)
 
@@ -353,6 +362,10 @@ def test_cli_gqa_paged_decode(tmp_path: Path):
         capture_output=True,
         text=True,
         timeout=300,
+        env={
+            **os.environ,
+            "SOL_EXECBENCH_ALLOW_CPU_TIMING": "1",
+        },
     )
     assert result.returncode == 0, (
         f"CLI failed:\n  stdout={result.stdout}\n  stderr={result.stderr}"
