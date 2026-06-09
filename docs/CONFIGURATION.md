@@ -39,8 +39,6 @@ below are optional runtime, Docker, diagnostic, or build inputs discovered in
 | `CUDA_VISIBLE_DEVICES` | Optional | Unset | Compatibility visibility variable recorded by Docker runtime evidence when present. |
 | `GPU_DEVICE_ORDINAL` | Optional | Unset | Compatibility visibility variable recorded by Docker runtime evidence when present. |
 | `SOL_EXECBENCH_CLOCKS_LOCKED` | Optional | `0` when unset | Set by `docker/entrypoint.sh` after clock-lock attempts; read by clock-lock checks. |
-| `SOL_EXECBENCH_SCLK_LEVEL` | Optional | Device preset when available | Overrides the SCLK DPM level used by the ROCm clock-lock helper. |
-| `SOL_EXECBENCH_MCLK_LEVEL` | Optional | Device preset when available | Overrides the MCLK DPM level used by the ROCm clock-lock helper. |
 | `FLASHINFER_TRACE_DIR` | Optional | `/sol-execbench/data/flashinfer-trace` under `scripts/run_docker.sh` | Adds the FlashInfer trace safetensors lookup root for evaluation. |
 | `IMAGE_NAME` | Optional | `sol-execbench` | Docker wrapper local image name. |
 | `IMAGE_TAG` | Optional | `rocm-<selected Docker tag>` | Docker wrapper local image tag. The default target resolves to `rocm-7.1.1-complete`. |

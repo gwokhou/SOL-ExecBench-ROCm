@@ -154,26 +154,18 @@ examples.
 ## Clock Locking
 
 `--lock-clocks` requires ROCm clock tooling to be available through
-passwordless `sudo`. The implementation uses `rocm-smi` to set manual
-performance level and SCLK/MCLK DPM levels. If clock locking is unavailable,
-run without `--lock-clocks` for functional validation.
-
-On RDNA 4 `gfx1200`, ROCm can report the GPU in a low-power state while the
-selected SCLK/MCLK DPM levels remain supported but not currently active. ROCm's
-clock-set API applies a frequency-level mask, so active clocks can still follow
-load-dependent low-power behavior within the accepted mask. In that case the
-clock-lock check treats a level as valid only when `rocm-smi -s` reports the
-requested level as supported and the preceding set command succeeded. Some ROCm
-releases can print messages such as `Unable to set performance level to manual`
-while still returning exit code 0; those outputs are treated as clock-lock
-failures.
-
-Optional overrides:
+passwordless `sudo`. The implementation uses `amd-smi` to enter the firmware
+`STABLE_PEAK` performance level before evaluation and returns to `AUTO` during
+cleanup:
 
 ```bash
-export SOL_EXECBENCH_SCLK_LEVEL=2
-export SOL_EXECBENCH_MCLK_LEVEL=5
+sudo amd-smi set -l STABLE_PEAK
+sudo amd-smi set -l AUTO
 ```
+
+The Docker image and `scripts/setup_rocm_clock_sudoers.py` install sudoers
+coverage for the exact `amd-smi` commands used by the runtime. If clock locking
+is unavailable, run without `--lock-clocks` for functional validation.
 
 ## Engineering Prerelease Support Matrix
 

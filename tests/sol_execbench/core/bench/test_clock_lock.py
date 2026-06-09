@@ -4,7 +4,7 @@
 
 """Tests for sol_execbench.core.bench.clock_lock."""
 
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -26,19 +26,22 @@ _MODULE = "sol_execbench.core.bench.clock_lock"
 
 
 @pytest.fixture(autouse=True)
-def _mock_rocm_smi_path(monkeypatch):
-    monkeypatch.setattr(clock_lock_module.shutil, "which", lambda _tool: "rocm-smi")
+def _mock_tool_paths(monkeypatch):
+    def _which(tool):
+        return {"rocm-smi": "rocm-smi", "amd-smi": "amd-smi"}.get(tool)
+
+    monkeypatch.setattr(clock_lock_module.shutil, "which", _which)
 
 
 class TestProbeClockLockAvailable:
-    def test_returns_true_when_sudo_rocm_smi_succeeds(self):
+    def test_returns_true_when_amd_smi_version_succeeds(self):
         probe_result = MagicMock(returncode=0)
         with patch(f"{_MODULE}.subprocess.run", return_value=probe_result) as mock_run:
             result = probe_clock_lock_available()
 
         assert result is True
         mock_run.assert_called_once_with(
-            ["sudo", "-n", "rocm-smi", "--showclocks"], capture_output=True
+            ["sudo", "-n", "amd-smi", "version"], capture_output=True
         )
 
     def test_returns_false_when_sudo_fails(self):
@@ -46,194 +49,78 @@ class TestProbeClockLockAvailable:
         with patch(f"{_MODULE}.subprocess.run", return_value=probe_result):
             assert probe_clock_lock_available() is False
 
-    def test_returns_false_when_rocm_smi_not_found(self):
+    def test_returns_false_when_amd_smi_not_found(self):
         with patch(f"{_MODULE}.subprocess.run", side_effect=FileNotFoundError):
             assert probe_clock_lock_available() is False
 
-    def test_uses_resolved_rocm_smi_path(self, monkeypatch):
-        monkeypatch.setattr(
-            clock_lock_module.shutil,
-            "which",
-            lambda _tool: "/opt/rocm/bin/rocm-smi",
-        )
-        probe_result = MagicMock(returncode=0)
-        with patch(f"{_MODULE}.subprocess.run", return_value=probe_result) as mock_run:
-            assert probe_clock_lock_available() is True
-
-        mock_run.assert_called_once_with(
-            ["sudo", "-n", "/opt/rocm/bin/rocm-smi", "--showclocks"],
-            capture_output=True,
-        )
-
 
 class TestLockClocks:
-    @staticmethod
-    @pytest.fixture(autouse=True)
-    def _clean_env(monkeypatch):
-        monkeypatch.delenv("SOL_EXECBENCH_SCLK_LEVEL", raising=False)
-        monkeypatch.delenv("SOL_EXECBENCH_MCLK_LEVEL", raising=False)
-
     def _patch_verify_and_sleep(self):
         return (
             patch(f"{_MODULE}.verify_clocks", return_value=True),
             patch(f"{_MODULE}.time.sleep"),
         )
 
-    def test_locks_sclk_and_mclk_for_known_device(self):
+    def test_locks_with_stable_peak(self):
         p_verify, p_sleep = self._patch_verify_and_sleep()
         with patch(f"{_MODULE}.subprocess.run") as mock_run, p_verify, p_sleep:
+            result = lock_clocks()
+
+        assert result is True
+        assert mock_run.call_count == 1
+        mock_run.assert_called_once_with(
+            ["sudo", "-n", "amd-smi", "set", "-l", "STABLE_PEAK"],
+            capture_output=True,
+            check=True,
+            text=True,
+        )
+
+    def test_accepts_legacy_device_name_parameter(self):
+        p_verify, p_sleep = self._patch_verify_and_sleep()
+        with patch(f"{_MODULE}.subprocess.run"), p_verify, p_sleep:
             result = lock_clocks("AMD Radeon gfx1200")
 
         assert result is True
-        assert mock_run.call_args_list[:3] == [
-            call(
-                ["sudo", "-n", "rocm-smi", "--setperflevel", "manual"],
-                capture_output=True,
-                check=True,
-                text=True,
-            ),
-            call(
-                ["sudo", "-n", "rocm-smi", "--setsclk", "2"],
-                capture_output=True,
-                check=True,
-                text=True,
-            ),
-            call(
-                ["sudo", "-n", "rocm-smi", "--setmclk", "5"],
-                capture_output=True,
-                check=True,
-                text=True,
-            ),
-        ]
 
-    def test_returns_false_for_unknown_device(self):
-        p_verify, p_sleep = self._patch_verify_and_sleep()
-        with patch(f"{_MODULE}.subprocess.run") as mock_run, p_verify, p_sleep:
-            result = lock_clocks("Unknown GPU")
-
-        assert result is False
-        mock_run.assert_not_called()
-
-    def test_env_var_overrides_preset(self, monkeypatch):
-        monkeypatch.setenv("SOL_EXECBENCH_SCLK_LEVEL", "2")
-        monkeypatch.setenv("SOL_EXECBENCH_MCLK_LEVEL", "3")
-
-        p_verify, p_sleep = self._patch_verify_and_sleep()
-        with patch(f"{_MODULE}.subprocess.run") as mock_run, p_verify, p_sleep:
-            result = lock_clocks("Unknown GPU")
-
-        assert result is True
-        assert mock_run.call_args_list[1] == call(
-            ["sudo", "-n", "rocm-smi", "--setsclk", "2"],
-            capture_output=True,
-            check=True,
-            text=True,
-        )
-        assert mock_run.call_args_list[2] == call(
-            ["sudo", "-n", "rocm-smi", "--setmclk", "3"],
-            capture_output=True,
-            check=True,
-            text=True,
-        )
-
-    def test_returns_false_when_perflevel_reports_failure_with_zero_exit(self):
+    def test_returns_false_when_stable_peak_reports_failure_with_zero_exit(self):
         failed = MagicMock(
             returncode=0,
-            stdout="ERROR: GPU[0]\t: Unable to set performance level to manual\n",
+            stdout="ERROR: GPU[0]\t: Unable to set performance level\n",
             stderr="",
         )
 
         with patch(f"{_MODULE}.subprocess.run", return_value=failed) as mock_run:
-            result = lock_clocks("AMD Radeon gfx1200")
+            result = lock_clocks()
 
         assert result is False
         mock_run.assert_called_once_with(
-            ["sudo", "-n", "rocm-smi", "--setperflevel", "manual"],
+            ["sudo", "-n", "amd-smi", "set", "-l", "STABLE_PEAK"],
             capture_output=True,
             check=True,
             text=True,
         )
 
-    def test_returns_false_and_unlocks_when_mclk_reports_failure_with_zero_exit(self):
-        ok = MagicMock(returncode=0, stdout="", stderr="")
-        failed = MagicMock(
-            returncode=0,
-            stdout="ERROR: GPU[0]\t: Unable to set mclk frequency\n",
-            stderr="",
-        )
-
-        with patch(
-            f"{_MODULE}.subprocess.run",
-            side_effect=[ok, ok, failed, ok, ok],
-        ) as mock_run:
-            result = lock_clocks("AMD Radeon gfx1200")
-
-        assert result is False
-        assert mock_run.call_args_list[:3] == [
-            call(
-                ["sudo", "-n", "rocm-smi", "--setperflevel", "manual"],
-                capture_output=True,
-                check=True,
-                text=True,
-            ),
-            call(
-                ["sudo", "-n", "rocm-smi", "--setsclk", "2"],
-                capture_output=True,
-                check=True,
-                text=True,
-            ),
-            call(
-                ["sudo", "-n", "rocm-smi", "--setmclk", "5"],
-                capture_output=True,
-                check=True,
-                text=True,
-            ),
-        ]
-        assert mock_run.call_args_list[3:] == [
-            call(["sudo", "-n", "rocm-smi", "--resetclocks"], capture_output=True),
-            call(
-                ["sudo", "-n", "rocm-smi", "--setperflevel", "auto"],
-                capture_output=True,
-            ),
-        ]
-
-    def test_returns_false_when_sclk_lock_fails(self):
+    def test_returns_false_when_amd_smi_fails(self):
         import subprocess as sp
 
         with patch(
             f"{_MODULE}.subprocess.run",
-            side_effect=sp.CalledProcessError(1, "rocm-smi"),
+            side_effect=sp.CalledProcessError(1, "amd-smi"),
         ) as mock_run:
-            result = lock_clocks("AMD Radeon gfx1200")
+            result = lock_clocks()
 
         assert result is False
         assert mock_run.call_count == 1
 
-    def test_returns_false_and_unlocks_when_mclk_fails(self):
-        import subprocess as sp
-
-        call_count = [0]
-
-        def side_effect(*args, **kwargs):
-            call_count[0] += 1
-            if call_count[0] == 3:
-                raise sp.CalledProcessError(1, "rocm-smi")
-            return MagicMock()
-
-        with patch(f"{_MODULE}.subprocess.run", side_effect=side_effect) as mock_run:
-            result = lock_clocks("AMD Radeon gfx1200")
-
-        assert result is False
-        assert mock_run.call_count == 5
-
-    def test_returns_false_when_verification_fails(self):
+    def test_returns_false_and_unlocks_when_verification_fails(self):
         p_sleep = patch(f"{_MODULE}.time.sleep")
         p_verify = patch(f"{_MODULE}.verify_clocks", return_value=False)
         with patch(f"{_MODULE}.subprocess.run") as mock_run, p_verify, p_sleep:
-            result = lock_clocks("AMD Radeon gfx1200")
+            result = lock_clocks()
 
         assert result is False
-        assert mock_run.call_count == 5
+        # 1 lock call + 1 unlock call (amd-smi AUTO)
+        assert mock_run.call_count == 2
 
     def test_sleeps_before_verification(self):
         from sol_execbench.core.bench.clock_lock import VERIFY_DELAY_S
@@ -241,157 +128,72 @@ class TestLockClocks:
         p_verify = patch(f"{_MODULE}.verify_clocks", return_value=True)
         p_sleep = patch(f"{_MODULE}.time.sleep")
         with patch(f"{_MODULE}.subprocess.run"), p_verify, p_sleep as mock_sleep:
-            lock_clocks("AMD Radeon gfx1200")
+            lock_clocks()
 
         mock_sleep.assert_called_once_with(VERIFY_DELAY_S)
+
+    def test_stable_peak_for_any_device(self):
+        p_verify, p_sleep = self._patch_verify_and_sleep()
+        with patch(f"{_MODULE}.subprocess.run"), p_verify, p_sleep:
+            assert lock_clocks("") is True  # works with empty device name
+
+        with patch(f"{_MODULE}.subprocess.run"), p_verify, p_sleep:
+            assert lock_clocks("Unknown GPU") is True  # works with unknown device
 
 
 class TestVerifyClocks:
     def _make_smi_result(self, stdout: str, returncode: int = 0):
         return MagicMock(returncode=returncode, stdout=stdout, stderr="")
 
-    def test_active_sclk_and_mclk_levels_match(self):
-        result = self._make_smi_result(
-            "sclk clock level:\n0: 500Mhz\n1: 2500Mhz *\n"
-            "mclk clock level:\n0: 96Mhz\n1: 1200Mhz *\n"
-        )
+    def test_stable_peak_detected(self):
+        result = self._make_smi_result("GPU[0]\t\t: Performance Level: stable_peak\n")
         with patch(f"{_MODULE}.subprocess.run", return_value=result):
-            assert verify_clocks(1, 1) is True
+            assert verify_clocks() is True
 
-    def test_same_line_clock_levels_match(self):
-        result = self._make_smi_result(
-            "GPU[0]\t\t: sclk clock level: 1: (0Mhz)\n"
-            "GPU[0]\t\t: mclk clock level: 0: (96Mhz)\n"
-        )
+    def test_auto_detected_as_not_locked(self):
+        result = self._make_smi_result("GPU[0]\t\t: Performance Level: auto\n")
         with patch(f"{_MODULE}.subprocess.run", return_value=result):
-            assert verify_clocks(1, 0) is True
+            assert verify_clocks() is False
 
-    def test_sclk_mismatch_fails(self):
-        result = self._make_smi_result(
-            "sclk clock level:\n0: 500Mhz *\n1: 2500Mhz\n"
-            "mclk clock level:\n0: 96Mhz\n1: 1200Mhz *\n"
-        )
+    def test_high_detected_as_not_locked(self):
+        result = self._make_smi_result("GPU[0]\t\t: Performance Level: high\n")
         with patch(f"{_MODULE}.subprocess.run", return_value=result):
-            assert verify_clocks(1, 1) is False
+            assert verify_clocks() is False
 
-    def test_mclk_mismatch_fails(self):
-        result = self._make_smi_result(
-            "sclk clock level:\n0: 500Mhz\n1: 2500Mhz *\n"
-            "mclk clock level:\n0: 96Mhz *\n1: 1200Mhz\n"
-        )
+    def test_case_insensitive_match(self):
+        result = self._make_smi_result("GPU[0]\t\t: Performance Level: STABLE_PEAK\n")
         with patch(f"{_MODULE}.subprocess.run", return_value=result):
-            assert verify_clocks(1, 1) is False
-
-    def test_supported_mclk_level_passes_when_low_power_keeps_active_level_low(self):
-        showclocks = self._make_smi_result(
-            "WARNING: AMD GPU device(s) is/are in a low-power state.\n"
-            "GPU[0]\t\t: sclk clock level: 1: (0Mhz)\n"
-            "GPU[0]\t\t: mclk clock level: 0: (96Mhz)\n"
-        )
-        supported = self._make_smi_result(
-            "GPU[0]\t\t: Supported mclk frequencies on GPU0\n"
-            "GPU[0]\t\t: 0: 96Mhz *\n"
-            "GPU[0]\t\t: 1: 456Mhz\n"
-            "GPU[0]\t\t: 2: 772Mhz\n"
-        )
-        with patch(
-            f"{_MODULE}.subprocess.run", side_effect=[showclocks, supported]
-        ) as mock_run:
-            assert verify_clocks(1, 1) is True
-
-        assert mock_run.call_args_list == [
-            call(["rocm-smi", "--showclocks"], capture_output=True, text=True),
-            call(["rocm-smi", "-s"], capture_output=True, text=True),
-        ]
-
-    def test_supported_sclk_level_passes_when_low_power_keeps_active_level_low(self):
-        showclocks = self._make_smi_result(
-            "WARNING: AMD GPU device(s) is/are in a low-power state.\n"
-            "GPU[0]\t\t: sclk clock level: 1: (0Mhz)\n"
-            "GPU[0]\t\t: mclk clock level: 5: (1258Mhz)\n"
-        )
-        supported = self._make_smi_result(
-            "GPU[0]\t\t: Supported sclk frequencies on GPU0\n"
-            "GPU[0]\t\t: 0: 500Mhz\n"
-            "GPU[0]\t\t: 1: 0Mhz *\n"
-            "GPU[0]\t\t: 2: 2780Mhz\n"
-            "GPU[0]\t\t: \n"
-            "GPU[0]\t\t: Supported mclk frequencies on GPU0\n"
-            "GPU[0]\t\t: 5: 1258Mhz *\n"
-        )
-        with patch(
-            f"{_MODULE}.subprocess.run", side_effect=[showclocks, supported]
-        ) as mock_run:
-            assert verify_clocks(2, 5) is True
-
-        assert mock_run.call_args_list == [
-            call(["rocm-smi", "--showclocks"], capture_output=True, text=True),
-            call(["rocm-smi", "-s"], capture_output=True, text=True),
-        ]
-
-    def test_low_power_sclk_fallback_rejects_unsupported_level(self):
-        showclocks = self._make_smi_result(
-            "WARNING: AMD GPU device(s) is/are in a low-power state.\n"
-            "GPU[0]\t\t: sclk clock level: 1: (0Mhz)\n"
-            "GPU[0]\t\t: mclk clock level: 5: (1258Mhz)\n"
-        )
-        supported = self._make_smi_result(
-            "GPU[0]\t\t: Supported sclk frequencies on GPU0\n"
-            "GPU[0]\t\t: 0: 500Mhz\n"
-            "GPU[0]\t\t: 1: 0Mhz *\n"
-        )
-        with patch(f"{_MODULE}.subprocess.run", side_effect=[showclocks, supported]):
-            assert verify_clocks(2, 5) is False
-
-    def test_low_power_mclk_fallback_rejects_unsupported_level(self):
-        showclocks = self._make_smi_result(
-            "WARNING: AMD GPU device(s) is/are in a low-power state.\n"
-            "GPU[0]\t\t: sclk clock level: 1: (0Mhz)\n"
-            "GPU[0]\t\t: mclk clock level: 0: (96Mhz)\n"
-        )
-        supported = self._make_smi_result(
-            "GPU[0]\t\t: Supported mclk frequencies on GPU0\n"
-            "GPU[0]\t\t: 0: 96Mhz *\n"
-            "GPU[0]\t\t: 1: 456Mhz\n"
-        )
-        with patch(f"{_MODULE}.subprocess.run", side_effect=[showclocks, supported]):
-            assert verify_clocks(1, 5) is False
+            assert verify_clocks() is True
 
     def test_rocm_smi_not_found(self):
         with patch(f"{_MODULE}.subprocess.run", side_effect=FileNotFoundError):
-            assert verify_clocks(1, 1) is False
+            assert verify_clocks() is False
 
     def test_rocm_smi_nonzero_exit(self):
         result = self._make_smi_result("", returncode=1)
         with patch(f"{_MODULE}.subprocess.run", return_value=result):
-            assert verify_clocks(1, 1) is False
+            assert verify_clocks() is False
 
     def test_empty_output(self):
         result = self._make_smi_result("")
         with patch(f"{_MODULE}.subprocess.run", return_value=result):
-            assert verify_clocks(1, 1) is False
+            assert verify_clocks() is False
 
-    def test_unsupported_clock_output_without_active_levels_fails(self):
-        result = self._make_smi_result(
-            "GPU[0]\t\t: sclk clock level: N/A\n"
-            "GPU[0]\t\t: mclk clock level: unsupported\n"
-        )
+    def test_accepts_legacy_level_parameters_ignored(self):
+        result = self._make_smi_result("GPU[0]\t\t: Performance Level: stable_peak\n")
         with patch(f"{_MODULE}.subprocess.run", return_value=result):
-            assert verify_clocks(1, 1) is False
+            assert verify_clocks(expected_sclk_level=2, expected_mclk_level=5) is True
 
 
 class TestUnlockClocks:
-    def test_resets_clocks_and_perf_level(self):
+    def test_unlocks_with_amd_smi(self):
         with patch(f"{_MODULE}.subprocess.run") as mock_run:
             unlock_clocks()
 
-        assert mock_run.call_args_list == [
-            call(["sudo", "-n", "rocm-smi", "--resetclocks"], capture_output=True),
-            call(
-                ["sudo", "-n", "rocm-smi", "--setperflevel", "auto"],
-                capture_output=True,
-            ),
-        ]
+        mock_run.assert_called_once_with(
+            ["sudo", "-n", "amd-smi", "set", "-l", "AUTO"],
+            capture_output=True,
+        )
 
     def test_does_not_raise_on_failure(self):
         with patch(f"{_MODULE}.subprocess.run", side_effect=Exception("no sudo")):
