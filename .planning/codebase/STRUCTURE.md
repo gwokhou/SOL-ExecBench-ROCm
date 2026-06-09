@@ -73,7 +73,7 @@ focus: arch
 
 - `config/benchmark_config.py`: benchmark settings and clock presets.
 - `config/device_config.py`: device configuration.
-- `clock_lock.py`: GPU clock lock detection.
+- `clock_lock.py`: `amd-smi` STABLE_PEAK clock lock detection and cleanup.
 - `correctness.py`: output validation and numerical error statistics.
 - `eval_runtime.py`: staged-driver loading, measurement, and trace helpers.
 - `io.py`: workload input generation/loading and output allocation.
@@ -189,7 +189,7 @@ directories, so path handling must be robust outside the repository root.
   `scripts/build_prerelease_artifact_bundle.py`, and
   `scripts/release_candidate_validation.py`.
 - ROCm environment helpers: `scripts/run_docker.sh` and
-  `scripts/setup_rocm_smi_sudoers.py`.
+  `scripts/setup_rocm_clock_sudoers.py`.
 
 ## Examples
 

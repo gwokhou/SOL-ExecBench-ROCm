@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.33
 milestone_name: RDNA4 Benchmark-Grade Evidence Closure
 status: Milestone v1.33 complete
-stopped_at: Milestone v1.33 complete with RDNA4 release evidence bundle and timing authority guardrails.
+stopped_at: Milestone v1.33 complete after Phase 169 audit and authority gap closure.
 last_updated: "2026-06-09T00:11:40.000Z"
-last_activity: 2026-06-09 — Phase 168 packaged RDNA4 release evidence bundle
+last_activity: 2026-06-09 — Phase 169 closed v1.33 audit and authority gaps
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 6
-  completed_plans: 6
+  total_phases: 7
+  completed_phases: 7
+  total_plans: 7
+  completed_plans: 7
   percent: 100
 ---
 
@@ -30,7 +30,7 @@ ExecBench.
 Phase: —
 Plan: —
 Status: Milestone v1.33 complete
-Last activity: 2026-06-09 — Phase 168 packaged RDNA4 release evidence bundle
+Last activity: 2026-06-09 — Phase 169 closed v1.33 audit and authority gaps
 
 ## Recent Trend
 
@@ -340,12 +340,13 @@ Last activity: 2026-06-09 — Phase 168 packaged RDNA4 release evidence bundle
 - Phase 138 failures are real RDNA4 execution findings and must remain visible
   in Phase 140 reports and Phase 141 public wording.
 
-- Phase 139 found that sudoers coverage is incomplete for exact GPU clock-lock
-  commands: `sudo rocm-smi --setsclk 2`, `sudo rocm-smi --setmclk 5`, and
-  `sudo rocm-smi --resetclocks`.
+- RDNA4 manual DPM clock commands are superseded by the confirmed
+  `amd-smi set -l STABLE_PEAK` runtime path. Sudoers coverage should track the
+  exact `amd-smi version`, `set -l STABLE_PEAK`, and `set -l AUTO` commands.
 
-- RDNA4 timing remains non-authoritative until clock-lock/reset coverage and
-  profiler-backed timing collection are rerun.
+- RDNA4 timing remains bounded by the v1.33 authority-gap closure: STABLE_PEAK
+  gives stable near-maximum timing evidence, but it is not a full
+  benchmark-grade authority upgrade.
 
 - The full Phase 149 replacement objective remains blocked. Phase 150 may
   reduce the opaque fallback bucket by classifying partial and blocked
@@ -365,6 +366,8 @@ Last activity: 2026-06-09 — Phase 168 packaged RDNA4 release evidence bundle
 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
+| 260609-he6 | Align clock locking scripts, Docker, docs, and tests around amd-smi STABLE_PEAK | 2026-06-09 | pending | [260609-he6-align-clock-locking-scripts-docker-docs-](./quick/260609-he6-align-clock-locking-scripts-docker-docs-/) |
+| 260609-rdna4-clock-lock-workload | RDNA4 clock-lock workload test — confirmed firmware overrides clock lock under load | 2026-06-09 | pending | [260609-rdna4-clock-lock-workload](./quick/260609-rdna4-clock-lock-workload/) |
 | 260608-k79 | Improve RDNA4 validation completeness guardrails | 2026-06-08 | f354c32 | [260608-k79-rdna4-rdna4](./quick/260608-k79-rdna4-rdna4/) |
 | 260608-kjo | Add RDNA4 profiler-backed timing smoke slice | 2026-06-08 | 6615606 | [260608-kjo-rdna4-profiler-backed-timing-smoke-slice](./quick/260608-kjo-rdna4-profiler-backed-timing-smoke-slice/) |
 | 260608-kum | Fix RDNA4 profiler timing finalization | 2026-06-08 | a945fc5 | [260608-kum-rdna4-profiler-timing-smoke-eval-driver-](./quick/260608-kum-rdna4-profiler-timing-smoke-eval-driver-/) |

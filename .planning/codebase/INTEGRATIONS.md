@@ -60,14 +60,15 @@ focus: tech
 - `amd-smi`
   - Probed for optional environment evidence in `src/sol_execbench/core/environment.py`.
   - Checked as an available system tool in `docker/Dockerfile`.
+  - Used for GPU clock lock, passwordless sudo probing, and unlock in
+    `src/sol_execbench/core/bench/clock_lock.py`.
+  - Sudoers setup is handled in `docker/Dockerfile` and
+    `scripts/setup_rocm_clock_sudoers.py`.
 - `rocm-smi`
-  - Used for GPU clock lock, verification, and unlock in `src/sol_execbench/core/bench/clock_lock.py`.
-  - Invoked through `sudo -n` for lock operations.
-  - Sudoers setup is handled in `docker/Dockerfile` and `scripts/setup_rocm_smi_sudoers.py`.
+  - Used for read-only clock/performance-level verification in
+    `src/sol_execbench/core/bench/clock_lock.py`.
   - Container entrypoint calls clock lock/unlock via `docker/entrypoint.sh`.
 - Environment knobs:
-  - `SOL_EXECBENCH_SCLK_LEVEL`
-  - `SOL_EXECBENCH_MCLK_LEVEL`
   - `SOL_EXECBENCH_CLOCKS_LOCKED`
 
 ## ROCprofiler SDK

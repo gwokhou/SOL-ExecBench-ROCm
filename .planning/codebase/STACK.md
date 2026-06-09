@@ -77,7 +77,9 @@ focus: tech
 - Runtime tensor execution uses PyTorch's HIP backend through the `torch.cuda` API.
 - Timing uses HIP-backed PyTorch events by default in `src/sol_execbench/core/bench/timing.py` and policy logic in `src/sol_execbench/core/bench/timing_policy.py`.
 - Optional profiler-backed timing and profile collection uses `rocprofv3` in `src/sol_execbench/core/bench/rocm_profiler.py`.
-- GPU clock locking uses `rocm-smi` through passwordless `sudo -n` in `src/sol_execbench/core/bench/clock_lock.py`.
+- GPU clock locking uses `amd-smi set -l STABLE_PEAK` through passwordless
+  `sudo -n` in `src/sol_execbench/core/bench/clock_lock.py`; `rocm-smi` is
+  used for read-only verification.
 
 ## Supported Solution Technologies
 
@@ -144,7 +146,7 @@ focus: tech
 - Dataset and batch execution: `scripts/run_dataset.py`.
 - Dataset download/migration helpers: `scripts/download_data.sh`, `scripts/download_solexecbench.py`, and CLI migration commands in `src/sol_execbench/cli/main.py`.
 - Docker launcher: `scripts/run_docker.sh`.
-- Sudoers helper for clock control: `scripts/setup_rocm_smi_sudoers.py`.
+- Sudoers helper for clock control: `scripts/setup_rocm_clock_sudoers.py`.
 - Evidence/report scripts:
   - `scripts/report_amd_bound_sanity.py`
   - `scripts/report_consistency.py`
