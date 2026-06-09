@@ -33,7 +33,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     hipcc --version && \
     command -v rocminfo && \
     command -v rocprofv3 && \
-    (command -v amd-smi || command -v rocm-smi)
+    command -v amd-smi && \
+    command -v rocm-smi
 
 ARG HOST_UID=1000
 ARG HOST_GID=1000
@@ -61,27 +62,14 @@ RUN if [ "${HOST_UID}" = "0" ]; then \
     fi && \
     mkdir -p /sol-execbench /venv /home/${HOST_USER}/.cache/uv && \
     chown -R ${HOST_UID}:${HOST_GID} /sol-execbench /venv /home/${HOST_USER} && \
-    for smi_tool in amd-smi rocm-smi; do \
-        if command -v "${smi_tool}" >/dev/null 2>&1; then \
-            echo "${RUN_USER} ALL=(ALL) NOPASSWD: $(command -v "${smi_tool}")" >> /etc/sudoers; \
-        fi; \
-    done && \
-    if command -v rocm-smi >/dev/null 2>&1; then \
-        ROCM_SMI="$(command -v rocm-smi)" && \
-        { \
-            echo "# SOL ExecBench ROCm clock commands"; \
-            echo "${RUN_USER} ALL=(root) NOPASSWD: ${ROCM_SMI} --showclocks, \\"; \
-            echo "    ${ROCM_SMI} -s, \\"; \
-            echo "    ${ROCM_SMI} --showperflevel, \\"; \
-            echo "    ${ROCM_SMI} --showclkfrq, \\"; \
-            echo "    ${ROCM_SMI} --setperflevel manual, \\"; \
-            echo "    ${ROCM_SMI} --setperflevel auto, \\"; \
-            echo "    ${ROCM_SMI} --setsclk *, \\"; \
-            echo "    ${ROCM_SMI} --setmclk *, \\"; \
-            echo "    ${ROCM_SMI} --resetclocks"; \
-        } > /etc/sudoers.d/sol-execbench-rocm-smi && \
-        chmod 0440 /etc/sudoers.d/sol-execbench-rocm-smi; \
-    fi
+    AMD_SMI="$(command -v amd-smi)" && \
+    { \
+        echo "# SOL ExecBench ROCm clock commands"; \
+        echo "${RUN_USER} ALL=(root) NOPASSWD: ${AMD_SMI} version, \\"; \
+        echo "    ${AMD_SMI} set -l STABLE_PEAK, \\"; \
+        echo "    ${AMD_SMI} set -l AUTO"; \
+    } > /etc/sudoers.d/sol-execbench-amd-smi && \
+    chmod 0440 /etc/sudoers.d/sol-execbench-amd-smi
 
 # Copy and set up entrypoint while still root (avoid switching back)
 COPY docker/entrypoint.sh /entrypoint.sh

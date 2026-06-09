@@ -14,7 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Device-specific configuration for SOL ExecBench benchmark execution."""
+"""Device-specific GPU clock presets (legacy).
+
+These presets were previously used with the ``rocm-smi --setperflevel manual``
++ ``--setsclk`` / ``--setmclk`` clock locking path.  Since the switch to
+``amd-smi set -l STABLE_PEAK`` (a firmware-level profiling mode that works
+identically across RDNA4 and CDNA3), they are retained only for reference
+and backward compatibility.
+"""
 
 from __future__ import annotations
 
@@ -24,7 +31,7 @@ from typing import Optional
 
 @dataclass(frozen=True)
 class ClockPreset:
-    """ROCm DPM levels for stable benchmarking."""
+    """ROCm DPM levels for stable benchmarking (legacy reference)."""
 
     sclk_level: int
     mclk_level: int
@@ -39,7 +46,11 @@ CLOCK_LOCK_PRESETS: dict[str, ClockPreset] = {
 
 
 def get_clock_preset(device_name: str) -> Optional[ClockPreset]:
-    """Get the ROCm clock preset for a GPU device name or architecture string."""
+    """Get the legacy ROCm clock preset for a GPU device name or architecture string.
+
+    No longer used by the clock locking system (``amd-smi set -l STABLE_PEAK``
+    is architecture-independent).  Retained for backward compatibility.
+    """
     for key, preset in CLOCK_LOCK_PRESETS.items():
         if key.lower() in device_name.lower():
             return preset

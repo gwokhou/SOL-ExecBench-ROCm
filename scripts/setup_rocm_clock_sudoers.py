@@ -1,6 +1,11 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
-"""Install or check passwordless sudoers coverage for ROCm clock commands."""
+"""Install or check passwordless sudoers coverage for ROCm clock commands.
+
+Covers the ``amd-smi`` commands used by SOL ExecBench clock locking:
+``version`` for passwordless probing, ``set -l STABLE_PEAK`` for locking, and
+``set -l AUTO`` for cleanup.
+"""
 
 from __future__ import annotations
 
@@ -16,8 +21,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 
-SUDOERS_PATH = Path("/etc/sudoers.d/sol-execbench-rocm-smi")
-DEFAULT_LABEL = "sol-execbench-rocm-smi"
+SUDOERS_PATH = Path("/etc/sudoers.d/sol-execbench-amd-smi")
+DEFAULT_LABEL = "sol-execbench-amd-smi"
 
 
 @dataclass(frozen=True)
@@ -28,10 +33,11 @@ class SudoCommandCheck:
     stderr_tail: str
 
 
-def resolve_rocm_smi(explicit_path: str | None = None) -> str:
+def resolve_amd_smi(explicit_path: str | None = None) -> str:
+    """Return the path to amd-smi."""
     if explicit_path:
         return explicit_path
-    return shutil.which("rocm-smi") or "/opt/rocm/bin/rocm-smi"
+    return shutil.which("amd-smi") or "/opt/rocm/bin/amd-smi"
 
 
 def default_target_user() -> str:
@@ -39,45 +45,34 @@ def default_target_user() -> str:
     return os.environ.get("SUDO_USER") or getpass.getuser()
 
 
-def sudoers_command_patterns(rocm_smi: str) -> list[str]:
+def amd_smi_command_patterns(amd_smi: str) -> list[str]:
     return [
-        f"{rocm_smi} --showclocks",
-        f"{rocm_smi} -s",
-        f"{rocm_smi} --showperflevel",
-        f"{rocm_smi} --showclkfrq",
-        f"{rocm_smi} --setperflevel manual",
-        f"{rocm_smi} --setperflevel auto",
-        f"{rocm_smi} --setsclk *",
-        f"{rocm_smi} --setmclk *",
-        f"{rocm_smi} --resetclocks",
+        f"{amd_smi} version",
+        f"{amd_smi} set -l STABLE_PEAK",
+        f"{amd_smi} set -l AUTO",
     ]
 
 
 def render_sudoers(
     *,
     user: str,
-    rocm_smi: str,
+    amd_smi: str,
     label: str = DEFAULT_LABEL,
 ) -> str:
-    patterns = ", \\\n    ".join(sudoers_command_patterns(rocm_smi))
-    return (
-        f"# Managed by SOL ExecBench ROCm: {label}\n"
-        f"# Allows only ROCm SMI clock query, lock, and reset commands.\n"
-        f"{user} ALL=(root) NOPASSWD: {patterns}\n"
-    )
+    patterns = ", \\\n    ".join(amd_smi_command_patterns(amd_smi))
+    lines = [
+        f"# Managed by SOL ExecBench ROCm: {label}",
+        "# Allows only amd-smi clock probe, lock, and reset commands.",
+        f"{user} ALL=(root) NOPASSWD: {patterns}",
+    ]
+    return "\n".join(lines) + "\n"
 
 
-def check_commands(rocm_smi: str) -> list[list[str]]:
+def check_commands(amd_smi: str) -> list[list[str]]:
     return [
-        ["sudo", "-n", rocm_smi, "--showclocks"],
-        ["sudo", "-n", rocm_smi, "-s"],
-        ["sudo", "-n", rocm_smi, "--showperflevel"],
-        ["sudo", "-n", rocm_smi, "--showclkfrq"],
-        ["sudo", "-n", rocm_smi, "--setperflevel", "manual"],
-        ["sudo", "-n", rocm_smi, "--setperflevel", "auto"],
-        ["sudo", "-n", rocm_smi, "--setsclk", "0"],
-        ["sudo", "-n", rocm_smi, "--setmclk", "0"],
-        ["sudo", "-n", rocm_smi, "--resetclocks"],
+        ["sudo", "-n", amd_smi, "version"],
+        ["sudo", "-n", amd_smi, "set", "-l", "STABLE_PEAK"],
+        ["sudo", "-n", amd_smi, "set", "-l", "AUTO"],
     ]
 
 
@@ -85,9 +80,9 @@ def _tail(value: str, limit: int = 400) -> str:
     return value[-limit:] if len(value) > limit else value
 
 
-def check_passwordless_coverage(rocm_smi: str) -> list[SudoCommandCheck]:
+def check_passwordless_coverage(amd_smi: str) -> list[SudoCommandCheck]:
     results: list[SudoCommandCheck] = []
-    for command in check_commands(rocm_smi):
+    for command in check_commands(amd_smi):
         try:
             result = subprocess.run(
                 command,
@@ -150,7 +145,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default="check",
     )
     parser.add_argument("--user", default=default_target_user())
-    parser.add_argument("--rocm-smi", default=None)
+    parser.add_argument("--amd-smi", default=None)
     parser.add_argument("--sudoers-path", type=Path, default=SUDOERS_PATH)
     parser.add_argument("--json", action="store_true")
     return parser.parse_args(argv)
@@ -158,8 +153,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    rocm_smi = resolve_rocm_smi(args.rocm_smi)
-    content = render_sudoers(user=args.user, rocm_smi=rocm_smi)
+    amd_smi = resolve_amd_smi(args.amd_smi)
+    content = render_sudoers(user=args.user, amd_smi=amd_smi)
 
     if args.mode == "print":
         print(content, end="")
@@ -176,11 +171,11 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"failed: {exc}", file=sys.stderr)
             return 1
 
-    checks = check_passwordless_coverage(rocm_smi)
+    checks = check_passwordless_coverage(amd_smi)
     all_covered = all(check.status == "covered" for check in checks)
     payload = {
         "status": "covered" if all_covered else "missing",
-        "rocm_smi": rocm_smi,
+        "amd_smi": amd_smi,
         "checks": [asdict(check) for check in checks],
     }
     if args.json:
