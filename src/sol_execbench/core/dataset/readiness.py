@@ -127,15 +127,23 @@ class DatasetReadiness(BaseModel):
         payload = self.model_dump(mode="json")
         payload["readiness_checksum"] = None
         return self.model_copy(
-            update={"readiness_checksum": DatasetManifestChecksum(value=stable_json_checksum(payload))}
+            update={
+                "readiness_checksum": DatasetManifestChecksum(
+                    value=stable_json_checksum(payload)
+                )
+            }
         )
 
     def to_json(self) -> str:
         return json.dumps(self.model_dump(mode="json"), indent=2, sort_keys=True) + "\n"
 
 
-def _reason(code: str, message: str, next_action: str, evidence_path: str | None = None) -> ReadinessReason:
-    return ReadinessReason(code=code, message=message, next_action=next_action, evidence_path=evidence_path)
+def _reason(
+    code: str, message: str, next_action: str, evidence_path: str | None = None
+) -> ReadinessReason:
+    return ReadinessReason(
+        code=code, message=message, next_action=next_action, evidence_path=evidence_path
+    )
 
 
 def _blocker(
@@ -171,12 +179,16 @@ def _reference_has_nvidia_blocker(problem: ProblemInventoryRecord) -> bool:
     return bool(problem.definition and problem.definition.reference_runtime_hints)
 
 
-def _low_precision_or_quant(problem: ProblemInventoryRecord, workload: WorkloadInventoryRecord) -> bool:
+def _low_precision_or_quant(
+    problem: ProblemInventoryRecord, workload: WorkloadInventoryRecord
+) -> bool:
     dtypes = set(workload.input_dtypes.values()) | set(workload.output_dtypes.values())
     return problem.category == "Quant" or bool(dtypes & LOW_PRECISION_DTYPES)
 
 
-def _blackwell_low_precision(problem: ProblemInventoryRecord, workload: WorkloadInventoryRecord) -> bool:
+def _blackwell_low_precision(
+    problem: ProblemInventoryRecord, workload: WorkloadInventoryRecord
+) -> bool:
     dtypes = set(workload.input_dtypes.values()) | set(workload.output_dtypes.values())
     identity = f"{problem.problem_id} {problem.problem_path}".lower()
     return (
@@ -188,7 +200,9 @@ def _blackwell_low_precision(problem: ProblemInventoryRecord, workload: Workload
     )
 
 
-def _solution_runtime_hints(problem: ProblemInventoryRecord, dataset_root: Path) -> set[str]:
+def _solution_runtime_hints(
+    problem: ProblemInventoryRecord, dataset_root: Path
+) -> set[str]:
     hints: set[str] = set()
     problem_dir = Path(dataset_root) / problem.problem_path
     for filename in problem.solution_files:
@@ -198,27 +212,44 @@ def _solution_runtime_hints(problem: ProblemInventoryRecord, dataset_root: Path)
         if "cute" in lowered or "cutile" in lowered or "cutlass" in lowered:
             hints.add("nvidia_dsl")
         path = problem_dir / filename
-        if not path.is_file() or path.suffix.lower() not in {".json", ".py", ".cu", ".cuh", ".cpp", ".hip"}:
+        if not path.is_file() or path.suffix.lower() not in {
+            ".json",
+            ".py",
+            ".cu",
+            ".cuh",
+            ".cpp",
+            ".hip",
+        }:
             continue
         text = path.read_text(encoding="utf-8", errors="ignore").lower()
         if any(token in text for token in ("cuda", "cublas", "cutlass", "nvrtc")):
             hints.add("cuda_kernel")
-        if any(token in text for token in ("flashinfer", "paged_decode", "paged attention")):
+        if any(
+            token in text for token in ("flashinfer", "paged_decode", "paged attention")
+        ):
             hints.add("flashinfer_runtime")
         if any(token in text for token in ("cute_dsl", "cutile", "cutlass")):
             hints.add("nvidia_dsl")
-        if any(token in text for token in ("nvfp4", "mxfp4", "float4_e2m1", "blackwell")):
+        if any(
+            token in text for token in ("nvfp4", "mxfp4", "float4_e2m1", "blackwell")
+        ):
             hints.add("blackwell_low_precision")
     return hints
 
 
-def _unsupported_dtype_failure(problem: ProblemInventoryRecord, workload: WorkloadInventoryRecord) -> str | None:
+def _unsupported_dtype_failure(
+    problem: ProblemInventoryRecord, workload: WorkloadInventoryRecord
+) -> str | None:
     failure = " ".join(
         item
         for item in (problem.schema_failure, workload.schema_failure)
         if item is not None
     ).lower()
-    if "unsupported dtype" in failure or "dtype" in failure and "unsupported" in failure:
+    if (
+        "unsupported dtype" in failure
+        or "dtype" in failure
+        and "unsupported" in failure
+    ):
         return problem.schema_failure or workload.schema_failure or "unsupported dtype"
     return None
 
@@ -247,7 +278,14 @@ def classify_workload_readiness(
         status = "dtype_blocked"
         readiness_class = ReadinessClass.UNSUPPORTED
         message = f"Unsupported dtype in migrated schema: {unsupported_dtype}"
-        reasons.append(_reason("unsupported_dtype", message, "Exclude or add an explicit ROCm dtype compatibility path.", problem.problem_path))
+        reasons.append(
+            _reason(
+                "unsupported_dtype",
+                message,
+                "Exclude or add an explicit ROCm dtype compatibility path.",
+                problem.problem_path,
+            )
+        )
         blockers.append(
             _blocker(
                 code="unsupported_dtype",
@@ -263,9 +301,22 @@ def classify_workload_readiness(
         layers.schema_known = "blocked"
         status = "schema_input_blocked"
         readiness_class = ReadinessClass.BLOCKED_MISSING_EVIDENCE
-        code = "workload_schema_failure" if workload.schema_status != "parsed" else "definition_schema_failure"
-        message = workload.schema_failure or problem.schema_failure or "schema parse failed"
-        reasons.append(_reason(code, message, "Fix or exclude malformed canonical dataset entry.", problem.problem_path))
+        code = (
+            "workload_schema_failure"
+            if workload.schema_status != "parsed"
+            else "definition_schema_failure"
+        )
+        message = (
+            workload.schema_failure or problem.schema_failure or "schema parse failed"
+        )
+        reasons.append(
+            _reason(
+                code,
+                message,
+                "Fix or exclude malformed canonical dataset entry.",
+                problem.problem_path,
+            )
+        )
         blockers.append(
             _blocker(
                 code=code,
@@ -281,7 +332,14 @@ def classify_workload_readiness(
         status = "schema_input_blocked"
         readiness_class = ReadinessClass.BLOCKED_MISSING_EVIDENCE
         layers.reference_execution = "blocked"
-        reasons.append(_reason("missing_reference", "Reference source is not available.", "Restore reference source before execution attempts.", problem.problem_path))
+        reasons.append(
+            _reason(
+                "missing_reference",
+                "Reference source is not available.",
+                "Restore reference source before execution attempts.",
+                problem.problem_path,
+            )
+        )
         blockers.append(
             _blocker(
                 code="missing_reference",
@@ -297,7 +355,14 @@ def classify_workload_readiness(
         status = "runtime_blocked"
         readiness_class = ReadinessClass.FLASHINFER_SPECIFIC
         layers.reference_execution = "blocked"
-        reasons.append(_reason("flashinfer_runtime_assumption", "FlashInfer Trace workload depends on FlashInfer-specific runtime semantics.", "Route through a dedicated ROCm FlashInfer compatibility/port path before execution.", problem.problem_path))
+        reasons.append(
+            _reason(
+                "flashinfer_runtime_assumption",
+                "FlashInfer Trace workload depends on FlashInfer-specific runtime semantics.",
+                "Route through a dedicated ROCm FlashInfer compatibility/port path before execution.",
+                problem.problem_path,
+            )
+        )
         blockers.append(
             _blocker(
                 code="flashinfer_runtime_assumption",
@@ -313,7 +378,14 @@ def classify_workload_readiness(
         status = "unsupported_nvidia_only_path"
         readiness_class = ReadinessClass.ROCM_PORT_NEEDED
         layers.reference_execution = "blocked"
-        reasons.append(_reason("nvidia_cuda_runtime_hint", "Static NVIDIA/CUDA runtime hint detected.", "Port or exclude NVIDIA-only reference path.", problem.problem_path))
+        reasons.append(
+            _reason(
+                "nvidia_cuda_runtime_hint",
+                "Static NVIDIA/CUDA runtime hint detected.",
+                "Port or exclude NVIDIA-only reference path.",
+                problem.problem_path,
+            )
+        )
         blockers.append(
             _blocker(
                 code="nvidia_cuda_runtime_hint",
@@ -329,7 +401,14 @@ def classify_workload_readiness(
         status = "unsupported_nvidia_only_path"
         readiness_class = ReadinessClass.ROCM_PORT_NEEDED
         layers.candidate_execution = "blocked"
-        reasons.append(_reason("cuda_solution_dependency", "Migrated solution still contains CUDA/NVIDIA kernel dependencies.", "Port candidate solution to HIP, Triton ROCm, or a ROCm library before execution.", problem.problem_path))
+        reasons.append(
+            _reason(
+                "cuda_solution_dependency",
+                "Migrated solution still contains CUDA/NVIDIA kernel dependencies.",
+                "Port candidate solution to HIP, Triton ROCm, or a ROCm library before execution.",
+                problem.problem_path,
+            )
+        )
         blockers.append(
             _blocker(
                 code="cuda_solution_dependency",
@@ -345,7 +424,14 @@ def classify_workload_readiness(
         status = "unsupported_nvidia_only_path"
         readiness_class = ReadinessClass.UNSUPPORTED
         layers.candidate_execution = "blocked"
-        reasons.append(_reason("unsupported_nvidia_dsl", "Migrated solution depends on NVIDIA-specific DSL/runtime code.", "Replace with a ROCm-native solution path before execution.", problem.problem_path))
+        reasons.append(
+            _reason(
+                "unsupported_nvidia_dsl",
+                "Migrated solution depends on NVIDIA-specific DSL/runtime code.",
+                "Replace with a ROCm-native solution path before execution.",
+                problem.problem_path,
+            )
+        )
         blockers.append(
             _blocker(
                 code="unsupported_nvidia_dsl",
@@ -358,21 +444,31 @@ def classify_workload_readiness(
             )
         )
     elif workload.uses_custom_inputs:
-        status = "custom_input_blocked"
-        readiness_class = ReadinessClass.BLOCKED_MISSING_EVIDENCE
-        layers.input_generation = "blocked"
-        reasons.append(_reason("custom_input_requires_evaluator_support", "Custom input generation requires evaluator support and must not be random-substituted.", "Use execution-time custom input support or exclude from ready subset.", problem.problem_path))
-        blockers.append(
-            _blocker(
-                code="custom_input_requires_evaluator_support",
-                blocker_type="missing_evidence",
-                problem=problem,
-                workload=workload,
-                message="Custom input generation requires evaluator support and must not be random-substituted.",
-                next_action="Use execution-time custom input support or exclude from ready subset.",
-                evidence_path=problem.problem_path,
+        if problem.definition and problem.definition.custom_inputs_entrypoint:
+            layers.input_generation = "ready_to_generate"
+        else:
+            status = "custom_input_blocked"
+            readiness_class = ReadinessClass.BLOCKED_MISSING_EVIDENCE
+            layers.input_generation = "blocked"
+            reasons.append(
+                _reason(
+                    "custom_input_requires_evaluator_support",
+                    "Custom input workload is missing a valid definition.custom_inputs_entrypoint.",
+                    "Restore the benchmark-defined custom input entrypoint before execution attempts.",
+                    problem.problem_path,
+                )
             )
-        )
+            blockers.append(
+                _blocker(
+                    code="custom_input_requires_evaluator_support",
+                    blocker_type="missing_evidence",
+                    problem=problem,
+                    workload=workload,
+                    message="Custom input workload is missing a valid definition.custom_inputs_entrypoint.",
+                    next_action="Restore the benchmark-defined custom input entrypoint before execution attempts.",
+                    evidence_path=problem.problem_path,
+                )
+            )
     else:
         missing_safetensors = []
         dataset_root_resolved = Path(dataset_root).resolve()
@@ -415,7 +511,10 @@ def classify_workload_readiness(
                         evidence_path=ref["path"],
                     )
                 )
-        elif _blackwell_low_precision(problem, workload) or "blackwell_low_precision" in solution_hints:
+        elif (
+            _blackwell_low_precision(problem, workload)
+            or "blackwell_low_precision" in solution_hints
+        ):
             status = "needs_hardware_evidence"
             readiness_class = ReadinessClass.NVFP4_BLACKWELL_SPECIFIC
             layers.hardware_validation = "needed"
@@ -450,7 +549,14 @@ def classify_workload_readiness(
             status = "needs_hardware_evidence"
             readiness_class = ReadinessClass.BLOCKED_MISSING_EVIDENCE
             layers.hardware_validation = "needed"
-            reasons.append(_reason("low_precision_requires_hardware_evidence", "Low-precision or Quant workload needs hardware validation evidence before validation claims.", "Collect hardware evidence during execution closure.", problem.problem_path))
+            reasons.append(
+                _reason(
+                    "low_precision_requires_hardware_evidence",
+                    "Low-precision or Quant workload needs hardware validation evidence before validation claims.",
+                    "Collect hardware evidence during execution closure.",
+                    problem.problem_path,
+                )
+            )
             blockers.append(
                 _blocker(
                     code="low_precision_requires_hardware_evidence",
@@ -464,9 +570,27 @@ def classify_workload_readiness(
             )
 
     if not reasons and status == "ready":
-        reasons.append(_reason("ready_to_attempt_rocm_execution", "No static blocker found; ready to attempt local ROCm execution.", "Run bounded execution closure in Phase 55.", problem.problem_path))
+        reasons.append(
+            _reason(
+                "ready_to_attempt_rocm_execution",
+                "No static blocker found; ready to attempt local ROCm execution.",
+                "Run bounded execution closure in Phase 55.",
+                problem.problem_path,
+            )
+        )
 
-    return WorkloadReadinessRecord(category=problem.category, problem_id=problem.problem_id, problem_path=problem.problem_path, workload_uuid=workload.uuid, row_index=workload.row_index, status=status, readiness_class=readiness_class, reasons=reasons, blocker_reports=blockers, layered_evidence=layers)
+    return WorkloadReadinessRecord(
+        category=problem.category,
+        problem_id=problem.problem_id,
+        problem_path=problem.problem_path,
+        workload_uuid=workload.uuid,
+        row_index=workload.row_index,
+        status=status,
+        readiness_class=readiness_class,
+        reasons=reasons,
+        blocker_reports=blockers,
+        layered_evidence=layers,
+    )
 
 
 def classify_rocm_readiness(
@@ -479,13 +603,22 @@ def classify_rocm_readiness(
     by_problem: dict[str, list[WorkloadReadinessRecord]] = defaultdict(list)
     for problem in inventory.problems:
         if not problem.workloads:
-            synthetic = WorkloadInventoryRecord(uuid=None, row_index=0, schema_status="schema_failure", schema_failure=problem.schema_failure or "no parsed workloads")
-            record = classify_workload_readiness(problem, synthetic, dataset_root=dataset_root)
+            synthetic = WorkloadInventoryRecord(
+                uuid=None,
+                row_index=0,
+                schema_status="schema_failure",
+                schema_failure=problem.schema_failure or "no parsed workloads",
+            )
+            record = classify_workload_readiness(
+                problem, synthetic, dataset_root=dataset_root
+            )
             workload_records.append(record)
             by_problem[problem.problem_id].append(record)
             continue
         for workload in problem.workloads:
-            record = classify_workload_readiness(problem, workload, dataset_root=dataset_root)
+            record = classify_workload_readiness(
+                problem, workload, dataset_root=dataset_root
+            )
             workload_records.append(record)
             by_problem[problem.problem_id].append(record)
 
@@ -497,22 +630,33 @@ def classify_rocm_readiness(
         for record in records:
             counts[record.status] = counts.get(record.status, 0) + 1
         problem = problem_lookup[problem_id]
-        problem_records.append(ProblemReadinessRecord(category=problem.category, problem_id=problem_id, problem_path=problem.problem_path, status=_worst_status([record.status for record in records]), workload_count=len(records), status_counts=dict(sorted(counts.items()))))
+        problem_records.append(
+            ProblemReadinessRecord(
+                category=problem.category,
+                problem_id=problem_id,
+                problem_path=problem.problem_path,
+                status=_worst_status([record.status for record in records]),
+                workload_count=len(records),
+                status_counts=dict(sorted(counts.items())),
+            )
+        )
 
     blocker_reports = [
-        blocker
-        for record in workload_records
-        for blocker in record.blocker_reports
+        blocker for record in workload_records for blocker in record.blocker_reports
     ]
     readiness = DatasetReadiness(
         created_at=created_at or utc_timestamp(),
-        inventory_checksum=inventory.inventory_checksum.value if inventory.inventory_checksum else None,
+        inventory_checksum=inventory.inventory_checksum.value
+        if inventory.inventory_checksum
+        else None,
         selected_categories=inventory.selected_categories,
         problems=problem_records,
         workloads=workload_records,
         blocker_reports=blocker_reports,
         claim_boundary=DatasetReadinessClaimBoundary(
-            ready_to_attempt_rocm_execution=any(record.status == "ready" for record in workload_records)
+            ready_to_attempt_rocm_execution=any(
+                record.status == "ready" for record in workload_records
+            )
         ),
     )
     return readiness.with_checksum()
