@@ -23,11 +23,11 @@
 
 ## Current Position
 
-**Status:** v1.34 planned. Phases 170-174 pending.
+**Status:** v1.34 in progress. Phase 170 complete. Phases 171-174 pending.
 
 ### Phase 170: Custom Input Evaluator Readiness
 
-**Status:** Pending
+**Status:** Complete (2026-06-09)
 
 **Goal:** Implement deterministic benchmark-defined custom input generation so
 the 55 L1/L2 custom-input readiness blockers can be attempted safely on ROCm.
@@ -36,10 +36,10 @@ the 55 L1/L2 custom-input readiness blockers can be attempted safely on ROCm.
 
 **Depends on:** Phase 169
 
-**Plans:** 1 plan
+**Plans:** 1 plan (1 complete)
 
 Plans:
-- [ ] 170-01 Custom input evaluator readiness
+- [x] 170-01 Custom input evaluator readiness
 
 **Deliverables:**
 - Evaluator/input assembly support for `custom_inputs_entrypoint`.
