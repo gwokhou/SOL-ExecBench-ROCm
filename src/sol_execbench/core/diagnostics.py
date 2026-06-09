@@ -19,6 +19,14 @@ from pathlib import Path
 from collections.abc import Mapping
 from typing import Any, Callable
 
+CUSTOM_INPUT_GENERATION_FAILURE_CLASSES: tuple[str, ...] = (
+    "gen_inputs_error",
+    "gen_inputs_oom_blocked",
+    "gen_inputs_timeout",
+    "gen_inputs_schema_mismatch",
+    "gen_inputs_device_mismatch",
+)
+
 
 class DiagnosticStage(str, Enum):
     """High-level evaluation stages used in actionable failure messages."""

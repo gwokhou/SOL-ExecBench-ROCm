@@ -56,6 +56,7 @@ from sol_execbench.core.bench.correctness import (  # noqa: E402
     set_seed,
 )
 from sol_execbench.core.bench.io import (  # noqa: E402
+    CustomInputGenerationError,
     allocate_outputs,
     gen_inputs,
     load_safetensors,
@@ -320,7 +321,7 @@ _inputs = None
 _ref_outputs = None
 _user_outputs = None
 _timing_outputs = None
-for _workload in workloads:
+for _row_index, _workload in enumerate(workloads):
     # Free GPU memory held by previous workload's tensors.
     # PyTorch's CUDA caching allocator retains freed blocks.
     # Without this cleanup, memory accumulates across workloads causing OOM.
@@ -376,7 +377,26 @@ for _workload in workloads:
                 device=_device,
                 safe_tensors=_safe_tensors or None,
                 custom_inputs_fn=_custom_inputs_fn,
+                row_index=_row_index,
             )
+        except CustomInputGenerationError as _e:
+            _emit(
+                Trace(
+                    definition=definition.name,
+                    solution=_solution_name,
+                    workload=_workload,
+                    evaluation=_make_eval(
+                        EvaluationStatus.RUNTIME_ERROR,
+                        _device,
+                        None,
+                        extra_msg=(
+                            f"{_e.failure_class}: {_e}\n{_e.provenance.log_text()}"
+                        ),
+                    ),
+                )
+            )
+            _correctness_failed = True
+            break
         except Exception as _e:
             _emit(
                 Trace(
