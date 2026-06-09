@@ -1,39 +1,42 @@
-# Project Research Summary
-
-## Milestone
-
-v1.27 Copyright Provenance Cleanup
+# Project Research Summary - RDNA4 Readiness Blocker Closure
 
 ## Stack Additions
 
-- Keep Apache-2.0 as the repository license.
-- Continue using SPDX file tags.
-- Add a lightweight provenance policy and classification artifact.
-- Prefer deterministic tests and prerelease gates over full REUSE certification
-  for this milestone.
+- Add deterministic custom input entrypoint execution in the evaluator/input
+  assembly path.
+- Refine Quant static CUDA/NVIDIA hint classification so true runtime
+  dependencies and lexical false positives are separated.
+- Split FlashInfer-Bench readiness by semantic dependency instead of blocking
+  the whole category.
+- Extend RDNA4 coverage reports with before/after readiness transition
+  accounting.
 
 ## Feature Table Stakes
 
-- Classify active files by provenance.
-- Fix SPDX/copyright headers based on provenance.
-- Preserve NVIDIA notices for retained or derivative upstream files.
-- Attribute independent ROCm work to this project instead of NVIDIA.
-- Update compliance, attribution, paper citation, and non-endorsement docs.
-- Refactor residue and release-readiness gates to prevent future blanket
-  header drift.
+- The 55 custom-input blockers need benchmark-defined input generation support,
+  not random tensor substitution.
+- The 33 Quant blockers need static hint triage plus explicit low-precision
+  evidence boundaries.
+- The 26 FlashInfer blockers need a semantic split: PyTorch-compatible simple
+  cases can move forward, true FlashInfer runtime cases need dedicated
+  compatibility work or residual blockers.
+- Recomputed coverage must preserve the 235-problem denominator and show where
+  each original readiness blocker moved.
 
 ## Watch Out For
 
-- Do not rewrite git history for ordinary blanket header correction.
-- Do not remove NVIDIA notices from derivative files.
-- Do not leave NVIDIA-only notices on clearly independent ROCm work.
-- Do not turn this milestone into full legal review or relicensing.
-- Do not conflate paper citation with file-level copyright ownership.
+- Do not report readiness reduction as validation success.
+- Do not let Quant readiness imply CDNA4 or low-precision hardware authority.
+- Do not let RDNA4 readiness evidence upgrade CDNA3 or CDNA4 claims.
+- Do not hide new input-generation OOM, reference OOM, runtime, correctness, or
+  profiler failures under generic readiness labels.
 
-## Sources
+## Recommended Build Order
 
-- Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0
-- SPDX file tags: https://spdx.github.io/spdx-spec/v2.3/file-tags/
-- REUSE specification 3.3: https://reuse.software/spec-3.3/
-- NVIDIA SOL-ExecBench repository: https://github.com/NVIDIA/SOL-ExecBench
-- SOL-ExecBench paper: https://arxiv.org/abs/2603.19173
+1. Add readiness transition accounting and custom-input support.
+2. Recompute custom-input coverage and classify new blockers.
+3. Refine Quant hint detection and low-precision readiness boundaries.
+4. Split FlashInfer-Bench into PyTorch-compatible and true runtime-dependent
+   subsets.
+5. Regenerate coverage, blocker ledgers, docs, and claim guardrails.
+

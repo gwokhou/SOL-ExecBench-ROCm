@@ -1,54 +1,71 @@
-# Project Research: Features
+# Project Research - Features for RDNA4 Readiness Blocker Closure
 
-## Milestone
+## Scope
 
-v1.27 Copyright Provenance Cleanup
+Milestone v1.34 targets the current 114 RDNA4 `readiness_blocked` problems:
 
-## Question
+- 55 `missing_evidence` problems caused by custom inputs.
+- 33 `cuda_kernel_dependency` Quant problems caused by NVIDIA/CUDA runtime
+  hints.
+- 26 `flashinfer_runtime_assumption` FlashInfer-Bench problems.
 
-How should copyright and provenance cleanup work for this ROCm fork?
+The milestone should reduce readiness blockers by making more problems safe to
+attempt on ROCm or by moving them into more precise residual blocker classes.
 
 ## Table Stakes
 
-- Classify active files by provenance:
-  - upstream retained;
-  - derivative modified;
-  - independent ROCm work;
-  - generated, planning, or documentation material.
-- Update file headers according to classification:
-  - upstream retained: keep NVIDIA notice;
-  - derivative modified: keep NVIDIA notice and add project attribution;
-  - independent ROCm work: use project attribution, not NVIDIA-only
-    attribution;
-  - generated/planning/docs: omit source-style headers or use project
-    attribution unless copied upstream expression is present.
-- Preserve Apache-2.0 license identity.
-- Document that the project is a ROCm port/adaptation of NVIDIA SOL-ExecBench,
-  not an NVIDIA- or AMD-endorsed release.
-- Keep paper attribution separate from source copyright. The paper is the
-  benchmark/method citation, not proof that every independent implementation
-  file should carry NVIDIA copyright.
-- Add automated checks that prevent future blanket NVIDIA headers in
-  independent ROCm files.
+### Custom Input Readiness
+
+- Evaluator can execute benchmark-defined custom input entrypoints safely.
+- Generated inputs are deterministic per workload.
+- Generated input keys, shapes, dtypes, scalar values, and devices are checked
+  before execution.
+- Failures are classified as input-generation errors or OOMs, not hidden as
+  generic readiness blockers.
+- Coverage reports show how many custom-input problems moved out of
+  `readiness_blocked`.
+
+### Quant Readiness
+
+- Static CUDA/NVIDIA hint classification separates real runtime dependencies
+  from false positives in names, comments, or compatibility labels.
+- Quant semantic references that run under PyTorch ROCm can be marked ready or
+  hardware-evidence-needed as appropriate.
+- Low-precision validation boundaries are explicit: readiness can improve
+  without claiming CDNA4 or unsupported low-precision hardware authority.
+- Any true CUDA-only Quant path remains blocked with a precise next action.
+
+### FlashInfer Readiness
+
+- FlashInfer-Bench is split by semantic dependency instead of category-only
+  blocking.
+- Simple PyTorch-compatible workloads can move to ready execution.
+- Paged, ragged, MLA, MoE, and FlashInfer-specific runtime workloads remain
+  separately classified until a compatibility path exists.
+- Coverage reports state which FlashInfer problems were reclassified and why.
+
+### Coverage and Claim Closure
+
+- RDNA4 coverage is recomputed after readiness changes.
+- The blocker ledger records before/after classification deltas.
+- Reports distinguish resolved readiness blockers from new runtime, OOM,
+  correctness, profiler, or hardware-evidence blockers.
+- Public docs and guardrails prevent paper-parity, leaderboard, CDNA3, or CDNA4
+  claim upgrades.
 
 ## Differentiators
 
-- A machine-readable provenance allowlist or manifest that the audit tests can
-  consume.
-- Release-readiness integration so public prerelease bundles fail when
-  provenance metadata is inconsistent.
-- Directory-level policy that reduces per-file churn for future contributors.
+- A before/after readiness transition ledger for all 114 original blockers.
+- Workload-level custom-input failure classes that preserve denominator
+  accounting.
+- Quant false-positive hint tests that prevent future overblocking.
+- FlashInfer semantic taxonomy that can guide later high-performance ROCm work.
 
 ## Anti-Features
 
-- Removing NVIDIA notices from files that still retain upstream expression.
-- Treating all files as NVIDIA-owned because the fork originated upstream.
-- Treating all files as project-owned because the current work is extensive.
-- Rewriting history for ordinary metadata correction.
-- Expanding into full legal review or dependency relicensing.
+- Treating readiness reduction as validation success.
+- Replacing custom inputs with random tensors.
+- Making FlashInfer compatibility depend on unverified CUDA semantics.
+- Reporting Quant low-precision readiness as CDNA4 hardware validation.
+- Collapsing new runtime failures into generic readiness blockers.
 
-## Sources
-
-- Upstream repository: https://github.com/NVIDIA/SOL-ExecBench
-- Original paper: https://arxiv.org/abs/2603.19173
-- Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0

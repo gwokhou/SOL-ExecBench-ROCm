@@ -1,52 +1,96 @@
-# Project Research: Pitfalls
+# Project Research - Pitfalls for RDNA4 Readiness Blocker Closure
 
-## Milestone
+## Custom Input Pitfalls
 
-v1.27 Copyright Provenance Cleanup
+### Random Substitution
 
-## Question
+Replacing custom inputs with random tensors would produce meaningless
+correctness results. Many blocked problems require semantically coupled values
+such as dropout masks, routing indices, position IDs, KV-cache updates, or
+variable-length metadata.
 
-What mistakes are likely when adding copyright/provenance cleanup to this
-existing ROCm port?
+Prevention: require the benchmark-defined custom entrypoint and validate its
+outputs before execution.
 
-## Pitfalls
+### Nondeterminism
 
-- Blanket replacement in either direction.
-  Replacing every NVIDIA notice with project attribution is as risky as keeping
-  NVIDIA attribution on every independent file. The decision has to follow
-  provenance.
+Custom input functions can call random tensor generation. If seeds are not
+controlled per workload, failures and coverage deltas will be hard to reproduce.
 
-- Using paper citation as source copyright evidence.
-  The paper supports methodology and benchmark attribution; it does not decide
-  source file ownership for independent implementation work.
+Prevention: set deterministic seeds around entrypoint execution and record seed
+policy in evidence.
 
-- Removing notices from derivative files.
-  Apache-2.0 requires retaining applicable upstream notices in derivative
-  distributions.
+### Hidden OOM Conversion
 
-- Making the release look officially endorsed.
-  Public wording should avoid implying NVIDIA or AMD endorsement unless there
-  is explicit approval.
+Custom input generation can OOM before reference execution. If this is reported
+as generic readiness failure, the milestone will not improve diagnosability.
 
-- Over-scoping into legal audit.
-  The milestone should improve release hygiene and provenance evidence, while
-  explicitly avoiding legal opinions, relicensing, and full dependency audits.
+Prevention: classify `gen_inputs_oom_blocked` and separate it from reference
+and user-solution OOM.
 
-- Breaking existing residue tests.
-  The current residue audit treats NVIDIA SPDX as an acceptable retained
-  upstream notice. It must be converted carefully so it catches incorrect
-  headers without flagging legitimate upstream-derived files.
+## Quant Pitfalls
 
-- Losing reviewability.
-  A generated bulk edit without a manifest will be hard to audit. A small,
-  explicit provenance policy makes the cleanup defensible.
+### False Positive CUDA Hints
 
-## Prevention Strategy
+Names like `CuBLASRefBlockwiseGemm` or variables like `scale_w_cublas` may
+describe compatibility layout rather than actual CUDA runtime use.
 
-- Require a classification artifact before bulk header edits.
-- Keep NVIDIA notices in upstream-retained and derivative files.
-- Add project attribution for modified derivative files.
-- Use project attribution only for independent files.
-- Add tests before or alongside bulk edits so future additions do not regress.
-- Document the limitations: not legal advice, not complete dependency audit,
-  not history rewrite.
+Prevention: make static hint classification context-aware and back it with
+fixtures.
+
+### Low-Precision Claim Leakage
+
+Moving Quant references to ready can be mistaken for CDNA4 or full
+low-precision hardware validation.
+
+Prevention: keep readiness, semantic compatibility, hardware evidence, and
+performance authority as separate fields and docs.
+
+### Real Runtime Dependencies
+
+Some Quant paths may still contain true CUDA-only code or NVIDIA DSL
+dependencies.
+
+Prevention: keep precise `rocm_port_needed` blockers with source evidence and
+next actions.
+
+## FlashInfer Pitfalls
+
+### Category-Only Overblocking
+
+Blocking every FlashInfer-Bench problem hides simple PyTorch-compatible cases.
+
+Prevention: classify by semantic dependency, not by category alone.
+
+### Unsafe Semantic Approximation
+
+Paged/ragged decode and prefill workloads depend on layout and runtime
+semantics that a simple PyTorch rewrite may not preserve.
+
+Prevention: only release those blockers after compatibility helpers encode page
+tables, offsets, masks, KV layout, and dtype assumptions.
+
+### Performance Scope Creep
+
+Readiness closure can drift into high-performance FlashInfer kernel tuning.
+
+Prevention: limit v1.34 to correctness/readiness and claim-safe execution
+closure; defer performance tuning.
+
+## Reporting Pitfalls
+
+### Readiness Reduction as Validation Claim
+
+Moving a problem out of `readiness_blocked` means it can be attempted, not that
+it passed.
+
+Prevention: coverage reports must show transitions into pass, fallback,
+runtime/OOM/correctness/profiler blockers, or residual deferrals.
+
+### Denominator Drift
+
+Resolving readiness blockers must not change the 235-problem denominator.
+
+Prevention: tests should assert denominator stability and before/after blocker
+accounting.
+
