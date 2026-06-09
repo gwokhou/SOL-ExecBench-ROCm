@@ -50,7 +50,7 @@ def _workload(uuid: str, m: int = 2) -> dict:
     }
 
 
-def _trace(uuid: str, status: str = "PASSED") -> dict:
+def _trace(uuid: str, status: str = "PASSED", log: str | None = None) -> dict:
     return {
         "definition": "matmul_demo",
         "workload": _workload(uuid),
@@ -65,6 +65,7 @@ def _trace(uuid: str, status: str = "PASSED") -> dict:
                 "reference_latency_ms": 2.0,
                 "speedup_factor": 2.0,
             },
+            **({"log": log} if log is not None else {}),
         },
     }
 
@@ -201,6 +202,26 @@ def test_skipped_problem_summary_records_cdna3_low_precision_reason():
             "cdna3_low_precision_hardware_unsupported: gfx942 unsupported"
         ],
     }
+
+
+def test_inspect_traces_preserves_custom_input_failure_class():
+    summary = run_dataset.inspect_traces(
+        [
+            _trace(
+                "bad-custom",
+                status="RUNTIME_ERROR",
+                log=(
+                    "gen_inputs_schema_mismatch: custom_inputs_entrypoint "
+                    "returned wrong shape"
+                ),
+            )
+        ],
+        "L1/custom_inputs_problem",
+    )
+
+    assert summary["failed"] == 1
+    assert "gen_inputs_schema_mismatch" in summary["failure_reasons"][0]
+    assert "readiness_blocked" not in summary["failure_reasons"][0]
 
 
 def test_effective_gpu_architecture_uses_environment_fallback(monkeypatch):

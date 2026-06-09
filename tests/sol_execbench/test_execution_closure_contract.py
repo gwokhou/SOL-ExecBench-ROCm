@@ -137,6 +137,7 @@ def test_totals_count_required_execution_closure_statuses():
         "attempted_failed": 1,
         "attempted_passed": 1,
         "derived_evidence_missing": 1,
+        "excluded_long_tail": 0,
         "failed": 2,
         "filtered": 1,
         "missing_trace": 1,
@@ -156,6 +157,7 @@ def test_status_and_reason_vocabularies_are_phase_83_contracts():
         "skipped_existing_pass",
         "missing_trace",
         "derived_evidence_missing",
+        "excluded_long_tail",
     }
     assert {reason.value for reason in ExecutionClosureReasonCode} == {
         "filtered",
