@@ -15,19 +15,19 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
 ## Current State
 
-**Shipped version:** v1.32 RDNA4 Profiler Timing Coverage Closure,
-closed 2026-06-08.
+**Shipped version:** v1.33 RDNA4 Benchmark-Grade Evidence Closure,
+closed 2026-06-09.
 
-**Current milestone:** v1.33 RDNA4 Benchmark-Grade Evidence Closure.
+**Current milestone:** v1.34 RDNA4 Readiness Blocker Closure.
 
 **Queued milestone:** None defined.
 
-**Latest milestone outcome:** v1.32 completed RDNA4 profiler timing coverage
-closure by accounting for the 235-problem denominator, adding workload-sharded
-profiler aggregation, classifying partial profiler failures, and promoting
-diagnosed current-device reference/gen_inputs OOMs into
-`reference_oom_blocked` coverage without counting them as profiler-backed
-timing.
+**Latest milestone outcome:** v1.33 completed RDNA4 benchmark-grade evidence
+closure by hardening denominator policy, memory/readiness classification,
+coverage recompute, profiler timing evidence, clock-lock evidence, release
+evidence packaging, and authority-gap closure while keeping incomplete
+profiler-backed coverage and benchmark-grade timing authority as explicit
+release boundaries.
 
 **Previous milestone outcome:** v1.30 completed bounded RDNA4 `gfx1200`
 validation closure by defining the ready-subset denominator, executing 121
@@ -37,9 +37,9 @@ clock/profiler blockers, generating AMD-derived score and SOL/SOLAR evidence
 bundles, isolating memory-heavy derived jobs, and closing public claim
 guardrails.
 
-**Next milestone goal:** Harden RDNA4 benchmark-grade evidence by finalizing
-the denominator policy, memory readiness classifier, coverage recompute,
-`rocprofv3` timing evidence, clock-lock evidence, and release evidence bundle.
+**Next milestone goal:** Reduce the 114 RDNA4 `readiness_blocked` problems by
+turning the three blocker classes into executable, claim-safe ROCm validation
+paths or explicit residual boundaries.
 
 The v1.0 milestone migrated the repository to a ROCm-only runtime baseline.
 Milestones v1.1-v1.6 added CDNA 3 code/schema support, maintained residue
@@ -155,39 +155,48 @@ SOL/SOLAR sidecar pairs after 56 temporary sidecar exclusions. RDNA4 timing
 remains non-authoritative until clock-lock/reset sudoers coverage and
 profiler-backed timing evidence are rerun.
 
-## Current Milestone: v1.33 RDNA4 Benchmark-Grade Evidence Closure
+## Current Milestone: v1.34 RDNA4 Readiness Blocker Closure
 
-**Goal:** Turn bounded RDNA4 `gfx1200` evidence into a benchmark-grade evidence
-chain where denominator policy, memory blockers, profiler timing, clock-lock
-authority, and release bundle claims are explicit and reproducible.
+**Goal:** Reduce the 114 RDNA4 `readiness_blocked` problems by turning the
+three blocker classes into executable, claim-safe ROCm validation paths or
+explicit residual boundaries.
 
 **Target features:**
-- RDNA4 `gfx1200` 16GB denominator policy hardening.
-- Memory/readiness classifier hardening for OOM, timeout, profiler, and
-  correctness/runtime blockers.
-- Recomputed RDNA4 coverage with claim-safe totals and blocker ledgers.
-- `rocprofv3` kernel activity timing closure for eligible included workloads.
-- Clock-lock/reset evidence for timing authority.
-- Release-grade RDNA4 evidence bundle and claim-upgrade review.
+- Custom-input evaluator support for the 55 L1/L2 `missing_evidence`
+  readiness-blocked problems.
+- Quant CUDA/NVIDIA hint triage and ROCm-safe low-precision reference
+  readiness for the 33 Quant readiness-blocked problems.
+- FlashInfer-Bench readiness split between simple PyTorch-compatible cases and
+  true FlashInfer runtime semantics for the 26 FlashInfer readiness-blocked
+  problems.
+- Recomputed RDNA4 coverage and blocker ledger showing exactly which readiness
+  blockers were resolved, moved to runtime/OOM/correctness blockers, or
+  explicitly deferred.
+- Claim guardrails preserving no paper-parity, leaderboard, CDNA3, or CDNA4
+  claim upgrades.
 
 **Key context:**
-- Phase 162 already accounts for 61 `profiler_backed`, 10
-  `reference_oom_blocked`, 4 `profiler_blocked`, 46 `timing_fallback`, and 114
-  `readiness_blocked` problems.
-- Known oversized workloads should not be blindly rerun as full-problem
-  profiler jobs; policy and classifier hardening come first.
-- Profiler-backed timing and benchmark-grade timing authority remain separate:
-  `rocprofv3` evidence still needs clock-lock/reset evidence for authoritative
-  timing claims.
+- Current RDNA4 coverage reports 62 `profiler_backed`, 42 `timing_fallback`,
+  15 `reference_oom_blocked`, 2 `profiler_blocked`, and 114
+  `readiness_blocked` problems over the 235-problem denominator.
+- The 114 readiness blockers split into 55 custom-input/missing-evidence
+  problems, 33 Quant CUDA/NVIDIA runtime-hint problems, and 26 FlashInfer
+  runtime-assumption problems.
+- Custom inputs must be generated through the benchmark-defined entrypoint;
+  random substitution would break benchmark semantics.
+- Quant and FlashInfer closure must distinguish true ROCm execution readiness
+  from naming/static-hint false positives, semantic compatibility, low-precision
+  hardware evidence, and true runtime dependencies.
 - Existing deferred boundaries remain: no B200/SOLAR upstream equivalence, no
-  leaderboard authority, no CDNA3/MI300X upgrade, and no CDNA4 claim.
+  leaderboard authority, no CDNA3 upgrade, and no CDNA4 claim.
 
 **Explicitly deferred:**
 - Claiming NVIDIA B200 equivalence, upstream SOLAR equivalence, hosted
   leaderboard authority, or paper-parity authority.
-- Upgrading CDNA3/MI300X or CDNA4 validation claims from RDNA4 evidence.
+- Upgrading CDNA3 or CDNA4 validation claims from RDNA4 evidence.
 - Redistributing NVIDIA/SOL-ExecBench original or derivative dataset content.
-- Treating temporarily excluded long-tail shards as passed validation.
+- Treating residual readiness, runtime, OOM, correctness, or profiler blockers
+  as passed validation.
 
 ## Latest Milestone: v1.29 Dataset Migration and Compliance
 
@@ -979,4 +988,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-07 after v1.30 milestone start*
+*Last updated: 2026-06-09 after v1.34 milestone start*
