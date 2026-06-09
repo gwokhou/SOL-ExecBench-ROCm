@@ -104,10 +104,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 | --- | --- | --- |
-| CUST-01 | Phase 170 | Pending |
-| CUST-02 | Phase 170 | Pending |
-| CUST-03 | Phase 170 | Pending |
-| CUST-04 | Phase 170 | Pending |
+| CUST-01 | Phase 170 | Complete |
+| CUST-02 | Phase 170 | Complete |
+| CUST-03 | Phase 170 | Complete |
+| CUST-04 | Phase 170 | Complete |
 | QUANT-01 | Phase 172 | Pending |
 | QUANT-02 | Phase 172 | Pending |
 | QUANT-03 | Phase 172 | Pending |
