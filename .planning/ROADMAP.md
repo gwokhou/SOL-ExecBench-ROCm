@@ -23,7 +23,7 @@
 
 ## Current Position
 
-**Status:** v1.34 in progress. Phase 170 complete. Phases 171-174 pending.
+**Status:** v1.34 in progress. Phases 170-171 complete. Phases 172-174 pending.
 
 ### Phase 170: Custom Input Evaluator Readiness
 
@@ -59,7 +59,7 @@ Plans:
 
 ### Phase 171: Custom Input Coverage Recompute
 
-**Status:** Pending
+**Status:** Complete (2026-06-09)
 
 **Goal:** Recompute RDNA4 readiness and coverage after custom input support,
 showing which of the 55 custom-input blockers moved to ready, pass/fail,
@@ -69,10 +69,10 @@ runtime/OOM, profiler, or residual readiness states.
 
 **Depends on:** Phase 170
 
-**Plans:** 1 plan
+**Plans:** 1 plan (1 complete)
 
 Plans:
-- [ ] 171-01 Custom input coverage recompute
+- [x] 171-01 Custom input coverage recompute
 
 **Deliverables:**
 - Before/after transition ledger for the 55 custom-input blockers.
@@ -90,7 +90,7 @@ Plans:
 
 ### Phase 172: Quant Readiness Triage
 
-**Status:** Pending
+**Status:** Planned
 
 **Goal:** Refine Quant readiness classification so the 33 Quant blockers
 distinguish true CUDA/NVIDIA dependencies from PyTorch ROCm-compatible semantic
