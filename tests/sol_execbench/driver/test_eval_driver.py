@@ -111,6 +111,7 @@ def _run_eval_driver(
     bench_config: Optional[dict] = None,
     extra_env: Optional[dict] = None,
     definition: Optional[dict] = None,
+    workload: Optional[dict] = None,
 ) -> list[dict]:
     """Write all staging files and run eval_driver.py in a subprocess.
 
@@ -132,6 +133,7 @@ def _run_eval_driver(
         bench_config=bench_config,
         extra_env=extra_env,
         definition=definition,
+        workload=workload,
     )
     return parse_eval_result(result.stdout, result.stderr)
 
@@ -142,13 +144,16 @@ def _run_eval_driver_process(
     bench_config: Optional[dict] = None,
     extra_env: Optional[dict] = None,
     definition: Optional[dict] = None,
+    workload: Optional[dict] = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run eval_driver.py and return the raw subprocess result."""
     (tmp_path / "eval_driver.py").write_text(build_driver())
     (tmp_path / "definition.json").write_text(
         json.dumps(definition if definition is not None else _MINIMAL_DEFINITION)
     )
-    (tmp_path / "workload.jsonl").write_text(json.dumps(_MINIMAL_WORKLOAD))
+    (tmp_path / "workload.jsonl").write_text(
+        json.dumps(workload if workload is not None else _MINIMAL_WORKLOAD)
+    )
     solution = {
         **_SOLUTION_SPEC,
         "sources": [{"path": "kernel.py", "content": kernel_code}],
@@ -214,6 +219,135 @@ def test_passing_solution(tmp_path):
     assert ev["status"] == "PASSED", (
         f"Expected PASSED, got {ev['status']}; log={ev.get('log')}"
     )
+
+
+def _custom_inputs_definition(generate_body: str) -> dict:
+    return {
+        "name": "test_custom_matmul",
+        "op_type": "matmul",
+        "axes": {
+            "m": {"type": "const", "value": 4},
+            "k": {"type": "const", "value": 3},
+            "n": {"type": "const", "value": 2},
+        },
+        "custom_inputs_entrypoint": "generate_inputs",
+        "inputs": {
+            "a": {"shape": ["m", "k"], "dtype": "float32"},
+            "b": {"shape": ["k", "n"], "dtype": "float32"},
+        },
+        "outputs": {"c": {"shape": ["m", "n"], "dtype": "float32"}},
+        "reference": (
+            "import torch\n"
+            f"{generate_body}\n\n"
+            "@torch.no_grad()\n"
+            "def run(a, b):\n"
+            "    return a @ b\n"
+        ),
+    }
+
+
+def _custom_inputs_workload() -> dict:
+    return {
+        "axes": {},
+        "inputs": {"a": {"type": "custom"}, "b": {"type": "custom"}},
+        "uuid": "custom-driver-0001",
+    }
+
+
+def test_custom_inputs_success_path_is_cpu_safe(tmp_path):
+    """The driver resolves and uses benchmark-defined custom inputs."""
+    definition = _custom_inputs_definition(
+        "def generate_inputs(axes, device):\n"
+        "    return {\n"
+        "        'a': torch.ones((axes['m'], axes['k']), device=device),\n"
+        "        'b': torch.ones((axes['k'], axes['n']), device=device),\n"
+        "    }\n"
+    )
+    kernel = "import torch\ndef run(a, b):\n    return a @ b\n"
+
+    traces = _run_eval_driver(
+        tmp_path,
+        kernel,
+        definition=definition,
+        workload=_custom_inputs_workload(),
+    )
+
+    assert len(traces) == 1
+    assert traces[0]["evaluation"]["status"] == "PASSED"
+
+
+def test_custom_inputs_schema_mismatch_preempts_reference_run(tmp_path):
+    """Bad generated tensors are classified before reference run()."""
+    definition = _custom_inputs_definition(
+        "def generate_inputs(axes, device):\n"
+        "    return {\n"
+        "        'a': torch.ones((axes['m'], axes['k'] + 1), device=device),\n"
+        "        'b': torch.ones((axes['k'], axes['n']), device=device),\n"
+        "    }\n"
+    )
+    kernel = "import torch\ndef run(a, b):\n    return a @ b\n"
+
+    traces = _run_eval_driver(
+        tmp_path,
+        kernel,
+        definition=definition,
+        workload=_custom_inputs_workload(),
+    )
+
+    ev = traces[0]["evaluation"]
+    assert ev["status"] == "RUNTIME_ERROR"
+    assert "gen_inputs_schema_mismatch" in ev.get("log", "")
+    assert "Reference run() failed" not in ev.get("log", "")
+    assert "seed=" in ev.get("log", "")
+    assert "generated_keys=['a', 'b']" in ev.get("log", "")
+
+
+def test_custom_inputs_device_mismatch_preempts_reference_run(tmp_path):
+    """Wrong-device generated tensors are classified before reference run()."""
+    if torch.cuda.is_available():
+        pytest.skip("CPU mismatch path only applies when CUDA/HIP is unavailable")
+    definition = _custom_inputs_definition(
+        "def generate_inputs(axes, device):\n"
+        "    return {\n"
+        "        'a': torch.ones((axes['m'], axes['k']), device='meta'),\n"
+        "        'b': torch.ones((axes['k'], axes['n']), device=device),\n"
+        "    }\n"
+    )
+    kernel = "import torch\ndef run(a, b):\n    return a @ b\n"
+
+    traces = _run_eval_driver(
+        tmp_path,
+        kernel,
+        definition=definition,
+        workload=_custom_inputs_workload(),
+    )
+
+    ev = traces[0]["evaluation"]
+    assert ev["status"] == "RUNTIME_ERROR"
+    assert "gen_inputs_device_mismatch" in ev.get("log", "")
+    assert "Reference run() failed" not in ev.get("log", "")
+
+
+def test_custom_inputs_non_oom_generation_error_class(tmp_path):
+    """Non-OOM generation failures stay separate from reference failures."""
+    definition = _custom_inputs_definition(
+        "def generate_inputs(axes, device):\n"
+        "    raise RuntimeError('synthetic generation failure')\n"
+    )
+    kernel = "import torch\ndef run(a, b):\n    return a @ b\n"
+
+    traces = _run_eval_driver(
+        tmp_path,
+        kernel,
+        definition=definition,
+        workload=_custom_inputs_workload(),
+    )
+
+    ev = traces[0]["evaluation"]
+    assert ev["status"] == "RUNTIME_ERROR"
+    assert "gen_inputs_error" in ev.get("log", "")
+    assert "synthetic generation failure" in ev.get("log", "")
+    assert "Reference run() failed" not in ev.get("log", "")
 
 
 def test_reference_outputs_aliasing_inputs_are_stabilized(tmp_path):
