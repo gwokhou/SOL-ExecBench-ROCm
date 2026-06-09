@@ -2,15 +2,17 @@
 # Testing
 
 Pytest is the project test framework. `pyproject.toml` configures
-`pytest-xdist` with `-n auto --dist loadgroup`, so full-suite runs execute in
+`pytest-xdist` with `-n 8 --dist loadgroup`, so full-suite runs execute in
 parallel by default.
 
 ## Test Framework and Setup
 
 The development dependency group declares `pytest>=9.0.2`
 and `pytest-xdist>=3.5` for parallel execution. `pyproject.toml`
-sets the default pytest options to `-n auto --dist loadgroup`, so tests run
-across available workers unless a command overrides xdist with `-n 0`.
+sets the default pytest options to `-n 8 --dist loadgroup` (capped at 8
+workers to stay within memory budget since each worker loads
+PyTorch+ROCm), so tests run across 8 workers unless a command overrides
+xdist with `-n 0`.
 
 Install development dependencies:
 

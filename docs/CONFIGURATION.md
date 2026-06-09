@@ -31,6 +31,7 @@ below are optional runtime, Docker, diagnostic, or build inputs discovered in
 | `PYTORCH_ALLOC_CONF` | Optional | `expandable_segments:True` in compile/eval subprocesses | Set by the CLI subprocess launcher for staged PyTorch ROCm compilation and evaluation. |
 | `PYTORCH_ROCM_ARCH` | Optional | Derived from solution `target_hardware` when unset | Overrides the ROCm architecture list used by PyTorch extension builds. |
 | `SOL_EXECBENCH_ALLOW_CPU_TIMING` | Optional | Unset | Test/debug escape hatch that lets evaluator timing proceed on CPU tensors when set to `1`; not a GPU validation setting. |
+| `SOL_EXECBENCH_GRACEFUL_EXIT` | Optional | Unset | When set to `1`, the eval driver uses `sys.exit(0)` instead of `os._exit(0)` at process end. Automatically injected by the profiler adapter during profiled evaluations. |
 | `SOLEXECBENCH_ENV_SNAPSHOT` | Optional | Unset | Set to `1` to write an environment snapshot sidecar next to `--output`. |
 | `SOLEXECBENCH_ENV_SNAPSHOT_PATH` | Optional | Unset | Explicit environment snapshot sidecar output path. |
 | `HIP_VISIBLE_DEVICES` | Optional | Unset | Device visibility filter recorded in environment and runtime evidence. |
