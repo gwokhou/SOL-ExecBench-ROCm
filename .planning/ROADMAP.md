@@ -2,8 +2,9 @@
 
 ## Milestones
 
-- Complete **v1.33 RDNA4 Benchmark-Grade Evidence Closure** - Phases 163-168
-  (completed 2026-06-09 with timing authority still blocked).
+- Complete **v1.33 RDNA4 Benchmark-Grade Evidence Closure** - Phases 163-169
+  (Phase 169 closes audit traceability, Nyquist validation, profiler coverage,
+  and timing authority gaps as explicit release boundaries).
   See `.planning/milestones/v1.33-ROADMAP.md`.
 - Complete **v1.32 RDNA4 Profiler Timing Coverage Closure** - Phases 148-162
   (closed 2026-06-08 with Phase 149 full replacement still blocked). See
@@ -26,7 +27,7 @@
 
 ## Current Position
 
-**Status:** v1.33 complete. Phases 163-168 complete.
+**Status:** v1.33 complete. Phases 163-169 complete.
 
 ### Phase 163: RDNA4 Denominator Policy Hardening
 
@@ -175,6 +176,33 @@ Plans:
 - Public documentation updates that cite the bundle without upgrading CDNA3,
   CDNA4, upstream SOLAR, paper-parity, or leaderboard claims.
 
+### Phase 169: RDNA4 Audit Closure and Authority Gap Finalization
+
+**Status:** Complete
+
+**Goal:** Close the v1.33 audit gaps by adding strict requirements
+traceability, retroactive Nyquist validation, and explicit release-boundary
+closure for incomplete profiler-backed timing coverage and non-authoritative
+timing.
+
+**Requirements:** RDNA4-BGE-13, RDNA4-BGE-14, RDNA4-BGE-15, RDNA4-BGE-16
+
+**Depends on:** Phase 168
+
+**Plans:** 1 plan
+
+Plans:
+- [x] 169-01 RDNA4 audit closure and authority gap finalization
+
+**Deliverables:**
+- `v1.33-REQUIREMENTS.md` traceability table mapping RDNA4-BGE-01 through
+  RDNA4-BGE-16 to phases, status, and evidence.
+- Retroactive `*-VALIDATION.md` files for Phase 163-168.
+- `RDNA4-AUTHORITY-GAP-CLOSURE.md` classifying full profiler coverage and
+  benchmark-grade timing authority as closed release blockers/deferred
+  boundaries, not achieved evidence.
+- Updated milestone audit showing the closure phase resolves the audit gaps.
+
 ## Requirements
 
 ### RDNA4-BGE-01: Denominator Policy Document
@@ -242,6 +270,29 @@ review.
 The final bundle must include a claim review that states which RDNA4 claims are
 supported and preserves deferred boundaries for CDNA3/MI300X, CDNA4, paper
 parity, upstream SOLAR equivalence, and leaderboard authority.
+
+### RDNA4-BGE-13: Requirements Traceability Closure
+
+The milestone must include a requirements traceability table that maps every
+RDNA4-BGE requirement to phase, status, and concrete evidence.
+
+### RDNA4-BGE-14: Nyquist Validation Closure
+
+Every v1.33 phase must have a validation artifact or explicit retroactive
+validation record so the milestone audit can distinguish unvalidated work from
+validated release boundaries.
+
+### RDNA4-BGE-15: Profiler Coverage Gap Closure
+
+The release must close the incomplete full profiler-backed timing coverage gap
+as an explicit blocker/deferred boundary. It must not claim 235/235
+profiler-backed timing coverage while accepted evidence remains 61/235.
+
+### RDNA4-BGE-16: Timing Authority Gap Closure
+
+The release must close the benchmark-grade timing authority gap as an explicit
+blocker/deferred boundary. It must not claim authoritative timing while stable
+benchmark-window clock-lock evidence is absent.
 
 ## Active Guardrails
 

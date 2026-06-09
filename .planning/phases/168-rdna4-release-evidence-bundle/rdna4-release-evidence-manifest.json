@@ -64,6 +64,20 @@
     "authoritative_timing_supported": false,
     "reason": "Phase 167 set/reset commands succeeded, but observed SCLK/MCLK did not prove stable maximum-frequency lock under idle low-power state."
   },
+  "closed_release_blockers": {
+    "full_profiler_backed_timing_coverage": {
+      "status": "closed_as_deferred_blocker",
+      "achieved": false,
+      "accepted_evidence": "61/235 profiler-backed problems",
+      "closure_ref": "docs/internal/RDNA4-AUTHORITY-GAP-CLOSURE.md"
+    },
+    "benchmark_grade_timing_authority": {
+      "status": "closed_as_deferred_blocker",
+      "achieved": false,
+      "accepted_evidence": "clock-control and reset exercised; stable benchmark-window max clock lock not proven",
+      "closure_ref": "docs/internal/RDNA4-AUTHORITY-GAP-CLOSURE.md"
+    }
+  },
   "artifacts": [
     {
       "role": "accepted coverage summary",
@@ -113,7 +127,17 @@
     {
       "role": "public claim boundaries",
       "path": "docs/CLAIMS.md",
-      "sha256": "6936be95d1c8bb2da93929daf4b03896b6c20abe44b4255bf550503249fdf4e2"
+      "sha256": "a3f14375fc40fcd18a7ec070810f13b781be98db96e51ce78c1694add524b7cd"
+    },
+    {
+      "role": "authority gap closure",
+      "path": "docs/internal/RDNA4-AUTHORITY-GAP-CLOSURE.md",
+      "sha256": "f84f0450b25ee26eb112b9a8aa35b82ad1e2f1cdf2cb8d5e0aa144204fac697b"
+    },
+    {
+      "role": "v1.33 requirements traceability",
+      "path": ".planning/milestones/v1.33-REQUIREMENTS.md",
+      "sha256": "cc1287c982c38535d1ff5daf15d699c2999cf764967ae8ae324a1c6ec3fa6575"
     }
   ],
   "supported_claims": [
