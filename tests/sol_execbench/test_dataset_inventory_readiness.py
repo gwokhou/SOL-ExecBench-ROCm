@@ -298,7 +298,9 @@ def test_readiness_blocks_missing_custom_entrypoint_and_missing_safetensors(tmp_
 
 
 def test_readiness_marks_quant_and_low_precision_as_needing_hardware_evidence(tmp_path):
-    _write_problem(tmp_path, "Quant", "quant_problem")
+    _write_problem(
+        tmp_path, "Quant", "quant_problem", definition=_definition(dtype="float32")
+    )
     _write_problem(
         tmp_path,
         "L1",
@@ -314,17 +316,264 @@ def test_readiness_marks_quant_and_low_precision_as_needing_hardware_evidence(tm
     )
 
     statuses = {record.problem_id: record.status for record in readiness.workloads}
-    assert statuses["Quant/quant_problem"] == "needs_hardware_evidence"
+    assert statuses["Quant/quant_problem"] == "ready"
     assert statuses["L1/fp8_problem"] == "needs_hardware_evidence"
     classes = {
         record.problem_id: record.readiness_class for record in readiness.workloads
     }
-    assert classes["Quant/quant_problem"] == "nvfp4_blackwell_specific"
+    assert classes["Quant/quant_problem"] == "pytorch_compatible"
     assert classes["L1/fp8_problem"] == "blocked_missing_evidence"
-    assert all(
-        record.layered_evidence.hardware_validation == "needed"
+    quant_record = next(
+        record
         for record in readiness.workloads
+        if record.problem_id == "Quant/quant_problem"
     )
+    fp8_record = next(
+        record
+        for record in readiness.workloads
+        if record.problem_id == "L1/fp8_problem"
+    )
+    assert quant_record.layered_evidence.hardware_validation == "not_required"
+    assert fp8_record.layered_evidence.hardware_validation == "needed"
+    assert any(
+        reason.code == "quant_rocm_compatible_reference"
+        for reason in quant_record.reasons
+    )
+    assert fp8_record.reasons[0].code == "low_precision_requires_hardware_evidence"
+
+
+def test_quant_standard_dtype_without_cuda_hints_is_ready(tmp_path):
+    _write_problem(
+        tmp_path,
+        "Quant",
+        "clean_quant_standard",
+        definition=_definition(
+            name="clean_quant_standard",
+            reference="def run(x):\n    return x\n",
+            dtype="float32",
+        ),
+    )
+    inventory = build_dataset_inventory(
+        tmp_path, categories=("Quant",), created_at="2026-05-23T00:00:00Z"
+    )
+
+    readiness = classify_rocm_readiness(
+        inventory, dataset_root=tmp_path, created_at="2026-05-23T00:00:00Z"
+    )
+
+    record = readiness.workloads[0]
+    assert record.status == "ready"
+    assert record.readiness_class == "pytorch_compatible"
+    assert record.reasons[0].code == "quant_rocm_compatible_reference"
+    assert readiness.claim_boundary.hardware_validation is False
+
+
+def test_quant_with_false_positive_cublas_class_name_is_ready(tmp_path):
+    _write_problem(
+        tmp_path,
+        "Quant",
+        "class_fp_problem",
+        definition=_definition(
+            name="class_fp_problem",
+            reference=(
+                "class CuBLASRefBlockwiseGemm:\n"
+                "    def forward(self, x):\n"
+                "        return x\n"
+                "\n"
+                "\ndef run(x):\n"
+                "    return x\n"
+            ),
+            dtype="float16",
+        ),
+    )
+    inventory = build_dataset_inventory(
+        tmp_path, categories=("Quant",), created_at="2026-05-23T00:00:00Z"
+    )
+
+    readiness = classify_rocm_readiness(
+        inventory, dataset_root=tmp_path, created_at="2026-05-23T00:00:00Z"
+    )
+    record = readiness.workloads[0]
+
+    assert record.status == "ready"
+    assert record.readiness_class == "pytorch_compatible"
+    assert record.reasons[0].code == "quant_rocm_compatible_reference"
+    assert "nvidia_cuda_runtime_hint" not in {reason.code for reason in record.reasons}
+
+    problem = inventory.problems[0]
+    assert problem.definition is not None
+    assert problem.definition.reference_runtime_hints == []
+    assert problem.definition.reference_runtime_false_positive_evidence, (
+        "expected false-positive evidence"
+    )
+    assert any(
+        evidence["token"] == "cublas" and evidence["match_kind"] == "class_name"
+        for evidence in problem.definition.reference_runtime_false_positive_evidence
+    )
+    assert any(
+        reason.code == "quant_cuda_false_positive_cleared" for reason in record.reasons
+    )
+
+
+def test_quant_with_true_cupy_import_remains_blocked(tmp_path):
+    _write_problem(
+        tmp_path,
+        "Quant",
+        "cupy_quant_problem",
+        definition=_definition(
+            name="cupy_quant_problem",
+            reference="import cupy\n\ndef run(x):\n    return cupy.asarray(x)\n",
+            dtype="float16",
+        ),
+    )
+    inventory = build_dataset_inventory(
+        tmp_path, categories=("Quant",), created_at="2026-05-23T00:00:00Z"
+    )
+
+    readiness = classify_rocm_readiness(
+        inventory, dataset_root=tmp_path, created_at="2026-05-23T00:00:00Z"
+    )
+
+    assert inventory.problems[0].definition is not None
+    assert inventory.problems[0].definition.reference_runtime_hints == ["cupy"]
+    assert readiness.workloads[0].status == "unsupported_nvidia_only_path"
+    assert readiness.workloads[0].readiness_class == "rocm_port_needed"
+    assert readiness.workloads[0].reasons[0].code == "nvidia_cuda_runtime_hint"
+
+
+def test_quant_fp8_dtype_without_cuda_hints_needs_hardware_evidence(tmp_path):
+    _write_problem(
+        tmp_path,
+        "Quant",
+        "fp8_quant_problem",
+        definition=_definition(name="fp8_quant_problem", dtype="float8_e4m3fn"),
+    )
+    inventory = build_dataset_inventory(
+        tmp_path, categories=("Quant",), created_at="2026-05-23T00:00:00Z"
+    )
+
+    readiness = classify_rocm_readiness(
+        inventory, dataset_root=tmp_path, created_at="2026-05-23T00:00:00Z"
+    )
+
+    record = readiness.workloads[0]
+    assert record.status == "needs_hardware_evidence"
+    assert record.readiness_class == "blocked_missing_evidence"
+    assert record.reasons[0].code == "low_precision_requires_hardware_evidence"
+    assert record.layered_evidence.hardware_validation == "needed"
+
+
+def test_quant_blackwell_nvfp4_needs_cdna4_evidence(tmp_path):
+    _write_problem(
+        tmp_path,
+        "Quant",
+        "blackwell_nvfp4_quant",
+        definition=_definition(name="blackwell_nvfp4_quant", dtype="float4_e2m1fn_x2"),
+    )
+    inventory = build_dataset_inventory(
+        tmp_path, categories=("Quant",), created_at="2026-05-23T00:00:00Z"
+    )
+
+    readiness = classify_rocm_readiness(
+        inventory, dataset_root=tmp_path, created_at="2026-05-23T00:00:00Z"
+    )
+
+    record = readiness.workloads[0]
+    assert record.status == "needs_hardware_evidence"
+    assert record.readiness_class == "nvfp4_blackwell_specific"
+    assert record.reasons[0].code == "phase134_low_precision_cpu_semantics"
+    assert record.reasons[1].code == "cdna4_low_precision_hardware_validation_deferred"
+    assert (
+        readiness.claim_boundary.hardware_validation is False
+        and readiness.claim_boundary.score_authority is False
+    )
+
+
+def test_quant_false_positive_cleared_preserves_evidence_record(tmp_path):
+    _write_problem(
+        tmp_path,
+        "Quant",
+        "var_token_problem",
+        definition=_definition(
+            name="var_token_problem",
+            reference="scale_w_cublas = 0.5\ndef run(x):\n    return x\n",
+            dtype="float16",
+        ),
+    )
+    inventory = build_dataset_inventory(
+        tmp_path, categories=("Quant",), created_at="2026-05-23T00:00:00Z"
+    )
+
+    readiness = classify_rocm_readiness(
+        inventory, dataset_root=tmp_path, created_at="2026-05-23T00:00:00Z"
+    )
+
+    record = readiness.workloads[0]
+    assert record.status == "ready"
+    assert record.readiness_class == "pytorch_compatible"
+    assert any(
+        reason.code == "quant_cuda_false_positive_cleared" for reason in record.reasons
+    )
+    problem = inventory.problems[0]
+    assert problem.definition is not None
+    assert any(
+        evidence["token"] == "cublas"
+        for evidence in problem.definition.reference_runtime_false_positive_evidence
+    )
+
+
+def test_quant_readiness_does_not_imply_hardware_authority(tmp_path):
+    _write_problem(
+        tmp_path,
+        "Quant",
+        "clean_quant_ready",
+        definition=_definition(name="clean_quant_ready", dtype="float16"),
+    )
+    _write_problem(
+        tmp_path,
+        "Quant",
+        "clean_class_quant_ready",
+        definition=_definition(
+            name="clean_class_quant_ready",
+            reference=(
+                "class CuBLASRefBlockwiseGemm:\n"
+                "    def __init__(self):\n"
+                "        self.x = 0\n"
+                "    def forward(self, x):\n"
+                "        return x\n"
+                "\n"
+                "\ndef run(x):\n"
+                "    return x\n"
+            ),
+            dtype="float32",
+        ),
+    )
+    _write_problem(
+        tmp_path,
+        "Quant",
+        "clean_var_quant_ready",
+        definition=_definition(
+            name="clean_var_quant_ready",
+            reference="scale_w_cublas = 1.0\ndef run(x):\n    return x\n",
+            dtype="float32",
+        ),
+    )
+    inventory = build_dataset_inventory(
+        tmp_path, categories=("Quant",), created_at="2026-05-23T00:00:00Z"
+    )
+    readiness = classify_rocm_readiness(
+        inventory, dataset_root=tmp_path, created_at="2026-05-23T00:00:00Z"
+    )
+
+    quant_readies = [
+        record for record in readiness.workloads if record.status == "ready"
+    ]
+    assert len(quant_readies) == 3
+    assert all(
+        record.readiness_class == "pytorch_compatible" for record in quant_readies
+    )
+    assert readiness.claim_boundary.hardware_validation is False
+    assert readiness.claim_boundary.score_authority is False
 
 
 def test_readiness_blocks_schema_failure_and_is_deterministic(tmp_path):
@@ -458,8 +707,115 @@ def test_readiness_classifies_flashinfer_migration_output(tmp_path):
 
     record = readiness.workloads[0]
     assert record.readiness_class == "flashinfer_specific"
-    assert record.reasons[0].code == "flashinfer_runtime_assumption"
-    assert readiness.blocker_reports[0].blocker_type == "flashinfer_runtime_assumption"
+    assert record.reasons[0].code == "flashinfer_runtime_unknown"
+    assert readiness.blocker_reports[0].blocker_type == "flashinfer_runtime_dependency"
+
+
+FLASHINFER_SIMPLE_NAMES = (
+    "001_fused_add_rmsnorm_h2048",
+    "002_fused_add_rmsnorm_h4096",
+    "003_fused_add_rmsnorm_h7168",
+    "004_gemm_n128_k2048",
+    "005_gemm_n256_k7168",
+    "006_gemm_n2048_k4096",
+    "007_gemm_n4096_k4096",
+    "008_gemm_n4096_k14336",
+    "009_gemm_n5120_k2048",
+    "010_gemm_n6144_k4096",
+    "011_gemm_n28672_k4096",
+    "021_rmsnorm_h128",
+    "022_rmsnorm_h512",
+    "023_rmsnorm_h1536",
+    "024_rmsnorm_h2048",
+    "025_rmsnorm_h4096",
+    "026_rmsnorm_h7168",
+)
+FLASHINFER_RUNTIME_NAMES = {
+    "012_gqa_paged_decode_h32_kv4_d128_ps1": "flashinfer_runtime_paged_decode",
+    "013_gqa_paged_decode_h32_kv8_d128_ps1": "flashinfer_runtime_paged_decode",
+    "014_gqa_paged_prefill_causal_h32_kv4_d128_ps1": "flashinfer_runtime_paged_prefill",
+    "015_gqa_paged_prefill_causal_h32_kv8_d128_ps1": "flashinfer_runtime_paged_prefill",
+    "016_gqa_ragged_prefill_causal_h32_kv4_d128": "flashinfer_runtime_ragged_prefill",
+    "017_gqa_ragged_prefill_causal_h32_kv8_d128": "flashinfer_runtime_ragged_prefill",
+    "018_mla_paged_decode_h16_ckv512_kpe64_ps1": "flashinfer_runtime_mla_paged",
+    "019_mla_paged_prefill_causal_h16_ckv512_kpe64_ps1": "flashinfer_runtime_mla_paged",
+    "020_moe_fp8_block_scale_ds_routing_topk8_ng8_kg4_e32_h7168_i2048": "flashinfer_runtime_moe_fp8_block_scale",
+}
+
+
+def test_readiness_classifies_flashinfer_semantic_buckets(tmp_path):
+    for name in FLASHINFER_SIMPLE_NAMES + tuple(FLASHINFER_RUNTIME_NAMES):
+        _write_problem(
+            tmp_path,
+            "FlashInfer-Bench",
+            name,
+            definition=_definition(name=name),
+        )
+
+    inventory = build_dataset_inventory(
+        tmp_path,
+        categories=("FlashInfer-Bench",),
+        created_at="2026-05-23T00:00:00Z",
+    )
+    readiness = classify_rocm_readiness(
+        inventory,
+        dataset_root=tmp_path,
+        created_at="2026-05-23T00:00:00Z",
+    )
+
+    records = {record.problem_id: record for record in readiness.workloads}
+    for name in FLASHINFER_SIMPLE_NAMES:
+        record = records[f"FlashInfer-Bench/{name}"]
+        assert record.status == "ready"
+        assert record.readiness_class == "pytorch_compatible"
+        assert (
+            record.reasons
+            and record.reasons[0].code == "flashinfer_pytorch_compatible_reference"
+        )
+
+    for name, expected_code in FLASHINFER_RUNTIME_NAMES.items():
+        record = records[f"FlashInfer-Bench/{name}"]
+        assert record.status == "runtime_blocked"
+        assert record.readiness_class == "flashinfer_specific"
+        assert record.reasons and record.reasons[0].code == expected_code
+        blocker_codes = {blocker.code for blocker in record.blocker_reports}
+        assert expected_code in blocker_codes
+        assert all(
+            blocker.blocker_type == "flashinfer_runtime_dependency"
+            for blocker in record.blocker_reports
+        )
+
+
+def test_readiness_classifies_unknown_flashinfer_runtime_dependency(tmp_path):
+    problem_dir = _write_problem(
+        tmp_path,
+        "FlashInfer-Bench",
+        "999_unknown_flashinfer_runtime",
+        definition=_definition(name="999_unknown_flashinfer_runtime"),
+    )
+    (problem_dir / "reference.py").write_text(
+        "import flashinfer\n\n\ndef run(x):\n    return x\n",
+        encoding="utf-8",
+    )
+
+    inventory = build_dataset_inventory(
+        tmp_path,
+        categories=("FlashInfer-Bench",),
+        created_at="2026-05-23T00:00:00Z",
+    )
+    readiness = classify_rocm_readiness(
+        inventory,
+        dataset_root=tmp_path,
+        created_at="2026-05-23T00:00:00Z",
+    )
+
+    record = readiness.workloads[0]
+    assert record.status == "runtime_blocked"
+    assert record.readiness_class == "flashinfer_specific"
+    assert record.reasons and record.reasons[0].code == "flashinfer_runtime_unknown"
+    assert readiness.blocker_reports
+    assert readiness.blocker_reports[0].code == "flashinfer_runtime_unknown"
+    assert readiness.blocker_reports[0].blocker_type == "flashinfer_runtime_dependency"
 
 
 def test_readiness_classifies_blackwell_low_precision_dependency(tmp_path):

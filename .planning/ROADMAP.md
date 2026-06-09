@@ -23,7 +23,7 @@
 
 ## Current Position
 
-**Status:** v1.34 in progress. Phases 170-171 complete. Phases 172-174 pending.
+**Status:** v1.34 in progress. Phases 170-174 complete.
 
 ### Phase 170: Custom Input Evaluator Readiness
 
@@ -36,7 +36,7 @@ the 55 L1/L2 custom-input readiness blockers can be attempted safely on ROCm.
 
 **Depends on:** Phase 169
 
-**Plans:** 1 plan (1 complete)
+**Plans:** 1/1 plans complete
 
 Plans:
 - [x] 170-01 Custom input evaluator readiness
@@ -90,7 +90,7 @@ Plans:
 
 ### Phase 172: Quant Readiness Triage
 
-**Status:** Planned
+**Status:** Complete (2026-06-09)
 
 **Goal:** Refine Quant readiness classification so the 33 Quant blockers
 distinguish true CUDA/NVIDIA dependencies from PyTorch ROCm-compatible semantic
@@ -100,10 +100,10 @@ references and preserve low-precision hardware-evidence boundaries.
 
 **Depends on:** Phase 171
 
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
-- [ ] 172-01 Quant readiness triage
+- [x] 172-01 Quant readiness triage
 
 **Deliverables:**
 - Context-aware CUDA/NVIDIA hint detection for Quant references.
@@ -122,7 +122,7 @@ Plans:
 
 ### Phase 173: FlashInfer Readiness Split
 
-**Status:** Pending
+**Status:** Complete (2026-06-09)
 
 **Goal:** Split the 26 FlashInfer-Bench readiness blockers by semantic
 dependency so simple PyTorch-compatible workloads can be attempted while true
@@ -132,10 +132,10 @@ FlashInfer runtime workloads retain precise residual blockers.
 
 **Depends on:** Phase 172
 
-**Plans:** 1 plan
+**Plans:** 1 plan complete
 
 Plans:
-- [ ] 173-01 FlashInfer readiness split
+- [x] 173-01 FlashInfer readiness split
 
 **Deliverables:**
 - FlashInfer-Bench semantic taxonomy for simple PyTorch-compatible, paged,
@@ -152,7 +152,7 @@ Plans:
 
 ### Phase 174: RDNA4 Readiness Closure Report and Claim Guardrails
 
-**Status:** Pending
+**Status:** Complete (2026-06-09)
 
 **Goal:** Finalize v1.34 by recomputing RDNA4 coverage across all 114 original
 readiness blockers, publishing blocker transition evidence, and preserving
@@ -162,10 +162,10 @@ claim-safe public/internal wording.
 
 **Depends on:** Phase 173
 
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
-- [ ] 174-01 RDNA4 readiness closure report and claim guardrails
+- [x] 174-01 RDNA4 readiness closure report and claim guardrails
 
 **Deliverables:**
 - Final v1.34 RDNA4 coverage report and blocker ledger for all 114 original
@@ -187,4 +187,3 @@ Plans:
 
 See `.planning/REQUIREMENTS.md` for the active v1.34 requirements and
 traceability table.
-

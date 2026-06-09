@@ -1,5 +1,19 @@
 # Milestones
 
+## v1.34 RDNA4 Readiness Blocker Closure (Shipped: 2026-06-09)
+
+**Phases completed:** 5 phases, 5 plans, 10 tasks
+
+**Key accomplishments:**
+
+- Deterministic custom input generation with schema validation, five failure-class diagnostics, and precise readiness reclassification for benchmark-defined custom inputs
+- Transition ledger confirming all 55 custom-input blockers promoted to ready, updated coverage showing readiness_blocked reduced from 114 to 59, and 235-problem denominator stable
+- Quant readiness triage distinguishing real CUDA/NVIDIA runtime dependencies from lexical false positives
+- FlashInfer semantic readiness split into PyTorch-compatible and runtime-dependent buckets
+- Final readiness closure report with claim guardrails preserving all existing authority boundaries
+
+---
+
 ## v1.31 RDNA4 Follow-Up Evidence Hardening (Shipped: 2026-06-08)
 
 **Phases completed:** 6 phases, 6 plans, 0 tasks
@@ -34,8 +48,10 @@
 
 - Full RDNA4 paper-denominator validation and any claim upgrade beyond the
   bounded v1.30/v1.31 `gfx1200` ready-subset evidence.
+
 - Authoritative profiler-backed RDNA4 timing until native HIP, ROCm library, or
   Triton source timing sidecars can be collected and validated.
+
 - Remaining memory-heavy RDNA4 workload failures that exceed the current 16 GiB
   validation GPU, unless memory efficiency work or larger-VRAM reruns change
   the boundary.

@@ -4,7 +4,9 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
+import re
 from collections import Counter
 from pathlib import Path
 
@@ -75,6 +77,7 @@ class ProblemDefinitionInventory(BaseModel):
     output_shapes: dict[str, list[str] | None] = Field(default_factory=dict)
     custom_inputs_entrypoint: str | None = None
     reference_runtime_hints: list[str] = Field(default_factory=list)
+    reference_runtime_false_positive_evidence: list[dict] = Field(default_factory=list)
 
 
 class ProblemInventoryRecord(BaseModel):
@@ -114,7 +117,11 @@ class DatasetInventory(BaseModel):
         payload = self.model_dump(mode="json")
         payload["inventory_checksum"] = None
         return self.model_copy(
-            update={"inventory_checksum": DatasetManifestChecksum(value=stable_json_checksum(payload))}
+            update={
+                "inventory_checksum": DatasetManifestChecksum(
+                    value=stable_json_checksum(payload)
+                )
+            }
         )
 
     def to_json(self) -> str:
@@ -158,19 +165,155 @@ def _direction(definition: Definition) -> tuple[str, str]:
     return "unknown", "unknown"
 
 
-NVIDIA_RUNTIME_HINTS = ("cupy", "cuda.c", "cuda runtime", "nvrtc", "cublas", "cutlass")
+# Runtime blocker hints that remain true blockers regardless of context
+NVIDIA_RUNTIME_BLOCKER_HINTS = ("cupy", "cuda.c", "cuda runtime", "nvrtc")
+
+# Lexical false positive hints that are only blockers in specific contexts
+NVIDIA_LEXICAL_FALSE_POSITIVE_HINTS = ("cublas", "cutlass")
+
+# Backward-compatible alias (union of the two tuples above)
+NVIDIA_RUNTIME_HINTS = (
+    NVIDIA_RUNTIME_BLOCKER_HINTS + NVIDIA_LEXICAL_FALSE_POSITIVE_HINTS
+)
 
 
-def _reference_runtime_hints(definition: Definition, reference_path: Path | None) -> list[str]:
-    text = definition.reference.lower()
+@dataclasses.dataclass(frozen=True)
+class ReferenceRuntimeHintEvidence:
+    """Evidence record for a reference runtime hint match."""
+
+    token: str
+    match_kind: str
+    context: str
+    line_number: int | None = None
+
+
+def _classify_reference_runtime_hints(
+    definition: Definition, reference_path: Path | None
+) -> tuple[list[str], list[ReferenceRuntimeHintEvidence]]:
+    """
+    Classify reference runtime hints into blockers and false positives.
+
+    Returns:
+        (blocker_hints, false_positive_evidence) where blocker_hints is a list
+        of hint tokens that are true CUDA blockers, and false_positive_evidence
+        is a list of evidence records for lexical matches that were ignored.
+    """
+    blocker_hints: list[str] = []
+    false_positive_evidence: list[ReferenceRuntimeHintEvidence] = []
+
+    # Combine reference text from definition and file
+    lines: list[str] = []
+    lines.extend(definition.reference.splitlines())
     if reference_path is not None and reference_path.is_file():
-        text += "\n" + reference_path.read_text(encoding="utf-8").lower()
-    return sorted(hint for hint in NVIDIA_RUNTIME_HINTS if hint in text)
+        lines.extend(reference_path.read_text(encoding="utf-8").splitlines())
+
+    in_docstring = False
+    import_patterns = {
+        hint: re.compile(
+            r"\b(?:from\s+\S+\s+)?import\s+[^#\n]*\b" + re.escape(hint) + r"\b",
+            re.IGNORECASE,
+        )
+        for hint in NVIDIA_LEXICAL_FALSE_POSITIVE_HINTS
+    }
+    call_patterns = {
+        hint: re.compile(rf"\b[\w]*{re.escape(hint)}[\w]*\s*\(", re.IGNORECASE)
+        for hint in NVIDIA_LEXICAL_FALSE_POSITIVE_HINTS
+    }
+    native_patterns = {
+        hint: re.compile(rf"\b[\w]*{re.escape(hint)}[\w]*\.(cu|cuh)\b", re.IGNORECASE)
+        for hint in NVIDIA_LEXICAL_FALSE_POSITIVE_HINTS
+    }
+    class_patterns = {
+        hint: re.compile(
+            rf"^\s*class\s+\w*{re.escape(hint)}\w*\b",
+            re.IGNORECASE,
+        )
+        for hint in NVIDIA_LEXICAL_FALSE_POSITIVE_HINTS
+    }
+    variable_patterns = {
+        hint: re.compile(rf"\b[a-z_][a-z0-9_]*{re.escape(hint)}[a-z0-9_]*\b")
+        for hint in NVIDIA_LEXICAL_FALSE_POSITIVE_HINTS
+    }
+
+    for line_idx, line in enumerate(lines, start=1):
+        lowered_line = line.lower()
+        context = line.strip()[:200]
+        stripped = line.strip()
+        is_comment = stripped.startswith("#")
+        # A line is treated as docstring content if we are already inside a
+        # multi-line docstring (in_docstring is True from a prior opening """")
+        # or if the line itself starts with a triple-quote delimiter.
+        is_docstring_line = (
+            in_docstring or stripped.startswith('"""') or stripped.startswith("'''")
+        )
+
+        # Check for runtime blocker hints (always blockers)
+        for hint in NVIDIA_RUNTIME_BLOCKER_HINTS:
+            if hint in lowered_line:
+                blocker_hints.append(hint)
+
+        # Check for lexical false-positive hints (context-dependent)
+        for hint in NVIDIA_LEXICAL_FALSE_POSITIVE_HINTS:
+            if hint not in lowered_line:
+                continue
+
+            match_kind = "compatibility_label"
+            is_blocker = False
+            if import_patterns[hint].search(line):
+                match_kind = "import"
+                is_blocker = True
+            elif call_patterns[hint].search(line):
+                match_kind = "call"
+                is_blocker = True
+            elif native_patterns[hint].search(lowered_line):
+                match_kind = "native_source"
+                is_blocker = True
+            elif class_patterns[hint].search(line):
+                match_kind = "class_name"
+            elif variable_patterns[hint].search(lowered_line):
+                match_kind = "variable_name"
+            elif is_comment:
+                match_kind = "comment"
+            elif is_docstring_line:
+                match_kind = "docstring"
+
+            if is_blocker:
+                blocker_hints.append(hint)
+            else:
+                false_positive_evidence.append(
+                    ReferenceRuntimeHintEvidence(
+                        token=hint,
+                        match_kind=match_kind,
+                        context=context,
+                        line_number=line_idx,
+                    )
+                )
+
+        # Update docstring state after line processing. This handles multi-line
+        # literal blocks conservatively based on quote parity.
+        quote_count = line.count('"""') + line.count("'''")
+        if quote_count % 2 == 1:
+            in_docstring = not in_docstring
+
+    return sorted(set(blocker_hints)), false_positive_evidence
 
 
-def _definition_record(definition: Definition, reference_path: Path | None) -> ProblemDefinitionInventory:
+def _reference_runtime_hints(
+    definition: Definition, reference_path: Path | None
+) -> list[str]:
+    """Legacy function for backward compatibility."""
+    blocker_hints, _ = _classify_reference_runtime_hints(definition, reference_path)
+    return blocker_hints
+
+
+def _definition_record(
+    definition: Definition, reference_path: Path | None
+) -> ProblemDefinitionInventory:
     family, family_source = _op_family(definition)
     direction, direction_source = _direction(definition)
+    blocker_hints, false_positive_evidence = _classify_reference_runtime_hints(
+        definition, reference_path
+    )
     return ProblemDefinitionInventory(
         name=definition.name,
         op_type=definition.op_type,
@@ -183,15 +326,25 @@ def _definition_record(definition: Definition, reference_path: Path | None) -> P
         input_shapes={name: spec.shape for name, spec in definition.inputs.items()},
         output_shapes={name: spec.shape for name, spec in definition.outputs.items()},
         custom_inputs_entrypoint=definition.custom_inputs_entrypoint,
-        reference_runtime_hints=_reference_runtime_hints(definition, reference_path),
+        reference_runtime_hints=blocker_hints,
+        reference_runtime_false_positive_evidence=[
+            dataclasses.asdict(evidence) for evidence in false_positive_evidence
+        ],
     )
 
 
-def _shape_dict(shapes: dict[str, tuple[int, ...] | None]) -> dict[str, list[int] | None]:
-    return {name: list(shape) if shape is not None else None for name, shape in shapes.items()}
+def _shape_dict(
+    shapes: dict[str, tuple[int, ...] | None],
+) -> dict[str, list[int] | None]:
+    return {
+        name: list(shape) if shape is not None else None
+        for name, shape in shapes.items()
+    }
 
 
-def _workload_record(definition: Definition, workload: Workload, row_index: int) -> WorkloadInventoryRecord:
+def _workload_record(
+    definition: Definition, workload: Workload, row_index: int
+) -> WorkloadInventoryRecord:
     input_kinds: dict[str, str] = {
         name: spec.type for name, spec in workload.inputs.items()
     }
@@ -216,11 +369,17 @@ def _workload_record(definition: Definition, workload: Workload, row_index: int)
         axes=workload.axes,
         input_kinds=input_kinds,
         input_kind_counts=dict(sorted(counts.items())),
-        uses_custom_inputs=any(isinstance(spec, CustomInput) for spec in workload.inputs.values()),
+        uses_custom_inputs=any(
+            isinstance(spec, CustomInput) for spec in workload.inputs.values()
+        ),
         uses_safetensors=bool(safetensors_refs),
         safetensors_refs=safetensors_refs,
-        input_dtypes={name: spec.dtype.value for name, spec in definition.inputs.items()},
-        output_dtypes={name: spec.dtype.value for name, spec in definition.outputs.items()},
+        input_dtypes={
+            name: spec.dtype.value for name, spec in definition.inputs.items()
+        },
+        output_dtypes={
+            name: spec.dtype.value for name, spec in definition.outputs.items()
+        },
         resolved_input_shapes=input_shapes,
         resolved_output_shapes=output_shapes,
         shape_status=shape_status,
@@ -253,18 +412,39 @@ def build_dataset_inventory(
         cat_denoms = InventoryDenominators()
         category_dir = root / category
         if not category_dir.is_dir():
-            diagnostics.append(InventoryDiagnostic(code="missing_category", category=category, message=f"Missing category: {category}"))
-            category_records.append(CategoryInventoryRecord(name=category, denominators=cat_denoms))
+            diagnostics.append(
+                InventoryDiagnostic(
+                    code="missing_category",
+                    category=category,
+                    message=f"Missing category: {category}",
+                )
+            )
+            category_records.append(
+                CategoryInventoryRecord(name=category, denominators=cat_denoms)
+            )
             continue
-        for problem_dir in sorted(path for path in category_dir.iterdir() if path.is_dir()):
+        for problem_dir in sorted(
+            path for path in category_dir.iterdir() if path.is_dir()
+        ):
             cat_denoms.discovered_problems += 1
             definition_path = problem_dir / "definition.json"
             workload_path = problem_dir / "workload.jsonl"
             problem_path = _rel(problem_dir, root)
-            missing = [path.name for path in (definition_path, workload_path) if not path.is_file()]
+            missing = [
+                path.name
+                for path in (definition_path, workload_path)
+                if not path.is_file()
+            ]
             if missing:
                 cat_denoms.missing_required_files += len(missing)
-                diagnostics.append(InventoryDiagnostic(code="missing_required_file", category=category, problem_path=problem_path, message=", ".join(missing)))
+                diagnostics.append(
+                    InventoryDiagnostic(
+                        code="missing_required_file",
+                        category=category,
+                        problem_path=problem_path,
+                        message=", ".join(missing),
+                    )
+                )
                 problems.append(
                     ProblemInventoryRecord(
                         category=category,
@@ -281,7 +461,14 @@ def build_dataset_inventory(
             definition, failure = _load_definition(definition_path)
             if definition is None:
                 cat_denoms.schema_failures += 1
-                diagnostics.append(InventoryDiagnostic(code="definition_schema_failure", category=category, problem_path=problem_path, message=failure or "definition parse failed"))
+                diagnostics.append(
+                    InventoryDiagnostic(
+                        code="definition_schema_failure",
+                        category=category,
+                        problem_path=problem_path,
+                        message=failure or "definition parse failed",
+                    )
+                )
                 problems.append(
                     ProblemInventoryRecord(
                         category=category,
@@ -296,14 +483,31 @@ def build_dataset_inventory(
                 continue
 
             workloads: list[WorkloadInventoryRecord] = []
-            for row_index, line in enumerate(workload_path.read_text(encoding="utf-8").splitlines(), start=1):
+            for row_index, line in enumerate(
+                workload_path.read_text(encoding="utf-8").splitlines(), start=1
+            ):
                 if not line.strip():
                     continue
                 workload, workload_failure = _load_workload(line)
                 if workload is None:
                     cat_denoms.schema_failures += 1
-                    diagnostics.append(InventoryDiagnostic(code="workload_schema_failure", category=category, problem_path=problem_path, row_index=row_index, message=workload_failure or "workload parse failed"))
-                    workloads.append(WorkloadInventoryRecord(uuid=None, row_index=row_index, schema_status="schema_failure", schema_failure=workload_failure))
+                    diagnostics.append(
+                        InventoryDiagnostic(
+                            code="workload_schema_failure",
+                            category=category,
+                            problem_path=problem_path,
+                            row_index=row_index,
+                            message=workload_failure or "workload parse failed",
+                        )
+                    )
+                    workloads.append(
+                        WorkloadInventoryRecord(
+                            uuid=None,
+                            row_index=row_index,
+                            schema_status="schema_failure",
+                            schema_failure=workload_failure,
+                        )
+                    )
                     continue
                 cat_denoms.parsed_workloads += 1
                 workloads.append(_workload_record(definition, workload, row_index))
@@ -320,7 +524,8 @@ def build_dataset_inventory(
                     reference_path=_rel(reference_path, root)
                     if reference_path.exists()
                     else None,
-                    reference_available=reference_path.exists() or bool(definition.reference),
+                    reference_available=reference_path.exists()
+                    or bool(definition.reference),
                     solution_files=_solution_files(problem_dir),
                     schema_status="parsed",
                     definition=_definition_record(definition, reference_path),
@@ -330,9 +535,20 @@ def build_dataset_inventory(
             )
 
         total.add(cat_denoms)
-        category_records.append(CategoryInventoryRecord(name=category, denominators=cat_denoms))
+        category_records.append(
+            CategoryInventoryRecord(name=category, denominators=cat_denoms)
+        )
 
-    inventory = DatasetInventory(created_at=created_at or utc_timestamp(), root=root.as_posix(), manifest_path=manifest_path.as_posix() if manifest_path else None, selected_categories=selected, categories=category_records, problems=problems, denominators=total, diagnostics=diagnostics)
+    inventory = DatasetInventory(
+        created_at=created_at or utc_timestamp(),
+        root=root.as_posix(),
+        manifest_path=manifest_path.as_posix() if manifest_path else None,
+        selected_categories=selected,
+        categories=category_records,
+        problems=problems,
+        denominators=total,
+        diagnostics=diagnostics,
+    )
     return inventory.with_checksum()
 
 

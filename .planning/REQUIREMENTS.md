@@ -13,65 +13,65 @@ phase after roadmap creation.
 
 ### Custom Input Evaluation
 
-- [ ] **CUST-01**: Evaluator can execute benchmark-defined custom input
+- [x] **CUST-01**: Evaluator can execute benchmark-defined custom input
   entrypoints for RDNA4 readiness-blocked workloads using workload axes/scalars
   and the selected ROCm device.
-- [ ] **CUST-02**: Evaluator validates generated custom inputs against expected
+- [x] **CUST-02**: Evaluator validates generated custom inputs against expected
   keys, tensor/scalar types, dtypes, shapes, and device placement before
   reference or candidate execution.
-- [ ] **CUST-03**: Custom input generation is deterministic per workload and
+- [x] **CUST-03**: Custom input generation is deterministic per workload and
   records enough seed/provenance evidence for repeatable RDNA4 closure runs.
-- [ ] **CUST-04**: Custom input failures are classified separately as input
+- [x] **CUST-04**: Custom input failures are classified separately as input
   generation errors or OOM blockers instead of remaining generic
   `readiness_blocked` records.
 
 ### Quant Readiness
 
-- [ ] **QUANT-01**: Readiness classification distinguishes real CUDA/NVIDIA
+- [x] **QUANT-01**: Readiness classification distinguishes real CUDA/NVIDIA
   runtime dependencies from lexical false positives in Quant references,
   comments, class names, and variable names.
-- [ ] **QUANT-02**: Quant semantic references that can run under PyTorch ROCm
+- [x] **QUANT-02**: Quant semantic references that can run under PyTorch ROCm
   are reclassified as ready to attempt or hardware-evidence-needed without
   claiming low-precision hardware authority.
-- [ ] **QUANT-03**: True CUDA-only Quant paths remain blocked with precise
+- [x] **QUANT-03**: True CUDA-only Quant paths remain blocked with precise
   evidence, blocker class, and next action for ROCm porting.
-- [ ] **QUANT-04**: Quant readiness reports preserve explicit CDNA4 and
+- [x] **QUANT-04**: Quant readiness reports preserve explicit CDNA4 and
   low-precision hardware-evidence boundaries.
 
 ### FlashInfer Readiness
 
-- [ ] **FLASH-01**: FlashInfer-Bench readiness classification separates simple
+- [x] **FLASH-01**: FlashInfer-Bench readiness classification separates simple
   PyTorch-compatible workloads from true FlashInfer runtime-dependent
   workloads.
-- [ ] **FLASH-02**: PyTorch-compatible FlashInfer-Bench workloads can move out
+- [x] **FLASH-02**: PyTorch-compatible FlashInfer-Bench workloads can move out
   of category-wide `flashinfer_runtime_assumption` blocking and become ready to
   attempt on ROCm.
-- [ ] **FLASH-03**: Runtime-dependent FlashInfer workloads are classified by
+- [x] **FLASH-03**: Runtime-dependent FlashInfer workloads are classified by
   semantic dependency such as paged decode/prefill, ragged prefill, MLA,
   MoE/FP8 block-scale, or unknown runtime dependency.
-- [ ] **FLASH-04**: Residual FlashInfer blockers include evidence and next
+- [x] **FLASH-04**: Residual FlashInfer blockers include evidence and next
   actions without implying performance tuning or full FlashInfer kernel parity.
 
 ### RDNA4 Coverage Accounting
 
-- [ ] **COV-01**: RDNA4 coverage recompute preserves the 235-problem
+- [x] **COV-01**: RDNA4 coverage recompute preserves the 235-problem
   denominator while showing before/after transitions for all 114 original
   readiness-blocked problems.
-- [ ] **COV-02**: Coverage and blocker ledgers distinguish resolved readiness
+- [x] **COV-02**: Coverage and blocker ledgers distinguish resolved readiness
   blockers from new runtime, OOM, correctness, profiler, hardware-evidence, or
   residual readiness blockers.
-- [ ] **COV-03**: CPU-safe regression tests prevent readiness blockers from
+- [x] **COV-03**: CPU-safe regression tests prevent readiness blockers from
   being dropped, double-counted, or counted as profiler-backed timing or passed
   validation.
 
 ### Claim Guardrails
 
-- [ ] **CLAIM-01**: Reports and docs state that readiness blocker reduction is
+- [x] **CLAIM-01**: Reports and docs state that readiness blocker reduction is
   not validation success unless execution evidence passes.
-- [ ] **CLAIM-02**: Public and internal claim guardrails prevent v1.34 RDNA4
+- [x] **CLAIM-02**: Public and internal claim guardrails prevent v1.34 RDNA4
   readiness evidence from upgrading paper-parity, leaderboard, CDNA3, or CDNA4
   claims.
-- [ ] **CLAIM-03**: Documentation records residual blocker classes and deferred
+- [x] **CLAIM-03**: Documentation records residual blocker classes and deferred
   boundaries for any original readiness-blocked problems not safely executable
   by milestone close.
 
@@ -108,20 +108,20 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CUST-02 | Phase 170 | Complete |
 | CUST-03 | Phase 170 | Complete |
 | CUST-04 | Phase 170 | Complete |
-| QUANT-01 | Phase 172 | Pending |
-| QUANT-02 | Phase 172 | Pending |
-| QUANT-03 | Phase 172 | Pending |
-| QUANT-04 | Phase 172 | Pending |
-| FLASH-01 | Phase 173 | Pending |
-| FLASH-02 | Phase 173 | Pending |
-| FLASH-03 | Phase 173 | Pending |
-| FLASH-04 | Phase 173 | Pending |
-| COV-01 | Phase 171 | Pending |
-| COV-02 | Phase 171 | Pending |
-| COV-03 | Phase 174 | Pending |
-| CLAIM-01 | Phase 174 | Pending |
-| CLAIM-02 | Phase 174 | Pending |
-| CLAIM-03 | Phase 174 | Pending |
+| QUANT-01 | Phase 172 | Complete |
+| QUANT-02 | Phase 172 | Complete |
+| QUANT-03 | Phase 172 | Complete |
+| QUANT-04 | Phase 172 | Complete |
+| FLASH-01 | Phase 173 | Complete |
+| FLASH-02 | Phase 173 | Complete |
+| FLASH-03 | Phase 173 | Complete |
+| FLASH-04 | Phase 173 | Complete |
+| COV-01 | Phase 171 | Complete |
+| COV-02 | Phase 171 | Complete |
+| COV-03 | Phase 174 | Complete |
+| CLAIM-01 | Phase 174 | Complete |
+| CLAIM-02 | Phase 174 | Complete |
+| CLAIM-03 | Phase 174 | Complete |
 
 **Coverage:**
 - v1 requirements: 18 total
@@ -130,4 +130,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-06-09*
-*Last updated: 2026-06-09 after v1.34 roadmap creation*
+*Last updated: 2026-06-09 after v1.34 phase 174 readiness closure*

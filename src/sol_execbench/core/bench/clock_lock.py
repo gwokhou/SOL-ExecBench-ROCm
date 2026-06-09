@@ -99,8 +99,8 @@ def lock_clocks(device_name: str = "") -> bool:
       - MCLK locked at 1124Mhz (zero fluctuation)
       - Clock and power gating disabled
 
-    The ``device_name`` parameter is accepted for backward compatibility
-    but is no longer required for STABLE_PEAK locking.
+    The ``device_name`` parameter is unused — retained solely for backward
+    compatibility with callers that pass a device name.
     """
     try:
         _run_checked_amd_smi(
@@ -134,8 +134,8 @@ def verify_clocks(
     """Verify that the GPU is in STABLE_PEAK mode via ``rocm-smi --showperflevel``.
 
     The ``expected_sclk_level`` and ``expected_mclk_level`` parameters are
-    accepted for backward compatibility but are not used in the STABLE_PEAK
-    verification path.
+    unused — retained solely for backward compatibility with callers that
+    pass explicit DPM levels.
     """
     try:
         result = subprocess.run(

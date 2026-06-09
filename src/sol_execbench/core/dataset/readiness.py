@@ -179,21 +179,44 @@ def _reference_has_nvidia_blocker(problem: ProblemInventoryRecord) -> bool:
     return bool(problem.definition and problem.definition.reference_runtime_hints)
 
 
+def _quant_uses_low_precision_dtype(
+    problem: ProblemInventoryRecord, workload: WorkloadInventoryRecord
+) -> bool:
+    """Check if a Quant workload uses low-precision dtypes."""
+    dtypes = set(workload.input_dtypes.values()) | set(workload.output_dtypes.values())
+    return bool(dtypes & LOW_PRECISION_DTYPES)
+
+
+def _quant_uses_blackwell_format(
+    problem: ProblemInventoryRecord, workload: WorkloadInventoryRecord
+) -> bool:
+    """Check if a Quant workload uses NVFP4/MXFP4/Blackwell-specific dtypes."""
+    dtypes = set(workload.input_dtypes.values()) | set(workload.output_dtypes.values())
+    identity = f"{problem.problem_id} {problem.problem_path}".lower()
+    return (
+        bool(dtypes & BLACKWELL_LOW_PRECISION_DTYPES)
+        or "blackwell" in identity
+        or "nvfp4" in identity
+        or "mxfp4" in identity
+    )
+
+
 def _low_precision_or_quant(
     problem: ProblemInventoryRecord, workload: WorkloadInventoryRecord
 ) -> bool:
+    """Check if a workload uses low-precision dtypes (excludes Quant category check)."""
     dtypes = set(workload.input_dtypes.values()) | set(workload.output_dtypes.values())
-    return problem.category == "Quant" or bool(dtypes & LOW_PRECISION_DTYPES)
+    return bool(dtypes & LOW_PRECISION_DTYPES)
 
 
 def _blackwell_low_precision(
     problem: ProblemInventoryRecord, workload: WorkloadInventoryRecord
 ) -> bool:
+    """Check if a workload uses Blackwell-specific formats or identity tokens."""
     dtypes = set(workload.input_dtypes.values()) | set(workload.output_dtypes.values())
     identity = f"{problem.problem_id} {problem.problem_path}".lower()
     return (
-        problem.category == "Quant"
-        or bool(dtypes & BLACKWELL_LOW_PRECISION_DTYPES)
+        bool(dtypes & BLACKWELL_LOW_PRECISION_DTYPES)
         or "blackwell" in identity
         or "nvfp4" in identity
         or "mxfp4" in identity
@@ -237,6 +260,81 @@ def _solution_runtime_hints(
     return hints
 
 
+FLASHINFER_SIMPLE_REFERENCE_TOKENS = (
+    "fused_add_rmsnorm",
+    "gemm",
+    "rmsnorm",
+)
+FLASHINFER_RUNTIME_REFERENCE_HINTS = (
+    "flashinfer",
+    "paged_decode",
+    "paged_prefill",
+    "ragged",
+    "prefill",
+    "kv_indptr",
+    "kv_indices",
+    "moe",
+    "fp8",
+)
+FLASHINFER_RUNTIME_BUCKETS = {
+    # More specific buckets must come before more general ones to avoid
+    # premature substring matches (e.g. "mla_paged_decode" contains both
+    # "mla_paged" and "paged_decode" — mla_paged must win).
+    "mla_paged": {
+        "mla_paged",
+    },
+    "moe_fp8_block_scale": {
+        "moe_fp8_block_scale",
+    },
+    "ragged_prefill": {
+        "ragged_prefill",
+    },
+    "paged_prefill": {
+        "paged_prefill",
+    },
+    "paged_decode": {
+        "paged_decode",
+        "gqa_paged_decode",
+    },
+}
+FLASHINFER_RUNTIME_BUCKET_TO_REASON = {
+    "paged_decode": "flashinfer_runtime_paged_decode",
+    "paged_prefill": "flashinfer_runtime_paged_prefill",
+    "ragged_prefill": "flashinfer_runtime_ragged_prefill",
+    "mla_paged": "flashinfer_runtime_mla_paged",
+    "moe_fp8_block_scale": "flashinfer_runtime_moe_fp8_block_scale",
+    "unknown_flashinfer_runtime": "flashinfer_runtime_unknown",
+}
+
+
+def _read_reference_text(problem: ProblemInventoryRecord, dataset_root: Path) -> str:
+    problem_dir = Path(dataset_root) / problem.problem_path
+    reference_path = problem_dir / "reference.py"
+    if not reference_path.is_file():
+        return ""
+    try:
+        return reference_path.read_text(encoding="utf-8", errors="ignore").lower()
+    except OSError:
+        return ""
+
+
+def _flashinfer_reference_is_runtime_dependent(
+    problem: ProblemInventoryRecord, dataset_root: Path
+) -> bool:
+    reference_text = _read_reference_text(problem, dataset_root)
+    return any(token in reference_text for token in FLASHINFER_RUNTIME_REFERENCE_HINTS)
+
+
+def _flashinfer_semantic_bucket(problem: ProblemInventoryRecord) -> str:
+    lowered = problem.problem_path.lower()
+    if any(token in lowered for token in FLASHINFER_SIMPLE_REFERENCE_TOKENS):
+        return "pytorch_compatible"
+    for bucket, tokens in FLASHINFER_RUNTIME_BUCKETS.items():
+        if any(token in lowered for token in tokens):
+            return bucket
+    return "unknown_flashinfer_runtime"
+
+
 def _unsupported_dtype_failure(
     problem: ProblemInventoryRecord, workload: WorkloadInventoryRecord
 ) -> str | None:
@@ -245,10 +343,8 @@ def _unsupported_dtype_failure(
         for item in (problem.schema_failure, workload.schema_failure)
         if item is not None
     ).lower()
-    if (
-        "unsupported dtype" in failure
-        or "dtype" in failure
-        and "unsupported" in failure
+    if "unsupported dtype" in failure or (
+        "dtype" in failure and "unsupported" in failure
     ):
         return problem.schema_failure or workload.schema_failure or "unsupported dtype"
     return None
@@ -352,29 +448,62 @@ def classify_workload_readiness(
             )
         )
     elif is_flashinfer:
-        status = "runtime_blocked"
-        readiness_class = ReadinessClass.FLASHINFER_SPECIFIC
-        layers.reference_execution = "blocked"
-        reasons.append(
-            _reason(
-                "flashinfer_runtime_assumption",
-                "FlashInfer Trace workload depends on FlashInfer-specific runtime semantics.",
-                "Route through a dedicated ROCm FlashInfer compatibility/port path before execution.",
-                problem.problem_path,
+        flashinfer_bucket = _flashinfer_semantic_bucket(problem)
+        if (
+            flashinfer_bucket == "pytorch_compatible"
+            and not _flashinfer_reference_is_runtime_dependent(problem, dataset_root)
+        ):
+            reasons.append(
+                _reason(
+                    "flashinfer_pytorch_compatible_reference",
+                    (
+                        "FlashInfer workload appears to use only PyTorch-level semantics "
+                        "that are compatible with ROCm execution."
+                    ),
+                    "Run bounded execution closure in Phase 55.",
+                    problem.problem_path,
+                )
             )
-        )
-        blockers.append(
-            _blocker(
-                code="flashinfer_runtime_assumption",
-                blocker_type="flashinfer_runtime_assumption",
-                problem=problem,
-                workload=workload,
-                message="FlashInfer Trace workload depends on FlashInfer-specific runtime semantics.",
-                next_action="Route through a dedicated ROCm FlashInfer compatibility/port path before execution.",
-                evidence_path=problem.problem_path,
+        else:
+            status = "runtime_blocked"
+            readiness_class = ReadinessClass.FLASHINFER_SPECIFIC
+            layers.reference_execution = "blocked"
+            reason_code = FLASHINFER_RUNTIME_BUCKET_TO_REASON.get(
+                flashinfer_bucket,
+                "flashinfer_runtime_unknown",
             )
-        )
+            bucket_name = flashinfer_bucket.replace("_", " ")
+            reasons.append(
+                _reason(
+                    reason_code,
+                    (
+                        f"FlashInfer-Bench workload is classified as {bucket_name} runtime-dependent "
+                        "and needs runtime semantics not guaranteed by PyTorch alone."
+                    ),
+                    "Route through a dedicated ROCm FlashInfer compatibility/port path before execution.",
+                    problem.problem_path,
+                )
+            )
+            blockers.append(
+                _blocker(
+                    code=reason_code,
+                    blocker_type="flashinfer_runtime_dependency",
+                    problem=problem,
+                    workload=workload,
+                    message=(
+                        f"FlashInfer-Bench workload is classified as {bucket_name} "
+                        "runtime-dependent and cannot be attempted without a FlashInfer compatibility path."
+                    ),
+                    next_action=(
+                        "Route through a dedicated ROCm FlashInfer compatibility/port "
+                        "path before execution."
+                    ),
+                    evidence_path=problem.problem_path,
+                )
+            )
     elif _reference_has_nvidia_blocker(problem):
+        # Lexical false positives are already filtered out by inventory.py
+        # (Phase 172 Quant triage), so any remaining hint is a true blocker.
         status = "unsupported_nvidia_only_path"
         readiness_class = ReadinessClass.ROCM_PORT_NEEDED
         layers.reference_execution = "blocked"
@@ -545,14 +674,100 @@ def classify_workload_readiness(
                     evidence_path=problem.problem_path,
                 )
             )
+        elif problem.category == "Quant":
+            # Refined Quant routing based on actual dtypes and formats
+            if _quant_uses_blackwell_format(problem, workload):
+                # Quant with NVFP4/MXFP4/Blackwell-specific formats
+                status = "needs_hardware_evidence"
+                readiness_class = ReadinessClass.NVFP4_BLACKWELL_SPECIFIC
+                layers.hardware_validation = "needed"
+                reasons.append(
+                    _reason(
+                        LOW_PRECISION_COMPATIBILITY_EVIDENCE_CODE,
+                        "Phase 134 CPU semantic compatibility path is available for NVFP4/Blackwell low-precision metadata, packing, and fallback behavior.",
+                        "Use the compatibility path for migrated definitions, then collect CDNA4 hardware evidence before validation claims.",
+                        problem.problem_path,
+                    )
+                )
+                reasons.append(
+                    _reason(
+                        CDNA4_VALIDATION_DEFERRED_CODE,
+                        "NVFP4/Blackwell Quant workload still needs CDNA4 hardware evidence before validation claims.",
+                        "Collect CDNA4 hardware evidence before validation or performance claims.",
+                        problem.problem_path,
+                    )
+                )
+                blockers.append(
+                    _blocker(
+                        code=CDNA4_VALIDATION_DEFERRED_CODE,
+                        blocker_type="low_precision_format_dependency",
+                        problem=problem,
+                        workload=workload,
+                        message="NVFP4/Blackwell Quant workload still needs CDNA4 hardware evidence before validation claims.",
+                        next_action="Collect CDNA4 hardware evidence before validation or performance claims.",
+                        evidence_path=problem.problem_path,
+                    )
+                )
+            elif _quant_uses_low_precision_dtype(problem, workload):
+                # Quant with FP8 dtypes (but not Blackwell)
+                status = "needs_hardware_evidence"
+                readiness_class = ReadinessClass.BLOCKED_MISSING_EVIDENCE
+                layers.hardware_validation = "needed"
+                reasons.append(
+                    _reason(
+                        "low_precision_requires_hardware_evidence",
+                        "Quant workload with FP8 dtypes needs hardware validation evidence before validation claims.",
+                        "Collect hardware evidence during execution closure.",
+                        problem.problem_path,
+                    )
+                )
+                blockers.append(
+                    _blocker(
+                        code="low_precision_requires_hardware_evidence",
+                        blocker_type="low_precision_format_dependency",
+                        problem=problem,
+                        workload=workload,
+                        message="Quant workload with FP8 dtypes needs hardware validation evidence before validation claims.",
+                        next_action="Collect hardware evidence during execution closure.",
+                        evidence_path=problem.problem_path,
+                    )
+                )
+            else:
+                # Quant with standard dtypes (float16, float32, bfloat16, etc.)
+                # Route to ready with explicit boundary
+                reasons.append(
+                    _reason(
+                        "quant_rocm_compatible_reference",
+                        "Quant semantic reference is PyTorch ROCm-compatible; readiness does not imply low-precision hardware authority.",
+                        "Run bounded execution closure in Phase 55.",
+                        problem.problem_path,
+                    )
+                )
+                # Add false-positive cleared reason if applicable
+                if (
+                    problem.definition
+                    and problem.definition.reference_runtime_false_positive_evidence
+                ):
+                    for (
+                        evidence
+                    ) in problem.definition.reference_runtime_false_positive_evidence:
+                        reasons.append(
+                            _reason(
+                                "quant_cuda_false_positive_cleared",
+                                f"Quant lexical CUDA hint '{evidence['token']}' was a {evidence['match_kind']} and ignored as a false positive.",
+                                "Run bounded execution closure in Phase 55.",
+                                problem.problem_path,
+                            )
+                        )
         elif _low_precision_or_quant(problem, workload):
+            # Non-Quant low-precision workload
             status = "needs_hardware_evidence"
             readiness_class = ReadinessClass.BLOCKED_MISSING_EVIDENCE
             layers.hardware_validation = "needed"
             reasons.append(
                 _reason(
                     "low_precision_requires_hardware_evidence",
-                    "Low-precision or Quant workload needs hardware validation evidence before validation claims.",
+                    "Low-precision workload needs hardware validation evidence before validation claims.",
                     "Collect hardware evidence during execution closure.",
                     problem.problem_path,
                 )
@@ -563,7 +778,7 @@ def classify_workload_readiness(
                     blocker_type="low_precision_format_dependency",
                     problem=problem,
                     workload=workload,
-                    message="Low-precision or Quant workload needs hardware validation evidence before validation claims.",
+                    message="Low-precision workload needs hardware validation evidence before validation claims.",
                     next_action="Collect hardware evidence during execution closure.",
                     evidence_path=problem.problem_path,
                 )

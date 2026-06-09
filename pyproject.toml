@@ -38,7 +38,10 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "-n auto --dist loadgroup"
+# DO NOT use `-n auto`: each worker loads PyTorch+ROCm (~1.5 GB), so on a 32-core
+# machine `auto` spawns ~32 workers that exhaust 30 GB RAM and trigger OOM killer.
+# Keep worker count ≤8 to stay within memory budget.
+addopts = "-n 8 --dist loadgroup"
 markers = [
     "cpp: test compiles HIP/C++ extensions (slow, requires ROCm compiler toolchain)",
     "requires_rocm: test requires a ROCm GPU visible through PyTorch",
