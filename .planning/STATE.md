@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.34
 milestone_name: RDNA4 Readiness Blocker Closure
-status: Ready to execute
-stopped_at: Phase 172 planned
-last_updated: "2026-06-09T12:00:00.000Z"
-last_activity: 2026-06-09 — Phase 172 Quant readiness triage planned
+status: ready_to_plan
+stopped_at: Phase 170 complete (1/1) — ready to discuss Phase 171
+last_updated: 2026-06-09T13:56:03.792Z
+last_activity: 2026-06-09 — Milestone 1.34 completed and archived
 progress:
   total_phases: 5
-  completed_phases: 1
-  total_plans: 1
-  completed_plans: 1
-  percent: 20
+  completed_phases: 5
+  total_plans: 5
+  completed_plans: 5
+  percent: 100
 ---
 
 # Project State
@@ -23,16 +23,25 @@ See: `.planning/PROJECT.md` (updated 2026-06-09)
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly
 on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL
 ExecBench.
-**Current focus:** v1.34 RDNA4 Readiness Blocker Closure.
+**Current focus:** Phase 171 — custom input coverage recompute
 
 ## Current Position
 
-Phase: 172 (planned)
-Plan: 172-01 (pending)
-Status: Phase 172 planned
-Last activity: 2026-06-09 — Phase 172 Quant readiness triage planned
+Phase: 171
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-06-09
 
 ## Recent Trend
+
+- Phase 173 completed on 2026-06-09 with FlashInfer semantic readiness split into
+  PyTorch-compatible simple cases and runtime-dependent runtime buckets:
+  `pytorch_compatible`, `paged_decode`, `paged_prefill`, `ragged_prefill`,
+  `mla_paged`, `moe_fp8_block_scale`, and `unknown_flashinfer_runtime`.
+
+- Phase 174 completed on 2026-06-09 by finalizing readiness-closure evidence
+  tracking for all original readiness blockers, including guardrails for no
+  execution claim upgrade and residual blocker provenance.
 
 - v1.23 shipped Phases 106-109 on 2026-06-01.
 - v1.24 shipped Phases 110-113 on 2026-06-01.
@@ -406,4 +415,4 @@ Resume file: .planning/phases/173-flashinfer-readiness-split/173-CONTEXT.md
 
 ## Operator Next Steps
 
-- Audit milestone v1.33 with `/gsd-audit-milestone`.
+- Start the next milestone with /gsd-new-milestone

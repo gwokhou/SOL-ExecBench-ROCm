@@ -642,11 +642,19 @@ def gen_custom_inputs(
             generated = custom_inputs_fn(axes_and_scalars, device)
     except Exception as exc:
         failure_class = _classify_custom_generation_exception(exc)
-        _raise_custom_input_error(
+        err = CustomInputGenerationError(
             f"custom_inputs_entrypoint failed: {exc}",
             failure_class=failure_class,
-            provenance=provenance,
+            provenance=CustomInputProvenance(
+                entrypoint=provenance.entrypoint,
+                seed=provenance.seed,
+                workload_uuid=provenance.workload_uuid,
+                row_index=provenance.row_index,
+                generated_keys=provenance.generated_keys,
+                failure_class=failure_class,
+            ),
         )
+        raise err from exc
     generated_keys = tuple(generated.keys()) if isinstance(generated, Mapping) else ()
     provenance = _custom_input_provenance(
         definition,

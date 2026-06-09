@@ -53,7 +53,9 @@ def _native_host_target() -> MatrixTarget:
     )
 
 
-def _observed_container_stack(*, torch_rocm_target: str = "rocm7.1") -> MatrixObservedEvidence:
+def _observed_container_stack(
+    *, torch_rocm_target: str = "rocm7.1"
+) -> MatrixObservedEvidence:
     return MatrixObservedEvidence(
         host=MatrixHostEvidence(
             rocm_version="7.1.0",
@@ -151,7 +153,9 @@ def test_mixed_version_is_blocked_before_benchmark_by_default():
     )
 
     assert decision.status is MatrixCompatibilityStatus.MIXED_VERSION
-    assert decision.reason_code is MatrixCompatibilityReasonCode.TARGET_OBSERVED_MISMATCH
+    assert (
+        decision.reason_code is MatrixCompatibilityReasonCode.TARGET_OBSERVED_MISMATCH
+    )
     assert decision.benchmark_allowed is False
     assert decision.probes_allowed is False
     assert decision.smoke_allowed is False
@@ -298,7 +302,9 @@ def test_container_validated_rejects_missing_container_evidence():
                 native_host_validated=False,
                 hardware_validated=True,
             ),
-            observed=MatrixObservedEvidence(host=MatrixHostEvidence(rocm_version="7.1.0")),
+            observed=MatrixObservedEvidence(
+                host=MatrixHostEvidence(rocm_version="7.1.0")
+            ),
         )
 
 
@@ -362,8 +368,10 @@ def test_matrix_contract_uses_target_and_matrix_entry_not_row_wording():
 def test_container_claim_wording_does_not_overstate_native_host_validation():
     claims = (REPO_ROOT / "docs/CLAIMS.md").read_text()
 
-    assert "container ROCm user-space validated on recorded host driver/devices" in claims
-    assert "Docker row is not native host ROCm validated" in claims
+    assert (
+        "container ROCm user-space validated on\nrecorded host driver/devices" in claims
+    )
+    assert "Docker row is not native host ROCm\nvalidated" in claims
 
 
 def test_matrix_diff_keeps_claim_boundary_escalation_diagnostic_only():

@@ -16,9 +16,9 @@ V1_10_REQUIRED_NO_CLAIM_PHRASES = (
     "not NVIDIA B200 or Blackwell equivalence",
     "not hosted leaderboard readiness",
     "not new real-hardware validation",
-    "do not claim CDNA3-family validation, including MI300X",
+    "not CDNA3-family validation, including MI300X",
     "CDNA 4 validation",
-    "NVFP4 validation",
+    "NVFP4/MXFP4 validation",
     "MXFP4 validation",
 )
 V1_10_FORBIDDEN_POSITIVE_CLAIMS = (
@@ -59,8 +59,8 @@ def test_analysis_docs_explain_v2_sidecars_and_rdna4_scope():
         "coverage_summary",
         "hardware_validation_status",
         "model_validation_status",
-        "RDNA 4 (`gfx1200`) is the only validation",
-        "CDNA3-family real-hardware validation, including MI300X (`gfx942`), and CDNA 4 validation",
+        "CDNA 3 claims additionally require real `gfx94*` full-suite validation",
+        "CDNA3-family, MI300X,\nCDNA4, NVFP4, or MXFP4 paths as validated",
     ):
         assert expected in text
 

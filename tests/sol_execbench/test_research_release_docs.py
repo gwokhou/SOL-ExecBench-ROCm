@@ -215,7 +215,7 @@ def test_v1_21_docs_keep_debt_reduction_separate_from_external_claims():
     ):
         assert helper in development
 
-    for status in ("Narrowed", "Externally blocked/deferred"):
+    for status in ("bounded", "deferred"):
         assert status in concerns
 
 

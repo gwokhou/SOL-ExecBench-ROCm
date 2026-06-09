@@ -65,8 +65,8 @@ def test_dockerfile_keeps_existing_runtime_setup() -> None:
 def test_dockerfile_allows_passwordless_rocm_smi_tools() -> None:
     dockerfile = DOCKERFILE_PATH.read_text()
 
-    assert "for smi_tool in amd-smi rocm-smi" in dockerfile
-    assert 'NOPASSWD: $(command -v "${smi_tool}")' in dockerfile
+    assert 'AMD_SMI="$(command -v amd-smi)"' in dockerfile
+    assert "NOPASSWD: ${AMD_SMI}" in dockerfile
 
 
 def _run_docker_preview(*args: str) -> subprocess.CompletedProcess[str]:
