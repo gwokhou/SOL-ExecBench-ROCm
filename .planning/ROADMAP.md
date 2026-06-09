@@ -2,188 +2,30 @@
 
 ## Milestones
 
-- Build **v1.34 RDNA4 Readiness Blocker Closure** - Phases 170-174
-  (reduce the 114 RDNA4 `readiness_blocked` problems through custom input
-  execution support, Quant hint triage, FlashInfer semantic splitting,
-  recomputed coverage, and claim guardrails).
+- **v1.34 RDNA4 Readiness Blocker Closure** - Phases 170-174 (shipped 2026-06-09)
 - Complete **v1.33 RDNA4 Benchmark-Grade Evidence Closure** - Phases 163-169
-  (Phase 169 closes audit traceability, Nyquist validation, profiler coverage,
-  and timing authority gaps as explicit release boundaries).
   See `.planning/milestones/v1.33-ROADMAP.md`.
 - Complete **v1.32 RDNA4 Profiler Timing Coverage Closure** - Phases 148-162
-  (closed 2026-06-08 with Phase 149 full replacement still blocked). See
-  `.planning/milestones/v1.32-ROADMAP.md`.
+  See `.planning/milestones/v1.32-ROADMAP.md`.
 - Complete **v1.31 RDNA4 Follow-Up Evidence Hardening** - Phases 142-147
-  (shipped 2026-06-08). See `.planning/milestones/v1.31-ROADMAP.md`.
+  See `.planning/milestones/v1.31-ROADMAP.md`.
 - Complete **v1.30 RDNA4 Benchmark-Grade Validation Closure** - Phases 136-141
-  (shipped 2026-06-08). See `.planning/milestones/v1.30-ROADMAP.md`.
+  See `.planning/milestones/v1.30-ROADMAP.md`.
 - Complete **v1.29 Dataset Migration and Compliance** - Phases 131-135
-  (shipped 2026-06-04). See `.planning/milestones/v1.29-ROADMAP.md`.
+  See `.planning/milestones/v1.29-ROADMAP.md`.
 - Earlier milestones are archived under `.planning/milestones/`.
 
 ## Current Position
 
-**Status:** v1.34 in progress. Phases 170-174 complete.
+**Status:** v1.34 shipped. Planning next milestone.
 
-### Phase 170: Custom Input Evaluator Readiness
+<details>
+<summary>v1.34 RDNA4 Readiness Blocker Closure (Phases 170-174) — SHIPPED 2026-06-09</summary>
 
-**Status:** Complete (2026-06-09)
+- [x] Phase 170: Custom Input Evaluator Readiness (1/1 plans)
+- [x] Phase 171: Custom Input Coverage Recompute (1/1 plans)
+- [x] Phase 172: Quant Readiness Triage (1/1 plans)
+- [x] Phase 173: FlashInfer Readiness Split (1/1 plans)
+- [x] Phase 174: RDNA4 Readiness Closure Report and Claim Guardrails (1/1 plans)
 
-**Goal:** Implement deterministic benchmark-defined custom input generation so
-the 55 L1/L2 custom-input readiness blockers can be attempted safely on ROCm.
-
-**Requirements:** CUST-01, CUST-02, CUST-03, CUST-04
-
-**Depends on:** Phase 169
-
-**Plans:** 1/1 plans complete
-
-Plans:
-- [x] 170-01 Custom input evaluator readiness
-
-**Deliverables:**
-- Evaluator/input assembly support for `custom_inputs_entrypoint`.
-- Validation for generated keys, scalar/tensor types, dtypes, shapes, and
-  device placement.
-- Deterministic seed/provenance evidence for custom input generation.
-- Failure classification for input-generation errors and OOM blockers.
-
-**Success criteria:**
-1. Representative custom-input workloads can generate benchmark-defined inputs
-   without random substitution.
-2. Invalid generated inputs fail before reference/candidate execution with
-   actionable diagnostics.
-3. Input-generation OOM and non-OOM failures are visible as distinct blocker
-   classes.
-4. CPU-safe tests cover deterministic custom input execution and validation.
-
-### Phase 171: Custom Input Coverage Recompute
-
-**Status:** Complete (2026-06-09)
-
-**Goal:** Recompute RDNA4 readiness and coverage after custom input support,
-showing which of the 55 custom-input blockers moved to ready, pass/fail,
-runtime/OOM, profiler, or residual readiness states.
-
-**Requirements:** COV-01, COV-02
-
-**Depends on:** Phase 170
-
-**Plans:** 1 plan (1 complete)
-
-Plans:
-- [x] 171-01 Custom input coverage recompute
-
-**Deliverables:**
-- Before/after transition ledger for the 55 custom-input blockers.
-- Updated RDNA4 coverage summary and blocker ledger over the 235-problem
-  denominator.
-- Residual blocker explanation for custom-input problems not safely
-  executable after Phase 170.
-
-**Success criteria:**
-1. The 235-problem denominator remains stable.
-2. All 55 original custom-input readiness blockers have an explicit transition
-   or residual blocker record.
-3. New runtime, OOM, correctness, profiler, and residual readiness blockers are
-   not collapsed into generic `readiness_blocked`.
-
-### Phase 172: Quant Readiness Triage
-
-**Status:** Complete (2026-06-09)
-
-**Goal:** Refine Quant readiness classification so the 33 Quant blockers
-distinguish true CUDA/NVIDIA dependencies from PyTorch ROCm-compatible semantic
-references and preserve low-precision hardware-evidence boundaries.
-
-**Requirements:** QUANT-01, QUANT-02, QUANT-03, QUANT-04
-
-**Depends on:** Phase 171
-
-**Plans:** 1/1 plans complete
-
-Plans:
-- [x] 172-01 Quant readiness triage
-
-**Deliverables:**
-- Context-aware CUDA/NVIDIA hint detection for Quant references.
-- Reclassification path for PyTorch ROCm-compatible Quant semantic references.
-- Precise residual blockers for true CUDA-only Quant paths.
-- Documentation and tests preserving CDNA4 and low-precision hardware-evidence
-  boundaries.
-
-**Success criteria:**
-1. Quant false positives from comments, class names, or variable names no
-   longer block otherwise executable references.
-2. True CUDA-only Quant dependencies remain blocked with source evidence and
-   next actions.
-3. Quant readiness improvements cannot be interpreted as CDNA4 or
-   low-precision hardware validation.
-
-### Phase 173: FlashInfer Readiness Split
-
-**Status:** Complete (2026-06-09)
-
-**Goal:** Split the 26 FlashInfer-Bench readiness blockers by semantic
-dependency so simple PyTorch-compatible workloads can be attempted while true
-FlashInfer runtime workloads retain precise residual blockers.
-
-**Requirements:** FLASH-01, FLASH-02, FLASH-03, FLASH-04
-
-**Depends on:** Phase 172
-
-**Plans:** 1 plan complete
-
-Plans:
-- [x] 173-01 FlashInfer readiness split
-
-**Deliverables:**
-- FlashInfer-Bench semantic taxonomy for simple PyTorch-compatible, paged,
-  ragged, MLA, MoE/FP8 block-scale, and unknown runtime-dependent workloads.
-- Readiness reclassification for PyTorch-compatible FlashInfer-Bench cases.
-- Residual blocker evidence and next actions for true runtime-dependent cases.
-
-**Success criteria:**
-1. FlashInfer-Bench is no longer blocked only by category name.
-2. Simple PyTorch-compatible cases can move to ready-to-attempt when semantics
-   are preserved.
-3. Paged/ragged/MLA/MoE/runtime-dependent cases remain explicitly blocked
-   until compatible ROCm semantics exist.
-
-### Phase 174: RDNA4 Readiness Closure Report and Claim Guardrails
-
-**Status:** Complete (2026-06-09)
-
-**Goal:** Finalize v1.34 by recomputing RDNA4 coverage across all 114 original
-readiness blockers, publishing blocker transition evidence, and preserving
-claim-safe public/internal wording.
-
-**Requirements:** COV-03, CLAIM-01, CLAIM-02, CLAIM-03
-
-**Depends on:** Phase 173
-
-**Plans:** 1/1 plans complete
-
-Plans:
-- [x] 174-01 RDNA4 readiness closure report and claim guardrails
-
-**Deliverables:**
-- Final v1.34 RDNA4 coverage report and blocker ledger for all 114 original
-  readiness blockers.
-- CPU-safe regression tests preventing blocker loss, double counting, or
-  incorrect promotion to profiler-backed timing or passed validation.
-- Documentation stating readiness reduction is not validation success and does
-  not upgrade paper-parity, leaderboard, CDNA3, or CDNA4 claims.
-
-**Success criteria:**
-1. Every original readiness-blocked problem has a final v1.34 disposition.
-2. Reports distinguish resolved readiness, execution pass/fail, OOM, runtime,
-   correctness, profiler, hardware-evidence, and residual readiness blockers.
-3. Public/internal docs preserve all existing authority boundaries.
-4. Requirement traceability shows all 18 v1.34 requirements mapped and pending
-   or complete.
-
-## Requirements
-
-See `.planning/REQUIREMENTS.md` for the active v1.34 requirements and
-traceability table.
+</details>
