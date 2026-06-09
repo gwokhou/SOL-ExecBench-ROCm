@@ -1,64 +1,79 @@
-# Project Research: Architecture
+# Project Research - Architecture for RDNA4 Readiness Blocker Closure
 
-## Milestone
+## Existing Architecture Context
 
-v1.27 Copyright Provenance Cleanup
+The current pipeline is:
 
-## Question
+1. Local migrated dataset under `data/SOL-ExecBench/benchmark`.
+2. Dataset inventory parses definitions, references, workloads, and solution
+   hints.
+3. ROCm readiness classifies each workload/problem before execution.
+4. Dataset execution/profiler scripts attempt ready workloads and write traces,
+   timing sidecars, closure reports, and coverage summaries.
+5. Coverage reports combine readiness and timing evidence into claim-safe
+   totals over the 235-problem denominator.
 
-How should the cleanup integrate with the existing ROCm port architecture and
-release gates?
+Milestone v1.34 should add execution readiness capabilities without weakening
+that architecture.
 
-## Existing Integration Points
+## Proposed Data Flow
 
-- Active NVIDIA/CUDA residue audit:
-  `tests/sol_execbench/test_rocm_migration_residue_audit.py`
-- Prerelease readiness gate:
-  `scripts/check_prerelease_readiness.py`
-- Public artifact bundle:
-  `scripts/build_prerelease_artifact_bundle.py`
-- Compliance documentation:
-  `docs/compliance.md`
-- Release and research preview docs:
-  `docs/public_prerelease.md`, `docs/research_preview.md`,
-  `docs/releases/v1_26_prerelease_draft.md`
-- Third-party notices:
-  `THIRD_PARTY_NOTICES.txt`
+### Custom Input Flow
 
-## Suggested Shape
+1. Inventory records `custom_inputs_entrypoint` and custom input fields.
+2. Readiness treats supported custom input entrypoints as conditionally ready
+   instead of blocked.
+3. Execution resolves and imports the reference source in isolation.
+4. Execution calls the custom input entrypoint with workload axes/scalars and
+   the selected ROCm device.
+5. Generated inputs are validated against definition/workload metadata.
+6. Reference and candidate execution use the generated inputs.
+7. Failures are classified as:
+   - input generation failure,
+   - input generation OOM,
+   - reference OOM,
+   - candidate/runtime failure,
+   - correctness failure,
+   - profiler failure.
 
-1. Create a provenance policy document.
-   It should define file classes, header policy, upstream attribution, paper
-   citation policy, and explicit non-endorsement wording.
+### Quant Flow
 
-2. Add a lightweight classification artifact.
-   The artifact can be a small Markdown table, a JSON/TOML manifest, or a
-   Python module constant consumed by tests. It must be reviewable by humans
-   and stable enough for CI.
+1. Inventory records runtime hints with source/context when possible.
+2. Readiness distinguishes real CUDA imports/calls from lexical false positives.
+3. PyTorch ROCm semantic references move to ready or hardware-evidence-needed.
+4. True CUDA-only paths remain `rocm_port_needed`.
+5. Coverage reports carry the refined blocker class.
 
-3. Refactor the residue audit.
-   The audit should no longer classify every NVIDIA SPDX line as acceptable.
-   It should permit NVIDIA notices only in upstream-retained or derivative
-   files.
+### FlashInfer Flow
 
-4. Add release-readiness integration.
-   The readiness check should fail if:
-   - active independent files contain NVIDIA-only file copyright;
-   - derivative files drop required upstream NVIDIA notices;
-   - provenance docs are missing;
-   - public docs imply NVIDIA or AMD endorsement.
-
-5. Update docs and release materials.
-   Public-facing docs should say this project is an Apache-2.0 ROCm port of
-   SOL-ExecBench, preserves benchmark semantics where practical, and cites the
-   paper for method context.
+1. Readiness no longer treats all `FlashInfer-Bench` problems as one class.
+2. Static classifier assigns semantic buckets:
+   - PyTorch-compatible normalization/GEMM/simple fused ops,
+   - paged decode/prefill,
+   - ragged prefill,
+   - MLA,
+   - MoE/FP8 block-scale,
+   - unknown FlashInfer runtime dependency.
+3. PyTorch-compatible buckets can be attempted.
+4. True runtime buckets remain blocked until compatibility helpers exist.
 
 ## Build Order
 
-1. Audit/classification.
-2. Header and notice cleanup.
-3. Test/gate refactor.
-4. Documentation and release material alignment.
+1. Add classifier/reporting improvements that expose current readiness subtypes
+   and transition accounting.
+2. Implement custom input generation support because it affects the largest
+   blocker class.
+3. Triage Quant hints and low-precision boundaries.
+4. Split FlashInfer readiness and implement the safe PyTorch-compatible subset.
+5. Recompute coverage and update claim documentation.
 
-This order avoids editing file headers before the project has a defensible
-classification rule.
+## Modified Components
+
+| Component | Change |
+| --- | --- |
+| Dataset readiness | Add supported custom-input, Quant hint, and FlashInfer semantic classifications |
+| Eval/input assembly | Add deterministic custom input entrypoint execution |
+| Execution closure | Record new failure classes after readiness blockers are attempted |
+| Profiler coverage | Add before/after readiness transition ledger |
+| Docs/tests | Preserve claim boundaries and regression coverage |
+
