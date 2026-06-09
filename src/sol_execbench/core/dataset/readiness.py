@@ -572,6 +572,88 @@ def classify_workload_readiness(
                 evidence_path=problem.problem_path,
             )
         )
+    elif problem.category == "Quant":
+        # Refined Quant routing based on actual dtypes and formats.
+        # Must come before custom_inputs so NVFP4/low-precision Quant problems
+        # are blocked even when they also have custom input entrypoints.
+        if _quant_uses_blackwell_format(problem, workload):
+            status = "needs_hardware_evidence"
+            readiness_class = ReadinessClass.NVFP4_BLACKWELL_SPECIFIC
+            layers.hardware_validation = "needed"
+            reasons.append(
+                _reason(
+                    LOW_PRECISION_COMPATIBILITY_EVIDENCE_CODE,
+                    "Phase 134 CPU semantic compatibility path is available for NVFP4/Blackwell low-precision metadata, packing, and fallback behavior.",
+                    "Use the compatibility path for migrated definitions, then collect CDNA4 hardware evidence before validation claims.",
+                    problem.problem_path,
+                )
+            )
+            reasons.append(
+                _reason(
+                    CDNA4_VALIDATION_DEFERRED_CODE,
+                    "NVFP4/Blackwell Quant workload still needs CDNA4 hardware evidence before validation claims.",
+                    "Collect CDNA4 hardware evidence before validation or performance claims.",
+                    problem.problem_path,
+                )
+            )
+            blockers.append(
+                _blocker(
+                    code=CDNA4_VALIDATION_DEFERRED_CODE,
+                    blocker_type="low_precision_format_dependency",
+                    problem=problem,
+                    workload=workload,
+                    message="NVFP4/Blackwell Quant workload still needs CDNA4 hardware evidence before validation claims.",
+                    next_action="Collect CDNA4 hardware evidence before validation or performance claims.",
+                    evidence_path=problem.problem_path,
+                )
+            )
+        elif _quant_uses_low_precision_dtype(problem, workload):
+            status = "needs_hardware_evidence"
+            readiness_class = ReadinessClass.BLOCKED_MISSING_EVIDENCE
+            layers.hardware_validation = "needed"
+            reasons.append(
+                _reason(
+                    "low_precision_requires_hardware_evidence",
+                    "Quant workload with FP8 dtypes needs hardware validation evidence before validation claims.",
+                    "Collect hardware evidence during execution closure.",
+                    problem.problem_path,
+                )
+            )
+            blockers.append(
+                _blocker(
+                    code="low_precision_requires_hardware_evidence",
+                    blocker_type="low_precision_format_dependency",
+                    problem=problem,
+                    workload=workload,
+                    message="Quant workload with FP8 dtypes needs hardware validation evidence before validation claims.",
+                    next_action="Collect hardware evidence during execution closure.",
+                    evidence_path=problem.problem_path,
+                )
+            )
+        else:
+            reasons.append(
+                _reason(
+                    "quant_rocm_compatible_reference",
+                    "Quant semantic reference is PyTorch ROCm-compatible; readiness does not imply low-precision hardware authority.",
+                    "Run bounded execution closure in Phase 55.",
+                    problem.problem_path,
+                )
+            )
+            if (
+                problem.definition
+                and problem.definition.reference_runtime_false_positive_evidence
+            ):
+                for (
+                    evidence
+                ) in problem.definition.reference_runtime_false_positive_evidence:
+                    reasons.append(
+                        _reason(
+                            "quant_cuda_false_positive_cleared",
+                            f"Quant lexical CUDA hint '{evidence['token']}' was a {evidence['match_kind']} and ignored as a false positive.",
+                            "Run bounded execution closure in Phase 55.",
+                            problem.problem_path,
+                        )
+                    )
     elif workload.uses_custom_inputs:
         if problem.definition and problem.definition.custom_inputs_entrypoint:
             layers.input_generation = "ready_to_generate"
@@ -674,91 +756,6 @@ def classify_workload_readiness(
                     evidence_path=problem.problem_path,
                 )
             )
-        elif problem.category == "Quant":
-            # Refined Quant routing based on actual dtypes and formats
-            if _quant_uses_blackwell_format(problem, workload):
-                # Quant with NVFP4/MXFP4/Blackwell-specific formats
-                status = "needs_hardware_evidence"
-                readiness_class = ReadinessClass.NVFP4_BLACKWELL_SPECIFIC
-                layers.hardware_validation = "needed"
-                reasons.append(
-                    _reason(
-                        LOW_PRECISION_COMPATIBILITY_EVIDENCE_CODE,
-                        "Phase 134 CPU semantic compatibility path is available for NVFP4/Blackwell low-precision metadata, packing, and fallback behavior.",
-                        "Use the compatibility path for migrated definitions, then collect CDNA4 hardware evidence before validation claims.",
-                        problem.problem_path,
-                    )
-                )
-                reasons.append(
-                    _reason(
-                        CDNA4_VALIDATION_DEFERRED_CODE,
-                        "NVFP4/Blackwell Quant workload still needs CDNA4 hardware evidence before validation claims.",
-                        "Collect CDNA4 hardware evidence before validation or performance claims.",
-                        problem.problem_path,
-                    )
-                )
-                blockers.append(
-                    _blocker(
-                        code=CDNA4_VALIDATION_DEFERRED_CODE,
-                        blocker_type="low_precision_format_dependency",
-                        problem=problem,
-                        workload=workload,
-                        message="NVFP4/Blackwell Quant workload still needs CDNA4 hardware evidence before validation claims.",
-                        next_action="Collect CDNA4 hardware evidence before validation or performance claims.",
-                        evidence_path=problem.problem_path,
-                    )
-                )
-            elif _quant_uses_low_precision_dtype(problem, workload):
-                # Quant with FP8 dtypes (but not Blackwell)
-                status = "needs_hardware_evidence"
-                readiness_class = ReadinessClass.BLOCKED_MISSING_EVIDENCE
-                layers.hardware_validation = "needed"
-                reasons.append(
-                    _reason(
-                        "low_precision_requires_hardware_evidence",
-                        "Quant workload with FP8 dtypes needs hardware validation evidence before validation claims.",
-                        "Collect hardware evidence during execution closure.",
-                        problem.problem_path,
-                    )
-                )
-                blockers.append(
-                    _blocker(
-                        code="low_precision_requires_hardware_evidence",
-                        blocker_type="low_precision_format_dependency",
-                        problem=problem,
-                        workload=workload,
-                        message="Quant workload with FP8 dtypes needs hardware validation evidence before validation claims.",
-                        next_action="Collect hardware evidence during execution closure.",
-                        evidence_path=problem.problem_path,
-                    )
-                )
-            else:
-                # Quant with standard dtypes (float16, float32, bfloat16, etc.)
-                # Route to ready with explicit boundary
-                reasons.append(
-                    _reason(
-                        "quant_rocm_compatible_reference",
-                        "Quant semantic reference is PyTorch ROCm-compatible; readiness does not imply low-precision hardware authority.",
-                        "Run bounded execution closure in Phase 55.",
-                        problem.problem_path,
-                    )
-                )
-                # Add false-positive cleared reason if applicable
-                if (
-                    problem.definition
-                    and problem.definition.reference_runtime_false_positive_evidence
-                ):
-                    for (
-                        evidence
-                    ) in problem.definition.reference_runtime_false_positive_evidence:
-                        reasons.append(
-                            _reason(
-                                "quant_cuda_false_positive_cleared",
-                                f"Quant lexical CUDA hint '{evidence['token']}' was a {evidence['match_kind']} and ignored as a false positive.",
-                                "Run bounded execution closure in Phase 55.",
-                                problem.problem_path,
-                            )
-                        )
         elif _low_precision_or_quant(problem, workload):
             # Non-Quant low-precision workload
             status = "needs_hardware_evidence"
