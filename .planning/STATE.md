@@ -1,36 +1,35 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.33
-milestone_name: RDNA4 Benchmark-Grade Evidence Closure
-status: Milestone v1.33 complete
-stopped_at: Milestone v1.33 complete after Phase 169 audit and authority gap closure.
-last_updated: "2026-06-09T00:11:40.000Z"
-last_activity: 2026-06-09 — Phase 169 closed v1.33 audit and authority gaps
+milestone: v1.34
+milestone_name: RDNA4 Readiness Blocker Closure
+status: planning
+last_updated: "2026-06-09T08:15:43.637Z"
+last_activity: 2026-06-09
 progress:
-  total_phases: 7
-  completed_phases: 7
-  total_plans: 7
-  completed_plans: 7
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (updated 2026-06-08)
+See: `.planning/PROJECT.md` (updated 2026-06-09)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly
 on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL
 ExecBench.
-**Current focus:** v1.33 RDNA4 Benchmark-Grade Evidence Closure.
+**Current focus:** v1.34 RDNA4 Readiness Blocker Closure.
 
 ## Current Position
 
-Phase: —
+Phase: Not started (defining requirements)
 Plan: —
-Status: Milestone v1.33 complete
-Last activity: 2026-06-09 — Phase 169 closed v1.33 audit and authority gaps
+Status: Defining requirements
+Last activity: 2026-06-09 — Milestone v1.34 started
 
 ## Recent Trend
 
