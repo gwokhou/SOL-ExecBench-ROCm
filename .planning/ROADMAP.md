@@ -2,6 +2,10 @@
 
 ## Milestones
 
+- Build **v1.34 RDNA4 Readiness Blocker Closure** - Phases 170-174
+  (reduce the 114 RDNA4 `readiness_blocked` problems through custom input
+  execution support, Quant hint triage, FlashInfer semantic splitting,
+  recomputed coverage, and claim guardrails).
 - Complete **v1.33 RDNA4 Benchmark-Grade Evidence Closure** - Phases 163-169
   (Phase 169 closes audit traceability, Nyquist validation, profiler coverage,
   and timing authority gaps as explicit release boundaries).
@@ -15,292 +19,172 @@
   (shipped 2026-06-08). See `.planning/milestones/v1.30-ROADMAP.md`.
 - Complete **v1.29 Dataset Migration and Compliance** - Phases 131-135
   (shipped 2026-06-04). See `.planning/milestones/v1.29-ROADMAP.md`.
-- Complete **v1.28 CDNA3 Test and Documentation Readiness** - Phases 127-130
-  (shipped 2026-06-04). See `.planning/milestones/v1.28-ROADMAP.md`.
-- Complete **v1.27 Copyright Provenance Cleanup** - Phases 123-126
-  (shipped 2026-06-02). See `.planning/milestones/v1.27-ROADMAP.md`.
-- Complete **v1.26 Public Prerelease and Research Preview** - Phases 119-122
-  (shipped 2026-06-02). See `.planning/milestones/v1.26-ROADMAP.md`.
-- Complete **v1.25 Engineering Prerelease** - Phases 114-118
-  (shipped 2026-06-01). See `.planning/milestones/v1.25-ROADMAP.md`.
 - Earlier milestones are archived under `.planning/milestones/`.
 
 ## Current Position
 
-**Status:** v1.33 complete. Phases 163-169 complete.
+**Status:** v1.34 planned. Phases 170-174 pending.
 
-### Phase 163: RDNA4 Denominator Policy Hardening
+### Phase 170: Custom Input Evaluator Readiness
 
-**Status:** Complete
+**Status:** Pending
 
-**Goal:** Convert the Phase 162 `reference_oom_blocked` accounting into a
-stable RDNA4 validation denominator policy for the current `gfx1200` 16GB
-device class.
+**Goal:** Implement deterministic benchmark-defined custom input generation so
+the 55 L1/L2 custom-input readiness blockers can be attempted safely on ROCm.
 
-**Requirements:** RDNA4-BGE-01, RDNA4-BGE-02
+**Requirements:** CUST-01, CUST-02, CUST-03, CUST-04
 
-**Depends on:** Phase 162
-
-**Plans:** 1 plan
-
-Plans:
-- [x] 163-01 RDNA4 denominator policy hardening
-
-**Deliverables:**
-- `RDNA4-DENOMINATOR-POLICY.md` defining included, excluded, blocked, and
-  claim-safe statuses for the 235-problem denominator.
-- Public/private wording boundaries for `gfx1200` 16GB validation versus
-  larger-memory AMD validation.
-- CPU-safe guardrails proving `reference_oom_blocked` does not count as
-  profiler-backed timing or full validation pass evidence.
-
-### Phase 164: RDNA4 Memory Readiness Classifier Hardening
-
-**Status:** Complete
-
-**Goal:** Generalize memory/readiness classification so RDNA4 reports separate
-reference OOM, input-generation OOM, user-solution OOM, timeout, profiler
-blocked, and correctness/runtime failures deterministically.
-
-**Requirements:** RDNA4-BGE-03, RDNA4-BGE-04
-
-**Depends on:** Phase 163
+**Depends on:** Phase 169
 
 **Plans:** 1 plan
 
 Plans:
-- [x] 164-01 RDNA4 memory readiness classifier hardening
+- [ ] 170-01 Custom input evaluator readiness
 
 **Deliverables:**
-- Classifier updates and tests for `reference_oom_blocked`,
-  `gen_inputs_oom_blocked`, `user_solution_oom`, `timeout`,
-  `profiler_blocked`, and correctness/runtime blocker classes.
-- Report fields that make memory footprint blockers visible without retrying
-  unsafe full-problem profiler jobs.
-- Regression fixtures covering the 10 diagnosed partial profiler targets.
+- Evaluator/input assembly support for `custom_inputs_entrypoint`.
+- Validation for generated keys, scalar/tensor types, dtypes, shapes, and
+  device placement.
+- Deterministic seed/provenance evidence for custom input generation.
+- Failure classification for input-generation errors and OOM blockers.
 
-### Phase 165: RDNA4 Coverage Recompute
+**Success criteria:**
+1. Representative custom-input workloads can generate benchmark-defined inputs
+   without random substitution.
+2. Invalid generated inputs fail before reference/candidate execution with
+   actionable diagnostics.
+3. Input-generation OOM and non-OOM failures are visible as distinct blocker
+   classes.
+4. CPU-safe tests cover deterministic custom input execution and validation.
 
-**Status:** Complete
+### Phase 171: Custom Input Coverage Recompute
 
-**Goal:** Regenerate RDNA4 coverage under the hardened denominator and
-classifier policy so the current completion numbers are reproducible and
-claim-safe.
+**Status:** Pending
 
-**Requirements:** RDNA4-BGE-05, RDNA4-BGE-06
+**Goal:** Recompute RDNA4 readiness and coverage after custom input support,
+showing which of the 55 custom-input blockers moved to ready, pass/fail,
+runtime/OOM, profiler, or residual readiness states.
 
-**Depends on:** Phase 164
+**Requirements:** COV-01, COV-02
+
+**Depends on:** Phase 170
 
 **Plans:** 1 plan
 
 Plans:
-- [x] 165-01 RDNA4 coverage recompute
+- [ ] 171-01 Custom input coverage recompute
 
 **Deliverables:**
-- Fresh coverage report over the 235-problem denominator with included,
-  profiler-backed, fallback, blocked, and readiness-blocked totals.
-- Machine-readable exclusion/blocker ledger with source artifacts and
-  checksums.
-- Tests proving the recomputed summary is deterministic from sidecars and
-  policy inputs.
+- Before/after transition ledger for the 55 custom-input blockers.
+- Updated RDNA4 coverage summary and blocker ledger over the 235-problem
+  denominator.
+- Residual blocker explanation for custom-input problems not safely
+  executable after Phase 170.
 
-### Phase 166: RDNA4 Rocprof Timing Closure
+**Success criteria:**
+1. The 235-problem denominator remains stable.
+2. All 55 original custom-input readiness blockers have an explicit transition
+   or residual blocker record.
+3. New runtime, OOM, correctness, profiler, and residual readiness blockers are
+   not collapsed into generic `readiness_blocked`.
 
-**Status:** Complete
+### Phase 172: Quant Readiness Triage
 
-**Goal:** Replace remaining eligible fallback timing with authoritative
-`rocprofv3` kernel activity timing for the included RDNA4 denominator.
+**Status:** Pending
 
-**Requirements:** RDNA4-BGE-07, RDNA4-BGE-08
+**Goal:** Refine Quant readiness classification so the 33 Quant blockers
+distinguish true CUDA/NVIDIA dependencies from PyTorch ROCm-compatible semantic
+references and preserve low-precision hardware-evidence boundaries.
 
-**Depends on:** Phase 165
+**Requirements:** QUANT-01, QUANT-02, QUANT-03, QUANT-04
+
+**Depends on:** Phase 171
 
 **Plans:** 1 plan
 
 Plans:
-- [x] 166-01 RDNA4 rocprof timing closure with accepted current-device OOM blocker
+- [ ] 172-01 Quant readiness triage
 
 **Deliverables:**
-- Profiler timing sidecars for eligible included workloads with
-  `profiler_collected=true` and `rocprofv3` kernel rows.
-- Coverage/report updates that keep PyTorch/device-event fallback visible but
-  non-authoritative.
-- Long-run controls and acceptance artifacts for bounded RDNA4 profiler reruns.
+- Context-aware CUDA/NVIDIA hint detection for Quant references.
+- Reclassification path for PyTorch ROCm-compatible Quant semantic references.
+- Precise residual blockers for true CUDA-only Quant paths.
+- Documentation and tests preserving CDNA4 and low-precision hardware-evidence
+  boundaries.
 
-### Phase 167: RDNA4 Clock-Lock Evidence
+**Success criteria:**
+1. Quant false positives from comments, class names, or variable names no
+   longer block otherwise executable references.
+2. True CUDA-only Quant dependencies remain blocked with source evidence and
+   next actions.
+3. Quant readiness improvements cannot be interpreted as CDNA4 or
+   low-precision hardware validation.
 
-**Status:** Complete
+### Phase 173: FlashInfer Readiness Split
 
-**Goal:** Collect host-level clock-lock and reset evidence required to upgrade
-RDNA4 timing from functional/profiler evidence to benchmark-grade timing
-authority.
+**Status:** Pending
 
-**Requirements:** RDNA4-BGE-09, RDNA4-BGE-10
+**Goal:** Split the 26 FlashInfer-Bench readiness blockers by semantic
+dependency so simple PyTorch-compatible workloads can be attempted while true
+FlashInfer runtime workloads retain precise residual blockers.
 
-**Depends on:** Phase 166
+**Requirements:** FLASH-01, FLASH-02, FLASH-03, FLASH-04
+
+**Depends on:** Phase 172
 
 **Plans:** 1 plan
 
 Plans:
-- [x] 167-01 RDNA4 clock-lock evidence
+- [ ] 173-01 FlashInfer readiness split
 
 **Deliverables:**
-- `rocm-smi` pre/run/post evidence showing clock lock status, reset behavior,
-  driver details, and host policy.
-- Documentation for required sudoers or operator-managed clock policy.
-- Guardrails that prevent authoritative timing claims when clocks are unlocked
-  or reset evidence is missing.
+- FlashInfer-Bench semantic taxonomy for simple PyTorch-compatible, paged,
+  ragged, MLA, MoE/FP8 block-scale, and unknown runtime-dependent workloads.
+- Readiness reclassification for PyTorch-compatible FlashInfer-Bench cases.
+- Residual blocker evidence and next actions for true runtime-dependent cases.
 
-### Phase 168: RDNA4 Release Evidence Bundle
+**Success criteria:**
+1. FlashInfer-Bench is no longer blocked only by category name.
+2. Simple PyTorch-compatible cases can move to ready-to-attempt when semantics
+   are preserved.
+3. Paged/ragged/MLA/MoE/runtime-dependent cases remain explicitly blocked
+   until compatible ROCm semantics exist.
 
-**Status:** Complete
+### Phase 174: RDNA4 Readiness Closure Report and Claim Guardrails
 
-**Goal:** Package RDNA4 trace, timing, score, derivation, exclusion, checksum,
-and hardware metadata into a release-grade evidence bundle.
+**Status:** Pending
 
-**Requirements:** RDNA4-BGE-11, RDNA4-BGE-12
+**Goal:** Finalize v1.34 by recomputing RDNA4 coverage across all 114 original
+readiness blockers, publishing blocker transition evidence, and preserving
+claim-safe public/internal wording.
 
-**Depends on:** Phase 167
+**Requirements:** COV-03, CLAIM-01, CLAIM-02, CLAIM-03
+
+**Depends on:** Phase 173
 
 **Plans:** 1 plan
 
 Plans:
-- [x] 168-01 RDNA4 release evidence bundle
+- [ ] 174-01 RDNA4 readiness closure report and claim guardrails
 
 **Deliverables:**
-- Release evidence manifest covering traces, timing sidecars, score records,
-  AMD SOL/SOLAR derivation sidecars, exclusion ledgers, checksums, and exact
-  hardware/software metadata.
-- Claim-upgrade review showing which RDNA4 statements are supported and which
-  remain blocked or deferred.
-- Public documentation updates that cite the bundle without upgrading CDNA3,
-  CDNA4, upstream SOLAR, paper-parity, or leaderboard claims.
+- Final v1.34 RDNA4 coverage report and blocker ledger for all 114 original
+  readiness blockers.
+- CPU-safe regression tests preventing blocker loss, double counting, or
+  incorrect promotion to profiler-backed timing or passed validation.
+- Documentation stating readiness reduction is not validation success and does
+  not upgrade paper-parity, leaderboard, CDNA3, or CDNA4 claims.
 
-### Phase 169: RDNA4 Audit Closure and Authority Gap Finalization
-
-**Status:** Complete
-
-**Goal:** Close the v1.33 audit gaps by adding strict requirements
-traceability, retroactive Nyquist validation, and explicit release-boundary
-closure for incomplete profiler-backed timing coverage and non-authoritative
-timing.
-
-**Requirements:** RDNA4-BGE-13, RDNA4-BGE-14, RDNA4-BGE-15, RDNA4-BGE-16
-
-**Depends on:** Phase 168
-
-**Plans:** 1 plan
-
-Plans:
-- [x] 169-01 RDNA4 audit closure and authority gap finalization
-
-**Deliverables:**
-- `v1.33-REQUIREMENTS.md` traceability table mapping RDNA4-BGE-01 through
-  RDNA4-BGE-16 to phases, status, and evidence.
-- Retroactive `*-VALIDATION.md` files for Phase 163-168.
-- `RDNA4-AUTHORITY-GAP-CLOSURE.md` classifying full profiler coverage and
-  benchmark-grade timing authority as closed release blockers/deferred
-  boundaries, not achieved evidence.
-- Updated milestone audit showing the closure phase resolves the audit gaps.
+**Success criteria:**
+1. Every original readiness-blocked problem has a final v1.34 disposition.
+2. Reports distinguish resolved readiness, execution pass/fail, OOM, runtime,
+   correctness, profiler, hardware-evidence, and residual readiness blockers.
+3. Public/internal docs preserve all existing authority boundaries.
+4. Requirement traceability shows all 18 v1.34 requirements mapped and pending
+   or complete.
 
 ## Requirements
 
-### RDNA4-BGE-01: Denominator Policy Document
+See `.planning/REQUIREMENTS.md` for the active v1.34 requirements and
+traceability table.
 
-The project must define the RDNA4 `gfx1200` validation denominator, including
-how current-device memory blockers, readiness blockers, explicit exclusions,
-and included workloads map to public claim wording.
-
-### RDNA4-BGE-02: Denominator Claim Boundary
-
-`reference_oom_blocked` and other blocker statuses must remain accounted in the
-235-problem denominator but must not count as complete profiler-backed timing
-or full benchmark validation pass evidence.
-
-### RDNA4-BGE-03: Memory Readiness Classifier
-
-Reports must distinguish reference OOM, input-generation OOM, user-solution
-OOM, timeout, profiler blocked, correctness failure, runtime failure, and mixed
-failure classes from one another.
-
-### RDNA4-BGE-04: Unsafe Retry Avoidance
-
-Known memory-footprint blockers must be visible to scheduling and resume logic
-so unsafe full-problem profiler retries are not selected by default.
-
-### RDNA4-BGE-05: Recomputed Coverage Authority
-
-The RDNA4 coverage report must be reproducible from sidecars, policy inputs,
-and classifier output, with included/excluded/blocker totals and source
-references.
-
-### RDNA4-BGE-06: Coverage Regression Guardrails
-
-CPU-safe tests must prevent blocker statuses from being dropped, double-counted,
-or promoted to profiler-backed timing by report changes.
-
-### RDNA4-BGE-07: Rocprof Timing Evidence
-
-Eligible included workloads must have `rocprofv3` kernel activity timing
-evidence before they can contribute to authoritative profiler-backed timing.
-
-### RDNA4-BGE-08: Fallback Timing Boundary
-
-PyTorch/device-event fallback timing may remain diagnostic evidence, but it
-must remain excluded from authoritative profiler-backed timing totals.
-
-### RDNA4-BGE-09: Clock-Lock Evidence
-
-Benchmark-grade RDNA4 timing claims require recorded clock-lock and reset
-evidence from the host environment.
-
-### RDNA4-BGE-10: Clock Claim Guardrail
-
-Reports and docs must prevent authoritative timing claims when clocks are
-unlocked, lock status is unknown, or reset evidence is missing.
-
-### RDNA4-BGE-11: Release Evidence Manifest
-
-The release bundle must include trace, timing, score, derivation, exclusion,
-checksum, and exact hardware/software metadata sufficient for independent
-review.
-
-### RDNA4-BGE-12: Claim Upgrade Review
-
-The final bundle must include a claim review that states which RDNA4 claims are
-supported and preserves deferred boundaries for CDNA3/MI300X, CDNA4, paper
-parity, upstream SOLAR equivalence, and leaderboard authority.
-
-### RDNA4-BGE-13: Requirements Traceability Closure
-
-The milestone must include a requirements traceability table that maps every
-RDNA4-BGE requirement to phase, status, and concrete evidence.
-
-### RDNA4-BGE-14: Nyquist Validation Closure
-
-Every v1.33 phase must have a validation artifact or explicit retroactive
-validation record so the milestone audit can distinguish unvalidated work from
-validated release boundaries.
-
-### RDNA4-BGE-15: Profiler Coverage Gap Closure
-
-The release must close the incomplete full profiler-backed timing coverage gap
-as an explicit blocker/deferred boundary. It must not claim 235/235
-profiler-backed timing coverage while accepted evidence remains 61/235.
-
-### RDNA4-BGE-16: Timing Authority Gap Closure
-
-The release must close the benchmark-grade timing authority gap as an explicit
-blocker/deferred boundary. It must not claim authoritative timing while stable
-benchmark-window clock-lock evidence is absent.
-
-## Active Guardrails
-
-- Do not rerun known oversized RDNA4 workloads as full-problem profiler jobs
-  unless a phase explicitly opts in with memory caps and checkpointed logs.
-- Profiler-backed timing and authoritative timing are separate claim levels:
-  `rocprofv3` evidence is necessary but not sufficient without clock-lock
-  evidence.
-- Long RDNA4 jobs must run through isolated `systemd-run --user` units or
-  equivalent memory/swap caps, with Codex polling logs/status files.
-- CDNA3/MI300X and CDNA4 validation remain outside this milestone.

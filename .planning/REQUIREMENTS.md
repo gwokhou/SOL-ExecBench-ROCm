@@ -104,31 +104,30 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 | --- | --- | --- |
-| CUST-01 | TBD | Pending |
-| CUST-02 | TBD | Pending |
-| CUST-03 | TBD | Pending |
-| CUST-04 | TBD | Pending |
-| QUANT-01 | TBD | Pending |
-| QUANT-02 | TBD | Pending |
-| QUANT-03 | TBD | Pending |
-| QUANT-04 | TBD | Pending |
-| FLASH-01 | TBD | Pending |
-| FLASH-02 | TBD | Pending |
-| FLASH-03 | TBD | Pending |
-| FLASH-04 | TBD | Pending |
-| COV-01 | TBD | Pending |
-| COV-02 | TBD | Pending |
-| COV-03 | TBD | Pending |
-| CLAIM-01 | TBD | Pending |
-| CLAIM-02 | TBD | Pending |
-| CLAIM-03 | TBD | Pending |
+| CUST-01 | Phase 170 | Pending |
+| CUST-02 | Phase 170 | Pending |
+| CUST-03 | Phase 170 | Pending |
+| CUST-04 | Phase 170 | Pending |
+| QUANT-01 | Phase 172 | Pending |
+| QUANT-02 | Phase 172 | Pending |
+| QUANT-03 | Phase 172 | Pending |
+| QUANT-04 | Phase 172 | Pending |
+| FLASH-01 | Phase 173 | Pending |
+| FLASH-02 | Phase 173 | Pending |
+| FLASH-03 | Phase 173 | Pending |
+| FLASH-04 | Phase 173 | Pending |
+| COV-01 | Phase 171 | Pending |
+| COV-02 | Phase 171 | Pending |
+| COV-03 | Phase 174 | Pending |
+| CLAIM-01 | Phase 174 | Pending |
+| CLAIM-02 | Phase 174 | Pending |
+| CLAIM-03 | Phase 174 | Pending |
 
 **Coverage:**
 - v1 requirements: 18 total
-- Mapped to phases: 0
-- Unmapped: 18
+- Mapped to phases: 18
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-06-09*
-*Last updated: 2026-06-09 after v1.34 requirements definition*
-
+*Last updated: 2026-06-09 after v1.34 roadmap creation*
