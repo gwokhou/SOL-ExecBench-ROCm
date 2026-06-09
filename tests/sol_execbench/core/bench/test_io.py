@@ -21,7 +21,10 @@ import pytest
 import torch
 
 from sol_execbench.core.bench.io import (
+    CustomInputGenerationError,
     FLASHINFER_TRACE_ENV,
+    GEN_INPUTS_DEVICE_MISMATCH,
+    GEN_INPUTS_SCHEMA_MISMATCH,
     ShiftingMemoryPoolAllocator,
     _cast_to_fp4x2,
     _generate_heuristic_tensor,
@@ -38,6 +41,7 @@ from sol_execbench.core.bench.io import (
     _resolve_blob_path,
     flashinfer_safetensors_env,
     gen_inputs,
+    isolated_torch_rng,
     load_safetensors,
     normalize_outputs,
 )
@@ -48,6 +52,7 @@ def test_flashinfer_safetensors_env_preserves_user_root():
     env = flashinfer_safetensors_env({FLASHINFER_TRACE_ENV: "/custom/root"})
 
     assert env[FLASHINFER_TRACE_ENV] == "/custom/root"
+
 
 # ------------------------------------------------------------------
 # _rand_tensor
@@ -793,6 +798,130 @@ class TestGenInputs:
 
         assert torch.equal(inputs[0], torch.full((4,), 3.0))
         assert torch.equal(inputs[1], torch.full((4,), 4.0))
+
+    def test_custom_factory_is_deterministic_for_same_workload_seed(self):
+        d = _make_definition(
+            inputs={
+                "a": {"shape": ["N"], "dtype": "float32"},
+                "b": {"shape": ["N"], "dtype": "float32"},
+            },
+            outputs={"c": {"shape": ["N"], "dtype": "float32"}},
+            custom_inputs_entrypoint="gen",
+            reference=(
+                "def run(a, b): return a\n"
+                "def gen(axes, device):\n"
+                "    import torch\n"
+                "    return {'a': torch.randn(axes['N'], device=device), "
+                "'b': torch.randn(axes['N'], device=device)}\n"
+            ),
+        )
+        wkl = make_workload(
+            uuid="stable",
+            axes={"N": 4},
+            inputs={"a": {"type": "custom"}, "b": {"type": "custom"}},
+        )
+
+        def gen(axes, device):
+            return {
+                "a": torch.randn(axes["N"], device=device),
+                "b": torch.randn(axes["N"], device=device),
+            }
+
+        first = gen_inputs(d, wkl, "cpu", custom_inputs_fn=gen)
+        second = gen_inputs(d, wkl, "cpu", custom_inputs_fn=gen)
+
+        assert torch.equal(first[0], second[0])
+        assert torch.equal(first[1], second[1])
+
+    def test_custom_factory_restores_torch_rng_state(self):
+        seed = 20260609
+
+        torch.manual_seed(seed)
+        before = torch.random.get_rng_state()
+        with isolated_torch_rng(12345):
+            _ = torch.randn(8)
+        after = torch.random.get_rng_state()
+
+        assert torch.equal(after, before)
+
+    def test_custom_factory_shape_mismatch_raises_schema_class(self):
+        d = _make_definition(
+            inputs={"a": {"shape": ["N"], "dtype": "float32"}},
+            custom_inputs_entrypoint="gen",
+            reference=(
+                "def run(a): return a\n"
+                "def gen(axes, device):\n"
+                "    import torch\n"
+                "    return {'a': torch.randn(axes['N'] + 1, device=device)}\n"
+            ),
+        )
+        wkl = make_workload(
+            uuid="u",
+            axes={"N": 4},
+            inputs={"a": {"type": "custom"}},
+        )
+
+        def gen(axes, device):
+            return {"a": torch.randn(axes["N"] + 1, device=device)}
+
+        with pytest.raises(CustomInputGenerationError) as excinfo:
+            gen_inputs(d, wkl, "cpu", custom_inputs_fn=gen)
+
+        assert excinfo.value.failure_class == GEN_INPUTS_SCHEMA_MISMATCH
+        assert excinfo.value.provenance.failure_class == GEN_INPUTS_SCHEMA_MISMATCH
+        assert excinfo.value.provenance.generated_keys == ("a",)
+
+    def test_custom_factory_dtype_mismatch_raises_schema_class(self):
+        d = _make_definition(
+            inputs={"a": {"shape": ["N"], "dtype": "float32"}},
+            custom_inputs_entrypoint="gen",
+            reference=(
+                "def run(a): return a\n"
+                "def gen(axes, device):\n"
+                "    import torch\n"
+                "    return {'a': torch.ones(axes['N'], dtype=torch.int32, device=device)}\n"
+            ),
+        )
+        wkl = make_workload(
+            uuid="u",
+            axes={"N": 4},
+            inputs={"a": {"type": "custom"}},
+        )
+
+        def gen(axes, device):
+            return {"a": torch.ones(axes["N"], dtype=torch.int32, device=device)}
+
+        with pytest.raises(CustomInputGenerationError) as excinfo:
+            gen_inputs(d, wkl, "cpu", custom_inputs_fn=gen)
+
+        assert excinfo.value.failure_class == GEN_INPUTS_SCHEMA_MISMATCH
+
+    def test_custom_factory_device_mismatch_raises_device_class(self):
+        if torch.cuda.is_available():
+            pytest.skip("CPU mismatch path only applies when CUDA/HIP is unavailable")
+        d = _make_definition(
+            inputs={"a": {"shape": ["N"], "dtype": "float32"}},
+            custom_inputs_entrypoint="gen",
+            reference=(
+                "def run(a): return a\n"
+                "def gen(axes, device):\n"
+                "    import torch\n"
+                "    return {'a': torch.ones(axes['N'], dtype=torch.float32, device='meta')}\n"
+            ),
+        )
+        wkl = make_workload(
+            uuid="u",
+            axes={"N": 4},
+            inputs={"a": {"type": "custom"}},
+        )
+
+        def gen(axes, device):
+            return {"a": torch.ones(axes["N"], dtype=torch.float32, device="meta")}
+
+        with pytest.raises(CustomInputGenerationError) as excinfo:
+            gen_inputs(d, wkl, "cpu", custom_inputs_fn=gen)
+
+        assert excinfo.value.failure_class == GEN_INPUTS_DEVICE_MISMATCH
 
     def test_missing_safetensors_raises(self):
         d = _make_definition(
