@@ -29,10 +29,10 @@
 
 ### Derived Script Parallelism
 
-- [ ] **DERV-01**: `run_derived_isolated.py` uses ThreadPoolExecutor for concurrent per-problem subprocess dispatch
-- [ ] **DERV-02**: Status JSONL writes are thread-safe via lock or batch-flush semantics
-- [ ] **DERV-03**: Existing `--resume` and `--continue-on-failure` semantics are preserved under parallel execution
-- [ ] **DERV-04**: `--jobs` flag controls concurrency level with a sensible default
+- [x] **DERV-01**: `run_derived_isolated.py` uses ThreadPoolExecutor for concurrent per-problem subprocess dispatch
+- [x] **DERV-02**: Status JSONL writes are thread-safe via lock or batch-flush semantics
+- [x] **DERV-03**: Existing `--resume` and `--continue-on-failure` semantics are preserved under parallel execution
+- [x] **DERV-04**: `--jobs` flag controls concurrency level with a sensible default
 
 ### Evaluation Stability Extension
 
@@ -76,10 +76,10 @@
 | PRFL-04 | Phase 177 | Complete |
 | PRFL-05 | Phase 177 | Complete |
 | PRFL-06 | Phase 177 | Complete |
-| DERV-01 | Phase 178 | Pending |
-| DERV-02 | Phase 178 | Pending |
-| DERV-03 | Phase 178 | Pending |
-| DERV-04 | Phase 178 | Pending |
+| DERV-01 | Phase 178 | Complete |
+| DERV-02 | Phase 178 | Complete |
+| DERV-03 | Phase 178 | Complete |
+| DERV-04 | Phase 178 | Complete |
 | STAB-01 | Phase 179 | Pending |
 | STAB-02 | Phase 179 | Pending |
 
