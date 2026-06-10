@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import shutil
 import subprocess
@@ -40,6 +41,14 @@ from sol_execbench.core.dataset.profiler_timing_coverage import (
 from sol_execbench.core.dataset.runner import build_reference_solution
 from sol_execbench.driver import ProblemPackager
 from sol_execbench.core.bench.pid_lock import acquire_pid_lock
+from sol_execbench.core.bench.timing_isolation import (
+    clear_gpu_cache_between_subprocesses,
+    collect_timing_environment_snapshot,
+    detect_concurrent_gpu_processes,
+    verify_clock_state_with_warning,
+)
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_DATASET_ROOT = Path("data/SOL-ExecBench/benchmark")
 DEFAULT_SOURCE_TIMING_DIR = Path("out/rdna4-timing-evidence/timing")
@@ -113,6 +122,19 @@ def run_batch(
         else rocprofv3_available
     )
 
+    # Pre-flight timing isolation audit
+    logger.info("Running timing isolation pre-flight audit...")
+    concurrent_processes = detect_concurrent_gpu_processes()
+    if concurrent_processes:
+        logger.warning(
+            "Detected %d concurrent GPU process(es). This may introduce timing variability: %s",
+            len(concurrent_processes),
+            concurrent_processes,
+        )
+    clock_state_verified = verify_clock_state_with_warning(context="batch_start")
+    if not clock_state_verified:
+        logger.warning("Clock state verification failed at batch start")
+
     results: list[dict[str, Any]] = []
     marked_blocked = _mark_blocked_targets(
         coverage,
@@ -123,9 +145,14 @@ def run_batch(
     results.extend(marked_blocked)
     marked_blocked_ids = {result["problem_id"] for result in marked_blocked}
     if not mark_blocked_only:
-        for target in targets:
+        for idx, target in enumerate(targets, 1):
             if target.problem_id in marked_blocked_ids:
                 continue
+
+            # Re-verify clock state between problems (every 10 problems)
+            if idx % 10 == 0:
+                verify_clock_state_with_warning(context=f"problem_{idx}")
+
             if workload_sharded:
                 results.append(
                     _profile_target_workload_sharded(
@@ -164,6 +191,9 @@ def run_batch(
                         runner=runner,
                     )
                 )
+
+            # Clear GPU cache at subprocess boundary
+            clear_gpu_cache_between_subprocesses()
 
     summary = _build_summary(
         coverage=coverage,
@@ -1280,6 +1310,7 @@ def _build_summary(
         "source_timing_dirs": [str(path) for path in source_timing_dirs],
         "claim_boundary": CLAIM_BOUNDARY,
         "results": list(results),
+        "timing_isolation_snapshot": collect_timing_environment_snapshot(),
     }
 
 
