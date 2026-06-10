@@ -36,8 +36,8 @@
 
 ### Evaluation Stability Extension
 
-- [ ] **STAB-01**: New reason codes (`gpu_contention`, `multi_instance_interference`) are added to evaluation stability diagnostics for concurrent GPU access detection
-- [ ] **STAB-02**: Integration tests verify PID lock contention, parallel staging + serial profiling, and isolation audit output
+- [x] **STAB-01**: New reason codes (`gpu_contention`, `multi_instance_interference`) are added to evaluation stability diagnostics for concurrent GPU access detection
+- [x] **STAB-02**: Integration tests verify PID lock contention, parallel staging + serial profiling, and isolation audit output
 
 ## v2 Requirements
 
@@ -80,8 +80,8 @@
 | DERV-02 | Phase 178 | Complete |
 | DERV-03 | Phase 178 | Complete |
 | DERV-04 | Phase 178 | Complete |
-| STAB-01 | Phase 179 | Pending |
-| STAB-02 | Phase 179 | Pending |
+| STAB-01 | Phase 179 | Complete |
+| STAB-02 | Phase 179 | Complete |
 
 **Coverage:**
 - v1 requirements: 19 total
