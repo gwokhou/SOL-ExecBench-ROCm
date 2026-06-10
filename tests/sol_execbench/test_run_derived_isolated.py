@@ -165,10 +165,15 @@ def test_main_records_per_problem_status_and_continues(tmp_path, monkeypatch):
         json.loads(line)
         for line in (tmp_path / "status.jsonl").read_text().splitlines()
     ]
-    assert [item["problem_id"] for item in statuses] == ["L1/a", "L1/b"]
-    assert [item["status"] for item in statuses] == ["ok", "failed"]
-    assert str(first) in statuses[0]["command"]
-    assert str(second) in statuses[1]["command"]
+    # After parallel execution, results are sorted by problem_id for determinism
+    assert sorted([item["problem_id"] for item in statuses]) == ["L1/a", "L1/b"]
+    assert {item["problem_id"]: item["status"] for item in statuses} == {
+        "L1/a": "ok",
+        "L1/b": "failed",
+    }
+    # Verify both problems were executed
+    assert any(str(first) in s["command"] for s in statuses)
+    assert any(str(second) in s["command"] for s in statuses)
 
 
 def test_thread_safe_jsonl_writes(tmp_path):

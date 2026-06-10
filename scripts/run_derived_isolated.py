@@ -15,7 +15,9 @@ import json
 import os
 import shlex
 import subprocess
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import nullcontext
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -240,6 +242,66 @@ def run_problem(
     )
 
 
+def _partition_problems_by_index(
+    problems: list[Path],
+    max_workers: int,
+) -> list[list[Path]]:
+    """Pre-partition problems for exclusive worker ownership."""
+    if not problems:
+        return []
+    chunk_size = (len(problems) + max_workers - 1) // max_workers
+    chunks = []
+    for i in range(0, len(problems), chunk_size):
+        chunks.append(problems[i : i + chunk_size])
+    return chunks
+
+
+def _process_problem_chunk(
+    chunk: list[Path],
+    *,
+    args: argparse.Namespace,
+    benchmark_dir: Path,
+    status_lock: threading.Lock,
+) -> list[ProblemStatus]:
+    """Process a chunk of problems serially within a worker thread."""
+    chunk_results = []
+    for problem_dir in chunk:
+        problem_id = problem_id_for(benchmark_dir, problem_dir)
+        if (
+            args.problem_id_filter is not None
+            and problem_id not in args.problem_id_filter
+        ):
+            continue
+        if should_skip(
+            problem_id,
+            completed=args.completed,
+            start_at=args.start_at,
+            start_after=args.start_after,
+        ):
+            continue
+        print(f"DERIVED {problem_id}", flush=True)
+        status = run_problem(
+            args,
+            problem_id=problem_id,
+            problem_dir=problem_dir,
+            log_path=args.log_file,
+        )
+        with status_lock:
+            append_status(args.status_jsonl, status)
+        print(
+            f"{problem_id}: {status.status} rc={status.returncode} "
+            f"elapsed={status.elapsed_seconds:.1f}s",
+            flush=True,
+        )
+        chunk_results.append(status)
+
+        # Handle --continue-on-failure
+        if status.status != "ok" and not args.continue_on_failure:
+            # Early exit: return what we have, signal failure via status
+            return chunk_results
+    return chunk_results
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("benchmark_dir", type=Path)
@@ -286,6 +348,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Acquire exclusive process lock to prevent concurrent runs",
     )
+    parser.add_argument(
+        "--jobs",
+        type=int,
+        default=min(os.cpu_count() or 1, 4),
+        help="Number of concurrent jobs (default: min(cpu_count, 4))",
+    )
     return parser.parse_args(argv)
 
 
@@ -302,37 +370,49 @@ def main(argv: list[str] | None = None) -> int:
         problems = discover_problems(args.benchmark_dir, args.category)
         problem_id_filter = load_problem_id_filter(args.problem_id_file)
         completed = load_completed(args.status_jsonl) if args.resume else set()
-        failures = 0
 
-        for problem_dir in problems:
-            problem_id = problem_id_for(args.benchmark_dir, problem_dir)
-            if problem_id_filter is not None and problem_id not in problem_id_filter:
-                continue
-            if should_skip(
-                problem_id,
-                completed=completed,
-                start_at=args.start_at,
-                start_after=args.start_after,
-            ):
-                continue
-            print(f"DERIVED {problem_id}", flush=True)
-            status = run_problem(
-                args,
-                problem_id=problem_id,
-                problem_dir=problem_dir,
-                log_path=args.log_file,
-            )
-            append_status(args.status_jsonl, status)
-            print(
-                f"{problem_id}: {status.status} rc={status.returncode} "
-                f"elapsed={status.elapsed_seconds:.1f}s",
-                flush=True,
-            )
-            if status.status != "ok":
-                failures += 1
-                if not args.continue_on_failure:
-                    return status.returncode or 1
-        return 1 if failures else 0
+        # Attach filter and completed set to args for worker access
+        args.problem_id_filter = problem_id_filter
+        args.completed = completed
+
+        # Pre-partition problems for parallel execution
+        problem_chunks = _partition_problems_by_index(problems, args.jobs)
+        status_lock = threading.Lock()
+
+        try:
+            all_results = []
+            with ThreadPoolExecutor(max_workers=args.jobs) as executor:
+                futures = {
+                    executor.submit(
+                        _process_problem_chunk,
+                        chunk,
+                        args=args,
+                        benchmark_dir=args.benchmark_dir,
+                        status_lock=status_lock,
+                    ): chunk
+                    for chunk in problem_chunks
+                }
+
+                for future in as_completed(futures.keys()):
+                    chunk_results = future.result()
+                    all_results.extend(chunk_results)
+
+                    # Early exit on failure if --continue-on-failure not set
+                    if chunk_results and chunk_results[-1].status != "ok":
+                        if not args.continue_on_failure:
+                            # Cancel remaining futures
+                            for f in futures:
+                                f.cancel()
+                            return chunk_results[-1].returncode or 1
+
+            # Sort results by problem_id for deterministic output
+            all_results.sort(key=lambda s: s.problem_id)
+            failures = sum(1 for s in all_results if s.status != "ok")
+            return 1 if failures else 0
+
+        except KeyboardInterrupt:
+            # Exit code 130 for SIGINT (128 + 2)
+            return 130
 
 
 if __name__ == "__main__":
