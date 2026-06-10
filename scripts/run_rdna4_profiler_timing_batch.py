@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import tempfile
 from collections.abc import Sequence
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
@@ -236,55 +237,87 @@ def run_batch(
     results.extend(marked_blocked)
     marked_blocked_ids = {result["problem_id"] for result in marked_blocked}
     if not mark_blocked_only:
-        for idx, target in enumerate(targets, 1):
-            if target.problem_id in marked_blocked_ids:
-                continue
+        # Pre-partition targets by index for CPU-parallel staging (PRFL-03)
+        target_chunks = _partition_targets_by_index(targets, max_workers)
 
-            # Re-verify clock state between problems (every 10 problems)
-            if idx % 10 == 0:
-                verify_clock_state_with_warning(context=f"problem_{idx}")
-
-            if workload_sharded:
-                results.append(
-                    _profile_target_workload_sharded(
-                        target,
-                        dataset_root=dataset_root,
-                        replacement_timing_dir=replacement_root,
-                        output_dir=output_dir,
-                        workload_limit=workload_limit,
-                        workload_offset=workload_offset,
-                        workload_slice_timing_dirs=workload_slice_timing_dirs,
-                        workload_sharded_import_only=workload_sharded_import_only,
-                        timeout=timeout,
-                        temp_dir=temp_dir,
-                        tool_version=tool_version,
-                        gpu_architecture=gpu_architecture,
-                        clock_locked=clock_locked,
-                        rocprofv3_available=available,
-                        runner=runner,
-                    )
+        # CPU-parallel staging + GPU-serial profiling (PRFL-01, PRFL-02)
+        all_results = []
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {}
+            for chunk_idx, chunk in enumerate(target_chunks):
+                global_start_idx = sum(len(c) for c in target_chunks[:chunk_idx])
+                future = executor.submit(
+                    _process_target_chunk,
+                    chunk=chunk,
+                    dataset_root=dataset_root,
+                    replacement_timing_dir=replacement_root,
+                    output_dir=output_dir,
+                    workload_limit=workload_limit,
+                    workload_offset=workload_offset,
+                    workload_sharded=workload_sharded,
+                    workload_slice_timing_dirs=workload_slice_timing_dirs,
+                    workload_sharded_import_only=workload_sharded_import_only,
+                    timeout=timeout,
+                    temp_dir=temp_dir,
+                    tool_version=tool_version,
+                    gpu_architecture=gpu_architecture,
+                    clock_locked=clock_locked,
+                    rocprofv3_available=available,
+                    runner=runner,
+                    marked_blocked_ids=marked_blocked_ids,
+                    global_start_index=global_start_idx,
                 )
-            else:
-                results.append(
-                    _profile_target(
-                        target,
-                        dataset_root=dataset_root,
-                        replacement_timing_dir=replacement_root,
-                        output_dir=output_dir,
-                        workload_limit=workload_limit,
-                        workload_offset=workload_offset,
-                        timeout=timeout,
-                        temp_dir=temp_dir,
-                        tool_version=tool_version,
-                        gpu_architecture=gpu_architecture,
-                        clock_locked=clock_locked,
-                        rocprofv3_available=available,
-                        runner=runner,
-                    )
-                )
+                futures[future] = chunk_idx
 
-            # Clear GPU cache at subprocess boundary
-            clear_gpu_cache_between_subprocesses()
+            try:
+                # Wait for all futures to complete
+                for future in as_completed(futures.keys()):
+                    chunk_results = future.result()
+                    all_results.extend(chunk_results)
+            except KeyboardInterrupt:
+                # Structured interrupt handling (PRFL-05)
+                logger.info(
+                    "Keyboard interrupt received, cancelling pending workers..."
+                )
+                for future in futures:
+                    future.cancel()
+
+                # Collect completed results
+                partial_results = []
+                for future in futures:
+                    if future.done():
+                        try:
+                            chunk_results = future.result()
+                            partial_results.extend(chunk_results)
+                        except Exception as exc:
+                            logger.error(f"Worker failed: {exc}")
+
+                all_results = partial_results
+
+                # Build partial-completion summary
+                summary = _build_summary(
+                    coverage=coverage,
+                    selected_targets=targets,
+                    results=all_results,
+                    output_dir=output_dir,
+                    replacement_timing_dir=replacement_root,
+                    source_timing_dirs=source_timing_dirs,
+                    rocprofv3_available=available,
+                    interrupted=True,  # NEW: flag for partial completion
+                )
+                (output_dir / "batch-summary.json").write_text(
+                    json.dumps(summary, indent=2, sort_keys=True) + "\n",
+                    encoding="utf-8",
+                )
+                (output_dir / "batch-summary.md").write_text(
+                    _render_summary_markdown(summary),
+                    encoding="utf-8",
+                )
+                return 130  # Standard exit code for interrupted batch
+
+        # Sort results for deterministic output order (PRFL-06)
+        all_results.sort(key=lambda r: r["problem_id"])
+        results = all_results
 
     summary = _build_summary(
         coverage=coverage,
@@ -1370,6 +1403,7 @@ def _build_summary(
     replacement_timing_dir: Path,
     source_timing_dirs: Sequence[Path],
     rocprofv3_available: bool,
+    interrupted: bool = False,
 ) -> dict[str, Any]:
     succeeded = sum(1 for result in results if result["status"] == "profiler_backed")
     partial = sum(
@@ -1402,6 +1436,7 @@ def _build_summary(
         "claim_boundary": CLAIM_BOUNDARY,
         "results": list(results),
         "timing_isolation_snapshot": collect_timing_environment_snapshot(),
+        "interrupted": interrupted,
     }
 
 
