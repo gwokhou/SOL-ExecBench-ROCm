@@ -13,10 +13,10 @@
 
 ### Timing Environment Isolation
 
-- [ ] **ISOL-01**: Pre-flight audit detects concurrent GPU processes via `rocm-smi` or `amd-smi` before profiling starts and warns or aborts
-- [ ] **ISOL-02**: Clock lock state is verified at batch start and rechecked between problems during long batch runs
-- [ ] **ISOL-03**: `torch.cuda.empty_cache()` is called at subprocess boundaries to reduce inter-problem GPU state leakage
-- [ ] **ISOL-04**: Batch summary sidecar records environment snapshot (GPU processes, clock state, lock status) for reproducibility audit
+- [x] **ISOL-01**: Pre-flight audit detects concurrent GPU processes via `rocm-smi` or `amd-smi` before profiling starts and warns or aborts
+- [x] **ISOL-02**: Clock lock state is verified at batch start and rechecked between problems during long batch runs
+- [x] **ISOL-03**: `torch.cuda.empty_cache()` is called at subprocess boundaries to reduce inter-problem GPU state leakage
+- [x] **ISOL-04**: Batch summary sidecar records environment snapshot (GPU processes, clock state, lock status) for reproducibility audit
 
 ### Profiler Timing Batch Parallelism
 
@@ -66,10 +66,10 @@
 | INST-01 | Phase 175 | Complete |
 | INST-02 | Phase 175 | Complete |
 | INST-03 | Phase 175 | Complete |
-| ISOL-01 | Phase 176 | Pending |
-| ISOL-02 | Phase 176 | Pending |
-| ISOL-03 | Phase 176 | Pending |
-| ISOL-04 | Phase 176 | Pending |
+| ISOL-01 | Phase 176 | Complete |
+| ISOL-02 | Phase 176 | Complete |
+| ISOL-03 | Phase 176 | Complete |
+| ISOL-04 | Phase 176 | Complete |
 | PRFL-01 | Phase 177 | Pending |
 | PRFL-02 | Phase 177 | Pending |
 | PRFL-03 | Phase 177 | Pending |
