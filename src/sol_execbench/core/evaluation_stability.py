@@ -19,20 +19,24 @@ from sol_execbench.core.dataset.manifest import DatasetManifestChecksum
 EVALUATION_STABILITY_SCHEMA_VERSION = "sol_execbench.evaluation_stability.v1"
 
 STABILITY_STATUS_KEYS = (
-    "stable",
-    "noisy",
+    "backend_unsupported",
+    "clock_unlocked",
+    "gpu_contention",
     "insufficient_samples",
     "missing_timing",
-    "clock_unlocked",
+    "multi_instance_interference",
+    "noisy",
     "profiler_overhead_risk",
-    "backend_unsupported",
+    "stable",
 )
 STABILITY_STATUS_PRIORITY = (
     "backend_unsupported",
     "missing_timing",
     "insufficient_samples",
     "clock_unlocked",
+    "gpu_contention",
     "profiler_overhead_risk",
+    "multi_instance_interference",
     "noisy",
     "stable",
 )
@@ -91,13 +95,15 @@ class StabilityWorkload(BaseModel):
 class StabilityStatusTotals(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    stable: int = 0
-    noisy: int = 0
+    backend_unsupported: int = 0
+    clock_unlocked: int = 0
+    gpu_contention: int = 0
     insufficient_samples: int = 0
     missing_timing: int = 0
-    clock_unlocked: int = 0
+    multi_instance_interference: int = 0
+    noisy: int = 0
     profiler_overhead_risk: int = 0
-    backend_unsupported: int = 0
+    stable: int = 0
 
     def add(self, status: str) -> None:
         if status not in STABILITY_STATUS_KEYS:
@@ -299,6 +305,13 @@ def _reason_codes(
         reasons.append("insufficient_samples")
     if payload.get("clock_locked") is False:
         reasons.append("clock_unlocked")
+    # Detect concurrent GPU processes
+    concurrent_processes = payload.get("concurrent_gpu_processes")
+    if isinstance(concurrent_processes, list) and concurrent_processes:
+        reasons.append("gpu_contention")
+    # Detect PID lock contention
+    if payload.get("pid_lock_contention") is True:
+        reasons.append("multi_instance_interference")
     if payload.get("fallback_applied") is True or backend in {
         "device_events",
         "pytorch_profiler",
