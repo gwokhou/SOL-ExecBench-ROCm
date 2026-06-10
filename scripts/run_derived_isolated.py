@@ -16,9 +16,12 @@ import os
 import shlex
 import subprocess
 import time
+from contextlib import nullcontext
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Literal
+
+from sol_execbench.core.bench.pid_lock import acquire_pid_lock
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -278,45 +281,58 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--continue-on-failure", action="store_true")
+    parser.add_argument(
+        "--pid-lock",
+        action="store_true",
+        help="Acquire exclusive process lock to prevent concurrent runs",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    problems = discover_problems(args.benchmark_dir, args.category)
-    problem_id_filter = load_problem_id_filter(args.problem_id_file)
-    completed = load_completed(args.status_jsonl) if args.resume else set()
-    failures = 0
 
-    for problem_dir in problems:
-        problem_id = problem_id_for(args.benchmark_dir, problem_dir)
-        if problem_id_filter is not None and problem_id not in problem_id_filter:
-            continue
-        if should_skip(
-            problem_id,
-            completed=completed,
-            start_at=args.start_at,
-            start_after=args.start_after,
-        ):
-            continue
-        print(f"DERIVED {problem_id}", flush=True)
-        status = run_problem(
-            args,
-            problem_id=problem_id,
-            problem_dir=problem_dir,
-            log_path=args.log_file,
-        )
-        append_status(args.status_jsonl, status)
-        print(
-            f"{problem_id}: {status.status} rc={status.returncode} "
-            f"elapsed={status.elapsed_seconds:.1f}s",
-            flush=True,
-        )
-        if status.status != "ok":
-            failures += 1
-            if not args.continue_on_failure:
-                return status.returncode or 1
-    return 1 if failures else 0
+    # Conditional PID lock based on --pid-lock flag
+    if args.pid_lock:
+        acquire = acquire_pid_lock(args.output_dir)
+    else:
+        acquire = nullcontext()
+
+    with acquire:
+        problems = discover_problems(args.benchmark_dir, args.category)
+        problem_id_filter = load_problem_id_filter(args.problem_id_file)
+        completed = load_completed(args.status_jsonl) if args.resume else set()
+        failures = 0
+
+        for problem_dir in problems:
+            problem_id = problem_id_for(args.benchmark_dir, problem_dir)
+            if problem_id_filter is not None and problem_id not in problem_id_filter:
+                continue
+            if should_skip(
+                problem_id,
+                completed=completed,
+                start_at=args.start_at,
+                start_after=args.start_after,
+            ):
+                continue
+            print(f"DERIVED {problem_id}", flush=True)
+            status = run_problem(
+                args,
+                problem_id=problem_id,
+                problem_dir=problem_dir,
+                log_path=args.log_file,
+            )
+            append_status(args.status_jsonl, status)
+            print(
+                f"{problem_id}: {status.status} rc={status.returncode} "
+                f"elapsed={status.elapsed_seconds:.1f}s",
+                flush=True,
+            )
+            if status.status != "ok":
+                failures += 1
+                if not args.continue_on_failure:
+                    return status.returncode or 1
+        return 1 if failures else 0
 
 
 if __name__ == "__main__":
