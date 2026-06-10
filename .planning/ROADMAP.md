@@ -47,7 +47,7 @@ environment independence and reproducibility for statistics-sensitive scripts.
 - [x] **Phase 176: Timing Isolation Audit** - Pre-flight GPU contention detection and environment audit for reproducibility (completed 2026-06-10)
 - [x] **Phase 177: Profiler Timing Batch Parallelism** - CPU-parallel staging with GPU-serial profiling for the profiler timing batch script (completed 2026-06-10)
 - [x] **Phase 178: Derived Script Parallelism** - ThreadPoolExecutor-based parallel dispatch for the derived isolation script (completed 2026-06-10)
-- [ ] **Phase 179: Evaluation Stability Extension and Integration Tests** - New reason codes and end-to-end integration validation
+- [x] **Phase 179: Evaluation Stability Extension and Integration Tests** - New reason codes and end-to-end integration validation (completed 2026-06-10)
 
 ## Phase Details
 
@@ -118,7 +118,7 @@ environment independence and reproducibility for statistics-sensitive scripts.
   2. Integration tests verify PID lock contention (second instance rejected), parallel staging with serial profiling (no GPU overlap), and isolation audit output (environment snapshot present and well-formed)
 **Plans**: 1 plan
 **Plan List**:
-- [ ] 179-01-PLAN.md — Extend evaluation stability with gpu_contention and multi_instance_interference reason codes, create integration tests for PID lock contention, parallel staging with serial profiling, and isolation audit output
+- [x] 179-01-PLAN.md — Extend evaluation stability with gpu_contention and multi_instance_interference reason codes, create integration tests for PID lock contention, parallel staging with serial profiling, and isolation audit output
 
 ## Progress
 
@@ -131,4 +131,4 @@ Phases execute in numeric order: 175 -> 176 -> 177 -> 178 -> 179
 | 176. Timing Isolation Audit | 1/1 | Complete    | 2026-06-10 |
 | 177. Profiler Timing Batch Parallelism | 1/1 | Complete    | 2026-06-10 |
 | 178. Derived Script Parallelism | 1/1 | Complete    | 2026-06-10 |
-| 179. Evaluation Stability Extension and Integration Tests | 1/1 | Ready to execute | - |
+| 179. Evaluation Stability Extension and Integration Tests | 1/1 | Complete   | 2026-06-10 |
