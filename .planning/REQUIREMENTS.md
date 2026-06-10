@@ -7,9 +7,9 @@
 
 ### Instance Safety
 
-- [ ] **INST-01**: Script acquires an exclusive `fcntl.flock` on a per-output-directory lock file at startup and exits with a clear diagnostic message if another instance holds the lock
-- [ ] **INST-02**: Lock is auto-released on process exit including SIGKILL and OOM kill with no stale-lock cleanup required
-- [ ] **INST-03**: PID lock is mandatory for `run_rdna4_profiler_timing_batch.py` and `run_rdna4_profiler_overhead_calibration.py`; optional via flag for `run_derived_isolated.py`
+- [x] **INST-01**: Script acquires an exclusive `fcntl.flock` on a per-output-directory lock file at startup and exits with a clear diagnostic message if another instance holds the lock
+- [x] **INST-02**: Lock is auto-released on process exit including SIGKILL and OOM kill with no stale-lock cleanup required
+- [x] **INST-03**: PID lock is mandatory for `run_rdna4_profiler_timing_batch.py` and `run_rdna4_profiler_overhead_calibration.py`; optional via flag for `run_derived_isolated.py`
 
 ### Timing Environment Isolation
 
@@ -63,9 +63,9 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INST-01 | Phase 175 | Pending |
-| INST-02 | Phase 175 | Pending |
-| INST-03 | Phase 175 | Pending |
+| INST-01 | Phase 175 | Complete |
+| INST-02 | Phase 175 | Complete |
+| INST-03 | Phase 175 | Complete |
 | ISOL-01 | Phase 176 | Pending |
 | ISOL-02 | Phase 176 | Pending |
 | ISOL-03 | Phase 176 | Pending |
