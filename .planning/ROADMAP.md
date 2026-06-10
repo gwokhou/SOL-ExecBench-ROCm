@@ -94,7 +94,7 @@ environment independence and reproducibility for statistics-sensitive scripts.
 **Plan List**:
 - [x] 177-01-PLAN.md — Refactor run_rdna4_profiler_timing_batch.py with ThreadPoolExecutor-based parallel staging, comprehensive tests covering all six requirements
 
-### Phase 178: Derived Script Parallelism
+### Phase 178: Derived Script Parallelism ✅ COMPLETE
 
 **Goal**: The derived isolation script runs multiple problem subprocesses concurrently, improving throughput for CPU-bound derived sidecar generation without affecting GPU correctness
 **Depends on**: Phase 175 (PID lock, optional flag)
@@ -116,7 +116,9 @@ environment independence and reproducibility for statistics-sensitive scripts.
 **Success Criteria** (what must be TRUE):
   1. Evaluation stability diagnostics include `gpu_contention` and `multi_instance_interference` reason codes for concurrent GPU access detection
   2. Integration tests verify PID lock contention (second instance rejected), parallel staging with serial profiling (no GPU overlap), and isolation audit output (environment snapshot present and well-formed)
-**Plans**: TBD
+**Plans**: 1 plan
+**Plan List**:
+- [ ] 179-01-PLAN.md — Extend evaluation stability with gpu_contention and multi_instance_interference reason codes, create integration tests for PID lock contention, parallel staging with serial profiling, and isolation audit output
 
 ## Progress
 
@@ -129,4 +131,4 @@ Phases execute in numeric order: 175 -> 176 -> 177 -> 178 -> 179
 | 176. Timing Isolation Audit | 1/1 | Complete    | 2026-06-10 |
 | 177. Profiler Timing Batch Parallelism | 1/1 | Complete    | 2026-06-10 |
 | 178. Derived Script Parallelism | 1/1 | Complete    | 2026-06-10 |
-| 179. Evaluation Stability Extension and Integration Tests | 0/? | Not started | - |
+| 179. Evaluation Stability Extension and Integration Tests | 1/1 | Ready to execute | - |
