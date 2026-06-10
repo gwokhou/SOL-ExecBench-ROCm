@@ -41,11 +41,11 @@ class TestProcessLock:
         # (This is a basic smoke test; detailed auto-release tests are below)
 
     def test_exclusive_acquire(self, tmp_path):
-        """Test that second concurrent acquisition fails with BlockingIOError."""
+        """Test that second concurrent acquisition exits the process."""
         # First acquisition should succeed
         with acquire_pid_lock(tmp_path):
-            # Second acquisition should fail
-            with pytest.raises(BlockingIOError):
+            # Second acquisition should trigger sys.exit(1)
+            with pytest.raises(SystemExit):
                 with acquire_pid_lock(tmp_path):
                     pass
 
