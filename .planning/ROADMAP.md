@@ -78,7 +78,7 @@ environment independence and reproducibility for statistics-sensitive scripts.
 **Plan List**:
 - [x] 176-01-PLAN.md — Create timing_isolation.py module with concurrent GPU process detection, clock verification, cache clearing, and environment snapshot, plus comprehensive tests and script integration
 
-### Phase 177: Profiler Timing Batch Parallelism ✅ PLANNED
+### Phase 177: Profiler Timing Batch Parallelism ✅ COMPLETE
 
 **Goal**: The profiler timing batch script stages problems in parallel CPU threads while keeping GPU profiling strictly serial, eliminating the manual multi-instance workflow and its timing bias
 **Depends on**: Phase 175 (PID lock), Phase 176 (timing isolation)
@@ -104,7 +104,9 @@ environment independence and reproducibility for statistics-sensitive scripts.
   2. Status JSONL writes are thread-safe -- concurrent workers never produce interleaved or corrupted lines
   3. Existing `--resume` and `--continue-on-failure` semantics produce identical results under parallel execution as under serial execution
   4. `--jobs` flag controls concurrency level with a sensible default (e.g., `min(os.cpu_count(), 4)`)
-**Plans**: TBD
+**Plans**: 1 plan
+**Plan List**:
+- [ ] 178-01-PLAN.md — Refactor run_derived_isolated.py with ThreadPoolExecutor-based parallel dispatch, thread-safe JSONL writes, and comprehensive tests
 
 ### Phase 179: Evaluation Stability Extension and Integration Tests
 
@@ -126,5 +128,5 @@ Phases execute in numeric order: 175 -> 176 -> 177 -> 178 -> 179
 | 175. PID Lock Module | 1/1 | Complete    | 2026-06-10 |
 | 176. Timing Isolation Audit | 1/1 | Complete    | 2026-06-10 |
 | 177. Profiler Timing Batch Parallelism | 1/1 | Complete    | 2026-06-10 |
-| 178. Derived Script Parallelism | 0/? | Not started | - |
+| 178. Derived Script Parallelism | 0/1 | Planning complete | - |
 | 179. Evaluation Stability Extension and Integration Tests | 0/? | Not started | - |
