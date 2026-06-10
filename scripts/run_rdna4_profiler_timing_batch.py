@@ -39,6 +39,7 @@ from sol_execbench.core.dataset.profiler_timing_coverage import (
 )
 from sol_execbench.core.dataset.runner import build_reference_solution
 from sol_execbench.driver import ProblemPackager
+from sol_execbench.core.bench.pid_lock import acquire_pid_lock
 
 DEFAULT_DATASET_ROOT = Path("data/SOL-ExecBench/benchmark")
 DEFAULT_SOURCE_TIMING_DIR = Path("out/rdna4-timing-evidence/timing")
@@ -1385,28 +1386,29 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.skip_problem_file
     )
     try:
-        return run_batch(
-            dataset_root=args.dataset_root,
-            output_dir=args.output_dir,
-            source_timing_dirs=source_timing_dirs,
-            replacement_timing_dir=args.replacement_timing_dir,
-            limit=args.limit,
-            only_problem=tuple(args.only_problem),
-            skip_problem=skip_problem,
-            mark_blocked_problem=tuple(args.mark_blocked_problem),
-            mark_blocked_only=args.mark_blocked_only,
-            workload_limit=args.workload_limit,
-            workload_offset=args.workload_offset,
-            workload_sharded=args.workload_sharded,
-            workload_slice_timing_dirs=tuple(args.workload_slice_timing_dir),
-            workload_sharded_import_only=args.workload_sharded_import_only,
-            timeout=args.timeout,
-            temp_dir=args.temp_dir,
-            resume=args.resume,
-            tool_version=args.timing_tool_version,
-            gpu_architecture=args.gpu_architecture,
-            clock_locked=args.clock_locked,
-        )
+        with acquire_pid_lock(args.output_dir):
+            return run_batch(
+                dataset_root=args.dataset_root,
+                output_dir=args.output_dir,
+                source_timing_dirs=source_timing_dirs,
+                replacement_timing_dir=args.replacement_timing_dir,
+                limit=args.limit,
+                only_problem=tuple(args.only_problem),
+                skip_problem=skip_problem,
+                mark_blocked_problem=tuple(args.mark_blocked_problem),
+                mark_blocked_only=args.mark_blocked_only,
+                workload_limit=args.workload_limit,
+                workload_offset=args.workload_offset,
+                workload_sharded=args.workload_sharded,
+                workload_slice_timing_dirs=tuple(args.workload_slice_timing_dir),
+                workload_sharded_import_only=args.workload_sharded_import_only,
+                timeout=args.timeout,
+                temp_dir=args.temp_dir,
+                resume=args.resume,
+                tool_version=args.timing_tool_version,
+                gpu_architecture=args.gpu_architecture,
+                clock_locked=args.clock_locked,
+            )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"ERROR: {exc}")
         return 2
