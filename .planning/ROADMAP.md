@@ -46,7 +46,7 @@ environment independence and reproducibility for statistics-sensitive scripts.
 - [x] **Phase 175: PID Lock Module** - Standalone fcntl.flock-based multi-instance prevention module
 - [x] **Phase 176: Timing Isolation Audit** - Pre-flight GPU contention detection and environment audit for reproducibility (completed 2026-06-10)
 - [x] **Phase 177: Profiler Timing Batch Parallelism** - CPU-parallel staging with GPU-serial profiling for the profiler timing batch script (completed 2026-06-10)
-- [ ] **Phase 178: Derived Script Parallelism** - ThreadPoolExecutor-based parallel dispatch for the derived isolation script
+- [x] **Phase 178: Derived Script Parallelism** - ThreadPoolExecutor-based parallel dispatch for the derived isolation script (completed 2026-06-10)
 - [ ] **Phase 179: Evaluation Stability Extension and Integration Tests** - New reason codes and end-to-end integration validation
 
 ## Phase Details
@@ -106,7 +106,7 @@ environment independence and reproducibility for statistics-sensitive scripts.
   4. `--jobs` flag controls concurrency level with a sensible default (e.g., `min(os.cpu_count(), 4)`)
 **Plans**: 1 plan
 **Plan List**:
-- [ ] 178-01-PLAN.md — Refactor run_derived_isolated.py with ThreadPoolExecutor-based parallel dispatch, thread-safe JSONL writes, and comprehensive tests
+- [x] 178-01-PLAN.md — Refactor run_derived_isolated.py with ThreadPoolExecutor-based parallel dispatch, thread-safe JSONL writes, and comprehensive tests
 
 ### Phase 179: Evaluation Stability Extension and Integration Tests
 
@@ -128,5 +128,5 @@ Phases execute in numeric order: 175 -> 176 -> 177 -> 178 -> 179
 | 175. PID Lock Module | 1/1 | Complete    | 2026-06-10 |
 | 176. Timing Isolation Audit | 1/1 | Complete    | 2026-06-10 |
 | 177. Profiler Timing Batch Parallelism | 1/1 | Complete    | 2026-06-10 |
-| 178. Derived Script Parallelism | 0/1 | Planning complete | - |
+| 178. Derived Script Parallelism | 1/1 | Complete   | 2026-06-10 |
 | 179. Evaluation Stability Extension and Integration Tests | 0/? | Not started | - |
