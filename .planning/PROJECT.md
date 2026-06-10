@@ -151,7 +151,31 @@ SOL/SOLAR sidecar pairs after 56 temporary sidecar exclusions. RDNA4 timing
 remains non-authoritative until clock-lock/reset sudoers coverage and
 profiler-backed timing evidence are rerun.
 
-## Current Milestone: v1.34 RDNA4 Readiness Blocker Closure (SHIPPED)
+## Current Milestone: v1.35 Script Parallelism and Safety Hardening
+
+**Goal:** Refactor key scripts for internal CPU-parallel/GPU-serial concurrency,
+prevent unsafe multi-instance execution, and audit and harden execution
+environment independence and reproducibility for statistics-sensitive scripts.
+
+**Target features:**
+- Internal parallelism for `run_rdna4_profiler_timing_batch.py` (CPU stage
+  parallel + GPU subprocess serial) to eliminate manual multi-instance timing
+  bias
+- Internal parallelism for `run_derived_isolated.py` (multi-problem CPU
+  parallel derived sidecar generation)
+- Defensive multi-instance prevention via PID locks or equivalent for scripts
+  that must not run concurrently
+- Execution environment independence and reproducibility audit for
+  statistics-sensitive scripts: GPU isolation, L2 cache pollution, timing
+  reproducibility, and side-channel interference checks
+
+**Explicitly deferred:**
+- Changing any public CLI interface, trace JSONL schema, or sidecar format.
+- Adding new benchmark correctness, scoring, or timing semantics.
+- Hardening scripts that are purely report/analysis utilities with no GPU
+  interaction.
+
+## Previous Milestone: v1.34 RDNA4 Readiness Blocker Closure (SHIPPED)
 
 **Shipped outcome:** v1.34 reduced RDNA4 `readiness_blocked` from 114 to 59
 over a stable 235-problem denominator. All 55 custom-input blockers were
@@ -159,14 +183,6 @@ promoted to ready. Quant triage reclassified false-positive CUDA/NVIDIA hints.
 FlashInfer workloads were semantically split into PyTorch-compatible and
 runtime-dependent buckets. Claim guardrails preserved all existing authority
 boundaries.
-
-**Explicitly deferred:**
-- Claiming NVIDIA B200 equivalence, upstream SOLAR equivalence, hosted
-  leaderboard authority, or paper-parity authority.
-- Upgrading CDNA3 or CDNA4 validation claims from RDNA4 evidence.
-- Redistributing NVIDIA/SOL-ExecBench original or derivative dataset content.
-- Treating residual readiness, runtime, OOM, correctness, or profiler blockers
-  as passed validation.
 
 ## Latest Milestone: v1.29 Dataset Migration and Compliance
 
@@ -958,4 +974,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-09 after v1.34 milestone completion*
+*Last updated: 2026-06-10 after v1.35 milestone started*
