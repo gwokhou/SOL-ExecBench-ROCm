@@ -292,6 +292,8 @@ def run_batch(
                         except Exception as exc:
                             logger.error(f"Worker failed: {exc}")
 
+                # Include marked_blocked in partial results
+                partial_results.extend(marked_blocked)
                 all_results = partial_results
 
                 # Build partial-completion summary
@@ -314,6 +316,9 @@ def run_batch(
                     encoding="utf-8",
                 )
                 return 130  # Standard exit code for interrupted batch
+
+        # Include marked_blocked in final results
+        all_results.extend(marked_blocked)
 
         # Sort results for deterministic output order (PRFL-06)
         all_results.sort(key=lambda r: r["problem_id"])
