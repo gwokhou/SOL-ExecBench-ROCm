@@ -43,7 +43,7 @@ environment independence and reproducibility for statistics-sensitive scripts.
 - Integer phases (175, 176, ...): Planned milestone work
 - Decimal phases (175.1, ...): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 175: PID Lock Module** - Standalone fcntl.flock-based multi-instance prevention module
+- [x] **Phase 175: PID Lock Module** - Standalone fcntl.flock-based multi-instance prevention module
 - [ ] **Phase 176: Timing Isolation Audit** - Pre-flight GPU contention detection and environment audit for reproducibility
 - [ ] **Phase 177: Profiler Timing Batch Parallelism** - CPU-parallel staging with GPU-serial profiling for the profiler timing batch script
 - [ ] **Phase 178: Derived Script Parallelism** - ThreadPoolExecutor-based parallel dispatch for the derived isolation script
@@ -51,7 +51,7 @@ environment independence and reproducibility for statistics-sensitive scripts.
 
 ## Phase Details
 
-### Phase 175: PID Lock Module
+### Phase 175: PID Lock Module ✅ PLANNED
 **Goal**: Scripts that must run exclusively can detect and reject concurrent instances with a kernel-managed lock that never leaves stale state
 **Depends on**: Nothing (first phase, zero dependencies)
 **Requirements**: INST-01, INST-02, INST-03
@@ -59,7 +59,9 @@ environment independence and reproducibility for statistics-sensitive scripts.
   1. A script calling `acquire_pid_lock(output_dir)` gets an exclusive lock and proceeds; a second concurrent invocation exits immediately with a clear diagnostic naming the holding process
   2. Killing the holding process (SIGKILL, OOM) releases the lock automatically so the next invocation succeeds without manual cleanup
   3. `run_rdna4_profiler_timing_batch.py` and `run_rdna4_profiler_overhead_calibration.py` acquire the lock unconditionally at startup; `run_derived_isolated.py` acquires it only when `--pid-lock` flag is passed
-**Plans**: TBD
+**Plans**: 1 plan
+**Plan List**:
+- [x] 175-01-PLAN.md — Create fcntl.flock-based PID lock module with unit/integration tests and script integration
 
 ### Phase 176: Timing Isolation Audit
 **Goal**: Profiling scripts verify their execution environment is clean before collecting timing-sensitive measurements and record that state for reproducibility audits
@@ -112,7 +114,7 @@ Phases execute in numeric order: 175 -> 176 -> 177 -> 178 -> 179
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 175. PID Lock Module | 0/? | Not started | - |
+| 175. PID Lock Module | 1/1 | Planned | - |
 | 176. Timing Isolation Audit | 0/? | Not started | - |
 | 177. Profiler Timing Batch Parallelism | 0/? | Not started | - |
 | 178. Derived Script Parallelism | 0/? | Not started | - |
