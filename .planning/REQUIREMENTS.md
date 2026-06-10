@@ -20,12 +20,12 @@
 
 ### Profiler Timing Batch Parallelism
 
-- [ ] **PRFL-01**: `run_rdna4_profiler_timing_batch.py` uses ThreadPoolExecutor for CPU-side staging (JSON parsing, ProblemPackager construction, temp directory setup) while GPU profiling subprocess runs remain serial
-- [ ] **PRFL-02**: GPU profiling exclusivity is architecturally enforced — no configuration or CLI flag can enable concurrent GPU subprocess execution
-- [ ] **PRFL-03**: Target list is pre-partitioned across worker threads by index so each worker owns exclusive targets with no file-based coordination
-- [ ] **PRFL-04**: Existing `--resume` deduplication semantics are preserved — completed targets are skipped atomically
-- [ ] **PRFL-05**: Keyboard interrupt produces structured partial-completion output with interrupted targets clearly distinguishable from completed or blocked targets
-- [ ] **PRFL-06**: Output order is deterministic regardless of parallel completion order — results are collected and written in problem-sorted order
+- [x] **PRFL-01**: `run_rdna4_profiler_timing_batch.py` uses ThreadPoolExecutor for CPU-side staging (JSON parsing, ProblemPackager construction, temp directory setup) while GPU profiling subprocess runs remain serial
+- [x] **PRFL-02**: GPU profiling exclusivity is architecturally enforced — no configuration or CLI flag can enable concurrent GPU subprocess execution
+- [x] **PRFL-03**: Target list is pre-partitioned across worker threads by index so each worker owns exclusive targets with no file-based coordination
+- [x] **PRFL-04**: Existing `--resume` deduplication semantics are preserved — completed targets are skipped atomically
+- [x] **PRFL-05**: Keyboard interrupt produces structured partial-completion output with interrupted targets clearly distinguishable from completed or blocked targets
+- [x] **PRFL-06**: Output order is deterministic regardless of parallel completion order — results are collected and written in problem-sorted order
 
 ### Derived Script Parallelism
 
@@ -70,12 +70,12 @@
 | ISOL-02 | Phase 176 | Complete |
 | ISOL-03 | Phase 176 | Complete |
 | ISOL-04 | Phase 176 | Complete |
-| PRFL-01 | Phase 177 | Pending |
-| PRFL-02 | Phase 177 | Pending |
-| PRFL-03 | Phase 177 | Pending |
-| PRFL-04 | Phase 177 | Pending |
-| PRFL-05 | Phase 177 | Pending |
-| PRFL-06 | Phase 177 | Pending |
+| PRFL-01 | Phase 177 | Complete |
+| PRFL-02 | Phase 177 | Complete |
+| PRFL-03 | Phase 177 | Complete |
+| PRFL-04 | Phase 177 | Complete |
+| PRFL-05 | Phase 177 | Complete |
+| PRFL-06 | Phase 177 | Complete |
 | DERV-01 | Phase 178 | Pending |
 | DERV-02 | Phase 178 | Pending |
 | DERV-03 | Phase 178 | Pending |
