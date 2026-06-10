@@ -51,7 +51,8 @@ environment independence and reproducibility for statistics-sensitive scripts.
 
 ## Phase Details
 
-### Phase 175: PID Lock Module ✅ PLANNED
+### Phase 175: PID Lock Module ✅ COMPLETE
+
 **Goal**: Scripts that must run exclusively can detect and reject concurrent instances with a kernel-managed lock that never leaves stale state
 **Depends on**: Nothing (first phase, zero dependencies)
 **Requirements**: INST-01, INST-02, INST-03
@@ -63,7 +64,8 @@ environment independence and reproducibility for statistics-sensitive scripts.
 **Plan List**:
 - [x] 175-01-PLAN.md — Create fcntl.flock-based PID lock module with unit/integration tests and script integration
 
-### Phase 176: Timing Isolation Audit ✅ PLANNED
+### Phase 176: Timing Isolation Audit ✅ COMPLETE
+
 **Goal**: Profiling scripts verify their execution environment is clean before collecting timing-sensitive measurements and record that state for reproducibility audits
 **Depends on**: Existing `clock_lock` module (no phase dependency)
 **Requirements**: ISOL-01, ISOL-02, ISOL-03, ISOL-04
@@ -76,7 +78,8 @@ environment independence and reproducibility for statistics-sensitive scripts.
 **Plan List**:
 - [x] 176-01-PLAN.md — Create timing_isolation.py module with concurrent GPU process detection, clock verification, cache clearing, and environment snapshot, plus comprehensive tests and script integration
 
-### Phase 177: Profiler Timing Batch Parallelism
+### Phase 177: Profiler Timing Batch Parallelism ✅ PLANNED
+
 **Goal**: The profiler timing batch script stages problems in parallel CPU threads while keeping GPU profiling strictly serial, eliminating the manual multi-instance workflow and its timing bias
 **Depends on**: Phase 175 (PID lock), Phase 176 (timing isolation)
 **Requirements**: PRFL-01, PRFL-02, PRFL-03, PRFL-04, PRFL-05, PRFL-06
@@ -87,9 +90,12 @@ environment independence and reproducibility for statistics-sensitive scripts.
   4. Existing `--resume` deduplication semantics are preserved -- completed targets are skipped atomically under parallel execution
   5. Keyboard interrupt produces structured partial-completion output where interrupted targets are clearly distinguishable from completed or blocked targets
   6. Final output order is deterministic (problem-sorted) regardless of parallel completion order
-**Plans**: TBD
+**Plans**: 1 plan
+**Plan List**:
+- [ ] 177-01-PLAN.md — Refactor run_rdna4_profiler_timing_batch.py with ThreadPoolExecutor-based parallel staging, comprehensive tests covering all six requirements
 
 ### Phase 178: Derived Script Parallelism
+
 **Goal**: The derived isolation script runs multiple problem subprocesses concurrently, improving throughput for CPU-bound derived sidecar generation without affecting GPU correctness
 **Depends on**: Phase 175 (PID lock, optional flag)
 **Requirements**: DERV-01, DERV-02, DERV-03, DERV-04
@@ -101,6 +107,7 @@ environment independence and reproducibility for statistics-sensitive scripts.
 **Plans**: TBD
 
 ### Phase 179: Evaluation Stability Extension and Integration Tests
+
 **Goal**: Evaluation stability diagnostics recognize new concurrency-related failure modes and integration tests verify the complete parallelism and safety hardening system end-to-end
 **Depends on**: Phase 175, Phase 176, Phase 177, Phase 178
 **Requirements**: STAB-01, STAB-02
@@ -118,6 +125,6 @@ Phases execute in numeric order: 175 -> 176 -> 177 -> 178 -> 179
 |-------|----------------|--------|-----------|
 | 175. PID Lock Module | 1/1 | Complete    | 2026-06-10 |
 | 176. Timing Isolation Audit | 1/1 | Complete    | 2026-06-10 |
-| 177. Profiler Timing Batch Parallelism | 0/? | Not started | - |
+| 177. Profiler Timing Batch Parallelism | 0/1 | Planned     | - |
 | 178. Derived Script Parallelism | 0/? | Not started | - |
 | 179. Evaluation Stability Extension and Integration Tests | 0/? | Not started | - |
