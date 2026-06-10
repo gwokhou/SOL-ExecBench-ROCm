@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.35
 milestone_name: Script Parallelism and Safety Hardening
-status: verifying
-stopped_at: Roadmap created for v1.35, ready to plan Phase 175
-last_updated: "2026-06-10T16:24:51.146Z"
+status: ready_to_plan
+stopped_at: Phase 177 complete (1/1) — ready to discuss Phase 178
+last_updated: 2026-06-10T16:30:43.407Z
 last_activity: 2026-06-10
 progress:
   total_phases: 5
@@ -23,13 +23,13 @@ See: `.planning/PROJECT.md` (updated 2026-06-10)
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly
 on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL
 ExecBench.
-**Current focus:** Phase 177 — Profiler Timing Batch Parallelism
+**Current focus:** Phase 178 — derived script parallelism
 
 ## Current Position
 
-Phase: 177 (Profiler Timing Batch Parallelism) — EXECUTING
-Plan: 1 of 1
-Status: Phase complete — ready for verification
+Phase: 178
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-06-10
 
 Progress: [██████████] 100%
