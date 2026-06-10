@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.34
-milestone_name: RDNA4 Readiness Blocker Closure
-status: milestone_complete
-stopped_at: Milestone v1.34 shipped and archived
-last_updated: 2026-06-09T23:30:00.000Z
-last_activity: 2026-06-09 — Milestone v1.34 shipped and archived
+milestone: v1.35
+milestone_name: Script Parallelism and Safety Hardening
+status: planning
+last_updated: "2026-06-10T14:00:00.827Z"
+last_activity: 2026-06-10
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 5
-  completed_plans: 5
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -27,10 +26,10 @@ ExecBench.
 
 ## Current Position
 
-Phase: None (milestone shipped)
-Plan: None
-Status: Planning next milestone
-Last activity: 2026-06-09
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-06-10 — Milestone v1.35 started
 
 ## Recent Trend
 
