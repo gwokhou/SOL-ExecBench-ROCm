@@ -65,6 +65,96 @@ CLAIM_BOUNDARY = (
 )
 
 
+def _partition_targets_by_index(
+    targets: list[ProfilerTimingProblemCoverage],
+    max_workers: int,
+) -> list[list[ProfilerTimingProblemCoverage]]:
+    """Pre-partition targets by index for exclusive worker ownership (PRFL-03)."""
+    if not targets:
+        return []
+    chunk_size = (len(targets) + max_workers - 1) // max_workers
+    chunks = []
+    for i in range(0, len(targets), chunk_size):
+        chunks.append(targets[i : i + chunk_size])
+    return chunks
+
+
+def _process_target_chunk(
+    chunk: list[ProfilerTimingProblemCoverage],
+    *,
+    dataset_root: Path,
+    replacement_timing_dir: Path,
+    output_dir: Path,
+    workload_limit: int | None = None,
+    workload_offset: int = 0,
+    workload_sharded: bool = False,
+    workload_slice_timing_dirs: Sequence[Path] = (),
+    workload_sharded_import_only: bool = False,
+    timeout: int = 900,
+    temp_dir: Path | None = None,
+    tool_version: str = DEFAULT_TOOL_VERSION,
+    gpu_architecture: str = DEFAULT_GPU_ARCHITECTURE,
+    clock_locked: bool = True,
+    rocprofv3_available: bool,
+    runner: ProfilerRunner,
+    marked_blocked_ids: set[str],
+    global_start_index: int = 0,
+) -> list[dict[str, Any]]:
+    """Process a chunk of targets with CPU-parallel staging + serial GPU profiling (PRFL-01, PRFL-02)."""
+    chunk_results = []
+    for local_idx, target in enumerate(chunk, 1):
+        global_target_index = global_start_index + local_idx
+        if target.problem_id in marked_blocked_ids:
+            continue
+
+        # Re-verify clock state periodically (every 10 problems globally)
+        if global_target_index % 10 == 0:
+            verify_clock_state_with_warning(context=f"problem_{global_target_index}")
+
+        # Process target (CPU staging + GPU profiling)
+        if workload_sharded:
+            result = _profile_target_workload_sharded(
+                target,
+                dataset_root=dataset_root,
+                replacement_timing_dir=replacement_timing_dir,
+                output_dir=output_dir,
+                workload_limit=workload_limit,
+                workload_offset=workload_offset,
+                workload_slice_timing_dirs=workload_slice_timing_dirs,
+                workload_sharded_import_only=workload_sharded_import_only,
+                timeout=timeout,
+                temp_dir=temp_dir,
+                tool_version=tool_version,
+                gpu_architecture=gpu_architecture,
+                clock_locked=clock_locked,
+                rocprofv3_available=rocprofv3_available,
+                runner=runner,
+            )
+        else:
+            result = _profile_target(
+                target,
+                dataset_root=dataset_root,
+                replacement_timing_dir=replacement_timing_dir,
+                output_dir=output_dir,
+                workload_limit=workload_limit,
+                workload_offset=workload_offset,
+                timeout=timeout,
+                temp_dir=temp_dir,
+                tool_version=tool_version,
+                gpu_architecture=gpu_architecture,
+                clock_locked=clock_locked,
+                rocprofv3_available=rocprofv3_available,
+                runner=runner,
+            )
+
+        chunk_results.append(result)
+
+        # Clear GPU cache at subprocess boundary
+        clear_gpu_cache_between_subprocesses()
+
+    return chunk_results
+
+
 def run_batch(
     *,
     dataset_root: Path = DEFAULT_DATASET_ROOT,
@@ -89,6 +179,7 @@ def run_batch(
     clock_locked: bool = True,
     rocprofv3_available: bool | None = None,
     runner: ProfilerRunner | None = None,
+    max_workers: int = 4,
 ) -> int:
     """Run fallback replacement batch and return a process-style status code."""
     if limit is not None and limit <= 0:
