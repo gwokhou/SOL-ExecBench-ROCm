@@ -41,7 +41,10 @@ from sol_execbench.core.dataset.profiler_timing_coverage import (
 )
 from sol_execbench.core.dataset.runner import build_reference_solution
 from sol_execbench.driver import ProblemPackager
-from sol_execbench.core.bench.pid_lock import acquire_pid_lock
+from sol_execbench.core.bench.pid_lock import (
+    acquire_pid_lock,
+    read_pid_lock_contention_marker,
+)
 from sol_execbench.core.bench.timing_isolation import (
     clear_gpu_cache_between_subprocesses,
     collect_timing_environment_snapshot,
@@ -102,9 +105,12 @@ def _process_target_chunk(
     marked_blocked_ids: set[str],
     global_start_index: int = 0,
     concurrent_gpu_processes: list[dict[str, Any]] | None = None,
+    calibration_path: Path | None = None,
+    pid_lock_contention: bool = False,
 ) -> list[dict[str, Any]]:
     """Process a chunk of targets with CPU-parallel staging + serial GPU profiling (PRFL-01, PRFL-02)."""
     chunk_results = []
+    contention_detected = pid_lock_contention
     for local_idx, target in enumerate(chunk, 1):
         global_target_index = global_start_index + local_idx
         if target.problem_id in marked_blocked_ids:
@@ -113,6 +119,9 @@ def _process_target_chunk(
         # Re-verify clock state periodically (every 10 problems globally)
         if global_target_index % 10 == 0:
             verify_clock_state_with_warning(context=f"problem_{global_target_index}")
+            # Also check for PID lock contention marker from rejected instances
+            if not contention_detected:
+                contention_detected = read_pid_lock_contention_marker(output_dir)
 
         # Process target (CPU staging + GPU profiling)
         if workload_sharded:
@@ -133,6 +142,8 @@ def _process_target_chunk(
                 rocprofv3_available=rocprofv3_available,
                 runner=runner,
                 concurrent_gpu_processes=concurrent_gpu_processes,
+                calibration_path=calibration_path,
+                pid_lock_contention=contention_detected,
             )
         else:
             result = _profile_target(
@@ -150,6 +161,8 @@ def _process_target_chunk(
                 rocprofv3_available=rocprofv3_available,
                 runner=runner,
                 concurrent_gpu_processes=concurrent_gpu_processes,
+                calibration_path=calibration_path,
+                pid_lock_contention=contention_detected,
             )
 
         chunk_results.append(result)
@@ -187,6 +200,7 @@ def run_batch(
     max_workers: int = 4,
     strict_isolation: bool = False,
     gpu_device: int | None = None,
+    calibration_path: Path | None = None,
 ) -> int:
     """Run fallback replacement batch and return a process-style status code."""
     if limit is not None and limit <= 0:
@@ -297,6 +311,7 @@ def run_batch(
                     marked_blocked_ids=marked_blocked_ids,
                     global_start_index=global_start_idx,
                     concurrent_gpu_processes=concurrent_processes or None,
+                    calibration_path=calibration_path,
                 )
                 futures[future] = chunk_idx
 
@@ -464,6 +479,8 @@ def _profile_target(
     rocprofv3_available: bool,
     runner: ProfilerRunner | None,
     concurrent_gpu_processes: list[dict[str, Any]] | None = None,
+    calibration_path: Path | None = None,
+    pid_lock_contention: bool = False,
 ) -> dict[str, Any]:
     problem_dir = dataset_root / target.problem_path
     if temp_dir is not None:
@@ -519,6 +536,7 @@ def _profile_target(
             ),
             rocprofv3_available=rocprofv3_available,
             runner=batch_runner,
+            calibration_path=calibration_path,
         )
     except subprocess.TimeoutExpired as exc:
         return _write_blocked_sidecar(
@@ -531,6 +549,7 @@ def _profile_target(
             stdout=_subprocess_text(exc.stdout),
             stderr=_subprocess_text(exc.stderr),
             concurrent_gpu_processes=concurrent_gpu_processes,
+            pid_lock_contention=pid_lock_contention,
         )
     except (OSError, ValueError) as exc:
         return _write_blocked_sidecar(
@@ -541,6 +560,7 @@ def _profile_target(
             workload_offset=workload_offset,
             workload_limit=workload_limit,
             concurrent_gpu_processes=concurrent_gpu_processes,
+            pid_lock_contention=pid_lock_contention,
         )
 
     workload_slice_applied = workload_offset != 0 or (
@@ -588,6 +608,8 @@ def _profile_target(
     if result.profiler_collected or status == "profiler_blocked":
         if concurrent_gpu_processes:
             payload["concurrent_gpu_processes"] = concurrent_gpu_processes
+        if pid_lock_contention:
+            payload["pid_lock_contention"] = True
         replacement_path.parent.mkdir(parents=True, exist_ok=True)
         replacement_path.write_text(
             json.dumps(payload, indent=2, sort_keys=True) + "\n",
@@ -627,6 +649,8 @@ def _profile_target_workload_sharded(
     rocprofv3_available: bool,
     runner: ProfilerRunner | None,
     concurrent_gpu_processes: list[dict[str, Any]] | None = None,
+    calibration_path: Path | None = None,
+    pid_lock_contention: bool = False,
 ) -> dict[str, Any]:
     if workload_limit is not None or workload_offset:
         raise ValueError("workload-sharded mode owns workload slicing")
@@ -713,6 +737,7 @@ def _profile_target_workload_sharded(
             rocprofv3_available=rocprofv3_available,
             runner=runner,
             concurrent_gpu_processes=concurrent_gpu_processes,
+            calibration_path=calibration_path,
         )
         results.append(result)
         sidecar = _load_optional_json(Path(result["replacement_path"]))
@@ -782,6 +807,7 @@ def _write_blocked_sidecar(
     stdout: str = "",
     stderr: str = "",
     concurrent_gpu_processes: list[dict[str, Any]] | None = None,
+    pid_lock_contention: bool = False,
 ) -> dict[str, Any]:
     workload_slice_applied = workload_offset != 0 or workload_limit is not None
     payload = {
@@ -817,6 +843,8 @@ def _write_blocked_sidecar(
     }
     if concurrent_gpu_processes:
         payload["concurrent_gpu_processes"] = concurrent_gpu_processes
+    if pid_lock_contention:
+        payload["pid_lock_contention"] = True
     replacement_path.parent.mkdir(parents=True, exist_ok=True)
     replacement_path.write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n",
@@ -1582,6 +1610,16 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             "Recommended on multi-GPU systems to prevent cross-device interference."
         ),
     )
+    parser.add_argument(
+        "--calibration-path",
+        type=Path,
+        default=None,
+        help=(
+            "Path to a rocprofv3 overhead calibration JSON sidecar produced by "
+            "run_rdna4_profiler_overhead_calibration.py. When provided, the profiler "
+            "overhead value is included in timing evidence payloads."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -1632,6 +1670,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 clock_locked=args.clock_locked,
                 strict_isolation=args.strict_isolation,
                 gpu_device=args.gpu_device,
+                calibration_path=args.calibration_path,
             )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"ERROR: {exc}")

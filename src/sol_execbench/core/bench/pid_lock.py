@@ -118,3 +118,27 @@ def _write_contention_marker(
         )
     except OSError:
         logger.warning("Failed to write contention marker: %s", marker_path)
+
+
+def read_pid_lock_contention_marker(output_dir: Path) -> bool:
+    """Check for a PID lock contention marker and consume it.
+
+    If a contention marker file exists (written by a rejected second instance),
+    reads it, deletes it, and returns True. Returns False otherwise.
+
+    This enables the running batch script to detect that another instance
+    attempted to start and was rejected during its profiling run.
+    """
+    marker_path = output_dir / ".sol-execbench-lock-contention.json"
+    if not marker_path.exists():
+        return False
+    try:
+        payload = json.loads(marker_path.read_text(encoding="utf-8"))
+        marker_path.unlink(missing_ok=True)
+        return bool(payload.get("pid_lock_contention"))
+    except (json.JSONDecodeError, OSError, ValueError):
+        try:
+            marker_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        return False

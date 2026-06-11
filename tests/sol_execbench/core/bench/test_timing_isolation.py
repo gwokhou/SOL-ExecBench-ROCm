@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import subprocess
@@ -501,3 +502,94 @@ class TestStrictIsolationInBatch:
         coverage.total_problems = 0
         coverage.problems = []
         return coverage
+
+
+class TestCalibrationPathArg:
+    """Test --calibration-path CLI argument and passthrough."""
+
+    def _load_batch_module(self):
+        import importlib.util
+        import sys
+
+        REPO_ROOT = Path(__file__).resolve().parents[4]
+        SCRIPT_PATH = REPO_ROOT / "scripts" / "run_rdna4_profiler_timing_batch.py"
+        spec = importlib.util.spec_from_file_location(
+            "run_rdna4_profiler_timing_batch_gap", SCRIPT_PATH
+        )
+        assert spec is not None and spec.loader is not None
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = mod
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_calibration_path_arg_parsed(self):
+        batch = self._load_batch_module()
+        args = batch.parse_args(["--calibration-path", "/tmp/cal.json"])
+        assert args.calibration_path == Path("/tmp/cal.json")
+
+    def test_calibration_path_defaults_none(self):
+        batch = self._load_batch_module()
+        args = batch.parse_args([])
+        assert args.calibration_path is None
+
+
+class TestPidLockContentionInSidecar:
+    """Test pid_lock_contention field in sidecar payloads."""
+
+    def test_blocked_sidecar_includes_contention(self, tmp_path):
+        from importlib.util import module_from_spec, spec_from_file_location
+
+        REPO_ROOT = Path(__file__).resolve().parents[4]
+        SCRIPT_PATH = REPO_ROOT / "scripts" / "run_rdna4_profiler_timing_batch.py"
+        spec = spec_from_file_location("batch_sidecar_test", SCRIPT_PATH)
+        assert spec is not None and spec.loader is not None
+        mod = module_from_spec(spec)
+        spec.loader.exec_module(mod)
+
+        target = mod.ProfilerTimingProblemCoverage(
+            problem_path="L1/test",
+            problem_id="L1/test",
+            category="L1",
+            readiness_status="ready",
+            workload_count=1,
+            status="missing",
+        )
+        replacement_path = tmp_path / "timing" / "L1" / "test.json"
+        mod._write_blocked_sidecar(
+            target,
+            replacement_path=replacement_path,
+            staging_dir=None,
+            reason="test",
+            pid_lock_contention=True,
+        )
+        payload = json.loads(replacement_path.read_text(encoding="utf-8"))
+        assert payload["pid_lock_contention"] is True
+
+    def test_blocked_sidecar_omits_contention_when_false(self, tmp_path):
+        from importlib.util import module_from_spec, spec_from_file_location
+
+        REPO_ROOT = Path(__file__).resolve().parents[4]
+        SCRIPT_PATH = REPO_ROOT / "scripts" / "run_rdna4_profiler_timing_batch.py"
+        spec = spec_from_file_location("batch_sidecar_test2", SCRIPT_PATH)
+        assert spec is not None and spec.loader is not None
+        mod = module_from_spec(spec)
+        spec.loader.exec_module(mod)
+
+        target = mod.ProfilerTimingProblemCoverage(
+            problem_path="L1/test",
+            problem_id="L1/test",
+            category="L1",
+            readiness_status="ready",
+            workload_count=1,
+            status="missing",
+        )
+        replacement_path = tmp_path / "timing" / "L1" / "test2.json"
+        mod._write_blocked_sidecar(
+            target,
+            replacement_path=replacement_path,
+            staging_dir=None,
+            reason="test",
+            pid_lock_contention=False,
+        )
+        payload = json.loads(replacement_path.read_text(encoding="utf-8"))
+        assert "pid_lock_contention" not in payload
