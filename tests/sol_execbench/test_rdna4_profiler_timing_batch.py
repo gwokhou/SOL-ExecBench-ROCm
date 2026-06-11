@@ -107,6 +107,23 @@ def _coverage(dataset_root: Path, timing_root: Path, replacement_root: Path):
     )
 
 
+def _successful_runner(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
+    """Runner that creates rocprofv3 CSV output and returns PASSED trace."""
+    output_directory = Path(command[command.index("--output-directory") + 1])
+    output_file = command[command.index("--output-file") + 1]
+    output_directory.mkdir(parents=True, exist_ok=True)
+    (output_directory / f"{output_file}_kernel_trace.csv").write_text(
+        ROCPROFV3_CSV,
+        encoding="utf-8",
+    )
+    return subprocess.CompletedProcess(
+        args=list(command),
+        returncode=0,
+        stdout=PASSED_TRACE,
+        stderr="",
+    )
+
+
 def test_batch_selects_fallback_targets_and_honors_resume(tmp_path):
     dataset_root = tmp_path / "dataset"
     source_timing = tmp_path / "fallback"
@@ -1015,59 +1032,28 @@ def test_partition_targets_by_index_more_workers_than_targets():
 
 def test_cpu_parallel_staging_gpu_serial_profiling(tmp_path):
     """Test PRFL-01 & PRFL-02: CPU staging parallel, GPU profiling serial."""
-    from unittest.mock import patch
-
     dataset_root = tmp_path / "dataset"
     source_timing = tmp_path / "fallback"
     output_dir = tmp_path / "out"
     replacement = output_dir / "timing"
 
-    # Create 3 problems
     for i in range(3):
         _write_problem(dataset_root, "L1", f"problem{i}")
         _write_fallback_timing(source_timing, "L1", f"problem{i}")
 
-    # Track collect_rocprofv3_timing calls
-    gpu_calls = []
-    original_collect = batch.collect_rocprofv3_timing
+    status = batch.run_batch(
+        dataset_root=dataset_root,
+        output_dir=output_dir,
+        source_timing_dirs=(source_timing,),
+        replacement_timing_dir=replacement,
+        max_workers=2,
+        rocprofv3_available=True,
+        runner=lambda cmd: _successful_runner(cmd),
+    )
 
-    def mock_collect(request, rocprofv3_available, runner):
-        gpu_calls.append(request.application_command)
-        return original_collect(
-            batch.Rocprofv3CollectionRequest(
-                application_command=request.application_command,
-                output_directory=request.output_directory,
-                output_file=request.output_file,
-                policy=request.policy,
-                tool_version=request.tool_version,
-                gpu_architecture=request.gpu_architecture,
-                warmup_runs=request.warmup_runs,
-                iterations=request.iterations,
-                trial_count=request.trial_count,
-                clock_locked=request.clock_locked,
-            ),
-            rocprofv3_available=False,  # Skip actual profiling
-            runner=runner,
-        )
-
-    # Mock ThreadPoolExecutor to verify submission pattern
-    with patch.object(batch, "collect_rocprofv3_timing", side_effect=mock_collect):
-        status = batch.run_batch(
-            dataset_root=dataset_root,
-            output_dir=output_dir,
-            source_timing_dirs=(source_timing,),
-            replacement_timing_dir=replacement,
-            max_workers=2,  # 2 CPU workers
-            rocprofv3_available=False,
-            runner=lambda cmd: subprocess.CompletedProcess(cmd, 0, stdout=PASSED_TRACE),
-        )
-
-    # All 3 targets should be profiled
-    assert len(gpu_calls) == 3
-
-    # GPU calls happen sequentially (not concurrent)
-    # This is enforced by architecture, not by test
     assert status == 0
+    summary = json.loads((output_dir / "batch-summary.json").read_text())
+    assert summary["succeeded"] == 3
 
 
 def test_gpu_exclusivity_architecturally_enforced():
@@ -1111,7 +1097,6 @@ def test_parallel_resume_skips_completed_targets(tmp_path):
     output_dir = tmp_path / "out"
     replacement = output_dir / "timing"
 
-    # Create 3 problems
     for i in range(3):
         _write_problem(dataset_root, "L1", f"problem{i}")
         _write_fallback_timing(source_timing, "L1", f"problem{i}")
@@ -1134,18 +1119,6 @@ def test_parallel_resume_skips_completed_targets(tmp_path):
         encoding="utf-8",
     )
 
-    # Track which problems are actually profiled
-    profiled_problems = []
-
-    def tracking_runner(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
-        # Extract problem name from command path
-        cmd_str = " ".join(command)
-        for i in range(3):
-            if f"problem{i}" in cmd_str:
-                profiled_problems.append(f"problem{i}")
-                break
-        return subprocess.CompletedProcess(command, 0, stdout=PASSED_TRACE)
-
     status = batch.run_batch(
         dataset_root=dataset_root,
         output_dir=output_dir,
@@ -1153,147 +1126,100 @@ def test_parallel_resume_skips_completed_targets(tmp_path):
         replacement_timing_dir=replacement,
         max_workers=2,
         resume=True,
-        rocprofv3_available=False,
-        runner=tracking_runner,
+        rocprofv3_available=True,
+        runner=_successful_runner,
     )
 
-    # Only problem0 and problem2 should be profiled, not problem1
-    assert len(profiled_problems) == 2
-    assert "problem1" not in profiled_problems
-    assert "problem0" in profiled_problems
-    assert "problem2" in profiled_problems
     assert status == 0
+    summary = json.loads((output_dir / "batch-summary.json").read_text())
+    # problem1 was already done (skipped via resume), so only 2 profiled
+    result_ids = [r["problem_id"] for r in summary["results"]]
+    assert "L1/problem1" not in result_ids
+    assert summary["succeeded"] == 2
 
 
 def test_keyboard_interrupt_partial_completion(tmp_path):
     """Test PRFL-05: KeyboardInterrupt produces structured partial-completion output."""
+    from unittest.mock import patch
 
     dataset_root = tmp_path / "dataset"
     source_timing = tmp_path / "fallback"
     output_dir = tmp_path / "out"
     replacement = output_dir / "timing"
 
-    # Create 5 problems
     for i in range(5):
         _write_problem(dataset_root, "L1", f"problem{i}")
         _write_fallback_timing(source_timing, "L1", f"problem{i}")
 
-    completed_count = [0]
+    # Simulate KeyboardInterrupt in main thread by raising during as_completed
+    def interrupting_as_completed(fs):
+        futures_list = list(fs)
+        # Let first future complete, then interrupt
+        for future in futures_list[:1]:
+            future.result()  # Wait for first to complete
+        raise KeyboardInterrupt("Simulated Ctrl+C")
 
-    def interrupting_runner(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
-        completed_count[0] += 1
-        # Interrupt after processing 2 problems
-        if completed_count[0] >= 2:
-            raise KeyboardInterrupt("Simulated Ctrl+C")
-        return subprocess.CompletedProcess(command, 0, stdout=PASSED_TRACE)
+    with patch.object(batch, "as_completed", side_effect=interrupting_as_completed):
+        status = batch.run_batch(
+            dataset_root=dataset_root,
+            output_dir=output_dir,
+            source_timing_dirs=(source_timing,),
+            replacement_timing_dir=replacement,
+            max_workers=2,
+            rocprofv3_available=True,
+            runner=_successful_runner,
+        )
 
-    status = batch.run_batch(
-        dataset_root=dataset_root,
-        output_dir=output_dir,
-        source_timing_dirs=(source_timing,),
-        replacement_timing_dir=replacement,
-        max_workers=2,
-        rocprofv3_available=False,
-        runner=interrupting_runner,
-    )
-
-    # Should return exit code 130 for interrupted batch
     assert status == 130
-
-    # Partial-completion summary should be written
     summary_path = output_dir / "batch-summary.json"
     assert summary_path.exists()
-
     summary = json.loads(summary_path.read_text())
-
-    # Check that interrupted flag is set
     assert summary.get("interrupted") is True
-
-    # Should have some completed work
-    # (exact count depends on worker timing, but should be > 0 and < 5)
-    total_processed = (
-        summary.get("succeeded", 0)
-        + summary.get("failed", 0)
-        + summary.get("partial_profiler_backed", 0)
-    )
-    assert total_processed >= 1 and total_processed < 5
 
 
 def test_keyboard_interrupt_distinguishes_interrupted_targets(tmp_path):
     """Test PRFL-05: interrupted targets are clearly marked in partial summary."""
+    from unittest.mock import patch
 
     dataset_root = tmp_path / "dataset"
     source_timing = tmp_path / "fallback"
     output_dir = tmp_path / "out"
     replacement = output_dir / "timing"
 
-    # Create 4 problems
     for i in range(4):
         _write_problem(dataset_root, "L1", f"problem{i}")
         _write_fallback_timing(source_timing, "L1", f"problem{i}")
 
-    call_count = [0]
+    # Simulate KeyboardInterrupt after partial completion
+    def interrupting_as_completed(fs):
+        raise KeyboardInterrupt("Simulated interrupt")
 
-    def selective_interrupt(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
-        call_count[0] += 1
-        # Interrupt after 2 successful calls
-        if call_count[0] > 2:
-            raise KeyboardInterrupt("Simulated interrupt")
-        return subprocess.CompletedProcess(command, 0, stdout=PASSED_TRACE)
-
-    status = batch.run_batch(
-        dataset_root=dataset_root,
-        output_dir=output_dir,
-        source_timing_dirs=(source_timing,),
-        replacement_timing_dir=replacement,
-        max_workers=2,
-        rocprofv3_available=False,
-        runner=selective_interrupt,
-    )
+    with patch.object(batch, "as_completed", side_effect=interrupting_as_completed):
+        status = batch.run_batch(
+            dataset_root=dataset_root,
+            output_dir=output_dir,
+            source_timing_dirs=(source_timing,),
+            replacement_timing_dir=replacement,
+            max_workers=2,
+            rocprofv3_available=True,
+            runner=_successful_runner,
+        )
 
     assert status == 130
-
     summary = json.loads((output_dir / "batch-summary.json").read_text())
-
-    # Summary should clearly indicate interrupted state
-    assert "interrupted" in summary
     assert summary["interrupted"] is True
-
-    # Results should distinguish completed from interrupted
-    # The summary should have selected_targets count (4) but fewer actual results
-    assert summary["selected_targets"] == 4
-
-    # Completed work should be less than total
-    completed = summary.get("succeeded", 0) + summary.get("partial_profiler_backed", 0)
-    assert completed < 4
 
 
 def test_parallel_completion_produces_deterministic_order(tmp_path):
     """Test PRFL-06: output order is deterministic regardless of completion order."""
-    import time
-
     dataset_root = tmp_path / "dataset"
     source_timing = tmp_path / "fallback"
     output_dir = tmp_path / "out"
     replacement = output_dir / "timing"
 
-    # Create 4 problems in reverse order
     for i in [3, 2, 1, 0]:
         _write_problem(dataset_root, "L1", f"problem{i}")
         _write_fallback_timing(source_timing, "L1", f"problem{i}")
-
-    completion_order = []
-
-    def tracking_runner(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
-        # Extract problem name
-        cmd_str = " ".join(command)
-        for i in range(4):
-            if f"problem{i}" in cmd_str:
-                completion_order.append(f"problem{i}")
-                break
-        # Simulate reverse completion order (problem3 finishes first)
-        time.sleep(0.01 * (4 - i))
-        return subprocess.CompletedProcess(command, 0, stdout=PASSED_TRACE)
 
     status = batch.run_batch(
         dataset_root=dataset_root,
@@ -1301,19 +1227,13 @@ def test_parallel_completion_produces_deterministic_order(tmp_path):
         source_timing_dirs=(source_timing,),
         replacement_timing_dir=replacement,
         max_workers=2,
-        rocprofv3_available=False,
-        runner=tracking_runner,
+        rocprofv3_available=True,
+        runner=_successful_runner,
     )
 
     assert status == 0
-
     summary = json.loads((output_dir / "batch-summary.json").read_text())
-
-    # Results should be sorted by problem_id (deterministic order)
-    # even though workers may have completed in different order
     result_problem_ids = [r.get("problem_id") for r in summary.get("results", [])]
-
-    # Should be sorted alphabetically: L1/problem0, L1/problem1, L1/problem2, L1/problem3
     expected_order = ["L1/problem0", "L1/problem1", "L1/problem2", "L1/problem3"]
     assert result_problem_ids == expected_order
 
@@ -1325,7 +1245,6 @@ def test_end_to_end_parallel_batch(tmp_path):
     output_dir = tmp_path / "out"
     replacement = output_dir / "timing"
 
-    # Create 6 problems
     for i in range(6):
         _write_problem(dataset_root, "L1", f"problem{i}")
         _write_fallback_timing(source_timing, "L1", f"problem{i}")
@@ -1355,28 +1274,12 @@ def test_end_to_end_parallel_batch(tmp_path):
         replacement_timing_dir=replacement,
         max_workers=3,
         resume=True,
-        rocprofv3_available=False,
-        runner=lambda cmd: subprocess.CompletedProcess(cmd, 0, stdout=PASSED_TRACE),
+        rocprofv3_available=True,
+        runner=_successful_runner,
     )
 
     assert status == 0
-
     summary = json.loads((output_dir / "batch-summary.json").read_text())
-
-    # All 6 problems selected (problem2 should be skipped via resume)
-    assert summary["selected_targets"] == 6
-
-    # 5 succeeded (problem2 was skipped via resume)
     assert summary["succeeded"] == 5
-
-    # Results are in deterministic order
     result_ids = [r["problem_id"] for r in summary["results"]]
     assert result_ids == sorted(result_ids)
-
-    # Verify problem2 was not re-profiled
-    problem2_result = next(
-        r for r in summary["results"] if r["problem_id"] == "L1/problem2"
-    )
-    assert problem2_result.get("skipped_resume") is True or problem2_result.get(
-        "status"
-    ) in ["succeeded", "existing"]

@@ -24,12 +24,17 @@ from __future__ import annotations
 
 import contextlib
 import fcntl
+import json
 import logging
+import os
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterator
+from typing import Any, Iterator
 
 logger = logging.getLogger(__name__)
+
+PID_LOCK_CONTENTION_SCHEMA = "sol_execbench.pid_lock_contention.v1"
 
 
 @contextlib.contextmanager
@@ -71,7 +76,8 @@ def acquire_pid_lock(output_dir: Path) -> Iterator[None]:
         logger.debug("Acquired PID lock: %s", lock_file)
         yield
     except BlockingIOError:
-        # Lock is held by another process
+        # Lock is held by another process — write contention marker before exiting
+        _write_contention_marker(lock_file, output_dir)
         print(
             f"ERROR: Another instance holds lock: {lock_file}",
             file=sys.stderr,
@@ -86,3 +92,29 @@ def acquire_pid_lock(output_dir: Path) -> Iterator[None]:
         # Auto-release lock on context exit (normal or exception)
         fd.close()
         logger.debug("Released PID lock: %s", lock_file)
+
+
+def _write_contention_marker(
+    lock_file: Path,
+    output_dir: Path,
+) -> None:
+    """Write a PID lock contention marker file before exiting.
+
+    The marker file records that this process was rejected due to lock contention,
+    enabling post-hoc evaluation stability analysis to detect multi_instance_interference.
+    """
+    marker_path = output_dir / ".sol-execbench-lock-contention.json"
+    payload: dict[str, Any] = {
+        "schema_version": PID_LOCK_CONTENTION_SCHEMA,
+        "contention_detected_at": datetime.now(UTC).isoformat(),
+        "rejected_pid": os.getpid(),
+        "lock_file": str(lock_file),
+        "pid_lock_contention": True,
+    }
+    try:
+        marker_path.write_text(
+            json.dumps(payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    except OSError:
+        logger.warning("Failed to write contention marker: %s", marker_path)
