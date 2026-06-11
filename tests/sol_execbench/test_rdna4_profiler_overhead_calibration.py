@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import tempfile
 from pathlib import Path
+from typing import cast
 
 from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3TimingEvidence,
@@ -22,8 +23,10 @@ from sol_execbench.core.bench.timing_policy import (
 
 
 def _make_policy(**overrides) -> TimingPolicy:
+    from sol_execbench.core.bench.timing_policy import TimingSourceType
+
     defaults = {
-        "source_type": object(),
+        "source_type": cast(TimingSourceType, object()),
         "activity_domain": TimingActivityDomain.KERNEL_ACTIVITY,
         "backend": TimingBackend.ROCPROFV3,
         "aggregation_rule": "sum",
