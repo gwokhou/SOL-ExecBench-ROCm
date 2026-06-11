@@ -3,13 +3,14 @@
 
 """Timing isolation audit infrastructure for ROCm profiling scripts.
 
-This module provides four public functions for detecting and warning about
+This module provides five public functions for detecting and warning about
 conditions that could introduce timing variability or measurement bias:
 
 1. ``detect_concurrent_gpu_processes()`` — Detect concurrent GPU processes via rocm-smi
 2. ``verify_clock_state_with_warning()`` — Verify STABLE_PEAK clock mode with context-aware logging
 3. ``clear_gpu_cache_between_subprocesses()`` — Clear GPU cache at subprocess boundaries
 4. ``collect_timing_environment_snapshot()`` — Record environment state for reproducibility audits
+5. ``validate_gpu_device_isolation()`` — Validate GPU device isolation for timing-sensitive workloads
 
 All functions follow graceful degradation principles: log warnings but don't raise
 exceptions when probes fail or tools are unavailable.
@@ -18,6 +19,7 @@ exceptions when probes fail or tools are unavailable.
 from __future__ import annotations
 
 import logging
+import os
 import subprocess
 from datetime import UTC, datetime
 from typing import Any
@@ -25,6 +27,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 TIMING_ISOLATION_SNAPSHOT_SCHEMA_VERSION = "sol_execbench.timing_isolation_snapshot.v1"
+GPU_ISOLATION_SCHEMA_VERSION = "sol_execbench.gpu_device_isolation.v1"
 
 
 def detect_concurrent_gpu_processes() -> list[dict[str, Any]]:
@@ -160,6 +163,83 @@ def clear_gpu_cache_between_subprocesses() -> None:
         logger.warning("Failed to clear GPU cache: %s", e)
 
 
+def _detect_gpu_count() -> int:
+    """Detect GPU count via ``rocm-smi --showid``.
+
+    Returns 0 on error or when rocm-smi is unavailable.
+    """
+    try:
+        result = subprocess.run(
+            ["rocm-smi", "--showid"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return 0
+
+    gpu_count = 0
+    for line in (result.stdout or "").splitlines():
+        if line.strip().startswith("GPU"):
+            gpu_count += 1
+    return gpu_count
+
+
+def validate_gpu_device_isolation(
+    *,
+    gpu_device: int | None = None,
+) -> dict[str, Any]:
+    """Validate GPU device isolation for timing-sensitive workloads.
+
+    Checks whether the process has adequate GPU device isolation by examining
+    ``ROCR_VISIBLE_DEVICES`` and the total GPU count. Optionally sets
+    ``ROCR_VISIBLE_DEVICES`` when ``gpu_device`` is provided.
+
+    The caller decides whether to warn or abort based on the ``isolated`` result.
+
+    Args:
+        gpu_device: If provided, set ``ROCR_VISIBLE_DEVICES`` to this device index
+            for the current process before checking.
+
+    Returns:
+        Dict with keys:
+        - ``schema_version``: Isolation check schema identifier
+        - ``isolated``: Whether the process has adequate GPU isolation
+        - ``gpu_count``: Total GPU count detected (0 if unknown)
+        - ``rocr_visible_devices``: Current ``ROCR_VISIBLE_DEVICES`` value or None
+        - ``gpu_device_set``: Whether a specific device was requested and set
+        - ``warnings``: List of non-fatal warnings
+    """
+    warnings: list[str] = []
+
+    if gpu_device is not None:
+        os.environ["ROCR_VISIBLE_DEVICES"] = str(gpu_device)
+        logger.info("Set ROCR_VISIBLE_DEVICES=%d for GPU device isolation", gpu_device)
+
+    rocr_visible = os.environ.get("ROCR_VISIBLE_DEVICES")
+    gpu_count = _detect_gpu_count()
+
+    if gpu_count == 0:
+        warnings.append("gpu_count_unknown: rocm-smi unavailable or returned no GPUs")
+    elif gpu_count > 1 and rocr_visible is None:
+        warnings.append(
+            f"multi_gpu_no_restriction: {gpu_count} GPUs detected but "
+            "ROCR_VISIBLE_DEVICES not set — timing may be affected by "
+            "cross-device interference"
+        )
+
+    isolated = gpu_count <= 1 or rocr_visible is not None
+
+    return {
+        "schema_version": GPU_ISOLATION_SCHEMA_VERSION,
+        "isolated": isolated,
+        "gpu_count": gpu_count,
+        "rocr_visible_devices": rocr_visible,
+        "gpu_device_set": gpu_device is not None,
+        "warnings": warnings,
+    }
+
+
 def collect_timing_environment_snapshot() -> dict[str, Any]:
     """Collect timing environment snapshot for reproducibility audits.
 
@@ -182,6 +262,7 @@ def collect_timing_environment_snapshot() -> dict[str, Any]:
     # Collect timing-specific information
     gpu_processes = detect_concurrent_gpu_processes()
     clocks_locked = are_clocks_locked()
+    gpu_isolation = validate_gpu_device_isolation()
 
     # Build tools_available map from base snapshot
     tools_available = {}
@@ -202,6 +283,7 @@ def collect_timing_environment_snapshot() -> dict[str, Any]:
         "generated_at": datetime.now(UTC).isoformat(),
         "gpu_processes": gpu_processes,
         "clocks_locked": clocks_locked,
+        "gpu_isolation": gpu_isolation,
         "tools_available": tools_available,
         "warnings": warnings,
     }
