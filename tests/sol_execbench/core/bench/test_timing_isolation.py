@@ -19,6 +19,7 @@ from sol_execbench.core.bench.timing_isolation import (
     validate_gpu_device_isolation,
     verify_clock_state_with_warning,
 )
+from sol_execbench.core.environment import EnvironmentEvidenceStatus
 
 
 class TestDetectConcurrentGpuProcesses:
@@ -233,7 +234,7 @@ class TestCollectTimingEnvironmentSnapshot:
 
         return EnvironmentSnapshot(
             generated_at="2026-06-10T00:00:00Z",
-            collection_status="available",
+            collection_status=EnvironmentEvidenceStatus.AVAILABLE,
         )
 
 
@@ -294,7 +295,7 @@ class TestIntegrationPreflightAudit:
 
         return EnvironmentSnapshot(
             generated_at="2026-06-10T00:00:00Z",
-            collection_status="available",
+            collection_status=EnvironmentEvidenceStatus.AVAILABLE,
         )
 
 
