@@ -15,20 +15,20 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
 ## Current State
 
-**Shipped version:** v1.34 RDNA4 Readiness Blocker Closure,
-shipped 2026-06-09.
+**Shipped version:** v1.35 Script Parallelism and Safety Hardening,
+shipped 2026-06-11.
 
 **Current milestone:** None. Planning next milestone.
 
 **Queued milestone:** None defined.
 
-**Latest milestone outcome:** v1.34 reduced RDNA4 `readiness_blocked` from
-114 to 59 over a stable 235-problem denominator by implementing deterministic
-custom input generation with schema validation and five failure-class
-diagnostics, Quant readiness triage distinguishing CUDA/NVIDIA true blockers
-from lexical false positives, FlashInfer semantic readiness splitting into
-PyTorch-compatible and runtime-dependent buckets, and final claim guardrails
-preserving all existing authority boundaries.
+**Latest milestone outcome:** v1.35 refactored key scripts for internal
+CPU-parallel/GPU-serial concurrency via ThreadPoolExecutor, added fcntl.flock
+PID lock for multi-instance prevention, timing isolation audit with concurrent
+GPU process detection and clock verification, evaluation stability reason codes
+for gpu_contention and multi_instance_interference, GPU device isolation,
+strict-isolation abort mode, and rocprofv3 overhead calibration with
+profiler_overhead_ms in timing evidence.
 
 **Previous milestone outcome:** v1.33 completed RDNA4 benchmark-grade evidence
 closure by hardening denominator policy, memory/readiness classification,
@@ -151,38 +151,19 @@ SOL/SOLAR sidecar pairs after 56 temporary sidecar exclusions. RDNA4 timing
 remains non-authoritative until clock-lock/reset sudoers coverage and
 profiler-backed timing evidence are rerun.
 
-## Current Milestone: v1.35 Script Parallelism and Safety Hardening
+## Current Milestone: None
 
-**Goal:** Refactor key scripts for internal CPU-parallel/GPU-serial concurrency,
-prevent unsafe multi-instance execution, and audit and harden execution
-environment independence and reproducibility for statistics-sensitive scripts.
+Planning next milestone.
 
-**Target features:**
-- Internal parallelism for `run_rdna4_profiler_timing_batch.py` (CPU stage
-  parallel + GPU subprocess serial) to eliminate manual multi-instance timing
-  bias
-- Internal parallelism for `run_derived_isolated.py` (multi-problem CPU
-  parallel derived sidecar generation)
-- Defensive multi-instance prevention via PID locks or equivalent for scripts
-  that must not run concurrently
-- Execution environment independence and reproducibility audit for
-  statistics-sensitive scripts: GPU isolation, L2 cache pollution, timing
-  reproducibility, and side-channel interference checks
+## Previous Milestone: v1.35 Script Parallelism and Safety Hardening (SHIPPED)
 
-**Explicitly deferred:**
-- Changing any public CLI interface, trace JSONL schema, or sidecar format.
-- Adding new benchmark correctness, scoring, or timing semantics.
-- Hardening scripts that are purely report/analysis utilities with no GPU
-  interaction.
-
-## Previous Milestone: v1.34 RDNA4 Readiness Blocker Closure (SHIPPED)
-
-**Shipped outcome:** v1.34 reduced RDNA4 `readiness_blocked` from 114 to 59
-over a stable 235-problem denominator. All 55 custom-input blockers were
-promoted to ready. Quant triage reclassified false-positive CUDA/NVIDIA hints.
-FlashInfer workloads were semantically split into PyTorch-compatible and
-runtime-dependent buckets. Claim guardrails preserved all existing authority
-boundaries.
+**Shipped outcome:** v1.35 refactored key scripts for internal CPU-parallel/
+GPU-serial concurrency, prevented unsafe multi-instance execution via fcntl.flock
+PID locks, added timing isolation audit with concurrent GPU process detection,
+extended evaluation stability with gpu_contention and multi_instance_interference
+reason codes, added GPU device isolation with --strict-isolation mode, and
+created rocprofv3 overhead calibration with profiler_overhead_ms integration
+into timing evidence. All 23 requirements satisfied, all E2E flows verified.
 
 ## Latest Milestone: v1.29 Dataset Migration and Compliance
 
@@ -786,6 +767,20 @@ ROCm path, with validation scoped to RDNA 4 only.
   families, degraded MoE and SSM/Mamba evidence, coverage/status sidecars,
   AMD-native score guards, dataset-runner generated SOLAR sidecars,
   `derived_evidence_refs`, documentation, and public/claim guardrails - v1.10.
+- fcntl.flock-based PID lock with kernel-managed auto-release on SIGKILL/OOM
+  and mandatory/optional script integration - v1.35.
+- Timing isolation audit with concurrent GPU process detection, clock state
+  verification, GPU cache clearing, and environment snapshot sidecars - v1.35.
+- ThreadPoolExecutor CPU-parallel staging with architecturally enforced
+  GPU-serial profiling for the profiler timing batch script - v1.35.
+- ThreadPoolExecutor parallel subprocess dispatch with thread-safe JSONL writes
+  for the derived isolation script - v1.35.
+- gpu_contention and multi_instance_interference evaluation stability reason
+  codes with integration tests for PID lock contention, parallel staging, and
+  isolation audit - v1.35.
+- GPU device isolation validation, --strict-isolation abort mode, rocprofv3
+  overhead calibration script with versioned JSON sidecar, and
+  profiler_overhead_ms integration into timing evidence - v1.35.
 
 ### Active
 
@@ -952,6 +947,10 @@ ROCm-compatible data migration from real CDNA3/CDNA4 hardware validation.
 | Complete CDNA3 test readiness without hardware execution | User requested a new milestone to fill out real usable CDNA3 tests and docs, while acknowledging the current machine cannot execute the validation and actual hardware verification remains deferred. | Active in v1.28 |
 | Treat dataset migration as local-only for NVIDIA data | User asked about legal risk for SOL-ExecBench and FlashInfer Trace migration; NVIDIA/SOL-ExecBench redistribution is restricted, while FlashInfer Trace is Apache-2.0. | Validated in v1.29 |
 | Implement low-precision compatibility without hardware validation | User clarified v1.29 may include complete ROCm-equivalent implementations for NVFP4/Blackwell semantics, but real validation depends on future CDNA4 hardware evidence. | Validated in v1.29 |
+| fcntl.flock over PID-in-file locking | flock is kernel-managed and auto-released on SIGKILL/OOM. | Validated in v1.35 |
+| ThreadPoolExecutor over ProcessPoolExecutor | torch fork-safety concerns after module-level import. | Validated in v1.35 |
+| CPU-parallel staging + GPU-serial profiling | No flag can enable concurrent GPU subprocess execution. | Validated in v1.35 |
+| Overhead calibration via inner subprocess under rocprofv3 | Consistent measurement of profiler instrumentation overhead. | Validated in v1.35 |
 | Complete RDNA4 benchmark-grade validation | User selected v1.30 to turn existing RDNA4 `gfx1200` scoped evidence into full benchmark-grade validation with full dataset, timing, score, evidence-bundle, and claim-guardrail closure. | Active in v1.30 |
 | Preserve long-running validation jobs | User clarified that real validation may run for many hours; agents should poll and checkpoint rather than kill healthy processes solely because they are long-running. | Active in v1.30 |
 | Make long-tail exclusions explicit | User clarified that known super-long-tail shards should be temporarily excludable through `scripts/run_dataset.py` configuration while preserving denominator visibility and auditability. | Active in v1.30 |
@@ -974,4 +973,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-10 after v1.35 milestone started*
+*Last updated: 2026-06-11 after v1.35 milestone shipped*

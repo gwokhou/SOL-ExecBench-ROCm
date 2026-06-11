@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.35
 milestone_name: Script Parallelism and Safety Hardening
 status: milestone_complete
-stopped_at: Milestone complete (Phase 179 was final phase)
-last_updated: 2026-06-10T17:00:36.551Z
-last_activity: 2026-06-10
+stopped_at: Milestone complete (Phase 180 was final phase, gaps closed)
+last_updated: 2026-06-11T05:30:00Z
+last_activity: 2026-06-11
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 5
-  completed_plans: 5
+  total_phases: 6
+  completed_phases: 6
+  total_plans: 7
+  completed_plans: 7
   percent: 100
 ---
 
@@ -18,47 +18,40 @@ progress:
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (updated 2026-06-10)
+See: `.planning/PROJECT.md` (updated 2026-06-11)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly
 on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL
 ExecBench.
-**Current focus:** Milestone complete
+**Current focus:** Planning next milestone
 
 ## Current Position
 
-Phase: 179
-Plan: Not started
+Phase: 180
+Plan: Complete
 Status: Milestone complete
-Last activity: 2026-06-10
+Last activity: 2026-06-11
 
 Progress: [██████████] 100%
 
 ## Recent Trend
 
-- v1.35 roadmap created with 5 phases, 19 requirements, 100% coverage.
+- v1.35 shipped on 2026-06-11. 6 phases, 7 plans, 23 requirements satisfied.
+  Added PID locks, timing isolation, CPU-parallel staging, parallel dispatch,
+  evaluation stability reason codes, GPU device isolation, strict-isolation
+  mode, and rocprofv3 overhead calibration.
 
 - v1.34 shipped on 2026-06-09. Phases 170-174 reduced RDNA4 readiness_blocked
   from 114 to 59 over a stable 235-problem denominator.
-
-- v1.33 shipped on 2026-06-09 with RDNA4 benchmark-grade evidence closure.
 
 ## Accumulated Context
 
 ### Decisions
 
-- Research recommended 5-phase structure accepted: PID Lock -> Timing
-  Isolation -> Profiler Batch Parallelism -> Derived Script Parallelism ->
-  Stability Extension + Integration Tests.
-
-- `fcntl.flock` selected over PID-in-file locking because flock is
-  kernel-managed and auto-released on process death (even SIGKILL/OOM).
-
-- ThreadPoolExecutor chosen over ProcessPoolExecutor due to torch fork-safety
-  concerns.
-
-- CPU-parallel staging + GPU-serial profiling architecture enforced
-  structurally: no flag can enable concurrent GPU subprocess execution.
+- fcntl.flock selected over PID-in-file locking for kernel-managed auto-release.
+- ThreadPoolExecutor chosen over ProcessPoolExecutor due to torch fork-safety.
+- CPU-parallel staging + GPU-serial profiling architecturally enforced.
+- Overhead calibration uses inner subprocess under rocprofv3.
 
 ### Pending Todos
 
@@ -66,8 +59,7 @@ None.
 
 ### Blockers/Concerns
 
-- Phase 177 (Profiler Timing Batch Parallelism) refactors a 1417-line script;
-  planning may need deeper research on `_profile_target` boundaries.
+None.
 
 ## Deferred Items
 
@@ -85,10 +77,10 @@ Items acknowledged and deferred at prior milestone closes:
 
 ## Session Continuity
 
-Last session: 2026-06-10T16:56:07.613Z
-Stopped at: Roadmap created for v1.35, ready to plan Phase 175
+Last session: 2026-06-11T05:30:00Z
+Stopped at: v1.35 milestone complete, planning next milestone
 Resume file: None
 
 ## Operator Next Steps
 
-- Plan Phase 175: `/gsd:plan-phase 175`
+- Start next milestone: `/gsd:new-milestone`
