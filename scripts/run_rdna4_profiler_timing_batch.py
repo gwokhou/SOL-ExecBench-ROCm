@@ -100,6 +100,7 @@ def _process_target_chunk(
     runner: ProfilerRunner,
     marked_blocked_ids: set[str],
     global_start_index: int = 0,
+    concurrent_gpu_processes: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """Process a chunk of targets with CPU-parallel staging + serial GPU profiling (PRFL-01, PRFL-02)."""
     chunk_results = []
@@ -130,6 +131,7 @@ def _process_target_chunk(
                 clock_locked=clock_locked,
                 rocprofv3_available=rocprofv3_available,
                 runner=runner,
+                concurrent_gpu_processes=concurrent_gpu_processes,
             )
         else:
             result = _profile_target(
@@ -146,6 +148,7 @@ def _process_target_chunk(
                 clock_locked=clock_locked,
                 rocprofv3_available=rocprofv3_available,
                 runner=runner,
+                concurrent_gpu_processes=concurrent_gpu_processes,
             )
 
         chunk_results.append(result)
@@ -266,6 +269,7 @@ def run_batch(
                     runner=runner,
                     marked_blocked_ids=marked_blocked_ids,
                     global_start_index=global_start_idx,
+                    concurrent_gpu_processes=concurrent_processes or None,
                 )
                 futures[future] = chunk_idx
 
@@ -432,6 +436,7 @@ def _profile_target(
     clock_locked: bool,
     rocprofv3_available: bool,
     runner: ProfilerRunner | None,
+    concurrent_gpu_processes: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     problem_dir = dataset_root / target.problem_path
     if temp_dir is not None:
@@ -498,6 +503,7 @@ def _profile_target(
             workload_limit=workload_limit,
             stdout=_subprocess_text(exc.stdout),
             stderr=_subprocess_text(exc.stderr),
+            concurrent_gpu_processes=concurrent_gpu_processes,
         )
     except (OSError, ValueError) as exc:
         return _write_blocked_sidecar(
@@ -507,6 +513,7 @@ def _profile_target(
             reason=str(exc),
             workload_offset=workload_offset,
             workload_limit=workload_limit,
+            concurrent_gpu_processes=concurrent_gpu_processes,
         )
 
     workload_slice_applied = workload_offset != 0 or (
@@ -552,6 +559,8 @@ def _profile_target(
         "failure_reason": replacement_failure_reason,
     }
     if result.profiler_collected or status == "profiler_blocked":
+        if concurrent_gpu_processes:
+            payload["concurrent_gpu_processes"] = concurrent_gpu_processes
         replacement_path.parent.mkdir(parents=True, exist_ok=True)
         replacement_path.write_text(
             json.dumps(payload, indent=2, sort_keys=True) + "\n",
@@ -590,6 +599,7 @@ def _profile_target_workload_sharded(
     clock_locked: bool,
     rocprofv3_available: bool,
     runner: ProfilerRunner | None,
+    concurrent_gpu_processes: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     if workload_limit is not None or workload_offset:
         raise ValueError("workload-sharded mode owns workload slicing")
@@ -675,6 +685,7 @@ def _profile_target_workload_sharded(
             clock_locked=clock_locked,
             rocprofv3_available=rocprofv3_available,
             runner=runner,
+            concurrent_gpu_processes=concurrent_gpu_processes,
         )
         results.append(result)
         sidecar = _load_optional_json(Path(result["replacement_path"]))
@@ -743,6 +754,7 @@ def _write_blocked_sidecar(
     workload_limit: int | None = None,
     stdout: str = "",
     stderr: str = "",
+    concurrent_gpu_processes: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     workload_slice_applied = workload_offset != 0 or workload_limit is not None
     payload = {
@@ -776,6 +788,8 @@ def _write_blocked_sidecar(
             "failure_reason": reason,
         },
     }
+    if concurrent_gpu_processes:
+        payload["concurrent_gpu_processes"] = concurrent_gpu_processes
     replacement_path.parent.mkdir(parents=True, exist_ok=True)
     replacement_path.write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n",

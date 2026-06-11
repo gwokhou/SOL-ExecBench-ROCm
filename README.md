@@ -197,6 +197,13 @@ Project and development references:
 - [Analysis](docs/analysis.md) -- trace analysis, dataset closure, failure modes,
   and sharding
 - [ROCm Notes](docs/rocm.md) -- host, Docker, and validation notes
+- [ROCm Timing](docs/rocm_timing.md) -- timing backends, profiler collection,
+  and source-specific semantics
+- [ROCm Libraries](docs/rocm_libraries.md) -- supported ROCm library categories
+  (hipBLAS, MIOpen, Composable Kernel, rocWMMA) for RDNA 4 and CDNA 3 targets;
+  CDNA 4 validation is also deferred until suitable hardware evidence is available
+- [Troubleshooting](docs/TROUBLESHOOTING.md) -- common errors and troubleshooting for
+  benchmark runs
 
 Validation, release, and provenance:
 
@@ -207,6 +214,16 @@ Validation, release, and provenance:
   known gaps
 - [Research Preview](docs/research_preview.md) -- methodology, evidence surfaces,
   representative commands, and non-claims
+- [v1.25 Engineering Prerelease](docs/v1_25_release_notes.md) -- release notes,
+  checklist, and validation evidence
+- [Prerelease Artifact Bundle](docs/prerelease_artifact_bundle.md) -- versioned
+  artifact bundle and reproducibility closure
+- [Prerelease Readiness](docs/prerelease_readiness.md) -- release readiness
+  gates and quality checks
+- [Public Prerelease](docs/public_prerelease.md) -- public release materials
+  and navigation
+- [v1.25 Prerelease Checklist](docs/v1_25_prerelease_checklist.md) -- shipping
+  checklist and verification steps
 
 Schema-specific references:
 

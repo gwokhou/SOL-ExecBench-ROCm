@@ -58,6 +58,10 @@
 | Hardening report-only scripts (report_*.py) | No GPU interaction, no concurrency risk |
 | ProcessPoolExecutor-based parallelism | Unsafe after torch import at module level (fork deadlock) |
 | PID-in-file locking | Unreliable due to PID recycling; flock is strictly superior |
+| CDNA3 or CDNA4 validation claim upgrade | CDNA3-family real-hardware validation (including MI300X) and CDNA4 validation require complete evidence chains that are not available on the current machine |
+| NVIDIA B200/SOLAR/leaderboard equivalence | ROCm-only port; NVIDIA hardware parity is out of scope |
+| Paper-scale 235-problem full validation | Requires dedicated hardware time and validation budget |
+| Hard multi-tenant sandboxing | OS/container-level isolation requires infrastructure beyond this port |
 
 ## Traceability
 
