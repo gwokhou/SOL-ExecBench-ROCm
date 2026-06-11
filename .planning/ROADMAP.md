@@ -48,6 +48,7 @@ environment independence and reproducibility for statistics-sensitive scripts.
 - [x] **Phase 177: Profiler Timing Batch Parallelism** - CPU-parallel staging with GPU-serial profiling for the profiler timing batch script (completed 2026-06-10)
 - [x] **Phase 178: Derived Script Parallelism** - ThreadPoolExecutor-based parallel dispatch for the derived isolation script (completed 2026-06-10)
 - [x] **Phase 179: Evaluation Stability Extension and Integration Tests** - New reason codes and end-to-end integration validation (completed 2026-06-10)
+- [x] **Phase 180: Timing Environment Hardening and Overhead Calibration** - GPU device isolation, strict isolation mode, and rocprofv3 overhead calibration (completed 2026-06-11)
 
 ## Phase Details
 
@@ -120,6 +121,21 @@ environment independence and reproducibility for statistics-sensitive scripts.
 **Plan List**:
 - [x] 179-01-PLAN.md — Extend evaluation stability with gpu_contention and multi_instance_interference reason codes, create integration tests for PID lock contention, parallel staging with serial profiling, and isolation audit output
 
+### Phase 180: Timing Environment Hardening and Overhead Calibration 🔄 IN PROGRESS
+
+**Goal**: Close the three remaining gaps in timing data precision: GPU device isolation, strict isolation abort mode, and rocprofv3 overhead calibration
+**Depends on**: Phase 175, Phase 176, Phase 177, Phase 179
+**Requirements**: ENV-01, ENV-02, ENV-03, ENV-04
+**Success Criteria** (what must be TRUE):
+  1. Timing-sensitive scripts validate `ROCR_VISIBLE_DEVICES` or single-GPU state; multi-GPU without restriction warns (default) or aborts (`--strict-isolation`)
+  2. `--strict-isolation` flag on `run_rdna4_profiler_timing_batch.py` upgrades concurrent GPU process detection, clock state verification, and GPU device isolation from warn to abort
+  3. `run_rdna4_profiler_overhead_calibration.py` measures rocprofv3 instrumentation overhead via baseline-vs-instrumented kernel runs and writes a versioned JSON calibration sidecar
+  4. Profiler-backed timing evidence includes `profiler_overhead_ms` from calibration when available, enabling absolute timing accuracy claims
+**Plans**: 2 plans
+**Plan List**:
+- [x] 180-01-PLAN.md — Add GPU device isolation validation and --strict-isolation mode to timing_isolation.py and profiler timing batch script
+- [x] 180-02-PLAN.md — Create rocprofv3 overhead calibration script and integrate calibration values into timing evidence
+
 ## Progress
 
 **Execution Order:**
@@ -132,3 +148,4 @@ Phases execute in numeric order: 175 -> 176 -> 177 -> 178 -> 179
 | 177. Profiler Timing Batch Parallelism | 1/1 | Complete    | 2026-06-10 |
 | 178. Derived Script Parallelism | 1/1 | Complete    | 2026-06-10 |
 | 179. Evaluation Stability Extension and Integration Tests | 1/1 | Complete    | 2026-06-10 |
+| 180. Timing Environment Hardening and Overhead Calibration | 2/2 | Complete    | 2026-06-11 |

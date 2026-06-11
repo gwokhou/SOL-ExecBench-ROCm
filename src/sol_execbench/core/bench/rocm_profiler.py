@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import csv
+import json
 import os
 import re
 import subprocess
@@ -164,6 +165,7 @@ class Rocprofv3TimingEvidence:
     clock_locked: bool | None = None
     fallback_applied: bool = False
     fallback_reason: str | None = None
+    profiler_overhead_ms: float | None = None
     schema_version: str = ROCPROFV3_EVIDENCE_SCHEMA_VERSION
     derived: bool = True
     canonical_output: str = CANONICAL_BENCHMARK_OUTPUT
@@ -193,6 +195,7 @@ class Rocprofv3TimingEvidence:
             "clock_locked": self.clock_locked,
             "fallback_applied": self.fallback_applied,
             "fallback_reason": self.fallback_reason,
+            "profiler_overhead_ms": self.profiler_overhead_ms,
             "kernel_duration_ms": self.kernel_duration_ms,
             "parsed_rows": [row.to_dict() for row in self.parsed_rows],
         }
@@ -516,6 +519,7 @@ def build_timing_evidence(
     iterations: int | None = None,
     trial_count: int | None = None,
     clock_locked: bool | None = None,
+    profiler_overhead_ms: float | None = None,
 ) -> Rocprofv3TimingEvidence:
     """Build derived profiler timing evidence from parsed CSV content."""
     return Rocprofv3TimingEvidence(
@@ -532,7 +536,31 @@ def build_timing_evidence(
         clock_locked=clock_locked,
         fallback_applied=policy.fallback_applied,
         fallback_reason=policy.reason if policy.fallback_applied else None,
+        profiler_overhead_ms=profiler_overhead_ms,
     )
+
+
+def _read_overhead_calibration(
+    calibration_path: Path | None,
+) -> float | None:
+    """Read profiler overhead calibration value from a JSON sidecar.
+
+    Returns the ``overhead_ms`` value if the file exists and is valid,
+    otherwise None. Never raises — logs warnings on parse errors.
+    """
+    if calibration_path is None or not calibration_path.exists():
+        return None
+    try:
+        payload = json.loads(calibration_path.read_text(encoding="utf-8"))
+        overhead = payload.get("overhead_ms")
+        return float(overhead) if overhead is not None else None
+    except (json.JSONDecodeError, ValueError, OSError) as exc:
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "Failed to read overhead calibration from %s: %s", calibration_path, exc
+        )
+        return None
 
 
 def collect_rocprofv3_timing(
@@ -540,6 +568,7 @@ def collect_rocprofv3_timing(
     *,
     rocprofv3_available: bool = True,
     runner: ProfilerRunner | None = None,
+    calibration_path: Path | None = None,
 ) -> Rocprofv3CollectionResult:
     """Collect live `rocprofv3` timing evidence for a command.
 
@@ -601,6 +630,7 @@ def collect_rocprofv3_timing(
             stderr=completed.stderr or "",
         )
 
+    profiler_overhead_ms = _read_overhead_calibration(calibration_path)
     evidence = build_timing_evidence(
         policy=request.policy,
         csv_content=csv_path.read_text(),
@@ -610,6 +640,7 @@ def collect_rocprofv3_timing(
         iterations=request.iterations,
         trial_count=request.trial_count,
         clock_locked=request.clock_locked,
+        profiler_overhead_ms=profiler_overhead_ms,
     )
     if (
         request.policy.activity_domain == TimingActivityDomain.KERNEL_ACTIVITY

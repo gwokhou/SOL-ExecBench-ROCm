@@ -46,6 +46,7 @@ from sol_execbench.core.bench.timing_isolation import (
     clear_gpu_cache_between_subprocesses,
     collect_timing_environment_snapshot,
     detect_concurrent_gpu_processes,
+    validate_gpu_device_isolation,
     verify_clock_state_with_warning,
 )
 
@@ -184,6 +185,8 @@ def run_batch(
     rocprofv3_available: bool | None = None,
     runner: ProfilerRunner | None = None,
     max_workers: int = 4,
+    strict_isolation: bool = False,
+    gpu_device: int | None = None,
 ) -> int:
     """Run fallback replacement batch and return a process-style status code."""
     if limit is not None and limit <= 0:
@@ -221,6 +224,13 @@ def run_batch(
     logger.info("Running timing isolation pre-flight audit...")
     concurrent_processes = detect_concurrent_gpu_processes()
     if concurrent_processes:
+        if strict_isolation:
+            logger.error(
+                "STRICT ISOLATION: Detected %d concurrent GPU process(es), aborting: %s",
+                len(concurrent_processes),
+                concurrent_processes,
+            )
+            return 1
         logger.warning(
             "Detected %d concurrent GPU process(es). This may introduce timing variability: %s",
             len(concurrent_processes),
@@ -228,7 +238,24 @@ def run_batch(
         )
     clock_state_verified = verify_clock_state_with_warning(context="batch_start")
     if not clock_state_verified:
+        if strict_isolation:
+            logger.error(
+                "STRICT ISOLATION: Clock state verification failed at batch start, aborting"
+            )
+            return 1
         logger.warning("Clock state verification failed at batch start")
+
+    # GPU device isolation check (ENV-01)
+    gpu_isolation = validate_gpu_device_isolation(gpu_device=gpu_device)
+    if not gpu_isolation["isolated"]:
+        if strict_isolation:
+            logger.error(
+                "STRICT ISOLATION: GPU device isolation check failed, aborting: %s",
+                gpu_isolation["warnings"],
+            )
+            return 1
+        for warn in gpu_isolation["warnings"]:
+            logger.warning("GPU device isolation: %s", warn)
 
     results: list[dict[str, Any]] = []
     marked_blocked = _mark_blocked_targets(
@@ -1536,6 +1563,25 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         action=argparse.BooleanOptionalAction,
         default=True,
     )
+    parser.add_argument(
+        "--strict-isolation",
+        action="store_true",
+        default=False,
+        help=(
+            "Abort on any timing isolation check failure (concurrent GPU processes, "
+            "clock state, GPU device isolation) instead of warning. Recommended for "
+            "data-measurement-sensitive profiling runs."
+        ),
+    )
+    parser.add_argument(
+        "--gpu-device",
+        type=int,
+        default=None,
+        help=(
+            "Set ROCR_VISIBLE_DEVICES to this device index for GPU device isolation. "
+            "Recommended on multi-GPU systems to prevent cross-device interference."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -1584,6 +1630,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 tool_version=args.timing_tool_version,
                 gpu_architecture=args.gpu_architecture,
                 clock_locked=args.clock_locked,
+                strict_isolation=args.strict_isolation,
+                gpu_device=args.gpu_device,
             )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"ERROR: {exc}")
