@@ -184,11 +184,6 @@ def run_batch(
     limit: int | None = None,
     only_problem: Sequence[str] = (),
     skip_problem: Sequence[str] = (),
-    target_statuses: Sequence[str] = (
-        "timing_fallback",
-        "partial_profiler_backed",
-        "profiler_blocked",
-    ),
     mark_blocked_problem: Sequence[str] = (),
     mark_blocked_only: bool = False,
     workload_limit: int | None = None,
@@ -240,7 +235,6 @@ def run_batch(
         limit=limit,
         only_problem=only_problem,
         skip_problem=skip_problem,
-        target_statuses=target_statuses,
         resume=resume,
     )
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -415,20 +409,18 @@ def select_fallback_targets(
     limit: int | None = None,
     only_problem: Sequence[str] = (),
     skip_problem: Sequence[str] = (),
-    target_statuses: Sequence[str] = (
-        "timing_fallback",
-        "partial_profiler_backed",
-        "profiler_blocked",
-    ),
     resume: bool = True,
 ) -> list[ProfilerTimingProblemCoverage]:
     """Select coverage rows whose fallback timing should be replaced."""
     only = set(only_problem)
     skip = set(skip_problem)
-    target_status_set = set(target_statuses)
     targets: list[ProfilerTimingProblemCoverage] = []
     for problem in coverage.problems:
-        if problem.status not in target_status_set:
+        if problem.status not in {
+            "timing_fallback",
+            "partial_profiler_backed",
+            "profiler_blocked",
+        }:
             continue
         if only and problem.problem_id not in only:
             continue
@@ -1614,17 +1606,6 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--only-problem", action="append", default=[])
     parser.add_argument("--skip-problem", action="append", default=[])
     parser.add_argument("--skip-problem-file", type=Path, default=None)
-    parser.add_argument(
-        "--target-status",
-        action="append",
-        default=None,
-        help=(
-            "Coverage status to profile; may be repeated. Defaults to timing "
-            "fallback, partial profiler-backed, and profiler-blocked rows. "
-            "Use ready_missing_profiler_timing for ready rows that have no "
-            "timing sidecar yet."
-        ),
-    )
     parser.add_argument("--mark-blocked-problem", action="append", default=[])
     parser.add_argument("--mark-blocked-only", action="store_true")
     parser.add_argument("--workload-limit", type=int, default=None)
@@ -1729,15 +1710,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     skip_problem = tuple(args.skip_problem) + _load_problem_id_file(
         args.skip_problem_file
     )
-    target_statuses = (
-        tuple(args.target_status)
-        if args.target_status
-        else (
-            "timing_fallback",
-            "partial_profiler_backed",
-            "profiler_blocked",
-        )
-    )
     try:
         with acquire_pid_lock(args.output_dir):
             return run_batch(
@@ -1748,7 +1720,6 @@ def main(argv: Sequence[str] | None = None) -> int:
                 limit=args.limit,
                 only_problem=tuple(args.only_problem),
                 skip_problem=skip_problem,
-                target_statuses=target_statuses,
                 mark_blocked_problem=tuple(args.mark_blocked_problem),
                 mark_blocked_only=args.mark_blocked_only,
                 workload_limit=args.workload_limit,
