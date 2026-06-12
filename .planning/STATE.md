@@ -48,7 +48,6 @@ Progress: [██████████] 100%
 
 | Date | Task | Status | Notes |
 |------|------|--------|-------|
-| 2026-06-13 | rdna4-validation-100-percent | complete | Added explicit `--target-status` selection to the RDNA4 profiler batch so the latest v1.35 report's 73 `ready_missing_profiler_timing` problems can be targeted for follow-up profiling; strict full profiler-backed timing remains blocked by 41 readiness-blocked and 5 reference OOM-blocked denominator rows. |
 | 2026-06-12 | rdna4-v135-measurement-rerun | complete | Rebuilt RDNA4 v1.35 rerun closure, derived evidence, profiler timing batch, coverage, denominator, consistency, claim, trust, and bundle reports under `out/rdna4-v135-rerun-20260611/`; fixed derived/profiler OOM, profiler ENOSPC, and consistency evidence-gap drift misclassification. |
 
 ## Accumulated Context

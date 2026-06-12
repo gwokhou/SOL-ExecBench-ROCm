@@ -304,39 +304,6 @@ def test_batch_select_targets_honors_skip_problem(tmp_path):
     assert [target.problem_id for target in targets] == ["L1/two"]
 
 
-def test_batch_does_not_select_ready_missing_by_default(tmp_path):
-    dataset_root = tmp_path / "dataset"
-    source_timing = tmp_path / "fallback"
-    replacement = tmp_path / "replacement"
-    _write_problem(dataset_root, "L1", "ready")
-    coverage = _coverage(dataset_root, source_timing, replacement)
-
-    targets = batch.select_fallback_targets(
-        coverage,
-        replacement_timing_dir=replacement,
-        resume=True,
-    )
-
-    assert targets == []
-
-
-def test_batch_can_select_ready_missing_target_status(tmp_path):
-    dataset_root = tmp_path / "dataset"
-    source_timing = tmp_path / "fallback"
-    replacement = tmp_path / "replacement"
-    _write_problem(dataset_root, "L1", "ready")
-    coverage = _coverage(dataset_root, source_timing, replacement)
-
-    targets = batch.select_fallback_targets(
-        coverage,
-        replacement_timing_dir=replacement,
-        target_statuses=("ready_missing_profiler_timing",),
-        resume=True,
-    )
-
-    assert [target.problem_id for target in targets] == ["L1/ready"]
-
-
 def test_batch_resume_skips_profiler_blocked_replacement(tmp_path):
     dataset_root = tmp_path / "dataset"
     source_timing = tmp_path / "fallback"
