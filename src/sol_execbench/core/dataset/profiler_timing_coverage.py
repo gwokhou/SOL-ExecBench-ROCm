@@ -323,14 +323,15 @@ def _load_timing_evidence_summary(path: Path) -> ProfilerTimingEvidenceSummary:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError(f"timing evidence must be a JSON object: {path}")
-    _raw_evidence = payload.get("evidence")
-    evidence: dict[str, Any] = _raw_evidence if isinstance(_raw_evidence, dict) else {}
-    _raw_selection = payload.get("selection")
-    selection: dict[str, Any] = (
-        _raw_selection if isinstance(_raw_selection, dict) else {}
+    evidence = (
+        payload.get("evidence") if isinstance(payload.get("evidence"), dict) else {}
     )
-    _raw_policy = selection.get("policy")
-    policy: dict[str, Any] = _raw_policy if isinstance(_raw_policy, dict) else {}
+    selection = (
+        payload.get("selection") if isinstance(payload.get("selection"), dict) else {}
+    )
+    policy = (
+        selection.get("policy") if isinstance(selection.get("policy"), dict) else {}
+    )
     metadata = (
         payload.get("replacement_metadata")
         if isinstance(payload.get("replacement_metadata"), dict)
@@ -417,9 +418,10 @@ def _blocker_class(payload: dict[str, Any]) -> str | None:
         for detail in details
         if detail.get("oom_detected") is True
     }
-    _raw_meta = payload.get("replacement_metadata")
     trace_counts = _trace_status_counts(
-        _raw_meta if isinstance(_raw_meta, dict) else {},
+        payload.get("replacement_metadata")
+        if isinstance(payload.get("replacement_metadata"), dict)
+        else {}
     )
     source_workloads = _source_workloads(payload)
     has_profiler_gap = "PROFILER_BLOCKED" in trace_counts or any(

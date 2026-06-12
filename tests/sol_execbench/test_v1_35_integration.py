@@ -126,7 +126,7 @@ sys.exit(result.returncode)
         # First instance should complete successfully
         first_process.wait(timeout=5)
         assert first_process.returncode == 0, (
-            f"First instance failed: {first_process.stderr.read() if first_process.stderr else '<no stderr>'}"
+            f"First instance failed: {first_process.stderr.read()}"
         )
 
         # Second instance should detect contention and exit with non-zero code
