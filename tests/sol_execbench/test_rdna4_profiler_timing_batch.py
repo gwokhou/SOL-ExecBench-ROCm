@@ -745,6 +745,135 @@ def test_workload_sharded_batch_imports_existing_slice_sidecars(tmp_path):
     assert sidecar["replacement_metadata"]["trace_status_counts"] == {"PASSED": 2}
 
 
+def test_workload_sharded_aggregation_uses_manifest_summaries(tmp_path):
+    dataset_root = tmp_path / "dataset"
+    source_timing = tmp_path / "fallback"
+    output_dir = tmp_path / "out"
+    replacement = output_dir / "timing"
+    imported_dirs = [tmp_path / f"slice-{index}" / "timing" for index in range(2)]
+    _write_problem(dataset_root, "L1", "one")
+    _write_workloads(dataset_root, "L1", "one", 2)
+    _write_fallback_timing(source_timing, "L1", "one")
+    large_rows = [
+        {
+            "name": f"kernel_{row}",
+            "domain": "KERNEL_DISPATCH",
+            "duration_ms": 0.001,
+            "duration_ns": 1000,
+            "is_kernel_activity": True,
+            "raw": {"row": row},
+        }
+        for row in range(1000)
+    ]
+    for index, timing_dir in enumerate(imported_dirs):
+        _write_timing = timing_dir / "L1" / "one.timing.json"
+        _write_timing.parent.mkdir(parents=True, exist_ok=True)
+        _write_timing.write_text(
+            json.dumps(
+                {
+                    "profiler_collected": True,
+                    "csv_path": f"slice-{index}.csv",
+                    "selection": {"policy": {"backend": "rocprofv3"}},
+                    "evidence": {
+                        "backend": "rocprofv3",
+                        "kernel_duration_ms": 0.005,
+                        "parsed_rows": large_rows,
+                    },
+                    "replacement_metadata": {
+                        "replacement_status": "partial_profiler_backed",
+                        "profiled_workload_count": 1,
+                        "expected_workload_count": 2,
+                        "trace_status_counts": {"PASSED": 1},
+                        "workload_offset": index,
+                        "workload_slice_applied": True,
+                        "full_workload_coverage": False,
+                        "failure_reason": None,
+                    },
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+    def runner(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
+        raise AssertionError(f"runner should not be called: {command}")
+
+    status = batch.run_batch(
+        dataset_root=dataset_root,
+        output_dir=output_dir,
+        source_timing_dirs=(source_timing,),
+        replacement_timing_dir=replacement,
+        limit=1,
+        workload_sharded=True,
+        workload_slice_timing_dirs=tuple(imported_dirs),
+        rocprofv3_available=True,
+        runner=runner,
+    )
+
+    assert status == 0
+    sidecar = json.loads(
+        (replacement / "L1" / "one.timing.json").read_text(encoding="utf-8")
+    )
+    rows = sidecar["evidence"]["parsed_rows"]
+    assert len(rows) == 2
+    assert {row["name"] for row in rows} == {"workload_sharded_kernel_activity"}
+    assert sidecar["evidence"]["kernel_duration_ms"] == 0.01
+
+
+def test_workload_sharded_batch_compacts_completed_slice_artifacts(tmp_path):
+    dataset_root = tmp_path / "dataset"
+    source_timing = tmp_path / "fallback"
+    output_dir = tmp_path / "out"
+    replacement = output_dir / "timing"
+    _write_problem(dataset_root, "L1", "one")
+    _write_workloads(dataset_root, "L1", "one", 1)
+    _write_fallback_timing(source_timing, "L1", "one")
+
+    def runner(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
+        output_directory = Path(command[command.index("--output-directory") + 1])
+        output_file = command[command.index("--output-file") + 1]
+        output_directory.mkdir(parents=True, exist_ok=True)
+        (output_directory / f"{output_file}_kernel_trace.csv").write_text(
+            ROCPROFV3_CSV,
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(
+            args=list(command),
+            returncode=0,
+            stdout=PASSED_TRACE,
+            stderr="",
+        )
+
+    status = batch.run_batch(
+        dataset_root=dataset_root,
+        output_dir=output_dir,
+        source_timing_dirs=(source_timing,),
+        replacement_timing_dir=replacement,
+        limit=1,
+        workload_sharded=True,
+        rocprofv3_available=True,
+        runner=runner,
+    )
+
+    assert status == 0
+    slice_sidecar_path = (
+        output_dir
+        / "workload-slices"
+        / "workload-0000"
+        / "timing"
+        / "L1"
+        / "one.timing.json"
+    )
+    slice_sidecar = json.loads(slice_sidecar_path.read_text(encoding="utf-8"))
+    assert slice_sidecar["evidence"]["parsed_rows"] == []
+    assert slice_sidecar["evidence"]["parsed_rows_compacted"] is True
+    assert not Path(slice_sidecar["csv_path"]).parent.exists()
+    aggregate = json.loads(
+        (replacement / "L1" / "one.timing.json").read_text(encoding="utf-8")
+    )
+    assert aggregate["replacement_metadata"]["replacement_status"] == "profiler_backed"
+
+
 def test_workload_sharded_aggregation_keeps_failed_workload_partial(tmp_path):
     dataset_root = tmp_path / "dataset"
     source_timing = tmp_path / "fallback"

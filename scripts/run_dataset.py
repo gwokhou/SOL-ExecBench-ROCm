@@ -2512,8 +2512,11 @@ def main():
             )
 
         with ThreadPoolExecutor(max_workers=jobs) as executor:
-            results = executor.map(run_derived_item, enumerate(problems))
-            for result in results:
+            futures = [
+                executor.submit(run_derived_item, item) for item in enumerate(problems)
+            ]
+            for future in as_completed(futures):
+                result = future.result()
                 for message in result["messages"]:
                     print(message)
                 if result["summary"] is not None:

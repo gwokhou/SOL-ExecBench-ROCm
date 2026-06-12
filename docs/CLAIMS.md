@@ -68,6 +68,7 @@ CDNA3, or CDNA4 validation.
 | v1.21 debt-reduction evidence | Dataset, evaluator, analysis, SOLAR/static evidence, and boundary tests were refactored or hardened under stable public schemas. | Focused helper tests, unchanged sidecar schemas, `CONCERNS.md` status categories, and explicit non-claim wording. |
 | AMD-native-derived evidence | A score or bound report was derived from ROCm traces and AMD-side bound artifacts. | Canonical traces, AMD SOL bound sidecars, hardware model refs, score eligibility state, and warnings. |
 | RDNA4 bounded ready-subset evidence | RDNA4 `gfx1200` executed the v1.30 ready subset and produced bounded closure artifacts: 121 ready problems, 1907 attempted workloads, 1761 passed workloads, 146 failed workloads, 86 OK problems, 35 FAIL problems, and 12 explicit `missing_trace` workload records. The v1.31 follow-up classifies all 12 missing traces as `gpu_oom_no_trace` and groups all 146 failed workloads by failure class. | Phase 138 closure/summary artifacts, Phase 139 environment/timing blockers, Phase 140 reports/bundle, and v1.31 follow-up triage artifacts. This is bounded RDNA4 evidence, not paper parity, not upstream SOLAR parity, not NVIDIA B200 equivalence, not hosted leaderboard authority, not CDNA3/MI300X validation, and not CDNA4 validation. |
+| RDNA4 v1.35 rerun evidence | RDNA4 `gfx1200` regenerated the v1.35 evidence package under `out/rdna4-v135-rerun-20260611/`: execution closure has `derived_evidence_missing=0`; profiler timing batch produced 121 replacement timing sidecars and 121 workload manifests with 0 remaining resume targets; rebuilt coverage has 88 full profiler-backed problems, 28 partial profiler-backed problems, 0 fallback timing problems, 0 profiler-blocked problems, 73 ready-missing profiler timing problems, and `full_profiler_backed_timing_coverage=false`; rebuilt consistency has 0 findings; the full prerelease artifact bundle reports `overall_status=passed`. | `.planning/quick/260611-rdna4-v135-measurement-rerun/SUMMARY.md`, `out/rdna4-v135-rerun-20260611/profiler-batch/batch-summary.json`, `out/rdna4-v135-rerun-20260611/profiler-timing-coverage/coverage-summary.json`, `out/rdna4-v135-rerun-20260611/reports/consistency.json`, and `out/rdna4-v135-rerun-20260611/prerelease-artifact-bundle-full/prerelease_artifact_bundle.json`. This is same-source diagnostic/review evidence, not full profiler-backed timing coverage, not paper parity, not upstream SOLAR parity, not score authority, not leaderboard authority, not CDNA3/MI300X validation, and not CDNA4 validation. |
 | RDNA4 denominator policy evidence | RDNA4 `gfx1200` reports may account for the 235-problem denominator with explicit blocker classes, including `reference_oom_blocked` for current-device 16GB HIP OOM in reference/input-generation paths. | `docs/internal/RDNA4-DENOMINATOR-POLICY.md` and profiler timing coverage reports. Blocker classes remain accounted but do not count as profiler-backed timing, full validation pass evidence, authoritative timing, paper parity, score authority, or leaderboard authority. |
 | RDNA4 stable-peak timing evidence | RDNA4 `gfx1200` can achieve near-maximum stable clock frequencies using `sudo amd-smi set -l STABLE_PEAK`. Under sustained GPU workload (709 GEMM iterations), SCLK remains at 2709-2754Mhz (<1% from the 2780Mhz maximum) and MCLK locks at 1124Mhz with zero fluctuation. This is not PMFW-by-passing clock lock, but the firmware's built-in peak performance profile provides reproducible, stable timing suitable for comparative evaluation. | `.planning/quick/260609-rdna4-clock-lock-workload/SUMMARY.md` and local raw logs under `out/rdna4-clock-lock-workload-20260609/`. Run with: `sudo amd-smi set -l STABLE_PEAK` before benchmark execution. Reset with `sudo amd-smi set -l AUTO` after. |
 | RDNA4 release evidence bundle | RDNA4 `gfx1200` has a v1.33 release evidence bundle covering bounded execution, denominator accounting, partial profiler-backed timing, AMD-derived sidecars, blocker ledgers, checksums, clock-control/reset evidence, and explicit closure of remaining coverage/timing authority gaps as deferred blockers. | `.planning/phases/168-rdna4-release-evidence-bundle/rdna4-release-evidence-manifest.json`, `.planning/phases/168-rdna4-release-evidence-bundle/168-CLAIM-REVIEW.md`, `docs/internal/RDNA4-AUTHORITY-GAP-CLOSURE.md`, and `.planning/quick/260609-rdna4-clock-lock-workload/SUMMARY.md`. This bundle does not upgrade RDNA4 to full profiler-backed timing coverage, benchmark-grade authoritative timing, paper parity, upstream SOLAR equivalence, score authority, leaderboard authority, CDNA3/MI300X validation, or CDNA4 validation. |
@@ -87,6 +88,11 @@ For v1.25 engineering-prerelease support wording:
   validation result only with its denominator, failures, missing traces,
   temporary sidecar exclusions, unscored records, and non-authoritative timing
   blockers attached.
+- v1.35 RDNA4 `gfx1200` rerun evidence may be described as an internally
+  consistent same-source evidence package with 88 full profiler-backed problems,
+  28 partial profiler-backed problems, 0 rebuilt consistency findings, and a
+  passing prerelease artifact bundle. It must also state that full
+  profiler-backed timing coverage remains false.
 - Long RDNA4 derived or dataset jobs should run outside the Codex child process
   tree through `scripts/run_derived_isolated.py --launch-mode systemd` or an
   equivalent transient `systemd-run --user` unit with memory and swap caps.
@@ -151,9 +157,10 @@ leaderboard authority.
 - NVIDIA B200, Blackwell, or official leaderboard parity.
 - Upstream NVlabs/SOLAR equivalence.
 - Full 124-model extraction or full 235-problem paper validation.
-- RDNA4 bounded ready-subset evidence as zero-failure validation, authoritative
-  timing, upstream SOLAR equivalence, NVIDIA B200 equivalence, hosted
-  leaderboard authority, CDNA3/MI300X validation, or CDNA4 validation.
+- RDNA4 bounded ready-subset or v1.35 rerun evidence as zero-failure
+  validation, full profiler-backed timing coverage, authoritative timing,
+  upstream SOLAR equivalence, NVIDIA B200 equivalence, hosted leaderboard
+  authority, CDNA3/MI300X validation, or CDNA4 validation.
 - Full CDNA3-family hardware validation, including MI300X (`gfx942`), or CDNA4
   hardware validation without archived full-suite evidence and accepted
   timeout/skip boundaries from that hardware class.

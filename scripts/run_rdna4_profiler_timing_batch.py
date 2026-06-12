@@ -107,6 +107,7 @@ def _process_target_chunk(
     concurrent_gpu_processes: list[dict[str, Any]] | None = None,
     calibration_path: Path | None = None,
     pid_lock_contention: bool = False,
+    compact_workload_slices: bool = True,
 ) -> list[dict[str, Any]]:
     """Process a chunk of targets with CPU-parallel staging + serial GPU profiling (PRFL-01, PRFL-02)."""
     chunk_results = []
@@ -144,6 +145,7 @@ def _process_target_chunk(
                 concurrent_gpu_processes=concurrent_gpu_processes,
                 calibration_path=calibration_path,
                 pid_lock_contention=contention_detected,
+                compact_workload_slices=compact_workload_slices,
             )
         else:
             result = _profile_target(
@@ -201,6 +203,7 @@ def run_batch(
     strict_isolation: bool = False,
     gpu_device: int | None = None,
     calibration_path: Path | None = None,
+    compact_workload_slices: bool = True,
 ) -> int:
     """Run fallback replacement batch and return a process-style status code."""
     if limit is not None and limit <= 0:
@@ -213,6 +216,13 @@ def run_batch(
         raise ValueError("workload_sharded mode controls workload_limit internally")
     if workload_sharded and workload_offset:
         raise ValueError("workload_sharded mode profiles all manifest-missing offsets")
+    if strict_isolation and max_workers != 1:
+        logger.info(
+            "STRICT ISOLATION: reducing profiler batch workers from %d to 1 "
+            "to avoid concurrent GPU profiling",
+            max_workers,
+        )
+        max_workers = 1
 
     replacement_root = replacement_timing_dir or output_dir / "timing"
     coverage = _build_coverage(
@@ -312,6 +322,7 @@ def run_batch(
                     global_start_index=global_start_idx,
                     concurrent_gpu_processes=concurrent_processes or None,
                     calibration_path=calibration_path,
+                    compact_workload_slices=compact_workload_slices,
                 )
                 futures[future] = chunk_idx
 
@@ -481,6 +492,7 @@ def _profile_target(
     concurrent_gpu_processes: list[dict[str, Any]] | None = None,
     calibration_path: Path | None = None,
     pid_lock_contention: bool = False,
+    compact_workload_slices: bool = True,
 ) -> dict[str, Any]:
     problem_dir = dataset_root / target.problem_path
     if temp_dir is not None:
@@ -651,6 +663,7 @@ def _profile_target_workload_sharded(
     concurrent_gpu_processes: list[dict[str, Any]] | None = None,
     calibration_path: Path | None = None,
     pid_lock_contention: bool = False,
+    compact_workload_slices: bool = True,
 ) -> dict[str, Any]:
     if workload_limit is not None or workload_offset:
         raise ValueError("workload-sharded mode owns workload slicing")
@@ -744,6 +757,11 @@ def _profile_target_workload_sharded(
         entry = _workload_manifest_entry(ref, result=result, sidecar=sidecar)
         _upsert_workload_manifest_entry(manifest, entry)
         _write_workload_manifest(manifest_path, manifest)
+        if compact_workload_slices and _workload_manifest_entry_complete(entry):
+            _compact_workload_slice_artifacts(
+                sidecar_path=Path(result["replacement_path"]),
+                csv_path=result.get("csv_path"),
+            )
 
     aggregate = _write_workload_aggregate_sidecar(
         target=target,
@@ -1235,15 +1253,15 @@ def _write_workload_aggregate_sidecar(
 
 
 def _aggregate_rows_from_entry(entry: dict[str, Any]) -> list[dict[str, Any]]:
-    rows = _load_sidecar_rows(entry.get("replacement_path"))
-    if rows:
-        for row in rows:
-            row["workload_index"] = entry.get("workload_index")
-            row["workload_uuid"] = entry.get("workload_uuid")
-        return rows
     count = _int_value(entry.get("kernel_activity_rows"))
     duration = _float_value(entry.get("kernel_duration_ms"))
     if count <= 0 or duration <= 0:
+        rows = _load_sidecar_rows(entry.get("replacement_path"))
+        if rows:
+            for row in rows:
+                row["workload_index"] = entry.get("workload_index")
+                row["workload_uuid"] = entry.get("workload_uuid")
+            return rows
         return []
     return [
         {
@@ -1257,6 +1275,43 @@ def _aggregate_rows_from_entry(entry: dict[str, Any]) -> list[dict[str, Any]]:
             "workload_uuid": entry.get("workload_uuid"),
         }
     ]
+
+
+def _compact_workload_slice_artifacts(
+    *,
+    sidecar_path: Path,
+    csv_path: object,
+) -> None:
+    payload = _load_optional_json(sidecar_path)
+    if payload is not None:
+        evidence = (
+            payload.get("evidence")
+            if isinstance(payload.get("evidence"), dict)
+            else None
+        )
+        if evidence is not None and isinstance(evidence.get("parsed_rows"), list):
+            evidence["parsed_rows"] = []
+            evidence["parsed_rows_compacted"] = True
+            evidence["compaction_reason"] = (
+                "workload manifest retained kernel row and duration summaries"
+            )
+            sidecar_path.write_text(
+                json.dumps(payload, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+    if isinstance(csv_path, str) and csv_path:
+        _remove_rocprofv3_run_dir(Path(csv_path))
+
+
+def _remove_rocprofv3_run_dir(csv_path: Path) -> None:
+    try:
+        run_dir = csv_path.resolve().parent
+    except OSError:
+        run_dir = csv_path.parent
+    marker = f"{os.sep}rocprofv3{os.sep}"
+    if marker not in str(run_dir):
+        return
+    shutil.rmtree(run_dir, ignore_errors=True)
 
 
 def _load_sidecar_rows(path_value: object) -> list[dict[str, Any]]:
@@ -1581,6 +1636,16 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             "and do not profile missing workloads."
         ),
     )
+    parser.add_argument(
+        "--compact-workload-slices",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "In workload-sharded mode, compact completed slice timing sidecars "
+            "and remove raw rocprofv3 run directories after manifest summaries "
+            "have been recorded."
+        ),
+    )
     parser.add_argument("--timeout", type=int, default=900)
     parser.add_argument("--temp-dir", type=Path, default=None)
     parser.add_argument("--resume", action=argparse.BooleanOptionalAction, default=True)
@@ -1671,6 +1736,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 strict_isolation=args.strict_isolation,
                 gpu_device=args.gpu_device,
                 calibration_path=args.calibration_path,
+                compact_workload_slices=args.compact_workload_slices,
             )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"ERROR: {exc}")

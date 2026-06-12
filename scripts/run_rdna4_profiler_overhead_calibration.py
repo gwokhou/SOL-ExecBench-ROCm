@@ -13,11 +13,17 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
+from sol_execbench.core.bench.clock_lock import (
+    lock_clocks,
+    unlock_clocks,
+    verify_clocks,
+)
 from sol_execbench.core.bench.pid_lock import acquire_pid_lock
 from sol_execbench.core.bench.timing_isolation import (
     detect_concurrent_gpu_processes,
@@ -34,6 +40,21 @@ DEFAULT_GPU_ARCHITECTURE = "gfx1200"
 DEFAULT_ELEMENT_COUNT = 1_000_000
 
 
+class CalibrationClockState:
+    """Clock state managed by this calibration process."""
+
+    def __init__(
+        self,
+        *,
+        clock_locked: bool,
+        lock_acquired: bool,
+        previous_env: str | None,
+    ) -> None:
+        self.clock_locked = clock_locked
+        self.lock_acquired = lock_acquired
+        self.previous_env = previous_env
+
+
 def run_calibration(
     *,
     output_path: Path,
@@ -43,120 +64,203 @@ def run_calibration(
     element_count: int = DEFAULT_ELEMENT_COUNT,
     strict_isolation: bool = True,
     gpu_device: int | None = None,
+    manage_clocks: bool = True,
+    reset_clocks: bool = True,
 ) -> int:
     """Run rocprofv3 overhead calibration and write result to output_path."""
-    import torch
+    clock_state = _setup_calibration_clocks(
+        manage_clocks=manage_clocks,
+        strict_isolation=strict_isolation,
+    )
+    if strict_isolation and not clock_state.clock_locked:
+        return 1
 
-    # Pre-flight isolation audit
-    logger.info("Running timing isolation pre-flight audit...")
-    concurrent_processes = detect_concurrent_gpu_processes()
-    if concurrent_processes:
-        if strict_isolation:
-            logger.error(
-                "STRICT ISOLATION: Detected %d concurrent GPU process(es), aborting: %s",
+    try:
+        import torch
+
+        # Pre-flight isolation audit
+        logger.info("Running timing isolation pre-flight audit...")
+        concurrent_processes = detect_concurrent_gpu_processes()
+        if concurrent_processes:
+            if strict_isolation:
+                logger.error(
+                    "STRICT ISOLATION: Detected %d concurrent GPU process(es), aborting: %s",
+                    len(concurrent_processes),
+                    concurrent_processes,
+                )
+                return 1
+            logger.warning(
+                "Detected %d concurrent GPU process(es): %s",
                 len(concurrent_processes),
                 concurrent_processes,
             )
-            return 1
-        logger.warning(
-            "Detected %d concurrent GPU process(es): %s",
-            len(concurrent_processes),
-            concurrent_processes,
-        )
 
-    clock_ok = verify_clock_state_with_warning(context="calibration_start")
-    if not clock_ok:
-        if strict_isolation:
-            logger.error("STRICT ISOLATION: Clock state verification failed, aborting")
-            return 1
-        logger.warning("Clock state verification failed at calibration start")
+        clock_ok = verify_clock_state_with_warning(context="calibration_start")
+        if not clock_ok:
+            if strict_isolation:
+                logger.error(
+                    "STRICT ISOLATION: Clock state verification failed, aborting"
+                )
+                return 1
+            logger.warning("Clock state verification failed at calibration start")
 
-    gpu_isolation = validate_gpu_device_isolation(gpu_device=gpu_device)
-    if not gpu_isolation["isolated"]:
-        if strict_isolation:
-            logger.error(
-                "STRICT ISOLATION: GPU device isolation check failed, aborting: %s",
-                gpu_isolation["warnings"],
+        gpu_isolation = validate_gpu_device_isolation(gpu_device=gpu_device)
+        if not gpu_isolation["isolated"]:
+            if strict_isolation:
+                logger.error(
+                    "STRICT ISOLATION: GPU device isolation check failed, aborting: %s",
+                    gpu_isolation["warnings"],
+                )
+                return 1
+            for warn in gpu_isolation["warnings"]:
+                logger.warning("GPU device isolation: %s", warn)
+
+        # Build minimal HIP kernel (vector add)
+        a = torch.randn(element_count, device="cuda", dtype=torch.float32)
+        b = torch.randn(element_count, device="cuda", dtype=torch.float32)
+        c = torch.empty_like(a)
+
+        # Warmup
+        for _ in range(warmup_runs):
+            torch.add(a, b, out=c)
+            torch.cuda.synchronize()
+
+        # Baseline: device events WITHOUT rocprofv3
+        baseline_durations: list[float] = []
+        for _ in range(iterations):
+            start = torch.cuda.Event(enable_timing=True)
+            end = torch.cuda.Event(enable_timing=True)
+            start.record()
+            torch.add(a, b, out=c)
+            end.record()
+            torch.cuda.synchronize()
+            baseline_durations.append(start.elapsed_time(end))
+
+        # Profiler-backed: device events WITH rocprofv3
+        profiler_durations: list[float] = []
+        try:
+            profiler_result = _run_with_rocprofv3(
+                a,
+                b,
+                c,
+                iterations=iterations,
             )
+            profiler_durations = profiler_result
+        except Exception as exc:
+            logger.error("rocprofv3 profiling failed: %s", exc)
             return 1
-        for warn in gpu_isolation["warnings"]:
-            logger.warning("GPU device isolation: %s", warn)
 
-    # Build minimal HIP kernel (vector add)
-    a = torch.randn(element_count, device="cuda", dtype=torch.float32)
-    b = torch.randn(element_count, device="cuda", dtype=torch.float32)
-    c = torch.empty_like(a)
+        if not profiler_durations:
+            logger.error("rocprofv3 did not produce timing measurements")
+            return 1
 
-    # Warmup
-    for _ in range(warmup_runs):
-        torch.add(a, b, out=c)
-        torch.cuda.synchronize()
+        # Compute overhead
+        from statistics import median
 
-    # Baseline: device events WITHOUT rocprofv3
-    baseline_durations: list[float] = []
-    for _ in range(iterations):
-        start = torch.cuda.Event(enable_timing=True)
-        end = torch.cuda.Event(enable_timing=True)
-        start.record()
-        torch.add(a, b, out=c)
-        end.record()
-        torch.cuda.synchronize()
-        baseline_durations.append(start.elapsed_time(end))
+        baseline_median = median(baseline_durations)
+        profiler_median = median(profiler_durations)
+        overhead_ms = profiler_median - baseline_median
 
-    # Profiler-backed: device events WITH rocprofv3
-    profiler_durations: list[float] = []
-    try:
-        profiler_result = _run_with_rocprofv3(
-            a,
-            b,
-            c,
-            iterations=iterations,
+        calibration = {
+            "schema_version": CALIBRATION_SCHEMA_VERSION,
+            "generated_at": _utc_timestamp(),
+            "baseline_median_ms": round(baseline_median, 6),
+            "profiler_median_ms": round(profiler_median, 6),
+            "overhead_ms": round(overhead_ms, 6),
+            "iterations": iterations,
+            "warmup_runs": warmup_runs,
+            "element_count": element_count,
+            "gpu_architecture": gpu_architecture,
+            "clock_locked": clock_ok,
+            "clock_setup": {
+                "managed": manage_clocks,
+                "lock_acquired": clock_state.lock_acquired,
+                "reset_on_exit": reset_clocks,
+            },
+            "gpu_isolation": gpu_isolation,
+            "baseline_sample_count": len(baseline_durations),
+            "profiler_sample_count": len(profiler_durations),
+        }
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(
+            json.dumps(calibration, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
         )
-        profiler_durations = profiler_result
-    except Exception as exc:
-        logger.error("rocprofv3 profiling failed: %s", exc)
-        return 1
+        logger.info(
+            "Calibration complete: baseline=%.6fms, profiler=%.6fms, overhead=%.6fms",
+            baseline_median,
+            profiler_median,
+            overhead_ms,
+        )
+        logger.info("Calibration written to: %s", output_path)
+        return 0
+    finally:
+        _teardown_calibration_clocks(
+            clock_state,
+            reset_clocks=reset_clocks,
+        )
 
-    if not profiler_durations:
-        logger.error("rocprofv3 did not produce timing measurements")
-        return 1
 
-    # Compute overhead
-    from statistics import median
+def _setup_calibration_clocks(
+    *,
+    manage_clocks: bool,
+    strict_isolation: bool,
+) -> CalibrationClockState:
+    previous_env = os.environ.get("SOL_EXECBENCH_CLOCKS_LOCKED")
+    if not manage_clocks:
+        clock_locked = verify_clock_state_with_warning(context="calibration_preflight")
+        if clock_locked:
+            os.environ["SOL_EXECBENCH_CLOCKS_LOCKED"] = "1"
+        elif strict_isolation:
+            logger.error("STRICT ISOLATION: Clock state verification failed, aborting")
+        return CalibrationClockState(
+            clock_locked=clock_locked,
+            lock_acquired=False,
+            previous_env=previous_env,
+        )
 
-    baseline_median = median(baseline_durations)
-    profiler_median = median(profiler_durations)
-    overhead_ms = profiler_median - baseline_median
+    if verify_clocks():
+        os.environ["SOL_EXECBENCH_CLOCKS_LOCKED"] = "1"
+        return CalibrationClockState(
+            clock_locked=True,
+            lock_acquired=False,
+            previous_env=previous_env,
+        )
 
-    calibration = {
-        "schema_version": CALIBRATION_SCHEMA_VERSION,
-        "generated_at": _utc_timestamp(),
-        "baseline_median_ms": round(baseline_median, 6),
-        "profiler_median_ms": round(profiler_median, 6),
-        "overhead_ms": round(overhead_ms, 6),
-        "iterations": iterations,
-        "warmup_runs": warmup_runs,
-        "element_count": element_count,
-        "gpu_architecture": gpu_architecture,
-        "clock_locked": clock_ok,
-        "gpu_isolation": gpu_isolation,
-        "baseline_sample_count": len(baseline_durations),
-        "profiler_sample_count": len(profiler_durations),
-    }
+    logger.info("Locking GPU clocks to STABLE_PEAK for calibration...")
+    if not lock_clocks():
+        if strict_isolation:
+            logger.error("STRICT ISOLATION: Failed to lock GPU clocks, aborting")
+        else:
+            logger.warning("Failed to lock GPU clocks for calibration")
+        return CalibrationClockState(
+            clock_locked=False,
+            lock_acquired=False,
+            previous_env=previous_env,
+        )
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
-        json.dumps(calibration, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
+    os.environ["SOL_EXECBENCH_CLOCKS_LOCKED"] = "1"
+    return CalibrationClockState(
+        clock_locked=True,
+        lock_acquired=True,
+        previous_env=previous_env,
     )
-    logger.info(
-        "Calibration complete: baseline=%.6fms, profiler=%.6fms, overhead=%.6fms",
-        baseline_median,
-        profiler_median,
-        overhead_ms,
-    )
-    logger.info("Calibration written to: %s", output_path)
-    return 0
+
+
+def _teardown_calibration_clocks(
+    clock_state: CalibrationClockState,
+    *,
+    reset_clocks: bool,
+) -> None:
+    if clock_state.lock_acquired and reset_clocks:
+        logger.info("Resetting GPU clocks to AUTO after calibration...")
+        unlock_clocks()
+
+    if clock_state.previous_env is None:
+        os.environ.pop("SOL_EXECBENCH_CLOCKS_LOCKED", None)
+    else:
+        os.environ["SOL_EXECBENCH_CLOCKS_LOCKED"] = clock_state.previous_env
 
 
 def _run_with_rocprofv3(
@@ -209,6 +313,7 @@ def _run_with_rocprofv3(
         command = build_rocprofv3_command(
             [sys.executable, str(script_path)],
             output_directory=str(output_dir),
+            output_file="rocprofv3-overhead-calibration",
         )
 
         result = subprocess.run(
@@ -271,6 +376,18 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=None,
         help="Set ROCR_VISIBLE_DEVICES to this device index.",
     )
+    parser.add_argument(
+        "--lock-clocks",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Lock GPU clocks to STABLE_PEAK before calibration.",
+    )
+    parser.add_argument(
+        "--reset-clocks",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Reset clocks to AUTO after calibration if this process locked them.",
+    )
     return parser.parse_args(argv)
 
 
@@ -291,6 +408,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 element_count=args.element_count,
                 strict_isolation=args.strict_isolation,
                 gpu_device=args.gpu_device,
+                manage_clocks=args.lock_clocks,
+                reset_clocks=args.reset_clocks,
             )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"ERROR: {exc}")

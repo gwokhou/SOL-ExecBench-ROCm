@@ -160,7 +160,9 @@ def build_bound_graph(definition: Definition, workload: Workload) -> BoundGraph:
     tensors = _declared_tensors(definition, input_shapes, output_shapes)
     warnings: list[str] = []
 
-    fx_graph = _try_fx_bound_graph(definition, workload, input_shapes, output_shapes, tensors)
+    fx_graph = _try_fx_bound_graph(
+        definition, workload, input_shapes, output_shapes, tensors
+    )
     if fx_graph is not None:
         return fx_graph
 
@@ -169,7 +171,9 @@ def build_bound_graph(definition: Definition, workload: Workload) -> BoundGraph:
     try:
         tree = ast.parse(definition.reference, mode="exec")
     except SyntaxError as exc:
-        raise ValueError(f"Reference must be valid Python code for graph extraction: {exc}") from exc
+        raise ValueError(
+            f"Reference must be valid Python code for graph extraction: {exc}"
+        ) from exc
 
     extractor = _AstBoundGraphExtractor(
         definition=definition,
@@ -180,14 +184,16 @@ def build_bound_graph(definition: Definition, workload: Workload) -> BoundGraph:
     nodes, extracted_tensors, edges, extractor_warnings = extractor.extract(tree)
     warnings.extend(extractor_warnings)
 
-    return _annotate_family_graph(BoundGraph(
-        definition=definition.name,
-        workload_uuid=workload.uuid,
-        nodes=nodes,
-        tensors=extracted_tensors,
-        edges=edges,
-        warnings=tuple(dict.fromkeys(warnings)),
-    ))
+    return _annotate_family_graph(
+        BoundGraph(
+            definition=definition.name,
+            workload_uuid=workload.uuid,
+            nodes=nodes,
+            tensors=extracted_tensors,
+            edges=edges,
+            warnings=tuple(dict.fromkeys(warnings)),
+        )
+    )
 
 
 def _try_fx_bound_graph(
@@ -207,16 +213,19 @@ def _try_fx_bound_graph(
 
     namespace: dict[str, Any] = {"torch": torch}
     try:
-        exec(compile(definition.reference, f"<{definition.name}.reference>", "exec"), namespace)
+        exec(
+            compile(definition.reference, f"<{definition.name}.reference>", "exec"),
+            namespace,
+        )
         run = namespace["run"]
         sample_inputs = []
         for name, spec in definition.inputs.items():
             shape = input_shapes[name]
             dtype = _torch_dtype(torch, spec.dtype)
             if shape is None:
-                sample_inputs.append(torch.tensor(0, dtype=dtype))
+                sample_inputs.append(getattr(workload.inputs.get(name), "value", 0))
             else:
-                sample_inputs.append(torch.zeros(shape, dtype=dtype))
+                sample_inputs.append(torch.zeros(shape, dtype=dtype, device="meta"))
         traced = symbolic_trace(run)
         ShapeProp(traced).propagate(*sample_inputs)
     except Exception:
@@ -272,8 +281,10 @@ def _try_fx_bound_graph(
             tensor_id=output_tensor_id,
             name=output_tensor_id,
             role=BoundTensorRole.INTERMEDIATE,
-            shape=output_shape or _first_input_shape(input_tensor_ids, tensors, output_shapes),
-            dtype=output_dtype or _first_input_dtype(input_tensor_ids, tensors, definition),
+            shape=output_shape
+            or _first_input_shape(input_tensor_ids, tensors, output_shapes),
+            dtype=output_dtype
+            or _first_input_dtype(input_tensor_ids, tensors, definition),
             producer_node_id=node_id,
             source=_fx_source_expression(fx_node),
         )
@@ -314,7 +325,9 @@ def _try_fx_bound_graph(
         elif fx_node.op == "output":
             output_tensor_ids = [
                 tensor_id
-                for tensor_id in _flatten_fx_output_tensor_ids(fx_node.args, node_outputs)
+                for tensor_id in _flatten_fx_output_tensor_ids(
+                    fx_node.args, node_outputs
+                )
                 if tensor_id in tensors
             ]
             for index, output_name in enumerate(definition.outputs):
@@ -331,14 +344,16 @@ def _try_fx_bound_graph(
     if not nodes:
         return None
 
-    return _annotate_family_graph(BoundGraph(
-        definition=definition.name,
-        workload_uuid=workload.uuid,
-        nodes=tuple(nodes),
-        tensors=tensors,
-        edges=tuple(edges),
-        warnings=tuple(dict.fromkeys(warnings)),
-    ))
+    return _annotate_family_graph(
+        BoundGraph(
+            definition=definition.name,
+            workload_uuid=workload.uuid,
+            nodes=tuple(nodes),
+            tensors=tensors,
+            edges=tuple(edges),
+            warnings=tuple(dict.fromkeys(warnings)),
+        )
+    )
 
 
 def _declared_tensors(
@@ -399,6 +414,8 @@ def _fx_node_name(node: Any) -> str:
         name = target.__name__
         if module == "_operator":
             return name
+        if module == "torch._C._linalg" and name.startswith("linalg_"):
+            return f"torch.linalg.{name.removeprefix('linalg_')}"
         return f"{module}.{name}"
     return str(target)
 
@@ -427,7 +444,9 @@ def _fx_input_tensor_ids(
     return tuple(result)
 
 
-def _flatten_fx_output_tensor_ids(value: Any, node_outputs: dict[Any, str]) -> tuple[str, ...]:
+def _flatten_fx_output_tensor_ids(
+    value: Any, node_outputs: dict[Any, str]
+) -> tuple[str, ...]:
     result: list[str] = []
 
     def collect(item: Any) -> None:
@@ -445,13 +464,25 @@ def _fx_tensor_meta(node: Any) -> tuple[tuple[int, ...] | None, str | None]:
     meta = node.meta.get("tensor_meta") if hasattr(node, "meta") else None
     if meta is None:
         return None, None
-    shape = tuple(int(dim) for dim in meta.shape) if getattr(meta, "shape", None) is not None else None
-    dtype = str(meta.dtype).removeprefix("torch.") if getattr(meta, "dtype", None) is not None else None
+    shape = (
+        tuple(int(dim) for dim in meta.shape)
+        if getattr(meta, "shape", None) is not None
+        else None
+    )
+    dtype = (
+        str(meta.dtype).removeprefix("torch.")
+        if getattr(meta, "dtype", None) is not None
+        else None
+    )
     return shape, dtype
 
 
 def _fx_source_expression(node: Any) -> str:
-    if node.op == "call_function" and node.target is operator.matmul and len(node.args) >= 2:
+    if (
+        node.op == "call_function"
+        and node.target is operator.matmul
+        and len(node.args) >= 2
+    ):
         return f"{node.args[0]} @ {node.args[1]}"
     func_name = _fx_node_name(node)
     args = ", ".join(str(arg) for arg in node.args)
@@ -484,9 +515,13 @@ def _fx_node_attributes(
     if target_dtype is not None:
         attributes["target_dtype"] = target_dtype
     if op_family == OpFamily.CONVOLUTION:
-        attributes.update(_convolution_attributes(leaf_name, node.args, node.kwargs, node))
+        attributes.update(
+            _convolution_attributes(leaf_name, node.args, node.kwargs, node)
+        )
     if op_family == OpFamily.EMBEDDING_POSITIONAL:
-        attributes.update(_memory_bound_call_attributes(leaf_name, node.args, node.kwargs, node))
+        attributes.update(
+            _memory_bound_call_attributes(leaf_name, node.args, node.kwargs, node)
+        )
     if op_family == OpFamily.MOE:
         attributes.update(_moe_call_attributes(leaf_name, node.args, node.kwargs))
     if op_family == OpFamily.SSM_MAMBA:
@@ -496,7 +531,9 @@ def _fx_node_attributes(
 
 def _annotate_family_graph(graph: BoundGraph) -> BoundGraph:
     return _annotate_ssm_mamba_graph(
-        _annotate_moe_graph(_annotate_memory_bound_graph(_annotate_attention_graph(graph)))
+        _annotate_moe_graph(
+            _annotate_memory_bound_graph(_annotate_attention_graph(graph))
+        )
     )
 
 
@@ -554,7 +591,9 @@ def _annotate_attention_graph(graph: BoundGraph) -> BoundGraph:
             rationale="recognized attention QK score matmul",
         )
 
-        mask_node = _next_consumer_node(nodes, current_node, graph, families={OpFamily.ELEMENTWISE})
+        mask_node = _next_consumer_node(
+            nodes, current_node, graph, families={OpFamily.ELEMENTWISE}
+        )
         if mask_node is not None:
             mask_index = nodes.index(mask_node)
             mask_semantics = _attention_mask_semantics(graph, mask_node, qk_node)
@@ -590,7 +629,9 @@ def _annotate_attention_graph(graph: BoundGraph) -> BoundGraph:
         if softmax_node is None:
             continue
         softmax_index = nodes.index(softmax_node)
-        softmax_axis = softmax_node.attributes.get("dim", softmax_node.attributes.get("axis"))
+        softmax_axis = softmax_node.attributes.get(
+            "dim", softmax_node.attributes.get("axis")
+        )
         softmax_attrs = {
             **softmax_node.attributes,
             **qk_dims,
@@ -823,7 +864,9 @@ def _annotate_ssm_mamba_graph(graph: BoundGraph) -> BoundGraph:
 
     scan_nodes = [node for node in nodes if _is_ssm_scan_node(node)]
     if not scan_nodes:
-        return replace(graph, nodes=tuple(nodes), warnings=tuple(dict.fromkeys(warnings)))
+        return replace(
+            graph, nodes=tuple(nodes), warnings=tuple(dict.fromkeys(warnings))
+        )
 
     for scan_node in scan_nodes:
         _promote_ssm_predecessors(graph, nodes, scan_node)
@@ -845,7 +888,10 @@ def _annotate_ssm_mamba_graph(graph: BoundGraph) -> BoundGraph:
 
 
 def _is_ssm_scan_node(node: BoundGraphNode) -> bool:
-    return node.op_family == OpFamily.SSM_MAMBA and node.attributes.get("subrole") == "scan"
+    return (
+        node.op_family == OpFamily.SSM_MAMBA
+        and node.attributes.get("subrole") == "scan"
+    )
 
 
 def _promote_ssm_predecessors(
@@ -866,10 +912,15 @@ def _promote_ssm_predecessors(
             rationale="recognized SSM/Mamba depthwise convolution before scan",
         )
         producer = nodes[producer_index]
-        input_projection = _producer_node_for_input(graph, nodes, producer, input_index=0)
+        input_projection = _producer_node_for_input(
+            graph, nodes, producer, input_index=0
+        )
     else:
         input_projection = producer
-    if input_projection is not None and input_projection.op_family == OpFamily.LINEAR_PROJECTION:
+    if (
+        input_projection is not None
+        and input_projection.op_family == OpFamily.LINEAR_PROJECTION
+    ):
         nodes[nodes.index(input_projection)] = replace(
             input_projection,
             op_family=OpFamily.SSM_MAMBA,
@@ -929,7 +980,9 @@ def _producer_node_for_input(
     tensor = graph.tensors.get(node.input_tensor_ids[input_index])
     if tensor is None or tensor.producer_node_id is None:
         return None
-    return next((item for item in nodes if item.node_id == tensor.producer_node_id), None)
+    return next(
+        (item for item in nodes if item.node_id == tensor.producer_node_id), None
+    )
 
 
 def _ssm_sequence_hidden_metadata(
@@ -957,7 +1010,9 @@ def _ssm_state_update_metadata(
     if len(parameter_ids) < 3:
         return {}
     parameter_tensors = [
-        graph.tensors[tensor_id] for tensor_id in parameter_ids if tensor_id in graph.tensors
+        graph.tensors[tensor_id]
+        for tensor_id in parameter_ids
+        if tensor_id in graph.tensors
     ]
     state_tensor = next(
         (
@@ -1025,7 +1080,9 @@ def _moe_route_metadata_from_dispatch_input(
     return {"missing_route_metadata": ("route:top_k", "route:static_cardinality")}
 
 
-def _moe_static_shape_metadata(graph: BoundGraph, node: BoundGraphNode) -> dict[str, Any]:
+def _moe_static_shape_metadata(
+    graph: BoundGraph, node: BoundGraphNode
+) -> dict[str, Any]:
     attrs: dict[str, object] = {}
     for tensor_id in node.input_tensor_ids:
         tensor = graph.tensors.get(tensor_id)
@@ -1075,10 +1132,15 @@ def _annotate_lookup_node(graph: BoundGraph, node: BoundGraphNode) -> BoundGraph
     return replace(node, attributes=attributes)
 
 
-def _lookup_tensor_ids(node: BoundGraphNode, leaf_name: str) -> tuple[str | None, str | None]:
+def _lookup_tensor_ids(
+    node: BoundGraphNode, leaf_name: str
+) -> tuple[str | None, str | None]:
     if leaf_name == "embedding" and len(node.input_tensor_ids) >= 2:
         return node.input_tensor_ids[0], node.input_tensor_ids[1]
-    if leaf_name in {"gather", "index_select", "take"} and len(node.input_tensor_ids) >= 2:
+    if (
+        leaf_name in {"gather", "index_select", "take"}
+        and len(node.input_tensor_ids) >= 2
+    ):
         return node.input_tensor_ids[-1], node.input_tensor_ids[0]
     return None, node.input_tensor_ids[0] if node.input_tensor_ids else None
 
@@ -1107,17 +1169,24 @@ def _elementwise_memory_subrole(
     source = node.source_expression.lower()
     if any("pos" in name or "position" in name for name in names):
         return "positional_add"
-    if any(name in {"sin", "cos"} or "rotary" in name for name in names) or "rotary" in source:
+    if (
+        any(name in {"sin", "cos"} or "rotary" in name for name in names)
+        or "rotary" in source
+    ):
         return "rotary_like"
     return None
 
 
-def _attention_qk_dims(graph: BoundGraph, node: BoundGraphNode) -> dict[str, int] | None:
+def _attention_qk_dims(
+    graph: BoundGraph, node: BoundGraphNode
+) -> dict[str, int] | None:
     if node.op_family != OpFamily.GEMM or len(node.input_tensor_ids) < 2:
         return None
     lhs = graph.tensors.get(node.input_tensor_ids[0])
     rhs = graph.tensors.get(node.input_tensor_ids[1])
-    out = graph.tensors.get(node.output_tensor_ids[0]) if node.output_tensor_ids else None
+    out = (
+        graph.tensors.get(node.output_tensor_ids[0]) if node.output_tensor_ids else None
+    )
     if lhs is None or rhs is None or out is None:
         return None
     if lhs.shape is None or rhs.shape is None or out.shape is None:
@@ -1144,10 +1213,16 @@ def _attention_pv_dims(
     node: BoundGraphNode | None,
     qk_dims: dict[str, int],
 ) -> dict[str, int] | None:
-    if node is None or node.op_family != OpFamily.GEMM or len(node.input_tensor_ids) < 2:
+    if (
+        node is None
+        or node.op_family != OpFamily.GEMM
+        or len(node.input_tensor_ids) < 2
+    ):
         return None
     rhs = graph.tensors.get(node.input_tensor_ids[1])
-    out = graph.tensors.get(node.output_tensor_ids[0]) if node.output_tensor_ids else None
+    out = (
+        graph.tensors.get(node.output_tensor_ids[0]) if node.output_tensor_ids else None
+    )
     if rhs is None or out is None or rhs.shape is None or out.shape is None:
         return None
     expected_rhs = (
@@ -1271,7 +1346,11 @@ class _AstBoundGraphExtractor:
         tuple[str, ...],
     ]:
         run_func = next(
-            (node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "run"),
+            (
+                node
+                for node in tree.body
+                if isinstance(node, ast.FunctionDef) and node.name == "run"
+            ),
             None,
         )
         if run_func is None:
@@ -1293,10 +1372,14 @@ class _AstBoundGraphExtractor:
             for target in statement.targets:
                 self._bind_target(target, value_tensor_ids)
         elif isinstance(statement, ast.AnnAssign):
-            value_tensor_ids = self._process_expr(statement.value) if statement.value else ()
+            value_tensor_ids = (
+                self._process_expr(statement.value) if statement.value else ()
+            )
             self._bind_target(statement.target, value_tensor_ids)
         elif isinstance(statement, ast.Return):
-            self._bind_outputs(self._process_expr(statement.value) if statement.value else ())
+            self._bind_outputs(
+                self._process_expr(statement.value) if statement.value else ()
+            )
         elif isinstance(statement, ast.Expr):
             self._process_expr(statement.value)
         elif isinstance(statement, (ast.If, ast.For, ast.While, ast.Raise)):
@@ -1337,7 +1420,9 @@ class _AstBoundGraphExtractor:
         return ()
 
     def _process_binop(self, node: ast.BinOp) -> tuple[str, ...]:
-        input_tensor_ids = self._process_expr(node.left) + self._process_expr(node.right)
+        input_tensor_ids = self._process_expr(node.left) + self._process_expr(
+            node.right
+        )
         if isinstance(node.op, ast.MatMult):
             op_family = OpFamily.GEMM
             confidence = EstimateConfidence.SUPPORTED
@@ -1465,7 +1550,9 @@ class _AstBoundGraphExtractor:
                 source=source_tensor_id,
             )
 
-    def _default_intermediate_shape(self, input_tensor_ids: tuple[str, ...]) -> tuple[int, ...] | None:
+    def _default_intermediate_shape(
+        self, input_tensor_ids: tuple[str, ...]
+    ) -> tuple[int, ...] | None:
         for tensor_id in input_tensor_ids:
             tensor = self.tensors.get(tensor_id)
             if tensor and tensor.shape is not None:
@@ -1544,14 +1631,18 @@ def _ast_call_attributes(
     if movement_kind is not None:
         attributes["movement_kind"] = movement_kind
 
-    keyword_values = {keyword.arg: keyword.value for keyword in node.keywords if keyword.arg}
+    keyword_values = {
+        keyword.arg: keyword.value for keyword in node.keywords if keyword.arg
+    }
     op_family = _classification_family(classification)
     if op_family in {
         OpFamily.REDUCTION,
         OpFamily.NORMALIZATION,
         OpFamily.SOFTMAX,
     }:
-        positional_args = tuple(node.args if isinstance(node.func, ast.Attribute) else node.args[1:])
+        positional_args = tuple(
+            node.args if isinstance(node.func, ast.Attribute) else node.args[1:]
+        )
         axis = _axis_from_values(positional_args, keyword_values)
         if axis is not _MISSING:
             attributes["dim"] = axis
@@ -1566,9 +1657,13 @@ def _ast_call_attributes(
         attributes["target_dtype"] = target_dtype
     args = tuple(node.args)
     if op_family == OpFamily.CONVOLUTION:
-        attributes.update(_convolution_attributes(leaf_name, args, keyword_values, None))
+        attributes.update(
+            _convolution_attributes(leaf_name, args, keyword_values, None)
+        )
     if op_family == OpFamily.EMBEDDING_POSITIONAL:
-        attributes.update(_memory_bound_call_attributes(leaf_name, args, keyword_values, None))
+        attributes.update(
+            _memory_bound_call_attributes(leaf_name, args, keyword_values, None)
+        )
     if op_family == OpFamily.MOE:
         attributes.update(_moe_call_attributes(leaf_name, args, keyword_values))
     if op_family == OpFamily.SSM_MAMBA:
@@ -1613,8 +1708,17 @@ def _convolution_attributes(
         return {}
     output_shape = _fx_tensor_meta(node)[0] if node is not None else None
     attrs: dict[str, object] = {"dimensionality": dimensionality}
-    for name, position in (("stride", 3), ("padding", 4), ("dilation", 5), ("groups", 6)):
-        value = _literal_value(kwargs[name]) if name in kwargs else _arg_literal(args, position)
+    for name, position in (
+        ("stride", 3),
+        ("padding", 4),
+        ("dilation", 5),
+        ("groups", 6),
+    ):
+        value = (
+            _literal_value(kwargs[name])
+            if name in kwargs
+            else _arg_literal(args, position)
+        )
         if value is not _MISSING:
             attrs[name] = (
                 int(value)
@@ -1622,7 +1726,9 @@ def _convolution_attributes(
                 else _normalize_spatial_tuple(value, dimensionality)
             )
     if output_shape is not None and len(output_shape) >= dimensionality + 2:
-        attrs["output_spatial"] = tuple(int(dim) for dim in output_shape[-dimensionality:])
+        attrs["output_spatial"] = tuple(
+            int(dim) for dim in output_shape[-dimensionality:]
+        )
     return attrs
 
 
@@ -1651,7 +1757,9 @@ def _arg_literal(args: tuple[Any, ...], index: int) -> object:
     return _literal_value(args[index])
 
 
-def _normalize_spatial_tuple(value: object, dimensionality: int) -> tuple[int, ...] | object:
+def _normalize_spatial_tuple(
+    value: object, dimensionality: int
+) -> tuple[int, ...] | object:
     if isinstance(value, int):
         return tuple(value for _ in range(dimensionality))
     if isinstance(value, tuple) and len(value) == dimensionality:
@@ -1685,7 +1793,9 @@ def _literal_value(value: Any) -> object:
         return _MISSING
     if value is None or isinstance(value, int):
         return value
-    if isinstance(value, tuple | list) and all(item is None or isinstance(item, int) for item in value):
+    if isinstance(value, tuple | list) and all(
+        item is None or isinstance(item, int) for item in value
+    ):
         return tuple(value)
     return _MISSING
 

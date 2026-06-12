@@ -48,7 +48,7 @@ but do not replace canonical traces.
 
 | Hardware scope | Research preview status | Interpretation |
 | --- | --- | --- |
-| RDNA4 `gfx1200` | v1.30/v1.31 bounded ready-subset evidence exists: 121 ready problems, 1907 attempted workloads, 1761 passed workloads, 146 failed workloads, 86 OK problems, 35 FAIL problems, 12 explicit `missing_trace` workload records classified as `gpu_oom_no_trace`, 1895 derived score records, 172 scored, 1723 unscored, and 1839 AMD SOL/SOLAR sidecar pairs after 56 temporary sidecar exclusions. | Bounded RDNA4 evidence for the recorded host, commands, exclusions, and artifacts only. The v1.31 follow-up groups all 146 failed workloads by failure class; timing remains non-authoritative because timing used PyTorch/device-event fallback rather than profiler-backed `rocprofv3` kernel activity timing. |
+| RDNA4 `gfx1200` | v1.35 same-source rerun evidence exists under `out/rdna4-v135-rerun-20260611/`: execution closure has `derived_evidence_missing=0`; profiler timing batch produced 121 replacement timing sidecars and 121 workload manifests with 0 remaining resume targets; rebuilt coverage has 88 full profiler-backed problems, 28 partial profiler-backed problems, 0 fallback timing problems, 0 profiler-blocked problems, and 73 ready-missing profiler timing problems; rebuilt consistency has 0 findings; the full prerelease artifact bundle reports `overall_status=passed`. | Bounded RDNA4 evidence for the recorded host, commands, and artifacts only. Full profiler-backed timing coverage remains false, timing remains non-authoritative, and the result is not paper parity, upstream SOLAR parity, hosted leaderboard authority, CDNA3/MI300X validation, CDNA4 validation, or broader AMD hardware validation. |
 | MI300X GPU under CDNA3 `gfx942` | Infrastructure evidence with known blockers. | Current CDNA3 evidence was recorded on MI308X (`gfx942`), not MI300X. MI300X and MI308X are sibling GPU products under CDNA3 with different hardware configurations, even though they share the `gfx942` code path. |
 | CDNA4 | Unavailable. | CDNA4 validation is unavailable because suitable hardware is not currently accessible. |
 | Docker/container ROCm user-space | Diagnostic compatibility evidence where recorded. | Container user-space evidence is not native-host validation. |
@@ -95,9 +95,10 @@ equivalence, official leaderboard equivalence, or paper-scale validation.
 - No NVIDIA B200 equivalence is claimed.
 - No hosted leaderboard readiness is claimed.
 - No hard multi-tenant sandbox authority is claimed.
-- RDNA4 timing is not authoritative until clock-lock/reset sudoers coverage and
-  profiler-backed timing evidence are rerun.
-- RDNA4 long-tail sidecar exclusions remain temporary, visible, and reversible.
+- RDNA4 timing is not authoritative until full profiler-backed timing coverage
+  and a release policy for benchmark-grade timing authority are both satisfied.
+- RDNA4 ready-missing, partial-profiler, readiness-blocked, and
+  current-device-OOM-blocked rows remain visible denominator limitations.
 - No native-host ROCm validation is inferred from Docker/container user-space
   evidence.
 - Full MI300X validation under CDNA3 remains blocked by known timeout shards and

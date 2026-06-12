@@ -6,8 +6,10 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 
 from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3TimingEvidence,
@@ -179,6 +181,21 @@ class TestCalibrationScriptArgs:
         args = mod.parse_args(["--gpu-device", "1"])
         assert args.gpu_device == 1
 
+    def test_lock_clocks_enabled_by_default(self):
+        mod = self._load_script()
+        args = mod.parse_args([])
+        assert args.lock_clocks is True
+
+    def test_no_lock_clocks_disables_setup(self):
+        mod = self._load_script()
+        args = mod.parse_args(["--no-lock-clocks"])
+        assert args.lock_clocks is False
+
+    def test_reset_clocks_enabled_by_default(self):
+        mod = self._load_script()
+        args = mod.parse_args([])
+        assert args.reset_clocks is True
+
     def test_iterations_flag(self):
         mod = self._load_script()
         args = mod.parse_args(["--iterations", "50"])
@@ -203,3 +220,84 @@ class TestCalibrationJsonSchema:
             mod.CALIBRATION_SCHEMA_VERSION
             == "sol_execbench.rocprofv3_overhead_calibration.v1"
         )
+
+
+class TestCalibrationClockSetup:
+    """Test calibration clock setup/teardown without touching real hardware."""
+
+    def _load_script(self):
+        from importlib.util import module_from_spec, spec_from_file_location
+
+        REPO_ROOT = Path(__file__).resolve().parents[2]
+        SCRIPT_PATH = REPO_ROOT / "scripts/run_rdna4_profiler_overhead_calibration.py"
+        spec = spec_from_file_location(
+            "run_rdna4_profiler_overhead_calibration_clock_setup", SCRIPT_PATH
+        )
+        assert spec is not None and spec.loader is not None
+        mod = module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_setup_locks_unlocked_gpu_and_teardown_resets(self, monkeypatch):
+        mod = self._load_script()
+        calls: list[str] = []
+
+        monkeypatch.delenv("SOL_EXECBENCH_CLOCKS_LOCKED", raising=False)
+        monkeypatch.setattr(mod, "verify_clocks", lambda: False)
+        monkeypatch.setattr(mod, "lock_clocks", lambda: calls.append("lock") is None)
+        monkeypatch.setattr(mod, "unlock_clocks", lambda: calls.append("unlock"))
+
+        state = mod._setup_calibration_clocks(
+            manage_clocks=True,
+            strict_isolation=True,
+        )
+        assert state.clock_locked is True
+        assert state.lock_acquired is True
+        assert calls == ["lock"]
+
+        mod._teardown_calibration_clocks(state, reset_clocks=True)
+        assert calls == ["lock", "unlock"]
+
+    def test_setup_preserves_external_clock_lock(self, monkeypatch):
+        mod = self._load_script()
+        calls: list[str] = []
+
+        monkeypatch.setenv("SOL_EXECBENCH_CLOCKS_LOCKED", "external")
+        monkeypatch.setattr(mod, "verify_clocks", lambda: True)
+        monkeypatch.setattr(mod, "lock_clocks", lambda: calls.append("lock") is None)
+        monkeypatch.setattr(mod, "unlock_clocks", lambda: calls.append("unlock"))
+
+        state = mod._setup_calibration_clocks(
+            manage_clocks=True,
+            strict_isolation=True,
+        )
+        assert state.clock_locked is True
+        assert state.lock_acquired is False
+
+        mod._teardown_calibration_clocks(state, reset_clocks=True)
+        assert calls == []
+
+    def test_run_with_rocprofv3_passes_output_file(self, monkeypatch):
+        mod = self._load_script()
+        import sol_execbench.core.bench.rocm_profiler as rocm_profiler
+
+        captured: dict[str, object] = {}
+
+        def fake_build(command, **kwargs):
+            captured["application_command"] = command
+            captured["kwargs"] = kwargs
+            return ["rocprofv3", "--", *command]
+
+        def fake_run(command, **kwargs):
+            captured["run_command"] = command
+            captured["run_kwargs"] = kwargs
+            return subprocess.CompletedProcess(command, 0, stdout="[1.25, 1.5]\n")
+
+        monkeypatch.setattr(rocm_profiler, "build_rocprofv3_command", fake_build)
+        monkeypatch.setattr(subprocess, "run", fake_run)
+
+        tensor = SimpleNamespace(shape=(4,))
+        durations = mod._run_with_rocprofv3(tensor, tensor, tensor, iterations=2)
+
+        assert durations == [1.25, 1.5]
+        assert captured["kwargs"]["output_file"] == "rocprofv3-overhead-calibration"
