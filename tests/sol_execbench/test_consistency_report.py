@@ -81,15 +81,48 @@ def test_consistency_report_flags_cross_report_contradictions():
     assert report.summary.sources_checked == 5
     assert report.summary.finding_totals.blocker == 4
     assert report.summary.finding_totals.warning == 1
-    assert {
-        finding.reason_code for finding in report.findings
-    } == {
+    assert {finding.reason_code for finding in report.findings} == {
         "claim_boundary_violation",
         "denominator_closure_drift",
         "matrix_runtime_unavailable_attempted",
         "missing_derived_evidence_scored",
         "source_ref_checksum_mismatch",
     }
+
+
+def test_attempted_workload_with_evidence_gap_is_not_denominator_drift():
+    report = build_consistency_report(
+        execution_closure={
+            "schema_version": "sol_execbench.execution_closure.v1",
+            "records": [
+                {
+                    "problem_id": "p1",
+                    "workload_uuid": "w1",
+                    "closure_status": "attempted_failed",
+                },
+            ],
+        },
+        paper_denominator={
+            "schema_version": "sol_execbench.paper_denominator_report.v1",
+            "workloads": [
+                {
+                    "problem_id": "p1",
+                    "workload_uuid": "w1",
+                    "readiness_status": "ready",
+                    "closure_status": "attempted_failed",
+                    "evidence_gaps": ["timing_evidence_missing"],
+                    "states": {
+                        "attempted_failed": 1,
+                        "evidence_missing": 1,
+                        "ready": 1,
+                    },
+                },
+            ],
+        },
+        created_at="2026-05-31T00:00:00Z",
+    )
+
+    assert {finding.reason_code for finding in report.findings} == set()
 
 
 def test_consistency_report_is_strict_and_deterministic():
@@ -140,4 +173,3 @@ def test_consistency_markdown_keeps_negative_boundaries_visible():
         "`score_authority`: false",
     ):
         assert expected in markdown
-

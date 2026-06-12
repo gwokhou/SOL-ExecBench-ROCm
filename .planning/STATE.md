@@ -44,6 +44,12 @@ Progress: [██████████] 100%
 - v1.34 shipped on 2026-06-09. Phases 170-174 reduced RDNA4 readiness_blocked
   from 114 to 59 over a stable 235-problem denominator.
 
+## Quick Tasks Completed
+
+| Date | Task | Status | Notes |
+|------|------|--------|-------|
+| 2026-06-12 | rdna4-v135-measurement-rerun | complete | Rebuilt RDNA4 v1.35 rerun closure, derived evidence, profiler timing batch, coverage, denominator, consistency, claim, trust, and bundle reports under `out/rdna4-v135-rerun-20260611/`; fixed derived/profiler OOM, profiler ENOSPC, and consistency evidence-gap drift misclassification. |
+
 ## Accumulated Context
 
 ### Decisions

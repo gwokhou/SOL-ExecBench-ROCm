@@ -14,6 +14,31 @@ new benchmark schema and not a hardware validation upgrade by itself.
 This policy does not apply to CDNA3/MI300X, CDNA4, NVIDIA B200, upstream SOLAR
 equivalence, hosted leaderboard authority, or full paper-parity claims.
 
+## Current Accepted Validation Conclusion
+
+The current accepted RDNA4 `gfx1200` 16GB evidence package is the v1.35 rerun
+under `out/rdna4-v135-rerun-20260611/`.
+
+The rerun records:
+
+- 235 problems in the denominator.
+- 121 replacement profiler timing sidecars and 121 workload manifests.
+- 88 full `profiler_backed` problems.
+- 28 `partial_profiler_backed` problems.
+- 73 `ready_missing_profiler_timing` problems.
+- 5 reference/current-device OOM-blocked problems.
+- 41 readiness-blocked problems.
+- 0 fallback timing problems and 0 profiler-blocked problems in the rebuilt
+  coverage summary.
+- 0 cross-report consistency findings in the rebuilt reports.
+- Full prerelease artifact bundle status: `overall_status=passed`.
+
+Validation conclusion: the denominator is accounted and the rerun evidence is
+internally consistent, but `full_profiler_backed_timing_coverage=false`.
+Therefore the rerun does not upgrade RDNA4 to full profiler-backed timing
+coverage, paper parity, score authority, leaderboard authority, or broader AMD
+hardware validation.
+
 ## Status Classes
 
 | Status | Counts in 235 denominator | Counts as profiler-backed timing | Claim meaning |
@@ -71,6 +96,9 @@ Allowed wording:
 
 - "The RDNA4 235-problem denominator is accounted with explicit blocker
   classes."
+- "The v1.35 RDNA4 rerun is internally consistent and records 88 full
+  profiler-backed problems plus 28 partial profiler-backed problems out of the
+  235-problem denominator."
 - "`reference_oom_blocked` problems are current-device memory blockers on the
   recorded 16GB RDNA4 host."
 - "Profiler-backed timing coverage is limited to problems classified

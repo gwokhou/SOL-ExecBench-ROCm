@@ -42,7 +42,6 @@ BLOCKED_DENOMINATOR_STATUSES = frozenset(
         "blocked",
         "unsupported",
         "deferred",
-        "evidence_missing",
         "not_attempted",
         "skipped",
         "filtered",
