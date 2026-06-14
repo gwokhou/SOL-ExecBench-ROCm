@@ -20,11 +20,15 @@ import pytest
 _SCRIPT = (
     Path(__file__).resolve().parents[2]
     / "scripts"
+    / "internal"
+    / "rdna4"
     / "build_custom_input_transition_ledger.py"
 )
 _spec = importlib.util.spec_from_file_location(
     "build_custom_input_transition_ledger", _SCRIPT
 )
+assert _spec is not None
+assert _spec.loader is not None
 _mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_mod)
 

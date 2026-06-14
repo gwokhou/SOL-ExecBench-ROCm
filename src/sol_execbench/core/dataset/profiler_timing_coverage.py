@@ -336,19 +336,19 @@ def _load_timing_evidence_summary(path: Path) -> ProfilerTimingEvidenceSummary:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError(f"timing evidence must be a JSON object: {path}")
-    evidence = (
-        payload.get("evidence") if isinstance(payload.get("evidence"), dict) else {}
+    evidence_payload = payload.get("evidence")
+    evidence: dict[str, Any] = (
+        evidence_payload if isinstance(evidence_payload, dict) else {}
     )
-    selection = (
-        payload.get("selection") if isinstance(payload.get("selection"), dict) else {}
+    selection_payload = payload.get("selection")
+    selection: dict[str, Any] = (
+        selection_payload if isinstance(selection_payload, dict) else {}
     )
-    policy = (
-        selection.get("policy") if isinstance(selection.get("policy"), dict) else {}
-    )
-    metadata = (
-        payload.get("replacement_metadata")
-        if isinstance(payload.get("replacement_metadata"), dict)
-        else {}
+    policy_payload = selection.get("policy")
+    policy: dict[str, Any] = policy_payload if isinstance(policy_payload, dict) else {}
+    metadata_payload = payload.get("replacement_metadata")
+    metadata: dict[str, Any] = (
+        metadata_payload if isinstance(metadata_payload, dict) else {}
     )
     backend = evidence.get("backend") or policy.get("backend")
     activity_domain = evidence.get("activity_domain") or policy.get("activity_domain")
@@ -427,7 +427,12 @@ def _reference_override(metadata: dict[str, Any]) -> dict[str, Any] | None:
     reference_override = metadata.get("reference_override")
     if not isinstance(reference_override, dict):
         return None
-    return dict(sorted(reference_override.items()))
+    return {
+        str(key): value
+        for key, value in sorted(
+            reference_override.items(), key=lambda item: str(item[0])
+        )
+    }
 
 
 def _blocker_class(payload: dict[str, Any]) -> str | None:
@@ -439,11 +444,11 @@ def _blocker_class(payload: dict[str, Any]) -> str | None:
         for detail in details
         if detail.get("oom_detected") is True
     }
-    trace_counts = _trace_status_counts(
-        payload.get("replacement_metadata")
-        if isinstance(payload.get("replacement_metadata"), dict)
-        else {}
+    metadata_payload = payload.get("replacement_metadata")
+    metadata: dict[str, Any] = (
+        metadata_payload if isinstance(metadata_payload, dict) else {}
     )
+    trace_counts = _trace_status_counts(metadata)
     source_workloads = _source_workloads(payload)
     has_profiler_gap = "PROFILER_BLOCKED" in trace_counts or any(
         workload.get("status") == "profiler_blocked" for workload in source_workloads

@@ -8,6 +8,7 @@ from collections.abc import Sequence
 from contextlib import nullcontext
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
+from typing import Any, cast
 
 from sol_execbench.core.dataset import (
     build_dataset_inventory,
@@ -262,7 +263,7 @@ def test_staging_runner_applies_subprocess_memory_limit(
     result = runner(("python", "eval_driver.py"))
 
     assert result.returncode == 0
-    kwargs = captured["kwargs"]
+    kwargs = cast(dict[str, Any], captured["kwargs"])
     assert kwargs["cwd"] == tmp_path
     assert kwargs["timeout"] == 7
     assert kwargs["preexec_fn"] is not None
@@ -292,7 +293,8 @@ def test_staging_runner_forces_absolute_tmpdir(
     result = runner((sys.executable, "eval_driver.py"))
 
     assert result.returncode == 0
-    env = captured["kwargs"]["env"]
+    kwargs = cast(dict[str, Any], captured["kwargs"])
+    env = cast(dict[str, str], kwargs["env"])
     assert env["TMPDIR"] == str(staging_dir.parent.resolve())
     assert Path(env["TMPDIR"]).is_absolute()
 

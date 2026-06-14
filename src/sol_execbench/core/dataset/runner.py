@@ -838,7 +838,11 @@ def build_amd_score_reports_for_problem(
                 "derived_sidecar_exclusion": derived_exclusion,
                 "hardware_model": f"default_amd_hardware_models.{hardware_model_key}",
             }
-        if artifact is not None and sol_bound_path is not None:
+        if (
+            artifact is not None
+            and sol_bound_path is not None
+            and sol_bound_artifact_dir is not None
+        ):
             sol_bound_artifact_dir.mkdir(parents=True, exist_ok=True)
             if not sol_bound_path.exists():
                 sol_bound_path.write_text(json.dumps(artifact.to_dict(), indent=2))
