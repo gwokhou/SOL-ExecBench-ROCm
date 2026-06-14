@@ -125,6 +125,7 @@ sys.exit(result.returncode)
 
         # First instance should complete successfully
         first_process.wait(timeout=5)
+        assert first_process.stderr is not None
         assert first_process.returncode == 0, (
             f"First instance failed: {first_process.stderr.read()}"
         )

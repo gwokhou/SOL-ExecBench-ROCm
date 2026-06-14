@@ -17,7 +17,7 @@
 
 """Tests for sol_execbench.core.data.workload.Workload."""
 
-from sol_execbench.core.data.workload import Workload
+from sol_execbench.core.data.workload import RandomInput, ToleranceSpec, Workload
 
 
 def _wkl(**inputs):
@@ -62,8 +62,8 @@ class TestToleranceSpec:
         wkl = Workload(
             uuid="test-uuid",
             axes={},
-            inputs={"x": {"type": "random"}},
-            tolerance={"required_match_ratio": 0.98},
+            inputs={"x": RandomInput()},
+            tolerance=ToleranceSpec.model_validate({"required_match_ratio": 0.98}),
         )
 
         assert wkl.tolerance.required_matched_ratio == 0.98
@@ -72,8 +72,8 @@ class TestToleranceSpec:
         wkl = Workload(
             uuid="test-uuid",
             axes={},
-            inputs={"x": {"type": "random"}},
-            tolerance={"required_matched_ratio": 0.97},
+            inputs={"x": RandomInput()},
+            tolerance=ToleranceSpec(required_matched_ratio=0.97),
         )
 
         assert wkl.tolerance.required_matched_ratio == 0.97

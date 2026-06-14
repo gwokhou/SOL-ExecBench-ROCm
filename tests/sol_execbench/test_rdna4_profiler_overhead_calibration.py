@@ -10,6 +10,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, cast
 
 from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3TimingEvidence,
@@ -20,12 +21,13 @@ from sol_execbench.core.bench.timing_policy import (
     TimingActivityDomain,
     TimingBackend,
     TimingPolicy,
+    TimingSourceType,
 )
 
 
 def _make_policy(**overrides) -> TimingPolicy:
     defaults = {
-        "source_type": object(),
+        "source_type": TimingSourceType.UNKNOWN,
         "activity_domain": TimingActivityDomain.KERNEL_ACTIVITY,
         "backend": TimingBackend.ROCPROFV3,
         "aggregation_rule": "sum",
@@ -316,6 +318,7 @@ class TestCalibrationClockSetup:
         )
 
         assert durations == [1.25, 1.5]
-        assert captured["kwargs"]["output_file"] == "rocprofv3-overhead-calibration"
-        output_directory = Path(captured["kwargs"]["output_directory"])
+        kwargs = cast(dict[str, Any], captured["kwargs"])
+        assert kwargs["output_file"] == "rocprofv3-overhead-calibration"
+        output_directory = Path(kwargs["output_directory"])
         assert output_directory.is_relative_to(temp_dir)
