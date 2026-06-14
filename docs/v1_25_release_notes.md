@@ -11,7 +11,7 @@ the project without stronger research or service claims.
   correctness checks, trace JSONL output, timing policy, and selected ROCm
   examples.
 - Maintainers can run bounded release-candidate validation through
-  `scripts/release_candidate_validation.py`.
+  `scripts/internal/release/release_candidate_validation.py`.
 - Users can read the engineering prerelease support matrix in `docs/rocm.md`
   and the claim policy in `docs/CLAIMS.md`.
 

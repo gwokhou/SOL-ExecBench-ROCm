@@ -125,9 +125,9 @@ def _classification(relative_path: str, line: str) -> str | None:
         and "nvidia/SOL-ExecBench" in line
     ):
         return "upstream dataset repository identifier"
-    if relative_path.startswith("scripts/check_prerelease_readiness.py") and (
-        "NVIDIA" in line or "nvidia" in line or "CUDA" in line
-    ):
+    if relative_path.startswith(
+        "scripts/internal/release/check_prerelease_readiness.py"
+    ) and ("NVIDIA" in line or "nvidia" in line or "CUDA" in line):
         return "prerelease readiness provenance and claim-boundary guardrail"
     if "requires_cutile" in line or "legacy NVIDIA cuTile marker" in line:
         return "legacy marker compatibility skip"
@@ -268,9 +268,9 @@ def _classification(relative_path: str, line: str) -> str | None:
         "tests/sol_execbench/test_rocm_migration_residue_audit.py"
     ):
         return "this audit's residue pattern or classification text"
-    if relative_path.startswith("scripts/build_custom_input_transition_ledger.py") and (
-        "unsupported_nvidia_only_path" in line
-    ):
+    if relative_path.startswith(
+        "scripts/internal/rdna4/build_custom_input_transition_ledger.py"
+    ) and ("unsupported_nvidia_only_path" in line):
         return (
             "custom input transition ledger records NVIDIA-only residual blocker class"
         )

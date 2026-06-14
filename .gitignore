@@ -36,6 +36,7 @@ pytest*
 
 # other
 /out/
+/tmp/
 .planning/config.json
 .planning/tmp/
 .artifacts/

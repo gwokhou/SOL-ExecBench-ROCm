@@ -8,7 +8,7 @@ from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT_PATH = REPO_ROOT / "scripts/run_rdna4_profiler_timing_smoke.py"
+SCRIPT_PATH = REPO_ROOT / "scripts/internal/rdna4/run_rdna4_profiler_timing_smoke.py"
 SPEC = spec_from_file_location("run_rdna4_profiler_timing_smoke", SCRIPT_PATH)
 assert SPEC is not None and SPEC.loader is not None
 smoke = module_from_spec(SPEC)
@@ -63,6 +63,7 @@ def test_rdna4_profiler_smoke_collects_triton_kernel_timing(tmp_path):
     assert summary["profiler_collected"] is True
     assert summary["languages"] == ["triton"]
     assert "sol_execbench_rdna4_timing_" in summary["staging_dir"]
+    assert Path(summary["staging_dir"]).parent == smoke.DEFAULT_TEMP_ROOT.resolve()
     assert summary["policy_backend"] == "rocprofv3"
     assert summary["activity_domain"] == "kernel_activity"
     assert summary["kernel_duration_ms"] == 0.004
@@ -90,6 +91,7 @@ def test_rdna4_profiler_smoke_fails_without_profiler_backing(tmp_path):
     summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
     assert summary["status"] == "fallback"
     assert summary["profiler_collected"] is False
+    assert Path(summary["staging_dir"]).parent == smoke.DEFAULT_TEMP_ROOT.resolve()
     assert summary["policy_backend"] == "device_events"
     assert "rocprofv3 is unavailable" in summary["fallback_reason"]
     assert (

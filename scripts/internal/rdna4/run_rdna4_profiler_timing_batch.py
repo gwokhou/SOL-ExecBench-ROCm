@@ -9,8 +9,10 @@ import argparse
 import json
 import logging
 import os
+import resource
 import shutil
 import subprocess
+import sys
 import tempfile
 from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -58,6 +60,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_DATASET_ROOT = Path("data/SOL-ExecBench/benchmark")
 DEFAULT_SOURCE_TIMING_DIR = Path("out/rdna4-timing-evidence/timing")
 DEFAULT_OUTPUT_DIR = Path("out/rdna4-profiler-backed-timing")
+DEFAULT_TEMP_ROOT = Path("tmp")
 DEFAULT_EXPECTED_PROBLEM_DENOMINATOR = 235
 DEFAULT_TOOL_VERSION = "rocprofv3"
 DEFAULT_GPU_ARCHITECTURE = "gfx1200"
@@ -68,6 +71,76 @@ CLAIM_BOUNDARY = (
     "authority, paper parity, leaderboard result, or broader hardware "
     "validation."
 )
+AUTO_TIMING_INPUT_CAP_FRACTION = 0.70
+RDNA4_REFERENCE_OVERRIDES: dict[str, str] = {
+    "L2/035_convnextv2_block_with_grn": """import torch
+import torch.nn.functional as F
+
+@torch.no_grad()
+def run(
+    x: torch.Tensor,
+    dwconv_weight: torch.Tensor,
+    dwconv_bias: torch.Tensor,
+    layernorm_weight: torch.Tensor,
+    layernorm_bias: torch.Tensor,
+    pwconv1_weight: torch.Tensor,
+    pwconv1_bias: torch.Tensor,
+    grn_weight: torch.Tensor,
+    grn_bias: torch.Tensor,
+    pwconv2_weight: torch.Tensor,
+    pwconv2_bias: torch.Tensor,
+    eps: float,
+    layer_norm_eps: float,
+):
+    residual = x
+    _, channels, _, _ = x.shape
+
+    out = F.conv2d(x, dwconv_weight, dwconv_bias, padding=3, groups=channels)
+    out = out.permute(0, 2, 3, 1)
+    out = F.layer_norm(
+        out,
+        (channels,),
+        layernorm_weight,
+        layernorm_bias,
+        eps=layer_norm_eps,
+    )
+    out = out.permute(0, 3, 1, 2).contiguous()
+
+    out = F.conv2d(out, pwconv1_weight[:, :, None, None], pwconv1_bias)
+    out = F.gelu(out)
+
+    global_features = torch.linalg.vector_norm(
+        out,
+        ord=2,
+        dim=(2, 3),
+        keepdim=True,
+    )
+    norm_features = global_features / (
+        global_features.mean(dim=1, keepdim=True) + eps
+    )
+    grn_weight_nchw = grn_weight.permute(0, 3, 1, 2).contiguous()
+    grn_bias_nchw = grn_bias.permute(0, 3, 1, 2).contiguous()
+    out = grn_weight_nchw * (out * norm_features) + grn_bias_nchw + out
+
+    out = F.conv2d(out, pwconv2_weight[:, :, None, None], pwconv2_bias)
+    return residual + out
+""",
+}
+RDNA4_REFERENCE_OVERRIDE_METADATA: dict[str, dict[str, Any]] = {
+    "L2/035_convnextv2_block_with_grn": {
+        "override_type": "equivalent_reference_implementation",
+        "reason": (
+            "Use NCHW 1x1 conv pointwise projections for RDNA4 profiler timing; "
+            "semantic output is equivalent to the original NHWC matmul reference, "
+            "but backend dispatch is not original-reference dispatch timing."
+        ),
+        "claim_boundary": (
+            "Profiler timing collected with this override must be reported as "
+            "reference-implementation override evidence, not unmodified benchmark "
+            "reference dispatch timing."
+        ),
+    }
+}
 
 
 def _partition_targets_by_index(
@@ -96,10 +169,14 @@ def _process_target_chunk(
     workload_slice_timing_dirs: Sequence[Path] = (),
     workload_sharded_import_only: bool = False,
     timeout: int = 900,
+    subprocess_memory_limit_gib: float | None = None,
+    max_estimated_timing_input_gib: float | None = None,
+    estimated_timing_input_cap_source: str | None = None,
     temp_dir: Path | None = None,
     tool_version: str = DEFAULT_TOOL_VERSION,
     gpu_architecture: str = DEFAULT_GPU_ARCHITECTURE,
     clock_locked: bool = True,
+    include_hip_runtime_trace: bool = False,
     rocprofv3_available: bool,
     runner: ProfilerRunner,
     marked_blocked_ids: set[str],
@@ -108,6 +185,8 @@ def _process_target_chunk(
     calibration_path: Path | None = None,
     pid_lock_contention: bool = False,
     compact_workload_slices: bool = True,
+    keep_staging: bool = False,
+    keep_rocprofv3_csv: bool = False,
 ) -> list[dict[str, Any]]:
     """Process a chunk of targets with CPU-parallel staging + serial GPU profiling (PRFL-01, PRFL-02)."""
     chunk_results = []
@@ -136,16 +215,22 @@ def _process_target_chunk(
                 workload_slice_timing_dirs=workload_slice_timing_dirs,
                 workload_sharded_import_only=workload_sharded_import_only,
                 timeout=timeout,
+                subprocess_memory_limit_gib=subprocess_memory_limit_gib,
+                max_estimated_timing_input_gib=max_estimated_timing_input_gib,
+                estimated_timing_input_cap_source=estimated_timing_input_cap_source,
                 temp_dir=temp_dir,
                 tool_version=tool_version,
                 gpu_architecture=gpu_architecture,
                 clock_locked=clock_locked,
+                include_hip_runtime_trace=include_hip_runtime_trace,
                 rocprofv3_available=rocprofv3_available,
                 runner=runner,
                 concurrent_gpu_processes=concurrent_gpu_processes,
                 calibration_path=calibration_path,
                 pid_lock_contention=contention_detected,
                 compact_workload_slices=compact_workload_slices,
+                keep_staging=keep_staging,
+                keep_rocprofv3_csv=keep_rocprofv3_csv,
             )
         else:
             result = _profile_target(
@@ -156,15 +241,21 @@ def _process_target_chunk(
                 workload_limit=workload_limit,
                 workload_offset=workload_offset,
                 timeout=timeout,
+                subprocess_memory_limit_gib=subprocess_memory_limit_gib,
+                max_estimated_timing_input_gib=max_estimated_timing_input_gib,
+                estimated_timing_input_cap_source=estimated_timing_input_cap_source,
                 temp_dir=temp_dir,
                 tool_version=tool_version,
                 gpu_architecture=gpu_architecture,
                 clock_locked=clock_locked,
+                include_hip_runtime_trace=include_hip_runtime_trace,
                 rocprofv3_available=rocprofv3_available,
                 runner=runner,
                 concurrent_gpu_processes=concurrent_gpu_processes,
                 calibration_path=calibration_path,
                 pid_lock_contention=contention_detected,
+                keep_staging=keep_staging,
+                keep_rocprofv3_csv=keep_rocprofv3_csv,
             )
 
         chunk_results.append(result)
@@ -192,11 +283,15 @@ def run_batch(
     workload_slice_timing_dirs: Sequence[Path] = (),
     workload_sharded_import_only: bool = False,
     timeout: int = 900,
+    subprocess_memory_limit_gib: float | None = None,
+    max_estimated_timing_input_gib: float | None = None,
+    auto_estimated_timing_input_cap: bool = True,
     temp_dir: Path | None = None,
     resume: bool = True,
     tool_version: str = DEFAULT_TOOL_VERSION,
     gpu_architecture: str = DEFAULT_GPU_ARCHITECTURE,
     clock_locked: bool = True,
+    include_hip_runtime_trace: bool = False,
     rocprofv3_available: bool | None = None,
     runner: ProfilerRunner | None = None,
     max_workers: int = 4,
@@ -204,6 +299,8 @@ def run_batch(
     gpu_device: int | None = None,
     calibration_path: Path | None = None,
     compact_workload_slices: bool = True,
+    keep_staging: bool = False,
+    keep_rocprofv3_csv: bool = False,
 ) -> int:
     """Run fallback replacement batch and return a process-style status code."""
     if limit is not None and limit <= 0:
@@ -223,6 +320,20 @@ def run_batch(
             max_workers,
         )
         max_workers = 1
+    (
+        resolved_estimated_timing_input_gib,
+        estimated_timing_input_cap_source,
+    ) = _resolve_estimated_timing_input_cap(
+        max_estimated_timing_input_gib=max_estimated_timing_input_gib,
+        auto_estimated_timing_input_cap=auto_estimated_timing_input_cap,
+        subprocess_memory_limit_gib=subprocess_memory_limit_gib,
+    )
+    if resolved_estimated_timing_input_gib is not None:
+        logger.info(
+            "Using estimated timing input cap %.2f GiB (%s)",
+            resolved_estimated_timing_input_gib,
+            estimated_timing_input_cap_source,
+        )
 
     replacement_root = replacement_timing_dir or output_dir / "timing"
     coverage = _build_coverage(
@@ -281,6 +392,15 @@ def run_batch(
         for warn in gpu_isolation["warnings"]:
             logger.warning("GPU device isolation: %s", warn)
 
+    if runner is None and not _torch_rocm_gpu_available():
+        logger.error(
+            "PyTorch ROCm cannot see a GPU in this process. "
+            "Run this profiler batch outside sandbox/device isolation; "
+            "otherwise eval_driver falls back to CPU and produces invalid "
+            "RUNTIME_ERROR timing sidecars."
+        )
+        return 1
+
     results: list[dict[str, Any]] = []
     marked_blocked = _mark_blocked_targets(
         coverage,
@@ -312,10 +432,14 @@ def run_batch(
                     workload_slice_timing_dirs=workload_slice_timing_dirs,
                     workload_sharded_import_only=workload_sharded_import_only,
                     timeout=timeout,
+                    subprocess_memory_limit_gib=subprocess_memory_limit_gib,
+                    max_estimated_timing_input_gib=resolved_estimated_timing_input_gib,
+                    estimated_timing_input_cap_source=estimated_timing_input_cap_source,
                     temp_dir=temp_dir,
                     tool_version=tool_version,
                     gpu_architecture=gpu_architecture,
                     clock_locked=clock_locked,
+                    include_hip_runtime_trace=include_hip_runtime_trace,
                     rocprofv3_available=available,
                     runner=runner,
                     marked_blocked_ids=marked_blocked_ids,
@@ -323,6 +447,8 @@ def run_batch(
                     concurrent_gpu_processes=concurrent_processes or None,
                     calibration_path=calibration_path,
                     compact_workload_slices=compact_workload_slices,
+                    keep_staging=keep_staging,
+                    keep_rocprofv3_csv=keep_rocprofv3_csv,
                 )
                 futures[future] = chunk_idx
 
@@ -418,6 +544,7 @@ def select_fallback_targets(
     for problem in coverage.problems:
         if problem.status not in {
             "timing_fallback",
+            "ready_missing_profiler_timing",
             "partial_profiler_backed",
             "profiler_blocked",
         }:
@@ -483,16 +610,22 @@ def _profile_target(
     workload_limit: int | None,
     workload_offset: int,
     timeout: int,
+    subprocess_memory_limit_gib: float | None,
+    max_estimated_timing_input_gib: float | None,
+    estimated_timing_input_cap_source: str | None,
     temp_dir: Path | None,
     tool_version: str,
     gpu_architecture: str,
     clock_locked: bool,
+    include_hip_runtime_trace: bool,
     rocprofv3_available: bool,
     runner: ProfilerRunner | None,
     concurrent_gpu_processes: list[dict[str, Any]] | None = None,
     calibration_path: Path | None = None,
     pid_lock_contention: bool = False,
     compact_workload_slices: bool = True,
+    keep_staging: bool = False,
+    keep_rocprofv3_csv: bool = False,
 ) -> dict[str, Any]:
     problem_dir = dataset_root / target.problem_path
     if temp_dir is not None:
@@ -515,13 +648,40 @@ def _profile_target(
         target.category,
         target.problem_path,
     )
+    reference_override: dict[str, Any] | None = None
     try:
         definition_payload = _load_json(problem_dir / "definition.json")
+        reference_override = _apply_rdna4_reference_override(
+            definition_payload,
+            target.problem_id,
+        )
         workloads = _load_workloads(
             problem_dir / "workload.jsonl",
             limit=workload_limit,
             offset=workload_offset,
         )
+        preflight_reason = _estimated_timing_input_block_reason(
+            definition_payload,
+            workloads,
+            max_estimated_timing_input_gib=max_estimated_timing_input_gib,
+            cap_source=estimated_timing_input_cap_source,
+        )
+        if preflight_reason is not None:
+            return _result_with_optional_staging_cleanup(
+                _write_blocked_sidecar(
+                    target,
+                    replacement_path=replacement_path,
+                    staging_dir=staging_dir,
+                    reason=preflight_reason,
+                    workload_offset=workload_offset,
+                    workload_limit=workload_limit,
+                    concurrent_gpu_processes=concurrent_gpu_processes,
+                    pid_lock_contention=pid_lock_contention,
+                    reference_override=reference_override,
+                ),
+                staging_dir=staging_dir,
+                keep_staging=keep_staging,
+            )
         solution = build_reference_solution(definition_payload)
         packager = ProblemPackager(
             definition=Definition(**definition_payload),
@@ -531,8 +691,19 @@ def _profile_target(
             output_dir=staging_dir,
             keep_output_dir=True,
         )
-        command = tuple(str(part) for part in packager.execute())
-        batch_runner = runner or _staging_runner(staging_dir, timeout=timeout)
+        command_parts = [str(part) for part in packager.execute()]
+        if command_parts and command_parts[0] == "python":
+            command_parts[0] = sys.executable
+        command = tuple(command_parts)
+        batch_runner = runner or _staging_runner(
+            staging_dir,
+            timeout=timeout,
+            memory_limit_gib=subprocess_memory_limit_gib,
+        )
+        workload_slice_requested = workload_offset != 0 or workload_limit is not None
+        workload_slice_applied = workload_offset != 0 or (
+            workload_limit is not None and len(workloads) < target.workload_count
+        )
         result = collect_rocprofv3_timing(
             Rocprofv3CollectionRequest(
                 application_command=command,
@@ -545,39 +716,48 @@ def _profile_target(
                 iterations=BenchmarkConfig().iterations,
                 trial_count=1,
                 clock_locked=clock_locked,
+                include_hip_runtime=include_hip_runtime_trace,
+                compact_rows=True,
             ),
             rocprofv3_available=rocprofv3_available,
             runner=batch_runner,
             calibration_path=calibration_path,
         )
     except subprocess.TimeoutExpired as exc:
-        return _write_blocked_sidecar(
-            target,
-            replacement_path=replacement_path,
+        return _result_with_optional_staging_cleanup(
+            _write_blocked_sidecar(
+                target,
+                replacement_path=replacement_path,
+                staging_dir=staging_dir,
+                reason=f"rocprofv3 command timed out after {timeout} seconds",
+                workload_offset=workload_offset,
+                workload_limit=workload_limit,
+                stdout=_subprocess_text(exc.stdout),
+                stderr=_subprocess_text(exc.stderr),
+                concurrent_gpu_processes=concurrent_gpu_processes,
+                pid_lock_contention=pid_lock_contention,
+                reference_override=reference_override,
+            ),
             staging_dir=staging_dir,
-            reason=f"rocprofv3 command timed out after {timeout} seconds",
-            workload_offset=workload_offset,
-            workload_limit=workload_limit,
-            stdout=_subprocess_text(exc.stdout),
-            stderr=_subprocess_text(exc.stderr),
-            concurrent_gpu_processes=concurrent_gpu_processes,
-            pid_lock_contention=pid_lock_contention,
+            keep_staging=keep_staging,
         )
     except (OSError, ValueError) as exc:
-        return _write_blocked_sidecar(
-            target,
-            replacement_path=replacement_path,
+        return _result_with_optional_staging_cleanup(
+            _write_blocked_sidecar(
+                target,
+                replacement_path=replacement_path,
+                staging_dir=staging_dir,
+                reason=str(exc),
+                workload_offset=workload_offset,
+                workload_limit=workload_limit,
+                concurrent_gpu_processes=concurrent_gpu_processes,
+                pid_lock_contention=pid_lock_contention,
+                reference_override=reference_override,
+            ),
             staging_dir=staging_dir,
-            reason=str(exc),
-            workload_offset=workload_offset,
-            workload_limit=workload_limit,
-            concurrent_gpu_processes=concurrent_gpu_processes,
-            pid_lock_contention=pid_lock_contention,
+            keep_staging=keep_staging,
         )
 
-    workload_slice_applied = workload_offset != 0 or (
-        workload_limit is not None and len(workloads) < target.workload_count
-    )
     trace_status_counts = _trace_status_counts(result.stdout)
     all_workloads_passed = (
         not workload_slice_applied
@@ -588,6 +768,11 @@ def _profile_target(
     payload = result.to_dict()
     if not isinstance(payload.get("evidence"), dict):
         payload["evidence"] = {"backend": "rocprofv3", "parsed_rows": []}
+    evidence = (
+        payload.get("evidence") if isinstance(payload.get("evidence"), dict) else {}
+    )
+    kernel_activity_rows = _kernel_activity_rows(evidence)
+    kernel_duration_ms = _float_value(evidence.get("kernel_duration_ms"))
     replacement_failure_reason = _replacement_failure_reason(
         profiler_collected=result.profiler_collected,
         all_workloads_passed=all_workloads_passed,
@@ -596,7 +781,14 @@ def _profile_target(
     status = _replacement_status(
         profiler_collected=result.profiler_collected,
         full_workload_coverage=all_workloads_passed,
-        kernel_activity_rows=_kernel_activity_rows(payload.get("evidence") or {}),
+        kernel_activity_rows=kernel_activity_rows,
+    )
+    _compact_payload_parsed_rows(
+        payload,
+        reason=(
+            "RDNA4 profiler batch retains kernel row and duration summaries; "
+            "raw rocprofv3 CSV is retained only when --keep-rocprofv3-csv is set"
+        ),
     )
     payload["replacement_metadata"] = {
         "schema_version": "sol_execbench.rdna4_profiler_timing_replacement.v1",
@@ -616,6 +808,7 @@ def _profile_target(
         },
         "full_workload_coverage": all_workloads_passed,
         "failure_reason": replacement_failure_reason,
+        "reference_override": reference_override,
     }
     if result.profiler_collected or status == "profiler_blocked":
         if concurrent_gpu_processes:
@@ -627,20 +820,28 @@ def _profile_target(
             json.dumps(payload, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
-    return {
-        "problem_id": target.problem_id,
-        "status": status,
-        "replacement_path": str(replacement_path),
-        "staging_dir": str(staging_dir),
-        "profiler_collected": result.profiler_collected,
-        "full_workload_coverage": all_workloads_passed,
-        "workload_offset": workload_offset,
-        "workload_slice_applied": workload_slice_applied,
-        "trace_status_counts": trace_status_counts,
-        "csv_path": str(result.csv_path) if result.csv_path is not None else None,
-        "fallback_reason": replacement_failure_reason,
-        "returncode": result.returncode,
-    }
+    if not keep_rocprofv3_csv and result.csv_path is not None:
+        _remove_rocprofv3_run_dir(result.csv_path)
+    return _result_with_optional_staging_cleanup(
+        {
+            "problem_id": target.problem_id,
+            "status": status,
+            "replacement_path": str(replacement_path),
+            "staging_dir": str(staging_dir),
+            "profiler_collected": result.profiler_collected,
+            "full_workload_coverage": all_workloads_passed,
+            "workload_offset": workload_offset,
+            "workload_slice_applied": workload_slice_applied,
+            "trace_status_counts": trace_status_counts,
+            "csv_path": str(result.csv_path) if result.csv_path is not None else None,
+            "kernel_activity_rows": kernel_activity_rows,
+            "kernel_duration_ms": kernel_duration_ms,
+            "fallback_reason": replacement_failure_reason,
+            "returncode": result.returncode,
+        },
+        staging_dir=staging_dir,
+        keep_staging=keep_staging,
+    )
 
 
 def _profile_target_workload_sharded(
@@ -654,16 +855,22 @@ def _profile_target_workload_sharded(
     workload_slice_timing_dirs: Sequence[Path],
     workload_sharded_import_only: bool,
     timeout: int,
+    subprocess_memory_limit_gib: float | None,
+    max_estimated_timing_input_gib: float | None,
+    estimated_timing_input_cap_source: str | None,
     temp_dir: Path | None,
     tool_version: str,
     gpu_architecture: str,
     clock_locked: bool,
+    include_hip_runtime_trace: bool,
     rocprofv3_available: bool,
     runner: ProfilerRunner | None,
     concurrent_gpu_processes: list[dict[str, Any]] | None = None,
     calibration_path: Path | None = None,
     pid_lock_contention: bool = False,
     compact_workload_slices: bool = True,
+    keep_staging: bool = False,
+    keep_rocprofv3_csv: bool = False,
 ) -> dict[str, Any]:
     if workload_limit is not None or workload_offset:
         raise ValueError("workload-sharded mode owns workload slicing")
@@ -743,18 +950,23 @@ def _profile_target_workload_sharded(
             workload_limit=1,
             workload_offset=index,
             timeout=timeout,
+            subprocess_memory_limit_gib=subprocess_memory_limit_gib,
+            max_estimated_timing_input_gib=max_estimated_timing_input_gib,
+            estimated_timing_input_cap_source=estimated_timing_input_cap_source,
             temp_dir=temp_dir,
             tool_version=tool_version,
             gpu_architecture=gpu_architecture,
             clock_locked=clock_locked,
+            include_hip_runtime_trace=include_hip_runtime_trace,
             rocprofv3_available=rocprofv3_available,
             runner=runner,
             concurrent_gpu_processes=concurrent_gpu_processes,
             calibration_path=calibration_path,
+            keep_staging=keep_staging,
+            keep_rocprofv3_csv=keep_rocprofv3_csv,
         )
         results.append(result)
-        sidecar = _load_optional_json(Path(result["replacement_path"]))
-        entry = _workload_manifest_entry(ref, result=result, sidecar=sidecar)
+        entry = _workload_manifest_entry(ref, result=result, sidecar=None)
         _upsert_workload_manifest_entry(manifest, entry)
         _write_workload_manifest(manifest_path, manifest)
         if compact_workload_slices and _workload_manifest_entry_complete(entry):
@@ -814,6 +1026,17 @@ def _target_failure(
     }
 
 
+def _result_with_optional_staging_cleanup(
+    result: dict[str, Any],
+    *,
+    staging_dir: Path,
+    keep_staging: bool,
+) -> dict[str, Any]:
+    if not keep_staging:
+        shutil.rmtree(staging_dir, ignore_errors=True)
+    return result
+
+
 def _write_blocked_sidecar(
     target: ProfilerTimingProblemCoverage,
     *,
@@ -826,6 +1049,7 @@ def _write_blocked_sidecar(
     stderr: str = "",
     concurrent_gpu_processes: list[dict[str, Any]] | None = None,
     pid_lock_contention: bool = False,
+    reference_override: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     workload_slice_applied = workload_offset != 0 or workload_limit is not None
     payload = {
@@ -857,6 +1081,7 @@ def _write_blocked_sidecar(
             },
             "full_workload_coverage": False,
             "failure_reason": reason,
+            "reference_override": reference_override,
         },
     }
     if concurrent_gpu_processes:
@@ -958,6 +1183,7 @@ def _imported_workload_slice_sidecars(
     timing_dirs: Sequence[Path],
 ) -> dict[int, Path]:
     sidecars: dict[int, Path] = {}
+    complete_by_offset: dict[int, bool] = {}
     for timing_dir in timing_dirs:
         path = _replacement_timing_path(
             timing_dir,
@@ -975,9 +1201,46 @@ def _imported_workload_slice_sidecars(
         if metadata.get("workload_slice_applied") is not True:
             continue
         offset = _int_value(metadata.get("workload_offset"))
-        if offset not in sidecars:
+        complete = _workload_slice_sidecar_complete(payload)
+        if offset not in sidecars or (complete and not complete_by_offset[offset]):
             sidecars[offset] = path
+            complete_by_offset[offset] = complete
     return sidecars
+
+
+def _apply_rdna4_reference_override(
+    definition_payload: dict[str, Any],
+    problem_id: str,
+) -> dict[str, Any] | None:
+    reference = RDNA4_REFERENCE_OVERRIDES.get(problem_id)
+    if reference is None:
+        return None
+    definition_payload["reference"] = reference
+    metadata = {
+        "problem_id": problem_id,
+        **RDNA4_REFERENCE_OVERRIDE_METADATA.get(problem_id, {}),
+    }
+    return metadata
+
+
+def _workload_slice_sidecar_complete(payload: dict[str, Any]) -> bool:
+    evidence = (
+        payload.get("evidence") if isinstance(payload.get("evidence"), dict) else {}
+    )
+    metadata = (
+        payload.get("replacement_metadata")
+        if isinstance(payload.get("replacement_metadata"), dict)
+        else {}
+    )
+    trace_counts = _trace_status_counts_from_mapping(
+        metadata.get("trace_status_counts")
+    )
+    return (
+        payload.get("profiler_collected") is True
+        and evidence.get("backend") == "rocprofv3"
+        and _sidecar_kernel_activity_rows(evidence) > 0
+        and trace_counts.get("PASSED", 0) >= 1
+    )
 
 
 def _csv_path_from_sidecar(path: Path) -> str | None:
@@ -1072,18 +1335,28 @@ def _workload_manifest_entry(
         if isinstance(sidecar.get("replacement_metadata"), dict)
         else {}
     )
-    trace_counts = _trace_status_counts_from_mapping(
-        metadata.get("trace_status_counts")
+    trace_counts = _trace_status_counts_from_mapping(result.get("trace_status_counts"))
+    if not trace_counts:
+        trace_counts = _trace_status_counts_from_mapping(
+            metadata.get("trace_status_counts")
+        )
+    kernel_rows = _int_value(result.get("kernel_activity_rows"))
+    if kernel_rows <= 0:
+        kernel_rows = _sidecar_kernel_activity_rows(evidence)
+    kernel_duration_ms = _float_value(result.get("kernel_duration_ms"))
+    if kernel_duration_ms <= 0:
+        kernel_duration_ms = _float_value(evidence.get("kernel_duration_ms"))
+    profiler_collected = (
+        result.get("profiler_collected") is True
+        or sidecar.get("profiler_collected") is True
     )
-    kernel_rows = _kernel_activity_rows(evidence)
-    profiler_collected = sidecar.get("profiler_collected") is True
+    backend = evidence.get("backend")
+    if backend is None and profiler_collected:
+        backend = "rocprofv3"
     passed = trace_counts.get("PASSED", 0) >= 1
     status = (
         "profiler_backed"
-        if profiler_collected
-        and evidence.get("backend") == "rocprofv3"
-        and kernel_rows > 0
-        and passed
+        if profiler_collected and backend == "rocprofv3" and kernel_rows > 0 and passed
         else result["status"]
     )
     failure_reason = (
@@ -1100,10 +1373,10 @@ def _workload_manifest_entry(
         "status": status,
         "retryable": status != "profiler_backed",
         "profiler_collected": profiler_collected,
-        "backend": evidence.get("backend"),
+        "backend": backend,
         "trace_status_counts": trace_counts,
         "kernel_activity_rows": kernel_rows,
-        "kernel_duration_ms": _float_value(evidence.get("kernel_duration_ms")),
+        "kernel_duration_ms": kernel_duration_ms,
         "replacement_path": result.get("replacement_path"),
         "csv_path": result.get("csv_path"),
         "failure_reason": failure_reason,
@@ -1277,6 +1550,17 @@ def _aggregate_rows_from_entry(entry: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
+def _compact_payload_parsed_rows(payload: dict[str, Any], *, reason: str) -> None:
+    evidence = (
+        payload.get("evidence") if isinstance(payload.get("evidence"), dict) else None
+    )
+    if evidence is None or not isinstance(evidence.get("parsed_rows"), list):
+        return
+    evidence["parsed_rows"] = []
+    evidence["parsed_rows_compacted"] = True
+    evidence["compaction_reason"] = reason
+
+
 def _compact_workload_slice_artifacts(
     *,
     sidecar_path: Path,
@@ -1284,21 +1568,14 @@ def _compact_workload_slice_artifacts(
 ) -> None:
     payload = _load_optional_json(sidecar_path)
     if payload is not None:
-        evidence = (
-            payload.get("evidence")
-            if isinstance(payload.get("evidence"), dict)
-            else None
+        _compact_payload_parsed_rows(
+            payload,
+            reason="workload manifest retained kernel row and duration summaries",
         )
-        if evidence is not None and isinstance(evidence.get("parsed_rows"), list):
-            evidence["parsed_rows"] = []
-            evidence["parsed_rows_compacted"] = True
-            evidence["compaction_reason"] = (
-                "workload manifest retained kernel row and duration summaries"
-            )
-            sidecar_path.write_text(
-                json.dumps(payload, indent=2, sort_keys=True) + "\n",
-                encoding="utf-8",
-            )
+        sidecar_path.write_text(
+            json.dumps(payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
     if isinstance(csv_path, str) and csv_path:
         _remove_rocprofv3_run_dir(Path(csv_path))
 
@@ -1388,6 +1665,18 @@ def _kernel_activity_rows(evidence: dict[str, Any]) -> int:
         return 0
 
 
+def _sidecar_kernel_activity_rows(evidence: dict[str, Any]) -> int:
+    kernel_rows = _kernel_activity_rows(evidence)
+    if kernel_rows > 0:
+        return kernel_rows
+    if (
+        evidence.get("parsed_rows_compacted") is True
+        and _float_value(evidence.get("kernel_duration_ms")) > 0
+    ):
+        return 1
+    return 0
+
+
 def _load_json(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
@@ -1412,13 +1701,237 @@ def _load_workloads(
     return workloads
 
 
-def _staging_runner(staging_dir: Path, *, timeout: int) -> ProfilerRunner:
+_DTYPE_NBYTES = {
+    "bool": 1,
+    "int8": 1,
+    "uint8": 1,
+    "float4_e2m1fn_x2": 1,
+    "float8_e4m3fn": 1,
+    "float8_e5m2": 1,
+    "int16": 2,
+    "float16": 2,
+    "bfloat16": 2,
+    "int32": 4,
+    "float32": 4,
+    "int64": 8,
+    "float64": 8,
+}
+
+
+def _resolve_estimated_timing_input_cap(
+    *,
+    max_estimated_timing_input_gib: float | None,
+    auto_estimated_timing_input_cap: bool,
+    subprocess_memory_limit_gib: float | None,
+) -> tuple[float | None, str | None]:
+    if max_estimated_timing_input_gib is not None:
+        if max_estimated_timing_input_gib <= 0:
+            raise ValueError("max estimated timing input GiB must be positive")
+        return max_estimated_timing_input_gib, "manual"
+    if not auto_estimated_timing_input_cap:
+        return None, None
+    available_bytes = _dynamic_available_memory_bytes(
+        subprocess_memory_limit_gib=subprocess_memory_limit_gib,
+    )
+    if available_bytes is None or available_bytes <= 0:
+        return None, None
+    cap_bytes = int(available_bytes * AUTO_TIMING_INPUT_CAP_FRACTION)
+    return cap_bytes / (1024 * 1024 * 1024), (
+        f"dynamic_available_memory:{AUTO_TIMING_INPUT_CAP_FRACTION:.0%}"
+    )
+
+
+def _dynamic_available_memory_bytes(
+    *,
+    subprocess_memory_limit_gib: float | None,
+) -> int | None:
+    candidates: list[int] = []
+    mem_available = _proc_mem_available_bytes()
+    if mem_available is not None:
+        candidates.append(mem_available)
+    cgroup_available = _cgroup_available_memory_bytes()
+    if cgroup_available is not None:
+        candidates.append(cgroup_available)
+    if subprocess_memory_limit_gib is not None:
+        if subprocess_memory_limit_gib <= 0:
+            raise ValueError("subprocess memory limit must be positive")
+        candidates.append(int(subprocess_memory_limit_gib * 1024 * 1024 * 1024))
+    return min(candidates) if candidates else None
+
+
+def _proc_mem_available_bytes(path: Path = Path("/proc/meminfo")) -> int | None:
+    try:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.startswith("MemAvailable:"):
+                continue
+            parts = line.split()
+            if len(parts) >= 2:
+                return int(parts[1]) * 1024
+    except (OSError, ValueError):
+        return None
+    return None
+
+
+def _cgroup_available_memory_bytes(root: Path = Path("/sys/fs/cgroup")) -> int | None:
+    max_path = root / "memory.max"
+    current_path = root / "memory.current"
+    try:
+        raw_max = max_path.read_text(encoding="utf-8").strip()
+        if raw_max == "max":
+            return None
+        memory_max = int(raw_max)
+        memory_current = int(current_path.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return None
+    return max(memory_max - memory_current, 0)
+
+
+def _estimated_timing_input_block_reason(
+    definition_payload: dict[str, Any],
+    workloads: Sequence[Workload],
+    *,
+    max_estimated_timing_input_gib: float | None,
+    cap_source: str | None = None,
+) -> str | None:
+    if max_estimated_timing_input_gib is None:
+        return None
+    if max_estimated_timing_input_gib <= 0:
+        raise ValueError("max estimated timing input GiB must be positive")
+    max_estimated_bytes = int(max_estimated_timing_input_gib * 1024 * 1024 * 1024)
+    peak_input_bytes = 0
+    peak_uuid: str | None = None
+    for workload in workloads:
+        input_bytes = _estimate_workload_input_bytes(definition_payload, workload)
+        if input_bytes > peak_input_bytes:
+            peak_input_bytes = input_bytes
+            peak_uuid = workload.uuid
+
+    # time_runnable builds a shifting pool for every input tensor, so large
+    # tensor inputs are held once by the generated workload and once by the
+    # timing pool before any kernel intermediates are allocated.
+    estimated_timing_input_bytes = peak_input_bytes * 2
+    if estimated_timing_input_bytes <= max_estimated_bytes:
+        return None
+    return (
+        "estimated timing input footprint exceeds preflight cap: "
+        f"input={_format_gib(peak_input_bytes)} GiB, "
+        f"timing_pool_peak={_format_gib(estimated_timing_input_bytes)} GiB, "
+        f"cap={_format_gib(max_estimated_bytes)} GiB, "
+        f"cap_source={cap_source or 'manual'}, "
+        f"workload_uuid={peak_uuid or '<unknown>'}"
+    )
+
+
+def _estimate_workload_input_bytes(
+    definition_payload: dict[str, Any],
+    workload: Workload,
+) -> int:
+    axes = dict(workload.axes)
+    resolved_axes = _resolve_definition_axes(definition_payload, axes)
+    total = 0
+    inputs = definition_payload.get("inputs")
+    if not isinstance(inputs, dict):
+        return 0
+    for spec in inputs.values():
+        if not isinstance(spec, dict):
+            continue
+        shape = spec.get("shape")
+        dtype = spec.get("dtype")
+        if not isinstance(shape, list) or not isinstance(dtype, str):
+            continue
+        elem_count = _resolve_shape_numel(shape, resolved_axes)
+        dtype_nbytes = _DTYPE_NBYTES.get(dtype)
+        if elem_count is None or dtype_nbytes is None:
+            continue
+        total += elem_count * dtype_nbytes
+    return total
+
+
+def _resolve_definition_axes(
+    definition_payload: dict[str, Any],
+    workload_axes: dict[str, Any],
+) -> dict[str, int]:
+    resolved: dict[str, int] = {}
+    axes = definition_payload.get("axes")
+    if isinstance(axes, dict):
+        for name, spec in axes.items():
+            if not isinstance(name, str) or not isinstance(spec, dict):
+                continue
+            if spec.get("type") == "const" and spec.get("value") is not None:
+                try:
+                    resolved[name] = int(spec["value"])
+                except (TypeError, ValueError):
+                    pass
+    for name, value in workload_axes.items():
+        try:
+            resolved[str(name)] = int(value)
+        except (TypeError, ValueError):
+            continue
+    return resolved
+
+
+def _resolve_shape_numel(
+    shape: Sequence[Any],
+    axes: dict[str, int],
+) -> int | None:
+    numel = 1
+    for dim in shape:
+        if isinstance(dim, int):
+            value = dim
+        elif isinstance(dim, str):
+            if dim not in axes:
+                return None
+            value = axes[dim]
+        else:
+            return None
+        if value < 0:
+            return None
+        numel *= value
+    return numel
+
+
+def _format_gib(value: int) -> str:
+    return f"{value / (1024 * 1024 * 1024):.2f}"
+
+
+def _torch_rocm_gpu_available() -> bool:
+    try:
+        import torch
+    except Exception:
+        return False
+    try:
+        return bool(torch.cuda.is_available() and torch.cuda.device_count() > 0)
+    except Exception:
+        return False
+
+
+def _memory_limit_preexec(memory_limit_gib: float | None):
+    if memory_limit_gib is None:
+        return None
+    if memory_limit_gib <= 0:
+        raise ValueError("subprocess memory limit must be positive")
+    limit_bytes = int(memory_limit_gib * 1024 * 1024 * 1024)
+
+    def apply_limit() -> None:
+        resource.setrlimit(resource.RLIMIT_AS, (limit_bytes, limit_bytes))
+
+    return apply_limit
+
+
+def _staging_runner(
+    staging_dir: Path,
+    *,
+    timeout: int,
+    memory_limit_gib: float | None = None,
+) -> ProfilerRunner:
     def run(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
         env = {
             **os.environ,
             "PYTHONPATH": _pythonpath_with_src(),
             "SOL_EXECBENCH_GRACEFUL_EXIT": "1",
+            "TMPDIR": str(staging_dir.parent.resolve()),
         }
+        preexec_fn = _memory_limit_preexec(memory_limit_gib)
         return subprocess.run(
             list(command),
             cwd=staging_dir,
@@ -1427,13 +1940,14 @@ def _staging_runner(staging_dir: Path, *, timeout: int) -> ProfilerRunner:
             text=True,
             capture_output=True,
             timeout=timeout,
+            preexec_fn=preexec_fn,
         )
 
     return run
 
 
 def _pythonpath_with_src() -> str:
-    src = str(Path(__file__).resolve().parents[1] / "src")
+    src = str(Path(__file__).resolve().parents[3] / "src")
     existing = os.environ.get("PYTHONPATH")
     return src if not existing else f"{src}{os.pathsep}{existing}"
 
@@ -1604,6 +2118,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--replacement-timing-dir", type=Path, default=None)
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--only-problem", action="append", default=[])
+    parser.add_argument("--only-problem-file", type=Path, default=None)
     parser.add_argument("--skip-problem", action="append", default=[])
     parser.add_argument("--skip-problem-file", type=Path, default=None)
     parser.add_argument("--mark-blocked-problem", action="append", default=[])
@@ -1647,14 +2162,96 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument("--timeout", type=int, default=900)
-    parser.add_argument("--temp-dir", type=Path, default=None)
+    parser.add_argument(
+        "--subprocess-memory-limit-gib",
+        type=float,
+        default=None,
+        help=(
+            "Optional address-space limit for staged profiler subprocesses. "
+            "Use this for large RDNA4 closure targets so one workload cannot "
+            "trigger a system-wide OOM kill."
+        ),
+    )
+    parser.add_argument(
+        "--max-estimated-timing-input-gib",
+        type=float,
+        default=None,
+        help=(
+            "Manual preflight cap for estimated timing input footprint. "
+            "The estimate accounts for the generated input tensors and the "
+            "timing allocator's input pool copy; workloads above the cap are "
+            "classified as profiler-blocked before launching the subprocess. "
+            "When omitted, the batch uses a dynamic cap derived from current "
+            "host/cgroup availability unless --no-auto-estimated-timing-input-cap "
+            "is set."
+        ),
+    )
+    parser.add_argument(
+        "--auto-estimated-timing-input-cap",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "Dynamically cap estimated timing input footprint from current "
+            "MemAvailable, cgroup remaining memory, and subprocess memory limit. "
+            "Enabled by default; use --no-auto-estimated-timing-input-cap to "
+            "disable preflight unless a manual cap is provided."
+        ),
+    )
+    parser.add_argument(
+        "--temp-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Directory for staged eval_driver packages. Defaults to "
+            "tmp/<output-dir-name> so validation temporaries stay under the "
+            "project tmp directory."
+        ),
+    )
     parser.add_argument("--resume", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument(
+        "--max-workers",
+        type=int,
+        default=4,
+        help=(
+            "Maximum number of target-level workers. Use --max-workers 1 for "
+            "resource-sensitive GPU profiling runs that must avoid concurrent "
+            "eval_driver processes."
+        ),
+    )
     parser.add_argument("--timing-tool-version", default=DEFAULT_TOOL_VERSION)
     parser.add_argument("--gpu-architecture", default=DEFAULT_GPU_ARCHITECTURE)
     parser.add_argument(
         "--clock-locked",
         action=argparse.BooleanOptionalAction,
         default=True,
+    )
+    parser.add_argument(
+        "--hip-runtime-trace",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help=(
+            "Include rocprofv3 HIP runtime API tracing alongside kernel tracing. "
+            "Disabled by default because HIP API CSVs can grow to GiB-scale; "
+            "enable only for profiler debugging."
+        ),
+    )
+    parser.add_argument(
+        "--keep-staging",
+        action="store_true",
+        default=False,
+        help=(
+            "Keep per-target staging directories after each profiler subprocess. "
+            "Disabled by default to avoid accumulating temporary files."
+        ),
+    )
+    parser.add_argument(
+        "--keep-rocprofv3-csv",
+        action="store_true",
+        default=False,
+        help=(
+            "Keep raw rocprofv3 CSV run directories after compact timing sidecars "
+            "are written. Disabled by default to avoid large trace artifacts."
+        ),
     )
     parser.add_argument(
         "--strict-isolation",
@@ -1710,6 +2307,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     skip_problem = tuple(args.skip_problem) + _load_problem_id_file(
         args.skip_problem_file
     )
+    only_problem = tuple(args.only_problem) + _load_problem_id_file(
+        args.only_problem_file
+    )
+    temp_dir = args.temp_dir or DEFAULT_TEMP_ROOT / args.output_dir.name
     try:
         with acquire_pid_lock(args.output_dir):
             return run_batch(
@@ -1718,7 +2319,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 source_timing_dirs=source_timing_dirs,
                 replacement_timing_dir=args.replacement_timing_dir,
                 limit=args.limit,
-                only_problem=tuple(args.only_problem),
+                only_problem=only_problem,
                 skip_problem=skip_problem,
                 mark_blocked_problem=tuple(args.mark_blocked_problem),
                 mark_blocked_only=args.mark_blocked_only,
@@ -1728,15 +2329,22 @@ def main(argv: Sequence[str] | None = None) -> int:
                 workload_slice_timing_dirs=tuple(args.workload_slice_timing_dir),
                 workload_sharded_import_only=args.workload_sharded_import_only,
                 timeout=args.timeout,
-                temp_dir=args.temp_dir,
+                subprocess_memory_limit_gib=args.subprocess_memory_limit_gib,
+                max_estimated_timing_input_gib=args.max_estimated_timing_input_gib,
+                auto_estimated_timing_input_cap=args.auto_estimated_timing_input_cap,
+                temp_dir=temp_dir,
                 resume=args.resume,
                 tool_version=args.timing_tool_version,
                 gpu_architecture=args.gpu_architecture,
                 clock_locked=args.clock_locked,
+                include_hip_runtime_trace=args.hip_runtime_trace,
                 strict_isolation=args.strict_isolation,
                 gpu_device=args.gpu_device,
                 calibration_path=args.calibration_path,
                 compact_workload_slices=args.compact_workload_slices,
+                keep_staging=args.keep_staging,
+                keep_rocprofv3_csv=args.keep_rocprofv3_csv,
+                max_workers=args.max_workers,
             )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"ERROR: {exc}")

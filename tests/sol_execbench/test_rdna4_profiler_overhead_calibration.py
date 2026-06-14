@@ -157,7 +157,10 @@ class TestCalibrationScriptArgs:
         from importlib.util import module_from_spec, spec_from_file_location
 
         REPO_ROOT = Path(__file__).resolve().parents[2]
-        SCRIPT_PATH = REPO_ROOT / "scripts/run_rdna4_profiler_overhead_calibration.py"
+        SCRIPT_PATH = (
+            REPO_ROOT
+            / "scripts/internal/rdna4/run_rdna4_profiler_overhead_calibration.py"
+        )
         spec = spec_from_file_location(
             "run_rdna4_profiler_overhead_calibration", SCRIPT_PATH
         )
@@ -209,7 +212,10 @@ class TestCalibrationJsonSchema:
         from importlib.util import module_from_spec, spec_from_file_location
 
         REPO_ROOT = Path(__file__).resolve().parents[2]
-        SCRIPT_PATH = REPO_ROOT / "scripts/run_rdna4_profiler_overhead_calibration.py"
+        SCRIPT_PATH = (
+            REPO_ROOT
+            / "scripts/internal/rdna4/run_rdna4_profiler_overhead_calibration.py"
+        )
         spec = spec_from_file_location(
             "run_rdna4_profiler_overhead_calibration_schema", SCRIPT_PATH
         )
@@ -229,7 +235,10 @@ class TestCalibrationClockSetup:
         from importlib.util import module_from_spec, spec_from_file_location
 
         REPO_ROOT = Path(__file__).resolve().parents[2]
-        SCRIPT_PATH = REPO_ROOT / "scripts/run_rdna4_profiler_overhead_calibration.py"
+        SCRIPT_PATH = (
+            REPO_ROOT
+            / "scripts/internal/rdna4/run_rdna4_profiler_overhead_calibration.py"
+        )
         spec = spec_from_file_location(
             "run_rdna4_profiler_overhead_calibration_clock_setup", SCRIPT_PATH
         )
@@ -277,7 +286,7 @@ class TestCalibrationClockSetup:
         mod._teardown_calibration_clocks(state, reset_clocks=True)
         assert calls == []
 
-    def test_run_with_rocprofv3_passes_output_file(self, monkeypatch):
+    def test_run_with_rocprofv3_passes_output_file(self, monkeypatch, tmp_path):
         mod = self._load_script()
         import sol_execbench.core.bench.rocm_profiler as rocm_profiler
 
@@ -297,7 +306,16 @@ class TestCalibrationClockSetup:
         monkeypatch.setattr(subprocess, "run", fake_run)
 
         tensor = SimpleNamespace(shape=(4,))
-        durations = mod._run_with_rocprofv3(tensor, tensor, tensor, iterations=2)
+        temp_dir = tmp_path / "tmp" / "rdna4-overhead-calibration"
+        durations = mod._run_with_rocprofv3(
+            tensor,
+            tensor,
+            tensor,
+            iterations=2,
+            temp_dir=temp_dir,
+        )
 
         assert durations == [1.25, 1.5]
         assert captured["kwargs"]["output_file"] == "rocprofv3-overhead-calibration"
+        output_directory = Path(captured["kwargs"]["output_directory"])
+        assert output_directory.is_relative_to(temp_dir)

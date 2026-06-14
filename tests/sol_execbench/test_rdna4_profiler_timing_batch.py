@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from collections.abc import Sequence
+from contextlib import nullcontext
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
@@ -14,7 +16,7 @@ from sol_execbench.core.dataset import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT_PATH = REPO_ROOT / "scripts/run_rdna4_profiler_timing_batch.py"
+SCRIPT_PATH = REPO_ROOT / "scripts/internal/rdna4/run_rdna4_profiler_timing_batch.py"
 SPEC = spec_from_file_location("run_rdna4_profiler_timing_batch", SCRIPT_PATH)
 assert SPEC is not None and SPEC.loader is not None
 batch = module_from_spec(SPEC)
@@ -78,6 +80,60 @@ def _write_workloads(root: Path, category: str, name: str, count: int) -> None:
     )
 
 
+def _write_large_input_problem(root: Path, category: str, name: str) -> None:
+    problem_dir = root / category / name
+    problem_dir.mkdir(parents=True)
+    definition = {
+        "name": name,
+        "description": "large timing input demo",
+        "axes": {
+            "N": {"type": "var"},
+            "H": {"type": "const", "value": 1024},
+        },
+        "inputs": {"x": {"shape": ["N", "H"], "dtype": "float32"}},
+        "outputs": {"out": {"shape": ["N", "H"], "dtype": "float32"}},
+        "reference": "def run(x):\n    return x\n",
+    }
+    workload = {
+        "uuid": "large",
+        "axes": {"N": 4096},
+        "inputs": {"x": {"type": "random"}},
+    }
+    (problem_dir / "definition.json").write_text(
+        json.dumps(definition) + "\n",
+        encoding="utf-8",
+    )
+    (problem_dir / "workload.jsonl").write_text(
+        json.dumps(workload) + "\n",
+        encoding="utf-8",
+    )
+    (problem_dir / "reference.py").write_text(
+        definition["reference"],
+        encoding="utf-8",
+    )
+
+
+def test_rdna4_reference_override_is_scoped_to_convnextv2_grn():
+    payload = _definition("035_convnextv2_block_with_grn")
+
+    metadata = batch._apply_rdna4_reference_override(
+        payload,
+        "L2/035_convnextv2_block_with_grn",
+    )
+
+    assert "pwconv1_weight[:, :, None, None]" in payload["reference"]
+    assert metadata is not None
+    assert metadata["problem_id"] == "L2/035_convnextv2_block_with_grn"
+    assert metadata["override_type"] == "equivalent_reference_implementation"
+    assert (
+        "not unmodified benchmark reference dispatch timing"
+        in (metadata["claim_boundary"])
+    )
+    other = _definition("other")
+    assert batch._apply_rdna4_reference_override(other, "L2/other") is None
+    assert other["reference"] == "def run(x):\n    return x\n"
+
+
 def _write_fallback_timing(root: Path, category: str, name: str) -> None:
     path = root / category / f"{name}.timing.json"
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -124,6 +180,213 @@ def _successful_runner(command: Sequence[str]) -> subprocess.CompletedProcess[st
     )
 
 
+def test_batch_omits_hip_runtime_trace_by_default(tmp_path):
+    dataset_root = tmp_path / "dataset"
+    source_timing = tmp_path / "source"
+    output_dir = tmp_path / "out"
+    captured_commands: list[Sequence[str]] = []
+    _write_problem(dataset_root, "L1", "one")
+    _write_fallback_timing(source_timing, "L1", "one")
+
+    def runner(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
+        captured_commands.append(tuple(command))
+        return _successful_runner(command)
+
+    rc = batch.run_batch(
+        dataset_root=dataset_root,
+        output_dir=output_dir,
+        source_timing_dirs=(source_timing,),
+        only_problem=("L1/one",),
+        rocprofv3_available=True,
+        runner=runner,
+        max_workers=1,
+    )
+
+    assert rc == 0
+    assert len(captured_commands) == 1
+    assert "--kernel-trace" in captured_commands[0]
+    assert "--hip-runtime-trace" not in captured_commands[0]
+    separator_index = captured_commands[0].index("--")
+    assert captured_commands[0][separator_index + 1 : separator_index + 3] == (
+        sys.executable,
+        "eval_driver.py",
+    )
+
+
+def test_batch_can_enable_hip_runtime_trace_for_debugging(tmp_path):
+    dataset_root = tmp_path / "dataset"
+    source_timing = tmp_path / "source"
+    output_dir = tmp_path / "out"
+    captured_commands: list[Sequence[str]] = []
+    _write_problem(dataset_root, "L1", "one")
+    _write_fallback_timing(source_timing, "L1", "one")
+
+    def runner(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
+        captured_commands.append(tuple(command))
+        return _successful_runner(command)
+
+    rc = batch.run_batch(
+        dataset_root=dataset_root,
+        output_dir=output_dir,
+        source_timing_dirs=(source_timing,),
+        only_problem=("L1/one",),
+        include_hip_runtime_trace=True,
+        rocprofv3_available=True,
+        runner=runner,
+        max_workers=1,
+    )
+
+    assert rc == 0
+    assert len(captured_commands) == 1
+    assert "--hip-runtime-trace" in captured_commands[0]
+
+
+def test_staging_runner_applies_subprocess_memory_limit(
+    tmp_path,
+    monkeypatch,
+):
+    captured: dict[str, object] = {}
+
+    def fake_run(*args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return subprocess.CompletedProcess(args=args[0], returncode=0)
+
+    monkeypatch.setattr(batch.subprocess, "run", fake_run)
+
+    runner = batch._staging_runner(
+        tmp_path,
+        timeout=7,
+        memory_limit_gib=1.5,
+    )
+    result = runner(("python", "eval_driver.py"))
+
+    assert result.returncode == 0
+    kwargs = captured["kwargs"]
+    assert kwargs["cwd"] == tmp_path
+    assert kwargs["timeout"] == 7
+    assert kwargs["preexec_fn"] is not None
+
+
+def test_staging_runner_forces_absolute_tmpdir(
+    tmp_path,
+    monkeypatch,
+):
+    captured: dict[str, object] = {}
+    staging_dir = tmp_path / "relative-tmp-root" / "staging"
+    staging_dir.mkdir(parents=True)
+
+    def fake_run(*args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return subprocess.CompletedProcess(args=args[0], returncode=0)
+
+    monkeypatch.setenv("TMPDIR", os.path.join("relative", "tmp"))
+    monkeypatch.setattr(batch.subprocess, "run", fake_run)
+
+    runner = batch._staging_runner(
+        staging_dir,
+        timeout=7,
+        memory_limit_gib=None,
+    )
+    result = runner((sys.executable, "eval_driver.py"))
+
+    assert result.returncode == 0
+    env = captured["kwargs"]["env"]
+    assert env["TMPDIR"] == str(staging_dir.parent.resolve())
+    assert Path(env["TMPDIR"]).is_absolute()
+
+
+def test_batch_preflights_oversized_timing_inputs_before_runner(tmp_path):
+    dataset_root = tmp_path / "dataset"
+    source_timing = tmp_path / "source"
+    output_dir = tmp_path / "out"
+    _write_large_input_problem(dataset_root, "L1", "huge")
+    _write_fallback_timing(source_timing, "L1", "huge")
+
+    def runner(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
+        raise AssertionError(f"runner should not be called: {command}")
+
+    rc = batch.run_batch(
+        dataset_root=dataset_root,
+        output_dir=output_dir,
+        source_timing_dirs=(source_timing,),
+        only_problem=("L1/huge",),
+        max_estimated_timing_input_gib=0.01,
+        rocprofv3_available=True,
+        runner=runner,
+        max_workers=1,
+    )
+
+    assert rc == 1
+    sidecar = json.loads(
+        (output_dir / "timing" / "L1" / "huge.timing.json").read_text()
+    )
+    metadata = sidecar["replacement_metadata"]
+    assert metadata["replacement_status"] == "profiler_blocked"
+    assert (
+        "estimated timing input footprint exceeds preflight cap"
+        in metadata["failure_reason"]
+    )
+    assert "timing_pool_peak=" in metadata["failure_reason"]
+
+
+def test_batch_uses_dynamic_available_memory_cap_by_default(tmp_path, monkeypatch):
+    dataset_root = tmp_path / "dataset"
+    source_timing = tmp_path / "source"
+    output_dir = tmp_path / "out"
+    _write_large_input_problem(dataset_root, "L1", "huge")
+    _write_fallback_timing(source_timing, "L1", "huge")
+    monkeypatch.setattr(
+        batch,
+        "_dynamic_available_memory_bytes",
+        lambda *, subprocess_memory_limit_gib: 20 * 1024 * 1024,
+    )
+
+    def runner(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
+        raise AssertionError(f"runner should not be called: {command}")
+
+    rc = batch.run_batch(
+        dataset_root=dataset_root,
+        output_dir=output_dir,
+        source_timing_dirs=(source_timing,),
+        only_problem=("L1/huge",),
+        rocprofv3_available=True,
+        runner=runner,
+        max_workers=1,
+    )
+
+    assert rc == 1
+    sidecar = json.loads(
+        (output_dir / "timing" / "L1" / "huge.timing.json").read_text()
+    )
+    reason = sidecar["replacement_metadata"]["failure_reason"]
+    assert "estimated timing input footprint exceeds preflight cap" in reason
+    assert "cap_source=dynamic_available_memory:70%" in reason
+
+
+def test_batch_aborts_real_runner_when_torch_gpu_unavailable(tmp_path, monkeypatch):
+    dataset_root = tmp_path / "dataset"
+    source_timing = tmp_path / "source"
+    output_dir = tmp_path / "out"
+    _write_problem(dataset_root, "L1", "one")
+    _write_fallback_timing(source_timing, "L1", "one")
+    monkeypatch.setattr(batch, "_torch_rocm_gpu_available", lambda: False)
+
+    rc = batch.run_batch(
+        dataset_root=dataset_root,
+        output_dir=output_dir,
+        source_timing_dirs=(source_timing,),
+        only_problem=("L1/one",),
+        rocprofv3_available=True,
+        runner=None,
+        max_workers=1,
+    )
+
+    assert rc == 1
+    assert not (output_dir / "timing" / "L1" / "one.timing.json").exists()
+
+
 def test_batch_selects_fallback_targets_and_honors_resume(tmp_path):
     dataset_root = tmp_path / "dataset"
     source_timing = tmp_path / "fallback"
@@ -157,6 +420,22 @@ def test_batch_selects_fallback_targets_and_honors_resume(tmp_path):
     )
 
     assert [target.problem_id for target in targets] == ["L1/two"]
+
+
+def test_batch_selects_ready_missing_profiler_timing_targets(tmp_path):
+    dataset_root = tmp_path / "dataset"
+    source_timing = tmp_path / "fallback"
+    replacement = tmp_path / "replacement"
+    _write_problem(dataset_root, "L1", "missing")
+    coverage = _coverage(dataset_root, source_timing, replacement)
+
+    targets = batch.select_fallback_targets(
+        coverage,
+        replacement_timing_dir=replacement,
+        resume=True,
+    )
+
+    assert [target.problem_id for target in targets] == ["L1/missing"]
 
 
 def test_batch_resume_skips_classified_partial_replacement(tmp_path):
@@ -436,6 +715,109 @@ def test_batch_uses_configured_temp_dir_for_staging(tmp_path):
     summary = json.loads((output_dir / "batch-summary.json").read_text())
     staging_dir = Path(summary["results"][0]["staging_dir"])
     assert staging_dir.parent == temp_dir
+    assert not staging_dir.exists()
+
+
+def test_batch_cli_defaults_temp_dir_to_project_tmp(monkeypatch, tmp_path):
+    output_dir = tmp_path / "custom-output"
+    captured: dict[str, Path | tuple[Path, ...]] = {}
+
+    def fake_run_batch(**kwargs) -> int:
+        captured["output_dir"] = kwargs["output_dir"]
+        captured["temp_dir"] = kwargs["temp_dir"]
+        captured["source_timing_dirs"] = kwargs["source_timing_dirs"]
+        return 0
+
+    monkeypatch.setattr(batch, "run_batch", fake_run_batch)
+    monkeypatch.setattr(batch, "acquire_pid_lock", lambda _path: nullcontext())
+
+    status = batch.main(["--output-dir", str(output_dir)])
+
+    assert status == 0
+    assert captured["output_dir"] == output_dir
+    assert captured["temp_dir"] == Path("tmp") / output_dir.name
+    assert captured["source_timing_dirs"] == (batch.DEFAULT_SOURCE_TIMING_DIR,)
+
+
+def test_batch_can_keep_staging_for_debugging(tmp_path):
+    dataset_root = tmp_path / "dataset"
+    source_timing = tmp_path / "fallback"
+    output_dir = tmp_path / "out"
+    replacement = output_dir / "timing"
+    temp_dir = tmp_path / "staging-root"
+    _write_problem(dataset_root, "L1", "one")
+    _write_fallback_timing(source_timing, "L1", "one")
+
+    status = batch.run_batch(
+        dataset_root=dataset_root,
+        output_dir=output_dir,
+        source_timing_dirs=(source_timing,),
+        replacement_timing_dir=replacement,
+        limit=1,
+        rocprofv3_available=True,
+        runner=_successful_runner,
+        temp_dir=temp_dir,
+        keep_staging=True,
+    )
+
+    assert status == 0
+    summary = json.loads((output_dir / "batch-summary.json").read_text())
+    staging_dir = Path(summary["results"][0]["staging_dir"])
+    assert staging_dir.parent == temp_dir
+    assert staging_dir.exists()
+
+
+def test_batch_removes_raw_rocprofv3_csv_by_default(tmp_path):
+    dataset_root = tmp_path / "dataset"
+    source_timing = tmp_path / "fallback"
+    output_dir = tmp_path / "out"
+    replacement = output_dir / "timing"
+    _write_problem(dataset_root, "L1", "one")
+    _write_fallback_timing(source_timing, "L1", "one")
+
+    status = batch.run_batch(
+        dataset_root=dataset_root,
+        output_dir=output_dir,
+        source_timing_dirs=(source_timing,),
+        replacement_timing_dir=replacement,
+        limit=1,
+        rocprofv3_available=True,
+        runner=_successful_runner,
+    )
+
+    assert status == 0
+    sidecar = json.loads(
+        (replacement / "L1" / "one.timing.json").read_text(encoding="utf-8")
+    )
+    assert sidecar["evidence"]["parsed_rows"] == []
+    assert sidecar["evidence"]["parsed_rows_compacted"] is True
+    assert not Path(sidecar["csv_path"]).parent.exists()
+
+
+def test_batch_can_keep_raw_rocprofv3_csv_for_debugging(tmp_path):
+    dataset_root = tmp_path / "dataset"
+    source_timing = tmp_path / "fallback"
+    output_dir = tmp_path / "out"
+    replacement = output_dir / "timing"
+    _write_problem(dataset_root, "L1", "one")
+    _write_fallback_timing(source_timing, "L1", "one")
+
+    status = batch.run_batch(
+        dataset_root=dataset_root,
+        output_dir=output_dir,
+        source_timing_dirs=(source_timing,),
+        replacement_timing_dir=replacement,
+        limit=1,
+        rocprofv3_available=True,
+        runner=_successful_runner,
+        keep_rocprofv3_csv=True,
+    )
+
+    assert status == 0
+    sidecar = json.loads(
+        (replacement / "L1" / "one.timing.json").read_text(encoding="utf-8")
+    )
+    assert Path(sidecar["csv_path"]).parent.exists()
 
 
 def test_batch_records_workload_offset_slice_metadata(tmp_path):
@@ -687,11 +1069,43 @@ def test_workload_sharded_batch_imports_existing_slice_sidecars(tmp_path):
     source_timing = tmp_path / "fallback"
     output_dir = tmp_path / "out"
     replacement = output_dir / "timing"
-    imported_dirs = [tmp_path / f"slice-{index}" / "timing" for index in range(2)]
+    failed_dir = tmp_path / "stale-failed-slice" / "timing"
+    imported_dirs = [failed_dir] + [
+        tmp_path / f"slice-{index}" / "timing" for index in range(2)
+    ]
     _write_problem(dataset_root, "L1", "one")
     _write_workloads(dataset_root, "L1", "one", 2)
     _write_fallback_timing(source_timing, "L1", "one")
-    for index, timing_dir in enumerate(imported_dirs):
+    stale_timing = failed_dir / "L1" / "one.timing.json"
+    stale_timing.parent.mkdir(parents=True, exist_ok=True)
+    stale_timing.write_text(
+        json.dumps(
+            {
+                "profiler_collected": True,
+                "csv_path": "stale.csv",
+                "selection": {"policy": {"backend": "rocprofv3"}},
+                "evidence": {
+                    "backend": "rocprofv3",
+                    "kernel_duration_ms": 0.0,
+                    "parsed_rows": [],
+                    "parsed_rows_compacted": True,
+                },
+                "replacement_metadata": {
+                    "replacement_status": "partial_profiler_backed",
+                    "profiled_workload_count": 0,
+                    "expected_workload_count": 2,
+                    "trace_status_counts": {"TIMEOUT": 1},
+                    "workload_offset": 0,
+                    "workload_slice_applied": True,
+                    "full_workload_coverage": False,
+                    "failure_reason": "timeout",
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    for index, timing_dir in enumerate(imported_dirs[1:]):
         _write_timing = timing_dir / "L1" / "one.timing.json"
         _write_timing.parent.mkdir(parents=True, exist_ok=True)
         _write_timing.write_text(
@@ -820,6 +1234,72 @@ def test_workload_sharded_aggregation_uses_manifest_summaries(tmp_path):
     assert sidecar["evidence"]["kernel_duration_ms"] == 0.01
 
 
+def test_workload_sharded_aggregation_imports_compacted_sidecars(tmp_path):
+    dataset_root = tmp_path / "dataset"
+    source_timing = tmp_path / "fallback"
+    output_dir = tmp_path / "out"
+    replacement = output_dir / "timing"
+    imported_dirs = [tmp_path / f"slice-{index}" / "timing" for index in range(2)]
+    _write_problem(dataset_root, "L1", "one")
+    _write_workloads(dataset_root, "L1", "one", 2)
+    _write_fallback_timing(source_timing, "L1", "one")
+    for index, timing_dir in enumerate(imported_dirs):
+        _write_timing = timing_dir / "L1" / "one.timing.json"
+        _write_timing.parent.mkdir(parents=True, exist_ok=True)
+        _write_timing.write_text(
+            json.dumps(
+                {
+                    "profiler_collected": True,
+                    "csv_path": f"slice-{index}.csv",
+                    "selection": {"policy": {"backend": "rocprofv3"}},
+                    "evidence": {
+                        "backend": "rocprofv3",
+                        "kernel_duration_ms": 0.005,
+                        "parsed_rows": [],
+                        "parsed_rows_compacted": True,
+                    },
+                    "replacement_metadata": {
+                        "replacement_status": "partial_profiler_backed",
+                        "profiled_workload_count": 1,
+                        "expected_workload_count": 2,
+                        "trace_status_counts": {"PASSED": 1},
+                        "workload_offset": index,
+                        "workload_slice_applied": True,
+                        "full_workload_coverage": False,
+                        "failure_reason": None,
+                    },
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+    def runner(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
+        raise AssertionError(f"runner should not be called: {command}")
+
+    status = batch.run_batch(
+        dataset_root=dataset_root,
+        output_dir=output_dir,
+        source_timing_dirs=(source_timing,),
+        replacement_timing_dir=replacement,
+        limit=1,
+        workload_sharded=True,
+        workload_slice_timing_dirs=tuple(imported_dirs),
+        rocprofv3_available=True,
+        runner=runner,
+    )
+
+    assert status == 0
+    sidecar = json.loads(
+        (replacement / "L1" / "one.timing.json").read_text(encoding="utf-8")
+    )
+    rows = sidecar["evidence"]["parsed_rows"]
+    assert len(rows) == 2
+    assert sidecar["replacement_metadata"]["replacement_status"] == "profiler_backed"
+    assert sidecar["replacement_metadata"]["profiled_workload_count"] == 2
+    assert sidecar["replacement_metadata"]["trace_status_counts"] == {"PASSED": 2}
+
+
 def test_workload_sharded_batch_compacts_completed_slice_artifacts(tmp_path):
     dataset_root = tmp_path / "dataset"
     source_timing = tmp_path / "fallback"
@@ -872,6 +1352,56 @@ def test_workload_sharded_batch_compacts_completed_slice_artifacts(tmp_path):
         (replacement / "L1" / "one.timing.json").read_text(encoding="utf-8")
     )
     assert aggregate["replacement_metadata"]["replacement_status"] == "profiler_backed"
+
+
+def test_workload_sharded_keeps_csv_but_compacts_slice_json(tmp_path):
+    dataset_root = tmp_path / "dataset"
+    source_timing = tmp_path / "fallback"
+    output_dir = tmp_path / "out"
+    replacement = output_dir / "timing"
+    _write_problem(dataset_root, "L1", "one")
+    _write_workloads(dataset_root, "L1", "one", 1)
+    _write_fallback_timing(source_timing, "L1", "one")
+
+    def runner(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
+        return _successful_runner(command)
+
+    status = batch.run_batch(
+        dataset_root=dataset_root,
+        output_dir=output_dir,
+        source_timing_dirs=(source_timing,),
+        replacement_timing_dir=replacement,
+        limit=1,
+        workload_sharded=True,
+        compact_workload_slices=False,
+        keep_rocprofv3_csv=True,
+        rocprofv3_available=True,
+        runner=runner,
+    )
+
+    assert status == 0
+    slice_sidecar_path = (
+        output_dir
+        / "workload-slices"
+        / "workload-0000"
+        / "timing"
+        / "L1"
+        / "one.timing.json"
+    )
+    slice_sidecar = json.loads(slice_sidecar_path.read_text(encoding="utf-8"))
+    assert slice_sidecar["evidence"]["parsed_rows"] == []
+    assert slice_sidecar["evidence"]["parsed_rows_compacted"] is True
+    assert Path(slice_sidecar["csv_path"]).parent.exists()
+    manifest = json.loads(
+        (
+            output_dir
+            / "workload-manifests"
+            / "L1"
+            / "one.workload-profiler-manifest.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert manifest["workloads"][0]["status"] == "profiler_backed"
+    assert manifest["workloads"][0]["kernel_duration_ms"] == 0.005
 
 
 def test_workload_sharded_aggregation_keeps_failed_workload_partial(tmp_path):
@@ -1217,6 +1747,37 @@ def test_gpu_exclusivity_architecturally_enforced():
     for param in run_batch_sig.parameters.values():
         assert "parallel_gpu" not in param.name, "No parallel GPU flag should exist"
         assert "gpu_jobs" not in param.name, "No GPU jobs flag should exist"
+
+
+def test_cli_exposes_max_workers_for_resource_sensitive_runs():
+    default_args = batch.parse_args([])
+    assert default_args.max_workers == 4
+
+    serial_args = batch.parse_args(["--max-workers", "1"])
+    assert serial_args.max_workers == 1
+
+
+def test_cli_reads_only_problem_file(tmp_path, monkeypatch):
+    problem_file = tmp_path / "targets.txt"
+    problem_file.write_text(
+        "# comment\nL1/one\n\nL2/two\n",
+        encoding="utf-8",
+    )
+    captured: dict[str, object] = {}
+
+    def fake_run_batch(**kwargs):
+        captured.update(kwargs)
+        return 0
+
+    monkeypatch.setattr(batch, "run_batch", fake_run_batch)
+    monkeypatch.setattr(batch, "acquire_pid_lock", lambda output_dir: nullcontext())
+
+    rc = batch.main(
+        ["--only-problem", "L0/zero", "--only-problem-file", str(problem_file)]
+    )
+
+    assert rc == 0
+    assert captured["only_problem"] == ("L0/zero", "L1/one", "L2/two")
 
 
 def test_parallel_resume_skips_completed_targets(tmp_path):

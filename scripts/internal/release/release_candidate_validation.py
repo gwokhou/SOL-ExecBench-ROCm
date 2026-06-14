@@ -18,6 +18,7 @@ from typing import Callable, Sequence
 
 SCHEMA_VERSION = "sol_execbench.release_candidate_validation.v1"
 DEFAULT_OUTPUT_DIR = Path("out/release_candidate_validation")
+DEFAULT_TEMP_ROOT = Path("tmp/release_candidate_validation")
 DEFAULT_LOG_TAIL_CHARS = 4000
 
 DEFAULT_CPU_COMMAND = [
@@ -76,6 +77,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = _parse_args(argv)
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
+    temp_dir = DEFAULT_TEMP_ROOT
+    temp_dir.mkdir(parents=True, exist_ok=True)
 
     results: list[ValidationResult] = []
     if args.skip_cpu:
@@ -94,6 +97,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 command=_command_from_args(args.cpu_command, DEFAULT_CPU_COMMAND),
                 failure_classification="blocking",
                 failure_next_action="Fix the failing CPU-safe validation command before publishing.",
+                temp_dir=temp_dir,
                 log_tail_chars=args.log_tail_chars,
             )
         )
@@ -112,6 +116,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             failure_classification="deferred",
             failure_next_action="Review ROCm runtime availability; this is optional smoke evidence for prerelease.",
             evidence=_clock_policy_evidence(),
+            temp_dir=temp_dir,
             log_tail_chars=args.log_tail_chars,
         )
         results.append(doctor_result)
@@ -122,6 +127,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 failure_classification=_optional_smoke_classification,
                 failure_next_action="Run on a ROCm-capable host or keep this prerelease evidence marked deferred.",
                 evidence=_clock_policy_evidence(),
+                temp_dir=temp_dir,
                 log_tail_chars=args.log_tail_chars,
             )
         )
@@ -139,6 +145,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                         "paper parity, score authority, or leaderboard authority."
                     )
                 },
+                temp_dir=temp_dir,
                 log_tail_chars=args.log_tail_chars,
             )
         )
@@ -150,7 +157,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             raise SystemExit(
                 "--include-dataset-slice requires positive --dataset-limit"
             )
-        results.extend(_dataset_slice_results(args, output_dir, args.log_tail_chars))
+        results.extend(
+            _dataset_slice_results(args, output_dir, temp_dir, args.log_tail_chars)
+        )
 
     payload = _build_payload(results)
     json_path = output_dir / "release_candidate_validation.json"
@@ -190,6 +199,7 @@ def _command_from_args(value: list[str] | None, default: list[str]) -> list[str]
 def _dataset_slice_results(
     args: argparse.Namespace,
     output_dir: Path,
+    temp_dir: Path,
     log_tail_chars: int,
 ) -> list[ValidationResult]:
     closure_path = output_dir / "execution_closure.json"
@@ -214,7 +224,7 @@ def _dataset_slice_results(
         [
             "uv",
             "run",
-            "scripts/report_trust_summary.py",
+            "scripts/internal/reports/report_trust_summary.py",
             "--execution-closure",
             str(closure_path),
             "--json-out",
@@ -234,6 +244,7 @@ def _dataset_slice_results(
             "dataset_limit": args.dataset_limit,
             "paper_scale_boundary": "This bounded slice is not full 235-problem paper validation.",
         },
+        temp_dir=temp_dir,
         log_tail_chars=log_tail_chars,
     )
     if dataset_result.status == "passed" and closure_path.exists():
@@ -243,6 +254,7 @@ def _dataset_slice_results(
             failure_classification="diagnostic-only",
             failure_next_action="Generate trust summary after required input sidecars exist.",
             artifact_paths=[str(trust_json), str(trust_md)],
+            temp_dir=temp_dir,
             log_tail_chars=log_tail_chars,
         )
     else:
@@ -281,11 +293,14 @@ def _run_check(
     failure_next_action: str,
     artifact_paths: list[str] | None = None,
     evidence: dict[str, object] | None = None,
+    temp_dir: Path | None = None,
     log_tail_chars: int = DEFAULT_LOG_TAIL_CHARS,
 ) -> ValidationResult:
     started = time.monotonic()
-    stdout_path = _temporary_stream_path(name, "stdout")
-    stderr_path = _temporary_stream_path(name, "stderr")
+    stream_dir = temp_dir or DEFAULT_TEMP_ROOT
+    stream_dir.mkdir(parents=True, exist_ok=True)
+    stdout_path = _temporary_stream_path(stream_dir, name, "stdout")
+    stderr_path = _temporary_stream_path(stream_dir, name, "stderr")
     try:
         try:
             completed = _run_command_to_files(command, stdout_path, stderr_path)
@@ -465,11 +480,12 @@ def _redacted_tail_file(path: Path, limit: int) -> str:
     return tail
 
 
-def _temporary_stream_path(name: str, stream_name: str) -> Path:
+def _temporary_stream_path(temp_dir: Path, name: str, stream_name: str) -> Path:
     safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "_", name)
     with tempfile.NamedTemporaryFile(
         prefix=f"sol_execbench_{safe_name}_{stream_name}_",
         suffix=".log",
+        dir=temp_dir,
         delete=False,
     ) as handle:
         return Path(handle.name)

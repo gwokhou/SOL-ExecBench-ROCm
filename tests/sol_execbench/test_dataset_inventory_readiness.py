@@ -415,6 +415,46 @@ def test_quant_with_false_positive_cublas_class_name_is_ready(tmp_path):
     )
 
 
+def test_quant_with_false_positive_cublas_constructor_call_is_ready(tmp_path):
+    _write_problem(
+        tmp_path,
+        "Quant",
+        "constructor_fp_problem",
+        definition=_definition(
+            name="constructor_fp_problem",
+            reference=(
+                "class CuBLASRefBlockwiseGemm:\n"
+                "    def forward(self, x):\n"
+                "        return x\n"
+                "\n"
+                "\ndef run(x):\n"
+                "    gemm = CuBLASRefBlockwiseGemm()\n"
+                "    return gemm.forward(x)\n"
+            ),
+            dtype="float16",
+        ),
+    )
+    inventory = build_dataset_inventory(
+        tmp_path, categories=("Quant",), created_at="2026-05-23T00:00:00Z"
+    )
+
+    readiness = classify_rocm_readiness(
+        inventory, dataset_root=tmp_path, created_at="2026-05-23T00:00:00Z"
+    )
+    record = readiness.workloads[0]
+
+    assert record.status == "ready"
+    assert record.readiness_class == "pytorch_compatible"
+    assert "nvidia_cuda_runtime_hint" not in {reason.code for reason in record.reasons}
+    problem = inventory.problems[0]
+    assert problem.definition is not None
+    assert problem.definition.reference_runtime_hints == []
+    assert any(
+        evidence["token"] == "cublas" and evidence["match_kind"] == "constructor_name"
+        for evidence in problem.definition.reference_runtime_false_positive_evidence
+    )
+
+
 def test_quant_with_true_cupy_import_remains_blocked(tmp_path):
     _write_problem(
         tmp_path,
@@ -706,9 +746,10 @@ def test_readiness_classifies_flashinfer_migration_output(tmp_path):
     )
 
     record = readiness.workloads[0]
-    assert record.readiness_class == "flashinfer_specific"
-    assert record.reasons[0].code == "flashinfer_runtime_unknown"
-    assert readiness.blocker_reports[0].blocker_type == "flashinfer_runtime_dependency"
+    assert record.status == "ready"
+    assert record.readiness_class == "pytorch_compatible"
+    assert record.reasons[0].code == "flashinfer_pytorch_semantic_reference_migrated"
+    assert readiness.blocker_reports == []
 
 
 FLASHINFER_SIMPLE_NAMES = (
@@ -775,15 +816,17 @@ def test_readiness_classifies_flashinfer_semantic_buckets(tmp_path):
 
     for name, expected_code in FLASHINFER_RUNTIME_NAMES.items():
         record = records[f"FlashInfer-Bench/{name}"]
-        assert record.status == "runtime_blocked"
-        assert record.readiness_class == "flashinfer_specific"
-        assert record.reasons and record.reasons[0].code == expected_code
-        blocker_codes = {blocker.code for blocker in record.blocker_reports}
-        assert expected_code in blocker_codes
-        assert all(
-            blocker.blocker_type == "flashinfer_runtime_dependency"
-            for blocker in record.blocker_reports
+        assert record.status == "ready"
+        assert record.readiness_class == "pytorch_compatible"
+        assert (
+            record.reasons
+            and record.reasons[0].code
+            == "flashinfer_pytorch_semantic_reference_migrated"
         )
+        assert expected_code.replace("flashinfer_runtime_", "").replace("_", " ") in (
+            record.reasons[0].message
+        )
+        assert record.blocker_reports == []
 
 
 def test_readiness_classifies_unknown_flashinfer_runtime_dependency(tmp_path):

@@ -266,15 +266,9 @@ FLASHINFER_SIMPLE_REFERENCE_TOKENS = (
     "rmsnorm",
 )
 FLASHINFER_RUNTIME_REFERENCE_HINTS = (
-    "flashinfer",
-    "paged_decode",
-    "paged_prefill",
-    "ragged",
-    "prefill",
-    "kv_indptr",
-    "kv_indices",
-    "moe",
-    "fp8",
+    "import flashinfer",
+    "from flashinfer",
+    "flashinfer.",
 )
 FLASHINFER_RUNTIME_BUCKETS = {
     # More specific buckets must come before more general ones to avoid
@@ -449,16 +443,22 @@ def classify_workload_readiness(
         )
     elif is_flashinfer:
         flashinfer_bucket = _flashinfer_semantic_bucket(problem)
-        if (
-            flashinfer_bucket == "pytorch_compatible"
-            and not _flashinfer_reference_is_runtime_dependent(problem, dataset_root)
-        ):
+        runtime_dependent = _flashinfer_reference_is_runtime_dependent(
+            problem, dataset_root
+        )
+        if not runtime_dependent:
+            reason_code = (
+                "flashinfer_pytorch_compatible_reference"
+                if flashinfer_bucket == "pytorch_compatible"
+                else "flashinfer_pytorch_semantic_reference_migrated"
+            )
+            bucket_name = flashinfer_bucket.replace("_", " ")
             reasons.append(
                 _reason(
-                    "flashinfer_pytorch_compatible_reference",
+                    reason_code,
                     (
-                        "FlashInfer workload appears to use only PyTorch-level semantics "
-                        "that are compatible with ROCm execution."
+                        "FlashInfer workload has a PyTorch-level reference migrated for "
+                        f"{bucket_name} semantics and no direct FlashInfer runtime dependency."
                     ),
                     "Run bounded execution closure in Phase 55.",
                     problem.problem_path,

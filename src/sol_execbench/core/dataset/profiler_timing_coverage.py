@@ -40,6 +40,7 @@ class ProfilerTimingEvidenceSummary(BaseModel):
     replacement_failure_reason: str | None = None
     fallback_reason: str | None = None
     blocker_class: str | None = None
+    reference_override: dict[str, Any] | None = None
 
 
 class ProfilerTimingProblemCoverage(BaseModel):
@@ -67,7 +68,9 @@ class ProfilerTimingCoverageTotals(BaseModel):
     profiler_blocked_problems: int = 0
     fallback_timing_problems: int = 0
     ready_missing_profiler_timing_problems: int = 0
+    hardware_evidence_deferred_problems: int = 0
     readiness_blocked_problems: int = 0
+    reference_override_timing_problems: int = 0
     profiler_backed_coverage_pct: float = 0.0
 
 
@@ -135,6 +138,8 @@ def build_profiler_timing_coverage_report(
         )
         status = _problem_status(problem.status, evidence)
         counts[status] += 1
+        if evidence is not None and evidence.reference_override is not None:
+            counts["reference_override_timing"] += 1
         if evidence is not None and evidence.blocker_class:
             blocker_counts[evidence.blocker_class] += 1
         problems.append(
@@ -165,7 +170,9 @@ def build_profiler_timing_coverage_report(
         profiler_blocked_problems=counts["profiler_blocked"],
         fallback_timing_problems=counts["timing_fallback"],
         ready_missing_profiler_timing_problems=counts["ready_missing_profiler_timing"],
+        hardware_evidence_deferred_problems=counts["hardware_evidence_deferred"],
         readiness_blocked_problems=counts["readiness_blocked"],
+        reference_override_timing_problems=counts["reference_override_timing"],
         profiler_backed_coverage_pct=round(
             (profiler_backed / denominator * 100.0) if denominator else 0.0,
             4,
@@ -211,7 +218,11 @@ def render_profiler_timing_coverage_markdown(
         f"- Fallback timing problems: `{totals.fallback_timing_problems}`",
         "- Ready missing profiler timing problems: "
         f"`{totals.ready_missing_profiler_timing_problems}`",
+        "- Hardware evidence deferred problems: "
+        f"`{totals.hardware_evidence_deferred_problems}`",
         f"- Readiness-blocked problems: `{totals.readiness_blocked_problems}`",
+        "- Reference override timing problems: "
+        f"`{totals.reference_override_timing_problems}`",
         f"- Profiler-backed coverage: `{totals.profiler_backed_coverage_pct:.4f}%`",
         "",
         "## Status Counts",
@@ -297,6 +308,8 @@ def _problem_status(
         return "profiler_blocked"
     if evidence is not None:
         return "timing_fallback"
+    if readiness_status == "needs_hardware_evidence":
+        return "hardware_evidence_deferred"
     if readiness_status == "ready":
         return "ready_missing_profiler_timing"
     return "readiness_blocked"
@@ -358,6 +371,7 @@ def _load_timing_evidence_summary(path: Path) -> ProfilerTimingEvidenceSummary:
         if selection.get("reason") is not None
         else None,
         blocker_class=_blocker_class(payload),
+        reference_override=_reference_override(metadata),
     )
 
 
@@ -407,6 +421,13 @@ def _trace_status_counts(metadata: dict[str, Any]) -> dict[str, int]:
         if isinstance(key, str) and count is not None:
             normalized[key] = count
     return dict(sorted(normalized.items()))
+
+
+def _reference_override(metadata: dict[str, Any]) -> dict[str, Any] | None:
+    reference_override = metadata.get("reference_override")
+    if not isinstance(reference_override, dict):
+        return None
+    return dict(sorted(reference_override.items()))
 
 
 def _blocker_class(payload: dict[str, Any]) -> str | None:

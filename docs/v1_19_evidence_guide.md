@@ -29,10 +29,10 @@ claim, or hardware-validation claim.
 | Surface | Primary command surface | Artifact role |
 | --- | --- | --- |
 | execution closure | `scripts/run_dataset.py` | Records scoped problem closure statuses and bounded execution provenance. |
-| paper denominator report | `scripts/report_paper_denominator.py` | Accounts for denominator coverage, evidence gaps, and claim boundaries. |
-| Matrix schema export | `scripts/export_matrix_schema.py` | Exports strict JSON Schemas for Matrix report contracts. |
-| Matrix semantic diff | `scripts/diff_matrix_reports.py` | Compares Matrix reports for diagnostic compatibility drift. |
-| AMD bound sanity | `scripts/report_amd_bound_sanity.py` | Checks existing AMD/SOL/SOLAR evidence consistency and bounded risk. |
+| paper denominator report | `scripts/internal/reports/report_paper_denominator.py` | Accounts for denominator coverage, evidence gaps, and claim boundaries. |
+| Matrix schema export | `scripts/internal/reports/export_matrix_schema.py` | Exports strict JSON Schemas for Matrix report contracts. |
+| Matrix semantic diff | `scripts/internal/reports/diff_matrix_reports.py` | Compares Matrix reports for diagnostic compatibility drift. |
+| AMD bound sanity | `scripts/internal/reports/report_amd_bound_sanity.py` | Checks existing AMD/SOL/SOLAR evidence consistency and bounded risk. |
 
 All examples below use demo paths such as `out/v1_19_demo/...`. They are not
 real hardware validation outputs and must not be reported as performance
@@ -83,7 +83,7 @@ missing, deferred, filtered, or unavailable.
 Example command shape:
 
 ```bash
-UV_CACHE_DIR=out/v1_19_demo/uv-cache uv run scripts/report_paper_denominator.py \
+UV_CACHE_DIR=out/v1_19_demo/uv-cache uv run scripts/internal/reports/report_paper_denominator.py \
   --manifest out/v1_19_demo/manifest.json \
   --inventory out/v1_19_demo/inventory.json \
   --readiness out/v1_19_demo/readiness.json \
@@ -119,7 +119,7 @@ without running Docker, probing hardware, or changing benchmark semantics.
 Example command shape:
 
 ```bash
-UV_CACHE_DIR=out/v1_19_demo/uv-cache uv run scripts/export_matrix_schema.py \
+UV_CACHE_DIR=out/v1_19_demo/uv-cache uv run scripts/internal/reports/export_matrix_schema.py \
   --model all \
   --output-dir out/v1_19_demo/matrix-schema
 ```
@@ -145,7 +145,7 @@ JSON/Markdown describing status, severity, and semantic field changes.
 Example command shape:
 
 ```bash
-UV_CACHE_DIR=out/v1_19_demo/uv-cache uv run scripts/diff_matrix_reports.py \
+UV_CACHE_DIR=out/v1_19_demo/uv-cache uv run scripts/internal/reports/diff_matrix_reports.py \
   out/v1_19_demo/matrix.before.json \
   out/v1_19_demo/matrix.after.json \
   --json-out out/v1_19_demo/matrix_diff.json \
@@ -176,7 +176,7 @@ internally consistent enough to discuss as bounded diagnostic evidence.
 Example command shape:
 
 ```bash
-UV_CACHE_DIR=out/v1_19_demo/uv-cache uv run scripts/report_amd_bound_sanity.py \
+UV_CACHE_DIR=out/v1_19_demo/uv-cache uv run scripts/internal/reports/report_amd_bound_sanity.py \
   --trace out/v1_19_demo/traces/demo.trace.jsonl \
   --execution-closure out/v1_19_demo/execution_closure.json \
   --amd-sol-artifact out/v1_19_demo/amd-sol/demo.amd-sol-v2.json \

@@ -21,7 +21,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         description="Generate SOL ExecBench evaluation stability diagnostics.",
     )
     parser.add_argument("--timing-evidence", type=Path, action="append", default=[])
-    parser.add_argument("--json-out", "--json-output", dest="json_out", type=Path, required=True)
+    parser.add_argument(
+        "--json-out", "--json-output", dest="json_out", type=Path, required=True
+    )
     parser.add_argument(
         "--markdown-out",
         "--markdown-output",

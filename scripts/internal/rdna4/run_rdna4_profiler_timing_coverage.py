@@ -73,8 +73,14 @@ def run_coverage(
                 "ready_missing_profiler_timing_problems": (
                     report.totals.ready_missing_profiler_timing_problems
                 ),
+                "hardware_evidence_deferred_problems": (
+                    report.totals.hardware_evidence_deferred_problems
+                ),
                 "readiness_blocked_problems": (
                     report.totals.readiness_blocked_problems
+                ),
+                "reference_override_timing_problems": (
+                    report.totals.reference_override_timing_problems
                 ),
                 "profiler_backed_coverage_pct": (
                     report.totals.profiler_backed_coverage_pct
@@ -125,6 +131,9 @@ def build_blocker_ledger(report) -> dict:
                 "fallback_reason": evidence.fallback_reason if evidence else None,
                 "replacement_failure_reason": (
                     evidence.replacement_failure_reason if evidence else None
+                ),
+                "reference_override": (
+                    evidence.reference_override if evidence is not None else None
                 ),
             }
         )

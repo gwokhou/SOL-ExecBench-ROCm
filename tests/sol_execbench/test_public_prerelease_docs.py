@@ -13,8 +13,8 @@ def test_public_prerelease_guide_contains_publish_checklist_and_links():
     text = _read("docs/public_prerelease.md")
 
     for required in (
-        "scripts/build_prerelease_artifact_bundle.py",
-        "scripts/check_prerelease_readiness.py",
+        "scripts/internal/release/build_prerelease_artifact_bundle.py",
+        "scripts/internal/release/check_prerelease_readiness.py",
         "docs/prerelease_artifact_bundle.md",
         "docs/prerelease_readiness.md",
         "docs/provenance.md",

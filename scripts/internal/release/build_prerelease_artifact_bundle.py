@@ -22,6 +22,7 @@ from typing import Sequence
 
 SCHEMA_VERSION = "sol_execbench.prerelease_artifact_bundle.v1"
 DEFAULT_OUTPUT_DIR = Path("out/prerelease_artifact_bundle")
+DEFAULT_TEMP_ROOT = Path("tmp/prerelease_artifact_bundle")
 DEFAULT_LOG_TAIL_CHARS = 4000
 AUTHORITY_CLASSES = {
     "canonical",
@@ -34,7 +35,7 @@ AUTHORITY_CLASSES = {
 DEFAULT_RELEASE_VALIDATION_COMMAND = [
     "uv",
     "run",
-    "scripts/release_candidate_validation.py",
+    "scripts/internal/release/release_candidate_validation.py",
     "--output-dir",
     "{release_validation_dir}",
 ]
@@ -82,8 +83,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     release_validation_dir = bundle_dir / "release_candidate_validation"
     transcript_dir = bundle_dir / "transcripts"
     environment_dir = bundle_dir / "environment"
+    temp_dir = DEFAULT_TEMP_ROOT
     for path in (bundle_dir, release_validation_dir, transcript_dir, environment_dir):
         path.mkdir(parents=True, exist_ok=True)
+    temp_dir.mkdir(parents=True, exist_ok=True)
 
     transcripts: list[CommandTranscript] = []
     artifacts: list[BundleArtifact] = []
@@ -122,6 +125,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             name="release_candidate_validation",
             command=release_command,
             transcript_dir=transcript_dir,
+            temp_dir=temp_dir,
             log_tail_chars=args.log_tail_chars,
             failure_classification="blocking",
             failure_next_action="Fix release-candidate validation before publishing.",
@@ -156,6 +160,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             name="environment_evidence",
             command=environment_command,
             transcript_dir=transcript_dir,
+            temp_dir=temp_dir,
             log_tail_chars=args.log_tail_chars,
             failure_classification="diagnostic-only",
             failure_next_action="Run on the release host and attach doctor output when available.",
@@ -260,6 +265,7 @@ def _run_command(
     name: str,
     command: list[str],
     transcript_dir: Path,
+    temp_dir: Path,
     log_tail_chars: int,
     failure_classification: str,
     failure_next_action: str,
@@ -267,8 +273,8 @@ def _run_command(
 ) -> CommandTranscript:
     started = time.monotonic()
     transcript_path = transcript_dir / f"{name}.json"
-    stdout_path = _temporary_stream_path(transcript_dir, name, "stdout")
-    stderr_path = _temporary_stream_path(transcript_dir, name, "stderr")
+    stdout_path = _temporary_stream_path(temp_dir, name, "stdout")
+    stderr_path = _temporary_stream_path(temp_dir, name, "stderr")
     try:
         completed = _run_command_to_files(command, stdout_path, stderr_path)
         duration_s = time.monotonic() - started
@@ -577,12 +583,12 @@ def _git_output(command: list[str]) -> str:
     return completed.stdout.strip()
 
 
-def _temporary_stream_path(transcript_dir: Path, name: str, stream_name: str) -> Path:
+def _temporary_stream_path(temp_dir: Path, name: str, stream_name: str) -> Path:
     safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "_", name)
     with tempfile.NamedTemporaryFile(
         prefix=f"{safe_name}_{stream_name}_",
         suffix=".log",
-        dir=transcript_dir,
+        dir=temp_dir,
         delete=False,
     ) as handle:
         return Path(handle.name)

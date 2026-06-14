@@ -160,7 +160,7 @@ def test_v1_25_release_materials_cover_checklist_and_public_navigation():
     for required in (
         "git status --short",
         "UV_CACHE_DIR=/tmp/uv-cache uv run pytest",
-        "scripts/release_candidate_validation.py",
+        "scripts/internal/release/release_candidate_validation.py",
         "Review claim boundaries",
         "git tag -a v1.25.0-rc1",
         "git push origin main --tags",
@@ -404,10 +404,10 @@ def test_v1_19_guide_names_evidence_surfaces_and_scripts():
         "Matrix semantic diff",
         "AMD bound sanity",
         "scripts/run_dataset.py",
-        "scripts/report_paper_denominator.py",
-        "scripts/export_matrix_schema.py",
-        "scripts/diff_matrix_reports.py",
-        "scripts/report_amd_bound_sanity.py",
+        "scripts/internal/reports/report_paper_denominator.py",
+        "scripts/internal/reports/export_matrix_schema.py",
+        "scripts/internal/reports/diff_matrix_reports.py",
+        "scripts/internal/reports/report_amd_bound_sanity.py",
     ):
         assert required in text
 

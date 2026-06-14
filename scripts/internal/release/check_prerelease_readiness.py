@@ -21,7 +21,7 @@ from typing import Sequence
 SCHEMA_VERSION = "sol_execbench.prerelease_readiness.v1"
 BUNDLE_SCHEMA_VERSION = "sol_execbench.prerelease_artifact_bundle.v1"
 DEFAULT_OUTPUT_DIR = Path("out/prerelease_readiness")
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[3]
 PROVENANCE_MANIFEST_PATH = Path("provenance.toml")
 PROVENANCE_DOC_PATH = Path("docs/provenance.md")
 DATASET_REDISTRIBUTION_SCRIPT_PATH = Path("scripts/check_dataset_redistribution.py")
