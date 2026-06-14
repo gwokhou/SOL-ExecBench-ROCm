@@ -216,7 +216,10 @@ def _classify_reference_runtime_hints(
         for hint in NVIDIA_LEXICAL_FALSE_POSITIVE_HINTS
     }
     call_patterns = {
-        hint: re.compile(rf"\b[\w]*{re.escape(hint)}[\w]*\s*\(", re.IGNORECASE)
+        hint: re.compile(
+            rf"\b(?P<callee>[\w]*{re.escape(hint)}[\w]*)\s*\(",
+            re.IGNORECASE,
+        )
         for hint in NVIDIA_LEXICAL_FALSE_POSITIVE_HINTS
     }
     native_patterns = {
@@ -262,9 +265,13 @@ def _classify_reference_runtime_hints(
             if import_patterns[hint].search(line):
                 match_kind = "import"
                 is_blocker = True
-            elif call_patterns[hint].search(line):
-                match_kind = "call"
-                is_blocker = True
+            elif call_match := call_patterns[hint].search(line):
+                callee = call_match.group("callee")
+                if callee and callee[:1].isupper():
+                    match_kind = "constructor_name"
+                else:
+                    match_kind = "call"
+                    is_blocker = True
             elif native_patterns[hint].search(lowered_line):
                 match_kind = "native_source"
                 is_blocker = True

@@ -15,13 +15,14 @@ def _definition(
     *,
     name: str,
     custom_entrypoint: str | None = None,
+    dtype: str = "float32",
 ) -> dict:
     payload = {
         "name": name,
         "description": "forward demo",
         "axes": {"N": {"type": "var"}},
-        "inputs": {"x": {"shape": ["N"], "dtype": "float32"}},
-        "outputs": {"out": {"shape": ["N"], "dtype": "float32"}},
+        "inputs": {"x": {"shape": ["N"], "dtype": dtype}},
+        "outputs": {"out": {"shape": ["N"], "dtype": dtype}},
         "reference": "def run(x):\n    return x\n",
     }
     if custom_entrypoint:
@@ -47,11 +48,19 @@ def _write_problem(
     *,
     workload_kind: str = "random",
     custom_entrypoint: str | None = None,
+    dtype: str = "float32",
 ) -> None:
     problem_dir = root / category / name
     problem_dir.mkdir(parents=True)
     (problem_dir / "definition.json").write_text(
-        json.dumps(_definition(name=name, custom_entrypoint=custom_entrypoint)) + "\n",
+        json.dumps(
+            _definition(
+                name=name,
+                custom_entrypoint=custom_entrypoint,
+                dtype=dtype,
+            )
+        )
+        + "\n",
         encoding="utf-8",
     )
     (problem_dir / "workload.jsonl").write_text(
@@ -120,6 +129,7 @@ def test_profiler_timing_coverage_tracks_problem_denominator(tmp_path):
     assert report.totals.profiler_backed_problems == 1
     assert report.totals.fallback_timing_problems == 1
     assert report.totals.ready_missing_profiler_timing_problems == 1
+    assert report.totals.hardware_evidence_deferred_problems == 0
     assert report.totals.readiness_blocked_problems == 1
     assert report.totals.profiler_backed_coverage_pct == 25.0
     assert report.claim_boundary.problem_denominator_accounted is True
@@ -142,6 +152,25 @@ def test_profiler_timing_coverage_tracks_problem_denominator(tmp_path):
     )
     assert blocked.readiness_reason_codes == ["safetensors_asset_missing"]
     assert blocked.readiness_blocker_types == ["missing_blob"]
+
+
+def test_profiler_timing_coverage_separates_hardware_evidence_deferred(tmp_path):
+    dataset_root = tmp_path / "dataset"
+    _write_problem(dataset_root, "Quant", "fp8_missing", dtype="float8_e4m3fn")
+    inventory = build_dataset_inventory(dataset_root, categories=("Quant",))
+    readiness = classify_rocm_readiness(inventory, dataset_root=dataset_root)
+
+    report = build_profiler_timing_coverage_report(
+        readiness,
+        dataset_root=dataset_root,
+        expected_problem_denominator=1,
+        created_at="2026-06-08T00:00:00Z",
+    )
+
+    assert report.totals.hardware_evidence_deferred_problems == 1
+    assert report.totals.readiness_blocked_problems == 0
+    assert report.problems[0].status == "hardware_evidence_deferred"
+    assert report.problems[0].readiness_status == "needs_hardware_evidence"
 
 
 def test_profiler_timing_coverage_requires_expected_denominator(tmp_path):

@@ -236,6 +236,7 @@ class Rocprofv3CollectionRequest:
     iterations: int | None = None
     trial_count: int | None = None
     clock_locked: bool | None = None
+    compact_rows: bool = False
 
 
 @dataclass(frozen=True)
@@ -509,6 +510,70 @@ def parse_rocprofv3_csv(content: str) -> tuple[Rocprofv3TimingRow, ...]:
     return tuple(rows)
 
 
+def summarize_rocprofv3_csv(path: Path) -> tuple[int, float]:
+    """Stream a `rocprofv3` CSV file into kernel row count and duration."""
+    kernel_rows = 0
+    duration_ns = 0.0
+    with path.open(encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        for raw_row in reader:
+            normalized = {
+                _normalize_header(key): value for key, value in raw_row.items()
+            }
+            domain = _first_value(normalized, "domain", "kind", "type", "category")
+            row_duration_ns = _duration_ns(normalized)
+            if domain is None or row_duration_ns is None:
+                continue
+            if "kernel" not in _normalize_header(domain):
+                continue
+            kernel_rows += 1
+            duration_ns += row_duration_ns
+    return kernel_rows, duration_ns
+
+
+def build_compact_timing_evidence(
+    *,
+    policy: TimingPolicy,
+    csv_path: Path,
+    tool_version: str,
+    gpu_architecture: str,
+    warmup_runs: int | None = None,
+    iterations: int | None = None,
+    trial_count: int | None = None,
+    clock_locked: bool | None = None,
+    profiler_overhead_ms: float | None = None,
+) -> tuple[Rocprofv3TimingEvidence, int]:
+    """Build summary timing evidence without materializing every CSV row."""
+    kernel_rows, duration_ns = summarize_rocprofv3_csv(csv_path)
+    parsed_rows = ()
+    if kernel_rows > 0:
+        parsed_rows = (
+            Rocprofv3TimingRow(
+                name="compacted_kernel_activity",
+                domain="KERNEL_DISPATCH",
+                duration_ns=duration_ns,
+                raw={"compacted_kernel_activity_rows": str(kernel_rows)},
+            ),
+        )
+    evidence = Rocprofv3TimingEvidence(
+        tool_version=tool_version,
+        gpu_architecture=gpu_architecture,
+        activity_domain=policy.activity_domain,
+        aggregation_rule=policy.aggregation_rule,
+        backend=policy.backend,
+        interpretation=policy.interpretation,
+        parsed_rows=parsed_rows,
+        warmup_runs=warmup_runs,
+        iterations=iterations,
+        trial_count=trial_count,
+        clock_locked=clock_locked,
+        fallback_applied=policy.fallback_applied,
+        fallback_reason=policy.reason if policy.fallback_applied else None,
+        profiler_overhead_ms=profiler_overhead_ms,
+    )
+    return evidence, kernel_rows
+
+
 def build_timing_evidence(
     *,
     policy: TimingPolicy,
@@ -631,19 +696,34 @@ def collect_rocprofv3_timing(
         )
 
     profiler_overhead_ms = _read_overhead_calibration(calibration_path)
-    evidence = build_timing_evidence(
-        policy=request.policy,
-        csv_content=csv_path.read_text(),
-        tool_version=request.tool_version,
-        gpu_architecture=request.gpu_architecture,
-        warmup_runs=request.warmup_runs,
-        iterations=request.iterations,
-        trial_count=request.trial_count,
-        clock_locked=request.clock_locked,
-        profiler_overhead_ms=profiler_overhead_ms,
-    )
+    compacted_kernel_rows: int | None = None
+    if request.compact_rows:
+        evidence, compacted_kernel_rows = build_compact_timing_evidence(
+            policy=request.policy,
+            csv_path=csv_path,
+            tool_version=request.tool_version,
+            gpu_architecture=request.gpu_architecture,
+            warmup_runs=request.warmup_runs,
+            iterations=request.iterations,
+            trial_count=request.trial_count,
+            clock_locked=request.clock_locked,
+            profiler_overhead_ms=profiler_overhead_ms,
+        )
+    else:
+        evidence = build_timing_evidence(
+            policy=request.policy,
+            csv_content=csv_path.read_text(),
+            tool_version=request.tool_version,
+            gpu_architecture=request.gpu_architecture,
+            warmup_runs=request.warmup_runs,
+            iterations=request.iterations,
+            trial_count=request.trial_count,
+            clock_locked=request.clock_locked,
+            profiler_overhead_ms=profiler_overhead_ms,
+        )
     if (
         request.policy.activity_domain == TimingActivityDomain.KERNEL_ACTIVITY
+        and (compacted_kernel_rows or 0) <= 0
         and not any(row.is_kernel_activity for row in evidence.parsed_rows)
     ):
         fallback = DefaultTimingSelection(

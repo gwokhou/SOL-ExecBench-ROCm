@@ -175,7 +175,7 @@ class TestParallelStagingSerialProfiling:
         """Verify that no code path can enable concurrent GPU subprocess execution."""
 
         # Read the batch script source
-        script_path = Path("scripts/run_rdna4_profiler_timing_batch.py")
+        script_path = Path("scripts/internal/rdna4/run_rdna4_profiler_timing_batch.py")
         assert script_path.exists(), "Profiler timing batch script should exist"
         script_content = script_path.read_text()
 

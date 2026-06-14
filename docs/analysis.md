@@ -89,7 +89,7 @@ not paper parity, and not a leaderboard result.
 Generate a parity-gap JSON and Markdown report from the sidecars:
 
 ```bash
-uv run scripts/report_parity_gaps.py \
+uv run scripts/internal/reports/report_parity_gaps.py \
   --manifest out/dataset_manifest.json \
   --inventory out/inventory.json \
   --readiness out/readiness.json \

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import subprocess
 from datetime import UTC, datetime
 from typing import Any
@@ -178,11 +179,12 @@ def _detect_gpu_count() -> int:
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return 0
 
-    gpu_count = 0
+    gpu_ids: set[str] = set()
     for line in (result.stdout or "").splitlines():
-        if line.strip().startswith("GPU"):
-            gpu_count += 1
-    return gpu_count
+        match = re.match(r"^\s*GPU\[(\d+)\]\s*:", line)
+        if match:
+            gpu_ids.add(match.group(1))
+    return len(gpu_ids)
 
 
 def validate_gpu_device_isolation(

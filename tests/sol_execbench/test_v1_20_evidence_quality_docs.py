@@ -30,10 +30,10 @@ def test_v1_20_guide_names_scripts_and_boundaries():
     text = GUIDE.read_text(encoding="utf-8")
 
     for expected in (
-        "scripts/report_consistency.py",
-        "scripts/report_evaluation_stability.py",
-        "scripts/report_claim_upgrade.py",
-        "scripts/report_trust_summary.py",
+        "scripts/internal/reports/report_consistency.py",
+        "scripts/internal/reports/report_evaluation_stability.py",
+        "scripts/internal/reports/report_claim_upgrade.py",
+        "scripts/internal/reports/report_trust_summary.py",
         "sol_execbench.consistency_report.v1",
         "sol_execbench.evaluation_stability.v1",
         "sol_execbench.claim_upgrade.v1",
@@ -49,13 +49,17 @@ def test_v1_20_guide_names_scripts_and_boundaries():
 
 def test_v1_20_consistency_example_includes_amd_sol_and_solar_refs():
     text = GUIDE.read_text(encoding="utf-8")
-    consistency_block = text.split("scripts/report_consistency.py", maxsplit=1)[1].split(
-        "UV_CACHE_DIR=out/v1_20_demo/uv-cache uv run scripts/report_evaluation_stability.py",
+    consistency_block = text.split(
+        "scripts/internal/reports/report_consistency.py", maxsplit=1
+    )[1].split(
+        "UV_CACHE_DIR=out/v1_20_demo/uv-cache uv run scripts/internal/reports/report_evaluation_stability.py",
         maxsplit=1,
     )[0]
 
     assert "--amd-sol-report out/v1_20_demo/amd_sol.json" in consistency_block
-    assert "--solar-derivation out/v1_20_demo/solar_derivation.json" in consistency_block
+    assert (
+        "--solar-derivation out/v1_20_demo/solar_derivation.json" in consistency_block
+    )
 
 
 def test_v1_20_example_readme_references_existing_fixture_files():

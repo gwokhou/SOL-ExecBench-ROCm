@@ -223,15 +223,15 @@ If you are working on RDNA4 profiler-backed timing replacement evidence, build
 coverage from timing sidecars:
 
 ```bash
-uv run python scripts/run_rdna4_profiler_timing_coverage.py \
+uv run python scripts/internal/rdna4/run_rdna4_profiler_timing_coverage.py \
   --timing-evidence-dir out/rdna4-profiler-workload-aggregate-20260608-v2/timing
 ```
 
 For incomplete profiler-backed targets, use
-`scripts/run_rdna4_profiler_timing_batch.py --workload-sharded` to profile
+`scripts/internal/rdna4/run_rdna4_profiler_timing_batch.py --workload-sharded` to profile
 workloads independently and aggregate only complete workload manifests. Use
-`scripts/run_rdna4_profiler_partial_failures.py` and
-`scripts/run_rdna4_profiler_sharded_closure.py` to classify remaining partial
+`scripts/internal/rdna4/run_rdna4_profiler_partial_failures.py` and
+`scripts/internal/rdna4/run_rdna4_profiler_sharded_closure.py` to classify remaining partial
 or blocked targets before making closure claims.
 
 Run a bounded ready-subset batch with an execution-closure report:

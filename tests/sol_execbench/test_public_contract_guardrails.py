@@ -1090,7 +1090,7 @@ def test_phase88_example_docs_keep_v1_19_surfaces_sidecar_only():
 def test_v1_11_parity_gap_docs_keep_bounded_claim_boundary():
     docs = (REPO_ROOT / "docs/analysis.md").read_text()
 
-    assert "scripts/report_parity_gaps.py" in docs
+    assert "scripts/internal/reports/report_parity_gaps.py" in docs
     assert "discovered, parsed, ready, blocked" in docs
     assert "not full validation" in docs
     assert "not paper parity" in docs

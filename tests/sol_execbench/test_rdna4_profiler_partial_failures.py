@@ -12,7 +12,9 @@ from sol_execbench.core.dataset import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT_PATH = REPO_ROOT / "scripts/run_rdna4_profiler_partial_failures.py"
+SCRIPT_PATH = (
+    REPO_ROOT / "scripts/internal/rdna4/run_rdna4_profiler_partial_failures.py"
+)
 SPEC = spec_from_file_location("run_rdna4_profiler_partial_failures", SCRIPT_PATH)
 assert SPEC is not None and SPEC.loader is not None
 partial = module_from_spec(SPEC)

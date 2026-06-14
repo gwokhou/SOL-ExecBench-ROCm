@@ -42,12 +42,8 @@ def main() -> None:
     report = build_amd_bound_sanity_report(
         trace_refs=_load_trace_refs(args.trace),
         execution_closure=execution_closure,
-        amd_sol_artifacts=[
-            _load_artifact(path) for path in args.amd_sol_artifact
-        ],
-        solar_artifacts=[
-            _load_artifact(path) for path in args.solar_artifact
-        ],
+        amd_sol_artifacts=[_load_artifact(path) for path in args.amd_sol_artifact],
+        solar_artifacts=[_load_artifact(path) for path in args.solar_artifact],
         amd_score_report=amd_score_report,
         compatibility_matrix=compatibility_matrix,
         source_paths={

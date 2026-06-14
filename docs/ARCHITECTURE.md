@@ -199,7 +199,7 @@ subcommands call the same migration helpers used by scripts and tests, write
 deterministic migration manifests, and keep restricted source dataset content
 local to the operator's machine. Scripts such as
 `scripts/download_solexecbench.py`, `scripts/inspect_dataset.py`,
-`scripts/report_paper_denominator.py`, `scripts/report_parity_gaps.py`, and
+`scripts/internal/reports/report_paper_denominator.py`, `scripts/internal/reports/report_parity_gaps.py`, and
 `scripts/run_dataset.py` use those helpers.
 
 Dataset-scale execution is split between an operator-facing script and
@@ -220,11 +220,11 @@ profiler-backed timing serial, while allowing `--phase derived --jobs <N|auto>`
 to parallelize CPU/I/O-only report generation from existing traces.
 
 RDNA4 profiler-backed timing evidence has an additional operator layer:
-`scripts/run_rdna4_profiler_timing_coverage.py` renders denominator coverage
-from timing sidecars, `scripts/run_rdna4_profiler_timing_batch.py` can profile
+`scripts/internal/rdna4/run_rdna4_profiler_timing_coverage.py` renders denominator coverage
+from timing sidecars, `scripts/internal/rdna4/run_rdna4_profiler_timing_batch.py` can profile
 problem-level targets or workload slices, and
-`scripts/run_rdna4_profiler_partial_failures.py` plus
-`scripts/run_rdna4_profiler_sharded_closure.py` classify partial or blocked
+`scripts/internal/rdna4/run_rdna4_profiler_partial_failures.py` plus
+`scripts/internal/rdna4/run_rdna4_profiler_sharded_closure.py` classify partial or blocked
 targets. Workload-sharded profiler aggregation writes per-problem manifests
 under `workload-manifests/`, per-workload timing sidecars under
 `workload-slices/`, and a problem-level aggregate sidecar only when complete

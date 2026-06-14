@@ -11,7 +11,7 @@ claims.
 From a clean checkout or release tag:
 
 ```bash
-UV_CACHE_DIR=/tmp/uv-cache uv run scripts/build_prerelease_artifact_bundle.py \
+UV_CACHE_DIR=/tmp/uv-cache uv run scripts/internal/release/build_prerelease_artifact_bundle.py \
   --version v1.26.0-rc1 \
   --output-dir out/prerelease_artifact_bundle/v1.26.0-rc1
 ```
@@ -24,7 +24,7 @@ that status instead of treating it as paper-scale validation failure.
 For a dry evidence package that records the missing validation gap explicitly:
 
 ```bash
-UV_CACHE_DIR=/tmp/uv-cache uv run scripts/build_prerelease_artifact_bundle.py \
+UV_CACHE_DIR=/tmp/uv-cache uv run scripts/internal/release/build_prerelease_artifact_bundle.py \
   --version v1.26.0-rc1 \
   --output-dir out/prerelease_artifact_bundle/v1.26.0-rc1 \
   --skip-release-validation

@@ -29,7 +29,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--amd-sol-report", type=Path, default=None)
     parser.add_argument("--solar-derivation", type=Path, default=None)
     parser.add_argument("--amd-bound-sanity", type=Path, default=None)
-    parser.add_argument("--json-out", "--json-output", dest="json_out", type=Path, required=True)
+    parser.add_argument(
+        "--json-out", "--json-output", dest="json_out", type=Path, required=True
+    )
     parser.add_argument(
         "--markdown-out",
         "--markdown-output",

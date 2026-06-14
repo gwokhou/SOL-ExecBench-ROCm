@@ -25,6 +25,7 @@ from sol_execbench.driver import ProblemPackager
 
 DEFAULT_PROBLEM_DIR = Path("examples/triton/rmsnorm")
 DEFAULT_OUTPUT_DIR = Path("out/rdna4-profiler-backed-timing-smoke")
+DEFAULT_TEMP_ROOT = Path("tmp/rdna4-profiler-backed-timing-smoke")
 DEFAULT_OUTPUT_FILE = "rdna4-triton-rmsnorm-timing"
 CLAIM_BOUNDARY = (
     "Bounded RDNA4 profiler-backed timing smoke evidence only; not full paper "
@@ -60,7 +61,11 @@ def run_smoke(
 
     solution = _load_json(solution_path)
     languages = _solution_languages(solution)
-    staging_dir = Path(tempfile.mkdtemp(prefix="sol_execbench_rdna4_timing_"))
+    temp_root = DEFAULT_TEMP_ROOT
+    temp_root.mkdir(parents=True, exist_ok=True)
+    staging_dir = Path(
+        tempfile.mkdtemp(prefix="sol_execbench_rdna4_timing_", dir=temp_root)
+    )
     packager = ProblemPackager(
         definition=Definition(**_load_json(definition_path)),
         workloads=_load_workloads(limited_workload),
@@ -164,7 +169,7 @@ def _staging_runner(staging_dir: Path) -> ProfilerRunner:
 
 
 def _pythonpath_with_src() -> str:
-    src = str(Path(__file__).resolve().parents[1] / "src")
+    src = str(Path(__file__).resolve().parents[3] / "src")
     existing = os.environ.get("PYTHONPATH")
     return src if not existing else f"{src}{os.pathsep}{existing}"
 

@@ -13,6 +13,7 @@ from pathlib import Path
 
 
 from sol_execbench.core.bench.timing_isolation import (
+    _detect_gpu_count,
     clear_gpu_cache_between_subprocesses,
     collect_timing_environment_snapshot,
     detect_concurrent_gpu_processes,
@@ -301,6 +302,31 @@ class TestIntegrationPreflightAudit:
 class TestValidateGpuDeviceIsolation:
     """Test GPU device isolation validation."""
 
+    def test_detect_gpu_count_counts_unique_rocm_smi_gpu_ids(self):
+        """rocm-smi --showid emits multiple GPU[n] attribute rows per device."""
+        import unittest.mock
+
+        mock_output = """
+============================ ROCm System Management Interface ============================
+=========================================== ID ===========================================
+GPU[0]		: Device Name: 		AMD Radeon Graphics
+GPU[0]		: Device ID: 		0x7590
+GPU[0]		: Device Rev: 		0xc0
+GPU[0]		: Subsystem ID: 	0x2438
+GPU[0]		: GUID: 		7729
+==========================================================================================
+"""
+        with unittest.mock.patch(
+            "subprocess.run",
+            return_value=subprocess.CompletedProcess(
+                ["rocm-smi", "--showid"],
+                returncode=0,
+                stdout=mock_output,
+                stderr="",
+            ),
+        ):
+            assert _detect_gpu_count() == 1
+
     def test_single_gpu_is_isolated(self):
         """Single GPU system is always isolated regardless of ROCR_VISIBLE_DEVICES."""
         import unittest.mock
@@ -382,7 +408,9 @@ class TestStrictIsolationInBatch:
         from importlib.util import module_from_spec, spec_from_file_location
 
         REPO_ROOT = Path(__file__).resolve().parents[4]
-        SCRIPT_PATH = REPO_ROOT / "scripts/run_rdna4_profiler_timing_batch.py"
+        SCRIPT_PATH = (
+            REPO_ROOT / "scripts/internal/rdna4/run_rdna4_profiler_timing_batch.py"
+        )
         spec = spec_from_file_location(
             "run_rdna4_profiler_timing_batch_strict", SCRIPT_PATH
         )

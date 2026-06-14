@@ -67,7 +67,9 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("--model all requires --output-dir")
         schemas = export_matrix_json_schemas()
         for schema_name in sorted(schemas):
-            _write_schema(args.output_dir / SCHEMA_FILENAMES[schema_name], schemas[schema_name])
+            _write_schema(
+                args.output_dir / SCHEMA_FILENAMES[schema_name], schemas[schema_name]
+            )
         return 0
 
     if args.output_dir is not None:

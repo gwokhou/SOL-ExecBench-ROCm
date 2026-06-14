@@ -11,7 +11,7 @@ unreviewed status.
 Generate the bundle first:
 
 ```bash
-UV_CACHE_DIR=/tmp/uv-cache uv run scripts/build_prerelease_artifact_bundle.py \
+UV_CACHE_DIR=/tmp/uv-cache uv run scripts/internal/release/build_prerelease_artifact_bundle.py \
   --version v1.26.0-rc1 \
   --output-dir out/prerelease_artifact_bundle/v1.26.0-rc1
 ```
@@ -19,7 +19,7 @@ UV_CACHE_DIR=/tmp/uv-cache uv run scripts/build_prerelease_artifact_bundle.py \
 Then run readiness:
 
 ```bash
-UV_CACHE_DIR=/tmp/uv-cache uv run scripts/check_prerelease_readiness.py \
+UV_CACHE_DIR=/tmp/uv-cache uv run scripts/internal/release/check_prerelease_readiness.py \
   --bundle-dir out/prerelease_artifact_bundle/v1.26.0-rc1 \
   --output-dir out/prerelease_readiness/v1.26.0-rc1
 ```

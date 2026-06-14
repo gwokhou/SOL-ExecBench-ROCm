@@ -38,6 +38,7 @@ DEFAULT_ITERATIONS = 100
 DEFAULT_WARMUP_RUNS = 10
 DEFAULT_GPU_ARCHITECTURE = "gfx1200"
 DEFAULT_ELEMENT_COUNT = 1_000_000
+DEFAULT_TEMP_ROOT = Path("tmp/rdna4-overhead-calibration")
 
 
 class CalibrationClockState:
@@ -144,6 +145,7 @@ def run_calibration(
                 b,
                 c,
                 iterations=iterations,
+                temp_dir=DEFAULT_TEMP_ROOT,
             )
             profiler_durations = profiler_result
         except Exception as exc:
@@ -269,6 +271,7 @@ def _run_with_rocprofv3(
     c: Any,
     *,
     iterations: int,
+    temp_dir: Path | None = None,
 ) -> list[float]:
     """Run vector add under rocprofv3 and collect profiler-backed durations.
 
@@ -303,7 +306,9 @@ def _run_with_rocprofv3(
         "print(json.dumps(durations))\n"
     )
 
-    with tempfile.TemporaryDirectory() as tmpdir:
+    if temp_dir is not None:
+        temp_dir.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=temp_dir) as tmpdir:
         script_path = Path(tmpdir) / "inner_calibration.py"
         script_path.write_text(inner_script, encoding="utf-8")
 

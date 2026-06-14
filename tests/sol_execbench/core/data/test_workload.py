@@ -55,3 +55,25 @@ class TestGetScalarInputs:
     def test_all_custom_returns_empty(self):
         wkl = _wkl(a={"type": "custom"}, b={"type": "custom"})
         assert wkl.get_scalar_inputs() == {}
+
+
+class TestToleranceSpec:
+    def test_accepts_dataset_required_match_ratio_spelling(self):
+        wkl = Workload(
+            uuid="test-uuid",
+            axes={},
+            inputs={"x": {"type": "random"}},
+            tolerance={"required_match_ratio": 0.98},
+        )
+
+        assert wkl.tolerance.required_matched_ratio == 0.98
+
+    def test_accepts_internal_required_matched_ratio_spelling(self):
+        wkl = Workload(
+            uuid="test-uuid",
+            axes={},
+            inputs={"x": {"type": "random"}},
+            tolerance={"required_matched_ratio": 0.97},
+        )
+
+        assert wkl.tolerance.required_matched_ratio == 0.97

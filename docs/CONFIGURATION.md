@@ -212,7 +212,7 @@ files. Use these source-backed override paths instead:
   `--iterations`, `--warmup-runs`, `--timeout`, `--timeout-overrides`,
   `--blob-precheck`, and `--lock-clocks`.
 - RDNA4 profiler timing closure settings: pass
-  `scripts/run_rdna4_profiler_timing_batch.py` flags such as
+  `scripts/internal/rdna4/run_rdna4_profiler_timing_batch.py` flags such as
   `--only-problem`, `--skip-problem`, `--skip-problem-file`,
   `--mark-blocked-problem`, `--mark-blocked-only`, `--workload-limit`,
   `--workload-offset`, `--workload-sharded`,
@@ -406,7 +406,7 @@ The RDNA4 profiler closure scripts are evidence-generation tools for existing
 dataset layouts and timing sidecars. They do not change canonical Trace JSONL
 or create score authority.
 
-`scripts/run_rdna4_profiler_timing_coverage.py` accepts:
+`scripts/internal/rdna4/run_rdna4_profiler_timing_coverage.py` accepts:
 
 | Flag | Purpose |
 | --- | --- |
@@ -418,7 +418,7 @@ or create score authority.
 | `--no-expected-problem-denominator` | Disable fixed denominator recording. |
 | `--require-profiler-complete` | Exit nonzero unless every denominator problem has full profiler-backed timing. |
 
-`scripts/run_rdna4_profiler_timing_batch.py` accepts the same dataset/output
+`scripts/internal/rdna4/run_rdna4_profiler_timing_batch.py` accepts the same dataset/output
 roots plus target and workload controls:
 
 | Flag | Purpose |
@@ -440,8 +440,8 @@ roots plus target and workload controls:
 | `--temp-dir` | Parent directory for profiler staging directories. |
 
 The classification scripts
-`scripts/run_rdna4_profiler_partial_failures.py` and
-`scripts/run_rdna4_profiler_sharded_closure.py` accept dataset root, output
+`scripts/internal/rdna4/run_rdna4_profiler_partial_failures.py` and
+`scripts/internal/rdna4/run_rdna4_profiler_sharded_closure.py` accept dataset root, output
 directory, timing evidence directories, and denominator controls. The sharded
 closure audit also accepts repeated `--target-status` values.
 

@@ -12,7 +12,7 @@ from sol_execbench.core.dataset import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT_PATH = REPO_ROOT / "scripts/run_rdna4_profiler_timing_coverage.py"
+SCRIPT_PATH = REPO_ROOT / "scripts/internal/rdna4/run_rdna4_profiler_timing_coverage.py"
 SPEC = spec_from_file_location("run_rdna4_profiler_timing_coverage", SCRIPT_PATH)
 assert SPEC is not None and SPEC.loader is not None
 coverage_script = module_from_spec(SPEC)
@@ -120,5 +120,48 @@ def test_blocker_ledger_records_non_passing_rows(tmp_path):
             "trace_status_counts": {},
             "fallback_reason": "selected policy backend is device_events",
             "replacement_failure_reason": None,
+            "reference_override": None,
         }
     ]
+
+
+def test_coverage_and_ledger_surface_reference_override_metadata(tmp_path):
+    dataset_root = tmp_path / "dataset"
+    timing_root = tmp_path / "timing"
+    _write_problem(dataset_root, "override")
+    override = {
+        "problem_id": "L1/override",
+        "override_type": "equivalent_reference_implementation",
+        "claim_boundary": "not original-reference dispatch timing",
+    }
+    (timing_root / "L1").mkdir(parents=True)
+    (timing_root / "L1" / "override.timing.json").write_text(
+        json.dumps(
+            {
+                "profiler_collected": False,
+                "selection": {
+                    "reason": "selected policy backend is device_events",
+                    "policy": {"backend": "device_events"},
+                },
+                "evidence": None,
+                "replacement_metadata": {"reference_override": override},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    inventory = build_dataset_inventory(dataset_root, categories=("L1",))
+    readiness = classify_rocm_readiness(inventory, dataset_root=dataset_root)
+    report = build_profiler_timing_coverage_report(
+        readiness,
+        dataset_root=dataset_root,
+        timing_evidence_dirs=(timing_root,),
+        expected_problem_denominator=1,
+        created_at="2026-06-08T00:00:00Z",
+    )
+
+    assert report.totals.reference_override_timing_problems == 1
+    assert report.problems[0].evidence is not None
+    assert report.problems[0].evidence.reference_override == override
+    ledger = coverage_script.build_blocker_ledger(report)
+    assert ledger["rows"][0]["reference_override"] == override

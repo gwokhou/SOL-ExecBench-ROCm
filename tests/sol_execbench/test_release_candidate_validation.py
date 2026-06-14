@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT_PATH = REPO_ROOT / "scripts/release_candidate_validation.py"
+SCRIPT_PATH = REPO_ROOT / "scripts/internal/release/release_candidate_validation.py"
 SPEC = spec_from_file_location("release_candidate_validation", SCRIPT_PATH)
 assert SPEC is not None and SPEC.loader is not None
 release_candidate_validation = module_from_spec(SPEC)
@@ -44,6 +44,7 @@ def test_cpu_safe_validation_writes_json_and_markdown(tmp_path, monkeypatch):
     assert payload["results"][0]["classification"] == "diagnostic-only"
     assert "Release Candidate Validation" in markdown
     assert "engineering prerelease evidence only" in markdown
+    assert release_candidate_validation.DEFAULT_TEMP_ROOT.is_dir()
 
 
 def test_failing_cpu_safe_validation_is_blocking(tmp_path, monkeypatch):
@@ -128,11 +129,14 @@ def test_tail_file_redacts_secret_value_split_across_chunks(tmp_path):
     assert "<redacted>" in tail
 
 
-def test_run_check_cleans_temporary_stream_files_after_unexpected_error(monkeypatch):
+def test_run_check_cleans_temporary_stream_files_after_unexpected_error(
+    monkeypatch,
+    tmp_path,
+):
     created_paths: list[Path] = []
 
-    def fake_temp_path(name: str, stream_name: str) -> Path:
-        path = Path("/tmp") / f"sol-execbench-test-{name}-{stream_name}.log"
+    def fake_temp_path(temp_dir: Path, name: str, stream_name: str) -> Path:
+        path = temp_dir / f"sol-execbench-test-{name}-{stream_name}.log"
         path.write_text("", encoding="utf-8")
         created_paths.append(path)
         return path
@@ -151,6 +155,7 @@ def test_run_check_cleans_temporary_stream_files_after_unexpected_error(monkeypa
             command=["demo"],
             failure_classification="blocking",
             failure_next_action="fix",
+            temp_dir=tmp_path / "tmp",
         )
 
     assert created_paths
@@ -338,16 +343,19 @@ def test_trust_summary_skipped_when_dataset_closure_missing(tmp_path, monkeypatc
     assert by_name["bounded_dataset_slice"]["status"] == "failed"
     assert by_name["trust_summary"]["status"] == "skipped"
     assert "execution_closure.json exists" in by_name["trust_summary"]["next_action"]
-    assert not any("scripts/report_trust_summary.py" in command for command in calls)
+    assert not any(
+        "scripts/internal/reports/report_trust_summary.py" in command
+        for command in calls
+    )
 
 
 def test_release_candidate_validation_docs_preserve_claim_boundaries():
     text = (REPO_ROOT / "docs/release_candidate_validation.md").read_text(
         encoding="utf-8"
     )
-    script = (REPO_ROOT / "scripts/release_candidate_validation.py").read_text(
-        encoding="utf-8"
-    )
+    script = (
+        REPO_ROOT / "scripts/internal/release/release_candidate_validation.py"
+    ).read_text(encoding="utf-8")
 
     for required in (
         "bounded engineering prerelease evidence",

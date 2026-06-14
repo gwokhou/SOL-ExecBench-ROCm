@@ -7,7 +7,7 @@ from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT_PATH = REPO_ROOT / "scripts/build_prerelease_artifact_bundle.py"
+SCRIPT_PATH = REPO_ROOT / "scripts/internal/release/build_prerelease_artifact_bundle.py"
 SPEC = spec_from_file_location("build_prerelease_artifact_bundle", SCRIPT_PATH)
 assert SPEC is not None and SPEC.loader is not None
 build_prerelease_artifact_bundle = module_from_spec(SPEC)
@@ -87,8 +87,9 @@ def test_bundle_writes_manifest_transcripts_checksums_and_authority_map(
     assert (
         artifact_by_id["environment_evidence"]["authority_class"] == "diagnostic-only"
     )
-    assert "CDNA3/gfx942 validation infrastructure evidence was recorded on MI308X" in json.dumps(
-        manifest
+    assert (
+        "CDNA3/gfx942 validation infrastructure evidence was recorded on MI308X"
+        in json.dumps(manifest)
     )
     assert "not full 235-problem paper validation" in (
         tmp_path / "prerelease_artifact_bundle.md"

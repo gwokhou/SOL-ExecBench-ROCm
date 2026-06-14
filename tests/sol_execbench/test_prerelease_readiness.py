@@ -6,7 +6,7 @@ from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT_PATH = REPO_ROOT / "scripts/check_prerelease_readiness.py"
+SCRIPT_PATH = REPO_ROOT / "scripts/internal/release/check_prerelease_readiness.py"
 SPEC = spec_from_file_location("check_prerelease_readiness", SCRIPT_PATH)
 assert SPEC is not None and SPEC.loader is not None
 check_prerelease_readiness = module_from_spec(SPEC)

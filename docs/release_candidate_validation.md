@@ -12,7 +12,7 @@ For the v1.25 release-claim boundary and artifact authority table, see
 Run the CPU-safe prerelease validation path:
 
 ```bash
-UV_CACHE_DIR=/tmp/uv-cache uv run scripts/release_candidate_validation.py \
+UV_CACHE_DIR=/tmp/uv-cache uv run scripts/internal/release/release_candidate_validation.py \
   --output-dir out/release_candidate_validation
 ```
 
@@ -40,7 +40,7 @@ Workload, Solution, correctness, timing, score, or evaluator contract schemas.
 On a ROCm-capable host, add runtime smoke evidence:
 
 ```bash
-UV_CACHE_DIR=/tmp/uv-cache uv run scripts/release_candidate_validation.py \
+UV_CACHE_DIR=/tmp/uv-cache uv run scripts/internal/release/release_candidate_validation.py \
   --output-dir out/release_candidate_validation \
   --include-rocm-smoke
 ```
@@ -48,7 +48,7 @@ UV_CACHE_DIR=/tmp/uv-cache uv run scripts/release_candidate_validation.py \
 On a Docker-capable ROCm setup, add container smoke evidence:
 
 ```bash
-UV_CACHE_DIR=/tmp/uv-cache uv run scripts/release_candidate_validation.py \
+UV_CACHE_DIR=/tmp/uv-cache uv run scripts/internal/release/release_candidate_validation.py \
   --output-dir out/release_candidate_validation \
   --include-docker-smoke
 ```
@@ -67,7 +67,7 @@ present. They are evidence fields, not timing authority by themselves.
 If local benchmark assets are present, add a bounded dataset slice:
 
 ```bash
-UV_CACHE_DIR=/tmp/uv-cache uv run scripts/release_candidate_validation.py \
+UV_CACHE_DIR=/tmp/uv-cache uv run scripts/internal/release/release_candidate_validation.py \
   --output-dir out/release_candidate_validation \
   --include-dataset-slice \
   --dataset-dir data/SOL-ExecBench/benchmark \
