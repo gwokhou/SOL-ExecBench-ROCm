@@ -45,9 +45,13 @@ instead of promoting them into a prompt taxonomy.
 
 The CLI fills `identity.target_id`, `identity.run_id`, and
 `identity.candidate_hash` from emitted trace data when available. `run_id` is
-the persisted Trace JSONL checksum when the trace file exists. `source_hash`
-remains `null` unless a producer has actual source contents; the canonical trace
-rows only contain the compact solution label.
+the persisted Trace JSONL checksum when the trace file exists.
+`candidate_hash` is a checksum of the compact solution labels in emitted trace
+rows; it is not a source-content identity. When the CLI has loaded the
+`Solution`, `identity.source_hash` is the solution content hash covering source
+paths, source contents, build metadata, and dependencies. Consumers that need
+strong candidate-source freshness should prefer `source_hash` over
+`candidate_hash`.
 
 HIP runtime prompts should never include raw trace rows, raw profiler dumps, full
 kernel source, prompt text, or absolute temporary paths from SOL feedback. They
