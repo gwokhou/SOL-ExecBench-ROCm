@@ -177,7 +177,8 @@ virtual environments are excluded from Ruff checks.
 ## Testing
 
 Pytest is configured in `pyproject.toml` with `pytest-xdist` defaults:
-`-n auto --dist loadgroup`.
+`-n 8 --dist loadgroup`. The worker count is capped because each worker imports
+PyTorch and ROCm libraries.
 
 Run the full suite:
 

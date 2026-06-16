@@ -7,9 +7,10 @@ public benchmark problem schemas, solution metadata schemas, workload formats, C
 trace JSONL output, and benchmark semantics remain owned by SOL ExecBench ROCm.
 
 Repository evidence reviewed for this adaptation includes hip-execbench source
-surfaces `src/profiler/router.ts`, `src/errors/index.ts`,
-`src/agent/builder.ts`, `src/baseline/comparator.ts`, `src/schemas/*.ts`, and
-`src/pipeline/statistics.ts`, mapped against SOL ExecBench ROCm surfaces
+surfaces `hip-execbench/src/profiler/router.ts`,
+`hip-execbench/src/errors/index.ts`, `hip-execbench/src/agent/builder.ts`,
+`hip-execbench/src/baseline/comparator.ts`, `hip-execbench/src/schemas/*.ts`,
+and `hip-execbench/src/pipeline/statistics.ts`, mapped against SOL ExecBench ROCm surfaces
 `src/sol_execbench/core/bench/rocm_profiler.py`,
 `src/sol_execbench/core/diagnostics.py`, `src/sol_execbench/core/reporting.py`,
 `src/sol_execbench/core/baseline.py`, `src/sol_execbench/core/data/trace.py`,
