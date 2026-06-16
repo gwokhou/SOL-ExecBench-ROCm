@@ -88,6 +88,7 @@ from ..core.dataset import (
     migrate_sol_execbench,
     write_migration_manifest,
 )
+from ..core.dataset.checksums import sha256_file, stable_json_checksum
 from ..driver import ProblemPackager
 
 console = Console(stderr=True)
@@ -489,11 +490,16 @@ def _write_agent_feedback_sidecar(
         return None
 
     try:
+        identity_fields = _agent_feedback_identity_fields(output_file, traces)
         sidecar = build_agent_feedback_sidecar(
             traces=traces,
             profile_result=profile_result,
             static_evidence=static_evidence,
             trace_path=str(output_file) if output_file is not None else None,
+            target_id=identity_fields["target_id"],
+            run_id=identity_fields["run_id"],
+            candidate_hash=identity_fields["candidate_hash"],
+            source_hash=identity_fields["source_hash"],
             artifact_citations=_agent_feedback_artifact_citations(
                 output_file=output_file,
                 environment_sidecar_path=environment_sidecar_path,
@@ -510,6 +516,52 @@ def _write_agent_feedback_sidecar(
     except Exception as exc:
         console.print(f"[yellow]Agent feedback metadata skipped: {exc}[/yellow]")
         return None
+
+
+def _agent_feedback_identity_fields(
+    output_file: Path | None,
+    traces: Sequence[Trace],
+) -> dict[str, str | None]:
+    """Derive stable feedback freshness identity from emitted trace data."""
+
+    target_records = [
+        {
+            "definition": trace.definition,
+            "workload_uuid": trace.workload.uuid,
+        }
+        for trace in traces
+    ]
+    solution_labels = sorted(
+        {trace.solution for trace in traces if trace.solution is not None}
+    )
+
+    return {
+        "target_id": (
+            stable_json_checksum(target_records) if target_records else None
+        ),
+        "run_id": _agent_feedback_run_id(output_file, traces),
+        "candidate_hash": (
+            stable_json_checksum(solution_labels) if solution_labels else None
+        ),
+        # Trace rows do not include source contents; producers with source access
+        # can fill this field through build_agent_feedback_sidecar directly.
+        "source_hash": None,
+    }
+
+
+def _agent_feedback_run_id(
+    output_file: Path | None,
+    traces: Sequence[Trace],
+) -> str | None:
+    """Return a stable run id from the persisted trace file or trace payload."""
+
+    if output_file is not None and output_file.is_file():
+        return sha256_file(output_file)
+    if not traces:
+        return None
+    return stable_json_checksum(
+        [trace.model_dump(mode="json") for trace in traces]
+    )
 
 
 def _agent_feedback_artifact_citations(

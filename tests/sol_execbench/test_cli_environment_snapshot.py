@@ -401,6 +401,13 @@ def test_agent_feedback_sidecar_records_bounded_metadata(tmp_path: Path):
     assert payload["authority"]["diagnostic_only"] is True
     assert payload["authority"]["score_authority"] is False
     assert payload["identity"]["trace_path"] == "trace.jsonl"
+    assert payload["identity"]["target_id"] is not None
+    assert len(payload["identity"]["target_id"]) == 64
+    assert payload["identity"]["run_id"] is not None
+    assert len(payload["identity"]["run_id"]) == 64
+    assert payload["identity"]["candidate_hash"] is not None
+    assert len(payload["identity"]["candidate_hash"]) == 64
+    assert payload["identity"]["source_hash"] is None
     assert payload["summary"]["status_counts"] == {"COMPILE_ERROR": 1}
     assert payload["items"][0]["code"] == "compile_error"
     trace_citations = [

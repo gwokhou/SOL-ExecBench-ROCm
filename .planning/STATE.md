@@ -4,8 +4,8 @@ milestone: v1.36
 milestone_name: SOL Agent Feedback Sidecar Producer
 status: Awaiting next milestone
 stopped_at: v1.36 milestone completion
-last_updated: "2026-06-16T03:17:09.338Z"
-last_activity: 2026-06-16 — Milestone v1.36 completed and archived
+last_updated: "2026-06-16T08:25:22Z"
+last_activity: 2026-06-16 — Quick task 260616-mpd completed
 progress:
   total_phases: 5
   completed_phases: 5
@@ -61,6 +61,7 @@ Last activity: 2026-06-16 — Milestone v1.36 completed and archived
 
 | Date | Task | Status | Notes |
 |------|------|--------|-------|
+| 2026-06-16 | 260616-mpd-close-hip-v1-26-sol-feedback-sidecar-qui | complete | Clarified reserved profile-summary capability, filled feedback identity fields from emitted trace data, and closed SOL bottleneck vocabulary with targeted pytest/Ruff verification. |
 | 2026-06-12 | rdna4-v135-measurement-rerun | complete | Rebuilt RDNA4 v1.35 rerun closure, derived evidence, profiler timing batch, coverage, denominator, consistency, claim, trust, and bundle reports under `out/rdna4-v135-rerun-20260611/`; fixed derived/profiler OOM, profiler ENOSPC, and consistency evidence-gap drift misclassification. |
 
 ## Accumulated Context
