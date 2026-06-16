@@ -416,6 +416,7 @@ def _write_profile_summary_sidecar(
                 output_file=output_file,
                 profile_result=profile_result,
                 profile_sidecar_path=profile_sidecar_path,
+                trace_sha256=run_id,
             ),
         )
         sidecar_path.parent.mkdir(parents=True, exist_ok=True)
@@ -434,6 +435,7 @@ def _profile_summary_artifact_citations(
     output_file: Path,
     profile_result: Rocprofv3ProfileResult | None,
     profile_sidecar_path: Path | None,
+    trace_sha256: str | None = None,
 ) -> list[ProfileSummaryArtifactCitation]:
     """Return compact citations for profile-summary evidence inputs."""
 
@@ -442,6 +444,7 @@ def _profile_summary_artifact_citations(
             kind="trace",
             label="canonical_trace_jsonl",
             path=output_file,
+            sha256=trace_sha256,
         )
     ]
     if profile_sidecar_path is not None:
@@ -577,6 +580,8 @@ def _write_agent_feedback_sidecar(
         return None
 
     try:
+        if run_id is None:
+            run_id = _agent_feedback_run_id(output_file, traces)
         identity_fields = _agent_feedback_identity_fields(
             output_file,
             traces,
@@ -597,6 +602,7 @@ def _write_agent_feedback_sidecar(
                 environment_sidecar_path=environment_sidecar_path,
                 profile_sidecar_path=profile_sidecar_path,
                 static_evidence_sidecar_path=static_evidence_sidecar_path,
+                trace_sha256=run_id,
             ),
         )
         sidecar_path.parent.mkdir(parents=True, exist_ok=True)
@@ -663,6 +669,7 @@ def _agent_feedback_artifact_citations(
     environment_sidecar_path: Path | None,
     profile_sidecar_path: Path | None,
     static_evidence_sidecar_path: Path | None,
+    trace_sha256: str | None = None,
 ) -> list[AgentFeedbackArtifactCitation]:
     """Return compact citations for artifacts written during this CLI run."""
 
@@ -673,6 +680,7 @@ def _agent_feedback_artifact_citations(
                 kind="trace",
                 label="canonical_trace_jsonl",
                 path=output_file,
+                sha256=trace_sha256,
             )
         )
     for kind, label, path in (
