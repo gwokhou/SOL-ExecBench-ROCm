@@ -403,20 +403,6 @@ class Solution(BaseModelWithDocstrings):
         """
         return self.spec.entry_point.split("::")[-1]
 
-    def get_entry_source(self) -> Optional[SourceFile]:
-        """Get the entry source file specified in the build spec.
-
-        Returns
-        -------
-        Optional[SourceFile]
-            The SourceFile object containing the entry point, or None if not found.
-        """
-        entry_path = self.spec.entry_point.split("::")[0]
-        for source in self.sources:
-            if source.path == entry_path:
-                return source
-        return None
-
     def model_post_init(self, __context: Any) -> None:
         # Precompute hash once since the model is frozen/immutable.
         object.__setattr__(self, "_hash_cache", self._compute_hash())

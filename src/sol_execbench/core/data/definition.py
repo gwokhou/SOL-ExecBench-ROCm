@@ -209,14 +209,6 @@ class Definition(BaseModelWithDocstrings):
             If the parameter count or names of the ``run`` function do not match
             the ``inputs`` dictionary.
         """
-        """Check that ``run()`` parameter names match *inputs* keys (in order).
-
-        Uses AST to extract the parameter list of the top-level ``run`` function
-        and compares it against the ordered keys of *inputs*. Both count and names
-        must agree exactly.
-
-        Returns an error string on mismatch, or ``None`` on success.
-        """
         try:
             tree = ast.parse(self.reference, mode="exec")
         except SyntaxError:
@@ -344,11 +336,6 @@ class Definition(BaseModelWithDocstrings):
                     )
         return self
 
-    def _get_variable_names(self, expr: str) -> list[str]:
-        """Get all variable names from a mathematical expression."""
-        tree = ast.parse(expr, mode="eval")
-        return [node.id for node in ast.walk(tree) if isinstance(node, ast.Name)]
-
     @cached_property
     def const_axes(self) -> dict[str, int]:
         """Get all constant axes and their values.
@@ -465,8 +452,6 @@ class Definition(BaseModelWithDocstrings):
         resolved_axes_values: dict[str, int] = self.const_axes.copy()
 
         for name, axis_value in var_axes_values.items():
-            if name not in var_axes_values:
-                raise ValueError(f"Missing value for variable axis '{name}'")
             resolved_axes_values[name] = axis_value
 
         for name, axis in self.expr_axes.items():

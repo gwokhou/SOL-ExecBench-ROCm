@@ -19,10 +19,24 @@
 from __future__ import annotations
 
 from functools import cache
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 
 if TYPE_CHECKING:
     import torch
+
+
+_DTYPE_LOOKUP_T = TypeVar("_DTYPE_LOOKUP_T")
+
+
+def _resolve_dtype(dtype_str: str, mapping: dict[str, _DTYPE_LOOKUP_T]) -> _DTYPE_LOOKUP_T:
+    """Resolve a dtype string via *mapping*, raising a consistent error."""
+
+    if not dtype_str:
+        raise ValueError("dtype is None or empty")
+    dtype = mapping.get(dtype_str)
+    if dtype is None:
+        raise ValueError(f"Unsupported dtype '{dtype_str}'")
+    return dtype
 
 
 @cache
@@ -46,12 +60,7 @@ def _get_dtype_str_to_python_dtype() -> dict[str, type]:
 
 
 def dtype_str_to_python_dtype(dtype_str: str) -> type:
-    if not dtype_str:
-        raise ValueError("dtype is None or empty")
-    dtype = _get_dtype_str_to_python_dtype().get(dtype_str, None)
-    if dtype is None:
-        raise ValueError(f"Unsupported dtype '{dtype_str}'")
-    return dtype
+    return _resolve_dtype(dtype_str, _get_dtype_str_to_python_dtype())
 
 
 @cache
@@ -77,12 +86,7 @@ def _get_dtype_str_to_torch_dtype() -> dict[str, torch.dtype]:
 
 
 def dtype_str_to_torch_dtype(dtype_str: str) -> torch.dtype:
-    if not dtype_str:
-        raise ValueError("dtype is None or empty")
-    dtype = _get_dtype_str_to_torch_dtype().get(dtype_str, None)
-    if dtype is None:
-        raise ValueError(f"Unsupported dtype '{dtype_str}'")
-    return dtype
+    return _resolve_dtype(dtype_str, _get_dtype_str_to_torch_dtype())
 
 
 @cache

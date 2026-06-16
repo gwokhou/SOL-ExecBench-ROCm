@@ -16,7 +16,7 @@
 
 """Data layer with strongly-typed dataclasses for SOL ExecBench."""
 
-from .definition import AxisConst, AxisSpec, AxisVar, Definition, TensorSpec
+from .definition import AxisConst, AxisExpr, AxisSpec, AxisVar, Definition, TensorSpec
 from .contract import (
     SOL_EXECBENCH_CONTRACT_SCHEMA_VERSION,
     SOL_EXECBENCH_CONTRACT_VERSION,
