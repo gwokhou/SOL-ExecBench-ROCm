@@ -100,6 +100,35 @@ def test_profile_summary_sidecar_handles_unavailable_inputs(tmp_path: Path):
     assert failed.summary.failed_reason == "rocprofv3 failed"
 
 
+def test_profile_summary_success_without_artifacts_is_partial(tmp_path: Path):
+    success_empty = Rocprofv3ProfileResult(
+        status="success",
+        command=("rocprofv3", "--kernel-trace", "--", "python", "eval_driver.py"),
+        output_directory=tmp_path,
+        output_file="profile",
+        artifacts=(),
+        returncode=0,
+        profiler_available=True,
+        timeout_seconds=60,
+    )
+
+    sidecar = build_profile_summary_sidecar(
+        profile_result=success_empty,
+        trace_path="trace.jsonl",
+        generated_at="2026-06-16T00:00:00Z",
+    )
+    payload = sidecar.model_dump(mode="json")
+
+    assert payload["status"] == "partial"
+    assert payload["reason_code"] == "profile_partial"
+    assert payload["summary"]["profiler_status"] == "success"
+    assert payload["summary"]["artifact_count"] == 0
+    assert any(
+        "without registered artifacts" in limitation
+        for limitation in payload["limitations"]
+    )
+
+
 def test_profile_summary_freshness_and_governance(tmp_path: Path):
     sidecar = build_profile_summary_sidecar(
         profile_result=_profile_result(tmp_path),
@@ -123,19 +152,28 @@ def test_profile_summary_freshness_and_governance(tmp_path: Path):
     assert stale.status == "stale"
     assert stale.reason_codes == ["trace_path_mismatch", "run_id_mismatch"]
     assert unknown.status == "unknown"
-    assert evaluate_profile_summary_governance(
-        sidecar=sidecar,
-        freshness=current,
-    ).status == "usable_diagnostic"
-    assert evaluate_profile_summary_governance(
-        sidecar=sidecar,
-        freshness=stale,
-    ).status == "stale_diagnostic"
+    assert (
+        evaluate_profile_summary_governance(
+            sidecar=sidecar,
+            freshness=current,
+        ).status
+        == "usable_diagnostic"
+    )
+    assert (
+        evaluate_profile_summary_governance(
+            sidecar=sidecar,
+            freshness=stale,
+        ).status
+        == "stale_diagnostic"
+    )
     assert evaluate_profile_summary_governance(sidecar=None).status == "unavailable"
-    assert evaluate_profile_summary_governance(
-        sidecar=None,
-        parse_error="invalid json",
-    ).status == "invalid_diagnostic"
+    assert (
+        evaluate_profile_summary_governance(
+            sidecar=None,
+            parse_error="invalid json",
+        ).status
+        == "invalid_diagnostic"
+    )
 
 
 def test_profile_summary_rejects_authority_override(tmp_path: Path):

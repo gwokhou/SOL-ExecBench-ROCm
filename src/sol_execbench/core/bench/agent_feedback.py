@@ -202,6 +202,7 @@ class AgentFeedbackAuthority(BaseModelWithDocstrings):
     cutover_authority: Literal[False] = False
     paper_parity_authority: Literal[False] = False
     leaderboard_authority: Literal[False] = False
+    claim_upgrade_authority: Literal[False] = False
 
 
 class AgentFeedbackSummary(BaseModelWithDocstrings):
@@ -262,9 +263,7 @@ def build_agent_feedback_sidecar(
     """Build a bounded diagnostic feedback sidecar from existing evaluation data."""
 
     evaluated = [trace for trace in traces if trace.evaluation is not None]
-    counts = Counter(
-        trace.evaluation.status.value for trace in evaluated if trace.evaluation
-    )
+    counts = Counter(trace.evaluation.status.value for trace in evaluated)
     status = _aggregate_status(evaluated, profile_result, static_evidence)
     reason_code = (
         AgentFeedbackReasonCode.NO_EVALUATION_TRACES
@@ -354,9 +353,7 @@ def validate_agent_feedback_freshness(
             status=AgentFeedbackFreshnessStatus.STALE,
             reason_codes=reasons,
         )
-    if trace_path is None and not any(
-        (target_id, run_id, candidate_hash, source_hash)
-    ):
+    if trace_path is None and not any((target_id, run_id, candidate_hash, source_hash)):
         return AgentFeedbackFreshnessValidation(
             status=AgentFeedbackFreshnessStatus.UNKNOWN,
             reason_codes=["insufficient_expected_identity"],
@@ -466,7 +463,7 @@ def _source_refs(
 
 def _trace_feedback_items(traces: Sequence[Trace]) -> list[AgentFeedbackItem]:
     items: list[AgentFeedbackItem] = []
-    status_counts = Counter(trace.evaluation.status for trace in traces if trace.evaluation)
+    status_counts = Counter(trace.evaluation.status for trace in traces)
     for status, count in sorted(status_counts.items(), key=lambda item: item[0].value):
         item = _item_for_status(status, count)
         if item is not None:

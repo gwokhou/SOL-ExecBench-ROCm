@@ -176,6 +176,17 @@ def test_agent_feedback_sidecar_rejects_authority_override():
         type(sidecar).model_validate(payload)
 
 
+def test_agent_feedback_authority_freezes_claim_upgrade_boundary():
+    sidecar = build_agent_feedback_sidecar(traces=[_trace()])
+    payload = sidecar.model_dump(mode="json")
+
+    assert payload["authority"]["claim_upgrade_authority"] is False
+    payload["authority"]["claim_upgrade_authority"] = True
+
+    with pytest.raises(ValidationError):
+        type(sidecar).model_validate(payload)
+
+
 def test_agent_feedback_sidecar_rejects_unknown_bottleneck():
     sidecar = build_agent_feedback_sidecar(
         traces=[_trace(EvaluationStatus.COMPILE_ERROR)]

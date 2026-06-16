@@ -269,7 +269,9 @@ def validate_profile_summary_freshness(
     identity = sidecar.identity
     if identity.sol_contract_version != sol_contract_version:
         reasons.append("sol_contract_version_mismatch")
-    _match_optional(reasons, "trace_path", identity.trace_path, _compact_path(trace_path))
+    _match_optional(
+        reasons, "trace_path", identity.trace_path, _compact_path(trace_path)
+    )
     _match_optional(reasons, "run_id", identity.run_id, run_id)
     if reasons:
         return ProfileSummaryFreshnessValidation(
@@ -281,7 +283,9 @@ def validate_profile_summary_freshness(
             status=ProfileSummaryFreshnessStatus.UNKNOWN,
             reason_codes=["insufficient_expected_identity"],
         )
-    return ProfileSummaryFreshnessValidation(status=ProfileSummaryFreshnessStatus.CURRENT)
+    return ProfileSummaryFreshnessValidation(
+        status=ProfileSummaryFreshnessStatus.CURRENT
+    )
 
 
 def evaluate_profile_summary_governance(
@@ -302,7 +306,10 @@ def evaluate_profile_summary_governance(
             status=ProfileSummaryGovernanceStatus.UNAVAILABLE,
             reason_codes=["sidecar_missing"],
         )
-    if freshness is not None and freshness.status == ProfileSummaryFreshnessStatus.STALE:
+    if (
+        freshness is not None
+        and freshness.status == ProfileSummaryFreshnessStatus.STALE
+    ):
         return ProfileSummaryGovernanceGuardrail(
             status=ProfileSummaryGovernanceStatus.STALE_DIAGNOSTIC,
             reason_codes=freshness.reason_codes or ["sidecar_stale"],
@@ -327,6 +334,9 @@ def _status_for_profile_result(
         return ProfileSummaryStatus.UNAVAILABLE
     if profile_result.status == "success" and profile_result.artifacts:
         return ProfileSummaryStatus.AVAILABLE
+    if profile_result.status == "success":
+        # Succeeded but registered no artifacts: partial diagnostics, not missing.
+        return ProfileSummaryStatus.PARTIAL
     if profile_result.status in {"failed", "unavailable"}:
         return ProfileSummaryStatus.PARTIAL
     return ProfileSummaryStatus.UNAVAILABLE
