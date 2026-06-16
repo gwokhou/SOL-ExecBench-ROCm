@@ -398,6 +398,7 @@ def _write_profile_summary_sidecar(
     profile_result: Rocprofv3ProfileResult | None,
     *,
     profile_sidecar_path: Path | None = None,
+    run_id: str | None = None,
 ) -> Path | None:
     """Write optional normalized profile summary without changing trace JSONL."""
 
@@ -405,7 +406,8 @@ def _write_profile_summary_sidecar(
     if sidecar_path is None:
         return None
     try:
-        run_id = sha256_file(output_file) if output_file.is_file() else None
+        if run_id is None:
+            run_id = sha256_file(output_file) if output_file.is_file() else None
         sidecar = build_profile_summary_sidecar(
             profile_result=profile_result,
             trace_path=str(output_file),
@@ -566,6 +568,7 @@ def _write_agent_feedback_sidecar(
     environment_sidecar_path: Path | None = None,
     profile_sidecar_path: Path | None = None,
     static_evidence_sidecar_path: Path | None = None,
+    run_id: str | None = None,
 ) -> Path | None:
     """Write optional agent feedback metadata without changing trace JSONL."""
 
@@ -578,6 +581,7 @@ def _write_agent_feedback_sidecar(
             output_file,
             traces,
             solution=solution,
+            run_id=run_id,
         )
         sidecar = build_agent_feedback_sidecar(
             traces=traces,
@@ -611,6 +615,7 @@ def _agent_feedback_identity_fields(
     traces: Sequence[Trace],
     *,
     solution: Solution | None = None,
+    run_id: str | None = None,
 ) -> dict[str, str | None]:
     """Derive stable feedback freshness identity from emitted trace data."""
 
@@ -626,10 +631,12 @@ def _agent_feedback_identity_fields(
     )
 
     return {
-        "target_id": (
-            stable_json_checksum(target_records) if target_records else None
+        "target_id": (stable_json_checksum(target_records) if target_records else None),
+        "run_id": (
+            run_id
+            if run_id is not None
+            else _agent_feedback_run_id(output_file, traces)
         ),
-        "run_id": _agent_feedback_run_id(output_file, traces),
         "candidate_hash": (
             stable_json_checksum(solution_labels) if solution_labels else None
         ),
@@ -647,9 +654,7 @@ def _agent_feedback_run_id(
         return sha256_file(output_file)
     if not traces:
         return None
-    return stable_json_checksum(
-        [trace.model_dump(mode="json") for trace in traces]
-    )
+    return stable_json_checksum([trace.model_dump(mode="json") for trace in traces])
 
 
 def _agent_feedback_artifact_citations(
@@ -1081,12 +1086,18 @@ def _evaluate_cli(
                 f.write(json.dumps(t.model_dump(mode="json")) + "\n")
         console.print(f"[green]Saved {len(traces)} traces to {output_file}[/green]")
 
+    trace_run_id = (
+        sha256_file(output_file)
+        if output_file is not None and output_file.is_file()
+        else None
+    )
     environment_sidecar_path = _write_environment_snapshot_sidecar(output_file)
     profile_sidecar_path = _write_profile_sidecar(output_file, profile_result)
     _write_profile_summary_sidecar(
         output_file,
         profile_result,
         profile_sidecar_path=profile_sidecar_path,
+        run_id=trace_run_id,
     )
     static_evidence_sidecar_path = _write_static_evidence_sidecar(
         output_file,
@@ -1102,6 +1113,7 @@ def _evaluate_cli(
         environment_sidecar_path=environment_sidecar_path,
         profile_sidecar_path=profile_sidecar_path,
         static_evidence_sidecar_path=static_evidence_sidecar_path,
+        run_id=trace_run_id,
     )
 
     if json_output:
