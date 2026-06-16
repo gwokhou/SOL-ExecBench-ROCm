@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import argparse
 import os
 import platform
 import sys
@@ -115,3 +116,22 @@ def flush_stdio_streams() -> None:
             stream.flush()
         except Exception:
             pass
+
+
+def parse_bool(value: str) -> bool:
+    """Argparse type converting common boolean spellings to bool."""
+    normalized = value.lower()
+    if normalized in {"1", "true", "yes"}:
+        return True
+    if normalized in {"0", "false", "no"}:
+        return False
+    raise argparse.ArgumentTypeError(f"expected boolean value, got {value!r}")
+
+
+def none_if_requested(value: str | None) -> str | None:
+    """Normalize empty/none/null CLI values to None."""
+    if value is None:
+        return None
+    if value.lower() in {"", "none", "null"}:
+        return None
+    return value
