@@ -4,8 +4,8 @@ milestone: v1.36
 milestone_name: SOL Agent Feedback Sidecar Producer
 status: Awaiting next milestone
 stopped_at: v1.36 milestone completion
-last_updated: "2026-06-16T08:35:53Z"
-last_activity: 2026-06-16 — Quick task 260616-n06 completed
+last_updated: "2026-06-16T08:37:35Z"
+last_activity: 2026-06-16 — Quick task 260616-n3b completed
 progress:
   total_phases: 5
   completed_phases: 5
@@ -61,6 +61,7 @@ Last activity: 2026-06-16 — Milestone v1.36 completed and archived
 
 | Date | Task | Status | Notes |
 |------|------|--------|-------|
+| 2026-06-16 | 260616-n3b-record-deferred-hip-v1-26-feedback-sidec | complete | Recorded `profile_summary.sidecar.v1` producer/schema and profiler-counter-derived bottleneck diagnostics as deferred follow-ups. |
 | 2026-06-16 | 260616-n06-fix-sol-agent-feedback-source-hash-and-c | complete | Filled SOL CLI agent-feedback `source_hash` from `Solution.hash()` and documented `candidate_hash` as solution-label identity, with targeted pytest/Ruff verification. |
 | 2026-06-16 | 260616-mpd-close-hip-v1-26-sol-feedback-sidecar-qui | complete | Clarified reserved profile-summary capability, filled feedback identity fields from emitted trace data, and closed SOL bottleneck vocabulary with targeted pytest/Ruff verification. |
 | 2026-06-12 | rdna4-v135-measurement-rerun | complete | Rebuilt RDNA4 v1.35 rerun closure, derived evidence, profiler timing batch, coverage, denominator, consistency, claim, trust, and bundle reports under `out/rdna4-v135-rerun-20260611/`; fixed derived/profiler OOM, profiler ENOSPC, and consistency evidence-gap drift misclassification. |
@@ -112,6 +113,8 @@ Items acknowledged and deferred at prior milestone closes:
 | Security | Hard sandbox or multi-tenant adversarial execution | Deferred |
 | Release authority | Stable benchmark authority release | Deferred |
 | Dataset redistribution | Publishing or hosting NVIDIA/SOL-ExecBench original or derivative dataset content | Deferred |
+| Agent feedback sidecar | Actual `profile_summary.sidecar.v1` schema and producer beyond the reserved optional capability token | Deferred |
+| Agent feedback diagnostics | Profiler-counter-derived bottleneck diagnostics for occupancy, registers, LDS, bandwidth, cache, and utilization | Deferred |
 | Quick task | 260531-rdf-add-run-dataset-closure-e2e-gaps | completed |
 | Quick task | 260531-uki-add-remaining-requires-rocm-e2e-coverage | completed |
 | Quick task | 260613-44p-complete-short-term-rdna4-profiler-backe | unknown |
