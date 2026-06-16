@@ -63,6 +63,7 @@ CDNA3, or CDNA4 validation.
 | Profiling evidence | A run produced diagnostic `rocprofv3` artifacts. | `--profile rocprofv3`, per-trace profile sidecar such as `<trace>.profile.json`, registered artifact paths, and profiler status metadata. |
 | Toolchain routing evidence | The project selected or rejected ROCm tools for a requested evidence level based on registry entries and bounded probes. | `sol-execbench toolchain --json`, registry source refs, selected tool, fallback, status, and reason code. |
 | Static Kernel Evidence | A HIP/C++ run produced diagnostic static build artifacts and bounded routed extractor outputs. | `--static-evidence auto`, `<trace>.static-evidence.json`, persisted artifact paths, `llvm-objdump` / `readelf` tool-run records, and diagnostic-only authority flags. |
+| Agent Feedback Sidecar | A run produced bounded next-experiment guidance for agent consumers. | `<trace>.agent-feedback.json`, compact artifact citations, freshness identity, stale/invalid/unavailable diagnostic states, and diagnostic-only authority flags. This is not correctness, timing, performance, score, evidence-tier, confirmed-improvement, release-gate, cutover, paper-parity, leaderboard, or claim-upgrade authority. |
 | v1.19 sidecar evidence | Execution closure, paper denominator, Matrix schema export, Matrix semantic diff, and AMD bound sanity artifacts were generated or inspected under bounded report semantics. | `docs/v1_19_evidence_guide.md`, explicit sidecar/report paths, relative source refs, checksums, false authority fields, and focused CPU-safe docs/contract guardrails. |
 | v1.20 evidence-quality review | Consistency, stability, claim-upgrade, and trust-summary artifacts were generated or inspected under bounded report semantics. | `docs/v1_20_evidence_quality_guide.md`, source refs, checksums, false authority fields, and CPU-safe docs/contract guardrails. |
 | v1.21 debt-reduction evidence | Dataset, evaluator, analysis, SOLAR/static evidence, and boundary tests were refactored or hardened under stable public schemas. | Focused helper tests, unchanged sidecar schemas, `CONCERNS.md` status categories, and explicit non-claim wording. |
@@ -179,6 +180,11 @@ leaderboard authority.
   paper-parity, or leaderboard authority is not allowed.
 - Static Kernel Evidence as CDNA 3, CDNA 4, Triton cache, RGA-rich resource,
   or paper-scale static coverage unless direct evidence is archived.
+- Agent Feedback Sidecars as correctness, performance, timing, score,
+  evidence-tier, confirmed-improvement, release-gate, cutover, paper-parity,
+  leaderboard, or claim-upgrade authority. Missing, malformed, contradictory,
+  stale, unknown, partial, or unavailable feedback sidecars are diagnostic
+  states only and do not change canonical Trace JSONL validity.
 - Curated-slice results as paper-level benchmark results.
 - Docker Matrix Entries as native host ROCm validation without direct
   native-host evidence.
@@ -201,6 +207,7 @@ leaderboard authority.
 | Upstream SOLAR parity | A side-by-side comparison against upstream SOLAR outputs for the scoped dataset and operator families. |
 | Leaderboard readiness | Stable submission format, hosted or reproducible scoring policy, hardware policy, anti-cheat policy, and release-defined baselines. |
 | Static kernel evidence | Trace-adjacent static sidecars, persisted current-build artifacts, routed extractor records, bounded raw outputs, and documented diagnostic-only interpretation rules. |
+| Agent feedback guidance | Canonical trace evidence plus optional feedback sidecars with current freshness identity and compact citations. Feedback can guide another experiment only; it is never sufficient evidence for score, release, cutover, paper parity, or leaderboard wording. |
 
 ## Reporting Language
 
@@ -223,3 +230,6 @@ Avoid ambiguous wording:
 - Do not say "correctness authority", "performance authority", "timing
   authority", "score authority", "paper-parity authority", or "leaderboard
   authority" for static evidence sidecars.
+- Do not say "claim upgrade", "release gate", "cutover ready", "evidence tier
+  upgrade", "confirmed improvement", "score authority", "paper parity", or
+  "leaderboard ready" for agent-feedback sidecars.

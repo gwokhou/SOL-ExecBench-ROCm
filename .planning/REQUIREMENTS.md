@@ -54,15 +54,15 @@ ExecBench.
 
 ### Claim Governance
 
-- [ ] **GOVR-01**: Sidecar schema enforces `diagnostic_only=true` and false
+- [x] **GOVR-01**: Sidecar schema enforces `diagnostic_only=true` and false
   authority flags for correctness, timing, performance, score, evidence tier,
   confirmed improvement, release gate, cutover, paper parity, and leaderboard
   readiness.
-- [ ] **GOVR-02**: Guardrail tests reject contradictory-authority payloads and
+- [x] **GOVR-02**: Guardrail tests reject contradictory-authority payloads and
   prove sidecar presence, absence, parse failure, or stale identity cannot
   promote score authority, evidence tier, claim-upgrade status, release gates,
   or cutover eligibility.
-- [ ] **GOVR-03**: Existing public claim-boundary docs and evidence-quality docs
+- [x] **GOVR-03**: Existing public claim-boundary docs and evidence-quality docs
   describe the feedback sidecar as next-experiment guidance only.
 
 ### HIP Integration Fixtures
@@ -114,9 +114,9 @@ ExecBench.
 | IDEN-01 | Phase 183 | Complete |
 | IDEN-02 | Phase 183 | Complete |
 | IDEN-03 | Phase 183 | Complete |
-| GOVR-01 | Phase 184 | Pending |
-| GOVR-02 | Phase 184 | Pending |
-| GOVR-03 | Phase 184 | Pending |
+| GOVR-01 | Phase 184 | Complete |
+| GOVR-02 | Phase 184 | Complete |
+| GOVR-03 | Phase 184 | Complete |
 | FIXT-01 | Phase 185 | Pending |
 | FIXT-02 | Phase 185 | Pending |
 | FIXT-03 | Phase 185 | Pending |

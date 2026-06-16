@@ -6,11 +6,14 @@ import pytest
 from pydantic import ValidationError
 
 from sol_execbench.core.bench.agent_feedback import (
+    AgentFeedbackGovernanceGuardrail,
     artifact_citation_from_path,
     build_agent_feedback_sidecar,
+    evaluate_agent_feedback_governance,
     validate_agent_feedback_freshness,
 )
 from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileResult
+from sol_execbench.core.claim_upgrade import build_claim_upgrade_report
 from sol_execbench.core.data.trace import (
     Correctness,
     Environment,
@@ -171,3 +174,71 @@ def test_agent_feedback_sidecar_rejects_authority_override():
 
     with pytest.raises(ValidationError):
         type(sidecar).model_validate(payload)
+
+
+def test_agent_feedback_governance_guardrail_states_remain_diagnostic_only(
+    tmp_path: Path,
+):
+    sidecar = build_agent_feedback_sidecar(
+        traces=[_trace()],
+        trace_path=str(tmp_path / "trace.jsonl"),
+    )
+    stale = validate_agent_feedback_freshness(
+        sidecar,
+        trace_path=str(tmp_path / "other.jsonl"),
+    )
+
+    guardrails = [
+        evaluate_agent_feedback_governance(sidecar=sidecar),
+        evaluate_agent_feedback_governance(sidecar=sidecar, freshness=stale),
+        evaluate_agent_feedback_governance(sidecar=None),
+        evaluate_agent_feedback_governance(
+            sidecar=None,
+            parse_error="invalid json",
+        ),
+    ]
+
+    assert [guardrail.status for guardrail in guardrails] == [
+        "usable_diagnostic",
+        "stale_diagnostic",
+        "unavailable",
+        "invalid_diagnostic",
+    ]
+    for guardrail in guardrails:
+        payload = guardrail.model_dump(mode="json")
+        assert payload["diagnostic_only"] is True
+        for key, value in payload.items():
+            if key.endswith("_authority"):
+                assert value is False
+
+
+def test_agent_feedback_governance_rejects_authority_override():
+    guardrail = evaluate_agent_feedback_governance(
+        sidecar=build_agent_feedback_sidecar(traces=[_trace()])
+    )
+    payload = guardrail.model_dump(mode="json")
+    payload["claim_upgrade_authority"] = True
+
+    with pytest.raises(ValidationError):
+        AgentFeedbackGovernanceGuardrail.model_validate(payload)
+
+
+def test_agent_feedback_sidecar_states_do_not_promote_claim_upgrade():
+    sidecar = build_agent_feedback_sidecar(traces=[_trace()])
+    stale = validate_agent_feedback_freshness(sidecar, trace_path="other.jsonl")
+
+    for guardrail in (
+        evaluate_agent_feedback_governance(sidecar=sidecar),
+        evaluate_agent_feedback_governance(sidecar=sidecar, freshness=stale),
+        evaluate_agent_feedback_governance(sidecar=None),
+        evaluate_agent_feedback_governance(sidecar=None, parse_error="invalid json"),
+    ):
+        report = build_claim_upgrade_report(created_at="2026-06-16T00:00:00Z")
+
+        assert report.highest_eligible_claim == "diagnostic_only"
+        assert report.claim_boundary.score_authority is False
+        assert report.claim_boundary.leaderboard_authority is False
+        assert guardrail.score_authority is False
+        assert guardrail.evidence_tier_authority is False
+        assert guardrail.release_gate_authority is False
+        assert guardrail.cutover_authority is False
