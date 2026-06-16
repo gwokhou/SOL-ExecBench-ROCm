@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.36
-milestone_name: SOL Agent Feedback Sidecar Producer
-status: Awaiting next milestone
-stopped_at: v1.36 milestone completion
-last_updated: "2026-06-16T08:37:35Z"
-last_activity: 2026-06-16 — Quick task 260616-n3b completed
+milestone: v1.37
+milestone_name: Profile Summary Sidecar v1
+status: planning
+last_updated: "2026-06-16T08:51:25.932Z"
+last_activity: 2026-06-16
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 6
-  completed_plans: 6
-  percent: 100
+  total_phases: 4
+  completed_phases: 0
+  total_plans: 4
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -23,16 +22,21 @@ See: `.planning/PROJECT.md` (updated 2026-06-16)
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly
 on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL
 ExecBench.
-**Current focus:** Planning next milestone
+**Current focus:** v1.37 Profile Summary Sidecar v1
 
 ## Current Position
 
-Phase: Milestone v1.36 complete
+Phase: 186 - Profile Summary Contract and Schema
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-06-16 — Milestone v1.36 completed and archived
+Status: Ready for phase planning
+Last activity: 2026-06-16 — Milestone v1.37 requirements and roadmap defined
 
 ## Recent Trend
+
+- v1.37 starts the focused follow-up to v1.36 by turning
+  `profile_summary.sidecar.v1` from a reserved optional capability into a real
+  diagnostic sidecar artifact with strict schema, producer wiring, freshness
+  identity, citations, governance, and HIP-facing fixtures/docs.
 
 - v1.36 shipped the five-phase SOL-side producer milestone for HIP Playground
   v1.26. SOL now emits optional diagnostic agent-feedback sidecars with
@@ -51,11 +55,10 @@ Last activity: 2026-06-16 — Milestone v1.36 completed and archived
 
 | Phase | Goal | Requirements | Status |
 |-------|------|--------------|--------|
-| 181 - Feedback Contract and Capability Surface | Optional feedback/profile-summary capabilities and documentation boundaries without canonical trace drift | CNTR-01, CNTR-02, CNTR-03 | Complete |
-| 182 - Diagnostic Sidecar Schema and Generator | Strict `sol_execbench.agent_feedback.v1` schema and `trace.jsonl.agent-feedback.json` persistence | SIDE-01, SIDE-02, SIDE-03, SIDE-04 | Complete |
-| 183 - Freshness Identity and Artifact References | Trace/run/candidate identity plus compact artifact citations for stale-feedback detection | IDEN-01, IDEN-02, IDEN-03 | Complete |
-| 184 - Governance Guardrails and Compatibility Fixtures | Diagnostic-only authority validation and release/claim guardrails | GOVR-01, GOVR-02, GOVR-03 | Complete |
-| 185 - HIP Consumer Integration Package and Docs | HIP-facing fixtures, examples, mapping notes, and deterministic fixture tests | FIXT-01, FIXT-02, FIXT-03 | Complete |
+| 186 - Profile Summary Contract and Schema | Concrete optional `sol_execbench.profile_summary.v1` contract, strict schema, and authority boundary | PCON-01, PCON-02, PCON-03, PSCH-01, PSCH-02, PSCH-03 | Pending |
+| 187 - Profile Summary Producer and CLI Persistence | Persist `<trace>.profile-summary.json` without changing trace, profile, static evidence, or agent-feedback behavior | PROD-01, PROD-02, PROD-03 | Pending |
+| 188 - Profile Summary Freshness and Governance | Identity, artifact citations, stale-state validation, and diagnostic-only authority guardrails | PGOV-01, PGOV-02, PGOV-03 | Pending |
+| 189 - HIP Profile Summary Fixtures and Docs | HIP-facing fixtures, mapping docs, and deterministic CPU-safe tests | PFIX-01, PFIX-02, PFIX-03 | Pending |
 
 ## Quick Tasks Completed
 
@@ -88,9 +91,9 @@ Last activity: 2026-06-16 — Milestone v1.36 completed and archived
 
 ### Pending Todos
 
-- Start the next milestone with `$gsd-new-milestone`.
-- Coordinate the generated sidecar fixture shape with HIP Playground Phase 141
-  before HIP adapter implementation begins.
+- Plan Phase 186 with `$gsd-plan-phase 186`.
+- Keep profiler-counter-derived bottleneck diagnostics deferred unless the next
+  milestone explicitly scopes hardware/counter taxonomy work.
 
 ### Blockers/Concerns
 
@@ -113,7 +116,6 @@ Items acknowledged and deferred at prior milestone closes:
 | Security | Hard sandbox or multi-tenant adversarial execution | Deferred |
 | Release authority | Stable benchmark authority release | Deferred |
 | Dataset redistribution | Publishing or hosting NVIDIA/SOL-ExecBench original or derivative dataset content | Deferred |
-| Agent feedback sidecar | Actual `profile_summary.sidecar.v1` schema and producer beyond the reserved optional capability token | Deferred |
 | Agent feedback diagnostics | Profiler-counter-derived bottleneck diagnostics for occupancy, registers, LDS, bandwidth, cache, and utilization | Deferred |
 | Quick task | 260531-rdf-add-run-dataset-closure-e2e-gaps | completed |
 | Quick task | 260531-uki-add-remaining-requires-rocm-e2e-coverage | completed |
@@ -126,9 +128,9 @@ Items acknowledged and deferred at prior milestone closes:
 ## Session Continuity
 
 Last session: 2026-06-16T03:17:09Z
-Stopped at: v1.36 milestone completion
+Stopped at: v1.37 milestone planning complete
 Resume file: None
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Plan Phase 186 with /gsd-plan-phase 186

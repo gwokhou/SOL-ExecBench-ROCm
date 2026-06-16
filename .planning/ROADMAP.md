@@ -2,6 +2,7 @@
 
 ## Milestones
 
+- **v1.37 Profile Summary Sidecar v1** - Phases 186-189 (in progress)
 - **v1.36 SOL Agent Feedback Sidecar Producer** - Phases 181-185 (shipped 2026-06-16)
   See `.planning/milestones/v1.36-ROADMAP.md`.
 - **v1.35 Script Parallelism and Safety Hardening** - Phases 175-180 (shipped 2026-06-11)
@@ -22,10 +23,32 @@
 
 ## Current Position
 
-**Status:** Awaiting next milestone.
+**Status:** Planning v1.37 Profile Summary Sidecar v1.
 
-v1.36 is shipped and archived. Start the next milestone with
-`$gsd-new-milestone`.
+<details open>
+<summary>v1.37 Profile Summary Sidecar v1 (Phases 186-189) -- IN PROGRESS</summary>
+
+**Milestone Goal:** Turn `profile_summary.sidecar.v1` from a reserved optional
+capability into a concrete diagnostic sidecar artifact while preserving
+canonical Trace JSONL and existing rocprofv3 metadata authority boundaries.
+
+- [ ] **Phase 186: Profile Summary Contract and Schema** -- Define the concrete
+  sidecar contract, strict model, capability semantics, and diagnostic-only
+  authority boundary.
+
+- [ ] **Phase 187: Profile Summary Producer and CLI Persistence** -- Build the
+  trace-adjacent producer that writes `<trace>.profile-summary.json` without
+  changing existing trace, profile, static evidence, or agent-feedback outputs.
+
+- [ ] **Phase 188: Profile Summary Freshness and Governance** -- Add identity,
+  artifact citation, stale-state validation, and authority guardrails for
+  profile-summary sidecars.
+
+- [ ] **Phase 189: HIP Profile Summary Fixtures and Docs** -- Provide
+  HIP-facing fixtures, mapping docs, and deterministic CPU-safe tests for
+  profile-summary consumers.
+
+</details>
 
 <details>
 <summary>v1.36 SOL Agent Feedback Sidecar Producer (Phases 181-185) -- SHIPPED 2026-06-16</summary>
@@ -54,23 +77,107 @@ Archive: `.planning/milestones/v1.35-ROADMAP.md`
 
 </details>
 
-<details>
-<summary>v1.34 RDNA4 Readiness Blocker Closure (Phases 170-174) -- SHIPPED 2026-06-09</summary>
+## Phase Details
 
-- [x] Phase 170: Custom Input Evaluator Readiness (1/1 plans)
-- [x] Phase 171: Custom Input Coverage Recompute (1/1 plans)
-- [x] Phase 172: Quant Readiness Triage (1/1 plans)
-- [x] Phase 173: FlashInfer Readiness Split (1/1 plans)
-- [x] Phase 174: RDNA4 Readiness Closure Report and Claim Guardrails (1/1 plans)
+### Phase 186: Profile Summary Contract and Schema
 
-Archive: `.planning/milestones/v1.34-ROADMAP.md`
+**Goal:** SOL exposes a concrete, strict `sol_execbench.profile_summary.v1`
+diagnostic sidecar contract that downstream HIP consumers can parse safely.
+**Depends on:** Phase 185
+**Requirements:** PCON-01, PCON-02, PCON-03, PSCH-01, PSCH-02, PSCH-03
 
-</details>
+**Success Criteria:**
+
+1. Contract/docs describe `profile_summary.sidecar.v1` as a concrete optional
+   artifact and no longer only as a reserved future capability.
+
+2. Strict Pydantic models validate bounded profile-summary status, reason,
+   identity, summary, metrics, limitations, authority, and artifact citation
+   fields.
+
+3. Schema and contract tests prove canonical Trace JSONL and existing
+   `<trace>.profile.json` rocprofv3 metadata semantics remain unchanged.
+
+**Plans:** 1 plan
+
+- [ ] 186-01-PLAN.md -- Profile-summary sidecar schema, capability semantics,
+  and contract/doc tests.
+
+### Phase 187: Profile Summary Producer and CLI Persistence
+
+**Goal:** Evaluation can persist normalized profile summaries beside trace
+outputs without changing benchmark execution or existing sidecar behavior.
+**Depends on:** Phase 186
+**Requirements:** PROD-01, PROD-02, PROD-03
+
+**Success Criteria:**
+
+1. CLI writes `<trace>.profile-summary.json` when a trace output path and
+   profiling metadata are available.
+
+2. Missing, skipped, unavailable, failed, or artifact-empty profiling inputs
+   produce explicit summary states and do not fail evaluation.
+
+3. Existing `<trace>.profile.json`, static-evidence, environment, and
+   agent-feedback sidecars continue to be emitted with unchanged semantics.
+
+**Plans:** 1 plan
+
+- [ ] 187-01-PLAN.md -- Profile-summary builder, CLI persistence, and
+  nonfatal sidecar behavior.
+
+### Phase 188: Profile Summary Freshness and Governance
+
+**Goal:** HIP can reject stale or contradictory profile summaries while keeping
+profile summaries diagnostic-only.
+**Depends on:** Phase 187
+**Requirements:** PGOV-01, PGOV-02, PGOV-03
+
+**Success Criteria:**
+
+1. Sidecars include trace path, generated timestamp, SOL contract version,
+   optional run identity, and compact checksummed artifact citations.
+
+2. Validator helpers classify stale, missing, malformed, unavailable, partial,
+   and contradictory-authority profile summaries as diagnostic states.
+
+3. Authority flags prevent profile summaries from promoting correctness,
+   timing, performance, score, evidence-tier, release-gate, cutover,
+   paper-parity, leaderboard, or claim-upgrade status.
+
+**Plans:** 1 plan
+
+- [ ] 188-01-PLAN.md -- Freshness identity, artifact citations, governance
+  validators, and authority guardrail tests.
+
+### Phase 189: HIP Profile Summary Fixtures and Docs
+
+**Goal:** HIP Playground can build profile-summary adapter tests against stable
+SOL fixtures and safe ingestion documentation.
+**Depends on:** Phase 188
+**Requirements:** PFIX-01, PFIX-02, PFIX-03
+
+**Success Criteria:**
+
+1. Fixtures cover valid, unavailable, partial, stale, malformed, missing, and
+   contradictory-authority profile-summary cases.
+
+2. HIP-facing docs explain how profile-summary status, metric records,
+   limitations, and citations map into consumer-side `ProfileDigest` inputs.
+
+3. CPU-safe tests prove fixtures are deterministic and exclude raw profiler
+   dumps, full source, raw trace rows, and absolute temporary paths.
+
+**Plans:** 1 plan
+
+- [ ] 189-01-PLAN.md -- HIP-facing profile-summary fixtures, docs, and
+  deterministic fixture tests.
 
 ## Progress
 
-| Milestone | Phases | Plans | Status | Shipped |
-|-----------|--------|-------|--------|---------|
-| v1.36 SOL Agent Feedback Sidecar Producer | 181-185 | 6/6 | Shipped | 2026-06-16 |
-| v1.35 Script Parallelism and Safety Hardening | 175-180 | 7/7 | Shipped | 2026-06-11 |
-| v1.34 RDNA4 Readiness Blocker Closure | 170-174 | 5/5 | Shipped | 2026-06-09 |
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 186. Profile Summary Contract and Schema | 0/1 | Pending | — |
+| 187. Profile Summary Producer and CLI Persistence | 0/1 | Pending | — |
+| 188. Profile Summary Freshness and Governance | 0/1 | Pending | — |
+| 189. HIP Profile Summary Fixtures and Docs | 0/1 | Pending | — |
