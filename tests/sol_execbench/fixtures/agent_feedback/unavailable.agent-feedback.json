@@ -1,0 +1,48 @@
+{
+  "artifact_citations": [],
+  "authority": {
+    "confirmed_improvement_authority": false,
+    "correctness_authority": false,
+    "cutover_authority": false,
+    "diagnostic_only": true,
+    "evidence_tier_authority": false,
+    "leaderboard_authority": false,
+    "paper_parity_authority": false,
+    "performance_authority": false,
+    "release_gate_authority": false,
+    "score_authority": false,
+    "timing_authority": false
+  },
+  "identity": {
+    "candidate_hash": null,
+    "generated_at": "2026-06-16T00:00:00Z",
+    "run_id": null,
+    "sol_contract_version": "1.0",
+    "source_hash": null,
+    "target_id": null,
+    "trace_path": null
+  },
+  "items": [],
+  "limitations": [
+    "Agent feedback is diagnostic next-experiment guidance only.",
+    "Canonical Trace JSONL remains the authority for correctness, timing, scoring, and status.",
+    "No evaluated trace rows were available for feedback."
+  ],
+  "reason_code": "no_evaluation_traces",
+  "schema_version": "sol_execbench.agent_feedback.v1",
+  "source_refs": [
+    {
+      "kind": "trace",
+      "label": "canonical_trace_jsonl",
+      "status": null
+    }
+  ],
+  "status": "unavailable",
+  "summary": {
+    "evaluated_trace_count": 0,
+    "profile_status": null,
+    "static_evidence_status": null,
+    "status_counts": {},
+    "trace_count": 0
+  }
+}

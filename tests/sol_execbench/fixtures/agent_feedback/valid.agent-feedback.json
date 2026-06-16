@@ -1,0 +1,79 @@
+{
+  "artifact_citations": [
+    {
+      "kind": "trace",
+      "label": "canonical_trace_jsonl",
+      "path": "trace.jsonl",
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "status": null
+    },
+    {
+      "kind": "environment",
+      "label": "environment_snapshot",
+      "path": "trace.jsonl.environment.json",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "status": "available"
+    }
+  ],
+  "authority": {
+    "confirmed_improvement_authority": false,
+    "correctness_authority": false,
+    "cutover_authority": false,
+    "diagnostic_only": true,
+    "evidence_tier_authority": false,
+    "leaderboard_authority": false,
+    "paper_parity_authority": false,
+    "performance_authority": false,
+    "release_gate_authority": false,
+    "score_authority": false,
+    "timing_authority": false
+  },
+  "identity": {
+    "candidate_hash": "candidate-demo",
+    "generated_at": "2026-06-16T00:00:00Z",
+    "run_id": "run-demo",
+    "sol_contract_version": "1.0",
+    "source_hash": "source-demo",
+    "target_id": "linear-demo",
+    "trace_path": "trace.jsonl"
+  },
+  "items": [
+    {
+      "bottleneck": "unknown",
+      "code": "all_evaluated_traces_passed",
+      "message": "All evaluated traces passed; no failure-specific diagnostic is available.",
+      "recommendation": "Use optional profiling or static evidence for next-step performance diagnosis.",
+      "severity": "info",
+      "source_refs": [
+        {
+          "kind": "trace",
+          "label": "canonical_trace_jsonl",
+          "status": null
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "Agent feedback is diagnostic next-experiment guidance only.",
+    "Canonical Trace JSONL remains the authority for correctness, timing, scoring, and status."
+  ],
+  "reason_code": "feedback_generated",
+  "schema_version": "sol_execbench.agent_feedback.v1",
+  "source_refs": [
+    {
+      "kind": "trace",
+      "label": "canonical_trace_jsonl",
+      "status": null
+    }
+  ],
+  "status": "available",
+  "summary": {
+    "evaluated_trace_count": 1,
+    "profile_status": null,
+    "static_evidence_status": null,
+    "status_counts": {
+      "PASSED": 1
+    },
+    "trace_count": 1
+  }
+}

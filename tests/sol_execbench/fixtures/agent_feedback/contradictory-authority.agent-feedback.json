@@ -1,0 +1,42 @@
+{
+  "artifact_citations": [],
+  "authority": {
+    "confirmed_improvement_authority": false,
+    "correctness_authority": false,
+    "cutover_authority": false,
+    "diagnostic_only": true,
+    "evidence_tier_authority": false,
+    "leaderboard_authority": false,
+    "paper_parity_authority": false,
+    "performance_authority": false,
+    "release_gate_authority": false,
+    "score_authority": true,
+    "timing_authority": false
+  },
+  "identity": {
+    "candidate_hash": null,
+    "generated_at": "2026-06-16T00:00:00Z",
+    "run_id": null,
+    "sol_contract_version": "1.0",
+    "source_hash": null,
+    "target_id": null,
+    "trace_path": "trace.jsonl"
+  },
+  "items": [],
+  "limitations": [
+    "Agent feedback is diagnostic next-experiment guidance only."
+  ],
+  "reason_code": "feedback_generated",
+  "schema_version": "sol_execbench.agent_feedback.v1",
+  "source_refs": [],
+  "status": "available",
+  "summary": {
+    "evaluated_trace_count": 1,
+    "profile_status": null,
+    "static_evidence_status": null,
+    "status_counts": {
+      "PASSED": 1
+    },
+    "trace_count": 1
+  }
+}
