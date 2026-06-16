@@ -18,7 +18,7 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 **Shipped version:** v1.36 SOL Agent Feedback Sidecar Producer,
 shipped 2026-06-16.
 
-**Current milestone:** None defined.
+**Current milestone:** v1.37 Profile Summary Sidecar v1.
 
 **Queued milestone:** None defined.
 
@@ -28,6 +28,11 @@ surface includes contract capability tokens, strict sidecar generation,
 trace-adjacent CLI persistence, freshness identity, compact artifact citations,
 governance guardrails, and HIP-facing fixtures/docs while preserving canonical
 Trace JSONL as the only correctness, timing, scoring, and status authority.
+
+**Current milestone goal:** v1.37 turns the previously reserved
+`profile_summary.sidecar.v1` capability into a real trace-adjacent
+`sol_execbench.profile_summary.v1` artifact with strict schema, producer wiring,
+freshness/citation metadata, governance guardrails, and HIP-facing fixtures.
 
 **Previous milestone outcome:** v1.33 completed RDNA4 benchmark-grade evidence
 closure by hardening denominator policy, memory/readiness classification,
@@ -149,6 +154,26 @@ contains 1895 score records, 172 scored, 1723 unscored, and 1839 AMD
 SOL/SOLAR sidecar pairs after 56 temporary sidecar exclusions. RDNA4 timing
 remains non-authoritative until clock-lock/reset sudoers coverage and
 profiler-backed timing evidence are rerun.
+
+## Current Milestone: v1.37 Profile Summary Sidecar v1
+
+**Goal:** Turn `profile_summary.sidecar.v1` from a reserved optional capability
+into a real diagnostic sidecar artifact that summarizes existing ROCm profiler
+metadata without changing canonical Trace JSONL or benchmark authority.
+
+**Target features:**
+- Strict `sol_execbench.profile_summary.v1` schema with bounded status,
+  identity, summary, metric, limitation, authority, and artifact citation
+  fields.
+- CLI producer that writes `<trace>.profile-summary.json` beside trace outputs
+  when profile metadata is available, while preserving current
+  `<trace>.profile.json` rocprofv3 metadata.
+- Diagnostic-only freshness, citation, and governance helpers that make stale,
+  missing, unavailable, partial, or malformed profile summaries safe for HIP
+  consumers.
+- HIP-facing fixtures and docs that explain how to ingest the profile summary
+  as optional adapter input without treating it as correctness, timing, score,
+  release-gate, cutover, paper-parity, or leaderboard authority.
 
 ## Latest Milestone: v1.36 SOL Agent Feedback Sidecar Producer (SHIPPED)
 
@@ -975,6 +1000,7 @@ ROCm-compatible data migration from real CDNA3/CDNA4 hardware validation.
 | Overhead calibration via inner subprocess under rocprofv3 | Consistent measurement of profiler instrumentation overhead. | Validated in v1.35 |
 | Keep agent feedback sidecars diagnostic-only | HIP v1.26 needs next-turn guidance, but SOL canonical trace must remain the benchmark authority for correctness, timing, score, and status. | Validated in v1.36 |
 | SOL produces sidecars; HIP owns prompt/runtime normalization | This keeps repository ownership clear: SOL emits bounded artifacts and authority metadata, while HIP maps them into `ProfileDigest` and strategy hints. | Validated in v1.36 |
+| Complete profile-summary artifact before profiler-counter diagnosis | User chose v1.37 to make `profile_summary.sidecar.v1` a real sidecar while leaving occupancy/register/LDS/bandwidth/cache/utilization bottleneck inference for a later milestone. | Active in v1.37 |
 | Complete RDNA4 benchmark-grade validation | User selected v1.30 to turn existing RDNA4 `gfx1200` scoped evidence into full benchmark-grade validation with full dataset, timing, score, evidence-bundle, and claim-guardrail closure. | Active in v1.30 |
 | Preserve long-running validation jobs | User clarified that real validation may run for many hours; agents should poll and checkpoint rather than kill healthy processes solely because they are long-running. | Active in v1.30 |
 | Make long-tail exclusions explicit | User clarified that known super-long-tail shards should be temporarily excludable through `scripts/run_dataset.py` configuration while preserving denominator visibility and auditability. | Active in v1.30 |
@@ -997,4 +1023,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-16 after v1.36 milestone completion*
+*Last updated: 2026-06-16 after v1.37 milestone start*

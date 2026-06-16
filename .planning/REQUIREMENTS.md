@@ -1,0 +1,133 @@
+# Requirements: SOL ExecBench ROCm Port
+
+**Defined:** 2026-06-16
+**Milestone:** v1.37 Profile Summary Sidecar v1
+**Core Value:** Evaluate LLM-generated GPU kernels correctly and reproducibly
+on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL
+ExecBench.
+
+## v1.37 Requirements
+
+### Contract and Authority
+
+- [ ] **PCON-01**: Downstream consumers can treat
+  `profile_summary.sidecar.v1` as a concrete optional capability with a
+  documented artifact path and schema, not only a reserved capability token.
+
+- [ ] **PCON-02**: Documentation defines profile-summary sidecars as
+  diagnostic-only and explicitly not correctness, timing, performance, score,
+  evidence-tier, confirmed-improvement, release-gate, cutover, paper-parity, or
+  leaderboard authority.
+
+- [ ] **PCON-03**: Contract and schema tests prove adding profile-summary
+  sidecars does not add fields to canonical Trace JSONL or change existing
+  `trace.jsonl.profile.json` rocprofv3 metadata semantics.
+
+### Profile Summary Schema
+
+- [ ] **PSCH-01**: Maintainers can validate a strict
+  `sol_execbench.profile_summary.v1` model with bounded status, reason-code,
+  identity, summary, metric, limitation, authority, and artifact citation
+  fields.
+
+- [ ] **PSCH-02**: Profile summaries normalize existing `Rocprofv3ProfileResult`
+  metadata into compact status, command/tool availability, artifact count,
+  profiler overhead, and optional metric records without embedding raw profiler
+  dumps or unstable absolute temporary paths.
+
+- [ ] **PSCH-03**: Missing, skipped, unavailable, failed, or artifact-empty
+  profile inputs produce explicit unavailable or partial profile-summary states
+  instead of failing benchmark execution.
+
+### Producer and Persistence
+
+- [ ] **PROD-01**: Evaluation runs with a trace output path can persist
+  `<trace>.profile-summary.json` beside canonical Trace JSONL and the existing
+  `<trace>.profile.json` rocprofv3 metadata when profiling is requested.
+
+- [ ] **PROD-02**: Profile-summary generation is nonfatal and never changes
+  evaluation status, trace emission, scoring, existing profile sidecar output,
+  static evidence sidecar output, or agent-feedback sidecar output.
+
+- [ ] **PROD-03**: CLI output and docs make the relationship between
+  `<trace>.profile.json` raw profiler metadata and
+  `<trace>.profile-summary.json` normalized diagnostic summary explicit.
+
+### Freshness, Citations, and Governance
+
+- [ ] **PGOV-01**: Profile summaries include freshness identity covering trace
+  path, generated timestamp, SOL contract version, run id when available, and
+  referenced artifact checksums.
+
+- [ ] **PGOV-02**: Artifact citations use compact path/checksum references for
+  the canonical trace, raw profile metadata sidecar, and registered profiler
+  artifacts without leaking raw profiler directories into prompt-facing
+  summaries.
+
+- [ ] **PGOV-03**: Validator helpers classify stale, missing, malformed,
+  unavailable, partial, or contradictory-authority profile summaries as
+  diagnostic states while leaving canonical trace validity unchanged.
+
+### HIP Integration Fixtures and Docs
+
+- [ ] **PFIX-01**: Repository fixtures include valid, unavailable, partial,
+  stale, malformed, missing, and contradictory-authority profile-summary
+  sidecar cases for HIP adapter tests.
+
+- [ ] **PFIX-02**: HIP-facing docs explain how to map SOL profile-summary
+  status, metrics, limitations, and citations into consumer-side profile digest
+  inputs with safe unknown handling.
+
+- [ ] **PFIX-03**: CPU-safe tests verify generated fixtures and example
+  sidecars are deterministic and contain no raw profiler dumps, full source,
+  raw trace rows, or absolute temporary paths.
+
+## Future Requirements
+
+- **PDIAG-F01**: SOL parses profiler counter artifacts into a stable hardware
+  counter taxonomy for occupancy, VGPR/SGPR, LDS, scratch, bandwidth, cache, and
+  utilization.
+
+- **PDIAG-F02**: SOL emits confidence-scored bottleneck classification from
+  multiple corroborated profile sources.
+
+## Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| Changing canonical Trace JSONL schema | Profile summaries must remain optional trace-adjacent diagnostics. |
+| Replacing `<trace>.profile.json` rocprofv3 metadata | HIP still needs the raw metadata sidecar as a cited diagnostic artifact; v1.37 adds a normalized summary beside it. |
+| Treating profile summary as correctness, timing, score, evidence-tier, release-gate, or cutover authority | The sidecar is adapter input and next-experiment diagnostic context only. |
+| Profiler-counter-derived bottleneck diagnosis | Requires hardware/counter taxonomy and threshold work; explicitly deferred to a later milestone. |
+| HIP adapter/runtime implementation | HIP Playground owns `ProfileDigest`, adapter normalization, strategy hints, and runtime prompt assembly. |
+| Paper-scale validation, MI300X/CDNA3 full-suite validation, CDNA4 validation, hosted leaderboard, or hard sandboxing | These remain deferred project boundaries unrelated to profile-summary sidecar delivery. |
+
+## Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| PCON-01 | Phase 186 | Pending |
+| PCON-02 | Phase 186 | Pending |
+| PCON-03 | Phase 186 | Pending |
+| PSCH-01 | Phase 186 | Pending |
+| PSCH-02 | Phase 186 | Pending |
+| PSCH-03 | Phase 186 | Pending |
+| PROD-01 | Phase 187 | Pending |
+| PROD-02 | Phase 187 | Pending |
+| PROD-03 | Phase 187 | Pending |
+| PGOV-01 | Phase 188 | Pending |
+| PGOV-02 | Phase 188 | Pending |
+| PGOV-03 | Phase 188 | Pending |
+| PFIX-01 | Phase 189 | Pending |
+| PFIX-02 | Phase 189 | Pending |
+| PFIX-03 | Phase 189 | Pending |
+
+**Coverage:**
+
+- v1.37 requirements: 15 total
+- Mapped to phases: 15
+- Unmapped: 0
+
+---
+*Requirements defined: 2026-06-16*
+*Last updated: 2026-06-16 after roadmap traceability mapping*
