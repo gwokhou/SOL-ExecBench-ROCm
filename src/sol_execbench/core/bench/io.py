@@ -22,7 +22,7 @@ import math
 import os
 from collections.abc import Mapping, Sequence
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import hashlib
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -509,14 +509,7 @@ def _raise_custom_input_error(
     raise CustomInputGenerationError(
         message,
         failure_class=failure_class,
-        provenance=CustomInputProvenance(
-            entrypoint=provenance.entrypoint,
-            seed=provenance.seed,
-            workload_uuid=provenance.workload_uuid,
-            row_index=provenance.row_index,
-            generated_keys=provenance.generated_keys,
-            failure_class=failure_class,
-        ),
+        provenance=replace(provenance, failure_class=failure_class),
     )
 
 
@@ -645,14 +638,7 @@ def gen_custom_inputs(
         err = CustomInputGenerationError(
             f"custom_inputs_entrypoint failed: {exc}",
             failure_class=failure_class,
-            provenance=CustomInputProvenance(
-                entrypoint=provenance.entrypoint,
-                seed=provenance.seed,
-                workload_uuid=provenance.workload_uuid,
-                row_index=provenance.row_index,
-                generated_keys=provenance.generated_keys,
-                failure_class=failure_class,
-            ),
+            provenance=replace(provenance, failure_class=failure_class),
         )
         raise err from exc
     generated_keys = tuple(generated.keys()) if isinstance(generated, Mapping) else ()

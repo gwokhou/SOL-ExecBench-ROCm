@@ -279,22 +279,14 @@ def build_rocprofv3_command(
     include_hip_runtime: bool = True,
 ) -> list[str]:
     """Build a `rocprofv3` command for kernel timing evidence collection."""
-    if not application_command:
-        raise ValueError("application_command must not be empty")
-
-    command = [
-        executable,
-        "--kernel-trace",
-        "--output-format",
-        "csv",
-        "--output-directory",
-        output_directory,
-        "--output-file",
-        output_file,
-    ]
-    if include_hip_runtime:
-        command.insert(2, "--hip-runtime-trace")
-    return [*command, "--", *application_command]
+    return build_rocprofv3_profile_command(
+        application_command,
+        output_directory=output_directory,
+        output_file=output_file,
+        executable=executable,
+        include_hip_runtime=include_hip_runtime,
+        output_format="csv",
+    )
 
 
 def build_rocprofv3_profile_command(
