@@ -2,9 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.36
 milestone_name: SOL Agent Feedback Sidecar Producer
-status: in_progress
-last_updated: "2026-06-16T00:00:00.000Z"
-last_activity: 2026-06-16
+status: Awaiting next milestone
+stopped_at: v1.36 milestone completion
+last_updated: "2026-06-16T03:17:09.338Z"
+last_activity: 2026-06-16 — Milestone v1.36 completed and archived
 progress:
   total_phases: 5
   completed_phases: 5
@@ -17,26 +18,26 @@ progress:
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (updated 2026-06-15)
+See: `.planning/PROJECT.md` (updated 2026-06-16)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly
 on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL
 ExecBench.
-**Current focus:** v1.36 SOL Agent Feedback Sidecar Producer
+**Current focus:** Planning next milestone
 
 ## Current Position
 
-Phase: 185
-Plan: 185-01
-Status: Phase 185 complete; ready for milestone audit
-Last activity: 2026-06-16 — Phase 185 completed
+Phase: Milestone v1.36 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-06-16 — Milestone v1.36 completed and archived
 
 ## Recent Trend
 
-- v1.36 starts a five-phase SOL-side producer milestone for HIP Playground
-  v1.26. The goal is to emit optional diagnostic agent-feedback/profile-summary
-  sidecars that can guide hip-agent next-turn strategy while preserving
-  canonical Trace JSONL as the only correctness/timing/scoring authority.
+- v1.36 shipped the five-phase SOL-side producer milestone for HIP Playground
+  v1.26. SOL now emits optional diagnostic agent-feedback sidecars with
+  contract capability tokens, strict schema/writer support, freshness identity,
+  compact artifact citations, governance guardrails, and HIP-facing fixtures.
 
 - v1.35 shipped on 2026-06-11. 6 phases, 7 plans, 23 requirements satisfied.
   Added PID locks, timing isolation, CPU-parallel staging, parallel dispatch,
@@ -73,16 +74,18 @@ Last activity: 2026-06-16 — Phase 185 completed
 - v1.36: Agent-feedback/profile-summary sidecars are optional diagnostic
   sidecars only; canonical Trace JSONL remains the authority for correctness,
   timing, scoring, and evaluation status.
+
 - v1.36: HIP Playground owns `ProfileDigest`, adapter normalization, strategy
   hints, and runtime prompt assembly; SOL owns sidecar schema, generation,
   freshness identity, citations, and authority guardrails.
+
 - v1.36: Feedback may guide a next experiment but cannot promote evidence tier,
   score authority, confirmed improvement, release gates, cutover eligibility,
   paper parity, or leaderboard readiness.
 
 ### Pending Todos
 
-- Run milestone audit for v1.36 SOL Agent Feedback Sidecar Producer.
+- Start the next milestone with `$gsd-new-milestone`.
 - Coordinate the generated sidecar fixture shape with HIP Playground Phase 141
   before HIP adapter implementation begins.
 
@@ -90,6 +93,7 @@ Last activity: 2026-06-16 — Phase 185 completed
 
 - Stale sidecar identity is a primary risk when trace paths are reused across
   retries or resumed runs.
+
 - Raw profiler dumps, trace rows, source text, or temporary absolute paths must
   not leak into prompt-facing feedback summaries.
 
@@ -106,13 +110,20 @@ Items acknowledged and deferred at prior milestone closes:
 | Security | Hard sandbox or multi-tenant adversarial execution | Deferred |
 | Release authority | Stable benchmark authority release | Deferred |
 | Dataset redistribution | Publishing or hosting NVIDIA/SOL-ExecBench original or derivative dataset content | Deferred |
+| Quick task | 260531-rdf-add-run-dataset-closure-e2e-gaps | completed |
+| Quick task | 260531-uki-add-remaining-requires-rocm-e2e-coverage | completed |
+| Quick task | 260613-44p-complete-short-term-rdna4-profiler-backe | unknown |
+| Quick task | 260613-fix-l2041-partial | missing |
+| Quick task | 260613-iut-close-rdna4-ready-missing-profiler-timin | missing |
+| Quick task | 260613-lia-close-remaining-29-rdna4-l2-ready-missin | unknown |
+| Quick task | 260613-try-fix-rdna4-l2-profiler-blockers | unknown |
 
 ## Session Continuity
 
-Last session: 2026-06-15T15:56:52Z
-Stopped at: v1.36 roadmap creation
+Last session: 2026-06-16T03:17:09Z
+Stopped at: v1.36 milestone completion
 Resume file: None
 
 ## Operator Next Steps
 
-- `$gsd-audit-milestone` — audit v1.36 completion before cleanup/archive
+- Start the next milestone with /gsd-new-milestone
