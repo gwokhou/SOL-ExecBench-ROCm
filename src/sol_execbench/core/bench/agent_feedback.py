@@ -69,6 +69,19 @@ class AgentFeedbackGovernanceStatus(str, Enum):
     INVALID_DIAGNOSTIC = "invalid_diagnostic"
 
 
+class AgentFeedbackBottleneck(str, Enum):
+    """Closed bottleneck vocabulary emitted by SOL feedback sidecars."""
+
+    UNKNOWN = "unknown"
+    COMPILE_FAILURE = "compile_failure"
+    RUNTIME_FAILURE = "runtime_failure"
+    TIMEOUT = "timeout"
+    NUMERICAL_CORRECTNESS = "numerical_correctness"
+    INTERFACE_CORRECTNESS = "interface_correctness"
+    POLICY_VIOLATION = "policy_violation"
+    REFERENCE_FAILURE = "reference_failure"
+
+
 class AgentFeedbackSourceRef(BaseModelWithDocstrings):
     """Compact reference to source evidence used by the feedback sidecar."""
 
@@ -163,7 +176,7 @@ class AgentFeedbackItem(BaseModelWithDocstrings):
     """Stable item code."""
     severity: AgentFeedbackSeverity
     """Severity for next-experiment guidance."""
-    bottleneck: str
+    bottleneck: AgentFeedbackBottleneck
     """Closed SOL-side bottleneck label or unknown."""
     message: str
     """Bounded diagnostic message."""
@@ -463,7 +476,7 @@ def _trace_feedback_items(traces: Sequence[Trace]) -> list[AgentFeedbackItem]:
             AgentFeedbackItem(
                 code="all_evaluated_traces_passed",
                 severity=AgentFeedbackSeverity.INFO,
-                bottleneck="unknown",
+                bottleneck=AgentFeedbackBottleneck.UNKNOWN,
                 message=(
                     "All evaluated traces passed; no failure-specific diagnostic "
                     "is available."
@@ -491,7 +504,7 @@ def _item_for_status(
         return AgentFeedbackItem(
             code="compile_error",
             severity=AgentFeedbackSeverity.ACTION,
-            bottleneck="compile_failure",
+            bottleneck=AgentFeedbackBottleneck.COMPILE_FAILURE,
             message=f"{count} workload(s) failed during compilation.",
             recommendation=(
                 "Inspect bounded compile diagnostics before changing optimization "
@@ -503,7 +516,7 @@ def _item_for_status(
         return AgentFeedbackItem(
             code="runtime_error",
             severity=AgentFeedbackSeverity.ACTION,
-            bottleneck="runtime_failure",
+            bottleneck=AgentFeedbackBottleneck.RUNTIME_FAILURE,
             message=f"{count} workload(s) failed during runtime execution.",
             recommendation=(
                 "Prioritize launch, memory, and synchronization correctness before "
@@ -515,7 +528,7 @@ def _item_for_status(
         return AgentFeedbackItem(
             code="timeout",
             severity=AgentFeedbackSeverity.ACTION,
-            bottleneck="timeout",
+            bottleneck=AgentFeedbackBottleneck.TIMEOUT,
             message=f"{count} workload(s) timed out.",
             recommendation=(
                 "Reduce search-space risk and verify kernel termination behavior."
@@ -526,7 +539,7 @@ def _item_for_status(
         return AgentFeedbackItem(
             code="incorrect_numerical",
             severity=AgentFeedbackSeverity.ACTION,
-            bottleneck="numerical_correctness",
+            bottleneck=AgentFeedbackBottleneck.NUMERICAL_CORRECTNESS,
             message=f"{count} workload(s) produced numerically incorrect outputs.",
             recommendation=(
                 "Fix numerical correctness before interpreting performance feedback."
@@ -537,7 +550,7 @@ def _item_for_status(
         return AgentFeedbackItem(
             code=status.value.lower(),
             severity=AgentFeedbackSeverity.ACTION,
-            bottleneck="interface_correctness",
+            bottleneck=AgentFeedbackBottleneck.INTERFACE_CORRECTNESS,
             message=f"{count} workload(s) failed output interface validation.",
             recommendation="Match output shape and dtype contracts before optimization.",
             source_refs=source_refs,
@@ -546,7 +559,7 @@ def _item_for_status(
         return AgentFeedbackItem(
             code="reward_hack",
             severity=AgentFeedbackSeverity.ACTION,
-            bottleneck="policy_violation",
+            bottleneck=AgentFeedbackBottleneck.POLICY_VIOLATION,
             message=f"{count} workload(s) violated benchmark policy checks.",
             recommendation="Remove policy-violating behavior before further evaluation.",
             source_refs=source_refs,
@@ -555,7 +568,7 @@ def _item_for_status(
         return AgentFeedbackItem(
             code="invalid_reference",
             severity=AgentFeedbackSeverity.WARNING,
-            bottleneck="reference_failure",
+            bottleneck=AgentFeedbackBottleneck.REFERENCE_FAILURE,
             message=f"{count} workload(s) could not be compared to a valid reference.",
             recommendation="Resolve reference execution before using candidate feedback.",
             source_refs=source_refs,

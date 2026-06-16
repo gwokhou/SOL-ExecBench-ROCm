@@ -176,6 +176,17 @@ def test_agent_feedback_sidecar_rejects_authority_override():
         type(sidecar).model_validate(payload)
 
 
+def test_agent_feedback_sidecar_rejects_unknown_bottleneck():
+    sidecar = build_agent_feedback_sidecar(
+        traces=[_trace(EvaluationStatus.COMPILE_ERROR)]
+    )
+    payload = sidecar.model_dump(mode="json")
+    payload["items"][0]["bottleneck"] = "ad_hoc_bottleneck"
+
+    with pytest.raises(ValidationError):
+        type(sidecar).model_validate(payload)
+
+
 def test_agent_feedback_governance_guardrail_states_remain_diagnostic_only(
     tmp_path: Path,
 ):

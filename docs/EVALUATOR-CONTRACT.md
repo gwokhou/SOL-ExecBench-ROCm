@@ -34,11 +34,18 @@ These capabilities are intentionally optional. A compatible consumer must keep
 working when a SOL version only provides canonical trace/profile surfaces and
 does not produce feedback sidecars.
 
+`agent_feedback.sidecar.v1` is the concrete optional JSON sidecar currently
+written as `<trace>.agent-feedback.json`. `profile_summary.sidecar.v1` is a
+reserved optional capability for normalized profile summaries; current ROCm
+profiling metadata is still emitted as the trace-adjacent `<trace>.profile.json`
+rocprofv3 sidecar. Consumers must not require a profile-summary sidecar when the
+contract advertises the capability.
+
 ## Feedback Sidecars
 
-`agent_feedback.sidecar.v1` and `profile_summary.sidecar.v1` are
-trace-adjacent diagnostic surfaces. They may guide the next experiment in an
-agent loop, but they are not:
+`agent_feedback.sidecar.v1`, `profile_summary.sidecar.v1`, and the current
+`<trace>.profile.json` profiler metadata are trace-adjacent diagnostic surfaces.
+They may guide the next experiment in an agent loop, but they are not:
 
 - correctness authority
 - performance or timing authority

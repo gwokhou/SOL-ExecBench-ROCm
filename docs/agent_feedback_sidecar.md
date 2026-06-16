@@ -28,10 +28,36 @@ benchmark result. Suggested mapping:
 | `identity` | Freshness denominator for trace/run/candidate matching. | Reject as stale when expected identity mismatches. |
 | `authority` | Hard guardrail flags. | Reject contradictory truthy authority flags. |
 
+SOL emits a closed `items[].bottleneck` vocabulary:
+
+- `unknown`
+- `compile_failure`
+- `runtime_failure`
+- `timeout`
+- `numerical_correctness`
+- `interface_correctness`
+- `policy_violation`
+- `reference_failure`
+
+Schema validation rejects other SOL-produced bottleneck labels. HIP adapters
+should still downgrade unrecognized future values to `unknown` at their boundary
+instead of promoting them into a prompt taxonomy.
+
+The CLI fills `identity.target_id`, `identity.run_id`, and
+`identity.candidate_hash` from emitted trace data when available. `run_id` is
+the persisted Trace JSONL checksum when the trace file exists. `source_hash`
+remains `null` unless a producer has actual source contents; the canonical trace
+rows only contain the compact solution label.
+
 HIP runtime prompts should never include raw trace rows, raw profiler dumps, full
 kernel source, prompt text, or absolute temporary paths from SOL feedback. They
 should include only the normalized bottleneck, recommendation, limitation, and
 compact citation fields after freshness and authority checks pass.
+
+`profile_summary.sidecar.v1` is reserved for a future normalized profile-summary
+sidecar. Current ROCm profiler metadata remains the separate
+`<trace>.profile.json` rocprofv3 sidecar and is cited as optional diagnostic
+evidence when present.
 
 For all closed HIP taxonomies, unknown values must be downgraded rather than
 promoted.
