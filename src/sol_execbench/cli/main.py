@@ -41,7 +41,6 @@ from rich.table import Table
 
 from ..core.data.contract import build_evaluator_contract
 from ..core.environment import (
-    EnvironmentSnapshot,
     build_environment_diagnostics,
     collect_environment_snapshot,
 )
@@ -94,6 +93,7 @@ from ..core.dataset import (
     write_migration_manifest,
 )
 from ..core.dataset.checksums import sha256_file, stable_json_checksum
+from ..core.runtime_evidence import write_json_payload
 from ..driver import ProblemPackager
 
 console = Console(stderr=True)
@@ -191,8 +191,7 @@ def _write_no_trace_diagnostics_sidecar(
         "stderr_truncated": len(filtered_stderr) > _DIAGNOSTIC_TAIL_LIMIT,
     }
     try:
-        sidecar_path.parent.mkdir(parents=True, exist_ok=True)
-        sidecar_path.write_text(json.dumps(payload, sort_keys=True) + "\n")
+        write_json_payload(sidecar_path, payload)
         return sidecar_path
     except OSError as exc:
         console.print(f"[yellow]Failed to write no-trace diagnostics: {exc}[/yellow]")
@@ -329,14 +328,7 @@ def _write_environment_snapshot_sidecar(
 
     try:
         snapshot = collector()
-        if isinstance(snapshot, EnvironmentSnapshot):
-            payload = snapshot.model_dump(mode="json")
-        elif hasattr(snapshot, "model_dump"):
-            payload = snapshot.model_dump(mode="json")
-        else:
-            payload = snapshot
-        sidecar_path.parent.mkdir(parents=True, exist_ok=True)
-        sidecar_path.write_text(json.dumps(payload, sort_keys=True) + "\n")
+        write_json_payload(sidecar_path, snapshot)
         console.print(f"[green]Saved environment snapshot to {sidecar_path}[/green]")
         return sidecar_path
     except Exception as exc:
@@ -374,10 +366,7 @@ def _write_profile_sidecar(
 
     sidecar_path = _profile_sidecar_path(output_file, profile_result)
     try:
-        sidecar_path.parent.mkdir(parents=True, exist_ok=True)
-        sidecar_path.write_text(
-            json.dumps(profile_result.to_dict(), sort_keys=True) + "\n"
-        )
+        write_json_payload(sidecar_path, profile_result.to_dict())
         console.print(f"[green]Saved profiling metadata to {sidecar_path}[/green]")
         return sidecar_path
     except Exception as exc:
@@ -419,10 +408,7 @@ def _write_profile_summary_sidecar(
                 trace_sha256=run_id,
             ),
         )
-        sidecar_path.parent.mkdir(parents=True, exist_ok=True)
-        sidecar_path.write_text(
-            json.dumps(sidecar.model_dump(mode="json"), sort_keys=True) + "\n"
-        )
+        write_json_payload(sidecar_path, sidecar)
         console.print(f"[green]Saved profile summary to {sidecar_path}[/green]")
         return sidecar_path
     except Exception as exc:
@@ -485,11 +471,10 @@ def _static_evidence_sidecar_path(output_file: Path | None, staging_dir: Path) -
 
 
 def _static_evidence_summary(
-    sidecar: StaticKernelEvidenceSidecar,
+    payload: dict[str, object],
 ) -> dict[str, object]:
     """Return a compact human-facing static evidence summary."""
 
-    payload = sidecar.model_dump(mode="json")
     classification = payload["classification"]
     return {
         "status": payload["status"],
@@ -523,7 +508,7 @@ def _static_evidence_payload(
     """Return the JSON sidecar payload with a compact summary section."""
 
     payload = sidecar.model_dump(mode="json")
-    payload["summary"] = _static_evidence_summary(sidecar)
+    payload["summary"] = _static_evidence_summary(payload)
     return payload
 
 
@@ -539,10 +524,7 @@ def _write_static_evidence_sidecar(
 
     sidecar_path = _static_evidence_sidecar_path(output_file, staging_dir)
     try:
-        sidecar_path.parent.mkdir(parents=True, exist_ok=True)
-        sidecar_path.write_text(
-            json.dumps(_static_evidence_payload(sidecar), sort_keys=True) + "\n"
-        )
+        write_json_payload(sidecar_path, _static_evidence_payload(sidecar))
         console.print(
             "[green]Static evidence "
             f"{sidecar.status.value}; saved metadata to {sidecar_path}[/green]"
@@ -605,10 +587,7 @@ def _write_agent_feedback_sidecar(
                 trace_sha256=run_id,
             ),
         )
-        sidecar_path.parent.mkdir(parents=True, exist_ok=True)
-        sidecar_path.write_text(
-            json.dumps(sidecar.model_dump(mode="json"), sort_keys=True) + "\n"
-        )
+        write_json_payload(sidecar_path, sidecar)
         console.print(f"[green]Saved agent feedback to {sidecar_path}[/green]")
         return sidecar_path
     except Exception as exc:
