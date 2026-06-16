@@ -52,6 +52,7 @@ from ..core.toolchain import (
     build_toolchain_routing_report,
     default_toolchain_registry,
 )
+from ..core.bench.agent_feedback import build_agent_feedback_sidecar
 from ..core.bench.io import flashinfer_safetensors_env
 from ..core.bench.rocm_profiler import (
     ROCPROFV3_EXECUTABLE,
@@ -459,6 +460,44 @@ def _write_static_evidence_sidecar(
         return None
 
 
+def _agent_feedback_sidecar_path(output_file: Path | None) -> Path | None:
+    """Return the optional agent feedback sidecar path for a trace output."""
+
+    if output_file is None:
+        return None
+    return output_file.with_name(f"{output_file.name}.agent-feedback.json")
+
+
+def _write_agent_feedback_sidecar(
+    output_file: Path | None,
+    traces: list[Trace],
+    *,
+    profile_result: Rocprofv3ProfileResult | None,
+    static_evidence: StaticKernelEvidenceSidecar | None,
+) -> Path | None:
+    """Write optional agent feedback metadata without changing trace JSONL."""
+
+    sidecar_path = _agent_feedback_sidecar_path(output_file)
+    if sidecar_path is None:
+        return None
+
+    try:
+        sidecar = build_agent_feedback_sidecar(
+            traces=traces,
+            profile_result=profile_result,
+            static_evidence=static_evidence,
+        )
+        sidecar_path.parent.mkdir(parents=True, exist_ok=True)
+        sidecar_path.write_text(
+            json.dumps(sidecar.model_dump(mode="json"), sort_keys=True) + "\n"
+        )
+        console.print(f"[green]Saved agent feedback to {sidecar_path}[/green]")
+        return sidecar_path
+    except Exception as exc:
+        console.print(f"[yellow]Agent feedback metadata skipped: {exc}[/yellow]")
+        return None
+
+
 def _collect_static_evidence_for_cli(
     *,
     enabled: str,
@@ -861,6 +900,12 @@ def _evaluate_cli(
     _write_environment_snapshot_sidecar(output_file)
     _write_profile_sidecar(output_file, profile_result)
     _write_static_evidence_sidecar(output_file, staging_dir, static_evidence_result)
+    _write_agent_feedback_sidecar(
+        output_file,
+        traces,
+        profile_result=profile_result,
+        static_evidence=static_evidence_result,
+    )
 
     if json_output:
         for t in traces:
