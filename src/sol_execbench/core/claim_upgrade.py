@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from sol_execbench.core.dataset.checksums import stable_json_checksum
 from sol_execbench.core.dataset.manifest import DatasetManifestChecksum
+from sol_execbench.core.trust_summary import load_json as load_json, utc_timestamp
 
 CLAIM_UPGRADE_SCHEMA_VERSION = "sol_execbench.claim_upgrade.v1"
 
@@ -109,17 +109,6 @@ class ClaimUpgradeReport(BaseModel):
         return json.dumps(self.model_dump(mode="json"), indent=2, sort_keys=True) + "\n"
 
 
-def utc_timestamp() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-
-def load_json(path: Path) -> dict[str, Any]:
-    payload = json.loads(Path(path).read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        raise ValueError(f"Expected JSON object at {path}")
-    return payload
-
-
 def default_claim_rules() -> list[ClaimRule]:
     return [
         ClaimRule(
@@ -129,7 +118,11 @@ def default_claim_rules() -> list[ClaimRule]:
         ),
         ClaimRule(
             claim_level="container_validated",
-            required_sources=["execution_closure", "paper_denominator", "consistency_report"],
+            required_sources=[
+                "execution_closure",
+                "paper_denominator",
+                "consistency_report",
+            ],
             required_conditions=[
                 "closure_attempted_evidence",
                 "denominator_present",
@@ -139,7 +132,10 @@ def default_claim_rules() -> list[ClaimRule]:
         ClaimRule(
             claim_level="native_host_validated",
             required_sources=["hardware_validation", "matrix_report"],
-            required_conditions=["native_host_validation_evidence", "matrix_runtime_available"],
+            required_conditions=[
+                "native_host_validation_evidence",
+                "matrix_runtime_available",
+            ],
         ),
         ClaimRule(
             claim_level="score_authoritative",
@@ -330,7 +326,9 @@ def _condition_met(condition: str, payloads: dict[str, dict[str, Any] | None]) -
     if condition == "no_consistency_blockers":
         return not _consistency_blockers(payloads.get("consistency_report"))
     if condition == "native_host_validation_evidence":
-        return bool((payloads.get("hardware_validation") or {}).get("native_host_validated"))
+        return bool(
+            (payloads.get("hardware_validation") or {}).get("native_host_validated")
+        )
     if condition == "matrix_runtime_available":
         return not _matrix_runtime_unavailable(payloads.get("matrix_report"))
     if condition == "score_evidence_present":
@@ -348,8 +346,14 @@ def _condition_met(condition: str, payloads: dict[str, dict[str, Any] | None]) -
     if condition == "bound_sanity_clean":
         sanity = payloads.get("amd_bound_sanity") or {}
         totals = sanity.get("status_totals")
-        return isinstance(totals, dict) and int(totals.get("missing_evidence") or 0) == 0
-    if condition in {"paper_parity_candidate", "submission_policy_exists", "hosted_service_evidence"}:
+        return (
+            isinstance(totals, dict) and int(totals.get("missing_evidence") or 0) == 0
+        )
+    if condition in {
+        "paper_parity_candidate",
+        "submission_policy_exists",
+        "hosted_service_evidence",
+    }:
         return False
     return False
 
@@ -391,7 +395,9 @@ def _stability_clean(payload: dict[str, Any] | None) -> bool:
     )
 
 
-def _records(payload: dict[str, Any] | None, *, key: str = "records") -> list[dict[str, Any]]:
+def _records(
+    payload: dict[str, Any] | None, *, key: str = "records"
+) -> list[dict[str, Any]]:
     records = (payload or {}).get(key, [])
     return records if isinstance(records, list) else []
 

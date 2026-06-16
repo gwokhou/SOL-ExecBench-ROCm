@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import importlib.metadata
 import json
 import os
 from datetime import UTC
@@ -353,13 +352,6 @@ def write_aggregate_report(path: Path, entries: list[MatrixEntry]) -> Path:
     """Write an aggregate compatibility matrix JSON report."""
 
     return write_json_payload(path, build_aggregate_report(entries))
-
-
-def _distribution_version(name: str) -> str | None:
-    try:
-        return importlib.metadata.version(name)
-    except importlib.metadata.PackageNotFoundError:
-        return None
 
 
 def _none_if_requested(value: str | None) -> str | None:

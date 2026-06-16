@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
@@ -13,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from sol_execbench.core.dataset.checksums import stable_json_checksum
 from sol_execbench.core.dataset.manifest import DatasetManifestChecksum
+from sol_execbench.core.trust_summary import load_json as load_json, utc_timestamp
 
 CONSISTENCY_REPORT_SCHEMA_VERSION = "sol_execbench.consistency_report.v1"
 
@@ -152,17 +152,6 @@ class ConsistencyReport(BaseModel):
 
     def to_json(self) -> str:
         return json.dumps(self.model_dump(mode="json"), indent=2, sort_keys=True) + "\n"
-
-
-def utc_timestamp() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-
-def load_json(path: Path) -> dict[str, Any]:
-    payload = json.loads(Path(path).read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        raise ValueError(f"Expected JSON object at {path}")
-    return payload
 
 
 def build_consistency_report(
