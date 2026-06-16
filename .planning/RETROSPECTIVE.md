@@ -33,9 +33,9 @@
 
 - Early summaries for phases 183-185 lacked machine-readable frontmatter, so
   milestone audit required manual three-source cross-checking.
-- Nyquist `*-VALIDATION.md` artifacts were not generated during phase execution;
-  the milestone audit records this as process debt despite passing
-  phase-level verification.
+- Nyquist `*-VALIDATION.md` artifacts were generated after milestone close
+  rather than during phase execution; future autonomous runs should create them
+  before archive.
 - The milestone archive tool produced weak accomplishment extraction, requiring
   manual MILESTONES and PROJECT cleanup.
 
