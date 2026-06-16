@@ -1,0 +1,6 @@
+{
+  "case": "missing_profile_summary_sidecar",
+  "expected_governance_status": "unavailable",
+  "expected_reason_code": "sidecar_missing",
+  "path": "trace.jsonl.profile-summary.json"
+}

@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.37
 milestone_name: Profile Summary Sidecar v1
-status: planning
-last_updated: "2026-06-16T08:51:25.932Z"
+status: awaiting_next_milestone
+last_updated: "2026-06-16T10:05:00.000Z"
 last_activity: 2026-06-16
 progress:
   total_phases: 4
-  completed_phases: 0
+  completed_phases: 4
   total_plans: 4
-  completed_plans: 0
-  percent: 0
+  completed_plans: 4
+  percent: 100
 ---
 
 # Project State
@@ -22,14 +22,14 @@ See: `.planning/PROJECT.md` (updated 2026-06-16)
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly
 on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL
 ExecBench.
-**Current focus:** v1.37 Profile Summary Sidecar v1
+**Current focus:** No active milestone
 
 ## Current Position
 
-Phase: 186 - Profile Summary Contract and Schema
+Phase: —
 Plan: —
-Status: Ready for phase planning
-Last activity: 2026-06-16 — Milestone v1.37 requirements and roadmap defined
+Status: v1.37 shipped; awaiting next milestone
+Last activity: 2026-06-16 — v1.37 profile-summary sidecar milestone implemented, audited, and archived
 
 ## Recent Trend
 
@@ -37,6 +37,16 @@ Last activity: 2026-06-16 — Milestone v1.37 requirements and roadmap defined
   `profile_summary.sidecar.v1` from a reserved optional capability into a real
   diagnostic sidecar artifact with strict schema, producer wiring, freshness
   identity, citations, governance, and HIP-facing fixtures/docs.
+
+- v1.37 implementation is complete. SOL now emits optional
+  `<trace>.profile-summary.json` diagnostic sidecars with strict
+  `sol_execbench.profile_summary.v1` schema, compact citations, freshness and
+  governance validation helpers, and HIP-facing fixture/docs coverage.
+
+- v1.37 shipped on 2026-06-16. Active requirements were archived to
+  `.planning/milestones/v1.37-REQUIREMENTS.md`, roadmap details were archived
+  to `.planning/milestones/v1.37-ROADMAP.md`, and the audit is recorded at
+  `.planning/milestones/v1.37-MILESTONE-AUDIT.md`.
 
 - v1.36 shipped the five-phase SOL-side producer milestone for HIP Playground
   v1.26. SOL now emits optional diagnostic agent-feedback sidecars with
@@ -55,10 +65,10 @@ Last activity: 2026-06-16 — Milestone v1.37 requirements and roadmap defined
 
 | Phase | Goal | Requirements | Status |
 |-------|------|--------------|--------|
-| 186 - Profile Summary Contract and Schema | Concrete optional `sol_execbench.profile_summary.v1` contract, strict schema, and authority boundary | PCON-01, PCON-02, PCON-03, PSCH-01, PSCH-02, PSCH-03 | Pending |
-| 187 - Profile Summary Producer and CLI Persistence | Persist `<trace>.profile-summary.json` without changing trace, profile, static evidence, or agent-feedback behavior | PROD-01, PROD-02, PROD-03 | Pending |
-| 188 - Profile Summary Freshness and Governance | Identity, artifact citations, stale-state validation, and diagnostic-only authority guardrails | PGOV-01, PGOV-02, PGOV-03 | Pending |
-| 189 - HIP Profile Summary Fixtures and Docs | HIP-facing fixtures, mapping docs, and deterministic CPU-safe tests | PFIX-01, PFIX-02, PFIX-03 | Pending |
+| 186 - Profile Summary Contract and Schema | Concrete optional `sol_execbench.profile_summary.v1` contract, strict schema, and authority boundary | PCON-01, PCON-02, PCON-03, PSCH-01, PSCH-02, PSCH-03 | Complete |
+| 187 - Profile Summary Producer and CLI Persistence | Persist `<trace>.profile-summary.json` without changing trace, profile, static evidence, or agent-feedback behavior | PROD-01, PROD-02, PROD-03 | Complete |
+| 188 - Profile Summary Freshness and Governance | Identity, artifact citations, stale-state validation, and diagnostic-only authority guardrails | PGOV-01, PGOV-02, PGOV-03 | Complete |
+| 189 - HIP Profile Summary Fixtures and Docs | HIP-facing fixtures, mapping docs, and deterministic CPU-safe tests | PFIX-01, PFIX-02, PFIX-03 | Complete |
 
 ## Quick Tasks Completed
 
@@ -89,19 +99,21 @@ Last activity: 2026-06-16 — Milestone v1.37 requirements and roadmap defined
   score authority, confirmed improvement, release gates, cutover eligibility,
   paper parity, or leaderboard readiness.
 
+- v1.37: Profile-summary sidecars may inform HIP adapter diagnostics, but cannot
+  promote correctness, timing, performance, score, evidence-tier, release-gate,
+  cutover, paper-parity, leaderboard, or claim-upgrade authority.
+
 ### Pending Todos
 
-- Plan Phase 186 with `$gsd-plan-phase 186`.
+- Start the next milestone with `$gsd-new-milestone`.
 - Keep profiler-counter-derived bottleneck diagnostics deferred unless the next
   milestone explicitly scopes hardware/counter taxonomy work.
 
 ### Blockers/Concerns
 
-- Stale sidecar identity is a primary risk when trace paths are reused across
-  retries or resumed runs.
-
-- Raw profiler dumps, trace rows, source text, or temporary absolute paths must
-  not leak into prompt-facing feedback summaries.
+- Full `uv run pytest tests/` remains blocked on this Mac host by broader
+  environment/repo issues: missing `triton`, missing legacy report scripts, and
+  Docker shell compatibility failures.
 
 ## Deferred Items
 
@@ -133,4 +145,4 @@ Resume file: None
 
 ## Operator Next Steps
 
-- Plan Phase 186 with /gsd-plan-phase 186
+- Start the next milestone with /gsd-new-milestone.

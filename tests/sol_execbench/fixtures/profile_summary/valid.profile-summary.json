@@ -1,0 +1,87 @@
+{
+  "artifact_citations": [
+    {
+      "kind": "trace",
+      "label": "canonical_trace_jsonl",
+      "path": "trace.jsonl",
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "status": null
+    },
+    {
+      "kind": "profile_metadata",
+      "label": "rocprofv3_profile_metadata",
+      "path": "trace.jsonl.profile.json",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "status": null
+    },
+    {
+      "kind": "profiler_artifact",
+      "label": "rocpd",
+      "path": "trace.rocpd",
+      "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "status": "success"
+    }
+  ],
+  "authority": {
+    "claim_upgrade_authority": false,
+    "confirmed_improvement_authority": false,
+    "correctness_authority": false,
+    "cutover_authority": false,
+    "diagnostic_only": true,
+    "evidence_tier_authority": false,
+    "leaderboard_authority": false,
+    "paper_parity_authority": false,
+    "performance_authority": false,
+    "release_gate_authority": false,
+    "score_authority": false,
+    "timing_authority": false
+  },
+  "identity": {
+    "generated_at": "2026-06-16T00:00:00Z",
+    "run_id": "run-current",
+    "sol_contract_version": "1.0",
+    "trace_path": "trace.jsonl"
+  },
+  "limitations": [
+    "Profile summary is diagnostic adapter input only.",
+    "Canonical Trace JSONL remains the authority for correctness, timing, scoring, and status.",
+    "Raw rocprofv3 metadata remains in the separate profile sidecar when present."
+  ],
+  "reason_code": "profile_summary_generated",
+  "schema_version": "sol_execbench.profile_summary.v1",
+  "status": "available",
+  "summary": {
+    "artifact_count": 1,
+    "artifact_kinds": {
+      "rocpd": 1
+    },
+    "command": [
+      "rocprofv3",
+      "--kernel-trace",
+      "--",
+      "python",
+      "eval_driver.py"
+    ],
+    "failed_reason": null,
+    "metrics": [
+      {
+        "name": "artifact_count",
+        "source": "rocprofv3_profile_metadata",
+        "unit": "count",
+        "value": 1
+      },
+      {
+        "name": "artifact_total_size_bytes",
+        "source": "rocprofv3_profile_metadata",
+        "unit": "bytes",
+        "value": 128
+      }
+    ],
+    "output_file": "trace",
+    "profiler_available": true,
+    "profiler_status": "success",
+    "returncode": 0,
+    "skipped_reason": null,
+    "timeout_seconds": 60
+  }
+}

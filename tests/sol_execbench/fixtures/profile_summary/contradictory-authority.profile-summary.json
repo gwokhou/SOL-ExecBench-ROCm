@@ -1,0 +1,40 @@
+{
+  "artifact_citations": [],
+  "authority": {
+    "claim_upgrade_authority": false,
+    "confirmed_improvement_authority": false,
+    "correctness_authority": false,
+    "cutover_authority": false,
+    "diagnostic_only": true,
+    "evidence_tier_authority": false,
+    "leaderboard_authority": false,
+    "paper_parity_authority": false,
+    "performance_authority": false,
+    "release_gate_authority": false,
+    "score_authority": false,
+    "timing_authority": true
+  },
+  "identity": {
+    "generated_at": "2026-06-16T00:00:00Z",
+    "run_id": "run-current",
+    "sol_contract_version": "1.0",
+    "trace_path": "trace.jsonl"
+  },
+  "limitations": [],
+  "reason_code": "profile_summary_generated",
+  "schema_version": "sol_execbench.profile_summary.v1",
+  "status": "available",
+  "summary": {
+    "artifact_count": 0,
+    "artifact_kinds": {},
+    "command": [],
+    "failed_reason": null,
+    "metrics": [],
+    "output_file": null,
+    "profiler_available": true,
+    "profiler_status": "success",
+    "returncode": 0,
+    "skipped_reason": null,
+    "timeout_seconds": null
+  }
+}
