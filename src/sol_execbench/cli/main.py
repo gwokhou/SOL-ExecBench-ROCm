@@ -52,7 +52,11 @@ from ..core.toolchain import (
     build_toolchain_routing_report,
     default_toolchain_registry,
 )
-from ..core.bench.agent_feedback import build_agent_feedback_sidecar
+from ..core.bench.agent_feedback import (
+    AgentFeedbackArtifactCitation,
+    artifact_citation_from_path,
+    build_agent_feedback_sidecar,
+)
 from ..core.bench.io import flashinfer_safetensors_env
 from ..core.bench.rocm_profiler import (
     ROCPROFV3_EXECUTABLE,
@@ -474,6 +478,9 @@ def _write_agent_feedback_sidecar(
     *,
     profile_result: Rocprofv3ProfileResult | None,
     static_evidence: StaticKernelEvidenceSidecar | None,
+    environment_sidecar_path: Path | None = None,
+    profile_sidecar_path: Path | None = None,
+    static_evidence_sidecar_path: Path | None = None,
 ) -> Path | None:
     """Write optional agent feedback metadata without changing trace JSONL."""
 
@@ -486,6 +493,13 @@ def _write_agent_feedback_sidecar(
             traces=traces,
             profile_result=profile_result,
             static_evidence=static_evidence,
+            trace_path=str(output_file) if output_file is not None else None,
+            artifact_citations=_agent_feedback_artifact_citations(
+                output_file=output_file,
+                environment_sidecar_path=environment_sidecar_path,
+                profile_sidecar_path=profile_sidecar_path,
+                static_evidence_sidecar_path=static_evidence_sidecar_path,
+            ),
         )
         sidecar_path.parent.mkdir(parents=True, exist_ok=True)
         sidecar_path.write_text(
@@ -496,6 +510,36 @@ def _write_agent_feedback_sidecar(
     except Exception as exc:
         console.print(f"[yellow]Agent feedback metadata skipped: {exc}[/yellow]")
         return None
+
+
+def _agent_feedback_artifact_citations(
+    *,
+    output_file: Path | None,
+    environment_sidecar_path: Path | None,
+    profile_sidecar_path: Path | None,
+    static_evidence_sidecar_path: Path | None,
+) -> list[AgentFeedbackArtifactCitation]:
+    """Return compact citations for artifacts written during this CLI run."""
+
+    citations: list[AgentFeedbackArtifactCitation] = []
+    if output_file is not None:
+        citations.append(
+            artifact_citation_from_path(
+                kind="trace",
+                label="canonical_trace_jsonl",
+                path=output_file,
+            )
+        )
+    for kind, label, path in (
+        ("environment", "environment_snapshot", environment_sidecar_path),
+        ("profile", "rocprofv3_profile", profile_sidecar_path),
+        ("static_evidence", "static_kernel_evidence", static_evidence_sidecar_path),
+    ):
+        if path is not None:
+            citations.append(
+                artifact_citation_from_path(kind=kind, label=label, path=path)
+            )
+    return citations
 
 
 def _collect_static_evidence_for_cli(
@@ -897,14 +941,21 @@ def _evaluate_cli(
                 f.write(json.dumps(t.model_dump(mode="json")) + "\n")
         console.print(f"[green]Saved {len(traces)} traces to {output_file}[/green]")
 
-    _write_environment_snapshot_sidecar(output_file)
-    _write_profile_sidecar(output_file, profile_result)
-    _write_static_evidence_sidecar(output_file, staging_dir, static_evidence_result)
+    environment_sidecar_path = _write_environment_snapshot_sidecar(output_file)
+    profile_sidecar_path = _write_profile_sidecar(output_file, profile_result)
+    static_evidence_sidecar_path = _write_static_evidence_sidecar(
+        output_file,
+        staging_dir,
+        static_evidence_result,
+    )
     _write_agent_feedback_sidecar(
         output_file,
         traces,
         profile_result=profile_result,
         static_evidence=static_evidence_result,
+        environment_sidecar_path=environment_sidecar_path,
+        profile_sidecar_path=profile_sidecar_path,
+        static_evidence_sidecar_path=static_evidence_sidecar_path,
     )
 
     if json_output:

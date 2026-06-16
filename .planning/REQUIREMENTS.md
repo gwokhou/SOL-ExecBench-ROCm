@@ -42,13 +42,13 @@ ExecBench.
 
 ### Freshness and Artifact Identity
 
-- [ ] **IDEN-01**: Sidecars include freshness identity covering trace path,
+- [x] **IDEN-01**: Sidecars include freshness identity covering trace path,
   generated timestamp, SOL contract version, target/run identity when available,
   candidate/source hash when available, and referenced artifact checksums.
-- [ ] **IDEN-02**: Artifact citations use compact path/checksum references for
+- [x] **IDEN-02**: Artifact citations use compact path/checksum references for
   profile, static evidence, environment, stability, and trace-adjacent inputs
   without leaking raw profiler directories into prompt-facing summaries.
-- [ ] **IDEN-03**: Validator helpers classify stale or identity-mismatched
+- [x] **IDEN-03**: Validator helpers classify stale or identity-mismatched
   sidecars as diagnostic invalid/stale states while leaving canonical trace
   validity unchanged.
 
@@ -111,9 +111,9 @@ ExecBench.
 | SIDE-02 | Phase 182 | Complete |
 | SIDE-03 | Phase 182 | Complete |
 | SIDE-04 | Phase 182 | Complete |
-| IDEN-01 | Phase 183 | Pending |
-| IDEN-02 | Phase 183 | Pending |
-| IDEN-03 | Phase 183 | Pending |
+| IDEN-01 | Phase 183 | Complete |
+| IDEN-02 | Phase 183 | Complete |
+| IDEN-03 | Phase 183 | Complete |
 | GOVR-01 | Phase 184 | Pending |
 | GOVR-02 | Phase 184 | Pending |
 | GOVR-03 | Phase 184 | Pending |
