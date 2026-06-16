@@ -124,6 +124,10 @@ denominator reports, parity gaps, consistency reports, stability reports, and
 trust summaries should remain separate from public benchmark schemas unless a
 schema change is intentional and tested.
 
+See `docs/EVALUATOR-CONTRACT.md` for the downstream compatibility contract,
+including optional diagnostic feedback/profile-summary sidecar capabilities and
+their authority boundaries.
+
 Recent milestones moved focused debt out of monolithic paths without changing
 public benchmark schemas.
 

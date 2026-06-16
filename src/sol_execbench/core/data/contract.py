@@ -82,6 +82,8 @@ def build_evaluator_contract() -> EvaluatorContract:
             "profiling.evidence.v1",
             "toolchain.routing.v1",
             "static_kernel_evidence.v1",
+            "agent_feedback.sidecar.v1",
+            "profile_summary.sidecar.v1",
         ],
         trace_field_requirements={
             "top_level": ["definition", "workload", "solution", "evaluation"],
@@ -190,5 +192,7 @@ def build_evaluator_contract() -> EvaluatorContract:
             "Measured baseline registry evidence is distinct from SOL scoring baseline artifacts.",
             "Toolchain routing reports availability and provenance only; it is not correctness, performance, or score authority.",
             "Static kernel evidence is diagnostic sidecar metadata only; it is not correctness, performance, timing, score, paper-parity, or leaderboard authority.",
+            "Agent feedback and profile summary sidecars are diagnostic next-experiment guidance only; they are not correctness, performance, timing, score, evidence-tier, confirmed-improvement, release-gate, cutover, paper-parity, or leaderboard authority.",
+            "SOL owns optional feedback sidecar schema, generation, freshness identity, citations, and authority guardrails; HIP consumers own adapter normalization, ProfileDigest mapping, strategy hints, and prompt assembly.",
         ],
     )

@@ -27,6 +27,8 @@ OPTIONAL_CAPABILITIES = {
     "profiling.evidence.v1",
     "toolchain.routing.v1",
     "static_kernel_evidence.v1",
+    "agent_feedback.sidecar.v1",
+    "profile_summary.sidecar.v1",
 }
 
 
@@ -60,8 +62,24 @@ def test_evaluator_contract_advertises_optional_evidence_without_bump():
     assert "static_kernel_evidence" not in payload["correctness_fields"]
     assert "static_kernel_evidence" not in payload["timing_fields"]
     assert "static_kernel_evidence" not in payload["scoring_fields"]
+    for forbidden in ("agent_feedback", "profile_summary"):
+        assert forbidden not in payload["trace_field_requirements"]
+        assert forbidden not in payload["correctness_fields"]
+        assert forbidden not in payload["timing_fields"]
+        assert forbidden not in payload["scoring_fields"]
     assert any(
         "Static kernel evidence is diagnostic sidecar metadata only" in claim
+        for claim in payload["source_boundary_claims"]
+    )
+    assert any(
+        "Agent feedback and profile summary sidecars are diagnostic" in claim
+        and "release-gate" in claim
+        and "cutover" in claim
+        for claim in payload["source_boundary_claims"]
+    )
+    assert any(
+        "SOL owns optional feedback sidecar schema" in claim
+        and "HIP consumers own adapter normalization" in claim
         for claim in payload["source_boundary_claims"]
     )
 
@@ -125,3 +143,5 @@ def test_contract_cli_json_outputs_builder_payload_without_problem_directory():
     assert payload["schema_version"] == "sol_execbench.evaluator_contract.v1"
     assert REQUIRED_CAPABILITIES.issubset(set(payload["capabilities"]))
     assert "static_kernel_evidence.v1" in payload["capabilities"]
+    assert "agent_feedback.sidecar.v1" in payload["capabilities"]
+    assert "profile_summary.sidecar.v1" in payload["capabilities"]
