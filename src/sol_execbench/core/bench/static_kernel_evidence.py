@@ -462,7 +462,7 @@ def _discover_static_artifact_paths(
         if not _is_contained_file(path, build_root):
             continue
         resolved = path.resolve()
-        if _is_relative_to(resolved, evidence_root):
+        if resolved.is_relative_to(evidence_root):
             continue
         if resolved == primary_artifact.resolve():
             continue
@@ -495,7 +495,7 @@ def _discover_manifest_static_artifact_paths(
         if not _is_contained_file(path, build_root):
             continue
         resolved = path.resolve()
-        if _is_relative_to(resolved, evidence_root):
+        if resolved.is_relative_to(evidence_root):
             continue
         if _static_artifact_type(path) is None:
             continue
@@ -598,15 +598,7 @@ def _is_contained_file(path: Path, root: Path) -> bool:
         resolved = path.resolve(strict=True)
     except FileNotFoundError:
         return False
-    return resolved.is_file() and _is_relative_to(resolved, root)
-
-
-def _is_relative_to(path: Path, root: Path) -> bool:
-    try:
-        path.relative_to(root)
-    except ValueError:
-        return False
-    return True
+    return resolved.is_file() and resolved.is_relative_to(root)
 
 
 def _artifact_id(relative_path: Path) -> str:
