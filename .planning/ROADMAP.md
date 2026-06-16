@@ -89,7 +89,7 @@ and read the authority boundary before implementation.
 
 **Plans:** 1 plan
 
-- [ ] 181-01-PLAN.md -- Optional feedback capability tokens, contract tests,
+- [x] 181-01-PLAN.md -- Optional feedback capability tokens, contract tests,
   and evaluator-contract documentation.
 
 ### Phase 182: Diagnostic Sidecar Schema and Generator
@@ -113,9 +113,9 @@ diagnostics for agent next-step guidance without changing benchmark execution.
 
 **Plans:** 2 plans
 
-- [ ] 182-01-PLAN.md -- Agent-feedback sidecar schema, builder, authority
+- [x] 182-01-PLAN.md -- Agent-feedback sidecar schema, builder, authority
   fields, and unit tests.
-- [ ] 182-02-PLAN.md -- CLI/evaluation wiring to persist optional sidecars from
+- [x] 182-02-PLAN.md -- CLI/evaluation wiring to persist optional sidecars from
   bounded diagnostic inputs.
 
 ### Phase 183: Freshness Identity and Artifact References
