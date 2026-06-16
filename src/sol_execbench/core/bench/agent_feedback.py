@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Sequence
-from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 from typing import Literal
@@ -22,6 +21,7 @@ from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 from sol_execbench.core.data.contract import SOL_EXECBENCH_CONTRACT_VERSION
 from sol_execbench.core.data.trace import EvaluationStatus, Trace
 from sol_execbench.core.dataset.checksums import sha256_file
+from sol_execbench.core.trust_summary import utc_timestamp
 
 
 AGENT_FEEDBACK_SCHEMA_VERSION = "sol_execbench.agent_feedback.v1"
@@ -263,7 +263,7 @@ def build_agent_feedback_sidecar(
     """Build a bounded diagnostic feedback sidecar from existing evaluation data."""
 
     evaluated = [trace for trace in traces if trace.evaluation is not None]
-    counts = Counter(trace.evaluation.status.value for trace in evaluated)
+    status_counter = Counter(trace.evaluation.status for trace in evaluated)
     status = _aggregate_status(evaluated, profile_result, static_evidence)
     reason_code = (
         AgentFeedbackReasonCode.NO_EVALUATION_TRACES
@@ -279,7 +279,7 @@ def build_agent_feedback_sidecar(
         status=status,
         reason_code=reason_code,
         identity=AgentFeedbackIdentity(
-            generated_at=generated_at or _utc_timestamp(),
+            generated_at=generated_at or utc_timestamp(),
             sol_contract_version=SOL_EXECBENCH_CONTRACT_VERSION,
             trace_path=_compact_path(trace_path),
             target_id=target_id,
@@ -290,13 +290,17 @@ def build_agent_feedback_sidecar(
         summary=AgentFeedbackSummary(
             trace_count=len(traces),
             evaluated_trace_count=len(evaluated),
-            status_counts=dict(sorted(counts.items())),
+            status_counts=dict(
+                sorted(
+                    (status.value, count) for status, count in status_counter.items()
+                )
+            ),
             profile_status=profile_result.status if profile_result else None,
             static_evidence_status=(
                 static_evidence.status.value if static_evidence else None
             ),
         ),
-        items=_trace_feedback_items(evaluated),
+        items=_trace_feedback_items(status_counter),
         limitations=_limitations(traces, profile_result, static_evidence),
         source_refs=_source_refs(profile_result, static_evidence),
         artifact_citations=list(artifact_citations),
@@ -309,10 +313,15 @@ def artifact_citation_from_path(
     path: Path,
     label: str | None = None,
     status: str | None = None,
+    sha256: str | None = None,
 ) -> AgentFeedbackArtifactCitation:
     """Build a compact citation from an artifact path."""
 
-    checksum = sha256_file(path) if path.is_file() else None
+    checksum = (
+        sha256
+        if sha256 is not None
+        else (sha256_file(path) if path.is_file() else None)
+    )
     return AgentFeedbackArtifactCitation(
         kind=kind,
         label=label or path.name,
@@ -417,10 +426,6 @@ def _aggregate_status(
     return AgentFeedbackStatus.AVAILABLE
 
 
-def _utc_timestamp() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-
 def _compact_path(path: str | None) -> str | None:
     if path is None:
         return None
@@ -461,14 +466,15 @@ def _source_refs(
     return refs
 
 
-def _trace_feedback_items(traces: Sequence[Trace]) -> list[AgentFeedbackItem]:
+def _trace_feedback_items(
+    status_counter: Counter[EvaluationStatus],
+) -> list[AgentFeedbackItem]:
     items: list[AgentFeedbackItem] = []
-    status_counts = Counter(trace.evaluation.status for trace in traces)
-    for status, count in sorted(status_counts.items(), key=lambda item: item[0].value):
+    for status, count in sorted(status_counter.items(), key=lambda item: item[0].value):
         item = _item_for_status(status, count)
         if item is not None:
             items.append(item)
-    if not items and traces:
+    if not items and status_counter:
         items.append(
             AgentFeedbackItem(
                 code="all_evaluated_traces_passed",

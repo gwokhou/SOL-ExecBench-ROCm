@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 from typing import Literal
@@ -17,6 +16,7 @@ from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileResult
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 from sol_execbench.core.data.contract import SOL_EXECBENCH_CONTRACT_VERSION
 from sol_execbench.core.dataset.checksums import sha256_file
+from sol_execbench.core.trust_summary import utc_timestamp
 
 
 PROFILE_SUMMARY_SCHEMA_VERSION = "sol_execbench.profile_summary.v1"
@@ -226,7 +226,7 @@ def build_profile_summary_sidecar(
         status=status,
         reason_code=reason_code,
         identity=ProfileSummaryIdentity(
-            generated_at=generated_at or _utc_timestamp(),
+            generated_at=generated_at or utc_timestamp(),
             sol_contract_version=SOL_EXECBENCH_CONTRACT_VERSION,
             trace_path=_compact_path(trace_path),
             run_id=run_id,
@@ -243,10 +243,15 @@ def profile_summary_artifact_citation_from_path(
     path: Path,
     label: str | None = None,
     status: str | None = None,
+    sha256: str | None = None,
 ) -> ProfileSummaryArtifactCitation:
     """Build a compact citation from a profile-summary artifact path."""
 
-    checksum = sha256_file(path) if path.is_file() else None
+    checksum = (
+        sha256
+        if sha256 is not None
+        else (sha256_file(path) if path.is_file() else None)
+    )
     return ProfileSummaryArtifactCitation(
         kind=kind,
         label=label or path.name,
@@ -407,10 +412,6 @@ def _limitations(profile_result: Rocprofv3ProfileResult | None) -> list[str]:
     elif not profile_result.artifacts:
         limitations.append("rocprofv3 profile completed without registered artifacts.")
     return limitations
-
-
-def _utc_timestamp() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def _compact_path(path: str | None) -> str | None:
