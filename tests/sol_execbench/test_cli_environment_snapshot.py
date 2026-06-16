@@ -14,6 +14,13 @@ from sol_execbench.core.bench.static_kernel_evidence import (
     StaticKernelEvidenceStatus,
     build_static_kernel_evidence_sidecar,
 )
+from sol_execbench.core.data.solution import (
+    BuildSpec,
+    Solution,
+    SourceFile,
+    SupportedHardware,
+    SupportedLanguages,
+)
 from sol_execbench.core.data.trace import Environment, Evaluation, EvaluationStatus, Trace
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.environment import (
@@ -28,6 +35,20 @@ def _snapshot() -> EnvironmentSnapshot:
     return EnvironmentSnapshot(
         generated_at="2026-05-25T00:00:00+00:00",
         collection_status=EnvironmentEvidenceStatus.AVAILABLE,
+    )
+
+
+def _solution(source: str = "def run(x):\n    return x\n") -> Solution:
+    return Solution(
+        name="candidate",
+        definition="toy",
+        author="agent",
+        spec=BuildSpec(
+            languages=[SupportedLanguages.PYTORCH],
+            target_hardware=[SupportedHardware.LOCAL],
+            entry_point="solution.py::run",
+        ),
+        sources=[SourceFile(path="solution.py", content=source)],
     )
 
 
@@ -372,6 +393,7 @@ def test_agent_feedback_sidecar_tracks_trace_output(tmp_path: Path):
 def test_agent_feedback_sidecar_records_bounded_metadata(tmp_path: Path):
     output = tmp_path / "trace.jsonl"
     output.write_text('{"definition":"toy"}\n')
+    solution = _solution()
     trace = Trace(
         definition="toy",
         solution="candidate",
@@ -390,6 +412,7 @@ def test_agent_feedback_sidecar_records_bounded_metadata(tmp_path: Path):
     written = cli_main._write_agent_feedback_sidecar(
         output,
         [trace],
+        solution=solution,
         profile_result=None,
         static_evidence=None,
     )
@@ -407,7 +430,7 @@ def test_agent_feedback_sidecar_records_bounded_metadata(tmp_path: Path):
     assert len(payload["identity"]["run_id"]) == 64
     assert payload["identity"]["candidate_hash"] is not None
     assert len(payload["identity"]["candidate_hash"]) == 64
-    assert payload["identity"]["source_hash"] is None
+    assert payload["identity"]["source_hash"] == solution.hash()
     assert payload["summary"]["status_counts"] == {"COMPILE_ERROR": 1}
     assert payload["items"][0]["code"] == "compile_error"
     trace_citations = [
@@ -427,6 +450,45 @@ def test_agent_feedback_sidecar_records_bounded_metadata(tmp_path: Path):
     assert trace_citations[0]["sha256"] is not None
     assert len(trace_citations[0]["sha256"]) == 64
     assert "raw" not in json.dumps(payload).lower()
+
+
+def test_agent_feedback_identity_uses_solution_source_hash(tmp_path: Path):
+    output = tmp_path / "trace.jsonl"
+    output.write_text('{"definition":"toy"}\n')
+    trace = Trace(
+        definition="toy",
+        solution="candidate",
+        workload=Workload(
+            uuid="w0",
+            axes={"n": 1},
+            inputs={"n": {"type": "scalar", "value": 1}},
+        ),
+        evaluation=Evaluation(
+            status=EvaluationStatus.COMPILE_ERROR,
+            environment=Environment(hardware="AMD gfx1200", libs={"hip": "7.0"}),
+            timestamp="2026-06-16T00:00:00Z",
+        ),
+    )
+    first = _solution("def run(x):\n    return x\n")
+    second = _solution("def run(x):\n    return x + 1\n")
+
+    first_identity = cli_main._agent_feedback_identity_fields(
+        output,
+        [trace],
+        solution=first,
+    )
+    second_identity = cli_main._agent_feedback_identity_fields(
+        output,
+        [trace],
+        solution=second,
+    )
+    no_solution_identity = cli_main._agent_feedback_identity_fields(output, [trace])
+
+    assert first_identity["candidate_hash"] == second_identity["candidate_hash"]
+    assert first_identity["source_hash"] == first.hash()
+    assert second_identity["source_hash"] == second.hash()
+    assert first_identity["source_hash"] != second_identity["source_hash"]
+    assert no_solution_identity["source_hash"] is None
 
 
 def test_static_evidence_none_does_not_collect(tmp_path: Path):

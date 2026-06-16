@@ -477,6 +477,7 @@ def _write_agent_feedback_sidecar(
     output_file: Path | None,
     traces: list[Trace],
     *,
+    solution: Solution | None = None,
     profile_result: Rocprofv3ProfileResult | None,
     static_evidence: StaticKernelEvidenceSidecar | None,
     environment_sidecar_path: Path | None = None,
@@ -490,7 +491,11 @@ def _write_agent_feedback_sidecar(
         return None
 
     try:
-        identity_fields = _agent_feedback_identity_fields(output_file, traces)
+        identity_fields = _agent_feedback_identity_fields(
+            output_file,
+            traces,
+            solution=solution,
+        )
         sidecar = build_agent_feedback_sidecar(
             traces=traces,
             profile_result=profile_result,
@@ -521,6 +526,8 @@ def _write_agent_feedback_sidecar(
 def _agent_feedback_identity_fields(
     output_file: Path | None,
     traces: Sequence[Trace],
+    *,
+    solution: Solution | None = None,
 ) -> dict[str, str | None]:
     """Derive stable feedback freshness identity from emitted trace data."""
 
@@ -543,9 +550,7 @@ def _agent_feedback_identity_fields(
         "candidate_hash": (
             stable_json_checksum(solution_labels) if solution_labels else None
         ),
-        # Trace rows do not include source contents; producers with source access
-        # can fill this field through build_agent_feedback_sidecar directly.
-        "source_hash": None,
+        "source_hash": solution.hash() if solution is not None else None,
     }
 
 
@@ -1003,6 +1008,7 @@ def _evaluate_cli(
     _write_agent_feedback_sidecar(
         output_file,
         traces,
+        solution=solution,
         profile_result=profile_result,
         static_evidence=static_evidence_result,
         environment_sidecar_path=environment_sidecar_path,

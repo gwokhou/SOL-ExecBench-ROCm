@@ -160,6 +160,8 @@ def test_agent_feedback_docs_explain_hip_mapping_and_fixture_semantics():
         "limitation",
         "artifact_citations",
         "identity.target_id",
+        "source_hash",
+        "solution content hash",
         "compile_failure",
         "profile_summary.sidecar.v1",
         "unknown values must be downgraded",
