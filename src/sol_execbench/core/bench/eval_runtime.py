@@ -14,16 +14,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-from sol_execbench.core import Solution, SupportedLanguages, Trace
+from sol_execbench.core import Solution, Trace
 from sol_execbench.core.bench.reward_hack import RewardHackDetected
-
-NATIVE_ROCM_LANGUAGES = {
-    SupportedLanguages.HIP_CPP,
-    SupportedLanguages.HIPBLAS,
-    SupportedLanguages.MIOPEN,
-    SupportedLanguages.CK,
-    SupportedLanguages.ROCWMMA,
-}
+from sol_execbench.core.data.solution import NATIVE_ROCM_LANGUAGES
 
 
 @dataclass(frozen=True)

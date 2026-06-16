@@ -51,6 +51,18 @@ class SupportedLanguages(str, Enum):
     """rocWMMA native ROCm implementation."""
 
 
+NATIVE_ROCM_LANGUAGES = frozenset(
+    {
+        SupportedLanguages.HIP_CPP,
+        SupportedLanguages.HIPBLAS,
+        SupportedLanguages.MIOPEN,
+        SupportedLanguages.CK,
+        SupportedLanguages.ROCWMMA,
+    }
+)
+"""Native ROCm (HIP/C++ and library/DSL) language categories."""
+
+
 class SupportedHardware(str, Enum):
     """Supported hardware targets for solution implementations.
 
@@ -281,19 +293,14 @@ class BuildSpec(BaseModelWithDocstrings):
         """
 
         python_languages = [SupportedLanguages.PYTORCH, SupportedLanguages.TRITON]
-        cpp_languages = [
-            SupportedLanguages.HIP_CPP,
-            SupportedLanguages.HIPBLAS,
-            SupportedLanguages.MIOPEN,
-            SupportedLanguages.CK,
-            SupportedLanguages.ROCWMMA,
-        ]
 
         included_python_langs = [
             language for language in self.languages if language in python_languages
         ]
         included_cpp_langs = [
-            language for language in self.languages if language in cpp_languages
+            language
+            for language in self.languages
+            if language in NATIVE_ROCM_LANGUAGES
         ]
         if len(included_cpp_langs) and len(included_python_langs):
             raise ValueError(
