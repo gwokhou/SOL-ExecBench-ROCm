@@ -140,3 +140,22 @@ def test_v1_20_docs_keep_required_negative_claim_boundaries_visible():
         "score authority",
     ):
         assert expected in combined
+
+
+def test_agent_feedback_claim_boundaries_are_documented():
+    combined = "\n".join(
+        [
+            GUIDE.read_text(encoding="utf-8"),
+            _read("docs/CLAIMS.md"),
+        ]
+    )
+
+    for expected in (
+        "Agent Feedback Sidecar",
+        "next-experiment guidance",
+        "stale, unknown, partial, or unavailable feedback sidecars",
+        "do not feed claim-upgrade eligibility",
+        "release-gate, cutover, paper-parity, or leaderboard",
+        "canonical Trace JSONL validity",
+    ):
+        assert expected in combined

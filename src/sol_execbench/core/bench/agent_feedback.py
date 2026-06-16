@@ -60,6 +60,15 @@ class AgentFeedbackFreshnessStatus(str, Enum):
     UNKNOWN = "unknown"
 
 
+class AgentFeedbackGovernanceStatus(str, Enum):
+    """Diagnostic governance status for a feedback sidecar."""
+
+    USABLE_DIAGNOSTIC = "usable_diagnostic"
+    STALE_DIAGNOSTIC = "stale_diagnostic"
+    UNAVAILABLE = "unavailable"
+    INVALID_DIAGNOSTIC = "invalid_diagnostic"
+
+
 class AgentFeedbackSourceRef(BaseModelWithDocstrings):
     """Compact reference to source evidence used by the feedback sidecar."""
 
@@ -120,6 +129,29 @@ class AgentFeedbackFreshnessValidation(BaseModelWithDocstrings):
     """Freshness result."""
     reason_codes: list[str] = Field(default_factory=list)
     """Stable reason codes explaining stale or unknown status."""
+
+
+class AgentFeedbackGovernanceGuardrail(BaseModelWithDocstrings):
+    """Authority boundary after optional sidecar governance checks."""
+
+    model_config = _MODEL_CONFIG
+
+    status: AgentFeedbackGovernanceStatus
+    """Diagnostic governance status."""
+    reason_codes: list[str] = Field(default_factory=list)
+    """Stable reason codes for unavailable, stale, or invalid states."""
+    diagnostic_only: Literal[True] = True
+    correctness_authority: Literal[False] = False
+    performance_authority: Literal[False] = False
+    timing_authority: Literal[False] = False
+    score_authority: Literal[False] = False
+    evidence_tier_authority: Literal[False] = False
+    confirmed_improvement_authority: Literal[False] = False
+    release_gate_authority: Literal[False] = False
+    cutover_authority: Literal[False] = False
+    paper_parity_authority: Literal[False] = False
+    leaderboard_authority: Literal[False] = False
+    claim_upgrade_authority: Literal[False] = False
 
 
 class AgentFeedbackItem(BaseModelWithDocstrings):
@@ -318,6 +350,42 @@ def validate_agent_feedback_freshness(
         )
     return AgentFeedbackFreshnessValidation(
         status=AgentFeedbackFreshnessStatus.CURRENT,
+    )
+
+
+def evaluate_agent_feedback_governance(
+    *,
+    sidecar: AgentFeedbackSidecar | None,
+    freshness: AgentFeedbackFreshnessValidation | None = None,
+    parse_error: str | None = None,
+) -> AgentFeedbackGovernanceGuardrail:
+    """Return diagnostic-only governance state for an optional feedback sidecar."""
+
+    if parse_error is not None:
+        return AgentFeedbackGovernanceGuardrail(
+            status=AgentFeedbackGovernanceStatus.INVALID_DIAGNOSTIC,
+            reason_codes=["sidecar_parse_error"],
+        )
+    if sidecar is None:
+        return AgentFeedbackGovernanceGuardrail(
+            status=AgentFeedbackGovernanceStatus.UNAVAILABLE,
+            reason_codes=["sidecar_missing"],
+        )
+    if freshness is not None and freshness.status == AgentFeedbackFreshnessStatus.STALE:
+        return AgentFeedbackGovernanceGuardrail(
+            status=AgentFeedbackGovernanceStatus.STALE_DIAGNOSTIC,
+            reason_codes=freshness.reason_codes or ["sidecar_stale"],
+        )
+    if (
+        freshness is not None
+        and freshness.status == AgentFeedbackFreshnessStatus.UNKNOWN
+    ):
+        return AgentFeedbackGovernanceGuardrail(
+            status=AgentFeedbackGovernanceStatus.UNAVAILABLE,
+            reason_codes=freshness.reason_codes or ["sidecar_freshness_unknown"],
+        )
+    return AgentFeedbackGovernanceGuardrail(
+        status=AgentFeedbackGovernanceStatus.USABLE_DIAGNOSTIC,
     )
 
 

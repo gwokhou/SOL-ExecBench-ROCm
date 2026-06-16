@@ -73,6 +73,14 @@ does not create correctness, timing, score, paper-parity, native-host, or
 leaderboard authority. Claim-upgrade reports evaluate prerequisites only and do
 not mutate source authority fields. Trust summaries are review guidance only.
 
+Agent-feedback sidecars are separate next-experiment guidance. Valid, missing,
+malformed, contradictory-authority, stale, unknown, partial, or unavailable
+`sol_execbench.agent_feedback.v1` payloads do not feed claim-upgrade eligibility
+and do not create correctness, timing, score, evidence-tier,
+confirmed-improvement, release-gate, cutover, paper-parity, or leaderboard
+authority. Consumers must treat freshness mismatches as diagnostic stale states
+without changing canonical Trace JSONL validity.
+
 ## Fixtures
 
 Demo-only fixtures live under `docs/examples/v1_20_evidence_quality/`. They show

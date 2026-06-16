@@ -7,10 +7,10 @@ last_updated: "2026-06-16T00:00:00.000Z"
 last_activity: 2026-06-16
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 6
-  completed_plans: 4
-  percent: 60
+  completed_plans: 5
+  percent: 80
 ---
 
 # Project State
@@ -26,10 +26,10 @@ ExecBench.
 
 ## Current Position
 
-Phase: 184
+Phase: 185
 Plan: Not started
-Status: Phase 183 complete; ready for Governance Guardrails and Compatibility Fixtures
-Last activity: 2026-06-16 — Phase 183 completed
+Status: Phase 184 complete; ready for HIP Consumer Integration Package and Docs
+Last activity: 2026-06-16 — Phase 184 completed
 
 ## Recent Trend
 
@@ -53,7 +53,7 @@ Last activity: 2026-06-16 — Phase 183 completed
 | 181 - Feedback Contract and Capability Surface | Optional feedback/profile-summary capabilities and documentation boundaries without canonical trace drift | CNTR-01, CNTR-02, CNTR-03 | Complete |
 | 182 - Diagnostic Sidecar Schema and Generator | Strict `sol_execbench.agent_feedback.v1` schema and `trace.jsonl.agent-feedback.json` persistence | SIDE-01, SIDE-02, SIDE-03, SIDE-04 | Complete |
 | 183 - Freshness Identity and Artifact References | Trace/run/candidate identity plus compact artifact citations for stale-feedback detection | IDEN-01, IDEN-02, IDEN-03 | Complete |
-| 184 - Governance Guardrails and Compatibility Fixtures | Diagnostic-only authority validation and release/claim guardrails | GOVR-01, GOVR-02, GOVR-03 | Not started |
+| 184 - Governance Guardrails and Compatibility Fixtures | Diagnostic-only authority validation and release/claim guardrails | GOVR-01, GOVR-02, GOVR-03 | Complete |
 | 185 - HIP Consumer Integration Package and Docs | HIP-facing fixtures, examples, mapping notes, and deterministic fixture tests | FIXT-01, FIXT-02, FIXT-03 | Not started |
 
 ## Quick Tasks Completed
@@ -82,7 +82,7 @@ Last activity: 2026-06-16 — Phase 183 completed
 
 ### Pending Todos
 
-- Continue with Phase 184 governance guardrails and compatibility fixtures.
+- Continue with Phase 185 HIP consumer integration package and docs.
 - Coordinate the generated sidecar fixture shape with HIP Playground Phase 141
   before HIP adapter implementation begins.
 
@@ -115,4 +115,4 @@ Resume file: None
 
 ## Operator Next Steps
 
-- `$gsd-plan-phase 184` — plan Phase 184 (Governance Guardrails and Compatibility Fixtures)
+- `$gsd-plan-phase 185` — plan Phase 185 (HIP Consumer Integration Package and Docs)

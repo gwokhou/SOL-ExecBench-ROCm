@@ -38,7 +38,7 @@ timing, scoring, and release-gate semantics.
 - [x] **Phase 183: Freshness Identity and Artifact References** -- Attach
   trace/run/candidate identity and compact artifact citations so consumers can
   reject stale or mismatched feedback.
-- [ ] **Phase 184: Governance Guardrails and Compatibility Fixtures** -- Prove
+- [x] **Phase 184: Governance Guardrails and Compatibility Fixtures** -- Prove
   sidecars remain diagnostic-only across valid, invalid, stale, and
   contradictory states.
 - [ ] **Phase 185: HIP Consumer Integration Package and Docs** -- Provide
@@ -157,7 +157,7 @@ benchmark authority or release decisions.
 
 **Plans:** 1 plan
 
-- [ ] 184-01-PLAN.md -- Governance validators, authority guardrails, and
+- [x] 184-01-PLAN.md -- Governance validators, authority guardrails, and
   evidence-quality documentation updates.
 
 ### Phase 185: HIP Consumer Integration Package and Docs
@@ -187,5 +187,5 @@ SOL fixtures and examples.
 | 181. Feedback Contract and Capability Surface | 1/1 | Complete | 2026-06-16 |
 | 182. Diagnostic Sidecar Schema and Generator | 2/2 | Complete | 2026-06-16 |
 | 183. Freshness Identity and Artifact References | 1/1 | Complete | 2026-06-16 |
-| 184. Governance Guardrails and Compatibility Fixtures | 0/1 | Not started | - |
+| 184. Governance Guardrails and Compatibility Fixtures | 1/1 | Complete | 2026-06-16 |
 | 185. HIP Consumer Integration Package and Docs | 0/1 | Not started | - |
