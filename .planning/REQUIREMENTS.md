@@ -24,19 +24,19 @@ ExecBench.
 
 ### Sidecar Schema and Generation
 
-- [ ] **SIDE-01**: Maintainer can validate a strict
+- [x] **SIDE-01**: Maintainer can validate a strict
   `sol_execbench.agent_feedback.v1` sidecar schema with bounded status,
   reason-code, bottleneck, recommendation, limitation, authority, and citation
   fields.
-- [ ] **SIDE-02**: Evaluation runs with a trace output path can persist
+- [x] **SIDE-02**: Evaluation runs with a trace output path can persist
   `trace.jsonl.agent-feedback.json` beside the canonical trace without changing
   trace emission, evaluation status, or existing profile/static/environment
   sidecar behavior.
-- [ ] **SIDE-03**: Sidecar generation summarizes existing trace/profile/static
+- [x] **SIDE-03**: Sidecar generation summarizes existing trace/profile/static
   evidence/evaluation-stability inputs into prompt-safe bottleneck,
   recommendation, and limitation entries without embedding raw trace rows, raw
   profiler dumps, full source, prompt text, or unstable absolute temporary paths.
-- [ ] **SIDE-04**: Missing, skipped, unavailable, partial, and failed optional
+- [x] **SIDE-04**: Missing, skipped, unavailable, partial, and failed optional
   diagnostic inputs produce explicit sidecar availability and limitation states
   instead of failing benchmark execution.
 
@@ -107,10 +107,10 @@ ExecBench.
 | CNTR-01 | Phase 181 | Complete |
 | CNTR-02 | Phase 181 | Complete |
 | CNTR-03 | Phase 181 | Complete |
-| SIDE-01 | Phase 182 | Pending |
-| SIDE-02 | Phase 182 | Pending |
-| SIDE-03 | Phase 182 | Pending |
-| SIDE-04 | Phase 182 | Pending |
+| SIDE-01 | Phase 182 | Complete |
+| SIDE-02 | Phase 182 | Complete |
+| SIDE-03 | Phase 182 | Complete |
+| SIDE-04 | Phase 182 | Complete |
 | IDEN-01 | Phase 183 | Pending |
 | IDEN-02 | Phase 183 | Pending |
 | IDEN-03 | Phase 183 | Pending |

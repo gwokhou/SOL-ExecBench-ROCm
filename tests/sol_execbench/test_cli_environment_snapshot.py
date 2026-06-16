@@ -14,6 +14,8 @@ from sol_execbench.core.bench.static_kernel_evidence import (
     StaticKernelEvidenceStatus,
     build_static_kernel_evidence_sidecar,
 )
+from sol_execbench.core.data.trace import Environment, Evaluation, EvaluationStatus, Trace
+from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.environment import (
     EnvironmentCheckResult,
     EnvironmentDiagnostics,
@@ -356,6 +358,50 @@ def test_static_evidence_sidecar_writes_summary(tmp_path: Path):
     assert payload["summary"]["artifact_count"] == 1
     assert payload["summary"]["claim_boundaries"]["diagnostic_only"] is True
     assert payload["summary"]["claim_boundaries"]["score_authority"] is False
+
+
+def test_agent_feedback_sidecar_tracks_trace_output(tmp_path: Path):
+    output = tmp_path / "trace.jsonl"
+
+    assert cli_main._agent_feedback_sidecar_path(output) == (
+        tmp_path / "trace.jsonl.agent-feedback.json"
+    )
+    assert cli_main._agent_feedback_sidecar_path(None) is None
+
+
+def test_agent_feedback_sidecar_records_bounded_metadata(tmp_path: Path):
+    output = tmp_path / "trace.jsonl"
+    trace = Trace(
+        definition="toy",
+        solution="candidate",
+        workload=Workload(
+            uuid="w0",
+            axes={"n": 1},
+            inputs={"n": {"type": "scalar", "value": 1}},
+        ),
+        evaluation=Evaluation(
+            status=EvaluationStatus.COMPILE_ERROR,
+            environment=Environment(hardware="AMD gfx1200", libs={"hip": "7.0"}),
+            timestamp="2026-06-16T00:00:00Z",
+        ),
+    )
+
+    written = cli_main._write_agent_feedback_sidecar(
+        output,
+        [trace],
+        profile_result=None,
+        static_evidence=None,
+    )
+
+    assert written == tmp_path / "trace.jsonl.agent-feedback.json"
+    assert written is not None
+    payload = json.loads(written.read_text())
+    assert payload["schema_version"] == "sol_execbench.agent_feedback.v1"
+    assert payload["authority"]["diagnostic_only"] is True
+    assert payload["authority"]["score_authority"] is False
+    assert payload["summary"]["status_counts"] == {"COMPILE_ERROR": 1}
+    assert payload["items"][0]["code"] == "compile_error"
+    assert "raw" not in json.dumps(payload).lower()
 
 
 def test_static_evidence_none_does_not_collect(tmp_path: Path):

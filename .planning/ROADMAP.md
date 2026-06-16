@@ -32,7 +32,7 @@ timing, scoring, and release-gate semantics.
 - [x] **Phase 181: Feedback Contract and Capability Surface** -- Add optional
   feedback/profile-summary capabilities and documentation boundaries without
   changing canonical trace semantics.
-- [ ] **Phase 182: Diagnostic Sidecar Schema and Generator** -- Define strict
+- [x] **Phase 182: Diagnostic Sidecar Schema and Generator** -- Define strict
   `sol_execbench.agent_feedback.v1` models and persist
   `trace.jsonl.agent-feedback.json` beside trace outputs.
 - [ ] **Phase 183: Freshness Identity and Artifact References** -- Attach
@@ -185,7 +185,7 @@ SOL fixtures and examples.
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 181. Feedback Contract and Capability Surface | 1/1 | Complete | 2026-06-16 |
-| 182. Diagnostic Sidecar Schema and Generator | 0/2 | Not started | - |
+| 182. Diagnostic Sidecar Schema and Generator | 2/2 | Complete | 2026-06-16 |
 | 183. Freshness Identity and Artifact References | 0/1 | Not started | - |
 | 184. Governance Guardrails and Compatibility Fixtures | 0/1 | Not started | - |
 | 185. HIP Consumer Integration Package and Docs | 0/1 | Not started | - |
