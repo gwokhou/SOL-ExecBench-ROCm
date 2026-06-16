@@ -248,8 +248,9 @@ class ProblemPackager:
             f"got languages={self.solution.spec.languages}"
         )
 
-        sol_dict = json.loads(self.solution.model_dump_json())
-        sol_dict = self._inject_offload_arch_flags(sol_dict)
+        sol_dict = self._inject_offload_arch_flags(
+            self.solution.model_dump(mode="json")
+        )
 
         # Overwrite solution.json with injected offload architecture flags.
         (self.output_dir / "solution.json").write_text(json.dumps(sol_dict))
