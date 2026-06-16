@@ -15,20 +15,19 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
 ## Current State
 
-**Shipped version:** v1.35 Script Parallelism and Safety Hardening,
-shipped 2026-06-11.
+**Shipped version:** v1.36 SOL Agent Feedback Sidecar Producer,
+shipped 2026-06-16.
 
-**Current milestone:** v1.36 SOL Agent Feedback Sidecar Producer.
+**Current milestone:** None defined.
 
 **Queued milestone:** None defined.
 
-**Latest milestone outcome:** v1.35 refactored key scripts for internal
-CPU-parallel/GPU-serial concurrency via ThreadPoolExecutor, added fcntl.flock
-PID lock for multi-instance prevention, timing isolation audit with concurrent
-GPU process detection and clock verification, evaluation stability reason codes
-for gpu_contention and multi_instance_interference, GPU device isolation,
-strict-isolation abort mode, and rocprofv3 overhead calibration with
-profiler_overhead_ms in timing evidence.
+**Latest milestone outcome:** v1.36 delivered the optional diagnostic
+SOL agent-feedback sidecar producer for HIP Playground v1.26. The shipped
+surface includes contract capability tokens, strict sidecar generation,
+trace-adjacent CLI persistence, freshness identity, compact artifact citations,
+governance guardrails, and HIP-facing fixtures/docs while preserving canonical
+Trace JSONL as the only correctness, timing, scoring, and status authority.
 
 **Previous milestone outcome:** v1.33 completed RDNA4 benchmark-grade evidence
 closure by hardening denominator policy, memory/readiness classification,
@@ -151,17 +150,18 @@ SOL/SOLAR sidecar pairs after 56 temporary sidecar exclusions. RDNA4 timing
 remains non-authoritative until clock-lock/reset sudoers coverage and
 profiler-backed timing evidence are rerun.
 
-## Current Milestone: v1.36 SOL Agent Feedback Sidecar Producer
+## Latest Milestone: v1.36 SOL Agent Feedback Sidecar Producer (SHIPPED)
 
-**Goal:** Deliver the optional diagnostic SOL agent-feedback/profile-summary
+**Shipped outcome:** Delivered the optional diagnostic SOL
+agent-feedback/profile-summary
 sidecar producer that HIP Playground v1.26 needs, while preserving canonical
 Trace JSONL as the only authority for correctness, timing, scoring, and release
 gate semantics.
 
-**Target features:**
+**Delivered features:**
 - Optional `trace.jsonl.agent-feedback.json` sidecar schema and contract
   capability tokens for downstream HIP compatibility checks.
-- Diagnostic summary generation from existing trace, profile, stability,
+- Diagnostic summary generation from existing trace, profile,
   static-evidence, and claim-boundary inputs without changing canonical trace
   rows.
 - Prompt-safe bottleneck, recommendation, limitation, and artifact citation
@@ -173,6 +173,11 @@ gate semantics.
 - Documentation and examples that make the sidecar safe for hip-agent
   next-turn guidance but unusable as evidence-tier, score, confirmed
   improvement, cutover, paper-parity, or leaderboard authority.
+
+**Known process debt:** Formal Nyquist `*-VALIDATION.md` artifacts were not
+generated for phases 181-185. Phase-level `VERIFICATION.md` files and CPU-safe
+tests passed, and the milestone audit records this as non-blocking process
+debt.
 
 ## Previous Milestone: v1.35 Script Parallelism and Safety Hardening (SHIPPED)
 
@@ -970,8 +975,8 @@ ROCm-compatible data migration from real CDNA3/CDNA4 hardware validation.
 | ThreadPoolExecutor over ProcessPoolExecutor | torch fork-safety concerns after module-level import. | Validated in v1.35 |
 | CPU-parallel staging + GPU-serial profiling | No flag can enable concurrent GPU subprocess execution. | Validated in v1.35 |
 | Overhead calibration via inner subprocess under rocprofv3 | Consistent measurement of profiler instrumentation overhead. | Validated in v1.35 |
-| Keep agent feedback sidecars diagnostic-only | HIP v1.26 needs next-turn guidance, but SOL canonical trace must remain the benchmark authority for correctness, timing, score, and status. | Active in v1.36 |
-| SOL produces sidecars; HIP owns prompt/runtime normalization | This keeps repository ownership clear: SOL emits bounded artifacts and authority metadata, while HIP maps them into `ProfileDigest` and strategy hints. | Active in v1.36 |
+| Keep agent feedback sidecars diagnostic-only | HIP v1.26 needs next-turn guidance, but SOL canonical trace must remain the benchmark authority for correctness, timing, score, and status. | Validated in v1.36 |
+| SOL produces sidecars; HIP owns prompt/runtime normalization | This keeps repository ownership clear: SOL emits bounded artifacts and authority metadata, while HIP maps them into `ProfileDigest` and strategy hints. | Validated in v1.36 |
 | Complete RDNA4 benchmark-grade validation | User selected v1.30 to turn existing RDNA4 `gfx1200` scoped evidence into full benchmark-grade validation with full dataset, timing, score, evidence-bundle, and claim-guardrail closure. | Active in v1.30 |
 | Preserve long-running validation jobs | User clarified that real validation may run for many hours; agents should poll and checkpoint rather than kill healthy processes solely because they are long-running. | Active in v1.30 |
 | Make long-tail exclusions explicit | User clarified that known super-long-tail shards should be temporarily excludable through `scripts/run_dataset.py` configuration while preserving denominator visibility and auditability. | Active in v1.30 |
@@ -994,4 +999,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-15 after v1.36 milestone planning*
+*Last updated: 2026-06-16 after v1.36 milestone completion*

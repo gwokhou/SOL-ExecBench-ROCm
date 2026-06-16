@@ -2,6 +2,71 @@
 
 *A living document updated after each milestone. Lessons feed forward into future planning.*
 
+## Milestone: v1.36 - SOL Agent Feedback Sidecar Producer
+
+**Shipped:** 2026-06-16
+**Phases:** 5 | **Plans:** 6 | **Tasks:** 0
+
+### What Was Built
+
+- Optional evaluator contract capabilities for diagnostic agent-feedback and
+  profile-summary sidecars without changing canonical Trace JSONL semantics.
+- Strict `sol_execbench.agent_feedback.v1` sidecar generation and CLI
+  persistence as `<trace>.agent-feedback.json`.
+- Freshness identity, compact artifact citations, checksum references, and
+  stale/unknown validation helpers.
+- Governance guardrails proving sidecars cannot promote score, evidence-tier,
+  release-gate, cutover, paper-parity, leaderboard, or claim-upgrade authority.
+- HIP-facing fixtures and docs for valid, partial, unavailable, stale,
+  malformed, missing, and contradictory-authority sidecar cases.
+
+### What Worked
+
+- Keeping the sidecar trace-adjacent but optional let the CLI add agent guidance
+  without touching canonical trace rows or exit semantics.
+- Authority was modeled directly with literal true/false fields, making
+  contradictory payloads fail schema validation instead of relying on docs.
+- Fixture-driven consumer tests caught that JSON-emitted enum strings needed to
+  validate back into the model, which is the real downstream consumption path.
+
+### What Was Inefficient
+
+- Early summaries for phases 183-185 lacked machine-readable frontmatter, so
+  milestone audit required manual three-source cross-checking.
+- Nyquist `*-VALIDATION.md` artifacts were not generated during phase execution;
+  the milestone audit records this as process debt despite passing
+  phase-level verification.
+- The milestone archive tool produced weak accomplishment extraction, requiring
+  manual MILESTONES and PROJECT cleanup.
+
+### Patterns Established
+
+- Prompt-facing diagnostic artifacts should use compact file names and checksum
+  citations, not absolute paths or raw dumps.
+- Downstream fixtures should include both schema-valid positive cases and
+  intentionally invalid negative cases.
+- Diagnostic sidecars that guide agents need explicit freshness identity before
+  they are safe to reuse across retries or resumed runs.
+
+### Key Lessons
+
+1. A JSON sidecar contract is not complete until the emitted JSON can be parsed
+   back by the same strict model.
+2. Governance tests should cover absence, parse failure, stale identity, and
+   contradictory authority, not only the happy path.
+3. Integration packages for another repo need fixtures and mapping docs in the
+   producer repo, otherwise capability tokens are not enough for parallel work.
+
+### Cost Observations
+
+- Model mix: not recorded.
+- Sessions: 1 autonomous session covering phases 183-185, milestone audit, and
+  completion.
+- Notable: all implementation verification stayed CPU-safe on macOS without AMD
+  GPU hardware.
+
+---
+
 ## Milestone: v1.0 - ROCm Port
 
 **Shipped:** 2026-05-21

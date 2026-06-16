@@ -1,5 +1,35 @@
 # Milestones
 
+## v1.36 SOL Agent Feedback Sidecar Producer (Shipped: 2026-06-16)
+
+**Phases completed:** 5 phases, 6 plans, 0 tasks
+
+**Key accomplishments:**
+
+- Added optional `agent_feedback.sidecar.v1` and
+  `profile_summary.sidecar.v1` evaluator contract capabilities without changing
+  canonical Trace JSONL fields or contract version.
+- Implemented strict diagnostic `sol_execbench.agent_feedback.v1` sidecar
+  generation and CLI persistence as `<trace>.agent-feedback.json`.
+- Added freshness identity, compact artifact citations, checksums, and stale
+  sidecar validation helpers for downstream consumers.
+- Added governance guardrails proving feedback sidecars cannot promote
+  correctness, timing, score, evidence-tier, release-gate, cutover,
+  paper-parity, leaderboard, or claim-upgrade authority.
+- Added HIP-facing fixtures and mapping docs for valid, partial, unavailable,
+  stale, malformed, missing, and contradictory-authority sidecar cases.
+
+**Explicitly deferred:**
+
+- Parsing raw profiler counters into a confidence-scored bottleneck taxonomy.
+- Cross-run feedback accumulation and candidate ranking based on feedback.
+- Formal Nyquist `*-VALIDATION.md` artifacts for phases 181-185; phase-level
+  `VERIFICATION.md` files and CPU-safe tests passed.
+- Known deferred open artifacts at close: 7 historical quick-task items
+  recorded in `.planning/STATE.md`.
+
+---
+
 ## v1.34 RDNA4 Readiness Blocker Closure (Shipped: 2026-06-09)
 
 **Phases completed:** 5 phases, 5 plans, 10 tasks
