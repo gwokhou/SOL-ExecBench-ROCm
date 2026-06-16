@@ -9,6 +9,8 @@ from typing import Any, Literal
 
 from pydantic import ConfigDict, Field, model_validator
 
+from sol_execbench.core.utils import parse_bool as _parse_bool
+
 from sol_execbench.core.compatibility import (
     MatrixClaimBoundary,
     MatrixCompatibilityReasonCode,
@@ -508,15 +510,6 @@ def _build_parser() -> argparse.ArgumentParser:
     preflight.add_argument("--gpu-accessible", type=_parse_bool)
     preflight.add_argument("--image-digest")
     return parser
-
-
-def _parse_bool(value: str) -> bool:
-    normalized = value.lower()
-    if normalized in {"1", "true", "yes"}:
-        return True
-    if normalized in {"0", "false", "no"}:
-        return False
-    raise argparse.ArgumentTypeError(f"expected boolean value, got {value!r}")
 
 
 def main(argv: list[str] | None = None) -> int:

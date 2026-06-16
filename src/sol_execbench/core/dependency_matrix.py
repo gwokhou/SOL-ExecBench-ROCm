@@ -13,6 +13,11 @@ from typing import Literal
 
 from pydantic import ConfigDict
 
+from sol_execbench.core.utils import (
+    none_if_requested as _none_if_requested,
+    parse_bool as _parse_bool,
+)
+
 from sol_execbench.core.compatibility import (
     MatrixClaimBoundary,
     MatrixCompatibilityReasonCode,
@@ -492,23 +497,6 @@ def _version_matches_expected(version: str | None, expected_local_version: str) 
     if version is None or expected is None:
         return True
     return version.startswith(expected)
-
-
-def _none_if_requested(value: str | None) -> str | None:
-    if value is None:
-        return None
-    if value.lower() in {"", "none", "null"}:
-        return None
-    return value
-
-
-def _parse_bool(value: str) -> bool:
-    normalized = value.lower()
-    if normalized in {"1", "true", "yes"}:
-        return True
-    if normalized in {"0", "false", "no"}:
-        return False
-    raise argparse.ArgumentTypeError(f"expected boolean value, got {value!r}")
 
 
 def _build_parser() -> argparse.ArgumentParser:

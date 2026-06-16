@@ -12,6 +12,11 @@ from typing import Any, Literal, Protocol, cast
 
 from pydantic import ConfigDict
 
+from sol_execbench.core.utils import (
+    none_if_requested as _none_if_requested,
+    parse_bool as _parse_bool,
+)
+
 from sol_execbench.core.compatibility import (
     MatrixArtifactReference,
     MatrixClaimBoundary,
@@ -352,23 +357,6 @@ def write_aggregate_report(path: Path, entries: list[MatrixEntry]) -> Path:
     """Write an aggregate compatibility matrix JSON report."""
 
     return write_json_payload(path, build_aggregate_report(entries))
-
-
-def _none_if_requested(value: str | None) -> str | None:
-    if value is None:
-        return None
-    if value.lower() in {"", "none", "null"}:
-        return None
-    return value
-
-
-def _parse_bool(value: str) -> bool:
-    normalized = value.lower()
-    if normalized in {"1", "true", "yes"}:
-        return True
-    if normalized in {"0", "false", "no"}:
-        return False
-    raise argparse.ArgumentTypeError(f"expected boolean value, got {value!r}")
 
 
 def _build_parser() -> argparse.ArgumentParser:
