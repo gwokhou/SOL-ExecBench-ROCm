@@ -371,6 +371,7 @@ def test_agent_feedback_sidecar_tracks_trace_output(tmp_path: Path):
 
 def test_agent_feedback_sidecar_records_bounded_metadata(tmp_path: Path):
     output = tmp_path / "trace.jsonl"
+    output.write_text('{"definition":"toy"}\n')
     trace = Trace(
         definition="toy",
         solution="candidate",
@@ -399,8 +400,25 @@ def test_agent_feedback_sidecar_records_bounded_metadata(tmp_path: Path):
     assert payload["schema_version"] == "sol_execbench.agent_feedback.v1"
     assert payload["authority"]["diagnostic_only"] is True
     assert payload["authority"]["score_authority"] is False
+    assert payload["identity"]["trace_path"] == "trace.jsonl"
     assert payload["summary"]["status_counts"] == {"COMPILE_ERROR": 1}
     assert payload["items"][0]["code"] == "compile_error"
+    trace_citations = [
+        citation
+        for citation in payload["artifact_citations"]
+        if citation["kind"] == "trace"
+    ]
+    assert trace_citations == [
+        {
+            "kind": "trace",
+            "label": "canonical_trace_jsonl",
+            "path": "trace.jsonl",
+            "sha256": trace_citations[0]["sha256"],
+            "status": None,
+        }
+    ]
+    assert trace_citations[0]["sha256"] is not None
+    assert len(trace_citations[0]["sha256"]) == 64
     assert "raw" not in json.dumps(payload).lower()
 
 

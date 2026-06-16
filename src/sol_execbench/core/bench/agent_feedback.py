@@ -7,7 +7,9 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from enum import Enum
+from pathlib import Path
 from typing import Literal
 
 from pydantic import ConfigDict, Field
@@ -17,7 +19,9 @@ from sol_execbench.core.bench.static_kernel_evidence import (
     StaticKernelEvidenceSidecar,
 )
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
+from sol_execbench.core.data.contract import SOL_EXECBENCH_CONTRACT_VERSION
 from sol_execbench.core.data.trace import EvaluationStatus, Trace
+from sol_execbench.core.dataset.checksums import sha256_file
 
 
 AGENT_FEEDBACK_SCHEMA_VERSION = "sol_execbench.agent_feedback.v1"
@@ -48,6 +52,14 @@ class AgentFeedbackSeverity(str, Enum):
     ACTION = "action"
 
 
+class AgentFeedbackFreshnessStatus(str, Enum):
+    """Freshness validation status for a sidecar."""
+
+    CURRENT = "current"
+    STALE = "stale"
+    UNKNOWN = "unknown"
+
+
 class AgentFeedbackSourceRef(BaseModelWithDocstrings):
     """Compact reference to source evidence used by the feedback sidecar."""
 
@@ -59,6 +71,55 @@ class AgentFeedbackSourceRef(BaseModelWithDocstrings):
     """Stable compact label for the evidence source."""
     status: str | None = None
     """Optional source status."""
+
+
+class AgentFeedbackArtifactCitation(BaseModelWithDocstrings):
+    """Compact sidecar artifact citation."""
+
+    model_config = _MODEL_CONFIG
+
+    kind: str
+    """Artifact kind such as trace, profile, or static_evidence."""
+    label: str
+    """Compact artifact label."""
+    path: str | None = None
+    """Compact path, normally a file name or relative path."""
+    sha256: str | None = None
+    """Artifact checksum when available."""
+    status: str | None = None
+    """Optional source status."""
+
+
+class AgentFeedbackIdentity(BaseModelWithDocstrings):
+    """Freshness identity for a generated feedback sidecar."""
+
+    model_config = _MODEL_CONFIG
+
+    generated_at: str
+    """UTC timestamp when the sidecar was generated."""
+    sol_contract_version: str
+    """SOL evaluator contract version used by the producer."""
+    trace_path: str | None = None
+    """Compact trace path or file name when available."""
+    target_id: str | None = None
+    """Optional target/run denominator identity."""
+    run_id: str | None = None
+    """Optional run identity."""
+    candidate_hash: str | None = None
+    """Optional candidate hash used by downstream consumers."""
+    source_hash: str | None = None
+    """Optional source hash used by downstream consumers."""
+
+
+class AgentFeedbackFreshnessValidation(BaseModelWithDocstrings):
+    """Result of validating sidecar freshness identity."""
+
+    model_config = _MODEL_CONFIG
+
+    status: AgentFeedbackFreshnessStatus
+    """Freshness result."""
+    reason_codes: list[str] = Field(default_factory=list)
+    """Stable reason codes explaining stale or unknown status."""
 
 
 class AgentFeedbackItem(BaseModelWithDocstrings):
@@ -125,11 +186,15 @@ class AgentFeedbackSidecar(BaseModelWithDocstrings):
     )
     status: AgentFeedbackStatus
     reason_code: AgentFeedbackReasonCode
+    identity: AgentFeedbackIdentity
     authority: AgentFeedbackAuthority = Field(default_factory=AgentFeedbackAuthority)
     summary: AgentFeedbackSummary
     items: list[AgentFeedbackItem] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
     source_refs: list[AgentFeedbackSourceRef] = Field(default_factory=list)
+    artifact_citations: list[AgentFeedbackArtifactCitation] = Field(
+        default_factory=list
+    )
 
     def to_dict(self) -> dict[str, object]:
         """Return the JSON-compatible sidecar payload."""
@@ -141,6 +206,13 @@ def build_agent_feedback_sidecar(
     traces: Sequence[Trace],
     profile_result: Rocprofv3ProfileResult | None = None,
     static_evidence: StaticKernelEvidenceSidecar | None = None,
+    trace_path: str | None = None,
+    target_id: str | None = None,
+    run_id: str | None = None,
+    candidate_hash: str | None = None,
+    source_hash: str | None = None,
+    generated_at: str | None = None,
+    artifact_citations: Sequence[AgentFeedbackArtifactCitation] = (),
 ) -> AgentFeedbackSidecar:
     """Build a bounded diagnostic feedback sidecar from existing evaluation data."""
 
@@ -162,6 +234,15 @@ def build_agent_feedback_sidecar(
     return AgentFeedbackSidecar(
         status=status,
         reason_code=reason_code,
+        identity=AgentFeedbackIdentity(
+            generated_at=generated_at or _utc_timestamp(),
+            sol_contract_version=SOL_EXECBENCH_CONTRACT_VERSION,
+            trace_path=_compact_path(trace_path),
+            target_id=target_id,
+            run_id=run_id,
+            candidate_hash=candidate_hash,
+            source_hash=source_hash,
+        ),
         summary=AgentFeedbackSummary(
             trace_count=len(traces),
             evaluated_trace_count=len(evaluated),
@@ -174,6 +255,69 @@ def build_agent_feedback_sidecar(
         items=_trace_feedback_items(evaluated),
         limitations=_limitations(traces, profile_result, static_evidence),
         source_refs=_source_refs(profile_result, static_evidence),
+        artifact_citations=list(artifact_citations),
+    )
+
+
+def artifact_citation_from_path(
+    *,
+    kind: str,
+    path: Path,
+    label: str | None = None,
+    status: str | None = None,
+) -> AgentFeedbackArtifactCitation:
+    """Build a compact citation from an artifact path."""
+
+    checksum = sha256_file(path) if path.is_file() else None
+    return AgentFeedbackArtifactCitation(
+        kind=kind,
+        label=label or path.name,
+        path=path.name,
+        sha256=checksum,
+        status=status,
+    )
+
+
+def validate_agent_feedback_freshness(
+    sidecar: AgentFeedbackSidecar,
+    *,
+    trace_path: str | None = None,
+    sol_contract_version: str = SOL_EXECBENCH_CONTRACT_VERSION,
+    target_id: str | None = None,
+    run_id: str | None = None,
+    candidate_hash: str | None = None,
+    source_hash: str | None = None,
+) -> AgentFeedbackFreshnessValidation:
+    """Classify whether a sidecar identity matches expected run identity."""
+
+    reasons: list[str] = []
+    identity = sidecar.identity
+    if identity.sol_contract_version != sol_contract_version:
+        reasons.append("sol_contract_version_mismatch")
+    _match_optional(
+        reasons,
+        "trace_path",
+        identity.trace_path,
+        _compact_path(trace_path),
+    )
+    _match_optional(reasons, "target_id", identity.target_id, target_id)
+    _match_optional(reasons, "run_id", identity.run_id, run_id)
+    _match_optional(reasons, "candidate_hash", identity.candidate_hash, candidate_hash)
+    _match_optional(reasons, "source_hash", identity.source_hash, source_hash)
+    if reasons:
+        return AgentFeedbackFreshnessValidation(
+            status=AgentFeedbackFreshnessStatus.STALE,
+            reason_codes=reasons,
+        )
+    if trace_path is None and not any(
+        (target_id, run_id, candidate_hash, source_hash)
+    ):
+        return AgentFeedbackFreshnessValidation(
+            status=AgentFeedbackFreshnessStatus.UNKNOWN,
+            reason_codes=["insufficient_expected_identity"],
+        )
+    return AgentFeedbackFreshnessValidation(
+        status=AgentFeedbackFreshnessStatus.CURRENT,
     )
 
 
@@ -193,6 +337,26 @@ def _aggregate_status(
     if optional_unavailable:
         return AgentFeedbackStatus.PARTIAL
     return AgentFeedbackStatus.AVAILABLE
+
+
+def _utc_timestamp() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _compact_path(path: str | None) -> str | None:
+    if path is None:
+        return None
+    return Path(path).name
+
+
+def _match_optional(
+    reasons: list[str],
+    field: str,
+    actual: str | None,
+    expected: str | None,
+) -> None:
+    if expected is not None and actual != expected:
+        reasons.append(f"{field}_mismatch")
 
 
 def _source_refs(

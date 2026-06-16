@@ -2,7 +2,7 @@
 
 ## Milestones
 
-- **v1.36 SOL Agent Feedback Sidecar Producer** - Phases 181-185 (planning)
+- **v1.36 SOL Agent Feedback Sidecar Producer** - Phases 181-185 (in progress)
 - **v1.35 Script Parallelism and Safety Hardening** - Phases 175-180 (shipped 2026-06-11)
 - **v1.34 RDNA4 Readiness Blocker Closure** - Phases 170-174 (shipped 2026-06-09)
 - Complete **v1.33 RDNA4 Benchmark-Grade Evidence Closure** - Phases 163-169
@@ -19,10 +19,10 @@
 
 ## Current Position
 
-**Status:** Planning v1.36 SOL Agent Feedback Sidecar Producer.
+**Status:** Executing v1.36 SOL Agent Feedback Sidecar Producer.
 
 <details open>
-<summary>v1.36 SOL Agent Feedback Sidecar Producer (Phases 181-185) -- PLANNING</summary>
+<summary>v1.36 SOL Agent Feedback Sidecar Producer (Phases 181-185) -- IN PROGRESS</summary>
 
 **Milestone Goal:** Deliver the optional diagnostic SOL
 agent-feedback/profile-summary sidecar producer that HIP Playground v1.26 needs,
@@ -35,7 +35,7 @@ timing, scoring, and release-gate semantics.
 - [x] **Phase 182: Diagnostic Sidecar Schema and Generator** -- Define strict
   `sol_execbench.agent_feedback.v1` models and persist
   `trace.jsonl.agent-feedback.json` beside trace outputs.
-- [ ] **Phase 183: Freshness Identity and Artifact References** -- Attach
+- [x] **Phase 183: Freshness Identity and Artifact References** -- Attach
   trace/run/candidate identity and compact artifact citations so consumers can
   reject stale or mismatched feedback.
 - [ ] **Phase 184: Governance Guardrails and Compatibility Fixtures** -- Prove
@@ -136,7 +136,7 @@ and can cite source artifacts without ingesting raw dumps.
 
 **Plans:** 1 plan
 
-- [ ] 183-01-PLAN.md -- Freshness identity model, compact artifact citations,
+- [x] 183-01-PLAN.md -- Freshness identity model, compact artifact citations,
   checksum wiring, and stale-state validation.
 
 ### Phase 184: Governance Guardrails and Compatibility Fixtures
@@ -186,6 +186,6 @@ SOL fixtures and examples.
 |-------|----------------|--------|-----------|
 | 181. Feedback Contract and Capability Surface | 1/1 | Complete | 2026-06-16 |
 | 182. Diagnostic Sidecar Schema and Generator | 2/2 | Complete | 2026-06-16 |
-| 183. Freshness Identity and Artifact References | 0/1 | Not started | - |
+| 183. Freshness Identity and Artifact References | 1/1 | Complete | 2026-06-16 |
 | 184. Governance Guardrails and Compatibility Fixtures | 0/1 | Not started | - |
 | 185. HIP Consumer Integration Package and Docs | 0/1 | Not started | - |
