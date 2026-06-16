@@ -225,6 +225,7 @@ def collect_pytorch_dependency_observation() -> PytorchDependencyObservation:
     except (RuntimeError, AttributeError):
         device_available = False
     local_version = _local_version(torch_version or torch_distribution_version)
+    rocm_version = _collect_rocm_version_file()
     return PytorchDependencyObservation(
         torch_distribution_version=torch_distribution_version,
         torch_version=torch_version,
@@ -236,9 +237,9 @@ def collect_pytorch_dependency_observation() -> PytorchDependencyObservation:
         torchvision_distribution_version=torchvision_distribution_version,
         triton_rocm_distribution_version=triton_rocm_distribution_version,
         triton_rocm_status=triton_rocm_status,
-        container_rocm_user_space_version=_collect_rocm_version_file(),
+        container_rocm_user_space_version=rocm_version,
         hipcc_version=_collect_command_output(["hipcc", "--version"]),
-        toolchain_rocm_version=_collect_rocm_version_file(),
+        toolchain_rocm_version=rocm_version,
     )
 
 
@@ -347,7 +348,9 @@ def _classify_observation(
             "Required torch distribution is unavailable for this Target policy.",
         )
 
-    mismatch_reason = _mismatch_reason(target=target, policy=policy, observation=observation)
+    mismatch_reason = _mismatch_reason(
+        target=target, policy=policy, observation=observation
+    )
     if mismatch_reason is not None:
         return (
             MatrixCompatibilityStatus.MIXED_VERSION,
@@ -512,7 +515,9 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
     preflight = subparsers.add_parser("preflight")
-    preflight.add_argument("--manifest", type=Path, default=DEFAULT_DOCKER_TARGET_MANIFEST)
+    preflight.add_argument(
+        "--manifest", type=Path, default=DEFAULT_DOCKER_TARGET_MANIFEST
+    )
     preflight.add_argument("--target")
     preflight.add_argument("--allow-mixed-version-debug", action="store_true")
     preflight.add_argument("--torch-distribution-version")
