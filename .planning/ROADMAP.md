@@ -29,7 +29,7 @@ agent-feedback/profile-summary sidecar producer that HIP Playground v1.26 needs,
 while preserving canonical Trace JSONL as the only authority for correctness,
 timing, scoring, and release-gate semantics.
 
-- [ ] **Phase 181: Feedback Contract and Capability Surface** -- Add optional
+- [x] **Phase 181: Feedback Contract and Capability Surface** -- Add optional
   feedback/profile-summary capabilities and documentation boundaries without
   changing canonical trace semantics.
 - [ ] **Phase 182: Diagnostic Sidecar Schema and Generator** -- Define strict
@@ -184,7 +184,7 @@ SOL fixtures and examples.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 181. Feedback Contract and Capability Surface | 0/1 | Not started | - |
+| 181. Feedback Contract and Capability Surface | 1/1 | Complete | 2026-06-16 |
 | 182. Diagnostic Sidecar Schema and Generator | 0/2 | Not started | - |
 | 183. Freshness Identity and Artifact References | 0/1 | Not started | - |
 | 184. Governance Guardrails and Compatibility Fixtures | 0/1 | Not started | - |

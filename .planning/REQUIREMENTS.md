@@ -10,15 +10,15 @@ ExecBench.
 
 ### Contract and Capability
 
-- [ ] **CNTR-01**: Downstream maintainers can inspect documented optional
+- [x] **CNTR-01**: Downstream maintainers can inspect documented optional
   `agent_feedback.sidecar.v1` and `profile_summary.sidecar.v1` capabilities in
   the evaluator contract without changing required trace field groups or
   contract compatibility for older consumers.
-- [ ] **CNTR-02**: Documentation defines the SOL agent-feedback/profile-summary
+- [x] **CNTR-02**: Documentation defines the SOL agent-feedback/profile-summary
   sidecar as diagnostic-only and explicitly not correctness, timing, score,
   evidence-tier, confirmed-improvement, release-gate, cutover, paper-parity, or
   leaderboard authority.
-- [ ] **CNTR-03**: Contract tests prove optional feedback capabilities do not
+- [x] **CNTR-03**: Contract tests prove optional feedback capabilities do not
   add fields to canonical Trace JSONL correctness, timing, scoring, or status
   semantics.
 
@@ -104,9 +104,9 @@ ExecBench.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CNTR-01 | Phase 181 | Pending |
-| CNTR-02 | Phase 181 | Pending |
-| CNTR-03 | Phase 181 | Pending |
+| CNTR-01 | Phase 181 | Complete |
+| CNTR-02 | Phase 181 | Complete |
+| CNTR-03 | Phase 181 | Complete |
 | SIDE-01 | Phase 182 | Pending |
 | SIDE-02 | Phase 182 | Pending |
 | SIDE-03 | Phase 182 | Pending |
