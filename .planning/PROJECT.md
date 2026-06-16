@@ -174,10 +174,8 @@ gate semantics.
   next-turn guidance but unusable as evidence-tier, score, confirmed
   improvement, cutover, paper-parity, or leaderboard authority.
 
-**Known process debt:** Formal Nyquist `*-VALIDATION.md` artifacts were not
-generated for phases 181-185. Phase-level `VERIFICATION.md` files and CPU-safe
-tests passed, and the milestone audit records this as non-blocking process
-debt.
+**Validation closure:** Formal Nyquist `*-VALIDATION.md` artifacts now exist
+for phases 181-185, and the milestone audit is passed.
 
 ## Previous Milestone: v1.35 Script Parallelism and Safety Hardening (SHIPPED)
 
