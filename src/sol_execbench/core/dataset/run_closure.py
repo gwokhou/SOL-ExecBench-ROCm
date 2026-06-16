@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -22,6 +21,7 @@ from sol_execbench.core.dataset.execution_closure import (
     compare_execution_closure_provenance,
     write_execution_closure_report,
 )
+from sol_execbench.core.dataset.manifest import utc_timestamp
 
 
 @dataclass(frozen=True)
@@ -31,11 +31,6 @@ class DatasetReuseDecision:
     should_reuse: bool
     reason: str
     provenance_mismatches: tuple[dict[str, Any], ...] = ()
-
-
-def utc_timestamp() -> str:
-    """Return a second-resolution UTC timestamp for sidecar creation."""
-    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def stale_provenance_mismatch(*, observed: str | None) -> dict[str, object]:

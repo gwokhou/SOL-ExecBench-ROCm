@@ -5,14 +5,13 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 from .checksums import stable_json_checksum
-from .manifest import DatasetManifestChecksum
+from .manifest import DatasetManifestChecksum, utc_timestamp
 
 PARITY_GAP_REPORT_SCHEMA_VERSION = "sol_execbench.parity_gap_report.v1"
 DENOMINATOR_KEYS = (
@@ -102,22 +101,24 @@ class ParityGapReport(BaseModel):
     categories: list[ParityGapCategory]
     blockers: list[ParityGapBlocker]
     evidence_completeness: EvidenceCompleteness
-    claim_boundary: ParityGapClaimBoundary = Field(default_factory=ParityGapClaimBoundary)
+    claim_boundary: ParityGapClaimBoundary = Field(
+        default_factory=ParityGapClaimBoundary
+    )
     report_checksum: DatasetManifestChecksum | None = None
 
     def with_checksum(self) -> "ParityGapReport":
         payload = self.model_dump(mode="json")
         payload["report_checksum"] = None
         return self.model_copy(
-            update={"report_checksum": DatasetManifestChecksum(value=stable_json_checksum(payload))}
+            update={
+                "report_checksum": DatasetManifestChecksum(
+                    value=stable_json_checksum(payload)
+                )
+            }
         )
 
     def to_json(self) -> str:
         return json.dumps(self.model_dump(mode="json"), indent=2, sort_keys=True) + "\n"
-
-
-def utc_timestamp() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -152,7 +153,9 @@ def _default_counts() -> dict[str, int]:
     return dict.fromkeys(DENOMINATOR_KEYS, 0)
 
 
-def _category_counts(name: str, categories: dict[str, ParityGapDenominators]) -> ParityGapDenominators:
+def _category_counts(
+    name: str, categories: dict[str, ParityGapDenominators]
+) -> ParityGapDenominators:
     if name not in categories:
         categories[name] = ParityGapDenominators()
     return categories[name]
@@ -251,7 +254,9 @@ def build_parity_gap_report(
                     reason_code=str(reason.get("code", "unknown_readiness_blocker")),
                     category=category,
                     example_ref=_record_ref(workload),
-                    next_action=str(reason.get("next_action", "Review readiness blocker.")),
+                    next_action=str(
+                        reason.get("next_action", "Review readiness blocker.")
+                    ),
                 )
 
     evidence_present = dict.fromkeys(EVIDENCE_KEYS, 0)
@@ -323,7 +328,9 @@ def build_parity_gap_report(
 
     if amd_score_report is not None:
         for score in amd_score_report.get("scores", []):
-            counts = _category_counts(_score_category(score, workload_to_category), categories)
+            counts = _category_counts(
+                _score_category(score, workload_to_category), categories
+            )
             warnings = " ".join(str(warning) for warning in score.get("warnings", []))
             if score.get("supported") is True and "degraded" in warnings.lower():
                 counts.degraded += 1
@@ -345,15 +352,37 @@ def build_parity_gap_report(
     category_reports = []
     for name in sorted(categories):
         suite.merge(categories[name])
-        category_reports.append(ParityGapCategory(name=name, denominators=categories[name]))
+        category_reports.append(
+            ParityGapCategory(name=name, denominators=categories[name])
+        )
 
     sources = {
-        "manifest": _source(manifest, path=source_paths.get("manifest"), checksum_key="manifest_checksum"),
-        "inventory": _source(inventory, path=source_paths.get("inventory"), checksum_key="inventory_checksum"),
-        "readiness": _source(readiness, path=source_paths.get("readiness"), checksum_key="readiness_checksum"),
-        "ready_subset": _source(ready_subset, path=source_paths.get("ready_subset"), checksum_key="ready_subset_checksum"),
-        "execution_closure": _source(execution_closure, path=source_paths.get("execution_closure")),
-        "amd_score_report": _source(amd_score_report, path=source_paths.get("amd_score_report")),
+        "manifest": _source(
+            manifest,
+            path=source_paths.get("manifest"),
+            checksum_key="manifest_checksum",
+        ),
+        "inventory": _source(
+            inventory,
+            path=source_paths.get("inventory"),
+            checksum_key="inventory_checksum",
+        ),
+        "readiness": _source(
+            readiness,
+            path=source_paths.get("readiness"),
+            checksum_key="readiness_checksum",
+        ),
+        "ready_subset": _source(
+            ready_subset,
+            path=source_paths.get("ready_subset"),
+            checksum_key="ready_subset_checksum",
+        ),
+        "execution_closure": _source(
+            execution_closure, path=source_paths.get("execution_closure")
+        ),
+        "amd_score_report": _source(
+            amd_score_report, path=source_paths.get("amd_score_report")
+        ),
     }
 
     report = ParityGapReport(
@@ -388,14 +417,23 @@ def render_parity_gap_markdown(report: ParityGapReport) -> str:
     for key in DENOMINATOR_KEYS:
         lines.append(f"| {key} | {suite[key]} |")
 
-    lines.extend(["", "## Category Denominators", "", "| Category | " + " | ".join(DENOMINATOR_KEYS) + " |"])
+    lines.extend(
+        [
+            "",
+            "## Category Denominators",
+            "",
+            "| Category | " + " | ".join(DENOMINATOR_KEYS) + " |",
+        ]
+    )
     lines.append("|---" * (len(DENOMINATOR_KEYS) + 1) + "|")
     for category in payload["categories"]:
         denoms = category["denominators"]
         values = " | ".join(str(denoms[key]) for key in DENOMINATOR_KEYS)
         lines.append(f"| {category['name']} | {values} |")
 
-    lines.extend(["", "## Blockers", "", "| Reason | Count | Categories | Next Actions |"])
+    lines.extend(
+        ["", "## Blockers", "", "| Reason | Count | Categories | Next Actions |"]
+    )
     lines.append("|--------|------:|------------|--------------|")
     for blocker in payload["blockers"]:
         lines.append(
@@ -403,11 +441,15 @@ def render_parity_gap_markdown(report: ParityGapReport) -> str:
             f"{', '.join(blocker['categories'])} | {'; '.join(blocker['next_actions'])} |"
         )
 
-    lines.extend(["", "## Evidence Completeness", "", "| Evidence | Present | Missing |"])
+    lines.extend(
+        ["", "## Evidence Completeness", "", "| Evidence | Present | Missing |"]
+    )
     lines.append("|----------|--------:|--------:|")
     evidence = payload["evidence_completeness"]
     for key in EVIDENCE_KEYS:
-        lines.append(f"| {key} | {evidence['present'][key]} | {evidence['missing'][key]} |")
+        lines.append(
+            f"| {key} | {evidence['present'][key]} | {evidence['missing'][key]} |"
+        )
 
     lines.extend(["", "## Sources", "", "| Source | Schema | Checksum | Path |"])
     lines.append("|--------|--------|----------|------|")
