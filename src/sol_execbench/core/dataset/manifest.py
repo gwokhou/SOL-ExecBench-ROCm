@@ -18,13 +18,13 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
 from pathlib import Path
 
 from pydantic import BaseModel
 
 from .checksums import stable_json_checksum
 from .layout import LayoutCategory, LayoutDiagnostic, inspect_dataset_layout
+from sol_execbench.core.utils import utc_timestamp
 
 MANIFEST_SCHEMA_VERSION = "sol_execbench.dataset_manifest.v1"
 
@@ -91,17 +91,14 @@ class DatasetManifest(BaseModel):
     def to_json(self) -> str:
         """Serialize deterministically for sidecar output."""
 
-        return json.dumps(
-            self.model_dump(mode="json"),
-            indent=2,
-            sort_keys=True,
-        ) + "\n"
-
-
-def utc_timestamp() -> str:
-    """Return a UTC timestamp suitable for manifest metadata."""
-
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        return (
+            json.dumps(
+                self.model_dump(mode="json"),
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n"
+        )
 
 
 def build_dataset_manifest(

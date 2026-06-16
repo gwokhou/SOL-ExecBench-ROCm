@@ -20,6 +20,7 @@ import argparse
 import os
 import platform
 import sys
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Dict, List
 
 
@@ -116,6 +117,11 @@ def flush_stdio_streams() -> None:
             stream.flush()
         except Exception:
             pass
+
+
+def utc_timestamp() -> str:
+    """Return a second-resolution UTC ISO-8601 timestamp (Z-suffixed)."""
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def parse_bool(value: str) -> bool:

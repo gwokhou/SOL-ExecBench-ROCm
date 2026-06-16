@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
@@ -13,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from sol_execbench.core.dataset.checksums import stable_json_checksum
 from sol_execbench.core.dataset.manifest import DatasetManifestChecksum
+from sol_execbench.core.utils import utc_timestamp
 
 TRUST_SUMMARY_SCHEMA_VERSION = "sol_execbench.trust_summary.v1"
 
@@ -89,10 +89,6 @@ class TrustSummaryReport(BaseModel):
 
     def to_json(self) -> str:
         return json.dumps(self.model_dump(mode="json"), indent=2, sort_keys=True) + "\n"
-
-
-def utc_timestamp() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def load_json(path: Path) -> dict[str, Any]:
