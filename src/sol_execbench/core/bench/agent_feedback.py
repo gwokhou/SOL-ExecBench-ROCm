@@ -25,7 +25,7 @@ from sol_execbench.core.dataset.checksums import sha256_file
 
 
 AGENT_FEEDBACK_SCHEMA_VERSION = "sol_execbench.agent_feedback.v1"
-_MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True, strict=True)
+_MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
 
 
 class AgentFeedbackStatus(str, Enum):

@@ -1,0 +1,6 @@
+{
+  "expected_governance_status": "unavailable",
+  "expected_reason_code": "sidecar_missing",
+  "fixture_kind": "missing",
+  "missing_path": "missing.agent-feedback.json"
+}

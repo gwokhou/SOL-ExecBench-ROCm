@@ -41,7 +41,7 @@ timing, scoring, and release-gate semantics.
 - [x] **Phase 184: Governance Guardrails and Compatibility Fixtures** -- Prove
   sidecars remain diagnostic-only across valid, invalid, stale, and
   contradictory states.
-- [ ] **Phase 185: HIP Consumer Integration Package and Docs** -- Provide
+- [x] **Phase 185: HIP Consumer Integration Package and Docs** -- Provide
   fixtures, examples, and docs that HIP can use for adapter/runtime tests.
 
 </details>
@@ -177,7 +177,7 @@ SOL fixtures and examples.
 
 **Plans:** 1 plan
 
-- [ ] 185-01-PLAN.md -- HIP-facing fixtures, example sidecars, mapping notes,
+- [x] 185-01-PLAN.md -- HIP-facing fixtures, example sidecars, mapping notes,
   and deterministic fixture tests.
 
 ## Progress
@@ -188,4 +188,4 @@ SOL fixtures and examples.
 | 182. Diagnostic Sidecar Schema and Generator | 2/2 | Complete | 2026-06-16 |
 | 183. Freshness Identity and Artifact References | 1/1 | Complete | 2026-06-16 |
 | 184. Governance Guardrails and Compatibility Fixtures | 1/1 | Complete | 2026-06-16 |
-| 185. HIP Consumer Integration Package and Docs | 0/1 | Not started | - |
+| 185. HIP Consumer Integration Package and Docs | 1/1 | Complete | 2026-06-16 |

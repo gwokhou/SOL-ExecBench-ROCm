@@ -126,7 +126,8 @@ schema change is intentional and tested.
 
 See `docs/EVALUATOR-CONTRACT.md` for the downstream compatibility contract,
 including optional diagnostic feedback/profile-summary sidecar capabilities and
-their authority boundaries.
+their authority boundaries. See `docs/agent_feedback_sidecar.md` for HIP-facing
+fixture semantics and consumer mapping guidance.
 
 Recent milestones moved focused debt out of monolithic paths without changing
 public benchmark schemas.

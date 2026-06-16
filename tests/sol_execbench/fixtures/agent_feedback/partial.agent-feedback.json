@@ -1,0 +1,85 @@
+{
+  "artifact_citations": [
+    {
+      "kind": "trace",
+      "label": "canonical_trace_jsonl",
+      "path": "trace.jsonl",
+      "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "status": null
+    },
+    {
+      "kind": "profile",
+      "label": "rocprofv3_profile",
+      "path": "trace.jsonl.profile.json",
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "status": "unavailable"
+    }
+  ],
+  "authority": {
+    "confirmed_improvement_authority": false,
+    "correctness_authority": false,
+    "cutover_authority": false,
+    "diagnostic_only": true,
+    "evidence_tier_authority": false,
+    "leaderboard_authority": false,
+    "paper_parity_authority": false,
+    "performance_authority": false,
+    "release_gate_authority": false,
+    "score_authority": false,
+    "timing_authority": false
+  },
+  "identity": {
+    "candidate_hash": null,
+    "generated_at": "2026-06-16T00:00:00Z",
+    "run_id": null,
+    "sol_contract_version": "1.0",
+    "source_hash": null,
+    "target_id": null,
+    "trace_path": "trace.jsonl"
+  },
+  "items": [
+    {
+      "bottleneck": "compile_failure",
+      "code": "compile_error",
+      "message": "1 workload(s) failed during compilation.",
+      "recommendation": "Inspect bounded compile diagnostics before changing optimization strategy.",
+      "severity": "action",
+      "source_refs": [
+        {
+          "kind": "trace",
+          "label": "canonical_trace_jsonl",
+          "status": null
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "Agent feedback is diagnostic next-experiment guidance only.",
+    "Canonical Trace JSONL remains the authority for correctness, timing, scoring, and status.",
+    "rocprofv3 profile status is unavailable."
+  ],
+  "reason_code": "partial_diagnostics",
+  "schema_version": "sol_execbench.agent_feedback.v1",
+  "source_refs": [
+    {
+      "kind": "trace",
+      "label": "canonical_trace_jsonl",
+      "status": null
+    },
+    {
+      "kind": "profile",
+      "label": "rocprofv3_profile",
+      "status": "unavailable"
+    }
+  ],
+  "status": "partial",
+  "summary": {
+    "evaluated_trace_count": 1,
+    "profile_status": "unavailable",
+    "static_evidence_status": null,
+    "status_counts": {
+      "COMPILE_ERROR": 1
+    },
+    "trace_count": 1
+  }
+}

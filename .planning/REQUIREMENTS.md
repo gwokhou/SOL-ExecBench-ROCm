@@ -67,13 +67,13 @@ ExecBench.
 
 ### HIP Integration Fixtures
 
-- [ ] **FIXT-01**: Repository fixtures include valid, missing/unavailable,
+- [x] **FIXT-01**: Repository fixtures include valid, missing/unavailable,
   malformed, stale, partial, and contradictory-authority feedback sidecar cases
   for HIP adapter and runtime tests.
-- [ ] **FIXT-02**: Fixture docs explain how HIP should map SOL bottleneck,
+- [x] **FIXT-02**: Fixture docs explain how HIP should map SOL bottleneck,
   recommendation, limitation, and citation fields into closed prompt-safe
   consumer taxonomies, with unknown values downgraded safely.
-- [ ] **FIXT-03**: CPU-safe tests verify generated fixtures and example sidecars
+- [x] **FIXT-03**: CPU-safe tests verify generated fixtures and example sidecars
   remain deterministic and contain no raw profiler dump content, full source,
   raw trace rows, or absolute temporary paths.
 
@@ -117,9 +117,9 @@ ExecBench.
 | GOVR-01 | Phase 184 | Complete |
 | GOVR-02 | Phase 184 | Complete |
 | GOVR-03 | Phase 184 | Complete |
-| FIXT-01 | Phase 185 | Pending |
-| FIXT-02 | Phase 185 | Pending |
-| FIXT-03 | Phase 185 | Pending |
+| FIXT-01 | Phase 185 | Complete |
+| FIXT-02 | Phase 185 | Complete |
+| FIXT-03 | Phase 185 | Complete |
 
 **Coverage:**
 - v1.36 requirements: 16 total
