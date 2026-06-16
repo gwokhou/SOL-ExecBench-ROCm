@@ -104,7 +104,9 @@ def _estimate_node(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstim
     return _unsupported_estimate(node)
 
 
-def _attention_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstimate:
+def _attention_estimate(
+    graph: BoundGraph, node: BoundGraphNode
+) -> OperatorWorkEstimate:
     subrole = str(node.attributes.get("subrole") or "")
     if node.confidence == EstimateConfidence.UNSUPPORTED:
         return _unsupported_estimate(
@@ -149,7 +151,9 @@ def _attention_matmul_estimate(
     formula: str,
     rationale: str,
 ) -> OperatorWorkEstimate:
-    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(graph, node)
+    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(
+        graph, node
+    )
     read_bytes = _sum_tensor_bytes(input_tensors, "read", warnings, rationale_parts)
     write_bytes = _sum_tensor_bytes(output_tensors, "write", warnings, rationale_parts)
     dims = _attention_dims_from_node_or_shapes(input_tensors, output_tensors, node)
@@ -163,7 +167,9 @@ def _attention_matmul_estimate(
     else:
         formula_inputs = dims
         flops = float(2 * dims["B"] * dims["H"] * dims["S_q"] * dims["S_k"] * dims["D"])
-        confidence = EstimateConfidence.SUPPORTED if not warnings else EstimateConfidence.INEXACT
+        confidence = (
+            EstimateConfidence.SUPPORTED if not warnings else EstimateConfidence.INEXACT
+        )
         axis_source = "tensor_shapes"
     total_bytes = read_bytes + write_bytes
     return OperatorWorkEstimate(
@@ -186,11 +192,17 @@ def _attention_matmul_estimate(
     )
 
 
-def _attention_softmax_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstimate:
-    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(graph, node)
+def _attention_softmax_estimate(
+    graph: BoundGraph, node: BoundGraphNode
+) -> OperatorWorkEstimate:
+    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(
+        graph, node
+    )
     read_bytes = _sum_tensor_bytes(input_tensors, "read", warnings, rationale_parts)
     write_bytes = _sum_tensor_bytes(output_tensors, "write", warnings, rationale_parts)
-    input_elements = _sum_tensor_numel(input_tensors, "input", warnings, rationale_parts) or 0
+    input_elements = (
+        _sum_tensor_numel(input_tensors, "input", warnings, rationale_parts) or 0
+    )
     axis_source, axis = _axis_evidence(node)
     if axis is None:
         warnings.append("inexact_operator:attention_softmax_missing_axis")
@@ -214,7 +226,9 @@ def _attention_softmax_estimate(graph: BoundGraph, node: BoundGraphNode) -> Oper
         intermediate_bytes=0.0,
         movement_bytes=0.0,
         total_bytes=total_bytes,
-        confidence=EstimateConfidence.SUPPORTED if axis is not None and not warnings else EstimateConfidence.INEXACT,
+        confidence=EstimateConfidence.SUPPORTED
+        if axis is not None and not warnings
+        else EstimateConfidence.INEXACT,
         rationale=_join_rationale(
             "attention softmax pass-count estimate over score matrix",
             rationale_parts,
@@ -224,7 +238,9 @@ def _attention_softmax_estimate(graph: BoundGraph, node: BoundGraphNode) -> Oper
     )
 
 
-def _attention_scale_or_mask_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstimate:
+def _attention_scale_or_mask_estimate(
+    graph: BoundGraph, node: BoundGraphNode
+) -> OperatorWorkEstimate:
     estimate = _pointwise_estimate(
         graph,
         node,
@@ -238,7 +254,9 @@ def _attention_scale_or_mask_estimate(graph: BoundGraph, node: BoundGraphNode) -
     warnings = list(estimate.warnings)
     confidence = estimate.confidence
     if node.attributes.get("mask_semantics") == "partial":
-        warnings.extend(("inexact_operator:attention_mask", "inexact_mask:missing_sparsity"))
+        warnings.extend(
+            ("inexact_operator:attention_mask", "inexact_mask:missing_sparsity")
+        )
         confidence = EstimateConfidence.INEXACT
     return OperatorWorkEstimate(
         node_id=estimate.node_id,
@@ -265,7 +283,9 @@ def _attention_output_projection_estimate(
     graph: BoundGraph,
     node: BoundGraphNode,
 ) -> OperatorWorkEstimate:
-    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(graph, node)
+    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(
+        graph, node
+    )
     read_bytes = _sum_tensor_bytes(input_tensors, "read", warnings, rationale_parts)
     write_bytes = _sum_tensor_bytes(output_tensors, "write", warnings, rationale_parts)
     dims = _attention_output_projection_dims(input_tensors, output_tensors, node)
@@ -279,7 +299,9 @@ def _attention_output_projection_estimate(
         formula_inputs = dims
         flops = float(2 * dims["M"] * dims["N"] * dims["K"])
         axis_source = "tensor_shapes"
-        confidence = EstimateConfidence.SUPPORTED if not warnings else EstimateConfidence.INEXACT
+        confidence = (
+            EstimateConfidence.SUPPORTED if not warnings else EstimateConfidence.INEXACT
+        )
     return OperatorWorkEstimate(
         node_id=node.node_id,
         op_family=OpFamily.ATTENTION,
@@ -350,7 +372,9 @@ def _gemm_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstim
         formula = "2*M*N*K"
         flops = float(2 * dims["M"] * dims["N"] * dims["K"])
 
-    confidence = EstimateConfidence.SUPPORTED if not warnings else EstimateConfidence.INEXACT
+    confidence = (
+        EstimateConfidence.SUPPORTED if not warnings else EstimateConfidence.INEXACT
+    )
     return OperatorWorkEstimate(
         node_id=node.node_id,
         op_family=node.op_family,
@@ -374,8 +398,12 @@ def _gemm_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstim
     )
 
 
-def _convolution_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstimate:
-    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(graph, node)
+def _convolution_estimate(
+    graph: BoundGraph, node: BoundGraphNode
+) -> OperatorWorkEstimate:
+    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(
+        graph, node
+    )
     read_bytes = _sum_tensor_bytes(input_tensors, "read", warnings, rationale_parts)
     write_bytes = _sum_tensor_bytes(output_tensors, "write", warnings, rationale_parts)
     total_bytes = read_bytes + write_bytes
@@ -425,7 +453,9 @@ def _convolution_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWo
         intermediate_bytes=0.0,
         movement_bytes=0.0,
         total_bytes=total_bytes,
-        confidence=EstimateConfidence.SUPPORTED if not warnings else EstimateConfidence.INEXACT,
+        confidence=EstimateConfidence.SUPPORTED
+        if not warnings
+        else EstimateConfidence.INEXACT,
         rationale=_join_rationale(
             "convolution FLOPs estimated from input, weight, output, and grouping metadata",
             rationale_parts,
@@ -446,14 +476,18 @@ def _embedding_positional_estimate(
 
 
 def _moe_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstimate:
-    if node.confidence == EstimateConfidence.UNSUPPORTED or node.attributes.get("taxonomy_only"):
+    if node.confidence == EstimateConfidence.UNSUPPORTED or node.attributes.get(
+        "taxonomy_only"
+    ):
         return _unsupported_estimate(
             node,
             rationale=node.rationale,
             warnings=("unsupported_operator:moe_taxonomy_only",),
         )
     subrole = str(node.attributes.get("subrole") or "")
-    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(graph, node)
+    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(
+        graph, node
+    )
     read_bytes = _sum_tensor_bytes(input_tensors, "read", warnings, rationale_parts)
     write_bytes = _sum_tensor_bytes(output_tensors, "write", warnings, rationale_parts)
     total_bytes = read_bytes + write_bytes
@@ -536,7 +570,9 @@ def _moe_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstima
         intermediate_bytes=0.0,
         movement_bytes=0.0,
         total_bytes=total_bytes,
-        confidence=EstimateConfidence.SUPPORTED if not warnings else EstimateConfidence.INEXACT,
+        confidence=EstimateConfidence.SUPPORTED
+        if not warnings
+        else EstimateConfidence.INEXACT,
         rationale=_join_rationale(
             "MoE static top-k route FLOPs estimated from source-backed route metadata",
             rationale_parts,
@@ -585,8 +621,12 @@ def _moe_warning_for_missing(missing: str) -> str:
     return "inexact_operator:moe_dynamic_routing"
 
 
-def _ssm_mamba_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstimate:
-    if node.confidence == EstimateConfidence.UNSUPPORTED or node.attributes.get("custom_scan"):
+def _ssm_mamba_estimate(
+    graph: BoundGraph, node: BoundGraphNode
+) -> OperatorWorkEstimate:
+    if node.confidence == EstimateConfidence.UNSUPPORTED or node.attributes.get(
+        "custom_scan"
+    ):
         return _unsupported_estimate(
             node,
             rationale=node.rationale,
@@ -594,13 +634,17 @@ def _ssm_mamba_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWork
         )
 
     subrole = str(node.attributes.get("subrole") or "")
-    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(graph, node)
+    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(
+        graph, node
+    )
     read_bytes = _sum_tensor_bytes(input_tensors, "read", warnings, rationale_parts)
     write_bytes = _sum_tensor_bytes(output_tensors, "write", warnings, rationale_parts)
     total_bytes = read_bytes + write_bytes
 
     if subrole != "scan":
-        formula_inputs = _ssm_visible_formula_inputs(node, input_tensors, include_state=False)
+        formula_inputs = _ssm_visible_formula_inputs(
+            node, input_tensors, include_state=False
+        )
         if total_bytes <= 0.0:
             warnings.append("inexact_operator:ssm_missing_visible_bytes")
         return OperatorWorkEstimate(
@@ -616,7 +660,9 @@ def _ssm_mamba_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWork
             intermediate_bytes=0.0,
             movement_bytes=0.0,
             total_bytes=total_bytes,
-            confidence=EstimateConfidence.SUPPORTED if not warnings else EstimateConfidence.INEXACT,
+            confidence=EstimateConfidence.SUPPORTED
+            if not warnings
+            else EstimateConfidence.INEXACT,
             rationale=_join_rationale(
                 f"SSM/Mamba {subrole or 'subrole'} contributes visible byte evidence",
                 rationale_parts,
@@ -626,12 +672,16 @@ def _ssm_mamba_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWork
             warnings=tuple(dict.fromkeys(warnings)),
         )
 
-    formula_inputs = _ssm_visible_formula_inputs(node, input_tensors, include_state=True)
+    formula_inputs = _ssm_visible_formula_inputs(
+        node, input_tensors, include_state=True
+    )
     missing = _ssm_missing_static_scan_inputs(formula_inputs)
     if missing:
         warnings.append("inexact_operator:ssm_missing_recurrence")
         warnings.extend(_ssm_warning_for_missing(item) for item in missing)
-        degraded_inputs = _ssm_visible_formula_inputs(node, input_tensors, include_state=False)
+        degraded_inputs = _ssm_visible_formula_inputs(
+            node, input_tensors, include_state=False
+        )
         return OperatorWorkEstimate(
             node_id=node.node_id,
             op_family=OpFamily.SSM_MAMBA,
@@ -673,7 +723,9 @@ def _ssm_mamba_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWork
         intermediate_bytes=0.0,
         movement_bytes=0.0,
         total_bytes=total_bytes,
-        confidence=EstimateConfidence.SUPPORTED if not warnings else EstimateConfidence.INEXACT,
+        confidence=EstimateConfidence.SUPPORTED
+        if not warnings
+        else EstimateConfidence.INEXACT,
         rationale=_join_rationale(
             "SSM/Mamba scan FLOPs estimated from visible sequence, hidden, and state metadata",
             rationale_parts,
@@ -759,7 +811,9 @@ def _lookup_memory_estimate(
         missing.append("index_shape")
     if selected_elements is None:
         missing.append("selected_elements")
-    warnings.extend(f"inexact_operator:embedding_positional_missing_{item}" for item in missing)
+    warnings.extend(
+        f"inexact_operator:embedding_positional_missing_{item}" for item in missing
+    )
     rationale_parts.extend(f"missing embedding/gather {item}" for item in missing)
 
     index_dtype_bytes = (
@@ -792,7 +846,9 @@ def _lookup_memory_estimate(
             "table_dtype": table_tensor.dtype if table_tensor is not None else None,
             "memory_subrole": subrole,
         }
-        confidence = EstimateConfidence.SUPPORTED if not warnings else EstimateConfidence.INEXACT
+        confidence = (
+            EstimateConfidence.SUPPORTED if not warnings else EstimateConfidence.INEXACT
+        )
         axis_source = "tensor_shapes"
     return OperatorWorkEstimate(
         node_id=node.node_id,
@@ -824,16 +880,22 @@ def _visible_memory_estimate(
     *,
     subrole: str,
 ) -> OperatorWorkEstimate:
-    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(graph, node)
+    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(
+        graph, node
+    )
     read_bytes = _sum_tensor_bytes(input_tensors, "read", warnings, rationale_parts)
     write_bytes = _sum_tensor_bytes(output_tensors, "write", warnings, rationale_parts)
-    output_elements = _sum_tensor_numel(output_tensors, "output", warnings, rationale_parts)
+    output_elements = _sum_tensor_numel(
+        output_tensors, "output", warnings, rationale_parts
+    )
     missing: list[str] = []
     if output_elements is None:
         missing.append("output_shape")
     if subrole == "rotary_like" and len(input_tensors) < 2:
         missing.append("rotary_axes")
-    warnings.extend(f"inexact_operator:embedding_positional_missing_{item}" for item in missing)
+    warnings.extend(
+        f"inexact_operator:embedding_positional_missing_{item}" for item in missing
+    )
     total_bytes = read_bytes + write_bytes
     formula_inputs: dict[str, Any] = {}
     axis_source: str | None = None
@@ -844,7 +906,9 @@ def _visible_memory_estimate(
             "memory_subrole": subrole,
         }
         axis_source = "tensor_shapes"
-        confidence = EstimateConfidence.SUPPORTED if not warnings else EstimateConfidence.INEXACT
+        confidence = (
+            EstimateConfidence.SUPPORTED if not warnings else EstimateConfidence.INEXACT
+        )
     return OperatorWorkEstimate(
         node_id=node.node_id,
         op_family=OpFamily.EMBEDDING_POSITIONAL,
@@ -869,7 +933,9 @@ def _visible_memory_estimate(
     )
 
 
-def _elementwise_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstimate:
+def _elementwise_estimate(
+    graph: BoundGraph, node: BoundGraphNode
+) -> OperatorWorkEstimate:
     return _pointwise_estimate(
         graph,
         node,
@@ -880,7 +946,9 @@ def _elementwise_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWo
     )
 
 
-def _activation_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstimate:
+def _activation_estimate(
+    graph: BoundGraph, node: BoundGraphNode
+) -> OperatorWorkEstimate:
     return _pointwise_estimate(
         graph,
         node,
@@ -891,11 +959,17 @@ def _activation_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWor
     )
 
 
-def _reduction_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstimate:
-    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(graph, node)
+def _reduction_estimate(
+    graph: BoundGraph, node: BoundGraphNode
+) -> OperatorWorkEstimate:
+    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(
+        graph, node
+    )
     read_bytes = _sum_tensor_bytes(input_tensors, "read", warnings, rationale_parts)
     write_bytes = _sum_tensor_bytes(output_tensors, "write", warnings, rationale_parts)
-    input_elements = _sum_tensor_numel(input_tensors, "input", warnings, rationale_parts) or 0
+    input_elements = (
+        _sum_tensor_numel(input_tensors, "input", warnings, rationale_parts) or 0
+    )
     axis_source, axis = _axis_evidence(node)
     formula_inputs: dict[str, Any] = {"input_elements": input_elements, "axis": axis}
     total_bytes = read_bytes + write_bytes
@@ -922,11 +996,17 @@ def _reduction_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWork
     )
 
 
-def _normalization_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstimate:
-    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(graph, node)
+def _normalization_estimate(
+    graph: BoundGraph, node: BoundGraphNode
+) -> OperatorWorkEstimate:
+    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(
+        graph, node
+    )
     read_bytes = _sum_tensor_bytes(input_tensors, "read", warnings, rationale_parts)
     write_bytes = _sum_tensor_bytes(output_tensors, "write", warnings, rationale_parts)
-    input_elements = _sum_tensor_numel(input_tensors, "input", warnings, rationale_parts) or 0
+    input_elements = (
+        _sum_tensor_numel(input_tensors, "input", warnings, rationale_parts) or 0
+    )
     axis_source, axis = _axis_evidence(node)
     normalization_passes = 4
     formula_inputs: dict[str, Any] = {
@@ -959,10 +1039,14 @@ def _normalization_estimate(graph: BoundGraph, node: BoundGraphNode) -> Operator
 
 
 def _softmax_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstimate:
-    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(graph, node)
+    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(
+        graph, node
+    )
     read_bytes = _sum_tensor_bytes(input_tensors, "read", warnings, rationale_parts)
     write_bytes = _sum_tensor_bytes(output_tensors, "write", warnings, rationale_parts)
-    input_elements = _sum_tensor_numel(input_tensors, "input", warnings, rationale_parts) or 0
+    input_elements = (
+        _sum_tensor_numel(input_tensors, "input", warnings, rationale_parts) or 0
+    )
     axis_source, axis = _axis_evidence(node)
     softmax_passes = 5
     formula_inputs: dict[str, Any] = {
@@ -994,14 +1078,22 @@ def _softmax_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEs
     )
 
 
-def _data_movement_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstimate:
-    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(graph, node)
+def _data_movement_estimate(
+    graph: BoundGraph, node: BoundGraphNode
+) -> OperatorWorkEstimate:
+    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(
+        graph, node
+    )
     read_bytes = _sum_tensor_bytes(input_tensors, "read", warnings, rationale_parts)
     write_bytes = _sum_tensor_bytes(output_tensors, "write", warnings, rationale_parts)
-    movement_kind = str(node.attributes.get("movement_kind") or _movement_kind_from_op_name(node))
+    movement_kind = str(
+        node.attributes.get("movement_kind") or _movement_kind_from_op_name(node)
+    )
     if movement_kind == "materialized":
         movement_bytes = read_bytes + write_bytes
-        rationale = "materialized data movement estimate for contiguous or copy-like operation"
+        rationale = (
+            "materialized data movement estimate for contiguous or copy-like operation"
+        )
     elif movement_kind == "broadcast_view":
         movement_bytes = 0.0
         rationale = "broadcast view evidence with zero movement bytes"
@@ -1030,11 +1122,17 @@ def _data_movement_estimate(graph: BoundGraph, node: BoundGraphNode) -> Operator
     )
 
 
-def _dtype_conversion_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstimate:
-    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(graph, node)
+def _dtype_conversion_estimate(
+    graph: BoundGraph, node: BoundGraphNode
+) -> OperatorWorkEstimate:
+    input_tensors, output_tensors, warnings, rationale_parts = _estimate_tensors(
+        graph, node
+    )
     read_bytes = _sum_tensor_bytes(input_tensors, "read", warnings, rationale_parts)
     write_bytes = _sum_tensor_bytes(output_tensors, "write", warnings, rationale_parts)
-    target_dtype = node.attributes.get("target_dtype") or _first_tensor_dtype(output_tensors)
+    target_dtype = node.attributes.get("target_dtype") or _first_tensor_dtype(
+        output_tensors
+    )
     if target_dtype is None or _dtype_bytes(str(target_dtype)) is None:
         warnings.append("inexact_dtype_conversion:missing_target_dtype")
         rationale_parts.append("missing target dtype for dtype conversion")
@@ -1058,7 +1156,9 @@ def _dtype_conversion_estimate(graph: BoundGraph, node: BoundGraphNode) -> Opera
         movement_bytes=movement_bytes,
         total_bytes=total_bytes,
         confidence=EstimateConfidence.INEXACT,
-        rationale=_join_rationale("dtype conversion movement estimate", rationale_parts),
+        rationale=_join_rationale(
+            "dtype conversion movement estimate", rationale_parts
+        ),
         movement_kind="dtype_conversion",
         warnings=tuple(dict.fromkeys(warnings)),
     )
@@ -1079,14 +1179,18 @@ def _pointwise_estimate(
     rationale_parts: list[str] = []
     read_bytes = _sum_tensor_bytes(input_tensors, "read", warnings, rationale_parts)
     write_bytes = _sum_tensor_bytes(output_tensors, "write", warnings, rationale_parts)
-    output_elements = _sum_tensor_numel(output_tensors, "output", warnings, rationale_parts)
+    output_elements = _sum_tensor_numel(
+        output_tensors, "output", warnings, rationale_parts
+    )
     total_bytes = read_bytes + write_bytes
     if output_elements is None:
         if not input_tensors and not output_tensors:
             return _unsupported_estimate(
                 node,
                 rationale=f"unsupported {node.op_family.value} estimate: all key tensors are unresolved",
-                warnings=(f"unsupported_operator:{node.op_family.value}_missing_tensors",),
+                warnings=(
+                    f"unsupported_operator:{node.op_family.value}_missing_tensors",
+                ),
             )
         output_elements = 0
         warnings.append(f"inexact_operator:{node.op_family.value}_missing_shape")
@@ -1143,7 +1247,8 @@ def _unsupported_estimate(
         movement_bytes=0.0,
         total_bytes=0.0,
         confidence=EstimateConfidence.UNSUPPORTED,
-        rationale=rationale or (
+        rationale=rationale
+        or (
             f"unsupported operation estimate for {node.op_family.value}: "
             f"{node.op_name or node.source_expression}"
         ),
@@ -1151,23 +1256,26 @@ def _unsupported_estimate(
     )
 
 
+_DTYPE_BYTES = {
+    DType.FLOAT64.value: 8.0,
+    DType.FLOAT32.value: 4.0,
+    DType.FLOAT16.value: 2.0,
+    DType.BFLOAT16.value: 2.0,
+    DType.FLOAT8_E4M3FN.value: 1.0,
+    DType.FLOAT8_E5M2.value: 1.0,
+    DType.FLOAT4_E2M1.value: 0.5,
+    DType.FLOAT4_E2M1FN_X2.value: 0.5,
+    DType.INT64.value: 8.0,
+    DType.INT32.value: 4.0,
+    DType.INT16.value: 2.0,
+    DType.INT8.value: 1.0,
+    DType.BOOL.value: 1.0,
+}
+
+
 def _dtype_bytes(dtype: DType | str) -> float | None:
     raw = dtype.value if isinstance(dtype, DType) else str(dtype)
-    return {
-        DType.FLOAT64.value: 8.0,
-        DType.FLOAT32.value: 4.0,
-        DType.FLOAT16.value: 2.0,
-        DType.BFLOAT16.value: 2.0,
-        DType.FLOAT8_E4M3FN.value: 1.0,
-        DType.FLOAT8_E5M2.value: 1.0,
-        DType.FLOAT4_E2M1.value: 0.5,
-        DType.FLOAT4_E2M1FN_X2.value: 0.5,
-        DType.INT64.value: 8.0,
-        DType.INT32.value: 4.0,
-        DType.INT16.value: 2.0,
-        DType.INT8.value: 1.0,
-        DType.BOOL.value: 1.0,
-    }.get(raw)
+    return _DTYPE_BYTES.get(raw)
 
 
 def _tensor_numel(tensor: BoundTensor) -> int | None:
@@ -1184,8 +1292,14 @@ def _tensor_bytes(tensor: BoundTensor) -> float | None:
     return float(numel * dtype_bytes)
 
 
-def _node_tensors(graph: BoundGraph, tensor_ids: tuple[str, ...]) -> tuple[BoundTensor, ...]:
-    return tuple(graph.tensors[tensor_id] for tensor_id in tensor_ids if tensor_id in graph.tensors)
+def _node_tensors(
+    graph: BoundGraph, tensor_ids: tuple[str, ...]
+) -> tuple[BoundTensor, ...]:
+    return tuple(
+        graph.tensors[tensor_id]
+        for tensor_id in tensor_ids
+        if tensor_id in graph.tensors
+    )
 
 
 def _sum_tensor_bytes(
@@ -1199,10 +1313,14 @@ def _sum_tensor_bytes(
         tensor_bytes = _tensor_bytes(tensor)
         if tensor_bytes is None:
             if tensor.shape is None:
-                rationale_parts.append(f"missing shape for {bucket} tensor {tensor.tensor_id}")
+                rationale_parts.append(
+                    f"missing shape for {bucket} tensor {tensor.tensor_id}"
+                )
                 warnings.append(f"inexact_bytes:missing_shape:{tensor.tensor_id}")
             if _dtype_bytes(tensor.dtype) is None:
-                rationale_parts.append(f"missing dtype for {bucket} tensor {tensor.tensor_id}")
+                rationale_parts.append(
+                    f"missing dtype for {bucket} tensor {tensor.tensor_id}"
+                )
                 warnings.append(f"inexact_bytes:missing_dtype:{tensor.tensor_id}")
             continue
         total += tensor_bytes
@@ -1223,7 +1341,9 @@ def _sum_tensor_numel(
     for tensor in tensors:
         numel = _tensor_numel(tensor)
         if numel is None:
-            rationale_parts.append(f"missing shape for {bucket} tensor {tensor.tensor_id}")
+            rationale_parts.append(
+                f"missing shape for {bucket} tensor {tensor.tensor_id}"
+            )
             warnings.append(f"inexact_elements:missing_shape:{tensor.tensor_id}")
             return None
         total += numel
@@ -1244,9 +1364,13 @@ def _estimate_tensors(
 
 def _axis_evidence(node: BoundGraphNode) -> tuple[str, object]:
     if "dim" in node.attributes:
-        return str(node.attributes.get("axis_source") or "attribute"), node.attributes["dim"]
+        return str(node.attributes.get("axis_source") or "attribute"), node.attributes[
+            "dim"
+        ]
     if "axis" in node.attributes:
-        return str(node.attributes.get("axis_source") or "attribute"), node.attributes["axis"]
+        return str(node.attributes.get("axis_source") or "attribute"), node.attributes[
+            "axis"
+        ]
     return "missing", None
 
 
@@ -1278,7 +1402,11 @@ def _infer_gemm_dims(
     if lhs_shape is None or rhs_shape is None or out_shape is None:
         return None
     if len(lhs_shape) == 2 and len(rhs_shape) == 2 and len(out_shape) >= 2:
-        return {"M": int(lhs_shape[-2]), "N": int(out_shape[-1]), "K": int(lhs_shape[-1])}
+        return {
+            "M": int(lhs_shape[-2]),
+            "N": int(out_shape[-1]),
+            "K": int(lhs_shape[-1]),
+        }
     if len(lhs_shape) >= 3 and len(rhs_shape) == 2 and len(out_shape) >= 3:
         batch = prod(out_shape[:-2])
         return {
@@ -1337,7 +1465,11 @@ def _convolution_dims(
     assert isinstance(dimensionality, int)
     assert isinstance(groups, int)
     assert isinstance(output_spatial, tuple)
-    assert input_shape is not None and weight_shape is not None and output_shape is not None
+    assert (
+        input_shape is not None
+        and weight_shape is not None
+        and output_shape is not None
+    )
     if (
         len(input_shape) != dimensionality + 2
         or len(weight_shape) != dimensionality + 2
