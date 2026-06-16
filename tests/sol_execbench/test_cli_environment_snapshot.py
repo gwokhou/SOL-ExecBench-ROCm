@@ -8,6 +8,7 @@ from click.testing import CliRunner
 from sol_execbench.cli import main as cli_main
 from sol_execbench.cli.main import cli
 from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileResult
+from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileArtifact
 from sol_execbench.core.bench.static_kernel_evidence import (
     StaticKernelEvidenceArtifact,
     StaticKernelEvidenceReasonCode,
@@ -318,6 +319,65 @@ def test_profile_sidecar_records_diagnostic_metadata(tmp_path: Path):
     assert payload["diagnostic_only"] is True
     assert payload["score_authority"] is False
     assert payload["skipped_reason"] == "rocprofv3 is not available on PATH"
+
+
+def test_profile_summary_sidecar_tracks_trace_output(tmp_path: Path):
+    output = tmp_path / "trace.jsonl"
+
+    assert cli_main._profile_summary_sidecar_path(output) == (
+        tmp_path / "trace.jsonl.profile-summary.json"
+    )
+    assert cli_main._profile_summary_sidecar_path(None) is None
+
+
+def test_profile_summary_sidecar_records_bounded_metadata(tmp_path: Path):
+    output = tmp_path / "trace.jsonl"
+    output.write_text('{"definition":"toy"}\n')
+    profile_metadata = tmp_path / "trace.jsonl.profile.json"
+    profile_metadata.write_text('{"schema_version":"sol_execbench.rocprofv3_profile.v1"}\n')
+    profile_artifact = tmp_path / "trace.rocpd"
+    profile_artifact.write_text("profile artifact\n")
+    result = Rocprofv3ProfileResult(
+        status="success",
+        command=("rocprofv3", "--kernel-trace", "--", "python", "eval_driver.py"),
+        output_directory=tmp_path,
+        output_file="trace",
+        artifacts=(
+            Rocprofv3ProfileArtifact(
+                path=profile_artifact,
+                kind="rocpd",
+                size_bytes=profile_artifact.stat().st_size,
+            ),
+        ),
+        returncode=0,
+        profiler_available=True,
+    )
+
+    written = cli_main._write_profile_summary_sidecar(
+        output,
+        result,
+        profile_sidecar_path=profile_metadata,
+    )
+
+    assert written == tmp_path / "trace.jsonl.profile-summary.json"
+    assert written is not None
+    payload = json.loads(written.read_text())
+    assert payload["schema_version"] == "sol_execbench.profile_summary.v1"
+    assert payload["status"] == "available"
+    assert payload["authority"]["diagnostic_only"] is True
+    assert payload["authority"]["timing_authority"] is False
+    assert payload["identity"]["trace_path"] == "trace.jsonl"
+    assert payload["identity"]["run_id"] is not None
+    assert len(payload["identity"]["run_id"]) == 64
+    assert payload["summary"]["profiler_status"] == "success"
+    assert payload["summary"]["artifact_count"] == 1
+    citation_kinds = {citation["kind"] for citation in payload["artifact_citations"]}
+    assert citation_kinds == {"trace", "profile_metadata", "profiler_artifact"}
+    for citation in payload["artifact_citations"]:
+        assert "/" not in citation["path"]
+        assert citation["sha256"] is not None
+        assert len(citation["sha256"]) == 64
+    assert "profile artifact" not in json.dumps(payload)
 
 
 def test_profile_output_directory_tracks_trace_output(tmp_path: Path):

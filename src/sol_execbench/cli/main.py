@@ -64,6 +64,11 @@ from ..core.bench.rocm_profiler import (
     Rocprofv3ProfileResult,
     collect_rocprofv3_profile,
 )
+from ..core.bench.profile_summary import (
+    ProfileSummaryArtifactCitation,
+    build_profile_summary_sidecar,
+    profile_summary_artifact_citation_from_path,
+)
 from ..core.bench.stderr import filter_benign_rocm_stderr
 from ..core.bench.static_kernel_evidence import (
     StaticKernelEvidenceReasonCode,
@@ -378,6 +383,84 @@ def _write_profile_sidecar(
     except Exception as exc:
         console.print(f"[yellow]Profiling metadata skipped: {exc}[/yellow]")
         return None
+
+
+def _profile_summary_sidecar_path(output_file: Path | None) -> Path | None:
+    """Return the optional profile summary sidecar path for a trace output."""
+
+    if output_file is None:
+        return None
+    return output_file.with_name(f"{output_file.name}.profile-summary.json")
+
+
+def _write_profile_summary_sidecar(
+    output_file: Path | None,
+    profile_result: Rocprofv3ProfileResult | None,
+    *,
+    profile_sidecar_path: Path | None = None,
+) -> Path | None:
+    """Write optional normalized profile summary without changing trace JSONL."""
+
+    sidecar_path = _profile_summary_sidecar_path(output_file)
+    if sidecar_path is None:
+        return None
+    try:
+        run_id = sha256_file(output_file) if output_file.is_file() else None
+        sidecar = build_profile_summary_sidecar(
+            profile_result=profile_result,
+            trace_path=str(output_file),
+            run_id=run_id,
+            artifact_citations=_profile_summary_artifact_citations(
+                output_file=output_file,
+                profile_result=profile_result,
+                profile_sidecar_path=profile_sidecar_path,
+            ),
+        )
+        sidecar_path.parent.mkdir(parents=True, exist_ok=True)
+        sidecar_path.write_text(
+            json.dumps(sidecar.model_dump(mode="json"), sort_keys=True) + "\n"
+        )
+        console.print(f"[green]Saved profile summary to {sidecar_path}[/green]")
+        return sidecar_path
+    except Exception as exc:
+        console.print(f"[yellow]Profile summary skipped: {exc}[/yellow]")
+        return None
+
+
+def _profile_summary_artifact_citations(
+    *,
+    output_file: Path,
+    profile_result: Rocprofv3ProfileResult | None,
+    profile_sidecar_path: Path | None,
+) -> list[ProfileSummaryArtifactCitation]:
+    """Return compact citations for profile-summary evidence inputs."""
+
+    citations = [
+        profile_summary_artifact_citation_from_path(
+            kind="trace",
+            label="canonical_trace_jsonl",
+            path=output_file,
+        )
+    ]
+    if profile_sidecar_path is not None:
+        citations.append(
+            profile_summary_artifact_citation_from_path(
+                kind="profile_metadata",
+                label="rocprofv3_profile_metadata",
+                path=profile_sidecar_path,
+            )
+        )
+    if profile_result is not None:
+        for artifact in profile_result.artifacts:
+            citations.append(
+                profile_summary_artifact_citation_from_path(
+                    kind="profiler_artifact",
+                    label=artifact.kind,
+                    path=artifact.path,
+                    status=profile_result.status,
+                )
+            )
+    return citations
 
 
 def _static_evidence_directory(output_file: Path | None, staging_dir: Path) -> Path:
@@ -1000,6 +1083,11 @@ def _evaluate_cli(
 
     environment_sidecar_path = _write_environment_snapshot_sidecar(output_file)
     profile_sidecar_path = _write_profile_sidecar(output_file, profile_result)
+    _write_profile_summary_sidecar(
+        output_file,
+        profile_result,
+        profile_sidecar_path=profile_sidecar_path,
+    )
     static_evidence_sidecar_path = _write_static_evidence_sidecar(
         output_file,
         staging_dir,

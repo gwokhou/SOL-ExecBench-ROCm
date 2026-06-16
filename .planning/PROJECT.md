@@ -15,24 +15,24 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 
 ## Current State
 
-**Shipped version:** v1.36 SOL Agent Feedback Sidecar Producer,
+**Shipped version:** v1.37 Profile Summary Sidecar v1,
 shipped 2026-06-16.
 
-**Current milestone:** v1.37 Profile Summary Sidecar v1.
+**Current milestone:** None defined.
 
 **Queued milestone:** None defined.
 
-**Latest milestone outcome:** v1.36 delivered the optional diagnostic
-SOL agent-feedback sidecar producer for HIP Playground v1.26. The shipped
-surface includes contract capability tokens, strict sidecar generation,
-trace-adjacent CLI persistence, freshness identity, compact artifact citations,
-governance guardrails, and HIP-facing fixtures/docs while preserving canonical
-Trace JSONL as the only correctness, timing, scoring, and status authority.
+**Latest milestone outcome:** v1.37 turned the previously reserved
+`profile_summary.sidecar.v1` capability into a concrete optional
+trace-adjacent `sol_execbench.profile_summary.v1` diagnostic artifact. The
+shipped surface includes strict schema models, CLI persistence as
+`<trace>.profile-summary.json`, compact trace/profile/profiler artifact
+citations, freshness and governance validation helpers, HIP-facing fixtures,
+and consumer docs while preserving canonical Trace JSONL and raw
+`<trace>.profile.json` rocprofv3 metadata authority boundaries.
 
-**Current milestone goal:** v1.37 turns the previously reserved
-`profile_summary.sidecar.v1` capability into a real trace-adjacent
-`sol_execbench.profile_summary.v1` artifact with strict schema, producer wiring,
-freshness/citation metadata, governance guardrails, and HIP-facing fixtures.
+**Current milestone goal:** None defined. Start the next milestone with
+`$gsd-new-milestone`.
 
 **Previous milestone outcome:** v1.33 completed RDNA4 benchmark-grade evidence
 closure by hardening denominator policy, memory/readiness classification,
@@ -155,13 +155,14 @@ SOL/SOLAR sidecar pairs after 56 temporary sidecar exclusions. RDNA4 timing
 remains non-authoritative until clock-lock/reset sudoers coverage and
 profiler-backed timing evidence are rerun.
 
-## Current Milestone: v1.37 Profile Summary Sidecar v1
+## Latest Milestone: v1.37 Profile Summary Sidecar v1 (SHIPPED)
 
-**Goal:** Turn `profile_summary.sidecar.v1` from a reserved optional capability
-into a real diagnostic sidecar artifact that summarizes existing ROCm profiler
-metadata without changing canonical Trace JSONL or benchmark authority.
+**Shipped outcome:** Turned `profile_summary.sidecar.v1` from a reserved
+optional capability into a concrete diagnostic sidecar artifact that summarizes
+existing ROCm profiler metadata without changing canonical Trace JSONL,
+existing rocprofv3 profile metadata, or benchmark authority.
 
-**Target features:**
+**Delivered features:**
 - Strict `sol_execbench.profile_summary.v1` schema with bounded status,
   identity, summary, metric, limitation, authority, and artifact citation
   fields.
@@ -175,7 +176,12 @@ metadata without changing canonical Trace JSONL or benchmark authority.
   as optional adapter input without treating it as correctness, timing, score,
   release-gate, cutover, paper-parity, or leaderboard authority.
 
-## Latest Milestone: v1.36 SOL Agent Feedback Sidecar Producer (SHIPPED)
+**Validation closure:** v1.37 milestone audit passed with 15/15 requirements
+satisfied. Targeted profile-summary pytest and Ruff checks pass on this Mac
+host; full repository pytest remains blocked by broader environment/repo
+issues recorded in the milestone audit.
+
+## Previous Milestone: v1.36 SOL Agent Feedback Sidecar Producer (SHIPPED)
 
 **Shipped outcome:** Delivered the optional diagnostic SOL
 agent-feedback/profile-summary
