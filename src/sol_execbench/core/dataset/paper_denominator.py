@@ -5,14 +5,13 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from .checksums import sha256_file, stable_json_checksum
-from .manifest import DatasetManifestChecksum
+from .manifest import DatasetManifestChecksum, utc_timestamp
 
 PAPER_DENOMINATOR_REPORT_SCHEMA_VERSION = "sol_execbench.paper_denominator_report.v1"
 
@@ -63,12 +62,24 @@ class PaperDenominatorSourceRef(BaseModel):
 class PaperDenominatorSources(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    manifest: PaperDenominatorSourceRef = Field(default_factory=PaperDenominatorSourceRef)
-    inventory: PaperDenominatorSourceRef = Field(default_factory=PaperDenominatorSourceRef)
-    readiness: PaperDenominatorSourceRef = Field(default_factory=PaperDenominatorSourceRef)
-    ready_subset: PaperDenominatorSourceRef = Field(default_factory=PaperDenominatorSourceRef)
-    execution_closure: PaperDenominatorSourceRef = Field(default_factory=PaperDenominatorSourceRef)
-    amd_score_report: PaperDenominatorSourceRef = Field(default_factory=PaperDenominatorSourceRef)
+    manifest: PaperDenominatorSourceRef = Field(
+        default_factory=PaperDenominatorSourceRef
+    )
+    inventory: PaperDenominatorSourceRef = Field(
+        default_factory=PaperDenominatorSourceRef
+    )
+    readiness: PaperDenominatorSourceRef = Field(
+        default_factory=PaperDenominatorSourceRef
+    )
+    ready_subset: PaperDenominatorSourceRef = Field(
+        default_factory=PaperDenominatorSourceRef
+    )
+    execution_closure: PaperDenominatorSourceRef = Field(
+        default_factory=PaperDenominatorSourceRef
+    )
+    amd_score_report: PaperDenominatorSourceRef = Field(
+        default_factory=PaperDenominatorSourceRef
+    )
     amd_sol_artifacts: list[PaperDenominatorSourceRef] = Field(default_factory=list)
     solar_artifacts: list[PaperDenominatorSourceRef] = Field(default_factory=list)
 
@@ -100,7 +111,9 @@ class PaperDenominatorRollup(BaseModel):
 
     problems: int = 0
     workloads: int = 0
-    states: PaperDenominatorStateTotals = Field(default_factory=PaperDenominatorStateTotals)
+    states: PaperDenominatorStateTotals = Field(
+        default_factory=PaperDenominatorStateTotals
+    )
 
     def merge(self, other: "PaperDenominatorRollup") -> None:
         self.problems += other.problems
@@ -134,7 +147,9 @@ class PaperDenominatorWorkload(BaseModel):
     row_index: int | None = None
     readiness_status: str | None = None
     closure_status: str | None = None
-    states: PaperDenominatorStateTotals = Field(default_factory=PaperDenominatorStateTotals)
+    states: PaperDenominatorStateTotals = Field(
+        default_factory=PaperDenominatorStateTotals
+    )
     evidence_gaps: list[str] = Field(default_factory=list)
 
 
@@ -211,10 +226,6 @@ class PaperDenominatorReport(BaseModel):
         return json.dumps(self.model_dump(mode="json"), indent=2, sort_keys=True) + "\n"
 
 
-def utc_timestamp() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-
 def load_json(path: Path) -> dict[str, Any]:
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
@@ -278,7 +289,9 @@ def _source(
     )
 
 
-def _artifact_source(artifact: PaperDenominatorSourceRef | dict[str, Any] | str | Path) -> PaperDenominatorSourceRef:
+def _artifact_source(
+    artifact: PaperDenominatorSourceRef | dict[str, Any] | str | Path,
+) -> PaperDenominatorSourceRef:
     if isinstance(artifact, PaperDenominatorSourceRef):
         return artifact
     if isinstance(artifact, str | Path):
@@ -434,7 +447,9 @@ def _closure_state(status: str) -> str | None:
     return None
 
 
-def _sorted_reason_buckets(groups: dict[str, dict[str, Any]]) -> list[PaperDenominatorReasonBucket]:
+def _sorted_reason_buckets(
+    groups: dict[str, dict[str, Any]],
+) -> list[PaperDenominatorReasonBucket]:
     buckets = [
         PaperDenominatorReasonBucket(
             reason_code=group["reason_code"],
@@ -448,7 +463,9 @@ def _sorted_reason_buckets(groups: dict[str, dict[str, Any]]) -> list[PaperDenom
     return sorted(buckets, key=lambda bucket: (-bucket.count, bucket.reason_code))
 
 
-def _sorted_evidence_gaps(groups: dict[tuple[str, str], dict[str, Any]]) -> list[PaperDenominatorEvidenceGap]:
+def _sorted_evidence_gaps(
+    groups: dict[tuple[str, str], dict[str, Any]],
+) -> list[PaperDenominatorEvidenceGap]:
     gaps = [
         PaperDenominatorEvidenceGap(
             evidence=group["evidence"],
@@ -459,10 +476,14 @@ def _sorted_evidence_gaps(groups: dict[tuple[str, str], dict[str, Any]]) -> list
         )
         for group in groups.values()
     ]
-    return sorted(gaps, key=lambda gap: (EVIDENCE_KEYS.index(gap.evidence), gap.reason_code))
+    return sorted(
+        gaps, key=lambda gap: (EVIDENCE_KEYS.index(gap.evidence), gap.reason_code)
+    )
 
 
-def _next_hints(reason_buckets: list[PaperDenominatorReasonBucket]) -> list[PaperDenominatorNextEvidenceHint]:
+def _next_hints(
+    reason_buckets: list[PaperDenominatorReasonBucket],
+) -> list[PaperDenominatorNextEvidenceHint]:
     hints = []
     for bucket in reason_buckets:
         for hint in bucket.next_evidence:
@@ -484,8 +505,10 @@ def build_paper_denominator_report(
     manifest: dict[str, Any] | None = None,
     ready_subset: dict[str, Any] | None = None,
     amd_score_report: dict[str, Any] | None = None,
-    amd_sol_artifacts: list[PaperDenominatorSourceRef | dict[str, Any] | str | Path] | None = None,
-    solar_artifacts: list[PaperDenominatorSourceRef | dict[str, Any] | str | Path] | None = None,
+    amd_sol_artifacts: list[PaperDenominatorSourceRef | dict[str, Any] | str | Path]
+    | None = None,
+    solar_artifacts: list[PaperDenominatorSourceRef | dict[str, Any] | str | Path]
+    | None = None,
     source_paths: dict[str, Path | None] | None = None,
     created_at: str | None = None,
 ) -> PaperDenominatorReport:
@@ -504,7 +527,9 @@ def build_paper_denominator_report(
 
     for problem in inventory.get("problems", []):
         category = str(problem.get("category", "unknown"))
-        problem_id = str(problem.get("problem_id") or problem.get("problem_path") or "unknown")
+        problem_id = str(
+            problem.get("problem_id") or problem.get("problem_path") or "unknown"
+        )
         problem_path = problem.get("problem_path")
         _problem_rollup(
             problems,
@@ -532,7 +557,9 @@ def build_paper_denominator_report(
 
     for record in readiness.get("workloads", []):
         category = str(record.get("category", "unknown"))
-        problem_id = str(record.get("problem_id") or record.get("problem_path") or "unknown")
+        problem_id = str(
+            record.get("problem_id") or record.get("problem_path") or "unknown"
+        )
         problem_path = record.get("problem_path")
         state = _readiness_state(str(record.get("status", "blocked")))
         example_ref = _record_ref(record)
@@ -567,21 +594,29 @@ def build_paper_denominator_report(
                 category=category,
                 problem_id=problem_id,
                 problem_path=str(problem_path) if problem_path else None,
-                workload_uuid=str(record.get("workload_uuid")) if record.get("workload_uuid") else None,
+                workload_uuid=str(record.get("workload_uuid"))
+                if record.get("workload_uuid")
+                else None,
                 row_index=record.get("row_index"),
             ),
         )
         workload.category = category
         workload.problem_id = problem_id
         workload.problem_path = str(problem_path) if problem_path else None
-        workload.workload_uuid = str(record.get("workload_uuid")) if record.get("workload_uuid") else None
+        workload.workload_uuid = (
+            str(record.get("workload_uuid")) if record.get("workload_uuid") else None
+        )
         workload.row_index = record.get("row_index")
-        workload.readiness_status = str(record.get("status")) if record.get("status") else None
+        workload.readiness_status = (
+            str(record.get("status")) if record.get("status") else None
+        )
         workload.states = PaperDenominatorStateTotals(**{state: 1})
 
     for record in execution_closure.get("records", []):
         category = str(record.get("category", "unknown"))
-        problem_id = str(record.get("problem_id") or record.get("problem_path") or "unknown")
+        problem_id = str(
+            record.get("problem_id") or record.get("problem_path") or "unknown"
+        )
         problem_path = record.get("problem_path")
         status = str(record.get("closure_status"))
         state = _closure_state(status)
@@ -596,14 +631,18 @@ def build_paper_denominator_report(
                 category=category,
                 problem_id=problem_id,
                 problem_path=str(problem_path) if problem_path else None,
-                workload_uuid=str(record.get("workload_uuid")) if record.get("workload_uuid") else None,
+                workload_uuid=str(record.get("workload_uuid"))
+                if record.get("workload_uuid")
+                else None,
                 row_index=record.get("row_index"),
             ),
         )
         workload.category = category
         workload.problem_id = problem_id
         workload.problem_path = str(problem_path) if problem_path else None
-        workload.workload_uuid = str(record.get("workload_uuid")) if record.get("workload_uuid") else None
+        workload.workload_uuid = (
+            str(record.get("workload_uuid")) if record.get("workload_uuid") else None
+        )
         workload.row_index = record.get("row_index")
         workload.closure_status = status
         example_ref = _record_ref(record)
@@ -620,9 +659,19 @@ def build_paper_denominator_report(
                 rollup.states.add(state)
             workload.states.add(state)
         for reason in record.get("filter_reasons", []):
-            _add_reason(reason_groups, reason_code=str(reason), state="filtered", example_ref=example_ref)
+            _add_reason(
+                reason_groups,
+                reason_code=str(reason),
+                state="filtered",
+                example_ref=example_ref,
+            )
         for reason in record.get("readiness_reason_codes", []):
-            _add_reason(reason_groups, reason_code=str(reason), state=state or status, example_ref=example_ref)
+            _add_reason(
+                reason_groups,
+                reason_code=str(reason),
+                state=state or status,
+                example_ref=example_ref,
+            )
         for gap in record.get("evidence_gaps", []):
             gap_code = str(gap)
             if gap_code not in workload.evidence_gaps:
@@ -732,7 +781,9 @@ def build_paper_denominator_report(
     category_reports = []
     for name in sorted(categories):
         suite.merge(categories[name])
-        category_reports.append(PaperDenominatorCategory(name=name, rollup=categories[name]))
+        category_reports.append(
+            PaperDenominatorCategory(name=name, rollup=categories[name])
+        )
 
     reason_buckets = _sorted_reason_buckets(reason_groups)
     report = PaperDenominatorReport(
@@ -766,7 +817,11 @@ def build_paper_denominator_report(
             amd_score_report=_source(
                 amd_score_report,
                 path=source_paths.get("amd_score_report"),
-                checksum_keys=("amd_native_score_checksum", "amd_score_checksum", "report_checksum"),
+                checksum_keys=(
+                    "amd_native_score_checksum",
+                    "amd_score_checksum",
+                    "report_checksum",
+                ),
             ),
             amd_sol_artifacts=sorted(
                 [_artifact_source(artifact) for artifact in amd_sol_artifacts],
@@ -781,7 +836,11 @@ def build_paper_denominator_report(
         categories=category_reports,
         problems=sorted(
             problems.values(),
-            key=lambda problem: (problem.category, problem.problem_id, problem.problem_path or ""),
+            key=lambda problem: (
+                problem.category,
+                problem.problem_id,
+                problem.problem_path or "",
+            ),
         ),
         workloads=sorted(
             workloads.values(),
@@ -859,7 +918,9 @@ def render_paper_denominator_markdown(report: PaperDenominatorReport) -> str:
             "",
             "## Category Counts",
             "",
-            "| Category | Problems | Workloads | " + " | ".join(DENOMINATOR_STATE_KEYS) + " |",
+            "| Category | Problems | Workloads | "
+            + " | ".join(DENOMINATOR_STATE_KEYS)
+            + " |",
             "|---|---:|---:" + "|---:" * len(DENOMINATOR_STATE_KEYS) + "|",
         ]
     )
@@ -870,7 +931,9 @@ def render_paper_denominator_markdown(report: PaperDenominatorReport) -> str:
             f"{_state_row(rollup['states'])} |"
         )
 
-    lines.extend(["", "## Evidence Gaps", "", "| Evidence | Reason | Count | Next Evidence |"])
+    lines.extend(
+        ["", "## Evidence Gaps", "", "| Evidence | Reason | Count | Next Evidence |"]
+    )
     lines.append("|----------|--------|------:|---------------|")
     for gap in payload["evidence_gaps"]:
         lines.append(
@@ -878,7 +941,9 @@ def render_paper_denominator_markdown(report: PaperDenominatorReport) -> str:
             f"{_md_cell(gap['next_evidence'])} |"
         )
 
-    lines.extend(["", "## Reason Buckets", "", "| Reason | Count | States | Examples |"])
+    lines.extend(
+        ["", "## Reason Buckets", "", "| Reason | Count | States | Examples |"]
+    )
     lines.append("|--------|------:|--------|----------|")
     for bucket in payload["reason_buckets"]:
         lines.append(
@@ -896,7 +961,9 @@ def render_paper_denominator_markdown(report: PaperDenominatorReport) -> str:
                 f"{_md_cell(', '.join(bucket['example_refs']))} |"
             )
 
-    lines.extend(["", "## Next Evidence Hints", "", "| Reason | Next Evidence | Examples |"])
+    lines.extend(
+        ["", "## Next Evidence Hints", "", "| Reason | Next Evidence | Examples |"]
+    )
     lines.append("|--------|---------------|----------|")
     for hint in payload["next_evidence_hints"]:
         lines.append(
@@ -923,4 +990,6 @@ def write_paper_denominator_reports(
     json_path.parent.mkdir(parents=True, exist_ok=True)
     markdown_path.parent.mkdir(parents=True, exist_ok=True)
     json_path.write_text(report.to_json(), encoding="utf-8")
-    markdown_path.write_text(render_paper_denominator_markdown(report), encoding="utf-8")
+    markdown_path.write_text(
+        render_paper_denominator_markdown(report), encoding="utf-8"
+    )

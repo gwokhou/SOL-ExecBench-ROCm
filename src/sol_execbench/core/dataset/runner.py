@@ -598,19 +598,6 @@ def write_summary_report(output_dir: Path, summaries: list[dict]) -> Path:
     return summary_path
 
 
-def _hardware_model_key_from_traces(traces: Sequence[Trace]) -> str:
-    """Return the first known AMD gfx key found in trace environment strings."""
-    known = default_amd_hardware_models()
-    for trace in traces:
-        if trace.evaluation is None:
-            continue
-        hardware = trace.evaluation.environment.hardware
-        for key in known:
-            if key in hardware:
-                return key
-    return "gfx1200"
-
-
 def _hardware_model_key_from_trace_payloads(traces_payload: Sequence[dict]) -> str:
     """Return the first known AMD gfx key without retaining parsed traces."""
     known = default_amd_hardware_models()

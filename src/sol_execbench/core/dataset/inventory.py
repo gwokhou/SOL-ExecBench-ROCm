@@ -171,11 +171,6 @@ NVIDIA_RUNTIME_BLOCKER_HINTS = ("cupy", "cuda.c", "cuda runtime", "nvrtc")
 # Lexical false positive hints that are only blockers in specific contexts
 NVIDIA_LEXICAL_FALSE_POSITIVE_HINTS = ("cublas", "cutlass")
 
-# Backward-compatible alias (union of the two tuples above)
-NVIDIA_RUNTIME_HINTS = (
-    NVIDIA_RUNTIME_BLOCKER_HINTS + NVIDIA_LEXICAL_FALSE_POSITIVE_HINTS
-)
-
 
 @dataclasses.dataclass(frozen=True)
 class ReferenceRuntimeHintEvidence:
@@ -303,14 +298,6 @@ def _classify_reference_runtime_hints(
             in_docstring = not in_docstring
 
     return sorted(set(blocker_hints)), false_positive_evidence
-
-
-def _reference_runtime_hints(
-    definition: Definition, reference_path: Path | None
-) -> list[str]:
-    """Legacy function for backward compatibility."""
-    blocker_hints, _ = _classify_reference_runtime_hints(definition, reference_path)
-    return blocker_hints
 
 
 def _definition_record(

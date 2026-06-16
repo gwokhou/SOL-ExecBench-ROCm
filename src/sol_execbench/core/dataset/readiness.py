@@ -179,28 +179,6 @@ def _reference_has_nvidia_blocker(problem: ProblemInventoryRecord) -> bool:
     return bool(problem.definition and problem.definition.reference_runtime_hints)
 
 
-def _quant_uses_low_precision_dtype(
-    problem: ProblemInventoryRecord, workload: WorkloadInventoryRecord
-) -> bool:
-    """Check if a Quant workload uses low-precision dtypes."""
-    dtypes = set(workload.input_dtypes.values()) | set(workload.output_dtypes.values())
-    return bool(dtypes & LOW_PRECISION_DTYPES)
-
-
-def _quant_uses_blackwell_format(
-    problem: ProblemInventoryRecord, workload: WorkloadInventoryRecord
-) -> bool:
-    """Check if a Quant workload uses NVFP4/MXFP4/Blackwell-specific dtypes."""
-    dtypes = set(workload.input_dtypes.values()) | set(workload.output_dtypes.values())
-    identity = f"{problem.problem_id} {problem.problem_path}".lower()
-    return (
-        bool(dtypes & BLACKWELL_LOW_PRECISION_DTYPES)
-        or "blackwell" in identity
-        or "nvfp4" in identity
-        or "mxfp4" in identity
-    )
-
-
 def _low_precision_or_quant(
     problem: ProblemInventoryRecord, workload: WorkloadInventoryRecord
 ) -> bool:
@@ -576,7 +554,7 @@ def classify_workload_readiness(
         # Refined Quant routing based on actual dtypes and formats.
         # Must come before custom_inputs so NVFP4/low-precision Quant problems
         # are blocked even when they also have custom input entrypoints.
-        if _quant_uses_blackwell_format(problem, workload):
+        if _blackwell_low_precision(problem, workload):
             status = "needs_hardware_evidence"
             readiness_class = ReadinessClass.NVFP4_BLACKWELL_SPECIFIC
             layers.hardware_validation = "needed"
@@ -607,7 +585,7 @@ def classify_workload_readiness(
                     evidence_path=problem.problem_path,
                 )
             )
-        elif _quant_uses_low_precision_dtype(problem, workload):
+        elif _low_precision_or_quant(problem, workload):
             status = "needs_hardware_evidence"
             readiness_class = ReadinessClass.BLOCKED_MISSING_EVIDENCE
             layers.hardware_validation = "needed"
