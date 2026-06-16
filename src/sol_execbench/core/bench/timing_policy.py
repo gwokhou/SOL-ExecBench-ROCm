@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
-from sol_execbench.core.data.solution import SupportedLanguages
+from sol_execbench.core.data.solution import NATIVE_ROCM_LANGUAGES, SupportedLanguages
 
 
 class TimingSourceType(str, Enum):
@@ -77,14 +77,6 @@ _PYTHON_LANGUAGES = {
     SupportedLanguages.TRITON,
 }
 
-_NATIVE_LANGUAGES = {
-    SupportedLanguages.HIP_CPP,
-    SupportedLanguages.HIPBLAS,
-    SupportedLanguages.MIOPEN,
-    SupportedLanguages.CK,
-    SupportedLanguages.ROCWMMA,
-}
-
 
 def _coerce_language(language: SupportedLanguages | str) -> SupportedLanguages | None:
     if isinstance(language, SupportedLanguages):
@@ -105,7 +97,7 @@ def classify_timing_source(
         return TimingSourceType.UNKNOWN
 
     has_python = bool(parsed & _PYTHON_LANGUAGES)
-    has_native = bool(parsed & _NATIVE_LANGUAGES)
+    has_native = bool(parsed & NATIVE_ROCM_LANGUAGES)
     if has_python and has_native:
         return TimingSourceType.MIXED
     if SupportedLanguages.TRITON in parsed:

@@ -35,21 +35,13 @@ from ..core import (
     Definition,
     Solution,
     SupportedHardware,
-    SupportedLanguages,
     Trace,
     Workload,
 )
+from ..core.data.solution import NATIVE_ROCM_LANGUAGES
 from ..core.data.workload import SafetensorsInput
 
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
-
-_CPP_LANGUAGES = {
-    SupportedLanguages.HIP_CPP,
-    SupportedLanguages.HIPBLAS,
-    SupportedLanguages.MIOPEN,
-    SupportedLanguages.CK,
-    SupportedLanguages.ROCWMMA,
-}
 
 
 def _repo_root() -> Path:
@@ -148,7 +140,9 @@ class ProblemPackager:
 
     @property
     def _is_cpp(self) -> bool:
-        return any(lang in _CPP_LANGUAGES for lang in self.solution.spec.languages)
+        return any(
+            lang in NATIVE_ROCM_LANGUAGES for lang in self.solution.spec.languages
+        )
 
     def _inject_offload_arch_flags(self, sol_dict: dict) -> dict:
         """Auto-inject HIP offload architecture flags when none are explicit."""
