@@ -197,7 +197,10 @@ def _latency_ms(trace: Trace | None) -> float | None:
         return None
     if trace.evaluation.performance is None:
         return None
-    return trace.evaluation.performance.latency_ms
+    latency = trace.evaluation.performance.latency_ms
+    # latency_ms defaults to 0.0; treat an unmeasured (non-positive) latency as
+    # absent so classification and speedup computation agree on "no candidate".
+    return latency if latency > 0.0 else None
 
 
 def _classify(
