@@ -1011,11 +1011,34 @@ def _evaluate_cli(
             f"Evaluating {len(workloads)} workload(s)...", total=None
         )
 
-        proc = profiled_proc or _run_evaluation_command(
-            eval_cmd,
-            staging_dir=staging_dir,
-            timeout=timeout,
-        )
+        try:
+            proc = profiled_proc or _run_evaluation_command(
+                eval_cmd,
+                staging_dir=staging_dir,
+                timeout=timeout,
+            )
+        except subprocess.TimeoutExpired as exc:
+            # subprocess.run raises on timeout instead of returning a
+            # CompletedProcess; synthesize the no-trace diagnostic path so a
+            # hung/deadlocked evaluation produces a clean sidecar + exit rather
+            # than an unhandled traceback.
+            progress.update(task, completed=True)
+            console.print(f"[red]Evaluation timed out after {timeout}s[/red]")
+            diagnostic_path = _write_no_trace_diagnostics_sidecar(
+                output_file=output_file,
+                staging_dir=staging_dir,
+                keep_staging=keep_staging,
+                reason="evaluation_timeout",
+                returncode=124,
+                stdout=exc.stdout or "",
+                stderr=exc.stderr or "",
+            )
+            if diagnostic_path is not None:
+                console.print(
+                    f"[yellow]Saved no-trace diagnostics to {diagnostic_path}[/yellow]"
+                )
+            packager.close()
+            sys.exit(1)
         progress.update(task, completed=True)
 
     filtered_stderr = filter_benign_rocm_stderr(proc.stderr)
