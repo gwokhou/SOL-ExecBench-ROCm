@@ -40,7 +40,10 @@ def aggregate_extractor_status_value(
         return collected
     if successes:
         return partial
-    if failures and len(failures) == len(executable_runs):
+    if failures:
+        # With no successes, a real extractor failure (command ran and failed)
+        # must not be masked as "unavailable" when mixed with runs whose
+        # toolchain was missing -- surface it as failed instead.
         return failed
     return unavailable
 

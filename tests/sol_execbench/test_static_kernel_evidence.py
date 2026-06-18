@@ -192,6 +192,46 @@ def test_static_extractor_status_helpers_cover_aggregate_outcomes():
     )
 
 
+def test_aggregate_does_not_mask_failure_when_mixed_with_unavailable():
+    """A real extractor failure (command ran, failed) mixed with a run whose
+    toolchain was unavailable must surface as FAILED -- not be masked as
+    UNAVAILABLE. The unavailable run here carries a command (executable) but
+    its toolchain was reported missing, mirroring _tool_run_from_route_decision.
+    """
+    failed = _tool_run(
+        StaticKernelEvidenceStatus.FAILED,
+        StaticKernelEvidenceReasonCode.EXTRACTOR_FAILED,
+    )
+    executable_unavailable = _tool_run(
+        StaticKernelEvidenceStatus.UNAVAILABLE,
+        StaticKernelEvidenceReasonCode.TOOLCHAIN_UNAVAILABLE,
+    )
+
+    assert _aggregate_status([failed, executable_unavailable]) == (
+        StaticKernelEvidenceStatus.FAILED
+    )
+    assert _aggregate_reason([failed, executable_unavailable]) == (
+        StaticKernelEvidenceReasonCode.EXTRACTOR_FAILED
+    )
+    # Order-independent.
+    assert _aggregate_status([executable_unavailable, failed]) == (
+        StaticKernelEvidenceStatus.FAILED
+    )
+    # An unavailable run alone (no command => not executable) stays unavailable.
+    assert (
+        _aggregate_status(
+            [
+                _tool_run(
+                    StaticKernelEvidenceStatus.UNAVAILABLE,
+                    StaticKernelEvidenceReasonCode.TOOLCHAIN_UNAVAILABLE,
+                    command=[],
+                )
+            ]
+        )
+        == StaticKernelEvidenceStatus.UNAVAILABLE
+    )
+
+
 def test_authority_fields_are_diagnostic_only_and_false_for_benchmark_truth():
     payload = _representative_sidecar().model_dump(mode="json")
 
@@ -556,7 +596,9 @@ def test_static_extractor_returns_partial_when_one_tool_fails(tmp_path):
     tool_runs = {run.tool_id: run for run in sidecar.tool_runs}
 
     assert sidecar.status == StaticKernelEvidenceStatus.PARTIAL
-    assert sidecar.reason_code == StaticKernelEvidenceReasonCode.PARTIAL_ARTIFACT_METADATA
+    assert (
+        sidecar.reason_code == StaticKernelEvidenceReasonCode.PARTIAL_ARTIFACT_METADATA
+    )
     assert tool_runs["llvm-objdump"].status == StaticKernelEvidenceStatus.FAILED
     assert tool_runs["llvm-objdump"].reason_code == (
         StaticKernelEvidenceReasonCode.EXTRACTOR_FAILED
