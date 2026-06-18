@@ -421,8 +421,13 @@ class Solution(BaseModelWithDocstrings):
             self.name,
             self.definition,
             *[lang.value for lang in self.spec.languages],
+            *[hw.value for hw in self.spec.target_hardware],
             self.spec.entry_point,
             self.spec.binding.value if self.spec.binding else "",
+            str(self.spec.destination_passing_style),
+            self.spec.compile_options.model_dump_json()
+            if self.spec.compile_options
+            else "",
             *self.spec.dependencies,
             *(part for src in self.sources for part in (src.path, src.content)),
         ):
@@ -434,9 +439,10 @@ class Solution(BaseModelWithDocstrings):
         """Return the memoized deterministic hash of the solution content.
 
         This hash is computed from all fields that affect the solution's behavior:
-        name, definition, language, entry point, dependencies, and all source file
-        paths and contents. This ensures that any meaningful change to the solution
-        results in a different hash.
+        name, definition, languages, target hardware, entry point, binding,
+        destination-passing style, compile options, dependencies, and all source
+        file paths and contents. This ensures that any meaningful change to the
+        solution results in a different hash.
 
         The hash is used for caching build artifacts, allowing solutions with the same
         hash to reuse the same cached build result.

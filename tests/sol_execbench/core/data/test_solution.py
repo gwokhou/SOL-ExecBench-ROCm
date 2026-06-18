@@ -8,7 +8,10 @@ import pytest
 from pydantic import ValidationError
 
 from sol_execbench.core.data.solution import (
+    BuildSpec,
     CompileOptions,
+    Solution,
+    SourceFile,
     SupportedHardware,
     SupportedLanguages,
 )
@@ -240,3 +243,55 @@ class TestHardwareAndCompileOptions:
                 entry_point="kernel.hip::run",
                 compile_options={field: [flag]},
             )
+
+
+class TestSolutionHashCoversBehaviorFields:
+    """The build cache is keyed on solution.hash() (eval_runtime stages under a
+    directory named by the hash prefix), so the hash must cover every field that
+    changes the compiled artifact or runtime behavior -- otherwise two different
+    solutions collide on the same cached build."""
+
+    @staticmethod
+    def _solution(**spec_overrides):
+        kwargs = dict(
+            languages=["hip_cpp"],
+            target_hardware=["gfx1200"],
+            entry_point="kernel.hip::run",
+            binding="torch",
+        )
+        kwargs.update(spec_overrides)
+        return Solution(
+            name="sol",
+            definition="toy",
+            author="agent",
+            spec=BuildSpec(**kwargs),
+            sources=[SourceFile(path="kernel.hip", content="void run(){}")],
+        )
+
+    def test_compile_options_perturbs_hash(self):
+        base = self._solution()
+        with_opts = self._solution(
+            compile_options=CompileOptions(
+                hip_cflags=["-O3", "--offload-arch=gfx1200"]
+            )
+        )
+        assert base.hash() != with_opts.hash()
+        assert base != with_opts
+        assert hash(base) != hash(with_opts)
+
+    def test_target_hardware_perturbs_hash(self):
+        base = self._solution()
+        other = self._solution(target_hardware=["gfx942"])
+        assert base.hash() != other.hash()
+        assert base != other
+
+    def test_destination_passing_style_perturbs_hash(self):
+        base = self._solution()
+        other = self._solution(destination_passing_style=False)
+        assert base.hash() != other.hash()
+        assert base != other
+
+    def test_identical_solutions_still_collide(self):
+        # Cache sharing must still work for genuinely identical solutions.
+        assert self._solution() == self._solution()
+        assert hash(self._solution()) == hash(self._solution())
