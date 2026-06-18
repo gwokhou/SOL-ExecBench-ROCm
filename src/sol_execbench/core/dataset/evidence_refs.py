@@ -83,7 +83,7 @@ def build_derived_evidence_refs(
             if path.exists():
                 refs["amd_sol_bound"] = relative_ref(path, output_dir)
             else:
-                gaps.append("amd_sol_bound_missing")
+                gaps.append("amd_sol_evidence_missing")
         if solar_derivation_dir is not None:
             path = solar_derivation_dir / f"{sidecar_stem}.solar-derivation.json"
             if path.exists():
