@@ -38,7 +38,7 @@ from ..core import (
     Trace,
     Workload,
 )
-from ..core.data.solution import NATIVE_ROCM_LANGUAGES
+from ..core.data.solution import CompileOptions, NATIVE_ROCM_LANGUAGES
 from ..core.data.workload import SafetensorsInput
 
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -148,7 +148,11 @@ class ProblemPackager:
         """Auto-inject HIP offload architecture flags when none are explicit."""
         spec = sol_dict["spec"]
         compile_options = dict(spec.get("compile_options") or {})
-        hip_cflags = list(compile_options.get("hip_cflags", []))
+        if "hip_cflags" not in compile_options:
+            # Preserve the CompileOptions default (e.g. -O3) instead of
+            # clobbering it with an empty list when no flags were specified.
+            compile_options["hip_cflags"] = list(CompileOptions().hip_cflags)
+        hip_cflags = list(compile_options["hip_cflags"])
 
         if any(
             flag.startswith(("--offload-arch", "-offload-arch", "--amdgpu-target"))
