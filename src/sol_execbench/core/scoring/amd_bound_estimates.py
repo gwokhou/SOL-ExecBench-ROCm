@@ -1101,7 +1101,7 @@ def _data_movement_estimate(
         movement_kind = "logical_view"
         movement_bytes = 0.0
         rationale = "logical view evidence with zero movement bytes"
-    total_bytes = read_bytes + write_bytes + movement_bytes
+    total_bytes = read_bytes + write_bytes
     return OperatorWorkEstimate(
         node_id=node.node_id,
         op_family=node.op_family,
@@ -1137,7 +1137,7 @@ def _dtype_conversion_estimate(
         warnings.append("inexact_dtype_conversion:missing_target_dtype")
         rationale_parts.append("missing target dtype for dtype conversion")
     movement_bytes = read_bytes + write_bytes
-    total_bytes = read_bytes + write_bytes + movement_bytes
+    total_bytes = read_bytes + write_bytes
     return OperatorWorkEstimate(
         node_id=node.node_id,
         op_family=node.op_family,
