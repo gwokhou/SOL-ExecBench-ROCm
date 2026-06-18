@@ -220,7 +220,7 @@ def test_derived_evidence_for_workload_delegates_ref_and_gap_detection(tmp_path)
     )
 
     assert refs["amd_score"] == "score.json"
-    assert "amd_sol_bound_missing" in gaps
+    assert "amd_sol_evidence_missing" in gaps
     assert "missing_solar_derivation" not in gaps
 
 
