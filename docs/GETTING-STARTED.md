@@ -126,7 +126,7 @@ Open `out/first-run.trace.jsonl` and inspect one JSON object per line:
 
 If no parseable trace is produced, the CLI writes a bounded no-trace
 diagnostics sidecar next to the requested output path, for example
-`out/first-run.trace.jsonl.no-trace-diagnostics.json`. Treat that sidecar as
+`<output-name>.no-trace-diagnostics.json`. Treat that sidecar as
 diagnostic-only evidence and inspect its bounded stdout/stderr tails before
 rerunning.
 
