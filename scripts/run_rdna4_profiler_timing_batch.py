@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.internal.rdna4.run_rdna4_profiler_timing_batch import *  # noqa: F403
 from scripts.internal.rdna4.run_rdna4_profiler_timing_batch import (
+    _write_blocked_sidecar,  # noqa: F401
     main,
 )
 

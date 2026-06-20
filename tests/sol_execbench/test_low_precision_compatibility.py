@@ -31,13 +31,31 @@ def test_e2m1_pack_unpack_preserves_nibbles_and_shape():
 
 
 def test_e2m1_quantize_dequantize_round_trip_uses_cpu_reference_codebook():
-    values = torch.tensor([-6.0, -4.0, -3.0, -2.0, -1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 6.0])
+    values = torch.tensor(
+        [
+            -6.0,
+            -4.0,
+            -3.0,
+            -2.0,
+            -1.5,
+            -1.0,
+            -0.5,
+            0.0,
+            0.5,
+            1.0,
+            1.5,
+            2.0,
+            3.0,
+            4.0,
+            6.0,
+        ]
+    )
 
     codes = quantize_e2m1_codes(values, scale=1.0)
     restored = dequantize_e2m1_codes(codes, scale=1.0)
 
-    assert codes.dtype == torch.uint8
-    assert restored.dtype == torch.float32
+    assert str(codes.dtype) == "torch.uint8"
+    assert str(restored.dtype) == "torch.float32"
     assert torch.allclose(restored, values)
 
 
@@ -92,7 +110,9 @@ def test_low_precision_format_aliases_and_validation_errors():
 
 
 def test_scalar_low_precision_tensor_round_trips_shape():
-    payload = pack_low_precision_tensor(torch.tensor(1.0), format_name="float4_e2m1fn_x2")
+    payload = pack_low_precision_tensor(
+        torch.tensor(1.0), format_name="float4_e2m1fn_x2"
+    )
 
     assert payload.original_shape == ()
     assert payload.packed.shape == (1,)
@@ -118,15 +138,14 @@ def test_cdna3_low_precision_quant_skip_policy():
     assert definition_uses_cdna4_low_precision(definition) is True
     assert should_skip_cdna4_low_precision_on_arch(definition, "gfx942") is True
     assert (
-        should_skip_cdna4_low_precision_on_arch(
-            definition, "gfx941:sramecc+:xnack-"
-        )
+        should_skip_cdna4_low_precision_on_arch(definition, "gfx941:sramecc+:xnack-")
         is True
     )
     assert should_skip_cdna4_low_precision_on_arch(definition, "gfx950") is False
     assert should_skip_cdna4_low_precision_on_arch(definition, "unknown") is False
-    assert "cdna3_low_precision_hardware_unsupported" in cdna4_low_precision_skip_reason(
-        "gfx942"
+    assert (
+        "cdna3_low_precision_hardware_unsupported"
+        in cdna4_low_precision_skip_reason("gfx942")
     )
 
 
