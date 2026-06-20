@@ -68,6 +68,9 @@ mapped_at: 2026-06-16
 - Clock-lock state, profiler overhead, fallback timing, missing sidecars, and
   reference OOM states are explicitly modeled because performance claims are
   easy to overstate.
+- `bounded` evidence categories describe what the current artifacts can support;
+  deferred categories stay visible for work that needs new hardware, larger
+  runs, or stronger authority before any external claim can be upgraded.
 - Tests under `tests/sol_execbench/test_profiler_timing_coverage.py` and RDNA4
   profiler tests should stay close to timing changes.
 
