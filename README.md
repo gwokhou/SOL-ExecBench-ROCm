@@ -202,6 +202,8 @@ Project and development references:
 - [ROCm Libraries](docs/rocm_libraries.md) -- supported ROCm library categories
   (hipBLAS, MIOpen, Composable Kernel, rocWMMA) for RDNA 4 and CDNA 3 targets;
   CDNA 4 validation is also deferred until suitable hardware evidence is available
+- [Cookbook](docs/COOKBOOK.md) -- common troubleshooting and task-oriented
+  commands for benchmark runs, dataset batches, and evidence workflows
 
 Validation, release, and provenance:
 

@@ -136,7 +136,7 @@ public benchmark schemas.
 | --- | --- | --- |
 | Dataset execution | `core.dataset.run_state`, `core.dataset.run_closure`, `core.dataset.evidence_refs`, `core.dataset.sharding` | `scripts/run_dataset.py` CLI parsing, ROCm GPU/profiler subprocess phases, derived-phase worker scheduling, trace-stage pipeline scheduling, and high-level loop flow. |
 | RDNA4 profiler timing closure | `core.dataset.profiler_timing_coverage` | `scripts/internal/rdna4/run_rdna4_profiler_timing_batch.py` target selection, workload-slice staging, manifest import, profiler subprocess execution, and aggregate sidecar writing. |
-| Eval driver runtime | `core.bench.eval_runtime` | `driver/templates/eval_driver.py` subprocess context, staged wiring, correctness/timing loop, and integration smoke behavior. |
+| Eval driver runtime | `core.bench.eval_runtime` | `src/sol_execbench/driver/templates/eval_driver.py` subprocess context, staged wiring, correctness/timing loop, and integration smoke behavior. |
 | AMD bound analysis | `core.scoring.amd_bound_classification`, `core.scoring.amd_bound_estimate_families` | FX/AST graph extraction, family annotation, and formula bodies in existing scoring modules. |
 | SOLAR derivation | `core.scoring.solar_derivation_status` | Sidecar dataclasses, parser validation, semantic group construction, and rendering. |
 | Static evidence | `core.bench.static_kernel_status` | Artifact persistence, tool routing, bounded extractor execution, and sidecar model definitions. |
