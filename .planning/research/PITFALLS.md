@@ -1,30 +1,32 @@
-# Research: Pitfalls for v1.36 SOL Agent Feedback Sidecar Producer
+# Research: Pitfalls for v1.38 Confirmed Benchmark Evidence
 
-**Date:** 2026-06-15
+**Date:** 2026-06-21
 
 ## Pitfalls
 
-- **Trace schema drift:** adding fields to canonical Trace JSONL would break the
-  compatibility boundary HIP expects. Keep feedback in sidecars only.
-- **Authority leakage:** a sidecar that can claim score, timing, evidence-tier,
-  paper-parity, leaderboard, or cutover authority would undermine existing
-  release guardrails. Use literal false authority fields and validation tests.
-- **Prompt leakage:** raw profiler dumps, trace rows, source code, stderr dumps,
-  or absolute temp paths are unsuitable for agent prompts. Emit compact cited
-  summaries only.
-- **Stale feedback:** reused trace paths or resumed runs can make an old sidecar
-  look current. Include identity fields and make stale checks explicit.
-- **Ad hoc bottleneck labels:** HIP has a closed `ProfileDigest` taxonomy. SOL
-  should emit stable categories plus unknown/limitation fallbacks rather than
-  unbounded free-form labels.
-- **Optional-tool confusion:** profiler or static evidence may be unavailable.
-  Sidecar absence or unavailable status must never fail evaluation.
+- `rocprofv3` can produce different file layouts by output format and ROCm
+  version. Discovering only `output_file*` in one directory can misclassify a
+  successful run as `rocprof_no_registered_artifacts`.
+- Profile summary can become misleading if bottleneck hints are derived from
+  incomplete counters or if raw profiler fields are treated as normalized SOL
+  authority.
+- Official score evidence can be confused with `speedup_factor` or a derived
+  AMD score report if the schema does not record source, aggregation, and
+  baseline authority explicitly.
+- Falling back to `reference_latency_ms` can silently create
+  `placeholder_baseline` behavior unless valid-run score production rejects or
+  labels that path.
+- HIP cutover logic will overclaim if it treats diagnostic profile summary or
+  agent feedback as cutover authority.
 
-## Prevention Strategy
+## Prevention
 
-- Model authority boundaries as strict schema fields.
-- Keep capability tokens optional and backward compatible.
-- Add fixtures for valid, missing, unavailable, malformed, stale, and
-  contradictory-authority cases.
-- Reuse existing checksum and artifact-reference helpers instead of inventing a
-  parallel identity model.
+- Register artifacts recursively or through a version-aware manifest with tests
+  for CSV, JSON, rocpd, and nested output layouts.
+- Keep profile summary authority flags false; put confirmed score/baseline
+  authority into separate evidence reports.
+- Require non-null score only when measured latency, official baseline, SOL
+  bound, and aggregation policy are present and valid.
+- Make baseline coverage validation explicit and expose blocker reason codes.
+- Add HIP fixtures for confirmed pass, missing score, missing baseline,
+  placeholder baseline, profiler partial, and diagnostic-only sidecar cases.

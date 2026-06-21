@@ -1,37 +1,42 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.37
-milestone_name: Profile Summary Sidecar v1
-status: awaiting_next_milestone
-last_updated: "2026-06-20T13:21:10.117Z"
-last_activity: 2026-06-20
+milestone: v1.38
+milestone_name: Upgrade SOL Evidence Contract for Confirmed Benchmark Claims
+status: planning
+last_updated: "2026-06-21T08:19:01.776Z"
+last_activity: 2026-06-21
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 4
-  completed_plans: 4
-  percent: 100
+  total_phases: 5
+  completed_phases: 0
+  total_plans: 5
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (updated 2026-06-16)
+See: `.planning/PROJECT.md` (updated 2026-06-21)
 
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly
 on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL
 ExecBench.
-**Current focus:** No active milestone
+**Current focus:** v1.38 Upgrade SOL Evidence Contract for Confirmed Benchmark Claims
 
 ## Current Position
 
-Phase: —
+Phase: Not started (defining requirements)
 Plan: —
-Status: v1.37 shipped; awaiting next milestone
-Last activity: 2026-06-16 — v1.37 profile-summary sidecar milestone implemented, audited, and archived
+Status: Defining requirements
+Last activity: 2026-06-21 — Milestone v1.38 started
 
 ## Recent Trend
+
+- v1.38 starts the confirmed evidence contract upgrade needed for HIP
+  Playground cutover-gate decisions. It focuses on registered profiler
+  artifacts, structured profile-summary evidence, official score evidence,
+  measured baseline provenance, and HIP-facing confirmed evidence fixtures.
 
 - v1.37 starts the focused follow-up to v1.36 by turning
   `profile_summary.sidecar.v1` from a reserved optional capability into a real
@@ -65,10 +70,11 @@ Last activity: 2026-06-16 — v1.37 profile-summary sidecar milestone implemente
 
 | Phase | Goal | Requirements | Status |
 |-------|------|--------------|--------|
-| 186 - Profile Summary Contract and Schema | Concrete optional `sol_execbench.profile_summary.v1` contract, strict schema, and authority boundary | PCON-01, PCON-02, PCON-03, PSCH-01, PSCH-02, PSCH-03 | Complete |
-| 187 - Profile Summary Producer and CLI Persistence | Persist `<trace>.profile-summary.json` without changing trace, profile, static evidence, or agent-feedback behavior | PROD-01, PROD-02, PROD-03 | Complete |
-| 188 - Profile Summary Freshness and Governance | Identity, artifact citations, stale-state validation, and diagnostic-only authority guardrails | PGOV-01, PGOV-02, PGOV-03 | Complete |
-| 189 - HIP Profile Summary Fixtures and Docs | HIP-facing fixtures, mapping docs, and deterministic CPU-safe tests | PFIX-01, PFIX-02, PFIX-03 | Complete |
+| 190 - Profiler Artifact Registration Closure | Make requested successful `rocprofv3` profile runs produce discoverable artifacts and citations | PROF-01, PROF-02, PROF-03 | Pending |
+| 191 - Structured Profile Summary Evidence | Expand profile summary into structured profiling evidence with bottleneck hints while preserving diagnostic authority boundaries | PSUM-01, PSUM-02, PSUM-03 | Pending |
+| 192 - Official Score Evidence Contract | Add official benchmark score evidence with score source, aggregation policy, and valid-run non-null score semantics | SCOR-01, SCOR-02, SCOR-03 | Pending |
+| 193 - Measured Baseline Provenance and Coverage | Add measured baseline evidence and coverage validation for confirmed benchmark claims | BASE-01, BASE-02, BASE-03 | Pending |
+| 194 - HIP Confirmed Evidence Package | Publish contract capabilities, fixtures, docs, and guardrails for HIP cutover-gate decisions | GATE-01, GATE-02, GATE-03 | Pending |
 
 ## Quick Tasks Completed
 

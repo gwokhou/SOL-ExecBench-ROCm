@@ -18,7 +18,8 @@ hardware while preserving the benchmark semantics and rigor of SOL ExecBench.
 **Shipped version:** v1.37 Profile Summary Sidecar v1,
 shipped 2026-06-16.
 
-**Current milestone:** None defined.
+**Current milestone:** v1.38 Upgrade SOL Evidence Contract for Confirmed
+Benchmark Claims.
 
 **Queued milestone:** None defined.
 
@@ -31,8 +32,25 @@ citations, freshness and governance validation helpers, HIP-facing fixtures,
 and consumer docs while preserving canonical Trace JSONL and raw
 `<trace>.profile.json` rocprofv3 metadata authority boundaries.
 
-**Current milestone goal:** None defined. Start the next milestone with
-`$gsd-new-milestone`.
+**Current milestone goal:** Upgrade SOL-ExecBench-ROCm outputs so HIP
+Playground can make confirmed benchmark pass/fail decisions from SOL-provided
+profiling, official score, and measured baseline evidence instead of relying on
+diagnostic-only traces or placeholder baseline interpretation.
+
+**Current milestone target features:**
+- Fix `rocprofv3` profiling artifact registration so successful requested
+  profile runs produce discoverable profiler artifacts and citations.
+- Expand `profile_summary.sidecar.v1` from status-only diagnostics into
+  structured profiling evidence with workload/kernel metrics and bottleneck
+  hints, while preserving diagnostic-only authority boundaries.
+- Add authoritative official score evidence with explicit score source and
+  aggregation policy, distinct from diagnostic trace speedup.
+- Add measured baseline evidence with trace pointer, hardware, ROCm/SOL
+  version, target identity, timing policy, and workload coverage.
+- Provide a HIP-facing evidence package and guardrail checks that remove
+  `missing_score`, `missing_baseline`, and `placeholder_baseline` blockers for
+  valid runs without letting diagnostic sidecars become score or cutover
+  authority.
 
 **Previous milestone outcome:** v1.33 completed RDNA4 benchmark-grade evidence
 closure by hardening denominator policy, memory/readiness classification,

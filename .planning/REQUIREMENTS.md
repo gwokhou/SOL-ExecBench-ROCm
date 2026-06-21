@@ -1,0 +1,121 @@
+# Requirements: SOL ExecBench ROCm Port
+
+**Defined:** 2026-06-21
+**Milestone:** v1.38 Upgrade SOL Evidence Contract for Confirmed Benchmark Claims
+**Core Value:** Evaluate LLM-generated GPU kernels correctly and reproducibly
+on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL
+ExecBench.
+
+## v1.38 Requirements
+
+### Profiler Artifact Registration
+
+- [ ] **PROF-01**: SOL can discover profiler artifacts produced by successful
+  requested `rocprofv3` profile runs across supported output formats and
+  version-specific output layouts.
+- [ ] **PROF-02**: SOL records concrete profiler artifact citations with kind,
+  compact path, size, checksum where practical, and source status.
+- [ ] **PROF-03**: SOL distinguishes profiler command failure, unavailable
+  profiler, partial artifact discovery, and successful artifact registration
+  with stable reason codes.
+
+### Structured Profile Summary Evidence
+
+- [ ] **PSUM-01**: SOL profile summary contains workload and kernel-level metric
+  records derived from bounded profiler artifacts, including duration,
+  dispatch/count, and artifact coverage fields.
+- [ ] **PSUM-02**: SOL profile summary emits stable bottleneck hints for AMD
+  profiler concepts such as compute utilization, memory/L2 pressure, LDS bank
+  conflicts, launch overhead, and unknown/insufficient-counter states.
+- [ ] **PSUM-03**: SOL profile summary remains diagnostic-only and cannot claim
+  correctness, timing, score, evidence-tier, confirmed-improvement,
+  release-gate, cutover, paper-parity, leaderboard, or claim-upgrade authority.
+
+### Official Score Evidence
+
+- [ ] **SCOR-01**: SOL emits official benchmark score evidence for valid runs
+  with non-null score, score source, aggregation policy, scored/unscored counts,
+  and canonical input references.
+- [ ] **SCOR-02**: SOL distinguishes official benchmark score from diagnostic
+  trace speedup and provisional AMD-native derived score reports.
+- [ ] **SCOR-03**: SOL score evidence rejects or blocks placeholder/reference
+  baseline fallback when a confirmed benchmark claim requires release-defined
+  measured baseline evidence.
+
+### Measured Baseline Evidence
+
+- [ ] **BASE-01**: SOL emits measured baseline evidence with trace pointer,
+  hardware identity, ROCm version, SOL version, target identity, timing policy,
+  workload coverage, and generation timestamp.
+- [ ] **BASE-02**: SOL validates measured baseline coverage against target
+  workloads and reports missing, stale, mismatched, or placeholder baseline
+  blockers with stable reason codes.
+- [ ] **BASE-03**: SOL exposes measured baseline provenance separately from
+  scoring baseline artifacts so HIP can verify confirmed coverage without
+  treating reference latency as official baseline evidence.
+
+### HIP Cutover Evidence Package
+
+- [ ] **GATE-01**: SOL evaluator contract advertises confirmed benchmark
+  evidence capabilities for official score, measured baseline, and profiler
+  evidence while preserving existing diagnostic sidecar boundaries.
+- [ ] **GATE-02**: SOL provides HIP-facing fixtures and documentation for
+  confirmed pass, missing score, missing baseline, placeholder baseline,
+  profiler partial, and diagnostic-only sidecar cases.
+- [ ] **GATE-03**: HIP can remove `missing_score`, `missing_baseline`, and
+  `placeholder_baseline` blockers for valid SOL runs using only SOL-provided
+  benchmark evidence.
+
+## Future Requirements
+
+### Advanced Profiling
+
+- **PDIAG-F01**: SOL can parse richer ROCm Compute Profiler counter groups into
+  confidence-scored bottleneck evidence when full counter captures are
+  available.
+- **PDIAG-F02**: SOL can correlate profile-summary bottleneck hints across
+  repeated candidate runs for trend analysis.
+
+### Validation Expansion
+
+- **VAL-F01**: SOL can make broader paper-parity or leaderboard-readiness
+  claims after full denominator, hardware, baseline, and score validation is
+  complete.
+
+## Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| Promoting profile summary or agent feedback to score/cutover authority | These sidecars remain diagnostic adapter inputs only. |
+| Treating `reference_latency_ms` as a confirmed measured baseline | Official score evidence requires release-defined measured baseline provenance. |
+| Paper parity, NVIDIA B200 equivalence, hosted leaderboard readiness, CDNA3 full-suite validation, or CDNA4 validation | This milestone upgrades evidence contracts for HIP cutover decisions, not external benchmark claims. |
+| Replacing ROCm Compute Profiler or building a complete profiler UI | SOL should normalize bounded evidence produced by ROCm tools, not become a profiler frontend. |
+
+## Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| PROF-01 | Phase 190 | Pending |
+| PROF-02 | Phase 190 | Pending |
+| PROF-03 | Phase 190 | Pending |
+| PSUM-01 | Phase 191 | Pending |
+| PSUM-02 | Phase 191 | Pending |
+| PSUM-03 | Phase 191 | Pending |
+| SCOR-01 | Phase 192 | Pending |
+| SCOR-02 | Phase 192 | Pending |
+| SCOR-03 | Phase 192 | Pending |
+| BASE-01 | Phase 193 | Pending |
+| BASE-02 | Phase 193 | Pending |
+| BASE-03 | Phase 193 | Pending |
+| GATE-01 | Phase 194 | Pending |
+| GATE-02 | Phase 194 | Pending |
+| GATE-03 | Phase 194 | Pending |
+
+**Coverage:**
+- v1.38 requirements: 15 total
+- Mapped to phases: 15
+- Unmapped: 0
+
+---
+*Requirements defined: 2026-06-21*
+*Last updated: 2026-06-21 after v1.38 milestone initialization*

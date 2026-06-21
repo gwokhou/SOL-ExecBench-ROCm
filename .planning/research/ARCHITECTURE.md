@@ -1,30 +1,44 @@
-# Research: Architecture for v1.36 SOL Agent Feedback Sidecar Producer
+# Research: Architecture for v1.38 Confirmed Benchmark Evidence
 
-**Date:** 2026-06-15
+**Date:** 2026-06-21
 
-## Integration Shape
+## Integration Points
 
-1. `sol-execbench contract --json` advertises optional feedback capabilities.
-2. Evaluation continues to emit canonical Trace JSONL exactly as before.
-3. Optional sidecar generation reads canonical trace plus already-bounded
-   diagnostic artifacts.
-4. Sidecar writer persists `trace.jsonl.agent-feedback.json` beside the trace
-   when output path semantics allow it.
-5. HIP consumes the sidecar only through its execbench adapter.
+- `core.bench.rocm_profiler`: artifact discovery, `rocprofv3` output-format
+  handling, profile result status classification, CSV/JSON/rocpd citation.
+- `core.bench.profile_summary`: structured profiling metrics and diagnostic
+  bottleneck hints.
+- `core.scoring.amd_score` and dataset runner: official score evidence and
+  aggregation policy.
+- `core.scoring.baseline_artifact` or a new sibling module: measured baseline
+  provenance and coverage evidence.
+- `core.data.contract`: capability tokens and authority boundary statements for
+  confirmed evidence, distinct from diagnostic sidecars.
+- HIP-facing fixtures/docs: valid confirmed, missing score, missing baseline,
+  placeholder baseline, and diagnostic-only sidecar cases.
 
-## Suggested SOL Modules
+## Data Flow
 
-- `core/data/contract.py`: optional capability tokens and source-boundary text.
-- `core/bench/agent_feedback.py`: strict Pydantic sidecar models, builders,
-  validators, freshness identity, and summary helpers.
-- `cli/main.py`: output-path wiring and optional sidecar persistence after the
-  canonical trace/profile/static/environment sidecars have been written.
-- `docs/EVALUATOR-CONTRACT.md` or existing docs: consumer-facing contract
-  description and authority boundaries.
+1. Evaluation emits canonical Trace JSONL and optional `rocprofv3` profile
+   artifacts.
+2. Profile artifact registration records files produced under the requested
+   output prefix and version-specific output layouts.
+3. Profile summary cites trace/profile/profiler artifacts and emits bounded
+   workload/kernel metrics plus diagnostic bottleneck hints.
+4. Official score evidence consumes canonical traces, SOL/SOLAR bound evidence,
+   measured baseline evidence, and aggregation policy to produce a HIP-readable
+   score package.
+5. Measured baseline evidence records provenance and workload coverage for the
+   baseline used by the score.
+6. HIP cutover gate consumes SOL's confirmed evidence package and rejects runs
+   with missing score, missing baseline, placeholder baseline, or insufficient
+   coverage.
 
 ## Build Order
 
-1. Contract and schema first so HIP Phase 141 can lock consumer assumptions.
-2. Generator and CLI persistence next so HIP Phase 142 has real artifacts.
-3. Freshness and artifact citations before HIP Phase 143 uses hints.
-4. Guardrail fixtures last to prove all invalid states remain diagnostic-only.
+1. Fix profiler artifact registration and citations.
+2. Enrich profile summary with structured metrics and bottleneck hints.
+3. Add official score evidence with aggregation policy and non-null valid-run
+   score.
+4. Add measured baseline provenance and coverage validation.
+5. Add contract/docs/fixtures tying the confirmed pass/fail gate together.
