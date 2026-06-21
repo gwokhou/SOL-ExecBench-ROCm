@@ -87,6 +87,8 @@ class ProfileSummaryArtifactCitation(BaseModelWithDocstrings):
     """Artifact checksum when available."""
     status: str | None = None
     """Optional artifact status."""
+    size_bytes: int | None = Field(default=None, ge=0)
+    """Artifact size in bytes when available."""
 
 
 class ProfileSummaryIdentity(BaseModelWithDocstrings):
@@ -250,6 +252,7 @@ def profile_summary_artifact_citation_from_path(
     label: str | None = None,
     status: str | None = None,
     sha256: str | None = None,
+    size_bytes: int | None = None,
 ) -> ProfileSummaryArtifactCitation:
     """Build a compact citation from a profile-summary artifact path."""
 
@@ -264,6 +267,7 @@ def profile_summary_artifact_citation_from_path(
         path=path.name,
         sha256=checksum,
         status=status,
+        size_bytes=size_bytes,
     )
 
 
