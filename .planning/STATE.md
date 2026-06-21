@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.38
 milestone_name: Upgrade SOL Evidence Contract for Confirmed Benchmark Claims
 status: executing
-stopped_at: Phase 191 verified
-last_updated: "2026-06-21T09:17:44.701Z"
-last_activity: 2026-06-21 -- Phase 192 planning complete
+stopped_at: Phase 192 verified
+last_updated: "2026-06-21T09:22:02.000Z"
+last_activity: 2026-06-21 -- Phase 192 verified
 progress:
   total_phases: 5
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 3
-  completed_plans: 2
-  percent: 40
+  completed_plans: 3
+  percent: 60
 ---
 
 # Project State
@@ -23,14 +23,14 @@ See: `.planning/PROJECT.md` (updated 2026-06-21)
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly
 on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL
 ExecBench.
-**Current focus:** Phase 192 — Official Score Evidence Contract
+**Current focus:** Phase 193 — Measured Baseline Provenance and Coverage
 
 ## Current Position
 
-Phase: 192 (Official Score Evidence Contract) — READY FOR DISCUSSION
+Phase: 193 (Measured Baseline Provenance and Coverage) — READY FOR DISCUSSION
 Plan: —
-Status: Ready to execute
-Last activity: 2026-06-21 -- Phase 192 planning complete
+Status: Phase 192 verified; ready to discuss Phase 193
+Last activity: 2026-06-21 -- Phase 192 verified
 
 ## Recent Trend
 
@@ -71,9 +71,9 @@ Last activity: 2026-06-21 -- Phase 192 planning complete
 
 | Phase | Goal | Requirements | Status |
 |-------|------|--------------|--------|
-| 190 - Profiler Artifact Registration Closure | Make requested successful `rocprofv3` profile runs produce discoverable artifacts and citations | PROF-01, PROF-02, PROF-03 | Pending |
-| 191 - Structured Profile Summary Evidence | Expand profile summary into structured profiling evidence with bottleneck hints while preserving diagnostic authority boundaries | PSUM-01, PSUM-02, PSUM-03 | Pending |
-| 192 - Official Score Evidence Contract | Add official benchmark score evidence with score source, aggregation policy, and valid-run non-null score semantics | SCOR-01, SCOR-02, SCOR-03 | Pending |
+| 190 - Profiler Artifact Registration Closure | Make requested successful `rocprofv3` profile runs produce discoverable artifacts and citations | PROF-01, PROF-02, PROF-03 | Completed |
+| 191 - Structured Profile Summary Evidence | Expand profile summary into structured profiling evidence with bottleneck hints while preserving diagnostic authority boundaries | PSUM-01, PSUM-02, PSUM-03 | Completed |
+| 192 - Official Score Evidence Contract | Add official benchmark score evidence with score source, aggregation policy, and valid-run non-null score semantics | SCOR-01, SCOR-02, SCOR-03 | Completed |
 | 193 - Measured Baseline Provenance and Coverage | Add measured baseline evidence and coverage validation for confirmed benchmark claims | BASE-01, BASE-02, BASE-03 | Pending |
 | 194 - HIP Confirmed Evidence Package | Publish contract capabilities, fixtures, docs, and guardrails for HIP cutover-gate decisions | GATE-01, GATE-02, GATE-03 | Pending |
 
