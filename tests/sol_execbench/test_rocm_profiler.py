@@ -90,6 +90,45 @@ def test_profile_artifact_discovery_classifies_rocpd_and_csv_outputs(tmp_path):
     assert all(artifact.size_bytes > 0 for artifact in artifacts)
 
 
+def test_profile_artifact_discovery_recurses_and_filters_known_outputs(tmp_path):
+    profile_dir = tmp_path / "profile"
+    profile_dir.mkdir()
+    (profile_dir / "profile.rocpd").write_text("db")
+    (profile_dir / "profile_kernel_trace.csv").write_text("kernel")
+    (profile_dir / "profile_counters.csv").write_text("counter")
+    (profile_dir / "profile.json").write_text("{}")
+    (profile_dir / "profile.pftrace").write_text("perfetto")
+    (profile_dir / "profile.otf2").write_text("otf2")
+    (profile_dir / "profile-extra.bin").write_text("opaque")
+    (tmp_path / "unrelated.csv").write_text("skip")
+    unrelated_dir = tmp_path / "unrelated-profile"
+    unrelated_dir.mkdir()
+    (unrelated_dir / "notes.txt").write_text("skip")
+
+    artifacts = discover_rocprofv3_artifacts(tmp_path, "profile")
+
+    assert [
+        artifact.path.relative_to(tmp_path).as_posix() for artifact in artifacts
+    ] == [
+        "profile/profile-extra.bin",
+        "profile/profile.json",
+        "profile/profile.otf2",
+        "profile/profile.pftrace",
+        "profile/profile.rocpd",
+        "profile/profile_counters.csv",
+        "profile/profile_kernel_trace.csv",
+    ]
+    assert [artifact.kind for artifact in artifacts] == [
+        "other",
+        "metadata_json",
+        "otf2_trace",
+        "perfetto_trace",
+        "rocpd",
+        "counter_csv",
+        "trace_csv",
+    ]
+
+
 def test_profile_collection_records_success_metadata(tmp_path):
     calls: list[list[str]] = []
 
