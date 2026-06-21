@@ -13,6 +13,15 @@ The summary sidecar does not replace `<trace>.profile.json`. The existing
 profile metadata sidecar remains the raw diagnostic metadata record and is cited
 from the normalized profile summary when present.
 
+When a `rocprofv3` profile result is supplied, the summary carries bounded
+artifact registration metadata from `sol_execbench.rocprofv3_profile.v1`:
+`summary.artifact_coverage_status`, `summary.reason_codes`,
+`summary.warnings`, `summary.artifact_count`, and `summary.artifact_kinds`.
+Return-code-zero profile runs with at least one registered artifact remain
+`profiler_status: success`; partial or missing artifact coverage is represented
+with stable reason codes such as `rocprof_no_registered_artifacts` and
+`rocprof_partial_artifact_coverage`.
+
 The sidecar is not correctness authority, timing authority, performance
 authority, score authority, evidence-tier authority, confirmed-improvement
 authority, release-gate authority, cutover authority, paper-parity authority,
@@ -31,11 +40,14 @@ not as a benchmark result. Suggested mapping:
 | `reason_code` | Stable generation state. | Preserve as opaque diagnostic text or downgrade to unknown. |
 | `identity` | Freshness denominator for trace/run matching. | Reject as stale when expected identity mismatches. |
 | `summary.profiler_status` | Raw rocprofv3 collection status. | Treat absent status as unavailable. |
+| `summary.artifact_coverage_status` | Registration coverage class such as complete, partial, none, or unavailable. | Treat unknown values as partial diagnostics. |
+| `summary.reason_codes` | Stable rocprofv3 registration and availability reason codes. | Preserve unknown codes as opaque diagnostic text. |
+| `summary.warnings` | Bounded profile artifact coverage warnings. | Display as advisory text only. |
 | `summary.artifact_count` | Coarse evidence richness signal. | Use zero when absent. |
 | `summary.artifact_kinds` | Compact profile artifact inventory. | Ignore unsupported kinds. |
 | `summary.metrics[]` | Bounded metadata-derived metrics. | Ignore unknown metric names. |
 | `limitations[]` | Guardrails to include beside any profile digest. | Always preserve diagnostic-only wording. |
-| `artifact_citations[]` | Compact path and checksum references for trace, raw profile metadata, and profiler artifacts. | Reject absolute paths and missing checksums where a checksum is required. |
+| `artifact_citations[]` | Compact path, size, status, and checksum references for trace, raw profile metadata, and profiler artifacts. | Reject absolute paths and missing checksums where a checksum is required. |
 | `authority` | Hard guardrail flags. | Reject contradictory truthy authority flags. |
 
 The first profile-summary version intentionally does not infer hardware
@@ -48,6 +60,10 @@ HIP runtime prompts should never include raw trace rows, raw profiler dumps,
 full kernel source, prompt text, or absolute temporary paths from SOL profile
 summaries. They should include only normalized status, bounded metrics,
 limitations, and compact citations after freshness and authority checks pass.
+Profiler artifact citations use compact file names and compute SHA256 by
+default. Hashing large `.rocpd` or database artifacts can be expensive; SOL
+currently prefers auditability over skipping hashes, and any future size limit
+should be treated as a contract change rather than inferred by HIP.
 
 For all closed HIP taxonomies, unknown values must be downgraded rather than
 promoted.
