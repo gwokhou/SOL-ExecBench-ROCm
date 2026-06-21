@@ -33,12 +33,12 @@ ExecBench.
 
 ### Official Score Evidence
 
-- [ ] **SCOR-01**: SOL emits official benchmark score evidence for valid runs
+- [x] **SCOR-01**: SOL emits official benchmark score evidence for valid runs
   with non-null score, score source, aggregation policy, scored/unscored counts,
   and canonical input references.
-- [ ] **SCOR-02**: SOL distinguishes official benchmark score from diagnostic
+- [x] **SCOR-02**: SOL distinguishes official benchmark score from diagnostic
   trace speedup and provisional AMD-native derived score reports.
-- [ ] **SCOR-03**: SOL score evidence rejects or blocks placeholder/reference
+- [x] **SCOR-03**: SOL score evidence rejects or blocks placeholder/reference
   baseline fallback when a confirmed benchmark claim requires release-defined
   measured baseline evidence.
 
@@ -101,9 +101,9 @@ ExecBench.
 | PSUM-01 | Phase 191 | Complete |
 | PSUM-02 | Phase 191 | Complete |
 | PSUM-03 | Phase 191 | Complete |
-| SCOR-01 | Phase 192 | Pending |
-| SCOR-02 | Phase 192 | Pending |
-| SCOR-03 | Phase 192 | Pending |
+| SCOR-01 | Phase 192 | Complete |
+| SCOR-02 | Phase 192 | Complete |
+| SCOR-03 | Phase 192 | Complete |
 | BASE-01 | Phase 193 | Pending |
 | BASE-02 | Phase 193 | Pending |
 | BASE-03 | Phase 193 | Pending |
