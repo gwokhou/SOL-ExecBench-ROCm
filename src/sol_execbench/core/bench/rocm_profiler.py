@@ -29,6 +29,24 @@ from sol_execbench.core.reporting import CANONICAL_BENCHMARK_OUTPUT
 ROCPROFV3_EXECUTABLE = "rocprofv3"
 ROCPROFV3_EVIDENCE_SCHEMA_VERSION = "sol_execbench.rocprofv3_timing.v1"
 ROCPROFV3_PROFILE_SCHEMA_VERSION = "sol_execbench.rocprofv3_profile.v1"
+_PROFILE_ARTIFACT_SUFFIXES = {
+    ".csv",
+    ".db",
+    ".json",
+    ".otf2",
+    ".pftrace",
+    ".rocpd",
+    ".sqlite",
+    ".sqlite3",
+    ".trace",
+}
+_PROFILE_OUTPUT_DIR_NAMES = {
+    "rocprofiler",
+    "rocprofiler-sdk",
+    "rocprofv3",
+    "rocprofv3-results",
+    "roctracer",
+}
 ProfilerRunner = Callable[[Sequence[str]], subprocess.CompletedProcess[str]]
 ProfileRunner = Callable[
     [Sequence[str], Path | None, int | None], subprocess.CompletedProcess[str]
@@ -323,8 +341,13 @@ def discover_rocprofv3_artifacts(
 ) -> tuple[Rocprofv3ProfileArtifact, ...]:
     """Register profiler artifacts produced for an output-file prefix."""
     artifacts: list[Rocprofv3ProfileArtifact] = []
-    for path in sorted(output_directory.glob(f"{output_file}*")):
+    if not output_directory.exists():
+        return ()
+
+    for path in sorted(output_directory.rglob("*"), key=_profile_artifact_sort_key):
         if not path.is_file():
+            continue
+        if not _is_profile_artifact_candidate(path, output_directory, output_file):
             continue
         artifacts.append(
             Rocprofv3ProfileArtifact(
@@ -334,6 +357,50 @@ def discover_rocprofv3_artifacts(
             )
         )
     return tuple(artifacts)
+
+
+def _profile_artifact_sort_key(path: Path) -> tuple[str, ...]:
+    return tuple(path.parts)
+
+
+def _is_profile_artifact_candidate(
+    path: Path,
+    output_directory: Path,
+    output_file: str,
+) -> bool:
+    name = path.name
+    if name.startswith(output_file):
+        return True
+
+    if not _is_known_profile_artifact_name(path):
+        return False
+
+    try:
+        relative_parts = path.relative_to(output_directory).parts[:-1]
+    except ValueError:
+        return False
+    normalized_parts = {
+        _normalize_profile_artifact_token(part) for part in relative_parts
+    }
+    if output_file in relative_parts:
+        return True
+    return bool(normalized_parts & _PROFILE_OUTPUT_DIR_NAMES)
+
+
+def _is_known_profile_artifact_name(path: Path) -> bool:
+    if path.suffix.lower() in _PROFILE_ARTIFACT_SUFFIXES:
+        return True
+    normalized_name = _normalize_profile_artifact_token(path.name)
+    return normalized_name in {
+        "agent-info",
+        "counter-collection",
+        "kernel-trace",
+        "metadata",
+    }
+
+
+def _normalize_profile_artifact_token(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
 
 
 def _subprocess_text(value: str | bytes | None) -> str:
@@ -833,6 +900,10 @@ def _classify_profile_artifact(path: Path) -> str:
         return "trace_csv"
     if suffix == ".json":
         return "metadata_json"
+    if suffix == ".pftrace" or ("perfetto" in name and suffix == ".trace"):
+        return "perfetto_trace"
+    if suffix == ".otf2":
+        return "otf2_trace"
     return "other"
 
 
