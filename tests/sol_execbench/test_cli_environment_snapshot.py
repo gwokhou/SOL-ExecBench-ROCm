@@ -347,7 +347,7 @@ def test_profile_summary_sidecar_records_bounded_metadata(tmp_path: Path):
     profile_artifact = profile_artifact_dir / "trace.rocpd"
     profile_artifact.write_text("profile artifact\n")
     counter_artifact = profile_artifact_dir / "trace_counters.csv"
-    counter_artifact.write_text("counter data\n")
+    counter_artifact.write_text("Metric,Value,Unit\nSQ_INSTS_VALU,12,count\n")
     result = Rocprofv3ProfileResult(
         status="success",
         command=("rocprofv3", "--kernel-trace", "--", "python", "eval_driver.py"),
@@ -391,6 +391,18 @@ def test_profile_summary_sidecar_records_bounded_metadata(tmp_path: Path):
     assert payload["summary"]["artifact_count"] == 2
     assert payload["summary"]["artifact_coverage_status"] == "complete"
     assert payload["summary"]["reason_codes"] == ["rocprof_artifacts_registered"]
+    assert payload["summary"]["kernel_metrics"] == [
+        {
+            "kernel_name": "trace_counters",
+            "name": "SQ_INSTS_VALU",
+            "value": 12,
+            "unit": "count",
+            "source": "trace_counters.csv",
+            "artifact": "trace_counters.csv",
+            "parse_status": "available",
+        }
+    ]
+    assert payload["summary"]["bottleneck_hints"][0]["category"] == "compute_bound"
     citation_kinds = {citation["kind"] for citation in payload["artifact_citations"]}
     assert citation_kinds == {"trace", "profile_metadata", "profiler_artifact"}
     profiler_citations = [
