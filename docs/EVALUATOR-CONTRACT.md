@@ -25,6 +25,7 @@ available beside a run:
 
 - `runtime.evidence.v1`
 - `profiling.evidence.v1`
+- `official_score_evidence.v1`
 - `toolchain.routing.v1`
 - `static_kernel_evidence.v1`
 - `agent_feedback.sidecar.v1`
@@ -40,6 +41,32 @@ optional normalized profile summary written as `<trace>.profile-summary.json`
 when a trace output path is available. Current ROCm profiling metadata is still
 emitted separately as the trace-adjacent `<trace>.profile.json` rocprofv3
 sidecar. Consumers must keep working when either optional sidecar is absent.
+
+## Official Score Evidence
+
+`official_score_evidence.v1` is the SOL-owned score-authoritative evidence
+surface for confirmed benchmark score claims. It is separate from
+`sol_execbench.amd_native_score.v1`: AMD-native score reports remain derived
+inputs and may be cited by official evidence, but they are not by themselves
+confirmed official score artifacts.
+
+A workload official score is non-null only when the evidence gate has all
+required inputs:
+
+- measured candidate latency
+- official measured baseline latency
+- SOL/SOLAR bound evidence
+- explicit aggregation policy
+
+If any required input is absent, the official score value is `null` and the
+report carries stable `blocker_reason_codes`, including `missing_score`,
+`missing_baseline`, `placeholder_baseline`, `missing_sol_bound`,
+`missing_measured_latency`, and `missing_aggregation_policy`.
+
+Trace JSONL `evaluation.performance.speedup_factor` remains a diagnostic ratio
+of reference latency to candidate latency. It is not an official benchmark
+score and must not be substituted for `official_score_evidence.v1` score
+fields.
 
 ## Feedback Sidecars
 
