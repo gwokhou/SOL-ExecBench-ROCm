@@ -22,6 +22,21 @@ Return-code-zero profile runs with at least one registered artifact remain
 with stable reason codes such as `rocprof_no_registered_artifacts` and
 `rocprof_partial_artifact_coverage`.
 
+The summary may also include structured diagnostic evidence:
+
+- `summary.workload_metrics[]`: workload-level bounded metrics such as artifact
+  coverage and dispatch counts.
+- `summary.kernel_metrics[]`: kernel-level bounded metrics derived from
+  registered CSV/JSON profiler artifacts, such as kernel duration rows and
+  selected numeric counters.
+- `summary.bottleneck_hints[]`: conservative AMD-oriented diagnostic hints.
+- `summary.parse_warnings[]`: bounded parse warnings for malformed,
+  unsupported, too-large, or citation-only artifacts.
+
+Phase 191 parses only registered CSV and JSON text artifacts. `.rocpd`,
+database, Perfetto/PFTrace, and OTF2 artifacts remain citation-only evidence
+pointers in this version.
+
 The sidecar is not correctness authority, timing authority, performance
 authority, score authority, evidence-tier authority, confirmed-improvement
 authority, release-gate authority, cutover authority, paper-parity authority,
@@ -46,15 +61,27 @@ not as a benchmark result. Suggested mapping:
 | `summary.artifact_count` | Coarse evidence richness signal. | Use zero when absent. |
 | `summary.artifact_kinds` | Compact profile artifact inventory. | Ignore unsupported kinds. |
 | `summary.metrics[]` | Bounded metadata-derived metrics. | Ignore unknown metric names. |
+| `summary.workload_metrics[]` | Workload-level diagnostic metrics with source artifact and parse status. | Ignore unknown metric names or unsupported parse status values. |
+| `summary.kernel_metrics[]` | Kernel-level diagnostic metrics from bounded CSV/JSON artifacts. | Ignore unknown metric names and never treat them as official timing. |
+| `summary.bottleneck_hints[]` | Conservative diagnostic hint taxonomy. | Downgrade unknown categories to `unknown`. |
+| `summary.parse_warnings[]` | Bounded warnings explaining skipped or partial parsing. | Display as advisory text only. |
 | `limitations[]` | Guardrails to include beside any profile digest. | Always preserve diagnostic-only wording. |
 | `artifact_citations[]` | Compact path, size, status, and checksum references for trace, raw profile metadata, and profiler artifacts. | Reject absolute paths and missing checksums where a checksum is required. |
 | `authority` | Hard guardrail flags. | Reject contradictory truthy authority flags. |
 
-The first profile-summary version intentionally does not infer hardware
-bottlenecks such as occupancy, VGPR/SGPR pressure, LDS pressure, bandwidth,
-cache behavior, or utilization. It does not infer hardware bottlenecks because
-that requires profiler-counter taxonomy and threshold work that remains
-deferred.
+`summary.bottleneck_hints[]` uses this closed vocabulary:
+
+- `compute_bound`
+- `memory_l2_bound`
+- `lds_bound`
+- `launch_overhead`
+- `insufficient_counters`
+- `unknown`
+
+These hints are diagnostic adapter input only. They are conservative and do not
+claim fine-grained occupancy, VGPR/SGPR pressure, cache, or bandwidth
+conclusions. When counters are missing or insufficient, SOL emits
+`insufficient_counters` or `unknown` instead of speculating.
 
 HIP runtime prompts should never include raw trace rows, raw profiler dumps,
 full kernel source, prompt text, or absolute temporary paths from SOL profile
@@ -95,7 +122,8 @@ benchmark evidence and do not represent real profiler output.
    identity.
 4. Downgrade stale, unknown, missing, unavailable, and partial states instead of
    promoting benchmark claims.
-5. Map status, metrics, limitations, and citations into a closed HIP profile
-   digest taxonomy. Unknown values must be downgraded, not promoted.
+5. Map status, metrics, bottleneck hints, limitations, and citations into a
+   closed HIP profile digest taxonomy. Unknown values must be downgraded, not
+   promoted.
 6. Keep canonical Trace JSONL as the only source for correctness, timing,
    scoring, and status.

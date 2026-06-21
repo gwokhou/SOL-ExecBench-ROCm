@@ -58,10 +58,12 @@ kernel source, prompt text, or absolute temporary paths from SOL feedback. They
 should include only the normalized bottleneck, recommendation, limitation, and
 compact citation fields after freshness and authority checks pass.
 
-`profile_summary.sidecar.v1` is reserved for a future normalized profile-summary
-sidecar. Current ROCm profiler metadata remains the separate
+`profile_summary.sidecar.v1` is the normalized profile-summary sidecar for
+bounded profiler metrics, conservative bottleneck hints, and artifact
+citations. Current ROCm profiler metadata remains the separate
 `<trace>.profile.json` rocprofv3 sidecar and is cited as optional diagnostic
-evidence when present.
+evidence when present. Agent feedback and profile summary remain separate
+diagnostic surfaces; neither is score, release-gate, or cutover authority.
 
 For all closed HIP taxonomies, unknown values must be downgraded rather than
 promoted.
