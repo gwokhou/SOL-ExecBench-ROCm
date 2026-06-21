@@ -105,11 +105,24 @@ uv run sol-execbench <problem_dir> --solution solution.json \
 
 This path is separate from benchmark timing authority. It records a
 `sol_execbench.rocprofv3_profile.v1` sidecar next to the trace output, prefers
-`rocpd` output for full-fidelity inspection, and registers any matching CSV
-artifacts that `rocprofv3` produces. The sidecar labels whether collection
-succeeded, was unavailable, or failed, and includes command provenance,
-working directory, timeout, artifact paths, return code, and stdout/stderr
-tails.
+`rocpd` output for full-fidelity inspection, and recursively discovers filtered
+profiler artifacts under the requested output directory. Discovery registers
+files that match the requested output-file prefix or recognized `rocprofv3`
+layouts and classifies common formats as `rocpd`, `trace_csv`, `counter_csv`,
+`agent_info_csv`, `metadata_json`, `perfetto_trace`, `otf2_trace`, or `other`.
+Unrelated files under the output directory are not registered just because a
+recursive walk can see them. The sidecar labels whether collection succeeded,
+was unavailable, or failed, and includes command provenance, working directory,
+timeout, artifact paths, return code, artifact coverage status, stable reason
+codes, warnings, and stdout/stderr tails.
+
+A `rocprofv3` profile command that exits with return code 0 and produces at
+least one registered artifact remains `status: success`. Incomplete evidence is
+expressed through `artifact_coverage_status`, `reason_codes`, and `warnings`
+rather than alternate top-level success states. Stable reason codes include
+`rocprof_artifacts_registered`, `rocprof_no_registered_artifacts`,
+`rocprof_partial_artifact_coverage`, `rocprof_command_failed`, and
+`rocprof_unavailable`.
 
 The profile sidecar is diagnostic-only evidence using the authority-class
 vocabulary in `docs/CLAIMS.md`. It is not canonical trace JSONL data.
@@ -119,6 +132,11 @@ leaderboard authority.
 Profiler failure must not turn an otherwise passing benchmark run into a
 correctness failure. When collection falls back or is skipped, the sidecar
 records an explicit fallback reason through `skipped_reason` or `failed_reason`.
+Profile-summary citations compute SHA256 for registered profiler artifacts by
+default, including database artifacts such as `.rocpd`. This makes citations
+auditable but can add measurable cost for very large profiler databases; Phase
+190 intentionally keeps the always-hash behavior and treats any future size
+limit as a deliberate follow-up.
 
 ## Live rocprofv3 Collection
 
