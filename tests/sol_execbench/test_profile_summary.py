@@ -39,6 +39,12 @@ def _profile_result(tmp_path: Path, status: str = "success") -> Rocprofv3Profile
         returncode=0 if status == "success" else 1,
         failed_reason=None if status == "success" else "rocprofv3 failed",
         profiler_available=True,
+        artifact_coverage_status="complete" if status == "success" else "none",
+        reason_codes=(
+            ("rocprof_artifacts_registered",)
+            if status == "success"
+            else ("rocprof_command_failed",)
+        ),
         timeout_seconds=60,
     )
 
@@ -72,6 +78,9 @@ def test_profile_summary_sidecar_is_diagnostic_only(tmp_path: Path):
         if key != "diagnostic_only":
             assert value is False
     assert payload["summary"]["profiler_status"] == "success"
+    assert payload["summary"]["artifact_coverage_status"] == "complete"
+    assert payload["summary"]["reason_codes"] == ["rocprof_artifacts_registered"]
+    assert payload["summary"]["warnings"] == []
     assert payload["summary"]["artifact_count"] == 1
     assert payload["summary"]["artifact_kinds"] == {"rocpd": 1}
     assert payload["summary"]["metrics"][0]["name"] == "artifact_count"
@@ -98,6 +107,7 @@ def test_profile_summary_sidecar_handles_unavailable_inputs(tmp_path: Path):
     assert failed.reason_code == "profile_partial"
     assert failed.summary.profiler_status == "failed"
     assert failed.summary.failed_reason == "rocprofv3 failed"
+    assert failed.summary.reason_codes == ["rocprof_command_failed"]
 
 
 def test_profile_summary_success_without_artifacts_is_partial(tmp_path: Path):
@@ -110,6 +120,8 @@ def test_profile_summary_success_without_artifacts_is_partial(tmp_path: Path):
         returncode=0,
         profiler_available=True,
         timeout_seconds=60,
+        artifact_coverage_status="none",
+        reason_codes=("rocprof_no_registered_artifacts",),
     )
 
     sidecar = build_profile_summary_sidecar(
@@ -122,6 +134,8 @@ def test_profile_summary_success_without_artifacts_is_partial(tmp_path: Path):
     assert payload["status"] == "partial"
     assert payload["reason_code"] == "profile_partial"
     assert payload["summary"]["profiler_status"] == "success"
+    assert payload["summary"]["artifact_coverage_status"] == "none"
+    assert payload["summary"]["reason_codes"] == ["rocprof_no_registered_artifacts"]
     assert payload["summary"]["artifact_count"] == 0
     assert any(
         "without registered artifacts" in limitation

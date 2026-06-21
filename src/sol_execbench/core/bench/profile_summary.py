@@ -132,6 +132,12 @@ class ProfileSummaryContent(BaseModelWithDocstrings):
     """Raw profiler result status when available."""
     profiler_available: bool | None = None
     """Whether rocprofv3 was available to the producer."""
+    artifact_coverage_status: str | None = None
+    """Bounded profiler artifact coverage status."""
+    reason_codes: list[str] = Field(default_factory=list)
+    """Stable profiler result reason codes."""
+    warnings: list[str] = Field(default_factory=list)
+    """Bounded profiler result warnings."""
     command: list[str] = Field(default_factory=list)
     """Profiler command with bounded argv values."""
     output_file: str | None = None
@@ -387,6 +393,9 @@ def _profile_summary_content(
     return ProfileSummaryContent(
         profiler_status=profile_result.status,
         profiler_available=profile_result.profiler_available,
+        artifact_coverage_status=profile_result.artifact_coverage_status,
+        reason_codes=list(profile_result.reason_codes),
+        warnings=list(profile_result.warnings),
         command=list(profile_result.command),
         output_file=profile_result.output_file,
         artifact_count=len(profile_result.artifacts),

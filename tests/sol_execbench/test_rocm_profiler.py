@@ -166,6 +166,9 @@ def test_profile_collection_records_success_metadata(tmp_path):
     assert payload["working_directory"] == str(tmp_path)
     assert payload["timeout_seconds"] == 30
     assert payload["returncode"] == 0
+    assert payload["artifact_coverage_status"] == "complete"
+    assert payload["reason_codes"] == ["rocprof_artifacts_registered"]
+    assert payload["warnings"] == []
     assert payload["artifacts"][0]["kind"] == "rocpd"
     assert payload["stderr_tail"] == "profiler note"
 
@@ -192,7 +195,10 @@ def test_profile_collection_unavailable_is_nonfatal_metadata(tmp_path):
     assert result.status == "unavailable"
     assert result.returncode is None
     assert result.skipped_reason == "rocprofv3 is not available on PATH"
-    assert result.to_dict()["artifacts"] == []
+    payload = result.to_dict()
+    assert payload["artifact_coverage_status"] == "unavailable"
+    assert payload["reason_codes"] == ["rocprof_unavailable"]
+    assert payload["artifacts"] == []
 
 
 def test_profile_collection_failure_records_artifact_and_stderr_tail(tmp_path):
@@ -221,8 +227,47 @@ def test_profile_collection_failure_records_artifact_and_stderr_tail(tmp_path):
     assert result.status == "failed"
     assert payload["returncode"] == 22
     assert payload["failed_reason"] == "rocprofv3 command failed with exit code 22"
+    assert payload["artifact_coverage_status"] == "partial"
+    assert payload["reason_codes"] == [
+        "rocprof_command_failed",
+        "rocprof_partial_artifact_coverage",
+    ]
+    assert payload["warnings"] == [
+        "rocprofv3 registered artifacts, but coverage is incomplete or only opaque artifacts were discovered"
+    ]
     assert payload["stderr_tail"] == "profiler failed"
     assert payload["artifacts"][0]["kind"] == "trace_csv"
+
+
+def test_profile_collection_no_artifacts_records_stable_reason_code(tmp_path):
+    def runner(
+        command: Sequence[str],
+        cwd,
+        timeout,
+    ) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            args=list(command),
+            returncode=0,
+            stdout="",
+            stderr="",
+        )
+
+    request = Rocprofv3ProfileRequest(
+        application_command=("python", "eval_driver.py"),
+        output_directory=tmp_path,
+        output_file="profile",
+    )
+
+    result = collect_rocprofv3_profile(request, runner=runner)
+    payload = result.to_dict()
+
+    assert result.status == "failed"
+    assert result.succeeded is False
+    assert (
+        payload["failed_reason"] == "rocprofv3 completed without registered artifacts"
+    )
+    assert payload["artifact_coverage_status"] == "none"
+    assert payload["reason_codes"] == ["rocprof_no_registered_artifacts"]
 
 
 def test_parse_rocprofv3_csv_keeps_domains_separate():

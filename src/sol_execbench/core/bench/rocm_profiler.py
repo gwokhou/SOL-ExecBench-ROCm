@@ -29,6 +29,11 @@ from sol_execbench.core.reporting import CANONICAL_BENCHMARK_OUTPUT
 ROCPROFV3_EXECUTABLE = "rocprofv3"
 ROCPROFV3_EVIDENCE_SCHEMA_VERSION = "sol_execbench.rocprofv3_timing.v1"
 ROCPROFV3_PROFILE_SCHEMA_VERSION = "sol_execbench.rocprofv3_profile.v1"
+ROCPROF_REASON_ARTIFACTS_REGISTERED = "rocprof_artifacts_registered"
+ROCPROF_REASON_NO_REGISTERED_ARTIFACTS = "rocprof_no_registered_artifacts"
+ROCPROF_REASON_PARTIAL_ARTIFACT_COVERAGE = "rocprof_partial_artifact_coverage"
+ROCPROF_REASON_COMMAND_FAILED = "rocprof_command_failed"
+ROCPROF_REASON_UNAVAILABLE = "rocprof_unavailable"
 _PROFILE_ARTIFACT_SUFFIXES = {
     ".csv",
     ".db",
@@ -101,6 +106,9 @@ class Rocprofv3ProfileResult:
     working_directory: Path | None = None
     timeout_seconds: int | None = None
     profiler_available: bool | None = None
+    artifact_coverage_status: str | None = None
+    reason_codes: tuple[str, ...] = ()
+    warnings: tuple[str, ...] = ()
     schema_version: str = ROCPROFV3_PROFILE_SCHEMA_VERSION
 
     @property
@@ -125,6 +133,9 @@ class Rocprofv3ProfileResult:
             "output_directory": str(self.output_directory),
             "output_file": self.output_file,
             "profiler_available": self.profiler_available,
+            "artifact_coverage_status": self.artifact_coverage_status,
+            "reason_codes": list(self.reason_codes),
+            "warnings": list(self.warnings),
             "returncode": self.returncode,
             "stdout_tail": _tail(self.stdout),
             "stderr_tail": _tail(self.stderr),
@@ -403,6 +414,23 @@ def _normalize_profile_artifact_token(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
 
 
+def _profile_artifact_coverage_metadata(
+    artifacts: Sequence[Rocprofv3ProfileArtifact],
+    *,
+    command_succeeded: bool,
+) -> tuple[str, tuple[str, ...], tuple[str, ...]]:
+    if not artifacts:
+        return "none", (), ()
+
+    if command_succeeded and any(artifact.kind != "other" for artifact in artifacts):
+        return "complete", (ROCPROF_REASON_ARTIFACTS_REGISTERED,), ()
+
+    warnings = (
+        "rocprofv3 registered artifacts, but coverage is incomplete or only opaque artifacts were discovered",
+    )
+    return "partial", (ROCPROF_REASON_PARTIAL_ARTIFACT_COVERAGE,), warnings
+
+
 def _subprocess_text(value: str | bytes | None) -> str:
     if value is None:
         return ""
@@ -436,6 +464,8 @@ def collect_rocprofv3_profile(
             working_directory=request.working_directory,
             timeout_seconds=request.timeout_seconds,
             profiler_available=False,
+            artifact_coverage_status="unavailable",
+            reason_codes=(ROCPROF_REASON_UNAVAILABLE,),
         )
 
     request.output_directory.mkdir(parents=True, exist_ok=True)
@@ -460,6 +490,8 @@ def collect_rocprofv3_profile(
             working_directory=request.working_directory,
             timeout_seconds=request.timeout_seconds,
             profiler_available=True,
+            artifact_coverage_status="none",
+            reason_codes=(ROCPROF_REASON_COMMAND_FAILED,),
         )
 
     artifacts = discover_rocprofv3_artifacts(
@@ -467,6 +499,12 @@ def collect_rocprofv3_profile(
         request.output_file,
     )
     if completed.returncode != 0:
+        coverage_status, coverage_reasons, coverage_warnings = (
+            _profile_artifact_coverage_metadata(
+                artifacts,
+                command_succeeded=False,
+            )
+        )
         return Rocprofv3ProfileResult(
             status="failed",
             command=tuple(command),
@@ -480,6 +518,9 @@ def collect_rocprofv3_profile(
             working_directory=request.working_directory,
             timeout_seconds=request.timeout_seconds,
             profiler_available=True,
+            artifact_coverage_status=coverage_status,
+            reason_codes=(ROCPROF_REASON_COMMAND_FAILED, *coverage_reasons),
+            warnings=coverage_warnings,
         )
     if not artifacts:
         return Rocprofv3ProfileResult(
@@ -494,8 +535,16 @@ def collect_rocprofv3_profile(
             working_directory=request.working_directory,
             timeout_seconds=request.timeout_seconds,
             profiler_available=True,
+            artifact_coverage_status="none",
+            reason_codes=(ROCPROF_REASON_NO_REGISTERED_ARTIFACTS,),
         )
 
+    coverage_status, coverage_reasons, coverage_warnings = (
+        _profile_artifact_coverage_metadata(
+            artifacts,
+            command_succeeded=True,
+        )
+    )
     return Rocprofv3ProfileResult(
         status="success",
         command=tuple(command),
@@ -508,6 +557,9 @@ def collect_rocprofv3_profile(
         working_directory=request.working_directory,
         timeout_seconds=request.timeout_seconds,
         profiler_available=True,
+        artifact_coverage_status=coverage_status,
+        reason_codes=coverage_reasons,
+        warnings=coverage_warnings,
     )
 
 
