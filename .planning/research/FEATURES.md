@@ -1,33 +1,38 @@
-# Research: Features for v1.36 SOL Agent Feedback Sidecar Producer
+# Research: Features for v1.38 Confirmed Benchmark Evidence
 
-**Date:** 2026-06-15
+**Date:** 2026-06-21
 
 ## Table Stakes
 
-- Optional sidecar file named `trace.jsonl.agent-feedback.json` when an output
-  trace path is available.
-- Schema includes diagnostic-only authority flags and rejects contradictory
-  authority claims.
-- Contract advertises optional capabilities for agent-feedback/profile-summary
-  so HIP can detect support without breaking older SOL versions.
-- Payload exposes bounded bottleneck, recommendation, limitation, freshness,
-  and artifact citation fields.
-- Missing, skipped, unavailable, partial, malformed-source, and stale-source
-  states are explicit and do not alter canonical evaluation status.
-- Fixtures cover success and invalid states for HIP adapter tests.
+- Successful requested `rocprofv3` profile runs register at least one concrete
+  profiler artifact with kind, path, size, checksum where practical, and compact
+  citation in profile summary.
+- Profile summary contains structured profiling evidence, not only status:
+  workload identity, kernel rows, duration/dispatch metrics, artifact coverage,
+  and bottleneck hints mapped to stable categories.
+- Official score evidence is non-null for valid runs and exposes score source,
+  aggregation policy, scored/unscored counts, and authoritative input refs.
+- Measured baseline evidence exposes target identity, trace pointer, hardware,
+  ROCm version, SOL version, timing policy, workload coverage, and blockers.
+- HIP can validate confirmed coverage without scraping diagnostic sidecar prose.
 
 ## Differentiators
 
-- Recommendations are source-cited and bounded to ROCm/HIP-safe next-experiment
-  guidance rather than free-form prompt text.
-- Freshness identity ties the sidecar to trace path, run target, source/candidate
-  hash when available, SOL contract version, and artifact checksums.
-- Existing evaluation-stability and profiling reason codes can be summarized
-  without making profiler output mandatory.
+- Keep profile summary and agent feedback diagnostic-only, while adding a
+  separate confirmed benchmark evidence surface for score/baseline/cutover
+  decisions.
+- Prefer AMD profiler semantics and metric names, but translate into a compact
+  SOL-owned taxonomy that HIP can consume without depending on raw profiler
+  dumps.
+- Make invalid runs explicit through blockers such as missing profiler
+  artifacts, missing score evidence, missing baseline coverage, unsupported SOL
+  bounds, or placeholder/reference-only baseline use.
 
 ## Deferred
 
-- Multi-source confidence scoring for bottleneck classification.
-- Parsing full profiler counter dumps into a stable hardware-counter taxonomy.
-- Using feedback for candidate ranking or score authority.
-- Cross-run feedback accumulation.
+- Claiming paper parity, leaderboard readiness, NVIDIA B200 equivalence, or
+  full CDNA3/CDNA4 validation.
+- Replacing ROCm Compute Profiler; this milestone should parse/normalize
+  evidence compatible with available `rocprofv3` artifacts and bounded metrics.
+- Letting diagnostic sidecars become score, release-gate, cutover, or
+  confirmed-improvement authority.
