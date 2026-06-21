@@ -22,7 +22,12 @@ from sol_execbench.core.data.solution import (
     SupportedHardware,
     SupportedLanguages,
 )
-from sol_execbench.core.data.trace import Environment, Evaluation, EvaluationStatus, Trace
+from sol_execbench.core.data.trace import (
+    Environment,
+    Evaluation,
+    EvaluationStatus,
+    Trace,
+)
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.environment import (
     EnvironmentCheckResult,
@@ -334,13 +339,19 @@ def test_profile_summary_sidecar_records_bounded_metadata(tmp_path: Path):
     output = tmp_path / "trace.jsonl"
     output.write_text('{"definition":"toy"}\n')
     profile_metadata = tmp_path / "trace.jsonl.profile.json"
-    profile_metadata.write_text('{"schema_version":"sol_execbench.rocprofv3_profile.v1"}\n')
-    profile_artifact = tmp_path / "trace.rocpd"
+    profile_metadata.write_text(
+        '{"schema_version":"sol_execbench.rocprofv3_profile.v1"}\n'
+    )
+    profile_artifact_dir = tmp_path / "trace.jsonl.rocprofv3" / "trace"
+    profile_artifact_dir.mkdir(parents=True)
+    profile_artifact = profile_artifact_dir / "trace.rocpd"
     profile_artifact.write_text("profile artifact\n")
+    counter_artifact = profile_artifact_dir / "trace_counters.csv"
+    counter_artifact.write_text("counter data\n")
     result = Rocprofv3ProfileResult(
         status="success",
         command=("rocprofv3", "--kernel-trace", "--", "python", "eval_driver.py"),
-        output_directory=tmp_path,
+        output_directory=tmp_path / "trace.jsonl.rocprofv3",
         output_file="trace",
         artifacts=(
             Rocprofv3ProfileArtifact(
@@ -348,9 +359,16 @@ def test_profile_summary_sidecar_records_bounded_metadata(tmp_path: Path):
                 kind="rocpd",
                 size_bytes=profile_artifact.stat().st_size,
             ),
+            Rocprofv3ProfileArtifact(
+                path=counter_artifact,
+                kind="counter_csv",
+                size_bytes=counter_artifact.stat().st_size,
+            ),
         ),
         returncode=0,
         profiler_available=True,
+        artifact_coverage_status="complete",
+        reason_codes=("rocprof_artifacts_registered",),
     )
 
     written = cli_main._write_profile_summary_sidecar(
@@ -370,9 +388,24 @@ def test_profile_summary_sidecar_records_bounded_metadata(tmp_path: Path):
     assert payload["identity"]["run_id"] is not None
     assert len(payload["identity"]["run_id"]) == 64
     assert payload["summary"]["profiler_status"] == "success"
-    assert payload["summary"]["artifact_count"] == 1
+    assert payload["summary"]["artifact_count"] == 2
+    assert payload["summary"]["artifact_coverage_status"] == "complete"
+    assert payload["summary"]["reason_codes"] == ["rocprof_artifacts_registered"]
     citation_kinds = {citation["kind"] for citation in payload["artifact_citations"]}
     assert citation_kinds == {"trace", "profile_metadata", "profiler_artifact"}
+    profiler_citations = [
+        citation
+        for citation in payload["artifact_citations"]
+        if citation["kind"] == "profiler_artifact"
+    ]
+    assert {citation["path"] for citation in profiler_citations} == {
+        "trace.rocpd",
+        "trace_counters.csv",
+    }
+    assert {citation["size_bytes"] for citation in profiler_citations} == {
+        profile_artifact.stat().st_size,
+        counter_artifact.stat().st_size,
+    }
     for citation in payload["artifact_citations"]:
         assert "/" not in citation["path"]
         assert citation["sha256"] is not None

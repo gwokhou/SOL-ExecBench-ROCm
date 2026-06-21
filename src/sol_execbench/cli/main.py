@@ -449,6 +449,7 @@ def _profile_summary_artifact_citations(
                     label=artifact.kind,
                     path=artifact.path,
                     status=profile_result.status,
+                    size_bytes=artifact.size_bytes,
                 )
             )
     return citations
