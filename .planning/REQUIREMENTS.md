@@ -10,12 +10,12 @@ ExecBench.
 
 ### Profiler Artifact Registration
 
-- [ ] **PROF-01**: SOL can discover profiler artifacts produced by successful
+- [x] **PROF-01**: SOL can discover profiler artifacts produced by successful
   requested `rocprofv3` profile runs across supported output formats and
   version-specific output layouts.
-- [ ] **PROF-02**: SOL records concrete profiler artifact citations with kind,
+- [x] **PROF-02**: SOL records concrete profiler artifact citations with kind,
   compact path, size, checksum where practical, and source status.
-- [ ] **PROF-03**: SOL distinguishes profiler command failure, unavailable
+- [x] **PROF-03**: SOL distinguishes profiler command failure, unavailable
   profiler, partial artifact discovery, and successful artifact registration
   with stable reason codes.
 
@@ -95,9 +95,9 @@ ExecBench.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PROF-01 | Phase 190 | Pending |
-| PROF-02 | Phase 190 | Pending |
-| PROF-03 | Phase 190 | Pending |
+| PROF-01 | Phase 190 | Complete |
+| PROF-02 | Phase 190 | Complete |
+| PROF-03 | Phase 190 | Complete |
 | PSUM-01 | Phase 191 | Pending |
 | PSUM-02 | Phase 191 | Pending |
 | PSUM-03 | Phase 191 | Pending |
