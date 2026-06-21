@@ -21,13 +21,13 @@ ExecBench.
 
 ### Structured Profile Summary Evidence
 
-- [ ] **PSUM-01**: SOL profile summary contains workload and kernel-level metric
+- [x] **PSUM-01**: SOL profile summary contains workload and kernel-level metric
   records derived from bounded profiler artifacts, including duration,
   dispatch/count, and artifact coverage fields.
-- [ ] **PSUM-02**: SOL profile summary emits stable bottleneck hints for AMD
+- [x] **PSUM-02**: SOL profile summary emits stable bottleneck hints for AMD
   profiler concepts such as compute utilization, memory/L2 pressure, LDS bank
   conflicts, launch overhead, and unknown/insufficient-counter states.
-- [ ] **PSUM-03**: SOL profile summary remains diagnostic-only and cannot claim
+- [x] **PSUM-03**: SOL profile summary remains diagnostic-only and cannot claim
   correctness, timing, score, evidence-tier, confirmed-improvement,
   release-gate, cutover, paper-parity, leaderboard, or claim-upgrade authority.
 
@@ -98,9 +98,9 @@ ExecBench.
 | PROF-01 | Phase 190 | Complete |
 | PROF-02 | Phase 190 | Complete |
 | PROF-03 | Phase 190 | Complete |
-| PSUM-01 | Phase 191 | Pending |
-| PSUM-02 | Phase 191 | Pending |
-| PSUM-03 | Phase 191 | Pending |
+| PSUM-01 | Phase 191 | Complete |
+| PSUM-02 | Phase 191 | Complete |
+| PSUM-03 | Phase 191 | Complete |
 | SCOR-01 | Phase 192 | Pending |
 | SCOR-02 | Phase 192 | Pending |
 | SCOR-03 | Phase 192 | Pending |
