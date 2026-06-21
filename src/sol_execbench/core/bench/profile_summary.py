@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+import csv
+import json
 from collections.abc import Sequence
 from enum import Enum
 from pathlib import Path
@@ -21,6 +23,8 @@ from sol_execbench.core.trust_summary import utc_timestamp
 
 PROFILE_SUMMARY_SCHEMA_VERSION = "sol_execbench.profile_summary.v1"
 _MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
+_PROFILE_SUMMARY_MAX_PARSE_BYTES = 1_000_000
+_PROFILE_SUMMARY_MAX_ROWS = 10_000
 
 
 class ProfileSummaryStatus(str, Enum):
@@ -70,6 +74,74 @@ class ProfileSummaryMetric(BaseModelWithDocstrings):
     """Optional unit label."""
     source: str
     """Source label for this metric."""
+
+
+class ProfileSummaryStructuredMetric(BaseModelWithDocstrings):
+    """One bounded workload-level profile metric."""
+
+    model_config = _MODEL_CONFIG
+
+    name: str
+    """Stable metric name."""
+    value: int | float | str | bool | None
+    """JSON scalar metric value."""
+    unit: str | None = None
+    """Optional unit label."""
+    source: str
+    """Metric source label."""
+    workload_id: str | None = None
+    """Optional workload identity."""
+    artifact: str | None = None
+    """Compact source artifact label."""
+    parse_status: str = "available"
+    """Bounded parse status for the source metric."""
+
+
+class ProfileSummaryKernelMetric(BaseModelWithDocstrings):
+    """One bounded kernel-level profile metric."""
+
+    model_config = _MODEL_CONFIG
+
+    kernel_name: str
+    """Kernel or source bucket name."""
+    name: str
+    """Stable metric name."""
+    value: int | float | str | bool | None
+    """JSON scalar metric value."""
+    unit: str | None = None
+    """Optional unit label."""
+    source: str
+    """Metric source label."""
+    artifact: str | None = None
+    """Compact source artifact label."""
+    parse_status: str = "available"
+    """Bounded parse status for the source metric."""
+
+
+class ProfileSummaryBottleneckHint(BaseModelWithDocstrings):
+    """Conservative diagnostic bottleneck hint."""
+
+    model_config = _MODEL_CONFIG
+
+    category: Literal[
+        "compute_bound",
+        "memory_l2_bound",
+        "lds_bound",
+        "launch_overhead",
+        "insufficient_counters",
+        "unknown",
+    ]
+    """Closed diagnostic hint category."""
+    severity: Literal["low", "medium", "high", "unknown"] = "low"
+    """Conservative severity label."""
+    confidence: Literal["low", "medium", "high"] = "low"
+    """Confidence in this diagnostic hint."""
+    message: str
+    """Bounded human-readable diagnostic message."""
+    source_metrics: list[str] = Field(default_factory=list)
+    """Source metric names used to derive the hint."""
+    evidence_artifacts: list[str] = Field(default_factory=list)
+    """Compact artifact labels supporting the hint."""
 
 
 class ProfileSummaryArtifactCitation(BaseModelWithDocstrings):
@@ -158,6 +230,14 @@ class ProfileSummaryContent(BaseModelWithDocstrings):
     """Bounded failed reason."""
     metrics: list[ProfileSummaryMetric] = Field(default_factory=list)
     """Bounded normalized profile metrics derived from metadata."""
+    workload_metrics: list[ProfileSummaryStructuredMetric] = Field(default_factory=list)
+    """Structured workload-level profile metrics."""
+    kernel_metrics: list[ProfileSummaryKernelMetric] = Field(default_factory=list)
+    """Structured kernel-level profile metrics."""
+    bottleneck_hints: list[ProfileSummaryBottleneckHint] = Field(default_factory=list)
+    """Conservative diagnostic bottleneck hints."""
+    parse_warnings: list[str] = Field(default_factory=list)
+    """Bounded artifact parse warnings."""
 
 
 class ProfileSummaryFreshnessValidation(BaseModelWithDocstrings):
@@ -394,6 +474,7 @@ def _profile_summary_content(
             source="rocprofv3_profile_metadata",
         ),
     ]
+    structured = _structured_profile_evidence(profile_result)
     return ProfileSummaryContent(
         profiler_status=profile_result.status,
         profiler_available=profile_result.profiler_available,
@@ -409,6 +490,10 @@ def _profile_summary_content(
         skipped_reason=profile_result.skipped_reason,
         failed_reason=profile_result.failed_reason,
         metrics=metrics,
+        workload_metrics=structured.workload_metrics,
+        kernel_metrics=structured.kernel_metrics,
+        bottleneck_hints=structured.bottleneck_hints,
+        parse_warnings=structured.parse_warnings,
     )
 
 
@@ -425,6 +510,351 @@ def _limitations(profile_result: Rocprofv3ProfileResult | None) -> list[str]:
     elif not profile_result.artifacts:
         limitations.append("rocprofv3 profile completed without registered artifacts.")
     return limitations
+
+
+class _StructuredProfileEvidence(BaseModelWithDocstrings):
+    """Internal structured profile evidence accumulator."""
+
+    model_config = _MODEL_CONFIG
+
+    workload_metrics: list[ProfileSummaryStructuredMetric] = Field(default_factory=list)
+    kernel_metrics: list[ProfileSummaryKernelMetric] = Field(default_factory=list)
+    bottleneck_hints: list[ProfileSummaryBottleneckHint] = Field(default_factory=list)
+    parse_warnings: list[str] = Field(default_factory=list)
+
+
+def _structured_profile_evidence(
+    profile_result: Rocprofv3ProfileResult,
+) -> _StructuredProfileEvidence:
+    workload_id = _metadata_workload_id(profile_result)
+    workload_metrics = [
+        ProfileSummaryStructuredMetric(
+            name="artifact_coverage_status",
+            value=profile_result.artifact_coverage_status,
+            source="rocprofv3_profile_metadata",
+            workload_id=workload_id,
+            parse_status="available",
+        )
+    ]
+    kernel_metrics: list[ProfileSummaryKernelMetric] = []
+    parse_warnings: list[str] = []
+
+    for artifact in profile_result.artifacts:
+        if artifact.kind == "trace_csv":
+            parsed_metrics, warnings = _parse_trace_csv_artifact(artifact.path)
+            kernel_metrics.extend(parsed_metrics)
+            parse_warnings.extend(warnings)
+        elif artifact.kind == "counter_csv":
+            parsed_metrics, warnings = _parse_counter_csv_artifact(artifact.path)
+            kernel_metrics.extend(parsed_metrics)
+            parse_warnings.extend(warnings)
+        elif artifact.kind == "agent_info_csv":
+            _, warnings = _parse_limited_csv(artifact.path)
+            parse_warnings.extend(warnings)
+        elif artifact.kind == "metadata_json":
+            parsed_metrics, warnings = _parse_metadata_json_artifact(
+                artifact.path,
+                workload_id=workload_id,
+            )
+            workload_metrics.extend(parsed_metrics)
+            parse_warnings.extend(warnings)
+        elif artifact.kind in {"rocpd", "perfetto_trace", "otf2_trace"}:
+            parse_warnings.append(
+                f"{artifact.path.name}: {artifact.kind} artifacts are citation-only in profile_summary.sidecar.v1"
+            )
+        elif artifact.kind == "other":
+            parse_warnings.append(
+                f"{artifact.path.name}: unsupported profiler artifact kind other"
+            )
+
+    return _StructuredProfileEvidence(
+        workload_metrics=workload_metrics,
+        kernel_metrics=kernel_metrics,
+        bottleneck_hints=_derive_bottleneck_hints(kernel_metrics),
+        parse_warnings=parse_warnings,
+    )
+
+
+def _metadata_workload_id(profile_result: Rocprofv3ProfileResult) -> str | None:
+    for artifact in profile_result.artifacts:
+        if artifact.kind != "metadata_json" or not artifact.path.is_file():
+            continue
+        try:
+            if artifact.path.stat().st_size > _PROFILE_SUMMARY_MAX_PARSE_BYTES:
+                continue
+            payload = json.loads(artifact.path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+            continue
+        if isinstance(payload, dict):
+            value = payload.get("workload_id") or payload.get("workload")
+            if isinstance(value, str):
+                return value
+    return None
+
+
+def _parse_trace_csv_artifact(
+    path: Path,
+) -> tuple[list[ProfileSummaryKernelMetric], list[str]]:
+    rows, warnings = _parse_limited_csv(path)
+    metrics: list[ProfileSummaryKernelMetric] = []
+    for row in rows:
+        normalized = {_normalize_key(key): value for key, value in row.items()}
+        domain = _first_text(normalized, "domain", "kind", "type", "category")
+        if domain is None or "kernel" not in _normalize_key(domain):
+            continue
+        duration_ns = _first_number(
+            normalized,
+            "durationns",
+            "durationnsec",
+            "durationnanoseconds",
+            "duration",
+        )
+        if duration_ns is None:
+            continue
+        kernel_name = _first_text(
+            normalized,
+            "name",
+            "kernelname",
+            "function",
+            "operation",
+        )
+        metrics.append(
+            ProfileSummaryKernelMetric(
+                kernel_name=kernel_name or "unknown_kernel",
+                name="kernel_duration_ms",
+                value=duration_ns / 1_000_000.0,
+                unit="ms",
+                source=path.name,
+                artifact=path.name,
+            )
+        )
+    return metrics, warnings
+
+
+def _parse_counter_csv_artifact(
+    path: Path,
+) -> tuple[list[ProfileSummaryKernelMetric], list[str]]:
+    rows, warnings = _parse_limited_csv(path)
+    metrics: list[ProfileSummaryKernelMetric] = []
+    for row in rows:
+        normalized = {_normalize_key(key): value for key, value in row.items()}
+        name = _first_text(normalized, "metric", "name", "counter")
+        value = _first_number(normalized, "value", "countervalue", "result")
+        if name is None or value is None:
+            continue
+        unit = _first_text(normalized, "unit", "units")
+        kernel_name = _first_text(normalized, "kernel", "kernelname") or (
+            path.stem if path.stem != "profile_counters" else "profile_counters"
+        )
+        metrics.append(
+            ProfileSummaryKernelMetric(
+                kernel_name=kernel_name,
+                name=name,
+                value=value,
+                unit=unit,
+                source=path.name,
+                artifact=path.name,
+            )
+        )
+    return metrics, warnings
+
+
+def _parse_metadata_json_artifact(
+    path: Path,
+    *,
+    workload_id: str | None,
+) -> tuple[list[ProfileSummaryStructuredMetric], list[str]]:
+    warnings = _artifact_parse_preflight(path)
+    if warnings:
+        return [], warnings
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        return [], [f"{path.name}: malformed JSON profile metadata ({exc})"]
+    if not isinstance(payload, dict):
+        return [], [f"{path.name}: metadata JSON is not an object"]
+
+    metrics: list[ProfileSummaryStructuredMetric] = []
+    source_workload_id = workload_id
+    for key, unit in (
+        ("kernel_dispatches", "count"),
+        ("dispatch_count", "count"),
+        ("kernel_count", "count"),
+    ):
+        value = payload.get(key)
+        if isinstance(value, int | float | str | bool) or value is None:
+            number_or_value = _coerce_scalar(value)
+            if number_or_value is None:
+                continue
+            metrics.append(
+                ProfileSummaryStructuredMetric(
+                    name="kernel_dispatch_count",
+                    value=number_or_value,
+                    unit=unit,
+                    source=path.name,
+                    workload_id=source_workload_id,
+                    artifact=path.name,
+                    parse_status="available",
+                )
+            )
+            break
+    return metrics, []
+
+
+def _parse_limited_csv(path: Path) -> tuple[list[dict[str, str]], list[str]]:
+    warnings = _artifact_parse_preflight(path)
+    if warnings:
+        return [], warnings
+    try:
+        with path.open(encoding="utf-8", newline="") as handle:
+            reader = csv.DictReader(handle)
+            rows: list[dict[str, str]] = []
+            for index, row in enumerate(reader):
+                if index >= _PROFILE_SUMMARY_MAX_ROWS:
+                    return rows, [f"{path.name}: CSV row limit reached"]
+                rows.append({key or "": value for key, value in row.items()})
+            return rows, []
+    except (OSError, UnicodeDecodeError, csv.Error) as exc:
+        return [], [f"{path.name}: malformed CSV profile artifact ({exc})"]
+
+
+def _artifact_parse_preflight(path: Path) -> list[str]:
+    if not path.is_file():
+        return [f"{path.name}: profiler artifact is missing"]
+    try:
+        if path.stat().st_size > _PROFILE_SUMMARY_MAX_PARSE_BYTES:
+            return [f"{path.name}: profiler artifact exceeds parse byte limit"]
+    except OSError as exc:
+        return [f"{path.name}: profiler artifact stat failed ({exc})"]
+    return []
+
+
+def _derive_bottleneck_hints(
+    kernel_metrics: Sequence[ProfileSummaryKernelMetric],
+) -> list[ProfileSummaryBottleneckHint]:
+    counter_metrics = [
+        metric for metric in kernel_metrics if metric.name != "kernel_duration_ms"
+    ]
+    if not counter_metrics:
+        return [
+            ProfileSummaryBottleneckHint(
+                category="insufficient_counters",
+                severity="low",
+                confidence="high",
+                message="No bounded counter artifact was available for bottleneck classification.",
+            )
+        ]
+
+    by_name = {_normalize_key(metric.name): metric for metric in counter_metrics}
+    hints: list[ProfileSummaryBottleneckHint] = []
+    l2 = by_name.get("l2cachehitrate")
+    if l2 is not None and _numeric_value(l2.value) is not None:
+        if _numeric_value(l2.value) < 60:
+            hints.append(
+                ProfileSummaryBottleneckHint(
+                    category="memory_l2_bound",
+                    severity="medium",
+                    confidence="low",
+                    message="Low L2 hit-rate counter suggests memory/L2 pressure.",
+                    source_metrics=[l2.name],
+                    evidence_artifacts=_metric_artifacts([l2]),
+                )
+            )
+    lds = by_name.get("ldsbankconflict")
+    if lds is not None and (_numeric_value(lds.value) or 0) > 0:
+        hints.append(
+            ProfileSummaryBottleneckHint(
+                category="lds_bound",
+                severity="low",
+                confidence="low",
+                message="LDS bank conflict counter is present and non-zero.",
+                source_metrics=[lds.name],
+                evidence_artifacts=_metric_artifacts([lds]),
+            )
+        )
+    valu = by_name.get("sqinstsvalu")
+    if valu is not None:
+        hints.append(
+            ProfileSummaryBottleneckHint(
+                category="compute_bound",
+                severity="low",
+                confidence="low",
+                message="VALU instruction counter is present without stronger memory or launch evidence.",
+                source_metrics=[valu.name],
+                evidence_artifacts=_metric_artifacts([valu]),
+            )
+        )
+    if hints:
+        return hints
+    return [
+        ProfileSummaryBottleneckHint(
+            category="unknown",
+            severity="unknown",
+            confidence="low",
+            message="Counter artifact was parsed, but no conservative bottleneck rule matched.",
+            source_metrics=[metric.name for metric in counter_metrics],
+            evidence_artifacts=_metric_artifacts(counter_metrics),
+        )
+    ]
+
+
+def _metric_artifacts(metrics: Sequence[ProfileSummaryKernelMetric]) -> list[str]:
+    artifacts = {metric.artifact for metric in metrics if metric.artifact is not None}
+    return sorted(artifacts)
+
+
+def _normalize_key(value: str | None) -> str:
+    return "".join(ch for ch in (value or "").lower() if ch.isalnum())
+
+
+def _first_text(row: dict[str, str], *keys: str) -> str | None:
+    for key in keys:
+        value = row.get(key)
+        if value:
+            return str(value).strip()
+    return None
+
+
+def _first_number(row: dict[str, str], *keys: str) -> int | float | None:
+    for key in keys:
+        value = row.get(key)
+        number = _coerce_scalar(value)
+        if isinstance(number, int | float):
+            return number
+    return None
+
+
+def _coerce_scalar(value: object) -> int | float | str | bool | None:
+    if isinstance(value, bool | int | float) or value is None:
+        return value
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip()
+    if not stripped:
+        return None
+    try:
+        integer = int(stripped)
+    except ValueError:
+        pass
+    else:
+        return integer
+    try:
+        return float(stripped)
+    except ValueError:
+        return stripped
+
+
+def _numeric_value(value: object) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int | float):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value)
+        except ValueError:
+            return None
+    return None
 
 
 def _compact_path(path: str | None) -> str | None:

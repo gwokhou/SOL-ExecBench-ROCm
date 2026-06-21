@@ -212,7 +212,7 @@ def test_profile_summary_builds_structured_metrics_and_hints_from_text_artifacts
         "profile.rocpd: rocpd artifacts are citation-only in profile_summary.sidecar.v1"
     ]
     assert all(
-        "rocpd" not in metric.get("artifact", "")
+        "rocpd" not in (metric.get("artifact") or "")
         for metric in [*summary["workload_metrics"], *summary["kernel_metrics"]]
     )
     assert payload["authority"]["diagnostic_only"] is True
