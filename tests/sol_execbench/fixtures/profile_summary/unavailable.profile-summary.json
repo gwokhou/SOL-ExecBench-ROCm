@@ -16,7 +16,7 @@
   },
   "identity": {
     "generated_at": "2026-06-16T00:00:00Z",
-    "run_id": null,
+    "run_id": "run-current",
     "sol_contract_version": "1.0",
     "trace_path": "trace.jsonl"
   },
@@ -31,15 +31,22 @@
   "status": "unavailable",
   "summary": {
     "artifact_count": 0,
+    "artifact_coverage_status": null,
     "artifact_kinds": {},
+    "bottleneck_hints": [],
     "command": [],
     "failed_reason": null,
+    "kernel_metrics": [],
     "metrics": [],
     "output_file": null,
+    "parse_warnings": [],
     "profiler_available": null,
     "profiler_status": null,
+    "reason_codes": [],
     "returncode": null,
     "skipped_reason": null,
-    "timeout_seconds": null
+    "timeout_seconds": null,
+    "warnings": [],
+    "workload_metrics": []
   }
 }

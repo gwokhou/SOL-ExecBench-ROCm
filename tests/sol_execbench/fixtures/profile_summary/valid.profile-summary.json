@@ -5,6 +5,7 @@
       "label": "canonical_trace_jsonl",
       "path": "trace.jsonl",
       "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "size_bytes": null,
       "status": null
     },
     {
@@ -12,13 +13,39 @@
       "label": "rocprofv3_profile_metadata",
       "path": "trace.jsonl.profile.json",
       "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "size_bytes": null,
       "status": null
+    },
+    {
+      "kind": "profiler_artifact",
+      "label": "trace_csv",
+      "path": "trace_kernel_trace.csv",
+      "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "size_bytes": 61,
+      "status": "success"
+    },
+    {
+      "kind": "profiler_artifact",
+      "label": "counter_csv",
+      "path": "trace_counters.csv",
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "size_bytes": 100,
+      "status": "success"
+    },
+    {
+      "kind": "profiler_artifact",
+      "label": "metadata_json",
+      "path": "trace_profile.json",
+      "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "size_bytes": 62,
+      "status": "success"
     },
     {
       "kind": "profiler_artifact",
       "label": "rocpd",
       "path": "trace.rocpd",
-      "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "size_bytes": 15,
       "status": "success"
     }
   ],
@@ -51,10 +78,52 @@
   "schema_version": "sol_execbench.profile_summary.v1",
   "status": "available",
   "summary": {
-    "artifact_count": 1,
+    "artifact_count": 4,
+    "artifact_coverage_status": "complete",
     "artifact_kinds": {
-      "rocpd": 1
+      "counter_csv": 1,
+      "metadata_json": 1,
+      "rocpd": 1,
+      "trace_csv": 1
     },
+    "bottleneck_hints": [
+      {
+        "category": "memory_l2_bound",
+        "confidence": "low",
+        "evidence_artifacts": [
+          "trace_counters.csv"
+        ],
+        "message": "Low L2 hit-rate counter suggests memory/L2 pressure.",
+        "severity": "medium",
+        "source_metrics": [
+          "L2_CACHE_HIT_RATE"
+        ]
+      },
+      {
+        "category": "lds_bound",
+        "confidence": "low",
+        "evidence_artifacts": [
+          "trace_counters.csv"
+        ],
+        "message": "LDS bank conflict counter is present and non-zero.",
+        "severity": "low",
+        "source_metrics": [
+          "LDS_BANK_CONFLICT"
+        ]
+      },
+      {
+        "category": "compute_bound",
+        "confidence": "low",
+        "evidence_artifacts": [
+          "trace_counters.csv"
+        ],
+        "message": "VALU instruction counter is present without stronger memory or launch evidence.",
+        "severity": "low",
+        "source_metrics": [
+          "SQ_INSTS_VALU"
+        ]
+      }
+    ],
     "command": [
       "rocprofv3",
       "--kernel-trace",
@@ -63,25 +132,90 @@
       "eval_driver.py"
     ],
     "failed_reason": null,
+    "kernel_metrics": [
+      {
+        "artifact": "trace_kernel_trace.csv",
+        "kernel_name": "main_kernel",
+        "name": "kernel_duration_ms",
+        "parse_status": "available",
+        "source": "trace_kernel_trace.csv",
+        "unit": "ms",
+        "value": 2.0
+      },
+      {
+        "artifact": "trace_counters.csv",
+        "kernel_name": "trace_counters",
+        "name": "SQ_INSTS_VALU",
+        "parse_status": "available",
+        "source": "trace_counters.csv",
+        "unit": "count",
+        "value": 120000
+      },
+      {
+        "artifact": "trace_counters.csv",
+        "kernel_name": "trace_counters",
+        "name": "L2_CACHE_HIT_RATE",
+        "parse_status": "available",
+        "source": "trace_counters.csv",
+        "unit": "percent",
+        "value": 42
+      },
+      {
+        "artifact": "trace_counters.csv",
+        "kernel_name": "trace_counters",
+        "name": "LDS_BANK_CONFLICT",
+        "parse_status": "available",
+        "source": "trace_counters.csv",
+        "unit": "count",
+        "value": 8
+      }
+    ],
     "metrics": [
       {
         "name": "artifact_count",
         "source": "rocprofv3_profile_metadata",
         "unit": "count",
-        "value": 1
+        "value": 4
       },
       {
         "name": "artifact_total_size_bytes",
         "source": "rocprofv3_profile_metadata",
         "unit": "bytes",
-        "value": 128
+        "value": 238
       }
     ],
     "output_file": "trace",
+    "parse_warnings": [
+      "trace.rocpd: rocpd artifacts are citation-only in profile_summary.sidecar.v1"
+    ],
     "profiler_available": true,
     "profiler_status": "success",
+    "reason_codes": [
+      "rocprof_artifacts_registered"
+    ],
     "returncode": 0,
     "skipped_reason": null,
-    "timeout_seconds": 60
+    "timeout_seconds": 60,
+    "warnings": [],
+    "workload_metrics": [
+      {
+        "artifact": null,
+        "name": "artifact_coverage_status",
+        "parse_status": "available",
+        "source": "rocprofv3_profile_metadata",
+        "unit": null,
+        "value": "complete",
+        "workload_id": "w0"
+      },
+      {
+        "artifact": "trace_profile.json",
+        "name": "kernel_dispatch_count",
+        "parse_status": "available",
+        "source": "trace_profile.json",
+        "unit": "count",
+        "value": 1,
+        "workload_id": "w0"
+      }
+    ]
   }
 }

@@ -4,7 +4,8 @@
       "kind": "trace",
       "label": "canonical_trace_jsonl",
       "path": "trace.jsonl",
-      "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "size_bytes": null,
       "status": null
     }
   ],
@@ -39,7 +40,18 @@
   "status": "partial",
   "summary": {
     "artifact_count": 0,
+    "artifact_coverage_status": "none",
     "artifact_kinds": {},
+    "bottleneck_hints": [
+      {
+        "category": "insufficient_counters",
+        "confidence": "high",
+        "evidence_artifacts": [],
+        "message": "No bounded counter artifact was available for bottleneck classification.",
+        "severity": "low",
+        "source_metrics": []
+      }
+    ],
     "command": [
       "rocprofv3",
       "--kernel-trace",
@@ -48,6 +60,7 @@
       "eval_driver.py"
     ],
     "failed_reason": "rocprofv3 command failed with exit code 1",
+    "kernel_metrics": [],
     "metrics": [
       {
         "name": "artifact_count",
@@ -63,10 +76,26 @@
       }
     ],
     "output_file": "trace",
+    "parse_warnings": [],
     "profiler_available": true,
     "profiler_status": "failed",
+    "reason_codes": [
+      "rocprof_command_failed"
+    ],
     "returncode": 1,
     "skipped_reason": null,
-    "timeout_seconds": 60
+    "timeout_seconds": 60,
+    "warnings": [],
+    "workload_metrics": [
+      {
+        "artifact": null,
+        "name": "artifact_coverage_status",
+        "parse_status": "available",
+        "source": "rocprofv3_profile_metadata",
+        "unit": null,
+        "value": "none",
+        "workload_id": null
+      }
+    ]
   }
 }
