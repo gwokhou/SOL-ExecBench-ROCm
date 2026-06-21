@@ -2,9 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.38
 milestone_name: Upgrade SOL Evidence Contract for Confirmed Benchmark Claims
-status: planning
-last_updated: "2026-06-21T08:19:01.776Z"
-last_activity: 2026-06-21
+status: Defining requirements
+stopped_at: Phase 190 context gathered
+last_updated: "2026-06-21T08:34:55.916Z"
+last_activity: 2026-06-21 — Milestone v1.38 started
 progress:
   total_phases: 5
   completed_phases: 0
@@ -146,9 +147,9 @@ Items acknowledged and deferred at prior milestone closes:
 
 ## Session Continuity
 
-Last session: 2026-06-16T03:17:09Z
-Stopped at: v1.37 milestone planning complete
-Resume file: None
+Last session: 2026-06-21T08:34:55.913Z
+Stopped at: Phase 190 context gathered
+Resume file: .planning/phases/190-profiler-artifact-registration-closure/190-CONTEXT.md
 
 ## Operator Next Steps
 
