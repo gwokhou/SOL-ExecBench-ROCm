@@ -261,13 +261,122 @@ def test_profile_collection_no_artifacts_records_stable_reason_code(tmp_path):
     result = collect_rocprofv3_profile(request, runner=runner)
     payload = result.to_dict()
 
-    assert result.status == "failed"
+    assert result.status == "partial"
     assert result.succeeded is False
     assert (
-        payload["failed_reason"] == "rocprofv3 completed without registered artifacts"
+        payload["failed_reason"]
+        == "rocprofv3 completed without profiler data artifacts; diagnostic log artifact registered"
     )
-    assert payload["artifact_coverage_status"] == "none"
-    assert payload["reason_codes"] == ["rocprof_no_registered_artifacts"]
+    assert payload["artifact_coverage_status"] == "diagnostic_logs_only"
+    assert payload["output_format"] == "rocpd"
+    assert payload["profiler_data_artifacts"] is False
+    assert payload["output_directory_listing"] == [
+        f"profile.diagnostics.json:{(tmp_path / 'profile.diagnostics.json').stat().st_size}"
+    ]
+    assert "rocprof_no_registered_artifacts" in payload["reason_codes"]
+
+
+def test_profile_collection_no_profiler_data_registers_diagnostic_log(tmp_path):
+    def runner(
+        command: Sequence[str],
+        cwd,
+        timeout,
+    ) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            args=list(command),
+            returncode=0,
+            stdout='{"definition": "demo"}\n',
+            stderr="rocprof output generation without files",
+        )
+
+    request = Rocprofv3ProfileRequest(
+        application_command=("python", "eval_driver.py"),
+        output_directory=tmp_path,
+        output_file="profile",
+        working_directory=tmp_path,
+        timeout_seconds=30,
+    )
+
+    result = collect_rocprofv3_profile(request, runner=runner)
+    payload = result.to_dict()
+
+    assert result.status == "partial"
+    assert result.succeeded is False
+    assert payload["artifact_coverage_status"] == "diagnostic_logs_only"
+    assert payload["output_format"] == "rocpd"
+    assert payload["profiler_data_artifacts"] is False
+    assert payload["reason_codes"] == [
+        "rocprof_no_registered_artifacts",
+        "rocprof_diagnostic_log_registered",
+    ]
+    assert payload["warnings"] == [
+        "rocprofv3 returned success but produced no profiler data artifacts"
+    ]
+    assert payload["artifacts"] == [
+        {
+            "kind": "diagnostic_json",
+            "path": str(tmp_path / "profile.diagnostics.json"),
+            "size_bytes": (tmp_path / "profile.diagnostics.json").stat().st_size,
+        }
+    ]
+    diagnostic_payload = (tmp_path / "profile.diagnostics.json").read_text(
+        encoding="utf-8"
+    )
+    assert "rocprof output generation without files" in diagnostic_payload
+    assert '"output_format": "rocpd"' in diagnostic_payload
+    assert payload["output_directory_listing"] == [
+        f"profile.diagnostics.json:{(tmp_path / 'profile.diagnostics.json').stat().st_size}"
+    ]
+
+
+def test_profile_collection_existing_diagnostic_log_does_not_count_as_success(
+    tmp_path,
+):
+    diagnostic = tmp_path / "profile.diagnostics.json"
+    diagnostic.write_text('{"status":"no_profiler_data_artifacts"}\n')
+
+    def runner(
+        command: Sequence[str],
+        cwd,
+        timeout,
+    ) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            args=list(command),
+            returncode=0,
+            stdout='{"definition": "demo"}\n',
+            stderr="rocprof initialized but generated no data files",
+        )
+
+    request = Rocprofv3ProfileRequest(
+        application_command=("python", "eval_driver.py"),
+        output_directory=tmp_path,
+        output_file="profile",
+    )
+
+    result = collect_rocprofv3_profile(request, runner=runner)
+    payload = result.to_dict()
+
+    assert result.status == "partial"
+    assert result.succeeded is False
+    assert payload["artifact_coverage_status"] == "diagnostic_logs_only"
+    assert payload["failed_reason"] == (
+        "rocprofv3 completed without profiler data artifacts; "
+        "diagnostic log artifact registered"
+    )
+    assert payload["reason_codes"] == [
+        "rocprof_no_registered_artifacts",
+        "rocprof_diagnostic_log_registered",
+    ]
+    assert payload["warnings"] == [
+        "rocprofv3 returned success but produced no profiler data artifacts"
+    ]
+    assert payload["artifacts"] == [
+        {
+            "kind": "diagnostic_json",
+            "path": str(diagnostic),
+            "size_bytes": diagnostic.stat().st_size,
+        }
+    ]
 
 
 def test_parse_rocprofv3_csv_keeps_domains_separate():
@@ -648,3 +757,42 @@ def test_source_collection_routes_pytorch_to_explicit_fallback(tmp_path):
     assert result.evidence is None
     assert result.selection.fallback_applied is True
     assert result.selection.policy.backend == TimingBackend.DEVICE_EVENTS
+
+
+def test_discover_with_empty_output_file_does_not_register_every_file(tmp_path):
+    # An empty output_file must not make startswith("") match every file.
+    (tmp_path / "unrelated.csv").write_text("a,b\n1,2\n")
+    (tmp_path / "notes.txt").write_text("notes")
+    (tmp_path / "metadata.json").write_text("{}")
+
+    artifacts = discover_rocprofv3_artifacts(tmp_path, "")
+
+    # None of these live under a known profiler output subdir, so none register.
+    assert [a.path.name for a in artifacts] == []
+
+
+def test_profile_collection_timeout_keeps_partial_artifacts_and_reasons(tmp_path):
+    def runner(command, cwd, timeout):
+        # rocprofv3 flushed a counter CSV before being killed on timeout.
+        (tmp_path / "profile_counters.csv").write_text(
+            "Metric,Value,Unit\nSQ_INSTS_VALU,1,count\n"
+        )
+        raise subprocess.TimeoutExpired(cmd=list(command), timeout=timeout or 0)
+
+    request = Rocprofv3ProfileRequest(
+        application_command=("python", "eval_driver.py"),
+        output_directory=tmp_path,
+        output_file="profile",
+        timeout_seconds=5,
+    )
+
+    result = collect_rocprofv3_profile(request, runner=runner)
+    payload = result.to_dict()
+
+    assert result.status == "failed"
+    assert "rocprof_command_timeout" in payload["reason_codes"]
+    assert "rocprof_command_failed" not in payload["reason_codes"]
+    # The partial artifact flushed before the kill is retained, not lost.
+    assert payload["artifact_coverage_status"] == "partial"
+    assert payload["profiler_data_artifacts"] is True
+    assert any(a["kind"] == "counter_csv" for a in payload["artifacts"])

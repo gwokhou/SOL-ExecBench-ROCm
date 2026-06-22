@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 from collections.abc import Sequence
 from enum import Enum
 from pathlib import Path
@@ -14,7 +15,10 @@ from typing import Literal
 
 from pydantic import ConfigDict, Field
 
-from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileResult
+from sol_execbench.core.bench.rocm_profiler import (
+    Rocprofv3ProfileResult,
+    _NON_DATA_ARTIFACT_KINDS,
+)
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 from sol_execbench.core.data.contract import SOL_EXECBENCH_CONTRACT_VERSION
 from sol_execbench.core.dataset.checksums import sha256_file
@@ -427,10 +431,15 @@ def _status_for_profile_result(
 ) -> ProfileSummaryStatus:
     if profile_result is None:
         return ProfileSummaryStatus.UNAVAILABLE
-    if profile_result.status == "success" and profile_result.artifacts:
+    has_profiler_data_artifact = any(
+        artifact.kind not in _NON_DATA_ARTIFACT_KINDS
+        for artifact in profile_result.artifacts
+    )
+    if profile_result.status == "success" and has_profiler_data_artifact:
         return ProfileSummaryStatus.AVAILABLE
-    if profile_result.status == "success":
-        # Succeeded but registered no artifacts: partial diagnostics, not missing.
+    if profile_result.status in {"success", "partial"}:
+        # Successful process execution without profiler data is partial diagnostics,
+        # not missing and not full profile availability.
         return ProfileSummaryStatus.PARTIAL
     if profile_result.status in {"failed", "unavailable"}:
         return ProfileSummaryStatus.PARTIAL
@@ -507,8 +516,22 @@ def _limitations(profile_result: Rocprofv3ProfileResult | None) -> list[str]:
         limitations.append("No rocprofv3 profile result was supplied.")
     elif profile_result.status != "success":
         limitations.append(f"rocprofv3 profile status is {profile_result.status}.")
-    elif not profile_result.artifacts:
-        limitations.append("rocprofv3 profile completed without registered artifacts.")
+        if profile_result.artifact_coverage_status == "diagnostic_logs_only":
+            limitations.append(
+                "rocprofv3 produced diagnostic logs but no profiler data artifacts."
+            )
+    elif not any(
+        artifact.kind not in _NON_DATA_ARTIFACT_KINDS
+        for artifact in profile_result.artifacts
+    ):
+        if profile_result.artifact_coverage_status == "diagnostic_logs_only":
+            limitations.append(
+                "rocprofv3 produced diagnostic logs but no profiler data artifacts."
+            )
+        else:
+            limitations.append(
+                "rocprofv3 profile completed without profiler data artifacts."
+            )
     return limitations
 
 
@@ -558,7 +581,12 @@ def _structured_profile_evidence(
             )
             workload_metrics.extend(parsed_metrics)
             parse_warnings.extend(warnings)
-        elif artifact.kind in {"rocpd", "perfetto_trace", "otf2_trace"}:
+        elif artifact.kind in {
+            "diagnostic_json",
+            "rocpd",
+            "perfetto_trace",
+            "otf2_trace",
+        }:
             parse_warnings.append(
                 f"{artifact.path.name}: {artifact.kind} artifacts are citation-only in profile_summary.sidecar.v1"
             )
@@ -643,9 +671,7 @@ def _parse_counter_csv_artifact(
         if name is None or value is None:
             continue
         unit = _first_text(normalized, "unit", "units")
-        kernel_name = _first_text(normalized, "kernel", "kernelname") or (
-            path.stem if path.stem != "profile_counters" else "profile_counters"
-        )
+        kernel_name = _first_text(normalized, "kernel", "kernelname") or path.stem
         metrics.append(
             ProfileSummaryKernelMetric(
                 kernel_name=kernel_name,
@@ -711,7 +737,13 @@ def _parse_limited_csv(path: Path) -> tuple[list[dict[str, str]], list[str]]:
             rows: list[dict[str, str]] = []
             for index, row in enumerate(reader):
                 if index >= _PROFILE_SUMMARY_MAX_ROWS:
-                    return rows, [f"{path.name}: CSV row limit reached"]
+                    return rows, [
+                        (
+                            f"{path.name}: CSV row limit reached; metrics are "
+                            f"derived from the first {_PROFILE_SUMMARY_MAX_ROWS} "
+                            f"rows only and may be incomplete"
+                        )
+                    ]
                 rows.append({key or "": value for key, value in row.items()})
             return rows, []
     except (OSError, UnicodeDecodeError, csv.Error) as exc:
@@ -745,44 +777,48 @@ def _derive_bottleneck_hints(
             )
         ]
 
-    by_name = {_normalize_key(metric.name): metric for metric in counter_metrics}
+    by_name: dict[str, list[ProfileSummaryKernelMetric]] = {}
+    for metric in counter_metrics:
+        by_name.setdefault(_normalize_key(metric.name), []).append(metric)
     hints: list[ProfileSummaryBottleneckHint] = []
-    l2 = by_name.get("l2cachehitrate")
-    if l2 is not None:
-        l2_value = _numeric_value(l2.value)
-        if l2_value is not None and l2_value < 60:
+    l2_metrics = by_name.get("l2cachehitrate", [])
+    if l2_metrics:
+        low_l2 = [metric for metric in l2_metrics if _is_low_l2_hit_rate(metric)]
+        if low_l2:
             hints.append(
                 ProfileSummaryBottleneckHint(
                     category="memory_l2_bound",
                     severity="medium",
                     confidence="low",
                     message="Low L2 hit-rate counter suggests memory/L2 pressure.",
-                    source_metrics=[l2.name],
-                    evidence_artifacts=_metric_artifacts([l2]),
+                    source_metrics=[metric.name for metric in low_l2],
+                    evidence_artifacts=_metric_artifacts(low_l2),
                 )
             )
-    lds = by_name.get("ldsbankconflict")
-    if lds is not None and (_numeric_value(lds.value) or 0) > 0:
+    lds_metrics = by_name.get("ldsbankconflict", [])
+    if lds_metrics and any(
+        (_numeric_value(metric.value) or 0) > 0 for metric in lds_metrics
+    ):
         hints.append(
             ProfileSummaryBottleneckHint(
                 category="lds_bound",
                 severity="low",
                 confidence="low",
                 message="LDS bank conflict counter is present and non-zero.",
-                source_metrics=[lds.name],
-                evidence_artifacts=_metric_artifacts([lds]),
+                source_metrics=[metric.name for metric in lds_metrics],
+                evidence_artifacts=_metric_artifacts(lds_metrics),
             )
         )
-    valu = by_name.get("sqinstsvalu")
-    if valu is not None:
+    valu_metrics = by_name.get("sqinstsvalu", [])
+    if valu_metrics:
         hints.append(
             ProfileSummaryBottleneckHint(
                 category="compute_bound",
                 severity="low",
                 confidence="low",
                 message="VALU instruction counter is present without stronger memory or launch evidence.",
-                source_metrics=[valu.name],
-                evidence_artifacts=_metric_artifacts([valu]),
+                source_metrics=[metric.name for metric in valu_metrics],
+                evidence_artifacts=_metric_artifacts(valu_metrics),
             )
         )
     if hints:
@@ -797,6 +833,24 @@ def _derive_bottleneck_hints(
             evidence_artifacts=_metric_artifacts(counter_metrics),
         )
     ]
+
+
+def _is_low_l2_hit_rate(metric: ProfileSummaryKernelMetric) -> bool:
+    """Conservatively flag a low L2 hit rate, normalizing percent vs fraction units.
+
+    rocprof can report L2_CACHE_HIT_RATE as a percent (0-100) or a fraction (0-1);
+    a fixed ``< 60`` threshold would flag every fraction value. The unit hint
+    selects the threshold, falling back to the value's magnitude.
+    """
+    value = _numeric_value(metric.value)
+    if value is None:
+        return False
+    unit = _normalize_key(metric.unit)
+    if unit in {"fraction", "ratio"}:
+        return value < 0.6
+    if unit in {"percent", "pct"}:
+        return value < 60.0
+    return value < 0.6 if value <= 1.0 else value < 60.0
 
 
 def _metric_artifacts(metrics: Sequence[ProfileSummaryKernelMetric]) -> list[str]:
@@ -825,9 +879,14 @@ def _first_number(row: dict[str, str], *keys: str) -> int | float | None:
     return None
 
 
-def _coerce_scalar(value: object) -> int | float | str | bool | None:
-    if isinstance(value, bool | int | float) or value is None:
-        return value
+def _coerce_scalar(value: object) -> int | float | str | None:
+    # bool is intentionally rejected: Python bool is an int subclass, but a JSON
+    # `true` / CSV "true" is not a numeric metric value. Non-finite floats
+    # (NaN/Inf) are also rejected so they never reach the sidecar JSON.
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, int | float):
+        return value if math.isfinite(value) else None
     if not isinstance(value, str):
         return None
     stripped = value.strip()
@@ -840,21 +899,24 @@ def _coerce_scalar(value: object) -> int | float | str | bool | None:
     else:
         return integer
     try:
-        return float(stripped)
+        number = float(stripped)
     except ValueError:
         return stripped
+    return number if math.isfinite(number) else None
 
 
 def _numeric_value(value: object) -> float | None:
     if isinstance(value, bool):
         return None
     if isinstance(value, int | float):
-        return float(value)
+        number = float(value)
+        return number if math.isfinite(number) else None
     if isinstance(value, str):
         try:
-            return float(value)
+            number = float(value)
         except ValueError:
             return None
+        return number if math.isfinite(number) else None
     return None
 
 

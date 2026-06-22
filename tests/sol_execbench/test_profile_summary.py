@@ -220,6 +220,75 @@ def test_profile_summary_builds_structured_metrics_and_hints_from_text_artifacts
     assert payload["authority"]["cutover_authority"] is False
 
 
+def test_profile_summary_l2_hit_rate_fraction_is_not_misflagged(tmp_path: Path):
+    counter_csv = tmp_path / "profile_counters.csv"
+    counter_csv.write_text(
+        "Metric,Value,Unit\nSQ_INSTS_VALU,100,count\nL2_CACHE_HIT_RATE,0.95,ratio\n"
+    )
+    profile = Rocprofv3ProfileResult(
+        status="success",
+        command=("rocprofv3", "--kernel-trace", "--", "python", "eval_driver.py"),
+        output_directory=tmp_path,
+        output_file="profile",
+        artifacts=(
+            Rocprofv3ProfileArtifact(
+                path=counter_csv,
+                kind="counter_csv",
+                size_bytes=counter_csv.stat().st_size,
+            ),
+        ),
+        returncode=0,
+        profiler_available=True,
+        artifact_coverage_status="complete",
+        reason_codes=("rocprof_artifacts_registered",),
+    )
+
+    hints = build_profile_summary_sidecar(profile_result=profile).model_dump(
+        mode="json"
+    )["summary"]["bottleneck_hints"]
+    categories = {hint["category"] for hint in hints}
+
+    # 0.95 is a high fraction hit rate -> must NOT be flagged memory-bound.
+    assert "memory_l2_bound" not in categories
+    assert "compute_bound" in categories
+
+
+def test_profile_summary_metadata_rejects_bool_and_nan_dispatch_count(
+    tmp_path: Path,
+):
+    metadata = tmp_path / "profile.json"
+    metadata.write_text('{"kernel_dispatches": true, "dispatch_count": "nan"}\n')
+    profile = Rocprofv3ProfileResult(
+        status="success",
+        command=("rocprofv3", "--kernel-trace", "--", "python", "eval_driver.py"),
+        output_directory=tmp_path,
+        output_file="profile",
+        artifacts=(
+            Rocprofv3ProfileArtifact(
+                path=metadata,
+                kind="metadata_json",
+                size_bytes=metadata.stat().st_size,
+            ),
+        ),
+        returncode=0,
+        profiler_available=True,
+        artifact_coverage_status="complete",
+        reason_codes=("rocprof_artifacts_registered",),
+    )
+
+    summary = build_profile_summary_sidecar(profile_result=profile).model_dump(
+        mode="json"
+    )["summary"]
+
+    # bool true and "nan" string are both rejected -> no dispatch metric emitted.
+    dispatch_metrics = [
+        metric
+        for metric in summary["workload_metrics"]
+        if metric["name"] == "kernel_dispatch_count"
+    ]
+    assert dispatch_metrics == []
+
+
 def test_profile_summary_reports_insufficient_counters_without_speculation(
     tmp_path: Path,
 ):
@@ -281,18 +350,32 @@ def test_profile_summary_sidecar_handles_unavailable_inputs(tmp_path: Path):
     assert failed.summary.reason_codes == ["rocprof_command_failed"]
 
 
-def test_profile_summary_success_without_artifacts_is_partial(tmp_path: Path):
+def test_profile_summary_diagnostic_log_only_profile_is_partial(tmp_path: Path):
+    diagnostic = tmp_path / "profile.diagnostics.json"
+    diagnostic.write_text('{"status":"no_profiler_data_artifacts"}\n')
     success_empty = Rocprofv3ProfileResult(
-        status="success",
+        status="partial",
         command=("rocprofv3", "--kernel-trace", "--", "python", "eval_driver.py"),
         output_directory=tmp_path,
         output_file="profile",
-        artifacts=(),
+        artifacts=(
+            Rocprofv3ProfileArtifact(
+                path=diagnostic,
+                kind="diagnostic_json",
+                size_bytes=diagnostic.stat().st_size,
+            ),
+        ),
         returncode=0,
         profiler_available=True,
         timeout_seconds=60,
-        artifact_coverage_status="none",
-        reason_codes=("rocprof_no_registered_artifacts",),
+        artifact_coverage_status="diagnostic_logs_only",
+        reason_codes=(
+            "rocprof_no_registered_artifacts",
+            "rocprof_diagnostic_log_registered",
+        ),
+        warnings=(
+            "rocprofv3 returned success but produced no profiler data artifacts",
+        ),
     )
 
     sidecar = build_profile_summary_sidecar(
@@ -304,12 +387,59 @@ def test_profile_summary_success_without_artifacts_is_partial(tmp_path: Path):
 
     assert payload["status"] == "partial"
     assert payload["reason_code"] == "profile_partial"
-    assert payload["summary"]["profiler_status"] == "success"
-    assert payload["summary"]["artifact_coverage_status"] == "none"
-    assert payload["summary"]["reason_codes"] == ["rocprof_no_registered_artifacts"]
-    assert payload["summary"]["artifact_count"] == 0
+    assert payload["summary"]["profiler_status"] == "partial"
+    assert payload["summary"]["artifact_coverage_status"] == "diagnostic_logs_only"
+    assert payload["summary"]["reason_codes"] == [
+        "rocprof_no_registered_artifacts",
+        "rocprof_diagnostic_log_registered",
+    ]
+    assert payload["summary"]["artifact_count"] == 1
+    assert payload["summary"]["artifact_kinds"] == {"diagnostic_json": 1}
+    assert payload["summary"]["parse_warnings"] == [
+        "profile.diagnostics.json: diagnostic_json artifacts are citation-only in profile_summary.sidecar.v1"
+    ]
     assert any(
-        "without registered artifacts" in limitation
+        "diagnostic logs but no profiler data artifacts" in limitation
+        for limitation in payload["limitations"]
+    )
+
+
+def test_profile_summary_success_with_only_diagnostic_json_is_partial(
+    tmp_path: Path,
+):
+    diagnostic = tmp_path / "profile.diagnostics.json"
+    diagnostic.write_text('{"status":"no_profiler_data_artifacts"}\n')
+    profile = Rocprofv3ProfileResult(
+        status="success",
+        command=("rocprofv3", "--kernel-trace", "--", "python", "eval_driver.py"),
+        output_directory=tmp_path,
+        output_file="profile",
+        artifacts=(
+            Rocprofv3ProfileArtifact(
+                path=diagnostic,
+                kind="diagnostic_json",
+                size_bytes=diagnostic.stat().st_size,
+            ),
+        ),
+        returncode=0,
+        profiler_available=True,
+        artifact_coverage_status="diagnostic_logs_only",
+        reason_codes=(
+            "rocprof_no_registered_artifacts",
+            "rocprof_diagnostic_log_registered",
+        ),
+    )
+
+    sidecar = build_profile_summary_sidecar(profile_result=profile)
+    payload = sidecar.model_dump(mode="json")
+
+    assert payload["status"] == "partial"
+    assert payload["reason_code"] == "profile_partial"
+    assert payload["summary"]["profiler_status"] == "success"
+    assert payload["summary"]["artifact_coverage_status"] == "diagnostic_logs_only"
+    assert payload["summary"]["artifact_kinds"] == {"diagnostic_json": 1}
+    assert any(
+        "diagnostic logs but no profiler data artifacts" in limitation
         for limitation in payload["limitations"]
     )
 

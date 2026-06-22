@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import math
 import statistics
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
@@ -105,7 +106,11 @@ class OfficialScoreSuiteEvidence:
     @property
     def mean_score(self) -> float | None:
         """Mean score across workloads with official score authority."""
-        values = [score.score for score in self.scores if score.score_authority]
+        values = [
+            score.score
+            for score in self.scores
+            if score.score_authority and score.score is not None
+        ]
         return statistics.mean(values) if values else None
 
     @property
@@ -187,7 +192,8 @@ def official_score_from_amd_native_score(
         measured_latency_ms=score.measured_latency_ms,
         official_baseline_latency_ms=(
             score.baseline_latency_ms
-            if score.baseline_source in set(official_baseline_sources)
+            if MISSING_BASELINE_BLOCKER not in blockers
+            and PLACEHOLDER_BASELINE_BLOCKER not in blockers
             else None
         ),
         sol_bound_ms=score.sol_bound_ms,
@@ -234,11 +240,11 @@ def _official_score_blockers(
     blockers: list[str] = []
     if aggregation_policy is None:
         blockers.append(MISSING_AGGREGATION_POLICY_BLOCKER)
-    if score.score is None:
+    if score.score is None or not math.isfinite(score.score):
         blockers.append(MISSING_SCORE_BLOCKER)
-    if score.measured_latency_ms is None or score.measured_latency_ms <= 0.0:
+    if not _is_positive_finite(score.measured_latency_ms):
         blockers.append(MISSING_MEASURED_LATENCY_BLOCKER)
-    if score.sol_bound_ms is None or score.sol_bound_ms <= 0.0:
+    if not _is_positive_finite(score.sol_bound_ms):
         blockers.append(MISSING_SOL_BOUND_BLOCKER)
 
     baseline_source = score.baseline_source
@@ -246,10 +252,19 @@ def _official_score_blockers(
         blockers.append(PLACEHOLDER_BASELINE_BLOCKER)
     elif baseline_source not in set(official_baseline_sources):
         blockers.append(MISSING_BASELINE_BLOCKER)
-    elif score.baseline_latency_ms is None or score.baseline_latency_ms <= 0.0:
+    elif not _is_positive_finite(score.baseline_latency_ms):
         blockers.append(MISSING_BASELINE_BLOCKER)
 
     return _unique(blockers)
+
+
+def _is_positive_finite(value: float | None) -> bool:
+    """True only for a real, strictly positive number; rejects None/NaN/Inf/<=0.
+
+    A ``value <= 0.0`` check alone treats NaN as valid because ``NaN <= 0.0`` is
+    False, letting degenerate latencies through to the score and the mean.
+    """
+    return value is not None and math.isfinite(value) and value > 0.0
 
 
 def _normalize_policy(aggregation_policy: str | None) -> str | None:
@@ -260,10 +275,4 @@ def _normalize_policy(aggregation_policy: str | None) -> str | None:
 
 
 def _unique(values: list[str]) -> list[str]:
-    seen: set[str] = set()
-    unique: list[str] = []
-    for value in values:
-        if value not in seen:
-            seen.add(value)
-            unique.append(value)
-    return unique
+    return list(dict.fromkeys(values))
