@@ -68,6 +68,18 @@ of reference latency to candidate latency. It is not an official benchmark
 score and must not be substituted for `official_score_evidence.v1` score
 fields.
 
+> **Integration status (staging).** The gating logic and data models
+> (`sol_execbench.official_score_evidence.v1`) are delivered in
+> `src/sol_execbench/core/scoring/official_score.py` and re-exported from the
+> scoring package, but **no run path emits this artifact yet** — no CLI command,
+> runner, or sidecar writer invokes the gate. The `official_score_evidence.v1`
+> capability token is advertised as a future surface; downstream consumers must
+> treat it as absent today. Wiring requires an explicit score aggregation policy
+> (not yet a concept on `AmdNativeSuiteReport`) and baseline-source
+> classification coverage guarded by tests. Until then, AMD-native score reports
+> (`sol_execbench.amd_native_score.v1`) remain the only emitted score-adjacent
+> surface.
+
 ## Feedback Sidecars
 
 `agent_feedback.sidecar.v1`, `profile_summary.sidecar.v1`, and the current
