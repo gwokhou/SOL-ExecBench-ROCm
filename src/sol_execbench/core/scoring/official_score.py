@@ -1,7 +1,24 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""Official benchmark score evidence gates."""
+"""Official benchmark score evidence gates (STAGING).
+
+The gating logic and data models here are delivered but NOT yet wired into any
+run path: no CLI command, runner, or sidecar writer invokes
+``build_official_score_suite_evidence`` / ``official_score_from_amd_native_score``,
+so no ``official_score_evidence.v1`` artifact is emitted today. The public API is
+re-exported from :mod:`sol_execbench.core.scoring` as a preview and may change
+before integration.
+
+Wiring this in requires two unresolved decisions: (1) a score aggregation policy
+must be supplied (it is required by the gate but is not yet a concept on
+``AmdNativeSuiteReport``), and (2) ``_PLACEHOLDER_BASELINE_SOURCES`` /
+``DEFAULT_OFFICIAL_BASELINE_SOURCES`` must cover every ``baseline_source`` value
+produced by :mod:`sol_execbench.core.scoring.amd_score` (guarded by
+``test_official_score_baseline_source_sets_cover_amd_score_universe``). Until
+then, AMD-native score reports (``sol_execbench.amd_native_score.v1``) remain the
+only emitted score-adjacent surface.
+"""
 
 from __future__ import annotations
 

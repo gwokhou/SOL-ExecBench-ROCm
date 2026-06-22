@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import ast
+import inspect
+
+from sol_execbench.core.scoring import amd_score
 from sol_execbench.core.scoring.amd_score import (
     AMD_SCORE_CLAIM_LEVEL,
     AmdNativeScore,
 )
 from sol_execbench.core.scoring.official_score import (
+    DEFAULT_OFFICIAL_BASELINE_SOURCES,
     MISSING_AGGREGATION_POLICY_BLOCKER,
     MISSING_BASELINE_BLOCKER,
     MISSING_MEASURED_LATENCY_BLOCKER,
@@ -14,6 +19,7 @@ from sol_execbench.core.scoring.official_score import (
     OFFICIAL_SCORE_SCHEMA_VERSION,
     OFFICIAL_SCORE_SOURCE,
     PLACEHOLDER_BASELINE_BLOCKER,
+    _PLACEHOLDER_BASELINE_SOURCES,
     build_official_score_suite_evidence,
     official_score_from_amd_native_score,
 )
@@ -167,3 +173,47 @@ def test_official_baseline_latency_ms_is_none_when_baseline_blocked():
     assert MISSING_BASELINE_BLOCKER in evidence.blocker_reason_codes
     assert evidence.official_baseline_latency_ms is None
     assert evidence.to_dict()["official_baseline_latency_ms"] is None
+
+
+def test_official_score_baseline_source_sets_cover_amd_score_universe():
+    """Guard against staging bit-rot.
+
+    official_score is not yet wired into any run, so its baseline-source
+    classification sets can silently drift from what amd_score produces. Every
+    string-literal ``baseline_source`` value assigned inside amd_score must be
+    acknowledged here (as an official source, a placeholder source, or the
+    explicit "missing" sentinel) -- otherwise wiring the gate later would
+    silently mis-block or mis-label valid scores.
+    """
+    produced: set[str] = set()
+    tree = ast.parse(inspect.getsource(amd_score))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if (
+                    isinstance(target, ast.Name)
+                    and target.id == "baseline_source"
+                    and isinstance(node.value, ast.Constant)
+                    and isinstance(node.value.value, str)
+                ):
+                    produced.add(node.value.value)
+        elif isinstance(node, ast.keyword):
+            if (
+                node.arg == "baseline_source"
+                and isinstance(node.value, ast.Constant)
+                and isinstance(node.value.value, str)
+            ):
+                produced.add(node.value.value)
+
+    acknowledged = (
+        set(DEFAULT_OFFICIAL_BASELINE_SOURCES)
+        | set(_PLACEHOLDER_BASELINE_SOURCES)
+        | {"missing"}
+    )
+    unacknowledged = produced - acknowledged
+    assert not unacknowledged, (
+        "amd_score produces baseline_source values not classified by "
+        f"official_score: {sorted(unacknowledged)}. Add each to "
+        "DEFAULT_OFFICIAL_BASELINE_SOURCES (official) or "
+        "_PLACEHOLDER_BASELINE_SOURCES (placeholder) in official_score.py."
+    )
