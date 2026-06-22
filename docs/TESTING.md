@@ -1,18 +1,18 @@
 <!-- generated-by: gsd-doc-writer -->
 # Testing
 
-Pytest is the project test framework. `pyproject.toml` configures
-`pytest-xdist` with `-n 8 --dist loadgroup`, so full-suite runs execute in
-parallel by default.
+Pytest is the project test framework. `pyproject.toml` configures pytest,
+pytest-xdist defaults, and base marker declarations; `tests/conftest.py`
+registers additional hardware markers and skip behavior. Full-suite runs use
+`-n 8 --dist loadgroup` by default.
 
 ## Test Framework and Setup
 
-The development dependency group declares `pytest>=9.0.2`
-and `pytest-xdist>=3.5` for parallel execution. `pyproject.toml`
-sets the default pytest options to `-n 8 --dist loadgroup` (capped at 8
-workers to stay within memory budget since each worker loads
-PyTorch+ROCm), so tests run across 8 workers unless a command overrides
-xdist with `-n 0`.
+The development dependency group declares `pytest>=9.0.2` and
+`pytest-xdist>=3.5` for parallel execution. `pyproject.toml` sets the default
+pytest options to `-n 8 --dist loadgroup` (capped at 8 workers to stay within
+memory budget since each worker loads PyTorch+ROCm), so tests run across 8
+workers unless a command overrides xdist with `-n 0`.
 
 Install development dependencies:
 
@@ -20,7 +20,8 @@ Install development dependencies:
 uv sync --all-groups
 ```
 
-The development group includes `pytest`, `pytest-xdist`, `ruff`, and `ty`.
+The development group includes `pre-commit`, `pytest`, `pytest-xdist`, `ruff`,
+and `ty`.
 
 ## Running Tests
 
@@ -95,8 +96,8 @@ uv run pytest \
 
 ## Markers
 
-Core markers are registered in `pyproject.toml`; environment-sensitive skip
-logic and additional markers are registered in `tests/conftest.py`.
+Base markers are declared in `pyproject.toml`; environment-sensitive skip logic
+and additional marker registrations are implemented in `tests/conftest.py`.
 
 | Marker | Meaning |
 | --- | --- |
@@ -362,9 +363,9 @@ readiness.
 
 | Target id | Local image tag | Requested ROCm user-space | Evidence summary |
 | --- | --- | --- | --- |
-| `rocm-7.0.2-ubuntu-24.04-container` | `sol-execbench:rocm-7.0.2-complete` | 7.0.2 | `linear_backward` passed 3/3 workloads with `--record-container-validation`; trace `rocm-7.0.2-linear-wrapper-official.jsonl` and sidecar `rocm-7.0.2-linear-wrapper-official.compatibility.json` record container_validated evidence, but `CLOCKS_LOCKED=0` leaves performance unlocked. |
+| `rocm-7.0.2-ubuntu-24.04-container` | `sol-execbench:rocm-7.0.2-complete` | 7.0.2 | `linear_backward` passed 3/3 workloads with `--record-container-validation`; generated trace and compatibility sidecar artifacts record container_validated evidence, but `CLOCKS_LOCKED=0` leaves performance unlocked. |
 | `rocm-7.1.1-ubuntu-24.04-container` | `sol-execbench:rocm-7.1.1-complete` | 7.1.1 | Default target with project-default target-specific PyTorch ROCm dependencies and `CLOCKS_LOCKED=1` when the recorded container-validation path succeeds. |
-| `rocm-7.2.0-ubuntu-24.04-container` | `sol-execbench:rocm-7.2-complete` | 7.2.0 | `linear_backward` passed 3/3 workloads with trace `rocm-7.2-linear-wrapper-official.jsonl` and sidecar `rocm-7.2-linear-wrapper-official.compatibility.json`; `CLOCKS_LOCKED=1` was recorded for official wrapper evidence. |
+| `rocm-7.2.0-ubuntu-24.04-container` | `sol-execbench:rocm-7.2-complete` | 7.2.0 | `linear_backward` passed 3/3 workloads with generated trace and compatibility sidecar artifacts; `CLOCKS_LOCKED=1` was recorded for official wrapper evidence. |
 
 Key interpretation points:
 
@@ -381,9 +382,8 @@ Key interpretation points:
 - ROCm 7.0 target-specific PyTorch ROCm smoke coverage uses
   `torch==2.10.0+rocm7.0`; ROCm 7.2 target-specific PyTorch ROCm smoke
   coverage uses `torch==2.11.0+rocm7.2`.
-- Non-authoritative ROCm 7.2 smoke artifacts may be named
-  `rocm-7.2-linear-wrapper-smoke.jsonl` and
-  `rocm-7.2-linear-wrapper-smoke.compatibility.json`.
+- Non-authoritative ROCm 7.2 smoke artifacts may use smoke-specific trace and
+  compatibility-sidecar filenames.
 - Native-host validation requires direct native-host evidence for that ROCm
   stack; it cannot be inferred from Docker image selection or container runs.
 

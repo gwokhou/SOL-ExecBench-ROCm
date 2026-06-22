@@ -89,9 +89,9 @@ uv run pre-commit install
 Place new package tests under `tests/sol_execbench/` near related coverage.
 Place example workflow tests under `tests/examples/`.
 
-Use environment-sensitive markers where appropriate. Core marker names are
-declared in `pyproject.toml`; additional environment checks and skip behavior
-live in `tests/conftest.py`.
+Use environment-sensitive markers where appropriate. Base marker declarations
+live in `pyproject.toml`; additional hardware and environment-sensitive marker
+registration plus skip behavior live in `tests/conftest.py`.
 
 - `cpp`
 - `timing_serial`
@@ -208,6 +208,9 @@ The `Python Quality` GitHub Actions workflow runs `uv sync --locked
 example consistency tests on Python 3.12 and 3.13.
 
 ## Issue Reporting
+
+Use the GitHub Issues page for this repository:
+`https://github.com/gwokhou/SOL-ExecBench-ROCm/issues`.
 
 When reporting a bug or compatibility gap, include:
 

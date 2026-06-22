@@ -12,7 +12,7 @@ included sample problems and, when available, a ROCm-capable AMD GPU.
 | Package manager | `uv`. |
 | ROCm runtime | Required for live GPU evaluation. The project baseline is ROCm >= 7.0. |
 | GPU access | `/dev/kfd` and `/dev/dri` must be visible for ROCm hardware tests and evaluation. |
-| Optional Docker runtime | Native Linux Docker with ROCm device passthrough. |
+| Optional Docker runtime | Native Linux Docker with ROCm device passthrough; the default image is `rocm/dev-ubuntu-24.04:7.1.1-complete`. |
 | Optional dataset download | Hugging Face CLI, available through `huggingface-hub[cli]`. |
 
 On Linux x86_64, dependency resolution uses the PyTorch ROCm 7.1 index for
@@ -255,6 +255,7 @@ and profiler-backed timing remain serial.
 
 | Symptom | Check |
 | --- | --- |
+| `uv` is not found | Install `uv` first, then rerun `uv sync --all-groups`. |
 | `torch.version.hip` is empty | Confirm the ROCm wheel indexes in `pyproject.toml` were used during `uv sync --all-groups`. |
 | `torch.cuda.is_available()` is false | Check ROCm installation, GPU visibility, and access to `/dev/kfd` and `/dev/dri`. |
 | Hardware tests skip in a sandbox | Run GPU checks on a ROCm host or in Docker with ROCm device passthrough. |
