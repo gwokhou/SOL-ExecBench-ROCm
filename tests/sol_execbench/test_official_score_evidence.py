@@ -146,3 +146,24 @@ def test_suite_evidence_reports_counts_blockers_and_input_refs():
     assert payload["input_summary"]["derived:profile_summary"] == 2
     assert payload["scores"][0]["score_authority"] is True
     assert payload["scores"][1]["score_authority"] is False
+
+
+def test_nan_latency_is_blocked_not_averaged():
+    evidence = official_score_from_amd_native_score(
+        _amd_score(measured_latency_ms=float("nan")),
+        aggregation_policy="mean of per-workload SOL scores",
+    )
+
+    assert evidence.score is None
+    assert MISSING_MEASURED_LATENCY_BLOCKER in evidence.blocker_reason_codes
+
+
+def test_official_baseline_latency_ms_is_none_when_baseline_blocked():
+    evidence = official_score_from_amd_native_score(
+        _amd_score(baseline_latency_ms=0.0),
+        aggregation_policy="mean of per-workload SOL scores",
+    )
+
+    assert MISSING_BASELINE_BLOCKER in evidence.blocker_reason_codes
+    assert evidence.official_baseline_latency_ms is None
+    assert evidence.to_dict()["official_baseline_latency_ms"] is None

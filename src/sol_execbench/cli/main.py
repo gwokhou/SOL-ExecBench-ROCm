@@ -79,6 +79,7 @@ from ..core.bench.static_kernel_evidence import (
     collect_static_kernel_artifacts,
     run_static_kernel_extractors,
 )
+from ..core.baseline_export import export_hip_baseline_registry
 from ..core import (
     Definition,
     Workload,
@@ -1227,6 +1228,67 @@ def _toolchain_cli(
     click.echo(json.dumps(payload, sort_keys=True))
 
 
+@click.group("baseline", context_settings={"help_option_names": ["-h", "--help"]})
+def _baseline_cli() -> None:
+    """Measured baseline export utilities."""
+
+
+@_baseline_cli.command(
+    "export", context_settings={"help_option_names": ["-h", "--help"]}
+)
+@click.option(
+    "--trace",
+    "trace_path",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="SOL trace JSONL produced by sol-execbench.",
+)
+@click.option(
+    "--output",
+    "output_path",
+    required=True,
+    type=click.Path(dir_okay=False, path_type=Path),
+    help="Write HIP baseline_registry.v1 JSON here.",
+)
+@click.option("--target-id", required=True, help="HIP target id, such as gemm.")
+@click.option(
+    "--sol-version",
+    default="unknown",
+    show_default=True,
+    help="SOL version or source revision to record in baseline provenance.",
+)
+@click.option(
+    "--timing-policy",
+    default="latency_ms",
+    show_default=True,
+    help="Timing policy label to record in baseline provenance.",
+)
+@click.option("--json", "json_output", is_flag=True, help="Print registry JSON")
+def _baseline_export_cli(
+    trace_path: Path,
+    output_path: Path,
+    target_id: str,
+    sol_version: str,
+    timing_policy: str,
+    json_output: bool,
+) -> None:
+    """Export a HIP measured baseline registry from a SOL trace JSONL file."""
+
+    registry = export_hip_baseline_registry(
+        trace_path=trace_path,
+        output_path=output_path,
+        target_id=target_id,
+        sol_version=sol_version,
+        timing_policy=timing_policy,
+    )
+    if json_output:
+        click.echo(json.dumps(registry, sort_keys=True))
+    else:
+        console.print(
+            f"[green]Wrote measured baseline registry to {output_path}[/green]"
+        )
+
+
 @click.group("dataset", context_settings={"help_option_names": ["-h", "--help"]})
 def _dataset_cli() -> None:
     """Local dataset utilities."""
@@ -1354,6 +1416,16 @@ class SolExecbenchCli(click.Command):
             return _toolchain_cli.main(
                 args=args[1:],
                 prog_name=toolchain_prog,
+                complete_var=complete_var,
+                standalone_mode=standalone_mode,
+                windows_expand_args=windows_expand_args,
+                **extra,
+            )
+        if args and args[0] == "baseline":
+            baseline_prog = f"{prog_name or self.name} baseline"
+            return _baseline_cli.main(
+                args=args[1:],
+                prog_name=baseline_prog,
                 complete_var=complete_var,
                 standalone_mode=standalone_mode,
                 windows_expand_args=windows_expand_args,
