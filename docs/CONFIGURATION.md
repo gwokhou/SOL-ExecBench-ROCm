@@ -210,14 +210,18 @@ files. Use these source-backed override paths instead:
 - Dataset batch settings: pass `scripts/run_dataset.py` flags such as
   `--phase`, `--limit`, `--max-workloads`, `--workload-shard-size`,
   `--iterations`, `--warmup-runs`, `--timeout`, `--timeout-overrides`,
-  `--blob-precheck`, and `--lock-clocks`.
+  `--long-tail-exclusions`, `--blob-precheck`, and `--lock-clocks`.
 - RDNA4 profiler timing closure settings: pass
   `scripts/internal/rdna4/run_rdna4_profiler_timing_batch.py` flags such as
-  `--only-problem`, `--skip-problem`, `--skip-problem-file`,
-  `--mark-blocked-problem`, `--mark-blocked-only`, `--workload-limit`,
-  `--workload-offset`, `--workload-sharded`,
+  `--only-problem`, `--only-problem-file`, `--skip-problem`,
+  `--skip-problem-file`, `--mark-blocked-problem`, `--mark-blocked-only`,
+  `--workload-limit`, `--workload-offset`, `--workload-sharded`,
   `--workload-slice-timing-dir`, `--workload-sharded-import-only`,
-  `--timeout`, and `--temp-dir`.
+  `--compact-workload-slices`, `--timeout`, `--subprocess-memory-limit-gib`,
+  `--max-estimated-timing-input-gib`, `--auto-estimated-timing-input-cap`,
+  `--temp-dir`, `--resume`, `--max-workers`, `--clock-locked`,
+  `--hip-runtime-trace`, `--keep-staging`, `--keep-rocprofv3-csv`,
+  `--strict-isolation`, `--gpu-device`, and `--calibration-path`.
 - Docker ROCm stack selection: use `./scripts/run_docker.sh --target <id>` for
   declared targets in `docker/rocm-targets.json`.
 - Docker image overrides for unknown targets: use `--allow-unknown-target` with
@@ -323,6 +327,7 @@ uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
 | `--gpu-jobs` | `1` | GPU evaluation workers for pipeline mode; only `1` is currently accepted. |
 | `--timeout-policy` | `record` | Record timeout traces or fail on no-trace timeout behavior. |
 | `--timeout-overrides` | None | JSON object with `default`, `problems`, or `workloads` timeout overrides. |
+| `--long-tail-exclusions` | None | JSON config for temporarily excluding known long-tail problems, workloads, or workload shards while preserving closure accounting. |
 | `--blob-precheck` | `fail` | Precheck safetensors references with `fail`, `warn`, or `off`. |
 | `--log-order` | `completion` | Pipeline log ordering: `completion` or `problem`. |
 | `-o`, `--output` | `<repo_root>/out` | Output directory for traces and summary files. |
@@ -427,6 +432,7 @@ roots plus target and workload controls:
 | `--replacement-timing-dir` | Destination for replacement timing sidecars. |
 | `--limit` | Limit selected targets. |
 | `--only-problem` | Include only a problem ID; may be repeated. |
+| `--only-problem-file` | Read included problem IDs from a file. |
 | `--skip-problem` | Skip a problem ID; may be repeated. |
 | `--skip-problem-file` | Read skipped problem IDs from a file. |
 | `--mark-blocked-problem` | Write a classified profiler-blocked sidecar for a problem ID. |
@@ -436,8 +442,23 @@ roots plus target and workload controls:
 | `--workload-sharded` | Profile each workload independently and aggregate complete manifests. |
 | `--workload-slice-timing-dir` | Import existing workload-slice timing roots before profiling missing slices. |
 | `--workload-sharded-import-only` | Aggregate imported slices without profiling missing workloads. |
+| `--compact-workload-slices`, `--no-compact-workload-slices` | Compact completed slice timing sidecars and remove raw rocprofv3 run directories after manifest summaries; enabled by default. |
 | `--timeout` | Per-profiler subprocess timeout in seconds. |
+| `--subprocess-memory-limit-gib` | Optional address-space limit for staged profiler subprocesses. |
+| `--max-estimated-timing-input-gib` | Manual cap for estimated timing input footprint before launching profiler subprocesses. |
+| `--auto-estimated-timing-input-cap`, `--no-auto-estimated-timing-input-cap` | Dynamically derive the estimated timing input cap from available memory, cgroup remaining memory, and subprocess limit; enabled by default. |
 | `--temp-dir` | Parent directory for profiler staging directories. |
+| `--resume`, `--no-resume` | Resume from existing sidecars and manifests; enabled by default. |
+| `--max-workers` | Maximum target-level workers; default is `4`. |
+| `--timing-tool-version` | Timing tool version string recorded in evidence. |
+| `--gpu-architecture` | GPU architecture string recorded in evidence. |
+| `--clock-locked`, `--no-clock-locked` | Whether evidence records locked clocks; enabled by default. |
+| `--hip-runtime-trace`, `--no-hip-runtime-trace` | Include rocprofv3 HIP runtime API tracing; disabled by default. |
+| `--keep-staging` | Keep per-target staging directories after profiler subprocesses. |
+| `--keep-rocprofv3-csv` | Keep raw rocprofv3 CSV run directories after compact timing sidecars are written. |
+| `--strict-isolation` | Abort on timing isolation check failures instead of warning. |
+| `--gpu-device` | Set `ROCR_VISIBLE_DEVICES` to a device index for GPU isolation. |
+| `--calibration-path` | Include rocprofv3 overhead calibration data from a calibration JSON sidecar. |
 
 The classification scripts
 `scripts/internal/rdna4/run_rdna4_profiler_partial_failures.py` and
