@@ -748,8 +748,9 @@ def _derive_bottleneck_hints(
     by_name = {_normalize_key(metric.name): metric for metric in counter_metrics}
     hints: list[ProfileSummaryBottleneckHint] = []
     l2 = by_name.get("l2cachehitrate")
-    if l2 is not None and _numeric_value(l2.value) is not None:
-        if _numeric_value(l2.value) < 60:
+    if l2 is not None:
+        l2_value = _numeric_value(l2.value)
+        if l2_value is not None and l2_value < 60:
             hints.append(
                 ProfileSummaryBottleneckHint(
                     category="memory_l2_bound",

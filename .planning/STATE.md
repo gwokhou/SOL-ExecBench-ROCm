@@ -4,8 +4,8 @@ milestone: v1.38
 milestone_name: Upgrade SOL Evidence Contract for Confirmed Benchmark Claims
 status: executing
 stopped_at: Phase 192 verified
-last_updated: "2026-06-21T09:22:02.000Z"
-last_activity: 2026-06-21 -- Phase 192 verified
+last_updated: "2026-06-22T02:17:08.927Z"
+last_activity: 2026-06-22 -- Completed quick task 260622-eaa: Fix pre-push ty-check blockers before pushing local main
 progress:
   total_phases: 5
   completed_phases: 3
@@ -30,7 +30,7 @@ ExecBench.
 Phase: 193 (Measured Baseline Provenance and Coverage) — READY FOR DISCUSSION
 Plan: —
 Status: Phase 192 verified; ready to discuss Phase 193
-Last activity: 2026-06-21 -- Phase 192 verified
+Last activity: 2026-06-22 -- Completed quick task 260622-eaa: Fix pre-push ty-check blockers before pushing local main
 
 ## Recent Trend
 
@@ -81,6 +81,7 @@ Last activity: 2026-06-21 -- Phase 192 verified
 
 | Date | Task | Status | Notes |
 |------|------|--------|-------|
+| 2026-06-22 | 260622-eaa-fix-pre-push-ty-check-blockers-before-pu | complete | Fixed local `ty-check` failures blocking `git push origin main`; verified with `uv run ty check` and targeted pytest coverage. |
 | 2026-06-20 | 260620-tnn-cherry-pick-local-backup-changes-to-main | complete | Cherry-picked local backup commit `a33600b` onto current `main`, preserving current codebase mapping state while restoring wrapper scripts and documentation/evidence notes. |
 | 2026-06-16 | 260616-n3b-record-deferred-hip-v1-26-feedback-sidec | complete | Recorded `profile_summary.sidecar.v1` producer/schema and profiler-counter-derived bottleneck diagnostics as deferred follow-ups. |
 | 2026-06-16 | 260616-n06-fix-sol-agent-feedback-source-hash-and-c | complete | Filled SOL CLI agent-feedback `source_hash` from `Solution.hash()` and documented `candidate_hash` as solution-label identity, with targeted pytest/Ruff verification. |

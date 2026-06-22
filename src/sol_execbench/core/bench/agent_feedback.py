@@ -262,8 +262,9 @@ def build_agent_feedback_sidecar(
 ) -> AgentFeedbackSidecar:
     """Build a bounded diagnostic feedback sidecar from existing evaluation data."""
 
+    evaluations = [trace.evaluation for trace in traces if trace.evaluation is not None]
     evaluated = [trace for trace in traces if trace.evaluation is not None]
-    status_counter = Counter(trace.evaluation.status for trace in evaluated)
+    status_counter = Counter(evaluation.status for evaluation in evaluations)
     status = _aggregate_status(evaluated, profile_result, static_evidence)
     reason_code = (
         AgentFeedbackReasonCode.NO_EVALUATION_TRACES

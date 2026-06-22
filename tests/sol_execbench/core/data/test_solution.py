@@ -4,6 +4,8 @@
 
 """Tests for solution schema ROCm language, hardware, and entry point validation."""
 
+from typing import Any
+
 import pytest
 from pydantic import ValidationError
 
@@ -252,12 +254,12 @@ class TestSolutionHashCoversBehaviorFields:
     solutions collide on the same cached build."""
 
     @staticmethod
-    def _solution(**spec_overrides):
-        kwargs = dict(
-            languages=["hip_cpp"],
-            target_hardware=["gfx1200"],
+    def _solution(**spec_overrides: Any):
+        kwargs: dict[str, Any] = dict(
+            languages=[SupportedLanguages.HIP_CPP],
+            target_hardware=[SupportedHardware.GFX1200],
             entry_point="kernel.hip::run",
-            binding="torch",
+            binding=None,
         )
         kwargs.update(spec_overrides)
         return Solution(
