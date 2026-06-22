@@ -28,6 +28,7 @@ from sol_execbench.core.data.trace import (
     EvaluationStatus,
     Trace,
 )
+from sol_execbench.core.data.workload import ScalarInput
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.environment import (
     EnvironmentCheckResult,
@@ -505,7 +506,7 @@ def test_agent_feedback_sidecar_records_bounded_metadata(tmp_path: Path):
         workload=Workload(
             uuid="w0",
             axes={"n": 1},
-            inputs={"n": {"type": "scalar", "value": 1}},
+            inputs={"n": ScalarInput(value=1)},
         ),
         evaluation=Evaluation(
             status=EvaluationStatus.COMPILE_ERROR,
@@ -566,7 +567,7 @@ def test_agent_feedback_identity_uses_solution_source_hash(tmp_path: Path):
         workload=Workload(
             uuid="w0",
             axes={"n": 1},
-            inputs={"n": {"type": "scalar", "value": 1}},
+            inputs={"n": ScalarInput(value=1)},
         ),
         evaluation=Evaluation(
             status=EvaluationStatus.COMPILE_ERROR,

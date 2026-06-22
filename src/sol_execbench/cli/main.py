@@ -392,7 +392,7 @@ def _write_profile_summary_sidecar(
     """Write optional normalized profile summary without changing trace JSONL."""
 
     sidecar_path = _profile_summary_sidecar_path(output_file)
-    if sidecar_path is None:
+    if sidecar_path is None or output_file is None:
         return None
     try:
         if run_id is None:
@@ -472,33 +472,31 @@ def _static_evidence_sidecar_path(output_file: Path | None, staging_dir: Path) -
 
 
 def _static_evidence_summary(
-    payload: dict[str, object],
+    sidecar: StaticKernelEvidenceSidecar,
 ) -> dict[str, object]:
     """Return a compact human-facing static evidence summary."""
 
-    classification = payload["classification"]
+    classification = sidecar.classification
     return {
-        "status": payload["status"],
-        "reason_code": payload["reason_code"],
-        "artifact_count": len(payload["artifacts"]),
-        "tool_run_count": len(payload["tool_runs"]),
-        "metadata_present": classification["metadata_present"],
-        "disassembly_present": classification["disassembly_present"],
-        "detected_architectures": classification["detected_architectures"],
+        "status": sidecar.status,
+        "reason_code": sidecar.reason_code,
+        "artifact_count": len(sidecar.artifacts),
+        "tool_run_count": len(sidecar.tool_runs),
+        "metadata_present": classification.metadata_present,
+        "disassembly_present": classification.disassembly_present,
+        "detected_architectures": classification.detected_architectures,
         "unsupported_count": sum(
-            1 for run in payload["tool_runs"] if run["status"] == "unsupported"
+            1 for run in sidecar.tool_runs if run.status == "unsupported"
         ),
-        "failed_count": sum(
-            1 for run in payload["tool_runs"] if run["status"] == "failed"
-        ),
+        "failed_count": sum(1 for run in sidecar.tool_runs if run.status == "failed"),
         "claim_boundaries": {
-            "diagnostic_only": payload["diagnostic_only"],
-            "correctness_authority": payload["correctness_authority"],
-            "performance_authority": payload["performance_authority"],
-            "timing_authority": payload["timing_authority"],
-            "score_authority": payload["score_authority"],
-            "paper_parity_authority": payload["paper_parity_authority"],
-            "leaderboard_authority": payload["leaderboard_authority"],
+            "diagnostic_only": sidecar.diagnostic_only,
+            "correctness_authority": sidecar.correctness_authority,
+            "performance_authority": sidecar.performance_authority,
+            "timing_authority": sidecar.timing_authority,
+            "score_authority": sidecar.score_authority,
+            "paper_parity_authority": sidecar.paper_parity_authority,
+            "leaderboard_authority": sidecar.leaderboard_authority,
         },
     }
 
@@ -509,8 +507,18 @@ def _static_evidence_payload(
     """Return the JSON sidecar payload with a compact summary section."""
 
     payload = sidecar.model_dump(mode="json")
-    payload["summary"] = _static_evidence_summary(payload)
+    payload["summary"] = _static_evidence_summary(sidecar)
     return payload
+
+
+def _timeout_output_text(output: str | bytes | None) -> str:
+    """Return timeout output as text regardless of subprocess typing."""
+
+    if output is None:
+        return ""
+    if isinstance(output, bytes):
+        return output.decode(errors="replace")
+    return output
 
 
 def _write_static_evidence_sidecar(
@@ -1031,8 +1039,8 @@ def _evaluate_cli(
                 keep_staging=keep_staging,
                 reason="evaluation_timeout",
                 returncode=124,
-                stdout=exc.stdout or "",
-                stderr=exc.stderr or "",
+                stdout=_timeout_output_text(exc.stdout),
+                stderr=_timeout_output_text(exc.stderr),
             )
             if diagnostic_path is not None:
                 console.print(
