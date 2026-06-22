@@ -10,8 +10,8 @@ configuration. The evaluator stages those inputs in an isolated temporary
 directory, compiles native HIP/C++ solutions when needed, runs a generated
 evaluation driver in a subprocess, and emits typed JSONL trace records plus
 optional diagnostic sidecars. Supporting modules provide dataset inventory,
-ROCm compatibility evidence, scoring, baseline comparison, and release-quality
-guardrail reports.
+ROCm compatibility evidence, scoring, baseline export/comparison, agent
+feedback, and release-quality guardrail reports.
 
 ## Component Diagram
 
@@ -26,7 +26,8 @@ graph TD
     Evidence["core/environment.py + diagnostics.py + toolchain.py + compatibility.py"]
     Dataset["core/dataset/ + scripts/run_dataset.py"]
     Scoring["core/scoring/"]
-    Reports["core/reporting.py + baseline.py + trust_summary.py"]
+    Reports["core/reporting.py + baseline*.py + trust_summary.py"]
+    Feedback["bench/profile_summary.py + bench/agent_feedback.py"]
 
     Scripts --> Dataset
     Scripts --> Evidence
@@ -41,6 +42,8 @@ graph TD
     Dataset --> Models
     Scoring --> Reports
     Reports --> Models
+    Feedback --> Models
+    CLI --> Feedback
 ```
 
 ## Data Flow
@@ -52,8 +55,8 @@ graph TD
    `--definition`, `--workload`, `--solution`, and optional `--config` paths.
 3. The CLI loads inputs into `Definition`, `Workload`, `Solution`, and
    `BenchmarkConfig` objects before creating a `ProblemPackager`.
-4. `ProblemPackager` writes normalized staged files named `definition.json`,
-   `workload.jsonl`, `solution.json`, `config.json`, and solution source files into a
+4. `ProblemPackager` writes normalized staged definition, workload, solution,
+   config, and solution source files into a
    `tempfile.mkdtemp(prefix="sol_execbench_")` staging directory.
 5. For native ROCm solution categories, `ProblemPackager.compile()` copies
    `src/sol_execbench/driver/templates/build_ext.py`, injects HIP offload architecture flags when
@@ -67,16 +70,17 @@ graph TD
    runs correctness and timing helpers, and prints one `Trace` JSON
    object per workload to stdout.
 8. The CLI parses trace JSONL back into `Trace` models, writes optional trace,
-   profiler, static-evidence, and environment sidecars, prints a Rich summary
-   unless `--json` is selected, and exits nonzero when any workload fails.
+   profiler, profile-summary, static-evidence, agent-feedback, and environment
+   sidecars, prints a Rich summary unless `--json` is selected, and exits
+   nonzero when any workload fails.
    If no parseable trace output exists, the CLI persists a bounded
    diagnostic-only no-trace sidecar outside canonical trace JSONL.
 
-The root CLI also dispatches GPU-free metadata subcommands before normal
-evaluation: `contract`, `doctor`, `toolchain`, and the local-only `dataset`
-migration command group. The separate
-`sol-execbench-baseline` entry point dispatches to `src/sol_execbench/cli/baseline.py`
-for trace baseline comparison.
+The root CLI also dispatches metadata and local utility subcommands before
+normal evaluation: `contract`, `doctor`, `toolchain`, `baseline export`, and
+the local-only `dataset` migration command group. The separate
+`sol-execbench-baseline` entry point dispatches to
+`src/sol_execbench/cli/baseline.py` for trace baseline comparison.
 
 ## Key Abstractions
 
@@ -94,10 +98,15 @@ for trace baseline comparison.
 | `RocmCompatibilityMatrixReport` | `src/sol_execbench/core/compatibility.py` | Models compatibility matrix entries, evidence, validation scope, and execution decisions. |
 | `DockerTargetManifest` | `src/sol_execbench/core/docker_matrix.py` | Models ROCm Docker targets and preflight evidence used by Docker tooling and tests. |
 | `TraceRunSummary` and `BaselineComparison` | `src/sol_execbench/core/reporting.py`, `src/sol_execbench/core/baseline.py` | Summarize trace runs and compare new traces against baseline traces. |
+| Baseline export helpers | `src/sol_execbench/core/baseline_export.py` | Convert SOL trace JSONL into measured HIP baseline registry artifacts for scoring and comparison workflows. |
+| `ProfileSummarySidecar` and `AgentFeedbackSidecar` | `src/sol_execbench/core/bench/profile_summary.py`, `src/sol_execbench/core/bench/agent_feedback.py` | Normalize diagnostic profile and trace feedback into bounded sidecars that cite source artifacts without becoming correctness or performance authority. |
 | `DatasetReuseDecision` | `src/sol_execbench/core/dataset/run_closure.py` | Decides whether existing dataset traces can be reused based on rerun flags, failure counts, and execution-closure provenance. |
+| Run-state helpers | `src/sol_execbench/core/dataset/run_state.py` | Provide importable workload selection, trace matching, closure status, and requested-evidence helpers for dataset-scale runs. |
+| `LongTailExclusionSidecar` | `src/sol_execbench/core/dataset/long_tail_exclusions.py` | Loads explicit temporary exclusions for problem, workload, or shard-level long-tail validation blockers. |
 | Dataset runner helpers | `src/sol_execbench/core/dataset/runner.py` | Importable helpers used by `scripts/run_dataset.py` for solution wrapping, CLI subprocess invocation, trace parsing, timing evidence collection, and AMD score report generation. |
 | `DatasetShardPlan` and `DatasetShardMergeResult` | `src/sol_execbench/core/dataset/sharding.py` | Define deterministic workload shard assignment, per-shard trace refs, ordered trace merging, duplicate detection, and incomplete-shard reporting. |
 | `ProfilerTimingCoverageReport` | `src/sol_execbench/core/dataset/profiler_timing_coverage.py` | Classifies problem-level profiler timing evidence as profiler-backed, partial, profiler-blocked, fallback, ready-missing, reference-OOM-blocked, or readiness-blocked. |
+| `AmdSolBoundV2Artifact` | `src/sol_execbench/core/scoring/amd_sol_v2.py` | Stores family-aware AMD SOL bound sidecars with bound graphs, operator estimates, aggregate status, and coverage summaries. |
 | Validation diagnostics | `src/sol_execbench/core/diagnostics.py` | CPU-safe ROCm readiness helpers, profiler routing readiness, CDNA 3 readiness metadata, and MI300X validation claim blockers. |
 
 ## Directory Structure Rationale
@@ -124,6 +133,7 @@ Top-level operational directories follow the same boundary:
 | `examples/` | Runnable PyTorch, Triton ROCm, and native ROCm example problems. |
 | `docs/` | User-facing docs, schema references, ROCm validation notes, and research/release evidence. |
 | `scripts/` | Dataset download, inventory, matrix, parity, scoring, trust, and batch execution helpers. |
+| `scripts/internal/` | Internal report, RDNA4 validation, profiler timing, and prerelease artifact helpers used by evidence workflows. |
 | `docker/` | ROCm Dockerfile, entrypoint, wrapper script integration, and target manifest. |
 | `data/` | Local downloaded benchmark assets and runtime data outside the package. |
 
@@ -185,6 +195,9 @@ separate from benchmark correctness:
   native builds and reports unsupported status for non-native solutions.
 - `SOLEXECBENCH_ENV_SNAPSHOT` or `SOLEXECBENCH_ENV_SNAPSHOT_PATH` can request an
   environment snapshot sidecar.
+- Persisted trace outputs also produce normalized profile-summary and
+  agent-feedback sidecars when their source artifacts are available. These
+  sidecars cite trace, profile, static-evidence, or environment artifacts.
 
 These sidecars do not change trace schema or correctness status.
 
@@ -211,13 +224,18 @@ solutions, invoking `sol-execbench` as a subprocess, parsing trace JSONL,
 capturing bounded CLI logs, collecting source timing evidence, and writing AMD
 score reports.
 
-Dataset reuse and closure behavior is package-owned. `run_closure.py` computes
-reuse decisions, stale-provenance mismatches, selected-workload closure
-records, derived evidence refs, and missing-evidence states. `sharding.py`
-provides an importable design path for future workload-level dataset
-parallelism. `scripts/run_dataset.py` keeps ROCm GPU trace collection and
-profiler-backed timing serial, while allowing `--phase derived --jobs <N|auto>`
-to parallelize CPU/I/O-only report generation from existing traces.
+Dataset reuse and closure behavior is package-owned.
+`src/sol_execbench/core/dataset/run_closure.py` computes reuse decisions,
+stale-provenance mismatches, selected-workload closure records, derived
+evidence refs, and missing-evidence states.
+`src/sol_execbench/core/dataset/run_state.py` centralizes workload selection,
+trace matching, closure-status mapping, and requested-evidence declarations
+used by the dataset runner. `src/sol_execbench/core/dataset/sharding.py`
+provides deterministic shard assignment and merge helpers for workload-level
+dataset parallelism. `scripts/run_dataset.py` keeps ROCm GPU trace collection
+and profiler-backed timing serial, while allowing
+`--phase derived --jobs <N|auto>` to parallelize CPU/I/O-only report generation
+from existing traces.
 
 RDNA4 profiler-backed timing evidence has an additional operator layer:
 `scripts/internal/rdna4/run_rdna4_profiler_timing_coverage.py` renders denominator coverage
@@ -231,10 +249,10 @@ under `workload-manifests/`, per-workload timing sidecars under
 workload evidence is available.
 
 `src/sol_execbench/core/scoring/` contains AMD hardware models, bound graphs,
-operator work estimates, AMD SOL bound artifacts, SOLAR derivation helpers,
-baseline artifacts, and AMD-native score models. These helpers consume traces,
-hardware-model records, optional timing evidence, SOL bound sidecars, and
-baseline artifacts to produce guarded AMD-native-derived reports. Missing,
+operator work estimates, AMD SOL v1/v2 bound artifacts, SOLAR derivation
+helpers, baseline artifacts, and AMD-native score models. These helpers consume
+traces, hardware-model records, optional timing evidence, SOL bound sidecars,
+and baseline artifacts to produce guarded AMD-native-derived reports. Missing,
 degraded, unsupported, or unvalidated evidence remains represented as warnings
 or unscored states rather than upgraded into hardware-performance validation.
 
@@ -250,8 +268,8 @@ records.
 
 ## Diagnostics And Toolchain Routing
 
-The `contract`, `doctor`, and `toolchain` subcommands are dispatched by
-`SolExecbenchCli` before normal evaluation:
+The `contract`, `doctor`, `toolchain`, `baseline`, and `dataset` subcommands
+are dispatched by `SolExecbenchCli` before normal evaluation:
 
 - `sol-execbench contract --json` prints GPU-free evaluator compatibility
   metadata from `build_evaluator_contract()`.
@@ -261,6 +279,8 @@ The `contract`, `doctor`, and `toolchain` subcommands are dispatched by
   evidence level and artifact type.
 - `sol-execbench toolchain --json --list-registry` prints the default ROCm
   toolchain registry.
+- `sol-execbench baseline export ...` converts trace JSONL into a HIP measured
+  baseline registry artifact.
 - `sol-execbench dataset migrate-sol ...` and
   `sol-execbench dataset migrate-flashinfer ...` convert locally downloaded
   source datasets into local benchmark-layout artifacts plus migration
@@ -300,7 +320,8 @@ separate:
   validation.
 
 Trace JSONL remains the canonical benchmark output. Environment snapshots,
-`rocprofv3` profile metadata, static kernel evidence, Matrix entries,
-execution-closure reports, consistency reports, trust summaries, claim-upgrade
-reports, release-candidate summaries, and AMD-native score reports are bounded
-sidecar evidence with the authority declared by their schemas and docs.
+`rocprofv3` profile metadata, profile summaries, static kernel evidence, agent
+feedback, Matrix entries, execution-closure reports, consistency reports, trust
+summaries, claim-upgrade reports, release-candidate summaries, and AMD-native
+score reports are bounded sidecar evidence with the authority declared by their
+schemas and docs.

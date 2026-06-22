@@ -2,6 +2,9 @@
 
 # SOL ExecBench ROCm Port
 
+[![Version](https://img.shields.io/badge/version-1.0.2-blue.svg)](pyproject.toml)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
 A ROCm-only fork of SOL ExecBench for evaluating LLM-generated GPU kernel
 solutions on AMD hardware. It supports PyTorch ROCm, Triton ROCm, HIP/C++,
 and selected ROCm library categories while rejecting legacy CUDA/NVIDIA
@@ -88,6 +91,15 @@ uv run sol-execbench-baseline \
   --baseline traces_v1.jsonl
 ```
 
+**Export a measured HIP baseline registry from trace JSONL:**
+
+```bash
+uv run sol-execbench baseline export \
+  --trace traces.jsonl \
+  --output baseline_registry.json \
+  --target-id gemm
+```
+
 **Print ROCm environment diagnostics or the evaluator contract:**
 
 ```bash
@@ -126,6 +138,7 @@ The `sol-execbench` command provides several subcommands:
 | `contract --json` | Print the GPU-free evaluator compatibility contract |
 | `doctor --json` | Print ROCm environment diagnostics |
 | `toolchain --json` | Print ROCm toolchain routing diagnostics |
+| `baseline export` | Export a measured HIP baseline registry from SOL trace JSONL |
 | `dataset migrate-sol` | Migrate downloaded SOL-ExecBench inputs into local layout |
 | `dataset migrate-flashinfer` | Migrate downloaded FlashInfer trace inputs into local layout |
 
@@ -185,6 +198,8 @@ Start here:
   compiler/backend, agent, and reproducibility researchers
 - [Configuration](docs/CONFIGURATION.md) -- CLI flags, benchmark config,
   environment variables, Docker settings, and no-trace diagnostics
+- [Evaluator Contract](docs/EVALUATOR-CONTRACT.md) -- GPU-free compatibility
+  contract for evaluator integrations
 
 Project and development references:
 
@@ -199,9 +214,12 @@ Project and development references:
 - [ROCm Notes](docs/rocm.md) -- host, Docker, and validation notes
 - [ROCm Timing](docs/rocm_timing.md) -- timing backends, profiler collection,
   and source-specific semantics
+- [ROCm Toolchain Routing](docs/rocm_toolchain_routing.md) -- routing rules for
+  profiling, static evidence, compiler, and runtime artifacts
 - [ROCm Libraries](docs/rocm_libraries.md) -- supported ROCm library categories
   (hipBLAS, MIOpen, Composable Kernel, rocWMMA) for RDNA 4 and CDNA 3 targets;
-  CDNA 4 validation is also deferred until suitable hardware evidence is available
+  CDNA 4-specific low-precision benchmark adaptation is deferred until suitable
+  hardware evidence is available
 - [Cookbook](docs/COOKBOOK.md) -- common troubleshooting and task-oriented
   commands for benchmark runs, dataset batches, and evidence workflows
 

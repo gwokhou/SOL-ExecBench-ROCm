@@ -76,7 +76,7 @@ SOLEXECBENCH_ENV_SNAPSHOT=1 \
   --json -o traces.jsonl
 ```
 
-This writes `traces.jsonl.environment.json`. Use
+This writes an environment-sidecar JSON file next to the chosen output file. Use
 `SOLEXECBENCH_ENV_SNAPSHOT_PATH=/path/to/env.json` to choose an explicit path.
 The sidecar is reproducibility evidence only; it is not part of SOL/SOLAR
 correctness or scoring.
@@ -92,8 +92,8 @@ uv run sol-execbench examples/hip_cpp/rmsnorm --solution examples/hip_cpp/rmsnor
 ```
 
 Profiling is disabled by default. When enabled, SOL ExecBench writes profiler
-artifacts under `traces.jsonl.rocprofv3/` and writes diagnostic metadata to
-`traces.jsonl.profile.json`. The metadata records the profiler command,
+artifacts under `traces.jsonl.rocprofv3/` and writes diagnostic metadata JSON beside
+the output artifact. The metadata records the profiler command,
 working directory, timeout, output locations, registered artifacts, exit status,
 and stdout/stderr tails.
 

@@ -16,7 +16,17 @@ validation remain deferred until suitable CDNA4-class hardware is available.
 
 ## Local Setup
 
-Install runtime and development dependencies with `uv`:
+Fork the repository on GitHub if you plan to submit a pull request, then clone
+your fork or the upstream repository and enter the project directory:
+
+```bash
+git clone https://github.com/gwokhou/SOL-ExecBench-ROCm.git
+cd SOL-ExecBench-ROCm
+```
+
+Install runtime and development dependencies with `uv`. The project requires
+Python `>=3.12,<3.14`, and `.python-version` pins local development to Python
+3.12:
 
 ```bash
 uv sync --all-groups
@@ -49,14 +59,18 @@ configured:
 GPU evaluation requires ROCm-capable AMD hardware, device access to `/dev/kfd`
 and `/dev/dri`, ROCm user-space tooling, and a ROCm PyTorch build.
 
-## Common Commands
+## Build Commands
+
+This project does not use Node package scripts. Development commands are
+defined by `pyproject.toml`, the `sol-execbench` console scripts, repository
+scripts, and the Docker helper.
 
 | Command | Purpose |
 | --- | --- |
 | `uv sync --all-groups` | Install runtime and development dependency groups. |
 | `uv build` | Build package artifacts with Hatchling. |
 | `uv run sol-execbench <problem_dir> --solution <solution-path>` | Run one benchmark problem. |
-| `uv run sol-execbench --definition definition.json --workload workload.jsonl --solution solution.json` | Run one problem from explicit files. |
+| `uv run sol-execbench --definition <definition-json> --workload <workload-jsonl> --solution <solution-json>` | Run one problem from explicit files. |
 | `uv run sol-execbench contract --json` | Print the GPU-free evaluator compatibility contract. |
 | `uv run sol-execbench doctor --json` | Print ROCm environment diagnostics. |
 | `uv run sol-execbench toolchain --json` | Print ROCm evidence-tool routing diagnostics. |
@@ -228,7 +242,9 @@ uv run pytest \
   tests/sol_execbench/test_rdna4_profiler_sharded_closure.py -q
 ```
 
-Markers are registered in `pyproject.toml` and `tests/conftest.py`.
+Base markers are declared in `pyproject.toml`; additional hardware and
+environment-sensitive markers and skip behavior are registered in
+`tests/conftest.py`.
 
 | Marker | Purpose |
 | --- | --- |
@@ -267,6 +283,25 @@ git commit -s -m "#123 - Fix trace parsing"
 Pull requests should link the approved issue, describe behavior changes, and
 list the tests, lint checks, type checks, Docker checks, or GPU checks that were
 run. Document hardware-specific assumptions in tests or PR notes.
+
+## Branch Conventions
+
+The default branch is `main`. No branch naming pattern is documented in
+`CONTRIBUTING.md` or `.github/`, so use clear issue-oriented names such as
+`123-fix-trace-parsing` unless a maintainer asks for a different convention.
+
+## PR Process
+
+- Start from an approved GitHub issue and keep the pull request focused on one
+  concern.
+- Describe behavior changes clearly and link the related issue.
+- Include tests, lint checks, type checks, Docker checks, or GPU checks run.
+- Update documentation for changes to public commands, schemas, Docker targets,
+  scoring, timing, profiling, evidence semantics, ROCm support claims, or
+  examples.
+- Record ROCm hardware assumptions and remaining validation gaps in the PR
+  description.
+- Sign commits with DCO sign-off using `git commit -s`.
 
 ## CI Expectations
 

@@ -24,10 +24,10 @@ UV_CACHE_DIR=/tmp/uv-cache uv run scripts/internal/release/check_prerelease_read
   --output-dir out/prerelease_readiness/v1.26.0-rc1
 ```
 
-The gate writes:
+The gate writes two files into the chosen `--output-dir`:
 
-- `prerelease_readiness.json`
-- `prerelease_readiness.md`
+- JSON summary report
+- Markdown summary report
 
 ## Blocking Conditions
 

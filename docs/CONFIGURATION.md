@@ -149,11 +149,11 @@ readiness gate consumes this manifest with `docs/provenance.md`.
 There are no required environment variables for starting the CLI. Required
 inputs are passed as files or positional arguments:
 
-- `sol-execbench <problem_dir>` requires `definition.json` and `workload.jsonl`
-  in the problem directory.
+- `sol-execbench <problem_dir>` requires definition and workload JSON/JSONL
+  files in the problem directory.
 - If no problem directory is used, `--definition` and `--workload` are required.
-- A solution must be supplied through `--solution` or by a conventional
-  `solution.json` in the problem directory.
+- A solution must be supplied through `--solution` or by the conventional
+  solution JSON file in the problem directory.
 - `contract`, `doctor`, and `toolchain` subcommands only support `--json`
   output and raise a Click exception without it.
 - `BenchmarkConfig.warmup_runs` must be `>= 0`; `iterations` must be `> 0`.
@@ -204,8 +204,8 @@ files. Use these source-backed override paths instead:
 
 - Host benchmark runs: pass CLI flags such as `--config`, `--compile-timeout`,
   `--timeout`, `--output`, `--profile`, and `--static-evidence`.
-- Per-problem benchmark settings: place a `config.json` next to
-  `definition.json` and `workload.jsonl`, or pass a config file explicitly with
+- Per-problem benchmark settings: place the benchmark config JSON next to the
+  problem definition and workload files, or pass a config file explicitly with
   `--config`.
 - Dataset batch settings: pass `scripts/run_dataset.py` flags such as
   `--phase`, `--limit`, `--max-workloads`, `--workload-shard-size`,
@@ -253,9 +253,9 @@ uv run sol-execbench \
 
 | Flag | Default | Purpose |
 | --- | --- | --- |
-| `--definition` | None | Path to `definition.json` when not using a problem directory. |
+| `--definition` | None | Path to the definition JSON file when not using a problem directory. |
 | `--workload` | None | Path to `workload.jsonl` when not using a problem directory. |
-| `--solution` | Conventional `solution.json` in problem directory when present | Path to solution JSON. |
+| `--solution` | Conventional solution JSON in problem directory when present | Path to solution JSON. |
 | `--config` | None | Optional benchmark config JSON. |
 | `--compile-timeout` | `120` | HIP/C++ compilation timeout in seconds. |
 | `--timeout` | `600` | Evaluation subprocess timeout in seconds. |
@@ -416,7 +416,7 @@ or create score authority.
 | Flag | Purpose |
 | --- | --- |
 | `--dataset-root` | Dataset benchmark root, defaulting to `data/SOL-ExecBench/benchmark`. |
-| `--output-dir` | Directory for `coverage.json`, `coverage.md`, and `coverage-summary.json`. |
+| `--output-dir` | Directory for generated coverage JSON, Markdown, and summary JSON artifacts. |
 | `--timing-evidence-dir` | Timing sidecar root; may be repeated. |
 | `--category` | Dataset category filter; may be repeated. |
 | `--expected-problem-denominator` | Expected denominator, defaulting to `235`. |
