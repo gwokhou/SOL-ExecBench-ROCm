@@ -4,8 +4,8 @@ milestone: v1.38
 milestone_name: Upgrade SOL Evidence Contract for Confirmed Benchmark Claims
 status: executing
 stopped_at: Phase 192 verified
-last_updated: "2026-06-22T02:17:08.927Z"
-last_activity: 2026-06-22 -- Completed quick task 260622-eaa: Fix pre-push ty-check blockers before pushing local main
+last_updated: "2026-07-03T04:13:40.137Z"
+last_activity: 2026-07-03 -- Completed quick task 260703-gze: Close SOL-side diagnostic-only feedback-loop release gap
 progress:
   total_phases: 5
   completed_phases: 3
@@ -30,7 +30,7 @@ ExecBench.
 Phase: 193 (Measured Baseline Provenance and Coverage) — READY FOR DISCUSSION
 Plan: —
 Status: Phase 192 verified; ready to discuss Phase 193
-Last activity: 2026-06-22 -- Completed quick task 260622-eaa: Fix pre-push ty-check blockers before pushing local main
+Last activity: 2026-07-03 -- Completed quick task 260703-gze: Close SOL-side diagnostic-only feedback-loop release gap
 
 ## Recent Trend
 
@@ -81,6 +81,7 @@ Last activity: 2026-06-22 -- Completed quick task 260622-eaa: Fix pre-push ty-ch
 
 | Date | Task | Status | Notes |
 |------|------|--------|-------|
+| 2026-07-03 | 260703-gze-close-the-sol-side-diagnostic-only-feedb | complete | Added HIP-facing sidecar identity aliases, documented profile-summary bottleneck hint ownership, prepared `v1.38-feedback-loop-rc1`, and verified focused pytest/Ruff coverage. |
 | 2026-06-22 | 260622-eaa-fix-pre-push-ty-check-blockers-before-pu | complete | Fixed local `ty-check` failures blocking `git push origin main`; verified with `uv run ty check` and targeted pytest coverage. |
 | 2026-06-20 | 260620-tnn-cherry-pick-local-backup-changes-to-main | complete | Cherry-picked local backup commit `a33600b` onto current `main`, preserving current codebase mapping state while restoring wrapper scripts and documentation/evidence notes. |
 | 2026-06-16 | 260616-n3b-record-deferred-hip-v1-26-feedback-sidec | complete | Recorded `profile_summary.sidecar.v1` producer/schema and profiler-counter-derived bottleneck diagnostics as deferred follow-ups. |
@@ -111,6 +112,15 @@ Last activity: 2026-06-22 -- Completed quick task 260622-eaa: Fix pre-push ty-ch
 - v1.37: Profile-summary sidecars may inform HIP adapter diagnostics, but cannot
   promote correctness, timing, performance, score, evidence-tier, release-gate,
   cutover, paper-parity, leaderboard, or claim-upgrade authority.
+
+- v1.38 quick feedback-loop closure: HIP-facing sidecar freshness identity
+  should prefer `sol_version`, `candidate_id`, and `source_sha256` while keeping
+  `sol_contract_version`, `candidate_hash`, and `source_hash` as documented
+  compatibility aliases.
+
+- v1.38 quick feedback-loop closure: profiler-derived bottleneck hints remain
+  in `profile_summary.sidecar.v1`; SOL does not duplicate them into
+  `agent_feedback.items[]`.
 
 ### Pending Todos
 

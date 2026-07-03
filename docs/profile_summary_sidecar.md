@@ -53,7 +53,7 @@ not as a benchmark result. Suggested mapping:
 | --- | --- | --- |
 | `status` | Availability class for normalized profile metadata. | Treat unknown values as unavailable. |
 | `reason_code` | Stable generation state. | Preserve as opaque diagnostic text or downgrade to unknown. |
-| `identity` | Freshness denominator for trace/run matching. | Reject as stale when expected identity mismatches. |
+| `identity` | Freshness denominator for trace/run matching. `identity.sol_version` is the preferred HIP-facing alias for `identity.sol_contract_version`. | Reject as stale when expected identity mismatches. |
 | `summary.profiler_status` | Raw rocprofv3 collection status. | Treat absent status as unavailable. |
 | `summary.artifact_coverage_status` | Registration coverage class such as complete, partial, none, or unavailable. | Treat unknown values as partial diagnostics. |
 | `summary.reason_codes` | Stable rocprofv3 registration and availability reason codes. | Preserve unknown codes as opaque diagnostic text. |
@@ -82,6 +82,12 @@ These hints are diagnostic adapter input only. They are conservative and do not
 claim fine-grained occupancy, VGPR/SGPR pressure, cache, or bandwidth
 conclusions. When counters are missing or insufficient, SOL emits
 `insufficient_counters` or `unknown` instead of speculating.
+
+Profiler-derived bottleneck hints remain in `profile_summary.sidecar.v1`; SOL
+does not surface them as `agent_feedback.items[]`. HIP adapters that want one
+prompt-facing hint list should merge profile-summary hints with agent-feedback
+items only after each source sidecar passes strict freshness and authority
+checks.
 
 HIP runtime prompts should never include raw trace rows, raw profiler dumps,
 full kernel source, prompt text, or absolute temporary paths from SOL profile
