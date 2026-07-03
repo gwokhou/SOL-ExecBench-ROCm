@@ -19,7 +19,7 @@
 UV_CACHE_DIR=/tmp/uv-cache uv run sol-execbench examples/hip_cpp/rmsnorm \
   --solution examples/hip_cpp/rmsnorm/solution_hip.json \
   --static-evidence auto \
-  -o .artifacts/v1.17/rdna4-static-evidence/rmsnorm.trace.jsonl \
+  -o <out>/rdna4-static-evidence/rmsnorm.trace.jsonl \
   --timeout 120 \
   --compile-timeout 120
 ```
@@ -28,8 +28,8 @@ UV_CACHE_DIR=/tmp/uv-cache uv run sol-execbench examples/hip_cpp/rmsnorm \
 
 The run compiled the HIP/C++ solution and wrote:
 
-- `.artifacts/v1.17/rdna4-static-evidence/rmsnorm.trace.jsonl.static-evidence.json`
-- `.artifacts/v1.17/rdna4-static-evidence/rmsnorm.trace.jsonl.static-evidence/`
+- a trace-adjacent static-evidence JSON sidecar
+- a trace-adjacent static-evidence artifact directory
 
 The static evidence sidecar reported:
 
@@ -44,8 +44,8 @@ The static evidence sidecar reported:
 | failed tool runs | 0 |
 | unsupported tool runs | 0 |
 
-The archived evidence included `benchmark_kernel.so`, two object files, and
-bounded raw `llvm-objdump` / `readelf` outputs for each inspectable artifact.
+The archived evidence included `benchmark_kernel.so`, object files, and bounded raw
+`llvm-objdump` / `readelf` outputs for each inspectable artifact.
 
 ## Benchmark Result Boundary
 

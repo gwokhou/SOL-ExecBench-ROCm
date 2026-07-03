@@ -154,9 +154,8 @@ def fn(axes_and_scalars: dict[str, int | float | bool], device: torch.device) ->
         device: The target GPU device. In this ROCm port, PyTorch still exposes
                 AMD GPUs through the `torch.cuda` compatibility namespace.
     Returns:
-        Dict mapping input names (matching Definition.inputs keys) to generated
-        tensors or scalar values. Only needs to return the inputs that are
-        marked 'custom' in the workload.
+        Dict mapping every Definition.inputs key to a generated tensor or scalar
+        value; non-custom inputs are still required in the returned mapping.
     """
 ```
 

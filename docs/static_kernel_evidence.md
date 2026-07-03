@@ -23,15 +23,15 @@ collected and no static evidence sidecar is written.
 
 When `--output` is provided, static evidence is written beside the trace:
 
-| Artifact | Path |
+| Artifact | Location |
 | --- | --- |
-| Canonical traces | `<trace>.jsonl` |
-| Static sidecar | `<trace>.jsonl.static-evidence.json` |
-| Evidence directory | `<trace>.jsonl.static-evidence/` |
+| Canonical traces | `<trace-output>.jsonl` |
+| Static sidecar | `static-evidence payload file` |
+| Evidence directory | `trace-output static-evidence artifact directory` |
 
-Without `--output`, the fallback paths are under the temporary staging
-directory: `static-evidence.json` and `static-evidence/`. Use `--output` for
-durable artifacts.
+Without `--output`, static evidence is written under a temporary staging location
+for the current invocation. Use `--output` for durable, repository-independent
+artifacts.
 
 ## Status Vocabulary
 

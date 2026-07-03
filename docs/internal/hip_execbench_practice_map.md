@@ -6,11 +6,10 @@ adaptation map, not a porting plan:
 public benchmark problem schemas, solution metadata schemas, workload formats, CLI behavior,
 trace JSONL output, and benchmark semantics remain owned by SOL ExecBench ROCm.
 
-Repository evidence reviewed for this adaptation includes hip-execbench source
-surfaces `hip-execbench/src/profiler/router.ts`,
-`hip-execbench/src/errors/index.ts`, `hip-execbench/src/agent/builder.ts`,
-`hip-execbench/src/baseline/comparator.ts`, `hip-execbench/src/schemas/*.ts`,
-and `hip-execbench/src/pipeline/statistics.ts`, mapped against SOL ExecBench ROCm surfaces
+Repository evidence reviewed for this adaptation includes external
+hip-execbench source surfaces for profiler routing, error modeling, agent
+feedback, baseline comparison, schemas, and statistics, mapped against SOL
+ExecBench ROCm surfaces
 `src/sol_execbench/core/bench/rocm_profiler.py`,
 `src/sol_execbench/core/diagnostics.py`, `src/sol_execbench/core/reporting.py`,
 `src/sol_execbench/core/baseline.py`, `src/sol_execbench/core/data/trace.py`,
@@ -48,8 +47,8 @@ and `src/sol_execbench/core/scoring/amd_score.py`.
 
 - Adaptations must be internal helpers, tests, or documentation unless a later
   milestone explicitly approves a public contract change.
-- Existing benchmark `definition.json`, workload, `solution.json`, and trace
-  JSONL formats are compatibility contracts.
+- Existing benchmark definition, workload, solution, and trace JSONL
+  formats are compatibility contracts.
 - SOL-Score-style output must not be presented as an AMD-native hardware claim
   until a dedicated AMD interpretation model is defined and validated.
 - Baseline comparison is baseline-relative by default. It may be used for local
