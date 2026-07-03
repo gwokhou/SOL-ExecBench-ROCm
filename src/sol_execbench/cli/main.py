@@ -803,7 +803,11 @@ def _run_profiled_evaluation(
             text=True,
             timeout=timeout_seconds,
             env=flashinfer_safetensors_env(
-                {**os.environ, "PYTORCH_ALLOC_CONF": "expandable_segments:True"}
+                {
+                    **os.environ,
+                    "PYTORCH_ALLOC_CONF": "expandable_segments:True",
+                    "SOL_EXECBENCH_GRACEFUL_EXIT": "1",
+                }
             ),
         ),
     )
