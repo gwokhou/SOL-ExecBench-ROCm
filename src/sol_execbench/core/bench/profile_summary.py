@@ -13,7 +13,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Literal
 
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, model_validator
 
 from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileResult
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
@@ -173,10 +173,21 @@ class ProfileSummaryIdentity(BaseModelWithDocstrings):
     """UTC timestamp when the sidecar was generated."""
     sol_contract_version: str
     """SOL evaluator contract version used by the producer."""
+    sol_version: str | None = None
+    """Preferred HIP-facing alias for the SOL contract version."""
     trace_path: str | None = None
     """Compact trace path or file name when available."""
     run_id: str | None = None
     """Optional run identity."""
+
+    @model_validator(mode="after")
+    def _aliases_match(self) -> ProfileSummaryIdentity:
+        if (
+            self.sol_version is not None
+            and self.sol_version != self.sol_contract_version
+        ):
+            raise ValueError("sol_version must match sol_contract_version")
+        return self
 
 
 class ProfileSummaryAuthority(BaseModelWithDocstrings):
@@ -317,6 +328,7 @@ def build_profile_summary_sidecar(
         identity=ProfileSummaryIdentity(
             generated_at=generated_at or utc_timestamp(),
             sol_contract_version=SOL_EXECBENCH_CONTRACT_VERSION,
+            sol_version=SOL_EXECBENCH_CONTRACT_VERSION,
             trace_path=_compact_path(trace_path),
             run_id=run_id,
         ),
@@ -357,13 +369,15 @@ def validate_profile_summary_freshness(
     *,
     trace_path: str | None = None,
     sol_contract_version: str = SOL_EXECBENCH_CONTRACT_VERSION,
+    sol_version: str | None = None,
     run_id: str | None = None,
 ) -> ProfileSummaryFreshnessValidation:
     """Classify whether a profile summary identity matches expected run identity."""
 
     reasons: list[str] = []
     identity = sidecar.identity
-    if identity.sol_contract_version != sol_contract_version:
+    expected_sol_version = sol_version or sol_contract_version
+    if (identity.sol_version or identity.sol_contract_version) != expected_sol_version:
         reasons.append("sol_contract_version_mismatch")
     _match_optional(
         reasons, "trace_path", identity.trace_path, _compact_path(trace_path)

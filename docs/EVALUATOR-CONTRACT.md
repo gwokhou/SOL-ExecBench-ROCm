@@ -40,6 +40,10 @@ optional normalized profile summary written as `<trace>.profile-summary.json`
 when a trace output path is available. Current ROCm profiling metadata is still
 emitted separately as the trace-adjacent `<trace>.profile.json` rocprofv3
 sidecar. Consumers must keep working when either optional sidecar is absent.
+For HIP freshness checks, new SOL sidecars emit preferred identity fields
+`sol_version`, `candidate_id`, and `source_sha256` while preserving documented
+aliases `sol_contract_version`, `candidate_hash`, and `source_hash` for existing
+consumers.
 
 ## Official Score Evidence
 

@@ -97,6 +97,12 @@ def test_agent_feedback_sidecar_records_identity_and_artifact_citations(
     assert payload["identity"]["trace_path"] == "trace.jsonl"
     assert payload["identity"]["target_id"] == "problem-0"
     assert payload["identity"]["run_id"] == "run-0"
+    assert (
+        payload["identity"]["sol_version"]
+        == payload["identity"]["sol_contract_version"]
+    )
+    assert payload["identity"]["candidate_id"] == "candidate-sha"
+    assert payload["identity"]["source_sha256"] == "source-sha"
     assert payload["identity"]["candidate_hash"] == "candidate-sha"
     assert payload["identity"]["source_hash"] == "source-sha"
     assert payload["artifact_citations"] == [
@@ -126,6 +132,9 @@ def test_agent_feedback_freshness_validation_classifies_identity(tmp_path: Path)
         trace_path=str(trace_path),
         target_id="problem-0",
         run_id="run-0",
+        sol_version="1.0",
+        candidate_id=None,
+        source_sha256=None,
     )
     stale = validate_agent_feedback_freshness(
         sidecar,
@@ -141,6 +150,46 @@ def test_agent_feedback_freshness_validation_classifies_identity(tmp_path: Path)
     assert stale.reason_codes == ["trace_path_mismatch", "run_id_mismatch"]
     assert unknown.status == "unknown"
     assert unknown.reason_codes == ["insufficient_expected_identity"]
+
+
+def test_agent_feedback_freshness_accepts_hip_identity_aliases(tmp_path: Path):
+    trace_path = tmp_path / "trace.jsonl"
+    sidecar = build_agent_feedback_sidecar(
+        traces=[_trace()],
+        trace_path=str(trace_path),
+        target_id="problem-0",
+        run_id="run-0",
+        candidate_hash="candidate-sha",
+        source_hash="source-sha",
+    )
+
+    current = validate_agent_feedback_freshness(
+        sidecar,
+        trace_path=str(trace_path),
+        target_id="problem-0",
+        run_id="run-0",
+        candidate_id="candidate-sha",
+        source_sha256="source-sha",
+        sol_version="1.0",
+    )
+    stale = validate_agent_feedback_freshness(
+        sidecar,
+        candidate_id="other-candidate",
+        source_sha256="other-source",
+        sol_version="9.9",
+    )
+    payload = sidecar.model_dump(mode="json")
+    payload["identity"]["source_sha256"] = "different-source"
+
+    assert current.status == "current"
+    assert stale.status == "stale"
+    assert stale.reason_codes == [
+        "sol_contract_version_mismatch",
+        "candidate_id_mismatch",
+        "source_sha256_mismatch",
+    ]
+    with pytest.raises(ValidationError):
+        type(sidecar).model_validate(payload)
 
 
 def test_agent_feedback_sidecar_summarizes_failures_and_optional_profile():

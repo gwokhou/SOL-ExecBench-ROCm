@@ -73,6 +73,10 @@ def test_profile_summary_sidecar_is_diagnostic_only(tmp_path: Path):
     assert payload["reason_code"] == "profile_summary_generated"
     assert payload["identity"]["trace_path"] == "trace.jsonl"
     assert payload["identity"]["run_id"] == "run-0"
+    assert (
+        payload["identity"]["sol_version"]
+        == payload["identity"]["sol_contract_version"]
+    )
     assert payload["authority"]["diagnostic_only"] is True
     for key, value in payload["authority"].items():
         if key != "diagnostic_only":
@@ -85,6 +89,30 @@ def test_profile_summary_sidecar_is_diagnostic_only(tmp_path: Path):
     assert payload["summary"]["artifact_kinds"] == {"rocpd": 1}
     assert payload["summary"]["metrics"][0]["name"] == "artifact_count"
     assert payload["artifact_citations"][0]["sha256"] == citation.sha256
+
+
+def test_profile_summary_freshness_accepts_sol_version_alias(tmp_path: Path):
+    sidecar = build_profile_summary_sidecar(
+        profile_result=_profile_result(tmp_path),
+        trace_path=str(tmp_path / "trace.jsonl"),
+        run_id="run-0",
+    )
+
+    current = validate_profile_summary_freshness(
+        sidecar,
+        trace_path=str(tmp_path / "trace.jsonl"),
+        run_id="run-0",
+        sol_version="1.0",
+    )
+    stale = validate_profile_summary_freshness(sidecar, sol_version="9.9")
+    payload = sidecar.model_dump(mode="json")
+    payload["identity"]["sol_version"] = "different-version"
+
+    assert current.status == "current"
+    assert stale.status == "stale"
+    assert stale.reason_codes == ["sol_contract_version_mismatch"]
+    with pytest.raises(ValidationError):
+        ProfileSummarySidecar.model_validate(payload)
 
 
 def test_profile_summary_builds_structured_metrics_and_hints_from_text_artifacts(

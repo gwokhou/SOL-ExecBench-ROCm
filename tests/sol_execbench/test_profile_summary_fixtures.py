@@ -160,6 +160,8 @@ def test_profile_summary_docs_explain_hip_mapping_and_fixture_semantics():
         "summary.workload_metrics[]",
         "summary.kernel_metrics[]",
         "summary.bottleneck_hints[]",
+        "identity.sol_version",
+        "does not surface them as `agent_feedback.items[]`",
         "compute_bound",
         "insufficient_counters",
         "artifact_citations",

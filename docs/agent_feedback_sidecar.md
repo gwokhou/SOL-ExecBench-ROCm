@@ -43,15 +43,19 @@ Schema validation rejects other SOL-produced bottleneck labels. HIP adapters
 should still downgrade unrecognized future values to `unknown` at their boundary
 instead of promoting them into a prompt taxonomy.
 
-The CLI fills `identity.target_id`, `identity.run_id`, and
-`identity.candidate_hash` from emitted trace data when available. `run_id` is
-the persisted Trace JSONL checksum when the trace file exists.
-`candidate_hash` is a checksum of the compact solution labels in emitted trace
-rows; it is not a source-content identity. When the CLI has loaded the
-`Solution`, `identity.source_hash` is the solution content hash covering source
+The CLI fills `identity.target_id`, `identity.run_id`, `identity.candidate_id`,
+`identity.candidate_hash`, `identity.source_sha256`, and
+`identity.source_hash` from emitted trace data when available. `run_id` is the
+persisted Trace JSONL checksum when the trace file exists. `candidate_id` is the
+preferred HIP-facing name for `candidate_hash`: a checksum of the compact
+solution labels in emitted trace rows, not a source-content identity. When the
+CLI has loaded the `Solution`, `identity.source_sha256` is the preferred
+HIP-facing name for `source_hash`: the solution content hash covering source
 paths, source contents, build metadata, and dependencies. Consumers that need
-strong candidate-source freshness should prefer `source_hash` over
-`candidate_hash`.
+strong candidate-source freshness should prefer `source_sha256` over
+`candidate_id`. `identity.sol_version` is the preferred HIP-facing alias for
+`identity.sol_contract_version`; producers must keep the alias pairs identical
+when both are present.
 
 HIP runtime prompts should never include raw trace rows, raw profiler dumps, full
 kernel source, prompt text, or absolute temporary paths from SOL feedback. They
@@ -62,8 +66,12 @@ compact citation fields after freshness and authority checks pass.
 bounded profiler metrics, conservative bottleneck hints, and artifact
 citations. Current ROCm profiler metadata remains the separate
 `<trace>.profile.json` rocprofv3 sidecar and is cited as optional diagnostic
-evidence when present. Agent feedback and profile summary remain separate
-diagnostic surfaces; neither is score, release-gate, or cutover authority.
+evidence when present. Profiler-derived `summary.bottleneck_hints[]` remain in
+the profile-summary contract; SOL does not duplicate those hints into
+`agent_feedback.items[]`. HIP adapters may combine accepted profile-summary
+hints with accepted agent-feedback items after both sidecars pass freshness and
+authority checks. Agent feedback and profile summary remain separate diagnostic
+surfaces; neither is score, release-gate, or cutover authority.
 
 For all closed HIP taxonomies, unknown values must be downgraded rather than
 promoted.
