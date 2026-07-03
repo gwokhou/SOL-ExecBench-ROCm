@@ -109,6 +109,49 @@ def test_run_evaluation_command_passes_flashinfer_env(tmp_path: Path, monkeypatc
     assert captured_env["FLASHINFER_TRACE_DIR"] == "/repo"
 
 
+def test_run_profiled_evaluation_requests_graceful_eval_driver_exit(
+    tmp_path: Path, monkeypatch
+):
+    captured_env = None
+
+    def fake_env(base_env):
+        env = dict(base_env)
+        env["FLASHINFER_TRACE_DIR"] = "/repo"
+        return env
+
+    def fake_run(command, **kwargs):
+        nonlocal captured_env
+        captured_env = kwargs["env"]
+        output_dir = Path(command[command.index("--output-directory") + 1])
+        output_file = command[command.index("--output-file") + 1]
+        output_dir.mkdir(parents=True, exist_ok=True)
+        (output_dir / f"{output_file}_results.db").write_text("profile db")
+        return cli_main.subprocess.CompletedProcess(
+            args=command,
+            returncode=0,
+            stdout='{"definition": "demo"}\n',
+            stderr="",
+        )
+
+    monkeypatch.setattr(cli_main, "flashinfer_safetensors_env", fake_env)
+    monkeypatch.setattr(cli_main.subprocess, "run", fake_run)
+    monkeypatch.setattr(cli_main.shutil, "which", lambda _name: "/usr/bin/rocprofv3")
+
+    profiled_proc, profile_result = cli_main._run_profiled_evaluation(
+        ["python", "eval_driver.py"],
+        staging_dir=tmp_path,
+        output_file=tmp_path / "trace.jsonl",
+        timeout=30,
+    )
+
+    assert profiled_proc is not None
+    assert profile_result.succeeded is True
+    assert captured_env is not None
+    assert captured_env["PYTORCH_ALLOC_CONF"] == "expandable_segments:True"
+    assert captured_env["FLASHINFER_TRACE_DIR"] == "/repo"
+    assert captured_env["SOL_EXECBENCH_GRACEFUL_EXIT"] == "1"
+
+
 def test_no_trace_diagnostics_sidecar_uses_trace_output_path(tmp_path: Path):
     output = tmp_path / "traces.jsonl"
     staging = tmp_path / "staging"
