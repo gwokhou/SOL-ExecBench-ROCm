@@ -125,6 +125,9 @@ Last activity: 2026-07-03 -- Completed quick task 260703-gze: Close SOL-side dia
 ### Pending Todos
 
 - Start the next milestone with `$gsd-new-milestone`.
+- Canonicalize SOL feedback/profile-summary sidecar identity fields around
+  `candidate_id`, `source_sha256`, `sol_version`, and compatibility aliases;
+  see `.planning/todos/pending/2026-07-03-canonicalize-feedback-sidecar-identity-fields.md`.
 - Keep profiler-counter-derived bottleneck diagnostics deferred unless the next
   milestone explicitly scopes hardware/counter taxonomy work.
 
