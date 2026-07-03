@@ -1103,6 +1103,7 @@ def _default_profile_runner(
     working_directory: Path | None,
     timeout_seconds: int | None,
 ) -> subprocess.CompletedProcess[str]:
+    env = {**os.environ, "SOL_EXECBENCH_GRACEFUL_EXIT": "1"}
     return subprocess.run(
         list(command),
         check=False,
@@ -1110,6 +1111,7 @@ def _default_profile_runner(
         capture_output=True,
         cwd=working_directory,
         timeout=timeout_seconds,
+        env=env,
     )
 
 
