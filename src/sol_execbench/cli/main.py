@@ -396,8 +396,9 @@ def _write_profile_summary_sidecar(
     if sidecar_path is None or output_file is None:
         return None
     try:
+        trace_sha256 = sha256_file(output_file) if output_file.is_file() else None
         if run_id is None:
-            run_id = sha256_file(output_file) if output_file.is_file() else None
+            run_id = trace_sha256
         sidecar = build_profile_summary_sidecar(
             profile_result=profile_result,
             trace_path=str(output_file),
@@ -406,7 +407,7 @@ def _write_profile_summary_sidecar(
                 output_file=output_file,
                 profile_result=profile_result,
                 profile_sidecar_path=profile_sidecar_path,
-                trace_sha256=run_id,
+                trace_sha256=trace_sha256,
             ),
         )
         write_json_payload(sidecar_path, sidecar)
@@ -564,6 +565,10 @@ def _write_agent_feedback_sidecar(
     profile_sidecar_path: Path | None = None,
     static_evidence_sidecar_path: Path | None = None,
     run_id: str | None = None,
+    feedback_target_id: str | None = None,
+    feedback_candidate_id: str | None = None,
+    feedback_source_sha256: str | None = None,
+    feedback_sol_version: str | None = None,
 ) -> Path | None:
     """Write optional agent feedback metadata without changing trace JSONL."""
 
@@ -579,6 +584,9 @@ def _write_agent_feedback_sidecar(
             traces,
             solution=solution,
             run_id=run_id,
+            target_id=feedback_target_id,
+            candidate_id=feedback_candidate_id,
+            source_sha256=feedback_source_sha256,
         )
         sidecar = build_agent_feedback_sidecar(
             traces=traces,
@@ -589,12 +597,12 @@ def _write_agent_feedback_sidecar(
             run_id=identity_fields["run_id"],
             candidate_hash=identity_fields["candidate_hash"],
             source_hash=identity_fields["source_hash"],
+            sol_version=feedback_sol_version,
             artifact_citations=_agent_feedback_artifact_citations(
                 output_file=output_file,
                 environment_sidecar_path=environment_sidecar_path,
                 profile_sidecar_path=profile_sidecar_path,
                 static_evidence_sidecar_path=static_evidence_sidecar_path,
-                trace_sha256=run_id,
             ),
         )
         write_json_payload(sidecar_path, sidecar)
@@ -611,6 +619,9 @@ def _agent_feedback_identity_fields(
     *,
     solution: Solution | None = None,
     run_id: str | None = None,
+    target_id: str | None = None,
+    candidate_id: str | None = None,
+    source_sha256: str | None = None,
 ) -> dict[str, str | None]:
     """Derive stable feedback freshness identity from emitted trace data."""
 
@@ -626,16 +637,26 @@ def _agent_feedback_identity_fields(
     )
 
     return {
-        "target_id": (stable_json_checksum(target_records) if target_records else None),
+        "target_id": (
+            target_id
+            if target_id is not None
+            else (stable_json_checksum(target_records) if target_records else None)
+        ),
         "run_id": (
             run_id
             if run_id is not None
             else _agent_feedback_run_id(output_file, traces)
         ),
         "candidate_hash": (
-            stable_json_checksum(solution_labels) if solution_labels else None
+            candidate_id
+            if candidate_id is not None
+            else (stable_json_checksum(solution_labels) if solution_labels else None)
         ),
-        "source_hash": solution.hash() if solution is not None else None,
+        "source_hash": (
+            source_sha256
+            if source_sha256 is not None
+            else (solution.hash() if solution is not None else None)
+        ),
     }
 
 
@@ -862,6 +883,26 @@ def _run_profiled_evaluation(
     show_default=True,
     help="Collect optional diagnostic static kernel evidence",
 )
+@click.option(
+    "--feedback-target-id",
+    help="Consumer target identity to persist in diagnostic agent feedback.",
+)
+@click.option(
+    "--feedback-run-id",
+    help="Consumer run identity to persist in diagnostic agent feedback.",
+)
+@click.option(
+    "--feedback-candidate-id",
+    help="Consumer candidate identity to persist in diagnostic agent feedback.",
+)
+@click.option(
+    "--feedback-source-sha256",
+    help="Consumer source SHA256 identity to persist in diagnostic agent feedback.",
+)
+@click.option(
+    "--feedback-sol-version",
+    help="Consumer SOL version/tag identity to persist in diagnostic agent feedback.",
+)
 @click.option("--verbose", "-v", is_flag=True, help="Show subprocess output")
 def _evaluate_cli(
     problem_dir: Optional[Path],
@@ -877,6 +918,11 @@ def _evaluate_cli(
     keep_staging: bool,
     profile: str,
     static_evidence: str,
+    feedback_target_id: str | None,
+    feedback_run_id: str | None,
+    feedback_candidate_id: str | None,
+    feedback_source_sha256: str | None,
+    feedback_sol_version: str | None,
     verbose: bool,
 ):
     """Evaluate a SOL-ExecBench solution on GPU.
@@ -1133,7 +1179,11 @@ def _evaluate_cli(
         environment_sidecar_path=environment_sidecar_path,
         profile_sidecar_path=profile_sidecar_path,
         static_evidence_sidecar_path=static_evidence_sidecar_path,
-        run_id=trace_run_id,
+        run_id=feedback_run_id or trace_run_id,
+        feedback_target_id=feedback_target_id,
+        feedback_candidate_id=feedback_candidate_id,
+        feedback_source_sha256=feedback_source_sha256,
+        feedback_sol_version=feedback_sol_version,
     )
 
     if json_output:

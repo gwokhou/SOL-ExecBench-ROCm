@@ -376,6 +376,7 @@ def test_profile_summary_sidecar_records_bounded_metadata(tmp_path: Path):
         output,
         result,
         profile_sidecar_path=profile_metadata,
+        run_id="run-001",
     )
 
     assert written == tmp_path / "trace.jsonl.profile-summary.json"
@@ -386,8 +387,7 @@ def test_profile_summary_sidecar_records_bounded_metadata(tmp_path: Path):
     assert payload["authority"]["diagnostic_only"] is True
     assert payload["authority"]["timing_authority"] is False
     assert payload["identity"]["trace_path"] == "trace.jsonl"
-    assert payload["identity"]["run_id"] is not None
-    assert len(payload["identity"]["run_id"]) == 64
+    assert payload["identity"]["run_id"] == "run-001"
     assert (
         payload["identity"]["sol_version"]
         == payload["identity"]["sol_contract_version"]
@@ -525,6 +525,11 @@ def test_agent_feedback_sidecar_records_bounded_metadata(tmp_path: Path):
         solution=solution,
         profile_result=None,
         static_evidence=None,
+        run_id="run-001",
+        feedback_target_id="gemm",
+        feedback_candidate_id="candidate-sha",
+        feedback_source_sha256="source-sha",
+        feedback_sol_version="v1.36",
     )
 
     assert written == tmp_path / "trace.jsonl.agent-feedback.json"
@@ -534,19 +539,13 @@ def test_agent_feedback_sidecar_records_bounded_metadata(tmp_path: Path):
     assert payload["authority"]["diagnostic_only"] is True
     assert payload["authority"]["score_authority"] is False
     assert payload["identity"]["trace_path"] == "trace.jsonl"
-    assert payload["identity"]["target_id"] is not None
-    assert len(payload["identity"]["target_id"]) == 64
-    assert payload["identity"]["run_id"] is not None
-    assert len(payload["identity"]["run_id"]) == 64
-    assert (
-        payload["identity"]["sol_version"]
-        == payload["identity"]["sol_contract_version"]
-    )
-    assert payload["identity"]["candidate_hash"] is not None
-    assert len(payload["identity"]["candidate_hash"]) == 64
+    assert payload["identity"]["target_id"] == "gemm"
+    assert payload["identity"]["run_id"] == "run-001"
+    assert payload["identity"]["sol_version"] == "v1.36"
+    assert payload["identity"]["candidate_hash"] == "candidate-sha"
     assert payload["identity"]["candidate_id"] == payload["identity"]["candidate_hash"]
-    assert payload["identity"]["source_hash"] == solution.hash()
-    assert payload["identity"]["source_sha256"] == solution.hash()
+    assert payload["identity"]["source_hash"] == "source-sha"
+    assert payload["identity"]["source_sha256"] == "source-sha"
     assert payload["summary"]["status_counts"] == {"COMPILE_ERROR": 1}
     assert payload["items"][0]["code"] == "compile_error"
     trace_citations = [
@@ -605,6 +604,42 @@ def test_agent_feedback_identity_uses_solution_source_hash(tmp_path: Path):
     assert second_identity["source_hash"] == second.hash()
     assert first_identity["source_hash"] != second_identity["source_hash"]
     assert no_solution_identity["source_hash"] is None
+
+
+def test_agent_feedback_identity_accepts_consumer_identity_fields(tmp_path: Path):
+    output = tmp_path / "trace.jsonl"
+    output.write_text('{"definition":"toy"}\n')
+    trace = Trace(
+        definition="toy",
+        solution="candidate",
+        workload=Workload(
+            uuid="w0",
+            axes={"n": 1},
+            inputs={"n": ScalarInput(value=1)},
+        ),
+        evaluation=Evaluation(
+            status=EvaluationStatus.COMPILE_ERROR,
+            environment=Environment(hardware="AMD gfx1200", libs={"hip": "7.0"}),
+            timestamp="2026-06-16T00:00:00Z",
+        ),
+    )
+
+    identity = cli_main._agent_feedback_identity_fields(
+        output,
+        [trace],
+        solution=_solution(),
+        run_id="run-001",
+        target_id="gemm",
+        candidate_id="candidate-sha",
+        source_sha256="source-sha",
+    )
+
+    assert identity == {
+        "target_id": "gemm",
+        "run_id": "run-001",
+        "candidate_hash": "candidate-sha",
+        "source_hash": "source-sha",
+    }
 
 
 def test_static_evidence_none_does_not_collect(tmp_path: Path):

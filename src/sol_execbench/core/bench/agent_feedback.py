@@ -122,7 +122,7 @@ class AgentFeedbackIdentity(BaseModelWithDocstrings):
     sol_contract_version: str
     """SOL evaluator contract version used by the producer."""
     sol_version: str | None = None
-    """Preferred HIP-facing alias for the SOL contract version."""
+    """Producer/runtime SOL version or HIP-facing supported SOL tag."""
     trace_path: str | None = None
     """Compact trace path or file name when available."""
     target_id: str | None = None
@@ -140,11 +140,6 @@ class AgentFeedbackIdentity(BaseModelWithDocstrings):
 
     @model_validator(mode="after")
     def _aliases_match(self) -> AgentFeedbackIdentity:
-        if (
-            self.sol_version is not None
-            and self.sol_version != self.sol_contract_version
-        ):
-            raise ValueError("sol_version must match sol_contract_version")
         if self.candidate_id is not None and self.candidate_hash is not None:
             if self.candidate_id != self.candidate_hash:
                 raise ValueError("candidate_id must match candidate_hash")
@@ -278,6 +273,7 @@ def build_agent_feedback_sidecar(
     run_id: str | None = None,
     candidate_hash: str | None = None,
     source_hash: str | None = None,
+    sol_version: str | None = None,
     generated_at: str | None = None,
     artifact_citations: Sequence[AgentFeedbackArtifactCitation] = (),
 ) -> AgentFeedbackSidecar:
@@ -303,7 +299,7 @@ def build_agent_feedback_sidecar(
         identity=AgentFeedbackIdentity(
             generated_at=generated_at or utc_timestamp(),
             sol_contract_version=SOL_EXECBENCH_CONTRACT_VERSION,
-            sol_version=SOL_EXECBENCH_CONTRACT_VERSION,
+            sol_version=sol_version,
             trace_path=_compact_path(trace_path),
             target_id=target_id,
             run_id=run_id,
