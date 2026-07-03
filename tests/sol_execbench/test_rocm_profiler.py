@@ -90,6 +90,30 @@ def test_profile_artifact_discovery_classifies_rocpd_and_csv_outputs(tmp_path):
     assert all(artifact.size_bytes > 0 for artifact in artifacts)
 
 
+def test_profile_artifact_discovery_accepts_unprefixed_rocprofv3_root_outputs(
+    tmp_path,
+):
+    (tmp_path / "results.rocpd").write_text("db")
+    (tmp_path / "kernel_trace.csv").write_text("kernel")
+    (tmp_path / "agent_info.json").write_text("{}")
+    (tmp_path / "unrelated.csv").write_text("skip")
+
+    artifacts = discover_rocprofv3_artifacts(tmp_path, "profile")
+
+    assert [
+        artifact.path.relative_to(tmp_path).as_posix() for artifact in artifacts
+    ] == [
+        "agent_info.json",
+        "kernel_trace.csv",
+        "results.rocpd",
+    ]
+    assert [artifact.kind for artifact in artifacts] == [
+        "metadata_json",
+        "trace_csv",
+        "rocpd",
+    ]
+
+
 def test_profile_artifact_discovery_recurses_and_filters_known_outputs(tmp_path):
     profile_dir = tmp_path / "profile"
     profile_dir.mkdir()
@@ -333,7 +357,7 @@ def test_profile_collection_existing_diagnostic_log_does_not_count_as_success(
     tmp_path,
 ):
     diagnostic = tmp_path / "profile.diagnostics.json"
-    diagnostic.write_text('{"status":"no_profiler_data_artifacts"}\n')
+    diagnostic.write_text('{"status":"stale-diagnostic"}\n')
 
     def runner(
         command: Sequence[str],
@@ -377,6 +401,10 @@ def test_profile_collection_existing_diagnostic_log_does_not_count_as_success(
             "size_bytes": diagnostic.stat().st_size,
         }
     ]
+    diagnostic_payload = diagnostic.read_text(encoding="utf-8")
+    assert "stale-diagnostic" not in diagnostic_payload
+    assert "rocprof initialized but generated no data files" in diagnostic_payload
+    assert '"generated_at":' in diagnostic_payload
 
 
 def test_parse_rocprofv3_csv_keeps_domains_separate():

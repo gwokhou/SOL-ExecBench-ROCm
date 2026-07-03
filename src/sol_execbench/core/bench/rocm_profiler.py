@@ -9,10 +9,12 @@ import csv
 import json
 import os
 import re
+import shutil
 import subprocess
 from collections.abc import Callable
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -410,6 +412,8 @@ def _is_profile_artifact_candidate(
     name = path.name
     if output_file and name.startswith(output_file):
         return True
+    if not output_file:
+        return False
 
     if not _is_known_profile_artifact_name(path):
         return False
@@ -418,6 +422,8 @@ def _is_profile_artifact_candidate(
         relative_parts = path.relative_to(output_directory).parts[:-1]
     except ValueError:
         return False
+    if not relative_parts:
+        return _is_unprefixed_profile_artifact_name(path)
     normalized_parts = {
         _normalize_profile_artifact_token(part) for part in relative_parts
     }
@@ -436,6 +442,38 @@ def _is_known_profile_artifact_name(path: Path) -> bool:
         "kernel-trace",
         "metadata",
     }
+
+
+def _is_unprefixed_profile_artifact_name(path: Path) -> bool:
+    suffix = path.suffix.lower()
+    normalized_name = _normalize_profile_artifact_token(path.stem or path.name)
+    if suffix in {".db", ".sqlite", ".sqlite3", ".rocpd", ".pftrace", ".otf2"}:
+        return True
+    if suffix == ".json":
+        return normalized_name in {
+            "agent-info",
+            "metadata",
+            "out-config",
+            "results",
+        }
+    if suffix == ".csv":
+        return any(
+            token in normalized_name
+            for token in (
+                "agent",
+                "counter",
+                "hip",
+                "hsa",
+                "kernel",
+                "marker",
+                "memory",
+                "rocdecode",
+                "rocjpeg",
+                "runtime",
+                "trace",
+            )
+        )
+    return False
 
 
 def _normalize_profile_artifact_token(value: str) -> str:
@@ -517,7 +555,7 @@ def collect_rocprofv3_profile(
             **_profile_result_metadata(request),
         )
 
-    request.output_directory.mkdir(parents=True, exist_ok=True)
+    _prepare_profile_output_directory(request.output_directory, request.output_file)
     run = runner or _default_profile_runner
     try:
         completed = run(
@@ -678,6 +716,35 @@ def _profile_result_metadata(
             request.output_directory
         ),
     }
+
+
+def _prepare_profile_output_directory(output_directory: Path, output_file: str) -> None:
+    """Remove stale artifacts that would be registered for this profile run."""
+    output_directory.mkdir(parents=True, exist_ok=True)
+    for path in sorted(
+        output_directory.rglob("*"),
+        key=lambda candidate: len(candidate.parts),
+        reverse=True,
+    ):
+        if path.is_file():
+            if _is_profile_artifact_candidate(path, output_directory, output_file):
+                path.unlink(missing_ok=True)
+            continue
+        if not path.is_dir():
+            continue
+        try:
+            relative_parts = path.relative_to(output_directory).parts
+        except ValueError:
+            continue
+        normalized_parts = {
+            _normalize_profile_artifact_token(part) for part in relative_parts
+        }
+        if (
+            output_file in relative_parts
+            or path.name.startswith(output_file)
+            or bool(normalized_parts & _PROFILE_OUTPUT_DIR_NAMES)
+        ):
+            shutil.rmtree(path, ignore_errors=True)
 
 
 def select_default_timing(
@@ -1087,6 +1154,7 @@ def _write_rocprofv3_diagnostic_artifact(
     path = request.output_directory / f"{request.output_file}.diagnostics.json"
     payload = {
         "schema_version": "sol_execbench.rocprofv3_diagnostics.v1",
+        "generated_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "diagnostic_only": True,
         "score_authority": False,
         "status": "no_profiler_data_artifacts",
