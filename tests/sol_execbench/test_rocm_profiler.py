@@ -197,6 +197,38 @@ def test_profile_collection_records_success_metadata(tmp_path):
     assert payload["stderr_tail"] == "profiler note"
 
 
+def test_default_profile_collection_requests_graceful_eval_driver_exit(
+    tmp_path, monkeypatch
+):
+    captured_env: dict[str, str] = {}
+
+    def fake_run(command, **kwargs):
+        captured_env.update(kwargs.get("env") or {})
+        (tmp_path / "profile.rocpd").write_text("profile db")
+        return subprocess.CompletedProcess(
+            args=list(command),
+            returncode=0,
+            stdout='{"definition": "demo"}\n',
+            stderr="profiler note",
+        )
+
+    monkeypatch.setattr(
+        "sol_execbench.core.bench.rocm_profiler.subprocess.run", fake_run
+    )
+    request = Rocprofv3ProfileRequest(
+        application_command=("python", "eval_driver.py"),
+        output_directory=tmp_path,
+        output_file="profile",
+        working_directory=tmp_path,
+        timeout_seconds=30,
+    )
+
+    result = collect_rocprofv3_profile(request)
+
+    assert result.succeeded is True
+    assert captured_env["SOL_EXECBENCH_GRACEFUL_EXIT"] == "1"
+
+
 def test_profile_collection_unavailable_is_nonfatal_metadata(tmp_path):
     def runner(
         command: Sequence[str], cwd, timeout
