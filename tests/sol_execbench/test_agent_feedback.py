@@ -88,6 +88,7 @@ def test_agent_feedback_sidecar_records_identity_and_artifact_citations(
         run_id="run-0",
         candidate_hash="candidate-sha",
         source_hash="source-sha",
+        sol_version="v1.36",
         generated_at="2026-06-16T00:00:00Z",
         artifact_citations=[citation],
     )
@@ -97,10 +98,8 @@ def test_agent_feedback_sidecar_records_identity_and_artifact_citations(
     assert payload["identity"]["trace_path"] == "trace.jsonl"
     assert payload["identity"]["target_id"] == "problem-0"
     assert payload["identity"]["run_id"] == "run-0"
-    assert (
-        payload["identity"]["sol_version"]
-        == payload["identity"]["sol_contract_version"]
-    )
+    assert payload["identity"]["sol_version"] == "v1.36"
+    assert payload["identity"]["sol_contract_version"] != "v1.36"
     assert payload["identity"]["candidate_id"] == "candidate-sha"
     assert payload["identity"]["source_sha256"] == "source-sha"
     assert payload["identity"]["candidate_hash"] == "candidate-sha"
@@ -116,6 +115,31 @@ def test_agent_feedback_sidecar_records_identity_and_artifact_citations(
     ]
     assert citation.sha256 is not None
     assert len(citation.sha256) == 64
+
+
+def test_agent_feedback_sidecar_freshness_uses_consumer_sol_version_alias() -> None:
+    sidecar = build_agent_feedback_sidecar(
+        traces=[_trace()],
+        target_id="gemm",
+        run_id="run-001",
+        candidate_hash="candidate-sha",
+        source_hash="source-sha",
+        sol_version="v1.36",
+    )
+
+    current = validate_agent_feedback_freshness(
+        sidecar,
+        target_id="gemm",
+        run_id="run-001",
+        candidate_id="candidate-sha",
+        source_sha256="source-sha",
+        sol_version="v1.36",
+    )
+    stale = validate_agent_feedback_freshness(sidecar, sol_version="v1.35")
+
+    assert current.status == "current"
+    assert stale.status == "stale"
+    assert stale.reason_codes == ["sol_contract_version_mismatch"]
 
 
 def test_agent_feedback_freshness_validation_classifies_identity(tmp_path: Path):
