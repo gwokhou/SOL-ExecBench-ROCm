@@ -18,8 +18,8 @@ UV_CACHE_DIR=/tmp/uv-cache uv run scripts/internal/release/release_candidate_val
 
 The command writes:
 
-- `release_candidate_validation.json`
-- `release_candidate_validation.md`
+- a release-candidate validation JSON summary
+- a release-candidate validation Markdown summary
 
 The JSON and Markdown summaries classify every check as `blocking`,
 `deferred`, or `diagnostic-only`, and every non-passing or unavailable check has
@@ -53,10 +53,10 @@ UV_CACHE_DIR=/tmp/uv-cache uv run scripts/internal/release/release_candidate_val
   --include-docker-smoke
 ```
 
-These checks may be `passed`, `failed`, `skipped`, or `unavailable` depending on
-the host. Missing ROCm devices, unavailable Docker, or skipped hardware-marked
-tests should normally be classified as **deferred** or **diagnostic-only**, not
-as proof that the engineering prerelease is unusable.
+These checks may be `passed`, `failed`, or `unavailable` depending on
+the host. Missing ROCm devices, unavailable Docker, and intentionally
+missing optional checks are classified as **deferred** or **diagnostic-only**;
+they are not proof that the engineering prerelease is unusable.
 
 Clock-policy environment values such as `SOL_EXECBENCH_CLOCKS_LOCKED`,
 `SOL_EXECBENCH_GPU_CLK_MHZ`, and `SOL_EXECBENCH_DRAM_CLK_MHZ` are recorded when
@@ -78,9 +78,10 @@ The dataset limit is required and must be positive. This path is intentionally
 bounded engineering prerelease evidence. It is not full 235-problem paper
 validation and must not be presented as paper parity.
 
-The wrapper records expected trace, execution-closure, trust-summary, and
-known-gap artifact paths where available. Missing assets or readiness blockers
-should be reviewed as deferred evidence with concrete next actions.
+The wrapper records execution-closure artifacts for the bounded slice when
+available, and it records trust-summary and known-gap artifacts as defined
+by the runtime script. Missing assets or readiness blockers are reviewed as
+deferred evidence with concrete next actions.
 
 ## Failure Classification
 

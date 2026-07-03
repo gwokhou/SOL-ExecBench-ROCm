@@ -25,7 +25,6 @@ available beside a run:
 
 - `runtime.evidence.v1`
 - `profiling.evidence.v1`
-- `official_score_evidence.v1`
 - `toolchain.routing.v1`
 - `static_kernel_evidence.v1`
 - `agent_feedback.sidecar.v1`
@@ -73,8 +72,8 @@ fields.
 > `src/sol_execbench/core/scoring/official_score.py` and re-exported from the
 > scoring package, but **no run path emits this artifact yet** — no CLI command,
 > runner, or sidecar writer invokes the gate. The `official_score_evidence.v1`
-> capability token is advertised as a future surface; downstream consumers must
-> treat it as absent today. Wiring requires an explicit score aggregation policy
+> capability token is not advertised by `build_evaluator_contract()` today;
+> downstream consumers must treat it as absent. Wiring requires an explicit score aggregation policy
 > (not yet a concept on `AmdNativeSuiteReport`) and baseline-source
 > classification coverage guarded by tests. Until then, AMD-native score reports
 > (`sol_execbench.amd_native_score.v1`) remain the only emitted score-adjacent

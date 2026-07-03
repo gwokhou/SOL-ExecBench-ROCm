@@ -22,7 +22,7 @@ The evaluator runs your solution against every Workload in the problem's set; cu
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `uuid` | string | Yes | Required non-empty identifier for this workload |
-| `axes` | object | Yes | Map of `var` axis names → concrete integer values |
+| `axes` | object | Yes | Map of axis names → concrete non-negative integer values |
 | `inputs` | object | Yes | Map of input names → input descriptor (how to source the data) |
 | `tolerance` | object | No | Per-workload correctness bounds (defaults below) |
 
@@ -201,7 +201,7 @@ For each workload, the evaluator:
    - `safetensors` → loads tensor from file
    - `custom` → resolves the named custom input function from reference code
      and calls it with `(axes_and_scalars, device)`
-3. Pre-allocates output tensors (shapes from Definition.outputs with resolved axes)
+3. Resolves output tensor shapes from Definition.outputs with resolved axes
 4. Calls the solution with inputs in Definition order; preallocated outputs are
    appended only when `destination_passing_style` is true
 5. Compares outputs against the loaded reference function for correctness

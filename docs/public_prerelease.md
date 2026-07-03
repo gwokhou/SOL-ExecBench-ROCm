@@ -32,11 +32,11 @@ UV_CACHE_DIR=/tmp/uv-cache uv run scripts/internal/release/check_prerelease_read
 
 4. Attach or link release assets.
 
-- `out/prerelease_artifact_bundle/v1.26.0-rc1/prerelease_artifact_bundle.json`
-- `out/prerelease_artifact_bundle/v1.26.0-rc1/prerelease_artifact_bundle.md`
-- `out/prerelease_artifact_bundle/v1.26.0-rc1/SHA256SUMS`
-- `out/prerelease_readiness/v1.26.0-rc1/prerelease_readiness.json`
-- `out/prerelease_readiness/v1.26.0-rc1/prerelease_readiness.md`
+- prerelease artifact bundle JSON report
+- prerelease artifact bundle Markdown summary
+- SHA-256 checksum manifest
+- prerelease readiness JSON report
+- prerelease readiness Markdown summary
 
 5. Fill the release draft in `docs/releases/v1_26_prerelease_draft.md`.
 

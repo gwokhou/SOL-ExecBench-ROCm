@@ -168,7 +168,7 @@ this corrected interpretation:
   default NVFP4/MXFP4 hardware validation requires CDNA4-class support.
 - No remaining missing-safetensors blob failure was observed in the uploaded
   full-validation logs.
-- Six workload shards produced nested `eval_driver.py` `TimeoutExpired` logs.
+- Six workload shards produced nested staged eval-driver `TimeoutExpired` logs.
   The original full-validation summary omitted those shards and therefore must
   not be used to claim zero failures.
 

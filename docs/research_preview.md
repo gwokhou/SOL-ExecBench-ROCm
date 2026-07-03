@@ -82,10 +82,10 @@ equivalence, official leaderboard equivalence, or paper-scale validation.
 
 | Step | Representative command | Expected artifacts | Authority class |
 | --- | --- | --- | --- |
-| First-run trace | `uv run sol-execbench tests/sol_execbench/samples/rmsnorm --solution tests/sol_execbench/samples/rmsnorm/solution_triton.json --json -o out/researcher/rmsnorm.trace.jsonl` | `out/researcher/rmsnorm.trace.jsonl` | canonical |
-| Release validation | `UV_CACHE_DIR=/tmp/uv-cache uv run scripts/internal/release/release_candidate_validation.py --output-dir out/release_candidate_validation` | `release_candidate_validation.json`, `release_candidate_validation.md` | diagnostic-only |
-| Artifact bundle | `UV_CACHE_DIR=/tmp/uv-cache uv run scripts/internal/release/build_prerelease_artifact_bundle.py --version v1.26.0-rc1 --output-dir out/prerelease_artifact_bundle/v1.26.0-rc1` | bundle manifest, Markdown, `SHA256SUMS`, transcripts, release validation outputs, environment evidence | diagnostic-only |
-| Readiness gate | `UV_CACHE_DIR=/tmp/uv-cache uv run scripts/internal/release/check_prerelease_readiness.py --bundle-dir out/prerelease_artifact_bundle/v1.26.0-rc1 --output-dir out/prerelease_readiness/v1.26.0-rc1` | `prerelease_readiness.json`, `prerelease_readiness.md` | diagnostic-only |
+| First-run trace | `uv run sol-execbench tests/sol_execbench/samples/rmsnorm --solution tests/sol_execbench/samples/rmsnorm/solution_triton.json --json -o <out>/rmsnorm.trace.jsonl` | canonical trace in the selected output directory | canonical |
+| Release validation | `UV_CACHE_DIR=/tmp/uv-cache uv run scripts/internal/release/release_candidate_validation.py --output-dir out/release_candidate_validation` | release-candidate validation summaries | diagnostic-only |
+| Artifact bundle | `UV_CACHE_DIR=/tmp/uv-cache uv run scripts/internal/release/build_prerelease_artifact_bundle.py --version v1.26.0-rc1 --output-dir out/prerelease_artifact_bundle/v1.26.0-rc1` | bundle manifest report, Markdown summary, checksum file, transcripts, and release readiness diagnostics in the selected output directory | diagnostic-only |
+| Readiness gate | `UV_CACHE_DIR=/tmp/uv-cache uv run scripts/internal/release/check_prerelease_readiness.py --bundle-dir out/prerelease_artifact_bundle/v1.26.0-rc1 --output-dir out/prerelease_readiness/v1.26.0-rc1` | readiness summary outputs in the selected output directory | diagnostic-only |
 | Bounded dataset slice | `UV_CACHE_DIR=/tmp/uv-cache uv run scripts/internal/release/release_candidate_validation.py --output-dir out/release_candidate_validation --include-dataset-slice --dataset-dir data/SOL-ExecBench/benchmark --dataset-limit 5` | execution closure, trust summary when inputs exist, known-gap records | provisional |
 
 ## Limitations

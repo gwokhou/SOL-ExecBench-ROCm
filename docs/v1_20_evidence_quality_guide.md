@@ -10,8 +10,8 @@ semantics.
 | Surface | Script | Purpose |
 | --- | --- | --- |
 | `sol_execbench.consistency_report.v1` | `scripts/internal/reports/report_consistency.py` | Detect contradictions across closure, denominator, Matrix, runtime/static evidence, AMD score, and AMD bound sanity reports. |
-| `sol_execbench.evaluation_stability.v1` | `scripts/internal/reports/report_evaluation_stability.py` | Classify timing quality as stable, noisy, insufficient-samples, missing-timing, clock-unlocked, profiler-overhead-risk, or backend-unsupported. |
-| `sol_execbench.claim_upgrade.v1` | `scripts/internal/reports/report_claim_upgrade.py` | Evaluate prerequisites for diagnostic-only, container-validated, native-host-validated, score-authoritative, paper-parity-candidate, and leaderboard-ready claims. |
+| `sol_execbench.evaluation_stability.v1` | `scripts/internal/reports/report_evaluation_stability.py` | Classify timing quality as `stable`, `noisy`, `insufficient_samples`, `missing_timing`, `clock_unlocked`, `profiler_overhead_risk`, `backend_unsupported`, `gpu_contention`, or `multi_instance_interference`. |
+| `sol_execbench.claim_upgrade.v1` | `scripts/internal/reports/report_claim_upgrade.py` | Evaluate prerequisites for `diagnostic_only`, `container_validated`, `native_host_validated`, `score_authoritative`, `paper_parity_candidate`, and `leaderboard_ready` claims. |
 | `sol_execbench.trust_summary.v1` | `scripts/internal/reports/report_trust_summary.py` | Combine consistency, stability, claim-upgrade, closure, denominator, Matrix, score, and bound status into a concise review artifact. |
 
 ## Example Flow
