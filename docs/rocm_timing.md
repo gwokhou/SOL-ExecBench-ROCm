@@ -116,10 +116,10 @@ was unavailable, or failed, and includes command provenance, working directory,
 timeout, artifact paths, return code, artifact coverage status, stable reason
 codes, warnings, and stdout/stderr tails.
 
-A `rocprofv3` profile command that exits with return code 0 and produces at
-least one registered artifact remains `status: success`. Incomplete evidence is
-expressed through `artifact_coverage_status`, `reason_codes`, and `warnings`
-rather than alternate top-level success states. Stable reason codes include
+A `rocprofv3` profile command that exits with return code 0 can still produce
+`status: partial` when registered artifact coverage is incomplete. Incomplete
+evidence is expressed through `status`, `artifact_coverage_status`,
+`reason_codes`, and `warnings`. Stable reason codes include
 `rocprof_artifacts_registered`, `rocprof_no_registered_artifacts`,
 `rocprof_partial_artifact_coverage`, `rocprof_command_failed`, and
 `rocprof_unavailable`.

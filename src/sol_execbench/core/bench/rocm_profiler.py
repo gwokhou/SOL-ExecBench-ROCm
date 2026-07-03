@@ -131,6 +131,16 @@ class Rocprofv3ProfileResult:
         """Whether profiler collection completed with registered artifacts."""
         return self.status == "success"
 
+    @property
+    def has_profiler_data(self) -> bool:
+        """Whether any registered artifact carries profiler data.
+
+        Diagnostic/opaque kinds (``diagnostic_json``, ``other``) do not count.
+        Centralizes the data-vs-diagnostic classification so consumers
+        (e.g. profile_summary) read this instead of re-deriving it.
+        """
+        return _has_profiler_data_artifact(self.artifacts)
+
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable diagnostic sidecar payload."""
         return {
@@ -504,10 +514,7 @@ def collect_rocprofv3_profile(
             profiler_available=False,
             artifact_coverage_status="unavailable",
             reason_codes=(ROCPROF_REASON_UNAVAILABLE,),
-            output_format=request.output_format,
-            output_directory_listing=_profile_output_directory_listing(
-                request.output_directory
-            ),
+            **_profile_result_metadata(request),
         )
 
     request.output_directory.mkdir(parents=True, exist_ok=True)
@@ -549,11 +556,7 @@ def collect_rocprofv3_profile(
             artifact_coverage_status=timeout_coverage,
             reason_codes=(ROCPROF_REASON_COMMAND_TIMEOUT, *timeout_reasons),
             warnings=timeout_warnings,
-            output_format=request.output_format,
-            profiler_data_artifacts=_has_profiler_data_artifact(timeout_artifacts),
-            output_directory_listing=_profile_output_directory_listing(
-                request.output_directory
-            ),
+            **_profile_result_metadata(request, timeout_artifacts),
         )
 
     artifacts = discover_rocprofv3_artifacts(
@@ -583,70 +586,38 @@ def collect_rocprofv3_profile(
             artifact_coverage_status=coverage_status,
             reason_codes=(ROCPROF_REASON_COMMAND_FAILED, *coverage_reasons),
             warnings=coverage_warnings,
-            output_format=request.output_format,
-            profiler_data_artifacts=_has_profiler_data_artifact(artifacts),
-            output_directory_listing=_profile_output_directory_listing(
-                request.output_directory
-            ),
+            **_profile_result_metadata(request, artifacts),
         )
     if not artifacts:
-        diagnostic_artifact = _write_rocprofv3_diagnostic_artifact(
-            request,
-            completed,
-            command,
-        )
+        # rocprof wrote nothing on disk. Persist a diagnostic log so the run is
+        # not silent, then re-check. If a diagnostic artifact landed, fall
+        # through to the unified tail below, which classifies it as
+        # ``diagnostic_logs_only`` (status=partial) -- the same outcome that an
+        # explicit early return here would produce. Only the genuinely-empty
+        # case needs its own failed return, because the tail treats empty
+        # coverage as success.
+        _write_rocprofv3_diagnostic_artifact(request, completed, command)
         artifacts = discover_rocprofv3_artifacts(
             request.output_directory,
             request.output_file,
         )
-        if diagnostic_artifact is not None and artifacts:
+        if not artifacts:
             return Rocprofv3ProfileResult(
-                status="partial",
+                status="failed",
                 command=tuple(command),
                 output_directory=request.output_directory,
                 output_file=request.output_file,
-                artifacts=artifacts,
                 returncode=completed.returncode,
                 stdout=completed.stdout or "",
                 stderr=completed.stderr or "",
-                failed_reason=(
-                    "rocprofv3 completed without profiler data artifacts; "
-                    "diagnostic log artifact registered"
-                ),
+                failed_reason="rocprofv3 completed without registered artifacts",
                 working_directory=request.working_directory,
                 timeout_seconds=request.timeout_seconds,
                 profiler_available=True,
-                artifact_coverage_status="diagnostic_logs_only",
-                reason_codes=(
-                    ROCPROF_REASON_NO_REGISTERED_ARTIFACTS,
-                    ROCPROF_REASON_DIAGNOSTIC_LOG_REGISTERED,
-                ),
-                warnings=(ROCPROF_WARNING_NO_PROFILER_DATA_ARTIFACTS,),
-                output_format=request.output_format,
-                profiler_data_artifacts=False,
-                output_directory_listing=_profile_output_directory_listing(
-                    request.output_directory
-                ),
+                artifact_coverage_status="none",
+                reason_codes=(ROCPROF_REASON_NO_REGISTERED_ARTIFACTS,),
+                **_profile_result_metadata(request),
             )
-        return Rocprofv3ProfileResult(
-            status="failed",
-            command=tuple(command),
-            output_directory=request.output_directory,
-            output_file=request.output_file,
-            returncode=completed.returncode,
-            stdout=completed.stdout or "",
-            stderr=completed.stderr or "",
-            failed_reason="rocprofv3 completed without registered artifacts",
-            working_directory=request.working_directory,
-            timeout_seconds=request.timeout_seconds,
-            profiler_available=True,
-            artifact_coverage_status="none",
-            reason_codes=(ROCPROF_REASON_NO_REGISTERED_ARTIFACTS,),
-            output_format=request.output_format,
-            output_directory_listing=_profile_output_directory_listing(
-                request.output_directory
-            ),
-        )
 
     coverage_status, coverage_reasons, coverage_warnings = (
         _profile_artifact_coverage_metadata(
@@ -680,11 +651,7 @@ def collect_rocprofv3_profile(
         artifact_coverage_status=coverage_status,
         reason_codes=coverage_reasons,
         warnings=coverage_warnings,
-        output_format=request.output_format,
-        profiler_data_artifacts=_has_profiler_data_artifact(artifacts),
-        output_directory_listing=_profile_output_directory_listing(
-            request.output_directory
-        ),
+        **_profile_result_metadata(request, artifacts),
     )
 
 
@@ -692,6 +659,25 @@ def _has_profiler_data_artifact(
     artifacts: Sequence[Rocprofv3ProfileArtifact],
 ) -> bool:
     return any(_is_profiler_data_artifact(artifact) for artifact in artifacts)
+
+
+def _profile_result_metadata(
+    request: Rocprofv3ProfileRequest,
+    artifacts: Sequence[Rocprofv3ProfileArtifact] = (),
+) -> dict[str, Any]:
+    """Fields every Rocprofv3ProfileResult derives from the request + artifacts.
+
+    Collapses the ``output_format`` / ``profiler_data_artifacts`` /
+    ``output_directory_listing`` trio that would otherwise be hand-copied onto
+    every return site in ``collect_rocprofv3_profile``.
+    """
+    return {
+        "output_format": request.output_format,
+        "profiler_data_artifacts": _has_profiler_data_artifact(artifacts),
+        "output_directory_listing": _profile_output_directory_listing(
+            request.output_directory
+        ),
+    }
 
 
 def select_default_timing(

@@ -28,7 +28,7 @@ def export_hip_baseline_registry(
     expected_workload_keys: list[str] = []
     for index, trace in enumerate(traces):
         workload = trace.get("workload")
-        workload_map = workload if isinstance(workload, dict) else {}
+        workload_map = _dict_or_empty(workload)
         workload_uuid = _string_or_none(workload_map.get("uuid"))
         workload_key = _workload_key(trace, workload_uuid=workload_uuid, index=index)
         expected_workload_keys.append(workload_key)
@@ -44,9 +44,9 @@ def export_hip_baseline_registry(
         if latency_ms is None:
             continue
         environment = evaluation.get("environment")
-        environment_map = environment if isinstance(environment, dict) else {}
+        environment_map = _dict_or_empty(environment)
         libs = environment_map.get("libs")
-        libs_map = libs if isinstance(libs, dict) else {}
+        libs_map = _dict_or_empty(libs)
         entries.append(
             {
                 "target_id": target_id,
@@ -158,6 +158,10 @@ def _string_or_none(value: Any) -> str | None:
     if isinstance(value, str) and value.strip():
         return value
     return None
+
+
+def _dict_or_empty(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
 
 
 def _rocm_version(libs: dict[str, Any]) -> str:
