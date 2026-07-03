@@ -15,10 +15,7 @@ from typing import Literal
 
 from pydantic import ConfigDict, Field
 
-from sol_execbench.core.bench.rocm_profiler import (
-    Rocprofv3ProfileResult,
-    _NON_DATA_ARTIFACT_KINDS,
-)
+from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileResult
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 from sol_execbench.core.data.contract import SOL_EXECBENCH_CONTRACT_VERSION
 from sol_execbench.core.dataset.checksums import sha256_file
@@ -431,11 +428,7 @@ def _status_for_profile_result(
 ) -> ProfileSummaryStatus:
     if profile_result is None:
         return ProfileSummaryStatus.UNAVAILABLE
-    has_profiler_data_artifact = any(
-        artifact.kind not in _NON_DATA_ARTIFACT_KINDS
-        for artifact in profile_result.artifacts
-    )
-    if profile_result.status == "success" and has_profiler_data_artifact:
+    if profile_result.status == "success" and profile_result.has_profiler_data:
         return ProfileSummaryStatus.AVAILABLE
     if profile_result.status in {"success", "partial"}:
         # Successful process execution without profiler data is partial diagnostics,
@@ -514,24 +507,18 @@ def _limitations(profile_result: Rocprofv3ProfileResult | None) -> list[str]:
     ]
     if profile_result is None:
         limitations.append("No rocprofv3 profile result was supplied.")
-    elif profile_result.status != "success":
+        return limitations
+    if profile_result.status != "success":
         limitations.append(f"rocprofv3 profile status is {profile_result.status}.")
-        if profile_result.artifact_coverage_status == "diagnostic_logs_only":
-            limitations.append(
-                "rocprofv3 produced diagnostic logs but no profiler data artifacts."
-            )
-    elif not any(
-        artifact.kind not in _NON_DATA_ARTIFACT_KINDS
-        for artifact in profile_result.artifacts
-    ):
-        if profile_result.artifact_coverage_status == "diagnostic_logs_only":
-            limitations.append(
-                "rocprofv3 produced diagnostic logs but no profiler data artifacts."
-            )
-        else:
+    elif not profile_result.has_profiler_data:
+        if profile_result.artifact_coverage_status != "diagnostic_logs_only":
             limitations.append(
                 "rocprofv3 profile completed without profiler data artifacts."
             )
+    if profile_result.artifact_coverage_status == "diagnostic_logs_only":
+        limitations.append(
+            "rocprofv3 produced diagnostic logs but no profiler data artifacts."
+        )
     return limitations
 
 
@@ -879,6 +866,11 @@ def _first_number(row: dict[str, str], *keys: str) -> int | float | None:
     return None
 
 
+def _finite_or_none(value: int | float) -> int | float | None:
+    """Pass through finite numbers; reject NaN/Inf so they never reach sidecar JSON."""
+    return value if math.isfinite(value) else None
+
+
 def _coerce_scalar(value: object) -> int | float | str | None:
     # bool is intentionally rejected: Python bool is an int subclass, but a JSON
     # `true` / CSV "true" is not a numeric metric value. Non-finite floats
@@ -886,7 +878,7 @@ def _coerce_scalar(value: object) -> int | float | str | None:
     if isinstance(value, bool) or value is None:
         return None
     if isinstance(value, int | float):
-        return value if math.isfinite(value) else None
+        return _finite_or_none(value)
     if not isinstance(value, str):
         return None
     stripped = value.strip()
@@ -902,21 +894,20 @@ def _coerce_scalar(value: object) -> int | float | str | None:
         number = float(stripped)
     except ValueError:
         return stripped
-    return number if math.isfinite(number) else None
+    return _finite_or_none(number)
 
 
 def _numeric_value(value: object) -> float | None:
     if isinstance(value, bool):
         return None
     if isinstance(value, int | float):
-        number = float(value)
-        return number if math.isfinite(number) else None
+        return _finite_or_none(float(value))
     if isinstance(value, str):
         try:
             number = float(value)
         except ValueError:
             return None
-        return number if math.isfinite(number) else None
+        return _finite_or_none(number)
     return None
 
 
