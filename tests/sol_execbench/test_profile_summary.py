@@ -7,6 +7,7 @@ from pydantic import ValidationError
 
 from sol_execbench.core.bench.profile_summary import (
     ProfileSummaryGovernanceGuardrail,
+    ProfileSummaryIdentity,
     ProfileSummarySidecar,
     build_profile_summary_sidecar,
     evaluate_profile_summary_governance,
@@ -49,6 +50,33 @@ def _profile_result(tmp_path: Path, status: str = "success") -> Rocprofv3Profile
     )
 
 
+def test_profile_summary_identity_uses_sol_version_only() -> None:
+    identity = ProfileSummaryIdentity(
+        generated_at="2026-01-01T00:00:00Z",
+        sol_version="v1.42",
+        trace_path="trace.jsonl",
+        run_id="run-1",
+    )
+
+    payload = identity.model_dump(mode="json", exclude_none=True)
+
+    assert payload["sol_version"] == "v1.42"
+    assert "sol_contract_version" not in payload
+
+
+def test_profile_summary_identity_rejects_sol_contract_version_alias() -> None:
+    with pytest.raises(ValidationError, match="sol_contract_version"):
+        ProfileSummaryIdentity.model_validate(
+            {
+                "generated_at": "2026-01-01T00:00:00Z",
+                "sol_version": "v1.42",
+                "sol_contract_version": "v1.42",
+                "trace_path": "trace.jsonl",
+                "run_id": "run-1",
+            }
+        )
+
+
 def test_profile_summary_sidecar_is_diagnostic_only(tmp_path: Path):
     trace_path = tmp_path / "trace.jsonl"
     trace_path.write_text('{"definition":"toy"}\n')
@@ -73,10 +101,8 @@ def test_profile_summary_sidecar_is_diagnostic_only(tmp_path: Path):
     assert payload["reason_code"] == "profile_summary_generated"
     assert payload["identity"]["trace_path"] == "trace.jsonl"
     assert payload["identity"]["run_id"] == "run-0"
-    assert (
-        payload["identity"]["sol_version"]
-        == payload["identity"]["sol_contract_version"]
-    )
+    assert payload["identity"]["sol_version"] == "v1.42"
+    assert "sol_contract_version" not in payload["identity"]
     assert payload["authority"] == "diagnostic"
     assert payload["summary"]["profiler_status"] == "success"
     assert payload["summary"]["artifact_coverage_status"] == "complete"
@@ -88,7 +114,7 @@ def test_profile_summary_sidecar_is_diagnostic_only(tmp_path: Path):
     assert payload["artifact_citations"][0]["sha256"] == citation.sha256
 
 
-def test_profile_summary_freshness_accepts_sol_version_alias(tmp_path: Path):
+def test_profile_summary_freshness_uses_canonical_sol_version(tmp_path: Path):
     sidecar = build_profile_summary_sidecar(
         profile_result=_profile_result(tmp_path),
         trace_path=str(tmp_path / "trace.jsonl"),
@@ -99,17 +125,26 @@ def test_profile_summary_freshness_accepts_sol_version_alias(tmp_path: Path):
         sidecar,
         trace_path=str(tmp_path / "trace.jsonl"),
         run_id="run-0",
-        sol_version="1.0",
+        sol_version="v1.42",
     )
     stale = validate_profile_summary_freshness(sidecar, sol_version="9.9")
-    payload = sidecar.model_dump(mode="json")
-    payload["identity"]["sol_version"] = "different-version"
 
     assert current.status == "current"
     assert stale.status == "stale"
-    assert stale.reason_codes == ["sol_contract_version_mismatch"]
-    with pytest.raises(ValidationError):
-        ProfileSummarySidecar.model_validate(payload)
+    assert stale.reason_codes == ["sol_version_mismatch"]
+
+
+def test_profile_summary_freshness_sol_version_only_is_current(tmp_path: Path):
+    sidecar = build_profile_summary_sidecar(
+        profile_result=_profile_result(tmp_path),
+        trace_path=str(tmp_path / "trace.jsonl"),
+        run_id="run-0",
+    )
+
+    current = validate_profile_summary_freshness(sidecar, sol_version="v1.42")
+
+    assert current.status == "current"
+    assert current.reason_codes == []
 
 
 def test_profile_summary_builds_structured_metrics_and_hints_from_text_artifacts(

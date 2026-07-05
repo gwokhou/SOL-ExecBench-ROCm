@@ -10,11 +10,11 @@
   ],
   "authority": "diagnostic",
   "identity": {
-    "candidate_hash": "candidate-old",
+    "candidate_id": "candidate-old",
     "generated_at": "2026-06-16T00:00:00Z",
     "run_id": "run-old",
-    "sol_contract_version": "1.0",
-    "source_hash": "source-old",
+    "sol_version": "v1.42",
+    "source_sha256": "source-old",
     "target_id": "linear-demo",
     "trace_path": "old-trace.jsonl"
   },

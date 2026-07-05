@@ -595,8 +595,8 @@ def _write_agent_feedback_sidecar(
             trace_path=str(output_file) if output_file is not None else None,
             target_id=identity_fields["target_id"],
             run_id=identity_fields["run_id"],
-            candidate_hash=identity_fields["candidate_hash"],
-            source_hash=identity_fields["source_hash"],
+            candidate_id=identity_fields["candidate_id"],
+            source_sha256=identity_fields["source_sha256"],
             sol_version=feedback_sol_version,
             artifact_citations=_agent_feedback_artifact_citations(
                 output_file=output_file,
@@ -647,12 +647,12 @@ def _agent_feedback_identity_fields(
             if run_id is not None
             else _agent_feedback_run_id(output_file, traces)
         ),
-        "candidate_hash": (
+        "candidate_id": (
             candidate_id
             if candidate_id is not None
             else (stable_json_checksum(solution_labels) if solution_labels else None)
         ),
-        "source_hash": (
+        "source_sha256": (
             source_sha256
             if source_sha256 is not None
             else (solution.hash() if solution is not None else None)

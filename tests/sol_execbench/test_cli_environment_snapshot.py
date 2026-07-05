@@ -425,16 +425,13 @@ def test_profile_summary_sidecar_records_bounded_metadata(tmp_path: Path):
     assert written == tmp_path / "trace.jsonl.profile-summary.json"
     assert written is not None
     payload = json.loads(written.read_text())
-    assert payload["schema_version"] == "sol_execbench.profile_summary.v1"
+    assert payload["schema_version"] == "sol_execbench.profile_summary.v2"
     assert payload["status"] == "available"
-    assert payload["authority"]["diagnostic_only"] is True
-    assert payload["authority"]["timing_authority"] is False
+    assert payload["authority"] == "diagnostic"
     assert payload["identity"]["trace_path"] == "trace.jsonl"
     assert payload["identity"]["run_id"] == "run-001"
-    assert (
-        payload["identity"]["sol_version"]
-        == payload["identity"]["sol_contract_version"]
-    )
+    assert payload["identity"]["sol_version"] == "v1.42"
+    assert "sol_contract_version" not in payload["identity"]
     assert payload["summary"]["profiler_status"] == "success"
     assert payload["summary"]["artifact_count"] == 2
     assert payload["summary"]["artifact_coverage_status"] == "complete"
@@ -572,23 +569,23 @@ def test_agent_feedback_sidecar_records_bounded_metadata(tmp_path: Path):
         feedback_target_id="gemm",
         feedback_candidate_id="candidate-sha",
         feedback_source_sha256="source-sha",
-        feedback_sol_version="v1.36",
+        feedback_sol_version="custom-sol-tag",
     )
 
     assert written == tmp_path / "trace.jsonl.agent-feedback.json"
     assert written is not None
     payload = json.loads(written.read_text())
-    assert payload["schema_version"] == "sol_execbench.agent_feedback.v1"
-    assert payload["authority"]["diagnostic_only"] is True
-    assert payload["authority"]["score_authority"] is False
+    assert payload["schema_version"] == "sol_execbench.agent_feedback.v2"
+    assert payload["authority"] == "diagnostic"
     assert payload["identity"]["trace_path"] == "trace.jsonl"
     assert payload["identity"]["target_id"] == "gemm"
     assert payload["identity"]["run_id"] == "run-001"
-    assert payload["identity"]["sol_version"] == "v1.36"
-    assert payload["identity"]["candidate_hash"] == "candidate-sha"
-    assert payload["identity"]["candidate_id"] == payload["identity"]["candidate_hash"]
-    assert payload["identity"]["source_hash"] == "source-sha"
+    assert payload["identity"]["candidate_id"] == "candidate-sha"
     assert payload["identity"]["source_sha256"] == "source-sha"
+    assert payload["identity"]["sol_version"] == "custom-sol-tag"
+    assert "candidate_hash" not in payload["identity"]
+    assert "source_hash" not in payload["identity"]
+    assert "sol_contract_version" not in payload["identity"]
     assert payload["summary"]["status_counts"] == {"COMPILE_ERROR": 1}
     assert payload["items"][0]["code"] == "compile_error"
     trace_citations = [
@@ -642,11 +639,17 @@ def test_agent_feedback_identity_uses_solution_source_hash(tmp_path: Path):
     )
     no_solution_identity = cli_main._agent_feedback_identity_fields(output, [trace])
 
-    assert first_identity["candidate_hash"] == second_identity["candidate_hash"]
-    assert first_identity["source_hash"] == first.hash()
-    assert second_identity["source_hash"] == second.hash()
-    assert first_identity["source_hash"] != second_identity["source_hash"]
-    assert no_solution_identity["source_hash"] is None
+    assert first_identity["candidate_id"] == second_identity["candidate_id"]
+    assert first_identity["source_sha256"] == first.hash()
+    assert second_identity["source_sha256"] == second.hash()
+    assert first_identity["source_sha256"] != second_identity["source_sha256"]
+    assert no_solution_identity["source_sha256"] is None
+    assert "candidate_hash" not in first_identity
+    assert "source_hash" not in first_identity
+    assert "candidate_hash" not in second_identity
+    assert "source_hash" not in second_identity
+    assert "candidate_hash" not in no_solution_identity
+    assert "source_hash" not in no_solution_identity
 
 
 def test_agent_feedback_identity_accepts_consumer_identity_fields(tmp_path: Path):
@@ -680,8 +683,8 @@ def test_agent_feedback_identity_accepts_consumer_identity_fields(tmp_path: Path
     assert identity == {
         "target_id": "gemm",
         "run_id": "run-001",
-        "candidate_hash": "candidate-sha",
-        "source_hash": "source-sha",
+        "candidate_id": "candidate-sha",
+        "source_sha256": "source-sha",
     }
 
 

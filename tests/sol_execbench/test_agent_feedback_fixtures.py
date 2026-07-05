@@ -68,8 +68,9 @@ def test_agent_feedback_stale_fixture_classifies_as_stale_diagnostic():
         sidecar,
         trace_path="trace.jsonl",
         run_id="run-current",
-        candidate_hash="candidate-current",
-        source_hash="source-current",
+        candidate_id="candidate-current",
+        source_sha256="source-current",
+        sol_version="v1.42",
     )
     guardrail = evaluate_agent_feedback_governance(
         sidecar=sidecar,
@@ -157,9 +158,9 @@ def test_agent_feedback_docs_explain_hip_mapping_and_fixture_semantics():
         "limitation",
         "artifact_citations",
         "identity.target_id",
+        "identity.candidate_id",
         "identity.source_sha256",
         "identity.sol_version",
-        "source_hash",
         "solution content hash",
         "compile_failure",
         "profile_summary.sidecar.v2",
