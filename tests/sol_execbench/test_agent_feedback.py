@@ -58,14 +58,11 @@ def test_agent_feedback_sidecar_is_diagnostic_only_for_passing_trace():
     sidecar = build_agent_feedback_sidecar(traces=[_trace()])
     payload = sidecar.model_dump(mode="json")
 
-    assert payload["schema_version"] == "sol_execbench.agent_feedback.v1"
+    assert payload["schema_version"] == "sol_execbench.agent_feedback.v2"
     assert payload["status"] == "available"
     assert payload["reason_code"] == "feedback_generated"
     assert payload["summary"]["status_counts"] == {"PASSED": 1}
-    assert payload["authority"]["diagnostic_only"] is True
-    for key, value in payload["authority"].items():
-        if key != "diagnostic_only":
-            assert value is False
+    assert payload["authority"] == "diagnostic"
     assert payload["items"][0]["code"] == "all_evaluated_traces_passed"
     assert "Canonical Trace JSONL remains" in payload["limitations"][1]
 
@@ -243,7 +240,7 @@ def test_agent_feedback_sidecar_summarizes_failures_and_optional_profile():
 def test_agent_feedback_sidecar_rejects_authority_override():
     sidecar = build_agent_feedback_sidecar(traces=[_trace()])
     payload = sidecar.model_dump(mode="json")
-    payload["authority"]["score_authority"] = True
+    payload["authority"] = "score"
 
     with pytest.raises(ValidationError):
         type(sidecar).model_validate(payload)
@@ -253,8 +250,8 @@ def test_agent_feedback_authority_freezes_claim_upgrade_boundary():
     sidecar = build_agent_feedback_sidecar(traces=[_trace()])
     payload = sidecar.model_dump(mode="json")
 
-    assert payload["authority"]["claim_upgrade_authority"] is False
-    payload["authority"]["claim_upgrade_authority"] = True
+    assert payload["authority"] == "diagnostic"
+    payload["authority"] = "none"
 
     with pytest.raises(ValidationError):
         type(sidecar).model_validate(payload)

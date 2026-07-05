@@ -56,11 +56,7 @@ def test_profile_summary_valid_fixtures_parse(name: str, expected_status: str):
     sidecar = ProfileSummarySidecar.model_validate(_json(FIXTURE_DIR / name))
 
     assert sidecar.status == expected_status
-    assert sidecar.authority.diagnostic_only is True
-    assert sidecar.authority.timing_authority is False
-    assert sidecar.authority.score_authority is False
-    assert sidecar.authority.release_gate_authority is False
-    assert sidecar.authority.cutover_authority is False
+    assert sidecar.authority == "diagnostic"
 
 
 def test_profile_summary_stale_fixture_classifies_as_stale_diagnostic():
@@ -154,7 +150,7 @@ def test_profile_summary_docs_explain_hip_mapping_and_fixture_semantics():
 
     for expected in (
         "HIP Consumer Mapping",
-        "profile_summary.sidecar.v1",
+        "profile_summary.sidecar.v2",
         "summary.profiler_status",
         "summary.metrics[]",
         "summary.workload_metrics[]",

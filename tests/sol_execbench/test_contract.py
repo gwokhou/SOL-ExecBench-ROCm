@@ -14,21 +14,21 @@ from sol_execbench.core.data.trace import EvaluationStatus
 
 
 REQUIRED_CAPABILITIES = {
-    "trace.correctness.v1",
-    "trace.timing.v1",
-    "trace.scoring.v1",
-    "baseline.measured_export.v1",
-    "baseline.scoring_artifact.v1",
-    "compatibility.metadata.v1",
-    "failure_categories.v1",
+    "trace.correctness",
+    "trace.timing",
+    "trace.scoring",
+    "baseline.measured_export",
+    "baseline.scoring_artifact",
+    "compatibility.metadata",
+    "failure_categories",
 }
 OPTIONAL_CAPABILITIES = {
-    "runtime.evidence.v1",
-    "profiling.evidence.v1",
-    "toolchain.routing.v1",
-    "static_kernel_evidence.v1",
-    "agent_feedback.sidecar.v1",
-    "profile_summary.sidecar.v1",
+    "runtime.evidence",
+    "profiling.evidence",
+    "toolchain.routing",
+    "static_kernel.evidence",
+    "agent_feedback.sidecar",
+    "profile_summary.sidecar",
 }
 
 
@@ -37,20 +37,23 @@ def test_evaluator_contract_versions_are_stable():
 
     assert payload["schema_version"] == SOL_EXECBENCH_CONTRACT_SCHEMA_VERSION
     assert payload["contract_version"] == SOL_EXECBENCH_CONTRACT_VERSION
-    assert payload["schema_version"] == "sol_execbench.evaluator_contract.v1"
+    assert payload["schema_version"] == "sol_execbench.evaluator_contract.v2"
     assert payload["contract_version"] == "1.0"
+    assert payload["sol_release"] == "v1.41"
 
 
 def test_evaluator_contract_declares_required_capabilities():
     payload = build_evaluator_contract().model_dump(mode="json")
 
-    assert REQUIRED_CAPABILITIES.issubset(set(payload["capabilities"]))
+    assert REQUIRED_CAPABILITIES.issubset(payload["capabilities"])
+    for capability in REQUIRED_CAPABILITIES:
+        assert payload["capabilities"][capability] == "always"
 
 
 def test_evaluator_contract_advertises_optional_evidence_without_bump():
     payload = build_evaluator_contract().model_dump(mode="json")
 
-    assert OPTIONAL_CAPABILITIES.issubset(set(payload["capabilities"]))
+    assert OPTIONAL_CAPABILITIES.issubset(payload["capabilities"])
     assert payload["contract_version"] == "1.0"
     assert payload["trace_field_requirements"]["top_level"] == [
         "definition",
@@ -67,21 +70,14 @@ def test_evaluator_contract_advertises_optional_evidence_without_bump():
         assert forbidden not in payload["correctness_fields"]
         assert forbidden not in payload["timing_fields"]
         assert forbidden not in payload["scoring_fields"]
-    assert any(
-        "Static kernel evidence is diagnostic sidecar metadata only" in claim
-        for claim in payload["source_boundary_claims"]
-    )
-    assert any(
-        "Agent feedback and profile summary sidecars are diagnostic" in claim
-        and "release-gate" in claim
-        and "cutover" in claim
-        for claim in payload["source_boundary_claims"]
-    )
-    assert any(
-        "SOL owns optional feedback sidecar schema" in claim
-        and "HIP consumers own adapter normalization" in claim
-        for claim in payload["source_boundary_claims"]
-    )
+    assert "source_boundary_claims" not in payload
+    assert {
+        (boundary.get("owner"), boundary.get("scope"), boundary.get("authority"))
+        for boundary in payload["boundaries"]
+    } >= {
+        ("sol", "agent_feedback", "diagnostic"),
+        ("sol", "profile_summary", "diagnostic"),
+    }
 
 
 def test_evaluator_contract_freezes_trace_status_and_field_groups():
@@ -140,8 +136,8 @@ def test_contract_cli_json_outputs_builder_payload_without_problem_directory():
     payload = json.loads(result.output)
     expected = build_evaluator_contract().model_dump(mode="json")
     assert payload == expected
-    assert payload["schema_version"] == "sol_execbench.evaluator_contract.v1"
-    assert REQUIRED_CAPABILITIES.issubset(set(payload["capabilities"]))
-    assert "static_kernel_evidence.v1" in payload["capabilities"]
-    assert "agent_feedback.sidecar.v1" in payload["capabilities"]
-    assert "profile_summary.sidecar.v1" in payload["capabilities"]
+    assert payload["schema_version"] == "sol_execbench.evaluator_contract.v2"
+    assert REQUIRED_CAPABILITIES.issubset(payload["capabilities"])
+    assert payload["capabilities"]["static_kernel.evidence"] == "optional"
+    assert payload["capabilities"]["agent_feedback.sidecar"] == "profile:diagnostic"
+    assert payload["capabilities"]["profile_summary.sidecar"] == "profile:diagnostic"

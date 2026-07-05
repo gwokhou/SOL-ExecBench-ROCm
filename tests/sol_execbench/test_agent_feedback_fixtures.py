@@ -56,10 +56,7 @@ def test_agent_feedback_valid_fixtures_parse(name: str, expected_status: str):
     sidecar = AgentFeedbackSidecar.model_validate(_json(FIXTURE_DIR / name))
 
     assert sidecar.status == expected_status
-    assert sidecar.authority.diagnostic_only is True
-    assert sidecar.authority.score_authority is False
-    assert sidecar.authority.release_gate_authority is False
-    assert sidecar.authority.cutover_authority is False
+    assert sidecar.authority == "diagnostic"
 
 
 def test_agent_feedback_stale_fixture_classifies_as_stale_diagnostic():
@@ -165,7 +162,7 @@ def test_agent_feedback_docs_explain_hip_mapping_and_fixture_semantics():
         "source_hash",
         "solution content hash",
         "compile_failure",
-        "profile_summary.sidecar.v1",
+        "profile_summary.sidecar.v2",
         "SOL does not duplicate those hints into",
         "unknown values must be downgraded",
         "valid.agent-feedback.json",

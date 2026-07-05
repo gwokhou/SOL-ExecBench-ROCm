@@ -25,8 +25,9 @@ from .base_model import BaseModelWithDocstrings
 from .trace import EvaluationStatus
 
 
-SOL_EXECBENCH_CONTRACT_SCHEMA_VERSION = "sol_execbench.evaluator_contract.v1"
+SOL_EXECBENCH_CONTRACT_SCHEMA_VERSION = "sol_execbench.evaluator_contract.v2"
 SOL_EXECBENCH_CONTRACT_VERSION = "1.0"
+SOL_EXECBENCH_RELEASE = "v1.41"
 
 
 class EvaluatorContract(BaseModelWithDocstrings):
@@ -38,8 +39,10 @@ class EvaluatorContract(BaseModelWithDocstrings):
     """Schema identifier for the contract payload."""
     contract_version: str
     """Semantic contract version for HIP/SOL compatibility checks."""
-    capabilities: list[str] = Field(default_factory=list)
-    """Named capability tokens consumers must check explicitly."""
+    sol_release: str
+    """SOL release that emitted this contract payload."""
+    capabilities: dict[str, str] = Field(default_factory=dict)
+    """Named capability tokens mapped to requirement levels."""
     trace_field_requirements: dict[str, list[str]]
     """Required trace field groups from the canonical trace JSONL contract."""
     correctness_fields: list[str]
@@ -56,8 +59,8 @@ class EvaluatorContract(BaseModelWithDocstrings):
     """Measured baseline and scoring baseline field groups."""
     compatibility_metadata_fields: list[str]
     """Metadata fields consumers can persist for compatibility diagnostics."""
-    source_boundary_claims: list[str]
-    """Boundary statements that keep benchmark truth in SOL."""
+    boundaries: list[dict[str, object]]
+    """Structured authority boundaries that keep benchmark truth in SOL."""
 
     def to_dict(self) -> dict[str, Any]:
         """Return the JSON-compatible contract payload."""
@@ -70,21 +73,22 @@ def build_evaluator_contract() -> EvaluatorContract:
     return EvaluatorContract(
         schema_version=SOL_EXECBENCH_CONTRACT_SCHEMA_VERSION,
         contract_version=SOL_EXECBENCH_CONTRACT_VERSION,
-        capabilities=[
-            "trace.correctness.v1",
-            "trace.timing.v1",
-            "trace.scoring.v1",
-            "baseline.measured_export.v1",
-            "baseline.scoring_artifact.v1",
-            "compatibility.metadata.v1",
-            "failure_categories.v1",
-            "runtime.evidence.v1",
-            "profiling.evidence.v1",
-            "toolchain.routing.v1",
-            "static_kernel_evidence.v1",
-            "agent_feedback.sidecar.v1",
-            "profile_summary.sidecar.v1",
-        ],
+        sol_release=SOL_EXECBENCH_RELEASE,
+        capabilities={
+            "trace.correctness": "always",
+            "trace.timing": "always",
+            "trace.scoring": "always",
+            "baseline.measured_export": "always",
+            "baseline.scoring_artifact": "always",
+            "compatibility.metadata": "always",
+            "failure_categories": "always",
+            "runtime.evidence": "optional",
+            "profiling.evidence": "optional",
+            "toolchain.routing": "optional",
+            "static_kernel.evidence": "optional",
+            "agent_feedback.sidecar": "profile:diagnostic",
+            "profile_summary.sidecar": "profile:diagnostic",
+        },
         trace_field_requirements={
             "top_level": ["definition", "workload", "solution", "evaluation"],
             "evaluation": [
@@ -185,14 +189,11 @@ def build_evaluator_contract() -> EvaluatorContract:
             "command",
             "payload_sha256",
         ],
-        source_boundary_claims=[
-            "SOL owns correctness, timing, scoring, trace semantics, and ROCm execution.",
-            "HIP consumes this contract as external JSON and does not redefine benchmark truth.",
-            "Contract metadata is emitted beside trace JSONL and is not part of Trace.",
-            "Measured baseline registry evidence is distinct from SOL scoring baseline artifacts.",
-            "Toolchain routing reports availability and provenance only; it is not correctness, performance, or score authority.",
-            "Static kernel evidence is diagnostic sidecar metadata only; it is not correctness, performance, timing, score, paper-parity, or leaderboard authority.",
-            "Agent feedback and profile summary sidecars are diagnostic next-experiment guidance only; they are not correctness, performance, timing, score, evidence-tier, confirmed-improvement, release-gate, cutover, paper-parity, or leaderboard authority.",
-            "SOL owns optional feedback sidecar schema, generation, freshness identity, citations, and authority guardrails; HIP consumers own adapter normalization, ProfileDigest mapping, strategy hints, and prompt assembly.",
+        boundaries=[
+            {"owner": "sol", "scope": "correctness", "immutable": True},
+            {"owner": "sol", "scope": "timing", "immutable": True},
+            {"owner": "sol", "scope": "scoring", "immutable": True},
+            {"owner": "sol", "scope": "agent_feedback", "authority": "diagnostic"},
+            {"owner": "sol", "scope": "profile_summary", "authority": "diagnostic"},
         ],
     )

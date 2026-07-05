@@ -1,19 +1,6 @@
 {
   "artifact_citations": [],
-  "authority": {
-    "claim_upgrade_authority": false,
-    "confirmed_improvement_authority": false,
-    "correctness_authority": false,
-    "cutover_authority": false,
-    "diagnostic_only": true,
-    "evidence_tier_authority": false,
-    "leaderboard_authority": false,
-    "paper_parity_authority": false,
-    "performance_authority": false,
-    "release_gate_authority": false,
-    "score_authority": false,
-    "timing_authority": false
-  },
+  "authority": "diagnostic",
   "identity": {
     "generated_at": "2026-06-16T00:00:00Z",
     "run_id": "run-current",
@@ -27,7 +14,7 @@
     "No rocprofv3 profile result was supplied."
   ],
   "reason_code": "no_profile_result",
-  "schema_version": "sol_execbench.profile_summary.v1",
+  "schema_version": "sol_execbench.profile_summary.v2",
   "status": "unavailable",
   "summary": {
     "artifact_count": 0,

@@ -1,13 +1,13 @@
 # Profile Summary Sidecar
 
-`sol_execbench.profile_summary.v1` is an optional diagnostic sidecar written
+`sol_execbench.profile_summary.v2` is an optional diagnostic sidecar written
 next to canonical Trace JSONL as `<trace>.profile-summary.json`. It normalizes
 bounded `rocprofv3` profile metadata for downstream adapters while preserving
 Trace JSONL as the only authority for correctness, timing, scoring, and
 evaluation status.
 
 The evaluator contract advertises this artifact through the optional
-`profile_summary.sidecar.v1` capability token.
+`profile_summary.sidecar.v2` capability token.
 
 The summary sidecar does not replace `<trace>.profile.json`. The existing
 profile metadata sidecar remains the raw diagnostic metadata record and is cited
@@ -67,7 +67,7 @@ not as a benchmark result. Suggested mapping:
 | `summary.parse_warnings[]` | Bounded warnings explaining skipped or partial parsing. | Display as advisory text only. |
 | `limitations[]` | Guardrails to include beside any profile digest. | Always preserve diagnostic-only wording. |
 | `artifact_citations[]` | Compact path, size, status, and checksum references for trace, raw profile metadata, and profiler artifacts. | Reject absolute paths and missing checksums where a checksum is required. |
-| `authority` | Hard guardrail flags. | Reject contradictory truthy authority flags. |
+| `authority` | Hard guardrail enum. | Reject unsupported or non-diagnostic authority values. |
 
 `summary.bottleneck_hints[]` uses this closed vocabulary:
 
@@ -83,7 +83,7 @@ claim fine-grained occupancy, VGPR/SGPR pressure, cache, or bandwidth
 conclusions. When counters are missing or insufficient, SOL emits
 `insufficient_counters` or `unknown` instead of speculating.
 
-Profiler-derived bottleneck hints remain in `profile_summary.sidecar.v1`; SOL
+Profiler-derived bottleneck hints remain in `profile_summary.sidecar.v2`; SOL
 does not surface them as `agent_feedback.items[]`. HIP adapters that want one
 prompt-facing hint list should merge profile-summary hints with agent-feedback
 items only after each source sidecar passes strict freshness and authority
@@ -113,7 +113,7 @@ CPU-safe fixtures live under
 | `unavailable.profile-summary.json` | No profile result was available. | Treat as unavailable diagnostic state. |
 | `stale.profile-summary.json` | Valid schema with old trace/run identity. | Reject as stale for the current run. |
 | `malformed.profile-summary.json` | Invalid JSON payload. | Treat as invalid diagnostic state. |
-| `contradictory-authority.profile-summary.json` | Schema-shaped payload with forbidden truthy timing authority. | Reject before prompt assembly. |
+| `contradictory-authority.profile-summary.json` | Schema-shaped payload with forbidden score authority enum. | Reject before prompt assembly. |
 | `missing.profile-summary.case.json` | Metadata fixture for absent sidecar path behavior. | Treat missing sidecar as unavailable. |
 
 These fixtures use synthetic checksums and compact file names. They are not
