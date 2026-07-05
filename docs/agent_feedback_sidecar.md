@@ -5,6 +5,9 @@ to canonical Trace JSONL as `<trace>.agent-feedback.json`. It gives downstream
 agents bounded next-experiment guidance while preserving Trace JSONL as the only
 authority for correctness, timing, scoring, and evaluation status.
 
+The evaluator contract advertises this artifact through the optional
+`agent_feedback.sidecar` capability key.
+
 The sidecar is not score authority, evidence-tier authority, confirmed
 improvement authority, release-gate authority, cutover authority, paper-parity
 authority, leaderboard authority, or claim-upgrade authority. Missing,
