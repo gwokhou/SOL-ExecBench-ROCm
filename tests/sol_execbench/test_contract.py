@@ -52,6 +52,7 @@ OLD_EVALUATOR_CAPABILITY_TOKENS = {
     "profile_summary.sidecar.v2",
 }
 SCHEMA_AS_CAPABILITY_PHRASES = {
+    "official_score_evidence.v1 capability key",
     "official_score_evidence.v1 capability token",
 }
 
@@ -90,6 +91,13 @@ def _contains_stale_capability_token(text: str, token: str) -> bool:
 def _contains_schema_as_capability_phrase(text: str, phrase: str) -> bool:
     normalized_text = " ".join(text.replace("`", "").replace(">", " ").split())
     return phrase in normalized_text
+
+
+def test_schema_as_capability_guard_covers_key_and_token_wording():
+    assert {
+        "official_score_evidence.v1 capability key",
+        "official_score_evidence.v1 capability token",
+    }.issubset(SCHEMA_AS_CAPABILITY_PHRASES)
 
 
 def test_evaluator_contract_versions_are_stable():
