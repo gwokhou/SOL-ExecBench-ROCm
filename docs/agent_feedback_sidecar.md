@@ -1,6 +1,6 @@
 # Agent Feedback Sidecar
 
-`sol_execbench.agent_feedback.v1` is an optional diagnostic sidecar written next
+`sol_execbench.agent_feedback.v2` is an optional diagnostic sidecar written next
 to canonical Trace JSONL as `<trace>.agent-feedback.json`. It gives downstream
 agents bounded next-experiment guidance while preserving Trace JSONL as the only
 authority for correctness, timing, scoring, and evaluation status.
@@ -26,7 +26,7 @@ benchmark result. Suggested mapping:
 | `source_refs[]` | Compact evidence source categories. | Ignore unsupported source kinds. |
 | `artifact_citations[]` | Compact path and checksum references for trace-adjacent artifacts. | Reject absolute paths and missing checksums where a checksum is required. |
 | `identity` | Freshness denominator for trace/run/candidate matching. | Reject as stale when expected identity mismatches. |
-| `authority` | Hard guardrail flags. | Reject contradictory truthy authority flags. |
+| `authority` | Hard guardrail enum. | Reject unsupported or non-diagnostic authority values. |
 
 SOL emits a closed `items[].bottleneck` vocabulary:
 
@@ -62,7 +62,7 @@ kernel source, prompt text, or absolute temporary paths from SOL feedback. They
 should include only the normalized bottleneck, recommendation, limitation, and
 compact citation fields after freshness and authority checks pass.
 
-`profile_summary.sidecar.v1` is the normalized profile-summary sidecar for
+`profile_summary.sidecar.v2` is the normalized profile-summary sidecar for
 bounded profiler metrics, conservative bottleneck hints, and artifact
 citations. Current ROCm profiler metadata remains the separate
 `<trace>.profile.json` rocprofv3 sidecar and is cited as optional diagnostic
@@ -88,7 +88,7 @@ CPU-safe fixtures live under
 | `unavailable.agent-feedback.json` | No evaluated traces were available. | Treat as unavailable diagnostic state. |
 | `stale.agent-feedback.json` | Valid schema with old trace/run/candidate identity. | Reject as stale for the current run. |
 | `malformed.agent-feedback.json` | Invalid JSON payload. | Treat as invalid diagnostic state. |
-| `contradictory-authority.agent-feedback.json` | Schema-shaped payload with forbidden truthy score authority. | Reject before prompt assembly. |
+| `contradictory-authority.agent-feedback.json` | Schema-shaped payload with forbidden score authority enum. | Reject before prompt assembly. |
 | `missing.agent-feedback.case.json` | Metadata fixture for absent sidecar path behavior. | Treat missing sidecar as unavailable. |
 
 These fixtures use synthetic checksums and compact file names. They are not

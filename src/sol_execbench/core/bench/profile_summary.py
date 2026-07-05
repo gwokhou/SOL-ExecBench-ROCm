@@ -22,7 +22,7 @@ from sol_execbench.core.dataset.checksums import sha256_file
 from sol_execbench.core.trust_summary import utc_timestamp
 
 
-PROFILE_SUMMARY_SCHEMA_VERSION = "sol_execbench.profile_summary.v1"
+PROFILE_SUMMARY_SCHEMA_VERSION = "sol_execbench.profile_summary.v2"
 _MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
 _PROFILE_SUMMARY_MAX_PARSE_BYTES = 1_000_000
 _PROFILE_SUMMARY_MAX_ROWS = 10_000
@@ -291,13 +291,13 @@ class ProfileSummarySidecar(BaseModelWithDocstrings):
 
     model_config = _MODEL_CONFIG
 
-    schema_version: Literal["sol_execbench.profile_summary.v1"] = (
+    schema_version: Literal["sol_execbench.profile_summary.v2"] = (
         PROFILE_SUMMARY_SCHEMA_VERSION
     )
     status: ProfileSummaryStatus
     reason_code: ProfileSummaryReasonCode
     identity: ProfileSummaryIdentity
-    authority: ProfileSummaryAuthority = Field(default_factory=ProfileSummaryAuthority)
+    authority: Literal["diagnostic"] = "diagnostic"
     summary: ProfileSummaryContent
     limitations: list[str] = Field(default_factory=list)
     artifact_citations: list[ProfileSummaryArtifactCitation] = Field(
@@ -589,7 +589,7 @@ def _structured_profile_evidence(
             "otf2_trace",
         }:
             parse_warnings.append(
-                f"{artifact.path.name}: {artifact.kind} artifacts are citation-only in profile_summary.sidecar.v1"
+                f"{artifact.path.name}: {artifact.kind} artifacts are citation-only in profile_summary.sidecar.v2"
             )
         elif artifact.kind == "other":
             parse_warnings.append(

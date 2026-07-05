@@ -15,19 +15,7 @@
       "status": "unavailable"
     }
   ],
-  "authority": {
-    "confirmed_improvement_authority": false,
-    "correctness_authority": false,
-    "cutover_authority": false,
-    "diagnostic_only": true,
-    "evidence_tier_authority": false,
-    "leaderboard_authority": false,
-    "paper_parity_authority": false,
-    "performance_authority": false,
-    "release_gate_authority": false,
-    "score_authority": false,
-    "timing_authority": false
-  },
+  "authority": "diagnostic",
   "identity": {
     "candidate_hash": null,
     "generated_at": "2026-06-16T00:00:00Z",
@@ -59,7 +47,7 @@
     "rocprofv3 profile status is unavailable."
   ],
   "reason_code": "partial_diagnostics",
-  "schema_version": "sol_execbench.agent_feedback.v1",
+  "schema_version": "sol_execbench.agent_feedback.v2",
   "source_refs": [
     {
       "kind": "trace",

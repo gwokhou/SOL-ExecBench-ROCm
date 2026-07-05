@@ -68,7 +68,7 @@ def test_profile_summary_sidecar_is_diagnostic_only(tmp_path: Path):
     )
     payload = sidecar.model_dump(mode="json")
 
-    assert payload["schema_version"] == "sol_execbench.profile_summary.v1"
+    assert payload["schema_version"] == "sol_execbench.profile_summary.v2"
     assert payload["status"] == "available"
     assert payload["reason_code"] == "profile_summary_generated"
     assert payload["identity"]["trace_path"] == "trace.jsonl"
@@ -77,10 +77,7 @@ def test_profile_summary_sidecar_is_diagnostic_only(tmp_path: Path):
         payload["identity"]["sol_version"]
         == payload["identity"]["sol_contract_version"]
     )
-    assert payload["authority"]["diagnostic_only"] is True
-    for key, value in payload["authority"].items():
-        if key != "diagnostic_only":
-            assert value is False
+    assert payload["authority"] == "diagnostic"
     assert payload["summary"]["profiler_status"] == "success"
     assert payload["summary"]["artifact_coverage_status"] == "complete"
     assert payload["summary"]["reason_codes"] == ["rocprof_artifacts_registered"]
@@ -237,15 +234,13 @@ def test_profile_summary_builds_structured_metrics_and_hints_from_text_artifacts
         },
     ]
     assert summary["parse_warnings"] == [
-        "profile.rocpd: rocpd artifacts are citation-only in profile_summary.sidecar.v1"
+        "profile.rocpd: rocpd artifacts are citation-only in profile_summary.sidecar.v2"
     ]
     assert all(
         "rocpd" not in (metric.get("artifact") or "")
         for metric in [*summary["workload_metrics"], *summary["kernel_metrics"]]
     )
-    assert payload["authority"]["diagnostic_only"] is True
-    assert payload["authority"]["score_authority"] is False
-    assert payload["authority"]["cutover_authority"] is False
+    assert payload["authority"] == "diagnostic"
 
 
 def test_profile_summary_l2_hit_rate_fraction_is_not_misflagged(tmp_path: Path):
@@ -424,7 +419,7 @@ def test_profile_summary_diagnostic_log_only_profile_is_partial(tmp_path: Path):
     assert payload["summary"]["artifact_count"] == 1
     assert payload["summary"]["artifact_kinds"] == {"diagnostic_json": 1}
     assert payload["summary"]["parse_warnings"] == [
-        "profile.diagnostics.json: diagnostic_json artifacts are citation-only in profile_summary.sidecar.v1"
+        "profile.diagnostics.json: diagnostic_json artifacts are citation-only in profile_summary.sidecar.v2"
     ]
     assert any(
         "diagnostic logs but no profiler data artifacts" in limitation
@@ -522,7 +517,7 @@ def test_profile_summary_freshness_and_governance(tmp_path: Path):
 def test_profile_summary_rejects_authority_override(tmp_path: Path):
     sidecar = build_profile_summary_sidecar(profile_result=_profile_result(tmp_path))
     payload = sidecar.model_dump(mode="json")
-    payload["authority"]["timing_authority"] = True
+    payload["authority"] = "score"
 
     with pytest.raises(ValidationError):
         ProfileSummarySidecar.model_validate(payload)

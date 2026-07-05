@@ -24,7 +24,7 @@ from sol_execbench.core.dataset.checksums import sha256_file
 from sol_execbench.core.trust_summary import utc_timestamp
 
 
-AGENT_FEEDBACK_SCHEMA_VERSION = "sol_execbench.agent_feedback.v1"
+AGENT_FEEDBACK_SCHEMA_VERSION = "sol_execbench.agent_feedback.v2"
 _MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
 
 
@@ -243,13 +243,13 @@ class AgentFeedbackSidecar(BaseModelWithDocstrings):
 
     model_config = _MODEL_CONFIG
 
-    schema_version: Literal["sol_execbench.agent_feedback.v1"] = (
+    schema_version: Literal["sol_execbench.agent_feedback.v2"] = (
         AGENT_FEEDBACK_SCHEMA_VERSION
     )
     status: AgentFeedbackStatus
     reason_code: AgentFeedbackReasonCode
     identity: AgentFeedbackIdentity
-    authority: AgentFeedbackAuthority = Field(default_factory=AgentFeedbackAuthority)
+    authority: Literal["diagnostic"] = "diagnostic"
     summary: AgentFeedbackSummary
     items: list[AgentFeedbackItem] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
