@@ -80,11 +80,11 @@ Timing uses PyTorch's HIP-backed device event API. See [Analysis](analysis.md).
 PyTorch ROCm still exposes devices through `torch.cuda` compatibility APIs, but
 trace environment data should identify AMD hardware and ROCm/HIP versions.
 
-v1.13 adds an optional runtime environment evidence contract for richer
-diagnostics. That evidence is not a canonical trace JSONL field in v1.13:
+Runtime environment evidence is optional diagnostic metadata for richer
+environment reporting. It is not a canonical trace JSONL field:
 `evaluation.environment` remains limited to the stable `hardware` and `libs`
 shape described here, while consumers can detect optional support through the
-evaluator contract capability `runtime.evidence.v1`.
+current evaluator contract capability `runtime.evidence`.
 
 ## Nullable Fields By Status
 
