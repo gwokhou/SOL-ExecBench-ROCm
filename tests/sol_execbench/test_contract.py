@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from click.testing import CliRunner
@@ -31,12 +32,13 @@ OPTIONAL_CAPABILITIES = {
     "agent_feedback.sidecar",
     "profile_summary.sidecar",
 }
-CURRENT_CONTRACT_DOC = Path("docs/EVALUATOR-CONTRACT.md")
+REPO_ROOT = Path(__file__).resolve().parents[2]
+CURRENT_CONTRACT_DOC = REPO_ROOT / "docs/EVALUATOR-CONTRACT.md"
 ACTIVE_CONTRACT_DOCS = (
     CURRENT_CONTRACT_DOC,
-    Path("docs/trace.md"),
-    Path("docs/agent_feedback_sidecar.md"),
-    Path("docs/profile_summary_sidecar.md"),
+    REPO_ROOT / "docs/trace.md",
+    REPO_ROOT / "docs/agent_feedback_sidecar.md",
+    REPO_ROOT / "docs/profile_summary_sidecar.md",
 )
 OLD_EVALUATOR_CAPABILITY_TOKENS = {
     "runtime.evidence.v1",
@@ -48,6 +50,36 @@ OLD_EVALUATOR_CAPABILITY_TOKENS = {
     "profile_summary.sidecar.v1",
     "profile_summary.sidecar.v2",
 }
+
+
+def _contract_doc_capabilities(text: str) -> dict[str, str]:
+    rows: dict[str, str] = {}
+    in_table = False
+    for line in text.splitlines():
+        if line == "| Capability key | Level | Meaning |":
+            in_table = True
+            continue
+        if not in_table:
+            continue
+        if line == "| --- | --- | --- |":
+            continue
+        if not line.startswith("|"):
+            break
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if len(cells) != 3:
+            continue
+        key, level, _meaning = cells
+        if key.startswith("`") and key.endswith("`"):
+            key = key[1:-1]
+        if level.startswith("`") and level.endswith("`"):
+            level = level[1:-1]
+        rows[key] = level
+    return rows
+
+
+def _contains_stale_capability_token(text: str, token: str) -> bool:
+    pattern = rf"(?<![A-Za-z0-9_.-]){re.escape(token)}(?![A-Za-z0-9_.-])"
+    return re.search(pattern, text) is not None
 
 
 def test_evaluator_contract_versions_are_stable():
@@ -99,19 +131,19 @@ def test_evaluator_contract_advertises_optional_evidence_without_bump():
 
 
 def test_current_contract_doc_matches_builder_capabilities():
-    contract_text = CURRENT_CONTRACT_DOC.read_text()
-    active_doc_texts = {path: path.read_text() for path in ACTIVE_CONTRACT_DOCS}
+    contract_text = CURRENT_CONTRACT_DOC.read_text(encoding="utf-8")
+    active_doc_texts = {
+        path: path.read_text(encoding="utf-8") for path in ACTIVE_CONTRACT_DOCS
+    }
     payload = build_evaluator_contract().model_dump(mode="json")
     capabilities = payload["capabilities"]
 
     assert isinstance(capabilities, dict)
     for path, text in active_doc_texts.items():
         for old_token in sorted(OLD_EVALUATOR_CAPABILITY_TOKENS):
-            assert f"`{old_token}`" not in text, path
+            assert not _contains_stale_capability_token(text, old_token), path
 
-    for capability, level in capabilities.items():
-        expected_row = f"| `{capability}` | `{level}` |"
-        assert expected_row in contract_text
+    assert _contract_doc_capabilities(contract_text) == capabilities
 
     assert "`sol_execbench.agent_feedback.v2`" in contract_text
     assert "`sol_execbench.profile_summary.v2`" in contract_text
