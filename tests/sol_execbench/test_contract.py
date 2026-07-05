@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from click.testing import CliRunner
 
@@ -29,6 +30,15 @@ OPTIONAL_CAPABILITIES = {
     "static_kernel.evidence",
     "agent_feedback.sidecar",
     "profile_summary.sidecar",
+}
+CURRENT_CONTRACT_DOC = Path("docs/EVALUATOR-CONTRACT.md")
+OLD_EVALUATOR_CAPABILITY_TOKENS = {
+    "runtime.evidence.v1",
+    "profiling.evidence.v1",
+    "toolchain.routing.v1",
+    "static_kernel_evidence.v1",
+    "agent_feedback.sidecar.v1",
+    "profile_summary.sidecar.v1",
 }
 
 
@@ -78,6 +88,23 @@ def test_evaluator_contract_advertises_optional_evidence_without_bump():
         ("sol", "agent_feedback", "diagnostic"),
         ("sol", "profile_summary", "diagnostic"),
     }
+
+
+def test_current_contract_doc_matches_builder_capabilities():
+    text = CURRENT_CONTRACT_DOC.read_text()
+    payload = build_evaluator_contract().model_dump(mode="json")
+    capabilities = payload["capabilities"]
+
+    assert isinstance(capabilities, dict)
+    for old_token in OLD_EVALUATOR_CAPABILITY_TOKENS:
+        assert f"`{old_token}`" not in text
+
+    for capability, level in capabilities.items():
+        assert f"`{capability}`" in text
+        assert f"`{level}`" in text
+
+    assert "`sol_execbench.agent_feedback.v2`" in text
+    assert "`sol_execbench.profile_summary.v2`" in text
 
 
 def test_evaluator_contract_freezes_trace_status_and_field_groups():
