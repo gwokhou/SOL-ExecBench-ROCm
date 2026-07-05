@@ -13,11 +13,11 @@ from enum import Enum
 from pathlib import Path
 from typing import Literal
 
-from pydantic import ConfigDict, Field, model_validator
+from pydantic import ConfigDict, Field
 
 from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileResult
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
-from sol_execbench.core.data.contract import SOL_EXECBENCH_CONTRACT_VERSION
+from sol_execbench.core.data.contract import SOL_EXECBENCH_RELEASE
 from sol_execbench.core.dataset.checksums import sha256_file
 from sol_execbench.core.trust_summary import utc_timestamp
 
@@ -171,23 +171,12 @@ class ProfileSummaryIdentity(BaseModelWithDocstrings):
 
     generated_at: str
     """UTC timestamp when the sidecar was generated."""
-    sol_contract_version: str
-    """SOL evaluator contract version used by the producer."""
-    sol_version: str | None = None
-    """Preferred HIP-facing alias for the SOL contract version."""
+    sol_version: str
+    """Producer/runtime SOL version or HIP-facing supported SOL tag."""
     trace_path: str | None = None
     """Compact trace path or file name when available."""
     run_id: str | None = None
     """Optional run identity."""
-
-    @model_validator(mode="after")
-    def _aliases_match(self) -> ProfileSummaryIdentity:
-        if (
-            self.sol_version is not None
-            and self.sol_version != self.sol_contract_version
-        ):
-            raise ValueError("sol_version must match sol_contract_version")
-        return self
 
 
 class ProfileSummaryAuthority(BaseModelWithDocstrings):
@@ -327,8 +316,7 @@ def build_profile_summary_sidecar(
         reason_code=reason_code,
         identity=ProfileSummaryIdentity(
             generated_at=generated_at or utc_timestamp(),
-            sol_contract_version=SOL_EXECBENCH_CONTRACT_VERSION,
-            sol_version=SOL_EXECBENCH_CONTRACT_VERSION,
+            sol_version=SOL_EXECBENCH_RELEASE,
             trace_path=_compact_path(trace_path),
             run_id=run_id,
         ),
@@ -368,7 +356,6 @@ def validate_profile_summary_freshness(
     sidecar: ProfileSummarySidecar,
     *,
     trace_path: str | None = None,
-    sol_contract_version: str = SOL_EXECBENCH_CONTRACT_VERSION,
     sol_version: str | None = None,
     run_id: str | None = None,
 ) -> ProfileSummaryFreshnessValidation:
@@ -376,9 +363,7 @@ def validate_profile_summary_freshness(
 
     reasons: list[str] = []
     identity = sidecar.identity
-    expected_sol_version = sol_version or sol_contract_version
-    if (identity.sol_version or identity.sol_contract_version) != expected_sol_version:
-        reasons.append("sol_contract_version_mismatch")
+    _match_required_optional(reasons, "sol_version", identity.sol_version, sol_version)
     _match_optional(
         reasons, "trace_path", identity.trace_path, _compact_path(trace_path)
     )
@@ -388,7 +373,7 @@ def validate_profile_summary_freshness(
             status=ProfileSummaryFreshnessStatus.STALE,
             reason_codes=reasons,
         )
-    if trace_path is None and run_id is None:
+    if trace_path is None and run_id is None and sol_version is None:
         return ProfileSummaryFreshnessValidation(
             status=ProfileSummaryFreshnessStatus.UNKNOWN,
             reason_codes=["insufficient_expected_identity"],
@@ -938,4 +923,19 @@ def _match_optional(
     expected: str | None,
 ) -> None:
     if expected is not None and actual != expected:
+        reasons.append(f"{field}_mismatch")
+
+
+def _match_required_optional(
+    reasons: list[str],
+    field: str,
+    actual: str | None,
+    expected: str | None,
+) -> None:
+    if expected is None:
+        return
+    if actual is None:
+        reasons.append(f"{field}_missing")
+        return
+    if actual != expected:
         reasons.append(f"{field}_mismatch")

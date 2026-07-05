@@ -17,11 +17,11 @@
   ],
   "authority": "diagnostic",
   "identity": {
-    "candidate_hash": "candidate-demo",
+    "candidate_id": "candidate-demo",
     "generated_at": "2026-06-16T00:00:00Z",
     "run_id": "run-demo",
-    "sol_contract_version": "1.0",
-    "source_hash": "source-demo",
+    "sol_version": "v1.42",
+    "source_sha256": "source-demo",
     "target_id": "linear-demo",
     "trace_path": "trace.jsonl"
   },

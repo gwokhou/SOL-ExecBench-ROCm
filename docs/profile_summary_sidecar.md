@@ -53,7 +53,7 @@ not as a benchmark result. Suggested mapping:
 | --- | --- | --- |
 | `status` | Availability class for normalized profile metadata. | Treat unknown values as unavailable. |
 | `reason_code` | Stable generation state. | Preserve as opaque diagnostic text or downgrade to unknown. |
-| `identity` | Freshness denominator for trace/run matching. `identity.sol_version` is the preferred HIP-facing alias for `identity.sol_contract_version`. | Reject as stale when expected identity mismatches. |
+| `identity` | Freshness denominator for trace/run matching. `identity.sol_version` is the canonical SOL producer version. | Reject as stale when expected identity mismatches. |
 | `summary.profiler_status` | Raw rocprofv3 collection status. | Treat absent status as unavailable. |
 | `summary.artifact_coverage_status` | Registration coverage class such as complete, partial, none, or unavailable. | Treat unknown values as partial diagnostics. |
 | `summary.reason_codes` | Stable rocprofv3 registration and availability reason codes. | Preserve unknown codes as opaque diagnostic text. |

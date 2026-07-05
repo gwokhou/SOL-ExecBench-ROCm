@@ -11,14 +11,14 @@ from enum import Enum
 from pathlib import Path
 from typing import Literal
 
-from pydantic import ConfigDict, Field, model_validator
+from pydantic import ConfigDict, Field
 
 from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileResult
 from sol_execbench.core.bench.static_kernel_evidence import (
     StaticKernelEvidenceSidecar,
 )
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
-from sol_execbench.core.data.contract import SOL_EXECBENCH_CONTRACT_VERSION
+from sol_execbench.core.data.contract import SOL_EXECBENCH_RELEASE
 from sol_execbench.core.data.trace import EvaluationStatus, Trace
 from sol_execbench.core.dataset.checksums import sha256_file
 from sol_execbench.core.trust_summary import utc_timestamp
@@ -119,9 +119,7 @@ class AgentFeedbackIdentity(BaseModelWithDocstrings):
 
     generated_at: str
     """UTC timestamp when the sidecar was generated."""
-    sol_contract_version: str
-    """SOL evaluator contract version used by the producer."""
-    sol_version: str | None = None
+    sol_version: str
     """Producer/runtime SOL version or HIP-facing supported SOL tag."""
     trace_path: str | None = None
     """Compact trace path or file name when available."""
@@ -130,23 +128,9 @@ class AgentFeedbackIdentity(BaseModelWithDocstrings):
     run_id: str | None = None
     """Optional run identity."""
     candidate_id: str | None = None
-    """Preferred HIP-facing candidate identity alias."""
+    """Canonical candidate identity."""
     source_sha256: str | None = None
-    """Preferred HIP-facing source-content SHA256 identity alias."""
-    candidate_hash: str | None = None
-    """Optional candidate hash used by downstream consumers."""
-    source_hash: str | None = None
-    """Optional source hash used by downstream consumers."""
-
-    @model_validator(mode="after")
-    def _aliases_match(self) -> AgentFeedbackIdentity:
-        if self.candidate_id is not None and self.candidate_hash is not None:
-            if self.candidate_id != self.candidate_hash:
-                raise ValueError("candidate_id must match candidate_hash")
-        if self.source_sha256 is not None and self.source_hash is not None:
-            if self.source_sha256 != self.source_hash:
-                raise ValueError("source_sha256 must match source_hash")
-        return self
+    """Canonical source-content SHA256 identity."""
 
 
 class AgentFeedbackFreshnessValidation(BaseModelWithDocstrings):
@@ -271,8 +255,8 @@ def build_agent_feedback_sidecar(
     trace_path: str | None = None,
     target_id: str | None = None,
     run_id: str | None = None,
-    candidate_hash: str | None = None,
-    source_hash: str | None = None,
+    candidate_id: str | None = None,
+    source_sha256: str | None = None,
     sol_version: str | None = None,
     generated_at: str | None = None,
     artifact_citations: Sequence[AgentFeedbackArtifactCitation] = (),
@@ -298,15 +282,12 @@ def build_agent_feedback_sidecar(
         reason_code=reason_code,
         identity=AgentFeedbackIdentity(
             generated_at=generated_at or utc_timestamp(),
-            sol_contract_version=SOL_EXECBENCH_CONTRACT_VERSION,
-            sol_version=sol_version,
+            sol_version=sol_version or SOL_EXECBENCH_RELEASE,
             trace_path=_compact_path(trace_path),
             target_id=target_id,
             run_id=run_id,
-            candidate_id=candidate_hash,
-            source_sha256=source_hash,
-            candidate_hash=candidate_hash,
-            source_hash=source_hash,
+            candidate_id=candidate_id,
+            source_sha256=source_sha256,
         ),
         summary=AgentFeedbackSummary(
             trace_count=len(traces),
@@ -356,22 +337,16 @@ def validate_agent_feedback_freshness(
     sidecar: AgentFeedbackSidecar,
     *,
     trace_path: str | None = None,
-    sol_contract_version: str = SOL_EXECBENCH_CONTRACT_VERSION,
     target_id: str | None = None,
     run_id: str | None = None,
     candidate_id: str | None = None,
     source_sha256: str | None = None,
-    candidate_hash: str | None = None,
-    source_hash: str | None = None,
     sol_version: str | None = None,
 ) -> AgentFeedbackFreshnessValidation:
     """Classify whether a sidecar identity matches expected run identity."""
 
     reasons: list[str] = []
     identity = sidecar.identity
-    expected_sol_version = sol_version or sol_contract_version
-    if (identity.sol_version or identity.sol_contract_version) != expected_sol_version:
-        reasons.append("sol_contract_version_mismatch")
     _match_optional(
         reasons,
         "trace_path",
@@ -380,41 +355,26 @@ def validate_agent_feedback_freshness(
     )
     _match_optional(reasons, "target_id", identity.target_id, target_id)
     _match_optional(reasons, "run_id", identity.run_id, run_id)
-    if candidate_id is not None:
-        _match_optional(
-            reasons,
-            "candidate_id",
-            identity.candidate_id or identity.candidate_hash,
-            candidate_id,
-        )
-    else:
-        _match_optional(
-            reasons,
-            "candidate_hash",
-            identity.candidate_hash or identity.candidate_id,
-            candidate_hash,
-        )
-    if source_sha256 is not None:
-        _match_optional(
-            reasons,
-            "source_sha256",
-            identity.source_sha256 or identity.source_hash,
-            source_sha256,
-        )
-    else:
-        _match_optional(
-            reasons,
-            "source_hash",
-            identity.source_hash or identity.source_sha256,
-            source_hash,
-        )
+    _match_required_optional(
+        reasons,
+        "candidate_id",
+        identity.candidate_id,
+        candidate_id,
+    )
+    _match_required_optional(
+        reasons,
+        "source_sha256",
+        identity.source_sha256,
+        source_sha256,
+    )
+    _match_required_optional(reasons, "sol_version", identity.sol_version, sol_version)
     if reasons:
         return AgentFeedbackFreshnessValidation(
             status=AgentFeedbackFreshnessStatus.STALE,
             reason_codes=reasons,
         )
     if trace_path is None and not any(
-        (target_id, run_id, candidate_hash, source_hash, candidate_id, source_sha256)
+        (target_id, run_id, candidate_id, source_sha256, sol_version)
     ):
         return AgentFeedbackFreshnessValidation(
             status=AgentFeedbackFreshnessStatus.UNKNOWN,
@@ -492,6 +452,21 @@ def _match_optional(
     expected: str | None,
 ) -> None:
     if expected is not None and actual != expected:
+        reasons.append(f"{field}_mismatch")
+
+
+def _match_required_optional(
+    reasons: list[str],
+    field: str,
+    actual: str | None,
+    expected: str | None,
+) -> None:
+    if expected is None:
+        return
+    if actual is None:
+        reasons.append(f"{field}_missing")
+        return
+    if actual != expected:
         reasons.append(f"{field}_mismatch")
 
 

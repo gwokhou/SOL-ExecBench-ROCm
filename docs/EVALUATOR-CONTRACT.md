@@ -27,23 +27,21 @@ available beside a run:
 - `profiling.evidence.v1`
 - `toolchain.routing.v1`
 - `static_kernel_evidence.v1`
-- `agent_feedback.sidecar.v1`
-- `profile_summary.sidecar.v1`
+- `agent_feedback.sidecar.v2`
+- `profile_summary.sidecar.v2`
 
 These capabilities are intentionally optional. A compatible consumer must keep
 working when a SOL version only provides canonical trace/profile surfaces and
 does not produce feedback sidecars.
 
-`agent_feedback.sidecar.v1` is the concrete optional JSON sidecar written as
-`<trace>.agent-feedback.json`. `profile_summary.sidecar.v1` is the concrete
+`agent_feedback.sidecar.v2` is the concrete optional JSON sidecar written as
+`<trace>.agent-feedback.json`. `profile_summary.sidecar.v2` is the concrete
 optional normalized profile summary written as `<trace>.profile-summary.json`
 when a trace output path is available. Current ROCm profiling metadata is still
 emitted separately as the trace-adjacent `<trace>.profile.json` rocprofv3
 sidecar. Consumers must keep working when either optional sidecar is absent.
-For HIP freshness checks, new SOL sidecars emit preferred identity fields
-`sol_version`, `candidate_id`, and `source_sha256` while preserving documented
-aliases `sol_contract_version`, `candidate_hash`, and `source_hash` for existing
-consumers.
+For HIP freshness checks, SOL sidecars emit canonical identity fields only:
+`sol_version`, `candidate_id`, and `source_sha256`.
 
 ## Official Score Evidence
 
@@ -85,7 +83,7 @@ fields.
 
 ## Feedback Sidecars
 
-`agent_feedback.sidecar.v1`, `profile_summary.sidecar.v1`, and the current
+`agent_feedback.sidecar.v2`, `profile_summary.sidecar.v2`, and the current
 `<trace>.profile.json` profiler metadata are trace-adjacent diagnostic surfaces.
 They may guide the next experiment in an agent loop, but they are not:
 

@@ -2,11 +2,11 @@
   "artifact_citations": [],
   "authority": "score",
   "identity": {
-    "candidate_hash": null,
+    "candidate_id": null,
     "generated_at": "2026-06-16T00:00:00Z",
     "run_id": null,
-    "sol_contract_version": "1.0",
-    "source_hash": null,
+    "sol_version": "v1.42",
+    "source_sha256": null,
     "target_id": null,
     "trace_path": "trace.jsonl"
   },
