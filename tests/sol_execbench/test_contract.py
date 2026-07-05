@@ -4,6 +4,7 @@ import json
 import re
 from pathlib import Path
 
+import pytest
 from click.testing import CliRunner
 
 from sol_execbench.cli.main import cli
@@ -50,6 +51,9 @@ OLD_EVALUATOR_CAPABILITY_TOKENS = {
     "profile_summary.sidecar.v1",
     "profile_summary.sidecar.v2",
 }
+SCHEMA_AS_CAPABILITY_PHRASES = {
+    "official_score_evidence.v1 capability token",
+}
 
 
 def _contract_doc_capabilities(text: str) -> dict[str, str]:
@@ -73,6 +77,7 @@ def _contract_doc_capabilities(text: str) -> dict[str, str]:
             key = key[1:-1]
         if level.startswith("`") and level.endswith("`"):
             level = level[1:-1]
+        assert key not in rows, key
         rows[key] = level
     return rows
 
@@ -80,6 +85,11 @@ def _contract_doc_capabilities(text: str) -> dict[str, str]:
 def _contains_stale_capability_token(text: str, token: str) -> bool:
     pattern = rf"(?<![A-Za-z0-9_.-]){re.escape(token)}(?![A-Za-z0-9_.-])"
     return re.search(pattern, text) is not None
+
+
+def _contains_schema_as_capability_phrase(text: str, phrase: str) -> bool:
+    normalized_text = " ".join(text.replace("`", "").replace(">", " ").split())
+    return phrase in normalized_text
 
 
 def test_evaluator_contract_versions_are_stable():
@@ -142,11 +152,27 @@ def test_current_contract_doc_matches_builder_capabilities():
     for path, text in active_doc_texts.items():
         for old_token in sorted(OLD_EVALUATOR_CAPABILITY_TOKENS):
             assert not _contains_stale_capability_token(text, old_token), path
+        for phrase in sorted(SCHEMA_AS_CAPABILITY_PHRASES):
+            assert not _contains_schema_as_capability_phrase(text, phrase), path
 
     assert _contract_doc_capabilities(contract_text) == capabilities
 
     assert "`sol_execbench.agent_feedback.v2`" in contract_text
     assert "`sol_execbench.profile_summary.v2`" in contract_text
+
+
+def test_contract_doc_capabilities_rejects_duplicate_keys():
+    with pytest.raises(AssertionError, match="trace.correctness"):
+        _contract_doc_capabilities(
+            "\n".join(
+                [
+                    "| Capability key | Level | Meaning |",
+                    "| --- | --- | --- |",
+                    "| `trace.correctness` | `always` | First row. |",
+                    "| `trace.correctness` | `optional` | Duplicate row. |",
+                ]
+            )
+        )
 
 
 def test_evaluator_contract_freezes_trace_status_and_field_groups():
