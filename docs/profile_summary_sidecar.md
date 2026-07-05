@@ -7,7 +7,8 @@ Trace JSONL as the only authority for correctness, timing, scoring, and
 evaluation status.
 
 The evaluator contract advertises this artifact through the optional
-`profile_summary.sidecar.v2` capability token.
+`profile_summary.sidecar` capability key. The concrete artifact schema remains
+`sol_execbench.profile_summary.v2`.
 
 The summary sidecar does not replace `<trace>.profile.json`. The existing
 profile metadata sidecar remains the raw diagnostic metadata record and is cited
@@ -83,11 +84,11 @@ claim fine-grained occupancy, VGPR/SGPR pressure, cache, or bandwidth
 conclusions. When counters are missing or insufficient, SOL emits
 `insufficient_counters` or `unknown` instead of speculating.
 
-Profiler-derived bottleneck hints remain in `profile_summary.sidecar.v2`; SOL
-does not surface them as `agent_feedback.items[]`. HIP adapters that want one
-prompt-facing hint list should merge profile-summary hints with agent-feedback
-items only after each source sidecar passes strict freshness and authority
-checks.
+Profiler-derived bottleneck hints remain in the
+`sol_execbench.profile_summary.v2` sidecar; SOL does not surface them as
+`agent_feedback.items[]`. HIP adapters that want one prompt-facing hint list
+should merge profile-summary hints with agent-feedback items only after each
+source sidecar passes strict freshness and authority checks.
 
 HIP runtime prompts should never include raw trace rows, raw profiler dumps,
 full kernel source, prompt text, or absolute temporary paths from SOL profile

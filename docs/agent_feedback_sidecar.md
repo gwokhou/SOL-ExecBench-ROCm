@@ -58,7 +58,8 @@ kernel source, prompt text, or absolute temporary paths from SOL feedback. They
 should include only the normalized bottleneck, recommendation, limitation, and
 compact citation fields after freshness and authority checks pass.
 
-`profile_summary.sidecar.v2` is the normalized profile-summary sidecar for
+The `profile_summary.sidecar` evaluator capability key advertises the concrete
+`sol_execbench.profile_summary.v2` normalized profile-summary sidecar for
 bounded profiler metrics, conservative bottleneck hints, and artifact
 citations. Current ROCm profiler metadata remains the separate
 `<trace>.profile.json` rocprofv3 sidecar and is cited as optional diagnostic

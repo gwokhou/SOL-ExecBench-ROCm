@@ -32,6 +32,12 @@ OPTIONAL_CAPABILITIES = {
     "profile_summary.sidecar",
 }
 CURRENT_CONTRACT_DOC = Path("docs/EVALUATOR-CONTRACT.md")
+ACTIVE_CONTRACT_DOCS = (
+    CURRENT_CONTRACT_DOC,
+    Path("docs/trace.md"),
+    Path("docs/agent_feedback_sidecar.md"),
+    Path("docs/profile_summary_sidecar.md"),
+)
 OLD_EVALUATOR_CAPABILITY_TOKENS = {
     "runtime.evidence.v1",
     "profiling.evidence.v1",
@@ -93,20 +99,22 @@ def test_evaluator_contract_advertises_optional_evidence_without_bump():
 
 
 def test_current_contract_doc_matches_builder_capabilities():
-    text = CURRENT_CONTRACT_DOC.read_text()
+    contract_text = CURRENT_CONTRACT_DOC.read_text()
+    active_doc_texts = {path: path.read_text() for path in ACTIVE_CONTRACT_DOCS}
     payload = build_evaluator_contract().model_dump(mode="json")
     capabilities = payload["capabilities"]
 
     assert isinstance(capabilities, dict)
-    for old_token in sorted(OLD_EVALUATOR_CAPABILITY_TOKENS):
-        assert f"`{old_token}`" not in text
+    for path, text in active_doc_texts.items():
+        for old_token in sorted(OLD_EVALUATOR_CAPABILITY_TOKENS):
+            assert f"`{old_token}`" not in text, path
 
     for capability, level in capabilities.items():
         expected_row = f"| `{capability}` | `{level}` |"
-        assert expected_row in text
+        assert expected_row in contract_text
 
-    assert "`sol_execbench.agent_feedback.v2`" in text
-    assert "`sol_execbench.profile_summary.v2`" in text
+    assert "`sol_execbench.agent_feedback.v2`" in contract_text
+    assert "`sol_execbench.profile_summary.v2`" in contract_text
 
 
 def test_evaluator_contract_freezes_trace_status_and_field_groups():
