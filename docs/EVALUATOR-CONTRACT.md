@@ -20,27 +20,40 @@ diagnostics, but they must not redefine SOL benchmark truth.
 
 ## Optional Capabilities
 
-Optional capability tokens advertise sidecar or diagnostic surfaces that may be
-available beside a run:
+The `capabilities` field is a mapping of current evaluator contract capability
+keys to requirement levels. Required trace and baseline semantics use `always`;
+optional diagnostics use `optional` or a narrower diagnostic profile.
 
-- `runtime.evidence.v1`
-- `profiling.evidence.v1`
-- `toolchain.routing.v1`
-- `static_kernel_evidence.v1`
-- `agent_feedback.sidecar.v2`
-- `profile_summary.sidecar.v2`
+| Capability key | Level | Meaning |
+| --- | --- | --- |
+| `trace.correctness` | `always` | Canonical correctness status and correctness metrics. |
+| `trace.timing` | `always` | Canonical timing fields and timing interpretation. |
+| `trace.scoring` | `always` | Canonical scoring fields and score provenance. |
+| `baseline.measured_export` | `always` | Measured baseline registry export fields. |
+| `baseline.scoring_artifact` | `always` | Scoring baseline artifact fields. |
+| `compatibility.metadata` | `always` | Metadata consumers can persist for compatibility diagnostics. |
+| `failure_categories` | `always` | Stable consumer-facing failure buckets. |
+| `runtime.evidence` | `optional` | Optional runtime environment evidence beside canonical trace rows. |
+| `profiling.evidence` | `optional` | Optional profiler evidence and metadata beside benchmark output. |
+| `toolchain.routing` | `optional` | Optional toolchain availability and provenance diagnostics. |
+| `static_kernel.evidence` | `optional` | Optional static kernel evidence sidecar diagnostics. |
+| `agent_feedback.sidecar` | `profile:diagnostic` | Optional bounded next-experiment feedback diagnostics. |
+| `profile_summary.sidecar` | `profile:diagnostic` | Optional normalized profiler summary diagnostics. |
 
-These capabilities are intentionally optional. A compatible consumer must keep
-working when a SOL version only provides canonical trace/profile surfaces and
-does not produce feedback sidecars.
+Concrete artifact schema versions are separate from contract capability keys.
+`agent_feedback.sidecar` currently emits `sol_execbench.agent_feedback.v2` as
+`<trace>.agent-feedback.json`. `profile_summary.sidecar` currently emits
+`sol_execbench.profile_summary.v2` as `<trace>.profile-summary.json` when a
+trace output path is available. Static kernel evidence remains the concrete
+`sol_execbench.static_kernel_evidence.v1` sidecar schema behind the
+`static_kernel.evidence` capability key. Current ROCm profiling metadata is
+still emitted separately as the trace-adjacent `<trace>.profile.json`
+rocprofv3 sidecar.
 
-`agent_feedback.sidecar.v2` is the concrete optional JSON sidecar written as
-`<trace>.agent-feedback.json`. `profile_summary.sidecar.v2` is the concrete
-optional normalized profile summary written as `<trace>.profile-summary.json`
-when a trace output path is available. Current ROCm profiling metadata is still
-emitted separately as the trace-adjacent `<trace>.profile.json` rocprofv3
-sidecar. Consumers must keep working when either optional sidecar is absent.
-For HIP freshness checks, SOL sidecars emit canonical identity fields only:
+These capabilities are intentionally optional unless their level is `always`.
+A compatible consumer must keep working when a SOL version only provides
+canonical trace/profile surfaces and does not produce feedback sidecars. For
+HIP freshness checks, SOL sidecars emit canonical identity fields only:
 `sol_version`, `candidate_id`, and `source_sha256`.
 
 ## Official Score Evidence
@@ -83,8 +96,10 @@ fields.
 
 ## Feedback Sidecars
 
-`agent_feedback.sidecar.v2`, `profile_summary.sidecar.v2`, and the current
+`agent_feedback.sidecar`, `profile_summary.sidecar`, and the current
 `<trace>.profile.json` profiler metadata are trace-adjacent diagnostic surfaces.
+Their concrete feedback and profile-summary artifact schemas are
+`sol_execbench.agent_feedback.v2` and `sol_execbench.profile_summary.v2`.
 They may guide the next experiment in an agent loop, but they are not:
 
 - correctness authority
