@@ -38,7 +38,9 @@ OLD_EVALUATOR_CAPABILITY_TOKENS = {
     "toolchain.routing.v1",
     "static_kernel_evidence.v1",
     "agent_feedback.sidecar.v1",
+    "agent_feedback.sidecar.v2",
     "profile_summary.sidecar.v1",
+    "profile_summary.sidecar.v2",
 }
 
 
@@ -96,12 +98,12 @@ def test_current_contract_doc_matches_builder_capabilities():
     capabilities = payload["capabilities"]
 
     assert isinstance(capabilities, dict)
-    for old_token in OLD_EVALUATOR_CAPABILITY_TOKENS:
+    for old_token in sorted(OLD_EVALUATOR_CAPABILITY_TOKENS):
         assert f"`{old_token}`" not in text
 
     for capability, level in capabilities.items():
-        assert f"`{capability}`" in text
-        assert f"`{level}`" in text
+        expected_row = f"| `{capability}` | `{level}` |"
+        assert expected_row in text
 
     assert "`sol_execbench.agent_feedback.v2`" in text
     assert "`sol_execbench.profile_summary.v2`" in text
