@@ -71,9 +71,7 @@ def test_structured_profile_evidence_parses_trace_counter_and_metadata(
 
     evidence = structured_profile_evidence(profile)
 
-    assert [
-        metric.model_dump(mode="json") for metric in evidence.workload_metrics
-    ] == [
+    assert [metric.model_dump(mode="json") for metric in evidence.workload_metrics] == [
         {
             "name": "artifact_coverage_status",
             "value": "complete",
