@@ -234,7 +234,7 @@ Expected result: commit succeeds with DCO sign-off.
 Run:
 
 ```bash
-rg -n "<inactive sidecar authority class-name pattern>" src tests docs
+rg -n 'AgentFeedbackAuthorit[y]|ProfileSummaryAuthorit[y]' src tests docs
 ```
 
 Expected result: only the class definitions appear in `agent_feedback.py` and `profile_summary.py`.
@@ -261,7 +261,7 @@ Do not modify `ProfileSummaryGovernanceGuardrail`.
 Run:
 
 ```bash
-rg -n "<inactive sidecar authority class-name pattern>" src tests docs
+rg -n 'AgentFeedbackAuthorit[y]|ProfileSummaryAuthorit[y]' src tests docs
 ```
 
 Expected result: no matches.
@@ -324,7 +324,7 @@ schema `sol_execbench.static_kernel_evidence.v1`.
 Run:
 
 ```bash
-rg -n "<inactive sidecar authority class-name pattern>" src tests docs
+rg -n 'AgentFeedbackAuthorit[y]|ProfileSummaryAuthorit[y]' src tests docs
 ```
 
 Expected result: no matches.
