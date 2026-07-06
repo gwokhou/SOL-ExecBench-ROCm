@@ -42,7 +42,7 @@ class EvaluatorContract(BaseModelWithDocstrings):
     sol_release: str
     """SOL release that emitted this contract payload."""
     capabilities: dict[str, str] = Field(default_factory=dict)
-    """Named capability tokens mapped to requirement levels."""
+    """Named capability keys mapped to requirement levels."""
     trace_field_requirements: dict[str, list[str]]
     """Required trace field groups from the canonical trace JSONL contract."""
     correctness_fields: list[str]
