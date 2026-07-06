@@ -150,14 +150,16 @@ def test_profile_summary_docs_explain_hip_mapping_and_fixture_semantics():
 
     for expected in (
         "HIP Consumer Mapping",
-        "profile_summary.sidecar.v2",
+        "profile_summary.sidecar",
+        "sol_execbench.profile_summary.v2",
         "summary.profiler_status",
         "summary.metrics[]",
         "summary.workload_metrics[]",
         "summary.kernel_metrics[]",
         "summary.bottleneck_hints[]",
         "identity.sol_version",
-        "does not surface them as `agent_feedback.items[]`",
+        "does not surface them as",
+        "`agent_feedback.items[]`",
         "compute_bound",
         "insufficient_counters",
         "artifact_citations",
