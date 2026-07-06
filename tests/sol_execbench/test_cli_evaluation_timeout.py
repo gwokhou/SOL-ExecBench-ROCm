@@ -18,7 +18,7 @@ from pathlib import Path
 
 from click.testing import CliRunner
 
-from sol_execbench.cli import main as cli_main
+from sol_execbench.cli import evaluation as cli_evaluation
 from sol_execbench.cli.main import cli
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -50,7 +50,7 @@ def test_cli_eval_timeout_writes_no_trace_sidecar(tmp_path: Path, monkeypatch):
     def _raise_timeout(eval_cmd, *, staging_dir, timeout):  # noqa: ARG001
         raise subprocess.TimeoutExpired(cmd=eval_cmd, timeout=timeout)
 
-    monkeypatch.setattr(cli_main, "_run_evaluation_command", _raise_timeout)
+    monkeypatch.setattr(cli_evaluation, "_run_evaluation_command", _raise_timeout)
 
     result = CliRunner().invoke(
         cli,

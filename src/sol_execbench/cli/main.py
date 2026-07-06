@@ -26,7 +26,6 @@ from __future__ import annotations
 import dataclasses
 import json
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -51,17 +50,9 @@ from ..core.toolchain import (
     default_toolchain_registry,
 )
 from ..core.bench.io import flashinfer_safetensors_env
-from ..core.bench.rocm_profiler import (
-    ROCPROFV3_EXECUTABLE,
-    Rocprofv3ProfileResult,
-    collect_rocprofv3_profile,
-)
+from ..core.bench.rocm_profiler import Rocprofv3ProfileResult
 from ..core.bench.stderr import filter_benign_rocm_stderr
 from ..core.bench.static_kernel_evidence import StaticKernelEvidenceSidecar
-from ..core.bench.static_kernel_evidence import (
-    collect_static_kernel_artifacts,
-    run_static_kernel_extractors,
-)
 from ..core.baseline_export import export_hip_baseline_registry
 from ..core import (
     Definition,
@@ -83,28 +74,6 @@ console = Console(stderr=True)
 
 PROFILE_NONE = "none"
 PROFILE_ROCPROFV3 = "rocprofv3"
-
-NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION = cli_evaluation.NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION
-_DIAGNOSTIC_TAIL_LIMIT = cli_evaluation._DIAGNOSTIC_TAIL_LIMIT
-_no_trace_diagnostics_sidecar_path = cli_evaluation._no_trace_diagnostics_sidecar_path
-_timeout_output_text = cli_evaluation._timeout_output_text
-_write_no_trace_diagnostics_sidecar = cli_evaluation._write_no_trace_diagnostics_sidecar
-
-ENV_SNAPSHOT_ENABLE_ENV = cli_sidecars.ENV_SNAPSHOT_ENABLE_ENV
-ENV_SNAPSHOT_PATH_ENV = cli_sidecars.ENV_SNAPSHOT_PATH_ENV
-STATIC_EVIDENCE_AUTO = cli_sidecars.STATIC_EVIDENCE_AUTO
-STATIC_EVIDENCE_NONE = cli_sidecars.STATIC_EVIDENCE_NONE
-_agent_feedback_identity_fields = cli_sidecars._agent_feedback_identity_fields
-_agent_feedback_sidecar_path = cli_sidecars._agent_feedback_sidecar_path
-_profile_output_directory = cli_sidecars._profile_output_directory
-_profile_summary_sidecar_path = cli_sidecars._profile_summary_sidecar_path
-_static_evidence_directory = cli_sidecars._static_evidence_directory
-_static_evidence_sidecar_path = cli_sidecars._static_evidence_sidecar_path
-_write_agent_feedback_sidecar = cli_sidecars._write_agent_feedback_sidecar
-_write_environment_snapshot_sidecar = cli_sidecars._write_environment_snapshot_sidecar
-_write_profile_sidecar = cli_sidecars._write_profile_sidecar
-_write_profile_summary_sidecar = cli_sidecars._write_profile_summary_sidecar
-_write_static_evidence_sidecar = cli_sidecars._write_static_evidence_sidecar
 
 
 def _load_definition(path: Path) -> Definition:
@@ -235,65 +204,6 @@ def _print_traces_table(traces: list[Trace]) -> None:
             console.print(log.rstrip())
 
 
-def _collect_static_evidence_for_cli(
-    *,
-    enabled: str,
-    is_cpp: bool,
-    staging_dir: Path,
-    output_file: Path | None,
-    target_architecture: str | None = None,
-) -> StaticKernelEvidenceSidecar | None:
-    """Collect optional static evidence while preserving CLI monkeypatch hooks."""
-
-    return cli_sidecars._collect_static_evidence_for_cli(
-        enabled=enabled,
-        is_cpp=is_cpp,
-        staging_dir=staging_dir,
-        output_file=output_file,
-        target_architecture=target_architecture,
-        artifact_collector=collect_static_kernel_artifacts,
-        extractor_runner=run_static_kernel_extractors,
-    )
-
-
-def _run_evaluation_command(
-    eval_cmd: list[str],
-    *,
-    staging_dir: Path,
-    timeout: int,
-) -> subprocess.CompletedProcess[str]:
-    """Run the staged evaluation command with the standard ROCm allocator env."""
-
-    return cli_evaluation._run_evaluation_command(
-        eval_cmd,
-        staging_dir=staging_dir,
-        timeout=timeout,
-        env_builder=flashinfer_safetensors_env,
-        runner=subprocess.run,
-    )
-
-
-def _run_profiled_evaluation(
-    eval_cmd: list[str],
-    *,
-    staging_dir: Path,
-    output_file: Path | None,
-    timeout: int,
-) -> tuple[subprocess.CompletedProcess[str] | None, Rocprofv3ProfileResult]:
-    """Run evaluation under `rocprofv3`, returning normal execution on failure."""
-
-    return cli_evaluation._run_profiled_evaluation(
-        eval_cmd,
-        staging_dir=staging_dir,
-        output_file=output_file,
-        timeout=timeout,
-        env_builder=flashinfer_safetensors_env,
-        subprocess_run=subprocess.run,
-        rocprofv3_available=shutil.which(ROCPROFV3_EXECUTABLE) is not None,
-        profile_collector=collect_rocprofv3_profile,
-    )
-
-
 @click.command(
     name="sol-execbench", context_settings={"help_option_names": ["-h", "--help"]}
 )
@@ -354,8 +264,10 @@ def _run_profiled_evaluation(
 )
 @click.option(
     "--static-evidence",
-    type=click.Choice([STATIC_EVIDENCE_NONE, STATIC_EVIDENCE_AUTO]),
-    default=STATIC_EVIDENCE_NONE,
+    type=click.Choice(
+        [cli_sidecars.STATIC_EVIDENCE_NONE, cli_sidecars.STATIC_EVIDENCE_AUTO]
+    ),
+    default=cli_sidecars.STATIC_EVIDENCE_NONE,
     show_default=True,
     help="Collect optional diagnostic static kernel evidence",
 )
@@ -499,15 +411,15 @@ def _evaluate_cli(
         if verbose and filtered_stderr:
             console.print(f"[dim]{filtered_stderr}[/dim]")
 
-        if static_evidence == STATIC_EVIDENCE_AUTO:
-            static_evidence_result = _collect_static_evidence_for_cli(
+        if static_evidence == cli_sidecars.STATIC_EVIDENCE_AUTO:
+            static_evidence_result = cli_sidecars._collect_static_evidence_for_cli(
                 enabled=static_evidence,
                 is_cpp=True,
                 staging_dir=staging_dir,
                 output_file=output_file,
             )
-    elif static_evidence == STATIC_EVIDENCE_AUTO:
-        static_evidence_result = _collect_static_evidence_for_cli(
+    elif static_evidence == cli_sidecars.STATIC_EVIDENCE_AUTO:
+        static_evidence_result = cli_sidecars._collect_static_evidence_for_cli(
             enabled=static_evidence,
             is_cpp=False,
             staging_dir=staging_dir,
@@ -521,7 +433,7 @@ def _evaluate_cli(
     profiled_proc: subprocess.CompletedProcess[str] | None = None
     if profile == PROFILE_ROCPROFV3:
         console.print("[dim]Collecting optional rocprofv3 profiling evidence...[/dim]")
-        profiled_proc, profile_result = _run_profiled_evaluation(
+        profiled_proc, profile_result = cli_evaluation._run_profiled_evaluation(
             eval_cmd,
             staging_dir=staging_dir,
             output_file=output_file,
@@ -544,7 +456,7 @@ def _evaluate_cli(
         )
 
         try:
-            proc = profiled_proc or _run_evaluation_command(
+            proc = profiled_proc or cli_evaluation._run_evaluation_command(
                 eval_cmd,
                 staging_dir=staging_dir,
                 timeout=timeout,
@@ -556,14 +468,14 @@ def _evaluate_cli(
             # than an unhandled traceback.
             progress.update(task, completed=True)
             console.print(f"[red]Evaluation timed out after {timeout}s[/red]")
-            diagnostic_path = _write_no_trace_diagnostics_sidecar(
+            diagnostic_path = cli_evaluation._write_no_trace_diagnostics_sidecar(
                 output_file=output_file,
                 staging_dir=staging_dir,
                 keep_staging=keep_staging,
                 reason="evaluation_timeout",
                 returncode=124,
-                stdout=_timeout_output_text(exc.stdout),
-                stderr=_timeout_output_text(exc.stderr),
+                stdout=cli_evaluation._timeout_output_text(exc.stdout),
+                stderr=cli_evaluation._timeout_output_text(exc.stderr),
             )
             if diagnostic_path is not None:
                 console.print(
@@ -579,7 +491,7 @@ def _evaluate_cli(
 
     if proc.returncode != 0 and not proc.stdout.strip():
         console.print("[red]Evaluation failed[/red]")
-        diagnostic_path = _write_no_trace_diagnostics_sidecar(
+        diagnostic_path = cli_evaluation._write_no_trace_diagnostics_sidecar(
             output_file=output_file,
             staging_dir=staging_dir,
             keep_staging=keep_staging,
@@ -602,7 +514,7 @@ def _evaluate_cli(
 
     if not traces:
         console.print("[red]No traces produced[/red]")
-        diagnostic_path = _write_no_trace_diagnostics_sidecar(
+        diagnostic_path = cli_evaluation._write_no_trace_diagnostics_sidecar(
             output_file=output_file,
             staging_dir=staging_dir,
             keep_staging=keep_staging,
@@ -633,20 +545,24 @@ def _evaluate_cli(
         if output_file is not None and output_file.is_file()
         else None
     )
-    environment_sidecar_path = _write_environment_snapshot_sidecar(output_file)
-    profile_sidecar_path = _write_profile_sidecar(output_file, profile_result)
-    _write_profile_summary_sidecar(
+    environment_sidecar_path = cli_sidecars._write_environment_snapshot_sidecar(
+        output_file
+    )
+    profile_sidecar_path = cli_sidecars._write_profile_sidecar(
+        output_file, profile_result
+    )
+    cli_sidecars._write_profile_summary_sidecar(
         output_file,
         profile_result,
         profile_sidecar_path=profile_sidecar_path,
         run_id=trace_run_id,
     )
-    static_evidence_sidecar_path = _write_static_evidence_sidecar(
+    static_evidence_sidecar_path = cli_sidecars._write_static_evidence_sidecar(
         output_file,
         staging_dir,
         static_evidence_result,
     )
-    _write_agent_feedback_sidecar(
+    cli_sidecars._write_agent_feedback_sidecar(
         output_file,
         traces,
         solution=solution,

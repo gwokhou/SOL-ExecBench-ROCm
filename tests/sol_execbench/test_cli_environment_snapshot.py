@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 from click.testing import CliRunner
 
+from sol_execbench.cli import evaluation as cli_evaluation
 from sol_execbench.cli import main as cli_main
+from sol_execbench.cli import sidecars as cli_sidecars
 from sol_execbench.cli.main import cli
 from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileResult
 from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileArtifact
@@ -64,10 +67,10 @@ def test_environment_snapshot_sidecar_disabled_by_default(
     monkeypatch,
 ):
     output = tmp_path / "trace.jsonl"
-    monkeypatch.delenv(cli_main.ENV_SNAPSHOT_ENABLE_ENV, raising=False)
-    monkeypatch.delenv(cli_main.ENV_SNAPSHOT_PATH_ENV, raising=False)
+    monkeypatch.delenv(cli_sidecars.ENV_SNAPSHOT_ENABLE_ENV, raising=False)
+    monkeypatch.delenv(cli_sidecars.ENV_SNAPSHOT_PATH_ENV, raising=False)
 
-    written = cli_main._write_environment_snapshot_sidecar(
+    written = cli_sidecars._write_environment_snapshot_sidecar(
         output,
         collector=lambda: _snapshot(),
     )
@@ -87,20 +90,19 @@ def test_run_evaluation_command_passes_flashinfer_env(tmp_path: Path, monkeypatc
     def fake_run(*args, **kwargs):
         nonlocal captured_env
         captured_env = kwargs["env"]
-        return cli_main.subprocess.CompletedProcess(
+        return subprocess.CompletedProcess(
             args=args[0],
             returncode=0,
             stdout="",
             stderr="",
         )
 
-    monkeypatch.setattr(cli_main, "flashinfer_safetensors_env", fake_env)
-    monkeypatch.setattr(cli_main.subprocess, "run", fake_run)
-
-    result = cli_main._run_evaluation_command(
+    result = cli_evaluation._run_evaluation_command(
         ["python", "eval_driver.py"],
         staging_dir=tmp_path,
         timeout=30,
+        env_builder=fake_env,
+        runner=fake_run,
     )
 
     assert result.returncode == 0
@@ -126,22 +128,21 @@ def test_run_profiled_evaluation_requests_graceful_eval_driver_exit(
         output_file = command[command.index("--output-file") + 1]
         output_dir.mkdir(parents=True, exist_ok=True)
         (output_dir / f"{output_file}_results.db").write_text("profile db")
-        return cli_main.subprocess.CompletedProcess(
+        return subprocess.CompletedProcess(
             args=command,
             returncode=0,
             stdout='{"definition": "demo"}\n',
             stderr="",
         )
 
-    monkeypatch.setattr(cli_main, "flashinfer_safetensors_env", fake_env)
-    monkeypatch.setattr(cli_main.subprocess, "run", fake_run)
-    monkeypatch.setattr(cli_main.shutil, "which", lambda _name: "/usr/bin/rocprofv3")
-
-    profiled_proc, profile_result = cli_main._run_profiled_evaluation(
+    profiled_proc, profile_result = cli_evaluation._run_profiled_evaluation(
         ["python", "eval_driver.py"],
         staging_dir=tmp_path,
         output_file=tmp_path / "trace.jsonl",
         timeout=30,
+        env_builder=fake_env,
+        subprocess_run=fake_run,
+        rocprofv3_available=True,
     )
 
     assert profiled_proc is not None
@@ -156,7 +157,7 @@ def test_no_trace_diagnostics_sidecar_uses_trace_output_path(tmp_path: Path):
     output = tmp_path / "traces.jsonl"
     staging = tmp_path / "staging"
 
-    sidecar = cli_main._no_trace_diagnostics_sidecar_path(
+    sidecar = cli_evaluation._no_trace_diagnostics_sidecar_path(
         output,
         staging,
         keep_staging=False,
@@ -168,7 +169,7 @@ def test_no_trace_diagnostics_sidecar_uses_trace_output_path(tmp_path: Path):
 def test_no_trace_diagnostics_sidecar_survives_removed_staging(tmp_path: Path):
     staging = tmp_path / "sol_execbench_demo"
 
-    sidecar = cli_main._no_trace_diagnostics_sidecar_path(
+    sidecar = cli_evaluation._no_trace_diagnostics_sidecar_path(
         None,
         staging,
         keep_staging=False,
@@ -181,7 +182,7 @@ def test_no_trace_diagnostics_sidecar_survives_removed_staging(tmp_path: Path):
 def test_no_trace_diagnostics_sidecar_keeps_staging_when_requested(tmp_path: Path):
     staging = tmp_path / "sol_execbench_demo"
 
-    sidecar = cli_main._no_trace_diagnostics_sidecar_path(
+    sidecar = cli_evaluation._no_trace_diagnostics_sidecar_path(
         None,
         staging,
         keep_staging=True,
@@ -193,10 +194,10 @@ def test_no_trace_diagnostics_sidecar_keeps_staging_when_requested(tmp_path: Pat
 def test_no_trace_diagnostics_sidecar_records_bounded_failure_output(tmp_path: Path):
     output = tmp_path / "traces.jsonl"
     staging = tmp_path / "staging"
-    stdout = "library noise\n" + ("x" * (cli_main._DIAGNOSTIC_TAIL_LIMIT + 10))
-    stderr = "runtime failed\n" + ("y" * (cli_main._DIAGNOSTIC_TAIL_LIMIT + 20))
+    stdout = "library noise\n" + ("x" * (cli_evaluation._DIAGNOSTIC_TAIL_LIMIT + 10))
+    stderr = "runtime failed\n" + ("y" * (cli_evaluation._DIAGNOSTIC_TAIL_LIMIT + 20))
 
-    written = cli_main._write_no_trace_diagnostics_sidecar(
+    written = cli_evaluation._write_no_trace_diagnostics_sidecar(
         output_file=output,
         staging_dir=staging,
         keep_staging=False,
@@ -209,13 +210,15 @@ def test_no_trace_diagnostics_sidecar_records_bounded_failure_output(tmp_path: P
     assert written == tmp_path / "traces.jsonl.no-trace-diagnostics.json"
     assert written is not None
     payload = json.loads(written.read_text())
-    assert payload["schema_version"] == cli_main.NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION
+    assert (
+        payload["schema_version"] == cli_evaluation.NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION
+    )
     assert payload["diagnostic_only"] is True
     assert payload["canonical_trace_jsonl"] is False
     assert payload["reason"] == "no_parseable_traces"
     assert payload["returncode"] == 2
-    assert payload["stdout_tail"] == stdout[-cli_main._DIAGNOSTIC_TAIL_LIMIT :]
-    assert payload["stderr_tail"] == stderr[-cli_main._DIAGNOSTIC_TAIL_LIMIT :]
+    assert payload["stdout_tail"] == stdout[-cli_evaluation._DIAGNOSTIC_TAIL_LIMIT :]
+    assert payload["stderr_tail"] == stderr[-cli_evaluation._DIAGNOSTIC_TAIL_LIMIT :]
     assert payload["stdout_truncated"] is True
     assert payload["stderr_truncated"] is True
     assert payload["stdout_line_count"] == 2
@@ -226,7 +229,7 @@ def test_no_trace_diagnostics_sidecar_records_empty_stdout_failure(tmp_path: Pat
     output = tmp_path / "traces.jsonl"
     staging = tmp_path / "staging"
 
-    written = cli_main._write_no_trace_diagnostics_sidecar(
+    written = cli_evaluation._write_no_trace_diagnostics_sidecar(
         output_file=output,
         staging_dir=staging,
         keep_staging=False,
@@ -249,7 +252,7 @@ def test_no_trace_diagnostics_filters_benign_amdgpu_ids_noise(tmp_path: Path):
     output = tmp_path / "traces.jsonl"
     staging = tmp_path / "staging"
 
-    written = cli_main._write_no_trace_diagnostics_sidecar(
+    written = cli_evaluation._write_no_trace_diagnostics_sidecar(
         output_file=output,
         staging_dir=staging,
         keep_staging=False,
@@ -271,10 +274,10 @@ def test_no_trace_diagnostics_filters_benign_amdgpu_ids_noise(tmp_path: Path):
 
 def test_environment_snapshot_sidecar_uses_explicit_path(tmp_path: Path, monkeypatch):
     sidecar = tmp_path / "run" / "env.json"
-    monkeypatch.setenv(cli_main.ENV_SNAPSHOT_PATH_ENV, str(sidecar))
-    monkeypatch.delenv(cli_main.ENV_SNAPSHOT_ENABLE_ENV, raising=False)
+    monkeypatch.setenv(cli_sidecars.ENV_SNAPSHOT_PATH_ENV, str(sidecar))
+    monkeypatch.delenv(cli_sidecars.ENV_SNAPSHOT_ENABLE_ENV, raising=False)
 
-    written = cli_main._write_environment_snapshot_sidecar(
+    written = cli_sidecars._write_environment_snapshot_sidecar(
         tmp_path / "trace.jsonl",
         collector=lambda: _snapshot(),
     )
@@ -290,10 +293,10 @@ def test_environment_snapshot_sidecar_can_be_derived_from_trace_output(
     monkeypatch,
 ):
     output = tmp_path / "trace.jsonl"
-    monkeypatch.setenv(cli_main.ENV_SNAPSHOT_ENABLE_ENV, "1")
-    monkeypatch.delenv(cli_main.ENV_SNAPSHOT_PATH_ENV, raising=False)
+    monkeypatch.setenv(cli_sidecars.ENV_SNAPSHOT_ENABLE_ENV, "1")
+    monkeypatch.delenv(cli_sidecars.ENV_SNAPSHOT_PATH_ENV, raising=False)
 
-    written = cli_main._write_environment_snapshot_sidecar(
+    written = cli_sidecars._write_environment_snapshot_sidecar(
         output,
         collector=lambda: _snapshot(),
     )
@@ -311,10 +314,12 @@ def test_environment_snapshot_request_without_output_path_is_nonfatal(monkeypatc
         calls += 1
         return _snapshot()
 
-    monkeypatch.setenv(cli_main.ENV_SNAPSHOT_ENABLE_ENV, "1")
-    monkeypatch.delenv(cli_main.ENV_SNAPSHOT_PATH_ENV, raising=False)
+    monkeypatch.setenv(cli_sidecars.ENV_SNAPSHOT_ENABLE_ENV, "1")
+    monkeypatch.delenv(cli_sidecars.ENV_SNAPSHOT_PATH_ENV, raising=False)
 
-    written = cli_main._write_environment_snapshot_sidecar(None, collector=collector)
+    written = cli_sidecars._write_environment_snapshot_sidecar(
+        None, collector=collector
+    )
 
     assert written is None
     assert calls == 0
@@ -324,12 +329,12 @@ def test_environment_snapshot_collection_failure_is_nonfatal(
     tmp_path: Path, monkeypatch
 ):
     sidecar = tmp_path / "env.json"
-    monkeypatch.setenv(cli_main.ENV_SNAPSHOT_PATH_ENV, str(sidecar))
+    monkeypatch.setenv(cli_sidecars.ENV_SNAPSHOT_PATH_ENV, str(sidecar))
 
     def collector() -> EnvironmentSnapshot:
         raise RuntimeError("probe failed")
 
-    written = cli_main._write_environment_snapshot_sidecar(
+    written = cli_sidecars._write_environment_snapshot_sidecar(
         tmp_path / "trace.jsonl",
         collector=collector,
     )
@@ -341,7 +346,7 @@ def test_environment_snapshot_collection_failure_is_nonfatal(
 def test_profile_sidecar_is_disabled_when_no_profile_result(tmp_path: Path):
     output = tmp_path / "trace.jsonl"
 
-    written = cli_main._write_profile_sidecar(output, None)
+    written = cli_sidecars._write_profile_sidecar(output, None)
 
     assert written is None
     assert not (tmp_path / "trace.jsonl.profile.json").exists()
@@ -358,7 +363,7 @@ def test_profile_sidecar_records_diagnostic_metadata(tmp_path: Path):
         profiler_available=False,
     )
 
-    written = cli_main._write_profile_sidecar(output, result)
+    written = cli_sidecars._write_profile_sidecar(output, result)
 
     assert written == tmp_path / "trace.jsonl.profile.json"
     assert written is not None
@@ -373,10 +378,10 @@ def test_profile_sidecar_records_diagnostic_metadata(tmp_path: Path):
 def test_profile_summary_sidecar_tracks_trace_output(tmp_path: Path):
     output = tmp_path / "trace.jsonl"
 
-    assert cli_main._profile_summary_sidecar_path(output) == (
+    assert cli_sidecars._profile_summary_sidecar_path(output) == (
         tmp_path / "trace.jsonl.profile-summary.json"
     )
-    assert cli_main._profile_summary_sidecar_path(None) is None
+    assert cli_sidecars._profile_summary_sidecar_path(None) is None
 
 
 def test_profile_summary_sidecar_records_bounded_metadata(tmp_path: Path):
@@ -415,7 +420,7 @@ def test_profile_summary_sidecar_records_bounded_metadata(tmp_path: Path):
         reason_codes=("rocprof_artifacts_registered",),
     )
 
-    written = cli_main._write_profile_summary_sidecar(
+    written = cli_sidecars._write_profile_summary_sidecar(
         output,
         result,
         profile_sidecar_path=profile_metadata,
@@ -473,7 +478,7 @@ def test_profile_summary_sidecar_records_bounded_metadata(tmp_path: Path):
 def test_profile_output_directory_tracks_trace_output(tmp_path: Path):
     output = tmp_path / "run" / "trace.jsonl"
 
-    assert cli_main._profile_output_directory(output, tmp_path) == (
+    assert cli_sidecars._profile_output_directory(output, tmp_path) == (
         tmp_path / "run" / "trace.jsonl.rocprofv3"
     )
 
@@ -482,10 +487,10 @@ def test_static_evidence_paths_track_trace_output(tmp_path: Path):
     output = tmp_path / "run" / "trace.jsonl"
     staging = tmp_path / "staging"
 
-    assert cli_main._static_evidence_directory(output, staging) == (
+    assert cli_sidecars._static_evidence_directory(output, staging) == (
         tmp_path / "run" / "trace.jsonl.static-evidence"
     )
-    assert cli_main._static_evidence_sidecar_path(output, staging) == (
+    assert cli_sidecars._static_evidence_sidecar_path(output, staging) == (
         tmp_path / "run" / "trace.jsonl.static-evidence.json"
     )
 
@@ -493,10 +498,10 @@ def test_static_evidence_paths_track_trace_output(tmp_path: Path):
 def test_static_evidence_paths_fall_back_to_staging(tmp_path: Path):
     staging = tmp_path / "staging"
 
-    assert cli_main._static_evidence_directory(None, staging) == (
+    assert cli_sidecars._static_evidence_directory(None, staging) == (
         staging / "static-evidence"
     )
-    assert cli_main._static_evidence_sidecar_path(None, staging) == (
+    assert cli_sidecars._static_evidence_sidecar_path(None, staging) == (
         staging / "static-evidence.json"
     )
 
@@ -519,7 +524,7 @@ def test_static_evidence_sidecar_writes_summary(tmp_path: Path):
         ],
     )
 
-    written = cli_main._write_static_evidence_sidecar(output, staging, sidecar)
+    written = cli_sidecars._write_static_evidence_sidecar(output, staging, sidecar)
 
     assert written == tmp_path / "trace.jsonl.static-evidence.json"
     assert written is not None
@@ -534,10 +539,10 @@ def test_static_evidence_sidecar_writes_summary(tmp_path: Path):
 def test_agent_feedback_sidecar_tracks_trace_output(tmp_path: Path):
     output = tmp_path / "trace.jsonl"
 
-    assert cli_main._agent_feedback_sidecar_path(output) == (
+    assert cli_sidecars._agent_feedback_sidecar_path(output) == (
         tmp_path / "trace.jsonl.agent-feedback.json"
     )
-    assert cli_main._agent_feedback_sidecar_path(None) is None
+    assert cli_sidecars._agent_feedback_sidecar_path(None) is None
 
 
 def test_agent_feedback_sidecar_records_bounded_metadata(tmp_path: Path):
@@ -559,7 +564,7 @@ def test_agent_feedback_sidecar_records_bounded_metadata(tmp_path: Path):
         ),
     )
 
-    written = cli_main._write_agent_feedback_sidecar(
+    written = cli_sidecars._write_agent_feedback_sidecar(
         output,
         [trace],
         solution=solution,
@@ -627,17 +632,17 @@ def test_agent_feedback_identity_uses_solution_source_hash(tmp_path: Path):
     first = _solution("def run(x):\n    return x\n")
     second = _solution("def run(x):\n    return x + 1\n")
 
-    first_identity = cli_main._agent_feedback_identity_fields(
+    first_identity = cli_sidecars._agent_feedback_identity_fields(
         output,
         [trace],
         solution=first,
     )
-    second_identity = cli_main._agent_feedback_identity_fields(
+    second_identity = cli_sidecars._agent_feedback_identity_fields(
         output,
         [trace],
         solution=second,
     )
-    no_solution_identity = cli_main._agent_feedback_identity_fields(output, [trace])
+    no_solution_identity = cli_sidecars._agent_feedback_identity_fields(output, [trace])
 
     assert first_identity["candidate_id"] == second_identity["candidate_id"]
     assert first_identity["source_sha256"] == first.hash()
@@ -670,7 +675,7 @@ def test_agent_feedback_identity_accepts_consumer_identity_fields(tmp_path: Path
         ),
     )
 
-    identity = cli_main._agent_feedback_identity_fields(
+    identity = cli_sidecars._agent_feedback_identity_fields(
         output,
         [trace],
         solution=_solution(),
@@ -689,8 +694,8 @@ def test_agent_feedback_identity_accepts_consumer_identity_fields(tmp_path: Path
 
 
 def test_static_evidence_none_does_not_collect(tmp_path: Path):
-    sidecar = cli_main._collect_static_evidence_for_cli(
-        enabled=cli_main.STATIC_EVIDENCE_NONE,
+    sidecar = cli_sidecars._collect_static_evidence_for_cli(
+        enabled=cli_sidecars.STATIC_EVIDENCE_NONE,
         is_cpp=True,
         staging_dir=tmp_path / "staging",
         output_file=tmp_path / "trace.jsonl",
@@ -700,8 +705,8 @@ def test_static_evidence_none_does_not_collect(tmp_path: Path):
 
 
 def test_static_evidence_auto_for_non_cpp_is_unsupported_sidecar(tmp_path: Path):
-    sidecar = cli_main._collect_static_evidence_for_cli(
-        enabled=cli_main.STATIC_EVIDENCE_AUTO,
+    sidecar = cli_sidecars._collect_static_evidence_for_cli(
+        enabled=cli_sidecars.STATIC_EVIDENCE_AUTO,
         is_cpp=False,
         staging_dir=tmp_path / "staging",
         output_file=tmp_path / "trace.jsonl",
@@ -716,18 +721,16 @@ def test_static_evidence_auto_for_non_cpp_is_unsupported_sidecar(tmp_path: Path)
 
 def test_static_evidence_collection_failure_is_failed_sidecar(
     tmp_path: Path,
-    monkeypatch,
 ):
     def fail_collection(**kwargs):
         raise RuntimeError("collector failed")
 
-    monkeypatch.setattr(cli_main, "collect_static_kernel_artifacts", fail_collection)
-
-    sidecar = cli_main._collect_static_evidence_for_cli(
-        enabled=cli_main.STATIC_EVIDENCE_AUTO,
+    sidecar = cli_sidecars._collect_static_evidence_for_cli(
+        enabled=cli_sidecars.STATIC_EVIDENCE_AUTO,
         is_cpp=True,
         staging_dir=tmp_path / "staging",
         output_file=tmp_path / "trace.jsonl",
+        artifact_collector=fail_collection,
     )
 
     assert sidecar is not None
