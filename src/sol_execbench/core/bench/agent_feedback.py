@@ -11,6 +11,7 @@ from pathlib import Path
 
 from sol_execbench.core.bench.agent_feedback_models import (
     AGENT_FEEDBACK_SCHEMA_VERSION,
+    _MODEL_CONFIG,
     AgentFeedbackArtifactCitation,
     AgentFeedbackBottleneck,
     AgentFeedbackFreshnessStatus,
@@ -45,6 +46,7 @@ from sol_execbench.core.trust_summary import utc_timestamp
 
 __all__ = [
     "AGENT_FEEDBACK_SCHEMA_VERSION",
+    "_MODEL_CONFIG",
     "AgentFeedbackArtifactCitation",
     "AgentFeedbackBottleneck",
     "AgentFeedbackFreshnessStatus",

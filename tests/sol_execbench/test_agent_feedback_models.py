@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from sol_execbench.core.bench.agent_feedback import (
     AGENT_FEEDBACK_SCHEMA_VERSION as FacadeSchemaVersion,
 )
+from sol_execbench.core.bench.agent_feedback import _MODEL_CONFIG as FacadeModelConfig
 from sol_execbench.core.bench.agent_feedback import (
     AgentFeedbackArtifactCitation as FacadeArtifactCitation,
 )
@@ -50,6 +51,7 @@ from sol_execbench.core.bench.agent_feedback import (
 )
 from sol_execbench.core.bench.agent_feedback_models import (
     AGENT_FEEDBACK_SCHEMA_VERSION,
+    _MODEL_CONFIG,
     AgentFeedbackArtifactCitation,
     AgentFeedbackBottleneck,
     AgentFeedbackFreshnessStatus,
@@ -69,6 +71,7 @@ from sol_execbench.core.bench.agent_feedback_models import (
 
 def test_agent_feedback_model_names_remain_reexported_from_facade() -> None:
     assert FacadeSchemaVersion == AGENT_FEEDBACK_SCHEMA_VERSION
+    assert FacadeModelConfig is _MODEL_CONFIG
     assert FacadeStatus is AgentFeedbackStatus
     assert FacadeReasonCode is AgentFeedbackReasonCode
     assert FacadeSeverity is AgentFeedbackSeverity
@@ -105,6 +108,15 @@ def test_agent_feedback_model_names_remain_reexported_from_facade() -> None:
             message="1 workload(s) failed during compilation.",
         ),
         AgentFeedbackSummary(trace_count=1, evaluated_trace_count=1),
+        AgentFeedbackSidecar(
+            status=AgentFeedbackStatus.UNAVAILABLE,
+            reason_code=AgentFeedbackReasonCode.NO_EVALUATION_TRACES,
+            identity=AgentFeedbackIdentity(
+                generated_at="2026-01-01T00:00:00Z",
+                sol_version="v1.42",
+            ),
+            summary=AgentFeedbackSummary(trace_count=0, evaluated_trace_count=0),
+        ),
     ],
 )
 def test_agent_feedback_models_remain_strict_and_frozen(model: object) -> None:
