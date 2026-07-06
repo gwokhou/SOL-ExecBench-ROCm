@@ -14,6 +14,7 @@ from typing import Literal
 from pydantic import ConfigDict, Field
 
 from sol_execbench.core.bench.diagnostic_sidecar import (
+    DiagnosticSidecarAuthority,
     classify_diagnostic_governance,
     classify_freshness,
     compact_path,
@@ -151,27 +152,13 @@ class AgentFeedbackFreshnessValidation(BaseModelWithDocstrings):
     """Stable reason codes explaining stale or unknown status."""
 
 
-class AgentFeedbackGovernanceGuardrail(BaseModelWithDocstrings):
+class AgentFeedbackGovernanceGuardrail(DiagnosticSidecarAuthority):
     """Authority boundary after optional sidecar governance checks."""
-
-    model_config = _MODEL_CONFIG
 
     status: AgentFeedbackGovernanceStatus
     """Diagnostic governance status."""
     reason_codes: list[str] = Field(default_factory=list)
     """Stable reason codes for unavailable, stale, or invalid states."""
-    diagnostic_only: Literal[True] = True
-    correctness_authority: Literal[False] = False
-    performance_authority: Literal[False] = False
-    timing_authority: Literal[False] = False
-    score_authority: Literal[False] = False
-    evidence_tier_authority: Literal[False] = False
-    confirmed_improvement_authority: Literal[False] = False
-    release_gate_authority: Literal[False] = False
-    cutover_authority: Literal[False] = False
-    paper_parity_authority: Literal[False] = False
-    leaderboard_authority: Literal[False] = False
-    claim_upgrade_authority: Literal[False] = False
 
 
 class AgentFeedbackItem(BaseModelWithDocstrings):

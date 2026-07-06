@@ -1,17 +1,46 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""Shared helpers for diagnostic sidecar freshness and governance classification.
+"""Shared contract primitives for diagnostic sidecars.
 
-These helpers are extracted verbatim from ``agent_feedback.py`` and
-``profile_summary.py`` so the two sidecars share one freshness matching rule and
-one governance state machine. This module depends on neither sidecar module
-(both import it, not vice-versa) to avoid circular imports.
+Holds the freshness/governance classification helpers and the authority base
+model that ``agent_feedback.py`` and ``profile_summary.py`` share. This module
+depends on neither sidecar module (both import it, not vice-versa) to avoid
+circular imports.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
+
+from pydantic import ConfigDict
+
+from sol_execbench.core.data.base_model import BaseModelWithDocstrings
+
+
+class DiagnosticSidecarAuthority(BaseModelWithDocstrings):
+    """Shared diagnostic-only authority boundary for sidecar guardrails.
+
+    Carries the frozen + extra-forbid config and the closed set of authority
+    booleans that keep every diagnostic sidecar guardrail non-authoritative for
+    benchmark truth (correctness / timing / scoring / release / ...).
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    diagnostic_only: Literal[True] = True
+    correctness_authority: Literal[False] = False
+    performance_authority: Literal[False] = False
+    timing_authority: Literal[False] = False
+    score_authority: Literal[False] = False
+    evidence_tier_authority: Literal[False] = False
+    confirmed_improvement_authority: Literal[False] = False
+    release_gate_authority: Literal[False] = False
+    cutover_authority: Literal[False] = False
+    paper_parity_authority: Literal[False] = False
+    leaderboard_authority: Literal[False] = False
+    claim_upgrade_authority: Literal[False] = False
 
 
 def compact_path(path: str | None) -> str | None:
