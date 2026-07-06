@@ -120,8 +120,6 @@ def _active_stale_token_scan_paths() -> list[Path]:
                 continue
             if ACTIVE_STALE_TOKEN_EXCLUDED_PARTS.intersection(path.parts):
                 continue
-            if "fixtures" in path.parts and path.name.startswith("malformed"):
-                continue
             paths.append(path)
     return paths
 
@@ -168,6 +166,18 @@ def test_schema_as_capability_guard_covers_natural_wording():
         "The capability key is `profile_summary.sidecar`.",
         "sol_execbench.profile_summary.v2",
     )
+
+
+def test_active_stale_token_scan_includes_malformed_sidecar_fixtures():
+    malformed_fixture_paths = {
+        REPO_ROOT
+        / "tests/sol_execbench/fixtures/agent_feedback/malformed.agent-feedback.json",
+        REPO_ROOT
+        / "tests/sol_execbench/fixtures/profile_summary/malformed.profile-summary.json",
+    }
+
+    assert all(path.is_file() for path in malformed_fixture_paths)
+    assert malformed_fixture_paths.issubset(set(_active_stale_token_scan_paths()))
 
 
 def test_active_source_and_fixture_text_avoid_stale_sidecar_capability_tokens():
