@@ -53,6 +53,7 @@ OLD_EVALUATOR_CAPABILITY_TOKENS = {
 }
 SCHEMA_IDS_NOT_CAPABILITIES = {
     "official_score_evidence.v1",
+    "sol_execbench.official_score_evidence.v1",
     "sol_execbench.agent_feedback.v2",
     "sol_execbench.profile_summary.v2",
     "sol_execbench.static_kernel_evidence.v1",
@@ -91,18 +92,28 @@ def _contains_stale_capability_token(text: str, token: str) -> bool:
 
 
 def _describes_schema_as_capability(text: str, schema_id: str) -> bool:
-    schema = rf"(?<![A-Za-z0-9_.-]){re.escape(schema_id)}(?![A-Za-z0-9_.-])"
-    capability_label = r"capability\s+(?:key|token)"
-    schema_before_label = rf"{schema}[^.\n]{{0,80}}{capability_label}"
-    label_before_schema = rf"{capability_label}[^.\n]{{0,80}}{schema}"
-
-    return (
-        re.search(schema_before_label, text, flags=re.IGNORECASE) is not None
-        or re.search(label_before_schema, text, flags=re.IGNORECASE) is not None
+    schema_pattern = re.compile(
+        rf"(?<![A-Za-z0-9_.-]){re.escape(schema_id)}(?![A-Za-z0-9_.-])"
     )
+    capability_pattern = re.compile(r"capability\s+(?:key|token)", re.IGNORECASE)
+    schema_marker = "__SOL_EXECBENCH_SCHEMA_ID__"
+    guarded_text = schema_pattern.sub(schema_marker, text)
+    for segment in re.split(r"[.\n]", guarded_text):
+        if schema_marker in segment and capability_pattern.search(segment):
+            return True
+    return False
 
 
 def test_schema_as_capability_guard_covers_natural_wording():
+    assert "sol_execbench.official_score_evidence.v1" in SCHEMA_IDS_NOT_CAPABILITIES
+    assert _describes_schema_as_capability(
+        "`sol_execbench.official_score_evidence.v1` capability key",
+        "sol_execbench.official_score_evidence.v1",
+    )
+    assert _describes_schema_as_capability(
+        "capability token `sol_execbench.official_score_evidence.v1`",
+        "sol_execbench.official_score_evidence.v1",
+    )
     assert _describes_schema_as_capability(
         "`sol_execbench.profile_summary.v2` is the capability token",
         "sol_execbench.profile_summary.v2",
@@ -118,6 +129,17 @@ def test_schema_as_capability_guard_covers_natural_wording():
     assert _describes_schema_as_capability(
         "official_score_evidence.v1 capability key",
         "official_score_evidence.v1",
+    )
+    assert _describes_schema_as_capability(
+        "`sol_execbench.profile_summary.v2` is documented here as the optional "
+        "diagnostic profile summary capability token",
+        "sol_execbench.profile_summary.v2",
+    )
+    assert _describes_schema_as_capability(
+        "`sol_execbench.profile_summary.v2` is documented with concrete "
+        "artifact schema wording that deliberately includes enough descriptive "
+        "detail before its capability token label",
+        "sol_execbench.profile_summary.v2",
     )
     assert not _describes_schema_as_capability(
         "Concrete artifact schema is `sol_execbench.profile_summary.v2`. "
