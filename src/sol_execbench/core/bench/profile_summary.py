@@ -15,6 +15,13 @@ from typing import Literal
 
 from pydantic import ConfigDict, Field
 
+from sol_execbench.core.bench.diagnostic_sidecar import (
+    classify_diagnostic_governance,
+    classify_freshness,
+    compact_path,
+    match_optional,
+    match_required_optional,
+)
 from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileResult
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 from sol_execbench.core.data.contract import SOL_EXECBENCH_RELEASE
@@ -298,7 +305,7 @@ def build_profile_summary_sidecar(
         identity=ProfileSummaryIdentity(
             generated_at=generated_at or utc_timestamp(),
             sol_version=SOL_EXECBENCH_RELEASE,
-            trace_path=_compact_path(trace_path),
+            trace_path=compact_path(trace_path),
             run_id=run_id,
         ),
         summary=_profile_summary_content(profile_result),
@@ -344,23 +351,16 @@ def validate_profile_summary_freshness(
 
     reasons: list[str] = []
     identity = sidecar.identity
-    _match_required_optional(reasons, "sol_version", identity.sol_version, sol_version)
-    _match_optional(
-        reasons, "trace_path", identity.trace_path, _compact_path(trace_path)
+    match_required_optional(reasons, "sol_version", identity.sol_version, sol_version)
+    match_optional(reasons, "trace_path", identity.trace_path, compact_path(trace_path))
+    match_optional(reasons, "run_id", identity.run_id, run_id)
+    any_expected = (
+        trace_path is not None or run_id is not None or sol_version is not None
     )
-    _match_optional(reasons, "run_id", identity.run_id, run_id)
-    if reasons:
-        return ProfileSummaryFreshnessValidation(
-            status=ProfileSummaryFreshnessStatus.STALE,
-            reason_codes=reasons,
-        )
-    if trace_path is None and run_id is None and sol_version is None:
-        return ProfileSummaryFreshnessValidation(
-            status=ProfileSummaryFreshnessStatus.UNKNOWN,
-            reason_codes=["insufficient_expected_identity"],
-        )
+    status_value, reason_codes = classify_freshness(reasons, any_expected=any_expected)
     return ProfileSummaryFreshnessValidation(
-        status=ProfileSummaryFreshnessStatus.CURRENT
+        status=ProfileSummaryFreshnessStatus(status_value),
+        reason_codes=reason_codes,
     )
 
 
@@ -372,34 +372,17 @@ def evaluate_profile_summary_governance(
 ) -> ProfileSummaryGovernanceGuardrail:
     """Return diagnostic-only governance state for an optional profile summary."""
 
-    if parse_error is not None:
-        return ProfileSummaryGovernanceGuardrail(
-            status=ProfileSummaryGovernanceStatus.INVALID_DIAGNOSTIC,
-            reason_codes=["sidecar_parse_error"],
-        )
-    if sidecar is None:
-        return ProfileSummaryGovernanceGuardrail(
-            status=ProfileSummaryGovernanceStatus.UNAVAILABLE,
-            reason_codes=["sidecar_missing"],
-        )
-    if (
-        freshness is not None
-        and freshness.status == ProfileSummaryFreshnessStatus.STALE
-    ):
-        return ProfileSummaryGovernanceGuardrail(
-            status=ProfileSummaryGovernanceStatus.STALE_DIAGNOSTIC,
-            reason_codes=freshness.reason_codes or ["sidecar_stale"],
-        )
-    if (
-        freshness is not None
-        and freshness.status == ProfileSummaryFreshnessStatus.UNKNOWN
-    ):
-        return ProfileSummaryGovernanceGuardrail(
-            status=ProfileSummaryGovernanceStatus.UNAVAILABLE,
-            reason_codes=freshness.reason_codes or ["sidecar_freshness_unknown"],
-        )
+    status_value, reason_codes = classify_diagnostic_governance(
+        sidecar_present=sidecar is not None,
+        freshness_status=(freshness.status.value if freshness is not None else None),
+        freshness_reason_codes=(
+            freshness.reason_codes if freshness is not None else None
+        ),
+        parse_error=parse_error,
+    )
     return ProfileSummaryGovernanceGuardrail(
-        status=ProfileSummaryGovernanceStatus.USABLE_DIAGNOSTIC,
+        status=ProfileSummaryGovernanceStatus(status_value),
+        reason_codes=reason_codes,
     )
 
 
@@ -889,34 +872,3 @@ def _numeric_value(value: object) -> float | None:
             return None
         return _finite_or_none(number)
     return None
-
-
-def _compact_path(path: str | None) -> str | None:
-    if path is None:
-        return None
-    return Path(path).name
-
-
-def _match_optional(
-    reasons: list[str],
-    field: str,
-    actual: str | None,
-    expected: str | None,
-) -> None:
-    if expected is not None and actual != expected:
-        reasons.append(f"{field}_mismatch")
-
-
-def _match_required_optional(
-    reasons: list[str],
-    field: str,
-    actual: str | None,
-    expected: str | None,
-) -> None:
-    if expected is None:
-        return
-    if actual is None:
-        reasons.append(f"{field}_missing")
-        return
-    if actual != expected:
-        reasons.append(f"{field}_mismatch")

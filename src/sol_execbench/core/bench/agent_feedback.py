@@ -13,6 +13,13 @@ from typing import Literal
 
 from pydantic import ConfigDict, Field
 
+from sol_execbench.core.bench.diagnostic_sidecar import (
+    classify_diagnostic_governance,
+    classify_freshness,
+    compact_path,
+    match_optional,
+    match_required_optional,
+)
 from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileResult
 from sol_execbench.core.bench.static_kernel_evidence import (
     StaticKernelEvidenceSidecar,
@@ -264,7 +271,7 @@ def build_agent_feedback_sidecar(
         identity=AgentFeedbackIdentity(
             generated_at=generated_at or utc_timestamp(),
             sol_version=sol_version or SOL_EXECBENCH_RELEASE,
-            trace_path=_compact_path(trace_path),
+            trace_path=compact_path(trace_path),
             target_id=target_id,
             run_id=run_id,
             candidate_id=candidate_id,
@@ -328,41 +335,34 @@ def validate_agent_feedback_freshness(
 
     reasons: list[str] = []
     identity = sidecar.identity
-    _match_optional(
+    match_optional(
         reasons,
         "trace_path",
         identity.trace_path,
-        _compact_path(trace_path),
+        compact_path(trace_path),
     )
-    _match_optional(reasons, "target_id", identity.target_id, target_id)
-    _match_optional(reasons, "run_id", identity.run_id, run_id)
-    _match_required_optional(
+    match_optional(reasons, "target_id", identity.target_id, target_id)
+    match_optional(reasons, "run_id", identity.run_id, run_id)
+    match_required_optional(
         reasons,
         "candidate_id",
         identity.candidate_id,
         candidate_id,
     )
-    _match_required_optional(
+    match_required_optional(
         reasons,
         "source_sha256",
         identity.source_sha256,
         source_sha256,
     )
-    _match_required_optional(reasons, "sol_version", identity.sol_version, sol_version)
-    if reasons:
-        return AgentFeedbackFreshnessValidation(
-            status=AgentFeedbackFreshnessStatus.STALE,
-            reason_codes=reasons,
-        )
-    if trace_path is None and not any(
+    match_required_optional(reasons, "sol_version", identity.sol_version, sol_version)
+    any_expected = trace_path is not None or any(
         (target_id, run_id, candidate_id, source_sha256, sol_version)
-    ):
-        return AgentFeedbackFreshnessValidation(
-            status=AgentFeedbackFreshnessStatus.UNKNOWN,
-            reason_codes=["insufficient_expected_identity"],
-        )
+    )
+    status_value, reason_codes = classify_freshness(reasons, any_expected=any_expected)
     return AgentFeedbackFreshnessValidation(
-        status=AgentFeedbackFreshnessStatus.CURRENT,
+        status=AgentFeedbackFreshnessStatus(status_value),
+        reason_codes=reason_codes,
     )
 
 
@@ -374,31 +374,17 @@ def evaluate_agent_feedback_governance(
 ) -> AgentFeedbackGovernanceGuardrail:
     """Return diagnostic-only governance state for an optional feedback sidecar."""
 
-    if parse_error is not None:
-        return AgentFeedbackGovernanceGuardrail(
-            status=AgentFeedbackGovernanceStatus.INVALID_DIAGNOSTIC,
-            reason_codes=["sidecar_parse_error"],
-        )
-    if sidecar is None:
-        return AgentFeedbackGovernanceGuardrail(
-            status=AgentFeedbackGovernanceStatus.UNAVAILABLE,
-            reason_codes=["sidecar_missing"],
-        )
-    if freshness is not None and freshness.status == AgentFeedbackFreshnessStatus.STALE:
-        return AgentFeedbackGovernanceGuardrail(
-            status=AgentFeedbackGovernanceStatus.STALE_DIAGNOSTIC,
-            reason_codes=freshness.reason_codes or ["sidecar_stale"],
-        )
-    if (
-        freshness is not None
-        and freshness.status == AgentFeedbackFreshnessStatus.UNKNOWN
-    ):
-        return AgentFeedbackGovernanceGuardrail(
-            status=AgentFeedbackGovernanceStatus.UNAVAILABLE,
-            reason_codes=freshness.reason_codes or ["sidecar_freshness_unknown"],
-        )
+    status_value, reason_codes = classify_diagnostic_governance(
+        sidecar_present=sidecar is not None,
+        freshness_status=(freshness.status.value if freshness is not None else None),
+        freshness_reason_codes=(
+            freshness.reason_codes if freshness is not None else None
+        ),
+        parse_error=parse_error,
+    )
     return AgentFeedbackGovernanceGuardrail(
-        status=AgentFeedbackGovernanceStatus.USABLE_DIAGNOSTIC,
+        status=AgentFeedbackGovernanceStatus(status_value),
+        reason_codes=reason_codes,
     )
 
 
@@ -418,37 +404,6 @@ def _aggregate_status(
     if optional_unavailable:
         return AgentFeedbackStatus.PARTIAL
     return AgentFeedbackStatus.AVAILABLE
-
-
-def _compact_path(path: str | None) -> str | None:
-    if path is None:
-        return None
-    return Path(path).name
-
-
-def _match_optional(
-    reasons: list[str],
-    field: str,
-    actual: str | None,
-    expected: str | None,
-) -> None:
-    if expected is not None and actual != expected:
-        reasons.append(f"{field}_mismatch")
-
-
-def _match_required_optional(
-    reasons: list[str],
-    field: str,
-    actual: str | None,
-    expected: str | None,
-) -> None:
-    if expected is None:
-        return
-    if actual is None:
-        reasons.append(f"{field}_missing")
-        return
-    if actual != expected:
-        reasons.append(f"{field}_mismatch")
 
 
 def _source_refs(
