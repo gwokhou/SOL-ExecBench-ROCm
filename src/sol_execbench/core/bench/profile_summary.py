@@ -179,25 +179,6 @@ class ProfileSummaryIdentity(BaseModelWithDocstrings):
     """Optional run identity."""
 
 
-class ProfileSummaryAuthority(BaseModelWithDocstrings):
-    """Authority boundary for profile summary sidecars."""
-
-    model_config = _MODEL_CONFIG
-
-    diagnostic_only: Literal[True] = True
-    correctness_authority: Literal[False] = False
-    performance_authority: Literal[False] = False
-    timing_authority: Literal[False] = False
-    score_authority: Literal[False] = False
-    evidence_tier_authority: Literal[False] = False
-    confirmed_improvement_authority: Literal[False] = False
-    release_gate_authority: Literal[False] = False
-    cutover_authority: Literal[False] = False
-    paper_parity_authority: Literal[False] = False
-    leaderboard_authority: Literal[False] = False
-    claim_upgrade_authority: Literal[False] = False
-
-
 class ProfileSummaryContent(BaseModelWithDocstrings):
     """Compact normalized profiler metadata summary."""
 
