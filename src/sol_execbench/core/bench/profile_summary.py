@@ -25,8 +25,11 @@ from sol_execbench.core.bench.profile_summary_artifacts import (
 )
 from sol_execbench.core.bench.profile_summary_models import (
     ProfileSummaryArtifactCitation,
+    ProfileSummaryBottleneckHint,
     ProfileSummaryContent,
+    ProfileSummaryKernelMetric,
     ProfileSummaryMetric,
+    ProfileSummaryStructuredMetric,
 )
 from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileResult
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
@@ -37,6 +40,11 @@ from sol_execbench.core.trust_summary import utc_timestamp
 
 PROFILE_SUMMARY_SCHEMA_VERSION = "sol_execbench.profile_summary.v2"
 _MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
+_PROFILE_SUMMARY_MODEL_EXPORTS = (
+    ProfileSummaryBottleneckHint,
+    ProfileSummaryKernelMetric,
+    ProfileSummaryStructuredMetric,
+)
 
 
 class ProfileSummaryStatus(str, Enum):

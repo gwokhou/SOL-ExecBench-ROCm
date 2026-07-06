@@ -185,6 +185,16 @@ def test_profile_summary_sidecar_includes_structured_artifact_evidence(
             "parse_status": "available",
         }
     ]
+    assert payload["summary"]["bottleneck_hints"] == [
+        {
+            "category": "insufficient_counters",
+            "severity": "low",
+            "confidence": "high",
+            "message": "No bounded counter artifact was available for bottleneck classification.",
+            "source_metrics": [],
+            "evidence_artifacts": [],
+        }
+    ]
 
 
 def test_profile_summary_sidecar_handles_unavailable_inputs(tmp_path: Path):
