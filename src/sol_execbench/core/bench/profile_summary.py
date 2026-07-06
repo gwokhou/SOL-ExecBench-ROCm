@@ -555,7 +555,7 @@ def _structured_profile_evidence(
             "otf2_trace",
         }:
             parse_warnings.append(
-                f"{artifact.path.name}: {artifact.kind} artifacts are citation-only in profile_summary.sidecar.v2"
+                f"{artifact.path.name}: {artifact.kind} artifacts are citation-only in sol_execbench.profile_summary.v2"
             )
         elif artifact.kind == "other":
             parse_warnings.append(

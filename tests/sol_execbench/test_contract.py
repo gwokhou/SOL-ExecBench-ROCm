@@ -41,15 +41,18 @@ ACTIVE_CONTRACT_DOCS = (
     REPO_ROOT / "docs/agent_feedback_sidecar.md",
     REPO_ROOT / "docs/profile_summary_sidecar.md",
 )
+STALE_SIDECAR_CAPABILITY_TOKENS = {
+    f"{sidecar_name}.sidecar.v2"
+    for sidecar_name in ("agent_feedback", "profile_summary")
+}
 OLD_EVALUATOR_CAPABILITY_TOKENS = {
     "runtime.evidence.v1",
     "profiling.evidence.v1",
     "toolchain.routing.v1",
     "static_kernel_evidence.v1",
     "agent_feedback.sidecar.v1",
-    "agent_feedback.sidecar.v2",
     "profile_summary.sidecar.v1",
-    "profile_summary.sidecar.v2",
+    *STALE_SIDECAR_CAPABILITY_TOKENS,
 }
 SCHEMA_IDS_NOT_CAPABILITIES = {
     "official_score_evidence.v1",
@@ -58,6 +61,9 @@ SCHEMA_IDS_NOT_CAPABILITIES = {
     "sol_execbench.profile_summary.v2",
     "sol_execbench.static_kernel_evidence.v1",
 }
+ACTIVE_STALE_TOKEN_SCAN_ROOTS = (REPO_ROOT / "src", REPO_ROOT / "tests")
+ACTIVE_STALE_TOKEN_SUFFIXES = {".json", ".py"}
+ACTIVE_STALE_TOKEN_EXCLUDED_PARTS = {".pytest_cache", "__pycache__"}
 
 
 def _contract_doc_capabilities(text: str) -> dict[str, str]:
@@ -104,6 +110,22 @@ def _describes_schema_as_capability(text: str, schema_id: str) -> bool:
     return False
 
 
+def _active_stale_token_scan_paths() -> list[Path]:
+    paths: list[Path] = []
+    for root in ACTIVE_STALE_TOKEN_SCAN_ROOTS:
+        for path in root.rglob("*"):
+            if not path.is_file():
+                continue
+            if path.suffix not in ACTIVE_STALE_TOKEN_SUFFIXES:
+                continue
+            if ACTIVE_STALE_TOKEN_EXCLUDED_PARTS.intersection(path.parts):
+                continue
+            if "fixtures" in path.parts and path.name.startswith("malformed"):
+                continue
+            paths.append(path)
+    return paths
+
+
 def test_schema_as_capability_guard_covers_natural_wording():
     assert "sol_execbench.official_score_evidence.v1" in SCHEMA_IDS_NOT_CAPABILITIES
     assert _describes_schema_as_capability(
@@ -146,6 +168,18 @@ def test_schema_as_capability_guard_covers_natural_wording():
         "The capability key is `profile_summary.sidecar`.",
         "sol_execbench.profile_summary.v2",
     )
+
+
+def test_active_source_and_fixture_text_avoid_stale_sidecar_capability_tokens():
+    offenders: list[str] = []
+    for path in _active_stale_token_scan_paths():
+        text = path.read_text(encoding="utf-8")
+        for stale_token in sorted(STALE_SIDECAR_CAPABILITY_TOKENS):
+            if _contains_stale_capability_token(text, stale_token):
+                rel_path = path.relative_to(REPO_ROOT)
+                offenders.append(f"{rel_path}: {stale_token}")
+
+    assert offenders == []
 
 
 def test_evaluator_contract_versions_are_stable():
