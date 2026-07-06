@@ -18,7 +18,7 @@ SOL owns the benchmark truth for:
 Downstream consumers may persist contract metadata for compatibility
 diagnostics, but they must not redefine SOL benchmark truth.
 
-## Optional Capabilities
+## Capabilities
 
 The `capabilities` field is a mapping of current evaluator contract capability
 keys to requirement levels. Required trace and baseline semantics use `always`;

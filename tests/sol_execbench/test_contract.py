@@ -101,12 +101,47 @@ def _describes_schema_as_capability(text: str, schema_id: str) -> bool:
     schema_pattern = re.compile(
         rf"(?<![A-Za-z0-9_.-]){re.escape(schema_id)}(?![A-Za-z0-9_.-])"
     )
-    capability_pattern = re.compile(r"capability\s+(?:key|token)", re.IGNORECASE)
     schema_marker = "__SOL_EXECBENCH_SCHEMA_ID__"
     guarded_text = schema_pattern.sub(schema_marker, text)
-    for segment in re.split(r"[.\n]", guarded_text):
-        if schema_marker in segment and capability_pattern.search(segment):
-            return True
+    marker_pattern = re.escape(schema_marker)
+    capability_label = r"capability\s+(?:key|token)"
+    label_before_schema_pattern = re.compile(
+        rf"\b{capability_label}\b\s*(?:[:=,-]|\bis\b)?\s*`?\s*"
+        rf"{marker_pattern}\s*`?",
+        re.IGNORECASE,
+    )
+    schema_before_label_pattern = re.compile(
+        rf"`?\s*{marker_pattern}\s*`?(?P<link_text>.*?)\b{capability_label}\b",
+        re.IGNORECASE,
+    )
+
+    paragraphs = re.split(r"(?:\r?\n\s*){2,}", guarded_text)
+    for paragraph in paragraphs:
+        normalized_paragraph = re.sub(r"[ \t]*\r?\n[ \t]*", " ", paragraph.strip())
+        for segment in normalized_paragraph.split("."):
+            if schema_marker not in segment:
+                continue
+            if label_before_schema_pattern.search(segment):
+                return True
+            for match in schema_before_label_pattern.finditer(segment):
+                link_text = match.group("link_text")
+                link_words = re.findall(r"[A-Za-z]+", link_text)
+                schema_capability_starters = {
+                    "advertised",
+                    "advertises",
+                    "as",
+                    "is",
+                    "through",
+                }
+                if (
+                    ("`" not in link_text)
+                    and not re.search(r"\bbehind\b", link_text, re.IGNORECASE)
+                    and (
+                        not link_words
+                        or link_words[0].lower() in schema_capability_starters
+                    )
+                ):
+                    return True
     return False
 
 
@@ -139,7 +174,15 @@ def test_schema_as_capability_guard_covers_natural_wording():
         "sol_execbench.profile_summary.v2",
     )
     assert _describes_schema_as_capability(
+        "`sol_execbench.profile_summary.v2` is the optional\ncapability token",
+        "sol_execbench.profile_summary.v2",
+    )
+    assert _describes_schema_as_capability(
         "capability key sol_execbench.profile_summary.v2",
+        "sol_execbench.profile_summary.v2",
+    )
+    assert _describes_schema_as_capability(
+        "capability key\n`sol_execbench.profile_summary.v2`",
         "sol_execbench.profile_summary.v2",
     )
     assert _describes_schema_as_capability(
@@ -165,6 +208,11 @@ def test_schema_as_capability_guard_covers_natural_wording():
         "Concrete artifact schema is `sol_execbench.profile_summary.v2`. "
         "The capability key is `profile_summary.sidecar`.",
         "sol_execbench.profile_summary.v2",
+    )
+    assert not _describes_schema_as_capability(
+        "`sol_execbench.static_kernel_evidence.v1` sidecar schema behind the\n"
+        "`static_kernel.evidence` capability key.",
+        "sol_execbench.static_kernel_evidence.v1",
     )
 
 
