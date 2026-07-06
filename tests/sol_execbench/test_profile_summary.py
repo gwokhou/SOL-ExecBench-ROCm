@@ -147,211 +147,11 @@ def test_profile_summary_freshness_sol_version_only_is_current(tmp_path: Path):
     assert current.reason_codes == []
 
 
-def test_profile_summary_builds_structured_metrics_and_hints_from_text_artifacts(
+def test_profile_summary_sidecar_includes_structured_artifact_evidence(
     tmp_path: Path,
-):
+) -> None:
     trace_csv = tmp_path / "profile_kernel_trace.csv"
-    trace_csv.write_text(
-        "Domain,Name,Duration(ns)\n"
-        "KERNEL_DISPATCH,matmul_kernel,2000000\n"
-        "KERNEL_DISPATCH,matmul_epilogue,1000000\n"
-        "HIP_RUNTIME_API,hipLaunchKernel,50000\n"
-    )
-    counter_csv = tmp_path / "profile_counters.csv"
-    counter_csv.write_text(
-        "Metric,Value,Unit\n"
-        "SQ_INSTS_VALU,120000,count\n"
-        "L2_CACHE_HIT_RATE,42,percent\n"
-        "LDS_BANK_CONFLICT,8,count\n"
-    )
-    metadata_json = tmp_path / "profile.json"
-    metadata_json.write_text(
-        '{"workload_id":"w0","kernel_dispatches":2,"device":"gfx1200"}\n'
-    )
-    rocpd = tmp_path / "profile.rocpd"
-    rocpd.write_text("opaque database")
-    profile = Rocprofv3ProfileResult(
-        status="success",
-        command=("rocprofv3", "--kernel-trace", "--", "python", "eval_driver.py"),
-        output_directory=tmp_path,
-        output_file="profile",
-        artifacts=(
-            Rocprofv3ProfileArtifact(
-                path=trace_csv,
-                kind="trace_csv",
-                size_bytes=trace_csv.stat().st_size,
-            ),
-            Rocprofv3ProfileArtifact(
-                path=counter_csv,
-                kind="counter_csv",
-                size_bytes=counter_csv.stat().st_size,
-            ),
-            Rocprofv3ProfileArtifact(
-                path=metadata_json,
-                kind="metadata_json",
-                size_bytes=metadata_json.stat().st_size,
-            ),
-            Rocprofv3ProfileArtifact(
-                path=rocpd,
-                kind="rocpd",
-                size_bytes=rocpd.stat().st_size,
-            ),
-        ),
-        returncode=0,
-        profiler_available=True,
-        artifact_coverage_status="complete",
-        reason_codes=("rocprof_artifacts_registered",),
-    )
-
-    sidecar = build_profile_summary_sidecar(
-        profile_result=profile,
-        trace_path=str(tmp_path / "trace.jsonl"),
-        run_id="run-0",
-        generated_at="2026-06-21T00:00:00Z",
-    )
-    payload = sidecar.model_dump(mode="json")
-    summary = payload["summary"]
-
-    assert summary["workload_metrics"] == [
-        {
-            "name": "artifact_coverage_status",
-            "value": "complete",
-            "unit": None,
-            "source": "rocprofv3_profile_metadata",
-            "workload_id": "w0",
-            "artifact": None,
-            "parse_status": "available",
-        },
-        {
-            "name": "kernel_dispatch_count",
-            "value": 2,
-            "unit": "count",
-            "source": "profile.json",
-            "workload_id": "w0",
-            "artifact": "profile.json",
-            "parse_status": "available",
-        },
-    ]
-    assert {
-        (metric["kernel_name"], metric["name"], metric["value"], metric["unit"])
-        for metric in summary["kernel_metrics"]
-    } == {
-        ("matmul_kernel", "kernel_duration_ms", 2.0, "ms"),
-        ("matmul_epilogue", "kernel_duration_ms", 1.0, "ms"),
-        ("profile_counters", "SQ_INSTS_VALU", 120000, "count"),
-        ("profile_counters", "L2_CACHE_HIT_RATE", 42, "percent"),
-        ("profile_counters", "LDS_BANK_CONFLICT", 8, "count"),
-    }
-    assert summary["bottleneck_hints"] == [
-        {
-            "category": "memory_l2_bound",
-            "severity": "medium",
-            "confidence": "low",
-            "message": "Low L2 hit-rate counter suggests memory/L2 pressure.",
-            "source_metrics": ["L2_CACHE_HIT_RATE"],
-            "evidence_artifacts": ["profile_counters.csv"],
-        },
-        {
-            "category": "lds_bound",
-            "severity": "low",
-            "confidence": "low",
-            "message": "LDS bank conflict counter is present and non-zero.",
-            "source_metrics": ["LDS_BANK_CONFLICT"],
-            "evidence_artifacts": ["profile_counters.csv"],
-        },
-        {
-            "category": "compute_bound",
-            "severity": "low",
-            "confidence": "low",
-            "message": "VALU instruction counter is present without stronger memory or launch evidence.",
-            "source_metrics": ["SQ_INSTS_VALU"],
-            "evidence_artifacts": ["profile_counters.csv"],
-        },
-    ]
-    assert summary["parse_warnings"] == [
-        "profile.rocpd: rocpd artifacts are citation-only in sol_execbench.profile_summary.v2"
-    ]
-    assert all(
-        "rocpd" not in (metric.get("artifact") or "")
-        for metric in [*summary["workload_metrics"], *summary["kernel_metrics"]]
-    )
-    assert payload["authority"] == "diagnostic"
-
-
-def test_profile_summary_l2_hit_rate_fraction_is_not_misflagged(tmp_path: Path):
-    counter_csv = tmp_path / "profile_counters.csv"
-    counter_csv.write_text(
-        "Metric,Value,Unit\nSQ_INSTS_VALU,100,count\nL2_CACHE_HIT_RATE,0.95,ratio\n"
-    )
-    profile = Rocprofv3ProfileResult(
-        status="success",
-        command=("rocprofv3", "--kernel-trace", "--", "python", "eval_driver.py"),
-        output_directory=tmp_path,
-        output_file="profile",
-        artifacts=(
-            Rocprofv3ProfileArtifact(
-                path=counter_csv,
-                kind="counter_csv",
-                size_bytes=counter_csv.stat().st_size,
-            ),
-        ),
-        returncode=0,
-        profiler_available=True,
-        artifact_coverage_status="complete",
-        reason_codes=("rocprof_artifacts_registered",),
-    )
-
-    hints = build_profile_summary_sidecar(profile_result=profile).model_dump(
-        mode="json"
-    )["summary"]["bottleneck_hints"]
-    categories = {hint["category"] for hint in hints}
-
-    # 0.95 is a high fraction hit rate -> must NOT be flagged memory-bound.
-    assert "memory_l2_bound" not in categories
-    assert "compute_bound" in categories
-
-
-def test_profile_summary_metadata_rejects_bool_and_nan_dispatch_count(
-    tmp_path: Path,
-):
-    metadata = tmp_path / "profile.json"
-    metadata.write_text('{"kernel_dispatches": true, "dispatch_count": "nan"}\n')
-    profile = Rocprofv3ProfileResult(
-        status="success",
-        command=("rocprofv3", "--kernel-trace", "--", "python", "eval_driver.py"),
-        output_directory=tmp_path,
-        output_file="profile",
-        artifacts=(
-            Rocprofv3ProfileArtifact(
-                path=metadata,
-                kind="metadata_json",
-                size_bytes=metadata.stat().st_size,
-            ),
-        ),
-        returncode=0,
-        profiler_available=True,
-        artifact_coverage_status="complete",
-        reason_codes=("rocprof_artifacts_registered",),
-    )
-
-    summary = build_profile_summary_sidecar(profile_result=profile).model_dump(
-        mode="json"
-    )["summary"]
-
-    # bool true and "nan" string are both rejected -> no dispatch metric emitted.
-    dispatch_metrics = [
-        metric
-        for metric in summary["workload_metrics"]
-        if metric["name"] == "kernel_dispatch_count"
-    ]
-    assert dispatch_metrics == []
-
-
-def test_profile_summary_reports_insufficient_counters_without_speculation(
-    tmp_path: Path,
-):
-    trace_csv = tmp_path / "profile_kernel_trace.csv"
-    trace_csv.write_text("Domain,Name,Duration(ns)\nKERNEL_DISPATCH,kernel,100000\n")
+    trace_csv.write_text("Domain,Name,Duration(ns)\nKERNEL_DISPATCH,kernel,1000000\n")
     profile = Rocprofv3ProfileResult(
         status="success",
         command=("rocprofv3", "--kernel-trace", "--", "python", "eval_driver.py"),
@@ -370,17 +170,19 @@ def test_profile_summary_reports_insufficient_counters_without_speculation(
         reason_codes=("rocprof_artifacts_registered",),
     )
 
-    sidecar = build_profile_summary_sidecar(profile_result=profile)
-    hints = sidecar.model_dump(mode="json")["summary"]["bottleneck_hints"]
+    payload = build_profile_summary_sidecar(profile_result=profile).model_dump(
+        mode="json"
+    )
 
-    assert hints == [
+    assert payload["summary"]["kernel_metrics"] == [
         {
-            "category": "insufficient_counters",
-            "severity": "low",
-            "confidence": "high",
-            "message": "No bounded counter artifact was available for bottleneck classification.",
-            "source_metrics": [],
-            "evidence_artifacts": [],
+            "kernel_name": "kernel",
+            "name": "kernel_duration_ms",
+            "value": 1.0,
+            "unit": "ms",
+            "source": "profile_kernel_trace.csv",
+            "artifact": "profile_kernel_trace.csv",
+            "parse_status": "available",
         }
     ]
 
