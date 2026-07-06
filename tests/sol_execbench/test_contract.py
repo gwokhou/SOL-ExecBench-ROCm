@@ -51,9 +51,16 @@ OLD_EVALUATOR_CAPABILITY_TOKENS = {
     "profile_summary.sidecar.v1",
     "profile_summary.sidecar.v2",
 }
+SCHEMA_IDS_NOT_CAPABILITIES = {
+    "official_score_evidence.v1",
+    "sol_execbench.agent_feedback.v2",
+    "sol_execbench.profile_summary.v2",
+    "sol_execbench.static_kernel_evidence.v1",
+}
 SCHEMA_AS_CAPABILITY_PHRASES = {
-    "official_score_evidence.v1 capability key",
-    "official_score_evidence.v1 capability token",
+    f"{schema_id} capability {noun}"
+    for schema_id in SCHEMA_IDS_NOT_CAPABILITIES
+    for noun in ("key", "token")
 }
 
 
@@ -94,10 +101,20 @@ def _contains_schema_as_capability_phrase(text: str, phrase: str) -> bool:
 
 
 def test_schema_as_capability_guard_covers_key_and_token_wording():
-    assert {
-        "official_score_evidence.v1 capability key",
-        "official_score_evidence.v1 capability token",
-    }.issubset(SCHEMA_AS_CAPABILITY_PHRASES)
+    expected_schema_ids = {
+        "official_score_evidence.v1",
+        "sol_execbench.agent_feedback.v2",
+        "sol_execbench.profile_summary.v2",
+        "sol_execbench.static_kernel_evidence.v1",
+    }
+    expected_phrases = {
+        f"{schema_id} capability {noun}"
+        for schema_id in expected_schema_ids
+        for noun in ("key", "token")
+    }
+
+    assert SCHEMA_IDS_NOT_CAPABILITIES == expected_schema_ids
+    assert SCHEMA_AS_CAPABILITY_PHRASES == expected_phrases
 
 
 def test_evaluator_contract_versions_are_stable():
