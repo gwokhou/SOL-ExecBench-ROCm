@@ -101,7 +101,7 @@ def _item_for_status(
         )
     if status in {EvaluationStatus.INCORRECT_SHAPE, EvaluationStatus.INCORRECT_DTYPE}:
         return AgentFeedbackItem(
-            code=status.value,
+            code=status.value.lower(),
             severity=AgentFeedbackSeverity.ACTION,
             bottleneck=AgentFeedbackBottleneck.INTERFACE_CORRECTNESS,
             message=f"{count} workload(s) failed output interface validation.",
