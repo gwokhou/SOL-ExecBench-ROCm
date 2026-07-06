@@ -7,11 +7,11 @@ This test module verifies the complete parallelism and safety hardening system
 implemented across Phases 175-178:
 
 1. PID lock contention detection and prevention
-2. CPU-parallel staging with GPU-serial profiling
+2. CPU-parallel staging with GPU-serial profiling architecture
 3. Timing isolation audit output quality
 
-Tests use subprocess mocking for rocm-smi to avoid hardware dependencies where
-possible, and require actual ROCm hardware only when necessary.
+Tests use subprocess mocking and source inspection to avoid hardware
+dependencies.
 """
 
 from __future__ import annotations
@@ -158,19 +158,6 @@ sys.exit(result.returncode)
 
 class TestParallelStagingSerialProfiling:
     """Test that profiling maintains GPU exclusivity even with CPU-parallel staging."""
-
-    @pytest.mark.requires_rocm
-    def test_cpu_parallel_staging_gpu_serial_profiling(self, tmp_path: Path):
-        """Verify that profiling calls are strictly sequential even with CPU-parallel staging."""
-
-        # This test requires actual ROCm hardware and validates the architectural
-        # constraint that GPU subprocess execution remains serial
-        pytest.skip(
-            "This test requires actual GPU profiling setup and is placeholder "
-            "for the architectural constraint. The constraint is enforced by "
-            "design: collect_rocprofv3_timing is only called inside the serial "
-            "loop in _process_target_chunk, never in the ThreadPoolExecutor."
-        )
 
     def test_gpu_exclusivity_architecturally_enforced(self):
         """Verify that no code path can enable concurrent GPU subprocess execution."""

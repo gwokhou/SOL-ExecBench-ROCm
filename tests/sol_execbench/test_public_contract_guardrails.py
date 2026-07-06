@@ -1633,14 +1633,25 @@ def test_cdna3_validation_remains_deferred_in_docs():
 
 
 def test_phase_137_rdna4_category_evidence_stays_bounded():
-    phase_dir = Path(
-        ".planning/phases/137-rdna4-long-running-test-and-category-validation-orchestration"
+    phase_dirs = (
+        Path(
+            ".planning/phases/"
+            "137-rdna4-long-running-test-and-category-validation-orchestration"
+        ),
+        Path(
+            ".planning/milestones/v1.30-phases/"
+            "137-rdna4-long-running-test-and-category-validation-orchestration"
+        ),
     )
     # Phase 137 was archived after milestone completion. The guardrail intent
     # (RDNA4 evidence stays bounded) is preserved through public contract
     # guardrails in ROADMAP.md claim-boundary checks and REQUIREMENTS.md
     # out-of-scope entries.
-    if not (phase_dir / "137-EVIDENCE.json").exists():
+    phase_dir = next(
+        (path for path in phase_dirs if (path / "137-EVIDENCE.json").exists()),
+        None,
+    )
+    if phase_dir is None:
         pytest.skip("Phase 137 evidence was archived after milestone completion")
     evidence = json.loads((phase_dir / "137-EVIDENCE.json").read_text())
     runbook = (phase_dir / "137-RDNA4-LONG-RUN-RUNBOOK.md").read_text()
