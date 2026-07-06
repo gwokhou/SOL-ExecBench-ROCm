@@ -382,8 +382,15 @@ Key interpretation points:
 - ROCm 7.0 target-specific PyTorch ROCm smoke coverage uses
   `torch==2.10.0+rocm7.0`; ROCm 7.2 target-specific PyTorch ROCm smoke
   coverage uses `torch==2.11.0+rocm7.2`.
+- Official wrapper evidence filenames include
+  `rocm-7.0.2-linear-wrapper-official.jsonl`,
+  `rocm-7.0.2-linear-wrapper-official.compatibility.json`,
+  `rocm-7.2-linear-wrapper-official.jsonl`, and
+  `rocm-7.2-linear-wrapper-official.compatibility.json`.
 - Non-authoritative ROCm 7.2 smoke artifacts may use smoke-specific trace and
-  compatibility-sidecar filenames.
+  compatibility-sidecar filenames such as
+  `rocm-7.2-linear-wrapper-smoke.jsonl` and
+  `rocm-7.2-linear-wrapper-smoke.compatibility.json`.
 - Native-host validation requires direct native-host evidence for that ROCm
   stack; it cannot be inferred from Docker image selection or container runs.
 
