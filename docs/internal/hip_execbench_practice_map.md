@@ -15,6 +15,11 @@ ExecBench ROCm surfaces
 `src/sol_execbench/core/baseline.py`, `src/sol_execbench/core/data/trace.py`,
 and `src/sol_execbench/core/scoring/amd_score.py`.
 
+The external hip-execbench references used for classification were
+`src/profiler/router.ts`, `src/errors/index.ts`, `src/agent/builder.ts`,
+`src/baseline/comparator.ts`, `src/schemas/*.ts`, and
+`src/pipeline/statistics.ts`.
+
 ## Accepted Practices
 
 | Practice | hip-execbench source evidence | SOL ExecBench ROCm adaptation | Public contract impact |
@@ -48,7 +53,8 @@ and `src/sol_execbench/core/scoring/amd_score.py`.
 - Adaptations must be internal helpers, tests, or documentation unless a later
   milestone explicitly approves a public contract change.
 - Existing benchmark definition, workload, solution, and trace JSONL
-  formats are compatibility contracts.
+  formats are compatibility contracts. In particular, `definition.json`,
+  `solution.json`, and trace JSONL remain SOL-owned public surfaces.
 - SOL-Score-style output must not be presented as an AMD-native hardware claim
   until a dedicated AMD interpretation model is defined and validated.
 - Baseline comparison is baseline-relative by default. It may be used for local

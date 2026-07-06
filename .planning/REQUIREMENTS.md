@@ -88,6 +88,7 @@ ExecBench.
 |---------|--------|
 | Promoting profile summary or agent feedback to score/cutover authority | These sidecars remain diagnostic adapter inputs only. |
 | Treating `reference_latency_ms` as a confirmed measured baseline | Official score evidence requires release-defined measured baseline provenance. |
+| CDNA3 or CDNA4 validation claim upgrade | CDNA3-family validation requires exact hardware evidence and complete acceptance criteria. MI300X and MI308X are sibling GPU products under CDNA3/gfx942, but MI308X infrastructure evidence must not be reported as completed MI300X validation. CDNA4 validation remains unavailable. |
 | Paper parity, NVIDIA B200 equivalence, hosted leaderboard readiness, CDNA3 full-suite validation, or CDNA4 validation | This milestone upgrades evidence contracts for HIP cutover decisions, not external benchmark claims. |
 | Replacing ROCm Compute Profiler or building a complete profiler UI | SOL should normalize bounded evidence produced by ROCm tools, not become a profiler frontend. |
 

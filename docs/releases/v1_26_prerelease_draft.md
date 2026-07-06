@@ -10,11 +10,11 @@ release.
 
 ## Assets
 
-- Artifact bundle JSON: `<attach prerelease-artifact-bundle-json>`
-- Artifact bundle Markdown: `<attach prerelease-artifact-bundle-markdown>`
-- SHA-256 checksums: `<attach SHA256SUMS>`
-- Readiness JSON: `<attach prerelease-readiness-json>`
-- Readiness Markdown: `<attach prerelease-readiness-markdown>`
+- Artifact bundle JSON: `prerelease_artifact_bundle.json`
+- Artifact bundle Markdown: `prerelease_artifact_bundle.md`
+- SHA-256 checksums: `SHA256SUMS`
+- Readiness JSON: `prerelease_readiness.json`
+- Readiness Markdown: `prerelease_readiness.md`
 
 ## What This Prerelease Contains
 
