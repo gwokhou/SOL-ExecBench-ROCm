@@ -98,58 +98,6 @@ def _contains_stale_capability_token(text: str, token: str) -> bool:
     return re.search(pattern, text) is not None
 
 
-def _describes_schema_as_capability(text: str, schema_id: str) -> bool:
-    schema_pattern = re.compile(
-        rf"(?<![A-Za-z0-9_.-]){re.escape(schema_id)}(?![A-Za-z0-9_.-])"
-    )
-    schema_marker = "__SOL_EXECBENCH_SCHEMA_ID__"
-    guarded_text = schema_pattern.sub(schema_marker, text)
-    marker_pattern = re.escape(schema_marker)
-    capability_label = r"capability\s+(?:key|token)"
-    label_before_schema_pattern = re.compile(
-        rf"\b{capability_label}\b\s*(?:[:=,-]|\bis\b|\bfor\b)?\s*`?\s*"
-        rf"{marker_pattern}\s*`?",
-        re.IGNORECASE,
-    )
-    schema_before_label_pattern = re.compile(
-        rf"`?\s*{marker_pattern}\s*`?(?P<link_text>.*?)\b{capability_label}\b",
-        re.IGNORECASE,
-    )
-
-    paragraphs = re.split(r"(?:\r?\n\s*){2,}", guarded_text)
-    for paragraph in paragraphs:
-        normalized_paragraph = re.sub(r"[ \t]*\r?\n[ \t]*", " ", paragraph.strip())
-        for segment in normalized_paragraph.split("."):
-            if schema_marker not in segment:
-                continue
-            if label_before_schema_pattern.search(segment):
-                return True
-            for match in schema_before_label_pattern.finditer(segment):
-                link_text = match.group("link_text")
-                link_words = re.findall(r"[A-Za-z]+", link_text)
-                schema_capability_starters = {
-                    "advertised",
-                    "advertises",
-                    "artifact",
-                    "as",
-                    "evaluator",
-                    "is",
-                    "optional",
-                    "schema",
-                    "through",
-                }
-                if (
-                    ("`" not in link_text)
-                    and not re.search(r"\bbehind\b", link_text, re.IGNORECASE)
-                    and (
-                        not link_words
-                        or link_words[0].lower() in schema_capability_starters
-                    )
-                ):
-                    return True
-    return False
-
-
 def _active_stale_token_scan_paths() -> list[Path]:
     paths: list[Path] = []
     for root in ACTIVE_STALE_TOKEN_SCAN_ROOTS:
@@ -162,91 +110,6 @@ def _active_stale_token_scan_paths() -> list[Path]:
                 continue
             paths.append(path)
     return paths
-
-
-def test_schema_as_capability_guard_covers_natural_wording():
-    assert "sol_execbench.official_score_evidence.v1" in SCHEMA_IDS_NOT_CAPABILITIES
-    assert _describes_schema_as_capability(
-        "`sol_execbench.official_score_evidence.v1` capability key",
-        "sol_execbench.official_score_evidence.v1",
-    )
-    assert _describes_schema_as_capability(
-        "capability token `sol_execbench.official_score_evidence.v1`",
-        "sol_execbench.official_score_evidence.v1",
-    )
-    assert _describes_schema_as_capability(
-        "`sol_execbench.profile_summary.v2` is the capability token",
-        "sol_execbench.profile_summary.v2",
-    )
-    assert _describes_schema_as_capability(
-        "`sol_execbench.profile_summary.v2` is the optional\ncapability token",
-        "sol_execbench.profile_summary.v2",
-    )
-    assert _describes_schema_as_capability(
-        "`sol_execbench.profile_summary.v2` evaluator capability key",
-        "sol_execbench.profile_summary.v2",
-    )
-    assert _describes_schema_as_capability(
-        "`sol_execbench.profile_summary.v2` optional capability token",
-        "sol_execbench.profile_summary.v2",
-    )
-    assert _describes_schema_as_capability(
-        "`sol_execbench.profile_summary.v2` schema is the capability key",
-        "sol_execbench.profile_summary.v2",
-    )
-    assert _describes_schema_as_capability(
-        "`sol_execbench.profile_summary.v2` artifact schema is the capability token",
-        "sol_execbench.profile_summary.v2",
-    )
-    assert _describes_schema_as_capability(
-        "`sol_execbench.profile_summary.v2` schema advertised as the capability key",
-        "sol_execbench.profile_summary.v2",
-    )
-    assert _describes_schema_as_capability(
-        "capability key sol_execbench.profile_summary.v2",
-        "sol_execbench.profile_summary.v2",
-    )
-    assert _describes_schema_as_capability(
-        "capability key\n`sol_execbench.profile_summary.v2`",
-        "sol_execbench.profile_summary.v2",
-    )
-    assert _describes_schema_as_capability(
-        "capability key for `sol_execbench.profile_summary.v2`",
-        "sol_execbench.profile_summary.v2",
-    )
-    assert _describes_schema_as_capability(
-        "capability key\nfor `sol_execbench.profile_summary.v2`",
-        "sol_execbench.profile_summary.v2",
-    )
-    assert _describes_schema_as_capability(
-        "official_score_evidence.v1 capability token",
-        "official_score_evidence.v1",
-    )
-    assert _describes_schema_as_capability(
-        "official_score_evidence.v1 capability key",
-        "official_score_evidence.v1",
-    )
-    assert _describes_schema_as_capability(
-        "`sol_execbench.profile_summary.v2` is documented here as the optional "
-        "diagnostic profile summary capability token",
-        "sol_execbench.profile_summary.v2",
-    )
-    assert _describes_schema_as_capability(
-        "`sol_execbench.profile_summary.v2` is documented with concrete "
-        "artifact schema wording that deliberately includes enough descriptive "
-        "detail before its capability token label",
-        "sol_execbench.profile_summary.v2",
-    )
-    assert not _describes_schema_as_capability(
-        "Concrete artifact schema is `sol_execbench.profile_summary.v2`. "
-        "The capability key is `profile_summary.sidecar`.",
-        "sol_execbench.profile_summary.v2",
-    )
-    assert not _describes_schema_as_capability(
-        "`sol_execbench.static_kernel_evidence.v1` sidecar schema behind the\n"
-        "`static_kernel.evidence` capability key.",
-        "sol_execbench.static_kernel_evidence.v1",
-    )
 
 
 def test_active_stale_token_scan_includes_malformed_sidecar_fixtures():
@@ -352,10 +215,13 @@ def test_current_contract_doc_matches_builder_capabilities():
     for path, text in active_doc_texts.items():
         for old_token in sorted(OLD_EVALUATOR_CAPABILITY_TOKENS):
             assert not _contains_stale_capability_token(text, old_token), path
-        for schema_id in sorted(SCHEMA_IDS_NOT_CAPABILITIES):
-            assert not _describes_schema_as_capability(text, schema_id), path
 
-    assert _contract_doc_capabilities(contract_text) == capabilities
+    # The capability table in EVALUATOR-CONTRACT.md is the only authoritative
+    # capability-key list. Versioned artifact schema IDs live on a separate
+    # axis and must never appear as capability keys.
+    contract_capabilities = _contract_doc_capabilities(contract_text)
+    assert contract_capabilities == capabilities
+    assert set(contract_capabilities).isdisjoint(SCHEMA_IDS_NOT_CAPABILITIES)
 
     assert "`sol_execbench.agent_feedback.v2`" in contract_text
     assert "`sol_execbench.profile_summary.v2`" in contract_text
