@@ -186,25 +186,6 @@ class AgentFeedbackItem(BaseModelWithDocstrings):
     """Compact source references supporting this item."""
 
 
-class AgentFeedbackAuthority(BaseModelWithDocstrings):
-    """Authority boundary for agent feedback sidecars."""
-
-    model_config = _MODEL_CONFIG
-
-    diagnostic_only: Literal[True] = True
-    correctness_authority: Literal[False] = False
-    performance_authority: Literal[False] = False
-    timing_authority: Literal[False] = False
-    score_authority: Literal[False] = False
-    evidence_tier_authority: Literal[False] = False
-    confirmed_improvement_authority: Literal[False] = False
-    release_gate_authority: Literal[False] = False
-    cutover_authority: Literal[False] = False
-    paper_parity_authority: Literal[False] = False
-    leaderboard_authority: Literal[False] = False
-    claim_upgrade_authority: Literal[False] = False
-
-
 class AgentFeedbackSummary(BaseModelWithDocstrings):
     """Compact aggregate trace/profile summary."""
 

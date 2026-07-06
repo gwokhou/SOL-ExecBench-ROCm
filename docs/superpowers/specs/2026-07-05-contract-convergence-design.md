@@ -58,8 +58,8 @@ capability keys when the builder emits unversioned capability keys.
 
 Delete only inactive code that conflicts with the current sidecar schema:
 
-- Remove `AgentFeedbackAuthority`.
-- Remove `ProfileSummaryAuthority`.
+- Remove the obsolete agent-feedback sidecar authority model.
+- Remove the obsolete profile-summary sidecar authority model.
 
 Keep governance guardrail models unchanged:
 

@@ -19,9 +19,9 @@
 - Modify: `docs/trace.md`
   - Updates the runtime evidence capability reference from `runtime.evidence.v1` to `runtime.evidence`.
 - Modify: `src/sol_execbench/core/bench/agent_feedback.py`
-  - Removes the unused `AgentFeedbackAuthority` sidecar model.
+  - Removes the unused obsolete agent-feedback sidecar authority model.
 - Modify: `src/sol_execbench/core/bench/profile_summary.py`
-  - Removes the unused `ProfileSummaryAuthority` sidecar model.
+  - Removes the unused obsolete profile-summary sidecar authority model.
 
 ---
 
@@ -234,60 +234,25 @@ Expected result: commit succeeds with DCO sign-off.
 Run:
 
 ```bash
-rg -n "AgentFeedbackAuthority|ProfileSummaryAuthority" src tests docs
+rg -n "<inactive sidecar authority class-name pattern>" src tests docs
 ```
 
 Expected result: only the class definitions appear in `agent_feedback.py` and `profile_summary.py`.
 
-- [ ] **Step 2: Remove `AgentFeedbackAuthority`**
+- [ ] **Step 2: Remove the obsolete agent-feedback sidecar authority model**
 
-In `src/sol_execbench/core/bench/agent_feedback.py`, delete this whole class:
-
-```python
-class AgentFeedbackAuthority(BaseModelWithDocstrings):
-    """Authority boundary for agent feedback sidecars."""
-
-    model_config = _MODEL_CONFIG
-
-    diagnostic_only: Literal[True] = True
-    correctness_authority: Literal[False] = False
-    performance_authority: Literal[False] = False
-    timing_authority: Literal[False] = False
-    score_authority: Literal[False] = False
-    evidence_tier_authority: Literal[False] = False
-    confirmed_improvement_authority: Literal[False] = False
-    release_gate_authority: Literal[False] = False
-    cutover_authority: Literal[False] = False
-    paper_parity_authority: Literal[False] = False
-    leaderboard_authority: Literal[False] = False
-    claim_upgrade_authority: Literal[False] = False
-```
+In `src/sol_execbench/core/bench/agent_feedback.py`, delete the whole obsolete
+agent-feedback sidecar authority model with the docstring `Authority boundary for
+agent feedback sidecars.` and the diagnostic-only `*_authority` literal fields.
 
 Do not modify `AgentFeedbackGovernanceGuardrail`.
 
-- [ ] **Step 3: Remove `ProfileSummaryAuthority`**
+- [ ] **Step 3: Remove the obsolete profile-summary sidecar authority model**
 
-In `src/sol_execbench/core/bench/profile_summary.py`, delete this whole class:
-
-```python
-class ProfileSummaryAuthority(BaseModelWithDocstrings):
-    """Authority boundary for profile summary sidecars."""
-
-    model_config = _MODEL_CONFIG
-
-    diagnostic_only: Literal[True] = True
-    correctness_authority: Literal[False] = False
-    performance_authority: Literal[False] = False
-    timing_authority: Literal[False] = False
-    score_authority: Literal[False] = False
-    evidence_tier_authority: Literal[False] = False
-    confirmed_improvement_authority: Literal[False] = False
-    release_gate_authority: Literal[False] = False
-    cutover_authority: Literal[False] = False
-    paper_parity_authority: Literal[False] = False
-    leaderboard_authority: Literal[False] = False
-    claim_upgrade_authority: Literal[False] = False
-```
+In `src/sol_execbench/core/bench/profile_summary.py`, delete the whole obsolete
+profile-summary sidecar authority model with the docstring `Authority boundary
+for profile summary sidecars.` and the diagnostic-only `*_authority` literal
+fields.
 
 Do not modify `ProfileSummaryGovernanceGuardrail`.
 
@@ -296,7 +261,7 @@ Do not modify `ProfileSummaryGovernanceGuardrail`.
 Run:
 
 ```bash
-rg -n "AgentFeedbackAuthority|ProfileSummaryAuthority" src tests docs
+rg -n "<inactive sidecar authority class-name pattern>" src tests docs
 ```
 
 Expected result: no matches.
@@ -359,7 +324,7 @@ schema `sol_execbench.static_kernel_evidence.v1`.
 Run:
 
 ```bash
-rg -n "AgentFeedbackAuthority|ProfileSummaryAuthority" src tests docs
+rg -n "<inactive sidecar authority class-name pattern>" src tests docs
 ```
 
 Expected result: no matches.
