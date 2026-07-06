@@ -9,6 +9,7 @@ from click.testing import CliRunner
 
 from sol_execbench.cli.main import cli
 from sol_execbench.core.data.contract import (
+    EvaluatorContract,
     SOL_EXECBENCH_CONTRACT_SCHEMA_VERSION,
     SOL_EXECBENCH_CONTRACT_VERSION,
     build_evaluator_contract,
@@ -280,6 +281,25 @@ def test_evaluator_contract_versions_are_stable():
     assert payload["schema_version"] == "sol_execbench.evaluator_contract.v2"
     assert payload["contract_version"] == "1.0"
     assert payload["sol_release"] == "v1.42"
+
+
+def test_evaluator_contract_schema_describes_capabilities_as_keys():
+    schema = EvaluatorContract.model_json_schema()
+
+    assert schema["properties"]["capabilities"]["description"] == (
+        "Named capability keys mapped to requirement levels."
+    )
+
+
+def test_evaluator_contract_capability_keys_do_not_use_schema_ids():
+    payload = build_evaluator_contract().model_dump(mode="json")
+    capability_keys = set(payload["capabilities"])
+    forbidden_keys = SCHEMA_IDS_NOT_CAPABILITIES | OLD_EVALUATOR_CAPABILITY_TOKENS
+
+    assert capability_keys.isdisjoint(forbidden_keys)
+    for capability_key in capability_keys:
+        for forbidden_key in forbidden_keys:
+            assert not _contains_stale_capability_token(capability_key, forbidden_key)
 
 
 def test_evaluator_contract_declares_required_capabilities():
