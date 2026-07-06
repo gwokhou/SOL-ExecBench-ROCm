@@ -57,11 +57,6 @@ SCHEMA_IDS_NOT_CAPABILITIES = {
     "sol_execbench.profile_summary.v2",
     "sol_execbench.static_kernel_evidence.v1",
 }
-SCHEMA_AS_CAPABILITY_PHRASES = {
-    f"{schema_id} capability {noun}"
-    for schema_id in SCHEMA_IDS_NOT_CAPABILITIES
-    for noun in ("key", "token")
-}
 
 
 def _contract_doc_capabilities(text: str) -> dict[str, str]:
@@ -95,26 +90,40 @@ def _contains_stale_capability_token(text: str, token: str) -> bool:
     return re.search(pattern, text) is not None
 
 
-def _contains_schema_as_capability_phrase(text: str, phrase: str) -> bool:
-    normalized_text = " ".join(text.replace("`", "").replace(">", " ").split())
-    return phrase in normalized_text
+def _describes_schema_as_capability(text: str, schema_id: str) -> bool:
+    schema = rf"(?<![A-Za-z0-9_.-]){re.escape(schema_id)}(?![A-Za-z0-9_.-])"
+    capability_label = r"capability\s+(?:key|token)"
+    schema_before_label = rf"{schema}[^.\n]{{0,80}}{capability_label}"
+    label_before_schema = rf"{capability_label}[^.\n]{{0,80}}{schema}"
+
+    return (
+        re.search(schema_before_label, text, flags=re.IGNORECASE) is not None
+        or re.search(label_before_schema, text, flags=re.IGNORECASE) is not None
+    )
 
 
-def test_schema_as_capability_guard_covers_key_and_token_wording():
-    expected_schema_ids = {
-        "official_score_evidence.v1",
-        "sol_execbench.agent_feedback.v2",
+def test_schema_as_capability_guard_covers_natural_wording():
+    assert _describes_schema_as_capability(
+        "`sol_execbench.profile_summary.v2` is the capability token",
         "sol_execbench.profile_summary.v2",
-        "sol_execbench.static_kernel_evidence.v1",
-    }
-    expected_phrases = {
-        f"{schema_id} capability {noun}"
-        for schema_id in expected_schema_ids
-        for noun in ("key", "token")
-    }
-
-    assert SCHEMA_IDS_NOT_CAPABILITIES == expected_schema_ids
-    assert SCHEMA_AS_CAPABILITY_PHRASES == expected_phrases
+    )
+    assert _describes_schema_as_capability(
+        "capability key sol_execbench.profile_summary.v2",
+        "sol_execbench.profile_summary.v2",
+    )
+    assert _describes_schema_as_capability(
+        "official_score_evidence.v1 capability token",
+        "official_score_evidence.v1",
+    )
+    assert _describes_schema_as_capability(
+        "official_score_evidence.v1 capability key",
+        "official_score_evidence.v1",
+    )
+    assert not _describes_schema_as_capability(
+        "Concrete artifact schema is `sol_execbench.profile_summary.v2`. "
+        "The capability key is `profile_summary.sidecar`.",
+        "sol_execbench.profile_summary.v2",
+    )
 
 
 def test_evaluator_contract_versions_are_stable():
@@ -177,8 +186,8 @@ def test_current_contract_doc_matches_builder_capabilities():
     for path, text in active_doc_texts.items():
         for old_token in sorted(OLD_EVALUATOR_CAPABILITY_TOKENS):
             assert not _contains_stale_capability_token(text, old_token), path
-        for phrase in sorted(SCHEMA_AS_CAPABILITY_PHRASES):
-            assert not _contains_schema_as_capability_phrase(text, phrase), path
+        for schema_id in sorted(SCHEMA_IDS_NOT_CAPABILITIES):
+            assert not _describes_schema_as_capability(text, schema_id), path
 
     assert _contract_doc_capabilities(contract_text) == capabilities
 
