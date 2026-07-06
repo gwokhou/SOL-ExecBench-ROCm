@@ -106,7 +106,7 @@ def _describes_schema_as_capability(text: str, schema_id: str) -> bool:
     marker_pattern = re.escape(schema_marker)
     capability_label = r"capability\s+(?:key|token)"
     label_before_schema_pattern = re.compile(
-        rf"\b{capability_label}\b\s*(?:[:=,-]|\bis\b)?\s*`?\s*"
+        rf"\b{capability_label}\b\s*(?:[:=,-]|\bis\b|\bfor\b)?\s*`?\s*"
         rf"{marker_pattern}\s*`?",
         re.IGNORECASE,
     )
@@ -129,8 +129,12 @@ def _describes_schema_as_capability(text: str, schema_id: str) -> bool:
                 schema_capability_starters = {
                     "advertised",
                     "advertises",
+                    "artifact",
                     "as",
+                    "evaluator",
                     "is",
+                    "optional",
+                    "schema",
                     "through",
                 }
                 if (
@@ -178,11 +182,39 @@ def test_schema_as_capability_guard_covers_natural_wording():
         "sol_execbench.profile_summary.v2",
     )
     assert _describes_schema_as_capability(
+        "`sol_execbench.profile_summary.v2` evaluator capability key",
+        "sol_execbench.profile_summary.v2",
+    )
+    assert _describes_schema_as_capability(
+        "`sol_execbench.profile_summary.v2` optional capability token",
+        "sol_execbench.profile_summary.v2",
+    )
+    assert _describes_schema_as_capability(
+        "`sol_execbench.profile_summary.v2` schema is the capability key",
+        "sol_execbench.profile_summary.v2",
+    )
+    assert _describes_schema_as_capability(
+        "`sol_execbench.profile_summary.v2` artifact schema is the capability token",
+        "sol_execbench.profile_summary.v2",
+    )
+    assert _describes_schema_as_capability(
+        "`sol_execbench.profile_summary.v2` schema advertised as the capability key",
+        "sol_execbench.profile_summary.v2",
+    )
+    assert _describes_schema_as_capability(
         "capability key sol_execbench.profile_summary.v2",
         "sol_execbench.profile_summary.v2",
     )
     assert _describes_schema_as_capability(
         "capability key\n`sol_execbench.profile_summary.v2`",
+        "sol_execbench.profile_summary.v2",
+    )
+    assert _describes_schema_as_capability(
+        "capability key for `sol_execbench.profile_summary.v2`",
+        "sol_execbench.profile_summary.v2",
+    )
+    assert _describes_schema_as_capability(
+        "capability key\nfor `sol_execbench.profile_summary.v2`",
         "sol_execbench.profile_summary.v2",
     )
     assert _describes_schema_as_capability(
