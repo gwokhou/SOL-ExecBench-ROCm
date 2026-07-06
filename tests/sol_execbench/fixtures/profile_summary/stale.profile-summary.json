@@ -173,7 +173,7 @@
     ],
     "output_file": "trace",
     "parse_warnings": [
-      "trace.rocpd: rocpd artifacts are citation-only in profile_summary.sidecar.v2"
+      "trace.rocpd: rocpd artifacts are citation-only in sol_execbench.profile_summary.v2"
     ],
     "profiler_available": true,
     "profiler_status": "success",

@@ -269,7 +269,7 @@ def test_profile_summary_builds_structured_metrics_and_hints_from_text_artifacts
         },
     ]
     assert summary["parse_warnings"] == [
-        "profile.rocpd: rocpd artifacts are citation-only in profile_summary.sidecar.v2"
+        "profile.rocpd: rocpd artifacts are citation-only in sol_execbench.profile_summary.v2"
     ]
     assert all(
         "rocpd" not in (metric.get("artifact") or "")
@@ -454,7 +454,7 @@ def test_profile_summary_diagnostic_log_only_profile_is_partial(tmp_path: Path):
     assert payload["summary"]["artifact_count"] == 1
     assert payload["summary"]["artifact_kinds"] == {"diagnostic_json": 1}
     assert payload["summary"]["parse_warnings"] == [
-        "profile.diagnostics.json: diagnostic_json artifacts are citation-only in profile_summary.sidecar.v2"
+        "profile.diagnostics.json: diagnostic_json artifacts are citation-only in sol_execbench.profile_summary.v2"
     ]
     assert any(
         "diagnostic logs but no profiler data artifacts" in limitation
