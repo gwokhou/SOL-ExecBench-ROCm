@@ -27,6 +27,7 @@ from sol_execbench.core.bench.agent_feedback_models import (
     AgentFeedbackStatus,
     AgentFeedbackSummary,
 )
+from sol_execbench.core.bench.agent_feedback_items import trace_feedback_items
 from sol_execbench.core.bench.diagnostic_sidecar import (
     classify_diagnostic_governance,
     classify_freshness,
@@ -39,7 +40,7 @@ from sol_execbench.core.bench.static_kernel_evidence import (
     StaticKernelEvidenceSidecar,
 )
 from sol_execbench.core.data.contract import SOL_EXECBENCH_RELEASE
-from sol_execbench.core.data.trace import EvaluationStatus, Trace
+from sol_execbench.core.data.trace import Trace
 from sol_execbench.core.dataset.checksums import sha256_file
 from sol_execbench.core.trust_summary import utc_timestamp
 
@@ -123,7 +124,7 @@ def build_agent_feedback_sidecar(
                 static_evidence.status.value if static_evidence else None
             ),
         ),
-        items=_trace_feedback_items(status_counter),
+        items=trace_feedback_items(status_counter),
         limitations=_limitations(traces, profile_result, static_evidence),
         source_refs=_source_refs(profile_result, static_evidence),
         artifact_citations=list(artifact_citations),
@@ -261,119 +262,6 @@ def _source_refs(
             )
         )
     return refs
-
-
-def _trace_feedback_items(
-    status_counter: Counter[EvaluationStatus],
-) -> list[AgentFeedbackItem]:
-    items: list[AgentFeedbackItem] = []
-    for status, count in sorted(status_counter.items(), key=lambda item: item[0].value):
-        item = _item_for_status(status, count)
-        if item is not None:
-            items.append(item)
-    if not items and status_counter:
-        items.append(
-            AgentFeedbackItem(
-                code="all_evaluated_traces_passed",
-                severity=AgentFeedbackSeverity.INFO,
-                bottleneck=AgentFeedbackBottleneck.UNKNOWN,
-                message=(
-                    "All evaluated traces passed; no failure-specific diagnostic "
-                    "is available."
-                ),
-                recommendation=(
-                    "Use optional profiling or static evidence for next-step "
-                    "performance diagnosis."
-                ),
-                source_refs=[
-                    AgentFeedbackSourceRef(kind="trace", label="canonical_trace_jsonl")
-                ],
-            )
-        )
-    return items
-
-
-def _item_for_status(
-    status: EvaluationStatus,
-    count: int,
-) -> AgentFeedbackItem | None:
-    source_refs = [AgentFeedbackSourceRef(kind="trace", label="canonical_trace_jsonl")]
-    if status == EvaluationStatus.PASSED:
-        return None
-    if status == EvaluationStatus.COMPILE_ERROR:
-        return AgentFeedbackItem(
-            code="compile_error",
-            severity=AgentFeedbackSeverity.ACTION,
-            bottleneck=AgentFeedbackBottleneck.COMPILE_FAILURE,
-            message=f"{count} workload(s) failed during compilation.",
-            recommendation=(
-                "Inspect bounded compile diagnostics before changing optimization "
-                "strategy."
-            ),
-            source_refs=source_refs,
-        )
-    if status == EvaluationStatus.RUNTIME_ERROR:
-        return AgentFeedbackItem(
-            code="runtime_error",
-            severity=AgentFeedbackSeverity.ACTION,
-            bottleneck=AgentFeedbackBottleneck.RUNTIME_FAILURE,
-            message=f"{count} workload(s) failed during runtime execution.",
-            recommendation=(
-                "Prioritize launch, memory, and synchronization correctness before "
-                "tuning."
-            ),
-            source_refs=source_refs,
-        )
-    if status == EvaluationStatus.TIMEOUT:
-        return AgentFeedbackItem(
-            code="timeout",
-            severity=AgentFeedbackSeverity.ACTION,
-            bottleneck=AgentFeedbackBottleneck.TIMEOUT,
-            message=f"{count} workload(s) timed out.",
-            recommendation=(
-                "Reduce search-space risk and verify kernel termination behavior."
-            ),
-            source_refs=source_refs,
-        )
-    if status == EvaluationStatus.INCORRECT_NUMERICAL:
-        return AgentFeedbackItem(
-            code="incorrect_numerical",
-            severity=AgentFeedbackSeverity.ACTION,
-            bottleneck=AgentFeedbackBottleneck.NUMERICAL_CORRECTNESS,
-            message=f"{count} workload(s) produced numerically incorrect outputs.",
-            recommendation=(
-                "Fix numerical correctness before interpreting performance feedback."
-            ),
-            source_refs=source_refs,
-        )
-    if status in {EvaluationStatus.INCORRECT_SHAPE, EvaluationStatus.INCORRECT_DTYPE}:
-        return AgentFeedbackItem(
-            code=status.value.lower(),
-            severity=AgentFeedbackSeverity.ACTION,
-            bottleneck=AgentFeedbackBottleneck.INTERFACE_CORRECTNESS,
-            message=f"{count} workload(s) failed output interface validation.",
-            recommendation="Match output shape and dtype contracts before optimization.",
-            source_refs=source_refs,
-        )
-    if status == EvaluationStatus.REWARD_HACK:
-        return AgentFeedbackItem(
-            code="reward_hack",
-            severity=AgentFeedbackSeverity.ACTION,
-            bottleneck=AgentFeedbackBottleneck.POLICY_VIOLATION,
-            message=f"{count} workload(s) violated benchmark policy checks.",
-            recommendation="Remove policy-violating behavior before further evaluation.",
-            source_refs=source_refs,
-        )
-    if status == EvaluationStatus.INVALID_REFERENCE:
-        return AgentFeedbackItem(
-            code="invalid_reference",
-            severity=AgentFeedbackSeverity.WARNING,
-            bottleneck=AgentFeedbackBottleneck.REFERENCE_FAILURE,
-            message=f"{count} workload(s) could not be compared to a valid reference.",
-            recommendation="Resolve reference execution before using candidate feedback.",
-            source_refs=source_refs,
-        )
-    return None
 
 
 def _limitations(

@@ -335,9 +335,17 @@ def test_agent_feedback_sidecar_summarizes_failures_and_optional_profile():
     assert payload["status"] == "partial"
     assert payload["reason_code"] == "partial_diagnostics"
     assert payload["summary"]["profile_status"] == "unavailable"
+    assert any(ref["kind"] == "profile" for ref in payload["source_refs"])
+
+
+def test_agent_feedback_sidecar_includes_trace_feedback_items() -> None:
+    sidecar = build_agent_feedback_sidecar(
+        traces=[_trace(EvaluationStatus.COMPILE_ERROR)]
+    )
+    payload = sidecar.model_dump(mode="json")
+
     assert payload["items"][0]["code"] == "compile_error"
     assert payload["items"][0]["bottleneck"] == "compile_failure"
-    assert any(ref["kind"] == "profile" for ref in payload["source_refs"])
 
 
 def test_agent_feedback_sidecar_rejects_authority_override():
