@@ -44,6 +44,7 @@ from . import environment as cli_environment
 from . import metadata as cli_metadata
 from . import reporting as cli_reporting
 from . import sidecars as cli_sidecars
+from . import static_evidence as cli_static_evidence
 from ..core.bench.io import flashinfer_safetensors_env
 from ..core.bench.rocm_profiler import Rocprofv3ProfileResult
 from ..core.bench.stderr import filter_benign_rocm_stderr
@@ -176,9 +177,12 @@ def _resolve_problem_dir(
 @click.option(
     "--static-evidence",
     type=click.Choice(
-        [cli_sidecars.STATIC_EVIDENCE_NONE, cli_sidecars.STATIC_EVIDENCE_AUTO]
+        [
+            cli_static_evidence.STATIC_EVIDENCE_NONE,
+            cli_static_evidence.STATIC_EVIDENCE_AUTO,
+        ]
     ),
-    default=cli_sidecars.STATIC_EVIDENCE_NONE,
+    default=cli_static_evidence.STATIC_EVIDENCE_NONE,
     show_default=True,
     help="Collect optional diagnostic static kernel evidence",
 )
@@ -322,15 +326,17 @@ def _evaluate_cli(
         if verbose and filtered_stderr:
             console.print(f"[dim]{filtered_stderr}[/dim]")
 
-        if static_evidence == cli_sidecars.STATIC_EVIDENCE_AUTO:
-            static_evidence_result = cli_sidecars._collect_static_evidence_for_cli(
-                enabled=static_evidence,
-                is_cpp=True,
-                staging_dir=staging_dir,
-                output_file=output_file,
+        if static_evidence == cli_static_evidence.STATIC_EVIDENCE_AUTO:
+            static_evidence_result = (
+                cli_static_evidence._collect_static_evidence_for_cli(
+                    enabled=static_evidence,
+                    is_cpp=True,
+                    staging_dir=staging_dir,
+                    output_file=output_file,
+                )
             )
-    elif static_evidence == cli_sidecars.STATIC_EVIDENCE_AUTO:
-        static_evidence_result = cli_sidecars._collect_static_evidence_for_cli(
+    elif static_evidence == cli_static_evidence.STATIC_EVIDENCE_AUTO:
+        static_evidence_result = cli_static_evidence._collect_static_evidence_for_cli(
             enabled=static_evidence,
             is_cpp=False,
             staging_dir=staging_dir,
@@ -468,7 +474,7 @@ def _evaluate_cli(
         profile_sidecar_path=profile_sidecar_path,
         run_id=trace_run_id,
     )
-    static_evidence_sidecar_path = cli_sidecars._write_static_evidence_sidecar(
+    static_evidence_sidecar_path = cli_static_evidence._write_static_evidence_sidecar(
         output_file,
         staging_dir,
         static_evidence_result,
