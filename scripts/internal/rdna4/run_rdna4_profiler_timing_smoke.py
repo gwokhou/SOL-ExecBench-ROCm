@@ -21,6 +21,7 @@ from sol_execbench.core.bench.rocm_profiler import (
     collect_source_timing_evidence,
 )
 from sol_execbench.core import BenchmarkConfig, Definition, Solution, Workload
+from sol_execbench.core.data.json_utils import load_json_dict, load_jsonl_file
 from sol_execbench.driver import ProblemPackager
 
 DEFAULT_PROBLEM_DIR = Path("examples/triton/rmsnorm")
@@ -126,18 +127,11 @@ def _write_limited_workload(source: Path, destination: Path, limit: int) -> None
 
 
 def _load_json(path: Path) -> dict[str, Any]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        raise ValueError(f"expected JSON object at {path}")
-    return payload
+    return load_json_dict(path)
 
 
 def _load_workloads(path: Path) -> list[Workload]:
-    workloads = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if line.strip():
-            workloads.append(Workload(**json.loads(line)))
-    return workloads
+    return load_jsonl_file(Workload, path)
 
 
 def _solution_languages(solution: dict[str, Any]) -> tuple[str, ...]:

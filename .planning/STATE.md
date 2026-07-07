@@ -5,7 +5,7 @@ milestone_name: Upgrade SOL Evidence Contract for Confirmed Benchmark Claims
 status: executing
 stopped_at: Phase 192 verified
 last_updated: "2026-07-03T04:13:40.137Z"
-last_activity: 2026-07-03 -- Completed quick task 260703-gze: Close SOL-side diagnostic-only feedback-loop release gap
+last_activity: 2026-07-07 -- Completed quick task 260707-s2p: Refactor repeated helpers to use standard-library, Pydantic, and shared utilities
 progress:
   total_phases: 5
   completed_phases: 3
@@ -30,7 +30,7 @@ ExecBench.
 Phase: 193 (Measured Baseline Provenance and Coverage) — READY FOR DISCUSSION
 Plan: —
 Status: Phase 192 verified; ready to discuss Phase 193
-Last activity: 2026-07-03 -- Completed quick task 260703-gze: Close SOL-side diagnostic-only feedback-loop release gap
+Last activity: 2026-07-07 -- Completed quick task 260707-s2p: Refactor repeated helpers to use standard-library, Pydantic, and shared utilities
 
 ## Recent Trend
 
@@ -81,6 +81,7 @@ Last activity: 2026-07-03 -- Completed quick task 260703-gze: Close SOL-side dia
 
 | Date | Task | Status | Notes |
 |------|------|--------|-------|
+| 2026-07-07 | 260707-s2p-refactor-repeated-helpers-to-use-standar | complete | Added shared JSON/model, text, and scoring parsing helpers; replaced repeated report serialization/checksum, Markdown, sha256, JSONL, ordered-unique, and subprocess text/tail logic; verified focused pytest and Ruff coverage. |
 | 2026-07-03 | 260703-gze-close-the-sol-side-diagnostic-only-feedb | complete | Added HIP-facing sidecar identity aliases, documented profile-summary bottleneck hint ownership, prepared `v1.38-feedback-loop-rc1`, and verified focused pytest/Ruff coverage. |
 | 2026-06-22 | 260622-eaa-fix-pre-push-ty-check-blockers-before-pu | complete | Fixed local `ty-check` failures blocking `git push origin main`; verified with `uv run ty check` and targeted pytest coverage. |
 | 2026-06-20 | 260620-tnn-cherry-pick-local-backup-changes-to-main | complete | Cherry-picked local backup commit `a33600b` onto current `main`, preserving current codebase mapping state while restoring wrapper scripts and documentation/evidence notes. |

@@ -5,18 +5,17 @@
 from __future__ import annotations
 
 import dataclasses
-import json
 import re
 from collections import Counter
 from pathlib import Path
 
 from pydantic import BaseModel, Field
 
+from sol_execbench.core.data.json_utils import stable_model_checksum, stable_model_json
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import CustomInput, SafetensorsInput, Workload
 
 from .categories import validate_categories
-from .checksums import stable_json_checksum
 from .manifest import DatasetManifestChecksum, utc_timestamp
 
 INVENTORY_SCHEMA_VERSION = "sol_execbench.dataset_inventory.v1"
@@ -114,18 +113,16 @@ class DatasetInventory(BaseModel):
     inventory_checksum: DatasetManifestChecksum | None = None
 
     def with_checksum(self) -> "DatasetInventory":
-        payload = self.model_dump(mode="json")
-        payload["inventory_checksum"] = None
         return self.model_copy(
             update={
                 "inventory_checksum": DatasetManifestChecksum(
-                    value=stable_json_checksum(payload)
+                    value=stable_model_checksum(self, "inventory_checksum")
                 )
             }
         )
 
     def to_json(self) -> str:
-        return json.dumps(self.model_dump(mode="json"), indent=2, sort_keys=True) + "\n"
+        return stable_model_json(self)
 
 
 def _rel(path: Path, root: Path) -> str:

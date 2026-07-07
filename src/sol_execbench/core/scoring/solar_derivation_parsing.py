@@ -9,6 +9,14 @@ from math import isfinite
 from typing import Any
 
 from sol_execbench.core.scoring.amd_hardware_models import EstimateConfidence
+from sol_execbench.core.scoring.parsing_utils import (
+    ensure_dict as _ensure_dict,
+    parse_confidence as _parse_confidence,
+    parse_list as _parse_list,
+    parse_optional_str as _parse_optional_str,
+    parse_str as _parse_str,
+    parse_str_item as _parse_str_item,
+)
 from sol_execbench.core.scoring.solar_derivation_coverage import (
     _aggregate_status_for_groups,
     _coverage_for_groups,
@@ -573,43 +581,6 @@ def _parse_dict(payload: dict[str, Any], key: str, *, source: str) -> dict[str, 
     return _ensure_dict(payload[key], source=f"{source}.{key}")
 
 
-def _ensure_dict(value: Any, *, source: str) -> dict[str, Any]:
-    if not isinstance(value, dict):
-        raise ValueError(f"{source} must be an object")
-    return value
-
-
-def _parse_list(payload: dict[str, Any], key: str, *, source: str) -> list[Any]:
-    value = payload[key]
-    if not isinstance(value, list):
-        raise ValueError(f"{source}.{key} must be a list")
-    return value
-
-
-def _parse_str(payload: dict[str, Any], key: str, *, source: str) -> str:
-    return _parse_str_item(payload[key], source=f"{source}.{key}")
-
-
-def _parse_optional_str(
-    payload: dict[str, Any],
-    key: str,
-    *,
-    source: str,
-) -> str | None:
-    value = payload[key]
-    if value is None:
-        return None
-    return _parse_str_item(value, source=f"{source}.{key}")
-
-
-def _parse_str_item(value: Any, *, source: str) -> str:
-    if not isinstance(value, str):
-        raise ValueError(f"{source} must be a string")
-    if not value:
-        raise ValueError(f"{source} must be non-empty")
-    return value
-
-
 def _parse_str_tuple(
     payload: dict[str, Any], key: str, *, source: str
 ) -> tuple[str, ...]:
@@ -765,22 +736,6 @@ def _parse_shape(
             raise ValueError(f"{source}.{key}[{index}] must be non-negative")
         shape.append(item)
     return tuple(shape)
-
-
-def _parse_confidence(
-    payload: dict[str, Any],
-    key: str,
-    *,
-    source: str,
-) -> EstimateConfidence:
-    raw = _parse_str(payload, key, source=source)
-    try:
-        return EstimateConfidence(raw)
-    except ValueError as exc:
-        valid_values = ", ".join(value.value for value in EstimateConfidence)
-        raise ValueError(
-            f"{source}.{key} has invalid confidence '{raw}', expected one of: {valid_values}"
-        ) from exc
 
 
 def _parse_status(

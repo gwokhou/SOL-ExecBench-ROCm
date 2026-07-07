@@ -4,13 +4,13 @@
 
 from __future__ import annotations
 
-import json
 from collections import defaultdict
 from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from .checksums import stable_json_checksum
+from sol_execbench.core.data.json_utils import stable_model_checksum, stable_model_json
+
 from .manifest import DatasetManifestChecksum, utc_timestamp
 from .readiness import DatasetReadiness
 
@@ -76,12 +76,16 @@ class ReadySubset(BaseModel):
     ready_subset_checksum: DatasetManifestChecksum | None = None
 
     def with_checksum(self) -> "ReadySubset":
-        payload = self.model_dump(mode="json")
-        payload["ready_subset_checksum"] = None
-        return self.model_copy(update={"ready_subset_checksum": DatasetManifestChecksum(value=stable_json_checksum(payload))})
+        return self.model_copy(
+            update={
+                "ready_subset_checksum": DatasetManifestChecksum(
+                    value=stable_model_checksum(self, "ready_subset_checksum")
+                )
+            }
+        )
 
     def to_json(self) -> str:
-        return json.dumps(self.model_dump(mode="json"), indent=2, sort_keys=True) + "\n"
+        return stable_model_json(self)
 
 
 def build_ready_subset(
@@ -138,7 +142,14 @@ def build_ready_subset(
                 )
             )
     problems = [
-        ReadySubsetProblemRef(category=problem_meta[problem_id][0], problem_id=problem_id, problem_path=problem_meta[problem_id][1], workloads=sorted(workloads, key=lambda item: (item.row_index, item.uuid or "")))
+        ReadySubsetProblemRef(
+            category=problem_meta[problem_id][0],
+            problem_id=problem_id,
+            problem_path=problem_meta[problem_id][1],
+            workloads=sorted(
+                workloads, key=lambda item: (item.row_index, item.uuid or "")
+            ),
+        )
         for problem_id, workloads in sorted(grouped.items())
     ]
     subset = ReadySubset(
@@ -158,9 +169,15 @@ def build_ready_subset(
         problems=problems,
         exclusions=sorted(
             exclusions,
-            key=lambda item: (item.problem_id, item.row_index, item.workload_uuid or ""),
+            key=lambda item: (
+                item.problem_id,
+                item.row_index,
+                item.workload_uuid or "",
+            ),
         ),
-        claim_boundary=ReadySubsetClaimBoundary(ready_to_attempt_rocm_execution=included > 0),
+        claim_boundary=ReadySubsetClaimBoundary(
+            ready_to_attempt_rocm_execution=included > 0
+        ),
     )
     return subset.with_checksum()
 

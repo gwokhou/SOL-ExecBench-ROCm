@@ -10,8 +10,9 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from sol_execbench.core.dataset.checksums import stable_json_checksum
+from sol_execbench.core.data.json_utils import stable_model_checksum, stable_model_json
 from sol_execbench.core.dataset.manifest import DatasetManifestChecksum
+from sol_execbench.core.text_utils import markdown_table_cell as _md_cell
 from sol_execbench.core.trust_summary import load_json as load_json, utc_timestamp
 
 CLAIM_UPGRADE_SCHEMA_VERSION = "sol_execbench.claim_upgrade.v1"
@@ -95,18 +96,16 @@ class ClaimUpgradeReport(BaseModel):
     report_checksum: DatasetManifestChecksum | None = None
 
     def with_checksum(self) -> "ClaimUpgradeReport":
-        payload = self.model_dump(mode="json")
-        payload["report_checksum"] = None
         return self.model_copy(
             update={
                 "report_checksum": DatasetManifestChecksum(
-                    value=stable_json_checksum(payload)
+                    value=stable_model_checksum(self, "report_checksum")
                 )
             }
         )
 
     def to_json(self) -> str:
-        return json.dumps(self.model_dump(mode="json"), indent=2, sort_keys=True) + "\n"
+        return stable_model_json(self)
 
 
 def default_claim_rules() -> list[ClaimRule]:
@@ -504,7 +503,3 @@ def _checksum(payload: dict[str, Any]) -> str | None:
 
 def _optional_str(value: object) -> str | None:
     return value if isinstance(value, str) else None
-
-
-def _md_cell(value: object) -> str:
-    return str(value).replace("|", "\\|").replace("\n", " ")

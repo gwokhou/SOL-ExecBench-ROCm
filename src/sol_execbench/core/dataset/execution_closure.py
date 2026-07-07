@@ -4,14 +4,14 @@
 
 from __future__ import annotations
 
-import json
 from enum import Enum
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .checksums import stable_json_checksum
+from sol_execbench.core.data.json_utils import stable_model_checksum, stable_model_json
+
 from .manifest import DatasetManifestChecksum
 
 EXECUTION_CLOSURE_SCHEMA_VERSION = "sol_execbench.execution_closure.v1"
@@ -195,18 +195,16 @@ class ExecutionClosureReport(BaseModel):
     execution_closure_checksum: DatasetManifestChecksum | None = None
 
     def with_checksum(self) -> "ExecutionClosureReport":
-        payload = self.model_dump(mode="json")
-        payload["execution_closure_checksum"] = None
         return self.model_copy(
             update={
                 "execution_closure_checksum": DatasetManifestChecksum(
-                    value=stable_json_checksum(payload)
+                    value=stable_model_checksum(self, "execution_closure_checksum")
                 )
             }
         )
 
     def to_json(self) -> str:
-        return json.dumps(self.model_dump(mode="json"), indent=2, sort_keys=True) + "\n"
+        return stable_model_json(self)
 
 
 def _record_sort_key(record: ExecutionClosureRecord) -> tuple[str, int, str, str]:

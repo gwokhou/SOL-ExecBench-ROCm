@@ -38,7 +38,8 @@ def sha256_bytes(data: bytes) -> str:
 def sha256_file(path: Path) -> str:
     """Return the sha256 hex digest for one file."""
 
-    return sha256_bytes(path.read_bytes())
+    with path.open("rb") as handle:
+        return hashlib.file_digest(handle, "sha256").hexdigest()
 
 
 def stable_json_checksum(payload: object) -> str:

@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-import json
 import math
 from pathlib import Path
 from statistics import median
@@ -12,8 +11,9 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from sol_execbench.core.dataset.checksums import stable_json_checksum
+from sol_execbench.core.data.json_utils import stable_model_checksum, stable_model_json
 from sol_execbench.core.dataset.manifest import DatasetManifestChecksum
+from sol_execbench.core.text_utils import markdown_table_cell as _md_cell
 from sol_execbench.core.trust_summary import load_json as load_json, utc_timestamp
 
 EVALUATION_STABILITY_SCHEMA_VERSION = "sol_execbench.evaluation_stability.v1"
@@ -137,18 +137,16 @@ class EvaluationStabilityReport(BaseModel):
     report_checksum: DatasetManifestChecksum | None = None
 
     def with_checksum(self) -> "EvaluationStabilityReport":
-        payload = self.model_dump(mode="json")
-        payload["report_checksum"] = None
         return self.model_copy(
             update={
                 "report_checksum": DatasetManifestChecksum(
-                    value=stable_json_checksum(payload)
+                    value=stable_model_checksum(self, "report_checksum")
                 )
             }
         )
 
     def to_json(self) -> str:
-        return json.dumps(self.model_dump(mode="json"), indent=2, sort_keys=True) + "\n"
+        return stable_model_json(self)
 
 
 def build_evaluation_stability_report(
@@ -455,7 +453,3 @@ def _optional_bool(value: object) -> bool | None:
 
 def _fmt(value: float | None) -> str:
     return "" if value is None else f"{value:.6g}"
-
-
-def _md_cell(value: object) -> str:
-    return str(value).replace("|", "\\|").replace("\n", " ")

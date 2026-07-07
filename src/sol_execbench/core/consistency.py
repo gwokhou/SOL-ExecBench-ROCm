@@ -4,14 +4,14 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from sol_execbench.core.dataset.checksums import stable_json_checksum
+from sol_execbench.core.data.json_utils import stable_model_checksum, stable_model_json
 from sol_execbench.core.dataset.manifest import DatasetManifestChecksum
+from sol_execbench.core.text_utils import markdown_table_cell as _md_cell
 from sol_execbench.core.trust_summary import load_json as load_json, utc_timestamp
 
 CONSISTENCY_REPORT_SCHEMA_VERSION = "sol_execbench.consistency_report.v1"
@@ -140,18 +140,16 @@ class ConsistencyReport(BaseModel):
     report_checksum: DatasetManifestChecksum | None = None
 
     def with_checksum(self) -> "ConsistencyReport":
-        payload = self.model_dump(mode="json")
-        payload["report_checksum"] = None
         return self.model_copy(
             update={
                 "report_checksum": DatasetManifestChecksum(
-                    value=stable_json_checksum(payload)
+                    value=stable_model_checksum(self, "report_checksum")
                 )
             }
         )
 
     def to_json(self) -> str:
-        return json.dumps(self.model_dump(mode="json"), indent=2, sort_keys=True) + "\n"
+        return stable_model_json(self)
 
 
 def build_consistency_report(
@@ -641,7 +639,3 @@ def _dedupe_findings(findings: list[ConsistencyFinding]) -> list[ConsistencyFind
 
 def _optional_str(value: object) -> str | None:
     return value if isinstance(value, str) else None
-
-
-def _md_cell(value: object) -> str:
-    return str(value).replace("|", "\\|").replace("\n", " ")

@@ -42,6 +42,7 @@ from sol_execbench.core.dataset.profiler_timing_coverage import (
     ProfilerTimingProblemCoverage,
 )
 from sol_execbench.core.dataset.solutions import build_reference_solution
+from sol_execbench.core.data.json_utils import load_json_dict
 from sol_execbench.driver import ProblemPackager
 from sol_execbench.core.bench.pid_lock import (
     acquire_pid_lock,
@@ -54,6 +55,7 @@ from sol_execbench.core.bench.timing_isolation import (
     validate_gpu_device_isolation,
     verify_clock_state_with_warning,
 )
+from sol_execbench.core.text_utils import subprocess_text as _subprocess_text
 
 logger = logging.getLogger(__name__)
 
@@ -1678,10 +1680,7 @@ def _sidecar_kernel_activity_rows(evidence: dict[str, Any]) -> int:
 
 
 def _load_json(path: Path) -> dict[str, Any]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        raise ValueError(f"expected JSON object at {path}")
-    return payload
+    return load_json_dict(path)
 
 
 def _load_workloads(
@@ -1693,7 +1692,7 @@ def _load_workloads(
             continue
         if index < offset:
             continue
-        workloads.append(Workload(**json.loads(line)))
+        workloads.append(Workload.model_validate_json(line))
         if limit is not None and len(workloads) >= limit:
             break
     if not workloads:
@@ -1950,14 +1949,6 @@ def _pythonpath_with_src() -> str:
     src = str(Path(__file__).resolve().parents[3] / "src")
     existing = os.environ.get("PYTHONPATH")
     return src if not existing else f"{src}{os.pathsep}{existing}"
-
-
-def _subprocess_text(value: str | bytes | None) -> str:
-    if value is None:
-        return ""
-    if isinstance(value, bytes):
-        return value.decode(errors="replace")
-    return value
 
 
 def _trace_status_counts(stdout: str) -> dict[str, int]:

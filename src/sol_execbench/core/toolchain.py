@@ -20,6 +20,7 @@ from pydantic import ConfigDict, Field
 
 from .data.base_model import BaseModelWithDocstrings
 from .environment import ProbeCompletedProcess
+from .text_utils import text_tail as _tail
 
 
 TOOLCHAIN_ROUTING_SCHEMA_VERSION = "sol_execbench.toolchain_routing.v1"
@@ -608,13 +609,3 @@ def _lifecycle_decision(
         fallback_tool_id=capability.replacement_tool_id,
         source_refs=capability.source_refs,
     )
-
-
-def _tail(value: object, limit: int = 4000) -> str:
-    if value is None:
-        return ""
-    if isinstance(value, bytes):
-        text = value.decode(errors="replace")
-    else:
-        text = str(value)
-    return text[-limit:]

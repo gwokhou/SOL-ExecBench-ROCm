@@ -17,6 +17,7 @@ from sol_execbench.core.bench.timing_policy import (
     TimingPolicy,
 )
 from sol_execbench.core.reporting import CANONICAL_BENCHMARK_OUTPUT
+from sol_execbench.core.text_utils import text_tail
 
 
 ROCPROFV3_EXECUTABLE = "rocprofv3"
@@ -317,9 +318,7 @@ class Rocprofv3CollectionResult:
 
 
 def _tail(text: str, *, max_chars: int = 4096) -> str:
-    if len(text) <= max_chars:
-        return text
-    return text[-max_chars:]
+    return text_tail(text, limit=max_chars)
 
 
 def _normalize_header(header: str | None) -> str:

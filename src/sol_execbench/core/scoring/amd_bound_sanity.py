@@ -10,8 +10,9 @@ from typing import Any, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from sol_execbench.core.dataset.checksums import stable_json_checksum
+from sol_execbench.core.data.json_utils import stable_model_checksum, stable_model_json
 from sol_execbench.core.dataset.manifest import DatasetManifestChecksum
+from sol_execbench.core.text_utils import markdown_table_cell as _md_cell
 from sol_execbench.core.trust_summary import utc_timestamp
 
 
@@ -176,18 +177,16 @@ class AmdBoundSanityReport(BaseModel):
     report_checksum: DatasetManifestChecksum | None = None
 
     def with_checksum(self) -> "AmdBoundSanityReport":
-        payload = self.model_dump(mode="json")
-        payload["report_checksum"] = None
         return self.model_copy(
             update={
                 "report_checksum": DatasetManifestChecksum(
-                    value=stable_json_checksum(payload)
+                    value=stable_model_checksum(self, "report_checksum")
                 )
             }
         )
 
     def to_json(self) -> str:
-        return json.dumps(self.model_dump(mode="json"), indent=2, sort_keys=True) + "\n"
+        return stable_model_json(self)
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -810,16 +809,6 @@ def _sorted_jsonable(value: Any) -> Any:
     if isinstance(value, list):
         return [_sorted_jsonable(item) for item in value]
     return value
-
-
-def _md_cell(value: object) -> str:
-    text = "" if value is None else str(value)
-    return (
-        text.replace("\\", "\\\\")
-        .replace("|", "\\|")
-        .replace("\n", " ")
-        .replace("\r", " ")
-    )
 
 
 def _source_rows(payload: dict[str, Any]) -> list[str]:

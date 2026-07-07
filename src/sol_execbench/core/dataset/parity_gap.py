@@ -10,7 +10,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from .checksums import stable_json_checksum
+from sol_execbench.core.data.json_utils import stable_model_checksum, stable_model_json
+
 from .manifest import DatasetManifestChecksum, utc_timestamp
 
 PARITY_GAP_REPORT_SCHEMA_VERSION = "sol_execbench.parity_gap_report.v1"
@@ -107,18 +108,16 @@ class ParityGapReport(BaseModel):
     report_checksum: DatasetManifestChecksum | None = None
 
     def with_checksum(self) -> "ParityGapReport":
-        payload = self.model_dump(mode="json")
-        payload["report_checksum"] = None
         return self.model_copy(
             update={
                 "report_checksum": DatasetManifestChecksum(
-                    value=stable_json_checksum(payload)
+                    value=stable_model_checksum(self, "report_checksum")
                 )
             }
         )
 
     def to_json(self) -> str:
-        return json.dumps(self.model_dump(mode="json"), indent=2, sort_keys=True) + "\n"
+        return stable_model_json(self)
 
 
 def load_json(path: Path) -> dict[str, Any]:

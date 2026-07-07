@@ -40,6 +40,7 @@ from ..core import (
 )
 from ..core.data.solution import CompileOptions, NATIVE_ROCM_LANGUAGES
 from ..core.data.workload import SafetensorsInput
+from ..core.text_utils import ordered_unique
 
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
 
@@ -173,9 +174,7 @@ class ProblemPackager:
             if local_gfx:
                 offload_arches.append(local_gfx)
 
-        # Deduplicate preserving order
-        seen: set[str] = set()
-        unique = [gfx for gfx in offload_arches if not (gfx in seen or seen.add(gfx))]
+        unique = ordered_unique(offload_arches)
         if unique:
             compile_options["hip_cflags"] = [
                 _gfx_to_offload_arch(gfx) for gfx in unique

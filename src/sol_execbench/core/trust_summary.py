@@ -10,8 +10,9 @@ from typing import Any, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from sol_execbench.core.dataset.checksums import stable_json_checksum
+from sol_execbench.core.data.json_utils import stable_model_checksum, stable_model_json
 from sol_execbench.core.dataset.manifest import DatasetManifestChecksum
+from sol_execbench.core.text_utils import markdown_table_cell as _md_cell
 from sol_execbench.core.utils import utc_timestamp
 
 TRUST_SUMMARY_SCHEMA_VERSION = "sol_execbench.trust_summary.v1"
@@ -77,18 +78,16 @@ class TrustSummaryReport(BaseModel):
     report_checksum: DatasetManifestChecksum | None = None
 
     def with_checksum(self) -> "TrustSummaryReport":
-        payload = self.model_dump(mode="json")
-        payload["report_checksum"] = None
         return self.model_copy(
             update={
                 "report_checksum": DatasetManifestChecksum(
-                    value=stable_json_checksum(payload)
+                    value=stable_model_checksum(self, "report_checksum")
                 )
             }
         )
 
     def to_json(self) -> str:
-        return json.dumps(self.model_dump(mode="json"), indent=2, sort_keys=True) + "\n"
+        return stable_model_json(self)
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -385,7 +384,3 @@ def _checksum(payload: dict[str, Any]) -> str | None:
         if isinstance(value, str):
             return value
     return None
-
-
-def _md_cell(value: object) -> str:
-    return str(value).replace("|", "\\|").replace("\n", " ")

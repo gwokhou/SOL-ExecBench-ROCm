@@ -38,14 +38,7 @@ from sol_execbench.core.bench.rocm_profiler_models import (
     Rocprofv3ProfileResult,
     _tail as tail,
 )
-
-
-def subprocess_text(value: str | bytes | None) -> str:
-    if value is None:
-        return ""
-    if isinstance(value, bytes):
-        return value.decode(errors="replace")
-    return value
+from sol_execbench.core.text_utils import subprocess_text
 
 
 def collect_rocprofv3_profile(

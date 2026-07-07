@@ -11,7 +11,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from .checksums import stable_json_checksum
+from sol_execbench.core.data.json_utils import stable_model_checksum, stable_model_json
+
 from .manifest import DatasetManifestChecksum, utc_timestamp
 from .readiness import DatasetReadiness
 
@@ -101,18 +102,16 @@ class ProfilerTimingCoverageReport(BaseModel):
     coverage_checksum: DatasetManifestChecksum | None = None
 
     def with_checksum(self) -> "ProfilerTimingCoverageReport":
-        payload = self.model_dump(mode="json")
-        payload["coverage_checksum"] = None
         return self.model_copy(
             update={
                 "coverage_checksum": DatasetManifestChecksum(
-                    value=stable_json_checksum(payload)
+                    value=stable_model_checksum(self, "coverage_checksum")
                 )
             }
         )
 
     def to_json(self) -> str:
-        return json.dumps(self.model_dump(mode="json"), indent=2, sort_keys=True) + "\n"
+        return stable_model_json(self)
 
 
 def build_profiler_timing_coverage_report(
