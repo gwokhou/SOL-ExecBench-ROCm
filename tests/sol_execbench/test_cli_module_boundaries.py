@@ -199,3 +199,18 @@ def test_cli_compilation_helpers_live_outside_main() -> None:
         "run_compile_phase",
     ):
         assert not hasattr(cli_main, name)
+
+
+def test_cli_evaluation_runtime_helpers_live_outside_main() -> None:
+    from sol_execbench.cli import evaluation_runtime
+
+    assert evaluation_runtime.EvaluationRuntimeSuccess is not None
+    assert evaluation_runtime.EvaluationRuntimeNoTraceFailure is not None
+    assert evaluation_runtime.run_evaluation_runtime is not None
+
+    for name in (
+        "EvaluationRuntimeSuccess",
+        "EvaluationRuntimeNoTraceFailure",
+        "run_evaluation_runtime",
+    ):
+        assert not hasattr(cli_main, name)
