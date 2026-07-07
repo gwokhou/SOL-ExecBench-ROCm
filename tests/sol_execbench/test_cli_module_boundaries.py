@@ -101,3 +101,68 @@ def test_cli_dataset_commands_live_outside_main() -> None:
         "_dataset_migrate_flashinfer_cli",
     ):
         assert not hasattr(cli_main, name)
+
+
+def test_cli_profile_sidecar_helpers_live_outside_main() -> None:
+    from sol_execbench.cli import profile_sidecars
+
+    assert profile_sidecars._profile_output_directory is not None
+    assert profile_sidecars._profile_sidecar_path is not None
+    assert profile_sidecars._write_profile_sidecar is not None
+    assert profile_sidecars._profile_summary_sidecar_path is not None
+    assert profile_sidecars._write_profile_summary_sidecar is not None
+    assert profile_sidecars._profile_summary_artifact_citations is not None
+
+    for name in (
+        "_profile_output_directory",
+        "_profile_sidecar_path",
+        "_write_profile_sidecar",
+        "_profile_summary_sidecar_path",
+        "_write_profile_summary_sidecar",
+        "_profile_summary_artifact_citations",
+    ):
+        assert not hasattr(cli_main, name)
+
+
+def test_cli_static_evidence_helpers_live_outside_main() -> None:
+    from sol_execbench.cli import static_evidence
+
+    assert static_evidence.STATIC_EVIDENCE_NONE == "none"
+    assert static_evidence.STATIC_EVIDENCE_AUTO == "auto"
+    assert static_evidence._static_evidence_directory is not None
+    assert static_evidence._static_evidence_sidecar_path is not None
+    assert static_evidence._static_evidence_summary is not None
+    assert static_evidence._static_evidence_payload is not None
+    assert static_evidence._write_static_evidence_sidecar is not None
+    assert static_evidence._collect_static_evidence_for_cli is not None
+
+    for name in (
+        "STATIC_EVIDENCE_NONE",
+        "STATIC_EVIDENCE_AUTO",
+        "_static_evidence_directory",
+        "_static_evidence_sidecar_path",
+        "_static_evidence_summary",
+        "_static_evidence_payload",
+        "_write_static_evidence_sidecar",
+        "_collect_static_evidence_for_cli",
+    ):
+        assert not hasattr(cli_main, name)
+
+
+def test_cli_agent_feedback_sidecar_helpers_live_outside_main() -> None:
+    from sol_execbench.cli import agent_feedback_sidecar
+
+    assert agent_feedback_sidecar._agent_feedback_sidecar_path is not None
+    assert agent_feedback_sidecar._write_agent_feedback_sidecar is not None
+    assert agent_feedback_sidecar._agent_feedback_identity_fields is not None
+    assert agent_feedback_sidecar._agent_feedback_run_id is not None
+    assert agent_feedback_sidecar._agent_feedback_artifact_citations is not None
+
+    for name in (
+        "_agent_feedback_sidecar_path",
+        "_write_agent_feedback_sidecar",
+        "_agent_feedback_identity_fields",
+        "_agent_feedback_run_id",
+        "_agent_feedback_artifact_citations",
+    ):
+        assert not hasattr(cli_main, name)
