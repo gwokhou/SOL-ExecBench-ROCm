@@ -106,21 +106,18 @@ def test_cli_dataset_commands_live_outside_main() -> None:
 def test_cli_profile_sidecar_helpers_live_outside_main() -> None:
     from sol_execbench.cli import profile_sidecars
 
-    assert profile_sidecars._profile_output_directory is not None
-    assert profile_sidecars._profile_sidecar_path is not None
-    assert profile_sidecars._write_profile_sidecar is not None
-    assert profile_sidecars._profile_summary_sidecar_path is not None
-    assert profile_sidecars._write_profile_summary_sidecar is not None
-    assert profile_sidecars._profile_summary_artifact_citations is not None
-
-    for name in (
+    profile_sidecar_names = (
         "_profile_output_directory",
         "_profile_sidecar_path",
         "_write_profile_sidecar",
         "_profile_summary_sidecar_path",
         "_write_profile_summary_sidecar",
         "_profile_summary_artifact_citations",
-    ):
+    )
+
+    for name in profile_sidecar_names:
+        assert getattr(profile_sidecars, name) is not None
+        assert getattr(sidecars, name) is not None
         assert not hasattr(cli_main, name)
 
 
