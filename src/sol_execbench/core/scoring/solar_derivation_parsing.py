@@ -106,6 +106,11 @@ def solar_derivation_from_dict(payload: dict[str, Any]) -> SolarDerivationEviden
             raise ValueError(
                 "aggregate_status does not match semantic groups and warnings"
             )
+        coverage_summary = provided_coverage
+        aggregate_status = provided_aggregate
+    else:
+        coverage_summary = _coverage_for_groups(groups)
+        aggregate_status = _aggregate_status_for_groups(groups, warnings)
 
     return SolarDerivationEvidence(
         definition=_parse_str(
@@ -125,6 +130,8 @@ def solar_derivation_from_dict(payload: dict[str, Any]) -> SolarDerivationEviden
         source_boundary=_source_boundary_from_dict(
             _parse_dict(payload, "source_boundary", source="SOLAR derivation evidence")
         ),
+        coverage_summary=coverage_summary,
+        aggregate_status=aggregate_status,
         schema_version=schema_version,
         derived=derived,
     )

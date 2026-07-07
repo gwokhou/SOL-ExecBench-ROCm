@@ -343,17 +343,12 @@ class SolarDerivationEvidence:
     tensors: tuple[SolarTensorEvidence, ...]
     warnings: tuple[str, ...]
     source_boundary: dict[str, bool]
+    coverage_summary: SolarCoverageSummary
+    aggregate_status: SolarAggregateStatus
     schema_version: str = SOLAR_DERIVATION_SCHEMA_VERSION
     derived: bool = True
 
     def to_dict(self) -> dict[str, Any]:
-        from sol_execbench.core.scoring.solar_derivation_coverage import (
-            _aggregate_status_for_groups,
-            _coverage_for_groups,
-        )
-
-        coverage_summary = _coverage_for_groups(self.groups)
-        aggregate_status = _aggregate_status_for_groups(self.groups, self.warnings)
         return {
             "schema_version": self.schema_version,
             "derived": self.derived,
@@ -363,8 +358,8 @@ class SolarDerivationEvidence:
             "tensors": [tensor.to_dict() for tensor in self.tensors],
             "warnings": list(self.warnings),
             "source_boundary": dict(self.source_boundary),
-            "coverage_summary": coverage_summary.to_dict(),
-            "aggregate_status": aggregate_status.to_dict(),
+            "coverage_summary": self.coverage_summary.to_dict(),
+            "aggregate_status": self.aggregate_status.to_dict(),
         }
 
 

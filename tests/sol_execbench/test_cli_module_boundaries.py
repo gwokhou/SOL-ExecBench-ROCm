@@ -1,10 +1,86 @@
 from __future__ import annotations
 
+import ast
+from pathlib import Path
+
 from sol_execbench.cli import evaluation
 from sol_execbench.cli import environment
 from sol_execbench.cli import main as cli_main
 from sol_execbench.cli import reporting
 from sol_execbench.cli import sidecars
+
+SOURCE_ROOT = Path(__file__).resolve().parents[2] / "src"
+PACKAGE_ROOT = SOURCE_ROOT / "sol_execbench"
+
+
+def _is_under(module: str, prefix: str) -> bool:
+    return module == prefix or module.startswith(f"{prefix}.")
+
+
+def _internal_modules() -> dict[str, Path]:
+    modules: dict[str, Path] = {}
+    for path in sorted(PACKAGE_ROOT.rglob("*.py")):
+        module = ".".join(path.relative_to(SOURCE_ROOT).with_suffix("").parts)
+        if module.endswith(".__init__"):
+            module = module.removesuffix(".__init__")
+        modules[module] = path
+    return modules
+
+
+def _resolve_imported_modules(
+    module: str,
+    node: ast.Import | ast.ImportFrom,
+    modules: dict[str, Path],
+) -> set[str]:
+    names: list[str] = []
+    if isinstance(node, ast.Import):
+        names = [alias.name for alias in node.names]
+    elif node.level:
+        package_parts = module.split(".")[:-1]
+        if modules[module].name == "__init__.py":
+            package_parts = module.split(".")
+        base_parts = package_parts[: max(0, len(package_parts) - node.level + 1)]
+        if node.module:
+            base_parts.extend(node.module.split("."))
+        base = ".".join(base_parts)
+        names = [base]
+        names.extend(
+            f"{base}.{alias.name}" if base else alias.name
+            for alias in node.names
+            if alias.name != "*"
+        )
+    else:
+        base = node.module or ""
+        names = [base]
+        names.extend(
+            f"{base}.{alias.name}" if base else alias.name
+            for alias in node.names
+            if alias.name != "*"
+        )
+
+    resolved: set[str] = set()
+    for name in names:
+        if not name.startswith("sol_execbench"):
+            continue
+        parts = name.split(".")
+        for end in range(len(parts), 0, -1):
+            candidate = ".".join(parts[:end])
+            if candidate in modules and candidate != module:
+                resolved.add(candidate)
+                break
+    return resolved
+
+
+def _internal_import_edges() -> set[tuple[str, str]]:
+    modules = _internal_modules()
+    edges: set[tuple[str, str]] = set()
+    for module, path in modules.items():
+        tree = ast.parse(path.read_text())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import | ast.ImportFrom):
+                for imported in _resolve_imported_modules(module, node, modules):
+                    edges.add((module, imported))
+    return edges
 
 
 def test_cli_environment_helpers_live_outside_main_and_sidecars() -> None:
@@ -214,3 +290,123 @@ def test_cli_evaluation_runtime_helpers_live_outside_main() -> None:
         "run_evaluation_runtime",
     ):
         assert not hasattr(cli_main, name)
+
+
+def test_core_data_does_not_depend_on_higher_layers() -> None:
+    violations = sorted(
+        (source, target)
+        for source, target in _internal_import_edges()
+        if _is_under(source, "sol_execbench.core.data")
+        and not _is_under(target, "sol_execbench.core.data")
+    )
+
+    assert violations == []
+
+
+def test_core_does_not_depend_on_cli() -> None:
+    violations = sorted(
+        (source, target)
+        for source, target in _internal_import_edges()
+        if _is_under(source, "sol_execbench.core")
+        and _is_under(target, "sol_execbench.cli")
+    )
+
+    assert violations == []
+
+
+def test_cross_domain_imports_stay_explicitly_allowlisted() -> None:
+    allowed = {
+        (
+            "sol_execbench.core.dataset.amd_score_reports",
+            "sol_execbench.core.scoring.amd_hardware_models",
+        ),
+        (
+            "sol_execbench.core.dataset.amd_score_reports",
+            "sol_execbench.core.scoring.amd_score",
+        ),
+        (
+            "sol_execbench.core.dataset.amd_score_reports",
+            "sol_execbench.core.scoring.amd_sol",
+        ),
+        (
+            "sol_execbench.core.dataset.amd_score_reports",
+            "sol_execbench.core.scoring.amd_sol_v2",
+        ),
+        (
+            "sol_execbench.core.dataset.amd_score_reports",
+            "sol_execbench.core.scoring.baseline_artifact",
+        ),
+        (
+            "sol_execbench.core.dataset.amd_score_reports",
+            "sol_execbench.core.scoring.solar_derivation",
+        ),
+        (
+            "sol_execbench.core.dataset.cli_execution",
+            "sol_execbench.core.bench.io",
+        ),
+        (
+            "sol_execbench.core.dataset.cli_execution",
+            "sol_execbench.core.bench.stderr",
+        ),
+        (
+            "sol_execbench.core.dataset.runner",
+            "sol_execbench.core.bench.config",
+        ),
+        (
+            "sol_execbench.core.dataset.runner",
+            "sol_execbench.core.bench.rocm_profiler",
+        ),
+        (
+            "sol_execbench.core.dataset.runner",
+            "sol_execbench.core.scoring.amd_score",
+        ),
+        (
+            "sol_execbench.core.dataset.runner",
+            "sol_execbench.core.scoring.baseline_artifact",
+        ),
+        (
+            "sol_execbench.core.bench.agent_feedback",
+            "sol_execbench.core.dataset.checksums",
+        ),
+        (
+            "sol_execbench.core.bench.profile_summary",
+            "sol_execbench.core.dataset.checksums",
+        ),
+        (
+            "sol_execbench.core.bench.static_kernel_artifacts",
+            "sol_execbench.core.dataset.checksums",
+        ),
+        (
+            "sol_execbench.core.scoring.amd_bound_sanity",
+            "sol_execbench.core.dataset.manifest",
+        ),
+    }
+    domains = (
+        "sol_execbench.core.bench",
+        "sol_execbench.core.dataset",
+        "sol_execbench.core.scoring",
+    )
+    cross_domain_edges = sorted(
+        (source, target)
+        for source, target in _internal_import_edges()
+        if any(_is_under(source, domain) for domain in domains)
+        and any(_is_under(target, domain) for domain in domains)
+        and next(domain for domain in domains if _is_under(source, domain))
+        != next(domain for domain in domains if _is_under(target, domain))
+    )
+
+    assert cross_domain_edges == sorted(allowed)
+
+
+def test_no_internal_two_node_import_cycles() -> None:
+    allowed = {
+        ("sol_execbench.cli", "sol_execbench.cli.main"),
+    }
+    edges = _internal_import_edges()
+    cycles = {
+        tuple(sorted((source, target)))
+        for source, target in edges
+        if (target, source) in edges
+    }
+
+    assert cycles == allowed
