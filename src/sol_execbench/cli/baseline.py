@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""Public baseline comparison CLI for existing trace JSONL files."""
+"""Baseline-related CLI commands."""
 
 from __future__ import annotations
 
@@ -9,13 +9,79 @@ import json
 from pathlib import Path
 
 import click
+from rich.console import Console
 
+from ..core.baseline_export import export_hip_baseline_registry
 from ..core.baseline import (
     compare_trace_baselines,
     comparison_to_json,
     format_baseline_comparison,
     load_trace_jsonl,
 )
+
+
+console = Console(stderr=True)
+
+
+@click.group("baseline", context_settings={"help_option_names": ["-h", "--help"]})
+def _baseline_cli() -> None:
+    """Measured baseline export utilities."""
+
+
+@_baseline_cli.command(
+    "export", context_settings={"help_option_names": ["-h", "--help"]}
+)
+@click.option(
+    "--trace",
+    "trace_path",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="SOL trace JSONL produced by sol-execbench.",
+)
+@click.option(
+    "--output",
+    "output_path",
+    required=True,
+    type=click.Path(dir_okay=False, path_type=Path),
+    help="Write HIP baseline_registry.v1 JSON here.",
+)
+@click.option("--target-id", required=True, help="HIP target id, such as gemm.")
+@click.option(
+    "--sol-version",
+    default="unknown",
+    show_default=True,
+    help="SOL version or source revision to record in baseline provenance.",
+)
+@click.option(
+    "--timing-policy",
+    default="latency_ms",
+    show_default=True,
+    help="Timing policy label to record in baseline provenance.",
+)
+@click.option("--json", "json_output", is_flag=True, help="Print registry JSON")
+def _baseline_export_cli(
+    trace_path: Path,
+    output_path: Path,
+    target_id: str,
+    sol_version: str,
+    timing_policy: str,
+    json_output: bool,
+) -> None:
+    """Export a HIP measured baseline registry from a SOL trace JSONL file."""
+
+    registry = export_hip_baseline_registry(
+        trace_path=trace_path,
+        output_path=output_path,
+        target_id=target_id,
+        sol_version=sol_version,
+        timing_policy=timing_policy,
+    )
+    if json_output:
+        click.echo(json.dumps(registry, sort_keys=True))
+    else:
+        console.print(
+            f"[green]Wrote measured baseline registry to {output_path}[/green]"
+        )
 
 
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
