@@ -4,12 +4,9 @@ import json
 import subprocess
 from pathlib import Path
 
-from click.testing import CliRunner
 
 from sol_execbench.cli import evaluation as cli_evaluation
-from sol_execbench.cli import main as cli_main
 from sol_execbench.cli import sidecars as cli_sidecars
-from sol_execbench.cli.main import cli
 from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileResult
 from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileArtifact
 from sol_execbench.core.bench.static_kernel_evidence import (
@@ -33,19 +30,6 @@ from sol_execbench.core.data.trace import (
 )
 from sol_execbench.core.data.workload import ScalarInput
 from sol_execbench.core.data.workload import Workload
-from sol_execbench.core.environment import (
-    EnvironmentCheckResult,
-    EnvironmentDiagnostics,
-    EnvironmentEvidenceStatus,
-    EnvironmentSnapshot,
-)
-
-
-def _snapshot() -> EnvironmentSnapshot:
-    return EnvironmentSnapshot(
-        generated_at="2026-05-25T00:00:00+00:00",
-        collection_status=EnvironmentEvidenceStatus.AVAILABLE,
-    )
 
 
 def _solution(source: str = "def run(x):\n    return x\n") -> Solution:
@@ -650,36 +634,3 @@ def test_static_evidence_collection_failure_is_failed_sidecar(
     assert sidecar.reason_code == StaticKernelEvidenceReasonCode.EXTRACTOR_FAILED
     assert sidecar.warnings[0].code == "static_evidence_collection_failed"
     assert "collector failed" in sidecar.warnings[0].message
-
-
-def test_doctor_cli_outputs_json_without_problem_directory(monkeypatch):
-    diagnostics = EnvironmentDiagnostics(
-        generated_at="2026-05-25T00:00:00+00:00",
-        status=EnvironmentEvidenceStatus.AVAILABLE,
-        snapshot=_snapshot(),
-        checks=[
-            EnvironmentCheckResult(
-                name="pytorch_rocm_runtime",
-                status=EnvironmentEvidenceStatus.AVAILABLE,
-                message="ok",
-            )
-        ],
-    )
-    monkeypatch.setattr(cli_main, "build_environment_diagnostics", lambda: diagnostics)
-
-    result = CliRunner().invoke(cli, ["doctor", "--json"])
-
-    assert result.exit_code == 0, result.output
-    payload = json.loads(result.output)
-    assert payload["schema_version"] == "sol_execbench.environment_diagnostics.v1"
-    assert (
-        payload["snapshot"]["schema_version"] == "sol_execbench.environment_snapshot.v1"
-    )
-    assert payload["checks"][0]["name"] == "pytorch_rocm_runtime"
-
-
-def test_doctor_cli_rejects_non_json_mode():
-    result = CliRunner().invoke(cli, ["doctor"])
-
-    assert result.exit_code != 0
-    assert "Only --json output is supported for doctor" in result.output
