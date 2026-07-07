@@ -82,11 +82,25 @@ def resolve_problem_inputs(
     config_file: Path | None,
 ) -> ResolvedProblemInputs:
     if problem_dir:
-        def_path, wkl_path, cfg_path, sol_path = _resolve_problem_dir(problem_dir)
-        definition_file = definition_file or def_path
-        workload_file = workload_file or wkl_path
-        config_file = config_file or cfg_path
-        solution_file = solution_file or sol_path
+        def_path = problem_dir / "definition.json"
+        wkl_path = problem_dir / "workload.jsonl"
+        cfg_path = problem_dir / "config.json"
+        sol_path = problem_dir / "solution.json"
+
+        if definition_file is None:
+            if not def_path.exists():
+                raise click.ClickException(
+                    f"definition.json not found in {problem_dir}"
+                )
+            definition_file = def_path
+        if workload_file is None:
+            if not wkl_path.exists():
+                raise click.ClickException(f"workload.jsonl not found in {problem_dir}")
+            workload_file = wkl_path
+        if config_file is None and cfg_path.exists():
+            config_file = cfg_path
+        if solution_file is None and sol_path.exists():
+            solution_file = sol_path
 
     if not definition_file:
         raise click.ClickException("Provide PROBLEM_DIR or --definition")

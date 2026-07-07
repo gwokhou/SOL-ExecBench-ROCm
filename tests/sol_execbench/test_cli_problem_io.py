@@ -145,6 +145,58 @@ def test_resolve_problem_inputs_uses_problem_dir_defaults(tmp_path: Path) -> Non
     assert resolved.config_file == config
 
 
+def test_resolve_problem_inputs_allows_explicit_definition_when_problem_dir_default_missing(
+    tmp_path: Path,
+) -> None:
+    problem_dir = tmp_path / "problem"
+    problem_dir.mkdir()
+    workload = problem_dir / "workload.jsonl"
+    solution = tmp_path / "solution.json"
+    explicit_definition = tmp_path / "definition.json"
+    workload.write_text("")
+    solution.write_text("{}")
+    explicit_definition.write_text("{}")
+
+    resolved = problem_io.resolve_problem_inputs(
+        problem_dir=problem_dir,
+        definition_file=explicit_definition,
+        workload_file=None,
+        solution_file=solution,
+        config_file=None,
+    )
+
+    assert resolved.definition_file == explicit_definition
+    assert resolved.workload_file == workload
+    assert resolved.solution_file == solution
+    assert resolved.config_file is None
+
+
+def test_resolve_problem_inputs_allows_explicit_workload_when_problem_dir_default_missing(
+    tmp_path: Path,
+) -> None:
+    problem_dir = tmp_path / "problem"
+    problem_dir.mkdir()
+    definition = problem_dir / "definition.json"
+    solution = tmp_path / "solution.json"
+    explicit_workload = tmp_path / "workload.jsonl"
+    definition.write_text("{}")
+    solution.write_text("{}")
+    explicit_workload.write_text("")
+
+    resolved = problem_io.resolve_problem_inputs(
+        problem_dir=problem_dir,
+        definition_file=None,
+        workload_file=explicit_workload,
+        solution_file=solution,
+        config_file=None,
+    )
+
+    assert resolved.definition_file == definition
+    assert resolved.workload_file == explicit_workload
+    assert resolved.solution_file == solution
+    assert resolved.config_file is None
+
+
 def test_resolve_problem_inputs_rejects_missing_solution() -> None:
     try:
         problem_io.resolve_problem_inputs(
