@@ -7,6 +7,8 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
+import pytest
+
 from sol_execbench.core.bench.config import BenchmarkConfig
 from sol_execbench.core.dataset.evidence_refs import sidecar_stem_for_workload
 from sol_execbench.core.scoring.amd_score import build_amd_native_suite_report
@@ -195,6 +197,26 @@ def test_dataset_helper_can_emit_generated_solar_derivation_sidecars(tmp_path):
     )
     assert "solar_derivation" not in score_payload["evidence_refs"]
     assert "coverage" not in score_payload["evidence_refs"]
+
+
+def test_runner_score_report_wrapper_uses_runner_run_cli(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    from sol_execbench.core.dataset import runner
+
+    def fake_run_cli(*args, **kwargs):
+        return [{"evaluation": {"environment": {"hardware": "gfx1200"}}}]
+
+    monkeypatch.setattr(runner, "run_cli", fake_run_cli)
+
+    assert (
+        runner.build_amd_score_reports_for_problem.__module__
+        == "sol_execbench.core.dataset.runner"
+    )
+    assert (
+        runner.build_amd_score_reports_for_problem.__globals__["run_cli"]
+        is fake_run_cli
+    )
 
 
 def test_dataset_helper_keeps_scoring_when_solar_derivation_parse_fails(
