@@ -38,12 +38,13 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from . import baseline as cli_baseline
+from . import agent_feedback_sidecar as cli_agent_feedback_sidecar
 from . import dataset as cli_dataset
 from . import evaluation as cli_evaluation
 from . import environment as cli_environment
 from . import metadata as cli_metadata
+from . import profile_sidecars as cli_profile_sidecars
 from . import reporting as cli_reporting
-from . import sidecars as cli_sidecars
 from . import static_evidence as cli_static_evidence
 from ..core.bench.io import flashinfer_safetensors_env
 from ..core.bench.rocm_profiler import Rocprofv3ProfileResult
@@ -465,10 +466,10 @@ def _evaluate_cli(
     environment_sidecar_path = cli_environment._write_environment_snapshot_sidecar(
         output_file
     )
-    profile_sidecar_path = cli_sidecars._write_profile_sidecar(
+    profile_sidecar_path = cli_profile_sidecars._write_profile_sidecar(
         output_file, profile_result
     )
-    cli_sidecars._write_profile_summary_sidecar(
+    cli_profile_sidecars._write_profile_summary_sidecar(
         output_file,
         profile_result,
         profile_sidecar_path=profile_sidecar_path,
@@ -479,7 +480,7 @@ def _evaluate_cli(
         staging_dir,
         static_evidence_result,
     )
-    cli_sidecars._write_agent_feedback_sidecar(
+    cli_agent_feedback_sidecar._write_agent_feedback_sidecar(
         output_file,
         traces,
         solution=solution,
