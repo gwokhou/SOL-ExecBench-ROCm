@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import dataclasses
 import json
-import os
 import subprocess
 import sys
 import tempfile
@@ -39,6 +38,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from . import agent_feedback_sidecar as cli_agent_feedback_sidecar
 from . import baseline as cli_baseline
+from . import compilation as cli_compilation
 from . import dataset as cli_dataset
 from . import evaluation as cli_evaluation
 from . import environment as cli_environment
@@ -47,7 +47,6 @@ from . import problem_io as cli_problem_io
 from . import profile_sidecars as cli_profile_sidecars
 from . import reporting as cli_reporting
 from . import static_evidence as cli_static_evidence
-from ..core.bench.io import flashinfer_safetensors_env
 from ..core.bench.rocm_profiler import Rocprofv3ProfileResult
 from ..core.bench.stderr import filter_benign_rocm_stderr
 from ..core.bench.static_kernel_evidence import StaticKernelEvidenceSidecar
@@ -238,33 +237,25 @@ def _evaluate_cli(
         ) as progress:
             task = progress.add_task("Compiling HIP/C++ solution...", total=None)
 
-            cmd, artifact_path = packager.compile()
-            proc = subprocess.run(
-                cmd,
-                cwd=staging_dir,
-                capture_output=True,
-                text=True,
-                timeout=compile_timeout,
-                env=flashinfer_safetensors_env(
-                    {**os.environ, "PYTORCH_ALLOC_CONF": "expandable_segments:True"}
-                ),
+            compile_result = cli_compilation.run_compile_phase(
+                packager,
+                staging_dir=staging_dir,
+                compile_timeout=compile_timeout,
             )
             progress.update(task, completed=True)
 
-        if proc.returncode != 0:
+        if not compile_result.succeeded:
             console.print("[red]Compilation failed[/red]")
-            filtered_stderr = filter_benign_rocm_stderr(proc.stderr)
-            if filtered_stderr:
-                console.print(filtered_stderr)
-            if proc.stdout:
-                console.print(proc.stdout)
+            if compile_result.filtered_stderr:
+                console.print(compile_result.filtered_stderr)
+            if compile_result.stdout:
+                console.print(compile_result.stdout)
             packager.close()
             sys.exit(1)
 
         console.print("[green]Compilation succeeded[/green]")
-        filtered_stderr = filter_benign_rocm_stderr(proc.stderr)
-        if verbose and filtered_stderr:
-            console.print(f"[dim]{filtered_stderr}[/dim]")
+        if verbose and compile_result.filtered_stderr:
+            console.print(f"[dim]{compile_result.filtered_stderr}[/dim]")
 
         if static_evidence == cli_static_evidence.STATIC_EVIDENCE_AUTO:
             static_evidence_result = (
