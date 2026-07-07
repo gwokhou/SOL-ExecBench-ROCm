@@ -38,6 +38,10 @@ from sol_execbench.core.scoring.solar_derivation import (
     derive_solar_derivation_evidence,
     solar_derivation_from_dict,
 )
+from sol_execbench.core.scoring.solar_derivation_coverage import (
+    _aggregate_status_for_groups,
+    _coverage_for_groups,
+)
 from sol_execbench.core.scoring.solar_derivation_status import (
     default_source_boundary,
     ordered_status_counts,
@@ -74,6 +78,27 @@ def _source(
         detail=detail,
         node_id=node_id,
         tensor_id=tensor_id,
+    )
+
+
+def _solar_derivation_evidence(
+    *,
+    definition: str,
+    workload_uuid: str,
+    groups: tuple[SolarSemanticGroupEvidence, ...],
+    tensors: tuple[SolarTensorEvidence, ...],
+    warnings: tuple[str, ...],
+    source_boundary: dict[str, bool],
+) -> SolarDerivationEvidence:
+    return SolarDerivationEvidence(
+        definition=definition,
+        workload_uuid=workload_uuid,
+        groups=groups,
+        tensors=tensors,
+        warnings=warnings,
+        source_boundary=source_boundary,
+        coverage_summary=_coverage_for_groups(groups),
+        aggregate_status=_aggregate_status_for_groups(groups, warnings),
     )
 
 
@@ -170,7 +195,7 @@ def _contract_artifact() -> SolarDerivationEvidence:
         producer_node_id="op_1",
         missing_evidence=("mask:semantics",),
     )
-    return SolarDerivationEvidence(
+    return _solar_derivation_evidence(
         definition="attention_demo",
         workload_uuid="attention-workload",
         groups=(attention_group,),
@@ -317,7 +342,7 @@ def test_degraded_aggregate_status_remains_score_eligible():
         missing_evidence=("axis:op_1",),
         warning_prefixes=("aggregate_degraded:attention",),
     )
-    evidence = SolarDerivationEvidence(
+    evidence = _solar_derivation_evidence(
         definition=base.definition,
         workload_uuid=base.workload_uuid,
         groups=(degraded_group,),
@@ -627,7 +652,7 @@ def test_solar_derivation_legacy_payload_must_have_exact_phase48_to_phase50_keys
 
 
 def test_solar_derivation_empty_groups_are_unscored_not_missing_coverage():
-    evidence = SolarDerivationEvidence(
+    evidence = _solar_derivation_evidence(
         definition="empty_demo",
         workload_uuid="empty-workload",
         groups=(),
@@ -692,7 +717,7 @@ def test_solar_derivation_coverage_tracks_degraded_unsupported_and_missing_patte
         ),
         rationale="Unsupported custom operation.",
     )
-    evidence = SolarDerivationEvidence(
+    evidence = _solar_derivation_evidence(
         definition="coverage_demo",
         workload_uuid="coverage-workload",
         groups=(unsupported, degraded),
@@ -922,7 +947,7 @@ def test_solar_derivation_parser_rejects_malformed_phase51_fields(
 ):
     payload = _contract_payload()
     degraded_payload = solar_derivation_from_dict(
-        SolarDerivationEvidence(
+        _solar_derivation_evidence(
             definition="coverage_demo",
             workload_uuid="coverage-workload",
             groups=(
@@ -1168,7 +1193,7 @@ def _fixture_evidence_payload(fixture: JsonDict) -> JsonDict:
         )
         for index, subrole in enumerate(expectation["expected_subroles"], start=1)
     )
-    evidence = SolarDerivationEvidence(
+    evidence = _solar_derivation_evidence(
         definition=case_id,
         workload_uuid=f"{case_id}:fixture-workload",
         groups=(

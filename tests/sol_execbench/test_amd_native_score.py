@@ -42,6 +42,10 @@ from sol_execbench.core.scoring.solar_derivation import (
     SolarEvidenceSource,
     SolarSemanticGroupEvidence,
 )
+from sol_execbench.core.scoring.solar_derivation_coverage import (
+    _aggregate_status_for_groups,
+    _coverage_for_groups,
+)
 from sol_execbench.sol_score import sol_score
 
 
@@ -137,9 +141,7 @@ def _unsupported_cdna3_artifact(tmp_path: Path):
         inputs={"x": {"type": "random"}},
         uuid="unsupported-workload",
     )
-    return build_amd_sol_bound_artifact(
-        definition, workload, _cdna3_model(tmp_path)
-    )
+    return build_amd_sol_bound_artifact(definition, workload, _cdna3_model(tmp_path))
 
 
 def _unsupported_artifact_v2():
@@ -177,8 +179,28 @@ def _solar_aggregate_status(
     )
 
 
-def _degraded_solar_derivation() -> SolarDerivationEvidence:
+def _solar_derivation_evidence(
+    *,
+    definition: str,
+    workload_uuid: str,
+    groups: tuple[SolarSemanticGroupEvidence, ...],
+    warnings: tuple[str, ...],
+    source_boundary: dict[str, bool],
+) -> SolarDerivationEvidence:
     return SolarDerivationEvidence(
+        definition=definition,
+        workload_uuid=workload_uuid,
+        groups=groups,
+        tensors=(),
+        warnings=warnings,
+        source_boundary=source_boundary,
+        coverage_summary=_coverage_for_groups(groups),
+        aggregate_status=_aggregate_status_for_groups(groups, warnings),
+    )
+
+
+def _degraded_solar_derivation() -> SolarDerivationEvidence:
+    return _solar_derivation_evidence(
         definition="matmul_demo",
         workload_uuid="matmul-workload",
         groups=(
@@ -201,7 +223,6 @@ def _degraded_solar_derivation() -> SolarDerivationEvidence:
                 rationale="Matmul evidence is semantically incomplete.",
             ),
         ),
-        tensors=(),
         warnings=("aggregate_degraded:incomplete semantic evidence",),
         source_boundary={
             "canonical_trace_jsonl": False,
@@ -412,9 +433,13 @@ def test_v2_degraded_artifact_scores_with_deterministic_warnings():
     )
     assert report.supported is True
     assert DEGRADED_SOL_BOUND_WARNING in report.warnings
-    assert "aggregate_degraded:inexact or provisional evidence present" in report.warnings
+    assert (
+        "aggregate_degraded:inexact or provisional evidence present" in report.warnings
+    )
     assert report.evidence_refs["sol_bound"] == "sol/matmul.amd-sol-v2.json"
-    assert report.evidence_refs["hardware_model"] == "default_amd_hardware_models.gfx1200"
+    assert (
+        report.evidence_refs["hardware_model"] == "default_amd_hardware_models.gfx1200"
+    )
 
 
 def test_v2_unscored_artifact_omits_score_and_preserves_bound_warning():
@@ -431,7 +456,9 @@ def test_v2_unscored_artifact_omits_score_and_preserves_bound_warning():
     assert report.supported is False
     assert report.sol_bound_ms == artifact.aggregate_bound.sol_bound_ms
     assert UNSCORED_SOL_BOUND_WARNING in report.warnings
-    assert "aggregate_unscored:unsupported operation evidence present" in report.warnings
+    assert (
+        "aggregate_unscored:unsupported operation evidence present" in report.warnings
+    )
 
 
 def test_unsupported_cdna3_score_carries_no_validation_guardrails(tmp_path):

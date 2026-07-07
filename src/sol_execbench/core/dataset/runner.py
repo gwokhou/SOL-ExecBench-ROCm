@@ -11,7 +11,7 @@ from sol_execbench.core.bench.rocm_profiler import (
     ProfilerRunner,
     collect_source_timing_evidence,
 )
-from sol_execbench.core.dataset import cli_execution
+import sol_execbench.core.dataset.cli_execution as cli_execution
 from sol_execbench.core.dataset.amd_score_reports import (
     _build_amd_score_reports_for_problem_impl,
     write_amd_score_report as write_amd_score_report,

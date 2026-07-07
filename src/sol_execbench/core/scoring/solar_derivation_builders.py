@@ -24,6 +24,8 @@ from sol_execbench.core.scoring.amd_hardware_models import (
     default_amd_hardware_models,
 )
 from sol_execbench.core.scoring.solar_derivation_coverage import (
+    _aggregate_status_for_groups,
+    _coverage_for_groups,
     _default_source_boundary,
     _derivation_warnings,
     _status_for_confidence,
@@ -82,6 +84,8 @@ def derive_solar_derivation_evidence(
         tensors=tensors,
         warnings=warnings,
         source_boundary=_default_source_boundary(),
+        coverage_summary=_coverage_for_groups(groups),
+        aggregate_status=_aggregate_status_for_groups(groups, warnings),
     )
 
 
