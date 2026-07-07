@@ -58,3 +58,46 @@ def test_cli_evaluation_helpers_live_outside_main() -> None:
         "_run_profiled_evaluation",
     ):
         assert not hasattr(cli_main, name)
+
+
+def test_cli_metadata_commands_live_outside_main() -> None:
+    from sol_execbench.cli import metadata
+
+    assert metadata._contract_cli is not None
+    assert metadata._doctor_cli is not None
+    assert metadata._toolchain_cli is not None
+
+    for name in (
+        "_contract_cli",
+        "_doctor_cli",
+        "_toolchain_cli",
+    ):
+        assert not hasattr(cli_main, name)
+
+
+def test_cli_baseline_commands_live_outside_main() -> None:
+    from sol_execbench.cli import baseline
+
+    assert baseline._baseline_cli is not None
+    assert baseline._baseline_export_cli is not None
+
+    for name in (
+        "_baseline_cli",
+        "_baseline_export_cli",
+    ):
+        assert not hasattr(cli_main, name)
+
+
+def test_cli_dataset_commands_live_outside_main() -> None:
+    from sol_execbench.cli import dataset
+
+    assert dataset._dataset_cli is not None
+    assert dataset._dataset_migrate_sol_cli is not None
+    assert dataset._dataset_migrate_flashinfer_cli is not None
+
+    for name in (
+        "_dataset_cli",
+        "_dataset_migrate_sol_cli",
+        "_dataset_migrate_flashinfer_cli",
+    ):
+        assert not hasattr(cli_main, name)
