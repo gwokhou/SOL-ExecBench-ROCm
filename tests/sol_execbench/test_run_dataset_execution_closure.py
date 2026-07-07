@@ -15,6 +15,7 @@ from sol_execbench.core.dataset.evidence_refs import (
     build_derived_evidence_refs,
     sidecar_stem_for_workload,
 )
+from sol_execbench.core.dataset import cli_execution
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RUN_DATASET_PATH = REPO_ROOT / "scripts" / "run_dataset.py"
@@ -1497,10 +1498,10 @@ def test_cli_failure_logs_are_bounded_and_notes_read_header_only(tmp_path):
     output_dir = tmp_path / "out"
     output_dir.mkdir()
     large_stdout = (
-        "stdout-head-" + "a" * (run_dataset._CLI_LOG_LIMIT + 100) + "stdout-tail"
+        "stdout-head-" + "a" * (cli_execution.CLI_LOG_LIMIT + 100) + "stdout-tail"
     )
     large_stderr = (
-        "stderr-head-" + "b" * (run_dataset._CLI_LOG_LIMIT + 100) + "stderr-tail"
+        "stderr-head-" + "b" * (cli_execution.CLI_LOG_LIMIT + 100) + "stderr-tail"
     )
     result = subprocess.CompletedProcess(
         args=["sol-execbench"],
@@ -1509,7 +1510,7 @@ def test_cli_failure_logs_are_bounded_and_notes_read_header_only(tmp_path):
         stderr=large_stderr,
     )
 
-    run_dataset._save_cli_log(output_dir, "failed_job", result)
+    cli_execution.save_cli_log(output_dir, "failed_job", result)
 
     cli_log = output_dir / "failed_job_cli.log"
     log_text = cli_log.read_text()
@@ -1519,7 +1520,7 @@ def test_cli_failure_logs_are_bounded_and_notes_read_header_only(tmp_path):
     assert "stderr-tail" in log_text
     assert "stdout-head" not in log_text
     assert "stderr-head" not in log_text
-    assert run_dataset._cli_failure_notes(cli_log) == ["CLI failed with exit code 42"]
+    assert cli_execution.cli_failure_notes(cli_log) == ["CLI failed with exit code 42"]
 
 
 def test_cli_timeout_logs_are_bounded(tmp_path):
@@ -1528,14 +1529,14 @@ def test_cli_timeout_logs_are_bounded(tmp_path):
     exc = subprocess.TimeoutExpired(
         cmd=["sol-execbench"],
         timeout=300,
-        output="a" * (run_dataset._CLI_LOG_LIMIT + 100),
-        stderr="b" * (run_dataset._CLI_LOG_LIMIT + 100),
+        output="a" * (cli_execution.CLI_LOG_LIMIT + 100),
+        stderr="b" * (cli_execution.CLI_LOG_LIMIT + 100),
     )
 
-    run_dataset._save_cli_timeout_log(output_dir, "timeout_job", exc)
+    cli_execution.save_cli_timeout_log(output_dir, "timeout_job", exc)
 
     log_text = (output_dir / "timeout_job_cli.log").read_text()
-    assert len(log_text) < (run_dataset._CLI_LOG_LIMIT * 2) + 200
+    assert len(log_text) < (cli_execution.CLI_LOG_LIMIT * 2) + 200
     assert "[truncated CLI output]" in log_text
 
 
@@ -1552,7 +1553,7 @@ def test_cli_failure_notes_detects_inner_eval_driver_timeout(tmp_path):
         encoding="utf-8",
     )
 
-    assert run_dataset._cli_failure_notes(cli_log) == [
+    assert cli_execution.cli_failure_notes(cli_log) == [
         "CLI timed out after 900 seconds"
     ]
 

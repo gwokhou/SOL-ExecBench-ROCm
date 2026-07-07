@@ -4,6 +4,7 @@ import json
 import subprocess
 from pathlib import Path
 
+from sol_execbench.core.dataset import cli_execution
 from sol_execbench.core.dataset import runner
 
 
@@ -53,11 +54,7 @@ def test_build_reference_solution_uses_token_aware_stream_sanitizer():
 
 def test_build_custom_solution_preserves_metadata_and_detects_dps(tmp_path):
     solution_py = tmp_path / "solution.py"
-    solution_py.write_text(
-        "def run(x, out):\n"
-        "    stream = x\n"
-        "    return out\n"
-    )
+    solution_py.write_text("def run(x, out):\n    stream = x\n    return out\n")
 
     solution = runner.build_custom_solution(_definition(), solution_py)
 
@@ -79,9 +76,9 @@ def test_run_cli_parses_jsonl_and_ignores_non_json_stdout(tmp_path, monkeypatch)
             stderr="",
         )
 
-    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+    monkeypatch.setattr(cli_execution.subprocess, "run", fake_run)
 
-    traces = runner.run_cli(
+    traces = cli_execution.run_cli(
         definition_path=Path("definition.json"),
         workload_path=Path("workload.jsonl"),
         solution_path=Path("solution.json"),
@@ -110,10 +107,10 @@ def test_run_cli_passes_flashinfer_safetensors_env(tmp_path, monkeypatch):
             stderr="",
         )
 
-    monkeypatch.setattr(runner, "flashinfer_safetensors_env", fake_env)
-    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+    monkeypatch.setattr(cli_execution, "flashinfer_safetensors_env", fake_env)
+    monkeypatch.setattr(cli_execution.subprocess, "run", fake_run)
 
-    traces = runner.run_cli(
+    traces = cli_execution.run_cli(
         definition_path=Path("definition.json"),
         workload_path=Path("workload.jsonl"),
         solution_path=Path("solution.json"),
@@ -135,9 +132,9 @@ def test_run_cli_writes_log_for_nonzero_exit(tmp_path, monkeypatch):
             stderr="bad stderr",
         )
 
-    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+    monkeypatch.setattr(cli_execution.subprocess, "run", fake_run)
 
-    traces = runner.run_cli(
+    traces = cli_execution.run_cli(
         definition_path=Path("definition.json"),
         workload_path=Path("workload.jsonl"),
         solution_path=Path("solution.json"),
@@ -149,7 +146,7 @@ def test_run_cli_writes_log_for_nonzero_exit(tmp_path, monkeypatch):
     log_path = tmp_path / "demo_cli.log"
     assert traces is None
     assert "exit code: 7" in log_path.read_text()
-    assert runner.cli_failure_notes(log_path) == ["CLI failed with exit code 7"]
+    assert cli_execution.cli_failure_notes(log_path) == ["CLI failed with exit code 7"]
 
 
 def test_run_cli_log_filters_benign_amdgpu_ids_noise(tmp_path, monkeypatch):
@@ -164,9 +161,9 @@ def test_run_cli_log_filters_benign_amdgpu_ids_noise(tmp_path, monkeypatch):
             ),
         )
 
-    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+    monkeypatch.setattr(cli_execution.subprocess, "run", fake_run)
 
-    traces = runner.run_cli(
+    traces = cli_execution.run_cli(
         definition_path=Path("definition.json"),
         workload_path=Path("workload.jsonl"),
         solution_path=Path("solution.json"),
@@ -190,9 +187,9 @@ def test_run_cli_writes_log_for_timeout(tmp_path, monkeypatch):
             stderr=b"partial stderr",
         )
 
-    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+    monkeypatch.setattr(cli_execution.subprocess, "run", fake_run)
 
-    traces = runner.run_cli(
+    traces = cli_execution.run_cli(
         definition_path=Path("definition.json"),
         workload_path=Path("workload.jsonl"),
         solution_path=Path("solution.json"),
@@ -204,7 +201,9 @@ def test_run_cli_writes_log_for_timeout(tmp_path, monkeypatch):
     log_path = tmp_path / "demo_cli.log"
     assert traces is None
     assert "timeout after 61 seconds" in log_path.read_text()
-    assert runner.cli_failure_notes(log_path) == ["CLI timed out after 61 seconds"]
+    assert cli_execution.cli_failure_notes(log_path) == [
+        "CLI timed out after 61 seconds"
+    ]
 
 
 def test_write_summary_report_uses_existing_summary_json_shape(tmp_path):
