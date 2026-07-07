@@ -35,7 +35,7 @@ from sol_execbench.core.scoring.solar_derivation import (
     solar_derivation_from_dict,
 )
 
-RunCliFunc = Callable[..., list[dict]]
+RunCliFunc = Callable[..., list[dict] | None]
 
 
 def _hardware_model_key_from_trace_payloads(traces_payload: Sequence[dict]) -> str:
