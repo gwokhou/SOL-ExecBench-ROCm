@@ -163,3 +163,39 @@ def test_cli_agent_feedback_sidecar_helpers_live_outside_main() -> None:
         "_agent_feedback_artifact_citations",
     ):
         assert not hasattr(cli_main, name)
+
+
+def test_cli_problem_io_helpers_live_outside_main() -> None:
+    from sol_execbench.cli import problem_io
+
+    assert problem_io.ResolvedProblemInputs is not None
+    assert problem_io._load_definition is not None
+    assert problem_io._load_workloads is not None
+    assert problem_io._load_solution is not None
+    assert problem_io._load_config is not None
+    assert problem_io._resolve_problem_dir is not None
+    assert problem_io.resolve_problem_inputs is not None
+
+    for name in (
+        "ResolvedProblemInputs",
+        "_load_definition",
+        "_load_workloads",
+        "_load_solution",
+        "_load_config",
+        "_resolve_problem_dir",
+        "resolve_problem_inputs",
+    ):
+        assert not hasattr(cli_main, name)
+
+
+def test_cli_compilation_helpers_live_outside_main() -> None:
+    from sol_execbench.cli import compilation
+
+    assert compilation.CompilePhaseResult is not None
+    assert compilation.run_compile_phase is not None
+
+    for name in (
+        "CompilePhaseResult",
+        "run_compile_phase",
+    ):
+        assert not hasattr(cli_main, name)
