@@ -34,7 +34,7 @@ from sol_execbench.core.bench.profile_summary_models import (
 from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileResult
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 from sol_execbench.core.data.contract import SOL_EXECBENCH_RELEASE
-from sol_execbench.core.dataset.checksums import sha256_file
+from sol_execbench.core.checksums import sha256_file
 from sol_execbench.core.trust_summary import utc_timestamp
 
 

@@ -41,7 +41,7 @@ from sol_execbench.core.bench.static_kernel_evidence import (
 )
 from sol_execbench.core.data.contract import SOL_EXECBENCH_RELEASE
 from sol_execbench.core.data.trace import Trace
-from sol_execbench.core.dataset.checksums import sha256_file
+from sol_execbench.core.checksums import sha256_file
 from sol_execbench.core.trust_summary import utc_timestamp
 
 

@@ -49,7 +49,7 @@ from . import reporting as cli_reporting
 from . import static_evidence as cli_static_evidence
 from ..core.bench.static_kernel_evidence import StaticKernelEvidenceSidecar
 from ..core import EvaluationStatus
-from ..core.dataset.checksums import sha256_file
+from ..core.checksums import sha256_file
 from ..driver import ProblemPackager
 
 console = Console(stderr=True)

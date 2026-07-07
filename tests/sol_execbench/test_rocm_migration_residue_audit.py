@@ -278,6 +278,10 @@ def _classification(relative_path: str, line: str) -> str | None:
         "cuda_states" in line or "cuda out of memory" in line
     ):
         return "PyTorch ROCm compatibility namespace for CUDA/HIP RNG state and OOM error matching"
+    if relative_path.startswith("src/sol_execbench/core/bench/custom_inputs.py") and (
+        "cuda_states" in line or "cuda out of memory" in line
+    ):
+        return "PyTorch ROCm compatibility namespace for CUDA/HIP custom input RNG state and OOM error matching"
     if relative_path.startswith("tests/sol_execbench/core/bench/test_io.py") and (
         "CUDA/HIP" in line
     ):

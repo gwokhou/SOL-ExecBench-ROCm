@@ -19,7 +19,7 @@ from ..core.bench.agent_feedback import (
 )
 from ..core.bench.rocm_profiler import Rocprofv3ProfileResult
 from ..core.bench.static_kernel_evidence import StaticKernelEvidenceSidecar
-from ..core.dataset.checksums import sha256_file, stable_json_checksum
+from ..core.checksums import sha256_file, stable_json_checksum
 from ..core.runtime_evidence import write_json_payload
 
 console = Console(stderr=True)

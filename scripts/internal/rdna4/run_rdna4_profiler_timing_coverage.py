@@ -17,7 +17,7 @@ from sol_execbench.core.dataset import (
     validate_categories,
     write_profiler_timing_coverage_reports,
 )
-from sol_execbench.core.dataset.checksums import stable_json_checksum
+from sol_execbench.core.checksums import stable_json_checksum
 
 DEFAULT_DATASET_ROOT = Path("data/SOL-ExecBench/benchmark")
 DEFAULT_OUTPUT_DIR = Path("out/rdna4-profiler-timing-coverage")
