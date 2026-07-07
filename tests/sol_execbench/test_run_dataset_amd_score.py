@@ -200,22 +200,19 @@ def test_dataset_helper_can_emit_generated_solar_derivation_sidecars(tmp_path):
     assert "coverage" not in score_payload["evidence_refs"]
 
 
-def test_runner_score_report_wrapper_uses_runner_run_cli(
+def test_runner_score_report_wrapper_uses_cli_execution_run_cli(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ):
+    from sol_execbench.core.dataset import cli_execution
     from sol_execbench.core.dataset import runner
 
     calls = []
-
-    def fake_run_cli(*args, **kwargs):
-        return [{"evaluation": {"environment": {"hardware": "gfx1200"}}}]
 
     def spy_build_impl(**kwargs):
         calls.append(kwargs)
         return []
 
-    monkeypatch.setattr(runner, "run_cli", fake_run_cli)
     monkeypatch.setattr(
         runner,
         "_build_amd_score_reports_for_problem_impl",
@@ -226,10 +223,6 @@ def test_runner_score_report_wrapper_uses_runner_run_cli(
         runner.build_amd_score_reports_for_problem.__module__
         == "sol_execbench.core.dataset.runner"
     )
-    assert (
-        runner.build_amd_score_reports_for_problem.__globals__["run_cli"]
-        is fake_run_cli
-    )
     scores = runner.build_amd_score_reports_for_problem(
         definition_payload={},
         workload_path=tmp_path / "workload.jsonl",
@@ -238,7 +231,7 @@ def test_runner_score_report_wrapper_uses_runner_run_cli(
     )
 
     assert scores == []
-    assert calls[0]["run_cli_func"] is fake_run_cli
+    assert calls[0]["run_cli_func"] is cli_execution.run_cli
 
 
 def test_dataset_helper_keeps_scoring_when_solar_derivation_parse_fails(
