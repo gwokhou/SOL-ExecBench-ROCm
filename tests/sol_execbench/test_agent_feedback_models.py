@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from sol_execbench.core.bench.agent_feedback import (
     AGENT_FEEDBACK_SCHEMA_VERSION as FacadeSchemaVersion,
@@ -119,9 +119,9 @@ def test_agent_feedback_model_names_remain_reexported_from_facade() -> None:
         ),
     ],
 )
-def test_agent_feedback_models_remain_strict_and_frozen(model: object) -> None:
+def test_agent_feedback_models_remain_strict_and_frozen(model: BaseModel) -> None:
     model_type = type(model)
-    payload = model.model_dump(mode="json")  # type: ignore[attr-defined]
+    payload = model.model_dump(mode="json")
 
     with pytest.raises(ValidationError):
         model_type.model_validate({**payload, "unexpected": "field"})

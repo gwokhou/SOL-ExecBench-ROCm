@@ -30,7 +30,10 @@ def test_baseline_export_writes_registry_and_prints_message(
         assert target_id == "gemm"
         assert sol_version == "rev-a"
         assert timing_policy == "latency_ms"
-        registry = {"target_id": target_id, "sol_version": sol_version}
+        registry: dict[str, object] = {
+            "target_id": target_id,
+            "sol_version": sol_version,
+        }
         output_path.write_text(json.dumps(registry))
         return registry
 

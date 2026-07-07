@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from sol_execbench.core.bench.profile_summary import (
     ProfileSummaryArtifactCitation as FacadeArtifactCitation,
@@ -103,7 +103,7 @@ def test_profile_summary_model_names_remain_reexported_from_facade() -> None:
     ],
 )
 def test_profile_summary_content_models_remain_strict_and_frozen(
-    model_type: type,
+    model_type: type[BaseModel],
     payload: dict[str, object],
     mutation_field: str,
 ) -> None:
