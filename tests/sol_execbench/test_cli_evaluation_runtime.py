@@ -174,9 +174,10 @@ def test_run_evaluation_runtime_falls_back_when_profile_unavailable(
 ) -> None:
     packager = _FakePackager(traces=[_FakeTrace()])
     profile_result = Rocprofv3ProfileResult(
+        status="unavailable",
         command=("rocprofv3",),
         output_directory=tmp_path,
-        succeeded=False,
+        output_file="profile",
         skipped_reason="rocprofv3 unavailable",
     )
 
