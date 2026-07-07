@@ -1,0 +1,325 @@
+# CLI Execution Refactor Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Extract dataset CLI subprocess execution and CLI log handling from `runner.py` into `cli_execution.py`, updating internal callers directly without runner compatibility re-exports.
+
+**Architecture:** `cli_execution.py` owns command construction, subprocess execution, stream bounding, temporary stream files, trace JSONL parsing, log writing, and failure-note parsing. `runner.py` keeps solution building, timing evidence, summary reporting, and derived report orchestration. `scripts/run_dataset.py` imports CLI execution helpers directly from the new module.
+
+**Tech Stack:** Python 3.12, pytest, Ruff, existing SOL ExecBench dataset modules.
+
+---
+
+## File Structure
+
+- Create `src/sol_execbench/core/dataset/cli_execution.py`: focused CLI execution and logging helpers.
+- Modify `src/sol_execbench/core/dataset/runner.py`: remove CLI execution/logging helpers and imports that were only needed for them.
+- Modify `scripts/run_dataset.py`: import CLI helpers from `cli_execution.py` instead of `runner.py`.
+- Modify `tests/sol_execbench/test_dataset_runner.py`: keep runner solution/summary tests in this file, and point CLI execution tests at `cli_execution.py`.
+- Modify `tests/sol_execbench/test_run_dataset_execution_closure.py`: replace direct checks of script-level CLI log aliases with direct core helper imports where those helpers are not script behavior.
+
+## Task 1: Characterize Direct CLI Execution Module Boundary
+
+**Files:**
+- Modify: `tests/sol_execbench/test_dataset_runner.py`
+- Modify: `tests/sol_execbench/test_run_dataset_execution_closure.py`
+
+- [ ] **Step 1: Update tests to express the new import boundary**
+
+In `tests/sol_execbench/test_dataset_runner.py`, add the new module import while keeping `runner` for non-CLI tests:
+
+```python
+from sol_execbench.core.dataset import cli_execution
+from sol_execbench.core.dataset import runner
+```
+
+Change CLI execution tests to use `cli_execution`:
+
+```python
+monkeypatch.setattr(cli_execution.subprocess, "run", fake_run)
+traces = cli_execution.run_cli(...)
+assert cli_execution.cli_failure_notes(log_path) == [...]
+```
+
+For the safetensors environment test, patch the new module:
+
+```python
+monkeypatch.setattr(cli_execution, "flashinfer_safetensors_env", fake_env)
+monkeypatch.setattr(cli_execution.subprocess, "run", fake_run)
+```
+
+Leave solution-building and summary tests using `runner`.
+
+In `tests/sol_execbench/test_run_dataset_execution_closure.py`, import the core module:
+
+```python
+from sol_execbench.core.dataset import cli_execution
+```
+
+Update the bounded log helper tests to call core helpers directly:
+
+```python
+large_stdout = "stdout-head-" + "a" * (cli_execution.CLI_LOG_LIMIT + 100) + "stdout-tail"
+large_stderr = "stderr-head-" + "b" * (cli_execution.CLI_LOG_LIMIT + 100) + "stderr-tail"
+cli_execution.save_cli_log(output_dir, "failed_job", result)
+assert cli_execution.cli_failure_notes(cli_log) == ["CLI failed with exit code 42"]
+```
+
+```python
+exc = subprocess.TimeoutExpired(
+    cmd=["sol-execbench"],
+    timeout=300,
+    output="a" * (cli_execution.CLI_LOG_LIMIT + 100),
+    stderr="b" * (cli_execution.CLI_LOG_LIMIT + 100),
+)
+cli_execution.save_cli_timeout_log(output_dir, "timeout_job", exc)
+assert len(log_text) < (cli_execution.CLI_LOG_LIMIT * 2) + 200
+```
+
+```python
+assert cli_execution.cli_failure_notes(cli_log) == [
+    "CLI timed out after 900 seconds"
+]
+```
+
+- [ ] **Step 2: Run focused tests to verify the boundary fails before implementation**
+
+Run:
+
+```bash
+uv run pytest tests/sol_execbench/test_dataset_runner.py tests/sol_execbench/test_run_dataset_execution_closure.py::test_cli_failure_logs_are_bounded_and_notes_read_header_only tests/sol_execbench/test_run_dataset_execution_closure.py::test_cli_timeout_logs_are_bounded tests/sol_execbench/test_run_dataset_execution_closure.py::test_cli_failure_notes_detects_inner_eval_driver_timeout -v
+```
+
+Expected before implementation:
+
+```text
+ImportError: cannot import name 'cli_execution' from 'sol_execbench.core.dataset'
+```
+
+- [ ] **Step 3: Commit the failing boundary tests**
+
+Only commit if the failure is due to the missing `cli_execution` module.
+
+```bash
+git add tests/sol_execbench/test_dataset_runner.py tests/sol_execbench/test_run_dataset_execution_closure.py
+git commit -s -m "#0 - Add CLI execution module boundary tests"
+```
+
+## Task 2: Extract CLI Execution Helpers
+
+**Files:**
+- Create: `src/sol_execbench/core/dataset/cli_execution.py`
+- Modify: `src/sol_execbench/core/dataset/runner.py`
+- Modify: `scripts/run_dataset.py`
+
+- [ ] **Step 1: Create `cli_execution.py`**
+
+Create `src/sol_execbench/core/dataset/cli_execution.py` with:
+
+```python
+"""CLI subprocess execution helpers for dataset-scale runs."""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+from sol_execbench.core.bench.io import flashinfer_safetensors_env
+from sol_execbench.core.bench.stderr import filter_benign_rocm_stderr
+
+CLI_LOG_LIMIT = 64 * 1024
+```
+
+Move these functions from `runner.py` unchanged:
+
+```python
+def build_cli_command(...): ...
+def run_cli(...): ...
+def bounded_cli_stream(...): ...
+def _temporary_stream_path(...): ...
+def bounded_file_stream(...): ...
+def _parse_trace_jsonl(...): ...
+def save_cli_log(...): ...
+def save_cli_log_from_files(...): ...
+def save_cli_timeout_log(...): ...
+def save_cli_timeout_log_from_files(...): ...
+def cli_failure_notes(...): ...
+```
+
+Keep signatures and behavior identical to the existing `runner.py` functions.
+
+- [ ] **Step 2: Remove CLI execution helpers from `runner.py`**
+
+Delete the moved functions and constants from `src/sol_execbench/core/dataset/runner.py`.
+
+Remove these runner-level aliases:
+
+```python
+_bounded_cli_stream = bounded_cli_stream
+_save_cli_log = save_cli_log
+_save_cli_timeout_log = save_cli_timeout_log
+_cli_failure_notes = cli_failure_notes
+```
+
+Remove imports from `runner.py` that are no longer needed after extraction:
+
+```python
+import subprocess
+import sys
+import tempfile
+from sol_execbench.core.bench.io import flashinfer_safetensors_env
+from sol_execbench.core.bench.stderr import filter_benign_rocm_stderr
+```
+
+Keep `json`, `Path`, and `Sequence` if still used elsewhere.
+
+- [ ] **Step 3: Update `scripts/run_dataset.py` imports**
+
+Add a direct import from the new module:
+
+```python
+from sol_execbench.core.dataset.cli_execution import (
+    CLI_LOG_LIMIT as _CLI_LOG_LIMIT,
+    build_cli_command,
+    cli_failure_notes as _cli_failure_notes,
+    run_cli as _core_run_cli,
+    save_cli_log as _save_cli_log,
+    save_cli_timeout_log as _save_cli_timeout_log,
+)
+```
+
+Remove these names from the `sol_execbench.core.dataset.runner` import block:
+
+```python
+CLI_LOG_LIMIT as _CLI_LOG_LIMIT,
+_cli_failure_notes,
+_save_cli_log,
+_save_cli_timeout_log,
+build_cli_command,
+run_cli as _runner_run_cli,
+```
+
+Update the script wrapper to call `_core_run_cli`:
+
+```python
+def run_cli(
+    definition_path: Path,
+    workload_path: Path,
+    solution_path: Path,
+    output_dir: Path,
+    job_name: str,
+    timeout: int,
+    config_path: Path | None = None,
+    keep_staging: bool = False,
+    verbose: bool = False,
+) -> list[dict] | None:
+    """Compatibility wrapper for tests and callers importing this script module."""
+    return _core_run_cli(
+        definition_path=definition_path,
+        workload_path=workload_path,
+        solution_path=solution_path,
+        output_dir=output_dir,
+        job_name=job_name,
+        timeout=timeout,
+        config_path=config_path,
+        keep_staging=keep_staging,
+        verbose=verbose,
+    )
+```
+
+Keep script-level `_CLI_LOG_LIMIT`, `_save_cli_log`, `_save_cli_timeout_log`, and `_cli_failure_notes` aliases only because `scripts/run_dataset.py` itself still uses or exposes them in existing script tests.
+
+- [ ] **Step 4: Run focused tests**
+
+Run:
+
+```bash
+uv run pytest tests/sol_execbench/test_dataset_runner.py tests/sol_execbench/test_run_dataset_execution_closure.py::test_cli_failure_logs_are_bounded_and_notes_read_header_only tests/sol_execbench/test_run_dataset_execution_closure.py::test_cli_timeout_logs_are_bounded tests/sol_execbench/test_run_dataset_execution_closure.py::test_cli_failure_notes_detects_inner_eval_driver_timeout -v
+```
+
+Expected:
+
+```text
+... passed
+```
+
+- [ ] **Step 5: Commit extraction**
+
+```bash
+git add src/sol_execbench/core/dataset/cli_execution.py src/sol_execbench/core/dataset/runner.py scripts/run_dataset.py tests/sol_execbench/test_dataset_runner.py tests/sol_execbench/test_run_dataset_execution_closure.py
+git commit -s -m "#0 - Extract CLI execution helpers"
+```
+
+## Task 3: Regression Verification
+
+**Files:**
+- Verify: `tests/sol_execbench/test_dataset_runner.py`
+- Verify: `tests/sol_execbench/test_run_dataset_execution_closure.py`
+- Verify: `tests/sol_execbench/test_run_dataset_amd_score.py`
+- Verify: changed Python files
+
+- [ ] **Step 1: Run dataset runner tests**
+
+```bash
+uv run pytest tests/sol_execbench/test_dataset_runner.py
+```
+
+Expected:
+
+```text
+... passed
+```
+
+- [ ] **Step 2: Run execution closure tests**
+
+```bash
+uv run pytest tests/sol_execbench/test_run_dataset_execution_closure.py
+```
+
+Expected:
+
+```text
+... passed
+```
+
+- [ ] **Step 3: Run AMD score dataset tests**
+
+```bash
+uv run pytest tests/sol_execbench/test_run_dataset_amd_score.py
+```
+
+Expected:
+
+```text
+... passed
+```
+
+- [ ] **Step 4: Run Ruff on changed files**
+
+```bash
+uv run --with ruff ruff check src/sol_execbench/core/dataset/cli_execution.py src/sol_execbench/core/dataset/runner.py scripts/run_dataset.py tests/sol_execbench/test_dataset_runner.py tests/sol_execbench/test_run_dataset_execution_closure.py
+```
+
+Expected:
+
+```text
+All checks passed!
+```
+
+- [ ] **Step 5: Commit verification metadata if needed**
+
+If Task 3 required no file changes, do not create a commit. If verification required fixes, commit them:
+
+```bash
+git add <fixed-files>
+git commit -s -m "#0 - Fix CLI execution refactor regressions"
+```
+
+## Self-Review
+
+- Spec coverage: Task 1 updates tests for the new non-compatible boundary, Task 2 performs extraction and caller migration, Task 3 runs required regressions.
+- Placeholder scan: No placeholder steps remain; commands and code targets are explicit.
+- Type consistency: `run_cli` keeps the existing `list[dict] | None` return type, and script wrapper continues to expose script-level `run_cli` for script tests.
