@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from sol_execbench.core.dataset import runner
+import sol_execbench.core.dataset.runner as runner
 
 
 def test_write_summary_report_uses_existing_summary_json_shape(tmp_path):

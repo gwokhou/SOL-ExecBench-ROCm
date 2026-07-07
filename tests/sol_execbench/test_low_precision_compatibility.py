@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 import torch
 
-from sol_execbench.core.dataset import (
+from sol_execbench.core.dataset.low_precision import (
     CDNA4_VALIDATION_DEFERRED_CODE,
     LOW_PRECISION_COMPATIBILITY_EVIDENCE_CODE,
     cdna4_low_precision_skip_reason,

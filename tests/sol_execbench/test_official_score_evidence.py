@@ -3,7 +3,7 @@ from __future__ import annotations
 import ast
 import inspect
 
-from sol_execbench.core.scoring import amd_score
+import sol_execbench.core.scoring.amd_score as amd_score
 from sol_execbench.core.scoring.amd_score import (
     AMD_SCORE_CLAIM_LEVEL,
     AmdNativeScore,

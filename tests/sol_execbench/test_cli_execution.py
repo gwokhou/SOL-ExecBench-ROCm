@@ -4,7 +4,7 @@ import json
 import subprocess
 from pathlib import Path
 
-from sol_execbench.core.dataset import cli_execution
+import sol_execbench.core.dataset.cli_execution as cli_execution
 
 
 def test_run_cli_parses_jsonl_and_ignores_non_json_stdout(tmp_path, monkeypatch):
