@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import dataclasses
 import json
-import subprocess
 import sys
 import tempfile
 from collections.abc import Sequence
@@ -42,13 +41,12 @@ from . import compilation as cli_compilation
 from . import dataset as cli_dataset
 from . import evaluation as cli_evaluation
 from . import environment as cli_environment
+from . import evaluation_runtime as cli_evaluation_runtime
 from . import metadata as cli_metadata
 from . import problem_io as cli_problem_io
 from . import profile_sidecars as cli_profile_sidecars
 from . import reporting as cli_reporting
 from . import static_evidence as cli_static_evidence
-from ..core.bench.rocm_profiler import Rocprofv3ProfileResult
-from ..core.bench.stderr import filter_benign_rocm_stderr
 from ..core.bench.static_kernel_evidence import StaticKernelEvidenceSidecar
 from ..core import EvaluationStatus
 from ..core.dataset.checksums import sha256_file
@@ -275,24 +273,8 @@ def _evaluate_cli(
         )
 
     # Phase 2: Evaluate
-    eval_cmd = packager.execute()
-
-    profile_result: Rocprofv3ProfileResult | None = None
-    profiled_proc: subprocess.CompletedProcess[str] | None = None
     if profile == PROFILE_ROCPROFV3:
         console.print("[dim]Collecting optional rocprofv3 profiling evidence...[/dim]")
-        profiled_proc, profile_result = cli_evaluation._run_profiled_evaluation(
-            eval_cmd,
-            staging_dir=staging_dir,
-            output_file=output_file,
-            timeout=timeout,
-        )
-        if profiled_proc is None:
-            reason = profile_result.skipped_reason or profile_result.failed_reason
-            console.print(
-                "[yellow]rocprofv3 profiling unavailable or failed; "
-                f"running normal evaluation. Reason: {reason}[/yellow]"
-            )
 
     with Progress(
         SpinnerColumn(),
@@ -303,82 +285,52 @@ def _evaluate_cli(
             f"Evaluating {len(workloads)} workload(s)...", total=None
         )
 
-        try:
-            proc = profiled_proc or cli_evaluation._run_evaluation_command(
-                eval_cmd,
-                staging_dir=staging_dir,
-                timeout=timeout,
-            )
-        except subprocess.TimeoutExpired as exc:
-            # subprocess.run raises on timeout instead of returning a
-            # CompletedProcess; synthesize the no-trace diagnostic path so a
-            # hung/deadlocked evaluation produces a clean sidecar + exit rather
-            # than an unhandled traceback.
-            progress.update(task, completed=True)
-            console.print(f"[red]Evaluation timed out after {timeout}s[/red]")
-            diagnostic_path = cli_evaluation._write_no_trace_diagnostics_sidecar(
-                output_file=output_file,
-                staging_dir=staging_dir,
-                keep_staging=keep_staging,
-                reason="evaluation_timeout",
-                returncode=124,
-                stdout=cli_evaluation._timeout_output_text(exc.stdout),
-                stderr=cli_evaluation._timeout_output_text(exc.stderr),
-            )
-            if diagnostic_path is not None:
-                console.print(
-                    f"[yellow]Saved no-trace diagnostics to {diagnostic_path}[/yellow]"
-                )
-            packager.close()
-            sys.exit(1)
+        runtime_result = cli_evaluation_runtime.run_evaluation_runtime(
+            packager,
+            staging_dir=staging_dir,
+            output_file=output_file,
+            timeout=timeout,
+            profile=profile,
+        )
         progress.update(task, completed=True)
 
-    filtered_stderr = filter_benign_rocm_stderr(proc.stderr)
-    if verbose and filtered_stderr:
-        console.print(f"[dim]{filtered_stderr}[/dim]")
+    profile_result = runtime_result.profile_result
+    if runtime_result.profile_fallback_reason is not None:
+        console.print(
+            "[yellow]rocprofv3 profiling unavailable or failed; "
+            "running normal evaluation. Reason: "
+            f"{runtime_result.profile_fallback_reason}[/yellow]"
+        )
 
-    if proc.returncode != 0 and not proc.stdout.strip():
-        console.print("[red]Evaluation failed[/red]")
+    if isinstance(
+        runtime_result, cli_evaluation_runtime.EvaluationRuntimeNoTraceFailure
+    ):
+        console.print(f"[red]{runtime_result.message}[/red]")
         diagnostic_path = cli_evaluation._write_no_trace_diagnostics_sidecar(
             output_file=output_file,
             staging_dir=staging_dir,
             keep_staging=keep_staging,
-            reason="evaluation_failed_no_stdout",
-            returncode=proc.returncode,
-            stdout=proc.stdout,
-            stderr=proc.stderr,
+            reason=runtime_result.reason,
+            returncode=runtime_result.returncode,
+            stdout=runtime_result.stdout,
+            stderr=runtime_result.stderr,
         )
         if diagnostic_path is not None:
             console.print(
                 f"[yellow]Saved no-trace diagnostics to {diagnostic_path}[/yellow]"
             )
-        if filtered_stderr:
-            console.print(filtered_stderr)
+        if (
+            runtime_result.reason != "evaluation_timeout"
+            and runtime_result.filtered_stderr
+        ):
+            console.print(runtime_result.filtered_stderr)
         packager.close()
         sys.exit(1)
 
-    # Parse traces from stdout
-    traces = packager.convert_stdout_to_traces(proc.stdout)
+    if verbose and runtime_result.filtered_stderr:
+        console.print(f"[dim]{runtime_result.filtered_stderr}[/dim]")
 
-    if not traces:
-        console.print("[red]No traces produced[/red]")
-        diagnostic_path = cli_evaluation._write_no_trace_diagnostics_sidecar(
-            output_file=output_file,
-            staging_dir=staging_dir,
-            keep_staging=keep_staging,
-            reason="no_parseable_traces",
-            returncode=proc.returncode,
-            stdout=proc.stdout,
-            stderr=proc.stderr,
-        )
-        if diagnostic_path is not None:
-            console.print(
-                f"[yellow]Saved no-trace diagnostics to {diagnostic_path}[/yellow]"
-            )
-        if filtered_stderr:
-            console.print(filtered_stderr)
-        packager.close()
-        sys.exit(1)
+    traces = runtime_result.traces
 
     # Output
     if output_file:
