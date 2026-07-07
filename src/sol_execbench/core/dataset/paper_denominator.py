@@ -10,7 +10,10 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .checksums import sha256_file, stable_json_checksum
+from sol_execbench.core.data.json_utils import stable_model_checksum, stable_model_json
+from sol_execbench.core.text_utils import markdown_table_cell as _md_cell
+
+from .checksums import sha256_file
 from .manifest import DatasetManifestChecksum, utc_timestamp
 
 PAPER_DENOMINATOR_REPORT_SCHEMA_VERSION = "sol_execbench.paper_denominator_report.v1"
@@ -212,18 +215,16 @@ class PaperDenominatorReport(BaseModel):
     report_checksum: DatasetManifestChecksum | None = None
 
     def with_checksum(self) -> "PaperDenominatorReport":
-        payload = self.model_dump(mode="json")
-        payload["report_checksum"] = None
         return self.model_copy(
             update={
                 "report_checksum": DatasetManifestChecksum(
-                    value=stable_json_checksum(payload)
+                    value=stable_model_checksum(self, "report_checksum")
                 )
             }
         )
 
     def to_json(self) -> str:
-        return json.dumps(self.model_dump(mode="json"), indent=2, sort_keys=True) + "\n"
+        return stable_model_json(self)
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -358,16 +359,6 @@ def _add_missing_evidence(
         evidence_groups,
         reason_code=reason_code,
         example_ref=example_ref,
-    )
-
-
-def _md_cell(value: object) -> str:
-    text = "" if value is None else str(value)
-    return (
-        text.replace("\\", "\\\\")
-        .replace("|", "\\|")
-        .replace("\n", " ")
-        .replace("\r", " ")
     )
 
 

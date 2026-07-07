@@ -13,6 +13,7 @@ from pathlib import Path
 import click
 
 from ..core import BenchmarkConfig, Definition, Solution, Workload
+from ..core.data.json_utils import load_json_file, load_jsonl_file
 
 
 @dataclass(frozen=True)
@@ -24,16 +25,11 @@ class ResolvedProblemInputs:
 
 
 def _load_definition(path: Path) -> Definition:
-    return Definition(**json.loads(path.read_text()))
+    return load_json_file(Definition, path)
 
 
 def _load_workloads(path: Path) -> list[Workload]:
-    workloads = []
-    for line in path.read_text().splitlines():
-        line = line.strip()
-        if line:
-            workloads.append(Workload(**json.loads(line)))
-    return workloads
+    return load_jsonl_file(Workload, path)
 
 
 def _load_solution(path: Path) -> Solution:

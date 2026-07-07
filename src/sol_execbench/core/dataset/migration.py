@@ -25,8 +25,10 @@ from typing import Literal, cast
 
 from pydantic import BaseModel, Field
 
+from sol_execbench.core.data.json_utils import stable_model_checksum, stable_model_json
+
 from .categories import validate_categories
-from .checksums import sha256_file, stable_json_checksum
+from .checksums import sha256_file
 from .manifest import DatasetManifestChecksum, utc_timestamp
 
 MIGRATION_MANIFEST_SCHEMA_VERSION = "sol_execbench.dataset_migration_manifest.v1"
@@ -115,18 +117,16 @@ class DatasetMigrationManifest(BaseModel):
     manifest_checksum: DatasetManifestChecksum | None = None
 
     def with_checksum(self) -> "DatasetMigrationManifest":
-        payload = self.model_dump(mode="json")
-        payload["manifest_checksum"] = None
         return self.model_copy(
             update={
                 "manifest_checksum": DatasetManifestChecksum(
-                    value=stable_json_checksum(payload)
+                    value=stable_model_checksum(self, "manifest_checksum")
                 )
             }
         )
 
     def to_json(self) -> str:
-        return json.dumps(self.model_dump(mode="json"), indent=2, sort_keys=True) + "\n"
+        return stable_model_json(self)
 
 
 def write_migration_manifest(manifest: DatasetMigrationManifest, path: Path) -> None:

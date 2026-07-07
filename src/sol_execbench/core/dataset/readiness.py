@@ -4,13 +4,13 @@
 
 from __future__ import annotations
 
-import json
 from collections import defaultdict
 from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from .checksums import stable_json_checksum
+from sol_execbench.core.data.json_utils import stable_model_checksum, stable_model_json
+
 from .inventory import DatasetInventory, ProblemInventoryRecord, WorkloadInventoryRecord
 from .low_precision import (
     CDNA4_VALIDATION_DEFERRED_CODE,
@@ -124,18 +124,16 @@ class DatasetReadiness(BaseModel):
     readiness_checksum: DatasetManifestChecksum | None = None
 
     def with_checksum(self) -> "DatasetReadiness":
-        payload = self.model_dump(mode="json")
-        payload["readiness_checksum"] = None
         return self.model_copy(
             update={
                 "readiness_checksum": DatasetManifestChecksum(
-                    value=stable_json_checksum(payload)
+                    value=stable_model_checksum(self, "readiness_checksum")
                 )
             }
         )
 
     def to_json(self) -> str:
-        return json.dumps(self.model_dump(mode="json"), indent=2, sort_keys=True) + "\n"
+        return stable_model_json(self)
 
 
 def _reason(

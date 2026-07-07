@@ -23,6 +23,7 @@ from typing import Any
 from pydantic import ConfigDict, Field
 
 from .data.base_model import BaseModelWithDocstrings
+from .text_utils import text_tail as _tail
 
 
 ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION = "sol_execbench.environment_snapshot.v1"
@@ -248,7 +249,9 @@ def collect_environment_snapshot(
 
 def build_environment_diagnostics(
     *,
-    snapshot_collector: Callable[[], EnvironmentSnapshot] = collect_environment_snapshot,
+    snapshot_collector: Callable[
+        [], EnvironmentSnapshot
+    ] = collect_environment_snapshot,
     smoke_checker: Callable[[], list[EnvironmentCheckResult]] | None = None,
     now: Callable[[], datetime] | None = None,
 ) -> EnvironmentDiagnostics:
@@ -256,7 +259,9 @@ def build_environment_diagnostics(
 
     snapshot = snapshot_collector()
     checks = _tool_checks(snapshot)
-    checks.extend(smoke_checker() if smoke_checker is not None else run_pytorch_smoke_checks())
+    checks.extend(
+        smoke_checker() if smoke_checker is not None else run_pytorch_smoke_checks()
+    )
     status = _aggregate_check_status(
         [snapshot.collection_status, *(check.status for check in checks)]
     )
@@ -608,13 +613,3 @@ def _aggregate_check_status(
 def _visible_device_environment() -> dict[str, str]:
     keys = ("HIP_VISIBLE_DEVICES", "ROCR_VISIBLE_DEVICES", "HSA_OVERRIDE_GFX_VERSION")
     return {key: value for key in keys if (value := os.environ.get(key)) is not None}
-
-
-def _tail(value: object, limit: int = 4000) -> str:
-    if value is None:
-        return ""
-    if isinstance(value, bytes):
-        text = value.decode(errors="replace")
-    else:
-        text = str(value)
-    return text[-limit:]

@@ -17,12 +17,12 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from pydantic import BaseModel
 
-from .checksums import stable_json_checksum
+from sol_execbench.core.data.json_utils import stable_model_checksum, stable_model_json
+
 from .layout import LayoutCategory, LayoutDiagnostic, inspect_dataset_layout
 from sol_execbench.core.utils import utc_timestamp
 
@@ -79,26 +79,18 @@ class DatasetManifest(BaseModel):
     def with_checksum(self) -> "DatasetManifest":
         """Return a copy with a stable checksum over the manifest payload."""
 
-        payload = self.model_dump(mode="json")
-        payload["manifest_checksum"] = None
-        checksum = stable_json_checksum(payload)
         return self.model_copy(
             update={
-                "manifest_checksum": DatasetManifestChecksum(value=checksum),
+                "manifest_checksum": DatasetManifestChecksum(
+                    value=stable_model_checksum(self, "manifest_checksum")
+                ),
             }
         )
 
     def to_json(self) -> str:
         """Serialize deterministically for sidecar output."""
 
-        return (
-            json.dumps(
-                self.model_dump(mode="json"),
-                indent=2,
-                sort_keys=True,
-            )
-            + "\n"
-        )
+        return stable_model_json(self)
 
 
 def build_dataset_manifest(

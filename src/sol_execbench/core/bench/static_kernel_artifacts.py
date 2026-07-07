@@ -5,12 +5,12 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import shutil
 from pathlib import Path
 from typing import Any, cast
 
+from sol_execbench.core.dataset.checksums import sha256_file
 from sol_execbench.core.bench.static_kernel_evidence_builders import (
     build_static_kernel_evidence_sidecar,
     build_static_kernel_evidence_unavailable,
@@ -283,11 +283,7 @@ def _relative_path_string(path: Path, base: Path) -> str:
 
 
 def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    return sha256_file(path)
 
 
 def _is_inspectable_artifact(path: Path) -> bool:

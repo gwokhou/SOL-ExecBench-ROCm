@@ -23,6 +23,7 @@ from sol_execbench.core.scoring.solar_derivation import (
     SolarAggregateStatus,
     SolarDerivationEvidence,
 )
+from sol_execbench.core.text_utils import ordered_unique
 from sol_execbench.sol_score import sol_score
 
 
@@ -190,7 +191,10 @@ def score_amd_native_workload(
     score_value = None
     if solar_aggregate is not None and solar_aggregate.status == "unscored":
         score_value = None
-    elif isinstance(artifact, AmdSolBoundV2Artifact) and not artifact.aggregate_bound.scored:
+    elif (
+        isinstance(artifact, AmdSolBoundV2Artifact)
+        and not artifact.aggregate_bound.scored
+    ):
         if UNSCORED_SOL_BOUND_WARNING not in warnings:
             warnings.append(UNSCORED_SOL_BOUND_WARNING)
     elif _has_complete_numeric_inputs(
@@ -328,7 +332,9 @@ def build_amd_native_suite_report_from_traces(
 ) -> AmdNativeSuiteReport:
     """Build a suite report from canonical traces and derived SOL artifacts."""
     evidence_refs_by_workload_uuid = evidence_refs_by_workload_uuid or {}
-    derived_evidence_refs_by_workload_uuid = derived_evidence_refs_by_workload_uuid or {}
+    derived_evidence_refs_by_workload_uuid = (
+        derived_evidence_refs_by_workload_uuid or {}
+    )
     solar_derivations_by_workload_uuid = solar_derivations_by_workload_uuid or {}
     scores = []
     for trace in traces:
@@ -399,8 +405,10 @@ def _warnings_for_artifact(
         warnings.append(UNSUPPORTED_EVIDENCE_WARNING)
 
     if (
-        artifact.hardware_model.hardware_validation_status != HardwareValidationStatus.VALIDATED
-        or artifact.hardware_model.model_validation_status != HardwareValidationStatus.VALIDATED
+        artifact.hardware_model.hardware_validation_status
+        != HardwareValidationStatus.VALIDATED
+        or artifact.hardware_model.model_validation_status
+        != HardwareValidationStatus.VALIDATED
     ):
         warnings.append(UNVALIDATED_HARDWARE_WARNING)
 
@@ -440,13 +448,7 @@ def _warnings_for_solar_aggregate(
 
 
 def _unique(values: list[str]) -> list[str]:
-    seen: set[str] = set()
-    unique: list[str] = []
-    for value in values:
-        if value not in seen:
-            seen.add(value)
-            unique.append(value)
-    return unique
+    return ordered_unique(values)
 
 
 def _evidence_refs(

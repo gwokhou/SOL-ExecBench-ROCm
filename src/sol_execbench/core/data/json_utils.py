@@ -14,8 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unified JSON encoding/decoding utilities for Pydantic BaseModel objects."""
+"""Unified JSON encoding/decoding utilities for JSON and Pydantic models."""
 
+import hashlib
+import json
 from pathlib import Path
 from typing import Type, TypeVar, Union
 
@@ -42,6 +44,36 @@ def save_json_file(object: BaseModel, path: Union[str, Path]) -> None:
         f.write(object.model_dump_json(indent=2, exclude_unset=True))
 
 
+def stable_model_json(model: BaseModel) -> str:
+    """Serialize a Pydantic model with deterministic key ordering."""
+
+    return json.dumps(model.model_dump(mode="json"), indent=2, sort_keys=True) + "\n"
+
+
+def stable_model_checksum(model: BaseModel, checksum_field: str) -> str:
+    """Return a stable checksum for *model* with *checksum_field* nulled."""
+
+    payload = model.model_dump(mode="json")
+    payload[checksum_field] = None
+    encoded = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def load_json_dict(path: Union[str, Path]) -> dict:
+    """Load a JSON object from *path*."""
+
+    path = Path(path)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"Expected JSON object at {path}")
+    return payload
+
+
 def load_json_file(model_cls: Type[T], path: Union[str, Path]) -> T:
     """
     Load a Pydantic BaseModel object from a JSON file.
@@ -66,8 +98,7 @@ def load_json_file(model_cls: Type[T], path: Union[str, Path]) -> T:
     ValidationError
         If the JSON data doesn't match the BaseModel schema.
     """
-    with open(Path(path), "r", encoding="utf-8") as f:
-        return model_cls.model_validate_json(f.read())
+    return model_cls.model_validate_json(Path(path).read_text(encoding="utf-8"))
 
 
 def save_jsonl_file(objects: list[BaseModel], path: Union[str, Path]) -> None:
@@ -117,8 +148,8 @@ def load_jsonl_file(model_cls: Type[T], path: Union[str, Path]) -> list[T]:
     ValidationError
         If any JSON line doesn't match the BaseModel schema.
     """
-    out = []
-    with open(Path(path), "r", encoding="utf-8") as f:
+    out: list[T] = []
+    with Path(path).open("r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if line:

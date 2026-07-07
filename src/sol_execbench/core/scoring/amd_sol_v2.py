@@ -21,6 +21,14 @@ from sol_execbench.core.scoring.amd_hardware_models import (
     HardwareValidationStatus,
     amd_hardware_model_from_dict,
 )
+from sol_execbench.core.scoring.parsing_utils import (
+    ensure_dict as _ensure_dict,
+    parse_confidence as _parse_confidence,
+    parse_list as _parse_list,
+    parse_str as _parse_str,
+    parse_str_item as _parse_str_item,
+)
+from sol_execbench.core.text_utils import ordered_unique
 
 
 AMD_SOL_V2_SCHEMA_VERSION = "sol_execbench.amd_sol_bound.v2"
@@ -150,10 +158,14 @@ def build_amd_sol_bound_v2_artifact(
     """Build an AMD SOL bound artifact v2 sidecar."""
     graph = build_bound_graph(definition, workload)
     estimates = estimate_bound_work(graph)
-    op_bounds = tuple(_bound_for_estimate(estimate, hardware_model) for estimate in estimates)
+    op_bounds = tuple(
+        _bound_for_estimate(estimate, hardware_model) for estimate in estimates
+    )
     coverage = _coverage_for_estimates(estimates)
     aggregate = _aggregate_for_bounds(op_bounds, hardware_model)
-    warnings = _warnings_for_artifact(graph.warnings, estimates, aggregate, hardware_model)
+    warnings = _warnings_for_artifact(
+        graph.warnings, estimates, aggregate, hardware_model
+    )
     return AmdSolBoundV2Artifact(
         definition=definition.name,
         workload_uuid=workload.uuid,
@@ -207,7 +219,9 @@ def amd_sol_bound_v2_from_dict(payload: dict[str, Any]) -> AmdSolBoundV2Artifact
     )
     return AmdSolBoundV2Artifact(
         definition=_parse_str(payload, "definition", source="AMD SOL v2 artifact"),
-        workload_uuid=_parse_str(payload, "workload_uuid", source="AMD SOL v2 artifact"),
+        workload_uuid=_parse_str(
+            payload, "workload_uuid", source="AMD SOL v2 artifact"
+        ),
         hardware_model_ref=(
             str(payload["hardware_model_ref"])
             if payload["hardware_model_ref"] is not None
@@ -219,7 +233,12 @@ def amd_sol_bound_v2_from_dict(payload: dict[str, Any]) -> AmdSolBoundV2Artifact
         ),
         bound_graph=bound_graph,
         operator_work_estimates=operator_work_estimates,
-        op_bounds=tuple(_op_bound_from_dict(raw, index) for index, raw in enumerate(_parse_list(payload, "op_bounds", source="AMD SOL v2 artifact"))),
+        op_bounds=tuple(
+            _op_bound_from_dict(raw, index)
+            for index, raw in enumerate(
+                _parse_list(payload, "op_bounds", source="AMD SOL v2 artifact")
+            )
+        ),
         aggregate_bound=_aggregate_from_dict(
             _parse_dict(payload, "aggregate_bound", source="AMD SOL v2 artifact")
         ),
@@ -292,7 +311,8 @@ def _aggregate_for_bounds(
         )
     if (
         any(bound.confidence == EstimateConfidence.INEXACT for bound in op_bounds)
-        or hardware_model.hardware_validation_status != HardwareValidationStatus.VALIDATED
+        or hardware_model.hardware_validation_status
+        != HardwareValidationStatus.VALIDATED
         or hardware_model.model_validation_status != HardwareValidationStatus.VALIDATED
         or hardware_model.confidence != EstimateConfidence.SUPPORTED
     ):
@@ -317,7 +337,9 @@ def _coverage_for_estimates(
 ) -> AmdSolV2CoverageSummary:
     op_family_counts: dict[str, int] = {}
     confidence_counts: dict[str, dict[str, int]] = {}
-    worst = EstimateConfidence.SUPPORTED if estimates else EstimateConfidence.UNSUPPORTED
+    worst = (
+        EstimateConfidence.SUPPORTED if estimates else EstimateConfidence.UNSUPPORTED
+    )
 
     for estimate in estimates:
         family = estimate.op_family.value
@@ -337,10 +359,14 @@ def _coverage_for_estimates(
     return AmdSolV2CoverageSummary(
         total_ops=len(estimates),
         supported_ops=sum(
-            1 for estimate in estimates if estimate.confidence == EstimateConfidence.SUPPORTED
+            1
+            for estimate in estimates
+            if estimate.confidence == EstimateConfidence.SUPPORTED
         ),
         inexact_ops=sum(
-            1 for estimate in estimates if estimate.confidence == EstimateConfidence.INEXACT
+            1
+            for estimate in estimates
+            if estimate.confidence == EstimateConfidence.INEXACT
         ),
         unsupported_ops=sum(
             1
@@ -366,7 +392,9 @@ def _warnings_for_artifact(
         for warning in estimate.warnings:
             warnings.append(f"estimate_warning:{estimate.node_id}:{warning}")
         if estimate.confidence == EstimateConfidence.INEXACT:
-            warnings.append(f"inexact_operator:{estimate.node_id}:{estimate.op_family.value}")
+            warnings.append(
+                f"inexact_operator:{estimate.node_id}:{estimate.op_family.value}"
+            )
         elif estimate.confidence == EstimateConfidence.UNSUPPORTED:
             warnings.append(
                 f"unsupported_operator:{estimate.node_id}:{estimate.op_family.value}"
@@ -510,31 +538,6 @@ def _parse_dict(payload: dict[str, Any], key: str, *, source: str) -> dict[str, 
     return _ensure_dict(value, source=f"{source}.{key}")
 
 
-def _ensure_dict(value: Any, *, source: str) -> dict[str, Any]:
-    if not isinstance(value, dict):
-        raise ValueError(f"{source} must be an object")
-    return value
-
-
-def _parse_list(payload: dict[str, Any], key: str, *, source: str) -> list[Any]:
-    value = payload[key]
-    if not isinstance(value, list):
-        raise ValueError(f"{source}.{key} must be a list")
-    return value
-
-
-def _parse_str(payload: dict[str, Any], key: str, *, source: str) -> str:
-    return _parse_str_item(payload[key], source=f"{source}.{key}")
-
-
-def _parse_str_item(value: Any, *, source: str) -> str:
-    if not isinstance(value, str):
-        raise ValueError(f"{source} must be a string")
-    if not value:
-        raise ValueError(f"{source} must be non-empty")
-    return value
-
-
 def _parse_float(payload: dict[str, Any], key: str, *, source: str) -> float:
     try:
         return float(payload[key])
@@ -586,27 +589,5 @@ def _parse_nested_int_map(
     return parsed
 
 
-def _parse_confidence(
-    payload: dict[str, Any],
-    key: str,
-    *,
-    source: str,
-) -> EstimateConfidence:
-    raw = _parse_str(payload, key, source=source)
-    try:
-        return EstimateConfidence(raw)
-    except ValueError as exc:
-        valid_values = ", ".join(value.value for value in EstimateConfidence)
-        raise ValueError(
-            f"{source}.{key} has invalid confidence '{raw}', expected one of: {valid_values}"
-        ) from exc
-
-
 def _unique(values: list[str]) -> tuple[str, ...]:
-    seen: set[str] = set()
-    result: list[str] = []
-    for value in values:
-        if value not in seen:
-            result.append(value)
-            seen.add(value)
-    return tuple(result)
+    return tuple(ordered_unique(values))
