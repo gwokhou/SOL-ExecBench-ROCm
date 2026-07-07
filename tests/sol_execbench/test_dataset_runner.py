@@ -6,6 +6,7 @@ from pathlib import Path
 
 from sol_execbench.core.dataset import cli_execution
 from sol_execbench.core.dataset import runner
+from sol_execbench.core.dataset import solutions
 
 
 def _definition(reference: str = "def run(x):\n    return x\n") -> dict:
@@ -24,7 +25,7 @@ def test_sanitize_python_source_only_rewrites_stream_identifiers():
         "    return stream + mainstream\n"
     )
 
-    sanitized = runner.sanitize_python_source_for_static_review(source)
+    sanitized = solutions.sanitize_python_source_for_static_review(source)
 
     assert "def run(strm, mainstream):" in sanitized
     assert "return strm + mainstream" in sanitized
@@ -34,7 +35,7 @@ def test_sanitize_python_source_only_rewrites_stream_identifiers():
 
 
 def test_build_reference_solution_uses_token_aware_stream_sanitizer():
-    solution = runner.build_reference_solution(
+    solution = solutions.build_reference_solution(
         _definition(
             "def run(stream, x):\n"
             "    note = 'stream literal'\n"
@@ -56,7 +57,7 @@ def test_build_custom_solution_preserves_metadata_and_detects_dps(tmp_path):
     solution_py = tmp_path / "solution.py"
     solution_py.write_text("def run(x, out):\n    stream = x\n    return out\n")
 
-    solution = runner.build_custom_solution(_definition(), solution_py)
+    solution = solutions.build_custom_solution(_definition(), solution_py)
 
     assert solution["name"] == "custom_demo"
     assert solution["sources"][0]["path"] == "solution.py"
