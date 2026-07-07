@@ -12,12 +12,12 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
-from sol_execbench.core.dataset import (
+from sol_execbench.core.dataset.inventory import build_dataset_inventory
+from sol_execbench.core.dataset.profiler_timing_coverage import (
     ProfilerTimingCoverageReport,
-    build_dataset_inventory,
     build_profiler_timing_coverage_report,
-    classify_rocm_readiness,
 )
+from sol_execbench.core.dataset.readiness import classify_rocm_readiness
 
 DEFAULT_DATASET_ROOT = Path("data/SOL-ExecBench/benchmark")
 DEFAULT_OUTPUT_DIR = Path("out/rdna4-profiler-sharded-closure-audit")

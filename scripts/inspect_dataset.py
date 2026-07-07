@@ -12,19 +12,25 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from sol_execbench.core.dataset import (  # noqa: E402
+from sol_execbench.core.dataset.categories import validate_categories  # noqa: E402
+from sol_execbench.core.dataset.inventory import (  # noqa: E402
     build_dataset_inventory,
-    build_ready_subset,
-    classify_rocm_readiness,
-    validate_categories,
     write_dataset_inventory,
+)
+from sol_execbench.core.dataset.readiness import (  # noqa: E402
+    classify_rocm_readiness,
     write_dataset_readiness,
+)
+from sol_execbench.core.dataset.ready_subset import (  # noqa: E402
+    build_ready_subset,
     write_ready_subset,
 )
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Generate SOL-ExecBench dataset inventory/readiness sidecars.")
+    parser = argparse.ArgumentParser(
+        description="Generate SOL-ExecBench dataset inventory/readiness sidecars."
+    )
     parser.add_argument("--dataset-root", type=Path, required=True)
     parser.add_argument("--manifest", type=Path)
     parser.add_argument("--inventory", type=Path)

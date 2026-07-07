@@ -32,15 +32,13 @@ from sol_execbench.core.bench.timing_policy import (
     TimingPolicy,
     TimingSourceType,
 )
-from sol_execbench.core.dataset import (
-    ProfilerTimingCoverageReport,
-    build_dataset_inventory,
-    build_profiler_timing_coverage_report,
-    classify_rocm_readiness,
-)
 from sol_execbench.core.dataset.profiler_timing_coverage import (
+    ProfilerTimingCoverageReport,
     ProfilerTimingProblemCoverage,
+    build_profiler_timing_coverage_report,
 )
+from sol_execbench.core.dataset.inventory import build_dataset_inventory
+from sol_execbench.core.dataset.readiness import classify_rocm_readiness
 from sol_execbench.core.dataset.solutions import build_reference_solution
 from sol_execbench.core.data.json_utils import load_json_dict
 from sol_execbench.driver import ProblemPackager
