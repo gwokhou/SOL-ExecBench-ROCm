@@ -39,17 +39,9 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from . import evaluation as cli_evaluation
 from . import environment as cli_environment
+from . import metadata as cli_metadata
 from . import reporting as cli_reporting
 from . import sidecars as cli_sidecars
-from ..core.data.contract import build_evaluator_contract
-from ..core.environment import build_environment_diagnostics
-from ..core.toolchain import (
-    ToolchainArtifactType,
-    ToolchainEvidenceLevel,
-    ToolchainRoutingRequest,
-    build_toolchain_routing_report,
-    default_toolchain_registry,
-)
 from ..core.bench.io import flashinfer_safetensors_env
 from ..core.bench.rocm_profiler import Rocprofv3ProfileResult
 from ..core.bench.stderr import filter_benign_rocm_stderr
@@ -516,83 +508,6 @@ def _evaluate_cli(
     sys.exit(0 if all_passed else 1)
 
 
-@click.command("contract", context_settings={"help_option_names": ["-h", "--help"]})
-@click.option("--json", "json_output", is_flag=True, help="Print contract JSON")
-def _contract_cli(json_output: bool) -> None:
-    """Print the GPU-free evaluator compatibility contract."""
-
-    if not json_output:
-        raise click.ClickException("Only --json output is supported for contract")
-    payload = build_evaluator_contract().model_dump(mode="json")
-    click.echo(json.dumps(payload, sort_keys=True))
-
-
-@click.command("doctor", context_settings={"help_option_names": ["-h", "--help"]})
-@click.option("--json", "json_output", is_flag=True, help="Print diagnostics JSON")
-def _doctor_cli(json_output: bool) -> None:
-    """Print ROCm environment diagnostics."""
-
-    if not json_output:
-        raise click.ClickException("Only --json output is supported for doctor")
-    payload = build_environment_diagnostics().model_dump(mode="json")
-    click.echo(json.dumps(payload, sort_keys=True))
-
-
-@click.command("toolchain", context_settings={"help_option_names": ["-h", "--help"]})
-@click.option("--json", "json_output", is_flag=True, help="Print routing JSON")
-@click.option(
-    "--evidence-level",
-    type=click.Choice([level.value for level in ToolchainEvidenceLevel]),
-    default=ToolchainEvidenceLevel.PROFILING.value,
-    show_default=True,
-    help="Evidence level to route",
-)
-@click.option(
-    "--artifact-type",
-    type=click.Choice([artifact.value for artifact in ToolchainArtifactType]),
-    default=ToolchainArtifactType.EXECUTABLE_RUN.value,
-    show_default=True,
-    help="Artifact type to route",
-)
-@click.option("--gpu-arch", "gpu_architecture", help="GPU architecture such as gfx1200")
-@click.option("--hardware-generation", help="Hardware generation such as RDNA 4")
-@click.option("--rocm-version", help="ROCm version such as 7.0")
-@click.option(
-    "--list-registry",
-    is_flag=True,
-    help="Print registry entries instead of a routing decision",
-)
-def _toolchain_cli(
-    json_output: bool,
-    evidence_level: str,
-    artifact_type: str,
-    gpu_architecture: str | None,
-    hardware_generation: str | None,
-    rocm_version: str | None,
-    list_registry: bool,
-) -> None:
-    """Print ROCm toolchain routing diagnostics."""
-
-    if not json_output:
-        raise click.ClickException("Only --json output is supported for toolchain")
-    if list_registry:
-        payload = [
-            capability.model_dump(mode="json")
-            for capability in default_toolchain_registry()
-        ]
-        click.echo(json.dumps(payload, sort_keys=True))
-        return
-    request = ToolchainRoutingRequest(
-        evidence_level=ToolchainEvidenceLevel(evidence_level),
-        artifact_type=ToolchainArtifactType(artifact_type),
-        gpu_architecture=gpu_architecture,
-        hardware_generation=hardware_generation,
-        rocm_version=rocm_version,
-    )
-    payload = build_toolchain_routing_report(request).model_dump(mode="json")
-    click.echo(json.dumps(payload, sort_keys=True))
-
-
 @click.group("baseline", context_settings={"help_option_names": ["-h", "--help"]})
 def _baseline_cli() -> None:
     """Measured baseline export utilities."""
@@ -758,7 +673,7 @@ class SolExecbenchCli(click.Command):
         args = list(args) if args is not None else sys.argv[1:]
         if args and args[0] == "contract":
             contract_prog = f"{prog_name or self.name} contract"
-            return _contract_cli.main(
+            return cli_metadata._contract_cli.main(
                 args=args[1:],
                 prog_name=contract_prog,
                 complete_var=complete_var,
@@ -768,7 +683,7 @@ class SolExecbenchCli(click.Command):
             )
         if args and args[0] == "doctor":
             doctor_prog = f"{prog_name or self.name} doctor"
-            return _doctor_cli.main(
+            return cli_metadata._doctor_cli.main(
                 args=args[1:],
                 prog_name=doctor_prog,
                 complete_var=complete_var,
@@ -778,7 +693,7 @@ class SolExecbenchCli(click.Command):
             )
         if args and args[0] == "toolchain":
             toolchain_prog = f"{prog_name or self.name} toolchain"
-            return _toolchain_cli.main(
+            return cli_metadata._toolchain_cli.main(
                 args=args[1:],
                 prog_name=toolchain_prog,
                 complete_var=complete_var,
