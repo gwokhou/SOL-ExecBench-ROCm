@@ -80,15 +80,17 @@ from sol_execbench.core.dataset.run_closure import (
 )
 from sol_execbench.core.dataset.runner import (
     _extend_derived_reports_for_problem,
-    build_custom_solution,
-    build_reference_solution,
-    build_solution_for_problem,
     build_amd_score_reports_for_problem,
     collect_timing_evidence_for_problem,
     inspect_traces,
     print_summary,
     write_amd_score_report,
     write_summary_report,
+)
+from sol_execbench.core.dataset.solutions import (
+    build_custom_solution,
+    build_reference_solution,
+    build_solution_for_problem,
 )
 from sol_execbench.core.dataset.run_state import (
     closure_status_for_trace as _run_state_closure_status_for_trace,

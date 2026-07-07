@@ -41,7 +41,7 @@ from sol_execbench.core.dataset import (
 from sol_execbench.core.dataset.profiler_timing_coverage import (
     ProfilerTimingProblemCoverage,
 )
-from sol_execbench.core.dataset.runner import build_reference_solution
+from sol_execbench.core.dataset.solutions import build_reference_solution
 from sol_execbench.driver import ProblemPackager
 from sol_execbench.core.bench.pid_lock import (
     acquire_pid_lock,

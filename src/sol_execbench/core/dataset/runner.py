@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import ast
-import io
 import json
-import tokenize
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -23,122 +20,6 @@ from sol_execbench.core.scoring.amd_score import (
     AmdNativeScore,
 )
 from sol_execbench.core.scoring.baseline_artifact import ScoringBaselineArtifact
-
-
-def infer_destination_passing_style(code: str, definition: dict) -> bool:
-    """Infer destination-passing style by checking the ``run()`` signature."""
-    output_names = list(definition.get("outputs", {}).keys())
-    if not output_names:
-        return False
-
-    last_output = output_names[-1]
-
-    try:
-        tree = ast.parse(code)
-    except SyntaxError:
-        return False
-
-    for node in ast.walk(tree):
-        if (
-            isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-            and node.name == "run"
-        ):
-            args = node.args
-            if args.args:
-                last_param = args.args[-1].arg
-                return last_param == last_output
-            break
-
-    return False
-
-
-def sanitize_python_source_for_static_review(code: str) -> str:
-    """Rename exact ``stream`` identifiers without mutating comments or strings."""
-    tokens: list[tokenize.TokenInfo] = []
-    reader = io.StringIO(code).readline
-    for token in tokenize.generate_tokens(reader):
-        if token.type == tokenize.NAME and token.string == "stream":
-            token = tokenize.TokenInfo(
-                token.type,
-                "strm",
-                token.start,
-                token.end,
-                token.line,
-            )
-        tokens.append(token)
-    return tokenize.untokenize(tokens)
-
-
-def build_solution_for_problem(
-    definition: dict, problem_dir: Path, solution_name: str | None = None
-) -> dict:
-    """Build a reference or custom solution for a problem directory."""
-    if solution_name is not None:
-        solution_file = problem_dir / solution_name
-        if solution_file.exists():
-            if solution_file.suffix == ".json":
-                print(f"  Using solution in {solution_file}...")
-                return json.loads(solution_file.read_text())
-            print(f"  Building solution from {solution_file}...")
-            return build_custom_solution(definition, solution_file)
-    print("  Building solution from Definition.reference...")
-    return build_reference_solution(definition)
-
-
-def build_custom_solution(definition: dict, solution_py: Path) -> dict:
-    """Wrap an external ``solution.py`` file as a Solution dict."""
-    name = definition["name"]
-    code = solution_py.read_text()
-    dps = infer_destination_passing_style(code, definition)
-    code = sanitize_python_source_for_static_review(code)
-
-    return {
-        "name": f"custom_{name}",
-        "definition": name,
-        "author": "run_dataset",
-        "description": f"Custom solution from {solution_py.name}.",
-        "spec": {
-            "languages": ["pytorch"],
-            "target_hardware": ["LOCAL"],
-            "entry_point": "solution.py::run",
-            "dependencies": ["torch"],
-            "destination_passing_style": dps,
-        },
-        "sources": [
-            {
-                "path": "solution.py",
-                "content": code,
-            }
-        ],
-    }
-
-
-def build_reference_solution(definition: dict) -> dict:
-    """Construct a Solution dict that wraps the definition's reference code."""
-    name = definition["name"]
-    reference_code = definition["reference"]
-    dps = infer_destination_passing_style(reference_code, definition)
-    reference_code = sanitize_python_source_for_static_review(reference_code)
-
-    return {
-        "name": f"reference_{name}",
-        "definition": name,
-        "author": "run_dataset",
-        "description": "Identity solution: definition reference as-is.",
-        "spec": {
-            "languages": ["pytorch"],
-            "target_hardware": ["LOCAL"],
-            "entry_point": "reference.py::run",
-            "dependencies": ["torch"],
-            "destination_passing_style": dps,
-        },
-        "sources": [
-            {
-                "path": "reference.py",
-                "content": reference_code,
-            }
-        ],
-    }
 
 
 def collect_timing_evidence_for_problem(
