@@ -71,7 +71,7 @@ Run recent evaluation and dataset trustworthiness regressions:
 
 ```bash
 uv run pytest \
-  tests/sol_execbench/test_cli_environment_snapshot.py \
+  tests/sol_execbench/test_cli_diagnostics.py \
   tests/sol_execbench/core/bench/test_eval_runtime.py \
   tests/sol_execbench/core/data/test_solution.py \
   tests/sol_execbench/test_dataset_run_closure.py \
@@ -273,7 +273,7 @@ Focused run:
 
 ```bash
 uv run pytest \
-  tests/sol_execbench/test_cli_environment_snapshot.py \
+  tests/sol_execbench/test_cli_diagnostics.py \
   tests/sol_execbench/core/bench/test_eval_runtime.py \
   tests/sol_execbench/core/data/test_solution.py \
   tests/sol_execbench/driver/test_build_ext.py \
