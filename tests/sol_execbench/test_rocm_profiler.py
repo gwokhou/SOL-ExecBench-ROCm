@@ -213,7 +213,7 @@ def test_default_profile_collection_requests_graceful_eval_driver_exit(
         )
 
     monkeypatch.setattr(
-        "sol_execbench.core.bench.rocm_profiler.subprocess.run", fake_run
+        "sol_execbench.core.bench.rocm_profiler_commands.subprocess.run", fake_run
     )
     request = Rocprofv3ProfileRequest(
         application_command=("python", "eval_driver.py"),
@@ -567,7 +567,7 @@ def test_default_live_collection_requests_graceful_eval_driver_exit(
         )
 
     monkeypatch.setattr(
-        "sol_execbench.core.bench.rocm_profiler.subprocess.run", fake_run
+        "sol_execbench.core.bench.rocm_profiler_commands.subprocess.run", fake_run
     )
     request = Rocprofv3CollectionRequest(
         application_command=("uv", "run", "sol-execbench", "problem"),
