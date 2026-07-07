@@ -273,6 +273,8 @@ def _evaluate_cli(
         )
 
     # Phase 2: Evaluate
+    eval_cmd = packager.execute()
+
     if profile == PROFILE_ROCPROFV3:
         console.print("[dim]Collecting optional rocprofv3 profiling evidence...[/dim]")
 
@@ -287,6 +289,7 @@ def _evaluate_cli(
 
         runtime_result = cli_evaluation_runtime.run_evaluation_runtime(
             packager,
+            eval_cmd=eval_cmd,
             staging_dir=staging_dir,
             output_file=output_file,
             timeout=timeout,

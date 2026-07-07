@@ -20,8 +20,6 @@ PROFILE_ROCPROFV3 = "rocprofv3"
 
 
 class EvaluationPackager(Protocol):
-    def execute(self) -> list[str]: ...
-
     def convert_stdout_to_traces(self, stdout: str) -> list[Any]: ...
 
 
@@ -81,6 +79,7 @@ def _run_profiled_or_none(
 def run_evaluation_runtime(
     packager: EvaluationPackager,
     *,
+    eval_cmd: list[str],
     staging_dir: Path,
     output_file: Path | None,
     timeout: int,
@@ -88,7 +87,6 @@ def run_evaluation_runtime(
 ) -> EvaluationRuntimeSuccess | EvaluationRuntimeNoTraceFailure:
     """Run evaluation and classify subprocess outcomes without CLI side effects."""
 
-    eval_cmd = packager.execute()
     profiled_proc, profile_result = _run_profiled_or_none(
         eval_cmd,
         staging_dir=staging_dir,

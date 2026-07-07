@@ -24,12 +24,10 @@ class _FakeTrace:
 class _FakePackager:
     def __init__(self, traces: list[_FakeTrace] | None = None) -> None:
         self.traces = traces or []
-        self.execute_called = False
         self.converted_stdout: str | None = None
 
     def execute(self) -> list[str]:
-        self.execute_called = True
-        return ["python", "candidate.py"]
+        raise AssertionError("runtime must not call execute")
 
     def convert_stdout_to_traces(self, stdout: str) -> list[_FakeTrace]:
         self.converted_stdout = stdout
@@ -54,6 +52,7 @@ def test_run_evaluation_runtime_returns_success_for_parseable_traces(
 
     result = evaluation_runtime.run_evaluation_runtime(
         packager,
+        eval_cmd=["python", "candidate.py"],
         staging_dir=tmp_path,
         output_file=None,
         timeout=7,
@@ -61,7 +60,6 @@ def test_run_evaluation_runtime_returns_success_for_parseable_traces(
     )
 
     assert isinstance(result, evaluation_runtime.EvaluationRuntimeSuccess)
-    assert packager.execute_called is True
     assert packager.converted_stdout == '{"trace": 1}\n'
     assert len(result.traces) == 1
     assert result.returncode == 0
@@ -87,6 +85,7 @@ def test_run_evaluation_runtime_classifies_timeout(
 
     result = evaluation_runtime.run_evaluation_runtime(
         packager,
+        eval_cmd=["python", "candidate.py"],
         staging_dir=tmp_path,
         output_file=None,
         timeout=5,
@@ -120,6 +119,7 @@ def test_run_evaluation_runtime_classifies_failure_without_stdout(
 
     result = evaluation_runtime.run_evaluation_runtime(
         packager,
+        eval_cmd=["python", "candidate.py"],
         staging_dir=tmp_path,
         output_file=None,
         timeout=5,
@@ -153,6 +153,7 @@ def test_run_evaluation_runtime_classifies_no_parseable_traces(
 
     result = evaluation_runtime.run_evaluation_runtime(
         packager,
+        eval_cmd=["python", "candidate.py"],
         staging_dir=tmp_path,
         output_file=None,
         timeout=5,
@@ -197,6 +198,7 @@ def test_run_evaluation_runtime_falls_back_when_profile_unavailable(
 
     result = evaluation_runtime.run_evaluation_runtime(
         packager,
+        eval_cmd=["python", "candidate.py"],
         staging_dir=tmp_path,
         output_file=tmp_path / "trace.jsonl",
         timeout=5,
