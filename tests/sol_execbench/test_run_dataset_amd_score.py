@@ -11,8 +11,8 @@ import pytest
 
 from sol_execbench.core.bench.config import BenchmarkConfig
 from sol_execbench.core.dataset.evidence_refs import sidecar_stem_for_workload
-from sol_execbench.core.scoring import amd_score_reports
 from sol_execbench.core.scoring.amd_score import build_amd_native_suite_report
+import sol_execbench.core.scoring.amd_score_reports as amd_score_reports
 from sol_execbench.core.scoring.baseline_artifact import (
     scoring_baseline_artifact_from_dict,
 )
@@ -204,8 +204,8 @@ def test_runner_score_report_wrapper_uses_cli_execution_run_cli(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    from sol_execbench.core.dataset import cli_execution
-    from sol_execbench.core.dataset import runner
+    import sol_execbench.core.dataset.cli_execution as cli_execution
+    import sol_execbench.core.dataset.runner as runner
 
     calls = []
 

@@ -3,12 +3,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from sol_execbench.core.dataset import (
-    build_dataset_inventory,
+from sol_execbench.core.dataset.inventory import build_dataset_inventory
+from sol_execbench.core.dataset.profiler_timing_coverage import (
     build_profiler_timing_coverage_report,
-    classify_rocm_readiness,
     render_profiler_timing_coverage_markdown,
 )
+from sol_execbench.core.dataset.readiness import classify_rocm_readiness
 
 
 def _definition(

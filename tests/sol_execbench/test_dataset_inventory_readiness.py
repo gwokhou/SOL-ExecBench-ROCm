@@ -4,16 +4,22 @@ import json
 import importlib.util
 from pathlib import Path
 
-from sol_execbench.core.dataset import (
+from sol_execbench.core.dataset.inventory import (
     DatasetInventory,
     InventoryDenominators,
     ProblemInventoryRecord,
     WorkloadInventoryRecord,
     build_dataset_inventory,
-    build_ready_subset,
-    classify_rocm_readiness,
+)
+from sol_execbench.core.dataset.migration import (
     migrate_flashinfer_trace,
     migrate_sol_execbench,
+)
+from sol_execbench.core.dataset.readiness import (
+    classify_rocm_readiness,
+)
+from sol_execbench.core.dataset.ready_subset import (
+    build_ready_subset,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]

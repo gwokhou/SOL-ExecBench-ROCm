@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sol_execbench.core.dataset import solutions
+import sol_execbench.core.dataset.solutions as solutions
 
 
 def _definition(reference: str = "def run(x):\n    return x\n") -> dict:

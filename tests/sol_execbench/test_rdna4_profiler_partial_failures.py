@@ -5,11 +5,11 @@ import sys
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
-from sol_execbench.core.dataset import (
-    build_dataset_inventory,
+from sol_execbench.core.dataset.inventory import build_dataset_inventory
+from sol_execbench.core.dataset.profiler_timing_coverage import (
     build_profiler_timing_coverage_report,
-    classify_rocm_readiness,
 )
+from sol_execbench.core.dataset.readiness import classify_rocm_readiness
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = (

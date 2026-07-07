@@ -15,7 +15,7 @@ from sol_execbench.core.dataset.evidence_refs import (
     build_derived_evidence_refs,
     sidecar_stem_for_workload,
 )
-from sol_execbench.core.dataset import cli_execution
+import sol_execbench.core.dataset.cli_execution as cli_execution
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RUN_DATASET_PATH = REPO_ROOT / "scripts" / "run_dataset.py"
