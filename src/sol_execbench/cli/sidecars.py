@@ -30,6 +30,14 @@ from ..core.bench.static_kernel_evidence import (
 )
 from ..core.dataset.checksums import sha256_file, stable_json_checksum
 from ..core.runtime_evidence import write_json_payload
+from .profile_sidecars import (
+    _profile_output_directory as _profile_output_directory,
+    _profile_sidecar_path as _profile_sidecar_path,
+    _profile_summary_artifact_citations as _profile_summary_artifact_citations,
+    _profile_summary_sidecar_path as _profile_summary_sidecar_path,
+    _write_profile_sidecar as _write_profile_sidecar,
+    _write_profile_summary_sidecar as _write_profile_summary_sidecar,
+)
 
 console = Console(stderr=True)
 
