@@ -15,13 +15,13 @@ import json
 from collections import Counter
 from pathlib import Path
 
-from sol_execbench.core.dataset import (
-    build_dataset_inventory,
-    build_profiler_timing_coverage_report,
-    classify_rocm_readiness,
-    validate_categories,
-)
 from sol_execbench.core.checksums import stable_json_checksum
+from sol_execbench.core.dataset.categories import validate_categories
+from sol_execbench.core.dataset.inventory import build_dataset_inventory
+from sol_execbench.core.dataset.profiler_timing_coverage import (
+    build_profiler_timing_coverage_report,
+)
+from sol_execbench.core.dataset.readiness import classify_rocm_readiness
 
 DEFAULT_DATASET_ROOT = Path("data/SOL-ExecBench/benchmark")
 DEFAULT_BASELINE_PATH = Path("out/rdna4-coverage-current/coverage.json")
