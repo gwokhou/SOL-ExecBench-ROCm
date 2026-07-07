@@ -36,7 +36,13 @@ def subprocess_text(value: str | bytes | None) -> str:
 def text_tail(value: object, *, limit: int = 4000) -> str:
     """Normalize *value* to text and return its last *limit* characters."""
 
-    return subprocess_text(value)[-limit:]
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        text = value.decode(errors="replace")
+    else:
+        text = str(value)
+    return text[-limit:]
 
 
 def ordered_unique(values: Iterable[_T]) -> list[_T]:
