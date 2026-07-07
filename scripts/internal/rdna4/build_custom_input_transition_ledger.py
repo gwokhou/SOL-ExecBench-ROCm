@@ -21,7 +21,7 @@ from sol_execbench.core.dataset import (
     classify_rocm_readiness,
     validate_categories,
 )
-from sol_execbench.core.dataset.checksums import stable_json_checksum
+from sol_execbench.core.checksums import stable_json_checksum
 
 DEFAULT_DATASET_ROOT = Path("data/SOL-ExecBench/benchmark")
 DEFAULT_BASELINE_PATH = Path("out/rdna4-coverage-current/coverage.json")

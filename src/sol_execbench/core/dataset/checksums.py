@@ -17,9 +17,21 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 from pathlib import Path
+
+from sol_execbench.core.checksums import (
+    sha256_bytes,
+    sha256_file,
+    stable_json_checksum,
+)
+
+__all__ = [
+    "CANONICAL_PROBLEM_FILES",
+    "checksum_category",
+    "sha256_bytes",
+    "sha256_file",
+    "stable_json_checksum",
+]
 
 CANONICAL_PROBLEM_FILES: tuple[str, ...] = (
     "definition.json",
@@ -27,31 +39,6 @@ CANONICAL_PROBLEM_FILES: tuple[str, ...] = (
     "workload.jsonl",
 )
 """Problem files included in category checksums when present."""
-
-
-def sha256_bytes(data: bytes) -> str:
-    """Return the sha256 hex digest for *data*."""
-
-    return hashlib.sha256(data).hexdigest()
-
-
-def sha256_file(path: Path) -> str:
-    """Return the sha256 hex digest for one file."""
-
-    with path.open("rb") as handle:
-        return hashlib.file_digest(handle, "sha256").hexdigest()
-
-
-def stable_json_checksum(payload: object) -> str:
-    """Return a stable sha256 over a JSON-serializable payload."""
-
-    encoded = json.dumps(
-        payload,
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=True,
-    ).encode("utf-8")
-    return sha256_bytes(encoded)
 
 
 def checksum_category(category_dir: Path) -> str | None:

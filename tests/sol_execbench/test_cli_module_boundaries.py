@@ -365,18 +365,6 @@ def test_cross_domain_imports_stay_explicitly_allowlisted() -> None:
             "sol_execbench.core.scoring.baseline_artifact",
         ),
         (
-            "sol_execbench.core.bench.agent_feedback",
-            "sol_execbench.core.dataset.checksums",
-        ),
-        (
-            "sol_execbench.core.bench.profile_summary",
-            "sol_execbench.core.dataset.checksums",
-        ),
-        (
-            "sol_execbench.core.bench.static_kernel_artifacts",
-            "sol_execbench.core.dataset.checksums",
-        ),
-        (
             "sol_execbench.core.scoring.amd_bound_sanity",
             "sol_execbench.core.dataset.manifest",
         ),
