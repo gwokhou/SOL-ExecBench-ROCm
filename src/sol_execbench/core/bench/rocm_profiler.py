@@ -5,1243 +5,163 @@
 
 from __future__ import annotations
 
-import csv
-import json
-import os
-import re
-import shutil
 import subprocess
-from collections.abc import Callable
-from collections.abc import Sequence
-from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime
-from pathlib import Path
-from typing import Any
 
-from sol_execbench.core.bench.timing_policy import (
-    TimingActivityDomain,
-    TimingBackend,
-    TimingPolicy,
-    timing_policy_for_languages,
-    select_timing_policy,
+from sol_execbench.core.bench.rocm_profiler_artifacts import (
+    _classify_profile_artifact,
+    _has_profiler_data_artifact,
+    _is_known_profile_artifact_name,
+    _is_profile_artifact_candidate,
+    _is_profiler_data_artifact,
+    _is_unprefixed_profile_artifact_name,
+    _normalize_profile_artifact_token,
+    _profile_artifact_coverage_metadata,
+    _profile_artifact_sort_key,
+    _profile_output_directory_listing,
+    classify_profile_artifact,
+    discover_rocprofv3_artifacts,
+    has_profiler_data_artifact,
+    is_profiler_data_artifact,
+    profile_output_directory_listing,
 )
-from sol_execbench.core.reporting import CANONICAL_BENCHMARK_OUTPUT
+from sol_execbench.core.bench.rocm_profiler_commands import (
+    ProfileRunner,
+    ProfilerRunner,
+    _default_profile_runner,
+    _default_runner,
+    build_rocprofv3_command,
+    build_rocprofv3_profile_command,
+    default_profile_runner,
+    default_runner,
+)
+from sol_execbench.core.bench.rocm_profiler_models import (
+    ROCPROFV3_EVIDENCE_SCHEMA_VERSION,
+    ROCPROFV3_EXECUTABLE,
+    ROCPROFV3_PROFILE_SCHEMA_VERSION,
+    ROCPROF_REASON_ARTIFACTS_REGISTERED,
+    ROCPROF_REASON_COMMAND_FAILED,
+    ROCPROF_REASON_COMMAND_TIMEOUT,
+    ROCPROF_REASON_DIAGNOSTIC_LOG_REGISTERED,
+    ROCPROF_REASON_NO_REGISTERED_ARTIFACTS,
+    ROCPROF_REASON_PARTIAL_ARTIFACT_COVERAGE,
+    ROCPROF_REASON_UNAVAILABLE,
+    ROCPROF_WARNING_INCOMPLETE_ARTIFACT_COVERAGE,
+    ROCPROF_WARNING_NO_PROFILER_DATA_ARTIFACTS,
+    DefaultTimingSelection,
+    Rocprofv3CollectionRequest,
+    Rocprofv3CollectionResult,
+    Rocprofv3ProfileArtifact,
+    Rocprofv3ProfileRequest,
+    Rocprofv3ProfileResult,
+    Rocprofv3TimingEvidence,
+    Rocprofv3TimingRow,
+)
+from sol_execbench.core.bench.rocm_profiler_profile import (
+    _prepare_profile_output_directory,
+    _profile_result_metadata,
+    _subprocess_text,
+    _tail,
+    _write_rocprofv3_diagnostic_artifact,
+    collect_rocprofv3_profile,
+    prepare_profile_output_directory,
+    profile_result_metadata,
+    subprocess_text,
+    write_rocprofv3_diagnostic_artifact,
+)
+from sol_execbench.core.bench.rocm_profiler_timing import (
+    _duration_ns,
+    _find_rocprofv3_csv,
+    _first_numeric,
+    _first_value,
+    _normalize_header,
+    _read_overhead_calibration,
+    build_compact_timing_evidence,
+    build_timing_evidence,
+    collect_rocprofv3_timing,
+    collect_source_timing_evidence,
+    duration_ns,
+    find_rocprofv3_csv,
+    first_numeric,
+    first_value,
+    normalize_header,
+    parse_rocprofv3_csv,
+    read_overhead_calibration,
+    select_default_timing,
+    summarize_rocprofv3_csv,
+)
 
-
-ROCPROFV3_EXECUTABLE = "rocprofv3"
-ROCPROFV3_EVIDENCE_SCHEMA_VERSION = "sol_execbench.rocprofv3_timing.v1"
-ROCPROFV3_PROFILE_SCHEMA_VERSION = "sol_execbench.rocprofv3_profile.v1"
-ROCPROF_REASON_ARTIFACTS_REGISTERED = "rocprof_artifacts_registered"
-ROCPROF_REASON_NO_REGISTERED_ARTIFACTS = "rocprof_no_registered_artifacts"
-ROCPROF_REASON_DIAGNOSTIC_LOG_REGISTERED = "rocprof_diagnostic_log_registered"
-ROCPROF_REASON_PARTIAL_ARTIFACT_COVERAGE = "rocprof_partial_artifact_coverage"
-ROCPROF_REASON_COMMAND_FAILED = "rocprof_command_failed"
-ROCPROF_REASON_COMMAND_TIMEOUT = "rocprof_command_timeout"
-ROCPROF_REASON_UNAVAILABLE = "rocprof_unavailable"
-# Artifact kinds that are diagnostic/opaque only and never count as profiler data.
-# Single source of truth; profile_summary.py reuses this for status/limitations.
-_NON_DATA_ARTIFACT_KINDS = frozenset({"diagnostic_json", "other"})
-ROCPROF_WARNING_NO_PROFILER_DATA_ARTIFACTS = (
-    "rocprofv3 returned success but produced no profiler data artifacts"
-)
-ROCPROF_WARNING_INCOMPLETE_ARTIFACT_COVERAGE = (
-    "rocprofv3 registered artifacts, but coverage is incomplete or only opaque "
-    "artifacts were discovered"
-)
-_PROFILE_ARTIFACT_SUFFIXES = {
-    ".csv",
-    ".db",
-    ".json",
-    ".otf2",
-    ".pftrace",
-    ".rocpd",
-    ".sqlite",
-    ".sqlite3",
-    ".trace",
-}
-_PROFILE_OUTPUT_DIR_NAMES = {
-    "rocprofiler",
-    "rocprofiler-sdk",
-    "rocprofv3",
-    "rocprofv3-results",
-    "roctracer",
-}
-ProfilerRunner = Callable[[Sequence[str]], subprocess.CompletedProcess[str]]
-ProfileRunner = Callable[
-    [Sequence[str], Path | None, int | None], subprocess.CompletedProcess[str]
+__all__ = [
+    "_classify_profile_artifact",
+    "_default_profile_runner",
+    "_default_runner",
+    "_duration_ns",
+    "_find_rocprofv3_csv",
+    "_first_numeric",
+    "_first_value",
+    "_has_profiler_data_artifact",
+    "_is_known_profile_artifact_name",
+    "_is_profile_artifact_candidate",
+    "_is_profiler_data_artifact",
+    "_is_unprefixed_profile_artifact_name",
+    "_normalize_header",
+    "_normalize_profile_artifact_token",
+    "_prepare_profile_output_directory",
+    "_profile_artifact_coverage_metadata",
+    "_profile_artifact_sort_key",
+    "_profile_output_directory_listing",
+    "_profile_result_metadata",
+    "_read_overhead_calibration",
+    "_subprocess_text",
+    "_tail",
+    "_write_rocprofv3_diagnostic_artifact",
+    "ROCPROFV3_EVIDENCE_SCHEMA_VERSION",
+    "ROCPROFV3_EXECUTABLE",
+    "ROCPROFV3_PROFILE_SCHEMA_VERSION",
+    "ROCPROF_REASON_ARTIFACTS_REGISTERED",
+    "ROCPROF_REASON_COMMAND_FAILED",
+    "ROCPROF_REASON_COMMAND_TIMEOUT",
+    "ROCPROF_REASON_DIAGNOSTIC_LOG_REGISTERED",
+    "ROCPROF_REASON_NO_REGISTERED_ARTIFACTS",
+    "ROCPROF_REASON_PARTIAL_ARTIFACT_COVERAGE",
+    "ROCPROF_REASON_UNAVAILABLE",
+    "ROCPROF_WARNING_INCOMPLETE_ARTIFACT_COVERAGE",
+    "ROCPROF_WARNING_NO_PROFILER_DATA_ARTIFACTS",
+    "DefaultTimingSelection",
+    "ProfileRunner",
+    "ProfilerRunner",
+    "Rocprofv3CollectionRequest",
+    "Rocprofv3CollectionResult",
+    "Rocprofv3ProfileArtifact",
+    "Rocprofv3ProfileRequest",
+    "Rocprofv3ProfileResult",
+    "Rocprofv3TimingEvidence",
+    "Rocprofv3TimingRow",
+    "build_compact_timing_evidence",
+    "build_rocprofv3_command",
+    "build_rocprofv3_profile_command",
+    "build_timing_evidence",
+    "classify_profile_artifact",
+    "collect_rocprofv3_profile",
+    "collect_rocprofv3_timing",
+    "collect_source_timing_evidence",
+    "default_profile_runner",
+    "default_runner",
+    "discover_rocprofv3_artifacts",
+    "duration_ns",
+    "find_rocprofv3_csv",
+    "first_numeric",
+    "first_value",
+    "has_profiler_data_artifact",
+    "is_profiler_data_artifact",
+    "normalize_header",
+    "parse_rocprofv3_csv",
+    "prepare_profile_output_directory",
+    "profile_output_directory_listing",
+    "profile_result_metadata",
+    "read_overhead_calibration",
+    "select_default_timing",
+    "subprocess",
+    "subprocess_text",
+    "summarize_rocprofv3_csv",
+    "write_rocprofv3_diagnostic_artifact",
 ]
-
-
-@dataclass(frozen=True)
-class Rocprofv3ProfileArtifact:
-    """One profiler artifact registered from a `rocprofv3` output directory."""
-
-    path: Path
-    kind: str
-    size_bytes: int
-
-    def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-serializable artifact payload."""
-        return {
-            "path": str(self.path),
-            "kind": self.kind,
-            "size_bytes": self.size_bytes,
-        }
-
-
-@dataclass(frozen=True)
-class Rocprofv3ProfileRequest:
-    """Request to collect optional diagnostic `rocprofv3` artifacts."""
-
-    application_command: tuple[str, ...]
-    output_directory: Path
-    output_file: str
-    working_directory: Path | None = None
-    executable: str = ROCPROFV3_EXECUTABLE
-    include_hip_runtime: bool = True
-    output_format: str = "rocpd"
-    timeout_seconds: int | None = None
-
-
-@dataclass(frozen=True)
-class Rocprofv3ProfileResult:
-    """Result metadata for optional `rocprofv3` artifact collection."""
-
-    status: str
-    command: tuple[str, ...]
-    output_directory: Path
-    output_file: str
-    artifacts: tuple[Rocprofv3ProfileArtifact, ...] = ()
-    returncode: int | None = None
-    stdout: str = ""
-    stderr: str = ""
-    skipped_reason: str | None = None
-    failed_reason: str | None = None
-    working_directory: Path | None = None
-    timeout_seconds: int | None = None
-    profiler_available: bool | None = None
-    artifact_coverage_status: str | None = None
-    reason_codes: tuple[str, ...] = ()
-    warnings: tuple[str, ...] = ()
-    output_format: str | None = None
-    profiler_data_artifacts: bool = False
-    output_directory_listing: tuple[str, ...] = ()
-    schema_version: str = ROCPROFV3_PROFILE_SCHEMA_VERSION
-
-    @property
-    def succeeded(self) -> bool:
-        """Whether profiler collection completed with registered artifacts."""
-        return self.status == "success"
-
-    @property
-    def has_profiler_data(self) -> bool:
-        """Whether any registered artifact carries profiler data.
-
-        Diagnostic/opaque kinds (``diagnostic_json``, ``other``) do not count.
-        Centralizes the data-vs-diagnostic classification so consumers
-        (e.g. profile_summary) read this instead of re-deriving it.
-        """
-        return _has_profiler_data_artifact(self.artifacts)
-
-    def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-serializable diagnostic sidecar payload."""
-        return {
-            "schema_version": self.schema_version,
-            "status": self.status,
-            "diagnostic_only": True,
-            "score_authority": False,
-            "command": list(self.command),
-            "working_directory": (
-                str(self.working_directory)
-                if self.working_directory is not None
-                else None
-            ),
-            "timeout_seconds": self.timeout_seconds,
-            "output_directory": str(self.output_directory),
-            "output_file": self.output_file,
-            "profiler_available": self.profiler_available,
-            "artifact_coverage_status": self.artifact_coverage_status,
-            "output_format": self.output_format,
-            "profiler_data_artifacts": self.profiler_data_artifacts,
-            "output_directory_listing": list(self.output_directory_listing),
-            "reason_codes": list(self.reason_codes),
-            "warnings": list(self.warnings),
-            "returncode": self.returncode,
-            "stdout_tail": _tail(self.stdout),
-            "stderr_tail": _tail(self.stderr),
-            "skipped_reason": self.skipped_reason,
-            "failed_reason": self.failed_reason,
-            "artifacts": [artifact.to_dict() for artifact in self.artifacts],
-        }
-
-
-@dataclass(frozen=True)
-class Rocprofv3TimingRow:
-    """One normalized timing row parsed from `rocprofv3` CSV output."""
-
-    name: str
-    domain: str
-    duration_ns: float
-    raw: dict[str, str] = field(default_factory=dict)
-
-    @property
-    def duration_ms(self) -> float:
-        """Duration in milliseconds."""
-        return self.duration_ns / 1_000_000.0
-
-    @property
-    def is_kernel_activity(self) -> bool:
-        """Whether this row represents kernel activity."""
-        normalized = _normalize_header(self.domain)
-        return "kernel" in normalized
-
-    def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-serializable row payload."""
-        return {
-            "name": self.name,
-            "domain": self.domain,
-            "duration_ns": self.duration_ns,
-            "duration_ms": self.duration_ms,
-            "is_kernel_activity": self.is_kernel_activity,
-            "raw": dict(self.raw),
-        }
-
-
-@dataclass(frozen=True)
-class Rocprofv3TimingEvidence:
-    """Derived profiler timing evidence for one profiled command."""
-
-    tool_version: str
-    gpu_architecture: str
-    activity_domain: TimingActivityDomain
-    aggregation_rule: str
-    backend: TimingBackend
-    interpretation: str
-    parsed_rows: tuple[Rocprofv3TimingRow, ...]
-    warmup_runs: int | None = None
-    iterations: int | None = None
-    trial_count: int | None = None
-    clock_locked: bool | None = None
-    fallback_applied: bool = False
-    fallback_reason: str | None = None
-    profiler_overhead_ms: float | None = None
-    schema_version: str = ROCPROFV3_EVIDENCE_SCHEMA_VERSION
-    derived: bool = True
-    canonical_output: str = CANONICAL_BENCHMARK_OUTPUT
-
-    @property
-    def kernel_duration_ms(self) -> float:
-        """Aggregate kernel activity duration in milliseconds."""
-        return sum(
-            row.duration_ms for row in self.parsed_rows if row.is_kernel_activity
-        )
-
-    def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-serializable evidence payload."""
-        return {
-            "schema_version": self.schema_version,
-            "derived": self.derived,
-            "canonical_output": self.canonical_output,
-            "tool_version": self.tool_version,
-            "gpu_architecture": self.gpu_architecture,
-            "activity_domain": self.activity_domain.value,
-            "aggregation_rule": self.aggregation_rule,
-            "backend": self.backend.value,
-            "interpretation": self.interpretation,
-            "warmup_runs": self.warmup_runs,
-            "iterations": self.iterations,
-            "trial_count": self.trial_count,
-            "clock_locked": self.clock_locked,
-            "fallback_applied": self.fallback_applied,
-            "fallback_reason": self.fallback_reason,
-            "profiler_overhead_ms": self.profiler_overhead_ms,
-            "kernel_duration_ms": self.kernel_duration_ms,
-            "parsed_rows": [row.to_dict() for row in self.parsed_rows],
-        }
-
-
-@dataclass(frozen=True)
-class DefaultTimingSelection:
-    """Policy-aware decision for profiler-backed timing or fallback."""
-
-    policy: TimingPolicy
-    profiler_backed: bool
-    fallback_applied: bool
-    reason: str
-
-    def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-serializable selection payload."""
-        return {
-            "policy": self.policy.to_dict(),
-            "profiler_backed": self.profiler_backed,
-            "fallback_applied": self.fallback_applied,
-            "reason": self.reason,
-        }
-
-
-@dataclass(frozen=True)
-class Rocprofv3CollectionRequest:
-    """Request to collect live profiler timing evidence for one command."""
-
-    application_command: tuple[str, ...]
-    output_directory: Path
-    output_file: str
-    policy: TimingPolicy
-    tool_version: str
-    gpu_architecture: str
-    executable: str = ROCPROFV3_EXECUTABLE
-    include_hip_runtime: bool = True
-    warmup_runs: int | None = None
-    iterations: int | None = None
-    trial_count: int | None = None
-    clock_locked: bool | None = None
-    compact_rows: bool = False
-
-
-@dataclass(frozen=True)
-class Rocprofv3CollectionResult:
-    """Result of live profiler collection or explicit fallback routing."""
-
-    evidence: Rocprofv3TimingEvidence | None
-    selection: DefaultTimingSelection
-    command: tuple[str, ...] = ()
-    csv_path: Path | None = None
-    returncode: int | None = None
-    stdout: str = ""
-    stderr: str = ""
-
-    @property
-    def profiler_collected(self) -> bool:
-        """Whether live profiler evidence was collected and parsed."""
-        return self.evidence is not None and not self.selection.fallback_applied
-
-    def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-serializable collection result payload."""
-        return {
-            "profiler_collected": self.profiler_collected,
-            "selection": self.selection.to_dict(),
-            "command": list(self.command),
-            "csv_path": str(self.csv_path) if self.csv_path is not None else None,
-            "returncode": self.returncode,
-            "stdout": self.stdout,
-            "stderr": self.stderr,
-            "evidence": self.evidence.to_dict() if self.evidence is not None else None,
-        }
-
-
-def build_rocprofv3_command(
-    application_command: Sequence[str],
-    *,
-    output_directory: str,
-    output_file: str,
-    executable: str = ROCPROFV3_EXECUTABLE,
-    include_hip_runtime: bool = True,
-) -> list[str]:
-    """Build a `rocprofv3` command for kernel timing evidence collection."""
-    return build_rocprofv3_profile_command(
-        application_command,
-        output_directory=output_directory,
-        output_file=output_file,
-        executable=executable,
-        include_hip_runtime=include_hip_runtime,
-        output_format="csv",
-    )
-
-
-def build_rocprofv3_profile_command(
-    application_command: Sequence[str],
-    *,
-    output_directory: str,
-    output_file: str,
-    executable: str = ROCPROFV3_EXECUTABLE,
-    include_hip_runtime: bool = True,
-    output_format: str = "rocpd",
-) -> list[str]:
-    """Build a `rocprofv3` command for optional diagnostic artifacts."""
-    if not application_command:
-        raise ValueError("application_command must not be empty")
-
-    command = [
-        executable,
-        "--kernel-trace",
-        "--output-format",
-        output_format,
-        "--output-directory",
-        output_directory,
-        "--output-file",
-        output_file,
-    ]
-    if include_hip_runtime:
-        command.insert(2, "--hip-runtime-trace")
-    return [*command, "--", *application_command]
-
-
-def discover_rocprofv3_artifacts(
-    output_directory: Path,
-    output_file: str,
-) -> tuple[Rocprofv3ProfileArtifact, ...]:
-    """Register profiler artifacts produced for an output-file prefix."""
-    artifacts: list[Rocprofv3ProfileArtifact] = []
-    if not output_directory.exists():
-        return ()
-
-    for path in sorted(output_directory.rglob("*"), key=_profile_artifact_sort_key):
-        if not path.is_file():
-            continue
-        if not _is_profile_artifact_candidate(path, output_directory, output_file):
-            continue
-        artifacts.append(
-            Rocprofv3ProfileArtifact(
-                path=path,
-                kind=_classify_profile_artifact(path),
-                size_bytes=path.stat().st_size,
-            )
-        )
-    return tuple(artifacts)
-
-
-def _profile_artifact_sort_key(path: Path) -> tuple[str, ...]:
-    return tuple(path.parts)
-
-
-def _is_profile_artifact_candidate(
-    path: Path,
-    output_directory: Path,
-    output_file: str,
-) -> bool:
-    name = path.name
-    if output_file and name.startswith(output_file):
-        return True
-    if not output_file:
-        return False
-
-    if not _is_known_profile_artifact_name(path):
-        return False
-
-    try:
-        relative_parts = path.relative_to(output_directory).parts[:-1]
-    except ValueError:
-        return False
-    if not relative_parts:
-        return _is_unprefixed_profile_artifact_name(path)
-    normalized_parts = {
-        _normalize_profile_artifact_token(part) for part in relative_parts
-    }
-    if output_file in relative_parts:
-        return True
-    return bool(normalized_parts & _PROFILE_OUTPUT_DIR_NAMES)
-
-
-def _is_known_profile_artifact_name(path: Path) -> bool:
-    if path.suffix.lower() in _PROFILE_ARTIFACT_SUFFIXES:
-        return True
-    normalized_name = _normalize_profile_artifact_token(path.name)
-    return normalized_name in {
-        "agent-info",
-        "counter-collection",
-        "kernel-trace",
-        "metadata",
-    }
-
-
-def _is_unprefixed_profile_artifact_name(path: Path) -> bool:
-    suffix = path.suffix.lower()
-    normalized_name = _normalize_profile_artifact_token(path.stem or path.name)
-    if suffix in {".db", ".sqlite", ".sqlite3", ".rocpd", ".pftrace", ".otf2"}:
-        return True
-    if suffix == ".json":
-        return normalized_name in {
-            "agent-info",
-            "metadata",
-            "out-config",
-            "results",
-        }
-    if suffix == ".csv":
-        return any(
-            token in normalized_name
-            for token in (
-                "agent",
-                "counter",
-                "hip",
-                "hsa",
-                "kernel",
-                "marker",
-                "memory",
-                "rocdecode",
-                "rocjpeg",
-                "runtime",
-                "trace",
-            )
-        )
-    return False
-
-
-def _normalize_profile_artifact_token(value: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
-
-
-def _profile_artifact_coverage_metadata(
-    artifacts: Sequence[Rocprofv3ProfileArtifact],
-    *,
-    command_succeeded: bool,
-) -> tuple[str, tuple[str, ...], tuple[str, ...]]:
-    if not artifacts:
-        return "none", (), ()
-
-    has_profiler_data_artifact = any(
-        _is_profiler_data_artifact(artifact) for artifact in artifacts
-    )
-    if command_succeeded and has_profiler_data_artifact:
-        return "complete", (ROCPROF_REASON_ARTIFACTS_REGISTERED,), ()
-
-    if command_succeeded and any(
-        artifact.kind == "diagnostic_json" for artifact in artifacts
-    ):
-        return (
-            "diagnostic_logs_only",
-            (
-                ROCPROF_REASON_NO_REGISTERED_ARTIFACTS,
-                ROCPROF_REASON_DIAGNOSTIC_LOG_REGISTERED,
-            ),
-            (ROCPROF_WARNING_NO_PROFILER_DATA_ARTIFACTS,),
-        )
-
-    return (
-        "partial",
-        (ROCPROF_REASON_PARTIAL_ARTIFACT_COVERAGE,),
-        (ROCPROF_WARNING_INCOMPLETE_ARTIFACT_COVERAGE,),
-    )
-
-
-def _is_profiler_data_artifact(artifact: Rocprofv3ProfileArtifact) -> bool:
-    return artifact.kind not in _NON_DATA_ARTIFACT_KINDS
-
-
-def _subprocess_text(value: str | bytes | None) -> str:
-    if value is None:
-        return ""
-    if isinstance(value, bytes):
-        return value.decode(errors="replace")
-    return value
-
-
-def collect_rocprofv3_profile(
-    request: Rocprofv3ProfileRequest,
-    *,
-    rocprofv3_available: bool = True,
-    runner: ProfileRunner | None = None,
-) -> Rocprofv3ProfileResult:
-    """Collect optional `rocprofv3` artifacts without changing score semantics."""
-    command = build_rocprofv3_profile_command(
-        request.application_command,
-        output_directory=str(request.output_directory),
-        output_file=request.output_file,
-        executable=request.executable,
-        include_hip_runtime=request.include_hip_runtime,
-        output_format=request.output_format,
-    )
-    if not rocprofv3_available:
-        return Rocprofv3ProfileResult(
-            status="unavailable",
-            command=tuple(command),
-            output_directory=request.output_directory,
-            output_file=request.output_file,
-            skipped_reason=f"{request.executable} is not available on PATH",
-            working_directory=request.working_directory,
-            timeout_seconds=request.timeout_seconds,
-            profiler_available=False,
-            artifact_coverage_status="unavailable",
-            reason_codes=(ROCPROF_REASON_UNAVAILABLE,),
-            **_profile_result_metadata(request),
-        )
-
-    _prepare_profile_output_directory(request.output_directory, request.output_file)
-    run = runner or _default_profile_runner
-    try:
-        completed = run(
-            command,
-            request.working_directory,
-            request.timeout_seconds,
-        )
-    except subprocess.TimeoutExpired as exc:
-        # rocprofv3 may have flushed partial artifacts before being killed;
-        # discover them so they are not silently lost, and report a timeout
-        # (not command_failed) reason code.
-        timeout_artifacts = discover_rocprofv3_artifacts(
-            request.output_directory,
-            request.output_file,
-        )
-        timeout_coverage, timeout_reasons, timeout_warnings = (
-            _profile_artifact_coverage_metadata(
-                timeout_artifacts,
-                command_succeeded=False,
-            )
-        )
-        return Rocprofv3ProfileResult(
-            status="failed",
-            command=tuple(command),
-            output_directory=request.output_directory,
-            output_file=request.output_file,
-            artifacts=timeout_artifacts,
-            stdout=_subprocess_text(exc.stdout),
-            stderr=_subprocess_text(exc.stderr),
-            failed_reason=(
-                f"rocprofv3 command timed out after {request.timeout_seconds} seconds"
-            ),
-            working_directory=request.working_directory,
-            timeout_seconds=request.timeout_seconds,
-            profiler_available=True,
-            artifact_coverage_status=timeout_coverage,
-            reason_codes=(ROCPROF_REASON_COMMAND_TIMEOUT, *timeout_reasons),
-            warnings=timeout_warnings,
-            **_profile_result_metadata(request, timeout_artifacts),
-        )
-
-    artifacts = discover_rocprofv3_artifacts(
-        request.output_directory,
-        request.output_file,
-    )
-    if completed.returncode != 0:
-        coverage_status, coverage_reasons, coverage_warnings = (
-            _profile_artifact_coverage_metadata(
-                artifacts,
-                command_succeeded=False,
-            )
-        )
-        return Rocprofv3ProfileResult(
-            status="failed",
-            command=tuple(command),
-            output_directory=request.output_directory,
-            output_file=request.output_file,
-            artifacts=artifacts,
-            returncode=completed.returncode,
-            stdout=completed.stdout or "",
-            stderr=completed.stderr or "",
-            failed_reason=f"rocprofv3 command failed with exit code {completed.returncode}",
-            working_directory=request.working_directory,
-            timeout_seconds=request.timeout_seconds,
-            profiler_available=True,
-            artifact_coverage_status=coverage_status,
-            reason_codes=(ROCPROF_REASON_COMMAND_FAILED, *coverage_reasons),
-            warnings=coverage_warnings,
-            **_profile_result_metadata(request, artifacts),
-        )
-    if not artifacts:
-        # rocprof wrote nothing on disk. Persist a diagnostic log so the run is
-        # not silent, then re-check. If a diagnostic artifact landed, fall
-        # through to the unified tail below, which classifies it as
-        # ``diagnostic_logs_only`` (status=partial) -- the same outcome that an
-        # explicit early return here would produce. Only the genuinely-empty
-        # case needs its own failed return, because the tail treats empty
-        # coverage as success.
-        _write_rocprofv3_diagnostic_artifact(request, completed, command)
-        artifacts = discover_rocprofv3_artifacts(
-            request.output_directory,
-            request.output_file,
-        )
-        if not artifacts:
-            return Rocprofv3ProfileResult(
-                status="failed",
-                command=tuple(command),
-                output_directory=request.output_directory,
-                output_file=request.output_file,
-                returncode=completed.returncode,
-                stdout=completed.stdout or "",
-                stderr=completed.stderr or "",
-                failed_reason="rocprofv3 completed without registered artifacts",
-                working_directory=request.working_directory,
-                timeout_seconds=request.timeout_seconds,
-                profiler_available=True,
-                artifact_coverage_status="none",
-                reason_codes=(ROCPROF_REASON_NO_REGISTERED_ARTIFACTS,),
-                **_profile_result_metadata(request),
-            )
-
-    coverage_status, coverage_reasons, coverage_warnings = (
-        _profile_artifact_coverage_metadata(
-            artifacts,
-            command_succeeded=True,
-        )
-    )
-    status = "success"
-    failed_reason = None
-    if coverage_status == "diagnostic_logs_only":
-        status = "partial"
-        failed_reason = (
-            "rocprofv3 completed without profiler data artifacts; "
-            "diagnostic log artifact registered"
-        )
-    elif coverage_status == "partial":
-        status = "partial"
-    return Rocprofv3ProfileResult(
-        status=status,
-        command=tuple(command),
-        output_directory=request.output_directory,
-        output_file=request.output_file,
-        artifacts=artifacts,
-        returncode=completed.returncode,
-        stdout=completed.stdout or "",
-        stderr=completed.stderr or "",
-        failed_reason=failed_reason,
-        working_directory=request.working_directory,
-        timeout_seconds=request.timeout_seconds,
-        profiler_available=True,
-        artifact_coverage_status=coverage_status,
-        reason_codes=coverage_reasons,
-        warnings=coverage_warnings,
-        **_profile_result_metadata(request, artifacts),
-    )
-
-
-def _has_profiler_data_artifact(
-    artifacts: Sequence[Rocprofv3ProfileArtifact],
-) -> bool:
-    return any(_is_profiler_data_artifact(artifact) for artifact in artifacts)
-
-
-def _profile_result_metadata(
-    request: Rocprofv3ProfileRequest,
-    artifacts: Sequence[Rocprofv3ProfileArtifact] = (),
-) -> dict[str, Any]:
-    """Fields every Rocprofv3ProfileResult derives from the request + artifacts.
-
-    Collapses the ``output_format`` / ``profiler_data_artifacts`` /
-    ``output_directory_listing`` trio that would otherwise be hand-copied onto
-    every return site in ``collect_rocprofv3_profile``.
-    """
-    return {
-        "output_format": request.output_format,
-        "profiler_data_artifacts": _has_profiler_data_artifact(artifacts),
-        "output_directory_listing": _profile_output_directory_listing(
-            request.output_directory
-        ),
-    }
-
-
-def _prepare_profile_output_directory(output_directory: Path, output_file: str) -> None:
-    """Remove stale artifacts that would be registered for this profile run."""
-    output_directory.mkdir(parents=True, exist_ok=True)
-    for path in sorted(
-        output_directory.rglob("*"),
-        key=lambda candidate: len(candidate.parts),
-        reverse=True,
-    ):
-        if path.is_file():
-            if _is_profile_artifact_candidate(path, output_directory, output_file):
-                path.unlink(missing_ok=True)
-            continue
-        if not path.is_dir():
-            continue
-        try:
-            relative_parts = path.relative_to(output_directory).parts
-        except ValueError:
-            continue
-        normalized_parts = {
-            _normalize_profile_artifact_token(part) for part in relative_parts
-        }
-        if (
-            output_file in relative_parts
-            or path.name.startswith(output_file)
-            or bool(normalized_parts & _PROFILE_OUTPUT_DIR_NAMES)
-        ):
-            shutil.rmtree(path, ignore_errors=True)
-
-
-def select_default_timing(
-    policy: TimingPolicy,
-    *,
-    rocprofv3_available: bool,
-) -> DefaultTimingSelection:
-    """Resolve whether the default path can use profiler-backed timing."""
-    if policy.backend == TimingBackend.ROCPROFV3 and rocprofv3_available:
-        return DefaultTimingSelection(
-            policy=policy,
-            profiler_backed=True,
-            fallback_applied=False,
-            reason="rocprofv3 is available for the selected timing policy",
-        )
-
-    if policy.backend != TimingBackend.ROCPROFV3:
-        reason = (
-            f"selected policy backend is {policy.backend.value}, not rocprofv3 "
-            "kernel activity timing"
-        )
-    else:
-        reason = "rocprofv3 is unavailable for the selected timing policy"
-    fallback_policy = replace(
-        select_timing_policy(
-            policy.source_type,
-            profiler_available=False,
-        ),
-        reason=reason,
-    )
-    return DefaultTimingSelection(
-        policy=fallback_policy,
-        profiler_backed=False,
-        fallback_applied=True,
-        reason=reason,
-    )
-
-
-def parse_rocprofv3_csv(content: str) -> tuple[Rocprofv3TimingRow, ...]:
-    """Parse representative `rocprofv3` CSV content into timing rows."""
-    reader = csv.DictReader(content.splitlines())
-    rows: list[Rocprofv3TimingRow] = []
-    for raw_row in reader:
-        normalized = {_normalize_header(key): value for key, value in raw_row.items()}
-        name = _first_value(normalized, "kernelname", "name", "function", "operation")
-        domain = _first_value(normalized, "domain", "kind", "type", "category")
-        duration_ns = _duration_ns(normalized)
-        if name is None or domain is None or duration_ns is None:
-            continue
-        rows.append(
-            Rocprofv3TimingRow(
-                name=name,
-                domain=domain,
-                duration_ns=duration_ns,
-                raw={key: value for key, value in raw_row.items() if key is not None},
-            )
-        )
-    return tuple(rows)
-
-
-def summarize_rocprofv3_csv(path: Path) -> tuple[int, float]:
-    """Stream a `rocprofv3` CSV file into kernel row count and duration."""
-    kernel_rows = 0
-    duration_ns = 0.0
-    with path.open(encoding="utf-8", newline="") as handle:
-        reader = csv.DictReader(handle)
-        for raw_row in reader:
-            normalized = {
-                _normalize_header(key): value for key, value in raw_row.items()
-            }
-            domain = _first_value(normalized, "domain", "kind", "type", "category")
-            row_duration_ns = _duration_ns(normalized)
-            if domain is None or row_duration_ns is None:
-                continue
-            if "kernel" not in _normalize_header(domain):
-                continue
-            kernel_rows += 1
-            duration_ns += row_duration_ns
-    return kernel_rows, duration_ns
-
-
-def build_compact_timing_evidence(
-    *,
-    policy: TimingPolicy,
-    csv_path: Path,
-    tool_version: str,
-    gpu_architecture: str,
-    warmup_runs: int | None = None,
-    iterations: int | None = None,
-    trial_count: int | None = None,
-    clock_locked: bool | None = None,
-    profiler_overhead_ms: float | None = None,
-) -> tuple[Rocprofv3TimingEvidence, int]:
-    """Build summary timing evidence without materializing every CSV row."""
-    kernel_rows, duration_ns = summarize_rocprofv3_csv(csv_path)
-    parsed_rows = ()
-    if kernel_rows > 0:
-        parsed_rows = (
-            Rocprofv3TimingRow(
-                name="compacted_kernel_activity",
-                domain="KERNEL_DISPATCH",
-                duration_ns=duration_ns,
-                raw={"compacted_kernel_activity_rows": str(kernel_rows)},
-            ),
-        )
-    evidence = Rocprofv3TimingEvidence(
-        tool_version=tool_version,
-        gpu_architecture=gpu_architecture,
-        activity_domain=policy.activity_domain,
-        aggregation_rule=policy.aggregation_rule,
-        backend=policy.backend,
-        interpretation=policy.interpretation,
-        parsed_rows=parsed_rows,
-        warmup_runs=warmup_runs,
-        iterations=iterations,
-        trial_count=trial_count,
-        clock_locked=clock_locked,
-        fallback_applied=policy.fallback_applied,
-        fallback_reason=policy.reason if policy.fallback_applied else None,
-        profiler_overhead_ms=profiler_overhead_ms,
-    )
-    return evidence, kernel_rows
-
-
-def build_timing_evidence(
-    *,
-    policy: TimingPolicy,
-    csv_content: str,
-    tool_version: str,
-    gpu_architecture: str,
-    warmup_runs: int | None = None,
-    iterations: int | None = None,
-    trial_count: int | None = None,
-    clock_locked: bool | None = None,
-    profiler_overhead_ms: float | None = None,
-) -> Rocprofv3TimingEvidence:
-    """Build derived profiler timing evidence from parsed CSV content."""
-    return Rocprofv3TimingEvidence(
-        tool_version=tool_version,
-        gpu_architecture=gpu_architecture,
-        activity_domain=policy.activity_domain,
-        aggregation_rule=policy.aggregation_rule,
-        backend=policy.backend,
-        interpretation=policy.interpretation,
-        parsed_rows=parse_rocprofv3_csv(csv_content),
-        warmup_runs=warmup_runs,
-        iterations=iterations,
-        trial_count=trial_count,
-        clock_locked=clock_locked,
-        fallback_applied=policy.fallback_applied,
-        fallback_reason=policy.reason if policy.fallback_applied else None,
-        profiler_overhead_ms=profiler_overhead_ms,
-    )
-
-
-def _read_overhead_calibration(
-    calibration_path: Path | None,
-) -> float | None:
-    """Read profiler overhead calibration value from a JSON sidecar.
-
-    Returns the ``overhead_ms`` value if the file exists and is valid,
-    otherwise None. Never raises — logs warnings on parse errors.
-    """
-    if calibration_path is None or not calibration_path.exists():
-        return None
-    try:
-        payload = json.loads(calibration_path.read_text(encoding="utf-8"))
-        overhead = payload.get("overhead_ms")
-        return float(overhead) if overhead is not None else None
-    except (json.JSONDecodeError, ValueError, OSError) as exc:
-        import logging
-
-        logging.getLogger(__name__).warning(
-            "Failed to read overhead calibration from %s: %s", calibration_path, exc
-        )
-        return None
-
-
-def collect_rocprofv3_timing(
-    request: Rocprofv3CollectionRequest,
-    *,
-    rocprofv3_available: bool = True,
-    runner: ProfilerRunner | None = None,
-    calibration_path: Path | None = None,
-) -> Rocprofv3CollectionResult:
-    """Collect live `rocprofv3` timing evidence for a command.
-
-    The runner is injectable so unit tests can exercise live collection without
-    requiring a GPU or installed profiler. Non-profiler policies return explicit
-    fallback metadata instead of masquerading as kernel activity timing.
-    """
-    selection = select_default_timing(
-        request.policy,
-        rocprofv3_available=rocprofv3_available,
-    )
-    if not selection.profiler_backed:
-        return Rocprofv3CollectionResult(evidence=None, selection=selection)
-
-    request.output_directory.mkdir(parents=True, exist_ok=True)
-    command = build_rocprofv3_command(
-        request.application_command,
-        output_directory=str(request.output_directory),
-        output_file=request.output_file,
-        executable=request.executable,
-        include_hip_runtime=request.include_hip_runtime,
-    )
-    run = runner or _default_runner
-    completed = run(command)
-    csv_path = _find_rocprofv3_csv(request.output_directory, request.output_file)
-    if completed.returncode != 0:
-        fallback = DefaultTimingSelection(
-            policy=select_timing_policy(
-                request.policy.source_type, profiler_available=False
-            ),
-            profiler_backed=False,
-            fallback_applied=True,
-            reason=f"rocprofv3 command failed with exit code {completed.returncode}",
-        )
-        return Rocprofv3CollectionResult(
-            evidence=None,
-            selection=fallback,
-            command=tuple(command),
-            csv_path=csv_path,
-            returncode=completed.returncode,
-            stdout=completed.stdout or "",
-            stderr=completed.stderr or "",
-        )
-    if csv_path is None:
-        fallback = DefaultTimingSelection(
-            policy=select_timing_policy(
-                request.policy.source_type, profiler_available=False
-            ),
-            profiler_backed=False,
-            fallback_applied=True,
-            reason="rocprofv3 did not produce a CSV timing output",
-        )
-        return Rocprofv3CollectionResult(
-            evidence=None,
-            selection=fallback,
-            command=tuple(command),
-            returncode=completed.returncode,
-            stdout=completed.stdout or "",
-            stderr=completed.stderr or "",
-        )
-
-    profiler_overhead_ms = _read_overhead_calibration(calibration_path)
-    compacted_kernel_rows: int | None = None
-    if request.compact_rows:
-        evidence, compacted_kernel_rows = build_compact_timing_evidence(
-            policy=request.policy,
-            csv_path=csv_path,
-            tool_version=request.tool_version,
-            gpu_architecture=request.gpu_architecture,
-            warmup_runs=request.warmup_runs,
-            iterations=request.iterations,
-            trial_count=request.trial_count,
-            clock_locked=request.clock_locked,
-            profiler_overhead_ms=profiler_overhead_ms,
-        )
-    else:
-        evidence = build_timing_evidence(
-            policy=request.policy,
-            csv_content=csv_path.read_text(),
-            tool_version=request.tool_version,
-            gpu_architecture=request.gpu_architecture,
-            warmup_runs=request.warmup_runs,
-            iterations=request.iterations,
-            trial_count=request.trial_count,
-            clock_locked=request.clock_locked,
-            profiler_overhead_ms=profiler_overhead_ms,
-        )
-    if (
-        request.policy.activity_domain == TimingActivityDomain.KERNEL_ACTIVITY
-        and (compacted_kernel_rows or 0) <= 0
-        and not any(row.is_kernel_activity for row in evidence.parsed_rows)
-    ):
-        fallback = DefaultTimingSelection(
-            policy=select_timing_policy(
-                request.policy.source_type, profiler_available=False
-            ),
-            profiler_backed=False,
-            fallback_applied=True,
-            reason="rocprofv3 did not produce kernel activity rows",
-        )
-        return Rocprofv3CollectionResult(
-            evidence=None,
-            selection=fallback,
-            command=tuple(command),
-            csv_path=csv_path,
-            returncode=completed.returncode,
-            stdout=completed.stdout or "",
-            stderr=completed.stderr or "",
-        )
-    return Rocprofv3CollectionResult(
-        evidence=evidence,
-        selection=selection,
-        command=tuple(command),
-        csv_path=csv_path,
-        returncode=completed.returncode,
-        stdout=completed.stdout or "",
-        stderr=completed.stderr or "",
-    )
-
-
-def collect_source_timing_evidence(
-    *,
-    application_command: Sequence[str],
-    languages: Sequence[str],
-    output_directory: Path,
-    output_file: str,
-    tool_version: str,
-    gpu_architecture: str,
-    rocprofv3_available: bool = True,
-    runner: ProfilerRunner | None = None,
-    executable: str = ROCPROFV3_EXECUTABLE,
-    warmup_runs: int | None = None,
-    iterations: int | None = None,
-    trial_count: int | None = None,
-    clock_locked: bool | None = None,
-) -> Rocprofv3CollectionResult:
-    """Select source-specific timing policy and collect evidence when supported."""
-    policy = timing_policy_for_languages(languages, profiler_available=True)
-    request = Rocprofv3CollectionRequest(
-        application_command=tuple(application_command),
-        output_directory=output_directory,
-        output_file=output_file,
-        policy=policy,
-        tool_version=tool_version,
-        gpu_architecture=gpu_architecture,
-        executable=executable,
-        warmup_runs=warmup_runs,
-        iterations=iterations,
-        trial_count=trial_count,
-        clock_locked=clock_locked,
-    )
-    return collect_rocprofv3_timing(
-        request,
-        rocprofv3_available=rocprofv3_available,
-        runner=runner,
-    )
-
-
-def _default_runner(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
-    env = {**os.environ, "SOL_EXECBENCH_GRACEFUL_EXIT": "1"}
-    return subprocess.run(
-        list(command),
-        check=False,
-        text=True,
-        capture_output=True,
-        env=env,
-    )
-
-
-def _default_profile_runner(
-    command: Sequence[str],
-    working_directory: Path | None,
-    timeout_seconds: int | None,
-) -> subprocess.CompletedProcess[str]:
-    env = {**os.environ, "SOL_EXECBENCH_GRACEFUL_EXIT": "1"}
-    return subprocess.run(
-        list(command),
-        check=False,
-        text=True,
-        capture_output=True,
-        cwd=working_directory,
-        timeout=timeout_seconds,
-        env=env,
-    )
-
-
-def _find_rocprofv3_csv(output_directory: Path, output_file: str) -> Path | None:
-    candidates = sorted(output_directory.glob(f"{output_file}*.csv"))
-    if not candidates:
-        return None
-    for candidate in candidates:
-        if candidate.name.endswith("_kernel_trace.csv"):
-            return candidate
-    return candidates[0]
-
-
-def _classify_profile_artifact(path: Path) -> str:
-    name = path.name.lower()
-    suffix = path.suffix.lower()
-    if suffix in {".db", ".sqlite", ".sqlite3", ".rocpd"}:
-        return "rocpd"
-    if suffix == ".csv":
-        if "agent" in name:
-            return "agent_info_csv"
-        if "counter" in name:
-            return "counter_csv"
-        return "trace_csv"
-    if suffix == ".json":
-        if "diagnostic" in name:
-            return "diagnostic_json"
-        return "metadata_json"
-    if suffix == ".pftrace" or ("perfetto" in name and suffix == ".trace"):
-        return "perfetto_trace"
-    if suffix == ".otf2":
-        return "otf2_trace"
-    return "other"
-
-
-def _write_rocprofv3_diagnostic_artifact(
-    request: Rocprofv3ProfileRequest,
-    completed: subprocess.CompletedProcess[str],
-    command: Sequence[str],
-) -> Path | None:
-    """Persist bounded profiler execution diagnostics when rocprof writes no data."""
-    path = request.output_directory / f"{request.output_file}.diagnostics.json"
-    payload = {
-        "schema_version": "sol_execbench.rocprofv3_diagnostics.v1",
-        "generated_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
-        "diagnostic_only": True,
-        "score_authority": False,
-        "status": "no_profiler_data_artifacts",
-        "returncode": completed.returncode,
-        "command": list(command),
-        "working_directory": (
-            str(request.working_directory)
-            if request.working_directory is not None
-            else None
-        ),
-        "output_directory": str(request.output_directory),
-        "output_file": request.output_file,
-        "output_format": request.output_format,
-        "output_directory_listing": _profile_output_directory_listing(
-            request.output_directory
-        ),
-        "stdout_tail": _tail(completed.stdout or ""),
-        "stderr_tail": _tail(completed.stderr or ""),
-        "reason_codes": [
-            ROCPROF_REASON_NO_REGISTERED_ARTIFACTS,
-            ROCPROF_REASON_DIAGNOSTIC_LOG_REGISTERED,
-        ],
-    }
-    try:
-        path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
-    except OSError:
-        return None
-    return path
-
-
-def _profile_output_directory_listing(output_directory: Path) -> tuple[str, ...]:
-    if not output_directory.exists():
-        return ()
-    listing: list[str] = []
-    for path in sorted(output_directory.rglob("*"), key=_profile_artifact_sort_key):
-        try:
-            relative = path.relative_to(output_directory).as_posix()
-        except ValueError:
-            continue
-        if path.is_dir():
-            listing.append(f"{relative}/")
-        elif path.is_file():
-            listing.append(f"{relative}:{path.stat().st_size}")
-    return tuple(listing[:200])
-
-
-def _tail(text: str, *, max_chars: int = 4096) -> str:
-    if len(text) <= max_chars:
-        return text
-    return text[-max_chars:]
-
-
-def _normalize_header(header: str | None) -> str:
-    return re.sub(r"[^a-z0-9]", "", (header or "").lower())
-
-
-def _first_value(row: dict[str, str], *keys: str) -> str | None:
-    for key in keys:
-        value = row.get(key)
-        if value:
-            return value.strip()
-    return None
-
-
-def _duration_ns(row: dict[str, str]) -> float | None:
-    for key in (
-        "durationns",
-        "durationnsec",
-        "durationnanoseconds",
-        "duration",
-    ):
-        value = row.get(key)
-        if value:
-            return float(value)
-
-    start = _first_numeric(row, "starttimestamp", "startns", "begin")
-    end = _first_numeric(row, "endtimestamp", "endns", "end")
-    if start is not None and end is not None and end >= start:
-        return end - start
-    return None
-
-
-def _first_numeric(row: dict[str, str], *keys: str) -> float | None:
-    for key in keys:
-        value = row.get(key)
-        if value:
-            return float(value)
-    return None
