@@ -22,6 +22,7 @@
 
 - Modify `src/sol_execbench/cli/main.py`
   - Imports `evaluation_runtime as cli_evaluation_runtime`.
+  - Owns eval driver generation by calling `packager.execute()` before invoking runtime.
   - Replaces inline Phase 2 subprocess/profile/timeout/no-stdout/no-traces classification with calls into `run_evaluation_runtime()`.
   - Keeps progress spinner, console messages, no-trace sidecar writing, trace output, sidecar output, and exit behavior.
 
@@ -128,12 +129,10 @@ class _FakeTrace:
 class _FakePackager:
     def __init__(self, traces: list[_FakeTrace] | None = None) -> None:
         self.traces = traces or []
-        self.execute_called = False
         self.converted_stdout: str | None = None
 
     def execute(self) -> list[str]:
-        self.execute_called = True
-        return ["python", "candidate.py"]
+        raise AssertionError("runtime must not call execute")
 
     def convert_stdout_to_traces(self, stdout: str) -> list[_FakeTrace]:
         self.converted_stdout = stdout
@@ -163,6 +162,7 @@ def test_run_evaluation_runtime_returns_success_for_parseable_traces(
 
     result = evaluation_runtime.run_evaluation_runtime(
         packager,
+        eval_cmd=["python", "candidate.py"],
         staging_dir=tmp_path,
         output_file=None,
         timeout=7,
@@ -170,7 +170,6 @@ def test_run_evaluation_runtime_returns_success_for_parseable_traces(
     )
 
     assert isinstance(result, evaluation_runtime.EvaluationRuntimeSuccess)
-    assert packager.execute_called is True
     assert packager.converted_stdout == '{"trace": 1}\n'
     assert len(result.traces) == 1
     assert result.returncode == 0
@@ -201,6 +200,7 @@ def test_run_evaluation_runtime_classifies_timeout(
 
     result = evaluation_runtime.run_evaluation_runtime(
         packager,
+        eval_cmd=["python", "candidate.py"],
         staging_dir=tmp_path,
         output_file=None,
         timeout=5,
@@ -239,6 +239,7 @@ def test_run_evaluation_runtime_classifies_failure_without_stdout(
 
     result = evaluation_runtime.run_evaluation_runtime(
         packager,
+        eval_cmd=["python", "candidate.py"],
         staging_dir=tmp_path,
         output_file=None,
         timeout=5,
@@ -277,6 +278,7 @@ def test_run_evaluation_runtime_classifies_no_parseable_traces(
 
     result = evaluation_runtime.run_evaluation_runtime(
         packager,
+        eval_cmd=["python", "candidate.py"],
         staging_dir=tmp_path,
         output_file=None,
         timeout=5,
@@ -325,6 +327,7 @@ def test_run_evaluation_runtime_falls_back_when_profile_unavailable(
 
     result = evaluation_runtime.run_evaluation_runtime(
         packager,
+        eval_cmd=["python", "candidate.py"],
         staging_dir=tmp_path,
         output_file=tmp_path / "trace.jsonl",
         timeout=5,
@@ -393,8 +396,6 @@ PROFILE_ROCPROFV3 = "rocprofv3"
 
 
 class EvaluationPackager(Protocol):
-    def execute(self) -> list[str]: ...
-
     def convert_stdout_to_traces(self, stdout: str) -> list[Any]: ...
 
 
@@ -462,6 +463,7 @@ Append:
 def run_evaluation_runtime(
     packager: EvaluationPackager,
     *,
+    eval_cmd: list[str],
     staging_dir: Path,
     output_file: Path | None,
     timeout: int,
@@ -469,7 +471,6 @@ def run_evaluation_runtime(
 ) -> EvaluationRuntimeSuccess | EvaluationRuntimeNoTraceFailure:
     """Run evaluation and classify subprocess outcomes without CLI side effects."""
 
-    eval_cmd = packager.execute()
     profiled_proc, profile_result = _run_profiled_or_none(
         eval_cmd,
         staging_dir=staging_dir,
