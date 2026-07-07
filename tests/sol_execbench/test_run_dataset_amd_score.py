@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from sol_execbench.core.bench.config import BenchmarkConfig
+from sol_execbench.core.dataset import amd_score_reports
 from sol_execbench.core.dataset.evidence_refs import sidecar_stem_for_workload
 from sol_execbench.core.scoring.amd_score import build_amd_native_suite_report
 from sol_execbench.core.scoring.baseline_artifact import (
@@ -230,11 +231,7 @@ def test_dataset_helper_keeps_scoring_when_solar_derivation_parse_fails(
     def fail_parse(_payload):
         raise ValueError("formula_inputs.axis must be a JSON scalar")
 
-    monkeypatch.setitem(
-        build_amd_score_reports_for_problem.__globals__,
-        "solar_derivation_from_dict",
-        fail_parse,
-    )
+    monkeypatch.setattr(amd_score_reports, "solar_derivation_from_dict", fail_parse)
 
     scores = build_amd_score_reports_for_problem(
         definition_payload=definition,
@@ -461,23 +458,11 @@ def test_dataset_helper_reuses_existing_derived_sidecars(tmp_path, monkeypatch):
     def fail_solar(*_args, **_kwargs):
         raise AssertionError("existing SOLAR sidecar should be reused")
 
-    def fail_full_parse(*_args, **_kwargs):
-        raise AssertionError("existing AMD SOL sidecar should use minimal parsing")
-
-    monkeypatch.setitem(
-        build_amd_score_reports_for_problem.__globals__,
-        "build_amd_sol_bound_v2_artifact",
-        fail_sol_bound,
+    monkeypatch.setattr(
+        amd_score_reports, "build_amd_sol_bound_v2_artifact", fail_sol_bound
     )
-    monkeypatch.setitem(
-        build_amd_score_reports_for_problem.__globals__,
-        "build_solar_derivation_evidence",
-        fail_solar,
-    )
-    monkeypatch.setitem(
-        build_amd_score_reports_for_problem.__globals__,
-        "amd_sol_bound_v2_from_dict",
-        fail_full_parse,
+    monkeypatch.setattr(
+        amd_score_reports, "build_solar_derivation_evidence", fail_solar
     )
 
     reused_scores = build_amd_score_reports_for_problem(
@@ -511,15 +496,11 @@ def test_dataset_helper_can_skip_excluded_missing_derived_sidecars(
     def fail_solar(*_args, **_kwargs):
         raise AssertionError("excluded workload should not build SOLAR sidecar")
 
-    monkeypatch.setitem(
-        build_amd_score_reports_for_problem.__globals__,
-        "build_amd_sol_bound_v2_artifact",
-        fail_sol_bound,
+    monkeypatch.setattr(
+        amd_score_reports, "build_amd_sol_bound_v2_artifact", fail_sol_bound
     )
-    monkeypatch.setitem(
-        build_amd_score_reports_for_problem.__globals__,
-        "build_solar_derivation_evidence",
-        fail_solar,
+    monkeypatch.setattr(
+        amd_score_reports, "build_solar_derivation_evidence", fail_solar
     )
 
     scores = build_amd_score_reports_for_problem(

@@ -19,23 +19,14 @@ from sol_execbench.core.bench.rocm_profiler import (
     collect_source_timing_evidence,
 )
 from sol_execbench.core.bench.stderr import filter_benign_rocm_stderr
-from sol_execbench.core.dataset import amd_score_reports as _amd_score_reports
 from sol_execbench.core.dataset.amd_score_reports import (
     _build_amd_score_reports_for_problem_impl,
-    write_amd_score_report,
+    write_amd_score_report as write_amd_score_report,
 )
 from sol_execbench.core.scoring.amd_score import (
     AmdNativeScore,
 )
-from sol_execbench.core.scoring.amd_sol_v2 import build_amd_sol_bound_v2_artifact
 from sol_execbench.core.scoring.baseline_artifact import ScoringBaselineArtifact
-from sol_execbench.core.scoring.solar_derivation import (
-    build_solar_derivation_evidence,
-    solar_derivation_from_dict,
-)
-
-# Keep the imported writer as an explicit runner-module re-export for callers.
-_write_amd_score_report = write_amd_score_report
 
 
 def infer_destination_passing_style(code: str, definition: dict) -> bool:
@@ -600,9 +591,6 @@ def build_amd_score_reports_for_problem(
     derived_sidecar_exclusions: dict[str, str] | None = None,
 ) -> list[AmdNativeScore]:
     """Build derived AMD-native scores for one dataset-run problem."""
-    _amd_score_reports.build_amd_sol_bound_v2_artifact = build_amd_sol_bound_v2_artifact
-    _amd_score_reports.build_solar_derivation_evidence = build_solar_derivation_evidence
-    _amd_score_reports.solar_derivation_from_dict = solar_derivation_from_dict
     return _build_amd_score_reports_for_problem_impl(
         definition_payload=definition_payload,
         workload_path=workload_path,
