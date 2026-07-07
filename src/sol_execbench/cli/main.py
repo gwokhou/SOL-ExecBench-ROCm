@@ -37,12 +37,13 @@ import click
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from . import baseline as cli_baseline
 from . import agent_feedback_sidecar as cli_agent_feedback_sidecar
+from . import baseline as cli_baseline
 from . import dataset as cli_dataset
 from . import evaluation as cli_evaluation
 from . import environment as cli_environment
 from . import metadata as cli_metadata
+from . import problem_io as cli_problem_io
 from . import profile_sidecars as cli_profile_sidecars
 from . import reporting as cli_reporting
 from . import static_evidence as cli_static_evidence
@@ -50,13 +51,7 @@ from ..core.bench.io import flashinfer_safetensors_env
 from ..core.bench.rocm_profiler import Rocprofv3ProfileResult
 from ..core.bench.stderr import filter_benign_rocm_stderr
 from ..core.bench.static_kernel_evidence import StaticKernelEvidenceSidecar
-from ..core import (
-    Definition,
-    Workload,
-    Solution,
-    BenchmarkConfig,
-    EvaluationStatus,
-)
+from ..core import EvaluationStatus
 from ..core.dataset.checksums import sha256_file
 from ..driver import ProblemPackager
 
@@ -64,57 +59,6 @@ console = Console(stderr=True)
 
 PROFILE_NONE = "none"
 PROFILE_ROCPROFV3 = "rocprofv3"
-
-
-def _load_definition(path: Path) -> Definition:
-    return Definition(**json.loads(path.read_text()))
-
-
-def _load_workloads(path: Path) -> list[Workload]:
-    workloads = []
-    for line in path.read_text().splitlines():
-        line = line.strip()
-        if line:
-            workloads.append(Workload(**json.loads(line)))
-    return workloads
-
-
-def _load_solution(path: Path) -> Solution:
-    sol_dict = json.loads(path.read_text())
-    # Resolve source file contents relative to the solution JSON directory.
-    sol_dir = path.parent
-    for src in sol_dict.get("sources", []):
-        if not src.get("content"):
-            src_path = sol_dir / src["path"]
-            if src_path.exists():
-                src["content"] = src_path.read_text()
-    return Solution(**sol_dict)
-
-
-def _load_config(path: Optional[Path]) -> BenchmarkConfig:
-    if path is None:
-        return BenchmarkConfig()
-    return BenchmarkConfig(**json.loads(path.read_text()))
-
-
-def _resolve_problem_dir(
-    problem_dir: Path,
-) -> tuple[Path, Path, Optional[Path], Optional[Path]]:
-    """Return (definition.json, workload.jsonl, config.json?, solution.json?) inside a problem directory."""
-    def_path = problem_dir / "definition.json"
-    wkl_path = problem_dir / "workload.jsonl"
-    cfg_path = problem_dir / "config.json"
-    sol_path = problem_dir / "solution.json"
-    if not def_path.exists():
-        raise click.ClickException(f"definition.json not found in {problem_dir}")
-    if not wkl_path.exists():
-        raise click.ClickException(f"workload.jsonl not found in {problem_dir}")
-    return (
-        def_path,
-        wkl_path,
-        cfg_path if cfg_path.exists() else None,
-        sol_path if sol_path.exists() else None,
-    )
 
 
 @click.command(
@@ -241,28 +185,23 @@ def _evaluate_cli(
     Metadata:
       sol-execbench contract --json
     """
-    # Resolve definition + workloads
-    if problem_dir:
-        def_path, wkl_path, cfg_path, sol_path = _resolve_problem_dir(problem_dir)
-        definition_file = definition_file or def_path
-        workload_file = workload_file or wkl_path
-        config_file = config_file or cfg_path
-        solution_file = solution_file or sol_path
-
-    if not definition_file:
-        raise click.ClickException("Provide PROBLEM_DIR or --definition")
-    if not workload_file:
-        raise click.ClickException("Provide PROBLEM_DIR or --workload")
-    if not solution_file:
-        raise click.ClickException(
-            "Provide PROBLEM_DIR with solution.json or --solution"
-        )
+    resolved_inputs = cli_problem_io.resolve_problem_inputs(
+        problem_dir=problem_dir,
+        definition_file=definition_file,
+        workload_file=workload_file,
+        solution_file=solution_file,
+        config_file=config_file,
+    )
+    definition_file = resolved_inputs.definition_file
+    workload_file = resolved_inputs.workload_file
+    solution_file = resolved_inputs.solution_file
+    config_file = resolved_inputs.config_file
 
     # Load data models
-    definition = _load_definition(definition_file)
-    workloads = _load_workloads(workload_file)
-    solution = _load_solution(solution_file)
-    config = _load_config(config_file)
+    definition = cli_problem_io._load_definition(definition_file)
+    workloads = cli_problem_io._load_workloads(workload_file)
+    solution = cli_problem_io._load_solution(solution_file)
+    config = cli_problem_io._load_config(config_file)
 
     if lock_clocks:
         config.lock_clocks = True
