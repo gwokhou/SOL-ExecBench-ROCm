@@ -122,7 +122,9 @@ def _contract_artifact() -> SolarDerivationEvidence:
                 total_bytes=12288.0,
                 dtype_inputs={"q": "float16", "k": "float16", "scores": "float32"},
                 tensor_ids=("q", "k", "scores"),
-                source=_source(kind="estimate", detail="operator bytes", node_id="op_1"),
+                source=_source(
+                    kind="estimate", detail="operator bytes", node_id="op_1"
+                ),
                 confidence="supported",
                 rationale="Bytes derived from query, key, and score tensors.",
             ),
@@ -135,7 +137,9 @@ def _contract_artifact() -> SolarDerivationEvidence:
                 memory_bound_ms=0.002,
                 limiting_resource="memory",
                 sol_bound_ms=0.002,
-                source=_source(kind="estimate", detail="AMD SOL v2 math", node_id="op_1"),
+                source=_source(
+                    kind="estimate", detail="AMD SOL v2 math", node_id="op_1"
+                ),
                 confidence="supported",
                 rationale="Memory bound exceeds compute bound.",
             ),
@@ -193,7 +197,9 @@ def test_solar_derivation_round_trip_preserves_provenance():
     assert payload["schema_version"] == SOLAR_DERIVATION_SCHEMA_VERSION
     assert payload["derived"] is True
     assert loaded.to_dict() == payload
-    assert solar_derivation_from_dict(artifact.to_dict()).to_dict() == artifact.to_dict()
+    assert (
+        solar_derivation_from_dict(artifact.to_dict()).to_dict() == artifact.to_dict()
+    )
     assert payload["groups"][0]["node_ids"] == ["op_1", "op_2"]
     assert payload["groups"][0]["subroles"][0]["tensor_ids"] == ["q", "k", "scores"]
     assert payload["groups"][0]["formula_evidence"][0]["formula_kind"] == (
@@ -283,6 +289,23 @@ def test_solar_derivation_round_trip_preserves_provenance():
         "sequence_q",
         "sequence_k",
     )
+
+
+def test_solar_derivation_split_modules_export_facade_symbols():
+    from sol_execbench.core.scoring import solar_derivation
+    from sol_execbench.core.scoring.solar_derivation_builders import (
+        build_solar_derivation_evidence as split_build,
+    )
+    from sol_execbench.core.scoring.solar_derivation_models import (
+        SolarDerivationEvidence as split_evidence,
+    )
+    from sol_execbench.core.scoring.solar_derivation_parsing import (
+        solar_derivation_from_dict as split_from_dict,
+    )
+
+    assert split_evidence is solar_derivation.SolarDerivationEvidence
+    assert split_build is solar_derivation.build_solar_derivation_evidence
+    assert split_from_dict is solar_derivation.solar_derivation_from_dict
 
 
 def test_degraded_aggregate_status_remains_score_eligible():
@@ -858,9 +881,9 @@ def test_solar_derivation_coverage_tracks_degraded_unsupported_and_missing_patte
             r"coverage_summary\.estimated_node_ids\[1\] must be non-empty",
         ),
         (
-            lambda payload: payload["coverage_summary"]["missing_patterns"][0].__setitem__(
-                "node_ids", "op_1"
-            ),
+            lambda payload: payload["coverage_summary"]["missing_patterns"][
+                0
+            ].__setitem__("node_ids", "op_1"),
             r"coverage_summary\.missing_patterns\[0\]\.node_ids must be a list",
         ),
         (
@@ -882,9 +905,7 @@ def test_solar_derivation_coverage_tracks_degraded_unsupported_and_missing_patte
             r"coverage_summary\.provenance\[0\]\.detail must be non-empty",
         ),
         (
-            lambda payload: payload["aggregate_status"].__setitem__(
-                "node_ids", "op_1"
-            ),
+            lambda payload: payload["aggregate_status"].__setitem__("node_ids", "op_1"),
             r"aggregate_status\.node_ids must be a list",
         ),
         (
@@ -1141,7 +1162,9 @@ def _fixture_evidence_payload(fixture: JsonDict) -> JsonDict:
                 if expectation["degradation_rationale"] is not None
                 else "Fixture expectation is fully supported."
             ),
-            missing_evidence=tuple(str(item) for item in expectation["missing_evidence"]),
+            missing_evidence=tuple(
+                str(item) for item in expectation["missing_evidence"]
+            ),
         )
         for index, subrole in enumerate(expectation["expected_subroles"], start=1)
     )
@@ -1746,8 +1769,7 @@ def test_confidence_rules_map_incomplete_visible_evidence_to_inexact_degraded():
         warning.startswith("inexact_operator:") for warning in group.warning_prefixes
     )
     assert any(
-        warning.startswith("aggregate_degraded:")
-        for warning in group.warning_prefixes
+        warning.startswith("aggregate_degraded:") for warning in group.warning_prefixes
     )
     assert group.rationale
 
@@ -1793,8 +1815,7 @@ def test_confidence_rules_are_conservative_for_ambiguous_groups():
         for warning in group.warning_prefixes
     )
     assert any(
-        warning.startswith("aggregate_unscored:")
-        for warning in group.warning_prefixes
+        warning.startswith("aggregate_unscored:") for warning in group.warning_prefixes
     )
     assert group.rationale
 
