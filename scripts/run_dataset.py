@@ -59,6 +59,14 @@ from sol_execbench.core.dataset.long_tail_exclusions import (
     load_long_tail_exclusions as _load_long_tail_exclusions,
     split_excluded_workloads as _split_long_tail_excluded_workloads_core,
 )
+from sol_execbench.core.dataset.cli_execution import (
+    CLI_LOG_LIMIT as _CLI_LOG_LIMIT,
+    build_cli_command,
+    cli_failure_notes as _cli_failure_notes,
+    run_cli as _core_run_cli,
+    save_cli_log as _save_cli_log,
+    save_cli_timeout_log as _save_cli_timeout_log,
+)
 from sol_execbench.core.dataset.run_closure import (
     closure_record as _build_closure_record,
     closure_totals as _build_closure_totals,
@@ -71,12 +79,7 @@ from sol_execbench.core.dataset.run_closure import (
     write_execution_closure as _write_execution_closure_report,
 )
 from sol_execbench.core.dataset.runner import (
-    CLI_LOG_LIMIT as _CLI_LOG_LIMIT,
-    _cli_failure_notes,
-    _save_cli_log,
-    _save_cli_timeout_log,
     _extend_derived_reports_for_problem,
-    build_cli_command,
     build_custom_solution,
     build_reference_solution,
     build_solution_for_problem,
@@ -84,7 +87,6 @@ from sol_execbench.core.dataset.runner import (
     collect_timing_evidence_for_problem,
     inspect_traces,
     print_summary,
-    run_cli as _runner_run_cli,
     write_amd_score_report,
     write_summary_report,
 )
@@ -181,8 +183,8 @@ def run_cli(
     keep_staging: bool = False,
     verbose: bool = False,
 ) -> list[dict] | None:
-    """Compatibility wrapper for callers importing this script module."""
-    return _runner_run_cli(
+    """Compatibility wrapper for tests and callers importing this script module."""
+    return _core_run_cli(
         definition_path=definition_path,
         workload_path=workload_path,
         solution_path=solution_path,
