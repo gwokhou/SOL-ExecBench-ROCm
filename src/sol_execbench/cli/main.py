@@ -38,6 +38,7 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from . import baseline as cli_baseline
+from . import dataset as cli_dataset
 from . import evaluation as cli_evaluation
 from . import environment as cli_environment
 from . import metadata as cli_metadata
@@ -53,11 +54,6 @@ from ..core import (
     Solution,
     BenchmarkConfig,
     EvaluationStatus,
-)
-from ..core.dataset import (
-    migrate_flashinfer_trace,
-    migrate_sol_execbench,
-    write_migration_manifest,
 )
 from ..core.dataset.checksums import sha256_file
 from ..driver import ProblemPackager
@@ -508,95 +504,6 @@ def _evaluate_cli(
     sys.exit(0 if all_passed else 1)
 
 
-@click.group("dataset", context_settings={"help_option_names": ["-h", "--help"]})
-def _dataset_cli() -> None:
-    """Local dataset utilities."""
-
-
-@_dataset_cli.command(
-    "migrate-sol", context_settings={"help_option_names": ["-h", "--help"]}
-)
-@click.argument(
-    "source_root", type=click.Path(exists=True, file_okay=False, path_type=Path)
-)
-@click.argument("output_root", type=click.Path(path_type=Path))
-@click.option(
-    "--category",
-    "categories",
-    multiple=True,
-    help="SOL-ExecBench category to migrate. May be passed more than once.",
-)
-@click.option("--source-revision", help="Source dataset revision or local commit ref.")
-@click.option("--manifest", "manifest_path", type=click.Path(path_type=Path))
-@click.option("--json", "json_output", is_flag=True, help="Print manifest JSON")
-def _dataset_migrate_sol_cli(
-    source_root: Path,
-    output_root: Path,
-    categories: tuple[str, ...],
-    source_revision: str | None,
-    manifest_path: Path | None,
-    json_output: bool,
-) -> None:
-    """Migrate downloaded SOL-ExecBench inputs into local benchmark layout."""
-
-    manifest = migrate_sol_execbench(
-        source_root,
-        output_root,
-        categories=categories or None,
-        source_revision=source_revision,
-    )
-    target = manifest_path or output_root / "migration-manifest.json"
-    write_migration_manifest(manifest, target)
-    if json_output:
-        click.echo(manifest.to_json(), nl=False)
-    else:
-        console.print(f"[green]Wrote migration manifest to {target}[/green]")
-        console.print(
-            "[bold]Problems:[/bold] "
-            f"{manifest.denominators.migrated_problems}/"
-            f"{manifest.denominators.discovered_problems} migrated; "
-            f"{manifest.denominators.blockers} blocker(s)"
-        )
-
-
-@_dataset_cli.command(
-    "migrate-flashinfer", context_settings={"help_option_names": ["-h", "--help"]}
-)
-@click.argument(
-    "source_root", type=click.Path(exists=True, file_okay=False, path_type=Path)
-)
-@click.argument("output_root", type=click.Path(path_type=Path))
-@click.option("--source-revision", help="Source dataset revision or local commit ref.")
-@click.option("--manifest", "manifest_path", type=click.Path(path_type=Path))
-@click.option("--json", "json_output", is_flag=True, help="Print manifest JSON")
-def _dataset_migrate_flashinfer_cli(
-    source_root: Path,
-    output_root: Path,
-    source_revision: str | None,
-    manifest_path: Path | None,
-    json_output: bool,
-) -> None:
-    """Migrate downloaded FlashInfer Trace inputs into local benchmark layout."""
-
-    manifest = migrate_flashinfer_trace(
-        source_root,
-        output_root,
-        source_revision=source_revision,
-    )
-    target = manifest_path or output_root / "migration-manifest.json"
-    write_migration_manifest(manifest, target)
-    if json_output:
-        click.echo(manifest.to_json(), nl=False)
-    else:
-        console.print(f"[green]Wrote migration manifest to {target}[/green]")
-        console.print(
-            "[bold]Problems:[/bold] "
-            f"{manifest.denominators.migrated_problems}/"
-            f"{manifest.denominators.discovered_problems} migrated; "
-            f"{manifest.denominators.blockers} blocker(s)"
-        )
-
-
 class SolExecbenchCli(click.Command):
     """Dispatch root evaluator calls and the contract metadata command."""
 
@@ -652,7 +559,7 @@ class SolExecbenchCli(click.Command):
             )
         if args and args[0] == "dataset":
             dataset_prog = f"{prog_name or self.name} dataset"
-            return _dataset_cli.main(
+            return cli_dataset._dataset_cli.main(
                 args=args[1:],
                 prog_name=dataset_prog,
                 complete_var=complete_var,
