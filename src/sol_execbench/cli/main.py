@@ -39,6 +39,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
 from . import evaluation as cli_evaluation
+from . import environment as cli_environment
 from . import sidecars as cli_sidecars
 from ..core.data.contract import build_evaluator_contract
 from ..core.environment import build_environment_diagnostics
@@ -545,7 +546,7 @@ def _evaluate_cli(
         if output_file is not None and output_file.is_file()
         else None
     )
-    environment_sidecar_path = cli_sidecars._write_environment_snapshot_sidecar(
+    environment_sidecar_path = cli_environment._write_environment_snapshot_sidecar(
         output_file
     )
     profile_sidecar_path = cli_sidecars._write_profile_sidecar(
