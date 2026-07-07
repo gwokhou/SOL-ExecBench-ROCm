@@ -318,27 +318,7 @@ def test_cross_domain_imports_stay_explicitly_allowlisted() -> None:
     allowed = {
         (
             "sol_execbench.core.dataset.amd_score_reports",
-            "sol_execbench.core.scoring.amd_hardware_models",
-        ),
-        (
-            "sol_execbench.core.dataset.amd_score_reports",
-            "sol_execbench.core.scoring.amd_score",
-        ),
-        (
-            "sol_execbench.core.dataset.amd_score_reports",
-            "sol_execbench.core.scoring.amd_sol",
-        ),
-        (
-            "sol_execbench.core.dataset.amd_score_reports",
-            "sol_execbench.core.scoring.amd_sol_v2",
-        ),
-        (
-            "sol_execbench.core.dataset.amd_score_reports",
-            "sol_execbench.core.scoring.baseline_artifact",
-        ),
-        (
-            "sol_execbench.core.dataset.amd_score_reports",
-            "sol_execbench.core.scoring.solar_derivation",
+            "sol_execbench.core.scoring.amd_score_reports",
         ),
         (
             "sol_execbench.core.dataset.cli_execution",
@@ -359,6 +339,10 @@ def test_cross_domain_imports_stay_explicitly_allowlisted() -> None:
         (
             "sol_execbench.core.dataset.runner",
             "sol_execbench.core.scoring.amd_score",
+        ),
+        (
+            "sol_execbench.core.dataset.runner",
+            "sol_execbench.core.scoring.amd_score_reports",
         ),
         (
             "sol_execbench.core.dataset.runner",
