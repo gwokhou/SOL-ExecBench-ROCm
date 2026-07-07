@@ -24,7 +24,7 @@ from ..core.bench.rocm_profiler import (
 )
 from ..core.bench.stderr import filter_benign_rocm_stderr
 from ..core.runtime_evidence import write_json_payload
-from .sidecars import _profile_output_directory
+from .profile_sidecars import _profile_output_directory
 
 console = Console(stderr=True)
 
