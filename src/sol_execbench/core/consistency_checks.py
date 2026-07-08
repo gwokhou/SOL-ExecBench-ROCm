@@ -1,6 +1,6 @@
 """Compatibility facade for the relocated report module."""
 
-from importlib import import_module as _import_module
-import sys as _sys
+import importlib
+import sys
 
-_sys.modules[__name__] = _import_module("sol_execbench.core.reports.consistency_checks")
+sys.modules[__name__] = importlib.import_module("sol_execbench.core.reports.consistency_checks")
