@@ -69,5 +69,7 @@ def test_raw_payload_shape_checks_stay_in_allowlisted_boundary_modules() -> None
     }
 
     unexpected = sorted(modules_with_shape_checks - RAW_PAYLOAD_ALLOWLIST)
+    stale_allowlist_entries = sorted(RAW_PAYLOAD_ALLOWLIST - modules_with_shape_checks)
 
     assert unexpected == []
+    assert stale_allowlist_entries == []
