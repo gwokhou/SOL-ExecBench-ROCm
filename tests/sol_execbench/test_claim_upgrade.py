@@ -46,9 +46,18 @@ def test_claim_upgrade_blocks_authority_when_evidence_is_missing_or_contradictor
     assert evaluations["diagnostic_only"].eligible is True
     assert evaluations["container_validated"].eligible is False
     assert "consistency_blockers_present" in evaluations["container_validated"].blockers
-    assert "condition:stable_timing" in evaluations["score_authoritative"].unmet_prerequisites
-    assert "missing_source:amd_sol_report" in evaluations["score_authoritative"].unmet_prerequisites
-    assert "missing_source:solar_derivation" in evaluations["score_authoritative"].unmet_prerequisites
+    assert (
+        "condition:stable_timing"
+        in evaluations["score_authoritative"].unmet_prerequisites
+    )
+    assert (
+        "missing_source:amd_sol_report"
+        in evaluations["score_authoritative"].unmet_prerequisites
+    )
+    assert (
+        "missing_source:solar_derivation"
+        in evaluations["score_authoritative"].unmet_prerequisites
+    )
     assert evaluations["native_host_validated"].next_evidence
 
 
@@ -92,6 +101,42 @@ def test_claim_upgrade_allows_container_and_score_when_prerequisites_are_clean()
     assert evaluations["score_authoritative"].eligible is True
     assert evaluations["native_host_validated"].eligible is False
     assert report.highest_eligible_claim == "score_authoritative"
+
+
+def test_claim_upgrade_treats_non_object_source_payloads_as_missing() -> None:
+    report = build_claim_upgrade_report(
+        paper_denominator=[],  # type: ignore[arg-type]
+        hardware_validation={},
+        consistency_report={},
+        matrix_report={},
+        amd_score_report={},
+        created_at="2026-05-31T00:00:00Z",
+    )
+
+    evaluations = {item.claim_level: item for item in report.evaluations}
+    assert "missing_source:paper_denominator" in (
+        evaluations["container_validated"].unmet_prerequisites
+    )
+    assert all(source.source_id != "paper_denominator" for source in report.sources)
+
+
+def test_claim_upgrade_reads_full_suite_from_typed_denominator_view() -> None:
+    report = build_claim_upgrade_report(
+        paper_denominator={"suite": {"workloads": 235}, "workloads": [{}]},
+        hardware_validation={"native_host_validated": True},
+        consistency_report={"summary": {"finding_totals": {"blocker": 0}}},
+        matrix_report={"runtime_unavailable": False},
+        amd_score_report={"scores": [{"supported": True}]},
+        amd_sol_report={"aggregate_bound": {"status": "scored"}},
+        solar_derivation={"aggregate_status": "scored"},
+        amd_bound_sanity={"status_totals": {"missing_evidence": 0}},
+        created_at="2026-05-31T00:00:00Z",
+    )
+
+    evaluations = {item.claim_level: item for item in report.evaluations}
+    assert "condition:full_suite_accounted" not in (
+        evaluations["paper_parity_candidate"].unmet_prerequisites
+    )
 
 
 def test_claim_upgrade_report_is_strict_and_deterministic():

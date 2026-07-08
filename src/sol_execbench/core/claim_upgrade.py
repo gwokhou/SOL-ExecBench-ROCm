@@ -5,13 +5,23 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from sol_execbench.core.data.json_utils import stable_model_checksum, stable_model_json
+from sol_execbench.core.data.path_access import (
+    path_bool,
+    path_dict,
+    path_int,
+    path_mapping_list,
+    path_str_or_none,
+)
 from sol_execbench.core.dataset.manifest import DatasetManifestChecksum
+from sol_execbench.core.report_payloads import report_record_list, report_source_view
 from sol_execbench.core.text_utils import markdown_table_cell as _md_cell
 from sol_execbench.core.trust_summary import load_json as load_json, utc_timestamp
 
@@ -108,6 +118,21 @@ class ClaimUpgradeReport(BaseModel):
         return stable_model_json(self)
 
 
+@dataclass(frozen=True)
+class ClaimUpgradeSources:
+    paper_denominator: dict[str, Any] | None
+    hardware_validation: dict[str, Any] | None
+    consistency_report: dict[str, Any] | None
+    matrix_report: dict[str, Any] | None
+    amd_score_report: dict[str, Any] | None
+
+
+@dataclass(frozen=True)
+class PaperDenominatorClaimView:
+    workload_count: int
+    records_present: bool
+
+
 def default_claim_rules() -> list[ClaimRule]:
     return [
         ClaimRule(
@@ -201,16 +226,16 @@ def build_claim_upgrade_report(
 ) -> ClaimUpgradeReport:
     source_paths = source_paths or {}
     payloads = {
-        "consistency_report": consistency_report,
-        "evaluation_stability": evaluation_stability,
-        "execution_closure": execution_closure,
-        "paper_denominator": paper_denominator,
-        "matrix_report": matrix_report,
-        "amd_score_report": amd_score_report,
-        "amd_sol_report": amd_sol_report,
-        "solar_derivation": solar_derivation,
-        "amd_bound_sanity": amd_bound_sanity,
-        "hardware_validation": hardware_validation,
+        "consistency_report": _mapping_or_none(consistency_report),
+        "evaluation_stability": _mapping_or_none(evaluation_stability),
+        "execution_closure": _mapping_or_none(execution_closure),
+        "paper_denominator": _mapping_or_none(paper_denominator),
+        "matrix_report": _mapping_or_none(matrix_report),
+        "amd_score_report": _mapping_or_none(amd_score_report),
+        "amd_sol_report": _mapping_or_none(amd_sol_report),
+        "solar_derivation": _mapping_or_none(solar_derivation),
+        "amd_bound_sanity": _mapping_or_none(amd_bound_sanity),
+        "hardware_validation": _mapping_or_none(hardware_validation),
     }
     rules = default_claim_rules()
     evaluations = [_evaluate_rule(rule, payloads) for rule in rules]
@@ -317,7 +342,9 @@ def _condition_met(condition: str, payloads: dict[str, dict[str, Any] | None]) -
         return True
     if condition == "closure_attempted_evidence":
         return any(
-            str(record.get("closure_status", "")).startswith("attempted_")
+            str(path_str_or_none(record, "closure_status") or "").startswith(
+                "attempted_"
+            )
             for record in _records(payloads.get("execution_closure"))
         )
     if condition == "denominator_present":
@@ -325,9 +352,7 @@ def _condition_met(condition: str, payloads: dict[str, dict[str, Any] | None]) -
     if condition == "no_consistency_blockers":
         return not _consistency_blockers(payloads.get("consistency_report"))
     if condition == "native_host_validation_evidence":
-        return bool(
-            (payloads.get("hardware_validation") or {}).get("native_host_validated")
-        )
+        return path_bool(payloads.get("hardware_validation"), "native_host_validated")
     if condition == "matrix_runtime_available":
         return not _matrix_runtime_unavailable(payloads.get("matrix_report"))
     if condition == "score_evidence_present":
@@ -339,14 +364,16 @@ def _condition_met(condition: str, payloads: dict[str, dict[str, Any] | None]) -
     if condition == "stable_timing":
         return _stability_clean(payloads.get("evaluation_stability"))
     if condition == "full_suite_accounted":
-        denominator = payloads.get("paper_denominator") or {}
-        suite = denominator.get("suite")
-        return isinstance(suite, dict) and int(suite.get("workloads") or 0) >= 235
+        denominator = _paper_denominator_claim_view(payloads.get("paper_denominator"))
+        return denominator.workload_count >= 235
     if condition == "bound_sanity_clean":
-        sanity = payloads.get("amd_bound_sanity") or {}
-        totals = sanity.get("status_totals")
         return (
-            isinstance(totals, dict) and int(totals.get("missing_evidence") or 0) == 0
+            path_int(
+                payloads.get("amd_bound_sanity"),
+                "status_totals.missing_evidence",
+                default=0,
+            )
+            == 0
         )
     if condition in {
         "paper_parity_candidate",
@@ -360,27 +387,24 @@ def _condition_met(condition: str, payloads: dict[str, dict[str, Any] | None]) -
 def _consistency_blockers(payload: dict[str, Any] | None) -> bool:
     if payload is None:
         return False
-    summary = payload.get("summary")
-    if isinstance(summary, dict):
-        totals = summary.get("finding_totals")
-        if isinstance(totals, dict) and int(totals.get("blocker") or 0) > 0:
-            return True
+    if path_int(payload, "summary.finding_totals.blocker", default=0) > 0:
+        return True
     return any(
-        isinstance(finding, dict) and finding.get("severity") == "blocker"
-        for finding in payload.get("findings", [])
+        path_str_or_none(finding, "severity") == "blocker"
+        for finding in path_mapping_list(payload, "findings")
     )
 
 
 def _stability_clean(payload: dict[str, Any] | None) -> bool:
     if payload is None:
         return False
-    totals = payload.get("status_totals")
-    if not isinstance(totals, dict):
+    totals = path_dict(payload, "status_totals")
+    if not totals:
         return False
     return (
-        int(totals.get("stable") or 0) > 0
+        path_int(totals, "stable", default=0) > 0
         and sum(
-            int(totals.get(key) or 0)
+            path_int(totals, key, default=0)
             for key in (
                 "noisy",
                 "insufficient_samples",
@@ -397,15 +421,14 @@ def _stability_clean(payload: dict[str, Any] | None) -> bool:
 def _records(
     payload: dict[str, Any] | None, *, key: str = "records"
 ) -> list[dict[str, Any]]:
-    records = (payload or {}).get(key, [])
-    return records if isinstance(records, list) else []
+    return report_record_list(payload, key)
 
 
 def _score_records(payload: dict[str, Any] | None) -> list[dict[str, Any]]:
     for key in ("scores", "workloads", "records", "results"):
-        records = (payload or {}).get(key)
-        if isinstance(records, list):
-            return [record for record in records if isinstance(record, dict)]
+        records = path_mapping_list(payload, key)
+        if records:
+            return records
     return []
 
 
@@ -446,7 +469,7 @@ def _truthy_source_authority(payloads: dict[str, dict[str, Any] | None]) -> bool
 
 
 def _truthy_key(payload: object, keys: set[str]) -> bool:
-    if isinstance(payload, dict):
+    if isinstance(payload, Mapping):
         return any(
             (key in keys and value is True) or _truthy_key(value, keys)
             for key, value in payload.items()
@@ -481,25 +504,33 @@ def _source_ref(
     payload: dict[str, Any],
     path: Path | None,
 ) -> ClaimSourceRef:
+    source = report_source_view(payload, source_name=source_id)
     return ClaimSourceRef(
         source_id=source_id,
         path=str(path) if path else None,
-        schema_version=_optional_str(payload.get("schema_version")),
-        checksum=_checksum(payload),
+        schema_version=source.schema_version,
+        checksum=source.checksum or _checksum(payload),
     )
 
 
 def _checksum(payload: dict[str, Any]) -> str | None:
     for key in SOURCE_CHECKSUM_KEYS:
         value = payload.get(key)
-        if isinstance(value, dict):
-            checksum = value.get("value")
-            if isinstance(checksum, str):
+        if isinstance(value, Mapping):
+            checksum = path_str_or_none(value, "value")
+            if checksum is not None:
                 return checksum
         if isinstance(value, str):
             return value
     return None
 
 
-def _optional_str(value: object) -> str | None:
-    return value if isinstance(value, str) else None
+def _mapping_or_none(payload: object) -> dict[str, Any] | None:
+    return dict(payload) if isinstance(payload, Mapping) else None
+
+
+def _paper_denominator_claim_view(payload: object) -> PaperDenominatorClaimView:
+    return PaperDenominatorClaimView(
+        workload_count=path_int(payload, "suite.workloads", default=0),
+        records_present=bool(path_mapping_list(payload, "workloads")),
+    )
