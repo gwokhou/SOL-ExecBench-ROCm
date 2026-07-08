@@ -18,10 +18,10 @@ from pathlib import Path
 
 from click.testing import CliRunner
 
-from sol_execbench.cli import evaluation as cli_evaluation
+from sol_execbench.cli.evaluation import command as cli_evaluation
 from sol_execbench.cli.main import cli
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[4]
 LINEAR_BACKWARD_EXAMPLE = REPO_ROOT / "examples/pytorch/linear_backward"
 
 
