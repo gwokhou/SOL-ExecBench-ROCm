@@ -10,17 +10,17 @@ PACKAGE_ROOT = SOURCE_ROOT / "sol_execbench"
 
 RAW_PAYLOAD_INFRASTRUCTURE = {
     "sol_execbench.core.data.json_utils",
-    "sol_execbench.core.data.solution",
+    "sol_execbench.core.data.solution_models",
 }
 
 RAW_PAYLOAD_ARTIFACT_BOUNDARIES = {
     "sol_execbench.core.baseline_export",
-    "sol_execbench.core.evaluation_stability",
+    "sol_execbench.core.evaluation_stability_builder",
     "sol_execbench.core.bench.output_allocation",
     "sol_execbench.core.bench.profile_summary_artifacts",
     "sol_execbench.core.bench.static_kernel_artifacts",
     "sol_execbench.core.dataset.low_precision",
-    "sol_execbench.core.dataset.migration",
+    "sol_execbench.core.dataset.migration_artifacts",
     "sol_execbench.core.scoring.amd_bound_graph_fx",
     "sol_execbench.core.scoring.amd_hardware_models",
 }
@@ -43,7 +43,7 @@ RAW_PAYLOAD_ALLOWLIST = (
 
 GET_CALL_BUDGET = {
     "sol_execbench.core.dataset.paper_denominator_stages": 45,
-    "sol_execbench.core.evaluation_stability": 25,
+    "sol_execbench.core.evaluation_stability_builder": 25,
 }
 
 

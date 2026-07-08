@@ -4,162 +4,33 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
-
-from sol_execbench.core.data.json_utils import stable_model_checksum, stable_model_json
-from sol_execbench.core.data.path_access import (
-    path_bool,
-    path_dict,
-    path_get,
-    path_mapping_list,
-    path_str_list,
-    path_str_or_none,
+from sol_execbench.core.consistency_checks import (
+    dedupe_findings as _dedupe_findings,
+    find_checksum_mismatches as _find_checksum_mismatches,
+    find_claim_boundary_violations as _find_claim_boundary_violations,
+    find_denominator_closure_drift as _find_denominator_closure_drift,
+    find_matrix_runtime_attempted as _find_matrix_runtime_attempted,
+    find_missing_derived_evidence_scored as _find_missing_derived_evidence_scored,
+    mapping_or_none as _mapping_or_none,
+    records as _records,
+    source_ref as _source_ref,
 )
-from sol_execbench.core.dataset.manifest import DatasetManifestChecksum
-from sol_execbench.core.report_payloads import report_source_view
-from sol_execbench.core.text_utils import markdown_table_cell as _md_cell
+from sol_execbench.core.consistency_io import write_consistency_reports
+from sol_execbench.core.consistency_models import (
+    CLAIM_BOUNDARY_TEXT,
+    CONSISTENCY_REPORT_SCHEMA_VERSION,
+    ConsistencyClaimBoundary,
+    ConsistencyFinding,
+    ConsistencyFindingTotals,
+    ConsistencyReport,
+    ConsistencySourceRef,
+    ConsistencySummary,
+)
+from sol_execbench.core.consistency_rendering import render_consistency_markdown
 from sol_execbench.core.trust_summary import load_json as load_json, utc_timestamp
-
-CONSISTENCY_REPORT_SCHEMA_VERSION = "sol_execbench.consistency_report.v1"
-
-SOURCE_CHECKSUM_KEYS = (
-    "report_checksum",
-    "execution_closure_checksum",
-    "amd_native_score_checksum",
-    "amd_score_checksum",
-    "solar_derivation_checksum",
-    "matrix_checksum",
-    "checksum",
-)
-
-ATTEMPTED_CLOSURE_STATUSES = frozenset(
-    {
-        "attempted_passed",
-        "attempted_failed",
-        "executed",
-        "passed",
-        "failed",
-        "timed",
-        "scored",
-    }
-)
-BLOCKED_DENOMINATOR_STATUSES = frozenset(
-    {
-        "blocked",
-        "unsupported",
-        "deferred",
-        "not_attempted",
-        "skipped",
-        "filtered",
-    }
-)
-AUTHORITY_BOUNDARY_KEYS = frozenset(
-    {
-        "amd_sol_model_validation",
-        "cdna3_validation",
-        "cdna4_validation",
-        "full_235_problem_validation",
-        "leaderboard_authority",
-        "mi300x_validation",
-        "native_host_validation",
-        "new_hardware_validation",
-        "paper_parity",
-        "score_authority",
-        "score_authority_upgrade",
-        "solar_model_validation",
-        "upstream_solar_equivalence",
-        "upstream_solar_parity",
-    }
-)
-
-CLAIM_BOUNDARY_TEXT = (
-    "This report is diagnostic-only cross-report consistency lint: not score "
-    "authority, not paper parity, not leaderboard authority, not native-host "
-    "validation, and not new-hardware validation."
-)
-
-
-class ConsistencySourceRef(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    source_id: str
-    path: str | None = None
-    ref: str | None = None
-    schema_version: str | None = None
-    checksum: str | None = None
-
-
-class ConsistencyFinding(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    severity: str
-    reason_code: str
-    sources: list[str]
-    refs: list[str] = Field(default_factory=list)
-    message: str
-    next_step: str
-
-
-class ConsistencyFindingTotals(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    blocker: int = 0
-    warning: int = 0
-    info: int = 0
-
-    def add(self, severity: str) -> None:
-        if severity not in {"blocker", "warning", "info"}:
-            raise ValueError(f"Unknown consistency severity: {severity}")
-        setattr(self, severity, getattr(self, severity) + 1)
-
-
-class ConsistencySummary(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    sources_checked: int
-    findings_total: int
-    finding_totals: ConsistencyFindingTotals
-
-
-class ConsistencyClaimBoundary(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    diagnostic_only: bool = True
-    score_authority: bool = False
-    paper_parity: bool = False
-    leaderboard_authority: bool = False
-    native_host_validation: bool = False
-    new_hardware_validation: bool = False
-
-
-class ConsistencyReport(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    schema_version: str = CONSISTENCY_REPORT_SCHEMA_VERSION
-    created_at: str
-    sources: list[ConsistencySourceRef]
-    summary: ConsistencySummary
-    findings: list[ConsistencyFinding]
-    claim_boundary: ConsistencyClaimBoundary = Field(
-        default_factory=ConsistencyClaimBoundary
-    )
-    report_checksum: DatasetManifestChecksum | None = None
-
-    def with_checksum(self) -> "ConsistencyReport":
-        return self.model_copy(
-            update={
-                "report_checksum": DatasetManifestChecksum(
-                    value=stable_model_checksum(self, "report_checksum")
-                )
-            }
-        )
-
-    def to_json(self) -> str:
-        return stable_model_json(self)
 
 
 def build_consistency_report(
@@ -176,6 +47,7 @@ def build_consistency_report(
     source_paths: dict[str, Path | None] | None = None,
     created_at: str | None = None,
 ) -> ConsistencyReport:
+    """Build a deterministic cross-report consistency diagnostic report."""
     source_paths = source_paths or {}
     payloads = {
         "execution_closure": _mapping_or_none(execution_closure),
@@ -197,7 +69,6 @@ def build_consistency_report(
     findings: list[ConsistencyFinding] = []
     closure_records = _records(execution_closure)
     denominator_workloads = _records(paper_denominator, key="workloads")
-
     findings.extend(
         _find_denominator_closure_drift(closure_records, denominator_workloads)
     )
@@ -226,423 +97,18 @@ def build_consistency_report(
     return report.with_checksum()
 
 
-def render_consistency_markdown(report: ConsistencyReport) -> str:
-    lines = [
-        "# Cross-Report Consistency Report",
-        "",
-        f"- Schema: `{report.schema_version}`",
-        f"- Generated: `{report.created_at}`",
-        f"- Checksum: `{report.report_checksum.value if report.report_checksum else ''}`",
-        "",
-        CLAIM_BOUNDARY_TEXT,
-        "",
-        "## Summary",
-        "",
-        f"- Sources checked: {report.summary.sources_checked}",
-        f"- Findings: {report.summary.findings_total}",
-        f"- Blockers: {report.summary.finding_totals.blocker}",
-        f"- Warnings: {report.summary.finding_totals.warning}",
-        f"- Info: {report.summary.finding_totals.info}",
-        "",
-        "## Findings",
-        "",
-    ]
-    if report.findings:
-        lines.extend(
-            [
-                "| Severity | Reason | Sources | Refs | Message | Next step |",
-                "| --- | --- | --- | --- | --- | --- |",
-            ]
-        )
-        for finding in report.findings:
-            lines.append(
-                "| "
-                + " | ".join(
-                    [
-                        _md_cell(finding.severity),
-                        _md_cell(finding.reason_code),
-                        _md_cell(", ".join(finding.sources)),
-                        _md_cell(", ".join(finding.refs)),
-                        _md_cell(finding.message),
-                        _md_cell(finding.next_step),
-                    ]
-                )
-                + " |"
-            )
-    else:
-        lines.append("No consistency findings.")
-
-    lines.extend(
-        [
-            "",
-            "## Sources",
-            "",
-            "| Source | Path | Schema | Checksum |",
-            "| --- | --- | --- | --- |",
-        ]
-    )
-    for source in report.sources:
-        lines.append(
-            "| "
-            + " | ".join(
-                [
-                    _md_cell(source.source_id),
-                    _md_cell(source.path or source.ref or ""),
-                    _md_cell(source.schema_version or ""),
-                    _md_cell(source.checksum or ""),
-                ]
-            )
-            + " |"
-        )
-
-    lines.extend(["", "## Claim Boundary", ""])
-    for key, value in report.claim_boundary.model_dump(mode="json").items():
-        lines.append(f"- `{key}`: {str(value).lower()}")
-    return "\n".join(lines) + "\n"
-
-
-def write_consistency_reports(
-    report: ConsistencyReport,
-    *,
-    json_path: Path,
-    markdown_path: Path,
-) -> None:
-    json_path.parent.mkdir(parents=True, exist_ok=True)
-    markdown_path.parent.mkdir(parents=True, exist_ok=True)
-    json_path.write_text(report.to_json(), encoding="utf-8")
-    markdown_path.write_text(render_consistency_markdown(report), encoding="utf-8")
-
-
-def _records(
-    payload: dict[str, Any] | None, *, key: str = "records"
-) -> list[dict[str, Any]]:
-    return path_mapping_list(payload, key)
-
-
-def _source_ref(
-    source_id: str,
-    payload: dict[str, Any],
-    path: Path | None,
-) -> ConsistencySourceRef:
-    source = report_source_view(payload, source_name=source_id)
-    return ConsistencySourceRef(
-        source_id=source_id,
-        path=str(path) if path else None,
-        schema_version=source.schema_version,
-        checksum=source.checksum or _checksum(payload),
-    )
-
-
-def _checksum(payload: dict[str, Any] | None) -> str | None:
-    if payload is None:
-        return None
-    for key in SOURCE_CHECKSUM_KEYS:
-        value = payload.get(key)
-        if isinstance(value, Mapping):
-            checksum = path_str_or_none(value, "value")
-            if checksum is not None:
-                return checksum
-        if isinstance(value, str):
-            return value
-    return None
-
-
-def _find_denominator_closure_drift(
-    closure_records: list[dict[str, Any]],
-    denominator_workloads: list[dict[str, Any]],
-) -> list[ConsistencyFinding]:
-    attempted = {
-        _workload_key(record): record
-        for record in closure_records
-        if _is_attempted(path_get(record, "closure_status"))
-    }
-    findings: list[ConsistencyFinding] = []
-    for workload in denominator_workloads:
-        key = _workload_key(workload)
-        if key not in attempted:
-            continue
-        if not _is_denominator_blocked(workload):
-            continue
-        findings.append(
-            ConsistencyFinding(
-                severity="blocker",
-                reason_code="denominator_closure_drift",
-                sources=["paper_denominator", "execution_closure"],
-                refs=[key],
-                message=(
-                    "Workload is attempted in execution closure but blocked or "
-                    "unavailable in denominator accounting."
-                ),
-                next_step=(
-                    "Regenerate denominator and closure from the same inputs, or "
-                    "correct the stale workload state."
-                ),
-            )
-        )
-    return findings
-
-
-def _find_matrix_runtime_attempted(
-    matrix_report: dict[str, Any] | None,
-    closure_records: list[dict[str, Any]],
-) -> list[ConsistencyFinding]:
-    if matrix_report is None:
-        return []
-    attempted_refs = [
-        _workload_key(record)
-        for record in closure_records
-        if _is_attempted(path_get(record, "closure_status"))
-    ]
-    if not attempted_refs:
-        return []
-    unavailable_refs = _matrix_runtime_unavailable_refs(matrix_report)
-    if not unavailable_refs:
-        return []
-    return [
-        ConsistencyFinding(
-            severity="blocker",
-            reason_code="matrix_runtime_unavailable_attempted",
-            sources=["matrix_report", "execution_closure"],
-            refs=sorted((set(attempted_refs) | set(unavailable_refs)))[:10],
-            message=(
-                "Runtime evidence is marked unavailable while closure contains "
-                "attempted workloads."
-            ),
-            next_step=(
-                "Reconcile the matrix runtime status with the attempted closure "
-                "evidence before using either report as supporting evidence."
-            ),
-        )
-    ]
-
-
-def _find_missing_derived_evidence_scored(
-    closure_records: list[dict[str, Any]],
-    amd_score_report: dict[str, Any] | None,
-) -> list[ConsistencyFinding]:
-    if amd_score_report is None:
-        return []
-    missing = {
-        _workload_key(record)
-        for record in closure_records
-        if _has_missing_derived_evidence(record)
-    }
-    scored = {
-        _workload_key(record)
-        for record in _score_records(amd_score_report)
-        if _is_score_present(record)
-    }
-    overlaps = sorted(missing & scored)
-    if not overlaps:
-        return []
-    return [
-        ConsistencyFinding(
-            severity="blocker",
-            reason_code="missing_derived_evidence_scored",
-            sources=["execution_closure", "amd_score_report"],
-            refs=overlaps[:10],
-            message="Closure reports missing derived evidence for workloads that are scored.",
-            next_step=(
-                "Regenerate score evidence or remove stale scored entries until "
-                "derived evidence refs are present."
-            ),
-        )
-    ]
-
-
-def _find_checksum_mismatches(
-    payloads: dict[str, dict[str, Any] | None],
-) -> list[ConsistencyFinding]:
-    findings: list[ConsistencyFinding] = []
-    actual = {
-        source_id: _checksum(payload)
-        for source_id, payload in payloads.items()
-        if payload is not None
-    }
-    for source_id, payload in payloads.items():
-        if payload is None:
-            continue
-        for ref_source_id, expected in _embedded_source_checksums(payload).items():
-            observed = actual.get(ref_source_id)
-            if expected and observed and expected != observed:
-                findings.append(
-                    ConsistencyFinding(
-                        severity="warning",
-                        reason_code="source_ref_checksum_mismatch",
-                        sources=[source_id, ref_source_id],
-                        refs=[f"{source_id}->{ref_source_id}"],
-                        message=(
-                            "Embedded source checksum does not match the provided "
-                            "source payload checksum."
-                        ),
-                        next_step=(
-                            "Regenerate the dependent report from the provided "
-                            "source payloads."
-                        ),
-                    )
-                )
-    return findings
-
-
-def _find_claim_boundary_violations(
-    payloads: dict[str, dict[str, Any] | None],
-) -> list[ConsistencyFinding]:
-    findings: list[ConsistencyFinding] = []
-    for source_id, payload in payloads.items():
-        if payload is None:
-            continue
-        paths = sorted(_truthy_authority_paths(payload))
-        if not paths:
-            continue
-        findings.append(
-            ConsistencyFinding(
-                severity="blocker",
-                reason_code="claim_boundary_violation",
-                sources=[source_id],
-                refs=paths[:10],
-                message="A source report contains a truthy authority claim boundary.",
-                next_step=(
-                    "Keep authority claims false unless a separate validated "
-                    "artifact explicitly upgrades the claim."
-                ),
-            )
-        )
-    return findings
-
-
-def _embedded_source_checksums(payload: dict[str, Any]) -> dict[str, str]:
-    checksums: dict[str, str] = {}
-    for source_id, value in path_dict(payload, "sources").items():
-        checksum = _source_ref_checksum(value)
-        if checksum:
-            checksums[_normalize_source_id(str(source_id))] = checksum
-    return checksums
-
-
-def _source_ref_checksum(value: object) -> str | None:
-    if isinstance(value, Mapping):
-        checksum = path_get(value, "checksum")
-        if isinstance(checksum, Mapping):
-            return path_str_or_none(checksum, "value")
-        if isinstance(checksum, str):
-            return checksum
-    return None
-
-
-def _normalize_source_id(source_id: str) -> str:
-    aliases = {
-        "compatibility_matrix": "matrix_report",
-    }
-    return aliases.get(source_id, source_id)
-
-
-def _matrix_runtime_unavailable_refs(matrix_report: dict[str, Any]) -> list[str]:
-    refs: list[str] = []
-    candidates = []
-    for key in ("entries", "rows", "workloads", "records", "checks"):
-        candidates.extend(path_mapping_list(matrix_report, key))
-    for entry in candidates:
-        text = " ".join(
-            str(path_get(entry, key, default=""))
-            for key in ("status", "runtime_status", "reason_code", "message")
-        ).lower()
-        if "runtime_unavailable" in text or "runtime unavailable" in text:
-            refs.append(_workload_key(entry))
-    return refs
-
-
-def _score_records(payload: dict[str, Any]) -> list[dict[str, Any]]:
-    records: list[dict[str, Any]] = []
-    for key in ("scores", "workloads", "records", "results"):
-        records.extend(path_mapping_list(payload, key))
-    return records
-
-
-def _is_score_present(record: dict[str, Any]) -> bool:
-    if path_bool(record, "supported") or path_bool(record, "score_eligible"):
-        return True
-    for key in ("score", "runtime_ms", "speedup", "amd_native_score"):
-        if path_get(record, key) is not None:
-            return True
-    return False
-
-
-def _has_missing_derived_evidence(record: dict[str, Any]) -> bool:
-    status = path_str_or_none(record, "closure_status") or ""
-    if "derived_evidence_missing" in status:
-        return True
-    gaps = " ".join(path_str_list(record, "evidence_gaps"))
-    return any(
-        marker in gaps
-        for marker in ("amd_score", "amd_sol", "solar_derivation", "derived")
-    )
-
-
-def _is_attempted(value: object) -> bool:
-    status = (_optional_str(value) or "").lower()
-    return status in ATTEMPTED_CLOSURE_STATUSES or status.startswith("attempted_")
-
-
-def _is_denominator_blocked(workload: dict[str, Any]) -> bool:
-    statuses = {
-        str(path_get(workload, "readiness_status", default="")).lower(),
-        str(path_get(workload, "closure_status", default="")).lower(),
-    }
-    statuses.update(
-        str(key).lower()
-        for key, value in path_dict(workload, "states").items()
-        if key in BLOCKED_DENOMINATOR_STATUSES and bool(value)
-    )
-    return bool(statuses & BLOCKED_DENOMINATOR_STATUSES)
-
-
-def _truthy_authority_paths(payload: object, *, prefix: str = "") -> set[str]:
-    paths: set[str] = set()
-    if isinstance(payload, Mapping):
-        for key, value in payload.items():
-            path = f"{prefix}.{key}" if prefix else str(key)
-            if key in AUTHORITY_BOUNDARY_KEYS and value is True:
-                paths.add(path)
-            paths.update(_truthy_authority_paths(value, prefix=path))
-    elif isinstance(payload, list):
-        for index, item in enumerate(payload):
-            paths.update(_truthy_authority_paths(item, prefix=f"{prefix}[{index}]"))
-    return paths
-
-
-def _workload_key(payload: dict[str, Any]) -> str:
-    for key in ("workload_uuid", "uuid", "workload_id"):
-        value = path_get(payload, key)
-        if value is not None:
-            return str(value)
-    problem_id = (
-        path_get(payload, "problem_id") or path_get(payload, "problem") or "unknown"
-    )
-    row_index = path_get(payload, "row_index")
-    return f"{problem_id}:{row_index if row_index is not None else 'unknown'}"
-
-
-def _dedupe_findings(findings: list[ConsistencyFinding]) -> list[ConsistencyFinding]:
-    seen: set[tuple[str, tuple[str, ...], tuple[str, ...]]] = set()
-    unique: list[ConsistencyFinding] = []
-    for finding in findings:
-        key = (
-            finding.reason_code,
-            tuple(sorted(finding.sources)),
-            tuple(sorted(finding.refs)),
-        )
-        if key in seen:
-            continue
-        seen.add(key)
-        unique.append(finding)
-    return sorted(unique, key=lambda item: (item.severity, item.reason_code, item.refs))
-
-
-def _optional_str(value: object) -> str | None:
-    return value if isinstance(value, str) else None
-
-
-def _mapping_or_none(payload: object) -> dict[str, Any] | None:
-    if not isinstance(payload, Mapping):
-        return None
-    return {str(key): value for key, value in payload.items()}
+__all__ = [
+    "CLAIM_BOUNDARY_TEXT",
+    "CONSISTENCY_REPORT_SCHEMA_VERSION",
+    "ConsistencyClaimBoundary",
+    "ConsistencyFinding",
+    "ConsistencyFindingTotals",
+    "ConsistencyReport",
+    "ConsistencySourceRef",
+    "ConsistencySummary",
+    "build_consistency_report",
+    "load_json",
+    "render_consistency_markdown",
+    "utc_timestamp",
+    "write_consistency_reports",
+]
