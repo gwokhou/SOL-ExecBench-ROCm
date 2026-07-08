@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any, cast
 
 import pytest
 from pydantic import ValidationError
@@ -127,7 +128,7 @@ def test_attempted_workload_with_evidence_gap_is_not_denominator_drift():
 
 def test_consistency_report_normalizes_non_object_sources() -> None:
     report = build_consistency_report(
-        paper_denominator=[],  # type: ignore[arg-type]
+        paper_denominator=cast(dict[str, Any], []),
         execution_closure={"records": []},
         amd_score_report={"scores": []},
         created_at="2026-05-31T00:00:00Z",

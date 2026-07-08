@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any, cast
 
 import pytest
 from pydantic import ValidationError
@@ -89,7 +90,7 @@ def test_trust_summary_reports_missing_and_blocked_next_steps():
 
 def test_trust_summary_treats_non_object_sources_as_missing() -> None:
     report = build_trust_summary_report(
-        consistency_report=[],  # type: ignore[arg-type]
+        consistency_report=cast(dict[str, Any], []),
         created_at="2026-05-31T00:00:00Z",
     )
 

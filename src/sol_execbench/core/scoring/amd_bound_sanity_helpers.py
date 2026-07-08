@@ -26,7 +26,11 @@ from .amd_bound_sanity_models import (
 def _payload_artifacts(
     artifacts: list[AmdBoundSanitySourceRef | dict[str, Any] | str | Path],
 ) -> list[dict[str, Any]]:
-    return [dict(artifact) for artifact in artifacts if isinstance(artifact, Mapping)]
+    return [
+        {str(key): value for key, value in artifact.items()}
+        for artifact in artifacts
+        if isinstance(artifact, Mapping)
+    ]
 
 
 def _workload_seed(uuid: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -84,7 +88,9 @@ def _artifact_uuid(payload: dict[str, Any]) -> str | None:
 
 
 def _dict_value(value: object) -> dict[str, Any]:
-    return dict(value) if isinstance(value, Mapping) else {}
+    if isinstance(value, Mapping):
+        return {str(key): item for key, item in value.items()}
+    return {}
 
 
 def _optional_str(value: object) -> str | None:

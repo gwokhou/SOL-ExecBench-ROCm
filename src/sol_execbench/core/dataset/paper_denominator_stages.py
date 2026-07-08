@@ -8,6 +8,11 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+from sol_execbench.core.data.path_access import (
+    path_get,
+    path_mapping_list,
+    path_str_or_none,
+)
 from sol_execbench.core.dataset.paper_denominator_evidence import (
     _add_missing_evidence,
     _add_reason,
@@ -50,35 +55,29 @@ class ReadinessWorkloadRecord:
 
 
 def _inventory_problem_record(payload: object) -> InventoryProblemRecord:
-    record = payload if isinstance(payload, Mapping) else {}
-    problem_path = _optional_str(record.get("problem_path"))
-    problem_id = _optional_str(record.get("problem_id")) or problem_path or "unknown"
-    workloads = record.get("workloads")
+    problem_path = path_str_or_none(payload, "problem_path")
+    problem_id = path_str_or_none(payload, "problem_id") or problem_path or "unknown"
+    workloads = path_mapping_list(payload, "workloads")
     return InventoryProblemRecord(
-        category=_optional_str(record.get("category")) or "unknown",
+        category=path_str_or_none(payload, "category") or "unknown",
         problem_id=problem_id,
         problem_path=problem_path,
-        workloads=[dict(item) for item in workloads if isinstance(item, Mapping)]
-        if isinstance(workloads, list)
-        else [],
+        workloads=workloads,
     )
 
 
 def _readiness_workload_record(payload: object) -> ReadinessWorkloadRecord:
-    record = payload if isinstance(payload, Mapping) else {}
-    problem_path = _optional_str(record.get("problem_path"))
-    problem_id = _optional_str(record.get("problem_id")) or problem_path or "unknown"
-    reasons = record.get("reasons")
+    problem_path = path_str_or_none(payload, "problem_path")
+    problem_id = path_str_or_none(payload, "problem_id") or problem_path or "unknown"
+    reasons = path_mapping_list(payload, "reasons")
     return ReadinessWorkloadRecord(
-        category=_optional_str(record.get("category")) or "unknown",
+        category=path_str_or_none(payload, "category") or "unknown",
         problem_id=problem_id,
         problem_path=problem_path,
-        workload_uuid=_optional_str(record.get("workload_uuid")),
-        row_index=_optional_int(record.get("row_index")),
-        status=_optional_str(record.get("status")) or "blocked",
-        reasons=[dict(item) for item in reasons if isinstance(item, Mapping)]
-        if isinstance(reasons, list)
-        else [],
+        workload_uuid=path_str_or_none(payload, "workload_uuid"),
+        row_index=_optional_int(path_get(payload, "row_index")),
+        status=path_str_or_none(payload, "status") or "blocked",
+        reasons=reasons,
     )
 
 
@@ -343,7 +342,13 @@ def _optional_str(value: object) -> str | None:
 def _optional_int(value: object) -> int | None:
     if isinstance(value, bool) or value is None:
         return None
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return None
+    if isinstance(value, float):
+        return int(value) if value.is_integer() else None
+    return None

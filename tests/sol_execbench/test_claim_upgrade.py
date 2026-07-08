@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any, cast
 
 import pytest
 from pydantic import ValidationError
@@ -105,7 +106,7 @@ def test_claim_upgrade_allows_container_and_score_when_prerequisites_are_clean()
 
 def test_claim_upgrade_treats_non_object_source_payloads_as_missing() -> None:
     report = build_claim_upgrade_report(
-        paper_denominator=[],  # type: ignore[arg-type]
+        paper_denominator=cast(dict[str, Any], []),
         hardware_validation={},
         consistency_report={},
         matrix_report={},
