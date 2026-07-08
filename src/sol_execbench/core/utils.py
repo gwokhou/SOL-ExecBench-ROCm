@@ -25,7 +25,7 @@ from typing import TYPE_CHECKING, Dict, List
 
 
 if TYPE_CHECKING:
-    from sol_execbench.core.data import Environment
+    from sol_execbench.core.data.trace import Environment
 
 
 def is_cuda_available() -> bool:
@@ -44,7 +44,7 @@ def list_cuda_devices() -> List[str]:
 def env_snapshot(device: str) -> "Environment":
     import torch
 
-    from sol_execbench.core.data import Environment
+    from sol_execbench.core.data.trace import Environment
 
     libs: Dict[str, str] = {"torch": torch.__version__}
     try:

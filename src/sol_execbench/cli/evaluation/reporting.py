@@ -9,7 +9,7 @@ from __future__ import annotations
 from rich.console import Console
 from rich.table import Table
 
-from ...core import EvaluationStatus, Trace
+from ...core.data.trace import EvaluationStatus, Trace
 
 console = Console(stderr=True)
 

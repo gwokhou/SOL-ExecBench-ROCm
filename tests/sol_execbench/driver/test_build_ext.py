@@ -127,7 +127,7 @@ class TestTemplateAST:
                 import_names.append(node.module)
         assert "os" not in import_names
         assert "torch.utils.cpp_extension" in import_names
-        assert "sol_execbench.core" in import_names
+        assert "sol_execbench.core.data.solution" in import_names
 
 
 class TestSourceDiscovery:

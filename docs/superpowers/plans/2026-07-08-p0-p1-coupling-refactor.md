@@ -1,0 +1,65 @@
+# P0 P1 Coupling Refactor Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Reduce the highest-risk P0/P1 coupling hotspots without changing benchmark behavior.
+
+**Architecture:** Keep public imports stable, but move orchestration details into focused modules. Add boundary tests that prevent the original hotspots from regrowing.
+
+**Tech Stack:** Python 3.12+, pytest, AST-based module boundary tests.
+
+---
+
+### Task 1: Add Coupling Guardrails
+
+**Files:**
+- Modify: `tests/sol_execbench/cli/test_module_boundaries.py`
+
+- [ ] Add tests that assert `sol_execbench.cli.evaluation.evaluator` and `sol_execbench.core.bench.eval_workload_runner` stay below bounded import/size thresholds.
+- [ ] Add tests that assert `sol_execbench.core.dataset.runner` no longer imports scoring modules directly.
+- [ ] Run `uv run pytest tests/sol_execbench/cli/test_module_boundaries.py -q` and confirm the new tests fail before production refactoring.
+
+### Task 2: Split CLI Evaluation Orchestration
+
+**Files:**
+- Modify: `src/sol_execbench/cli/evaluation/evaluator.py`
+- Create: `src/sol_execbench/cli/evaluation/phases.py`
+- Create: `src/sol_execbench/cli/evaluation/outputs.py`
+- Create: `src/sol_execbench/cli/evaluation/sidecar_writer.py`
+
+- [ ] Move compile/runtime/no-trace phase helpers into `phases.py`.
+- [ ] Move trace file writing, trace checksum, and pass/fail calculation into `outputs.py`.
+- [ ] Move optional sidecar writing into `sidecar_writer.py`.
+- [ ] Keep `run_evaluation_cli` public behavior and CLI exit semantics unchanged.
+
+### Task 3: Split Workload Runtime Loop Helpers
+
+**Files:**
+- Modify: `src/sol_execbench/core/bench/eval_workload_runner.py`
+- Create: `src/sol_execbench/core/bench/eval_trace_helpers.py`
+- Create: `src/sol_execbench/core/bench/eval_correctness.py`
+
+- [ ] Move trace construction/emission helpers into `eval_trace_helpers.py`.
+- [ ] Move per-workload correctness rounds into `eval_correctness.py`.
+- [ ] Keep `evaluate_workloads` as the staged driver entry point.
+
+### Task 4: Move Dataset Scoring Bridge
+
+**Files:**
+- Modify: `src/sol_execbench/core/dataset/runner.py`
+- Create: `src/sol_execbench/core/dataset/runner_scoring.py`
+- Modify: `scripts/run_dataset.py`
+
+- [ ] Move AMD score report bridge functions out of `runner.py`.
+- [ ] Re-export compatibility aliases only where needed.
+- [ ] Update script imports to use the new focused module.
+
+### Task 5: Verify
+
+**Files:**
+- No code changes expected.
+
+- [ ] Run `uv run pytest tests/sol_execbench/cli/test_module_boundaries.py -q`.
+- [ ] Run focused affected tests:
+  `uv run pytest tests/sol_execbench/cli/evaluation tests/sol_execbench/core/bench/test_eval_runtime.py tests/sol_execbench/core/dataset/test_dataset_runner.py tests/sol_execbench/core/dataset/test_run_dataset_amd_score.py -q`.
+- [ ] Run lint on touched files if test time permits.

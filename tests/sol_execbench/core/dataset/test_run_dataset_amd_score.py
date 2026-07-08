@@ -205,7 +205,6 @@ def test_runner_score_report_wrapper_uses_cli_execution_run_cli(
     monkeypatch: pytest.MonkeyPatch,
 ):
     import sol_execbench.core.dataset.cli_execution as cli_execution
-    import sol_execbench.core.dataset.runner as runner
 
     calls = []
 
@@ -213,17 +212,19 @@ def test_runner_score_report_wrapper_uses_cli_execution_run_cli(
         calls.append(kwargs)
         return []
 
+    from sol_execbench.core.dataset import runner_scoring
+
     monkeypatch.setattr(
-        runner,
+        runner_scoring,
         "_build_amd_score_reports_for_problem_impl",
         spy_build_impl,
     )
 
     assert (
-        runner.build_amd_score_reports_for_problem.__module__
-        == "sol_execbench.core.dataset.runner"
+        runner_scoring.build_amd_score_reports_for_problem.__module__
+        == "sol_execbench.core.dataset.runner_scoring"
     )
-    scores = runner.build_amd_score_reports_for_problem(
+    scores = runner_scoring.build_amd_score_reports_for_problem(
         definition_payload={},
         workload_path=tmp_path / "workload.jsonl",
         traces_payload=[],

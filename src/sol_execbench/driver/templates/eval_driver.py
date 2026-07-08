@@ -69,13 +69,10 @@ from sol_execbench.core.bench.utils import (  # noqa: E402,F401
     make_eval,
 )
 from sol_execbench.core.bench.eval_workload_runner import evaluate_workloads  # noqa: E402
-from sol_execbench.core import (  # noqa: E402
-    Definition,
-    EvaluationStatus,
-    Solution,
-    Trace,
-    Workload,
-)
+from sol_execbench.core.data.definition import Definition  # noqa: E402
+from sol_execbench.core.data.solution import Solution  # noqa: E402
+from sol_execbench.core.data.trace import EvaluationStatus, Trace  # noqa: E402
+from sol_execbench.core.data.workload import Workload  # noqa: E402
 from sol_execbench.core.data.dtypes import dtype_str_to_torch_dtype  # noqa: E402
 
 # ── Load problem ─────────────────────────────────────────────────────────────

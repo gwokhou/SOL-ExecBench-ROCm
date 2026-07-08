@@ -22,7 +22,7 @@ from typing import Any, Dict, List
 
 import torch
 
-from sol_execbench.core.data import Definition
+from sol_execbench.core.data.definition import Definition
 
 
 def normalize_outputs(
