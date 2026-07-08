@@ -287,17 +287,17 @@ cleanup_candidates = [
   "tests/docker/dependencies/test_rocm_runtime.py",
   "tests/docker/dependencies/test_triton_rocm.py",
   "tests/sol_execbench/core/bench/test_eval_runtime.py",
-  "tests/sol_execbench/solar_derivation_fixtures.py",
-  "tests/sol_execbench/test_dataset_contract.py",
-  "tests/sol_execbench/test_rocm_eval_timing_audit.py",
-  "tests/sol_execbench/test_rocm_library_examples.py",
+  "tests/sol_execbench/core/scoring/solar_derivation_fixtures.py",
+  "tests/sol_execbench/core/dataset/test_dataset_contract.py",
+  "tests/sol_execbench/core/dataset/test_rocm_eval_timing_audit.py",
+  "tests/sol_execbench/core/dataset/test_rocm_library_examples.py",
   "tests/sol_execbench/core/platform/test_rocm_marker_device_nodes.py",
   "tests/sol_execbench/core/platform/test_rocm_migration_residue_audit.py",
   "tests/sol_execbench/core/platform/test_rocm_schema_build_audit.py",
   "tests/sol_execbench/core/platform/test_rocm_support_docs.py",
   "tests/sol_execbench/core/platform/test_rocm_test_suite_audit.py",
-  "tests/sol_execbench/test_solar_derivation_contract.py",
-  "tests/sol_execbench/test_solar_derivation_evidence.py",
+  "tests/sol_execbench/core/scoring/test_solar_derivation_contract.py",
+  "tests/sol_execbench/core/scoring/test_solar_derivation_evidence.py",
 ]
 
 [notes]
