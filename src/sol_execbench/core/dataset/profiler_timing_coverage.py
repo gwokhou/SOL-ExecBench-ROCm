@@ -448,7 +448,7 @@ def _reference_override(metadata: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
-def _blocker_class(payload: Mapping[object, Any]) -> str | None:
+def _blocker_class(payload: Mapping[object, object]) -> str | None:
     normalized_payload: dict[str, Any] = {
         str(key): value for key, value in payload.items()
     }
