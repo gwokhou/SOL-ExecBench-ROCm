@@ -24,8 +24,6 @@ RAW_PAYLOAD_ALLOWLIST = {
     "sol_execbench.core.dataset.low_precision",
     "sol_execbench.core.dataset.migration",
     "sol_execbench.core.dataset.paper_denominator_sources",
-    "sol_execbench.core.dataset.profiler_timing_coverage",
-    "sol_execbench.core.dataset.run_closure",
     # Scoring artifact and parser boundaries.
     "sol_execbench.core.scoring.amd_bound_graph_fx",
     "sol_execbench.core.scoring.amd_bound_sanity_builder",
