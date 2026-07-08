@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from enum import Enum
 from pathlib import Path
 from typing import Any, Literal
@@ -18,6 +19,7 @@ from sol_execbench.core.compatibility import (
     RocmCompatibilityMatrixReport,
 )
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
+from sol_execbench.core.data.path_access import path_dict, path_get, path_mapping_list
 
 
 ROCM_COMPATIBILITY_MATRIX_DIFF_SCHEMA_VERSION = (
@@ -142,7 +144,7 @@ class MatrixReportDiff(BaseModelWithDocstrings):
 def _normalize_value(value: Any) -> Any:
     if isinstance(value, list):
         return [_normalize_value(item) for item in value]
-    if isinstance(value, dict):
+    if isinstance(value, Mapping):
         return {key: _normalize_value(value[key]) for key in sorted(value)}
     return value
 
@@ -152,7 +154,7 @@ def _normalize_artifacts(artifacts: list[dict[str, Any]]) -> list[dict[str, Any]
     return sorted(
         normalized,
         key=lambda artifact: (
-            str(artifact.get("artifact_id", "")),
+            str(path_get(artifact, "artifact_id", default="")),
             json.dumps(artifact, sort_keys=True),
         ),
     )
@@ -160,7 +162,7 @@ def _normalize_artifacts(artifacts: list[dict[str, Any]]) -> list[dict[str, Any]
 
 def _normalize_entry(entry: MatrixEntry) -> dict[str, Any]:
     payload = _normalize_value(entry.model_dump(mode="json"))
-    payload["artifacts"] = _normalize_artifacts(payload.get("artifacts", []))
+    payload["artifacts"] = _normalize_artifacts(path_mapping_list(payload, "artifacts"))
     return payload
 
 
@@ -196,12 +198,7 @@ _FIELD_GROUPS = {
 
 
 def _get_path(payload: dict[str, Any], path: tuple[str, ...]) -> Any:
-    value: Any = payload
-    for part in path:
-        if value is None:
-            return None
-        value = value.get(part)
-    return value
+    return path_get(payload, ".".join(path))
 
 
 def _semantic_changes(
@@ -242,8 +239,8 @@ def _claim_boundary_escalated(
     old_payload: dict[str, Any],
     new_payload: dict[str, Any],
 ) -> bool:
-    old_claims = old_payload.get("claim_boundary", {})
-    new_claims = new_payload.get("claim_boundary", {})
+    old_claims = path_dict(old_payload, "claim_boundary")
+    new_claims = path_dict(new_payload, "claim_boundary")
     for field in (
         "score_authority",
         "paper_parity_authority",
@@ -252,7 +249,10 @@ def _claim_boundary_escalated(
         "native_host_validated",
         "hardware_validated",
     ):
-        if new_claims.get(field) is True and old_claims.get(field) is not True:
+        if (
+            path_get(new_claims, field) is True
+            and path_get(old_claims, field) is not True
+        ):
             return True
     return False
 
@@ -264,17 +264,19 @@ def _mixed_version_drift(
     statuses = {old_payload["status"], new_payload["status"]}
     if MatrixCompatibilityStatus.MIXED_VERSION.value in statuses:
         return True
-    old_target = old_payload.get("target", {})
-    new_target = new_payload.get("target", {})
-    old_python = old_payload.get("observed", {}).get("python_dependency") or {}
-    new_python = new_payload.get("observed", {}).get("python_dependency") or {}
+    old_target = path_dict(old_payload, "target")
+    new_target = path_dict(new_payload, "target")
+    old_python = path_dict(old_payload, "observed.python_dependency")
+    new_python = path_dict(new_payload, "observed.python_dependency")
     return (
-        old_target.get("requested_rocm_user_space_version")
-        != new_target.get("requested_rocm_user_space_version")
-        or old_target.get("pytorch_rocm_target")
-        != new_target.get("pytorch_rocm_target")
-        or old_python.get("torch_rocm_target") != new_python.get("torch_rocm_target")
-        or old_python.get("torch_hip_version") != new_python.get("torch_hip_version")
+        path_get(old_target, "requested_rocm_user_space_version")
+        != path_get(new_target, "requested_rocm_user_space_version")
+        or path_get(old_target, "pytorch_rocm_target")
+        != path_get(new_target, "pytorch_rocm_target")
+        or path_get(old_python, "torch_rocm_target")
+        != path_get(new_python, "torch_rocm_target")
+        or path_get(old_python, "torch_hip_version")
+        != path_get(new_python, "torch_hip_version")
     )
 
 
@@ -292,13 +294,13 @@ def _gpu_architecture_drift(
     old_payload: dict[str, Any],
     new_payload: dict[str, Any],
 ) -> bool:
-    old_target = old_payload.get("target", {})
-    new_target = new_payload.get("target", {})
-    old_gpu = old_payload.get("observed", {}).get("gpu") or {}
-    new_gpu = new_payload.get("observed", {}).get("gpu") or {}
-    return old_target.get("intended_gpu_architecture") != new_target.get(
-        "intended_gpu_architecture"
-    ) or old_gpu.get("gfx_architecture") != new_gpu.get("gfx_architecture")
+    old_target = path_dict(old_payload, "target")
+    new_target = path_dict(new_payload, "target")
+    old_gpu = path_dict(old_payload, "observed.gpu")
+    new_gpu = path_dict(new_payload, "observed.gpu")
+    return path_get(old_target, "intended_gpu_architecture") != path_get(
+        new_target, "intended_gpu_architecture"
+    ) or path_get(old_gpu, "gfx_architecture") != path_get(new_gpu, "gfx_architecture")
 
 
 def _image_dependency_drift(changes: dict[str, dict[str, Any]]) -> bool:
@@ -311,14 +313,16 @@ def _image_dependency_drift(changes: dict[str, dict[str, Any]]) -> bool:
         )
     ):
         return True
-    target_change = changes.get("target")
+    target_change = path_get(changes, "target")
     if target_change is None:
         return False
-    old_target = target_change["old"] or {}
-    new_target = target_change["new"] or {}
-    return old_target.get("docker_image_repository") != new_target.get(
-        "docker_image_repository"
-    ) or old_target.get("docker_image_tag") != new_target.get("docker_image_tag")
+    old_target = path_dict(target_change, "old")
+    new_target = path_dict(target_change, "new")
+    return path_get(old_target, "docker_image_repository") != path_get(
+        new_target, "docker_image_repository"
+    ) or path_get(old_target, "docker_image_tag") != path_get(
+        new_target, "docker_image_tag"
+    )
 
 
 def _severity_categories(

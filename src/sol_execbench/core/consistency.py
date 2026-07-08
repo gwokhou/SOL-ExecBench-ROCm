@@ -4,13 +4,23 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from sol_execbench.core.data.json_utils import stable_model_checksum, stable_model_json
+from sol_execbench.core.data.path_access import (
+    path_bool,
+    path_dict,
+    path_get,
+    path_mapping_list,
+    path_str_list,
+    path_str_or_none,
+)
 from sol_execbench.core.dataset.manifest import DatasetManifestChecksum
+from sol_execbench.core.report_payloads import report_source_view
 from sol_execbench.core.text_utils import markdown_table_cell as _md_cell
 from sol_execbench.core.trust_summary import load_json as load_json, utc_timestamp
 
@@ -168,15 +178,15 @@ def build_consistency_report(
 ) -> ConsistencyReport:
     source_paths = source_paths or {}
     payloads = {
-        "execution_closure": execution_closure,
-        "paper_denominator": paper_denominator,
-        "matrix_report": matrix_report,
-        "runtime_evidence": runtime_evidence,
-        "static_evidence": static_evidence,
-        "amd_score_report": amd_score_report,
-        "amd_sol_report": amd_sol_report,
-        "solar_derivation": solar_derivation,
-        "amd_bound_sanity": amd_bound_sanity,
+        "execution_closure": _mapping_or_none(execution_closure),
+        "paper_denominator": _mapping_or_none(paper_denominator),
+        "matrix_report": _mapping_or_none(matrix_report),
+        "runtime_evidence": _mapping_or_none(runtime_evidence),
+        "static_evidence": _mapping_or_none(static_evidence),
+        "amd_score_report": _mapping_or_none(amd_score_report),
+        "amd_sol_report": _mapping_or_none(amd_sol_report),
+        "solar_derivation": _mapping_or_none(solar_derivation),
+        "amd_bound_sanity": _mapping_or_none(amd_bound_sanity),
     }
     sources = [
         _source_ref(source_id, payload, source_paths.get(source_id))
@@ -306,10 +316,7 @@ def write_consistency_reports(
 def _records(
     payload: dict[str, Any] | None, *, key: str = "records"
 ) -> list[dict[str, Any]]:
-    records = (payload or {}).get(key, [])
-    if not isinstance(records, list):
-        return []
-    return [record for record in records if isinstance(record, dict)]
+    return path_mapping_list(payload, key)
 
 
 def _source_ref(
@@ -317,11 +324,12 @@ def _source_ref(
     payload: dict[str, Any],
     path: Path | None,
 ) -> ConsistencySourceRef:
+    source = report_source_view(payload, source_name=source_id)
     return ConsistencySourceRef(
         source_id=source_id,
         path=str(path) if path else None,
-        schema_version=_optional_str(payload.get("schema_version")),
-        checksum=_checksum(payload),
+        schema_version=source.schema_version,
+        checksum=source.checksum or _checksum(payload),
     )
 
 
@@ -330,9 +338,9 @@ def _checksum(payload: dict[str, Any] | None) -> str | None:
         return None
     for key in SOURCE_CHECKSUM_KEYS:
         value = payload.get(key)
-        if isinstance(value, dict):
-            checksum = value.get("value")
-            if isinstance(checksum, str):
+        if isinstance(value, Mapping):
+            checksum = path_str_or_none(value, "value")
+            if checksum is not None:
                 return checksum
         if isinstance(value, str):
             return value
@@ -346,7 +354,7 @@ def _find_denominator_closure_drift(
     attempted = {
         _workload_key(record): record
         for record in closure_records
-        if _is_attempted(record.get("closure_status"))
+        if _is_attempted(path_get(record, "closure_status"))
     }
     findings: list[ConsistencyFinding] = []
     for workload in denominator_workloads:
@@ -383,7 +391,7 @@ def _find_matrix_runtime_attempted(
     attempted_refs = [
         _workload_key(record)
         for record in closure_records
-        if _is_attempted(record.get("closure_status"))
+        if _is_attempted(path_get(record, "closure_status"))
     ]
     if not attempted_refs:
         return []
@@ -504,21 +512,18 @@ def _find_claim_boundary_violations(
 
 def _embedded_source_checksums(payload: dict[str, Any]) -> dict[str, str]:
     checksums: dict[str, str] = {}
-    sources = payload.get("sources")
-    if isinstance(sources, dict):
-        for source_id, value in sources.items():
-            checksum = _source_ref_checksum(value)
-            if checksum:
-                checksums[_normalize_source_id(str(source_id))] = checksum
+    for source_id, value in path_dict(payload, "sources").items():
+        checksum = _source_ref_checksum(value)
+        if checksum:
+            checksums[_normalize_source_id(str(source_id))] = checksum
     return checksums
 
 
 def _source_ref_checksum(value: object) -> str | None:
-    if isinstance(value, dict):
-        checksum = cast(dict[str, Any], value).get("checksum")
-        if isinstance(checksum, dict):
-            nested = checksum.get("value")
-            return nested if isinstance(nested, str) else None
+    if isinstance(value, Mapping):
+        checksum = value.get("checksum")
+        if isinstance(checksum, Mapping):
+            return path_str_or_none(checksum, "value")
         if isinstance(checksum, str):
             return checksum
     return None
@@ -535,12 +540,10 @@ def _matrix_runtime_unavailable_refs(matrix_report: dict[str, Any]) -> list[str]
     refs: list[str] = []
     candidates = []
     for key in ("entries", "rows", "workloads", "records", "checks"):
-        value = matrix_report.get(key)
-        if isinstance(value, list):
-            candidates.extend(item for item in value if isinstance(item, dict))
+        candidates.extend(path_mapping_list(matrix_report, key))
     for entry in candidates:
         text = " ".join(
-            str(entry.get(key, ""))
+            str(path_get(entry, key, default=""))
             for key in ("status", "runtime_status", "reason_code", "message")
         ).lower()
         if "runtime_unavailable" in text or "runtime unavailable" in text:
@@ -551,26 +554,24 @@ def _matrix_runtime_unavailable_refs(matrix_report: dict[str, Any]) -> list[str]
 def _score_records(payload: dict[str, Any]) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
     for key in ("scores", "workloads", "records", "results"):
-        value = payload.get(key)
-        if isinstance(value, list):
-            records.extend(item for item in value if isinstance(item, dict))
+        records.extend(path_mapping_list(payload, key))
     return records
 
 
 def _is_score_present(record: dict[str, Any]) -> bool:
-    if record.get("supported") is True or record.get("score_eligible") is True:
+    if path_bool(record, "supported") or path_bool(record, "score_eligible"):
         return True
     for key in ("score", "runtime_ms", "speedup", "amd_native_score"):
-        if record.get(key) is not None:
+        if path_get(record, key) is not None:
             return True
     return False
 
 
 def _has_missing_derived_evidence(record: dict[str, Any]) -> bool:
-    status = _optional_str(record.get("closure_status")) or ""
+    status = path_str_or_none(record, "closure_status") or ""
     if "derived_evidence_missing" in status:
         return True
-    gaps = " ".join(str(gap) for gap in record.get("evidence_gaps", []))
+    gaps = " ".join(path_str_list(record, "evidence_gaps"))
     return any(
         marker in gaps
         for marker in ("amd_score", "amd_sol", "solar_derivation", "derived")
@@ -584,22 +585,20 @@ def _is_attempted(value: object) -> bool:
 
 def _is_denominator_blocked(workload: dict[str, Any]) -> bool:
     statuses = {
-        str(workload.get("readiness_status", "")).lower(),
-        str(workload.get("closure_status", "")).lower(),
+        str(path_get(workload, "readiness_status", default="")).lower(),
+        str(path_get(workload, "closure_status", default="")).lower(),
     }
-    states = workload.get("states")
-    if isinstance(states, dict):
-        statuses.update(
-            str(key).lower()
-            for key, value in states.items()
-            if key in BLOCKED_DENOMINATOR_STATUSES and bool(value)
-        )
+    statuses.update(
+        str(key).lower()
+        for key, value in path_dict(workload, "states").items()
+        if key in BLOCKED_DENOMINATOR_STATUSES and bool(value)
+    )
     return bool(statuses & BLOCKED_DENOMINATOR_STATUSES)
 
 
 def _truthy_authority_paths(payload: object, *, prefix: str = "") -> set[str]:
     paths: set[str] = set()
-    if isinstance(payload, dict):
+    if isinstance(payload, Mapping):
         for key, value in payload.items():
             path = f"{prefix}.{key}" if prefix else str(key)
             if key in AUTHORITY_BOUNDARY_KEYS and value is True:
@@ -613,11 +612,13 @@ def _truthy_authority_paths(payload: object, *, prefix: str = "") -> set[str]:
 
 def _workload_key(payload: dict[str, Any]) -> str:
     for key in ("workload_uuid", "uuid", "workload_id"):
-        value = payload.get(key)
+        value = path_get(payload, key)
         if value is not None:
             return str(value)
-    problem_id = payload.get("problem_id") or payload.get("problem") or "unknown"
-    row_index = payload.get("row_index")
+    problem_id = (
+        path_get(payload, "problem_id") or path_get(payload, "problem") or "unknown"
+    )
+    row_index = path_get(payload, "row_index")
     return f"{problem_id}:{row_index if row_index is not None else 'unknown'}"
 
 
@@ -639,3 +640,7 @@ def _dedupe_findings(findings: list[ConsistencyFinding]) -> list[ConsistencyFind
 
 def _optional_str(value: object) -> str | None:
     return value if isinstance(value, str) else None
+
+
+def _mapping_or_none(payload: object) -> dict[str, Any] | None:
+    return dict(payload) if isinstance(payload, Mapping) else None

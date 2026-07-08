@@ -125,6 +125,18 @@ def test_attempted_workload_with_evidence_gap_is_not_denominator_drift():
     assert {finding.reason_code for finding in report.findings} == set()
 
 
+def test_consistency_report_normalizes_non_object_sources() -> None:
+    report = build_consistency_report(
+        paper_denominator=[],  # type: ignore[arg-type]
+        execution_closure={"records": []},
+        amd_score_report={"scores": []},
+        created_at="2026-05-31T00:00:00Z",
+    )
+
+    assert report.summary.finding_totals.blocker >= 0
+    assert all(source.source_id != "paper_denominator" for source in report.sources)
+
+
 def test_consistency_report_is_strict_and_deterministic():
     report = build_consistency_report(
         execution_closure={
