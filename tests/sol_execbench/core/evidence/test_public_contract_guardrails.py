@@ -46,7 +46,7 @@ from sol_execbench_type_helpers import (
     make_workload,
 )
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[4]
 PLANNING_ROOT = REPO_ROOT / ".planning"
 COMPATIBILITY_INVENTORY = REPO_ROOT / "docs/internal/v1_4_compatibility_inventory.md"
 TEST_DIR = str(Path(__file__).resolve().parent)

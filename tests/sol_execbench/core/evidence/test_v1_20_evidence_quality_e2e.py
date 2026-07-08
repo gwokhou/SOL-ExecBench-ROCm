@@ -5,7 +5,7 @@ import sys
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[4]
 
 
 def _load_script(name: str):
