@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 SCRIPT_PATH = (
-    Path(__file__).resolve().parents[2] / "scripts/setup_rocm_clock_sudoers.py"
+    Path(__file__).resolve().parents[4] / "scripts/setup_rocm_clock_sudoers.py"
 )
 SPEC = importlib.util.spec_from_file_location("setup_rocm_clock_sudoers", SCRIPT_PATH)
 assert SPEC is not None

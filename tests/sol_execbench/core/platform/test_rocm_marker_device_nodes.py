@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import importlib
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -14,8 +15,11 @@ def _test_conftest() -> Any:
     return importlib.import_module("conftest")
 
 
-def test_rocm_gpu_info_reports_missing_device_nodes_before_torch_probe() -> None:
+def test_rocm_gpu_info_reports_missing_device_nodes_before_torch_probe(
+    monkeypatch,
+) -> None:
     conftest = _test_conftest()
+    monkeypatch.setattr(sys, "platform", "linux")
 
     available, gfx_arch, reason = conftest._rocm_gpu_info(
         path_exists=lambda _path: False
@@ -29,8 +33,9 @@ def test_rocm_gpu_info_reports_missing_device_nodes_before_torch_probe() -> None
     assert "Codex or container sandbox" in reason
 
 
-def test_missing_rocm_device_nodes_only_reports_absent_nodes() -> None:
+def test_missing_rocm_device_nodes_only_reports_absent_nodes(monkeypatch) -> None:
     conftest = _test_conftest()
+    monkeypatch.setattr(sys, "platform", "linux")
 
     missing = conftest._missing_rocm_device_nodes(
         path_exists=lambda path: path != Path("/dev/kfd")

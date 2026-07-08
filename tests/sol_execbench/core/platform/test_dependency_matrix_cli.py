@@ -13,7 +13,7 @@ from sol_execbench.core.dependency_matrix import (
 from sol_execbench.core.docker_matrix import load_docker_target_manifest
 
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[4]
 MANIFEST_PATH = REPO_ROOT / "docker" / "rocm-targets.json"
 
 

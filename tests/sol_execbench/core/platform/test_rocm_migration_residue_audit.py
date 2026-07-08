@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[4]
 
 ACTIVE_ROOTS = (
     "src",
@@ -79,6 +79,14 @@ def _classification(relative_path: str, line: str) -> str | None:
         return "legacy schema rejection or migration guidance"
     if relative_path.startswith(("docs/", "README.md")):
         return "user-facing unsupported feature or migration documentation"
+    if relative_path.startswith(
+        (
+            "tests/sol_execbench/core/platform/test_rocm_migration_residue_audit.py",
+            "tests/sol_execbench/core/platform/test_rocm_schema_build_audit.py",
+            "tests/sol_execbench/core/platform/test_rocm_test_suite_audit.py",
+        )
+    ):
+        return "ROCm migration residue audit definitions"
     if relative_path.startswith("src/sol_execbench/core/bench/reward_hack") and (
         "cudaStream" in line or "torch\\.cuda\\.Stream" in line
     ):
@@ -93,9 +101,12 @@ def _classification(relative_path: str, line: str) -> str | None:
         or "nvrtc" in line
     ):
         return "dataset parity metadata preserves upstream NVIDIA boundary labels"
-    if relative_path.startswith("src/sol_execbench/core/environment") and (
-        "cuda_version" in line or "CUDA/HIP" in line
-    ):
+    if relative_path.startswith(
+        (
+            "src/sol_execbench/core/environment",
+            "src/sol_execbench/core/platform/environment",
+        )
+    ) and ("cuda_version" in line or "CUDA/HIP" in line):
         return "environment snapshot records PyTorch CUDA/HIP compatibility metadata"
     if relative_path.startswith("scripts/run_docker.sh") and (
         "SOL_EXECBENCH_DEPENDENCY_TORCH_CUDA_VERSION" in line
@@ -104,11 +115,19 @@ def _classification(relative_path: str, line: str) -> str | None:
         return (
             "Docker wrapper preserves PyTorch ROCm CUDA compatibility environment names"
         )
-    if relative_path.startswith("src/sol_execbench/core/compatibility") and (
-        "torch_cuda_version" in line or "ROCm/CUDA" in line or "CUDA" in line
-    ):
+    if relative_path.startswith(
+        (
+            "src/sol_execbench/core/compatibility",
+            "src/sol_execbench/core/platform/compatibility",
+        )
+    ) and ("torch_cuda_version" in line or "ROCm/CUDA" in line or "CUDA" in line):
         return "compatibility matrix records PyTorch ROCm CUDA compatibility metadata"
-    if relative_path.startswith("src/sol_execbench/core/dependency_matrix") and (
+    if relative_path.startswith(
+        (
+            "src/sol_execbench/core/dependency_matrix",
+            "src/sol_execbench/core/platform/dependency_matrix",
+        )
+    ) and (
         "torch_cuda_version" in line
         or "CUDA PyTorch runtime" in line
         or "--torch-cuda-version" in line
@@ -316,15 +335,30 @@ def _classification(relative_path: str, line: str) -> str | None:
         "cuda device not available" in line
     ):
         return "Triton compatibility skip reason uses CUDA device namespace"
-    if relative_path.startswith("tests/sol_execbench/test_dependency_matrix") and (
+    if relative_path.startswith(
+        (
+            "tests/sol_execbench/test_dependency_matrix",
+            "tests/sol_execbench/core/platform/test_dependency_matrix",
+        )
+    ) and (
         "torch_cuda_version" in line or "CUDA" in line or "--torch-cuda-version" in line
     ):
         return "dependency matrix test covers PyTorch ROCm CUDA compatibility metadata"
-    if relative_path.startswith("tests/sol_execbench/test_runtime_evidence") and (
+    if relative_path.startswith(
+        (
+            "tests/sol_execbench/test_runtime_evidence",
+            "tests/sol_execbench/core/reports/test_runtime_evidence",
+        )
+    ) and (
         "torch_cuda_version" in line or "--torch-cuda-version" in line
     ):
         return "runtime evidence test covers PyTorch ROCm CUDA compatibility metadata"
-    if relative_path.startswith("tests/sol_execbench/test_run_docker") and (
+    if relative_path.startswith(
+        (
+            "tests/sol_execbench/test_run_docker",
+            "tests/sol_execbench/core/platform/test_run_docker",
+        )
+    ) and (
         "SOL_EXECBENCH_DEPENDENCY_TORCH_CUDA_VERSION" in line
     ):
         return "Docker wrapper test covers PyTorch ROCm CUDA compatibility env var"
