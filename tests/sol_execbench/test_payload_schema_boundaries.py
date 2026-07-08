@@ -11,9 +11,7 @@ PACKAGE_ROOT = SOURCE_ROOT / "sol_execbench"
 RAW_PAYLOAD_ALLOWLIST = {
     # External trace and report readers.
     "sol_execbench.core.baseline_export",
-    "sol_execbench.core.consistency",
     "sol_execbench.core.evaluation_stability",
-    "sol_execbench.core.matrix_diff",
     "sol_execbench.core.trust_summary",
     # Core data compatibility parsers.
     "sol_execbench.core.data.json_utils",
