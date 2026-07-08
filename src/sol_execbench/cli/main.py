@@ -36,17 +36,15 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from . import agent_feedback_sidecar as cli_agent_feedback_sidecar
-from . import baseline as cli_baseline
 from . import compilation as cli_compilation
-from . import dataset as cli_dataset
 from . import evaluation as cli_evaluation
 from . import environment as cli_environment
 from . import evaluation_runtime as cli_evaluation_runtime
-from . import metadata as cli_metadata
 from . import problem_io as cli_problem_io
 from . import profile_sidecars as cli_profile_sidecars
 from . import reporting as cli_reporting
 from . import static_evidence as cli_static_evidence
+from .commands import dispatch_subcommand
 from ..core.bench.static_kernel_evidence import StaticKernelEvidenceSidecar
 from ..core import EvaluationStatus
 from ..core.checksums import sha256_file
@@ -397,7 +395,7 @@ def _evaluate_cli(
 
 
 class SolExecbenchCli(click.Command):
-    """Dispatch root evaluator calls and the contract metadata command."""
+    """Dispatch root evaluator calls and GPU-free metadata subcommands."""
 
     def main(
         self,
@@ -409,56 +407,18 @@ class SolExecbenchCli(click.Command):
         **extra: Any,
     ) -> Any:
         args = list(args) if args is not None else sys.argv[1:]
-        if args and args[0] == "contract":
-            contract_prog = f"{prog_name or self.name} contract"
-            return cli_metadata._contract_cli.main(
-                args=args[1:],
-                prog_name=contract_prog,
-                complete_var=complete_var,
-                standalone_mode=standalone_mode,
-                windows_expand_args=windows_expand_args,
-                **extra,
-            )
-        if args and args[0] == "doctor":
-            doctor_prog = f"{prog_name or self.name} doctor"
-            return cli_metadata._doctor_cli.main(
-                args=args[1:],
-                prog_name=doctor_prog,
-                complete_var=complete_var,
-                standalone_mode=standalone_mode,
-                windows_expand_args=windows_expand_args,
-                **extra,
-            )
-        if args and args[0] == "toolchain":
-            toolchain_prog = f"{prog_name or self.name} toolchain"
-            return cli_metadata._toolchain_cli.main(
-                args=args[1:],
-                prog_name=toolchain_prog,
-                complete_var=complete_var,
-                standalone_mode=standalone_mode,
-                windows_expand_args=windows_expand_args,
-                **extra,
-            )
-        if args and args[0] == "baseline":
-            baseline_prog = f"{prog_name or self.name} baseline"
-            return cli_baseline._baseline_cli.main(
-                args=args[1:],
-                prog_name=baseline_prog,
-                complete_var=complete_var,
-                standalone_mode=standalone_mode,
-                windows_expand_args=windows_expand_args,
-                **extra,
-            )
-        if args and args[0] == "dataset":
-            dataset_prog = f"{prog_name or self.name} dataset"
-            return cli_dataset._dataset_cli.main(
-                args=args[1:],
-                prog_name=dataset_prog,
-                complete_var=complete_var,
-                standalone_mode=standalone_mode,
-                windows_expand_args=windows_expand_args,
-                **extra,
-            )
+        subcommand_dispatch = dispatch_subcommand(
+            args,
+            root_command=self,
+            prog_name=prog_name,
+            complete_var=complete_var,
+            standalone_mode=standalone_mode,
+            windows_expand_args=windows_expand_args,
+            extra=extra,
+        )
+        if subcommand_dispatch is not None:
+            return subcommand_dispatch.result
+
         return _evaluate_cli.main(
             args=args,
             prog_name=prog_name or self.name,
