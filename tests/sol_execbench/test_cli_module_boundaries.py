@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import ast
+import subprocess
+import sys
 from pathlib import Path
+
+from click.testing import CliRunner
 
 from sol_execbench.cli import evaluation
 from sol_execbench.cli import environment
@@ -175,6 +179,53 @@ def test_no_internal_two_node_import_cycles_except_cli_entrypoint() -> None:
     }
 
     assert cycles == allowed
+
+
+def test_cli_main_import_fanout_stays_bounded() -> None:
+    edges = _internal_import_edges()
+    main_imports = sorted(
+        target for source, target in edges if source == "sol_execbench.cli.main"
+    )
+
+    assert len(main_imports) <= 15
+
+
+def test_cli_main_import_does_not_eagerly_load_subcommand_modules() -> None:
+    script = """
+import sys
+
+import sol_execbench.cli.main
+
+eager_modules = [
+    "sol_execbench.cli.baseline",
+    "sol_execbench.cli.dataset",
+    "sol_execbench.cli.metadata",
+]
+loaded = [module for module in eager_modules if module in sys.modules]
+if loaded:
+    raise SystemExit(f"eagerly loaded subcommand modules: {loaded}")
+"""
+    subprocess.run(
+        [sys.executable, "-c", script],
+        check=True,
+        cwd=SOURCE_ROOT,
+    )
+
+
+def test_cli_subcommand_completion_dispatches_to_subcommand_options() -> None:
+    result = CliRunner().invoke(
+        cli_main.cli,
+        [],
+        env={
+            "_SOL_EXECBENCH_COMPLETE": "bash_complete",
+            "COMP_WORDS": "sol-execbench contract --",
+            "COMP_CWORD": "2",
+        },
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "--json" in result.output
+    assert "--definition" not in result.output
 
 
 def test_cli_environment_helpers_live_outside_main_and_sidecars() -> None:
