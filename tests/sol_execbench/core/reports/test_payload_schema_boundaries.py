@@ -14,7 +14,7 @@ RAW_PAYLOAD_INFRASTRUCTURE = {
 }
 
 RAW_PAYLOAD_ARTIFACT_BOUNDARIES = {
-    "sol_execbench.core.baseline_export",
+    "sol_execbench.core.evidence.baseline_export",
     "sol_execbench.core.reports.evaluation_stability_builder",
     "sol_execbench.core.bench.output_allocation",
     "sol_execbench.core.bench.profile_summary_artifacts",
