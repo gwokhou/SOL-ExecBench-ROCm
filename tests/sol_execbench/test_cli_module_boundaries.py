@@ -32,6 +32,23 @@ def _internal_modules() -> dict[str, Path]:
     return modules
 
 
+def _resolve_import_from_base(
+    module: str,
+    node: ast.ImportFrom,
+    modules: dict[str, Path],
+) -> str:
+    if node.level:
+        package_parts = module.split(".")[:-1]
+        if modules[module].name == "__init__.py":
+            package_parts = module.split(".")
+        base_parts = package_parts[: max(0, len(package_parts) - node.level + 1)]
+        if node.module:
+            base_parts.extend(node.module.split("."))
+        return ".".join(base_parts)
+
+    return node.module or ""
+
+
 def _resolve_imported_modules(
     module: str,
     node: ast.Import | ast.ImportFrom,
@@ -40,22 +57,8 @@ def _resolve_imported_modules(
     names: list[str] = []
     if isinstance(node, ast.Import):
         names = [alias.name for alias in node.names]
-    elif node.level:
-        package_parts = module.split(".")[:-1]
-        if modules[module].name == "__init__.py":
-            package_parts = module.split(".")
-        base_parts = package_parts[: max(0, len(package_parts) - node.level + 1)]
-        if node.module:
-            base_parts.extend(node.module.split("."))
-        base = ".".join(base_parts)
-        names = [base]
-        names.extend(
-            f"{base}.{alias.name}" if base else alias.name
-            for alias in node.names
-            if alias.name != "*"
-        )
     else:
-        base = node.module or ""
+        base = _resolve_import_from_base(module, node, modules)
         names = [base]
         names.extend(
             f"{base}.{alias.name}" if base else alias.name
@@ -188,6 +191,48 @@ def test_cli_main_import_fanout_stays_bounded() -> None:
     )
 
     assert len(main_imports) <= 15
+
+
+def test_source_modules_do_not_import_dataset_package_reexports() -> None:
+    modules = _internal_modules()
+    core_root = "sol_execbench.core"
+    dataset_root = "sol_execbench.core.dataset"
+    violations: list[tuple[str, str]] = []
+
+    for module, path in modules.items():
+        if path.name == "__init__.py":
+            continue
+        tree = ast.parse(path.read_text())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                violations.extend(
+                    (module, alias.name)
+                    for alias in node.names
+                    if alias.name == dataset_root
+                )
+                continue
+
+            if not isinstance(node, ast.ImportFrom):
+                continue
+
+            base = _resolve_import_from_base(module, node, modules)
+            if base == core_root:
+                violations.extend(
+                    (module, alias.name)
+                    for alias in node.names
+                    if alias.name == "dataset"
+                )
+                continue
+
+            if base != dataset_root:
+                continue
+
+            for alias in node.names:
+                imported = f"{dataset_root}.{alias.name}"
+                if imported not in modules:
+                    violations.append((module, alias.name))
+
+    assert sorted(violations) == []
 
 
 def test_cli_main_import_does_not_eagerly_load_subcommand_modules() -> None:
