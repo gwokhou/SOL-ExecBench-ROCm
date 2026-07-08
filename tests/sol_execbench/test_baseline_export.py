@@ -129,6 +129,27 @@ def test_export_rejects_nan_latency_and_does_not_confirm_coverage(
     assert "NaN" not in output_path.read_text(encoding="utf-8")
 
 
+def test_baseline_export_skips_malformed_trace_records(tmp_path: Path) -> None:
+    trace_path = tmp_path / "trace.jsonl"
+    output_path = tmp_path / "baseline.json"
+    trace_path.write_text(
+        '{"definition":"demo","workload":[],"evaluation":[]}\n'
+        '{"definition":"demo","workload":{"uuid":"w0"},"evaluation":{"status":"FAILED"}}\n',
+        encoding="utf-8",
+    )
+
+    registry = export_hip_baseline_registry(
+        trace_path=trace_path,
+        output_path=output_path,
+        target_id="demo",
+        sol_version="test",
+        timing_policy="test",
+    )
+
+    assert registry["entries"] == []
+    assert registry["coverage_status"] == "diagnostic"
+
+
 def test_workload_key_axis_fallback_does_not_collide(tmp_path: Path) -> None:
     def _trace(axes: dict[str, int]) -> dict[str, object]:
         return {

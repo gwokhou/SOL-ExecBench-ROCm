@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,19 @@ HIP_BASELINE_REGISTRY_SCHEMA_VERSION = "baseline_registry.v1"
 SOL_MEASURED_BASELINE_REGISTRY_SCHEMA_VERSION = (
     "sol_execbench.measured_baseline_registry.v1"
 )
+
+
+@dataclass(frozen=True)
+class _BaselineTraceRecord:
+    trace: dict[str, Any]
+    index: int
+    workload: dict[str, Any]
+    workload_uuid: str | None
+    workload_key: str
+    evaluation: dict[str, Any]
+    performance: dict[str, Any]
+    environment: dict[str, Any]
+    libs: dict[str, Any]
 
 
 def export_hip_baseline_registry(
@@ -27,40 +41,29 @@ def export_hip_baseline_registry(
     entries: list[dict[str, Any]] = []
     expected_workload_keys: list[str] = []
     for index, trace in enumerate(traces):
-        workload = trace.get("workload")
-        workload_map = _dict_or_empty(workload)
-        workload_uuid = _string_or_none(workload_map.get("uuid"))
-        workload_key = _workload_key(trace, workload_uuid=workload_uuid, index=index)
-        expected_workload_keys.append(workload_key)
-        evaluation = trace.get("evaluation")
-        if not isinstance(evaluation, dict):
+        record = _baseline_trace_record(trace, index=index)
+        expected_workload_keys.append(record.workload_key)
+        if record.evaluation.get("status") != "PASSED":
             continue
-        if evaluation.get("status") != "PASSED":
+        if not record.performance:
             continue
-        performance = evaluation.get("performance")
-        if not isinstance(performance, dict):
-            continue
-        latency_ms = _positive_float(performance.get("latency_ms"))
+        latency_ms = _positive_float(record.performance.get("latency_ms"))
         if latency_ms is None:
             continue
-        environment = evaluation.get("environment")
-        environment_map = _dict_or_empty(environment)
-        libs = environment_map.get("libs")
-        libs_map = _dict_or_empty(libs)
         entries.append(
             {
                 "target_id": target_id,
-                "definition": str(trace.get("definition") or target_id),
-                "workload_key": workload_key,
-                "workload_uuid": workload_uuid,
+                "definition": str(record.trace.get("definition") or target_id),
+                "workload_key": record.workload_key,
+                "workload_uuid": record.workload_uuid,
                 "latency_ms": latency_ms,
-                "score": _optional_float(performance.get("speedup_factor")),
+                "score": _optional_float(record.performance.get("speedup_factor")),
                 "trace_ref": str(trace_path),
                 "source": "SOL-ExecBench-ROCm measured baseline trace",
                 "artifact_ref": f"{trace_path}#{index + 1}",
                 "provenance": {
-                    "hardware": str(environment_map.get("hardware") or "unknown"),
-                    "rocm_version": _rocm_version(libs_map),
+                    "hardware": str(record.environment.get("hardware") or "unknown"),
+                    "rocm_version": _rocm_version(record.libs),
                     "sol_version": sol_version or "unknown",
                     "target_id": target_id,
                     "timing_policy": timing_policy,
@@ -68,12 +71,12 @@ def export_hip_baseline_registry(
                 "facts": {
                     "latency_ms": latency_ms,
                     "reference_latency_ms": _optional_float(
-                        performance.get("reference_latency_ms")
+                        record.performance.get("reference_latency_ms")
                     ),
                     "speedup_factor": _optional_float(
-                        performance.get("speedup_factor")
+                        record.performance.get("speedup_factor")
                     ),
-                    "libs": libs_map,
+                    "libs": record.libs,
                     "trace_line": index + 1,
                 },
             }
@@ -113,23 +116,49 @@ def _load_trace_jsonl(path: Path) -> list[dict[str, Any]]:
     return traces
 
 
+def _baseline_trace_record(
+    trace: dict[str, Any], *, index: int
+) -> _BaselineTraceRecord:
+    workload = _mapping(trace, "workload")
+    workload_uuid = _string_or_none(workload.get("uuid"))
+    evaluation = _mapping(trace, "evaluation")
+    performance = _mapping(evaluation, "performance")
+    environment = _mapping(evaluation, "environment")
+    libs = _mapping(environment, "libs")
+    return _BaselineTraceRecord(
+        trace=trace,
+        index=index,
+        workload=workload,
+        workload_uuid=workload_uuid,
+        workload_key=_workload_key(
+            trace,
+            workload=workload,
+            workload_uuid=workload_uuid,
+            index=index,
+        ),
+        evaluation=evaluation,
+        performance=performance,
+        environment=environment,
+        libs=libs,
+    )
+
+
 def _workload_key(
     trace: dict[str, Any],
     *,
+    workload: dict[str, Any],
     workload_uuid: str | None,
     index: int,
 ) -> str:
     if workload_uuid:
         return workload_uuid
-    workload = trace.get("workload")
-    if isinstance(workload, dict):
-        axes = workload.get("axes")
-        if isinstance(axes, dict) and axes:
-            # Separator between key and value prevents collisions such as
-            # {'n': 12} vs {'n1': 2} both yielding "n12".
-            axis_parts = "-".join(f"{key}={axes[key]}" for key in sorted(axes))
-            if axis_parts:
-                return axis_parts
+    axes = _mapping(workload, "axes")
+    if axes:
+        # Separator between key and value prevents collisions such as
+        # {'n': 12} vs {'n1': 2} both yielding "n12".
+        axis_parts = "-".join(f"{key}={axes[key]}" for key in sorted(axes))
+        if axis_parts:
+            return axis_parts
     digest = sha256(
         json.dumps(trace.get("workload"), sort_keys=True, default=str).encode()
     ).hexdigest()[:12]
@@ -160,7 +189,8 @@ def _string_or_none(value: Any) -> str | None:
     return None
 
 
-def _dict_or_empty(value: Any) -> dict[str, Any]:
+def _mapping(payload: dict[str, Any], key: str) -> dict[str, Any]:
+    value = payload.get(key)
     return value if isinstance(value, dict) else {}
 
 
