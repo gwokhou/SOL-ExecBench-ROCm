@@ -141,6 +141,7 @@ allowed = [
   "src/sol_execbench/__init__.py",
   "src/sol_execbench/cli/__init__.py",
   "src/sol_execbench/cli/agent_feedback_sidecar.py",
+  "src/sol_execbench/cli/commands.py",
   "src/sol_execbench/cli/dataset.py",
   "src/sol_execbench/cli/environment.py",
   "src/sol_execbench/cli/evaluation.py",
