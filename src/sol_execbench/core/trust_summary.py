@@ -5,13 +5,22 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from sol_execbench.core.data.json_utils import stable_model_checksum, stable_model_json
+from sol_execbench.core.data.path_access import (
+    path_dict,
+    path_get,
+    path_int,
+    path_mapping_list,
+    path_str_or_none,
+)
 from sol_execbench.core.dataset.manifest import DatasetManifestChecksum
+from sol_execbench.core.report_payloads import report_source_view
 from sol_execbench.core.text_utils import markdown_table_cell as _md_cell
 from sol_execbench.core.utils import utc_timestamp
 
@@ -92,9 +101,9 @@ class TrustSummaryReport(BaseModel):
 
 def load_json(path: Path) -> dict[str, Any]:
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
+    if not isinstance(payload, Mapping):
         raise ValueError(f"Expected JSON object at {path}")
-    return payload
+    return dict(payload)
 
 
 def build_trust_summary_report(
@@ -114,29 +123,29 @@ def build_trust_summary_report(
 ) -> TrustSummaryReport:
     source_paths = source_paths or {}
     payloads = {
-        "consistency_report": consistency_report,
-        "evaluation_stability": evaluation_stability,
-        "claim_upgrade": claim_upgrade,
-        "execution_closure": execution_closure,
-        "paper_denominator": paper_denominator,
-        "matrix_report": matrix_report,
-        "amd_score_report": amd_score_report,
-        "amd_sol_report": amd_sol_report,
-        "solar_derivation": solar_derivation,
-        "amd_bound_sanity": amd_bound_sanity,
+        "consistency_report": _mapping_or_none(consistency_report),
+        "evaluation_stability": _mapping_or_none(evaluation_stability),
+        "claim_upgrade": _mapping_or_none(claim_upgrade),
+        "execution_closure": _mapping_or_none(execution_closure),
+        "paper_denominator": _mapping_or_none(paper_denominator),
+        "matrix_report": _mapping_or_none(matrix_report),
+        "amd_score_report": _mapping_or_none(amd_score_report),
+        "amd_sol_report": _mapping_or_none(amd_sol_report),
+        "solar_derivation": _mapping_or_none(solar_derivation),
+        "amd_bound_sanity": _mapping_or_none(amd_bound_sanity),
     }
     outcomes = [
-        _consistency_outcome(consistency_report),
-        _stability_outcome(evaluation_stability),
-        _claim_outcome(claim_upgrade),
+        _consistency_outcome(payloads["consistency_report"]),
+        _stability_outcome(payloads["evaluation_stability"]),
+        _claim_outcome(payloads["claim_upgrade"]),
         _evidence_outcome(
-            execution_closure=execution_closure,
-            paper_denominator=paper_denominator,
-            matrix_report=matrix_report,
-            amd_score_report=amd_score_report,
-            amd_sol_report=amd_sol_report,
-            solar_derivation=solar_derivation,
-            amd_bound_sanity=amd_bound_sanity,
+            execution_closure=payloads["execution_closure"],
+            paper_denominator=payloads["paper_denominator"],
+            matrix_report=payloads["matrix_report"],
+            amd_score_report=payloads["amd_score_report"],
+            amd_sol_report=payloads["amd_sol_report"],
+            solar_derivation=payloads["solar_derivation"],
+            amd_bound_sanity=payloads["amd_bound_sanity"],
         ),
     ]
     next_steps = sorted({step for outcome in outcomes for step in outcome.next_steps})
@@ -254,8 +263,7 @@ def _stability_outcome(payload: dict[str, Any] | None) -> TrustOutcome:
             reason_codes=["evaluation_stability_missing"],
             next_steps=["Generate evaluation_stability.v1."],
         )
-    raw_totals = payload.get("status_totals")
-    totals = cast(dict[str, Any], raw_totals) if isinstance(raw_totals, dict) else {}
+    totals = path_dict(payload, "status_totals")
     risky = [
         key
         for key in (
@@ -266,12 +274,12 @@ def _stability_outcome(payload: dict[str, Any] | None) -> TrustOutcome:
             "profiler_overhead_risk",
             "backend_unsupported",
         )
-        if int(totals.get(key) or 0) > 0
+        if path_int(totals, key, default=0) > 0
     ]
     return TrustOutcome(
         key="stable_enough_to_interpret",
         status="stable_enough"
-        if not risky and int(totals.get("stable") or 0) > 0
+        if not risky and path_int(totals, "stable", default=0) > 0
         else "blocked",
         reason_codes=["stable_timing"] if not risky else risky,
         next_steps=[]
@@ -290,7 +298,7 @@ def _claim_outcome(payload: dict[str, Any] | None) -> TrustOutcome:
             reason_codes=["claim_upgrade_missing"],
             next_steps=["Generate claim_upgrade.v1."],
         )
-    highest = str(payload.get("highest_eligible_claim") or "diagnostic_only")
+    highest = str(path_get(payload, "highest_eligible_claim") or "diagnostic_only")
     status = "claim_upgrade_blocked" if highest == "diagnostic_only" else highest
     return TrustOutcome(
         key="claim_upgrade",
@@ -349,38 +357,39 @@ def _overall_status(outcomes: list[TrustOutcome]) -> str:
 
 
 def _finding_total(payload: dict[str, Any], severity: str) -> int:
-    summary = payload.get("summary")
-    if isinstance(summary, dict):
-        totals = summary.get("finding_totals")
-        if isinstance(totals, dict):
-            return int(totals.get(severity) or 0)
+    totals = path_dict(payload, "summary.finding_totals")
+    if totals:
+        return path_int(totals, severity, default=0)
     return sum(
         1
-        for finding in payload.get("findings", [])
-        if isinstance(finding, dict) and finding.get("severity") == severity
+        for finding in path_mapping_list(payload, "findings")
+        if path_get(finding, "severity") == severity
     )
 
 
 def _source_ref(
     source_id: str, payload: dict[str, Any], path: Path | None
 ) -> TrustSourceRef:
+    source = report_source_view(payload, source_name=source_id)
     return TrustSourceRef(
         source_id=source_id,
         path=str(path) if path else None,
-        schema_version=payload.get("schema_version")
-        if isinstance(payload.get("schema_version"), str)
-        else None,
-        checksum=_checksum(payload),
+        schema_version=source.schema_version,
+        checksum=source.checksum or _checksum(payload),
     )
 
 
 def _checksum(payload: dict[str, Any]) -> str | None:
     for key in SOURCE_CHECKSUM_KEYS:
         value = payload.get(key)
-        if isinstance(value, dict):
-            checksum = value.get("value")
-            if isinstance(checksum, str):
+        if isinstance(value, Mapping):
+            checksum = path_str_or_none(value, "value")
+            if checksum is not None:
                 return checksum
         if isinstance(value, str):
             return value
     return None
+
+
+def _mapping_or_none(payload: object) -> dict[str, Any] | None:
+    return dict(payload) if isinstance(payload, Mapping) else None

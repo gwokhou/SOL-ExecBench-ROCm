@@ -87,6 +87,18 @@ def test_trust_summary_reports_missing_and_blocked_next_steps():
     assert "Future CDNA3-family validation, including MI300X (gfx942)" in text
 
 
+def test_trust_summary_treats_non_object_sources_as_missing() -> None:
+    report = build_trust_summary_report(
+        consistency_report=[],  # type: ignore[arg-type]
+        created_at="2026-05-31T00:00:00Z",
+    )
+
+    assert report.overall_status == "evidence_missing"
+    assert all(source.source_id != "consistency_report" for source in report.sources)
+    outcomes = {outcome.key: outcome for outcome in report.outcomes}
+    assert outcomes["internally_consistent"].status == "evidence_missing"
+
+
 def test_trust_summary_report_is_strict_and_deterministic():
     report = build_trust_summary_report(created_at="2026-05-31T00:00:00Z")
     payload = report.model_dump(mode="json")
