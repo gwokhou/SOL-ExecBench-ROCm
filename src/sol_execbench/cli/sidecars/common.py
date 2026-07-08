@@ -6,14 +6,14 @@
 
 from __future__ import annotations
 
-from .agent_feedback_sidecar import (
+from .agent_feedback import (
     _agent_feedback_artifact_citations as _agent_feedback_artifact_citations,
     _agent_feedback_identity_fields as _agent_feedback_identity_fields,
     _agent_feedback_run_id as _agent_feedback_run_id,
     _agent_feedback_sidecar_path as _agent_feedback_sidecar_path,
     _write_agent_feedback_sidecar as _write_agent_feedback_sidecar,
 )
-from .profile_sidecars import (
+from .profile import (
     _profile_output_directory as _profile_output_directory,
     _profile_sidecar_path as _profile_sidecar_path,
     _profile_summary_artifact_citations as _profile_summary_artifact_citations,

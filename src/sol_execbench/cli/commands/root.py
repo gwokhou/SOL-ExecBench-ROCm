@@ -42,23 +42,23 @@ class CompletionEnvironment:
 
 def _subcommand_for(name: str) -> click.Command | None:
     if name == "baseline":
-        from . import baseline as cli_baseline
+        import sol_execbench.cli.commands.baseline as cli_baseline
 
         return cli_baseline._baseline_cli
     if name == "contract":
-        from . import metadata as cli_metadata
+        import sol_execbench.cli.commands.metadata as cli_metadata
 
         return cli_metadata._contract_cli
     if name == "dataset":
-        from . import dataset as cli_dataset
+        import sol_execbench.cli.commands.dataset as cli_dataset
 
         return cli_dataset._dataset_cli
     if name == "doctor":
-        from . import metadata as cli_metadata
+        import sol_execbench.cli.commands.metadata as cli_metadata
 
         return cli_metadata._doctor_cli
     if name == "toolchain":
-        from . import metadata as cli_metadata
+        import sol_execbench.cli.commands.metadata as cli_metadata
 
         return cli_metadata._toolchain_cli
     return None

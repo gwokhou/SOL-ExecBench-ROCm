@@ -14,7 +14,7 @@ from sol_execbench.cli import reporting
 from sol_execbench.cli import sidecars
 from sol_execbench.core.scoring import amd_score_reports
 
-SOURCE_ROOT = Path(__file__).resolve().parents[2] / "src"
+SOURCE_ROOT = Path(__file__).resolve().parents[3] / "src"
 PACKAGE_ROOT = SOURCE_ROOT / "sol_execbench"
 
 

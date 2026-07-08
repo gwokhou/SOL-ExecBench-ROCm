@@ -15,16 +15,16 @@ from pathlib import Path
 
 from rich.console import Console
 
-from ..core.bench.io import flashinfer_safetensors_env
-from ..core.bench.rocm_profiler import (
+from ...core.bench.io import flashinfer_safetensors_env
+from ...core.bench.rocm_profiler import (
     ROCPROFV3_EXECUTABLE,
     Rocprofv3ProfileRequest,
     Rocprofv3ProfileResult,
     collect_rocprofv3_profile,
 )
-from ..core.bench.stderr import filter_benign_rocm_stderr
-from ..core.runtime_evidence import write_json_payload
-from .profile_sidecars import _profile_output_directory
+from ...core.bench.stderr import filter_benign_rocm_stderr
+from ...core.runtime_evidence import write_json_payload
+from ..sidecars.profile import _profile_output_directory
 
 console = Console(stderr=True)
 
