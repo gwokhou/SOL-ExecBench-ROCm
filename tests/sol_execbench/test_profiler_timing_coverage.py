@@ -5,6 +5,7 @@ from pathlib import Path
 
 from sol_execbench.core.dataset.inventory import build_dataset_inventory
 from sol_execbench.core.dataset.profiler_timing_coverage import (
+    _profiler_timing_summary_from_payload,
     build_profiler_timing_coverage_report,
     render_profiler_timing_coverage_markdown,
 )
@@ -76,6 +77,25 @@ def _write_problem(
 def _write_timing(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+
+def test_profiler_timing_summary_rejects_non_dict_payload() -> None:
+    assert _profiler_timing_summary_from_payload([], path="sidecar.json") is None
+
+
+def test_profiler_timing_summary_uses_nested_evidence_defaults() -> None:
+    summary = _profiler_timing_summary_from_payload(
+        {
+            "profiler_collected": True,
+            "evidence": {"backend": "rocprofv3", "kernel_duration_ms": 1.5},
+        },
+        path="sidecar.json",
+    )
+
+    assert summary is not None
+    assert summary.path == "sidecar.json"
+    assert summary.backend == "rocprofv3"
+    assert summary.kernel_duration_ms == 1.5
 
 
 def test_profiler_timing_coverage_tracks_problem_denominator(tmp_path):
