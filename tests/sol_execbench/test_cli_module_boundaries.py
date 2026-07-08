@@ -235,6 +235,46 @@ def test_source_modules_do_not_import_dataset_package_reexports() -> None:
     assert sorted(violations) == []
 
 
+def test_source_modules_do_not_import_scoring_package_reexports() -> None:
+    modules = _internal_modules()
+    core_root = "sol_execbench.core"
+    scoring_root = "sol_execbench.core.scoring"
+    violations: list[tuple[str, str]] = []
+
+    for module, path in modules.items():
+        tree = ast.parse(path.read_text())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                violations.extend(
+                    (module, alias.name)
+                    for alias in node.names
+                    if alias.name == scoring_root
+                )
+                continue
+
+            if not isinstance(node, ast.ImportFrom):
+                continue
+
+            base = _resolve_import_from_base(module, node, modules)
+            if base == core_root:
+                violations.extend(
+                    (module, alias.name)
+                    for alias in node.names
+                    if alias.name == "scoring"
+                )
+                continue
+
+            if base != scoring_root:
+                continue
+
+            for alias in node.names:
+                imported = f"{scoring_root}.{alias.name}"
+                if imported not in modules:
+                    violations.append((module, alias.name))
+
+    assert sorted(violations) == []
+
+
 def test_cli_main_import_does_not_eagerly_load_subcommand_modules() -> None:
     script = """
 import sys
