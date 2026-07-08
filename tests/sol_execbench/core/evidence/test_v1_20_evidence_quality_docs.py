@@ -8,7 +8,7 @@ from sol_execbench.core.consistency import ConsistencyReport
 from sol_execbench.core.evaluation_stability import EvaluationStabilityReport
 from sol_execbench.core.trust_summary import TrustSummaryReport
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[4]
 GUIDE = REPO_ROOT / "docs/v1_20_evidence_quality_guide.md"
 EXAMPLES_DIR = REPO_ROOT / "docs/examples/v1_20_evidence_quality"
 
