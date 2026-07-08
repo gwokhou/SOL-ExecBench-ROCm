@@ -6,13 +6,19 @@ from __future__ import annotations
 
 import json
 from collections import Counter, defaultdict
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 from sol_execbench.core.data.json_utils import stable_model_checksum, stable_model_json
-from sol_execbench.core.data.path_access import path_dict, path_get
+from sol_execbench.core.data.path_access import (
+    path_dict,
+    path_get,
+    path_mapping_list,
+    path_str_or_none,
+)
 
 from .manifest import DatasetManifestChecksum, utc_timestamp
 from .readiness import DatasetReadiness
@@ -345,7 +351,7 @@ def _profiler_timing_summary_from_payload(
     *,
     path: str,
 ) -> ProfilerTimingEvidenceSummary | None:
-    if not isinstance(payload, dict):
+    if not isinstance(payload, Mapping):
         return None
 
     evidence = path_dict(payload, "evidence")
@@ -421,9 +427,7 @@ def _full_workload_coverage(metadata: dict[str, Any]) -> bool:
 
 
 def _trace_status_counts(metadata: dict[str, Any]) -> dict[str, int]:
-    counts = metadata.get("trace_status_counts")
-    if not isinstance(counts, dict):
-        return {}
+    counts = path_dict(metadata, "trace_status_counts")
     normalized: dict[str, int] = {}
     for key, value in counts.items():
         count = _int_or_none(value)
@@ -433,8 +437,8 @@ def _trace_status_counts(metadata: dict[str, Any]) -> dict[str, int]:
 
 
 def _reference_override(metadata: dict[str, Any]) -> dict[str, Any] | None:
-    reference_override = metadata.get("reference_override")
-    if not isinstance(reference_override, dict):
+    reference_override = path_dict(metadata, "reference_override")
+    if not reference_override:
         return None
     return {
         str(key): value
@@ -453,10 +457,7 @@ def _blocker_class(payload: dict[str, Any]) -> str | None:
         for detail in details
         if detail.get("oom_detected") is True
     }
-    metadata_payload = payload.get("replacement_metadata")
-    metadata: dict[str, Any] = (
-        metadata_payload if isinstance(metadata_payload, dict) else {}
-    )
+    metadata = path_dict(payload, "replacement_metadata")
     trace_counts = _trace_status_counts(metadata)
     source_workloads = _source_workloads(payload)
     has_profiler_gap = "PROFILER_BLOCKED" in trace_counts or any(
@@ -490,33 +491,25 @@ def _failure_trace_details(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _source_workloads(payload: dict[str, Any]) -> list[dict[str, Any]]:
-    evidence = payload.get("evidence")
-    if not isinstance(evidence, dict):
-        return []
-    source = evidence.get("source_workloads")
-    if not isinstance(source, list):
-        return []
-    return [item for item in source if isinstance(item, dict)]
+    return path_mapping_list(payload, "evidence.source_workloads")
 
 
 def _payload_failure_details(payload: dict[str, Any] | None) -> list[dict[str, Any]]:
-    stdout = payload.get("stdout") if isinstance(payload, dict) else None
+    stdout = path_str_or_none(payload, "stdout")
     details: list[dict[str, Any]] = []
-    if isinstance(stdout, str):
+    if stdout is not None:
         for line in stdout.splitlines():
             try:
                 record = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            if not isinstance(record, dict):
+            if not isinstance(record, Mapping):
                 continue
-            evaluation = record.get("evaluation")
-            if not isinstance(evaluation, dict):
-                continue
-            status = evaluation.get("status")
+            evaluation = path_dict(record, "evaluation")
+            status = path_get(evaluation, "status")
             if status == "PASSED" or not isinstance(status, str):
                 continue
-            log = str(evaluation.get("log") or "")
+            log = str(path_get(evaluation, "log") or "")
             details.append(
                 {
                     "status": status,
@@ -524,8 +517,8 @@ def _payload_failure_details(payload: dict[str, Any] | None) -> list[dict[str, A
                     "oom_detected": _is_oom_log(log),
                 }
             )
-    stderr = payload.get("stderr") if isinstance(payload, dict) else None
-    if isinstance(stderr, str) and _is_oom_log(stderr):
+    stderr = path_str_or_none(payload, "stderr")
+    if stderr is not None and _is_oom_log(stderr):
         details.append(
             {
                 "status": "PROFILER_BLOCKED",
@@ -541,7 +534,7 @@ def _load_optional_json(path: Path) -> dict[str, Any] | None:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
-    return payload if isinstance(payload, dict) else None
+    return dict(payload) if isinstance(payload, Mapping) else None
 
 
 def _is_oom_log(log: str) -> bool:
@@ -572,14 +565,12 @@ def _is_memory_oom_blocker(blocker_class: str | None) -> bool:
 
 
 def _kernel_activity_rows(evidence: dict[str, Any]) -> int:
-    parsed_rows = evidence.get("parsed_rows")
-    if isinstance(parsed_rows, list):
+    parsed_rows = path_mapping_list(evidence, "parsed_rows")
+    if parsed_rows:
         return sum(
-            1
-            for row in parsed_rows
-            if isinstance(row, dict) and row.get("is_kernel_activity") is True
+            1 for row in parsed_rows if path_get(row, "is_kernel_activity") is True
         )
-    duration = _float_or_none(evidence.get("kernel_duration_ms"))
+    duration = _float_or_none(path_get(evidence, "kernel_duration_ms"))
     return 1 if duration is not None and duration > 0 else 0
 
 

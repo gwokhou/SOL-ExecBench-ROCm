@@ -5,10 +5,16 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from sol_execbench.core.data.path_access import (
+    path_dict,
+    path_get,
+    path_mapping_list,
+)
 from sol_execbench.core.dataset.evidence_refs import build_derived_evidence_refs
 from sol_execbench.core.dataset.evidence_refs import relative_ref
 from sol_execbench.core.dataset.execution_closure import (
@@ -53,8 +59,10 @@ def prior_closure_provenance(
         payload = json.loads(path.read_text())
     except (OSError, json.JSONDecodeError):
         return None, stale_provenance_mismatch(observed="unreadable")
-    provenance = payload.get("provenance") if isinstance(payload, dict) else None
-    if not isinstance(provenance, dict):
+    if not isinstance(payload, Mapping):
+        return None, stale_provenance_mismatch(observed="missing provenance")
+    provenance = path_dict(payload, "provenance")
+    if not provenance:
         return None, stale_provenance_mismatch(observed="missing provenance")
     return provenance, None
 
@@ -121,14 +129,13 @@ def closure_record(
     notes: list[str] | None = None,
 ) -> dict[str, Any]:
     """Build one serialized execution-closure record."""
-    reasons = readiness.get("reasons", []) if readiness else []
-    blockers = readiness.get("blocker_reports", []) if readiness else []
+    reasons = path_mapping_list(readiness, "reasons")
+    blockers = path_mapping_list(readiness, "blocker_reports")
     readiness_evidence_refs = {
-        str(blocker["code"]): str(blocker["evidence_path"])
+        str(path_get(blocker, "code")): str(path_get(blocker, "evidence_path"))
         for blocker in blockers
-        if isinstance(blocker, dict)
-        and blocker.get("code") is not None
-        and blocker.get("evidence_path") is not None
+        if path_get(blocker, "code") is not None
+        and path_get(blocker, "evidence_path") is not None
     }
     return ExecutionClosureRecord(
         category=category,
@@ -136,22 +143,22 @@ def closure_record(
         problem_path=problem_path,
         workload_uuid=workload_uuid,
         row_index=row_index,
-        readiness_status=readiness.get("status") if readiness else None,
-        readiness_class=readiness.get("readiness_class") if readiness else None,
+        readiness_status=path_get(readiness, "status"),
+        readiness_class=path_get(readiness, "readiness_class"),
         readiness_reason_codes=[
-            reason["code"]
+            path_get(reason, "code")
             for reason in reasons
-            if isinstance(reason, dict) and reason.get("code") is not None
+            if path_get(reason, "code") is not None
         ],
         readiness_blocker_codes=[
-            blocker["code"]
+            path_get(blocker, "code")
             for blocker in blockers
-            if isinstance(blocker, dict) and blocker.get("code") is not None
+            if path_get(blocker, "code") is not None
         ],
         readiness_blocker_types=[
-            blocker["blocker_type"]
+            path_get(blocker, "blocker_type")
             for blocker in blockers
-            if isinstance(blocker, dict) and blocker.get("blocker_type") is not None
+            if path_get(blocker, "blocker_type") is not None
         ],
         readiness_evidence_refs=readiness_evidence_refs,
         closure_status=ExecutionClosureStatus(closure_status),
@@ -236,8 +243,8 @@ def derived_evidence_for_workload(
 def _trace_status(trace: dict[str, Any] | None) -> str | None:
     if not trace:
         return None
-    evaluation = trace.get("evaluation") or {}
-    return evaluation.get("status", "UNKNOWN")
+    evaluation = path_dict(trace, "evaluation")
+    return path_get(evaluation, "status", default="UNKNOWN")
 
 
 def selected_workload_closure_record(

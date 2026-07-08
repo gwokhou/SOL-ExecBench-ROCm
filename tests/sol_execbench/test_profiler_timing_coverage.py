@@ -6,6 +6,8 @@ from pathlib import Path
 from sol_execbench.core.dataset.inventory import build_dataset_inventory
 from sol_execbench.core.dataset.profiler_timing_coverage import (
     _profiler_timing_summary_from_payload,
+    _source_workloads,
+    _trace_status_counts,
     build_profiler_timing_coverage_report,
     render_profiler_timing_coverage_markdown,
 )
@@ -96,6 +98,28 @@ def test_profiler_timing_summary_uses_nested_evidence_defaults() -> None:
     assert summary.path == "sidecar.json"
     assert summary.backend == "rocprofv3"
     assert summary.kernel_duration_ms == 1.5
+
+
+def test_profiler_source_workloads_filter_to_mapping_records() -> None:
+    workloads = _source_workloads(
+        {
+            "evidence": {
+                "source_workloads": [
+                    {"status": "passed"},
+                    [],
+                    {"status": "blocked"},
+                ]
+            }
+        }
+    )
+
+    assert workloads == [{"status": "passed"}, {"status": "blocked"}]
+
+
+def test_profiler_trace_status_counts_filters_invalid_counts() -> None:
+    counts = _trace_status_counts({"trace_status_counts": {"PASSED": 2, "BAD": True}})
+
+    assert counts == {"PASSED": 2}
 
 
 def test_profiler_timing_coverage_tracks_problem_denominator(tmp_path):
