@@ -11,7 +11,7 @@ from pathlib import Path
 import click
 from rich.console import Console
 
-from ..core.dataset import (
+from ..core.dataset.migration import (
     migrate_flashinfer_trace,
     migrate_sol_execbench,
     write_migration_manifest,
