@@ -521,7 +521,7 @@ def _embedded_source_checksums(payload: dict[str, Any]) -> dict[str, str]:
 
 def _source_ref_checksum(value: object) -> str | None:
     if isinstance(value, Mapping):
-        checksum = value.get("checksum")
+        checksum = path_get(value, "checksum")
         if isinstance(checksum, Mapping):
             return path_str_or_none(checksum, "value")
         if isinstance(checksum, str):
@@ -643,4 +643,6 @@ def _optional_str(value: object) -> str | None:
 
 
 def _mapping_or_none(payload: object) -> dict[str, Any] | None:
-    return dict(payload) if isinstance(payload, Mapping) else None
+    if not isinstance(payload, Mapping):
+        return None
+    return {str(key): value for key, value in payload.items()}

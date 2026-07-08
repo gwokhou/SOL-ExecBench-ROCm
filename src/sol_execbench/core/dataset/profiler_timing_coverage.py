@@ -448,8 +448,11 @@ def _reference_override(metadata: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
-def _blocker_class(payload: dict[str, Any]) -> str | None:
-    details = _failure_trace_details(payload)
+def _blocker_class(payload: Mapping[object, Any]) -> str | None:
+    normalized_payload: dict[str, Any] = {
+        str(key): value for key, value in payload.items()
+    }
+    details = _failure_trace_details(normalized_payload)
     if not any(detail.get("oom_detected") is True for detail in details):
         return None
     oom_phases = {
@@ -457,9 +460,9 @@ def _blocker_class(payload: dict[str, Any]) -> str | None:
         for detail in details
         if detail.get("oom_detected") is True
     }
-    metadata = path_dict(payload, "replacement_metadata")
+    metadata = path_dict(normalized_payload, "replacement_metadata")
     trace_counts = _trace_status_counts(metadata)
-    source_workloads = _source_workloads(payload)
+    source_workloads = _source_workloads(normalized_payload)
     has_profiler_gap = "PROFILER_BLOCKED" in trace_counts or any(
         workload.get("status") == "profiler_blocked" for workload in source_workloads
     )

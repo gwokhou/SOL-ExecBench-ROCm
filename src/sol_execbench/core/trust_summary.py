@@ -392,4 +392,6 @@ def _checksum(payload: dict[str, Any]) -> str | None:
 
 
 def _mapping_or_none(payload: object) -> dict[str, Any] | None:
-    return dict(payload) if isinstance(payload, Mapping) else None
+    if not isinstance(payload, Mapping):
+        return None
+    return {str(key): value for key, value in payload.items()}
