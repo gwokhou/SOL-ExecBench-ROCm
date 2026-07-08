@@ -91,6 +91,28 @@ def _internal_import_edges() -> set[tuple[str, str]]:
     return edges
 
 
+def test_high_inbound_model_modules_keep_exact_internal_imports() -> None:
+    expected_targets = {
+        "sol_execbench.core.data.base_model": [],
+        "sol_execbench.core.scoring.amd_bound_graph_models": [
+            "sol_execbench.core.scoring.amd_hardware_models",
+        ],
+        "sol_execbench.core.scoring.amd_hardware_models": [],
+        "sol_execbench.core.scoring.solar_derivation_models": [
+            "sol_execbench.core.scoring.amd_hardware_models",
+            "sol_execbench.core.scoring.solar_derivation_status",
+        ],
+    }
+    edges = _internal_import_edges()
+
+    observed = {
+        module: sorted(target for source, target in edges if source == module)
+        for module in expected_targets
+    }
+
+    assert observed == expected_targets
+
+
 def test_core_data_does_not_depend_on_higher_layers() -> None:
     violations = sorted(
         (source, target)
