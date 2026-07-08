@@ -84,6 +84,99 @@ def _internal_import_edges() -> set[tuple[str, str]]:
     return edges
 
 
+def test_core_data_does_not_depend_on_higher_layers() -> None:
+    violations = sorted(
+        (source, target)
+        for source, target in _internal_import_edges()
+        if _is_under(source, "sol_execbench.core.data")
+        and not _is_under(target, "sol_execbench.core.data")
+    )
+
+    assert violations == []
+
+
+def test_core_does_not_depend_on_cli() -> None:
+    violations = sorted(
+        (source, target)
+        for source, target in _internal_import_edges()
+        if _is_under(source, "sol_execbench.core")
+        and _is_under(target, "sol_execbench.cli")
+    )
+
+    assert violations == []
+
+
+def test_cross_domain_imports_stay_explicitly_allowlisted() -> None:
+    allowed_with_rationale = {
+        (
+            "sol_execbench.core.dataset.amd_score_reports",
+            "sol_execbench.core.scoring.amd_score_reports",
+        ): "dataset compatibility module re-exports scoring report helpers",
+        (
+            "sol_execbench.core.dataset.cli_execution",
+            "sol_execbench.core.bench.io",
+        ): "dataset CLI execution loads benchmark result traces",
+        (
+            "sol_execbench.core.dataset.cli_execution",
+            "sol_execbench.core.bench.stderr",
+        ): "dataset CLI execution classifies benchmark stderr failures",
+        (
+            "sol_execbench.core.dataset.runner",
+            "sol_execbench.core.bench.config",
+        ): "dataset runner constructs benchmark configuration for runs",
+        (
+            "sol_execbench.core.dataset.runner",
+            "sol_execbench.core.bench.rocm_profiler",
+        ): "dataset runner wires optional ROCm profiler artifacts",
+        (
+            "sol_execbench.core.dataset.runner",
+            "sol_execbench.core.scoring.amd_score",
+        ): "dataset runner exposes AMD score types for run reporting",
+        (
+            "sol_execbench.core.dataset.runner",
+            "sol_execbench.core.scoring.amd_score_reports",
+        ): "dataset runner delegates AMD score report construction",
+        (
+            "sol_execbench.core.dataset.runner",
+            "sol_execbench.core.scoring.baseline_artifact",
+        ): "dataset runner accepts scoring baseline artifacts",
+        (
+            "sol_execbench.core.scoring.amd_bound_sanity_models",
+            "sol_execbench.core.dataset.manifest",
+        ): "AMD bound sanity report embeds dataset manifest checksums",
+    }
+    assert all(reason for reason in allowed_with_rationale.values())
+    domains = (
+        "sol_execbench.core.bench",
+        "sol_execbench.core.dataset",
+        "sol_execbench.core.scoring",
+    )
+    cross_domain_edges = sorted(
+        (source, target)
+        for source, target in _internal_import_edges()
+        if any(_is_under(source, domain) for domain in domains)
+        and any(_is_under(target, domain) for domain in domains)
+        and next(domain for domain in domains if _is_under(source, domain))
+        != next(domain for domain in domains if _is_under(target, domain))
+    )
+
+    assert cross_domain_edges == sorted(allowed_with_rationale)
+
+
+def test_no_internal_two_node_import_cycles_except_cli_entrypoint() -> None:
+    allowed = {
+        ("sol_execbench.cli", "sol_execbench.cli.main"),
+    }
+    edges = _internal_import_edges()
+    cycles = {
+        tuple(sorted((source, target)))
+        for source, target in edges
+        if (target, source) in edges
+    }
+
+    assert cycles == allowed
+
+
 def test_cli_environment_helpers_live_outside_main_and_sidecars() -> None:
     assert environment._write_environment_snapshot_sidecar is not None
     assert environment._environment_snapshot_sidecar_path is not None
@@ -306,96 +399,3 @@ def test_amd_score_report_sidecar_parsers_live_outside_orchestrator() -> None:
         "_minimal_solar_aggregate_from_payload",
     ):
         assert not hasattr(amd_score_reports, name)
-
-
-def test_core_data_does_not_depend_on_higher_layers() -> None:
-    violations = sorted(
-        (source, target)
-        for source, target in _internal_import_edges()
-        if _is_under(source, "sol_execbench.core.data")
-        and not _is_under(target, "sol_execbench.core.data")
-    )
-
-    assert violations == []
-
-
-def test_core_does_not_depend_on_cli() -> None:
-    violations = sorted(
-        (source, target)
-        for source, target in _internal_import_edges()
-        if _is_under(source, "sol_execbench.core")
-        and _is_under(target, "sol_execbench.cli")
-    )
-
-    assert violations == []
-
-
-def test_cross_domain_imports_stay_explicitly_allowlisted() -> None:
-    allowed_with_rationale = {
-        (
-            "sol_execbench.core.dataset.amd_score_reports",
-            "sol_execbench.core.scoring.amd_score_reports",
-        ): "dataset compatibility module re-exports scoring report helpers",
-        (
-            "sol_execbench.core.dataset.cli_execution",
-            "sol_execbench.core.bench.io",
-        ): "dataset CLI execution loads benchmark result traces",
-        (
-            "sol_execbench.core.dataset.cli_execution",
-            "sol_execbench.core.bench.stderr",
-        ): "dataset CLI execution classifies benchmark stderr failures",
-        (
-            "sol_execbench.core.dataset.runner",
-            "sol_execbench.core.bench.config",
-        ): "dataset runner constructs benchmark configuration for runs",
-        (
-            "sol_execbench.core.dataset.runner",
-            "sol_execbench.core.bench.rocm_profiler",
-        ): "dataset runner wires optional ROCm profiler artifacts",
-        (
-            "sol_execbench.core.dataset.runner",
-            "sol_execbench.core.scoring.amd_score",
-        ): "dataset runner exposes AMD score types for run reporting",
-        (
-            "sol_execbench.core.dataset.runner",
-            "sol_execbench.core.scoring.amd_score_reports",
-        ): "dataset runner delegates AMD score report construction",
-        (
-            "sol_execbench.core.dataset.runner",
-            "sol_execbench.core.scoring.baseline_artifact",
-        ): "dataset runner accepts scoring baseline artifacts",
-        (
-            "sol_execbench.core.scoring.amd_bound_sanity_models",
-            "sol_execbench.core.dataset.manifest",
-        ): "AMD bound sanity report embeds dataset manifest checksums",
-    }
-    assert all(reason for reason in allowed_with_rationale.values())
-    domains = (
-        "sol_execbench.core.bench",
-        "sol_execbench.core.dataset",
-        "sol_execbench.core.scoring",
-    )
-    cross_domain_edges = sorted(
-        (source, target)
-        for source, target in _internal_import_edges()
-        if any(_is_under(source, domain) for domain in domains)
-        and any(_is_under(target, domain) for domain in domains)
-        and next(domain for domain in domains if _is_under(source, domain))
-        != next(domain for domain in domains if _is_under(target, domain))
-    )
-
-    assert cross_domain_edges == sorted(allowed_with_rationale)
-
-
-def test_no_internal_two_node_import_cycles() -> None:
-    allowed = {
-        ("sol_execbench.cli", "sol_execbench.cli.main"),
-    }
-    edges = _internal_import_edges()
-    cycles = {
-        tuple(sorted((source, target)))
-        for source, target in edges
-        if (target, source) in edges
-    }
-
-    assert cycles == allowed
