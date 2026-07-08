@@ -4,385 +4,36 @@
 
 from __future__ import annotations
 
-import dataclasses
-import re
-from collections import Counter
 from pathlib import Path
 
-from pydantic import BaseModel, Field
-
-from sol_execbench.core.data.json_utils import stable_model_checksum, stable_model_json
-from sol_execbench.core.data.definition import Definition
-from sol_execbench.core.data.workload import CustomInput, SafetensorsInput, Workload
-
-from .categories import validate_categories
-from .manifest import DatasetManifestChecksum, utc_timestamp
-
-INVENTORY_SCHEMA_VERSION = "sol_execbench.dataset_inventory.v1"
-
-
-class InventoryDiagnostic(BaseModel):
-    code: str
-    severity: str = "error"
-    category: str | None = None
-    problem_path: str | None = None
-    row_index: int | None = None
-    message: str
-
-
-class InventoryDenominators(BaseModel):
-    discovered_problems: int = 0
-    parsed_problems: int = 0
-    parsed_workloads: int = 0
-    schema_failures: int = 0
-    missing_required_files: int = 0
-
-    def add(self, other: "InventoryDenominators") -> None:
-        self.discovered_problems += other.discovered_problems
-        self.parsed_problems += other.parsed_problems
-        self.parsed_workloads += other.parsed_workloads
-        self.schema_failures += other.schema_failures
-        self.missing_required_files += other.missing_required_files
-
-
-class WorkloadInventoryRecord(BaseModel):
-    uuid: str | None
-    row_index: int
-    schema_status: str
-    schema_failure: str | None = None
-    axes: dict[str, int] = Field(default_factory=dict)
-    input_kinds: dict[str, str] = Field(default_factory=dict)
-    input_kind_counts: dict[str, int] = Field(default_factory=dict)
-    uses_custom_inputs: bool = False
-    uses_safetensors: bool = False
-    safetensors_refs: list[dict[str, str]] = Field(default_factory=list)
-    input_dtypes: dict[str, str] = Field(default_factory=dict)
-    output_dtypes: dict[str, str] = Field(default_factory=dict)
-    resolved_input_shapes: dict[str, list[int] | None] = Field(default_factory=dict)
-    resolved_output_shapes: dict[str, list[int] | None] = Field(default_factory=dict)
-    shape_status: str = "unknown"
-
-
-class ProblemDefinitionInventory(BaseModel):
-    name: str | None = None
-    op_type: str | None = None
-    op_family_hint: str = "unknown"
-    op_family_source: str = "unknown"
-    direction_hint: str = "unknown"
-    direction_source: str = "unknown"
-    input_dtypes: list[str] = Field(default_factory=list)
-    output_dtypes: list[str] = Field(default_factory=list)
-    input_shapes: dict[str, list[str] | None] = Field(default_factory=dict)
-    output_shapes: dict[str, list[str] | None] = Field(default_factory=dict)
-    custom_inputs_entrypoint: str | None = None
-    reference_runtime_hints: list[str] = Field(default_factory=list)
-    reference_runtime_false_positive_evidence: list[dict] = Field(default_factory=list)
-
-
-class ProblemInventoryRecord(BaseModel):
-    category: str
-    problem_id: str
-    problem_path: str
-    definition_path: str
-    workload_path: str
-    reference_path: str | None = None
-    reference_available: bool = False
-    solution_files: list[str] = Field(default_factory=list)
-    schema_status: str
-    schema_failure: str | None = None
-    definition: ProblemDefinitionInventory | None = None
-    workload_count: int = 0
-    workloads: list[WorkloadInventoryRecord] = Field(default_factory=list)
-
-
-class CategoryInventoryRecord(BaseModel):
-    name: str
-    denominators: InventoryDenominators
-
-
-class DatasetInventory(BaseModel):
-    schema_version: str = INVENTORY_SCHEMA_VERSION
-    created_at: str
-    root: str
-    manifest_path: str | None = None
-    selected_categories: tuple[str, ...]
-    categories: list[CategoryInventoryRecord]
-    problems: list[ProblemInventoryRecord]
-    denominators: InventoryDenominators
-    diagnostics: list[InventoryDiagnostic]
-    inventory_checksum: DatasetManifestChecksum | None = None
-
-    def with_checksum(self) -> "DatasetInventory":
-        return self.model_copy(
-            update={
-                "inventory_checksum": DatasetManifestChecksum(
-                    value=stable_model_checksum(self, "inventory_checksum")
-                )
-            }
-        )
-
-    def to_json(self) -> str:
-        return stable_model_json(self)
-
-
-def _rel(path: Path, root: Path) -> str:
-    return path.relative_to(root).as_posix()
-
-
-def _load_definition(path: Path) -> tuple[Definition | None, str | None]:
-    try:
-        return Definition.model_validate_json(path.read_text(encoding="utf-8")), None
-    except Exception as exc:
-        return None, str(exc)
-
-
-def _load_workload(line: str) -> tuple[Workload | None, str | None]:
-    try:
-        return Workload.model_validate_json(line), None
-    except Exception as exc:
-        return None, str(exc)
-
-
-def _op_family(definition: Definition) -> tuple[str, str]:
-    if definition.op_type:
-        return definition.op_type, "definition.op_type"
-    lowered = definition.name.lower()
-    for hint in ("matmul", "attention", "conv", "moe", "mamba", "embedding", "norm"):
-        if hint in lowered:
-            return hint, "definition.name"
-    return "unknown", "unknown"
-
-
-def _direction(definition: Definition) -> tuple[str, str]:
-    text = f"{definition.name} {definition.description or ''}".lower()
-    if "backward" in text or "grad" in text:
-        return "backward", "definition.name_or_description"
-    if "forward" in text:
-        return "forward", "definition.name_or_description"
-    return "unknown", "unknown"
-
-
-# Runtime blocker hints that remain true blockers regardless of context
-NVIDIA_RUNTIME_BLOCKER_HINTS = ("cupy", "cuda.c", "cuda runtime", "nvrtc")
-
-# Lexical false positive hints that are only blockers in specific contexts
-NVIDIA_LEXICAL_FALSE_POSITIVE_HINTS = ("cublas", "cutlass")
-
-
-@dataclasses.dataclass(frozen=True)
-class ReferenceRuntimeHintEvidence:
-    """Evidence record for a reference runtime hint match."""
-
-    token: str
-    match_kind: str
-    context: str
-    line_number: int | None = None
-
-
-def _classify_reference_runtime_hints(
-    definition: Definition, reference_path: Path | None
-) -> tuple[list[str], list[ReferenceRuntimeHintEvidence]]:
-    """
-    Classify reference runtime hints into blockers and false positives.
-
-    Returns:
-        (blocker_hints, false_positive_evidence) where blocker_hints is a list
-        of hint tokens that are true CUDA blockers, and false_positive_evidence
-        is a list of evidence records for lexical matches that were ignored.
-    """
-    blocker_hints: list[str] = []
-    false_positive_evidence: list[ReferenceRuntimeHintEvidence] = []
-
-    # Combine reference text from definition and file
-    lines: list[str] = []
-    lines.extend(definition.reference.splitlines())
-    if reference_path is not None and reference_path.is_file():
-        lines.extend(reference_path.read_text(encoding="utf-8").splitlines())
-
-    in_docstring = False
-    import_patterns = {
-        hint: re.compile(
-            r"\b(?:from\s+\S+\s+)?import\s+[^#\n]*\b" + re.escape(hint) + r"\b",
-            re.IGNORECASE,
-        )
-        for hint in NVIDIA_LEXICAL_FALSE_POSITIVE_HINTS
-    }
-    call_patterns = {
-        hint: re.compile(
-            rf"\b(?P<callee>[\w]*{re.escape(hint)}[\w]*)\s*\(",
-            re.IGNORECASE,
-        )
-        for hint in NVIDIA_LEXICAL_FALSE_POSITIVE_HINTS
-    }
-    native_patterns = {
-        hint: re.compile(rf"\b[\w]*{re.escape(hint)}[\w]*\.(cu|cuh)\b", re.IGNORECASE)
-        for hint in NVIDIA_LEXICAL_FALSE_POSITIVE_HINTS
-    }
-    class_patterns = {
-        hint: re.compile(
-            rf"^\s*class\s+\w*{re.escape(hint)}\w*\b",
-            re.IGNORECASE,
-        )
-        for hint in NVIDIA_LEXICAL_FALSE_POSITIVE_HINTS
-    }
-    variable_patterns = {
-        hint: re.compile(rf"\b[a-z_][a-z0-9_]*{re.escape(hint)}[a-z0-9_]*\b")
-        for hint in NVIDIA_LEXICAL_FALSE_POSITIVE_HINTS
-    }
-
-    for line_idx, line in enumerate(lines, start=1):
-        lowered_line = line.lower()
-        context = line.strip()[:200]
-        stripped = line.strip()
-        is_comment = stripped.startswith("#")
-        # A line is treated as docstring content if we are already inside a
-        # multi-line docstring (in_docstring is True from a prior opening """")
-        # or if the line itself starts with a triple-quote delimiter.
-        is_docstring_line = (
-            in_docstring or stripped.startswith('"""') or stripped.startswith("'''")
-        )
-
-        # Check for runtime blocker hints (always blockers)
-        for hint in NVIDIA_RUNTIME_BLOCKER_HINTS:
-            if hint in lowered_line:
-                blocker_hints.append(hint)
-
-        # Check for lexical false-positive hints (context-dependent)
-        for hint in NVIDIA_LEXICAL_FALSE_POSITIVE_HINTS:
-            if hint not in lowered_line:
-                continue
-
-            match_kind = "compatibility_label"
-            is_blocker = False
-            if import_patterns[hint].search(line):
-                match_kind = "import"
-                is_blocker = True
-            elif call_match := call_patterns[hint].search(line):
-                callee = call_match.group("callee")
-                if callee and callee[:1].isupper():
-                    match_kind = "constructor_name"
-                else:
-                    match_kind = "call"
-                    is_blocker = True
-            elif native_patterns[hint].search(lowered_line):
-                match_kind = "native_source"
-                is_blocker = True
-            elif class_patterns[hint].search(line):
-                match_kind = "class_name"
-            elif variable_patterns[hint].search(lowered_line):
-                match_kind = "variable_name"
-            elif is_comment:
-                match_kind = "comment"
-            elif is_docstring_line:
-                match_kind = "docstring"
-
-            if is_blocker:
-                blocker_hints.append(hint)
-            else:
-                false_positive_evidence.append(
-                    ReferenceRuntimeHintEvidence(
-                        token=hint,
-                        match_kind=match_kind,
-                        context=context,
-                        line_number=line_idx,
-                    )
-                )
-
-        # Update docstring state after line processing. This handles multi-line
-        # literal blocks conservatively based on quote parity.
-        quote_count = line.count('"""') + line.count("'''")
-        if quote_count % 2 == 1:
-            in_docstring = not in_docstring
-
-    return sorted(set(blocker_hints)), false_positive_evidence
-
-
-def _definition_record(
-    definition: Definition, reference_path: Path | None
-) -> ProblemDefinitionInventory:
-    family, family_source = _op_family(definition)
-    direction, direction_source = _direction(definition)
-    blocker_hints, false_positive_evidence = _classify_reference_runtime_hints(
-        definition, reference_path
-    )
-    return ProblemDefinitionInventory(
-        name=definition.name,
-        op_type=definition.op_type,
-        op_family_hint=family,
-        op_family_source=family_source,
-        direction_hint=direction,
-        direction_source=direction_source,
-        input_dtypes=[str(spec.dtype.value) for spec in definition.inputs.values()],
-        output_dtypes=[str(spec.dtype.value) for spec in definition.outputs.values()],
-        input_shapes={name: spec.shape for name, spec in definition.inputs.items()},
-        output_shapes={name: spec.shape for name, spec in definition.outputs.items()},
-        custom_inputs_entrypoint=definition.custom_inputs_entrypoint,
-        reference_runtime_hints=blocker_hints,
-        reference_runtime_false_positive_evidence=[
-            dataclasses.asdict(evidence) for evidence in false_positive_evidence
-        ],
-    )
-
-
-def _shape_dict(
-    shapes: dict[str, tuple[int, ...] | None],
-) -> dict[str, list[int] | None]:
-    return {
-        name: list(shape) if shape is not None else None
-        for name, shape in shapes.items()
-    }
-
-
-def _workload_record(
-    definition: Definition, workload: Workload, row_index: int
-) -> WorkloadInventoryRecord:
-    input_kinds: dict[str, str] = {
-        name: spec.type for name, spec in workload.inputs.items()
-    }
-    counts = Counter(input_kinds.values())
-    safetensors_refs = [
-        {"input": name, "path": spec.path, "tensor_key": spec.tensor_key}
-        for name, spec in workload.inputs.items()
-        if isinstance(spec, SafetensorsInput)
-    ]
-    shape_status = "resolved"
-    try:
-        input_shapes = _shape_dict(definition.get_input_shapes(workload.axes))
-        output_shapes = _shape_dict(definition.get_output_shapes(workload.axes))
-    except Exception:
-        shape_status = "unresolved"
-        input_shapes = {}
-        output_shapes = {}
-    return WorkloadInventoryRecord(
-        uuid=workload.uuid,
-        row_index=row_index,
-        schema_status="parsed",
-        axes=workload.axes,
-        input_kinds=input_kinds,
-        input_kind_counts=dict(sorted(counts.items())),
-        uses_custom_inputs=any(
-            isinstance(spec, CustomInput) for spec in workload.inputs.values()
-        ),
-        uses_safetensors=bool(safetensors_refs),
-        safetensors_refs=safetensors_refs,
-        input_dtypes={
-            name: spec.dtype.value for name, spec in definition.inputs.items()
-        },
-        output_dtypes={
-            name: spec.dtype.value for name, spec in definition.outputs.items()
-        },
-        resolved_input_shapes=input_shapes,
-        resolved_output_shapes=output_shapes,
-        shape_status=shape_status,
-    )
-
-
-def _solution_files(problem_dir: Path) -> list[str]:
-    return sorted(
-        path.name
-        for path in problem_dir.iterdir()
-        if path.is_file() and (path.name.startswith("solution") or path.suffix == ".so")
-    )
+from sol_execbench.core.dataset.categories import validate_categories
+from sol_execbench.core.dataset.inventory_io import (
+    load_definition as _load_definition,
+    load_workload as _load_workload,
+    rel as _rel,
+    solution_files as _solution_files,
+    write_dataset_inventory,
+)
+from sol_execbench.core.dataset.inventory_models import (
+    INVENTORY_SCHEMA_VERSION,
+    CategoryInventoryRecord,
+    DatasetInventory,
+    InventoryDenominators,
+    InventoryDiagnostic,
+    ProblemDefinitionInventory,
+    ProblemInventoryRecord,
+    WorkloadInventoryRecord,
+)
+from sol_execbench.core.dataset.inventory_records import (
+    definition_record as _definition_record,
+    workload_record as _workload_record,
+)
+from sol_execbench.core.dataset.inventory_reference_hints import (
+    NVIDIA_LEXICAL_FALSE_POSITIVE_HINTS,
+    NVIDIA_RUNTIME_BLOCKER_HINTS,
+    ReferenceRuntimeHintEvidence,
+)
+from sol_execbench.core.dataset.manifest import utc_timestamp
 
 
 def build_dataset_inventory(
@@ -543,7 +194,18 @@ def build_dataset_inventory(
     return inventory.with_checksum()
 
 
-def write_dataset_inventory(inventory: DatasetInventory, path: Path) -> None:
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(inventory.to_json(), encoding="utf-8")
+__all__ = [
+    "INVENTORY_SCHEMA_VERSION",
+    "NVIDIA_LEXICAL_FALSE_POSITIVE_HINTS",
+    "NVIDIA_RUNTIME_BLOCKER_HINTS",
+    "CategoryInventoryRecord",
+    "DatasetInventory",
+    "InventoryDenominators",
+    "InventoryDiagnostic",
+    "ProblemDefinitionInventory",
+    "ProblemInventoryRecord",
+    "ReferenceRuntimeHintEvidence",
+    "WorkloadInventoryRecord",
+    "build_dataset_inventory",
+    "write_dataset_inventory",
+]

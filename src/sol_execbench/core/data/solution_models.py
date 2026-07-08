@@ -1,0 +1,344 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Strong-typed data definitions for solution implementations."""
+
+import hashlib
+from enum import Enum
+from pathlib import Path
+from typing import Any, Optional
+
+from pydantic import ConfigDict, Field, PrivateAttr, field_validator, model_validator
+
+
+from enum import Enum
+from pathlib import Path
+from typing import Any, Optional
+
+from pydantic import Field, field_validator, model_validator
+
+from sol_execbench.core.data.base_model import BaseModelWithDocstrings, NonEmptyString
+
+
+class SupportedLanguages(str, Enum):
+    """Supported programming languages for solution implementations.
+
+    Enumeration of programming languages that can be used to implement
+    solutions for computational workloads.
+    """
+
+    # Python languages
+    PYTORCH = "pytorch"
+    """PyTorch programming language. Specified if the solution uses PyTorch operators."""
+    TRITON = "triton"
+    """Triton GPU programming language."""
+    # Native ROCm languages and library/DSL categories
+    HIP_CPP = "hip_cpp"
+    """HIP C++ programming language."""
+    HIPBLAS = "hipblas"
+    """hipBLAS-backed native ROCm implementation."""
+    MIOPEN = "miopen"
+    """MIOpen-backed native ROCm implementation."""
+    CK = "ck"
+    """Composable Kernel native ROCm implementation."""
+    ROCWMMA = "rocwmma"
+    """rocWMMA native ROCm implementation."""
+
+
+NATIVE_ROCM_LANGUAGES = frozenset(
+    {
+        SupportedLanguages.HIP_CPP,
+        SupportedLanguages.HIPBLAS,
+        SupportedLanguages.MIOPEN,
+        SupportedLanguages.CK,
+        SupportedLanguages.ROCWMMA,
+    }
+)
+
+
+class SupportedHardware(str, Enum):
+    """Supported hardware targets for solution implementations.
+
+    Enumeration of hardware platforms that solutions can target.
+    """
+
+    GFX1200 = "gfx1200"
+    """AMD gfx1200."""
+    GFX940 = "gfx940"
+    """AMD CDNA 3 gfx940."""
+    GFX941 = "gfx941"
+    """AMD CDNA 3 gfx941."""
+    GFX942 = "gfx942"
+    """AMD CDNA 3 gfx942."""
+    LOCAL = "LOCAL"
+    """Local AMD GPU."""
+
+
+class SupportedBindings(str, Enum):
+    """Supported bindings for HIP/C++ solution implementations.
+
+    Enumeration of binding types that can be used to interface compiled
+    HIP/C++ code with Python.
+    """
+
+    TORCH = "torch"
+    """PyTorch HIP/C++ extension binding."""
+
+
+_PATH_INJECTION_PREFIXES = (
+    "-I",
+    "-L",
+    "-B",
+    "-isystem",
+    "-idirafter",
+    "-iquote",
+    "-include",
+    "-imacros",
+    "--sysroot",
+    "-fplugin",
+)
+
+
+_PATH_INJECTION_EXACT_FLAGS = {
+    "-I",
+    "-L",
+    "-B",
+    "-isystem",
+    "-idirafter",
+    "-iquote",
+    "-include",
+    "-imacros",
+    "--sysroot",
+    "-Xlinker",
+}
+
+
+_LINKER_LOADER_MARKERS = (
+    "-Wl,-rpath",
+    "-Wl,--rpath",
+    "-Wl,-dynamic-linker",
+    "-Wl,--dynamic-linker",
+    "--dynamic-linker",
+    "-rpath",
+)
+
+
+_ALLOWED_ROCM_SYSTEM_PATH_FLAGS = {
+    "-I/opt/rocm/include",
+    "-L/opt/rocm/lib",
+}
+
+
+def _validate_compile_flag(flag: str) -> None:
+    """Reject native compile flags that weaken the staging boundary."""
+    if "\x00" in flag:
+        raise ValueError("Compile option contains a NUL byte")
+    if flag.startswith("@") or ",@" in flag or "=@" in flag:
+        raise ValueError(f"Compile option uses a response file: {flag}")
+    if flag in _PATH_INJECTION_EXACT_FLAGS:
+        raise ValueError(f"Compile option requires an external path value: {flag}")
+    if any(flag.startswith(marker) for marker in _LINKER_LOADER_MARKERS):
+        raise ValueError(f"Compile option controls runtime linker paths: {flag}")
+    if flag in _ALLOWED_ROCM_SYSTEM_PATH_FLAGS:
+        return
+    if any(flag.startswith(prefix) for prefix in _PATH_INJECTION_PREFIXES):
+        raise ValueError(f"Compile option can reference host paths: {flag}")
+
+
+class SourceFile(BaseModelWithDocstrings):
+    """A single source code file in a solution implementation.
+
+    Represents a source code file with its relative path and complete content.
+    The file content is validated for syntax correctness based on the file extension.
+    """
+
+    path: NonEmptyString
+    """The relative path of the file, including its name and extension (e.g., 'src/kernel.cu',
+    'main.py'). When compiling the solution, a temporary solution source directory will be
+    created, and the file will be placed according to this path. The path should not contain
+    parent directory traversal ("..")."""
+    content: NonEmptyString
+    """The complete text content of the source file."""
+
+    @model_validator(mode="after")
+    def _validate_source_path(self) -> "SourceFile":
+        """Validate source path for security.
+
+        Raises
+        ------
+        ValueError
+            If the path contains security issues (absolute paths or path traversal).
+        """
+        src_path = Path(self.path)
+        if src_path.is_absolute():
+            raise ValueError(
+                f"Invalid source path (absolute path not allowed): {self.path}"
+            )
+        if ".." in src_path.parts:
+            raise ValueError(
+                f"Invalid source path (parent directory traversal not allowed): {self.path}"
+            )
+        return self
+
+
+class CompileOptions(BaseModelWithDocstrings):
+    """Compiler and linker flags for HIP/C++ solutions.
+
+    Passed directly to the underlying build system (e.g. torch.utils.cpp_extension.load).
+    """
+
+    cflags: list[str] = Field(default_factory=list)
+    """Extra flags passed to the C++ compiler (gcc/g++)."""
+    hip_cflags: list[str] = Field(default_factory=lambda: ["-O3"])
+    """Extra flags passed to the HIP compiler. Defaults to -O3."""
+    ld_flags: list[str] = Field(default_factory=list)
+    """Extra flags passed to the linker."""
+
+    @field_validator("cflags", "hip_cflags", "ld_flags")
+    @classmethod
+    def _reject_dangerous_flags(cls, value: list[str]) -> list[str]:
+        """Reject flags that can escape staging or control dynamic loading."""
+        for flag in value:
+            _validate_compile_flag(flag)
+        return value
+
+
+class BuildSpec(BaseModelWithDocstrings):
+    """Build specification for a solution implementation.
+
+    Contains all technical specifications required to build and execute a solution, including
+    language, hardware targets, dependencies, entry point, and build commands.
+    """
+
+    languages: list[SupportedLanguages]
+    """The list of programming languages used to implement the solution. C++ languages and Python languages cannot be mixed."""
+    target_hardware: list[SupportedHardware] = Field(min_length=1)
+    """List of hardware this solution is compatible with (e.g., gfx1200, gfx942, LOCAL)."""
+    entry_point: NonEmptyString
+    """The exact path to the function to be called. Format: '{file_path}::{function_name}'
+    (e.g., 'main.py::run')."""
+    dependencies: list[NonEmptyString] = Field(default_factory=list)
+    """Optional list of required libraries or packages."""
+    destination_passing_style: bool = True
+    """Whether to use destination passing style for the solution. If True, the solution should
+    accept the output tensors as the last arguments. If False, the solution should return the
+    output tensors."""
+    binding: Optional[SupportedBindings] = None
+    """The binding type to use for HIP/C++ solutions. If None, defaults to 'torch' for
+    HIP/C++ languages. Ignored for Python and Triton languages."""
+    compile_options: Optional[CompileOptions] = None
+    """Optional compiler and linker flags. Only used for HIP/C++ solutions with torch binding."""
+
+    @field_validator("languages", mode="before")
+    @classmethod
+    def _reject_legacy_languages(cls, value: Any) -> Any:
+        """Reject CUDA/NVIDIA language values with ROCm migration guidance."""
+        if value is None:
+            return value
+        values = value if isinstance(value, list) else [value]
+        replacements = {
+            "cuda_cpp": "hip_cpp",
+            "cutlass": "ck or rocwmma",
+            "cudnn": "miopen",
+            "cudnn_frontend": "miopen",
+            "cublas": "hipblas",
+            "cute_dsl": "no direct Phase 2 ROCm replacement; Phase 4 owns concrete replacements",
+            "cutile": "no direct Phase 2 ROCm replacement; Phase 4 owns concrete replacements",
+        }
+        for item in values:
+            raw = item.value if isinstance(item, Enum) else item
+            if raw in replacements:
+                raise ValueError(
+                    f"Unsupported CUDA/NVIDIA language value '{raw}' in ROCm "
+                    f"schema; use {replacements[raw]} instead."
+                )
+        return value
+
+    @field_validator("compile_options", mode="before")
+    @classmethod
+    def _reject_legacy_compile_options(cls, value: Any) -> Any:
+        """Reject CUDA compile option keys before nested model validation."""
+        if isinstance(value, dict) and "cuda_cflags" in value:
+            raise ValueError(
+                "Unsupported compile option 'cuda_cflags' in ROCm schema; use "
+                "'hip_cflags' instead."
+            )
+        return value
+
+    @model_validator(mode="after")
+    def _validate_entry_point(self) -> "BuildSpec":
+        """Validate entry_point format.
+
+        Raises
+        ------
+        ValueError
+            If entry_point doesn't follow the required format.
+        """
+        if self.entry_point.count("::") != 1:
+            raise ValueError(
+                f"Invalid entry point format: {self.entry_point}. Expected "
+                '"<file_path>::<function_name>".'
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_languages(self) -> "BuildSpec":
+        """Validate languages support matrix.
+
+        Raises
+        ------
+        ValueError
+            If the languages are not valid.
+        """
+
+        python_languages = [SupportedLanguages.PYTORCH, SupportedLanguages.TRITON]
+
+        included_python_langs = [
+            language for language in self.languages if language in python_languages
+        ]
+        included_cpp_langs = [
+            language
+            for language in self.languages
+            if language in NATIVE_ROCM_LANGUAGES
+        ]
+        if len(included_cpp_langs) and len(included_python_langs):
+            raise ValueError(
+                f"HIP/C++ and Python cannot be mixed, but got {included_cpp_langs} "
+                f"and {included_python_langs}"
+            )
+
+        # Validate entry point file suffix matches the language category.
+        entry_file = self.entry_point.split("::")[0]
+        suffix = Path(entry_file).suffix
+        if included_cpp_langs and suffix not in (
+            ".hip",
+            ".cpp",
+            ".cc",
+            ".cxx",
+            ".c",
+            ".h",
+            ".hpp",
+        ):
+            raise ValueError(
+                f"HIP/C++ languages require a .hip or C/C++ entry point file, "
+                f"but got '{entry_file}' (suffix '{suffix}')"
+            )
+        if included_python_langs and suffix != ".py":
+            raise ValueError(
+                f"Python languages require a .py entry point file, "
+                f"but got '{entry_file}' (suffix '{suffix}')"
+            )
+        return self

@@ -23,37 +23,18 @@ Usage:
 
 from __future__ import annotations
 
-import dataclasses
-import json
 import sys
-import tempfile
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Optional
 
 import click
-from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from . import agent_feedback_sidecar as cli_agent_feedback_sidecar
-from . import compilation as cli_compilation
-from . import evaluation as cli_evaluation
-from . import environment as cli_environment
-from . import evaluation_runtime as cli_evaluation_runtime
-from . import problem_io as cli_problem_io
-from . import profile_sidecars as cli_profile_sidecars
-from . import reporting as cli_reporting
 from . import static_evidence as cli_static_evidence
 from .commands import dispatch_subcommand
-from ..core.bench.static_kernel_evidence import StaticKernelEvidenceSidecar
-from ..core import EvaluationStatus
-from ..core.checksums import sha256_file
-from ..driver import ProblemPackager
+from .evaluator import PROFILE_NONE, PROFILE_ROCPROFV3, run_evaluation_cli
 
-console = Console(stderr=True)
-
-PROFILE_NONE = "none"
-PROFILE_ROCPROFV3 = "rocprofv3"
+_COMPILE_PROGRESS_TEXT = "Compiling HIP/C++ solution..."
 
 
 @click.command(
@@ -180,218 +161,27 @@ def _evaluate_cli(
     Metadata:
       sol-execbench contract --json
     """
-    resolved_inputs = cli_problem_io.resolve_problem_inputs(
+    run_evaluation_cli(
         problem_dir=problem_dir,
         definition_file=definition_file,
         workload_file=workload_file,
         solution_file=solution_file,
         config_file=config_file,
-    )
-    definition_file = resolved_inputs.definition_file
-    workload_file = resolved_inputs.workload_file
-    solution_file = resolved_inputs.solution_file
-    config_file = resolved_inputs.config_file
-
-    # Load data models
-    definition = cli_problem_io._load_definition(definition_file)
-    workloads = cli_problem_io._load_workloads(workload_file)
-    solution = cli_problem_io._load_solution(solution_file)
-    config = cli_problem_io._load_config(config_file)
-
-    if lock_clocks:
-        config.lock_clocks = True
-
-    console.print(f"[bold]Problem:[/bold]  {definition.name}")
-    console.print(f"[bold]Solution:[/bold] {solution.name}")
-    console.print(f"[bold]Workloads:[/bold] {len(workloads)}")
-    if config_file:
-        console.print(
-            f"[bold]Config:[/bold]   {json.dumps(dataclasses.asdict(config))}"
-        )
-
-    # Create staging directory
-    staging_dir = Path(tempfile.mkdtemp(prefix="sol_execbench_"))
-    packager = ProblemPackager(
-        definition=definition,
-        workloads=workloads,
-        solution=solution,
-        config=config,
-        output_dir=staging_dir,
-        keep_output_dir=keep_staging,
-    )
-
-    if verbose:
-        console.print(f"[dim]Staging dir: {staging_dir}[/dim]")
-
-    # Phase 1: Compile (HIP/C++ only)
-    static_evidence_result: StaticKernelEvidenceSidecar | None = None
-    if packager._is_cpp:
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console,
-        ) as progress:
-            task = progress.add_task("Compiling HIP/C++ solution...", total=None)
-
-            compile_result = cli_compilation.run_compile_phase(
-                packager,
-                staging_dir=staging_dir,
-                compile_timeout=compile_timeout,
-            )
-            progress.update(task, completed=True)
-
-        if not compile_result.succeeded:
-            console.print("[red]Compilation failed[/red]")
-            if compile_result.filtered_stderr:
-                console.print(compile_result.filtered_stderr)
-            if compile_result.stdout:
-                console.print(compile_result.stdout)
-            packager.close()
-            sys.exit(1)
-
-        console.print("[green]Compilation succeeded[/green]")
-        if verbose and compile_result.filtered_stderr:
-            console.print(f"[dim]{compile_result.filtered_stderr}[/dim]")
-
-        if static_evidence == cli_static_evidence.STATIC_EVIDENCE_AUTO:
-            static_evidence_result = (
-                cli_static_evidence._collect_static_evidence_for_cli(
-                    enabled=static_evidence,
-                    is_cpp=True,
-                    staging_dir=staging_dir,
-                    output_file=output_file,
-                )
-            )
-    elif static_evidence == cli_static_evidence.STATIC_EVIDENCE_AUTO:
-        static_evidence_result = cli_static_evidence._collect_static_evidence_for_cli(
-            enabled=static_evidence,
-            is_cpp=False,
-            staging_dir=staging_dir,
-            output_file=output_file,
-        )
-
-    # Phase 2: Evaluate
-    eval_cmd = packager.execute()
-
-    if profile == PROFILE_ROCPROFV3:
-        console.print("[dim]Collecting optional rocprofv3 profiling evidence...[/dim]")
-
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        console=console,
-    ) as progress:
-        task = progress.add_task(
-            f"Evaluating {len(workloads)} workload(s)...", total=None
-        )
-
-        runtime_result = cli_evaluation_runtime.run_evaluation_runtime(
-            packager,
-            eval_cmd=eval_cmd,
-            staging_dir=staging_dir,
-            output_file=output_file,
-            timeout=timeout,
-            profile=profile,
-        )
-        progress.update(task, completed=True)
-
-    profile_result = runtime_result.profile_result
-    if runtime_result.profile_fallback_reason is not None:
-        console.print(
-            "[yellow]rocprofv3 profiling unavailable or failed; "
-            "running normal evaluation. Reason: "
-            f"{runtime_result.profile_fallback_reason}[/yellow]"
-        )
-
-    if isinstance(
-        runtime_result, cli_evaluation_runtime.EvaluationRuntimeNoTraceFailure
-    ):
-        console.print(f"[red]{runtime_result.message}[/red]")
-        diagnostic_path = cli_evaluation._write_no_trace_diagnostics_sidecar(
-            output_file=output_file,
-            staging_dir=staging_dir,
-            keep_staging=keep_staging,
-            reason=runtime_result.reason,
-            returncode=runtime_result.returncode,
-            stdout=runtime_result.stdout,
-            stderr=runtime_result.stderr,
-        )
-        if diagnostic_path is not None:
-            console.print(
-                f"[yellow]Saved no-trace diagnostics to {diagnostic_path}[/yellow]"
-            )
-        if (
-            runtime_result.reason != "evaluation_timeout"
-            and runtime_result.filtered_stderr
-        ):
-            console.print(runtime_result.filtered_stderr)
-        packager.close()
-        sys.exit(1)
-
-    if verbose and runtime_result.filtered_stderr:
-        console.print(f"[dim]{runtime_result.filtered_stderr}[/dim]")
-
-    traces = runtime_result.traces
-
-    # Output
-    if output_file:
-        output_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(output_file, "w") as f:
-            for t in traces:
-                f.write(json.dumps(t.model_dump(mode="json")) + "\n")
-        console.print(f"[green]Saved {len(traces)} traces to {output_file}[/green]")
-
-    trace_run_id = (
-        sha256_file(output_file)
-        if output_file is not None and output_file.is_file()
-        else None
-    )
-    environment_sidecar_path = cli_environment._write_environment_snapshot_sidecar(
-        output_file
-    )
-    profile_sidecar_path = cli_profile_sidecars._write_profile_sidecar(
-        output_file, profile_result
-    )
-    cli_profile_sidecars._write_profile_summary_sidecar(
-        output_file,
-        profile_result,
-        profile_sidecar_path=profile_sidecar_path,
-        run_id=trace_run_id,
-    )
-    static_evidence_sidecar_path = cli_static_evidence._write_static_evidence_sidecar(
-        output_file,
-        staging_dir,
-        static_evidence_result,
-    )
-    cli_agent_feedback_sidecar._write_agent_feedback_sidecar(
-        output_file,
-        traces,
-        solution=solution,
-        profile_result=profile_result,
-        static_evidence=static_evidence_result,
-        environment_sidecar_path=environment_sidecar_path,
-        profile_sidecar_path=profile_sidecar_path,
-        static_evidence_sidecar_path=static_evidence_sidecar_path,
-        run_id=feedback_run_id or trace_run_id,
+        compile_timeout=compile_timeout,
+        timeout=timeout,
+        output_file=output_file,
+        json_output=json_output,
+        lock_clocks=lock_clocks,
+        keep_staging=keep_staging,
+        profile=profile,
+        static_evidence=static_evidence,
+        feedback_run_id=feedback_run_id,
         feedback_target_id=feedback_target_id,
         feedback_candidate_id=feedback_candidate_id,
         feedback_source_sha256=feedback_source_sha256,
         feedback_sol_version=feedback_sol_version,
+        verbose=verbose,
     )
-
-    if json_output:
-        for t in traces:
-            print(json.dumps(t.model_dump(mode="json")))
-    else:
-        cli_reporting.print_traces_table(traces)
-
-    packager.close()
-
-    # Exit code: 0 if all passed, 1 otherwise
-    all_passed = all(
-        t.evaluation and t.evaluation.status == EvaluationStatus.PASSED for t in traces
-    )
-    sys.exit(0 if all_passed else 1)
 
 
 class SolExecbenchCli(click.Command):

@@ -79,7 +79,7 @@ def _classification(relative_path: str, line: str) -> str | None:
         return "legacy schema rejection or migration guidance"
     if relative_path.startswith(("docs/", "README.md")):
         return "user-facing unsupported feature or migration documentation"
-    if relative_path.startswith("src/sol_execbench/core/bench/reward_hack.py") and (
+    if relative_path.startswith("src/sol_execbench/core/bench/reward_hack") and (
         "cudaStream" in line or "torch\\.cuda\\.Stream" in line
     ):
         return "reward-hack detector covers HIP and CUDA stream abuse spellings"
@@ -93,7 +93,7 @@ def _classification(relative_path: str, line: str) -> str | None:
         or "nvrtc" in line
     ):
         return "dataset parity metadata preserves upstream NVIDIA boundary labels"
-    if relative_path.startswith("src/sol_execbench/core/environment.py") and (
+    if relative_path.startswith("src/sol_execbench/core/environment") and (
         "cuda_version" in line or "CUDA/HIP" in line
     ):
         return "environment snapshot records PyTorch CUDA/HIP compatibility metadata"
@@ -104,17 +104,17 @@ def _classification(relative_path: str, line: str) -> str | None:
         return (
             "Docker wrapper preserves PyTorch ROCm CUDA compatibility environment names"
         )
-    if relative_path.startswith("src/sol_execbench/core/compatibility.py") and (
-        "torch_cuda_version" in line or "ROCm/CUDA" in line
+    if relative_path.startswith("src/sol_execbench/core/compatibility") and (
+        "torch_cuda_version" in line or "ROCm/CUDA" in line or "CUDA" in line
     ):
         return "compatibility matrix records PyTorch ROCm CUDA compatibility metadata"
-    if relative_path.startswith("src/sol_execbench/core/dependency_matrix.py") and (
+    if relative_path.startswith("src/sol_execbench/core/dependency_matrix") and (
         "torch_cuda_version" in line
         or "CUDA PyTorch runtime" in line
         or "--torch-cuda-version" in line
     ):
         return "dependency matrix records PyTorch ROCm CUDA compatibility metadata"
-    if relative_path.startswith("src/sol_execbench/core/runtime_evidence.py") and (
+    if relative_path.startswith("src/sol_execbench/core/runtime_evidence") and (
         "torch_cuda_version" in line
         or "CUDA_VISIBLE_DEVICES" in line
         or "--torch-cuda-version" in line
@@ -137,7 +137,7 @@ def _classification(relative_path: str, line: str) -> str | None:
         "tests/docker/dependencies/test_python_dependencies.py"
     ):
         return "negative dependency audit for removed NVIDIA packages"
-    if relative_path.startswith("src/sol_execbench/core/data/solution.py") and (
+    if relative_path.startswith("src/sol_execbench/core/data/solution") and (
         "CUDA" in line
         or "NVIDIA" in line
         or "cuda_" in line
