@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -49,7 +50,7 @@ class ReadinessWorkloadRecord:
 
 
 def _inventory_problem_record(payload: object) -> InventoryProblemRecord:
-    record = payload if isinstance(payload, dict) else {}
+    record = payload if isinstance(payload, Mapping) else {}
     problem_path = _optional_str(record.get("problem_path"))
     problem_id = _optional_str(record.get("problem_id")) or problem_path or "unknown"
     workloads = record.get("workloads")
@@ -57,14 +58,14 @@ def _inventory_problem_record(payload: object) -> InventoryProblemRecord:
         category=_optional_str(record.get("category")) or "unknown",
         problem_id=problem_id,
         problem_path=problem_path,
-        workloads=[item for item in workloads if isinstance(item, dict)]
+        workloads=[dict(item) for item in workloads if isinstance(item, Mapping)]
         if isinstance(workloads, list)
         else [],
     )
 
 
 def _readiness_workload_record(payload: object) -> ReadinessWorkloadRecord:
-    record = payload if isinstance(payload, dict) else {}
+    record = payload if isinstance(payload, Mapping) else {}
     problem_path = _optional_str(record.get("problem_path"))
     problem_id = _optional_str(record.get("problem_id")) or problem_path or "unknown"
     reasons = record.get("reasons")
@@ -75,7 +76,7 @@ def _readiness_workload_record(payload: object) -> ReadinessWorkloadRecord:
         workload_uuid=_optional_str(record.get("workload_uuid")),
         row_index=_optional_int(record.get("row_index")),
         status=_optional_str(record.get("status")) or "blocked",
-        reasons=[item for item in reasons if isinstance(item, dict)]
+        reasons=[dict(item) for item in reasons if isinstance(item, Mapping)]
         if isinstance(reasons, list)
         else [],
     )
@@ -118,7 +119,7 @@ def merge_readiness(state: PaperDenominatorBuildState) -> None:
         record = _readiness_workload_record(record_payload)
         denominator_state = _readiness_state(record.status)
         example_ref = _record_ref(
-            record_payload if isinstance(record_payload, dict) else {}
+            record_payload if isinstance(record_payload, Mapping) else {}
         )
         for rollup in (
             _category_rollup(state.categories, record.category),
