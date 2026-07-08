@@ -8,7 +8,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from sol_execbench.core.scoring.amd_hardware_models import AmdHardwareModel, EstimateConfidence
+from sol_execbench.core.scoring.amd_hardware_models import (
+    AmdHardwareModel,
+    EstimateConfidence,
+)
 
 AMD_SOL_SCHEMA_VERSION = "sol_execbench.amd_sol_bound.v1"
 
@@ -87,6 +90,7 @@ class AmdSolBoundArtifact:
     graph_nodes: tuple[GraphNode, ...]
     work_estimates: tuple[WorkEstimate, ...]
     op_bounds: tuple[OpSolBound, ...]
+    coverage_summary: AmdSolCoverageSummary
     schema_version: str = AMD_SOL_SCHEMA_VERSION
     derived: bool = True
 
@@ -94,12 +98,6 @@ class AmdSolBoundArtifact:
     def aggregate_sol_bound_ms(self) -> float:
         """Aggregate SOL bound as the sum of per-op bounds."""
         return sum(bound.sol_bound_ms for bound in self.op_bounds)
-
-    @property
-    def coverage_summary(self) -> AmdSolCoverageSummary:
-        """Derived coverage summary for this artifact."""
-        from sol_execbench.core.scoring.amd_sol_coverage import summarize_amd_sol_coverage
-        return summarize_amd_sol_coverage(self.graph_nodes, self.work_estimates)
 
     def to_dict(self) -> dict[str, Any]:
         return {
