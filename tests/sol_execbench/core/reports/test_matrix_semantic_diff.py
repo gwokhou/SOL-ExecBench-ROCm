@@ -37,7 +37,7 @@ from sol_execbench.core.matrix_diff import (
 )
 
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[4]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "diff_matrix_reports.py"
 
 

@@ -4,7 +4,7 @@ import ast
 from pathlib import Path
 
 
-SOURCE_ROOT = Path(__file__).resolve().parents[2] / "src"
+SOURCE_ROOT = Path(__file__).resolve().parents[4] / "src"
 PACKAGE_ROOT = SOURCE_ROOT / "sol_execbench"
 
 
@@ -15,7 +15,7 @@ RAW_PAYLOAD_INFRASTRUCTURE = {
 
 RAW_PAYLOAD_ARTIFACT_BOUNDARIES = {
     "sol_execbench.core.baseline_export",
-    "sol_execbench.core.evaluation_stability_builder",
+    "sol_execbench.core.reports.evaluation_stability_builder",
     "sol_execbench.core.bench.output_allocation",
     "sol_execbench.core.bench.profile_summary_artifacts",
     "sol_execbench.core.bench.static_kernel_artifacts",
@@ -43,7 +43,7 @@ RAW_PAYLOAD_ALLOWLIST = (
 
 GET_CALL_BUDGET = {
     "sol_execbench.core.dataset.paper_denominator_stages": 45,
-    "sol_execbench.core.evaluation_stability_builder": 25,
+    "sol_execbench.core.reports.evaluation_stability_builder": 25,
 }
 
 
