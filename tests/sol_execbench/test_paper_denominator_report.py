@@ -13,9 +13,40 @@ from sol_execbench.core.dataset.paper_denominator import (
     render_paper_denominator_markdown,
     write_paper_denominator_reports,
 )
+from sol_execbench.core.dataset.paper_denominator_stages import (
+    _inventory_problem_record,
+    _readiness_workload_record,
+)
 
 
 CREATED_AT = "2026-05-31T00:00:00Z"
+
+
+def test_inventory_problem_record_normalizes_missing_fields() -> None:
+    record = _inventory_problem_record({"problem_path": "L1/demo"})
+
+    assert record.category == "unknown"
+    assert record.problem_id == "L1/demo"
+    assert record.problem_path == "L1/demo"
+    assert record.workloads == []
+
+
+def test_readiness_workload_record_normalizes_identifiers() -> None:
+    record = _readiness_workload_record(
+        {
+            "category": "L1",
+            "problem_id": "demo",
+            "workload_uuid": "w0",
+            "row_index": 0,
+            "status": "ready",
+        }
+    )
+
+    assert record.category == "L1"
+    assert record.problem_id == "demo"
+    assert record.workload_uuid == "w0"
+    assert record.row_index == 0
+    assert record.status == "ready"
 
 
 def inventory_fixture() -> dict:
@@ -274,17 +305,28 @@ def amd_score_fixture() -> dict:
 
 def build_fixture_report():
     return build_paper_denominator_report(
-        manifest={"schema_version": "sol_execbench.dataset_manifest.v1", "manifest_checksum": {"value": "manifest-sha"}},
+        manifest={
+            "schema_version": "sol_execbench.dataset_manifest.v1",
+            "manifest_checksum": {"value": "manifest-sha"},
+        },
         inventory=inventory_fixture(),
         readiness=readiness_fixture(),
         ready_subset=ready_subset_fixture(),
         execution_closure=execution_closure_fixture(),
         amd_score_report=amd_score_fixture(),
         amd_sol_artifacts=[
-            {"path": "artifacts/amd-sol/pass.json", "ref": "pass-bound", "checksum": "amd-sol-sha"}
+            {
+                "path": "artifacts/amd-sol/pass.json",
+                "ref": "pass-bound",
+                "checksum": "amd-sol-sha",
+            }
         ],
         solar_artifacts=[
-            {"path": "artifacts/solar/pass.json", "ref": "pass-solar", "checksum": "solar-sha"}
+            {
+                "path": "artifacts/solar/pass.json",
+                "ref": "pass-solar",
+                "checksum": "solar-sha",
+            }
         ],
         source_paths={
             "manifest": Path("manifest.json"),
@@ -360,12 +402,17 @@ def test_paper_denominator_report_tracks_reasons_and_next_evidence():
         "amd_sol",
         "solar_derivation",
     }.issubset(evidence_codes)
-    assert any("Attach" in hint["next_evidence"] for hint in payload["next_evidence_hints"])
+    assert any(
+        "Attach" in hint["next_evidence"] for hint in payload["next_evidence_hints"]
+    )
 
 
 def test_paper_denominator_report_accounts_for_absent_optional_evidence_sources():
     report = build_paper_denominator_report(
-        manifest={"schema_version": "sol_execbench.dataset_manifest.v1", "manifest_checksum": {"value": "manifest-sha"}},
+        manifest={
+            "schema_version": "sol_execbench.dataset_manifest.v1",
+            "manifest_checksum": {"value": "manifest-sha"},
+        },
         inventory=inventory_fixture(),
         readiness=readiness_fixture(),
         ready_subset=ready_subset_fixture(),
@@ -425,8 +472,14 @@ def test_paper_denominator_report_keeps_inventory_only_denominator_records():
     }
     report = build_paper_denominator_report(
         inventory=inventory,
-        readiness={"schema_version": "sol_execbench.rocm_readiness.v1", "workloads": []},
-        execution_closure={"schema_version": "sol_execbench.execution_closure.v1", "records": []},
+        readiness={
+            "schema_version": "sol_execbench.rocm_readiness.v1",
+            "workloads": [],
+        },
+        execution_closure={
+            "schema_version": "sol_execbench.execution_closure.v1",
+            "records": [],
+        },
         created_at=CREATED_AT,
     )
     payload = report.model_dump(mode="json")
@@ -457,7 +510,10 @@ def test_paper_denominator_report_uses_bounded_source_refs_only():
         "checksum": "inventory-sha",
     }
     assert payload["sources"]["execution_closure"]["checksum"] == "closure-sha"
-    assert payload["sources"]["amd_sol_artifacts"][0]["path"] == "artifacts/amd-sol/pass.json"
+    assert (
+        payload["sources"]["amd_sol_artifacts"][0]["path"]
+        == "artifacts/amd-sol/pass.json"
+    )
     serialized = json.dumps(payload["sources"], sort_keys=True)
     assert "workloads" not in serialized
     assert "records" not in serialized
@@ -501,7 +557,9 @@ def test_paper_denominator_json_markdown_and_write_helpers_are_deterministic(tmp
 
     json_path = tmp_path / "report.json"
     markdown_path = tmp_path / "report.md"
-    write_paper_denominator_reports(first, json_path=json_path, markdown_path=markdown_path)
+    write_paper_denominator_reports(
+        first, json_path=json_path, markdown_path=markdown_path
+    )
 
     assert json_path.read_text(encoding="utf-8") == first_json
     assert markdown_path.read_text(encoding="utf-8") == first_markdown
@@ -519,7 +577,10 @@ def test_paper_denominator_models_reject_unknown_fields():
 
 def test_paper_denominator_markdown_escapes_dynamic_table_cells():
     report = build_paper_denominator_report(
-        manifest={"schema_version": "sol_execbench.dataset_manifest.v1", "manifest_checksum": {"value": "manifest-sha"}},
+        manifest={
+            "schema_version": "sol_execbench.dataset_manifest.v1",
+            "manifest_checksum": {"value": "manifest-sha"},
+        },
         inventory=inventory_fixture(),
         readiness=readiness_fixture(),
         ready_subset=ready_subset_fixture(),

@@ -4,6 +4,9 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+from typing import Any
+
 from sol_execbench.core.dataset.paper_denominator_evidence import (
     _add_missing_evidence,
     _add_reason,
@@ -21,7 +24,61 @@ from sol_execbench.core.dataset.paper_denominator_rollups import (
     _readiness_state,
     _record_ref,
 )
-from sol_execbench.core.dataset.paper_denominator_state import PaperDenominatorBuildState
+from sol_execbench.core.dataset.paper_denominator_state import (
+    PaperDenominatorBuildState,
+)
+
+
+@dataclass(frozen=True)
+class InventoryProblemRecord:
+    category: str
+    problem_id: str
+    problem_path: str | None
+    workloads: list[dict[str, Any]] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class ReadinessWorkloadRecord:
+    category: str
+    problem_id: str
+    problem_path: str | None
+    workload_uuid: str | None
+    row_index: int | None
+    status: str
+    reasons: list[dict[str, Any]] = field(default_factory=list)
+
+
+def _inventory_problem_record(payload: object) -> InventoryProblemRecord:
+    record = payload if isinstance(payload, dict) else {}
+    problem_path = _optional_str(record.get("problem_path"))
+    problem_id = _optional_str(record.get("problem_id")) or problem_path or "unknown"
+    workloads = record.get("workloads")
+    return InventoryProblemRecord(
+        category=_optional_str(record.get("category")) or "unknown",
+        problem_id=problem_id,
+        problem_path=problem_path,
+        workloads=[item for item in workloads if isinstance(item, dict)]
+        if isinstance(workloads, list)
+        else [],
+    )
+
+
+def _readiness_workload_record(payload: object) -> ReadinessWorkloadRecord:
+    record = payload if isinstance(payload, dict) else {}
+    problem_path = _optional_str(record.get("problem_path"))
+    problem_id = _optional_str(record.get("problem_id")) or problem_path or "unknown"
+    reasons = record.get("reasons")
+    return ReadinessWorkloadRecord(
+        category=_optional_str(record.get("category")) or "unknown",
+        problem_id=problem_id,
+        problem_path=problem_path,
+        workload_uuid=_optional_str(record.get("workload_uuid")),
+        row_index=_optional_int(record.get("row_index")),
+        status=_optional_str(record.get("status")) or "blocked",
+        reasons=[item for item in reasons if isinstance(item, dict)]
+        if isinstance(reasons, list)
+        else [],
+    )
 
 
 def seed_inventory(state: PaperDenominatorBuildState) -> None:
@@ -29,31 +86,27 @@ def seed_inventory(state: PaperDenominatorBuildState) -> None:
         category_name = str(category.get("name", "unknown"))
         _category_rollup(state.categories, category_name)
 
-    for problem in state.inventory.get("problems", []):
-        category = str(problem.get("category", "unknown"))
-        problem_id = str(
-            problem.get("problem_id") or problem.get("problem_path") or "unknown"
-        )
-        problem_path = problem.get("problem_path")
+    for problem_payload in state.inventory.get("problems", []):
+        problem = _inventory_problem_record(problem_payload)
         _problem_rollup(
             state.problems,
-            category=category,
-            problem_id=problem_id,
-            problem_path=str(problem_path) if problem_path else None,
+            category=problem.category,
+            problem_id=problem.problem_id,
+            problem_path=problem.problem_path,
         )
-        for workload_record in problem.get("workloads", []):
+        for workload_record in problem.workloads:
             workload_uuid = workload_record.get("uuid")
             key = (
-                problem_id,
+                problem.problem_id,
                 workload_record.get("row_index"),
                 str(workload_uuid) if workload_uuid else None,
             )
             state.workloads.setdefault(
                 key,
                 PaperDenominatorWorkload(
-                    category=category,
-                    problem_id=problem_id,
-                    problem_path=str(problem_path) if problem_path else None,
+                    category=problem.category,
+                    problem_id=problem.problem_id,
+                    problem_path=problem.problem_path,
                     workload_uuid=str(workload_uuid) if workload_uuid else None,
                     row_index=workload_record.get("row_index"),
                 ),
@@ -61,26 +114,24 @@ def seed_inventory(state: PaperDenominatorBuildState) -> None:
 
 
 def merge_readiness(state: PaperDenominatorBuildState) -> None:
-    for record in state.readiness.get("workloads", []):
-        category = str(record.get("category", "unknown"))
-        problem_id = str(
-            record.get("problem_id") or record.get("problem_path") or "unknown"
+    for record_payload in state.readiness.get("workloads", []):
+        record = _readiness_workload_record(record_payload)
+        denominator_state = _readiness_state(record.status)
+        example_ref = _record_ref(
+            record_payload if isinstance(record_payload, dict) else {}
         )
-        problem_path = record.get("problem_path")
-        denominator_state = _readiness_state(str(record.get("status", "blocked")))
-        example_ref = _record_ref(record)
         for rollup in (
-            _category_rollup(state.categories, category),
+            _category_rollup(state.categories, record.category),
             _problem_rollup(
                 state.problems,
-                category=category,
-                problem_id=problem_id,
-                problem_path=str(problem_path) if problem_path else None,
+                category=record.category,
+                problem_id=record.problem_id,
+                problem_path=record.problem_path,
             ),
         ):
             rollup.workloads += 1
             rollup.states.add(denominator_state)
-        for reason in record.get("reasons", []):
+        for reason in record.reasons:
             code = str(reason.get("code", f"{denominator_state}_readiness"))
             _add_reason(
                 state.reason_groups,
@@ -90,32 +141,26 @@ def merge_readiness(state: PaperDenominatorBuildState) -> None:
                 next_evidence=reason.get("next_action"),
             )
         key = (
-            problem_id,
-            record.get("row_index"),
-            str(record.get("workload_uuid")) if record.get("workload_uuid") else None,
+            record.problem_id,
+            record.row_index,
+            record.workload_uuid,
         )
         workload = state.workloads.setdefault(
             key,
             PaperDenominatorWorkload(
-                category=category,
-                problem_id=problem_id,
-                problem_path=str(problem_path) if problem_path else None,
-                workload_uuid=str(record.get("workload_uuid"))
-                if record.get("workload_uuid")
-                else None,
-                row_index=record.get("row_index"),
+                category=record.category,
+                problem_id=record.problem_id,
+                problem_path=record.problem_path,
+                workload_uuid=record.workload_uuid,
+                row_index=record.row_index,
             ),
         )
-        workload.category = category
-        workload.problem_id = problem_id
-        workload.problem_path = str(problem_path) if problem_path else None
-        workload.workload_uuid = (
-            str(record.get("workload_uuid")) if record.get("workload_uuid") else None
-        )
-        workload.row_index = record.get("row_index")
-        workload.readiness_status = (
-            str(record.get("status")) if record.get("status") else None
-        )
+        workload.category = record.category
+        workload.problem_id = record.problem_id
+        workload.problem_path = record.problem_path
+        workload.workload_uuid = record.workload_uuid
+        workload.row_index = record.row_index
+        workload.readiness_status = record.status
         workload.states = PaperDenominatorStateTotals(**{denominator_state: 1})
 
 
@@ -288,3 +333,16 @@ def finalize_rollups(state: PaperDenominatorBuildState) -> None:
         category_rollup = _category_rollup(state.categories, problem.category)
         category_rollup.problems += 1
         category_rollup.workloads += problem.rollup.workloads
+
+
+def _optional_str(value: object) -> str | None:
+    return str(value) if value else None
+
+
+def _optional_int(value: object) -> int | None:
+    if isinstance(value, bool) or value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
