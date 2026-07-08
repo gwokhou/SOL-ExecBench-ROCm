@@ -45,7 +45,8 @@ Keep these as stable entry or data locations:
 
 ## Facade Pattern
 
-For every moved public module, leave a file at the old path with this exact pattern:
+For every moved public module whose old basename does not become a package name,
+leave a file at the old path with this exact pattern:
 
 ```python
 """Compatibility facade for the relocated module."""
@@ -54,6 +55,22 @@ from sol_execbench.core.reports.claim_upgrade import *  # noqa: F403
 ```
 
 Use the matching canonical target for each module. CLI facades use `sol_execbench.cli.commands`, `sol_execbench.cli.evaluation`, or `sol_execbench.cli.sidecars`; core facades use `sol_execbench.core.reports`, `sol_execbench.core.platform`, or `sol_execbench.core.evidence`.
+
+When the old module name becomes a package directory, Python will import the package
+instead of the old `*.py` file. For these three CLI modules, preserve compatibility
+through the package `__init__.py`:
+
+```python
+"""Command helpers for the SOL ExecBench CLI."""
+
+from sol_execbench.cli.commands.root import *  # noqa: F403
+```
+
+Apply that package-compatibility pattern to:
+
+- `sol_execbench.cli.commands` -> `sol_execbench.cli.commands.root`
+- `sol_execbench.cli.evaluation` -> `sol_execbench.cli.evaluation.command`
+- `sol_execbench.cli.sidecars` -> `sol_execbench.cli.sidecars.common`
 
 ### Task 1: Create Package Directories
 
@@ -113,6 +130,7 @@ Expected: exit code 0.
 - Move: `src/sol_execbench/cli/static_evidence.py` to `src/sol_execbench/cli/sidecars/static_evidence.py`
 - Move tests with `test_cli_*` names to matching `tests/sol_execbench/cli/...` packages.
 - Modify: old CLI module paths as facades.
+- Modify: `cli/commands/__init__.py`, `cli/evaluation/__init__.py`, and `cli/sidecars/__init__.py` as same-name package compatibility exports.
 - Modify: imports under `src/sol_execbench/cli/`, `tests/sol_execbench/cli/`, `tests/examples/`, and `pyproject.toml` only where needed.
 
 - [ ] **Step 1: Move implementation files with git**
@@ -123,7 +141,7 @@ Expected: `git status --short` shows renames from flat `src/sol_execbench/cli/*.
 
 - [ ] **Step 2: Add CLI facades**
 
-For each old CLI path, add the facade import:
+For each old CLI path that does not share its basename with a new package, add the facade import:
 
 ```python
 """Compatibility facade for the relocated CLI module."""
@@ -134,20 +152,26 @@ from sol_execbench.cli.commands.baseline import *  # noqa: F403
 Use these facade targets:
 
 - `cli/baseline.py` -> `cli.commands.baseline`
-- `cli/commands.py` -> `cli.commands.root`
 - `cli/dataset.py` -> `cli.commands.dataset`
 - `cli/environment.py` -> `cli.commands.environment`
 - `cli/metadata.py` -> `cli.commands.metadata`
 - `cli/compilation.py` -> `cli.evaluation.compilation`
-- `cli/evaluation.py` -> `cli.evaluation.command`
 - `cli/evaluation_runtime.py` -> `cli.evaluation.runtime`
 - `cli/evaluator.py` -> `cli.evaluation.evaluator`
 - `cli/problem_io.py` -> `cli.evaluation.problem_io`
 - `cli/reporting.py` -> `cli.evaluation.reporting`
 - `cli/agent_feedback_sidecar.py` -> `cli.sidecars.agent_feedback`
 - `cli/profile_sidecars.py` -> `cli.sidecars.profile`
-- `cli/sidecars.py` -> `cli.sidecars.common`
 - `cli/static_evidence.py` -> `cli.sidecars.static_evidence`
+
+For `cli/commands.py`, `cli/evaluation.py`, and `cli/sidecars.py`, do not recreate
+the old flat files. Instead, add package re-exports in:
+
+```text
+src/sol_execbench/cli/commands/__init__.py -> from sol_execbench.cli.commands.root import *  # noqa: F403
+src/sol_execbench/cli/evaluation/__init__.py -> from sol_execbench.cli.evaluation.command import *  # noqa: F403
+src/sol_execbench/cli/sidecars/__init__.py -> from sol_execbench.cli.sidecars.common import *  # noqa: F403
+```
 
 - [ ] **Step 3: Update internal CLI imports**
 
