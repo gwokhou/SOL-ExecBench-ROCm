@@ -1,0 +1,1110 @@
+# Complete Payload Schema Normalization Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Fully eliminate ad-hoc raw JSON payload handling from core business logic by converting every external artifact reader into an explicit schema/adapter boundary with tests and tightening the raw payload guard until only deliberately generic infrastructure remains.
+
+**Architecture:** External JSON artifacts stay permissive at file/API boundaries, then immediately normalize into Pydantic models, frozen dataclasses, or named typed view adapters. Report assembly, scoring, consistency checks, and claim logic consume those typed views instead of arbitrary `dict` payloads. Static guard tests enforce that raw `isinstance(..., dict)` checks only exist in approved parser infrastructure, and a second guard tracks `.get()` hotspots that are intentionally still dictionary-like.
+
+**Tech Stack:** Python 3.12, Pydantic v2, pytest, Ruff, existing `sol_execbench.core.data.path_access`, existing report/scoring model modules.
+
+---
+
+## Completion Definition
+
+This work is complete only when all of these are true:
+
+- `tests/sol_execbench/test_payload_schema_boundaries.py` allows raw `isinstance(..., dict)` only in:
+  - `sol_execbench.core.data.json_utils`
+  - `sol_execbench.core.data.path_access`
+  - `sol_execbench.core.data.solution`
+  - parser modules whose filename or class purpose is explicitly schema parsing, for example `*_parsing.py` or `*_sources.py`
+- The current high-risk modules no longer appear in the raw dict shape-check allowlist:
+  - `sol_execbench.core.claim_upgrade`
+  - `sol_execbench.core.consistency`
+  - `sol_execbench.core.matrix_diff`
+  - `sol_execbench.core.trust_summary`
+  - `sol_execbench.core.dataset.parity_gap`
+  - `sol_execbench.core.dataset.profiler_timing_coverage`
+  - `sol_execbench.core.dataset.run_closure`
+  - `sol_execbench.core.scoring.amd_bound_sanity_builder`
+  - `sol_execbench.core.scoring.amd_bound_sanity_helpers`
+- `.get()` remains only where the object is intentionally a map, such as counters, environment variables, graph attributes, Pydantic `model_dump()` output for rendering, or metadata passthrough maps.
+- Full suite passes:
+  - `uv run pytest tests/ -q`
+  - `uv run --with ruff ruff check .`
+
+## Current Baseline
+
+As of 2026-07-08 after the first schema hardening wave:
+
+- Static raw payload boundary test passes.
+- Full test suite passes: `1866 passed, 60 skipped`.
+- Remaining raw dict shape checks are concentrated in 27 allowlisted modules.
+- Highest `.get()` hotspots are:
+  - `src/sol_execbench/core/dataset/parity_gap.py`
+  - `src/sol_execbench/core/dataset/paper_denominator_stages.py`
+  - `src/sol_execbench/core/claim_upgrade.py`
+  - `src/sol_execbench/core/matrix_diff.py`
+  - `src/sol_execbench/core/consistency.py`
+  - `src/sol_execbench/core/scoring/amd_bound_sanity_helpers.py`
+  - `src/sol_execbench/core/dataset/profiler_timing_coverage.py`
+
+## File Structure
+
+- Modify: `src/sol_execbench/core/data/path_access.py`
+  - Add conservative `path_bool`, `path_int_or_none`, `path_mapping_list`, and `path_str_list` helpers.
+- Modify: `tests/sol_execbench/core/data/test_path_access.py`
+  - Cover new helper behavior.
+- Create: `src/sol_execbench/core/report_payloads.py`
+  - Shared typed adapters for common report-source fields: schema version, checksum, source refs, claim boundary flags, status totals, and record lists.
+- Create: `tests/sol_execbench/test_report_payloads.py`
+  - Unit tests for shared report adapters.
+- Modify: `src/sol_execbench/core/claim_upgrade.py`
+  - Convert artifact payload access to typed report views.
+- Modify: `tests/sol_execbench/test_claim_upgrade.py`
+  - Add malformed and missing-field coverage for claim source payloads.
+- Modify: `src/sol_execbench/core/consistency.py`
+  - Convert paper denominator, readiness, execution closure, and AMD score comparisons to typed views.
+- Modify: `tests/sol_execbench/test_consistency_report.py`
+  - Add malformed source payload coverage.
+- Modify: `src/sol_execbench/core/matrix_diff.py`
+  - Convert semantic diff inputs into typed matrix report views.
+- Modify: `tests/sol_execbench/test_matrix_semantic_diff.py`
+  - Add malformed nested target/observed sections coverage.
+- Modify: `src/sol_execbench/core/trust_summary.py`
+  - Consume typed source summaries instead of raw dict navigation.
+- Modify: matching trust summary tests under `tests/sol_execbench/`.
+- Modify: `src/sol_execbench/core/dataset/parity_gap.py`
+  - Add normalized records for manifest, inventory, readiness, ready subset, execution closure, and AMD score source rows.
+- Modify: parity gap tests under `tests/sol_execbench/`.
+- Modify: `src/sol_execbench/core/dataset/profiler_timing_coverage.py`
+  - Move remaining raw parsing helpers into typed local adapters.
+- Modify: `tests/sol_execbench/test_profiler_timing_coverage.py`
+  - Add adapter tests for OOM trace details, source workloads, trace counts, and reference overrides.
+- Modify: `src/sol_execbench/core/dataset/run_closure.py`
+  - Normalize closure records before aggregation.
+- Modify: related run closure tests under `tests/sol_execbench/`.
+- Modify: `src/sol_execbench/core/scoring/amd_bound_sanity_builder.py`
+  - Normalize builder input report summaries.
+- Modify: `src/sol_execbench/core/scoring/amd_bound_sanity_helpers.py`
+  - Convert helper payload reads to typed views.
+- Modify: `tests/sol_execbench/test_amd_bound_sanity.py`
+  - Add malformed report source coverage.
+- Modify: `tests/sol_execbench/test_payload_schema_boundaries.py`
+  - Tighten allowlist in stages until high-risk modules are gone.
+- Modify: `docs/superpowers/plans/2026-07-08-complete-payload-schema-normalization.md`
+  - Track execution checkboxes.
+
+---
+
+### Task 1: Strengthen Shared Payload Access Helpers
+
+**Files:**
+- Modify: `src/sol_execbench/core/data/path_access.py`
+- Modify: `tests/sol_execbench/core/data/test_path_access.py`
+
+- [ ] **Step 1: Add helper tests**
+
+Append these tests to `tests/sol_execbench/core/data/test_path_access.py`:
+
+```python
+def test_optional_scalar_helpers_reject_bool_for_int() -> None:
+    payload = {"count": 3, "enabled": True, "missing": None}
+
+    assert path_int_or_none(payload, "count") == 3
+    assert path_int_or_none(payload, "enabled") is None
+    assert path_int_or_none(payload, "missing") is None
+    assert path_bool(payload, "enabled") is True
+    assert path_bool(payload, "count") is False
+
+
+def test_list_helpers_filter_to_expected_shapes() -> None:
+    payload = {
+        "records": [{"id": "a"}, [], {"id": "b"}],
+        "codes": ["ready", 3, "blocked"],
+    }
+
+    assert path_mapping_list(payload, "records") == [{"id": "a"}, {"id": "b"}]
+    assert path_str_list(payload, "codes") == ["ready", "blocked"]
+```
+
+- [ ] **Step 2: Run helper tests and confirm failure**
+
+Run:
+
+```bash
+uv run pytest tests/sol_execbench/core/data/test_path_access.py -q
+```
+
+Expected: FAIL because `path_int_or_none`, `path_bool`, `path_mapping_list`, and `path_str_list` do not exist yet.
+
+- [ ] **Step 3: Add helper imports in the test file**
+
+Update the import block in `tests/sol_execbench/core/data/test_path_access.py` to include:
+
+```python
+from sol_execbench.core.data.path_access import (
+    path_bool,
+    path_dict,
+    path_float_or_none,
+    path_get,
+    path_int,
+    path_int_or_none,
+    path_list,
+    path_mapping_list,
+    path_require,
+    path_str_list,
+    path_str_or_none,
+)
+```
+
+- [ ] **Step 4: Implement helper functions**
+
+Append to `src/sol_execbench/core/data/path_access.py`:
+
+```python
+def path_bool(payload: object, path: str, *, default: bool = False) -> bool:
+    value = path_get(payload, path)
+    return value if isinstance(value, bool) else default
+
+
+def path_int_or_none(payload: object, path: str) -> int | None:
+    value = path_get(payload, path)
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
+
+
+def path_mapping_list(payload: object, path: str) -> list[dict[str, Any]]:
+    value = path_get(payload, path)
+    if not isinstance(value, list):
+        return []
+    return [dict(item) for item in value if isinstance(item, Mapping)]
+
+
+def path_str_list(payload: object, path: str) -> list[str]:
+    value = path_get(payload, path)
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str)]
+```
+
+- [ ] **Step 5: Run helper tests**
+
+Run:
+
+```bash
+uv run pytest tests/sol_execbench/core/data/test_path_access.py -q
+```
+
+Expected: PASS.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add src/sol_execbench/core/data/path_access.py tests/sol_execbench/core/data/test_path_access.py
+git commit -s -m "#0 - Extend payload access helpers"
+```
+
+---
+
+### Task 2: Create Shared Report Payload Adapters
+
+**Files:**
+- Create: `src/sol_execbench/core/report_payloads.py`
+- Create: `tests/sol_execbench/test_report_payloads.py`
+
+- [ ] **Step 1: Add adapter tests**
+
+Create `tests/sol_execbench/test_report_payloads.py`:
+
+```python
+from __future__ import annotations
+
+from sol_execbench.core.report_payloads import (
+    ClaimBoundaryView,
+    ReportSourceView,
+    report_record_list,
+    report_source_view,
+)
+
+
+def test_report_source_view_normalizes_common_fields() -> None:
+    view = report_source_view(
+        {
+            "schema_version": "demo.v1",
+            "report_checksum": {"value": "abc"},
+            "claim_boundary": {"score_authority": True, "leaderboard_result": False},
+        },
+        source_name="demo",
+    )
+
+    assert view == ReportSourceView(
+        source_name="demo",
+        schema_version="demo.v1",
+        checksum="abc",
+        claim_boundary=ClaimBoundaryView(
+            score_authority=True,
+            paper_parity=False,
+            leaderboard_result=False,
+        ),
+    )
+
+
+def test_report_record_list_filters_to_mapping_records() -> None:
+    records = report_record_list({"records": [{"id": "a"}, [], {"id": "b"}]}, "records")
+
+    assert records == [{"id": "a"}, {"id": "b"}]
+```
+
+- [ ] **Step 2: Run adapter tests and confirm failure**
+
+Run:
+
+```bash
+uv run pytest tests/sol_execbench/test_report_payloads.py -q
+```
+
+Expected: FAIL because `sol_execbench.core.report_payloads` does not exist.
+
+- [ ] **Step 3: Implement shared adapters**
+
+Create `src/sol_execbench/core/report_payloads.py`:
+
+```python
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any
+
+from sol_execbench.core.data.path_access import (
+    path_bool,
+    path_mapping_list,
+    path_str_or_none,
+)
+
+
+@dataclass(frozen=True)
+class ClaimBoundaryView:
+    score_authority: bool = False
+    paper_parity: bool = False
+    leaderboard_result: bool = False
+
+
+@dataclass(frozen=True)
+class ReportSourceView:
+    source_name: str
+    schema_version: str | None
+    checksum: str | None
+    claim_boundary: ClaimBoundaryView
+
+
+def report_source_view(payload: object, *, source_name: str) -> ReportSourceView:
+    return ReportSourceView(
+        source_name=source_name,
+        schema_version=path_str_or_none(payload, "schema_version"),
+        checksum=(
+            path_str_or_none(payload, "report_checksum.value")
+            or path_str_or_none(payload, "coverage_checksum.value")
+            or path_str_or_none(payload, "readiness_checksum.value")
+            or path_str_or_none(payload, "inventory_checksum.value")
+            or path_str_or_none(payload, "manifest_checksum.value")
+        ),
+        claim_boundary=ClaimBoundaryView(
+            score_authority=path_bool(payload, "claim_boundary.score_authority"),
+            paper_parity=path_bool(payload, "claim_boundary.paper_parity"),
+            leaderboard_result=path_bool(payload, "claim_boundary.leaderboard_result"),
+        ),
+    )
+
+
+def report_record_list(payload: object, path: str) -> list[dict[str, Any]]:
+    return path_mapping_list(payload, path)
+```
+
+- [ ] **Step 4: Run adapter tests**
+
+Run:
+
+```bash
+uv run pytest tests/sol_execbench/test_report_payloads.py -q
+```
+
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/sol_execbench/core/report_payloads.py tests/sol_execbench/test_report_payloads.py
+git commit -s -m "#0 - Add report payload adapters"
+```
+
+---
+
+### Task 3: Normalize Claim Upgrade Inputs
+
+**Files:**
+- Modify: `src/sol_execbench/core/claim_upgrade.py`
+- Modify: `tests/sol_execbench/test_claim_upgrade.py`
+- Modify: `tests/sol_execbench/test_payload_schema_boundaries.py`
+
+- [ ] **Step 1: Locate current claim upgrade tests**
+
+Run:
+
+```bash
+rg -n "claim_upgrade|build_claim|upgrade" tests/sol_execbench
+```
+
+Expected: identify the existing claim upgrade test file. If the file is not `tests/sol_execbench/test_claim_upgrade.py`, use the existing file path for this task.
+
+- [ ] **Step 2: Add malformed source payload tests**
+
+Add tests that exercise:
+
+```python
+def test_claim_upgrade_treats_non_object_source_payloads_as_missing() -> None:
+    result = build_claim_upgrade_report(
+        paper_denominator=[],
+        hardware_validation={},
+        consistency_report={},
+        matrix_report={},
+        amd_score_report={},
+    )
+
+    assert "paper_denominator" in result.missing_sources
+
+
+def test_claim_upgrade_reads_full_suite_from_typed_denominator_view() -> None:
+    result = build_claim_upgrade_report(
+        paper_denominator={"suite": {"workloads": 235}},
+        hardware_validation={"native_host_validated": True},
+        consistency_report={"summary": {"finding_totals": {"blocker": 0}}},
+        matrix_report={"runtime_unavailable": False},
+        amd_score_report={"scores": [{"supported": True}]},
+    )
+
+    assert result.conditions["full_suite_accounted"] is True
+```
+
+Adjust `build_claim_upgrade_report` call names to match the actual public function found in Step 1.
+
+- [ ] **Step 3: Run claim upgrade tests and confirm baseline**
+
+Run:
+
+```bash
+uv run pytest tests/sol_execbench/test_claim_upgrade.py -q
+```
+
+Expected: PASS before refactor or FAIL only for the newly added tests if the current API rejects malformed non-object payloads differently.
+
+- [ ] **Step 4: Add local typed views**
+
+In `src/sol_execbench/core/claim_upgrade.py`, add frozen dataclasses near existing private helpers:
+
+```python
+@dataclass(frozen=True)
+class ClaimUpgradeSources:
+    paper_denominator: dict[str, Any] | None
+    hardware_validation: dict[str, Any] | None
+    consistency_report: dict[str, Any] | None
+    matrix_report: dict[str, Any] | None
+    amd_score_report: dict[str, Any] | None
+
+
+@dataclass(frozen=True)
+class PaperDenominatorClaimView:
+    workload_count: int
+    records_present: bool
+```
+
+Then add helpers:
+
+```python
+def _mapping_or_none(payload: object) -> dict[str, Any] | None:
+    return dict(payload) if isinstance(payload, Mapping) else None
+
+
+def _paper_denominator_claim_view(payload: object) -> PaperDenominatorClaimView:
+    return PaperDenominatorClaimView(
+        workload_count=path_int(payload, "suite.workloads", default=0),
+        records_present=bool(path_mapping_list(payload, "workloads")),
+    )
+```
+
+- [ ] **Step 5: Replace repeated raw payload access**
+
+Replace direct `(payload or {}).get(...)`, `isinstance(..., dict)`, and nested `.get()` chains in claim condition logic with:
+
+```python
+paper = _paper_denominator_claim_view(payloads.get("paper_denominator"))
+```
+
+Use `path_bool`, `path_int`, `path_mapping_list`, and `report_source_view` for the remaining source-specific fields.
+
+- [ ] **Step 6: Run claim upgrade tests and boundary test**
+
+Run:
+
+```bash
+uv run pytest tests/sol_execbench/test_claim_upgrade.py tests/sol_execbench/test_payload_schema_boundaries.py -q
+```
+
+Expected: claim tests PASS. Boundary test may still PASS with `claim_upgrade` allowlisted.
+
+- [ ] **Step 7: Remove `claim_upgrade` from raw payload allowlist**
+
+If this command returns no matches:
+
+```bash
+rg -n "isinstance\\([^\\n]+, dict\\)" src/sol_execbench/core/claim_upgrade.py
+```
+
+remove `"sol_execbench.core.claim_upgrade"` from `RAW_PAYLOAD_ALLOWLIST`.
+
+- [ ] **Step 8: Run boundary test**
+
+Run:
+
+```bash
+uv run pytest tests/sol_execbench/test_payload_schema_boundaries.py -q
+```
+
+Expected: PASS.
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add src/sol_execbench/core/claim_upgrade.py tests/sol_execbench/test_claim_upgrade.py tests/sol_execbench/test_payload_schema_boundaries.py
+git commit -s -m "#0 - Normalize claim upgrade source payloads"
+```
+
+---
+
+### Task 4: Normalize Consistency and Matrix Diff Inputs
+
+**Files:**
+- Modify: `src/sol_execbench/core/consistency.py`
+- Modify: `src/sol_execbench/core/matrix_diff.py`
+- Modify: `tests/sol_execbench/test_consistency_report.py`
+- Modify: `tests/sol_execbench/test_matrix_semantic_diff.py`
+- Modify: `tests/sol_execbench/test_payload_schema_boundaries.py`
+
+- [ ] **Step 1: Add consistency malformed payload tests**
+
+Add coverage to `tests/sol_execbench/test_consistency_report.py` for non-object and missing nested sections:
+
+```python
+def test_consistency_report_normalizes_non_object_sources() -> None:
+    report = build_consistency_report(
+        paper_denominator=[],
+        execution_closure={"records": []},
+        amd_score_report={"scores": []},
+    )
+
+    assert report.summary.finding_totals["blocker"] >= 0
+```
+
+Adjust function and field names to match the existing test fixture API in the file.
+
+- [ ] **Step 2: Add matrix malformed payload tests**
+
+Add coverage to `tests/sol_execbench/test_matrix_semantic_diff.py`:
+
+```python
+def test_matrix_semantic_diff_handles_missing_target_and_observed_sections() -> None:
+    diff = diff_matrix_reports(old_payload={}, new_payload={"observed": []})
+
+    assert diff.changes == []
+```
+
+Adjust function and field names to match the existing matrix diff API.
+
+- [ ] **Step 3: Run tests and confirm baseline**
+
+Run:
+
+```bash
+uv run pytest tests/sol_execbench/test_consistency_report.py tests/sol_execbench/test_matrix_semantic_diff.py -q
+```
+
+Expected: PASS before refactor or FAIL only where current malformed payload behavior is not normalized.
+
+- [ ] **Step 4: Add typed views in `consistency.py`**
+
+Create local dataclasses:
+
+```python
+@dataclass(frozen=True)
+class ConsistencyPaperDenominatorView:
+    workload_records: list[dict[str, Any]]
+    suite_workloads: int
+
+
+@dataclass(frozen=True)
+class ConsistencyExecutionClosureView:
+    records: list[dict[str, Any]]
+
+
+@dataclass(frozen=True)
+class ConsistencyAmdScoreView:
+    scores: list[dict[str, Any]]
+```
+
+Populate them using `path_int` and `path_mapping_list`.
+
+- [ ] **Step 5: Add typed views in `matrix_diff.py`**
+
+Create local dataclasses:
+
+```python
+@dataclass(frozen=True)
+class MatrixReportView:
+    target: dict[str, Any]
+    observed: dict[str, Any]
+    claim_boundary: dict[str, Any]
+    artifacts: list[dict[str, Any]]
+```
+
+Populate them with `path_dict` and `path_mapping_list`.
+
+- [ ] **Step 6: Replace raw checks in both modules**
+
+Remove raw `isinstance(..., dict)` checks from `consistency.py` and `matrix_diff.py`. Business logic should access `view.target`, `view.observed`, `view.records`, and `view.scores`.
+
+- [ ] **Step 7: Run focused tests**
+
+Run:
+
+```bash
+uv run pytest tests/sol_execbench/test_consistency_report.py tests/sol_execbench/test_matrix_semantic_diff.py -q
+```
+
+Expected: PASS.
+
+- [ ] **Step 8: Tighten boundary allowlist**
+
+If both commands return no matches:
+
+```bash
+rg -n "isinstance\\([^\\n]+, dict\\)" src/sol_execbench/core/consistency.py
+rg -n "isinstance\\([^\\n]+, dict\\)" src/sol_execbench/core/matrix_diff.py
+```
+
+remove these modules from `RAW_PAYLOAD_ALLOWLIST`:
+
+```python
+"sol_execbench.core.consistency",
+"sol_execbench.core.matrix_diff",
+```
+
+- [ ] **Step 9: Run boundary test**
+
+Run:
+
+```bash
+uv run pytest tests/sol_execbench/test_payload_schema_boundaries.py -q
+```
+
+Expected: PASS.
+
+- [ ] **Step 10: Commit**
+
+```bash
+git add src/sol_execbench/core/consistency.py src/sol_execbench/core/matrix_diff.py tests/sol_execbench/test_consistency_report.py tests/sol_execbench/test_matrix_semantic_diff.py tests/sol_execbench/test_payload_schema_boundaries.py
+git commit -s -m "#0 - Normalize consistency and matrix payloads"
+```
+
+---
+
+### Task 5: Normalize Parity Gap Dataset Inputs
+
+**Files:**
+- Modify: `src/sol_execbench/core/dataset/parity_gap.py`
+- Modify: parity gap tests under `tests/sol_execbench/`
+- Modify: `tests/sol_execbench/test_payload_schema_boundaries.py`
+
+- [ ] **Step 1: Locate parity gap tests**
+
+Run:
+
+```bash
+rg -n "parity_gap|ParityGap|build_parity" tests/sol_execbench
+```
+
+Expected: identify the parity gap test file.
+
+- [ ] **Step 2: Add normalized record adapter tests**
+
+Add tests for these behaviors:
+
+```python
+def test_parity_gap_execution_record_adapter_normalizes_missing_fields() -> None:
+    record = _execution_closure_record({"problem_path": "L1/demo"})
+
+    assert record.category == "unknown"
+    assert record.problem_id == "L1/demo"
+    assert record.problem_path == "L1/demo"
+    assert record.workload_uuid is None
+    assert record.evidence_gaps == []
+
+
+def test_parity_gap_score_record_adapter_filters_warning_list() -> None:
+    record = _amd_score_record(
+        {"definition": "L1/demo", "warnings": ["degraded", 3], "supported": True}
+    )
+
+    assert record.definition == "L1/demo"
+    assert record.supported is True
+    assert record.warnings == ["degraded"]
+```
+
+- [ ] **Step 3: Add local dataclasses**
+
+In `src/sol_execbench/core/dataset/parity_gap.py`, add:
+
+```python
+@dataclass(frozen=True)
+class ParityExecutionClosureRecord:
+    category: str
+    problem_id: str
+    problem_path: str | None
+    workload_uuid: str | None
+    row_index: int | None
+    closure_status: str
+    trace_status: str | None
+    evidence_refs: dict[str, Any]
+    evidence_gaps: list[str]
+
+
+@dataclass(frozen=True)
+class ParityAmdScoreRecord:
+    definition: str
+    workload_uuid: str | None
+    supported: bool
+    warnings: list[str]
+    evidence_refs: dict[str, Any]
+    derived_evidence_refs: dict[str, Any]
+```
+
+- [ ] **Step 4: Implement adapters**
+
+Use `path_str_or_none`, `path_bool`, `path_int_or_none`, `path_dict`, and `path_str_list` to implement `_execution_closure_record(payload: object)` and `_amd_score_record(payload: object)`.
+
+- [ ] **Step 5: Refactor loops**
+
+Replace loops over `execution_closure.get("records", [])` and `amd_score_report.get("scores", [])` with:
+
+```python
+for record in (_execution_closure_record(item) for item in path_mapping_list(execution_closure, "records")):
+    ...
+
+for score in (_amd_score_record(item) for item in path_mapping_list(amd_score_report, "scores")):
+    ...
+```
+
+- [ ] **Step 6: Run parity tests**
+
+Run the parity gap test file identified in Step 1.
+
+Expected: PASS.
+
+- [ ] **Step 7: Tighten boundary allowlist**
+
+If this command returns no matches:
+
+```bash
+rg -n "isinstance\\([^\\n]+, dict\\)" src/sol_execbench/core/dataset/parity_gap.py
+```
+
+remove `"sol_execbench.core.dataset.parity_gap"` from `RAW_PAYLOAD_ALLOWLIST`.
+
+- [ ] **Step 8: Run boundary test and commit**
+
+Run:
+
+```bash
+uv run pytest tests/sol_execbench/test_payload_schema_boundaries.py -q
+```
+
+Expected: PASS.
+
+Commit:
+
+```bash
+git add src/sol_execbench/core/dataset/parity_gap.py tests/sol_execbench tests/sol_execbench/test_payload_schema_boundaries.py
+git commit -s -m "#0 - Normalize parity gap payload records"
+```
+
+---
+
+### Task 6: Finish Profiler Timing and Run Closure Adapters
+
+**Files:**
+- Modify: `src/sol_execbench/core/dataset/profiler_timing_coverage.py`
+- Modify: `src/sol_execbench/core/dataset/run_closure.py`
+- Modify: `tests/sol_execbench/test_profiler_timing_coverage.py`
+- Modify: run closure tests under `tests/sol_execbench/`
+- Modify: `tests/sol_execbench/test_payload_schema_boundaries.py`
+
+- [ ] **Step 1: Add profiler adapter tests**
+
+Add tests for:
+
+```python
+def test_profiler_source_workloads_filter_to_mapping_records() -> None:
+    workloads = _source_workloads(
+        {"evidence": {"source_workloads": [{"status": "passed"}, [], {"status": "blocked"}]}}
+    )
+
+    assert workloads == [{"status": "passed"}, {"status": "blocked"}]
+
+
+def test_profiler_trace_status_counts_filters_invalid_counts() -> None:
+    counts = _trace_status_counts({"trace_status_counts": {"PASSED": 2, "BAD": True}})
+
+    assert counts == {"PASSED": 2}
+```
+
+- [ ] **Step 2: Locate run closure tests**
+
+Run:
+
+```bash
+rg -n "run_closure|closure" tests/sol_execbench
+```
+
+- [ ] **Step 3: Add run closure adapter tests**
+
+Add tests that validate closure record normalization for missing `problem_id`, missing `workload_uuid`, and non-list `evidence_gaps`.
+
+- [ ] **Step 4: Refactor profiler helpers**
+
+In `profiler_timing_coverage.py`, replace remaining raw dict checks with helper calls:
+
+- `_trace_status_counts()` uses `path_dict(metadata, "trace_status_counts")`.
+- `_reference_override()` uses `path_dict(metadata, "reference_override")`.
+- `_blocker_class()` uses `path_dict(payload, "replacement_metadata")`.
+- `_source_workloads()` uses `path_mapping_list(payload, "evidence.source_workloads")`.
+- `_payload_failure_details()` parses JSONL into a small `_FailureTraceRecord` dataclass.
+- `_kernel_activity_rows()` uses `path_mapping_list(evidence, "parsed_rows")`.
+
+- [ ] **Step 5: Refactor run closure**
+
+Add `RunClosureRecord` dataclass and `_run_closure_record(payload: object)` adapter in `run_closure.py`. Replace raw payload loops with typed record loops.
+
+- [ ] **Step 6: Run focused tests**
+
+Run:
+
+```bash
+uv run pytest tests/sol_execbench/test_profiler_timing_coverage.py -q
+```
+
+Run the run closure test file found in Step 2.
+
+Expected: PASS.
+
+- [ ] **Step 7: Tighten boundary allowlist**
+
+If these commands return no matches:
+
+```bash
+rg -n "isinstance\\([^\\n]+, dict\\)" src/sol_execbench/core/dataset/profiler_timing_coverage.py
+rg -n "isinstance\\([^\\n]+, dict\\)" src/sol_execbench/core/dataset/run_closure.py
+```
+
+remove:
+
+```python
+"sol_execbench.core.dataset.profiler_timing_coverage",
+"sol_execbench.core.dataset.run_closure",
+```
+
+- [ ] **Step 8: Run boundary test and commit**
+
+Run:
+
+```bash
+uv run pytest tests/sol_execbench/test_payload_schema_boundaries.py -q
+```
+
+Expected: PASS.
+
+Commit:
+
+```bash
+git add src/sol_execbench/core/dataset/profiler_timing_coverage.py src/sol_execbench/core/dataset/run_closure.py tests/sol_execbench tests/sol_execbench/test_payload_schema_boundaries.py
+git commit -s -m "#0 - Normalize profiler and closure payload records"
+```
+
+---
+
+### Task 7: Normalize AMD Bound Sanity Payloads
+
+**Files:**
+- Modify: `src/sol_execbench/core/scoring/amd_bound_sanity_builder.py`
+- Modify: `src/sol_execbench/core/scoring/amd_bound_sanity_helpers.py`
+- Modify: `tests/sol_execbench/test_amd_bound_sanity.py`
+- Modify: `tests/sol_execbench/test_payload_schema_boundaries.py`
+
+- [ ] **Step 1: Add malformed AMD bound sanity tests**
+
+Add tests in `tests/sol_execbench/test_amd_bound_sanity.py` for:
+
+```python
+def test_amd_bound_sanity_ignores_non_object_score_records() -> None:
+    report = build_amd_bound_sanity_report(
+        amd_score_report={"scores": [{"definition": "L1/demo"}, []]},
+        amd_sol_report={},
+        solar_derivation={},
+    )
+
+    assert report.status_totals
+```
+
+Adjust function names to the existing API.
+
+- [ ] **Step 2: Add local typed views**
+
+Add dataclasses:
+
+```python
+@dataclass(frozen=True)
+class AmdBoundSanityScoreView:
+    definition: str
+    workload_uuid: str | None
+    supported: bool
+    warnings: list[str]
+    evidence_refs: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class AmdBoundSanityArtifactView:
+    artifact_id: str
+    path: str | None
+    checksum: str | None
+```
+
+- [ ] **Step 3: Refactor helpers**
+
+Use `path_mapping_list`, `path_dict`, `path_str_or_none`, `path_bool`, and `path_str_list` instead of raw `isinstance(..., dict)` checks.
+
+- [ ] **Step 4: Run AMD bound sanity tests**
+
+Run:
+
+```bash
+uv run pytest tests/sol_execbench/test_amd_bound_sanity.py -q
+```
+
+Expected: PASS.
+
+- [ ] **Step 5: Tighten boundary allowlist**
+
+If these commands return no matches:
+
+```bash
+rg -n "isinstance\\([^\\n]+, dict\\)" src/sol_execbench/core/scoring/amd_bound_sanity_builder.py
+rg -n "isinstance\\([^\\n]+, dict\\)" src/sol_execbench/core/scoring/amd_bound_sanity_helpers.py
+```
+
+remove:
+
+```python
+"sol_execbench.core.scoring.amd_bound_sanity_builder",
+"sol_execbench.core.scoring.amd_bound_sanity_helpers",
+```
+
+- [ ] **Step 6: Run boundary test and commit**
+
+Run:
+
+```bash
+uv run pytest tests/sol_execbench/test_payload_schema_boundaries.py -q
+```
+
+Expected: PASS.
+
+Commit:
+
+```bash
+git add src/sol_execbench/core/scoring/amd_bound_sanity_builder.py src/sol_execbench/core/scoring/amd_bound_sanity_helpers.py tests/sol_execbench/test_amd_bound_sanity.py tests/sol_execbench/test_payload_schema_boundaries.py
+git commit -s -m "#0 - Normalize AMD bound sanity payloads"
+```
+
+---
+
+### Task 8: Tighten Global Guards and Document Remaining Exceptions
+
+**Files:**
+- Modify: `tests/sol_execbench/test_payload_schema_boundaries.py`
+- Create: `docs/schema-boundaries.md`
+
+- [ ] **Step 1: Split allowlist into strict categories**
+
+Replace `RAW_PAYLOAD_ALLOWLIST` with:
+
+```python
+RAW_PAYLOAD_INFRASTRUCTURE = {
+    "sol_execbench.core.data.json_utils",
+    "sol_execbench.core.data.solution",
+}
+
+RAW_PAYLOAD_PARSER_BOUNDARIES = {
+    "sol_execbench.core.scoring.amd_score_sidecar_parsing",
+    "sol_execbench.core.scoring.amd_sol_v2_parsing",
+    "sol_execbench.core.scoring.baseline_artifact",
+    "sol_execbench.core.scoring.parsing_utils",
+    "sol_execbench.core.scoring.solar_derivation_parse_root",
+    "sol_execbench.core.scoring.solar_derivation_parse_utils",
+    "sol_execbench.core.dataset.paper_denominator_sources",
+}
+```
+
+Then define:
+
+```python
+RAW_PAYLOAD_ALLOWLIST = RAW_PAYLOAD_INFRASTRUCTURE | RAW_PAYLOAD_PARSER_BOUNDARIES
+```
+
+- [ ] **Step 2: Add hotspot budget test for `.get()`**
+
+Add a test that fails if high-risk business modules exceed a fixed `.get()` budget:
+
+```python
+GET_CALL_BUDGET = {
+    "sol_execbench.core.dataset.paper_denominator_stages": 45,
+}
+
+def test_get_call_hotspots_do_not_regress_in_business_modules() -> None:
+    modules_with_counts = _get_call_counts()
+    over_budget = {
+        module: count
+        for module, count in modules_with_counts.items()
+        if module not in GET_CALL_BUDGET and count >= 20
+    }
+
+    assert over_budget == {}
+```
+
+Implement `_get_call_counts()` with AST by counting `ast.Call` nodes whose function is `ast.Attribute` with `attr == "get"`.
+
+- [ ] **Step 3: Create schema boundary documentation**
+
+Create `docs/schema-boundaries.md`:
+
+```markdown
+# Schema Boundaries
+
+Raw JSON dictionaries are allowed only at external artifact boundaries. Boundary
+code must convert payloads into Pydantic models, frozen dataclasses, or named view
+adapters before report assembly, scoring, claim, or consistency logic consumes the data.
+
+Allowed raw payload infrastructure:
+
+- `sol_execbench.core.data.json_utils`
+- `sol_execbench.core.data.solution`
+
+Allowed parser boundaries:
+
+- `*_parsing.py` modules
+- source reference adapters such as `paper_denominator_sources.py`
+- sidecar readers whose public contract is compatibility with historical JSON
+
+Business logic must not add new `isinstance(value, dict)` payload checks. Use
+`sol_execbench.core.data.path_access` helpers or define a local typed adapter.
+```
+
+- [ ] **Step 4: Run guard tests**
+
+Run:
+
+```bash
+uv run pytest tests/sol_execbench/test_payload_schema_boundaries.py -q
+```
+
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add tests/sol_execbench/test_payload_schema_boundaries.py docs/schema-boundaries.md
+git commit -s -m "#0 - Document and enforce schema boundaries"
+```
+
+---
+
+### Task 9: Final Verification
+
+**Files:**
+- No planned source edits
+
+- [ ] **Step 1: Run focused parser and schema tests**
+
+Run:
+
+```bash
+uv run pytest tests/sol_execbench/core/data/test_path_access.py tests/sol_execbench/test_report_payloads.py tests/sol_execbench/test_payload_schema_boundaries.py -q
+```
+
+Expected: PASS.
+
+- [ ] **Step 2: Run all migrated module tests**
+
+Run:
+
+```bash
+uv run pytest tests/sol_execbench/test_claim_upgrade.py tests/sol_execbench/test_consistency_report.py tests/sol_execbench/test_matrix_semantic_diff.py tests/sol_execbench/test_profiler_timing_coverage.py tests/sol_execbench/test_amd_bound_sanity.py -q
+```
+
+Expected: PASS.
+
+- [ ] **Step 3: Run full test suite**
+
+Run:
+
+```bash
+uv run pytest tests/ -q
+```
+
+Expected: PASS with hardware/environment skips only.
+
+- [ ] **Step 4: Run lint**
+
+Run:
+
+```bash
+uv run --with ruff ruff check .
+```
+
+Expected: `All checks passed!`
+
+- [ ] **Step 5: Confirm final raw dict inventory**
+
+Run:
+
+```bash
+rg -n "isinstance\\([^\\n]+, dict\\)" src/sol_execbench
+```
+
+Expected: matches only in infrastructure/parser-boundary modules allowed by `tests/sol_execbench/test_payload_schema_boundaries.py`.
+
+- [ ] **Step 6: Commit plan completion if checklist was updated**
+
+```bash
+git add docs/superpowers/plans/2026-07-08-complete-payload-schema-normalization.md
+git commit -s -m "#0 - Complete payload schema normalization plan"
+```
+
+---
+
+## Execution Notes
+
+- Do not rewrite every `.get()` mechanically. A `.get()` on `os.environ`, `Counter`, graph attributes, render-only dictionaries, or intentionally flexible metadata can stay.
+- Do not turn compatibility parsing into strict rejection unless an existing public schema already requires strict behavior.
+- Prefer local dataclasses for report-internal views. Use Pydantic models when the object is a public schema or is serialized.
+- Every task should end with a commit on `main`, following the existing `#0 - ...` convention unless a real issue number is available.
+- If a task discovers that a module is fundamentally a parser boundary, move parsing code into a named `*_parsing.py` or `*_sources.py` module and keep business logic clean.
