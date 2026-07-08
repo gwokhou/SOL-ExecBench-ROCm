@@ -4,7 +4,7 @@ import ast
 from pathlib import Path
 
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[4]
 SRC_ROOT = REPO_ROOT / "src" / "sol_execbench"
 
 HIP_AGENT_SEMANTICS = [

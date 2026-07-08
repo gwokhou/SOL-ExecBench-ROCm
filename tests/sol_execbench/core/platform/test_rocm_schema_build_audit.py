@@ -6,7 +6,7 @@
 from pathlib import Path
 
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[4]
 
 AUDITED_PATHS = (
     "src/sol_execbench/core/data/solution.py",

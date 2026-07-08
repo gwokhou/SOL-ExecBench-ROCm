@@ -4,7 +4,7 @@ from pathlib import Path
 import tomllib
 
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[4]
 PYPROJECT = REPO_ROOT / "pyproject.toml"
 PRE_COMMIT_CONFIG = REPO_ROOT / ".pre-commit-config.yaml"
 

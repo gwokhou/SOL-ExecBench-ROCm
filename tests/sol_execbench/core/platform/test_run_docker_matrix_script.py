@@ -9,7 +9,7 @@ from pathlib import Path
 from sol_execbench.core.docker_matrix import load_docker_target_manifest
 
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[4]
 DOCKERFILE_PATH = REPO_ROOT / "docker" / "Dockerfile"
 RUN_DOCKER_SCRIPT = REPO_ROOT / "scripts" / "run_docker.sh"
 MANIFEST_PATH = REPO_ROOT / "docker" / "rocm-targets.json"
