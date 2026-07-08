@@ -26,6 +26,10 @@ from sol_execbench.core.scoring_guardrails import (
     AMD_PERFORMANCE_CLAIM_WARNING,
     interpret_sol_score,
 )
+from sol_execbench.core.scoring.amd_score_sidecar_parsing import (
+    minimal_amd_sol_bound_v2_from_payload,
+    minimal_solar_aggregate_from_payload,
+)
 from sol_execbench.sol_score import sol_score
 
 
@@ -148,3 +152,22 @@ def test_static_evidence_sidecar_construction_does_not_mutate_trace_or_scoring()
     assert summary.total == 1
     assert score == 1.0
     assert interpretation.claim_level == "benchmark-relative"
+
+
+def test_minimal_amd_sol_bound_v2_rejects_malformed_nested_payloads() -> None:
+    assert minimal_amd_sol_bound_v2_from_payload({"schema_version": "wrong"}) is None
+    assert (
+        minimal_amd_sol_bound_v2_from_payload(
+            {
+                "schema_version": "sol_execbench.amd_sol_bound.v2",
+                "aggregate_bound": [],
+                "hardware_model": {},
+                "coverage_summary": {},
+            }
+        )
+        is None
+    )
+
+
+def test_minimal_solar_aggregate_rejects_non_dict_aggregate_status() -> None:
+    assert minimal_solar_aggregate_from_payload({"aggregate_status": []}) is None
