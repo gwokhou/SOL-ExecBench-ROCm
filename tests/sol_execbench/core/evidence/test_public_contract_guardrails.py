@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 
 import pytest
@@ -46,14 +45,11 @@ from sol_execbench_type_helpers import (
     make_workload,
 )
 
+from ..scoring.solar_derivation_fixtures import load_solar_derivation_fixtures
+
 REPO_ROOT = Path(__file__).resolve().parents[4]
 PLANNING_ROOT = REPO_ROOT / ".planning"
 COMPATIBILITY_INVENTORY = REPO_ROOT / "docs/internal/v1_4_compatibility_inventory.md"
-TEST_DIR = str(Path(__file__).resolve().parent)
-if TEST_DIR not in sys.path:
-    sys.path.insert(0, TEST_DIR)
-
-from solar_derivation_fixtures import load_solar_derivation_fixtures  # noqa: E402
 
 
 PHASE50_INTERNAL_EVIDENCE_NAMES = (
