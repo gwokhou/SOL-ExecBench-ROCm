@@ -25,12 +25,9 @@ from typing import Dict, List, Optional
 
 import torch
 
-from sol_execbench.core.data import (
-    Definition,
-    Workload,
-)
+from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.dtypes import dtype_str_to_torch_dtype
-from sol_execbench.core.data.workload import SafetensorsInput
+from sol_execbench.core.data.workload import SafetensorsInput, Workload
 
 
 FLASHINFER_TRACE_ENV = "FLASHINFER_TRACE_DIR"

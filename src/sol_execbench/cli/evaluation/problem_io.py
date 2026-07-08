@@ -12,8 +12,11 @@ from pathlib import Path
 
 import click
 
-from ...core import BenchmarkConfig, Definition, Solution, Workload
+from ...core.bench.config import BenchmarkConfig
+from ...core.data.definition import Definition
 from ...core.data.json_utils import load_json_file, load_jsonl_file
+from ...core.data.solution import Solution
+from ...core.data.workload import Workload
 
 
 @dataclass(frozen=True)

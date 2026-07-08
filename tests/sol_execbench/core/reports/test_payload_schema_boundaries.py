@@ -21,7 +21,7 @@ RAW_PAYLOAD_ARTIFACT_BOUNDARIES = {
     "sol_execbench.core.bench.static_kernel_artifacts",
     "sol_execbench.core.dataset.low_precision",
     "sol_execbench.core.dataset.migration_artifacts",
-    "sol_execbench.core.scoring.amd_bound_graph_fx",
+    "sol_execbench.core.scoring.amd_bound_graph_fx_helpers",
     "sol_execbench.core.scoring.amd_hardware_models",
 }
 

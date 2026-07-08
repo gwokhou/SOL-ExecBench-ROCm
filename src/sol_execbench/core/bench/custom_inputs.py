@@ -26,11 +26,9 @@ from typing import Any
 
 import torch
 
-from sol_execbench.core.data import (
-    Definition,
-    Workload,
-)
+from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.dtypes import dtype_str_to_torch_dtype
+from sol_execbench.core.data.workload import Workload
 
 
 GEN_INPUTS_ERROR = "gen_inputs_error"

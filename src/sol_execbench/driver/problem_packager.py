@@ -30,16 +30,12 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from ..core import (
-    BenchmarkConfig,
-    Definition,
-    Solution,
-    SupportedHardware,
-    Trace,
-    Workload,
-)
+from ..core.bench.config import BenchmarkConfig
+from ..core.data.definition import Definition
 from ..core.data.solution import CompileOptions, NATIVE_ROCM_LANGUAGES
-from ..core.data.workload import SafetensorsInput
+from ..core.data.solution import Solution, SupportedHardware
+from ..core.data.trace import Trace
+from ..core.data.workload import SafetensorsInput, Workload
 from ..core.text_utils import ordered_unique
 
 _TEMPLATES_DIR = Path(__file__).parent / "templates"

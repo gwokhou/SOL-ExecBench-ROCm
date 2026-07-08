@@ -91,6 +91,10 @@ def _internal_import_edges() -> set[tuple[str, str]]:
     return edges
 
 
+def _module_line_count(module: str) -> int:
+    return len(_internal_modules()[module].read_text().splitlines())
+
+
 def test_high_inbound_model_modules_keep_exact_internal_imports() -> None:
     expected_targets = {
         "sol_execbench.core.data.base_model": [],
@@ -158,17 +162,17 @@ def test_cross_domain_imports_stay_explicitly_allowlisted() -> None:
             "sol_execbench.core.bench.rocm_profiler",
         ): "dataset runner wires optional ROCm profiler artifacts",
         (
-            "sol_execbench.core.dataset.runner",
+            "sol_execbench.core.dataset.runner_scoring",
             "sol_execbench.core.scoring.amd_score",
-        ): "dataset runner exposes AMD score types for run reporting",
+        ): "dataset scoring bridge exposes AMD score types for run reporting",
         (
-            "sol_execbench.core.dataset.runner",
+            "sol_execbench.core.dataset.runner_scoring",
             "sol_execbench.core.scoring.amd_score_reports",
-        ): "dataset runner delegates AMD score report construction",
+        ): "dataset scoring bridge delegates AMD score report construction",
         (
-            "sol_execbench.core.dataset.runner",
+            "sol_execbench.core.dataset.runner_scoring",
             "sol_execbench.core.scoring.baseline_artifact",
-        ): "dataset runner accepts scoring baseline artifacts",
+        ): "dataset scoring bridge accepts scoring baseline artifacts",
         (
             "sol_execbench.core.scoring.amd_bound_sanity_models",
             "sol_execbench.core.dataset.manifest",
@@ -213,6 +217,85 @@ def test_cli_main_import_fanout_stays_bounded() -> None:
     )
 
     assert len(main_imports) <= 15
+
+
+def test_p0_orchestrators_stay_bounded_after_refactor() -> None:
+    edges = _internal_import_edges()
+    imports_by_source = {
+        source: sorted(target for edge_source, target in edges if edge_source == source)
+        for source in (
+            "sol_execbench.cli.evaluation.evaluator",
+            "sol_execbench.core.bench.eval_workload_runner",
+        )
+    }
+
+    assert len(imports_by_source["sol_execbench.cli.evaluation.evaluator"]) <= 8
+    assert _module_line_count("sol_execbench.cli.evaluation.evaluator") <= 240
+    assert len(imports_by_source["sol_execbench.core.bench.eval_workload_runner"]) <= 8
+    assert _module_line_count("sol_execbench.core.bench.eval_workload_runner") <= 320
+
+
+def test_dataset_runner_no_longer_imports_scoring_bridge_directly() -> None:
+    runner_imports = sorted(
+        target
+        for source, target in _internal_import_edges()
+        if source == "sol_execbench.core.dataset.runner"
+        and _is_under(target, "sol_execbench.core.scoring")
+    )
+
+    assert runner_imports == []
+
+
+def test_p2_hotspots_stay_bounded_after_refactor() -> None:
+    edges = _internal_import_edges()
+    limits = {
+        "sol_execbench.core.bench.agent_feedback": (180, 5),
+        "sol_execbench.core.bench.profile_summary": (200, 6),
+        "sol_execbench.core.bench.input_generation": (260, 5),
+        "sol_execbench.core.scoring.amd_bound_graph_fx": (260, 6),
+        "sol_execbench.core.bench.rocm_profiler": (180, 5),
+        "sol_execbench.core.scoring.amd_sol_graph": (220, 6),
+    }
+
+    observed = {
+        module: (_module_line_count(module), len({target for source, target in edges if source == module}))
+        for module in limits
+    }
+
+    assert observed == {
+        module: (line_count, fanout)
+        for module, (line_limit, fanout_limit) in limits.items()
+        for line_count, fanout in [observed[module]]
+        if line_count <= line_limit and fanout <= fanout_limit
+    }
+
+
+def test_source_modules_do_not_import_core_or_data_facades() -> None:
+    modules = _internal_modules()
+    facade_roots = {"sol_execbench.core", "sol_execbench.core.data"}
+    violations: list[tuple[str, str]] = []
+
+    for module, path in modules.items():
+        if path.name == "__init__.py":
+            continue
+        tree = ast.parse(path.read_text())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                violations.extend(
+                    (module, alias.name)
+                    for alias in node.names
+                    if alias.name in facade_roots
+                )
+                continue
+
+            if not isinstance(node, ast.ImportFrom):
+                continue
+
+            base = _resolve_import_from_base(module, node, modules)
+            if base in facade_roots:
+                violations.extend((module, base) for _alias in node.names)
+
+    assert sorted(set(violations)) == []
 
 
 def test_source_modules_do_not_import_dataset_package_reexports() -> None:

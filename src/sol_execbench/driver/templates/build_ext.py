@@ -19,7 +19,7 @@ from pathlib import Path
 
 import torch.utils.cpp_extension as ext
 
-from sol_execbench.core import Solution
+from sol_execbench.core.data.solution import Solution
 
 HERE = Path.cwd().resolve()
 ENVIRON = __import__("os").environ

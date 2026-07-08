@@ -23,8 +23,8 @@ from typing import Optional, Tuple
 
 import torch
 
-from sol_execbench.core.data import Correctness
 from sol_execbench.core.data.trace import EvaluationStatus
+from sol_execbench.core.data.trace import Correctness
 from sol_execbench.core.data.workload import ToleranceSpec
 
 

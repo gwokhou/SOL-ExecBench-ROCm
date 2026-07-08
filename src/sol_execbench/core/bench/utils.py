@@ -24,7 +24,7 @@ from typing import Any, Optional
 import torch
 
 from sol_execbench.core.bench.io import allocate_outputs, normalize_outputs
-from sol_execbench.core.data import (
+from sol_execbench.core.data.trace import (
     Correctness,
     Evaluation,
     EvaluationStatus,

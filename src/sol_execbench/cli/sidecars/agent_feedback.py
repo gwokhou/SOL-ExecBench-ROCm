@@ -11,7 +11,6 @@ from pathlib import Path
 
 from rich.console import Console
 
-from ...core import Solution, Trace
 from ...core.bench.agent_feedback import (
     AgentFeedbackArtifactCitation,
     artifact_citation_from_path,
@@ -20,6 +19,8 @@ from ...core.bench.agent_feedback import (
 from ...core.bench.rocm_profiler import Rocprofv3ProfileResult
 from ...core.bench.static_kernel_evidence import StaticKernelEvidenceSidecar
 from ...core.checksums import sha256_file, stable_json_checksum
+from ...core.data.solution import Solution
+from ...core.data.trace import Trace
 from ...core.runtime_evidence import write_json_payload
 
 console = Console(stderr=True)

@@ -14,9 +14,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-from sol_execbench.core import Solution, Trace
 from sol_execbench.core.bench.reward_hack import RewardHackDetected
 from sol_execbench.core.data.solution import NATIVE_ROCM_LANGUAGES
+from sol_execbench.core.data.solution import Solution
+from sol_execbench.core.data.trace import Trace
 
 
 @dataclass(frozen=True)

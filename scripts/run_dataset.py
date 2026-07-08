@@ -79,13 +79,15 @@ from sol_execbench.core.dataset.run_closure import (
     write_execution_closure as _write_execution_closure_report,
 )
 from sol_execbench.core.dataset.runner import (
-    _extend_derived_reports_for_problem,
-    build_amd_score_reports_for_problem,
     collect_timing_evidence_for_problem,
     inspect_traces,
     print_summary,
-    write_amd_score_report,
     write_summary_report,
+)
+from sol_execbench.core.dataset.runner_scoring import (
+    _extend_derived_reports_for_problem,
+    build_amd_score_reports_for_problem,
+    write_amd_score_report,
 )
 from sol_execbench.core.dataset.solutions import (
     build_custom_solution,
