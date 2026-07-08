@@ -51,9 +51,35 @@ def path_int(payload: object, path: str, *, default: int = 0) -> int:
     return value if isinstance(value, int) else default
 
 
+def path_bool(payload: object, path: str, *, default: bool = False) -> bool:
+    value = path_get(payload, path)
+    return value if isinstance(value, bool) else default
+
+
+def path_int_or_none(payload: object, path: str) -> int | None:
+    value = path_get(payload, path)
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
+
+
 def path_float_or_none(payload: object, path: str) -> float | None:
     value = path_get(payload, path)
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
     number = float(value)
     return number if math.isfinite(number) else None
+
+
+def path_mapping_list(payload: object, path: str) -> list[dict[str, Any]]:
+    value = path_get(payload, path)
+    if not isinstance(value, list):
+        return []
+    return [dict(item) for item in value if isinstance(item, Mapping)]
+
+
+def path_str_list(payload: object, path: str) -> list[str]:
+    value = path_get(payload, path)
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str)]
