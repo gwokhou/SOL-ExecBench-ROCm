@@ -5,12 +5,23 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 from sol_execbench.core.data.json_utils import stable_model_checksum, stable_model_json
+from sol_execbench.core.data.path_access import (
+    path_bool,
+    path_dict,
+    path_get,
+    path_int_or_none,
+    path_mapping_list,
+    path_str_list,
+    path_str_or_none,
+)
 
 from .manifest import DatasetManifestChecksum, utc_timestamp
 
@@ -120,14 +131,49 @@ class ParityGapReport(BaseModel):
         return stable_model_json(self)
 
 
+@dataclass(frozen=True)
+class ParityReadinessWorkloadRecord:
+    category: str
+    problem_id: str
+    problem_path: str | None
+    workload_uuid: str | None
+    row_index: int | None
+    status: str
+    reasons: list[dict[str, Any]] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class ParityExecutionClosureRecord:
+    category: str
+    problem_id: str
+    problem_path: str | None
+    workload_uuid: str | None
+    row_index: int | None
+    closure_status: str
+    trace_status: str | None
+    trace_ref: str | None
+    evidence_refs: dict[str, Any]
+    evidence_gaps: list[str]
+
+
+@dataclass(frozen=True)
+class ParityAmdScoreRecord:
+    definition: str
+    workload_uuid: str | None
+    supported: bool
+    warnings: list[str]
+    evidence_refs: dict[str, Any]
+    derived_evidence_refs: dict[str, Any]
+
+
 def load_json(path: Path) -> dict[str, Any]:
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
 def _checksum(payload: dict[str, Any], key: str) -> str | None:
     value = payload.get(key)
-    if isinstance(value, dict):
-        return value.get("value")
+    if isinstance(value, Mapping):
+        return path_str_or_none(value, "value")
     if isinstance(value, str):
         return value
     return None
@@ -143,7 +189,7 @@ def _source(
         return ParityGapSource(path=str(path) if path else None)
     return ParityGapSource(
         path=str(path) if path else None,
-        schema_version=payload.get("schema_version"),
+        schema_version=path_str_or_none(payload, "schema_version"),
         checksum=_checksum(payload, checksum_key) if checksum_key else None,
     )
 
@@ -161,9 +207,11 @@ def _category_counts(
 
 
 def _record_ref(record: dict[str, Any]) -> str:
-    problem = record.get("problem_id") or record.get("problem_path") or "unknown"
-    uuid = record.get("workload_uuid")
-    row = record.get("row_index")
+    problem = (
+        path_get(record, "problem_id") or path_get(record, "problem_path") or "unknown"
+    )
+    uuid = path_get(record, "workload_uuid")
+    row = path_get(record, "row_index")
     return f"{problem}#{uuid or row}"
 
 
@@ -208,11 +256,53 @@ def _final_blockers(groups: dict[str, dict[str, Any]]) -> list[ParityGapBlocker]
 
 
 def _score_category(
-    score: dict[str, Any],
+    score: ParityAmdScoreRecord,
     workload_to_category: dict[str, str],
 ) -> str:
-    uuid = str(score.get("workload_uuid") or "")
+    uuid = str(score.workload_uuid or "")
     return workload_to_category.get(uuid, "unknown")
+
+
+def _readiness_workload_record(payload: object) -> ParityReadinessWorkloadRecord:
+    problem_path = path_str_or_none(payload, "problem_path")
+    problem_id = path_str_or_none(payload, "problem_id") or problem_path or "unknown"
+    return ParityReadinessWorkloadRecord(
+        category=path_str_or_none(payload, "category") or "unknown",
+        problem_id=problem_id,
+        problem_path=problem_path,
+        workload_uuid=path_str_or_none(payload, "workload_uuid"),
+        row_index=path_int_or_none(payload, "row_index"),
+        status=path_str_or_none(payload, "status") or "unknown",
+        reasons=path_mapping_list(payload, "reasons"),
+    )
+
+
+def _execution_closure_record(payload: object) -> ParityExecutionClosureRecord:
+    problem_path = path_str_or_none(payload, "problem_path")
+    problem_id = path_str_or_none(payload, "problem_id") or problem_path or "unknown"
+    return ParityExecutionClosureRecord(
+        category=path_str_or_none(payload, "category") or "unknown",
+        problem_id=problem_id,
+        problem_path=problem_path,
+        workload_uuid=path_str_or_none(payload, "workload_uuid"),
+        row_index=path_int_or_none(payload, "row_index"),
+        closure_status=path_str_or_none(payload, "closure_status") or "unknown",
+        trace_status=path_str_or_none(payload, "trace_status"),
+        trace_ref=path_str_or_none(payload, "trace_ref"),
+        evidence_refs=path_dict(payload, "evidence_refs"),
+        evidence_gaps=path_str_list(payload, "evidence_gaps"),
+    )
+
+
+def _amd_score_record(payload: object) -> ParityAmdScoreRecord:
+    return ParityAmdScoreRecord(
+        definition=path_str_or_none(payload, "definition") or "unknown",
+        workload_uuid=path_str_or_none(payload, "workload_uuid"),
+        supported=path_bool(payload, "supported"),
+        warnings=path_str_list(payload, "warnings"),
+        evidence_refs=path_dict(payload, "evidence_refs"),
+        derived_evidence_refs=path_dict(payload, "derived_evidence_refs"),
+    )
 
 
 def build_parity_gap_report(
@@ -231,42 +321,49 @@ def build_parity_gap_report(
     blockers: dict[str, dict[str, Any]] = {}
     workload_to_category: dict[str, str] = {}
 
-    for category in inventory.get("categories", []):
-        counts = _category_counts(category["name"], categories)
-        denoms = category.get("denominators", {})
-        counts.discovered += int(denoms.get("discovered_problems", 0))
-        counts.parsed += int(denoms.get("parsed_problems", 0))
+    for category in path_mapping_list(inventory, "categories"):
+        category_name = path_str_or_none(category, "name") or "unknown"
+        counts = _category_counts(category_name, categories)
+        denoms = path_dict(category, "denominators")
+        counts.discovered += int(
+            path_get(denoms, "discovered_problems", default=0) or 0
+        )
+        counts.parsed += int(path_get(denoms, "parsed_problems", default=0) or 0)
 
-    for workload in readiness.get("workloads", []):
-        category = str(workload.get("category", "unknown"))
-        counts = _category_counts(category, categories)
-        uuid = workload.get("workload_uuid")
-        if uuid:
-            workload_to_category[str(uuid)] = category
-        if workload.get("status") == "ready":
+    for workload_payload in path_mapping_list(readiness, "workloads"):
+        workload = _readiness_workload_record(workload_payload)
+        counts = _category_counts(workload.category, categories)
+        if workload.workload_uuid:
+            workload_to_category[workload.workload_uuid] = workload.category
+        if workload.status == "ready":
             counts.ready += 1
         else:
             counts.blocked += 1
-            for reason in workload.get("reasons", []):
+            for reason in workload.reasons:
                 _add_blocker(
                     blockers,
-                    reason_code=str(reason.get("code", "unknown_readiness_blocker")),
-                    category=category,
-                    example_ref=_record_ref(workload),
+                    reason_code=str(
+                        path_get(reason, "code", default="unknown_readiness_blocker")
+                    ),
+                    category=workload.category,
+                    example_ref=_record_ref(workload_payload),
                     next_action=str(
-                        reason.get("next_action", "Review readiness blocker.")
+                        path_get(
+                            reason,
+                            "next_action",
+                            default="Review readiness blocker.",
+                        )
                     ),
                 )
 
     evidence_present = dict.fromkeys(EVIDENCE_KEYS, 0)
     evidence_missing = dict.fromkeys(EVIDENCE_KEYS, 0)
-    for record in execution_closure.get("records", []):
-        category = str(record.get("category", "unknown"))
-        counts = _category_counts(category, categories)
-        status = str(record.get("closure_status"))
-        uuid = record.get("workload_uuid")
-        if uuid:
-            workload_to_category[str(uuid)] = category
+    for record_payload in path_mapping_list(execution_closure, "records"):
+        record = _execution_closure_record(record_payload)
+        counts = _category_counts(record.category, categories)
+        status = record.closure_status
+        if record.workload_uuid:
+            workload_to_category[record.workload_uuid] = record.category
         if status == "not_attempted":
             counts.not_attempted += 1
         if status == "filtered":
@@ -280,17 +377,16 @@ def build_parity_gap_report(
             "derived_evidence_missing",
         }:
             counts.attempted += 1
-        if status == "attempted_passed" or record.get("trace_status") == "PASSED":
+        if status == "attempted_passed" or record.trace_status == "PASSED":
             counts.passed += 1
         if status in {"attempted_failed", "missing_trace"} or (
-            record.get("trace_status") not in {None, "PASSED"}
+            record.trace_status not in {None, "PASSED"}
         ):
             counts.failed += 1
-        if record.get("trace_ref"):
+        if record.trace_ref:
             evidence_present["trace"] += 1
         elif status not in {"filtered", "not_attempted"}:
             evidence_missing["trace"] += 1
-        refs = record.get("evidence_refs", {})
         evidence_map = {
             "timing": "timing_evidence",
             "amd_native_score": "amd_score",
@@ -298,52 +394,53 @@ def build_parity_gap_report(
             "solar_derivation": "solar_derivation",
         }
         for evidence_key, ref_key in evidence_map.items():
-            if refs.get(ref_key):
+            if record.evidence_refs.get(ref_key):
                 evidence_present[evidence_key] += 1
-        for gap in record.get("evidence_gaps", []):
-            if str(gap).startswith("timing"):
+        for gap in record.evidence_gaps:
+            if gap.startswith("timing"):
                 evidence_missing["timing"] += 1
-            elif str(gap).startswith("amd_score"):
+            elif gap.startswith("amd_score"):
                 evidence_missing["amd_native_score"] += 1
-            elif str(gap).startswith("amd_sol"):
+            elif gap.startswith("amd_sol"):
                 evidence_missing["amd_sol"] += 1
-            elif str(gap).startswith("solar"):
+            elif gap.startswith("solar"):
                 evidence_missing["solar_derivation"] += 1
             _add_blocker(
                 blockers,
-                reason_code=str(gap),
-                category=category,
-                example_ref=_record_ref(record),
+                reason_code=gap,
+                category=record.category,
+                example_ref=_record_ref(record_payload),
                 next_action="Generate or attach the missing derived evidence artifact.",
             )
         if status in {"attempted_failed", "missing_trace"}:
             _add_blocker(
                 blockers,
                 reason_code=status,
-                category=category,
-                example_ref=_record_ref(record),
+                category=record.category,
+                example_ref=_record_ref(record_payload),
                 next_action="Inspect CLI logs, trace output, and runner environment.",
             )
 
     if amd_score_report is not None:
-        for score in amd_score_report.get("scores", []):
+        for score_payload in path_mapping_list(amd_score_report, "scores"):
+            score = _amd_score_record(score_payload)
             counts = _category_counts(
                 _score_category(score, workload_to_category), categories
             )
-            warnings = " ".join(str(warning) for warning in score.get("warnings", []))
-            if score.get("supported") is True and "degraded" in warnings.lower():
+            warnings = " ".join(score.warnings)
+            if score.supported and "degraded" in warnings.lower():
                 counts.degraded += 1
-            elif score.get("supported") is True:
+            elif score.supported:
                 counts.scored += 1
             else:
                 counts.unscored += 1
-            refs = score.get("evidence_refs", {})
-            derived_refs = score.get("derived_evidence_refs", {})
-            if refs.get("timing"):
+            if score.evidence_refs.get("timing"):
                 evidence_present["timing"] += 1
-            if refs.get("sol_bound"):
+            if score.evidence_refs.get("sol_bound"):
                 evidence_present["amd_sol"] += 1
-            if derived_refs.get("formula") or derived_refs.get("coverage"):
+            if score.derived_evidence_refs.get(
+                "formula"
+            ) or score.derived_evidence_refs.get("coverage"):
                 evidence_present["solar_derivation"] += 1
             evidence_present["amd_native_score"] += 1
 

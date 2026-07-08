@@ -6,6 +6,8 @@ import sys
 from pathlib import Path
 
 from sol_execbench.core.dataset.parity_gap import (
+    _amd_score_record,
+    _execution_closure_record,
     build_parity_gap_report,
     render_parity_gap_markdown,
 )
@@ -17,6 +19,26 @@ assert spec is not None
 report_parity_gaps = importlib.util.module_from_spec(spec)
 assert spec.loader is not None
 spec.loader.exec_module(report_parity_gaps)
+
+
+def test_parity_gap_execution_record_adapter_normalizes_missing_fields() -> None:
+    record = _execution_closure_record({"problem_path": "L1/demo"})
+
+    assert record.category == "unknown"
+    assert record.problem_id == "L1/demo"
+    assert record.problem_path == "L1/demo"
+    assert record.workload_uuid is None
+    assert record.evidence_gaps == []
+
+
+def test_parity_gap_score_record_adapter_filters_warning_list() -> None:
+    record = _amd_score_record(
+        {"definition": "L1/demo", "warnings": ["degraded", 3], "supported": True}
+    )
+
+    assert record.definition == "L1/demo"
+    assert record.supported is True
+    assert record.warnings == ["degraded"]
 
 
 def _inventory() -> dict:
