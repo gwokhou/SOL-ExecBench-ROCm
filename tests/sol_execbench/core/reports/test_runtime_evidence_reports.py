@@ -22,7 +22,7 @@ from sol_execbench.core.runtime_evidence import (
 from sol_execbench_type_helpers import make_trace
 
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[4]
 MANIFEST_PATH = REPO_ROOT / "docker" / "rocm-targets.json"
 
 

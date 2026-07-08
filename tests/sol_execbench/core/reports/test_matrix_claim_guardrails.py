@@ -28,7 +28,7 @@ from sol_execbench.core.matrix_diff import (
 )
 
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[4]
 
 
 def _container_target() -> MatrixTarget:
