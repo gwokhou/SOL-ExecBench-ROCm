@@ -12,13 +12,16 @@ from sol_execbench.core.scoring.amd_hardware_models import (
     default_amd_hardware_models as load_default_amd_hardware_models,
 )
 from sol_execbench.core.scoring.amd_sol_bounds import _bound_for_estimate
+from sol_execbench.core.scoring.amd_sol_coverage import summarize_amd_sol_coverage
 from sol_execbench.core.scoring.amd_sol_graph import extract_graph
 from sol_execbench.core.scoring.amd_sol_models import AmdSolBoundArtifact
 from sol_execbench.core.scoring.amd_sol_work import estimate_work
 
+
 def default_amd_hardware_models() -> dict[str, AmdHardwareModel]:
     """Return built-in AMD hardware model entries."""
     return load_default_amd_hardware_models()
+
 
 def build_amd_sol_bound_artifact(
     definition: Definition,
@@ -38,4 +41,5 @@ def build_amd_sol_bound_artifact(
         graph_nodes=graph_nodes,
         work_estimates=work_estimates,
         op_bounds=op_bounds,
+        coverage_summary=summarize_amd_sol_coverage(graph_nodes, work_estimates),
     )
