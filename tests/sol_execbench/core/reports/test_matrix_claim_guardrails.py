@@ -358,7 +358,9 @@ def test_host_validated_rejects_container_claim_flag():
 
 
 def test_matrix_contract_uses_target_and_matrix_entry_not_row_wording():
-    source = (REPO_ROOT / "src/sol_execbench/core/compatibility.py").read_text()
+    source = (
+        REPO_ROOT / "src/sol_execbench/core/platform/compatibility.py"
+    ).read_text()
 
     assert "Matrix Entry" in source
     assert "Target" in source
