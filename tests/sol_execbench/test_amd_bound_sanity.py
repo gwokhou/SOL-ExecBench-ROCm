@@ -20,6 +20,27 @@ from sol_execbench.core.scoring.amd_bound_sanity import (
 CREATED_AT = "2026-05-31T00:00:00Z"
 
 
+def test_amd_bound_sanity_ignores_non_object_score_records() -> None:
+    report = build_amd_bound_sanity_report(
+        execution_closure={
+            "records": [
+                {
+                    "category": "L1",
+                    "problem_id": "L1/demo",
+                    "workload_uuid": "w0",
+                    "row_index": 0,
+                    "closure_status": "attempted_passed",
+                }
+            ]
+        },
+        amd_score_report={"scores": [{"workload_uuid": "w0"}, []]},
+        created_at=CREATED_AT,
+    )
+
+    assert len(report.workloads) == 1
+    assert report.status_totals.missing_evidence >= 1
+
+
 def trace_ref_fixture() -> list[AmdBoundSanitySourceRef | dict[str, Any] | str | Path]:
     return [
         {

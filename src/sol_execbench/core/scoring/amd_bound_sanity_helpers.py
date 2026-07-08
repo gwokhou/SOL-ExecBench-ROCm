@@ -4,8 +4,17 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
+
+from sol_execbench.core.data.path_access import (
+    path_dict,
+    path_get,
+    path_int_or_none,
+    path_str_list,
+    path_str_or_none,
+)
 
 from .amd_bound_sanity_models import (
     AmdBoundSanityEvidenceGap,
@@ -13,24 +22,23 @@ from .amd_bound_sanity_models import (
     SOURCE_CHECKSUM_KEYS,
 )
 
+
 def _payload_artifacts(
     artifacts: list[AmdBoundSanitySourceRef | dict[str, Any] | str | Path],
 ) -> list[dict[str, Any]]:
-    return [artifact for artifact in artifacts if isinstance(artifact, dict)]
+    return [dict(artifact) for artifact in artifacts if isinstance(artifact, Mapping)]
 
 
 def _workload_seed(uuid: str, payload: dict[str, Any]) -> dict[str, Any]:
-    definition = _optional_str(payload.get("definition"))
-    problem_id = _optional_str(payload.get("problem_id")) or definition or "unknown"
+    definition = path_str_or_none(payload, "definition")
+    problem_id = path_str_or_none(payload, "problem_id") or definition or "unknown"
     return {
-        "category": _optional_str(payload.get("category")) or "unknown",
+        "category": path_str_or_none(payload, "category") or "unknown",
         "problem_id": problem_id,
-        "problem_path": _optional_str(payload.get("problem_path")),
+        "problem_path": path_str_or_none(payload, "problem_path"),
         "definition": definition,
         "workload_uuid": uuid,
-        "row_index": payload.get("row_index")
-        if isinstance(payload.get("row_index"), int)
-        else None,
+        "row_index": path_int_or_none(payload, "row_index"),
         "diagnostic_flags": set(),
         "source_statuses": {
             "closure_status": None,
@@ -55,27 +63,28 @@ def _ensure_workload(
         workloads[uuid] = _workload_seed(uuid, payload)
         return workloads[uuid]
     workload = workloads[uuid]
-    definition = _optional_str(payload.get("definition"))
+    definition = path_str_or_none(payload, "definition")
     if definition and workload["definition"] is None:
         workload["definition"] = definition
         if workload["problem_id"] == "unknown":
             workload["problem_id"] = definition
     for key in ("category", "problem_id", "problem_path"):
-        value = _optional_str(payload.get(key))
+        value = path_str_or_none(payload, key)
         if value and (workload[key] in {None, "unknown"}):
             workload[key] = value
-    if isinstance(payload.get("row_index"), int) and workload["row_index"] is None:
-        workload["row_index"] = payload["row_index"]
+    row_index = path_int_or_none(payload, "row_index")
+    if row_index is not None and workload["row_index"] is None:
+        workload["row_index"] = row_index
     return workload
 
 
 def _artifact_uuid(payload: dict[str, Any]) -> str | None:
-    uuid = payload.get("workload_uuid")
+    uuid = path_get(payload, "workload_uuid")
     return str(uuid) if uuid is not None else None
 
 
 def _dict_value(value: object) -> dict[str, Any]:
-    return cast(dict[str, Any], value) if isinstance(value, dict) else {}
+    return dict(value) if isinstance(value, Mapping) else {}
 
 
 def _optional_str(value: object) -> str | None:
@@ -83,8 +92,7 @@ def _optional_str(value: object) -> str | None:
 
 
 def _warnings_from(payload: dict[str, Any]) -> list[str]:
-    values = payload.get("warnings") if isinstance(payload, dict) else None
-    return [str(value) for value in values] if isinstance(values, list) else []
+    return path_str_list(payload, "warnings")
 
 
 def _extend_unique(target: list[str], values: list[str]) -> None:
@@ -140,12 +148,11 @@ def _is_degraded_status(
         return True
     if _contains_provisional(warnings):
         return True
-    if isinstance(coverage_summary, dict):
-        summary = cast(dict[str, Any], coverage_summary)
-        if summary.get("inexact_ops", 0):
-            return True
-        if summary.get("worst_confidence") in {"inexact", "estimated"}:
-            return True
+    summary = _dict_value(coverage_summary)
+    if summary and path_get(summary, "inexact_ops", default=0):
+        return True
+    if path_get(summary, "worst_confidence") in {"inexact", "estimated"}:
+        return True
     return False
 
 
@@ -163,11 +170,11 @@ def _contains_provisional(values: list[str]) -> bool:
 def _provisional_artifact(artifact: dict[str, Any]) -> bool:
     if _contains_provisional(_warnings_from(artifact)):
         return True
-    hardware = _dict_value(artifact.get("hardware_model"))
-    architecture = str(hardware.get("architecture", "")).lower()
+    hardware = path_dict(artifact, "hardware_model")
+    architecture = str(path_get(hardware, "architecture", default="")).lower()
     validation_values = {
-        str(hardware.get("hardware_validation_status", "")).lower(),
-        str(hardware.get("model_validation_status", "")).lower(),
+        str(path_get(hardware, "hardware_validation_status", default="")).lower(),
+        str(path_get(hardware, "model_validation_status", default="")).lower(),
     }
     return (
         architecture in {"gfx1200", "rdna4", "rdna 4"}
@@ -184,9 +191,7 @@ def _source(
     return AmdBoundSanitySourceRef(
         path=str(path) if path else None,
         ref=ref,
-        schema_version=_optional_str(payload.get("schema_version"))
-        if payload
-        else None,
+        schema_version=path_str_or_none(payload, "schema_version") if payload else None,
         checksum=_checksum(payload),
     )
 
@@ -199,10 +204,10 @@ def _source_from_ref(
     if isinstance(value, str | Path):
         return AmdBoundSanitySourceRef(path=str(value))
     return AmdBoundSanitySourceRef(
-        path=_optional_str(value.get("path")),
-        ref=_optional_str(value.get("ref")),
-        schema_version=_optional_str(value.get("schema_version")),
-        checksum=_checksum(value),
+        path=path_str_or_none(value, "path"),
+        ref=path_str_or_none(value, "ref"),
+        schema_version=path_str_or_none(value, "schema_version"),
+        checksum=_checksum(_dict_value(value)),
     )
 
 
@@ -211,8 +216,10 @@ def _checksum(payload: dict[str, Any] | None) -> str | None:
         return None
     for key in SOURCE_CHECKSUM_KEYS:
         value = payload.get(key)
-        if isinstance(value, dict) and isinstance(value.get("value"), str):
-            return value["value"]
+        if isinstance(value, Mapping):
+            checksum = path_str_or_none(value, "value")
+            if checksum is not None:
+                return checksum
         if isinstance(value, str):
             return value
     return None
@@ -223,14 +230,12 @@ def _coverage_summary(
     compatibility_matrix: dict[str, Any] | None,
 ) -> dict[str, Any]:
     summary: dict[str, Any] = {}
-    if amd_score_report and isinstance(amd_score_report.get("evidence_summary"), dict):
-        summary["amd_score"] = _sorted_jsonable(amd_score_report["evidence_summary"])
-    if compatibility_matrix and isinstance(
-        compatibility_matrix.get("status_counts"), dict
-    ):
-        summary["compatibility_matrix"] = _sorted_jsonable(
-            compatibility_matrix["status_counts"]
-        )
+    amd_score_summary = path_dict(amd_score_report, "evidence_summary")
+    if amd_score_summary:
+        summary["amd_score"] = _sorted_jsonable(amd_score_summary)
+    matrix_counts = path_dict(compatibility_matrix, "status_counts")
+    if matrix_counts:
+        summary["compatibility_matrix"] = _sorted_jsonable(matrix_counts)
     return summary
 
 
@@ -278,7 +283,7 @@ def _workload_ref(workload: dict[str, Any]) -> str:
 
 
 def _sorted_jsonable(value: Any) -> Any:
-    if isinstance(value, dict):
+    if isinstance(value, Mapping):
         return {str(key): _sorted_jsonable(value[key]) for key in sorted(value)}
     if isinstance(value, list):
         return [_sorted_jsonable(item) for item in value]
