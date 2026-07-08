@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
+# SPDX-License-Identifier: Apache-2.0
+
 """Compatibility facade for the relocated CLI module."""
 
 from importlib import import_module as _import_module

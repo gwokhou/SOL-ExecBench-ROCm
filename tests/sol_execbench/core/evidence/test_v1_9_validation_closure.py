@@ -117,9 +117,9 @@ def test_v1_10_docs_allow_historical_or_deferred_context_mentions():
 
 
 def test_golden_bound_modeling_coverage_inventory_is_present():
-    graph_tests = _text("tests/sol_execbench/test_amd_bound_graph.py")
-    estimate_tests = _text("tests/sol_execbench/test_amd_bound_estimates.py")
-    sol_v2_tests = _text("tests/sol_execbench/test_amd_sol_v2.py")
+    graph_tests = _text("tests/sol_execbench/core/scoring/test_amd_bound_graph.py")
+    estimate_tests = _text("tests/sol_execbench/core/scoring/test_amd_bound_estimates.py")
+    sol_v2_tests = _text("tests/sol_execbench/core/scoring/test_amd_sol_v2.py")
     evidence = _text("docs/internal/rdna4_v1_9_validation_evidence.md")
     combined = "\n".join([graph_tests, estimate_tests, sol_v2_tests, evidence])
 
@@ -140,8 +140,8 @@ def test_golden_bound_modeling_coverage_inventory_is_present():
 
 
 def test_score_validation_coverage_inventory_is_present():
-    score_tests = _text("tests/sol_execbench/test_amd_native_score.py")
-    dataset_tests = _text("tests/sol_execbench/test_run_dataset_amd_score.py")
+    score_tests = _text("tests/sol_execbench/core/scoring/test_amd_native_score.py")
+    dataset_tests = _text("tests/sol_execbench/core/dataset/test_run_dataset_amd_score.py")
     evidence = _text("docs/internal/rdna4_v1_9_validation_evidence.md")
     combined = "\n".join([score_tests, dataset_tests, evidence])
 
