@@ -26,8 +26,6 @@ RAW_PAYLOAD_ALLOWLIST = {
     "sol_execbench.core.dataset.paper_denominator_sources",
     # Scoring artifact and parser boundaries.
     "sol_execbench.core.scoring.amd_bound_graph_fx",
-    "sol_execbench.core.scoring.amd_bound_sanity_builder",
-    "sol_execbench.core.scoring.amd_bound_sanity_helpers",
     "sol_execbench.core.scoring.amd_score_sidecar_parsing",
     "sol_execbench.core.scoring.amd_hardware_models",
     "sol_execbench.core.scoring.amd_sol_v2_parsing",

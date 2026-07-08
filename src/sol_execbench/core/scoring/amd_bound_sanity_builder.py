@@ -7,6 +7,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from sol_execbench.core.data.path_access import (
+    path_dict,
+    path_get,
+    path_mapping_list,
+    path_str_list,
+    path_str_or_none,
+)
 from sol_execbench.core.trust_summary import utc_timestamp
 
 from .amd_bound_sanity_helpers import (
@@ -17,11 +24,9 @@ from .amd_bound_sanity_helpers import (
     _contains_provisional,
     _contains_unsupported,
     _coverage_summary,
-    _dict_value,
     _ensure_workload,
     _extend_unique,
     _is_degraded_status,
-    _optional_str,
     _payload_artifacts,
     _provisional_artifact,
     _sorted_evidence_gaps,
@@ -45,6 +50,7 @@ from .amd_bound_sanity_models import (
     AmdBoundSanityWorkload,
 )
 
+
 def build_amd_bound_sanity_report(
     *,
     trace_refs: list[AmdBoundSanitySourceRef | dict[str, Any] | str | Path]
@@ -64,29 +70,32 @@ def build_amd_bound_sanity_report(
     solar_artifacts = solar_artifacts or []
     source_paths = source_paths or {}
 
-    closure_records = (execution_closure or {}).get("records", [])
+    closure_records = path_mapping_list(execution_closure, "records")
     workloads: dict[str, dict[str, Any]] = {}
     evidence_gap_groups: dict[str, dict[str, Any]] = {}
 
     for record in closure_records:
-        if not isinstance(record, dict):
-            continue
-        uuid = str(record.get("workload_uuid") or record.get("row_index") or "unknown")
+        uuid = str(
+            path_get(record, "workload_uuid")
+            or path_get(record, "row_index")
+            or "unknown"
+        )
         workload = _ensure_workload(workloads, uuid, record)
-        workload["source_statuses"]["closure_status"] = _optional_str(
-            record.get("closure_status")
+        workload["source_statuses"]["closure_status"] = path_str_or_none(
+            record, "closure_status"
         )
         workload["evidence_refs"].update(
             {
                 str(key): str(value)
-                for key, value in (record.get("evidence_refs") or {}).items()
+                for key, value in path_dict(record, "evidence_refs").items()
                 if value
             }
         )
-        if record.get("trace_ref"):
-            workload["evidence_refs"]["trace"] = str(record["trace_ref"])
-        for gap in record.get("evidence_gaps", []):
-            _add_gap(workload, str(gap))
+        trace_ref = path_str_or_none(record, "trace_ref")
+        if trace_ref:
+            workload["evidence_refs"]["trace"] = trace_ref
+        for gap in path_str_list(record, "evidence_gaps"):
+            _add_gap(workload, gap)
 
     amd_sol_statuses: dict[str, int] = {}
     for artifact in _payload_artifacts(amd_sol_artifacts):
@@ -94,17 +103,16 @@ def build_amd_bound_sanity_report(
         if uuid is None:
             continue
         workload = _ensure_workload(workloads, uuid, artifact)
-        aggregate = _dict_value(artifact.get("aggregate_bound"))
-        status = _optional_str(aggregate.get("status"))
+        aggregate = path_dict(artifact, "aggregate_bound")
+        status = path_str_or_none(aggregate, "status")
         if status:
             workload["source_statuses"]["amd_sol_status"] = status
             amd_sol_statuses[status] = amd_sol_statuses.get(status, 0) + 1
-        if artifact.get("coverage_summary") is not None:
-            workload["coverage_summary"]["amd_sol"] = artifact["coverage_summary"]
+        coverage_summary = path_get(artifact, "coverage_summary")
+        if coverage_summary is not None:
+            workload["coverage_summary"]["amd_sol"] = coverage_summary
         _extend_unique(workload["warnings"], _warnings_from(artifact))
-        if _is_degraded_status(
-            status, artifact.get("coverage_summary"), workload["warnings"]
-        ):
+        if _is_degraded_status(status, coverage_summary, workload["warnings"]):
             workload["diagnostic_flags"].add("degraded")
         if status == "unscored":
             workload["diagnostic_flags"].add("unscored")
@@ -119,13 +127,14 @@ def build_amd_bound_sanity_report(
         if uuid is None:
             continue
         workload = _ensure_workload(workloads, uuid, artifact)
-        aggregate = _dict_value(artifact.get("aggregate_status"))
-        status = _optional_str(aggregate.get("status"))
+        aggregate = path_dict(artifact, "aggregate_status")
+        status = path_str_or_none(aggregate, "status")
         if status:
             workload["source_statuses"]["solar_status"] = status
             solar_statuses[status] = solar_statuses.get(status, 0) + 1
-        if artifact.get("coverage_summary") is not None:
-            workload["coverage_summary"]["solar"] = artifact["coverage_summary"]
+        coverage_summary = path_get(artifact, "coverage_summary")
+        if coverage_summary is not None:
+            workload["coverage_summary"]["solar"] = coverage_summary
         _extend_unique(workload["warnings"], _warnings_from(aggregate))
         _extend_unique(workload["warnings"], _warnings_from(artifact))
         if status == "degraded":
@@ -137,14 +146,12 @@ def build_amd_bound_sanity_report(
         if _contains_provisional(workload["warnings"]):
             workload["diagnostic_flags"].add("provisional")
 
-    for score in (amd_score_report or {}).get("scores", []):
-        if not isinstance(score, dict):
-            continue
+    for score in path_mapping_list(amd_score_report, "scores"):
         uuid = _artifact_uuid(score)
         if uuid is None:
             continue
         workload = _ensure_workload(workloads, uuid, score)
-        supported = score.get("supported")
+        supported = path_get(score, "supported")
         if isinstance(supported, bool):
             workload["source_statuses"]["amd_score_supported"] = supported
             workload["amd_score_supported"] = supported
@@ -154,14 +161,13 @@ def build_amd_bound_sanity_report(
                 workload["diagnostic_flags"].add("unsupported")
             else:
                 workload["diagnostic_flags"].add("unscored")
-        if isinstance(score.get("evidence_refs"), dict):
-            workload["evidence_refs"].update(
-                {
-                    str(key): str(value)
-                    for key, value in score["evidence_refs"].items()
-                    if value
-                }
-            )
+        workload["evidence_refs"].update(
+            {
+                str(key): str(value)
+                for key, value in path_dict(score, "evidence_refs").items()
+                if value
+            }
+        )
 
     for workload in workloads.values():
         _apply_missing_required_artifact_gaps(
