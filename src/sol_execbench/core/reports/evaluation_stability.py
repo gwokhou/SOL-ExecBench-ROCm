@@ -22,7 +22,7 @@ from sol_execbench.core.reports.evaluation_stability_rendering import (
     render_evaluation_stability_markdown,
     write_evaluation_stability_reports,
 )
-from sol_execbench.core.reports.trust_summary import load_json as load_json, utc_timestamp
+from sol_execbench.core.reports.trust_summary import load_json, utc_timestamp
 
 __all__ = [
     "CLAIM_BOUNDARY_TEXT",

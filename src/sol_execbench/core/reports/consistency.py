@@ -30,7 +30,7 @@ from sol_execbench.core.reports.consistency_models import (
     ConsistencySummary,
 )
 from sol_execbench.core.reports.consistency_rendering import render_consistency_markdown
-from sol_execbench.core.reports.trust_summary import load_json as load_json, utc_timestamp
+from sol_execbench.core.reports.trust_summary import load_json, utc_timestamp
 
 
 def build_consistency_report(

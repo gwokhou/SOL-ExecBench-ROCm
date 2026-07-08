@@ -1,6 +1,6 @@
 """Compatibility facade for the relocated platform module."""
 
-from importlib import import_module as _import_module
-import sys as _sys
+import importlib
+import sys
 
-_sys.modules[__name__] = _import_module("sol_execbench.core.platform.dependency_matrix_cli")
+sys.modules[__name__] = importlib.import_module("sol_execbench.core.platform.dependency_matrix_cli")
