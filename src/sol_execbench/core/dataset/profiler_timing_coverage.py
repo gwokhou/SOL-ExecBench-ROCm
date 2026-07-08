@@ -12,6 +12,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from sol_execbench.core.data.json_utils import stable_model_checksum, stable_model_json
+from sol_execbench.core.data.path_access import path_dict, path_get
 
 from .manifest import DatasetManifestChecksum, utc_timestamp
 from .readiness import DatasetReadiness
@@ -333,42 +334,51 @@ def _find_problem_timing_evidence(
 
 def _load_timing_evidence_summary(path: Path) -> ProfilerTimingEvidenceSummary:
     payload = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
+    summary = _profiler_timing_summary_from_payload(payload, path=path.as_posix())
+    if summary is None:
         raise ValueError(f"timing evidence must be a JSON object: {path}")
-    evidence_payload = payload.get("evidence")
-    evidence: dict[str, Any] = (
-        evidence_payload if isinstance(evidence_payload, dict) else {}
+    return summary
+
+
+def _profiler_timing_summary_from_payload(
+    payload: object,
+    *,
+    path: str,
+) -> ProfilerTimingEvidenceSummary | None:
+    if not isinstance(payload, dict):
+        return None
+
+    evidence = path_dict(payload, "evidence")
+    selection = path_dict(payload, "selection")
+    policy = path_dict(selection, "policy")
+    metadata = path_dict(payload, "replacement_metadata")
+    backend = path_get(evidence, "backend") or path_get(policy, "backend")
+    activity_domain = path_get(evidence, "activity_domain") or path_get(
+        policy, "activity_domain"
     )
-    selection_payload = payload.get("selection")
-    selection: dict[str, Any] = (
-        selection_payload if isinstance(selection_payload, dict) else {}
-    )
-    policy_payload = selection.get("policy")
-    policy: dict[str, Any] = policy_payload if isinstance(policy_payload, dict) else {}
-    metadata_payload = payload.get("replacement_metadata")
-    metadata: dict[str, Any] = (
-        metadata_payload if isinstance(metadata_payload, dict) else {}
-    )
-    backend = evidence.get("backend") or policy.get("backend")
-    activity_domain = evidence.get("activity_domain") or policy.get("activity_domain")
+    csv_path = path_get(payload, "csv_path")
+    failure_reason = path_get(metadata, "failure_reason")
+    fallback_reason = path_get(selection, "reason")
     return ProfilerTimingEvidenceSummary(
-        path=path.as_posix(),
-        profiler_collected=payload.get("profiler_collected") is True,
+        path=path,
+        profiler_collected=path_get(payload, "profiler_collected") is True,
         backend=str(backend) if backend is not None else None,
         activity_domain=str(activity_domain) if activity_domain is not None else None,
-        csv_path=str(payload["csv_path"]) if payload.get("csv_path") else None,
-        kernel_duration_ms=_float_or_none(evidence.get("kernel_duration_ms")),
+        csv_path=str(csv_path) if csv_path else None,
+        kernel_duration_ms=_float_or_none(path_get(evidence, "kernel_duration_ms")),
         kernel_activity_rows=_kernel_activity_rows(evidence),
         full_workload_coverage=_full_workload_coverage(metadata),
-        profiled_workload_count=_int_or_none(metadata.get("profiled_workload_count")),
-        expected_workload_count=_int_or_none(metadata.get("expected_workload_count")),
+        profiled_workload_count=_int_or_none(
+            path_get(metadata, "profiled_workload_count")
+        ),
+        expected_workload_count=_int_or_none(
+            path_get(metadata, "expected_workload_count")
+        ),
         trace_status_counts=_trace_status_counts(metadata),
-        replacement_failure_reason=str(metadata["failure_reason"])
-        if metadata.get("failure_reason") is not None
+        replacement_failure_reason=str(failure_reason)
+        if failure_reason is not None
         else None,
-        fallback_reason=str(selection["reason"])
-        if selection.get("reason") is not None
-        else None,
+        fallback_reason=str(fallback_reason) if fallback_reason is not None else None,
         blocker_class=_blocker_class(payload),
         reference_override=_reference_override(metadata),
     )
