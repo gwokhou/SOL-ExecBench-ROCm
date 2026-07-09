@@ -122,7 +122,7 @@ dev_dri_has_accessible_node() {
 
 resolve_docker_target_json() {
     local cmd=(
-        -m sol_execbench.core.docker_matrix preview
+        -m sol_execbench.core.platform.docker_matrix preview
         --manifest "${REPO_ROOT}/docker/rocm-targets.json"
     )
     if [ -n "${DOCKER_TARGET}" ]; then
@@ -177,7 +177,7 @@ append_dependency_arg_from_env() {
 
 classify_dependency_preflight_json() {
     local cmd=(
-        -m sol_execbench.core.dependency_matrix preflight
+        -m sol_execbench.core.platform.dependency_matrix preflight
         --manifest "${REPO_ROOT}/docker/rocm-targets.json"
     )
     if [ -n "${DOCKER_TARGET}" ]; then
@@ -232,7 +232,7 @@ write_compatibility_sidecars() {
     local cmd
     entry_path="$(compatibility_entry_output_path)"
     cmd=(
-        -m sol_execbench.core.runtime_evidence collect-target
+        -m sol_execbench.core.evidence.runtime_evidence collect-target
         --manifest "${REPO_ROOT}/docker/rocm-targets.json"
         --output "${entry_path}"
     )
@@ -286,7 +286,7 @@ write_compatibility_sidecars() {
     run_host_python "${cmd[@]}" >/dev/null
 
     if [ -n "${COMPATIBILITY_MATRIX_PATH}" ]; then
-        run_host_python -m sol_execbench.core.runtime_evidence aggregate \
+        run_host_python -m sol_execbench.core.evidence.runtime_evidence aggregate \
             --output "${COMPATIBILITY_MATRIX_PATH}" "${entry_path}" >/dev/null
     fi
 }
@@ -335,7 +335,7 @@ classify_docker_preflight_json() {
     dev_dri_accessible="$(preflight_bool SOL_EXECBENCH_DEV_DRI_ACCESSIBLE "$(bool_text "$(dev_dri_has_accessible_node && echo 1 || echo 0)")")"
 
     cmd=(
-        -m sol_execbench.core.docker_matrix preflight
+        -m sol_execbench.core.platform.docker_matrix preflight
         --manifest "${REPO_ROOT}/docker/rocm-targets.json"
         --docker-context "${context_name}"
         --docker-host "${docker_host}"
@@ -575,7 +575,7 @@ run_container_dependency_preflight_json() {
         "${DOCKER_COMMON_ARGS[@]}"
         --entrypoint python
         "${IMAGE}"
-        -m sol_execbench.core.dependency_matrix preflight
+        -m sol_execbench.core.platform.dependency_matrix preflight
         --manifest "${CONTAINER_PROJECT}/docker/rocm-targets.json"
     )
     if [ -n "${DOCKER_TARGET}" ]; then
@@ -596,7 +596,7 @@ write_container_validated_sidecars() {
         "${DOCKER_COMMON_ARGS[@]}"
         --entrypoint python
         "${IMAGE}"
-        -m sol_execbench.core.runtime_evidence collect-target
+        -m sol_execbench.core.evidence.runtime_evidence collect-target
         --manifest "${CONTAINER_PROJECT}/docker/rocm-targets.json"
         --output "${container_entry_path}"
         --container-validated
@@ -610,7 +610,7 @@ write_container_validated_sidecars() {
     fi
     "${cmd[@]}" >/dev/null
     if [ -n "${COMPATIBILITY_MATRIX_PATH}" ]; then
-        run_host_python -m sol_execbench.core.runtime_evidence aggregate \
+        run_host_python -m sol_execbench.core.evidence.runtime_evidence aggregate \
             --output "${COMPATIBILITY_MATRIX_PATH}" "${entry_path}" >/dev/null
     fi
 }

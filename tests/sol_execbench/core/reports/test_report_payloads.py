@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sol_execbench.core.report_payloads import (
+from sol_execbench.core.reports.report_payloads import (
     ClaimBoundaryView,
     ReportSourceView,
     report_record_list,

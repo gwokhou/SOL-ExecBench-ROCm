@@ -8,7 +8,7 @@ import subprocess
 
 import pytest
 
-from sol_execbench.core.diagnostics import rocm_library_diagnostics
+from sol_execbench.core.platform.diagnostics import rocm_library_diagnostics
 
 pytestmark = [
     pytest.mark.docker_dependency,
@@ -22,7 +22,9 @@ def _resolve_rocm_library(name: str, candidates: tuple[str, ...]) -> str:
         if found:
             return found
 
-    result = subprocess.run(["ldconfig", "-p"], capture_output=True, text=True, timeout=30)
+    result = subprocess.run(
+        ["ldconfig", "-p"], capture_output=True, text=True, timeout=30
+    )
     assert result.returncode == 0, result.stderr
     for line in result.stdout.splitlines():
         if name.lower() in line.lower():

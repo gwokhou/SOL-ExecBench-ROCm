@@ -17,6 +17,5 @@
 """Benchmark configuration for SOL ExecBench evaluation."""
 
 from .benchmark_config import BenchmarkConfig
-from .device_config import CLOCK_LOCK_PRESETS, ClockPreset, get_clock_preset
 
-__all__ = ["BenchmarkConfig", "CLOCK_LOCK_PRESETS", "ClockPreset", "get_clock_preset"]
+__all__ = ["BenchmarkConfig"]

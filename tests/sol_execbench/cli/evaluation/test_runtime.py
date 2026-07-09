@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from sol_execbench.cli import evaluation_runtime
+from sol_execbench.cli.evaluation import runtime as evaluation_runtime
 from sol_execbench.cli.evaluation import command as cli_evaluation
 from sol_execbench.core import EvaluationStatus
 from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileResult

@@ -196,7 +196,9 @@ def _classification(relative_path: str, line: str) -> str | None:
     ) and ("nvidia/SOL-ExecBench" in line or "CUDA" in line):
         return "upstream dataset downloader fixture"
     if (
-        relative_path.startswith("tests/sol_execbench/core/dataset/test_dataset_contract.py")
+        relative_path.startswith(
+            "tests/sol_execbench/core/dataset/test_dataset_contract.py"
+        )
         and "CUDA" in line
     ):
         return "dataset category rejection fixture"
@@ -204,9 +206,9 @@ def _classification(relative_path: str, line: str) -> str | None:
         "tests/sol_execbench/core/dataset/test_dataset_inventory_readiness.py"
     ) and ("nvidia" in line or "cuda" in line or "cutile" in line):
         return "dataset readiness NVIDIA-only blocker fixture"
-    if relative_path.startswith("tests/sol_execbench/core/dataset/test_dataset_migration.py") and (
-        "NVIDIA" in line or "nvidia" in line
-    ):
+    if relative_path.startswith(
+        "tests/sol_execbench/core/dataset/test_dataset_migration.py"
+    ) and ("NVIDIA" in line or "nvidia" in line):
         return "dataset migration provenance fixture"
     if relative_path.startswith(
         "tests/sol_execbench/core/dataset/test_dataset_redistribution_policy.py"
@@ -216,7 +218,9 @@ def _classification(relative_path: str, line: str) -> str | None:
         "tests/sol_execbench/core/dataset/test_run_dataset_execution_closure.py"
     ) and ("NVIDIA" in line or "nvidia" in line):
         return "dataset execution closure provenance fixture"
-    if relative_path.startswith("tests/sol_execbench/core/dataset/test_original_parity_docs.py"):
+    if relative_path.startswith(
+        "tests/sol_execbench/core/dataset/test_original_parity_docs.py"
+    ):
         return "original NVIDIA parity documentation assertions"
     if relative_path.startswith(
         "tests/sol_execbench/core/evidence/test_public_contract_guardrails.py"
@@ -232,12 +236,14 @@ def _classification(relative_path: str, line: str) -> str | None:
         or "cutile" in line
     ):
         return "former NVIDIA library compatibility fixture"
-    if relative_path.startswith("tests/sol_execbench/core/scoring/test_solar_derivation") and (
-        "nvidia_blackwell_b200_equivalence" in line
-    ):
+    if relative_path.startswith(
+        "tests/sol_execbench/core/scoring/test_solar_derivation"
+    ) and ("nvidia_blackwell_b200_equivalence" in line):
         return "SOLAR claim-boundary assertion"
     if (
-        relative_path.startswith("tests/sol_execbench/core/scoring/test_amd_native_score.py")
+        relative_path.startswith(
+            "tests/sol_execbench/core/scoring/test_amd_native_score.py"
+        )
         and "NVIDIA B200" in line
     ):
         return "AMD-native score claim-boundary assertion"
@@ -269,24 +275,20 @@ def _classification(relative_path: str, line: str) -> str | None:
         and "solution_" in relative_path
     ):
         return "sample fixture containing compatibility API text"
-    if relative_path.startswith("src/sol_execbench/core/bench/timing.py") and (
-        "bench_time_with_cuda_events" in line
-        or "cupti" in line
-        or "cuda_events" in line
-    ):
-        return "backward-compatible timing wrapper name with ROCm implementation"
     if (
         relative_path.startswith("src/sol_execbench/core/bench/timing.py")
         and "CUPTI" in line
     ):
         return "documentation of removed CUPTI dependency"
-    if relative_path.startswith("tests/sol_execbench/core/bench/test_timing.py"):
-        return "legacy timing regression tests for compatibility wrappers"
-    if relative_path.startswith("tests/sol_execbench/core/dataset/test_rocm_eval_timing_audit.py"):
+    if relative_path.startswith(
+        "tests/sol_execbench/core/dataset/test_rocm_eval_timing_audit.py"
+    ):
         return "ROCm timing audit fixture or assertion"
     if relative_path.startswith("tests/sol_execbench/test_rocm_schema_build_audit.py"):
         return "ROCm schema/build audit fixture or assertion"
-    if relative_path.startswith("tests/sol_execbench/core/dataset/test_rocm_library_examples.py"):
+    if relative_path.startswith(
+        "tests/sol_execbench/core/dataset/test_rocm_library_examples.py"
+    ):
         return "ROCm library migration audit fixture or assertion"
     if relative_path.startswith(
         "tests/sol_execbench/core/platform/test_rocm_migration_residue_audit.py"
@@ -328,14 +330,18 @@ def _classification(relative_path: str, line: str) -> str | None:
         "CUDA/HIP" in line
     ):
         return "e2e test skip reason uses CUDA/HIP compatibility namespace"
-    if relative_path.startswith("tests/sol_execbench/core/evidence/test_provenance_policy.py") and (
-        "NVIDIA" in line or "nvidia" in line
-    ):
+    if relative_path.startswith(
+        "tests/sol_execbench/core/evidence/test_provenance_policy.py"
+    ) and ("NVIDIA" in line or "nvidia" in line):
         return "provenance policy test verifies retained upstream NVIDIA notices"
     if relative_path.startswith(
         "tests/sol_execbench/core/bench/test_reward_hack.py"
     ) and ("cuda.Stream" in line):
         return "reward-hack test fixture covers CUDA stream abuse spelling"
+    if relative_path.startswith("tests/sol_execbench/core/bench/test_timing.py") and (
+        "cuda" in line
+    ):
+        return "timing tests use PyTorch ROCm CUDA device namespace"
     if relative_path.startswith("tests/sol_execbench/driver/test_eval_driver.py") and (
         "cuda device not available" in line
     ):
@@ -355,9 +361,7 @@ def _classification(relative_path: str, line: str) -> str | None:
             "tests/sol_execbench/core/evidence/test_runtime_evidence",
             "tests/sol_execbench/core/reports/test_runtime_evidence_reports",
         )
-    ) and (
-        "torch_cuda_version" in line or "--torch-cuda-version" in line
-    ):
+    ) and ("torch_cuda_version" in line or "--torch-cuda-version" in line):
         return "runtime evidence test covers PyTorch ROCm CUDA compatibility metadata"
     if relative_path.startswith(
         (
@@ -365,9 +369,7 @@ def _classification(relative_path: str, line: str) -> str | None:
             "tests/sol_execbench/core/evidence/test_run_docker",
             "tests/sol_execbench/core/platform/test_run_docker_dependency_preflight",
         )
-    ) and (
-        "SOL_EXECBENCH_DEPENDENCY_TORCH_CUDA_VERSION" in line
-    ):
+    ) and ("SOL_EXECBENCH_DEPENDENCY_TORCH_CUDA_VERSION" in line):
         return "Docker wrapper test covers PyTorch ROCm CUDA compatibility env var"
     if relative_path.startswith("tests/sol_execbench/core/dataset/test_research") and (
         "NVIDIA" in line or "CUDA" in line

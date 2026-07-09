@@ -5,7 +5,7 @@ from pathlib import Path
 
 from click.testing import CliRunner
 
-from sol_execbench.cli import baseline as cli_baseline
+from sol_execbench.cli.commands import baseline as cli_baseline
 from sol_execbench.cli.main import cli
 
 

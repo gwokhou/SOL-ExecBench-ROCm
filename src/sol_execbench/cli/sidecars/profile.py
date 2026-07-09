@@ -16,8 +16,8 @@ from ...core.bench.profile_summary import (
     profile_summary_artifact_citation_from_path,
 )
 from ...core.bench.rocm_profiler import Rocprofv3ProfileResult
-from ...core.checksums import sha256_file
-from ...core.runtime_evidence import write_json_payload
+from ...core.evidence.checksums import sha256_file
+from ...core.evidence.runtime_evidence import write_json_payload
 
 console = Console(stderr=True)
 

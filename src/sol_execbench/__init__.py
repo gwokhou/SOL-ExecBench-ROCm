@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Public SOL ExecBench compatibility facade."""
+"""Public SOL ExecBench convenience exports."""
 
 from __future__ import annotations
 
@@ -48,7 +48,6 @@ _EXPORTS = {
     "ToleranceSpec": ".core",
     "Trace": ".core",
     "Workload": ".core",
-    "get_clock_preset": ".core",
     "append_jsonl_file": ".core.data",
     "load_json_file": ".core.data",
     "load_jsonl_file": ".core.data",
@@ -85,7 +84,6 @@ __all__ = [
     "Trace",
     # Bench config
     "BenchmarkConfig",
-    "get_clock_preset",
     # JSON utilities
     "save_json_file",
     "load_json_file",
@@ -96,7 +94,7 @@ __all__ = [
 
 
 def __getattr__(name: str) -> Any:
-    """Load compatibility re-exports on first access."""
+    """Load package exports on first access."""
     module_name = _EXPORTS.get(name)
     if module_name is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

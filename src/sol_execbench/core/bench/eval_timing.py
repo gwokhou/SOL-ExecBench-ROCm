@@ -23,7 +23,7 @@ def measure_solution_latency(
     device: str,
     destination_passing_style: bool,
     user_fn: Callable[..., Any],
-    inputs: dict[str, Any],
+    inputs: list[Any],
     warmup: int,
     rep: int,
 ) -> float:
@@ -50,7 +50,7 @@ def measure_optional_reference_latency(
     *,
     benchmark_reference: bool,
     ref_fn: Callable[..., Any],
-    inputs: dict[str, Any],
+    inputs: list[Any],
     device: str,
     warmup: int,
     rep: int,

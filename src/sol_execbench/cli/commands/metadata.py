@@ -23,8 +23,8 @@ import json
 import click
 
 from ...core.data.contract import build_evaluator_contract
-from ...core.environment import build_environment_diagnostics
-from ...core.toolchain import (
+from ...core.platform.environment import build_environment_diagnostics
+from ...core.platform.toolchain import (
     ToolchainArtifactType,
     ToolchainEvidenceLevel,
     ToolchainRoutingRequest,

@@ -9,7 +9,7 @@ import argparse
 from pathlib import Path
 from typing import Sequence
 
-from sol_execbench.core.claim_upgrade import (
+from sol_execbench.core.reports.claim_upgrade import (
     build_claim_upgrade_report,
     load_json,
     write_claim_upgrade_reports,

@@ -1,9 +1,45 @@
 """Sidecar helpers for the SOL ExecBench CLI."""
 
-from sol_execbench.cli.sidecars import common as _common
+from sol_execbench.cli.sidecars.common import (
+    STATIC_EVIDENCE_AUTO,
+    STATIC_EVIDENCE_NONE,
+    _agent_feedback_artifact_citations,
+    _agent_feedback_identity_fields,
+    _agent_feedback_run_id,
+    _agent_feedback_sidecar_path,
+    _collect_static_evidence_for_cli,
+    _profile_output_directory,
+    _profile_sidecar_path,
+    _profile_summary_artifact_citations,
+    _profile_summary_sidecar_path,
+    _static_evidence_directory,
+    _static_evidence_payload,
+    _static_evidence_sidecar_path,
+    _static_evidence_summary,
+    _write_agent_feedback_sidecar,
+    _write_profile_sidecar,
+    _write_profile_summary_sidecar,
+    _write_static_evidence_sidecar,
+)
 
-for _name in dir(_common):
-    if not (_name.startswith("__") and _name.endswith("__")):
-        globals()[_name] = getattr(_common, _name)
-
-del _name, _common
+__all__ = [
+    "STATIC_EVIDENCE_AUTO",
+    "STATIC_EVIDENCE_NONE",
+    "_agent_feedback_artifact_citations",
+    "_agent_feedback_identity_fields",
+    "_agent_feedback_run_id",
+    "_agent_feedback_sidecar_path",
+    "_collect_static_evidence_for_cli",
+    "_profile_output_directory",
+    "_profile_sidecar_path",
+    "_profile_summary_artifact_citations",
+    "_profile_summary_sidecar_path",
+    "_static_evidence_directory",
+    "_static_evidence_payload",
+    "_static_evidence_sidecar_path",
+    "_static_evidence_summary",
+    "_write_agent_feedback_sidecar",
+    "_write_profile_sidecar",
+    "_write_profile_summary_sidecar",
+    "_write_static_evidence_sidecar",
+]

@@ -6,9 +6,9 @@ import sys
 from pathlib import Path
 
 from sol_execbench.core.data.trace import Trace
-from sol_execbench.core.docker_matrix import load_docker_target_manifest
-from sol_execbench.core import runtime_evidence
-from sol_execbench.core.runtime_evidence import (
+from sol_execbench.core.platform.docker_matrix import load_docker_target_manifest
+from sol_execbench.core.evidence import runtime_evidence
+from sol_execbench.core.evidence.runtime_evidence import (
     RuntimeFailureEvidence,
     build_aggregate_report,
     build_host_evidence,
@@ -155,10 +155,14 @@ def test_writes_per_target_sidecar_and_aggregate_status_counts(tmp_path: Path) -
 
     entry_payload = json.loads(entry_path.read_text())
     report_payload = json.loads(report_path.read_text())
-    assert entry_payload["schema_version"] == "sol_execbench.rocm_compatibility_matrix.v1"
+    assert (
+        entry_payload["schema_version"] == "sol_execbench.rocm_compatibility_matrix.v1"
+    )
     assert entry_payload["status"] == "runtime_unavailable"
     assert entry_payload["artifacts"][0]["kind"] == "runtime_evidence_setup_runtime"
-    assert report_payload["schema_version"] == "sol_execbench.rocm_compatibility_matrix.v1"
+    assert (
+        report_payload["schema_version"] == "sol_execbench.rocm_compatibility_matrix.v1"
+    )
     assert report_payload["status_counts"] == {
         "not_tested": 1,
         "runtime_unavailable": 1,
@@ -176,7 +180,9 @@ def test_aggregate_report_validates_counts() -> None:
 
 
 def test_failure_categories_do_not_mutate_canonical_trace_payload() -> None:
-    trace = make_trace(definition="demo", workload={"uuid": "w0", "axes": {}, "inputs": {}})
+    trace = make_trace(
+        definition="demo", workload={"uuid": "w0", "axes": {}, "inputs": {}}
+    )
     before = trace.model_dump(mode="json")
 
     build_runtime_matrix_entry(
@@ -200,7 +206,7 @@ def test_runtime_evidence_cli_collects_and_aggregates(tmp_path: Path) -> None:
         [
             sys.executable,
             "-m",
-            "sol_execbench.core.runtime_evidence",
+            "sol_execbench.core.evidence.runtime_evidence",
             "collect-target",
             "--manifest",
             str(MANIFEST_PATH),
@@ -270,7 +276,7 @@ def test_runtime_evidence_cli_collects_and_aggregates(tmp_path: Path) -> None:
         [
             sys.executable,
             "-m",
-            "sol_execbench.core.runtime_evidence",
+            "sol_execbench.core.evidence.runtime_evidence",
             "aggregate",
             "--output",
             str(report_path),
@@ -292,7 +298,7 @@ def test_runtime_evidence_cli_rejects_invalid_boolean_without_traceback(
         [
             sys.executable,
             "-m",
-            "sol_execbench.core.runtime_evidence",
+            "sol_execbench.core.evidence.runtime_evidence",
             "collect-target",
             "--manifest",
             str(MANIFEST_PATH),

@@ -30,9 +30,9 @@ from typing import Any, Optional
 
 import click
 
-import sol_execbench.cli.static_evidence as cli_static_evidence
+import sol_execbench.cli.sidecars.static_evidence as cli_static_evidence
 from sol_execbench.cli.commands import dispatch_subcommand
-from sol_execbench.cli.evaluator import (
+from sol_execbench.cli.evaluation.evaluator import (
     PROFILE_NONE,
     PROFILE_ROCPROFV3,
     run_evaluation_cli,

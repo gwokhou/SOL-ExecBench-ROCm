@@ -19,10 +19,10 @@ P0_LIMITS = {
     "sol_execbench.core.bench.eval_workload_runner": (320, 8),
 }
 P1_LIMITS = {
-    "sol_execbench.core.scoring.amd_bound_graph_models": (130, 2),
+    "sol_execbench.core.scoring.amd_bound_graph.models": (130, 2),
     "sol_execbench.core.scoring.amd_hardware_models": (240, 1),
-    "sol_execbench.core.scoring.solar_derivation_models": (140, 4),
-    "sol_execbench.core.scoring.amd_score_reports": (160, 7),
+    "sol_execbench.core.scoring.solar_derivation.models": (140, 4),
+    "sol_execbench.core.scoring.amd_score.reports": (160, 7),
     "sol_execbench.driver.problem_packager": (230, 7),
     "sol_execbench.core.bench.rocm_profiler": (180, 5),
 }
@@ -236,9 +236,7 @@ def check_limits(stats: dict[str, ModuleStats]) -> list[str]:
     for module, (line_limit, fanout_limit) in {**P0_LIMITS, **P1_LIMITS}.items():
         stat = stats[module]
         if stat.line_count > line_limit:
-            failures.append(
-                f"{module}: line_count {stat.line_count} > {line_limit}"
-            )
+            failures.append(f"{module}: line_count {stat.line_count} > {line_limit}")
         if stat.fanout > fanout_limit:
             failures.append(f"{module}: fanout {stat.fanout} > {fanout_limit}")
     for module, expected_imports in EXACT_IMPORTS.items():
@@ -284,9 +282,7 @@ def main() -> int:
         print(f"facade import violations: {result['facade_import_violations']}")
         print(f"limit failures: {result['limit_failures']}")
         for module, stat in result["stats"].items():
-            print(
-                f"{module}: lines={stat['line_count']} fanout={stat['fanout']}"
-            )
+            print(f"{module}: lines={stat['line_count']} fanout={stat['fanout']}")
     if (
         result["cycles"]
         or result["facade_import_violations"]

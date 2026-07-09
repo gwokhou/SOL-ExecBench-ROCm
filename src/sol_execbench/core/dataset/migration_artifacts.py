@@ -168,6 +168,8 @@ def safetensors_blockers(
         if not isinstance(inputs, dict):
             continue
         for input_name, input_spec in sorted(inputs.items()):
+            if not isinstance(input_name, str):
+                continue
             if not isinstance(input_spec, dict):
                 continue
             input_spec_payload = cast(dict[str, object], input_spec)

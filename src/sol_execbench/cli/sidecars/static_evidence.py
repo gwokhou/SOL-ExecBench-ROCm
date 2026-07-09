@@ -10,7 +10,7 @@ from pathlib import Path
 
 from rich.console import Console
 
-from ...core.bench.static_kernel_evidence import (
+from ...core.bench.static_kernel.evidence import (
     StaticKernelEvidenceReasonCode,
     StaticKernelEvidenceSidecar,
     StaticKernelEvidenceSourceReference,
@@ -20,7 +20,7 @@ from ...core.bench.static_kernel_evidence import (
     collect_static_kernel_artifacts,
     run_static_kernel_extractors,
 )
-from ...core.runtime_evidence import write_json_payload
+from ...core.evidence.runtime_evidence import write_json_payload
 
 console = Console(stderr=True)
 

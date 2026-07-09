@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sol_execbench.core.bench.static_kernel_evidence import (
+from sol_execbench.core.bench.static_kernel.evidence import (
     StaticKernelEvidenceReasonCode,
     StaticKernelEvidenceStatus,
     build_static_kernel_evidence_sidecar,
@@ -14,19 +14,19 @@ from sol_execbench.core.data.trace import (
     Trace,
 )
 from sol_execbench.core.data.workload import Workload
-from sol_execbench.core.diagnostics import DiagnosticStage, StageDiagnostic
-from sol_execbench.core.reporting import (
+from sol_execbench.core.platform.diagnostics import DiagnosticStage, StageDiagnostic
+from sol_execbench.core.reports.reporting import (
     CANONICAL_BENCHMARK_OUTPUT,
     DERIVED_EVIDENCE_SCHEMA_VERSION,
     build_evidence_report,
     format_trace_summary,
     summarize_traces,
 )
-from sol_execbench.core.scoring_guardrails import (
+from sol_execbench.core.evidence.scoring_guardrails import (
     AMD_PERFORMANCE_CLAIM_WARNING,
     interpret_sol_score,
 )
-from sol_execbench.core.scoring.amd_score_sidecar_parsing import (
+from sol_execbench.core.scoring.amd_score.sidecar_parsing import (
     minimal_amd_sol_bound_v2_from_payload,
     minimal_solar_aggregate_from_payload,
 )

@@ -3,7 +3,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from sol_execbench.cli import compilation
+from sol_execbench.cli.evaluation import compilation
 
 
 class _Packager:

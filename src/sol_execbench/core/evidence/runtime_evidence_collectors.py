@@ -5,8 +5,11 @@ from __future__ import annotations
 import os
 from collections.abc import Callable
 
-from sol_execbench.core.compatibility import MatrixGpuEvidence, MatrixHostEvidence
-from sol_execbench.core.dependency_matrix import (
+from sol_execbench.core.platform.compatibility import (
+    MatrixGpuEvidence,
+    MatrixHostEvidence,
+)
+from sol_execbench.core.platform.dependency_matrix import (
     PytorchDependencyObservation,
     collect_pytorch_dependency_observation,
 )

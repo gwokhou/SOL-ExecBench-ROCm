@@ -9,7 +9,7 @@ import argparse
 from pathlib import Path
 from typing import Sequence
 
-from sol_execbench.core.consistency import (
+from sol_execbench.core.reports.consistency import (
     build_consistency_report,
     load_json,
     write_consistency_reports,

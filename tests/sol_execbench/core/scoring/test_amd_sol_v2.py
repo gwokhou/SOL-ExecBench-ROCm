@@ -24,7 +24,7 @@ from sol_execbench.core.scoring.amd_sol import (
     build_amd_sol_bound_artifact,
     default_amd_hardware_models,
 )
-from sol_execbench.core.scoring.amd_sol_v2 import (
+from sol_execbench.core.scoring.amd_sol.v2 import (
     AMD_SOL_V2_SCHEMA_VERSION,
     AmdSolBoundV2Artifact,
     amd_sol_bound_v2_from_dict,
@@ -213,11 +213,14 @@ def test_inexact_coverage_and_warning_semantics_are_deterministic():
     assert any(
         warning.startswith("aggregate_degraded:") for warning in artifact.warnings
     )
-    assert artifact.warnings == build_amd_sol_bound_v2_artifact(
-        definition,
-        workload,
-        default_amd_hardware_models()["gfx1200"],
-    ).warnings
+    assert (
+        artifact.warnings
+        == build_amd_sol_bound_v2_artifact(
+            definition,
+            workload,
+            default_amd_hardware_models()["gfx1200"],
+        ).warnings
+    )
 
 
 def test_validated_supported_evidence_produces_scored_aggregate():

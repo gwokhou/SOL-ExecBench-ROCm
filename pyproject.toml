@@ -26,8 +26,8 @@ dependencies = [
 ]
 
 [project.scripts]
-sol-execbench = "sol_execbench.cli:cli"
-sol-execbench-baseline = "sol_execbench.cli.baseline:cli"
+sol-execbench = "sol_execbench.cli.main:cli"
+sol-execbench-baseline = "sol_execbench.cli.commands.baseline:cli"
 
 [dependency-groups]
 dev = [

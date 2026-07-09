@@ -1,11 +1,21 @@
 """Command helpers for the SOL ExecBench CLI."""
 
-from importlib import import_module
+from sol_execbench.cli.commands.root import (
+    CompletionEnvironment,
+    SubcommandDispatch,
+    _completion_args,
+    _completion_environment,
+    _shift_completion_environment,
+    _subcommand_for,
+    dispatch_subcommand,
+)
 
-_root = import_module("sol_execbench.cli.commands.root")
-
-for _name in dir(_root):
-    if not (_name.startswith("__") and _name.endswith("__")):
-        globals()[_name] = getattr(_root, _name)
-
-del _name, _root
+__all__ = [
+    "CompletionEnvironment",
+    "SubcommandDispatch",
+    "_completion_args",
+    "_completion_environment",
+    "_shift_completion_environment",
+    "_subcommand_for",
+    "dispatch_subcommand",
+]

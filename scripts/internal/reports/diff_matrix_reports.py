@@ -9,7 +9,7 @@ import argparse
 import json
 from pathlib import Path
 
-from sol_execbench.core.matrix_diff import (
+from sol_execbench.core.reports.matrix_diff import (
     diff_matrix_reports,
     load_matrix_report,
     matrix_report_diff_to_markdown,

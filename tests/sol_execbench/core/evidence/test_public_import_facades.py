@@ -1,9 +1,9 @@
-"""Public import compatibility checks for refactored facade modules."""
+"""Public import checks for canonical module paths."""
 
 from __future__ import annotations
 
 
-def test_data_definition_facade_exports_public_schema_types() -> None:
+def test_data_definition_module_exports_public_schema_types() -> None:
     from sol_execbench.core.data.definition import (
         AxisConst,
         AxisExpr,
@@ -23,7 +23,7 @@ def test_data_definition_facade_exports_public_schema_types() -> None:
     assert AxisSpec is not None
 
 
-def test_amd_score_facade_exports_public_scoring_api() -> None:
+def test_amd_score_module_exports_public_scoring_api() -> None:
     from sol_execbench.core.scoring.amd_score import (
         AmdNativeScore,
         AmdNativeSuiteReport,
@@ -41,8 +41,8 @@ def test_amd_score_facade_exports_public_scoring_api() -> None:
     assert callable(score_amd_native_workload)
 
 
-def test_runtime_evidence_facade_exports_public_api() -> None:
-    from sol_execbench.core.runtime_evidence import (
+def test_runtime_evidence_module_exports_public_api() -> None:
+    from sol_execbench.core.evidence.runtime_evidence import (
         RuntimeFailureEvidence,
         build_aggregate_report,
         build_dependency_observation,
@@ -69,7 +69,7 @@ def test_runtime_evidence_facade_exports_public_api() -> None:
     assert callable(write_matrix_entry)
 
 
-def test_dataset_inventory_facade_exports_public_api() -> None:
+def test_dataset_inventory_module_exports_public_api() -> None:
     from sol_execbench.core.dataset.inventory import (
         CategoryInventoryRecord,
         DatasetInventory,

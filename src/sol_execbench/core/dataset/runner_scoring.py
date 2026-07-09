@@ -7,7 +7,7 @@ from pathlib import Path
 
 import sol_execbench.core.dataset.cli_execution as cli_execution
 from sol_execbench.core.scoring.amd_score import AmdNativeScore
-from sol_execbench.core.scoring.amd_score_reports import (
+from sol_execbench.core.scoring.amd_score.reports import (
     _build_amd_score_reports_for_problem_impl,
     write_amd_score_report as write_amd_score_report,
 )

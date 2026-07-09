@@ -32,7 +32,7 @@ from sol_execbench.core.data.workload import Workload
 @dataclass
 class CorrectnessRoundsResult:
     failed: bool
-    inputs: dict[str, Any] | None
+    inputs: list[Any] | None
     threads_before: int | None
     correctness: Correctness
 
@@ -102,10 +102,7 @@ def run_correctness_rounds(
             emitter.emit_status(
                 workload,
                 EvaluationStatus.RUNTIME_ERROR,
-                extra_msg=(
-                    f"{exc.failure_class}: {exc}\n"
-                    f"{exc.provenance.log_text()}"
-                ),
+                extra_msg=(f"{exc.failure_class}: {exc}\n{exc.provenance.log_text()}"),
             )
             return CorrectnessRoundsResult(True, inputs, threads_before, correctness)
         except Exception as exc:
@@ -162,7 +159,9 @@ def run_correctness_rounds(
                 check_fn=check_integrity,
                 args=(integrity_snapshot, driver_globals),
             ):
-                return CorrectnessRoundsResult(True, inputs, threads_before, correctness)
+                return CorrectnessRoundsResult(
+                    True, inputs, threads_before, correctness
+                )
 
             threads_before = threading.active_count()
 
@@ -172,12 +171,16 @@ def run_correctness_rounds(
                 check_fn=check_lazy_outputs,
                 args=(user_outputs,),
             ):
-                return CorrectnessRoundsResult(True, inputs, threads_before, correctness)
+                return CorrectnessRoundsResult(
+                    True, inputs, threads_before, correctness
+                )
 
             shape_dtype_issue = check_output_shape_dtype(ref_outputs, user_outputs)
             if shape_dtype_issue is not None:
                 emitter.emit_status(workload, shape_dtype_issue)
-                return CorrectnessRoundsResult(True, inputs, threads_before, correctness)
+                return CorrectnessRoundsResult(
+                    True, inputs, threads_before, correctness
+                )
 
         numerically_wrong = False
         for ref_out, usr_out in zip(ref_outputs, user_outputs):

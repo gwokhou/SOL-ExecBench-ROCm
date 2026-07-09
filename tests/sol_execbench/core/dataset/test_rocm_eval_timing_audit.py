@@ -13,7 +13,6 @@ AUDITED_PATHS = (
     "src/sol_execbench/core/bench/timing.py",
     "src/sol_execbench/core/bench/timing_policy.py",
     "src/sol_execbench/core/bench/clock_lock.py",
-    "src/sol_execbench/core/bench/config/device_config.py",
     "src/sol_execbench/core/utils.py",
     "tests/sol_execbench/driver/test_eval_driver.py",
     "tests/sol_execbench/core/bench/test_clock_lock.py",
@@ -31,14 +30,14 @@ FORBIDDEN_PATTERNS = (
     "SupportedLanguages.CUBLAS",
     '"cuda_cpp"',
     '"cuda_cflags"',
+    "bench_time_with_cuda_events",
+    "bench_gpu_time_with_cupti",
+    "cuda_events",
 )
 
 COMPAT_PATTERNS = (
     "torch.cuda",
     "at::cuda::getCurrentCUDAStream",
-    "bench_time_with_cuda_events",
-    "bench_gpu_time_with_cupti",
-    "cuda_events",
 )
 
 ALLOWLIST = {
@@ -50,18 +49,6 @@ ALLOWLIST = {
         "src/sol_execbench/core/bench/timing.py",
         "torch.cuda",
     ): "PyTorch ROCm event timing is exposed through torch.cuda.Event.",
-    (
-        "src/sol_execbench/core/bench/timing.py",
-        "bench_time_with_cuda_events",
-    ): "Compatibility wrapper delegates to ROCm-compatible device events.",
-    (
-        "src/sol_execbench/core/bench/timing.py",
-        "bench_gpu_time_with_cupti",
-    ): "Compatibility wrapper delegates to ROCm-compatible device events without importing CUPTI.",
-    (
-        "src/sol_execbench/core/bench/timing.py",
-        "cuda_events",
-    ): "Legacy methodology spelling is accepted as an alias for device events.",
     (
         "src/sol_execbench/core/utils.py",
         "torch.cuda",

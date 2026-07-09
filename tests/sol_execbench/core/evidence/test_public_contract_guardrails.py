@@ -32,7 +32,7 @@ from sol_execbench.core.scoring.amd_sol import (
     build_amd_sol_bound_artifact,
     default_amd_hardware_models,
 )
-from sol_execbench.core.scoring.amd_sol_v2 import build_amd_sol_bound_v2_artifact
+from sol_execbench.core.scoring.amd_sol.v2 import build_amd_sol_bound_v2_artifact
 from sol_execbench.core.scoring.amd_hardware_models import HardwareValidationStatus
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.scoring import solar_derivation as solar_derivation_module
@@ -766,7 +766,7 @@ def test_v1_19_amd_bound_sanity_fields_remain_sidecar_only():
 
 
 def test_v1_19_amd_bound_sanity_does_not_enter_amd_score_contracts():
-    from sol_execbench.core.scoring.amd_bound_sanity import (
+    from sol_execbench.core.scoring.amd_bound_sanity.models import (
         AMD_BOUND_SANITY_SCHEMA_VERSION,
         AmdBoundSanityClaimBoundary,
     )
@@ -1007,8 +1007,10 @@ def test_primary_cli_does_not_expose_v1_20_trust_summary_options():
 
 
 def test_v1_19_amd_bound_sanity_markdown_keeps_negative_boundaries_visible():
-    from sol_execbench.core.scoring.amd_bound_sanity import (
+    from sol_execbench.core.scoring.amd_bound_sanity.builder import (
         build_amd_bound_sanity_report,
+    )
+    from sol_execbench.core.scoring.amd_bound_sanity.rendering import (
         render_amd_bound_sanity_markdown,
     )
 

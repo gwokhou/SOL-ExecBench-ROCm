@@ -11,7 +11,7 @@ from pathlib import Path
 from rich.console import Console
 
 from sol_execbench.core.bench.stderr import filter_benign_rocm_stderr
-from sol_execbench.core.runtime_evidence import write_json_payload
+from sol_execbench.core.evidence.runtime_evidence import write_json_payload
 
 NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION = "sol_execbench.no_trace_diagnostics.v1"
 _DIAGNOSTIC_TAIL_LIMIT = 8192

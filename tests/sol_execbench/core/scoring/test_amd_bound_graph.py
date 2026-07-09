@@ -11,7 +11,7 @@ from sol_execbench.core.scoring.amd_bound_graph import (
     OpFamily,
     build_bound_graph,
 )
-from sol_execbench.core.scoring.amd_bound_classification import (
+from sol_execbench.core.scoring.amd_bound_estimate.classification import (
     classify_call,
     dtype_method_target,
     movement_kind_for_name,

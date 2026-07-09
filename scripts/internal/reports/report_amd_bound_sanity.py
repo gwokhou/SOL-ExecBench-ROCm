@@ -9,8 +9,10 @@ import argparse
 from pathlib import Path
 from typing import Any
 
-from sol_execbench.core.scoring.amd_bound_sanity import (
+from sol_execbench.core.scoring.amd_bound_sanity.builder import (
     build_amd_bound_sanity_report,
+)
+from sol_execbench.core.scoring.amd_bound_sanity.io import (
     load_json,
     write_amd_bound_sanity_reports,
 )

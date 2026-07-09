@@ -20,7 +20,7 @@ from sol_execbench.core.bench.timing_isolation import (
     validate_gpu_device_isolation,
     verify_clock_state_with_warning,
 )
-from sol_execbench.core.environment import EnvironmentEvidenceStatus
+from sol_execbench.core.platform.environment import EnvironmentEvidenceStatus
 
 
 class TestDetectConcurrentGpuProcesses:
@@ -195,7 +195,7 @@ class TestCollectTimingEnvironmentSnapshot:
                 return_value=False,
             ):
                 with unittest.mock.patch(
-                    "sol_execbench.core.environment.collect_environment_snapshot",
+                    "sol_execbench.core.platform.environment.collect_environment_snapshot",
                     return_value=self._mock_snapshot(),
                 ):
                     snapshot = collect_timing_environment_snapshot()
@@ -220,7 +220,7 @@ class TestCollectTimingEnvironmentSnapshot:
                 return_value=False,
             ):
                 with unittest.mock.patch(
-                    "sol_execbench.core.environment.collect_environment_snapshot",
+                    "sol_execbench.core.platform.environment.collect_environment_snapshot",
                     return_value=self._mock_snapshot(),
                 ):
                     snapshot = collect_timing_environment_snapshot()
@@ -231,7 +231,7 @@ class TestCollectTimingEnvironmentSnapshot:
 
     def _mock_snapshot(self):
         """Helper to create a mock environment snapshot."""
-        from sol_execbench.core.environment import EnvironmentSnapshot
+        from sol_execbench.core.platform.environment import EnvironmentSnapshot
 
         return EnvironmentSnapshot(
             generated_at="2026-06-10T00:00:00Z",
@@ -264,7 +264,7 @@ class TestIntegrationPreflightAudit:
                     return_value=True,
                 ):
                     with unittest.mock.patch(
-                        "sol_execbench.core.environment.collect_environment_snapshot",
+                        "sol_execbench.core.platform.environment.collect_environment_snapshot",
                         return_value=self._mock_snapshot(),
                     ):
                         # Step 1: Detect concurrent processes
@@ -292,7 +292,7 @@ class TestIntegrationPreflightAudit:
 
     def _mock_snapshot(self):
         """Helper to create a mock environment snapshot."""
-        from sol_execbench.core.environment import EnvironmentSnapshot
+        from sol_execbench.core.platform.environment import EnvironmentSnapshot
 
         return EnvironmentSnapshot(
             generated_at="2026-06-10T00:00:00Z",

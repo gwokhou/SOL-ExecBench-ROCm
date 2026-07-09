@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sol_execbench.core.checksums import (
+from sol_execbench.core.evidence.checksums import (
     sha256_bytes,
     sha256_file,
     stable_json_checksum,

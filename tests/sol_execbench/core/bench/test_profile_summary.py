@@ -18,7 +18,7 @@ from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3ProfileArtifact,
     Rocprofv3ProfileResult,
 )
-from sol_execbench.core.claim_upgrade import build_claim_upgrade_report
+from sol_execbench.core.reports.claim_upgrade import build_claim_upgrade_report
 
 
 def _profile_result(tmp_path: Path, status: str = "success") -> Rocprofv3ProfileResult:

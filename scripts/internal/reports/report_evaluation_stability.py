@@ -9,7 +9,7 @@ import argparse
 from pathlib import Path
 from typing import Sequence
 
-from sol_execbench.core.evaluation_stability import (
+from sol_execbench.core.reports.evaluation_stability import (
     build_evaluation_stability_report,
     load_json,
     write_evaluation_stability_reports,

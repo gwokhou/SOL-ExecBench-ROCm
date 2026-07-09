@@ -21,7 +21,7 @@ from sol_execbench.core.bench.profile_summary import (
 from sol_execbench.core.bench.profile_summary import (
     ProfileSummaryStructuredMetric as FacadeStructuredMetric,
 )
-from sol_execbench.core.bench.profile_summary_models import (
+from sol_execbench.core.bench.profile_summary.models import (
     ProfileSummaryArtifactCitation,
     ProfileSummaryBottleneckHint,
     ProfileSummaryContent,

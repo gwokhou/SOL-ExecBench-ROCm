@@ -13,7 +13,7 @@ from sol_execbench.core.bench.timing_policy import (
     TimingActivityDomain,
     TimingBackend,
 )
-from sol_execbench.core.evaluation_stability import (
+from sol_execbench.core.reports.evaluation_stability import (
     EVALUATION_STABILITY_SCHEMA_VERSION,
     EvaluationStabilityReport,
     build_evaluation_stability_report,
@@ -75,7 +75,10 @@ def test_evaluation_stability_classifies_core_statuses():
 
     assert report.schema_version == EVALUATION_STABILITY_SCHEMA_VERSION
     assert report.report_checksum is not None
-    statuses = {workload.workload_ref: workload.stability_status for workload in report.workloads}
+    statuses = {
+        workload.workload_ref: workload.stability_status
+        for workload in report.workloads
+    }
     assert statuses == {
         "stable": "stable",
         "noisy": "noisy",
@@ -103,8 +106,12 @@ def test_evaluation_stability_accepts_rocm_timing_evidence_shape():
         trial_count=3,
         clock_locked=True,
         parsed_rows=(
-            Rocprofv3TimingRow(name="kernel_a", domain="Kernel", duration_ns=10_000_000),
-            Rocprofv3TimingRow(name="kernel_b", domain="Kernel", duration_ns=10_100_000),
+            Rocprofv3TimingRow(
+                name="kernel_a", domain="Kernel", duration_ns=10_000_000
+            ),
+            Rocprofv3TimingRow(
+                name="kernel_b", domain="Kernel", duration_ns=10_100_000
+            ),
             Rocprofv3TimingRow(name="kernel_c", domain="Kernel", duration_ns=9_900_000),
         ),
     )
@@ -172,4 +179,3 @@ def test_evaluation_stability_markdown_keeps_claim_boundaries_visible():
         "`score_authority`: false",
     ):
         assert expected in markdown
-

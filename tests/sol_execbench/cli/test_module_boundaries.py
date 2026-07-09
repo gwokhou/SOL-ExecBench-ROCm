@@ -9,11 +9,11 @@ from pathlib import Path
 from click.testing import CliRunner
 
 from sol_execbench.cli import evaluation
-from sol_execbench.cli import environment
+from sol_execbench.cli.commands import environment
 from sol_execbench.cli import main as cli_main
-from sol_execbench.cli import reporting
+from sol_execbench.cli.evaluation import reporting
 from sol_execbench.cli import sidecars
-from sol_execbench.core.scoring import amd_score_reports
+from sol_execbench.core.scoring.amd_score import reports as amd_score_reports
 
 SOURCE_ROOT = Path(__file__).resolve().parents[3] / "src"
 PACKAGE_ROOT = SOURCE_ROOT / "sol_execbench"
@@ -151,17 +151,17 @@ def _module_line_count(module: str) -> int:
 def test_high_inbound_model_modules_keep_exact_internal_imports() -> None:
     expected_targets = {
         "sol_execbench.core.data.base_model": [],
-        "sol_execbench.core.scoring.amd_bound_graph_models": [
-            "sol_execbench.core.scoring.amd_bound_graph_enums",
+        "sol_execbench.core.scoring.amd_bound_graph.models": [
+            "sol_execbench.core.scoring.amd_bound_graph.enums",
             "sol_execbench.core.scoring.confidence",
         ],
         "sol_execbench.core.scoring.amd_hardware_models": [
             "sol_execbench.core.scoring.confidence",
         ],
-        "sol_execbench.core.scoring.solar_derivation_models": [
+        "sol_execbench.core.scoring.solar_derivation.models": [
             "sol_execbench.core.scoring.confidence",
-            "sol_execbench.core.scoring.solar_derivation_coverage_models",
-            "sol_execbench.core.scoring.solar_derivation_evidence_models",
+            "sol_execbench.core.scoring.solar_derivation.coverage_models",
+            "sol_execbench.core.scoring.solar_derivation.evidence_models",
         ],
     }
     edges = _internal_import_edges()
@@ -200,8 +200,24 @@ def test_cross_domain_imports_stay_explicitly_allowlisted() -> None:
     allowed_with_rationale = {
         (
             "sol_execbench.core.dataset.amd_score_reports",
-            "sol_execbench.core.scoring.amd_score_reports",
-        ): "dataset compatibility module re-exports scoring report helpers",
+            "sol_execbench.core.scoring.amd_score.derived_artifacts",
+        ): "dataset score report exports derive hardware model references",
+        (
+            "sol_execbench.core.dataset.amd_score_reports",
+            "sol_execbench.core.scoring.amd_score.reports",
+        ): "dataset score report exports scoring report helpers",
+        (
+            "sol_execbench.core.dataset.amd_score_reports",
+            "sol_execbench.core.scoring.amd_score.sidecar_parsing",
+        ): "dataset score report exports sidecar payload parsers",
+        (
+            "sol_execbench.core.dataset.amd_score_reports",
+            "sol_execbench.core.scoring.amd_sol.v2",
+        ): "dataset score report exports AMD SOL v2 artifact builder",
+        (
+            "sol_execbench.core.dataset.amd_score_reports",
+            "sol_execbench.core.scoring.solar_derivation",
+        ): "dataset score report exports SOLAR derivation helpers",
         (
             "sol_execbench.core.dataset.cli_execution",
             "sol_execbench.core.bench.io",
@@ -224,14 +240,14 @@ def test_cross_domain_imports_stay_explicitly_allowlisted() -> None:
         ): "dataset scoring bridge exposes AMD score types for run reporting",
         (
             "sol_execbench.core.dataset.runner_scoring",
-            "sol_execbench.core.scoring.amd_score_reports",
+            "sol_execbench.core.scoring.amd_score.reports",
         ): "dataset scoring bridge delegates AMD score report construction",
         (
             "sol_execbench.core.dataset.runner_scoring",
             "sol_execbench.core.scoring.baseline_artifact",
         ): "dataset scoring bridge accepts scoring baseline artifacts",
         (
-            "sol_execbench.core.scoring.amd_bound_sanity_models",
+            "sol_execbench.core.scoring.amd_bound_sanity.models",
             "sol_execbench.core.dataset.manifest",
         ): "AMD bound sanity report embeds dataset manifest checksums",
     }
@@ -317,7 +333,7 @@ def test_p0_orchestrators_stay_bounded_after_refactor() -> None:
 def test_p1_orchestrators_stay_bounded_after_refactor() -> None:
     edges = _internal_import_edges()
     limits = {
-        "sol_execbench.core.scoring.amd_score_reports": (160, 7),
+        "sol_execbench.core.scoring.amd_score.reports": (160, 7),
         "sol_execbench.driver.problem_packager": (230, 7),
         "sol_execbench.core.bench.rocm_profiler": (180, 5),
     }
@@ -354,13 +370,16 @@ def test_p2_hotspots_stay_bounded_after_refactor() -> None:
         "sol_execbench.core.bench.agent_feedback": (180, 5),
         "sol_execbench.core.bench.profile_summary": (200, 6),
         "sol_execbench.core.bench.input_generation": (260, 5),
-        "sol_execbench.core.scoring.amd_bound_graph_fx": (260, 6),
+        "sol_execbench.core.scoring.amd_bound_graph.fx": (260, 6),
         "sol_execbench.core.bench.rocm_profiler": (180, 5),
-        "sol_execbench.core.scoring.amd_sol_graph": (220, 6),
+        "sol_execbench.core.scoring.amd_sol.graph": (220, 6),
     }
 
     observed = {
-        module: (_module_line_count(module), len({target for source, target in edges if source == module}))
+        module: (
+            _module_line_count(module),
+            len({target for source, target in edges if source == module}),
+        )
         for module in limits
     }
 
@@ -509,8 +528,8 @@ import sol_execbench.core as core
 eager_modules = [
     "sol_execbench.core.data",
     "sol_execbench.core.data.definition",
-    "sol_execbench.core.environment",
-    "sol_execbench.core.toolchain",
+    "sol_execbench.core.platform.environment",
+    "sol_execbench.core.platform.toolchain",
     "sol_execbench.core.bench.config",
 ]
 loaded = [module for module in eager_modules if module in sys.modules]
@@ -570,7 +589,7 @@ import sol_execbench.core.scoring as scoring
 
 eager_modules = [
     "sol_execbench.core.scoring.amd_sol",
-    "sol_execbench.core.scoring.amd_sol_v2",
+    "sol_execbench.core.scoring.amd_sol.v2",
     "sol_execbench.core.scoring.amd_score",
     "sol_execbench.core.scoring.official_score",
 ]
@@ -636,9 +655,9 @@ import sys
 import sol_execbench.cli.main
 
 eager_modules = [
-    "sol_execbench.cli.baseline",
-    "sol_execbench.cli.dataset",
-    "sol_execbench.cli.metadata",
+    "sol_execbench.cli.commands.baseline",
+    "sol_execbench.cli.commands.dataset",
+    "sol_execbench.cli.commands.metadata",
 ]
 loaded = [module for module in eager_modules if module in sys.modules]
 if loaded:
@@ -721,7 +740,7 @@ def test_cli_evaluation_helpers_live_outside_main() -> None:
 
 
 def test_cli_metadata_commands_live_outside_main() -> None:
-    from sol_execbench.cli import metadata
+    from sol_execbench.cli.commands import metadata
 
     assert metadata._contract_cli is not None
     assert metadata._doctor_cli is not None
@@ -736,7 +755,7 @@ def test_cli_metadata_commands_live_outside_main() -> None:
 
 
 def test_cli_baseline_commands_live_outside_main() -> None:
-    from sol_execbench.cli import baseline
+    from sol_execbench.cli.commands import baseline
 
     assert baseline._baseline_cli is not None
     assert baseline._baseline_export_cli is not None
@@ -749,7 +768,7 @@ def test_cli_baseline_commands_live_outside_main() -> None:
 
 
 def test_cli_dataset_commands_live_outside_main() -> None:
-    from sol_execbench.cli import dataset
+    from sol_execbench.cli.commands import dataset
 
     assert dataset._dataset_cli is not None
     assert dataset._dataset_migrate_sol_cli is not None
@@ -764,7 +783,7 @@ def test_cli_dataset_commands_live_outside_main() -> None:
 
 
 def test_cli_profile_sidecar_helpers_live_outside_main() -> None:
-    from sol_execbench.cli import profile_sidecars
+    from sol_execbench.cli.sidecars import profile as profile_sidecars
 
     profile_sidecar_names = (
         "_profile_output_directory",
@@ -782,7 +801,7 @@ def test_cli_profile_sidecar_helpers_live_outside_main() -> None:
 
 
 def test_cli_static_evidence_helpers_live_outside_main() -> None:
-    from sol_execbench.cli import static_evidence
+    from sol_execbench.cli.sidecars import static_evidence
 
     assert static_evidence.STATIC_EVIDENCE_NONE == "none"
     assert static_evidence.STATIC_EVIDENCE_AUTO == "auto"
@@ -807,7 +826,7 @@ def test_cli_static_evidence_helpers_live_outside_main() -> None:
 
 
 def test_cli_agent_feedback_sidecar_helpers_live_outside_main() -> None:
-    from sol_execbench.cli import agent_feedback_sidecar
+    from sol_execbench.cli.sidecars import agent_feedback as agent_feedback_sidecar
 
     assert agent_feedback_sidecar._agent_feedback_sidecar_path is not None
     assert agent_feedback_sidecar._write_agent_feedback_sidecar is not None
@@ -826,7 +845,7 @@ def test_cli_agent_feedback_sidecar_helpers_live_outside_main() -> None:
 
 
 def test_cli_problem_io_helpers_live_outside_main() -> None:
-    from sol_execbench.cli import problem_io
+    from sol_execbench.cli.evaluation import problem_io
 
     assert problem_io.ResolvedProblemInputs is not None
     assert problem_io._load_definition is not None
@@ -849,7 +868,7 @@ def test_cli_problem_io_helpers_live_outside_main() -> None:
 
 
 def test_cli_compilation_helpers_live_outside_main() -> None:
-    from sol_execbench.cli import compilation
+    from sol_execbench.cli.evaluation import compilation
 
     assert compilation.CompilePhaseResult is not None
     assert compilation.run_compile_phase is not None
@@ -862,7 +881,7 @@ def test_cli_compilation_helpers_live_outside_main() -> None:
 
 
 def test_cli_evaluation_runtime_helpers_live_outside_main() -> None:
-    from sol_execbench.cli import evaluation_runtime
+    from sol_execbench.cli.evaluation import runtime as evaluation_runtime
 
     assert evaluation_runtime.EvaluationRuntimeSuccess is not None
     assert evaluation_runtime.EvaluationRuntimeNoTraceFailure is not None
@@ -877,7 +896,9 @@ def test_cli_evaluation_runtime_helpers_live_outside_main() -> None:
 
 
 def test_amd_score_report_sidecar_parsers_live_outside_orchestrator() -> None:
-    from sol_execbench.core.scoring import amd_score_sidecar_parsing
+    from sol_execbench.core.scoring.amd_score import (
+        sidecar_parsing as amd_score_sidecar_parsing,
+    )
 
     assert amd_score_sidecar_parsing.read_json_object is not None
     assert amd_score_sidecar_parsing.minimal_amd_sol_bound_v2_from_payload is not None

@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from sol_execbench.core.docker_matrix import load_docker_target_manifest
+from sol_execbench.core.platform.docker_matrix import load_docker_target_manifest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[4]

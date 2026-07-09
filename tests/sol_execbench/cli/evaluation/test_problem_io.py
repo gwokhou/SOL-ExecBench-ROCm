@@ -5,7 +5,7 @@ from pathlib import Path
 
 import click
 
-from sol_execbench.cli import problem_io
+from sol_execbench.cli.evaluation import problem_io
 from sol_execbench.core import BenchmarkConfig
 
 

@@ -13,8 +13,8 @@ import pytest
 
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import Workload
-from sol_execbench.core.scoring.amd_bound_estimates import OperatorWorkEstimate
-from sol_execbench.core.scoring.amd_bound_estimates import estimate_bound_work
+from sol_execbench.core.scoring.amd_bound_estimate.estimates import OperatorWorkEstimate
+from sol_execbench.core.scoring.amd_bound_estimate.estimates import estimate_bound_work
 from sol_execbench.core.scoring.amd_bound_graph import (
     BoundGraph,
     BoundGraphNode,
@@ -38,11 +38,11 @@ from sol_execbench.core.scoring.solar_derivation import (
     derive_solar_derivation_evidence,
     solar_derivation_from_dict,
 )
-from sol_execbench.core.scoring.solar_derivation_coverage import (
+from sol_execbench.core.scoring.solar_derivation.coverage import (
     _aggregate_status_for_groups,
     _coverage_for_groups,
 )
-from sol_execbench.core.scoring.solar_derivation_status import (
+from sol_execbench.core.scoring.solar_derivation.status import (
     default_source_boundary,
     ordered_status_counts,
     status_for_confidence,
@@ -318,13 +318,13 @@ def test_solar_derivation_round_trip_preserves_provenance():
 
 def test_solar_derivation_split_modules_export_facade_symbols():
     from sol_execbench.core.scoring import solar_derivation
-    from sol_execbench.core.scoring.solar_derivation_builders import (
+    from sol_execbench.core.scoring.solar_derivation.builders import (
         build_solar_derivation_evidence as split_build,
     )
-    from sol_execbench.core.scoring.solar_derivation_models import (
+    from sol_execbench.core.scoring.solar_derivation.models import (
         SolarDerivationEvidence as split_evidence,
     )
-    from sol_execbench.core.scoring.solar_derivation_parsing import (
+    from sol_execbench.core.scoring.solar_derivation.parsing import (
         solar_derivation_from_dict as split_from_dict,
     )
 
@@ -620,35 +620,27 @@ def test_solar_derivation_source_boundary_records_sidecar_only_inputs():
         solar_derivation_from_dict(non_bool_boundary)
 
 
-def test_solar_derivation_legacy_sidecars_parse_and_recompute_coverage():
-    legacy_payload = _contract_payload()
-    del legacy_payload["coverage_summary"]
-    del legacy_payload["aggregate_status"]
+def test_solar_derivation_requires_coverage_summary_and_aggregate_status():
+    payload = _contract_payload()
+    del payload["coverage_summary"]
+    del payload["aggregate_status"]
 
-    parsed = solar_derivation_from_dict(legacy_payload)
-    normalized = parsed.to_dict()
-
-    assert normalized["coverage_summary"]["family_counts"] == {"attention": 1}
-    assert normalized["coverage_summary"]["status_counts"] == {
-        "degraded": 0,
-        "scored": 1,
-        "unscored": 0,
-    }
-    assert normalized["aggregate_status"]["status"] == "scored"
-    assert normalized["aggregate_status"]["score_eligible"] is True
+    with pytest.raises(
+        ValueError,
+        match=r"SOLAR derivation evidence missing required field: aggregate_status",
+    ):
+        solar_derivation_from_dict(payload)
 
 
-def test_solar_derivation_legacy_payload_must_have_exact_phase48_to_phase50_keys():
-    legacy_payload = _contract_payload()
-    del legacy_payload["coverage_summary"]
-    del legacy_payload["aggregate_status"]
-    legacy_payload["extra_claim"] = "not allowed"
+def test_solar_derivation_payload_must_have_exact_keys():
+    payload = _contract_payload()
+    payload["extra_claim"] = "not allowed"
 
     with pytest.raises(
         ValueError,
         match=r"SOLAR derivation evidence contains unknown field\(s\): extra_claim",
     ):
-        solar_derivation_from_dict(legacy_payload)
+        solar_derivation_from_dict(payload)
 
 
 def test_solar_derivation_empty_groups_are_unscored_not_missing_coverage():

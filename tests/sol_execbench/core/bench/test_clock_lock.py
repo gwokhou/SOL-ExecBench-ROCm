@@ -16,11 +16,6 @@ from sol_execbench.core.bench.clock_lock import (
     unlock_clocks,
     verify_clocks,
 )
-from sol_execbench.core.bench.config.device_config import (
-    CLOCK_LOCK_PRESETS,
-    ClockPreset,
-    get_clock_preset,
-)
 
 _MODULE = "sol_execbench.core.bench.clock_lock"
 
@@ -75,13 +70,6 @@ class TestLockClocks:
             text=True,
         )
 
-    def test_accepts_legacy_device_name_parameter(self):
-        p_verify, p_sleep = self._patch_verify_and_sleep()
-        with patch(f"{_MODULE}.subprocess.run"), p_verify, p_sleep:
-            result = lock_clocks("AMD Radeon gfx1200")
-
-        assert result is True
-
     def test_returns_false_when_stable_peak_reports_failure_with_zero_exit(self):
         failed = MagicMock(
             returncode=0,
@@ -132,14 +120,6 @@ class TestLockClocks:
 
         mock_sleep.assert_called_once_with(VERIFY_DELAY_S)
 
-    def test_stable_peak_for_any_device(self):
-        p_verify, p_sleep = self._patch_verify_and_sleep()
-        with patch(f"{_MODULE}.subprocess.run"), p_verify, p_sleep:
-            assert lock_clocks("") is True  # works with empty device name
-
-        with patch(f"{_MODULE}.subprocess.run"), p_verify, p_sleep:
-            assert lock_clocks("Unknown GPU") is True  # works with unknown device
-
 
 class TestVerifyClocks:
     def _make_smi_result(self, stdout: str, returncode: int = 0):
@@ -179,11 +159,6 @@ class TestVerifyClocks:
         with patch(f"{_MODULE}.subprocess.run", return_value=result):
             assert verify_clocks() is False
 
-    def test_accepts_legacy_level_parameters_ignored(self):
-        result = self._make_smi_result("GPU[0]\t\t: Performance Level: stable_peak\n")
-        with patch(f"{_MODULE}.subprocess.run", return_value=result):
-            assert verify_clocks(expected_sclk_level=2, expected_mclk_level=5) is True
-
 
 class TestUnlockClocks:
     def test_unlocks_with_amd_smi(self):
@@ -212,23 +187,3 @@ class TestAreClocksLocked:
     def test_returns_false_when_env_unset(self, monkeypatch):
         monkeypatch.delenv("SOL_EXECBENCH_CLOCKS_LOCKED", raising=False)
         assert are_clocks_locked() is False
-
-
-class TestGetClockPreset:
-    def test_gfx1200(self):
-        preset = get_clock_preset("AMD Radeon gfx1200")
-        assert preset == ClockPreset(sclk_level=2, mclk_level=5)
-
-    def test_instinct(self):
-        preset = get_clock_preset("AMD Instinct MI300X")
-        assert preset == ClockPreset(sclk_level=1, mclk_level=1)
-
-    def test_unknown_device_returns_none(self):
-        assert get_clock_preset("NVIDIA H100") is None
-
-    def test_empty_string_returns_none(self):
-        assert get_clock_preset("") is None
-
-    def test_presets_cover_all_known_devices(self):
-        for name, preset in CLOCK_LOCK_PRESETS.items():
-            assert get_clock_preset(name) == preset

@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ..data.trace import EvaluationStatus, Trace
-from ..diagnostics import StageDiagnostic
+from ..platform.diagnostics import StageDiagnostic
 
 
 DERIVED_EVIDENCE_SCHEMA_VERSION = "sol_execbench.derived_evidence.v1"

@@ -5,12 +5,12 @@ import subprocess
 import sys
 from pathlib import Path
 
-from sol_execbench.core.dependency_matrix import (
+from sol_execbench.core.platform.dependency_matrix import (
     PytorchDependencyObservation,
     classify_dependency_preflight,
     load_docker_target_dependency_policy,
 )
-from sol_execbench.core.docker_matrix import load_docker_target_manifest
+from sol_execbench.core.platform.docker_matrix import load_docker_target_manifest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -21,7 +21,7 @@ def _base_command(*extra: str) -> list[str]:
     return [
         sys.executable,
         "-m",
-        "sol_execbench.core.dependency_matrix",
+        "sol_execbench.core.platform.dependency_matrix",
         "preflight",
         "--manifest",
         str(MANIFEST_PATH),

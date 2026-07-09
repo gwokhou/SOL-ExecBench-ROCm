@@ -8,7 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from sol_execbench.core.bench.static_kernel_evidence import StaticKernelEvidenceSidecar
+from sol_execbench.core.bench.static_kernel.evidence import StaticKernelEvidenceSidecar
 
 from ..commands import environment as cli_environment
 from ..sidecars import agent_feedback as cli_agent_feedback_sidecar

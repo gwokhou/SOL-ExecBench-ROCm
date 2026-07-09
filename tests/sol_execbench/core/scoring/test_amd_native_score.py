@@ -33,7 +33,7 @@ from sol_execbench.core.scoring.amd_sol import (
     build_amd_sol_bound_artifact,
     default_amd_hardware_models,
 )
-from sol_execbench.core.scoring.amd_sol_v2 import build_amd_sol_bound_v2_artifact
+from sol_execbench.core.scoring.amd_sol.v2 import build_amd_sol_bound_v2_artifact
 from sol_execbench.core.scoring.amd_hardware_models import load_amd_hardware_model
 from sol_execbench_type_helpers import make_definition, make_trace, make_workload
 from sol_execbench.core.scoring.solar_derivation import (
@@ -42,7 +42,7 @@ from sol_execbench.core.scoring.solar_derivation import (
     SolarEvidenceSource,
     SolarSemanticGroupEvidence,
 )
-from sol_execbench.core.scoring.solar_derivation_coverage import (
+from sol_execbench.core.scoring.solar_derivation.coverage import (
     _aggregate_status_for_groups,
     _coverage_for_groups,
 )

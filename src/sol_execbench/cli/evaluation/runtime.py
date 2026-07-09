@@ -50,6 +50,9 @@ class EvaluationRuntimeNoTraceFailure:
     profile_fallback_reason: str | None = None
 
 
+EvaluationRuntimeResult = EvaluationRuntimeSuccess | EvaluationRuntimeNoTraceFailure
+
+
 def _profile_fallback_reason(
     profile_result: Rocprofv3ProfileResult | None,
 ) -> str | None:
@@ -84,7 +87,7 @@ def run_evaluation_runtime(
     output_file: Path | None,
     timeout: int,
     profile: str,
-) -> EvaluationRuntimeSuccess | EvaluationRuntimeNoTraceFailure:
+) -> EvaluationRuntimeResult:
     """Run evaluation and classify subprocess outcomes without CLI side effects."""
 
     profiled_proc, profile_result = _run_profiled_or_none(

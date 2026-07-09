@@ -6,7 +6,7 @@ from typing import Any, cast
 import pytest
 from pydantic import ValidationError
 
-from sol_execbench.core.claim_upgrade import (
+from sol_execbench.core.reports.claim_upgrade import (
     CLAIM_UPGRADE_SCHEMA_VERSION,
     ClaimUpgradeReport,
     build_claim_upgrade_report,

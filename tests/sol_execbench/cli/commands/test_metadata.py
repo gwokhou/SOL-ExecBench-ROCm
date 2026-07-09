@@ -4,15 +4,15 @@ import json
 
 from click.testing import CliRunner
 
-from sol_execbench.cli import metadata as cli_metadata
+from sol_execbench.cli.commands import metadata as cli_metadata
 from sol_execbench.cli.main import cli
-from sol_execbench.core.environment import (
+from sol_execbench.core.platform.environment import (
     EnvironmentCheckResult,
     EnvironmentDiagnostics,
     EnvironmentEvidenceStatus,
     EnvironmentSnapshot,
 )
-from sol_execbench.core.toolchain import (
+from sol_execbench.core.platform.toolchain import (
     ToolLifecycle,
     ToolchainArtifactType,
     ToolchainCapability,

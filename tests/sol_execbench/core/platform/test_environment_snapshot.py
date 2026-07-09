@@ -3,7 +3,7 @@ from __future__ import annotations
 import subprocess
 from datetime import UTC, datetime
 
-from sol_execbench.core.environment import (
+from sol_execbench.core.platform.environment import (
     ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION,
     EnvironmentCheckResult,
     EnvironmentDiagnostics,

@@ -9,13 +9,15 @@ from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.scoring import (
     OperatorWorkEstimate as ExportedOperatorWorkEstimate,
 )
-from sol_execbench.core.scoring import estimate_bound_work as exported_estimate_bound_work
-from sol_execbench.core.scoring.amd_bound_estimates import (
+from sol_execbench.core.scoring import (
+    estimate_bound_work as exported_estimate_bound_work,
+)
+from sol_execbench.core.scoring.amd_bound_estimate.estimates import (
     OperatorWorkEstimate,
     _dtype_bytes,
     estimate_bound_work,
 )
-from sol_execbench.core.scoring.amd_bound_estimate_families import (
+from sol_execbench.core.scoring.amd_bound_estimate.families import (
     EstimateDispatchFamily,
     estimate_dispatch_family,
     estimate_dispatch_groups,
@@ -130,12 +132,26 @@ def test_dtype_byte_widths_cover_public_dtype_contract():
 
 
 def test_estimate_dispatch_groups_are_family_specific_and_directly_testable():
-    assert estimate_dispatch_family(OpFamily.ATTENTION) == EstimateDispatchFamily.ATTENTION
+    assert (
+        estimate_dispatch_family(OpFamily.ATTENTION) == EstimateDispatchFamily.ATTENTION
+    )
     assert estimate_dispatch_family(OpFamily.GEMM) == EstimateDispatchFamily.GEMM
-    assert estimate_dispatch_family(OpFamily.LINEAR_PROJECTION) == EstimateDispatchFamily.GEMM
-    assert estimate_dispatch_family(OpFamily.ELEMENTWISE) == EstimateDispatchFamily.ELEMENTWISE
-    assert estimate_dispatch_family(OpFamily.DATA_MOVEMENT) == EstimateDispatchFamily.DATA_MOVEMENT
-    assert estimate_dispatch_family(OpFamily.UNSUPPORTED) == EstimateDispatchFamily.UNSUPPORTED
+    assert (
+        estimate_dispatch_family(OpFamily.LINEAR_PROJECTION)
+        == EstimateDispatchFamily.GEMM
+    )
+    assert (
+        estimate_dispatch_family(OpFamily.ELEMENTWISE)
+        == EstimateDispatchFamily.ELEMENTWISE
+    )
+    assert (
+        estimate_dispatch_family(OpFamily.DATA_MOVEMENT)
+        == EstimateDispatchFamily.DATA_MOVEMENT
+    )
+    assert (
+        estimate_dispatch_family(OpFamily.UNSUPPORTED)
+        == EstimateDispatchFamily.UNSUPPORTED
+    )
 
     groups = estimate_dispatch_groups()
     assert groups[EstimateDispatchFamily.GEMM] == ("gemm", "linear_projection")
@@ -252,7 +268,10 @@ def test_moe_static_route_estimate_locks_formula_inputs_and_kind():
         inputs={
             "x": {"shape": ["tokens", "hidden"], "dtype": "float16"},
             "router": {"shape": ["hidden", "experts"], "dtype": "float16"},
-            "expert_weights": {"shape": ["experts", "hidden", "hidden"], "dtype": "float16"},
+            "expert_weights": {
+                "shape": ["experts", "hidden", "hidden"],
+                "dtype": "float16",
+            },
         },
         outputs={"out": {"shape": ["tokens", "hidden"], "dtype": "float16"}},
         reference=(
@@ -274,7 +293,9 @@ def test_moe_static_route_estimate_locks_formula_inputs_and_kind():
     )
 
     estimates = estimate_bound_work(build_bound_graph(definition, workload))
-    estimate = next(item for item in estimates if item.formula_kind == "moe_static_route_flops")
+    estimate = next(
+        item for item in estimates if item.formula_kind == "moe_static_route_flops"
+    )
 
     assert estimate.formula == "2*tokens*top_k*hidden*hidden"
     assert estimate.formula_inputs == {
@@ -302,7 +323,10 @@ def test_moe_dynamic_route_estimate_uses_visible_bytes_without_route_defaults():
         inputs={
             "x": {"shape": ["tokens", "hidden"], "dtype": "float16"},
             "router": {"shape": ["hidden", "experts"], "dtype": "float16"},
-            "expert_weights": {"shape": ["experts", "hidden", "hidden"], "dtype": "float16"},
+            "expert_weights": {
+                "shape": ["experts", "hidden", "hidden"],
+                "dtype": "float16",
+            },
             "threshold": {"shape": None, "dtype": "float16"},
         },
         outputs={"out": {"shape": ["tokens", "hidden"], "dtype": "float16"}},
@@ -371,7 +395,9 @@ def test_moe_taxonomy_only_estimate_remains_unsupported_without_formula_inputs()
     assert estimate.warnings == ("unsupported_operator:moe_taxonomy_only",)
 
 
-def _ssm_mamba_definition(*, missing_recurrence: bool = False, custom_scan: bool = False) -> Definition:
+def _ssm_mamba_definition(
+    *, missing_recurrence: bool = False, custom_scan: bool = False
+) -> Definition:
     if custom_scan:
         return make_definition(
             name="ssm_mamba_custom_scan",
@@ -384,7 +410,9 @@ def _ssm_mamba_definition(*, missing_recurrence: bool = False, custom_scan: bool
                 "x": {"shape": ["batch", "sequence", "hidden"], "dtype": "float16"},
                 "opaque_scan": {"shape": ["hidden", "hidden"], "dtype": "float16"},
             },
-            outputs={"out": {"shape": ["batch", "sequence", "hidden"], "dtype": "float16"}},
+            outputs={
+                "out": {"shape": ["batch", "sequence", "hidden"], "dtype": "float16"}
+            },
             reference="def run(x, opaque_scan):\n    return opaque_scan(x)\n",
         )
     inputs = {
@@ -420,7 +448,9 @@ def _ssm_mamba_definition(*, missing_recurrence: bool = False, custom_scan: bool
             "    return out_proj(y, w_out)\n"
         )
     return make_definition(
-        name="ssm_mamba_missing_recurrence" if missing_recurrence else "ssm_mamba_static",
+        name="ssm_mamba_missing_recurrence"
+        if missing_recurrence
+        else "ssm_mamba_static",
         axes={
             "batch": {"type": "const", "value": 2},
             "sequence": {"type": "const", "value": 64},
@@ -435,7 +465,9 @@ def _ssm_mamba_definition(*, missing_recurrence: bool = False, custom_scan: bool
     )
 
 
-def _ssm_mamba_workload(*, missing_recurrence: bool = False, custom_scan: bool = False) -> Workload:
+def _ssm_mamba_workload(
+    *, missing_recurrence: bool = False, custom_scan: bool = False
+) -> Workload:
     if custom_scan:
         return make_workload(
             axes={},
@@ -464,8 +496,12 @@ def _ssm_mamba_workload(*, missing_recurrence: bool = False, custom_scan: bool =
 def test_ssm_mamba_static_scan_estimate_locks_formula_kind_and_inputs():
     from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
 
-    estimates = estimate_bound_work(build_bound_graph(_ssm_mamba_definition(), _ssm_mamba_workload()))
-    estimate = next(item for item in estimates if item.formula_kind == "ssm_mamba_static_scan_flops")
+    estimates = estimate_bound_work(
+        build_bound_graph(_ssm_mamba_definition(), _ssm_mamba_workload())
+    )
+    estimate = next(
+        item for item in estimates if item.formula_kind == "ssm_mamba_static_scan_flops"
+    )
 
     assert estimate.formula == "2*batch*sequence*hidden*state"
     assert estimate.formula_inputs == {
@@ -916,7 +952,9 @@ def test_reduction_estimate_records_axis_and_conservative_formula():
         outputs={"out": {"shape": ["M"], "dtype": "float32"}},
         reference="def run(x):\n    return x.sum(dim=1)",
     )
-    workload = make_workload(axes={}, inputs={"x": {"type": "random"}}, uuid="reduction-workload")
+    workload = make_workload(
+        axes={}, inputs={"x": {"type": "random"}}, uuid="reduction-workload"
+    )
 
     estimate = estimate_bound_work(build_bound_graph(definition, workload))[0]
 
@@ -987,7 +1025,9 @@ def test_normalization_estimate_uses_conservative_pass_count():
         outputs={"out": {"shape": ["N"], "dtype": "float32"}},
         reference="def run(x):\n    return x.norm()",
     )
-    workload = make_workload(axes={}, inputs={"x": {"type": "random"}}, uuid="norm-workload")
+    workload = make_workload(
+        axes={}, inputs={"x": {"type": "random"}}, uuid="norm-workload"
+    )
 
     estimate = estimate_bound_work(build_bound_graph(definition, workload))[0]
 
@@ -1008,11 +1048,17 @@ def test_logical_and_broadcast_views_have_zero_movement_bytes():
         outputs={"out": {"shape": ["N"], "dtype": "float32"}},
         reference="def run(x):\n    return x.reshape(2, 4).expand(2, 4).reshape(8)",
     )
-    workload = make_workload(axes={}, inputs={"x": {"type": "random"}}, uuid="views-workload")
+    workload = make_workload(
+        axes={}, inputs={"x": {"type": "random"}}, uuid="views-workload"
+    )
 
     estimates = estimate_bound_work(build_bound_graph(definition, workload))
-    logical = next(estimate for estimate in estimates if estimate.movement_kind == "logical_view")
-    broadcast = next(estimate for estimate in estimates if estimate.movement_kind == "broadcast_view")
+    logical = next(
+        estimate for estimate in estimates if estimate.movement_kind == "logical_view"
+    )
+    broadcast = next(
+        estimate for estimate in estimates if estimate.movement_kind == "broadcast_view"
+    )
 
     assert logical.movement_bytes == 0.0
     assert "logical view" in logical.rationale
@@ -1030,12 +1076,18 @@ def test_contiguous_and_dtype_conversion_count_movement_bytes():
         outputs={"out": {"shape": ["N"], "dtype": "float16"}},
         reference="import torch\n\ndef run(x):\n    return x.contiguous().to(torch.float16)",
     )
-    workload = make_workload(axes={}, inputs={"x": {"type": "random"}}, uuid="movement-workload")
+    workload = make_workload(
+        axes={}, inputs={"x": {"type": "random"}}, uuid="movement-workload"
+    )
 
     estimates = estimate_bound_work(build_bound_graph(definition, workload))
-    contiguous = next(estimate for estimate in estimates if estimate.movement_kind == "materialized")
+    contiguous = next(
+        estimate for estimate in estimates if estimate.movement_kind == "materialized"
+    )
     conversion = next(
-        estimate for estimate in estimates if estimate.movement_kind == "dtype_conversion"
+        estimate
+        for estimate in estimates
+        if estimate.movement_kind == "dtype_conversion"
     )
 
     assert contiguous.movement_bytes > 0.0
@@ -1131,7 +1183,10 @@ def test_convolution_estimate_accounts_for_grouped_depthwise_formula_and_bytes()
     estimate = estimate_bound_work(graph)[0]
 
     assert estimate.formula_kind == "convolution_flops"
-    assert estimate.formula == "2*N*C_out*output_spatial_elements*(C_in/groups)*kernel_elements"
+    assert (
+        estimate.formula
+        == "2*N*C_out*output_spatial_elements*(C_in/groups)*kernel_elements"
+    )
     assert estimate.formula_inputs == {
         "N": 2,
         "C_in": 4,
@@ -1363,7 +1418,9 @@ def test_bound_estimates_do_not_mutate_public_schema_payloads():
         reference="def run(x):\n    return x",
     )
     workload = make_workload(axes={"N": 8}, inputs={"x": {"type": "random"}}, uuid="w1")
-    trace = make_trace(definition="demo", workload=workload, solution=None, evaluation=None)
+    trace = make_trace(
+        definition="demo", workload=workload, solution=None, evaluation=None
+    )
     graph = BoundGraph(
         definition="demo",
         workload_uuid="w1",

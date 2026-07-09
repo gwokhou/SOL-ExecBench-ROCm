@@ -11,8 +11,8 @@ from pathlib import Path
 import click
 from rich.console import Console
 
-from ...core.baseline_export import export_hip_baseline_registry
-from ...core.baseline import (
+from ...core.evidence.baseline_export import export_hip_baseline_registry
+from ...core.evidence.baseline import (
     compare_trace_baselines,
     comparison_to_json,
     format_baseline_comparison,
