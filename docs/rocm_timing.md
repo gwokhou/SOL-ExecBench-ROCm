@@ -140,7 +140,7 @@ limit as a deliberate follow-up.
 
 ## Live rocprofv3 Collection
 
-`src/sol_execbench/core/bench/rocm_profiler.py` provides a reusable live
+`src/sol_execbench/core/bench/rocm_profiler/timing_collectors.py` provides a reusable live
 collection adapter for workflows that opt into profiler-backed evidence. The
 adapter builds a `rocprofv3 --kernel-trace --hip-runtime-trace` command, runs
 the benchmark or dataset command after the `--` separator, reads generated CSV

@@ -134,7 +134,7 @@ ROCm/Docker environment described in `docs/TESTING.md` and
 `docs/rocm_timing.md`.
 
 The first deterministic sharding contract lives in
-`sol_execbench.core.dataset.sharding`. It assigns workload refs by original input
+`src/sol_execbench/core/dataset/sharding.py`. It assigns workload refs by original input
 ordinal, gives each shard a stable id such as `shard-0000-of-0002`, and
 reserves one trace file ref per shard. The merge helper orders merged traces by
 original workload ordinal and reports duplicate workloads or incomplete shards

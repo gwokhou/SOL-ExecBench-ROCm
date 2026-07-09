@@ -189,7 +189,7 @@ clock-sensitive evaluation paths can reject the run based on
 | Docker local image name | `sol-execbench` | `scripts/run_docker.sh` |
 | Docker local image tag | `rocm-<selected Docker tag>` | `scripts/run_docker.sh` |
 | Docker FlashInfer trace root | `/sol-execbench/data/flashinfer-trace` | `scripts/run_docker.sh` |
-| Python package version | `1.0.2` | `pyproject.toml`; separate from milestone and prerelease labels |
+| Python package version | `1.0.5` | `pyproject.toml`; separate from milestone and prerelease labels |
 | Python requirement | `>=3.12,<3.14` | `pyproject.toml` |
 | Default ROCm Torch wheel | `torch==2.10.0+rocm7.1` | `pyproject.toml` Linux x86_64 marker and Docker target metadata |
 | Default ROCm torchvision wheel | `torchvision==0.25.0+rocm7.1` | `pyproject.toml` Linux x86_64 marker and Docker target metadata |
@@ -203,7 +203,8 @@ The repository does not define `.env.development`, `.env.production`, or
 files. Use these source-backed override paths instead:
 
 - Host benchmark runs: pass CLI flags such as `--config`, `--compile-timeout`,
-  `--timeout`, `--output`, `--profile`, and `--static-evidence`.
+  `--timeout`, `--output`, `--profile`, `--static-evidence`, and
+  `--feedback-*` diagnostic metadata flags.
 - Per-problem benchmark settings: place the benchmark config JSON next to the
   problem definition and workload files, or pass a config file explicitly with
   `--config`.
@@ -265,6 +266,11 @@ uv run sol-execbench \
 | `--keep-staging` | Disabled | Preserve the temporary staging directory. |
 | `--profile` | `none` | Use `rocprofv3` for optional diagnostic profiling when set to `rocprofv3`. |
 | `--static-evidence` | `none` | Collect optional diagnostic static kernel evidence when set to `auto`. |
+| `--feedback-target-id` | None | Consumer target identity persisted in diagnostic agent feedback. |
+| `--feedback-run-id` | None | Consumer run identity persisted in diagnostic agent feedback. |
+| `--feedback-candidate-id` | None | Consumer candidate identity persisted in diagnostic agent feedback. |
+| `--feedback-source-sha256` | None | Consumer source SHA256 identity persisted in diagnostic agent feedback. |
+| `--feedback-sol-version` | None | Consumer SOL version or tag identity persisted in diagnostic agent feedback. |
 | `-v`, `--verbose` | Disabled | Show subprocess output and staging details. |
 
 No-trace diagnostic sidecars are not controlled by a separate flag. When an
@@ -471,7 +477,7 @@ closure audit also accepts repeated `--target-status` values.
 `pyproject.toml` defines:
 
 - Package name `sol-execbench`
-- Version `1.0.2`, which is the Python package version rather than the v1.26
+- Version `1.0.5`, which is the Python package version rather than the v1.26
   research-prerelease milestone tag
 - Python range `>=3.12,<3.14`
 - Console scripts `sol-execbench` and `sol-execbench-baseline`

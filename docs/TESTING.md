@@ -71,27 +71,27 @@ Run recent evaluation and dataset trustworthiness regressions:
 
 ```bash
 uv run pytest \
-  tests/sol_execbench/test_cli_diagnostics.py \
+  tests/sol_execbench/cli/commands/test_diagnostics.py \
   tests/sol_execbench/core/bench/test_eval_runtime.py \
   tests/sol_execbench/core/data/test_solution.py \
-  tests/sol_execbench/test_dataset_run_closure.py \
-  tests/sol_execbench/test_run_dataset_execution_closure.py \
-  tests/sol_execbench/test_dataset_failure_mode_docs.py \
-  tests/sol_execbench/test_dataset_migration.py \
-  tests/sol_execbench/test_dataset_inventory_readiness.py \
-  tests/sol_execbench/test_low_precision_compatibility.py \
-  tests/sol_execbench/test_dataset_redistribution_policy.py \
-  tests/sol_execbench/test_dataset_sharding.py -q
+  tests/sol_execbench/core/dataset/test_dataset_run_closure.py \
+  tests/sol_execbench/core/dataset/test_run_dataset_execution_closure.py \
+  tests/sol_execbench/core/dataset/test_dataset_failure_mode_docs.py \
+  tests/sol_execbench/core/dataset/test_dataset_migration.py \
+  tests/sol_execbench/core/dataset/test_dataset_inventory_readiness.py \
+  tests/sol_execbench/core/dataset/test_low_precision_compatibility.py \
+  tests/sol_execbench/core/dataset/test_dataset_redistribution_policy.py \
+  tests/sol_execbench/core/dataset/test_dataset_sharding.py -q
 ```
 
 Run focused RDNA4 profiler-backed timing closure regressions:
 
 ```bash
 uv run pytest \
-  tests/sol_execbench/test_profiler_timing_coverage.py \
-  tests/sol_execbench/test_rdna4_profiler_timing_batch.py \
-  tests/sol_execbench/test_rdna4_profiler_partial_failures.py \
-  tests/sol_execbench/test_rdna4_profiler_sharded_closure.py -q
+  tests/sol_execbench/core/dataset/test_profiler_timing_coverage.py \
+  tests/sol_execbench/core/bench/test_rdna4_profiler_timing_batch.py \
+  tests/sol_execbench/core/bench/test_rdna4_profiler_partial_failures.py \
+  tests/sol_execbench/core/bench/test_rdna4_profiler_sharded_closure.py -q
 ```
 
 ## Markers
@@ -103,8 +103,13 @@ and additional marker registrations are implemented in `tests/conftest.py`.
 | --- | --- |
 | `cpp` | Compiles HIP/C++ extensions and may be slow. |
 | `timing_serial` | GPU timing tests skipped by default unless selected with `-m timing_serial`. |
+| `docker_dependency` | Docker ROCm dependency checks skipped by default unless selected with `-m docker_dependency`. |
+| `native_extension_serial` | Serial native extension tests skipped by default unless selected with `-m native_extension_serial`. |
 | `requires_rocm` | Requires a ROCm GPU visible through PyTorch. |
+| `requires_rocm_gpu` | Requires a ROCm GPU visible through PyTorch. |
 | `requires_rocm_dev` | Requires ROCm native extension development headers under `/opt/rocm`. |
+| `requires_triton_rocm` | Requires the `triton-rocm` Python package. |
+| `requires_safetensors_torch` | Requires `safetensors.torch` support. |
 | `requires_ck` | Requires Composable Kernel headers under `/opt/rocm/include/ck/`. |
 | `requires_rocwmma` | Requires rocWMMA headers under `/opt/rocm/include/rocwmma/`. |
 | `requires_rdna4` | Requires an AMD RDNA 4 GPU such as `gfx1200`. |
@@ -132,10 +137,10 @@ uv run pytest tests -m requires_rocm_dev -n 0
 ```
 
 For CDNA3 readiness specifically, the lightweight marker surface lives in
-`tests/sol_execbench/test_cdna3_hardware_marker.py`:
+`tests/sol_execbench/core/platform/test_cdna3_hardware_marker.py`:
 
 ```bash
-uv run pytest tests/sol_execbench/test_cdna3_hardware_marker.py -m requires_cdna3 -n 0
+uv run pytest tests/sol_execbench/core/platform/test_cdna3_hardware_marker.py -m requires_cdna3 -n 0
 ```
 
 On non-CDNA3 hosts this command should skip the live hardware test with a
@@ -177,18 +182,18 @@ Focused matrix run:
 
 ```bash
 UV_CACHE_DIR=/tmp/uv-cache uv run pytest \
-  tests/sol_execbench/test_rocm_compatibility_matrix.py \
-  tests/sol_execbench/test_matrix_claim_guardrails.py \
-  tests/sol_execbench/test_docker_matrix_targets.py \
-  tests/sol_execbench/test_docker_matrix_preflight.py \
-  tests/sol_execbench/test_run_docker_matrix_script.py \
-  tests/sol_execbench/test_dependency_matrix_policy.py \
-  tests/sol_execbench/test_dependency_matrix_classification.py \
-  tests/sol_execbench/test_dependency_matrix_cli.py \
-  tests/sol_execbench/test_run_docker_dependency_preflight.py \
-  tests/sol_execbench/test_runtime_evidence_reports.py \
-  tests/sol_execbench/test_run_docker_runtime_evidence.py \
-  tests/sol_execbench/test_rocm_matrix_docs.py -q
+  tests/sol_execbench/core/platform/test_rocm_compatibility_matrix.py \
+  tests/sol_execbench/core/reports/test_matrix_claim_guardrails.py \
+  tests/sol_execbench/core/platform/test_docker_matrix_targets.py \
+  tests/sol_execbench/core/platform/test_docker_matrix_preflight.py \
+  tests/sol_execbench/core/platform/test_run_docker_matrix_script.py \
+  tests/sol_execbench/core/platform/test_dependency_matrix_policy.py \
+  tests/sol_execbench/core/platform/test_dependency_matrix_classification.py \
+  tests/sol_execbench/core/platform/test_dependency_matrix_cli.py \
+  tests/sol_execbench/core/platform/test_run_docker_dependency_preflight.py \
+  tests/sol_execbench/core/reports/test_runtime_evidence_reports.py \
+  tests/sol_execbench/core/evidence/test_run_docker_runtime_evidence.py \
+  tests/sol_execbench/core/platform/test_rocm_matrix_docs.py -q
 ```
 
 Wrapper syntax and docs lint checks:
@@ -196,7 +201,7 @@ Wrapper syntax and docs lint checks:
 ```bash
 bash -n scripts/run_docker.sh
 UV_CACHE_DIR=/tmp/uv-cache uv run ruff check \
-  docs/CLAIMS.md docs/TESTING.md tests/sol_execbench/test_rocm_matrix_docs.py
+  docs/CLAIMS.md docs/TESTING.md tests/sol_execbench/core/platform/test_rocm_matrix_docs.py
 ```
 
 ## v1.19 Evidence Docs Guardrails
@@ -213,13 +218,13 @@ Run the v1.19 documentation and sidecar-only contract checks:
 
 ```bash
 UV_CACHE_DIR=/tmp/uv-cache uv run pytest \
-  tests/sol_execbench/test_research_release_docs.py \
-  tests/sol_execbench/test_rocm_matrix_docs.py \
-  tests/sol_execbench/test_public_contract_guardrails.py::test_v1_19_paper_denominator_fields_remain_sidecar_only \
-  tests/sol_execbench/test_public_contract_guardrails.py::test_v1_19_amd_bound_sanity_fields_remain_sidecar_only -q
+  tests/sol_execbench/core/dataset/test_research_release_docs.py \
+  tests/sol_execbench/core/platform/test_rocm_matrix_docs.py \
+  tests/sol_execbench/core/evidence/test_public_contract_guardrails.py::test_v1_19_paper_denominator_fields_remain_sidecar_only \
+  tests/sol_execbench/core/evidence/test_public_contract_guardrails.py::test_v1_19_amd_bound_sanity_fields_remain_sidecar_only -q
 
 UV_CACHE_DIR=/tmp/uv-cache uv run ruff check \
-  tests/sol_execbench/test_research_release_docs.py
+  tests/sol_execbench/core/dataset/test_research_release_docs.py
 ```
 
 This command set does not run GPU probes, ROCm live validation, Docker builds,
@@ -242,8 +247,8 @@ Run the v1.20 documentation and sidecar-only contract checks:
 
 ```bash
 UV_CACHE_DIR=/tmp/uv-cache uv run pytest \
-  tests/sol_execbench/test_v1_20_evidence_quality_docs.py \
-  tests/sol_execbench/test_public_contract_guardrails.py -q
+  tests/sol_execbench/core/evidence/test_v1_20_evidence_quality_docs.py \
+  tests/sol_execbench/core/evidence/test_public_contract_guardrails.py -q
 ```
 
 ## Evaluation And Dataset Trustworthiness Guardrails
@@ -273,22 +278,22 @@ Focused run:
 
 ```bash
 uv run pytest \
-  tests/sol_execbench/test_cli_diagnostics.py \
+  tests/sol_execbench/cli/commands/test_diagnostics.py \
   tests/sol_execbench/core/bench/test_eval_runtime.py \
   tests/sol_execbench/core/data/test_solution.py \
   tests/sol_execbench/driver/test_build_ext.py \
-  tests/sol_execbench/test_dataset_run_closure.py \
-  tests/sol_execbench/test_run_dataset_execution_closure.py \
-  tests/sol_execbench/test_run_dataset_amd_score.py \
-  tests/sol_execbench/test_release_candidate_validation.py \
-  tests/sol_execbench/test_prerelease_artifact_bundle.py \
-  tests/sol_execbench/test_prerelease_readiness.py \
-  tests/sol_execbench/test_dataset_failure_mode_docs.py \
-  tests/sol_execbench/test_dataset_migration.py \
-  tests/sol_execbench/test_dataset_inventory_readiness.py \
-  tests/sol_execbench/test_low_precision_compatibility.py \
-  tests/sol_execbench/test_dataset_redistribution_policy.py \
-  tests/sol_execbench/test_dataset_sharding.py -q
+  tests/sol_execbench/core/dataset/test_dataset_run_closure.py \
+  tests/sol_execbench/core/dataset/test_run_dataset_execution_closure.py \
+  tests/sol_execbench/core/dataset/test_run_dataset_amd_score.py \
+  tests/sol_execbench/core/evidence/test_release_candidate_validation.py \
+  tests/sol_execbench/core/dataset/test_prerelease_artifact_bundle.py \
+  tests/sol_execbench/core/dataset/test_prerelease_readiness.py \
+  tests/sol_execbench/core/dataset/test_dataset_failure_mode_docs.py \
+  tests/sol_execbench/core/dataset/test_dataset_migration.py \
+  tests/sol_execbench/core/dataset/test_dataset_inventory_readiness.py \
+  tests/sol_execbench/core/dataset/test_low_precision_compatibility.py \
+  tests/sol_execbench/core/dataset/test_dataset_redistribution_policy.py \
+  tests/sol_execbench/core/dataset/test_dataset_sharding.py -q
 ```
 
 These tests do not prove live ROCm shard execution or full dataset validation.
@@ -306,13 +311,13 @@ boundaries:
 
 ```bash
 uv run pytest \
-  tests/sol_execbench/test_provenance_policy.py \
-  tests/sol_execbench/test_prerelease_readiness.py \
-  tests/sol_execbench/test_public_prerelease_docs.py \
-  tests/sol_execbench/test_research_preview_docs.py -q
+  tests/sol_execbench/core/evidence/test_provenance_policy.py \
+  tests/sol_execbench/core/dataset/test_prerelease_readiness.py \
+  tests/sol_execbench/core/dataset/test_public_prerelease_docs.py \
+  tests/sol_execbench/core/dataset/test_research_preview_docs.py -q
 ```
 
-`tests/sol_execbench/test_provenance_policy.py` checks that files retaining
+`tests/sol_execbench/core/evidence/test_provenance_policy.py` checks that files retaining
 NVIDIA SPDX notices are listed under `provenance.toml` and that cleanup
 candidates carry project attribution only. The prerelease readiness tests check
 required bundle artifacts, checksum behavior, forbidden claim boundaries,
@@ -333,7 +338,7 @@ uv run pytest tests -m requires_cdna3 -n 0
 CDNA3-only marker readiness can also be checked directly:
 
 ```bash
-uv run pytest tests/sol_execbench/test_cdna3_hardware_marker.py -m requires_cdna3 -n 0
+uv run pytest tests/sol_execbench/core/platform/test_cdna3_hardware_marker.py -m requires_cdna3 -n 0
 ```
 
 Interpret CDNA3 skips carefully: skipped tests on RDNA 4, macOS, or ROCm-less
@@ -416,7 +421,7 @@ workflow coverage.
 
 Shared test helpers live in `tests/conftest.py`,
 `tests/sol_execbench_type_helpers.py`, and
-`tests/sol_execbench/solar_derivation_fixtures.py`. Use `tmp_cache_dir` from
+`tests/sol_execbench/core/scoring/solar_derivation_fixtures.py`. Use `tmp_cache_dir` from
 `tests/conftest.py` when a test needs an isolated `SOLEXECBENCH_CACHE_PATH`,
 and use the typed model constructors in `tests/sol_execbench_type_helpers.py`
 for schema-heavy tests.
@@ -440,7 +445,7 @@ The `Python Quality` workflow runs on push and pull request for Python 3.12 and
 the `python-tests` job:
 
 ```bash
-uv sync --locked --all-groups
+uv sync --locked --all-groups --python ${{ matrix.python-version }}
 uv run ruff check .
 uv run ty check
 uv run pytest tests/sol_execbench \

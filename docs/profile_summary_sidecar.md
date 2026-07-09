@@ -1,7 +1,7 @@
 # Profile Summary Sidecar
 
 `sol_execbench.profile_summary.v2` is an optional diagnostic sidecar written
-next to canonical Trace JSONL as `<trace>.profile-summary.json`. It normalizes
+next to canonical Trace JSONL using the profile-summary JSON suffix. It normalizes
 bounded `rocprofv3` profile metadata for downstream adapters while preserving
 Trace JSONL as the only authority for correctness, timing, scoring, and
 evaluation status.
@@ -10,7 +10,7 @@ The evaluator contract advertises this artifact through the optional
 `profile_summary.sidecar` capability key. The concrete artifact schema remains
 `sol_execbench.profile_summary.v2`.
 
-The summary sidecar does not replace `<trace>.profile.json`. The existing
+The summary sidecar does not replace the raw profile JSON sidecar. The existing
 profile metadata sidecar remains the raw diagnostic metadata record and is cited
 from the normalized profile summary when present.
 
@@ -109,13 +109,13 @@ CPU-safe fixtures live under
 
 | Fixture | Purpose | Expected HIP handling |
 | --- | --- | --- |
-| `valid.profile-summary.json` | Current, available sidecar with profile metadata and artifact citations. | Accept as diagnostic profile digest input. |
-| `partial.profile-summary.json` | Partial diagnostics because rocprofv3 failed or profile artifacts are incomplete. | Accept with limitation text and lower confidence. |
-| `unavailable.profile-summary.json` | No profile result was available. | Treat as unavailable diagnostic state. |
-| `stale.profile-summary.json` | Valid schema with old trace/run identity. | Reject as stale for the current run. |
-| `malformed.profile-summary.json` | Invalid JSON payload. | Treat as invalid diagnostic state. |
-| `contradictory-authority.profile-summary.json` | Schema-shaped payload with forbidden score authority enum. | Reject before prompt assembly. |
-| `missing.profile-summary.case.json` | Metadata fixture for absent sidecar path behavior. | Treat missing sidecar as unavailable. |
+| `tests/sol_execbench/fixtures/profile_summary/valid.profile-summary.json` | Current, available sidecar with profile metadata and artifact citations. | Accept as diagnostic profile digest input. |
+| `tests/sol_execbench/fixtures/profile_summary/partial.profile-summary.json` | Partial diagnostics because rocprofv3 failed or profile artifacts are incomplete. | Accept with limitation text and lower confidence. |
+| `tests/sol_execbench/fixtures/profile_summary/unavailable.profile-summary.json` | No profile result was available. | Treat as unavailable diagnostic state. |
+| `tests/sol_execbench/fixtures/profile_summary/stale.profile-summary.json` | Valid schema with old trace/run identity. | Reject as stale for the current run. |
+| `tests/sol_execbench/fixtures/profile_summary/malformed.profile-summary.json` | Invalid JSON payload. | Treat as invalid diagnostic state. |
+| `tests/sol_execbench/fixtures/profile_summary/contradictory-authority.profile-summary.json` | Schema-shaped payload with forbidden score authority enum. | Reject before prompt assembly. |
+| `tests/sol_execbench/fixtures/profile_summary/missing.profile-summary.case.json` | Metadata fixture for absent sidecar path behavior. | Treat missing sidecar as unavailable. |
 
 These fixtures use synthetic checksums and compact file names. They are not
 benchmark evidence and do not represent real profiler output.

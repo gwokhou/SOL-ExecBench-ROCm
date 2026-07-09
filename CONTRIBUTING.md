@@ -126,7 +126,7 @@ uv run pytest tests -m requires_rocwmma -n 0
 Place future CDNA3-specific live tests near related package coverage under
 `tests/sol_execbench/` and mark them with both `requires_rocm` and
 `requires_cdna3` when they need a real `gfx94*` GPU. Use
-`tests/sol_execbench/test_cdna3_hardware_marker.py` as the minimal marker-gate
+`tests/sol_execbench/core/platform/test_cdna3_hardware_marker.py` as the minimal marker-gate
 pattern. CPU-safe tests may cover `gfx940`, `gfx941`, and `gfx942` schema or
 metadata behavior, but those tests must not claim hardware validation.
 
@@ -190,6 +190,10 @@ The repository pre-commit configuration includes a commit-message hook that
 checks for a `Signed-off-by:` line.
 
 ## PR Guidelines
+
+The default branch is `main`. No repository branch naming convention is
+currently documented; use a focused branch name that describes the issue or
+change.
 
 PRs should include:
 

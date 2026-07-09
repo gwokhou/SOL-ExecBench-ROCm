@@ -77,7 +77,7 @@ SOLEXECBENCH_ENV_SNAPSHOT=1 \
 ```
 
 This writes an environment-sidecar JSON file next to the chosen output file. Use
-`SOLEXECBENCH_ENV_SNAPSHOT_PATH=/path/to/env.json` to choose an explicit path.
+`SOLEXECBENCH_ENV_SNAPSHOT_PATH=out/env.json` to choose an explicit path.
 The sidecar is reproducibility evidence only; it is not part of SOL/SOLAR
 correctness or scoring.
 
@@ -217,7 +217,7 @@ host can report locked clocks. NVFP4/MXFP4 validation remains deferred on CDNA3
 and requires CDNA4-class hardware support.
 
 CDNA3 test readiness is now concrete but still bounded: the repository contains
-`tests/sol_execbench/test_cdna3_hardware_marker.py`, which is selected with
+`tests/sol_execbench/core/platform/test_cdna3_hardware_marker.py`, which is selected with
 `requires_cdna3` and runs only on `gfx94*` ROCm targets. The status may change
 from infrastructure evidence to MI300X hardware-validated only after the MI300X
 handoff artifacts exist for actual MI300X hardware and

@@ -33,7 +33,7 @@ The gate writes two files into the chosen `--output-dir`:
 
 The gate exits nonzero when it finds:
 
-- missing `prerelease_artifact_bundle.json` or `SHA256SUMS`
+- missing bundle outputs such as `prerelease_artifact_bundle.json` or `SHA256SUMS`
 - missing required artifact files
 - checksum mismatches
 - unknown authority classes

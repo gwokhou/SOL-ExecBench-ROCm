@@ -9,8 +9,8 @@ not full 235-problem validation, and not leaderboard parity.
 Problems belong in the slice when they satisfy all required criteria:
 
 - They use repository-local examples or downloaded public dataset problem
-  directories with stable `definition.json`, `workload.jsonl`, and solution
-  metadata inside each problem directory.
+  directories with stable problem definition, workload, and solution metadata
+  inside each problem directory.
 - They exercise an important solution path: PyTorch ROCm, Triton ROCm, HIP/C++,
   or a ROCm native library category.
 - They can run through the existing `sol-execbench` CLI or
@@ -110,9 +110,9 @@ uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
 
 | Artifact | Meaning | Claim boundary |
 | --- | --- | --- |
-| `*.trace.jsonl` | Canonical benchmark output. | ROCm-port evidence only. |
-| `*.environment.json` | Optional runtime reproducibility sidecar. | Runtime evidence, not score authority. |
-| `*.profile.json` and `.rocprofv3/` | Optional profiler sidecars and artifacts. | Diagnostic evidence, not correctness or score authority. |
+| Trace output files | Canonical benchmark output. | ROCm-port evidence only. |
+| Environment sidecars | Optional runtime reproducibility sidecar. | Runtime evidence, not score authority. |
+| Profile sidecars and rocprofv3 artifact directories | Optional profiler sidecars and artifacts. | Diagnostic evidence, not correctness or score authority. |
 | AMD SOL sidecars | Derived AMD bound inputs. | AMD-native-derived evidence only. |
 | AMD score report | Guarded local score interpretation. | Not B200, SOLAR, or leaderboard parity. |
 | execution closure | Bounded run accounting. | Not full 235-problem validation. |
