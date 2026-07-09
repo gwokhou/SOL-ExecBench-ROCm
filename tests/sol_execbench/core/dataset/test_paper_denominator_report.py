@@ -13,7 +13,7 @@ from sol_execbench.core.dataset.paper_denominator import (
     render_paper_denominator_markdown,
     write_paper_denominator_reports,
 )
-from sol_execbench.core.dataset.paper_denominator_stages import (
+from sol_execbench.core.dataset.paper_denominator.stages import (
     _inventory_problem_record,
     _readiness_workload_record,
 )

@@ -24,7 +24,7 @@
   - Introduce small normalized trace reader records before registry export logic.
 - Modify third wave: `src/sol_execbench/core/dataset/profiler_timing_coverage.py`
   - Extract profiler timing sidecar parser functions into typed boundary helpers.
-- Modify fourth wave: `src/sol_execbench/core/dataset/paper_denominator_stages.py`
+- Modify fourth wave: `src/sol_execbench/core/dataset/paper_denominator/stages.py`
   - Add local normalized record adapters for inventory, readiness, execution closure, and AMD score report records.
 - Documentation: `docs/superpowers/plans/2026-07-08-payload-schema-hardening.md`
   - Keep this plan as the execution checklist.
@@ -42,7 +42,7 @@ Use these categories during implementation:
 Initial hotspot scan found the highest source concentrations in:
 
 ```text
-src/sol_execbench/core/dataset/paper_denominator_stages.py
+src/sol_execbench/core/dataset/paper_denominator/stages.py
 src/sol_execbench/core/dataset/profiler_timing_coverage.py
 src/sol_execbench/core/dataset/parity_gap.py
 src/sol_execbench/core/claim_upgrade.py
@@ -244,7 +244,7 @@ RAW_PAYLOAD_ALLOWLIST = {
     "sol_execbench.core.claim_upgrade",
     "sol_execbench.core.consistency",
     "sol_execbench.core.dataset.migration",
-    "sol_execbench.core.dataset.paper_denominator_stages",
+    "sol_execbench.core.dataset.paper_denominator.stages",
     "sol_execbench.core.dataset.profiler_timing_coverage",
     "sol_execbench.core.evaluation_stability",
     "sol_execbench.core.matrix_diff",
@@ -573,7 +573,7 @@ git commit -s -m "#0 - Extract profiler timing sidecar parser"
 ### Task 6: Normalize Paper Denominator Stage Inputs
 
 **Files:**
-- Modify: `src/sol_execbench/core/dataset/paper_denominator_stages.py`
+- Modify: `src/sol_execbench/core/dataset/paper_denominator/stages.py`
 - Test: `tests/sol_execbench/test_paper_denominator_report.py`
 
 - [x] **Step 1: Add record adapter tests**
@@ -581,7 +581,7 @@ git commit -s -m "#0 - Extract profiler timing sidecar parser"
 Add tests to `tests/sol_execbench/test_paper_denominator_report.py`:
 
 ```python
-from sol_execbench.core.dataset.paper_denominator_stages import (
+from sol_execbench.core.dataset.paper_denominator.stages import (
     _inventory_problem_record,
     _readiness_workload_record,
 )
@@ -626,7 +626,7 @@ Expected: FAIL until helper records exist.
 
 - [x] **Step 3: Add local normalized dataclasses**
 
-In `src/sol_execbench/core/dataset/paper_denominator_stages.py`, add:
+In `src/sol_execbench/core/dataset/paper_denominator/stages.py`, add:
 
 ```python
 from dataclasses import dataclass, field
@@ -671,7 +671,7 @@ Expected: PASS.
 - [x] **Step 6: Commit**
 
 ```bash
-git add src/sol_execbench/core/dataset/paper_denominator_stages.py tests/sol_execbench/test_paper_denominator_report.py
+git add src/sol_execbench/core/dataset/paper_denominator/stages.py tests/sol_execbench/test_paper_denominator_report.py
 git commit -s -m "#0 - Normalize paper denominator stage records"
 ```
 

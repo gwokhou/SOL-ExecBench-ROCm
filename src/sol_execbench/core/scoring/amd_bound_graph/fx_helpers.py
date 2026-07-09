@@ -23,13 +23,27 @@ from sol_execbench.core.scoring.amd_bound_graph.common import (
     _moe_call_attributes,
     _ssm_mamba_call_attributes,
     _target_dtype_from_values,
-    _fx_tensor_meta as _fx_tensor_meta,
+    _fx_tensor_meta,
 )
 from sol_execbench.core.scoring.amd_bound_graph.models import (
     BoundTensor,
     OpFamily,
 )
 from sol_execbench.core.scoring.confidence import EstimateConfidence
+
+__all__ = [
+    "_classification_family",
+    "_classify_fx_node",
+    "_first_input_dtype",
+    "_first_input_shape",
+    "_flatten_fx_output_tensor_ids",
+    "_fx_input_tensor_ids",
+    "_fx_node_attributes",
+    "_fx_node_name",
+    "_fx_source_expression",
+    "_fx_tensor_meta",
+    "_torch_dtype",
+]
 
 
 def _classify_fx_node(node: Any) -> tuple[str, _CallClassification, str | None]:

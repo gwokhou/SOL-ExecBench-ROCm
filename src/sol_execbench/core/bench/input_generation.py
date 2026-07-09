@@ -25,16 +25,16 @@ import torch
 
 from sol_execbench.core.bench.custom_inputs import gen_custom_inputs
 from sol_execbench.core.bench.input_heuristics import (
-    _generate_heuristic_tensor as _generate_heuristic_tensor,
-    _is_binary_mask as _is_binary_mask,
-    _is_causal_attention_mask as _is_causal_attention_mask,
-    _is_norm_bias as _is_norm_bias,
-    _is_norm_weight as _is_norm_weight,
-    _is_positive_tensor as _is_positive_tensor,
-    _is_rope_cos_sin as _is_rope_cos_sin,
-    _is_softmax_output as _is_softmax_output,
-    _is_ssm_decay as _is_ssm_decay,
-    _is_weight_matrix as _is_weight_matrix,
+    _generate_heuristic_tensor,
+    _is_binary_mask,
+    _is_causal_attention_mask,
+    _is_norm_bias,
+    _is_norm_weight,
+    _is_positive_tensor,
+    _is_rope_cos_sin,
+    _is_softmax_output,
+    _is_ssm_decay,
+    _is_weight_matrix,
     is_sampling_operation,
 )
 from sol_execbench.core.data.definition import Definition
@@ -45,6 +45,23 @@ from sol_execbench.core.data.workload import (
     ScalarInput,
     Workload,
 )
+
+__all__ = [
+    "_cast_to_fp4x2",
+    "_generate_heuristic_tensor",
+    "_is_binary_mask",
+    "_is_causal_attention_mask",
+    "_is_norm_bias",
+    "_is_norm_weight",
+    "_is_positive_tensor",
+    "_is_rope_cos_sin",
+    "_is_softmax_output",
+    "_is_ssm_decay",
+    "_is_weight_matrix",
+    "_rand_tensor",
+    "gen_inputs",
+    "is_sampling_operation",
+]
 
 
 def _cast_to_fp4x2(x: torch.Tensor) -> torch.Tensor:
