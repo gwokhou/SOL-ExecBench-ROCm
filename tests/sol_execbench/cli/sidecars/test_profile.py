@@ -92,6 +92,7 @@ def test_profile_summary_sidecar_records_bounded_metadata(tmp_path: Path):
         result,
         profile_sidecar_path=profile_metadata,
         run_id="run-001",
+        sol_version="v1.43",
     )
 
     assert written == tmp_path / "trace.jsonl.profile-summary.json"

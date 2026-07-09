@@ -114,6 +114,23 @@ def test_profile_summary_sidecar_is_diagnostic_only(tmp_path: Path):
     assert payload["artifact_citations"][0]["sha256"] == citation.sha256
 
 
+def test_profile_summary_sidecar_accepts_consumer_sol_version(
+    tmp_path: Path,
+) -> None:
+    sidecar = build_profile_summary_sidecar(
+        profile_result=_profile_result(tmp_path),
+        trace_path=str(tmp_path / "trace.jsonl"),
+        run_id="consumer-run-001",
+        sol_version="consumer-sol-version",
+        generated_at="2026-06-16T00:00:00Z",
+    )
+
+    payload = sidecar.model_dump(mode="json")
+
+    assert payload["identity"]["run_id"] == "consumer-run-001"
+    assert payload["identity"]["sol_version"] == "consumer-sol-version"
+
+
 def test_profile_summary_freshness_uses_canonical_sol_version(tmp_path: Path):
     sidecar = build_profile_summary_sidecar(
         profile_result=_profile_result(tmp_path),

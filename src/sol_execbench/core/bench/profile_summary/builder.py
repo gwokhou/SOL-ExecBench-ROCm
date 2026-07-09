@@ -32,6 +32,7 @@ def build_profile_summary_sidecar(
     profile_result: Rocprofv3ProfileResult | None,
     trace_path: str | None = None,
     run_id: str | None = None,
+    sol_version: str | None = None,
     generated_at: str | None = None,
     artifact_citations: Sequence[ProfileSummaryArtifactCitation] = (),
 ) -> ProfileSummarySidecar:
@@ -44,7 +45,7 @@ def build_profile_summary_sidecar(
         reason_code=reason_code,
         identity=ProfileSummaryIdentity(
             generated_at=generated_at or utc_timestamp(),
-            sol_version=SOL_EXECBENCH_RELEASE,
+            sol_version=sol_version or SOL_EXECBENCH_RELEASE,
             trace_path=compact_path(trace_path),
             run_id=run_id,
         ),

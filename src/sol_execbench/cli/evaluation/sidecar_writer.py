@@ -41,7 +41,8 @@ def write_optional_sidecars(
         output_file,
         profile_result,
         profile_sidecar_path=profile_sidecar_path,
-        run_id=trace_run_id,
+        run_id=feedback_run_id or trace_run_id,
+        sol_version=feedback_sol_version,
     )
     static_evidence_sidecar_path = cli_static_evidence._write_static_evidence_sidecar(
         output_file,
