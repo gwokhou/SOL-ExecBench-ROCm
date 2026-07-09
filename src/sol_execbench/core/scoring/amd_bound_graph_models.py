@@ -6,38 +6,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
 from typing import Any
 
-from sol_execbench.core.scoring.amd_hardware_models import EstimateConfidence
-
-class BoundTensorRole(str, Enum):
-    """Role of a tensor in a bound graph."""
-
-    INPUT = "input"
-    OUTPUT = "output"
-    INTERMEDIATE = "intermediate"
-
-
-class OpFamily(str, Enum):
-    """Paper-aligned operation family for SOLAR graph extraction."""
-
-    ATTENTION = "attention"
-    MOE = "moe"
-    NORMALIZATION = "normalization"
-    EMBEDDING_POSITIONAL = "embedding_positional"
-    LINEAR_PROJECTION = "linear_projection"
-    GEMM = "gemm"
-    MLP_ACTIVATION = "mlp_activation"
-    CONVOLUTION = "convolution"
-    SSM_MAMBA = "ssm_mamba"
-    SOFTMAX = "softmax"
-    REDUCTION = "reduction"
-    ELEMENTWISE = "elementwise"
-    DATA_MOVEMENT = "data_movement"
-    DTYPE_CONVERSION = "dtype_conversion"
-    UNSUPPORTED = "unsupported"
-
+from sol_execbench.core.scoring.amd_bound_graph_enums import BoundTensorRole, OpFamily
+from sol_execbench.core.scoring.confidence import EstimateConfidence
 
 @dataclass(frozen=True)
 class BoundTensor:

@@ -13,191 +13,115 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Dataset acquisition and layout contract helpers."""
+"""Dataset acquisition and layout contract helpers.
 
-from .categories import DEFAULT_CATEGORIES, validate_categories
-from .evidence_refs import (
-    build_derived_evidence_refs,
-    relative_ref,
-    safe_sidecar_stem,
-    sidecar_stem_for_workload,
-)
-from .layout import (
-    DatasetLayout,
-    LayoutCategory,
-    LayoutDiagnostic,
-    inspect_dataset_layout,
-)
-from .low_precision import (
-    CDNA4_VALIDATION_DEFERRED_CODE,
-    CDNA3_LOW_PRECISION_SKIP_CODE,
-    LOW_PRECISION_COMPATIBILITY_EVIDENCE_CODE,
-    LOW_PRECISION_COMPATIBILITY_FORMATS,
-    LowPrecisionCompatibilityEvidence,
-    LowPrecisionScaleMetadata,
-    PackedLowPrecisionTensor,
-    cdna4_low_precision_skip_reason,
-    dequantize_e2m1_codes,
-    definition_uses_cdna4_low_precision,
-    low_precision_unvalidated_evidence,
-    normalize_low_precision_format,
-    pack_e2m1_codes,
-    pack_low_precision_tensor,
-    quantize_e2m1_codes,
-    should_skip_cdna4_low_precision_on_arch,
-    unpack_e2m1_codes,
-)
-from .long_tail_exclusions import (
-    LONG_TAIL_EXCLUSION_REASON,
-    LONG_TAIL_EXCLUSION_SCHEMA_VERSION,
-    LONG_TAIL_EXCLUSION_STATUS,
-    LongTailExclusionConfig,
-    LongTailExclusionEntry,
-    LongTailExclusionSidecar,
-    exclusion_closure_metadata,
-    load_long_tail_exclusions,
-    split_excluded_workloads,
-)
-from .manifest import (
-    DatasetManifest,
-    DatasetManifestSource,
-    build_dataset_manifest,
-    write_dataset_manifest,
-)
-from .migration import (
-    DatasetMigrationManifest,
-    migrate_flashinfer_trace,
-    migrate_sol_execbench,
-    write_migration_manifest,
-)
-from .inventory import (
-    DatasetInventory,
-    InventoryDenominators,
-    ProblemInventoryRecord,
-    WorkloadInventoryRecord,
-    build_dataset_inventory,
-    write_dataset_inventory,
-)
-from .readiness import (
-    DatasetReadiness,
-    DatasetReadinessClaimBoundary,
-    ReadinessBlockerReport,
-    ReadinessClass,
-    WorkloadReadinessRecord,
-    classify_rocm_readiness,
-    write_dataset_readiness,
-)
-from .ready_subset import (
-    ReadySubset,
-    ReadySubsetDenominator,
-    ReadySubsetExclusionReason,
-    build_ready_subset,
-    write_ready_subset,
-)
-from .sharding import (
-    DatasetShardMergeResult,
-    DatasetShardPlan,
-    DatasetShardWorkload,
-    merge_dataset_shard_traces,
-    plan_dataset_shards,
-)
-from .parity_gap import (
-    ParityGapReport,
-    build_parity_gap_report,
-    render_parity_gap_markdown,
-    write_parity_gap_reports,
-)
-from .paper_denominator import (
-    PaperDenominatorReport,
-    build_paper_denominator_report,
-    render_paper_denominator_markdown,
-    write_paper_denominator_reports,
-)
-from .profiler_timing_coverage import (
-    ProfilerTimingCoverageReport,
-    build_profiler_timing_coverage_report,
-    render_profiler_timing_coverage_markdown,
-    write_profiler_timing_coverage_reports,
-)
+This package keeps historical re-export names available without eagerly
+importing every dataset subsystem at package import time. New internal code
+should import from the focused submodule that owns the symbol.
+"""
 
-__all__ = [
-    "DEFAULT_CATEGORIES",
-    "DatasetLayout",
-    "DatasetManifest",
-    "DatasetManifestSource",
-    "DatasetMigrationManifest",
-    "DatasetInventory",
-    "DatasetReadiness",
-    "DatasetReadinessClaimBoundary",
-    "DatasetShardMergeResult",
-    "DatasetShardPlan",
-    "DatasetShardWorkload",
-    "CDNA4_VALIDATION_DEFERRED_CODE",
-    "CDNA3_LOW_PRECISION_SKIP_CODE",
-    "InventoryDenominators",
-    "LayoutCategory",
-    "LayoutDiagnostic",
-    "LOW_PRECISION_COMPATIBILITY_EVIDENCE_CODE",
-    "LOW_PRECISION_COMPATIBILITY_FORMATS",
-    "LONG_TAIL_EXCLUSION_REASON",
-    "LONG_TAIL_EXCLUSION_SCHEMA_VERSION",
-    "LONG_TAIL_EXCLUSION_STATUS",
-    "LongTailExclusionConfig",
-    "LongTailExclusionEntry",
-    "LongTailExclusionSidecar",
-    "LowPrecisionCompatibilityEvidence",
-    "LowPrecisionScaleMetadata",
-    "ProblemInventoryRecord",
-    "ParityGapReport",
-    "PaperDenominatorReport",
-    "ProfilerTimingCoverageReport",
-    "PackedLowPrecisionTensor",
-    "ReadySubset",
-    "ReadySubsetDenominator",
-    "ReadySubsetExclusionReason",
-    "ReadinessBlockerReport",
-    "ReadinessClass",
-    "WorkloadInventoryRecord",
-    "WorkloadReadinessRecord",
-    "build_derived_evidence_refs",
-    "build_dataset_manifest",
-    "build_dataset_inventory",
-    "classify_rocm_readiness",
-    "build_ready_subset",
-    "cdna4_low_precision_skip_reason",
-    "dequantize_e2m1_codes",
-    "definition_uses_cdna4_low_precision",
-    "exclusion_closure_metadata",
-    "load_long_tail_exclusions",
-    "low_precision_unvalidated_evidence",
-    "migrate_flashinfer_trace",
-    "migrate_sol_execbench",
-    "merge_dataset_shard_traces",
-    "normalize_low_precision_format",
-    "plan_dataset_shards",
-    "pack_e2m1_codes",
-    "pack_low_precision_tensor",
-    "quantize_e2m1_codes",
-    "build_parity_gap_report",
-    "build_paper_denominator_report",
-    "build_profiler_timing_coverage_report",
-    "inspect_dataset_layout",
-    "render_parity_gap_markdown",
-    "render_paper_denominator_markdown",
-    "render_profiler_timing_coverage_markdown",
-    "relative_ref",
-    "safe_sidecar_stem",
-    "sidecar_stem_for_workload",
-    "should_skip_cdna4_low_precision_on_arch",
-    "split_excluded_workloads",
-    "validate_categories",
-    "write_dataset_manifest",
-    "write_dataset_inventory",
-    "write_migration_manifest",
-    "write_dataset_readiness",
-    "write_ready_subset",
-    "unpack_e2m1_codes",
-    "write_parity_gap_reports",
-    "write_paper_denominator_reports",
-    "write_profiler_timing_coverage_reports",
-]
+from __future__ import annotations
+
+from importlib import import_module
+from typing import Any
+
+_EXPORTS = {
+    "DEFAULT_CATEGORIES": ".categories",
+    "DatasetLayout": ".layout",
+    "DatasetManifest": ".manifest",
+    "DatasetManifestSource": ".manifest",
+    "DatasetMigrationManifest": ".migration",
+    "DatasetInventory": ".inventory",
+    "DatasetReadiness": ".readiness",
+    "DatasetReadinessClaimBoundary": ".readiness",
+    "DatasetShardMergeResult": ".sharding",
+    "DatasetShardPlan": ".sharding",
+    "DatasetShardWorkload": ".sharding",
+    "CDNA4_VALIDATION_DEFERRED_CODE": ".low_precision",
+    "CDNA3_LOW_PRECISION_SKIP_CODE": ".low_precision",
+    "InventoryDenominators": ".inventory",
+    "LayoutCategory": ".layout",
+    "LayoutDiagnostic": ".layout",
+    "LOW_PRECISION_COMPATIBILITY_EVIDENCE_CODE": ".low_precision",
+    "LOW_PRECISION_COMPATIBILITY_FORMATS": ".low_precision",
+    "LONG_TAIL_EXCLUSION_REASON": ".long_tail_exclusions",
+    "LONG_TAIL_EXCLUSION_SCHEMA_VERSION": ".long_tail_exclusions",
+    "LONG_TAIL_EXCLUSION_STATUS": ".long_tail_exclusions",
+    "LongTailExclusionConfig": ".long_tail_exclusions",
+    "LongTailExclusionEntry": ".long_tail_exclusions",
+    "LongTailExclusionSidecar": ".long_tail_exclusions",
+    "LowPrecisionCompatibilityEvidence": ".low_precision",
+    "LowPrecisionScaleMetadata": ".low_precision",
+    "ProblemInventoryRecord": ".inventory",
+    "ParityGapReport": ".parity_gap",
+    "PaperDenominatorReport": ".paper_denominator",
+    "ProfilerTimingCoverageReport": ".profiler_timing_coverage",
+    "PackedLowPrecisionTensor": ".low_precision",
+    "ReadySubset": ".ready_subset",
+    "ReadySubsetDenominator": ".ready_subset",
+    "ReadySubsetExclusionReason": ".ready_subset",
+    "ReadinessBlockerReport": ".readiness",
+    "ReadinessClass": ".readiness",
+    "WorkloadInventoryRecord": ".inventory",
+    "WorkloadReadinessRecord": ".readiness",
+    "build_derived_evidence_refs": ".evidence_refs",
+    "build_dataset_manifest": ".manifest",
+    "build_dataset_inventory": ".inventory",
+    "classify_rocm_readiness": ".readiness",
+    "build_ready_subset": ".ready_subset",
+    "cdna4_low_precision_skip_reason": ".low_precision",
+    "dequantize_e2m1_codes": ".low_precision",
+    "definition_uses_cdna4_low_precision": ".low_precision",
+    "exclusion_closure_metadata": ".long_tail_exclusions",
+    "load_long_tail_exclusions": ".long_tail_exclusions",
+    "low_precision_unvalidated_evidence": ".low_precision",
+    "migrate_flashinfer_trace": ".migration",
+    "migrate_sol_execbench": ".migration",
+    "merge_dataset_shard_traces": ".sharding",
+    "normalize_low_precision_format": ".low_precision",
+    "plan_dataset_shards": ".sharding",
+    "pack_e2m1_codes": ".low_precision",
+    "pack_low_precision_tensor": ".low_precision",
+    "quantize_e2m1_codes": ".low_precision",
+    "build_parity_gap_report": ".parity_gap",
+    "build_paper_denominator_report": ".paper_denominator",
+    "build_profiler_timing_coverage_report": ".profiler_timing_coverage",
+    "inspect_dataset_layout": ".layout",
+    "render_parity_gap_markdown": ".parity_gap",
+    "render_paper_denominator_markdown": ".paper_denominator",
+    "render_profiler_timing_coverage_markdown": ".profiler_timing_coverage",
+    "relative_ref": ".evidence_refs",
+    "safe_sidecar_stem": ".evidence_refs",
+    "sidecar_stem_for_workload": ".evidence_refs",
+    "should_skip_cdna4_low_precision_on_arch": ".low_precision",
+    "split_excluded_workloads": ".long_tail_exclusions",
+    "validate_categories": ".categories",
+    "write_dataset_manifest": ".manifest",
+    "write_dataset_inventory": ".inventory",
+    "write_migration_manifest": ".migration",
+    "write_dataset_readiness": ".readiness",
+    "write_ready_subset": ".ready_subset",
+    "unpack_e2m1_codes": ".low_precision",
+    "workload_prefix_lines": ".sharding",
+    "workload_shard_paths": ".sharding",
+    "write_parity_gap_reports": ".parity_gap",
+    "write_paper_denominator_reports": ".paper_denominator",
+    "write_profiler_timing_coverage_reports": ".profiler_timing_coverage",
+}
+
+__all__ = sorted(_EXPORTS)
+
+
+def __getattr__(name: str) -> Any:
+    """Load compatibility re-exports on first access."""
+    module_name = _EXPORTS.get(name)
+    if module_name is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(import_module(module_name, __name__), name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    """Return stable names for interactive discovery and star imports."""
+    return sorted({*globals(), *__all__})

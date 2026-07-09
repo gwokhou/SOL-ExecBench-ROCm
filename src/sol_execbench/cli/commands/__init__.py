@@ -1,6 +1,8 @@
 """Command helpers for the SOL ExecBench CLI."""
 
-from sol_execbench.cli.commands import root as _root
+from importlib import import_module
+
+_root = import_module("sol_execbench.cli.commands.root")
 
 for _name in dir(_root):
     if not (_name.startswith("__") and _name.endswith("__")):

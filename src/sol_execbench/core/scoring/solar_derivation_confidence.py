@@ -11,7 +11,7 @@ from sol_execbench.core.scoring.amd_bound_graph_models import (
     BoundTensor,
     OpFamily,
 )
-from sol_execbench.core.scoring.amd_hardware_models import EstimateConfidence
+from sol_execbench.core.scoring.confidence import EstimateConfidence
 from sol_execbench.core.scoring.solar_derivation_confidence_families import (
     _attention_confidence_evidence,
     _convolution_confidence_evidence,
@@ -32,9 +32,11 @@ from sol_execbench.core.scoring.solar_derivation_coverage import (
     _worse_confidence,
     _worst_estimate_confidence,
 )
+from sol_execbench.core.scoring.solar_derivation_evidence_models import (
+    SolarTensorEvidence,
+)
 from sol_execbench.core.scoring.solar_derivation_models import (
     SolarConfidenceClassification,
-    SolarTensorEvidence,
 )
 
 def classify_solar_confidence(

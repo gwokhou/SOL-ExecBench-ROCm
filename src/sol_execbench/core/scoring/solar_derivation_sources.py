@@ -12,7 +12,7 @@ from sol_execbench.core.scoring.amd_bound_graph_models import (
     BoundGraphNode,
     BoundTensor,
 )
-from sol_execbench.core.scoring.solar_derivation_models import SolarEvidenceSource
+from sol_execbench.core.scoring.solar_derivation_evidence_models import SolarEvidenceSource
 
 def _source_for_tensor(graph: BoundGraph, tensor: BoundTensor) -> SolarEvidenceSource:
     producer = (

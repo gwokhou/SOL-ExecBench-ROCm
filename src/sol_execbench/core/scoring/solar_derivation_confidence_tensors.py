@@ -9,7 +9,7 @@ from sol_execbench.core.scoring.amd_bound_graph_models import (
     BoundTensor,
     BoundTensorRole,
 )
-from sol_execbench.core.scoring.solar_derivation_models import SolarTensorEvidence
+from sol_execbench.core.scoring.solar_derivation_evidence_models import SolarTensorEvidence
 
 def _tensor_id(tensor: BoundTensor | SolarTensorEvidence) -> str:
     return tensor.tensor_id

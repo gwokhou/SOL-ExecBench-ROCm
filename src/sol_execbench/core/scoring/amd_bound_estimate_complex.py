@@ -13,7 +13,7 @@ from sol_execbench.core.scoring.amd_bound_graph_models import (
     BoundTensor,
     OpFamily,
 )
-from sol_execbench.core.scoring.amd_hardware_models import EstimateConfidence
+from sol_execbench.core.scoring.confidence import EstimateConfidence
 
 from sol_execbench.core.scoring.amd_bound_estimate_common import (
     _estimate_tensors,

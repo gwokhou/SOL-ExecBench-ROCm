@@ -8,7 +8,7 @@ from __future__ import annotations
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.scoring.amd_bound_graph_models import BoundGraph, BoundTensor
-from sol_execbench.core.scoring.solar_derivation_models import SolarTensorEvidence
+from sol_execbench.core.scoring.solar_derivation_evidence_models import SolarTensorEvidence
 from sol_execbench.core.scoring.solar_derivation_sources import (
     _semantic_axes_for_tensor,
     _source_for_tensor,

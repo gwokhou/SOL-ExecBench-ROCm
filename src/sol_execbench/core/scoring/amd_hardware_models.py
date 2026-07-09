@@ -13,17 +13,11 @@ from importlib import resources
 from pathlib import Path
 from typing import Any
 
+from sol_execbench.core.scoring.confidence import EstimateConfidence
+
 
 AMD_HARDWARE_MODEL_SCHEMA_VERSION = "sol_execbench.amd_hardware_model.v2"
 VALIDATED_GFX1200_ONLY = "gfx1200"
-
-
-class EstimateConfidence(str, Enum):
-    """Confidence level for hardware model estimates."""
-
-    SUPPORTED = "supported"
-    INEXACT = "inexact"
-    UNSUPPORTED = "unsupported"
 
 
 class HardwareValidationStatus(str, Enum):

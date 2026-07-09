@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from sol_execbench.core.scoring.amd_hardware_models import EstimateConfidence
+from sol_execbench.core.scoring.confidence import EstimateConfidence
 from sol_execbench.core.scoring.amd_sol_models import (
     AmdSolCoverageSummary,
     GraphNode,

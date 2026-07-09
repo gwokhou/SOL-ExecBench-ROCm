@@ -4,46 +4,26 @@ from __future__ import annotations
 
 import gc
 import json
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from pathlib import Path
 
-from sol_execbench.core.data.definition import Definition
-from sol_execbench.core.data.trace import Trace
-from sol_execbench.core.data.workload import Workload
-from sol_execbench.core.evidence_refs import sidecar_stem_for_workload
 from sol_execbench.core.scoring.amd_score import (
     AmdNativeScore,
     build_amd_native_suite_report,
     score_amd_native_trace_workload,
 )
-from sol_execbench.core.scoring.amd_score_sidecar_parsing import (
-    minimal_amd_sol_bound_v2_from_payload,
-    minimal_solar_aggregate_from_payload,
-    read_json_object,
+from sol_execbench.core.scoring.amd_score_report_inputs import (
+    load_score_report_workloads,
+    parse_score_report_definition,
+    parse_score_report_trace,
 )
-from sol_execbench.core.scoring.amd_sol import default_amd_hardware_models
-from sol_execbench.core.scoring.amd_sol_v2 import build_amd_sol_bound_v2_artifact
+from sol_execbench.core.scoring.amd_score_derived_artifacts import (
+    resolve_derived_score_artifacts,
+    resolve_hardware_model_from_trace_payloads,
+)
 from sol_execbench.core.scoring.baseline_artifact import ScoringBaselineArtifact
-from sol_execbench.core.scoring.solar_derivation import (
-    build_solar_derivation_evidence,
-    solar_derivation_from_dict,
-)
 
 RunCliFunc = Callable[..., list[dict] | None]
-
-
-def _hardware_model_key_from_trace_payloads(traces_payload: Sequence[dict]) -> str:
-    """Return the first known AMD gfx key without retaining parsed traces."""
-    known = default_amd_hardware_models()
-    for payload in traces_payload:
-        try:
-            hardware = str(payload["evaluation"]["environment"].get("hardware", ""))
-        except (KeyError, TypeError, AttributeError):
-            continue
-        for key in known:
-            if key in hardware:
-                return key
-    return "gfx1200"
 
 
 def _build_amd_score_reports_for_problem_impl(
@@ -61,123 +41,33 @@ def _build_amd_score_reports_for_problem_impl(
 ) -> list[AmdNativeScore]:
     """Build derived AMD-native scores for one dataset-run problem."""
     _ = run_cli_func
-    definition = Definition(**definition_payload)
-    workloads = {
-        workload.uuid: workload
-        for workload in (
-            Workload(**json.loads(line))
-            for line in workload_path.read_text().splitlines()
-            if line.strip()
-        )
-    }
-    hardware_models = default_amd_hardware_models()
-    hardware_model_key = _hardware_model_key_from_trace_payloads(traces_payload)
-    hardware_model = hardware_models[hardware_model_key]
+    definition = parse_score_report_definition(definition_payload)
+    workloads = load_score_report_workloads(workload_path)
+    hardware_model = resolve_hardware_model_from_trace_payloads(traces_payload)
     scores: list[AmdNativeScore] = []
     derived_sidecar_exclusions = derived_sidecar_exclusions or {}
 
     for trace_index, trace_payload in enumerate(traces_payload):
-        trace = Trace(**trace_payload)
+        trace = parse_score_report_trace(trace_payload)
         workload = workloads.get(trace.workload.uuid)
         derived_exclusion = derived_sidecar_exclusions.get(trace.workload.uuid)
-        sidecar_stem = (
-            sidecar_stem_for_workload(
-                definition.name,
-                trace.workload.uuid,
-                problem_namespace=sidecar_namespace,
-            )
-            if workload is not None
-            else None
+        derived_artifacts = resolve_derived_score_artifacts(
+            definition=definition,
+            workload=workload,
+            workload_uuid=trace.workload.uuid,
+            hardware_model=hardware_model,
+            sol_bound_artifact_dir=sol_bound_artifact_dir,
+            solar_derivation_dir=solar_derivation_dir,
+            sidecar_namespace=sidecar_namespace,
+            derived_exclusion=derived_exclusion,
         )
-        sol_bound_ref = (
-            f"derived:{definition.name}:{trace.workload.uuid}:amd_sol_bound_v2"
-        )
-        sol_bound_path = (
-            sol_bound_artifact_dir / f"{sidecar_stem}.amd-sol-v2.json"
-            if sol_bound_artifact_dir is not None and sidecar_stem is not None
-            else None
-        )
-        artifact = None
-        if sol_bound_path is not None and sol_bound_path.exists():
-            existing_payload = read_json_object(sol_bound_path)
-            if existing_payload is not None:
-                artifact = minimal_amd_sol_bound_v2_from_payload(existing_payload)
-                if artifact is not None:
-                    sol_bound_ref = str(sol_bound_path)
-        if artifact is None and workload is not None and derived_exclusion is None:
-            artifact = build_amd_sol_bound_v2_artifact(
-                definition,
-                workload,
-                hardware_model,
-                hardware_model_ref=f"default_amd_hardware_models.{hardware_model_key}",
-            )
-        solar_derivation = None
-        derived_evidence_refs = None
-        solar_derivation_ref = (
-            f"derived:{definition.name}:{trace.workload.uuid}:solar_derivation"
-        )
-        solar_derivation_path = (
-            solar_derivation_dir / f"{sidecar_stem}.solar-derivation.json"
-            if solar_derivation_dir is not None and sidecar_stem is not None
-            else None
-        )
-        if solar_derivation_path is not None and solar_derivation_path.exists():
-            existing_payload = read_json_object(solar_derivation_path)
-            if existing_payload is not None:
-                solar_derivation = minimal_solar_aggregate_from_payload(
-                    existing_payload
-                )
-                if solar_derivation is not None:
-                    solar_derivation_ref = str(solar_derivation_path)
-        if (
-            workload is not None
-            and solar_derivation_dir is not None
-            and derived_exclusion is None
-        ):
-            solar_derivation_dir.mkdir(parents=True, exist_ok=True)
-            assert solar_derivation_path is not None
-            if solar_derivation is None:
-                generated = build_solar_derivation_evidence(definition, workload)
-                generated_payload = generated.to_dict()
-                solar_derivation_path.write_text(
-                    json.dumps(generated_payload, indent=2)
-                )
-                solar_derivation_ref = str(solar_derivation_path)
-                try:
-                    solar_derivation = solar_derivation_from_dict(generated_payload)
-                except ValueError as exc:
-                    solar_derivation = None
-                    derived_evidence_refs = {"solar_derivation_parse_error": str(exc)}
-            else:
-                solar_derivation_ref = str(solar_derivation_path)
-            derived_evidence_refs = {
-                "formula": f"{solar_derivation_ref}#groups.formula_evidence",
-                "hardware_model": f"default_amd_hardware_models.{hardware_model_key}",
-                "coverage": f"{solar_derivation_ref}#coverage_summary",
-                "score_eligibility": f"{solar_derivation_ref}#aggregate_status",
-                **(derived_evidence_refs or {}),
-            }
-        elif derived_exclusion is not None:
-            derived_evidence_refs = {
-                "derived_sidecar_exclusion": derived_exclusion,
-                "hardware_model": f"default_amd_hardware_models.{hardware_model_key}",
-            }
-        if (
-            artifact is not None
-            and sol_bound_path is not None
-            and sol_bound_artifact_dir is not None
-        ):
-            sol_bound_artifact_dir.mkdir(parents=True, exist_ok=True)
-            if not sol_bound_path.exists():
-                sol_bound_path.write_text(json.dumps(artifact.to_dict(), indent=2))
-            sol_bound_ref = str(sol_bound_path)
         scores.append(
             score_amd_native_trace_workload(
                 trace,
-                artifact,
+                derived_artifacts.sol_bound_artifact,
                 trace_ref=trace_ref,
                 timing_evidence_ref=trace_ref,
-                sol_bound_ref=sol_bound_ref,
+                sol_bound_ref=derived_artifacts.sol_bound_ref,
                 baseline_ref=(
                     f"{baseline_artifact.source}#{definition.name}:{trace.workload.uuid}"
                     if baseline_artifact
@@ -186,9 +76,9 @@ def _build_amd_score_reports_for_problem_impl(
                     else "trace.evaluation.performance.reference_latency_ms"
                 ),
                 baseline_artifact=baseline_artifact,
-                hardware_model_ref=f"default_amd_hardware_models.{hardware_model_key}",
-                solar_derivation=solar_derivation,
-                derived_evidence_refs=derived_evidence_refs,
+                hardware_model_ref=hardware_model.ref,
+                solar_derivation=derived_artifacts.solar_derivation,
+                derived_evidence_refs=derived_artifacts.evidence_refs,
             )
         )
         if trace_index % 16 == 0:

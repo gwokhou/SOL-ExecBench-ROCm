@@ -14,7 +14,7 @@ from sol_execbench.core.scoring.amd_bound_estimates import (
     estimate_bound_work,
 )
 from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
-from sol_execbench.core.scoring.amd_hardware_models import EstimateConfidence
+from sol_execbench.core.scoring.confidence import EstimateConfidence
 from sol_execbench.core.scoring.amd_sol_models import GraphNode, WorkEstimate
 
 def estimate_work(

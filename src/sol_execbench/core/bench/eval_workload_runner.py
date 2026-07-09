@@ -20,15 +20,12 @@ from sol_execbench.core.bench.eval_correctness import (
     run_correctness_rounds,
     set_evaluation_seed,
 )
-from sol_execbench.core.bench.eval_runtime import (
-    measure_latency,
-    measure_reference_latency,
+from sol_execbench.core.bench.eval_timing import (
+    load_required_safetensors,
+    measure_optional_reference_latency,
+    measure_solution_latency,
 )
 from sol_execbench.core.bench.eval_trace_helpers import WorkloadTraceEmitter
-from sol_execbench.core.bench.io import (
-    allocate_outputs,
-    load_safetensors,
-)
 from sol_execbench.core.bench.reward_hack import (
     RewardHackDetected,
     check_monkey_patch,
@@ -91,7 +88,6 @@ def evaluate_workloads(
 
     set_evaluation_seed(bench_config.seed)
     inputs = None
-    timing_outputs = None
     custom_inputs_fn = (
         ref_namespace.get(definition.custom_inputs_entrypoint)
         if definition.custom_inputs_entrypoint
@@ -100,25 +96,24 @@ def evaluate_workloads(
 
     for row_index, workload in enumerate(workloads):
         inputs = None
-        timing_outputs = None
         gc.collect()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
         resolved_axes = definition.get_resolved_axes_values(workload.axes)
 
-        safe_tensors: dict = {}
-        if any(value.type == "safetensors" for value in workload.inputs.values()):
-            try:
-                safe_tensors = load_safetensors(
-                    definition, workload, list(safetensors_roots)
-                )
-            except Exception as exc:
-                emitter.emit_status(
-                    workload,
-                    EvaluationStatus.RUNTIME_ERROR,
-                    extra_msg=f"Failed to load safetensors: {exc}",
-                )
-                continue
+        try:
+            safe_tensors = load_required_safetensors(
+                definition=definition,
+                workload=workload,
+                safetensors_roots=list(safetensors_roots),
+            )
+        except Exception as exc:
+            emitter.emit_status(
+                workload,
+                EvaluationStatus.RUNTIME_ERROR,
+                extra_msg=f"Failed to load safetensors: {exc}",
+            )
+            continue
 
         correctness_result = run_correctness_rounds(
             definition=definition,
@@ -158,22 +153,16 @@ def evaluate_workloads(
             torch.cuda.empty_cache()
 
         try:
-            timing_outputs = (
-                allocate_outputs(definition, resolved_axes, device)
-                if destination_passing_style
-                else []
-            )
-            sol_timing = measure_latency(
-                user_fn,
-                inputs,
-                timing_outputs,
-                device,
+            sol_latency_ms = measure_solution_latency(
+                definition=definition,
+                resolved_axes=resolved_axes,
+                device=device,
+                destination_passing_style=destination_passing_style,
+                user_fn=user_fn,
+                inputs=inputs,
                 warmup=bench_config.warmup_runs,
                 rep=bench_config.iterations,
             )
-            if sol_timing.failure is not None:
-                raise RuntimeError(sol_timing.failure)
-            sol_latency_ms = sol_timing.latency_ms
         except Exception as exc:
             emitter.emit_status(
                 workload,
@@ -190,18 +179,14 @@ def evaluate_workloads(
         ):
             continue
 
-        ref_latency_ms = 0.0
-        ref_timing_failure = None
-        if bench_config.benchmark_reference:
-            ref_timing = measure_reference_latency(
-                ref_fn,
-                inputs,
-                device,
-                warmup=bench_config.warmup_runs,
-                rep=bench_config.iterations,
-            )
-            ref_latency_ms = ref_timing.latency_ms
-            ref_timing_failure = ref_timing.failure
+        ref_latency_ms, ref_timing_failure = measure_optional_reference_latency(
+            benchmark_reference=bench_config.benchmark_reference,
+            ref_fn=ref_fn,
+            inputs=inputs,
+            device=device,
+            warmup=bench_config.warmup_runs,
+            rep=bench_config.iterations,
+        )
 
         speedup = ref_latency_ms / sol_latency_ms if sol_latency_ms > 0 else 0.0
         emitter.emit_status(

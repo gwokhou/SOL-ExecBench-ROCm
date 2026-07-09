@@ -7,10 +7,10 @@ from __future__ import annotations
 
 from sol_execbench.core.scoring.amd_sol import (
     AmdSolBoundArtifact,
-    EstimateConfidence,
     HardwareValidationStatus,
 )
 from sol_execbench.core.scoring.amd_sol_v2 import AmdSolBoundV2Artifact
+from sol_execbench.core.scoring.confidence import EstimateConfidence
 from sol_execbench.core.scoring.solar_derivation import (
     SolarAggregateStatus,
     SolarDerivationEvidence,

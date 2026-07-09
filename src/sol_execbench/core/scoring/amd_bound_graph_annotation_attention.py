@@ -15,7 +15,7 @@ from sol_execbench.core.scoring.amd_bound_graph_models import (
     BoundGraphNode,
     OpFamily,
 )
-from sol_execbench.core.scoring.amd_hardware_models import EstimateConfidence
+from sol_execbench.core.scoring.confidence import EstimateConfidence
 
 def _annotate_attention_graph(graph: BoundGraph) -> BoundGraph:
     """Promote visible dense attention chains into attention-family graph nodes."""

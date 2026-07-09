@@ -12,7 +12,7 @@ from sol_execbench.core.scoring.amd_bound_graph_models import (
     BoundGraphNode,
     OpFamily,
 )
-from sol_execbench.core.scoring.amd_hardware_models import EstimateConfidence
+from sol_execbench.core.scoring.confidence import EstimateConfidence
 
 from sol_execbench.core.scoring.amd_bound_estimate_common import (
     _attention_dims_from_attributes,

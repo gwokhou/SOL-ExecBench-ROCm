@@ -9,7 +9,7 @@ from typing import Any
 
 from sol_execbench.core.scoring.parsing_utils import parse_optional_str as _parse_optional_str
 from sol_execbench.core.scoring.parsing_utils import parse_str as _parse_str
-from sol_execbench.core.scoring.solar_derivation_models import SolarEvidenceSource
+from sol_execbench.core.scoring.solar_derivation_evidence_models import SolarEvidenceSource
 from sol_execbench.core.scoring.solar_derivation_status import SOLAR_DERIVATION_SOURCE_BOUNDARY_FIELDS
 
 from .solar_derivation_parse_utils import _require_exact_keys

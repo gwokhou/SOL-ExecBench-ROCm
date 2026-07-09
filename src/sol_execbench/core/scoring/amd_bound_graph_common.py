@@ -14,7 +14,7 @@ from sol_execbench.core.scoring.amd_bound_classification import (
     dtype_method_target as _dtype_method_target,
     movement_kind_for_name as _movement_kind_for_name,
 )
-from sol_execbench.core.scoring.amd_bound_graph_models import OpFamily
+from sol_execbench.core.scoring.amd_bound_graph_enums import OpFamily
 
 def _fx_tensor_meta(node: Any) -> tuple[tuple[int, ...] | None, str | None]:
     meta = node.meta.get("tensor_meta") if hasattr(node, "meta") else None

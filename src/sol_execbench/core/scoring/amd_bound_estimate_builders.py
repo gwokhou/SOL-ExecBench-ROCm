@@ -17,7 +17,7 @@ from sol_execbench.core.scoring.amd_bound_graph_models import (
     BoundGraphNode,
     OpFamily,
 )
-from sol_execbench.core.scoring.amd_hardware_models import EstimateConfidence
+from sol_execbench.core.scoring.confidence import EstimateConfidence
 
 
 def pointwise_estimate(

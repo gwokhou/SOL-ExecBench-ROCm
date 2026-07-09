@@ -16,7 +16,7 @@ from sol_execbench.core.scoring.amd_bound_graph_models import (
     BoundGraphNode,
     OpFamily,
 )
-from sol_execbench.core.scoring.amd_hardware_models import EstimateConfidence
+from sol_execbench.core.scoring.confidence import EstimateConfidence
 
 def _annotate_moe_graph(graph: BoundGraph) -> BoundGraph:
     """Promote only visible MoE routing primitives into family evidence."""

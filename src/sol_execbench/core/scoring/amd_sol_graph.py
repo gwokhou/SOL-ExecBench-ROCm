@@ -12,7 +12,7 @@ from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import RandomInput, Workload
 from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
 from sol_execbench.core.scoring.amd_bound_graph_models import BoundGraphNode, OpFamily
-from sol_execbench.core.scoring.amd_hardware_models import EstimateConfidence
+from sol_execbench.core.scoring.confidence import EstimateConfidence
 from sol_execbench.core.scoring.amd_sol_models import GraphNode
 
 def extract_graph(definition: Definition) -> tuple[GraphNode, ...]:

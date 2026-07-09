@@ -8,7 +8,7 @@ from __future__ import annotations
 from math import isfinite
 from typing import Any
 
-from sol_execbench.core.scoring.amd_hardware_models import EstimateConfidence
+from sol_execbench.core.scoring.confidence import EstimateConfidence
 from sol_execbench.core.scoring.parsing_utils import (
     ensure_dict as _ensure_dict,
     parse_list as _parse_list,

@@ -8,8 +8,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from sol_execbench.core.scoring.amd_bound_graph_models import OpFamily
-from sol_execbench.core.scoring.amd_hardware_models import EstimateConfidence
+from sol_execbench.core.scoring.amd_bound_graph_enums import OpFamily
+from sol_execbench.core.scoring.confidence import EstimateConfidence
 
 
 @dataclass(frozen=True)

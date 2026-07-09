@@ -30,9 +30,13 @@ from typing import Any, Optional
 
 import click
 
-from . import static_evidence as cli_static_evidence
-from .commands import dispatch_subcommand
-from .evaluator import PROFILE_NONE, PROFILE_ROCPROFV3, run_evaluation_cli
+import sol_execbench.cli.static_evidence as cli_static_evidence
+from sol_execbench.cli.commands import dispatch_subcommand
+from sol_execbench.cli.evaluator import (
+    PROFILE_NONE,
+    PROFILE_ROCPROFV3,
+    run_evaluation_cli,
+)
 
 _COMPILE_PROGRESS_TEXT = "Compiling HIP/C++ solution..."
 

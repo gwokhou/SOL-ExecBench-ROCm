@@ -29,7 +29,7 @@ from sol_execbench.core.scoring.amd_bound_graph_models import (
     BoundTensor,
     OpFamily,
 )
-from sol_execbench.core.scoring.amd_hardware_models import EstimateConfidence
+from sol_execbench.core.scoring.confidence import EstimateConfidence
 
 
 def _classify_fx_node(node: Any) -> tuple[str, _CallClassification, str | None]:

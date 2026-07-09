@@ -12,9 +12,9 @@ from sol_execbench.core.data.path_access import (
     path_require,
 )
 from sol_execbench.core.scoring.amd_hardware_models import (
-    EstimateConfidence,
     amd_hardware_model_from_dict,
 )
+from sol_execbench.core.scoring.confidence import EstimateConfidence
 from sol_execbench.core.scoring.amd_sol_v2 import (
     AMD_SOL_V2_SCHEMA_VERSION,
     AmdSolBoundV2Artifact,
