@@ -1,88 +1,127 @@
 ---
 generated_by: gsd-map-codebase
+generated_on: 2026-07-09
+last_mapped_commit: cc007cd3af3e5100f7d86f155a40d5e51ffb57e5
 focus: tech
-mapped_at: 2026-06-16
 ---
 
 # Technology Stack
 
 ## Runtime
 
-- Python package using Python `>=3.12,<3.14`, configured in `pyproject.toml`.
-- Package source lives under `src/sol_execbench/`.
-- Build backend is Hatchling through `[build-system]` in `pyproject.toml`.
-- Dependency and command execution are managed with `uv`.
-- Public console scripts:
-  - `sol-execbench = sol_execbench.cli:cli`
-  - `sol-execbench-baseline = sol_execbench.cli.baseline:cli`
+SOL ExecBench ROCm Port is a Python package under `src/sol_execbench/` requiring
+Python `>=3.12,<3.14`. Packaging is defined in `pyproject.toml` with Hatchling
+and `uv`-managed dependencies. The primary executable is `sol-execbench`,
+implemented by `sol_execbench.cli.main:cli`; a second baseline comparison entry
+point is `sol-execbench-baseline`.
 
-## Primary Libraries
+## Core Dependencies
 
-- `torch` and `torchvision` are pinned to ROCm wheels on Linux x86_64:
-  `torch==2.10.0+rocm7.1` and `torchvision==0.25.0+rocm7.1`.
-- Non-Linux or non-x86_64 environments resolve non-ROCm `torch==2.10.0` and
-  `torchvision==0.25.0` wheels for CPU-safe development.
-- `triton-rocm==3.6.0` is enabled on Linux x86_64 through the PyTorch wheel
-  index in `pyproject.toml`.
-- `pydantic>=2.12.5` models public schemas in `src/sol_execbench/core/data/`.
-- `click>=8.0` and `rich>=13.0` implement CLI parsing and terminal output in
-  `src/sol_execbench/cli/main.py`.
-- `safetensors>=0.7.0` supports workload inputs in
-  `src/sol_execbench/core/bench/io.py`.
-- `datasets>=4.8.2` supports dataset workflows.
-- `ninja>=1.13.0`, `torch-c-dlpack-ext>=0.1.5`, and
-  `apache-tvm-ffi>=0.1.9` are runtime dependencies.
+- `torch==2.10.0+rocm7.1` on Linux x86_64 via the `pytorch-rocm71` uv index.
+- `torchvision==0.25.0+rocm7.1` on Linux x86_64 via the same ROCm index.
+- `triton-rocm==3.6.0` from the PyTorch ROCm wheel root on Linux x86_64.
+- `pydantic>=2.12.5` for all public schemas in `src/sol_execbench/core/data/`.
+- `click>=8.0` and `rich>=13.0` for the CLI and terminal output.
+- `datasets>=4.8.2`, `safetensors>=0.7.0`, `glom>=25.12.0`, `torch-c-dlpack-ext>=0.1.5`, and `apache-tvm-ffi>=0.1.9` for dataset, tensor, and integration workflows.
+- `ninja>=1.13.0` for native extension builds through PyTorch.
 
-## Development Tooling
+Non-Linux or non-x86_64 platforms resolve to CPU/non-ROCm PyTorch wheels so
+schema, docs, and CPU-safe tests can still run.
 
-- Dev dependency group in `pyproject.toml` includes `pytest`, `pytest-xdist`,
-  `ruff`, `ty`, and `pre-commit`.
-- Ruff lint/format configuration lives in `[tool.ruff]` and `[tool.ruff.lint]`.
-- Ty source scope is `src` and `tests` via `[tool.ty.src]`.
-- Pytest default options are `-n 8 --dist loadgroup` to avoid PyTorch/ROCm
-  worker memory blowups.
-- GitHub Actions workflow `.github/workflows/code-quality.yml` runs on Python
-  3.12 and 3.13 with `uv sync --locked --all-groups`, Ruff, Ty, CPU-safe package
-  tests, and example consistency tests.
-- `.pre-commit-config.yaml` runs Ruff check/format, a DCO sign-off check, and a
-  pre-push Ty check.
+## GPU And Native Toolchain
 
-## GPU And Native Tooling
+The project targets ROCm `>=7.0`, with package metadata and Docker targets
+currently aligned to ROCm 7.1 wheel sets. Native solution categories are built
+through `torch.utils.cpp_extension` from staged HIP/C++ sources using
+`src/sol_execbench/driver/templates/build_ext.py`.
 
-- ROCm is the only supported GPU runtime target.
-- Native solution categories include HIP/C++, hipBLAS, MIOpen, Composable
-  Kernel, and rocWMMA through `src/sol_execbench/core/data/solution.py`.
-- Native extension builds are staged by `src/sol_execbench/driver/problem_packager.py`
-  and `src/sol_execbench/driver/templates/build_ext.py`.
-- Evaluation runtime uses HIP-backed PyTorch through the historical
-  `torch.cuda` namespace.
-- `rocprofv3` profiling integration lives in
-  `src/sol_execbench/core/bench/rocm_profiler.py`.
-- Static kernel artifact extraction lives in
-  `src/sol_execbench/core/bench/static_kernel_evidence.py`.
-- Clock locking and timing policy helpers live in
-  `src/sol_execbench/core/bench/clock_lock.py`,
-  `src/sol_execbench/core/bench/timing.py`, and
-  `src/sol_execbench/core/bench/timing_policy.py`.
+Supported solution language categories are declared in
+`src/sol_execbench/core/data/solution_models.py`:
 
-## Configuration Sources
+- `pytorch`
+- `triton`
+- `hip_cpp`
+- `hipblas`
+- `miopen`
+- `ck`
+- `rocwmma`
 
-- Project metadata, dependencies, pytest markers, Ruff, Ty, and uv indexes:
-  `pyproject.toml`.
-- Docker target metadata: `docker/rocm-targets.json`.
-- Docker image and runtime setup: `docker/Dockerfile`, `docker/entrypoint.sh`,
-  and `scripts/run_docker.sh`.
-- Benchmark runtime config model: `src/sol_execbench/core/bench/config/`.
-- Packaged AMD hardware model data: `src/sol_execbench/data/amd_hardware_models/gfx1200.json`.
-- Local downloaded datasets and benchmark assets belong under `data/`.
+The project intentionally rejects legacy CUDA/NVIDIA schema values such as
+`cuda_cpp`, `cublas`, `cudnn`, `cutlass`, `cute_dsl`, and `cutile`.
 
-## Common Commands
+## CLI And Application Framework
 
-- Install dependencies: `uv sync --all-groups`.
-- Run one problem: `uv run sol-execbench <problem_dir> --solution <solution-path>`.
-- Compare traces: `uv run sol-execbench-baseline --candidate <file> --baseline <file>`.
-- Run dataset batch: `uv run scripts/run_dataset.py <downloaded-benchmark-dir> --limit 5`.
-- Run full tests: `uv run pytest tests/`.
-- Lint: `uv run --with ruff ruff check .`.
-- Format: `uv run --with ruff ruff format .`.
-- Build/run ROCm container: `./scripts/run_docker.sh --build`.
+`Click` owns command parsing in `src/sol_execbench/cli/main.py` and
+`src/sol_execbench/cli/commands/`. `Rich` is used for user-facing progress,
+tables, and status output in the evaluator path. The root command dispatches
+GPU-free metadata subcommands before falling back to evaluation.
+
+Important command areas:
+
+- `src/sol_execbench/cli/commands/root.py` for metadata dispatch.
+- `src/sol_execbench/cli/commands/baseline.py` for trace baseline comparison and export.
+- `src/sol_execbench/cli/commands/dataset.py` for local dataset migration commands.
+- `src/sol_execbench/cli/commands/environment.py` and `src/sol_execbench/cli/commands/metadata.py` for diagnostics and contract output.
+- `src/sol_execbench/cli/evaluation/` for the root evaluation workflow.
+
+## Data And Validation
+
+Pydantic v2 models define benchmark contracts:
+
+- `src/sol_execbench/core/data/definition.py` and related `definition_*` modules.
+- `src/sol_execbench/core/data/workload.py`.
+- `src/sol_execbench/core/data/solution.py`, `solution_instance.py`, and `solution_models.py`.
+- `src/sol_execbench/core/data/trace.py`.
+- `src/sol_execbench/core/bench/config/benchmark_config.py`.
+
+Models use project-specific base classes in `src/sol_execbench/core/data/base_model.py`
+and include ROCm-specific validators for language categories, compile options,
+source path traversal, target hardware, and entry-point compatibility.
+
+## Scoring And Reports
+
+Scoring logic lives in `src/sol_execbench/core/scoring/` and includes AMD-bound
+estimates, AMD SOL artifacts, official score helpers, confidence helpers, and
+solar derivation evidence parsing. Report builders live in
+`src/sol_execbench/core/reports/` and cover consistency, matrix diffs, claim
+upgrade evaluation, trust summaries, and evaluation stability.
+
+## Dataset And Evidence Tooling
+
+Dataset helpers live in `src/sol_execbench/core/dataset/` with subpackages for
+inventory, migration, execution closure, paper denominator reporting, parity
+gaps, readiness, sharding, and profiler timing coverage. Operator scripts in
+`scripts/` and `scripts/internal/` call into these package modules rather than
+duplicating all logic.
+
+Evidence and sidecar logic is split across:
+
+- `src/sol_execbench/core/evidence/` for runtime evidence references and collectors.
+- `src/sol_execbench/core/bench/rocm_profiler/` for `rocprofv3` commands, artifacts, parsing, and timing.
+- `src/sol_execbench/core/bench/static_kernel/` for static kernel evidence sidecars.
+- `src/sol_execbench/core/bench/profile_summary/` for profile summary sidecars.
+- `src/sol_execbench/core/bench/agent_feedback/` for bounded diagnostic feedback artifacts.
+
+## Tooling
+
+Development commands are defined by convention rather than a task runner:
+
+- `uv sync --all-groups`
+- `uv run pytest tests/`
+- `uv run --with ruff ruff check .`
+- `uv run --with ruff ruff format .`
+- `uv run ty check`
+- `./scripts/run_docker.sh --build`
+
+CI is defined in `.github/workflows/code-quality.yml` and runs on Python 3.12
+and 3.13 with `uv sync --locked --all-groups`, Ruff, Ty, and CPU-safe pytest
+subsets.
+
+## Container Stack
+
+`docker/Dockerfile` builds the ROCm environment and verifies tool availability
+including `hipcc`, `rocprofv3`, Python dependencies, PyTorch ROCm, Triton ROCm,
+and ROCm library headers. `docker/rocm-targets.json` declares supported target
+matrices and dependency versions. `scripts/run_docker.sh` wraps Docker build and
+runtime invocation, including ROCm device passthrough and dependency argument
+routing.
