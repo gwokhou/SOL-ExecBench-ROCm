@@ -13,7 +13,7 @@ from pydantic import BeforeValidator, ConfigDict, Field
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 
 
-STATIC_KERNEL_EVIDENCE_SCHEMA_VERSION = "sol_execbench.static_kernel_evidence.v1"
+STATIC_KERNEL_EVIDENCE_SCHEMA_VERSION = "sol_execbench.static_kernel_evidence.v2"
 _STATIC_MODEL_CONFIG = ConfigDict(
     extra="forbid",
     frozen=True,
@@ -114,6 +114,66 @@ class StaticKernelEvidenceClassification(BaseModelWithDocstrings):
     """Number of detected symbols when known."""
 
 
+class StaticResourceFootprintIdentity(BaseModelWithDocstrings):
+    """Freshness identity for a static resource footprint."""
+
+    model_config = _STATIC_MODEL_CONFIG
+
+    artifact_id: str
+    """Artifact this footprint was derived from."""
+    extractor_tool_id: str
+    """Extractor tool that produced the footprint."""
+    source_sha256: str | None = None
+    """SHA256 of the source artifact content when available."""
+    generated_at: str | None = None
+    """UTC timestamp when the footprint was generated, when available."""
+
+
+class StaticResourceFootprint(BaseModelWithDocstrings):
+    """Per-kernel resource footprint derived from routed static extractors."""
+
+    model_config = _STATIC_MODEL_CONFIG
+
+    identity: StaticResourceFootprintIdentity | None = None
+    """Freshness identity for this footprint when available."""
+    vgpr_used: int | None = Field(default=None, ge=0)
+    """Vector general-purpose registers used by the kernel when known."""
+    sgpr_used: int | None = Field(default=None, ge=0)
+    """Scalar general-purpose registers used by the kernel when known."""
+    lds_bytes: int | None = Field(default=None, ge=0)
+    """Local Data Share bytes allocated by the kernel when known."""
+    scratch_bytes: int | None = Field(default=None, ge=0)
+    """Scratch memory bytes spilled by the kernel when known."""
+    spill_detected: bool | None = None
+    """Whether register spilling was detected when known."""
+    occupancy_estimate_waves_per_cu: int | None = Field(default=None, ge=0)
+    """Conservative occupancy estimate in waves per CU when known."""
+    wavefront_size: int | None = Field(default=None, ge=0)
+    """Wavefront size assumed by the footprint when known."""
+    source_tool: str | None = None
+    """Tool that produced this footprint, such as ``roc-objdump``."""
+    source_confidence: str | None = None
+    """Confidence of the footprint values when known."""
+    diagnostic_only: Literal[True] = True
+    """Resource footprint is diagnostic metadata only."""
+    correctness_authority: Literal[False] = False
+    """Resource footprint never proves correctness."""
+    performance_authority: Literal[False] = False
+    """Resource footprint never proves performance."""
+    timing_authority: Literal[False] = False
+    """Resource footprint never proves benchmark timing."""
+    score_authority: Literal[False] = False
+    """Resource footprint never proves score validity."""
+    paper_parity_authority: Literal[False] = False
+    """Resource footprint never proves paper parity."""
+    leaderboard_authority: Literal[False] = False
+    """Resource footprint never proves leaderboard readiness."""
+    source_references: list[StaticKernelEvidenceSourceReference] = Field(
+        default_factory=list
+    )
+    """References supporting this footprint."""
+
+
 class StaticKernelEvidenceKernel(BaseModelWithDocstrings):
     """Conservative kernel symbol metadata."""
 
@@ -129,6 +189,8 @@ class StaticKernelEvidenceKernel(BaseModelWithDocstrings):
         default_factory=list
     )
     """References supporting this kernel metadata."""
+    footprint: StaticResourceFootprint | None = None
+    """Per-kernel resource footprint when routed extractors produced one."""
 
 
 class StaticKernelEvidenceArtifact(BaseModelWithDocstrings):
@@ -198,7 +260,7 @@ class StaticKernelEvidenceSidecar(BaseModelWithDocstrings):
 
     model_config = _STATIC_MODEL_CONFIG
 
-    schema_version: Literal["sol_execbench.static_kernel_evidence.v1"] = (
+    schema_version: Literal["sol_execbench.static_kernel_evidence.v2"] = (
         STATIC_KERNEL_EVIDENCE_SCHEMA_VERSION
     )
     """Static kernel evidence schema version."""
@@ -230,6 +292,8 @@ class StaticKernelEvidenceSidecar(BaseModelWithDocstrings):
     """Static evidence tool-run records."""
     kernels: list[StaticKernelEvidenceKernel] = Field(default_factory=list)
     """Conservative kernel metadata entries."""
+    footprints: list[StaticResourceFootprint] = Field(default_factory=list)
+    """Per-kernel resource footprints when routed extractors produced them."""
     warnings: list[StaticKernelEvidenceWarning] = Field(default_factory=list)
     """Nonfatal static evidence warnings."""
     source_references: list[StaticKernelEvidenceSourceReference] = Field(

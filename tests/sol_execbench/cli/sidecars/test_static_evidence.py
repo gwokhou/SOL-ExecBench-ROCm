@@ -60,7 +60,7 @@ def test_static_evidence_sidecar_writes_summary(tmp_path: Path):
     assert written == tmp_path / "trace.jsonl.static-evidence.json"
     assert written is not None
     payload = json.loads(written.read_text())
-    assert payload["schema_version"] == "sol_execbench.static_kernel_evidence.v1"
+    assert payload["schema_version"] == "sol_execbench.static_kernel_evidence.v2"
     assert payload["summary"]["status"] == "collected"
     assert payload["summary"]["artifact_count"] == 1
     assert payload["summary"]["claim_boundaries"]["diagnostic_only"] is True

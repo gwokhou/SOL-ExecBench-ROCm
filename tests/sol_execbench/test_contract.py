@@ -33,6 +33,8 @@ OPTIONAL_CAPABILITIES = {
     "static_kernel.evidence",
     "agent_feedback.sidecar",
     "profile_summary.sidecar",
+    "environment_budget.sidecar",
+    "static_resource_footprint.sidecar",
 }
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CURRENT_CONTRACT_DOC = REPO_ROOT / "docs/EVALUATOR-CONTRACT.md"
@@ -60,7 +62,9 @@ SCHEMA_IDS_NOT_CAPABILITIES = {
     "sol_execbench.official_score_evidence.v1",
     "sol_execbench.agent_feedback.v2",
     "sol_execbench.profile_summary.v2",
-    "sol_execbench.static_kernel_evidence.v1",
+    "sol_execbench.static_kernel_evidence.v2",
+    "sol_execbench.environment_snapshot.v2",
+    "sol_execbench.arch_capability_budget.v1",
 }
 ACTIVE_STALE_TOKEN_SCAN_ROOTS = (REPO_ROOT / "src", REPO_ROOT / "tests")
 ACTIVE_STALE_TOKEN_SUFFIXES = {".json", ".py"}
@@ -200,6 +204,8 @@ def test_evaluator_contract_advertises_optional_evidence_without_bump():
     } >= {
         ("sol", "agent_feedback", "diagnostic"),
         ("sol", "profile_summary", "diagnostic"),
+        ("sol", "environment_budget", "diagnostic"),
+        ("sol", "static_resource_footprint", "diagnostic"),
     }
 
 

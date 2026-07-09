@@ -12,6 +12,9 @@ from pathlib import Path
 from sol_execbench.core.bench.static_kernel.evidence_builders import (
     build_static_kernel_evidence_sidecar,
 )
+from sol_execbench.core.bench.static_kernel.footprint_parsers import (
+    parse_roc_objdump_resource_usage,
+)
 from sol_execbench.core.bench.static_kernel.evidence_models import (
     StaticKernelEvidenceArtifact,
     StaticKernelEvidenceReasonCode,
@@ -20,6 +23,7 @@ from sol_execbench.core.bench.static_kernel.evidence_models import (
     StaticKernelEvidenceStatus,
     StaticKernelEvidenceToolRun,
     StaticKernelEvidenceWarning,
+    StaticResourceFootprint,
 )
 from sol_execbench.core.bench.static_kernel.extractor_execution import (
     ExtractorRunner,
@@ -45,6 +49,7 @@ from sol_execbench.core.platform.toolchain import (
 
 
 _STATIC_EXTRACTOR_TOOL_IDS = ("llvm-objdump", "readelf")
+_FOOTPRINT_EXTRACTOR_TOOL_IDS = ("roc-objdump",)
 
 
 def run_static_kernel_extractors(
@@ -164,12 +169,96 @@ def run_static_kernel_extractors(
             if raw_artifact is not None:
                 output_artifacts.append(raw_artifact)
 
+    footprints = _collect_resource_footprints(
+        artifacts=artifacts,
+        sidecar_base=sidecar_base,
+        evidence_root=evidence_root,
+        probe_runner=probe_runner,
+        which=which,
+        registry=effective_registry,
+        runner=runner,
+        timeout_seconds=timeout_seconds,
+        output_artifacts=output_artifacts,
+    )
     all_artifacts = list(artifacts) + output_artifacts
     return build_static_kernel_evidence_sidecar(
         status=_aggregate_extractor_status(tool_runs),
         reason_code=_aggregate_extractor_reason(tool_runs),
         artifacts=all_artifacts,
         tool_runs=tool_runs,
+        footprints=footprints,
         warnings=warnings,
         classification=_classification_from_tool_runs(tool_runs, artifacts),
     )
+
+
+def _collect_resource_footprints(
+    *,
+    artifacts: Sequence[StaticKernelEvidenceArtifact],
+    sidecar_base: Path,
+    evidence_root: Path,
+    probe_runner: ProbeRunner | None,
+    which: Which,
+    registry: Sequence[ToolchainCapability] | None,
+    runner: ExtractorRunner | None,
+    timeout_seconds: float,
+    output_artifacts: list[StaticKernelEvidenceArtifact],
+) -> list[StaticResourceFootprint]:
+    """Run routed footprint extractors (``roc-objdump``) as an enhancement.
+
+    Footprint extractors are optional enhancements over the base static
+    evidence: when a tool is unavailable it is skipped silently rather than
+    downgrading the aggregate static evidence status. Successful runs append
+    their raw output artifact for diagnostics and contribute a parsed
+    ``StaticResourceFootprint``.
+    """
+
+    footprints: list[StaticResourceFootprint] = []
+    for artifact in artifacts:
+        artifact_type = toolchain_artifact_type_for_static_artifact(artifact)
+        if artifact_type is None:
+            continue
+        artifact_path = _artifact_persisted_path(artifact, sidecar_base)
+        if artifact_path is None or not artifact_path.is_file():
+            continue
+        for tool_id in _FOOTPRINT_EXTRACTOR_TOOL_IDS:
+            route_decision = _route_static_tool(
+                tool_id=tool_id,
+                artifact_type=artifact_type,
+                registry=registry,
+                runner=probe_runner,
+                which=which,
+                timeout_seconds=timeout_seconds,
+            )
+            if (
+                route_decision is None
+                or route_decision.status != ToolchainStatus.AVAILABLE
+            ):
+                continue
+            command = _extractor_command(tool_id, artifact_path)
+            tool_run, raw_artifact = _run_static_extractor(
+                tool_id=tool_id,
+                command=command,
+                artifact=artifact,
+                evidence_root=evidence_root,
+                sidecar_base=sidecar_base,
+                timeout_seconds=timeout_seconds,
+                runner=runner,
+            )
+            if raw_artifact is not None:
+                output_artifacts.append(raw_artifact)
+            if (
+                tool_run.status == StaticKernelEvidenceStatus.COLLECTED
+                and raw_artifact is not None
+            ):
+                raw_path = _artifact_persisted_path(raw_artifact, sidecar_base)
+                if raw_path is not None and raw_path.is_file():
+                    text = raw_path.read_text(encoding="utf-8", errors="replace")
+                    footprint = parse_roc_objdump_resource_usage(
+                        text,
+                        artifact_id=artifact.artifact_id,
+                        source_sha256=raw_artifact.sha256,
+                    )
+                    if footprint is not None:
+                        footprints.append(footprint)
+    return footprints

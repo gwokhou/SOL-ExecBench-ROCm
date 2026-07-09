@@ -40,16 +40,24 @@ optional diagnostics use `optional` or a narrower diagnostic profile.
 | `static_kernel.evidence` | `optional` | Optional static kernel evidence sidecar diagnostics. |
 | `agent_feedback.sidecar` | `profile:diagnostic` | Optional bounded next-experiment feedback diagnostics. |
 | `profile_summary.sidecar` | `profile:diagnostic` | Optional normalized profiler summary diagnostics. |
+| `environment_budget.sidecar` | `profile:diagnostic` | Optional derived arch ISA capability budgets for detected gfx targets. |
+| `static_resource_footprint.sidecar` | `profile:diagnostic` | Optional per-kernel resource usage footprints from routed static extractors. |
 
 Concrete artifact schema versions are separate from contract capability keys.
 `agent_feedback.sidecar` currently emits `sol_execbench.agent_feedback.v2` as
 &lt;trace&gt;.agent-feedback.json. `profile_summary.sidecar` currently emits
 `sol_execbench.profile_summary.v2` as &lt;trace&gt;.profile-summary.json when a
-trace output path is available. Static kernel evidence remains the concrete
-`sol_execbench.static_kernel_evidence.v1` sidecar schema behind the
-`static_kernel.evidence` capability key. Current ROCm profiling metadata is
-still emitted separately as the trace-adjacent &lt;trace&gt;.profile.json
-rocprofv3 sidecar.
+trace output path is available. Static kernel evidence emits the concrete
+`sol_execbench.static_kernel_evidence.v2` sidecar schema (now carrying
+per-kernel `footprints[]` resource usage) behind the `static_kernel.evidence`
+capability key. `environment_budget.sidecar` advertises the `capability_budgets[]`
+derived from a run's detected gfx targets, sourced from upstream ISA references
+(opengpu/rocm-systems) and emitted under `sol_execbench.environment_snapshot.v2`
+with packaged `sol_execbench.arch_capability_budget.v1` budgets.
+`static_resource_footprint.sidecar` advertises the resource-usage footprints
+surfaced by routed static extractors such as `roc-objdump`. Current ROCm
+profiling metadata is still emitted separately as the trace-adjacent
+&lt;trace&gt;.profile.json rocprofv3 sidecar.
 
 These capabilities are intentionally optional unless their level is `always`.
 A compatible consumer must keep working when a SOL version only provides
@@ -125,3 +133,8 @@ closed-taxonomy `ProfileDigest` mapping, strategy hints, and prompt assembly.
 
 This split keeps optional feedback useful for next-turn diagnostics without
 making prompt-facing summaries part of the benchmark authority model.
+
+`environment_budget.sidecar` and `static_resource_footprint.sidecar` carry
+diagnostic-only facts (arch ISA budgets and per-kernel resource usage). They are
+inputs for a separate Decision sidecar workflow and are not correctness,
+performance, timing, score, paper-parity, or leaderboard authority.
