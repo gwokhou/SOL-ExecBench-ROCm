@@ -10,15 +10,15 @@ Repository evidence reviewed for this adaptation includes external
 hip-execbench source surfaces for profiler routing, error modeling, agent
 feedback, baseline comparison, schemas, and statistics, mapped against SOL
 ExecBench ROCm surfaces
-`src/sol_execbench/core/bench/rocm_profiler.py`,
-`src/sol_execbench/core/diagnostics.py`, `src/sol_execbench/core/reporting.py`,
-`src/sol_execbench/core/baseline.py`, `src/sol_execbench/core/data/trace.py`,
-and `src/sol_execbench/core/scoring/amd_score.py`.
+`src/sol_execbench/core/bench/rocm_profiler/`,
+`src/sol_execbench/core/platform/diagnostics.py`, `src/sol_execbench/core/reports/reporting.py`,
+`src/sol_execbench/core/evidence/baseline.py`, `src/sol_execbench/core/data/trace.py`,
+and `src/sol_execbench/core/scoring/amd_score/`.
 
 The external hip-execbench references used for classification were
-`src/profiler/router.ts`, `src/errors/index.ts`, `src/agent/builder.ts`,
-`src/baseline/comparator.ts`, `src/schemas/*.ts`, and
-`src/pipeline/statistics.ts`.
+the profiler router, errors index, agent builder,
+baseline comparator, schema modules, and
+pipeline statistics modules.
 
 ## Accepted Practices
 
@@ -53,8 +53,10 @@ The external hip-execbench references used for classification were
 - Adaptations must be internal helpers, tests, or documentation unless a later
   milestone explicitly approves a public contract change.
 - Existing benchmark definition, workload, solution, and trace JSONL
-  formats are compatibility contracts. In particular, `definition.json`,
-  `solution.json`, and trace JSONL remain SOL-owned public surfaces.
+  formats are compatibility contracts. In particular, files such as
+  `examples/hip_cpp/rmsnorm/definition.json`,
+  `tests/sol_execbench/samples/gqa_paged_decode/solution.json`, and trace
+  JSONL remain SOL-owned public surfaces.
 - SOL-Score-style output must not be presented as an AMD-native hardware claim
   until a dedicated AMD interpretation model is defined and validated.
 - Baseline comparison is baseline-relative by default. It may be used for local

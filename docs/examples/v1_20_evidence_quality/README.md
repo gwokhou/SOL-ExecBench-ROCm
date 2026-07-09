@@ -14,8 +14,8 @@ are synthetic `sha256:` strings.
 
 Fixture set:
 
-- `trust_summary.consistent.demo.json`
-- `consistency.contradictory.demo.json`
-- `evaluation_stability.noisy.demo.json`
-- `claim_upgrade.blocked.demo.json`
-- `trust_summary.missing.demo.json`
+- `docs/examples/v1_20_evidence_quality/trust_summary.consistent.demo.json`
+- `docs/examples/v1_20_evidence_quality/consistency.contradictory.demo.json`
+- `docs/examples/v1_20_evidence_quality/evaluation_stability.noisy.demo.json`
+- `docs/examples/v1_20_evidence_quality/claim_upgrade.blocked.demo.json`
+- `docs/examples/v1_20_evidence_quality/trust_summary.missing.demo.json`

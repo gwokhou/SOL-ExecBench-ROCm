@@ -2,7 +2,7 @@
 
 # SOL ExecBench ROCm Port
 
-[![Version](https://img.shields.io/badge/version-1.0.2-blue.svg)](pyproject.toml)
+[![Version](https://img.shields.io/badge/version-1.0.5-blue.svg)](pyproject.toml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 A ROCm-only fork of SOL ExecBench for evaluating LLM-generated GPU kernel

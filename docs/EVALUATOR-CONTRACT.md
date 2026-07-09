@@ -1,3 +1,4 @@
+<!-- generated-by: gsd-doc-writer -->
 # Evaluator Contract
 
 `sol-execbench contract --json` prints the GPU-free compatibility contract that
@@ -42,12 +43,12 @@ optional diagnostics use `optional` or a narrower diagnostic profile.
 
 Concrete artifact schema versions are separate from contract capability keys.
 `agent_feedback.sidecar` currently emits `sol_execbench.agent_feedback.v2` as
-`<trace>.agent-feedback.json`. `profile_summary.sidecar` currently emits
-`sol_execbench.profile_summary.v2` as `<trace>.profile-summary.json` when a
+&lt;trace&gt;.agent-feedback.json. `profile_summary.sidecar` currently emits
+`sol_execbench.profile_summary.v2` as &lt;trace&gt;.profile-summary.json when a
 trace output path is available. Static kernel evidence remains the concrete
 `sol_execbench.static_kernel_evidence.v1` sidecar schema behind the
 `static_kernel.evidence` capability key. Current ROCm profiling metadata is
-still emitted separately as the trace-adjacent `<trace>.profile.json`
+still emitted separately as the trace-adjacent &lt;trace&gt;.profile.json
 rocprofv3 sidecar.
 
 These capabilities are intentionally optional unless their level is `always`.
@@ -98,7 +99,7 @@ fields.
 ## Feedback Sidecars
 
 `agent_feedback.sidecar`, `profile_summary.sidecar`, and the current
-`<trace>.profile.json` profiler metadata are trace-adjacent diagnostic surfaces.
+&lt;trace&gt;.profile.json profiler metadata are trace-adjacent diagnostic surfaces.
 Their concrete feedback and profile-summary artifact schemas are
 `sol_execbench.agent_feedback.v2` and `sol_execbench.profile_summary.v2`.
 They may guide the next experiment in an agent loop, but they are not:

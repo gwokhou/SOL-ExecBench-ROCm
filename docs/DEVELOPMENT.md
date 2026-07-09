@@ -26,7 +26,9 @@ cd SOL-ExecBench-ROCm
 
 Install runtime and development dependencies with `uv`. The project requires
 Python `>=3.12,<3.14`, and `.python-version` pins local development to Python
-3.12:
+3.12. On Linux x86_64, the checked-in dependency configuration resolves the
+default ROCm stack to PyTorch `2.10.0+rocm7.1`, torchvision
+`0.25.0+rocm7.1`, and `triton-rocm==3.6.0`:
 
 ```bash
 uv sync --all-groups
@@ -57,7 +59,9 @@ configured:
 ```
 
 GPU evaluation requires ROCm-capable AMD hardware, device access to `/dev/kfd`
-and `/dev/dri`, ROCm user-space tooling, and a ROCm PyTorch build.
+and `/dev/dri`, ROCm user-space tooling, and a ROCm PyTorch build. The default
+Docker target is `rocm-7.1.1-ubuntu-24.04-container`; declared targets for
+ROCm 7.0, 7.1, and 7.2 live in `docker/rocm-targets.json`.
 
 ## Build Commands
 
@@ -78,7 +82,9 @@ scripts, and the Docker helper.
 | `uv run sol-execbench dataset migrate-sol <source_root> <output_root>` | Convert locally downloaded SOL-ExecBench inputs into local benchmark layout. |
 | `uv run sol-execbench dataset migrate-flashinfer <source_root> <output_root>` | Convert locally downloaded FlashInfer Trace inputs into local benchmark layout. |
 | `uv run sol-execbench-baseline --candidate <file> --baseline <file>` | Compare trace JSONL files. |
+| `uv run sol-execbench-baseline export --trace <trace-jsonl> --output <baseline-json> --target-id <target>` | Export a measured HIP baseline registry from trace JSONL. |
 | `uv run scripts/run_dataset.py <downloaded-benchmark-dir> --limit 5` | Run a small downloaded dataset batch. |
+| `uv run scripts/run_derived_isolated.py <downloaded-benchmark-dir> -o <output-dir> --status-jsonl <status-jsonl> --log-file <log-file>` | Run derived dataset sidecar generation outside the GPU trace subprocess path. |
 | `uv run python scripts/internal/rdna4/run_rdna4_profiler_timing_coverage.py` | Build RDNA4 profiler-backed timing coverage reports from timing sidecars. |
 | `uv run python scripts/internal/rdna4/run_rdna4_profiler_timing_batch.py --workload-sharded` | Profile missing RDNA4 workload slices independently and aggregate complete manifests. |
 | `uv run python scripts/internal/rdna4/run_rdna4_profiler_partial_failures.py` | Classify partial RDNA4 profiler-backed targets by failure mode and closure decision. |
@@ -101,6 +107,9 @@ valid.
 | `src/sol_execbench/core/data/` | Pydantic v2 schemas for definitions, workloads, solutions, traces, shapes, dtypes, and the evaluator contract. |
 | `src/sol_execbench/core/bench/` | Correctness, timing, clock locking, reward-hack checks, profiler integration, static evidence, IO, and runtime helpers. |
 | `src/sol_execbench/core/dataset/` | Dataset layout, migration, inventory, readiness, manifests, checksums, closure, sharding, parity-gap, and low-precision compatibility helpers. |
+| `src/sol_execbench/core/evidence/` | Baseline export/comparison, runtime evidence aggregation, prerelease validation, and release evidence helpers. |
+| `src/sol_execbench/core/platform/` | ROCm diagnostics, dependency matrix checks, Docker target modeling, and toolchain routing. |
+| `src/sol_execbench/core/reports/` | Claim-upgrade, consistency, evaluation-stability, matrix-diff, and trust-summary report builders. |
 | `src/sol_execbench/core/scoring/` | AMD score, AMD bound estimates and graphs, hardware models, SOL derivation helpers, and baseline artifacts. |
 | `src/sol_execbench/core/` | Shared reporting, compatibility, diagnostics, toolchain routing, Docker matrix, runtime evidence, consistency, stability, trust summary, and claim-upgrade utilities. |
 | `src/sol_execbench/driver/` | Problem staging plus generated HIP/C++ build and evaluation driver templates. |
@@ -160,7 +169,7 @@ hardware validation, paper-scale parity evidence, or leaderboard authority.
 
 Provenance guardrails live outside the evaluator path. `provenance.toml`
 records source attribution classifications, and
-`tests/sol_execbench/test_provenance_policy.py` verifies active SPDX header
+`tests/sol_execbench/core/evidence/test_provenance_policy.py` verifies active SPDX header
 expectations. Header cleanup is source maintenance, not benchmark behavior.
 
 ## Code Style
@@ -236,10 +245,10 @@ Run focused RDNA4 profiler timing closure regressions:
 
 ```bash
 uv run pytest \
-  tests/sol_execbench/test_profiler_timing_coverage.py \
-  tests/sol_execbench/test_rdna4_profiler_timing_batch.py \
-  tests/sol_execbench/test_rdna4_profiler_partial_failures.py \
-  tests/sol_execbench/test_rdna4_profiler_sharded_closure.py -q
+  tests/sol_execbench/core/dataset/test_profiler_timing_coverage.py \
+  tests/sol_execbench/core/bench/test_rdna4_profiler_timing_batch.py \
+  tests/sol_execbench/core/bench/test_rdna4_profiler_partial_failures.py \
+  tests/sol_execbench/core/bench/test_rdna4_profiler_sharded_closure.py -q
 ```
 
 Base markers are declared in `pyproject.toml`; additional hardware and
@@ -305,10 +314,11 @@ The default branch is `main`. No branch naming pattern is documented in
 
 ## CI Expectations
 
-The GitHub Actions code-quality workflow runs on Python 3.12 and 3.13. It
-installs locked dependencies, runs Ruff and Ty, runs the CPU-safe package test
-subset, and runs example consistency checks. It intentionally avoids tests that
-need live ROCm GPU execution.
+The `Python Quality` GitHub Actions workflow runs on pull requests and pushes
+to all branches. It tests Python 3.12 and 3.13, installs locked dependencies,
+runs Ruff and Ty, runs the CPU-safe package test subset, and runs example
+consistency checks. It intentionally avoids tests that need live ROCm GPU
+execution.
 
 The representative CI command sequence is:
 

@@ -20,13 +20,13 @@ sidecar output, and public contract guardrails:
 
 ```bash
 uv run pytest \
-  tests/sol_execbench/test_amd_hardware_models.py \
-  tests/sol_execbench/test_amd_bound_graph.py \
-  tests/sol_execbench/test_amd_bound_estimates.py \
-  tests/sol_execbench/test_amd_sol_v2.py \
-  tests/sol_execbench/test_amd_native_score.py \
-  tests/sol_execbench/test_run_dataset_amd_score.py \
-  tests/sol_execbench/test_public_contract_guardrails.py -x
+  tests/sol_execbench/core/scoring/test_amd_hardware_models.py \
+  tests/sol_execbench/core/scoring/test_amd_bound_graph.py \
+  tests/sol_execbench/core/scoring/test_amd_bound_estimates.py \
+  tests/sol_execbench/core/scoring/test_amd_sol_v2.py \
+  tests/sol_execbench/core/scoring/test_amd_native_score.py \
+  tests/sol_execbench/core/dataset/test_run_dataset_amd_score.py \
+  tests/sol_execbench/core/evidence/test_public_contract_guardrails.py -x
 ```
 
 ## Derived Sample Run Shape

@@ -37,8 +37,8 @@ running the normal validation path first.
 
 The bundle writes:
 
-- `prerelease_artifact_bundle.json`: machine-readable manifest.
-- `prerelease_artifact_bundle.md`: reviewer summary.
+- A machine-readable manifest in the selected output directory.
+- A reviewer summary Markdown file in the selected output directory.
 - `SHA256SUMS`: checksums for generated bundle files.
 - `release_candidate_validation/`: release validation JSON and Markdown.
 - `transcripts/`: command transcripts with redacted log tails.

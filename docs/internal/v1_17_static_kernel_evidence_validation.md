@@ -29,7 +29,7 @@ UV_CACHE_DIR=/tmp/uv-cache uv run sol-execbench examples/hip_cpp/rmsnorm \
 The run compiled the HIP/C++ solution and wrote:
 
 - a trace-adjacent static-evidence JSON sidecar:
-  `rmsnorm.trace.jsonl.static-evidence.json`
+  `out/evidence/legacy-artifacts/artifacts-root/v1.17/rdna4-static-evidence/rmsnorm.trace.jsonl.static-evidence.json`
 - a trace-adjacent static-evidence artifact directory
 
 The static evidence sidecar reported:

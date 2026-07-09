@@ -65,7 +65,8 @@ PyTorch ROCm compatibility namespace, not NVIDIA CUDA runtime support.
 ### First-Run Checklist
 
 Use this path for the smallest end-to-end smoke from a fresh checkout on a
-ROCm-capable host:
+ROCm-capable host. The benchmark command in step 4 is the first command that
+produces working benchmark output: `out/first-run.trace.jsonl`.
 
 1. Install dependencies with `uv sync --all-groups`.
 2. Confirm CLI metadata with `uv run sol-execbench contract --json`.

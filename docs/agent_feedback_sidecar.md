@@ -1,8 +1,9 @@
 # Agent Feedback Sidecar
 
 `sol_execbench.agent_feedback.v2` is an optional diagnostic sidecar written next
-to canonical Trace JSONL as `<trace>.agent-feedback.json`. It gives downstream
-agents bounded next-experiment guidance while preserving Trace JSONL as the only
+to canonical Trace JSONL by `_agent_feedback_sidecar_path` in
+`src/sol_execbench/cli/sidecars/agent_feedback.py`. It gives downstream agents
+bounded next-experiment guidance while preserving Trace JSONL as the only
 authority for correctness, timing, scoring, and evaluation status.
 
 The evaluator contract advertises this artifact through the optional
@@ -64,8 +65,9 @@ compact citation fields after freshness and authority checks pass.
 The `profile_summary.sidecar` evaluator capability key advertises the concrete
 `sol_execbench.profile_summary.v2` normalized profile-summary sidecar for
 bounded profiler metrics, conservative bottleneck hints, and artifact
-citations. Current ROCm profiler metadata remains the separate
-`<trace>.profile.json` rocprofv3 sidecar and is cited as optional diagnostic
+citations. Current ROCm profiler metadata remains the separate rocprofv3
+sidecar written by `_profile_sidecar_path` in
+`src/sol_execbench/cli/sidecars/profile.py` and is cited as optional diagnostic
 evidence when present. Profiler-derived `summary.bottleneck_hints[]` remain in
 the profile-summary contract; SOL does not duplicate those hints into
 `agent_feedback.items[]`. HIP adapters may combine accepted profile-summary
@@ -83,13 +85,13 @@ CPU-safe fixtures live under
 
 | Fixture | Purpose | Expected HIP handling |
 | --- | --- | --- |
-| `valid.agent-feedback.json` | Current, available sidecar with passing trace guidance. | Accept as diagnostic next-experiment guidance. |
-| `partial.agent-feedback.json` | Partial diagnostics because profile evidence is unavailable. | Accept with limitation text and lower confidence. |
-| `unavailable.agent-feedback.json` | No evaluated traces were available. | Treat as unavailable diagnostic state. |
-| `stale.agent-feedback.json` | Valid schema with old trace/run/candidate identity. | Reject as stale for the current run. |
-| `malformed.agent-feedback.json` | Invalid JSON payload. | Treat as invalid diagnostic state. |
-| `contradictory-authority.agent-feedback.json` | Schema-shaped payload with forbidden score authority enum. | Reject before prompt assembly. |
-| `missing.agent-feedback.case.json` | Metadata fixture for absent sidecar path behavior. | Treat missing sidecar as unavailable. |
+| `tests/sol_execbench/fixtures/agent_feedback/valid.agent-feedback.json` | Current, available sidecar with passing trace guidance. | Accept as diagnostic next-experiment guidance. |
+| `tests/sol_execbench/fixtures/agent_feedback/partial.agent-feedback.json` | Partial diagnostics because profile evidence is unavailable. | Accept with limitation text and lower confidence. |
+| `tests/sol_execbench/fixtures/agent_feedback/unavailable.agent-feedback.json` | No evaluated traces were available. | Treat as unavailable diagnostic state. |
+| `tests/sol_execbench/fixtures/agent_feedback/stale.agent-feedback.json` | Valid schema with old trace/run/candidate identity. | Reject as stale for the current run. |
+| `tests/sol_execbench/fixtures/agent_feedback/malformed.agent-feedback.json` | Invalid JSON payload. | Treat as invalid diagnostic state. |
+| `tests/sol_execbench/fixtures/agent_feedback/contradictory-authority.agent-feedback.json` | Schema-shaped payload with forbidden score authority enum. | Reject before prompt assembly. |
+| `tests/sol_execbench/fixtures/agent_feedback/missing.agent-feedback.case.json` | Metadata fixture for absent sidecar path behavior. | Treat missing sidecar as unavailable. |
 
 These fixtures use synthetic checksums and compact file names. They are not
 benchmark evidence and do not represent real profiler output.

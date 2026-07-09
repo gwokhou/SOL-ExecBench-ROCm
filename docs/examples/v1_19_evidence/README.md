@@ -24,14 +24,14 @@ Required boundaries:
 
 | File | Purpose |
 | --- | --- |
-| `execution_closure.demo.json` | Demo execution closure sidecar with relative trace and log refs. |
-| `paper_denominator.demo.json` | Demo paper denominator report with source refs and false authority fields. |
-| `paper_denominator.demo.md` | Demo Markdown rendering for denominator interpretation. |
-| `matrix_schema_export.demo.json` | Compact Matrix schema export identity and strictness example. |
-| `matrix_diff.demo.json` | Demo Matrix semantic diff report with diagnostic-only boundaries. |
-| `matrix_diff.demo.md` | Demo Markdown rendering for Matrix diff interpretation. |
-| `amd_bound_sanity.demo.json` | Demo AMD bound sanity report with existing-evidence refs and warnings. |
-| `amd_bound_sanity.demo.md` | Demo Markdown rendering for AMD bound sanity interpretation. |
+| execution_closure.demo.json | Demo execution closure sidecar with relative trace and log refs. |
+| paper_denominator.demo.json | Demo paper denominator report with source refs and false authority fields. |
+| paper_denominator.demo.md | Demo Markdown rendering for denominator interpretation. |
+| matrix_schema_export.demo.json | Compact Matrix schema export identity and strictness example. |
+| matrix_diff.demo.json | Demo Matrix semantic diff report with diagnostic-only boundaries. |
+| matrix_diff.demo.md | Demo Markdown rendering for Matrix diff interpretation. |
+| amd_bound_sanity.demo.json | Demo AMD bound sanity report with existing-evidence refs and warnings. |
+| amd_bound_sanity.demo.md | Demo Markdown rendering for AMD bound sanity interpretation. |
 
 All paths are synthetic relative refs such as `out/v1_19_demo/...` and
 `logs/demo-build.log`. Checksums are synthetic `sha256:` strings. The fixtures

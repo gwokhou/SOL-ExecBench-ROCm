@@ -22,7 +22,7 @@ MI300X commercial GPU hardware-validation pass.
   corrected interpretation is 220 complete passing problem traces, 15 expected
   Quant NVFP4/MXFP4 CDNA3 skips, and 6 remaining timeout shards across 4
   problems.
-- Nested `eval_driver.py` timeout classification was fixed in commit `2984c29`
+- Nested `src/sol_execbench/driver/templates/eval_driver.py` timeout classification was fixed in commit `2984c29`
   and verified on
   `FlashInfer-Bench/014_gqa_paged_prefill_causal_h32_kv4_d128_ps1`, which now
   records `29 PASSED + 1 TIMEOUT` and summary `FAIL`.
