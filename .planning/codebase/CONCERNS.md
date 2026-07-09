@@ -1,94 +1,121 @@
 ---
 generated_by: gsd-map-codebase
+generated_on: 2026-07-09
+last_mapped_commit: cc007cd3af3e5100f7d86f155a40d5e51ffb57e5
 focus: concerns
-mapped_at: 2026-06-16
 ---
 
 # Concerns
 
-## Runtime Isolation
+## Execution Isolation Is Not A Sandbox
 
-- `src/sol_execbench/driver/templates/eval_driver.py` runs submitted solution
-  code in a subprocess staging directory, but this is not a hardened sandbox.
-- Reward-hack checks reduce obvious manipulation risks, yet untrusted
-  submissions still require Docker, VM, or dedicated host isolation.
-- The eval driver imports PyTorch and user code in the same subprocess, so
-  global monkey-patching and side effects must remain actively guarded.
+The evaluator runs submitted code in a local subprocess with static and runtime
+guardrails, but it is not a hardened multi-tenant sandbox. This is documented in
+`README.md` and `docs/ARCHITECTURE.md`. Any workflow that evaluates untrusted
+solutions must use external isolation such as Docker, a VM, or a dedicated ROCm
+host.
 
-## Long CLI Module
+Relevant paths:
 
-- `src/sol_execbench/cli/main.py` owns command parsing, input loading,
-  subprocess orchestration, sidecar handling, metadata subcommands, and dataset
-  migration commands.
-- This is operationally convenient but makes local changes high-blast-radius.
-- Focused helper extraction should preserve Click behavior and public output
-  contracts.
+- `src/sol_execbench/driver/templates/eval_driver.py`
+- `src/sol_execbench/core/bench/reward_hack/`
+- `src/sol_execbench/core/data/solution_models.py`
+- `docs/SECURITY.md`
 
-## Generated Driver Complexity
+## Large Surface Area
 
-- `src/sol_execbench/driver/templates/eval_driver.py` is a generated script with
-  many responsibilities: stdout redirection, problem loading, user import,
-  reward-hack checks, input generation, correctness, timing, trace emission,
-  and shutdown behavior.
-- Small changes can affect subprocess semantics, strict JSONL output, or
-  hardware timing behavior.
-- Driver changes need integration coverage in `tests/sol_execbench/driver/` and
-  E2E-style tests.
+The project has grown beyond a simple evaluator. `src/sol_execbench/core/`
+contains benchmark runtime, dataset migration, execution closure, readiness,
+reporting, scoring, ROCm platform diagnostics, profiler integration, and
+release evidence. This breadth increases regression risk when changing shared
+models such as `Trace`, `Solution`, `Workload`, or evidence refs.
 
-## Hardware Evidence Boundaries
+Changes to `src/sol_execbench/core/data/` and `src/sol_execbench/core/bench/`
+should run targeted unit tests plus at least one CLI/evaluator integration path.
 
-- Many docs and reports distinguish RDNA4, CDNA3, MI300X, MI308X, and CDNA4
-  evidence scopes.
-- Incorrect wording can overstate validation authority even when code is
-  technically correct.
-- Claim-boundary tests and docs such as `docs/CLAIMS.md`, `docs/rocm.md`, and
-  `docs/research_preview.md` should be updated together with evidence changes.
+## Generated Cache Files Present
 
-## Dataset Runner Size
+The working tree contains many `__pycache__` files under `src/`, `tests/`, and
+`scripts/`. They are ignored by tooling, but their presence can make file scans
+noisy and increases the chance of accidental artifact handling in ad-hoc
+scripts.
 
-- `scripts/run_dataset.py` is a large operator script that coordinates dataset
-  runs, output layout, skip/reuse decisions, profiling, derived reports, and
-  summaries.
-- Some logic has been moved into `src/sol_execbench/core/dataset/`, but the
-  script remains a major integration surface.
-- Changes should prefer reusable package helpers when possible.
+## Legacy CUDA/NVIDIA Residue Is Intentional But Fragile
 
-## Native Build Fragility
+The codebase intentionally retains some CUDA/NVIDIA strings for attribution,
+negative tests, compatibility namespace explanations, migration guidance, and
+dataset provenance. The distinction between allowed residue and accidental
+runtime residue is enforced by tests such as
+`tests/sol_execbench/core/platform/test_rocm_migration_residue_audit.py`.
 
-- Native ROCm paths depend on ROCm user-space, HIP compiler tooling, headers,
-  architecture flags, PyTorch extension behavior, and device access.
-- `src/sol_execbench/driver/problem_packager.py` auto-injects offload
-  architecture flags when possible, but local `LOCAL` target probing can still
-  depend on `rocm_agent_enumerator` or `rocminfo`.
-- Header-dependent categories such as CK and rocWMMA need marker-gated tests.
+When editing docs, examples, or schema validators, avoid introducing unclassified
+CUDA/NVIDIA terms. If a new term is legitimate, update the classifier test with
+a precise reason.
 
-## Performance Measurement Risk
+## PyTorch ROCm Uses CUDA Namespace Compatibility
 
-- Timing uses HIP-backed PyTorch APIs and optional profiler evidence.
-- Clock-lock state, profiler overhead, fallback timing, missing sidecars, and
-  reference OOM states are explicitly modeled because performance claims are
-  easy to overstate.
-- `bounded` evidence categories describe what the current artifacts can support;
-  deferred categories stay visible for work that needs new hardware, larger
-  runs, or stronger authority before any external claim can be upgraded.
-- Tests under `tests/sol_execbench/test_profiler_timing_coverage.py` and RDNA4
-  profiler tests should stay close to timing changes.
+ROCm PyTorch still exposes many device APIs through `torch.cuda` and related
+names. The project documents this, but it remains easy to misread as NVIDIA CUDA
+runtime support. Examples include `torch.cuda.is_available()` in
+`tests/conftest.py` and device selection in
+`src/sol_execbench/driver/templates/eval_driver.py`.
 
-## Repository Hygiene
+Public docs and error messages should continue to distinguish PyTorch namespace
+compatibility from actual CUDA backend support.
 
-- `__pycache__/` files are visible in the checkout listing; avoid treating them
-  as source or including them in docs.
-- Downloaded datasets, local traces, and generated benchmark output belong
-  under ignored/output paths and should not be committed.
-- Examples are excluded from Ruff, so example correctness relies on example
-  tests and CLI-path tests rather than formatter enforcement.
+## Native Build Boundary Is Sensitive
 
-## Deferred Or Blocked Areas
+Native ROCm builds accept user-supplied source and limited compile options.
+`src/sol_execbench/core/data/solution_models.py` rejects response files,
+external path injection, and dynamic loader control, while allowing documented
+ROCm system include/library paths. Any relaxation of compile flag validation
+should be treated as security-sensitive and tested directly.
 
-- CDNA4 validation and NVFP4/MXFP4 Quant ROCm adaptation remain deferred in the
-  docs and diagnostics.
-- MI300X validation must not be inferred from MI308X/`gfx942` infrastructure
-  evidence.
-- Full paper parity, upstream SOLAR parity, leaderboard authority, and broader
-  AMD hardware validation remain explicit non-claims unless new evidence is
-  recorded.
+`ProblemPackager` also auto-injects HIP offload architecture flags through
+`src/sol_execbench/driver/build_config.py`. Changes there can affect both local
+developer workflows and reproducibility on RDNA4/CDNA3 hosts.
+
+## Profiler Evidence Is Diagnostic
+
+`rocprofv3` integration is optional and can fail or partially produce artifacts.
+The CLI intentionally falls back to normal evaluation when profiler collection
+fails. Reports and docs must not treat profiler sidecars as correctness or
+official score authority.
+
+Relevant paths:
+
+- `src/sol_execbench/cli/evaluation/phases.py`
+- `src/sol_execbench/cli/evaluation/runtime.py`
+- `src/sol_execbench/core/bench/rocm_profiler/`
+- `src/sol_execbench/core/dataset/profiler_timing_coverage/`
+- `docs/rocm_timing.md`
+
+## Hardware Coverage Is Bounded
+
+The project target includes RDNA4 and CDNA3, but current documented validation
+is bounded. RDNA4 has recorded validation evidence; CDNA3/MI300X validation has
+handoff/deferred records under `.planning/milestones/` and `docs/internal/`.
+Docs should keep claims specific to the exact hardware, commands, and artifacts
+that were actually validated.
+
+## CI Is CPU-Safe, Not Full ROCm Validation
+
+GitHub Actions run Ruff, Ty, and CPU-safe pytest subsets. Hardware tests are
+skipped unless a ROCm-capable environment with `/dev/kfd`, `/dev/dri`, headers,
+and supported GPU architecture is available. A green CI run does not prove GPU
+runtime behavior.
+
+## Dataset Licensing Boundary
+
+The repository does not redistribute upstream restricted datasets. Migration
+and execution workflows assume the operator supplies local dataset assets under
+the applicable license. Scripts and docs around `scripts/download_solexecbench.py`,
+`src/sol_execbench/core/dataset/migration/`, and `docs/provenance.md` should
+continue preserving this boundary.
+
+## Subprocess And Parallelism Resource Risk
+
+PyTorch+ROCm imports can be memory-heavy, and profiler/GPU timing runs are
+resource-sensitive. `pyproject.toml` caps pytest-xdist at eight workers, and
+dataset/profiler scripts include serial GPU timing paths. Avoid introducing
+unbounded parallel GPU subprocess execution.

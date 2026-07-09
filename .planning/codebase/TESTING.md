@@ -1,92 +1,133 @@
 ---
 generated_by: gsd-map-codebase
+generated_on: 2026-07-09
+last_mapped_commit: cc007cd3af3e5100f7d86f155a40d5e51ffb57e5
 focus: quality
-mapped_at: 2026-06-16
 ---
 
 # Testing
 
 ## Framework
 
-- Pytest is the test framework.
-- `pytest-xdist` is enabled by default through `pyproject.toml` with
-  `-n 8 --dist loadgroup`.
-- The worker count is intentionally capped because each worker can import
-  PyTorch and ROCm libraries.
-- Development dependencies include `pytest>=9.0.2` and `pytest-xdist>=3.5`.
+Pytest is the test framework. The default configuration in `pyproject.toml` uses
+`pytest-xdist` with `-n 8 --dist loadgroup`. A comment explicitly avoids
+`-n auto` because each worker can load PyTorch+ROCm and consume significant RAM.
 
-## Test Locations
+Common commands:
 
-- Main package tests: `tests/sol_execbench/`.
-- Driver tests: `tests/sol_execbench/driver/`.
-- Example workflow tests: `tests/examples/`.
-- Docker dependency probes: `tests/docker/dependencies/`.
-- Shared test helpers: `tests/conftest.py` and
-  `tests/sol_execbench_type_helpers.py`.
-- Sample benchmark fixtures: `tests/sol_execbench/samples/`.
-- Reward-hack manifests: `tests/samples/rmsnorm/`.
+- `uv run pytest tests/`
+- `uv run pytest tests/sol_execbench/test_e2e.py`
+- `uv run pytest tests/sol_execbench/core/data/test_solution.py`
+- `uv run --with ruff ruff check .`
+- `uv run ty check`
 
-## Markers And Skip Logic
+## Marker Strategy
 
-Markers are registered in `pyproject.toml` and `tests/conftest.py`:
+Markers are declared in both `pyproject.toml` and `tests/conftest.py`.
+`tests/conftest.py` dynamically skips tests based on platform, architecture,
+ROCm device availability, development headers, Python modules, and selected
+marker expressions.
 
-- `cpp`
-- `timing_serial`
-- `requires_rocm`
+Important markers:
+
+- `requires_linux`
+- `requires_x86_64`
+- `requires_rocm` and `requires_rocm_gpu`
 - `requires_rocm_dev`
-- `requires_ck`
-- `requires_rocwmma`
+- `requires_triton_rocm`
+- `requires_safetensors_torch`
 - `requires_rdna4`
 - `requires_cdna3`
-- `requires_cutile`
+- `requires_ck`
+- `requires_rocwmma`
+- `docker_dependency`
+- `subprocess_uv`
+- `native_extension`
+- `native_extension_serial`
+- `timing_serial`
+- `requires_cutile` for legacy NVIDIA cuTile tests, skipped in this ROCm-only port.
 
-`tests/conftest.py` checks `/dev/kfd`, `/dev/dri`, PyTorch ROCm availability,
-detected `gfx*` architecture, ROCm development headers, CK headers, and rocWMMA
-headers before hardware-sensitive tests run.
+`timing_serial`, `docker_dependency`, and `native_extension_serial` are skipped
+by default unless explicitly selected with `-m`.
 
-## Common Test Commands
+## Test Layout
 
-- Full suite: `uv run pytest tests/`.
-- Focused E2E: `uv run pytest tests/sol_execbench/test_e2e.py`.
-- Driver tests: `uv run pytest tests/sol_execbench/driver/`.
-- Example consistency: `uv run pytest tests/examples/test_examples.py -k consistency`.
-- Timing tests: `uv run pytest tests -m timing_serial -n 0`.
-- ROCm hardware tests: `uv run pytest tests -m requires_rocm -n 0`.
-- RDNA4 tests: `uv run pytest tests -m requires_rdna4 -n 0`.
-- CDNA3 tests: `uv run pytest tests -m requires_cdna3 -n 0`.
-- Docker dependency checks inside container:
-  `./scripts/run_docker.sh -- uv run pytest tests/docker/dependencies/`.
+The newer test layout mirrors package modules:
 
-## CI Coverage
+- `tests/sol_execbench/cli/` covers CLI commands, evaluation, reporting,
+  runtime, timeout behavior, and sidecars.
+- `tests/sol_execbench/core/bench/` covers correctness, timing, profiler,
+  reward-hack checks, static kernel evidence, profile summaries, PID locking,
+  and runtime helpers.
+- `tests/sol_execbench/core/data/` covers definitions, workloads, dtypes,
+  solutions, JSON utilities, and path access.
+- `tests/sol_execbench/core/dataset/` covers migration, inventory, readiness,
+  sharding, run closure, scoring reports, release readiness, and docs/claim
+  guardrails.
+- `tests/sol_execbench/core/platform/` covers diagnostics, dependency matrices,
+  Docker matrices, toolchain routing, and ROCm migration residue.
+- `tests/examples/` covers runnable examples and CLI path behavior.
+- `tests/docker/dependencies/` covers container dependency expectations.
 
-`.github/workflows/code-quality.yml` runs:
+There are also legacy flat tests under `tests/sol_execbench/test_*.py` that
+cover broad workflows and release/validation assertions.
 
-1. `uv sync --locked --all-groups --python <matrix-version>`
-2. `uv run ruff check .`
-3. `uv run ty check`
-4. CPU-safe package tests under `tests/sol_execbench`, excluding the eval-driver
-   and E2E files.
-5. Example consistency tests with `tests/examples/test_examples.py -k consistency`.
+## CI
 
-The matrix covers Python 3.12 and 3.13 on Ubuntu.
+`.github/workflows/code-quality.yml` runs on push and pull requests for Python
+3.12 and 3.13. It installs with:
 
-## Test Themes
+```bash
+uv sync --locked --all-groups --python ${{ matrix.python-version }}
+```
 
-- Schema contracts and migration behavior.
-- CLI behavior and environment snapshots.
-- Driver staging and generated eval-driver runtime.
-- Correctness, timing, reward-hack, profiler, static-evidence, and sidecar
-  behavior.
-- Dataset migration, inventory, readiness, closure, denominator, sharding, and
-  redistribution boundaries.
-- AMD scoring, AMD bound estimates, SOLAR derivation, and claim guardrails.
-- ROCm matrix, Docker target, dependency, runtime evidence, and release docs.
+Then it runs Ruff, Ty, and CPU-safe pytest:
 
-## Practical Notes
+```bash
+uv run pytest tests/sol_execbench \
+  --ignore=tests/sol_execbench/driver/test_eval_driver.py \
+  --ignore=tests/sol_execbench/test_e2e.py
+uv run pytest tests/examples/test_examples.py -k consistency
+```
 
-- Hardware tests should generally run with `-n 0` to avoid multiple workers
-  competing for one GPU.
-- CPU-safe tests may model ROCm states but must not claim live hardware
-  validation.
-- Tests that assert documentation wording are part of the claim-boundary
-  safety net.
+Hardware ROCm behavior is not expected to run on GitHub-hosted CPU-only runners.
+
+## Hardware-Sensitive Testing
+
+ROCm availability detection in `tests/conftest.py` checks `/dev/kfd`,
+`/dev/dri`, PyTorch HIP support, `torch.cuda.is_available()`, and the detected
+AMD gfx architecture. RDNA4 detection uses `gfx12*`; CDNA3 detection uses
+`gfx94*`.
+
+Native extension tests also check `/opt/rocm/include/hip/hip_runtime_api.h`.
+Composable Kernel and rocWMMA tests check `/opt/rocm/include/ck/ck.hpp` and
+`/opt/rocm/include/rocwmma/rocwmma.hpp`.
+
+## Example Coverage
+
+Examples under `examples/` are covered by `tests/examples/` and selected core
+dataset tests. They are intentionally excluded from Ruff formatting/linting,
+because example source and JSON can be benchmark fixtures rather than package
+style exemplars.
+
+## Documentation And Claim Tests
+
+Many tests assert documentation policy, public claim boundaries, release
+readiness, provenance, and ROCm migration residue. Representative files include:
+
+- `tests/sol_execbench/core/platform/test_rocm_migration_residue_audit.py`
+- `tests/sol_execbench/core/dataset/test_public_prerelease_docs.py`
+- `tests/sol_execbench/core/dataset/test_research_release_docs.py`
+- `tests/sol_execbench/core/dataset/test_original_parity_docs.py`
+- `tests/sol_execbench/core/dataset/test_rocm_library_readiness_docs.py`
+
+Docs changes can break tests even when Python behavior is unchanged.
+
+## Test Data And Fixtures
+
+`tests/samples/` contains solution fixtures, including reward-hack examples and
+legacy CUDA-labeled negative fixtures. `tests/sol_execbench_type_helpers.py`
+contains typed helper constructors for schema tests.
+
+Local downloaded benchmark assets belong under `data/` and should not be
+committed unless deliberately curated as tiny fixtures.
