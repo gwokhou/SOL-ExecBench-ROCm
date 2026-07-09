@@ -13,10 +13,12 @@ from sol_execbench.core.scoring.amd_bound_graph_models import (
 from sol_execbench.core.scoring.solar_derivation_confidence import (
     classify_solar_confidence,
 )
-from sol_execbench.core.scoring.solar_derivation_models import (
+from sol_execbench.core.scoring.solar_derivation_evidence_models import (
     SolarEvidenceSource,
-    SolarSemanticGroupEvidence,
     SolarTensorEvidence,
+)
+from sol_execbench.core.scoring.solar_derivation_models import (
+    SolarSemanticGroupEvidence,
 )
 from sol_execbench.core.scoring.solar_derivation_operator_evidence import (
     _bound_evidence_for_estimates,

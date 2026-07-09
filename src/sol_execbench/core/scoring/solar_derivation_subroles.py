@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from sol_execbench.core.scoring.amd_bound_graph_models import BoundGraphNode, OpFamily
-from sol_execbench.core.scoring.solar_derivation_models import (
+from sol_execbench.core.scoring.solar_derivation_evidence_models import (
     SolarSubroleEvidence,
     SolarTensorEvidence,
 )

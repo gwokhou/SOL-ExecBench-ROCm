@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sol_execbench.core.scoring.amd_hardware_models import EstimateConfidence
+from sol_execbench.core.scoring.confidence import EstimateConfidence
 
 
 def ensure_dict(value: Any, *, source: str) -> dict[str, Any]:

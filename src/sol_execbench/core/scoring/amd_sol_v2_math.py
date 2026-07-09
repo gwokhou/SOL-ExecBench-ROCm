@@ -8,9 +8,9 @@ from __future__ import annotations
 from sol_execbench.core.scoring.amd_bound_estimates import OperatorWorkEstimate
 from sol_execbench.core.scoring.amd_hardware_models import (
     AmdHardwareModel,
-    EstimateConfidence,
     HardwareValidationStatus,
 )
+from sol_execbench.core.scoring.confidence import EstimateConfidence
 from sol_execbench.core.scoring.amd_sol_v2_models import (
     AmdSolV2AggregateBound,
     AmdSolV2CoverageSummary,

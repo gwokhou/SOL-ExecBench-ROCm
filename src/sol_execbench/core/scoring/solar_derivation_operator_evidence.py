@@ -8,13 +8,15 @@ from __future__ import annotations
 from sol_execbench.core.scoring.amd_bound_estimates import OperatorWorkEstimate
 from sol_execbench.core.scoring.amd_bound_graph_models import BoundGraphNode
 from sol_execbench.core.scoring.amd_hardware_models import default_amd_hardware_models
-from sol_execbench.core.scoring.solar_derivation_models import (
-    SOLAR_DEFAULT_AMD_HARDWARE_MODEL_REF,
+from sol_execbench.core.scoring.solar_derivation_evidence_models import (
     SolarBoundEvidence,
     SolarByteEvidence,
     SolarEvidenceSource,
     SolarFormulaEvidence,
     SolarTensorEvidence,
+)
+from sol_execbench.core.scoring.solar_derivation_models import (
+    SOLAR_DEFAULT_AMD_HARDWARE_MODEL_REF,
 )
 from sol_execbench.core.scoring.solar_derivation_sources import _node_tensor_ids
 

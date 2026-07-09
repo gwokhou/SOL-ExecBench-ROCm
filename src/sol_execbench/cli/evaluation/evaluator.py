@@ -14,13 +14,12 @@ from pathlib import Path
 
 from rich.console import Console
 
-from sol_execbench.driver import ProblemPackager
-
-from . import outputs as cli_outputs
-from . import phases as cli_phases
-from . import runtime as cli_evaluation_runtime
-from . import problem_io as cli_problem_io
-from . import sidecar_writer as cli_sidecar_writer
+import sol_execbench.cli.evaluation.outputs as cli_outputs
+import sol_execbench.cli.evaluation.phases as cli_phases
+import sol_execbench.cli.evaluation.problem_io as cli_problem_io
+import sol_execbench.cli.evaluation.runtime as cli_evaluation_runtime
+import sol_execbench.cli.evaluation.sidecar_writer as cli_sidecar_writer
+from sol_execbench.driver.problem_packager import ProblemPackager
 
 
 console = Console(stderr=True)

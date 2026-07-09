@@ -13,7 +13,7 @@ from sol_execbench.core.scoring.parsing_utils import (
     parse_optional_str as _parse_optional_str,
     parse_str as _parse_str,
 )
-from sol_execbench.core.scoring.solar_derivation_models import (
+from sol_execbench.core.scoring.solar_derivation_coverage_models import (
     SolarAggregateStatus,
     SolarCoveragePattern,
     SolarCoverageSourceRef,

@@ -7,9 +7,9 @@ from __future__ import annotations
 
 from sol_execbench.core.scoring.amd_hardware_models import (
     AmdHardwareModel,
-    EstimateConfidence,
     HardwareValidationStatus,
 )
+from sol_execbench.core.scoring.confidence import EstimateConfidence
 from sol_execbench.core.scoring.amd_sol_bounds import _bound_for_estimate  # noqa: F401
 from sol_execbench.core.scoring.amd_sol_builder import (
     build_amd_sol_bound_artifact,

@@ -6,9 +6,9 @@
 from __future__ import annotations
 
 from sol_execbench.core.scoring.amd_bound_estimates import OperatorWorkEstimate
-from sol_execbench.core.scoring.amd_bound_graph_models import OpFamily
+from sol_execbench.core.scoring.amd_bound_graph_enums import OpFamily
 from sol_execbench.core.scoring.solar_derivation_coverage import _unique_sorted
-from sol_execbench.core.scoring.solar_derivation_models import (
+from sol_execbench.core.scoring.solar_derivation_evidence_models import (
     SolarBoundEvidence,
     SolarByteEvidence,
     SolarFormulaEvidence,

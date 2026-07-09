@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -16,6 +17,7 @@ from sol_execbench.core.scoring import amd_score_reports
 
 SOURCE_ROOT = Path(__file__).resolve().parents[3] / "src"
 PACKAGE_ROOT = SOURCE_ROOT / "sol_execbench"
+COUPLING_CHECK_SCRIPT = SOURCE_ROOT.parents[0] / "scripts" / "check_coupling.py"
 
 
 def _is_under(module: str, prefix: str) -> bool:
@@ -91,6 +93,57 @@ def _internal_import_edges() -> set[tuple[str, str]]:
     return edges
 
 
+def _strongly_connected_components(
+    edges: set[tuple[str, str]],
+) -> list[tuple[str, ...]]:
+    modules = set(_internal_modules())
+    graph = {module: set[str]() for module in modules}
+    for source, target in edges:
+        graph.setdefault(source, set()).add(target)
+        graph.setdefault(target, set())
+
+    index = 0
+    stack: list[str] = []
+    on_stack: set[str] = set()
+    indices: dict[str, int] = {}
+    lowlinks: dict[str, int] = {}
+    components: list[tuple[str, ...]] = []
+
+    def visit(module: str) -> None:
+        nonlocal index
+        indices[module] = index
+        lowlinks[module] = index
+        index += 1
+        stack.append(module)
+        on_stack.add(module)
+
+        for target in graph[module]:
+            if target not in indices:
+                visit(target)
+                lowlinks[module] = min(lowlinks[module], lowlinks[target])
+            elif target in on_stack:
+                lowlinks[module] = min(lowlinks[module], indices[target])
+
+        if lowlinks[module] != indices[module]:
+            return
+
+        component: list[str] = []
+        while True:
+            target = stack.pop()
+            on_stack.remove(target)
+            component.append(target)
+            if target == module:
+                break
+        if len(component) > 1:
+            components.append(tuple(sorted(component)))
+
+    for module in sorted(graph):
+        if module not in indices:
+            visit(module)
+
+    return sorted(components)
+
+
 def _module_line_count(module: str) -> int:
     return len(_internal_modules()[module].read_text().splitlines())
 
@@ -99,12 +152,16 @@ def test_high_inbound_model_modules_keep_exact_internal_imports() -> None:
     expected_targets = {
         "sol_execbench.core.data.base_model": [],
         "sol_execbench.core.scoring.amd_bound_graph_models": [
-            "sol_execbench.core.scoring.amd_hardware_models",
+            "sol_execbench.core.scoring.amd_bound_graph_enums",
+            "sol_execbench.core.scoring.confidence",
         ],
-        "sol_execbench.core.scoring.amd_hardware_models": [],
+        "sol_execbench.core.scoring.amd_hardware_models": [
+            "sol_execbench.core.scoring.confidence",
+        ],
         "sol_execbench.core.scoring.solar_derivation_models": [
-            "sol_execbench.core.scoring.amd_hardware_models",
-            "sol_execbench.core.scoring.solar_derivation_status",
+            "sol_execbench.core.scoring.confidence",
+            "sol_execbench.core.scoring.solar_derivation_coverage_models",
+            "sol_execbench.core.scoring.solar_derivation_evidence_models",
         ],
     }
     edges = _internal_import_edges()
@@ -196,10 +253,13 @@ def test_cross_domain_imports_stay_explicitly_allowlisted() -> None:
     assert cross_domain_edges == sorted(allowed_with_rationale)
 
 
-def test_no_internal_two_node_import_cycles_except_cli_entrypoint() -> None:
-    allowed = {
-        ("sol_execbench.cli", "sol_execbench.cli.main"),
-    }
+def test_no_internal_import_cycles() -> None:
+    edges = _internal_import_edges()
+
+    assert _strongly_connected_components(edges) == []
+
+
+def test_no_internal_two_node_import_cycles() -> None:
     edges = _internal_import_edges()
     cycles = {
         tuple(sorted((source, target)))
@@ -207,7 +267,22 @@ def test_no_internal_two_node_import_cycles_except_cli_entrypoint() -> None:
         if (target, source) in edges
     }
 
-    assert cycles == allowed
+    assert cycles == set()
+
+
+def test_coupling_guardrail_script_passes() -> None:
+    result = subprocess.run(
+        [sys.executable, str(COUPLING_CHECK_SCRIPT), "--json"],
+        check=True,
+        capture_output=True,
+        text=True,
+        cwd=SOURCE_ROOT.parents[0],
+    )
+    payload = json.loads(result.stdout)
+
+    assert payload["cycles"] == []
+    assert payload["facade_import_violations"] == []
+    assert payload["limit_failures"] == []
 
 
 def test_cli_main_import_fanout_stays_bounded() -> None:
@@ -225,14 +300,41 @@ def test_p0_orchestrators_stay_bounded_after_refactor() -> None:
         source: sorted(target for edge_source, target in edges if edge_source == source)
         for source in (
             "sol_execbench.cli.evaluation.evaluator",
+            "sol_execbench.driver.templates.eval_driver",
             "sol_execbench.core.bench.eval_workload_runner",
         )
     }
 
     assert len(imports_by_source["sol_execbench.cli.evaluation.evaluator"]) <= 8
     assert _module_line_count("sol_execbench.cli.evaluation.evaluator") <= 240
+    assert imports_by_source["sol_execbench.driver.templates.eval_driver"] == [
+        "sol_execbench.driver.eval_runtime_api"
+    ]
     assert len(imports_by_source["sol_execbench.core.bench.eval_workload_runner"]) <= 8
     assert _module_line_count("sol_execbench.core.bench.eval_workload_runner") <= 320
+
+
+def test_p1_orchestrators_stay_bounded_after_refactor() -> None:
+    edges = _internal_import_edges()
+    limits = {
+        "sol_execbench.core.scoring.amd_score_reports": (160, 7),
+        "sol_execbench.driver.problem_packager": (230, 7),
+        "sol_execbench.core.bench.rocm_profiler": (180, 5),
+    }
+    observed = {
+        module: (
+            _module_line_count(module),
+            len({target for source, target in edges if source == module}),
+        )
+        for module in limits
+    }
+
+    assert observed == {
+        module: (line_count, fanout)
+        for module, (line_limit, fanout_limit) in limits.items()
+        for line_count, fanout in [observed[module]]
+        if line_count <= line_limit and fanout <= fanout_limit
+    }
 
 
 def test_dataset_runner_no_longer_imports_scoring_bridge_directly() -> None:
@@ -338,6 +440,37 @@ def test_source_modules_do_not_import_dataset_package_reexports() -> None:
                     violations.append((module, alias.name))
 
     assert sorted(violations) == []
+
+
+def test_dataset_package_facade_is_lazy() -> None:
+    script = """
+import sys
+
+import sol_execbench.core.dataset as dataset
+
+eager_modules = [
+    "sol_execbench.core.dataset.inventory",
+    "sol_execbench.core.dataset.low_precision",
+    "sol_execbench.core.dataset.migration",
+    "sol_execbench.core.dataset.paper_denominator",
+    "sol_execbench.core.dataset.readiness",
+]
+loaded = [module for module in eager_modules if module in sys.modules]
+if loaded:
+    raise SystemExit(f"eagerly loaded dataset modules: {loaded}")
+
+_ = dataset.DatasetShardPlan
+if "sol_execbench.core.dataset.sharding" not in sys.modules:
+    raise SystemExit("lazy access did not load sharding module")
+late_loaded = [module for module in eager_modules if module in sys.modules]
+if late_loaded:
+    raise SystemExit(f"unrelated dataset modules loaded after sharding: {late_loaded}")
+"""
+    subprocess.run(
+        [sys.executable, "-c", script],
+        check=True,
+        cwd=SOURCE_ROOT,
+    )
 
 
 def test_source_modules_do_not_import_scoring_package_reexports() -> None:

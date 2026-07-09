@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from sol_execbench.core.scoring.amd_bound_graph_models import BoundGraphNode
 from sol_execbench.core.scoring.solar_derivation_coverage import _unique_sorted
-from sol_execbench.core.scoring.solar_derivation_models import (
+from sol_execbench.core.scoring.solar_derivation_evidence_models import (
     SolarEvidenceSource,
     SolarSubroleEvidence,
     SolarTensorEvidence,

@@ -8,7 +8,7 @@ from typing import Any
 
 from sol_execbench.core.scoring.amd_bound_estimate_models import OperatorWorkEstimate
 from sol_execbench.core.scoring.amd_bound_graph_models import BoundGraph, BoundGraphNode
-from sol_execbench.core.scoring.amd_hardware_models import EstimateConfidence
+from sol_execbench.core.scoring.confidence import EstimateConfidence
 from sol_execbench.core.scoring.amd_bound_estimate_common import (
     _axis_evidence,
     _estimate_tensors,

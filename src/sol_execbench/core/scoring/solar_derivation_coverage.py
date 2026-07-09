@@ -7,14 +7,16 @@ from __future__ import annotations
 
 from sol_execbench.core.scoring.amd_bound_estimates import OperatorWorkEstimate
 from sol_execbench.core.scoring.amd_bound_graph_models import BoundGraph
-from sol_execbench.core.scoring.amd_hardware_models import EstimateConfidence
-from sol_execbench.core.scoring.solar_derivation_models import (
+from sol_execbench.core.scoring.confidence import EstimateConfidence
+from sol_execbench.core.scoring.solar_derivation_coverage_models import (
     SolarAggregateStatus,
     SolarCoveragePattern,
     SolarCoverageSourceRef,
     SolarCoverageSummary,
-    SolarEvidenceSource,
     SolarFamilyCoverage,
+)
+from sol_execbench.core.scoring.solar_derivation_models import (
+    SolarEvidenceSource,
     SolarSemanticGroupEvidence,
 )
 from sol_execbench.core.scoring.solar_derivation_status import (

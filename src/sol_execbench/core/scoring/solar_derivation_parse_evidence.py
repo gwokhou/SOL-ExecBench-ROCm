@@ -14,14 +14,16 @@ from sol_execbench.core.scoring.parsing_utils import (
     parse_optional_str as _parse_optional_str,
     parse_str as _parse_str,
 )
-from sol_execbench.core.scoring.solar_derivation_models import (
-    SOLAR_BOUND_LIMITING_RESOURCES,
+from sol_execbench.core.scoring.solar_derivation_evidence_models import (
     SolarBoundEvidence,
     SolarByteEvidence,
     SolarFormulaEvidence,
-    SolarSemanticGroupEvidence,
     SolarSubroleEvidence,
     SolarTensorEvidence,
+)
+from sol_execbench.core.scoring.solar_derivation_models import (
+    SOLAR_BOUND_LIMITING_RESOURCES,
+    SolarSemanticGroupEvidence,
 )
 
 from .solar_derivation_parse_sources import _evidence_source_from_dict

@@ -43,37 +43,35 @@ import torch  # noqa: E402 — must come after redirect
 STAGING_DIR = Path(__file__).parent.resolve()
 sys.path.insert(0, str(STAGING_DIR))
 
-# ── Imports from sol_execbench.core ─────────────────────────────────────────────
-from sol_execbench.core.bench.config import BenchmarkConfig  # noqa: E402
-from sol_execbench.core.bench.correctness import compute_error_stats  # noqa: E402,F401
-from sol_execbench.core.bench.io import allocate_outputs, gen_inputs  # noqa: E402,F401
-from sol_execbench.core.bench.reward_hack import (  # noqa: E402,F401
+# ── Imports from sol_execbench runtime API ───────────────────────────────────
+from sol_execbench.driver.eval_runtime_api import (  # noqa: E402,F401
+    BenchmarkConfig,
+    Definition,
+    EvaluationStatus,
+    Solution,
+    Trace,
+    Workload,
+    allocate_outputs,
+    call_and_collect_outputs,
     check_eval_integrity,
     check_lazy_outputs,
     check_monkey_patch,
     check_thread_injection,
-    snapshot_critical_functions,
-    review_solution_sources,
-)
-from sol_execbench.core.bench.eval_runtime import (  # noqa: E402,F401
+    compute_error_stats,
+    dtype_str_to_torch_dtype,
     emit_trace_jsonl,
+    evaluate_workloads,
+    gen_inputs,
     load_reference_function,
     load_staged_problem,
     load_user_function,
-    measure_latency,
-    run_reward_hack_check,
-    measure_reference_latency,
-)
-from sol_execbench.core.bench.utils import (  # noqa: E402,F401
-    call_and_collect_outputs,
     make_eval,
+    measure_latency,
+    measure_reference_latency,
+    review_solution_sources,
+    run_reward_hack_check,
+    snapshot_critical_functions,
 )
-from sol_execbench.core.bench.eval_workload_runner import evaluate_workloads  # noqa: E402
-from sol_execbench.core.data.definition import Definition  # noqa: E402
-from sol_execbench.core.data.solution import Solution  # noqa: E402
-from sol_execbench.core.data.trace import EvaluationStatus, Trace  # noqa: E402
-from sol_execbench.core.data.workload import Workload  # noqa: E402
-from sol_execbench.core.data.dtypes import dtype_str_to_torch_dtype  # noqa: E402
 
 # ── Load problem ─────────────────────────────────────────────────────────────
 definition_dict, _workload_dicts = load_staged_problem(STAGING_DIR)

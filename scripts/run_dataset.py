@@ -107,6 +107,10 @@ from sol_execbench.core.dataset.run_state import (
     trace_status as _run_state_trace_status,
     workload_key as _run_workload_key,
 )
+from sol_execbench.core.dataset.sharding import (
+    workload_prefix_lines as _core_workload_prefix_lines,
+    workload_shard_paths as _core_workload_shard_paths,
+)
 from sol_execbench.core.scoring.amd_score import (
     AmdNativeScore,
 )
@@ -230,16 +234,7 @@ def _read_workload_rows(workload_path: Path) -> list[tuple[int, dict, str]]:
 
 
 def _workload_prefix_lines(workload_path: Path, limit: int) -> tuple[list[str], bool]:
-    lines: list[str] = []
-    truncated = False
-    with workload_path.open(encoding="utf-8") as handle:
-        for index, line in enumerate(handle):
-            if index < limit:
-                lines.append(line.rstrip("\n"))
-            else:
-                truncated = True
-                break
-    return lines, truncated
+    return _core_workload_prefix_lines(workload_path, limit)
 
 
 def _workload_shard_paths(
@@ -249,23 +244,11 @@ def _workload_shard_paths(
     output_dir: Path,
 ) -> list[Path]:
     """Return workload JSONL paths, optionally split into fixed-size shards."""
-    if shard_size is None:
-        return [workload_path]
-    if shard_size <= 0:
-        raise ValueError("workload shard size must be positive")
-
-    lines = [line for line in workload_path.read_text().splitlines() if line.strip()]
-    if len(lines) <= shard_size:
-        return [workload_path]
-
-    shard_dir = output_dir / "workload_shards"
-    shard_dir.mkdir(parents=True, exist_ok=True)
-    shards: list[Path] = []
-    for start in range(0, len(lines), shard_size):
-        shard_path = shard_dir / f"workload_shard_{len(shards) + 1:04d}.jsonl"
-        shard_path.write_text("\n".join(lines[start : start + shard_size]) + "\n")
-        shards.append(shard_path)
-    return shards
+    return _core_workload_shard_paths(
+        workload_path,
+        shard_size=shard_size,
+        output_dir=output_dir,
+    )
 
 
 def _timeout_traces_for_workload_file(

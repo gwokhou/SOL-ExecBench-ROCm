@@ -5,6 +5,8 @@ import pytest
 from sol_execbench.core.dataset.sharding import (
     merge_dataset_shard_traces,
     plan_dataset_shards,
+    workload_prefix_lines,
+    workload_shard_paths,
 )
 
 
@@ -130,3 +132,41 @@ def test_merge_dataset_shard_traces_reports_duplicates_and_incomplete_shards(
             ],
         },
     )
+
+
+def test_workload_prefix_lines_reports_truncation(tmp_path):
+    workload_path = tmp_path / "workload.jsonl"
+    workload_path.write_text("a\nb\nc\n")
+
+    lines, truncated = workload_prefix_lines(workload_path, 2)
+
+    assert lines == ["a", "b"]
+    assert truncated is True
+
+
+def test_workload_shard_paths_splits_nonblank_lines(tmp_path):
+    workload_path = tmp_path / "workload.jsonl"
+    workload_path.write_text("a\n\nb\nc\n")
+
+    shards = workload_shard_paths(
+        workload_path,
+        shard_size=2,
+        output_dir=tmp_path / "out",
+    )
+
+    assert [path.name for path in shards] == [
+        "workload_shard_0001.jsonl",
+        "workload_shard_0002.jsonl",
+    ]
+    assert [path.read_text() for path in shards] == ["a\nb\n", "c\n"]
+
+
+def test_workload_shard_paths_reuses_input_when_split_is_unneeded(tmp_path):
+    workload_path = tmp_path / "workload.jsonl"
+    workload_path.write_text("a\nb\n")
+
+    assert workload_shard_paths(
+        workload_path,
+        shard_size=2,
+        output_dir=tmp_path / "out",
+    ) == [workload_path]

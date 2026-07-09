@@ -24,7 +24,7 @@ from sol_execbench.core.scoring.amd_bound_graph_models import (
     BoundTensorRole,
     OpFamily,
 )
-from sol_execbench.core.scoring.amd_hardware_models import EstimateConfidence
+from sol_execbench.core.scoring.confidence import EstimateConfidence
 
 class _AstBoundGraphExtractor:
     def __init__(

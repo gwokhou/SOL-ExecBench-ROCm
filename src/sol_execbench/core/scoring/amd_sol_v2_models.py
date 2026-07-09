@@ -8,7 +8,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from sol_execbench.core.scoring.amd_hardware_models import AmdHardwareModel, EstimateConfidence
+from sol_execbench.core.scoring.amd_hardware_models import AmdHardwareModel
+from sol_execbench.core.scoring.confidence import EstimateConfidence
 
 AMD_SOL_V2_SCHEMA_VERSION = "sol_execbench.amd_sol_bound.v2"
 AGGREGATE_STATUSES = frozenset({"scored", "degraded", "unscored"})

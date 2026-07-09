@@ -208,3 +208,43 @@ def merge_dataset_shard_traces(
         duplicate_workloads=tuple(duplicate_workloads),
         incomplete_shards=tuple(incomplete_shards),
     )
+
+
+def workload_prefix_lines(workload_path: Path, limit: int) -> tuple[list[str], bool]:
+    """Return at most ``limit`` workload JSONL lines and whether input was truncated."""
+    lines: list[str] = []
+    truncated = False
+    with workload_path.open(encoding="utf-8") as handle:
+        for index, line in enumerate(handle):
+            if index < limit:
+                lines.append(line.rstrip("\n"))
+            else:
+                truncated = True
+                break
+    return lines, truncated
+
+
+def workload_shard_paths(
+    workload_path: Path,
+    *,
+    shard_size: int | None,
+    output_dir: Path,
+) -> list[Path]:
+    """Return workload JSONL paths, optionally split into fixed-size shards."""
+    if shard_size is None:
+        return [workload_path]
+    if shard_size <= 0:
+        raise ValueError("workload shard size must be positive")
+
+    lines = [line for line in workload_path.read_text().splitlines() if line.strip()]
+    if len(lines) <= shard_size:
+        return [workload_path]
+
+    shard_dir = output_dir / "workload_shards"
+    shard_dir.mkdir(parents=True, exist_ok=True)
+    shards: list[Path] = []
+    for start in range(0, len(lines), shard_size):
+        shard_path = shard_dir / f"workload_shard_{len(shards) + 1:04d}.jsonl"
+        shard_path.write_text("\n".join(lines[start : start + shard_size]) + "\n")
+        shards.append(shard_path)
+    return shards
