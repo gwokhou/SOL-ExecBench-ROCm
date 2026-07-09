@@ -102,7 +102,7 @@ def test_profile_summary_sidecar_records_bounded_metadata(tmp_path: Path):
     assert payload["authority"] == "diagnostic"
     assert payload["identity"]["trace_path"] == "trace.jsonl"
     assert payload["identity"]["run_id"] == "run-001"
-    assert payload["identity"]["sol_version"] == "v1.42"
+    assert payload["identity"]["sol_version"] == "v1.43"
     assert "sol_contract_version" not in payload["identity"]
     assert payload["summary"]["profiler_status"] == "success"
     assert payload["summary"]["artifact_count"] == 2

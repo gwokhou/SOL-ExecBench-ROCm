@@ -4,7 +4,7 @@
   "identity": {
     "generated_at": "2026-06-16T00:00:00Z",
     "run_id": "run-current",
-    "sol_version": "v1.42",
+    "sol_version": "v1.43",
     "trace_path": "trace.jsonl"
   },
   "limitations": [],

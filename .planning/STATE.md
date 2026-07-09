@@ -4,8 +4,8 @@ milestone: v1.38
 milestone_name: Upgrade SOL Evidence Contract for Confirmed Benchmark Claims
 status: executing
 stopped_at: Phase 192 verified
-last_updated: "2026-07-03T04:13:40.137Z"
-last_activity: 2026-07-09 -- Completed quick task 260709-g1w: 清理剩余向后兼容遗留
+last_updated: "2026-07-09T08:40:00Z"
+last_activity: 2026-07-09 -- Completed quick task 260709-my4: 修正 v1.43 tag/release 常量
 progress:
   total_phases: 5
   completed_phases: 3
@@ -81,6 +81,7 @@ Last activity: 2026-07-07 -- Completed quick task 260707-s2p: Refactor repeated 
 
 | Date | Task | Status | Notes |
 |------|------|--------|-------|
+| 2026-07-09 | 260709-my4-v1-43-tag-release-release-tag | complete | Updated the runtime SOL release constant and current sidecar fixtures/tests to `v1.43`; stale fixtures remain on `v1.42`; verified focused contract, feedback, profile-summary, and sidecar tests. |
 | 2026-07-09 | 260709-g1w-remove-remaining-backward-compatibility | complete | Removed remaining compatibility facades, legacy parser/fallback paths, stale CLI exports, and unused clock preset API; verified full pytest and Ruff. |
 | 2026-07-09 | 260709-fjx-organize-flat-files-by-module-function | complete | Grouped flat bench and scoring feature clusters into subpackages while preserving compatibility facades; validation not run. |
 | 2026-07-07 | 260707-s2p-refactor-repeated-helpers-to-use-standar | complete | Added shared JSON/model, text, and scoring parsing helpers; replaced repeated report serialization/checksum, Markdown, sha256, JSONL, ordered-unique, and subprocess text/tail logic; verified focused pytest and Ruff coverage. |
