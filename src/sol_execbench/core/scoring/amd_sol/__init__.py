@@ -10,13 +10,13 @@ from sol_execbench.core.scoring.amd_hardware_models import (
     HardwareValidationStatus,
 )
 from sol_execbench.core.scoring.confidence import EstimateConfidence
-from sol_execbench.core.scoring.amd_sol.bounds import _bound_for_estimate  # noqa: F401
+from sol_execbench.core.scoring.amd_sol.bounds import _bound_for_estimate
 from sol_execbench.core.scoring.amd_sol.builder import (
     build_amd_sol_bound_artifact,
     default_amd_hardware_models,
 )
 from sol_execbench.core.scoring.amd_sol.coverage import summarize_amd_sol_coverage
-from sol_execbench.core.scoring.amd_sol.graph import (  # noqa: F401
+from sol_execbench.core.scoring.amd_sol.graph import (
     _CALL_ANALYZERS,
     _CallAnalyzer,
     _GraphVisitor,
@@ -35,7 +35,7 @@ from sol_execbench.core.scoring.amd_sol.models import (
     OpSolBound,
     WorkEstimate,
 )
-from sol_execbench.core.scoring.amd_sol.work import (  # noqa: F401
+from sol_execbench.core.scoring.amd_sol.work import (
     _work_estimate_from_rich_estimate,
     estimate_work,
 )
@@ -50,6 +50,16 @@ __all__ = [
     "HardwareValidationStatus",
     "OpSolBound",
     "WorkEstimate",
+    "_CALL_ANALYZERS",
+    "_CallAnalyzer",
+    "_GraphVisitor",
+    "_bound_for_estimate",
+    "_call_name",
+    "_classify_call",
+    "_graph_node_from_bound_node",
+    "_minimal_workload_for_definition",
+    "_op_type_for_family",
+    "_work_estimate_from_rich_estimate",
     "build_amd_sol_bound_artifact",
     "default_amd_hardware_models",
     "estimate_work",

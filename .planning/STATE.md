@@ -30,7 +30,7 @@ ExecBench.
 Phase: 193 (Measured Baseline Provenance and Coverage) — READY FOR DISCUSSION
 Plan: —
 Status: Phase 192 verified; ready to discuss Phase 193
-Last activity: 2026-07-07 -- Completed quick task 260707-s2p: Refactor repeated helpers to use standard-library, Pydantic, and shared utilities
+Last activity: 2026-07-09 -- Completed quick task 260709-my4: 修正 v1.43 tag/release 常量
 
 ## Recent Trend
 
@@ -82,6 +82,11 @@ Last activity: 2026-07-07 -- Completed quick task 260707-s2p: Refactor repeated 
 | Date | Task | Status | Notes |
 |------|------|--------|-------|
 | 2026-07-09 | 260709-my4-v1-43-tag-release-release-tag | complete | Updated the runtime SOL release constant and current sidecar fixtures/tests to `v1.43`; stale fixtures remain on `v1.42`; verified focused contract, feedback, profile-summary, and sidecar tests. |
+| 2026-07-09 | 260709-tch-organize-platform-toolchain-modules | complete | Grouped `toolchain` platform modules into a subpackage while keeping the public facade; verified focused toolchain tests, Ruff, ty, and full pytest. |
+| 2026-07-09 | 260709-evi-organize-runtime-evidence-modules | complete | Grouped `runtime_evidence` evidence modules into a subpackage while retaining `python -m` entry point; verified focused evidence/runtime tests, shell syntax, module help, Ruff, ty, and full pytest. |
+| 2026-07-09 | 260709-plt-organize-platform-matrix-modules | complete | Grouped `dependency_matrix` and `docker_matrix` platform clusters into subpackages while retaining `python -m` entry points; verified focused platform tests, shell syntax, Ruff, ty, and full pytest. |
+| 2026-07-09 | 260709-rpt-organize-report-modules | complete | Grouped clear `core/reports` feature clusters into subpackages and updated imports; verified focused report tests, Ruff, ty, and full pytest. |
+| 2026-07-09 | 260709-dst-organize-dataset-modules | complete | Grouped clear `core/dataset` feature clusters into subpackages and updated imports; verified focused dataset tests, Ruff, ty, and full pytest. |
 | 2026-07-09 | 260709-g1w-remove-remaining-backward-compatibility | complete | Removed remaining compatibility facades, legacy parser/fallback paths, stale CLI exports, and unused clock preset API; verified full pytest and Ruff. |
 | 2026-07-09 | 260709-fjx-organize-flat-files-by-module-function | complete | Grouped flat bench and scoring feature clusters into subpackages while preserving compatibility facades; validation not run. |
 | 2026-07-07 | 260707-s2p-refactor-repeated-helpers-to-use-standar | complete | Added shared JSON/model, text, and scoring parsing helpers; replaced repeated report serialization/checksum, Markdown, sha256, JSONL, ordered-unique, and subprocess text/tail logic; verified focused pytest and Ruff coverage. |

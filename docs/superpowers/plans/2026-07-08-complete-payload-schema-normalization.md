@@ -43,7 +43,7 @@ As of 2026-07-08 after the first schema hardening wave:
 - Remaining raw dict shape checks are concentrated in 27 allowlisted modules.
 - Highest `.get()` hotspots are:
   - `src/sol_execbench/core/dataset/parity_gap.py`
-  - `src/sol_execbench/core/dataset/paper_denominator_stages.py`
+  - `src/sol_execbench/core/dataset/paper_denominator/stages.py`
   - `src/sol_execbench/core/claim_upgrade.py`
   - `src/sol_execbench/core/matrix_diff.py`
   - `src/sol_execbench/core/consistency.py`
@@ -960,7 +960,7 @@ RAW_PAYLOAD_PARSER_BOUNDARIES = {
     "sol_execbench.core.scoring.parsing_utils",
     "sol_execbench.core.scoring.solar_derivation_parse_root",
     "sol_execbench.core.scoring.solar_derivation_parse_utils",
-    "sol_execbench.core.dataset.paper_denominator_sources",
+    "sol_execbench.core.dataset.paper_denominator.sources",
 }
 ```
 
@@ -976,7 +976,7 @@ Add a test that fails if high-risk business modules exceed a fixed `.get()` budg
 
 ```python
 GET_CALL_BUDGET = {
-    "sol_execbench.core.dataset.paper_denominator_stages": 45,
+    "sol_execbench.core.dataset.paper_denominator.stages": 45,
 }
 
 def test_get_call_hotspots_do_not_regress_in_business_modules() -> None:

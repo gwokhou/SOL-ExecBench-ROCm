@@ -262,8 +262,8 @@ Use the same basename in `core.reports` as the old module basename.
 Replace report-to-report imports to canonical paths. Example:
 
 ```python
-from sol_execbench.core.reports.trust_summary_models import TrustSummaryReport
-from sol_execbench.core.reports.consistency_rendering import render_consistency_markdown
+from sol_execbench.core.reports.trust_summary.models import TrustSummaryReport
+from sol_execbench.core.reports.consistency.rendering import render_consistency_markdown
 ```
 
 Leave external imports from scripts and public tests on old facade paths only when they intentionally verify compatibility.
@@ -346,7 +346,7 @@ Replace platform-to-platform imports to canonical paths. Example:
 
 ```python
 from sol_execbench.core.platform.environment_models import EnvironmentSnapshot
-from sol_execbench.core.platform.toolchain_registry import ToolchainRegistry
+from sol_execbench.core.platform.toolchain.registry import ToolchainRegistry
 ```
 
 - [ ] **Step 4: Move platform tests**
@@ -433,7 +433,7 @@ Use the same basename in `core.evidence` as the old module basename.
 Replace imports among moved evidence modules to canonical paths. Example:
 
 ```python
-from sol_execbench.core.evidence.runtime_evidence_models import RuntimeEvidenceReport
+from sol_execbench.core.evidence.runtime_evidence.models import RuntimeEvidenceReport
 from sol_execbench.core.evidence.checksums import sha256_file
 ```
 

@@ -23,14 +23,26 @@ from ...core.bench.rocm_profiler import (
 )
 from ..sidecars.profile import _profile_output_directory
 from .diagnostics import (
-    NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION as NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION,
-    _DIAGNOSTIC_TAIL_LIMIT as _DIAGNOSTIC_TAIL_LIMIT,
-    _diagnostic_tail as _diagnostic_tail,
-    _no_trace_diagnostics_sidecar_path as _no_trace_diagnostics_sidecar_path,
-    _write_no_trace_diagnostics_sidecar as _write_no_trace_diagnostics_sidecar,
+    NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION,
+    _DIAGNOSTIC_TAIL_LIMIT,
+    _diagnostic_tail,
+    _no_trace_diagnostics_sidecar_path,
+    _write_no_trace_diagnostics_sidecar,
 )
 
+__all__ = [
+    "NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION",
+    "_DIAGNOSTIC_TAIL_LIMIT",
+    "_diagnostic_tail",
+    "_no_trace_diagnostics_sidecar_path",
+    "_run_evaluation_command",
+    "_run_profiled_evaluation",
+    "_timeout_output_text",
+    "_write_no_trace_diagnostics_sidecar",
+]
+
 console = Console(stderr=True)
+
 
 def _timeout_output_text(output: str | bytes | None) -> str:
     """Return timeout output as text regardless of subprocess typing."""

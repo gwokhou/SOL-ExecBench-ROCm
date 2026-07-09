@@ -9,9 +9,15 @@ import sol_execbench.core.dataset.cli_execution as cli_execution
 from sol_execbench.core.scoring.amd_score import AmdNativeScore
 from sol_execbench.core.scoring.amd_score.reports import (
     _build_amd_score_reports_for_problem_impl,
-    write_amd_score_report as write_amd_score_report,
+    write_amd_score_report,
 )
 from sol_execbench.core.scoring.baseline_artifact import ScoringBaselineArtifact
+
+__all__ = [
+    "build_amd_score_reports_for_problem",
+    "extend_derived_reports_for_problem",
+    "write_amd_score_report",
+]
 
 
 def build_amd_score_reports_for_problem(

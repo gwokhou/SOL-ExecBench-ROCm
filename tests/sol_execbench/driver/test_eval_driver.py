@@ -29,6 +29,7 @@ Verifies that:
 from __future__ import annotations
 
 import ast
+import importlib.util
 import json
 import os
 import subprocess
@@ -566,13 +567,7 @@ def test_lazy_output_detected(tmp_path):
 
 
 # Check if triton is available for the regression test
-_triton_available = False
-try:
-    import triton  # noqa: F401
-
-    _triton_available = True
-except ImportError:
-    pass
+_triton_available = importlib.util.find_spec("triton") is not None
 
 
 @pytest.mark.skipif(
