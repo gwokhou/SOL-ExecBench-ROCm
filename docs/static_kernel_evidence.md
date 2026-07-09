@@ -49,20 +49,22 @@ timing, scoring, paper-parity, leaderboard, or default benchmark semantics.
 
 ## What The Sidecar Contains
 
-The sidecar schema is `sol_execbench.static_kernel_evidence.v1`. It contains:
+The sidecar schema is `sol_execbench.static_kernel_evidence.v2`. It contains:
 
 - diagnostic-only authority flags
 - aggregate status and reason code
 - persisted build artifacts such as `benchmark_kernel.so`, object files, code
   objects, or HSACO files when present
 - SHA256 and size for persisted artifacts
-- routed `llvm-objdump` and `readelf` tool-run records
+- routed `llvm-objdump`, `readelf`, and `roc-objdump` tool-run records
 - bounded stdout/stderr tails and bounded raw output artifact paths
 - conservative metadata and disassembly presence flags
+- per-kernel `footprints[]` resource usage (VGPR/SGPR/LDS/scratch/occupancy)
+  parsed from routed `roc-objdump --resource-usage` output when available
 - a compact `summary` section for human-facing reporting
 
-`llvm-objdump` and `readelf` are routed through the toolchain registry. RGA and
-`roc-objdump` are not mandatory execution paths in v1.17.
+`llvm-objdump`, `readelf`, and `roc-objdump` are routed through the toolchain
+registry. `rga` remains a planned route and is not yet wired as an extractor.
 
 ## Claim Boundaries
 
@@ -77,6 +79,11 @@ In guardrail wording: it is not correctness authority, performance authority,
 timing authority, score authority, paper-parity authority, or
 leaderboard authority.
 
+The `footprints[]` resource-usage fields are raw facts only. Bottleneck
+classification and optimization recommendations belong to a separate Decision
+sidecar (see `docs/decision_sidecar_contract.md`) that consumes these facts;
+this sidecar does not carry decision fields.
+
 ## Deferred Or Unsupported Scope
 
 The following remain unsupported, partial, or deferred unless direct evidence is
@@ -85,10 +92,13 @@ recorded in a future artifact:
 - CDNA3-family live hardware validation, including MI300X (`gfx942`)
 - CDNA 4 live hardware validation
 - Triton ROCm cache capture
-- RGA-rich resource parsing such as VGPR, SGPR, LDS, scratch, and occupancy-like
-  summaries
+- `rga`-rich resource parsing beyond what `roc-objdump --resource-usage` reports (RGA-rich resource parsing itself remains deferred)
 - paper-scale static coverage for the full original benchmark denominator
 - standalone static analysis of arbitrary pre-existing binaries
+
+Per-kernel VGPR, SGPR, LDS, scratch, spill, and occupancy-like summaries are now
+collected into `footprints[]` from routed `roc-objdump` output when the tool is
+available; uncovered fields stay `null` rather than being speculated.
 
 ## CPU-Safe Coverage
 

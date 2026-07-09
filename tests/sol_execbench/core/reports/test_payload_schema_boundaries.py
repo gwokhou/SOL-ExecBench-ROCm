@@ -23,6 +23,7 @@ RAW_PAYLOAD_ARTIFACT_BOUNDARIES = {
     "sol_execbench.core.dataset.migration.artifacts",
     "sol_execbench.core.scoring.amd_bound_graph.fx_helpers",
     "sol_execbench.core.scoring.amd_hardware_models",
+    "sol_execbench.core.platform.arch_capabilities",
 }
 
 RAW_PAYLOAD_PARSER_BOUNDARIES = {

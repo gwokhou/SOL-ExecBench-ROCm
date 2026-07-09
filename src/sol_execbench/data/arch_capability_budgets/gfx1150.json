@@ -1,0 +1,17 @@
+{
+  "schema_version": "sol_execbench.arch_capability_budget.v1",
+  "architecture": "gfx1150",
+  "wavefront_size": 32,
+  "vgpr_limit": 256,
+  "sgpr_limit": 102,
+  "waves_per_cu_max": null,
+  "lds_per_workgroup_bytes": null,
+  "register_file_per_cu_bytes": 131072,
+  "supported_dtypes": ["fp32", "fp16", "bf16", "int8", "fp8"],
+  "mfma_variants": [],
+  "source": "AMD RDNA4 ISA Reference Guide; GPUOpen; mirrored via opengpu/rocm-systems",
+  "confidence": "inexact",
+  "evidence_refs": [
+    "https://docs.amd.com/v/u/en-US/rdna4-instruction-set-architecture"
+  ]
+}

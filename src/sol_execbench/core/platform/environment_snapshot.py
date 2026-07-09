@@ -10,8 +10,13 @@ import shutil
 from collections.abc import Callable
 from datetime import UTC, datetime
 
+from .arch_capabilities import (
+    ArchCapabilityBudgetStatus,
+    derive_arch_capability_budget,
+)
 from .environment_models import (
     DEFAULT_PROBE_TIMEOUT_SECONDS,
+    EnvironmentCapabilityBudget,
     EnvironmentEvidenceStatus,
     EnvironmentSnapshot,
     GpuEnvironmentSummary,
@@ -62,12 +67,14 @@ def collect_environment_snapshot(
     pytorch = collect_pytorch_rocm_summary() if collect_pytorch else None
     visible_devices = visible_device_environment()
     gpus = summarize_gpus(tools, pytorch)
+    capability_budgets = derive_capability_budgets(gpus)
     warnings = snapshot_warnings(tools, pytorch)
     return EnvironmentSnapshot(
         generated_at=generated_at,
         collection_status=aggregate_status(tools, pytorch),
         tools=tools,
         gpus=gpus,
+        capability_budgets=capability_budgets,
         rocm=RocmEnvironmentSummary(
             hip_visible_devices=visible_devices.get("HIP_VISIBLE_DEVICES"),
             rocr_visible_devices=visible_devices.get("ROCR_VISIBLE_DEVICES"),
@@ -121,6 +128,48 @@ def summarize_gpus(
                     )
                 )
     return gpus
+
+
+def derive_capability_budgets(
+    gpus: list[GpuEnvironmentSummary],
+) -> list[EnvironmentCapabilityBudget]:
+    """Derive arch capability budgets for detected GPUs.
+
+    Each distinct gfx architecture yields one budget entry. Uncovered
+    architectures downgrade to ``unsupported`` rather than promoting unknown
+    budget values.
+    """
+
+    budgets: list[EnvironmentCapabilityBudget] = []
+    seen: set[str] = set()
+    for gpu in gpus:
+        gfx_target = gpu.gfx_target
+        if gfx_target is None:
+            continue
+        token = gfx_target.split(":", maxsplit=1)[0].strip().lower()
+        if token in seen:
+            continue
+        seen.add(token)
+        budget = derive_arch_capability_budget(gfx_target)
+        if budget is not None:
+            budgets.append(
+                EnvironmentCapabilityBudget(
+                    status=ArchCapabilityBudgetStatus.AVAILABLE,
+                    architecture=budget.architecture,
+                    budget=budget,
+                    source="packaged:arch_capability_budgets",
+                )
+            )
+        else:
+            budgets.append(
+                EnvironmentCapabilityBudget(
+                    status=ArchCapabilityBudgetStatus.UNSUPPORTED,
+                    architecture=gfx_target,
+                    reason_code="unsupported_architecture",
+                    source="packaged:arch_capability_budgets",
+                )
+            )
+    return budgets
 
 
 def snapshot_warnings(

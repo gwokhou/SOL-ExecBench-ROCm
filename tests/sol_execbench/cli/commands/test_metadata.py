@@ -68,7 +68,7 @@ def test_doctor_cli_outputs_json_without_problem_directory(monkeypatch) -> None:
     payload = json.loads(result.output)
     assert payload["schema_version"] == "sol_execbench.environment_diagnostics.v1"
     assert (
-        payload["snapshot"]["schema_version"] == "sol_execbench.environment_snapshot.v1"
+        payload["snapshot"]["schema_version"] == "sol_execbench.environment_snapshot.v2"
     )
     assert payload["checks"][0]["name"] == "pytorch_rocm_runtime"
 

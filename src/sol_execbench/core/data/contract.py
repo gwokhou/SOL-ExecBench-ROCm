@@ -88,6 +88,8 @@ def build_evaluator_contract() -> EvaluatorContract:
             "static_kernel.evidence": "optional",
             "agent_feedback.sidecar": "profile:diagnostic",
             "profile_summary.sidecar": "profile:diagnostic",
+            "environment_budget.sidecar": "profile:diagnostic",
+            "static_resource_footprint.sidecar": "profile:diagnostic",
         },
         trace_field_requirements={
             "top_level": ["definition", "workload", "solution", "evaluation"],
@@ -195,5 +197,7 @@ def build_evaluator_contract() -> EvaluatorContract:
             {"owner": "sol", "scope": "scoring", "immutable": True},
             {"owner": "sol", "scope": "agent_feedback", "authority": "diagnostic"},
             {"owner": "sol", "scope": "profile_summary", "authority": "diagnostic"},
+            {"owner": "sol", "scope": "environment_budget", "authority": "diagnostic"},
+            {"owner": "sol", "scope": "static_resource_footprint", "authority": "diagnostic"},
         ],
     )

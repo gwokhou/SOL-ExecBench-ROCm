@@ -1,0 +1,58 @@
+{
+  "schema_version": "sol_execbench.static_kernel_evidence.v2",
+  "status": "collected",
+  "reason_code": "static_evidence_collected",
+  "diagnostic_only": true,
+  "correctness_authority": false,
+  "performance_authority": false,
+  "timing_authority": false,
+  "score_authority": false,
+  "paper_parity_authority": false,
+  "leaderboard_authority": false,
+  "classification": {
+    "metadata_present": true,
+    "disassembly_present": true,
+    "detected_architectures": ["gfx942"],
+    "symbol_count": 1
+  },
+  "artifacts": [],
+  "tool_runs": [
+    {
+      "tool_id": "roc-objdump",
+      "command": ["roc-objdump", "--disassemble", "--resource-usage", "benchmark_kernel.so"],
+      "status": "collected",
+      "reason_code": "static_evidence_collected",
+      "stdout_tail": "; NumVgprs: 32",
+      "timeout_seconds": 10.0
+    }
+  ],
+  "kernels": [],
+  "footprints": [
+    {
+      "identity": {
+        "artifact_id": "benchmark_kernel",
+        "extractor_tool_id": "roc-objdump",
+        "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "vgpr_used": 32,
+      "sgpr_used": 16,
+      "lds_bytes": 0,
+      "scratch_bytes": 0,
+      "spill_detected": false,
+      "occupancy_estimate_waves_per_cu": 8,
+      "wavefront_size": 64,
+      "source_tool": "roc-objdump",
+      "source_confidence": "parsed_from_extractor_output",
+      "diagnostic_only": true,
+      "correctness_authority": false,
+      "performance_authority": false,
+      "timing_authority": false,
+      "score_authority": false,
+      "paper_parity_authority": false,
+      "leaderboard_authority": false,
+      "source_references": []
+    }
+  ],
+  "warnings": [],
+  "source_references": []
+}

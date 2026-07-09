@@ -46,7 +46,7 @@ def test_environment_snapshot_sidecar_uses_explicit_path(tmp_path: Path, monkeyp
 
     assert written == sidecar
     payload = json.loads(sidecar.read_text())
-    assert payload["schema_version"] == "sol_execbench.environment_snapshot.v1"
+    assert payload["schema_version"] == "sol_execbench.environment_snapshot.v2"
     assert payload["collection_status"] == "available"
 
 

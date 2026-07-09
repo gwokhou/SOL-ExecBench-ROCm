@@ -13,9 +13,10 @@ from typing import Any
 from pydantic import ConfigDict, Field
 
 from ..data.base_model import BaseModelWithDocstrings
+from .arch_capabilities import ArchCapabilityBudgetStatus, ArchIsaBudget
 
 
-ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION = "sol_execbench.environment_snapshot.v1"
+ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION = "sol_execbench.environment_snapshot.v2"
 DEFAULT_PROBE_TIMEOUT_SECONDS = 3.0
 
 
@@ -107,6 +108,23 @@ class PytorchRocmSummary(BaseModelWithDocstrings):
     """Import or runtime error captured while probing PyTorch."""
 
 
+class EnvironmentCapabilityBudget(BaseModelWithDocstrings):
+    """Derived arch capability budget for one detected GPU."""
+
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    status: ArchCapabilityBudgetStatus
+    """Availability of the capability budget."""
+    architecture: str | None = None
+    """gfx architecture the budget was derived for when known."""
+    reason_code: str | None = None
+    """Stable reason code when status is not available."""
+    budget: ArchIsaBudget | None = None
+    """Derived ISA resource budget when available."""
+    source: str
+    """Source of the derivation, such as the packaged budget catalog."""
+
+
 class EnvironmentSnapshot(BaseModelWithDocstrings):
     """Optional ROCm environment evidence snapshot."""
 
@@ -122,6 +140,8 @@ class EnvironmentSnapshot(BaseModelWithDocstrings):
     """Per-tool probe evidence."""
     gpus: list[GpuEnvironmentSummary] = Field(default_factory=list)
     """Best-effort detected GPU summaries."""
+    capability_budgets: list[EnvironmentCapabilityBudget] = Field(default_factory=list)
+    """Derived arch capability budgets for detected GPUs."""
     rocm: RocmEnvironmentSummary = Field(default_factory=RocmEnvironmentSummary)
     """ROCm runtime visibility summary."""
     pytorch: PytorchRocmSummary | None = None

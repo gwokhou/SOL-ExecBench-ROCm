@@ -85,6 +85,8 @@ def extractor_command(tool_id: str, artifact_path: Path) -> list[str]:
         return [tool_id, "--disassemble", str(artifact_path)]
     if tool_id == "readelf":
         return [tool_id, "--headers", "--wide", str(artifact_path)]
+    if tool_id == "roc-objdump":
+        return [tool_id, "--disassemble", "--resource-usage", str(artifact_path)]
     raise ValueError(f"unsupported static extractor: {tool_id}")
 
 
