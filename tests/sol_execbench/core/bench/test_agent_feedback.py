@@ -59,7 +59,7 @@ def _trace(status: EvaluationStatus = EvaluationStatus.PASSED) -> Trace:
 def test_agent_feedback_identity_uses_canonical_fields_only() -> None:
     identity = AgentFeedbackIdentity(
         generated_at="2026-01-01T00:00:00Z",
-        sol_version="v1.42",
+        sol_version="v1.43",
         trace_path="trace.jsonl",
         target_id="gemm",
         run_id="run-1",
@@ -69,7 +69,7 @@ def test_agent_feedback_identity_uses_canonical_fields_only() -> None:
 
     payload = identity.model_dump(mode="json", exclude_none=True)
 
-    assert payload["sol_version"] == "v1.42"
+    assert payload["sol_version"] == "v1.43"
     assert payload["candidate_id"] == "candidate-sha"
     assert payload["source_sha256"] == "source-sha"
     assert "sol_contract_version" not in payload
@@ -80,18 +80,18 @@ def test_agent_feedback_identity_uses_canonical_fields_only() -> None:
 @pytest.mark.parametrize(
     ("legacy_alias", "legacy_kwargs"),
     [
-        ("sol_contract_version", {"sol_contract_version": "v1.42"}),
+        ("sol_contract_version", {"sol_contract_version": "v1.43"}),
         (
             "candidate_hash",
             {
-                "sol_contract_version": "v1.42",
+                "sol_contract_version": "v1.43",
                 "candidate_hash": "candidate-sha",
             },
         ),
         (
             "source_hash",
             {
-                "sol_contract_version": "v1.42",
+                "sol_contract_version": "v1.43",
                 "source_hash": "source-sha",
             },
         ),
@@ -104,7 +104,7 @@ def test_agent_feedback_identity_rejects_legacy_alias_fields(
     with pytest.raises(ValidationError, match=legacy_alias):
         AgentFeedbackIdentity(
             generated_at="2026-01-01T00:00:00Z",
-            sol_version="v1.42",
+            sol_version="v1.43",
             trace_path="trace.jsonl",
             candidate_id="candidate-sha",
             source_sha256="source-sha",
@@ -133,7 +133,7 @@ def test_agent_feedback_sidecar_builder_emits_no_legacy_identity_aliases() -> No
         run_id="run-1",
         candidate_id="candidate-sha",
         source_sha256="source-sha",
-        sol_version="v1.42",
+        sol_version="v1.43",
     )
 
     raw_identity = sidecar.to_dict()["identity"]
@@ -142,7 +142,7 @@ def test_agent_feedback_sidecar_builder_emits_no_legacy_identity_aliases() -> No
 
     assert identity["candidate_id"] == "candidate-sha"
     assert identity["source_sha256"] == "source-sha"
-    assert identity["sol_version"] == "v1.42"
+    assert identity["sol_version"] == "v1.43"
     assert "candidate_hash" not in identity
     assert "source_hash" not in identity
     assert "sol_contract_version" not in identity
@@ -154,7 +154,7 @@ def test_agent_feedback_freshness_rejects_missing_canonical_identity() -> None:
         trace_path="trace.jsonl",
         target_id="gemm",
         run_id="run-1",
-        sol_version="v1.42",
+        sol_version="v1.43",
     )
 
     stale = validate_agent_feedback_freshness(
@@ -164,7 +164,7 @@ def test_agent_feedback_freshness_rejects_missing_canonical_identity() -> None:
         run_id="run-1",
         candidate_id="candidate-sha",
         source_sha256="source-sha",
-        sol_version="v1.42",
+        sol_version="v1.43",
     )
 
     assert stale.status.value == "stale"
@@ -260,7 +260,7 @@ def test_agent_feedback_freshness_validation_classifies_identity(tmp_path: Path)
         trace_path=str(trace_path),
         target_id="problem-0",
         run_id="run-0",
-        sol_version="v1.42",
+        sol_version="v1.43",
         candidate_id=None,
         source_sha256=None,
     )
@@ -298,7 +298,7 @@ def test_agent_feedback_freshness_uses_canonical_hip_identity(tmp_path: Path):
         run_id="run-0",
         candidate_id="candidate-sha",
         source_sha256="source-sha",
-        sol_version="v1.42",
+        sol_version="v1.43",
     )
     stale = validate_agent_feedback_freshness(
         sidecar,

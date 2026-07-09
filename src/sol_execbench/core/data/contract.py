@@ -27,7 +27,7 @@ from .trace import EvaluationStatus
 
 SOL_EXECBENCH_CONTRACT_SCHEMA_VERSION = "sol_execbench.evaluator_contract.v2"
 SOL_EXECBENCH_CONTRACT_VERSION = "1.0"
-SOL_EXECBENCH_RELEASE = "v1.42"
+SOL_EXECBENCH_RELEASE = "v1.43"
 
 
 class EvaluatorContract(BaseModelWithDocstrings):

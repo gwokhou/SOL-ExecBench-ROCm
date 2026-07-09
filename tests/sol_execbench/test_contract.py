@@ -143,7 +143,7 @@ def test_evaluator_contract_versions_are_stable():
     assert payload["contract_version"] == SOL_EXECBENCH_CONTRACT_VERSION
     assert payload["schema_version"] == "sol_execbench.evaluator_contract.v2"
     assert payload["contract_version"] == "1.0"
-    assert payload["sol_release"] == "v1.42"
+    assert payload["sol_release"] == "v1.43"
 
 
 def test_evaluator_contract_schema_describes_capabilities_as_keys():

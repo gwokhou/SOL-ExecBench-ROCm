@@ -53,14 +53,14 @@ def _profile_result(tmp_path: Path, status: str = "success") -> Rocprofv3Profile
 def test_profile_summary_identity_uses_sol_version_only() -> None:
     identity = ProfileSummaryIdentity(
         generated_at="2026-01-01T00:00:00Z",
-        sol_version="v1.42",
+        sol_version="v1.43",
         trace_path="trace.jsonl",
         run_id="run-1",
     )
 
     payload = identity.model_dump(mode="json", exclude_none=True)
 
-    assert payload["sol_version"] == "v1.42"
+    assert payload["sol_version"] == "v1.43"
     assert "sol_contract_version" not in payload
 
 
@@ -69,8 +69,8 @@ def test_profile_summary_identity_rejects_sol_contract_version_alias() -> None:
         ProfileSummaryIdentity.model_validate(
             {
                 "generated_at": "2026-01-01T00:00:00Z",
-                "sol_version": "v1.42",
-                "sol_contract_version": "v1.42",
+                "sol_version": "v1.43",
+                "sol_contract_version": "v1.43",
                 "trace_path": "trace.jsonl",
                 "run_id": "run-1",
             }
@@ -101,7 +101,7 @@ def test_profile_summary_sidecar_is_diagnostic_only(tmp_path: Path):
     assert payload["reason_code"] == "profile_summary_generated"
     assert payload["identity"]["trace_path"] == "trace.jsonl"
     assert payload["identity"]["run_id"] == "run-0"
-    assert payload["identity"]["sol_version"] == "v1.42"
+    assert payload["identity"]["sol_version"] == "v1.43"
     assert "sol_contract_version" not in payload["identity"]
     assert payload["authority"] == "diagnostic"
     assert payload["summary"]["profiler_status"] == "success"
@@ -125,7 +125,7 @@ def test_profile_summary_freshness_uses_canonical_sol_version(tmp_path: Path):
         sidecar,
         trace_path=str(tmp_path / "trace.jsonl"),
         run_id="run-0",
-        sol_version="v1.42",
+        sol_version="v1.43",
     )
     stale = validate_profile_summary_freshness(sidecar, sol_version="9.9")
 
@@ -141,7 +141,7 @@ def test_profile_summary_freshness_sol_version_only_is_current(tmp_path: Path):
         run_id="run-0",
     )
 
-    current = validate_profile_summary_freshness(sidecar, sol_version="v1.42")
+    current = validate_profile_summary_freshness(sidecar, sol_version="v1.43")
 
     assert current.status == "current"
     assert current.reason_codes == []

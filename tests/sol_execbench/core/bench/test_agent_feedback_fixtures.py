@@ -70,7 +70,7 @@ def test_agent_feedback_stale_fixture_classifies_as_stale_diagnostic():
         run_id="run-current",
         candidate_id="candidate-current",
         source_sha256="source-current",
-        sol_version="v1.42",
+        sol_version="v1.43",
     )
     guardrail = evaluate_agent_feedback_governance(
         sidecar=sidecar,

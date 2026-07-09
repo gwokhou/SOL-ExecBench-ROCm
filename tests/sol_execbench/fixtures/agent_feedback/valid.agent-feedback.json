@@ -20,7 +20,7 @@
     "candidate_id": "candidate-demo",
     "generated_at": "2026-06-16T00:00:00Z",
     "run_id": "run-demo",
-    "sol_version": "v1.42",
+    "sol_version": "v1.43",
     "source_sha256": "source-demo",
     "target_id": "linear-demo",
     "trace_path": "trace.jsonl"
