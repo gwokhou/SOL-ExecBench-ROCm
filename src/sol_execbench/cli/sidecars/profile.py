@@ -74,6 +74,7 @@ def _write_profile_summary_sidecar(
     *,
     profile_sidecar_path: Path | None = None,
     run_id: str | None = None,
+    sol_version: str | None = None,
 ) -> Path | None:
     """Write optional normalized profile summary without changing trace JSONL."""
 
@@ -88,6 +89,7 @@ def _write_profile_summary_sidecar(
             profile_result=profile_result,
             trace_path=str(output_file),
             run_id=run_id,
+            sol_version=sol_version,
             artifact_citations=_profile_summary_artifact_citations(
                 output_file=output_file,
                 profile_result=profile_result,
