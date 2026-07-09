@@ -4,8 +4,8 @@ milestone: v1.38
 milestone_name: Upgrade SOL Evidence Contract for Confirmed Benchmark Claims
 status: executing
 stopped_at: Phase 192 verified
-last_updated: "2026-07-09T08:40:00Z"
-last_activity: 2026-07-09 -- Completed quick task 260709-my4: 修正 v1.43 tag/release 常量
+last_updated: "2026-07-09T09:00:00Z"
+last_activity: 2026-07-09 -- Completed quick task 260709-spd: imported Superpowers docs into GSD planning
 progress:
   total_phases: 5
   completed_phases: 3
@@ -30,7 +30,7 @@ ExecBench.
 Phase: 193 (Measured Baseline Provenance and Coverage) — READY FOR DISCUSSION
 Plan: —
 Status: Phase 192 verified; ready to discuss Phase 193
-Last activity: 2026-07-09 -- Completed quick task 260709-my4: 修正 v1.43 tag/release 常量
+Last activity: 2026-07-09 -- Completed quick task 260709-spd: imported Superpowers docs into GSD planning
 
 ## Recent Trend
 
@@ -81,6 +81,7 @@ Last activity: 2026-07-09 -- Completed quick task 260709-my4: 修正 v1.43 tag/r
 
 | Date | Task | Status | Notes |
 |------|------|--------|-------|
+| 2026-07-09 | 260709-spd-import-superpowers-docs | complete | Converted 25 Superpowers implementation plans into archived GSD quick artifacts, converted 7 design specs into `.planning/research/superpowers/`, and added an import index mapping every source file to its GSD artifact. |
 | 2026-07-09 | 260709-my4-v1-43-tag-release-release-tag | complete | Updated the runtime SOL release constant and current sidecar fixtures/tests to `v1.43`; stale fixtures remain on `v1.42`; verified focused contract, feedback, profile-summary, and sidecar tests. |
 | 2026-07-09 | 260709-tch-organize-platform-toolchain-modules | complete | Grouped `toolchain` platform modules into a subpackage while keeping the public facade; verified focused toolchain tests, Ruff, ty, and full pytest. |
 | 2026-07-09 | 260709-evi-organize-runtime-evidence-modules | complete | Grouped `runtime_evidence` evidence modules into a subpackage while retaining `python -m` entry point; verified focused evidence/runtime tests, shell syntax, module help, Ruff, ty, and full pytest. |
