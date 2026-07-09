@@ -9,7 +9,7 @@ import argparse
 from pathlib import Path
 from typing import Sequence
 
-from sol_execbench.core.trust_summary import (
+from sol_execbench.core.reports.trust_summary import (
     build_trust_summary_report,
     load_json,
     write_trust_summary_reports,

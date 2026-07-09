@@ -5,7 +5,7 @@ milestone_name: Upgrade SOL Evidence Contract for Confirmed Benchmark Claims
 status: executing
 stopped_at: Phase 192 verified
 last_updated: "2026-07-03T04:13:40.137Z"
-last_activity: 2026-07-07 -- Completed quick task 260707-s2p: Refactor repeated helpers to use standard-library, Pydantic, and shared utilities
+last_activity: 2026-07-09 -- Completed quick task 260709-g1w: 清理剩余向后兼容遗留
 progress:
   total_phases: 5
   completed_phases: 3
@@ -81,6 +81,8 @@ Last activity: 2026-07-07 -- Completed quick task 260707-s2p: Refactor repeated 
 
 | Date | Task | Status | Notes |
 |------|------|--------|-------|
+| 2026-07-09 | 260709-g1w-remove-remaining-backward-compatibility | complete | Removed remaining compatibility facades, legacy parser/fallback paths, stale CLI exports, and unused clock preset API; verified full pytest and Ruff. |
+| 2026-07-09 | 260709-fjx-organize-flat-files-by-module-function | complete | Grouped flat bench and scoring feature clusters into subpackages while preserving compatibility facades; validation not run. |
 | 2026-07-07 | 260707-s2p-refactor-repeated-helpers-to-use-standar | complete | Added shared JSON/model, text, and scoring parsing helpers; replaced repeated report serialization/checksum, Markdown, sha256, JSONL, ordered-unique, and subprocess text/tail logic; verified focused pytest and Ruff coverage. |
 | 2026-07-03 | 260703-gze-close-the-sol-side-diagnostic-only-feedb | complete | Added HIP-facing sidecar identity aliases, documented profile-summary bottleneck hint ownership, prepared `v1.38-feedback-loop-rc1`, and verified focused pytest/Ruff coverage. |
 | 2026-06-22 | 260622-eaa-fix-pre-push-ty-check-blockers-before-pu | complete | Fixed local `ty-check` failures blocking `git push origin main`; verified with `uv run ty check` and targeted pytest coverage. |

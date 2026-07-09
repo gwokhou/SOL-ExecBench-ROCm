@@ -7,13 +7,19 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from sol_execbench.core.scoring.amd_bound_sanity import (
+from sol_execbench.core.scoring.amd_bound_sanity.builder import (
+    build_amd_bound_sanity_report,
+)
+from sol_execbench.core.scoring.amd_bound_sanity.io import (
+    write_amd_bound_sanity_reports,
+)
+from sol_execbench.core.scoring.amd_bound_sanity.models import (
     AMD_BOUND_SANITY_SCHEMA_VERSION,
     AmdBoundSanityReport,
     AmdBoundSanitySourceRef,
-    build_amd_bound_sanity_report,
+)
+from sol_execbench.core.scoring.amd_bound_sanity.rendering import (
     render_amd_bound_sanity_markdown,
-    write_amd_bound_sanity_reports,
 )
 
 

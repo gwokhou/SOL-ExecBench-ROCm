@@ -10,7 +10,7 @@ from click.testing import CliRunner
 from pydantic import ValidationError
 
 from sol_execbench.cli.main import cli
-from sol_execbench.core.compatibility import (
+from sol_execbench.core.platform.compatibility import (
     ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION,
     MatrixArtifactReference,
     MatrixClaimBoundary,
@@ -28,7 +28,7 @@ from sol_execbench.core.compatibility import (
     RocmCompatibilityMatrixReport,
     build_matrix_entry,
 )
-from sol_execbench.core.matrix_diff import (
+from sol_execbench.core.reports.matrix_diff import (
     MatrixDiffSeverity,
     MatrixReportDiff,
     diff_matrix_reports,
@@ -227,7 +227,9 @@ def test_matrix_diff_matches_keys_and_buckets_are_sorted():
     diff = diff_matrix_reports(old, new, old_label="old", new_label="new")
     payload = diff.to_dict()
 
-    assert payload["schema_version"] == "sol_execbench.rocm_compatibility_matrix_diff.v1"
+    assert (
+        payload["schema_version"] == "sol_execbench.rocm_compatibility_matrix_diff.v1"
+    )
     assert payload["old_report"]["label"] == "old"
     assert payload["new_report"]["label"] == "new"
     assert payload["summary_counts"] == {
@@ -472,7 +474,9 @@ def test_matrix_diff_markdown_escapes_dynamic_table_cells():
     assert "new\\|probe.json" in markdown
 
 
-def test_load_matrix_report_validates_payload_and_rejects_authority_escalation(tmp_path):
+def test_load_matrix_report_validates_payload_and_rejects_authority_escalation(
+    tmp_path,
+):
     payload = _report([_entry("target-a")]).model_dump(mode="json")
     path = tmp_path / "matrix.json"
     path.write_text(json.dumps(payload), encoding="utf-8")

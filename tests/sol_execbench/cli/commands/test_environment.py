@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from sol_execbench.cli import environment as cli_environment
-from sol_execbench.core.environment import (
+from sol_execbench.cli.commands import environment as cli_environment
+from sol_execbench.core.platform.environment import (
     EnvironmentEvidenceStatus,
     EnvironmentSnapshot,
 )

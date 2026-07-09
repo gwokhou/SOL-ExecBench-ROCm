@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Data layer compatibility facade for SOL ExecBench."""
+"""Data layer convenience exports for SOL ExecBench."""
 
 from __future__ import annotations
 
@@ -105,7 +105,7 @@ __all__ = [
 
 
 def __getattr__(name: str) -> Any:
-    """Load compatibility re-exports on first access."""
+    """Load package exports on first access."""
     module_name = _EXPORTS.get(name)
     if module_name is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

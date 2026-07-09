@@ -115,50 +115,6 @@ def bench_time_with_device_events(
     return [s.elapsed_time(e) for s, e in zip(start_events, end_events)]
 
 
-def bench_time_with_cuda_events(
-    fn: Callable[..., Any],
-    warmup: int = 10,
-    rep: int = 100,
-    setup: Callable[[], Any] | None = None,
-    device: str = "cuda",
-) -> list[float]:
-    """Compatibility wrapper for PyTorch's HIP-backed event timing API."""
-    return bench_time_with_device_events(
-        fn=fn,
-        warmup=warmup,
-        rep=rep,
-        setup=setup,
-        device=device,
-    )
-
-
-def bench_gpu_time_with_cupti(
-    fn: Callable,
-    warmup: int = 10,
-    rep: int = 100,
-    setup: Callable[[], Any] | None = None,
-    cold_l2_cache: bool = True,
-    device="cuda",
-) -> list[float]:
-    """Compatibility wrapper for the removed CUPTI timing path.
-
-    The ROCm port does not import or call CUPTI. Existing callers receive
-    PyTorch device-event measurements instead.
-    """
-    if not cold_l2_cache:
-        # The event timing path intentionally keeps cache clearing enabled to
-        # preserve benchmark semantics. Keep this branch explicit so callers do
-        # not assume the flag changes behavior under ROCm.
-        pass
-    return bench_time_with_device_events(
-        fn=fn,
-        warmup=warmup,
-        rep=rep,
-        setup=setup,
-        device=device,
-    )
-
-
 def time_runnable(
     fn: Any,
     inputs: list,
@@ -167,7 +123,7 @@ def time_runnable(
     warmup: int = 10,
     rep: int = 100,
     return_mode: Literal["mean", "median", "all"] = "median",
-    methodology: Literal["events", "cuda_events", "cupti"] = "events",
+    methodology: Literal["events"] = "events",
 ) -> Union[float, list[float]]:
     """Time a callable using ROCm-compatible PyTorch device events.
 
@@ -179,7 +135,7 @@ def time_runnable(
     total_iterations = warmup + rep
     allocator = ShiftingMemoryPoolAllocator(inputs, outputs, total_iterations)
     with torch.cuda.device(device):
-        if methodology not in {"events", "cuda_events", "cupti"}:
+        if methodology != "events":
             raise ValueError(f"Unknown timing methodology: {methodology}")
         times = bench_time_with_device_events(
             fn=lambda args: fn(*args),

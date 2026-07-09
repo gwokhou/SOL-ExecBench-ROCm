@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from sol_execbench.core.compatibility import (
+from sol_execbench.core.platform.compatibility import (
     MatrixClaimBoundary,
     MatrixCompatibilityReasonCode,
     MatrixCompatibilityStatus,
@@ -21,7 +21,7 @@ from sol_execbench.core.compatibility import (
     build_matrix_entry,
     classify_matrix_entry_for_execution,
 )
-from sol_execbench.core.matrix_diff import (
+from sol_execbench.core.reports.matrix_diff import (
     MatrixDiffSeverity,
     diff_matrix_reports,
     matrix_report_diff_to_markdown,

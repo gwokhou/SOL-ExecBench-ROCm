@@ -12,7 +12,7 @@ import pytest
 from sol_execbench.core.bench.config import BenchmarkConfig
 from sol_execbench.core.dataset.evidence_refs import sidecar_stem_for_workload
 from sol_execbench.core.scoring.amd_score import build_amd_native_suite_report
-import sol_execbench.core.scoring.amd_score_derived_artifacts as amd_score_derived_artifacts
+import sol_execbench.core.scoring.amd_score.derived_artifacts as amd_score_derived_artifacts
 from sol_execbench.core.scoring.baseline_artifact import (
     scoring_baseline_artifact_from_dict,
 )

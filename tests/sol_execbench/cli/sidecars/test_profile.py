@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from sol_execbench.cli import profile_sidecars as cli_profile_sidecars
+from sol_execbench.cli.sidecars import profile as cli_profile_sidecars
 from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3ProfileArtifact,
     Rocprofv3ProfileResult,

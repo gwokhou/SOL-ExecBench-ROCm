@@ -2,16 +2,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sol_execbench.core.dependency_matrix import (
+from sol_execbench.core.platform.dependency_matrix import (
     dependency_policy_evidence_for_target,
     load_docker_target_dependency_policy,
 )
-from sol_execbench.core.docker_matrix import (
+from sol_execbench.core.platform.docker_matrix import (
     load_docker_target_manifest,
     select_docker_target,
     to_matrix_target,
 )
-from sol_execbench.core.compatibility import (
+from sol_execbench.core.platform.compatibility import (
     MatrixClaimBoundary,
     MatrixCompatibilityReasonCode,
     MatrixCompatibilityStatus,

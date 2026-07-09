@@ -5,14 +5,14 @@ from pathlib import Path
 
 from click.testing import CliRunner
 
-from sol_execbench.cli.baseline import cli
-from sol_execbench.core.baseline import (
+from sol_execbench.cli.commands.baseline import cli
+from sol_execbench.core.evidence.baseline import (
     compare_trace_baselines,
     comparison_to_json,
     format_baseline_comparison,
     load_trace_jsonl,
 )
-from sol_execbench.core.scoring_guardrails import AMD_PERFORMANCE_CLAIM_WARNING
+from sol_execbench.core.evidence.scoring_guardrails import AMD_PERFORMANCE_CLAIM_WARNING
 
 
 def _trace(solution: str, latency_ms: float, uuid: str = "w1") -> dict:

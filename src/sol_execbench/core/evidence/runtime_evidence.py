@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from sol_execbench.core.dependency_matrix import collect_pytorch_dependency_observation
+from sol_execbench.core.platform.dependency_matrix import (
+    collect_pytorch_dependency_observation,
+)
 from sol_execbench.core.evidence.runtime_evidence_builders import (
     build_aggregate_report,
     build_runtime_matrix_entry,

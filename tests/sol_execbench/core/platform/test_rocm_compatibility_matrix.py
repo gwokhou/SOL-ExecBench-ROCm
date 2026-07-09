@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from sol_execbench.core.compatibility import (
+from sol_execbench.core.platform.compatibility import (
     ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION,
     MatrixArtifactReference,
     MatrixClaimBoundary,

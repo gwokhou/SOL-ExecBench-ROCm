@@ -5,7 +5,9 @@ import json
 import sys
 from pathlib import Path
 
-from sol_execbench.core.scoring.amd_bound_sanity import AMD_BOUND_SANITY_SCHEMA_VERSION
+from sol_execbench.core.scoring.amd_bound_sanity.models import (
+    AMD_BOUND_SANITY_SCHEMA_VERSION,
+)
 
 from .test_amd_bound_sanity import (
     CREATED_AT,
@@ -52,7 +54,9 @@ def test_sanity_01_04_script_writes_json_and_markdown_from_existing_paths(
     _write_json(closure_path, execution_closure_fixture())
     _write_json(score_path, amd_score_fixture())
     _write_json(matrix_path, compatibility_matrix_fixture())
-    _write_json(amd_sol_scored, amd_sol_artifact("scored_demo", "scored-workload", "scored"))
+    _write_json(
+        amd_sol_scored, amd_sol_artifact("scored_demo", "scored-workload", "scored")
+    )
     _write_json(
         amd_sol_degraded,
         amd_sol_artifact(
@@ -64,7 +68,10 @@ def test_sanity_01_04_script_writes_json_and_markdown_from_existing_paths(
             model_validation_status="unvalidated",
         ),
     )
-    _write_json(amd_sol_unscored, amd_sol_artifact("unscored_demo", "unscored-workload", "unscored"))
+    _write_json(
+        amd_sol_unscored,
+        amd_sol_artifact("unscored_demo", "unscored-workload", "unscored"),
+    )
     _write_json(
         amd_sol_unsupported,
         amd_sol_artifact(
@@ -74,7 +81,9 @@ def test_sanity_01_04_script_writes_json_and_markdown_from_existing_paths(
             warnings=["unsupported operator family"],
         ),
     )
-    _write_json(solar_scored, solar_artifact("scored_demo", "scored-workload", "scored"))
+    _write_json(
+        solar_scored, solar_artifact("scored_demo", "scored-workload", "scored")
+    )
     _write_json(
         solar_degraded,
         solar_artifact(
@@ -84,7 +93,9 @@ def test_sanity_01_04_script_writes_json_and_markdown_from_existing_paths(
             warnings=["provisional RDNA 4 semantic grouping risk"],
         ),
     )
-    _write_json(solar_unscored, solar_artifact("unscored_demo", "unscored-workload", "unscored"))
+    _write_json(
+        solar_unscored, solar_artifact("unscored_demo", "unscored-workload", "unscored")
+    )
     _write_json(
         solar_unsupported,
         solar_artifact(

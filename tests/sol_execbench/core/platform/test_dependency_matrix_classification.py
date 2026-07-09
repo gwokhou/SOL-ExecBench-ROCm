@@ -5,17 +5,17 @@ from typing import Any
 
 import pytest
 
-from sol_execbench.core.compatibility import (
+from sol_execbench.core.platform.compatibility import (
     MatrixCompatibilityReasonCode,
     MatrixCompatibilityStatus,
 )
-from sol_execbench.core.dependency_matrix import (
+from sol_execbench.core.platform.dependency_matrix import (
     PytorchDependencyObservation,
     PytorchDependencyPolicy,
     classify_dependency_preflight,
     load_docker_target_dependency_policy,
 )
-from sol_execbench.core.docker_matrix import (
+from sol_execbench.core.platform.docker_matrix import (
     load_docker_target_manifest,
 )
 

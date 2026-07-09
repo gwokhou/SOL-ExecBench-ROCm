@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.trace import (
     Correctness,
@@ -22,7 +24,7 @@ from sol_execbench.core.scoring.amd_sol import (
     extract_graph,
     summarize_amd_sol_coverage,
 )
-from sol_execbench.core.scoring.amd_bound_estimates import estimate_bound_work
+from sol_execbench.core.scoring.amd_bound_estimate.estimates import estimate_bound_work
 from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
 from sol_execbench.core.scoring.amd_hardware_models import load_amd_hardware_model
 from sol_execbench_type_helpers import make_definition, make_trace, make_workload
@@ -128,12 +130,18 @@ def test_unsupported_ops_stay_visible_instead_of_getting_silent_scores(tmp_path:
     assert artifact.work_estimates[0].confidence == EstimateConfidence.UNSUPPORTED
     assert artifact.work_estimates[0].bytes_accessed == 0.0
     assert artifact.op_bounds[0].confidence == EstimateConfidence.UNSUPPORTED
-    assert artifact.hardware_model.model_validation_status == HardwareValidationStatus.UNVALIDATED
-    assert artifact.hardware_model.hardware_validation_status == HardwareValidationStatus.UNVALIDATED
+    assert (
+        artifact.hardware_model.model_validation_status
+        == HardwareValidationStatus.UNVALIDATED
+    )
+    assert (
+        artifact.hardware_model.hardware_validation_status
+        == HardwareValidationStatus.UNVALIDATED
+    )
     assert artifact.hardware_model.source.endswith("CDNA3 scaffold for phase 45")
 
 
-def test_legacy_work_estimate_fields_are_unchanged_and_adapt_rich_totals():
+def test_work_estimate_fields_adapt_rich_totals():
     definition = _matmul_definition()
     workload = make_workload(
         axes={"M": 2},
@@ -157,7 +165,7 @@ def test_legacy_work_estimate_fields_are_unchanged_and_adapt_rich_totals():
     assert estimates[0].bytes_accessed == rich_estimates[0].total_bytes
 
 
-def test_legacy_estimate_work_falls_back_when_graph_nodes_do_not_align():
+def test_estimate_work_rejects_graph_nodes_that_do_not_align():
     definition = _matmul_definition()
     workload = make_workload(
         axes={"M": 2},
@@ -173,11 +181,11 @@ def test_legacy_estimate_work_falls_back_when_graph_nodes_do_not_align():
         rationale="test mismatch",
     )
 
-    estimates = estimate_work(definition, workload, (*graph, extra_graph_node))
-
-    assert len(estimates) == 2
-    assert estimates[0].node_id == "op_1"
-    assert "legacy fallback" in estimates[0].rationale
+    with pytest.raises(
+        ValueError,
+        match="graph node count does not match rich bound estimate count",
+    ):
+        estimate_work(definition, workload, (*graph, extra_graph_node))
 
 
 def test_coverage_summary_counts_supported_inexact_and_unsupported_ops():
@@ -245,7 +253,9 @@ def test_reduction_data_movement_and_softmax_estimates_are_labeled():
         "softmax",
         "data_movement",
     ]
-    assert all(estimate.confidence == EstimateConfidence.INEXACT for estimate in estimates)
+    assert all(
+        estimate.confidence == EstimateConfidence.INEXACT for estimate in estimates
+    )
     assert estimates[0].flops == 0.0
     assert estimates[1].flops > 0.0
     assert "softmax-like" in estimates[1].rationale

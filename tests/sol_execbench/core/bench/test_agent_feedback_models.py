@@ -49,7 +49,7 @@ from sol_execbench.core.bench.agent_feedback import (
 from sol_execbench.core.bench.agent_feedback import (
     AgentFeedbackSummary as FacadeSummary,
 )
-from sol_execbench.core.bench.agent_feedback_models import (
+from sol_execbench.core.bench.agent_feedback.models import (
     AGENT_FEEDBACK_SCHEMA_VERSION,
     _MODEL_CONFIG,
     AgentFeedbackArtifactCitation,

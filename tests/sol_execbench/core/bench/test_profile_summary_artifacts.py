@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sol_execbench.core.bench.profile_summary_artifacts import (
+from sol_execbench.core.bench.profile_summary.artifacts import (
     structured_profile_evidence,
 )
 from sol_execbench.core.bench.rocm_profiler import (

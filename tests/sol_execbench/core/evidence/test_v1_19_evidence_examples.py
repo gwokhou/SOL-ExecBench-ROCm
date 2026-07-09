@@ -6,8 +6,8 @@ from pathlib import Path
 
 from sol_execbench.core.dataset.execution_closure import ExecutionClosureReport
 from sol_execbench.core.dataset.paper_denominator import PaperDenominatorReport
-from sol_execbench.core.matrix_diff import MatrixReportDiff
-from sol_execbench.core.scoring.amd_bound_sanity import AmdBoundSanityReport
+from sol_execbench.core.reports.matrix_diff import MatrixReportDiff
+from sol_execbench.core.scoring.amd_bound_sanity.models import AmdBoundSanityReport
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 EXAMPLES_DIR = REPO_ROOT / "docs/examples/v1_19_evidence"

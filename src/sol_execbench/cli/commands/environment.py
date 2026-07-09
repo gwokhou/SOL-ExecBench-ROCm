@@ -11,8 +11,8 @@ from pathlib import Path
 
 from rich.console import Console
 
-from ...core.environment import collect_environment_snapshot
-from ...core.runtime_evidence import write_json_payload
+from ...core.platform.environment import collect_environment_snapshot
+from ...core.evidence.runtime_evidence import write_json_payload
 
 console = Console(stderr=True)
 

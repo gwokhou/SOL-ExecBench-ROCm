@@ -7,9 +7,12 @@ import json
 from pathlib import Path
 from typing import Callable
 
-from sol_execbench.core.compatibility import MatrixContainerEvidence, MatrixEntry
-from sol_execbench.core.dependency_matrix import PytorchDependencyObservation
-from sol_execbench.core.docker_matrix import (
+from sol_execbench.core.platform.compatibility import (
+    MatrixContainerEvidence,
+    MatrixEntry,
+)
+from sol_execbench.core.platform.dependency_matrix import PytorchDependencyObservation
+from sol_execbench.core.platform.docker_matrix import (
     DEFAULT_DOCKER_TARGET_MANIFEST,
     select_docker_target,
 )

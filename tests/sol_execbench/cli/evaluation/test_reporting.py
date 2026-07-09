@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from rich.console import Console
 
-from sol_execbench.cli.reporting import print_traces_table
+from sol_execbench.cli.evaluation.reporting import print_traces_table
 from sol_execbench.core import (
     Correctness,
     Environment,

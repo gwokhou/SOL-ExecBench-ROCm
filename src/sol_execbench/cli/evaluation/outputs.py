@@ -10,7 +10,7 @@ from pathlib import Path
 
 from rich.console import Console
 
-from sol_execbench.core.checksums import sha256_file
+from sol_execbench.core.evidence.checksums import sha256_file
 from sol_execbench.core.data.trace import EvaluationStatus, Trace
 
 from . import reporting as cli_reporting

@@ -8,11 +8,11 @@ from typing import Any
 
 import pytest
 
-from sol_execbench.core.compatibility import (
+from sol_execbench.core.platform.compatibility import (
     MatrixCompatibilityReasonCode,
     MatrixCompatibilityStatus,
 )
-from sol_execbench.core.docker_matrix import (
+from sol_execbench.core.platform.docker_matrix import (
     DockerPreflightObservation,
     classify_docker_preflight,
     docker_build_args_for_target,
@@ -127,7 +127,7 @@ def test_module_main_emits_preflight_json_from_explicit_observations() -> None:
         [
             sys.executable,
             "-m",
-            "sol_execbench.core.docker_matrix",
+            "sol_execbench.core.platform.docker_matrix",
             "preflight",
             "--manifest",
             str(MANIFEST_PATH),
@@ -172,7 +172,7 @@ def test_module_main_rejects_invalid_preflight_boolean_without_traceback() -> No
         [
             sys.executable,
             "-m",
-            "sol_execbench.core.docker_matrix",
+            "sol_execbench.core.platform.docker_matrix",
             "preflight",
             "--manifest",
             str(MANIFEST_PATH),

@@ -3,10 +3,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from sol_execbench.core.claim_upgrade import ClaimUpgradeReport
-from sol_execbench.core.consistency import ConsistencyReport
-from sol_execbench.core.evaluation_stability import EvaluationStabilityReport
-from sol_execbench.core.trust_summary import TrustSummaryReport
+from sol_execbench.core.reports.claim_upgrade import ClaimUpgradeReport
+from sol_execbench.core.reports.consistency import ConsistencyReport
+from sol_execbench.core.reports.evaluation_stability import EvaluationStabilityReport
+from sol_execbench.core.reports.trust_summary import TrustSummaryReport
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 GUIDE = REPO_ROOT / "docs/v1_20_evidence_quality_guide.md"

@@ -8,7 +8,7 @@ import json
 from collections.abc import Mapping
 from typing import Any
 
-from sol_execbench.core.compatibility import (
+from sol_execbench.core.platform.compatibility import (
     MatrixCompatibilityStatus,
     MatrixEntry,
     RocmCompatibilityMatrixReport,

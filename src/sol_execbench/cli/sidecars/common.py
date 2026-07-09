@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""Compatibility facade for CLI diagnostic sidecar helpers."""
+"""Shared exports for CLI diagnostic sidecar helpers."""
 
 from __future__ import annotations
 

@@ -8,7 +8,7 @@ import subprocess
 import pytest
 from pydantic import ValidationError
 
-from sol_execbench.core.bench.static_kernel_evidence import (
+from sol_execbench.core.bench.static_kernel.evidence import (
     STATIC_KERNEL_EVIDENCE_SCHEMA_VERSION,
     StaticKernelEvidenceArtifact,
     StaticKernelEvidenceClassification,
@@ -25,11 +25,11 @@ from sol_execbench.core.bench.static_kernel_evidence import (
     collect_static_kernel_artifacts,
     run_static_kernel_extractors,
 )
-from sol_execbench.core.bench.static_kernel_status import (
+from sol_execbench.core.bench.static_kernel.status import (
     aggregate_extractor_reason_value,
     aggregate_extractor_status_value,
 )
-from sol_execbench.core.environment import ProbeCompletedProcess
+from sol_execbench.core.platform.environment import ProbeCompletedProcess
 
 
 EXPECTED_STATUSES = {

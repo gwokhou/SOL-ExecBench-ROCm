@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from sol_execbench.core.bench.profile_summary_hints import derive_bottleneck_hints
-from sol_execbench.core.bench.profile_summary_models import (
+from sol_execbench.core.bench.profile_summary.hints import derive_bottleneck_hints
+from sol_execbench.core.bench.profile_summary.models import (
     ProfileSummaryKernelMetric,
 )
 

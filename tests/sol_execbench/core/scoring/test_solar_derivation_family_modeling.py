@@ -6,7 +6,7 @@ from typing import Any
 
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import Workload
-from sol_execbench.core.scoring.amd_bound_estimates import estimate_bound_work
+from sol_execbench.core.scoring.amd_bound_estimate.estimates import estimate_bound_work
 from sol_execbench.core.scoring.amd_bound_graph import OpFamily, build_bound_graph
 from sol_execbench.core.scoring.solar_derivation import (
     build_solar_derivation_evidence,
@@ -45,9 +45,18 @@ def _assert_group_matches_fixture(
 
 def _attention_definition(*, mask: bool = False) -> Definition:
     inputs: dict[str, Any] = {
-        "q": {"shape": ["batch", "heads", "sequence_q", "head_dim"], "dtype": "float32"},
-        "k": {"shape": ["batch", "heads", "sequence_k", "head_dim"], "dtype": "float32"},
-        "v": {"shape": ["batch", "heads", "sequence_k", "head_dim"], "dtype": "float32"},
+        "q": {
+            "shape": ["batch", "heads", "sequence_q", "head_dim"],
+            "dtype": "float32",
+        },
+        "k": {
+            "shape": ["batch", "heads", "sequence_k", "head_dim"],
+            "dtype": "float32",
+        },
+        "v": {
+            "shape": ["batch", "heads", "sequence_k", "head_dim"],
+            "dtype": "float32",
+        },
         "w_o": {"shape": ["head_dim", "head_dim"], "dtype": "float32"},
     }
     if mask:
@@ -103,7 +112,9 @@ def _attention_workload(*, mask: bool = False) -> Workload:
     return make_workload(axes={"batch": 2}, inputs=inputs, uuid="attention-workload")
 
 
-def _moe_definition(*, dynamic: bool = False, taxonomy_only: bool = False) -> Definition:
+def _moe_definition(
+    *, dynamic: bool = False, taxonomy_only: bool = False
+) -> Definition:
     if taxonomy_only:
         return make_definition(
             name="moe_taxonomy_only",
@@ -169,10 +180,16 @@ def _moe_workload(*, dynamic: bool = False, taxonomy_only: bool = False) -> Work
     }
     if dynamic:
         inputs["threshold"] = {"type": "random"}
-    return make_workload(axes={}, inputs=inputs, uuid="moe-dynamic-workload" if dynamic else "moe-static-workload")
+    return make_workload(
+        axes={},
+        inputs=inputs,
+        uuid="moe-dynamic-workload" if dynamic else "moe-static-workload",
+    )
 
 
-def _ssm_mamba_definition(*, missing_recurrence: bool = False, custom_scan: bool = False) -> Definition:
+def _ssm_mamba_definition(
+    *, missing_recurrence: bool = False, custom_scan: bool = False
+) -> Definition:
     if custom_scan:
         return make_definition(
             name="ssm_mamba_custom_scan",
@@ -185,7 +202,9 @@ def _ssm_mamba_definition(*, missing_recurrence: bool = False, custom_scan: bool
                 "x": {"shape": ["batch", "sequence", "hidden"], "dtype": "float16"},
                 "opaque_scan": {"shape": ["hidden", "hidden"], "dtype": "float16"},
             },
-            outputs={"out": {"shape": ["batch", "sequence", "hidden"], "dtype": "float16"}},
+            outputs={
+                "out": {"shape": ["batch", "sequence", "hidden"], "dtype": "float16"}
+            },
             reference="def run(x, opaque_scan):\n    return opaque_scan(x)\n",
         )
     inputs = {
@@ -221,7 +240,9 @@ def _ssm_mamba_definition(*, missing_recurrence: bool = False, custom_scan: bool
             "    return out_proj(y, w_out)\n"
         )
     return make_definition(
-        name="ssm_mamba_missing_recurrence" if missing_recurrence else "ssm_mamba_static",
+        name="ssm_mamba_missing_recurrence"
+        if missing_recurrence
+        else "ssm_mamba_static",
         axes={
             "batch": {"type": "const", "value": 2},
             "sequence": {"type": "const", "value": 64},
@@ -236,7 +257,9 @@ def _ssm_mamba_definition(*, missing_recurrence: bool = False, custom_scan: bool
     )
 
 
-def _ssm_mamba_workload(*, missing_recurrence: bool = False, custom_scan: bool = False) -> Workload:
+def _ssm_mamba_workload(
+    *, missing_recurrence: bool = False, custom_scan: bool = False
+) -> Workload:
     if custom_scan:
         return make_workload(
             axes={},
@@ -264,7 +287,9 @@ def _ssm_mamba_workload(*, missing_recurrence: bool = False, custom_scan: bool =
 
 def test_ssm_mamba_static_sidecar_matches_positive_fixture_contract():
     expectation = _expectation("ssm_mamba_positive.json")
-    evidence = build_solar_derivation_evidence(_ssm_mamba_definition(), _ssm_mamba_workload())
+    evidence = build_solar_derivation_evidence(
+        _ssm_mamba_definition(), _ssm_mamba_workload()
+    )
     group = next(group for group in evidence.groups if group.family == "ssm_mamba")
 
     _assert_group_matches_fixture(group, expectation)
@@ -379,7 +404,8 @@ def test_attention_sidecar_records_subroles_formula_bytes_and_bounds():
             if item["node_id"] == subrole["node_ids"][0]
         )
         for subrole in group["subroles"]
-        if subrole["name"] in {"qk_scores", "softmax", "pv_aggregation", "output_projection"}
+        if subrole["name"]
+        in {"qk_scores", "softmax", "pv_aggregation", "output_projection"}
     }
     assert formula_by_role["qk_scores"]["formula_kind"] == "attention_scores_flops"
     assert formula_by_role["qk_scores"]["formula_inputs"] == {
@@ -463,7 +489,9 @@ def test_attention_estimates_keep_projection_family_inside_attention_group():
     graph = build_bound_graph(_attention_definition(), _attention_workload())
     estimates = estimate_bound_work(graph)
 
-    attention_nodes = [node for node in graph.nodes if node.op_family == OpFamily.ATTENTION]
+    attention_nodes = [
+        node for node in graph.nodes if node.op_family == OpFamily.ATTENTION
+    ]
     attention_estimates = [
         estimate for estimate in estimates if estimate.op_family == OpFamily.ATTENTION
     ]
@@ -617,7 +645,9 @@ def test_embedding_positional_sidecar_records_memory_bound_evidence():
     )
 
     evidence = build_solar_derivation_evidence(definition, workload)
-    group = next(group for group in evidence.groups if group.family == "embedding_positional")
+    group = next(
+        group for group in evidence.groups if group.family == "embedding_positional"
+    )
 
     assert group.status == "scored"
     assert group.confidence == "supported"
@@ -656,7 +686,9 @@ def test_embedding_dynamic_indices_degrade_without_selected_byte_fabrication():
     )
 
     evidence = build_solar_derivation_evidence(definition, workload)
-    group = next(group for group in evidence.groups if group.family == "embedding_positional")
+    group = next(
+        group for group in evidence.groups if group.family == "embedding_positional"
+    )
 
     assert group.status == "degraded"
     assert group.confidence == "inexact"

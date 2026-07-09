@@ -8,11 +8,12 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import NoReturn
 
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from sol_execbench.core.bench.static_kernel_evidence import StaticKernelEvidenceSidecar
+from sol_execbench.core.bench.static_kernel.evidence import StaticKernelEvidenceSidecar
 from sol_execbench.driver import ProblemPackager
 
 from . import command as cli_evaluation
@@ -130,7 +131,7 @@ def handle_no_trace_failure(
     keep_staging: bool,
     packager: ProblemPackager,
     console: Console,
-) -> None:
+) -> NoReturn:
     console.print(f"[red]{runtime_result.message}[/red]")
     diagnostic_path = cli_evaluation._write_no_trace_diagnostics_sidecar(
         output_file=output_file,
@@ -142,7 +143,9 @@ def handle_no_trace_failure(
         stderr=runtime_result.stderr,
     )
     if diagnostic_path is not None:
-        console.print(f"[yellow]Saved no-trace diagnostics to {diagnostic_path}[/yellow]")
+        console.print(
+            f"[yellow]Saved no-trace diagnostics to {diagnostic_path}[/yellow]"
+        )
     if runtime_result.reason != "evaluation_timeout" and runtime_result.filtered_stderr:
         console.print(runtime_result.filtered_stderr)
     packager.close()

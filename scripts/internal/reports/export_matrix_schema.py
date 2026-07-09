@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from sol_execbench.core.compatibility import (
+from sol_execbench.core.platform.compatibility import (
     export_matrix_entry_json_schema,
     export_matrix_json_schemas,
     export_rocm_compatibility_matrix_report_json_schema,

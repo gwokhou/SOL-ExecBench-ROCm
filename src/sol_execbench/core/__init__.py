@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Core public compatibility facade."""
+"""Core public convenience exports."""
 
 from __future__ import annotations
 
@@ -47,35 +47,34 @@ _EXPORTS = {
     "ToleranceSpec": ".data",
     "Trace": ".data",
     "Workload": ".data",
-    "ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION": ".environment",
-    "EnvironmentCheckResult": ".environment",
-    "EnvironmentDiagnostics": ".environment",
-    "EnvironmentEvidenceStatus": ".environment",
-    "EnvironmentSnapshot": ".environment",
-    "GpuEnvironmentSummary": ".environment",
-    "ProbeCompletedProcess": ".environment",
-    "PytorchRocmSummary": ".environment",
-    "RocmEnvironmentSummary": ".environment",
-    "ToolProbeResult": ".environment",
-    "build_environment_diagnostics": ".environment",
-    "collect_environment_snapshot": ".environment",
-    "collect_pytorch_rocm_summary": ".environment",
-    "probe_tool": ".environment",
-    "TOOLCHAIN_ROUTING_SCHEMA_VERSION": ".toolchain",
-    "ToolLifecycle": ".toolchain",
-    "ToolchainArtifactType": ".toolchain",
-    "ToolchainCapability": ".toolchain",
-    "ToolchainEvidenceLevel": ".toolchain",
-    "ToolchainProbeResult": ".toolchain",
-    "ToolchainRoutingDecision": ".toolchain",
-    "ToolchainRoutingReport": ".toolchain",
-    "ToolchainRoutingRequest": ".toolchain",
-    "ToolchainStatus": ".toolchain",
-    "build_toolchain_routing_report": ".toolchain",
-    "default_toolchain_registry": ".toolchain",
-    "probe_toolchain_tool": ".toolchain",
+    "ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION": ".platform.environment",
+    "EnvironmentCheckResult": ".platform.environment",
+    "EnvironmentDiagnostics": ".platform.environment",
+    "EnvironmentEvidenceStatus": ".platform.environment",
+    "EnvironmentSnapshot": ".platform.environment",
+    "GpuEnvironmentSummary": ".platform.environment",
+    "ProbeCompletedProcess": ".platform.environment",
+    "PytorchRocmSummary": ".platform.environment",
+    "RocmEnvironmentSummary": ".platform.environment",
+    "ToolProbeResult": ".platform.environment",
+    "build_environment_diagnostics": ".platform.environment",
+    "collect_environment_snapshot": ".platform.environment",
+    "collect_pytorch_rocm_summary": ".platform.environment",
+    "probe_tool": ".platform.environment",
+    "TOOLCHAIN_ROUTING_SCHEMA_VERSION": ".platform.toolchain",
+    "ToolLifecycle": ".platform.toolchain",
+    "ToolchainArtifactType": ".platform.toolchain",
+    "ToolchainCapability": ".platform.toolchain",
+    "ToolchainEvidenceLevel": ".platform.toolchain",
+    "ToolchainProbeResult": ".platform.toolchain",
+    "ToolchainRoutingDecision": ".platform.toolchain",
+    "ToolchainRoutingReport": ".platform.toolchain",
+    "ToolchainRoutingRequest": ".platform.toolchain",
+    "ToolchainStatus": ".platform.toolchain",
+    "build_toolchain_routing_report": ".platform.toolchain",
+    "default_toolchain_registry": ".platform.toolchain",
+    "probe_toolchain_tool": ".platform.toolchain",
     "BenchmarkConfig": ".bench.config",
-    "get_clock_preset": ".bench.config",
 }
 
 __all__ = [
@@ -136,12 +135,11 @@ __all__ = [
     "probe_toolchain_tool",
     # Bench config
     "BenchmarkConfig",
-    "get_clock_preset",
 ]
 
 
 def __getattr__(name: str) -> Any:
-    """Load compatibility re-exports on first access."""
+    """Load convenience exports on first access."""
     module_name = _EXPORTS.get(name)
     if module_name is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

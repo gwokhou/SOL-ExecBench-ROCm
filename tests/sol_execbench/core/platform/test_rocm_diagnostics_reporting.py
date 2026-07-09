@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from sol_execbench.core.diagnostics import (
+from sol_execbench.core.platform.diagnostics import (
     DiagnosticStage,
     MI300X_FP8_READINESS,
     MI300X_REQUIRED_ARTIFACTS,

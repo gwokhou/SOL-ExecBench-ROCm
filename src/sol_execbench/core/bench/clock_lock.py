@@ -87,7 +87,7 @@ def probe_clock_lock_available() -> bool:
     return probe.returncode == 0
 
 
-def lock_clocks(device_name: str = "") -> bool:
+def lock_clocks() -> bool:
     """Lock GPU clocks to STABLE_PEAK via ``amd-smi``.
 
     Uses ``sudo amd-smi set -l STABLE_PEAK`` which sets the GPU to a
@@ -99,8 +99,6 @@ def lock_clocks(device_name: str = "") -> bool:
       - MCLK locked at 1124Mhz (zero fluctuation)
       - Clock and power gating disabled
 
-    The ``device_name`` parameter is unused — retained solely for backward
-    compatibility with callers that pass a device name.
     """
     try:
         _run_checked_amd_smi(
@@ -128,15 +126,8 @@ def lock_clocks(device_name: str = "") -> bool:
     return True
 
 
-def verify_clocks(
-    expected_sclk_level: int | None = None, expected_mclk_level: int | None = None
-) -> bool:
-    """Verify that the GPU is in STABLE_PEAK mode via ``rocm-smi --showperflevel``.
-
-    The ``expected_sclk_level`` and ``expected_mclk_level`` parameters are
-    unused — retained solely for backward compatibility with callers that
-    pass explicit DPM levels.
-    """
+def verify_clocks() -> bool:
+    """Verify that the GPU is in STABLE_PEAK mode via ``rocm-smi --showperflevel``."""
     try:
         result = subprocess.run(
             [_rocm_smi_executable(), "--showperflevel"],

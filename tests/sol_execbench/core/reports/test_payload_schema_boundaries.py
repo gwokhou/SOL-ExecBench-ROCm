@@ -17,22 +17,22 @@ RAW_PAYLOAD_ARTIFACT_BOUNDARIES = {
     "sol_execbench.core.evidence.baseline_export",
     "sol_execbench.core.reports.evaluation_stability_builder",
     "sol_execbench.core.bench.output_allocation",
-    "sol_execbench.core.bench.profile_summary_artifacts",
-    "sol_execbench.core.bench.static_kernel_artifacts",
+    "sol_execbench.core.bench.profile_summary.artifacts",
+    "sol_execbench.core.bench.static_kernel.artifacts",
     "sol_execbench.core.dataset.low_precision",
     "sol_execbench.core.dataset.migration_artifacts",
-    "sol_execbench.core.scoring.amd_bound_graph_fx_helpers",
+    "sol_execbench.core.scoring.amd_bound_graph.fx_helpers",
     "sol_execbench.core.scoring.amd_hardware_models",
 }
 
 RAW_PAYLOAD_PARSER_BOUNDARIES = {
     "sol_execbench.core.dataset.paper_denominator_sources",
-    "sol_execbench.core.scoring.amd_score_sidecar_parsing",
-    "sol_execbench.core.scoring.amd_sol_v2_parsing",
+    "sol_execbench.core.scoring.amd_score.sidecar_parsing",
+    "sol_execbench.core.scoring.amd_sol.v2_parsing",
     "sol_execbench.core.scoring.baseline_artifact",
     "sol_execbench.core.scoring.parsing_utils",
-    "sol_execbench.core.scoring.solar_derivation_parse_root",
-    "sol_execbench.core.scoring.solar_derivation_parse_utils",
+    "sol_execbench.core.scoring.solar_derivation.parse_root",
+    "sol_execbench.core.scoring.solar_derivation.parse_utils",
 }
 
 RAW_PAYLOAD_ALLOWLIST = (

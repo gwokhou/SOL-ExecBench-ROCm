@@ -10,14 +10,13 @@ TEST_DIR = str(Path(__file__).resolve().parent)
 if TEST_DIR not in sys.path:
     sys.path.insert(0, TEST_DIR)
 
-from test_paper_denominator_report import (  # noqa: E402
-    CREATED_AT,
-    amd_score_fixture,
-    execution_closure_fixture,
-    inventory_fixture,
-    readiness_fixture,
-    ready_subset_fixture,
-)
+_paper_denominator_report = importlib.import_module("test_paper_denominator_report")
+CREATED_AT = _paper_denominator_report.CREATED_AT
+amd_score_fixture = _paper_denominator_report.amd_score_fixture
+execution_closure_fixture = _paper_denominator_report.execution_closure_fixture
+inventory_fixture = _paper_denominator_report.inventory_fixture
+readiness_fixture = _paper_denominator_report.readiness_fixture
+ready_subset_fixture = _paper_denominator_report.ready_subset_fixture
 
 SCRIPT_PATH = REPO_ROOT / "scripts" / "report_paper_denominator.py"
 spec = importlib.util.spec_from_file_location("report_paper_denominator", SCRIPT_PATH)
@@ -27,7 +26,9 @@ assert spec.loader is not None
 spec.loader.exec_module(report_paper_denominator)
 
 
-def test_report_paper_denominator_script_writes_json_and_markdown(tmp_path, monkeypatch):
+def test_report_paper_denominator_script_writes_json_and_markdown(
+    tmp_path, monkeypatch
+):
     manifest_path = tmp_path / "manifest.json"
     inventory_path = tmp_path / "inventory.json"
     readiness_path = tmp_path / "readiness.json"

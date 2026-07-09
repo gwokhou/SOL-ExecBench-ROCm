@@ -28,7 +28,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from sol_execbench.core.reporting import CANONICAL_BENCHMARK_OUTPUT
+from sol_execbench.core.reports.reporting import CANONICAL_BENCHMARK_OUTPUT
 from sol_execbench.core.scoring.amd_score import (
     AMD_SCORE_SCHEMA_VERSION,
     AmdNativeScore,

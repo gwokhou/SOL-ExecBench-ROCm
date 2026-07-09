@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sol_execbench.core.compatibility import (
+from sol_execbench.core.platform.compatibility import (
     MatrixArtifactReference,
     MatrixClaimBoundary,
     MatrixCompatibilityReasonCode,
@@ -18,13 +18,16 @@ from sol_execbench.core.compatibility import (
     RocmCompatibilityMatrixReport,
     build_matrix_entry,
 )
-from sol_execbench.core.dependency_matrix import (
+from sol_execbench.core.platform.dependency_matrix import (
     PytorchDependencyObservation,
     classify_dependency_preflight,
     dependency_policy_evidence_for_target,
     load_docker_target_dependency_policy,
 )
-from sol_execbench.core.docker_matrix import DockerTargetManifestEntry, to_matrix_target
+from sol_execbench.core.platform.docker_matrix import (
+    DockerTargetManifestEntry,
+    to_matrix_target,
+)
 from sol_execbench.core.evidence.runtime_evidence_models import RuntimeFailureEvidence
 
 

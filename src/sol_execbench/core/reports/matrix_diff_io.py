@@ -10,7 +10,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from sol_execbench.core.compatibility import RocmCompatibilityMatrixReport
+from sol_execbench.core.platform.compatibility import RocmCompatibilityMatrixReport
 
 
 def load_matrix_report(

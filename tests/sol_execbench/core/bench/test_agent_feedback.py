@@ -15,7 +15,7 @@ from sol_execbench.core.bench.agent_feedback import (
     validate_agent_feedback_freshness,
 )
 from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileResult
-from sol_execbench.core.claim_upgrade import build_claim_upgrade_report
+from sol_execbench.core.reports.claim_upgrade import build_claim_upgrade_report
 from sol_execbench.core.data.trace import (
     Correctness,
     Environment,

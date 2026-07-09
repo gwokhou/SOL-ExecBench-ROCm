@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sol_execbench.core.evidence_refs import (
+from sol_execbench.core.evidence.evidence_refs import (
     relative_ref,
     safe_sidecar_stem,
     sidecar_stem_for_workload,

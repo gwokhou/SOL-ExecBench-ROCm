@@ -49,7 +49,7 @@ graph TD
 ## Data Flow
 
 1. The `sol-execbench` entry point in `pyproject.toml` dispatches to
-   `sol_execbench.cli:cli`, which is implemented by `SolExecbenchCli` in
+   `sol_execbench.cli.main:cli`, which is implemented by `SolExecbenchCli` in
    `src/sol_execbench/cli/main.py`.
 2. Root evaluator calls resolve either a problem directory or explicit
    `--definition`, `--workload`, `--solution`, and optional `--config` paths.

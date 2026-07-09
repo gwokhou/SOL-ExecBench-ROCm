@@ -5,8 +5,8 @@ import json
 from click.testing import CliRunner
 
 from sol_execbench.cli.main import cli
-from sol_execbench.core.environment import ProbeCompletedProcess
-from sol_execbench.core.toolchain import (
+from sol_execbench.core.platform.environment import ProbeCompletedProcess
+from sol_execbench.core.platform.toolchain import (
     TOOLCHAIN_ROUTING_SCHEMA_VERSION,
     ToolLifecycle,
     ToolchainArtifactType,
@@ -146,7 +146,7 @@ def test_toolchain_cli_prints_routing_json(monkeypatch):
         return ProbeCompletedProcess(returncode=0, stdout="rocprofv3 7.0.0")
 
     monkeypatch.setattr(
-        "sol_execbench.core.toolchain._run_probe",
+        "sol_execbench.core.platform.toolchain._run_probe",
         runner,
     )
 

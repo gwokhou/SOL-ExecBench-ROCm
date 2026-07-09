@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""AMD-native scoring support compatibility facade."""
+"""AMD-native scoring support convenience exports."""
 
 from __future__ import annotations
 
@@ -21,13 +21,13 @@ _EXPORTS = {
     "default_amd_hardware_models": ".amd_sol",
     "estimate_work": ".amd_sol",
     "extract_graph": ".amd_sol",
-    "AMD_SOL_V2_SCHEMA_VERSION": ".amd_sol_v2",
-    "AmdSolBoundV2Artifact": ".amd_sol_v2",
-    "AmdSolV2AggregateBound": ".amd_sol_v2",
-    "AmdSolV2CoverageSummary": ".amd_sol_v2",
-    "AmdSolV2OpBound": ".amd_sol_v2",
-    "amd_sol_bound_v2_from_dict": ".amd_sol_v2",
-    "build_amd_sol_bound_v2_artifact": ".amd_sol_v2",
+    "AMD_SOL_V2_SCHEMA_VERSION": ".amd_sol.v2",
+    "AmdSolBoundV2Artifact": ".amd_sol.v2",
+    "AmdSolV2AggregateBound": ".amd_sol.v2",
+    "AmdSolV2CoverageSummary": ".amd_sol.v2",
+    "AmdSolV2OpBound": ".amd_sol.v2",
+    "amd_sol_bound_v2_from_dict": ".amd_sol.v2",
+    "build_amd_sol_bound_v2_artifact": ".amd_sol.v2",
     "BoundEdge": ".amd_bound_graph",
     "BoundGraph": ".amd_bound_graph",
     "BoundGraphNode": ".amd_bound_graph",
@@ -35,8 +35,8 @@ _EXPORTS = {
     "BoundTensorRole": ".amd_bound_graph",
     "OpFamily": ".amd_bound_graph",
     "build_bound_graph": ".amd_bound_graph",
-    "OperatorWorkEstimate": ".amd_bound_estimates",
-    "estimate_bound_work": ".amd_bound_estimates",
+    "OperatorWorkEstimate": ".amd_bound_estimate.estimates",
+    "estimate_bound_work": ".amd_bound_estimate.estimates",
     "AMD_HARDWARE_MODEL_SCHEMA_VERSION": ".amd_hardware_models",
     "amd_hardware_model_from_dict": ".amd_hardware_models",
     "load_amd_hardware_model": ".amd_hardware_models",
@@ -144,7 +144,7 @@ __all__ = [
 
 
 def __getattr__(name: str) -> Any:
-    """Load compatibility re-exports on first access."""
+    """Load package exports on first access."""
     module_name = _EXPORTS.get(name)
     if module_name is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

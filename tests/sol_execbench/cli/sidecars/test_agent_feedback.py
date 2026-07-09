@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from sol_execbench.cli import agent_feedback_sidecar as cli_agent_feedback_sidecar
+from sol_execbench.cli.sidecars import agent_feedback as cli_agent_feedback_sidecar
 from sol_execbench.core.data.solution import (
     BuildSpec,
     Solution,

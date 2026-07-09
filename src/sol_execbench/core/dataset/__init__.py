@@ -15,9 +15,9 @@
 
 """Dataset acquisition and layout contract helpers.
 
-This package keeps historical re-export names available without eagerly
-importing every dataset subsystem at package import time. New internal code
-should import from the focused submodule that owns the symbol.
+This package exposes dataset subsystem symbols without eagerly importing every
+submodule at package import time. Internal code should import from the focused
+submodule that owns the symbol.
 """
 
 from __future__ import annotations
@@ -113,7 +113,7 @@ __all__ = sorted(_EXPORTS)
 
 
 def __getattr__(name: str) -> Any:
-    """Load compatibility re-exports on first access."""
+    """Load package exports on first access."""
     module_name = _EXPORTS.get(name)
     if module_name is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

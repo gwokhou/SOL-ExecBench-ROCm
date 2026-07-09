@@ -6,7 +6,7 @@ from typing import Any, cast
 import pytest
 from pydantic import ValidationError
 
-from sol_execbench.core.trust_summary import (
+from sol_execbench.core.reports.trust_summary import (
     TRUST_SUMMARY_SCHEMA_VERSION,
     TrustSummaryReport,
     build_trust_summary_report,

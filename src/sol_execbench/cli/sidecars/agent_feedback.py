@@ -17,11 +17,11 @@ from ...core.bench.agent_feedback import (
     build_agent_feedback_sidecar,
 )
 from ...core.bench.rocm_profiler import Rocprofv3ProfileResult
-from ...core.bench.static_kernel_evidence import StaticKernelEvidenceSidecar
-from ...core.checksums import sha256_file, stable_json_checksum
+from ...core.bench.static_kernel.evidence import StaticKernelEvidenceSidecar
+from ...core.evidence.checksums import sha256_file, stable_json_checksum
 from ...core.data.solution import Solution
 from ...core.data.trace import Trace
-from ...core.runtime_evidence import write_json_payload
+from ...core.evidence.runtime_evidence import write_json_payload
 
 console = Console(stderr=True)
 

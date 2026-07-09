@@ -256,7 +256,7 @@ def collect_timing_environment_snapshot() -> dict[str, Any]:
     The snapshot is designed for JSON serialization in batch summary sidecars.
     """
     from sol_execbench.core.bench.clock_lock import are_clocks_locked
-    from sol_execbench.core.environment import collect_environment_snapshot
+    from sol_execbench.core.platform.environment import collect_environment_snapshot
 
     # Collect base environment snapshot (without PyTorch for speed)
     base_snapshot = collect_environment_snapshot(collect_pytorch=False)

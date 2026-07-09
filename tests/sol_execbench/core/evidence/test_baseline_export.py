@@ -7,7 +7,7 @@ from typing import Any
 from click.testing import CliRunner
 
 from sol_execbench.cli.main import cli
-from sol_execbench.core.baseline_export import export_hip_baseline_registry
+from sol_execbench.core.evidence.baseline_export import export_hip_baseline_registry
 
 
 def test_export_hip_baseline_registry_from_passed_trace(tmp_path: Path) -> None:

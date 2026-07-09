@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from sol_execbench.cli import static_evidence as cli_static_evidence
-from sol_execbench.core.bench.static_kernel_evidence import (
+from sol_execbench.cli.sidecars import static_evidence as cli_static_evidence
+from sol_execbench.core.bench.static_kernel.evidence import (
     StaticKernelEvidenceArtifact,
     StaticKernelEvidenceReasonCode,
     StaticKernelEvidenceStatus,

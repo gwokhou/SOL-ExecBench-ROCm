@@ -7,12 +7,12 @@ from pathlib import Path
 
 import pytest
 
-from sol_execbench.core.compatibility import (
+from sol_execbench.core.platform.compatibility import (
     MatrixCompatibilityReasonCode,
     MatrixCompatibilityStatus,
     MatrixValidationScope,
 )
-from sol_execbench.core.docker_matrix import (
+from sol_execbench.core.platform.docker_matrix import (
     docker_build_args_for_target,
     load_docker_target_manifest,
     preview_docker_target_selection,
@@ -207,7 +207,7 @@ def test_module_main_emits_default_preview_json_without_live_docker() -> None:
         [
             sys.executable,
             "-m",
-            "sol_execbench.core.docker_matrix",
+            "sol_execbench.core.platform.docker_matrix",
             "preview",
             "--manifest",
             str(MANIFEST_PATH),

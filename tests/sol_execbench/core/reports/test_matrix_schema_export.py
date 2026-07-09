@@ -8,7 +8,7 @@ from pathlib import Path
 from click.testing import CliRunner
 
 from sol_execbench.cli.main import cli
-from sol_execbench.core.compatibility import (
+from sol_execbench.core.platform.compatibility import (
     ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION,
     export_matrix_entry_json_schema,
     export_matrix_json_schemas,
@@ -138,7 +138,9 @@ def test_export_matrix_schema_script_writes_all_schema_files(tmp_path, monkeypat
     ]
     first = (output_dir / "matrix-entry.schema.json").read_text(encoding="utf-8")
     module.main()
-    assert (output_dir / "matrix-entry.schema.json").read_text(encoding="utf-8") == first
+    assert (output_dir / "matrix-entry.schema.json").read_text(
+        encoding="utf-8"
+    ) == first
 
 
 def test_schema_export_script_is_not_primary_sol_execbench_cli_option():

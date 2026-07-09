@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import cast
 
-from sol_execbench.core.compatibility import MatrixEntry
+from sol_execbench.core.platform.compatibility import MatrixEntry
 from sol_execbench.core.evidence.runtime_evidence_builders import build_aggregate_report
 from sol_execbench.core.evidence.runtime_evidence_models import ModelDumpable
 

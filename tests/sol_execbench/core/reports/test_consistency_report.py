@@ -6,7 +6,7 @@ from typing import Any, cast
 import pytest
 from pydantic import ValidationError
 
-from sol_execbench.core.consistency import (
+from sol_execbench.core.reports.consistency import (
     CONSISTENCY_REPORT_SCHEMA_VERSION,
     ConsistencyReport,
     build_consistency_report,

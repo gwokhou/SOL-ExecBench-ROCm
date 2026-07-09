@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 
-from sol_execbench.core.bench.agent_feedback_items import trace_feedback_items
+from sol_execbench.core.bench.agent_feedback.items import trace_feedback_items
 from sol_execbench.core.data.trace import EvaluationStatus
 
 
