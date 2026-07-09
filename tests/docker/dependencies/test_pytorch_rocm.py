@@ -4,6 +4,13 @@
 from __future__ import annotations
 
 import torch
+import pytest
+
+pytestmark = [
+    pytest.mark.docker_dependency,
+    pytest.mark.requires_rocm,
+    pytest.mark.requires_rocm_gpu,
+]
 
 
 def test_torch_rocm_backend_available():

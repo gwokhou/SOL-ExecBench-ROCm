@@ -6,6 +6,13 @@ from __future__ import annotations
 import shutil
 import subprocess
 
+import pytest
+
+pytestmark = [
+    pytest.mark.docker_dependency,
+    pytest.mark.requires_linux,
+]
+
 
 def require_tool(name: str) -> str:
     path = shutil.which(name)

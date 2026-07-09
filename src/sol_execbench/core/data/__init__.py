@@ -14,48 +14,50 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Data layer with strongly-typed dataclasses for SOL ExecBench."""
+"""Data layer compatibility facade for SOL ExecBench."""
 
-from .definition import AxisConst, AxisExpr, AxisSpec, AxisVar, Definition, TensorSpec
-from .contract import (
-    SOL_EXECBENCH_CONTRACT_SCHEMA_VERSION,
-    SOL_EXECBENCH_CONTRACT_VERSION,
-    EvaluatorContract,
-    build_evaluator_contract,
-)
-from .json_utils import (
-    append_jsonl_file,
-    load_json_file,
-    load_jsonl_file,
-    save_json_file,
-    save_jsonl_file,
-)
-from .solution import (
-    BuildSpec,
-    CompileOptions,
-    Solution,
-    SourceFile,
-    SupportedBindings,
-    SupportedHardware,
-    SupportedLanguages,
-)
-from .trace import (
-    Correctness,
-    Environment,
-    Evaluation,
-    EvaluationStatus,
-    Performance,
-    Trace,
-)
-from .workload import (
-    CustomInput,
-    InputSpec,
-    RandomInput,
-    SafetensorsInput,
-    ScalarInput,
-    ToleranceSpec,
-    Workload,
-)
+from __future__ import annotations
+
+from importlib import import_module
+from typing import Any
+
+_EXPORTS = {
+    "AxisConst": ".definition",
+    "AxisExpr": ".definition",
+    "AxisSpec": ".definition",
+    "AxisVar": ".definition",
+    "TensorSpec": ".definition",
+    "Definition": ".definition",
+    "SOL_EXECBENCH_CONTRACT_SCHEMA_VERSION": ".contract",
+    "SOL_EXECBENCH_CONTRACT_VERSION": ".contract",
+    "EvaluatorContract": ".contract",
+    "build_evaluator_contract": ".contract",
+    "SourceFile": ".solution",
+    "BuildSpec": ".solution",
+    "CompileOptions": ".solution",
+    "SupportedBindings": ".solution",
+    "SupportedHardware": ".solution",
+    "SupportedLanguages": ".solution",
+    "Solution": ".solution",
+    "ToleranceSpec": ".workload",
+    "CustomInput": ".workload",
+    "RandomInput": ".workload",
+    "ScalarInput": ".workload",
+    "SafetensorsInput": ".workload",
+    "InputSpec": ".workload",
+    "Workload": ".workload",
+    "Correctness": ".trace",
+    "Performance": ".trace",
+    "Environment": ".trace",
+    "Evaluation": ".trace",
+    "EvaluationStatus": ".trace",
+    "Trace": ".trace",
+    "save_json_file": ".json_utils",
+    "load_json_file": ".json_utils",
+    "save_jsonl_file": ".json_utils",
+    "load_jsonl_file": ".json_utils",
+    "append_jsonl_file": ".json_utils",
+}
 
 __all__ = [
     # Definition types
@@ -100,3 +102,18 @@ __all__ = [
     "load_jsonl_file",
     "append_jsonl_file",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    """Load compatibility re-exports on first access."""
+    module_name = _EXPORTS.get(name)
+    if module_name is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(import_module(module_name, __name__), name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    """Return stable names for interactive discovery and star imports."""
+    return sorted({*globals(), *__all__})

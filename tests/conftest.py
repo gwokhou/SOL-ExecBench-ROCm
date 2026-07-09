@@ -15,6 +15,8 @@
 # limitations under the License.
 
 import sys
+from importlib.util import find_spec
+from platform import machine
 from collections.abc import Callable
 from pathlib import Path
 
@@ -80,6 +82,10 @@ def _has_rocwmma_headers() -> bool:
     return Path("/opt/rocm/include/rocwmma/rocwmma.hpp").exists()
 
 
+def _has_python_module(module: str) -> bool:
+    return find_spec(module) is not None
+
+
 def _is_rdna4(gfx_arch: str) -> bool:
     return gfx_arch.startswith("gfx12")
 
@@ -96,11 +102,47 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers",
+        "requires_linux: test requires Linux platform semantics or tools",
+    )
+    config.addinivalue_line(
+        "markers",
+        "requires_x86_64: test requires an x86_64 machine architecture",
+    )
+    config.addinivalue_line(
+        "markers",
         "requires_rocm: test requires a ROCm GPU visible through PyTorch",
     )
     config.addinivalue_line(
         "markers",
+        "requires_rocm_gpu: test requires a ROCm GPU visible through PyTorch",
+    )
+    config.addinivalue_line(
+        "markers",
         "requires_rocm_dev: test requires ROCm native extension development headers",
+    )
+    config.addinivalue_line(
+        "markers",
+        "requires_triton_rocm: test requires the triton-rocm Python package",
+    )
+    config.addinivalue_line(
+        "markers",
+        "requires_safetensors_torch: test requires safetensors.torch support",
+    )
+    config.addinivalue_line(
+        "markers",
+        "docker_dependency: test verifies dependencies expected inside the Docker ROCm environment",
+    )
+    config.addinivalue_line(
+        "markers",
+        "subprocess_uv: test launches uv-managed subprocesses and may need build-system dependencies cached",
+    )
+    config.addinivalue_line(
+        "markers",
+        "native_extension: test loads native extension modules such as torch or safetensors",
+    )
+    config.addinivalue_line(
+        "markers",
+        "native_extension_serial: native extension test skipped by default; run with: pytest tests -m native_extension_serial -n 0",
     )
     config.addinivalue_line(
         "markers",
@@ -129,19 +171,33 @@ def pytest_collection_modifyitems(
 ) -> None:
     """Skip tests based on hardware availability.
 
-    Also skips timing_serial tests unless explicitly selected with -m.
+    Also skips serial-only native/timing tests unless explicitly selected with -m.
     """
     rocm_available, gfx_arch, rocm_skip_reason = _rocm_gpu_info()
     rocm_dev_available = _has_rocm_dev_headers()
     ck_available = _has_ck_headers()
     rocwmma_available = _has_rocwmma_headers()
+    triton_rocm_available = _has_python_module("triton")
+    safetensors_torch_available = _has_python_module("safetensors.torch")
     detected = gfx_arch or "unavailable"
     supported_arch = _is_rdna4(gfx_arch) or _is_cdna3(gfx_arch)
+    skip_not_linux = pytest.mark.skip(reason="test requires Linux")
+    skip_not_x86_64 = pytest.mark.skip(reason="test requires x86_64 architecture")
     skip_timing = pytest.mark.skip(
         reason="timing_serial tests skipped by default; run with: pytest tests -m timing_serial -n 0"
     )
+    skip_docker_dependency = pytest.mark.skip(
+        reason="docker_dependency tests skipped by default; run with: pytest tests/docker/dependencies -m docker_dependency"
+    )
+    skip_native_extension_serial = pytest.mark.skip(
+        reason="native_extension_serial tests skipped by default; run with: pytest tests -m native_extension_serial -n 0"
+    )
     skip_no_rocm = pytest.mark.skip(reason=rocm_skip_reason)
     skip_no_rocm_dev = pytest.mark.skip(reason="ROCm HIP development headers unavailable")
+    skip_no_triton_rocm = pytest.mark.skip(reason="triton-rocm Python package unavailable")
+    skip_no_safetensors_torch = pytest.mark.skip(
+        reason="safetensors.torch support unavailable"
+    )
     skip_no_ck = pytest.mark.skip(reason="Composable Kernel headers unavailable")
     skip_no_rocwmma = pytest.mark.skip(reason="rocWMMA headers unavailable")
     skip_rdna4 = pytest.mark.skip(
@@ -160,12 +216,31 @@ def pytest_collection_modifyitems(
     # If the user passed -m that includes timing_serial, don't auto-skip them.
     markexpr = config.getoption("-m", default="")
     timing_selected = "timing_serial" in markexpr
+    docker_dependency_selected = "docker_dependency" in markexpr
+    native_extension_serial_selected = "native_extension_serial" in markexpr
 
     for item in items:
-        if any(item.iter_markers(name="requires_rocm")) and not rocm_available:
+        if any(item.iter_markers(name="requires_linux")) and sys.platform != "linux":
+            item.add_marker(skip_not_linux)
+        if any(item.iter_markers(name="requires_x86_64")) and machine().lower() not in {
+            "x86_64",
+            "amd64",
+        }:
+            item.add_marker(skip_not_x86_64)
+        if (
+            any(item.iter_markers(name="requires_rocm"))
+            or any(item.iter_markers(name="requires_rocm_gpu"))
+        ) and not rocm_available:
             item.add_marker(skip_no_rocm)
         if any(item.iter_markers(name="requires_rocm_dev")) and not rocm_dev_available:
             item.add_marker(skip_no_rocm_dev)
+        if any(item.iter_markers(name="requires_triton_rocm")) and not triton_rocm_available:
+            item.add_marker(skip_no_triton_rocm)
+        if (
+            any(item.iter_markers(name="requires_safetensors_torch"))
+            and not safetensors_torch_available
+        ):
+            item.add_marker(skip_no_safetensors_torch)
         if any(item.iter_markers(name="requires_ck")) and not ck_available:
             item.add_marker(skip_no_ck)
         if any(item.iter_markers(name="requires_rocwmma")) and not rocwmma_available:
@@ -184,6 +259,13 @@ def pytest_collection_modifyitems(
             item.add_marker(skip_legacy_cutile)
         if "timing_serial" in item.keywords and not timing_selected:
             item.add_marker(skip_timing)
+        if "docker_dependency" in item.keywords and not docker_dependency_selected:
+            item.add_marker(skip_docker_dependency)
+        if (
+            "native_extension_serial" in item.keywords
+            and not native_extension_serial_selected
+        ):
+            item.add_marker(skip_native_extension_serial)
 
 
 @pytest.fixture

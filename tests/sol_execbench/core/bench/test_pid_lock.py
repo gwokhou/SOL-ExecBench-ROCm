@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 
 import pytest
 
@@ -69,7 +70,7 @@ with acquire_pid_lock(output_dir):
 
         # Spawn holder process
         holder = subprocess.Popen(
-            ["python", "-c", holder_script],
+            [sys.executable, "-c", holder_script],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
@@ -90,7 +91,7 @@ with acquire_pid_lock(output_dir):
 """
 
         result = subprocess.run(
-            ["python", "-c", contender_script],
+            [sys.executable, "-c", contender_script],
             capture_output=True,
             text=True,
         )
@@ -118,7 +119,7 @@ with acquire_pid_lock(output_dir):
 """
 
         result1 = subprocess.run(
-            ["python", "-c", first_script],
+            [sys.executable, "-c", first_script],
             capture_output=True,
             text=True,
         )
@@ -135,7 +136,7 @@ with acquire_pid_lock(output_dir):
 """
 
         result2 = subprocess.run(
-            ["python", "-c", second_script],
+            [sys.executable, "-c", second_script],
             capture_output=True,
             text=True,
         )
@@ -155,7 +156,7 @@ with acquire_pid_lock(output_dir):
 """
 
         holder = subprocess.Popen(
-            ["python", "-c", holder_script],
+            [sys.executable, "-c", holder_script],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
@@ -180,7 +181,7 @@ with acquire_pid_lock(output_dir):
 """
 
         result = subprocess.run(
-            ["python", "-c", next_script],
+            [sys.executable, "-c", next_script],
             capture_output=True,
             text=True,
         )

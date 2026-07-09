@@ -45,7 +45,17 @@ dev = [
 addopts = "-n 8 --dist loadgroup"
 markers = [
     "cpp: test compiles HIP/C++ extensions (slow, requires ROCm compiler toolchain)",
+    "requires_linux: test requires Linux platform semantics or tools",
+    "requires_x86_64: test requires an x86_64 machine architecture",
     "requires_rocm: test requires a ROCm GPU visible through PyTorch",
+    "requires_rocm_gpu: test requires a ROCm GPU visible through PyTorch",
+    "requires_rocm_dev: test requires ROCm native extension development headers",
+    "requires_triton_rocm: test requires the triton-rocm Python package",
+    "requires_safetensors_torch: test requires safetensors.torch support",
+    "docker_dependency: test verifies dependencies expected inside the Docker ROCm environment",
+    "subprocess_uv: test launches uv-managed subprocesses and may need build-system dependencies cached",
+    "native_extension: test loads native extension modules such as torch or safetensors",
+    "native_extension_serial: native extension test skipped by default; run with: pytest tests -m native_extension_serial -n 0",
     "requires_rdna4: test requires an AMD RDNA 4 GPU, such as gfx1200",
     "requires_cdna3: test requires an AMD CDNA 3 GPU, such as gfx942",
     "requires_cutile: legacy NVIDIA cuTile marker; skipped in this ROCm-only port",

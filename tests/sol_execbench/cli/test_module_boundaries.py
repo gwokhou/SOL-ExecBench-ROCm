@@ -473,6 +473,122 @@ if late_loaded:
     )
 
 
+def test_top_level_package_facade_is_lazy() -> None:
+    script = """
+import sys
+
+import sol_execbench
+
+eager_modules = [
+    "sol_execbench.core",
+    "sol_execbench.core.data",
+    "sol_execbench.core.data.definition",
+    "sol_execbench.core.bench.config",
+]
+loaded = [module for module in eager_modules if module in sys.modules]
+if loaded:
+    raise SystemExit(f"eagerly loaded top-level facade modules: {loaded}")
+
+_ = sol_execbench.Definition
+if "sol_execbench.core.data.definition" not in sys.modules:
+    raise SystemExit("lazy access did not load definition module")
+"""
+    subprocess.run(
+        [sys.executable, "-c", script],
+        check=True,
+        cwd=SOURCE_ROOT,
+    )
+
+
+def test_core_package_facade_is_lazy() -> None:
+    script = """
+import sys
+
+import sol_execbench.core as core
+
+eager_modules = [
+    "sol_execbench.core.data",
+    "sol_execbench.core.data.definition",
+    "sol_execbench.core.environment",
+    "sol_execbench.core.toolchain",
+    "sol_execbench.core.bench.config",
+]
+loaded = [module for module in eager_modules if module in sys.modules]
+if loaded:
+    raise SystemExit(f"eagerly loaded core facade modules: {loaded}")
+
+_ = core.BenchmarkConfig
+if "sol_execbench.core.bench.config" not in sys.modules:
+    raise SystemExit("lazy access did not load benchmark config module")
+"""
+    subprocess.run(
+        [sys.executable, "-c", script],
+        check=True,
+        cwd=SOURCE_ROOT,
+    )
+
+
+def test_core_data_package_facade_is_lazy() -> None:
+    script = """
+import sys
+
+import sol_execbench.core.data as data
+
+eager_modules = [
+    "sol_execbench.core.data.definition",
+    "sol_execbench.core.data.solution",
+    "sol_execbench.core.data.trace",
+    "sol_execbench.core.data.workload",
+]
+loaded = [module for module in eager_modules if module in sys.modules]
+if loaded:
+    raise SystemExit(f"eagerly loaded data facade modules: {loaded}")
+
+_ = data.Workload
+if "sol_execbench.core.data.workload" not in sys.modules:
+    raise SystemExit("lazy access did not load workload module")
+late_loaded = [
+    module
+    for module in eager_modules
+    if module in sys.modules and module != "sol_execbench.core.data.workload"
+]
+if late_loaded:
+    raise SystemExit(f"unrelated data modules loaded after workload: {late_loaded}")
+"""
+    subprocess.run(
+        [sys.executable, "-c", script],
+        check=True,
+        cwd=SOURCE_ROOT,
+    )
+
+
+def test_core_scoring_package_facade_is_lazy() -> None:
+    script = """
+import sys
+
+import sol_execbench.core.scoring as scoring
+
+eager_modules = [
+    "sol_execbench.core.scoring.amd_sol",
+    "sol_execbench.core.scoring.amd_sol_v2",
+    "sol_execbench.core.scoring.amd_score",
+    "sol_execbench.core.scoring.official_score",
+]
+loaded = [module for module in eager_modules if module in sys.modules]
+if loaded:
+    raise SystemExit(f"eagerly loaded scoring facade modules: {loaded}")
+
+_ = scoring.AmdNativeScore
+if "sol_execbench.core.scoring.amd_score" not in sys.modules:
+    raise SystemExit("lazy access did not load AMD score module")
+"""
+    subprocess.run(
+        [sys.executable, "-c", script],
+        check=True,
+        cwd=SOURCE_ROOT,
+    )
+
+
 def test_source_modules_do_not_import_scoring_package_reexports() -> None:
     modules = _internal_modules()
     core_root = "sol_execbench.core"

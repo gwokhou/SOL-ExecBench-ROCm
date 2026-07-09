@@ -28,6 +28,11 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+if [ "$(uname -s)" != "Linux" ]; then
+    echo "ERROR: scripts/run_docker.sh is supported only on Linux ROCm hosts." >&2
+    exit 2
+fi
+
 IMAGE_NAME="${IMAGE_NAME:-sol-execbench}"
 IMAGE_TAG="${IMAGE_TAG:-}"
 

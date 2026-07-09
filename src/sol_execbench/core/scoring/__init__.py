@@ -1,88 +1,79 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""AMD-native scoring support modules."""
+"""AMD-native scoring support compatibility facade."""
 
-from .amd_sol import (
-    AMD_SOL_SCHEMA_VERSION,
-    AmdHardwareModel,
-    AmdSolBoundArtifact,
-    EstimateConfidence,
-    GraphNode,
-    HardwareValidationStatus,
-    OpSolBound,
-    WorkEstimate,
-    build_amd_sol_bound_artifact,
-    default_amd_hardware_models,
-    estimate_work,
-    extract_graph,
-)
-from .amd_sol_v2 import (
-    AMD_SOL_V2_SCHEMA_VERSION,
-    AmdSolBoundV2Artifact,
-    AmdSolV2AggregateBound,
-    AmdSolV2CoverageSummary,
-    AmdSolV2OpBound,
-    amd_sol_bound_v2_from_dict,
-    build_amd_sol_bound_v2_artifact,
-)
-from .amd_bound_graph import (
-    BoundEdge,
-    BoundGraph,
-    BoundGraphNode,
-    BoundTensor,
-    BoundTensorRole,
-    OpFamily,
-    build_bound_graph,
-)
-from .amd_bound_estimates import (
-    OperatorWorkEstimate,
-    estimate_bound_work,
-)
-from .amd_hardware_models import (
-    AMD_HARDWARE_MODEL_SCHEMA_VERSION,
-    amd_hardware_model_from_dict,
-    load_amd_hardware_model,
-    load_packaged_amd_hardware_model,
-)
-from .amd_score import (
-    AMD_SCORE_CLAIM_LEVEL,
-    AMD_SCORE_SCHEMA_VERSION,
-    CDNA3_NO_VALIDATION_WARNING,
-    DEGRADED_SOL_BOUND_WARNING,
-    INCOMPLETE_EVIDENCE_WARNING,
-    REFERENCE_BASELINE_WARNING,
-    UNSCORED_SOL_BOUND_WARNING,
-    UNSUPPORTED_EVIDENCE_WARNING,
-    UNVALIDATED_HARDWARE_WARNING,
-    AmdNativeScore,
-    AmdNativeSuiteReport,
-    build_amd_native_suite_report,
-    score_amd_native_workload,
-)
-from .baseline_artifact import (
-    BASELINE_ARTIFACT_SCHEMA_VERSION,
-    ScoringBaselineArtifact,
-    ScoringBaselineEntry,
-    load_scoring_baseline_artifact,
-    scoring_baseline_artifact_from_dict,
-)
-from .official_score import (
-    MISSING_AGGREGATION_POLICY_BLOCKER,
-    MISSING_BASELINE_BLOCKER,
-    MISSING_MEASURED_LATENCY_BLOCKER,
-    MISSING_SCORE_BLOCKER,
-    MISSING_SOL_BOUND_BLOCKER,
-    OFFICIAL_SCORE_CLAIM_LEVEL,
-    OFFICIAL_SCORE_KIND,
-    OFFICIAL_SCORE_SCHEMA_VERSION,
-    OFFICIAL_SCORE_SOURCE,
-    PLACEHOLDER_BASELINE_BLOCKER,
-    OfficialScoreEvidence,
-    OfficialScoreSuiteEvidence,
-    build_official_score_suite_evidence,
-    official_score_from_amd_native_score,
-)
+from __future__ import annotations
+
+from importlib import import_module
+from typing import Any
+
+_EXPORTS = {
+    "AMD_SOL_SCHEMA_VERSION": ".amd_sol",
+    "AmdHardwareModel": ".amd_sol",
+    "AmdSolBoundArtifact": ".amd_sol",
+    "EstimateConfidence": ".amd_sol",
+    "GraphNode": ".amd_sol",
+    "HardwareValidationStatus": ".amd_sol",
+    "OpSolBound": ".amd_sol",
+    "WorkEstimate": ".amd_sol",
+    "build_amd_sol_bound_artifact": ".amd_sol",
+    "default_amd_hardware_models": ".amd_sol",
+    "estimate_work": ".amd_sol",
+    "extract_graph": ".amd_sol",
+    "AMD_SOL_V2_SCHEMA_VERSION": ".amd_sol_v2",
+    "AmdSolBoundV2Artifact": ".amd_sol_v2",
+    "AmdSolV2AggregateBound": ".amd_sol_v2",
+    "AmdSolV2CoverageSummary": ".amd_sol_v2",
+    "AmdSolV2OpBound": ".amd_sol_v2",
+    "amd_sol_bound_v2_from_dict": ".amd_sol_v2",
+    "build_amd_sol_bound_v2_artifact": ".amd_sol_v2",
+    "BoundEdge": ".amd_bound_graph",
+    "BoundGraph": ".amd_bound_graph",
+    "BoundGraphNode": ".amd_bound_graph",
+    "BoundTensor": ".amd_bound_graph",
+    "BoundTensorRole": ".amd_bound_graph",
+    "OpFamily": ".amd_bound_graph",
+    "build_bound_graph": ".amd_bound_graph",
+    "OperatorWorkEstimate": ".amd_bound_estimates",
+    "estimate_bound_work": ".amd_bound_estimates",
+    "AMD_HARDWARE_MODEL_SCHEMA_VERSION": ".amd_hardware_models",
+    "amd_hardware_model_from_dict": ".amd_hardware_models",
+    "load_amd_hardware_model": ".amd_hardware_models",
+    "load_packaged_amd_hardware_model": ".amd_hardware_models",
+    "AMD_SCORE_CLAIM_LEVEL": ".amd_score",
+    "AMD_SCORE_SCHEMA_VERSION": ".amd_score",
+    "CDNA3_NO_VALIDATION_WARNING": ".amd_score",
+    "DEGRADED_SOL_BOUND_WARNING": ".amd_score",
+    "INCOMPLETE_EVIDENCE_WARNING": ".amd_score",
+    "REFERENCE_BASELINE_WARNING": ".amd_score",
+    "UNSCORED_SOL_BOUND_WARNING": ".amd_score",
+    "UNSUPPORTED_EVIDENCE_WARNING": ".amd_score",
+    "UNVALIDATED_HARDWARE_WARNING": ".amd_score",
+    "AmdNativeScore": ".amd_score",
+    "AmdNativeSuiteReport": ".amd_score",
+    "build_amd_native_suite_report": ".amd_score",
+    "score_amd_native_workload": ".amd_score",
+    "BASELINE_ARTIFACT_SCHEMA_VERSION": ".baseline_artifact",
+    "ScoringBaselineArtifact": ".baseline_artifact",
+    "ScoringBaselineEntry": ".baseline_artifact",
+    "load_scoring_baseline_artifact": ".baseline_artifact",
+    "scoring_baseline_artifact_from_dict": ".baseline_artifact",
+    "MISSING_AGGREGATION_POLICY_BLOCKER": ".official_score",
+    "MISSING_BASELINE_BLOCKER": ".official_score",
+    "MISSING_MEASURED_LATENCY_BLOCKER": ".official_score",
+    "MISSING_SCORE_BLOCKER": ".official_score",
+    "MISSING_SOL_BOUND_BLOCKER": ".official_score",
+    "OFFICIAL_SCORE_CLAIM_LEVEL": ".official_score",
+    "OFFICIAL_SCORE_KIND": ".official_score",
+    "OFFICIAL_SCORE_SCHEMA_VERSION": ".official_score",
+    "OFFICIAL_SCORE_SOURCE": ".official_score",
+    "PLACEHOLDER_BASELINE_BLOCKER": ".official_score",
+    "OfficialScoreEvidence": ".official_score",
+    "OfficialScoreSuiteEvidence": ".official_score",
+    "build_official_score_suite_evidence": ".official_score",
+    "official_score_from_amd_native_score": ".official_score",
+}
 
 __all__ = [
     "AMD_SCORE_CLAIM_LEVEL",
@@ -150,3 +141,18 @@ __all__ = [
     "official_score_from_amd_native_score",
     "score_amd_native_workload",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    """Load compatibility re-exports on first access."""
+    module_name = _EXPORTS.get(name)
+    if module_name is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(import_module(module_name, __name__), name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    """Return stable names for interactive discovery and star imports."""
+    return sorted({*globals(), *__all__})

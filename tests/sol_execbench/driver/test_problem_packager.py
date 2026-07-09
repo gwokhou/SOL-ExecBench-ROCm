@@ -18,6 +18,7 @@
 
 import ast
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -358,7 +359,7 @@ class TestCompile:
     ):
         pkg = _make_packager(tmp_path, definition, workloads, hip_solution, config)
         cmd, artifact_path = pkg.compile()
-        assert cmd == ["python", "build_ext.py"]
+        assert cmd == [sys.executable, "build_ext.py"]
         assert artifact_path.endswith("benchmark_kernel.so")
 
     def test_build_ext_staged(
@@ -466,7 +467,7 @@ class TestExecute:
     ):
         pkg = _make_packager(tmp_path, definition, workloads, python_solution, config)
         cmd = pkg.execute()
-        assert cmd == ["python", "eval_driver.py"]
+        assert cmd == [sys.executable, "eval_driver.py"]
 
     def test_eval_driver_staged(
         self, tmp_path, definition, workloads, python_solution, config
@@ -491,7 +492,7 @@ class TestExecute:
         # Simulate a compiled artifact.
         (pkg.output_dir / "benchmark_kernel.so").write_bytes(b"\x00")
         cmd = pkg.execute()
-        assert cmd == ["python", "eval_driver.py"]
+        assert cmd == [sys.executable, "eval_driver.py"]
 
 
 class TestLocalGfxDetection:

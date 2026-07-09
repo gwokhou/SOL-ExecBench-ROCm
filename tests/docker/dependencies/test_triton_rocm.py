@@ -4,11 +4,22 @@
 from __future__ import annotations
 
 import torch
-import triton
-import triton.language as tl
+import pytest
+
+pytestmark = [
+    pytest.mark.docker_dependency,
+    pytest.mark.requires_linux,
+    pytest.mark.requires_x86_64,
+    pytest.mark.requires_rocm,
+    pytest.mark.requires_rocm_gpu,
+    pytest.mark.requires_triton_rocm,
+]
 
 
 def test_triton_rocm_import_and_backend():
+    triton = pytest.importorskip("triton")
+    tl = pytest.importorskip("triton.language")
+
     assert triton is not None
     assert tl is not None
     assert hasattr(triton, "__version__")
