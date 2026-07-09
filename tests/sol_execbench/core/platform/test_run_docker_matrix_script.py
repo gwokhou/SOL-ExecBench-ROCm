@@ -4,7 +4,10 @@ import json
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
+
+import pytest
 
 from sol_execbench.core.docker_matrix import load_docker_target_manifest
 
@@ -74,6 +77,7 @@ def _run_docker_preview(*args: str) -> subprocess.CompletedProcess[str]:
         **os.environ,
         "PYTHONPATH": str(REPO_ROOT / "src"),
         "SOL_EXECBENCH_RUN_DOCKER_DRY_RUN": "1",
+        "SOL_EXECBENCH_HOST_PYTHON": sys.executable,
     }
     return subprocess.run(
         [str(RUN_DOCKER_SCRIPT), *args],
@@ -93,6 +97,7 @@ def _run_docker_preflight(
         **os.environ,
         "PYTHONPATH": str(REPO_ROOT / "src"),
         "SOL_EXECBENCH_RUN_DOCKER_DRY_RUN": "1",
+        "SOL_EXECBENCH_HOST_PYTHON": sys.executable,
         **env_overrides,
     }
     return subprocess.run(
@@ -124,6 +129,8 @@ def test_run_docker_host_helpers_use_uv_managed_python() -> None:
     assert not re.search(r"^\s*python\s+-c\b", script, re.MULTILINE)
 
 
+@pytest.mark.requires_linux
+@pytest.mark.subprocess_uv
 def test_run_docker_default_build_preview_uses_rocm_7_1_build_args() -> None:
     completed = _run_docker_preview("--build")
 
@@ -148,6 +155,8 @@ def test_run_docker_default_build_preview_uses_rocm_7_1_build_args() -> None:
     assert "--privileged" not in completed.stdout
 
 
+@pytest.mark.requires_linux
+@pytest.mark.subprocess_uv
 def test_run_docker_declared_target_build_preview_uses_manifest_build_args() -> None:
     manifest = load_docker_target_manifest(MANIFEST_PATH)
     non_default = next(
@@ -187,6 +196,8 @@ def test_run_docker_declared_target_build_preview_uses_manifest_build_args() -> 
     )
 
 
+@pytest.mark.requires_linux
+@pytest.mark.subprocess_uv
 def test_run_docker_target_flag_is_not_forwarded_to_docker_args_or_command() -> None:
     manifest = load_docker_target_manifest(MANIFEST_PATH)
 
@@ -212,6 +223,8 @@ def test_run_docker_target_flag_is_not_forwarded_to_docker_args_or_command() -> 
     assert "--target" not in run_line
 
 
+@pytest.mark.requires_linux
+@pytest.mark.subprocess_uv
 def test_run_docker_image_tag_env_overrides_target_tag() -> None:
     completed = _run_docker_preflight(
         "--build",
@@ -223,6 +236,8 @@ def test_run_docker_image_tag_env_overrides_target_tag() -> None:
     assert "sol-execbench:custom" in completed.stdout
 
 
+@pytest.mark.requires_linux
+@pytest.mark.subprocess_uv
 def test_run_docker_unknown_target_rejected_before_docker_commands() -> None:
     completed = _run_docker_preview("--build", "--target", "rocm-9.9-unknown")
 
@@ -232,6 +247,8 @@ def test_run_docker_unknown_target_rejected_before_docker_commands() -> None:
     assert "docker run" not in completed.stdout
 
 
+@pytest.mark.requires_linux
+@pytest.mark.subprocess_uv
 def test_run_docker_preflight_only_emits_runtime_unavailable_diagnostics() -> None:
     completed = _run_docker_preflight(
         "--preflight-only",
@@ -263,6 +280,8 @@ def test_run_docker_preflight_only_emits_runtime_unavailable_diagnostics() -> No
     assert "docker run" not in completed.stdout
 
 
+@pytest.mark.requires_linux
+@pytest.mark.subprocess_uv
 def test_run_docker_runtime_unavailable_skips_build_and_run() -> None:
     completed = _run_docker_preflight(
         "--build",
@@ -283,6 +302,8 @@ def test_run_docker_runtime_unavailable_skips_build_and_run() -> None:
     assert "docker run" not in completed.stdout
 
 
+@pytest.mark.requires_linux
+@pytest.mark.subprocess_uv
 def test_run_docker_preflight_only_available_exits_without_build_or_run() -> None:
     completed = _run_docker_preflight(
         "--preflight-only",
@@ -306,6 +327,8 @@ def test_run_docker_preflight_only_available_exits_without_build_or_run() -> Non
     assert "docker run" not in completed.stdout
 
 
+@pytest.mark.requires_linux
+@pytest.mark.subprocess_uv
 def test_run_docker_preflight_only_allows_explicit_not_tested_smoke() -> None:
     completed = _run_docker_preflight(
         "--preflight-only",
@@ -330,6 +353,8 @@ def test_run_docker_preflight_only_allows_explicit_not_tested_smoke() -> None:
     assert "docker run" not in completed.stdout
 
 
+@pytest.mark.requires_linux
+@pytest.mark.subprocess_uv
 def test_run_docker_not_tested_preflight_blocks_normal_run() -> None:
     completed = _run_docker_preflight(
         "--",
@@ -351,6 +376,8 @@ def test_run_docker_not_tested_preflight_blocks_normal_run() -> None:
     assert "docker run" not in completed.stdout
 
 
+@pytest.mark.requires_linux
+@pytest.mark.subprocess_uv
 def test_run_docker_explicit_not_tested_smoke_reaches_dry_run_command() -> None:
     completed = _run_docker_preflight(
         "--allow-untested-target-smoke",
@@ -371,6 +398,8 @@ def test_run_docker_explicit_not_tested_smoke_reaches_dry_run_command() -> None:
     assert "sol-execbench tests/sol_execbench/samples/rmsnorm" in completed.stdout
 
 
+@pytest.mark.requires_linux
+@pytest.mark.subprocess_uv
 def test_run_docker_invalid_preflight_boolean_has_no_traceback() -> None:
     completed = _run_docker_preflight(
         "--preflight-only",

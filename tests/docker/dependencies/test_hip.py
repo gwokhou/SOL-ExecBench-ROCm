@@ -7,6 +7,14 @@ import os
 import subprocess
 import tempfile
 
+import pytest
+
+pytestmark = [
+    pytest.mark.docker_dependency,
+    pytest.mark.requires_linux,
+    pytest.mark.requires_rocm_dev,
+]
+
 HIP_SRC = r"""
 #include <hip/hip_runtime.h>
 #include <cstdio>

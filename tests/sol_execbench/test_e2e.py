@@ -33,6 +33,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -338,6 +339,8 @@ def test_reward_hack_e2e(tmp_path: Path, case: EvilCase):
 
 
 @pytest.mark.xdist_group("serial")
+@pytest.mark.requires_rocm_gpu
+@pytest.mark.requires_safetensors_torch
 def test_cli_gqa_paged_decode(tmp_path: Path):
     """CLI e2e: run sol-execbench on a GQA paged-decode problem with safetensors inputs."""
     sample_dir = _SAMPLES_DIR / "gqa_paged_decode"
@@ -352,9 +355,9 @@ def test_cli_gqa_paged_decode(tmp_path: Path):
 
     result = subprocess.run(
         [
-            "uv",
-            "run",
-            "sol-execbench",
+            sys.executable,
+            "-c",
+            "from sol_execbench.cli import cli; cli()",
             str(sample_dir),
             "-o",
             str(output_file),

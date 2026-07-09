@@ -53,7 +53,16 @@ def test_pytest_markers_describe_rocm_hardware_semantics():
 
     expected = [
         "cpp: test compiles HIP/C++ extensions",
+        "requires_linux: test requires Linux platform semantics or tools",
+        "requires_x86_64: test requires an x86_64 machine architecture",
         "requires_rocm: test requires a ROCm GPU",
+        "requires_rocm_gpu: test requires a ROCm GPU",
+        "requires_triton_rocm: test requires the triton-rocm Python package",
+        "requires_safetensors_torch: test requires safetensors.torch support",
+        "docker_dependency: test verifies dependencies expected inside the Docker ROCm environment",
+        "subprocess_uv: test launches uv-managed subprocesses",
+        "native_extension: test loads native extension modules",
+        "native_extension_serial: native extension test skipped by default",
         "requires_rdna4: test requires an AMD RDNA 4 GPU",
         "requires_cdna3: test requires an AMD CDNA 3 GPU",
         "legacy NVIDIA cuTile marker; skipped in this ROCm-only port",
@@ -65,6 +74,12 @@ def test_pytest_markers_describe_rocm_hardware_semantics():
         "ROCm device nodes unavailable in current execution environment",
         "Codex or container sandbox",
         "ROCm GPU unavailable through PyTorch",
+        "test requires Linux",
+        "test requires x86_64 architecture",
+        "triton-rocm Python package unavailable",
+        "safetensors.torch support unavailable",
+        "docker_dependency tests skipped by default",
+        "native_extension_serial tests skipped by default",
         "requires AMD RDNA 4 ROCm GPU",
         "requires AMD CDNA 3 ROCm GPU",
         "unsupported AMD GPU architecture for ROCm test",
@@ -112,7 +127,7 @@ def test_cdna3_marker_has_concrete_hardware_gated_test_surface():
 
 
 def test_cdna3_schema_support_is_distinct_from_hardware_validation():
-    solution_schema = _read("src/sol_execbench/core/data/solution.py")
+    solution_schema = _read("src/sol_execbench/core/data/solution_models.py")
     requirements = _read_current_or_archived_requirements()
 
     for target in ("gfx940", "gfx941", "gfx942"):

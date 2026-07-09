@@ -26,6 +26,7 @@ import dataclasses
 import json
 import os
 import shutil
+import sys
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -174,7 +175,7 @@ class ProblemPackager:
             (_TEMPLATES_DIR / "build_ext.py").read_text()
         )
 
-        cmd = ["python", "build_ext.py"]
+        cmd = [sys.executable, "build_ext.py"]
         artifact_path = str(self.output_dir / "benchmark_kernel.so")
 
         return cmd, artifact_path
@@ -202,7 +203,7 @@ class ProblemPackager:
             (_TEMPLATES_DIR / "eval_driver.py").read_text()
         )
 
-        return ["python", "eval_driver.py"]
+        return [sys.executable, "eval_driver.py"]
 
     def convert_stdout_to_traces(self, stdout: str) -> list[Any]:
         """Parse JSONL stdout from eval_driver.py into Trace objects.

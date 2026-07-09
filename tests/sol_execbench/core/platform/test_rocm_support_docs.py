@@ -60,7 +60,7 @@ def test_cdna3_validation_handoff_defines_next_milestone_gate():
     handoff = _read(".planning/milestones/CDNA3-VALIDATION-HANDOFF.md")
 
     expected = [
-        "uv run --no-sync pytest tests/",
+        "uv run pytest tests/",
         "gfx94*",
         "ROCm >= 7.0",
         "Evidence To Record",
@@ -110,7 +110,7 @@ def test_cdna3_readiness_doc_is_not_hardware_validation_claim():
         "completed benchmark-grade hardware-validation pass for the CDNA 3 family"
         in normalized
     )
-    assert "uv run --no-sync pytest tests/" in readiness
+    assert "uv run pytest tests/" in readiness
     assert "gfx94*" in readiness
 
 

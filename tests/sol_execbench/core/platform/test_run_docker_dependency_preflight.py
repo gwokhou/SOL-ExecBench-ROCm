@@ -3,11 +3,16 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
+
+import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 RUN_DOCKER_SCRIPT = REPO_ROOT / "scripts" / "run_docker.sh"
+
+pytestmark = [pytest.mark.requires_linux, pytest.mark.subprocess_uv]
 
 
 def _matching_default_dependency_env() -> dict[str, str]:
@@ -37,6 +42,7 @@ def _run_docker_dependency_preflight(
         **os.environ,
         "PYTHONPATH": str(REPO_ROOT / "src"),
         "SOL_EXECBENCH_RUN_DOCKER_DRY_RUN": "1",
+        "SOL_EXECBENCH_HOST_PYTHON": sys.executable,
         **env_overrides,
     }
     return subprocess.run(

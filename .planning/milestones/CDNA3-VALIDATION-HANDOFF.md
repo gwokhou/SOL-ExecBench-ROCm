@@ -23,7 +23,7 @@ validation.
 Run the full adapted suite:
 
 ```bash
-uv run --no-sync pytest tests/
+uv run pytest tests/
 ```
 
 Capture environment context:
@@ -99,7 +99,7 @@ validation because the hardware configurations differ.
 
 ## Acceptance Criteria
 
-- `uv run --no-sync pytest tests/` completes successfully on a real CDNA 3 GPU.
+- `uv run pytest tests/` completes successfully on a real CDNA 3 GPU.
 - The recorded environment shows `gfx94*`.
 - Documentation support matrix can be updated from "code/schema support;
   hardware validation deferred" to "full adapted suite passed" only after the

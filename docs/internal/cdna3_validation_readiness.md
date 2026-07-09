@@ -40,7 +40,7 @@ MI300X GPU model under that family.
 ## Expected Commands
 
 ```bash
-uv run --no-sync pytest tests/
+uv run pytest tests/
 uv run python -c 'import torch; print(torch.__version__, torch.version.hip, torch.cuda.is_available())'
 rocm-smi --showproductname --showdriverversion --showhw || true
 rocminfo | grep -E "Name: *gfx94|Marketing Name" || true

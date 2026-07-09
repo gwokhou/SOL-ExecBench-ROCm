@@ -14,42 +14,47 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .core import (
-    AxisConst,
-    AxisSpec,
-    AxisVar,
-    BenchmarkConfig,
-    BuildSpec,
-    CompileOptions,
-    Correctness,
-    CustomInput,
-    Definition,
-    Environment,
-    Evaluation,
-    EvaluationStatus,
-    InputSpec,
-    Performance,
-    RandomInput,
-    SafetensorsInput,
-    ScalarInput,
-    Solution,
-    SourceFile,
-    SupportedBindings,
-    SupportedHardware,
-    SupportedLanguages,
-    TensorSpec,
-    ToleranceSpec,
-    Trace,
-    Workload,
-    get_clock_preset,
-)
-from .core.data import (
-    append_jsonl_file,
-    load_json_file,
-    load_jsonl_file,
-    save_json_file,
-    save_jsonl_file,
-)
+"""Public SOL ExecBench compatibility facade."""
+
+from __future__ import annotations
+
+from importlib import import_module
+from typing import Any
+
+_EXPORTS = {
+    "AxisConst": ".core",
+    "AxisSpec": ".core",
+    "AxisVar": ".core",
+    "BenchmarkConfig": ".core",
+    "BuildSpec": ".core",
+    "CompileOptions": ".core",
+    "Correctness": ".core",
+    "CustomInput": ".core",
+    "Definition": ".core",
+    "Environment": ".core",
+    "Evaluation": ".core",
+    "EvaluationStatus": ".core",
+    "InputSpec": ".core",
+    "Performance": ".core",
+    "RandomInput": ".core",
+    "SafetensorsInput": ".core",
+    "ScalarInput": ".core",
+    "Solution": ".core",
+    "SourceFile": ".core",
+    "SupportedBindings": ".core",
+    "SupportedHardware": ".core",
+    "SupportedLanguages": ".core",
+    "TensorSpec": ".core",
+    "ToleranceSpec": ".core",
+    "Trace": ".core",
+    "Workload": ".core",
+    "get_clock_preset": ".core",
+    "append_jsonl_file": ".core.data",
+    "load_json_file": ".core.data",
+    "load_jsonl_file": ".core.data",
+    "save_json_file": ".core.data",
+    "save_jsonl_file": ".core.data",
+}
 
 __all__ = [
     # Data models
@@ -88,3 +93,18 @@ __all__ = [
     "load_jsonl_file",
     "append_jsonl_file",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    """Load compatibility re-exports on first access."""
+    module_name = _EXPORTS.get(name)
+    if module_name is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(import_module(module_name, __name__), name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    """Return stable names for interactive discovery and star imports."""
+    return sorted({*globals(), *__all__})

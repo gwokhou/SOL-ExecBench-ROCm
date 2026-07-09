@@ -151,9 +151,9 @@ def test_cdna3_validation_readiness_for_gfx94_target():
     assert readiness.target_family == "cdna3"
     assert readiness.ready is True
     assert readiness.claim == "cdna3_readiness_implemented"
-    assert "uv run --no-sync pytest tests/" in readiness.commands
+    assert "uv run pytest tests/" in readiness.commands
     assert any("gfx94" in item for item in readiness.acceptance_criteria)
-    assert payload["commands"][0] == "uv run --no-sync pytest tests/"
+    assert payload["commands"][0] == "uv run pytest tests/"
 
 
 def test_cdna3_validation_readiness_blocks_rdna4_target():

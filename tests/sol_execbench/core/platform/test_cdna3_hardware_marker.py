@@ -34,7 +34,7 @@ class _FakeItem:
     def __init__(self, *marker_names: str) -> None:
         self._marker_names = set(marker_names)
         self.added_markers: list[Any] = []
-        self.keywords: dict[str, Any] = {}
+        self.keywords: dict[str, Any] = {name: True for name in marker_names}
 
     def iter_markers(self, name: str | None = None) -> tuple[Any, ...]:
         if name in self._marker_names:
@@ -124,6 +124,88 @@ def test_cdna3_marker_allows_detected_gfx94_hardware(
     monkeypatch.setattr(conftest, "_has_rocm_dev_headers", lambda: False)
     monkeypatch.setattr(conftest, "_has_ck_headers", lambda: False)
     monkeypatch.setattr(conftest, "_has_rocwmma_headers", lambda: False)
+
+    conftest.pytest_collection_modifyitems(_FakeConfig(), [item])
+
+    assert _skip_reasons(item) == []
+
+
+def test_platform_markers_skip_mismatched_local_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    conftest = _test_conftest()
+    linux_item = _FakeItem("requires_linux")
+    x86_item = _FakeItem("requires_x86_64")
+
+    monkeypatch.setattr(conftest.sys, "platform", "darwin")
+    monkeypatch.setattr(conftest, "machine", lambda: "arm64")
+    monkeypatch.setattr(conftest, "_rocm_gpu_info", lambda: (False, "", "no ROCm"))
+    monkeypatch.setattr(conftest, "_has_rocm_dev_headers", lambda: False)
+    monkeypatch.setattr(conftest, "_has_ck_headers", lambda: False)
+    monkeypatch.setattr(conftest, "_has_rocwmma_headers", lambda: False)
+    monkeypatch.setattr(conftest, "_has_python_module", lambda _module: False)
+
+    conftest.pytest_collection_modifyitems(_FakeConfig(), [linux_item, x86_item])
+
+    assert _skip_reasons(linux_item) == ["test requires Linux"]
+    assert _skip_reasons(x86_item) == ["test requires x86_64 architecture"]
+
+
+def test_dependency_markers_skip_missing_python_modules(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    conftest = _test_conftest()
+    triton_item = _FakeItem("requires_triton_rocm")
+    safetensors_item = _FakeItem("requires_safetensors_torch")
+
+    monkeypatch.setattr(conftest, "_rocm_gpu_info", lambda: (False, "", "no ROCm"))
+    monkeypatch.setattr(conftest, "_has_rocm_dev_headers", lambda: False)
+    monkeypatch.setattr(conftest, "_has_ck_headers", lambda: False)
+    monkeypatch.setattr(conftest, "_has_rocwmma_headers", lambda: False)
+    monkeypatch.setattr(conftest, "_has_python_module", lambda _module: False)
+
+    conftest.pytest_collection_modifyitems(
+        _FakeConfig(), [triton_item, safetensors_item]
+    )
+
+    assert _skip_reasons(triton_item) == ["triton-rocm Python package unavailable"]
+    assert _skip_reasons(safetensors_item) == ["safetensors.torch support unavailable"]
+
+
+def test_execution_risk_markers_skip_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    conftest = _test_conftest()
+    docker_item = _FakeItem("docker_dependency")
+    native_item = _FakeItem("native_extension_serial")
+
+    monkeypatch.setattr(conftest, "_rocm_gpu_info", lambda: (False, "", "no ROCm"))
+    monkeypatch.setattr(conftest, "_has_rocm_dev_headers", lambda: False)
+    monkeypatch.setattr(conftest, "_has_ck_headers", lambda: False)
+    monkeypatch.setattr(conftest, "_has_rocwmma_headers", lambda: False)
+    monkeypatch.setattr(conftest, "_has_python_module", lambda _module: True)
+
+    conftest.pytest_collection_modifyitems(_FakeConfig(), [docker_item, native_item])
+
+    assert _skip_reasons(docker_item) == [
+        "docker_dependency tests skipped by default; run with: pytest tests/docker/dependencies -m docker_dependency"
+    ]
+    assert _skip_reasons(native_item) == [
+        "native_extension_serial tests skipped by default; run with: pytest tests -m native_extension_serial -n 0"
+    ]
+
+
+def test_subprocess_uv_marker_is_not_skipped_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    conftest = _test_conftest()
+    item = _FakeItem("subprocess_uv")
+
+    monkeypatch.setattr(conftest, "_rocm_gpu_info", lambda: (False, "", "no ROCm"))
+    monkeypatch.setattr(conftest, "_has_rocm_dev_headers", lambda: False)
+    monkeypatch.setattr(conftest, "_has_ck_headers", lambda: False)
+    monkeypatch.setattr(conftest, "_has_rocwmma_headers", lambda: False)
+    monkeypatch.setattr(conftest, "_has_python_module", lambda _module: True)
 
     conftest.pytest_collection_modifyitems(_FakeConfig(), [item])
 

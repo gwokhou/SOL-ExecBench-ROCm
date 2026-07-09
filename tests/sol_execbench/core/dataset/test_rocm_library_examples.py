@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 from sol_execbench.core.bench.config import BenchmarkConfig
@@ -237,7 +238,7 @@ def test_hipblas_example_stages_through_native_packager(tmp_path):
 
     command, artifact_path = packager.compile()
 
-    assert command == ["python", "build_ext.py"]
+    assert command == [sys.executable, "build_ext.py"]
     assert artifact_path == str(tmp_path / "benchmark_kernel.so")
     assert (tmp_path / "main.cpp").exists()
     staged_solution = json.loads((tmp_path / "solution.json").read_text())
@@ -261,7 +262,7 @@ def test_miopen_example_stages_through_native_packager(tmp_path):
 
     command, artifact_path = packager.compile()
 
-    assert command == ["python", "build_ext.py"]
+    assert command == [sys.executable, "build_ext.py"]
     assert artifact_path == str(tmp_path / "benchmark_kernel.so")
     assert (tmp_path / "main.cpp").exists()
     staged_solution = json.loads((tmp_path / "solution.json").read_text())
@@ -286,7 +287,7 @@ def test_ck_example_stages_through_native_packager(tmp_path):
 
     command, artifact_path = packager.compile()
 
-    assert command == ["python", "build_ext.py"]
+    assert command == [sys.executable, "build_ext.py"]
     assert artifact_path == str(tmp_path / "benchmark_kernel.so")
     assert (tmp_path / "kernel.hip").exists()
     staged_solution = json.loads((tmp_path / "solution.json").read_text())
@@ -311,7 +312,7 @@ def test_rocwmma_example_stages_through_native_packager(tmp_path):
 
     command, artifact_path = packager.compile()
 
-    assert command == ["python", "build_ext.py"]
+    assert command == [sys.executable, "build_ext.py"]
     assert artifact_path == str(tmp_path / "benchmark_kernel.so")
     assert (tmp_path / "kernel.hip").exists()
     staged_solution = json.loads((tmp_path / "solution.json").read_text())
@@ -367,7 +368,7 @@ def test_remaining_rocm_library_categories_stage_through_native_packager(tmp_pat
 
         command, artifact_path = packager.compile()
 
-        assert command == ["python", "build_ext.py"]
+        assert command == [sys.executable, "build_ext.py"]
         assert artifact_path == str(output_dir / "benchmark_kernel.so")
         assert (output_dir / source_path).exists()
         staged_solution = json.loads((output_dir / "solution.json").read_text())

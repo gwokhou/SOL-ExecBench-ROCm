@@ -972,6 +972,12 @@ class TestGenInputs:
 
 
 class TestLoadSafetensors:
+    pytestmark = [
+        pytest.mark.native_extension,
+        pytest.mark.native_extension_serial,
+        pytest.mark.requires_safetensors_torch,
+    ]
+
     def test_resolves_relative_path_from_blob_root(self, tmp_path):
         st = pytest.importorskip("safetensors.torch")
         t = torch.tensor([1.0, 2.0, 3.0, 4.0])

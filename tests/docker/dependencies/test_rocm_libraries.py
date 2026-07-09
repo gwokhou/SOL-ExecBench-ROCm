@@ -6,7 +6,14 @@ from __future__ import annotations
 import ctypes.util
 import subprocess
 
+import pytest
+
 from sol_execbench.core.diagnostics import rocm_library_diagnostics
+
+pytestmark = [
+    pytest.mark.docker_dependency,
+    pytest.mark.requires_linux,
+]
 
 
 def _resolve_rocm_library(name: str, candidates: tuple[str, ...]) -> str:
