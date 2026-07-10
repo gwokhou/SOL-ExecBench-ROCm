@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import struct
+from pathlib import Path
 
 from sol_execbench.core.bench.static_kernel.amdgpu_metadata import (
     _unpack_msgpack,
@@ -128,3 +129,43 @@ def test_msgpack_round_trip():
     assert _unpack_msgpack(_pack({"a": [1, 2, 3]}))[0] == {"a": [1, 2, 3]}
     assert _unpack_msgpack(_pack(4096))[0] == 4096
     assert _unpack_msgpack(_pack("gfx942"))[0] == "gfx942"
+
+
+def test_target_architecture_filter_skips_other_archs():
+    meta_a = {
+        "amdhsa.kernels": [{".vgpr_count": 10, ".sgpr_count": 5}],
+        "amdhsa.target": "amdgcn-amd-amdhsa--gfx942",
+    }
+    meta_b = {
+        "amdhsa.kernels": [{".vgpr_count": 99, ".sgpr_count": 5}],
+        "amdhsa.target": "amdgcn-amd-amdhsa--gfx1150",
+    }
+    data = _note(_pack(meta_a)) + b"\x00" * 16 + _note(_pack(meta_b))
+
+    fps = extract_amdgpu_footprints(
+        data, artifact_id="k0", target_architecture="gfx942"
+    )
+    assert len(fps) == 1
+    assert fps[0].vgpr_used == 10  # gfx942 kernel, not gfx1150's 99
+
+    # No filter -> both archs' kernels extracted.
+    assert len(extract_amdgpu_footprints(data, artifact_id="k0")) == 2
+
+
+_FIXTURE = (
+    Path(__file__).resolve().parents[4]
+    / "tests/sol_execbench/fixtures/static_kernel/gfx1200_code_object.co"
+)
+
+
+def test_real_code_object_fixture():
+    fps = extract_amdgpu_footprints(_FIXTURE.read_bytes(), artifact_id="rmsnorm")
+
+    assert len(fps) == 1
+    fp = fps[0]
+    assert fp.vgpr_used == 13
+    assert fp.sgpr_used == 14
+    assert fp.lds_bytes == 4096
+    assert fp.wavefront_size == 32
+    assert fp.spill_detected is False
+    assert fp.source_tool == "amdgpu-metadata"

@@ -70,14 +70,24 @@ def test_budget_none_emits_only_spill():
     assert hints[0].bottleneck_class.value == "spill_detected"
 
 
-def test_dynamic_budget_emits_low_confidence_note():
+def test_dynamic_budget_emits_no_layer_r_hints():
     dynamic = GFX942.model_copy(
         update={"register_allocation_model": "dynamic", "architecture": "gfx1200"}
     )
-    hints = derive_decision_hints([_fp(vgpr_used=40)], dynamic)
-    assert len(hints) == 1
-    assert hints[0].confidence.value == "inferred_low"
-    assert hints[0].limitations  # carries the dynamic-allocation limitation
+    # Dynamic arch: no Layer R hint (no detected bottleneck); the limitation is
+    # recorded at the sidecar level, not as a misleading bottleneck hint.
+    assert derive_decision_hints([_fp(vgpr_used=40)], dynamic) == []
+
+
+def test_dynamic_budget_sidecar_carries_limitation():
+    from sol_execbench.core.bench.decision.builder import build_decision_sidecar
+
+    dynamic = GFX942.model_copy(
+        update={"register_allocation_model": "dynamic", "architecture": "gfx1200"}
+    )
+    sidecar = build_decision_sidecar(footprints=[_fp(vgpr_used=40)], budget=dynamic)
+    assert sidecar.hints == []
+    assert any("dynamic" in lim.lower() for lim in sidecar.limitations)
 
 
 def test_empty_footprints_returns_empty():

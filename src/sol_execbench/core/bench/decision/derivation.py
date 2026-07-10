@@ -48,11 +48,6 @@ _RECOMMENDATIONS = {
     ),
 }
 
-_DYNAMIC_LIMITATION = (
-    "static occupancy derivation is unreliable under dynamic register "
-    "allocation; confirm via runtime profiling"
-)
-
 
 def _ratio(used: int | None, limit: int | None) -> float | None:
     """Return ``used / limit`` or ``None`` when either side is unset or invalid."""
@@ -204,24 +199,12 @@ def derive_decision_hints(
     if not footprints:
         return []
 
-    # Dynamic register allocation (RDNA4+) defeats static occupancy derivation.
+    # Dynamic register allocation (RDNA4+) defeats static Layer R derivation.
+    # No bottleneck hint is emitted (there is no detected bottleneck); the
+    # limitation is recorded at the sidecar level by the builder, so we do not
+    # attach a misleading register_pressure_high label to a healthy kernel.
     if budget is not None and budget.register_allocation_model == "dynamic":
-        arch = budget.architecture
-        return [
-            _make_hint(
-                bottleneck_class=DecisionBottleneckClass.REGISTER_PRESSURE_HIGH,
-                confidence=DecisionConfidence.INFERRED_LOW,
-                message=(
-                    f"register pressure cannot be statically derived on {arch} "
-                    "(dynamic register allocation)"
-                ),
-                architecture=arch,
-                footprint=fp,
-                limitations=[_DYNAMIC_LIMITATION],
-                evidence_refs=["budget.register_allocation_model"],
-            )
-            for fp in footprints
-        ]
+        return []
 
     hints: list[DecisionHint] = []
     for fp in footprints:

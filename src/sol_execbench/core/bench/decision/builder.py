@@ -105,6 +105,11 @@ def _limitations(budget: ArchIsaBudget | None) -> list[str]:
         "Static hints are most actionable for latency-bound kernels; confirm via "
         "runtime profiling before acting (occupancy != performance).",
     ]
+    if budget is not None and budget.register_allocation_model == "dynamic":
+        limitations.append(
+            f"Static Layer R derivation unavailable on {budget.architecture} "
+            "(dynamic register allocation); profile at runtime for resource limits."
+        )
     if budget is None:
         limitations.append(
             "No arch capability budget matched the detected gfx target; only "

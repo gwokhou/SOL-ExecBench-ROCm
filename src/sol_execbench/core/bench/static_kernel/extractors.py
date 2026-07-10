@@ -172,7 +172,7 @@ def run_static_kernel_extractors(
             if raw_artifact is not None:
                 output_artifacts.append(raw_artifact)
 
-    footprints = _collect_resource_footprints(
+    footprints, amdgpu_runs = _collect_resource_footprints(
         artifacts=artifacts,
         sidecar_base=sidecar_base,
         evidence_root=evidence_root,
@@ -183,6 +183,7 @@ def run_static_kernel_extractors(
         timeout_seconds=timeout_seconds,
         output_artifacts=output_artifacts,
     )
+    tool_runs.extend(amdgpu_runs)
     all_artifacts = list(artifacts) + output_artifacts
     return build_static_kernel_evidence_sidecar(
         status=_aggregate_extractor_status(tool_runs),
@@ -206,17 +207,18 @@ def _collect_resource_footprints(
     runner: ExtractorRunner | None,
     timeout_seconds: float,
     output_artifacts: list[StaticKernelEvidenceArtifact],
-) -> list[StaticResourceFootprint]:
-    """Run routed footprint extractors (``roc-objdump``) as an enhancement.
+) -> tuple[list[StaticResourceFootprint], list[StaticKernelEvidenceToolRun]]:
+    """Run footprint extractors (``roc-objdump`` then native AMDGPU metadata).
 
-    Footprint extractors are optional enhancements over the base static
-    evidence: when a tool is unavailable it is skipped silently rather than
-    downgrading the aggregate static evidence status. Successful runs append
-    their raw output artifact for diagnostics and contribute a parsed
-    ``StaticResourceFootprint``.
+    ``roc-objdump`` is the routed extractor where available; on ROCm 7.x
+    (roc-objdump removed) the native AMDGPU metadata parser runs as a fallback.
+    Returns the parsed footprints plus an ``amdgpu-metadata`` tool-run per
+    artifact that went through the native fallback, so the sidecar records the
+    real footprint source.
     """
 
     footprints: list[StaticResourceFootprint] = []
+    amdgpu_runs: list[StaticKernelEvidenceToolRun] = []
     for artifact in artifacts:
         artifact_type = toolchain_artifact_type_for_static_artifact(artifact)
         if artifact_type is None:
@@ -269,13 +271,31 @@ def _collect_resource_footprints(
         if not covered_footprint:
             # ROCm 7.x fallback: read AMDGPU code-object metadata directly
             # (roc-objdump is absent). Covers CDNA + RDNA (amdgcn ABI).
+            amdgpu_count = 0
             try:
-                footprints.extend(
-                    extract_amdgpu_footprints(
-                        artifact_path.read_bytes(),
-                        artifact_id=artifact.artifact_id,
-                    )
+                native = extract_amdgpu_footprints(
+                    artifact_path.read_bytes(),
+                    artifact_id=artifact.artifact_id,
+                    source_sha256=artifact.sha256,
+                    target_architecture=artifact.target_architecture,
                 )
+                footprints.extend(native)
+                amdgpu_count = len(native)
             except OSError:
                 pass
-    return footprints
+            if amdgpu_count:
+                amdgpu_runs.append(
+                    StaticKernelEvidenceToolRun(
+                        tool_id="amdgpu-metadata",
+                        command=["amdgpu-metadata", str(artifact_path)],
+                        status=StaticKernelEvidenceStatus.COLLECTED,
+                        reason_code=(
+                            StaticKernelEvidenceReasonCode.STATIC_EVIDENCE_COLLECTED
+                        ),
+                        stdout_tail=(
+                            f"native AMDGPU metadata: {amdgpu_count} footprint(s)"
+                        ),
+                        timeout_seconds=timeout_seconds,
+                    )
+                )
+    return footprints, amdgpu_runs
