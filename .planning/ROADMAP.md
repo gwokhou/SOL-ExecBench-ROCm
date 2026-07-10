@@ -25,8 +25,12 @@
 
 ## Current Position
 
-**Status:** v1.38 executing. Phases 190-191 are verified; phases 192-194 remain
-pending.
+**Status:** v1.38 executing. Phases 190-192 are verified; phases 193-194 remain
+pending. Phase 192 shipped 2026-06-21 (commit `0150256`); 193-194 have been
+stalled since, with recent work shifting to the decision sidecar track
+(orthogonal diagnostic capability, not a replacement for 193/194). See
+`.planning/phases/193-measured-baseline-provenance-and-coverage/193-SCOPE-REVIEW.md`
+for the 193 scope re-baseline before planning.
 
 ## v1.38 Upgrade SOL Evidence Contract for Confirmed Benchmark Claims
 
@@ -37,7 +41,7 @@ from SOL-provided profiling, official score, and measured baseline evidence.
 |-------|------|------|--------------|------------------|
 | 190 | Profiler Artifact Registration Closure | Make requested successful `rocprofv3` profile runs produce discoverable artifacts and citations. | PROF-01, PROF-02, PROF-03 | Verified 2026-06-21 |
 | 191 | Structured Profile Summary Evidence | Expand profile summary into structured profiling evidence with bottleneck hints while preserving diagnostic authority boundaries. | PSUM-01, PSUM-02, PSUM-03 | Verified 2026-06-21 |
-| 192 | Official Score Evidence Contract | Add official benchmark score evidence with score source, aggregation policy, and valid-run non-null score semantics. | SCOR-01, SCOR-02, SCOR-03 | 4 |
+| 192 | Official Score Evidence Contract | Add official benchmark score evidence with score source, aggregation policy, and valid-run non-null score semantics. | SCOR-01, SCOR-02, SCOR-03 | Verified 2026-06-21 |
 | 193 | Measured Baseline Provenance and Coverage | Add measured baseline evidence and coverage validation for confirmed benchmark claims. | BASE-01, BASE-02, BASE-03 | 4 |
 | 194 | HIP Confirmed Evidence Package | Publish contract capabilities, fixtures, docs, and guardrails for HIP cutover-gate decisions. | GATE-01, GATE-02, GATE-03 | 4 |
 
