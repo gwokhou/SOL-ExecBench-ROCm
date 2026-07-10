@@ -1,10 +1,10 @@
 # Decision Sidecar Contract
 
-This document reserves the seam for a future **Decision sidecar** that turns
-diagnostic-only data-layer facts into structured optimization guidance. It
-records the contract boundary and design intent. The `sol_execbench.decision.v1`
-schema and run path are now implemented in `src/sol_execbench/core/bench/decision/`
-(emits `<trace>.decision.json` via `--decision auto`).
+This document records the contract for the **Decision sidecar**, which turns
+diagnostic-only data-layer facts into structured optimization guidance. The
+`sol_execbench.decision.v1` schema and run path are implemented in
+`src/sol_execbench/core/bench/decision/` (emits `<trace>.decision.json` via
+`--decision auto`); this file records the contract boundary and design intent.
 
 For the modeling survey and source-credibility assessment that informs this
 contract, see `docs/decision-modeling-research.md`.
@@ -22,7 +22,7 @@ schemas that feed it.
 
 ## Inputs
 
-A future Decision sidecar consumes facts from the diagnostic data sidecars:
+The Decision sidecar consumes facts from the diagnostic data sidecars:
 
 - `EnvironmentSnapshot.capability_budgets[]` — arch ISA resource budgets
   (`sol_execbench.environment_snapshot.v2` with packaged
@@ -32,7 +32,12 @@ A future Decision sidecar consumes facts from the diagnostic data sidecars:
 - Optional `profile_summary.v2` runtime bottleneck hints and `agent_feedback.v2`
   aggregate items, after each passes its own freshness and authority checks.
 
-## Outputs (future, not implemented)
+**Applicability.** The Decision sidecar requires
+`StaticKernelEvidenceSidecar.footprints[]`, which the static-evidence path
+collects only for HIP/C++ solutions (its `is_cpp` gate). PyTorch and Triton
+solutions produce no footprints, so no decision sidecar is written for them.
+
+## Outputs
 
 - A closed bottleneck taxonomy spanning compile-time, runtime, and resource
   dimensions, merged across data sources with documented precedence (runtime
@@ -48,3 +53,6 @@ A future Decision sidecar consumes facts from the diagnostic data sidecars:
   authority (correctness, timing, score, paper-parity, leaderboard).
 - Canonical Trace JSONL remains the only authority surface; the Decision sidecar
   is `diagnostic` only, like the other sidecars.
+- `vgpr_limit` is the architected *addressing* limit, not the physical register
+  file; derivation uses it as a static pressure proxy. Physical occupancy uses
+  `register_file_per_cu_bytes`. See decision-modeling-research.md §11.
