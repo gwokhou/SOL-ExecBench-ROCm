@@ -36,6 +36,8 @@ class ClockController(Protocol):
 
     def unlock(self) -> None: ...
 
+    def observe_locked(self) -> bool: ...
+
 
 class Rdna4ClockController:
     def lock(self) -> bool:
@@ -43,6 +45,9 @@ class Rdna4ClockController:
 
     def unlock(self) -> None:
         clock_lock.unlock_clocks()
+
+    def observe_locked(self) -> bool:
+        return clock_lock.verify_clocks()
 
 
 class ClockLockRequiredError(RuntimeError):
@@ -106,12 +111,19 @@ def run_calibration(request: CalibrationRequest) -> HardwareCalibrationArtifact:
     if controller is None and adapter.supports_clock_lock:
         controller = Rdna4ClockController()
     locked = False
+    observations: dict[str, bool | None] = {"pre": None, "during": None, "post": None}
     clock_reason: str | None = None
     if controller is None:
         clock_reason = "clock_lock_adapter_unavailable"
         if request.require_clock_lock:
             raise ClockLockRequiredError(clock_reason)
     else:
+        observe = getattr(controller, "observe_locked", None)
+        if callable(observe):
+            try:
+                observations["pre"] = bool(observe())
+            except Exception:
+                observations["pre"] = None
         try:
             locked = controller.lock()
         except Exception:
@@ -122,10 +134,22 @@ def run_calibration(request: CalibrationRequest) -> HardwareCalibrationArtifact:
                 raise ClockLockRequiredError(clock_reason)
     probe = request.hip_probe or default_hip_probe()
     try:
+        observe = getattr(controller, "observe_locked", None) if controller else None
+        if callable(observe):
+            try:
+                observations["during"] = bool(observe())
+            except Exception:
+                observations["during"] = None
         candidates = tuple(probe.measure(key) for key in adapter.candidates)
     finally:
         if locked and controller is not None:
             controller.unlock()
+            observe = getattr(controller, "observe_locked", None)
+            if callable(observe):
+                try:
+                    observations["post"] = bool(observe())
+                except Exception:
+                    observations["post"] = None
     metric_map = {
         "Peak FP32": tuple(
             (key.value, "TFLOP/s")
@@ -138,6 +162,13 @@ def run_calibration(request: CalibrationRequest) -> HardwareCalibrationArtifact:
         "architecture": request.environment.architecture,
         "adapter_family": adapter.family,
         "clock_locked": locked,
+        "clock_observations": observations,
+        "adapter_policy": {
+            "requires_clock_lock": adapter.supports_clock_lock,
+            "declared_candidate_keys": [key.value for key in adapter.candidates],
+        },
+        "gpu_uuid": request.environment.uuid,
+        "rocm_version": request.environment.rocm_version,
     }
     if clock_reason:
         metadata["clock_lock_reason"] = clock_reason
@@ -145,12 +176,16 @@ def run_calibration(request: CalibrationRequest) -> HardwareCalibrationArtifact:
     validated_from_provenance = (
         adapter.supports_clock_lock
         and locked
+        and observations["during"] is True
+        and observations["post"] is False
         and bool(candidates)
         and all(candidate.state == "measured" for candidate in candidates)
     )
     metadata["validation_provenance"] = {
         "adapter_requires_clock_lock": adapter.supports_clock_lock,
         "clock_locked": locked,
+        "clock_observed_during_sampling": observations["during"] is True,
+        "clock_reset_observed": observations["post"] is False,
         "all_declared_profiles_measured": all(
             candidate.state == "measured" for candidate in candidates
         ),
