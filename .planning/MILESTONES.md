@@ -1,5 +1,15 @@
 # Milestones
 
+## v1.38 v1.38 (Shipped: 2026-07-10)
+
+**Phases completed:** 5 phases, 10 plans, 0 tasks
+
+**Key accomplishments:**
+
+- (none recorded)
+
+---
+
 ## v1.37 Profile Summary Sidecar v1 (Shipped: 2026-06-16)
 
 **Phases completed:** 4 phases, 4 plans, 0 tasks
@@ -8,15 +18,19 @@
 
 - Turned `profile_summary.sidecar.v1` from a reserved capability token into a
   concrete optional `sol_execbench.profile_summary.v1` diagnostic sidecar.
+
 - Added strict profile-summary models, normalized status/reason/metric records,
   artifact citations, freshness validation, and diagnostic-only authority
   guardrails.
+
 - Wired CLI persistence for `<trace>.profile-summary.json` while preserving
   canonical Trace JSONL, raw `<trace>.profile.json` rocprofv3 metadata, static
   evidence, environment, and agent-feedback sidecar semantics.
+
 - Added compact checksummed citations for trace, raw profile metadata, and
   profiler artifacts without leaking raw profiler dumps or unstable absolute
   temporary paths.
+
 - Added HIP-facing fixtures and docs for valid, partial, unavailable, stale,
   malformed, missing, and contradictory-authority sidecar cases.
 
@@ -24,6 +38,7 @@
 
 - Profiler-counter-derived bottleneck diagnostics for occupancy, registers,
   LDS, bandwidth, cache, and utilization remain deferred to PDIAG-F01/PDIAG-F02.
+
 - Known deferred open artifacts at close: 7 historical quick-task items
   recorded in `.planning/STATE.md`.
 
@@ -38,13 +53,17 @@
 - Added optional `agent_feedback.sidecar.v1` and
   `profile_summary.sidecar.v1` evaluator contract capabilities without changing
   canonical Trace JSONL fields or contract version.
+
 - Implemented strict diagnostic `sol_execbench.agent_feedback.v1` sidecar
   generation and CLI persistence as `<trace>.agent-feedback.json`.
+
 - Added freshness identity, compact artifact citations, checksums, and stale
   sidecar validation helpers for downstream consumers.
+
 - Added governance guardrails proving feedback sidecars cannot promote
   correctness, timing, score, evidence-tier, release-gate, cutover,
   paper-parity, leaderboard, or claim-upgrade authority.
+
 - Added HIP-facing fixtures and mapping docs for valid, partial, unavailable,
   stale, malformed, missing, and contradictory-authority sidecar cases.
 
