@@ -21,3 +21,13 @@ uv run --with ruff ruff check src/sol_execbench/core/scoring/amd_hardware_models
 uv run pytest tests/sol_execbench/core/scoring/test_amd_hardware_models.py tests/sol_execbench/core/scoring/test_amd_sol_v2.py tests/sol_execbench/core/scoring/hardware_calibration/test_builder.py -n 0 -v
 # 22 passed
 ```
+
+## Review follow-up
+
+- Memory profiles now resolve by the complete access, input dtype, output dtype,
+  and path key. A BF16 workload therefore cannot consume an FP32 stream profile.
+- Bound confidence now applies the general confidence ordering to every resolved
+  profile; an `unsupported` profile makes the operation unsupported and the
+  aggregate unscored.
+
+Focused review verification: `17 passed` for the Task 3 scoring tests.

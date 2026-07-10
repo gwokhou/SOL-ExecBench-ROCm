@@ -62,6 +62,7 @@ def _with_hardware_profile_evidence(
         output_dtype=output_dtype,
         compute_path=path,
         memory_access=str(node.attributes.get("memory_access") or "stream_copy"),
+        memory_path=str(node.attributes.get("memory_path") or "portable"),
     )
 
 

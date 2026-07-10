@@ -38,6 +38,7 @@ class OperatorWorkEstimate:
     output_dtype: str | None = None
     compute_path: str | None = None
     memory_access: str | None = None
+    memory_path: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize as JSON-safe derived estimate evidence."""
@@ -64,4 +65,5 @@ class OperatorWorkEstimate:
             "output_dtype": self.output_dtype,
             "compute_path": self.compute_path,
             "memory_access": self.memory_access,
+            "memory_path": self.memory_path,
         }

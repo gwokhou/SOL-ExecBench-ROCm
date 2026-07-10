@@ -87,14 +87,12 @@ class AmdHardwareModel:
             (profile for profile in self.compute_profiles if profile.key == key), None
         )
 
-    def resolve_memory(self, access: str) -> HardwareProfile | None:
-        prefix = f"memory.{access}."
+    def resolve_memory(
+        self, access: str, input_dtype: str, output_dtype: str, path: str
+    ) -> HardwareProfile | None:
+        key = f"memory.{access}.{input_dtype}.{output_dtype}.{path}"
         return next(
-            (
-                profile
-                for profile in self.memory_profiles
-                if profile.key == access or profile.key.startswith(prefix)
-            ),
+            (profile for profile in self.memory_profiles if profile.key == key),
             None,
         )
 
