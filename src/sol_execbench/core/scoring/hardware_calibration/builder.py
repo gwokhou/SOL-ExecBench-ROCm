@@ -113,27 +113,27 @@ def run_calibration(request: CalibrationRequest) -> HardwareCalibrationArtifact:
     locked = False
     observations: dict[str, bool | None] = {"pre": None, "during": None, "post": None}
     clock_reason: str | None = None
-    if controller is None:
-        clock_reason = "clock_lock_adapter_unavailable"
-        if request.require_clock_lock:
-            raise ClockLockRequiredError(clock_reason)
-    else:
-        observe = getattr(controller, "observe_locked", None)
-        if callable(observe):
-            try:
-                observations["pre"] = bool(observe())
-            except Exception:
-                observations["pre"] = None
-        try:
-            locked = controller.lock()
-        except Exception:
-            locked = False
-        if not locked:
-            clock_reason = "clock_lock_failed"
-            if request.require_clock_lock:
-                raise ClockLockRequiredError(clock_reason)
     probe = request.hip_probe or default_hip_probe()
     try:
+        if controller is None:
+            clock_reason = "clock_lock_adapter_unavailable"
+            if request.require_clock_lock:
+                raise ClockLockRequiredError(clock_reason)
+        else:
+            observe = getattr(controller, "observe_locked", None)
+            if callable(observe):
+                try:
+                    observations["pre"] = bool(observe())
+                except Exception:
+                    observations["pre"] = None
+            try:
+                locked = controller.lock()
+            except Exception:
+                locked = False
+            if not locked:
+                clock_reason = "clock_lock_failed"
+                if request.require_clock_lock:
+                    raise ClockLockRequiredError(clock_reason)
         observe = getattr(controller, "observe_locked", None) if controller else None
         if callable(observe):
             try:
