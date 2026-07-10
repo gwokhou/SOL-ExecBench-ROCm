@@ -33,6 +33,8 @@ def test_gfx942_budget_values():
     assert budget.vgpr_limit == 256
     assert budget.sgpr_limit == 104
     assert budget.lds_per_workgroup_bytes == 65536
+    assert budget.register_file_per_cu_bytes == 524288
+    assert budget.waves_per_cu_max == 40
     assert budget.confidence.value == "inexact"
     assert "mfma" in budget.mfma_variants
     assert budget.source
@@ -43,9 +45,10 @@ def test_gfx1150_budget_values():
 
     assert budget.wavefront_size == 32
     assert budget.vgpr_limit == 256
-    assert budget.register_file_per_cu_bytes == 131072
+    assert budget.register_file_per_cu_bytes is None
     assert budget.mfma_variants == []
     assert budget.confidence.value == "inexact"
+    assert "RDNA 3.5" in budget.source
 
 
 def test_derive_known_arch():
