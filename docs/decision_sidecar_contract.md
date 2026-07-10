@@ -5,6 +5,9 @@ diagnostic-only data-layer facts into structured optimization guidance. It is a
 contract boundary, not an implemented artifact. No `sol_execbench.decision.v1`
 schema or run path exists yet.
 
+For the modeling survey and source-credibility assessment that informs this
+contract, see `docs/decision-modeling-research.md`.
+
 ## Why a separate sidecar
 
 The data layer (environment capability budgets and static resource footprints)
