@@ -12,7 +12,9 @@ external tools required (pure-Python msgpack + ELF note scan).
 
 from __future__ import annotations
 
+import gzip
 import struct
+import zlib
 
 from sol_execbench.core.bench.static_kernel.evidence_models import (
     StaticResourceFootprint,
@@ -107,13 +109,8 @@ def _unpack_str(data: bytes, offset: int, length: int, head: int) -> tuple[str, 
     return data[offset : offset + length].decode("utf-8", "replace"), offset + length
 
 
-def _iter_amdgpu_metadata(data: bytes):
-    """Yield parsed AMDGPU metadata maps found anywhere in ``data``.
-
-    Scans the byte stream for the ``AMDGPU`` ELF note name and parses each
-    description as msgpack. Works on standalone code objects and on ``.so``
-    files (whose ``.hip_fatbin`` section embeds per-arch code objects).
-    """
+def _scan_amdgpu_notes(data: bytes):
+    """Yield parsed AMDGPU metadata maps from a raw byte scan of ``data``."""
 
     search = 0
     while True:
@@ -136,6 +133,52 @@ def _iter_amdgpu_metadata(data: bytes):
             continue
         if isinstance(meta, dict):
             yield meta
+
+
+def _decompressed_variants(data: bytes):
+    """Best-effort yield of gzip/zlib-decompressed views of ``data``.
+
+    Newer clang-offload-bundler outputs (Compressed Code Object Bundle, ccob)
+    store per-target code objects compressed; the raw byte scan cannot see the
+    AMDGPU notes inside. This yields the whole-buffer gzip/zlib decode plus any
+    embedded zlib streams (ccob per-target chunks). Full ccob manifest parsing
+    is a documented follow-up; this covers the common compressed cases.
+    """
+
+    if data[:2] == b"\x1f\x8b":
+        try:
+            yield gzip.decompress(data)
+        except OSError:
+            pass
+    if data[:1] == b"\x78":
+        try:
+            yield zlib.decompress(data)
+        except zlib.error:
+            pass
+    search = 0
+    while True:
+        idx = data.find(b"\x78\x9c", search)
+        if idx == -1:
+            return
+        search = idx + 2
+        try:
+            yield zlib.decompress(data[idx:])
+        except zlib.error:
+            continue
+
+
+def _iter_amdgpu_metadata(data: bytes):
+    """Yield parsed AMDGPU metadata maps found anywhere in ``data``.
+
+    Scans the byte stream for the ``AMDGPU`` ELF note name and parses each
+    description as msgpack, with best-effort decompression for compressed
+    code-object bundles. Works on standalone code objects and on ``.so`` files
+    (whose ``.hip_fatbin`` section embeds per-arch code objects).
+    """
+
+    yield from _scan_amdgpu_notes(data)
+    for variant in _decompressed_variants(data):
+        yield from _scan_amdgpu_notes(variant)
 
 
 def _footprint_from_kernel(
@@ -169,6 +212,9 @@ def _footprint_from_kernel(
             or bool(sgpr_spill)
             or (scratch_bytes is not None and scratch_bytes > 0)
         ),
+        # occupancy is NOT carried by NT_AMDGPU_METADATA; it requires an
+        # arch-specific formula over vgpr_count + the physical register file,
+        # which the decision layer approximates via the vgpr/limit ratio.
         occupancy_estimate_waves_per_cu=None,
         wavefront_size=wavefront if isinstance(wavefront, int) else None,
         source_tool="amdgpu-metadata",
@@ -181,15 +227,27 @@ def extract_amdgpu_footprints(
     *,
     artifact_id: str,
     source_sha256: str | None = None,
+    target_architecture: str | None = None,
 ) -> list[StaticResourceFootprint]:
     """Extract per-kernel footprints from AMDGPU code-object metadata.
 
     Returns one footprint per kernel found in any ``NT_AMDGPU_METADATA`` note.
-    Diagnostic only; never raises on malformed input (returns what it can).
+    When ``target_architecture`` is set, only metadata whose ``amdhsa.target``
+    matches is used, so a multi-arch bundle does not yield the wrong arch's
+    kernels. Diagnostic only; never raises on malformed input.
     """
 
+    wanted = (
+        target_architecture.split(":")[0].strip().lower()
+        if target_architecture
+        else None
+    )
     footprints: list[StaticResourceFootprint] = []
     for meta in _iter_amdgpu_metadata(data):
+        if wanted is not None:
+            target = meta.get("amdhsa.target")
+            if not isinstance(target, str) or wanted not in target.lower():
+                continue
         kernels = meta.get("amdhsa.kernels")
         if not isinstance(kernels, list):
             continue

@@ -59,8 +59,10 @@ The sidecar schema is `sol_execbench.static_kernel_evidence.v2`. It contains:
 - routed `llvm-objdump`, `readelf`, and `roc-objdump` tool-run records
 - bounded stdout/stderr tails and bounded raw output artifact paths
 - conservative metadata and disassembly presence flags
-- per-kernel `footprints[]` resource usage (VGPR/SGPR/LDS/scratch/occupancy)
-  parsed from routed `roc-objdump --resource-usage` output when available
+- per-kernel `footprints[]` resource usage (VGPR/SGPR/LDS/scratch/spill/wavefront)
+  parsed from routed `roc-objdump --resource-usage` output, or — on ROCm 7.x
+  where `roc-objdump` is absent — from the code object's `NT_AMDGPU_METADATA`
+  ELF note via a native pure-Python parser (covers CDNA + RDNA)
 - a compact `summary` section for human-facing reporting
 
 `llvm-objdump`, `readelf`, and `roc-objdump` are routed through the toolchain
@@ -96,9 +98,13 @@ recorded in a future artifact:
 - paper-scale static coverage for the full original benchmark denominator
 - standalone static analysis of arbitrary pre-existing binaries
 
-Per-kernel VGPR, SGPR, LDS, scratch, spill, and occupancy-like summaries are now
-collected into `footprints[]` from routed `roc-objdump` output when the tool is
-available; uncovered fields stay `null` rather than being speculated.
+Per-kernel VGPR, SGPR, LDS, scratch, spill, and wavefront-size fields are
+collected into `footprints[]` from routed `roc-objdump` output, or — on ROCm 7.x
+(roc-objdump removed) — from the code object's `NT_AMDGPU_METADATA` ELF note via
+a native pure-Python msgpack parser. `occupancy_estimate_waves_per_cu` stays
+`null` on the metadata path (the note does not carry occupancy); the decision
+layer derives resource pressure from the vgpr/limit ratio instead. Uncovered
+fields stay `null` rather than being speculated.
 
 ## CPU-Safe Coverage
 
