@@ -4,6 +4,7 @@ import pytest
 
 from sol_execbench.core.scoring.hardware_calibration.models import (
     CalibrationCandidate,
+    HardwareCalibrationArtifact,
     hardware_calibration_artifact_from_dict,
 )
 
@@ -68,4 +69,26 @@ def test_artifact_parser_rejects_wrong_json_types(
     target[path[-1]] = value  # type: ignore[index]
 
     with pytest.raises(ValueError, match=message):
+        hardware_calibration_artifact_from_dict(payload)
+
+
+def test_artifact_parser_rejects_edited_payload_checksum() -> None:
+    artifact = HardwareCalibrationArtifact(
+        generated_at="2026-07-10T00:00:00Z",
+        candidates=(
+            CalibrationCandidate(
+                "compute.vector.fp32.fp32.portable",
+                "measured",
+                5.0,
+                "TFLOP/s",
+                (5.0,) * 7,
+            ),
+        ),
+        collection_status="collected",
+        validation_status="validated",
+    )
+    payload = artifact.to_dict()
+    payload["generated_at"] = "2026-07-11T00:00:00Z"
+
+    with pytest.raises(ValueError, match="checksum"):
         hardware_calibration_artifact_from_dict(payload)

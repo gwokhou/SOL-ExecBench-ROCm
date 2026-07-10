@@ -5,6 +5,7 @@ from sol_execbench.core.scoring.hardware_calibration.rocprof_compute import (
     ensure_profiler_environment,
     parse_roofline_metrics,
     run_rocprof_compute_bench_only,
+    _find_requirements,
 )
 
 
@@ -174,3 +175,22 @@ def test_reused_environment_rejects_malformed_manifest_shape(tmp_path: Path) -> 
 
         assert result.state == "unknown"
         assert result.reason_code == "rocprof_compute_manifest_invalid"
+
+
+def test_requirements_discovery_uses_each_actual_rocm_installation(
+    tmp_path: Path,
+) -> None:
+    installations = []
+    for version in ("7.0.0", "7.2.0"):
+        root = tmp_path / f"rocm-{version}"
+        launcher = root / "bin" / "rocprof-compute"
+        requirements = root / "libexec" / "rocprofiler-compute" / "requirements.txt"
+        launcher.parent.mkdir(parents=True)
+        requirements.parent.mkdir(parents=True)
+        launcher.touch()
+        requirements.write_text(f"profiler=={version}\n")
+        installations.append((launcher, requirements))
+
+    assert [_find_requirements(launcher) for launcher, _ in installations] == [
+        requirements for _, requirements in installations
+    ]

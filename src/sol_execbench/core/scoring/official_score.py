@@ -290,7 +290,7 @@ def _official_score_blockers(
     else:
         if eligibility.amd_sol_status != "scored":
             blockers.append(AMD_SOL_NOT_SCORED_BLOCKER)
-        if eligibility.solar_status != "scored":
+        if eligibility.solar_status not in {"scored", "not_requested"}:
             blockers.append(SOLAR_NOT_SCORED_BLOCKER)
         if eligibility.hardware_profile_state != "measured":
             blockers.append(UNSUPPORTED_HARDWARE_PROFILE_BLOCKER)

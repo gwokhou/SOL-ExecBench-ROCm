@@ -79,6 +79,12 @@ def test_rdna4_lock_lifecycle_wraps_measurement() -> None:
         def unlock(self) -> None:
             events.append("unlock")
 
+        def observe_locked(self) -> bool:
+            # pre=False, benchmark window=True, reset=False
+            return len([event for event in events if event == "lock"]) > len(
+                [event for event in events if event == "unlock"]
+            )
+
     artifact = run_calibration(
         CalibrationRequest(
             environment=GpuEnvironment(device=0, architecture="gfx1200"),

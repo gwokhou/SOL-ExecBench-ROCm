@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+from math import isfinite
 from pathlib import Path
 from tempfile import mkdtemp
 from dataclasses import dataclass
@@ -194,7 +195,9 @@ class HipCommandBackend:
             )
         except (IndexError, ValueError):
             return None
-        if not samples or any(sample <= 0.0 for sample in samples):
+        if not samples or any(
+            not isfinite(sample) or sample <= 0.0 for sample in samples
+        ):
             return None
         return ProbeExecution(
             samples=samples,
@@ -253,6 +256,10 @@ int main() {{
   hipMemcpy(d_left, left.data(), count * sizeof(float), hipMemcpyHostToDevice);
   hipMemcpy(d_right, right.data(), count * sizeof(float), hipMemcpyHostToDevice);
   hipEvent_t start, stop; hipEventCreate(&start); hipEventCreate(&stop);
+  for (int warmup = 0; warmup < 3; ++warmup) {{
+    hipLaunchKernelGGL(probe_kernel, dim3((count + 255) / 256), dim3(256), 0, 0, d_left, d_right, d_out, count);
+  }}
+  hipDeviceSynchronize();
   for (int repeat = 0; repeat < 7; ++repeat) {{
     hipEventRecord(start); hipLaunchKernelGGL(probe_kernel, dim3((count + 255) / 256), dim3(256), 0, 0, d_left, d_right, d_out, count); hipEventRecord(stop); hipEventSynchronize(stop);
     float elapsed_ms = 0.0f; hipEventElapsedTime(&elapsed_ms, start, stop);

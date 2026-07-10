@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+import hashlib
+import json
 from math import isfinite
 from typing import Any, Mapping
 
@@ -132,6 +134,7 @@ class HardwareCalibrationArtifact:
     collection_status: str
     validation_status: str
     metadata: Mapping[str, Any] = field(default_factory=dict)
+    payload_sha256: str | None = None
     schema_version: str = CALIBRATION_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -156,8 +159,20 @@ class HardwareCalibrationArtifact:
         keys = [candidate.key for candidate in self.candidates]
         if len(keys) != len(set(keys)):
             raise ValueError("calibration candidate keys must be unique")
+        # The checksum binds every byte of the semantic payload.  It deliberately
+        # excludes itself so callers can verify a parsed artifact identically.
+        try:
+            expected_checksum = _artifact_payload_sha256(self._payload_dict())
+        except (TypeError, ValueError) as exc:
+            raise ValueError("artifact metadata must be JSON serializable") from exc
+        if self.payload_sha256 is not None:
+            if not isinstance(self.payload_sha256, str) or (
+                self.payload_sha256 != expected_checksum
+            ):
+                raise ValueError("calibration payload checksum does not match payload")
+        object.__setattr__(self, "payload_sha256", expected_checksum)
 
-    def to_dict(self) -> dict[str, Any]:
+    def _payload_dict(self) -> dict[str, Any]:
         return {
             "schema_version": self.schema_version,
             "generated_at": self.generated_at,
@@ -166,6 +181,16 @@ class HardwareCalibrationArtifact:
             "collection_status": self.collection_status,
             "validation_status": self.validation_status,
         }
+
+    def to_dict(self) -> dict[str, Any]:
+        return {**self._payload_dict(), "payload_sha256": self.payload_sha256}
+
+
+def _artifact_payload_sha256(payload: Mapping[str, Any]) -> str:
+    canonical = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), allow_nan=False
+    ).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
 
 
 def _require_exact_keys(
@@ -240,8 +265,18 @@ def hardware_calibration_artifact_from_dict(
         "candidates",
         "collection_status",
         "validation_status",
+        "payload_sha256",
     }
-    _require_exact_keys(payload, expected, "hardware calibration artifact")
+    # v1 artifacts written before checksum support remain parseable diagnostics;
+    # the model-build authority boundary separately requires the checksum.
+    extras = sorted(set(payload) - expected)
+    missing = sorted((expected - {"payload_sha256"}) - set(payload))
+    if extras or missing:
+        details = [
+            *(f"unknown field {key}" for key in extras),
+            *(f"missing field {key}" for key in missing),
+        ]
+        raise ValueError("hardware calibration artifact has " + ", ".join(details))
     if not isinstance(payload["metadata"], dict) or not isinstance(
         payload["candidates"], list
     ):
@@ -262,5 +297,10 @@ def hardware_calibration_artifact_from_dict(
         ),
         validation_status=_require_json_string(
             payload["validation_status"], "validation_status"
+        ),
+        payload_sha256=(
+            _require_json_string(payload["payload_sha256"], "payload_sha256")
+            if "payload_sha256" in payload
+            else None
         ),
     )

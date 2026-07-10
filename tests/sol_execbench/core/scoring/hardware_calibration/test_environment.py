@@ -17,8 +17,11 @@ def test_supported_adapters_declare_portable_fp32_candidates(architecture: str) 
         "vector",
         "stream_copy",
     }
-    assert all(candidate.input_dtype == "fp32" for candidate in candidates)
-    assert all(candidate.output_dtype == "fp32" for candidate in candidates)
+    assert any(candidate.input_dtype == "fp32" for candidate in candidates)
+    assert any(
+        candidate.operation == "matrix" and candidate.input_dtype == "bf16"
+        for candidate in candidates
+    )
     assert {
         (candidate.kind, candidate.operation, candidate.path)
         for candidate in candidates

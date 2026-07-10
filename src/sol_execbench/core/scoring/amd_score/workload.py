@@ -118,7 +118,12 @@ def _bound_eligibility(
         amd_sol_status = "scored"
         hardware_profile_state = "unknown"
         artifact_warnings = tuple(warnings_for_artifact(artifact))
-    solar_status = solar_aggregate.status if solar_aggregate is not None else "unknown"
+    # SOLAR derivation is optional.  Its absence is not evidence that a present
+    # derivation failed, and must not turn an otherwise AMD-authoritative score
+    # into an artificial unknown blocker.
+    solar_status = (
+        solar_aggregate.status if solar_aggregate is not None else "not_requested"
+    )
     solar_warnings = solar_aggregate.warnings if solar_aggregate is not None else ()
     hardware = artifact.hardware_model
     return BoundEligibilityEvidence(

@@ -10,6 +10,7 @@ import hashlib
 import io
 import json
 import os
+import shutil
 import subprocess
 import sys
 from contextlib import contextmanager
@@ -65,16 +66,60 @@ class RooflineParseResult:
 
 
 def default_profiler_discovery(project_root: Path) -> ProfilerDiscovery:
-    """Discover the system launcher without changing its ROCm installation."""
-    tool_path = Path("/usr/bin/rocprof-compute")
-    rocm_root = Path("/opt/rocm-7.1.1")
+    """Derive launcher, version, and requirements from the installed tool.
+
+    ROCm's package layout changes between releases, so no release directory or
+    profiler version is baked into the calibration contract.
+    """
+    tool_path = Path(shutil.which("rocprof-compute") or "/usr/bin/rocprof-compute")
+    requirements_path = _find_requirements(tool_path)
+    tool_version = _discover_tool_version(tool_path)
     return ProfilerDiscovery(
         tool_path=tool_path,
-        tool_version="unknown",
-        requirements_path=rocm_root / "libexec/rocprofiler-compute/requirements.txt",
+        tool_version=tool_version,
+        requirements_path=requirements_path,
         artifact_root=project_root / ".artifacts" / "rocprof-compute",
         interpreter_abi=f"cp{sys.version_info.major}{sys.version_info.minor}",
     )
+
+
+def _find_requirements(tool_path: Path) -> Path:
+    """Find the requirements shipped beside the resolved ROCm installation."""
+    try:
+        resolved = tool_path.resolve(strict=False)
+    except OSError:
+        resolved = tool_path
+    roots = (resolved.parent, *resolved.parents)
+    candidates: list[Path] = []
+    for root in roots:
+        candidates.extend(
+            (
+                root / "requirements.txt",
+                root / "libexec" / "rocprofiler-compute" / "requirements.txt",
+                root / "lib" / "rocprofiler-compute" / "requirements.txt",
+            )
+        )
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    # Preserve a deterministic unavailable path for diagnostics.
+    return resolved.parent / "requirements.txt"
+
+
+def _discover_tool_version(tool_path: Path) -> str:
+    try:
+        completed = subprocess.run(
+            (str(tool_path), "--version"), capture_output=True, text=True, check=False
+        )
+    except OSError:
+        return "unknown"
+    output = f"{completed.stdout}\n{completed.stderr}"
+    import re
+
+    match = re.search(
+        r"(?:version\s*)?(\d+(?:\.\d+){1,3}(?:[-+][\w.]+)?)", output, re.I
+    )
+    return match.group(1) if completed.returncode == 0 and match else "unknown"
 
 
 def _requirements_digest(discovery: ProfilerDiscovery) -> str | None:
