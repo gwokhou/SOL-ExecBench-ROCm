@@ -25,12 +25,11 @@
 
 ## Current Position
 
-**Status:** v1.38 executing. Phases 190-192 are verified; phases 193-194 remain
-pending. Phase 192 shipped 2026-06-21 (commit `0150256`); 193-194 have been
-stalled since, with recent work shifting to the decision sidecar track
-(orthogonal diagnostic capability, not a replacement for 193/194). See
-`.planning/phases/193-measured-baseline-provenance-and-coverage/193-SCOPE-REVIEW.md`
-for the 193 scope re-baseline before planning.
+**Status:** v1.38 executing. Phases 190-193 are verified; phase 194 remains
+pending. Phase 193 shipped 2026-07-10 (measured baseline provenance + five-state
+coverage validation + official score gate wiring). See
+`.planning/phases/193-measured-baseline-provenance-and-coverage/193-VERIFICATION.md`
+for the 193 verification.
 
 ## v1.38 Upgrade SOL Evidence Contract for Confirmed Benchmark Claims
 
