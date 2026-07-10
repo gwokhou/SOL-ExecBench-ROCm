@@ -3,7 +3,10 @@
 
 import pytest
 
-from sol_execbench.core.scoring.hardware_calibration.environment import adapter_for
+from sol_execbench.core.scoring.hardware_calibration.environment import (
+    adapter_for,
+    discover_gpu,
+)
 
 
 @pytest.mark.parametrize("architecture", ("gfx1200", "gfx942", "gfx950"))
@@ -23,3 +26,15 @@ def test_supported_adapters_declare_portable_fp32_candidates(architecture: str) 
         ("compute", "vector", "portable"),
         ("memory", "stream_copy", "portable"),
     }
+
+
+def test_runtime_discovery_uses_the_requested_device() -> None:
+    class Runtime:
+        def architecture_for(self, device: int) -> str:
+            assert device == 2
+            return "GFX950"
+
+    environment = discover_gpu(2, Runtime())
+
+    assert environment.device == 2
+    assert environment.architecture == "gfx950"
