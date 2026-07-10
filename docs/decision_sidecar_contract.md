@@ -1,9 +1,10 @@
 # Decision Sidecar Contract
 
 This document reserves the seam for a future **Decision sidecar** that turns
-diagnostic-only data-layer facts into structured optimization guidance. It is a
-contract boundary, not an implemented artifact. No `sol_execbench.decision.v1`
-schema or run path exists yet.
+diagnostic-only data-layer facts into structured optimization guidance. It
+records the contract boundary and design intent. The `sol_execbench.decision.v1`
+schema and run path are now implemented in `src/sol_execbench/core/bench/decision/`
+(emits `<trace>.decision.json` via `--decision auto`).
 
 For the modeling survey and source-credibility assessment that informs this
 contract, see `docs/decision-modeling-research.md`.

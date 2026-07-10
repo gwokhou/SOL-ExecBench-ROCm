@@ -1,0 +1,61 @@
+{
+  "schema_version": "sol_execbench.decision.v1",
+  "status": "partial",
+  "reason_code": "partial_decision",
+  "identity": {
+    "generated_at": "2026-07-10T00:00:00Z",
+    "sol_version": "v1.43",
+    "trace_path": "trace.jsonl",
+    "target_id": "gemm",
+    "run_id": "run-1",
+    "candidate_id": "candidate-sha",
+    "source_sha256": "source-sha"
+  },
+  "authority": "diagnostic",
+  "summary": {
+    "hint_count": 1,
+    "footprint_count": 1,
+    "architecture": null,
+    "bottleneck_counts": {
+      "spill_detected": 1
+    }
+  },
+  "hints": [
+    {
+      "bottleneck_class": "spill_detected",
+      "confidence": "inferred_high",
+      "message": "register spill to scratch memory detected (512 B)",
+      "recommendation": "lower VGPR usage via the waves_per_eu hint, or reorder the compute graph to shorten live ranges",
+      "architecture": null,
+      "identity": {
+        "artifact_id": "k0",
+        "extractor_tool_id": "roc-objdump",
+        "source_sha256": "abc123",
+        "generated_at": null
+      },
+      "limitations": [],
+      "evidence_refs": [
+        "footprint.scratch_bytes"
+      ],
+      "source_refs": []
+    }
+  ],
+  "limitations": [
+    "Decision hints are diagnostic resource-risk signals, not benchmark authority.",
+    "Static hints are most actionable for latency-bound kernels; confirm via runtime profiling before acting (occupancy != performance).",
+    "No arch capability budget matched the detected gfx target; only spill signals are derived."
+  ],
+  "source_refs": [
+    {
+      "kind": "static_evidence",
+      "label": "static_resource_footprints",
+      "status": null
+    },
+    {
+      "kind": "environment",
+      "label": "arch_capability_budget",
+      "status": "unavailable"
+    }
+  ],
+  "artifact_citations": []
+}
