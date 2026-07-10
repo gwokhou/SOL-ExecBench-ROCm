@@ -23,19 +23,51 @@ def _bound_for_estimate(
     estimate: OperatorWorkEstimate,
     hardware_model: AmdHardwareModel,
 ) -> AmdSolV2OpBound:
+    compute_profile = (
+        hardware_model.resolve_compute(
+            estimate.compute_operation or "",
+            estimate.input_dtype or "",
+            estimate.output_dtype or "",
+            estimate.compute_path or "",
+        )
+        if estimate.compute_operation
+        else None
+    )
+    memory_profile = (
+        hardware_model.resolve_memory(estimate.memory_access)
+        if estimate.memory_access
+        else None
+    )
+    usable_compute = (
+        compute_profile is not None
+        and compute_profile.state == "measured"
+        and compute_profile.value is not None
+    )
+    usable_memory = (
+        memory_profile is not None
+        and memory_profile.state == "measured"
+        and memory_profile.value is not None
+    )
     compute_bound_ms = (
-        estimate.flops / (hardware_model.peak_tflops * 1_000_000_000_000.0) * 1000.0
-        if hardware_model.peak_tflops > 0.0
+        estimate.flops / (compute_profile.value * 1_000_000_000_000.0) * 1000.0
+        if usable_compute
         else 0.0
     )
     memory_bound_ms = (
-        estimate.total_bytes
-        / (hardware_model.memory_bandwidth_gbps * 1_000_000_000.0)
-        * 1000.0
-        if hardware_model.memory_bandwidth_gbps > 0.0
+        estimate.total_bytes / (memory_profile.value * 1_000_000_000.0) * 1000.0
+        if usable_memory
         else 0.0
     )
     limiting_resource = "compute" if compute_bound_ms >= memory_bound_ms else "memory"
+    profile_warnings = list(estimate.warnings)
+    confidence = estimate.confidence
+    if not usable_compute or not usable_memory:
+        profile_warnings.append("unknown_hardware_profile")
+        if confidence == EstimateConfidence.SUPPORTED:
+            confidence = EstimateConfidence.INEXACT
+    for profile in (compute_profile, memory_profile):
+        if profile is not None and profile.confidence == EstimateConfidence.INEXACT:
+            confidence = _worse_confidence(confidence, profile.confidence)
     return AmdSolV2OpBound(
         node_id=estimate.node_id,
         op_family=estimate.op_family.value,
@@ -44,9 +76,9 @@ def _bound_for_estimate(
         memory_bound_ms=memory_bound_ms,
         sol_bound_ms=max(compute_bound_ms, memory_bound_ms),
         limiting_resource=limiting_resource,
-        confidence=estimate.confidence,
+        confidence=confidence,
         rationale=estimate.rationale,
-        estimate_warnings=estimate.warnings,
+        estimate_warnings=_unique(profile_warnings),
     )
 
 
@@ -147,6 +179,7 @@ def _warnings_for_artifact(
     estimates: tuple[OperatorWorkEstimate, ...],
     aggregate: AmdSolV2AggregateBound,
     hardware_model: AmdHardwareModel,
+    op_bounds: tuple[AmdSolV2OpBound, ...] = (),
 ) -> tuple[str, ...]:
     warnings: list[str] = []
     for warning in graph_warnings:
@@ -162,6 +195,10 @@ def _warnings_for_artifact(
             warnings.append(
                 f"unsupported_operator:{estimate.node_id}:{estimate.op_family.value}"
             )
+    if any(
+        "unknown_hardware_profile" in bound.estimate_warnings for bound in op_bounds
+    ):
+        warnings.append("unknown_hardware_profile")
     if hardware_model.hardware_validation_status != HardwareValidationStatus.VALIDATED:
         warnings.append(
             "hardware_validation:"

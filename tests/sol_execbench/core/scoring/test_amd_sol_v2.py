@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
-from dataclasses import replace
 
 import pytest
 
@@ -32,7 +31,7 @@ from sol_execbench.core.scoring.amd_sol.v2 import (
 )
 from sol_execbench.core.scoring.amd_hardware_models import (
     EstimateConfidence,
-    HardwareValidationStatus,
+    amd_hardware_model_from_dict,
 )
 from sol_execbench_type_helpers import make_definition, make_workload
 
@@ -84,9 +83,10 @@ def test_v2_artifact_serializes_required_sidecar_fields():
     assert payload["hardware_model"]["architecture"] == "gfx1200"
     assert payload["bound_graph"]["definition"] == "matmul_demo"
     assert payload["operator_work_estimates"][0]["formula_kind"] == "gemm_flops"
-    assert payload["op_bounds"][0]["confidence"] == "supported"
+    assert payload["op_bounds"][0]["confidence"] == "inexact"
     assert payload["aggregate_bound"]["status"] == "degraded"
     assert payload["coverage_summary"]["worst_confidence"] == "supported"
+    assert "unknown_hardware_profile" in payload["warnings"]
     assert "model_validation:gfx1200:provisional" in payload["warnings"]
     for solar_derivation_field in (
         "solar_derivation",
@@ -156,16 +156,13 @@ def test_v2_matmul_bounds_are_derived_from_rich_estimates():
 
     assert estimate["flops"] == 128.0
     assert estimate["total_bytes"] == 224.0
-    assert bound.compute_bound_ms == pytest.approx(
-        128.0 / (hardware.peak_tflops * 1_000_000_000_000.0) * 1000.0
-    )
-    assert bound.memory_bound_ms == pytest.approx(
-        224.0 / (hardware.memory_bandwidth_gbps * 1_000_000_000.0) * 1000.0
-    )
+    assert bound.compute_bound_ms == 0.0
+    assert bound.memory_bound_ms == 0.0
     assert bound.sol_bound_ms == max(bound.compute_bound_ms, bound.memory_bound_ms)
     assert bound.limiting_resource in {"compute", "memory"}
     assert artifact.aggregate_bound.sol_bound_ms == bound.sol_bound_ms
     assert artifact.aggregate_bound.scored is True
+    assert "unknown_hardware_profile" in bound.estimate_warnings
 
 
 def test_inexact_coverage_and_warning_semantics_are_deterministic():
@@ -224,11 +221,35 @@ def test_inexact_coverage_and_warning_semantics_are_deterministic():
 
 
 def test_validated_supported_evidence_produces_scored_aggregate():
-    hardware = replace(
-        default_amd_hardware_models()["gfx1200"],
-        confidence=EstimateConfidence.SUPPORTED,
-        hardware_validation_status=HardwareValidationStatus.VALIDATED,
-        model_validation_status=HardwareValidationStatus.VALIDATED,
+    hardware = amd_hardware_model_from_dict(
+        {
+            "schema_version": "sol_execbench.amd_hardware_model.v3",
+            "architecture": "gfx942",
+            "clock_assumptions": ["locked"],
+            "source": "fixture",
+            "confidence": "supported",
+            "hardware_validation_status": "validated",
+            "model_validation_status": "validated",
+            "evidence_refs": ["fixture"],
+            "compute_profiles": [
+                {
+                    "key": "compute.matrix.fp32.fp32.mfma",
+                    "state": "measured",
+                    "value": 100.0,
+                    "confidence": "supported",
+                    "evidence_ref": "fp32",
+                }
+            ],
+            "memory_profiles": [
+                {
+                    "key": "memory.stream_copy.fp32.fp32.portable",
+                    "state": "measured",
+                    "value": 1000.0,
+                    "confidence": "supported",
+                    "evidence_ref": "memory",
+                }
+            ],
+        }
     )
 
     artifact = build_amd_sol_bound_v2_artifact(
@@ -304,3 +325,60 @@ def test_v1_artifact_does_not_emit_v2_only_fields():
         "confidence_counts_by_family",
     ):
         assert v2_only not in payload
+
+
+def test_v3_fp32_profiles_do_not_service_bf16_matrix_bounds():
+    definition = make_definition(
+        name="bf16_matmul",
+        axes={
+            "M": {"type": "const", "value": 2},
+            "K": {"type": "const", "value": 4},
+            "N": {"type": "const", "value": 8},
+        },
+        inputs={
+            "a": {"shape": ["M", "K"], "dtype": "bfloat16"},
+            "b": {"shape": ["K", "N"], "dtype": "bfloat16"},
+        },
+        outputs={"out": {"shape": ["M", "N"], "dtype": "bfloat16"}},
+        reference="def run(a, b):\n    return a @ b",
+    )
+    hardware = amd_hardware_model_from_dict(
+        {
+            "schema_version": "sol_execbench.amd_hardware_model.v3",
+            "architecture": "gfx942",
+            "clock_assumptions": ["locked"],
+            "source": "fixture",
+            "confidence": "supported",
+            "hardware_validation_status": "validated",
+            "model_validation_status": "validated",
+            "evidence_refs": ["fixture"],
+            "compute_profiles": [
+                {
+                    "key": "compute.matrix.fp32.fp32.mfma",
+                    "state": "measured",
+                    "value": 100.0,
+                    "confidence": "supported",
+                    "evidence_ref": "fp32",
+                }
+            ],
+            "memory_profiles": [
+                {
+                    "key": "memory.stream_copy.fp32.fp32.portable",
+                    "state": "measured",
+                    "value": 1000.0,
+                    "confidence": "supported",
+                    "evidence_ref": "fp32-memory",
+                }
+            ],
+        }
+    )
+
+    artifact = build_amd_sol_bound_v2_artifact(
+        definition,
+        _matmul_workload(),
+        hardware,
+    )
+
+    assert artifact.aggregate_bound.status == "degraded"
+    assert "unknown_hardware_profile" in artifact.op_bounds[0].estimate_warnings
+    assert "unknown_hardware_profile" in artifact.warnings

@@ -142,10 +142,23 @@ def run_calibration(request: CalibrationRequest) -> HardwareCalibrationArtifact:
     if clock_reason:
         metadata["clock_lock_reason"] = clock_reason
     metadata.update(_profile_metadata(request, metric_map))
+    validated_from_provenance = (
+        adapter.supports_clock_lock
+        and locked
+        and bool(candidates)
+        and all(candidate.state == "measured" for candidate in candidates)
+    )
+    metadata["validation_provenance"] = {
+        "adapter_requires_clock_lock": adapter.supports_clock_lock,
+        "clock_locked": locked,
+        "all_declared_profiles_measured": all(
+            candidate.state == "measured" for candidate in candidates
+        ),
+    }
     return HardwareCalibrationArtifact(
         generated_at=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         candidates=candidates,
         collection_status="collected",
-        validation_status="validated" if locked else "provisional",
+        validation_status="validated" if validated_from_provenance else "provisional",
         metadata=metadata,
     )

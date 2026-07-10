@@ -35,7 +35,7 @@ def build_amd_sol_bound_v2_artifact(
     coverage = _coverage_for_estimates(estimates)
     aggregate = _aggregate_for_bounds(op_bounds, hardware_model)
     warnings = _warnings_for_artifact(
-        graph.warnings, estimates, aggregate, hardware_model
+        graph.warnings, estimates, aggregate, hardware_model, op_bounds
     )
     return AmdSolBoundV2Artifact(
         definition=definition.name,
