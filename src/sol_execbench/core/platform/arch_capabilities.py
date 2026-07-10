@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 from enum import Enum
 from importlib import resources
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import ConfigDict, Field
 
@@ -58,8 +58,18 @@ class ArchIsaBudget(BaseModelWithDocstrings):
     """Vector register file bytes per CU when known."""
     supported_dtypes: list[str] = Field(default_factory=list)
     """Closed dtype capability labels."""
-    mfma_variants: list[str] = Field(default_factory=list)
-    """Closed matrix-unit capability labels such as ``mfma`` or ``wmma``."""
+    matrix_unit: Literal["mfma", "wmma", "none"] | None = None
+    """Matrix acceleration unit class; ``None`` when unconfirmed."""
+    register_allocation_model: Literal["static", "dynamic"] | None = None
+    """Register allocation model; ``dynamic`` (RDNA4+) defeats static occupancy derivation."""
+    compute_unit_grouping: Literal["cu", "wgp"] | None = None
+    """Scheduling grouping; ``cu`` for CDNA, ``wgp`` for RDNA."""
+    simd_per_cu: int | None = Field(default=None, ge=0)
+    """SIMD units per compute unit when known."""
+    wave_slots_per_simd: int | None = Field(default=None, ge=0)
+    """Resident wave slots per SIMD unit when known."""
+    cache_line_bytes: int | None = Field(default=None, ge=0)
+    """Cache line width in bytes when known; drives coalescing guidance."""
     source: str
     """Upstream reference the budget values were derived from."""
     confidence: EstimateConfidence
@@ -78,7 +88,12 @@ _ALLOWED_BUDGET_KEYS = {
     "lds_per_workgroup_bytes",
     "register_file_per_cu_bytes",
     "supported_dtypes",
-    "mfma_variants",
+    "matrix_unit",
+    "register_allocation_model",
+    "compute_unit_grouping",
+    "simd_per_cu",
+    "wave_slots_per_simd",
+    "cache_line_bytes",
     "source",
     "confidence",
     "evidence_refs",

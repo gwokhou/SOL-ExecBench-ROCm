@@ -36,7 +36,11 @@ def test_gfx942_budget_values():
     assert budget.register_file_per_cu_bytes == 524288
     assert budget.waves_per_cu_max == 40
     assert budget.confidence.value == "inexact"
-    assert "mfma" in budget.mfma_variants
+    assert budget.matrix_unit == "mfma"
+    assert budget.register_allocation_model == "static"
+    assert budget.compute_unit_grouping == "cu"
+    assert budget.simd_per_cu == 4
+    assert budget.wave_slots_per_simd == 10
     assert budget.source
 
 
@@ -46,7 +50,13 @@ def test_gfx1150_budget_values():
     assert budget.wavefront_size == 32
     assert budget.vgpr_limit == 256
     assert budget.register_file_per_cu_bytes is None
-    assert budget.mfma_variants == []
+    assert budget.matrix_unit == "wmma"
+    assert budget.register_allocation_model == "static"
+    assert budget.compute_unit_grouping == "wgp"
+    assert budget.simd_per_cu == 2
+    assert budget.wave_slots_per_simd == 16
+    assert budget.cache_line_bytes == 128
+    assert budget.waves_per_cu_max == 32
     assert budget.confidence.value == "inexact"
     assert "RDNA 3.5" in budget.source
 
