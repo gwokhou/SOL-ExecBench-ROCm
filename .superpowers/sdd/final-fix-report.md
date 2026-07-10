@@ -63,3 +63,15 @@ before those BF16 profiles can become authoritative.
 Re-review verification: the calibration, hardware-model, CLI, score, and
 official-evidence focus ran with `-n 0`: **90 passed**.  Ruff passed for all
 changed source and test paths.
+
+## Final lifecycle follow-up
+
+The entire clock-control/probe lifecycle is now enclosed by the reset
+`finally` block.  Consequently, `--require-clock-lock` failures after a false
+or exceptional lock result still call `unlock()` and attempt a post-reset
+observation.  The strict false-lock regression verifies this behavior.  The
+live RDNA4 smoke test intentionally accepts only the authority-safe rejected
+diagnostic when strict evidence cannot be reached; it does not require all
+matrix candidates to be measured or a successful authority upgrade.
+
+Final focused verification: **91 passed** with `-n 0`; Ruff passed.
