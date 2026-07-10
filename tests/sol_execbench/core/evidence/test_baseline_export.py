@@ -26,6 +26,10 @@ def test_export_hip_baseline_registry_from_passed_trace(tmp_path: Path) -> None:
     assert registry["schema_version"] == "baseline_registry.v1"
     assert registry["coverage_status"] == "confirmed"
     assert registry["target_id"] == "attention"
+    # generated_at is an ISO-8601 UTC timestamp (additive BASE-01 field, no
+    # schema bump) defaulting to the shared freshness helper.
+    assert isinstance(registry["generated_at"], str)
+    assert registry["generated_at"].endswith("Z")
     assert registry["expected_workload_keys"] == ["w-attn-1"]
     entry = registry["entries"][0]
     assert entry["workload_key"] == "w-attn-1"
@@ -40,6 +44,24 @@ def test_export_hip_baseline_registry_from_passed_trace(tmp_path: Path) -> None:
         "timing_policy": "latency_ms",
     }
     assert json.loads(output_path.read_text(encoding="utf-8")) == registry
+
+
+def test_export_hip_baseline_registry_generated_at_override(tmp_path: Path) -> None:
+    trace_path = tmp_path / "trace.jsonl"
+    trace_path.write_text(json.dumps(_passed_trace()) + "\n", encoding="utf-8")
+    output_path = tmp_path / "baseline-registry.json"
+
+    registry = export_hip_baseline_registry(
+        trace_path=trace_path,
+        output_path=output_path,
+        target_id="attention",
+        sol_version="sol-test",
+        timing_policy="latency_ms",
+        generated_at="2026-07-10T00:00:00Z",
+    )
+
+    # An explicitly supplied generated_at is preserved verbatim.
+    assert registry["generated_at"] == "2026-07-10T00:00:00Z"
 
 
 def test_baseline_export_cli_writes_registry(tmp_path: Path) -> None:
