@@ -42,6 +42,7 @@ optional diagnostics use `optional` or a narrower diagnostic profile.
 | `profile_summary.sidecar` | `profile:diagnostic` | Optional normalized profiler summary diagnostics. |
 | `environment_budget.sidecar` | `profile:diagnostic` | Optional derived arch ISA capability budgets for detected gfx targets. |
 | `static_resource_footprint.sidecar` | `profile:diagnostic` | Optional per-kernel resource usage footprints from routed static extractors. |
+| `decision.sidecar` | `profile:diagnostic` | Optional Layer R optimization hints derived from static footprints and arch budgets. |
 
 Concrete artifact schema versions are separate from contract capability keys.
 `agent_feedback.sidecar` currently emits `sol_execbench.agent_feedback.v2` as
@@ -55,9 +56,12 @@ derived from a run's detected gfx targets, sourced from upstream ISA references
 (opengpu/rocm-systems) and emitted under `sol_execbench.environment_snapshot.v2`
 with packaged `sol_execbench.arch_capability_budget.v1` budgets.
 `static_resource_footprint.sidecar` advertises the resource-usage footprints
-surfaced by routed static extractors such as `roc-objdump`. Current ROCm
-profiling metadata is still emitted separately as the trace-adjacent
-&lt;trace&gt;.profile.json rocprofv3 sidecar.
+surfaced by routed static extractors such as `roc-objdump`. `decision.sidecar`
+emits `sol_execbench.decision.v1` as &lt;trace&gt;.decision.json:
+confidence-weighted Layer R optimization hints derived from those footprints and
+the environment capability budget. Current ROCm profiling metadata is still
+emitted separately as the trace-adjacent &lt;trace&gt;.profile.json rocprofv3
+sidecar.
 
 These capabilities are intentionally optional unless their level is `always`.
 A compatible consumer must keep working when a SOL version only provides
@@ -134,7 +138,9 @@ closed-taxonomy `ProfileDigest` mapping, strategy hints, and prompt assembly.
 This split keeps optional feedback useful for next-turn diagnostics without
 making prompt-facing summaries part of the benchmark authority model.
 
-`environment_budget.sidecar` and `static_resource_footprint.sidecar` carry
-diagnostic-only facts (arch ISA budgets and per-kernel resource usage). They are
-inputs for a separate Decision sidecar workflow and are not correctness,
-performance, timing, score, paper-parity, or leaderboard authority.
+`environment_budget.sidecar`, `static_resource_footprint.sidecar`, and
+`decision.sidecar` carry diagnostic-only facts and hints (arch ISA budgets,
+per-kernel resource usage, and Layer R optimization hints). The Decision sidecar
+consumes the budgets and footprints to emit `sol_execbench.decision.v1` hints;
+none of these are correctness, performance, timing, score, paper-parity, or
+leaderboard authority.

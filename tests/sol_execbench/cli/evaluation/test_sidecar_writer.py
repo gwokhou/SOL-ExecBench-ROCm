@@ -37,6 +37,7 @@ def test_optional_sidecars_use_consumer_identity_for_profile_summary(
         solution=_solution(),
         profile_result=_profile_result(tmp_path),
         static_evidence_result=None,
+        decision="none",
         trace_run_id="trace-sha-run-id",
         feedback_run_id="consumer-run-id",
         feedback_target_id="gemm",

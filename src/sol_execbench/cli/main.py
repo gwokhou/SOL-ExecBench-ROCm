@@ -30,6 +30,7 @@ from typing import Any, Optional
 
 import click
 
+import sol_execbench.cli.sidecars.decision as cli_decision
 import sol_execbench.cli.sidecars.static_evidence as cli_static_evidence
 from sol_execbench.cli.commands import dispatch_subcommand
 from sol_execbench.cli.evaluation.evaluator import (
@@ -112,6 +113,13 @@ _COMPILE_PROGRESS_TEXT = "Compiling HIP/C++ solution..."
     help="Collect optional diagnostic static kernel evidence",
 )
 @click.option(
+    "--decision",
+    type=click.Choice([cli_decision.DECISION_NONE, cli_decision.DECISION_AUTO]),
+    default=cli_decision.DECISION_NONE,
+    show_default=True,
+    help="Emit optional Layer R decision sidecar from static footprints",
+)
+@click.option(
     "--feedback-target-id",
     help="Consumer target identity to persist in diagnostic agent feedback.",
 )
@@ -146,6 +154,7 @@ def _evaluate_cli(
     keep_staging: bool,
     profile: str,
     static_evidence: str,
+    decision: str,
     feedback_target_id: str | None,
     feedback_run_id: str | None,
     feedback_candidate_id: str | None,
@@ -179,6 +188,7 @@ def _evaluate_cli(
         keep_staging=keep_staging,
         profile=profile,
         static_evidence=static_evidence,
+        decision=decision,
         feedback_run_id=feedback_run_id,
         feedback_target_id=feedback_target_id,
         feedback_candidate_id=feedback_candidate_id,

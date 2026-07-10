@@ -90,6 +90,7 @@ def build_evaluator_contract() -> EvaluatorContract:
             "profile_summary.sidecar": "profile:diagnostic",
             "environment_budget.sidecar": "profile:diagnostic",
             "static_resource_footprint.sidecar": "profile:diagnostic",
+            "decision.sidecar": "profile:diagnostic",
         },
         trace_field_requirements={
             "top_level": ["definition", "workload", "solution", "evaluation"],
@@ -199,5 +200,6 @@ def build_evaluator_contract() -> EvaluatorContract:
             {"owner": "sol", "scope": "profile_summary", "authority": "diagnostic"},
             {"owner": "sol", "scope": "environment_budget", "authority": "diagnostic"},
             {"owner": "sol", "scope": "static_resource_footprint", "authority": "diagnostic"},
+            {"owner": "sol", "scope": "decision", "authority": "diagnostic"},
         ],
     )
