@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.38
 milestone_name: Upgrade SOL Evidence Contract for Confirmed Benchmark Claims
 status: executing
-stopped_at: Phase 191 verified
-last_updated: "2026-07-10T10:03:08.030Z"
-last_activity: 2026-07-10 -- Phase 194 planning complete
+stopped_at: Phase 194 verified — milestone v1.38 complete
+last_updated: "2026-07-10T10:30:00Z"
+last_activity: 2026-07-10 -- Phase 194 verified
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 5
   total_plans: 10
-  completed_plans: 3
-  percent: 30
+  completed_plans: 10
+  percent: 100
 ---
 
 # Project State
@@ -23,14 +23,14 @@ See: `.planning/PROJECT.md` (updated 2026-06-21)
 **Core value:** Evaluate LLM-generated GPU kernels correctly and reproducibly
 on AMD ROCm hardware while preserving the benchmark semantics and rigor of SOL
 ExecBench.
-**Current focus:** Phase 194 — HIP Confirmed Evidence Package
+**Current focus:** Milestone v1.38 complete — ready for audit/complete/cleanup
 
 ## Current Position
 
-Phase: 194 (HIP Confirmed Evidence Package) — READY FOR DISCUSSION
+Phase: 194 (HIP Confirmed Evidence Package) — VERIFIED
 Plan: —
-Status: Ready to execute
-Last activity: 2026-07-10 -- Phase 194 planning complete
+Status: Phase 194 verified; all v1.38 phases complete
+Last activity: 2026-07-10 -- Phase 194 verified
 
 ## Recent Trend
 
@@ -75,7 +75,7 @@ Last activity: 2026-07-10 -- Phase 194 planning complete
 | 191 - Structured Profile Summary Evidence | Expand profile summary into structured profiling evidence with bottleneck hints while preserving diagnostic authority boundaries | PSUM-01, PSUM-02, PSUM-03 | Completed |
 | 192 - Official Score Evidence Contract | Add official benchmark score evidence with score source, aggregation policy, and valid-run non-null score semantics | SCOR-01, SCOR-02, SCOR-03 | Completed |
 | 193 - Measured Baseline Provenance and Coverage | Add measured baseline evidence and coverage validation for confirmed benchmark claims | BASE-01, BASE-02, BASE-03 | Completed |
-| 194 - HIP Confirmed Evidence Package | Publish contract capabilities, fixtures, docs, and guardrails for HIP cutover-gate decisions | GATE-01, GATE-02, GATE-03 | Pending |
+| 194 - HIP Confirmed Evidence Package | Publish contract capabilities, fixtures, docs, and guardrails for HIP cutover-gate decisions | GATE-01, GATE-02, GATE-03 | Completed |
 
 ## Quick Tasks Completed
 
