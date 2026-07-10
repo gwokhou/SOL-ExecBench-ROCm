@@ -25,11 +25,11 @@
 
 ## Current Position
 
-**Status:** v1.38 executing. Phases 190-193 are verified; phase 194 remains
-pending. Phase 193 shipped 2026-07-10 (measured baseline provenance + five-state
-coverage validation + official score gate wiring). See
-`.planning/phases/193-measured-baseline-provenance-and-coverage/193-VERIFICATION.md`
-for the 193 verification.
+**Status:** v1.38 complete. Phases 190-194 are all verified. Phase 194 shipped
+2026-07-10 (HIP confirmed-evidence package: contract capabilities, fixtures,
+docs, and the `sol-execbench official-score` emission CLI). See
+`.planning/phases/194-hip-confirmed-evidence-package/194-VERIFICATION.md` for the
+194 verification. Milestone ready for audit → complete → cleanup.
 
 ## v1.38 Upgrade SOL Evidence Contract for Confirmed Benchmark Claims
 
