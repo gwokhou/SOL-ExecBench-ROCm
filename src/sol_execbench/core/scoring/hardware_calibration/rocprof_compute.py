@@ -108,6 +108,21 @@ def _environment_is_ready(discovery: ProfilerDiscovery, venv_path: Path) -> bool
     )
 
 
+def _tool_is_available(discovery: ProfilerDiscovery) -> bool:
+    return discovery.exists(discovery.tool_path) and discovery.is_executable(
+        discovery.tool_path
+    )
+
+
+def _load_manifest(discovery: ProfilerDiscovery, venv_path: Path) -> tuple[str, ...]:
+    payload = json.loads(discovery.read_text(_manifest_path(venv_path)))
+    if not isinstance(payload, list) or not all(
+        isinstance(item, str) for item in payload
+    ):
+        raise ValueError("installed-distribution manifest must be a list of strings")
+    return tuple(payload)
+
+
 def parse_roofline_metrics(
     raw_output: str,
     metric_to_candidate: Mapping[str, tuple[str, str]],
@@ -194,6 +209,38 @@ def _unknown(
     )
 
 
+def _measured_or_unknown(
+    discovery: ProfilerDiscovery,
+    requirements_sha256: str,
+    venv_path: Path,
+) -> ProfilerEnvironment:
+    if not _tool_is_available(discovery):
+        return _unknown(
+            discovery, "rocprof_compute_tool_unavailable", requirements_sha256
+        )
+    try:
+        manifest = _load_manifest(discovery, venv_path)
+    except OSError:
+        return _unknown(
+            discovery, "rocprof_compute_manifest_unavailable", requirements_sha256
+        )
+    except (TypeError, ValueError):
+        return _unknown(
+            discovery, "rocprof_compute_manifest_invalid", requirements_sha256
+        )
+    python = venv_path / "bin" / "python"
+    return ProfilerEnvironment(
+        state="measured",
+        reason_code=None,
+        tool_path=discovery.tool_path,
+        tool_version=discovery.tool_version,
+        requirements_sha256=requirements_sha256,
+        venv_path=venv_path,
+        interpreter_path=python,
+        installed_distributions=manifest,
+    )
+
+
 def ensure_profiler_environment(
     discovery: ProfilerDiscovery, offline: bool, auto_install: bool
 ) -> ProfilerEnvironment:
@@ -203,29 +250,12 @@ def ensure_profiler_environment(
         return _unknown(discovery, "rocprof_compute_requirements_unavailable", None)
     venv_path = _venv_path(discovery, requirements_sha256)
     python = venv_path / "bin" / "python"
-    if _environment_is_ready(discovery, venv_path):
-        if not discovery.exists(discovery.tool_path) or not discovery.is_executable(
-            discovery.tool_path
-        ):
-            return _unknown(
-                discovery, "rocprof_compute_tool_unavailable", requirements_sha256
-            )
-        try:
-            manifest = tuple(json.loads(discovery.read_text(_manifest_path(venv_path))))
-        except (OSError, ValueError, TypeError):
-            return _unknown(
-                discovery, "rocprof_compute_manifest_unavailable", requirements_sha256
-            )
-        return ProfilerEnvironment(
-            state="measured",
-            reason_code=None,
-            tool_path=discovery.tool_path,
-            tool_version=discovery.tool_version,
-            requirements_sha256=requirements_sha256,
-            venv_path=venv_path,
-            interpreter_path=python,
-            installed_distributions=manifest,
+    if not _tool_is_available(discovery):
+        return _unknown(
+            discovery, "rocprof_compute_tool_unavailable", requirements_sha256
         )
+    if _environment_is_ready(discovery, venv_path):
+        return _measured_or_unknown(discovery, requirements_sha256, venv_path)
     if offline:
         return _unknown(
             discovery,
@@ -259,26 +289,13 @@ def ensure_profiler_environment(
                 discovery.write_text(
                     _manifest_path(venv_path), json.dumps(manifest, indent=2) + "\n"
                 )
-            else:
-                manifest = tuple(
-                    json.loads(discovery.read_text(_manifest_path(venv_path)))
-                )
     except (OSError, subprocess.SubprocessError, ValueError):
         return _unknown(
             discovery,
             "rocprof_compute_dependencies_install_failed",
             requirements_sha256,
         )
-    return ProfilerEnvironment(
-        state="measured",
-        reason_code=None,
-        tool_path=discovery.tool_path,
-        tool_version=discovery.tool_version,
-        requirements_sha256=requirements_sha256,
-        venv_path=venv_path,
-        interpreter_path=python,
-        installed_distributions=manifest,
-    )
+    return _measured_or_unknown(discovery, requirements_sha256, venv_path)
 
 
 def run_rocprof_compute_bench_only(

@@ -24,6 +24,8 @@ def _discovery(tmp_path: Path) -> ProfilerDiscovery:
         artifact_root=tmp_path / ".artifacts" / "rocprof-compute",
         interpreter_abi="cp312",
         run=run,
+        exists=lambda path: path == Path("/usr/bin/rocprof-compute") or path.exists(),
+        is_executable=lambda path: path == Path("/usr/bin/rocprof-compute"),
     )
 
 
@@ -104,3 +106,71 @@ def test_reused_environment_rejects_nonexecutable_tool(tmp_path: Path) -> None:
 
     assert result.state == "unknown"
     assert result.reason_code == "rocprof_compute_tool_unavailable"
+
+
+def test_new_install_rejects_missing_launcher_before_running_uv(tmp_path: Path) -> None:
+    discovery = _discovery(tmp_path)
+    commands: list[list[str]] = []
+    unavailable = ProfilerDiscovery(
+        **{
+            **discovery.__dict__,
+            "exists": lambda path: (
+                False if path == discovery.tool_path else discovery.exists(path)
+            ),
+            "run": lambda command, **kwargs: commands.append(command),
+        },
+    )
+
+    result = ensure_profiler_environment(unavailable, offline=False, auto_install=True)
+
+    assert result.reason_code == "rocprof_compute_tool_unavailable"
+    assert commands == []
+
+
+def test_lock_race_rechecks_launcher_before_final_measured_result(
+    tmp_path: Path,
+) -> None:
+    discovery = _discovery(tmp_path)
+    ensure_profiler_environment(discovery, offline=False, auto_install=True)
+    ready_checks = 0
+    tool_checks = 0
+
+    def exists(path: Path) -> bool:
+        nonlocal ready_checks, tool_checks
+        if path == discovery.tool_path:
+            tool_checks += 1
+            return tool_checks == 1
+        if path.name == "python":
+            ready_checks += 1
+            return ready_checks != 1
+        return discovery.exists(path)
+
+    raced = ProfilerDiscovery(**{**discovery.__dict__, "exists": exists})
+
+    result = ensure_profiler_environment(raced, offline=False, auto_install=True)
+
+    assert result.reason_code == "rocprof_compute_tool_unavailable"
+
+
+def test_reused_environment_rejects_malformed_manifest_shape(tmp_path: Path) -> None:
+    discovery = _discovery(tmp_path)
+    ensure_profiler_environment(discovery, offline=False, auto_install=True)
+
+    for manifest in ('{"package": "example"}', '["example", 1]'):
+        malformed = ProfilerDiscovery(
+            **{
+                **discovery.__dict__,
+                "read_text": lambda path, manifest=manifest: (
+                    manifest
+                    if path.name == "installed-distributions.json"
+                    else discovery.read_text(path)
+                ),
+            },
+        )
+
+        result = ensure_profiler_environment(
+            malformed, offline=False, auto_install=False
+        )
+
+        assert result.state == "unknown"
+        assert result.reason_code == "rocprof_compute_manifest_invalid"
