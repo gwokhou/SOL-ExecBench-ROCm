@@ -16,7 +16,7 @@ from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 from sol_execbench.core.scoring.confidence import EstimateConfidence
 
 ARCH_CAPABILITY_BUDGET_SCHEMA_VERSION = "sol_execbench.arch_capability_budget.v1"
-_BUILTIN_ARCH_BUDGETS = ("gfx942", "gfx1150")
+_BUILTIN_ARCH_BUDGETS = ("gfx942", "gfx1150", "gfx1200")
 
 
 class ArchCapabilityBudgetStatus(str, Enum):

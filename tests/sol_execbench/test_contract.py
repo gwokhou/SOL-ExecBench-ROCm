@@ -44,6 +44,7 @@ ACTIVE_CONTRACT_DOCS = (
     REPO_ROOT / "docs/trace.md",
     REPO_ROOT / "docs/agent_feedback_sidecar.md",
     REPO_ROOT / "docs/profile_summary_sidecar.md",
+    REPO_ROOT / "docs/decision_sidecar.md",
 )
 STALE_SIDECAR_CAPABILITY_TOKENS = {
     f"{sidecar_name}.sidecar.v2"

@@ -45,3 +45,46 @@ def test_precedence_annotation_is_idempotent():
     once = apply_runtime_precedence(sidecar, runtime_profile_available=True)
     twice = apply_runtime_precedence(once, runtime_profile_available=True)
     assert once.limitations == twice.limitations
+
+
+def test_demoted_classes_lower_hint_confidence():
+    from sol_execbench.core.bench.decision.decision_models import (
+        DecisionBottleneckClass,
+    )
+
+    sidecar = build_decision_sidecar(
+        footprints=[
+            StaticResourceFootprint(
+                vgpr_used=250, scratch_bytes=1024, spill_detected=True
+            )
+        ],
+        budget=GFX942,
+    )
+    # Precondition: register_pressure_high is present above inferred_low.
+    assert any(
+        h.bottleneck_class == DecisionBottleneckClass.REGISTER_PRESSURE_HIGH
+        and h.confidence.value != "inferred_low"
+        for h in sidecar.hints
+    )
+
+    annotated = apply_runtime_precedence(
+        sidecar,
+        runtime_profile_available=True,
+        demoted_classes={DecisionBottleneckClass.REGISTER_PRESSURE_HIGH},
+    )
+
+    reg = next(
+        h
+        for h in annotated.hints
+        if h.bottleneck_class == DecisionBottleneckClass.REGISTER_PRESSURE_HIGH
+    )
+    assert reg.confidence.value == "inferred_low"
+    assert any("Demoted" in lim for lim in reg.limitations)
+
+    # Spill is not in demoted_classes -> confidence unchanged.
+    spill = next(
+        h
+        for h in annotated.hints
+        if h.bottleneck_class == DecisionBottleneckClass.SPILL_DETECTED
+    )
+    assert spill.confidence.value == "inferred_high"

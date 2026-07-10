@@ -1,0 +1,24 @@
+{
+  "schema_version": "sol_execbench.arch_capability_budget.v1",
+  "architecture": "gfx1200",
+  "wavefront_size": 32,
+  "vgpr_limit": 256,
+  "sgpr_limit": 102,
+  "waves_per_cu_max": null,
+  "lds_per_workgroup_bytes": 65536,
+  "register_file_per_cu_bytes": null,
+  "supported_dtypes": ["fp32", "fp16", "bf16", "int8", "fp8"],
+  "matrix_unit": "wmma",
+  "register_allocation_model": "dynamic",
+  "compute_unit_grouping": "wgp",
+  "simd_per_cu": 2,
+  "wave_slots_per_simd": 16,
+  "cache_line_bytes": 128,
+  "source": "AMD RDNA 4 (gfx1200); HIP hardware implementation docs + Hot Chips 2025 (dynamic register allocation); mirrored via opengpu/rocm-systems. register_allocation_model=dynamic defeats static occupancy derivation; waves_per_cu_max and register_file_per_cu_bytes are null on purpose.",
+  "confidence": "inexact",
+  "evidence_refs": [
+    "https://rocm.docs.amd.com/projects/HIP/en/latest/understand/hardware_implementation.html",
+    "https://hc2025.hotchips.org/assets/program/conference/day1/8_amd_pomianowski_final.pdf",
+    "https://gpuopen.com/learn/using_matrix_core_amd_rdna4/"
+  ]
+}

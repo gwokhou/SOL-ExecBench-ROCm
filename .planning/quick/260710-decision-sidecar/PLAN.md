@@ -1,6 +1,6 @@
 ---
 quick_task: decision-sidecar
-status: planned
+status: complete
 created: 2026-07-10
 branch: feat/decision-ready-data-layer
 ---

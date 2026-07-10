@@ -26,8 +26,15 @@ DECISION_AUTO = "auto"
 
 def _load_budget_from_environment(
     environment_sidecar_path: Path | None,
+    *,
+    target_architecture: str | None = None,
 ) -> ArchIsaBudget | None:
-    """Read the first available arch capability budget from an environment sidecar."""
+    """Read the arch capability budget from an environment sidecar.
+
+    When ``target_architecture`` is set (the static-evidence detected gfx), the
+    matching budget is preferred over other available budgets so a multi-GPU
+    environment does not yield the wrong arch's limits.
+    """
 
     if environment_sidecar_path is None or not environment_sidecar_path.is_file():
         return None
@@ -35,12 +42,21 @@ def _load_budget_from_environment(
         payload = json.loads(environment_sidecar_path.read_text(encoding="utf-8"))
     except Exception:
         return None
-    for entry in payload.get("capability_budgets") or []:
-        if entry.get("status") == "available" and entry.get("budget"):
-            try:
-                return arch_capability_budget_from_dict(entry["budget"])
-            except Exception:
-                return None
+    candidates = [
+        entry
+        for entry in (payload.get("capability_budgets") or [])
+        if entry.get("status") == "available" and entry.get("budget")
+    ]
+    if target_architecture:
+        norm = target_architecture.split(":")[0].strip().lower()
+        candidates.sort(
+            key=lambda entry: (entry.get("architecture") or "").lower() != norm
+        )
+    for entry in candidates:
+        try:
+            return arch_capability_budget_from_dict(entry["budget"])
+        except Exception:
+            return None
     return None
 
 
@@ -67,7 +83,14 @@ def _write_decision_sidecar(
     )
     if not footprints:
         return None
-    budget = _load_budget_from_environment(environment_sidecar_path)
+    target_architecture = None
+    if static_evidence_result is not None:
+        detected = static_evidence_result.classification.detected_architectures
+        if detected:
+            target_architecture = detected[0]
+    budget = _load_budget_from_environment(
+        environment_sidecar_path, target_architecture=target_architecture
+    )
     sidecar = build_decision_sidecar(
         footprints=footprints,
         budget=budget,
