@@ -346,3 +346,10 @@ ROCm 端目前更偏向“RDNA4/CDNA3 可复现实验范围”，并保留了对
 ## 备注
 
 本文档是**工程落地评估报告**，不是 leaderboard 等价声明。后续若要主张与 NVIDIA 公开结果可比，需要在证据链、分母策略与可复现基线发布节奏上达到可复核闭环。
+# Calibrated hardware-model authority boundary
+
+Calibration JSON and external hardware models are diagnostic evidence.  An official
+score additionally requires serialized bound eligibility: scored AMD SOL and SOLAR
+aggregates, measured exact profiles, validated hardware and model states, and no
+degraded, inexact, or unsupported bound warnings.  Missing legacy eligibility evidence
+is explicitly official-blocked.

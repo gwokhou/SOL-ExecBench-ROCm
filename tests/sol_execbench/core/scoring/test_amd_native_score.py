@@ -105,6 +105,37 @@ def _matmul_artifact_v2():
     )
 
 
+def test_score_serializes_bound_eligibility_evidence() -> None:
+    score = score_amd_native_workload(
+        _matmul_artifact_v2(),
+        measured_latency_ms=1.0,
+        baseline_latency_ms=2.0,
+        solar_derivation=SolarAggregateStatus(
+            status="scored",
+            score_eligible=True,
+            reason="complete",
+            group_ids=(),
+            node_ids=(),
+            warnings=(),
+        ),
+    )
+
+    payload = score.to_dict()
+
+    assert payload["bound_eligibility"] == {
+        "amd_sol_status": "degraded",
+        "solar_status": "scored",
+        "hardware_profile_state": "unknown",
+        "hardware_validation_status": "validated",
+        "model_validation_status": "provisional",
+        "warnings": [
+            "unknown_hardware_profile",
+            "model_validation:gfx1200:provisional",
+            "aggregate_degraded:inexact or provisional evidence present",
+        ],
+    }
+
+
 def _cdna3_model(tmp_path):
     path = tmp_path / "cdna3-model.json"
     path.write_text(

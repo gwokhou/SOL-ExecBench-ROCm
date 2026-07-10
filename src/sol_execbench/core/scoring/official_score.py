@@ -60,6 +60,13 @@ PLACEHOLDER_BASELINE_BLOCKER = "placeholder_baseline"
 MISSING_SOL_BOUND_BLOCKER = "missing_sol_bound"
 MISSING_AGGREGATION_POLICY_BLOCKER = "missing_aggregation_policy"
 BASELINE_COVERAGE_FAILED_BLOCKER = "baseline_coverage_failed"
+MISSING_BOUND_ELIGIBILITY_BLOCKER = "missing_bound_eligibility"
+AMD_SOL_NOT_SCORED_BLOCKER = "amd_sol_not_scored"
+SOLAR_NOT_SCORED_BLOCKER = "solar_not_scored"
+UNSUPPORTED_HARDWARE_PROFILE_BLOCKER = "unsupported_hardware_profile"
+HARDWARE_NOT_VALIDATED_BLOCKER = "hardware_not_validated"
+MODEL_NOT_VALIDATED_BLOCKER = "model_not_validated"
+BOUND_EVIDENCE_WARNING_BLOCKER = "bound_evidence_warning"
 
 _PLACEHOLDER_BASELINE_SOURCES = {
     "reference_latency",
@@ -277,6 +284,25 @@ def _official_score_blockers(
         blockers.append(MISSING_AGGREGATION_POLICY_BLOCKER)
     if score.score is None or not math.isfinite(score.score):
         blockers.append(MISSING_SCORE_BLOCKER)
+    eligibility = score.bound_eligibility
+    if eligibility is None:
+        blockers.append(MISSING_BOUND_ELIGIBILITY_BLOCKER)
+    else:
+        if eligibility.amd_sol_status != "scored":
+            blockers.append(AMD_SOL_NOT_SCORED_BLOCKER)
+        if eligibility.solar_status != "scored":
+            blockers.append(SOLAR_NOT_SCORED_BLOCKER)
+        if eligibility.hardware_profile_state != "measured":
+            blockers.append(UNSUPPORTED_HARDWARE_PROFILE_BLOCKER)
+        if eligibility.hardware_validation_status != "validated":
+            blockers.append(HARDWARE_NOT_VALIDATED_BLOCKER)
+        if eligibility.model_validation_status != "validated":
+            blockers.append(MODEL_NOT_VALIDATED_BLOCKER)
+        if any(
+            _authority_disqualifying_warning(warning)
+            for warning in eligibility.warnings
+        ):
+            blockers.append(BOUND_EVIDENCE_WARNING_BLOCKER)
     if not _is_positive_finite(score.measured_latency_ms):
         blockers.append(MISSING_MEASURED_LATENCY_BLOCKER)
     if not _is_positive_finite(score.sol_bound_ms):
@@ -308,6 +334,12 @@ def _is_positive_finite(value: float | None) -> bool:
     False, letting degenerate latencies through to the score and the mean.
     """
     return value is not None and math.isfinite(value) and value > 0.0
+
+
+def _authority_disqualifying_warning(warning: str) -> bool:
+    """Warnings that prove an inexact/degraded bound is not authoritative."""
+    normalized = warning.lower()
+    return any(token in normalized for token in ("degraded", "inexact", "unsupported"))
 
 
 def _normalize_policy(aggregation_policy: str | None) -> str | None:

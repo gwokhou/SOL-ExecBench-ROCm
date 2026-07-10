@@ -10,6 +10,7 @@ from sol_execbench.core.scoring.amd_sol.v2 import AmdSolBoundV2Artifact
 from sol_execbench.core.scoring.amd_score.models import (
     AMD_SCORE_CLAIM_LEVEL,
     AmdNativeScore,
+    BoundEligibilityEvidence,
 )
 from sol_execbench.core.scoring.amd_score.warnings import (
     INCOMPLETE_EVIDENCE_WARNING,
@@ -93,6 +94,40 @@ def score_amd_native_workload(
         baseline_source=baseline_source,
         evidence_refs=refs,
         derived_evidence_refs=dict(derived_evidence_refs or {}),
+        bound_eligibility=_bound_eligibility(artifact, solar_aggregate),
+    )
+
+
+def _bound_eligibility(
+    artifact: AmdSolBoundArtifact | AmdSolBoundV2Artifact,
+    solar_aggregate: SolarScoreGuard | None,
+) -> BoundEligibilityEvidence:
+    """Capture the exact inputs of the authority gate with the score."""
+    if isinstance(artifact, AmdSolBoundV2Artifact):
+        amd_sol_status = artifact.aggregate_bound.status
+        hardware_profile_state = (
+            "unknown"
+            if any("hardware_profile" in warning for warning in artifact.warnings)
+            else "measured"
+            if artifact.coverage_summary.worst_confidence.value == "supported"
+            else "unknown"
+        )
+        artifact_warnings = artifact.warnings
+    else:
+        # v1 scalar models cannot prove exact-profile eligibility.
+        amd_sol_status = "scored"
+        hardware_profile_state = "unknown"
+        artifact_warnings = tuple(warnings_for_artifact(artifact))
+    solar_status = solar_aggregate.status if solar_aggregate is not None else "unknown"
+    solar_warnings = solar_aggregate.warnings if solar_aggregate is not None else ()
+    hardware = artifact.hardware_model
+    return BoundEligibilityEvidence(
+        amd_sol_status=amd_sol_status,
+        solar_status=solar_status,
+        hardware_profile_state=hardware_profile_state,
+        hardware_validation_status=hardware.hardware_validation_status.value,
+        model_validation_status=hardware.model_validation_status.value,
+        warnings=tuple(unique(list(artifact_warnings) + list(solar_warnings))),
     )
 
 
@@ -109,7 +144,9 @@ def has_complete_numeric_inputs(
         and baseline_latency_ms is not None
         and baseline_latency_ms > 0.0
         and sol_bound_ms is not None
-        and sol_bound_ms > 0.0
+        # A zero lower bound is numerically complete diagnostic evidence.  The
+        # official gate remains stricter and rejects it as non-authoritative.
+        and sol_bound_ms >= 0.0
     )
 
 

@@ -19,6 +19,33 @@ AMD_SCORE_CLAIM_LEVEL = "amd-native-derived"
 
 
 @dataclass(frozen=True)
+class BoundEligibilityEvidence:
+    """Bound provenance required before a derived score may be authoritative.
+
+    This deliberately records states rather than re-interpreting human-facing
+    warnings at the official-score boundary.  Older serialized scores have no
+    such evidence and are therefore diagnostic-only.
+    """
+
+    amd_sol_status: str
+    solar_status: str
+    hardware_profile_state: str
+    hardware_validation_status: str
+    model_validation_status: str
+    warnings: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "amd_sol_status": self.amd_sol_status,
+            "solar_status": self.solar_status,
+            "hardware_profile_state": self.hardware_profile_state,
+            "hardware_validation_status": self.hardware_validation_status,
+            "model_validation_status": self.model_validation_status,
+            "warnings": list(self.warnings),
+        }
+
+
+@dataclass(frozen=True)
 class AmdNativeScore:
     """Derived AMD-native score for one workload."""
 
@@ -33,6 +60,7 @@ class AmdNativeScore:
     baseline_source: str
     evidence_refs: dict[str, str] = field(default_factory=dict)
     derived_evidence_refs: dict[str, str] = field(default_factory=dict)
+    bound_eligibility: BoundEligibilityEvidence | None = None
 
     @property
     def supported(self) -> bool:
@@ -53,6 +81,11 @@ class AmdNativeScore:
             "supported": self.supported,
             "evidence_refs": dict(self.evidence_refs),
             "derived_evidence_refs": dict(self.derived_evidence_refs),
+            "bound_eligibility": (
+                self.bound_eligibility.to_dict()
+                if self.bound_eligibility is not None
+                else None
+            ),
         }
 
 
@@ -133,6 +166,36 @@ def _str_dict(value: Any) -> dict[str, str]:
     return {str(key): str(val) for key, val in value.items()}
 
 
+def _bound_eligibility(value: Any) -> BoundEligibilityEvidence | None:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise ValueError("bound_eligibility must be an object or null")
+    required = {
+        "amd_sol_status",
+        "solar_status",
+        "hardware_profile_state",
+        "hardware_validation_status",
+        "model_validation_status",
+        "warnings",
+    }
+    if set(value) != required or not isinstance(value["warnings"], list):
+        raise ValueError("bound_eligibility has invalid fields")
+    return BoundEligibilityEvidence(
+        *(
+            str(value[key])
+            for key in (
+                "amd_sol_status",
+                "solar_status",
+                "hardware_profile_state",
+                "hardware_validation_status",
+                "model_validation_status",
+            )
+        ),
+        tuple(str(warning) for warning in value["warnings"]),
+    )
+
+
 def amd_native_score_from_dict(payload: Mapping[str, Any]) -> AmdNativeScore:
     """Reconstruct an :class:`AmdNativeScore` from its ``to_dict()`` payload.
 
@@ -154,6 +217,7 @@ def amd_native_score_from_dict(payload: Mapping[str, Any]) -> AmdNativeScore:
         baseline_source=str(payload.get("baseline_source", "missing")),
         evidence_refs=_str_dict(payload.get("evidence_refs")),
         derived_evidence_refs=_str_dict(payload.get("derived_evidence_refs")),
+        bound_eligibility=_bound_eligibility(payload.get("bound_eligibility")),
     )
 
 

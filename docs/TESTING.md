@@ -457,3 +457,8 @@ uv run pytest tests/examples/test_examples.py -k consistency
 The remote workflow excludes tests that need live ROCm GPU execution or Docker
 runtime passthrough. Run those locally on suitable hardware before merging
 hardware-sensitive changes.
+# Calibration evidence
+
+Hardware calibration is diagnostic by default.  The marker-gated live test requires
+RDNA4 hardware; absent profiler data must remain `unknown`, never a substituted peak.
+Run it with `uv run pytest tests/sol_execbench/core/scoring/hardware_calibration/test_live_calibration.py -m requires_rdna4 -n 0 -v`.

@@ -7,6 +7,7 @@ import sol_execbench.core.scoring.amd_score as amd_score
 from sol_execbench.core.scoring.amd_score import (
     AMD_SCORE_CLAIM_LEVEL,
     AmdNativeScore,
+    BoundEligibilityEvidence,
 )
 from sol_execbench.core.evidence.baseline_coverage import (
     BASELINE_HARDWARE_MISMATCH_CODE,
@@ -60,6 +61,14 @@ def _amd_score(
             "hardware_model": "hardware-model.json#gfx1200",
         },
         derived_evidence_refs={"profile_summary": "profile_summary.json"},
+        bound_eligibility=BoundEligibilityEvidence(
+            amd_sol_status="scored",
+            solar_status="scored",
+            hardware_profile_state="measured",
+            hardware_validation_status="validated",
+            model_validation_status="validated",
+            warnings=(),
+        ),
     )
 
 
@@ -86,6 +95,43 @@ def test_official_score_accepts_complete_scoring_baseline_input():
         payload["input_refs"]["amd_native_score"] == "amd_native_score.json#workload-1"
     )
     assert payload["derived_input_refs"] == {"profile_summary": "profile_summary.json"}
+
+
+def test_legacy_score_without_bound_eligibility_cannot_be_official():
+    legacy = _amd_score()
+    legacy = AmdNativeScore(**{**legacy.__dict__, "bound_eligibility": None})
+
+    evidence = official_score_from_amd_native_score(
+        legacy, aggregation_policy="mean of per-workload SOL scores"
+    )
+
+    assert evidence.score is None
+    assert "missing_bound_eligibility" in evidence.blocker_reason_codes
+
+
+def test_inexact_or_degraded_bound_evidence_cannot_be_official():
+    score = _amd_score()
+    blocked = AmdNativeScore(
+        **{
+            **score.__dict__,
+            "bound_eligibility": BoundEligibilityEvidence(
+                amd_sol_status="degraded",
+                solar_status="scored",
+                hardware_profile_state="measured",
+                hardware_validation_status="validated",
+                model_validation_status="validated",
+                warnings=("inexact hardware estimate",),
+            ),
+        }
+    )
+
+    evidence = official_score_from_amd_native_score(
+        blocked, aggregation_policy="mean of per-workload SOL scores"
+    )
+
+    assert evidence.score is None
+    assert "amd_sol_not_scored" in evidence.blocker_reason_codes
+    assert "bound_evidence_warning" in evidence.blocker_reason_codes
 
 
 def test_reference_latency_baseline_blocks_official_score():
