@@ -4,14 +4,15 @@
   "wavefront_size": 64,
   "vgpr_limit": 256,
   "sgpr_limit": 104,
-  "waves_per_cu_max": null,
+  "waves_per_cu_max": 40,
   "lds_per_workgroup_bytes": 65536,
-  "register_file_per_cu_bytes": 65536,
+  "register_file_per_cu_bytes": 524288,
   "supported_dtypes": ["fp64", "fp32", "fp16", "bf16", "int8", "int32"],
   "mfma_variants": ["mfma"],
-  "source": "AMD CDNA3 ISA Reference Guide (MI300); mirrored via opengpu/rocm-systems",
+  "source": "AMD CDNA3 ISA Reference Guide (MI300) + HIP hardware implementation docs; register_file_per_cu_bytes is the VGPR+AGPR combined file (up to 512 KiB per CU), waves_per_cu_max is the 4 SIMD x 10 wave-slot ceiling; mirrored via opengpu/rocm-systems",
   "confidence": "inexact",
   "evidence_refs": [
-    "https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/instruction-set-architectures/amd-instinct-mi300-cdna3-instruction-set-architecture.pdf"
+    "https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/instruction-set-architectures/amd-instinct-mi300-cdna3-instruction-set-architecture.pdf",
+    "https://rocm.docs.amd.com/projects/HIP/en/latest/understand/hardware_implementation.html"
   ]
 }
