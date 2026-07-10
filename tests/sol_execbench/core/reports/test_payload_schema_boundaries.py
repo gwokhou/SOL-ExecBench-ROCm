@@ -19,6 +19,7 @@ RAW_PAYLOAD_ARTIFACT_BOUNDARIES = {
     "sol_execbench.core.bench.output_allocation",
     "sol_execbench.core.bench.profile_summary.artifacts",
     "sol_execbench.core.bench.static_kernel.artifacts",
+    "sol_execbench.core.bench.static_kernel.amdgpu_metadata",
     "sol_execbench.core.dataset.low_precision",
     "sol_execbench.core.dataset.migration.artifacts",
     "sol_execbench.core.scoring.amd_bound_graph.fx_helpers",
