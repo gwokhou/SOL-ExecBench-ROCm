@@ -34,7 +34,12 @@ def _bound_for_estimate(
         else None
     )
     memory_profile = (
-        hardware_model.resolve_memory(estimate.memory_access)
+        hardware_model.resolve_memory(
+            estimate.memory_access,
+            estimate.input_dtype or "",
+            estimate.output_dtype or "",
+            estimate.memory_path or "",
+        )
         if estimate.memory_access
         else None
     )
@@ -66,7 +71,7 @@ def _bound_for_estimate(
         if confidence == EstimateConfidence.SUPPORTED:
             confidence = EstimateConfidence.INEXACT
     for profile in (compute_profile, memory_profile):
-        if profile is not None and profile.confidence == EstimateConfidence.INEXACT:
+        if profile is not None:
             confidence = _worse_confidence(confidence, profile.confidence)
     return AmdSolV2OpBound(
         node_id=estimate.node_id,

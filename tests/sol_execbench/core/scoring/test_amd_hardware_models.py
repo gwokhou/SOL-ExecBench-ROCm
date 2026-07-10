@@ -191,4 +191,6 @@ def test_v3_resolves_exact_bf16_mfma_compute_and_memory_profiles():
     )
 
     assert model.resolve_compute("matrix", "bf16", "bf16", "mfma").value == 100.0
-    assert model.resolve_memory("stream_copy").value == 1000.0
+    assert (
+        model.resolve_memory("stream_copy", "bf16", "bf16", "portable").value == 1000.0
+    )

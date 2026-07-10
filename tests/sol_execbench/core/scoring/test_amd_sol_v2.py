@@ -327,7 +327,7 @@ def test_v1_artifact_does_not_emit_v2_only_fields():
         assert v2_only not in payload
 
 
-def test_v3_fp32_profiles_do_not_service_bf16_matrix_bounds():
+def test_v3_fp32_memory_profile_does_not_service_bf16_matrix_bounds():
     definition = make_definition(
         name="bf16_matmul",
         axes={
@@ -354,11 +354,11 @@ def test_v3_fp32_profiles_do_not_service_bf16_matrix_bounds():
             "evidence_refs": ["fixture"],
             "compute_profiles": [
                 {
-                    "key": "compute.matrix.fp32.fp32.mfma",
+                    "key": "compute.matrix.bf16.bf16.mfma",
                     "state": "measured",
                     "value": 100.0,
                     "confidence": "supported",
-                    "evidence_ref": "fp32",
+                    "evidence_ref": "bf16",
                 }
             ],
             "memory_profiles": [
@@ -380,5 +380,48 @@ def test_v3_fp32_profiles_do_not_service_bf16_matrix_bounds():
     )
 
     assert artifact.aggregate_bound.status == "degraded"
+    assert artifact.op_bounds[0].compute_bound_ms > 0.0
+    assert artifact.op_bounds[0].memory_bound_ms == 0.0
+    assert hardware.resolve_memory("stream_copy", "bf16", "bf16", "portable") is None
     assert "unknown_hardware_profile" in artifact.op_bounds[0].estimate_warnings
     assert "unknown_hardware_profile" in artifact.warnings
+
+
+def test_unsupported_profile_confidence_cannot_produce_supported_bound():
+    hardware = amd_hardware_model_from_dict(
+        {
+            "schema_version": "sol_execbench.amd_hardware_model.v3",
+            "architecture": "gfx942",
+            "clock_assumptions": ["locked"],
+            "source": "fixture",
+            "confidence": "supported",
+            "hardware_validation_status": "validated",
+            "model_validation_status": "validated",
+            "evidence_refs": ["fixture"],
+            "compute_profiles": [
+                {
+                    "key": "compute.matrix.fp32.fp32.mfma",
+                    "state": "measured",
+                    "value": 100.0,
+                    "confidence": "unsupported",
+                    "evidence_ref": "unsupported-compute",
+                }
+            ],
+            "memory_profiles": [
+                {
+                    "key": "memory.stream_copy.fp32.fp32.portable",
+                    "state": "measured",
+                    "value": 1000.0,
+                    "confidence": "supported",
+                    "evidence_ref": "memory",
+                }
+            ],
+        }
+    )
+
+    artifact = build_amd_sol_bound_v2_artifact(
+        _matmul_definition(), _matmul_workload(), hardware
+    )
+
+    assert artifact.op_bounds[0].confidence == EstimateConfidence.UNSUPPORTED
+    assert artifact.aggregate_bound.status == "unscored"
