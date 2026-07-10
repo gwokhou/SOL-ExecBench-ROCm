@@ -29,6 +29,20 @@ SOL_EXECBENCH_CONTRACT_SCHEMA_VERSION = "sol_execbench.evaluator_contract.v2"
 SOL_EXECBENCH_CONTRACT_VERSION = "1.0"
 SOL_EXECBENCH_RELEASE = "v1.43"
 
+# Confirmed-evidence blocker reason-code vocabulary advertised on the contract
+# (GATE-01 D-03). Mirrored as literals so the GPU-free contract module does not
+# import the scoring package; pinned equal to official_score's constants by a
+# consistency test in tests/sol_execbench/test_contract.py.
+CONFIRMED_EVIDENCE_BLOCKERS: tuple[str, ...] = (
+    "missing_score",
+    "missing_measured_latency",
+    "missing_baseline",
+    "placeholder_baseline",
+    "missing_sol_bound",
+    "missing_aggregation_policy",
+    "baseline_coverage_failed",
+)
+
 
 class EvaluatorContract(BaseModelWithDocstrings):
     """SOL-owned evaluator and baseline export compatibility contract."""
@@ -61,6 +75,8 @@ class EvaluatorContract(BaseModelWithDocstrings):
     """Metadata fields consumers can persist for compatibility diagnostics."""
     boundaries: list[dict[str, object]]
     """Structured authority boundaries that keep benchmark truth in SOL."""
+    confirmed_evidence_blockers: list[str]
+    """Stable blocker reason-code vocabulary SOL can emit for confirmed-evidence gates."""
 
     def to_dict(self) -> dict[str, Any]:
         """Return the JSON-compatible contract payload."""
@@ -80,6 +96,8 @@ def build_evaluator_contract() -> EvaluatorContract:
             "trace.scoring": "always",
             "baseline.measured_export": "always",
             "baseline.scoring_artifact": "always",
+            "official_score.evidence": "confirmed",
+            "measured_baseline.coverage": "confirmed",
             "compatibility.metadata": "always",
             "failure_categories": "always",
             "runtime.evidence": "optional",
@@ -196,10 +214,13 @@ def build_evaluator_contract() -> EvaluatorContract:
             {"owner": "sol", "scope": "correctness", "immutable": True},
             {"owner": "sol", "scope": "timing", "immutable": True},
             {"owner": "sol", "scope": "scoring", "immutable": True},
+            {"owner": "sol", "scope": "official_score", "authority": "confirmed"},
+            {"owner": "sol", "scope": "measured_baseline", "authority": "confirmed"},
             {"owner": "sol", "scope": "agent_feedback", "authority": "diagnostic"},
             {"owner": "sol", "scope": "profile_summary", "authority": "diagnostic"},
             {"owner": "sol", "scope": "environment_budget", "authority": "diagnostic"},
             {"owner": "sol", "scope": "static_resource_footprint", "authority": "diagnostic"},
             {"owner": "sol", "scope": "decision", "authority": "diagnostic"},
         ],
+        confirmed_evidence_blockers=list(CONFIRMED_EVIDENCE_BLOCKERS),
     )
