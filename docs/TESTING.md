@@ -462,3 +462,15 @@ hardware-sensitive changes.
 Hardware calibration is diagnostic by default.  The marker-gated live test requires
 RDNA4 hardware; absent profiler data must remain `unknown`, never a substituted peak.
 Run it with `uv run pytest tests/sol_execbench/core/scoring/hardware_calibration/test_live_calibration.py -m requires_rdna4 -n 0 -v`.
+
+## BF16 matrix-probe calibration
+
+Run the focused calibration and hardware-model CLI suite with:
+
+```bash
+uv run pytest tests/sol_execbench/core/scoring/hardware_calibration \
+  tests/sol_execbench/cli/commands/test_hardware_model_cli.py -n 0 -v
+```
+
+In a live calibration report, `unavailable` means an explicit architecture-aware capability check proved that the exact path is unsupported.
+`unknown` means support could not be determined reliably; it includes compiler, runtime, output, correctness, and stability failures.

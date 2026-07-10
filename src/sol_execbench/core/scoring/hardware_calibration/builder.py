@@ -113,7 +113,9 @@ def run_calibration(request: CalibrationRequest) -> HardwareCalibrationArtifact:
     locked = False
     observations: dict[str, bool | None] = {"pre": None, "during": None, "post": None}
     clock_reason: str | None = None
-    probe = request.hip_probe or default_hip_probe()
+    probe = request.hip_probe or default_hip_probe(
+        architecture=request.environment.architecture
+    )
     try:
         if controller is None:
             clock_reason = "clock_lock_adapter_unavailable"

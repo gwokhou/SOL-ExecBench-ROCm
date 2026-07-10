@@ -30,6 +30,64 @@ def _probe() -> HipProbe:
     )
 
 
+def _probe_with_states(states: dict[str, str]) -> HipProbe:
+    """Return a probe that overrides evidence states for selected candidates."""
+    return HipProbe(
+        compile_candidate=lambda _: "passed",
+        execute_candidate=lambda key: ProbeExecution(
+            (10.0,) * 7, "TFLOP/s" if key.kind == "compute" else "GB/s"
+        ),
+        check_correctness=lambda key, _: states.get(key.value, "measured")
+        == "measured",
+        check_stability=lambda _, __: True,
+    )
+
+
+def _locked_clock():
+    class Clock:
+        locked = False
+
+        def lock(self) -> bool:
+            self.locked = True
+            return True
+
+        def unlock(self) -> None:
+            self.locked = False
+
+        def observe_locked(self) -> bool:
+            return self.locked
+
+    return Clock()
+
+
+def test_rdna4_validates_when_real_wmma_candidate_is_measured() -> None:
+    artifact = run_calibration(
+        CalibrationRequest(
+            environment=GpuEnvironment(0, "gfx1200"),
+            hip_probe=_probe_with_states(
+                {"compute.matrix.bf16.bf16.wmma": "measured"}
+            ),
+            clock_controller=_locked_clock(),
+        )
+    )
+
+    assert artifact.validation_status == "validated"
+
+
+def test_rdna4_remains_provisional_when_wmma_is_unknown() -> None:
+    artifact = run_calibration(
+        CalibrationRequest(
+            environment=GpuEnvironment(0, "gfx1200"),
+            hip_probe=_probe_with_states(
+                {"compute.matrix.bf16.bf16.wmma": "unknown"}
+            ),
+            clock_controller=_locked_clock(),
+        )
+    )
+
+    assert artifact.validation_status == "provisional"
+
+
 def test_missing_clock_adapter_is_collected_but_provisional() -> None:
     artifact = run_calibration(
         CalibrationRequest(
@@ -47,7 +105,7 @@ def test_request_without_injected_probe_uses_default_backend(monkeypatch) -> Non
     probe = _probe()
     monkeypatch.setattr(
         "sol_execbench.core.scoring.hardware_calibration.builder.default_hip_probe",
-        lambda: probe,
+        lambda **_: probe,
     )
 
     artifact = run_calibration(

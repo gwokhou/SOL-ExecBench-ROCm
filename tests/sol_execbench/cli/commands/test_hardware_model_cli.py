@@ -84,6 +84,13 @@ def test_build_profile_evidence_ref_binds_calibration_checksum(
                 "TFLOP/s",
                 (5.0,) * 7,
             ),
+            CalibrationCandidate(
+                "compute.matrix.bf16.bf16.wmma",
+                "measured",
+                10.0,
+                "TFLOP/s",
+                (10.0,) * 7,
+            ),
         ),
         collection_status="collected",
         validation_status="validated",
@@ -112,6 +119,70 @@ def test_build_profile_evidence_ref_binds_calibration_checksum(
         f"sha256:{artifact.payload_sha256}"
         in model["compute_profiles"][0]["evidence_ref"]
     )
+
+
+def test_build_rejects_measured_mismatched_matrix_evidence(
+    tmp_path, monkeypatch
+) -> None:
+    from sol_execbench.cli.commands import hardware_model
+    from sol_execbench.core.scoring.hardware_calibration.environment import (
+        GpuEnvironment,
+    )
+
+    artifact = HardwareCalibrationArtifact(
+        generated_at="2026-07-10T00:00:00Z",
+        candidates=(
+            CalibrationCandidate(
+                "compute.vector.fp32.fp32.portable",
+                "measured",
+                5.0,
+                "TFLOP/s",
+                (5.0,) * 7,
+            ),
+            CalibrationCandidate(
+                "compute.matrix.bf16.bf16.mfma",
+                "measured",
+                10.0,
+                "TFLOP/s",
+                (10.0,) * 7,
+            ),
+        ),
+        collection_status="collected",
+        validation_status="validated",
+        metadata={
+            "device": 0,
+            "gpu_uuid": "GPU-a",
+            "architecture": "gfx1200",
+            "rocm_version": "7.1.1",
+            "adapter_policy": {"requires_clock_lock": True},
+            "clock_observations": {"pre": False, "during": True, "post": False},
+        },
+    )
+    calibration_path = tmp_path / "calibration.json"
+    output = tmp_path / "model.json"
+    calibration_path.write_text(json.dumps(artifact.to_dict()))
+    monkeypatch.setattr(
+        hardware_model,
+        "discover_gpu",
+        lambda _: GpuEnvironment(0, "gfx1200", uuid="GPU-a", rocm_version="7.1.1"),
+    )
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "hardware-model",
+            "build",
+            "--calibration",
+            str(calibration_path),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code != 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["status"] == "rejected"
+    assert "compute.matrix.bf16.bf16.wmma" in payload["reason"]
 
 
 def test_calibrate_writes_rejected_artifact_before_nonzero_exit(tmp_path) -> None:
