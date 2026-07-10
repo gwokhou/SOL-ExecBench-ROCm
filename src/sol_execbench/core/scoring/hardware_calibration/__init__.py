@@ -11,6 +11,7 @@ from sol_execbench.core.scoring.hardware_calibration.models import (
 )
 from sol_execbench.core.scoring.hardware_calibration.rocprof_compute import (
     ensure_profiler_environment,
+    parse_roofline_metrics,
     run_rocprof_compute_bench_only,
 )
 from sol_execbench.core.scoring.hardware_calibration.statistics import (
@@ -23,6 +24,7 @@ __all__ = [
     "HardwareCalibrationArtifact",
     "ensure_profiler_environment",
     "hardware_calibration_artifact_from_dict",
+    "parse_roofline_metrics",
     "run_rocprof_compute_bench_only",
     "select_conservative_value",
 ]
