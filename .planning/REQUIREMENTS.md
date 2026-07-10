@@ -44,25 +44,25 @@ ExecBench.
 
 ### Measured Baseline Evidence
 
-- [ ] **BASE-01**: SOL emits measured baseline evidence with trace pointer,
+- [x] **BASE-01**: SOL emits measured baseline evidence with trace pointer,
   hardware identity, ROCm version, SOL version, target identity, timing policy,
   workload coverage, and generation timestamp.
-- [ ] **BASE-02**: SOL validates measured baseline coverage against target
+- [x] **BASE-02**: SOL validates measured baseline coverage against target
   workloads and reports missing, stale, mismatched, or placeholder baseline
   blockers with stable reason codes.
-- [ ] **BASE-03**: SOL exposes measured baseline provenance separately from
+- [x] **BASE-03**: SOL exposes measured baseline provenance separately from
   scoring baseline artifacts so HIP can verify confirmed coverage without
   treating reference latency as official baseline evidence.
 
 ### HIP Cutover Evidence Package
 
-- [ ] **GATE-01**: SOL evaluator contract advertises confirmed benchmark
+- [x] **GATE-01**: SOL evaluator contract advertises confirmed benchmark
   evidence capabilities for official score, measured baseline, and profiler
   evidence while preserving existing diagnostic sidecar boundaries.
-- [ ] **GATE-02**: SOL provides HIP-facing fixtures and documentation for
+- [x] **GATE-02**: SOL provides HIP-facing fixtures and documentation for
   confirmed pass, missing score, missing baseline, placeholder baseline,
   profiler partial, and diagnostic-only sidecar cases.
-- [ ] **GATE-03**: HIP can remove `missing_score`, `missing_baseline`, and
+- [x] **GATE-03**: HIP can remove `missing_score`, `missing_baseline`, and
   `placeholder_baseline` blockers for valid SOL runs using only SOL-provided
   benchmark evidence.
 
@@ -105,12 +105,12 @@ ExecBench.
 | SCOR-01 | Phase 192 | Complete |
 | SCOR-02 | Phase 192 | Complete |
 | SCOR-03 | Phase 192 | Complete |
-| BASE-01 | Phase 193 | Pending |
-| BASE-02 | Phase 193 | Pending |
-| BASE-03 | Phase 193 | Pending |
-| GATE-01 | Phase 194 | Pending |
-| GATE-02 | Phase 194 | Pending |
-| GATE-03 | Phase 194 | Pending |
+| BASE-01 | Phase 193 | Complete |
+| BASE-02 | Phase 193 | Complete |
+| BASE-03 | Phase 193 | Complete |
+| GATE-01 | Phase 194 | Complete |
+| GATE-02 | Phase 194 | Complete |
+| GATE-03 | Phase 194 | Complete |
 
 **Coverage:**
 - v1.38 requirements: 15 total
