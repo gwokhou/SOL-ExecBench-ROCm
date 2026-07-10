@@ -27,6 +27,13 @@ and only when `roc-objdump` is installed (it is the footprint source). PyTorch
 and Triton solutions, or HIP/C++ solutions without `roc-objdump`, produce no
 footprints, so no decision sidecar is written for them.
 
+> **ROCm 7.x footprint path:** `roc-objdump` is absent on ROCm 7.x and its
+> `llvm-objdump` does not support `--resource-usage`. The static-evidence path
+> therefore reads footprints directly from each code object's
+> `NT_AMDGPU_METADATA` ELF note (msgpack-encoded, the amdgcn ABI standard —
+> covers CDNA and RDNA) via a native pure-Python parser, with `roc-objdump`
+> retained as a fallback where available. No external profiling tool needed.
+
 ## Output Files
 
 | Artifact | Location |

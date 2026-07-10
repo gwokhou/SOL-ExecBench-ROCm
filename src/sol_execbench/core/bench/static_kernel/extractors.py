@@ -12,6 +12,9 @@ from pathlib import Path
 from sol_execbench.core.bench.static_kernel.evidence_builders import (
     build_static_kernel_evidence_sidecar,
 )
+from sol_execbench.core.bench.static_kernel.amdgpu_metadata import (
+    extract_amdgpu_footprints,
+)
 from sol_execbench.core.bench.static_kernel.footprint_parsers import (
     parse_roc_objdump_resource_usage,
 )
@@ -221,6 +224,7 @@ def _collect_resource_footprints(
         artifact_path = _artifact_persisted_path(artifact, sidecar_base)
         if artifact_path is None or not artifact_path.is_file():
             continue
+        covered_footprint = False
         for tool_id in _FOOTPRINT_EXTRACTOR_TOOL_IDS:
             route_decision = _route_static_tool(
                 tool_id=tool_id,
@@ -261,4 +265,17 @@ def _collect_resource_footprints(
                     )
                     if footprint is not None:
                         footprints.append(footprint)
+                        covered_footprint = True
+        if not covered_footprint:
+            # ROCm 7.x fallback: read AMDGPU code-object metadata directly
+            # (roc-objdump is absent). Covers CDNA + RDNA (amdgcn ABI).
+            try:
+                footprints.extend(
+                    extract_amdgpu_footprints(
+                        artifact_path.read_bytes(),
+                        artifact_id=artifact.artifact_id,
+                    )
+                )
+            except OSError:
+                pass
     return footprints
