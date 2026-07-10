@@ -156,7 +156,10 @@ def _build(calibration_path: Path, output: Path, max_age_hours: float | None) ->
             "state": candidate.state,
             "value": candidate.value,
             "confidence": "supported",
-            "evidence_ref": f"{calibration_path}#{candidate.key}",
+            "evidence_ref": (
+                f"{calibration_path}#sha256:{calibration.payload_sha256}:"
+                f"{candidate.key}"
+            ),
         }
         for candidate in calibration.candidates
     ]

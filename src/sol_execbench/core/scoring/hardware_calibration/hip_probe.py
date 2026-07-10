@@ -154,6 +154,15 @@ class HipCommandBackend:
         self._executables: dict[CalibrationProfileKey, Path] = {}
 
     def compile(self, key: CalibrationProfileKey) -> str:
+        # The bundled source implements only FP32 vector/copy semantics.  Never
+        # label a matrix or reduced-precision key as measured until a matching
+        # instruction/dtype implementation exists.
+        if (
+            key.input_dtype != "fp32"
+            or key.output_dtype != "fp32"
+            or key.operation not in {"vector", "stream_copy"}
+        ):
+            return "unsupported"
         if self.hipcc is None:
             return "missing"
         self.workspace.mkdir(parents=True, exist_ok=True)

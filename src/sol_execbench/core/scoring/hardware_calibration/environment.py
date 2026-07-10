@@ -100,9 +100,7 @@ def _adapter(family: str, *, supports_clock_lock: bool = False) -> ArchitectureA
             CalibrationProfileKey("compute", "vector", "fp32", "fp32", family),
             # These are declarations, not claims: the HIP probe marks a path
             # unavailable or unknown if the active toolchain cannot execute it.
-            CalibrationProfileKey(
-                "compute", "matrix", "bf16", "bf16", f"{family}_mfma"
-            ),
+            CalibrationProfileKey("compute", "matrix", "bf16", "bf16", "mfma"),
             CalibrationProfileKey("memory", "stream_copy", "fp32", "fp32", family),
         ),
     )

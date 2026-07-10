@@ -65,3 +65,15 @@ def test_default_backend_hipcc_failure_is_unknown(tmp_path) -> None:
 
     assert candidate.state == "unknown"
     assert candidate.reason_code == "hip_probe_compile_failed"
+
+
+def test_production_backend_never_measures_bf16_mfma_with_fp32_source(tmp_path) -> None:
+    probe = default_hip_probe(
+        HipCommandBackend(workspace=tmp_path, hipcc="/missing/hipcc")
+    )
+    key = CalibrationProfileKey("compute", "matrix", "bf16", "bf16", "mfma")
+
+    candidate = probe.measure(key)
+
+    assert candidate.state == "unavailable"
+    assert candidate.reason_code == "hip_probe_explicitly_unsupported"

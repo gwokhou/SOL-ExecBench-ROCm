@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import asdict, dataclass
 from enum import Enum
 from importlib import resources
@@ -43,7 +44,11 @@ class HardwareProfile:
                 "hardware profile state must be measured, unavailable, or unknown"
             )
         if self.state == "measured":
-            if self.value is None or float(self.value) <= 0.0:
+            if (
+                self.value is None
+                or not math.isfinite(float(self.value))
+                or float(self.value) <= 0.0
+            ):
                 raise ValueError("measured hardware profile value must be positive")
             object.__setattr__(self, "value", float(self.value))
         elif self.value is not None:
@@ -135,7 +140,7 @@ def _positive(payload: dict[str, Any], key: str, source: str | None) -> float:
         raise ValueError(
             f"{source or 'hardware model'} field '{key}' must be numeric"
         ) from exc
-    if value <= 0.0:
+    if not math.isfinite(value) or value <= 0.0:
         raise ValueError(
             f"{source or 'hardware model'} field '{key}' must be a positive number"
         )
