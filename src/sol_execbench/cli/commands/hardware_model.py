@@ -102,11 +102,13 @@ def _calibrate(
     except (RuntimeError, ValueError) as exc:
         _rejected(output, str(exc))
         raise click.ClickException(str(exc)) from exc
-    _write_json(output, artifact.to_dict())
     if artifact.validation_status != "validated":
-        raise click.ClickException(
+        reason = (
             "calibration is diagnostic only; validation provenance is not confirmed"
         )
+        _rejected(output, reason)
+        raise click.ClickException(reason)
+    _write_json(output, artifact.to_dict())
 
 
 @_hardware_model_cli.command("build")
