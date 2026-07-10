@@ -84,6 +84,7 @@ def test_extract_footprint_from_minimal_metadata():
     assert fp.wavefront_size == 32
     assert fp.spill_detected is True  # scratch > 0
     assert fp.source_tool == "amdgpu-metadata"
+    assert fp.identity is not None
     assert fp.identity.extractor_tool_id == "amdgpu-metadata"
 
 

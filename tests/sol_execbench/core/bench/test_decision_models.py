@@ -20,8 +20,8 @@ from sol_execbench.core.bench.decision.decision_models import (
 )
 
 
-def _sidecar(**overrides):
-    base = dict(
+def _sidecar(**overrides) -> DecisionSidecar:
+    sidecar = DecisionSidecar(
         status=DecisionStatus.AVAILABLE,
         reason_code=DecisionReasonCode.DECISION_RENDERED,
         identity=DecisionIdentity(
@@ -29,8 +29,9 @@ def _sidecar(**overrides):
         ),
         summary=DecisionSummary(hint_count=1, footprint_count=1, architecture="gfx942"),
     )
-    base.update(overrides)
-    return DecisionSidecar(**base)
+    if overrides:
+        return sidecar.model_copy(update=overrides)
+    return sidecar
 
 
 def test_schema_version_is_v1():
@@ -60,7 +61,9 @@ def test_sidecar_round_trip():
 
 def test_sidecar_rejects_unknown_field():
     with pytest.raises(Exception):
-        DecisionIdentity(generated_at="x", sol_version="y", bogus=1)
+        DecisionIdentity.model_validate(
+            {"generated_at": "x", "sol_version": "y", "bogus": 1}
+        )
 
 
 def test_sidecar_is_frozen():

@@ -9,6 +9,8 @@ import json
 from pathlib import Path
 
 from sol_execbench.core.bench.static_kernel.evidence_models import (
+    StaticKernelEvidenceReasonCode,
+    StaticKernelEvidenceStatus,
     StaticKernelEvidenceSidecar,
     StaticResourceFootprint,
 )
@@ -105,8 +107,8 @@ def test_extractor_collects_footprint_without_downgrading_base_status(tmp_path):
     artifact = StaticKernelEvidenceArtifact(
         artifact_id="k0",
         artifact_type="code_object",
-        status="collected",
-        reason_code="static_evidence_collected",
+        status=StaticKernelEvidenceStatus.COLLECTED,
+        reason_code=StaticKernelEvidenceReasonCode.STATIC_EVIDENCE_COLLECTED,
         persisted_path=str(shared_object),
     )
     resource = (
@@ -157,8 +159,8 @@ def test_extractor_skips_footprint_when_roc_objdump_missing(tmp_path):
     artifact = StaticKernelEvidenceArtifact(
         artifact_id="k0",
         artifact_type="code_object",
-        status="collected",
-        reason_code="static_evidence_collected",
+        status=StaticKernelEvidenceStatus.COLLECTED,
+        reason_code=StaticKernelEvidenceReasonCode.STATIC_EVIDENCE_COLLECTED,
         persisted_path=str(shared_object),
     )
 

@@ -76,6 +76,7 @@ def test_decision_auto_writes_sidecar_with_matched_budget(tmp_path: Path) -> Non
         sol_version="v1.43",
     )
 
+    assert path is not None
     assert path == tmp_path / "trace.jsonl.decision.json"
     decision = json.loads(path.read_text(encoding="utf-8"))
     assert decision["schema_version"] == "sol_execbench.decision.v1"
