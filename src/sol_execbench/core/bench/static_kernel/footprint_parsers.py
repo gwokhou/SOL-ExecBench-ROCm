@@ -12,11 +12,15 @@ from sol_execbench.core.bench.static_kernel.evidence_models import (
     StaticResourceFootprintIdentity,
 )
 
-_VGPR = re.compile(r"NumVgprs:\s*(\d+)", re.IGNORECASE)
-_SGPR = re.compile(r"NumSgprs:\s*(\d+)", re.IGNORECASE)
-_SCRATCH = re.compile(r"ScratchSize:\s*(\d+)", re.IGNORECASE)
-_LDS = re.compile(r"LDS\w*Size:\s*(\d+)", re.IGNORECASE)
-_OCCUPANCY = re.compile(r"Occupancy:\s*(\d+)", re.IGNORECASE)
+# Anchored to line start (re.MULTILINE) with an optional leading `;` comment
+# marker so ``NumVgprs``/``NumSgprs`` never substring-match
+# ``TotalNumVgprs``/``TotalNumSgprs`` and only line-leading markers are read.
+_MARKER = r"(?m)^\s*;?\s*"
+_VGPR = re.compile(_MARKER + r"NumVgprs:\s*(\d+)", re.IGNORECASE)
+_SGPR = re.compile(_MARKER + r"(?:Total)?NumSgprs:\s*(\d+)", re.IGNORECASE)
+_SCRATCH = re.compile(_MARKER + r"ScratchSize:\s*(\d+)", re.IGNORECASE)
+_LDS = re.compile(_MARKER + r"LDS\w*Size:\s*(\d+)", re.IGNORECASE)
+_OCCUPANCY = re.compile(_MARKER + r"Occupancy:\s*(\d+)", re.IGNORECASE)
 
 
 def _first_int(text: str, pattern: re.Pattern[str]) -> int | None:

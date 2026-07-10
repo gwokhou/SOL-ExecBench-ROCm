@@ -8,8 +8,11 @@ Emits only the static-inferable Layer R subset (decision-modeling-research.md
 alignment, workgroup-size, and barrier limits require block-size or access
 pattern data the static footprint does not carry, so they stay deferred and are
 never speculated (unknown -> not emitted). Dynamic register allocation (RDNA4+)
-defeats static occupancy derivation, so it emits a single low-confidence note
-with an explicit limitation (research §6.4).
+defeats static occupancy derivation, so register/LDS pressure hints are
+disabled on such budgets (the vgpr/lds budget ratios no longer reflect real
+resource pressure) while deterministic spill signals are still derived — they
+need no occupancy budget. The limitation is recorded at the sidecar level
+(research §6.4).
 """
 
 from __future__ import annotations
@@ -108,12 +111,16 @@ def _make_hint(
 def _derive_for_footprint(
     footprint: StaticResourceFootprint,
     budget: ArchIsaBudget | None,
+    *,
+    pressure_derivable: bool = True,
 ) -> list[DecisionHint]:
     hints: list[DecisionHint] = []
     arch = budget.architecture if budget is not None else None
     occ_low = _occupancy_low(footprint, budget) if budget is not None else False
 
     # SPILL_DETECTED -- deterministic, highest confidence (research §8.3).
+    # Arch-agnostic: emitted even on dynamic-allocation budgets, since it does
+    # not depend on the occupancy budget.
     scratch = footprint.scratch_bytes
     if footprint.spill_detected is True or (scratch is not None and scratch > 0):
         size = f"{scratch} B" if scratch is not None else "unknown size"
@@ -128,7 +135,7 @@ def _derive_for_footprint(
             )
         )
 
-    if budget is None:
+    if budget is None or not pressure_derivable:
         return hints
 
     # REGISTER_PRESSURE_HIGH -- vgpr_limit is the architected addressing limit
@@ -191,22 +198,27 @@ def derive_decision_hints(
     """Derive Layer R decision hints from static footprints and an arch budget.
 
     Returns a flat list of hints (one footprint may yield several). Dynamic
-    register-allocation budgets emit a single low-confidence note per footprint
-    instead of a derived pressure signal. Never promotes unknown values: missing
-    fields simply produce no hint.
+    register-allocation budgets (RDNA4+) suppress the register/LDS pressure
+    signals (no reliable static occupancy budget to ratio against) but still
+    derive deterministic signals such as spill. Never promotes unknown values:
+    missing fields simply produce no hint.
     """
 
     if not footprints:
         return []
 
-    # Dynamic register allocation (RDNA4+) defeats static Layer R derivation.
-    # No bottleneck hint is emitted (there is no detected bottleneck); the
-    # limitation is recorded at the sidecar level by the builder, so we do not
-    # attach a misleading register_pressure_high label to a healthy kernel.
-    if budget is not None and budget.register_allocation_model == "dynamic":
-        return []
+    # Dynamic register allocation (RDNA4+) defeats static occupancy derivation:
+    # the vgpr/lds budget ratios no longer reflect real resource pressure, so
+    # pressure hints are suppressed. Deterministic, arch-agnostic signals
+    # (notably spill) are still derived. The limitation is recorded at the
+    # sidecar level by the builder.
+    pressure_derivable = not (
+        budget is not None and budget.register_allocation_model == "dynamic"
+    )
 
     hints: list[DecisionHint] = []
     for fp in footprints:
-        hints.extend(_derive_for_footprint(fp, budget))
+        hints.extend(
+            _derive_for_footprint(fp, budget, pressure_derivable=pressure_derivable)
+        )
     return hints

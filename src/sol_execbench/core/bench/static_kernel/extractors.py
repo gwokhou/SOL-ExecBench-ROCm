@@ -43,16 +43,50 @@ from sol_execbench.core.bench.static_kernel.extractor_routing import (
     tool_run_from_route_decision as _tool_run_from_route_decision,
     toolchain_artifact_type_for_static_artifact,
 )
+from sol_execbench.core.platform.environment import ProbeCompletedProcess
 from sol_execbench.core.platform.toolchain import (
     ProbeRunner,
     ToolchainCapability,
     ToolchainStatus,
     Which,
 )
+from sol_execbench.core.platform.toolchain.probes import run_probe
 
 
 _STATIC_EXTRACTOR_TOOL_IDS = ("llvm-objdump", "readelf")
 _FOOTPRINT_EXTRACTOR_TOOL_IDS = ("roc-objdump",)
+
+
+def _memoize_which(which: Which) -> Which:
+    """Cache ``which(binary)`` lookups; tool paths are invariant across a run."""
+
+    cache: dict[str, str | None] = {}
+
+    def resolved(binary: str) -> str | None:
+        if binary not in cache:
+            cache[binary] = which(binary)
+        return cache[binary]
+
+    return resolved
+
+
+def _memoize_probe_runner(runner: ProbeRunner | None) -> ProbeRunner:
+    """Cache probe results per command.
+
+    A tool's version probe (``<binary> --version``) is invariant across
+    artifacts in one run, so memoizing it avoids N redundant subprocess spawns
+    when the extractor loop routes the same tool per artifact.
+    """
+
+    cache: dict[tuple[str, ...], ProbeCompletedProcess] = {}
+
+    def resolved(command: list[str], timeout_seconds: float) -> ProbeCompletedProcess:
+        key = tuple(command)
+        if key not in cache:
+            cache[key] = (runner or run_probe)(command, timeout_seconds)
+        return cache[key]
+
+    return resolved
 
 
 def run_static_kernel_extractors(
@@ -75,6 +109,10 @@ def run_static_kernel_extractors(
         else evidence_root
     )
     effective_registry = list(registry) if registry is not None else None
+    # Probe results (tool paths + version probes) are invariant across artifacts
+    # in one run; memoize so the per-artifact loops do not re-probe each tool.
+    effective_which = _memoize_which(which)
+    effective_probe = _memoize_probe_runner(probe_runner)
     tool_runs: list[StaticKernelEvidenceToolRun] = []
     warnings: list[StaticKernelEvidenceWarning] = []
     output_artifacts: list[StaticKernelEvidenceArtifact] = []
@@ -118,8 +156,8 @@ def run_static_kernel_extractors(
                 tool_id=tool_id,
                 artifact_type=artifact_type,
                 registry=effective_registry,
-                runner=probe_runner,
-                which=which,
+                runner=effective_probe,
+                which=effective_which,
                 timeout_seconds=timeout_seconds,
             )
             if route_decision is None:
@@ -176,8 +214,8 @@ def run_static_kernel_extractors(
         artifacts=artifacts,
         sidecar_base=sidecar_base,
         evidence_root=evidence_root,
-        probe_runner=probe_runner,
-        which=which,
+        probe_runner=effective_probe,
+        which=effective_which,
         registry=effective_registry,
         runner=runner,
         timeout_seconds=timeout_seconds,

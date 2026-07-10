@@ -11,6 +11,8 @@ from pathlib import Path
 from rich.console import Console
 
 from ...core.bench.decision.builder import build_decision_sidecar
+from ...core.bench.decision.decision_models import DecisionBottleneckClass
+from ...core.bench.decision.precedence import apply_runtime_precedence
 from ...core.bench.static_kernel.evidence import StaticKernelEvidenceSidecar
 from ...core.evidence.runtime_evidence import write_json_payload
 from ...core.platform.arch_capabilities import (
@@ -40,7 +42,7 @@ def _load_budget_from_environment(
         return None
     try:
         payload = json.loads(environment_sidecar_path.read_text(encoding="utf-8"))
-    except Exception:
+    except (json.JSONDecodeError, OSError):
         return None
     candidates = [
         entry
@@ -55,8 +57,10 @@ def _load_budget_from_environment(
     for entry in candidates:
         try:
             return arch_capability_budget_from_dict(entry["budget"])
-        except Exception:
-            return None
+        except (ValueError, TypeError, KeyError):
+            # Skip a malformed budget and try the next candidate rather than
+            # aborting the whole loop (a later valid budget may be usable).
+            continue
     return None
 
 
@@ -66,6 +70,7 @@ def _write_decision_sidecar(
     static_evidence_result: StaticKernelEvidenceSidecar | None,
     environment_sidecar_path: Path | None,
     *,
+    runtime_profile_available: bool = False,
     run_id: str | None = None,
     target_id: str | None = None,
     candidate_id: str | None = None,
@@ -101,6 +106,19 @@ def _write_decision_sidecar(
         source_sha256=source_sha256,
         sol_version=sol_version,
     )
+    # Runtime profiling takes precedence over static-inferred pressure hints
+    # (decision-modeling-research.md §8.4): a measured bottleneck classification
+    # supersedes the inferred register/LDS pressure. Deterministic spill stays
+    # (it is a code-object fact, not a runtime-only observation).
+    if runtime_profile_available:
+        sidecar = apply_runtime_precedence(
+            sidecar,
+            runtime_profile_available=True,
+            demoted_classes={
+                DecisionBottleneckClass.REGISTER_PRESSURE_HIGH,
+                DecisionBottleneckClass.LDS_PRESSURE_HIGH,
+            },
+        )
     sidecar_path = output_file.with_name(f"{output_file.name}.decision.json")
     try:
         write_json_payload(sidecar_path, sidecar.to_dict())

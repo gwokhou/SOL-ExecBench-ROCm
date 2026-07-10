@@ -97,3 +97,27 @@ def test_empty_footprints_returns_empty():
 def test_never_promotes_unknown():
     # All-None footprint -> no hint is speculated.
     assert derive_decision_hints([_fp()], GFX942) == []
+
+
+def test_dynamic_budget_still_emits_spill():
+    # Spill is deterministic and arch-agnostic, so a dynamic-allocation budget
+    # (gfx1200/RDNA4) must still emit SPILL_DETECTED; only pressure is gated.
+    dynamic = GFX942.model_copy(
+        update={"register_allocation_model": "dynamic", "architecture": "gfx1200"}
+    )
+    hints = derive_decision_hints(
+        [_fp(vgpr_used=250, scratch_bytes=1024, spill_detected=True)], dynamic
+    )
+    spill = _cls(hints, "spill_detected")
+    assert spill and spill[0].confidence.value == "inferred_high"
+    # register pressure is suppressed on dynamic budgets even though vgpr(250)
+    # would otherwise cross the ratio threshold.
+    assert _cls(hints, "register_pressure_high") == []
+
+
+def test_dynamic_budget_suppresses_pressure_without_spill():
+    dynamic = GFX942.model_copy(
+        update={"register_allocation_model": "dynamic", "architecture": "gfx1200"}
+    )
+    # vgpr_used=256 would trigger register_pressure on a static budget.
+    assert derive_decision_hints([_fp(vgpr_used=256)], dynamic) == []

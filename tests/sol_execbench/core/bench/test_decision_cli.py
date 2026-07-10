@@ -122,3 +122,37 @@ def test_decision_auto_without_environment_budget_falls_back_to_partial(
     assert decision["status"] == "partial"
     assert decision["summary"]["architecture"] is None
     assert any(h["bottleneck_class"] == "spill_detected" for h in decision["hints"])
+
+
+def test_runtime_profile_demotes_pressure_and_keeps_spill(tmp_path: Path) -> None:
+    output = tmp_path / "trace.jsonl"
+    output.write_text("{}\n")
+    env_path = tmp_path / "trace.jsonl.environment.json"
+    _environment_sidecar(env_path, ["gfx942"])
+
+    path = _write_decision_sidecar(
+        output,
+        DECISION_AUTO,
+        _static_evidence(["gfx942"]),
+        env_path,
+        runtime_profile_available=True,
+        run_id="r1",
+        sol_version="v1.43",
+    )
+    assert path is not None
+    decision = json.loads(path.read_text(encoding="utf-8"))
+    # Inferred register pressure is demoted to inferred_low under runtime
+    # precedence; deterministic spill stays at inferred_high.
+    reg = next(
+        h
+        for h in decision["hints"]
+        if h["bottleneck_class"] == "register_pressure_high"
+    )
+    assert reg["confidence"] == "inferred_low"
+    spill = next(
+        h for h in decision["hints"] if h["bottleneck_class"] == "spill_detected"
+    )
+    assert spill["confidence"] == "inferred_high"
+    assert any(
+        "Runtime profile takes precedence" in lim for lim in decision["limitations"]
+    )

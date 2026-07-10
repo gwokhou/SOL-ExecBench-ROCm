@@ -22,18 +22,24 @@ from sol_execbench.core.bench.static_kernel.evidence_models import (
 )
 
 _AMDGPU_NOTE_NAME = b"AMDGPU\x00"
+# Upper bound on how many embedded zlib streams we attempt to inflate while
+# scanning for AMDGPU notes. The scan walks every 0x78 0x9c byte pair and calls
+# zlib.decompress over the remaining tail at each hit; without a cap a large
+# artifact with many incidental header-looking pairs becomes O(n^2) work.
+_MAX_ZLIB_STREAM_ATTEMPTS = 32
 
 
 def _unpack_msgpack(data: bytes, offset: int = 0) -> tuple[object, int]:
     """Minimal msgpack unpacker for AMDGPU metadata.
 
-    Supports the type subset AMDGPU metadata uses: fixmap/map16, fixarray/
-    array16, fixstr/str8/str16, positive/negative fixint, uint/int 8/16/32/64,
-    nil, bool, bin8. Raises on unsupported codes so callers can skip bad notes.
+    Supports the format subset AMDGPU metadata uses: fixmap/map16/map32,
+    fixarray/array16/array32, fixstr/str8/str16/str32, positive/negative
+    fixint, uint/int 8/16/32/64, float32/float64, nil, bool, bin8/16/32. Raises
+    on genuinely unsupported codes (ext, etc.) so callers can skip bad notes.
     """
 
     code = data[offset]
-    if code <= 0x7F:
+    if code <= 0x7F:  # positive fixint
         return code, offset + 1
     if 0x80 <= code <= 0x8F:  # fixmap
         return _unpack_map(data, offset, code & 0x0F)
@@ -50,6 +56,16 @@ def _unpack_msgpack(data: bytes, offset: int = 0) -> tuple[object, int]:
     if code == 0xC4:  # bin8
         n = data[offset + 1]
         return data[offset + 2 : offset + 2 + n], offset + 2 + n
+    if code == 0xC5:  # bin16
+        n = struct.unpack_from(">H", data, offset + 1)[0]
+        return data[offset + 3 : offset + 3 + n], offset + 3 + n
+    if code == 0xC6:  # bin32
+        n = struct.unpack_from(">I", data, offset + 1)[0]
+        return data[offset + 5 : offset + 5 + n], offset + 5 + n
+    if code == 0xCA:  # float32
+        return struct.unpack_from(">f", data, offset + 1)[0], offset + 5
+    if code == 0xCB:  # float64
+        return struct.unpack_from(">d", data, offset + 1)[0], offset + 9
     if code == 0xCC:
         return data[offset + 1], offset + 2
     if code == 0xCD:
@@ -64,20 +80,36 @@ def _unpack_msgpack(data: bytes, offset: int = 0) -> tuple[object, int]:
         return struct.unpack_from(">h", data, offset + 1)[0], offset + 3
     if code == 0xD2:
         return struct.unpack_from(">i", data, offset + 1)[0], offset + 5
+    if code == 0xD3:  # int64
+        return struct.unpack_from(">q", data, offset + 1)[0], offset + 9
     if code == 0xD9:  # str8
         return _unpack_str(data, offset, data[offset + 1], 2)
     if code == 0xDA:  # str16
         return _unpack_str(
             data, offset, struct.unpack_from(">H", data, offset + 1)[0], 3
         )
+    if code == 0xDB:  # str32
+        return _unpack_str(
+            data, offset, struct.unpack_from(">I", data, offset + 1)[0], 5
+        )
     if code == 0xDC:  # array16
         return _unpack_array(
             data, offset, struct.unpack_from(">H", data, offset + 1)[0], 3
+        )
+    if code == 0xDD:  # array32
+        return _unpack_array(
+            data, offset, struct.unpack_from(">I", data, offset + 1)[0], 5
         )
     if code == 0xDE:  # map16
         return _unpack_map(
             data, offset, struct.unpack_from(">H", data, offset + 1)[0], 3
         )
+    if code == 0xDF:  # map32
+        return _unpack_map(
+            data, offset, struct.unpack_from(">I", data, offset + 1)[0], 5
+        )
+    if 0xE0 <= code <= 0xFF:  # negative fixint
+        return code - 0x100, offset + 1
     raise ValueError(f"unsupported msgpack code {code:#x} at offset {offset}")
 
 
@@ -129,7 +161,7 @@ def _scan_amdgpu_notes(data: bytes):
             continue
         try:
             meta, _ = _unpack_msgpack(desc)
-        except (ValueError, IndexError):
+        except (ValueError, IndexError, struct.error):
             continue
         if isinstance(meta, dict):
             yield meta
@@ -156,11 +188,13 @@ def _decompressed_variants(data: bytes):
         except zlib.error:
             pass
     search = 0
-    while True:
+    attempts = 0
+    while attempts < _MAX_ZLIB_STREAM_ATTEMPTS:
         idx = data.find(b"\x78\x9c", search)
         if idx == -1:
             return
         search = idx + 2
+        attempts += 1
         try:
             yield zlib.decompress(data[idx:])
         except zlib.error:
@@ -189,14 +223,19 @@ def _footprint_from_kernel(
 ) -> StaticResourceFootprint | None:
     vgpr = kernel.get(".vgpr_count")
     sgpr = kernel.get(".sgpr_count")
-    if not isinstance(vgpr, int) and not isinstance(sgpr, int):
-        return None
     scratch = kernel.get(".private_segment_fixed_size")
     lds = kernel.get(".group_segment_fixed_size")
     vgpr_spill = kernel.get(".vgpr_spill_count") or 0
     sgpr_spill = kernel.get(".sgpr_spill_count") or 0
     wavefront = kernel.get(".wavefront_size")
     scratch_bytes = scratch if isinstance(scratch, int) else None
+    lds_bytes = lds if isinstance(lds, int) else None
+    # Emit a footprint when any resource signal is present; only a completely
+    # empty kernel entry carries no decision value. Register counts may be
+    # absent while scratch/LDS/spill data is meaningful (mirrors roc-objdump,
+    # which does not gate on register presence).
+    if not any(isinstance(value, int) for value in (vgpr, sgpr, scratch, lds)):
+        return None
     return StaticResourceFootprint(
         identity=StaticResourceFootprintIdentity(
             artifact_id=artifact_id,
@@ -205,7 +244,7 @@ def _footprint_from_kernel(
         ),
         vgpr_used=vgpr if isinstance(vgpr, int) else None,
         sgpr_used=sgpr if isinstance(sgpr, int) else None,
-        lds_bytes=lds if isinstance(lds, int) else None,
+        lds_bytes=lds_bytes,
         scratch_bytes=scratch_bytes,
         spill_detected=(
             bool(vgpr_spill)

@@ -169,3 +169,60 @@ def test_real_code_object_fixture():
     assert fp.wavefront_size == 32
     assert fp.spill_detected is False
     assert fp.source_tool == "amdgpu-metadata"
+
+
+def test_truncated_multibyte_int_does_not_raise():
+    # A uint32 (0xCE) value field truncated mid-way hits struct.unpack_from ->
+    # struct.error; the malformed note must be skipped, not crash the run
+    # (the "never raises on malformed input" contract).
+    metadata = {"amdhsa.kernels": [{".vgpr_count": 70000}]}  # 70000 -> uint32
+    full_note = _note(_pack(metadata))
+    truncated = full_note[:-2]  # cut the uint32 value field short
+    assert extract_amdgpu_footprints(truncated, artifact_id="k0") == []
+
+
+def test_msgpack_handles_full_numeric_range():
+    # negative fixint (0xE0-0xFF)
+    assert _unpack_msgpack(bytes([0xFF]))[0] == -1
+    assert _unpack_msgpack(bytes([0xE0]))[0] == -32
+    # int64 (0xD3)
+    assert (
+        _unpack_msgpack(bytes([0xD3]) + struct.pack(">q", -123456789012))[0]
+        == -123456789012
+    )
+    # float32 (0xCA) / float64 (0xCB)
+    assert _unpack_msgpack(bytes([0xCA]) + struct.pack(">f", 1.5))[0] == 1.5
+    assert (
+        _unpack_msgpack(bytes([0xCB]) + struct.pack(">d", 2.718281828))[0]
+        == 2.718281828
+    )
+
+
+def test_msgpack_handles_large_containers_and_blobs():
+    # map32 (0xDF) with one entry
+    payload = bytes([0xDF]) + struct.pack(">I", 1) + _pack("k") + _pack(9)
+    assert _unpack_msgpack(payload)[0] == {"k": 9}
+    # array32 (0xDD) with two entries
+    payload = bytes([0xDD]) + struct.pack(">I", 2) + _pack(1) + _pack(2)
+    assert _unpack_msgpack(payload)[0] == [1, 2]
+    # bin16 (0xC5)
+    payload = bytes([0xC5]) + struct.pack(">H", 3) + b"abc"
+    assert _unpack_msgpack(payload)[0] == b"abc"
+    # str32 (0xDB)
+    payload = bytes([0xDB]) + struct.pack(">I", 3) + b"xyz"
+    assert _unpack_msgpack(payload)[0] == "xyz"
+
+
+def test_spill_only_kernel_without_register_counts():
+    # C7: a kernel with scratch/LDS data but no register counts still yields a
+    # footprint (with None register fields) rather than being dropped.
+    metadata = {
+        "amdhsa.kernels": [{".private_segment_fixed_size": 2048}]  # no vgpr/sgpr
+    }
+    fps = extract_amdgpu_footprints(_note(_pack(metadata)), artifact_id="k0")
+    assert len(fps) == 1
+    fp = fps[0]
+    assert fp.vgpr_used is None
+    assert fp.sgpr_used is None
+    assert fp.scratch_bytes == 2048
+    assert fp.spill_detected is True
