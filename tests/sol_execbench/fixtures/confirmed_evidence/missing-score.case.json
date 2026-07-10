@@ -1,0 +1,9 @@
+{
+  "case": "missing-score",
+  "description": "Missing score input: official score null with missing_score blocker.",
+  "diagnostic_sidecar_count": 0,
+  "expected_blockers": [
+    "missing_score"
+  ],
+  "expected_score_authority": false
+}

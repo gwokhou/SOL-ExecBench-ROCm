@@ -1,0 +1,9 @@
+{
+  "case": "placeholder-baseline",
+  "description": "Reference-latency-derived baseline: placeholder_baseline blocker (not measured).",
+  "diagnostic_sidecar_count": 0,
+  "expected_blockers": [
+    "placeholder_baseline"
+  ],
+  "expected_score_authority": false
+}
