@@ -40,4 +40,5 @@ pytest*
 .planning/config.json
 .planning/tmp/
 .artifacts/
+.worktrees/
 .omc
