@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from sol_execbench.core.scoring.amd_bound_estimate.attention import _attention_estimate
 from sol_execbench.core.scoring.amd_bound_estimate.common import (
     _dtype_bytes,
@@ -27,6 +29,50 @@ from sol_execbench.core.scoring.amd_bound_estimate.memory import (
     _reduction_estimate,
     _softmax_estimate,
 )
+from sol_execbench.core.scoring.amd_bound_estimate.models import OperatorWorkEstimate
+from sol_execbench.core.scoring.amd_bound_estimate.tensors import (
+    first_tensor_dtype,
+    node_tensors,
+)
+from sol_execbench.core.scoring.amd_bound_graph.models import (
+    BoundGraph,
+    BoundGraphNode,
+    OpFamily,
+)
+
+
+def _with_hardware_profile_evidence(
+    graph: BoundGraph, node: BoundGraphNode, estimate: OperatorWorkEstimate
+) -> OperatorWorkEstimate:
+    """Attach exact profile lookup inputs without inventing a fallback dtype/path."""
+    inputs = node_tensors(graph, node.input_tensor_ids)
+    outputs = node_tensors(graph, node.output_tensor_ids)
+    input_dtype = _profile_dtype(first_tensor_dtype(inputs))
+    output_dtype = _profile_dtype(first_tensor_dtype(outputs))
+    matrix_families = {OpFamily.GEMM, OpFamily.CONVOLUTION, OpFamily.ATTENTION}
+    operation = "matrix" if node.op_family in matrix_families else "vector"
+    path = str(
+        node.attributes.get("compute_path")
+        or ("mfma" if operation == "matrix" else "portable")
+    )
+    return replace(
+        estimate,
+        compute_operation=operation,
+        input_dtype=input_dtype,
+        output_dtype=output_dtype,
+        compute_path=path,
+        memory_access=str(node.attributes.get("memory_access") or "stream_copy"),
+    )
+
+
+def _profile_dtype(dtype: str | None) -> str | None:
+    return {
+        "bfloat16": "bf16",
+        "float16": "fp16",
+        "float32": "fp32",
+        "float64": "fp64",
+    }.get(dtype or "", dtype)
+
 
 __all__ = [
     "_activation_estimate",
@@ -44,4 +90,5 @@ __all__ = [
     "_softmax_estimate",
     "_ssm_mamba_estimate",
     "_unsupported_estimate",
+    "_with_hardware_profile_evidence",
 ]

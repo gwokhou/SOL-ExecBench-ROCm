@@ -33,6 +33,11 @@ class OperatorWorkEstimate:
     axis_source: str | None = None
     movement_kind: str | None = None
     warnings: tuple[str, ...] = ()
+    compute_operation: str | None = None
+    input_dtype: str | None = None
+    output_dtype: str | None = None
+    compute_path: str | None = None
+    memory_access: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize as JSON-safe derived estimate evidence."""
@@ -54,4 +59,9 @@ class OperatorWorkEstimate:
             "axis_source": self.axis_source,
             "movement_kind": self.movement_kind,
             "warnings": list(self.warnings),
+            "compute_operation": self.compute_operation,
+            "input_dtype": self.input_dtype,
+            "output_dtype": self.output_dtype,
+            "compute_path": self.compute_path,
+            "memory_access": self.memory_access,
         }

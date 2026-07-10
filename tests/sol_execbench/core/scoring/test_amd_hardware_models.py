@@ -109,7 +109,7 @@ def test_parse_rejects_invalid_schema_values(tmp_path):
         load_amd_hardware_model(path)
 
 
-def test_parse_rejects_non_gfx1200_validated_statuses(tmp_path):
+def test_parse_allows_validated_statuses_for_non_gfx1200_provenance(tmp_path):
     path = _write_model(
         tmp_path,
         {
@@ -126,8 +126,10 @@ def test_parse_rejects_non_gfx1200_validated_statuses(tmp_path):
             "evidence_refs": ["fixture"],
         },
     )
-    with pytest.raises(ValueError, match="only gfx1200"):
-        load_amd_hardware_model(path)
+    assert (
+        load_amd_hardware_model(path).hardware_validation_status
+        == HardwareValidationStatus.VALIDATED
+    )
 
 
 def test_parse_rejects_architecture_mismatch_between_path_and_payload(tmp_path):
@@ -154,3 +156,39 @@ def test_parse_rejects_architecture_mismatch_between_path_and_payload(tmp_path):
         amd_hardware_model_from_dict(
             payload, source=str(path), expected_architecture="gfx1200"
         )
+
+
+def test_v3_resolves_exact_bf16_mfma_compute_and_memory_profiles():
+    model = amd_hardware_model_from_dict(
+        {
+            "schema_version": "sol_execbench.amd_hardware_model.v3",
+            "architecture": "gfx942",
+            "clock_assumptions": ["locked"],
+            "source": "calibration fixture",
+            "confidence": "supported",
+            "hardware_validation_status": "validated",
+            "model_validation_status": "validated",
+            "evidence_refs": ["calibration.json"],
+            "compute_profiles": [
+                {
+                    "key": "compute.matrix.bf16.bf16.mfma",
+                    "state": "measured",
+                    "value": 100.0,
+                    "confidence": "supported",
+                    "evidence_ref": "compute-bf16",
+                }
+            ],
+            "memory_profiles": [
+                {
+                    "key": "memory.stream_copy.bf16.bf16.portable",
+                    "state": "measured",
+                    "value": 1000.0,
+                    "confidence": "supported",
+                    "evidence_ref": "memory-bf16",
+                }
+            ],
+        }
+    )
+
+    assert model.resolve_compute("matrix", "bf16", "bf16", "mfma").value == 100.0
+    assert model.resolve_memory("stream_copy").value == 1000.0
