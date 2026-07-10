@@ -5,7 +5,9 @@
 
 from __future__ import annotations
 
+import math
 import statistics
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -112,3 +114,69 @@ class AmdNativeSuiteReport:
             "evidence_summary": self.evidence_summary,
             "scores": [score.to_dict() for score in self.scores],
         }
+
+
+def _optional_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        number = float(value)
+        return number if math.isfinite(number) else None
+    return None
+
+
+def _str_dict(value: Any) -> dict[str, str]:
+    if not isinstance(value, Mapping):
+        return {}
+    return {str(key): str(val) for key, val in value.items()}
+
+
+def amd_native_score_from_dict(payload: Mapping[str, Any]) -> AmdNativeScore:
+    """Reconstruct an :class:`AmdNativeScore` from its ``to_dict()`` payload.
+
+    The ``supported`` key emitted by ``to_dict()`` is a computed property and is
+    ignored on load.
+    """
+    warnings = payload.get("warnings")
+    return AmdNativeScore(
+        definition=str(payload["definition"]),
+        workload_uuid=str(payload["workload_uuid"]),
+        measured_latency_ms=_optional_float(payload.get("measured_latency_ms")),
+        baseline_latency_ms=_optional_float(payload.get("baseline_latency_ms")),
+        sol_bound_ms=_optional_float(payload.get("sol_bound_ms")),
+        score=_optional_float(payload.get("score")),
+        claim_level=str(payload.get("claim_level", AMD_SCORE_CLAIM_LEVEL)),
+        warnings=tuple(str(warning) for warning in warnings)
+        if isinstance(warnings, list)
+        else (),
+        baseline_source=str(payload.get("baseline_source", "missing")),
+        evidence_refs=_str_dict(payload.get("evidence_refs")),
+        derived_evidence_refs=_str_dict(payload.get("derived_evidence_refs")),
+    )
+
+
+def amd_native_suite_report_from_dict(
+    payload: Mapping[str, Any],
+) -> AmdNativeSuiteReport:
+    """Reconstruct an :class:`AmdNativeSuiteReport` from its ``to_dict()`` payload."""
+    scores_payload = payload.get("scores")
+    if not isinstance(scores_payload, list):
+        raise ValueError("amd native suite report requires a scores list")
+    scores = tuple(amd_native_score_from_dict(score) for score in scores_payload)
+    raw_summary = payload.get("baseline_summary")
+    baseline_summary: dict[str, int] | None
+    if isinstance(raw_summary, Mapping):
+        baseline_summary = {str(key): int(val) for key, val in raw_summary.items()}
+    else:
+        baseline_summary = None
+    return AmdNativeSuiteReport(
+        scores=scores,
+        baseline_summary=baseline_summary,
+        schema_version=str(payload.get("schema_version", AMD_SCORE_SCHEMA_VERSION)),
+        derived=bool(payload.get("derived", True)),
+        canonical_output=str(
+            payload.get("canonical_output", CANONICAL_BENCHMARK_OUTPUT)
+        ),
+    )

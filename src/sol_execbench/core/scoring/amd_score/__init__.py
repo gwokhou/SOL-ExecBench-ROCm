@@ -10,6 +10,8 @@ from sol_execbench.core.scoring.amd_score.models import (
     AMD_SCORE_SCHEMA_VERSION,
     AmdNativeScore,
     AmdNativeSuiteReport,
+    amd_native_score_from_dict,
+    amd_native_suite_report_from_dict,
 )
 from sol_execbench.core.scoring.amd_score.traces import (
     build_amd_native_suite_report,
@@ -41,6 +43,8 @@ __all__ = [
     "AmdNativeScore",
     "AmdNativeSuiteReport",
     "SolarScoreGuard",
+    "amd_native_score_from_dict",
+    "amd_native_suite_report_from_dict",
     "build_amd_native_suite_report",
     "build_amd_native_suite_report_from_traces",
     "score_amd_native_trace_workload",
