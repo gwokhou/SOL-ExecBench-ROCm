@@ -142,8 +142,14 @@ def run_calibration(request: CalibrationRequest) -> HardwareCalibrationArtifact:
                 observations["during"] = None
         candidates = tuple(probe.measure(key) for key in adapter.candidates)
     finally:
-        if locked and controller is not None:
-            controller.unlock()
+        # Reset is unconditional: a failed/ambiguous lock command can still
+        # have changed policy, and diagnostic collection must leave no setting
+        # behind.  Reset failure is reflected by absent post observation.
+        if controller is not None:
+            try:
+                controller.unlock()
+            except Exception:
+                pass
             observe = getattr(controller, "observe_locked", None)
             if callable(observe):
                 try:

@@ -97,6 +97,32 @@ def test_rdna4_lock_lifecycle_wraps_measurement() -> None:
     assert artifact.validation_status == "validated"
 
 
+def test_reset_is_attempted_after_unsuccessful_lock() -> None:
+    events: list[str] = []
+
+    class Clock:
+        def lock(self) -> bool:
+            events.append("lock")
+            return False
+
+        def unlock(self) -> None:
+            events.append("unlock")
+
+        def observe_locked(self) -> bool:
+            return False
+
+    artifact = run_calibration(
+        CalibrationRequest(
+            environment=GpuEnvironment(device=0, architecture="gfx1200"),
+            hip_probe=_probe(),
+            clock_controller=Clock(),
+        )
+    )
+
+    assert events == ["lock", "unlock"]
+    assert artifact.metadata["clock_observations"]["post"] is False
+
+
 def _profiler_environment(tmp_path: Path) -> ProfilerEnvironment:
     return ProfilerEnvironment(
         state="measured",

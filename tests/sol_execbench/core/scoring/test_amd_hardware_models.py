@@ -109,6 +109,56 @@ def test_parse_rejects_invalid_schema_values(tmp_path):
         load_amd_hardware_model(path)
 
 
+@pytest.mark.parametrize("value", (float("nan"), float("inf"), float("-inf")))
+def test_parse_rejects_nonfinite_legacy_values(tmp_path, value):
+    path = _write_model(
+        tmp_path,
+        {
+            "schema_version": AMD_HARDWARE_MODEL_SCHEMA_VERSION,
+            "architecture": "gfx1200",
+            "dtype_or_path": "fp32",
+            "peak_tflops": value,
+            "memory_bandwidth_gbps": 420.0,
+            "clock_assumptions": ["test"],
+            "source": "fixture",
+            "confidence": "inexact",
+            "hardware_validation_status": "provisional",
+            "model_validation_status": "provisional",
+            "evidence_refs": ["fixture"],
+        },
+    )
+
+    with pytest.raises(ValueError, match="positive number"):
+        load_amd_hardware_model(path)
+
+
+@pytest.mark.parametrize("value", (float("nan"), float("inf"), float("-inf")))
+def test_parse_rejects_nonfinite_v3_profile_values(value):
+    payload = {
+        "schema_version": "sol_execbench.amd_hardware_model.v3",
+        "architecture": "gfx1200",
+        "clock_assumptions": ["test"],
+        "source": "fixture",
+        "confidence": "supported",
+        "hardware_validation_status": "validated",
+        "model_validation_status": "validated",
+        "evidence_refs": ["fixture"],
+        "compute_profiles": [
+            {
+                "key": "compute.vector.fp32.fp32.portable",
+                "state": "measured",
+                "value": value,
+                "confidence": "supported",
+                "evidence_ref": "fixture",
+            }
+        ],
+        "memory_profiles": [],
+    }
+
+    with pytest.raises(ValueError, match="positive"):
+        amd_hardware_model_from_dict(payload)
+
+
 def test_parse_allows_validated_statuses_for_non_gfx1200_provenance(tmp_path):
     path = _write_model(
         tmp_path,

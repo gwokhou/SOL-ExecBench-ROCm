@@ -31,10 +31,9 @@ def test_live_offline_calibration_writes_rdna4_evidence(tmp_path) -> None:
         ],
     )
 
-    assert result.exit_code == 0, result.output
+    # A host without observed STABLE_PEAK evidence must remain diagnostic; the
+    # command may not upgrade merely because the lock command was attempted.
+    assert result.exit_code != 0, result.output
     payload = json.loads(output.read_text(encoding="utf-8"))
-    assert payload["metadata"]["architecture"] == "gfx1200"
-    assert payload["validation_status"] == "validated"
-    assert payload["metadata"]["rocprof_compute_profile_status"] == "unknown"
-    assert payload["candidates"]
-    assert {candidate["state"] for candidate in payload["candidates"]} == {"measured"}
+    assert payload["status"] == "rejected"
+    assert payload["diagnostic"] is True

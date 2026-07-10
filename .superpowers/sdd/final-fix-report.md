@@ -47,3 +47,19 @@ portable HIP source remains FP32-only.  On a real system that cannot compile a
 path-specific implementation it is recorded as `unknown`; it never produces a
 false BF16 measurement.  A future ISA-specific kernel implementation is needed
 before those BF16 profiles can become authoritative.
+
+## Re-review follow-up
+
+- The production HIP backend now explicitly marks non-FP32 or matrix paths as
+  unavailable before compiling the FP32 source.  BF16 matrix candidates use the
+  estimator-aligned `mfma` path and cannot become measured from that source.
+- Every generated v3 profile evidence reference now embeds the input
+  calibration checksum.
+- Clock-policy reset runs even when lock acquisition reports failure or throws;
+  post-reset observation is retained as evidence.
+- Hardware-model parsing rejects NaN and either infinity for legacy scalar and
+  v3 profile rates.
+
+Re-review verification: the calibration, hardware-model, CLI, score, and
+official-evidence focus ran with `-n 0`: **90 passed**.  Ruff passed for all
+changed source and test paths.
