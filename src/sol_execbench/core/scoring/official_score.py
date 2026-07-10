@@ -10,14 +10,19 @@ so no ``official_score_evidence.v1`` artifact is emitted today. The public API i
 re-exported from :mod:`sol_execbench.core.scoring` as a preview and may change
 before integration.
 
-Wiring this in requires two unresolved decisions: (1) a score aggregation policy
-must be supplied (it is required by the gate but is not yet a concept on
-``AmdNativeSuiteReport``), and (2) ``_PLACEHOLDER_BASELINE_SOURCES`` /
-``DEFAULT_OFFICIAL_BASELINE_SOURCES`` must cover every ``baseline_source`` value
-produced by :mod:`sol_execbench.core.scoring.amd_score` (guarded by
-``test_official_score_baseline_source_sets_cover_amd_score_universe``). Until
-then, AMD-native score reports (``sol_execbench.amd_native_score.v1``) remain the
-only emitted score-adjacent surface.
+Wiring this into a run path remains gated by one unresolved decision: (1) a
+score aggregation policy must be supplied (it is required by the gate but is not
+yet a concept on ``AmdNativeSuiteReport``). The baseline-source classification
+sets (``_PLACEHOLDER_BASELINE_SOURCES`` / ``DEFAULT_OFFICIAL_BASELINE_SOURCES``)
+now cover ``scoring_baseline`` and ``measured_baseline_registry`` and are
+guarded by ``test_official_score_baseline_source_sets_cover_amd_score_universe``.
+The gate also accepts an optional ``coverage_report`` precondition
+(:mod:`sol_execbench.core.evidence.baseline_coverage`); a non-confirmed report
+adds the ``baseline_coverage_failed`` umbrella blocker plus the report's
+specific reason codes (BASE-03). Until the gate is wired into a run path
+(Phase 194 GATE-01), AMD-native score reports
+(``sol_execbench.amd_native_score.v1``) remain the only emitted score-adjacent
+surface.
 """
 
 from __future__ import annotations
@@ -26,7 +31,7 @@ import math
 import statistics
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sol_execbench.core.reports.reporting import CANONICAL_BENCHMARK_OUTPUT
 from sol_execbench.core.scoring.amd_score import (
@@ -34,12 +39,19 @@ from sol_execbench.core.scoring.amd_score import (
     AmdNativeScore,
 )
 
+if TYPE_CHECKING:
+    # TYPE_CHECKING-only: the gate consumes the coverage report's public
+    # ``all_confirmed`` / ``blocker_reason_codes`` surface at runtime, so there is
+    # no hard import-time dependency on the evidence package (scoring -> evidence
+    # is one-way; baseline_coverage has no internal sol_execbench imports).
+    from sol_execbench.core.evidence.baseline_coverage import BaselineCoverageReport
+
 
 OFFICIAL_SCORE_SCHEMA_VERSION = "sol_execbench.official_score_evidence.v1"
 OFFICIAL_SCORE_SOURCE = "official_score_evidence"
 OFFICIAL_SCORE_KIND = "official_benchmark_score"
 OFFICIAL_SCORE_CLAIM_LEVEL = "official-confirmed"
-DEFAULT_OFFICIAL_BASELINE_SOURCES = ("scoring_baseline",)
+DEFAULT_OFFICIAL_BASELINE_SOURCES = ("scoring_baseline", "measured_baseline_registry")
 
 MISSING_SCORE_BLOCKER = "missing_score"
 MISSING_MEASURED_LATENCY_BLOCKER = "missing_measured_latency"
@@ -47,6 +59,7 @@ MISSING_BASELINE_BLOCKER = "missing_baseline"
 PLACEHOLDER_BASELINE_BLOCKER = "placeholder_baseline"
 MISSING_SOL_BOUND_BLOCKER = "missing_sol_bound"
 MISSING_AGGREGATION_POLICY_BLOCKER = "missing_aggregation_policy"
+BASELINE_COVERAGE_FAILED_BLOCKER = "baseline_coverage_failed"
 
 _PLACEHOLDER_BASELINE_SOURCES = {
     "reference_latency",
@@ -185,6 +198,7 @@ def official_score_from_amd_native_score(
     aggregation_policy: str | None,
     source_score_ref: str | None = None,
     official_baseline_sources: Sequence[str] = DEFAULT_OFFICIAL_BASELINE_SOURCES,
+    coverage_report: BaselineCoverageReport | None = None,
 ) -> OfficialScoreEvidence:
     """Gate a derived AMD-native score into official score evidence."""
     normalized_policy = _normalize_policy(aggregation_policy)
@@ -192,6 +206,7 @@ def official_score_from_amd_native_score(
         score,
         aggregation_policy=normalized_policy,
         official_baseline_sources=official_baseline_sources,
+        coverage_report=coverage_report,
     )
     official_score = score.score if not blockers else None
     input_refs = dict(score.evidence_refs)
@@ -228,6 +243,7 @@ def build_official_score_suite_evidence(
     aggregation_policy: str | None,
     source_score_refs_by_workload_uuid: dict[str, str] | None = None,
     official_baseline_sources: Sequence[str] = DEFAULT_OFFICIAL_BASELINE_SOURCES,
+    coverage_report: BaselineCoverageReport | None = None,
 ) -> OfficialScoreSuiteEvidence:
     """Build suite-level official score evidence from AMD-native score inputs."""
     source_score_refs_by_workload_uuid = source_score_refs_by_workload_uuid or {}
@@ -239,6 +255,7 @@ def build_official_score_suite_evidence(
                 score.workload_uuid
             ),
             official_baseline_sources=official_baseline_sources,
+            coverage_report=coverage_report,
         )
         for score in scores
     )
@@ -253,6 +270,7 @@ def _official_score_blockers(
     *,
     aggregation_policy: str | None,
     official_baseline_sources: Sequence[str],
+    coverage_report: BaselineCoverageReport | None = None,
 ) -> list[str]:
     blockers: list[str] = []
     if aggregation_policy is None:
@@ -271,6 +289,14 @@ def _official_score_blockers(
         blockers.append(MISSING_BASELINE_BLOCKER)
     elif not _is_positive_finite(score.baseline_latency_ms):
         blockers.append(MISSING_BASELINE_BLOCKER)
+
+    # BASE-03: a non-confirmed measured-baseline coverage report is a suite-level
+    # precondition failure. Emit the umbrella blocker plus the report's specific
+    # reason codes so HIP sees precise failure reasons (D-11). ``coverage_report``
+    # is optional; when ``None`` the gate behaves exactly as before.
+    if coverage_report is not None and not coverage_report.all_confirmed:
+        blockers.append(BASELINE_COVERAGE_FAILED_BLOCKER)
+        blockers.extend(coverage_report.blocker_reason_codes)
 
     return _unique(blockers)
 
