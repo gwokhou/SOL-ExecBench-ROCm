@@ -7,6 +7,8 @@ from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
+from sol_execbench.core.reports.trust_summary import utc_timestamp
+
 
 HIP_BASELINE_REGISTRY_SCHEMA_VERSION = "baseline_registry.v1"
 SOL_MEASURED_BASELINE_REGISTRY_SCHEMA_VERSION = (
@@ -34,6 +36,7 @@ def export_hip_baseline_registry(
     target_id: str,
     sol_version: str,
     timing_policy: str,
+    generated_at: str | None = None,
 ) -> dict[str, Any]:
     """Export a measured HIP baseline registry from a SOL trace JSONL file."""
 
@@ -90,6 +93,7 @@ def export_hip_baseline_registry(
     registry = {
         "schema_version": HIP_BASELINE_REGISTRY_SCHEMA_VERSION,
         "sol_schema_version": SOL_MEASURED_BASELINE_REGISTRY_SCHEMA_VERSION,
+        "generated_at": generated_at or utc_timestamp(),
         "target_id": target_id,
         "coverage_status": "confirmed" if coverage_confirmed else "diagnostic",
         "expected_workload_keys": expected_workload_keys,
