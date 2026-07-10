@@ -5,6 +5,9 @@
 
 from __future__ import annotations
 
+import csv
+import hashlib
+import io
 import subprocess
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -15,13 +18,15 @@ from sol_execbench.core.scoring.hardware_calibration.environment import (
     GpuEnvironment,
     adapter_for,
 )
-from sol_execbench.core.scoring.hardware_calibration.hip_probe import HipProbe
+from sol_execbench.core.scoring.hardware_calibration.hip_probe import (
+    HipProbe,
+    default_hip_probe,
+)
 from sol_execbench.core.scoring.hardware_calibration.models import (
     HardwareCalibrationArtifact,
 )
 from sol_execbench.core.scoring.hardware_calibration.rocprof_compute import (
     ProfilerEnvironment,
-    parse_roofline_metrics,
     run_rocprof_compute_bench_only,
 )
 
@@ -47,7 +52,7 @@ class ClockLockRequiredError(RuntimeError):
 @dataclass(frozen=True)
 class CalibrationRequest:
     environment: GpuEnvironment
-    hip_probe: HipProbe
+    hip_probe: HipProbe | None = None
     require_clock_lock: bool = False
     clock_controller: ClockController | None = None
     profiler_environment: ProfilerEnvironment | None = None
@@ -55,7 +60,7 @@ class CalibrationRequest:
 
 
 def _profile_metadata(
-    request: CalibrationRequest, metric_map: dict[str, tuple[str, str]]
+    request: CalibrationRequest, metric_map: dict[str, tuple[tuple[str, str], ...]]
 ) -> dict[str, object]:
     environment = request.profiler_environment
     if environment is None or environment.state != "measured":
@@ -67,15 +72,29 @@ def _profile_metadata(
         raw_output = str(getattr(result, "stdout", "") or "")
     except Exception:
         return {"rocprof_compute_profile_status": "unknown"}
-    parsed = parse_roofline_metrics(raw_output, metric_map)
+    digest = hashlib.sha256(raw_output.encode("utf-8")).hexdigest()
+    try:
+        observed = {
+            str(row.get("Metric", "")).strip()
+            for row in csv.DictReader(io.StringIO(raw_output))
+            if str(row.get("Metric", "")).strip()
+        }
+    except csv.Error:
+        observed = set()
     recognised = [
-        candidate.key
-        for candidate in parsed.candidates
-        if candidate.key in {key for key, _ in metric_map.values()}
+        candidate_key
+        for metric in observed
+        for candidate_key, _unit in metric_map.get(metric, ())
     ]
+    if not recognised:
+        return {
+            "rocprof_compute_profile_status": "unknown",
+            "rocprof_compute_raw_output_sha256": digest,
+            "rocprof_compute_recognised_candidate_keys": [],
+        }
     return {
         "rocprof_compute_profile_status": "collected",
-        "rocprof_compute_raw_output_sha256": parsed.raw_output_sha256,
+        "rocprof_compute_raw_output_sha256": digest,
         "rocprof_compute_recognised_candidate_keys": recognised,
     }
 
@@ -101,15 +120,18 @@ def run_calibration(request: CalibrationRequest) -> HardwareCalibrationArtifact:
             clock_reason = "clock_lock_failed"
             if request.require_clock_lock:
                 raise ClockLockRequiredError(clock_reason)
+    probe = request.hip_probe or default_hip_probe()
     try:
-        candidates = tuple(request.hip_probe.measure(key) for key in adapter.candidates)
+        candidates = tuple(probe.measure(key) for key in adapter.candidates)
     finally:
         if locked and controller is not None:
             controller.unlock()
     metric_map = {
-        "Peak FP32": (key.value, "TFLOP/s")
-        for key in adapter.candidates
-        if key.kind == "compute" and key.operation == "vector"
+        "Peak FP32": tuple(
+            (key.value, "TFLOP/s")
+            for key in adapter.candidates
+            if key.kind == "compute" and key.operation == "vector"
+        )
     }
     metadata: dict[str, object] = {
         "device": request.environment.device,
