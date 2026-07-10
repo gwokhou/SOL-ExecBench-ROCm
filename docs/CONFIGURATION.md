@@ -453,6 +453,15 @@ roots plus target and workload controls:
 | `--subprocess-memory-limit-gib` | Optional address-space limit for staged profiler subprocesses. |
 | `--max-estimated-timing-input-gib` | Manual cap for estimated timing input footprint before launching profiler subprocesses. |
 | `--auto-estimated-timing-input-cap`, `--no-auto-estimated-timing-input-cap` | Dynamically derive the estimated timing input cap from available memory, cgroup remaining memory, and subprocess limit; enabled by default. |
+
+### Calibrated AMD hardware models
+
+`sol-execbench hardware-model calibrate --device 0 --output calibration.json` records
+measured or explicitly unknown calibration evidence.  The optional `--offline` and
+`--no-auto-install` switches prevent managed ROCm Compute Profiler dependency
+installation; unavailable profiler data remains `unknown`.  Convert only a validated
+artifact with `hardware-model build --calibration calibration.json --output model.json`,
+then select that external model explicitly in bound-generation workflows.
 | `--temp-dir` | Parent directory for profiler staging directories. |
 | `--resume`, `--no-resume` | Resume from existing sidecars and manifests; enabled by default. |
 | `--max-workers` | Maximum target-level workers; default is `4`. |

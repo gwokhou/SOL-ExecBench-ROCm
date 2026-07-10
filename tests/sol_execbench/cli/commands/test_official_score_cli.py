@@ -16,6 +16,7 @@ from sol_execbench.core.scoring.amd_score import (
     AMD_SCORE_SCHEMA_VERSION,
     AmdNativeScore,
     AmdNativeSuiteReport,
+    BoundEligibilityEvidence,
 )
 from sol_execbench.core.scoring.official_score import (
     BASELINE_COVERAGE_FAILED_BLOCKER,
@@ -45,6 +46,14 @@ def _score(
         baseline_source=baseline_source,
         evidence_refs={},
         derived_evidence_refs={},
+        bound_eligibility=BoundEligibilityEvidence(
+            amd_sol_status="scored",
+            solar_status="scored",
+            hardware_profile_state="measured",
+            hardware_validation_status="validated",
+            model_validation_status="validated",
+            warnings=(),
+        ),
     )
 
 

@@ -57,6 +57,10 @@ def _subcommand_for(name: str) -> click.Command | None:
         import sol_execbench.cli.commands.metadata as cli_metadata
 
         return cli_metadata._doctor_cli
+    if name == "hardware-model":
+        import sol_execbench.cli.commands.hardware_model as cli_hardware_model
+
+        return cli_hardware_model._hardware_model_cli
     if name == "official-score":
         import sol_execbench.cli.commands.official_score as cli_official_score
 
