@@ -32,6 +32,8 @@ optional diagnostics use `optional` or a narrower diagnostic profile.
 | `trace.scoring` | `always` | Canonical scoring fields and score provenance. |
 | `baseline.measured_export` | `always` | Measured baseline registry export fields. |
 | `baseline.scoring_artifact` | `always` | Scoring baseline artifact fields. |
+| `official_score.evidence` | `confirmed` | Confirmed official benchmark score evidence gate (emitted via `sol-execbench official-score`). |
+| `measured_baseline.coverage` | `confirmed` | Confirmed measured baseline coverage validation (five-state reason codes). |
 | `compatibility.metadata` | `always` | Metadata consumers can persist for compatibility diagnostics. |
 | `failure_categories` | `always` | Stable consumer-facing failure buckets. |
 | `runtime.evidence` | `optional` | Optional runtime environment evidence beside canonical trace rows. |
@@ -88,25 +90,28 @@ required inputs:
 If any required input is absent, the official score value is `null` and the
 report carries stable `blocker_reason_codes`, including `missing_score`,
 `missing_baseline`, `placeholder_baseline`, `missing_sol_bound`,
-`missing_measured_latency`, and `missing_aggregation_policy`.
+`missing_measured_latency`, `missing_aggregation_policy`, and
+`baseline_coverage_failed` (emitted with propagated coverage sub-codes when
+measured baseline coverage validation does not fully confirm). The full stable
+vocabulary is advertised on the contract as `confirmed_evidence_blockers`.
 
 Trace JSONL `evaluation.performance.speedup_factor` remains a diagnostic ratio
 of reference latency to candidate latency. It is not an official benchmark
 score and must not be substituted for `official_score_evidence.v1` score
 fields.
 
-> **Integration status (staging).** The gating logic and data models
-> (`sol_execbench.official_score_evidence.v1`) are delivered in
-> `src/sol_execbench/core/scoring/official_score.py` and re-exported from the
-> scoring package, but **no run path emits this artifact yet** — no CLI command,
-> runner, or sidecar writer invokes the gate. No evaluator capability key is
-> advertised for official score evidence by `build_evaluator_contract()` today;
-> downstream consumers must treat this artifact as absent. Wiring requires an
-> explicit score aggregation policy (not yet a concept on `AmdNativeSuiteReport`)
-> and baseline-source classification coverage guarded by tests. Until then,
-> AMD-native score reports
-> (`sol_execbench.amd_native_score.v1`) remain the only emitted score-adjacent
-> surface.
+> **Integration status (confirmed-evidence surface).** The gating logic and
+> data models (`sol_execbench.official_score_evidence.v1`) live in
+> `src/sol_execbench/core/scoring/official_score.py` and are re-exported from
+> the scoring package. The `official_score.evidence` capability is advertised
+> as `confirmed`, and the `sol-execbench official-score` CLI emits the
+> `official_score_evidence.v1` artifact from an AMD-native score report plus a
+> measured baseline registry and an explicit `--aggregation-policy` (which
+> resolves the previously unresolved aggregation-policy precondition without
+> adding it to `AmdNativeSuiteReport`). The gate is not yet auto-emitted by the
+> default eval-driver / dataset runner run path; until it is, AMD-native score
+> reports (`sol_execbench.amd_native_score.v1`) plus the explicit
+> `official-score` CLI are the emitted score-adjacent surfaces.
 
 ## Feedback Sidecars
 
@@ -134,6 +139,12 @@ status, correctness, timing, and scoring semantics.
 SOL owns feedback sidecar schema, generation, freshness identity, artifact
 citations, and authority guardrails. HIP consumers own adapter normalization,
 closed-taxonomy `ProfileDigest` mapping, strategy hints, and prompt assembly.
+
+`official_score` and `measured_baseline` are `confirmed` authority surfaces:
+they are the only SOL artifacts that can satisfy a confirmed benchmark
+pass/fail decision. All feedback/profile/decision sidecars remain
+`diagnostic` authority and cannot promote correctness, timing, score,
+evidence-tier, release-gate, cutover, paper-parity, or leaderboard authority.
 
 This split keeps optional feedback useful for next-turn diagnostics without
 making prompt-facing summaries part of the benchmark authority model.

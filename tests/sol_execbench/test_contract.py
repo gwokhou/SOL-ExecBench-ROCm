@@ -311,3 +311,72 @@ def test_contract_cli_json_outputs_builder_payload_without_problem_directory():
     assert payload["capabilities"]["static_kernel.evidence"] == "optional"
     assert payload["capabilities"]["agent_feedback.sidecar"] == "profile:diagnostic"
     assert payload["capabilities"]["profile_summary.sidecar"] == "profile:diagnostic"
+
+
+# --- GATE-01: confirmed-evidence contract surface (Phase 194) ---------------
+
+
+def test_evaluator_contract_advertises_confirmed_evidence_capabilities():
+    payload = build_evaluator_contract().model_dump(mode="json")
+
+    assert payload["capabilities"]["official_score.evidence"] == "confirmed"
+    assert payload["capabilities"]["measured_baseline.coverage"] == "confirmed"
+
+
+def test_evaluator_contract_declares_confirmed_evidence_boundaries():
+    payload = build_evaluator_contract().model_dump(mode="json")
+    boundary_tuples = {
+        (b.get("owner"), b.get("scope"), b.get("authority"))
+        for b in payload["boundaries"]
+    }
+
+    # official_score and measured_baseline are confirmed authority; diagnostic
+    # sidecars remain diagnostic.
+    assert ("sol", "official_score", "confirmed") in boundary_tuples
+    assert ("sol", "measured_baseline", "confirmed") in boundary_tuples
+    assert ("sol", "agent_feedback", "diagnostic") in boundary_tuples
+    assert ("sol", "profile_summary", "diagnostic") in boundary_tuples
+    assert ("sol", "decision", "diagnostic") in boundary_tuples
+
+
+def test_evaluator_contract_advertises_confirmed_evidence_blocker_vocabulary():
+    from sol_execbench.core.data.contract import CONFIRMED_EVIDENCE_BLOCKERS
+
+    payload = build_evaluator_contract().model_dump(mode="json")
+
+    assert payload["confirmed_evidence_blockers"] == list(CONFIRMED_EVIDENCE_BLOCKERS)
+    # The vocabulary must include the blockers HIP removes for valid runs and the
+    # coverage-failure umbrella added in Phase 193.
+    for code in (
+        "missing_score",
+        "missing_baseline",
+        "placeholder_baseline",
+        "baseline_coverage_failed",
+    ):
+        assert code in payload["confirmed_evidence_blockers"]
+
+
+def test_contract_confirmed_evidence_blockers_match_official_score_constants():
+    # D-03: the contract's mirrored blocker literals must equal the official
+    # score gate's blocker constants (no parallel namespace drift).
+    from sol_execbench.core.data.contract import CONFIRMED_EVIDENCE_BLOCKERS
+    from sol_execbench.core.scoring.official_score import (
+        BASELINE_COVERAGE_FAILED_BLOCKER,
+        MISSING_AGGREGATION_POLICY_BLOCKER,
+        MISSING_BASELINE_BLOCKER,
+        MISSING_MEASURED_LATENCY_BLOCKER,
+        MISSING_SCORE_BLOCKER,
+        MISSING_SOL_BOUND_BLOCKER,
+        PLACEHOLDER_BASELINE_BLOCKER,
+    )
+
+    official_blockers = {
+        MISSING_SCORE_BLOCKER,
+        MISSING_MEASURED_LATENCY_BLOCKER,
+        MISSING_BASELINE_BLOCKER,
+        PLACEHOLDER_BASELINE_BLOCKER,
+        MISSING_SOL_BOUND_BLOCKER,
+        MISSING_AGGREGATION_POLICY_BLOCKER,
+        BASELINE_COVERAGE_FAILED_BLOCKER,
+    }
+    assert set(CONFIRMED_EVIDENCE_BLOCKERS) == official_blockers
