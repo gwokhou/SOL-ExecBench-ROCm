@@ -18,6 +18,25 @@ CALIBRATION_SCHEMA_VERSION = "sol_execbench.hardware_calibration.v1"
 CALIBRATION_CANDIDATE_STATES = frozenset({"measured", "unavailable", "unknown"})
 
 
+def _is_json_number(value: object) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _require_json_string(value: object, field_name: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"{field_name} must be a string")
+    return value
+
+
+def _require_json_number(value: object, field_name: str) -> float:
+    if not _is_json_number(value):
+        raise ValueError(f"{field_name} must be a JSON number")
+    numeric_value = float(value)
+    if not isfinite(numeric_value):
+        raise ValueError(f"{field_name} must be finite")
+    return numeric_value
+
+
 @dataclass(frozen=True)
 class CalibrationCandidate:
     """One calibration capability, including its explicit evidence state."""
@@ -32,6 +51,10 @@ class CalibrationCandidate:
     retained_spread: float | None = None
 
     def __post_init__(self) -> None:
+        if not isinstance(self.key, str):
+            raise ValueError("candidate key must be a string")
+        if not isinstance(self.state, str):
+            raise ValueError("candidate state must be a string")
         if not self.key.strip():
             raise ValueError("candidate key must be non-empty")
         if self.state not in CALIBRATION_CANDIDATE_STATES:
@@ -54,12 +77,21 @@ class CalibrationCandidate:
                     "unavailable and unknown candidates require a reason_code"
                 )
             return
-        if self.value is None or not isfinite(float(self.value)) or self.value <= 0.0:
+        if self.value is None or not _is_json_number(self.value):
+            raise ValueError("measured candidate value must be a JSON number")
+        value = _require_json_number(self.value, "value")
+        if value <= 0.0:
             raise ValueError("measured candidate value must be finite and positive")
-        if not self.unit or not self.unit.strip():
+        if not isinstance(self.unit, str) or not self.unit.strip():
             raise ValueError("measured candidate unit must be non-empty")
-        selection = select_conservative_value(self.samples)
-        if abs(float(self.value) - selection.value) > 1e-12:
+        if not isinstance(self.samples, tuple):
+            raise ValueError("samples must be a tuple of JSON numbers")
+        normalized_samples = tuple(
+            _require_json_number(sample, f"samples[{index}]")
+            for index, sample in enumerate(self.samples)
+        )
+        selection = select_conservative_value(normalized_samples)
+        if abs(value - selection.value) > 1e-12:
             raise ValueError(
                 "measured candidate value must equal conservative sample value"
             )
@@ -73,6 +105,8 @@ class CalibrationCandidate:
             and abs(self.retained_spread - selection.spread) > 1e-12
         ):
             raise ValueError("retained spread does not match conservative selection")
+        object.__setattr__(self, "value", value)
+        object.__setattr__(self, "samples", normalized_samples)
         object.__setattr__(self, "retained_samples", selection.retained_samples)
         object.__setattr__(self, "retained_spread", selection.spread)
 
@@ -101,6 +135,14 @@ class HardwareCalibrationArtifact:
     schema_version: str = CALIBRATION_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
+        if not isinstance(self.schema_version, str):
+            raise ValueError("schema_version must be a string")
+        if not isinstance(self.generated_at, str):
+            raise ValueError("generated_at must be a string")
+        if not isinstance(self.collection_status, str):
+            raise ValueError("collection_status must be a string")
+        if not isinstance(self.validation_status, str):
+            raise ValueError("validation_status must be a string")
         if self.schema_version != CALIBRATION_SCHEMA_VERSION:
             raise ValueError(f"unsupported calibration schema: {self.schema_version}")
         try:
@@ -140,6 +182,8 @@ def _require_exact_keys(
 
 
 def calibration_candidate_from_dict(payload: Mapping[str, Any]) -> CalibrationCandidate:
+    if not isinstance(payload, Mapping):
+        raise ValueError("calibration candidate must be an object")
     expected = {
         "key",
         "state",
@@ -155,21 +199,40 @@ def calibration_candidate_from_dict(payload: Mapping[str, Any]) -> CalibrationCa
         payload["retained_samples"], list
     ):
         raise ValueError("candidate samples must be lists")
+    key = _require_json_string(payload["key"], "key")
+    state = _require_json_string(payload["state"], "state")
+    value = (
+        None
+        if payload["value"] is None
+        else _require_json_number(payload["value"], "value")
+    )
+    unit = payload["unit"]
+    if unit is not None:
+        unit = _require_json_string(unit, "unit")
+    reason_code = payload["reason_code"]
+    if reason_code is not None:
+        reason_code = _require_json_string(reason_code, "reason_code")
+    samples = tuple(
+        _require_json_number(sample, f"samples[{index}]")
+        for index, sample in enumerate(payload["samples"])
+    )
+    retained_samples = tuple(
+        _require_json_number(sample, f"retained_samples[{index}]")
+        for index, sample in enumerate(payload["retained_samples"])
+    )
+    retained_spread = payload["retained_spread"]
+    if retained_spread is not None:
+        retained_spread = _require_json_number(retained_spread, "retained_spread")
     return CalibrationCandidate(
-        key=str(payload["key"]),
-        state=str(payload["state"]),
-        value=payload["value"],
-        unit=payload["unit"],
-        samples=tuple(payload["samples"]),
-        reason_code=payload["reason_code"],
-        retained_samples=tuple(payload["retained_samples"]),
-        retained_spread=payload["retained_spread"],
+        key, state, value, unit, samples, reason_code, retained_samples, retained_spread
     )
 
 
 def hardware_calibration_artifact_from_dict(
     payload: Mapping[str, Any],
 ) -> HardwareCalibrationArtifact:
+    if not isinstance(payload, Mapping):
+        raise ValueError("hardware calibration artifact must be an object")
     expected = {
         "schema_version",
         "generated_at",
@@ -186,12 +249,18 @@ def hardware_calibration_artifact_from_dict(
             "artifact metadata must be an object and candidates must be a list"
         )
     return HardwareCalibrationArtifact(
-        schema_version=str(payload["schema_version"]),
-        generated_at=str(payload["generated_at"]),
+        schema_version=_require_json_string(
+            payload["schema_version"], "schema_version"
+        ),
+        generated_at=_require_json_string(payload["generated_at"], "generated_at"),
         metadata=payload["metadata"],
         candidates=tuple(
             calibration_candidate_from_dict(item) for item in payload["candidates"]
         ),
-        collection_status=str(payload["collection_status"]),
-        validation_status=str(payload["validation_status"]),
+        collection_status=_require_json_string(
+            payload["collection_status"], "collection_status"
+        ),
+        validation_status=_require_json_string(
+            payload["validation_status"], "validation_status"
+        ),
     )
