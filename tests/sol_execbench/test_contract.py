@@ -35,6 +35,7 @@ OPTIONAL_CAPABILITIES = {
     "profile_summary.sidecar",
     "environment_budget.sidecar",
     "static_resource_footprint.sidecar",
+    "decision.sidecar",
 }
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CURRENT_CONTRACT_DOC = REPO_ROOT / "docs/EVALUATOR-CONTRACT.md"
@@ -206,6 +207,7 @@ def test_evaluator_contract_advertises_optional_evidence_without_bump():
         ("sol", "profile_summary", "diagnostic"),
         ("sol", "environment_budget", "diagnostic"),
         ("sol", "static_resource_footprint", "diagnostic"),
+        ("sol", "decision", "diagnostic"),
     }
 
 

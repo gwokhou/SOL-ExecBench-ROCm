@@ -12,6 +12,7 @@ from sol_execbench.core.bench.static_kernel.evidence import StaticKernelEvidence
 
 from ..commands import environment as cli_environment
 from ..sidecars import agent_feedback as cli_agent_feedback_sidecar
+from ..sidecars import decision as cli_decision_sidecar
 from ..sidecars import profile as cli_profile_sidecars
 from ..sidecars import static_evidence as cli_static_evidence
 
@@ -24,6 +25,7 @@ def write_optional_sidecars(
     solution: Any,
     profile_result: Any,
     static_evidence_result: StaticKernelEvidenceSidecar | None,
+    decision: str,
     trace_run_id: str | None,
     feedback_run_id: str | None,
     feedback_target_id: str | None,
@@ -48,6 +50,17 @@ def write_optional_sidecars(
         output_file,
         staging_dir,
         static_evidence_result,
+    )
+    cli_decision_sidecar._write_decision_sidecar(
+        output_file,
+        decision,
+        static_evidence_result,
+        environment_sidecar_path,
+        run_id=feedback_run_id or trace_run_id,
+        target_id=feedback_target_id,
+        candidate_id=feedback_candidate_id,
+        source_sha256=feedback_source_sha256,
+        sol_version=feedback_sol_version,
     )
     cli_agent_feedback_sidecar._write_agent_feedback_sidecar(
         output_file,
