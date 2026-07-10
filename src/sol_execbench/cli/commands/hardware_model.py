@@ -23,7 +23,10 @@ from sol_execbench.core.scoring.hardware_calibration.builder import (
     CalibrationRequest,
     run_calibration,
 )
-from sol_execbench.core.scoring.hardware_calibration.environment import discover_gpu
+from sol_execbench.core.scoring.hardware_calibration.environment import (
+    adapter_for,
+    discover_gpu,
+)
 from sol_execbench.core.scoring.hardware_calibration.models import (
     hardware_calibration_artifact_from_dict,
 )
@@ -141,6 +144,21 @@ def _build(calibration_path: Path, output: Path, max_age_hours: float | None) ->
             raise ValueError("calibration validation status is not validated")
         if any(candidate.state != "measured" for candidate in calibration.candidates):
             raise ValueError("calibration contains non-measured hardware profiles")
+        required_matrix_keys = {
+            candidate.value
+            for candidate in adapter_for(architecture).candidates
+            if candidate.operation == "matrix"
+            and candidate.input_dtype == "bf16"
+            and candidate.output_dtype == "bf16"
+        }
+        missing_matrix_keys = required_matrix_keys - {
+            candidate.key for candidate in calibration.candidates
+        }
+        if missing_matrix_keys:
+            raise ValueError(
+                "calibration missing required architecture matrix evidence: "
+                + ", ".join(sorted(missing_matrix_keys))
+            )
         _validate_calibration_authority(
             calibration,
             discover_gpu(int(calibration.metadata["device"])),

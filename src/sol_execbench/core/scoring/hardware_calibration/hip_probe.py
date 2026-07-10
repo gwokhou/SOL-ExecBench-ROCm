@@ -55,6 +55,7 @@ class ProbeExecution:
 CompileCandidate = Callable[[CalibrationProfileKey], str | bool | None]
 ExecuteCandidate = Callable[[CalibrationProfileKey], ProbeExecution | None]
 CheckCandidate = Callable[[CalibrationProfileKey, ProbeExecution], bool | None]
+_DEFAULT_HIPCC = object()
 
 
 @dataclass(frozen=True)
@@ -99,8 +100,8 @@ class HipProbe:
             result = self.compile_candidate(key)
         except Exception:
             return "failed"
-        if result == "unsupported":
-            return "unsupported"
+        if result in {"unsupported", "missing", "failed"}:
+            return result
         return "passed" if result is True or result == "passed" else "failed"
 
     def _execute(self, key: CalibrationProfileKey) -> ProbeExecution | None:
@@ -145,34 +146,48 @@ class HipCommandBackend:
     def __init__(
         self,
         workspace: Path | None = None,
-        hipcc: str | None = None,
+        hipcc: str | None | object = _DEFAULT_HIPCC,
+        architecture: str | None = None,
         run: Callable[..., object] = subprocess.run,
     ) -> None:
         self.workspace = workspace or Path(mkdtemp(prefix="sol-execbench-hip-"))
-        self.hipcc = hipcc if hipcc is not None else shutil.which("hipcc")
+        self.hipcc = shutil.which("hipcc") if hipcc is _DEFAULT_HIPCC else hipcc
+        self.architecture = architecture.lower() if architecture is not None else None
         self.run = run
         self._executables: dict[CalibrationProfileKey, Path] = {}
 
     def compile(self, key: CalibrationProfileKey) -> str:
-        # The bundled source implements only FP32 vector/copy semantics.  Never
-        # label a matrix or reduced-precision key as measured until a matching
-        # instruction/dtype implementation exists.
-        if (
-            key.input_dtype != "fp32"
-            or key.output_dtype != "fp32"
-            or key.operation not in {"vector", "stream_copy"}
+        if self.architecture is not None and not _matrix_path_is_supported(
+            key, self.architecture
         ):
             return "unsupported"
         if self.hipcc is None:
             return "missing"
+        is_matrix = (
+            key.operation == "matrix"
+            and key.input_dtype == "bf16"
+            and key.output_dtype == "bf16"
+            and key.path in {"wmma", "mfma"}
+        )
+        is_fp32_probe = (
+            key.input_dtype == "fp32"
+            and key.output_dtype == "fp32"
+            and key.operation in {"vector", "stream_copy"}
+        )
+        if not (is_matrix or is_fp32_probe):
+            return "failed"
         self.workspace.mkdir(parents=True, exist_ok=True)
         stem = key.value.replace(".", "_")
         source = self.workspace / f"{stem}.hip"
         executable = self.workspace / stem
         try:
             source.write_text(_hip_source(key), encoding="utf-8")
+            command = [self.hipcc, "-O3"]
+            if is_matrix and self.architecture is not None:
+                command.append(f"--offload-arch={self.architecture}")
+            command.extend((str(source), "-o", str(executable)))
             result = self.run(
-                [self.hipcc, "-O3", str(source), "-o", str(executable)],
+                command,
                 capture_output=True,
                 text=True,
                 check=False,
@@ -222,9 +237,11 @@ class HipCommandBackend:
         return execution.stable and len(execution.samples) >= MINIMUM_SAMPLE_COUNT
 
 
-def default_hip_probe(backend: HipCommandBackend | None = None) -> HipProbe:
+def default_hip_probe(
+    backend: HipCommandBackend | None = None, architecture: str | None = None
+) -> HipProbe:
     """Return the concrete HIP probe without resolving HIP tools at import time."""
-    backend = backend or HipCommandBackend()
+    backend = backend or HipCommandBackend(architecture=architecture)
     return HipProbe(
         compile_candidate=backend.compile,
         execute_candidate=backend.execute,
@@ -233,8 +250,26 @@ def default_hip_probe(backend: HipCommandBackend | None = None) -> HipProbe:
     )
 
 
+def _matrix_path_is_supported(key: CalibrationProfileKey, architecture: str) -> bool:
+    """Return whether a declared BF16 matrix path matches an AMD ISA family."""
+    if key.operation != "matrix" or key.input_dtype != "bf16" or key.output_dtype != "bf16":
+        return True
+    return (
+        (architecture.startswith("gfx12") and key.path == "wmma")
+        or (architecture.startswith(("gfx94", "gfx95")) and key.path == "mfma")
+    )
+
+
 def _hip_source(key: CalibrationProfileKey) -> str:
-    """Generate a self-checking FP32 vector or streaming-copy HIP benchmark."""
+    """Generate the self-checking HIP benchmark for a calibration candidate."""
+    if (
+        key.operation == "matrix"
+        and key.input_dtype == "bf16"
+        and key.output_dtype == "bf16"
+        and key.path in {"wmma", "mfma"}
+    ):
+        return _matrix_hip_source(key)
+
     is_compute = key.kind == "compute"
     kernel = (
         "out[index] = left[index] + right[index];"
@@ -278,5 +313,96 @@ int main() {{
   hipMemcpy(out.data(), d_out, count * sizeof(float), hipMemcpyDeviceToHost);
   for (size_t index = 0; index < count; ++index) if (out[index] != {expected}) return 4;
   hipFree(d_left); hipFree(d_right); hipFree(d_out); hipEventDestroy(start); hipEventDestroy(stop); return 0;
+}}
+"""
+
+
+def _matrix_hip_source(key: CalibrationProfileKey) -> str:
+    """Generate a direct-intrinsic BF16 matrix probe for the selected ISA path."""
+    if key.path == "wmma":
+        # gfx12 WMMA executes with wave32.  Every lane owns eight FP32 outputs.
+        lane_count = 32
+        values_per_lane = 8
+        packed_bf16_count = 8
+        accumulator_type = "float8v"
+        intrinsic = (
+            "__builtin_amdgcn_wmma_f32_16x16x16_bf16_w32_gfx12(a, b, accumulator)"
+        )
+    elif key.path == "mfma":
+        # gfx94x/gfx95x MFMA executes with wave64.  Every lane owns four outputs.
+        lane_count = 64
+        values_per_lane = 4
+        packed_bf16_count = 4
+        accumulator_type = "float4v"
+        intrinsic = (
+            "__builtin_amdgcn_mfma_f32_16x16x16bf16_1k("
+            "a, b, accumulator, 0, 0, 0)"
+        )
+    else:  # Defensive guard for direct callers outside _hip_source.
+        raise ValueError(f"unsupported matrix path: {key.path}")
+
+    packed_values = ", ".join("one.data" for _ in range(packed_bf16_count))
+    return f"""#include <hip/hip_runtime.h>
+#include <hip/hip_bfloat16.h>
+#include <cmath>
+#include <cstdio>
+#include <vector>
+
+// AMD HIP spells the CUDA-compatible __hip_bfloat16 type hip_bfloat16.
+using bf16x{packed_bf16_count} = unsigned short __attribute__((ext_vector_type({packed_bf16_count})));
+using {accumulator_type} = float __attribute__((ext_vector_type({values_per_lane})));
+
+constexpr int matrix_m = 16;
+constexpr int matrix_n = 16;
+constexpr int matrix_k = 16;
+constexpr int repetitions = 1024;
+constexpr int lane_count = {lane_count};
+constexpr int values_per_lane = {values_per_lane};
+constexpr float validation_tolerance = 1.0e-3f;
+
+__global__ void matrix_probe_kernel(float* out) {{
+  hip_bfloat16 one(1.0f);
+  bf16x{packed_bf16_count} a = {{{packed_values}}};
+  bf16x{packed_bf16_count} b = {{{packed_values}}};
+  {accumulator_type} accumulator = {{}};
+  for (int repeat = 0; repeat < repetitions; ++repeat) {{
+    accumulator = {intrinsic};
+  }}
+  const int lane = threadIdx.x;
+  for (int index = 0; index < values_per_lane; ++index) {{
+    out[lane * values_per_lane + index] = accumulator[index];
+  }}
+}}
+
+int main() {{
+  constexpr size_t output_count = matrix_m * matrix_n;
+  std::vector<float> output(output_count);
+  float* device_output = nullptr;
+  if (hipMalloc(&device_output, output_count * sizeof(float)) != hipSuccess) return 2;
+  hipEvent_t start = nullptr, stop = nullptr;
+  if (hipEventCreate(&start) != hipSuccess || hipEventCreate(&stop) != hipSuccess) return 2;
+
+  hipLaunchKernelGGL(matrix_probe_kernel, dim3(1), dim3(lane_count), 0, 0, device_output);
+  if (hipDeviceSynchronize() != hipSuccess) return 2;
+  if (hipMemcpy(output.data(), device_output, output_count * sizeof(float), hipMemcpyDeviceToHost) != hipSuccess) return 2;
+  const float cpu_reference = static_cast<float>(matrix_k * repetitions);
+  for (float value : output) {{
+    if (std::fabs(value - cpu_reference) > validation_tolerance) return 4;
+  }}
+
+  double samples[7] = {{}};
+  for (int sample = 0; sample < 7; ++sample) {{
+    if (hipEventRecord(start) != hipSuccess) return 2;
+    hipLaunchKernelGGL(matrix_probe_kernel, dim3(1), dim3(lane_count), 0, 0, device_output);
+    if (hipEventRecord(stop) != hipSuccess || hipEventSynchronize(stop) != hipSuccess) return 2;
+    float elapsed_ms = 0.0f;
+    if (hipEventElapsedTime(&elapsed_ms, start, stop) != hipSuccess || elapsed_ms <= 0.0f) return 3;
+    const double elapsed_seconds = static_cast<double>(elapsed_ms) / 1.0e3;
+    samples[sample] = 2.0 * matrix_m * matrix_n * matrix_k * repetitions / elapsed_seconds / 1.0e12;
+  }}
+
+  for (double sample : samples) std::printf("RESULT %.9f\\n", sample);
+  hipEventDestroy(start); hipEventDestroy(stop); hipFree(device_output);
+  return 0;
 }}
 """

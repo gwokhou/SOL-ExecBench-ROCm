@@ -90,6 +90,11 @@ class ArchitectureAdapter:
     supports_clock_lock: bool = False
 
 
+def _matrix_key(family: str) -> CalibrationProfileKey:
+    path = "wmma" if family == "gfx12" else "mfma"
+    return CalibrationProfileKey("compute", "matrix", "bf16", "bf16", path)
+
+
 def _adapter(family: str, *, supports_clock_lock: bool = False) -> ArchitectureAdapter:
     return ArchitectureAdapter(
         family=family,
@@ -98,9 +103,7 @@ def _adapter(family: str, *, supports_clock_lock: bool = False) -> ArchitectureA
             CalibrationProfileKey("compute", "vector", "fp32", "fp32", "portable"),
             CalibrationProfileKey("memory", "stream_copy", "fp32", "fp32", "portable"),
             CalibrationProfileKey("compute", "vector", "fp32", "fp32", family),
-            # These are declarations, not claims: the HIP probe marks a path
-            # unavailable or unknown if the active toolchain cannot execute it.
-            CalibrationProfileKey("compute", "matrix", "bf16", "bf16", "mfma"),
+            _matrix_key(family),
             CalibrationProfileKey("memory", "stream_copy", "fp32", "fp32", family),
         ),
     )
