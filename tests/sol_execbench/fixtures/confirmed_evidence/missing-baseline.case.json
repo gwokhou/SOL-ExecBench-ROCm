@@ -1,0 +1,9 @@
+{
+  "case": "missing-baseline",
+  "description": "Missing official baseline: official score null with missing_baseline blocker.",
+  "diagnostic_sidecar_count": 0,
+  "expected_blockers": [
+    "missing_baseline"
+  ],
+  "expected_score_authority": false
+}

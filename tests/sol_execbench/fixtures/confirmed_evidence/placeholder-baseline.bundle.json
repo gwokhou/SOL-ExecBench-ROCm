@@ -1,0 +1,75 @@
+{
+  "case": "placeholder-baseline",
+  "coverage_summary": {
+    "all_confirmed": true,
+    "blocker_reason_codes": [],
+    "entries": [
+      {
+        "detail": "baseline covers workload with matching provenance",
+        "reason_code": null,
+        "state": "confirmed",
+        "sub_codes": [],
+        "workload_key": "workload-1"
+      }
+    ],
+    "expected_workload_keys": [
+      "workload-1"
+    ],
+    "state_summary": {
+      "confirmed": 1
+    }
+  },
+  "diagnostic_sidecars": [],
+  "measured_baseline_registry": {
+    "coverage_status": "confirmed",
+    "entry_count": 1,
+    "expected_workload_keys": [
+      "workload-1"
+    ],
+    "generated_at": "2026-07-10T00:00:00Z",
+    "schema_version": "baseline_registry.v1",
+    "sol_schema_version": "sol_execbench.measured_baseline_registry.v1",
+    "target_id": "attention"
+  },
+  "official_score_evidence": {
+    "aggregation_policy": "mean of per-workload SOL scores",
+    "blocker_summary": {
+      "placeholder_baseline": 1
+    },
+    "canonical_output": "trace_jsonl",
+    "input_summary": {},
+    "mean_score": null,
+    "schema_version": "sol_execbench.official_score_evidence.v1",
+    "score": null,
+    "score_authority": false,
+    "score_kind": "official_benchmark_score",
+    "score_source": "official_score_evidence",
+    "scored_count": 0,
+    "scores": [
+      {
+        "aggregation_policy": "mean of per-workload SOL scores",
+        "baseline_source": "reference_latency",
+        "blocker_reason_codes": [
+          "placeholder_baseline"
+        ],
+        "claim_level": "official-blocked",
+        "definition": "matmul_demo",
+        "derived_input_refs": {},
+        "input_refs": {},
+        "measured_latency_ms": 1.0,
+        "official_baseline_latency_ms": null,
+        "schema_version": "sol_execbench.official_score_evidence.v1",
+        "score": null,
+        "score_authority": false,
+        "score_kind": "official_benchmark_score",
+        "score_source": "official_score_evidence",
+        "sol_bound_ms": 0.5,
+        "source_score_claim_level": "amd-native-derived",
+        "source_score_schema": "sol_execbench.amd_native_score.v1",
+        "status": "blocked",
+        "workload_uuid": "workload-1"
+      }
+    ],
+    "unscored_count": 1
+  }
+}
