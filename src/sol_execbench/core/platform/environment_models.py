@@ -111,7 +111,9 @@ class PytorchRocmSummary(BaseModelWithDocstrings):
 class EnvironmentCapabilityBudget(BaseModelWithDocstrings):
     """Derived arch capability budget for one detected GPU."""
 
-    model_config = ConfigDict(use_attribute_docstrings=True)
+    model_config = ConfigDict(
+        use_attribute_docstrings=True, extra="forbid", frozen=True
+    )
 
     status: ArchCapabilityBudgetStatus
     """Availability of the capability budget."""

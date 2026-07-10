@@ -182,3 +182,17 @@ def test_extractor_skips_footprint_when_roc_objdump_missing(tmp_path):
 
     assert sidecar.status.value == "collected"
     assert sidecar.footprints == []
+
+
+def test_parser_does_not_match_total_marker_substring():
+    # NumVgprs is a substring of TotalNumVgprs; the anchored regex must read
+    # only the plain NumVgprs line, not the Total line. SGPR real-world output
+    # is TotalNumSgprs, matched via the (?:Total)? optional prefix.
+    text = (
+        ";  NumVgprs: 40\n;  TotalNumVgprs: 256\n"
+        ";  TotalNumSgprs: 80\n;  ScratchSize: 0\n"
+    )
+    footprint = parse_roc_objdump_resource_usage(text, artifact_id="k0")
+    assert footprint is not None
+    assert footprint.vgpr_used == 40  # not 256 from TotalNumVgprs
+    assert footprint.sgpr_used == 80  # TotalNumSgprs matched via (?:Total)?

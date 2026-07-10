@@ -39,7 +39,7 @@ def write_optional_sidecars(
     profile_sidecar_path = cli_profile_sidecars._write_profile_sidecar(
         output_file, profile_result
     )
-    cli_profile_sidecars._write_profile_summary_sidecar(
+    profile_summary_sidecar_path = cli_profile_sidecars._write_profile_summary_sidecar(
         output_file,
         profile_result,
         profile_sidecar_path=profile_sidecar_path,
@@ -56,6 +56,7 @@ def write_optional_sidecars(
         decision,
         static_evidence_result,
         environment_sidecar_path,
+        runtime_profile_available=profile_summary_sidecar_path is not None,
         run_id=feedback_run_id or trace_run_id,
         target_id=feedback_target_id,
         candidate_id=feedback_candidate_id,
