@@ -64,7 +64,7 @@ def _profile_metadata(
 ) -> dict[str, object]:
     environment = request.profiler_environment
     if environment is None or environment.state != "measured":
-        return {}
+        return {"rocprof_compute_profile_status": "unknown"}
     try:
         result = run_rocprof_compute_bench_only(
             environment, run=request.profiler_run or subprocess.run
