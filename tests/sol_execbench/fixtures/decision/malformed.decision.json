@@ -1,0 +1,5 @@
+{
+  "schema_version": "sol_execbench.decision.v1",
+  "status": "not-a-real-status",
+  "reason_code": "decision_rendered"
+}

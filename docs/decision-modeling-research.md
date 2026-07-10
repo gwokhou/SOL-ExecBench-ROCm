@@ -329,10 +329,13 @@ rather than silently dropped.
 - The data layer is decision-ready: the `ArchIsaBudget` divergence fields let
   the formula pick a tier, and `register_allocation_model` gates RDNA4 dynamic
   fallback.
-- Open items for the `/gsd-plan-phase` workflow: (a) the `nW` gap (§9); (b) the
-  `vgpr_limit` addressing-vs-physical semantics; (c) the `sol_execbench.decision.v1`
-  schema and derivation run path; (d) cross-sidecar precedence against
-  `profile_summary.v2` and `agent_feedback.v2`.
+- **Resolved — implemented in `src/sol_execbench/core/bench/decision/` (quick
+  task `260710-decision-sidecar`):** (a) `nW` gap — uses the roc-objdump
+  `Occupancy` value directly, precise closed-form deferred; (b) `vgpr_limit`
+  documented as the architected addressing limit (occupancy uses
+  `register_file_per_cu_bytes`); (c) `sol_execbench.decision.v1` schema + builder
+  + `--decision auto` CLI; (d) cross-sidecar precedence via
+  `apply_runtime_precedence` (runtime > static).
 
 ## References
 
