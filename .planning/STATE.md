@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.38
 milestone_name: Upgrade SOL Evidence Contract for Confirmed Benchmark Claims
 status: executing
-stopped_at: Phase 192 verified
-last_updated: "2026-07-09T09:00:00Z"
-last_activity: 2026-07-09 -- Completed quick task 260709-spd: imported Superpowers docs into GSD planning
+stopped_at: Phase 191 verified
+last_updated: "2026-07-10T07:07:06.784Z"
+last_activity: 2026-07-10 -- Phase 193 planning complete
 progress:
   total_phases: 5
   completed_phases: 3
-  total_plans: 3
+  total_plans: 6
   completed_plans: 3
-  percent: 60
+  percent: 50
 ---
 
 # Project State
@@ -29,8 +29,8 @@ ExecBench.
 
 Phase: 193 (Measured Baseline Provenance and Coverage) — READY FOR DISCUSSION
 Plan: —
-Status: Phase 192 verified; ready to discuss Phase 193
-Last activity: 2026-07-09 -- Completed quick task 260709-spd: imported Superpowers docs into GSD planning
+Status: Ready to execute
+Last activity: 2026-07-10 -- Phase 193 planning complete
 
 ## Recent Trend
 
@@ -138,6 +138,7 @@ Last activity: 2026-07-09 -- Completed quick task 260709-spd: imported Superpowe
 - Canonicalize SOL feedback/profile-summary sidecar identity fields around
   `candidate_id`, `source_sha256`, `sol_version`, and compatibility aliases;
   see `.planning/todos/pending/2026-07-03-canonicalize-feedback-sidecar-identity-fields.md`.
+
 - Keep profiler-counter-derived bottleneck diagnostics deferred unless the next
   milestone explicitly scopes hardware/counter taxonomy work.
 
