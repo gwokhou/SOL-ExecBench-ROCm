@@ -65,6 +65,12 @@ def _classify_fx_node(node: Any) -> tuple[str, _CallClassification, str | None]:
         operator.mul,
         operator.truediv,
         operator.pow,
+        operator.eq,
+        operator.ne,
+        operator.lt,
+        operator.le,
+        operator.gt,
+        operator.ge,
     }:
         return (
             func_name,
@@ -72,6 +78,16 @@ def _classify_fx_node(node: Any) -> tuple[str, _CallClassification, str | None]:
                 OpFamily.ELEMENTWISE.value,
                 EstimateConfidence.INEXACT,
                 "recognized traced elementwise operation",
+            ),
+            None,
+        )
+    if node.op == "call_function" and node.target is operator.getitem:
+        return (
+            "getitem",
+            _CallClassification(
+                OpFamily.DATA_MOVEMENT.value,
+                EstimateConfidence.INEXACT,
+                "recognized materialized tensor indexing operation",
             ),
             None,
         )
@@ -183,6 +199,8 @@ def _fx_node_attributes(
     movement_kind = _movement_kind_for_name(leaf_name)
     if movement_kind is not None:
         attributes["movement_kind"] = movement_kind
+    if leaf_name in {"zeros", "zeros_like"}:
+        attributes["materialization_kind"] = "fill"
 
     op_family = _classification_family(classification)
     if op_family in {

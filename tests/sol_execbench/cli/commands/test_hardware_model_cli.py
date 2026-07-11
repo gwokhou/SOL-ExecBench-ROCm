@@ -91,6 +91,13 @@ def test_build_profile_evidence_ref_binds_calibration_checksum(
                 "TFLOP/s",
                 (10.0,) * 7,
             ),
+            CalibrationCandidate(
+                "compute.matrix.fp16.fp16.wmma",
+                "measured",
+                10.0,
+                "TFLOP/s",
+                (10.0,) * 7,
+            ),
         ),
         collection_status="collected",
         validation_status="validated",

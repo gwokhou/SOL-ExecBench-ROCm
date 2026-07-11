@@ -25,6 +25,20 @@ from sol_execbench.core.scoring.official_score import (
     OFFICIAL_AGGREGATION_POLICY,
     PLACEHOLDER_BASELINE_BLOCKER,
 )
+from sol_execbench.core.scoring.baseline_artifact import (
+    ScoringBaselineArtifact,
+    ScoringBaselineEntry,
+)
+from sol_execbench.core.scoring.release_baseline import (
+    ReleaseBaselineBundle,
+    ReleaseBaselineVerification,
+    ReleaseBaselineVerificationWorkload,
+    ReleaseBaselineWorkload,
+    ReleaseProvenance,
+    sha256_file,
+    write_release_baseline_bundle,
+    write_release_baseline_verification,
+)
 from sol_execbench.core.reports.reporting import CANONICAL_BENCHMARK_OUTPUT
 
 
@@ -45,7 +59,13 @@ def _score(
         claim_level=AMD_SCORE_CLAIM_LEVEL,
         warnings=(),
         baseline_source=baseline_source,
-        evidence_refs={},
+        evidence_refs={
+            "trace": "trace.jsonl#workload",
+            "timing": "trace.jsonl#timing",
+            "sol_bound": "bound.json#workload",
+            "baseline": "baseline.json#workload",
+            "hardware_model": "model.json#gfx1200",
+        },
         derived_evidence_refs={},
         bound_eligibility=BoundEligibilityEvidence(
             amd_sol_status="scored",
@@ -109,6 +129,90 @@ def _write_registry(
     return path
 
 
+def _write_release_inputs(
+    tmp_path: Path, report_path: Path
+) -> tuple[Path, Path, Path, Path]:
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+    scores = payload["scores"]
+    baseline_path = tmp_path / "scoring-baseline.json"
+    baseline = ScoringBaselineArtifact(
+        entries=tuple(
+            ScoringBaselineEntry(score["definition"], score["workload_uuid"], 2.0)
+            for score in scores
+        ),
+        release="v2.14",
+        source="release_baseline_bundle",
+    )
+    baseline_path.write_text(json.dumps(baseline.to_dict()), encoding="utf-8")
+    workloads = tuple(
+        ReleaseBaselineWorkload(
+            score["definition"],
+            score["workload_uuid"],
+            "official",
+            2.0,
+            (),
+            trace_ref="baseline.jsonl",
+            trace_sha256="a" * 64,
+            bound_ref="bound.json",
+            bound_sha256="b" * 64,
+            hardware_model_ref="model.json",
+            hardware_model_sha256="c" * 64,
+        )
+        for score in scores
+    )
+    bundle_path = tmp_path / "release-bundle.json"
+    bundle = ReleaseBaselineBundle(
+        release="v2.14",
+        suite_manifest_ref="suite.json",
+        suite_manifest_sha256="d" * 64,
+        baseline_artifact_ref=str(baseline_path),
+        baseline_artifact_sha256=sha256_file(baseline_path),
+        provenance=ReleaseProvenance(solution="hipblaslt", solution_sha256="e" * 64),
+        workloads=workloads,
+        latency_tolerance_rel=0.05,
+    )
+    write_release_baseline_bundle(bundle, bundle_path)
+    verification_path = tmp_path / "release-verification.json"
+    verification = ReleaseBaselineVerification(
+        release="v2.14",
+        bundle_ref=str(bundle_path),
+        bundle_sha256=sha256_file(bundle_path),
+        rerun_trace_ref="rerun.jsonl",
+        rerun_trace_sha256="f" * 64,
+        workloads=tuple(
+            ReleaseBaselineVerificationWorkload(
+                score["definition"],
+                score["workload_uuid"],
+                "official",
+                "official",
+                2.0,
+                2.0,
+                0.0,
+                True,
+                (),
+            )
+            for score in scores
+        ),
+    )
+    write_release_baseline_verification(verification, verification_path)
+    manifest_path = tmp_path / "suite.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "workloads": [
+                    {
+                        "definition": score["definition"],
+                        "workload_uuid": score["workload_uuid"],
+                    }
+                    for score in scores
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    return baseline_path, bundle_path, verification_path, manifest_path
+
+
 def _invoke(
     tmp_path: Path,
     *,
@@ -117,12 +221,23 @@ def _invoke(
     env_hardware: str | None = "gfx1200",
     env_timing_policy: str | None = "latency_ms",
 ):
+    baseline_path, bundle_path, verification_path, manifest_path = (
+        _write_release_inputs(tmp_path, report_path)
+    )
     args = [
         "official-score",
         "--amd-native-score",
         str(report_path),
         "--measured-registry",
         str(registry_path),
+        "--scoring-baseline",
+        str(baseline_path),
+        "--release-baseline-bundle",
+        str(bundle_path),
+        "--release-baseline-verification",
+        str(verification_path),
+        "--suite-manifest",
+        str(manifest_path),
     ]
     args.extend(["--aggregation-policy", OFFICIAL_AGGREGATION_POLICY])
     if env_hardware is not None:
@@ -262,6 +377,9 @@ def test_legacy_aggregation_policy_refuses_and_help_lists_only_policy(
 def test_missing_aggregation_policy_refuses(tmp_path: Path) -> None:
     report_path = _write_report(tmp_path, [_score()])
     registry_path = _write_registry(tmp_path)
+    baseline_path, bundle_path, verification_path, manifest_path = (
+        _write_release_inputs(tmp_path, report_path)
+    )
 
     result = CliRunner().invoke(
         cli,
@@ -271,6 +389,14 @@ def test_missing_aggregation_policy_refuses(tmp_path: Path) -> None:
             str(report_path),
             "--measured-registry",
             str(registry_path),
+            "--scoring-baseline",
+            str(baseline_path),
+            "--release-baseline-bundle",
+            str(bundle_path),
+            "--release-baseline-verification",
+            str(verification_path),
+            "--suite-manifest",
+            str(manifest_path),
         ],
     )
 

@@ -48,3 +48,10 @@ changes and list tests and any ROCm hardware checks performed.
 Never commit tokens, proprietary kernels, datasets, caches, or benchmark output.
 GPU evaluation requires ROCm-capable AMD hardware and may need `/dev/kfd` and
 `/dev/dri` access; document architecture-specific assumptions in tests or PR notes.
+
+## Container Permission Handling
+
+When a required container operation fails solely because of sandbox, cache, or
+filesystem permissions, request the necessary escalation from the user and retry
+the same scoped operation. Do not treat that permission failure as a benchmark,
+calibration, or implementation failure.

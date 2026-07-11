@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -26,11 +27,27 @@ from .models import (
 def _payload_artifacts(
     artifacts: list[AmdBoundSanitySourceRef | dict[str, Any] | str | Path],
 ) -> list[dict[str, Any]]:
-    return [
-        {str(key): value for key, value in artifact.items()}
-        for artifact in artifacts
-        if isinstance(artifact, Mapping)
-    ]
+    """Normalize inline and path-backed sidecars for the sanity audit."""
+    payloads: list[dict[str, Any]] = []
+    for artifact in artifacts:
+        if isinstance(artifact, Mapping):
+            payloads.append({str(key): value for key, value in artifact.items()})
+            continue
+        if isinstance(artifact, AmdBoundSanitySourceRef):
+            path = artifact.path
+        elif isinstance(artifact, str | Path):
+            path = str(artifact)
+        else:
+            continue
+        if not path:
+            continue
+        try:
+            payload = json.loads(Path(path).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(payload, Mapping):
+            payloads.append({str(key): value for key, value in payload.items()})
+    return payloads
 
 
 def _workload_seed(uuid: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -55,6 +72,7 @@ def _workload_seed(uuid: str, payload: dict[str, Any]) -> dict[str, Any]:
         "warnings": [],
         "evidence_refs": {},
         "evidence_gaps": [],
+        "blocker_codes": set(),
     }
 
 
@@ -294,3 +312,14 @@ def _sorted_jsonable(value: Any) -> Any:
     if isinstance(value, list):
         return [_sorted_jsonable(item) for item in value]
     return value
+
+
+def _increment_count(target: dict[str, int], key: str) -> None:
+    target[key] = target.get(key, 0) + 1
+
+
+def _increment_nested_count(
+    target: dict[str, dict[str, int]], group: str, key: str
+) -> None:
+    counts = target.setdefault(group, {})
+    counts[key] = counts.get(key, 0) + 1

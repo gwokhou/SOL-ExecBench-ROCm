@@ -267,6 +267,48 @@ def test_validated_supported_evidence_produces_scored_aggregate():
     assert artifact.warnings == ()
 
 
+def test_gfx12_matrix_estimate_resolves_the_exact_wmma_profile():
+    hardware = amd_hardware_model_from_dict(
+        {
+            "schema_version": "sol_execbench.amd_hardware_model.v3",
+            "architecture": "gfx1200",
+            "clock_assumptions": ["locked"],
+            "source": "fixture",
+            "confidence": "supported",
+            "hardware_validation_status": "validated",
+            "model_validation_status": "validated",
+            "evidence_refs": ["fixture"],
+            "compute_profiles": [
+                {
+                    "key": "compute.matrix.fp32.fp32.wmma",
+                    "state": "measured",
+                    "value": 100.0,
+                    "confidence": "supported",
+                    "evidence_ref": "wmma",
+                }
+            ],
+            "memory_profiles": [
+                {
+                    "key": "memory.stream_copy.fp32.fp32.portable",
+                    "state": "measured",
+                    "value": 1000.0,
+                    "confidence": "supported",
+                    "evidence_ref": "memory",
+                }
+            ],
+        }
+    )
+
+    artifact = build_amd_sol_bound_v2_artifact(
+        _matmul_definition(), _matmul_workload(), hardware
+    )
+
+    assert artifact.operator_work_estimates[0]["compute_path"] == "wmma"
+    assert artifact.op_bounds[0].compute_bound_ms > 0.0
+    assert artifact.aggregate_bound.status == "scored"
+    assert artifact.warnings == ()
+
+
 def test_unsupported_evidence_forces_unscored_aggregate():
     definition = make_definition(
         name="unsupported_demo",

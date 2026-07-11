@@ -16,11 +16,13 @@ from sol_execbench.core.scoring.amd_score.reports import (
     _build_amd_score_reports_for_problem_impl,
     write_amd_score_report,
 )
+from sol_execbench.core.scoring.amd_score.derived_artifacts import ResolvedHardwareModel
 from sol_execbench.core.scoring.baseline_artifact import ScoringBaselineArtifact
 from sol_execbench.core.scoring.official_score import (
     build_official_score_suite_evidence,
     validate_official_aggregation_policy,
 )
+from sol_execbench.core.scoring.release_baseline import OfficialReleaseBaseline
 
 __all__ = [
     "build_amd_score_reports_for_problem",
@@ -42,6 +44,7 @@ def build_amd_score_reports_for_problem(
     solar_derivation_dir: Path | None = None,
     sidecar_namespace: str | None = None,
     derived_sidecar_exclusions: dict[str, str] | None = None,
+    hardware_model: ResolvedHardwareModel | None = None,
 ) -> list[AmdNativeScore]:
     """Build derived AMD-native scores for one dataset-run problem."""
     return _build_amd_score_reports_for_problem_impl(
@@ -55,6 +58,7 @@ def build_amd_score_reports_for_problem(
         solar_derivation_dir=solar_derivation_dir,
         sidecar_namespace=sidecar_namespace,
         derived_sidecar_exclusions=derived_sidecar_exclusions,
+        hardware_model=hardware_model,
     )
 
 
@@ -70,6 +74,7 @@ def extend_derived_reports_for_problem(
     sol_bound_artifact_dir: Path | None,
     solar_derivation_dir: Path | None,
     derived_sidecar_exclusions: dict[str, str] | None = None,
+    hardware_model: ResolvedHardwareModel | None = None,
 ) -> None:
     """Append requested derived reports and materialize requested sidecars."""
     trace_ref = (
@@ -91,6 +96,7 @@ def extend_derived_reports_for_problem(
             solar_derivation_dir=solar_derivation_dir,
             sidecar_namespace=sidecar_namespace,
             derived_sidecar_exclusions=derived_sidecar_exclusions,
+            hardware_model=hardware_model,
         )
     )
 
@@ -105,6 +111,8 @@ def write_official_score_report(
     aggregation_policy: str,
     coverage_report: BaselineCoverageReport | None = None,
     source_score_ref: str | None = None,
+    release_baseline: OfficialReleaseBaseline | None = None,
+    expected_workloads: tuple[tuple[str, str], ...] | None = None,
 ) -> None:
     """Write canonical official-score evidence without partial artifacts."""
     normalized_policy = validate_official_aggregation_policy(aggregation_policy)
@@ -122,6 +130,9 @@ def write_official_score_report(
             else None
         ),
         coverage_report=coverage_report,
+        release_baseline=release_baseline,
+        expected_workloads=expected_workloads,
+        require_release_baseline=True,
     )
     serialized = json.dumps(suite.to_dict(), indent=2, sort_keys=True) + "\n"
     report_path.parent.mkdir(parents=True, exist_ok=True)

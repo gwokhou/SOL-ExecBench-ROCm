@@ -35,6 +35,11 @@ from sol_execbench.core.scoring.amd_sol.models import (
     OpSolBound,
     WorkEstimate,
 )
+from sol_execbench.core.scoring.amd_sol.origami import (
+    OrigamiGemmEstimate,
+    OrigamiGemmProvider,
+    OrigamiGemmRequest,
+)
 from sol_execbench.core.scoring.amd_sol.work import (
     _work_estimate_from_rich_estimate,
     estimate_work,
@@ -49,6 +54,9 @@ __all__ = [
     "GraphNode",
     "HardwareValidationStatus",
     "OpSolBound",
+    "OrigamiGemmEstimate",
+    "OrigamiGemmProvider",
+    "OrigamiGemmRequest",
     "WorkEstimate",
     "_CALL_ANALYZERS",
     "_CallAnalyzer",

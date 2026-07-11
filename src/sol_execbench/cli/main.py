@@ -139,6 +139,18 @@ _COMPILE_PROGRESS_TEXT = "Compiling HIP/C++ solution..."
     "--feedback-sol-version",
     help="Consumer SOL version/tag identity to persist in diagnostic agent feedback.",
 )
+@click.option(
+    "--release-bound-sha256", help="Immutable AMD SOL bound SHA-256 for release reruns."
+)
+@click.option(
+    "--release-hardware-model-sha256",
+    help="Immutable hardware-model SHA-256 for release reruns.",
+)
+@click.option(
+    "--release-authority-json",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="Per-workload release authority JSON.",
+)
 @click.option("--verbose", "-v", is_flag=True, help="Show subprocess output")
 def _evaluate_cli(
     problem_dir: Optional[Path],
@@ -160,6 +172,9 @@ def _evaluate_cli(
     feedback_candidate_id: str | None,
     feedback_source_sha256: str | None,
     feedback_sol_version: str | None,
+    release_bound_sha256: str | None,
+    release_hardware_model_sha256: str | None,
+    release_authority_json: Path | None,
     verbose: bool,
 ):
     """Evaluate a SOL-ExecBench solution on GPU.
@@ -194,6 +209,9 @@ def _evaluate_cli(
         feedback_candidate_id=feedback_candidate_id,
         feedback_source_sha256=feedback_source_sha256,
         feedback_sol_version=feedback_sol_version,
+        release_bound_sha256=release_bound_sha256,
+        release_hardware_model_sha256=release_hardware_model_sha256,
+        release_authority_json=release_authority_json,
         verbose=verbose,
     )
 

@@ -23,11 +23,16 @@ from sol_execbench.core.scoring.release_baseline import (
     ReleaseProvenance,
     build_release_baseline_bundle,
     load_release_baseline_bundle,
+    load_official_release_baseline,
     sha256_file,
     write_release_baseline_bundle,
     write_release_baseline_outputs,
     verify_release_baseline_rerun,
     write_release_baseline_verification,
+)
+from sol_execbench.core.scoring.baseline_artifact import (
+    ScoringBaselineArtifact,
+    ScoringBaselineEntry,
 )
 
 
@@ -636,3 +641,109 @@ def test_verifier_returns_full_blocked_report_for_unreadable_or_malformed_trace(
     assert len(report.workloads) == 1
     assert report.workloads[0].classification == "blocked"
     assert reason in report.workloads[0].blocker_reason_codes
+
+
+def test_official_release_baseline_requires_matching_official_rerun(tmp_path):
+    baseline_path = tmp_path / "scoring-baseline.json"
+    baseline = ScoringBaselineArtifact(
+        entries=(ScoringBaselineEntry("gemm", "w1", 10.0),),
+        release="v2.14",
+        source="release_baseline_bundle",
+    )
+    baseline_path.write_text(json.dumps(baseline.to_dict()), encoding="utf-8")
+    bundle = ReleaseBaselineBundle(
+        release="v2.14",
+        suite_manifest_ref="suite.json",
+        suite_manifest_sha256="a" * 64,
+        baseline_artifact_ref=str(baseline_path),
+        baseline_artifact_sha256=sha256_file(baseline_path),
+        provenance=_verification_provenance(tmp_path),
+        workloads=(
+            ReleaseBaselineWorkload(
+                "gemm",
+                "w1",
+                "official",
+                10.0,
+                (),
+                trace_ref="baseline.jsonl",
+                trace_sha256="c" * 64,
+                bound_ref="bound.json",
+                bound_sha256="d" * 64,
+                hardware_model_ref="model.json",
+                hardware_model_sha256="e" * 64,
+            ),
+        ),
+        latency_tolerance_rel=0.05,
+    )
+    bundle_path = tmp_path / "bundle.json"
+    write_release_baseline_bundle(bundle, bundle_path)
+    verification = ReleaseBaselineVerification(
+        release="v2.14",
+        bundle_ref=str(bundle_path),
+        bundle_sha256=sha256_file(bundle_path),
+        rerun_trace_ref="rerun.jsonl",
+        rerun_trace_sha256="f" * 64,
+        workloads=(
+            ReleaseBaselineVerificationWorkload(
+                "gemm", "w1", "official", "official", 10.0, 10.0, 0.0, True, ()
+            ),
+        ),
+    )
+    verification_path = tmp_path / "verification.json"
+    write_release_baseline_verification(verification, verification_path)
+
+    authority = load_official_release_baseline(
+        baseline_path=baseline_path,
+        bundle_path=bundle_path,
+        verification_path=verification_path,
+    )
+
+    assert authority.permits("gemm", "w1", 10.0)
+    assert not authority.permits("gemm", "w1", 10.1)
+
+
+def test_official_release_baseline_rejects_verification_bundle_drift(tmp_path):
+    baseline_path = tmp_path / "baseline.json"
+    baseline_path.write_text(
+        json.dumps(
+            ScoringBaselineArtifact(
+                entries=(ScoringBaselineEntry("gemm", "w1", 10.0),),
+                release="v2.14",
+                source="release_baseline_bundle",
+            ).to_dict()
+        ),
+        encoding="utf-8",
+    )
+    bundle = _official_bundle(tmp_path)
+    bundle = ReleaseBaselineBundle(
+        **{
+            **bundle.__dict__,
+            "baseline_artifact_ref": str(baseline_path),
+            "baseline_artifact_sha256": sha256_file(baseline_path),
+        }
+    )
+    bundle_path = tmp_path / "bundle.json"
+    write_release_baseline_bundle(bundle, bundle_path)
+    verification_path = tmp_path / "verification.json"
+    write_release_baseline_verification(
+        ReleaseBaselineVerification(
+            release=bundle.release,
+            bundle_ref=str(bundle_path),
+            bundle_sha256="0" * 64,
+            rerun_trace_ref="rerun.jsonl",
+            rerun_trace_sha256="f" * 64,
+            workloads=(
+                ReleaseBaselineVerificationWorkload(
+                    "gemm", "w1", "official", "official", 10.0, 10.0, 0.0, True, ()
+                ),
+            ),
+        ),
+        verification_path,
+    )
+
+    with pytest.raises(ValueError, match="does not match bundle"):
+        load_official_release_baseline(
+            baseline_path=baseline_path,
+            bundle_path=bundle_path,
+            verification_path=verification_path,
+        )

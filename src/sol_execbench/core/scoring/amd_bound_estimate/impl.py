@@ -50,7 +50,11 @@ def _with_hardware_profile_evidence(
     input_dtype = _profile_dtype(first_tensor_dtype(inputs))
     output_dtype = _profile_dtype(first_tensor_dtype(outputs))
     matrix_families = {OpFamily.GEMM, OpFamily.CONVOLUTION, OpFamily.ATTENTION}
-    operation = "matrix" if node.op_family in matrix_families else "vector"
+    operation = (
+        ("matrix" if node.op_family in matrix_families else "vector")
+        if estimate.flops > 0.0
+        else None
+    )
     path = str(
         node.attributes.get("compute_path")
         or ("mfma" if operation == "matrix" else "portable")
@@ -58,10 +62,14 @@ def _with_hardware_profile_evidence(
     return replace(
         estimate,
         compute_operation=operation,
-        input_dtype=input_dtype,
+        input_dtype=input_dtype or output_dtype,
         output_dtype=output_dtype,
-        compute_path=path,
-        memory_access=str(node.attributes.get("memory_access") or "stream_copy"),
+        compute_path=path if operation is not None else None,
+        memory_access=(
+            str(node.attributes.get("memory_access") or "stream_copy")
+            if estimate.total_bytes > 0.0
+            else None
+        ),
         memory_path=str(node.attributes.get("memory_path") or "portable"),
     )
 

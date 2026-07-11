@@ -26,6 +26,7 @@ from sol_execbench.core.scoring.official_score import (
     BASELINE_COVERAGE_FAILED_BLOCKER,
     OFFICIAL_AGGREGATION_POLICY,
     OFFICIAL_SCORE_SCHEMA_VERSION,
+    RELEASE_BASELINE_NOT_VERIFIED_BLOCKER,
 )
 from sol_execbench.core.dataset.runner_scoring import write_official_score_report
 
@@ -296,10 +297,11 @@ def test_runner_writes_official_score_sidecar(tmp_path: Path):
     assert report_path.exists()
     assert payload["schema_version"] == OFFICIAL_SCORE_SCHEMA_VERSION
     assert payload["aggregation_policy"] == OFFICIAL_AGGREGATION_POLICY
-    assert payload["score"] == 0.375
+    assert payload["score"] == 0.0
     assert payload["total_workload_count"] == 2
-    assert payload["scored_count"] == 1
-    assert payload["blocked_count"] == 1
+    assert payload["scored_count"] == 0
+    assert payload["blocked_count"] == 2
+    assert RELEASE_BASELINE_NOT_VERIFIED_BLOCKER in payload["blocker_summary"]
     assert all(
         score["input_refs"]["amd_native_score"] == "reports/amd-score.json"
         for score in payload["scores"]

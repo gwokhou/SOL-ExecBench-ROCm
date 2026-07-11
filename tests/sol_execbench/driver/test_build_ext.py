@@ -93,11 +93,16 @@ def _exec_build_ext(
     sys.modules["torch.utils.cpp_extension"] = fake_torch_utils_cpp
 
     old_cwd = Path.cwd()
+    previous_cxx = os.environ.get("CXX")
     try:
         os.chdir(cwd)
         exec(compile(script, "build_ext.py", "exec"), {"__builtins__": __builtins__})
     finally:
         os.chdir(old_cwd)
+        if previous_cxx is None:
+            os.environ.pop("CXX", None)
+        else:
+            os.environ["CXX"] = previous_cxx
         for mod_name, orig in saved_modules.items():
             if orig is None:
                 sys.modules.pop(mod_name, None)
@@ -126,6 +131,7 @@ class TestTemplateAST:
             elif isinstance(node, ast.ImportFrom):
                 import_names.append(node.module)
         assert "os" not in import_names
+        assert "shutil" in import_names
         assert "torch.utils.cpp_extension" in import_names
         assert "sol_execbench.core.data.solution" in import_names
 
@@ -239,6 +245,16 @@ class TestIncludePaths:
         mock = _exec_build_ext(tmp_path)
         includes = mock.load.call_args.kwargs["extra_include_paths"]
         assert includes == [str(tmp_path)]
+
+
+class TestRocmRootResolution:
+    def test_template_rebases_portable_rocm_flags(self):
+        source = _TEMPLATE_PATH.read_text()
+
+        assert 'shutil.which("hipcc")' in source
+        assert 'ENVIRON.setdefault("CXX"' in source
+        assert 'flag == "-I/opt/rocm/include"' in source
+        assert 'flag == "-L/opt/rocm/lib"' in source
 
 
 class TestSoRename:

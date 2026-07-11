@@ -1,23 +1,17 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""Official benchmark score evidence gates (STAGING).
+"""Official benchmark score evidence gates.
 
-The public standalone ``sol-execbench official-score`` CLI already emits
-``official_score_evidence.v1`` from an AMD-native score report, measured
-baseline input, and explicit aggregation policy.
-The dataset runner emits explicitly requested official output. This module does
-not give ordinary AMD-native reports, provisional evidence, or degraded bound
-evidence official-score authority.
+The standalone CLI validates a compact scoring baseline against a release
+bundle, independent rerun verification, and fixed suite manifest. The dataset runner emits explicitly requested official output, but it remains blocked without equivalent release evidence. Ordinary AMD-native reports, provisional evidence, and degraded bounds never gain official-score authority.
 
-The gate requires measured candidate latency, an official measured baseline,
-SOL/SOLAR bound evidence, and the aggregation policy. Missing prerequisites
-leave the workload score ``null`` with stable blocker codes. The fixed suite
-policy counts such blocked workloads as zero only in suite aggregation; it does
-not upgrade the blocked workload or its input evidence. The baseline-source
-classification sets (``_PLACEHOLDER_BASELINE_SOURCES`` /
-``DEFAULT_OFFICIAL_BASELINE_SOURCES``) cover ``scoring_baseline`` and
-``measured_baseline_registry``. An optional non-confirmed ``coverage_report``
+The gate requires measured candidate latency, a verified release baseline,
+SOL/SOLAR bound evidence, complete core references, and the aggregation policy.
+Missing prerequisites leave the workload score ``null`` with stable blockers.
+The fixed suite policy counts blocked workloads as zero only in suite
+aggregation. Only ``scoring_baseline`` is an official baseline source; an
+optional non-confirmed ``coverage_report``
 (:mod:`sol_execbench.core.evidence.baseline_coverage`) adds the
 ``baseline_coverage_failed`` umbrella blocker and its specific reason codes.
 """
@@ -42,6 +36,7 @@ if TYPE_CHECKING:
     # no hard import-time dependency on the evidence package (scoring -> evidence
     # is one-way; baseline_coverage has no internal sol_execbench imports).
     from sol_execbench.core.evidence.baseline_coverage import BaselineCoverageReport
+    from sol_execbench.core.scoring.release_baseline import OfficialReleaseBaseline
 
 
 OFFICIAL_SCORE_SCHEMA_VERSION = "sol_execbench.official_score_evidence.v1"
@@ -49,7 +44,7 @@ OFFICIAL_SCORE_SOURCE = "official_score_evidence"
 OFFICIAL_SCORE_KIND = "official_benchmark_score"
 OFFICIAL_SCORE_CLAIM_LEVEL = "official-confirmed"
 OFFICIAL_AGGREGATION_POLICY = "fixed_suite_denominator_zero_for_blocked"
-DEFAULT_OFFICIAL_BASELINE_SOURCES = ("scoring_baseline", "measured_baseline_registry")
+DEFAULT_OFFICIAL_BASELINE_SOURCES = ("scoring_baseline",)
 
 MISSING_SCORE_BLOCKER = "missing_score"
 MISSING_MEASURED_LATENCY_BLOCKER = "missing_measured_latency"
@@ -65,6 +60,10 @@ UNSUPPORTED_HARDWARE_PROFILE_BLOCKER = "unsupported_hardware_profile"
 HARDWARE_NOT_VALIDATED_BLOCKER = "hardware_not_validated"
 MODEL_NOT_VALIDATED_BLOCKER = "model_not_validated"
 BOUND_EVIDENCE_WARNING_BLOCKER = "bound_evidence_warning"
+MISSING_EVIDENCE_REFERENCE_BLOCKER = "missing_evidence_reference"
+RELEASE_BASELINE_NOT_VERIFIED_BLOCKER = "release_baseline_not_verified"
+BASELINE_NOT_SLOWER_THAN_SOL_BOUND_BLOCKER = "baseline_not_slower_than_sol_bound"
+CANDIDATE_BELOW_SOL_BOUND_BLOCKER = "candidate_below_sol_bound"
 
 _PLACEHOLDER_BASELINE_SOURCES = {
     "reference_latency",
@@ -226,6 +225,8 @@ def official_score_from_amd_native_score(
     source_score_ref: str | None = None,
     official_baseline_sources: Sequence[str] = DEFAULT_OFFICIAL_BASELINE_SOURCES,
     coverage_report: BaselineCoverageReport | None = None,
+    release_baseline: OfficialReleaseBaseline | None = None,
+    require_release_baseline: bool = False,
 ) -> OfficialScoreEvidence:
     """Gate a derived AMD-native score into official score evidence."""
     normalized_policy = validate_official_aggregation_policy(aggregation_policy)
@@ -234,6 +235,8 @@ def official_score_from_amd_native_score(
         aggregation_policy=normalized_policy,
         official_baseline_sources=official_baseline_sources,
         coverage_report=coverage_report,
+        release_baseline=release_baseline,
+        require_release_baseline=require_release_baseline,
     )
     official_score = score.score if not blockers else None
     input_refs = dict(score.evidence_refs)
@@ -271,20 +274,43 @@ def build_official_score_suite_evidence(
     source_score_refs_by_workload_uuid: dict[str, str] | None = None,
     official_baseline_sources: Sequence[str] = DEFAULT_OFFICIAL_BASELINE_SOURCES,
     coverage_report: BaselineCoverageReport | None = None,
+    release_baseline: OfficialReleaseBaseline | None = None,
+    expected_workloads: Iterable[tuple[str, str]] | None = None,
+    require_release_baseline: bool = False,
 ) -> OfficialScoreSuiteEvidence:
     """Build suite-level official score evidence from AMD-native score inputs."""
     source_score_refs_by_workload_uuid = source_score_refs_by_workload_uuid or {}
+    score_by_key: dict[tuple[str, str], AmdNativeScore] = {}
+    for score in scores:
+        score_key = (score.definition, score.workload_uuid)
+        if score_key in score_by_key:
+            raise ValueError(f"duplicate AMD-native score for workload {score_key!r}")
+        score_by_key[score_key] = score
+    expected = (
+        tuple(expected_workloads)
+        if expected_workloads is not None
+        else tuple(score_by_key)
+    )
+    if len(expected) != len(set(expected)):
+        raise ValueError("duplicate expected official-score workload")
+    unexpected = set(score_by_key) - set(expected)
+    if unexpected:
+        raise ValueError(
+            f"AMD-native score outside official suite: {sorted(unexpected)!r}"
+        )
     official_scores = tuple(
         official_score_from_amd_native_score(
-            score,
+            score_by_key[key],
             aggregation_policy=aggregation_policy,
-            source_score_ref=source_score_refs_by_workload_uuid.get(
-                score.workload_uuid
-            ),
+            source_score_ref=source_score_refs_by_workload_uuid.get(key[1]),
             official_baseline_sources=official_baseline_sources,
             coverage_report=coverage_report,
+            release_baseline=release_baseline,
+            require_release_baseline=require_release_baseline,
         )
-        for score in scores
+        if key in score_by_key
+        else _missing_score_evidence(key, aggregation_policy)
+        for key in expected
     )
     return OfficialScoreSuiteEvidence(
         scores=official_scores,
@@ -298,6 +324,8 @@ def _official_score_blockers(
     aggregation_policy: str | None,
     official_baseline_sources: Sequence[str],
     coverage_report: BaselineCoverageReport | None = None,
+    release_baseline: OfficialReleaseBaseline | None = None,
+    require_release_baseline: bool = False,
 ) -> list[str]:
     blockers: list[str] = []
     if aggregation_policy is None:
@@ -327,6 +355,13 @@ def _official_score_blockers(
         blockers.append(MISSING_MEASURED_LATENCY_BLOCKER)
     if not _is_positive_finite(score.sol_bound_ms):
         blockers.append(MISSING_SOL_BOUND_BLOCKER)
+    required_refs = {"trace", "timing", "sol_bound", "baseline", "hardware_model"}
+    if any(
+        not isinstance(score.evidence_refs.get(ref), str)
+        or not score.evidence_refs[ref].strip()
+        for ref in required_refs
+    ):
+        blockers.append(MISSING_EVIDENCE_REFERENCE_BLOCKER)
 
     baseline_source = score.baseline_source
     if baseline_source in _PLACEHOLDER_BASELINE_SOURCES:
@@ -335,6 +370,25 @@ def _official_score_blockers(
         blockers.append(MISSING_BASELINE_BLOCKER)
     elif not _is_positive_finite(score.baseline_latency_ms):
         blockers.append(MISSING_BASELINE_BLOCKER)
+    elif release_baseline is not None and not release_baseline.permits(
+        score.definition, score.workload_uuid, score.baseline_latency_ms
+    ):
+        blockers.append(RELEASE_BASELINE_NOT_VERIFIED_BLOCKER)
+    elif release_baseline is None and require_release_baseline:
+        blockers.append(RELEASE_BASELINE_NOT_VERIFIED_BLOCKER)
+
+    if (
+        _is_positive_finite(score.baseline_latency_ms)
+        and _is_positive_finite(score.sol_bound_ms)
+        and score.baseline_latency_ms <= score.sol_bound_ms
+    ):
+        blockers.append(BASELINE_NOT_SLOWER_THAN_SOL_BOUND_BLOCKER)
+    if (
+        _is_positive_finite(score.measured_latency_ms)
+        and _is_positive_finite(score.sol_bound_ms)
+        and score.measured_latency_ms < score.sol_bound_ms
+    ):
+        blockers.append(CANDIDATE_BELOW_SOL_BOUND_BLOCKER)
 
     # BASE-03: a non-confirmed measured-baseline coverage report is a suite-level
     # precondition failure. Emit the umbrella blocker plus the report's specific
@@ -370,3 +424,27 @@ def validate_official_aggregation_policy(policy: str | None) -> str | None:
 
 def _unique(values: list[str]) -> list[str]:
     return list(dict.fromkeys(values))
+
+
+def _missing_score_evidence(
+    key: tuple[str, str], aggregation_policy: str | None
+) -> OfficialScoreEvidence:
+    """Materialize a requested workload with no derived score as blocked evidence."""
+    normalized_policy = validate_official_aggregation_policy(aggregation_policy)
+    blockers = [MISSING_SCORE_BLOCKER, MISSING_MEASURED_LATENCY_BLOCKER]
+    if normalized_policy is None:
+        blockers.insert(0, MISSING_AGGREGATION_POLICY_BLOCKER)
+    return OfficialScoreEvidence(
+        definition=key[0],
+        workload_uuid=key[1],
+        score=None,
+        status="blocked",
+        score_source=OFFICIAL_SCORE_SOURCE,
+        score_kind=OFFICIAL_SCORE_KIND,
+        aggregation_policy=normalized_policy,
+        measured_latency_ms=None,
+        official_baseline_latency_ms=None,
+        sol_bound_ms=None,
+        baseline_source="missing",
+        blocker_reason_codes=tuple(blockers),
+    )

@@ -38,6 +38,7 @@ class _AstBoundGraphExtractor:
         self.definition = definition
         self.tensors = dict(initial_tensors)
         self.env = {name: f"input:{name}" for name in definition.inputs}
+        self.constants: dict[str, object] = {}
         self.output_names = output_names
         self.output_shapes = output_shapes
         self.nodes: list[BoundGraphNode] = []
@@ -76,6 +77,12 @@ class _AstBoundGraphExtractor:
 
     def _process_statement(self, statement: ast.stmt) -> None:
         if isinstance(statement, ast.Assign):
+            constant = self._static_value(statement.value)
+            if constant is not _STATIC_MISSING:
+                for target in statement.targets:
+                    if isinstance(target, ast.Name):
+                        self.constants[target.id] = constant
+                return
             value_tensor_ids = self._process_expr(statement.value)
             for target in statement.targets:
                 self._bind_target(target, value_tensor_ids)
@@ -90,19 +97,45 @@ class _AstBoundGraphExtractor:
             )
         elif isinstance(statement, ast.Expr):
             self._process_expr(statement.value)
-        elif isinstance(statement, (ast.If, ast.For, ast.While, ast.Raise)):
-            expression = ast.unparse(statement)
-            op_name = statement.__class__.__name__.lower()
-            self._append_node(
-                op_family=OpFamily.UNSUPPORTED,
-                op_name=op_name,
-                source_expression=expression,
-                input_tensor_ids=(),
-                confidence=EstimateConfidence.UNSUPPORTED,
-                rationale="unsupported dynamic control flow preserved as graph evidence",
-                attributes={},
-            )
-            self.warnings.append(f"unsupported_operator:{op_name}")
+        elif isinstance(statement, ast.If):
+            condition = self._static_value(statement.test)
+            if isinstance(condition, bool):
+                for nested in statement.body if condition else statement.orelse:
+                    self._process_statement(nested)
+            else:
+                self._append_unsupported_control_flow(statement)
+        elif isinstance(statement, ast.For):
+            values = self._static_range(statement.iter)
+            if values is None or not isinstance(statement.target, ast.Name):
+                self._append_unsupported_control_flow(statement)
+            else:
+                previous = self.constants.get(statement.target.id, _STATIC_MISSING)
+                for value in values:
+                    self.constants[statement.target.id] = value
+                    for nested in statement.body:
+                        self._process_statement(nested)
+                if previous is _STATIC_MISSING:
+                    self.constants.pop(statement.target.id, None)
+                else:
+                    self.constants[statement.target.id] = previous
+                for nested in statement.orelse:
+                    self._process_statement(nested)
+        elif isinstance(statement, (ast.While, ast.Raise)):
+            self._append_unsupported_control_flow(statement)
+
+    def _append_unsupported_control_flow(self, statement: ast.stmt) -> None:
+        expression = ast.unparse(statement)
+        op_name = statement.__class__.__name__.lower()
+        self._append_node(
+            op_family=OpFamily.UNSUPPORTED,
+            op_name=op_name,
+            source_expression=expression,
+            input_tensor_ids=(),
+            confidence=EstimateConfidence.UNSUPPORTED,
+            rationale="unsupported dynamic control flow preserved as graph evidence",
+            attributes={},
+        )
+        self.warnings.append(f"unsupported_operator:{op_name}")
 
     def _process_expr(self, expression: ast.AST | None) -> tuple[str, ...]:
         if expression is None:
@@ -110,19 +143,61 @@ class _AstBoundGraphExtractor:
         if isinstance(expression, ast.Name):
             tensor_id = self.env.get(expression.id)
             return (tensor_id,) if tensor_id is not None else ()
-        if isinstance(expression, ast.Tuple):
+        if isinstance(expression, (ast.Tuple, ast.List)):
             result: list[str] = []
             for element in expression.elts:
                 result.extend(self._process_expr(element))
             return tuple(result)
         if isinstance(expression, ast.BinOp):
             return self._process_binop(expression)
+        if isinstance(expression, ast.Compare):
+            input_tensor_ids: tuple[str, ...] = self._process_expr(expression.left)
+            for comparator in expression.comparators:
+                input_tensor_ids += self._process_expr(comparator)
+            return self._append_node(
+                op_family=OpFamily.ELEMENTWISE,
+                op_name=expression.ops[0].__class__.__name__.lower(),
+                source_expression=ast.unparse(expression),
+                input_tensor_ids=input_tensor_ids,
+                confidence=EstimateConfidence.INEXACT,
+                rationale="recognized elementwise comparison",
+                attributes={},
+            )
         if isinstance(expression, ast.Call):
             return self._process_call(expression)
         if isinstance(expression, ast.UnaryOp):
-            return self._process_expr(expression.operand)
+            input_tensor_ids = self._process_expr(expression.operand)
+            if not input_tensor_ids:
+                return ()
+            return self._append_node(
+                op_family=OpFamily.ELEMENTWISE,
+                op_name=expression.op.__class__.__name__.lower(),
+                source_expression=ast.unparse(expression),
+                input_tensor_ids=input_tensor_ids,
+                confidence=EstimateConfidence.INEXACT,
+                rationale="recognized elementwise unary operation",
+                attributes={},
+            )
         if isinstance(expression, ast.Subscript):
-            return self._process_expr(expression.value)
+            if isinstance(
+                expression.value, ast.Attribute
+            ) and expression.value.attr in {
+                "shape",
+                "stride",
+            }:
+                return ()
+            input_tensor_ids = self._process_expr(expression.value)
+            if not input_tensor_ids:
+                return ()
+            return self._append_node(
+                op_family=OpFamily.DATA_MOVEMENT,
+                op_name="getitem",
+                source_expression=ast.unparse(expression),
+                input_tensor_ids=input_tensor_ids,
+                confidence=EstimateConfidence.INEXACT,
+                rationale="recognized materialized tensor indexing operation",
+                attributes={"movement_kind": "materialized"},
+            )
         if isinstance(expression, ast.Attribute):
             return self._process_expr(expression.value)
         return ()
@@ -152,6 +227,17 @@ class _AstBoundGraphExtractor:
         )
 
     def _process_call(self, node: ast.Call) -> tuple[str, ...]:
+        func_name = _call_name(node.func)
+        if func_name.rsplit(".", maxsplit=1)[-1] in {
+            "dim",
+            "ndimension",
+            "numel",
+            "size",
+            "stride",
+            "is_contiguous",
+            "len",
+        }:
+            return ()
         input_tensor_ids: list[str] = []
         if isinstance(node.func, ast.Attribute):
             input_tensor_ids.extend(self._process_expr(node.func.value))
@@ -162,7 +248,6 @@ class _AstBoundGraphExtractor:
         for keyword in node.keywords:
             input_tensor_ids.extend(self._process_expr(keyword.value))
 
-        func_name = _call_name(node.func)
         classification = _classify_call(func_name)
         if classification is None:
             self.warnings.append(f"unsupported_operator:{func_name or '<unknown>'}")
@@ -236,6 +321,67 @@ class _AstBoundGraphExtractor:
             )
         return (output_tensor_id,)
 
+    def _static_range(self, expression: ast.AST) -> tuple[int, ...] | None:
+        if (
+            not isinstance(expression, ast.Call)
+            or _call_name(expression.func) != "range"
+        ):
+            return None
+        values = [self._static_value(arg) for arg in expression.args]
+        if not values or any(not isinstance(value, int) for value in values):
+            return None
+        int_values = [value for value in values if isinstance(value, int)]
+        try:
+            if len(int_values) == 1:
+                result = tuple(range(int_values[0]))
+            elif len(int_values) == 2:
+                result = tuple(range(int_values[0], int_values[1]))
+            elif len(int_values) == 3:
+                result = tuple(range(int_values[0], int_values[1], int_values[2]))
+            else:
+                return None
+        except (TypeError, ValueError):
+            return None
+        return result if len(result) <= 1024 else None
+
+    def _static_value(self, expression: ast.AST) -> object:
+        if isinstance(expression, ast.Constant):
+            return expression.value
+        if isinstance(expression, ast.Name):
+            return self.constants.get(expression.id, _STATIC_MISSING)
+        if isinstance(expression, ast.UnaryOp):
+            operand = self._static_value(expression.operand)
+            if operand is _STATIC_MISSING:
+                return _STATIC_MISSING
+            if isinstance(expression.op, ast.Not):
+                return not bool(operand)
+            if isinstance(expression.op, ast.USub) and isinstance(operand, int | float):
+                return -operand
+        if isinstance(expression, ast.Compare) and len(expression.ops) == 1:
+            left = self._static_value(expression.left)
+            right = self._static_value(expression.comparators[0])
+            if left is _STATIC_MISSING or right is _STATIC_MISSING:
+                return _STATIC_MISSING
+            op = expression.ops[0]
+            left_value: Any = left
+            right_value: Any = right
+            try:
+                if isinstance(op, ast.Eq):
+                    return left_value == right_value
+                if isinstance(op, ast.NotEq):
+                    return left_value != right_value
+                if isinstance(op, ast.Lt):
+                    return left_value < right_value
+                if isinstance(op, ast.LtE):
+                    return left_value <= right_value
+                if isinstance(op, ast.Gt):
+                    return left_value > right_value
+                if isinstance(op, ast.GtE):
+                    return left_value >= right_value
+            except TypeError:
+                return _STATIC_MISSING
+        return _STATIC_MISSING
+
     def _bind_target(self, target: ast.AST, tensor_ids: tuple[str, ...]) -> None:
         if isinstance(target, ast.Name) and tensor_ids:
             self.env[target.id] = tensor_ids[0]
@@ -287,3 +433,6 @@ def _call_name(node: ast.AST) -> str:
     if isinstance(node, ast.Name):
         return node.id
     return ""
+
+
+_STATIC_MISSING = object()

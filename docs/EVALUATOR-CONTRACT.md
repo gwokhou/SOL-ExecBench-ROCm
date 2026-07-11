@@ -122,10 +122,10 @@ fields.
 > `src/sol_execbench/core/scoring/official_score.py` and are re-exported from
 > the scoring package. The `official_score.evidence` capability is advertised
 > as `confirmed`. The `sol-execbench official-score` CLI emits the artifact
-> directly, and the dataset runner can emit it when callers explicitly request
-> `--official-score-report`, provide an AMD-native report and scoring baseline,
-> and select
-> `--official-aggregation-policy fixed_suite_denominator_zero_for_blocked`.
+> directly when callers provide an AMD-native report, a compact scoring
+> baseline, the matching release bundle, an independent rerun verification,
+> and the canonical suite manifest. The dataset runner may write a requested
+> sidecar, but without those release artifacts it is intentionally blocked.
 > AMD-native score reports (`sol_execbench.amd_native_score.v1`) remain derived
 > inputs and do not independently carry confirmed official-score authority.
 

@@ -148,8 +148,8 @@ def _build(calibration_path: Path, output: Path, max_age_hours: float | None) ->
             candidate.value
             for candidate in adapter_for(architecture).candidates
             if candidate.operation == "matrix"
-            and candidate.input_dtype == "bf16"
-            and candidate.output_dtype == "bf16"
+            and candidate.input_dtype in {"bf16", "fp16"}
+            and candidate.output_dtype == candidate.input_dtype
         }
         missing_matrix_keys = required_matrix_keys - {
             candidate.key for candidate in calibration.candidates

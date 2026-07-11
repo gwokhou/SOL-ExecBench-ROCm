@@ -90,6 +90,18 @@ def render_amd_bound_sanity_markdown(report: AmdBoundSanityReport) -> str:
             f"{_md_cell(gap['next_evidence'])} |"
         )
 
+    lines.extend(["", "## Authority Blockers", "", "| Blocker | Count |"])
+    lines.append("|---------|------:|")
+    for blocker, count in payload["blocker_code_counts"].items():
+        lines.append(f"| {_md_cell(blocker)} | {count} |")
+
+    lines.extend(["", "## Operator Audit", "", "| Kind | Name | Count |"])
+    lines.append("|------|------|------:|")
+    for operator, count in payload["operator_counts"].items():
+        lines.append(f"| operator | {_md_cell(operator)} | {count} |")
+    for family, count in payload["op_family_counts"].items():
+        lines.append(f"| family | {_md_cell(family)} | {count} |")
+
     lines.extend(["", "## Sources", "", "| Source | Schema | Checksum | Ref | Path |"])
     lines.append("|--------|--------|----------|-----|------|")
     lines.extend(_source_rows(payload))

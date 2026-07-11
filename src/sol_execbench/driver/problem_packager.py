@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import Any
 
 from ..core.bench.config import BenchmarkConfig
+from ..core.bench.clock_lock import lock_clocks, unlock_clocks
 from ..core.data.solution import NATIVE_ROCM_LANGUAGES
 from .build_config import (
     first_gfx_target as _first_gfx_target_core,
@@ -84,6 +85,8 @@ class ProblemPackager:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.keep_output_dir = keep_output_dir
         self._closed = False
+        self._clock_lock_active = False
+        self._prior_clock_lock_env: str | None = None
 
         self.definition = definition
         self.workloads = workloads
@@ -116,6 +119,13 @@ class ProblemPackager:
         if self._closed:
             return
         self._closed = True
+        if self.config.lock_clocks:
+            if self._clock_lock_active:
+                unlock_clocks()
+            if self._prior_clock_lock_env is None:
+                os.environ.pop("SOL_EXECBENCH_CLOCKS_LOCKED", None)
+            else:
+                os.environ["SOL_EXECBENCH_CLOCKS_LOCKED"] = self._prior_clock_lock_env
         if not self.keep_output_dir:
             shutil.rmtree(self.output_dir, ignore_errors=True)
 
@@ -198,6 +208,13 @@ class ProblemPackager:
                     f"benchmark_kernel.so not found at {so_path} — "
                     "run compile() first for HIP/C++ solutions"
                 )
+
+        if self.config.lock_clocks:
+            self._prior_clock_lock_env = os.environ.get("SOL_EXECBENCH_CLOCKS_LOCKED")
+            self._clock_lock_active = lock_clocks()
+            os.environ["SOL_EXECBENCH_CLOCKS_LOCKED"] = (
+                "1" if self._clock_lock_active else "0"
+            )
 
         (self.output_dir / "eval_driver.py").write_text(
             (_TEMPLATES_DIR / "eval_driver.py").read_text()

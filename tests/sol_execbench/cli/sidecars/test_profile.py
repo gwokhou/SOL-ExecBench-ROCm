@@ -149,3 +149,13 @@ def test_profile_output_directory_tracks_trace_output(tmp_path: Path):
     assert cli_profile_sidecars._profile_output_directory(output, tmp_path) == (
         tmp_path / "run" / "trace.jsonl.rocprofv3"
     )
+
+
+def test_profile_output_directory_is_absolute_for_relative_trace_output(
+    tmp_path: Path, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+
+    assert cli_profile_sidecars._profile_output_directory(
+        Path("out/trace.jsonl"), tmp_path
+    ) == (tmp_path / "out" / "trace.jsonl.rocprofv3")

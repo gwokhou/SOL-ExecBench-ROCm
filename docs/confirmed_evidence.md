@@ -38,7 +38,10 @@ SOL emits `official_score_evidence.v1` via the GPU-free CLI:
 ```bash
 sol-execbench official-score \
   --amd-native-score amd-native-score.json \
-  --measured-registry measured-baseline-registry.json \
+  --scoring-baseline scoring-baseline.json \
+  --release-baseline-bundle release-baseline-bundle.json \
+  --release-baseline-verification release-baseline-verification.json \
+  --suite-manifest suite.json \
   --aggregation-policy "fixed_suite_denominator_zero_for_blocked" \
   --current-run-env-hardware gfx1200 \
   --current-run-env-rocm 7.1 \
@@ -77,14 +80,16 @@ contract as `confirmed_evidence_blockers`:
   `baseline_hardware_mismatch`, `baseline_timing_policy_mismatch`, and
   `baseline_stale_trace` when measured baseline coverage does not fully confirm)
 
-### Reference Latency Is Not Confirmed Baseline
+### Release Baseline Is Required
 
 `reference_latency_ms` and placeholder/reference baseline fallback are blocked
 for confirmed official score claims. A baseline sourced from
 `reference_latency` produces a `placeholder_baseline` blocker, not a confirmed
-score. Confirmed baseline authority requires either `scoring_baseline`
-(release-scoped `ScoringBaselineArtifact`) or `measured_baseline_registry`
-(measured baseline registry) with fully confirmed coverage.
+score. Confirmed baseline authority requires a `scoring_baseline` entry whose
+digest matches `release_baseline_bundle.v1` and whose workload is `official` in
+both the bundle and its independent `release_baseline_verification.v1`.
+`measured_baseline_registry` remains useful for coverage diagnostics, but it
+cannot supply `T_b`.
 
 ## Fixture Cases
 
