@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any, cast
 
 import click
 
@@ -177,8 +178,9 @@ def _suite_workloads(path: Path) -> tuple[tuple[str, str], ...]:
     for index, row in enumerate(rows):
         if not isinstance(row, dict):
             raise ValueError(f"suite workload {index} must be an object")
-        definition = row.get("definition")
-        workload_uuid = row.get("workload_uuid")
+        typed_row = cast(dict[str, Any], row)
+        definition = typed_row.get("definition")
+        workload_uuid = typed_row.get("workload_uuid")
         if not isinstance(definition, str) or not definition.strip():
             raise ValueError(f"suite workload {index} has invalid definition")
         if not isinstance(workload_uuid, str) or not workload_uuid.strip():

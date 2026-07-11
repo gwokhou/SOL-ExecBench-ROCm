@@ -377,16 +377,23 @@ def _official_score_blockers(
     elif release_baseline is None and require_release_baseline:
         blockers.append(RELEASE_BASELINE_NOT_VERIFIED_BLOCKER)
 
+    baseline_latency = score.baseline_latency_ms
+    measured_latency = score.measured_latency_ms
+    sol_bound = score.sol_bound_ms
     if (
-        _is_positive_finite(score.baseline_latency_ms)
-        and _is_positive_finite(score.sol_bound_ms)
-        and score.baseline_latency_ms <= score.sol_bound_ms
+        isinstance(baseline_latency, int | float)
+        and isinstance(sol_bound, int | float)
+        and _is_positive_finite(baseline_latency)
+        and _is_positive_finite(sol_bound)
+        and baseline_latency <= sol_bound
     ):
         blockers.append(BASELINE_NOT_SLOWER_THAN_SOL_BOUND_BLOCKER)
     if (
-        _is_positive_finite(score.measured_latency_ms)
-        and _is_positive_finite(score.sol_bound_ms)
-        and score.measured_latency_ms < score.sol_bound_ms
+        isinstance(measured_latency, int | float)
+        and isinstance(sol_bound, int | float)
+        and _is_positive_finite(measured_latency)
+        and _is_positive_finite(sol_bound)
+        and measured_latency < sol_bound
     ):
         blockers.append(CANDIDATE_BELOW_SOL_BOUND_BLOCKER)
 
