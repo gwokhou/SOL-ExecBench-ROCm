@@ -25,6 +25,8 @@ from sol_execbench.core.scoring.release_baseline import (
     sha256_file,
     write_release_baseline_bundle,
     write_release_baseline_outputs,
+    verify_release_baseline_rerun,
+    write_release_baseline_verification,
 )
 
 
@@ -56,6 +58,57 @@ def _write_trace(tmp_path: Path, *traces: dict[str, Any]) -> Path:
         encoding="utf-8",
     )
     return path
+
+
+def _verification_provenance(
+    tmp_path: Path, *, solution_sha256: str | None = None
+) -> ReleaseProvenance:
+    provenance = _provenance(tmp_path)
+    return ReleaseProvenance(
+        solution=provenance.solution,
+        solution_sha256=solution_sha256 or provenance.solution_sha256,
+        environment_fingerprint="environment-a",
+        clock_policy="locked",
+        compiler_build_id="rocm-7.1",
+        timing_policy="latency_ms",
+        suite_manifest_sha256="a" * 64,
+    )
+
+
+def _official_bundle(tmp_path: Path, *, latency: float = 10.0) -> ReleaseBaselineBundle:
+    return ReleaseBaselineBundle(
+        release="v2.14",
+        suite_manifest_ref="suite.json",
+        suite_manifest_sha256="a" * 64,
+        baseline_artifact_ref="baseline.json",
+        baseline_artifact_sha256="b" * 64,
+        provenance=_verification_provenance(tmp_path),
+        workloads=(
+            ReleaseBaselineWorkload(
+                "gemm",
+                "w1",
+                "official",
+                latency,
+                (),
+                trace_ref="baseline.jsonl",
+                trace_sha256="c" * 64,
+                bound_ref="bound.json",
+                bound_sha256="d" * 64,
+                hardware_model_ref="model.json",
+                hardware_model_sha256="e" * 64,
+            ),
+        ),
+        latency_tolerance_rel=0.05,
+    )
+
+
+def _rerun_trace(latency: float = 10.0, **evidence: str) -> dict[str, Any]:
+    trace = _passed_trace("gemm", "w1", latency)
+    trace["evaluation"]["release_baseline"] = {
+        "bound_sha256": evidence.get("bound_sha256", "d" * 64),
+        "hardware_model_sha256": evidence.get("hardware_model_sha256", "e" * 64),
+    }
+    return trace
 
 
 def _build_with_trace(
@@ -356,3 +409,77 @@ def test_writer_rejects_one_path_for_both_linked_artifacts(tmp_path):
             baseline_path=tmp_path / "output.json",
             bundle_path=tmp_path / "output.json",
         )
+
+
+def test_verifier_accepts_latency_at_relative_tolerance_boundary(tmp_path):
+    bundle = _official_bundle(tmp_path, latency=10.0)
+
+    report = verify_release_baseline_rerun(
+        bundle=bundle,
+        rerun_trace_path=_write_trace(tmp_path, _rerun_trace(10.5)),
+        rerun_provenance=bundle.provenance,
+    )
+
+    assert report.workloads[0].classification == "official"
+    assert report.workloads[0].latency_delta_rel == pytest.approx(0.05)
+    assert report.workloads[0].passed is True
+
+
+def test_verifier_blocks_solution_hash_mismatch_even_when_latency_matches(tmp_path):
+    bundle = _official_bundle(tmp_path)
+
+    report = verify_release_baseline_rerun(
+        bundle=bundle,
+        rerun_trace_path=_write_trace(tmp_path, _rerun_trace()),
+        rerun_provenance=_verification_provenance(tmp_path, solution_sha256="f" * 64),
+    )
+
+    assert "solution_hash_mismatch" in report.workloads[0].blocker_reason_codes
+
+
+@pytest.mark.parametrize(
+    ("reason", "trace_evidence", "provenance_kwargs", "latency"),
+    [
+        (
+            "environment_fingerprint_mismatch",
+            {},
+            {"environment_fingerprint": "other"},
+            10.0,
+        ),
+        ("timing_policy_mismatch", {}, {"timing_policy": "rocprofv3"}, 10.0),
+        ("bound_checksum_mismatch", {"bound_sha256": "f" * 64}, {}, 10.0),
+        ("latency_outside_tolerance", {}, {}, 10.6),
+    ],
+)
+def test_verifier_reports_stable_blocker_codes(
+    tmp_path, reason, trace_evidence, provenance_kwargs, latency
+):
+    bundle = _official_bundle(tmp_path)
+    provenance = _verification_provenance(tmp_path)
+    provenance = ReleaseProvenance(**{**provenance.to_dict(), **provenance_kwargs})
+
+    report = verify_release_baseline_rerun(
+        bundle=bundle,
+        rerun_trace_path=_write_trace(
+            tmp_path, _rerun_trace(latency, **trace_evidence)
+        ),
+        rerun_provenance=provenance,
+    )
+
+    assert report.workloads[0].classification == "blocked"
+    assert reason in report.workloads[0].blocker_reason_codes
+
+
+def test_verifier_writes_deterministic_output(tmp_path):
+    bundle = _official_bundle(tmp_path)
+    report = verify_release_baseline_rerun(
+        bundle=bundle,
+        rerun_trace_path=_write_trace(tmp_path, _rerun_trace()),
+        rerun_provenance=bundle.provenance,
+    )
+    first, second = tmp_path / "first.json", tmp_path / "second.json"
+
+    write_release_baseline_verification(report, first)
+    write_release_baseline_verification(report, second)
+
+    assert first.read_bytes() == second.read_bytes()
