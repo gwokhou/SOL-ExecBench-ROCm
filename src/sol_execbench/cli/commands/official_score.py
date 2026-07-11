@@ -24,7 +24,10 @@ from ...core.evidence.baseline_coverage import (
     validate_baseline_coverage,
 )
 from ...core.scoring.amd_score import amd_native_suite_report_from_dict
-from ...core.scoring.official_score import build_official_score_suite_evidence
+from ...core.scoring.official_score import (
+    OFFICIAL_AGGREGATION_POLICY,
+    build_official_score_suite_evidence,
+)
 
 
 @click.command(
@@ -49,7 +52,8 @@ from ...core.scoring.official_score import build_official_score_suite_evidence
     "--aggregation-policy",
     "aggregation_policy",
     required=True,
-    help="Score aggregation policy (e.g. 'mean of per-workload SOL scores').",
+    type=click.Choice([OFFICIAL_AGGREGATION_POLICY], case_sensitive=True),
+    help="Required official score aggregation policy.",
 )
 @click.option(
     "--current-run-env-hardware",

@@ -32,22 +32,22 @@
     "target_id": "attention"
   },
   "official_score_evidence": {
-    "aggregation_policy": "mean of per-workload SOL scores",
+    "aggregation_policy": "fixed_suite_denominator_zero_for_blocked",
     "blocker_summary": {
       "placeholder_baseline": 1
     },
     "canonical_output": "trace_jsonl",
     "input_summary": {},
-    "mean_score": null,
+    "mean_score": 0.0,
     "schema_version": "sol_execbench.official_score_evidence.v1",
-    "score": null,
+    "score": 0.0,
     "score_authority": false,
     "score_kind": "official_benchmark_score",
     "score_source": "official_score_evidence",
     "scored_count": 0,
     "scores": [
       {
-        "aggregation_policy": "mean of per-workload SOL scores",
+        "aggregation_policy": "fixed_suite_denominator_zero_for_blocked",
         "baseline_source": "reference_latency",
         "blocker_reason_codes": [
           "placeholder_baseline"
@@ -70,6 +70,9 @@
         "workload_uuid": "workload-1"
       }
     ],
+    "total_workload_count": 1,
+    "blocked_count": 1,
+    "zero_scored_count": 1,
     "unscored_count": 1
   }
 }

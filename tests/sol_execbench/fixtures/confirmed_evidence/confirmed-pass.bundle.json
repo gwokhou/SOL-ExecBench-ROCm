@@ -32,7 +32,7 @@
     "target_id": "attention"
   },
   "official_score_evidence": {
-    "aggregation_policy": "mean of per-workload SOL scores",
+    "aggregation_policy": "fixed_suite_denominator_zero_for_blocked",
     "blocker_summary": {},
     "canonical_output": "trace_jsonl",
     "input_summary": {},
@@ -45,7 +45,7 @@
     "scored_count": 1,
     "scores": [
       {
-        "aggregation_policy": "mean of per-workload SOL scores",
+        "aggregation_policy": "fixed_suite_denominator_zero_for_blocked",
         "baseline_source": "scoring_baseline",
         "blocker_reason_codes": [],
         "claim_level": "official-confirmed",
@@ -66,6 +66,9 @@
         "workload_uuid": "workload-1"
       }
     ],
+    "total_workload_count": 1,
+    "blocked_count": 0,
+    "zero_scored_count": 0,
     "unscored_count": 0
   }
 }

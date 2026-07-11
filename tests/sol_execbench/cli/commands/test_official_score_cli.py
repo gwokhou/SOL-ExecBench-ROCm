@@ -22,6 +22,7 @@ from sol_execbench.core.scoring.official_score import (
     BASELINE_COVERAGE_FAILED_BLOCKER,
     MISSING_BASELINE_BLOCKER,
     MISSING_SCORE_BLOCKER,
+    OFFICIAL_AGGREGATION_POLICY,
     PLACEHOLDER_BASELINE_BLOCKER,
 )
 from sol_execbench.core.reports.reporting import CANONICAL_BENCHMARK_OUTPUT
@@ -113,7 +114,6 @@ def _invoke(
     *,
     report_path: Path,
     registry_path: Path,
-    aggregation_policy: str | None,
     env_hardware: str | None = "gfx1200",
     env_timing_policy: str | None = "latency_ms",
 ):
@@ -124,8 +124,7 @@ def _invoke(
         "--measured-registry",
         str(registry_path),
     ]
-    if aggregation_policy is not None:
-        args.extend(["--aggregation-policy", aggregation_policy])
+    args.extend(["--aggregation-policy", OFFICIAL_AGGREGATION_POLICY])
     if env_hardware is not None:
         args.extend(["--current-run-env-hardware", env_hardware])
     if env_timing_policy is not None:
@@ -144,11 +143,11 @@ def test_valid_run_emits_confirmed_score_with_no_blockers(tmp_path: Path) -> Non
         tmp_path,
         report_path=report_path,
         registry_path=registry_path,
-        aggregation_policy="mean of per-workload SOL scores",
     )
 
     # GATE-03 valid case: no missing_score / missing_baseline / placeholder_baseline.
     assert payload["score_authority"] is True
+    assert payload["aggregation_policy"] == OFFICIAL_AGGREGATION_POLICY
     assert payload["scored_count"] == 1
     assert payload["unscored_count"] == 0
     for blocker in (
@@ -172,7 +171,6 @@ def test_missing_baseline_keeps_precise_blocker(tmp_path: Path) -> None:
         tmp_path,
         report_path=report_path,
         registry_path=registry_path,
-        aggregation_policy="mean of per-workload SOL scores",
     )
 
     assert payload["score_authority"] is False
@@ -187,7 +185,6 @@ def test_placeholder_baseline_keeps_precise_blocker(tmp_path: Path) -> None:
         tmp_path,
         report_path=report_path,
         registry_path=registry_path,
-        aggregation_policy="mean of per-workload SOL scores",
     )
 
     assert payload["score_authority"] is False
@@ -205,7 +202,6 @@ def test_coverage_failure_blocks_score_and_propagates_codes(tmp_path: Path) -> N
         tmp_path,
         report_path=report_path,
         registry_path=registry_path,
-        aggregation_policy="mean of per-workload SOL scores",
         env_hardware="gfx942",  # mismatch -> coverage failure
         env_timing_policy="latency_ms",
     )
@@ -213,6 +209,54 @@ def test_coverage_failure_blocks_score_and_propagates_codes(tmp_path: Path) -> N
     assert payload["score_authority"] is False
     assert BASELINE_COVERAGE_FAILED_BLOCKER in payload["blocker_summary"]
     assert "baseline_hardware_mismatch" in payload["blocker_summary"]
+
+
+def test_placeholder_baseline_contributes_zero_to_suite_score(tmp_path: Path) -> None:
+    report_path = _write_report(
+        tmp_path,
+        [
+            _score(),
+            _score(workload_uuid="workload-2", baseline_source="reference_latency"),
+        ],
+    )
+    registry_path = _write_registry(tmp_path)
+
+    payload = _invoke(
+        tmp_path,
+        report_path=report_path,
+        registry_path=registry_path,
+    )
+
+    assert payload["score"] == 0.375
+    assert payload["mean_score"] == 0.375
+    assert payload["total_workload_count"] == 2
+    assert payload["scored_count"] == 1
+    assert payload["blocked_count"] == 1
+    assert payload["zero_scored_count"] == 1
+    assert payload["unscored_count"] == 1
+
+
+def test_legacy_aggregation_policy_refuses_and_help_lists_only_policy(
+    tmp_path: Path,
+) -> None:
+    report_path = _write_report(tmp_path, [_score()])
+    registry_path = _write_registry(tmp_path)
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "official-score",
+            "--amd-native-score",
+            str(report_path),
+            "--measured-registry",
+            str(registry_path),
+            "--aggregation-policy",
+            "mean of per-workload SOL scores",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert OFFICIAL_AGGREGATION_POLICY in result.output
 
 
 def test_missing_aggregation_policy_refuses(tmp_path: Path) -> None:
@@ -227,7 +271,6 @@ def test_missing_aggregation_policy_refuses(tmp_path: Path) -> None:
             str(report_path),
             "--measured-registry",
             str(registry_path),
-            # --aggregation-policy intentionally omitted
         ],
     )
 

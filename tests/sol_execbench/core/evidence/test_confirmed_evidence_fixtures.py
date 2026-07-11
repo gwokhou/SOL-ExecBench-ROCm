@@ -15,6 +15,8 @@ from pathlib import Path
 
 import pytest
 
+from sol_execbench.core.scoring.official_score import OFFICIAL_AGGREGATION_POLICY
+
 FIXTURE_DIR = (
     Path(__file__).resolve().parents[4]
     / "tests/sol_execbench/fixtures/confirmed_evidence"
@@ -70,6 +72,24 @@ def test_confirmed_pass_has_no_blockers_and_score_authority() -> None:
     assert evidence["score_authority"] is True
     assert evidence["scored_count"] == 1
     assert evidence["unscored_count"] == 0
+
+
+@pytest.mark.parametrize("case", CASES)
+def test_bundle_serialization_uses_fixed_denominator_policy(case: str) -> None:
+    bundle, _ = _load(case)
+    evidence = bundle["official_score_evidence"]
+
+    assert evidence["aggregation_policy"] == OFFICIAL_AGGREGATION_POLICY
+    assert evidence["total_workload_count"] == len(evidence["scores"])
+    assert evidence["blocked_count"] == evidence["unscored_count"]
+    assert evidence["zero_scored_count"] == evidence["blocked_count"]
+    assert evidence["score"] == evidence["mean_score"]
+    assert evidence["score"] == (
+        sum(score["score"] or 0.0 for score in evidence["scores"])
+        / evidence["total_workload_count"]
+    )
+    for score in evidence["scores"]:
+        assert score["aggregation_policy"] == OFFICIAL_AGGREGATION_POLICY
 
 
 @pytest.mark.parametrize("case", ["profiler-partial", "diagnostic-only-sidecar"])
