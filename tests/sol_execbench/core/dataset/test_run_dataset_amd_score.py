@@ -11,11 +11,21 @@ import pytest
 
 from sol_execbench.core.bench.config import BenchmarkConfig
 from sol_execbench.core.dataset.evidence_refs import sidecar_stem_for_workload
-from sol_execbench.core.scoring.amd_score import build_amd_native_suite_report
+from sol_execbench.core.scoring.amd_score import (
+    AMD_SCORE_CLAIM_LEVEL,
+    AmdNativeScore,
+    BoundEligibilityEvidence,
+    build_amd_native_suite_report,
+)
 import sol_execbench.core.scoring.amd_score.derived_artifacts as amd_score_derived_artifacts
 from sol_execbench.core.scoring.baseline_artifact import (
     scoring_baseline_artifact_from_dict,
 )
+from sol_execbench.core.scoring.official_score import (
+    OFFICIAL_AGGREGATION_POLICY,
+    OFFICIAL_SCORE_SCHEMA_VERSION,
+)
+from sol_execbench.core.dataset.runner_scoring import write_official_score_report
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 RUN_DATASET_PATH = REPO_ROOT / "scripts" / "run_dataset.py"
@@ -26,6 +36,40 @@ assert spec.loader is not None
 spec.loader.exec_module(run_dataset)
 build_amd_score_reports_for_problem = run_dataset.build_amd_score_reports_for_problem
 collect_timing_evidence_for_problem = run_dataset.collect_timing_evidence_for_problem
+
+
+def _official_ready_score(score: float) -> AmdNativeScore:
+    return AmdNativeScore(
+        definition="matmul_demo",
+        workload_uuid="official-ready",
+        measured_latency_ms=1.0,
+        baseline_latency_ms=2.0,
+        sol_bound_ms=0.5,
+        score=score,
+        claim_level=AMD_SCORE_CLAIM_LEVEL,
+        warnings=(),
+        baseline_source="scoring_baseline",
+        evidence_refs={},
+        derived_evidence_refs={},
+        bound_eligibility=BoundEligibilityEvidence(
+            amd_sol_status="scored",
+            solar_status="scored",
+            hardware_profile_state="measured",
+            hardware_validation_status="validated",
+            model_validation_status="validated",
+            warnings=(),
+        ),
+    )
+
+
+def _official_blocked_score() -> AmdNativeScore:
+    return AmdNativeScore(
+        **{
+            **_official_ready_score(0.75).__dict__,
+            "workload_uuid": "official-blocked",
+            "baseline_source": "reference_latency",
+        }
+    )
 
 
 def _matmul_definition() -> dict:
@@ -233,6 +277,31 @@ def test_runner_score_report_wrapper_uses_cli_execution_run_cli(
 
     assert scores == []
     assert calls[0]["run_cli_func"] is cli_execution.run_cli
+
+
+def test_runner_writes_official_score_sidecar(tmp_path: Path):
+    report_path = tmp_path / "official-score.json"
+
+    write_official_score_report(
+        report_path,
+        [_official_ready_score(0.75), _official_blocked_score()],
+        aggregation_policy=OFFICIAL_AGGREGATION_POLICY,
+        source_score_ref="reports/amd-score.json",
+    )
+
+    payload = json.loads(report_path.read_text())
+
+    assert report_path.exists()
+    assert payload["schema_version"] == OFFICIAL_SCORE_SCHEMA_VERSION
+    assert payload["aggregation_policy"] == OFFICIAL_AGGREGATION_POLICY
+    assert payload["score"] == 0.375
+    assert payload["total_workload_count"] == 2
+    assert payload["scored_count"] == 1
+    assert payload["blocked_count"] == 1
+    assert all(
+        score["input_refs"]["amd_native_score"] == "reports/amd-score.json"
+        for score in payload["scores"]
+    )
 
 
 def test_dataset_helper_keeps_scoring_when_solar_derivation_parse_fails(

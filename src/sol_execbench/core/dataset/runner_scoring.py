@@ -4,19 +4,26 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 import sol_execbench.core.dataset.cli_execution as cli_execution
+from sol_execbench.core.evidence.baseline_coverage import BaselineCoverageReport
 from sol_execbench.core.scoring.amd_score import AmdNativeScore
 from sol_execbench.core.scoring.amd_score.reports import (
     _build_amd_score_reports_for_problem_impl,
     write_amd_score_report,
 )
 from sol_execbench.core.scoring.baseline_artifact import ScoringBaselineArtifact
+from sol_execbench.core.scoring.official_score import (
+    build_official_score_suite_evidence,
+    validate_official_aggregation_policy,
+)
 
 __all__ = [
     "build_amd_score_reports_for_problem",
     "extend_derived_reports_for_problem",
     "write_amd_score_report",
+    "write_official_score_report",
 ]
 
 
@@ -85,3 +92,48 @@ def extend_derived_reports_for_problem(
 
 
 _extend_derived_reports_for_problem = extend_derived_reports_for_problem
+
+
+def write_official_score_report(
+    report_path: Path,
+    amd_scores: list[AmdNativeScore],
+    *,
+    aggregation_policy: str,
+    coverage_report: BaselineCoverageReport | None = None,
+    source_score_ref: str | None = None,
+) -> None:
+    """Write canonical official-score evidence without partial artifacts."""
+    normalized_policy = validate_official_aggregation_policy(aggregation_policy)
+    if normalized_policy is None:
+        raise ValueError(
+            f"Unsupported official aggregation policy: {aggregation_policy!r}"
+        )
+
+    suite = build_official_score_suite_evidence(
+        amd_scores,
+        aggregation_policy=normalized_policy,
+        source_score_refs_by_workload_uuid=(
+            {score.workload_uuid: source_score_ref for score in amd_scores}
+            if source_score_ref
+            else None
+        ),
+        coverage_report=coverage_report,
+    )
+    serialized = json.dumps(suite.to_dict(), indent=2, sort_keys=True) + "\n"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path: Path | None = None
+    try:
+        with NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=report_path.parent,
+            prefix=f".{report_path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as temporary_file:
+            temporary_file.write(serialized)
+            temporary_path = Path(temporary_file.name)
+        temporary_path.replace(report_path)
+    finally:
+        if temporary_path is not None and temporary_path.exists():
+            temporary_path.unlink()
