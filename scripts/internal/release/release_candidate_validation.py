@@ -26,11 +26,11 @@ DEFAULT_CPU_COMMAND = [
     "run",
     "pytest",
     "tests/sol_execbench/test_contract.py",
-    "tests/sol_execbench/test_trust_summary.py",
-    "tests/sol_execbench/test_trust_summary_script.py",
-    "tests/sol_execbench/test_consistency_script.py",
-    "tests/sol_execbench/test_claim_upgrade_script.py",
-    "tests/sol_execbench/test_run_dataset_execution_closure.py",
+    "tests/sol_execbench/core/reports/test_trust_summary.py",
+    "tests/sol_execbench/core/reports/test_trust_summary_script.py",
+    "tests/sol_execbench/core/reports/test_consistency_script.py",
+    "tests/sol_execbench/core/reports/test_claim_upgrade_script.py",
+    "tests/sol_execbench/core/dataset/test_run_dataset_execution_closure.py",
     "-q",
 ]
 DEFAULT_DOCTOR_COMMAND = ["uv", "run", "sol-execbench", "doctor", "--json"]
