@@ -18,6 +18,11 @@ from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 from typing import Sequence
 
+from sol_execbench.core.scoring.release_baseline import (
+    load_release_baseline_bundle,
+    release_baseline_verification_from_dict,
+)
+
 SCHEMA_VERSION = "sol_execbench.prerelease_readiness.v1"
 BUNDLE_SCHEMA_VERSION = "sol_execbench.prerelease_artifact_bundle.v1"
 DEFAULT_OUTPUT_DIR = Path("out/prerelease_readiness")
@@ -216,7 +221,141 @@ def _check_manifest(
     findings.extend(_check_claim_boundary(manifest))
     findings.extend(_check_known_gaps(manifest))
     findings.extend(_check_artifacts(manifest, bundle_dir, checksum_cache))
+    findings.extend(_check_release_baseline_evidence(manifest, bundle_dir))
     findings.extend(_check_bundle_checksums(bundle_dir, checksums, checksum_cache))
+    return findings
+
+
+def _check_release_baseline_evidence(
+    manifest: dict[str, object], bundle_dir: Path
+) -> list[Finding]:
+    """Validate the linked release baseline and independent rerun evidence."""
+    artifacts = {
+        str(item.get("id")): item for item in _list_of_dicts(manifest.get("artifacts"))
+    }
+    baseline_artifact = artifacts.get("release_baseline_bundle")
+    verification_artifact = artifacts.get("release_baseline_verification")
+    scoring_artifact = artifacts.get("release_scoring_baseline")
+    if (
+        baseline_artifact is None
+        and verification_artifact is None
+        and scoring_artifact is None
+    ):
+        return []
+    if (
+        baseline_artifact is None
+        or verification_artifact is None
+        or scoring_artifact is None
+    ):
+        return [
+            Finding(
+                id="release_baseline_evidence_pair_missing",
+                status="blocking",
+                category="release_baseline",
+                message="Release baseline bundle and verification must both be present.",
+            )
+        ]
+    paths = []
+    for artifact in (baseline_artifact, verification_artifact, scoring_artifact):
+        path = artifact.get("path")
+        if not isinstance(path, str) or not path:
+            return [
+                Finding(
+                    id="release_baseline_evidence_path_missing",
+                    status="blocking",
+                    category="release_baseline",
+                    message="Release baseline evidence path is missing.",
+                )
+            ]
+        paths.append(_resolve_artifact_path(bundle_dir, Path(path)))
+    baseline_path, verification_path, scoring_path = paths
+    try:
+        baseline = load_release_baseline_bundle(baseline_path)
+        verification = release_baseline_verification_from_dict(
+            json.loads(verification_path.read_text(encoding="utf-8"))
+        )
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return [
+            Finding(
+                id="invalid_release_baseline_evidence",
+                status="blocking",
+                category="release_baseline",
+                message=str(exc),
+            )
+        ]
+    findings: list[Finding] = []
+    if verification.bundle_sha256 != _sha256(baseline_path):
+        findings.append(
+            Finding(
+                id="release_baseline_verification_checksum_mismatch",
+                status="blocking",
+                category="release_baseline",
+                message="Verification does not reference the bundled baseline digest.",
+            )
+        )
+    if _sha256(scoring_path) != baseline.baseline_artifact_sha256:
+        findings.append(
+            Finding(
+                id="release_scoring_baseline_checksum_mismatch",
+                status="blocking",
+                category="release_baseline",
+                message="Bundled compact scoring baseline does not match release evidence.",
+            )
+        )
+    baseline_summary = baseline.summary
+    verification_summary = verification.summary
+    if any(
+        verification_summary[key] != baseline_summary[key] for key in baseline_summary
+    ):
+        findings.append(
+            Finding(
+                id="release_baseline_summary_mismatch",
+                status="blocking",
+                category="release_baseline",
+                message="Verification classifications do not preserve the bundle denominator.",
+            )
+        )
+    baseline_by_key = {row.key: row for row in baseline.workloads}
+    verification_by_key = {row.key: row for row in verification.workloads}
+    if set(verification_by_key) != set(baseline_by_key) or any(
+        verification_row.original_classification != baseline_row.classification
+        or verification_row.classification != baseline_row.classification
+        or verification_row.passed != (baseline_row.classification != "blocked")
+        for key, baseline_row in baseline_by_key.items()
+        if (verification_row := verification_by_key.get(key)) is not None
+    ):
+        findings.append(
+            Finding(
+                id="release_baseline_workload_mismatch",
+                status="blocking",
+                category="release_baseline",
+                message="Verification workload identities and outcomes must exactly preserve the baseline evidence.",
+            )
+        )
+    manifest_summary = manifest.get("release_baseline_summary")
+    if manifest_summary != baseline_summary:
+        findings.append(
+            Finding(
+                id="release_baseline_manifest_summary_mismatch",
+                status="blocking",
+                category="release_baseline",
+                message="Manifest release-baseline summary does not match evidence.",
+            )
+        )
+    boundary = manifest.get("claim_boundary")
+    if (
+        isinstance(boundary, dict)
+        and baseline_summary["derived"] + baseline_summary["blocked"]
+    ):
+        if boundary.get("release_baseline_full_suite_official") is not False:
+            findings.append(
+                Finding(
+                    id="release_baseline_full_suite_authority_overclaim",
+                    status="blocking",
+                    category="claim_boundary",
+                    message="Derived or blocked release-baseline rows forbid a full-suite official claim.",
+                )
+            )
     return findings
 
 

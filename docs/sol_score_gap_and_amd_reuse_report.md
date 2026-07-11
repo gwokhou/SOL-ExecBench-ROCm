@@ -252,6 +252,17 @@ baseline_source: missing
 7. 在独立 rerun 中验证 candidate、baseline 与 bound 的一致性，再发布版本化
    AMD score artifact。
 
+### 7.3 / 7.7 实施状态（2026-07-11）
+
+Release baseline 发布器现可从固定优化解的 trace 与 suite manifest 生成
+`scoring_baseline.v1` 和 `release_baseline_bundle.v1`，记录 solution hash、
+环境/时钟、编译标识、timing policy、trace、bound/model checksum 与完整分母。
+独立 rerun 会对这些不变量和相对延迟容差逐 workload 验证，并发布
+`release_baseline_verification.v1`。发布包和 readiness gate 仅接受互相校验的
+工件对；每个 workload 明确为 `official`、`derived` 或 `blocked`。这关闭了
+baseline 生成与独立复跑的工程发布闭环，但不改变本报告中硬件模型、bound
+精确度或 NVIDIA leaderboard 可比性的未解决边界。
+
 ## 与 NVIDIA SOL ExecBench 实现的差距
 
 ### 1. 公式实现基本一致（gap 最小）

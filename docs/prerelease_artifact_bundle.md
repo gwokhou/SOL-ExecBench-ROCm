@@ -33,6 +33,24 @@ UV_CACHE_DIR=/tmp/uv-cache uv run scripts/internal/release/build_prerelease_arti
 Do not publish a release candidate from a skipped-validation bundle without
 running the normal validation path first.
 
+## Release Baseline Evidence
+
+When publishing a scored release, attach the generated complete-suite baseline
+bundle and its independent rerun verification together:
+
+```bash
+uv run scripts/internal/release/build_prerelease_artifact_bundle.py \
+  --version v2.14.0-rc1 \
+  --output-dir out/prerelease_artifact_bundle/v2.14.0-rc1 \
+  --release-baseline-bundle out/release/release-baseline.json \
+  --release-baseline-verification out/release/release-baseline-verification.json
+```
+
+The bundle copies both files under `release_baseline/`, records their checksums,
+and reports the complete workload denominator as `official`, `derived`, and
+`blocked`.  A derived or blocked workload remains publishable review evidence,
+but does not make a full-suite official claim.
+
 ## Output Layout
 
 The bundle writes:
