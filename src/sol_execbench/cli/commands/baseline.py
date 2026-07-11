@@ -227,6 +227,7 @@ def _release_verify_cli(
         bundle = load_release_baseline_bundle(bundle_path)
         report = verify_release_baseline_rerun(
             bundle=bundle,
+            bundle_path=bundle_path,
             rerun_trace_path=rerun_trace_path,
             rerun_provenance=ReleaseProvenance(
                 solution=bundle.provenance.solution,

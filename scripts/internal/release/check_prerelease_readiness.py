@@ -235,9 +235,14 @@ def _check_release_baseline_evidence(
     }
     baseline_artifact = artifacts.get("release_baseline_bundle")
     verification_artifact = artifacts.get("release_baseline_verification")
+    scoring_artifact = artifacts.get("release_scoring_baseline")
     if baseline_artifact is None and verification_artifact is None:
         return []
-    if baseline_artifact is None or verification_artifact is None:
+    if (
+        baseline_artifact is None
+        or verification_artifact is None
+        or scoring_artifact is None
+    ):
         return [
             Finding(
                 id="release_baseline_evidence_pair_missing",
@@ -247,7 +252,7 @@ def _check_release_baseline_evidence(
             )
         ]
     paths = []
-    for artifact in (baseline_artifact, verification_artifact):
+    for artifact in (baseline_artifact, verification_artifact, scoring_artifact):
         path = artifact.get("path")
         if not isinstance(path, str) or not path:
             return [
@@ -259,7 +264,7 @@ def _check_release_baseline_evidence(
                 )
             ]
         paths.append(_resolve_artifact_path(bundle_dir, Path(path)))
-    baseline_path, verification_path = paths
+    baseline_path, verification_path, scoring_path = paths
     try:
         baseline = load_release_baseline_bundle(baseline_path)
         verification = release_baseline_verification_from_dict(
@@ -284,6 +289,15 @@ def _check_release_baseline_evidence(
                 message="Verification does not reference the bundled baseline digest.",
             )
         )
+    if _sha256(scoring_path) != baseline.baseline_artifact_sha256:
+        findings.append(
+            Finding(
+                id="release_scoring_baseline_checksum_mismatch",
+                status="blocking",
+                category="release_baseline",
+                message="Bundled compact scoring baseline does not match release evidence.",
+            )
+        )
     baseline_summary = baseline.summary
     verification_summary = verification.summary
     if any(
@@ -295,6 +309,23 @@ def _check_release_baseline_evidence(
                 status="blocking",
                 category="release_baseline",
                 message="Verification classifications do not preserve the bundle denominator.",
+            )
+        )
+    baseline_by_key = {row.key: row for row in baseline.workloads}
+    verification_by_key = {row.key: row for row in verification.workloads}
+    if set(verification_by_key) != set(baseline_by_key) or any(
+        verification_row.original_classification != baseline_row.classification
+        or verification_row.classification != baseline_row.classification
+        or verification_row.passed != (baseline_row.classification != "blocked")
+        for key, baseline_row in baseline_by_key.items()
+        if (verification_row := verification_by_key.get(key)) is not None
+    ):
+        findings.append(
+            Finding(
+                id="release_baseline_workload_mismatch",
+                status="blocking",
+                category="release_baseline",
+                message="Verification workload identities and outcomes must exactly preserve the baseline evidence.",
             )
         )
     manifest_summary = manifest.get("release_baseline_summary")

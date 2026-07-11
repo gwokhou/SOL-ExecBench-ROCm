@@ -275,7 +275,12 @@ def test_builder_writes_compact_entries_and_keeps_missing_suite_rows_blocked(tmp
         release="v2.14",
         provenance=_provenance(tmp_path),
         authority_by_key={
-            ("gemm", "w1"): AuthorityInput(),
+            ("gemm", "w1"): AuthorityInput(
+                bound_ref="bound.json",
+                bound_sha256="a" * 64,
+                hardware_model_ref="model.json",
+                hardware_model_sha256="b" * 64,
+            ),
         },
         latency_tolerance_rel=0.05,
     )
@@ -350,6 +355,25 @@ def test_authority_degrades_measured_trace_and_preserves_evidence_refs(tmp_path)
     assert bundle.workloads[0].blocker_reason_codes == ("model_not_validated",)
     assert bundle.workloads[0].bound_ref == "bound.json"
     assert bundle.workloads[0].hardware_model_ref == "model.json"
+
+
+def test_missing_authority_references_keep_measured_workload_derived(tmp_path):
+    _, bundle = _build_with_trace(
+        tmp_path,
+        _passed_trace("gemm", "w1", 1.0),
+        {("gemm", "w1"): AuthorityInput()},
+    )
+
+    assert bundle.workloads[0].classification == "derived"
+    assert bundle.workloads[0].blocker_reason_codes == (
+        "missing_bound_evidence",
+        "missing_hardware_model_evidence",
+    )
+
+
+def test_official_workload_requires_bound_and_hardware_model_evidence():
+    with pytest.raises(ValueError, match="official workloads require"):
+        ReleaseBaselineWorkload("gemm", "w1", "official", 1.0, ())
 
 
 def test_missing_authority_input_makes_measured_trace_derived(tmp_path):
@@ -437,6 +461,36 @@ def test_verifier_blocks_solution_hash_mismatch_even_when_latency_matches(tmp_pa
     )
 
     assert "solution_hash_mismatch" in report.workloads[0].blocker_reason_codes
+
+
+def test_verifier_rejects_rerun_with_same_trace_digest_as_baseline(tmp_path):
+    bundle = _official_bundle(tmp_path)
+    rerun_path = _write_trace(tmp_path, _rerun_trace())
+    bundle = ReleaseBaselineBundle(
+        **{
+            **bundle.__dict__,
+            "workloads": (
+                ReleaseBaselineWorkload(
+                    **{
+                        **bundle.workloads[0].__dict__,
+                        "trace_sha256": sha256_file(rerun_path),
+                    }
+                ),
+            ),
+        }
+    )
+
+    report = verify_release_baseline_rerun(
+        bundle=bundle,
+        rerun_trace_path=rerun_path,
+        rerun_provenance=bundle.provenance,
+    )
+
+    assert report.workloads[0].classification == "blocked"
+    assert (
+        "rerun_trace_digest_matches_baseline"
+        in report.workloads[0].blocker_reason_codes
+    )
 
 
 @pytest.mark.parametrize(

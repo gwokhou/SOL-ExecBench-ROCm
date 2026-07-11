@@ -121,6 +121,12 @@ class ReleaseBaselineWorkload:
         _require_optional_reference(
             self.hardware_model_ref, self.hardware_model_sha256, "hardware_model"
         )
+        if self.classification == "official" and (
+            self.bound_ref is None or self.hardware_model_ref is None
+        ):
+            raise ValueError(
+                "official workloads require bound and hardware model evidence"
+            )
 
     @property
     def key(self) -> tuple[str, str]:

@@ -317,6 +317,8 @@ def test_release_build_and_verify_share_the_manifest_file_digest(
     report = json.loads(verification_path.read_text(encoding="utf-8"))
     assert bundle["suite_manifest_ref"] == str(suite_path)
     assert bundle["suite_manifest_sha256"] == cli_baseline.sha256_file(suite_path)
+    assert report["bundle_ref"] == str(bundle_path)
+    assert report["bundle_sha256"] == cli_baseline.sha256_file(bundle_path)
     assert report["workloads"][0]["classification"] == "official"
     assert (
         "suite_manifest_checksum_mismatch"

@@ -111,6 +111,15 @@ def build_release_baseline_bundle(
         elif authority_input.official_blockers:
             classification = "derived"
             authority_blockers = authority_input.official_blockers
+        elif (
+            authority_input.bound_ref is None
+            or authority_input.hardware_model_ref is None
+        ):
+            classification = "derived"
+            authority_blockers = (
+                "missing_bound_evidence",
+                "missing_hardware_model_evidence",
+            )
         else:
             classification = "official"
             authority_blockers = ()

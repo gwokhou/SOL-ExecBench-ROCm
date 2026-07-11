@@ -291,8 +291,15 @@ def _release_baseline_artifacts(
 
     release_dir = output_dir / "release_baseline"
     release_dir.mkdir(parents=True, exist_ok=True)
+    source_baseline = Path(baseline.baseline_artifact_ref)
+    if not source_baseline.is_file():
+        raise ValueError("referenced compact scoring baseline is unavailable")
+    if _sha256(source_baseline) != baseline.baseline_artifact_sha256:
+        raise ValueError("referenced compact scoring baseline checksum mismatch")
+    copied_scoring_baseline = release_dir / "scoring_baseline.json"
     copied_bundle = release_dir / "release_baseline_bundle.json"
     copied_verification = release_dir / "release_baseline_verification.json"
+    shutil.copyfile(source_baseline, copied_scoring_baseline)
     shutil.copyfile(bundle_path, copied_bundle)
     shutil.copyfile(verification_path, copied_verification)
     authority_class = (
@@ -302,6 +309,16 @@ def _release_baseline_artifacts(
     )
     return (
         [
+            _file_artifact(
+                id="release_scoring_baseline",
+                path=copied_scoring_baseline,
+                bundle_dir=output_dir,
+                authority_class=authority_class,
+                status="present",
+                description="Compact scoring baseline referenced by release evidence.",
+                required=True,
+                checksum_cache=checksum_cache,
+            ),
             _file_artifact(
                 id="release_baseline_bundle",
                 path=copied_bundle,
