@@ -483,3 +483,49 @@ def test_verifier_writes_deterministic_output(tmp_path):
     write_release_baseline_verification(report, second)
 
     assert first.read_bytes() == second.read_bytes()
+
+
+def test_verifier_preserves_matching_derived_classification_and_reason(tmp_path):
+    official = _official_bundle(tmp_path)
+    derived = ReleaseBaselineWorkload(
+        **{
+            **official.workloads[0].__dict__,
+            "classification": "derived",
+            "blocker_reason_codes": ("model_not_validated",),
+        }
+    )
+    bundle = ReleaseBaselineBundle(**{**official.__dict__, "workloads": (derived,)})
+
+    report = verify_release_baseline_rerun(
+        bundle=bundle,
+        rerun_trace_path=_write_trace(tmp_path, _rerun_trace()),
+        rerun_provenance=bundle.provenance,
+    )
+
+    assert report.workloads[0].classification == "derived"
+    assert report.workloads[0].blocker_reason_codes == ("model_not_validated",)
+
+
+@pytest.mark.parametrize(
+    ("path_name", "contents", "reason"),
+    [
+        ("missing.jsonl", None, "rerun_trace_unavailable"),
+        ("malformed.jsonl", "not json\n", "rerun_trace_malformed"),
+    ],
+)
+def test_verifier_returns_full_blocked_report_for_unreadable_or_malformed_trace(
+    tmp_path, path_name, contents, reason
+):
+    path = tmp_path / path_name
+    if contents is not None:
+        path.write_text(contents, encoding="utf-8")
+
+    report = verify_release_baseline_rerun(
+        bundle=_official_bundle(tmp_path),
+        rerun_trace_path=path,
+        rerun_provenance=_verification_provenance(tmp_path),
+    )
+
+    assert len(report.workloads) == 1
+    assert report.workloads[0].classification == "blocked"
+    assert reason in report.workloads[0].blocker_reason_codes
