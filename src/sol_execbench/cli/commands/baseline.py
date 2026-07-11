@@ -167,6 +167,8 @@ def _release_build_cli(
             provenance=provenance,
             authority_by_key=_authority_from_json(authority_path),
             latency_tolerance_rel=latency_tolerance_rel,
+            suite_manifest_ref=str(suite_manifest_path),
+            suite_manifest_sha256=provenance.suite_manifest_sha256,
         )
         written_bundle = write_release_baseline_outputs(
             baseline=baseline,

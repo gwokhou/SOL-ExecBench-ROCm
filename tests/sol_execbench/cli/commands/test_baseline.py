@@ -149,6 +149,8 @@ def test_release_verify_writes_report(monkeypatch, tmp_path: Path) -> None:
         ),
         authority_by_key={},
         latency_tolerance_rel=0.05,
+        suite_manifest_ref=str(suite_path),
+        suite_manifest_sha256=cli_baseline.sha256_file(suite_path),
     )
     baseline_path = tmp_path / "baseline.json"
     bundle_path = tmp_path / "bundle.json"
@@ -204,6 +206,122 @@ def test_release_verify_writes_report(monkeypatch, tmp_path: Path) -> None:
 
     assert result.exit_code == 0, result.output
     assert output_path.exists()
+
+
+def test_release_build_and_verify_share_the_manifest_file_digest(
+    tmp_path: Path,
+) -> None:
+    suite_path, trace_path = _release_inputs(tmp_path)
+    authority_path = tmp_path / "authority.json"
+    authority_path.write_text(
+        json.dumps(
+            [
+                {
+                    "definition": "gemm",
+                    "workload_uuid": "w1",
+                    "bound_ref": "bound.json",
+                    "bound_sha256": "b" * 64,
+                    "hardware_model_ref": "model.json",
+                    "hardware_model_sha256": "c" * 64,
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    baseline_path = tmp_path / "baseline.json"
+    bundle_path = tmp_path / "bundle.json"
+    runner = CliRunner()
+    build = runner.invoke(
+        cli,
+        [
+            "baseline",
+            "release-build",
+            "--suite-manifest",
+            str(suite_path),
+            "--trace",
+            str(trace_path),
+            "--release",
+            "v2.14",
+            "--baseline-output",
+            str(baseline_path),
+            "--bundle-output",
+            str(bundle_path),
+            "--authority-json",
+            str(authority_path),
+            "--solution",
+            "hipblaslt",
+            "--solution-sha256",
+            "a" * 64,
+            "--environment-fingerprint",
+            "gfx1200-rocm7.1",
+            "--clock-policy",
+            "locked",
+            "--timing-policy",
+            "median-100",
+            "--compiler-build-id",
+            "rocm-7.1",
+            "--latency-tolerance-rel",
+            "0.05",
+        ],
+    )
+    assert build.exit_code == 0, build.output
+
+    rerun_path = tmp_path / "rerun.jsonl"
+    rerun_path.write_text(
+        json.dumps(
+            {
+                "definition": "gemm",
+                "workload": {"uuid": "w1"},
+                "evaluation": {
+                    "status": "PASSED",
+                    "performance": {"latency_ms": 1.25},
+                    "release_baseline": {
+                        "bound_sha256": "b" * 64,
+                        "hardware_model_sha256": "c" * 64,
+                    },
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    verification_path = tmp_path / "verification.json"
+    verify = runner.invoke(
+        cli,
+        [
+            "baseline",
+            "release-verify",
+            "--bundle",
+            str(bundle_path),
+            "--rerun-trace",
+            str(rerun_path),
+            "--output",
+            str(verification_path),
+            "--solution-sha256",
+            "a" * 64,
+            "--environment-fingerprint",
+            "gfx1200-rocm7.1",
+            "--clock-policy",
+            "locked",
+            "--timing-policy",
+            "median-100",
+            "--compiler-build-id",
+            "rocm-7.1",
+            "--suite-manifest-sha256",
+            cli_baseline.sha256_file(suite_path),
+        ],
+    )
+
+    assert verify.exit_code == 0, verify.output
+    bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
+    report = json.loads(verification_path.read_text(encoding="utf-8"))
+    assert bundle["suite_manifest_ref"] == str(suite_path)
+    assert bundle["suite_manifest_sha256"] == cli_baseline.sha256_file(suite_path)
+    assert report["workloads"][0]["classification"] == "official"
+    assert (
+        "suite_manifest_checksum_mismatch"
+        not in report["workloads"][0]["blocker_reason_codes"]
+    )
 
 
 def test_baseline_export_writes_registry_and_prints_message(

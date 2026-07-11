@@ -58,8 +58,22 @@ def build_release_baseline_bundle(
     provenance: ReleaseProvenance,
     authority_by_key: Mapping[tuple[str, str], AuthorityInput],
     latency_tolerance_rel: float,
+    suite_manifest_ref: str | None = None,
+    suite_manifest_sha256: str | None = None,
 ) -> tuple[ScoringBaselineArtifact, ReleaseBaselineBundle]:
     """Build complete-suite release evidence; never drop an expected workload."""
+
+    if suite_manifest_ref is None:
+        suite_manifest_ref = "in-memory-suite-manifest"
+    if suite_manifest_sha256 is None:
+        suite_manifest_sha256 = provenance.suite_manifest_sha256
+    if suite_manifest_sha256 is None:
+        raise ValueError("suite_manifest_sha256 must be supplied with the manifest")
+    if (
+        provenance.suite_manifest_sha256 is not None
+        and provenance.suite_manifest_sha256 != suite_manifest_sha256
+    ):
+        raise ValueError("suite manifest digest must match provenance")
 
     suite = _normalize_suite_workloads(suite_workloads)
     authority = _normalize_authority(authority_by_key, set(suite))
@@ -113,8 +127,8 @@ def build_release_baseline_bundle(
     )
     bundle = ReleaseBaselineBundle(
         release=release,
-        suite_manifest_ref="in-memory-suite-manifest",
-        suite_manifest_sha256=_sha256_json(suite_workloads),
+        suite_manifest_ref=suite_manifest_ref,
+        suite_manifest_sha256=suite_manifest_sha256,
         baseline_artifact_ref="unwritten-scoring-baseline-artifact",
         baseline_artifact_sha256=_sha256_json(baseline.to_dict()),
         provenance=provenance,
