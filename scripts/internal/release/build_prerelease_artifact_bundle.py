@@ -20,6 +20,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Sequence
 
+from sol_execbench.core.scoring.release_baseline import (
+    load_release_baseline_bundle,
+    release_baseline_verification_from_dict,
+)
+
 SCHEMA_VERSION = "sol_execbench.prerelease_artifact_bundle.v1"
 DEFAULT_OUTPUT_DIR = Path("out/prerelease_artifact_bundle")
 DEFAULT_TEMP_ROOT = Path("tmp/prerelease_artifact_bundle")
@@ -92,6 +97,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     artifacts: list[BundleArtifact] = []
     known_gaps = _default_known_gaps()
     checksum_cache: dict[Path, str] = {}
+
+    release_baseline_summary: dict[str, int] | None = None
+    if (args.release_baseline_bundle is None) != (
+        args.release_baseline_verification is None
+    ):
+        raise SystemExit(
+            "--release-baseline-bundle and --release-baseline-verification "
+            "must be supplied together"
+        )
+    if args.release_baseline_bundle is not None:
+        release_artifacts, release_baseline_summary = _release_baseline_artifacts(
+            bundle_path=args.release_baseline_bundle,
+            verification_path=args.release_baseline_verification,
+            output_dir=bundle_dir,
+            checksum_cache=checksum_cache,
+        )
+        artifacts.extend(release_artifacts)
 
     release_command = _expand_command(
         _command_from_args(
@@ -215,6 +237,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         "commands": [asdict(transcript) for transcript in transcripts],
         "artifacts": [asdict(artifact) for artifact in artifacts],
     }
+    if release_baseline_summary is not None:
+        payload["release_baseline_summary"] = release_baseline_summary
 
     manifest_path = bundle_dir / "prerelease_artifact_bundle.json"
     markdown_path = bundle_dir / "prerelease_artifact_bundle.md"
@@ -237,8 +261,70 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     parser.add_argument("--release-validation-command", nargs="+", default=None)
     parser.add_argument("--skip-environment-evidence", action="store_true")
     parser.add_argument("--environment-command", nargs="+", default=None)
+    parser.add_argument("--release-baseline-bundle", type=Path, default=None)
+    parser.add_argument("--release-baseline-verification", type=Path, default=None)
     parser.add_argument("--log-tail-chars", type=int, default=DEFAULT_LOG_TAIL_CHARS)
     return parser.parse_args(argv)
+
+
+def _release_baseline_artifacts(
+    *,
+    bundle_path: Path,
+    verification_path: Path,
+    output_dir: Path,
+    checksum_cache: dict[Path, str],
+) -> tuple[list[BundleArtifact], dict[str, int]]:
+    """Copy a validated release-baseline bundle and its matching verification."""
+    baseline = load_release_baseline_bundle(bundle_path)
+    verification_payload = json.loads(verification_path.read_text(encoding="utf-8"))
+    verification = release_baseline_verification_from_dict(verification_payload)
+    bundle_sha256 = _sha256(bundle_path)
+    if verification.bundle_sha256 != bundle_sha256:
+        raise ValueError("release baseline verification bundle checksum mismatch")
+    if verification.release != baseline.release:
+        raise ValueError("release baseline verification release does not match bundle")
+    if {
+        key: verification.summary[key]
+        for key in ("total", "official", "derived", "blocked")
+    } != baseline.summary:
+        raise ValueError("release baseline verification summary does not match bundle")
+
+    release_dir = output_dir / "release_baseline"
+    release_dir.mkdir(parents=True, exist_ok=True)
+    copied_bundle = release_dir / "release_baseline_bundle.json"
+    copied_verification = release_dir / "release_baseline_verification.json"
+    shutil.copyfile(bundle_path, copied_bundle)
+    shutil.copyfile(verification_path, copied_verification)
+    authority_class = (
+        "provisional"
+        if baseline.summary["derived"] or baseline.summary["blocked"]
+        else "diagnostic-only"
+    )
+    return (
+        [
+            _file_artifact(
+                id="release_baseline_bundle",
+                path=copied_bundle,
+                bundle_dir=output_dir,
+                authority_class=authority_class,
+                status="present",
+                description="Complete release baseline evidence bundle.",
+                required=True,
+                checksum_cache=checksum_cache,
+            ),
+            _file_artifact(
+                id="release_baseline_verification",
+                path=copied_verification,
+                bundle_dir=output_dir,
+                authority_class=authority_class,
+                status="present",
+                description="Independent release baseline rerun verification.",
+                required=True,
+                checksum_cache=checksum_cache,
+            ),
+        ],
+        baseline.summary,
+    )
 
 
 def _command_from_args(value: list[str] | None, default: list[str]) -> list[str]:

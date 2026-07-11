@@ -6,6 +6,19 @@ import sys
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
+import pytest
+
+from sol_execbench.core.scoring.release_baseline import (
+    ReleaseBaselineBundle,
+    ReleaseBaselineVerification,
+    ReleaseBaselineVerificationWorkload,
+    ReleaseBaselineWorkload,
+    ReleaseProvenance,
+    sha256_file,
+    write_release_baseline_bundle,
+    write_release_baseline_verification,
+)
+
 REPO_ROOT = Path(__file__).resolve().parents[4]
 SCRIPT_PATH = REPO_ROOT / "scripts/internal/release/build_prerelease_artifact_bundle.py"
 SPEC = spec_from_file_location("build_prerelease_artifact_bundle", SCRIPT_PATH)
@@ -19,6 +32,136 @@ def _load_manifest(output_dir: Path) -> dict:
     return json.loads(
         (output_dir / "prerelease_artifact_bundle.json").read_text(encoding="utf-8")
     )
+
+
+def _write_release_evidence(tmp_path: Path) -> tuple[Path, Path]:
+    bundle_path = tmp_path / "release-baseline.json"
+    bundle = ReleaseBaselineBundle(
+        release="v2.14-test",
+        suite_manifest_ref="suite.json",
+        suite_manifest_sha256="a" * 64,
+        baseline_artifact_ref="baseline.json",
+        baseline_artifact_sha256="b" * 64,
+        provenance=ReleaseProvenance(solution="baseline", solution_sha256="c" * 64),
+        workloads=(
+            ReleaseBaselineWorkload("gemm", "w1", "official", 1.0, ()),
+            ReleaseBaselineWorkload(
+                "gemm", "w2", "derived", 2.0, ("model_not_validated",)
+            ),
+        ),
+        latency_tolerance_rel=0.05,
+    )
+    write_release_baseline_bundle(bundle, bundle_path)
+    verification_path = tmp_path / "verification.json"
+    write_release_baseline_verification(
+        ReleaseBaselineVerification(
+            release=bundle.release,
+            bundle_ref=str(bundle_path),
+            bundle_sha256=sha256_file(bundle_path),
+            rerun_trace_ref="rerun.jsonl",
+            rerun_trace_sha256="d" * 64,
+            workloads=(
+                ReleaseBaselineVerificationWorkload(
+                    "gemm", "w1", "official", "official", 1.0, 1.0, 0.0, True, ()
+                ),
+                ReleaseBaselineVerificationWorkload(
+                    "gemm",
+                    "w2",
+                    "derived",
+                    "derived",
+                    2.0,
+                    2.0,
+                    0.0,
+                    True,
+                    ("model_not_validated",),
+                ),
+            ),
+        ),
+        verification_path,
+    )
+    return bundle_path, verification_path
+
+
+def test_bundle_copies_release_baseline_evidence_and_records_summary(
+    tmp_path, monkeypatch
+):
+    baseline_bundle, verification = _write_release_evidence(tmp_path)
+
+    def fake_run_command(**kwargs):
+        validation_dir = Path(
+            kwargs["command"][kwargs["command"].index("--output-dir") + 1]
+        )
+        validation_dir.mkdir(parents=True, exist_ok=True)
+        (validation_dir / "release_candidate_validation.json").write_text("{}\n")
+        (validation_dir / "release_candidate_validation.md").write_text(
+            "# validation\n"
+        )
+        return build_prerelease_artifact_bundle.CommandTranscript(
+            "release_candidate_validation",
+            [],
+            "passed",
+            "diagnostic-only",
+            0.0,
+            "transcripts/release_candidate_validation.json",
+        )
+
+    monkeypatch.setattr(
+        build_prerelease_artifact_bundle, "_run_command", fake_run_command
+    )
+    assert (
+        build_prerelease_artifact_bundle.main(
+            [
+                "--version",
+                "v2.14-rc1",
+                "--output-dir",
+                str(tmp_path / "out"),
+                "--release-baseline-bundle",
+                str(baseline_bundle),
+                "--release-baseline-verification",
+                str(verification),
+                "--skip-environment-evidence",
+            ]
+        )
+        == 0
+    )
+    manifest = _load_manifest(tmp_path / "out")
+    artifacts = {item["id"]: item for item in manifest["artifacts"]}
+    assert artifacts["release_baseline_bundle"]["required"] is True
+    assert artifacts["release_baseline_verification"]["required"] is True
+    assert manifest["release_baseline_summary"] == {
+        "total": 2,
+        "official": 1,
+        "derived": 1,
+        "blocked": 0,
+    }
+
+
+@pytest.mark.parametrize(
+    "argument", ["--release-baseline-bundle", "--release-baseline-verification"]
+)
+def test_bundle_requires_release_evidence_pair(tmp_path, argument):
+    with pytest.raises(SystemExit, match="must be supplied together"):
+        build_prerelease_artifact_bundle.main(
+            ["--version", "v2.14", argument, str(tmp_path / "input.json")]
+        )
+
+
+def test_bundle_rejects_verification_for_different_bundle(tmp_path):
+    baseline_bundle, verification = _write_release_evidence(tmp_path)
+    payload = json.loads(verification.read_text())
+    payload["bundle_sha256"] = "f" * 64
+    verification.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ValueError, match="bundle checksum"):
+        build_prerelease_artifact_bundle.main(
+            [
+                "--version",
+                "v2.14",
+                "--release-baseline-bundle",
+                str(baseline_bundle),
+                "--release-baseline-verification",
+                str(verification),
+            ]
+        )
 
 
 def test_bundle_writes_manifest_transcripts_checksums_and_authority_map(
