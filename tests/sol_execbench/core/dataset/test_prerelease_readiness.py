@@ -5,6 +5,17 @@ import sys
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
+from sol_execbench.core.scoring.release_baseline import (
+    ReleaseBaselineBundle,
+    ReleaseBaselineVerification,
+    ReleaseBaselineVerificationWorkload,
+    ReleaseBaselineWorkload,
+    ReleaseProvenance,
+    sha256_file,
+    write_release_baseline_bundle,
+    write_release_baseline_verification,
+)
+
 REPO_ROOT = Path(__file__).resolve().parents[4]
 SCRIPT_PATH = REPO_ROOT / "scripts/internal/release/check_prerelease_readiness.py"
 SPEC = spec_from_file_location("check_prerelease_readiness", SCRIPT_PATH)
@@ -149,6 +160,104 @@ def test_readiness_passes_for_complete_bundle(tmp_path):
     assert (output_dir / "prerelease_readiness.md").exists()
 
 
+def test_readiness_rejects_release_verification_workload_drift(tmp_path):
+    bundle_dir = tmp_path / "bundle"
+    manifest = _write_bundle(bundle_dir)
+    release_dir = bundle_dir / "release_baseline"
+    release_dir.mkdir()
+    compact = release_dir / "scoring_baseline.json"
+    compact.write_text('{"entries": []}\n', encoding="utf-8")
+    baseline_path = release_dir / "release_baseline_bundle.json"
+    baseline = ReleaseBaselineBundle(
+        release="v2.14",
+        suite_manifest_ref="suite.json",
+        suite_manifest_sha256="a" * 64,
+        baseline_artifact_ref=str(compact),
+        baseline_artifact_sha256=sha256_file(compact),
+        provenance=ReleaseProvenance(solution="solution", solution_sha256="b" * 64),
+        workloads=(
+            ReleaseBaselineWorkload(
+                "gemm", "w1", "derived", 1.0, ("missing_bound_evidence",)
+            ),
+        ),
+        latency_tolerance_rel=0.05,
+    )
+    write_release_baseline_bundle(baseline, baseline_path)
+    verification_path = release_dir / "release_baseline_verification.json"
+    write_release_baseline_verification(
+        ReleaseBaselineVerification(
+            release=baseline.release,
+            bundle_ref=str(baseline_path),
+            bundle_sha256=sha256_file(baseline_path),
+            rerun_trace_ref="rerun.jsonl",
+            rerun_trace_sha256="c" * 64,
+            workloads=(
+                ReleaseBaselineVerificationWorkload(
+                    "gemm", "w1", "official", "official", 1.0, 1.0, 0.0, True, ()
+                ),
+            ),
+        ),
+        verification_path,
+    )
+    manifest["artifacts"].extend(
+        [
+            {
+                "id": "release_scoring_baseline",
+                "path": "release_baseline/scoring_baseline.json",
+                "authority_class": "provisional",
+                "status": "present",
+                "required": True,
+                "sha256": sha256_file(compact),
+            },
+            {
+                "id": "release_baseline_bundle",
+                "path": "release_baseline/release_baseline_bundle.json",
+                "authority_class": "provisional",
+                "status": "present",
+                "required": True,
+                "sha256": sha256_file(baseline_path),
+            },
+            {
+                "id": "release_baseline_verification",
+                "path": "release_baseline/release_baseline_verification.json",
+                "authority_class": "provisional",
+                "status": "present",
+                "required": True,
+                "sha256": sha256_file(verification_path),
+            },
+        ]
+    )
+    manifest["release_baseline_summary"] = baseline.summary
+    (bundle_dir / "prerelease_artifact_bundle.json").write_text(
+        json.dumps(manifest), encoding="utf-8"
+    )
+    (bundle_dir / "SHA256SUMS").write_text(
+        "\n".join(
+            f"{sha256_file(path)}  {path.relative_to(bundle_dir)}"
+            for path in sorted(bundle_dir.rglob("*"))
+            if path.is_file() and path.name != "SHA256SUMS"
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    assert (
+        check_prerelease_readiness.main(
+            [
+                "--bundle-dir",
+                str(bundle_dir),
+                "--output-dir",
+                str(tmp_path / "readiness"),
+                "--skip-doc-claim-checks",
+            ]
+        )
+        == 1
+    )
+    assert "release_baseline_workload_mismatch" in {
+        finding["id"] for finding in _load_report(tmp_path / "readiness")["findings"]
+    }
+
+
 def test_readiness_fails_when_required_artifact_missing(tmp_path):
     bundle_dir = tmp_path / "bundle"
     output_dir = tmp_path / "readiness"
@@ -174,6 +283,52 @@ def test_readiness_fails_when_required_artifact_missing(tmp_path):
     ids = {finding["id"] for finding in report["findings"]}
     assert "missing_artifact_file_release_candidate_validation_json" in ids
     assert report["summary"]["blocking"] >= 1
+
+
+def test_readiness_rejects_a_lone_compact_release_baseline(tmp_path):
+    bundle_dir = tmp_path / "bundle"
+    manifest = _write_bundle(bundle_dir)
+    compact_path = bundle_dir / "release_baseline/scoring_baseline.json"
+    compact_path.parent.mkdir()
+    compact_path.write_text('{"entries": []}\n', encoding="utf-8")
+    manifest["artifacts"].append(
+        {
+            "id": "release_scoring_baseline",
+            "path": "release_baseline/scoring_baseline.json",
+            "authority_class": "provisional",
+            "status": "present",
+            "required": True,
+            "sha256": sha256_file(compact_path),
+        }
+    )
+    (bundle_dir / "prerelease_artifact_bundle.json").write_text(
+        json.dumps(manifest), encoding="utf-8"
+    )
+    (bundle_dir / "SHA256SUMS").write_text(
+        "\n".join(
+            f"{sha256_file(path)}  {path.relative_to(bundle_dir)}"
+            for path in sorted(bundle_dir.rglob("*"))
+            if path.is_file() and path.name != "SHA256SUMS"
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    assert (
+        check_prerelease_readiness.main(
+            [
+                "--bundle-dir",
+                str(bundle_dir),
+                "--output-dir",
+                str(tmp_path / "readiness"),
+                "--skip-doc-claim-checks",
+            ]
+        )
+        == 1
+    )
+    assert "release_baseline_evidence_pair_missing" in {
+        finding["id"] for finding in _load_report(tmp_path / "readiness")["findings"]
+    }
 
 
 def test_readiness_fails_on_claim_boundary_regression(tmp_path):

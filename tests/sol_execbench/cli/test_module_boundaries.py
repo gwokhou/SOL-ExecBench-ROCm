@@ -156,7 +156,7 @@ def test_high_inbound_model_modules_keep_exact_internal_imports() -> None:
             "sol_execbench.core.scoring.confidence",
         ],
         "sol_execbench.core.scoring.amd_hardware_models": [
-            "sol_execbench.core.scoring.confidence",
+            "sol_execbench.core.scoring._amd_hardware_model_parsing",
         ],
         "sol_execbench.core.scoring.solar_derivation.models": [
             "sol_execbench.core.scoring.confidence",
@@ -247,9 +247,21 @@ def test_cross_domain_imports_stay_explicitly_allowlisted() -> None:
             "sol_execbench.core.scoring.baseline_artifact",
         ): "dataset scoring bridge accepts scoring baseline artifacts",
         (
+            "sol_execbench.core.dataset.runner_scoring",
+            "sol_execbench.core.scoring.official_score",
+        ): "dataset scoring bridge writes authoritative official-score sidecars",
+        (
             "sol_execbench.core.scoring.amd_bound_sanity.models",
             "sol_execbench.core.dataset.manifest",
         ): "AMD bound sanity report embeds dataset manifest checksums",
+        (
+            "sol_execbench.core.scoring.hardware_calibration.builder",
+            "sol_execbench.core.bench",
+        ): "hardware calibration imports the benchmark clock-lock package",
+        (
+            "sol_execbench.core.scoring.hardware_calibration.builder",
+            "sol_execbench.core.bench.clock_lock",
+        ): "hardware calibration locks benchmark clocks while sampling evidence",
     }
     assert all(reason for reason in allowed_with_rationale.values())
     domains = (

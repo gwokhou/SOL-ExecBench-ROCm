@@ -43,6 +43,11 @@ The gate exits nonzero when it finds:
 - known gaps with statuses outside `blocking`, `deferred`, `unavailable`, or
   `diagnostic-only`
 
+When release-baseline evidence is attached, readiness also blocks publication
+for a missing evidence pair, malformed linked evidence, verification checksum
+drift, non-conserving workload classification summaries, or a full-suite
+official claim while any workload is `derived` or `blocked`.
+
 ## Known Gap Review
 
 Known gaps must be visible before publishing. The gate reports each known gap

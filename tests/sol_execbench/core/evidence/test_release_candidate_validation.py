@@ -47,6 +47,17 @@ def test_cpu_safe_validation_writes_json_and_markdown(tmp_path, monkeypatch):
     assert release_candidate_validation.DEFAULT_TEMP_ROOT.is_dir()
 
 
+def test_default_cpu_command_references_existing_test_modules() -> None:
+    test_paths = [
+        REPO_ROOT / part
+        for part in release_candidate_validation.DEFAULT_CPU_COMMAND
+        if part.startswith("tests/")
+    ]
+
+    assert test_paths
+    assert all(path.is_file() for path in test_paths)
+
+
 def test_failing_cpu_safe_validation_is_blocking(tmp_path, monkeypatch):
     def fake_run(command, **kwargs):
         return subprocess.CompletedProcess(
