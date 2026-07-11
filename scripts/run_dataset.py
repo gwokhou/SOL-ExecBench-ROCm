@@ -88,6 +88,7 @@ from sol_execbench.core.dataset.runner_scoring import (
     _extend_derived_reports_for_problem,
     build_amd_score_reports_for_problem,
     write_amd_score_report,
+    write_official_score_report,
 )
 from sol_execbench.core.dataset.solutions import (
     build_custom_solution,
@@ -117,6 +118,7 @@ from sol_execbench.core.scoring.amd_score import (
 from sol_execbench.core.scoring.baseline_artifact import (
     load_scoring_baseline_artifact,
 )
+from sol_execbench.core.scoring.official_score import OFFICIAL_AGGREGATION_POLICY
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -636,6 +638,7 @@ def _normalized_command_args(args: argparse.Namespace) -> list[str]:
         ("--execution-closure", args.execution_closure),
         ("--dataset-manifest", args.dataset_manifest),
         ("--amd-score-report", args.amd_score_report),
+        ("--official-score-report", args.official_score_report),
         ("--amd-sol-bound-dir", args.amd_sol_bound_dir),
         ("--solar-derivation", args.solar_derivation),
         ("--timing-evidence-dir", args.timing_evidence_dir),
@@ -643,6 +646,10 @@ def _normalized_command_args(args: argparse.Namespace) -> list[str]:
     ):
         if value is not None:
             normalized.extend([flag, Path(value).name])
+    if args.official_aggregation_policy is not None:
+        normalized.extend(
+            ["--official-aggregation-policy", args.official_aggregation_policy]
+        )
     return normalized
 
 
@@ -1920,6 +1927,17 @@ def main():
         help="Optional path for a derived AMD-native suite score JSON report.",
     )
     ap.add_argument(
+        "--official-score-report",
+        type=Path,
+        default=None,
+        help="Write official_score_evidence.v1 after derived scoring.",
+    )
+    ap.add_argument(
+        "--official-aggregation-policy",
+        default=None,
+        help=f"Required policy: {OFFICIAL_AGGREGATION_POLICY}.",
+    )
+    ap.add_argument(
         "--scoring-baseline",
         type=Path,
         default=None,
@@ -2001,6 +2019,18 @@ def main():
         ap.error("--workload-shard-size must be a positive integer")
     if args.gpu_jobs != 1:
         ap.error("--gpu-jobs currently only supports 1")
+    if args.official_score_report is not None:
+        if args.phase not in {"all", "derived"}:
+            ap.error("--official-score-report requires --phase all or derived")
+        if args.amd_score_report is None:
+            ap.error("--official-score-report requires --amd-score-report")
+        if args.scoring_baseline is None:
+            ap.error("--official-score-report requires --scoring-baseline")
+        if args.official_aggregation_policy != OFFICIAL_AGGREGATION_POLICY:
+            ap.error(
+                "--official-score-report requires "
+                f"--official-aggregation-policy {OFFICIAL_AGGREGATION_POLICY}"
+            )
     if args.execution_mode == "pipeline":
         if args.phase not in {"traces", "all"}:
             ap.error(
@@ -2338,6 +2368,12 @@ def main():
                 if args.amd_score_report
                 else None
             ),
+            "official_score_report": (
+                _first_relative_ref(args.official_score_report, output_dir, ROOT)
+                if args.official_score_report
+                else None
+            ),
+            "official_aggregation_policy": args.official_aggregation_policy,
             "amd_sol_bound_dir": (
                 _first_relative_ref(args.amd_sol_bound_dir, output_dir, ROOT)
                 if args.amd_sol_bound_dir
@@ -2471,6 +2507,17 @@ def main():
                 else 0,
             )
             print(f"AMD-native score report saved to {report_path}")
+        if args.phase == "all" and args.official_score_report is not None:
+            report_path = args.official_score_report.resolve()
+            write_official_score_report(
+                report_path,
+                amd_scores,
+                aggregation_policy=args.official_aggregation_policy,
+                source_score_ref=_relative_ref(
+                    args.amd_score_report.resolve(), output_dir
+                ),
+            )
+            print(f"Official score report saved to {report_path}")
         return
 
     if args.phase == "derived" and jobs > 1:
@@ -2530,6 +2577,18 @@ def main():
                 else 0,
             )
             print(f"AMD-native score report saved to {report_path}")
+
+        if args.official_score_report is not None:
+            report_path = args.official_score_report.resolve()
+            write_official_score_report(
+                report_path,
+                amd_scores,
+                aggregation_policy=args.official_aggregation_policy,
+                source_score_ref=_relative_ref(
+                    args.amd_score_report.resolve(), output_dir
+                ),
+            )
+            print(f"Official score report saved to {report_path}")
 
         if execution_closure_path is not None:
             if readiness is not None:
@@ -3227,6 +3286,16 @@ def main():
             else 0,
         )
         print(f"AMD-native score report saved to {report_path}")
+
+    if run_derived_phase and args.official_score_report is not None:
+        report_path = args.official_score_report.resolve()
+        write_official_score_report(
+            report_path,
+            amd_scores,
+            aggregation_policy=args.official_aggregation_policy,
+            source_score_ref=_relative_ref(args.amd_score_report.resolve(), output_dir),
+        )
+        print(f"Official score report saved to {report_path}")
 
     if execution_closure_path is not None:
         if readiness is not None:

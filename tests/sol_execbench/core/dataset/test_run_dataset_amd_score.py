@@ -794,6 +794,129 @@ def test_dataset_runner_phase_derived_reuses_existing_traces_without_gpu(
     assert _dataset_sidecar_path(solar_dir, problem_id="L1/matmul_demo").exists()
 
 
+def test_dataset_runner_phase_derived_writes_official_score_sidecar(
+    tmp_path,
+    monkeypatch,
+):
+    dataset_root = _write_matmul_dataset(tmp_path)
+    output_dir = tmp_path / "out"
+    trace_dir = output_dir / "L1" / "matmul_demo"
+    trace_dir.mkdir(parents=True)
+    (trace_dir / "traces.json").write_text(json.dumps(_matmul_trace_payload()))
+    amd_report_path = tmp_path / "reports" / "amd-score.json"
+    official_report_path = tmp_path / "reports" / "official-score.json"
+    closure_path = output_dir / "execution-closure.json"
+    baseline_path = tmp_path / "scoring-baseline.json"
+    baseline_path.write_text(
+        json.dumps(
+            {
+                "release": "v1.7",
+                "entries": [
+                    {
+                        "definition": "matmul_demo",
+                        "workload_uuid": "matmul-workload",
+                        "latency_ms": 2.0,
+                    }
+                ],
+            }
+        )
+    )
+
+    def fail_run_cli(*args, **kwargs):
+        raise AssertionError("--phase derived must not run GPU validation")
+
+    monkeypatch.setattr(run_dataset, "run_cli", fail_run_cli)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--phase",
+            "derived",
+            "--output",
+            str(output_dir),
+            "--amd-score-report",
+            str(amd_report_path),
+            "--official-score-report",
+            str(official_report_path),
+            "--official-aggregation-policy",
+            OFFICIAL_AGGREGATION_POLICY,
+            "--scoring-baseline",
+            str(baseline_path),
+            "--execution-closure",
+            str(closure_path),
+        ],
+    )
+
+    run_dataset.main()
+
+    payload = json.loads(official_report_path.read_text())
+    closure = json.loads(closure_path.read_text())
+
+    assert payload["aggregation_policy"] == OFFICIAL_AGGREGATION_POLICY
+    assert payload["scores"][0]["input_refs"]["amd_native_score"] == "amd-score.json"
+    assert payload["total_workload_count"] == 1
+    assert payload["zero_scored_count"] == 1
+    assert payload["score"] == 0.0
+    assert payload["scores"][0]["score"] is None
+    assert payload["scores"][0]["score_authority"] is False
+    assert closure["provenance"]["derived_evidence"] == {
+        "amd_score_report": "amd-score.json",
+        "official_score_report": "official-score.json",
+        "official_aggregation_policy": OFFICIAL_AGGREGATION_POLICY,
+        "amd_sol_bound_dir": None,
+        "solar_derivation": None,
+        "timing_evidence_dir": None,
+    }
+
+
+def test_dataset_runner_official_score_report_requires_scoring_baseline(
+    tmp_path,
+    monkeypatch,
+):
+    dataset_root = _write_matmul_dataset(tmp_path)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--amd-score-report",
+            str(tmp_path / "amd-score.json"),
+            "--official-score-report",
+            str(tmp_path / "official-score.json"),
+        ],
+    )
+
+    with pytest.raises(SystemExit, match="2"):
+        run_dataset.main()
+
+
+def test_dataset_runner_official_score_report_requires_amd_score_report(
+    tmp_path,
+    monkeypatch,
+):
+    dataset_root = _write_matmul_dataset(tmp_path)
+    baseline_path = tmp_path / "scoring-baseline.json"
+    baseline_path.write_text(json.dumps({"release": "v1.7", "entries": []}))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--official-score-report",
+            str(tmp_path / "official-score.json"),
+            "--scoring-baseline",
+            str(baseline_path),
+        ],
+    )
+
+    with pytest.raises(SystemExit, match="2"):
+        run_dataset.main()
+
+
 def test_dataset_runner_phase_derived_jobs_reuses_existing_traces_without_gpu(
     tmp_path,
     monkeypatch,
