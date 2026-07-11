@@ -30,7 +30,17 @@ def verify_release_baseline_rerun(
     """Verify a new run without changing the supplied bundle evidence."""
 
     rerun_trace_path = Path(rerun_trace_path)
-    trace_records, extra_identity = _load_rerun_trace(rerun_trace_path, bundle)
+    try:
+        trace_records, extra_identity = _load_rerun_trace(rerun_trace_path, bundle)
+        rerun_trace_sha256 = sha256_file(rerun_trace_path)
+    except (OSError, UnicodeDecodeError):
+        return _trace_failure_verification(
+            bundle, rerun_trace_path, "rerun_trace_unavailable"
+        )
+    except ValueError:
+        return _trace_failure_verification(
+            bundle, rerun_trace_path, "rerun_trace_malformed"
+        )
     provenance_blockers = _provenance_blockers(bundle, rerun_provenance)
     path_is_distinct = all(
         row.trace_ref is None
@@ -53,7 +63,7 @@ def verify_release_baseline_rerun(
         bundle_ref="in-memory-release-baseline-bundle",
         bundle_sha256=_bundle_digest(bundle),
         rerun_trace_ref=str(rerun_trace_path),
-        rerun_trace_sha256=sha256_file(rerun_trace_path),
+        rerun_trace_sha256=rerun_trace_sha256,
         workloads=workloads,
     )
 
@@ -66,29 +76,29 @@ def _verify_workload(
     path_is_distinct: bool,
     tolerance: float,
 ) -> ReleaseBaselineVerificationWorkload:
-    blockers = list(baseline.blocker_reason_codes)
+    rerun_blockers: list[str] = []
     rerun_latency: float | None = None
     if baseline.classification != "blocked":
-        blockers.extend(provenance_blockers)
+        rerun_blockers.extend(provenance_blockers)
         if not path_is_distinct:
-            blockers.append("rerun_trace_matches_baseline")
+            rerun_blockers.append("rerun_trace_matches_baseline")
         if extra_identity:
-            blockers.append("extra_trace_identity")
+            rerun_blockers.append("extra_trace_identity")
         rerun_latency, record_blockers = _rerun_measurement(records, baseline)
-        blockers.extend(record_blockers)
+        rerun_blockers.extend(record_blockers)
         if rerun_latency is not None and baseline.latency_ms is not None:
             delta = abs(rerun_latency - baseline.latency_ms) / baseline.latency_ms
             if delta > tolerance:
-                blockers.append("latency_outside_tolerance")
+                rerun_blockers.append("latency_outside_tolerance")
         else:
             delta = None
     else:
         delta = None
 
-    blockers = list(dict.fromkeys(blockers))
+    blockers = list(dict.fromkeys((*baseline.blocker_reason_codes, *rerun_blockers)))
     classification = (
         baseline.classification
-        if not blockers and baseline.classification != "blocked"
+        if not rerun_blockers and baseline.classification != "blocked"
         else "blocked"
     )
     return ReleaseBaselineVerificationWorkload(
@@ -101,6 +111,37 @@ def _verify_workload(
         latency_delta_rel=delta,
         passed=classification != "blocked",
         blocker_reason_codes=tuple(blockers),
+    )
+
+
+def _trace_failure_verification(
+    bundle: ReleaseBaselineBundle, rerun_trace_path: Path, reason: str
+) -> ReleaseBaselineVerification:
+    """Return a complete, deterministic report when the trace cannot be read."""
+
+    workloads = tuple(
+        ReleaseBaselineVerificationWorkload(
+            definition=row.definition,
+            workload_uuid=row.workload_uuid,
+            original_classification=row.classification,
+            classification="blocked",
+            baseline_latency_ms=row.latency_ms,
+            rerun_latency_ms=None,
+            latency_delta_rel=None,
+            passed=False,
+            blocker_reason_codes=tuple(
+                dict.fromkeys((*row.blocker_reason_codes, reason))
+            ),
+        )
+        for row in bundle.workloads
+    )
+    return ReleaseBaselineVerification(
+        release=bundle.release,
+        bundle_ref="in-memory-release-baseline-bundle",
+        bundle_sha256=_bundle_digest(bundle),
+        rerun_trace_ref=str(rerun_trace_path),
+        rerun_trace_sha256="0" * 64,
+        workloads=workloads,
     )
 
 
