@@ -58,6 +58,7 @@ markers = [
     "native_extension_serial: native extension test skipped by default; run with: pytest tests -m native_extension_serial -n 0",
     "requires_rdna4: test requires an AMD RDNA 4 GPU, such as gfx1200",
     "requires_cdna3: test requires an AMD CDNA 3 GPU, such as gfx942",
+    "requires_network: test fetches a pinned external resource and is opt-in",
     "requires_cutile: legacy NVIDIA cuTile marker; skipped in this ROCm-only port",
 ]
 

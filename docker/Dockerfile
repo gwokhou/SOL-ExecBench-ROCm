@@ -27,7 +27,7 @@ ENV ROCM_PATH=/opt/rocm \
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get install -y \
-    curl git vim tmux gdb valgrind git-lfs wget \
+    curl git vim tmux gdb valgrind git-lfs wget cmake \
     python3 python3-dev \
     build-essential libblas-dev liblapack-dev sudo && \
     hipcc --version && \
@@ -98,6 +98,11 @@ COPY --chown=${HOST_UID}:${HOST_GID} src/ ./src/
 # Install the project itself (creates the sol-execbench console script).
 RUN --mount=type=cache,target=/home/${HOST_USER}/.cache/uv,uid=${HOST_UID},gid=${HOST_GID} \
     uv sync --frozen --no-editable --no-dev
+
+# Compile the vendored AMD ISA JSON helper while the image has a C++ toolchain.
+# XML specifications remain runtime-downloaded and integrity-checked by the tool.
+RUN --mount=type=cache,target=/home/${HOST_USER}/.cache/uv,uid=${HOST_UID},gid=${HOST_GID} \
+    uv run python -c "from sol_execbench.tools.amd_isa.helper import ensure_helper; ensure_helper()"
 
 # The checked-in lock is the default ROCm 7.1 stack. Non-default Docker targets
 # install their declared PyTorch ROCm wheels after the frozen sync so each image
