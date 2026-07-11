@@ -1,6 +1,17 @@
 <!-- generated-by: gsd-doc-writer -->
 # Evaluator Contract
 
+## Release Baseline Publication
+
+`sol_execbench.scoring_baseline.v1` remains the compact measured-latency input
+to scoring.  A release publication additionally carries
+`sol_execbench.release_baseline_bundle.v1` and
+`sol_execbench.release_baseline_verification.v1`.  The bundle denominator is
+complete and every workload is classified as `official`, `derived`, or
+`blocked`; only `official` rows can support official score authority.  The
+verification artifact is produced by an independent rerun and must reference
+the exact baseline-bundle SHA-256.
+
 `sol-execbench contract --json` prints the GPU-free compatibility contract that
 downstream tools can inspect before running a benchmark. The contract is
 metadata about SOL-owned behavior. It is not itself a Trace row and it does not
