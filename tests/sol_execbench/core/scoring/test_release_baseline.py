@@ -6,20 +6,71 @@
 from __future__ import annotations
 
 import hashlib
+import json
+from pathlib import Path
+from typing import Any
 
 import pytest
 
 from sol_execbench.core.scoring.release_baseline import (
+    AuthorityInput,
     RELEASE_BASELINE_BUNDLE_SCHEMA_VERSION,
     RELEASE_BASELINE_VERIFICATION_SCHEMA_VERSION,
     ReleaseBaselineBundle,
     ReleaseBaselineVerification,
     ReleaseBaselineWorkload,
     ReleaseProvenance,
+    build_release_baseline_bundle,
     load_release_baseline_bundle,
     sha256_file,
     write_release_baseline_bundle,
+    write_release_baseline_outputs,
 )
+
+
+def _provenance(tmp_path: Path) -> ReleaseProvenance:
+    solution = tmp_path / "solution.py"
+    solution.write_text("solution", encoding="utf-8")
+    return ReleaseProvenance(
+        solution=str(solution), solution_sha256=sha256_file(solution)
+    )
+
+
+def _passed_trace(
+    definition: str, workload_uuid: str, latency: float
+) -> dict[str, Any]:
+    return {
+        "definition": definition,
+        "workload": {"uuid": workload_uuid},
+        "evaluation": {
+            "status": "PASSED",
+            "performance": {"latency_ms": latency},
+        },
+    }
+
+
+def _write_trace(tmp_path: Path, *traces: dict[str, Any]) -> Path:
+    path = tmp_path / "trace.jsonl"
+    path.write_text(
+        "".join(json.dumps(trace, allow_nan=True) + "\n" for trace in traces),
+        encoding="utf-8",
+    )
+    return path
+
+
+def _build_with_trace(
+    tmp_path: Path,
+    trace: dict[str, Any],
+    authority_by_key: dict[tuple[str, str], AuthorityInput] | None = None,
+):
+    return build_release_baseline_bundle(
+        suite_workloads=[{"definition": "gemm", "workload_uuid": "w1"}],
+        trace_path=_write_trace(tmp_path, trace),
+        release="v2.14",
+        provenance=_provenance(tmp_path),
+        authority_by_key=authority_by_key or {},
+        latency_tolerance_rel=0.05,
+    )
 
 
 def _bundle_fixture() -> ReleaseBaselineBundle:
@@ -157,3 +208,151 @@ def test_release_verification_and_sha256_file_are_deterministic(tmp_path):
         == RELEASE_BASELINE_VERIFICATION_SCHEMA_VERSION
     )
     assert sha256_file(path) == hashlib.sha256(b"release evidence").hexdigest()
+
+
+def test_builder_writes_compact_entries_and_keeps_missing_suite_rows_blocked(tmp_path):
+    baseline, bundle = build_release_baseline_bundle(
+        suite_workloads=[
+            {"definition": "gemm", "workload_uuid": "w1"},
+            {"definition": "gemm", "workload_uuid": "w2"},
+        ],
+        trace_path=_write_trace(tmp_path, _passed_trace("gemm", "w1", 1.25)),
+        release="v2.14",
+        provenance=_provenance(tmp_path),
+        authority_by_key={
+            ("gemm", "w1"): AuthorityInput(),
+        },
+        latency_tolerance_rel=0.05,
+    )
+
+    assert [(entry.definition, entry.workload_uuid) for entry in baseline.entries] == [
+        ("gemm", "w1")
+    ]
+    assert {row.workload_uuid: row.classification for row in bundle.workloads} == {
+        "w1": "official",
+        "w2": "blocked",
+    }
+    assert bundle.workloads[1].blocker_reason_codes == ("missing_trace_record",)
+
+
+@pytest.mark.parametrize("latency", [0.0, -1.0, float("nan"), float("inf")])
+def test_invalid_latency_becomes_blocked_and_is_excluded_from_compact_artifact(
+    tmp_path, latency
+):
+    baseline, bundle = _build_with_trace(tmp_path, _passed_trace("gemm", "w1", latency))
+
+    assert baseline.entries == ()
+    assert bundle.workloads[0].classification == "blocked"
+    assert "invalid_baseline_latency" in bundle.workloads[0].blocker_reason_codes
+
+
+def test_duplicate_and_failed_trace_records_are_blocked(tmp_path):
+    failed = _passed_trace("gemm", "w2", 1.0)
+    failed["evaluation"] = {"status": "RUNTIME_ERROR"}
+    baseline, bundle = build_release_baseline_bundle(
+        suite_workloads=[
+            {"definition": "gemm", "workload_uuid": "w1"},
+            {"definition": "gemm", "workload_uuid": "w2"},
+        ],
+        trace_path=_write_trace(
+            tmp_path,
+            _passed_trace("gemm", "w1", 1.0),
+            _passed_trace("gemm", "w1", 1.1),
+            failed,
+        ),
+        release="v2.14",
+        provenance=_provenance(tmp_path),
+        authority_by_key={},
+        latency_tolerance_rel=0.05,
+    )
+
+    assert baseline.entries == ()
+    assert {
+        row.workload_uuid: row.blocker_reason_codes for row in bundle.workloads
+    } == {
+        "w1": ("duplicate_trace_record",),
+        "w2": ("trace_status_not_passed",),
+    }
+
+
+def test_authority_degrades_measured_trace_and_preserves_evidence_refs(tmp_path):
+    baseline, bundle = _build_with_trace(
+        tmp_path,
+        _passed_trace("gemm", "w1", 1.0),
+        {
+            ("gemm", "w1"): AuthorityInput(
+                official_blockers=("model_not_validated",),
+                bound_ref="bound.json",
+                bound_sha256="a" * 64,
+                hardware_model_ref="model.json",
+                hardware_model_sha256="b" * 64,
+            )
+        },
+    )
+
+    assert baseline.entries[0].source == "release_baseline_bundle"
+    assert bundle.workloads[0].classification == "derived"
+    assert bundle.workloads[0].blocker_reason_codes == ("model_not_validated",)
+    assert bundle.workloads[0].bound_ref == "bound.json"
+    assert bundle.workloads[0].hardware_model_ref == "model.json"
+
+
+def test_missing_authority_input_makes_measured_trace_derived(tmp_path):
+    _, bundle = _build_with_trace(tmp_path, _passed_trace("gemm", "w1", 1.0))
+
+    assert bundle.workloads[0].classification == "derived"
+    assert bundle.workloads[0].blocker_reason_codes == ("missing_authority_input",)
+
+
+def test_builder_rejects_malformed_manifest_and_unrecognized_trace_identity(tmp_path):
+    with pytest.raises(ValueError, match="duplicate suite workload"):
+        build_release_baseline_bundle(
+            suite_workloads=[
+                {"definition": "gemm", "workload_uuid": "w1"},
+                {"definition": "gemm", "workload_uuid": "w1"},
+            ],
+            trace_path=_write_trace(tmp_path, _passed_trace("gemm", "w1", 1.0)),
+            release="v2.14",
+            provenance=_provenance(tmp_path),
+            authority_by_key={},
+            latency_tolerance_rel=0.05,
+        )
+    with pytest.raises(ValueError, match="outside suite"):
+        _build_with_trace(tmp_path, _passed_trace("other", "w1", 1.0))
+
+
+def test_writer_atomically_links_bundle_to_written_baseline_digest(tmp_path):
+    baseline, bundle = _build_with_trace(
+        tmp_path,
+        _passed_trace("gemm", "w1", 1.0),
+        {("gemm", "w1"): AuthorityInput()},
+    )
+    baseline_path = tmp_path / "baseline.json"
+    bundle_path = tmp_path / "bundle.json"
+
+    written = write_release_baseline_outputs(
+        baseline=baseline,
+        bundle=bundle,
+        baseline_path=baseline_path,
+        bundle_path=bundle_path,
+    )
+
+    assert written.baseline_artifact_ref == str(baseline_path)
+    assert written.baseline_artifact_sha256 == sha256_file(baseline_path)
+    assert load_release_baseline_bundle(bundle_path) == written
+
+
+def test_writer_rejects_one_path_for_both_linked_artifacts(tmp_path):
+    baseline, bundle = _build_with_trace(
+        tmp_path,
+        _passed_trace("gemm", "w1", 1.0),
+        {("gemm", "w1"): AuthorityInput()},
+    )
+
+    with pytest.raises(ValueError, match="different paths"):
+        write_release_baseline_outputs(
+            baseline=baseline,
+            bundle=bundle,
+            baseline_path=tmp_path / "output.json",
+            bundle_path=tmp_path / "output.json",
+        )
