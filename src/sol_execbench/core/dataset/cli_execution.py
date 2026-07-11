@@ -23,20 +23,29 @@ def build_cli_command(
     config_path: Path | None = None,
     keep_staging: bool = False,
     verbose: bool = False,
+    trace_output_path: Path | None = None,
 ) -> list[str]:
     """Build the ``sol-execbench`` command used by dataset runs."""
     cmd = [
         str(Path(sys.executable).parent / "sol-execbench"),
-        "--definition",
-        str(definition_path),
-        "--workload",
-        str(workload_path),
-        "--solution",
-        str(solution_path),
-        "--timeout",
-        str(timeout),
-        "--json",
     ]
+    if trace_output_path is not None:
+        cmd.extend(["--format", "json"])
+    cmd.extend(
+        [
+            "evaluate",
+            "--definition",
+            str(definition_path),
+            "--workload",
+            str(workload_path),
+            "--solution",
+            str(solution_path),
+            "--timeout",
+            str(timeout),
+        ]
+    )
+    if trace_output_path is not None:
+        cmd.extend(["--trace-output", str(trace_output_path)])
 
     if config_path:
         cmd.extend(["--config", str(config_path)])
@@ -60,6 +69,8 @@ def run_cli(
     verbose: bool = False,
 ) -> list[dict] | None:
     """Invoke ``sol-execbench`` and return parsed trace dicts."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    trace_path = output_dir / f".{job_name}.trace.jsonl"
     cmd = build_cli_command(
         definition_path=definition_path,
         workload_path=workload_path,
@@ -68,9 +79,9 @@ def run_cli(
         config_path=config_path,
         keep_staging=keep_staging,
         verbose=verbose,
+        trace_output_path=trace_path,
     )
 
-    output_dir.mkdir(parents=True, exist_ok=True)
     stdout_path = _temporary_stream_path(output_dir, job_name, "stdout")
     stderr_path = _temporary_stream_path(output_dir, job_name, "stderr")
     try:
@@ -114,7 +125,7 @@ def run_cli(
             )
             return None
 
-        traces = _parse_trace_jsonl(stdout_path)
+        traces = _parse_trace_jsonl(trace_path)
 
         if result.returncode != 0:
             print(f"CLI failed for {job_name}: exit code {result.returncode}")
@@ -145,6 +156,7 @@ def run_cli(
     finally:
         stdout_path.unlink(missing_ok=True)
         stderr_path.unlink(missing_ok=True)
+        trace_path.unlink(missing_ok=True)
 
 
 def bounded_cli_stream(value: str | bytes | None) -> str:

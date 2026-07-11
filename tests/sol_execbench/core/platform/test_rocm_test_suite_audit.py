@@ -176,10 +176,11 @@ def test_python_compatibility_examples_do_not_carry_native_markers():
 
 
 def test_user_facing_compile_text_uses_hip_cpp():
-    cli = _read("src/sol_execbench/cli/main.py")
+    cli = _read("src/sol_execbench/cli/commands/evaluate.py")
+    phases = _read("src/sol_execbench/cli/evaluation/phases.py")
 
     assert "Compilation timeout in seconds (HIP/C++ only)" in cli
-    assert "Compiling HIP/C++ solution..." in cli
+    assert "Compiling HIP/C++ solution..." in phases
     assert "C++/CUDA" not in cli
 
 

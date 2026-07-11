@@ -9,10 +9,9 @@ Use this recipe for single-kernel evaluation before interpreting wider
 curated-slice or dataset results.
 
 ```bash
-uv run sol-execbench tests/sol_execbench/samples/rmsnorm \
+uv run sol-execbench --format json evaluate tests/sol_execbench/samples/rmsnorm \
   --solution tests/sol_execbench/samples/rmsnorm/solution_triton.json \
-  --json \
-  -o out/cookbook/rmsnorm.trace.jsonl
+  --trace-output out/cookbook/rmsnorm.trace.jsonl
 ```
 
 Inspect:
@@ -32,10 +31,9 @@ This recipe adds a HIP/C++ solution while keeping the benchmark problem stable.
 5. Run:
 
 ```bash
-uv run sol-execbench examples/hip_cpp/rmsnorm \
+uv run sol-execbench --format json evaluate examples/hip_cpp/rmsnorm \
   --solution examples/hip_cpp/rmsnorm/solution_hip.json \
-  --json \
-  -o out/cookbook/hip_cpp_rmsnorm.trace.jsonl
+  --trace-output out/cookbook/hip_cpp_rmsnorm.trace.jsonl
 ```
 
 ## Recipe: Run The Curated Slice Manually
@@ -47,41 +45,36 @@ Run a small representative subset first:
 ```bash
 mkdir -p out/curated
 
-uv run sol-execbench tests/sol_execbench/samples/rmsnorm \
+uv run sol-execbench --format json evaluate tests/sol_execbench/samples/rmsnorm \
   --solution tests/sol_execbench/samples/rmsnorm/solution_triton.json \
-  --json \
-  -o out/curated/rmsnorm.trace.jsonl
+  --trace-output out/curated/rmsnorm.trace.jsonl
 
-uv run sol-execbench examples/triton/rmsnorm \
+uv run sol-execbench --format json evaluate examples/triton/rmsnorm \
   --solution examples/triton/rmsnorm/solution_triton.json \
-  --json \
-  -o out/curated/triton_rmsnorm.trace.jsonl
+  --trace-output out/curated/triton_rmsnorm.trace.jsonl
 
-uv run sol-execbench examples/hip_cpp/rmsnorm \
+uv run sol-execbench --format json evaluate examples/hip_cpp/rmsnorm \
   --solution examples/hip_cpp/rmsnorm/solution_hip.json \
-  --json \
-  -o out/curated/hip_cpp_rmsnorm.trace.jsonl
+  --trace-output out/curated/hip_cpp_rmsnorm.trace.jsonl
 ```
 
 Then add ROCm library examples when dependencies are installed:
 
 ```bash
-uv run sol-execbench examples/hipblas/gemm \
+uv run sol-execbench --format json evaluate examples/hipblas/gemm \
   --solution examples/hipblas/gemm/solution_hipblas.json \
-  --json \
-  -o out/curated/hipblas_gemm.trace.jsonl
+  --trace-output out/curated/hipblas_gemm.trace.jsonl
 ```
 
 ## Recipe: Capture Environment Evidence
 
 ```bash
-uv run sol-execbench doctor --json > out/cookbook/doctor.json
+uv run sol-execbench --format json environment doctor > out/cookbook/doctor.json
 
 SOLEXECBENCH_ENV_SNAPSHOT=1 \
-  uv run sol-execbench tests/sol_execbench/samples/rmsnorm \
+  uv run sol-execbench --format json evaluate tests/sol_execbench/samples/rmsnorm \
     --solution tests/sol_execbench/samples/rmsnorm/solution_triton.json \
-    --json \
-    -o out/cookbook/rmsnorm.env.trace.jsonl
+    --trace-output out/cookbook/rmsnorm.env.trace.jsonl
 ```
 
 Expected sidecar:
@@ -93,11 +86,10 @@ out/cookbook/rmsnorm.env.trace.jsonl.environment.json
 ## Recipe: Collect rocprofv3 Diagnostics
 
 ```bash
-uv run sol-execbench tests/sol_execbench/samples/rmsnorm \
+uv run sol-execbench --format json evaluate tests/sol_execbench/samples/rmsnorm \
   --solution tests/sol_execbench/samples/rmsnorm/solution_triton.json \
   --profile rocprofv3 \
-  --json \
-  -o out/cookbook/rmsnorm.profile.trace.jsonl
+  --trace-output out/cookbook/rmsnorm.profile.trace.jsonl
 ```
 
 Expected sidecars:
@@ -113,7 +105,7 @@ benchmark follows the normal path.
 ## Recipe: Inspect ROCm Toolchain Routing
 
 ```bash
-uv run sol-execbench toolchain --json \
+uv run sol-execbench --format json toolchain route \
   --evidence-level profiling \
   --artifact-type executable_run \
   --gpu-arch gfx1200
@@ -127,7 +119,7 @@ leaderboard readiness.
 List the built-in tool registry:
 
 ```bash
-uv run sol-execbench toolchain --json --list-registry
+uv run sol-execbench --format json toolchain list
 ```
 
 ## Recipe: Generate AMD-Native Derived Evidence
@@ -142,7 +134,7 @@ solutions, blobs, or ROCm-migrated derivatives. Migrate the local copy into a
 local output root:
 
 ```bash
-uv run sol-execbench dataset migrate-sol \
+uv run sol-execbench dataset migrate sol \
   /path/to/local/SOL-ExecBench \
   data/local-sol-migrated \
   --manifest out/local-sol-migration-manifest.json
@@ -151,7 +143,7 @@ uv run sol-execbench dataset migrate-sol \
 FlashInfer Trace inputs use their separate Apache-2.0 provenance boundary:
 
 ```bash
-uv run sol-execbench dataset migrate-flashinfer \
+uv run sol-execbench dataset migrate flashinfer \
   /path/to/local/flashinfer-trace \
   data/local-flashinfer-migrated \
   --manifest out/local-flashinfer-migration-manifest.json

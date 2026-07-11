@@ -228,7 +228,8 @@ def test_cli_package_readiness_preserves_on_disk_release_baseline_links(
         cli,
         [
             "baseline",
-            "release-build",
+            "release",
+            "build",
             "--suite-manifest",
             str(suite_path),
             "--trace",
@@ -282,7 +283,8 @@ def test_cli_package_readiness_preserves_on_disk_release_baseline_links(
         cli,
         [
             "baseline",
-            "release-verify",
+            "release",
+            "verify",
             "--bundle",
             str(bundle_path),
             "--rerun-trace",
@@ -390,7 +392,15 @@ def test_bundle_writes_manifest_transcripts_checksums_and_authority_map(
             return subprocess.CompletedProcess(
                 command, 0, stdout="validation ok", stderr=""
             )
-        if command == ["uv", "run", "sol-execbench", "doctor", "--json"]:
+        if command == [
+            "uv",
+            "run",
+            "sol-execbench",
+            "--format",
+            "json",
+            "environment",
+            "doctor",
+        ]:
             return subprocess.CompletedProcess(
                 command,
                 0,
@@ -515,7 +525,15 @@ def test_failed_release_validation_blocks_and_redacts_transcript(
                 stdout="failed",
                 stderr="HF_TOKEN=hf_secret",
             )
-        if command == ["uv", "run", "sol-execbench", "doctor", "--json"]:
+        if command == [
+            "uv",
+            "run",
+            "sol-execbench",
+            "--format",
+            "json",
+            "environment",
+            "doctor",
+        ]:
             return subprocess.CompletedProcess(command, 0, stdout="{}", stderr="")
         raise AssertionError(f"unexpected command: {command}")
 

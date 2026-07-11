@@ -1623,10 +1623,17 @@ def test_execution_closure_preserves_traces_from_cli_nonzero_exit(
     output_dir = tmp_path / "out"
 
     def failed_subprocess_run(*args, **kwargs):
+        command = args[0]
+        if "--trace-output" not in command:
+            return subprocess.CompletedProcess(
+                args=command, returncode=0, stdout="test-revision\n", stderr=""
+            )
+        trace_path = Path(command[command.index("--trace-output") + 1])
+        trace_path.write_text(json.dumps(_trace("selected-workload")) + "\n")
         return subprocess.CompletedProcess(
-            args=["sol-execbench"],
+            args=command,
             returncode=9,
-            stdout=json.dumps(_trace("selected-workload")) + "\n",
+            stdout='{"schema_version":"sol_execbench.cli_response.v1"}\n',
             stderr=f"secret stderr from {tmp_path}",
         )
 

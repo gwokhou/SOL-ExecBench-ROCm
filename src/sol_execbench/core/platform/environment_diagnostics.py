@@ -25,7 +25,7 @@ def build_environment_diagnostics(
     smoke_checker: Callable[[], list[EnvironmentCheckResult]] | None = None,
     now: Callable[[], datetime] | None = None,
 ) -> EnvironmentDiagnostics:
-    """Build standalone environment diagnostics for ``sol-execbench doctor``."""
+    """Build diagnostics for ``sol-execbench environment doctor``."""
 
     snapshot = snapshot_collector()
     checks = tool_checks(snapshot)

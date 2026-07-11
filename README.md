@@ -70,6 +70,7 @@ uv run sol-execbench examples/triton/rmsnorm \
 
 ```bash
 uv run sol-execbench \
+  evaluate \
   --definition definition.json \
   --workload workload.jsonl \
   --solution solution.json
@@ -78,15 +79,15 @@ uv run sol-execbench \
 **Write trace JSONL to a file:**
 
 ```bash
-uv run sol-execbench examples/pytorch/gemma3_swiglu \
+uv run sol-execbench evaluate examples/pytorch/gemma3_swiglu \
   --solution examples/pytorch/gemma3_swiglu/solution_python.json \
-  --output traces.jsonl
+  --trace-output traces.jsonl
 ```
 
 **Compare two trace JSONL files (baseline comparison):**
 
 ```bash
-uv run sol-execbench-baseline \
+uv run sol-execbench baseline compare \
   --candidate traces_v2.jsonl \
   --baseline traces_v1.jsonl
 ```
@@ -103,17 +104,17 @@ uv run sol-execbench baseline export \
 **Print ROCm environment diagnostics or the evaluator contract:**
 
 ```bash
-uv run sol-execbench doctor --json
-uv run sol-execbench contract --json
-uv run sol-execbench toolchain --json
+uv run sol-execbench --format json environment doctor
+uv run sol-execbench --format json contract evaluator
+uv run sol-execbench --format json toolchain route
 ```
 
 **Migrate downloaded SOL-ExecBench or FlashInfer Trace inputs:**
 
 ```bash
-uv run sol-execbench dataset migrate-sol data/source data/benchmark \
+uv run sol-execbench dataset migrate sol data/source data/benchmark \
   --manifest out/manifest.json
-uv run sol-execbench dataset migrate-flashinfer data/source data/benchmark \
+uv run sol-execbench dataset migrate flashinfer data/source data/benchmark \
   --manifest out/manifest.json
 ```
 
@@ -131,7 +132,7 @@ uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark --phase derived \
   --scoring-baseline baselines/gfx1200.json
 ```
 
-For an official score, use `sol-execbench official-score` with the matching
+For an official score, use `sol-execbench score official` with the matching
 release bundle, independent rerun verification, and suite manifest. Dataset
 sidecars requested with `--official-score-report out/official-score.json`
 without those release artifacts remain explicitly blocked; use
@@ -139,7 +140,7 @@ without those release artifacts remain explicitly blocked; use
 the only accepted aggregation policy.
 
 If evaluation exits without parseable trace JSONL, the CLI writes a bounded
-diagnostic-only no-trace sidecar next to `--output`, in the kept staging
+diagnostic-only no-trace sidecar next to `--trace-output`, in the kept staging
 directory, or in the system temp directory. This sidecar records stdout/stderr
 tails and line counts. It is not canonical trace JSONL.
 
@@ -149,17 +150,18 @@ The `sol-execbench` command provides several subcommands:
 
 | Subcommand | Description |
 | --- | --- |
-| `<problem_dir> --solution <path>` | Evaluate a solution (default when no subcommand is given) |
-| `contract --json` | Print the GPU-free evaluator compatibility contract |
-| `doctor --json` | Print ROCm environment diagnostics |
-| `toolchain --json` | Print ROCm toolchain routing diagnostics |
+| `evaluate <problem_dir> --solution <path>` | Evaluate a solution |
+| `--format json contract evaluator` | Print the GPU-free evaluator compatibility contract |
+| `--format json contract cli` | Print the generated CLI contract |
+| `--format json environment doctor` | Print ROCm environment diagnostics |
+| `--format json toolchain route` | Print ROCm toolchain routing diagnostics |
 | `baseline export` | Export a measured HIP baseline registry from SOL trace JSONL |
-| `dataset migrate-sol` | Migrate downloaded SOL-ExecBench inputs into local layout |
-| `dataset migrate-flashinfer` | Migrate downloaded FlashInfer trace inputs into local layout |
+| `dataset migrate sol` | Migrate downloaded SOL-ExecBench inputs into local layout |
+| `dataset migrate flashinfer` | Migrate downloaded FlashInfer trace inputs into local layout |
 
-The `sol-execbench-baseline` command compares two trace JSONL files for
+The `sol-execbench baseline compare` command compares trace JSONL files for
 baseline regression analysis. It accepts repeated `--baseline` inputs,
-`--format text|json`, `--output`, `--win-pct`, `--parity-pct`, and
+root-level `--format text|json`, `--output`, `--win-pct`, `--parity-pct`, and
 `--amd-native-claim` for guarded AMD-native reporting.
 
 Key evaluation options:
@@ -168,13 +170,26 @@ Key evaluation options:
 | --- | --- | --- |
 | `--compile-timeout` | 120 | Compilation timeout in seconds (HIP/C++ only) |
 | `--timeout` | 600 | Evaluation subprocess timeout in seconds |
-| `-o`, `--output` | -- | Write trace JSONL to a file |
-| `--json` | off | Print trace JSON lines to stdout |
+| `--trace-output` | -- | Write canonical trace JSONL to a file |
 | `--lock-clocks` | off | Require GPU clocks to be locked for stable timing |
 | `--keep-staging` | off | Preserve the temporary staging directory |
 | `--profile` | `none` | Collect diagnostic profiling artifacts (`rocprofv3`) |
 | `--static-evidence` | `none` | Collect diagnostic static kernel evidence (`auto`) |
 | `-v`, `--verbose` | off | Show subprocess output and staging details |
+
+CLI 2.0 is intentionally breaking and does not install compatibility aliases:
+
+| CLI 1.x | CLI 2.0 |
+| --- | --- |
+| `sol-execbench DIR ...` | `sol-execbench evaluate DIR ...` |
+| `sol-execbench doctor --json` | `sol-execbench --format json environment doctor` |
+| `sol-execbench contract --json` | `sol-execbench --format json contract evaluator` |
+| `sol-execbench-baseline ...` | `sol-execbench baseline compare ...` |
+| `baseline release-build` | `baseline release build` |
+
+Root `--format` must precede the subcommand. JSON evaluation also requires
+`--trace-output`; stdout carries one response envelope while canonical Trace
+JSONL remains a separate artifact.
 
 ## Supported Solution Categories
 

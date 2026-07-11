@@ -193,7 +193,8 @@ def test_authority_freeze_cli_writes_a_baseline_compatible_manifest(tmp_path) ->
         cli,
         [
             "baseline",
-            "authority-freeze",
+            "authority",
+            "freeze",
             "--suite-manifest",
             str(suite_path),
             "--sanity-report",

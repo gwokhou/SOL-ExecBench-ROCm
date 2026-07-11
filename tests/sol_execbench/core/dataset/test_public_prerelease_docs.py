@@ -104,8 +104,8 @@ def test_dataset_runner_cookbook_preserves_local_only_dataset_boundaries():
     normalized = " ".join(text.split())
 
     for required in (
-        "migrate-sol",
-        "migrate-flashinfer",
+        "migrate sol",
+        "migrate flashinfer",
         "--dataset-manifest",
         "does not redistribute original NVIDIA dataset rows",
         "ROCm-migrated derivatives",

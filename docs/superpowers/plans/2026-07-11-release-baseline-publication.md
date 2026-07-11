@@ -29,7 +29,7 @@
 - Create: `src/sol_execbench/core/scoring/release_baseline/verifier.py` — independent rerun matching, latency tolerance comparison, final classification, and verification report generation.
 - Create: `src/sol_execbench/core/scoring/release_baseline/__init__.py` — stable public APIs and schema constants.
 - Modify: `src/sol_execbench/core/scoring/__init__.py` — lazy export the release-baseline public surface.
-- Modify: `src/sol_execbench/cli/commands/baseline.py` — add `baseline release-build` and `baseline release-verify` subcommands.
+- Modify: `src/sol_execbench/cli/commands/baseline.py` — add `baseline release build` and `baseline release verify` subcommands.
 - Modify: `scripts/internal/release/build_prerelease_artifact_bundle.py` — accept, validate, copy, checksum, and require finalized baseline release evidence.
 - Modify: `scripts/internal/release/check_prerelease_readiness.py` — verify the required bundle/report pair and reject inconsistent classification or full-suite-official overclaim.
 - Modify: `docs/prerelease_artifact_bundle.md`, `docs/prerelease_readiness.md`, `docs/EVALUATOR-CONTRACT.md`, `docs/sol_score_gap_and_amd_reuse_report.md` — document commands, artifact authority, and closure of 7.3/7.7 without changing non-goals.
@@ -302,16 +302,16 @@ git commit -s -m "feat: verify independent release baseline reruns"
 - Modify: `src/sol_execbench/cli/commands/baseline.py`
 - Test: `tests/sol_execbench/cli/commands/test_baseline.py`
 
-**Consumes:** `baseline release-build` options for suite manifest, trace, solution/provenance, authority JSON, tolerance, and output paths; `baseline release-verify` options for bundle, rerun trace/provenance, and output.
+**Consumes:** `baseline release build` options for suite manifest, trace, solution/provenance, authority JSON, tolerance, and output paths; `baseline release verify` options for bundle, rerun trace/provenance, and output.
 
-**Produces:** two files from `release-build` (`scoring_baseline.v1` and `release_baseline_bundle.v1`) and one `release_baseline_verification.v1` file from `release-verify`.
+**Produces:** two files from `release build` (`scoring_baseline.v1` and `release_baseline_bundle.v1`) and one `release_baseline_verification.v1` file from `release verify`.
 
 - [ ] **Step 1: Write Click tests for the new commands.**
 
 ```python
 def test_release_build_writes_compact_baseline_and_bundle(monkeypatch, tmp_path):
     monkeypatch.setattr(cli_baseline, "build_release_baseline_bundle", _fake_build)
-    result = CliRunner().invoke(cli, ["baseline", "release-build", "--suite-manifest", str(tmp_path / "suite.json"), "--trace", str(tmp_path / "trace.jsonl"), "--release", "v2.14", "--baseline-output", str(tmp_path / "baseline.json"), "--bundle-output", str(tmp_path / "bundle.json"), "--solution", "hipblaslt", "--solution-sha256", "a" * 64, "--environment-fingerprint", "gfx1200-rocm7.1", "--timing-policy", "median-100", "--compiler-build-id", "rocm-7.1", "--latency-tolerance-rel", "0.05"])
+    result = CliRunner().invoke(cli, ["baseline", "release", "build", "--suite-manifest", str(tmp_path / "suite.json"), "--trace", str(tmp_path / "trace.jsonl"), "--release", "v2.14", "--baseline-output", str(tmp_path / "baseline.json"), "--bundle-output", str(tmp_path / "bundle.json"), "--solution", "hipblaslt", "--solution-sha256", "a" * 64, "--environment-fingerprint", "gfx1200-rocm7.1", "--timing-policy", "median-100", "--compiler-build-id", "rocm-7.1", "--latency-tolerance-rel", "0.05"])
     assert result.exit_code == 0, result.output
     assert (tmp_path / "baseline.json").exists()
     assert (tmp_path / "bundle.json").exists()
@@ -321,12 +321,12 @@ def test_release_build_writes_compact_baseline_and_bundle(monkeypatch, tmp_path)
 
 Run: `uv run pytest tests/sol_execbench/cli/commands/test_baseline.py -q`
 
-Expected: FAIL because `release-build` is not a baseline subcommand.
+Expected: FAIL before the nested `release build` command is implemented.
 
 - [ ] **Step 3: Add commands with explicit required provenance.**
 
 ```python
-@_baseline_cli.command("release-build")
+@release_cli.command("build")
 @click.option("--suite-manifest", required=True, type=click.Path(exists=True, dir_okay=False, path_type=Path))
 @click.option("--trace", required=True, type=click.Path(exists=True, dir_okay=False, path_type=Path))
 @click.option("--release", required=True)
@@ -347,19 +347,19 @@ def _release_build_cli(
     """Build compact and complete release-baseline evidence from one trace."""
 ```
 
-Add equivalent required `release-verify` options for `--bundle`, `--rerun-trace`, `--output`, `--solution-sha256`, `--environment-fingerprint`, `--timing-policy`, and `--compiler-build-id`.  Parse suite and authority JSON before invoking core code; show output locations and summaries.  Do not add a command path that infers identity from host state.
+Add equivalent required `release verify` options for `--bundle`, `--rerun-trace`, `--output`, `--solution-sha256`, `--environment-fingerprint`, `--timing-policy`, and `--compiler-build-id`. Parse suite and authority JSON before invoking core code; show output locations and summaries. Do not add a command path that infers identity from host state.
 
 - [ ] **Step 4: Add option validation and verify-command tests.**
 
 ```python
 def test_release_build_requires_positive_tolerance(tmp_path):
-    result = CliRunner().invoke(cli, ["baseline", "release-build", "--suite-manifest", str(tmp_path / "suite.json"), "--trace", str(tmp_path / "trace.jsonl"), "--release", "v2.14", "--baseline-output", str(tmp_path / "baseline.json"), "--bundle-output", str(tmp_path / "bundle.json"), "--solution", "hipblaslt", "--solution-sha256", "a" * 64, "--environment-fingerprint", "gfx1200-rocm7.1", "--timing-policy", "median-100", "--compiler-build-id", "rocm-7.1", "--latency-tolerance-rel", "0"])
+    result = CliRunner().invoke(cli, ["baseline", "release", "build", "--suite-manifest", str(tmp_path / "suite.json"), "--trace", str(tmp_path / "trace.jsonl"), "--release", "v2.14", "--baseline-output", str(tmp_path / "baseline.json"), "--bundle-output", str(tmp_path / "bundle.json"), "--solution", "hipblaslt", "--solution-sha256", "a" * 64, "--environment-fingerprint", "gfx1200-rocm7.1", "--timing-policy", "median-100", "--compiler-build-id", "rocm-7.1", "--latency-tolerance-rel", "0"])
     assert result.exit_code != 0
     assert "Invalid value" in result.output
 
 def test_release_verify_writes_report(monkeypatch, tmp_path):
     monkeypatch.setattr(cli_baseline, "verify_release_baseline_rerun", _fake_verify)
-    result = CliRunner().invoke(cli, ["baseline", "release-verify", "--bundle", str(tmp_path / "bundle.json"), "--rerun-trace", str(tmp_path / "rerun.jsonl"), "--output", str(tmp_path / "verification.json"), "--solution-sha256", "a" * 64, "--environment-fingerprint", "gfx1200-rocm7.1", "--timing-policy", "median-100", "--compiler-build-id", "rocm-7.1"])
+    result = CliRunner().invoke(cli, ["baseline", "release", "verify", "--bundle", str(tmp_path / "bundle.json"), "--rerun-trace", str(tmp_path / "rerun.jsonl"), "--output", str(tmp_path / "verification.json"), "--solution-sha256", "a" * 64, "--environment-fingerprint", "gfx1200-rocm7.1", "--timing-policy", "median-100", "--compiler-build-id", "rocm-7.1"])
     assert result.exit_code == 0, result.output
 ```
 
@@ -538,13 +538,13 @@ Expected: FAIL because the release-baseline publication wording has not been add
 - [ ] **Step 3: Document exact build, verify, package, and readiness commands.**
 
 ```bash
-uv run sol-execbench baseline release-build \
+uv run sol-execbench baseline release build \
   --suite-manifest out/release/suite.json --trace out/release/baseline-trace.jsonl \
   --release v2.14-gfx1200-rocm7.1 --baseline-output out/release/scoring-baseline.json \
   --bundle-output out/release/release-baseline.json --solution hipblaslt \
   --solution-sha256 <sha256> --environment-fingerprint <fingerprint> \
   --timing-policy median-100 --compiler-build-id <build-id> --latency-tolerance-rel 0.05
-uv run sol-execbench baseline release-verify \
+uv run sol-execbench baseline release verify \
   --bundle out/release/release-baseline.json --rerun-trace out/rerun/baseline-trace.jsonl \
   --output out/release/release-baseline-verification.json --solution-sha256 <sha256> \
   --environment-fingerprint <fingerprint> --timing-policy median-100 --compiler-build-id <build-id>
@@ -560,7 +560,7 @@ Expected: PASS.
 
 - [ ] **Step 5: Run an offline synthetic end-to-end release rehearsal.**
 
-Run: `uv run sol-execbench baseline release-build --suite-manifest tests/fixtures/release_baseline/suite.json --trace tests/fixtures/release_baseline/baseline.jsonl --release v2.14-test --baseline-output out/release-baseline-rehearsal/scoring-baseline.json --bundle-output out/release-baseline-rehearsal/release-baseline.json --solution fixture-baseline --solution-sha256 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --environment-fingerprint fixture-gfx1200-rocm7.1 --timing-policy median-100 --compiler-build-id fixture-build --latency-tolerance-rel 0.05 && uv run sol-execbench baseline release-verify --bundle out/release-baseline-rehearsal/release-baseline.json --rerun-trace tests/fixtures/release_baseline/rerun.jsonl --output out/release-baseline-rehearsal/release-baseline-verification.json --solution-sha256 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --environment-fingerprint fixture-gfx1200-rocm7.1 --timing-policy median-100 --compiler-build-id fixture-build && uv run scripts/internal/release/build_prerelease_artifact_bundle.py --version v2.14-test --output-dir out/release-baseline-package --release-baseline-bundle out/release-baseline-rehearsal/release-baseline.json --release-baseline-verification out/release-baseline-rehearsal/release-baseline-verification.json && uv run scripts/internal/release/check_prerelease_readiness.py --bundle-dir out/release-baseline-package --output-dir out/release-baseline-readiness --skip-doc-claim-checks`
+Run: `uv run sol-execbench baseline release build --suite-manifest tests/fixtures/release_baseline/suite.json --trace tests/fixtures/release_baseline/baseline.jsonl --release v2.14-test --baseline-output out/release-baseline-rehearsal/scoring-baseline.json --bundle-output out/release-baseline-rehearsal/release-baseline.json --solution fixture-baseline --solution-sha256 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --environment-fingerprint fixture-gfx1200-rocm7.1 --timing-policy median-100 --compiler-build-id fixture-build --latency-tolerance-rel 0.05 && uv run sol-execbench baseline release verify --bundle out/release-baseline-rehearsal/release-baseline.json --rerun-trace tests/fixtures/release_baseline/rerun.jsonl --output out/release-baseline-rehearsal/release-baseline-verification.json --solution-sha256 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --environment-fingerprint fixture-gfx1200-rocm7.1 --timing-policy median-100 --compiler-build-id fixture-build && uv run scripts/internal/release/build_prerelease_artifact_bundle.py --version v2.14-test --output-dir out/release-baseline-package --release-baseline-bundle out/release-baseline-rehearsal/release-baseline.json --release-baseline-verification out/release-baseline-rehearsal/release-baseline-verification.json && uv run scripts/internal/release/check_prerelease_readiness.py --bundle-dir out/release-baseline-package --output-dir out/release-baseline-readiness --skip-doc-claim-checks`
 
 Expected: exit 0; release summary counts add up to suite total; generated artifacts remain untracked under `out/`.
 

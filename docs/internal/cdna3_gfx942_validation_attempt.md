@@ -22,7 +22,7 @@ multiple sources:
 - `rocm-smi --showproductname --showdriverversion --showhw`
 - `rocminfo`
 - `rocm_agent_enumerator`
-- `uv run sol-execbench doctor --json`
+- `uv run sol-execbench --format json environment doctor`
 
 The diagnostic report status was `available`, including:
 

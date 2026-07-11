@@ -23,10 +23,9 @@ validation claims.
 Write JSONL traces from a single problem:
 
 ```bash
-uv run sol-execbench examples/pytorch/gemma3_swiglu \
+uv run sol-execbench --format json evaluate examples/pytorch/gemma3_swiglu \
   --solution examples/pytorch/gemma3_swiglu/solution_python.json \
-  --json \
-  -o out/rmsnorm.jsonl
+  --trace-output out/rmsnorm.jsonl
 ```
 
 Run a dataset batch:
@@ -182,7 +181,7 @@ The benchmark path:
 For benchmark-grade runs, use:
 
 ```bash
-uv run sol-execbench <problem_dir> --solution <solution-file> --lock-clocks
+uv run sol-execbench evaluate <problem_dir> --solution <solution-file> --lock-clocks
 ```
 
 Clock locking uses `rocm-smi`. The command fails the workload if
@@ -246,11 +245,11 @@ clock policy, and problem inputs are comparable.
 
 ## Baseline Comparison
 
-Use `sol-execbench-baseline` to compare existing trace JSONL files without
+Use `sol-execbench baseline compare` to compare existing trace JSONL files without
 changing the trace schema:
 
 ```bash
-uv run sol-execbench-baseline \
+uv run sol-execbench baseline compare \
   --candidate out/candidate.jsonl \
   --baseline out/baseline.jsonl
 ```
@@ -268,7 +267,7 @@ as:
 JSON output is available for automation:
 
 ```bash
-uv run sol-execbench-baseline \
+uv run sol-execbench --format json baseline compare \
   --candidate out/candidate.jsonl \
   --baseline out/baseline.jsonl \
   --format json \

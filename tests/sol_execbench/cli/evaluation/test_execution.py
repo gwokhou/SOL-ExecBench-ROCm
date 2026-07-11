@@ -11,10 +11,13 @@ def test_run_cli_parses_jsonl_and_ignores_non_json_stdout(tmp_path, monkeypatch)
     trace = {"evaluation": {"status": "PASSED"}}
 
     def fake_run(*args, **kwargs):
+        command = args[0]
+        trace_path = Path(command[command.index("--trace-output") + 1])
+        trace_path.write_text(json.dumps(trace) + "\n")
         return subprocess.CompletedProcess(
-            args=args[0],
+            args=command,
             returncode=0,
-            stdout="noise\n" + json.dumps(trace) + "\n",
+            stdout='{"schema_version":"sol_execbench.cli_response.v1"}\n',
             stderr="",
         )
 
@@ -42,10 +45,13 @@ def test_run_cli_passes_flashinfer_safetensors_env(tmp_path, monkeypatch):
     def fake_run(*args, **kwargs):
         nonlocal captured_env
         captured_env = kwargs["env"]
+        command = args[0]
+        trace_path = Path(command[command.index("--trace-output") + 1])
+        trace_path.write_text(json.dumps(trace) + "\n")
         return subprocess.CompletedProcess(
-            args=args[0],
+            args=command,
             returncode=0,
-            stdout=json.dumps(trace) + "\n",
+            stdout='{"schema_version":"sol_execbench.cli_response.v1"}\n',
             stderr="",
         )
 

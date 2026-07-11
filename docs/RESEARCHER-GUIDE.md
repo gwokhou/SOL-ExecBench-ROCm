@@ -26,10 +26,9 @@ benchmark/reproducibility researcher, and research preview reviewer.
 ```bash
 uv sync --all-groups
 
-uv run sol-execbench tests/sol_execbench/samples/rmsnorm \
+uv run sol-execbench --format json evaluate tests/sol_execbench/samples/rmsnorm \
   --solution tests/sol_execbench/samples/rmsnorm/solution_triton.json \
-  --json \
-  -o out/researcher/rmsnorm.trace.jsonl
+  --trace-output out/researcher/rmsnorm.trace.jsonl
 ```
 
 Read the canonical trace first. It is the primary artifact. Derived reports and

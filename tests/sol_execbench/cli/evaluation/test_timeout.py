@@ -55,18 +55,18 @@ def test_cli_eval_timeout_writes_no_trace_sidecar(tmp_path: Path, monkeypatch):
     result = CliRunner().invoke(
         cli,
         [
+            "evaluate",
             str(problem_dir),
             "--solution",
             str(problem_dir / "solution.json"),
-            "--output",
+            "--trace-output",
             str(trace_path),
-            "--json",
             "--timeout",
             "5",
         ],
     )
 
-    assert result.exit_code == 1, result.output
+    assert result.exit_code == 4, result.output
     assert "timed out" in result.output.lower()
 
     sidecar = trace_path.with_name(f"{trace_path.name}.no-trace-diagnostics.json")

@@ -45,28 +45,25 @@ shrinking must keep the selection criteria and excluded categories visible.
 Fast sample:
 
 ```bash
-uv run sol-execbench tests/sol_execbench/samples/rmsnorm \
+uv run sol-execbench --format json evaluate tests/sol_execbench/samples/rmsnorm \
   --solution tests/sol_execbench/samples/rmsnorm/solution_triton.json \
-  --json \
-  -o out/curated/rmsnorm.trace.jsonl
+  --trace-output out/curated/rmsnorm.trace.jsonl
 ```
 
 HIP/C++ example:
 
 ```bash
-uv run sol-execbench examples/hip_cpp/rmsnorm \
+uv run sol-execbench --format json evaluate examples/hip_cpp/rmsnorm \
   --solution examples/hip_cpp/rmsnorm/solution_hip.json \
-  --json \
-  -o out/curated/hip_cpp_rmsnorm.trace.jsonl
+  --trace-output out/curated/hip_cpp_rmsnorm.trace.jsonl
 ```
 
 ROCm library example:
 
 ```bash
-uv run sol-execbench examples/hipblas/gemm \
+uv run sol-execbench --format json evaluate examples/hipblas/gemm \
   --solution examples/hipblas/gemm/solution_hipblas.json \
-  --json \
-  -o out/curated/hipblas_gemm.trace.jsonl
+  --trace-output out/curated/hipblas_gemm.trace.jsonl
 ```
 
 ## Optional Evidence
@@ -75,20 +72,18 @@ Environment evidence:
 
 ```bash
 SOLEXECBENCH_ENV_SNAPSHOT=1 \
-  uv run sol-execbench tests/sol_execbench/samples/rmsnorm \
+  uv run sol-execbench --format json evaluate tests/sol_execbench/samples/rmsnorm \
     --solution tests/sol_execbench/samples/rmsnorm/solution_triton.json \
-    --json \
-    -o out/curated/rmsnorm.trace.jsonl
+    --trace-output out/curated/rmsnorm.trace.jsonl
 ```
 
 Profiling evidence:
 
 ```bash
-uv run sol-execbench tests/sol_execbench/samples/rmsnorm \
+uv run sol-execbench --format json evaluate tests/sol_execbench/samples/rmsnorm \
   --solution tests/sol_execbench/samples/rmsnorm/solution_triton.json \
   --profile rocprofv3 \
-  --json \
-  -o out/curated/rmsnorm.profiled.trace.jsonl
+  --trace-output out/curated/rmsnorm.profiled.trace.jsonl
 ```
 
 AMD-native score evidence, when dataset sidecars and bound artifacts are

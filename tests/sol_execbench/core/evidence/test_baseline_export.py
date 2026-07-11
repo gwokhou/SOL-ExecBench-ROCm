@@ -72,6 +72,8 @@ def test_baseline_export_cli_writes_registry(tmp_path: Path) -> None:
     result = CliRunner().invoke(
         cli,
         [
+            "--format",
+            "json",
             "baseline",
             "export",
             "--trace",
@@ -82,12 +84,11 @@ def test_baseline_export_cli_writes_registry(tmp_path: Path) -> None:
             "attention",
             "--sol-version",
             "sol-test",
-            "--json",
         ],
     )
 
     assert result.exit_code == 0, result.output
-    payload = json.loads(result.output)
+    payload = json.loads(result.output)["data"]["registry"]
     assert payload["coverage_status"] == "confirmed"
     assert output_path.exists()
 

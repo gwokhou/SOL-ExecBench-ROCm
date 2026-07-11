@@ -334,7 +334,7 @@ def test_reward_hack_e2e(tmp_path: Path, case: EvilCase):
 
 
 # ---------------------------------------------------------------------------
-# CLI e2e test — runs `sol-execbench <problem_dir> -o <output>`
+# CLI e2e test — runs `sol-execbench evaluate <problem_dir> --trace-output <output>`
 # ---------------------------------------------------------------------------
 
 
@@ -358,8 +358,9 @@ def test_cli_gqa_paged_decode(tmp_path: Path):
             sys.executable,
             "-c",
             "from sol_execbench.cli import cli; cli()",
+            "evaluate",
             str(sample_dir),
-            "-o",
+            "--trace-output",
             str(output_file),
         ],
         capture_output=True,

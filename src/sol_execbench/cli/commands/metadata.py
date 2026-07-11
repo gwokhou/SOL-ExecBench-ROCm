@@ -1,24 +1,13 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 
-"""GPU-free metadata commands for the SOL-ExecBench CLI."""
+"""Environment, contract, and toolchain command domains."""
 
 from __future__ import annotations
 
 import json
+from typing import Any
 
 import click
 
@@ -31,74 +20,148 @@ from ...core.platform.toolchain import (
     build_toolchain_routing_report,
     default_toolchain_registry,
 )
+from ..protocol import (
+    CLI_CONTRACT_SCHEMA_VERSION,
+    CLI_RESPONSE_SCHEMA_VERSION,
+    EXIT_UNAVAILABLE,
+    CliResult,
+    output_format,
+)
 
 
-@click.command("contract", context_settings={"help_option_names": ["-h", "--help"]})
-@click.option("--json", "json_output", is_flag=True, help="Print contract JSON")
-def _contract_cli(json_output: bool) -> None:
-    """Print the GPU-free evaluator compatibility contract."""
-
-    if not json_output:
-        raise click.ClickException("Only --json output is supported for contract")
-    payload = build_evaluator_contract().model_dump(mode="json")
-    click.echo(json.dumps(payload, sort_keys=True))
+def _show(payload: Any) -> None:
+    if output_format() == "text":
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
 
 
-@click.command("doctor", context_settings={"help_option_names": ["-h", "--help"]})
-@click.option("--json", "json_output", is_flag=True, help="Print diagnostics JSON")
-def _doctor_cli(json_output: bool) -> None:
-    """Print ROCm environment diagnostics."""
+@click.group("environment")
+def environment_cli() -> None:
+    """Inspect runtime and hardware availability."""
 
-    if not json_output:
-        raise click.ClickException("Only --json output is supported for doctor")
+
+@environment_cli.command("doctor")
+def doctor_cli() -> CliResult:
+    """Diagnose the ROCm environment without running a benchmark.
+
+    Example: ``sol-execbench --format json environment doctor``
+    """
     payload = build_environment_diagnostics().model_dump(mode="json")
-    click.echo(json.dumps(payload, sort_keys=True))
+    _show(payload)
+    unavailable = payload.get("status") == "unavailable"
+    return CliResult(data=payload, exit_code=EXIT_UNAVAILABLE if unavailable else 0)
 
 
-@click.command("toolchain", context_settings={"help_option_names": ["-h", "--help"]})
-@click.option("--json", "json_output", is_flag=True, help="Print routing JSON")
+@click.group("contract")
+def contract_cli() -> None:
+    """Describe stable evaluator and CLI interfaces."""
+
+
+@contract_cli.command("evaluator")
+def evaluator_contract_cli() -> CliResult:
+    """Print the unchanged evaluator compatibility contract."""
+    payload = build_evaluator_contract().model_dump(mode="json")
+    _show(payload)
+    return CliResult(data=payload)
+
+
+@contract_cli.command("cli")
+def cli_contract_cli() -> CliResult:
+    """Print the generated, machine-readable CLI 2.0 contract.
+
+    Example: ``sol-execbench --format json contract cli``
+    """
+    from sol_execbench.cli.main import cli
+
+    context = click.Context(cli, info_name="sol-execbench")
+    payload = {
+        "schema_version": CLI_CONTRACT_SCHEMA_VERSION,
+        "root_options_before_subcommand": True,
+        "response_schema": CLI_RESPONSE_SCHEMA_VERSION,
+        "exit_codes": {
+            "0": "success",
+            "1": "valid evaluation or verification result did not pass",
+            "2": "usage, input, or schema error",
+            "3": "hardware, environment, or dependency unavailable",
+            "4": "execution or internal failure",
+        },
+        "command_tree": _describe_command(cli, context),
+        "artifacts": {
+            "canonical_trace_jsonl": "Canonical evaluator Trace JSONL; schema and semantics unchanged",
+            "json_file": "Command-specific JSON evidence",
+            "directory": "Generated artifact directory",
+        },
+    }
+    _show(payload)
+    return CliResult(data=payload)
+
+
+def _describe_command(command: click.Command, ctx: click.Context) -> dict[str, Any]:
+    params = []
+    for param in command.get_params(ctx):
+        entry: dict[str, Any] = {
+            "name": param.name,
+            "kind": "argument" if isinstance(param, click.Argument) else "option",
+            "type": param.type.name,
+            "required": bool(param.required),
+        }
+        if isinstance(param, click.Option):
+            entry["flags"] = list(param.opts)
+            entry["default"] = (
+                param.default
+                if param.default is None
+                or isinstance(param.default, (str, int, float, bool, list, tuple))
+                else None
+            )
+            entry["multiple"] = param.multiple
+        params.append(entry)
+    result: dict[str, Any] = {
+        "name": command.name,
+        "help": command.help or "",
+        "parameters": params,
+    }
+    constraints = getattr(command, "cli_constraints", None)
+    if constraints:
+        result["constraints"] = list(constraints)
+    if isinstance(command, click.Group):
+        children = []
+        for name in command.list_commands(ctx):
+            child = command.get_command(ctx, name)
+            if child is None:
+                continue
+            children.append(_describe_command(child, click.Context(child, parent=ctx)))
+        result["commands"] = children
+    return result
+
+
+@click.group("toolchain")
+def toolchain_cli() -> None:
+    """Inspect ROCm tool routing capabilities."""
+
+
+@toolchain_cli.command("route")
 @click.option(
     "--evidence-level",
-    type=click.Choice([level.value for level in ToolchainEvidenceLevel]),
+    type=click.Choice([v.value for v in ToolchainEvidenceLevel]),
     default=ToolchainEvidenceLevel.PROFILING.value,
     show_default=True,
-    help="Evidence level to route",
 )
 @click.option(
     "--artifact-type",
-    type=click.Choice([artifact.value for artifact in ToolchainArtifactType]),
+    type=click.Choice([v.value for v in ToolchainArtifactType]),
     default=ToolchainArtifactType.EXECUTABLE_RUN.value,
     show_default=True,
-    help="Artifact type to route",
 )
-@click.option("--gpu-arch", "gpu_architecture", help="GPU architecture such as gfx1200")
-@click.option("--hardware-generation", help="Hardware generation such as RDNA 4")
-@click.option("--rocm-version", help="ROCm version such as 7.0")
-@click.option(
-    "--list-registry",
-    is_flag=True,
-    help="Print registry entries instead of a routing decision",
-)
-def _toolchain_cli(
-    json_output: bool,
+@click.option("--gpu-arch", "gpu_architecture")
+@click.option("--hardware-generation")
+@click.option("--rocm-version")
+def toolchain_route_cli(
     evidence_level: str,
     artifact_type: str,
     gpu_architecture: str | None,
     hardware_generation: str | None,
     rocm_version: str | None,
-    list_registry: bool,
-) -> None:
-    """Print ROCm toolchain routing diagnostics."""
-
-    if not json_output:
-        raise click.ClickException("Only --json output is supported for toolchain")
-    if list_registry:
-        payload = [
-            capability.model_dump(mode="json")
-            for capability in default_toolchain_registry()
-        ]
-        click.echo(json.dumps(payload, sort_keys=True))
-        return
+) -> CliResult:
+    """Choose a toolchain for a requested evidence artifact."""
     request = ToolchainRoutingRequest(
         evidence_level=ToolchainEvidenceLevel(evidence_level),
         artifact_type=ToolchainArtifactType(artifact_type),
@@ -107,4 +170,19 @@ def _toolchain_cli(
         rocm_version=rocm_version,
     )
     payload = build_toolchain_routing_report(request).model_dump(mode="json")
-    click.echo(json.dumps(payload, sort_keys=True))
+    _show(payload)
+    return CliResult(data=payload)
+
+
+@toolchain_cli.command("list")
+def toolchain_list_cli() -> CliResult:
+    """List the registry; route-only filters are intentionally not accepted."""
+    payload = [item.model_dump(mode="json") for item in default_toolchain_registry()]
+    _show(payload)
+    return CliResult(data=payload)
+
+
+# Private compatibility names for import-level callers; they are not CLI aliases.
+_contract_cli = contract_cli
+_doctor_cli = doctor_cli
+_toolchain_cli = toolchain_cli

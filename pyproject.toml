@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "sol-execbench"
-version = "1.0.5"
+version = "2.0.0"
 description = "ROCm-only port of SOL ExecBench for evaluating GPU kernel solutions on AMD hardware"
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
@@ -27,7 +27,6 @@ dependencies = [
 
 [project.scripts]
 sol-execbench = "sol_execbench.cli.main:cli"
-sol-execbench-baseline = "sol_execbench.cli.commands.baseline:cli"
 
 [dependency-groups]
 dev = [

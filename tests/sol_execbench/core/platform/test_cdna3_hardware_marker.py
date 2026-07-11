@@ -16,7 +16,11 @@ def _test_conftest() -> Any:
 
 
 def _skip_reasons(item: Any) -> list[str]:
-    return [marker.mark.kwargs["reason"] for marker in item.added_markers]
+    return [
+        marker.mark.kwargs["reason"]
+        for marker in item.added_markers
+        if marker.mark.name == "skip"
+    ]
 
 
 class _FakeConfig:
@@ -43,6 +47,24 @@ class _FakeItem:
 
     def add_marker(self, marker: Any) -> None:
         self.added_markers.append(marker)
+
+
+@pytest.mark.parametrize(
+    "marker_name",
+    ["requires_rocm", "requires_rocm_gpu", "requires_rdna4", "requires_cdna3"],
+)
+def test_real_gpu_markers_share_one_xdist_group(marker_name: str) -> None:
+    conftest = _test_conftest()
+
+    class Item(_FakeItem):
+        own_markers = [pytest.mark.xdist_group("serial").mark]
+
+    item = Item(marker_name)
+    conftest._assign_real_gpu_xdist_group(item)
+
+    assert [marker.name for marker in item.own_markers] == []
+    assert item.added_markers[-1].mark.name == "xdist_group"
+    assert item.added_markers[-1].mark.args == ("real_rocm_gpu",)
 
 
 def test_cdna3_marker_is_registered_with_concrete_hardware_semantics() -> None:
@@ -89,9 +111,7 @@ def test_cdna3_marker_skips_rdna4_with_detected_architecture(
 
     conftest.pytest_collection_modifyitems(_FakeConfig(), [item])
 
-    assert _skip_reasons(item) == [
-        "requires AMD CDNA 3 ROCm GPU (detected gfx1200)"
-    ]
+    assert _skip_reasons(item) == ["requires AMD CDNA 3 ROCm GPU (detected gfx1200)"]
 
 
 def test_cdna3_marker_skips_missing_rocm_with_missing_state(

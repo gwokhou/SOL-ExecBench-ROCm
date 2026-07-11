@@ -11,7 +11,7 @@ identity of every externally stored input.  This repository uses
 `out/authority-release-20260711-v3/` directory must not be committed to Git.
 When a suitable free public store is available, upload that directory as one
 versioned bundle, create and commit its publication manifest, and run
-`baseline publication-verify` from a clean download. Until then, all claims
+`baseline publication verify` from a clean download. Until then, all claims
 about this slice must use **locally verified authority slice** and must not use
 **published authority slice**.
 
@@ -57,7 +57,7 @@ or other immutable HTTPS object store before publishing an authority claim.
 6. Download the bundle into a fresh directory and verify it:
 
    ```bash
-   uv run sol-execbench baseline publication-verify \
+   uv run sol-execbench baseline publication verify \
      --manifest docs/releases/<release>.evidence.json \
      --artifact-root /path/to/downloaded-release
    ```

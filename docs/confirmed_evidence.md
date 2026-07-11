@@ -36,7 +36,7 @@ or leaderboard authority.
 SOL emits `official_score_evidence.v1` via the GPU-free CLI:
 
 ```bash
-sol-execbench official-score \
+sol-execbench score official \
   --amd-native-score amd-native-score.json \
   --scoring-baseline scoring-baseline.json \
   --release-baseline-bundle release-baseline-bundle.json \

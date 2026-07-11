@@ -44,7 +44,15 @@ DEFAULT_RELEASE_VALIDATION_COMMAND = [
     "--output-dir",
     "{release_validation_dir}",
 ]
-DEFAULT_ENVIRONMENT_COMMAND = ["uv", "run", "sol-execbench", "doctor", "--json"]
+DEFAULT_ENVIRONMENT_COMMAND = [
+    "uv",
+    "run",
+    "sol-execbench",
+    "--format",
+    "json",
+    "environment",
+    "doctor",
+]
 
 TOKEN_PATTERN = re.compile(
     r"(?ix)"
@@ -198,7 +206,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 authority_class="diagnostic-only",
                 status="present" if doctor_path.exists() else "unavailable",
                 description=(
-                    "Diagnostic environment evidence from sol-execbench doctor; "
+                    "Diagnostic environment evidence from sol-execbench environment doctor; "
                     "not timing, score, paper-parity, leaderboard, or hardware-validation authority."
                 ),
                 checksum_cache=checksum_cache,

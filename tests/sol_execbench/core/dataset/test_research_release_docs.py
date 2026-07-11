@@ -135,9 +135,9 @@ def test_first_run_guide_covers_minimal_trace_and_troubleshooting():
     for required in (
         "First-Run Checklist",
         "uv sync --all-groups",
-        "uv run sol-execbench doctor --json",
+        "uv run sol-execbench --format json environment doctor",
         "out/first-run.trace.jsonl",
-        "--output out/first-run.trace.jsonl",
+        "--trace-output out/first-run.trace.jsonl",
         "canonical Trace JSONL",
         "`status`",
         "`correctness`",

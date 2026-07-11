@@ -8,7 +8,7 @@
 #   ./scripts/run_docker.sh                             # interactive shell
 #   ./scripts/run_docker.sh --build                     # build image, then shell
 #   ./scripts/run_docker.sh --target rocm-7.1.1         # select a declared ROCm Docker Target
-#   ./scripts/run_docker.sh -- sol-execbench tests/sol_execbench/samples/rmsnorm --solution tests/sol_execbench/samples/rmsnorm/solution_python.json
+#   ./scripts/run_docker.sh -- sol-execbench evaluate tests/sol_execbench/samples/rmsnorm --solution tests/sol_execbench/samples/rmsnorm/solution_python.json
 #   ./scripts/run_docker.sh --device=/dev/kfd --device=/dev/dri -- bash
 #
 # Environment variables:

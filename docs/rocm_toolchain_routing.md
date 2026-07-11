@@ -54,7 +54,7 @@ components.
 Print a routing decision:
 
 ```bash
-uv run sol-execbench toolchain --json \
+uv run sol-execbench --format json toolchain route \
   --evidence-level profiling \
   --artifact-type executable_run \
   --gpu-arch gfx1200
@@ -63,7 +63,7 @@ uv run sol-execbench toolchain --json \
 Print the built-in registry:
 
 ```bash
-uv run sol-execbench toolchain --json --list-registry
+uv run sol-execbench --format json toolchain list
 ```
 
 Static evidence routes can be queried directly. HIP/C++ benchmark runs can also
@@ -71,7 +71,7 @@ consume active routes through `--static-evidence auto`, which writes diagnostic
 sidecars documented in `docs/static_kernel_evidence.md`:
 
 ```bash
-uv run sol-execbench toolchain --json \
+uv run sol-execbench --format json toolchain route \
   --evidence-level static \
   --artifact-type rocm_binary \
   --gpu-arch gfx1200
