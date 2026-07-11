@@ -74,9 +74,26 @@ class ScoringBaselineArtifact:
         }
 
 
-def load_scoring_baseline_artifact(path: Path) -> ScoringBaselineArtifact:
-    """Load a scoring baseline artifact from JSON."""
+def load_scoring_baseline_artifact(
+    path: Path,
+    *,
+    required_schema_version: str | None = None,
+) -> ScoringBaselineArtifact:
+    """Load a scoring baseline artifact from JSON.
+
+    Callers that emit authoritative evidence can require an explicit schema
+    marker. The legacy default remains permissive for non-authoritative score
+    derivation inputs.
+    """
     payload = json.loads(path.read_text())
+    if (
+        required_schema_version is not None
+        and payload.get("schema_version") != required_schema_version
+    ):
+        raise ValueError(
+            "scoring baseline artifact requires schema_version "
+            f"{required_schema_version!r}; got {payload.get('schema_version')!r}"
+        )
     return scoring_baseline_artifact_from_dict(payload, source=str(path))
 
 

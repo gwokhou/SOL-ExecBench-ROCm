@@ -7,7 +7,10 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 import sol_execbench.core.dataset.cli_execution as cli_execution
-from sol_execbench.core.evidence.baseline_coverage import BaselineCoverageReport
+from sol_execbench.core.evidence.baseline_coverage import (
+    BaselineCoverageReport,
+    validate_baseline_coverage,
+)
 from sol_execbench.core.scoring.amd_score import AmdNativeScore
 from sol_execbench.core.scoring.amd_score.reports import (
     _build_amd_score_reports_for_problem_impl,
@@ -22,6 +25,7 @@ from sol_execbench.core.scoring.official_score import (
 __all__ = [
     "build_amd_score_reports_for_problem",
     "extend_derived_reports_for_problem",
+    "scoring_baseline_coverage_report",
     "write_amd_score_report",
     "write_official_score_report",
 ]
@@ -137,3 +141,29 @@ def write_official_score_report(
     finally:
         if temporary_path is not None and temporary_path.exists():
             temporary_path.unlink()
+
+
+def scoring_baseline_coverage_report(
+    baseline_artifact: ScoringBaselineArtifact,
+    amd_scores: list[AmdNativeScore],
+) -> BaselineCoverageReport:
+    """Validate release-baseline coverage for every emitted score workload.
+
+    The release scoring-baseline format is intentionally smaller than the
+    measured-baseline registry format consumed by ``validate_baseline_coverage``.
+    Adapt its exact workload entries into that validator's public input shape so
+    an official runner sidecar carries the same all-workloads-confirmed gate.
+    """
+    registry = {
+        "expected_workload_keys": list(
+            dict.fromkeys(score.workload_uuid for score in amd_scores)
+        ),
+        "entries": [
+            {
+                "workload_key": entry.workload_uuid,
+                "source": "scoring_baseline",
+            }
+            for entry in baseline_artifact.entries
+        ],
+    }
+    return validate_baseline_coverage(registry)
