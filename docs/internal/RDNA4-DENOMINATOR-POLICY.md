@@ -55,6 +55,15 @@ The key policy decision is that blocker statuses remain visible inside the
 235-problem denominator. They are not silently excluded, but they also do not
 count as successful profiler-backed timing or full validation pass evidence.
 
+For an explicitly requested `official_score_evidence.v1` report, the only
+supported aggregation policy is `fixed_suite_denominator_zero_for_blocked`.
+Blocked workloads keep their null workload-level official score and blocker
+codes, while blocked workloads contribute 0 to the fixed suite denominator.
+The RDNA4 count of 235 does not itself grant official score authority: only a
+complete benchmark run that explicitly requests official output and passes the
+official-score evidence gate may make that authority claim. This policy does
+not promote provisional, degraded, partial, or blocked RDNA4 evidence.
+
 ## Current Device Memory Boundary
 
 `reference_oom_blocked` means the recorded evidence shows current-device HIP OOM

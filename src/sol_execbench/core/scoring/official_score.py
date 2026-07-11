@@ -3,26 +3,23 @@
 
 """Official benchmark score evidence gates (STAGING).
 
-The gating logic and data models here are delivered but NOT yet wired into any
-run path: no CLI command, runner, or sidecar writer invokes
-``build_official_score_suite_evidence`` / ``official_score_from_amd_native_score``,
-so no ``official_score_evidence.v1`` artifact is emitted today. The public API is
-re-exported from :mod:`sol_execbench.core.scoring` as a preview and may change
-before integration.
+The public standalone ``sol-execbench official-score`` CLI already emits
+``official_score_evidence.v1`` from an AMD-native score report, measured
+baseline input, and explicit aggregation policy. Dataset-runner automation is
+being integrated separately and must remain explicitly requested; this module
+does not give ordinary AMD-native reports, provisional evidence, or degraded
+bound evidence official-score authority.
 
-Wiring this into a run path remains gated by one unresolved decision: (1) a
-score aggregation policy must be supplied (it is required by the gate but is not
-yet a concept on ``AmdNativeSuiteReport``). The baseline-source classification
-sets (``_PLACEHOLDER_BASELINE_SOURCES`` / ``DEFAULT_OFFICIAL_BASELINE_SOURCES``)
-now cover ``scoring_baseline`` and ``measured_baseline_registry`` and are
-guarded by ``test_official_score_baseline_source_sets_cover_amd_score_universe``.
-The gate also accepts an optional ``coverage_report`` precondition
-(:mod:`sol_execbench.core.evidence.baseline_coverage`); a non-confirmed report
-adds the ``baseline_coverage_failed`` umbrella blocker plus the report's
-specific reason codes (BASE-03). Until the gate is wired into a run path
-(Phase 194 GATE-01), AMD-native score reports
-(``sol_execbench.amd_native_score.v1``) remain the only emitted score-adjacent
-surface.
+The gate requires measured candidate latency, an official measured baseline,
+SOL/SOLAR bound evidence, and the aggregation policy. Missing prerequisites
+leave the workload score ``null`` with stable blocker codes. The fixed suite
+policy counts such blocked workloads as zero only in suite aggregation; it does
+not upgrade the blocked workload or its input evidence. The baseline-source
+classification sets (``_PLACEHOLDER_BASELINE_SOURCES`` /
+``DEFAULT_OFFICIAL_BASELINE_SOURCES``) cover ``scoring_baseline`` and
+``measured_baseline_registry``. An optional non-confirmed ``coverage_report``
+(:mod:`sol_execbench.core.evidence.baseline_coverage`) adds the
+``baseline_coverage_failed`` umbrella blocker and its specific reason codes.
 """
 
 from __future__ import annotations

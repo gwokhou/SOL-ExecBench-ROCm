@@ -380,3 +380,26 @@ def test_contract_confirmed_evidence_blockers_match_official_score_constants():
         BASELINE_COVERAGE_FAILED_BLOCKER,
     }
     assert set(CONFIRMED_EVIDENCE_BLOCKERS) == official_blockers
+
+
+def test_official_score_automation_docs_preserve_policy_and_authority_boundaries():
+    contract = (REPO_ROOT / "docs/EVALUATOR-CONTRACT.md").read_text()
+    rdna4_policy = (REPO_ROOT / "docs/internal/RDNA4-DENOMINATOR-POLICY.md").read_text()
+    readme = (REPO_ROOT / "README.md").read_text()
+    consumer_guide = (REPO_ROOT / "docs/confirmed_evidence.md").read_text()
+
+    assert "official_score_evidence.v1" in contract
+    assert "fixed_suite_denominator_zero_for_blocked" in contract
+    assert "blocked workloads contribute 0" in contract
+    assert "not yet auto-emitted" not in contract
+
+    assert "fixed_suite_denominator_zero_for_blocked" in rdna4_policy
+    assert "does not itself grant official score authority" in rdna4_policy
+    assert "blocked workloads contribute 0" in rdna4_policy
+
+    assert "--official-score-report out/official-score.json" in readme
+    assert (
+        "--official-aggregation-policy fixed_suite_denominator_zero_for_blocked"
+        in readme
+    )
+    assert '"fixed_suite_denominator_zero_for_blocked"' in consumer_guide

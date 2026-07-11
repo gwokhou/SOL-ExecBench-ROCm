@@ -123,6 +123,20 @@ uv run sol-execbench dataset migrate-flashinfer data/source data/benchmark \
 uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark --limit 5
 ```
 
+**Write AMD-native and confirmed official-score reports for a derived batch:**
+
+```bash
+uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark --phase derived \
+  --amd-score-report out/amd-score.json \
+  --scoring-baseline baselines/gfx1200.json \
+  --official-score-report out/official-score.json \
+  --official-aggregation-policy fixed_suite_denominator_zero_for_blocked
+```
+
+The official report is emitted only when explicitly requested. Its fixed suite
+denominator counts blocked workloads as 0; blocked workload scores remain null
+and do not gain confirmed authority.
+
 If evaluation exits without parseable trace JSONL, the CLI writes a bounded
 diagnostic-only no-trace sidecar next to `--output`, in the kept staging
 directory, or in the system temp directory. This sidecar records stdout/stderr
