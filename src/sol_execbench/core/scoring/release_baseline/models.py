@@ -129,6 +129,8 @@ class ReleaseBaselineWorkload:
             raise ValueError(
                 "official workloads require trace, bound, and hardware model evidence"
             )
+        if self.classification == "official" and self.latency_ms is None:
+            raise ValueError("official workloads require a measured latency_ms")
 
     @property
     def key(self) -> tuple[str, str]:
@@ -317,6 +319,14 @@ class ReleaseBaselineVerificationWorkload:
             raise ValueError("blocker_reason_codes must contain non-empty strings")
         if self.passed != (self.classification in ("official", "derived")):
             raise ValueError("passed must match a non-blocked final classification")
+        if self.classification != "blocked" and (
+            self.baseline_latency_ms is None
+            or self.rerun_latency_ms is None
+            or self.latency_delta_rel is None
+        ):
+            raise ValueError(
+                "non-blocked verification workloads require baseline, rerun, and delta measurements"
+            )
 
     @property
     def key(self) -> tuple[str, str]:
