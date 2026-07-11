@@ -1,0 +1,500 @@
+ .../core/scoring/hardware_calibration/builder.py   | 129 +++++++++++++++++++++
+ .../scoring/hardware_calibration/environment.py    |  89 ++++++++++++++
+ .../core/scoring/hardware_calibration/hip_probe.py | 126 ++++++++++++++++++++
+ .../scoring/hardware_calibration/test_builder.py   |  50 ++++++++
+ .../hardware_calibration/test_environment.py       |  25 ++++
+ .../scoring/hardware_calibration/test_hip_probe.py |  38 ++++++
+ 6 files changed, 457 insertions(+)
+diff --git a/src/sol_execbench/core/scoring/hardware_calibration/builder.py b/src/sol_execbench/core/scoring/hardware_calibration/builder.py
+new file mode 100644
+index 0000000..536f77d
+--- /dev/null
++++ b/src/sol_execbench/core/scoring/hardware_calibration/builder.py
+@@ -0,0 +1,129 @@
++# SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
++# SPDX-License-Identifier: Apache-2.0
++
++"""Orchestrate HIP calibration while preserving explicit evidence states."""
++
++from __future__ import annotations
++
++import subprocess
++from dataclasses import dataclass
++from datetime import UTC, datetime
++from typing import Callable, Protocol
++
++from sol_execbench.core.bench import clock_lock
++from sol_execbench.core.scoring.hardware_calibration.environment import (
++    GpuEnvironment,
++    adapter_for,
++)
++from sol_execbench.core.scoring.hardware_calibration.hip_probe import HipProbe
++from sol_execbench.core.scoring.hardware_calibration.models import (
++    HardwareCalibrationArtifact,
++)
++from sol_execbench.core.scoring.hardware_calibration.rocprof_compute import (
++    ProfilerEnvironment,
++    parse_roofline_metrics,
++    run_rocprof_compute_bench_only,
++)
++
++
++class ClockController(Protocol):
++    def lock(self) -> bool: ...
++
++    def unlock(self) -> None: ...
++
++
++class Rdna4ClockController:
++    def lock(self) -> bool:
++        return clock_lock.lock_clocks()
++
++    def unlock(self) -> None:
++        clock_lock.unlock_clocks()
++
++
++class ClockLockRequiredError(RuntimeError):
++    pass
++
++
++@dataclass(frozen=True)
++class CalibrationRequest:
++    environment: GpuEnvironment
++    hip_probe: HipProbe
++    require_clock_lock: bool = False
++    clock_controller: ClockController | None = None
++    profiler_environment: ProfilerEnvironment | None = None
++    profiler_run: Callable[..., object] | None = None
++
++
++def _profile_metadata(
++    request: CalibrationRequest, metric_map: dict[str, tuple[str, str]]
++) -> dict[str, object]:
++    environment = request.profiler_environment
++    if environment is None or environment.state != "measured":
++        return {}
++    try:
++        result = run_rocprof_compute_bench_only(
++            environment, run=request.profiler_run or subprocess.run
++        )
++        raw_output = str(getattr(result, "stdout", "") or "")
++    except Exception:
++        return {"rocprof_compute_profile_status": "unknown"}
++    parsed = parse_roofline_metrics(raw_output, metric_map)
++    recognised = [
++        candidate.key
++        for candidate in parsed.candidates
++        if candidate.key in {key for key, _ in metric_map.values()}
++    ]
++    return {
++        "rocprof_compute_profile_status": "collected",
++        "rocprof_compute_raw_output_sha256": parsed.raw_output_sha256,
++        "rocprof_compute_recognised_candidate_keys": recognised,
++    }
++
++
++def run_calibration(request: CalibrationRequest) -> HardwareCalibrationArtifact:
++    """Run declared candidates and return an evidence artifact, never defaults."""
++    adapter = adapter_for(request.environment.architecture)
++    controller = request.clock_controller
++    if controller is None and adapter.supports_clock_lock:
++        controller = Rdna4ClockController()
++    locked = False
++    clock_reason: str | None = None
++    if controller is None:
++        clock_reason = "clock_lock_adapter_unavailable"
++        if request.require_clock_lock:
++            raise ClockLockRequiredError(clock_reason)
++    else:
++        try:
++            locked = controller.lock()
++        except Exception:
++            locked = False
++        if not locked:
++            clock_reason = "clock_lock_failed"
++            if request.require_clock_lock:
++                raise ClockLockRequiredError(clock_reason)
++    try:
++        candidates = tuple(request.hip_probe.measure(key) for key in adapter.candidates)
++    finally:
++        if locked and controller is not None:
++            controller.unlock()
++    metric_map = {
++        "Peak FP32": (key.value, "TFLOP/s")
++        for key in adapter.candidates
++        if key.kind == "compute" and key.operation == "vector"
++    }
++    metadata: dict[str, object] = {
++        "device": request.environment.device,
++        "architecture": request.environment.architecture,
++        "adapter_family": adapter.family,
++        "clock_locked": locked,
++    }
++    if clock_reason:
++        metadata["clock_lock_reason"] = clock_reason
++    metadata.update(_profile_metadata(request, metric_map))
++    return HardwareCalibrationArtifact(
++        generated_at=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
++        candidates=candidates,
++        collection_status="collected",
++        validation_status="validated" if locked else "provisional",
++        metadata=metadata,
++    )
+diff --git a/src/sol_execbench/core/scoring/hardware_calibration/environment.py b/src/sol_execbench/core/scoring/hardware_calibration/environment.py
+new file mode 100644
+index 0000000..8f67b46
+--- /dev/null
++++ b/src/sol_execbench/core/scoring/hardware_calibration/environment.py
+@@ -0,0 +1,89 @@
++# SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
++# SPDX-License-Identifier: Apache-2.0
++
++"""Runtime GPU discovery and architecture-specific calibration declarations."""
++
++from __future__ import annotations
++
++import re
++import subprocess
++from dataclasses import dataclass
++from typing import Protocol
++
++from sol_execbench.core.scoring.hardware_calibration.hip_probe import (
++    CalibrationProfileKey,
++)
++
++
++@dataclass(frozen=True)
++class GpuEnvironment:
++    device: int
++    architecture: str
++    name: str | None = None
++
++
++class GpuRuntime(Protocol):
++    def architecture_for(self, device: int) -> str: ...
++
++
++class RocmInfoRuntime:
++    """Discover the visible GPU architecture without importing HIP Python bindings."""
++
++    def architecture_for(self, device: int) -> str:
++        try:
++            output = subprocess.check_output(
++                ("rocminfo",), text=True, stderr=subprocess.DEVNULL
++            )
++        except (OSError, subprocess.SubprocessError) as exc:
++            raise RuntimeError("HIP runtime discovery unavailable") from exc
++        architectures = re.findall(r"(?:Name|Marketing Name):\s*(gfx[0-9a-z]+)", output)
++        try:
++            return architectures[device].lower()
++        except IndexError as exc:
++            raise RuntimeError(f"HIP device {device} was not discovered") from exc
++
++
++def discover_gpu(device: int, runtime: GpuRuntime | None = None) -> GpuEnvironment:
++    """Return runtime evidence for one visible HIP device."""
++    if device < 0:
++        raise ValueError("device must be non-negative")
++    runtime = runtime or RocmInfoRuntime()
++    return GpuEnvironment(
++        device=device, architecture=runtime.architecture_for(device).lower()
++    )
++
++
++@dataclass(frozen=True)
++class ArchitectureAdapter:
++    family: str
++    candidates: tuple[CalibrationProfileKey, ...]
++    supports_clock_lock: bool = False
++
++
++def _adapter(family: str, *, supports_clock_lock: bool = False) -> ArchitectureAdapter:
++    return ArchitectureAdapter(
++        family=family,
++        supports_clock_lock=supports_clock_lock,
++        candidates=(
++            CalibrationProfileKey("compute", "vector", "fp32", "fp32", "portable"),
++            CalibrationProfileKey("memory", "stream_copy", "fp32", "fp32", "portable"),
++            CalibrationProfileKey("compute", "vector", "fp32", "fp32", family),
++            CalibrationProfileKey("memory", "stream_copy", "fp32", "fp32", family),
++        ),
++    )
++
++
++_ADAPTERS = {
++    "gfx12": _adapter("gfx12", supports_clock_lock=True),
++    "gfx94": _adapter("gfx94"),
++    "gfx95": _adapter("gfx95"),
++}
++
++
++def adapter_for(architecture: str) -> ArchitectureAdapter:
++    """Return the declared calibration adapter for a supported AMD ISA family."""
++    normalized = architecture.lower()
++    for prefix, adapter in _ADAPTERS.items():
++        if normalized.startswith(prefix):
++            return adapter
++    raise ValueError(f"unsupported GPU architecture: {architecture}")
+diff --git a/src/sol_execbench/core/scoring/hardware_calibration/hip_probe.py b/src/sol_execbench/core/scoring/hardware_calibration/hip_probe.py
+new file mode 100644
+index 0000000..ba553c3
+--- /dev/null
++++ b/src/sol_execbench/core/scoring/hardware_calibration/hip_probe.py
+@@ -0,0 +1,126 @@
++# SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
++# SPDX-License-Identifier: Apache-2.0
++
++"""Small, injectable HIP calibration probe abstraction.
++
++The production implementation deliberately has no import-time HIP dependency.
++Callers provide compilation and execution seams, which keeps calibration tests
++portable and prevents a missing ROCm installation from becoming fabricated data.
++"""
++
++from __future__ import annotations
++
++from dataclasses import dataclass
++from typing import Callable
++
++from sol_execbench.core.scoring.hardware_calibration.models import CalibrationCandidate
++
++
++@dataclass(frozen=True, order=True)
++class CalibrationProfileKey:
++    """Identifies one measured calibration matrix entry."""
++
++    kind: str
++    operation: str
++    input_dtype: str
++    output_dtype: str
++    path: str
++
++    @property
++    def value(self) -> str:
++        return ".".join(
++            (self.kind, self.operation, self.input_dtype, self.output_dtype, self.path)
++        )
++
++
++@dataclass(frozen=True)
++class ProbeExecution:
++    """Timed samples produced by a successfully executed probe."""
++
++    samples: tuple[float, ...]
++    unit: str
++
++
++CompileCandidate = Callable[[CalibrationProfileKey], str | bool | None]
++ExecuteCandidate = Callable[[CalibrationProfileKey], ProbeExecution | None]
++CheckCandidate = Callable[[CalibrationProfileKey, ProbeExecution], bool | None]
++
++
++@dataclass(frozen=True)
++class HipProbe:
++    """Compile, run, check, and stabilise a HIP candidate through injected seams."""
++
++    compile_candidate: CompileCandidate | None
++    execute_candidate: ExecuteCandidate | None
++    check_correctness: CheckCandidate | None
++    check_stability: CheckCandidate | None
++
++    def measure(self, key: CalibrationProfileKey) -> CalibrationCandidate:
++        compile_state = self._compile(key)
++        if compile_state == "unsupported":
++            return self._unavailable(key, "hip_probe_explicitly_unsupported")
++        if compile_state != "passed":
++            return self._unknown(key, f"hip_probe_compile_{compile_state}")
++        execution = self._execute(key)
++        if execution is None:
++            return self._unknown(key, "hip_probe_run_failed")
++        if not self._check(self.check_correctness, key, execution):
++            return self._unknown(key, "hip_probe_correctness_failed")
++        if not self._check(self.check_stability, key, execution):
++            return self._unknown(key, "hip_probe_stability_failed")
++        try:
++            return CalibrationCandidate(
++                key=key.value,
++                state="measured",
++                value=min(execution.samples),
++                unit=execution.unit,
++                samples=execution.samples,
++            )
++        except (TypeError, ValueError):
++            return self._unknown(key, "hip_probe_samples_invalid")
++
++    def _compile(self, key: CalibrationProfileKey) -> str:
++        if self.compile_candidate is None:
++            return "missing"
++        try:
++            result = self.compile_candidate(key)
++        except Exception:
++            return "failed"
++        if result == "unsupported":
++            return "unsupported"
++        return "passed" if result is True or result == "passed" else "failed"
++
++    def _execute(self, key: CalibrationProfileKey) -> ProbeExecution | None:
++        if self.execute_candidate is None:
++            return None
++        try:
++            return self.execute_candidate(key)
++        except Exception:
++            return None
++
++    @staticmethod
++    def _check(
++        check: CheckCandidate | None,
++        key: CalibrationProfileKey,
++        execution: ProbeExecution,
++    ) -> bool:
++        if check is None:
++            return False
++        try:
++            return check(key, execution) is True
++        except Exception:
++            return False
++
++    @staticmethod
++    def _unknown(key: CalibrationProfileKey, reason_code: str) -> CalibrationCandidate:
++        return CalibrationCandidate(
++            key.value, "unknown", None, None, reason_code=reason_code
++        )
++
++    @staticmethod
++    def _unavailable(
++        key: CalibrationProfileKey, reason_code: str
++    ) -> CalibrationCandidate:
++        return CalibrationCandidate(
++            key.value, "unavailable", None, None, reason_code=reason_code
++        )
+diff --git a/tests/sol_execbench/core/scoring/hardware_calibration/test_builder.py b/tests/sol_execbench/core/scoring/hardware_calibration/test_builder.py
+new file mode 100644
+index 0000000..978bf5d
+--- /dev/null
++++ b/tests/sol_execbench/core/scoring/hardware_calibration/test_builder.py
+@@ -0,0 +1,50 @@
++# SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
++# SPDX-License-Identifier: Apache-2.0
++
++import pytest
++
++from sol_execbench.core.scoring.hardware_calibration.builder import (
++    CalibrationRequest,
++    ClockLockRequiredError,
++    run_calibration,
++)
++from sol_execbench.core.scoring.hardware_calibration.environment import GpuEnvironment
++from sol_execbench.core.scoring.hardware_calibration.hip_probe import (
++    HipProbe,
++    ProbeExecution,
++)
++
++
++def _probe() -> HipProbe:
++    return HipProbe(
++        compile_candidate=lambda _: "passed",
++        execute_candidate=lambda key: ProbeExecution(
++            (10.0,), "TFLOP/s" if key.kind == "compute" else "GB/s"
++        ),
++        check_correctness=lambda _, __: True,
++        check_stability=lambda _, __: True,
++    )
++
++
++def test_missing_clock_adapter_is_collected_but_provisional() -> None:
++    artifact = run_calibration(
++        CalibrationRequest(
++            environment=GpuEnvironment(device=0, architecture="gfx942"),
++            hip_probe=_probe(),
++        )
++    )
++
++    assert artifact.collection_status == "collected"
++    assert artifact.validation_status == "provisional"
++    assert artifact.metadata["clock_lock_reason"] == "clock_lock_adapter_unavailable"
++
++
++def test_require_clock_lock_rejects_missing_adapter() -> None:
++    with pytest.raises(ClockLockRequiredError):
++        run_calibration(
++            CalibrationRequest(
++                environment=GpuEnvironment(device=0, architecture="gfx950"),
++                hip_probe=_probe(),
++                require_clock_lock=True,
++            )
++        )
+diff --git a/tests/sol_execbench/core/scoring/hardware_calibration/test_environment.py b/tests/sol_execbench/core/scoring/hardware_calibration/test_environment.py
+new file mode 100644
+index 0000000..ec9d7ee
+--- /dev/null
++++ b/tests/sol_execbench/core/scoring/hardware_calibration/test_environment.py
+@@ -0,0 +1,25 @@
++# SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
++# SPDX-License-Identifier: Apache-2.0
++
++import pytest
++
++from sol_execbench.core.scoring.hardware_calibration.environment import adapter_for
++
++
++@pytest.mark.parametrize("architecture", ("gfx1200", "gfx942", "gfx950"))
++def test_supported_adapters_declare_portable_fp32_candidates(architecture: str) -> None:
++    candidates = set(adapter_for(architecture).candidates)
++
++    assert {candidate.operation for candidate in candidates} >= {
++        "vector",
++        "stream_copy",
++    }
++    assert all(candidate.input_dtype == "fp32" for candidate in candidates)
++    assert all(candidate.output_dtype == "fp32" for candidate in candidates)
++    assert {
++        (candidate.kind, candidate.operation, candidate.path)
++        for candidate in candidates
++    } >= {
++        ("compute", "vector", "portable"),
++        ("memory", "stream_copy", "portable"),
++    }
+diff --git a/tests/sol_execbench/core/scoring/hardware_calibration/test_hip_probe.py b/tests/sol_execbench/core/scoring/hardware_calibration/test_hip_probe.py
+new file mode 100644
+index 0000000..6305328
+--- /dev/null
++++ b/tests/sol_execbench/core/scoring/hardware_calibration/test_hip_probe.py
+@@ -0,0 +1,38 @@
++# SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
++# SPDX-License-Identifier: Apache-2.0
++
++from sol_execbench.core.scoring.hardware_calibration.hip_probe import (
++    CalibrationProfileKey,
++    HipProbe,
++    ProbeExecution,
++)
++
++
++def test_explicitly_unsupported_probe_is_unavailable() -> None:
++    key = CalibrationProfileKey("compute", "vector", "fp32", "fp32", "portable")
++    probe = HipProbe(
++        compile_candidate=lambda _: "unsupported",
++        execute_candidate=lambda _: ProbeExecution((1.0,), "TFLOP/s"),
++        check_correctness=lambda _, __: True,
++        check_stability=lambda _, __: True,
++    )
++
++    candidate = probe.measure(key)
++
++    assert candidate.state == "unavailable"
++    assert candidate.reason_code == "hip_probe_explicitly_unsupported"
++
++
++def test_failed_probe_is_unknown() -> None:
++    key = CalibrationProfileKey("memory", "stream_copy", "fp32", "fp32", "portable")
++    probe = HipProbe(
++        compile_candidate=lambda _: "passed",
++        execute_candidate=lambda _: ProbeExecution((1.0,), "GB/s"),
++        check_correctness=lambda _, __: False,
++        check_stability=lambda _, __: True,
++    )
++
++    candidate = probe.measure(key)
++
++    assert candidate.state == "unknown"
++    assert candidate.reason_code == "hip_probe_correctness_failed"

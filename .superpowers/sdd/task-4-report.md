@@ -43,3 +43,27 @@ this report are intended for the Task 4 commit. Pre-existing concurrent edits
 to `src/sol_execbench/core/dataset/runner_scoring.py` and
 `tests/sol_execbench/core/dataset/test_run_dataset_amd_score.py` were left
 untouched and excluded.
+Verification: the exact `-m requires_rdna4` live test passed on this host, and
+the CLI regression plus calibration builder tests passed (9 tests total).
+
+## Follow-up: live calibration outcome and clock-state investigation
+
+The live RDNA4 calibration test intentionally remains strict: it expects the
+diagnostic rejection path and does not branch on a successful outcome.  A
+requested investigation found no basis for weakening it.  Immediately before
+the exact live test, `rocm-smi --showperflevel` reported GPU 0 at
+`Performance Level: auto`; the marker-gated test then passed.  The focused
+calibration builder and CLI suite uses injected/mocked clock controllers for
+its lifecycle tests, passed 12 tests, and the same `rocm-smi` check reported
+`auto` both before and after it.  `run_calibration()` also invokes the
+controller's `unlock()` unconditionally in its `finally` block.
+
+Therefore STABLE_PEAK was neither a pre-existing host state nor leaked by the
+relevant test suite in this reproduction.  No production authority semantics
+or test assertion were changed.
+
+Verification:
+
+- `rocm-smi --showperflevel` before/after focused suite — GPU 0 `auto`.
+- `.../.venv/bin/python -m pytest tests/sol_execbench/core/scoring/hardware_calibration/test_live_calibration.py::test_live_offline_calibration_writes_rdna4_evidence -m requires_rdna4 -q` — 1 passed in 8.45s.
+- `.../.venv/bin/python -m pytest tests/sol_execbench/core/scoring/hardware_calibration/test_builder.py tests/sol_execbench/cli/commands/test_hardware_model_cli.py -q` — 12 passed in 2.27s.

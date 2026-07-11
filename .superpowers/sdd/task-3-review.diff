@@ -1,0 +1,1228 @@
+ .superpowers/sdd/task-3-report.md                  |  23 ++
+ .../core/scoring/amd_bound_estimate/estimates.py   |  55 ++--
+ .../core/scoring/amd_bound_estimate/impl.py        |  47 +++
+ .../core/scoring/amd_bound_estimate/models.py      |  10 +
+ .../core/scoring/amd_hardware_models.py            | 328 +++++++++++++--------
+ .../core/scoring/amd_sol/v2_builder.py             |   2 +-
+ src/sol_execbench/core/scoring/amd_sol/v2_math.py  |  53 +++-
+ .../core/scoring/hardware_calibration/builder.py   |  15 +-
+ .../core/scoring/test_amd_hardware_models.py       |  44 ++-
+ .../sol_execbench/core/scoring/test_amd_sol_v2.py  | 106 ++++++-
+ 10 files changed, 499 insertions(+), 184 deletions(-)
+diff --git a/.superpowers/sdd/task-3-report.md b/.superpowers/sdd/task-3-report.md
+new file mode 100644
+index 0000000..850bb77
+--- /dev/null
++++ b/.superpowers/sdd/task-3-report.md
+@@ -0,0 +1,23 @@
++# Task 3 report — Hardware model v3 and exact SOL profile resolution
++
++## Delivered
++
++- Added strict v3 hardware-model profiles (`HardwareProfile`) and exact compute/
++  memory lookup APIs while retaining v2 JSON parsing and serialization.
++- Bound estimates now record normalized dtype, compute operation/path, and memory
++  access evidence. Bounds use only matching measured profiles; missing,
++  unavailable, or unknown evidence produces `unknown_hardware_profile` and a
++  degraded result without a scalar/FP32 fallback.
++- Removed the architecture-specific `gfx1200` validation restriction. Calibration
++  validation now records provenance from adapter policy, clock lock state, and
++  measured declared profiles.
++
++## Verification
++
++```text
++uv run --with ruff ruff check src/sol_execbench/core/scoring/amd_hardware_models.py src/sol_execbench/core/scoring/amd_bound_estimate src/sol_execbench/core/scoring/amd_sol src/sol_execbench/core/scoring/hardware_calibration/builder.py tests/sol_execbench/core/scoring/test_amd_hardware_models.py tests/sol_execbench/core/scoring/test_amd_sol_v2.py
++# All checks passed!
++
++uv run pytest tests/sol_execbench/core/scoring/test_amd_hardware_models.py tests/sol_execbench/core/scoring/test_amd_sol_v2.py tests/sol_execbench/core/scoring/hardware_calibration/test_builder.py -n 0 -v
++# 22 passed
++```
+diff --git a/src/sol_execbench/core/scoring/amd_bound_estimate/estimates.py b/src/sol_execbench/core/scoring/amd_bound_estimate/estimates.py
+index e75fba9..bcd6309 100644
+--- a/src/sol_execbench/core/scoring/amd_bound_estimate/estimates.py
++++ b/src/sol_execbench/core/scoring/amd_bound_estimate/estimates.py
+@@ -18,56 +18,59 @@ from sol_execbench.core.scoring.amd_bound_estimate.impl import (
+     _dtype_conversion_estimate,
+     _elementwise_estimate,
+     _embedding_positional_estimate,
+     _gemm_estimate,
+     _moe_estimate,
+     _normalization_estimate,
+     _reduction_estimate,
+     _softmax_estimate,
+     _ssm_mamba_estimate,
+     _unsupported_estimate,
++    _with_hardware_profile_evidence,
+ )
+ from sol_execbench.core.scoring.amd_bound_estimate.models import OperatorWorkEstimate
+ from sol_execbench.core.scoring.amd_bound_graph.models import BoundGraph, BoundGraphNode
+ 
+ 
+ def estimate_bound_work(graph: BoundGraph) -> tuple[OperatorWorkEstimate, ...]:
+     """Estimate per-node operator work from a structured bound graph."""
+     return tuple(_estimate_node(graph, node) for node in graph.nodes)
+ 
+ 
+ def _estimate_node(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstimate:
+     dispatch_family = estimate_dispatch_family(node.op_family)
+     if dispatch_family == EstimateDispatchFamily.ATTENTION:
+-        return _attention_estimate(graph, node)
+-    if dispatch_family == EstimateDispatchFamily.CONVOLUTION:
+-        return _convolution_estimate(graph, node)
+-    if dispatch_family == EstimateDispatchFamily.EMBEDDING_POSITIONAL:
+-        return _embedding_positional_estimate(graph, node)
+-    if dispatch_family == EstimateDispatchFamily.MOE:
+-        return _moe_estimate(graph, node)
+-    if dispatch_family == EstimateDispatchFamily.SSM_MAMBA:
+-        return _ssm_mamba_estimate(graph, node)
+-    if dispatch_family == EstimateDispatchFamily.GEMM:
+-        return _gemm_estimate(graph, node)
+-    if dispatch_family == EstimateDispatchFamily.ELEMENTWISE:
+-        return _elementwise_estimate(graph, node)
+-    if dispatch_family == EstimateDispatchFamily.ACTIVATION:
+-        return _activation_estimate(graph, node)
+-    if dispatch_family == EstimateDispatchFamily.REDUCTION:
+-        return _reduction_estimate(graph, node)
+-    if dispatch_family == EstimateDispatchFamily.NORMALIZATION:
+-        return _normalization_estimate(graph, node)
+-    if dispatch_family == EstimateDispatchFamily.SOFTMAX:
+-        return _softmax_estimate(graph, node)
+-    if dispatch_family == EstimateDispatchFamily.DATA_MOVEMENT:
+-        return _data_movement_estimate(graph, node)
+-    if dispatch_family == EstimateDispatchFamily.DTYPE_CONVERSION:
+-        return _dtype_conversion_estimate(graph, node)
+-    return _unsupported_estimate(node)
++        estimate = _attention_estimate(graph, node)
++    elif dispatch_family == EstimateDispatchFamily.CONVOLUTION:
++        estimate = _convolution_estimate(graph, node)
++    elif dispatch_family == EstimateDispatchFamily.EMBEDDING_POSITIONAL:
++        estimate = _embedding_positional_estimate(graph, node)
++    elif dispatch_family == EstimateDispatchFamily.MOE:
++        estimate = _moe_estimate(graph, node)
++    elif dispatch_family == EstimateDispatchFamily.SSM_MAMBA:
++        estimate = _ssm_mamba_estimate(graph, node)
++    elif dispatch_family == EstimateDispatchFamily.GEMM:
++        estimate = _gemm_estimate(graph, node)
++    elif dispatch_family == EstimateDispatchFamily.ELEMENTWISE:
++        estimate = _elementwise_estimate(graph, node)
++    elif dispatch_family == EstimateDispatchFamily.ACTIVATION:
++        estimate = _activation_estimate(graph, node)
++    elif dispatch_family == EstimateDispatchFamily.REDUCTION:
++        estimate = _reduction_estimate(graph, node)
++    elif dispatch_family == EstimateDispatchFamily.NORMALIZATION:
++        estimate = _normalization_estimate(graph, node)
++    elif dispatch_family == EstimateDispatchFamily.SOFTMAX:
++        estimate = _softmax_estimate(graph, node)
++    elif dispatch_family == EstimateDispatchFamily.DATA_MOVEMENT:
++        estimate = _data_movement_estimate(graph, node)
++    elif dispatch_family == EstimateDispatchFamily.DTYPE_CONVERSION:
++        estimate = _dtype_conversion_estimate(graph, node)
++    else:
++        estimate = _unsupported_estimate(node)
++    return _with_hardware_profile_evidence(graph, node, estimate)
+ 
+ 
+ __all__ = [
+     "OperatorWorkEstimate",
+     "_dtype_bytes",
+     "estimate_bound_work",
+ ]
+diff --git a/src/sol_execbench/core/scoring/amd_bound_estimate/impl.py b/src/sol_execbench/core/scoring/amd_bound_estimate/impl.py
+index 08907af..4b34156 100644
+--- a/src/sol_execbench/core/scoring/amd_bound_estimate/impl.py
++++ b/src/sol_execbench/core/scoring/amd_bound_estimate/impl.py
+@@ -1,16 +1,18 @@
+ # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
+ # SPDX-License-Identifier: Apache-2.0
+ """Private estimator exports for AMD bound work estimates."""
+ 
+ from __future__ import annotations
+ 
++from dataclasses import replace
++
+ from sol_execbench.core.scoring.amd_bound_estimate.attention import _attention_estimate
+ from sol_execbench.core.scoring.amd_bound_estimate.common import (
+     _dtype_bytes,
+     _unsupported_estimate,
+ )
+ from sol_execbench.core.scoring.amd_bound_estimate.complex import (
+     _moe_estimate,
+     _ssm_mamba_estimate,
+ )
+ from sol_execbench.core.scoring.amd_bound_estimate.matrix import (
+@@ -20,28 +22,73 @@ from sol_execbench.core.scoring.amd_bound_estimate.matrix import (
+ from sol_execbench.core.scoring.amd_bound_estimate.memory import (
+     _activation_estimate,
+     _data_movement_estimate,
+     _dtype_conversion_estimate,
+     _elementwise_estimate,
+     _embedding_positional_estimate,
+     _normalization_estimate,
+     _reduction_estimate,
+     _softmax_estimate,
+ )
++from sol_execbench.core.scoring.amd_bound_estimate.models import OperatorWorkEstimate
++from sol_execbench.core.scoring.amd_bound_estimate.tensors import (
++    first_tensor_dtype,
++    node_tensors,
++)
++from sol_execbench.core.scoring.amd_bound_graph.models import (
++    BoundGraph,
++    BoundGraphNode,
++    OpFamily,
++)
++
++
++def _with_hardware_profile_evidence(
++    graph: BoundGraph, node: BoundGraphNode, estimate: OperatorWorkEstimate
++) -> OperatorWorkEstimate:
++    """Attach exact profile lookup inputs without inventing a fallback dtype/path."""
++    inputs = node_tensors(graph, node.input_tensor_ids)
++    outputs = node_tensors(graph, node.output_tensor_ids)
++    input_dtype = _profile_dtype(first_tensor_dtype(inputs))
++    output_dtype = _profile_dtype(first_tensor_dtype(outputs))
++    matrix_families = {OpFamily.GEMM, OpFamily.CONVOLUTION, OpFamily.ATTENTION}
++    operation = "matrix" if node.op_family in matrix_families else "vector"
++    path = str(
++        node.attributes.get("compute_path")
++        or ("mfma" if operation == "matrix" else "portable")
++    )
++    return replace(
++        estimate,
++        compute_operation=operation,
++        input_dtype=input_dtype,
++        output_dtype=output_dtype,
++        compute_path=path,
++        memory_access=str(node.attributes.get("memory_access") or "stream_copy"),
++    )
++
++
++def _profile_dtype(dtype: str | None) -> str | None:
++    return {
++        "bfloat16": "bf16",
++        "float16": "fp16",
++        "float32": "fp32",
++        "float64": "fp64",
++    }.get(dtype or "", dtype)
++
+ 
+ __all__ = [
+     "_activation_estimate",
+     "_attention_estimate",
+     "_convolution_estimate",
+     "_data_movement_estimate",
+     "_dtype_bytes",
+     "_dtype_conversion_estimate",
+     "_elementwise_estimate",
+     "_embedding_positional_estimate",
+     "_gemm_estimate",
+     "_moe_estimate",
+     "_normalization_estimate",
+     "_reduction_estimate",
+     "_softmax_estimate",
+     "_ssm_mamba_estimate",
+     "_unsupported_estimate",
++    "_with_hardware_profile_evidence",
+ ]
+diff --git a/src/sol_execbench/core/scoring/amd_bound_estimate/models.py b/src/sol_execbench/core/scoring/amd_bound_estimate/models.py
+index d63af4c..893a92c 100644
+--- a/src/sol_execbench/core/scoring/amd_bound_estimate/models.py
++++ b/src/sol_execbench/core/scoring/amd_bound_estimate/models.py
+@@ -26,20 +26,25 @@ class OperatorWorkEstimate:
+     read_bytes: float
+     write_bytes: float
+     intermediate_bytes: float
+     movement_bytes: float
+     total_bytes: float
+     confidence: EstimateConfidence
+     rationale: str
+     axis_source: str | None = None
+     movement_kind: str | None = None
+     warnings: tuple[str, ...] = ()
++    compute_operation: str | None = None
++    input_dtype: str | None = None
++    output_dtype: str | None = None
++    compute_path: str | None = None
++    memory_access: str | None = None
+ 
+     def to_dict(self) -> dict[str, Any]:
+         """Serialize as JSON-safe derived estimate evidence."""
+         return {
+             "node_id": self.node_id,
+             "op_family": self.op_family.value,
+             "op_name": self.op_name,
+             "formula_kind": self.formula_kind,
+             "formula": self.formula,
+             "formula_inputs": dict(self.formula_inputs),
+@@ -47,11 +52,16 @@ class OperatorWorkEstimate:
+             "read_bytes": self.read_bytes,
+             "write_bytes": self.write_bytes,
+             "intermediate_bytes": self.intermediate_bytes,
+             "movement_bytes": self.movement_bytes,
+             "total_bytes": self.total_bytes,
+             "confidence": self.confidence.value,
+             "rationale": self.rationale,
+             "axis_source": self.axis_source,
+             "movement_kind": self.movement_kind,
+             "warnings": list(self.warnings),
++            "compute_operation": self.compute_operation,
++            "input_dtype": self.input_dtype,
++            "output_dtype": self.output_dtype,
++            "compute_path": self.compute_path,
++            "memory_access": self.memory_access,
+         }
+diff --git a/src/sol_execbench/core/scoring/amd_hardware_models.py b/src/sol_execbench/core/scoring/amd_hardware_models.py
+index 41da43f..cec247d 100644
+--- a/src/sol_execbench/core/scoring/amd_hardware_models.py
++++ b/src/sol_execbench/core/scoring/amd_hardware_models.py
+@@ -1,238 +1,304 @@
+ # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
+ # SPDX-License-Identifier: Apache-2.0
+ 
+-"""Strict AMD hardware model loader and v2 contract objects."""
++"""Strict AMD hardware-model readers and exact calibration profile resolution."""
+ 
+ from __future__ import annotations
+ 
+ import json
+-from dataclasses import dataclass
+-from dataclasses import asdict
++from dataclasses import asdict, dataclass
+ from enum import Enum
+ from importlib import resources
+ from pathlib import Path
+ from typing import Any
+ 
+ from sol_execbench.core.scoring.confidence import EstimateConfidence
+ 
+ 
+ AMD_HARDWARE_MODEL_SCHEMA_VERSION = "sol_execbench.amd_hardware_model.v2"
+-VALIDATED_GFX1200_ONLY = "gfx1200"
++AMD_HARDWARE_MODEL_V3_SCHEMA_VERSION = "sol_execbench.amd_hardware_model.v3"
+ 
+ 
+ class HardwareValidationStatus(str, Enum):
+-    """Validation state for architecture and model metadata."""
+-
+     VALIDATED = "validated"
+     PROVISIONAL = "provisional"
+     UNVALIDATED = "unvalidated"
+ 
+ 
++@dataclass(frozen=True)
++class HardwareProfile:
++    """One exact calibrated rate, or an explicit absence of that evidence."""
++
++    key: str
++    state: str
++    value: float | None
++    confidence: EstimateConfidence
++    evidence_ref: str
++
++    def __post_init__(self) -> None:
++        if not self.key.strip() or not self.evidence_ref.strip():
++            raise ValueError("hardware profile key and evidence_ref must be non-empty")
++        if self.state not in {"measured", "unavailable", "unknown"}:
++            raise ValueError(
++                "hardware profile state must be measured, unavailable, or unknown"
++            )
++        if self.state == "measured":
++            if self.value is None or float(self.value) <= 0.0:
++                raise ValueError("measured hardware profile value must be positive")
++            object.__setattr__(self, "value", float(self.value))
++        elif self.value is not None:
++            raise ValueError(
++                "unavailable or unknown hardware profiles cannot have a value"
++            )
++
++    def to_dict(self) -> dict[str, Any]:
++        return {
++            "key": self.key,
++            "state": self.state,
++            "value": self.value,
++            "confidence": self.confidence.value,
++            "evidence_ref": self.evidence_ref,
++        }
++
++
+ @dataclass(frozen=True)
+ class AmdHardwareModel:
+-    """AMD hardware model contract object for v2 payloads."""
++    """AMD model with legacy scalar evidence and v3 exact profile collections."""
+ 
+     architecture: str
+     dtype_or_path: str
+     peak_tflops: float
+     memory_bandwidth_gbps: float
+     clock_assumptions: tuple[str, ...]
+     source: str
+     confidence: EstimateConfidence
+     hardware_validation_status: HardwareValidationStatus
+     model_validation_status: HardwareValidationStatus
+     evidence_refs: tuple[str, ...]
+     schema_version: str = AMD_HARDWARE_MODEL_SCHEMA_VERSION
++    compute_profiles: tuple[HardwareProfile, ...] = ()
++    memory_profiles: tuple[HardwareProfile, ...] = ()
++
++    def resolve_compute(
++        self, operation: str, input_dtype: str, output_dtype: str, path: str
++    ) -> HardwareProfile | None:
++        key = f"compute.{operation}.{input_dtype}.{output_dtype}.{path}"
++        return next(
++            (profile for profile in self.compute_profiles if profile.key == key), None
++        )
++
++    def resolve_memory(self, access: str) -> HardwareProfile | None:
++        prefix = f"memory.{access}."
++        return next(
++            (
++                profile
++                for profile in self.memory_profiles
++                if profile.key == access or profile.key.startswith(prefix)
++            ),
++            None,
++        )
+ 
+     def to_dict(self) -> dict[str, Any]:
+-        """Serialize as JSON-safe payload."""
+         payload = asdict(self)
+         payload["confidence"] = self.confidence.value
+         payload["hardware_validation_status"] = self.hardware_validation_status.value
+         payload["model_validation_status"] = self.model_validation_status.value
+         payload["clock_assumptions"] = list(self.clock_assumptions)
+         payload["evidence_refs"] = list(self.evidence_refs)
++        payload["compute_profiles"] = [
++            profile.to_dict() for profile in self.compute_profiles
++        ]
++        payload["memory_profiles"] = [
++            profile.to_dict() for profile in self.memory_profiles
++        ]
++        if self.schema_version == AMD_HARDWARE_MODEL_SCHEMA_VERSION:
++            payload.pop("compute_profiles")
++            payload.pop("memory_profiles")
++        else:
++            payload.pop("dtype_or_path")
++            payload.pop("peak_tflops")
++            payload.pop("memory_bandwidth_gbps")
+         return payload
+ 
+ 
+-def _extract_payload(payload: dict[str, Any], *, source: str | None) -> dict[str, Any]:
+-    if not isinstance(payload, dict):
+-        raise ValueError("hardware model payload must be a JSON object")
+-    return payload
+-
+-
+-def _require_keys(payload: dict[str, Any], *, source: str | None) -> None:
+-    allowed = {
+-        "schema_version",
+-        "architecture",
+-        "dtype_or_path",
+-        "peak_tflops",
+-        "memory_bandwidth_gbps",
+-        "clock_assumptions",
+-        "source",
+-        "confidence",
+-        "hardware_validation_status",
+-        "model_validation_status",
+-        "evidence_refs",
+-    }
+-    payload_keys = set(payload.keys())
+-    unknown = sorted(payload_keys - allowed)
+-    if unknown:
++def _non_empty(payload: dict[str, Any], key: str, source: str | None) -> str:
++    value = str(payload[key]).strip()
++    if not value:
+         raise ValueError(
+-            f"{source or 'hardware model'} contains unknown field(s): {', '.join(unknown)}"
++            f"{source or 'hardware model'} field '{key}' must be non-empty"
+         )
+-    for required in allowed:
+-        if required not in payload:
+-            raise ValueError(f"{source or 'hardware model'} missing required field: {required}")
++    return value
+ 
+ 
+-def _parse_confidence(payload: dict[str, Any], *, source: str | None) -> EstimateConfidence:
+-    raw = str(payload["confidence"])
++def _positive(payload: dict[str, Any], key: str, source: str | None) -> float:
+     try:
+-        return EstimateConfidence(raw)
+-    except ValueError as exc:
+-        valid_values = ", ".join([value.value for value in EstimateConfidence])
++        value = float(payload[key])
++    except (TypeError, ValueError) as exc:
+         raise ValueError(
+-            f"{source or 'hardware model'} has invalid confidence '{raw}', expected one of: {valid_values}"
++            f"{source or 'hardware model'} field '{key}' must be numeric"
+         ) from exc
++    if value <= 0.0:
++        raise ValueError(
++            f"{source or 'hardware model'} field '{key}' must be a positive number"
++        )
++    return value
++
+ 
++def _strings(payload: dict[str, Any], key: str, source: str | None) -> tuple[str, ...]:
++    raw = payload[key]
++    if not isinstance(raw, list) or any(not isinstance(item, str) for item in raw):
++        raise ValueError(
++            f"{source or 'hardware model'} field '{key}' must be a list of strings"
++        )
++    return tuple(raw)
+ 
+-def _parse_status(
+-    payload: dict[str, Any], key: str, *, source: str | None
+-) -> HardwareValidationStatus:
+-    raw = str(payload[key])
++
++def _confidence(value: object, source: str | None) -> EstimateConfidence:
+     try:
+-        return HardwareValidationStatus(raw)
++        return EstimateConfidence(str(value))
+     except ValueError as exc:
+-        valid_values = ", ".join([value.value for value in HardwareValidationStatus])
+         raise ValueError(
+-            f"{source or 'hardware model'} has invalid {key} '{raw}', expected one of: {valid_values}"
++            f"{source or 'hardware model'} has invalid confidence '{value}'"
+         ) from exc
+ 
+ 
+-def _parse_non_empty_string(
+-    payload: dict[str, Any], key: str, *, source: str | None
+-) -> str:
+-    raw = str(payload[key]).strip()
+-    if not raw:
+-        raise ValueError(f"{source or 'hardware model'} field '{key}' must be non-empty")
+-    return raw
+-
+-
+-def _parse_positive_float(
+-    payload: dict[str, Any], key: str, *, source: str | None
+-) -> float:
+-    value = payload[key]
++def _status(value: object, key: str, source: str | None) -> HardwareValidationStatus:
+     try:
+-        value_f = float(value)
+-    except (TypeError, ValueError) as exc:
+-        raise ValueError(f"{source or 'hardware model'} field '{key}' must be numeric") from exc
+-    if value_f <= 0.0:
++        return HardwareValidationStatus(str(value))
++    except ValueError as exc:
+         raise ValueError(
+-            f"{source or 'hardware model'} field '{key}' must be a positive number"
+-        )
+-    return value_f
++            f"{source or 'hardware model'} has invalid {key} '{value}'"
++        ) from exc
+ 
+ 
+-def _parse_str_sequence(
+-    payload: dict[str, Any], key: str, *, source: str | None
+-) -> tuple[str, ...]:
++def _profiles(
++    payload: dict[str, Any], key: str, source: str | None
++) -> tuple[HardwareProfile, ...]:
+     raw = payload[key]
+     if not isinstance(raw, list):
+-        raise ValueError(
+-            f"{source or 'hardware model'} field '{key}' must be a list of strings"
+-        )
+-    values: list[str] = []
+-    for index, item in enumerate(raw):
+-        if not isinstance(item, str):
++        raise ValueError(f"{source or 'hardware model'} field '{key}' must be a list")
++    profiles: list[HardwareProfile] = []
++    for item in raw:
++        if not isinstance(item, dict) or set(item) != {
++            "key",
++            "state",
++            "value",
++            "confidence",
++            "evidence_ref",
++        }:
+             raise ValueError(
+-                f"{source or 'hardware model'} field '{key}'[{index}] must be a string"
++                f"{source or 'hardware model'} {key} entries must have exact profile fields"
++            )
++        profiles.append(
++            HardwareProfile(
++                item["key"],
++                item["state"],
++                item["value"],
++                _confidence(item["confidence"], source),
++                item["evidence_ref"],
+             )
+-        values.append(item)
+-    return tuple(values)
++        )
++    if len({profile.key for profile in profiles}) != len(profiles):
++        raise ValueError(f"{source or 'hardware model'} {key} contains duplicate keys")
++    return tuple(profiles)
+ 
+ 
+ def amd_hardware_model_from_dict(
+     payload: dict[str, Any],
+     *,
+     source: str | None = None,
+     expected_architecture: str | None = None,
+ ) -> AmdHardwareModel:
+-    """Create an AMD hardware model from parsed JSON payload."""
+-    payload = _extract_payload(payload, source=source)
+-    _require_keys(payload, source=source)
+-
+-    schema_version = _parse_non_empty_string(payload, "schema_version", source=source)
+-    architecture = _parse_non_empty_string(payload, "architecture", source=source)
++    """Create a hardware model, retaining v2 scalars as deliberately inexact evidence."""
++    if not isinstance(payload, dict):
++        raise ValueError("hardware model payload must be a JSON object")
++    schema_version = _non_empty(payload, "schema_version", source)
++    common = {
++        "schema_version",
++        "architecture",
++        "clock_assumptions",
++        "source",
++        "confidence",
++        "hardware_validation_status",
++        "model_validation_status",
++        "evidence_refs",
++    }
++    v2 = common | {"dtype_or_path", "peak_tflops", "memory_bandwidth_gbps"}
++    v3 = common | {"compute_profiles", "memory_profiles"}
++    expected = (
++        v2
++        if schema_version == AMD_HARDWARE_MODEL_SCHEMA_VERSION
++        else v3
++        if schema_version == AMD_HARDWARE_MODEL_V3_SCHEMA_VERSION
++        else set()
++    )
++    if not expected or set(payload) != expected:
++        unknown = sorted(set(payload) - expected)
++        missing = sorted(expected - set(payload))
++        details = [
++            *(f"unknown field(s): {', '.join(unknown)}" for _ in [0] if unknown),
++            *(f"missing required field: {key}" for key in missing),
++        ]
++        raise ValueError(
++            f"{source or 'hardware model'} "
++            + ("; ".join(details) or "has unsupported schema_version")
++        )
++    architecture = _non_empty(payload, "architecture", source)
+     if expected_architecture is not None and architecture != expected_architecture:
+         raise ValueError(
+             f"{source or 'hardware model'} architecture '{architecture}' does not match expected '{expected_architecture}'"
+         )
+-
+-    dtype_or_path = _parse_non_empty_string(payload, "dtype_or_path", source=source)
+-    peak_tflops = _parse_positive_float(payload, "peak_tflops", source=source)
+-    memory_bandwidth_gbps = _parse_positive_float(
+-        payload, "memory_bandwidth_gbps", source=source
+-    )
+-    clock_assumptions = _parse_str_sequence(
+-        payload, "clock_assumptions", source=source
+-    )
+-    source_field = _parse_non_empty_string(payload, "source", source=source)
+-    confidence = _parse_confidence(payload, source=source)
+-    hardware_validation_status = _parse_status(
+-        payload, "hardware_validation_status", source=source
+-    )
+-    model_validation_status = _parse_status(
+-        payload, "model_validation_status", source=source
+-    )
+-    evidence_refs = _parse_str_sequence(payload, "evidence_refs", source=source)
+-    if architecture != VALIDATED_GFX1200_ONLY:
+-        if (
+-            hardware_validation_status == HardwareValidationStatus.VALIDATED
+-            or model_validation_status == HardwareValidationStatus.VALIDATED
+-        ):
+-            raise ValueError(
+-                f"{source or 'hardware model'} only gfx1200 may use validated status fields in v1.9"
+-            )
+-
++    if schema_version == AMD_HARDWARE_MODEL_SCHEMA_VERSION:
++        dtype_or_path = _non_empty(payload, "dtype_or_path", source)
++        peak_tflops = _positive(payload, "peak_tflops", source)
++        memory_bandwidth_gbps = _positive(payload, "memory_bandwidth_gbps", source)
++        compute_profiles = ()
++        memory_profiles = ()
++    else:
++        dtype_or_path = "legacy scalar unavailable"
++        peak_tflops = 0.0
++        memory_bandwidth_gbps = 0.0
++        compute_profiles = _profiles(payload, "compute_profiles", source)
++        memory_profiles = _profiles(payload, "memory_profiles", source)
+     return AmdHardwareModel(
+-        architecture=architecture,
+-        dtype_or_path=dtype_or_path,
+-        peak_tflops=peak_tflops,
+-        memory_bandwidth_gbps=memory_bandwidth_gbps,
+-        clock_assumptions=clock_assumptions,
+-        source=source_field,
+-        confidence=confidence,
+-        hardware_validation_status=hardware_validation_status,
+-        model_validation_status=model_validation_status,
+-        evidence_refs=evidence_refs,
+-        schema_version=schema_version,
++        architecture,
++        dtype_or_path,
++        peak_tflops,
++        memory_bandwidth_gbps,
++        _strings(payload, "clock_assumptions", source),
++        _non_empty(payload, "source", source),
++        _confidence(payload["confidence"], source),
++        _status(
++            payload["hardware_validation_status"], "hardware_validation_status", source
++        ),
++        _status(payload["model_validation_status"], "model_validation_status", source),
++        _strings(payload, "evidence_refs", source),
++        schema_version,
++        compute_profiles,
++        memory_profiles,
+     )
+ 
+ 
+ def load_amd_hardware_model(path: Path) -> AmdHardwareModel:
+-    """Load an AMD hardware model from an external JSON file."""
+-    payload = json.loads(path.read_text(encoding="utf-8"))
+-    return amd_hardware_model_from_dict(payload, source=str(path))
++    return amd_hardware_model_from_dict(
++        json.loads(path.read_text(encoding="utf-8")), source=str(path)
++    )
+ 
+ 
+ def load_packaged_amd_hardware_model(architecture: str) -> AmdHardwareModel:
+-    """Load a packaged AMD hardware model resource by architecture token."""
+     path = resources.files("sol_execbench.data.amd_hardware_models").joinpath(
+         f"{architecture}.json"
+     )
+     if not path.is_file():
+         raise FileNotFoundError(
+             f"packaged AMD hardware model not found for architecture '{architecture}'"
+         )
+-    payload = json.loads(path.read_text(encoding="utf-8"))
+     return amd_hardware_model_from_dict(
+-        payload,
++        json.loads(path.read_text(encoding="utf-8")),
+         source=f"packaged: {architecture}",
+         expected_architecture=architecture,
+     )
+ 
+ 
+ def default_amd_hardware_models() -> dict[str, AmdHardwareModel]:
+-    """Return the built-in v1.9 AMD hardware model catalog."""
+     return {"gfx1200": load_packaged_amd_hardware_model("gfx1200")}
+diff --git a/src/sol_execbench/core/scoring/amd_sol/v2_builder.py b/src/sol_execbench/core/scoring/amd_sol/v2_builder.py
+index 8b0d262..e85c7ca 100644
+--- a/src/sol_execbench/core/scoring/amd_sol/v2_builder.py
++++ b/src/sol_execbench/core/scoring/amd_sol/v2_builder.py
+@@ -28,21 +28,21 @@ def build_amd_sol_bound_v2_artifact(
+ ) -> AmdSolBoundV2Artifact:
+     """Build an AMD SOL bound artifact v2 sidecar."""
+     graph = build_bound_graph(definition, workload)
+     estimates = estimate_bound_work(graph)
+     op_bounds = tuple(
+         _bound_for_estimate(estimate, hardware_model) for estimate in estimates
+     )
+     coverage = _coverage_for_estimates(estimates)
+     aggregate = _aggregate_for_bounds(op_bounds, hardware_model)
+     warnings = _warnings_for_artifact(
+-        graph.warnings, estimates, aggregate, hardware_model
++        graph.warnings, estimates, aggregate, hardware_model, op_bounds
+     )
+     return AmdSolBoundV2Artifact(
+         definition=definition.name,
+         workload_uuid=workload.uuid,
+         hardware_model_ref=hardware_model_ref,
+         hardware_model=hardware_model,
+         bound_graph=graph.to_dict(),
+         operator_work_estimates=tuple(estimate.to_dict() for estimate in estimates),
+         op_bounds=op_bounds,
+         aggregate_bound=aggregate,
+diff --git a/src/sol_execbench/core/scoring/amd_sol/v2_math.py b/src/sol_execbench/core/scoring/amd_sol/v2_math.py
+index dfb3def..15ba3e7 100644
+--- a/src/sol_execbench/core/scoring/amd_sol/v2_math.py
++++ b/src/sol_execbench/core/scoring/amd_sol/v2_math.py
+@@ -16,44 +16,76 @@ from sol_execbench.core.scoring.amd_sol.v2_models import (
+     AmdSolV2CoverageSummary,
+     AmdSolV2OpBound,
+ )
+ from sol_execbench.core.text_utils import ordered_unique
+ 
+ 
+ def _bound_for_estimate(
+     estimate: OperatorWorkEstimate,
+     hardware_model: AmdHardwareModel,
+ ) -> AmdSolV2OpBound:
++    compute_profile = (
++        hardware_model.resolve_compute(
++            estimate.compute_operation or "",
++            estimate.input_dtype or "",
++            estimate.output_dtype or "",
++            estimate.compute_path or "",
++        )
++        if estimate.compute_operation
++        else None
++    )
++    memory_profile = (
++        hardware_model.resolve_memory(estimate.memory_access)
++        if estimate.memory_access
++        else None
++    )
++    usable_compute = (
++        compute_profile is not None
++        and compute_profile.state == "measured"
++        and compute_profile.value is not None
++    )
++    usable_memory = (
++        memory_profile is not None
++        and memory_profile.state == "measured"
++        and memory_profile.value is not None
++    )
+     compute_bound_ms = (
+-        estimate.flops / (hardware_model.peak_tflops * 1_000_000_000_000.0) * 1000.0
+-        if hardware_model.peak_tflops > 0.0
++        estimate.flops / (compute_profile.value * 1_000_000_000_000.0) * 1000.0
++        if usable_compute
+         else 0.0
+     )
+     memory_bound_ms = (
+-        estimate.total_bytes
+-        / (hardware_model.memory_bandwidth_gbps * 1_000_000_000.0)
+-        * 1000.0
+-        if hardware_model.memory_bandwidth_gbps > 0.0
++        estimate.total_bytes / (memory_profile.value * 1_000_000_000.0) * 1000.0
++        if usable_memory
+         else 0.0
+     )
+     limiting_resource = "compute" if compute_bound_ms >= memory_bound_ms else "memory"
++    profile_warnings = list(estimate.warnings)
++    confidence = estimate.confidence
++    if not usable_compute or not usable_memory:
++        profile_warnings.append("unknown_hardware_profile")
++        if confidence == EstimateConfidence.SUPPORTED:
++            confidence = EstimateConfidence.INEXACT
++    for profile in (compute_profile, memory_profile):
++        if profile is not None and profile.confidence == EstimateConfidence.INEXACT:
++            confidence = _worse_confidence(confidence, profile.confidence)
+     return AmdSolV2OpBound(
+         node_id=estimate.node_id,
+         op_family=estimate.op_family.value,
+         op_name=estimate.op_name,
+         compute_bound_ms=compute_bound_ms,
+         memory_bound_ms=memory_bound_ms,
+         sol_bound_ms=max(compute_bound_ms, memory_bound_ms),
+         limiting_resource=limiting_resource,
+-        confidence=estimate.confidence,
++        confidence=confidence,
+         rationale=estimate.rationale,
+-        estimate_warnings=estimate.warnings,
++        estimate_warnings=_unique(profile_warnings),
+     )
+ 
+ 
+ def _aggregate_for_bounds(
+     op_bounds: tuple[AmdSolV2OpBound, ...],
+     hardware_model: AmdHardwareModel,
+ ) -> AmdSolV2AggregateBound:
+     sol_bound_ms = sum(bound.sol_bound_ms for bound in op_bounds)
+     node_ids = tuple(bound.node_id for bound in op_bounds)
+     if not op_bounds:
+@@ -140,35 +172,40 @@ def _coverage_for_estimates(
+         confidence_counts_by_family=confidence_counts,
+         worst_confidence=worst,
+     )
+ 
+ 
+ def _warnings_for_artifact(
+     graph_warnings: tuple[str, ...],
+     estimates: tuple[OperatorWorkEstimate, ...],
+     aggregate: AmdSolV2AggregateBound,
+     hardware_model: AmdHardwareModel,
++    op_bounds: tuple[AmdSolV2OpBound, ...] = (),
+ ) -> tuple[str, ...]:
+     warnings: list[str] = []
+     for warning in graph_warnings:
+         warnings.append(f"graph_warning:{warning}")
+     for estimate in estimates:
+         for warning in estimate.warnings:
+             warnings.append(f"estimate_warning:{estimate.node_id}:{warning}")
+         if estimate.confidence == EstimateConfidence.INEXACT:
+             warnings.append(
+                 f"inexact_operator:{estimate.node_id}:{estimate.op_family.value}"
+             )
+         elif estimate.confidence == EstimateConfidence.UNSUPPORTED:
+             warnings.append(
+                 f"unsupported_operator:{estimate.node_id}:{estimate.op_family.value}"
+             )
++    if any(
++        "unknown_hardware_profile" in bound.estimate_warnings for bound in op_bounds
++    ):
++        warnings.append("unknown_hardware_profile")
+     if hardware_model.hardware_validation_status != HardwareValidationStatus.VALIDATED:
+         warnings.append(
+             "hardware_validation:"
+             f"{hardware_model.architecture}:{hardware_model.hardware_validation_status.value}"
+         )
+     if hardware_model.model_validation_status != HardwareValidationStatus.VALIDATED:
+         warnings.append(
+             "model_validation:"
+             f"{hardware_model.architecture}:{hardware_model.model_validation_status.value}"
+         )
+diff --git a/src/sol_execbench/core/scoring/hardware_calibration/builder.py b/src/sol_execbench/core/scoring/hardware_calibration/builder.py
+index 957f3c9..3736b08 100644
+--- a/src/sol_execbench/core/scoring/hardware_calibration/builder.py
++++ b/src/sol_execbench/core/scoring/hardware_calibration/builder.py
+@@ -135,17 +135,30 @@ def run_calibration(request: CalibrationRequest) -> HardwareCalibrationArtifact:
+     }
+     metadata: dict[str, object] = {
+         "device": request.environment.device,
+         "architecture": request.environment.architecture,
+         "adapter_family": adapter.family,
+         "clock_locked": locked,
+     }
+     if clock_reason:
+         metadata["clock_lock_reason"] = clock_reason
+     metadata.update(_profile_metadata(request, metric_map))
++    validated_from_provenance = (
++        adapter.supports_clock_lock
++        and locked
++        and bool(candidates)
++        and all(candidate.state == "measured" for candidate in candidates)
++    )
++    metadata["validation_provenance"] = {
++        "adapter_requires_clock_lock": adapter.supports_clock_lock,
++        "clock_locked": locked,
++        "all_declared_profiles_measured": all(
++            candidate.state == "measured" for candidate in candidates
++        ),
++    }
+     return HardwareCalibrationArtifact(
+         generated_at=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+         candidates=candidates,
+         collection_status="collected",
+-        validation_status="validated" if locked else "provisional",
++        validation_status="validated" if validated_from_provenance else "provisional",
+         metadata=metadata,
+     )
+diff --git a/tests/sol_execbench/core/scoring/test_amd_hardware_models.py b/tests/sol_execbench/core/scoring/test_amd_hardware_models.py
+index cd28320..c6bf307 100644
+--- a/tests/sol_execbench/core/scoring/test_amd_hardware_models.py
++++ b/tests/sol_execbench/core/scoring/test_amd_hardware_models.py
+@@ -102,39 +102,41 @@ def test_parse_rejects_invalid_schema_values(tmp_path):
+             "confidence": "unsupported-confidence",
+             "hardware_validation_status": "validated",
+             "model_validation_status": "provisional",
+             "evidence_refs": ["fixture"],
+         },
+     )
+     with pytest.raises(ValueError, match="dtype_or_path|positive number|invalid"):
+         load_amd_hardware_model(path)
+ 
+ 
+-def test_parse_rejects_non_gfx1200_validated_statuses(tmp_path):
++def test_parse_allows_validated_statuses_for_non_gfx1200_provenance(tmp_path):
+     path = _write_model(
+         tmp_path,
+         {
+             "schema_version": AMD_HARDWARE_MODEL_SCHEMA_VERSION,
+             "architecture": "gfx942",
+             "dtype_or_path": "bf16 path",
+             "peak_tflops": 13.0,
+             "memory_bandwidth_gbps": 420.0,
+             "clock_assumptions": ["single-card assumption"],
+             "source": "cdna3 test fixture",
+             "confidence": "inexact",
+             "hardware_validation_status": "validated",
+             "model_validation_status": "provisional",
+             "evidence_refs": ["fixture"],
+         },
+     )
+-    with pytest.raises(ValueError, match="only gfx1200"):
+-        load_amd_hardware_model(path)
++    assert (
++        load_amd_hardware_model(path).hardware_validation_status
++        == HardwareValidationStatus.VALIDATED
++    )
+ 
+ 
+ def test_parse_rejects_architecture_mismatch_between_path_and_payload(tmp_path):
+     path = _write_model(
+         tmp_path,
+         {
+             "schema_version": AMD_HARDWARE_MODEL_SCHEMA_VERSION,
+             "architecture": "custom",
+             "dtype_or_path": "bf16 path",
+             "peak_tflops": 13.0,
+@@ -147,10 +149,46 @@ def test_parse_rejects_architecture_mismatch_between_path_and_payload(tmp_path):
+             "evidence_refs": ["fixture"],
+         },
+     )
+     path = tmp_path / "model.json"
+     payload = json.loads(path.read_text(encoding="utf-8"))
+ 
+     with pytest.raises(ValueError, match="does not match expected"):
+         amd_hardware_model_from_dict(
+             payload, source=str(path), expected_architecture="gfx1200"
+         )
++
++
++def test_v3_resolves_exact_bf16_mfma_compute_and_memory_profiles():
++    model = amd_hardware_model_from_dict(
++        {
++            "schema_version": "sol_execbench.amd_hardware_model.v3",
++            "architecture": "gfx942",
++            "clock_assumptions": ["locked"],
++            "source": "calibration fixture",
++            "confidence": "supported",
++            "hardware_validation_status": "validated",
++            "model_validation_status": "validated",
++            "evidence_refs": ["calibration.json"],
++            "compute_profiles": [
++                {
++                    "key": "compute.matrix.bf16.bf16.mfma",
++                    "state": "measured",
++                    "value": 100.0,
++                    "confidence": "supported",
++                    "evidence_ref": "compute-bf16",
++                }
++            ],
++            "memory_profiles": [
++                {
++                    "key": "memory.stream_copy.bf16.bf16.portable",
++                    "state": "measured",
++                    "value": 1000.0,
++                    "confidence": "supported",
++                    "evidence_ref": "memory-bf16",
++                }
++            ],
++        }
++    )
++
++    assert model.resolve_compute("matrix", "bf16", "bf16", "mfma").value == 100.0
++    assert model.resolve_memory("stream_copy").value == 1000.0
+diff --git a/tests/sol_execbench/core/scoring/test_amd_sol_v2.py b/tests/sol_execbench/core/scoring/test_amd_sol_v2.py
+index beace00..57a92ef 100644
+--- a/tests/sol_execbench/core/scoring/test_amd_sol_v2.py
++++ b/tests/sol_execbench/core/scoring/test_amd_sol_v2.py
+@@ -1,14 +1,13 @@
+ from __future__ import annotations
+ 
+ from dataclasses import FrozenInstanceError
+-from dataclasses import replace
+ 
+ import pytest
+ 
+ from sol_execbench.core.data.definition import Definition
+ from sol_execbench.core.data.workload import Workload
+ from sol_execbench.core.scoring import (
+     AMD_SOL_V2_SCHEMA_VERSION as EXPORTED_AMD_SOL_V2_SCHEMA_VERSION,
+ )
+ from sol_execbench.core.scoring import (
+     AmdSolBoundV2Artifact as ExportedAmdSolBoundV2Artifact,
+@@ -25,21 +24,21 @@ from sol_execbench.core.scoring.amd_sol import (
+     default_amd_hardware_models,
+ )
+ from sol_execbench.core.scoring.amd_sol.v2 import (
+     AMD_SOL_V2_SCHEMA_VERSION,
+     AmdSolBoundV2Artifact,
+     amd_sol_bound_v2_from_dict,
+     build_amd_sol_bound_v2_artifact,
+ )
+ from sol_execbench.core.scoring.amd_hardware_models import (
+     EstimateConfidence,
+-    HardwareValidationStatus,
++    amd_hardware_model_from_dict,
+ )
+ from sol_execbench_type_helpers import make_definition, make_workload
+ 
+ 
+ def _matmul_definition() -> Definition:
+     return make_definition(
+         name="matmul_demo",
+         axes={
+             "M": {"type": "var"},
+             "K": {"type": "const", "value": 4},
+@@ -77,23 +76,24 @@ def test_v2_artifact_serializes_required_sidecar_fields():
+     assert AMD_SOL_V2_SCHEMA_VERSION != AMD_SOL_SCHEMA_VERSION
+     assert artifact.derived is True
+     assert payload["schema_version"] == "sol_execbench.amd_sol_bound.v2"
+     assert payload["derived"] is True
+     assert payload["definition"] == "matmul_demo"
+     assert payload["workload_uuid"] == "matmul-workload"
+     assert payload["hardware_model_ref"] == "default_amd_hardware_models.gfx1200"
+     assert payload["hardware_model"]["architecture"] == "gfx1200"
+     assert payload["bound_graph"]["definition"] == "matmul_demo"
+     assert payload["operator_work_estimates"][0]["formula_kind"] == "gemm_flops"
+-    assert payload["op_bounds"][0]["confidence"] == "supported"
++    assert payload["op_bounds"][0]["confidence"] == "inexact"
+     assert payload["aggregate_bound"]["status"] == "degraded"
+     assert payload["coverage_summary"]["worst_confidence"] == "supported"
++    assert "unknown_hardware_profile" in payload["warnings"]
+     assert "model_validation:gfx1200:provisional" in payload["warnings"]
+     for solar_derivation_field in (
+         "solar_derivation",
+         "aggregate_status",
+         "score_eligible",
+         "degraded_node_ids",
+         "unsupported_node_ids",
+         "estimated_node_ids",
+         "formula_evidence",
+         "byte_evidence",
+@@ -149,30 +149,27 @@ def test_v2_matmul_bounds_are_derived_from_rich_estimates():
+         _matmul_definition(),
+         _matmul_workload(),
+         hardware,
+     )
+ 
+     estimate = artifact.operator_work_estimates[0]
+     bound = artifact.op_bounds[0]
+ 
+     assert estimate["flops"] == 128.0
+     assert estimate["total_bytes"] == 224.0
+-    assert bound.compute_bound_ms == pytest.approx(
+-        128.0 / (hardware.peak_tflops * 1_000_000_000_000.0) * 1000.0
+-    )
+-    assert bound.memory_bound_ms == pytest.approx(
+-        224.0 / (hardware.memory_bandwidth_gbps * 1_000_000_000.0) * 1000.0
+-    )
++    assert bound.compute_bound_ms == 0.0
++    assert bound.memory_bound_ms == 0.0
+     assert bound.sol_bound_ms == max(bound.compute_bound_ms, bound.memory_bound_ms)
+     assert bound.limiting_resource in {"compute", "memory"}
+     assert artifact.aggregate_bound.sol_bound_ms == bound.sol_bound_ms
+     assert artifact.aggregate_bound.scored is True
++    assert "unknown_hardware_profile" in bound.estimate_warnings
+ 
+ 
+ def test_inexact_coverage_and_warning_semantics_are_deterministic():
+     definition = make_definition(
+         name="inexact_demo",
+         axes={"N": {"type": "var"}},
+         inputs={"x": {"shape": ["N"], "dtype": "float32"}},
+         outputs={"out": {"shape": ["1"], "dtype": "float32"}},
+         reference=(
+             "import torch\n\n"
+@@ -217,25 +214,49 @@ def test_inexact_coverage_and_warning_semantics_are_deterministic():
+         artifact.warnings
+         == build_amd_sol_bound_v2_artifact(
+             definition,
+             workload,
+             default_amd_hardware_models()["gfx1200"],
+         ).warnings
+     )
+ 
+ 
+ def test_validated_supported_evidence_produces_scored_aggregate():
+-    hardware = replace(
+-        default_amd_hardware_models()["gfx1200"],
+-        confidence=EstimateConfidence.SUPPORTED,
+-        hardware_validation_status=HardwareValidationStatus.VALIDATED,
+-        model_validation_status=HardwareValidationStatus.VALIDATED,
++    hardware = amd_hardware_model_from_dict(
++        {
++            "schema_version": "sol_execbench.amd_hardware_model.v3",
++            "architecture": "gfx942",
++            "clock_assumptions": ["locked"],
++            "source": "fixture",
++            "confidence": "supported",
++            "hardware_validation_status": "validated",
++            "model_validation_status": "validated",
++            "evidence_refs": ["fixture"],
++            "compute_profiles": [
++                {
++                    "key": "compute.matrix.fp32.fp32.mfma",
++                    "state": "measured",
++                    "value": 100.0,
++                    "confidence": "supported",
++                    "evidence_ref": "fp32",
++                }
++            ],
++            "memory_profiles": [
++                {
++                    "key": "memory.stream_copy.fp32.fp32.portable",
++                    "state": "measured",
++                    "value": 1000.0,
++                    "confidence": "supported",
++                    "evidence_ref": "memory",
++                }
++            ],
++        }
+     )
+ 
+     artifact = build_amd_sol_bound_v2_artifact(
+         _matmul_definition(),
+         _matmul_workload(),
+         hardware,
+     )
+ 
+     assert artifact.aggregate_bound.status == "scored"
+     assert artifact.aggregate_bound.scored is True
+@@ -297,10 +318,67 @@ def test_v1_artifact_does_not_emit_v2_only_fields():
+ 
+     assert payload["schema_version"] == AMD_SOL_SCHEMA_VERSION
+     for v2_only in (
+         "operator_work_estimates",
+         "aggregate_bound",
+         "hardware_model_ref",
+         "bound_graph",
+         "confidence_counts_by_family",
+     ):
+         assert v2_only not in payload
++
++
++def test_v3_fp32_profiles_do_not_service_bf16_matrix_bounds():
++    definition = make_definition(
++        name="bf16_matmul",
++        axes={
++            "M": {"type": "const", "value": 2},
++            "K": {"type": "const", "value": 4},
++            "N": {"type": "const", "value": 8},
++        },
++        inputs={
++            "a": {"shape": ["M", "K"], "dtype": "bfloat16"},
++            "b": {"shape": ["K", "N"], "dtype": "bfloat16"},
++        },
++        outputs={"out": {"shape": ["M", "N"], "dtype": "bfloat16"}},
++        reference="def run(a, b):\n    return a @ b",
++    )
++    hardware = amd_hardware_model_from_dict(
++        {
++            "schema_version": "sol_execbench.amd_hardware_model.v3",
++            "architecture": "gfx942",
++            "clock_assumptions": ["locked"],
++            "source": "fixture",
++            "confidence": "supported",
++            "hardware_validation_status": "validated",
++            "model_validation_status": "validated",
++            "evidence_refs": ["fixture"],
++            "compute_profiles": [
++                {
++                    "key": "compute.matrix.fp32.fp32.mfma",
++                    "state": "measured",
++                    "value": 100.0,
++                    "confidence": "supported",
++                    "evidence_ref": "fp32",
++                }
++            ],
++            "memory_profiles": [
++                {
++                    "key": "memory.stream_copy.fp32.fp32.portable",
++                    "state": "measured",
++                    "value": 1000.0,
++                    "confidence": "supported",
++                    "evidence_ref": "fp32-memory",
++                }
++            ],
++        }
++    )
++
++    artifact = build_amd_sol_bound_v2_artifact(
++        definition,
++        _matmul_workload(),
++        hardware,
++    )
++
++    assert artifact.aggregate_bound.status == "degraded"
++    assert "unknown_hardware_profile" in artifact.op_bounds[0].estimate_warnings
++    assert "unknown_hardware_profile" in artifact.warnings

@@ -31,3 +31,18 @@ uv run pytest tests/sol_execbench/core/scoring/test_amd_hardware_models.py tests
   aggregate unscored.
 
 Focused review verification: `17 passed` for the Task 3 scoring tests.
+
+## CDNA4 live-test selection
+
+The live calibration test is guarded by `requires_rocm` plus a runtime `gfx95`
+check. It was selected with the repository virtual environment:
+
+```text
+env PYTHONPATH=src /home/guohao/PyCharmMiscProject/SOL-ExecBench-ROCm/.venv/bin/python -m pytest tests/sol_execbench/core/scoring/hardware_calibration/test_live_calibration.py -m 'requires_rdna4 or requires_cdna3 or requires_rocm' -n 0 -v
+# collected 1 item
+# test_live_offline_calibration_writes_rdna4_evidence SKIPPED
+# 1 skipped in 0.78s
+```
+
+The test was selected successfully and skipped because the current host does
+not satisfy its live ROCm/CDNA4 (`gfx95`) runtime guard. No defect was exposed.

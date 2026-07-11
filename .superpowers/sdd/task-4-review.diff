@@ -1,0 +1,987 @@
+ .superpowers/sdd/task-4-report.md                  |  17 +++
+ docs/CONFIGURATION.md                              |   9 ++
+ docs/TESTING.md                                    |   5 +
+ docs/sol_score_gap_and_amd_reuse_report.md         |   7 +
+ src/sol_execbench/cli/commands/hardware_model.py   | 163 +++++++++++++++++++++
+ src/sol_execbench/cli/commands/root.py             |   4 +
+ .../core/scoring/amd_score/__init__.py             |   2 +
+ src/sol_execbench/core/scoring/amd_score/models.py |  64 ++++++++
+ .../core/scoring/amd_score/workload.py             |  39 ++++-
+ src/sol_execbench/core/scoring/official_score.py   |  32 ++++
+ .../cli/commands/test_hardware_model_cli.py        |  35 +++++
+ .../cli/commands/test_official_score_cli.py        |   9 ++
+ .../core/evidence/test_official_score_evidence.py  |  46 ++++++
+ .../core/scoring/test_amd_native_score.py          |  31 ++++
+ 14 files changed, 462 insertions(+), 1 deletion(-)
+diff --git a/.superpowers/sdd/task-4-report.md b/.superpowers/sdd/task-4-report.md
+new file mode 100644
+index 0000000..cd8a7ba
+--- /dev/null
++++ b/.superpowers/sdd/task-4-report.md
+@@ -0,0 +1,17 @@
++# Task 4 report: official authority gate and CLI
++
++Implemented serialized `BoundEligibilityEvidence` for AMD-native scores and
++made legacy scores without it official-blocked.  The official gate now rejects
++non-scored AMD SOL/SOLAR aggregates, non-measured profiles, non-validated
++hardware/model states, and degraded/inexact/unsupported bound warnings.
++
++Added lazy `hardware-model` CLI dispatch with calibration and build commands.
++Failures write a diagnostic rejected JSON artifact before Click exits nonzero.
++Calibration remains diagnostic; building an external v3 model requires a fully
++validated calibration input.
++
++Verification:
++
++- `uv run pytest tests/sol_execbench/core/scoring/hardware_calibration tests/sol_execbench/core/scoring/test_amd_hardware_models.py tests/sol_execbench/core/scoring/test_amd_sol_v2.py tests/sol_execbench/core/scoring/test_amd_native_score.py tests/sol_execbench/core/evidence/test_official_score_evidence.py tests/sol_execbench/cli/commands/test_hardware_model_cli.py -n 0 -q` — 86 passed.
++- `uv run --with ruff ruff check .` — passed.
++- The requested `test_live_calibration.py` path is absent in this checkout, so the marker-gated live check could not be collected.
+diff --git a/docs/CONFIGURATION.md b/docs/CONFIGURATION.md
+index 815e7f8..139dcab 100644
+--- a/docs/CONFIGURATION.md
++++ b/docs/CONFIGURATION.md
+@@ -446,20 +446,29 @@ roots plus target and workload controls:
+ | `--workload-limit` | Profile a bounded workload slice for a selected problem. |
+ | `--workload-offset` | Start workload-slice profiling at an offset. |
+ | `--workload-sharded` | Profile each workload independently and aggregate complete manifests. |
+ | `--workload-slice-timing-dir` | Import existing workload-slice timing roots before profiling missing slices. |
+ | `--workload-sharded-import-only` | Aggregate imported slices without profiling missing workloads. |
+ | `--compact-workload-slices`, `--no-compact-workload-slices` | Compact completed slice timing sidecars and remove raw rocprofv3 run directories after manifest summaries; enabled by default. |
+ | `--timeout` | Per-profiler subprocess timeout in seconds. |
+ | `--subprocess-memory-limit-gib` | Optional address-space limit for staged profiler subprocesses. |
+ | `--max-estimated-timing-input-gib` | Manual cap for estimated timing input footprint before launching profiler subprocesses. |
+ | `--auto-estimated-timing-input-cap`, `--no-auto-estimated-timing-input-cap` | Dynamically derive the estimated timing input cap from available memory, cgroup remaining memory, and subprocess limit; enabled by default. |
++
++### Calibrated AMD hardware models
++
++`sol-execbench hardware-model calibrate --device 0 --output calibration.json` records
++measured or explicitly unknown calibration evidence.  The optional `--offline` and
++`--no-auto-install` switches prevent managed ROCm Compute Profiler dependency
++installation; unavailable profiler data remains `unknown`.  Convert only a validated
++artifact with `hardware-model build --calibration calibration.json --output model.json`,
++then select that external model explicitly in bound-generation workflows.
+ | `--temp-dir` | Parent directory for profiler staging directories. |
+ | `--resume`, `--no-resume` | Resume from existing sidecars and manifests; enabled by default. |
+ | `--max-workers` | Maximum target-level workers; default is `4`. |
+ | `--timing-tool-version` | Timing tool version string recorded in evidence. |
+ | `--gpu-architecture` | GPU architecture string recorded in evidence. |
+ | `--clock-locked`, `--no-clock-locked` | Whether evidence records locked clocks; enabled by default. |
+ | `--hip-runtime-trace`, `--no-hip-runtime-trace` | Include rocprofv3 HIP runtime API tracing; disabled by default. |
+ | `--keep-staging` | Keep per-target staging directories after profiler subprocesses. |
+ | `--keep-rocprofv3-csv` | Keep raw rocprofv3 CSV run directories after compact timing sidecars are written. |
+ | `--strict-isolation` | Abort on timing isolation check failures instead of warning. |
+diff --git a/docs/TESTING.md b/docs/TESTING.md
+index 5a13ebe..7cbbd29 100644
+--- a/docs/TESTING.md
++++ b/docs/TESTING.md
+@@ -450,10 +450,15 @@ uv run ruff check .
+ uv run ty check
+ uv run pytest tests/sol_execbench \
+   --ignore=tests/sol_execbench/driver/test_eval_driver.py \
+   --ignore=tests/sol_execbench/test_e2e.py
+ uv run pytest tests/examples/test_examples.py -k consistency
+ ```
+ 
+ The remote workflow excludes tests that need live ROCm GPU execution or Docker
+ runtime passthrough. Run those locally on suitable hardware before merging
+ hardware-sensitive changes.
++# Calibration evidence
++
++Hardware calibration is diagnostic by default.  The marker-gated live test requires
++RDNA4 hardware; absent profiler data must remain `unknown`, never a substituted peak.
++Run it with `uv run pytest tests/sol_execbench/core/scoring/hardware_calibration/test_live_calibration.py -m requires_rdna4 -n 0 -v`.
+diff --git a/docs/sol_score_gap_and_amd_reuse_report.md b/docs/sol_score_gap_and_amd_reuse_report.md
+index 94b6efc..1679bfe 100644
+--- a/docs/sol_score_gap_and_amd_reuse_report.md
++++ b/docs/sol_score_gap_and_amd_reuse_report.md
+@@ -339,10 +339,17 @@ ROCm 端目前更偏向“RDNA4/CDNA3 可复现实验范围”，并保留了对
+ ## 与现有本地文档映射
+ 
+ - `docs/original_parity.md`：记录当前对上游兼容边界；
+ - `docs/EVALUATOR-CONTRACT.md`：定义官方评分证据门槛；
+ - `docs/internal/RDNA4-DENOMINATOR-POLICY.md`：当前分母/覆盖策略现状；
+ - `docs/original_parity.md` 与 `docs/analysis.md` 可作为后续报告挂接点。
+ 
+ ## 备注
+ 
+ 本文档是**工程落地评估报告**，不是 leaderboard 等价声明。后续若要主张与 NVIDIA 公开结果可比，需要在证据链、分母策略与可复现基线发布节奏上达到可复核闭环。
++# Calibrated hardware-model authority boundary
++
++Calibration JSON and external hardware models are diagnostic evidence.  An official
++score additionally requires serialized bound eligibility: scored AMD SOL and SOLAR
++aggregates, measured exact profiles, validated hardware and model states, and no
++degraded, inexact, or unsupported bound warnings.  Missing legacy eligibility evidence
++is explicitly official-blocked.
+diff --git a/src/sol_execbench/cli/commands/hardware_model.py b/src/sol_execbench/cli/commands/hardware_model.py
+new file mode 100644
+index 0000000..7d74c07
+--- /dev/null
++++ b/src/sol_execbench/cli/commands/hardware_model.py
+@@ -0,0 +1,163 @@
++# SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
++# SPDX-License-Identifier: Apache-2.0
++
++"""Calibrated AMD hardware-model CLI artifacts.
++
++These commands emit diagnostic evidence.  A successful file is not an
++official score claim; the official gate independently requires exact validated
++bound eligibility recorded on every score.
++"""
++
++from __future__ import annotations
++
++import json
++from pathlib import Path
++
++import click
++
++from sol_execbench.core.scoring.amd_hardware_models import (
++    AMD_HARDWARE_MODEL_V3_SCHEMA_VERSION,
++)
++from sol_execbench.core.scoring.hardware_calibration.builder import (
++    CalibrationRequest,
++    run_calibration,
++)
++from sol_execbench.core.scoring.hardware_calibration.environment import (
++    GpuEnvironment,
++    discover_gpu,
++)
++from sol_execbench.core.scoring.hardware_calibration.models import (
++    hardware_calibration_artifact_from_dict,
++)
++from sol_execbench.core.scoring.hardware_calibration.rocprof_compute import (
++    default_profiler_discovery,
++    ensure_profiler_environment,
++)
++
++
++def _write_json(path: Path, payload: dict[str, object]) -> None:
++    path.parent.mkdir(parents=True, exist_ok=True)
++    path.write_text(
++        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
++    )
++
++
++def _rejected(path: Path, reason: str) -> None:
++    _write_json(
++        path,
++        {
++            "schema_version": "sol_execbench.hardware_model_diagnostic.v1",
++            "status": "rejected",
++            "diagnostic": True,
++            "reason": reason,
++        },
++    )
++
++
++@click.group("hardware-model", context_settings={"help_option_names": ["-h", "--help"]})
++def _hardware_model_cli() -> None:
++    """Create diagnostic calibration evidence and external hardware models."""
++
++
++@_hardware_model_cli.command("calibrate")
++@click.option("--device", default=0, show_default=True, type=click.IntRange(min=0))
++@click.option(
++    "--output", required=True, type=click.Path(dir_okay=False, path_type=Path)
++)
++@click.option(
++    "--architecture", default=None, help="Override discovered AMD GFX architecture."
++)
++@click.option("--require-clock-lock", is_flag=True)
++@click.option("--offline", is_flag=True, help="Never install profiler dependencies.")
++@click.option(
++    "--no-auto-install", is_flag=True, help="Do not install profiler dependencies."
++)
++def _calibrate(
++    device: int,
++    output: Path,
++    architecture: str | None,
++    require_clock_lock: bool,
++    offline: bool,
++    no_auto_install: bool,
++) -> None:
++    """Collect calibration candidates without fabricating unavailable evidence."""
++    try:
++        environment = (
++            GpuEnvironment(device=device, architecture=architecture.lower())
++            if architecture
++            else discover_gpu(device)
++        )
++        profiler = ensure_profiler_environment(
++            default_profiler_discovery(Path.cwd()),
++            offline=offline,
++            auto_install=not no_auto_install,
++        )
++        artifact = run_calibration(
++            CalibrationRequest(
++                environment=environment,
++                require_clock_lock=require_clock_lock,
++                profiler_environment=profiler,
++            )
++        )
++    except (RuntimeError, ValueError) as exc:
++        _rejected(output, str(exc))
++        raise click.ClickException(str(exc)) from exc
++    _write_json(output, artifact.to_dict())
++    if artifact.validation_status != "validated":
++        raise click.ClickException(
++            "calibration is diagnostic only; validation provenance is not confirmed"
++        )
++
++
++@_hardware_model_cli.command("build")
++@click.option(
++    "--calibration",
++    "calibration_path",
++    required=True,
++    type=click.Path(exists=True, dir_okay=False, path_type=Path),
++)
++@click.option(
++    "--output", required=True, type=click.Path(dir_okay=False, path_type=Path)
++)
++def _build(calibration_path: Path, output: Path) -> None:
++    """Convert a validated calibration artifact into an external v3 model."""
++    try:
++        calibration = hardware_calibration_artifact_from_dict(
++            json.loads(calibration_path.read_text(encoding="utf-8"))
++        )
++        architecture = str(calibration.metadata["architecture"])
++        if calibration.validation_status != "validated":
++            raise ValueError("calibration validation status is not validated")
++        if any(candidate.state != "measured" for candidate in calibration.candidates):
++            raise ValueError("calibration contains non-measured hardware profiles")
++    except (KeyError, OSError, ValueError, json.JSONDecodeError) as exc:
++        _rejected(output, str(exc))
++        raise click.ClickException(str(exc)) from exc
++
++    profiles = [
++        {
++            "key": candidate.key,
++            "state": candidate.state,
++            "value": candidate.value,
++            "confidence": "supported",
++            "evidence_ref": f"{calibration_path}#{candidate.key}",
++        }
++        for candidate in calibration.candidates
++    ]
++    _write_json(
++        output,
++        {
++            "schema_version": AMD_HARDWARE_MODEL_V3_SCHEMA_VERSION,
++            "architecture": architecture,
++            "clock_assumptions": ["calibration provenance recorded in input artifact"],
++            "source": f"calibrated from {calibration_path}",
++            "confidence": "supported",
++            "hardware_validation_status": "validated",
++            "model_validation_status": "validated",
++            "evidence_refs": [str(calibration_path)],
++            "compute_profiles": [
++                p for p in profiles if p["key"].startswith("compute.")
++            ],
++            "memory_profiles": [p for p in profiles if p["key"].startswith("memory.")],
++        },
++    )
+diff --git a/src/sol_execbench/cli/commands/root.py b/src/sol_execbench/cli/commands/root.py
+index 3bee7ea..1986107 100644
+--- a/src/sol_execbench/cli/commands/root.py
++++ b/src/sol_execbench/cli/commands/root.py
+@@ -50,20 +50,24 @@ def _subcommand_for(name: str) -> click.Command | None:
+ 
+         return cli_metadata._contract_cli
+     if name == "dataset":
+         import sol_execbench.cli.commands.dataset as cli_dataset
+ 
+         return cli_dataset._dataset_cli
+     if name == "doctor":
+         import sol_execbench.cli.commands.metadata as cli_metadata
+ 
+         return cli_metadata._doctor_cli
++    if name == "hardware-model":
++        import sol_execbench.cli.commands.hardware_model as cli_hardware_model
++
++        return cli_hardware_model._hardware_model_cli
+     if name == "official-score":
+         import sol_execbench.cli.commands.official_score as cli_official_score
+ 
+         return cli_official_score._official_score_cli
+     if name == "toolchain":
+         import sol_execbench.cli.commands.metadata as cli_metadata
+ 
+         return cli_metadata._toolchain_cli
+     return None
+ 
+diff --git a/src/sol_execbench/core/scoring/amd_score/__init__.py b/src/sol_execbench/core/scoring/amd_score/__init__.py
+index 14d41de..76032ae 100644
+--- a/src/sol_execbench/core/scoring/amd_score/__init__.py
++++ b/src/sol_execbench/core/scoring/amd_score/__init__.py
+@@ -3,20 +3,21 @@
+ 
+ """Derived AMD-native score reports."""
+ 
+ from __future__ import annotations
+ 
+ from sol_execbench.core.scoring.amd_score.models import (
+     AMD_SCORE_CLAIM_LEVEL,
+     AMD_SCORE_SCHEMA_VERSION,
+     AmdNativeScore,
+     AmdNativeSuiteReport,
++    BoundEligibilityEvidence,
+     amd_native_score_from_dict,
+     amd_native_suite_report_from_dict,
+ )
+ from sol_execbench.core.scoring.amd_score.traces import (
+     build_amd_native_suite_report,
+     build_amd_native_suite_report_from_traces,
+     score_amd_native_trace_workload,
+ )
+ from sol_execbench.core.scoring.amd_score.warnings import (
+     CDNA3_NO_VALIDATION_WARNING,
+@@ -35,18 +36,19 @@ __all__ = [
+     "AMD_SCORE_SCHEMA_VERSION",
+     "CDNA3_NO_VALIDATION_WARNING",
+     "DEGRADED_SOL_BOUND_WARNING",
+     "INCOMPLETE_EVIDENCE_WARNING",
+     "REFERENCE_BASELINE_WARNING",
+     "UNSCORED_SOL_BOUND_WARNING",
+     "UNSUPPORTED_EVIDENCE_WARNING",
+     "UNVALIDATED_HARDWARE_WARNING",
+     "AmdNativeScore",
+     "AmdNativeSuiteReport",
++    "BoundEligibilityEvidence",
+     "SolarScoreGuard",
+     "amd_native_score_from_dict",
+     "amd_native_suite_report_from_dict",
+     "build_amd_native_suite_report",
+     "build_amd_native_suite_report_from_traces",
+     "score_amd_native_trace_workload",
+     "score_amd_native_workload",
+ ]
+diff --git a/src/sol_execbench/core/scoring/amd_score/models.py b/src/sol_execbench/core/scoring/amd_score/models.py
+index 153d0b4..9175203 100644
+--- a/src/sol_execbench/core/scoring/amd_score/models.py
++++ b/src/sol_execbench/core/scoring/amd_score/models.py
+@@ -11,55 +11,88 @@ from collections.abc import Mapping
+ from dataclasses import dataclass, field
+ from typing import Any
+ 
+ from sol_execbench.core.reports.reporting import CANONICAL_BENCHMARK_OUTPUT
+ 
+ 
+ AMD_SCORE_SCHEMA_VERSION = "sol_execbench.amd_native_score.v1"
+ AMD_SCORE_CLAIM_LEVEL = "amd-native-derived"
+ 
+ 
++@dataclass(frozen=True)
++class BoundEligibilityEvidence:
++    """Bound provenance required before a derived score may be authoritative.
++
++    This deliberately records states rather than re-interpreting human-facing
++    warnings at the official-score boundary.  Older serialized scores have no
++    such evidence and are therefore diagnostic-only.
++    """
++
++    amd_sol_status: str
++    solar_status: str
++    hardware_profile_state: str
++    hardware_validation_status: str
++    model_validation_status: str
++    warnings: tuple[str, ...]
++
++    def to_dict(self) -> dict[str, Any]:
++        return {
++            "amd_sol_status": self.amd_sol_status,
++            "solar_status": self.solar_status,
++            "hardware_profile_state": self.hardware_profile_state,
++            "hardware_validation_status": self.hardware_validation_status,
++            "model_validation_status": self.model_validation_status,
++            "warnings": list(self.warnings),
++        }
++
++
+ @dataclass(frozen=True)
+ class AmdNativeScore:
+     """Derived AMD-native score for one workload."""
+ 
+     definition: str
+     workload_uuid: str
+     measured_latency_ms: float | None
+     baseline_latency_ms: float | None
+     sol_bound_ms: float | None
+     score: float | None
+     claim_level: str
+     warnings: tuple[str, ...]
+     baseline_source: str
+     evidence_refs: dict[str, str] = field(default_factory=dict)
+     derived_evidence_refs: dict[str, str] = field(default_factory=dict)
++    bound_eligibility: BoundEligibilityEvidence | None = None
+ 
+     @property
+     def supported(self) -> bool:
+         """Whether the score has complete numeric inputs."""
+         return self.score is not None
+ 
+     def to_dict(self) -> dict[str, Any]:
+         return {
+             "definition": self.definition,
+             "workload_uuid": self.workload_uuid,
+             "measured_latency_ms": self.measured_latency_ms,
+             "baseline_latency_ms": self.baseline_latency_ms,
+             "sol_bound_ms": self.sol_bound_ms,
+             "score": self.score,
+             "claim_level": self.claim_level,
+             "warnings": list(self.warnings),
+             "baseline_source": self.baseline_source,
+             "supported": self.supported,
+             "evidence_refs": dict(self.evidence_refs),
+             "derived_evidence_refs": dict(self.derived_evidence_refs),
++            "bound_eligibility": (
++                self.bound_eligibility.to_dict()
++                if self.bound_eligibility is not None
++                else None
++            ),
+         }
+ 
+ 
+ @dataclass(frozen=True)
+ class AmdNativeSuiteReport:
+     """Derived AMD-native score report for a suite of workloads."""
+ 
+     scores: tuple[AmdNativeScore, ...]
+     baseline_summary: dict[str, int] | None = None
+     schema_version: str = AMD_SCORE_SCHEMA_VERSION
+@@ -126,20 +159,50 @@ def _optional_float(value: Any) -> float | None:
+         return number if math.isfinite(number) else None
+     return None
+ 
+ 
+ def _str_dict(value: Any) -> dict[str, str]:
+     if not isinstance(value, Mapping):
+         return {}
+     return {str(key): str(val) for key, val in value.items()}
+ 
+ 
++def _bound_eligibility(value: Any) -> BoundEligibilityEvidence | None:
++    if value is None:
++        return None
++    if not isinstance(value, Mapping):
++        raise ValueError("bound_eligibility must be an object or null")
++    required = {
++        "amd_sol_status",
++        "solar_status",
++        "hardware_profile_state",
++        "hardware_validation_status",
++        "model_validation_status",
++        "warnings",
++    }
++    if set(value) != required or not isinstance(value["warnings"], list):
++        raise ValueError("bound_eligibility has invalid fields")
++    return BoundEligibilityEvidence(
++        *(
++            str(value[key])
++            for key in (
++                "amd_sol_status",
++                "solar_status",
++                "hardware_profile_state",
++                "hardware_validation_status",
++                "model_validation_status",
++            )
++        ),
++        tuple(str(warning) for warning in value["warnings"]),
++    )
++
++
+ def amd_native_score_from_dict(payload: Mapping[str, Any]) -> AmdNativeScore:
+     """Reconstruct an :class:`AmdNativeScore` from its ``to_dict()`` payload.
+ 
+     The ``supported`` key emitted by ``to_dict()`` is a computed property and is
+     ignored on load.
+     """
+     warnings = payload.get("warnings")
+     return AmdNativeScore(
+         definition=str(payload["definition"]),
+         workload_uuid=str(payload["workload_uuid"]),
+@@ -147,20 +210,21 @@ def amd_native_score_from_dict(payload: Mapping[str, Any]) -> AmdNativeScore:
+         baseline_latency_ms=_optional_float(payload.get("baseline_latency_ms")),
+         sol_bound_ms=_optional_float(payload.get("sol_bound_ms")),
+         score=_optional_float(payload.get("score")),
+         claim_level=str(payload.get("claim_level", AMD_SCORE_CLAIM_LEVEL)),
+         warnings=tuple(str(warning) for warning in warnings)
+         if isinstance(warnings, list)
+         else (),
+         baseline_source=str(payload.get("baseline_source", "missing")),
+         evidence_refs=_str_dict(payload.get("evidence_refs")),
+         derived_evidence_refs=_str_dict(payload.get("derived_evidence_refs")),
++        bound_eligibility=_bound_eligibility(payload.get("bound_eligibility")),
+     )
+ 
+ 
+ def amd_native_suite_report_from_dict(
+     payload: Mapping[str, Any],
+ ) -> AmdNativeSuiteReport:
+     """Reconstruct an :class:`AmdNativeSuiteReport` from its ``to_dict()`` payload."""
+     scores_payload = payload.get("scores")
+     if not isinstance(scores_payload, list):
+         raise ValueError("amd native suite report requires a scores list")
+diff --git a/src/sol_execbench/core/scoring/amd_score/workload.py b/src/sol_execbench/core/scoring/amd_score/workload.py
+index 3b72146..f2a391e 100644
+--- a/src/sol_execbench/core/scoring/amd_score/workload.py
++++ b/src/sol_execbench/core/scoring/amd_score/workload.py
+@@ -3,20 +3,21 @@
+ 
+ """Single-workload AMD-native scoring."""
+ 
+ from __future__ import annotations
+ 
+ from sol_execbench.core.scoring.amd_sol import AmdSolBoundArtifact
+ from sol_execbench.core.scoring.amd_sol.v2 import AmdSolBoundV2Artifact
+ from sol_execbench.core.scoring.amd_score.models import (
+     AMD_SCORE_CLAIM_LEVEL,
+     AmdNativeScore,
++    BoundEligibilityEvidence,
+ )
+ from sol_execbench.core.scoring.amd_score.warnings import (
+     INCOMPLETE_EVIDENCE_WARNING,
+     REFERENCE_BASELINE_WARNING,
+     SolarScoreGuard,
+     UNSCORED_SOL_BOUND_WARNING,
+     evidence_refs,
+     solar_aggregate_status,
+     unique,
+     warnings_for_artifact,
+@@ -86,37 +87,73 @@ def score_amd_native_workload(
+         workload_uuid=artifact.workload_uuid,
+         measured_latency_ms=measured_latency_ms,
+         baseline_latency_ms=baseline_latency_ms,
+         sol_bound_ms=sol_bound_ms,
+         score=score_value,
+         claim_level=AMD_SCORE_CLAIM_LEVEL,
+         warnings=tuple(warnings),
+         baseline_source=baseline_source,
+         evidence_refs=refs,
+         derived_evidence_refs=dict(derived_evidence_refs or {}),
++        bound_eligibility=_bound_eligibility(artifact, solar_aggregate),
++    )
++
++
++def _bound_eligibility(
++    artifact: AmdSolBoundArtifact | AmdSolBoundV2Artifact,
++    solar_aggregate: SolarScoreGuard | None,
++) -> BoundEligibilityEvidence:
++    """Capture the exact inputs of the authority gate with the score."""
++    if isinstance(artifact, AmdSolBoundV2Artifact):
++        amd_sol_status = artifact.aggregate_bound.status
++        hardware_profile_state = (
++            "unknown"
++            if any("hardware_profile" in warning for warning in artifact.warnings)
++            else "measured"
++            if artifact.coverage_summary.worst_confidence.value == "supported"
++            else "unknown"
++        )
++        artifact_warnings = artifact.warnings
++    else:
++        # v1 scalar models cannot prove exact-profile eligibility.
++        amd_sol_status = "scored"
++        hardware_profile_state = "unknown"
++        artifact_warnings = tuple(warnings_for_artifact(artifact))
++    solar_status = solar_aggregate.status if solar_aggregate is not None else "unknown"
++    solar_warnings = solar_aggregate.warnings if solar_aggregate is not None else ()
++    hardware = artifact.hardware_model
++    return BoundEligibilityEvidence(
++        amd_sol_status=amd_sol_status,
++        solar_status=solar_status,
++        hardware_profile_state=hardware_profile_state,
++        hardware_validation_status=hardware.hardware_validation_status.value,
++        model_validation_status=hardware.model_validation_status.value,
++        warnings=tuple(unique(list(artifact_warnings) + list(solar_warnings))),
+     )
+ 
+ 
+ def has_complete_numeric_inputs(
+     *,
+     measured_latency_ms: float | None,
+     baseline_latency_ms: float | None,
+     sol_bound_ms: float | None,
+ ) -> bool:
+     """Whether all score inputs are present and positive."""
+     return (
+         measured_latency_ms is not None
+         and measured_latency_ms > 0.0
+         and baseline_latency_ms is not None
+         and baseline_latency_ms > 0.0
+         and sol_bound_ms is not None
+-        and sol_bound_ms > 0.0
++        # A zero lower bound is numerically complete diagnostic evidence.  The
++        # official gate remains stricter and rejects it as non-authoritative.
++        and sol_bound_ms >= 0.0
+     )
+ 
+ 
+ def artifact_sol_bound_ms(
+     artifact: AmdSolBoundArtifact | AmdSolBoundV2Artifact,
+ ) -> float:
+     """Return the aggregate SOL bound latency from either artifact schema."""
+     if isinstance(artifact, AmdSolBoundV2Artifact):
+         return artifact.aggregate_bound.sol_bound_ms
+     return artifact.aggregate_sol_bound_ms
+diff --git a/src/sol_execbench/core/scoring/official_score.py b/src/sol_execbench/core/scoring/official_score.py
+index 5d3622e..7d0f6e5 100644
+--- a/src/sol_execbench/core/scoring/official_score.py
++++ b/src/sol_execbench/core/scoring/official_score.py
+@@ -53,20 +53,27 @@ OFFICIAL_SCORE_KIND = "official_benchmark_score"
+ OFFICIAL_SCORE_CLAIM_LEVEL = "official-confirmed"
+ DEFAULT_OFFICIAL_BASELINE_SOURCES = ("scoring_baseline", "measured_baseline_registry")
+ 
+ MISSING_SCORE_BLOCKER = "missing_score"
+ MISSING_MEASURED_LATENCY_BLOCKER = "missing_measured_latency"
+ MISSING_BASELINE_BLOCKER = "missing_baseline"
+ PLACEHOLDER_BASELINE_BLOCKER = "placeholder_baseline"
+ MISSING_SOL_BOUND_BLOCKER = "missing_sol_bound"
+ MISSING_AGGREGATION_POLICY_BLOCKER = "missing_aggregation_policy"
+ BASELINE_COVERAGE_FAILED_BLOCKER = "baseline_coverage_failed"
++MISSING_BOUND_ELIGIBILITY_BLOCKER = "missing_bound_eligibility"
++AMD_SOL_NOT_SCORED_BLOCKER = "amd_sol_not_scored"
++SOLAR_NOT_SCORED_BLOCKER = "solar_not_scored"
++UNSUPPORTED_HARDWARE_PROFILE_BLOCKER = "unsupported_hardware_profile"
++HARDWARE_NOT_VALIDATED_BLOCKER = "hardware_not_validated"
++MODEL_NOT_VALIDATED_BLOCKER = "model_not_validated"
++BOUND_EVIDENCE_WARNING_BLOCKER = "bound_evidence_warning"
+ 
+ _PLACEHOLDER_BASELINE_SOURCES = {
+     "reference_latency",
+     "trace_reference_latency",
+     "trace.evaluation.performance.reference_latency_ms",
+ }
+ 
+ 
+ @dataclass(frozen=True)
+ class OfficialScoreEvidence:
+@@ -270,20 +277,39 @@ def _official_score_blockers(
+     *,
+     aggregation_policy: str | None,
+     official_baseline_sources: Sequence[str],
+     coverage_report: BaselineCoverageReport | None = None,
+ ) -> list[str]:
+     blockers: list[str] = []
+     if aggregation_policy is None:
+         blockers.append(MISSING_AGGREGATION_POLICY_BLOCKER)
+     if score.score is None or not math.isfinite(score.score):
+         blockers.append(MISSING_SCORE_BLOCKER)
++    eligibility = score.bound_eligibility
++    if eligibility is None:
++        blockers.append(MISSING_BOUND_ELIGIBILITY_BLOCKER)
++    else:
++        if eligibility.amd_sol_status != "scored":
++            blockers.append(AMD_SOL_NOT_SCORED_BLOCKER)
++        if eligibility.solar_status != "scored":
++            blockers.append(SOLAR_NOT_SCORED_BLOCKER)
++        if eligibility.hardware_profile_state != "measured":
++            blockers.append(UNSUPPORTED_HARDWARE_PROFILE_BLOCKER)
++        if eligibility.hardware_validation_status != "validated":
++            blockers.append(HARDWARE_NOT_VALIDATED_BLOCKER)
++        if eligibility.model_validation_status != "validated":
++            blockers.append(MODEL_NOT_VALIDATED_BLOCKER)
++        if any(
++            _authority_disqualifying_warning(warning)
++            for warning in eligibility.warnings
++        ):
++            blockers.append(BOUND_EVIDENCE_WARNING_BLOCKER)
+     if not _is_positive_finite(score.measured_latency_ms):
+         blockers.append(MISSING_MEASURED_LATENCY_BLOCKER)
+     if not _is_positive_finite(score.sol_bound_ms):
+         blockers.append(MISSING_SOL_BOUND_BLOCKER)
+ 
+     baseline_source = score.baseline_source
+     if baseline_source in _PLACEHOLDER_BASELINE_SOURCES:
+         blockers.append(PLACEHOLDER_BASELINE_BLOCKER)
+     elif baseline_source not in set(official_baseline_sources):
+         blockers.append(MISSING_BASELINE_BLOCKER)
+@@ -303,19 +329,25 @@ def _official_score_blockers(
+ 
+ def _is_positive_finite(value: float | None) -> bool:
+     """True only for a real, strictly positive number; rejects None/NaN/Inf/<=0.
+ 
+     A ``value <= 0.0`` check alone treats NaN as valid because ``NaN <= 0.0`` is
+     False, letting degenerate latencies through to the score and the mean.
+     """
+     return value is not None and math.isfinite(value) and value > 0.0
+ 
+ 
++def _authority_disqualifying_warning(warning: str) -> bool:
++    """Warnings that prove an inexact/degraded bound is not authoritative."""
++    normalized = warning.lower()
++    return any(token in normalized for token in ("degraded", "inexact", "unsupported"))
++
++
+ def _normalize_policy(aggregation_policy: str | None) -> str | None:
+     if aggregation_policy is None:
+         return None
+     stripped = aggregation_policy.strip()
+     return stripped or None
+ 
+ 
+ def _unique(values: list[str]) -> list[str]:
+     return list(dict.fromkeys(values))
+diff --git a/tests/sol_execbench/cli/commands/test_hardware_model_cli.py b/tests/sol_execbench/cli/commands/test_hardware_model_cli.py
+new file mode 100644
+index 0000000..3b2f1ef
+--- /dev/null
++++ b/tests/sol_execbench/cli/commands/test_hardware_model_cli.py
+@@ -0,0 +1,35 @@
++"""CLI tests for calibrated AMD hardware-model evidence."""
++
++from __future__ import annotations
++
++import json
++
++from click.testing import CliRunner
++
++from sol_execbench.cli.main import cli
++
++
++def test_calibrate_writes_rejected_artifact_before_nonzero_exit(tmp_path) -> None:
++    output = tmp_path / "calibration.json"
++
++    result = CliRunner().invoke(
++        cli,
++        [
++            "hardware-model",
++            "calibrate",
++            "--device",
++            "0",
++            "--architecture",
++            "unsupported-gfx",
++            "--output",
++            str(output),
++            "--offline",
++            "--no-auto-install",
++        ],
++    )
++
++    assert result.exit_code != 0
++    payload = json.loads(output.read_text(encoding="utf-8"))
++    assert payload["status"] == "rejected"
++    assert payload["diagnostic"] is True
++    assert "unsupported GPU architecture" in payload["reason"]
+diff --git a/tests/sol_execbench/cli/commands/test_official_score_cli.py b/tests/sol_execbench/cli/commands/test_official_score_cli.py
+index 376c731..af24190 100644
+--- a/tests/sol_execbench/cli/commands/test_official_score_cli.py
++++ b/tests/sol_execbench/cli/commands/test_official_score_cli.py
+@@ -9,20 +9,21 @@ import json
+ from pathlib import Path
+ 
+ from click.testing import CliRunner
+ 
+ from sol_execbench.cli.main import cli
+ from sol_execbench.core.scoring.amd_score import (
+     AMD_SCORE_CLAIM_LEVEL,
+     AMD_SCORE_SCHEMA_VERSION,
+     AmdNativeScore,
+     AmdNativeSuiteReport,
++    BoundEligibilityEvidence,
+ )
+ from sol_execbench.core.scoring.official_score import (
+     BASELINE_COVERAGE_FAILED_BLOCKER,
+     MISSING_BASELINE_BLOCKER,
+     MISSING_SCORE_BLOCKER,
+     PLACEHOLDER_BASELINE_BLOCKER,
+ )
+ from sol_execbench.core.reports.reporting import CANONICAL_BENCHMARK_OUTPUT
+ 
+ 
+@@ -38,20 +39,28 @@ def _score(
+         workload_uuid=workload_uuid,
+         measured_latency_ms=1.0,
+         baseline_latency_ms=baseline_latency_ms,
+         sol_bound_ms=0.5,
+         score=score,
+         claim_level=AMD_SCORE_CLAIM_LEVEL,
+         warnings=(),
+         baseline_source=baseline_source,
+         evidence_refs={},
+         derived_evidence_refs={},
++        bound_eligibility=BoundEligibilityEvidence(
++            amd_sol_status="scored",
++            solar_status="scored",
++            hardware_profile_state="measured",
++            hardware_validation_status="validated",
++            model_validation_status="validated",
++            warnings=(),
++        ),
+     )
+ 
+ 
+ def _write_report(tmp_path: Path, scores: list[AmdNativeScore]) -> Path:
+     report = AmdNativeSuiteReport(scores=tuple(scores))
+     payload = report.to_dict()
+     path = tmp_path / "amd-native-score.json"
+     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+     return path
+ 
+diff --git a/tests/sol_execbench/core/evidence/test_official_score_evidence.py b/tests/sol_execbench/core/evidence/test_official_score_evidence.py
+index 7abc8bf..254c079 100644
+--- a/tests/sol_execbench/core/evidence/test_official_score_evidence.py
++++ b/tests/sol_execbench/core/evidence/test_official_score_evidence.py
+@@ -1,19 +1,20 @@
+ from __future__ import annotations
+ 
+ import ast
+ import inspect
+ 
+ import sol_execbench.core.scoring.amd_score as amd_score
+ from sol_execbench.core.scoring.amd_score import (
+     AMD_SCORE_CLAIM_LEVEL,
+     AmdNativeScore,
++    BoundEligibilityEvidence,
+ )
+ from sol_execbench.core.evidence.baseline_coverage import (
+     BASELINE_HARDWARE_MISMATCH_CODE,
+     BASELINE_MISMATCHED_CODE,
+     CONFIRMED,
+     MISMATCHED,
+     BaselineCoverageEntry,
+     BaselineCoverageReport,
+ )
+ from sol_execbench.core.scoring.official_score import (
+@@ -53,20 +54,28 @@ def _amd_score(
+         warnings=(),
+         baseline_source=baseline_source,
+         evidence_refs={
+             "trace": "trace.jsonl#workload-1",
+             "timing": "trace.jsonl#timing",
+             "baseline": "baseline.json#matmul_demo:workload-1",
+             "sol_bound": "sol-bound.json#workload-1",
+             "hardware_model": "hardware-model.json#gfx1200",
+         },
+         derived_evidence_refs={"profile_summary": "profile_summary.json"},
++        bound_eligibility=BoundEligibilityEvidence(
++            amd_sol_status="scored",
++            solar_status="scored",
++            hardware_profile_state="measured",
++            hardware_validation_status="validated",
++            model_validation_status="validated",
++            warnings=(),
++        ),
+     )
+ 
+ 
+ def test_official_score_accepts_complete_scoring_baseline_input():
+     evidence = official_score_from_amd_native_score(
+         _amd_score(),
+         aggregation_policy="mean of per-workload SOL scores",
+         source_score_ref="amd_native_score.json#workload-1",
+     )
+ 
+@@ -81,20 +90,57 @@ def test_official_score_accepts_complete_scoring_baseline_input():
+     assert payload["claim_level"] == "official-confirmed"
+     assert payload["aggregation_policy"] == "mean of per-workload SOL scores"
+     assert payload["official_baseline_latency_ms"] == 2.0
+     assert payload["input_refs"]["baseline"] == "baseline.json#matmul_demo:workload-1"
+     assert (
+         payload["input_refs"]["amd_native_score"] == "amd_native_score.json#workload-1"
+     )
+     assert payload["derived_input_refs"] == {"profile_summary": "profile_summary.json"}
+ 
+ 
++def test_legacy_score_without_bound_eligibility_cannot_be_official():
++    legacy = _amd_score()
++    legacy = AmdNativeScore(**{**legacy.__dict__, "bound_eligibility": None})
++
++    evidence = official_score_from_amd_native_score(
++        legacy, aggregation_policy="mean of per-workload SOL scores"
++    )
++
++    assert evidence.score is None
++    assert "missing_bound_eligibility" in evidence.blocker_reason_codes
++
++
++def test_inexact_or_degraded_bound_evidence_cannot_be_official():
++    score = _amd_score()
++    blocked = AmdNativeScore(
++        **{
++            **score.__dict__,
++            "bound_eligibility": BoundEligibilityEvidence(
++                amd_sol_status="degraded",
++                solar_status="scored",
++                hardware_profile_state="measured",
++                hardware_validation_status="validated",
++                model_validation_status="validated",
++                warnings=("inexact hardware estimate",),
++            ),
++        }
++    )
++
++    evidence = official_score_from_amd_native_score(
++        blocked, aggregation_policy="mean of per-workload SOL scores"
++    )
++
++    assert evidence.score is None
++    assert "amd_sol_not_scored" in evidence.blocker_reason_codes
++    assert "bound_evidence_warning" in evidence.blocker_reason_codes
++
++
+ def test_reference_latency_baseline_blocks_official_score():
+     evidence = official_score_from_amd_native_score(
+         _amd_score(baseline_source="reference_latency"),
+         aggregation_policy="mean of per-workload SOL scores",
+     )
+ 
+     assert evidence.score is None
+     assert evidence.score_authority is False
+     assert evidence.official_baseline_latency_ms is None
+     assert evidence.blocker_reason_codes == (PLACEHOLDER_BASELINE_BLOCKER,)
+diff --git a/tests/sol_execbench/core/scoring/test_amd_native_score.py b/tests/sol_execbench/core/scoring/test_amd_native_score.py
+index f84d1e6..c82dc19 100644
+--- a/tests/sol_execbench/core/scoring/test_amd_native_score.py
++++ b/tests/sol_execbench/core/scoring/test_amd_native_score.py
+@@ -98,20 +98,51 @@ def _matmul_artifact_v2():
+         uuid="matmul-workload",
+     )
+     return build_amd_sol_bound_v2_artifact(
+         definition,
+         workload,
+         default_amd_hardware_models()["gfx1200"],
+         hardware_model_ref="default_amd_hardware_models.gfx1200",
+     )
+ 
+ 
++def test_score_serializes_bound_eligibility_evidence() -> None:
++    score = score_amd_native_workload(
++        _matmul_artifact_v2(),
++        measured_latency_ms=1.0,
++        baseline_latency_ms=2.0,
++        solar_derivation=SolarAggregateStatus(
++            status="scored",
++            score_eligible=True,
++            reason="complete",
++            group_ids=(),
++            node_ids=(),
++            warnings=(),
++        ),
++    )
++
++    payload = score.to_dict()
++
++    assert payload["bound_eligibility"] == {
++        "amd_sol_status": "degraded",
++        "solar_status": "scored",
++        "hardware_profile_state": "unknown",
++        "hardware_validation_status": "validated",
++        "model_validation_status": "provisional",
++        "warnings": [
++            "unknown_hardware_profile",
++            "model_validation:gfx1200:provisional",
++            "aggregate_degraded:inexact or provisional evidence present",
++        ],
++    }
++
++
+ def _cdna3_model(tmp_path):
+     path = tmp_path / "cdna3-model.json"
+     path.write_text(
+         json.dumps(
+             {
+                 "schema_version": "sol_execbench.amd_hardware_model.v2",
+                 "architecture": "gfx942",
+                 "dtype_or_path": "bf16/fp32 mixed benchmark path",
+                 "peak_tflops": 1300.0,
+                 "memory_bandwidth_gbps": 5300.0,
