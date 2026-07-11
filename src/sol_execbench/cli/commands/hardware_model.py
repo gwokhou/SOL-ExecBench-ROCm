@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any, cast
 
 import click
 
@@ -193,9 +194,11 @@ def _build(calibration_path: Path, output: Path, max_age_hours: float | None) ->
             "model_validation_status": "validated",
             "evidence_refs": [str(calibration_path)],
             "compute_profiles": [
-                p for p in profiles if p["key"].startswith("compute.")
+                p for p in profiles if str(p["key"]).startswith("compute.")
             ],
-            "memory_profiles": [p for p in profiles if p["key"].startswith("memory.")],
+            "memory_profiles": [
+                p for p in profiles if str(p["key"]).startswith("memory.")
+            ],
         },
     )
 
@@ -236,7 +239,7 @@ def _validate_calibration_authority(
     if max_age_hours is not None:
         try:
             generated = datetime.fromisoformat(
-                calibration.generated_at.replace("Z", "+00:00")
+                cast(Any, calibration).generated_at.replace("Z", "+00:00")
             )
         except ValueError as exc:
             raise ValueError("calibration timestamp is invalid") from exc

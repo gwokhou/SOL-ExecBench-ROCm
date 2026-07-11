@@ -135,7 +135,7 @@ def _config_summary(config: object | None) -> dict[str, int] | None:
             "mi_m": int(mi.m),
             "mi_n": int(mi.n),
             "mi_k": int(mi.k),
-            "occupancy": int(config.occupancy),
+            "occupancy": int(getattr(config, "occupancy")),
         }
     except (AttributeError, TypeError, ValueError):
         return None

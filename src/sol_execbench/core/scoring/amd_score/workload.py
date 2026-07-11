@@ -23,6 +23,7 @@ from sol_execbench.core.scoring.amd_score.warnings import (
     warnings_for_artifact,
     warnings_for_solar_aggregate,
 )
+from sol_execbench.core.scoring.solar_derivation.models import SolarDerivationEvidence
 from sol_execbench.sol_score import sol_score
 
 
@@ -122,7 +123,11 @@ def _bound_eligibility(
     # derivation failed, and must not turn an otherwise AMD-authoritative score
     # into an artificial unknown blocker.
     solar_status = (
-        solar_aggregate.status if solar_aggregate is not None else "not_requested"
+        solar_aggregate.aggregate_status.status
+        if isinstance(solar_aggregate, SolarDerivationEvidence)
+        else solar_aggregate.status
+        if solar_aggregate is not None
+        else "not_requested"
     )
     solar_warnings = solar_aggregate.warnings if solar_aggregate is not None else ()
     hardware = artifact.hardware_model

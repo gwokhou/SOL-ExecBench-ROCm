@@ -10,7 +10,7 @@ from datetime import datetime
 import hashlib
 import json
 from math import isfinite
-from typing import Any, Mapping
+from typing import Any, Mapping, TypeGuard
 
 from sol_execbench.core.scoring.hardware_calibration.statistics import (
     select_conservative_value,
@@ -20,7 +20,7 @@ CALIBRATION_SCHEMA_VERSION = "sol_execbench.hardware_calibration.v1"
 CALIBRATION_CANDIDATE_STATES = frozenset({"measured", "unavailable", "unknown"})
 
 
-def _is_json_number(value: object) -> bool:
+def _is_json_number(value: object) -> TypeGuard[int | float]:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 

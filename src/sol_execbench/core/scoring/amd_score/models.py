@@ -182,17 +182,12 @@ def _bound_eligibility(value: Any) -> BoundEligibilityEvidence | None:
     if set(value) != required or not isinstance(value["warnings"], list):
         raise ValueError("bound_eligibility has invalid fields")
     return BoundEligibilityEvidence(
-        *(
-            str(value[key])
-            for key in (
-                "amd_sol_status",
-                "solar_status",
-                "hardware_profile_state",
-                "hardware_validation_status",
-                "model_validation_status",
-            )
-        ),
-        tuple(str(warning) for warning in value["warnings"]),
+        amd_sol_status=str(value["amd_sol_status"]),
+        solar_status=str(value["solar_status"]),
+        hardware_profile_state=str(value["hardware_profile_state"]),
+        hardware_validation_status=str(value["hardware_validation_status"]),
+        model_validation_status=str(value["model_validation_status"]),
+        warnings=tuple(str(warning) for warning in value["warnings"]),
     )
 
 
