@@ -292,6 +292,8 @@ def test_builder_writes_compact_entries_and_keeps_missing_suite_rows_blocked(tmp
         "w1": "official",
         "w2": "blocked",
     }
+    assert bundle.workloads[0].trace_ref == str(tmp_path / "trace.jsonl")
+    assert bundle.workloads[0].trace_sha256 == sha256_file(tmp_path / "trace.jsonl")
     assert bundle.workloads[1].blocker_reason_codes == ("missing_trace_record",)
 
 
@@ -374,6 +376,30 @@ def test_missing_authority_references_keep_measured_workload_derived(tmp_path):
 def test_official_workload_requires_bound_and_hardware_model_evidence():
     with pytest.raises(ValueError, match="official workloads require"):
         ReleaseBaselineWorkload("gemm", "w1", "official", 1.0, ())
+
+
+def test_official_workload_requires_trace_evidence():
+    with pytest.raises(ValueError, match="official workloads require"):
+        ReleaseBaselineWorkload(
+            "gemm",
+            "w1",
+            "official",
+            1.0,
+            (),
+            bound_ref="bound.json",
+            bound_sha256="a" * 64,
+            hardware_model_ref="model.json",
+            hardware_model_sha256="b" * 64,
+        )
+
+
+def test_derived_workload_allows_missing_trace_evidence():
+    workload = ReleaseBaselineWorkload(
+        "gemm", "w1", "derived", 1.0, ("model_not_validated",)
+    )
+
+    assert workload.trace_ref is None
+    assert workload.trace_sha256 is None
 
 
 def test_missing_authority_input_makes_measured_trace_derived(tmp_path):

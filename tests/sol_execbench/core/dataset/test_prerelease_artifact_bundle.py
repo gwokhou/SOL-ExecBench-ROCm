@@ -54,6 +54,8 @@ def _write_release_evidence(tmp_path: Path) -> tuple[Path, Path]:
                 "official",
                 1.0,
                 (),
+                trace_ref="trace.jsonl",
+                trace_sha256="f" * 64,
                 bound_ref="bound.json",
                 bound_sha256="d" * 64,
                 hardware_model_ref="model.json",
