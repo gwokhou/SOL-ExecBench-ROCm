@@ -594,6 +594,7 @@ def _claim_boundary() -> dict[str, bool]:
         "native_host_validation_from_docker": False,
         "mi300x_cdna3_full_suite_validated": False,
         "cdna4_validated": False,
+        "release_baseline_full_suite_official": False,
     }
 
 
