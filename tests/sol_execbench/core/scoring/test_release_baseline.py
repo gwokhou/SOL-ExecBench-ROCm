@@ -34,7 +34,9 @@ def _provenance(tmp_path: Path) -> ReleaseProvenance:
     solution = tmp_path / "solution.py"
     solution.write_text("solution", encoding="utf-8")
     return ReleaseProvenance(
-        solution=str(solution), solution_sha256=sha256_file(solution)
+        solution=str(solution),
+        solution_sha256=sha256_file(solution),
+        suite_manifest_sha256="a" * 64,
     )
 
 
