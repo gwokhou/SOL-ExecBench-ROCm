@@ -224,7 +224,7 @@ def test_batched_matmul_estimate_records_batch_formula_inputs():
     assert estimate.confidence == EstimateConfidence.SUPPORTED
 
 
-def test_reduction_family_golden_fixture_records_inexact_axis_evidence():
+def test_static_sum_reduction_family_records_exact_axis_evidence():
     from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
 
     definition = make_definition(
@@ -247,12 +247,16 @@ def test_reduction_family_golden_fixture_records_inexact_axis_evidence():
 
     assert estimate.op_family == OpFamily.REDUCTION
     assert estimate.formula_kind == "reduction_flops"
-    assert estimate.formula == "input_elements"
-    assert estimate.formula_inputs == {"input_elements": 32, "axis": -1}
-    assert estimate.flops == 32.0
+    assert estimate.formula == "input_elements-output_elements"
+    assert estimate.formula_inputs == {
+        "input_elements": 32,
+        "output_elements": 4,
+        "axis": -1,
+    }
+    assert estimate.flops == 28.0
     assert estimate.total_bytes == 144.0
     assert estimate.axis_source == "attribute"
-    assert estimate.confidence == EstimateConfidence.INEXACT
+    assert estimate.confidence == EstimateConfidence.SUPPORTED
 
 
 def test_moe_static_route_estimate_locks_formula_inputs_and_kind():
@@ -829,7 +833,7 @@ def test_incomplete_linear_projection_degrades_without_fabricated_formula_or_byt
     assert "inexact_bytes:missing_shape:output:y" in estimate.warnings
 
 
-def test_elementwise_and_activation_chain_estimates_stay_per_node():
+def test_exact_elementwise_and_activation_chain_estimates_stay_per_node():
     from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
 
     definition = make_definition(
@@ -859,9 +863,8 @@ def test_elementwise_and_activation_chain_estimates_stay_per_node():
     assert estimates[0].flops == 16.0
     assert estimates[1].formula_kind == "activation_flops"
     assert estimates[1].formula_inputs["activation_ops_per_element"] == 1
-    assert all(
-        estimate.confidence == EstimateConfidence.INEXACT for estimate in estimates
-    )
+    assert estimates[0].confidence == EstimateConfidence.SUPPORTED
+    assert estimates[1].confidence == EstimateConfidence.INEXACT
 
 
 def test_missing_shape_or_dtype_downgrades_without_fabricating_bytes():
@@ -942,7 +945,7 @@ def test_all_key_tensors_unresolved_marks_known_operator_unsupported():
     assert "unresolved" in estimate.rationale
 
 
-def test_reduction_estimate_records_axis_and_conservative_formula():
+def test_static_sum_reduction_estimate_records_exact_axis_and_formula():
     from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
 
     definition = make_definition(
@@ -959,11 +962,13 @@ def test_reduction_estimate_records_axis_and_conservative_formula():
     estimate = estimate_bound_work(build_bound_graph(definition, workload))[0]
 
     assert estimate.formula_kind == "reduction_flops"
+    assert estimate.formula == "input_elements-output_elements"
     assert estimate.formula_inputs["input_elements"] == 8
+    assert estimate.formula_inputs["output_elements"] == 2
     assert estimate.formula_inputs["axis"] == 1
     assert estimate.axis_source == "attribute"
-    assert estimate.confidence == EstimateConfidence.INEXACT
-    assert "conservative" in estimate.rationale
+    assert estimate.confidence == EstimateConfidence.SUPPORTED
+    assert "exact sum-reduction" in estimate.rationale
 
 
 def test_softmax_missing_axis_stays_inexact_with_missing_axis_evidence():

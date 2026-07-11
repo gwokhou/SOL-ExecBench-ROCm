@@ -212,8 +212,8 @@ def test_cross_domain_imports_stay_explicitly_allowlisted() -> None:
         ): "dataset score report exports sidecar payload parsers",
         (
             "sol_execbench.core.dataset.amd_score_reports",
-            "sol_execbench.core.scoring.amd_sol.v2",
-        ): "dataset score report exports AMD SOL v2 artifact builder",
+            "sol_execbench.core.scoring.amd_sol.v3",
+        ): "dataset score report exports AMD SOL v3 artifact builder",
         (
             "sol_execbench.core.dataset.amd_score_reports",
             "sol_execbench.core.scoring.solar_derivation",
@@ -240,6 +240,10 @@ def test_cross_domain_imports_stay_explicitly_allowlisted() -> None:
         ): "dataset scoring bridge exposes AMD score types for run reporting",
         (
             "sol_execbench.core.dataset.runner_scoring",
+            "sol_execbench.core.scoring.amd_score.derived_artifacts",
+        ): "dataset scoring bridge resolves derived score evidence references",
+        (
+            "sol_execbench.core.dataset.runner_scoring",
             "sol_execbench.core.scoring.amd_score.reports",
         ): "dataset scoring bridge delegates AMD score report construction",
         (
@@ -251,9 +255,17 @@ def test_cross_domain_imports_stay_explicitly_allowlisted() -> None:
             "sol_execbench.core.scoring.official_score",
         ): "dataset scoring bridge writes authoritative official-score sidecars",
         (
+            "sol_execbench.core.dataset.runner_scoring",
+            "sol_execbench.core.scoring.release_baseline",
+        ): "dataset scoring bridge verifies release baseline authority before writing sidecars",
+        (
             "sol_execbench.core.scoring.amd_bound_sanity.models",
             "sol_execbench.core.dataset.manifest",
         ): "AMD bound sanity report embeds dataset manifest checksums",
+        (
+            "sol_execbench.core.scoring.authority_slice",
+            "sol_execbench.core.dataset.manifest",
+        ): "authority slice manifests reuse the canonical dataset checksum type",
         (
             "sol_execbench.core.scoring.hardware_calibration.builder",
             "sol_execbench.core.bench",
@@ -913,12 +925,12 @@ def test_amd_score_report_sidecar_parsers_live_outside_orchestrator() -> None:
     )
 
     assert amd_score_sidecar_parsing.read_json_object is not None
-    assert amd_score_sidecar_parsing.minimal_amd_sol_bound_v2_from_payload is not None
+    assert amd_score_sidecar_parsing.minimal_amd_sol_bound_v3_from_payload is not None
     assert amd_score_sidecar_parsing.minimal_solar_aggregate_from_payload is not None
 
     for name in (
         "_read_json_object",
-        "_minimal_amd_sol_bound_v2_from_payload",
+        "_minimal_amd_sol_bound_v3_from_payload",
         "_minimal_solar_aggregate_from_payload",
     ):
         assert not hasattr(amd_score_reports, name)

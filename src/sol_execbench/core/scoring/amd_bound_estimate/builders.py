@@ -15,6 +15,7 @@ from sol_execbench.core.scoring.amd_bound_estimate.tensors import (
 from sol_execbench.core.scoring.amd_bound_graph.models import (
     BoundGraph,
     BoundGraphNode,
+    BoundTensor,
     OpFamily,
 )
 from sol_execbench.core.scoring.confidence import EstimateConfidence
@@ -52,6 +53,15 @@ def pointwise_estimate(
         output_elements = 0
         warnings.append(f"inexact_operator:{node.op_family.value}_missing_shape")
 
+    confidence = EstimateConfidence.INEXACT
+    if (
+        node.confidence == EstimateConfidence.SUPPORTED
+        and not warnings
+        and _has_exact_pointwise_tensor_contract(input_tensors, output_tensors)
+        and _is_exact_elementwise_operation(node)
+    ):
+        confidence = EstimateConfidence.SUPPORTED
+
     formula_inputs: dict[str, Any] = {"output_elements": output_elements}
     formula_inputs.update(formula_inputs_extra)
     flops = float(output_elements)
@@ -71,10 +81,41 @@ def pointwise_estimate(
         intermediate_bytes=0.0,
         movement_bytes=0.0,
         total_bytes=total_bytes,
-        confidence=EstimateConfidence.INEXACT,
+        confidence=confidence,
         rationale=join_rationale(rationale, rationale_parts),
         warnings=tuple(dict.fromkeys(warnings)),
     )
+
+
+def _has_exact_pointwise_tensor_contract(
+    input_tensors: tuple[BoundTensor, ...], output_tensors: tuple[BoundTensor, ...]
+) -> bool:
+    """Return whether every material tensor has the exact output shape.
+
+    This deliberately excludes broadcasting: it makes the byte count and the
+    elementwise operation count depend on implementation-specific expansion.
+    Constants are absent from the tensor list and remain safe here.
+    """
+    if len(output_tensors) != 1 or not input_tensors:
+        return False
+    output_shape = output_tensors[0].shape
+    return output_shape is not None and all(
+        tensor.shape == output_shape for tensor in input_tensors
+    )
+
+
+def _is_exact_elementwise_operation(node: BoundGraphNode) -> bool:
+    """Limit supported pointwise modeling to one exact binary primitive."""
+    if node.op_family != OpFamily.ELEMENTWISE:
+        return False
+    return node.op_name.rsplit(".", maxsplit=1)[-1] in {
+        "add",
+        "sub",
+        "mul",
+        "mult",
+        "truediv",
+        "div",
+    }
 
 
 def unsupported_estimate(

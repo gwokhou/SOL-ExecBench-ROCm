@@ -16,9 +16,9 @@ ExecBench ROCm surfaces
 and `src/sol_execbench/core/scoring/amd_score/`.
 
 The external hip-execbench references used for classification were
-the profiler router, errors index, agent builder,
-baseline comparator, schema modules, and
-pipeline statistics modules.
+`src/profiler/router.ts`, `src/errors/index.ts`, `src/agent/builder.ts`,
+`src/baseline/comparator.ts`, `src/schemas/*.ts`, and
+`src/pipeline/statistics.ts`.
 
 ## Accepted Practices
 

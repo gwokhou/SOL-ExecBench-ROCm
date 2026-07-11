@@ -48,11 +48,11 @@ def _assert_no_v1_10_positive_overclaims(text: str) -> None:
         assert phrase not in text
 
 
-def test_analysis_docs_explain_v2_sidecars_and_rdna4_scope():
+def test_analysis_docs_explain_v3_sidecars_and_rdna4_scope():
     text = _text("docs/analysis.md")
 
     for expected in (
-        "sol_execbench.amd_sol_bound.v2",
+        "sol_execbench.amd_sol_bound.v3",
         "--amd-sol-bound-dir",
         "operator_work_estimates",
         "aggregate_bound",
@@ -118,10 +118,12 @@ def test_v1_10_docs_allow_historical_or_deferred_context_mentions():
 
 def test_golden_bound_modeling_coverage_inventory_is_present():
     graph_tests = _text("tests/sol_execbench/core/scoring/test_amd_bound_graph.py")
-    estimate_tests = _text("tests/sol_execbench/core/scoring/test_amd_bound_estimates.py")
-    sol_v2_tests = _text("tests/sol_execbench/core/scoring/test_amd_sol_v2.py")
+    estimate_tests = _text(
+        "tests/sol_execbench/core/scoring/test_amd_bound_estimates.py"
+    )
+    sol_v3_tests = _text("tests/sol_execbench/core/scoring/test_amd_sol_v3.py")
     evidence = _text("docs/internal/rdna4_v1_9_validation_evidence.md")
-    combined = "\n".join([graph_tests, estimate_tests, sol_v2_tests, evidence])
+    combined = "\n".join([graph_tests, estimate_tests, sol_v3_tests, evidence])
 
     for expected in (
         "matmul",
@@ -141,13 +143,15 @@ def test_golden_bound_modeling_coverage_inventory_is_present():
 
 def test_score_validation_coverage_inventory_is_present():
     score_tests = _text("tests/sol_execbench/core/scoring/test_amd_native_score.py")
-    dataset_tests = _text("tests/sol_execbench/core/dataset/test_run_dataset_amd_score.py")
+    dataset_tests = _text(
+        "tests/sol_execbench/core/dataset/test_run_dataset_amd_score.py"
+    )
     evidence = _text("docs/internal/rdna4_v1_9_validation_evidence.md")
     combined = "\n".join([score_tests, dataset_tests, evidence])
 
     for expected in (
-        "test_v2_degraded_artifact_scores_with_deterministic_warnings",
-        "test_v2_unscored_artifact_omits_score_and_preserves_bound_warning",
+        "test_v3_degraded_artifact_scores_with_deterministic_warnings",
+        "test_v3_unscored_artifact_omits_score_and_preserves_bound_warning",
         "test_trace_workflow_marks_missing_bound_as_unscored",
         "test_trace_workflow_marks_failed_trace_as_unscored",
         "REFERENCE_BASELINE_WARNING",
@@ -164,7 +168,7 @@ def test_rdna4_validation_evidence_records_sample_outputs():
     for expected in (
         "Validation target:** RDNA 4 `gfx1200`",
         "trace_jsonl",
-        "sol_execbench.amd_sol_bound.v2",
+        "sol_execbench.amd_sol_bound.v3",
         "sol_execbench.amd_native_score.v1",
         "out/amd-sol-bounds",
         "out/amd-score-report.json",

@@ -10,13 +10,13 @@ from typing import Any
 
 from sol_execbench.core.evidence.evidence_refs import sidecar_stem_for_workload
 from sol_execbench.core.scoring.amd_score.sidecar_parsing import (
-    minimal_amd_sol_bound_v2_from_payload,
+    minimal_amd_sol_bound_v3_from_payload,
     minimal_solar_aggregate_from_payload,
     read_json_object,
 )
 from sol_execbench.core.scoring.amd_hardware_models import load_amd_hardware_model
 from sol_execbench.core.scoring.amd_sol import default_amd_hardware_models
-from sol_execbench.core.scoring.amd_sol.v2 import build_amd_sol_bound_v2_artifact
+from sol_execbench.core.scoring.amd_sol.v3 import build_amd_sol_bound_v3_artifact
 from sol_execbench.core.scoring.solar_derivation import (
     build_solar_derivation_evidence,
     solar_derivation_from_dict,
@@ -98,9 +98,9 @@ def resolve_derived_score_artifacts(
         if workload is not None
         else None
     )
-    sol_bound_ref = f"derived:{definition.name}:{workload_uuid}:amd_sol_bound_v2"
+    sol_bound_ref = f"derived:{definition.name}:{workload_uuid}:amd_sol_bound_v3"
     sol_bound_path = (
-        sol_bound_artifact_dir / f"{sidecar_stem}.amd-sol-v2.json"
+        sol_bound_artifact_dir / f"{sidecar_stem}.amd-sol-v3.json"
         if sol_bound_artifact_dir is not None and sidecar_stem is not None
         else None
     )
@@ -149,9 +149,9 @@ def _resolve_sol_bound_artifact(
     if sol_bound_path is not None and sol_bound_path.exists():
         existing_payload = read_json_object(sol_bound_path)
         if existing_payload is not None:
-            artifact = minimal_amd_sol_bound_v2_from_payload(existing_payload)
+            artifact = minimal_amd_sol_bound_v3_from_payload(existing_payload)
     if artifact is None and workload is not None and derived_exclusion is None:
-        artifact = build_amd_sol_bound_v2_artifact(
+        artifact = build_amd_sol_bound_v3_artifact(
             definition,
             workload,
             hardware_model.model,

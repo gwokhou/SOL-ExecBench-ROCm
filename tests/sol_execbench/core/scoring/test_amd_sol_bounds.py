@@ -80,7 +80,7 @@ def test_matmul_bound_artifact_records_graph_work_hardware_and_bounds():
     assert "operator_work_estimates" not in json.dumps(payload)
 
 
-def test_elementwise_work_estimate_is_inexact_and_auditable():
+def test_exact_binary_elementwise_work_estimate_is_supported_and_auditable():
     definition = make_definition(
         name="add_demo",
         axes={"N": {"type": "var"}},
@@ -102,7 +102,7 @@ def test_elementwise_work_estimate_is_inexact_and_auditable():
     rich_estimates = estimate_bound_work(build_bound_graph(definition, workload))
 
     assert graph[0].op_type == "elementwise"
-    assert estimates[0].confidence == EstimateConfidence.INEXACT
+    assert estimates[0].confidence == EstimateConfidence.SUPPORTED
     assert estimates[0].flops == 16.0
     assert estimates[0].bytes_accessed == 192.0
     assert estimates[0].bytes_accessed == rich_estimates[0].total_bytes

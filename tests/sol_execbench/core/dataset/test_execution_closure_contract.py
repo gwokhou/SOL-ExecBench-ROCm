@@ -304,7 +304,7 @@ def test_report_records_sidecar_refs_and_cache_provenance_in_checksum():
         derived_evidence={
             "sidecars": {
                 "amd_score": "score/demo.amd-score.json",
-                "amd_sol_bound": "sol/demo.amd-sol-v2.json",
+                "amd_sol_bound": "sol/demo.amd-sol-v3.json",
                 "solar_derivation": "solar/demo.solar.json",
                 "static_kernel_evidence": "static/demo.static.json",
             },
@@ -317,7 +317,7 @@ def test_report_records_sidecar_refs_and_cache_provenance_in_checksum():
     )
     source_refs = {
         "amd_score": "score/demo.amd-score.json",
-        "amd_sol_bound": "sol/demo.amd-sol-v2.json",
+        "amd_sol_bound": "sol/demo.amd-sol-v3.json",
         "artifact_manifest": "static/artifact-manifest.json",
         "solar_derivation": "solar/demo.solar.json",
         "static_kernel_evidence": "static/demo.static.json",

@@ -10,7 +10,11 @@ to scoring.  A release publication additionally carries
 complete and every workload is classified as `official`, `derived`, or
 `blocked`; only `official` rows can support official score authority.  The
 verification artifact is produced by an independent rerun and must reference
-the exact baseline-bundle SHA-256.
+the exact baseline-bundle SHA-256.  An official bundle also requires a
+non-empty human-readable `scope`; the scope is copied into official-score
+evidence and prevents a validated slice from being described as a full suite.
+Legacy bundles without one are retained for audit but emit
+`release_scope_not_declared` and cannot become official.
 
 `sol-execbench contract --json` prints the GPU-free compatibility contract that
 downstream tools can inspect before running a benchmark. The contract is
@@ -97,6 +101,11 @@ required inputs:
 - official measured baseline latency
 - SOL/SOLAR bound evidence
 - explicit aggregation policy
+
+For release authority, the bound and hardware-model refs must also match the
+bundle's per-workload paths and SHA-256 values, and the bound must be
+`sol_execbench.amd_sol_bound.v3`. A missing, stale, or v2 ref emits
+`release_bound_not_verified` and remains blocked.
 
 If any required input is absent, the official score value is `null` and the
 report carries stable `blocker_reason_codes`, including `missing_score`,

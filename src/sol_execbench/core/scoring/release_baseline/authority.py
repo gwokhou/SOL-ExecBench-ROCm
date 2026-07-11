@@ -31,6 +31,9 @@ from .models import (
 )
 
 
+_AMD_SOL_V3_SCHEMA_VERSION = "sol_execbench.amd_sol_bound.v3"
+
+
 @dataclass(frozen=True)
 class OfficialReleaseBaseline:
     """A release baseline whose official rows passed independent verification."""
@@ -52,6 +55,58 @@ class OfficialReleaseBaseline:
             and latency_ms is not None
             and math.isfinite(latency_ms)
             and entry.latency_ms == latency_ms
+        )
+
+    def verifies_bound_reference(
+        self,
+        definition: str,
+        workload_uuid: str,
+        sol_bound_ref: str | None,
+        hardware_model_ref: str | None,
+    ) -> bool:
+        """Verify immutable v3 bound and model inputs for one official score.
+
+        The score report is derived data.  Official authority therefore requires
+        that its cited inputs resolve to the exact, checksummed files published
+        in the paired release bundle.  This deliberately makes retired v2 bound
+        evidence ineligible after the v3 fusion-model migration.
+        """
+        row = next(
+            (
+                row
+                for row in self.bundle.workloads
+                if row.key == (definition, workload_uuid)
+            ),
+            None,
+        )
+        if (
+            row is None
+            or row.bound_ref is None
+            or row.bound_sha256 is None
+            or row.hardware_model_ref is None
+            or row.hardware_model_sha256 is None
+            or sol_bound_ref != row.bound_ref
+            or hardware_model_ref != row.hardware_model_ref
+        ):
+            return False
+        bound_path = Path(row.bound_ref)
+        hardware_path = Path(row.hardware_model_ref)
+        if not bound_path.is_file() or not hardware_path.is_file():
+            return False
+        if (
+            sha256_file(bound_path) != row.bound_sha256
+            or sha256_file(hardware_path) != row.hardware_model_sha256
+        ):
+            return False
+        try:
+            bound_payload = json.loads(bound_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return False
+        return (
+            isinstance(bound_payload, dict)
+            and bound_payload.get("schema_version") == _AMD_SOL_V3_SCHEMA_VERSION
+            and bound_payload.get("definition") == definition
+            and bound_payload.get("workload_uuid") == workload_uuid
         )
 
 
@@ -80,7 +135,12 @@ def load_official_release_baseline(
         raise ValueError("release baseline verification release does not match bundle")
     if verification.bundle_sha256 != sha256_file(bundle_path):
         raise ValueError("release baseline verification does not match bundle")
-
+    rerun_trace_path = Path(verification.rerun_trace_ref)
+    if (
+        not rerun_trace_path.is_file()
+        or sha256_file(rerun_trace_path) != verification.rerun_trace_sha256
+    ):
+        raise ValueError("release baseline rerun trace does not match verification")
     bundle_rows = {row.key: row for row in bundle.workloads}
     verification_rows = {row.key: row for row in verification.workloads}
     if set(bundle_rows) != set(verification_rows):
@@ -111,6 +171,16 @@ def load_official_release_baseline(
         if entry.latency_ms != row.latency_ms:
             raise ValueError(
                 "scoring baseline latency differs from release bundle for "
+                f"{key[0]}:{key[1]}"
+            )
+        if (
+            row.trace_ref is None
+            or row.trace_sha256 is None
+            or not Path(row.trace_ref).is_file()
+            or sha256_file(Path(row.trace_ref)) != row.trace_sha256
+        ):
+            raise ValueError(
+                "official release baseline trace does not match bundle for "
                 f"{key[0]}:{key[1]}"
             )
         official_keys.add(key)

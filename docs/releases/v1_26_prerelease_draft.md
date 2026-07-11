@@ -13,7 +13,7 @@ release.
 - Artifact bundle JSON: `out/rdna4-v135-rerun-20260611/prerelease-artifact-bundle-full/prerelease_artifact_bundle.json`
 - Artifact bundle Markdown: `out/rdna4-v135-rerun-20260611/prerelease-artifact-bundle-full/prerelease_artifact_bundle.md`
 - SHA-256 checksums: `SHA256SUMS`
-- Readiness JSON: `out/rdna4-v135-rerun-20260611/readiness.json`
+- Readiness JSON: `out/rdna4-v135-rerun-20260611/prerelease_readiness.json`
 - Readiness Markdown: `docs/prerelease_readiness.md`
 
 ## What This Prerelease Contains

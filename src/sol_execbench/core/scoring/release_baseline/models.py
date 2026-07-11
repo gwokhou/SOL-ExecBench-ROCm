@@ -164,6 +164,7 @@ class ReleaseBaselineBundle:
     provenance: ReleaseProvenance
     workloads: tuple[ReleaseBaselineWorkload, ...]
     latency_tolerance_rel: float
+    scope: str = "unspecified"
     schema_version: str = RELEASE_BASELINE_BUNDLE_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -172,6 +173,7 @@ class ReleaseBaselineBundle:
         _require_sha256(self.suite_manifest_sha256, "suite_manifest_sha256")
         _require_non_empty(self.baseline_artifact_ref, "baseline_artifact_ref")
         _require_sha256(self.baseline_artifact_sha256, "baseline_artifact_sha256")
+        _require_non_empty(self.scope, "scope")
         if (
             not math.isfinite(self.latency_tolerance_rel)
             or self.latency_tolerance_rel <= 0.0
@@ -210,6 +212,7 @@ class ReleaseBaselineBundle:
             "baseline_artifact_sha256": self.baseline_artifact_sha256,
             "provenance": self.provenance.to_dict(),
             "latency_tolerance_rel": self.latency_tolerance_rel,
+            "scope": self.scope,
             "summary": self.summary,
             "workloads": [
                 workload.to_dict()
@@ -388,6 +391,7 @@ def release_baseline_bundle_from_dict(
             provenance=provenance,
             workloads=workloads,
             latency_tolerance_rel=float(payload["latency_tolerance_rel"]),
+            scope=str(payload.get("scope", "unspecified")),
             schema_version=str(payload["schema_version"]),
         )
     except KeyError as exc:

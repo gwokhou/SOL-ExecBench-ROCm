@@ -213,8 +213,16 @@ class _AstBoundGraphExtractor:
             op_name = "@"
         else:
             op_family = OpFamily.ELEMENTWISE
-            confidence = EstimateConfidence.INEXACT
-            rationale = "recognized elementwise binary operation"
+            confidence = (
+                EstimateConfidence.SUPPORTED
+                if self._has_exact_elementwise_shapes(input_tensor_ids)
+                else EstimateConfidence.INEXACT
+            )
+            rationale = (
+                "recognized exact-shape elementwise binary operation"
+                if confidence == EstimateConfidence.SUPPORTED
+                else "recognized elementwise binary operation"
+            )
             op_name = node.op.__class__.__name__.lower()
         return self._append_node(
             op_family=op_family,
@@ -225,6 +233,12 @@ class _AstBoundGraphExtractor:
             rationale=rationale,
             attributes={},
         )
+
+    def _has_exact_elementwise_shapes(self, input_tensor_ids: tuple[str, ...]) -> bool:
+        if not input_tensor_ids:
+            return False
+        shapes = [self.tensors[tensor_id].shape for tensor_id in input_tensor_ids]
+        return shapes[0] is not None and all(shape == shapes[0] for shape in shapes)
 
     def _process_call(self, node: ast.Call) -> tuple[str, ...]:
         func_name = _call_name(node.func)

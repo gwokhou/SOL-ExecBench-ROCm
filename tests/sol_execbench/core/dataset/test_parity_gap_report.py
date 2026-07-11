@@ -146,7 +146,7 @@ def _execution_closure() -> dict:
                 "trace_ref": "L1/pass_demo/traces.json",
                 "evidence_refs": {
                     "amd_score": "amd-score.json",
-                    "amd_sol_bound": "amd-sol/pass.amd-sol-v2.json",
+                    "amd_sol_bound": "amd-sol/pass.amd-sol-v3.json",
                 },
                 "evidence_gaps": ["timing_evidence_missing"],
             },
@@ -180,7 +180,7 @@ def _amd_score_report() -> dict:
                 "evidence_refs": {
                     "trace": "L1/pass_demo/traces.json",
                     "timing": "timing/L1/pass_demo.timing.json",
-                    "sol_bound": "amd-sol/pass.amd-sol-v2.json",
+                    "sol_bound": "amd-sol/pass.amd-sol-v3.json",
                 },
                 "derived_evidence_refs": {
                     "formula": "solar/pass.solar-derivation.json#groups.formula_evidence"

@@ -15,7 +15,7 @@ or CDNA 4 validation.
 ## Focused Verification Commands
 
 The v1.9 closure uses CPU-verifiable golden tests for graph extraction,
-operator estimates, v2 bound artifacts, AMD-native score integration, dataset
+operator estimates, v3 bound artifacts, AMD-native score integration, dataset
 sidecar output, and public contract guardrails:
 
 ```bash
@@ -23,7 +23,7 @@ uv run pytest \
   tests/sol_execbench/core/scoring/test_amd_hardware_models.py \
   tests/sol_execbench/core/scoring/test_amd_bound_graph.py \
   tests/sol_execbench/core/scoring/test_amd_bound_estimates.py \
-  tests/sol_execbench/core/scoring/test_amd_sol_v2.py \
+  tests/sol_execbench/core/scoring/test_amd_sol_v3.py \
   tests/sol_execbench/core/scoring/test_amd_native_score.py \
   tests/sol_execbench/core/dataset/test_run_dataset_amd_score.py \
   tests/sol_execbench/core/evidence/test_public_contract_guardrails.py -x
@@ -34,7 +34,7 @@ uv run pytest \
 A small RDNA 4-scoped derived report run should emit:
 
 - canonical trace JSON under the dataset output directory;
-- AMD SOL bound artifact v2 sidecars under `out/amd-sol-bounds`;
+- AMD SOL bound artifact v3 sidecars under `out/amd-sol-bounds`;
 - AMD-native score report JSON at the caller-provided report path.
 
 Example command:
@@ -50,9 +50,10 @@ uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
 Expected derived artifacts:
 
 - `trace_jsonl`: remains the canonical benchmark output and is not modified by
-  the v2 sidecars.
-- `sol_execbench.amd_sol_bound.v2`: contains graph, rich estimate, per-op
-  bound, aggregate, warning, coverage, and hardware model evidence.
+  the v3 sidecars.
+- `sol_execbench.amd_sol_bound.v3`: contains graph, rich estimate, versioned
+  fusion groups, per-group bound, aggregate, warning, coverage, capability
+  budget, and hardware model evidence.
 - `sol_execbench.amd_native_score.v1`: references trace, SOL-bound, baseline,
   and hardware-model evidence and reports scored/unscored counts.
 
@@ -68,4 +69,4 @@ The focused tests cover:
 - tuple outputs;
 - unsupported operations;
 - missing baseline, reference-latency fallback, provisional hardware, failed
-  traces, degraded v2 bounds, and unscored v2 bounds.
+  traces, degraded v3 bounds, and unscored v3 bounds.

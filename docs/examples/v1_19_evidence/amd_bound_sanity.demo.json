@@ -65,9 +65,9 @@
     "amd_sol_artifacts": [
       {
         "checksum": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "path": "out/v1_19_demo/amd-sol/demo.amd-sol-v2.json",
+        "path": "out/v1_19_demo/amd-sol/demo.amd-sol-v3.json",
         "ref": "amd_sol",
-        "schema_version": "sol_execbench.amd_sol_bound.v2"
+        "schema_version": "sol_execbench.amd_sol_bound.v3"
       }
     ],
     "compatibility_matrix": {
@@ -137,7 +137,7 @@
       "evidence_gaps": [],
       "evidence_refs": {
         "amd_score": "out/v1_19_demo/amd_score.json",
-        "amd_sol_bound": "out/v1_19_demo/amd-sol/demo.amd-sol-v2.json",
+        "amd_sol_bound": "out/v1_19_demo/amd-sol/demo.amd-sol-v3.json",
         "solar_derivation": "out/v1_19_demo/solar/demo.solar-derivation.json",
         "trace": "out/v1_19_demo/traces/demo.trace.jsonl"
       },

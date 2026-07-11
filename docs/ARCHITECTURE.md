@@ -123,7 +123,7 @@ comparison.
 | Dataset runner helpers | `src/sol_execbench/core/dataset/runner.py` | Importable helpers used by `scripts/run_dataset.py` for solution wrapping, CLI subprocess invocation, trace parsing, timing evidence collection, and AMD score report generation. |
 | `DatasetShardPlan` and `DatasetShardMergeResult` | `src/sol_execbench/core/dataset/sharding.py` | Define deterministic workload shard assignment, per-shard trace refs, ordered trace merging, duplicate detection, and incomplete-shard reporting. |
 | `ProfilerTimingCoverageReport` | `src/sol_execbench/core/dataset/profiler_timing_coverage/models.py` | Classifies problem-level profiler timing evidence as profiler-backed, partial, profiler-blocked, fallback, ready-missing, reference-OOM-blocked, or readiness-blocked. |
-| `AmdSolBoundV2Artifact` | `src/sol_execbench/core/scoring/amd_sol/v2_models.py` | Stores family-aware AMD SOL bound sidecars with bound graphs, operator estimates, aggregate status, and coverage summaries. |
+| `AmdSolBoundV3Artifact` | `src/sol_execbench/core/scoring/amd_sol/v3_models.py` | Stores fusion-aware AMD SOL bound sidecars with bound graphs, operator estimates, fusion groups, aggregate status, and coverage summaries. |
 | Validation diagnostics | `src/sol_execbench/core/platform/diagnostics.py` | CPU-safe ROCm readiness helpers, profiler routing readiness, CDNA 3 readiness metadata, and MI300X validation claim blockers. |
 
 ## Directory Structure Rationale
@@ -270,7 +270,7 @@ under `workload-manifests/`, per-workload timing sidecars under
 workload evidence is available.
 
 `src/sol_execbench/core/scoring/` contains AMD hardware models, bound graphs,
-operator work estimates, AMD SOL v1/v2 bound artifacts, SOLAR derivation
+operator work estimates, AMD SOL v3 bound artifacts, SOLAR derivation
 helpers, baseline artifacts, and AMD-native score models. These helpers consume
 traces, hardware-model records, optional timing evidence, SOL bound sidecars,
 and baseline artifacts to produce guarded AMD-native-derived reports. Missing,

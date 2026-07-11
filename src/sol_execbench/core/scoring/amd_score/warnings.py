@@ -5,11 +5,8 @@
 
 from __future__ import annotations
 
-from sol_execbench.core.scoring.amd_sol import (
-    AmdSolBoundArtifact,
-    HardwareValidationStatus,
-)
-from sol_execbench.core.scoring.amd_sol.v2 import AmdSolBoundV2Artifact
+from sol_execbench.core.scoring.amd_sol import HardwareValidationStatus
+from sol_execbench.core.scoring.amd_sol.v3 import AmdSolBoundV3Artifact
 from sol_execbench.core.scoring.confidence import EstimateConfidence
 from sol_execbench.core.scoring.solar_derivation import (
     SolarAggregateStatus,
@@ -49,26 +46,15 @@ DEGRADED_SOL_BOUND_WARNING = (
 
 
 def warnings_for_artifact(
-    artifact: AmdSolBoundArtifact | AmdSolBoundV2Artifact,
+    artifact: AmdSolBoundV3Artifact,
 ) -> list[str]:
     """Build warnings implied by an AMD SOL bound artifact."""
-    if isinstance(artifact, AmdSolBoundV2Artifact):
-        warnings = list(artifact.warnings)
-        if artifact.aggregate_bound.status == "degraded":
-            warnings.append(DEGRADED_SOL_BOUND_WARNING)
-        elif artifact.aggregate_bound.status == "unscored":
-            warnings.append(UNSCORED_SOL_BOUND_WARNING)
-        if artifact.hardware_model.architecture.startswith("gfx94"):
-            warnings.append(CDNA3_NO_VALIDATION_WARNING)
-        return unique(warnings)
-
-    warnings: list[str] = []
-    if any(
-        estimate.confidence == EstimateConfidence.UNSUPPORTED
-        for estimate in artifact.work_estimates
-    ):
+    warnings = list(artifact.warnings)
+    for bound in artifact.group_bounds:
+        if bound.confidence != EstimateConfidence.SUPPORTED:
+            warnings.append(f"fusion_group_inexact:{bound.group_id}")
+    if any("unsupported_operator:" in warning for warning in artifact.warnings):
         warnings.append(UNSUPPORTED_EVIDENCE_WARNING)
-
     if (
         artifact.hardware_model.hardware_validation_status
         != HardwareValidationStatus.VALIDATED
@@ -76,11 +62,13 @@ def warnings_for_artifact(
         != HardwareValidationStatus.VALIDATED
     ):
         warnings.append(UNVALIDATED_HARDWARE_WARNING)
-
+    if artifact.aggregate_bound.status == "degraded":
+        warnings.append(DEGRADED_SOL_BOUND_WARNING)
+    elif artifact.aggregate_bound.status == "unscored":
+        warnings.append(UNSCORED_SOL_BOUND_WARNING)
     if artifact.hardware_model.architecture.startswith("gfx94"):
         warnings.append(CDNA3_NO_VALIDATION_WARNING)
-
-    return warnings
+    return unique(warnings)
 
 
 def solar_aggregate_status(

@@ -187,7 +187,6 @@ class ProblemPackager:
 
         cmd = [sys.executable, "build_ext.py"]
         artifact_path = str(self.output_dir / "benchmark_kernel.so")
-
         return cmd, artifact_path
 
     def execute(self) -> list[str]:

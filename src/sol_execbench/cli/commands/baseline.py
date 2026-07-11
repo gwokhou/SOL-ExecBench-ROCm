@@ -23,6 +23,7 @@ from ...core.scoring.release_baseline import (
     AuthorityInput,
     ReleaseProvenance,
     build_release_baseline_bundle,
+    load_evidence_publication_manifest,
     load_release_baseline_bundle,
     sha256_file,
     verify_release_baseline_rerun,
@@ -188,6 +189,11 @@ def _authority_freeze_cli(
 @click.option("--timing-policy", required=True)
 @click.option("--compiler-build-id", required=True)
 @click.option(
+    "--scope",
+    required=True,
+    help="Human-readable authority scope, for example authority-slice:gfx1200:gemm:25-workloads.",
+)
+@click.option(
     "--latency-tolerance-rel",
     required=True,
     type=click.FloatRange(min=0.0, min_open=True),
@@ -205,6 +211,7 @@ def _release_build_cli(
     clock_policy: str,
     timing_policy: str,
     compiler_build_id: str,
+    scope: str,
     latency_tolerance_rel: float,
 ) -> None:
     """Build compact and complete release-baseline evidence from one trace."""
@@ -229,6 +236,7 @@ def _release_build_cli(
             latency_tolerance_rel=latency_tolerance_rel,
             suite_manifest_ref=str(suite_manifest_path),
             suite_manifest_sha256=provenance.suite_manifest_sha256,
+            scope=scope,
         )
         written_bundle = write_release_baseline_outputs(
             baseline=baseline,
@@ -306,6 +314,32 @@ def _release_verify_cli(
         f"[green]Wrote release baseline verification to {output_path}[/green]"
     )
     console.print(f"Release {report.release}: {report.summary}")
+
+
+@_baseline_cli.command("publication-verify")
+@click.option(
+    "--manifest",
+    "manifest_path",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="Git-tracked evidence_publication_manifest.v1 JSON.",
+)
+@click.option(
+    "--artifact-root",
+    required=True,
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    help="Directory containing the downloaded release artifacts.",
+)
+def _publication_verify_cli(manifest_path: Path, artifact_root: Path) -> None:
+    """Verify a downloaded evidence bundle against its Git-tracked manifest."""
+    try:
+        manifest = load_evidence_publication_manifest(manifest_path)
+        manifest.verify_artifact_root(artifact_root)
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+    console.print(
+        f"[green]Verified published evidence for {manifest.release} ({manifest.scope})[/green]"
+    )
 
 
 @_baseline_cli.command(

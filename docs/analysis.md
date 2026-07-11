@@ -321,7 +321,7 @@ references for each workload score, and keeps the output separate from canonical
 trace JSONL. Missing timing, baseline, or bound evidence is reported as an
 unscored guarded state rather than an invented score.
 
-To also materialize the derived AMD SOL bound artifact v2 sidecars used by the
+To also materialize the derived AMD SOL bound artifact v3 sidecars used by the
 score report, provide a sidecar directory:
 
 ```bash
@@ -331,11 +331,12 @@ uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
   --amd-sol-bound-dir out/amd-sol-bounds
 ```
 
-The sidecars use schema version `sol_execbench.amd_sol_bound.v2`. Each sidecar
+The sidecars use schema version `sol_execbench.amd_sol_bound.v3`. Each sidecar
 contains the derived marker, definition name, workload UUID, hardware model
 reference, hardware model payload, bound graph, rich operator work estimates,
-per-operation SOL bounds, aggregate bound state, deterministic warnings, and
-coverage summary. This is the ROCm port's AMD-local analog of the paper's
+versioned fusion groups, per-group SOL bounds, aggregate bound state,
+deterministic warnings, and coverage summary. This is the ROCm port's AMD-local
+analog of the paper's
 graph/evidence/SOL-analyzer artifact boundary; it is not an upstream NVIDIA
 B200 or full SOLAR reproduction claim.
 
@@ -360,7 +361,7 @@ This local workflow produces three artifact layers:
 - canonical trace JSONL files: the benchmark trace JSONL output for each problem.
   The canonical trace JSONL remains unchanged by `--amd-score-report`,
   `--amd-sol-bound-dir`, and `--solar-derivation`.
-- AMD SOL v2 sidecars under `--amd-sol-bound-dir`: derived AMD roofline and
+- AMD SOL v3 sidecars under `--amd-sol-bound-dir`: derived AMD roofline and
   work-estimate inputs used for AMD-native score eligibility.
 - SOLAR derivation sidecars under `--solar-derivation`: paper-aligned automatic
   SOLAR derivation evidence for the ROCm port, generated from `Definition`,
@@ -477,3 +478,15 @@ data-movement or zero-FLOP nodes when recognized. Reductions, normalization,
 softmax-like operations, and activations use conservative estimates unless a
 future analyzer records a more exact formula. These coverage summaries are
 derived methodology artifacts and do not modify canonical trace JSONL.
+
+## Dataset Sharding Contract
+
+`sol_execbench.core.dataset.sharding` shards the original input in stable
+ordinal order. A two-way split uses names such as `shard-0000-of-0002`; each
+shard records one trace file ref per shard. The coordinator rejects duplicate
+workloads or incomplete shards instead of silently merging partial results.
+
+Only CPU/I/O-only report generation may run concurrently. Profiler-backed
+timing phases remain serial so that GPU measurements are not contaminated by
+other workers. Use `--phase derived` for derived sidecars and report-only work;
+it does not rerun benchmark execution.

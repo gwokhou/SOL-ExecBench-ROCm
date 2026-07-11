@@ -44,14 +44,27 @@ from sol_execbench.core.scoring.amd_sol.work import (
     _work_estimate_from_rich_estimate,
     estimate_work,
 )
+from sol_execbench.core.scoring.amd_sol.v3 import (
+    AMD_SOL_V3_SCHEMA_VERSION,
+    AmdSolBoundV3Artifact,
+    AmdSolV3GroupBound,
+    FusionGroup,
+    amd_sol_bound_v3_from_dict,
+    build_amd_sol_bound_v3_artifact,
+    build_fusion_groups,
+)
 
 __all__ = [
     "AMD_SOL_SCHEMA_VERSION",
+    "AMD_SOL_V3_SCHEMA_VERSION",
     "AmdHardwareModel",
     "AmdSolBoundArtifact",
+    "AmdSolBoundV3Artifact",
+    "AmdSolV3GroupBound",
     "AmdSolCoverageSummary",
     "EstimateConfidence",
     "GraphNode",
+    "FusionGroup",
     "HardwareValidationStatus",
     "OpSolBound",
     "OrigamiGemmEstimate",
@@ -69,6 +82,9 @@ __all__ = [
     "_op_type_for_family",
     "_work_estimate_from_rich_estimate",
     "build_amd_sol_bound_artifact",
+    "build_amd_sol_bound_v3_artifact",
+    "build_fusion_groups",
+    "amd_sol_bound_v3_from_dict",
     "default_amd_hardware_models",
     "estimate_work",
     "extract_graph",
