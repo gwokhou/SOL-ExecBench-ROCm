@@ -39,6 +39,52 @@ def _release_inputs(tmp_path: Path) -> tuple[Path, Path]:
     return suite_path, trace_path
 
 
+def test_publication_verify_rejects_incomplete_contract(tmp_path: Path) -> None:
+    solution = tmp_path / "candidate.json"
+    trace = tmp_path / "candidate.trace.jsonl"
+    solution.write_text('{"name":"candidate"}\n', encoding="utf-8")
+    trace.write_text('{"trace":true}\n', encoding="utf-8")
+    manifest_path = tmp_path / "publication.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "sol_execbench.evidence_publication_manifest.v1",
+                "release": "v-test",
+                "scope": "authority-slice:gfx1200:gemm:1-workload",
+                "source_repository": "https://github.com/example/repo",
+                "source_revision": "a" * 40,
+                "container_image_digest": "sha256:" + "b" * 64,
+                "artifact_base_uri": "https://example.invalid/releases/v-test/",
+                "candidate": {
+                    "solution_ref": "candidate.json",
+                    "solution_sha256": cli_baseline.sha256_file(solution),
+                    "trace_relative_path": "candidate.trace.jsonl",
+                    "trace_sha256": cli_baseline.sha256_file(trace),
+                    "timing_relative_path": "candidate.trace.jsonl",
+                    "timing_sha256": cli_baseline.sha256_file(trace),
+                },
+                "artifacts": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "baseline",
+            "publication-verify",
+            "--manifest",
+            str(manifest_path),
+            "--artifact-root",
+            str(tmp_path),
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "artifacts must be non-empty" in result.output
+
+
 def test_release_build_writes_compact_baseline_and_bundle(
     monkeypatch, tmp_path: Path
 ) -> None:
@@ -80,6 +126,8 @@ def test_release_build_writes_compact_baseline_and_bundle(
             "median-100",
             "--compiler-build-id",
             "rocm-7.1",
+            "--scope",
+            "test-authority-slice:gemm:1-workload",
             "--latency-tolerance-rel",
             "0.05",
         ],
@@ -123,6 +171,8 @@ def test_release_build_requires_positive_tolerance(tmp_path: Path) -> None:
             "median-100",
             "--compiler-build-id",
             "rocm-7.1",
+            "--scope",
+            "test-authority-slice:gemm:1-workload",
             "--latency-tolerance-rel",
             "0",
         ],
@@ -260,6 +310,8 @@ def test_release_build_and_verify_share_the_manifest_file_digest(
             "median-100",
             "--compiler-build-id",
             "rocm-7.1",
+            "--scope",
+            "test-authority-slice:gemm:1-workload",
             "--latency-tolerance-rel",
             "0.05",
         ],

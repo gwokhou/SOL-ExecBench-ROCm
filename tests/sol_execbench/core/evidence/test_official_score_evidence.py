@@ -33,12 +33,23 @@ from sol_execbench.core.scoring.official_score import (
     OFFICIAL_SCORE_SOURCE,
     PLACEHOLDER_BASELINE_BLOCKER,
     _PLACEHOLDER_BASELINE_SOURCES,
-    build_official_score_suite_evidence,
-    official_score_from_amd_native_score,
+    build_official_score_suite_evidence as _build_official_score_suite_evidence,
+    official_score_from_amd_native_score as _official_score_from_amd_native_score,
 )
 
 
 AGGREGATION_POLICY = OFFICIAL_AGGREGATION_POLICY
+
+
+def official_score_from_amd_native_score(*args, **kwargs):
+    """Exercise diagnostic mode explicitly; strict authority is tested below."""
+    kwargs.setdefault("require_release_baseline", False)
+    return _official_score_from_amd_native_score(*args, **kwargs)
+
+
+def build_official_score_suite_evidence(*args, **kwargs):
+    kwargs.setdefault("require_release_baseline", False)
+    return _build_official_score_suite_evidence(*args, **kwargs)
 
 
 def _amd_score(
@@ -102,6 +113,15 @@ def test_official_score_accepts_complete_scoring_baseline_input():
         payload["input_refs"]["amd_native_score"] == "amd_native_score.json#workload-1"
     )
     assert payload["derived_input_refs"] == {"profile_summary": "profile_summary.json"}
+
+
+def test_authority_mode_requires_release_and_candidate_evidence():
+    evidence = _official_score_from_amd_native_score(
+        _amd_score(), aggregation_policy=AGGREGATION_POLICY
+    )
+    assert evidence.score is None
+    assert "release_baseline_not_verified" in evidence.blocker_reason_codes
+    assert "candidate_evidence_not_verified" in evidence.blocker_reason_codes
 
 
 def test_legacy_score_without_bound_eligibility_cannot_be_official():

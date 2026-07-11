@@ -349,7 +349,7 @@ uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
 | `-v`, `--verbose` | Disabled | Pass verbose mode through to `sol-execbench`. |
 | `--amd-score-report` | None | Write a derived AMD-native suite score JSON report. |
 | `--scoring-baseline` | None | Use a release-defined scoring baseline artifact for AMD score reports. |
-| `--amd-sol-bound-dir` | None | Write derived AMD SOL bound v2 sidecars when score reporting is enabled. |
+| `--amd-sol-bound-dir` | None | Write derived AMD SOL bound v3 sidecars when score reporting is enabled. |
 | `--solar-derivation` | None | Write SOLAR derivation sidecars from definitions and workloads. |
 | `--timing-evidence-dir` | None | Write per-problem ROCm timing evidence JSON. |
 | `--timing-tool-version` | `rocprofv3` | Tool version string recorded in timing evidence. |

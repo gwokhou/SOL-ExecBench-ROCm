@@ -339,7 +339,7 @@ def _audit_bound_artifact(
     blocker_counts_by_operator: dict[str, dict[str, int]],
     blocker_counts_by_op_family: dict[str, dict[str, int]],
 ) -> None:
-    """Collect deterministic, machine-readable authority blockers from a v2 bound."""
+    """Collect deterministic, machine-readable authority blockers from a v3 bound."""
     aggregate_status = path_str_or_none(
         path_dict(artifact, "aggregate_bound"), "status"
     )
@@ -375,11 +375,35 @@ def _audit_bound_artifact(
         _increment_nested_count(blocker_counts_by_operator, operator, blocker)
         _increment_nested_count(blocker_counts_by_op_family, family, blocker)
 
-    estimates = path_mapping_list(artifact, "operator_work_estimates")
-    if len(estimates) > 1:
-        # v2 is deliberately an operator-sum format. Until a fusion-group IR
-        # proves external traffic and reuse, a multi-op sum is diagnostic only.
-        workload["blocker_codes"].add("fusion_semantics_inexact")
+    if artifact.get("schema_version") == "sol_execbench.amd_sol_bound.v3":
+        _audit_fusion_groups(artifact, workload)
+    else:
+        workload["blocker_codes"].add("unsupported_amd_sol_schema")
+
+
+def _audit_fusion_groups(artifact: dict[str, Any], workload: dict[str, Any]) -> None:
+    """Audit v3 fusion evidence without a blanket multi-op rule."""
+    groups = path_mapping_list(artifact, "fusion_groups")
+    bounds = {
+        path_str_or_none(bound, "group_id"): bound
+        for bound in path_mapping_list(artifact, "group_bounds")
+    }
+    if not groups:
+        workload["blocker_codes"].add("fusion_group_evidence_missing")
+        return
+    for group in groups:
+        group_id = path_str_or_none(group, "group_id")
+        bound = bounds.get(group_id)
+        if bound is None:
+            workload["blocker_codes"].add("fusion_group_bound_missing")
+            continue
+        confidence = path_str_or_none(bound, "confidence") or "unsupported"
+        if confidence != "supported":
+            workload["blocker_codes"].add("fusion_group_inexact")
+        for warning in path_str_list(group, "warnings"):
+            workload["blocker_codes"].add(f"fusion_group_warning:{warning}")
+        for warning in path_str_list(bound, "warnings"):
+            workload["blocker_codes"].add(f"fusion_group_bound_warning:{warning}")
 
 
 def _apply_score_prerequisite_blockers(

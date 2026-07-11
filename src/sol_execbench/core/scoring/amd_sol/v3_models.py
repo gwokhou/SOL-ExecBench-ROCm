@@ -1,53 +1,26 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""Data models for AMD SOL v2 bound artifacts."""
+"""Data models for fusion-aware AMD SOL v3 sidecars."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
 
+from sol_execbench.core.platform.arch_capabilities import ArchIsaBudget
 from sol_execbench.core.scoring.amd_hardware_models import AmdHardwareModel
+from sol_execbench.core.scoring.amd_sol.fusion import FusionGroup
 from sol_execbench.core.scoring.confidence import EstimateConfidence
 
-AMD_SOL_V2_SCHEMA_VERSION = "sol_execbench.amd_sol_bound.v2"
+
+AMD_SOL_V3_SCHEMA_VERSION = "sol_execbench.amd_sol_bound.v3"
 AGGREGATE_STATUSES = frozenset({"scored", "degraded", "unscored"})
 
 
 @dataclass(frozen=True)
-class AmdSolV2OpBound:
-    """Per-operation AMD SOL bound derived from rich operator evidence."""
-
-    node_id: str
-    op_family: str
-    op_name: str
-    compute_bound_ms: float
-    memory_bound_ms: float
-    sol_bound_ms: float
-    limiting_resource: str
-    confidence: EstimateConfidence
-    rationale: str
-    estimate_warnings: tuple[str, ...] = ()
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "node_id": self.node_id,
-            "op_family": self.op_family,
-            "op_name": self.op_name,
-            "compute_bound_ms": self.compute_bound_ms,
-            "memory_bound_ms": self.memory_bound_ms,
-            "sol_bound_ms": self.sol_bound_ms,
-            "limiting_resource": self.limiting_resource,
-            "confidence": self.confidence.value,
-            "rationale": self.rationale,
-            "estimate_warnings": list(self.estimate_warnings),
-        }
-
-
-@dataclass(frozen=True)
-class AmdSolV2AggregateBound:
-    """Aggregate bound and score eligibility state for a v2 artifact."""
+class AmdSolAggregateBound:
+    """Aggregate bound and score-eligibility state for a v3 sidecar."""
 
     status: str
     scored: bool
@@ -66,8 +39,8 @@ class AmdSolV2AggregateBound:
 
 
 @dataclass(frozen=True)
-class AmdSolV2CoverageSummary:
-    """Family-aware coverage summary for v2 AMD SOL bounds."""
+class AmdSolCoverageSummary:
+    """Family-aware coverage summary for a v3 sidecar."""
 
     total_ops: int
     supported_ops: int
@@ -93,20 +66,57 @@ class AmdSolV2CoverageSummary:
 
 
 @dataclass(frozen=True)
-class AmdSolBoundV2Artifact:
-    """Stable AMD SOL bound artifact v2 sidecar."""
+class AmdSolV3GroupBound:
+    """Roofline bound for a fusion group or a singleton node."""
+
+    group_id: str
+    pattern_id: str
+    node_ids: tuple[str, ...]
+    compute_bound_ms: float
+    memory_bound_ms: float
+    sol_bound_ms: float
+    limiting_resource: str
+    confidence: EstimateConfidence
+    rationale: str
+    warnings: tuple[str, ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "group_id": self.group_id,
+            "pattern_id": self.pattern_id,
+            "node_ids": list(self.node_ids),
+            "compute_bound_ms": self.compute_bound_ms,
+            "memory_bound_ms": self.memory_bound_ms,
+            "sol_bound_ms": self.sol_bound_ms,
+            "limiting_resource": self.limiting_resource,
+            "confidence": self.confidence.value,
+            "rationale": self.rationale,
+            "warnings": list(self.warnings),
+        }
+
+
+@dataclass(frozen=True)
+class AmdSolBoundV3Artifact:
+    """Stable fusion-aware AMD SOL artifact.
+
+    v3 intentionally retains the rich v2 node estimates so coverage reports can
+    explain why a group is blocked without reverse engineering group totals.
+    """
 
     definition: str
     workload_uuid: str
     hardware_model_ref: str | None
     hardware_model: AmdHardwareModel
+    capability_budget_ref: str | None
+    capability_budget: ArchIsaBudget | None
     bound_graph: dict[str, object]
     operator_work_estimates: tuple[dict[str, object], ...]
-    op_bounds: tuple[AmdSolV2OpBound, ...]
-    aggregate_bound: AmdSolV2AggregateBound
+    fusion_groups: tuple[FusionGroup, ...]
+    group_bounds: tuple[AmdSolV3GroupBound, ...]
+    aggregate_bound: AmdSolAggregateBound
     warnings: tuple[str, ...]
-    coverage_summary: AmdSolV2CoverageSummary
-    schema_version: str = AMD_SOL_V2_SCHEMA_VERSION
+    coverage_summary: AmdSolCoverageSummary
+    schema_version: str = AMD_SOL_V3_SCHEMA_VERSION
     derived: bool = True
 
     def to_dict(self) -> dict[str, Any]:
@@ -117,11 +127,18 @@ class AmdSolBoundV2Artifact:
             "workload_uuid": self.workload_uuid,
             "hardware_model_ref": self.hardware_model_ref,
             "hardware_model": self.hardware_model.to_dict(),
+            "capability_budget_ref": self.capability_budget_ref,
+            "capability_budget": (
+                self.capability_budget.model_dump(mode="json")
+                if self.capability_budget is not None
+                else None
+            ),
             "bound_graph": dict(self.bound_graph),
             "operator_work_estimates": [
                 dict(estimate) for estimate in self.operator_work_estimates
             ],
-            "op_bounds": [bound.to_dict() for bound in self.op_bounds],
+            "fusion_groups": [group.to_dict() for group in self.fusion_groups],
+            "group_bounds": [bound.to_dict() for bound in self.group_bounds],
             "aggregate_bound": self.aggregate_bound.to_dict(),
             "warnings": list(self.warnings),
             "coverage_summary": self.coverage_summary.to_dict(),

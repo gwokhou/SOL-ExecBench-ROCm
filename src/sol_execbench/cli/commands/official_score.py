@@ -22,10 +22,11 @@ from ...core.evidence.baseline_coverage import (
 )
 from ...core.scoring.amd_score import amd_native_suite_report_from_dict
 from ...core.scoring.official_score import (
+    CandidateScoreEvidence,
     OFFICIAL_AGGREGATION_POLICY,
     build_official_score_suite_evidence,
 )
-from ...core.scoring.release_baseline import load_official_release_baseline
+from ...core.scoring.release_baseline import load_official_release_baseline, sha256_file
 
 
 @click.command(
@@ -35,7 +36,7 @@ from ...core.scoring.release_baseline import load_official_release_baseline
 @click.option(
     "--amd-native-score",
     "amd_native_score_path",
-    required=True,
+    required=False,
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     help="AMD-native score report JSON (sol_execbench.amd_native_score.v1).",
 )
@@ -48,14 +49,14 @@ from ...core.scoring.release_baseline import load_official_release_baseline
 @click.option(
     "--scoring-baseline",
     "scoring_baseline_path",
-    required=True,
+    required=False,
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     help="Release scoring_baseline.v1 JSON.",
 )
 @click.option(
     "--release-baseline-bundle",
     "release_bundle_path",
-    required=True,
+    required=False,
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     help="release_baseline_bundle.v1 matching --scoring-baseline.",
 )
@@ -73,6 +74,30 @@ from ...core.scoring.release_baseline import load_official_release_baseline
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     help="Canonical JSON suite denominator (list or {workloads: [...]}) .",
 )
+@click.option(
+    "--candidate-solution",
+    "candidate_solution_path",
+    required=False,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="Exact candidate solution file used for the measured score.",
+)
+@click.option(
+    "--candidate-trace",
+    "candidate_trace_path",
+    required=False,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="Canonical candidate trace JSONL cited by every scored workload.",
+)
+@click.option(
+    "--candidate-timing-evidence",
+    "candidate_timing_path",
+    required=False,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="Timing evidence file cited by every scored workload.",
+)
+@click.option("--candidate-environment-fingerprint")
+@click.option("--candidate-clock-policy")
+@click.option("--candidate-timing-policy")
 @click.option(
     "--aggregation-policy",
     "aggregation_policy",
@@ -118,6 +143,12 @@ def _official_score_cli(
     release_bundle_path: Path,
     release_verification_path: Path,
     suite_manifest_path: Path,
+    candidate_solution_path: Path | None,
+    candidate_trace_path: Path | None,
+    candidate_timing_path: Path | None,
+    candidate_environment_fingerprint: str | None,
+    candidate_clock_policy: str | None,
+    candidate_timing_policy: str | None,
     aggregation_policy: str,
     env_hardware: str | None,
     env_rocm: str | None,
@@ -136,6 +167,35 @@ def _official_score_cli(
             bundle_path=release_bundle_path,
             verification_path=release_verification_path,
         )
+        candidate_evidence = None
+        if all(
+            value is not None
+            for value in (
+                candidate_solution_path,
+                candidate_trace_path,
+                candidate_timing_path,
+                candidate_environment_fingerprint,
+                candidate_clock_policy,
+                candidate_timing_policy,
+            )
+        ):
+            assert candidate_solution_path is not None
+            assert candidate_trace_path is not None
+            assert candidate_timing_path is not None
+            assert candidate_environment_fingerprint is not None
+            assert candidate_clock_policy is not None
+            assert candidate_timing_policy is not None
+            candidate_evidence = CandidateScoreEvidence(
+                solution_ref=str(candidate_solution_path),
+                solution_sha256=sha256_file(candidate_solution_path),
+                trace_ref=str(candidate_trace_path),
+                trace_sha256=sha256_file(candidate_trace_path),
+                timing_ref=str(candidate_timing_path),
+                timing_sha256=sha256_file(candidate_timing_path),
+                environment_fingerprint=candidate_environment_fingerprint,
+                clock_policy=candidate_clock_policy,
+                timing_policy=candidate_timing_policy,
+            )
         expected_workloads = _suite_workloads(suite_manifest_path)
         coverage_report = None
         if measured_registry_path is not None:
@@ -154,6 +214,7 @@ def _official_score_cli(
             aggregation_policy=aggregation_policy,
             coverage_report=coverage_report,
             release_baseline=release_baseline,
+            candidate_evidence=candidate_evidence,
             expected_workloads=expected_workloads,
         )
     except (OSError, ValueError, json.JSONDecodeError) as exc:

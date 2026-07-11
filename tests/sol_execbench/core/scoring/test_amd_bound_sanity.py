@@ -180,7 +180,7 @@ def amd_sol_artifact(
     model_validation_status: str = "validated",
 ) -> dict:
     return {
-        "schema_version": "sol_execbench.amd_sol_bound.v2",
+        "schema_version": "sol_execbench.amd_sol_bound.v3",
         "definition": definition,
         "workload_uuid": workload_uuid,
         "hardware_model": {

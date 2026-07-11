@@ -24,6 +24,7 @@ from sol_execbench.core.scoring.official_score import (
     MISSING_SCORE_BLOCKER,
     OFFICIAL_AGGREGATION_POLICY,
     PLACEHOLDER_BASELINE_BLOCKER,
+    RELEASE_BOUND_NOT_VERIFIED_BLOCKER,
 )
 from sol_execbench.core.scoring.baseline_artifact import (
     ScoringBaselineArtifact,
@@ -79,6 +80,39 @@ def _score(
 
 
 def _write_report(tmp_path: Path, scores: list[AmdNativeScore]) -> Path:
+    trace_path = tmp_path / "candidate-trace.jsonl"
+    timing_path = tmp_path / "candidate-timing.json"
+    trace_path.write_text(
+        "".join(
+            json.dumps(
+                {
+                    "definition": score.definition,
+                    "workload": {"uuid": score.workload_uuid},
+                    "evaluation": {
+                        "status": "PASSED",
+                        "performance": {"latency_ms": score.measured_latency_ms},
+                    },
+                }
+            )
+            + "\n"
+            for score in scores
+        ),
+        encoding="utf-8",
+    )
+    timing_path.write_text('{"policy":"latency_ms"}\n', encoding="utf-8")
+    scores = [
+        AmdNativeScore(
+            **{
+                **score.__dict__,
+                "evidence_refs": {
+                    **score.evidence_refs,
+                    "trace": f"{trace_path}#{score.workload_uuid}",
+                    "timing": f"{timing_path}#{score.workload_uuid}",
+                },
+            }
+        )
+        for score in scores
+    ]
     report = AmdNativeSuiteReport(scores=tuple(scores))
     payload = report.to_dict()
     path = tmp_path / "amd-native-score.json"
@@ -144,6 +178,9 @@ def _write_release_inputs(
         source="release_baseline_bundle",
     )
     baseline_path.write_text(json.dumps(baseline.to_dict()), encoding="utf-8")
+    hardware_model_path = tmp_path / "model.json"
+    hardware_model_path.write_text("{}\n", encoding="utf-8")
+    candidate_trace_path = tmp_path / "candidate-trace.jsonl"
     workloads = tuple(
         ReleaseBaselineWorkload(
             score["definition"],
@@ -151,15 +188,25 @@ def _write_release_inputs(
             "official",
             2.0,
             (),
-            trace_ref="baseline.jsonl",
-            trace_sha256="a" * 64,
-            bound_ref="bound.json",
-            bound_sha256="b" * 64,
-            hardware_model_ref="model.json",
-            hardware_model_sha256="c" * 64,
+            trace_ref=str(candidate_trace_path),
+            trace_sha256=sha256_file(candidate_trace_path),
+            bound_ref=str(tmp_path / f"bound-{score['workload_uuid']}.json"),
+            bound_sha256=sha256_file(
+                _write_v3_bound(
+                    tmp_path,
+                    score["definition"],
+                    score["workload_uuid"],
+                )
+            ),
+            hardware_model_ref=str(hardware_model_path),
+            hardware_model_sha256=sha256_file(hardware_model_path),
         )
         for score in scores
     )
+    for score, workload in zip(scores, workloads, strict=True):
+        score["evidence_refs"]["sol_bound"] = workload.bound_ref
+        score["evidence_refs"]["hardware_model"] = workload.hardware_model_ref
+    report_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     bundle_path = tmp_path / "release-bundle.json"
     bundle = ReleaseBaselineBundle(
         release="v2.14",
@@ -167,9 +214,16 @@ def _write_release_inputs(
         suite_manifest_sha256="d" * 64,
         baseline_artifact_ref=str(baseline_path),
         baseline_artifact_sha256=sha256_file(baseline_path),
-        provenance=ReleaseProvenance(solution="hipblaslt", solution_sha256="e" * 64),
+        provenance=ReleaseProvenance(
+            solution="hipblaslt",
+            solution_sha256="e" * 64,
+            environment_fingerprint="environment-a",
+            clock_policy="locked",
+            timing_policy="latency_ms",
+        ),
         workloads=workloads,
         latency_tolerance_rel=0.05,
+        scope="test-authority-slice:matmul-demo",
     )
     write_release_baseline_bundle(bundle, bundle_path)
     verification_path = tmp_path / "release-verification.json"
@@ -177,8 +231,8 @@ def _write_release_inputs(
         release="v2.14",
         bundle_ref=str(bundle_path),
         bundle_sha256=sha256_file(bundle_path),
-        rerun_trace_ref="rerun.jsonl",
-        rerun_trace_sha256="f" * 64,
+        rerun_trace_ref=str(candidate_trace_path),
+        rerun_trace_sha256=sha256_file(candidate_trace_path),
         workloads=tuple(
             ReleaseBaselineVerificationWorkload(
                 score["definition"],
@@ -213,6 +267,21 @@ def _write_release_inputs(
     return baseline_path, bundle_path, verification_path, manifest_path
 
 
+def _write_v3_bound(tmp_path: Path, definition: str, workload_uuid: str) -> Path:
+    path = tmp_path / f"bound-{workload_uuid}.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": "sol_execbench.amd_sol_bound.v3",
+                "definition": definition,
+                "workload_uuid": workload_uuid,
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
 def _invoke(
     tmp_path: Path,
     *,
@@ -240,6 +309,24 @@ def _invoke(
         str(manifest_path),
     ]
     args.extend(["--aggregation-policy", OFFICIAL_AGGREGATION_POLICY])
+    candidate_solution_path = tmp_path / "candidate-solution.json"
+    candidate_solution_path.write_text('{"solution":"candidate"}\n', encoding="utf-8")
+    args.extend(
+        [
+            "--candidate-solution",
+            str(candidate_solution_path),
+            "--candidate-trace",
+            str(tmp_path / "candidate-trace.jsonl"),
+            "--candidate-timing-evidence",
+            str(tmp_path / "candidate-timing.json"),
+            "--candidate-environment-fingerprint",
+            "environment-a",
+            "--candidate-clock-policy",
+            "locked",
+            "--candidate-timing-policy",
+            "latency_ms",
+        ]
+    )
     if env_hardware is not None:
         args.extend(["--current-run-env-hardware", env_hardware])
     if env_timing_policy is not None:
@@ -349,6 +436,49 @@ def test_placeholder_baseline_contributes_zero_to_suite_score(tmp_path: Path) ->
     assert payload["blocked_count"] == 1
     assert payload["zero_scored_count"] == 1
     assert payload["unscored_count"] == 1
+
+
+def test_v2_bound_reference_is_blocked_even_when_the_score_report_claims_authority(
+    tmp_path: Path,
+) -> None:
+    report_path = _write_report(tmp_path, [_score()])
+    registry_path = _write_registry(tmp_path)
+    baseline_path, bundle_path, verification_path, manifest_path = (
+        _write_release_inputs(tmp_path, report_path)
+    )
+    bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
+    bound_path = Path(bundle["workloads"][0]["bound_ref"])
+    bound = json.loads(bound_path.read_text(encoding="utf-8"))
+    bound["schema_version"] = "sol_execbench.amd_sol_bound.v2"
+    bound_path.write_text(json.dumps(bound), encoding="utf-8")
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "official-score",
+            "--amd-native-score",
+            str(report_path),
+            "--measured-registry",
+            str(registry_path),
+            "--scoring-baseline",
+            str(baseline_path),
+            "--release-baseline-bundle",
+            str(bundle_path),
+            "--release-baseline-verification",
+            str(verification_path),
+            "--suite-manifest",
+            str(manifest_path),
+            "--aggregation-policy",
+            OFFICIAL_AGGREGATION_POLICY,
+            "--output",
+            str(tmp_path / "official-score.json"),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads((tmp_path / "official-score.json").read_text(encoding="utf-8"))
+    assert payload["score_authority"] is False
+    assert RELEASE_BOUND_NOT_VERIFIED_BLOCKER in payload["blocker_summary"]
 
 
 def test_legacy_aggregation_policy_refuses_and_help_lists_only_policy(

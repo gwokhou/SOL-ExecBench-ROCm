@@ -1,0 +1,70 @@
+{
+  "schema_version": "sol_execbench.evidence_publication_manifest.v1",
+  "release": "gfx1200-gemm-example-v1",
+  "scope": "authority-slice:gfx1200:004_gemm_n128_k2048:25-workloads",
+  "source_repository": "https://github.com/example/sol-execbench-rocm",
+  "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "container_image_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "artifact_base_uri": "https://github.com/example/sol-execbench-rocm/releases/download/gfx1200-gemm-example-v1/",
+  "candidate": {
+    "solution_ref": "candidate/solution.json",
+    "solution_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "trace_relative_path": "candidate/trace.jsonl",
+    "trace_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "timing_relative_path": "candidate/timing.json",
+    "timing_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  },
+  "artifacts": [
+    {
+      "role": "candidate_solution",
+      "relative_path": "candidate/solution.json",
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "role": "candidate_trace",
+      "relative_path": "candidate/trace.jsonl",
+      "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    {
+      "role": "candidate_timing",
+      "relative_path": "candidate/timing.json",
+      "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    {
+      "role": "scoring_baseline",
+      "relative_path": "baseline/scoring-baseline.json",
+      "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+      "role": "release_baseline_bundle",
+      "relative_path": "baseline/release-bundle.json",
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "role": "release_baseline_verification",
+      "relative_path": "baseline/release-verification.json",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    {
+      "role": "suite_manifest",
+      "relative_path": "suite/manifest.json",
+      "sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+    },
+    {
+      "role": "official_score_evidence",
+      "relative_path": "score/official-score.json",
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+    },
+    {
+      "role": "amd_sol_bound:004_gemm_n128_k2048",
+      "relative_path": "bounds/004_gemm_n128_k2048.json",
+      "sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+    },
+    {
+      "role": "hardware_model:gfx1200",
+      "relative_path": "hardware/gfx1200.json",
+      "sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+    }
+  ],
+  "manifest_sha256": null
+}

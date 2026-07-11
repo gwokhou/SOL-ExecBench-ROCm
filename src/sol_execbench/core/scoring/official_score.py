@@ -19,10 +19,12 @@ optional non-confirmed ``coverage_report``
 from __future__ import annotations
 
 import math
+import json
 import statistics
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
+from pathlib import Path
 
 from sol_execbench.core.reports.reporting import CANONICAL_BENCHMARK_OUTPUT
 from sol_execbench.core.scoring.amd_score import (
@@ -62,14 +64,51 @@ MODEL_NOT_VALIDATED_BLOCKER = "model_not_validated"
 BOUND_EVIDENCE_WARNING_BLOCKER = "bound_evidence_warning"
 MISSING_EVIDENCE_REFERENCE_BLOCKER = "missing_evidence_reference"
 RELEASE_BASELINE_NOT_VERIFIED_BLOCKER = "release_baseline_not_verified"
+RELEASE_BOUND_NOT_VERIFIED_BLOCKER = "release_bound_not_verified"
+RELEASE_SCOPE_NOT_DECLARED_BLOCKER = "release_scope_not_declared"
 BASELINE_NOT_SLOWER_THAN_SOL_BOUND_BLOCKER = "baseline_not_slower_than_sol_bound"
 CANDIDATE_BELOW_SOL_BOUND_BLOCKER = "candidate_below_sol_bound"
+CANDIDATE_EVIDENCE_NOT_VERIFIED_BLOCKER = "candidate_evidence_not_verified"
 
 _PLACEHOLDER_BASELINE_SOURCES = {
     "reference_latency",
     "trace_reference_latency",
     "trace.evaluation.performance.reference_latency_ms",
 }
+
+
+@dataclass(frozen=True)
+class CandidateScoreEvidence:
+    """Content-addressed candidate inputs for an official score suite.
+
+    The score gate must be able to re-read the candidate trace and prove that
+    the latency used in a score belongs to that exact candidate run.  Plain
+    string references are useful diagnostics, but are not sufficient evidence
+    for an authority claim.
+    """
+
+    solution_ref: str
+    solution_sha256: str
+    trace_ref: str
+    trace_sha256: str
+    timing_ref: str
+    timing_sha256: str
+    environment_fingerprint: str
+    clock_policy: str
+    timing_policy: str
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "solution_ref": self.solution_ref,
+            "solution_sha256": self.solution_sha256,
+            "trace_ref": self.trace_ref,
+            "trace_sha256": self.trace_sha256,
+            "timing_ref": self.timing_ref,
+            "timing_sha256": self.timing_sha256,
+            "environment_fingerprint": self.environment_fingerprint,
+            "clock_policy": self.clock_policy,
+            "timing_policy": self.timing_policy,
+        }
 
 
 @dataclass(frozen=True)
@@ -90,6 +129,7 @@ class OfficialScoreEvidence:
     blocker_reason_codes: tuple[str, ...]
     input_refs: dict[str, str] = field(default_factory=dict)
     derived_input_refs: dict[str, str] = field(default_factory=dict)
+    candidate_evidence: CandidateScoreEvidence | None = None
     source_score_schema: str = AMD_SCORE_SCHEMA_VERSION
     source_score_claim_level: str | None = None
 
@@ -121,6 +161,11 @@ class OfficialScoreEvidence:
             "blocker_reason_codes": list(self.blocker_reason_codes),
             "input_refs": dict(self.input_refs),
             "derived_input_refs": dict(self.derived_input_refs),
+            "candidate_evidence": (
+                self.candidate_evidence.to_dict()
+                if self.candidate_evidence is not None
+                else None
+            ),
             "source_score_schema": self.source_score_schema,
             "source_score_claim_level": self.source_score_claim_level,
         }
@@ -136,6 +181,8 @@ class OfficialScoreSuiteEvidence:
     score_source: str = OFFICIAL_SCORE_SOURCE
     score_kind: str = OFFICIAL_SCORE_KIND
     canonical_output: str = CANONICAL_BENCHMARK_OUTPUT
+    scope: str = "unspecified"
+    candidate_evidence: CandidateScoreEvidence | None = None
 
     @property
     def mean_score(self) -> float | None:
@@ -203,6 +250,7 @@ class OfficialScoreSuiteEvidence:
             "score_source": self.score_source,
             "score_kind": self.score_kind,
             "canonical_output": self.canonical_output,
+            "scope": self.scope,
             "aggregation_policy": self.aggregation_policy,
             "score": self.mean_score,
             "mean_score": self.mean_score,
@@ -214,6 +262,11 @@ class OfficialScoreSuiteEvidence:
             "unscored_count": self.unscored_count,
             "blocker_summary": self.blocker_summary,
             "input_summary": self.input_summary,
+            "candidate_evidence": (
+                self.candidate_evidence.to_dict()
+                if self.candidate_evidence is not None
+                else None
+            ),
             "scores": [score.to_dict() for score in self.scores],
         }
 
@@ -226,7 +279,8 @@ def official_score_from_amd_native_score(
     official_baseline_sources: Sequence[str] = DEFAULT_OFFICIAL_BASELINE_SOURCES,
     coverage_report: BaselineCoverageReport | None = None,
     release_baseline: OfficialReleaseBaseline | None = None,
-    require_release_baseline: bool = False,
+    candidate_evidence: CandidateScoreEvidence | None = None,
+    require_release_baseline: bool = True,
 ) -> OfficialScoreEvidence:
     """Gate a derived AMD-native score into official score evidence."""
     normalized_policy = validate_official_aggregation_policy(aggregation_policy)
@@ -236,6 +290,7 @@ def official_score_from_amd_native_score(
         official_baseline_sources=official_baseline_sources,
         coverage_report=coverage_report,
         release_baseline=release_baseline,
+        candidate_evidence=candidate_evidence,
         require_release_baseline=require_release_baseline,
     )
     official_score = score.score if not blockers else None
@@ -263,6 +318,7 @@ def official_score_from_amd_native_score(
         blocker_reason_codes=tuple(blockers),
         input_refs=input_refs,
         derived_input_refs=dict(score.derived_evidence_refs),
+        candidate_evidence=candidate_evidence,
         source_score_claim_level=score.claim_level,
     )
 
@@ -275,8 +331,9 @@ def build_official_score_suite_evidence(
     official_baseline_sources: Sequence[str] = DEFAULT_OFFICIAL_BASELINE_SOURCES,
     coverage_report: BaselineCoverageReport | None = None,
     release_baseline: OfficialReleaseBaseline | None = None,
+    candidate_evidence: CandidateScoreEvidence | None = None,
     expected_workloads: Iterable[tuple[str, str]] | None = None,
-    require_release_baseline: bool = False,
+    require_release_baseline: bool = True,
 ) -> OfficialScoreSuiteEvidence:
     """Build suite-level official score evidence from AMD-native score inputs."""
     source_score_refs_by_workload_uuid = source_score_refs_by_workload_uuid or {}
@@ -306,6 +363,7 @@ def build_official_score_suite_evidence(
             official_baseline_sources=official_baseline_sources,
             coverage_report=coverage_report,
             release_baseline=release_baseline,
+            candidate_evidence=candidate_evidence,
             require_release_baseline=require_release_baseline,
         )
         if key in score_by_key
@@ -315,6 +373,10 @@ def build_official_score_suite_evidence(
     return OfficialScoreSuiteEvidence(
         scores=official_scores,
         aggregation_policy=validate_official_aggregation_policy(aggregation_policy),
+        scope=release_baseline.bundle.scope
+        if release_baseline is not None
+        else "unspecified",
+        candidate_evidence=candidate_evidence,
     )
 
 
@@ -325,7 +387,8 @@ def _official_score_blockers(
     official_baseline_sources: Sequence[str],
     coverage_report: BaselineCoverageReport | None = None,
     release_baseline: OfficialReleaseBaseline | None = None,
-    require_release_baseline: bool = False,
+    candidate_evidence: CandidateScoreEvidence | None = None,
+    require_release_baseline: bool = True,
 ) -> list[str]:
     blockers: list[str] = []
     if aggregation_policy is None:
@@ -363,6 +426,11 @@ def _official_score_blockers(
     ):
         blockers.append(MISSING_EVIDENCE_REFERENCE_BLOCKER)
 
+    if require_release_baseline and not _candidate_evidence_matches(
+        candidate_evidence, score, release_baseline
+    ):
+        blockers.append(CANDIDATE_EVIDENCE_NOT_VERIFIED_BLOCKER)
+
     baseline_source = score.baseline_source
     if baseline_source in _PLACEHOLDER_BASELINE_SOURCES:
         blockers.append(PLACEHOLDER_BASELINE_BLOCKER)
@@ -376,6 +444,16 @@ def _official_score_blockers(
         blockers.append(RELEASE_BASELINE_NOT_VERIFIED_BLOCKER)
     elif release_baseline is None and require_release_baseline:
         blockers.append(RELEASE_BASELINE_NOT_VERIFIED_BLOCKER)
+
+    if release_baseline is not None and not release_baseline.verifies_bound_reference(
+        score.definition,
+        score.workload_uuid,
+        score.evidence_refs.get("sol_bound"),
+        score.evidence_refs.get("hardware_model"),
+    ):
+        blockers.append(RELEASE_BOUND_NOT_VERIFIED_BLOCKER)
+    if release_baseline is not None and release_baseline.bundle.scope == "unspecified":
+        blockers.append(RELEASE_SCOPE_NOT_DECLARED_BLOCKER)
 
     baseline_latency = score.baseline_latency_ms
     measured_latency = score.measured_latency_ms
@@ -415,6 +493,108 @@ def _is_positive_finite(value: float | None) -> bool:
     False, letting degenerate latencies through to the score and the mean.
     """
     return value is not None and math.isfinite(value) and value > 0.0
+
+
+def _candidate_evidence_matches(
+    candidate: CandidateScoreEvidence | None,
+    score: AmdNativeScore,
+    release_baseline: OfficialReleaseBaseline | None,
+) -> bool:
+    """Verify a score's candidate inputs, trace row, and run provenance.
+
+    This intentionally verifies files at the authority boundary.  A sidecar
+    reference may still be useful after a file is archived elsewhere, but it
+    cannot establish an official result without a content-addressed candidate
+    solution and trace that can be re-read here.
+    """
+    if candidate is None or release_baseline is None:
+        return False
+    if not _verified_file(candidate.solution_ref, candidate.solution_sha256):
+        return False
+    if not _verified_file(candidate.trace_ref, candidate.trace_sha256):
+        return False
+    if not _verified_file(candidate.timing_ref, candidate.timing_sha256):
+        return False
+    if not _reference_targets(score.evidence_refs.get("trace"), candidate.trace_ref):
+        return False
+    if not _reference_targets(score.evidence_refs.get("timing"), candidate.timing_ref):
+        return False
+
+    provenance = release_baseline.bundle.provenance
+    if (
+        candidate.environment_fingerprint != provenance.environment_fingerprint
+        or candidate.clock_policy != provenance.clock_policy
+        or candidate.timing_policy != provenance.timing_policy
+    ):
+        return False
+
+    return _trace_contains_measurement(candidate.trace_ref, score)
+
+
+def _verified_file(ref: str, expected_sha256: str) -> bool:
+    """Return whether ``ref`` is a local file matching its SHA-256 digest."""
+    from sol_execbench.core.scoring.release_baseline.models import sha256_file
+
+    if len(expected_sha256) != 64 or any(
+        character not in "0123456789abcdef" for character in expected_sha256
+    ):
+        return False
+    path = Path(ref)
+    return path.is_file() and sha256_file(path) == expected_sha256
+
+
+def _reference_targets(reference: str | None, artifact_ref: str) -> bool:
+    """Allow an evidence reference to identify one row within an artifact."""
+    return isinstance(reference, str) and reference.split("#", 1)[0] == artifact_ref
+
+
+def _trace_contains_measurement(trace_ref: str, score: AmdNativeScore) -> bool:
+    """Check that the measured latency is in the cited candidate trace row."""
+    if not _is_positive_finite(score.measured_latency_ms):
+        return False
+    try:
+        lines = Path(trace_ref).read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return False
+    matches = 0
+    for line in lines:
+        if not line.strip():
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            return False
+        if not isinstance(record, dict):
+            return False
+        workload = record.get("workload")
+        if (
+            record.get("definition") != score.definition
+            or not isinstance(workload, dict)
+            or workload.get("uuid") != score.workload_uuid
+        ):
+            continue
+        evaluation = record.get("evaluation")
+        performance = (
+            evaluation.get("performance") if isinstance(evaluation, dict) else None
+        )
+        latency = (
+            performance.get("latency_ms") if isinstance(performance, dict) else None
+        )
+        if (
+            evaluation.get("status") != "PASSED"
+            if isinstance(evaluation, dict)
+            else True
+        ):
+            return False
+        if (
+            isinstance(latency, bool)
+            or not isinstance(latency, (int, float))
+            or not math.isfinite(latency)
+            or float(latency) != score.measured_latency_ms
+        ):
+            return False
+        matches += 1
+    return matches == 1
 
 
 def _authority_disqualifying_warning(warning: str) -> bool:

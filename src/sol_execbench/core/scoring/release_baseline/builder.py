@@ -60,6 +60,7 @@ def build_release_baseline_bundle(
     latency_tolerance_rel: float,
     suite_manifest_ref: str | None = None,
     suite_manifest_sha256: str | None = None,
+    scope: str = "unspecified",
 ) -> tuple[ScoringBaselineArtifact, ReleaseBaselineBundle]:
     """Build complete-suite release evidence; never drop an expected workload."""
 
@@ -143,6 +144,7 @@ def build_release_baseline_bundle(
         provenance=provenance,
         workloads=tuple(workloads),
         latency_tolerance_rel=latency_tolerance_rel,
+        scope=scope,
     )
     return baseline, bundle
 
@@ -170,6 +172,7 @@ def write_release_baseline_outputs(
         provenance=bundle.provenance,
         workloads=bundle.workloads,
         latency_tolerance_rel=bundle.latency_tolerance_rel,
+        scope=bundle.scope,
     )
     _atomic_write_bundle(written_bundle, bundle_path)
     return written_bundle

@@ -107,6 +107,7 @@ def _official_bundle(tmp_path: Path, *, latency: float = 10.0) -> ReleaseBaselin
             ),
         ),
         latency_tolerance_rel=0.05,
+        scope="test-authority-slice:gemm:1-workload",
     )
 
 
@@ -651,6 +652,10 @@ def test_official_release_baseline_requires_matching_official_rerun(tmp_path):
         source="release_baseline_bundle",
     )
     baseline_path.write_text(json.dumps(baseline.to_dict()), encoding="utf-8")
+    baseline_trace_path = tmp_path / "baseline.jsonl"
+    rerun_trace_path = tmp_path / "rerun.jsonl"
+    baseline_trace_path.write_text("{}\n", encoding="utf-8")
+    rerun_trace_path.write_text("{}\n", encoding="utf-8")
     bundle = ReleaseBaselineBundle(
         release="v2.14",
         suite_manifest_ref="suite.json",
@@ -665,8 +670,8 @@ def test_official_release_baseline_requires_matching_official_rerun(tmp_path):
                 "official",
                 10.0,
                 (),
-                trace_ref="baseline.jsonl",
-                trace_sha256="c" * 64,
+                trace_ref=str(baseline_trace_path),
+                trace_sha256=sha256_file(baseline_trace_path),
                 bound_ref="bound.json",
                 bound_sha256="d" * 64,
                 hardware_model_ref="model.json",
@@ -674,6 +679,7 @@ def test_official_release_baseline_requires_matching_official_rerun(tmp_path):
             ),
         ),
         latency_tolerance_rel=0.05,
+        scope="test-authority-slice:gemm:1-workload",
     )
     bundle_path = tmp_path / "bundle.json"
     write_release_baseline_bundle(bundle, bundle_path)
@@ -681,8 +687,8 @@ def test_official_release_baseline_requires_matching_official_rerun(tmp_path):
         release="v2.14",
         bundle_ref=str(bundle_path),
         bundle_sha256=sha256_file(bundle_path),
-        rerun_trace_ref="rerun.jsonl",
-        rerun_trace_sha256="f" * 64,
+        rerun_trace_ref=str(rerun_trace_path),
+        rerun_trace_sha256=sha256_file(rerun_trace_path),
         workloads=(
             ReleaseBaselineVerificationWorkload(
                 "gemm", "w1", "official", "official", 10.0, 10.0, 0.0, True, ()
@@ -724,14 +730,16 @@ def test_official_release_baseline_rejects_verification_bundle_drift(tmp_path):
     )
     bundle_path = tmp_path / "bundle.json"
     write_release_baseline_bundle(bundle, bundle_path)
+    rerun_trace_path = tmp_path / "rerun.jsonl"
+    rerun_trace_path.write_text("{}\n", encoding="utf-8")
     verification_path = tmp_path / "verification.json"
     write_release_baseline_verification(
         ReleaseBaselineVerification(
             release=bundle.release,
             bundle_ref=str(bundle_path),
             bundle_sha256="0" * 64,
-            rerun_trace_ref="rerun.jsonl",
-            rerun_trace_sha256="f" * 64,
+            rerun_trace_ref=str(rerun_trace_path),
+            rerun_trace_sha256=sha256_file(rerun_trace_path),
             workloads=(
                 ReleaseBaselineVerificationWorkload(
                     "gemm", "w1", "official", "official", 10.0, 10.0, 0.0, True, ()

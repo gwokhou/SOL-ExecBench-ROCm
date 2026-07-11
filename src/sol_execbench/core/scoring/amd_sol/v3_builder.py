@@ -1,0 +1,264 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
+# SPDX-License-Identifier: Apache-2.0
+
+"""Builder for fusion-aware AMD SOL v3 artifacts."""
+
+from __future__ import annotations
+
+from dataclasses import replace
+
+from sol_execbench.core.data.definition import Definition
+from sol_execbench.core.data.workload import Workload
+from sol_execbench.core.platform.arch_capabilities import (
+    ArchIsaBudget,
+    derive_arch_capability_budget,
+)
+from sol_execbench.core.scoring.amd_bound_estimate.estimates import estimate_bound_work
+from sol_execbench.core.scoring.amd_bound_estimate.models import OperatorWorkEstimate
+from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
+from sol_execbench.core.scoring.amd_hardware_models import (
+    AmdHardwareModel,
+    HardwareValidationStatus,
+)
+from sol_execbench.core.scoring.amd_sol.fusion import FusionGroup, build_fusion_groups
+from sol_execbench.core.scoring.amd_sol.v3_models import (
+    AmdSolAggregateBound,
+    AmdSolBoundV3Artifact,
+    AmdSolV3GroupBound,
+)
+from sol_execbench.core.scoring.amd_sol.v3_math import (
+    bound_for_estimate,
+    coverage_for_estimates,
+    worse_confidence,
+)
+from sol_execbench.core.scoring.confidence import EstimateConfidence
+
+
+def build_amd_sol_bound_v3_artifact(
+    definition: Definition,
+    workload: Workload,
+    hardware_model: AmdHardwareModel,
+    *,
+    hardware_model_ref: str | None = None,
+    capability_budget_ref: str | None = None,
+    capability_budget: ArchIsaBudget | None = None,
+) -> AmdSolBoundV3Artifact:
+    """Build a fusion-aware sidecar using explicit architecture capability evidence."""
+    budget = capability_budget or derive_arch_capability_budget(
+        hardware_model.architecture
+    )
+    if budget is not None and budget.architecture != hardware_model.architecture:
+        raise ValueError(
+            "capability budget architecture must match the hardware model architecture"
+        )
+    if capability_budget_ref is None and budget is not None:
+        capability_budget_ref = (
+            f"packaged:arch_capability_budgets/{budget.architecture}.json"
+        )
+    graph = build_bound_graph(definition, workload)
+    estimates = _resolve_architecture_matrix_paths(
+        estimate_bound_work(graph), hardware_model
+    )
+    groups = build_fusion_groups(graph, estimates, capability_budget=budget)
+    group_bounds = tuple(
+        _bound_for_group(group, estimates, hardware_model) for group in groups
+    )
+    aggregate = _aggregate_for_groups(group_bounds, hardware_model)
+    warnings = _warnings_for_artifact(
+        graph.warnings, estimates, groups, group_bounds, aggregate, hardware_model
+    )
+    return AmdSolBoundV3Artifact(
+        definition=definition.name,
+        workload_uuid=workload.uuid,
+        hardware_model_ref=hardware_model_ref,
+        hardware_model=hardware_model,
+        capability_budget_ref=capability_budget_ref,
+        capability_budget=budget,
+        bound_graph=graph.to_dict(),
+        operator_work_estimates=tuple(estimate.to_dict() for estimate in estimates),
+        fusion_groups=groups,
+        group_bounds=group_bounds,
+        aggregate_bound=aggregate,
+        warnings=warnings,
+        coverage_summary=coverage_for_estimates(estimates),
+    )
+
+
+def _bound_for_group(
+    group: FusionGroup,
+    estimates: tuple[OperatorWorkEstimate, ...],
+    hardware_model: AmdHardwareModel,
+) -> AmdSolV3GroupBound:
+    estimates_by_node = {estimate.node_id: estimate for estimate in estimates}
+    members = tuple(estimates_by_node[node_id] for node_id in group.node_ids)
+    member_bounds = tuple(
+        bound_for_estimate(member, hardware_model) for member in members
+    )
+    compute_bound_ms = sum(bound[0] for bound in member_bounds)
+    warnings = list(group.warnings)
+    confidence = group.confidence
+
+    if len(members) == 1:
+        memory_bound_ms = member_bounds[0][1]
+        confidence = worse_confidence(confidence, member_bounds[0][2])
+        warnings.extend(member_bounds[0][3])
+    else:
+        memory_bound_ms, memory_confidence, memory_warnings = _group_memory_bound(
+            group, members, hardware_model
+        )
+        confidence = worse_confidence(confidence, memory_confidence)
+        warnings.extend(memory_warnings)
+        for _compute, _memory, member_confidence, member_warnings in member_bounds:
+            confidence = worse_confidence(confidence, member_confidence)
+            warnings.extend(member_warnings)
+
+    limiting_resource = "compute" if compute_bound_ms >= memory_bound_ms else "memory"
+    return AmdSolV3GroupBound(
+        group_id=group.group_id,
+        pattern_id=group.pattern_id,
+        node_ids=group.node_ids,
+        compute_bound_ms=compute_bound_ms,
+        memory_bound_ms=memory_bound_ms,
+        sol_bound_ms=max(compute_bound_ms, memory_bound_ms),
+        limiting_resource=limiting_resource,
+        confidence=confidence,
+        rationale=(
+            "fusion-group roofline bound using proved external traffic"
+            if len(members) > 1
+            else members[0].rationale
+        ),
+        warnings=tuple(sorted(set(warnings))),
+    )
+
+
+def _group_memory_bound(
+    group: FusionGroup,
+    members: tuple[OperatorWorkEstimate, ...],
+    hardware_model: AmdHardwareModel,
+) -> tuple[float, EstimateConfidence, tuple[str, ...]]:
+    profiles = []
+    for member in members:
+        if member.total_bytes <= 0.0:
+            continue
+        profile = hardware_model.resolve_memory(
+            member.memory_access or "",
+            member.input_dtype or "",
+            member.output_dtype or "",
+            member.memory_path or "",
+        )
+        if profile is None or profile.state != "measured" or profile.value is None:
+            return 0.0, EstimateConfidence.INEXACT, ("unknown_hardware_profile",)
+        profiles.append(profile)
+    if not profiles:
+        return 0.0, EstimateConfidence.SUPPORTED, ()
+    profile_keys = {profile.key for profile in profiles}
+    if len(profile_keys) != 1:
+        return 0.0, EstimateConfidence.INEXACT, ("fusion_mixed_memory_profiles",)
+    profile = profiles[0]
+    assert profile.value is not None
+    return (
+        group.external_bytes / (profile.value * 1_000_000_000_000.0) * 1000.0,
+        profile.confidence,
+        (),
+    )
+
+
+def _aggregate_for_groups(
+    bounds: tuple[AmdSolV3GroupBound, ...], hardware_model: AmdHardwareModel
+) -> AmdSolAggregateBound:
+    sol_bound_ms = sum(bound.sol_bound_ms for bound in bounds)
+    node_ids = tuple(node_id for bound in bounds for node_id in bound.node_ids)
+    if not bounds:
+        return AmdSolAggregateBound(
+            status="unscored",
+            scored=False,
+            sol_bound_ms=sol_bound_ms,
+            reason="missing fusion-group bound evidence",
+            node_ids=node_ids,
+        )
+    if any(bound.confidence == EstimateConfidence.UNSUPPORTED for bound in bounds):
+        return AmdSolAggregateBound(
+            status="unscored",
+            scored=False,
+            sol_bound_ms=sol_bound_ms,
+            reason="unsupported fusion-group evidence present",
+            node_ids=node_ids,
+        )
+    if (
+        any(bound.confidence == EstimateConfidence.INEXACT for bound in bounds)
+        or hardware_model.hardware_validation_status
+        != HardwareValidationStatus.VALIDATED
+        or hardware_model.model_validation_status != HardwareValidationStatus.VALIDATED
+        or hardware_model.confidence != EstimateConfidence.SUPPORTED
+    ):
+        return AmdSolAggregateBound(
+            status="degraded",
+            scored=True,
+            sol_bound_ms=sol_bound_ms,
+            reason="inexact fusion-group or provisional hardware evidence present",
+            node_ids=node_ids,
+        )
+    return AmdSolAggregateBound(
+        status="scored",
+        scored=True,
+        sol_bound_ms=sol_bound_ms,
+        reason="all fusion-group and hardware evidence is supported",
+        node_ids=node_ids,
+    )
+
+
+def _warnings_for_artifact(
+    graph_warnings: tuple[str, ...],
+    estimates: tuple[OperatorWorkEstimate, ...],
+    groups: tuple[FusionGroup, ...],
+    bounds: tuple[AmdSolV3GroupBound, ...],
+    aggregate: AmdSolAggregateBound,
+    hardware_model: AmdHardwareModel,
+) -> tuple[str, ...]:
+    warnings = [f"graph_warning:{warning}" for warning in graph_warnings]
+    for estimate in estimates:
+        warnings.extend(
+            f"estimate_warning:{estimate.node_id}:{warning}"
+            for warning in estimate.warnings
+        )
+        if estimate.confidence != EstimateConfidence.SUPPORTED:
+            warnings.append(
+                f"{estimate.confidence.value}_operator:"
+                f"{estimate.node_id}:{estimate.op_family.value}"
+            )
+    for group, bound in zip(groups, bounds, strict=True):
+        warnings.extend(
+            f"fusion_warning:{group.group_id}:{warning}" for warning in group.warnings
+        )
+        warnings.extend(
+            f"fusion_bound_warning:{bound.group_id}:{warning}"
+            for warning in bound.warnings
+        )
+    if hardware_model.hardware_validation_status != HardwareValidationStatus.VALIDATED:
+        warnings.append(
+            "hardware_validation:"
+            f"{hardware_model.architecture}:"
+            f"{hardware_model.hardware_validation_status.value}"
+        )
+    if hardware_model.model_validation_status != HardwareValidationStatus.VALIDATED:
+        warnings.append(
+            "model_validation:"
+            f"{hardware_model.architecture}:"
+            f"{hardware_model.model_validation_status.value}"
+        )
+    if aggregate.status != "scored":
+        warnings.append(f"aggregate_{aggregate.status}:{aggregate.reason}")
+    return tuple(dict.fromkeys(warnings))
+
+
+def _resolve_architecture_matrix_paths(
+    estimates: tuple[OperatorWorkEstimate, ...], hardware_model: AmdHardwareModel
+) -> tuple[OperatorWorkEstimate, ...]:
+    if not hardware_model.architecture.lower().startswith("gfx12"):
+        return estimates
+    return tuple(
+        replace(estimate, compute_path="wmma")
+        if estimate.compute_operation == "matrix" and estimate.compute_path == "mfma"
+        else estimate
+        for estimate in estimates
+    )

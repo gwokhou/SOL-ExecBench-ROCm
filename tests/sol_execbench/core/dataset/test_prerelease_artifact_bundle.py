@@ -253,6 +253,8 @@ def test_cli_package_readiness_preserves_on_disk_release_baseline_links(
             "median",
             "--compiler-build-id",
             "rocm",
+            "--scope",
+            "test-authority-slice:gemm:1-workload",
             "--latency-tolerance-rel",
             "0.05",
         ],

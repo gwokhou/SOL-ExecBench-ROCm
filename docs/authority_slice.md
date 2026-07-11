@@ -24,9 +24,9 @@ The v1 policy selects only warning-free workloads whose AMD SOL and SOLAR
 aggregates are both `scored`, profiler timing is cited, and exact validated
 hardware-profile evidence is present. Missing baseline evidence is audited but
 does not block freezing because the release baseline is measured after the
-selection. Multi-operator v2 bounds remain excluded with
-`fusion_semantics_inexact` until a fusion-group IR proves external traffic and
-intermediate reuse.
+selection. A v3 bound may include a multi-operator workload only when its
+fusion-group IR proves external traffic and intermediate reuse, and every group
+is `supported`; a recorded but inexact group remains excluded.
 
 This artifact does not establish full 235-problem authority, NVIDIA leaderboard
 equivalence, upstream SOLAR parity, or paper parity. A selected workload becomes

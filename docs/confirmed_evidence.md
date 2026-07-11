@@ -88,6 +88,10 @@ for confirmed official score claims. A baseline sourced from
 score. Confirmed baseline authority requires a `scoring_baseline` entry whose
 digest matches `release_baseline_bundle.v1` and whose workload is `official` in
 both the bundle and its independent `release_baseline_verification.v1`.
+The cited bound and hardware-model files must match the bundle's per-workload
+SHA-256 values, and the bound schema must be `sol_execbench.amd_sol_bound.v3`.
+Every release bundle also declares a non-empty `scope`; consumers must preserve
+that scope rather than describing an authority slice as a full suite.
 `measured_baseline_registry` remains useful for coverage diagnostics, but it
 cannot supply `T_b`.
 

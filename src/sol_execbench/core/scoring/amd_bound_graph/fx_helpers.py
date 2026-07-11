@@ -72,12 +72,26 @@ def _classify_fx_node(node: Any) -> tuple[str, _CallClassification, str | None]:
         operator.gt,
         operator.ge,
     }:
+        supported = node.target in {
+            operator.add,
+            operator.sub,
+            operator.mul,
+            operator.truediv,
+        }
         return (
             func_name,
             _CallClassification(
                 OpFamily.ELEMENTWISE.value,
-                EstimateConfidence.INEXACT,
-                "recognized traced elementwise operation",
+                (
+                    EstimateConfidence.SUPPORTED
+                    if supported
+                    else EstimateConfidence.INEXACT
+                ),
+                (
+                    "recognized traced exact elementwise operation"
+                    if supported
+                    else "recognized traced elementwise operation"
+                ),
             ),
             None,
         )

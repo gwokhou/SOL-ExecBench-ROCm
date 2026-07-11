@@ -8,8 +8,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from sol_execbench.core.data.trace import EvaluationStatus, Trace
-from sol_execbench.core.scoring.amd_sol import AmdSolBoundArtifact
-from sol_execbench.core.scoring.amd_sol.v2 import AmdSolBoundV2Artifact
+from sol_execbench.core.scoring.amd_sol.v3 import AmdSolBoundV3Artifact
 from sol_execbench.core.scoring.amd_score.models import (
     AMD_SCORE_CLAIM_LEVEL,
     AmdNativeScore,
@@ -41,7 +40,7 @@ def build_amd_native_suite_report(
 
 def score_amd_native_trace_workload(
     trace: Trace,
-    artifact: AmdSolBoundArtifact | AmdSolBoundV2Artifact | None,
+    artifact: AmdSolBoundV3Artifact | None,
     *,
     trace_ref: str | None = None,
     timing_evidence_ref: str | None = None,
@@ -119,7 +118,7 @@ def score_amd_native_trace_workload(
 
 def build_amd_native_suite_report_from_traces(
     traces: Iterable[Trace],
-    artifacts_by_workload_uuid: dict[str, AmdSolBoundArtifact | AmdSolBoundV2Artifact],
+    artifacts_by_workload_uuid: dict[str, AmdSolBoundV3Artifact],
     *,
     evidence_refs_by_workload_uuid: dict[str, dict[str, str]] | None = None,
     derived_evidence_refs_by_workload_uuid: dict[str, dict[str, str]] | None = None,

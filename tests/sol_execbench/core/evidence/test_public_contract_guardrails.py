@@ -29,10 +29,9 @@ from sol_execbench.core.scoring.amd_score import (
 )
 from sol_execbench.core.scoring.amd_sol import (
     EstimateConfidence,
-    build_amd_sol_bound_artifact,
     default_amd_hardware_models,
 )
-from sol_execbench.core.scoring.amd_sol.v2 import build_amd_sol_bound_v2_artifact
+from sol_execbench.core.scoring.amd_sol.v3 import build_amd_sol_bound_v3_artifact
 from sol_execbench.core.scoring.amd_hardware_models import HardwareValidationStatus
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.scoring import solar_derivation as solar_derivation_module
@@ -493,17 +492,15 @@ def test_amd_sol_artifacts_may_keep_existing_bound_fields_while_solar_fields_sta
         uuid="matmul-workload",
     )
     hardware = default_amd_hardware_models()["gfx1200"]
-    v1_payload = build_amd_sol_bound_artifact(definition, workload, hardware).to_dict()
-    v2_payload = build_amd_sol_bound_v2_artifact(
+    v3_payload = build_amd_sol_bound_v3_artifact(
         definition,
         workload,
         hardware,
         hardware_model_ref="default_amd_hardware_models.gfx1200",
     ).to_dict()
 
-    assert "compute_bound_ms" in repr(v1_payload)
-    assert "compute_bound_ms" in repr(v2_payload)
-    for payload in (v1_payload, v2_payload):
+    assert "compute_bound_ms" in repr(v3_payload)
+    for payload in (v3_payload,):
         assert "solar_derivation" not in payload
         payload_keys = _json_object_keys(payload)
         for field in PHASE51_SOLAR_ONLY_ARTIFACT_FIELDS:
@@ -1150,7 +1147,7 @@ def test_public_score_evidence_refs_keep_exact_established_key_space():
         inputs={"a": {"type": "random"}, "b": {"type": "random"}},
         uuid="matmul-workload",
     )
-    artifact = build_amd_sol_bound_artifact(
+    artifact = build_amd_sol_bound_v3_artifact(
         definition,
         workload,
         default_amd_hardware_models()["gfx1200"],
@@ -1270,7 +1267,7 @@ def test_degraded_complex_family_score_eligibility_ignores_solar_sidecars():
     hardware = default_amd_hardware_models()["gfx1200"]
 
     for definition, workload, formula_kind in cases:
-        artifact = build_amd_sol_bound_v2_artifact(definition, workload, hardware)
+        artifact = build_amd_sol_bound_v3_artifact(definition, workload, hardware)
         score = score_amd_native_workload(
             artifact,
             measured_latency_ms=1.0,
@@ -1316,39 +1313,27 @@ def test_importing_solar_derivation_keeps_amd_native_score_eligibility_unchanged
         uuid="matmul-workload",
     )
     hardware = default_amd_hardware_models()["gfx1200"]
-    v1_artifact = build_amd_sol_bound_artifact(definition, workload, hardware)
-    v2_artifact = build_amd_sol_bound_v2_artifact(
+    v3_artifact = build_amd_sol_bound_v3_artifact(
         definition,
         workload,
         hardware,
         hardware_model_ref="default_amd_hardware_models.gfx1200",
     )
 
-    v1_score = score_amd_native_workload(
-        v1_artifact,
-        measured_latency_ms=1.0,
-        baseline_latency_ms=2.0,
-        hardware_model_ref="default_amd_hardware_models.gfx1200",
-    )
-    v2_score = score_amd_native_workload(
-        v2_artifact,
+    v3_score = score_amd_native_workload(
+        v3_artifact,
         measured_latency_ms=1.0,
         baseline_latency_ms=2.0,
         hardware_model_ref="default_amd_hardware_models.gfx1200",
     )
 
-    assert v1_score.supported is True
-    assert v2_score.supported is True
-    assert v1_score.to_dict()["claim_level"] == "amd-native-derived"
-    assert v2_score.to_dict()["claim_level"] == "amd-native-derived"
+    assert v3_score.supported is True
+    assert v3_score.to_dict()["claim_level"] == "amd-native-derived"
     for field in PHASE51_SCORE_INTERNAL_EVIDENCE_REFS:
-        assert field not in v1_score.to_dict()["evidence_refs"]
-        assert field not in v2_score.to_dict()["evidence_refs"]
-    v1_artifact_keys = _json_object_keys(v1_artifact.to_dict())
-    v2_artifact_keys = _json_object_keys(v2_artifact.to_dict())
+        assert field not in v3_score.to_dict()["evidence_refs"]
+    v3_artifact_keys = _json_object_keys(v3_artifact.to_dict())
     for field in PHASE51_SOLAR_ONLY_ARTIFACT_FIELDS:
-        assert field not in v1_artifact_keys
-        assert field not in v2_artifact_keys
+        assert field not in v3_artifact_keys
 
 
 def test_solar_score_guard_does_not_expose_internal_evidence_refs_or_claims():
@@ -1371,7 +1356,7 @@ def test_solar_score_guard_does_not_expose_internal_evidence_refs_or_claims():
         inputs={"a": {"type": "random"}, "b": {"type": "random"}},
         uuid="matmul-workload",
     )
-    artifact = build_amd_sol_bound_artifact(
+    artifact = build_amd_sol_bound_v3_artifact(
         definition,
         workload,
         default_amd_hardware_models()["gfx1200"],
@@ -1487,7 +1472,7 @@ def test_hardware_model_evidence_survives_bound_and_score_artifacts():
         uuid="matmul-workload",
     )
     hardware = default_amd_hardware_models()["gfx1200"]
-    artifact = build_amd_sol_bound_artifact(definition, workload, hardware)
+    artifact = build_amd_sol_bound_v3_artifact(definition, workload, hardware)
     score = score_amd_native_workload(
         artifact,
         measured_latency_ms=1.0,

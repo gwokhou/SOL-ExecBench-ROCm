@@ -205,7 +205,7 @@ def test_dataset_helper_builds_derived_amd_score_report(tmp_path):
     )
     assert report["scores"][0]["evidence_refs"]["hardware_model"].endswith("gfx1200")
     assert report["scores"][0]["evidence_refs"]["sol_bound"].endswith(
-        ":amd_sol_bound_v2"
+        ":amd_sol_bound_v3"
     )
     assert report["scores"][0]["baseline_source"] == "reference_latency"
     assert report["evidence_summary"]["sol_bound"] == 1
@@ -369,7 +369,7 @@ def test_dataset_helper_keeps_path_shaped_sidecars_under_requested_dirs(tmp_path
 
     sidecar_stem = run_dataset._safe_sidecar_stem(definition["name"], workload_uuid)
     solar_path = solar_dir / f"{sidecar_stem}.solar-derivation.json"
-    sol_bound_path = sol_bound_dir / f"{sidecar_stem}.amd-sol-v2.json"
+    sol_bound_path = sol_bound_dir / f"{sidecar_stem}.amd-sol-v3.json"
     score_payload = scores[0].to_dict()
 
     assert solar_path.exists()
@@ -378,7 +378,7 @@ def test_dataset_helper_keeps_path_shaped_sidecars_under_requested_dirs(tmp_path
     assert sol_bound_path.resolve().is_relative_to(sol_bound_dir.resolve())
     assert list(outside_parent.rglob("*.json")) == []
     assert list(solar_dir.glob("*.solar-derivation.json")) == [solar_path]
-    assert list(sol_bound_dir.glob("*.amd-sol-v2.json")) == [sol_bound_path]
+    assert list(sol_bound_dir.glob("*.amd-sol-v3.json")) == [sol_bound_path]
     assert score_payload["derived_evidence_refs"]["formula"].startswith(
         f"{solar_path}#"
     )
@@ -462,7 +462,7 @@ def test_dataset_helper_uses_scoring_baseline_artifact(tmp_path):
     )
 
 
-def test_dataset_helper_can_emit_v2_sol_bound_sidecars(tmp_path):
+def test_dataset_helper_can_emit_v3_sol_bound_sidecars(tmp_path):
     definition = {
         "name": "matmul_demo",
         "axes": {
@@ -519,9 +519,9 @@ def test_dataset_helper_can_emit_v2_sol_bound_sidecars(tmp_path):
         sol_bound_artifact_dir=sidecar_dir,
     )
 
-    sidecar_path = sidecar_dir / "matmul_demo.matmul-workload.amd-sol-v2.json"
+    sidecar_path = sidecar_dir / "matmul_demo.matmul-workload.amd-sol-v3.json"
     sidecar = json.loads(sidecar_path.read_text())
-    assert sidecar["schema_version"] == "sol_execbench.amd_sol_bound.v2"
+    assert sidecar["schema_version"] == "sol_execbench.amd_sol_bound.v3"
     assert sidecar["operator_work_estimates"][0]["formula_kind"] == "gemm_flops"
     assert scores[0].evidence_refs["sol_bound"] == str(sidecar_path)
 
@@ -550,7 +550,7 @@ def test_dataset_helper_reuses_existing_derived_sidecars(tmp_path, monkeypatch):
 
     monkeypatch.setattr(
         amd_score_derived_artifacts,
-        "build_amd_sol_bound_v2_artifact",
+        "build_amd_sol_bound_v3_artifact",
         fail_sol_bound,
     )
     monkeypatch.setattr(
@@ -569,7 +569,7 @@ def test_dataset_helper_reuses_existing_derived_sidecars(tmp_path, monkeypatch):
     )
 
     assert reused_scores[0].score == first_scores[0].score
-    assert reused_scores[0].evidence_refs["sol_bound"].endswith(".amd-sol-v2.json")
+    assert reused_scores[0].evidence_refs["sol_bound"].endswith(".amd-sol-v3.json")
     assert (
         reused_scores[0]
         .derived_evidence_refs["formula"]
@@ -592,7 +592,7 @@ def test_dataset_helper_can_skip_excluded_missing_derived_sidecars(
 
     monkeypatch.setattr(
         amd_score_derived_artifacts,
-        "build_amd_sol_bound_v2_artifact",
+        "build_amd_sol_bound_v3_artifact",
         fail_sol_bound,
     )
     monkeypatch.setattr(

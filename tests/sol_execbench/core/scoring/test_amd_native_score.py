@@ -29,11 +29,8 @@ from sol_execbench.core.scoring.baseline_artifact import (
     BASELINE_ARTIFACT_SCHEMA_VERSION,
     scoring_baseline_artifact_from_dict,
 )
-from sol_execbench.core.scoring.amd_sol import (
-    build_amd_sol_bound_artifact,
-    default_amd_hardware_models,
-)
-from sol_execbench.core.scoring.amd_sol.v2 import build_amd_sol_bound_v2_artifact
+from sol_execbench.core.scoring.amd_sol import default_amd_hardware_models
+from sol_execbench.core.scoring.amd_sol.v3 import build_amd_sol_bound_v3_artifact
 from sol_execbench.core.scoring.amd_hardware_models import load_amd_hardware_model
 from sol_execbench_type_helpers import make_definition, make_trace, make_workload
 from sol_execbench.core.scoring.solar_derivation import (
@@ -72,7 +69,7 @@ def _matmul_artifact():
         inputs={"a": {"type": "random"}, "b": {"type": "random"}},
         uuid="matmul-workload",
     )
-    return build_amd_sol_bound_artifact(
+    return build_amd_sol_bound_v3_artifact(
         definition, workload, default_amd_hardware_models()["gfx1200"]
     )
 
@@ -97,7 +94,7 @@ def _matmul_artifact_v2():
         inputs={"a": {"type": "random"}, "b": {"type": "random"}},
         uuid="matmul-workload",
     )
-    return build_amd_sol_bound_v2_artifact(
+    return build_amd_sol_bound_v3_artifact(
         definition,
         workload,
         default_amd_hardware_models()["gfx1200"],
@@ -129,9 +126,9 @@ def test_score_serializes_bound_eligibility_evidence() -> None:
         "hardware_validation_status": "validated",
         "model_validation_status": "provisional",
         "warnings": [
-            "unknown_hardware_profile",
+            "fusion_bound_warning:fusion_0000:unknown_hardware_profile",
             "model_validation:gfx1200:provisional",
-            "aggregate_degraded:inexact or provisional evidence present",
+            "aggregate_degraded:inexact fusion-group or provisional hardware evidence present",
         ],
     }
 
@@ -172,7 +169,7 @@ def _unsupported_cdna3_artifact(tmp_path: Path):
         inputs={"x": {"type": "random"}},
         uuid="unsupported-workload",
     )
-    return build_amd_sol_bound_artifact(definition, workload, _cdna3_model(tmp_path))
+    return build_amd_sol_bound_v3_artifact(definition, workload, _cdna3_model(tmp_path))
 
 
 def _unsupported_artifact_v2():
@@ -188,7 +185,7 @@ def _unsupported_artifact_v2():
         inputs={"x": {"type": "random"}},
         uuid="unsupported-workload",
     )
-    return build_amd_sol_bound_v2_artifact(
+    return build_amd_sol_bound_v3_artifact(
         definition,
         workload,
         default_amd_hardware_models()["gfx1200"],
@@ -280,7 +277,7 @@ def test_amd_native_workload_score_uses_existing_sol_score_formula():
     assert report.score == sol_score(
         t_k=1.5,
         t_b=2.0,
-        t_sol=artifact.aggregate_sol_bound_ms,
+        t_sol=artifact.aggregate_bound.sol_bound_ms,
     )
     assert report.claim_level == AMD_SCORE_CLAIM_LEVEL
     assert report.evidence_refs == {
@@ -332,7 +329,7 @@ def test_solar_degraded_aggregate_preserves_numeric_workload_score():
     assert report.score == sol_score(
         t_k=1.5,
         t_b=2.0,
-        t_sol=artifact.aggregate_sol_bound_ms,
+        t_sol=artifact.aggregate_bound.sol_bound_ms,
     )
     assert report.supported is True
     assert DEGRADED_SOL_BOUND_WARNING in report.warnings
@@ -357,7 +354,7 @@ def test_derived_solar_degraded_sidecar_preserves_numeric_workload_score():
     assert report.score == sol_score(
         t_k=1.5,
         t_b=2.0,
-        t_sol=artifact.aggregate_sol_bound_ms,
+        t_sol=artifact.aggregate_bound.sol_bound_ms,
     )
     assert report.supported is True
     assert DEGRADED_SOL_BOUND_WARNING in report.warnings
@@ -379,9 +376,9 @@ def test_absent_solar_derivation_preserves_existing_workload_score_behavior():
     assert report.score == sol_score(
         t_k=1.5,
         t_b=2.0,
-        t_sol=artifact.aggregate_sol_bound_ms,
+        t_sol=artifact.aggregate_bound.sol_bound_ms,
     )
-    assert DEGRADED_SOL_BOUND_WARNING not in report.warnings
+    assert DEGRADED_SOL_BOUND_WARNING in report.warnings
     assert UNSCORED_SOL_BOUND_WARNING not in report.warnings
 
 
@@ -414,7 +411,7 @@ def test_suite_report_exposes_derived_evidence_refs_outside_public_refs():
         measured_latency_ms=1.5,
         baseline_latency_ms=2.0,
         trace_ref="traces/matmul.json",
-        sol_bound_ref="sol/matmul.amd-sol-v2.json",
+        sol_bound_ref="sol/matmul.amd-sol-v3.json",
         hardware_model_ref="default_amd_hardware_models.gfx1200",
         derived_evidence_refs={
             "formula": "solar/matmul.solar-derivation.json#groups.formula_evidence",
@@ -432,7 +429,7 @@ def test_suite_report_exposes_derived_evidence_refs_outside_public_refs():
     assert score_payload["claim_level"] == AMD_SCORE_CLAIM_LEVEL
     assert score_payload["evidence_refs"] == {
         "trace": "traces/matmul.json",
-        "sol_bound": "sol/matmul.amd-sol-v2.json",
+        "sol_bound": "sol/matmul.amd-sol-v3.json",
         "hardware_model": "default_amd_hardware_models.gfx1200",
     }
     assert score_payload["derived_evidence_refs"] == {
@@ -446,14 +443,14 @@ def test_suite_report_exposes_derived_evidence_refs_outside_public_refs():
     assert "score_eligibility" not in score_payload["evidence_refs"]
 
 
-def test_v2_degraded_artifact_scores_with_deterministic_warnings():
+def test_v3_degraded_artifact_scores_with_deterministic_warnings():
     artifact = _matmul_artifact_v2()
 
     report = score_amd_native_workload(
         artifact,
         measured_latency_ms=1.5,
         baseline_latency_ms=2.0,
-        sol_bound_ref="sol/matmul.amd-sol-v2.json",
+        sol_bound_ref="sol/matmul.amd-sol-v3.json",
         hardware_model_ref="default_amd_hardware_models.gfx1200",
     )
 
@@ -465,22 +462,23 @@ def test_v2_degraded_artifact_scores_with_deterministic_warnings():
     assert report.supported is True
     assert DEGRADED_SOL_BOUND_WARNING in report.warnings
     assert (
-        "aggregate_degraded:inexact or provisional evidence present" in report.warnings
+        "aggregate_degraded:inexact fusion-group or provisional hardware evidence present"
+        in report.warnings
     )
-    assert report.evidence_refs["sol_bound"] == "sol/matmul.amd-sol-v2.json"
+    assert report.evidence_refs["sol_bound"] == "sol/matmul.amd-sol-v3.json"
     assert (
         report.evidence_refs["hardware_model"] == "default_amd_hardware_models.gfx1200"
     )
 
 
-def test_v2_unscored_artifact_omits_score_and_preserves_bound_warning():
+def test_v3_unscored_artifact_omits_score_and_preserves_bound_warning():
     artifact = _unsupported_artifact_v2()
 
     report = score_amd_native_workload(
         artifact,
         measured_latency_ms=1.0,
         baseline_latency_ms=2.0,
-        sol_bound_ref="sol/unsupported.amd-sol-v2.json",
+        sol_bound_ref="sol/unsupported.amd-sol-v3.json",
     )
 
     assert report.score is None
@@ -488,7 +486,8 @@ def test_v2_unscored_artifact_omits_score_and_preserves_bound_warning():
     assert report.sol_bound_ms == artifact.aggregate_bound.sol_bound_ms
     assert UNSCORED_SOL_BOUND_WARNING in report.warnings
     assert (
-        "aggregate_unscored:unsupported operation evidence present" in report.warnings
+        "aggregate_unscored:unsupported fusion-group evidence present"
+        in report.warnings
     )
 
 
@@ -690,7 +689,7 @@ def test_trace_workflow_marks_failed_trace_as_unscored():
         trace,
         artifact,
         trace_ref="traces.json",
-        sol_bound_ref="sol/matmul.amd-sol-v2.json",
+        sol_bound_ref="sol/matmul.amd-sol-v3.json",
     )
 
     assert score.supported is False
@@ -699,7 +698,7 @@ def test_trace_workflow_marks_failed_trace_as_unscored():
     assert score.baseline_latency_ms is None
     assert INCOMPLETE_EVIDENCE_WARNING in score.warnings
     assert score.evidence_refs["trace"] == "traces.json"
-    assert score.evidence_refs["sol_bound"] == "sol/matmul.amd-sol-v2.json"
+    assert score.evidence_refs["sol_bound"] == "sol/matmul.amd-sol-v3.json"
 
 
 def test_suite_workflow_builds_scores_from_trace_and_artifact_maps():
@@ -812,7 +811,7 @@ def test_suite_workflow_missing_solar_guard_entry_is_neutral():
     assert suite.scores[0].score == sol_score(
         t_k=1.5,
         t_b=2.0,
-        t_sol=artifact.aggregate_sol_bound_ms,
+        t_sol=artifact.aggregate_bound.sol_bound_ms,
     )
     assert UNSCORED_SOL_BOUND_WARNING not in suite.scores[0].warnings
 

@@ -18,6 +18,7 @@ from sol_execbench.core.scoring.authority_slice import (
 
 def _bound(uuid: str, *, status: str = "scored", confidence: str = "supported") -> dict:
     return {
+        "schema_version": "sol_execbench.amd_sol_bound.v3",
         "definition": f"demo_{uuid}",
         "workload_uuid": uuid,
         "aggregate_bound": {"status": status},
@@ -36,6 +37,10 @@ def _bound(uuid: str, *, status: str = "scored", confidence: str = "supported") 
                 "op_family": "gemm",
                 "confidence": confidence,
             }
+        ],
+        "fusion_groups": [{"group_id": "group-0", "warnings": []}],
+        "group_bounds": [
+            {"group_id": "group-0", "confidence": "supported", "warnings": []}
         ],
         "warnings": [] if confidence == "supported" else ["inexact_operator:op_1:gemm"],
     }

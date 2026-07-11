@@ -239,7 +239,7 @@ def test_derived_evidence_for_workload_combines_present_refs_and_missing_gaps(tm
         "w0",
         problem_namespace="L2/demo",
     )
-    (sol_dir / f"{sidecar_stem}.amd-sol-v2.json").write_text("{}")
+    (sol_dir / f"{sidecar_stem}.amd-sol-v3.json").write_text("{}")
     (timing_dir / "L2" / "demo.timing.json").write_text("{}")
 
     refs, gaps = derived_evidence_for_workload(
@@ -256,7 +256,7 @@ def test_derived_evidence_for_workload_combines_present_refs_and_missing_gaps(tm
 
     assert refs == {
         "amd_score": "score.json",
-        "amd_sol_bound": f"sol/{sidecar_stem}.amd-sol-v2.json",
+        "amd_sol_bound": f"sol/{sidecar_stem}.amd-sol-v3.json",
         "timing_evidence": "timing/L2/demo.timing.json",
     }
     assert gaps == ["solar_derivation_missing"]

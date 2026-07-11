@@ -5,8 +5,7 @@
 
 from __future__ import annotations
 
-from sol_execbench.core.scoring.amd_sol import AmdSolBoundArtifact
-from sol_execbench.core.scoring.amd_sol.v2 import AmdSolBoundV2Artifact
+from sol_execbench.core.scoring.amd_sol.v3 import AmdSolBoundV3Artifact
 from sol_execbench.core.scoring.amd_score.models import (
     AMD_SCORE_CLAIM_LEVEL,
     AmdNativeScore,
@@ -28,7 +27,7 @@ from sol_execbench.sol_score import sol_score
 
 
 def score_amd_native_workload(
-    artifact: AmdSolBoundArtifact | AmdSolBoundV2Artifact,
+    artifact: AmdSolBoundV3Artifact,
     *,
     measured_latency_ms: float | None,
     baseline_latency_ms: float | None,
@@ -61,10 +60,7 @@ def score_amd_native_workload(
     score_value = None
     if solar_aggregate is not None and solar_aggregate.status == "unscored":
         score_value = None
-    elif (
-        isinstance(artifact, AmdSolBoundV2Artifact)
-        and not artifact.aggregate_bound.scored
-    ):
+    elif not artifact.aggregate_bound.scored:
         if UNSCORED_SOL_BOUND_WARNING not in warnings:
             warnings.append(UNSCORED_SOL_BOUND_WARNING)
     elif has_complete_numeric_inputs(
@@ -100,25 +96,19 @@ def score_amd_native_workload(
 
 
 def _bound_eligibility(
-    artifact: AmdSolBoundArtifact | AmdSolBoundV2Artifact,
+    artifact: AmdSolBoundV3Artifact,
     solar_aggregate: SolarScoreGuard | None,
 ) -> BoundEligibilityEvidence:
     """Capture the exact inputs of the authority gate with the score."""
-    if isinstance(artifact, AmdSolBoundV2Artifact):
-        amd_sol_status = artifact.aggregate_bound.status
-        hardware_profile_state = (
-            "unknown"
-            if any("hardware_profile" in warning for warning in artifact.warnings)
-            else "measured"
-            if artifact.coverage_summary.worst_confidence.value == "supported"
-            else "unknown"
-        )
-        artifact_warnings = artifact.warnings
-    else:
-        # v1 scalar models cannot prove exact-profile eligibility.
-        amd_sol_status = "scored"
-        hardware_profile_state = "unknown"
-        artifact_warnings = tuple(warnings_for_artifact(artifact))
+    amd_sol_status = artifact.aggregate_bound.status
+    hardware_profile_state = (
+        "unknown"
+        if any("hardware_profile" in warning for warning in artifact.warnings)
+        else "measured"
+        if artifact.coverage_summary.worst_confidence.value == "supported"
+        else "unknown"
+    )
+    artifact_warnings = artifact.warnings
     # SOLAR derivation is optional.  Its absence is not evidence that a present
     # derivation failed, and must not turn an otherwise AMD-authoritative score
     # into an artificial unknown blocker.
@@ -161,9 +151,7 @@ def has_complete_numeric_inputs(
 
 
 def artifact_sol_bound_ms(
-    artifact: AmdSolBoundArtifact | AmdSolBoundV2Artifact,
+    artifact: AmdSolBoundV3Artifact,
 ) -> float:
     """Return the aggregate SOL bound latency from either artifact schema."""
-    if isinstance(artifact, AmdSolBoundV2Artifact):
-        return artifact.aggregate_bound.sol_bound_ms
-    return artifact.aggregate_sol_bound_ms
+    return artifact.aggregate_bound.sol_bound_ms

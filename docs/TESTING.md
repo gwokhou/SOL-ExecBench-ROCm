@@ -463,6 +463,16 @@ Hardware calibration is diagnostic by default.  The marker-gated live test requi
 RDNA4 hardware; absent profiler data must remain `unknown`, never a substituted peak.
 Run it with `uv run pytest tests/sol_execbench/core/scoring/hardware_calibration/test_live_calibration.py -m requires_rdna4 -n 0 -v`.
 
+## Live ROCm validation
+
+Live ROCm validation is marker-gated: use `requires_rocm`, `requires_rdna4`,
+or `requires_cdna3` to select hardware-sensitive checks. The marker contract is
+covered by `tests/sol_execbench/test_cdna3_hardware_marker.py`. RDNA4 smoke
+coverage is not full MI300X hardware-validation evidence, and RDNA4 is not a
+`gfx94*` validation target. The current host ROCm 7.1.x environment is the
+recorded default; default validation does not require host reinstall. ROCm 7.0.x
+or ROCm 7.2.x native-host validation requires a matching host.
+
 ## BF16 matrix-probe calibration
 
 Run the focused calibration and hardware-model CLI suite with:

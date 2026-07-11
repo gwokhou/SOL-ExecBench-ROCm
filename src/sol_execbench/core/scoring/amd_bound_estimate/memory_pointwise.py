@@ -57,29 +57,65 @@ def _reduction_estimate(
         _sum_tensor_numel(input_tensors, "input", warnings, rationale_parts) or 0
     )
     axis_source, axis = _axis_evidence(node)
-    formula_inputs: dict[str, Any] = {"input_elements": input_elements, "axis": axis}
+    output_elements = (
+        _sum_tensor_numel(output_tensors, "output", warnings, rationale_parts) or 0
+    )
+    formula_inputs: dict[str, Any] = {
+        "input_elements": input_elements,
+        "output_elements": output_elements,
+        "axis": axis,
+    }
     total_bytes = read_bytes + write_bytes
+    exact_sum = _has_exact_sum_reduction_contract(
+        node, axis, input_elements, output_elements, warnings
+    )
+    flops = (
+        float(input_elements - output_elements) if exact_sum else float(input_elements)
+    )
     return OperatorWorkEstimate(
         node_id=node.node_id,
         op_family=node.op_family,
         op_name=node.op_name,
         formula_kind="reduction_flops",
-        formula="input_elements",
+        formula=("input_elements-output_elements" if exact_sum else "input_elements"),
         formula_inputs=formula_inputs,
-        flops=float(input_elements),
+        flops=flops,
         read_bytes=read_bytes,
         write_bytes=write_bytes,
         intermediate_bytes=0.0,
         movement_bytes=0.0,
         total_bytes=total_bytes,
-        confidence=EstimateConfidence.INEXACT,
+        confidence=(
+            EstimateConfidence.SUPPORTED if exact_sum else EstimateConfidence.INEXACT
+        ),
         rationale=_join_rationale(
-            "conservative reduction pass-count estimate over input elements",
+            (
+                "exact sum-reduction operation count from static input and output shapes"
+                if exact_sum
+                else "conservative reduction pass-count estimate over input elements"
+            ),
             rationale_parts,
         ),
         axis_source=axis_source,
         warnings=tuple(dict.fromkeys(warnings)),
     )
+
+
+def _has_exact_sum_reduction_contract(
+    node: BoundGraphNode,
+    axis: object,
+    input_elements: int,
+    output_elements: int,
+    warnings: list[str],
+) -> bool:
+    """Return whether the visible operation is a statically exact sum reduction."""
+    if node.op_name.rsplit(".", maxsplit=1)[-1] != "sum":
+        return False
+    if axis is None or input_elements <= 0 or output_elements <= 0:
+        return False
+    if input_elements < output_elements or input_elements % output_elements:
+        return False
+    return not warnings
 
 
 def _normalization_estimate(
