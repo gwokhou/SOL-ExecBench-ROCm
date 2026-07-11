@@ -51,6 +51,7 @@ OFFICIAL_SCORE_SCHEMA_VERSION = "sol_execbench.official_score_evidence.v1"
 OFFICIAL_SCORE_SOURCE = "official_score_evidence"
 OFFICIAL_SCORE_KIND = "official_benchmark_score"
 OFFICIAL_SCORE_CLAIM_LEVEL = "official-confirmed"
+OFFICIAL_AGGREGATION_POLICY = "fixed_suite_denominator_zero_for_blocked"
 DEFAULT_OFFICIAL_BASELINE_SOURCES = ("scoring_baseline", "measured_baseline_registry")
 
 MISSING_SCORE_BLOCKER = "missing_score"
@@ -142,13 +143,22 @@ class OfficialScoreSuiteEvidence:
 
     @property
     def mean_score(self) -> float | None:
-        """Mean score across workloads with official score authority."""
-        values = [
-            score.score
+        """Mean score using the fixed suite denominator policy."""
+        if not self.scores:
+            return None
+        return statistics.mean(self._score_contributions())
+
+    def _score_contributions(self) -> tuple[float, ...]:
+        """Return one official-score contribution for every suite workload."""
+        return tuple(
+            score.score if score.score_authority and score.score is not None else 0.0
             for score in self.scores
-            if score.score_authority and score.score is not None
-        ]
-        return statistics.mean(values) if values else None
+        )
+
+    @property
+    def total_workload_count(self) -> int:
+        """Total number of workloads in the suite."""
+        return len(self.scores)
 
     @property
     def scored_count(self) -> int:
@@ -157,8 +167,18 @@ class OfficialScoreSuiteEvidence:
 
     @property
     def unscored_count(self) -> int:
+        """Compatibility alias for the number of blocked workloads."""
+        return self.blocked_count
+
+    @property
+    def blocked_count(self) -> int:
         """Number of workloads blocked from official score authority."""
-        return len(self.scores) - self.scored_count
+        return self.total_workload_count - self.scored_count
+
+    @property
+    def zero_scored_count(self) -> int:
+        """Number of blocked workloads contributing zero to the suite score."""
+        return self.blocked_count
 
     @property
     def blocker_summary(self) -> dict[str, int]:
@@ -191,7 +211,10 @@ class OfficialScoreSuiteEvidence:
             "score": self.mean_score,
             "mean_score": self.mean_score,
             "score_authority": self.scored_count > 0 and self.unscored_count == 0,
+            "total_workload_count": self.total_workload_count,
             "scored_count": self.scored_count,
+            "blocked_count": self.blocked_count,
+            "zero_scored_count": self.zero_scored_count,
             "unscored_count": self.unscored_count,
             "blocker_summary": self.blocker_summary,
             "input_summary": self.input_summary,
@@ -208,7 +231,7 @@ def official_score_from_amd_native_score(
     coverage_report: BaselineCoverageReport | None = None,
 ) -> OfficialScoreEvidence:
     """Gate a derived AMD-native score into official score evidence."""
-    normalized_policy = _normalize_policy(aggregation_policy)
+    normalized_policy = validate_official_aggregation_policy(aggregation_policy)
     blockers = _official_score_blockers(
         score,
         aggregation_policy=normalized_policy,
@@ -268,7 +291,7 @@ def build_official_score_suite_evidence(
     )
     return OfficialScoreSuiteEvidence(
         scores=official_scores,
-        aggregation_policy=_normalize_policy(aggregation_policy),
+        aggregation_policy=validate_official_aggregation_policy(aggregation_policy),
     )
 
 
@@ -342,11 +365,10 @@ def _authority_disqualifying_warning(warning: str) -> bool:
     return any(token in normalized for token in ("degraded", "inexact", "unsupported"))
 
 
-def _normalize_policy(aggregation_policy: str | None) -> str | None:
-    if aggregation_policy is None:
-        return None
-    stripped = aggregation_policy.strip()
-    return stripped or None
+def validate_official_aggregation_policy(policy: str | None) -> str | None:
+    """Return the sole supported official aggregation policy, if supplied."""
+    normalized = policy.strip() if policy else ""
+    return normalized if normalized == OFFICIAL_AGGREGATION_POLICY else None
 
 
 def _unique(values: list[str]) -> list[str]:

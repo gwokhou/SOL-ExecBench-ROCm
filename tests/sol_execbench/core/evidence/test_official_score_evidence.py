@@ -25,6 +25,7 @@ from sol_execbench.core.scoring.official_score import (
     MISSING_MEASURED_LATENCY_BLOCKER,
     MISSING_SCORE_BLOCKER,
     MISSING_SOL_BOUND_BLOCKER,
+    OFFICIAL_AGGREGATION_POLICY,
     OFFICIAL_SCORE_KIND,
     OFFICIAL_SCORE_SCHEMA_VERSION,
     OFFICIAL_SCORE_SOURCE,
@@ -33,6 +34,9 @@ from sol_execbench.core.scoring.official_score import (
     build_official_score_suite_evidence,
     official_score_from_amd_native_score,
 )
+
+
+AGGREGATION_POLICY = OFFICIAL_AGGREGATION_POLICY
 
 
 def _amd_score(
@@ -75,7 +79,7 @@ def _amd_score(
 def test_official_score_accepts_complete_scoring_baseline_input():
     evidence = official_score_from_amd_native_score(
         _amd_score(),
-        aggregation_policy="mean of per-workload SOL scores",
+        aggregation_policy=AGGREGATION_POLICY,
         source_score_ref="amd_native_score.json#workload-1",
     )
 
@@ -88,7 +92,7 @@ def test_official_score_accepts_complete_scoring_baseline_input():
     assert payload["score_source"] == OFFICIAL_SCORE_SOURCE
     assert payload["score_kind"] == OFFICIAL_SCORE_KIND
     assert payload["claim_level"] == "official-confirmed"
-    assert payload["aggregation_policy"] == "mean of per-workload SOL scores"
+    assert payload["aggregation_policy"] == AGGREGATION_POLICY
     assert payload["official_baseline_latency_ms"] == 2.0
     assert payload["input_refs"]["baseline"] == "baseline.json#matmul_demo:workload-1"
     assert (
@@ -102,7 +106,7 @@ def test_legacy_score_without_bound_eligibility_cannot_be_official():
     legacy = AmdNativeScore(**{**legacy.__dict__, "bound_eligibility": None})
 
     evidence = official_score_from_amd_native_score(
-        legacy, aggregation_policy="mean of per-workload SOL scores"
+        legacy, aggregation_policy=AGGREGATION_POLICY
     )
 
     assert evidence.score is None
@@ -126,7 +130,7 @@ def test_inexact_or_degraded_bound_evidence_cannot_be_official():
     )
 
     evidence = official_score_from_amd_native_score(
-        blocked, aggregation_policy="mean of per-workload SOL scores"
+        blocked, aggregation_policy=AGGREGATION_POLICY
     )
 
     assert evidence.score is None
@@ -137,7 +141,7 @@ def test_inexact_or_degraded_bound_evidence_cannot_be_official():
 def test_reference_latency_baseline_blocks_official_score():
     evidence = official_score_from_amd_native_score(
         _amd_score(baseline_source="reference_latency"),
-        aggregation_policy="mean of per-workload SOL scores",
+        aggregation_policy=AGGREGATION_POLICY,
     )
 
     assert evidence.score is None
@@ -167,7 +171,7 @@ def test_missing_numeric_inputs_emit_stable_blockers():
             sol_bound_ms=None,
             baseline_source="missing",
         ),
-        aggregation_policy="mean of per-workload SOL scores",
+        aggregation_policy=AGGREGATION_POLICY,
     )
 
     assert evidence.score is None
@@ -188,7 +192,7 @@ def test_suite_evidence_reports_counts_blockers_and_input_refs():
                 baseline_source="reference_latency",
             ),
         ),
-        aggregation_policy="mean of per-workload SOL scores",
+        aggregation_policy=AGGREGATION_POLICY,
         source_score_refs_by_workload_uuid={
             "workload-1": "amd_native_score.json#workload-1"
         },
@@ -196,10 +200,13 @@ def test_suite_evidence_reports_counts_blockers_and_input_refs():
 
     payload = report.to_dict()
 
-    assert payload["score"] == 0.75
-    assert payload["mean_score"] == 0.75
+    assert payload["score"] == 0.375
+    assert payload["mean_score"] == 0.375
     assert payload["score_authority"] is False
+    assert payload["total_workload_count"] == 2
     assert payload["scored_count"] == 1
+    assert payload["blocked_count"] == 1
+    assert payload["zero_scored_count"] == 1
     assert payload["unscored_count"] == 1
     assert payload["blocker_summary"] == {PLACEHOLDER_BASELINE_BLOCKER: 1}
     assert payload["input_summary"]["trace"] == 2
@@ -209,10 +216,66 @@ def test_suite_evidence_reports_counts_blockers_and_input_refs():
     assert payload["scores"][1]["score_authority"] is False
 
 
+def test_suite_uses_fixed_denominator_and_zero_for_blocked_scores():
+    report = build_official_score_suite_evidence(
+        (
+            _amd_score(score=0.75),
+            _amd_score(score=0.9, baseline_source="reference_latency"),
+        ),
+        aggregation_policy=AGGREGATION_POLICY,
+    )
+
+    payload = report.to_dict()
+
+    assert payload["score"] == 0.375
+    assert payload["mean_score"] == 0.375
+    assert payload["total_workload_count"] == 2
+    assert payload["scored_count"] == 1
+    assert payload["blocked_count"] == 1
+    assert payload["zero_scored_count"] == 1
+    assert payload["unscored_count"] == 1
+    assert payload["score_authority"] is False
+
+
+def test_all_blocked_suite_is_zero_not_null():
+    report = build_official_score_suite_evidence(
+        (_amd_score(baseline_source="reference_latency"),),
+        aggregation_policy=AGGREGATION_POLICY,
+    )
+
+    payload = report.to_dict()
+
+    assert payload["score"] == 0.0
+    assert payload["mean_score"] == 0.0
+    assert payload["score_authority"] is False
+
+
+def test_empty_suite_is_null_with_zero_workloads():
+    report = build_official_score_suite_evidence(
+        (), aggregation_policy=AGGREGATION_POLICY
+    )
+
+    payload = report.to_dict()
+
+    assert payload["score"] is None
+    assert payload["mean_score"] is None
+    assert payload["total_workload_count"] == 0
+
+
+def test_legacy_aggregation_policy_blocks_official_score():
+    evidence = official_score_from_amd_native_score(
+        _amd_score(), aggregation_policy="mean of per-workload SOL scores"
+    )
+
+    assert evidence.score is None
+    assert evidence.aggregation_policy is None
+    assert evidence.blocker_reason_codes == (MISSING_AGGREGATION_POLICY_BLOCKER,)
+
+
 def test_nan_latency_is_blocked_not_averaged():
     evidence = official_score_from_amd_native_score(
         _amd_score(measured_latency_ms=float("nan")),
-        aggregation_policy="mean of per-workload SOL scores",
+        aggregation_policy=AGGREGATION_POLICY,
     )
 
     assert evidence.score is None
@@ -222,7 +285,7 @@ def test_nan_latency_is_blocked_not_averaged():
 def test_official_baseline_latency_ms_is_none_when_baseline_blocked():
     evidence = official_score_from_amd_native_score(
         _amd_score(baseline_latency_ms=0.0),
-        aggregation_policy="mean of per-workload SOL scores",
+        aggregation_policy=AGGREGATION_POLICY,
     )
 
     assert MISSING_BASELINE_BLOCKER in evidence.blocker_reason_codes
@@ -307,7 +370,7 @@ def _mismatched_coverage_report() -> BaselineCoverageReport:
 def test_measured_baseline_registry_with_confirmed_coverage_is_accepted():
     evidence = official_score_from_amd_native_score(
         _amd_score(baseline_source="measured_baseline_registry"),
-        aggregation_policy="mean of per-workload SOL scores",
+        aggregation_policy=AGGREGATION_POLICY,
         coverage_report=_confirmed_coverage_report(),
     )
 
@@ -319,7 +382,7 @@ def test_measured_baseline_registry_with_confirmed_coverage_is_accepted():
 def test_coverage_failure_adds_umbrella_and_propagated_codes():
     evidence = official_score_from_amd_native_score(
         _amd_score(baseline_source="measured_baseline_registry"),
-        aggregation_policy="mean of per-workload SOL scores",
+        aggregation_policy=AGGREGATION_POLICY,
         coverage_report=_mismatched_coverage_report(),
     )
 
@@ -337,7 +400,7 @@ def test_coverage_report_none_preserves_prior_gate_behavior():
     # baseline_coverage_failed blocker) -- backward compatible (D-10).
     evidence = official_score_from_amd_native_score(
         _amd_score(),
-        aggregation_policy="mean of per-workload SOL scores",
+        aggregation_policy=AGGREGATION_POLICY,
         coverage_report=None,
     )
 
@@ -352,7 +415,7 @@ def test_both_official_baseline_sources_accepted_when_confirmed():
     for source in DEFAULT_OFFICIAL_BASELINE_SOURCES:
         evidence = official_score_from_amd_native_score(
             _amd_score(baseline_source=source),
-            aggregation_policy="mean of per-workload SOL scores",
+            aggregation_policy=AGGREGATION_POLICY,
             coverage_report=_confirmed_coverage_report(),
         )
         assert MISSING_BASELINE_BLOCKER not in evidence.blocker_reason_codes, source
@@ -374,7 +437,7 @@ def test_coverage_blocker_literals_match_official_score_blockers():
 def test_suite_coverage_failure_blocks_every_workload_score():
     report = build_official_score_suite_evidence(
         (_amd_score(baseline_source="measured_baseline_registry"),),
-        aggregation_policy="mean of per-workload SOL scores",
+        aggregation_policy=AGGREGATION_POLICY,
         coverage_report=_mismatched_coverage_report(),
     )
 
