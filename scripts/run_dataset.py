@@ -87,6 +87,7 @@ from sol_execbench.core.dataset.runner import (
 from sol_execbench.core.dataset.runner_scoring import (
     _extend_derived_reports_for_problem,
     build_amd_score_reports_for_problem,
+    scoring_baseline_coverage_report,
     write_amd_score_report,
     write_official_score_report,
 )
@@ -116,6 +117,7 @@ from sol_execbench.core.scoring.amd_score import (
     AmdNativeScore,
 )
 from sol_execbench.core.scoring.baseline_artifact import (
+    BASELINE_ARTIFACT_SCHEMA_VERSION,
     load_scoring_baseline_artifact,
 )
 from sol_execbench.core.scoring.official_score import OFFICIAL_AGGREGATION_POLICY
@@ -2280,10 +2282,27 @@ def main():
     summaries = []
     amd_scores: list[AmdNativeScore] = []
     scoring_baseline = (
-        load_scoring_baseline_artifact(args.scoring_baseline)
+        load_scoring_baseline_artifact(
+            args.scoring_baseline,
+            required_schema_version=(
+                BASELINE_ARTIFACT_SCHEMA_VERSION
+                if args.official_score_report is not None
+                else None
+            ),
+        )
         if args.scoring_baseline is not None
         else None
     )
+    if (
+        args.official_score_report is not None
+        and scoring_baseline is not None
+        and scoring_baseline.schema_version != BASELINE_ARTIFACT_SCHEMA_VERSION
+    ):
+        raise ValueError(
+            "--official-score-report requires --scoring-baseline schema_version "
+            f"{BASELINE_ARTIFACT_SCHEMA_VERSION!r}; got "
+            f"{scoring_baseline.schema_version!r}"
+        )
     provenance = {
         "command_args": _normalized_command_args(args),
         "dataset_root": _first_relative_ref(problems_dir, ROOT),
@@ -2513,6 +2532,9 @@ def main():
                 report_path,
                 amd_scores,
                 aggregation_policy=args.official_aggregation_policy,
+                coverage_report=scoring_baseline_coverage_report(
+                    scoring_baseline, amd_scores
+                ),
                 source_score_ref=_relative_ref(
                     args.amd_score_report.resolve(), output_dir
                 ),
@@ -2584,6 +2606,9 @@ def main():
                 report_path,
                 amd_scores,
                 aggregation_policy=args.official_aggregation_policy,
+                coverage_report=scoring_baseline_coverage_report(
+                    scoring_baseline, amd_scores
+                ),
                 source_score_ref=_relative_ref(
                     args.amd_score_report.resolve(), output_dir
                 ),
@@ -3293,6 +3318,9 @@ def main():
             report_path,
             amd_scores,
             aggregation_policy=args.official_aggregation_policy,
+            coverage_report=scoring_baseline_coverage_report(
+                scoring_baseline, amd_scores
+            ),
             source_score_ref=_relative_ref(args.amd_score_report.resolve(), output_dir),
         )
         print(f"Official score report saved to {report_path}")

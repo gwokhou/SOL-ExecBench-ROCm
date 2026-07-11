@@ -19,9 +19,11 @@ from sol_execbench.core.scoring.amd_score import (
 )
 import sol_execbench.core.scoring.amd_score.derived_artifacts as amd_score_derived_artifacts
 from sol_execbench.core.scoring.baseline_artifact import (
+    BASELINE_ARTIFACT_SCHEMA_VERSION,
     scoring_baseline_artifact_from_dict,
 )
 from sol_execbench.core.scoring.official_score import (
+    BASELINE_COVERAGE_FAILED_BLOCKER,
     OFFICIAL_AGGREGATION_POLICY,
     OFFICIAL_SCORE_SCHEMA_VERSION,
 )
@@ -810,6 +812,7 @@ def test_dataset_runner_phase_derived_writes_official_score_sidecar(
     baseline_path.write_text(
         json.dumps(
             {
+                "schema_version": BASELINE_ARTIFACT_SCHEMA_VERSION,
                 "release": "v1.7",
                 "entries": [
                     {
@@ -861,6 +864,7 @@ def test_dataset_runner_phase_derived_writes_official_score_sidecar(
     assert payload["score"] == 0.0
     assert payload["scores"][0]["score"] is None
     assert payload["scores"][0]["score_authority"] is False
+    assert BASELINE_COVERAGE_FAILED_BLOCKER not in payload["blocker_summary"]
     assert closure["provenance"]["derived_evidence"] == {
         "amd_score_report": "amd-score.json",
         "official_score_report": "official-score.json",
@@ -915,6 +919,106 @@ def test_dataset_runner_official_score_report_requires_amd_score_report(
 
     with pytest.raises(SystemExit, match="2"):
         run_dataset.main()
+
+
+@pytest.mark.parametrize("schema_version", [None, "scoring_baseline.v1", []])
+def test_dataset_runner_official_score_requires_exact_baseline_schema(
+    tmp_path,
+    monkeypatch,
+    schema_version: object | None,
+):
+    dataset_root = _write_matmul_dataset(tmp_path)
+    output_dir = tmp_path / "out"
+    trace_dir = output_dir / "L1" / "matmul_demo"
+    trace_dir.mkdir(parents=True)
+    (trace_dir / "traces.json").write_text(json.dumps(_matmul_trace_payload()))
+    baseline_path = tmp_path / "scoring-baseline.json"
+    baseline = {
+        "release": "v1.7",
+        "entries": [
+            {
+                "definition": "matmul_demo",
+                "workload_uuid": "matmul-workload",
+                "latency_ms": 2.0,
+            }
+        ],
+    }
+    if schema_version is not None:
+        baseline["schema_version"] = schema_version
+    baseline_path.write_text(json.dumps(baseline))
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--phase",
+            "derived",
+            "--output",
+            str(output_dir),
+            "--amd-score-report",
+            str(tmp_path / "amd-score.json"),
+            "--official-score-report",
+            str(tmp_path / "official-score.json"),
+            "--official-aggregation-policy",
+            OFFICIAL_AGGREGATION_POLICY,
+            "--scoring-baseline",
+            str(baseline_path),
+        ],
+    )
+
+    with pytest.raises(ValueError, match="sol_execbench.scoring_baseline.v1"):
+        run_dataset.main()
+
+
+def test_dataset_runner_official_score_blocks_unconfirmed_baseline_coverage(
+    tmp_path,
+    monkeypatch,
+):
+    dataset_root = _write_matmul_dataset(tmp_path)
+    output_dir = tmp_path / "out"
+    trace_dir = output_dir / "L1" / "matmul_demo"
+    trace_dir.mkdir(parents=True)
+    (trace_dir / "traces.json").write_text(json.dumps(_matmul_trace_payload()))
+    baseline_path = tmp_path / "scoring-baseline.json"
+    baseline_path.write_text(
+        json.dumps(
+            {
+                "schema_version": BASELINE_ARTIFACT_SCHEMA_VERSION,
+                "release": "v1.7",
+                "entries": [],
+            }
+        )
+    )
+    official_report_path = tmp_path / "official-score.json"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_dataset.py",
+            str(dataset_root),
+            "--phase",
+            "derived",
+            "--output",
+            str(output_dir),
+            "--amd-score-report",
+            str(tmp_path / "amd-score.json"),
+            "--official-score-report",
+            str(official_report_path),
+            "--official-aggregation-policy",
+            OFFICIAL_AGGREGATION_POLICY,
+            "--scoring-baseline",
+            str(baseline_path),
+        ],
+    )
+
+    run_dataset.main()
+
+    payload = json.loads(official_report_path.read_text())
+    assert payload["score_authority"] is False
+    assert BASELINE_COVERAGE_FAILED_BLOCKER in payload["blocker_summary"]
 
 
 def test_dataset_runner_phase_derived_jobs_reuses_existing_traces_without_gpu(
