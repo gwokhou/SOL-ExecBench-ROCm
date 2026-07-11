@@ -26,6 +26,7 @@ def verify_release_baseline_rerun(
     bundle: ReleaseBaselineBundle,
     rerun_trace_path: Path,
     rerun_provenance: ReleaseProvenance,
+    bundle_path: Path | None = None,
 ) -> ReleaseBaselineVerification:
     """Verify a new run without changing the supplied bundle evidence."""
 
@@ -35,11 +36,11 @@ def verify_release_baseline_rerun(
         rerun_trace_sha256 = sha256_file(rerun_trace_path)
     except (OSError, UnicodeDecodeError):
         return _trace_failure_verification(
-            bundle, rerun_trace_path, "rerun_trace_unavailable"
+            bundle, rerun_trace_path, "rerun_trace_unavailable", bundle_path
         )
     except ValueError:
         return _trace_failure_verification(
-            bundle, rerun_trace_path, "rerun_trace_malformed"
+            bundle, rerun_trace_path, "rerun_trace_malformed", bundle_path
         )
     provenance_blockers = _provenance_blockers(bundle, rerun_provenance)
     path_is_distinct = all(
@@ -54,14 +55,19 @@ def verify_release_baseline_rerun(
             provenance_blockers,
             extra_identity,
             path_is_distinct,
+            rerun_trace_sha256,
             bundle.latency_tolerance_rel,
         )
         for row in bundle.workloads
     )
     return ReleaseBaselineVerification(
         release=bundle.release,
-        bundle_ref="in-memory-release-baseline-bundle",
-        bundle_sha256=_bundle_digest(bundle),
+        bundle_ref=(
+            str(bundle_path)
+            if bundle_path is not None
+            else "in-memory-release-baseline-bundle"
+        ),
+        bundle_sha256=_bundle_digest(bundle, bundle_path),
         rerun_trace_ref=str(rerun_trace_path),
         rerun_trace_sha256=rerun_trace_sha256,
         workloads=workloads,
@@ -74,6 +80,7 @@ def _verify_workload(
     provenance_blockers: tuple[str, ...],
     extra_identity: bool,
     path_is_distinct: bool,
+    rerun_trace_sha256: str,
     tolerance: float,
 ) -> ReleaseBaselineVerificationWorkload:
     rerun_blockers: list[str] = []
@@ -82,6 +89,8 @@ def _verify_workload(
         rerun_blockers.extend(provenance_blockers)
         if not path_is_distinct:
             rerun_blockers.append("rerun_trace_matches_baseline")
+        if baseline.trace_sha256 == rerun_trace_sha256:
+            rerun_blockers.append("rerun_trace_digest_matches_baseline")
         if extra_identity:
             rerun_blockers.append("extra_trace_identity")
         rerun_latency, record_blockers = _rerun_measurement(records, baseline)
@@ -115,7 +124,10 @@ def _verify_workload(
 
 
 def _trace_failure_verification(
-    bundle: ReleaseBaselineBundle, rerun_trace_path: Path, reason: str
+    bundle: ReleaseBaselineBundle,
+    rerun_trace_path: Path,
+    reason: str,
+    bundle_path: Path | None,
 ) -> ReleaseBaselineVerification:
     """Return a complete, deterministic report when the trace cannot be read."""
 
@@ -137,8 +149,12 @@ def _trace_failure_verification(
     )
     return ReleaseBaselineVerification(
         release=bundle.release,
-        bundle_ref="in-memory-release-baseline-bundle",
-        bundle_sha256=_bundle_digest(bundle),
+        bundle_ref=(
+            str(bundle_path)
+            if bundle_path is not None
+            else "in-memory-release-baseline-bundle"
+        ),
+        bundle_sha256=_bundle_digest(bundle, bundle_path),
         rerun_trace_ref=str(rerun_trace_path),
         rerun_trace_sha256="0" * 64,
         workloads=workloads,
@@ -251,22 +267,28 @@ def _rerun_measurement(
         return None, ("invalid_rerun_latency",)
     evidence = evaluation.get("release_baseline")
     if not isinstance(evidence, Mapping):
+        if baseline.bound_sha256 is None and baseline.hardware_model_sha256 is None:
+            return latency, ()
         return latency, ("missing_rerun_immutable_evidence",)
     blockers: list[str] = []
     if (
-        not isinstance(evidence.get("bound_sha256"), str)
-        or evidence.get("bound_sha256") != baseline.bound_sha256
+        baseline.bound_sha256 is not None
+        and evidence.get("bound_sha256") != baseline.bound_sha256
     ):
         blockers.append("bound_checksum_mismatch")
     if (
-        not isinstance(evidence.get("hardware_model_sha256"), str)
-        or evidence.get("hardware_model_sha256") != baseline.hardware_model_sha256
+        baseline.hardware_model_sha256 is not None
+        and evidence.get("hardware_model_sha256") != baseline.hardware_model_sha256
     ):
         blockers.append("hardware_model_checksum_mismatch")
-    return latency, tuple(blockers)
+    return latency, tuple(dict.fromkeys(blockers))
 
 
-def _bundle_digest(bundle: ReleaseBaselineBundle) -> str:
+def _bundle_digest(
+    bundle: ReleaseBaselineBundle, bundle_path: Path | None = None
+) -> str:
+    if bundle_path is not None:
+        return sha256_file(bundle_path)
     return hashlib.sha256(
         json.dumps(
             bundle.to_dict(), sort_keys=True, separators=(",", ":"), allow_nan=False
