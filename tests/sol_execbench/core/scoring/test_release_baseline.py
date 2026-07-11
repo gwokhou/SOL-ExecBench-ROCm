@@ -18,6 +18,7 @@ from sol_execbench.core.scoring.release_baseline import (
     RELEASE_BASELINE_VERIFICATION_SCHEMA_VERSION,
     ReleaseBaselineBundle,
     ReleaseBaselineVerification,
+    ReleaseBaselineVerificationWorkload,
     ReleaseBaselineWorkload,
     ReleaseProvenance,
     build_release_baseline_bundle,
@@ -390,6 +391,30 @@ def test_official_workload_requires_trace_evidence():
             bound_sha256="a" * 64,
             hardware_model_ref="model.json",
             hardware_model_sha256="b" * 64,
+        )
+
+
+def test_official_workload_requires_measured_latency() -> None:
+    with pytest.raises(ValueError, match="measured latency_ms"):
+        ReleaseBaselineWorkload(
+            "gemm",
+            "w1",
+            "official",
+            None,
+            (),
+            trace_ref="trace.jsonl",
+            trace_sha256="a" * 64,
+            bound_ref="bound.json",
+            bound_sha256="b" * 64,
+            hardware_model_ref="model.json",
+            hardware_model_sha256="c" * 64,
+        )
+
+
+def test_passing_verification_requires_timing_measurements() -> None:
+    with pytest.raises(ValueError, match="require baseline, rerun, and delta"):
+        ReleaseBaselineVerificationWorkload(
+            "gemm", "w1", "official", "official", None, None, None, True, ()
         )
 
 

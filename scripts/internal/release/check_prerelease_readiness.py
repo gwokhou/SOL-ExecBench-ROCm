@@ -236,7 +236,11 @@ def _check_release_baseline_evidence(
     baseline_artifact = artifacts.get("release_baseline_bundle")
     verification_artifact = artifacts.get("release_baseline_verification")
     scoring_artifact = artifacts.get("release_scoring_baseline")
-    if baseline_artifact is None and verification_artifact is None:
+    if (
+        baseline_artifact is None
+        and verification_artifact is None
+        and scoring_artifact is None
+    ):
         return []
     if (
         baseline_artifact is None
