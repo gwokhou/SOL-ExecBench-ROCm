@@ -5,10 +5,10 @@
 
 The public standalone ``sol-execbench official-score`` CLI already emits
 ``official_score_evidence.v1`` from an AMD-native score report, measured
-baseline input, and explicit aggregation policy. Dataset-runner automation is
-being integrated separately and must remain explicitly requested; this module
-does not give ordinary AMD-native reports, provisional evidence, or degraded
-bound evidence official-score authority.
+baseline input, and explicit aggregation policy.
+The dataset runner emits explicitly requested official output. This module does
+not give ordinary AMD-native reports, provisional evidence, or degraded bound
+evidence official-score authority.
 
 The gate requires measured candidate latency, an official measured baseline,
 SOL/SOLAR bound evidence, and the aggregation policy. Missing prerequisites

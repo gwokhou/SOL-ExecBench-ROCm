@@ -403,3 +403,12 @@ def test_official_score_automation_docs_preserve_policy_and_authority_boundaries
         in readme
     )
     assert '"fixed_suite_denominator_zero_for_blocked"' in consumer_guide
+
+
+def test_official_score_module_documents_explicit_runner_output():
+    module_source = (
+        REPO_ROOT / "src/sol_execbench/core/scoring/official_score.py"
+    ).read_text()
+
+    assert "dataset runner emits explicitly requested official output" in module_source
+    assert "automation is being integrated separately" not in module_source
