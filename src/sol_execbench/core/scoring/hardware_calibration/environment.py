@@ -45,12 +45,9 @@ class RocmInfoRuntime:
             )
         except (OSError, subprocess.SubprocessError) as exc:
             raise RuntimeError("HIP runtime discovery unavailable") from exc
-        architectures = re.findall(r"(?:Name|Marketing Name):\s*(gfx[0-9a-z]+)", output)
-        uuids = re.findall(r"(?:Uuid|UUID):\s*([^\s]+)", output, re.IGNORECASE)
+        gpu_agents = _gpu_agents_from_rocminfo(output)
         try:
-            return architectures[device].lower(), (
-                uuids[device] if device < len(uuids) else None
-            )
+            return gpu_agents[device]
         except IndexError as exc:
             raise RuntimeError(f"HIP device {device} was not discovered") from exc
 
@@ -83,6 +80,26 @@ def discover_gpu(device: int, runtime: GpuRuntime | None = None) -> GpuEnvironme
     )
 
 
+def _gpu_agents_from_rocminfo(output: str) -> list[tuple[str, str | None]]:
+    """Return GPU architecture/UUID pairs from the same ROCr agent block.
+
+    ``rocminfo`` lists CPU agents before GPU agents on common desktop systems.
+    Collecting architectures and UUIDs independently incorrectly pairs gfx1200
+    with ``CPU-XX``; authority evidence must bind both values to one GPU agent.
+    """
+    agents = re.split(r"\*+\s*\n\s*Agent\s+\d+\s*\n\s*\*+", output)
+    result: list[tuple[str, str | None]] = []
+    for agent in agents[1:]:
+        architecture = re.search(r"^\s*Name:\s*(gfx[0-9a-z]+)\s*$", agent, re.M)
+        if architecture is None:
+            continue
+        uuid = re.search(r"^\s*Uuid:\s*([^\s]+)", agent, re.M | re.I)
+        result.append(
+            (architecture.group(1).lower(), uuid.group(1) if uuid is not None else None)
+        )
+    return result
+
+
 @dataclass(frozen=True)
 class ArchitectureAdapter:
     family: str
@@ -90,22 +107,31 @@ class ArchitectureAdapter:
     supports_clock_lock: bool = False
 
 
-def _matrix_key(family: str) -> CalibrationProfileKey:
+def _matrix_key(family: str, dtype: str = "bf16") -> CalibrationProfileKey:
     path = "wmma" if family == "gfx12" else "mfma"
-    return CalibrationProfileKey("compute", "matrix", "bf16", "bf16", path)
+    return CalibrationProfileKey("compute", "matrix", dtype, dtype, path)
 
 
 def _adapter(family: str, *, supports_clock_lock: bool = False) -> ArchitectureAdapter:
+    candidates = [
+        CalibrationProfileKey("compute", "vector", "fp32", "fp32", "portable"),
+        CalibrationProfileKey("memory", "stream_copy", "fp32", "fp32", "portable"),
+        CalibrationProfileKey("compute", "vector", "fp32", "fp32", family),
+        _matrix_key(family),
+        CalibrationProfileKey("memory", "stream_copy", "fp32", "fp32", family),
+    ]
+    if family == "gfx12":
+        candidates.append(_matrix_key(family, "fp16"))
+        candidates.append(
+            CalibrationProfileKey("memory", "stream_copy", "fp16", "fp16", "portable")
+        )
+        candidates.append(
+            CalibrationProfileKey("memory", "stream_copy", "fp16", "fp16", family)
+        )
     return ArchitectureAdapter(
         family=family,
         supports_clock_lock=supports_clock_lock,
-        candidates=(
-            CalibrationProfileKey("compute", "vector", "fp32", "fp32", "portable"),
-            CalibrationProfileKey("memory", "stream_copy", "fp32", "fp32", "portable"),
-            CalibrationProfileKey("compute", "vector", "fp32", "fp32", family),
-            _matrix_key(family),
-            CalibrationProfileKey("memory", "stream_copy", "fp32", "fp32", family),
-        ),
+        candidates=tuple(candidates),
     )
 
 

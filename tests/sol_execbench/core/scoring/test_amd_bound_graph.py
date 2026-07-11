@@ -59,6 +59,33 @@ def test_bound_graph_contract_serializes_json_like_values():
     assert payload["tensors"]["output:out"]["shape"] == [2, 8]
 
 
+def test_fx_tensor_transpose_preserves_gemm_operand_dependency():
+    definition = make_definition(
+        name="matmul_transpose_demo",
+        axes={
+            "M": {"type": "var"},
+            "N": {"type": "const", "value": 8},
+            "K": {"type": "const", "value": 4},
+        },
+        inputs={
+            "a": {"shape": ["M", "K"], "dtype": "float16"},
+            "b": {"shape": ["N", "K"], "dtype": "float16"},
+        },
+        outputs={"out": {"shape": ["M", "N"], "dtype": "float16"}},
+        reference="import torch\n\ndef run(a, b):\n    return torch.matmul(a, b.T)",
+    )
+    workload = make_workload(
+        axes={"M": 2},
+        inputs={"a": {"type": "random"}, "b": {"type": "random"}},
+        uuid="matmul-transpose-workload",
+    )
+
+    graph = build_bound_graph(definition, workload)
+
+    gemm = next(node for node in graph.nodes if node.op_family == OpFamily.GEMM)
+    assert gemm.input_tensor_ids == ("input:a", "input:b")
+
+
 def test_op_family_taxonomy_includes_paper_aligned_families():
     values = {family.value for family in OpFamily}
 
@@ -651,6 +678,63 @@ def test_dynamic_control_flow_is_inexact_or_unsupported_evidence():
     assert graph.nodes[0].op_family == OpFamily.UNSUPPORTED
     assert graph.nodes[0].confidence == EstimateConfidence.UNSUPPORTED
     assert "unsupported_operator:if" in graph.warnings
+
+
+def test_ast_fallback_expands_static_control_flow_and_ignores_metadata_calls():
+    from sol_execbench.core.scoring.amd_bound_graph.ast import _AstBoundGraphExtractor
+    from sol_execbench.core.scoring.amd_bound_graph.builder import _declared_tensors
+    import ast
+
+    definition = make_definition(
+        name="static_control_flow_demo",
+        axes={"N": {"type": "const", "value": 8}},
+        inputs={"x": {"shape": ["N"], "dtype": "float32"}},
+        outputs={"out": {"shape": ["N"], "dtype": "float32"}},
+        reference=(
+            "def run(x):\n"
+            "    enabled = True\n"
+            "    n = x.size(0)\n"
+            "    y = x\n"
+            "    if enabled:\n"
+            "        for i in range(2):\n"
+            "            y = y + x\n"
+            "    return y\n"
+        ),
+    )
+    workload = make_workload(axes={}, inputs={"x": {"type": "random"}}, uuid="w1")
+    input_shapes = definition.get_input_shapes(workload.axes)
+    output_shapes = definition.get_output_shapes(workload.axes)
+    extractor = _AstBoundGraphExtractor(
+        definition,
+        _declared_tensors(definition, input_shapes, output_shapes),
+        tuple(definition.outputs),
+        output_shapes,
+    )
+
+    nodes, _, _, warnings = extractor.extract(ast.parse(definition.reference))
+
+    assert [node.op_family for node in nodes] == [
+        OpFamily.ELEMENTWISE,
+        OpFamily.ELEMENTWISE,
+    ]
+    assert not any("size" in node.op_name for node in nodes)
+    assert not any("unsupported_operator" in warning for warning in warnings)
+
+
+def test_ast_fallback_keeps_dynamic_loop_unsupported():
+    definition = make_definition(
+        name="dynamic_loop_demo",
+        axes={"N": {"type": "const", "value": 8}},
+        inputs={"x": {"shape": ["N"], "dtype": "float32"}},
+        outputs={"out": {"shape": ["N"], "dtype": "float32"}},
+        reference="def run(x):\n    for i in range(x.size(0)):\n        x = x + 1\n    return x\n",
+    )
+    workload = make_workload(axes={}, inputs={"x": {"type": "random"}}, uuid="w1")
+
+    graph = build_bound_graph(definition, workload)
+
+    assert any(node.op_name == "for" for node in graph.nodes)
+    assert "unsupported_operator:for" in graph.warnings
 
 
 def test_projection_residual_graph_has_edges_for_common_patterns():

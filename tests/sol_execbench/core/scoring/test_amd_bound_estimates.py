@@ -1098,6 +1098,59 @@ def test_contiguous_and_dtype_conversion_count_movement_bytes():
     assert "dtype conversion" in conversion.rationale
 
 
+def test_zeros_like_has_exact_fill_bytes_without_reading_source_values():
+    from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
+
+    definition = make_definition(
+        name="zeros_like_demo",
+        axes={"N": {"type": "const", "value": 8}},
+        inputs={"x": {"shape": ["N"], "dtype": "float32"}},
+        outputs={"out": {"shape": ["N"], "dtype": "float32"}},
+        reference="import torch\n\ndef run(x):\n    return torch.zeros_like(x)",
+    )
+    workload = make_workload(
+        axes={}, inputs={"x": {"type": "random"}}, uuid="zeros-like-workload"
+    )
+
+    estimate = estimate_bound_work(build_bound_graph(definition, workload))[0]
+
+    assert estimate.confidence == EstimateConfidence.SUPPORTED
+    assert estimate.flops == 0.0
+    assert estimate.read_bytes == 0.0
+    assert estimate.write_bytes == 32.0
+    assert estimate.total_bytes == 32.0
+
+
+def test_cat_has_exact_materialized_read_and_write_bytes():
+    from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
+
+    definition = make_definition(
+        name="cat_demo",
+        axes={
+            "N": {"type": "const", "value": 4},
+            "M": {"type": "const", "value": 8},
+        },
+        inputs={
+            "x": {"shape": ["N"], "dtype": "float32"},
+            "y": {"shape": ["N"], "dtype": "float32"},
+        },
+        outputs={"out": {"shape": ["M"], "dtype": "float32"}},
+        reference="import torch\n\ndef run(x, y):\n    return torch.cat((x, y))",
+    )
+    workload = make_workload(
+        axes={},
+        inputs={"x": {"type": "random"}, "y": {"type": "random"}},
+        uuid="cat-workload",
+    )
+
+    estimate = estimate_bound_work(build_bound_graph(definition, workload))[0]
+
+    assert estimate.confidence == EstimateConfidence.SUPPORTED
+    assert estimate.read_bytes == 32.0
+    assert estimate.write_bytes == 32.0
+    assert estimate.total_bytes == 64.0
+
+
 def test_complex_families_keep_specific_unsupported_estimate_warnings():
     expected_warnings = {
         OpFamily.MOE: ("unsupported_operator:moe_taxonomy_only",),

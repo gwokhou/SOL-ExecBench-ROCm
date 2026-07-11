@@ -21,12 +21,31 @@ def write_trace_output(
     output_file: Path | None,
     traces: list[Trace],
     console: Console,
+    release_baseline_evidence: dict[str, dict[str, str]] | dict[str, str] | None = None,
 ) -> str | None:
     if output_file:
         output_file.parent.mkdir(parents=True, exist_ok=True)
         with open(output_file, "w") as f:
             for trace in traces:
-                f.write(json.dumps(trace.model_dump(mode="json")) + "\n")
+                payload = trace.model_dump(mode="json")
+                if release_baseline_evidence is not None:
+                    evaluation = payload.get("evaluation")
+                    if isinstance(evaluation, dict):
+                        workload = payload.get("workload")
+                        uuid = (
+                            workload.get("uuid") if isinstance(workload, dict) else None
+                        )
+                        evidence = (
+                            release_baseline_evidence.get(uuid)
+                            if isinstance(uuid, str)
+                            else None
+                        )
+                        evaluation["release_baseline"] = (
+                            evidence
+                            if isinstance(evidence, dict)
+                            else release_baseline_evidence
+                        )
+                f.write(json.dumps(payload) + "\n")
         console.print(f"[green]Saved {len(traces)} traces to {output_file}[/green]")
 
     return (

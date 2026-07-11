@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.scoring.amd_bound_estimate.estimates import estimate_bound_work
@@ -28,7 +30,9 @@ def build_amd_sol_bound_v2_artifact(
 ) -> AmdSolBoundV2Artifact:
     """Build an AMD SOL bound artifact v2 sidecar."""
     graph = build_bound_graph(definition, workload)
-    estimates = estimate_bound_work(graph)
+    estimates = _resolve_architecture_matrix_paths(
+        estimate_bound_work(graph), hardware_model
+    )
     op_bounds = tuple(
         _bound_for_estimate(estimate, hardware_model) for estimate in estimates
     )
@@ -48,4 +52,23 @@ def build_amd_sol_bound_v2_artifact(
         aggregate_bound=aggregate,
         warnings=warnings,
         coverage_summary=coverage,
+    )
+
+
+def _resolve_architecture_matrix_paths(estimates, hardware_model: AmdHardwareModel):
+    """Bind default matrix estimates to the model's exact ISA path.
+
+    Estimation predates model selection and historically used MFMA as the
+    generic matrix default.  gfx12 uses WMMA instead, so retaining MFMA would
+    deliberately miss an otherwise exact measured profile.  This only rewrites
+    that legacy default; a node that declares a different explicit path remains
+    untouched.
+    """
+    if not hardware_model.architecture.lower().startswith("gfx12"):
+        return estimates
+    return tuple(
+        replace(estimate, compute_path="wmma")
+        if estimate.compute_operation == "matrix" and estimate.compute_path == "mfma"
+        else estimate
+        for estimate in estimates
     )

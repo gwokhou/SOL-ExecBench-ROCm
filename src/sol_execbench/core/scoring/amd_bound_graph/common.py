@@ -83,6 +83,8 @@ def _ast_call_attributes(
     movement_kind = _movement_kind_for_name(leaf_name)
     if movement_kind is not None:
         attributes["movement_kind"] = movement_kind
+    if leaf_name in {"zeros", "zeros_like"}:
+        attributes["materialization_kind"] = "fill"
 
     keyword_values = {
         keyword.arg: keyword.value for keyword in node.keywords if keyword.arg

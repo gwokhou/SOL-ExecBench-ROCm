@@ -26,7 +26,11 @@ def _profile_output_directory(output_file: Path | None, staging_dir: Path) -> Pa
     """Return the profiler artifact directory for an evaluation run."""
 
     if output_file is not None:
-        return output_file.with_name(f"{output_file.name}.rocprofv3")
+        # rocprofv3 runs the application from the temporary staging directory.
+        # A relative trace path would otherwise make its output land under that
+        # staging directory while artifact discovery looks in the caller's
+        # requested output directory.
+        return output_file.with_name(f"{output_file.name}.rocprofv3").resolve()
     return staging_dir / "rocprofv3"
 
 

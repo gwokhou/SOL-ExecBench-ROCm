@@ -27,6 +27,8 @@ from .helpers import (
     _ensure_workload,
     _extend_unique,
     _is_degraded_status,
+    _increment_count,
+    _increment_nested_count,
     _payload_artifacts,
     _provisional_artifact,
     _sorted_evidence_gaps,
@@ -40,6 +42,7 @@ from .helpers import (
 from .models import (
     PRIMARY_STATUS_ORDER,
     SANITY_STATUS_KEYS,
+    AMD_AUTHORITY_AUDIT_POLICY_VERSION,
     AmdBoundSanityArtifactAvailability,
     AmdBoundSanityClaimBoundary,
     AmdBoundSanityReport,
@@ -73,6 +76,10 @@ def build_amd_bound_sanity_report(
     closure_records = path_mapping_list(execution_closure, "records")
     workloads: dict[str, dict[str, Any]] = {}
     evidence_gap_groups: dict[str, dict[str, Any]] = {}
+    operator_counts: dict[str, int] = {}
+    op_family_counts: dict[str, int] = {}
+    blocker_counts_by_operator: dict[str, dict[str, int]] = {}
+    blocker_counts_by_op_family: dict[str, dict[str, int]] = {}
 
     for record in closure_records:
         uuid = str(
@@ -120,6 +127,14 @@ def build_amd_bound_sanity_report(
             workload["diagnostic_flags"].add("unsupported")
         if _provisional_artifact(artifact):
             workload["diagnostic_flags"].add("provisional")
+        _audit_bound_artifact(
+            artifact,
+            workload,
+            operator_counts=operator_counts,
+            op_family_counts=op_family_counts,
+            blocker_counts_by_operator=blocker_counts_by_operator,
+            blocker_counts_by_op_family=blocker_counts_by_op_family,
+        )
 
     solar_statuses: dict[str, int] = {}
     for artifact in _payload_artifacts(solar_artifacts):
@@ -145,6 +160,8 @@ def build_amd_bound_sanity_report(
             workload["diagnostic_flags"].add("unsupported")
         if _contains_provisional(workload["warnings"]):
             workload["diagnostic_flags"].add("provisional")
+        if status != "scored":
+            workload["blocker_codes"].add("solar_not_scored")
 
     for score in path_mapping_list(amd_score_report, "scores"):
         uuid = _artifact_uuid(score)
@@ -168,6 +185,8 @@ def build_amd_bound_sanity_report(
                 if value
             }
         )
+        eligibility = path_dict(score, "bound_eligibility")
+        _apply_score_prerequisite_blockers(workload, score, eligibility)
 
     for workload in workloads.values():
         _apply_missing_required_artifact_gaps(
@@ -178,6 +197,7 @@ def build_amd_bound_sanity_report(
             has_matrix=compatibility_matrix is not None,
         )
         for gap in workload["evidence_gaps"]:
+            workload["blocker_codes"].add(gap)
             _add_gap_group(
                 evidence_gap_groups,
                 reason_code=gap,
@@ -211,6 +231,7 @@ def build_amd_bound_sanity_report(
 
     rows = []
     totals = AmdBoundSanityStatusTotals()
+    blocker_code_counts: dict[str, int] = {}
     provisional_risk = False
     for raw in workloads.values():
         flags = set(raw["diagnostic_flags"]) or {"scored"}
@@ -223,6 +244,8 @@ def build_amd_bound_sanity_report(
         if "provisional" in flags and primary_status != "provisional":
             totals.add("provisional")
         provisional_risk = provisional_risk or "provisional" in flags
+        for blocker_code in raw["blocker_codes"]:
+            _increment_count(blocker_code_counts, blocker_code)
         rows.append(
             AmdBoundSanityWorkload(
                 category=raw["category"],
@@ -239,10 +262,12 @@ def build_amd_bound_sanity_report(
                 warnings=sorted(raw["warnings"]),
                 evidence_refs=dict(sorted(raw["evidence_refs"].items())),
                 evidence_gaps=sorted(raw["evidence_gaps"]),
+                blocker_codes=sorted(raw["blocker_codes"]),
             )
         )
 
     report = AmdBoundSanityReport(
+        authority_audit_policy_version=AMD_AUTHORITY_AUDIT_POLICY_VERSION,
         created_at=created_at or utc_timestamp(),
         sources=AmdBoundSanitySources(
             trace_refs=sorted(
@@ -284,6 +309,11 @@ def build_amd_bound_sanity_report(
         coverage_summary=_coverage_summary(amd_score_report, compatibility_matrix),
         warnings=_suite_warnings(workloads, amd_score_report),
         evidence_gaps=_sorted_evidence_gaps(evidence_gap_groups),
+        blocker_code_counts=dict(sorted(blocker_code_counts.items())),
+        operator_counts=dict(sorted(operator_counts.items())),
+        op_family_counts=dict(sorted(op_family_counts.items())),
+        blocker_counts_by_operator=_sorted_jsonable(blocker_counts_by_operator),
+        blocker_counts_by_op_family=_sorted_jsonable(blocker_counts_by_op_family),
         workloads=sorted(
             rows,
             key=lambda row: (
@@ -298,3 +328,78 @@ def build_amd_bound_sanity_report(
         ),
     )
     return report.with_checksum()
+
+
+def _audit_bound_artifact(
+    artifact: dict[str, Any],
+    workload: dict[str, Any],
+    *,
+    operator_counts: dict[str, int],
+    op_family_counts: dict[str, int],
+    blocker_counts_by_operator: dict[str, dict[str, int]],
+    blocker_counts_by_op_family: dict[str, dict[str, int]],
+) -> None:
+    """Collect deterministic, machine-readable authority blockers from a v2 bound."""
+    aggregate_status = path_str_or_none(
+        path_dict(artifact, "aggregate_bound"), "status"
+    )
+    if aggregate_status != "scored":
+        workload["blocker_codes"].add("amd_sol_not_scored")
+
+    hardware = path_dict(artifact, "hardware_model")
+    if path_str_or_none(hardware, "hardware_validation_status") != "validated":
+        workload["blocker_codes"].add("hardware_not_validated")
+    if path_str_or_none(hardware, "model_validation_status") != "validated":
+        workload["blocker_codes"].add("model_not_validated")
+    if any(
+        "unknown_hardware_profile" in warning for warning in _warnings_from(artifact)
+    ):
+        workload["blocker_codes"].add("unsupported_hardware_profile")
+    if _warnings_from(artifact):
+        workload["blocker_codes"].add("bound_evidence_warning")
+
+    for estimate in path_mapping_list(artifact, "operator_work_estimates"):
+        operator = path_str_or_none(estimate, "op_name") or "<unknown>"
+        family = path_str_or_none(estimate, "op_family") or "unknown"
+        confidence = path_str_or_none(estimate, "confidence") or "unsupported"
+        _increment_count(operator_counts, operator)
+        _increment_count(op_family_counts, family)
+        blocker = {
+            "unsupported": "unsupported_operator",
+            "inexact": "inexact_operator",
+            "estimated": "inexact_operator",
+        }.get(confidence)
+        if blocker is None:
+            continue
+        workload["blocker_codes"].add(blocker)
+        _increment_nested_count(blocker_counts_by_operator, operator, blocker)
+        _increment_nested_count(blocker_counts_by_op_family, family, blocker)
+
+    estimates = path_mapping_list(artifact, "operator_work_estimates")
+    if len(estimates) > 1:
+        # v2 is deliberately an operator-sum format. Until a fusion-group IR
+        # proves external traffic and reuse, a multi-op sum is diagnostic only.
+        workload["blocker_codes"].add("fusion_semantics_inexact")
+
+
+def _apply_score_prerequisite_blockers(
+    workload: dict[str, Any], score: dict[str, Any], eligibility: dict[str, Any]
+) -> None:
+    refs = path_dict(score, "evidence_refs")
+    if not refs.get("timing"):
+        workload["blocker_codes"].add("missing_profiler_timing")
+    if not refs.get("baseline"):
+        workload["blocker_codes"].add("missing_baseline")
+    if (
+        not refs.get("trace")
+        or not refs.get("sol_bound")
+        or not refs.get("hardware_model")
+    ):
+        workload["blocker_codes"].add("missing_provenance")
+    if eligibility:
+        if path_str_or_none(eligibility, "hardware_profile_state") != "measured":
+            workload["blocker_codes"].add("unsupported_hardware_profile")
+        if path_str_or_none(eligibility, "hardware_validation_status") != "validated":
+            workload["blocker_codes"].add("hardware_not_validated")
+        if path_str_or_none(eligibility, "model_validation_status") != "validated":
+            workload["blocker_codes"].add("model_not_validated")

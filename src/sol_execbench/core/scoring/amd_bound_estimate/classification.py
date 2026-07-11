@@ -91,6 +91,27 @@ _CALL_CLASSIFIERS: tuple[tuple[set[str], CallClassification], ...] = (
         ),
     ),
     (
+        {
+            "abs",
+            "clamp",
+            "clamp_min",
+            "clamp_max",
+            "clip",
+            "maximum",
+            "minimum",
+            "where",
+            "one_hot",
+            "logical_and",
+            "logical_or",
+            "logical_not",
+        },
+        CallClassification(
+            "elementwise",
+            EstimateConfidence.INEXACT,
+            "recognized pointwise operation with shape-dependent work",
+        ),
+    ),
+    (
         {"selective_scan", "mamba_scan", "ssm_scan"},
         CallClassification(
             "ssm_mamba",
@@ -115,7 +136,22 @@ _CALL_CLASSIFIERS: tuple[tuple[set[str], CallClassification], ...] = (
         CallClassification(
             "data_movement",
             EstimateConfidence.INEXACT,
-            "recognized view or data-movement operation",
+            "recognized logical view or broadcast operation",
+        ),
+    ),
+    (
+        {
+            "zeros",
+            "zeros_like",
+            "cat",
+            "concat",
+            "stack",
+            "copy_",
+        },
+        CallClassification(
+            "data_movement",
+            EstimateConfidence.SUPPORTED,
+            "recognized materialized data-movement operation",
         ),
     ),
     (
@@ -140,6 +176,9 @@ _LOGICAL_VIEW_NAMES = {
 }
 _BROADCAST_VIEW_NAMES = {"expand", "broadcast_to"}
 _MATERIALIZED_MOVEMENT_NAMES = {"contiguous"}
+_MATERIALIZED_MOVEMENT_NAMES.update(
+    {"zeros", "zeros_like", "cat", "concat", "stack", "copy_", "getitem"}
+)
 _DTYPE_METHOD_TARGETS = {
     "float": "float32",
     "half": "float16",

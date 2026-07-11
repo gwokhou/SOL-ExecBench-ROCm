@@ -49,6 +49,9 @@ def run_evaluation_cli(
     feedback_candidate_id: str | None,
     feedback_source_sha256: str | None,
     feedback_sol_version: str | None,
+    release_bound_sha256: str | None,
+    release_hardware_model_sha256: str | None,
+    release_authority_json: Path | None,
     verbose: bool,
 ) -> None:
     """Evaluate a SOL-ExecBench solution on GPU."""
@@ -132,10 +135,14 @@ def run_evaluation_cli(
         console.print(f"[dim]{runtime_result.filtered_stderr}[/dim]")
 
     traces = runtime_result.traces
+    release_baseline_evidence = _release_baseline_evidence(
+        release_bound_sha256, release_hardware_model_sha256, release_authority_json
+    )
     trace_run_id = cli_outputs.write_trace_output(
         output_file=output_file,
         traces=traces,
         console=console,
+        release_baseline_evidence=release_baseline_evidence,
     )
     profile_result = runtime_result.profile_result
     cli_sidecar_writer.write_optional_sidecars(
@@ -158,3 +165,42 @@ def run_evaluation_cli(
 
     packager.close()
     sys.exit(0 if cli_outputs.all_traces_passed(traces) else 1)
+
+
+def _release_baseline_evidence(
+    bound_sha256: str | None,
+    hardware_model_sha256: str | None,
+    authority_json: Path | None,
+) -> dict[str, dict[str, str]] | dict[str, str] | None:
+    """Return explicit immutable evidence only when both release inputs exist."""
+    if authority_json is not None:
+        rows = json.loads(authority_json.read_text(encoding="utf-8")).get(
+            "workloads", []
+        )
+        result = {
+            str(row["workload_uuid"]): {
+                "bound_sha256": str(row["bound_sha256"]),
+                "hardware_model_sha256": str(row["hardware_model_sha256"]),
+            }
+            for row in rows
+            if isinstance(row, dict)
+            and row.get("workload_uuid")
+            and row.get("bound_sha256")
+            and row.get("hardware_model_sha256")
+        }
+        if not result:
+            raise ValueError(
+                "release authority JSON has no immutable workload evidence"
+            )
+        return result
+    if bound_sha256 is None and hardware_model_sha256 is None:
+        return None
+    if not bound_sha256 or not hardware_model_sha256:
+        raise ValueError(
+            "release rerun evidence requires both --release-bound-sha256 and "
+            "--release-hardware-model-sha256"
+        )
+    return {
+        "bound_sha256": bound_sha256,
+        "hardware_model_sha256": hardware_model_sha256,
+    }

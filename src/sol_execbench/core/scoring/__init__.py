@@ -9,6 +9,11 @@ from importlib import import_module
 from typing import Any
 
 _EXPORTS = {
+    "AUTHORITY_SLICE_SCHEMA_VERSION": ".authority_slice",
+    "AuthoritySliceManifest": ".authority_slice",
+    "AuthoritySliceSelectionPolicy": ".authority_slice",
+    "authority_slice_manifest_from_dict": ".authority_slice",
+    "build_authority_slice_manifest": ".authority_slice",
     "AMD_SOL_SCHEMA_VERSION": ".amd_sol",
     "AmdHardwareModel": ".amd_sol",
     "AmdSolBoundArtifact": ".amd_sol",
@@ -92,6 +97,9 @@ _EXPORTS = {
 }
 
 __all__ = [
+    "AUTHORITY_SLICE_SCHEMA_VERSION",
+    "AuthoritySliceManifest",
+    "AuthoritySliceSelectionPolicy",
     "AMD_SCORE_CLAIM_LEVEL",
     "AMD_SCORE_SCHEMA_VERSION",
     "AMD_SOL_SCHEMA_VERSION",
@@ -149,6 +157,8 @@ __all__ = [
     "ReleaseProvenance",
     "WorkEstimate",
     "build_bound_graph",
+    "build_authority_slice_manifest",
+    "authority_slice_manifest_from_dict",
     "build_amd_native_suite_report",
     "amd_hardware_model_from_dict",
     "load_amd_hardware_model",

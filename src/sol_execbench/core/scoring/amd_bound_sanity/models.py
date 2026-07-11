@@ -12,6 +12,7 @@ from sol_execbench.core.data.json_utils import stable_model_checksum, stable_mod
 from sol_execbench.core.dataset.manifest import DatasetManifestChecksum
 
 AMD_BOUND_SANITY_SCHEMA_VERSION = "sol_execbench.amd_bound_sanity.v1"
+AMD_AUTHORITY_AUDIT_POLICY_VERSION = "amd-authority-blockers-v1"
 
 SANITY_STATUS_KEYS = (
     "scored",
@@ -124,6 +125,7 @@ class AmdBoundSanityWorkload(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     evidence_refs: dict[str, str] = Field(default_factory=dict)
     evidence_gaps: list[str] = Field(default_factory=list)
+    blocker_codes: list[str] = Field(default_factory=list)
 
 
 class AmdBoundSanityEvidenceGap(BaseModel):
@@ -156,6 +158,7 @@ class AmdBoundSanityReport(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     schema_version: str = AMD_BOUND_SANITY_SCHEMA_VERSION
+    authority_audit_policy_version: str | None = None
     created_at: str
     sources: AmdBoundSanitySources
     artifact_availability: AmdBoundSanityArtifactAvailability
@@ -165,6 +168,11 @@ class AmdBoundSanityReport(BaseModel):
     coverage_summary: dict[str, Any]
     warnings: list[str]
     evidence_gaps: list[AmdBoundSanityEvidenceGap]
+    blocker_code_counts: dict[str, int] = Field(default_factory=dict)
+    operator_counts: dict[str, int] = Field(default_factory=dict)
+    op_family_counts: dict[str, int] = Field(default_factory=dict)
+    blocker_counts_by_operator: dict[str, dict[str, int]] = Field(default_factory=dict)
+    blocker_counts_by_op_family: dict[str, dict[str, int]] = Field(default_factory=dict)
     workloads: list[AmdBoundSanityWorkload]
     claim_boundary: AmdBoundSanityClaimBoundary = Field(
         default_factory=AmdBoundSanityClaimBoundary

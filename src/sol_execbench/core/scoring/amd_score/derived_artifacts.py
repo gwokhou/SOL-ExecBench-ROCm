@@ -14,6 +14,7 @@ from sol_execbench.core.scoring.amd_score.sidecar_parsing import (
     minimal_solar_aggregate_from_payload,
     read_json_object,
 )
+from sol_execbench.core.scoring.amd_hardware_models import load_amd_hardware_model
 from sol_execbench.core.scoring.amd_sol import default_amd_hardware_models
 from sol_execbench.core.scoring.amd_sol.v2 import build_amd_sol_bound_v2_artifact
 from sol_execbench.core.scoring.solar_derivation import (
@@ -62,6 +63,17 @@ def resolve_hardware_model_from_trace_payloads(
         key=hardware_model_key,
         model=hardware_models[hardware_model_key],
         ref=f"default_amd_hardware_models.{hardware_model_key}",
+    )
+
+
+def resolve_hardware_model_from_path(path: Path) -> ResolvedHardwareModel:
+    """Load a validated external model instead of silently using a package default."""
+    path = Path(path)
+    model = load_amd_hardware_model(path)
+    return ResolvedHardwareModel(
+        key=model.architecture,
+        model=model,
+        ref=str(path),
     )
 
 

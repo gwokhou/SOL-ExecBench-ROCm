@@ -26,22 +26,32 @@ def _data_movement_estimate(
     )
     read_bytes = _sum_tensor_bytes(input_tensors, "read", warnings, rationale_parts)
     write_bytes = _sum_tensor_bytes(output_tensors, "write", warnings, rationale_parts)
+    if node.attributes.get("materialization_kind") == "fill":
+        # zeros_like consumes shape/dtype metadata but does not read tensor data.
+        read_bytes = 0.0
     movement_kind = str(
         node.attributes.get("movement_kind") or _movement_kind_from_op_name(node)
     )
     if movement_kind == "materialized":
         movement_bytes = read_bytes + write_bytes
+        total_bytes = movement_bytes
         rationale = (
             "materialized data movement estimate for contiguous or copy-like operation"
         )
     elif movement_kind == "broadcast_view":
         movement_bytes = 0.0
+        total_bytes = 0.0
         rationale = "broadcast view evidence with zero movement bytes"
     else:
         movement_kind = "logical_view"
         movement_bytes = 0.0
+        total_bytes = 0.0
         rationale = "logical view evidence with zero movement bytes"
-    total_bytes = read_bytes + write_bytes
+    confidence = (
+        EstimateConfidence.SUPPORTED
+        if node.confidence == EstimateConfidence.SUPPORTED and not warnings
+        else EstimateConfidence.INEXACT
+    )
     return OperatorWorkEstimate(
         node_id=node.node_id,
         op_family=node.op_family,
@@ -55,7 +65,7 @@ def _data_movement_estimate(
         intermediate_bytes=0.0,
         movement_bytes=movement_bytes,
         total_bytes=total_bytes,
-        confidence=EstimateConfidence.INEXACT,
+        confidence=confidence,
         rationale=_join_rationale(rationale, rationale_parts),
         movement_kind=movement_kind,
         warnings=tuple(dict.fromkeys(warnings)),

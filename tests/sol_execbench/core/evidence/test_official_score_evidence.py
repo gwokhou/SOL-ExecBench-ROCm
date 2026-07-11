@@ -3,6 +3,8 @@ from __future__ import annotations
 import ast
 import inspect
 
+import pytest
+
 import sol_execbench.core.scoring.amd_score as amd_score
 from sol_execbench.core.scoring.amd_score import (
     AMD_SCORE_CLAIM_LEVEL,
@@ -46,10 +48,11 @@ def _amd_score(
     baseline_latency_ms: float | None = 2.0,
     sol_bound_ms: float | None = 0.5,
     baseline_source: str = "scoring_baseline",
+    workload_uuid: str = "workload-1",
 ) -> AmdNativeScore:
     return AmdNativeScore(
         definition="matmul_demo",
-        workload_uuid="workload-1",
+        workload_uuid=workload_uuid,
         measured_latency_ms=measured_latency_ms,
         baseline_latency_ms=baseline_latency_ms,
         sol_bound_ms=sol_bound_ms,
@@ -111,6 +114,34 @@ def test_legacy_score_without_bound_eligibility_cannot_be_official():
 
     assert evidence.score is None
     assert "missing_bound_eligibility" in evidence.blocker_reason_codes
+
+
+def test_missing_authority_evidence_refs_cannot_be_official():
+    score = _amd_score()
+    score = AmdNativeScore(**{**score.__dict__, "evidence_refs": {}})
+
+    evidence = official_score_from_amd_native_score(
+        score, aggregation_policy=AGGREGATION_POLICY
+    )
+
+    assert evidence.score is None
+    assert "missing_evidence_reference" in evidence.blocker_reason_codes
+
+
+def test_inconsistent_baseline_or_candidate_bound_is_blocked():
+    baseline_conflict = official_score_from_amd_native_score(
+        _amd_score(baseline_latency_ms=0.5, sol_bound_ms=0.5),
+        aggregation_policy=AGGREGATION_POLICY,
+    )
+    candidate_conflict = official_score_from_amd_native_score(
+        _amd_score(measured_latency_ms=0.4, sol_bound_ms=0.5),
+        aggregation_policy=AGGREGATION_POLICY,
+    )
+
+    assert (
+        "baseline_not_slower_than_sol_bound" in baseline_conflict.blocker_reason_codes
+    )
+    assert "candidate_below_sol_bound" in candidate_conflict.blocker_reason_codes
 
 
 def test_inexact_or_degraded_bound_evidence_cannot_be_official():
@@ -190,11 +221,13 @@ def test_suite_evidence_reports_counts_blockers_and_input_refs():
             _amd_score(
                 score=0.9,
                 baseline_source="reference_latency",
+                workload_uuid="workload-2",
             ),
         ),
         aggregation_policy=AGGREGATION_POLICY,
         source_score_refs_by_workload_uuid={
-            "workload-1": "amd_native_score.json#workload-1"
+            "workload-1": "amd_native_score.json#workload-1",
+            "workload-2": "amd_native_score.json#workload-2",
         },
     )
 
@@ -220,7 +253,11 @@ def test_suite_uses_fixed_denominator_and_zero_for_blocked_scores():
     report = build_official_score_suite_evidence(
         (
             _amd_score(score=0.75),
-            _amd_score(score=0.9, baseline_source="reference_latency"),
+            _amd_score(
+                score=0.9,
+                baseline_source="reference_latency",
+                workload_uuid="workload-2",
+            ),
         ),
         aggregation_policy=AGGREGATION_POLICY,
     )
@@ -235,6 +272,34 @@ def test_suite_uses_fixed_denominator_and_zero_for_blocked_scores():
     assert payload["zero_scored_count"] == 1
     assert payload["unscored_count"] == 1
     assert payload["score_authority"] is False
+
+
+def test_suite_manifest_keeps_missing_derived_score_in_denominator():
+    report = build_official_score_suite_evidence(
+        (_amd_score(),),
+        aggregation_policy=AGGREGATION_POLICY,
+        expected_workloads=(
+            ("matmul_demo", "workload-1"),
+            ("matmul_demo", "workload-without-trace"),
+        ),
+    )
+
+    payload = report.to_dict()
+
+    assert payload["total_workload_count"] == 2
+    assert payload["scored_count"] == 1
+    assert payload["zero_scored_count"] == 1
+    assert payload["score"] == 0.375
+    assert payload["scores"][1]["workload_uuid"] == "workload-without-trace"
+    assert MISSING_SCORE_BLOCKER in payload["scores"][1]["blocker_reason_codes"]
+
+
+def test_suite_rejects_duplicate_derived_scores():
+    with pytest.raises(ValueError, match="duplicate AMD-native score"):
+        build_official_score_suite_evidence(
+            (_amd_score(), _amd_score()),
+            aggregation_policy=AGGREGATION_POLICY,
+        )
 
 
 def test_all_blocked_suite_is_zero_not_null():
@@ -367,15 +432,16 @@ def _mismatched_coverage_report() -> BaselineCoverageReport:
     )
 
 
-def test_measured_baseline_registry_with_confirmed_coverage_is_accepted():
+def test_measured_baseline_registry_is_not_a_release_scoring_baseline():
     evidence = official_score_from_amd_native_score(
         _amd_score(baseline_source="measured_baseline_registry"),
         aggregation_policy=AGGREGATION_POLICY,
         coverage_report=_confirmed_coverage_report(),
     )
 
-    assert evidence.score == 0.75
-    assert evidence.score_authority is True
+    assert evidence.score is None
+    assert evidence.score_authority is False
+    assert MISSING_BASELINE_BLOCKER in evidence.blocker_reason_codes
     assert BASELINE_COVERAGE_FAILED_BLOCKER not in evidence.blocker_reason_codes
 
 

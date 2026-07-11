@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
@@ -23,6 +24,18 @@ class ScoringBaselineEntry:
     latency_ms: float
     solution: str | None = None
     source: str | None = None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.definition, str) or not self.definition.strip():
+            raise ValueError("baseline definition must be non-empty")
+        if not isinstance(self.workload_uuid, str) or not self.workload_uuid.strip():
+            raise ValueError("baseline workload_uuid must be non-empty")
+        if not isinstance(self.latency_ms, (int, float)) or isinstance(
+            self.latency_ms, bool
+        ):
+            raise ValueError("baseline latency_ms must be a number")
+        if not math.isfinite(self.latency_ms) or self.latency_ms <= 0.0:
+            raise ValueError("baseline latency_ms must be positive and finite")
 
     @property
     def key(self) -> tuple[str, str]:
@@ -50,6 +63,19 @@ class ScoringBaselineArtifact:
     source: str
     schema_version: str = BASELINE_ARTIFACT_SCHEMA_VERSION
     derived: bool = True
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.release, str) or not self.release.strip():
+            raise ValueError("baseline release must be non-empty")
+        if not isinstance(self.source, str) or not self.source.strip():
+            raise ValueError("baseline source must be non-empty")
+        if self.schema_version != BASELINE_ARTIFACT_SCHEMA_VERSION:
+            raise ValueError(
+                f"unsupported scoring baseline schema {self.schema_version!r}"
+            )
+        keys = [entry.key for entry in self.entries]
+        if len(keys) != len(set(keys)):
+            raise ValueError("duplicate baseline definition/workload key")
 
     @property
     def summary(self) -> dict[str, int]:
@@ -125,18 +151,22 @@ def scoring_baseline_artifact_from_dict(
             raise ValueError(f"baseline entry {index} must be an object")
         raw_entry = cast(dict[str, Any], raw)
         try:
-            definition = str(raw_entry["definition"])
-            workload_uuid = str(raw_entry["workload_uuid"])
-            latency_ms = float(raw_entry["latency_ms"])
+            definition = raw_entry["definition"]
+            workload_uuid = raw_entry["workload_uuid"]
+            latency_ms = raw_entry["latency_ms"]
         except KeyError as exc:
             raise ValueError(f"baseline entry {index} missing {exc.args[0]}") from exc
-        if latency_ms <= 0.0:
-            raise ValueError(f"baseline entry {index} latency_ms must be positive")
+        if not isinstance(definition, str) or not definition.strip():
+            raise ValueError(f"baseline entry {index} definition must be non-empty")
+        if not isinstance(workload_uuid, str) or not workload_uuid.strip():
+            raise ValueError(f"baseline entry {index} workload_uuid must be non-empty")
+        if not isinstance(latency_ms, (int, float)) or isinstance(latency_ms, bool):
+            raise ValueError(f"baseline entry {index} latency_ms must be a number")
         entries.append(
             ScoringBaselineEntry(
                 definition=definition,
                 workload_uuid=workload_uuid,
-                latency_ms=latency_ms,
+                latency_ms=float(latency_ms),
                 solution=(
                     str(raw_entry["solution"]) if raw_entry.get("solution") else None
                 ),

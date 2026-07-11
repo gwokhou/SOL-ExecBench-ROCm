@@ -43,26 +43,32 @@ def _bound_for_estimate(
         if estimate.memory_access
         else None
     )
-    usable_compute = (
+    compute_profile_required = estimate.flops > 0.0
+    memory_profile_required = estimate.total_bytes > 0.0
+    usable_compute = not compute_profile_required or (
         compute_profile is not None
         and compute_profile.state == "measured"
         and compute_profile.value is not None
     )
-    usable_memory = (
+    usable_memory = not memory_profile_required or (
         memory_profile is not None
         and memory_profile.state == "measured"
         and memory_profile.value is not None
     )
-    compute_bound_ms = (
-        estimate.flops / (compute_profile.value * 1_000_000_000_000.0) * 1000.0
-        if usable_compute
-        else 0.0
-    )
-    memory_bound_ms = (
-        estimate.total_bytes / (memory_profile.value * 1_000_000_000.0) * 1000.0
-        if usable_memory
-        else 0.0
-    )
+    if compute_profile_required and usable_compute:
+        assert compute_profile is not None and compute_profile.value is not None
+        compute_bound_ms = (
+            estimate.flops / (compute_profile.value * 1_000_000_000_000.0) * 1000.0
+        )
+    else:
+        compute_bound_ms = 0.0
+    if memory_profile_required and usable_memory:
+        assert memory_profile is not None and memory_profile.value is not None
+        memory_bound_ms = (
+            estimate.total_bytes / (memory_profile.value * 1_000_000_000.0) * 1000.0
+        )
+    else:
+        memory_bound_ms = 0.0
     limiting_resource = "compute" if compute_bound_ms >= memory_bound_ms else "memory"
     profile_warnings = list(estimate.warnings)
     confidence = estimate.confidence

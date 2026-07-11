@@ -3,13 +3,9 @@
 
 """``sol-execbench official-score`` CLI (GATE-03 confirmed-evidence emitter).
 
-Emits an ``official_score_evidence.v1`` JSON artifact from SOL-provided
-benchmark evidence (an AMD-native score report plus a measured baseline
-registry), mirroring the agent_feedback / profile_summary sidecar-producer
-pattern: input SOL artifacts -> output confirmed-evidence artifact. The score
-aggregation policy is supplied explicitly via ``--aggregation-policy``, which
-resolves the official score gate's previously-unresolved precondition without
-adding the concept to ``AmdNativeSuiteReport``.
+Emits official score evidence only from a release-scoped baseline, its
+independent rerun verification, and an explicit suite denominator. A measured
+baseline registry can still add diagnostic coverage checks, but is not ``T_b``.
 """
 
 from __future__ import annotations
@@ -28,6 +24,7 @@ from ...core.scoring.official_score import (
     OFFICIAL_AGGREGATION_POLICY,
     build_official_score_suite_evidence,
 )
+from ...core.scoring.release_baseline import load_official_release_baseline
 
 
 @click.command(
@@ -44,9 +41,36 @@ from ...core.scoring.official_score import (
 @click.option(
     "--measured-registry",
     "measured_registry_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="Optional measured-baseline coverage registry; not a scoring baseline.",
+)
+@click.option(
+    "--scoring-baseline",
+    "scoring_baseline_path",
     required=True,
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
-    help="Measured baseline registry JSON (baseline_export.py output).",
+    help="Release scoring_baseline.v1 JSON.",
+)
+@click.option(
+    "--release-baseline-bundle",
+    "release_bundle_path",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="release_baseline_bundle.v1 matching --scoring-baseline.",
+)
+@click.option(
+    "--release-baseline-verification",
+    "release_verification_path",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="Passing release_baseline_verification.v1 for the bundle.",
+)
+@click.option(
+    "--suite-manifest",
+    "suite_manifest_path",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="Canonical JSON suite denominator (list or {workloads: [...]}) .",
 )
 @click.option(
     "--aggregation-policy",
@@ -88,7 +112,11 @@ from ...core.scoring.official_score import (
 )
 def _official_score_cli(
     amd_native_score_path: Path,
-    measured_registry_path: Path,
+    measured_registry_path: Path | None,
+    scoring_baseline_path: Path,
+    release_bundle_path: Path,
+    release_verification_path: Path,
+    suite_manifest_path: Path,
     aggregation_policy: str,
     env_hardware: str | None,
     env_rocm: str | None,
@@ -101,21 +129,34 @@ def _official_score_cli(
     report = amd_native_suite_report_from_dict(
         json.loads(amd_native_score_path.read_text(encoding="utf-8"))
     )
-    registry = json.loads(measured_registry_path.read_text(encoding="utf-8"))
-    current_run_env = CurrentRunEnvironment(
-        hardware=env_hardware,
-        rocm_version=env_rocm,
-        target_id=env_target,
-        timing_policy=env_timing_policy,
-    )
-    coverage_report = validate_baseline_coverage(
-        registry, current_run_environment=current_run_env
-    )
-    suite = build_official_score_suite_evidence(
-        report.scores,
-        aggregation_policy=aggregation_policy,
-        coverage_report=coverage_report,
-    )
+    try:
+        release_baseline = load_official_release_baseline(
+            baseline_path=scoring_baseline_path,
+            bundle_path=release_bundle_path,
+            verification_path=release_verification_path,
+        )
+        expected_workloads = _suite_workloads(suite_manifest_path)
+        coverage_report = None
+        if measured_registry_path is not None:
+            registry = json.loads(measured_registry_path.read_text(encoding="utf-8"))
+            current_run_env = CurrentRunEnvironment(
+                hardware=env_hardware,
+                rocm_version=env_rocm,
+                target_id=env_target,
+                timing_policy=env_timing_policy,
+            )
+            coverage_report = validate_baseline_coverage(
+                registry, current_run_environment=current_run_env
+            )
+        suite = build_official_score_suite_evidence(
+            report.scores,
+            aggregation_policy=aggregation_policy,
+            coverage_report=coverage_report,
+            release_baseline=release_baseline,
+            expected_workloads=expected_workloads,
+        )
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        raise click.ClickException(str(exc)) from exc
     payload = suite.to_dict()
     serialized = json.dumps(payload, indent=2, sort_keys=True) + "\n"
     if output_path is not None:
@@ -124,3 +165,23 @@ def _official_score_cli(
         click.echo(f"wrote {output_path}")
     else:
         click.echo(serialized)
+
+
+def _suite_workloads(path: Path) -> tuple[tuple[str, str], ...]:
+    """Load the canonical official-score denominator from a suite manifest."""
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    rows = payload.get("workloads") if isinstance(payload, dict) else payload
+    if not isinstance(rows, list):
+        raise ValueError("suite manifest must be a list or object with workloads")
+    workloads: list[tuple[str, str]] = []
+    for index, row in enumerate(rows):
+        if not isinstance(row, dict):
+            raise ValueError(f"suite workload {index} must be an object")
+        definition = row.get("definition")
+        workload_uuid = row.get("workload_uuid")
+        if not isinstance(definition, str) or not definition.strip():
+            raise ValueError(f"suite workload {index} has invalid definition")
+        if not isinstance(workload_uuid, str) or not workload_uuid.strip():
+            raise ValueError(f"suite workload {index} has invalid workload_uuid")
+        workloads.append((definition, workload_uuid))
+    return tuple(workloads)

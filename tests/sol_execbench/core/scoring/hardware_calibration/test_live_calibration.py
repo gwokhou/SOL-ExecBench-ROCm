@@ -10,6 +10,10 @@ from click.testing import CliRunner
 from sol_execbench.cli.main import cli
 from sol_execbench.cli.commands.hardware_model import _validate_calibration_authority
 from sol_execbench.core.scoring.hardware_calibration.environment import discover_gpu
+from sol_execbench.core.scoring.hardware_calibration.builder import (
+    CalibrationRequest,
+    run_calibration,
+)
 from sol_execbench.core.scoring.hardware_calibration.hip_probe import (
     CalibrationProfileKey,
     HipCommandBackend,
@@ -23,11 +27,17 @@ from sol_execbench.core.scoring.hardware_calibration.models import (
 @pytest.mark.requires_rdna4
 def test_live_rdna4_wmma_calibration_is_measured() -> None:
     environment = discover_gpu(0)
-    candidate = default_hip_probe(
-        HipCommandBackend(architecture=environment.architecture)
-    ).measure(CalibrationProfileKey("compute", "matrix", "bf16", "bf16", "wmma"))
+    artifact = run_calibration(
+        CalibrationRequest(environment=environment, require_clock_lock=True)
+    )
+    candidate = next(
+        candidate
+        for candidate in artifact.candidates
+        if candidate.key == "compute.matrix.bf16.bf16.wmma"
+    )
 
     assert candidate.state == "measured"
+    assert artifact.validation_status == "validated"
 
 
 @pytest.mark.requires_cdna3

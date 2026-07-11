@@ -112,6 +112,24 @@ def test_wmma_source_uses_bf16_wmma_intrinsic() -> None:
     assert "RESULT" in source
 
 
+def test_wmma_source_uses_fp16_wmma_intrinsic_when_requested() -> None:
+    source = _hip_source(
+        CalibrationProfileKey("compute", "matrix", "fp16", "fp16", "wmma")
+    )
+
+    assert "wmma_f32_16x16x16_f16_w32_gfx12" in source
+    assert "0x3c00" in source
+
+
+def test_fp16_stream_probe_uses_half_storage_and_byte_accounting() -> None:
+    source = _hip_source(
+        CalibrationProfileKey("memory", "stream_copy", "fp16", "fp16", "gfx12")
+    )
+
+    assert "__half" in source
+    assert "sizeof(__half)" in source
+
+
 def test_mfma_source_uses_bf16_mfma_intrinsic() -> None:
     source = _hip_source(
         CalibrationProfileKey("compute", "matrix", "bf16", "bf16", "mfma")
@@ -128,10 +146,12 @@ def test_matrix_source_validates_before_timed_samples_and_result_output() -> Non
     )
 
     validation_launch = source.index(
-        "hipLaunchKernelGGL(matrix_probe_kernel, dim3(1), dim3(lane_count), 0, 0, device_output);"
+        "hipLaunchKernelGGL(matrix_probe_kernel, dim3(grid_blocks), dim3(lane_count), 0, 0, device_output);"
     )
     validation_sync = source.index("hipDeviceSynchronize()", validation_launch)
-    validation_copy = source.index("hipMemcpy(output.data(), device_output", validation_sync)
+    validation_copy = source.index(
+        "hipMemcpy(output.data(), device_output", validation_sync
+    )
     validation_check = source.index("std::fabs(value - cpu_reference)", validation_copy)
     validation_failure = source.index("return 4", validation_check)
     timed_loop = source.index("for (int sample = 0; sample < 7; ++sample)")
@@ -145,6 +165,8 @@ def test_matrix_source_validates_before_timed_samples_and_result_output() -> Non
         < validation_failure
         < timed_loop
     )
+    assert "const int blocks_per_cu = 8" in source
+    assert "properties.multiProcessorCount" in source
     assert validation_failure < result_output
 
 
@@ -154,8 +176,9 @@ def test_matrix_compile_targets_selected_architecture(tmp_path) -> None:
         workspace=tmp_path,
         hipcc="hipcc",
         architecture="gfx1200",
-        run=lambda command, **_: commands.append(command)
-        or type("Result", (), {"returncode": 0})(),
+        run=lambda command, **_: (
+            commands.append(command) or type("Result", (), {"returncode": 0})()
+        ),
     )
 
     assert (
@@ -165,3 +188,25 @@ def test_matrix_compile_targets_selected_architecture(tmp_path) -> None:
         == "passed"
     )
     assert "--offload-arch=gfx1200" in commands[0]
+
+
+def test_fp32_vector_probe_uses_arithmetic_saturation_and_full_validation() -> None:
+    source = _hip_source(
+        CalibrationProfileKey("compute", "vector", "fp32", "fp32", "portable")
+    )
+
+    assert "arithmetic_repetitions = 4096" in source
+    assert "fmaf(value" in source
+    assert "2.0 * arithmetic_repetitions" in source
+    assert "for (size_t index = 0; index < count; ++index) if" in source
+
+
+def test_streaming_probe_requires_a_cache_busting_vram_working_set() -> None:
+    source = _hip_source(
+        CalibrationProfileKey("memory", "stream_copy", "fp32", "fp32", "portable")
+    )
+
+    assert "hipMemGetInfo" in source
+    assert "maximum_count = static_cast<size_t>(1) << 27" in source
+    assert "count < (static_cast<size_t>(1) << 24)" in source
+    assert "2.0 * sizeof(float)" in source

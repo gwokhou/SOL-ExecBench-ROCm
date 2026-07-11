@@ -47,6 +47,27 @@ def test_amd_bound_sanity_ignores_non_object_score_records() -> None:
     assert report.status_totals.missing_evidence >= 1
 
 
+def test_amd_bound_sanity_loads_path_backed_bound_sidecars(tmp_path: Path) -> None:
+    artifact_path = tmp_path / "bound.json"
+    artifact_path.write_text(
+        json.dumps(
+            {
+                "definition": "demo",
+                "workload_uuid": "w0",
+                "aggregate_bound": {"status": "scored"},
+                "coverage_summary": {"worst_confidence": "supported"},
+                "warnings": [],
+            }
+        )
+    )
+
+    report = build_amd_bound_sanity_report(
+        amd_sol_artifacts=[artifact_path], created_at=CREATED_AT
+    )
+
+    assert report.workloads[0].source_statuses.amd_sol_status == "scored"
+
+
 def trace_ref_fixture() -> list[AmdBoundSanitySourceRef | dict[str, Any] | str | Path]:
     return [
         {

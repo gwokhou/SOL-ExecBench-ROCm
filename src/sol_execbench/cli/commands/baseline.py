@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import click
 from rich.console import Console
@@ -28,6 +29,12 @@ from ...core.scoring.release_baseline import (
     write_release_baseline_outputs,
     write_release_baseline_verification,
 )
+from ...core.scoring.authority_slice import (
+    AuthoritySliceSelectionPolicy,
+    build_authority_slice_manifest,
+    write_authority_slice_manifest,
+)
+from ...core.scoring.amd_bound_sanity.models import AmdBoundSanityReport
 
 
 console = Console(stderr=True)
@@ -38,7 +45,7 @@ def _baseline_cli() -> None:
     """Measured baseline export utilities."""
 
 
-def _load_json(path: Path, description: str) -> object:
+def _load_json(path: Path, description: str) -> Any:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -69,9 +76,10 @@ def _authority_from_json(path: Path | None) -> dict[tuple[str, str], AuthorityIn
 
     authority: dict[tuple[str, str], AuthorityInput] = {}
     try:
-        for index, raw in enumerate(payload):
-            if not isinstance(raw, dict):
+        for index, item in enumerate(payload):
+            if not isinstance(item, dict):
                 raise ValueError(f"authority workload {index} must be an object")
+            raw: Any = item
             definition = raw["definition"]
             workload_uuid = raw["workload_uuid"]
             if not isinstance(definition, str) or not isinstance(workload_uuid, str):
@@ -88,6 +96,58 @@ def _authority_from_json(path: Path | None) -> dict[tuple[str, str], AuthorityIn
     except (KeyError, TypeError, ValueError) as exc:
         raise click.ClickException(f"invalid authority JSON: {exc}") from exc
     return authority
+
+
+@_baseline_cli.command("authority-freeze")
+@click.option(
+    "--suite-manifest",
+    "suite_manifest_path",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.option(
+    "--sanity-report",
+    "sanity_report_path",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.option(
+    "--output",
+    "output_path",
+    required=True,
+    type=click.Path(dir_okay=False, path_type=Path),
+)
+@click.option(
+    "--selection-policy-version",
+    default="amd-authority-scored-evidence-v1",
+    show_default=True,
+)
+def _authority_freeze_cli(
+    suite_manifest_path: Path,
+    sanity_report_path: Path,
+    output_path: Path,
+    selection_policy_version: str,
+) -> None:
+    """Freeze a score-independent authoritative workload subset."""
+    try:
+        sanity_payload = _load_json(sanity_report_path, "AMD bound sanity report")
+        if not isinstance(sanity_payload, dict):
+            raise ValueError("AMD bound sanity report must be an object")
+        manifest = build_authority_slice_manifest(
+            suite_workloads=_suite_workloads_from_json(suite_manifest_path),
+            source_suite_manifest_sha256=sha256_file(suite_manifest_path),
+            sanity_report=AmdBoundSanityReport.model_validate(sanity_payload),
+            selection_policy=AuthoritySliceSelectionPolicy(
+                version=selection_policy_version
+            ),
+        )
+        write_authority_slice_manifest(manifest, output_path)
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+    console.print(
+        f"[green]Wrote frozen authority slice to {output_path}[/green] "
+        f"({len(manifest.workloads)} selected, {len(manifest.excluded)} excluded)"
+    )
 
 
 @_baseline_cli.command("release-build")

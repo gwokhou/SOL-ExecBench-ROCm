@@ -32,7 +32,12 @@ from sol_execbench.core import (
 )
 from sol_execbench.driver import problem_packager
 from sol_execbench.driver.problem_packager import ProblemPackager, _get_local_gfx
-from sol_execbench_type_helpers import JsonDict, make_definition, make_solution, make_workload
+from sol_execbench_type_helpers import (
+    JsonDict,
+    make_definition,
+    make_solution,
+    make_workload,
+)
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -477,6 +482,30 @@ class TestExecute:
         driver = pkg.output_dir / "eval_driver.py"
         assert driver.exists()
         ast.parse(driver.read_text())
+
+    def test_lock_clocks_is_managed_for_evaluator_lifecycle(
+        self, tmp_path, definition, workloads, python_solution, monkeypatch
+    ):
+        calls: list[str] = []
+        monkeypatch.setattr(problem_packager, "lock_clocks", lambda: True)
+        monkeypatch.setattr(
+            problem_packager, "unlock_clocks", lambda: calls.append("unlock")
+        )
+        monkeypatch.delenv("SOL_EXECBENCH_CLOCKS_LOCKED", raising=False)
+        pkg = _make_packager(
+            tmp_path,
+            definition,
+            workloads,
+            python_solution,
+            BenchmarkConfig(lock_clocks=True),
+        )
+
+        pkg.execute()
+
+        assert problem_packager.os.environ["SOL_EXECBENCH_CLOCKS_LOCKED"] == "1"
+        pkg.close()
+        assert calls == ["unlock"]
+        assert "SOL_EXECBENCH_CLOCKS_LOCKED" not in problem_packager.os.environ
 
     def test_raises_without_so_for_cpp(
         self, tmp_path, definition, workloads, hip_solution, config

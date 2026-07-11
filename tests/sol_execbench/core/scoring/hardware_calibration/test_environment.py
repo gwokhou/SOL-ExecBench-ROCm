@@ -4,6 +4,7 @@
 import pytest
 
 from sol_execbench.core.scoring.hardware_calibration.environment import (
+    RocmInfoRuntime,
     adapter_for,
     discover_gpu,
 )
@@ -47,6 +48,14 @@ def test_adapter_declares_its_exact_bf16_matrix_path(
     )
 
 
+def test_gfx12_adapter_declares_fp16_wmma_evidence() -> None:
+    keys = {key.value for key in adapter_for("gfx1200").candidates}
+
+    assert "compute.matrix.fp16.fp16.wmma" in keys
+    assert "memory.stream_copy.fp16.fp16.portable" in keys
+    assert "memory.stream_copy.fp16.fp16.gfx12" in keys
+
+
 def test_runtime_discovery_uses_the_requested_device() -> None:
     class Runtime:
         def architecture_for(self, device: int) -> str:
@@ -57,3 +66,26 @@ def test_runtime_discovery_uses_the_requested_device() -> None:
 
     assert environment.device == 2
     assert environment.architecture == "gfx950"
+
+
+def test_rocminfo_runtime_pairs_uuid_with_its_gpu_agent(monkeypatch) -> None:
+    output = """*******
+Agent 1
+*******
+  Name:                    AMD CPU
+  Uuid:                    CPU-XX
+*******
+Agent 2
+*******
+  Name:                    gfx1200
+  Uuid:                    GPU-real
+"""
+    monkeypatch.setattr(
+        "sol_execbench.core.scoring.hardware_calibration.environment.subprocess.check_output",
+        lambda *_args, **_kwargs: output,
+    )
+
+    runtime = RocmInfoRuntime()
+
+    assert runtime.architecture_for(0) == "gfx1200"
+    assert runtime.uuid_for(0) == "GPU-real"

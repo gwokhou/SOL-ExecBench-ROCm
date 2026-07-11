@@ -18,6 +18,7 @@ from sol_execbench.core.scoring.amd_score.report_inputs import (
     parse_score_report_trace,
 )
 from sol_execbench.core.scoring.amd_score.derived_artifacts import (
+    ResolvedHardwareModel,
     resolve_derived_score_artifacts,
     resolve_hardware_model_from_trace_payloads,
 )
@@ -38,12 +39,15 @@ def _build_amd_score_reports_for_problem_impl(
     solar_derivation_dir: Path | None = None,
     sidecar_namespace: str | None = None,
     derived_sidecar_exclusions: dict[str, str] | None = None,
+    hardware_model: ResolvedHardwareModel | None = None,
 ) -> list[AmdNativeScore]:
     """Build derived AMD-native scores for one dataset-run problem."""
     _ = run_cli_func
     definition = parse_score_report_definition(definition_payload)
     workloads = load_score_report_workloads(workload_path)
-    hardware_model = resolve_hardware_model_from_trace_payloads(traces_payload)
+    hardware_model = hardware_model or resolve_hardware_model_from_trace_payloads(
+        traces_payload
+    )
     scores: list[AmdNativeScore] = []
     derived_sidecar_exclusions = derived_sidecar_exclusions or {}
 

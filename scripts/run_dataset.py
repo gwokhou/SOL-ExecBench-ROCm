@@ -91,6 +91,7 @@ from sol_execbench.core.dataset.runner_scoring import (
     write_amd_score_report,
     write_official_score_report,
 )
+from sol_execbench.core.scoring.release_baseline import load_official_release_baseline
 from sol_execbench.core.dataset.solutions import (
     build_custom_solution,
     build_reference_solution,
@@ -115,6 +116,10 @@ from sol_execbench.core.dataset.sharding import (
 )
 from sol_execbench.core.scoring.amd_score import (
     AmdNativeScore,
+)
+from sol_execbench.core.scoring.amd_score.derived_artifacts import (
+    ResolvedHardwareModel,
+    resolve_hardware_model_from_path,
 )
 from sol_execbench.core.scoring.baseline_artifact import (
     BASELINE_ARTIFACT_SCHEMA_VERSION,
@@ -642,9 +647,13 @@ def _normalized_command_args(args: argparse.Namespace) -> list[str]:
         ("--amd-score-report", args.amd_score_report),
         ("--official-score-report", args.official_score_report),
         ("--amd-sol-bound-dir", args.amd_sol_bound_dir),
+        ("--amd-hardware-model", args.amd_hardware_model),
         ("--solar-derivation", args.solar_derivation),
         ("--timing-evidence-dir", args.timing_evidence_dir),
         ("--scoring-baseline", args.scoring_baseline),
+        ("--release-baseline-bundle", args.release_baseline_bundle),
+        ("--release-baseline-verification", args.release_baseline_verification),
+        ("--official-suite-manifest", args.official_suite_manifest),
     ):
         if value is not None:
             normalized.extend([flag, Path(value).name])
@@ -653,6 +662,28 @@ def _normalized_command_args(args: argparse.Namespace) -> list[str]:
             ["--official-aggregation-policy", args.official_aggregation_policy]
         )
     return normalized
+
+
+def _official_suite_workloads(path: Path) -> tuple[tuple[str, str], ...]:
+    """Load the canonical official-score denominator from a JSON manifest."""
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    rows = payload.get("workloads") if isinstance(payload, dict) else payload
+    if not isinstance(rows, list):
+        raise ValueError("official suite manifest must contain a workloads list")
+    workloads: list[tuple[str, str]] = []
+    for index, row in enumerate(rows):
+        if not isinstance(row, dict):
+            raise ValueError(f"official suite workload {index} must be an object")
+        definition = row.get("definition")
+        workload_uuid = row.get("workload_uuid")
+        if not isinstance(definition, str) or not definition.strip():
+            raise ValueError(f"official suite workload {index} has invalid definition")
+        if not isinstance(workload_uuid, str) or not workload_uuid.strip():
+            raise ValueError(
+                f"official suite workload {index} has invalid workload_uuid"
+            )
+        workloads.append((definition, workload_uuid))
+    return tuple(workloads)
 
 
 def _closure_record(
@@ -988,6 +1019,7 @@ def _run_existing_trace_derived_problem(
     timing_evidence_dir: Path | None,
     scoring_baseline,
     derived_sidecar_exclusions: dict[str, str] | None = None,
+    hardware_model: ResolvedHardwareModel | None = None,
 ) -> dict:
     problem_name = problem_dir.name
     category = problem_dir.parent.name
@@ -1093,6 +1125,7 @@ def _run_existing_trace_derived_problem(
             sol_bound_artifact_dir=amd_sol_bound_dir,
             solar_derivation_dir=solar_derivation,
             derived_sidecar_exclusions=derived_sidecar_exclusions,
+            hardware_model=hardware_model,
         )
 
     if selected_workload_refs is not None:
@@ -1950,12 +1983,39 @@ def main():
         ),
     )
     ap.add_argument(
+        "--release-baseline-bundle",
+        type=Path,
+        default=None,
+        help="release_baseline_bundle.v1 required for an authoritative official score.",
+    )
+    ap.add_argument(
+        "--release-baseline-verification",
+        type=Path,
+        default=None,
+        help="Independent release_baseline_verification.v1 for the release bundle.",
+    )
+    ap.add_argument(
+        "--official-suite-manifest",
+        type=Path,
+        default=None,
+        help="Canonical JSON denominator required for an authoritative official score.",
+    )
+    ap.add_argument(
         "--amd-sol-bound-dir",
         type=Path,
         default=None,
         help=(
             "Optional directory for derived AMD SOL bound v2 sidecars when "
             "--amd-score-report is enabled."
+        ),
+    )
+    ap.add_argument(
+        "--amd-hardware-model",
+        type=Path,
+        default=None,
+        help=(
+            "Validated external AMD hardware-model v3 used when generating "
+            "AMD SOL bounds."
         ),
     )
     ap.add_argument(
@@ -2032,6 +2092,18 @@ def main():
             ap.error(
                 "--official-score-report requires "
                 f"--official-aggregation-policy {OFFICIAL_AGGREGATION_POLICY}"
+            )
+        release_inputs = (
+            args.release_baseline_bundle,
+            args.release_baseline_verification,
+            args.official_suite_manifest,
+        )
+        if any(value is None for value in release_inputs) and any(
+            value is not None for value in release_inputs
+        ):
+            ap.error(
+                "release baseline inputs must include --release-baseline-bundle, "
+                "--release-baseline-verification, and --official-suite-manifest together"
             )
     if args.execution_mode == "pipeline":
         if args.phase not in {"traces", "all"}:
@@ -2293,6 +2365,11 @@ def main():
         if args.scoring_baseline is not None
         else None
     )
+    external_hardware_model = (
+        resolve_hardware_model_from_path(args.amd_hardware_model)
+        if args.amd_hardware_model is not None
+        else None
+    )
     if (
         args.official_score_report is not None
         and scoring_baseline is not None
@@ -2303,6 +2380,20 @@ def main():
             f"{BASELINE_ARTIFACT_SCHEMA_VERSION!r}; got "
             f"{scoring_baseline.schema_version!r}"
         )
+    release_baseline = (
+        load_official_release_baseline(
+            baseline_path=args.scoring_baseline,
+            bundle_path=args.release_baseline_bundle,
+            verification_path=args.release_baseline_verification,
+        )
+        if args.release_baseline_bundle is not None
+        else None
+    )
+    official_expected_workloads = (
+        _official_suite_workloads(args.official_suite_manifest)
+        if args.official_suite_manifest is not None
+        else None
+    )
     provenance = {
         "command_args": _normalized_command_args(args),
         "dataset_root": _first_relative_ref(problems_dir, ROOT),
@@ -2538,6 +2629,8 @@ def main():
                 source_score_ref=_relative_ref(
                     args.amd_score_report.resolve(), output_dir
                 ),
+                release_baseline=release_baseline,
+                expected_workloads=official_expected_workloads,
             )
             print(f"Official score report saved to {report_path}")
         return
@@ -2561,6 +2654,7 @@ def main():
                 solar_derivation=args.solar_derivation,
                 timing_evidence_dir=None,
                 scoring_baseline=scoring_baseline,
+                hardware_model=external_hardware_model,
                 derived_sidecar_exclusions=_derived_sidecar_exclusions_for_problem(
                     problem_id=problem_id,
                     workload_path=problem_dir / "workload.jsonl",
@@ -2612,6 +2706,8 @@ def main():
                 source_score_ref=_relative_ref(
                     args.amd_score_report.resolve(), output_dir
                 ),
+                release_baseline=release_baseline,
+                expected_workloads=official_expected_workloads,
             )
             print(f"Official score report saved to {report_path}")
 
@@ -2791,6 +2887,7 @@ def main():
                     sol_bound_artifact_dir=args.amd_sol_bound_dir,
                     solar_derivation_dir=args.solar_derivation,
                     derived_sidecar_exclusions=derived_sidecar_exclusions,
+                    hardware_model=external_hardware_model,
                 )
 
             if run_timing_phase and args.timing_evidence_dir is not None:
@@ -2930,6 +3027,7 @@ def main():
                         sol_bound_artifact_dir=args.amd_sol_bound_dir,
                         solar_derivation_dir=args.solar_derivation,
                         derived_sidecar_exclusions=derived_sidecar_exclusions,
+                        hardware_model=external_hardware_model,
                     )
                 print("  Skipping (already passed). Use --rerun to re-evaluate.")
                 summaries.append(summary)
@@ -3212,6 +3310,7 @@ def main():
                 sol_bound_artifact_dir=args.amd_sol_bound_dir,
                 solar_derivation_dir=args.solar_derivation,
                 derived_sidecar_exclusions=derived_sidecar_exclusions,
+                hardware_model=external_hardware_model,
             )
 
         if (
@@ -3322,6 +3421,8 @@ def main():
                 scoring_baseline, amd_scores
             ),
             source_score_ref=_relative_ref(args.amd_score_report.resolve(), output_dir),
+            release_baseline=release_baseline,
+            expected_workloads=official_expected_workloads,
         )
         print(f"Official score report saved to {report_path}")
 

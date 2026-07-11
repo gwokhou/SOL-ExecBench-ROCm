@@ -134,6 +134,22 @@ def _try_fx_bound_graph(
             node_outputs[fx_node] = f"input:{fx_node.target}"
         elif fx_node.op in {"call_function", "call_method", "call_module"}:
             if _fx_node_name(fx_node) == "builtins.getattr":
+                # ``Tensor.T`` is represented as ``getattr(tensor, "T")`` by
+                # FX. It is a logical layout view, not a GPU operation, but
+                # its source tensor remains a real GEMM operand. Preserve the
+                # data dependency so downstream shape/FLOP inference receives
+                # both operands instead of silently degrading the GEMM.
+                if len(fx_node.args) >= 2 and fx_node.args[1] in {"T", "mT"}:
+                    source_ids = _fx_input_tensor_ids(fx_node, node_outputs, definition)
+                    if source_ids:
+                        node_outputs[fx_node] = source_ids[0]
+                continue
+            if _fx_node_name(fx_node) in {
+                "getitem",
+                "_operator.getitem",
+            } and _fx_tensor_meta(fx_node) == (None, None):
+                # Indexing x.shape/stride metadata is host-side bookkeeping,
+                # not a GPU operator in the bound graph.
                 continue
             append_fx_node(fx_node)
         elif fx_node.op == "output":

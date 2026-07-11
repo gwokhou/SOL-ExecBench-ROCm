@@ -16,6 +16,7 @@
 
 import json
 from pathlib import Path
+import shutil
 
 import torch.utils.cpp_extension as ext
 
@@ -28,10 +29,46 @@ ENVIRON = __import__("os").environ
 solution = Solution(**json.loads((HERE / "solution.json").read_text()))
 compile_options = solution.spec.compile_options
 
+
+def _active_rocm_root() -> Path | None:
+    """Resolve the installed ROCm tree from HIPCC rather than assuming /opt/rocm."""
+    hipcc = shutil.which("hipcc")
+    if hipcc is None:
+        return None
+    resolved = Path(hipcc).resolve()
+    # HIPCC normally lives at <ROCM_ROOT>/bin/hipcc.  Keep this defensive for
+    # distro wrappers that do not resolve into the ROCm installation.
+    return resolved.parent.parent if resolved.parent.name == "bin" else None
+
+
+ROCM_ROOT = _active_rocm_root()
+if ROCM_ROOT is not None:
+    ENVIRON.setdefault("CXX", str(ROCM_ROOT / "bin" / "hipcc"))
+
+
+def _rebase_rocm_flag(flag: str) -> str:
+    """Map portable solution flags to the actual installed ROCm root."""
+    if ROCM_ROOT is None:
+        return flag
+    if flag == "-I/opt/rocm/include":
+        return f"-I{ROCM_ROOT / 'include'}"
+    if flag == "-L/opt/rocm/lib":
+        return f"-L{ROCM_ROOT / 'lib'}"
+    return flag
+
+
 # set flags
-hip_cflags = compile_options.hip_cflags if compile_options else []
-cflags = compile_options.cflags if compile_options else []
-ld_flags = compile_options.ld_flags if compile_options else []
+hip_cflags = list(compile_options.hip_cflags) if compile_options else []
+cflags = (
+    [_rebase_rocm_flag(flag) for flag in compile_options.cflags]
+    if compile_options
+    else []
+)
+ld_flags = (
+    [_rebase_rocm_flag(flag) for flag in compile_options.ld_flags]
+    if compile_options
+    else []
+)
 
 rocm_arches = [
     target.value
