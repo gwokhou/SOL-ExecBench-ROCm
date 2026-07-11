@@ -39,7 +39,7 @@ SOL emits `official_score_evidence.v1` via the GPU-free CLI:
 sol-execbench official-score \
   --amd-native-score amd-native-score.json \
   --measured-registry measured-baseline-registry.json \
-  --aggregation-policy "mean of per-workload SOL scores" \
+  --aggregation-policy "fixed_suite_denominator_zero_for_blocked" \
   --current-run-env-hardware gfx1200 \
   --current-run-env-rocm 7.1 \
   --current-run-env-target attention \
@@ -47,11 +47,11 @@ sol-execbench official-score \
   --output official-score-evidence.json
 ```
 
-`--aggregation-policy` is **required** (the caller supplies the policy; this
-resolves the gate's precondition without adding the concept to
-`AmdNativeSuiteReport`). The `--current-run-env-*` flags build the coverage
-report's current-run environment; omit any flag to skip that field's
-comparison.
+`--aggregation-policy` is **required** and must be
+`fixed_suite_denominator_zero_for_blocked`; the caller supplies this explicit
+policy without adding the concept to `AmdNativeSuiteReport`. The
+`--current-run-env-*` flags build the coverage report's current-run environment;
+omit any flag to skip that field's comparison.
 
 ### Blocker Removal (GATE-03)
 

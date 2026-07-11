@@ -95,6 +95,12 @@ report carries stable `blocker_reason_codes`, including `missing_score`,
 measured baseline coverage validation does not fully confirm). The full stable
 vocabulary is advertised on the contract as `confirmed_evidence_blockers`.
 
+The only supported suite aggregation policy is
+`fixed_suite_denominator_zero_for_blocked`. A blocked workload retains its
+`null` official score and blocker codes; it is not converted into a successful
+workload score. At suite level, however, the fixed denominator includes every
+requested workload, so blocked workloads contribute 0 to the suite score.
+
 Trace JSONL `evaluation.performance.speedup_factor` remains a diagnostic ratio
 of reference latency to candidate latency. It is not an official benchmark
 score and must not be substituted for `official_score_evidence.v1` score
@@ -104,14 +110,13 @@ fields.
 > data models (`sol_execbench.official_score_evidence.v1`) live in
 > `src/sol_execbench/core/scoring/official_score.py` and are re-exported from
 > the scoring package. The `official_score.evidence` capability is advertised
-> as `confirmed`, and the `sol-execbench official-score` CLI emits the
-> `official_score_evidence.v1` artifact from an AMD-native score report plus a
-> measured baseline registry and an explicit `--aggregation-policy` (which
-> resolves the previously unresolved aggregation-policy precondition without
-> adding it to `AmdNativeSuiteReport`). The gate is not yet auto-emitted by the
-> default eval-driver / dataset runner run path; until it is, AMD-native score
-> reports (`sol_execbench.amd_native_score.v1`) plus the explicit
-> `official-score` CLI are the emitted score-adjacent surfaces.
+> as `confirmed`. The `sol-execbench official-score` CLI emits the artifact
+> directly, and the dataset runner can emit it when callers explicitly request
+> `--official-score-report`, provide an AMD-native report and scoring baseline,
+> and select
+> `--official-aggregation-policy fixed_suite_denominator_zero_for_blocked`.
+> AMD-native score reports (`sol_execbench.amd_native_score.v1`) remain derived
+> inputs and do not independently carry confirmed official-score authority.
 
 ## Feedback Sidecars
 
