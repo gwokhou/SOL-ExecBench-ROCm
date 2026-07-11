@@ -86,7 +86,7 @@ graph TD
    object per workload to stdout.
 8. The CLI parses trace JSONL back into `Trace` models, writes optional trace,
    profiler, profile-summary, static-evidence, agent-feedback, and environment
-   sidecars, prints a Rich summary unless `--json` is selected, and exits
+   sidecars, prints a Rich summary in text mode, and exits
    nonzero when any workload fails.
    If no parseable trace output exists, the CLI persists a bounded
    diagnostic-only no-trace sidecar outside canonical trace JSONL.
@@ -94,7 +94,7 @@ graph TD
 The root CLI also dispatches metadata and local utility subcommands before
 normal evaluation through `src/sol_execbench/cli/commands/`: `contract`,
 `doctor`, `toolchain`, `baseline export`, and the local-only `dataset`
-migration command group. The separate `sol-execbench-baseline` entry point
+migration command group. The `sol-execbench baseline compare` command
 dispatches to `src/sol_execbench/cli/commands/baseline.py` for trace baseline
 comparison.
 
@@ -228,7 +228,7 @@ These sidecars do not change trace schema or correctness status.
 readiness, manifest, checksum, local migration, execution-closure,
 paper-denominator, ready-subset, category, low-precision compatibility,
 parity-gap, reuse-policy, and deterministic sharding workflows. The
-`sol-execbench dataset migrate-sol` and `sol-execbench dataset migrate-flashinfer`
+`sol-execbench dataset migrate sol` and `sol-execbench dataset migrate flashinfer`
 subcommands call the same migration helpers used by scripts and tests, write
 deterministic migration manifests, and keep restricted source dataset content
 local to the operator's machine. Scripts such as
@@ -294,18 +294,18 @@ The `contract`, `doctor`, `toolchain`, `baseline`, and `dataset` subcommands
 are dispatched by `SolExecbenchCli` through `src/sol_execbench/cli/commands/`
 before normal evaluation:
 
-- `sol-execbench contract --json` prints GPU-free evaluator compatibility
+- `sol-execbench --format json contract evaluator` prints GPU-free evaluator compatibility
   metadata from `build_evaluator_contract()`.
-- `sol-execbench doctor --json` prints ROCm environment diagnostics from
+- `sol-execbench --format json environment doctor` prints ROCm environment diagnostics from
   `build_environment_diagnostics()`.
-- `sol-execbench toolchain --json` prints a routing decision for a requested
+- `sol-execbench --format json toolchain route` prints a routing decision for a requested
   evidence level and artifact type.
-- `sol-execbench toolchain --json --list-registry` prints the default ROCm
+- `sol-execbench --format json toolchain list` prints the default ROCm
   toolchain registry.
 - `sol-execbench baseline export ...` converts trace JSONL into a HIP measured
   baseline registry artifact.
-- `sol-execbench dataset migrate-sol ...` and
-  `sol-execbench dataset migrate-flashinfer ...` convert locally downloaded
+- `sol-execbench dataset migrate sol ...` and
+  `sol-execbench dataset migrate flashinfer ...` convert locally downloaded
   source datasets into local benchmark-layout artifacts plus migration
   manifests.
 

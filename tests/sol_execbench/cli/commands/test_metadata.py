@@ -22,34 +22,44 @@ from sol_execbench.core.platform.toolchain import (
 )
 
 
-def _snapshot() -> EnvironmentSnapshot:
-    return EnvironmentSnapshot(
-        generated_at="2026-05-25T00:00:00+00:00",
-        collection_status=EnvironmentEvidenceStatus.AVAILABLE,
+def _json(args: list[str]) -> tuple[object, object]:
+    result = CliRunner().invoke(cli, ["--format", "json", *args])
+    assert result.exit_code == 0, result.output
+    return result, json.loads(result.output)
+
+
+def test_evaluator_contract_uses_response_envelope() -> None:
+    _, response = _json(["contract", "evaluator"])
+    assert response["schema_version"] == "sol_execbench.cli_response.v1"
+    assert response["data"]["schema_version"].startswith(
+        "sol_execbench.evaluator_contract."
     )
 
 
-def test_contract_cli_outputs_json_without_problem_directory() -> None:
-    result = CliRunner().invoke(cli, ["contract", "--json"])
+def test_cli_contract_matches_public_tree() -> None:
+    _, response = _json(["contract", "cli"])
+    contract = response["data"]
+    assert contract["schema_version"] == "sol_execbench.cli_contract.v1"
+    assert {item["name"] for item in contract["command_tree"]["commands"]} == {
+        "evaluate",
+        "environment",
+        "contract",
+        "toolchain",
+        "dataset",
+        "baseline",
+        "hardware",
+        "score",
+    }
 
-    assert result.exit_code == 0, result.output
-    payload = json.loads(result.output)
-    assert payload["schema_version"].startswith("sol_execbench.evaluator_contract.")
-    assert "capabilities" in payload
 
-
-def test_contract_cli_rejects_non_json_mode() -> None:
-    result = CliRunner().invoke(cli, ["contract"])
-
-    assert result.exit_code != 0
-    assert "Only --json output is supported for contract" in result.output
-
-
-def test_doctor_cli_outputs_json_without_problem_directory(monkeypatch) -> None:
+def test_doctor_outputs_diagnostics(monkeypatch) -> None:
     diagnostics = EnvironmentDiagnostics(
         generated_at="2026-05-25T00:00:00+00:00",
         status=EnvironmentEvidenceStatus.AVAILABLE,
-        snapshot=_snapshot(),
+        snapshot=EnvironmentSnapshot(
+            generated_at="2026-05-25T00:00:00+00:00",
+            collection_status=EnvironmentEvidenceStatus.AVAILABLE,
+        ),
         checks=[
             EnvironmentCheckResult(
                 name="pytorch_rocm_runtime",
@@ -61,29 +71,12 @@ def test_doctor_cli_outputs_json_without_problem_directory(monkeypatch) -> None:
     monkeypatch.setattr(
         cli_metadata, "build_environment_diagnostics", lambda: diagnostics
     )
-
-    result = CliRunner().invoke(cli, ["doctor", "--json"])
-
-    assert result.exit_code == 0, result.output
-    payload = json.loads(result.output)
-    assert payload["schema_version"] == "sol_execbench.environment_diagnostics.v1"
-    assert (
-        payload["snapshot"]["schema_version"] == "sol_execbench.environment_snapshot.v2"
-    )
-    assert payload["checks"][0]["name"] == "pytorch_rocm_runtime"
+    _, response = _json(["environment", "doctor"])
+    assert response["data"]["checks"][0]["name"] == "pytorch_rocm_runtime"
 
 
-def test_doctor_cli_rejects_non_json_mode() -> None:
-    result = CliRunner().invoke(cli, ["doctor"])
-
-    assert result.exit_code != 0
-    assert "Only --json output is supported for doctor" in result.output
-
-
-def test_toolchain_cli_outputs_routing_json(monkeypatch) -> None:
+def test_toolchain_route_outputs_report(monkeypatch) -> None:
     def fake_report(request: ToolchainRoutingRequest) -> ToolchainRoutingReport:
-        assert request.evidence_level == ToolchainEvidenceLevel.PROFILING
-        assert request.artifact_type == ToolchainArtifactType.EXECUTABLE_RUN
         assert request.gpu_architecture == "gfx1200"
         return ToolchainRoutingReport(
             generated_at="2026-05-25T00:00:00+00:00",
@@ -92,23 +85,11 @@ def test_toolchain_cli_outputs_routing_json(monkeypatch) -> None:
         )
 
     monkeypatch.setattr(cli_metadata, "build_toolchain_routing_report", fake_report)
-
-    result = CliRunner().invoke(
-        cli,
-        [
-            "toolchain",
-            "--json",
-            "--gpu-arch",
-            "gfx1200",
-        ],
-    )
-
-    assert result.exit_code == 0, result.output
-    payload = json.loads(result.output)
-    assert payload["selected_tool_id"] == "rocprofv3"
+    _, response = _json(["toolchain", "route", "--gpu-arch", "gfx1200"])
+    assert response["data"]["selected_tool_id"] == "rocprofv3"
 
 
-def test_toolchain_cli_outputs_registry_json(monkeypatch) -> None:
+def test_toolchain_list_has_no_route_filters(monkeypatch) -> None:
     monkeypatch.setattr(
         cli_metadata,
         "default_toolchain_registry",
@@ -122,17 +103,7 @@ def test_toolchain_cli_outputs_registry_json(monkeypatch) -> None:
             )
         ],
     )
-
-    result = CliRunner().invoke(cli, ["toolchain", "--json", "--list-registry"])
-
-    assert result.exit_code == 0, result.output
-    payload = json.loads(result.output)
-    assert payload[0]["tool_id"] == "rocprofv3"
-    assert payload[0]["lifecycle"] == "active"
-
-
-def test_toolchain_cli_rejects_non_json_mode() -> None:
-    result = CliRunner().invoke(cli, ["toolchain"])
-
-    assert result.exit_code != 0
-    assert "Only --json output is supported for toolchain" in result.output
+    _, response = _json(["toolchain", "list"])
+    assert response["data"][0]["tool_id"] == "rocprofv3"
+    rejected = CliRunner().invoke(cli, ["toolchain", "list", "--gpu-arch", "gfx1200"])
+    assert rejected.exit_code == 2

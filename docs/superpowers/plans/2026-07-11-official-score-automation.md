@@ -275,7 +275,7 @@ git commit -s -m "feat: automate official score dataset sidecars"
 
 ```python
 result = CliRunner().invoke(cli, [
-    "official-score", "--amd-native-score", str(report_path),
+    "score", "official", "--amd-native-score", str(report_path),
     "--measured-registry", str(registry_path),
     "--aggregation-policy", "mean of per-workload SOL scores",
 ])

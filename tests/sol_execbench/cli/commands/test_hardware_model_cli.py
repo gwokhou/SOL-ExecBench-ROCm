@@ -177,7 +177,8 @@ def test_build_rejects_measured_mismatched_matrix_evidence(
     result = CliRunner().invoke(
         cli,
         [
-            "hardware-model",
+            "hardware",
+            "model",
             "build",
             "--calibration",
             str(calibration_path),
@@ -198,7 +199,8 @@ def test_calibrate_writes_rejected_artifact_before_nonzero_exit(tmp_path) -> Non
     result = CliRunner().invoke(
         cli,
         [
-            "hardware-model",
+            "hardware",
+            "model",
             "calibrate",
             "--device",
             "0",
@@ -249,7 +251,8 @@ def test_calibrate_provisional_result_writes_rejected_diagnostic_before_exit(
     result = CliRunner().invoke(
         cli,
         [
-            "hardware-model",
+            "hardware",
+            "model",
             "calibrate",
             "--architecture",
             "gfx1200",

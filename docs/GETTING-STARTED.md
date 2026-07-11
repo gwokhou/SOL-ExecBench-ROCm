@@ -32,8 +32,8 @@ uv sync --all-groups
 Confirm the package entry points are available:
 
 ```bash
-uv run sol-execbench contract --json
-uv run sol-execbench doctor --json
+uv run sol-execbench --format json contract evaluator
+uv run sol-execbench --format json environment doctor
 ```
 
 `contract` is GPU-free compatibility metadata. `doctor` probes ROCm tools,
@@ -69,15 +69,15 @@ ROCm-capable host. The benchmark command in step 4 is the first command that
 produces working benchmark output: `out/first-run.trace.jsonl`.
 
 1. Install dependencies with `uv sync --all-groups`.
-2. Confirm CLI metadata with `uv run sol-execbench contract --json`.
-3. Check ROCm visibility with `uv run sol-execbench doctor --json`.
+2. Confirm CLI metadata with `uv run sol-execbench --format json contract evaluator`.
+3. Check ROCm visibility with `uv run sol-execbench --format json environment doctor`.
 4. Run one included sample and write canonical Trace JSONL:
 
 ```bash
 mkdir -p out
-uv run sol-execbench tests/sol_execbench/samples/linear_backward \
+uv run sol-execbench evaluate tests/sol_execbench/samples/linear_backward \
   --solution tests/sol_execbench/samples/linear_backward/solution_python.json \
-  --output out/first-run.trace.jsonl
+  --trace-output out/first-run.trace.jsonl
 ```
 
 The output file `out/first-run.trace.jsonl` is the canonical benchmark trace
@@ -90,23 +90,23 @@ full-suite validation.
 Run an included PyTorch example:
 
 ```bash
-uv run sol-execbench examples/pytorch/gemma3_swiglu \
+uv run sol-execbench evaluate examples/pytorch/gemma3_swiglu \
   --solution examples/pytorch/gemma3_swiglu/solution_python.json
 ```
 
 Run an included Triton ROCm example:
 
 ```bash
-uv run sol-execbench examples/triton/rmsnorm \
+uv run sol-execbench evaluate examples/triton/rmsnorm \
   --solution examples/triton/rmsnorm/solution_triton.json
 ```
 
 Write trace JSONL:
 
 ```bash
-uv run sol-execbench tests/sol_execbench/samples/linear_backward \
+uv run sol-execbench evaluate tests/sol_execbench/samples/linear_backward \
   --solution tests/sol_execbench/samples/linear_backward/solution_python.json \
-  --output out/linear_backward.trace.jsonl
+  --trace-output out/linear_backward.trace.jsonl
 ```
 
 ### Reading The First Trace
@@ -142,14 +142,14 @@ Build and enter the default ROCm Docker target:
 Run a benchmark command inside the container:
 
 ```bash
-./scripts/run_docker.sh -- sol-execbench examples/pytorch/gemma3_swiglu \
+./scripts/run_docker.sh -- sol-execbench evaluate examples/pytorch/gemma3_swiglu \
   --solution examples/pytorch/gemma3_swiglu/solution_python.json
 ```
 
 Select a declared Docker target:
 
 ```bash
-./scripts/run_docker.sh --target rocm-7.1.1-ubuntu-24.04-container -- sol-execbench contract --json
+./scripts/run_docker.sh --target rocm-7.1.1-ubuntu-24.04-container -- sol-execbench --format json contract evaluator
 ```
 
 The wrapper uses `docker/rocm-targets.json` to preview target images and
@@ -194,9 +194,9 @@ If you already have local source copies, migrate them into the benchmark layout
 with the CLI dataset commands:
 
 ```bash
-uv run sol-execbench dataset migrate-sol data/SOL-ExecBench/source data/SOL-ExecBench/benchmark \
+uv run sol-execbench dataset migrate sol data/SOL-ExecBench/source data/SOL-ExecBench/benchmark \
   --manifest out/sol-migration-manifest.json
-uv run sol-execbench dataset migrate-flashinfer data/flashinfer-trace/source data/flashinfer-trace/benchmark \
+uv run sol-execbench dataset migrate flashinfer data/flashinfer-trace/source data/flashinfer-trace/benchmark \
   --manifest out/flashinfer-migration-manifest.json
 ```
 

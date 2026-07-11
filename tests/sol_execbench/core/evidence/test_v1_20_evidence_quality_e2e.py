@@ -112,100 +112,112 @@ def test_v1_20_scripts_chain_generated_outputs_and_source_refs(tmp_path):
     claim_json = tmp_path / "claim.json"
     trust_json = tmp_path / "trust.json"
 
-    assert report_consistency.main(
-        [
-            "--execution-closure",
-            str(closure),
-            "--paper-denominator",
-            str(denominator),
-            "--matrix-report",
-            str(matrix),
-            "--amd-score-report",
-            str(score),
-            "--amd-sol-report",
-            str(amd_sol),
-            "--solar-derivation",
-            str(solar),
-            "--amd-bound-sanity",
-            str(bound),
-            "--json-out",
-            str(consistency_json),
-            "--markdown-out",
-            str(tmp_path / "consistency.md"),
-            "--created-at",
-            "2026-05-31T00:00:00Z",
-        ]
-    ) == 0
-    assert report_evaluation_stability.main(
-        [
-            "--timing-evidence",
-            str(timing),
-            "--json-out",
-            str(stability_json),
-            "--markdown-out",
-            str(tmp_path / "stability.md"),
-            "--created-at",
-            "2026-05-31T00:00:00Z",
-        ]
-    ) == 0
-    assert report_claim_upgrade.main(
-        [
-            "--consistency-report",
-            str(consistency_json),
-            "--evaluation-stability",
-            str(stability_json),
-            "--execution-closure",
-            str(closure),
-            "--paper-denominator",
-            str(denominator),
-            "--matrix-report",
-            str(matrix),
-            "--amd-score-report",
-            str(score),
-            "--amd-sol-report",
-            str(amd_sol),
-            "--solar-derivation",
-            str(solar),
-            "--amd-bound-sanity",
-            str(bound),
-            "--json-out",
-            str(claim_json),
-            "--markdown-out",
-            str(tmp_path / "claim.md"),
-            "--created-at",
-            "2026-05-31T00:00:00Z",
-        ]
-    ) == 0
-    assert report_trust_summary.main(
-        [
-            "--consistency-report",
-            str(consistency_json),
-            "--evaluation-stability",
-            str(stability_json),
-            "--claim-upgrade",
-            str(claim_json),
-            "--execution-closure",
-            str(closure),
-            "--paper-denominator",
-            str(denominator),
-            "--matrix-report",
-            str(matrix),
-            "--amd-score-report",
-            str(score),
-            "--amd-sol-report",
-            str(amd_sol),
-            "--solar-derivation",
-            str(solar),
-            "--amd-bound-sanity",
-            str(bound),
-            "--json-out",
-            str(trust_json),
-            "--markdown-out",
-            str(tmp_path / "trust.md"),
-            "--created-at",
-            "2026-05-31T00:00:00Z",
-        ]
-    ) == 0
+    assert (
+        report_consistency.main(
+            [
+                "--execution-closure",
+                str(closure),
+                "--paper-denominator",
+                str(denominator),
+                "--matrix-report",
+                str(matrix),
+                "--amd-score-report",
+                str(score),
+                "--amd-sol-report",
+                str(amd_sol),
+                "--solar-derivation",
+                str(solar),
+                "--amd-bound-sanity",
+                str(bound),
+                "--json-out",
+                str(consistency_json),
+                "--markdown-out",
+                str(tmp_path / "consistency.md"),
+                "--created-at",
+                "2026-05-31T00:00:00Z",
+            ]
+        )
+        == 0
+    )
+    assert (
+        report_evaluation_stability.main(
+            [
+                "--timing-evidence",
+                str(timing),
+                "--json-out",
+                str(stability_json),
+                "--markdown-out",
+                str(tmp_path / "stability.md"),
+                "--created-at",
+                "2026-05-31T00:00:00Z",
+            ]
+        )
+        == 0
+    )
+    assert (
+        report_claim_upgrade.main(
+            [
+                "--consistency-report",
+                str(consistency_json),
+                "--evaluation-stability",
+                str(stability_json),
+                "--execution-closure",
+                str(closure),
+                "--paper-denominator",
+                str(denominator),
+                "--matrix-report",
+                str(matrix),
+                "--amd-score-report",
+                str(score),
+                "--amd-sol-report",
+                str(amd_sol),
+                "--solar-derivation",
+                str(solar),
+                "--amd-bound-sanity",
+                str(bound),
+                "--json-out",
+                str(claim_json),
+                "--markdown-out",
+                str(tmp_path / "claim.md"),
+                "--created-at",
+                "2026-05-31T00:00:00Z",
+            ]
+        )
+        == 0
+    )
+    assert (
+        report_trust_summary.main(
+            [
+                "--consistency-report",
+                str(consistency_json),
+                "--evaluation-stability",
+                str(stability_json),
+                "--claim-upgrade",
+                str(claim_json),
+                "--execution-closure",
+                str(closure),
+                "--paper-denominator",
+                str(denominator),
+                "--matrix-report",
+                str(matrix),
+                "--amd-score-report",
+                str(score),
+                "--amd-sol-report",
+                str(amd_sol),
+                "--solar-derivation",
+                str(solar),
+                "--amd-bound-sanity",
+                str(bound),
+                "--json-out",
+                str(trust_json),
+                "--markdown-out",
+                str(tmp_path / "trust.md"),
+                "--created-at",
+                "2026-05-31T00:00:00Z",
+            ]
+        )
+        == 0
+    )
 
     claim_payload = json.loads(claim_json.read_text(encoding="utf-8"))
     trust_payload = json.loads(trust_json.read_text(encoding="utf-8"))
@@ -219,4 +231,3 @@ def test_v1_20_scripts_chain_generated_outputs_and_source_refs(tmp_path):
     assert trust_payload["overall_status"] == "reviewable"
     assert trust_sources["amd_sol_report"]["checksum"] == "amd-sol-real"
     assert trust_sources["solar_derivation"]["checksum"] == "solar-real"
-

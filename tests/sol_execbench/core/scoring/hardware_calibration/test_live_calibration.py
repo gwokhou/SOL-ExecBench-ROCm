@@ -71,7 +71,8 @@ def test_live_offline_calibration_writes_rdna4_evidence(tmp_path) -> None:
     result = CliRunner().invoke(
         cli,
         [
-            "hardware-model",
+            "hardware",
+            "model",
             "calibrate",
             "--device",
             "0",

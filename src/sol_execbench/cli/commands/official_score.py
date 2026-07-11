@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""``sol-execbench official-score`` CLI (GATE-03 confirmed-evidence emitter).
+"""``sol-execbench score official`` CLI (GATE-03 confirmed-evidence emitter).
 
 Emits official score evidence only from a release-scoped baseline, its
 independent rerun verification, and an explicit suite denominator. A measured
@@ -27,16 +27,19 @@ from ...core.scoring.official_score import (
     build_official_score_suite_evidence,
 )
 from ...core.scoring.release_baseline import load_official_release_baseline, sha256_file
+from ..protocol import CliFailure, CliResult, artifact
 
 
-@click.command(
-    "official-score",
-    context_settings={"help_option_names": ["-h", "--help"]},
-)
+@click.group("score", context_settings={"help_option_names": ["-h", "--help"]})
+def score_cli() -> None:
+    """Build score evidence under explicit authority rules."""
+
+
+@score_cli.command("official")
 @click.option(
     "--amd-native-score",
     "amd_native_score_path",
-    required=False,
+    required=True,
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     help="AMD-native score report JSON (sol_execbench.amd_native_score.v1).",
 )
@@ -49,14 +52,14 @@ from ...core.scoring.release_baseline import load_official_release_baseline, sha
 @click.option(
     "--scoring-baseline",
     "scoring_baseline_path",
-    required=False,
+    required=True,
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     help="Release scoring_baseline.v1 JSON.",
 )
 @click.option(
     "--release-baseline-bundle",
     "release_bundle_path",
-    required=False,
+    required=True,
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     help="release_baseline_bundle.v1 matching --scoring-baseline.",
 )
@@ -155,13 +158,38 @@ def _official_score_cli(
     env_target: str | None,
     env_timing_policy: str | None,
     output_path: Path | None,
-) -> None:
+) -> CliResult:
     """Emit official_score_evidence.v1 from SOL-provided benchmark evidence."""
 
-    report = amd_native_suite_report_from_dict(
-        json.loads(amd_native_score_path.read_text(encoding="utf-8"))
+    evidence_values = (
+        candidate_solution_path,
+        candidate_trace_path,
+        candidate_timing_path,
+        candidate_environment_fingerprint,
+        candidate_clock_policy,
+        candidate_timing_policy,
     )
+    if any(value is not None for value in evidence_values) and not all(
+        value is not None for value in evidence_values
+    ):
+        raise CliFailure(
+            "candidate evidence options must be supplied all together",
+            code="incomplete_candidate_evidence",
+            details={
+                "options": [
+                    "--candidate-solution",
+                    "--candidate-trace",
+                    "--candidate-timing-evidence",
+                    "--candidate-environment-fingerprint",
+                    "--candidate-clock-policy",
+                    "--candidate-timing-policy",
+                ]
+            },
+        )
     try:
+        report = amd_native_suite_report_from_dict(
+            json.loads(amd_native_score_path.read_text(encoding="utf-8"))
+        )
         release_baseline = load_official_release_baseline(
             baseline_path=scoring_baseline_path,
             bundle_path=release_bundle_path,
@@ -227,6 +255,10 @@ def _official_score_cli(
         click.echo(f"wrote {output_path}")
     else:
         click.echo(serialized)
+    return CliResult(
+        data=payload,
+        artifacts=(artifact(output_path, "json_file"),) if output_path else (),
+    )
 
 
 def _suite_workloads(path: Path) -> tuple[tuple[str, str], ...]:
@@ -248,3 +280,15 @@ def _suite_workloads(path: Path) -> tuple[tuple[str, str], ...]:
             raise ValueError(f"suite workload {index} has invalid workload_uuid")
         workloads.append((definition, workload_uuid))
     return tuple(workloads)
+
+
+_official_score_cli = score_cli
+_official_score_cli_command = score_cli.commands["official"]
+setattr(
+    _official_score_cli_command,
+    "cli_constraints",
+    [
+        "--amd-native-score, --scoring-baseline, and --release-baseline-bundle are required",
+        "the six candidate evidence options are all-or-none",
+    ],
+)

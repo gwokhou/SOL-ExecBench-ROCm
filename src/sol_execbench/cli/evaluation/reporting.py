@@ -11,7 +11,7 @@ from rich.table import Table
 
 from ...core.data.trace import EvaluationStatus, Trace
 
-console = Console(stderr=True)
+console = Console()
 
 
 def print_traces_table(traces: list[Trace], *, console: Console = console) -> None:

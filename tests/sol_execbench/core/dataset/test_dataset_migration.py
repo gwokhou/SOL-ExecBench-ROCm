@@ -236,8 +236,11 @@ def test_dataset_migration_cli_writes_manifest_json(tmp_path: Path) -> None:
     result = CliRunner().invoke(
         cli,
         [
+            "--format",
+            "json",
             "dataset",
-            "migrate-sol",
+            "migrate",
+            "sol",
             str(source_root),
             str(output_root),
             "--category",
@@ -246,13 +249,12 @@ def test_dataset_migration_cli_writes_manifest_json(tmp_path: Path) -> None:
             "cli-rev",
             "--manifest",
             str(manifest_path),
-            "--json",
         ],
     )
 
     assert result.exit_code == 0, result.output
     assert manifest_path.is_file()
-    payload = json.loads(result.output)
+    payload = json.loads(result.output)["data"]["manifest"]
     written = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert payload == written
     assert payload["source"]["revision"] == "cli-rev"

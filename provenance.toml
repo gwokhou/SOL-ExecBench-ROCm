@@ -143,7 +143,6 @@ allowed = [
   "src/sol_execbench/cli/commands/dataset.py",
   "src/sol_execbench/cli/commands/environment.py",
   "src/sol_execbench/cli/commands/metadata.py",
-  "src/sol_execbench/cli/commands/root.py",
   "src/sol_execbench/cli/evaluation/command.py",
   "src/sol_execbench/cli/evaluation/evaluator.py",
   "src/sol_execbench/cli/evaluation/phases.py",

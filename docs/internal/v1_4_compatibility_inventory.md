@@ -11,8 +11,8 @@ Source: `src/sol_execbench/cli/main.py`
 
 - Entry point: `sol_execbench.cli:cli`, exposed as `sol-execbench`.
 - Supported invocation shapes:
-  - `sol-execbench <problem_dir> --solution <solution-file>`
-  - `sol-execbench --definition <definition-file> --workload <workload-file> --solution <solution-file>`
+  - Historical v1 syntax: `sol-execbench evaluate <problem_dir> --solution <solution-file>` in CLI 2.0
+  - `sol-execbench evaluate --definition <definition-file> --workload <workload-file> --solution <solution-file>`
 - Public options include:
   - `--definition`
   - `--workload`
@@ -20,15 +20,15 @@ Source: `src/sol_execbench/cli/main.py`
   - `--config`
   - `--compile-timeout`
   - `--timeout`
-  - `-o` / `--output`
-  - `--json`
+  - `--trace-output`
+  - root `--format text|json`
   - `--lock-clocks`
   - `--keep-staging`
   - `--verbose` / `-v`
-- Normal benchmark output remains trace JSONL when `--json` or `--output` is
-  used. Rich table output remains the human-facing default.
-- Current public CLI additions include `doctor`, `toolchain`, `--profile`,
-  `--static-evidence`, and contract dispatch.
+- Canonical trace output is written with `--trace-output`; JSON stdout uses the
+  CLI response envelope. Rich table output remains the human-facing default.
+- CLI 2.0 exposes `environment doctor`, `toolchain route/list`, `--profile`,
+  `--static-evidence`, and nested contract commands.
 
 ## Definition Schema Contract
 

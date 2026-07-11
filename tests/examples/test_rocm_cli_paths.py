@@ -143,12 +143,14 @@ def test_sol_execbench_cli_runs_linear_backward_on_rocm(tmp_path: Path):
     result = CliRunner().invoke(
         cli,
         [
+            "--format",
+            "json",
+            "evaluate",
             str(problem_dir),
             "--solution",
             str(problem_dir / "solution.json"),
-            "--output",
+            "--trace-output",
             str(trace_path),
-            "--json",
         ]
     )
 
@@ -156,7 +158,7 @@ def test_sol_execbench_cli_runs_linear_backward_on_rocm(tmp_path: Path):
     traces = _read_jsonl(trace_path)
     assert len(traces) == 1
     assert traces[0]["evaluation"]["status"] == "PASSED"
-    assert "PASSED" in result.output
+    assert json.loads(result.output)["data"]["all_passed"] is True
 
 
 def test_sol_execbench_cli_reports_incorrect_rocm_result(tmp_path: Path):
@@ -166,12 +168,14 @@ def test_sol_execbench_cli_reports_incorrect_rocm_result(tmp_path: Path):
     result = CliRunner().invoke(
         cli,
         [
+            "--format",
+            "json",
+            "evaluate",
             str(problem_dir),
             "--solution",
             str(problem_dir / "solution.json"),
-            "--output",
+            "--trace-output",
             str(trace_path),
-            "--json",
         ]
     )
 
@@ -193,16 +197,18 @@ def test_sol_execbench_cli_runs_hip_cpp_with_static_evidence_on_rocm(tmp_path: P
     result = CliRunner().invoke(
         cli,
         [
+            "--format",
+            "json",
+            "evaluate",
             str(problem_dir),
             "--solution",
             str(problem_dir / "solution_hip.json"),
-            "--output",
+            "--trace-output",
             str(trace_path),
             "--compile-timeout",
             "300",
             "--static-evidence",
             "auto",
-            "--json",
         ],
     )
 

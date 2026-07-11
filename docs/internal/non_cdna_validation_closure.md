@@ -8,7 +8,7 @@ does not claim CDNA 3 real hardware validation.
 | Area | Evidence | Status |
 | --- | --- | --- |
 | Original public feature parity | `docs/original_parity.md` and `tests/sol_execbench/core/dataset/test_original_parity_docs.py` | Closed |
-| Baseline comparison and score guardrails | `sol-execbench-baseline`, `docs/analysis.md`, and `tests/sol_execbench/core/evidence/test_baseline_comparison.py` | Closed |
+| Baseline comparison and score guardrails | `sol-execbench baseline compare`, `docs/analysis.md`, and `tests/sol_execbench/core/evidence/test_baseline_comparison.py` | Closed |
 | ROCm library category readiness | `docs/rocm_libraries.md` and `tests/sol_execbench/core/dataset/test_rocm_library_readiness_docs.py` | Closed |
 | `hip-execbench` practice adaptation | `docs/internal/hip_execbench_practice_map.md` and `tests/sol_execbench/core/dataset/test_hip_execbench_practice_map.py` | Closed |
 | Public contract stability | Existing schema, CLI, trace, example, and CDNA deferral tests plus v1.3 additions | Closed |

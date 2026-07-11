@@ -59,7 +59,7 @@ def test_research_preview_links_representative_commands_to_artifacts():
     text = _read("docs/research_preview.md")
 
     for required in (
-        "uv run sol-execbench tests/sol_execbench/samples/rmsnorm",
+        "uv run sol-execbench --format json evaluate tests/sol_execbench/samples/rmsnorm",
         "scripts/internal/release/release_candidate_validation.py --output-dir out/release_candidate_validation",
         "scripts/internal/release/build_prerelease_artifact_bundle.py --version v1.26.0-rc1",
         "scripts/internal/release/check_prerelease_readiness.py --bundle-dir",

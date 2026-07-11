@@ -73,7 +73,8 @@ def test_publication_verify_rejects_incomplete_contract(tmp_path: Path) -> None:
         cli,
         [
             "baseline",
-            "publication-verify",
+            "publication",
+            "verify",
             "--manifest",
             str(manifest_path),
             "--artifact-root",
@@ -103,7 +104,8 @@ def test_release_build_writes_compact_baseline_and_bundle(
         cli,
         [
             "baseline",
-            "release-build",
+            "release",
+            "build",
             "--suite-manifest",
             str(suite_path),
             "--trace",
@@ -148,7 +150,8 @@ def test_release_build_requires_positive_tolerance(tmp_path: Path) -> None:
         cli,
         [
             "baseline",
-            "release-build",
+            "release",
+            "build",
             "--suite-manifest",
             str(suite_path),
             "--trace",
@@ -232,7 +235,8 @@ def test_release_verify_writes_report(monkeypatch, tmp_path: Path) -> None:
         cli,
         [
             "baseline",
-            "release-verify",
+            "release",
+            "verify",
             "--bundle",
             str(bundle_path),
             "--rerun-trace",
@@ -285,7 +289,8 @@ def test_release_build_and_verify_share_the_manifest_file_digest(
         cli,
         [
             "baseline",
-            "release-build",
+            "release",
+            "build",
             "--suite-manifest",
             str(suite_path),
             "--trace",
@@ -342,7 +347,8 @@ def test_release_build_and_verify_share_the_manifest_file_digest(
         cli,
         [
             "baseline",
-            "release-verify",
+            "release",
+            "verify",
             "--bundle",
             str(bundle_path),
             "--rerun-trace",
@@ -459,6 +465,8 @@ def test_baseline_export_json_prints_sorted_registry(
     result = CliRunner().invoke(
         cli,
         [
+            "--format",
+            "json",
             "baseline",
             "export",
             "--trace",
@@ -467,9 +475,11 @@ def test_baseline_export_json_prints_sorted_registry(
             str(output_path),
             "--target-id",
             "gemm",
-            "--json",
         ],
     )
 
     assert result.exit_code == 0, result.output
-    assert result.output == '{"a": {"b": 2}, "z": 1}\n'
+    assert json.loads(result.output)["data"]["registry"] == {
+        "a": {"b": 2},
+        "z": 1,
+    }

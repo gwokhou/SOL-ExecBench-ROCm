@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -60,7 +61,8 @@ def test_dataset_migrate_sol_writes_manifest_and_prints_summary(
         cli,
         [
             "dataset",
-            "migrate-sol",
+            "migrate",
+            "sol",
             str(source),
             str(output),
             "--category",
@@ -110,18 +112,22 @@ def test_dataset_migrate_sol_prints_json_when_requested(
     result = CliRunner().invoke(
         cli,
         [
+            "--format",
+            "json",
             "dataset",
-            "migrate-sol",
+            "migrate",
+            "sol",
             str(source),
             str(output),
             "--manifest",
             str(explicit_manifest),
-            "--json",
         ],
     )
 
     assert result.exit_code == 0, result.output
-    assert result.output == manifest.to_json()
+    assert json.loads(result.output)["data"]["manifest"] == {
+        "schema_version": "fake.migration_manifest.v1"
+    }
     assert explicit_manifest.read_text() == manifest.to_json()
 
 
@@ -158,7 +164,8 @@ def test_dataset_migrate_flashinfer_writes_manifest_and_prints_summary(
         cli,
         [
             "dataset",
-            "migrate-flashinfer",
+            "migrate",
+            "flashinfer",
             str(source),
             str(output),
             "--source-revision",
@@ -202,13 +209,17 @@ def test_dataset_migrate_flashinfer_prints_json_when_requested(
     result = CliRunner().invoke(
         cli,
         [
+            "--format",
+            "json",
             "dataset",
-            "migrate-flashinfer",
+            "migrate",
+            "flashinfer",
             str(source),
             str(output),
-            "--json",
         ],
     )
 
     assert result.exit_code == 0, result.output
-    assert result.output == manifest.to_json()
+    assert json.loads(result.output)["data"]["manifest"] == {
+        "schema_version": "fake.migration_manifest.v1"
+    }

@@ -59,7 +59,7 @@ v1.13 provides a standalone diagnostics command that does not require a problem
 directory or solution:
 
 ```bash
-uv run sol-execbench doctor --json
+uv run sol-execbench --format json environment doctor
 ```
 
 The JSON payload reports ROCm tool availability, best-effort GPU identity,
@@ -72,8 +72,8 @@ trace JSONL:
 
 ```bash
 SOLEXECBENCH_ENV_SNAPSHOT=1 \
-  uv run sol-execbench examples/hip_cpp/rmsnorm --solution examples/hip_cpp/rmsnorm/solution_hip.json \
-  --json -o traces.jsonl
+  uv run sol-execbench --format json evaluate examples/hip_cpp/rmsnorm --solution examples/hip_cpp/rmsnorm/solution_hip.json \
+  --trace-output traces.jsonl
 ```
 
 This writes an environment-sidecar JSON file next to the chosen output file. Use
@@ -87,8 +87,8 @@ v1.14 adds opt-in `rocprofv3` artifact collection for diagnosing anomalous or
 hardware-sensitive benchmark runs:
 
 ```bash
-uv run sol-execbench examples/hip_cpp/rmsnorm --solution examples/hip_cpp/rmsnorm/solution_hip.json \
-  --profile rocprofv3 --json -o traces.jsonl
+uv run sol-execbench --format json evaluate examples/hip_cpp/rmsnorm --solution examples/hip_cpp/rmsnorm/solution_hip.json \
+  --profile rocprofv3 --trace-output traces.jsonl
 ```
 
 Profiling is disabled by default. When enabled, SOL ExecBench writes profiler

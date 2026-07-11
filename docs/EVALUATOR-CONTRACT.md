@@ -16,7 +16,7 @@ evidence and prevents a validated slice from being described as a full suite.
 Legacy bundles without one are retained for audit but emit
 `release_scope_not_declared` and cannot become official.
 
-`sol-execbench contract --json` prints the GPU-free compatibility contract that
+`sol-execbench --format json contract evaluator` prints the GPU-free compatibility contract that
 downstream tools can inspect before running a benchmark. The contract is
 metadata about SOL-owned behavior. It is not itself a Trace row and it does not
 extend the canonical Trace JSONL schema.
@@ -47,7 +47,7 @@ optional diagnostics use `optional` or a narrower diagnostic profile.
 | `trace.scoring` | `always` | Canonical scoring fields and score provenance. |
 | `baseline.measured_export` | `always` | Measured baseline registry export fields. |
 | `baseline.scoring_artifact` | `always` | Scoring baseline artifact fields. |
-| `official_score.evidence` | `confirmed` | Confirmed official benchmark score evidence gate (emitted via `sol-execbench official-score`). |
+| `official_score.evidence` | `confirmed` | Confirmed official benchmark score evidence gate (emitted via `sol-execbench score official`). |
 | `measured_baseline.coverage` | `confirmed` | Confirmed measured baseline coverage validation (five-state reason codes). |
 | `compatibility.metadata` | `always` | Metadata consumers can persist for compatibility diagnostics. |
 | `failure_categories` | `always` | Stable consumer-facing failure buckets. |
@@ -130,7 +130,7 @@ fields.
 > data models (`sol_execbench.official_score_evidence.v1`) live in
 > `src/sol_execbench/core/scoring/official_score.py` and are re-exported from
 > the scoring package. The `official_score.evidence` capability is advertised
-> as `confirmed`. The `sol-execbench official-score` CLI emits the artifact
+> as `confirmed`. The `sol-execbench score official` CLI emits the artifact
 > directly when callers provide an AMD-native report, a compact scoring
 > baseline, the matching release bundle, an independent rerun verification,
 > and the canonical suite manifest. The dataset runner may write a requested

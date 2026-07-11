@@ -28,7 +28,7 @@ The external hip-execbench references used for classification were
 | Structured failure surfaces | Typed errors carrying path, field, expected, actual, detail, and fix-hint context. | Add internal stage/error helpers for parse, packaging, compile, runtime, verification, timing, and environment failures. | None |
 | Agent/report transformation layer | Stable document generation through pure transformation helpers. | Add pure derived trace summary helpers for local reporting and tests; do not add fields to trace JSONL. | None |
 | Baseline/scoring discipline | Named-source comparison with thresholds and explicit repeated-run statistics boundaries. | Keep baseline comparison baseline-relative and warn against unsupported AMD performance claims. | None |
-| Trace-file baseline comparison | Named baseline comparison and summary emission. | Keep `sol-execbench-baseline` over existing trace JSONL with WIN/PARITY/LOSS classifications and JSON/text output. | Additive CLI only; existing `sol-execbench` behavior and trace schema unchanged |
+| Trace-file baseline comparison | Named baseline comparison and summary emission. | Keep `sol-execbench baseline compare` over existing trace JSONL with WIN/PARITY/LOSS classifications and JSON/text output. | CLI 2.0 command tree; trace schema unchanged |
 
 ## Rejected Practices
 

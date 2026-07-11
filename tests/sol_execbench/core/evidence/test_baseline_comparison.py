@@ -5,7 +5,7 @@ from pathlib import Path
 
 from click.testing import CliRunner
 
-from sol_execbench.cli.commands.baseline import cli
+from sol_execbench.cli.main import cli
 from sol_execbench.core.evidence.baseline import (
     compare_trace_baselines,
     comparison_to_json,
@@ -97,7 +97,15 @@ def test_baseline_cli_outputs_text_and_preserves_trace_contract(tmp_path: Path):
     _write_jsonl(baseline, [_trace("baseline", 1.0)])
 
     result = CliRunner().invoke(
-        cli, ["--candidate", str(candidate), "--baseline", str(baseline)]
+        cli,
+        [
+            "baseline",
+            "compare",
+            "--candidate",
+            str(candidate),
+            "--baseline",
+            str(baseline),
+        ],
     )
 
     assert result.exit_code == 0

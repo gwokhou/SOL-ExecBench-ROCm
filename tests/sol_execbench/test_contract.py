@@ -300,10 +300,10 @@ def test_baseline_export_fields_distinguish_measured_and_scoring_artifacts():
 
 
 def test_contract_cli_json_outputs_builder_payload_without_problem_directory():
-    result = CliRunner().invoke(cli, ["contract", "--json"])
+    result = CliRunner().invoke(cli, ["--format", "json", "contract", "evaluator"])
 
     assert result.exit_code == 0, result.output
-    payload = json.loads(result.output)
+    payload = json.loads(result.output)["data"]
     expected = build_evaluator_contract().model_dump(mode="json")
     assert payload == expected
     assert payload["schema_version"] == "sol_execbench.evaluator_contract.v2"

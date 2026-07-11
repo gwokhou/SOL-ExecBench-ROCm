@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import dataclasses
 import json
-import sys
 import tempfile
 from pathlib import Path
 
@@ -20,6 +19,8 @@ import sol_execbench.cli.evaluation.problem_io as cli_problem_io
 import sol_execbench.cli.evaluation.runtime as cli_evaluation_runtime
 import sol_execbench.cli.evaluation.sidecar_writer as cli_sidecar_writer
 from sol_execbench.driver.problem_packager import ProblemPackager
+from sol_execbench.cli.protocol import CliResult, artifact
+from sol_execbench.cli.protocol import CliFailure
 
 
 console = Console(stderr=True)
@@ -53,7 +54,7 @@ def run_evaluation_cli(
     release_hardware_model_sha256: str | None,
     release_authority_json: Path | None,
     verbose: bool,
-) -> None:
+) -> CliResult:
     """Evaluate a SOL-ExecBench solution on GPU."""
 
     resolved_inputs = cli_problem_io.resolve_problem_inputs(
@@ -68,10 +69,13 @@ def run_evaluation_cli(
     solution_file = resolved_inputs.solution_file
     config_file = resolved_inputs.config_file
 
-    definition = cli_problem_io._load_definition(definition_file)
-    workloads = cli_problem_io._load_workloads(workload_file)
-    solution = cli_problem_io._load_solution(solution_file)
-    config = cli_problem_io._load_config(config_file)
+    try:
+        definition = cli_problem_io._load_definition(definition_file)
+        workloads = cli_problem_io._load_workloads(workload_file)
+        solution = cli_problem_io._load_solution(solution_file)
+        config = cli_problem_io._load_config(config_file)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        raise CliFailure(str(exc), code="invalid_input_schema") from exc
 
     if lock_clocks:
         config.lock_clocks = True
@@ -164,7 +168,23 @@ def run_evaluation_cli(
     cli_outputs.emit_trace_output(traces=traces, json_output=json_output)
 
     packager.close()
-    sys.exit(0 if cli_outputs.all_traces_passed(traces) else 1)
+    passed = sum(1 for trace in traces if trace.is_successful())
+    artifacts = (
+        (artifact(output_file, "canonical_trace_jsonl"),)
+        if output_file is not None
+        else ()
+    )
+    return CliResult(
+        data={
+            "problem": definition.name,
+            "solution": solution.name,
+            "workloads": len(traces),
+            "passed": passed,
+            "all_passed": cli_outputs.all_traces_passed(traces),
+        },
+        artifacts=artifacts,
+        exit_code=0 if cli_outputs.all_traces_passed(traces) else 1,
+    )
 
 
 def _release_baseline_evidence(

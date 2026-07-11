@@ -14,10 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import contextlib
+import fcntl
 import sys
 from importlib.util import find_spec
 from platform import machine
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
@@ -25,9 +27,16 @@ import pytest
 PathExists = Callable[[Path], bool]
 
 _ROCM_DEVICE_NODES = (Path("/dev/kfd"), Path("/dev/dri"))
+_REAL_GPU_MARKERS = frozenset(
+    {"requires_rocm", "requires_rocm_gpu", "requires_rdna4", "requires_cdna3"}
+)
+_REAL_GPU_XDIST_GROUP = "real_rocm_gpu"
+_REAL_GPU_LOCK_PATH = Path("/tmp/sol-execbench-real-gpu.lock")
 
 
-def _missing_rocm_device_nodes(path_exists: PathExists | None = None) -> tuple[str, ...]:
+def _missing_rocm_device_nodes(
+    path_exists: PathExists | None = None,
+) -> tuple[str, ...]:
     """Return missing ROCm device nodes for Linux hardware test collection."""
     if sys.platform != "linux":
         return ()
@@ -193,8 +202,12 @@ def pytest_collection_modifyitems(
         reason="native_extension_serial tests skipped by default; run with: pytest tests -m native_extension_serial -n 0"
     )
     skip_no_rocm = pytest.mark.skip(reason=rocm_skip_reason)
-    skip_no_rocm_dev = pytest.mark.skip(reason="ROCm HIP development headers unavailable")
-    skip_no_triton_rocm = pytest.mark.skip(reason="triton-rocm Python package unavailable")
+    skip_no_rocm_dev = pytest.mark.skip(
+        reason="ROCm HIP development headers unavailable"
+    )
+    skip_no_triton_rocm = pytest.mark.skip(
+        reason="triton-rocm Python package unavailable"
+    )
     skip_no_safetensors_torch = pytest.mark.skip(
         reason="safetensors.torch support unavailable"
     )
@@ -220,6 +233,7 @@ def pytest_collection_modifyitems(
     native_extension_serial_selected = "native_extension_serial" in markexpr
 
     for item in items:
+        _assign_real_gpu_xdist_group(item)
         if any(item.iter_markers(name="requires_linux")) and sys.platform != "linux":
             item.add_marker(skip_not_linux)
         if any(item.iter_markers(name="requires_x86_64")) and machine().lower() not in {
@@ -234,7 +248,10 @@ def pytest_collection_modifyitems(
             item.add_marker(skip_no_rocm)
         if any(item.iter_markers(name="requires_rocm_dev")) and not rocm_dev_available:
             item.add_marker(skip_no_rocm_dev)
-        if any(item.iter_markers(name="requires_triton_rocm")) and not triton_rocm_available:
+        if (
+            any(item.iter_markers(name="requires_triton_rocm"))
+            and not triton_rocm_available
+        ):
             item.add_marker(skip_no_triton_rocm)
         if (
             any(item.iter_markers(name="requires_safetensors_torch"))
@@ -266,6 +283,53 @@ def pytest_collection_modifyitems(
             and not native_extension_serial_selected
         ):
             item.add_marker(skip_native_extension_serial)
+
+
+def _assign_real_gpu_xdist_group(item: pytest.Item) -> None:
+    """Put every real-GPU test in one xdist group.
+
+    A single AMD GPU has process-global clock, profiler, and memory state.  A
+    common group prevents tests that mutate those resources from racing even
+    when the rest of the suite uses multiple xdist workers.
+    """
+    if not _has_real_gpu_marker(item):
+        return
+
+    # Keep a single effective xdist group.  Some older tests have a local
+    # ``serial`` group; leaving both groups would split GPU tests by their
+    # combined marker name rather than serialize the entire hardware set.
+    own_markers = getattr(item, "own_markers", None)
+    if isinstance(own_markers, list):
+        own_markers[:] = [
+            marker for marker in own_markers if marker.name != "xdist_group"
+        ]
+    item.add_marker(pytest.mark.xdist_group(_REAL_GPU_XDIST_GROUP))
+
+
+def _has_real_gpu_marker(item: pytest.Item) -> bool:
+    """Return whether an item declares that it touches real GPU hardware."""
+    return any(any(item.iter_markers(name=marker)) for marker in _REAL_GPU_MARKERS)
+
+
+@contextlib.contextmanager
+def _real_gpu_execution_lock() -> Iterator[None]:
+    """Serialize real-GPU tests even if xdist group scheduling changes."""
+    with _REAL_GPU_LOCK_PATH.open("a+") as lock_file:
+        fcntl.flock(lock_file, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
+
+
+@pytest.fixture(autouse=True)
+def _serialize_real_gpu_test(request: pytest.FixtureRequest) -> Iterator[None]:
+    """Hold the process-global GPU resource lock for marked hardware tests."""
+    if not _has_real_gpu_marker(request.node):
+        yield
+        return
+    with _real_gpu_execution_lock():
+        yield
 
 
 @pytest.fixture

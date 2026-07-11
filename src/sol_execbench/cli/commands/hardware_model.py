@@ -35,6 +35,12 @@ from sol_execbench.core.scoring.hardware_calibration.rocprof_compute import (
     default_profiler_discovery,
     ensure_profiler_environment,
 )
+from sol_execbench.cli.protocol import (
+    EXIT_UNAVAILABLE,
+    CliFailure,
+    CliResult,
+    artifact,
+)
 
 
 def _write_json(path: Path, payload: dict[str, object]) -> None:
@@ -56,12 +62,17 @@ def _rejected(path: Path, reason: str) -> None:
     )
 
 
-@click.group("hardware-model", context_settings={"help_option_names": ["-h", "--help"]})
-def _hardware_model_cli() -> None:
+@click.group("hardware", context_settings={"help_option_names": ["-h", "--help"]})
+def hardware_cli() -> None:
+    """Manage hardware-derived benchmark evidence."""
+
+
+@hardware_cli.group("model")
+def hardware_model_cli() -> None:
     """Create diagnostic calibration evidence and external hardware models."""
 
 
-@_hardware_model_cli.command("calibrate")
+@hardware_model_cli.command("calibrate")
 @click.option("--device", default=0, show_default=True, type=click.IntRange(min=0))
 @click.option(
     "--output", required=True, type=click.Path(dir_okay=False, path_type=Path)
@@ -81,7 +92,7 @@ def _calibrate(
     require_clock_lock: bool,
     offline: bool,
     no_auto_install: bool,
-) -> None:
+) -> CliResult:
     """Collect calibration candidates without fabricating unavailable evidence."""
     try:
         environment = discover_gpu(device)
@@ -104,17 +115,25 @@ def _calibrate(
         )
     except (RuntimeError, ValueError) as exc:
         _rejected(output, str(exc))
-        raise click.ClickException(str(exc)) from exc
+        raise CliFailure(
+            str(exc), code="environment_unavailable", exit_code=EXIT_UNAVAILABLE
+        ) from exc
     if artifact.validation_status != "validated":
         reason = (
             "calibration is diagnostic only; validation provenance is not confirmed"
         )
         _rejected(output, reason)
-        raise click.ClickException(reason)
+        raise CliFailure(
+            reason, code="environment_unavailable", exit_code=EXIT_UNAVAILABLE
+        )
     _write_json(output, artifact.to_dict())
+    return CliResult(
+        data={"validation_status": artifact.validation_status},
+        artifacts=(artifact_ref(output, "json_file"),),
+    )
 
 
-@_hardware_model_cli.command("build")
+@hardware_model_cli.command("build")
 @click.option(
     "--calibration",
     "calibration_path",
@@ -130,7 +149,9 @@ def _calibrate(
     default=None,
     help="Reject calibration evidence older than this age.",
 )
-def _build(calibration_path: Path, output: Path, max_age_hours: float | None) -> None:
+def _build(
+    calibration_path: Path, output: Path, max_age_hours: float | None
+) -> CliResult:
     """Convert a validated calibration artifact into an external v3 model."""
     try:
         raw_calibration = json.loads(calibration_path.read_text(encoding="utf-8"))
@@ -201,6 +222,13 @@ def _build(calibration_path: Path, output: Path, max_age_hours: float | None) ->
             ],
         },
     )
+    return CliResult(
+        data={
+            "schema_version": AMD_HARDWARE_MODEL_V3_SCHEMA_VERSION,
+            "architecture": architecture,
+        },
+        artifacts=(artifact_ref(output, "json_file"),),
+    )
 
 
 def _validate_calibration_authority(
@@ -245,3 +273,7 @@ def _validate_calibration_authority(
             raise ValueError("calibration timestamp is invalid") from exc
         if generated < datetime.now(UTC) - timedelta(hours=max_age_hours):
             raise ValueError("calibration evidence exceeds requested freshness window")
+
+
+artifact_ref = artifact
+_hardware_model_cli = hardware_model_cli

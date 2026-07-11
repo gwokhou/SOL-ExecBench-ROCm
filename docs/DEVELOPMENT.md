@@ -4,7 +4,7 @@
 SOL ExecBench ROCm Port is a Python package managed with `uv`. The package
 source lives under `src/sol_execbench/`, the main console script is
 `sol-execbench`, and the baseline comparison console script is
-`sol-execbench-baseline`.
+`sol-execbench baseline compare`.
 
 Development work should preserve the ROCm-only scope and the public benchmark
 schemas unless a ROCm-specific change is required. Keep validation claims within
@@ -38,7 +38,7 @@ Run a GPU-free CLI contract check and the test suite to confirm the environment
 is usable:
 
 ```bash
-uv run sol-execbench contract --json
+uv run sol-execbench --format json contract evaluator
 uv run pytest tests/
 ```
 
@@ -73,16 +73,16 @@ scripts, and the Docker helper.
 | --- | --- |
 | `uv sync --all-groups` | Install runtime and development dependency groups. |
 | `uv build` | Build package artifacts with Hatchling. |
-| `uv run sol-execbench <problem_dir> --solution <solution-path>` | Run one benchmark problem. |
+| `uv run sol-execbench evaluate <problem_dir> --solution <solution-path>` | Run one benchmark problem. |
 | `uv run sol-execbench --definition <definition-json> --workload <workload-jsonl> --solution <solution-json>` | Run one problem from explicit files. |
-| `uv run sol-execbench contract --json` | Print the GPU-free evaluator compatibility contract. |
-| `uv run sol-execbench doctor --json` | Print ROCm environment diagnostics. |
-| `uv run sol-execbench toolchain --json` | Print ROCm evidence-tool routing diagnostics. |
-| `uv run sol-execbench toolchain --json --list-registry` | Print registered ROCm toolchain capabilities. |
-| `uv run sol-execbench dataset migrate-sol <source_root> <output_root>` | Convert locally downloaded SOL-ExecBench inputs into local benchmark layout. |
-| `uv run sol-execbench dataset migrate-flashinfer <source_root> <output_root>` | Convert locally downloaded FlashInfer Trace inputs into local benchmark layout. |
-| `uv run sol-execbench-baseline --candidate <file> --baseline <file>` | Compare trace JSONL files. |
-| `uv run sol-execbench-baseline export --trace <trace-jsonl> --output <baseline-json> --target-id <target>` | Export a measured HIP baseline registry from trace JSONL. |
+| `uv run sol-execbench --format json contract evaluator` | Print the GPU-free evaluator compatibility contract. |
+| `uv run sol-execbench --format json environment doctor` | Print ROCm environment diagnostics. |
+| `uv run sol-execbench --format json toolchain route` | Print ROCm evidence-tool routing diagnostics. |
+| `uv run sol-execbench --format json toolchain list` | Print registered ROCm toolchain capabilities. |
+| `uv run sol-execbench dataset migrate sol <source_root> <output_root>` | Convert locally downloaded SOL-ExecBench inputs into local benchmark layout. |
+| `uv run sol-execbench dataset migrate flashinfer <source_root> <output_root>` | Convert locally downloaded FlashInfer Trace inputs into local benchmark layout. |
+| `uv run sol-execbench baseline compare --candidate <file> --baseline <file>` | Compare trace JSONL files. |
+| `uv run sol-execbench baseline export --trace <trace-jsonl> --output <baseline-json> --target-id <target>` | Export a measured HIP baseline registry from trace JSONL. |
 | `uv run scripts/run_dataset.py <downloaded-benchmark-dir> --limit 5` | Run a small downloaded dataset batch. |
 | `uv run scripts/run_derived_isolated.py <downloaded-benchmark-dir> -o <output-dir> --status-jsonl <status-jsonl> --log-file <log-file>` | Run derived dataset sidecar generation outside the GPU trace subprocess path. |
 | `uv run python scripts/internal/rdna4/run_rdna4_profiler_timing_coverage.py` | Build RDNA4 profiler-backed timing coverage reports from timing sidecars. |

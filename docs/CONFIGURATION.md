@@ -149,12 +149,12 @@ readiness gate consumes this manifest with `docs/provenance.md`.
 There are no required environment variables for starting the CLI. Required
 inputs are passed as files or positional arguments:
 
-- `sol-execbench <problem_dir>` requires definition and workload JSON/JSONL
+- `sol-execbench evaluate <problem_dir>` requires definition and workload JSON/JSONL
   files in the problem directory.
 - If no problem directory is used, `--definition` and `--workload` are required.
 - A solution must be supplied through `--solution` or by the conventional
   solution JSON file in the problem directory.
-- `contract`, `doctor`, and `toolchain` subcommands only support `--json`
+- JSON responses use root-level `--format json` before the subcommand
   output and raise a Click exception without it.
 - `BenchmarkConfig.warmup_runs` must be `>= 0`; `iterations` must be `> 0`.
 - `scripts/run_docker.sh --target`, `--compatibility-entry`, and
@@ -182,8 +182,8 @@ clock-sensitive evaluation paths can reject the run based on
 | Dataset runner timeout | `300` seconds per problem | `scripts/run_dataset.py --timeout` |
 | Dataset runner phase | `all` | `scripts/run_dataset.py --phase` |
 | Dataset runner execution mode | `serial` | `scripts/run_dataset.py --execution-mode` |
-| Baseline comparison win threshold | `2.0` percent | `sol-execbench-baseline --win-pct` |
-| Baseline comparison parity threshold | `5.0` percent | `sol-execbench-baseline --parity-pct` |
+| Baseline comparison win threshold | `2.0` percent | `sol-execbench baseline compare --win-pct` |
+| Baseline comparison parity threshold | `5.0` percent | `sol-execbench baseline compare --parity-pct` |
 | Docker target | `rocm-7.1.1-ubuntu-24.04-container` | `docker/rocm-targets.json` |
 | Docker base image | `rocm/dev-ubuntu-24.04:7.1.1-complete` | Default Docker target and `docker/Dockerfile` |
 | Docker local image name | `sol-execbench` | `scripts/run_docker.sh` |
@@ -240,7 +240,7 @@ files. Use these source-backed override paths instead:
 Primary evaluator form:
 
 ```bash
-uv run sol-execbench <problem_dir> --solution solution.json
+uv run sol-execbench evaluate <problem_dir> --solution solution.json
 ```
 
 Explicit input form:
@@ -261,7 +261,7 @@ uv run sol-execbench \
 | `--compile-timeout` | `120` | HIP/C++ compilation timeout in seconds. |
 | `--timeout` | `600` | Evaluation subprocess timeout in seconds. |
 | `-o`, `--output` | None | Trace JSONL output path. |
-| `--json` | Disabled | Print trace JSON lines to stdout. |
+| `--trace-output` | Disabled | Write canonical trace JSONL separately from stdout. |
 | `--lock-clocks` | Disabled | Require GPU clocks to be locked. |
 | `--keep-staging` | Disabled | Preserve the temporary staging directory. |
 | `--profile` | `none` | Use `rocprofv3` for optional diagnostic profiling when set to `rocprofv3`. |
@@ -280,12 +280,12 @@ directory, or in the system temp directory depending on the available path.
 That sidecar records stdout/stderr tails and line counts and is not canonical
 trace JSONL.
 
-Metadata and diagnostic subcommands require `--json`:
+Metadata and diagnostic subcommands support the root JSON format:
 
 ```bash
-uv run sol-execbench contract --json
-uv run sol-execbench doctor --json
-uv run sol-execbench toolchain --json
+uv run sol-execbench --format json contract evaluator
+uv run sol-execbench --format json environment doctor
+uv run sol-execbench --format json toolchain route
 ```
 
 `toolchain` also accepts `--evidence-level`, `--artifact-type`, `--gpu-arch`,
@@ -295,21 +295,19 @@ Local dataset migration subcommands live under the same `sol-execbench` entry
 point:
 
 ```bash
-uv run sol-execbench dataset migrate-sol <source_root> <output_root> \
-  --category L1 --manifest out/sol-migration-manifest.json --json
-uv run sol-execbench dataset migrate-flashinfer <source_root> <output_root> \
-  --manifest out/flashinfer-migration-manifest.json --json
+uv run sol-execbench --format json dataset migrate sol <source_root> <output_root> \
+  --category L1 --manifest out/sol-migration-manifest.json
+uv run sol-execbench --format json dataset migrate flashinfer <source_root> <output_root> \
+  --manifest out/flashinfer-migration-manifest.json
 ```
 
 | Subcommand | Option | Purpose |
 | --- | --- | --- |
-| `dataset migrate-sol` | `--category` | Restrict SOL-ExecBench migration to one or more categories. |
-| `dataset migrate-sol` | `--source-revision` | Record the source dataset revision or local commit ref in the manifest. |
-| `dataset migrate-sol` | `--manifest` | Write the migration manifest to an explicit path. |
-| `dataset migrate-sol` | `--json` | Print the migration manifest JSON to stdout. |
-| `dataset migrate-flashinfer` | `--source-revision` | Record the FlashInfer Trace source revision or local commit ref in the manifest. |
-| `dataset migrate-flashinfer` | `--manifest` | Write the migration manifest to an explicit path. |
-| `dataset migrate-flashinfer` | `--json` | Print the migration manifest JSON to stdout. |
+| `dataset migrate sol` | `--category` | Restrict SOL-ExecBench migration to one or more categories. |
+| `dataset migrate sol` | `--source-revision` | Record the source dataset revision or local commit ref in the manifest. |
+| `dataset migrate sol` | `--manifest` | Write the migration manifest to an explicit path. |
+| `dataset migrate flashinfer` | `--source-revision` | Record the FlashInfer Trace source revision or local commit ref in the manifest. |
+| `dataset migrate flashinfer` | `--manifest` | Write the migration manifest to an explicit path. |
 
 ## Dataset Runner Options
 
@@ -366,11 +364,11 @@ and derived/timing sidecars are produced after the serial GPU trace path.
 
 ## Baseline Comparison CLI
 
-The package also exposes `sol-execbench-baseline` for comparing existing trace
+The package exposes `sol-execbench baseline compare` for comparing existing trace
 JSONL files. It does not run GPU evaluation.
 
 ```bash
-uv run sol-execbench-baseline \
+uv run sol-execbench baseline compare \
   --candidate out/current/traces.jsonl \
   --baseline out/baseline/traces.jsonl \
   --format json --output out/baseline-comparison.json
@@ -456,11 +454,11 @@ roots plus target and workload controls:
 
 ### Calibrated AMD hardware models
 
-`sol-execbench hardware-model calibrate --device 0 --output calibration.json` records
+`sol-execbench hardware model calibrate --device 0 --output calibration.json` records
 measured or explicitly unknown calibration evidence.  The optional `--offline` and
 `--no-auto-install` switches prevent managed ROCm Compute Profiler dependency
 installation; unavailable profiler data remains `unknown`.  Convert only a validated
-artifact with `hardware-model build --calibration calibration.json --output model.json`,
+artifact with `hardware model build --calibration calibration.json --output model.json`,
 then select that external model explicitly in bound-generation workflows.
 
 | `--temp-dir` | Parent directory for profiler staging directories. |
@@ -501,7 +499,7 @@ closure audit also accepts repeated `--target-status` values.
 - Version `1.0.5`, which is the Python package version rather than the v1.26
   research-prerelease milestone tag
 - Python range `>=3.12,<3.14`
-- Console scripts `sol-execbench` and `sol-execbench-baseline`
+- Console script `sol-execbench`
 - Runtime dependencies, including PyTorch ROCm, torchvision ROCm, `triton-rocm`,
   Pydantic, Click, Rich, datasets, and native build helpers
 - Development dependencies for pytest, pytest-xdist, Ruff, Ty, and pre-commit

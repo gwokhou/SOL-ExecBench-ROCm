@@ -36,13 +36,14 @@ from ...core.scoring.authority_slice import (
     write_authority_slice_manifest,
 )
 from ...core.scoring.amd_bound_sanity.models import AmdBoundSanityReport
+from ..protocol import CliResult, artifact, output_format
 
 
 console = Console(stderr=True)
 
 
 @click.group("baseline", context_settings={"help_option_names": ["-h", "--help"]})
-def _baseline_cli() -> None:
+def baseline_cli() -> None:
     """Measured baseline export utilities."""
 
 
@@ -99,7 +100,12 @@ def _authority_from_json(path: Path | None) -> dict[tuple[str, str], AuthorityIn
     return authority
 
 
-@_baseline_cli.command("authority-freeze")
+@baseline_cli.group("authority")
+def authority_cli() -> None:
+    """Manage frozen baseline authority inputs."""
+
+
+@authority_cli.command("freeze")
 @click.option(
     "--suite-manifest",
     "suite_manifest_path",
@@ -128,7 +134,7 @@ def _authority_freeze_cli(
     sanity_report_path: Path,
     output_path: Path,
     selection_policy_version: str,
-) -> None:
+) -> CliResult:
     """Freeze a score-independent authoritative workload subset."""
     try:
         sanity_payload = _load_json(sanity_report_path, "AMD bound sanity report")
@@ -149,9 +155,18 @@ def _authority_freeze_cli(
         f"[green]Wrote frozen authority slice to {output_path}[/green] "
         f"({len(manifest.workloads)} selected, {len(manifest.excluded)} excluded)"
     )
+    return CliResult(
+        data={"selected": len(manifest.workloads), "excluded": len(manifest.excluded)},
+        artifacts=(artifact(output_path, "json_file"),),
+    )
 
 
-@_baseline_cli.command("release-build")
+@baseline_cli.group("release")
+def release_cli() -> None:
+    """Build and verify immutable release baseline evidence."""
+
+
+@release_cli.command("build")
 @click.option(
     "--suite-manifest",
     "suite_manifest_path",
@@ -213,7 +228,7 @@ def _release_build_cli(
     compiler_build_id: str,
     scope: str,
     latency_tolerance_rel: float,
-) -> None:
+) -> CliResult:
     """Build compact and complete release-baseline evidence from one trace."""
 
     suite_workloads = _suite_workloads_from_json(suite_manifest_path)
@@ -251,9 +266,16 @@ def _release_build_cli(
         f"[green]Wrote release baseline bundle to {bundle_output_path}[/green]"
     )
     console.print(f"Release {written_bundle.release}: {written_bundle.summary}")
+    return CliResult(
+        data={"release": written_bundle.release, "summary": written_bundle.summary},
+        artifacts=(
+            artifact(baseline_output_path, "json_file"),
+            artifact(bundle_output_path, "json_file"),
+        ),
+    )
 
 
-@_baseline_cli.command("release-verify")
+@release_cli.command("verify")
 @click.option(
     "--bundle",
     "bundle_path",
@@ -288,7 +310,7 @@ def _release_verify_cli(
     timing_policy: str,
     compiler_build_id: str,
     suite_manifest_sha256: str,
-) -> None:
+) -> CliResult:
     """Verify an immutable release baseline bundle against a rerun trace."""
 
     try:
@@ -314,9 +336,24 @@ def _release_verify_cli(
         f"[green]Wrote release baseline verification to {output_path}[/green]"
     )
     console.print(f"Release {report.release}: {report.summary}")
+    return CliResult(
+        data={"release": report.release, "summary": report.summary},
+        artifacts=(artifact(output_path, "json_file"),),
+        exit_code=(
+            1
+            if isinstance(report.summary, dict)
+            and report.summary.get("passed") != report.summary.get("total")
+            else 0
+        ),
+    )
 
 
-@_baseline_cli.command("publication-verify")
+@baseline_cli.group("publication")
+def publication_cli() -> None:
+    """Verify published evidence artifacts."""
+
+
+@publication_cli.command("verify")
 @click.option(
     "--manifest",
     "manifest_path",
@@ -330,7 +367,7 @@ def _release_verify_cli(
     type=click.Path(exists=True, file_okay=False, path_type=Path),
     help="Directory containing the downloaded release artifacts.",
 )
-def _publication_verify_cli(manifest_path: Path, artifact_root: Path) -> None:
+def _publication_verify_cli(manifest_path: Path, artifact_root: Path) -> CliResult:
     """Verify a downloaded evidence bundle against its Git-tracked manifest."""
     try:
         manifest = load_evidence_publication_manifest(manifest_path)
@@ -340,9 +377,10 @@ def _publication_verify_cli(manifest_path: Path, artifact_root: Path) -> None:
     console.print(
         f"[green]Verified published evidence for {manifest.release} ({manifest.scope})[/green]"
     )
+    return CliResult(data={"release": manifest.release, "scope": manifest.scope})
 
 
-@_baseline_cli.command(
+@baseline_cli.command(
     "export", context_settings={"help_option_names": ["-h", "--help"]}
 )
 @click.option(
@@ -372,15 +410,13 @@ def _publication_verify_cli(manifest_path: Path, artifact_root: Path) -> None:
     show_default=True,
     help="Timing policy label to record in baseline provenance.",
 )
-@click.option("--json", "json_output", is_flag=True, help="Print registry JSON")
 def _baseline_export_cli(
     trace_path: Path,
     output_path: Path,
     target_id: str,
     sol_version: str,
     timing_policy: str,
-    json_output: bool,
-) -> None:
+) -> CliResult:
     """Export a HIP measured baseline registry from a SOL trace JSONL file."""
 
     registry = export_hip_baseline_registry(
@@ -390,15 +426,19 @@ def _baseline_export_cli(
         sol_version=sol_version,
         timing_policy=timing_policy,
     )
-    if json_output:
-        click.echo(json.dumps(registry, sort_keys=True))
-    else:
+    if output_format() == "text":
         console.print(
             f"[green]Wrote measured baseline registry to {output_path}[/green]"
         )
+    return CliResult(
+        data={"registry": registry},
+        artifacts=(artifact(output_path, "json_file"),),
+    )
 
 
-@click.command(context_settings={"help_option_names": ["-h", "--help"]})
+@baseline_cli.command(
+    "compare", context_settings={"help_option_names": ["-h", "--help"]}
+)
 @click.option(
     "--candidate",
     "candidate_file",
@@ -413,14 +453,6 @@ def _baseline_export_cli(
     multiple=True,
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     help="Baseline trace JSONL file. May be repeated.",
-)
-@click.option(
-    "--format",
-    "output_format",
-    type=click.Choice(["text", "json"]),
-    default="text",
-    show_default=True,
-    help="Output format.",
 )
 @click.option(
     "--output",
@@ -447,15 +479,14 @@ def _baseline_export_cli(
     is_flag=True,
     help="Label output as an AMD-native claim and emit guardrail warnings.",
 )
-def cli(
+def _baseline_compare_cli(
     candidate_file: Path,
     baseline_files: tuple[Path, ...],
-    output_format: str,
     output_file: Path | None,
     win_pct: float,
     parity_pct: float,
     amd_native_claim: bool,
-) -> None:
+) -> CliResult:
     """Compare candidate trace JSONL against one or more baseline trace files."""
     candidate_traces = load_trace_jsonl(candidate_file)
     baseline_traces = []
@@ -470,8 +501,9 @@ def cli(
         amd_native_claim=amd_native_claim,
     )
 
-    if output_format == "json":
-        rendered = json.dumps(comparison_to_json(comparison), indent=2)
+    payload = comparison_to_json(comparison)
+    if output_format() == "json":
+        rendered = json.dumps(payload, indent=2)
     else:
         rendered = format_baseline_comparison(comparison)
 
@@ -480,7 +512,8 @@ def cli(
         output_file.write_text(rendered + "\n")
     else:
         click.echo(rendered)
+    artifacts = (artifact(output_file, "json_file"),) if output_file else ()
+    return CliResult(data=payload, artifacts=artifacts)
 
 
-if __name__ == "__main__":
-    cli()
+_baseline_cli = baseline_cli

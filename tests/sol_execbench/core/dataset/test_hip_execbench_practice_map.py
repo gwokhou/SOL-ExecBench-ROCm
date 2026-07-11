@@ -10,7 +10,7 @@ PRACTICE_MAP = REPO_ROOT / "docs/internal/hip_execbench_practice_map.md"
 def test_practice_map_records_baseline_comparison_adaptation():
     text = PRACTICE_MAP.read_text()
     assert "Trace-file baseline comparison" in text
-    assert "sol-execbench-baseline" in text
+    assert "sol-execbench baseline compare" in text
     assert "WIN/PARITY/LOSS" in text
 
 
@@ -46,4 +46,4 @@ def test_practice_map_keeps_public_contract_guardrails():
     assert "solution.json" in text
     assert "trace JSONL" in text
     assert "Baseline comparison is baseline-relative" in text
-    assert "existing `sol-execbench` behavior and trace schema unchanged" in text
+    assert "CLI 2.0 command tree; trace schema unchanged" in text

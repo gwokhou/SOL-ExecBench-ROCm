@@ -706,7 +706,7 @@ def test_cli_subcommand_completion_dispatches_to_subcommand_options() -> None:
     )
 
     assert result.exit_code == 0, result.output
-    assert "--json" in result.output
+    assert "--help" in result.output
     assert "--definition" not in result.output
 
 

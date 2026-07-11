@@ -153,8 +153,10 @@ def test_toolchain_cli_prints_routing_json(monkeypatch):
     result = CliRunner().invoke(
         cli,
         [
+            "--format",
+            "json",
             "toolchain",
-            "--json",
+            "route",
             "--evidence-level",
             "profiling",
             "--artifact-type",
@@ -165,16 +167,16 @@ def test_toolchain_cli_prints_routing_json(monkeypatch):
     )
 
     assert result.exit_code == 0, result.output
-    payload = json.loads(result.output)
+    payload = json.loads(result.output)["data"]
     assert payload["schema_version"] == TOOLCHAIN_ROUTING_SCHEMA_VERSION
     assert payload["request"]["gpu_architecture"] == "gfx1200"
     assert payload["correctness_authority"] is False
 
 
 def test_toolchain_cli_can_list_registry():
-    result = CliRunner().invoke(cli, ["toolchain", "--json", "--list-registry"])
+    result = CliRunner().invoke(cli, ["--format", "json", "toolchain", "list"])
 
     assert result.exit_code == 0, result.output
-    payload = json.loads(result.output)
+    payload = json.loads(result.output)["data"]
     tool_ids = {entry["tool_id"] for entry in payload}
     assert {"rocprofv3", "rocm-systems", "rga", "llvm-objdump"}.issubset(tool_ids)

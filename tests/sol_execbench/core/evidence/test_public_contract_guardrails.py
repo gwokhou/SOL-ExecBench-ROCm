@@ -293,10 +293,22 @@ def test_v1_18_compatibility_matrix_fields_remain_sidecar_only():
             assert field not in text
 
 
-def test_cli_help_preserves_existing_public_options():
+def test_cli_help_exposes_v2_tree_and_evaluate_options():
     result = CliRunner().invoke(cli, ["--help"])
     assert result.exit_code == 0
     help_text = result.output
+    for command in (
+        "evaluate",
+        "environment",
+        "contract",
+        "toolchain",
+        "dataset",
+        "baseline",
+        "hardware",
+        "score",
+    ):
+        assert command in help_text
+    evaluate_help = CliRunner().invoke(cli, ["evaluate", "--help"]).output
     for expected_option in (
         "Usage:",
         "--definition",
@@ -305,26 +317,25 @@ def test_cli_help_preserves_existing_public_options():
         "--config",
         "--compile-timeout",
         "--timeout",
-        "--output",
-        "--json",
+        "--trace-output",
         "--lock-clocks",
         "--keep-staging",
         "--profile",
         "--static-evidence",
         "--verbose",
     ):
-        assert expected_option in help_text
-    assert "contract" in help_text
+        assert expected_option in evaluate_help
+    assert "--json" not in evaluate_help
     for unexpected_option in (
         "diagnose",
         "--rocprofv3",
         "hip-bench",
     ):
-        assert unexpected_option not in help_text
+        assert unexpected_option not in evaluate_help
 
 
 def test_cli_help_documents_hip_cpp_compile_timeout_option():
-    result = CliRunner().invoke(cli, ["--help"])
+    result = CliRunner().invoke(cli, ["evaluate", "--help"])
     assert result.exit_code == 0
     assert "--compile-timeout" in result.output
     assert "Compilation timeout in seconds" in result.output

@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 from typing import NoReturn
 
@@ -20,6 +19,7 @@ from . import command as cli_evaluation
 from . import compilation as cli_compilation
 from . import runtime as cli_evaluation_runtime
 from ..sidecars import static_evidence as cli_static_evidence
+from ..protocol import EXIT_EXECUTION, CliFailure
 
 PROFILE_NONE = "none"
 PROFILE_ROCPROFV3 = "rocprofv3"
@@ -57,7 +57,11 @@ def run_optional_compile_phase(
             if compile_result.stdout:
                 console.print(compile_result.stdout)
             packager.close()
-            sys.exit(1)
+            raise CliFailure(
+                "solution compilation failed",
+                code="compilation_failed",
+                exit_code=EXIT_EXECUTION,
+            )
 
         console.print("[green]Compilation succeeded[/green]")
         if verbose and compile_result.filtered_stderr:
@@ -149,4 +153,12 @@ def handle_no_trace_failure(
     if runtime_result.reason != "evaluation_timeout" and runtime_result.filtered_stderr:
         console.print(runtime_result.filtered_stderr)
     packager.close()
-    sys.exit(1)
+    raise CliFailure(
+        runtime_result.message,
+        code=runtime_result.reason,
+        exit_code=EXIT_EXECUTION,
+        details={
+            "returncode": runtime_result.returncode,
+            "diagnostics_path": str(diagnostic_path) if diagnostic_path else None,
+        },
+    )

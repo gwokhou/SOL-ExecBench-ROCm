@@ -99,7 +99,7 @@ an explicit documented output path.
 Benchmark execution can collect diagnostic profiler artifacts with:
 
 ```bash
-uv run sol-execbench <problem_dir> --solution solution.json \
+uv run sol-execbench evaluate <problem_dir> --solution solution.json \
   --profile rocprofv3 -o traces.jsonl
 ```
 

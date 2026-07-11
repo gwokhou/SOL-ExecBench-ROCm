@@ -33,7 +33,15 @@ DEFAULT_CPU_COMMAND = [
     "tests/sol_execbench/core/dataset/test_run_dataset_execution_closure.py",
     "-q",
 ]
-DEFAULT_DOCTOR_COMMAND = ["uv", "run", "sol-execbench", "doctor", "--json"]
+DEFAULT_DOCTOR_COMMAND = [
+    "uv",
+    "run",
+    "sol-execbench",
+    "--format",
+    "json",
+    "environment",
+    "doctor",
+]
 DEFAULT_ROCM_PYTEST_COMMAND = [
     "uv",
     "run",

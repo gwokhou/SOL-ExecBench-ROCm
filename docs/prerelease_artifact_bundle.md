@@ -17,7 +17,7 @@ UV_CACHE_DIR=/tmp/uv-cache uv run scripts/internal/release/build_prerelease_arti
 ```
 
 The default command runs CPU-safe release-candidate validation and attempts to
-capture `sol-execbench doctor --json` as diagnostic environment evidence. The
+capture `sol-execbench --format json environment doctor` as diagnostic environment evidence. The
 doctor command is optional evidence; if it is unavailable, the bundle records
 that status instead of treating it as paper-scale validation failure.
 

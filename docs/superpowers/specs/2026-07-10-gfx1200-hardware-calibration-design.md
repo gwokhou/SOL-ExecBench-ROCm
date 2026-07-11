@@ -19,7 +19,7 @@ operator-family estimators.
 
 ### Calibration workflow
 
-A new `hardware-model calibrate` CLI command runs local HIP microbenchmarks on
+A new `hardware model calibrate` CLI command runs local HIP microbenchmarks on
 one selected GPU. It detects the live gfx architecture by default; an optional
 `--architecture` value is an assertion and the command rejects a mismatch. It
 must run on RDNA4, CDNA3, and CDNA4 targets even where a release-quality
@@ -127,7 +127,7 @@ Every candidate has one of three distinct evidence states:
   raw samples, selected conservative value, spread, and reason codes;
 - a distinct `collection_status` and `validation_status`, with stable blockers.
 
-A second command, `hardware-model build`, accepts a validated calibration
+A second command, `hardware model build`, accepts a validated calibration
 artifact and writes an external `sol_execbench.amd_hardware_model.v2` JSON.
 It validates the requested architecture, GPU UUID, ROCm version and artifact
 schema before emitting a model. The hardware-model schema evolves from a
@@ -191,10 +191,10 @@ suite summary.
 The following public interfaces are added:
 
 ```text
-sol-execbench hardware-model calibrate \
+sol-execbench hardware model calibrate \
   --device 0 --output calibration.json
 
-sol-execbench hardware-model build \
+sol-execbench hardware model build \
   --calibration calibration.json --output calibrated-hardware-model.json
 ```
 

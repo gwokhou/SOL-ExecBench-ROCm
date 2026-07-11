@@ -1,223 +1,73 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 
-"""SOL-ExecBench CLI — evaluate solutions locally on GPU.
-
-Usage:
-    uv run sol-execbench <problem_dir> --solution solution.json
-    uv run sol-execbench --definition def.json --workload wkl.jsonl --solution sol.json
-"""
+"""SOL ExecBench 2.0 command-line interface."""
 
 from __future__ import annotations
 
-import sys
+import difflib
+import io
+import json
 from collections.abc import Sequence
-from pathlib import Path
-from typing import Any, Optional
+from contextlib import redirect_stderr, redirect_stdout
+from typing import Any
 
 import click
 
-import sol_execbench.cli.sidecars.decision as cli_decision
-import sol_execbench.cli.sidecars.static_evidence as cli_static_evidence
-from sol_execbench.cli.commands import dispatch_subcommand
-from sol_execbench.cli.evaluation.evaluator import (
-    PROFILE_NONE,
-    PROFILE_ROCPROFV3,
-    run_evaluation_cli,
+from .protocol import (
+    EXIT_EXECUTION,
+    CliResult,
+    response_failure,
+    response_success,
 )
 
-_COMPILE_PROGRESS_TEXT = "Compiling HIP/C++ solution..."
+VERSION = "2.0.0"
 
 
-@click.command(
-    name="sol-execbench", context_settings={"help_option_names": ["-h", "--help"]}
-)
-@click.argument(
-    "problem_dir", required=False, type=click.Path(exists=True, path_type=Path)
-)
-@click.option(
-    "--definition",
-    "definition_file",
-    type=click.Path(exists=True, path_type=Path),
-    help="Path to definition.json",
-)
-@click.option(
-    "--workload",
-    "workload_file",
-    type=click.Path(exists=True, path_type=Path),
-    help="Path to workload.jsonl",
-)
-@click.option(
-    "--solution",
-    "solution_file",
-    type=click.Path(exists=True, path_type=Path),
-    help="Path to solution.json",
-)
-@click.option(
-    "--config",
-    "config_file",
-    type=click.Path(exists=True, path_type=Path),
-    help="Path to benchmark config JSON",
-)
-@click.option(
-    "--compile-timeout",
-    default=120,
-    type=int,
-    help="Compilation timeout in seconds (HIP/C++ only)",
-)
-@click.option(
-    "--timeout", default=600, type=int, help="Evaluation subprocess timeout in seconds"
-)
-@click.option(
-    "-o",
-    "--output",
-    "output_file",
-    type=click.Path(path_type=Path),
-    help="Write trace JSONL to this file",
-)
-@click.option("--json", "json_output", is_flag=True, help="Print trace JSON to stdout")
-@click.option("--lock-clocks", is_flag=True, help="Require GPU clocks to be locked")
-@click.option(
-    "--keep-staging", is_flag=True, help="Keep the staging directory after evaluation"
-)
-@click.option(
-    "--profile",
-    type=click.Choice([PROFILE_NONE, PROFILE_ROCPROFV3]),
-    default=PROFILE_NONE,
-    show_default=True,
-    help="Collect optional diagnostic profiling artifacts",
-)
-@click.option(
-    "--static-evidence",
-    type=click.Choice(
-        [
-            cli_static_evidence.STATIC_EVIDENCE_NONE,
-            cli_static_evidence.STATIC_EVIDENCE_AUTO,
-        ]
-    ),
-    default=cli_static_evidence.STATIC_EVIDENCE_NONE,
-    show_default=True,
-    help="Collect optional diagnostic static kernel evidence",
-)
-@click.option(
-    "--decision",
-    type=click.Choice([cli_decision.DECISION_NONE, cli_decision.DECISION_AUTO]),
-    default=cli_decision.DECISION_NONE,
-    show_default=True,
-    help="Emit optional Layer R decision sidecar from static footprints",
-)
-@click.option(
-    "--feedback-target-id",
-    help="Consumer target identity to persist in diagnostic agent feedback.",
-)
-@click.option(
-    "--feedback-run-id",
-    help="Consumer run identity to persist in diagnostic agent feedback.",
-)
-@click.option(
-    "--feedback-candidate-id",
-    help="Consumer candidate identity to persist in diagnostic agent feedback.",
-)
-@click.option(
-    "--feedback-source-sha256",
-    help="Consumer source SHA256 identity to persist in diagnostic agent feedback.",
-)
-@click.option(
-    "--feedback-sol-version",
-    help="Consumer SOL version/tag identity to persist in diagnostic agent feedback.",
-)
-@click.option(
-    "--release-bound-sha256", help="Immutable AMD SOL bound SHA-256 for release reruns."
-)
-@click.option(
-    "--release-hardware-model-sha256",
-    help="Immutable hardware-model SHA-256 for release reruns.",
-)
-@click.option(
-    "--release-authority-json",
-    type=click.Path(exists=True, dir_okay=False, path_type=Path),
-    help="Per-workload release authority JSON.",
-)
-@click.option("--verbose", "-v", is_flag=True, help="Show subprocess output")
-def _evaluate_cli(
-    problem_dir: Optional[Path],
-    definition_file: Optional[Path],
-    workload_file: Optional[Path],
-    solution_file: Path,
-    config_file: Optional[Path],
-    compile_timeout: int,
-    timeout: int,
-    output_file: Optional[Path],
-    json_output: bool,
-    lock_clocks: bool,
-    keep_staging: bool,
-    profile: str,
-    static_evidence: str,
-    decision: str,
-    feedback_target_id: str | None,
-    feedback_run_id: str | None,
-    feedback_candidate_id: str | None,
-    feedback_source_sha256: str | None,
-    feedback_sol_version: str | None,
-    release_bound_sha256: str | None,
-    release_hardware_model_sha256: str | None,
-    release_authority_json: Path | None,
-    verbose: bool,
-):
-    """Evaluate a SOL-ExecBench solution on GPU.
+class LazyGroup(click.Group):
+    """A standard Click group whose top-level domains are imported on demand."""
 
-    \b
-    Two ways to specify the problem:
-      1) Positional: sol-execbench <problem_dir> --solution sol.json
-         (reads definition.json and workload.jsonl from problem_dir)
-      2) Explicit:   sol-execbench --definition def.json --workload wkl.jsonl --solution sol.json
+    _loaders = {
+        "evaluate": ("sol_execbench.cli.commands.evaluate", "evaluate_cli"),
+        "environment": ("sol_execbench.cli.commands.metadata", "environment_cli"),
+        "contract": ("sol_execbench.cli.commands.metadata", "contract_cli"),
+        "toolchain": ("sol_execbench.cli.commands.metadata", "toolchain_cli"),
+        "dataset": ("sol_execbench.cli.commands.dataset", "dataset_cli"),
+        "baseline": ("sol_execbench.cli.commands.baseline", "baseline_cli"),
+        "hardware": ("sol_execbench.cli.commands.hardware_model", "hardware_cli"),
+        "score": ("sol_execbench.cli.commands.official_score", "score_cli"),
+    }
 
-    \b
-    Metadata:
-      sol-execbench contract --json
-    """
-    run_evaluation_cli(
-        problem_dir=problem_dir,
-        definition_file=definition_file,
-        workload_file=workload_file,
-        solution_file=solution_file,
-        config_file=config_file,
-        compile_timeout=compile_timeout,
-        timeout=timeout,
-        output_file=output_file,
-        json_output=json_output,
-        lock_clocks=lock_clocks,
-        keep_staging=keep_staging,
-        profile=profile,
-        static_evidence=static_evidence,
-        decision=decision,
-        feedback_run_id=feedback_run_id,
-        feedback_target_id=feedback_target_id,
-        feedback_candidate_id=feedback_candidate_id,
-        feedback_source_sha256=feedback_source_sha256,
-        feedback_sol_version=feedback_sol_version,
-        release_bound_sha256=release_bound_sha256,
-        release_hardware_model_sha256=release_hardware_model_sha256,
-        release_authority_json=release_authority_json,
-        verbose=verbose,
-    )
+    def list_commands(self, ctx: click.Context) -> list[str]:
+        return list(self._loaders)
+
+    def get_command(self, ctx: click.Context, cmd_name: str) -> click.Command | None:
+        target = self._loaders.get(cmd_name)
+        if target is None:
+            return None
+        from importlib import import_module
+
+        module_name, attribute = target
+        return getattr(import_module(module_name), attribute)
+
+    def resolve_command(
+        self, ctx: click.Context, args: list[str]
+    ) -> tuple[str | None, click.Command | None, list[str]]:
+        try:
+            return super().resolve_command(ctx, args)
+        except click.UsageError as exc:
+            if args:
+                matches = difflib.get_close_matches(
+                    args[0], self.list_commands(ctx), n=1
+                )
+                if matches:
+                    exc.message += f"\nDid you mean '{matches[0]}'?"
+            raise
 
 
-class SolExecbenchCli(click.Command):
-    """Dispatch root evaluator calls and GPU-free metadata subcommands."""
+class RootGroup(LazyGroup):
+    """Serialize JSON-mode results and handled failures at one boundary."""
 
     def main(
         self,
@@ -228,33 +78,134 @@ class SolExecbenchCli(click.Command):
         windows_expand_args: bool = True,
         **extra: Any,
     ) -> Any:
-        args = list(args) if args is not None else sys.argv[1:]
-        subcommand_dispatch = dispatch_subcommand(
-            args,
-            root_command=self,
-            prog_name=prog_name,
-            complete_var=complete_var,
-            standalone_mode=standalone_mode,
-            windows_expand_args=windows_expand_args,
-            extra=extra,
+        import sys
+
+        raw_args = list(args) if args is not None else sys.argv[1:]
+        json_mode = _requested_json(raw_args)
+        standalone = standalone_mode
+        captured_stdout = io.StringIO()
+        captured_stderr = io.StringIO()
+        try:
+            if json_mode:
+                with redirect_stdout(captured_stdout), redirect_stderr(captured_stderr):
+                    result = super().main(
+                        args=raw_args,
+                        prog_name=prog_name,
+                        complete_var=complete_var,
+                        standalone_mode=False,
+                        windows_expand_args=windows_expand_args,
+                        **extra,
+                    )
+            else:
+                result = super().main(
+                    args=raw_args,
+                    prog_name=prog_name,
+                    complete_var=complete_var,
+                    standalone_mode=False,
+                    windows_expand_args=windows_expand_args,
+                    **extra,
+                )
+            cli_result = result if isinstance(result, CliResult) else CliResult()
+            exit_code = cli_result.exit_code
+            if json_mode:
+                click.echo(
+                    json.dumps(
+                        response_success(_command_name(raw_args), cli_result),
+                        sort_keys=True,
+                    )
+                )
+        except click.exceptions.Exit as exc:
+            exit_code = exc.exit_code
+            if json_mode and exc.exit_code != 0:
+                click.echo(
+                    json.dumps(
+                        response_failure(_command_name(raw_args), exc), sort_keys=True
+                    )
+                )
+        except (click.ClickException, Exception) as exc:
+            if isinstance(exc, click.UsageError):
+                exit_code = 2
+            elif isinstance(exc, click.ClickException):
+                exit_code = getattr(exc, "exit_code", 2)
+                if type(exc) is click.ClickException:
+                    exit_code = 2
+            else:
+                exit_code = EXIT_EXECUTION
+            if json_mode:
+                click.echo(
+                    json.dumps(
+                        response_failure(_command_name(raw_args), exc), sort_keys=True
+                    )
+                )
+            elif isinstance(exc, click.ClickException):
+                exc.show()
+            else:
+                click.echo(f"Error: {exc}", err=True)
+        if standalone:
+            raise SystemExit(exit_code)
+        return exit_code if exit_code else result
+
+
+def _requested_json(args: list[str]) -> bool:
+    try:
+        index = args.index("--format")
+    except ValueError:
+        return False
+    return index + 1 < len(args) and args[index + 1] == "json"
+
+
+def _command_name(args: list[str]) -> str:
+    values = list(args)
+    if "--format" in values:
+        index = values.index("--format")
+        del values[index : index + 2]
+    if not values or values[0].startswith("-"):
+        return "sol-execbench"
+    domain = values[0]
+    depths = {
+        "evaluate": 1,
+        "environment": 2,
+        "contract": 2,
+        "toolchain": 2,
+        "dataset": 3,
+        "hardware": 3,
+        "score": 2,
+    }
+    if domain == "baseline":
+        depth = (
+            3
+            if len(values) > 1 and values[1] in {"authority", "release", "publication"}
+            else 2
         )
-        if subcommand_dispatch is not None:
-            return subcommand_dispatch.result
-
-        return _evaluate_cli.main(
-            args=args,
-            prog_name=prog_name or self.name,
-            complete_var=complete_var,
-            standalone_mode=standalone_mode,
-            windows_expand_args=windows_expand_args,
-            **extra,
-        )
+    else:
+        depth = depths.get(domain, 1)
+    return " ".join(values[:depth])
 
 
-cli = SolExecbenchCli(
+@click.group(
+    cls=RootGroup,
     name="sol-execbench",
-    help="Evaluate solutions or print GPU-free evaluator/toolchain metadata.",
+    invoke_without_command=True,
+    context_settings={"help_option_names": ["-h", "--help"]},
 )
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["text", "json"]),
+    default="text",
+    show_default=True,
+    help="Response format. This root option must precede the subcommand.",
+)
+@click.version_option(VERSION, prog_name="sol-execbench")
+@click.pass_context
+def cli(ctx: click.Context, output_format: str) -> None:
+    """Evaluate kernels and manage GPU benchmark evidence.
+
+    Root options such as --format must appear before the subcommand. Run
+    ``sol-execbench contract cli`` for the machine-readable command contract.
+    """
+    if ctx.invoked_subcommand is None:
+        click.echo(ctx.get_help())
 
 
 if __name__ == "__main__":

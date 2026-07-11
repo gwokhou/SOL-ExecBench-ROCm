@@ -8,7 +8,7 @@ Create the audit first with `scripts/report_amd_bound_sanity.py`, then freeze th
 selection:
 
 ```bash
-uv run sol-execbench baseline authority-freeze \
+uv run sol-execbench baseline authority freeze \
   --suite-manifest suite.json \
   --sanity-report amd-bound-sanity.json \
   --output authority-slice.json
@@ -16,7 +16,7 @@ uv run sol-execbench baseline authority-freeze \
 
 The manifest contains the source suite SHA-256, the versioned selection policy,
 selected workloads, every excluded workload, stable blocker codes, and its own
-payload checksum. Its `workloads` list can be passed to `baseline release-build`;
+payload checksum. Its `workloads` list can be passed to `baseline release build`;
 the original complete suite manifest remains the denominator for a full-suite
 official score report.
 

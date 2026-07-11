@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""CLI tests for ``sol-execbench official-score`` (Phase 194-02 / GATE-03)."""
+"""CLI tests for ``sol-execbench score official`` (Phase 194-02 / GATE-03)."""
 
 from __future__ import annotations
 
@@ -294,7 +294,8 @@ def _invoke(
         _write_release_inputs(tmp_path, report_path)
     )
     args = [
-        "official-score",
+        "score",
+        "official",
         "--amd-native-score",
         str(report_path),
         "--measured-registry",
@@ -455,7 +456,8 @@ def test_v2_bound_reference_is_blocked_even_when_the_score_report_claims_authori
     result = CliRunner().invoke(
         cli,
         [
-            "official-score",
+            "score",
+            "official",
             "--amd-native-score",
             str(report_path),
             "--measured-registry",
@@ -490,7 +492,8 @@ def test_legacy_aggregation_policy_refuses_and_help_lists_only_policy(
     result = CliRunner().invoke(
         cli,
         [
-            "official-score",
+            "score",
+            "official",
             "--amd-native-score",
             str(report_path),
             "--measured-registry",
@@ -514,7 +517,8 @@ def test_missing_aggregation_policy_refuses(tmp_path: Path) -> None:
     result = CliRunner().invoke(
         cli,
         [
-            "official-score",
+            "score",
+            "official",
             "--amd-native-score",
             str(report_path),
             "--measured-registry",

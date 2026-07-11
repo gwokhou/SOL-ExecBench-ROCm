@@ -97,7 +97,7 @@
 - Test: `tests/sol_execbench/core/evidence/test_official_score_evidence.py`
 - Test: `tests/sol_execbench/cli/commands/test_hardware_model_cli.py`
 
-**Interfaces:** Add `BoundEligibilityEvidence(amd_sol_status, solar_status, hardware_profile_state, hardware_validation_status, model_validation_status, warnings)` to serialized AMD scores. Add `sol-execbench hardware-model calibrate --device 0 --output calibration.json [--architecture GFX] [--require-clock-lock] [--offline] [--no-auto-install]` and `hardware-model build --calibration calibration.json --output calibrated-model.json`.
+**Interfaces:** Add `BoundEligibilityEvidence(amd_sol_status, solar_status, hardware_profile_state, hardware_validation_status, model_validation_status, warnings)` to serialized AMD scores. Add `sol-execbench hardware model calibrate --device 0 --output calibration.json [--architecture GFX] [--require-clock-lock] [--offline] [--no-auto-install]` and `hardware model build --calibration calibration.json --output calibrated-model.json`.
 
 - [ ] **Step 1: Write failing tests** — A legacy score without `BoundEligibilityEvidence` receives `missing_bound_eligibility` and cannot become official. Exact validated profile evidence passes. CLI writes a rejected artifact before reporting nonzero exit.
 

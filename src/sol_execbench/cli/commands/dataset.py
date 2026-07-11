@@ -16,22 +16,26 @@ from ...core.dataset.migration import (
     migrate_sol_execbench,
     write_migration_manifest,
 )
+from ..protocol import CliResult, artifact
 
 console = Console(stderr=True)
 
 
 @click.group("dataset", context_settings={"help_option_names": ["-h", "--help"]})
-def _dataset_cli() -> None:
+def dataset_cli() -> None:
     """Local dataset utilities."""
 
 
-@_dataset_cli.command(
-    "migrate-sol", context_settings={"help_option_names": ["-h", "--help"]}
-)
+@dataset_cli.group("migrate")
+def migrate_cli() -> None:
+    """Migrate external datasets into the local benchmark layout."""
+
+
+@migrate_cli.command("sol", context_settings={"help_option_names": ["-h", "--help"]})
 @click.argument(
     "source_root", type=click.Path(exists=True, file_okay=False, path_type=Path)
 )
-@click.argument("output_root", type=click.Path(path_type=Path))
+@click.argument("output_root", type=click.Path(file_okay=False, path_type=Path))
 @click.option(
     "--category",
     "categories",
@@ -40,15 +44,13 @@ def _dataset_cli() -> None:
 )
 @click.option("--source-revision", help="Source dataset revision or local commit ref.")
 @click.option("--manifest", "manifest_path", type=click.Path(path_type=Path))
-@click.option("--json", "json_output", is_flag=True, help="Print manifest JSON")
 def _dataset_migrate_sol_cli(
     source_root: Path,
     output_root: Path,
     categories: tuple[str, ...],
     source_revision: str | None,
     manifest_path: Path | None,
-    json_output: bool,
-) -> None:
+) -> CliResult:
     """Migrate downloaded SOL-ExecBench inputs into local benchmark layout."""
 
     manifest = migrate_sol_execbench(
@@ -57,30 +59,32 @@ def _dataset_migrate_sol_cli(
         categories=categories or None,
         source_revision=source_revision,
     )
+    target = manifest_path or output_root / "migration-manifest.json"
     _write_and_report_manifest(
         manifest=manifest,
-        target=manifest_path or output_root / "migration-manifest.json",
-        json_output=json_output,
+        target=target,
+    )
+    return CliResult(
+        data={"manifest": _manifest_payload(manifest)},
+        artifacts=(artifact(target, "json_file"),),
     )
 
 
-@_dataset_cli.command(
-    "migrate-flashinfer", context_settings={"help_option_names": ["-h", "--help"]}
+@migrate_cli.command(
+    "flashinfer", context_settings={"help_option_names": ["-h", "--help"]}
 )
 @click.argument(
     "source_root", type=click.Path(exists=True, file_okay=False, path_type=Path)
 )
-@click.argument("output_root", type=click.Path(path_type=Path))
+@click.argument("output_root", type=click.Path(file_okay=False, path_type=Path))
 @click.option("--source-revision", help="Source dataset revision or local commit ref.")
 @click.option("--manifest", "manifest_path", type=click.Path(path_type=Path))
-@click.option("--json", "json_output", is_flag=True, help="Print manifest JSON")
 def _dataset_migrate_flashinfer_cli(
     source_root: Path,
     output_root: Path,
     source_revision: str | None,
     manifest_path: Path | None,
-    json_output: bool,
-) -> None:
+) -> CliResult:
     """Migrate downloaded FlashInfer Trace inputs into local benchmark layout."""
 
     manifest = migrate_flashinfer_trace(
@@ -88,10 +92,14 @@ def _dataset_migrate_flashinfer_cli(
         output_root,
         source_revision=source_revision,
     )
+    target = manifest_path or output_root / "migration-manifest.json"
     _write_and_report_manifest(
         manifest=manifest,
-        target=manifest_path or output_root / "migration-manifest.json",
-        json_output=json_output,
+        target=target,
+    )
+    return CliResult(
+        data={"manifest": _manifest_payload(manifest)},
+        artifacts=(artifact(target, "json_file"),),
     )
 
 
@@ -99,17 +107,22 @@ def _write_and_report_manifest(
     *,
     manifest,
     target: Path,
-    json_output: bool,
 ) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     write_migration_manifest(manifest, target)
-    if json_output:
-        click.echo(manifest.to_json(), nl=False)
-    else:
-        console.print(f"[green]Wrote migration manifest to {target}[/green]")
-        console.print(
-            "[bold]Problems:[/bold] "
-            f"{manifest.denominators.migrated_problems}/"
-            f"{manifest.denominators.discovered_problems} migrated; "
-            f"{manifest.denominators.blockers} blocker(s)"
-        )
+    console.print(f"[green]Wrote migration manifest to {target}[/green]")
+    console.print(
+        "[bold]Problems:[/bold] "
+        f"{manifest.denominators.migrated_problems}/"
+        f"{manifest.denominators.discovered_problems} migrated; "
+        f"{manifest.denominators.blockers} blocker(s)"
+    )
+
+
+def _manifest_payload(manifest) -> object:
+    import json
+
+    return json.loads(manifest.to_json())
+
+
+_dataset_cli = dataset_cli
