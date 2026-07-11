@@ -1,0 +1,21 @@
+{
+  "schema_version": "sol_execbench.amd_isa_release_lock.v1",
+  "default_release": "2026-03-05",
+  "releases": {
+    "2026-03-05": {
+      "url": "https://gpuopen.com/download/AMD_GPU_MR_ISA_XML_2026_03_05.zip",
+      "archive_sha256": "1f17587abc9d0d355cf6f65bdba7496838b4e8313922769199689615c434965c",
+      "files": {
+        "rdna1": {"name": "amdgpu_isa_rdna1.xml", "sha256": "f60248605e8c4cb9ae29130ce3114142467d953a3f1c57a1b0ca6d8de014e722"},
+        "rdna2": {"name": "amdgpu_isa_rdna2.xml", "sha256": "d671ecbc36543674ab59e9b2feffd56718fd2137e7ad913c314f2e2508b9f4f7"},
+        "rdna3": {"name": "amdgpu_isa_rdna3.xml", "sha256": "6eee5f8737172adf08c0e7d5994ea916e9555b9c23ccb9ec80d9ee38678733b4"},
+        "rdna3_5": {"name": "amdgpu_isa_rdna3_5.xml", "sha256": "c36b6d79b1e940d74107221c985f5a7fde248025da251d2c6ef756c4cd31391a"},
+        "rdna4": {"name": "amdgpu_isa_rdna4.xml", "sha256": "f8a290c8471e26a1071b08b61a33e4d9efa46ec6cedcdb8e5ba57d7969b60692"},
+        "cdna1": {"name": "amdgpu_isa_cdna1.xml", "sha256": "7522b4fdb5b388153450abd3470e6eafa82b87d3ffed13929ea090ee93ddb815"},
+        "cdna2": {"name": "amdgpu_isa_cdna2.xml", "sha256": "4d19245e6e1ee4faa682b560b7e2a35a3532e4e5828464931a96eb957a3a0f0f"},
+        "cdna3": {"name": "amdgpu_isa_cdna3.xml", "sha256": "af24feb95c9230a87f694c814b0035e7448a57f8503b059f0282dba1e5f20d9c"},
+        "cdna4": {"name": "amdgpu_isa_cdna4.xml", "sha256": "bb2a96f3db5c67d7c9b90e34559045c272f3536acdb03d16bc455f2f5b0a1597"}
+      }
+    }
+  }
+}

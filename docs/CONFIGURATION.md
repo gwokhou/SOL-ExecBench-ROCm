@@ -462,6 +462,7 @@ measured or explicitly unknown calibration evidence.  The optional `--offline` a
 installation; unavailable profiler data remains `unknown`.  Convert only a validated
 artifact with `hardware-model build --calibration calibration.json --output model.json`,
 then select that external model explicitly in bound-generation workflows.
+
 | `--temp-dir` | Parent directory for profiler staging directories. |
 | `--resume`, `--no-resume` | Resume from existing sidecars and manifests; enabled by default. |
 | `--max-workers` | Maximum target-level workers; default is `4`. |
@@ -474,6 +475,17 @@ then select that external model explicitly in bound-generation workflows.
 | `--strict-isolation` | Abort on timing isolation check failures instead of warning. |
 | `--gpu-device` | Set `ROCR_VISIBLE_DEVICES` to a device index for GPU isolation. |
 | `--calibration-path` | Include rocprofv3 overhead calibration data from a calibration JSON sidecar. |
+
+### AMD ISA tool layer
+
+`sol_execbench.tools.amd_isa` exposes AMD's machine-readable ISA decoder and
+explorer APIs to Python callers. Its first explicit use builds a small local
+C++ helper and downloads the project-pinned XML release into the user cache;
+imports have no build or network side effect. Set
+`SOL_EXECBENCH_AMD_ISA_CACHE` to relocate that cache, or set
+`SOL_EXECBENCH_AMD_ISA_OFFLINE=1` to require a pre-populated cache. Missing
+tools, a missing cache, or failed integrity checks produce explicit tool-layer
+errors rather than fabricated ISA capability claims.
 
 The classification scripts
 `scripts/internal/rdna4/run_rdna4_profiler_partial_failures.py` and
