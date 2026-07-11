@@ -16,9 +16,15 @@ from .models import (
     sha256_file,
     write_release_baseline_bundle,
 )
+from .builder import (
+    AuthorityInput,
+    build_release_baseline_bundle,
+    write_release_baseline_outputs,
+)
 
 __all__ = [
     "CLASSIFICATIONS",
+    "AuthorityInput",
     "RELEASE_BASELINE_BUNDLE_SCHEMA_VERSION",
     "RELEASE_BASELINE_VERIFICATION_SCHEMA_VERSION",
     "ReleaseBaselineBundle",
@@ -29,4 +35,6 @@ __all__ = [
     "release_provenance_from_dict",
     "sha256_file",
     "write_release_baseline_bundle",
+    "build_release_baseline_bundle",
+    "write_release_baseline_outputs",
 ]
