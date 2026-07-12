@@ -4,22 +4,43 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, cast
 
-from glom import PathAccessError, glom
+
+_MISSING = object()
+
+
+def _path_value(payload: object, path: str, *, default: object) -> object:
+    """Read a dot-delimited path from nested mappings.
+
+    Report and sidecar payloads are JSON-like mappings.  Keeping this helper
+    deliberately narrow avoids accepting attribute access, list indexing, or
+    other expression syntax at an untrusted artifact boundary.
+    """
+
+    value = payload
+    for segment in path.split("."):
+        if not isinstance(value, Mapping):
+            return default
+        try:
+            value = cast(Mapping[str, object], value)[segment]
+        except KeyError:
+            return default
+    return value
 
 
 def path_get(payload: object, path: str, *, default: Any = None) -> Any:
     """Return a nested payload value or a default when the path is absent."""
-    return glom(payload, path, default=default)
+    value = _path_value(payload, path, default=_MISSING)
+    return default if value is _MISSING else value
 
 
 def path_require(payload: object, path: str, *, source: str = "payload") -> Any:
     """Return a nested payload value, raising ValueError when it is absent."""
-    try:
-        return glom(payload, path)
-    except PathAccessError as exc:
-        raise ValueError(f"{source} missing required field: {path}") from exc
+    value = _path_value(payload, path, default=_MISSING)
+    if value is _MISSING:
+        raise ValueError(f"{source} missing required field: {path}")
+    return value
 
 
 def path_dict(
