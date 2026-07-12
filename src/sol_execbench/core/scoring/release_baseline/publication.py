@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any, Mapping
 from urllib.parse import urlparse
 
-from .models import sha256_file
+from sol_execbench.core.integrity.checksums import sha256_file
 
 
 EVIDENCE_PUBLICATION_MANIFEST_SCHEMA_VERSION = (

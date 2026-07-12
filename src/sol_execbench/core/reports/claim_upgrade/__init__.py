@@ -26,7 +26,7 @@ from sol_execbench.core.reports.claim_upgrade.rendering import (
     write_claim_upgrade_reports,
 )
 from sol_execbench.core.reports.claim_upgrade.rules import default_claim_rules
-from sol_execbench.core.reports.trust_summary import load_json, utc_timestamp
+from sol_execbench.core.reports.trust_summary import load_json
 
 __all__ = [
     "CLAIM_BOUNDARY_TEXT",
@@ -45,6 +45,5 @@ __all__ = [
     "default_claim_rules",
     "load_json",
     "render_claim_upgrade_markdown",
-    "utc_timestamp",
     "write_claim_upgrade_reports",
 ]

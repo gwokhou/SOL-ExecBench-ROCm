@@ -13,7 +13,7 @@ AUDITED_PATHS = (
     "src/sol_execbench/core/bench/timing.py",
     "src/sol_execbench/core/bench/timing_policy.py",
     "src/sol_execbench/core/bench/clock_lock.py",
-    "src/sol_execbench/core/utils.py",
+    "src/sol_execbench/core/platform/runtime.py",
     "tests/sol_execbench/driver/test_eval_driver.py",
     "tests/sol_execbench/core/bench/test_clock_lock.py",
 )
@@ -50,7 +50,7 @@ ALLOWLIST = {
         "torch.cuda",
     ): "PyTorch ROCm event timing is exposed through torch.cuda.Event.",
     (
-        "src/sol_execbench/core/utils.py",
+        "src/sol_execbench/core/platform/runtime.py",
         "torch.cuda",
     ): "PyTorch ROCm reports HIP devices through torch.cuda device helpers.",
     (

@@ -12,7 +12,7 @@ from ..inventory import (
     ProblemInventoryRecord,
     WorkloadInventoryRecord,
 )
-from ..manifest import utc_timestamp
+from sol_execbench.core.timestamps import utc_timestamp
 from .classification_handlers import (
     classify_cuda_solution,
     classify_custom_inputs,

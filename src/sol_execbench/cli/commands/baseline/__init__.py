@@ -11,7 +11,6 @@ from .export import register_export_command
 from .publication import register_publication_commands
 from .release import register_release_commands
 from .verify import verify_release_baseline_rerun
-from sol_execbench.core.scoring.release_baseline import sha256_file
 
 register_export_command(baseline_cli)
 register_compare_command(baseline_cli)
@@ -23,6 +22,5 @@ __all__ = [
     "ReleaseProvenance",
     "baseline_cli",
     "build_release_baseline_bundle",
-    "sha256_file",
     "verify_release_baseline_rerun",
 ]

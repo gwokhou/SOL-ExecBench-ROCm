@@ -8,7 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from sol_execbench.core.dataset.checksums import sha256_file
+from sol_execbench.core.integrity.checksums import sha256_file
 from sol_execbench.core.dataset.paper_denominator.models import (
     PaperDenominatorSourceRef,
 )

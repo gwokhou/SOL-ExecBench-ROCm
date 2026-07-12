@@ -4,11 +4,11 @@
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from sol_execbench.core.data.json_utils import load_json_dict
 from sol_execbench.core.data.path_access import (
     path_bool,
     path_dict,
@@ -30,7 +30,7 @@ from sol_execbench.core.dataset.parity_gap.models import (
 
 
 def load_json(path: Path) -> dict[str, Any]:
-    return json.loads(Path(path).read_text(encoding="utf-8"))
+    return load_json_dict(path)
 
 
 def _checksum(payload: dict[str, Any], key: str) -> str | None:

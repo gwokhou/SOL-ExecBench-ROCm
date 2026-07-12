@@ -11,7 +11,9 @@ from pydantic import BaseModel, Field
 
 from sol_execbench.core.data.json_utils import stable_model_checksum, stable_model_json
 
-from .manifest import DatasetManifestChecksum, utc_timestamp
+from sol_execbench.core.timestamps import utc_timestamp
+
+from .manifest import DatasetManifestChecksum
 from .readiness import DatasetReadiness
 
 READY_SUBSET_SCHEMA_VERSION = "sol_execbench.ready_subset.v1"

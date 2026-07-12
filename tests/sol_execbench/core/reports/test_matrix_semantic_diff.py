@@ -35,10 +35,16 @@ from sol_execbench.core.reports.matrix_diff import (
     load_matrix_report,
     matrix_report_diff_to_markdown,
 )
+from sol_execbench.core.reports.matrix_diff.rendering import _markdown_value
 
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "diff_matrix_reports.py"
+
+
+def test_matrix_diff_markdown_value_preserves_existing_escaping() -> None:
+    assert _markdown_value(None) == ""
+    assert _markdown_value("a|b\\c\r\n") == '"a\\|b\\\\\\\\c\\\\r\\\\n"'
 
 
 def _load_script():

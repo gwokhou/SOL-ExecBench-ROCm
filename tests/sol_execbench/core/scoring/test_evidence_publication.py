@@ -10,8 +10,8 @@ from sol_execbench.core.scoring.release_baseline import (
     EvidencePublicationManifest,
     PublishedArtifact,
     evidence_publication_manifest_from_dict,
-    sha256_file,
 )
+from sol_execbench.core.integrity.checksums import sha256_file
 
 
 def _write_json(path: Path, payload: object) -> None:

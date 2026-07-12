@@ -17,11 +17,11 @@ from sol_execbench.core.scoring.release_baseline import (
     ReleaseProvenance,
     build_release_baseline_bundle,
     load_release_baseline_bundle,
-    sha256_file,
     verify_release_baseline_rerun,
     write_release_baseline_outputs,
     write_release_baseline_verification,
 )
+from sol_execbench.core.integrity.checksums import sha256_file
 
 console = Console(stderr=True)
 

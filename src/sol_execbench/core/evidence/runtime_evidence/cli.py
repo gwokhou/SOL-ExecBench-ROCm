@@ -34,7 +34,7 @@ from sol_execbench.core.evidence.runtime_evidence.models import (
     RuntimeFailureCategory,
     RuntimeFailureEvidence,
 )
-from sol_execbench.core.utils import (
+from sol_execbench.core.arguments import (
     none_if_requested as _none_if_requested,
     parse_bool as _parse_bool,
 )

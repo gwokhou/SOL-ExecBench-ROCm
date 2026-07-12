@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-from pathlib import Path
 from typing import Mapping
 
 
@@ -18,13 +17,4 @@ def sha256_payload(payload: Mapping[str, object]) -> str:
     return hashlib.sha256(canonical_json_bytes(payload)).hexdigest()
 
 
-def sha256_file(path: Path) -> str:
-    """Return the SHA-256 checksum of a file."""
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-__all__ = ["canonical_json_bytes", "sha256_file", "sha256_payload"]
+__all__ = ["canonical_json_bytes", "sha256_payload"]

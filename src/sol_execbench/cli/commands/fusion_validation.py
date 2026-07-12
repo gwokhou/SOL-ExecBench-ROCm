@@ -24,8 +24,8 @@ from sol_execbench.cli.protocol import (
 from sol_execbench.core.scoring.fusion_validation import (
     FusionValidationArtifact,
     fusion_validation_from_dict,
-    sha256_file,
 )
+from sol_execbench.core.integrity.checksums import sha256_file
 from sol_execbench.core.scoring.hardware_calibration.environment import discover_gpu
 
 

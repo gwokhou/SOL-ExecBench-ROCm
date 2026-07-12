@@ -37,10 +37,10 @@ from sol_execbench.core.scoring.release_baseline import (
     ReleaseBaselineVerificationWorkload,
     ReleaseBaselineWorkload,
     ReleaseProvenance,
-    sha256_file,
     write_release_baseline_bundle,
     write_release_baseline_verification,
 )
+from sol_execbench.core.integrity.checksums import sha256_file
 from sol_execbench.core.reports.reporting import CANONICAL_BENCHMARK_OUTPUT
 from sol_execbench_type_helpers import (
     make_amd_hardware_model,

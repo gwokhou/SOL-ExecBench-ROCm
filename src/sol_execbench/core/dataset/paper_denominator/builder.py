@@ -5,10 +5,10 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
+from sol_execbench.core.data.json_utils import load_json_dict
 from sol_execbench.core.dataset.paper_denominator.assembly import (
     assemble_paper_denominator_report,
 )
@@ -29,7 +29,7 @@ from sol_execbench.core.dataset.paper_denominator.state import (
 
 
 def load_json(path: Path) -> dict[str, Any]:
-    return json.loads(Path(path).read_text(encoding="utf-8"))
+    return load_json_dict(path)
 
 
 def build_paper_denominator_report(

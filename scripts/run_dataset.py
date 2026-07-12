@@ -126,9 +126,9 @@ from sol_execbench.core.scoring.baseline_artifact import (
     load_scoring_baseline_artifact,
 )
 from sol_execbench.core.scoring.official_score import OFFICIAL_AGGREGATION_POLICY
+from sol_execbench.core.integrity.checksums import sha256_file
 from sol_execbench.core.scoring.fusion_validation import (
     fusion_validation_from_dict,
-    sha256_file,
 )
 
 ROOT = Path(__file__).resolve().parent.parent

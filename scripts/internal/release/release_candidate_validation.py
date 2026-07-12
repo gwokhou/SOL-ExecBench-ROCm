@@ -8,13 +8,18 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
-import tempfile
 import subprocess
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Callable, Sequence
+
+from sol_execbench.core.process.logs import (
+    redacted_file_tail,
+    redacted_text_tail,
+    run_command_to_files,
+    temporary_stream_path,
+)
 
 SCHEMA_VERSION = "sol_execbench.release_candidate_validation.v1"
 DEFAULT_OUTPUT_DIR = Path("out/release_candidate_validation")
@@ -52,18 +57,6 @@ DEFAULT_ROCM_PYTEST_COMMAND = [
     "-rs",
 ]
 DEFAULT_DOCKER_COMMAND = ["./scripts/run_docker.sh", "--dry-run"]
-
-TOKEN_PATTERN = re.compile(
-    r"(?ix)"
-    r"("
-    r"(?:[A-Z0-9_]*?(?:TOKEN|SECRET|PASSWORD|PASSWD|API[_-]?KEY|CREDENTIAL)[A-Z0-9_-]*?)"
-    r"|authorization"
-    r")"
-    r"(\s*:\s*bearer\s+|\s*[:=]\s*)"
-    r"([^\s'\"]+)"
-)
-_TOKEN_PREFIX_OVERLAP_CHARS = 512
-_TOKEN_VALUE_DELIMITERS = set(" \t\r\n'\"")
 
 
 @dataclass(frozen=True)
@@ -423,80 +416,16 @@ def _clock_policy_evidence() -> dict[str, object]:
 
 
 def _tail(value: str, limit: int = DEFAULT_LOG_TAIL_CHARS) -> str:
-    if limit <= 0:
-        return ""
-    redacted = TOKEN_PATTERN.sub(
-        lambda match: f"{match.group(1)}{match.group(2)}<redacted>", value
-    )
-    return redacted[-limit:]
-
-
-def _append_tail(tail: str, text: str, limit: int) -> str:
-    if not text:
-        return tail
-    return (tail + text)[-limit:]
-
-
-def _redacted_tail_file(path: Path, limit: int) -> str:
-    tail = ""
-    pending = ""
-    in_secret = False
-    chunk_size = max(limit, 8192)
-
-    with path.open("rb") as handle:
-        for raw_chunk in iter(lambda: handle.read(chunk_size), b""):
-            text = raw_chunk.decode(errors="replace")
-            if in_secret:
-                delimiter_index = next(
-                    (
-                        index
-                        for index, char in enumerate(text)
-                        if char in _TOKEN_VALUE_DELIMITERS
-                    ),
-                    None,
-                )
-                if delimiter_index is None:
-                    continue
-                tail = _append_tail(tail, text[delimiter_index], limit)
-                text = text[delimiter_index + 1 :]
-                in_secret = False
-
-            pending += text
-            while pending:
-                match = TOKEN_PATTERN.search(pending)
-                if match is None:
-                    if len(pending) > _TOKEN_PREFIX_OVERLAP_CHARS:
-                        emit = pending[:-_TOKEN_PREFIX_OVERLAP_CHARS]
-                        tail = _append_tail(tail, emit, limit)
-                        pending = pending[-_TOKEN_PREFIX_OVERLAP_CHARS:]
-                    break
-
-                tail = _append_tail(tail, pending[: match.start()], limit)
-                tail = _append_tail(
-                    tail,
-                    f"{match.group(1)}{match.group(2)}<redacted>",
-                    limit,
-                )
-                if match.end() == len(pending):
-                    pending = ""
-                    in_secret = True
-                    break
-                pending = pending[match.end() :]
-
-    if not in_secret:
-        tail = _append_tail(tail, _tail(pending, max(limit, 8192)), limit)
-    return tail
+    return redacted_text_tail(value, limit)
 
 
 def _temporary_stream_path(temp_dir: Path, name: str, stream_name: str) -> Path:
-    safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "_", name)
-    with tempfile.NamedTemporaryFile(
-        prefix=f"sol_execbench_{safe_name}_{stream_name}_",
-        suffix=".log",
-        dir=temp_dir,
-        delete=False,
-    ) as handle:
-        return Path(handle.name)
+    return temporary_stream_path(
+        temp_dir,
+        name,
+        stream_name,
+        name_prefix="sol_execbench_",
+    )
 
 
 def _run_command_to_files(
@@ -504,37 +433,16 @@ def _run_command_to_files(
     stdout_path: Path,
     stderr_path: Path,
 ) -> subprocess.CompletedProcess[str]:
-    with (
-        stdout_path.open("w", encoding="utf-8") as stdout_handle,
-        stderr_path.open(
-            "w",
-            encoding="utf-8",
-        ) as stderr_handle,
-    ):
-        completed = subprocess.run(
-            command,
-            stdout=stdout_handle,
-            stderr=stderr_handle,
-            text=True,
-            check=False,
-        )
-    # Some tests monkeypatch subprocess.run and return captured text while
-    # ignoring stdout/stderr file handles. Mirror that text into the stream
-    # files so production and test paths exercise the same tail logic.
-    if completed.stdout:
-        stdout_path.write_text(completed.stdout, encoding="utf-8")
-    if completed.stderr:
-        stderr_path.write_text(completed.stderr, encoding="utf-8")
-    return completed
+    return run_command_to_files(
+        command,
+        stdout_path,
+        stderr_path,
+        runner=subprocess.run,
+    )
 
 
 def _tail_file(path: Path, limit: int = DEFAULT_LOG_TAIL_CHARS) -> str:
-    if limit <= 0:
-        return ""
-    try:
-        return _redacted_tail_file(path, limit)
-    except OSError:
-        return ""
+    return redacted_file_tail(path, limit)
 
 
 def _output_contains_any(

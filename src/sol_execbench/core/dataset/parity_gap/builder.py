@@ -13,7 +13,7 @@ from sol_execbench.core.data.path_access import (
     path_mapping_list,
     path_str_or_none,
 )
-from sol_execbench.core.dataset.manifest import utc_timestamp
+from sol_execbench.core.timestamps import utc_timestamp
 from sol_execbench.core.dataset.parity_gap.models import (
     EVIDENCE_KEYS,
     EvidenceCompleteness,

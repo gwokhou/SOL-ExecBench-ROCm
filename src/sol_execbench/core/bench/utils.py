@@ -30,7 +30,8 @@ from sol_execbench.core.data.trace import (
     EvaluationStatus,
     Performance,
 )
-from sol_execbench.core.utils import env_snapshot, flush_stdio_streams
+from sol_execbench.core.platform.runtime import env_snapshot
+from sol_execbench.core.process.stdio import flush_stdio_streams
 
 
 _MAX_EMBEDDED_LOG_BYTES = 5 * 1024 * 1024

@@ -8,7 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from ..manifest import utc_timestamp
+from sol_execbench.core.timestamps import utc_timestamp
 from .models import (
     SOL_SOURCE_ID,
     DatasetMigrationManifest,

@@ -6,7 +6,7 @@ import argparse
 import json
 from pathlib import Path
 
-from sol_execbench.core.utils import (
+from sol_execbench.core.arguments import (
     none_if_requested as _none_if_requested,
     parse_bool as _parse_bool,
 )

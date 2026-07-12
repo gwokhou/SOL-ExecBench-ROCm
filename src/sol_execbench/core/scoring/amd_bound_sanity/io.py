@@ -4,16 +4,17 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
+
+from sol_execbench.core.data.json_utils import load_json_value
 
 from .models import AmdBoundSanityReport
 from .rendering import render_amd_bound_sanity_markdown
 
 
-def load_json(path: Path) -> dict[str, Any]:
-    return json.loads(Path(path).read_text(encoding="utf-8"))
+def load_json(path: Path) -> Any:
+    return load_json_value(path)
 
 
 def write_amd_bound_sanity_reports(

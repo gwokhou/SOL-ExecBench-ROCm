@@ -1,6 +1,6 @@
 """Explicit fusion validation API."""
 
-from .io import canonical_json_bytes, sha256_file, sha256_payload
+from .io import canonical_json_bytes, sha256_payload
 from .models import (
     FUSION_VALIDATION_SCHEMA_VERSION,
     FusionSignature,
@@ -24,6 +24,5 @@ __all__ = [
     "fusion_validation_from_dict",
     "kernel_resource_from_code_object",
     "performance_from_rounds",
-    "sha256_file",
     "sha256_payload",
 ]

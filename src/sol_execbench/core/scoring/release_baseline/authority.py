@@ -23,13 +23,13 @@ from sol_execbench.core.scoring.baseline_artifact import (
 )
 from sol_execbench.core.scoring.amd_hardware_models import load_amd_hardware_model
 from sol_execbench.core.scoring.amd_sol import amd_sol_bound_from_dict
+from sol_execbench.core.integrity.checksums import sha256_file
 
 from .models import (
     ReleaseBaselineBundle,
     ReleaseBaselineVerification,
     load_release_baseline_bundle,
     release_baseline_verification_from_dict,
-    sha256_file,
 )
 
 

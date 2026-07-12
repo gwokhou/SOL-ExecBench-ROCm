@@ -6,13 +6,10 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
-import re
 import shutil
 import subprocess
-import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass
@@ -20,6 +17,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Sequence
 
+from sol_execbench.core.integrity.checksums import sha256_file as _sha256
+from sol_execbench.core.process.logs import (
+    redacted_file_tail,
+    redacted_text_tail,
+    run_command_to_files,
+    temporary_stream_path,
+)
 from sol_execbench.core.scoring.release_baseline import (
     load_release_baseline_bundle,
     release_baseline_verification_from_dict,
@@ -53,18 +57,6 @@ DEFAULT_ENVIRONMENT_COMMAND = [
     "environment",
     "doctor",
 ]
-
-TOKEN_PATTERN = re.compile(
-    r"(?ix)"
-    r"("
-    r"(?:[A-Z0-9_]*?(?:TOKEN|SECRET|PASSWORD|PASSWD|API[_-]?KEY|CREDENTIAL)[A-Z0-9_-]*?)"
-    r"|authorization"
-    r")"
-    r"(\s*:\s*bearer\s+|\s*[:=]\s*)"
-    r"([^\s'\"]+)"
-)
-_TOKEN_PREFIX_OVERLAP_CHARS = 512
-_TOKEN_VALUE_DELIMITERS = set(" \t\r\n'\"")
 
 
 @dataclass(frozen=True)
@@ -696,14 +688,7 @@ def _git_output(command: list[str]) -> str:
 
 
 def _temporary_stream_path(temp_dir: Path, name: str, stream_name: str) -> Path:
-    safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "_", name)
-    with tempfile.NamedTemporaryFile(
-        prefix=f"{safe_name}_{stream_name}_",
-        suffix=".log",
-        dir=temp_dir,
-        delete=False,
-    ) as handle:
-        return Path(handle.name)
+    return temporary_stream_path(temp_dir, name, stream_name)
 
 
 def _run_command_to_files(
@@ -711,25 +696,12 @@ def _run_command_to_files(
     stdout_path: Path,
     stderr_path: Path,
 ) -> subprocess.CompletedProcess[str]:
-    with (
-        stdout_path.open("w", encoding="utf-8") as stdout_handle,
-        stderr_path.open(
-            "w",
-            encoding="utf-8",
-        ) as stderr_handle,
-    ):
-        completed = subprocess.run(
-            command,
-            stdout=stdout_handle,
-            stderr=stderr_handle,
-            text=True,
-            check=False,
-        )
-    if completed.stdout:
-        stdout_path.write_text(completed.stdout, encoding="utf-8")
-    if completed.stderr:
-        stderr_path.write_text(completed.stderr, encoding="utf-8")
-    return completed
+    return run_command_to_files(
+        command,
+        stdout_path,
+        stderr_path,
+        runner=subprocess.run,
+    )
 
 
 def _validate_authority_classes(
@@ -834,11 +806,6 @@ def _render_markdown(payload: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
-def _sha256(path: Path) -> str:
-    with path.open("rb") as handle:
-        return hashlib.file_digest(handle, "sha256").hexdigest()
-
-
 def _sha256_cached(path: Path, checksum_cache: dict[Path, str]) -> str:
     resolved = path.resolve()
     digest = checksum_cache.get(resolved)
@@ -863,78 +830,11 @@ def _sha256_cached_many(paths: list[Path], checksum_cache: dict[Path, str]) -> N
 
 
 def _tail(value: str, limit: int = DEFAULT_LOG_TAIL_CHARS) -> str:
-    if limit <= 0:
-        return ""
-    redacted = TOKEN_PATTERN.sub(
-        lambda match: f"{match.group(1)}{match.group(2)}<redacted>", value
-    )
-    return redacted[-limit:]
-
-
-def _append_tail(tail: str, text: str, limit: int) -> str:
-    if not text:
-        return tail
-    return (tail + text)[-limit:]
-
-
-def _redacted_tail_file(path: Path, limit: int) -> str:
-    tail = ""
-    pending = ""
-    in_secret = False
-    chunk_size = max(limit, 8192)
-
-    with path.open("rb") as handle:
-        for raw_chunk in iter(lambda: handle.read(chunk_size), b""):
-            text = raw_chunk.decode(errors="replace")
-            if in_secret:
-                delimiter_index = next(
-                    (
-                        index
-                        for index, char in enumerate(text)
-                        if char in _TOKEN_VALUE_DELIMITERS
-                    ),
-                    None,
-                )
-                if delimiter_index is None:
-                    continue
-                tail = _append_tail(tail, text[delimiter_index], limit)
-                text = text[delimiter_index + 1 :]
-                in_secret = False
-
-            pending += text
-            while pending:
-                match = TOKEN_PATTERN.search(pending)
-                if match is None:
-                    if len(pending) > _TOKEN_PREFIX_OVERLAP_CHARS:
-                        emit = pending[:-_TOKEN_PREFIX_OVERLAP_CHARS]
-                        tail = _append_tail(tail, emit, limit)
-                        pending = pending[-_TOKEN_PREFIX_OVERLAP_CHARS:]
-                    break
-
-                tail = _append_tail(tail, pending[: match.start()], limit)
-                tail = _append_tail(
-                    tail,
-                    f"{match.group(1)}{match.group(2)}<redacted>",
-                    limit,
-                )
-                if match.end() == len(pending):
-                    pending = ""
-                    in_secret = True
-                    break
-                pending = pending[match.end() :]
-
-    if not in_secret:
-        tail = _append_tail(tail, _tail(pending, max(limit, 8192)), limit)
-    return tail
+    return redacted_text_tail(value, limit)
 
 
 def _tail_file(path: Path, limit: int = DEFAULT_LOG_TAIL_CHARS) -> str:
-    if limit <= 0:
-        return ""
-    try:
-        return _redacted_tail_file(path, limit)
-    except OSError:
-        return ""
+    return redacted_file_tail(path, limit)
 
 
 def _relative_path(path: Path, root: Path) -> str:

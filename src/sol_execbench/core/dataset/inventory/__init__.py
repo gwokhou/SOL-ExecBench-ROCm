@@ -33,7 +33,7 @@ from sol_execbench.core.dataset.inventory.reference_hints import (
     NVIDIA_RUNTIME_BLOCKER_HINTS,
     ReferenceRuntimeHintEvidence,
 )
-from sol_execbench.core.dataset.manifest import utc_timestamp
+from sol_execbench.core.timestamps import utc_timestamp
 
 
 def build_dataset_inventory(

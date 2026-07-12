@@ -10,7 +10,7 @@ import shutil
 from pathlib import Path
 from typing import Any, cast
 
-from sol_execbench.core.evidence.checksums import sha256_file
+from sol_execbench.core.integrity.checksums import sha256_file
 from sol_execbench.core.bench.static_kernel.evidence_builders import (
     build_static_kernel_evidence_sidecar,
     build_static_kernel_evidence_unavailable,

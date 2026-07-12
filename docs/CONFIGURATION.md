@@ -485,6 +485,11 @@ imports have no build or network side effect. Set
 tools, a missing cache, or failed integrity checks produce explicit tool-layer
 errors rather than fabricated ISA capability claims.
 
+`tools/` is reserved for integrations with independently managed external
+tools, resources, or protocols. General-purpose package primitives live under
+`core/` by concern (for example integrity, process execution, platform, and
+argument parsing), rather than being added to `tools/`.
+
 The classification scripts
 `scripts/internal/rdna4/run_rdna4_profiler_partial_failures.py` and
 `scripts/internal/rdna4/run_rdna4_profiler_sharded_closure.py` accept dataset root, output

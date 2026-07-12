@@ -31,7 +31,7 @@ from sol_execbench.core.reports.trust_summary.outcomes import (
 from sol_execbench.core.reports.trust_summary.rendering import (
     render_trust_summary_markdown,
 )
-from sol_execbench.core.utils import utc_timestamp
+from sol_execbench.core.timestamps import utc_timestamp as _utc_timestamp
 
 
 def build_trust_summary_report(
@@ -79,7 +79,7 @@ def build_trust_summary_report(
     ]
     next_steps = sorted({step for outcome in outcomes for step in outcome.next_steps})
     report = TrustSummaryReport(
-        created_at=created_at or utc_timestamp(),
+        created_at=created_at or _utc_timestamp(),
         sources=[
             _source_ref(source_id, payload, source_paths.get(source_id))
             for source_id, payload in payloads.items()
