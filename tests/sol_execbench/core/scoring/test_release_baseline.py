@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -523,18 +524,9 @@ def test_verifier_blocks_solution_hash_mismatch_even_when_latency_matches(tmp_pa
 def test_verifier_rejects_rerun_with_same_trace_digest_as_baseline(tmp_path):
     bundle = _official_bundle(tmp_path)
     rerun_path = _write_trace(tmp_path, _rerun_trace())
-    bundle = ReleaseBaselineBundle(
-        **{
-            **bundle.__dict__,
-            "workloads": (
-                ReleaseBaselineWorkload(
-                    **{
-                        **bundle.workloads[0].__dict__,
-                        "trace_sha256": sha256_file(rerun_path),
-                    }
-                ),
-            ),
-        }
+    bundle = replace(
+        bundle,
+        workloads=(replace(bundle.workloads[0], trace_sha256=sha256_file(rerun_path)),),
     )
 
     report = verify_release_baseline_rerun(
@@ -565,11 +557,15 @@ def test_verifier_rejects_rerun_with_same_trace_digest_as_baseline(tmp_path):
     ],
 )
 def test_verifier_reports_stable_blocker_codes(
-    tmp_path, reason, trace_evidence, provenance_kwargs, latency
+    tmp_path: Path,
+    reason: str,
+    trace_evidence: dict[str, str],
+    provenance_kwargs: dict[str, str],
+    latency: float,
 ):
     bundle = _official_bundle(tmp_path)
     provenance = _verification_provenance(tmp_path)
-    provenance = ReleaseProvenance(**{**provenance.to_dict(), **provenance_kwargs})
+    provenance = replace(provenance, **provenance_kwargs)
 
     report = verify_release_baseline_rerun(
         bundle=bundle,
@@ -600,14 +596,12 @@ def test_verifier_writes_deterministic_output(tmp_path):
 
 def test_verifier_preserves_matching_derived_classification_and_reason(tmp_path):
     official = _official_bundle(tmp_path)
-    derived = ReleaseBaselineWorkload(
-        **{
-            **official.workloads[0].__dict__,
-            "classification": "derived",
-            "blocker_reason_codes": ("model_not_validated",),
-        }
+    derived = replace(
+        official.workloads[0],
+        classification="derived",
+        blocker_reason_codes=("model_not_validated",),
     )
-    bundle = ReleaseBaselineBundle(**{**official.__dict__, "workloads": (derived,)})
+    bundle = replace(official, workloads=(derived,))
 
     report = verify_release_baseline_rerun(
         bundle=bundle,
@@ -721,12 +715,10 @@ def test_official_release_baseline_rejects_verification_bundle_drift(tmp_path):
         encoding="utf-8",
     )
     bundle = _official_bundle(tmp_path)
-    bundle = ReleaseBaselineBundle(
-        **{
-            **bundle.__dict__,
-            "baseline_artifact_ref": str(baseline_path),
-            "baseline_artifact_sha256": sha256_file(baseline_path),
-        }
+    bundle = replace(
+        bundle,
+        baseline_artifact_ref=str(baseline_path),
+        baseline_artifact_sha256=sha256_file(baseline_path),
     )
     bundle_path = tmp_path / "bundle.json"
     write_release_baseline_bundle(bundle, bundle_path)

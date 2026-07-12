@@ -62,6 +62,13 @@ def test_runtime_discovery_uses_the_requested_device() -> None:
             assert device == 2
             return "GFX950"
 
+        def uuid_for(self, device: int) -> str | None:
+            assert device == 2
+            return None
+
+        def rocm_version(self) -> str | None:
+            return None
+
     environment = discover_gpu(2, Runtime())
 
     assert environment.device == 2

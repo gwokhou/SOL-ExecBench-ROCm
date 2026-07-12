@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import json
-import importlib.util
-from pathlib import Path
 
 from sol_execbench.core.dataset.inventory import (
     DatasetInventory,
@@ -13,85 +11,16 @@ from sol_execbench.core.dataset.inventory import (
 )
 from sol_execbench.core.dataset.migration import (
     migrate_flashinfer_trace,
-    migrate_sol_execbench,
 )
 from sol_execbench.core.dataset.readiness import (
     classify_rocm_readiness,
 )
-from sol_execbench.core.dataset.ready_subset import (
-    build_ready_subset,
+from .dataset_inventory_fixtures import (
+    default_definition as _definition,
+    workload as _workload,
+    write_problem as _write_problem,
+    write_solution as _write_solution,
 )
-
-REPO_ROOT = Path(__file__).resolve().parents[4]
-INSPECT_DATASET_PATH = REPO_ROOT / "scripts" / "inspect_dataset.py"
-spec = importlib.util.spec_from_file_location("inspect_dataset", INSPECT_DATASET_PATH)
-assert spec is not None
-inspect_dataset = importlib.util.module_from_spec(spec)
-assert spec.loader is not None
-spec.loader.exec_module(inspect_dataset)
-
-
-def _definition(
-    *,
-    name: str = "matmul_forward",
-    dtype: str = "float32",
-    reference: str = "def run(x):\n    return x\n",
-    custom_entrypoint: str | None = None,
-) -> dict:
-    payload = {
-        "name": name,
-        "description": "forward demo",
-        "axes": {"N": {"type": "var"}},
-        "inputs": {"x": {"shape": ["N"], "dtype": dtype}},
-        "outputs": {"out": {"shape": ["N"], "dtype": dtype}},
-        "reference": reference,
-    }
-    if custom_entrypoint:
-        payload["custom_inputs_entrypoint"] = custom_entrypoint
-    return payload
-
-
-def _workload(kind: str = "random", **extra) -> dict:
-    spec = {"type": kind}
-    spec.update(extra)
-    return {"uuid": f"{kind}-w", "axes": {"N": 4}, "inputs": {"x": spec}}
-
-
-def _write_problem(
-    root: Path,
-    category: str,
-    name: str,
-    *,
-    definition: dict | None = None,
-    workloads: list[dict] | None = None,
-    reference_file: bool = True,
-    solution_file: bool = False,
-) -> Path:
-    problem_dir = root / category / name
-    problem_dir.mkdir(parents=True)
-    (problem_dir / "definition.json").write_text(
-        json.dumps(definition or _definition(name=name)) + "\n",
-        encoding="utf-8",
-    )
-    (problem_dir / "workload.jsonl").write_text(
-        "".join(json.dumps(row) + "\n" for row in (workloads or [_workload()])),
-        encoding="utf-8",
-    )
-    if reference_file:
-        (problem_dir / "reference.py").write_text(
-            "def run(x):\n    return x\n", encoding="utf-8"
-        )
-    if solution_file:
-        (problem_dir / "solution.json").write_text("{}\n", encoding="utf-8")
-    return problem_dir
-
-
-def _write_solution(problem_dir: Path, name: str, payload: dict | str) -> None:
-    if isinstance(payload, str):
-        text = payload
-    else:
-        text = json.dumps(payload, sort_keys=True) + "\n"
-    (problem_dir / name).write_text(text, encoding="utf-8")
 
 
 def test_inventory_records_problem_workload_metadata_and_denominators(tmp_path):
@@ -989,129 +918,3 @@ def test_readiness_blocks_safetensors_paths_outside_dataset_root(tmp_path):
     assert {record.reasons[0].code for record in readiness.workloads} == {
         "safetensors_path_outside_dataset_root"
     }
-
-
-def test_ready_subset_includes_only_ready_workloads(tmp_path):
-    ready_dir = _write_problem(tmp_path, "L1", "ready_problem")
-    _write_problem(
-        tmp_path,
-        "L1",
-        "blocked_problem",
-        workloads=[
-            _workload("safetensors", path="missing.safetensors", tensor_key="x")
-        ],
-    )
-    inventory = build_dataset_inventory(
-        tmp_path, categories=("L1",), created_at="2026-05-23T00:00:00Z"
-    )
-    readiness = classify_rocm_readiness(
-        inventory, dataset_root=tmp_path, created_at="2026-05-23T00:00:00Z"
-    )
-    definition_before = (ready_dir / "definition.json").read_text(encoding="utf-8")
-    workload_before = (ready_dir / "workload.jsonl").read_text(encoding="utf-8")
-
-    subset = build_ready_subset(
-        readiness, dataset_root=tmp_path, created_at="2026-05-23T00:00:00Z"
-    )
-    second = build_ready_subset(
-        readiness, dataset_root=tmp_path, created_at="2026-05-23T00:00:00Z"
-    )
-
-    assert subset.included_workloads == 1
-    assert subset.excluded_workloads == 1
-    assert subset.denominator.total_workloads == 2
-    assert subset.denominator.included_workloads == 1
-    assert subset.denominator.excluded_workloads == 1
-    assert [problem.problem_id for problem in subset.problems] == ["L1/ready_problem"]
-    included = subset.problems[0].workloads[0]
-    assert included.readiness_class == "pytorch_compatible"
-    assert included.closure_inputs["problem_id"] == "L1/ready_problem"
-    assert [item.problem_id for item in subset.exclusions] == ["L1/blocked_problem"]
-    assert subset.exclusions[0].reason_codes == ["safetensors_asset_missing"]
-    assert subset.claim_boundary.execution_success is False
-    assert subset.claim_boundary.hardware_validation is False
-    assert subset.claim_boundary.paper_level_validation is False
-    assert subset.claim_boundary.score_authority is False
-    assert subset.to_json() == second.to_json()
-    assert subset.ready_subset_checksum == second.ready_subset_checksum
-    assert (ready_dir / "definition.json").read_text(
-        encoding="utf-8"
-    ) == definition_before
-    assert (ready_dir / "workload.jsonl").read_text(encoding="utf-8") == workload_before
-
-
-def test_inspect_dataset_cli_writes_requested_sidecars(tmp_path):
-    _write_problem(tmp_path / "dataset", "L1", "ready_problem")
-    out = tmp_path / "out"
-
-    rc = inspect_dataset.main(
-        [
-            "--dataset-root",
-            str(tmp_path / "dataset"),
-            "--category",
-            "L1",
-            "--inventory",
-            str(out / "inventory.json"),
-            "--readiness",
-            str(out / "readiness.json"),
-            "--ready-subset",
-            str(out / "ready_subset.json"),
-        ]
-    )
-
-    assert rc == 0
-    assert (
-        json.loads((out / "inventory.json").read_text())["schema_version"]
-        == "sol_execbench.dataset_inventory.v1"
-    )
-    assert (
-        json.loads((out / "readiness.json").read_text())["schema_version"]
-        == "sol_execbench.rocm_readiness.v1"
-    )
-    assert (
-        json.loads((out / "ready_subset.json").read_text())["schema_version"]
-        == "sol_execbench.ready_subset.v1"
-    )
-
-
-def test_sol_migration_output_readiness_preserves_missing_blob_blocker(tmp_path):
-    source_root = tmp_path / "source"
-    output_root = tmp_path / "out"
-    _write_problem(
-        source_root,
-        "L2",
-        "uses_blob",
-        workloads=[
-            _workload("safetensors", path="blobs/missing.safetensors", tensor_key="x")
-        ],
-        solution_file=True,
-    )
-    migrate_sol_execbench(
-        source_root,
-        output_root,
-        categories=("L2",),
-        created_at="2026-06-04T00:00:00Z",
-    )
-    inventory = build_dataset_inventory(
-        output_root,
-        categories=("L2",),
-        created_at="2026-05-23T00:00:00Z",
-    )
-
-    readiness = classify_rocm_readiness(
-        inventory,
-        dataset_root=output_root,
-        created_at="2026-05-23T00:00:00Z",
-    )
-    subset = build_ready_subset(
-        readiness,
-        dataset_root=output_root,
-        created_at="2026-05-23T00:00:00Z",
-    )
-
-    assert readiness.workloads[0].readiness_class == "blocked_missing_evidence"
-    assert readiness.blocker_reports[0].blocker_type == "missing_blob"
-    assert subset.included_workloads == 0
-    assert subset.excluded_workloads == 1
-    assert subset.exclusions[0].blocker_types == ["missing_blob"]
-    assert subset.claim_boundary.ready_to_attempt_rocm_execution is False

@@ -14,15 +14,13 @@ RAW_PAYLOAD_INFRASTRUCTURE = {
 }
 
 RAW_PAYLOAD_ARTIFACT_BOUNDARIES = {
-    "sol_execbench.cli.commands.baseline",
+    "sol_execbench.cli.commands.baseline._legacy",
     "sol_execbench.cli.commands.fusion_validation",
     "sol_execbench.cli.commands.fusion_probe_runner",
     "sol_execbench.cli.commands.hardware_model",
     "sol_execbench.cli.commands.official_score",
-    "sol_execbench.cli.evaluation.evaluator",
     "sol_execbench.cli.evaluation.outputs",
     "sol_execbench.core.evidence.baseline_export",
-    "sol_execbench.core.reports.evaluation_stability.builder",
     "sol_execbench.core.bench.output_allocation",
     "sol_execbench.core.bench.profile_summary.artifacts",
     "sol_execbench.core.bench.static_kernel.artifacts",
@@ -34,9 +32,9 @@ RAW_PAYLOAD_ARTIFACT_BOUNDARIES = {
     "sol_execbench.core.scoring.amd_sol.parsing",
     "sol_execbench.core.scoring.amd_sol.artifact",
     "sol_execbench.core.scoring.baseline_selection",
-    "sol_execbench.core.scoring.fusion_validation",
+    "sol_execbench.core.scoring.official_score.policy",
+    "sol_execbench.core.scoring.fusion_validation.parsing",
     "sol_execbench.core.scoring.hardware_calibration.models",
-    "sol_execbench.core.scoring.official_score",
     "sol_execbench.core.scoring.release_baseline.authority",
     "sol_execbench.core.scoring.release_baseline.publication",
     "sol_execbench.core.scoring.representative_suite",

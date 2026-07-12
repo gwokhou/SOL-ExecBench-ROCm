@@ -14,6 +14,7 @@ from sol_execbench.cli.evaluation.evaluator import (
     PROFILE_ROCPROFV3,
     run_evaluation_cli,
 )
+from sol_execbench.cli.evaluation.requests import EvaluationRequest
 from sol_execbench.cli.protocol import CliFailure, output_format
 
 
@@ -163,7 +164,7 @@ def evaluate_cli(
             hint="Add --trace-output PATH after the evaluate subcommand.",
         )
     assert solution_file is not None
-    return run_evaluation_cli(
+    request = EvaluationRequest(
         problem_dir=problem_dir,
         definition_file=definition_file,
         workload_file=workload_file,
@@ -188,6 +189,7 @@ def evaluate_cli(
         release_authority_json=release_authority_json,
         verbose=verbose,
     )
+    return run_evaluation_cli(request=request)
 
 
 setattr(

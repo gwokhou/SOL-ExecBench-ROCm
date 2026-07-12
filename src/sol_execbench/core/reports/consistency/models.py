@@ -4,6 +4,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from pathlib import Path
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from sol_execbench.core.data.json_utils import stable_model_checksum, stable_model_json
@@ -16,6 +20,23 @@ CLAIM_BOUNDARY_TEXT = (
     "authority, not paper parity, not leaderboard authority, not native-host "
     "validation, and not new-hardware validation."
 )
+
+
+@dataclass(frozen=True, slots=True)
+class ConsistencyInputs:
+    """Read-only artifact boundary for one consistency-report build."""
+
+    execution_closure: Mapping[str, object] | None = None
+    paper_denominator: Mapping[str, object] | None = None
+    matrix_report: Mapping[str, object] | None = None
+    runtime_evidence: Mapping[str, object] | None = None
+    static_evidence: Mapping[str, object] | None = None
+    amd_score_report: Mapping[str, object] | None = None
+    amd_sol_report: Mapping[str, object] | None = None
+    solar_derivation: Mapping[str, object] | None = None
+    amd_bound_sanity: Mapping[str, object] | None = None
+    source_paths: Mapping[str, Path | None] = field(default_factory=dict)
+    created_at: str | None = None
 
 
 class ConsistencySourceRef(BaseModel):

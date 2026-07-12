@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import pytest
+from dataclasses import replace
 
 from sol_execbench.core.scoring.amd_bound_estimate.models import OperatorWorkEstimate
 from sol_execbench.core.scoring.amd_bound_graph.enums import OpFamily
@@ -53,7 +54,7 @@ def test_requirements_bind_exact_compute_and_memory_profiles() -> None:
 
 def test_requirements_reject_missing_exact_profile_fields() -> None:
     estimate = _estimate()
-    estimate = OperatorWorkEstimate(**{**estimate.__dict__, "compute_path": None})
+    estimate = replace(estimate, compute_path=None)
 
     with pytest.raises(ValueError, match="exact compute profile"):
         requirements_from_estimates(

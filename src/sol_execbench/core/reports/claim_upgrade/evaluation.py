@@ -14,6 +14,7 @@ from sol_execbench.core.reports.claim_upgrade.models import (
     ClaimEvaluation,
     ClaimRule,
     ClaimSourceRef,
+    ClaimUpgradeInputs,
     ClaimUpgradeReport,
     PaperDenominatorClaimView,
 )
@@ -33,32 +34,62 @@ from sol_execbench.core.reports.trust_summary import utc_timestamp
 
 
 def build_claim_upgrade_report(
+    inputs: ClaimUpgradeInputs | None = None,
     *,
-    consistency_report: dict[str, Any] | None = None,
-    evaluation_stability: dict[str, Any] | None = None,
-    execution_closure: dict[str, Any] | None = None,
-    paper_denominator: dict[str, Any] | None = None,
-    matrix_report: dict[str, Any] | None = None,
-    amd_score_report: dict[str, Any] | None = None,
-    amd_sol_report: dict[str, Any] | None = None,
-    solar_derivation: dict[str, Any] | None = None,
-    amd_bound_sanity: dict[str, Any] | None = None,
-    hardware_validation: dict[str, Any] | None = None,
-    source_paths: dict[str, Path | None] | None = None,
+    consistency_report: Mapping[str, object] | None = None,
+    evaluation_stability: Mapping[str, object] | None = None,
+    execution_closure: Mapping[str, object] | None = None,
+    paper_denominator: Mapping[str, object] | None = None,
+    matrix_report: Mapping[str, object] | None = None,
+    amd_score_report: Mapping[str, object] | None = None,
+    amd_sol_report: Mapping[str, object] | None = None,
+    solar_derivation: Mapping[str, object] | None = None,
+    amd_bound_sanity: Mapping[str, object] | None = None,
+    hardware_validation: Mapping[str, object] | None = None,
+    source_paths: Mapping[str, Path | None] | None = None,
     created_at: str | None = None,
 ) -> ClaimUpgradeReport:
-    source_paths = source_paths or {}
+    if inputs is not None:
+        _reject_legacy_arguments(
+            consistency_report,
+            evaluation_stability,
+            execution_closure,
+            paper_denominator,
+            matrix_report,
+            amd_score_report,
+            amd_sol_report,
+            solar_derivation,
+            amd_bound_sanity,
+            hardware_validation,
+            source_paths,
+            created_at,
+        )
+    else:
+        inputs = ClaimUpgradeInputs(
+            consistency_report=consistency_report,
+            evaluation_stability=evaluation_stability,
+            execution_closure=execution_closure,
+            paper_denominator=paper_denominator,
+            matrix_report=matrix_report,
+            amd_score_report=amd_score_report,
+            amd_sol_report=amd_sol_report,
+            solar_derivation=solar_derivation,
+            amd_bound_sanity=amd_bound_sanity,
+            hardware_validation=hardware_validation,
+            source_paths=source_paths or {},
+            created_at=created_at,
+        )
     payloads = {
-        "consistency_report": _mapping_or_none(consistency_report),
-        "evaluation_stability": _mapping_or_none(evaluation_stability),
-        "execution_closure": _mapping_or_none(execution_closure),
-        "paper_denominator": _mapping_or_none(paper_denominator),
-        "matrix_report": _mapping_or_none(matrix_report),
-        "amd_score_report": _mapping_or_none(amd_score_report),
-        "amd_sol_report": _mapping_or_none(amd_sol_report),
-        "solar_derivation": _mapping_or_none(solar_derivation),
-        "amd_bound_sanity": _mapping_or_none(amd_bound_sanity),
-        "hardware_validation": _mapping_or_none(hardware_validation),
+        "consistency_report": _mapping_or_none(inputs.consistency_report),
+        "evaluation_stability": _mapping_or_none(inputs.evaluation_stability),
+        "execution_closure": _mapping_or_none(inputs.execution_closure),
+        "paper_denominator": _mapping_or_none(inputs.paper_denominator),
+        "matrix_report": _mapping_or_none(inputs.matrix_report),
+        "amd_score_report": _mapping_or_none(inputs.amd_score_report),
+        "amd_sol_report": _mapping_or_none(inputs.amd_sol_report),
+        "solar_derivation": _mapping_or_none(inputs.solar_derivation),
+        "amd_bound_sanity": _mapping_or_none(inputs.amd_bound_sanity),
+        "hardware_validation": _mapping_or_none(inputs.hardware_validation),
     }
     rules = default_claim_rules()
     evaluations = [_evaluate_rule(rule, payloads) for rule in rules]
@@ -68,9 +99,9 @@ def build_claim_upgrade_report(
             highest = evaluation.claim_level
 
     report = ClaimUpgradeReport(
-        created_at=created_at or utc_timestamp(),
+        created_at=inputs.created_at or utc_timestamp(),
         sources=[
-            _source_ref(source_id, payload, source_paths.get(source_id))
+            _source_ref(source_id, payload, inputs.source_paths.get(source_id))
             for source_id, payload in payloads.items()
             if payload is not None
         ],
@@ -79,6 +110,13 @@ def build_claim_upgrade_report(
         highest_eligible_claim=highest,
     )
     return report.with_checksum()
+
+
+def _reject_legacy_arguments(*values: object) -> None:
+    if any(value is not None for value in values):
+        raise TypeError(
+            "pass either ClaimUpgradeInputs or legacy keyword arguments, not both"
+        )
 
 
 def _evaluate_rule(

@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any, cast
 
 from click.testing import CliRunner
 
 from sol_execbench.cli.commands import baseline as cli_baseline
+from sol_execbench.cli.commands.baseline import export as cli_baseline_export
+from sol_execbench.cli.commands.baseline import release as cli_baseline_release
 from sol_execbench.cli.main import cli
 from sol_execbench.core.scoring.release_baseline import (
     build_release_baseline_bundle as real_build_release_baseline_bundle,
@@ -90,13 +93,15 @@ def test_release_build_writes_compact_baseline_and_bundle(
     monkeypatch, tmp_path: Path
 ) -> None:
     suite_path, trace_path = _release_inputs(tmp_path)
-    captured: dict[str, object] = {}
+    captured: dict[str, Any] = {}
 
-    def fake_build(**kwargs: object) -> tuple[object, object]:
+    def fake_build(**kwargs: Any) -> tuple[object, object]:
         captured.update(kwargs)
-        return real_build_release_baseline_bundle(**kwargs)  # type: ignore[arg-type]
+        return real_build_release_baseline_bundle(**kwargs)
 
-    monkeypatch.setattr(cli_baseline, "build_release_baseline_bundle", fake_build)
+    monkeypatch.setattr(
+        cli_baseline_release, "build_release_baseline_bundle", fake_build
+    )
 
     baseline_path = tmp_path / "baseline.json"
     bundle_path = tmp_path / "bundle.json"
@@ -138,7 +143,7 @@ def test_release_build_writes_compact_baseline_and_bundle(
     assert result.exit_code == 0, result.output
     assert baseline_path.exists()
     assert bundle_path.exists()
-    provenance = captured["provenance"]
+    provenance = cast(cli_baseline.ReleaseProvenance, captured["provenance"])
     assert provenance.clock_policy == "locked"
     assert provenance.suite_manifest_sha256 is not None
 
@@ -219,17 +224,21 @@ def test_release_verify_writes_report(monkeypatch, tmp_path: Path) -> None:
     @dataclass
     class FakeReport:
         release: str = "v2.14"
-        summary: dict[str, int] | None = None
+        summary: dict[str, int] = field(
+            default_factory=lambda: {"passed": 0, "total": 0}
+        )
 
         def to_dict(self) -> dict[str, object]:
             return {"schema_version": "sol_execbench.release_baseline_verification.v1"}
 
-    def fake_verify(**kwargs: object) -> FakeReport:
+    def fake_verify(**kwargs: Any) -> FakeReport:
         assert kwargs["bundle"] == load_release_baseline_bundle(bundle_path)
         assert kwargs["rerun_provenance"].clock_policy == "locked"
         return FakeReport()
 
-    monkeypatch.setattr(cli_baseline, "verify_release_baseline_rerun", fake_verify)
+    monkeypatch.setattr(
+        cli_baseline_release, "verify_release_baseline_rerun", fake_verify
+    )
     output_path = tmp_path / "verification.json"
     result = CliRunner().invoke(
         cli,
@@ -414,7 +423,9 @@ def test_baseline_export_writes_registry_and_prints_message(
 
     trace_path_arg = trace_path
     output_path_arg = output_path
-    monkeypatch.setattr(cli_baseline, "export_hip_baseline_registry", fake_export)
+    monkeypatch.setattr(
+        cli_baseline_export, "export_hip_baseline_registry", fake_export
+    )
 
     result = CliRunner().invoke(
         cli,
@@ -460,7 +471,9 @@ def test_baseline_export_json_prints_sorted_registry(
     ) -> dict[str, object]:
         return {"z": 1, "a": {"b": 2}}
 
-    monkeypatch.setattr(cli_baseline, "export_hip_baseline_registry", fake_export)
+    monkeypatch.setattr(
+        cli_baseline_export, "export_hip_baseline_registry", fake_export
+    )
 
     result = CliRunner().invoke(
         cli,

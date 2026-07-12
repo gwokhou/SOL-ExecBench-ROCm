@@ -215,7 +215,7 @@ def _classification(relative_path: str, line: str) -> str | None:
     ) and ("NVIDIA" in line or "nvidia" in line):
         return "dataset redistribution policy fixture"
     if relative_path.startswith(
-        "tests/sol_execbench/core/dataset/test_run_dataset_execution_closure.py"
+        "tests/sol_execbench/core/dataset/test_run_dataset_execution_closure"
     ) and ("NVIDIA" in line or "nvidia" in line):
         return "dataset execution closure provenance fixture"
     if relative_path.startswith(
@@ -223,7 +223,7 @@ def _classification(relative_path: str, line: str) -> str | None:
     ):
         return "original NVIDIA parity documentation assertions"
     if relative_path.startswith(
-        "tests/sol_execbench/core/evidence/test_public_contract_guardrails.py"
+        "tests/sol_execbench/core/evidence/test_public_contract_guardrails"
     ) and ("NVIDIA" in line or "nvidia" in line or "solution_cuda" in line):
         return "public contract claim-boundary assertions"
     if relative_path.startswith(

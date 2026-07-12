@@ -1,4 +1,6 @@
+from dataclasses import replace
 from pathlib import Path
+from typing import cast
 
 from sol_execbench.core.scoring.hardware_calibration.rocprof_compute import (
     ProfilerDiscovery,
@@ -42,7 +44,7 @@ def test_managed_invocation_uses_isolated_environment(tmp_path: Path) -> None:
         run=lambda command, *, env: seen.update(command=command, env=env),
     )
 
-    env = seen["env"]
+    env = cast(dict[str, str], seen["env"])
     assert env["VIRTUAL_ENV"] == str(environment.venv_path)
     assert env["PATH"].split(":")[0] == str(environment.venv_path / "bin")
     assert env["PYTHONNOUSERSITE"] == "1"
@@ -79,9 +81,7 @@ def test_reused_environment_rejects_missing_tool(tmp_path: Path) -> None:
     environment = ensure_profiler_environment(
         discovery, offline=False, auto_install=True
     )
-    unavailable = ProfilerDiscovery(
-        **{**discovery.__dict__, "exists": lambda path: path != discovery.tool_path},
-    )
+    unavailable = replace(discovery, exists=lambda path: path != discovery.tool_path)
 
     result = ensure_profiler_environment(unavailable, offline=False, auto_install=False)
 
@@ -93,14 +93,12 @@ def test_reused_environment_rejects_missing_tool(tmp_path: Path) -> None:
 def test_reused_environment_rejects_nonexecutable_tool(tmp_path: Path) -> None:
     discovery = _discovery(tmp_path)
     ensure_profiler_environment(discovery, offline=False, auto_install=True)
-    unavailable = ProfilerDiscovery(
-        **{
-            **discovery.__dict__,
-            "exists": lambda path: (
-                True if path == discovery.tool_path else discovery.exists(path)
-            ),
-            "is_executable": lambda path: False,
-        },
+    unavailable = replace(
+        discovery,
+        exists=lambda path: (
+            True if path == discovery.tool_path else discovery.exists(path)
+        ),
+        is_executable=lambda path: False,
     )
 
     result = ensure_profiler_environment(unavailable, offline=False, auto_install=False)
@@ -112,14 +110,12 @@ def test_reused_environment_rejects_nonexecutable_tool(tmp_path: Path) -> None:
 def test_new_install_rejects_missing_launcher_before_running_uv(tmp_path: Path) -> None:
     discovery = _discovery(tmp_path)
     commands: list[list[str]] = []
-    unavailable = ProfilerDiscovery(
-        **{
-            **discovery.__dict__,
-            "exists": lambda path: (
-                False if path == discovery.tool_path else discovery.exists(path)
-            ),
-            "run": lambda command, **kwargs: commands.append(command),
-        },
+    unavailable = replace(
+        discovery,
+        exists=lambda path: (
+            False if path == discovery.tool_path else discovery.exists(path)
+        ),
+        run=lambda command, **kwargs: commands.append(command),
     )
 
     result = ensure_profiler_environment(unavailable, offline=False, auto_install=True)
@@ -146,7 +142,7 @@ def test_lock_race_rechecks_launcher_before_final_measured_result(
             return ready_checks != 1
         return discovery.exists(path)
 
-    raced = ProfilerDiscovery(**{**discovery.__dict__, "exists": exists})
+    raced = replace(discovery, exists=exists)
 
     result = ensure_profiler_environment(raced, offline=False, auto_install=True)
 
@@ -158,15 +154,13 @@ def test_reused_environment_rejects_malformed_manifest_shape(tmp_path: Path) -> 
     ensure_profiler_environment(discovery, offline=False, auto_install=True)
 
     for manifest in ('{"package": "example"}', '["example", 1]'):
-        malformed = ProfilerDiscovery(
-            **{
-                **discovery.__dict__,
-                "read_text": lambda path, manifest=manifest: (
-                    manifest
-                    if path.name == "installed-distributions.json"
-                    else discovery.read_text(path)
-                ),
-            },
+        malformed = replace(
+            discovery,
+            read_text=lambda path, manifest=manifest: (
+                manifest
+                if path.name == "installed-distributions.json"
+                else discovery.read_text(path)
+            ),
         )
 
         result = ensure_profiler_environment(

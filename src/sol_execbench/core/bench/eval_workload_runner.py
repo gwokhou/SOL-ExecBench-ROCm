@@ -1,202 +1,70 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
-
-"""Workload execution loop used by the staged eval driver template."""
+"""Workload orchestration used by the staged evaluation driver."""
 
 from __future__ import annotations
 
-import gc
-import threading
-from collections.abc import Callable, Iterable
-from pathlib import Path
-from typing import Any, TextIO
-
-import torch
-
 from sol_execbench.core.bench.clock_lock import are_clocks_locked
-from sol_execbench.core.bench.config import BenchmarkConfig
-from sol_execbench.core.bench.eval_correctness import (
-    emit_reward_hack_if_detected,
-    run_correctness_rounds,
-    set_evaluation_seed,
-)
-from sol_execbench.core.bench.eval_timing import (
-    load_required_safetensors,
-    measure_optional_reference_latency,
-    measure_solution_latency,
-)
+from sol_execbench.core.bench.evaluation_requests import WorkloadEvaluationRequest
+from sol_execbench.core.bench.eval_correctness import set_evaluation_seed
 from sol_execbench.core.bench.eval_trace_helpers import WorkloadTraceEmitter
-from sol_execbench.core.bench.reward_hack import (
-    RewardHackDetected,
-    check_monkey_patch,
-    check_thread_injection,
-)
-from sol_execbench.core.data.trace import EvaluationStatus, Performance
+from sol_execbench.core.bench.eval_workload_execution import evaluate_one_workload
+from sol_execbench.core.bench.reward_hack import RewardHackDetected
+from sol_execbench.core.data.trace import EvaluationStatus
 
 
-def evaluate_workloads(
-    *,
-    definition: Any,
-    workloads: list[Any],
-    solution_name: str,
-    device: str,
-    output_names: list[str],
-    output_dtypes_torch: dict[str, torch.dtype],
-    bench_config: BenchmarkConfig,
-    ref_namespace: dict[str, Any],
-    ref_fn: Callable[..., Any],
-    user_fn: Callable[..., Any],
-    destination_passing_style: bool,
-    safetensors_roots: Iterable[Path],
-    integrity_snapshot: dict[str, int],
-    check_integrity: Callable[[dict[str, int], dict[str, Any]], None],
-    driver_globals: dict[str, Any],
-    real_stdout: TextIO,
-) -> None:
-    """Evaluate all workloads and emit Trace JSONL records."""
+def evaluate_workloads(request: WorkloadEvaluationRequest) -> None:
+    """Validate process preconditions, then evaluate each requested workload."""
     clocks_locked = are_clocks_locked()
-    clock_status_msg = None
-    if bench_config.lock_clocks:
-        clock_status_msg = "Clocks locked: yes" if clocks_locked else "Clocks locked: no"
-
+    clock_status = None
+    if request.bench_config.lock_clocks:
+        clock_status = "Clocks locked: yes" if clocks_locked else "Clocks locked: no"
     emitter = WorkloadTraceEmitter(
-        definition=definition,
-        solution_name=solution_name,
-        device=device,
-        clock_status_msg=clock_status_msg,
-        real_stdout=real_stdout,
+        definition=request.definition,
+        solution_name=request.solution_name,
+        device=request.device,
+        clock_status_msg=clock_status,
+        real_stdout=request.dependencies.real_stdout,
     )
+    if not _preflight_succeeds(request, emitter, clocks_locked):
+        return
+    set_evaluation_seed(request.bench_config.seed)
+    custom_inputs_fn = (
+        request.dependencies.ref_namespace.get(
+            request.definition.custom_inputs_entrypoint
+        )
+        if request.definition.custom_inputs_entrypoint
+        else None
+    )
+    for row_index, workload in enumerate(request.workloads):
+        evaluate_one_workload(request, emitter, row_index, workload, custom_inputs_fn)
 
+
+def _preflight_succeeds(
+    request: WorkloadEvaluationRequest,
+    emitter: WorkloadTraceEmitter,
+    clocks_locked: bool,
+) -> bool:
     try:
-        check_integrity(integrity_snapshot, driver_globals)
+        request.dependencies.check_integrity(
+            request.dependencies.integrity_snapshot,
+            request.dependencies.driver_globals,
+        )
     except RewardHackDetected as integrity_err:
         emitter.emit_status_for_workloads(
-            workloads,
+            request.workloads,
             EvaluationStatus.REWARD_HACK,
             extra_msg=str(integrity_err),
         )
-        return
-
-    if bench_config.lock_clocks and not clocks_locked:
-        reject_msg = "lock_clocks=True but GPU clocks are not locked on this server"
+        return False
+    if request.bench_config.lock_clocks and not clocks_locked:
         emitter.emit_status_for_workloads(
-            workloads,
+            request.workloads,
             EvaluationStatus.RUNTIME_ERROR,
-            extra_msg=reject_msg,
+            extra_msg="lock_clocks=True but GPU clocks are not locked on this server",
         )
-        return
+        return False
+    return True
 
-    set_evaluation_seed(bench_config.seed)
-    inputs = None
-    custom_inputs_fn = (
-        ref_namespace.get(definition.custom_inputs_entrypoint)
-        if definition.custom_inputs_entrypoint
-        else None
-    )
 
-    for row_index, workload in enumerate(workloads):
-        inputs = None
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-        resolved_axes = definition.get_resolved_axes_values(workload.axes)
-
-        try:
-            safe_tensors = load_required_safetensors(
-                definition=definition,
-                workload=workload,
-                safetensors_roots=list(safetensors_roots),
-            )
-        except Exception as exc:
-            emitter.emit_status(
-                workload,
-                EvaluationStatus.RUNTIME_ERROR,
-                extra_msg=f"Failed to load safetensors: {exc}",
-            )
-            continue
-
-        correctness_result = run_correctness_rounds(
-            definition=definition,
-            workload=workload,
-            row_index=row_index,
-            device=device,
-            safe_tensors=safe_tensors or None,
-            custom_inputs_fn=custom_inputs_fn,
-            ref_fn=ref_fn,
-            user_fn=user_fn,
-            destination_passing_style=destination_passing_style,
-            resolved_axes=resolved_axes,
-            output_names=output_names,
-            output_dtypes_torch=output_dtypes_torch,
-            integrity_snapshot=integrity_snapshot,
-            check_integrity=check_integrity,
-            driver_globals=driver_globals,
-            emitter=emitter,
-        )
-        if correctness_result.failed:
-            continue
-
-        inputs = correctness_result.inputs
-        threads_before = correctness_result.threads_before
-        correctness = correctness_result.correctness
-
-        if emit_reward_hack_if_detected(
-            emitter=emitter,
-            workload=workload,
-            check_fn=check_monkey_patch,
-        ):
-            continue
-
-        assert inputs is not None
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-
-        try:
-            sol_latency_ms = measure_solution_latency(
-                definition=definition,
-                resolved_axes=resolved_axes,
-                device=device,
-                destination_passing_style=destination_passing_style,
-                user_fn=user_fn,
-                inputs=inputs,
-                warmup=bench_config.warmup_runs,
-                rep=bench_config.iterations,
-            )
-        except Exception as exc:
-            emitter.emit_status(
-                workload,
-                EvaluationStatus.RUNTIME_ERROR,
-                extra_msg=f"Timing failed: {exc}",
-            )
-            continue
-
-        if emit_reward_hack_if_detected(
-            emitter=emitter,
-            workload=workload,
-            check_fn=check_thread_injection,
-            args=(threads_before, threading.active_count()),
-        ):
-            continue
-
-        ref_latency_ms, ref_timing_failure = measure_optional_reference_latency(
-            benchmark_reference=bench_config.benchmark_reference,
-            ref_fn=ref_fn,
-            inputs=inputs,
-            device=device,
-            warmup=bench_config.warmup_runs,
-            rep=bench_config.iterations,
-        )
-
-        speedup = ref_latency_ms / sol_latency_ms if sol_latency_ms > 0 else 0.0
-        emitter.emit_status(
-            workload,
-            EvaluationStatus.PASSED,
-            correctness=correctness,
-            performance=Performance(
-                latency_ms=sol_latency_ms,
-                reference_latency_ms=ref_latency_ms,
-                speedup_factor=speedup,
-            ),
-            extra_msg=ref_timing_failure,
-        )
+__all__ = ["evaluate_workloads"]

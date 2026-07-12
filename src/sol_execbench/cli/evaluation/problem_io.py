@@ -27,6 +27,16 @@ class ResolvedProblemInputs:
     config_file: Path | None
 
 
+@dataclass(frozen=True)
+class LoadedProblemInputs:
+    """Validated models loaded from a resolved CLI input set."""
+
+    definition: Definition
+    workloads: list[Workload]
+    solution: Solution
+    config: BenchmarkConfig
+
+
 def _load_definition(path: Path) -> Definition:
     return load_json_file(Definition, path)
 
@@ -50,6 +60,24 @@ def _load_config(path: Path | None) -> BenchmarkConfig:
     if path is None:
         return BenchmarkConfig()
     return BenchmarkConfig(**json.loads(path.read_text()))
+
+
+def load_problem_inputs(inputs: ResolvedProblemInputs) -> LoadedProblemInputs:
+    """Load and validate every model needed by an evaluation run."""
+    return LoadedProblemInputs(
+        definition=_load_definition(inputs.definition_file),
+        workloads=_load_workloads(inputs.workload_file),
+        solution=_load_solution(inputs.solution_file),
+        config=_load_config(inputs.config_file),
+    )
+
+
+__all__ = [
+    "LoadedProblemInputs",
+    "ResolvedProblemInputs",
+    "load_problem_inputs",
+    "resolve_problem_inputs",
+]
 
 
 def _resolve_problem_dir(

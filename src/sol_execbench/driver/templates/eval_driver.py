@@ -47,10 +47,12 @@ sys.path.insert(0, str(STAGING_DIR))
 from sol_execbench.driver.eval_runtime_api import (  # noqa: E402,F401
     BenchmarkConfig,
     Definition,
+    EvaluationDependencies,
     EvaluationStatus,
     Solution,
     Trace,
     Workload,
+    WorkloadEvaluationRequest,
     allocate_outputs,
     call_and_collect_outputs,
     check_eval_integrity,
@@ -163,22 +165,26 @@ if _benchmark_dir:
 # ── Evaluate each workload ────────────────────────────────────────────────────
 # evaluate_workloads emits traces via emit_trace_jsonl, which uses allow_nan=False.
 evaluate_workloads(
-    definition=definition,
-    workloads=workloads,
-    solution_name=_solution_name,
-    device=_device,
-    output_names=_output_names,
-    output_dtypes_torch=_output_dtypes_torch,
-    bench_config=bench_config,
-    ref_namespace=ref_namespace,
-    ref_fn=ref_fn,
-    user_fn=user_fn,
-    destination_passing_style=_dps,
-    safetensors_roots=_safetensors_roots,
-    integrity_snapshot=_integrity_snapshot,
-    check_integrity=_check_integrity,
-    driver_globals=globals(),
-    real_stdout=_real_stdout,
+    WorkloadEvaluationRequest(
+        definition=definition,
+        workloads=workloads,
+        solution_name=_solution_name,
+        device=_device,
+        output_names=_output_names,
+        output_dtypes_torch=_output_dtypes_torch,
+        bench_config=bench_config,
+        destination_passing_style=_dps,
+        safetensors_roots=_safetensors_roots,
+        dependencies=EvaluationDependencies(
+            ref_namespace=ref_namespace,
+            ref_fn=ref_fn,
+            user_fn=user_fn,
+            integrity_snapshot=_integrity_snapshot,
+            check_integrity=_check_integrity,
+            driver_globals=globals(),
+            real_stdout=_real_stdout,
+        ),
+    )
 )
 
 # TorchInductor and ROCm runtimes can leave non-daemon worker threads alive after

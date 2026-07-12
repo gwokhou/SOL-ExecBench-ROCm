@@ -5,13 +5,14 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from statistics import median
-from typing import Any
 
 from sol_execbench.core.reports.evaluation_stability.models import (
     SOURCE_CHECKSUM_KEYS,
     STABILITY_STATUS_PRIORITY,
+    EvaluationStabilityInputs,
     EvaluationStabilityReport,
     RuntimeDistribution,
     StabilitySourceRef,
@@ -22,33 +23,55 @@ from sol_execbench.core.reports.trust_summary import utc_timestamp
 
 
 def build_evaluation_stability_report(
+    inputs: EvaluationStabilityInputs | None = None,
     *,
-    timing_evidence: list[dict[str, Any]],
-    source_paths: list[Path | None] | None = None,
+    timing_evidence: Sequence[Mapping[str, object]] | None = None,
+    source_paths: Sequence[Path | None] | None = None,
     created_at: str | None = None,
     noise_cv_threshold: float = 0.10,
     min_samples: int = 3,
 ) -> EvaluationStabilityReport:
-    source_paths = source_paths or [None] * len(timing_evidence)
+    """Build a timing-quality report from one explicit input request."""
+    if inputs is not None:
+        _reject_legacy_arguments(
+            timing_evidence,
+            source_paths,
+            created_at,
+            noise_cv_threshold,
+            min_samples,
+        )
+    elif timing_evidence is None:
+        raise TypeError("timing_evidence or EvaluationStabilityInputs is required")
+    else:
+        inputs = EvaluationStabilityInputs(
+            timing_evidence=timing_evidence,
+            source_paths=source_paths or (),
+            created_at=created_at,
+            noise_cv_threshold=noise_cv_threshold,
+            min_samples=min_samples,
+        )
+    resolved_source_paths = inputs.source_paths or (None,) * len(inputs.timing_evidence)
     sources: list[StabilitySourceRef] = []
     workloads: list[StabilityWorkload] = []
     totals = StabilityStatusTotals()
 
-    for index, payload in enumerate(timing_evidence):
+    for index, payload in enumerate(inputs.timing_evidence):
         source_id = f"timing_{index + 1}"
-        path = source_paths[index] if index < len(source_paths) else None
+        path = (
+            resolved_source_paths[index] if index < len(resolved_source_paths) else None
+        )
         sources.append(_source_ref(source_id, payload, path))
         workload = _build_workload(
             source_id,
             payload,
-            noise_cv_threshold=noise_cv_threshold,
-            min_samples=min_samples,
+            noise_cv_threshold=inputs.noise_cv_threshold,
+            min_samples=inputs.min_samples,
         )
         totals.add(workload.stability_status)
         workloads.append(workload)
 
     report = EvaluationStabilityReport(
-        created_at=created_at or utc_timestamp(),
+        created_at=inputs.created_at or utc_timestamp(),
         sources=sources,
         status_totals=totals,
         workloads=workloads,
@@ -56,9 +79,28 @@ def build_evaluation_stability_report(
     return report.with_checksum()
 
 
+def _reject_legacy_arguments(
+    timing_evidence: object,
+    source_paths: object,
+    created_at: object,
+    noise_cv_threshold: float,
+    min_samples: int,
+) -> None:
+    if (
+        timing_evidence is not None
+        or source_paths is not None
+        or created_at is not None
+        or noise_cv_threshold != 0.10
+        or min_samples != 3
+    ):
+        raise TypeError(
+            "pass either EvaluationStabilityInputs or legacy keyword arguments, not both"
+        )
+
+
 def _build_workload(
     source_id: str,
-    payload: dict[str, Any],
+    payload: Mapping[str, object],
     *,
     noise_cv_threshold: float,
     min_samples: int,
@@ -84,7 +126,7 @@ def _build_workload(
 
 
 def _reason_codes(
-    payload: dict[str, Any],
+    payload: Mapping[str, object],
     distribution: RuntimeDistribution,
     noise_cv_threshold: float,
     min_samples: int,
@@ -129,7 +171,7 @@ def _primary_status(reasons: list[str]) -> str:
     return "stable"
 
 
-def _duration_samples(payload: dict[str, Any]) -> list[float]:
+def _duration_samples(payload: Mapping[str, object]) -> list[float]:
     for key in ("runtime_ms_distribution", "durations_ms", "measurements_ms"):
         value = payload.get(key)
         if isinstance(value, list):
@@ -144,11 +186,12 @@ def _duration_samples(payload: dict[str, Any]) -> list[float]:
     if isinstance(rows, list):
         durations = []
         for row in rows:
-            if not isinstance(row, dict):
+            normalized_row = _string_keyed_mapping(row)
+            if normalized_row is None:
                 continue
-            if row.get("is_kernel_activity") is False:
+            if normalized_row.get("is_kernel_activity") is False:
                 continue
-            duration = _positive_float(row.get("duration_ms"))
+            duration = _positive_float(normalized_row.get("duration_ms"))
             if duration is not None:
                 durations.append(duration)
         if durations:
@@ -184,7 +227,7 @@ def _runtime_distribution(samples: list[float]) -> RuntimeDistribution:
 
 def _source_ref(
     source_id: str,
-    payload: dict[str, Any],
+    payload: Mapping[str, object],
     path: Path | None,
 ) -> StabilitySourceRef:
     return StabilitySourceRef(
@@ -195,11 +238,12 @@ def _source_ref(
     )
 
 
-def _checksum(payload: dict[str, Any]) -> str | None:
+def _checksum(payload: Mapping[str, object]) -> str | None:
     for key in SOURCE_CHECKSUM_KEYS:
         value = payload.get(key)
-        if isinstance(value, dict):
-            checksum = value.get("value")
+        nested_payload = _string_keyed_mapping(value)
+        if nested_payload is not None:
+            checksum = nested_payload.get("value")
             if isinstance(checksum, str):
                 return checksum
         if isinstance(value, str):
@@ -207,7 +251,7 @@ def _checksum(payload: dict[str, Any]) -> str | None:
     return None
 
 
-def _workload_ref(payload: dict[str, Any], fallback: str) -> str:
+def _workload_ref(payload: Mapping[str, object], fallback: str) -> str:
     for key in ("workload_uuid", "workload_id", "problem_id", "trace_ref"):
         value = payload.get(key)
         if value:
@@ -215,7 +259,7 @@ def _workload_ref(payload: dict[str, Any], fallback: str) -> str:
     return fallback
 
 
-def _trace_refs(payload: dict[str, Any]) -> list[str]:
+def _trace_refs(payload: Mapping[str, object]) -> list[str]:
     refs = payload.get("source_trace_refs")
     if isinstance(refs, list):
         return [str(ref) for ref in refs if ref]
@@ -223,7 +267,7 @@ def _trace_refs(payload: dict[str, Any]) -> list[str]:
     return [str(ref)] if ref else []
 
 
-def _synchronization_policy(payload: dict[str, Any]) -> str:
+def _synchronization_policy(payload: Mapping[str, object]) -> str:
     value = payload.get("synchronization_policy")
     if isinstance(value, str):
         return value
@@ -257,3 +301,9 @@ def _optional_int(value: object) -> int | None:
 
 def _optional_bool(value: object) -> bool | None:
     return value if isinstance(value, bool) else None
+
+
+def _string_keyed_mapping(value: object) -> dict[str, object] | None:
+    if not isinstance(value, Mapping):
+        return None
+    return {str(key): item for key, item in value.items()}

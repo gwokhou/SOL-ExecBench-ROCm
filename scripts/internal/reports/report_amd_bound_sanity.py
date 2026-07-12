@@ -16,6 +16,7 @@ from sol_execbench.core.scoring.amd_bound_sanity.io import (
     load_json,
     write_amd_bound_sanity_reports,
 )
+from sol_execbench.core.scoring.amd_bound_sanity.inputs import SanityInputs
 
 
 def main() -> None:
@@ -42,18 +43,20 @@ def main() -> None:
     )
 
     report = build_amd_bound_sanity_report(
-        trace_refs=_load_trace_refs(args.trace),
-        execution_closure=execution_closure,
-        amd_sol_artifacts=[_load_artifact(path) for path in args.amd_sol_artifact],
-        solar_artifacts=[_load_artifact(path) for path in args.solar_artifact],
-        amd_score_report=amd_score_report,
-        compatibility_matrix=compatibility_matrix,
-        source_paths={
-            "execution_closure": args.execution_closure,
-            "amd_score_report": args.amd_score_report,
-            "compatibility_matrix": args.compatibility_matrix,
-        },
-        created_at=args.created_at,
+        SanityInputs(
+            trace_refs=_load_trace_refs(args.trace),
+            execution_closure=execution_closure,
+            amd_sol_artifacts=[_load_artifact(path) for path in args.amd_sol_artifact],
+            solar_artifacts=[_load_artifact(path) for path in args.solar_artifact],
+            amd_score_report=amd_score_report,
+            compatibility_matrix=compatibility_matrix,
+            source_paths={
+                "execution_closure": args.execution_closure,
+                "amd_score_report": args.amd_score_report,
+                "compatibility_matrix": args.compatibility_matrix,
+            },
+            created_at=args.created_at,
+        )
     )
     write_amd_bound_sanity_reports(
         report,

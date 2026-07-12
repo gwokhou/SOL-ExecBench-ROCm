@@ -48,8 +48,10 @@ def test_v3_external_model_round_trip(tmp_path):
     model = load_amd_hardware_model(path)
 
     assert model.to_dict() == _payload()
-    assert model.resolve_compute("matrix", "fp32", "fp32", "wmma").value == 100.0
-    assert model.resolve_memory("stream_copy", "fp32", "fp32", "gfx12").value == 1000.0
+    compute = model.resolve_compute("matrix", "fp32", "fp32", "wmma")
+    memory = model.resolve_memory("stream_copy", "fp32", "fp32", "gfx12")
+    assert compute is not None and compute.value == 100.0
+    assert memory is not None and memory.value == 1000.0
 
 
 def test_v2_scalar_model_is_explicitly_rejected():
