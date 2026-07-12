@@ -117,7 +117,15 @@ jobs:
           curl --fail --location --silent --show-error \
             -o "public-download/${archive}" \
             "https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/${archive}"
-          expected=$(awk '{print $1}' incoming/SHA256SUMS)
+          existing_record=$(jq -cer --arg release "$RELEASE_TAG" \
+            '.records[] | select(.release == $release)' \
+            docs/releases/evidence-lifecycle.json || true)
+          if [ -n "$existing_record" ]; then
+            test "$(jq -r .status <<<"$existing_record")" = published
+            expected=$(jq -r .bundle_sha256 <<<"$existing_record")
+          else
+            expected=$(awk '{print $1}' incoming/SHA256SUMS)
+          fi
           actual=$(sha256sum "public-download/${archive}" | awk '{print $1}')
           test "$actual" = "$expected"
           tar -xzf "public-download/${archive}" -C public-artifacts
@@ -142,7 +150,6 @@ jobs:
             docs/releases/evidence-lifecycle.json || true)
           if [ -n "$existing" ]; then
             test "$(jq -r .status <<<"$existing")" = published
-            test "$(jq -r .bundle_sha256 <<<"$existing")" = "$bundle_sha256"
             test "$(jq -r .release_url <<<"$existing")" = "$RELEASE_URL"
             exit 0
           fi

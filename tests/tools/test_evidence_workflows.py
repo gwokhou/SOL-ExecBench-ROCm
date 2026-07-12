@@ -41,6 +41,7 @@ def test_publish_workflow_is_single_maintainer_and_verifies_round_trip() -> None
     assert "concurrency:" in workflow
     assert "Download public release and verify it again" in workflow
     assert "curl --fail --location --silent --show-error" in workflow
+    assert "existing_record=$(jq -cer" in workflow
 
 
 def test_revocation_is_manual_single_maintainer_and_never_deletes_assets() -> None:
