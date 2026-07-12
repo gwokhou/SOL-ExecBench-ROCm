@@ -29,7 +29,9 @@ def _manifest(root: Path) -> EvidencePublicationManifest:
     solution.write_text('{"name":"candidate"}\n', encoding="utf-8")
     trace.write_text(
         '{"definition":"gemm","workload":{"uuid":"w1"},'
-        '"evaluation":{"status":"PASSED","performance":{"latency_ms":1.0}}}\n',
+        '"evaluation":{"status":"PASSED","performance":{"latency_ms":1.0}}}\n'
+        '{"definition":"gemm","workload":{"uuid":"w2"},'
+        '"evaluation":{"status":"PASSED","performance":{"latency_ms":1.1}}}\n',
         encoding="utf-8",
     )
     _write_json(timing, {"policy": "latency_ms"})
@@ -44,13 +46,20 @@ def _manifest(root: Path) -> EvidencePublicationManifest:
             "schema_version": "sol_execbench.release_baseline_bundle.v1",
             "release": "gfx1200-gemm-v1",
             "scope": "authority-slice:gfx1200:gemm:1-workload",
+            "baseline_artifact_ref": baseline.name,
             "baseline_artifact_sha256": sha256_file(baseline),
+            "suite_manifest_ref": suite.name,
             "suite_manifest_sha256": sha256_file(suite),
             "workloads": [
                 {
                     "classification": "official",
+                    "definition": "gemm",
+                    "workload_uuid": "w1",
+                    "trace_ref": trace.name,
                     "trace_sha256": sha256_file(trace),
+                    "bound_ref": bound.name,
                     "bound_sha256": sha256_file(bound),
+                    "hardware_model_ref": hardware.name,
                     "hardware_model_sha256": sha256_file(hardware),
                 }
             ],
@@ -63,6 +72,7 @@ def _manifest(root: Path) -> EvidencePublicationManifest:
             "schema_version": "sol_execbench.release_baseline_verification.v1",
             "release": "gfx1200-gemm-v1",
             "bundle_sha256": sha256_file(bundle),
+            "rerun_trace_ref": trace.name,
             "rerun_trace_sha256": sha256_file(trace),
         },
     )
@@ -86,6 +96,17 @@ def _manifest(root: Path) -> EvidencePublicationManifest:
                 "trace_sha256": candidate.trace_sha256,
                 "timing_sha256": candidate.timing_sha256,
             },
+            "scores": [
+                {
+                    "definition": "gemm",
+                    "workload_uuid": "w1",
+                    "input_refs": {
+                        "trace": trace.name,
+                        "sol_bound": bound.name,
+                        "hardware_model": hardware.name,
+                    },
+                }
+            ],
         },
     )
     files = {
@@ -148,4 +169,79 @@ def test_publication_verification_rejects_changed_download(tmp_path: Path) -> No
     manifest = _manifest(tmp_path)
     (tmp_path / "candidate.trace.jsonl").write_text("tampered\n", encoding="utf-8")
     with pytest.raises(ValueError, match="checksum_mismatch:candidate.trace.jsonl"):
+        manifest.verify_artifact_root(tmp_path)
+
+
+def test_publication_verification_rejects_undeclared_file(tmp_path: Path) -> None:
+    manifest = _manifest(tmp_path)
+    (tmp_path / "legacy-bound.json").write_text("{}\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="undeclared files: legacy-bound.json"):
+        manifest.verify_artifact_root(tmp_path)
+
+
+def test_publication_stage_creates_exact_upload_directory(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    manifest = _manifest(source)
+    (source / "local-only.json").write_text("{}\n", encoding="utf-8")
+    destination = tmp_path / "staged"
+
+    manifest.stage_artifact_root(source, destination)
+
+    assert not (destination / "local-only.json").exists()
+    assert {
+        path.relative_to(destination).as_posix()
+        for path in destination.rglob("*")
+        if path.is_file()
+    } == {artifact.relative_path for artifact in manifest.artifacts}
+    manifest.verify_artifact_root(destination)
+
+
+def test_publication_stage_removes_partial_directory_after_failure(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    manifest = _manifest(source)
+    (source / "candidate.json").unlink()
+    destination = tmp_path / "staged"
+
+    with pytest.raises(ValueError, match="cannot stage missing published artifact"):
+        manifest.stage_artifact_root(source, destination)
+
+    assert not destination.exists()
+    assert not list(tmp_path.glob(".staged.staging-*"))
+
+
+def test_publication_verification_rejects_score_reference_mismatch(
+    tmp_path: Path,
+) -> None:
+    manifest = _manifest(tmp_path)
+    official_path = tmp_path / "official-score.json"
+    official = json.loads(official_path.read_text(encoding="utf-8"))
+    official["scores"][0]["input_refs"]["sol_bound"] = "other-bound.json"
+    _write_json(official_path, official)
+    artifacts = tuple(
+        PublishedArtifact(
+            artifact.role,
+            artifact.relative_path,
+            sha256_file(official_path)
+            if artifact.role == "official_score_evidence"
+            else artifact.sha256,
+        )
+        for artifact in manifest.artifacts
+    )
+    manifest = EvidencePublicationManifest(
+        release=manifest.release,
+        scope=manifest.scope,
+        source_repository=manifest.source_repository,
+        source_revision=manifest.source_revision,
+        container_image_digest=manifest.container_image_digest,
+        artifact_base_uri=manifest.artifact_base_uri,
+        candidate=manifest.candidate,
+        artifacts=artifacts,
+    )
+
+    with pytest.raises(ValueError, match="input reference does not match bundle"):
         manifest.verify_artifact_root(tmp_path)

@@ -114,9 +114,17 @@ def test_derived_evidence_report_labels_noncanonical_output():
     ]
 
 
-def test_sol_score_formula_stays_unchanged_for_existing_contract():
-    assert sol_score(t_k=2.0, t_b=2.0, t_sol=1.0) == 0.5
-    assert sol_score(t_k=1.0, t_b=2.0, t_sol=1.0) == 1.0
+def test_sol_score_formula_orders_slow_equal_fast_candidates():
+    slow = sol_score(t_k=3.0, t_b=2.0, t_sol=1.0)
+    equal = sol_score(t_k=2.0, t_b=2.0, t_sol=1.0)
+    fast = sol_score(t_k=1.5, t_b=2.0, t_sol=1.0)
+    at_sol = sol_score(t_k=1.0, t_b=2.0, t_sol=1.0)
+
+    assert slow == 1.0 / 3.0
+    assert equal == 0.5
+    assert fast == 2.0 / 3.0
+    assert at_sol == 1.0
+    assert slow < equal < fast < at_sol
 
 
 def test_amd_native_claims_receive_guardrail_warning():
