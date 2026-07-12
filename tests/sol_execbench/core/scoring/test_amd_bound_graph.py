@@ -129,9 +129,112 @@ def test_movement_and_dtype_classification_helpers_are_directly_testable():
     assert movement_kind_for_name("reshape") == "logical_view"
     assert movement_kind_for_name("expand") == "broadcast_view"
     assert movement_kind_for_name("contiguous") == "materialized"
+    assert movement_kind_for_name("chunk") == "logical_view"
     assert movement_kind_for_name("matmul") is None
     assert dtype_method_target("half") == "float16"
     assert dtype_method_target("to") is None
+
+
+def test_ast_chunk_preserves_partition_dependencies_as_inexact_views() -> None:
+    definition = make_definition(
+        name="chunk_view_demo",
+        axes={
+            "batch": {"type": "const", "value": 2},
+            "hidden": {"type": "const", "value": 6},
+        },
+        inputs={"x": {"shape": ["batch", "hidden"], "dtype": "float32"}},
+        outputs={"out": {"shape": ["batch", "hidden"], "dtype": "float32"}},
+        reference=(
+            "def run(x):\n"
+            "    left, right, extra = x.chunk(3, dim=1)\n"
+            "    return left + right + extra\n"
+        ),
+    )
+    workload = make_workload(
+        axes={}, inputs={"x": {"type": "random"}}, uuid="chunk-view-workload"
+    )
+
+    graph = build_bound_graph(definition, workload)
+    chunk = next(node for node in graph.nodes if node.op_name.endswith("chunk"))
+    additions = [node for node in graph.nodes if node.op_name == "add"]
+
+    assert chunk.op_family == OpFamily.DATA_MOVEMENT
+    assert chunk.confidence == EstimateConfidence.INEXACT
+    assert "unsupported_operator:chunk" not in graph.warnings
+    assert additions and all(node.input_tensor_ids for node in additions)
+
+
+def test_convolution_uses_documented_defaults_only_when_arguments_are_absent() -> None:
+    definition = make_definition(
+        name="conv_defaults_demo",
+        axes={
+            "batch": {"type": "const", "value": 1},
+            "channels": {"type": "const", "value": 2},
+            "length": {"type": "const", "value": 8},
+            "output_channels": {"type": "const", "value": 4},
+            "kernel": {"type": "const", "value": 3},
+        },
+        inputs={
+            "x": {"shape": ["batch", "channels", "length"], "dtype": "float32"},
+            "weight": {
+                "shape": ["output_channels", "channels", "kernel"],
+                "dtype": "float32",
+            },
+        },
+        outputs={
+            "out": {
+                "shape": ["batch", "output_channels", "length"],
+                "dtype": "float32",
+            }
+        },
+        reference=(
+            "import torch.nn.functional as F\n\n"
+            "def run(x, weight):\n"
+            "    return F.conv1d(x, weight)\n"
+        ),
+    )
+    workload = make_workload(
+        axes={},
+        inputs={"x": {"type": "random"}, "weight": {"type": "random"}},
+        uuid="conv-defaults-workload",
+    )
+
+    graph = build_bound_graph(definition, workload)
+    convolution = next(
+        node for node in graph.nodes if node.op_family == OpFamily.CONVOLUTION
+    )
+
+    assert convolution.attributes["stride"] == (1,)
+    assert convolution.attributes["padding"] == (0,)
+    assert convolution.attributes["dilation"] == (1,)
+    assert convolution.attributes["groups"] == 1
+
+
+def test_fx_shape_proved_layout_chain_is_supported() -> None:
+    definition = make_definition(
+        name="layout_chain_demo",
+        axes={
+            "batch": {"type": "const", "value": 2},
+            "heads": {"type": "const", "value": 3},
+            "sequence": {"type": "const", "value": 4},
+        },
+        inputs={"x": {"shape": ["batch", "heads", "sequence"], "dtype": "float32"}},
+        outputs={"out": {"shape": ["batch", "sequence", "heads"], "dtype": "float32"}},
+        reference=(
+            "def run(x):\n    return x.transpose(1, 2).contiguous().reshape(2, 4, 3)\n"
+        ),
+    )
+    workload = make_workload(
+        axes={}, inputs={"x": {"type": "random"}}, uuid="layout-chain-workload"
+    )
+
+    graph = build_bound_graph(definition, workload)
+    movement = [
+        node for node in graph.nodes if node.op_family == OpFamily.DATA_MOVEMENT
+    ]
+
+    assert len(movement) == 3
+    assert all(node.confidence == EstimateConfidence.SUPPORTED for node in movement)
 
 
 def test_moe_visible_static_route_nodes_record_subroles_and_metadata():

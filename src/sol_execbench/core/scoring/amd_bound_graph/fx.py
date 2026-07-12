@@ -24,6 +24,7 @@ from sol_execbench.core.scoring.amd_bound_graph.fx_helpers import (
     _fx_node_name,
     _fx_source_expression,
     _fx_tensor_meta,
+    _static_data_movement_confidence,
     _torch_dtype,
 )
 from sol_execbench.core.scoring.amd_bound_graph.models import (
@@ -91,12 +92,28 @@ def _try_fx_bound_graph(
         )
         output_tensor_id = f"tmp:{node_id}:0"
         output_shape, output_dtype = _fx_tensor_meta(fx_node)
+        resolved_output_shape = (
+            output_shape
+            if output_shape is not None
+            else _first_input_shape(input_tensor_ids, tensors, output_shapes)
+        )
+        attributes = {
+            "trace_source": "torch.fx",
+            **_fx_node_attributes(fx_node, func_name, classification),
+        }
+        confidence, rationale = _static_data_movement_confidence(
+            classification,
+            attributes,
+            input_tensor_ids,
+            tensors,
+            resolved_output_shape,
+            output_shape is not None,
+        )
         tensors[output_tensor_id] = BoundTensor(
             tensor_id=output_tensor_id,
             name=output_tensor_id,
             role=BoundTensorRole.INTERMEDIATE,
-            shape=output_shape
-            or _first_input_shape(input_tensor_ids, tensors, output_shapes),
+            shape=resolved_output_shape,
             dtype=output_dtype
             or _first_input_dtype(input_tensor_ids, tensors, definition),
             producer_node_id=node_id,
@@ -109,12 +126,9 @@ def _try_fx_bound_graph(
             source_expression=_fx_source_expression(fx_node),
             input_tensor_ids=input_tensor_ids,
             output_tensor_ids=(output_tensor_id,),
-            attributes={
-                "trace_source": "torch.fx",
-                **_fx_node_attributes(fx_node, func_name, classification),
-            },
-            confidence=classification.confidence,
-            rationale=classification.rationale,
+            attributes=attributes,
+            confidence=confidence,
+            rationale=rationale,
             conversion_status="not_converted",
         )
         nodes.append(bound_node)

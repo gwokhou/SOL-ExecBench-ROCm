@@ -15,6 +15,8 @@ RAW_PAYLOAD_INFRASTRUCTURE = {
 
 RAW_PAYLOAD_ARTIFACT_BOUNDARIES = {
     "sol_execbench.cli.commands.baseline",
+    "sol_execbench.cli.commands.fusion_validation",
+    "sol_execbench.cli.commands.fusion_probe_runner",
     "sol_execbench.cli.commands.hardware_model",
     "sol_execbench.cli.commands.official_score",
     "sol_execbench.cli.evaluation.evaluator",
@@ -30,10 +32,14 @@ RAW_PAYLOAD_ARTIFACT_BOUNDARIES = {
     "sol_execbench.core.scoring.amd_bound_graph.fx_helpers",
     "sol_execbench.core.scoring._amd_hardware_model_parsing",
     "sol_execbench.core.scoring.amd_sol.v3_parsing",
+    "sol_execbench.core.scoring.amd_sol.v4",
+    "sol_execbench.core.scoring.baseline_selection",
+    "sol_execbench.core.scoring.fusion_validation",
     "sol_execbench.core.scoring.hardware_calibration.models",
     "sol_execbench.core.scoring.official_score",
     "sol_execbench.core.scoring.release_baseline.authority",
     "sol_execbench.core.scoring.release_baseline.publication",
+    "sol_execbench.core.scoring.representative_suite",
     "sol_execbench.core.platform.arch_capabilities",
 }
 
@@ -57,6 +63,7 @@ GET_CALL_BUDGET = {
     "sol_execbench.core.dataset.paper_denominator.stages": 45,
     "sol_execbench.core.reports.evaluation_stability.builder": 25,
     "sol_execbench.core.scoring.release_baseline.models": 24,
+    "sol_execbench.core.scoring.release_baseline.publication": 21,
 }
 
 

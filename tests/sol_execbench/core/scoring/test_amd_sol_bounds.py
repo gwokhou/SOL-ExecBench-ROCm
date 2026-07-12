@@ -215,8 +215,8 @@ def test_coverage_summary_counts_supported_inexact_and_unsupported_ops():
 
     assert summary.derived is True
     assert summary.total_ops == 3
-    assert summary.supported_ops == 0
-    assert summary.inexact_ops == 3
+    assert summary.supported_ops == 2
+    assert summary.inexact_ops == 1
     assert summary.unsupported_ops == 0
     assert payload["op_type_counts"] == {
         "activation": 1,
@@ -253,9 +253,11 @@ def test_reduction_data_movement_and_softmax_estimates_are_labeled():
         "softmax",
         "data_movement",
     ]
-    assert all(
-        estimate.confidence == EstimateConfidence.INEXACT for estimate in estimates
-    )
+    assert [estimate.confidence for estimate in estimates] == [
+        EstimateConfidence.SUPPORTED,
+        EstimateConfidence.INEXACT,
+        EstimateConfidence.SUPPORTED,
+    ]
     assert estimates[0].flops == 0.0
     assert estimates[1].flops > 0.0
     assert "softmax-like" in estimates[1].rationale

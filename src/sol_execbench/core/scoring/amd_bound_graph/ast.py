@@ -258,9 +258,11 @@ class _AstBoundGraphExtractor:
         elif isinstance(node.func, ast.Name) and node.func.id in self.env:
             input_tensor_ids.extend(self._process_expr(node.func))
         for arg in node.args:
-            input_tensor_ids.extend(self._process_expr(arg))
+            if not _is_dtype_metadata(arg):
+                input_tensor_ids.extend(self._process_expr(arg))
         for keyword in node.keywords:
-            input_tensor_ids.extend(self._process_expr(keyword.value))
+            if not _is_dtype_metadata(keyword.value):
+                input_tensor_ids.extend(self._process_expr(keyword.value))
 
         classification = _classify_call(func_name)
         if classification is None:
@@ -275,6 +277,15 @@ class _AstBoundGraphExtractor:
                 attributes={},
             )
 
+        attributes = _ast_call_attributes(node, func_name, classification)
+        if (
+            func_name.rsplit(".", maxsplit=1)[-1] in {"to", "type"}
+            and "target_dtype" not in attributes
+        ):
+            target_dtype = self._dtype_from_metadata(node)
+            if target_dtype is not None:
+                attributes["target_dtype"] = target_dtype
+
         return self._append_node(
             op_family=_classification_family(classification),
             op_name=func_name,
@@ -282,7 +293,7 @@ class _AstBoundGraphExtractor:
             input_tensor_ids=tuple(input_tensor_ids),
             confidence=classification.confidence,
             rationale=classification.rationale,
-            attributes=_ast_call_attributes(node, func_name, classification),
+            attributes=attributes,
         )
 
     def _append_node(
@@ -298,11 +309,16 @@ class _AstBoundGraphExtractor:
         node_id = f"op_{len(self.nodes) + 1}"
         output_tensor_id = f"tmp:{node_id}:0"
         node_attributes = attributes or {}
+        output_shape = self._default_intermediate_shape(input_tensor_ids)
+        if op_family == OpFamily.REDUCTION:
+            output_shape = self._reduction_output_shape(
+                input_tensor_ids, node_attributes, output_shape
+            )
         output_tensor = BoundTensor(
             tensor_id=output_tensor_id,
             name=output_tensor_id,
             role=BoundTensorRole.INTERMEDIATE,
-            shape=self._default_intermediate_shape(input_tensor_ids),
+            shape=output_shape,
             dtype=str(
                 node_attributes.get("target_dtype")
                 or self._default_intermediate_dtype(input_tensor_ids)
@@ -334,6 +350,54 @@ class _AstBoundGraphExtractor:
                 )
             )
         return (output_tensor_id,)
+
+    def _dtype_from_metadata(self, node: ast.Call) -> str | None:
+        values = [*node.args, *(keyword.value for keyword in node.keywords)]
+        for value in values:
+            if not _is_dtype_metadata(value):
+                continue
+            assert isinstance(value, ast.Attribute)
+            tensor_ids = self._process_expr(value.value)
+            if tensor_ids and tensor_ids[0] in self.tensors:
+                return self.tensors[tensor_ids[0]].dtype
+        return None
+
+    def _reduction_output_shape(
+        self,
+        input_tensor_ids: tuple[str, ...],
+        attributes: dict[str, Any],
+        fallback: tuple[int, ...] | None,
+    ) -> tuple[int, ...] | None:
+        if not input_tensor_ids:
+            return fallback
+        input_tensor = self.tensors.get(input_tensor_ids[0])
+        input_shape = input_tensor.shape if input_tensor is not None else None
+        if input_shape is None:
+            return fallback
+        raw_axis = attributes.get("dim")
+        if raw_axis is None:
+            axes = tuple(range(len(input_shape)))
+        elif isinstance(raw_axis, int):
+            axes = (raw_axis,)
+        elif isinstance(raw_axis, tuple) and all(
+            isinstance(axis, int) for axis in raw_axis
+        ):
+            axes = raw_axis
+        else:
+            return fallback
+        normalized = {axis + len(input_shape) if axis < 0 else axis for axis in axes}
+        if any(axis < 0 or axis >= len(input_shape) for axis in normalized):
+            return fallback
+        if attributes.get("keepdim") is True:
+            return tuple(
+                1 if index in normalized else dimension
+                for index, dimension in enumerate(input_shape)
+            )
+        return tuple(
+            dimension
+            for index, dimension in enumerate(input_shape)
+            if index not in normalized
+        )
 
     def _static_range(self, expression: ast.AST) -> tuple[int, ...] | None:
         if (
@@ -400,6 +464,13 @@ class _AstBoundGraphExtractor:
         if isinstance(target, ast.Name) and tensor_ids:
             self.env[target.id] = tensor_ids[0]
         elif isinstance(target, ast.Tuple):
+            if len(tensor_ids) == 1:
+                # ``chunk``/``split`` return several logical views.  AST
+                # extraction cannot prove each partition extent, so retain the
+                # common producer for every target while the node itself stays
+                # explicitly inexact.  This preserves downstream dependency
+                # evidence without inventing exact shapes or traffic.
+                tensor_ids = tensor_ids * len(target.elts)
             for element, tensor_id in zip(target.elts, tensor_ids):
                 if isinstance(element, ast.Name):
                     self.env[element.id] = tensor_id
@@ -447,6 +518,10 @@ def _call_name(node: ast.AST) -> str:
     if isinstance(node, ast.Name):
         return node.id
     return ""
+
+
+def _is_dtype_metadata(node: ast.AST) -> bool:
+    return isinstance(node, ast.Attribute) and node.attr == "dtype"
 
 
 _STATIC_MISSING = object()

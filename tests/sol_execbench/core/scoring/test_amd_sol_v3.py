@@ -24,6 +24,17 @@ from sol_execbench.core.scoring.amd_sol.v3 import (
     amd_sol_bound_v3_from_dict,
     build_amd_sol_bound_v3_artifact,
 )
+from sol_execbench.core.scoring.amd_sol.v4 import (
+    amd_sol_bound_v4_from_dict,
+    build_amd_sol_bound_v4_artifact,
+    fusion_signature_for_group,
+)
+from sol_execbench.core.scoring.fusion_validation import (
+    FusionValidationArtifact,
+    FusionValidationCase,
+    KernelResourceEvidence,
+    PerformanceEvidence,
+)
 from sol_execbench.core.scoring.amd_bound_sanity.builder import (
     build_amd_bound_sanity_report,
 )
@@ -55,7 +66,7 @@ def _hardware():
                     "evidence_ref": "fixture",
                 },
                 {
-                    "key": "compute.vector.fp32.fp32.portable",
+                    "key": "compute.vector.fp32.fp32.gfx12",
                     "state": "measured",
                     "value": 10.0,
                     "confidence": "supported",
@@ -64,7 +75,7 @@ def _hardware():
             ],
             "memory_profiles": [
                 {
-                    "key": "memory.stream_copy.fp32.fp32.portable",
+                    "key": "memory.stream_copy.fp32.fp32.gfx12",
                     "state": "measured",
                     "value": 100.0,
                     "confidence": "supported",
@@ -343,6 +354,120 @@ def test_v3_round_trips_and_rejects_tampered_group_partition():
     }
     with pytest.raises(ValueError, match="aggregate_bound has unknown field"):
         amd_sol_bound_v3_from_dict(nested_unknown)
+
+
+def test_v4_exact_capacity_evidence_promotes_without_performance_claim():
+    definition = _exact_fused_definition()
+    workload = make_workload(
+        axes={},
+        inputs={
+            "a": {"type": "random"},
+            "b": {"type": "random"},
+            "c": {"type": "random"},
+        },
+        uuid="fused-exact-workload",
+    )
+    v3 = build_amd_sol_bound_v3_artifact(definition, workload, _hardware())
+    signature = fusion_signature_for_group(v3.fusion_groups[0], v3.bound_graph)
+    kernel = KernelResourceEvidence(
+        kernel_name="fused",
+        binary_sha256="a" * 64,
+        source_sha256="b" * 64,
+        compile_command=("hipcc", "probe.hip"),
+        architecture="gfx1200",
+        vgpr_count=32,
+        sgpr_count=20,
+        vgpr_spill_count=0,
+        sgpr_spill_count=0,
+        private_segment_bytes=0,
+        static_lds_bytes=64,
+        dynamic_lds_bytes=0,
+        lds_limit_bytes=65536,
+        active_blocks_per_multiprocessor=1,
+        launch_passed=True,
+        correctness_passed=True,
+    )
+    evidence = FusionValidationArtifact(
+        architecture="gfx1200",
+        gpu_uuid="GPU-1",
+        rocm_version="7.1",
+        hipcc_version="7.1",
+        clocks_locked=True,
+        suite_manifest_sha256="c" * 64,
+        benchmark_root_sha256="d" * 64,
+        generated_at="2026-07-11T00:00:00Z",
+        cases=(
+            FusionValidationCase(
+                "gemm-add-m2",
+                "fused-exact-workload",
+                "gemm_add_fp32",
+                signature,
+                kernel,
+                (kernel,),
+                "passed",
+                PerformanceEvidence(
+                    "failed",
+                    (1.03, 1.03, 1.03),
+                    (1.0, 1.0, 1.0),
+                    1.03,
+                    0.0,
+                ),
+            ),
+        ),
+    )
+
+    v4 = build_amd_sol_bound_v4_artifact(
+        definition,
+        workload,
+        _hardware(),
+        fusion_validation=evidence,
+        fusion_validation_ref="fusion.json",
+        fusion_validation_sha256="e" * 64,
+    )
+    payload = v4.to_dict()
+
+    assert v4.aggregate_bound.status == "scored"
+    assert payload["fusion_groups"][0]["capacity_status"] == "passed"
+    assert payload["fusion_groups"][0]["performance_status"] == "failed"
+    assert (
+        "fusion_capacity_evidence_missing"
+        not in payload["fusion_groups"][0]["warnings"]
+    )
+    assert amd_sol_bound_v4_from_dict(payload).to_dict() == payload
+
+
+def test_v4_does_not_extrapolate_an_unmatched_shape():
+    definition = _exact_fused_definition()
+    workload = make_workload(
+        axes={},
+        inputs={
+            "a": {"type": "random"},
+            "b": {"type": "random"},
+            "c": {"type": "random"},
+        },
+        uuid="fused-exact-workload",
+    )
+    empty = FusionValidationArtifact(
+        architecture="gfx1200",
+        gpu_uuid="GPU-1",
+        rocm_version="7.1",
+        hipcc_version="7.1",
+        clocks_locked=True,
+        suite_manifest_sha256="c" * 64,
+        benchmark_root_sha256="d" * 64,
+        generated_at="2026-07-11T00:00:00Z",
+        cases=(),
+    )
+    v4 = build_amd_sol_bound_v4_artifact(
+        definition,
+        workload,
+        _hardware(),
+        fusion_validation=empty,
+        fusion_validation_ref="fusion.json",
+        fusion_validation_sha256="e" * 64,
+    )
+    assert v4.aggregate_bound.status == "degraded"
+    assert v4.fusion_validation_matches[0].capacity_status == "missing"
 
 
 def test_v3_sanity_reports_group_specific_blockers_not_v2_blanket_blocker():

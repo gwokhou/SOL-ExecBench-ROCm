@@ -226,6 +226,18 @@ def _fx_node_attributes(
         if axis is not _MISSING:
             attributes["dim"] = axis
             attributes["axis_source"] = "attribute"
+        if op_family == OpFamily.REDUCTION and "keepdim" in node.kwargs:
+            keepdim = node.kwargs["keepdim"]
+            if isinstance(keepdim, bool):
+                attributes["keepdim"] = keepdim
+
+    if leaf_name == "pow":
+        # FX args include the receiver for both call_method and call_function.
+        exponent_position = 1
+        if exponent_position < len(node.args):
+            exponent = node.args[exponent_position]
+            if isinstance(exponent, int | float):
+                attributes["exponent"] = exponent
 
     target_dtype = _target_dtype_from_values(leaf_name, node.args[1:], node.kwargs)
     if target_dtype is not None:
@@ -243,6 +255,59 @@ def _fx_node_attributes(
     if op_family == OpFamily.SSM_MAMBA:
         attributes.update(_ssm_mamba_call_attributes(leaf_name))
     return attributes
+
+
+def _static_data_movement_confidence(
+    classification: _CallClassification,
+    attributes: dict[str, Any],
+    input_tensor_ids: tuple[str, ...],
+    tensors: dict[str, BoundTensor],
+    output_shape: tuple[int, ...] | None,
+    has_shape_propagation: bool,
+) -> tuple[EstimateConfidence, str]:
+    """Upgrade only fully shape-proved FX layout operations.
+
+    ``torch.fx`` shape propagation gives exact tensor extents for this narrow
+    path.  A transpose/reshape view has no device traffic, while ``contiguous``
+    is exact only when it preserves the known element count.  AST and dynamic
+    paths deliberately retain their original inexact classification.
+    """
+    if _classification_family(classification) != OpFamily.DATA_MOVEMENT:
+        return classification.confidence, classification.rationale
+    input_shapes = tuple(
+        tensors[tensor_id].shape
+        for tensor_id in input_tensor_ids
+        if tensor_id in tensors
+    )
+    if (
+        not has_shape_propagation
+        or output_shape is None
+        or len(input_shapes) != len(input_tensor_ids)
+        or any(shape is None for shape in input_shapes)
+    ):
+        return classification.confidence, classification.rationale
+    movement_kind = attributes.get("movement_kind")
+    if movement_kind == "logical_view":
+        return (
+            EstimateConfidence.SUPPORTED,
+            "shape-proved traced logical view with zero device traffic",
+        )
+    if movement_kind == "materialized" and len(input_shapes) == 1:
+        input_shape = input_shapes[0]
+        assert input_shape is not None
+        if _shape_numel(input_shape) == _shape_numel(output_shape):
+            return (
+                EstimateConfidence.SUPPORTED,
+                "shape-proved traced materialization with preserved element count",
+            )
+    return classification.confidence, classification.rationale
+
+
+def _shape_numel(shape: tuple[int, ...]) -> int:
+    result = 1
+    for dimension in shape:
+        result *= dimension
+    return result
 
 
 def _first_input_shape(

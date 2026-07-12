@@ -130,6 +130,36 @@ def test_fp16_stream_probe_uses_half_storage_and_byte_accounting() -> None:
     assert "sizeof(__half)" in source
 
 
+def test_bf16_stream_probe_uses_bf16_storage_and_validation() -> None:
+    source = _hip_source(
+        CalibrationProfileKey("memory", "stream_copy", "bf16", "bf16", "gfx12")
+    )
+
+    assert "hip_bfloat16" in source
+    assert "static_cast<float>" in source
+
+
+def test_bf16_fp32_conversion_probe_accounts_for_both_storage_types() -> None:
+    source = _hip_source(
+        CalibrationProfileKey("memory", "stream_copy", "bf16", "fp32", "gfx12")
+    )
+
+    assert "conversion_probe_kernel" in source
+    assert "sizeof(hip_bfloat16) + sizeof(float)" in source
+
+
+def test_reduction_and_transcendental_profiles_have_dedicated_probes() -> None:
+    reduction = _hip_source(
+        CalibrationProfileKey("compute", "reduction", "fp32", "fp32", "gfx12")
+    )
+    transcendental = _hip_source(
+        CalibrationProfileKey("compute", "transcendental", "fp32", "fp32", "gfx12")
+    )
+
+    assert "reduction_probe_kernel" in reduction
+    assert "tanhf" in transcendental
+
+
 def test_mfma_source_uses_bf16_mfma_intrinsic() -> None:
     source = _hip_source(
         CalibrationProfileKey("compute", "matrix", "bf16", "bf16", "mfma")
@@ -188,6 +218,28 @@ def test_matrix_compile_targets_selected_architecture(tmp_path) -> None:
         == "passed"
     )
     assert "--offload-arch=gfx1200" in commands[0]
+
+
+def test_extended_profiles_compile_when_declared(tmp_path) -> None:
+    commands: list[list[str]] = []
+    backend = HipCommandBackend(
+        workspace=tmp_path,
+        hipcc="hipcc",
+        architecture="gfx1200",
+        run=lambda command, **_: (
+            commands.append(command) or type("Result", (), {"returncode": 0})()
+        ),
+    )
+
+    for key in (
+        CalibrationProfileKey("compute", "vector", "bf16", "bf16", "gfx12"),
+        CalibrationProfileKey("memory", "stream_copy", "bf16", "bf16", "gfx12"),
+        CalibrationProfileKey("compute", "reduction", "fp32", "fp32", "gfx12"),
+        CalibrationProfileKey("compute", "transcendental", "fp32", "fp32", "gfx12"),
+    ):
+        assert backend.compile(key) == "passed"
+
+    assert all("--offload-arch=gfx1200" in command for command in commands)
 
 
 def test_fp32_vector_probe_uses_arithmetic_saturation_and_full_validation() -> None:

@@ -257,8 +257,21 @@ def _resolve_architecture_matrix_paths(
     if not hardware_model.architecture.lower().startswith("gfx12"):
         return estimates
     return tuple(
-        replace(estimate, compute_path="wmma")
-        if estimate.compute_operation == "matrix" and estimate.compute_path == "mfma"
-        else estimate
+        replace(
+            estimate,
+            compute_path=(
+                "wmma"
+                if estimate.compute_operation == "matrix"
+                and estimate.compute_path == "mfma"
+                else "gfx12"
+                if estimate.compute_operation
+                in {"vector", "reduction", "transcendental"}
+                and estimate.compute_path == "portable"
+                else estimate.compute_path
+            ),
+            memory_path=(
+                "gfx12" if estimate.memory_path == "portable" else estimate.memory_path
+            ),
+        )
         for estimate in estimates
     )

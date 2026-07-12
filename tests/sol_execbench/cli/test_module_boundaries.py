@@ -267,6 +267,10 @@ def test_cross_domain_imports_stay_explicitly_allowlisted() -> None:
             "sol_execbench.core.dataset.manifest",
         ): "authority slice manifests reuse the canonical dataset checksum type",
         (
+            "sol_execbench.core.scoring.fusion_validation",
+            "sol_execbench.core.bench.static_kernel.amdgpu_metadata",
+        ): "fusion authority reuses the code-object metadata parser without promoting diagnostic footprints",
+        (
             "sol_execbench.core.scoring.hardware_calibration.builder",
             "sol_execbench.core.bench",
         ): "hardware calibration imports the benchmark clock-lock package",

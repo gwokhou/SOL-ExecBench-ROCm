@@ -306,6 +306,31 @@ class EvidencePublicationManifest:
                     raise ValueError(
                         f"published official workload input is absent: {field}"
                     )
+            bound_digest = row.get("bound_sha256")
+            bound_artifact = next(
+                (
+                    artifact
+                    for artifact in self.artifacts
+                    if artifact.sha256 == bound_digest
+                ),
+                None,
+            )
+            if bound_artifact is None:
+                continue
+            try:
+                bound = json.loads(
+                    (root / bound_artifact.relative_path).read_text(encoding="utf-8")
+                )
+            except (OSError, json.JSONDecodeError) as exc:
+                raise ValueError("published AMD SOL bound is not valid JSON") from exc
+            if (
+                isinstance(bound, dict)
+                and bound.get("schema_version") == "sol_execbench.amd_sol_bound.v4"
+                and bound.get("fusion_validation_sha256") not in digests
+            ):
+                raise ValueError(
+                    "published v4 bound fusion evidence is absent from artifact manifest"
+                )
 
 
 def evidence_publication_manifest_from_dict(

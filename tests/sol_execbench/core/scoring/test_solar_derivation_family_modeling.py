@@ -565,7 +565,7 @@ def test_convolution_sidecar_records_subroles_formula_bytes_and_bounds():
     assert group.missing_evidence == ()
 
 
-def test_convolution_missing_padding_degrades_with_explicit_missing_evidence():
+def test_convolution_omitted_padding_uses_framework_default():
     definition = make_definition(
         name="conv_missing_padding",
         axes={
@@ -596,13 +596,9 @@ def test_convolution_missing_padding_degrades_with_explicit_missing_evidence():
     evidence = build_solar_derivation_evidence(definition, workload)
     group = next(group for group in evidence.groups if group.family == "convolution")
 
-    assert group.status == "degraded"
-    assert group.confidence == "inexact"
-    assert "convolution:padding" in group.missing_evidence
-    assert any(
-        warning.startswith("inexact_operator:convolution_missing_padding")
-        for warning in group.warning_prefixes
-    )
+    assert group.status == "scored"
+    assert group.confidence == "supported"
+    assert "convolution:padding" not in group.missing_evidence
 
 
 def test_embedding_positional_sidecar_records_memory_bound_evidence():
