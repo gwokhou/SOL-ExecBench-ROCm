@@ -16,6 +16,8 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import shutil
+import tempfile
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Mapping
@@ -34,6 +36,15 @@ _REQUIRED_ARTIFACT_ROLES = frozenset(
         "candidate_solution",
         "candidate_trace",
         "candidate_timing",
+        "scoring_baseline",
+        "release_baseline_bundle",
+        "release_baseline_verification",
+        "suite_manifest",
+        "official_score_evidence",
+    }
+)
+_AUTHORITY_JSON_ARTIFACT_ROLES = frozenset(
+    {
         "scoring_baseline",
         "release_baseline_bundle",
         "release_baseline_verification",
@@ -208,6 +219,8 @@ class EvidencePublicationManifest:
     def verify_artifact_root(self, artifact_root: Path) -> None:
         """Ensure a downloaded release bundle exactly matches this manifest."""
         root = Path(artifact_root)
+        if not root.is_dir():
+            raise ValueError("published evidence artifact root must be a directory")
         failures: list[str] = []
         for artifact in self.artifacts:
             path = root / artifact.relative_path
@@ -219,7 +232,55 @@ class EvidencePublicationManifest:
             raise ValueError(
                 "published evidence verification failed: " + ", ".join(failures)
             )
+        self._verify_exact_inventory(root)
         self._verify_authority_contract(root)
+
+    def stage_artifact_root(self, source_root: Path, destination: Path) -> None:
+        """Copy exactly this manifest's immutable artifacts into a clean directory."""
+        source = Path(source_root)
+        target = Path(destination)
+        if not source.is_dir():
+            raise ValueError("publication source root must be a directory")
+        if source.resolve() == target.resolve():
+            raise ValueError("publication destination must differ from source root")
+        if target.exists():
+            if not target.is_dir() or any(target.iterdir()):
+                raise ValueError("publication destination must be new or empty")
+            target.rmdir()
+        target.parent.mkdir(parents=True, exist_ok=True)
+        staging_root = Path(
+            tempfile.mkdtemp(prefix=f".{target.name}.staging-", dir=target.parent)
+        )
+        try:
+            for artifact in self.artifacts:
+                source_path = source / artifact.relative_path
+                if not source_path.is_file():
+                    raise ValueError(
+                        "cannot stage missing published artifact: "
+                        f"{artifact.relative_path}"
+                    )
+                destination_path = staging_root / artifact.relative_path
+                destination_path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source_path, destination_path)
+            self.verify_artifact_root(staging_root)
+            staging_root.replace(target)
+        except Exception:
+            shutil.rmtree(staging_root, ignore_errors=True)
+            raise
+
+    def _verify_exact_inventory(self, root: Path) -> None:
+        """Reject extra files so a verified root cannot hide dependencies."""
+        declared = {artifact.relative_path for artifact in self.artifacts}
+        actual = {
+            path.relative_to(root).as_posix()
+            for path in root.rglob("*")
+            if path.is_file() or path.is_symlink()
+        }
+        undeclared = sorted(actual - declared)
+        if undeclared:
+            raise ValueError(
+                "published evidence contains undeclared files: " + ", ".join(undeclared)
+            )
 
     def _verify_authority_contract(self, root: Path) -> None:
         """Verify that all published score inputs form one complete release."""
@@ -230,7 +291,7 @@ class EvidencePublicationManifest:
                     (root / artifact.relative_path).read_text(encoding="utf-8")
                 )
                 for role, artifact in by_role.items()
-                if role in _REQUIRED_ARTIFACT_ROLES
+                if role in _AUTHORITY_JSON_ARTIFACT_ROLES
             }
         except (OSError, json.JSONDecodeError) as exc:
             raise ValueError(
@@ -295,41 +356,156 @@ class EvidencePublicationManifest:
         digests = {artifact.sha256 for artifact in self.artifacts}
         if verification.get("rerun_trace_sha256") not in digests:
             raise ValueError("published rerun trace is absent from artifact manifest")
+        self._verify_referenced_artifacts(root, bundle, verification, evidence)
+
+    def _verify_referenced_artifacts(
+        self,
+        root: Path,
+        bundle: Mapping[str, Any],
+        verification: Mapping[str, Any],
+        evidence: Mapping[str, Any],
+    ) -> None:
+        """Require every authority reference to resolve to its declared artifact."""
+        by_path = {artifact.relative_path: artifact for artifact in self.artifacts}
+        self._require_reference(
+            bundle.get("baseline_artifact_ref"),
+            bundle.get("baseline_artifact_sha256"),
+            by_path,
+            "published scoring baseline reference",
+        )
+        self._require_reference(
+            bundle.get("suite_manifest_ref"),
+            bundle.get("suite_manifest_sha256"),
+            by_path,
+            "published suite manifest reference",
+        )
+        self._require_reference(
+            verification.get("rerun_trace_ref"),
+            verification.get("rerun_trace_sha256"),
+            by_path,
+            "published rerun trace reference",
+        )
         workloads = bundle.get("workloads")
         if not isinstance(workloads, list):
             raise ValueError("published release bundle has no workload list")
+        official_rows: dict[tuple[str, str], Mapping[str, Any]] = {}
         for row in workloads:
-            if not isinstance(row, dict) or row.get("classification") != "official":
+            if not isinstance(row, Mapping) or row.get("classification") != "official":
                 continue
-            for field in ("trace_sha256", "bound_sha256", "hardware_model_sha256"):
-                if row.get(field) not in digests:
-                    raise ValueError(
-                        f"published official workload input is absent: {field}"
-                    )
-            bound_digest = row.get("bound_sha256")
-            bound_artifact = next(
-                (
-                    artifact
-                    for artifact in self.artifacts
-                    if artifact.sha256 == bound_digest
-                ),
-                None,
-            )
-            if bound_artifact is None:
-                continue
-            try:
-                bound = json.loads(
-                    (root / bound_artifact.relative_path).read_text(encoding="utf-8")
-                )
-            except (OSError, json.JSONDecodeError) as exc:
-                raise ValueError("published AMD SOL bound is not valid JSON") from exc
-            if (
-                isinstance(bound, dict)
-                and bound.get("schema_version") == "sol_execbench.amd_sol_bound.v4"
-                and bound.get("fusion_validation_sha256") not in digests
-            ):
+            definition = row.get("definition")
+            workload_uuid = row.get("workload_uuid")
+            if not isinstance(definition, str) or not isinstance(workload_uuid, str):
+                raise ValueError("published official workload has invalid identity")
+            key = (definition, workload_uuid)
+            if key in official_rows:
                 raise ValueError(
-                    "published v4 bound fusion evidence is absent from artifact manifest"
+                    "published release bundle has duplicate official workload"
+                )
+            official_rows[key] = row
+            for ref_field, digest_field, label in (
+                ("trace_ref", "trace_sha256", "trace"),
+                ("bound_ref", "bound_sha256", "bound"),
+                ("hardware_model_ref", "hardware_model_sha256", "hardware model"),
+            ):
+                self._require_reference(
+                    row.get(ref_field),
+                    row.get(digest_field),
+                    by_path,
+                    f"published official workload {label} reference",
+                )
+            self._verify_bound_fusion_reference(root, row, by_path)
+        self._verify_official_score_references(evidence, official_rows)
+
+    @staticmethod
+    def _require_reference(
+        reference: object,
+        digest: object,
+        by_path: Mapping[str, PublishedArtifact],
+        label: str,
+    ) -> None:
+        if not isinstance(reference, str) or not isinstance(digest, str):
+            raise ValueError(f"{label} is missing")
+        _relative_path(reference, label)
+        artifact = by_path.get(reference)
+        if artifact is None or artifact.sha256 != digest:
+            raise ValueError(f"{label} is absent from artifact manifest")
+
+    def _verify_bound_fusion_reference(
+        self,
+        root: Path,
+        row: Mapping[str, Any],
+        by_path: Mapping[str, PublishedArtifact],
+    ) -> None:
+        bound_ref = row["bound_ref"]
+        try:
+            bound = json.loads((root / bound_ref).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValueError("published AMD SOL bound is not valid JSON") from exc
+        if not isinstance(bound, Mapping):
+            raise ValueError("published AMD SOL bound must be an object")
+        if bound.get("schema_version") != "sol_execbench.amd_sol_bound.v4":
+            return
+        reference = bound.get("fusion_validation_ref")
+        digest = bound.get("fusion_validation_sha256")
+        if not isinstance(reference, str) or not isinstance(digest, str):
+            raise ValueError(
+                "published v4 bound fusion validation reference is missing"
+            )
+        fusion_path = (root / bound_ref).parent / reference
+        try:
+            relative_path = fusion_path.resolve().relative_to(root.resolve()).as_posix()
+        except ValueError as exc:
+            raise ValueError(
+                "published v4 bound fusion validation escapes artifact root"
+            ) from exc
+        artifact = by_path.get(relative_path)
+        if artifact is None or artifact.sha256 != digest:
+            raise ValueError(
+                "published v4 bound fusion validation reference is absent from artifact manifest"
+            )
+
+    @staticmethod
+    def _verify_official_score_references(
+        evidence: Mapping[str, Any],
+        official_rows: Mapping[tuple[str, str], Mapping[str, Any]],
+    ) -> None:
+        scores = evidence.get("scores")
+        if not isinstance(scores, list):
+            raise ValueError("published official score evidence has no score list")
+        by_key: dict[tuple[str, str], Mapping[str, Any]] = {}
+        for score in scores:
+            if not isinstance(score, Mapping):
+                raise ValueError("published official score entry must be an object")
+            definition = score.get("definition")
+            workload_uuid = score.get("workload_uuid")
+            if not isinstance(definition, str) or not isinstance(workload_uuid, str):
+                raise ValueError(
+                    "published official score has invalid workload identity"
+                )
+            key = (definition, workload_uuid)
+            if key in by_key:
+                raise ValueError(
+                    "published official score evidence has duplicate workload"
+                )
+            by_key[key] = score
+        missing = set(official_rows) - set(by_key)
+        if missing:
+            raise ValueError(
+                "published official score evidence misses official workload"
+            )
+        for key, row in official_rows.items():
+            score = by_key[key]
+            refs = score.get("input_refs")
+            if not isinstance(refs, Mapping):
+                raise ValueError("published official score has no input references")
+            expected = {
+                "trace": row["trace_ref"],
+                "sol_bound": row["bound_ref"],
+                "hardware_model": row["hardware_model_ref"],
+            }
+            if any(refs.get(name) != reference for name, reference in expected.items()):
+                raise ValueError(
+                    "published official score input reference does not match bundle"
                 )
 
 

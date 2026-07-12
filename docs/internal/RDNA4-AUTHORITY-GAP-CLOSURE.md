@@ -10,8 +10,8 @@ as achieved benchmark evidence.
 
 ## Full Profiler-Backed Timing Coverage
 
-Current accepted v1.35 rerun coverage, generated under
-`out/rdna4-v135-rerun-20260611/`, is:
+The accepted historical v1.35 rerun coverage was generated under the now-pruned
+ignored local output tree `out/rdna4-v135-rerun-20260611/`; its recorded totals are:
 
 - denominator: 235 problems;
 - full profiler-backed: 88 problems;

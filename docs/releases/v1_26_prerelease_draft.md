@@ -10,10 +10,12 @@ release.
 
 ## Assets
 
-- Artifact bundle JSON: `out/rdna4-v135-rerun-20260611/prerelease-artifact-bundle-full/prerelease_artifact_bundle.json`
-- Artifact bundle Markdown: `out/rdna4-v135-rerun-20260611/prerelease-artifact-bundle-full/prerelease_artifact_bundle.md`
+- Artifact bundle JSON: upload as a versioned release asset before publishing (the
+  historical ignored local copy was pruned)
+- Artifact bundle Markdown: upload as a versioned release asset before publishing
 - SHA-256 checksums: `SHA256SUMS`
-- Readiness JSON: `out/rdna4-v135-rerun-20260611/prerelease_readiness.json`
+- Readiness JSON: upload as a versioned release asset before publishing (the
+  historical ignored local copy was pruned)
 - Readiness Markdown: `docs/prerelease_readiness.md`
 
 ## What This Prerelease Contains

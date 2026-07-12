@@ -225,7 +225,7 @@ coverage from timing sidecars:
 
 ```bash
 uv run python scripts/internal/rdna4/run_rdna4_profiler_timing_coverage.py \
-  --timing-evidence-dir out/rdna4-profiler-workload-aggregate-20260608-v2/timing
+  --timing-evidence-dir out/<your-timing-evidence-dir>/timing
 ```
 
 For incomplete profiler-backed targets, use

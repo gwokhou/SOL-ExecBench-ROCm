@@ -49,5 +49,45 @@ def register_publication_commands(baseline_cli: click.Group) -> None:
         )
         return CliResult(data={"release": manifest.release, "scope": manifest.scope})
 
+    @publication_cli.command("stage")
+    @click.option(
+        "--manifest",
+        "manifest_path",
+        required=True,
+        type=click.Path(exists=True, dir_okay=False, path_type=Path),
+        help="Git-tracked evidence_publication_manifest.v1 JSON.",
+    )
+    @click.option(
+        "--source-root",
+        required=True,
+        type=click.Path(exists=True, file_okay=False, path_type=Path),
+        help="Directory containing the locally generated evidence artifacts.",
+    )
+    @click.option(
+        "--destination",
+        required=True,
+        type=click.Path(path_type=Path),
+        help="New or empty directory that will contain only manifest artifacts.",
+    )
+    def stage_cli(
+        manifest_path: Path, source_root: Path, destination: Path
+    ) -> CliResult:
+        """Stage an exact, upload-ready artifact directory from a manifest."""
+        try:
+            manifest = load_evidence_publication_manifest(manifest_path)
+            manifest.stage_artifact_root(source_root, destination)
+        except ValueError as exc:
+            raise click.ClickException(str(exc)) from exc
+        console.print(
+            f"[green]Staged published evidence for {manifest.release} at {destination}[/green]"
+        )
+        return CliResult(
+            data={
+                "release": manifest.release,
+                "scope": manifest.scope,
+                "destination": str(destination),
+            }
+        )
+
 
 __all__ = ["load_evidence_publication_manifest", "register_publication_commands"]

@@ -7,13 +7,33 @@ identity of every externally stored input.  This repository uses
 
 ## Current TODO: publish the authority slice
 
-**Status: blocked on an available immutable public artifact store.** The local
-`out/authority-release-20260711-v3/` directory must not be committed to Git.
-When a suitable free public store is available, upload that directory as one
-versioned bundle, create and commit its publication manifest, and run
-`baseline publication verify` from a clean download. Until then, all claims
-about this slice must use **locally verified authority slice** and must not use
-**published authority slice**.
+**Status: v4 local closure verified; external publication pending artifact-store
+selection.** Legacy v3 evidence was rejected by the current official gate and has
+been removed from the local worktree; it must not be restored or uploaded as an
+authority release. Its replacement is the local
+`gfx1200-20260712-hipblaslt-v4` source evidence tree at
+`out/authority-release-20260712-v3-closure/` (the directory name is historical).
+It contains 25 v4 bounds, matching fusion validation, baseline/bundle/rerun evidence,
+candidate identity, and official-score evidence, plus retained local generation
+diagnostics. It is not itself the upload directory. Stage exactly the manifest-listed
+files into a new directory, then verify that exact directory:
+
+```bash
+uv run sol-execbench baseline publication stage \
+  --manifest docs/releases/gfx1200-20260712-hipblaslt-v4.evidence.json \
+  --source-root out/authority-release-20260712-v3-closure \
+  --destination out/gfx1200-20260712-hipblaslt-v4-publish
+
+uv run sol-execbench baseline publication verify \
+  --manifest docs/releases/gfx1200-20260712-hipblaslt-v4.evidence.json \
+  --artifact-root out/gfx1200-20260712-hipblaslt-v4-publish
+```
+
+The manifest's HTTPS URI is only a planned release location. When a suitable public
+immutable store is available, upload this closure without changing filenames,
+commit the resulting final manifest, and repeat the command from a clean download.
+Until then, this is a **locally verified authority slice**, not a **published
+authority slice**.
 
 ## What is committed
 
@@ -45,16 +65,22 @@ or other immutable HTTPS object store before publishing an authority claim.
 ## Publisher procedure
 
 1. Generate baseline, bound, rerun, candidate trace, and official-score files
-   into a clean release directory.
-2. Upload that directory without changing filenames.  Do not use a mutable
+   into a clean release directory. Copy or regenerate every file referenced from
+   another release directory (including suite manifest, candidate solution, and
+   hardware model), then rewrite references to paths inside this closure.
+2. Create the manifest using the final SHA-256 values, candidate solution hash,
+   source commit, container image digest, and immutable release URL.
+3. Use `baseline publication stage` to create a separate, exact upload directory.
+   The command copies only manifest-listed files and re-verifies every authority
+   reference; it rejects undeclared files in the staged result.
+4. Upload that staged directory without changing filenames.  Do not use a mutable
    `latest` URL.
-3. Create the manifest using the final SHA-256 values, candidate solution hash,
-   source commit, container image digest, and release URL.
-4. Generate official-score evidence with content-addressed candidate solution,
+5. Generate official-score evidence with content-addressed candidate solution,
    trace, and timing evidence. Its environment fingerprint, clock policy, and
    timing policy must match the release baseline.
-5. Commit the manifest and tag the same Git revision as the evidence release.
-6. Download the bundle into a fresh directory and verify it:
+6. Commit the manifest and tag the same Git revision as the evidence release.
+7. Download the bundle into a fresh directory with no sibling `out/` release
+   directories, and verify it:
 
    ```bash
    uv run sol-execbench baseline publication verify \
@@ -62,7 +88,7 @@ or other immutable HTTPS object store before publishing an authority claim.
      --artifact-root /path/to/downloaded-release
    ```
 
-7. Record that verification in CI or the release notes.  A checksum failure,
+8. Record that verification in CI or the release notes.  A checksum failure,
    missing candidate identity, changed source revision, or unresolved artifact
    blocks a *published* authority claim.
 

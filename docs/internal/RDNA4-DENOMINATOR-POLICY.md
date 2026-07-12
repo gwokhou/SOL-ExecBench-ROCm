@@ -16,8 +16,9 @@ equivalence, hosted leaderboard authority, or full paper-parity claims.
 
 ## Current Accepted Validation Conclusion
 
-The current accepted RDNA4 `gfx1200` 16GB evidence package is the v1.35 rerun
-under `out/rdna4-v135-rerun-20260611/`.
+The current accepted RDNA4 `gfx1200` 16GB conclusion is based on the historical
+v1.35 rerun. Its ignored local output tree has been pruned after recording the
+following summary.
 
 The rerun records:
 
