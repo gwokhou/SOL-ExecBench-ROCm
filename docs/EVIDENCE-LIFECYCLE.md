@@ -11,7 +11,7 @@ Publishing is deliberately split into two workflows:
 
 - `Prepare evidence bundle` runs only on a repository-restricted self-hosted runner
   labelled `evidence-producer`. It has `contents: read` only and stages raw local
-  evidence from `$RUNNER_TEMP/evidence/<release>/source` into a short-lived Actions
+  evidence from `$EVIDENCE_SOURCE_ROOT/<release>/source` into a short-lived Actions
   artifact. It has no Git, release, attestation, or OIDC write permission.
 - `Publish evidence bundle` downloads only a successful `Prepare evidence bundle`
   artifact from `main`, validates its manifest and archive checksum, creates a new
@@ -50,7 +50,10 @@ The code-quality workflow remains read-only. Neither `pull_request` nor
 The producer runner is intentionally repository-scoped and labelled only
 `evidence-producer`; its registration token is one-time and is not retained as a
 personal access token. It is the only runner that can access the raw local source
-closure at `$RUNNER_TEMP/evidence/<release>/source`.
+closure at `$EVIDENCE_SOURCE_ROOT/<release>/source`. The committed user service
+sets `EVIDENCE_SOURCE_ROOT` to
+`~/.local/share/sol-execbench/evidence-input`; do not use `RUNNER_TEMP` for source
+input because GitHub Actions clears it at every job start.
 
 Its user-level systemd unit is
 [`tools/actions-runner/evidence-producer.service`](../tools/actions-runner/evidence-producer.service).
@@ -84,7 +87,7 @@ be handled before making new authority claims.
 
 1. Merge the manifest under `docs/releases/<release>.evidence.json`.
 2. Place the source closure on the restricted producer runner at
-   `$RUNNER_TEMP/evidence/<release>/source`.
+   `$EVIDENCE_SOURCE_ROOT/<release>/source`.
 3. Dispatch `Prepare evidence bundle` on `main` and retain its successful run ID.
 4. Dispatch `Publish evidence bundle` on `main` with that run ID. If a run stops
    after creating the immutable Release but before recording its

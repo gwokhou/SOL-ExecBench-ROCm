@@ -22,6 +22,7 @@ def test_prepare_workflow_is_manual_and_read_only() -> None:
     assert "contents: read" in workflow
     assert "contents: write" not in workflow
     assert "runs-on: [self-hosted, evidence-producer]" in workflow
+    assert "EVIDENCE_SOURCE_ROOT" in workflow
 
 
 def test_publish_workflow_is_single_maintainer_and_verifies_round_trip() -> None:
@@ -73,5 +74,6 @@ def test_evidence_producer_runner_service_is_user_scoped_and_restartable() -> No
     assert (
         "ExecStart=%h/.local/share/actions-runner/SOL-ExecBench-ROCm/run.sh" in service
     )
+    assert "Environment=EVIDENCE_SOURCE_ROOT=" in service
     assert "Restart=always" in service
     assert "WantedBy=default.target" in service

@@ -9,8 +9,9 @@ on:
         type: string
 
 # This workflow can read the repository but never publishes, changes Git, or gets
-# an OIDC token. The self-hosted runner must be a repository-restricted runner
-# group named evidence-producer; its operator places raw evidence under RUNNER_TEMP.
+# an OIDC token. The self-hosted runner must be repository-restricted and expose
+# raw local evidence through EVIDENCE_SOURCE_ROOT. RUNNER_TEMP is deliberately
+# used only for ephemeral staging because Actions clears it at job start.
 permissions:
   contents: read
 
@@ -29,13 +30,14 @@ jobs:
           set -euo pipefail
           [[ "$RELEASE_TAG" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]
           test -f "docs/releases/${RELEASE_TAG}.evidence.json"
-          test -d "${RUNNER_TEMP}/evidence/${RELEASE_TAG}/source"
+          test -n "${EVIDENCE_SOURCE_ROOT:-}"
+          test -d "${EVIDENCE_SOURCE_ROOT}/${RELEASE_TAG}/source"
       - name: Stage and verify exact evidence bundle
         env:
           RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
-          source_root="${RUNNER_TEMP}/evidence/${RELEASE_TAG}/source"
+          source_root="${EVIDENCE_SOURCE_ROOT}/${RELEASE_TAG}/source"
           stage_root="${RUNNER_TEMP}/evidence/${RELEASE_TAG}/staged"
           archive_root="${RUNNER_TEMP}/evidence/${RELEASE_TAG}/artifact"
           rm -rf "$stage_root" "$archive_root"
