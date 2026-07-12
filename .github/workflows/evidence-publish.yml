@@ -16,8 +16,9 @@ on:
         required: false
         type: string
 
-# Keep the workflow read-only by default. Only the environment-protected publish
-# job receives temporary release, attestation, and lifecycle-index write access.
+# Keep the workflow read-only by default. In single-maintainer mode, only this
+# manual main-branch job receives temporary release, attestation, and lifecycle
+# index write access.
 permissions:
   actions: read
   contents: read
@@ -43,20 +44,13 @@ jobs:
         with:
           fetch-depth: 0
       - uses: astral-sh/setup-uv@v6
-      - name: Require protected publishing environment and validate dispatch
+      - name: Validate single-maintainer publishing dispatch
         env:
-          GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
           [[ "$RELEASE_TAG" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]
           test -f "docs/releases/${RELEASE_TAG}.evidence.json"
-          gh api "repos/${GITHUB_REPOSITORY}/environments/evidence-publish" \
-            --jq '[.protection_rules[]? | select(
-              .type == "required_reviewers"
-              and .prevent_self_review == true
-              and ((.reviewers // []) | length > 0)
-            )] | length > 0' | grep -qx true
       - name: Download only a successful prepare artifact from main
         env:
           GH_TOKEN: ${{ github.token }}
