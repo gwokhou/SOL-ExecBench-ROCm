@@ -1,0 +1,153 @@
+name: Publish evidence bundle
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Exact release name, matching docs/releases/<tag>.evidence.json.
+        required: true
+        type: string
+      prepare_run_id:
+        description: Successful "Prepare evidence bundle" workflow run ID.
+        required: true
+        type: string
+      supersedes:
+        description: Optional active release replaced by this evidence bundle.
+        required: false
+        type: string
+
+# Keep the workflow read-only by default. Only the environment-protected publish
+# job receives temporary release, attestation, and lifecycle-index write access.
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: evidence-publish
+    permissions:
+      actions: read
+      attestations: write
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v6
+      - name: Require protected publishing environment and validate dispatch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]
+          test -f "docs/releases/${RELEASE_TAG}.evidence.json"
+          rules=$(gh api "repos/${GITHUB_REPOSITORY}/environments/evidence-publish" \
+            --jq '[.protection_rules[]? | select(.type == "required_reviewers")] | length')
+          test "$rules" -gt 0
+      - name: Download only a successful prepare artifact from main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREPARE_RUN_ID: ${{ inputs.prepare_run_id }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          run=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${PREPARE_RUN_ID}")
+          test "$(jq -r .name <<<"$run")" = "Prepare evidence bundle"
+          test "$(jq -r .conclusion <<<"$run")" = "success"
+          test "$(jq -r .head_branch <<<"$run")" = "main"
+          gh run download "$PREPARE_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name "evidence-release-${RELEASE_TAG}" --dir incoming
+          cmp "incoming/manifest.json" "docs/releases/${RELEASE_TAG}.evidence.json"
+          (
+            cd incoming
+            sha256sum --check SHA256SUMS
+          )
+      - name: Verify artifact closure before release creation
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          mkdir artifacts
+          tar -xzf incoming/release.tar.gz -C artifacts
+          uv sync --locked --all-groups
+          uv run sol-execbench baseline publication verify \
+            --manifest "docs/releases/${RELEASE_TAG}.evidence.json" \
+            --artifact-root artifacts
+      - name: Refuse to mutate an existing release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "refusing to mutate existing evidence release: $RELEASE_TAG" >&2
+            exit 1
+          fi
+      - name: Create immutable release assets
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          gh release create "$RELEASE_TAG" \
+            "incoming/release.tar.gz#${RELEASE_TAG}-evidence.tar.gz" \
+            "incoming/SHA256SUMS#${RELEASE_TAG}-SHA256SUMS" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "${RELEASE_TAG} evidence bundle" \
+            --notes "Machine-published evidence bundle. Verify against docs/releases/${RELEASE_TAG}.evidence.json before relying on its scope claims."
+          echo "url=https://github.com/${GITHUB_REPOSITORY}/releases/tag/${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
+      - name: Attest the published archive
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: incoming/release.tar.gz
+      - name: Download public release and verify it again
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          mkdir public-download public-artifacts
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern "${RELEASE_TAG}-evidence.tar.gz" --dir public-download
+          expected=$(awk '{print $1}' incoming/SHA256SUMS)
+          actual=$(sha256sum "public-download/${RELEASE_TAG}-evidence.tar.gz" | awk '{print $1}')
+          test "$actual" = "$expected"
+          tar -xzf "public-download/${RELEASE_TAG}-evidence.tar.gz" -C public-artifacts
+          uv run sol-execbench baseline publication verify \
+            --manifest "docs/releases/${RELEASE_TAG}.evidence.json" \
+            --artifact-root public-artifacts
+      - name: Record published lifecycle state
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_URL: ${{ steps.release.outputs.url }}
+          SUPERSEDES: ${{ inputs.supersedes }}
+        run: |
+          set -euo pipefail
+          bundle_sha256=$(awk '{print $1}' incoming/SHA256SUMS)
+          args=(
+            --registry docs/releases/evidence-lifecycle.json
+            --repo-root .
+            --record-published
+            --release "$RELEASE_TAG"
+            --bundle-sha256 "$bundle_sha256"
+            --release-url "$RELEASE_URL"
+            --published-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          )
+          if [ -n "$SUPERSEDES" ]; then
+            args+=(--supersedes "$SUPERSEDES")
+          fi
+          uv run python tools/evidence_lifecycle.py "${args[@]}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/releases/evidence-lifecycle.json
+          git commit -s -m "Record published evidence ${RELEASE_TAG}"
+          git push origin "HEAD:main"

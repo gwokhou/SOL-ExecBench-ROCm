@@ -32,4 +32,5 @@ jobs:
           uv run pytest tests/sol_execbench \
             --ignore=tests/sol_execbench/driver/test_eval_driver.py \
             --ignore=tests/sol_execbench/test_e2e.py
+          uv run pytest tests/tools
           uv run pytest tests/examples/test_examples.py -k consistency
