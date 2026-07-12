@@ -8,6 +8,7 @@ After=network-online.target
 
 [Service]
 Type=simple
+Environment=EVIDENCE_SOURCE_ROOT=%h/.local/share/sol-execbench/evidence-input
 WorkingDirectory=%h/.local/share/actions-runner/SOL-ExecBench-ROCm
 ExecStart=%h/.local/share/actions-runner/SOL-ExecBench-ROCm/run.sh
 Restart=always
