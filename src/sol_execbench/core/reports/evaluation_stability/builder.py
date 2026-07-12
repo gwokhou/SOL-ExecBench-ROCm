@@ -19,7 +19,7 @@ from sol_execbench.core.reports.evaluation_stability.models import (
     StabilityStatusTotals,
     StabilityWorkload,
 )
-from sol_execbench.core.reports.trust_summary import utc_timestamp
+from sol_execbench.core.timestamps import utc_timestamp
 
 
 def build_evaluation_stability_report(

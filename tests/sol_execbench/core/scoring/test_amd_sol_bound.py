@@ -16,8 +16,8 @@ from sol_execbench.core.scoring.fusion_validation import (
     FusionValidationCase,
     KernelResourceEvidence,
     PerformanceEvidence,
-    sha256_file,
 )
+from sol_execbench.core.integrity.checksums import sha256_file
 from sol_execbench_type_helpers import make_definition, make_workload
 
 

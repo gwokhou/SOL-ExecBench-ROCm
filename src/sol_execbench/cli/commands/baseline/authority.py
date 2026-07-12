@@ -18,7 +18,7 @@ from sol_execbench.core.scoring.authority_slice import (
     build_authority_slice_manifest,
     write_authority_slice_manifest,
 )
-from sol_execbench.core.scoring.release_baseline import sha256_file
+from sol_execbench.core.integrity.checksums import sha256_file
 
 console = Console(stderr=True)
 

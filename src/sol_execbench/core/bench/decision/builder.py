@@ -24,7 +24,7 @@ from sol_execbench.core.bench.static_kernel.evidence_models import (
 )
 from sol_execbench.core.data.contract import SOL_EXECBENCH_RELEASE
 from sol_execbench.core.platform.arch_capabilities import ArchIsaBudget
-from sol_execbench.core.reports.trust_summary import utc_timestamp
+from sol_execbench.core.timestamps import utc_timestamp
 
 
 def build_decision_sidecar(

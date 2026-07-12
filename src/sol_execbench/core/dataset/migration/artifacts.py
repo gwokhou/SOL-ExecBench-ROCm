@@ -11,7 +11,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import cast
 
-from ..checksums import sha256_file
+from sol_execbench.core.integrity.checksums import sha256_file
 from .models import (
     TRACE_FILENAMES,
     MigrationArtifact,

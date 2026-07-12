@@ -7,7 +7,7 @@ from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
-from sol_execbench.core.reports.trust_summary import utc_timestamp
+from sol_execbench.core.timestamps import utc_timestamp
 
 
 HIP_BASELINE_REGISTRY_SCHEMA_VERSION = "baseline_registry.v1"

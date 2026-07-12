@@ -32,8 +32,8 @@ from sol_execbench.core.scoring.fusion_validation import (
     FusionValidationCase,
     KernelResourceEvidence,
     performance_from_rounds,
-    sha256_file,
 )
+from sol_execbench.core.integrity.checksums import sha256_file
 
 
 _RMS_DEFINITION = "025_rmsnorm_h4096"

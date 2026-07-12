@@ -109,6 +109,10 @@ def _coverage(dataset_root: Path, timing_root: Path):
     )
 
 
+def test_markdown_cell_uses_shared_escaping() -> None:
+    assert partial._markdown_cell("a|b\\c\nnext\rline") == "a\\|b\\\\c next line"
+
+
 def test_failure_mode_classification():
     assert (
         partial.classify_failure_mode(

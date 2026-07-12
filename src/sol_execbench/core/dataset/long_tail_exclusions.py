@@ -12,7 +12,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
-from sol_execbench.core.dataset.checksums import sha256_file
+from sol_execbench.core.integrity.checksums import sha256_file
 
 LONG_TAIL_EXCLUSION_SCHEMA_VERSION = "sol_execbench.long_tail_exclusions.v1"
 LONG_TAIL_EXCLUSION_STATUS = "excluded_long_tail"

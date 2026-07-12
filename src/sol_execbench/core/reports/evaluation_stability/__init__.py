@@ -25,7 +25,7 @@ from sol_execbench.core.reports.evaluation_stability.rendering import (
     render_evaluation_stability_markdown,
     write_evaluation_stability_reports,
 )
-from sol_execbench.core.reports.trust_summary import load_json, utc_timestamp
+from sol_execbench.core.reports.trust_summary import load_json
 
 __all__ = [
     "CLAIM_BOUNDARY_TEXT",
@@ -43,6 +43,5 @@ __all__ = [
     "build_evaluation_stability_report",
     "load_json",
     "render_evaluation_stability_markdown",
-    "utc_timestamp",
     "write_evaluation_stability_reports",
 ]

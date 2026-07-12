@@ -31,7 +31,8 @@ from sol_execbench.core.reports.consistency.models import (
     ConsistencySummary,
 )
 from sol_execbench.core.reports.consistency.rendering import render_consistency_markdown
-from sol_execbench.core.reports.trust_summary import load_json, utc_timestamp
+from sol_execbench.core.reports.trust_summary import load_json
+from sol_execbench.core.timestamps import utc_timestamp as _utc_timestamp
 
 
 def build_consistency_report(
@@ -123,7 +124,7 @@ def _build_consistency_report(inputs: ConsistencyInputs) -> ConsistencyReport:
         totals.add(finding.severity)
 
     report = ConsistencyReport(
-        created_at=inputs.created_at or utc_timestamp(),
+        created_at=inputs.created_at or _utc_timestamp(),
         sources=sorted(sources, key=lambda source: source.source_id),
         summary=ConsistencySummary(
             sources_checked=len(sources),
@@ -155,6 +156,5 @@ __all__ = [
     "build_consistency_report",
     "load_json",
     "render_consistency_markdown",
-    "utc_timestamp",
     "write_consistency_reports",
 ]

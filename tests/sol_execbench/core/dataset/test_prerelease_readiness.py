@@ -11,10 +11,10 @@ from sol_execbench.core.scoring.release_baseline import (
     ReleaseBaselineVerificationWorkload,
     ReleaseBaselineWorkload,
     ReleaseProvenance,
-    sha256_file,
     write_release_baseline_bundle,
     write_release_baseline_verification,
 )
+from sol_execbench.core.integrity.checksums import sha256_file
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 SCRIPT_PATH = REPO_ROOT / "scripts/internal/release/check_prerelease_readiness.py"

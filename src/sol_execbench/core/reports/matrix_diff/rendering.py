@@ -11,18 +11,13 @@ from sol_execbench.core.reports.matrix_diff.models import (
     _SEVERITY_RANK,
     MatrixReportDiff,
 )
+from sol_execbench.core.text_utils import markdown_table_cell
 
 
 def _markdown_value(value: Any) -> str:
     if value is None:
         return ""
-    return (
-        json.dumps(value, sort_keys=True)
-        .replace("\\", "\\\\")
-        .replace("|", "\\|")
-        .replace("\n", " ")
-        .replace("\r", " ")
-    )
+    return markdown_table_cell(json.dumps(value, sort_keys=True))
 
 
 def matrix_report_diff_to_markdown(diff: MatrixReportDiff) -> str:

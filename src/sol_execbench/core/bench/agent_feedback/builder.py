@@ -25,7 +25,7 @@ from sol_execbench.core.bench.static_kernel.evidence import (
 )
 from sol_execbench.core.data.contract import SOL_EXECBENCH_RELEASE
 from sol_execbench.core.data.trace import Trace
-from sol_execbench.core.reports.trust_summary import utc_timestamp
+from sol_execbench.core.timestamps import utc_timestamp
 
 
 def build_agent_feedback_sidecar(

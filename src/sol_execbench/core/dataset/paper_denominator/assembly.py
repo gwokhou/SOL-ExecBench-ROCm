@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from sol_execbench.core.dataset.manifest import utc_timestamp
+from sol_execbench.core.timestamps import utc_timestamp
 from sol_execbench.core.dataset.paper_denominator.evidence import (
     _next_hints,
     _sorted_evidence_gaps,

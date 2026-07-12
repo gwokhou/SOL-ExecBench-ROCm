@@ -7,7 +7,7 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from sol_execbench.core.dataset.manifest import utc_timestamp
+from sol_execbench.core.timestamps import utc_timestamp
 from sol_execbench.core.dataset.profiler_timing_coverage.evidence import (
     _find_problem_timing_evidence,
     _has_profiler_backed_kernel_activity,

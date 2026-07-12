@@ -10,7 +10,7 @@ import json
 from collections.abc import Sequence
 from pathlib import Path
 
-from sol_execbench.core.evidence.checksums import stable_json_checksum
+from sol_execbench.core.integrity.checksums import stable_json_checksum
 from sol_execbench.core.dataset.categories import validate_categories
 from sol_execbench.core.dataset.inventory import build_dataset_inventory
 from sol_execbench.core.dataset.profiler_timing_coverage import (

@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import sys
@@ -18,6 +17,7 @@ from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 from typing import Sequence
 
+from sol_execbench.core.integrity.checksums import sha256_file as _sha256
 from sol_execbench.core.scoring.release_baseline import (
     load_release_baseline_bundle,
     release_baseline_verification_from_dict,
@@ -919,11 +919,6 @@ def _resolve_artifact_path(bundle_dir: Path, path: Path) -> Path:
     if in_bundle.exists():
         return in_bundle
     return path
-
-
-def _sha256(path: Path) -> str:
-    with path.open("rb") as handle:
-        return hashlib.file_digest(handle, "sha256").hexdigest()
 
 
 def _sha256_cached(path: Path, checksum_cache: dict[Path, str]) -> str:

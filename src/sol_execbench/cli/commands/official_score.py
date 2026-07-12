@@ -26,7 +26,8 @@ from ...core.scoring.official_score import (
     OFFICIAL_AGGREGATION_POLICY,
     build_official_score_suite_evidence,
 )
-from ...core.scoring.release_baseline import load_official_release_baseline, sha256_file
+from ...core.integrity.checksums import sha256_file
+from ...core.scoring.release_baseline import load_official_release_baseline
 from ..protocol import CliFailure, CliResult, artifact
 
 

@@ -30,9 +30,9 @@ from sol_execbench.core.scoring.fusion_validation import (
     FusionSignature,
     FusionValidationArtifact,
     fusion_validation_from_dict,
-    sha256_file,
     sha256_payload,
 )
+from sol_execbench.core.integrity.checksums import sha256_file
 
 
 AMD_SOL_SCHEMA_VERSION = "sol_execbench.amd_sol_bound.v4"

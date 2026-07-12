@@ -8,7 +8,7 @@ import argparse
 import json
 from pathlib import Path
 
-from sol_execbench.core.utils import parse_bool as _parse_bool
+from sol_execbench.core.arguments import parse_bool as _parse_bool
 from sol_execbench.core.platform.docker_matrix.models import (
     DEFAULT_DOCKER_TARGET_MANIFEST,
     DockerPreflightObservation,

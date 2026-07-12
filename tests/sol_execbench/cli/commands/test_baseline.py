@@ -16,6 +16,7 @@ from sol_execbench.core.scoring.release_baseline import (
     load_release_baseline_bundle,
     write_release_baseline_outputs,
 )
+from sol_execbench.core.integrity.checksums import sha256_file
 
 
 def _release_inputs(tmp_path: Path) -> tuple[Path, Path]:
@@ -60,11 +61,11 @@ def test_publication_verify_rejects_incomplete_contract(tmp_path: Path) -> None:
                 "artifact_base_uri": "https://example.invalid/releases/v-test/",
                 "candidate": {
                     "solution_ref": "candidate.json",
-                    "solution_sha256": cli_baseline.sha256_file(solution),
+                    "solution_sha256": sha256_file(solution),
                     "trace_relative_path": "candidate.trace.jsonl",
-                    "trace_sha256": cli_baseline.sha256_file(trace),
+                    "trace_sha256": sha256_file(trace),
                     "timing_relative_path": "candidate.trace.jsonl",
-                    "timing_sha256": cli_baseline.sha256_file(trace),
+                    "timing_sha256": sha256_file(trace),
                 },
                 "artifacts": [],
             }
@@ -203,12 +204,12 @@ def test_release_verify_writes_report(monkeypatch, tmp_path: Path) -> None:
             clock_policy="locked",
             compiler_build_id="rocm-7.1",
             timing_policy="median-100",
-            suite_manifest_sha256=cli_baseline.sha256_file(suite_path),
+            suite_manifest_sha256=sha256_file(suite_path),
         ),
         authority_by_key={},
         latency_tolerance_rel=0.05,
         suite_manifest_ref=str(suite_path),
-        suite_manifest_sha256=cli_baseline.sha256_file(suite_path),
+        suite_manifest_sha256=sha256_file(suite_path),
     )
     baseline_path = tmp_path / "baseline.json"
     bundle_path = tmp_path / "bundle.json"
@@ -263,7 +264,7 @@ def test_release_verify_writes_report(monkeypatch, tmp_path: Path) -> None:
             "--compiler-build-id",
             "rocm-7.1",
             "--suite-manifest-sha256",
-            cli_baseline.sha256_file(suite_path),
+            sha256_file(suite_path),
         ],
     )
 
@@ -375,7 +376,7 @@ def test_release_build_and_verify_share_the_manifest_file_digest(
             "--compiler-build-id",
             "rocm-7.1",
             "--suite-manifest-sha256",
-            cli_baseline.sha256_file(suite_path),
+            sha256_file(suite_path),
         ],
     )
 
@@ -383,9 +384,9 @@ def test_release_build_and_verify_share_the_manifest_file_digest(
     bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
     report = json.loads(verification_path.read_text(encoding="utf-8"))
     assert bundle["suite_manifest_ref"] == str(suite_path)
-    assert bundle["suite_manifest_sha256"] == cli_baseline.sha256_file(suite_path)
+    assert bundle["suite_manifest_sha256"] == sha256_file(suite_path)
     assert report["bundle_ref"] == str(bundle_path)
-    assert report["bundle_sha256"] == cli_baseline.sha256_file(bundle_path)
+    assert report["bundle_sha256"] == sha256_file(bundle_path)
     assert report["workloads"][0]["classification"] == "official"
     assert (
         "suite_manifest_checksum_mismatch"

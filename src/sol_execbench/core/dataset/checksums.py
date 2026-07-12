@@ -19,18 +19,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sol_execbench.core.evidence.checksums import (
-    sha256_bytes,
-    sha256_file,
-    stable_json_checksum,
+from sol_execbench.core.integrity.checksums import (
+    sha256_file as _sha256_file,
+    stable_json_checksum as _stable_json_checksum,
 )
 
 __all__ = [
     "CANONICAL_PROBLEM_FILES",
     "checksum_category",
-    "sha256_bytes",
-    "sha256_file",
-    "stable_json_checksum",
 ]
 
 CANONICAL_PROBLEM_FILES: tuple[str, ...] = (
@@ -56,8 +52,8 @@ def checksum_category(category_dir: Path) -> str | None:
                     {
                         "path": path.relative_to(category_dir).as_posix(),
                         "size_bytes": path.stat().st_size,
-                        "sha256": sha256_file(path),
+                        "sha256": _sha256_file(path),
                     }
                 )
 
-    return stable_json_checksum(records)
+    return _stable_json_checksum(records)

@@ -30,7 +30,7 @@ from sol_execbench.core.reports.report_payloads import (
     report_record_list,
     report_source_view,
 )
-from sol_execbench.core.reports.trust_summary import utc_timestamp
+from sol_execbench.core.timestamps import utc_timestamp
 
 
 def build_claim_upgrade_report(

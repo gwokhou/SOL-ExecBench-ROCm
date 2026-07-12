@@ -10,6 +10,18 @@ live in `examples/`; Docker support is in `docker/`; helper scripts are in
 `scripts/`. Keep downloaded benchmark data and generated outputs in `data/`, not in
 commits.
 
+## Reuse and Shared-Primitives Policy
+
+- Before adding a generic helper, search with `rg` and reuse the existing
+  implementation; do not hand-write duplicates in domains, CLIs, or scripts.
+- Shared helpers belong in `core/` by concern: `integrity`, `process`,
+  `data.json_utils`, `text_utils`, `platform.runtime`, `arguments`, or
+  `timestamps`. Do not create `core.utils` or restore the retired evidence
+  checksum/log modules.
+- `tools/` is only for external-tool integrations. Domain packages must not
+  re-export generic helpers; wrappers require a documented test seam and a
+  focused test. Migrate in-scope duplicates and confirm old imports are gone.
+
 ## Build, Test, and Development Commands
 
 - `uv sync --all-groups` installs runtime and development dependencies.

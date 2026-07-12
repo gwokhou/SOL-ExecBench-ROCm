@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from sol_execbench.core.data.json_utils import (
     load_json_dict,
+    load_json_value,
     load_jsonl_file,
     stable_model_checksum,
     stable_model_json,
@@ -47,6 +48,8 @@ def test_load_json_dict_requires_json_object(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="Expected JSON object"):
         load_json_dict(path)
+
+    assert load_json_value(path) == [1, 2, 3]
 
 
 def test_load_jsonl_file_uses_pydantic_validation_and_skips_blank_lines(

@@ -18,6 +18,7 @@ from sol_execbench.core.dataset.profiler_timing_coverage import (
     build_profiler_timing_coverage_report,
 )
 from sol_execbench.core.dataset.readiness import classify_rocm_readiness
+from sol_execbench.core.text_utils import markdown_table_cell as _markdown_cell
 
 DEFAULT_DATASET_ROOT = Path("data/SOL-ExecBench/benchmark")
 DEFAULT_OUTPUT_DIR = Path("out/rdna4-profiler-sharded-closure-audit")
@@ -207,11 +208,6 @@ def _failure_reason(evidence: Any) -> str:
     if evidence.fallback_reason:
         return evidence.fallback_reason
     return ""
-
-
-def _markdown_cell(value: object) -> str:
-    text = "" if value is None else str(value)
-    return text.replace("|", "\\|").replace("\n", " ")
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:

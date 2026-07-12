@@ -11,13 +11,14 @@ import math
 from pathlib import Path
 from typing import Any, Mapping
 
+from sol_execbench.core.integrity.checksums import sha256_file
+
 from .models import (
     ReleaseBaselineBundle,
     ReleaseBaselineVerification,
     ReleaseBaselineVerificationWorkload,
     ReleaseBaselineWorkload,
     ReleaseProvenance,
-    sha256_file,
 )
 
 

@@ -187,7 +187,7 @@ allowed = [
   "src/sol_execbench/core/data/solution_models.py",
   "src/sol_execbench/core/data/trace.py",
   "src/sol_execbench/core/data/workload.py",
-  "src/sol_execbench/core/utils.py",
+  "src/sol_execbench/core/platform/runtime.py",
   "src/sol_execbench/driver/__init__.py",
   "src/sol_execbench/driver/problem_packager.py",
   "src/sol_execbench/driver/templates/build_ext.py",

@@ -27,7 +27,7 @@ from sol_execbench.core.dataset.execution_closure import (
     compare_execution_closure_provenance,
     write_execution_closure_report,
 )
-from sol_execbench.core.dataset.manifest import utc_timestamp
+from sol_execbench.core.timestamps import utc_timestamp
 
 
 @dataclass(frozen=True)

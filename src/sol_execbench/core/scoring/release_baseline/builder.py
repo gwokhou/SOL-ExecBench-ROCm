@@ -16,12 +16,12 @@ from sol_execbench.core.scoring.baseline_artifact import (
     ScoringBaselineArtifact,
     ScoringBaselineEntry,
 )
+from sol_execbench.core.integrity.checksums import sha256_file
 
 from .models import (
     ReleaseBaselineBundle,
     ReleaseBaselineWorkload,
     ReleaseProvenance,
-    sha256_file,
     write_release_baseline_bundle,
 )
 

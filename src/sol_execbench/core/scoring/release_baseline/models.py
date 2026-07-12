@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import math
 from dataclasses import dataclass
@@ -542,13 +541,3 @@ def write_release_baseline_verification(
         json.dumps(verification.to_dict(), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-
-
-def sha256_file(path: Path) -> str:
-    """Return the lowercase SHA-256 digest of a file's bytes."""
-
-    digest = hashlib.sha256()
-    with Path(path).open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()

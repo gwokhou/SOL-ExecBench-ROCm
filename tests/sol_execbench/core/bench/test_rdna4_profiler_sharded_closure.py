@@ -81,6 +81,11 @@ def _coverage(dataset_root: Path, timing_root: Path):
     )
 
 
+def test_markdown_cell_uses_shared_escaping() -> None:
+    assert closure._markdown_cell(None) == ""
+    assert closure._markdown_cell("a|b\\c\nnext\rline") == "a\\|b\\\\c next line"
+
+
 def test_sharded_closure_audit_targets_partial_and_blocked_only(tmp_path):
     dataset_root = tmp_path / "dataset"
     timing_root = tmp_path / "timing"

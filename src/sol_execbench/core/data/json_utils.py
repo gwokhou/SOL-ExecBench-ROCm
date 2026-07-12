@@ -19,7 +19,7 @@
 import hashlib
 import json
 from pathlib import Path
-from typing import Type, TypeVar, Union
+from typing import Any, Type, TypeVar, Union
 
 from pydantic import BaseModel
 
@@ -64,11 +64,18 @@ def stable_model_checksum(model: BaseModel, checksum_field: str) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def load_json_value(path: Union[str, Path]) -> Any:
+    """Load any JSON value from *path*."""
+
+    path = Path(path)
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
 def load_json_dict(path: Union[str, Path]) -> dict:
     """Load a JSON object from *path*."""
 
     path = Path(path)
-    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload = load_json_value(path)
     if not isinstance(payload, dict):
         raise ValueError(f"Expected JSON object at {path}")
     return payload

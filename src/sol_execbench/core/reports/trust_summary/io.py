@@ -4,11 +4,10 @@
 
 from __future__ import annotations
 
-import json
-from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from sol_execbench.core.data.json_utils import load_json_dict
 from sol_execbench.core.reports.trust_summary.models import TrustSummaryReport
 from sol_execbench.core.reports.trust_summary.rendering import (
     render_trust_summary_markdown,
@@ -17,10 +16,8 @@ from sol_execbench.core.reports.trust_summary.rendering import (
 
 def load_json(path: Path) -> dict[str, Any]:
     """Load a JSON object from path."""
-    payload = json.loads(Path(path).read_text(encoding="utf-8"))
-    if not isinstance(payload, Mapping):
-        raise ValueError(f"Expected JSON object at {path}")
-    return dict(payload)
+
+    return load_json_dict(path)
 
 
 def write_trust_summary_reports(

@@ -383,7 +383,7 @@ def _classification(relative_path: str, line: str) -> str | None:
         "tests/sol_execbench/core/dataset/test_prerelease_readiness.py"
     ) and ("NVIDIA" in line or "nvidia" in line):
         return "prerelease readiness provenance guardrail fixture"
-    if relative_path.startswith("src/sol_execbench/core/utils.py") and (
+    if relative_path.startswith("src/sol_execbench/core/platform/runtime.py") and (
         "is_cuda_available" in line or "list_cuda_devices" in line or "cuda" in line
     ):
         return "backward-compatible PyTorch device helper naming"

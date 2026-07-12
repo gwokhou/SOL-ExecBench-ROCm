@@ -298,7 +298,7 @@ def _candidate_evidence_matches(
 
 
 def _verified_file(ref: str, expected_sha256: str) -> bool:
-    from sol_execbench.core.scoring.release_baseline.models import sha256_file
+    from sol_execbench.core.integrity.checksums import sha256_file
 
     return (
         len(expected_sha256) == 64

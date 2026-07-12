@@ -25,12 +25,12 @@ from sol_execbench.core.scoring.release_baseline import (
     build_release_baseline_bundle,
     load_release_baseline_bundle,
     load_official_release_baseline,
-    sha256_file,
     write_release_baseline_bundle,
     write_release_baseline_outputs,
     verify_release_baseline_rerun,
     write_release_baseline_verification,
 )
+from sol_execbench.core.integrity.checksums import sha256_file
 from sol_execbench.core.scoring.baseline_artifact import (
     ScoringBaselineArtifact,
     ScoringBaselineEntry,

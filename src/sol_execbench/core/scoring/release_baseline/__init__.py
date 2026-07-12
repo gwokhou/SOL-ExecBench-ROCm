@@ -15,7 +15,6 @@ from .models import (
     load_release_baseline_bundle,
     release_baseline_bundle_from_dict,
     release_baseline_verification_from_dict,
-    sha256_file,
     write_release_baseline_bundle,
     write_release_baseline_verification,
 )
@@ -57,7 +56,6 @@ __all__ = [
     "load_evidence_publication_manifest",
     "release_baseline_bundle_from_dict",
     "release_baseline_verification_from_dict",
-    "sha256_file",
     "write_release_baseline_bundle",
     "write_release_baseline_verification",
     "write_release_baseline_outputs",
