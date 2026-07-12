@@ -5,8 +5,8 @@
 
 from __future__ import annotations
 
-from sol_execbench.core.scoring.amd_sol import HardwareValidationStatus
-from sol_execbench.core.scoring.amd_sol.v3 import AmdSolBoundV3Artifact
+from sol_execbench.core.scoring.amd_sol import AmdSolBoundArtifact
+from sol_execbench.core.scoring.amd_hardware_models import HardwareValidationStatus
 from sol_execbench.core.scoring.confidence import EstimateConfidence
 from sol_execbench.core.scoring.solar_derivation import (
     SolarAggregateStatus,
@@ -46,7 +46,7 @@ DEGRADED_SOL_BOUND_WARNING = (
 
 
 def warnings_for_artifact(
-    artifact: AmdSolBoundV3Artifact,
+    artifact: AmdSolBoundArtifact,
 ) -> list[str]:
     """Build warnings implied by an AMD SOL bound artifact."""
     warnings = list(artifact.warnings)

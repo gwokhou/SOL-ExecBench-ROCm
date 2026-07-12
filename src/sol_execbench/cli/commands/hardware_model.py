@@ -18,7 +18,7 @@ from typing import Any, cast
 import click
 
 from sol_execbench.core.scoring.amd_hardware_models import (
-    AMD_HARDWARE_MODEL_V3_SCHEMA_VERSION,
+    AMD_HARDWARE_MODEL_SCHEMA_VERSION,
 )
 from sol_execbench.core.scoring.hardware_calibration.builder import (
     CalibrationRequest,
@@ -281,7 +281,7 @@ def _build(
     _write_json(
         output,
         {
-            "schema_version": AMD_HARDWARE_MODEL_V3_SCHEMA_VERSION,
+            "schema_version": AMD_HARDWARE_MODEL_SCHEMA_VERSION,
             "architecture": architecture,
             "clock_assumptions": ["calibration provenance recorded in input artifact"],
             "source": f"calibrated from {calibration_path}",
@@ -303,7 +303,7 @@ def _build(
     )
     return CliResult(
         data={
-            "schema_version": AMD_HARDWARE_MODEL_V3_SCHEMA_VERSION,
+            "schema_version": AMD_HARDWARE_MODEL_SCHEMA_VERSION,
             "architecture": architecture,
         },
         artifacts=(artifact_ref(output, "json_file"),),

@@ -29,10 +29,14 @@ from sol_execbench.core.scoring.baseline_artifact import (
     BASELINE_ARTIFACT_SCHEMA_VERSION,
     scoring_baseline_artifact_from_dict,
 )
-from sol_execbench.core.scoring.amd_sol import default_amd_hardware_models
-from sol_execbench.core.scoring.amd_sol.v3 import build_amd_sol_bound_v3_artifact
 from sol_execbench.core.scoring.amd_hardware_models import load_amd_hardware_model
-from sol_execbench_type_helpers import make_definition, make_trace, make_workload
+from sol_execbench_type_helpers import (
+    make_amd_hardware_model,
+    make_amd_sol_bound,
+    make_definition,
+    make_trace,
+    make_workload,
+)
 from sol_execbench.core.scoring.solar_derivation import (
     SolarAggregateStatus,
     SolarDerivationEvidence,
@@ -69,9 +73,7 @@ def _matmul_artifact():
         inputs={"a": {"type": "random"}, "b": {"type": "random"}},
         uuid="matmul-workload",
     )
-    return build_amd_sol_bound_v3_artifact(
-        definition, workload, default_amd_hardware_models()["gfx1200"]
-    )
+    return make_amd_sol_bound(definition, workload)
 
 
 def _matmul_artifact_v2():
@@ -94,11 +96,11 @@ def _matmul_artifact_v2():
         inputs={"a": {"type": "random"}, "b": {"type": "random"}},
         uuid="matmul-workload",
     )
-    return build_amd_sol_bound_v3_artifact(
+    return make_amd_sol_bound(
         definition,
         workload,
-        default_amd_hardware_models()["gfx1200"],
-        hardware_model_ref="default_amd_hardware_models.gfx1200",
+        make_amd_hardware_model(),
+        hardware_model_ref="hardware/gfx1200.json",
     )
 
 
@@ -124,10 +126,9 @@ def test_score_serializes_bound_eligibility_evidence() -> None:
         "solar_status": "scored",
         "hardware_profile_state": "unknown",
         "hardware_validation_status": "validated",
-        "model_validation_status": "provisional",
+        "model_validation_status": "validated",
         "warnings": [
             "fusion_bound_warning:fusion_0000:unknown_hardware_profile",
-            "model_validation:gfx1200:provisional",
             "aggregate_degraded:inexact fusion-group or provisional hardware evidence present",
         ],
     }
@@ -138,17 +139,16 @@ def _cdna3_model(tmp_path):
     path.write_text(
         json.dumps(
             {
-                "schema_version": "sol_execbench.amd_hardware_model.v2",
+                "schema_version": "sol_execbench.amd_hardware_model.v3",
                 "architecture": "gfx942",
-                "dtype_or_path": "bf16/fp32 mixed benchmark path",
-                "peak_tflops": 1300.0,
-                "memory_bandwidth_gbps": 5300.0,
                 "clock_assumptions": ["CDNA3 scaffold for phase 45"],
                 "source": "CDNA3 scaffold for phase 45",
                 "confidence": "inexact",
                 "hardware_validation_status": "unvalidated",
                 "model_validation_status": "unvalidated",
                 "evidence_refs": ["docs/internal/mi300x_validation_readiness.md"],
+                "compute_profiles": [],
+                "memory_profiles": [],
             }
         ),
         encoding="utf-8",
@@ -169,7 +169,7 @@ def _unsupported_cdna3_artifact(tmp_path: Path):
         inputs={"x": {"type": "random"}},
         uuid="unsupported-workload",
     )
-    return build_amd_sol_bound_v3_artifact(definition, workload, _cdna3_model(tmp_path))
+    return make_amd_sol_bound(definition, workload, _cdna3_model(tmp_path))
 
 
 def _unsupported_artifact_v2():
@@ -185,10 +185,10 @@ def _unsupported_artifact_v2():
         inputs={"x": {"type": "random"}},
         uuid="unsupported-workload",
     )
-    return build_amd_sol_bound_v3_artifact(
+    return make_amd_sol_bound(
         definition,
         workload,
-        default_amd_hardware_models()["gfx1200"],
+        make_amd_hardware_model(),
     )
 
 
@@ -288,7 +288,7 @@ def test_amd_native_workload_score_uses_existing_sol_score_formula():
         "hardware_model": "hardware/gfx1200.json",
     }
     assert report.supported is True
-    assert UNVALIDATED_HARDWARE_WARNING in report.warnings
+    assert UNVALIDATED_HARDWARE_WARNING not in report.warnings
 
 
 def test_solar_unscored_aggregate_suppresses_workload_score():
@@ -411,11 +411,11 @@ def test_suite_report_exposes_derived_evidence_refs_outside_public_refs():
         measured_latency_ms=1.5,
         baseline_latency_ms=2.0,
         trace_ref="traces/matmul.json",
-        sol_bound_ref="sol/matmul.amd-sol-v3.json",
-        hardware_model_ref="default_amd_hardware_models.gfx1200",
+        sol_bound_ref="sol/matmul.amd-sol.json",
+        hardware_model_ref="hardware/gfx1200.json",
         derived_evidence_refs={
             "formula": "solar/matmul.solar-derivation.json#groups.formula_evidence",
-            "hardware_model": "default_amd_hardware_models.gfx1200",
+            "hardware_model": "hardware/gfx1200.json",
             "coverage": "solar/matmul.solar-derivation.json#coverage_summary",
             "score_eligibility": (
                 "solar/matmul.solar-derivation.json#aggregate_status"
@@ -429,12 +429,12 @@ def test_suite_report_exposes_derived_evidence_refs_outside_public_refs():
     assert score_payload["claim_level"] == AMD_SCORE_CLAIM_LEVEL
     assert score_payload["evidence_refs"] == {
         "trace": "traces/matmul.json",
-        "sol_bound": "sol/matmul.amd-sol-v3.json",
-        "hardware_model": "default_amd_hardware_models.gfx1200",
+        "sol_bound": "sol/matmul.amd-sol.json",
+        "hardware_model": "hardware/gfx1200.json",
     }
     assert score_payload["derived_evidence_refs"] == {
         "formula": "solar/matmul.solar-derivation.json#groups.formula_evidence",
-        "hardware_model": "default_amd_hardware_models.gfx1200",
+        "hardware_model": "hardware/gfx1200.json",
         "coverage": "solar/matmul.solar-derivation.json#coverage_summary",
         "score_eligibility": "solar/matmul.solar-derivation.json#aggregate_status",
     }
@@ -450,8 +450,8 @@ def test_v3_degraded_artifact_scores_with_deterministic_warnings():
         artifact,
         measured_latency_ms=1.5,
         baseline_latency_ms=2.0,
-        sol_bound_ref="sol/matmul.amd-sol-v3.json",
-        hardware_model_ref="default_amd_hardware_models.gfx1200",
+        sol_bound_ref="sol/matmul.amd-sol.json",
+        hardware_model_ref="hardware/gfx1200.json",
     )
 
     assert report.score == sol_score(
@@ -465,10 +465,8 @@ def test_v3_degraded_artifact_scores_with_deterministic_warnings():
         "aggregate_degraded:inexact fusion-group or provisional hardware evidence present"
         in report.warnings
     )
-    assert report.evidence_refs["sol_bound"] == "sol/matmul.amd-sol-v3.json"
-    assert (
-        report.evidence_refs["hardware_model"] == "default_amd_hardware_models.gfx1200"
-    )
+    assert report.evidence_refs["sol_bound"] == "sol/matmul.amd-sol.json"
+    assert report.evidence_refs["hardware_model"] == "hardware/gfx1200.json"
 
 
 def test_v3_unscored_artifact_omits_score_and_preserves_bound_warning():
@@ -478,7 +476,7 @@ def test_v3_unscored_artifact_omits_score_and_preserves_bound_warning():
         artifact,
         measured_latency_ms=1.0,
         baseline_latency_ms=2.0,
-        sol_bound_ref="sol/unsupported.amd-sol-v3.json",
+        sol_bound_ref="sol/unsupported.amd-sol.json",
     )
 
     assert report.score is None
@@ -689,7 +687,7 @@ def test_trace_workflow_marks_failed_trace_as_unscored():
         trace,
         artifact,
         trace_ref="traces.json",
-        sol_bound_ref="sol/matmul.amd-sol-v3.json",
+        sol_bound_ref="sol/matmul.amd-sol.json",
     )
 
     assert score.supported is False
@@ -698,7 +696,7 @@ def test_trace_workflow_marks_failed_trace_as_unscored():
     assert score.baseline_latency_ms is None
     assert INCOMPLETE_EVIDENCE_WARNING in score.warnings
     assert score.evidence_refs["trace"] == "traces.json"
-    assert score.evidence_refs["sol_bound"] == "sol/matmul.amd-sol-v3.json"
+    assert score.evidence_refs["sol_bound"] == "sol/matmul.amd-sol.json"
 
 
 def test_suite_workflow_builds_scores_from_trace_and_artifact_maps():

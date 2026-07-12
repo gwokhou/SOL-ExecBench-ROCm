@@ -13,6 +13,10 @@ from sol_execbench.core.scoring.amd_bound_estimate.estimates import (
 )
 from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
 from sol_execbench.core.scoring.amd_bound_graph.models import BoundGraph
+from sol_execbench.core.scoring.amd_hardware_models import AmdHardwareModel
+from sol_execbench.core.scoring.amd_sol.builder import (
+    _resolve_architecture_matrix_paths,
+)
 from sol_execbench.core.scoring.solar_derivation.confidence import (
     classify_solar_confidence,
 )
@@ -40,11 +44,23 @@ __all__ = [
 def build_solar_derivation_evidence(
     definition: Definition,
     workload: Workload,
+    hardware_model: AmdHardwareModel,
+    *,
+    hardware_model_ref: str,
 ) -> SolarDerivationEvidence:
     """Build internal SOLAR derivation evidence from canonical problem inputs."""
     graph = build_bound_graph(definition, workload)
-    estimates = estimate_bound_work(graph)
-    return derive_solar_derivation_evidence(definition, workload, graph, estimates)
+    estimates = _resolve_architecture_matrix_paths(
+        estimate_bound_work(graph), hardware_model
+    )
+    return derive_solar_derivation_evidence(
+        definition,
+        workload,
+        graph,
+        estimates,
+        hardware_model,
+        hardware_model_ref=hardware_model_ref,
+    )
 
 
 def derive_solar_derivation_evidence(
@@ -52,6 +68,9 @@ def derive_solar_derivation_evidence(
     workload: Workload,
     graph: BoundGraph,
     estimates: tuple[OperatorWorkEstimate, ...],
+    hardware_model: AmdHardwareModel,
+    *,
+    hardware_model_ref: str,
 ) -> SolarDerivationEvidence:
     """Derive SOLAR evidence from a prebuilt bound graph and operator estimates."""
     nodes_by_id = {node.node_id: node for node in graph.nodes}
@@ -65,6 +84,8 @@ def derive_solar_derivation_evidence(
         estimates,
         nodes_by_id=nodes_by_id,
         tensor_evidence_by_id=tensor_evidence_by_id,
+        hardware_model=hardware_model,
+        hardware_model_ref=hardware_model_ref,
     )
     warnings = _derivation_warnings(graph, estimates)
     return SolarDerivationEvidence(

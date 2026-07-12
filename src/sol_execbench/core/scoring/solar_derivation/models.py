@@ -26,12 +26,10 @@ from sol_execbench.core.scoring.solar_derivation.evidence_models import (
 )
 
 SOLAR_DERIVATION_SCHEMA_VERSION = "sol_execbench.solar_derivation.v1"
-SOLAR_DEFAULT_AMD_HARDWARE_MODEL_REF = "default_amd_hardware_models.gfx1200"
 SOLAR_BOUND_LIMITING_RESOURCES = frozenset({"compute", "memory", "none"})
 
 __all__ = [
     "SOLAR_BOUND_LIMITING_RESOURCES",
-    "SOLAR_DEFAULT_AMD_HARDWARE_MODEL_REF",
     "SOLAR_DERIVATION_SCHEMA_VERSION",
     "SolarAggregateStatus",
     "SolarBoundEvidence",

@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""Fusion-validation-aware AMD SOL v4 artifacts."""
+"""The fusion-validation-aware AMD SOL bound artifact contract."""
 
 from __future__ import annotations
 
@@ -14,25 +14,28 @@ from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.platform.arch_capabilities import ArchIsaBudget
 from sol_execbench.core.scoring.amd_hardware_models import AmdHardwareModel
 from sol_execbench.core.scoring.amd_sol.fusion import FusionGroup
-from sol_execbench.core.scoring.amd_sol.v3_builder import (
+from sol_execbench.core.scoring.amd_sol.builder import (
     _aggregate_for_groups,
-    build_amd_sol_bound_v3_artifact,
+    _build_amd_sol_bound_base,
 )
-from sol_execbench.core.scoring.amd_sol.v3_models import (
-    AmdSolBoundV3Artifact,
-    AmdSolV3GroupBound,
+from sol_execbench.core.scoring.amd_sol.models import (
+    AmdSolAggregateBound,
+    AmdSolCoverageSummary,
+    AmdSolGroupBound,
+    _AmdSolBoundBase,
 )
-from sol_execbench.core.scoring.amd_sol.v3_parsing import amd_sol_bound_v3_from_dict
+from sol_execbench.core.scoring.amd_sol.parsing import _amd_sol_bound_base_from_dict
 from sol_execbench.core.scoring.confidence import EstimateConfidence
 from sol_execbench.core.scoring.fusion_validation import (
     FusionSignature,
     FusionValidationArtifact,
     fusion_validation_from_dict,
     sha256_file,
+    sha256_payload,
 )
 
 
-AMD_SOL_V4_SCHEMA_VERSION = "sol_execbench.amd_sol_bound.v4"
+AMD_SOL_SCHEMA_VERSION = "sol_execbench.amd_sol_bound.v4"
 
 
 @dataclass(frozen=True)
@@ -49,17 +52,70 @@ class FusionGroupEvidenceSummary:
 
 
 @dataclass(frozen=True)
-class AmdSolBoundV4Artifact:
-    """A v3-compatible payload with independently bound fusion validation."""
+class AmdSolBoundArtifact:
+    """AMD SOL payload with independently bound fusion-validation evidence."""
 
-    base: AmdSolBoundV3Artifact
+    base: _AmdSolBoundBase
     fusion_validation_ref: str
     fusion_validation_sha256: str
     fusion_validation_matches: tuple[FusionGroupEvidenceSummary, ...]
-    schema_version: str = AMD_SOL_V4_SCHEMA_VERSION
+    schema_version: str = AMD_SOL_SCHEMA_VERSION
 
-    def __getattr__(self, name: str) -> object:
-        return getattr(self.base, name)
+    @property
+    def definition(self) -> str:
+        return self.base.definition
+
+    @property
+    def workload_uuid(self) -> str:
+        return self.base.workload_uuid
+
+    @property
+    def hardware_model_ref(self) -> str | None:
+        return self.base.hardware_model_ref
+
+    @property
+    def hardware_model(self) -> AmdHardwareModel:
+        return self.base.hardware_model
+
+    @property
+    def capability_budget_ref(self) -> str | None:
+        return self.base.capability_budget_ref
+
+    @property
+    def capability_budget(self) -> ArchIsaBudget | None:
+        return self.base.capability_budget
+
+    @property
+    def bound_graph(self) -> dict[str, object]:
+        return self.base.bound_graph
+
+    @property
+    def operator_work_estimates(self) -> tuple[dict[str, object], ...]:
+        return self.base.operator_work_estimates
+
+    @property
+    def fusion_groups(self) -> tuple[FusionGroup, ...]:
+        return self.base.fusion_groups
+
+    @property
+    def group_bounds(self) -> tuple[AmdSolGroupBound, ...]:
+        return self.base.group_bounds
+
+    @property
+    def aggregate_bound(self) -> AmdSolAggregateBound:
+        return self.base.aggregate_bound
+
+    @property
+    def warnings(self) -> tuple[str, ...]:
+        return self.base.warnings
+
+    @property
+    def coverage_summary(self) -> AmdSolCoverageSummary:
+        return self.base.coverage_summary
+
+    @property
+    def derived(self) -> bool:
+        return self.base.derived
 
     def to_dict(self) -> dict[str, Any]:
         payload = self.base.to_dict()
@@ -145,7 +201,7 @@ def fusion_signature_for_group(
     )
 
 
-def build_amd_sol_bound_v4_artifact(
+def build_amd_sol_bound_artifact(
     definition: Definition,
     workload: Workload,
     hardware_model: AmdHardwareModel,
@@ -158,14 +214,16 @@ def build_amd_sol_bound_v4_artifact(
     capability_budget_ref: str | None = None,
     capability_budget: ArchIsaBudget | None = None,
     tile_contracts: dict[str, dict[str, object]] | None = None,
-) -> AmdSolBoundV4Artifact:
-    """Build v4, promoting only uniquely matched, capacity-passed groups."""
+) -> AmdSolBoundArtifact:
+    """Build the bound, promoting only uniquely matched, capacity-passed groups."""
     evidence_payload = (
         cast(dict[str, Any], fusion_validation)
         if isinstance(fusion_validation, dict)
         else cast(dict[str, Any], fusion_validation.to_dict())
     )
     evidence = fusion_validation_from_dict(evidence_payload)
+    if not fusion_validation_ref.strip():
+        raise ValueError("fusion_validation_ref must be a non-empty path")
     if evidence.architecture != hardware_model.architecture.lower():
         raise ValueError("fusion evidence architecture does not match hardware model")
     if (
@@ -177,7 +235,7 @@ def build_amd_sol_bound_v4_artifact(
         character not in "0123456789abcdef" for character in fusion_validation_sha256
     ):
         raise ValueError("fusion_validation_sha256 must be a SHA-256")
-    base = build_amd_sol_bound_v3_artifact(
+    base = _build_amd_sol_bound_base(
         definition,
         workload,
         hardware_model,
@@ -187,20 +245,31 @@ def build_amd_sol_bound_v4_artifact(
     )
     summaries: list[FusionGroupEvidenceSummary] = []
     promoted_groups: list[FusionGroup] = []
-    promoted_bounds: list[AmdSolV3GroupBound] = []
+    promoted_bounds: list[AmdSolGroupBound] = []
     estimates = {item["node_id"]: item for item in base.operator_work_estimates}
     for group, bound in zip(base.fusion_groups, base.group_bounds, strict=True):
-        signature = fusion_signature_for_group(
-            group,
-            base.bound_graph,
-            tile_contract=(tile_contracts or {}).get(group.group_id),
+        try:
+            signature = fusion_signature_for_group(
+                group,
+                base.bound_graph,
+                tile_contract=(tile_contracts or {}).get(group.group_id),
+            )
+        except ValueError:
+            signature = None
+        case = (
+            evidence.matching_case(signature, workload_uuid=workload.uuid)
+            if signature is not None
+            else None
         )
-        case = evidence.matching_case(signature, workload_uuid=workload.uuid)
         passed = case is not None and case.capacity_status == "passed"
         summaries.append(
             FusionGroupEvidenceSummary(
                 group_id=group.group_id,
-                signature_sha256=signature.canonical_id,
+                signature_sha256=(
+                    signature.canonical_id
+                    if signature is not None
+                    else sha256_payload({"unmatchable_fusion_group": group.to_dict()})
+                ),
                 variant_id=case.variant_id if case else None,
                 capacity_evidence_id=case.evidence_id if passed else None,
                 capacity_status="passed" if passed else "missing",
@@ -259,7 +328,7 @@ def build_amd_sol_bound_v4_artifact(
         aggregate_bound=aggregate,
         warnings=warnings,
     )
-    return AmdSolBoundV4Artifact(
+    return AmdSolBoundArtifact(
         base=base,
         fusion_validation_ref=fusion_validation_ref,
         fusion_validation_sha256=fusion_validation_sha256,
@@ -267,20 +336,20 @@ def build_amd_sol_bound_v4_artifact(
     )
 
 
-def amd_sol_bound_v4_from_dict(payload: dict[str, Any]) -> AmdSolBoundV4Artifact:
-    """Strict v4 parser that reuses all v3 mathematical consistency checks."""
+def amd_sol_bound_from_dict(payload: dict[str, Any]) -> AmdSolBoundArtifact:
+    """Strict parser for the sole supported AMD SOL schema."""
     required_extra = {
         "fusion_validation_ref",
         "fusion_validation_sha256",
         "fusion_validation_matches",
     }
-    v3_keys = set(AmdSolBoundV3Artifact.__dataclass_fields__) - {"schema_version"}
-    # Dataclass field names and serialized v3 names are identical.
+    v3_keys = set(_AmdSolBoundBase.__dataclass_fields__) - {"derived"}
+    v3_keys.add("derived")
     expected = v3_keys | {"schema_version"} | required_extra
     if set(payload) != expected:
         raise ValueError("AMD SOL v4 artifact has missing or unknown top-level fields")
-    if payload["schema_version"] != AMD_SOL_V4_SCHEMA_VERSION:
-        raise ValueError("AMD SOL v4 artifact has invalid schema_version")
+    if payload["schema_version"] != AMD_SOL_SCHEMA_VERSION:
+        raise ValueError("AMD SOL artifact has invalid schema_version")
     if (
         not isinstance(payload["fusion_validation_ref"], str)
         or not payload["fusion_validation_ref"]
@@ -322,12 +391,12 @@ def amd_sol_bound_v4_from_dict(payload: dict[str, Any]) -> AmdSolBoundV4Artifact
     }
     v3_payload["schema_version"] = "sol_execbench.amd_sol_bound.v3"
     v3_payload["fusion_groups"] = stripped_groups
-    base = amd_sol_bound_v3_from_dict(v3_payload)
+    base = _amd_sol_bound_base_from_dict(v3_payload)
     raw_matches = payload["fusion_validation_matches"]
     if not isinstance(raw_matches, list) or embedded != raw_matches:
         raise ValueError("fusion_validation_matches must exactly mirror fusion groups")
     matches = tuple(_summary(item) for item in raw_matches)
-    return AmdSolBoundV4Artifact(
+    return AmdSolBoundArtifact(
         base, payload["fusion_validation_ref"], checksum, matches
     )
 
@@ -357,10 +426,10 @@ def _summary(raw: dict[str, Any]) -> FusionGroupEvidenceSummary:
 
 
 __all__ = [
-    "AMD_SOL_V4_SCHEMA_VERSION",
-    "AmdSolBoundV4Artifact",
+    "AMD_SOL_SCHEMA_VERSION",
+    "AmdSolBoundArtifact",
     "FusionGroupEvidenceSummary",
-    "amd_sol_bound_v4_from_dict",
-    "build_amd_sol_bound_v4_artifact",
+    "amd_sol_bound_from_dict",
+    "build_amd_sol_bound_artifact",
     "fusion_signature_for_group",
 ]

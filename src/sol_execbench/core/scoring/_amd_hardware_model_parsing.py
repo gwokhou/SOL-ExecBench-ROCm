@@ -13,8 +13,7 @@ from typing import Any
 from sol_execbench.core.scoring.confidence import EstimateConfidence
 
 
-AMD_HARDWARE_MODEL_SCHEMA_VERSION = "sol_execbench.amd_hardware_model.v2"
-AMD_HARDWARE_MODEL_V3_SCHEMA_VERSION = "sol_execbench.amd_hardware_model.v3"
+AMD_HARDWARE_MODEL_SCHEMA_VERSION = "sol_execbench.amd_hardware_model.v3"
 
 
 class HardwareValidationStatus(str, Enum):
@@ -65,12 +64,9 @@ class HardwareProfile:
 
 @dataclass(frozen=True)
 class AmdHardwareModel:
-    """AMD model with legacy scalar evidence and v3 exact profile collections."""
+    """AMD model containing exact calibrated compute and memory profiles."""
 
     architecture: str
-    dtype_or_path: str
-    peak_tflops: float
-    memory_bandwidth_gbps: float
     clock_assumptions: tuple[str, ...]
     source: str
     confidence: EstimateConfidence
@@ -111,13 +107,6 @@ class AmdHardwareModel:
         payload["memory_profiles"] = [
             profile.to_dict() for profile in self.memory_profiles
         ]
-        if self.schema_version == AMD_HARDWARE_MODEL_SCHEMA_VERSION:
-            payload.pop("compute_profiles")
-            payload.pop("memory_profiles")
-        else:
-            payload.pop("dtype_or_path")
-            payload.pop("peak_tflops")
-            payload.pop("memory_bandwidth_gbps")
         return payload
 
 
@@ -126,20 +115,6 @@ def _non_empty(payload: dict[str, Any], key: str, source: str | None) -> str:
     if not value:
         raise ValueError(
             f"{source or 'hardware model'} field '{key}' must be non-empty"
-        )
-    return value
-
-
-def _positive(payload: dict[str, Any], key: str, source: str | None) -> float:
-    try:
-        value = float(payload[key])
-    except (TypeError, ValueError) as exc:
-        raise ValueError(
-            f"{source or 'hardware model'} field '{key}' must be numeric"
-        ) from exc
-    if not math.isfinite(value) or value <= 0.0:
-        raise ValueError(
-            f"{source or 'hardware model'} field '{key}' must be a positive number"
         )
     return value
 
@@ -209,10 +184,15 @@ def amd_hardware_model_from_dict(
     source: str | None = None,
     expected_architecture: str | None = None,
 ) -> AmdHardwareModel:
-    """Create a hardware model, retaining v2 scalars as deliberately inexact evidence."""
+    """Create a strictly validated v3 exact-profile hardware model."""
     if not isinstance(payload, dict):
         raise ValueError("hardware model payload must be a JSON object")
     schema_version = _non_empty(payload, "schema_version", source)
+    if schema_version != AMD_HARDWARE_MODEL_SCHEMA_VERSION:
+        raise ValueError(
+            f"{source or 'hardware model'} has unsupported schema_version "
+            f"'{schema_version}'"
+        )
     common = {
         "schema_version",
         "architecture",
@@ -223,15 +203,7 @@ def amd_hardware_model_from_dict(
         "model_validation_status",
         "evidence_refs",
     }
-    v2 = common | {"dtype_or_path", "peak_tflops", "memory_bandwidth_gbps"}
-    v3 = common | {"compute_profiles", "memory_profiles"}
-    expected = (
-        v2
-        if schema_version == AMD_HARDWARE_MODEL_SCHEMA_VERSION
-        else v3
-        if schema_version == AMD_HARDWARE_MODEL_V3_SCHEMA_VERSION
-        else set()
-    )
+    expected = common | {"compute_profiles", "memory_profiles"}
     if not expected or set(payload) != expected:
         unknown = sorted(set(payload) - expected)
         missing = sorted(expected - set(payload))
@@ -248,23 +220,10 @@ def amd_hardware_model_from_dict(
         raise ValueError(
             f"{source or 'hardware model'} architecture '{architecture}' does not match expected '{expected_architecture}'"
         )
-    if schema_version == AMD_HARDWARE_MODEL_SCHEMA_VERSION:
-        dtype_or_path = _non_empty(payload, "dtype_or_path", source)
-        peak_tflops = _positive(payload, "peak_tflops", source)
-        memory_bandwidth_gbps = _positive(payload, "memory_bandwidth_gbps", source)
-        compute_profiles = ()
-        memory_profiles = ()
-    else:
-        dtype_or_path = "legacy scalar unavailable"
-        peak_tflops = 0.0
-        memory_bandwidth_gbps = 0.0
-        compute_profiles = _profiles(payload, "compute_profiles", source)
-        memory_profiles = _profiles(payload, "memory_profiles", source)
+    compute_profiles = _profiles(payload, "compute_profiles", source)
+    memory_profiles = _profiles(payload, "memory_profiles", source)
     return AmdHardwareModel(
         architecture,
-        dtype_or_path,
-        peak_tflops,
-        memory_bandwidth_gbps,
         _strings(payload, "clock_assumptions", source),
         _non_empty(payload, "source", source),
         _confidence(payload["confidence"], source),

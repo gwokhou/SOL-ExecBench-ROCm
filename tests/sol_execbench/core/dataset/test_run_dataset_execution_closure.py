@@ -16,6 +16,7 @@ from sol_execbench.core.dataset.evidence_refs import (
     sidecar_stem_for_workload,
 )
 import sol_execbench.core.dataset.cli_execution as cli_execution
+from sol_execbench_type_helpers import write_amd_contract_inputs
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 RUN_DATASET_PATH = REPO_ROOT / "scripts" / "run_dataset.py"
@@ -1054,7 +1055,7 @@ def test_build_derived_evidence_refs_reports_present_refs_and_missing_gaps(tmp_p
         "selected-workload",
         problem_namespace="L1/matmul_demo",
     )
-    (sol_bound_dir / f"{sidecar_stem}.amd-sol-v3.json").write_text("{}")
+    (sol_bound_dir / f"{sidecar_stem}.amd-sol.json").write_text("{}")
 
     refs, gaps = build_derived_evidence_refs(
         definition_name="matmul_demo",
@@ -1070,7 +1071,7 @@ def test_build_derived_evidence_refs_reports_present_refs_and_missing_gaps(tmp_p
 
     assert refs == {
         "amd_score": "amd-score.json",
-        "amd_sol_bound": f"sol-bounds/{sidecar_stem}.amd-sol-v3.json",
+        "amd_sol_bound": f"sol-bounds/{sidecar_stem}.amd-sol.json",
         "timing_evidence": "timing/L1/matmul_demo.timing.json",
     }
     assert gaps == ["solar_derivation_missing"]
@@ -1774,6 +1775,7 @@ def test_execution_closure_provenance_uses_bounded_refs(tmp_path, monkeypatch):
     )
     output_dir = tmp_path / "out"
     score_path = tmp_path / "score.json"
+    model_path, fusion_path = write_amd_contract_inputs(tmp_path)
 
     def run_cli(*, workload_path: Path, **kwargs):
         uuid = json.loads(workload_path.read_text().splitlines()[0])["uuid"]
@@ -1796,6 +1798,10 @@ def test_execution_closure_provenance_uses_bounded_refs(tmp_path, monkeypatch):
             str(output_dir),
             "--amd-score-report",
             str(score_path),
+            "--amd-hardware-model",
+            str(model_path),
+            "--fusion-validation",
+            str(fusion_path),
         ],
     )
 

@@ -10,15 +10,10 @@ from sol_execbench.core.data.path_access import (
     path_get,
     path_require,
 )
-from sol_execbench.core.scoring.amd_sol.v3 import (
-    AMD_SOL_V3_SCHEMA_VERSION,
-    AmdSolBoundV3Artifact,
-    amd_sol_bound_v3_from_dict,
-)
-from sol_execbench.core.scoring.amd_sol.v4 import (
-    AMD_SOL_V4_SCHEMA_VERSION,
-    AmdSolBoundV4Artifact,
-    amd_sol_bound_v4_from_dict,
+from sol_execbench.core.scoring.amd_sol import (
+    AMD_SOL_SCHEMA_VERSION,
+    AmdSolBoundArtifact,
+    amd_sol_bound_from_dict,
 )
 from sol_execbench.core.scoring.solar_derivation import SolarAggregateStatus
 
@@ -31,16 +26,12 @@ def read_json_object(path: Path) -> dict | None:
     return payload if isinstance(payload, dict) else None
 
 
-def minimal_amd_sol_bound_v3_from_payload(
-    payload: dict,
-) -> AmdSolBoundV3Artifact | AmdSolBoundV4Artifact | None:
-    """Parse a persisted v3/v4 sidecar, rejecting malformed fusion evidence."""
+def amd_sol_bound_from_payload(payload: dict) -> AmdSolBoundArtifact | None:
+    """Parse a persisted sidecar, rejecting old or malformed contracts."""
     version = path_get(payload, "schema_version")
     try:
-        if version == AMD_SOL_V3_SCHEMA_VERSION:
-            return amd_sol_bound_v3_from_dict(payload)
-        if version == AMD_SOL_V4_SCHEMA_VERSION:
-            return amd_sol_bound_v4_from_dict(payload)
+        if version == AMD_SOL_SCHEMA_VERSION:
+            return amd_sol_bound_from_dict(payload)
         return None
     except (KeyError, TypeError, ValueError):
         return None
