@@ -45,6 +45,25 @@ Configure the repository before dispatching either workflow:
 The code-quality workflow remains read-only. Neither `pull_request` nor
 `pull_request_target` can publish, revoke, or mutate evidence.
 
+### Evidence-producer runner
+
+The producer runner is intentionally repository-scoped and labelled only
+`evidence-producer`; its registration token is one-time and is not retained as a
+personal access token. It is the only runner that can access the raw local source
+closure at `$RUNNER_TEMP/evidence/<release>/source`.
+
+Its user-level systemd unit is
+[`tools/actions-runner/evidence-producer.service`](../tools/actions-runner/evidence-producer.service).
+After registration, verify it with:
+
+```bash
+systemctl --user status sol-execbench-evidence-producer.service
+gh api 'repos/gwokhou/SOL-ExecBench-ROCm/actions/runners?per_page=100'
+```
+
+Do not add `evidence-producer` to general-purpose runners or expose the runner to
+other repositories.
+
 ## State machine
 
 The executable state machine is in `tools/evidence_lifecycle.py` and validates every

@@ -7,6 +7,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS = REPO_ROOT / ".github/workflows"
+RUNNER_SERVICE = REPO_ROOT / "tools/actions-runner/evidence-producer.service"
 
 
 def _workflow(name: str) -> str:
@@ -61,3 +62,16 @@ def test_integrity_verifier_is_read_only_and_files_an_incident() -> None:
     assert "contents: write" not in workflow
     assert "issues: write" in workflow
     assert "Open one integrity incident" in workflow
+
+
+def test_evidence_producer_runner_service_is_user_scoped_and_restartable() -> None:
+    service = RUNNER_SERVICE.read_text(encoding="utf-8")
+
+    assert (
+        "WorkingDirectory=%h/.local/share/actions-runner/SOL-ExecBench-ROCm" in service
+    )
+    assert (
+        "ExecStart=%h/.local/share/actions-runner/SOL-ExecBench-ROCm/run.sh" in service
+    )
+    assert "Restart=always" in service
+    assert "WantedBy=default.target" in service
