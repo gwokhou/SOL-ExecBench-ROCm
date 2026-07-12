@@ -1,6 +1,13 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
+import hashlib
+from importlib import resources
+from pathlib import Path
+
+import pytest
+
+import sol_execbench.core.scoring.hardware_calibration.hip_probe as hip_probe_module
 from sol_execbench.core.scoring.hardware_calibration.hip_probe import (
     CalibrationProfileKey,
     HipCommandBackend,
@@ -9,6 +16,123 @@ from sol_execbench.core.scoring.hardware_calibration.hip_probe import (
     _hip_source,
     default_hip_probe,
 )
+
+
+_RESOURCE_CASES = (
+    (
+        "vector_fp32_fp32.hip",
+        CalibrationProfileKey("compute", "vector", "fp32", "fp32", "portable"),
+    ),
+    (
+        "stream_copy_fp32_fp32.hip",
+        CalibrationProfileKey("memory", "stream_copy", "fp32", "fp32", "portable"),
+    ),
+    (
+        "vector_fp16_fp16.hip",
+        CalibrationProfileKey("compute", "vector", "fp16", "fp16", "gfx12"),
+    ),
+    (
+        "stream_copy_fp16_fp16.hip",
+        CalibrationProfileKey("memory", "stream_copy", "fp16", "fp16", "gfx12"),
+    ),
+    (
+        "vector_bf16_bf16.hip",
+        CalibrationProfileKey("compute", "vector", "bf16", "bf16", "gfx12"),
+    ),
+    (
+        "stream_copy_bf16_bf16.hip",
+        CalibrationProfileKey("memory", "stream_copy", "bf16", "bf16", "gfx12"),
+    ),
+    (
+        "stream_copy_bf16_fp32.hip",
+        CalibrationProfileKey("memory", "stream_copy", "bf16", "fp32", "gfx12"),
+    ),
+    (
+        "stream_copy_fp32_bf16.hip",
+        CalibrationProfileKey("memory", "stream_copy", "fp32", "bf16", "gfx12"),
+    ),
+    (
+        "reduction_fp32_fp32.hip",
+        CalibrationProfileKey("compute", "reduction", "fp32", "fp32", "gfx12"),
+    ),
+    (
+        "transcendental_fp32_fp32.hip",
+        CalibrationProfileKey("compute", "transcendental", "fp32", "fp32", "gfx12"),
+    ),
+    (
+        "matrix_bf16_bf16_wmma.hip",
+        CalibrationProfileKey("compute", "matrix", "bf16", "bf16", "wmma"),
+    ),
+    (
+        "matrix_fp16_fp16_wmma.hip",
+        CalibrationProfileKey("compute", "matrix", "fp16", "fp16", "wmma"),
+    ),
+    (
+        "matrix_bf16_bf16_mfma.hip",
+        CalibrationProfileKey("compute", "matrix", "bf16", "bf16", "mfma"),
+    ),
+)
+
+
+@pytest.mark.parametrize(("filename", "key"), _RESOURCE_CASES)
+def test_every_probe_route_loads_its_package_resource(
+    filename: str, key: CalibrationProfileKey
+) -> None:
+    resource = resources.files(
+        "sol_execbench.data.hardware_calibration_probes"
+    ).joinpath(filename)
+
+    assert resource.is_file()
+    assert _hip_source(key) == resource.read_text(encoding="utf-8")
+    suffix = f"_{key.path}" if key.operation == "matrix" else ""
+    assert filename == (
+        f"{key.operation}_{key.input_dtype}_{key.output_dtype}{suffix}.hip"
+    )
+
+
+def test_probe_resources_are_complete_and_utf8() -> None:
+    root = resources.files("sol_execbench.data.hardware_calibration_probes")
+    expected = {filename for filename, _ in _RESOURCE_CASES}
+    packaged = {item.name for item in root.iterdir() if item.name.endswith(".hip")}
+
+    assert packaged == expected
+    assert all(
+        root.joinpath(filename).read_text(encoding="utf-8") for filename in expected
+    )
+
+
+@pytest.mark.parametrize(
+    ("filename", "expected_sha256"),
+    (
+        (
+            "vector_fp32_fp32.hip",
+            "ba990fd967177b0d3d32640a3f8779ec4c695dc7e34645477f02b200aa63e2f3",
+        ),
+        (
+            "stream_copy_bf16_fp32.hip",
+            "042bfe2390fb532e7a8cc5ab32e0fbebe2944c6bdadfe5c580659f187a829966",
+        ),
+        (
+            "matrix_bf16_bf16_wmma.hip",
+            "232e0333d31c902729ae3f4e7174a2e253a75ba6ecfb229d3351d88649feafe6",
+        ),
+    ),
+)
+def test_representative_probe_source_hashes_are_unchanged(
+    filename: str, expected_sha256: str
+) -> None:
+    source = resources.files("sol_execbench.data.hardware_calibration_probes").joinpath(
+        filename
+    )
+
+    assert hashlib.sha256(source.read_bytes()).hexdigest() == expected_sha256
+
+
+def test_production_probe_module_does_not_embed_hip_programs() -> None:
+    source = Path(hip_probe_module.__file__).read_text(encoding="utf-8")
+
+    assert "#include <hip/" not in source
+    assert "__global__ void" not in source
 
 
 def test_default_probe_passes_architecture_to_command_backend(monkeypatch) -> None:

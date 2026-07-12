@@ -17,6 +17,7 @@ import re
 import subprocess
 import sys
 from datetime import UTC, datetime
+from importlib import resources
 from pathlib import Path
 from statistics import median
 from tempfile import TemporaryDirectory
@@ -37,7 +38,7 @@ from sol_execbench.core.scoring.fusion_validation import (
 
 _RMS_DEFINITION = "025_rmsnorm_h4096"
 _TANH_DEFINITION = "061_tanh_gated_residual_add_backward"
-_SOURCE_DIR = Path(__file__).resolve().parents[2] / "data" / "fusion_probes"
+_SOURCE_RESOURCES = resources.files("sol_execbench.data").joinpath("fusion_probes")
 
 
 def main() -> int:
@@ -51,18 +52,23 @@ def main() -> int:
         manifest = _json_object(suite_path)
         shapes = _selected_shapes(manifest, root)
         with TemporaryDirectory(prefix="sol-execbench-fusion-") as temporary:
-            executable, command = _compile_runner(Path(temporary), architecture)
-            binary = executable.read_bytes()
-            resources = _resource_factory(binary, command, architecture)
-            cases = tuple(
-                _collect_case(
-                    executable=executable,
-                    device=device,
-                    shape=shape,
-                    resource_for=resources,
+            with resources.as_file(_SOURCE_RESOURCES) as source_dir:
+                executable, command = _compile_runner(
+                    Path(temporary), architecture, source_dir
                 )
-                for shape in shapes
-            )
+                binary = executable.read_bytes()
+                resource_for = _resource_factory(
+                    binary, command, architecture, source_dir
+                )
+                cases = tuple(
+                    _collect_case(
+                        executable=executable,
+                        device=device,
+                        shape=shape,
+                        resource_for=resource_for,
+                    )
+                    for shape in shapes
+                )
         artifact = FusionValidationArtifact(
             architecture=architecture,
             gpu_uuid=_required_env("SOL_EXECBENCH_FUSION_GPU_UUID"),
@@ -135,14 +141,16 @@ def _workload_file(root: Path, definition: str) -> Path:
     return candidates[0]
 
 
-def _compile_runner(workspace: Path, architecture: str) -> tuple[Path, tuple[str, ...]]:
-    source = _SOURCE_DIR / "fusion_probe_runner.hip"
+def _compile_runner(
+    workspace: Path, architecture: str, source_dir: Path
+) -> tuple[Path, tuple[str, ...]]:
+    source = source_dir / "fusion_probe_runner.hip"
     executable = workspace / "fusion_probe_runner"
     command = (
         "hipcc",
         "-O3",
         f"--offload-arch={architecture}",
-        f"-I{_SOURCE_DIR}",
+        f"-I{source_dir}",
         str(source),
         "-o",
         str(executable),
@@ -153,14 +161,19 @@ def _compile_runner(workspace: Path, architecture: str) -> tuple[Path, tuple[str
     return executable, command
 
 
-def _resource_factory(binary: bytes, command: tuple[str, ...], architecture: str):
+def _resource_factory(
+    binary: bytes,
+    command: tuple[str, ...],
+    architecture: str,
+    source_dir: Path,
+):
     metadata = {
         item.name: item
         for item in extract_amdgpu_kernel_metadata(
             binary, target_architecture=architecture
         )
     }
-    source = (_SOURCE_DIR / "gfx1200_reduction_epilogue.hip").read_bytes()
+    source = (source_dir / "gfx1200_reduction_epilogue.hip").read_bytes()
     binary_sha256 = hashlib.sha256(binary).hexdigest()
     source_sha256 = hashlib.sha256(source).hexdigest()
 
