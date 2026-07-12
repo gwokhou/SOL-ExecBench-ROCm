@@ -74,7 +74,7 @@ scripts, and the Docker helper.
 | `uv sync --all-groups` | Install runtime and development dependency groups. |
 | `uv build` | Build package artifacts with Hatchling. |
 | `uv run sol-execbench evaluate <problem_dir> --solution <solution-path>` | Run one benchmark problem. |
-| `uv run sol-execbench --definition <definition-json> --workload <workload-jsonl> --solution <solution-json>` | Run one problem from explicit files. |
+| `uv run sol-execbench evaluate --definition <definition-json> --workload <workload-jsonl> --solution <solution-json>` | Run one problem from explicit files. |
 | `uv run sol-execbench --format json contract evaluator` | Print the GPU-free evaluator compatibility contract. |
 | `uv run sol-execbench --format json environment doctor` | Print ROCm environment diagnostics. |
 | `uv run sol-execbench --format json toolchain route` | Print ROCm evidence-tool routing diagnostics. |

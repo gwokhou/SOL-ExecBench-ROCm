@@ -2,7 +2,7 @@
 
 # SOL ExecBench ROCm Port
 
-[![Version](https://img.shields.io/badge/version-1.0.5-blue.svg)](pyproject.toml)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](pyproject.toml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 A ROCm-only fork of SOL ExecBench for evaluating LLM-generated GPU kernel
@@ -43,7 +43,7 @@ Build and enter the ROCm Docker environment (optional):
 2. Run an included PyTorch example:
 
    ```bash
-   uv run sol-execbench examples/pytorch/gemma3_swiglu \
+   uv run sol-execbench evaluate examples/pytorch/gemma3_swiglu \
      --solution examples/pytorch/gemma3_swiglu/solution_python.json
    ```
 
@@ -55,22 +55,21 @@ Build and enter the ROCm Docker environment (optional):
 **Evaluate a PyTorch solution against a problem directory:**
 
 ```bash
-uv run sol-execbench examples/pytorch/gemma3_swiglu \
+uv run sol-execbench evaluate examples/pytorch/gemma3_swiglu \
   --solution examples/pytorch/gemma3_swiglu/solution_python.json
 ```
 
 **Evaluate a Triton ROCm solution:**
 
 ```bash
-uv run sol-execbench examples/triton/rmsnorm \
+uv run sol-execbench evaluate examples/triton/rmsnorm \
   --solution examples/triton/rmsnorm/solution_triton.json
 ```
 
 **Evaluate with explicit definition, workload, and solution files:**
 
 ```bash
-uv run sol-execbench \
-  evaluate \
+uv run sol-execbench evaluate \
   --definition definition.json \
   --workload workload.jsonl \
   --solution solution.json
@@ -218,12 +217,15 @@ you control.
 
 ## Documentation
 
+Use the [Documentation Map](docs/README.md) to select current user guides,
+contracts, evidence/release material, internal records, or historical plans.
+
 Start here:
 
 - [Getting Started](docs/GETTING-STARTED.md) -- prerequisites, installation,
   first run, and setup issues
-- [Cookbook](docs/COOKBOOK.md) -- task-oriented commands for common benchmark
-  workflows
+- [Cookbook](docs/COOKBOOK.md) -- task-oriented commands and troubleshooting
+  for common benchmark workflows
 - [Researcher Guide](docs/RESEARCHER-GUIDE.md) -- workflows for kernel,
   compiler/backend, agent, and reproducibility researchers
 - [Configuration](docs/CONFIGURATION.md) -- CLI flags, benchmark config,
@@ -250,8 +252,6 @@ Project and development references:
   (hipBLAS, MIOpen, Composable Kernel, rocWMMA) for RDNA 4 and CDNA 3 targets;
   CDNA 4-specific low-precision benchmark adaptation is deferred until suitable
   hardware evidence is available. CDNA 4 validation is also deferred.
-- [Cookbook](docs/COOKBOOK.md) -- common troubleshooting and task-oriented
-  commands for benchmark runs, dataset batches, and evidence workflows
 
 Validation, release, and provenance:
 

@@ -211,7 +211,7 @@ analysis is needed:
 
 ```bash
 rocprofv3 --stats -- \
-  uv run sol-execbench examples/pytorch/gemma3_swiglu \
+  uv run sol-execbench evaluate examples/pytorch/gemma3_swiglu \
     --solution examples/pytorch/gemma3_swiglu/solution_python.json
 ```
 
@@ -270,7 +270,6 @@ JSON output is available for automation:
 uv run sol-execbench --format json baseline compare \
   --candidate out/candidate.jsonl \
   --baseline out/baseline.jsonl \
-  --format json \
   --output out/baseline-comparison.json
 ```
 

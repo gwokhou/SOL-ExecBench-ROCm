@@ -10,7 +10,7 @@ required application-level `.env` file.
 
 Most users only need:
 
-- `--config`, `--compile-timeout`, `--timeout`, `--output`, `--profile`, and
+- `--config`, `--compile-timeout`, `--timeout`, `--trace-output`, `--profile`, and
   `--static-evidence` for single benchmark runs.
 - `scripts/run_dataset.py` flags for dataset batches and derived reports.
 - `./scripts/run_docker.sh --target <id>` when selecting a ROCm container.
@@ -32,7 +32,7 @@ below are optional runtime, Docker, diagnostic, or build inputs discovered in
 | `PYTORCH_ROCM_ARCH` | Optional | Derived from solution `target_hardware` when unset | Overrides the ROCm architecture list used by PyTorch extension builds. |
 | `SOL_EXECBENCH_ALLOW_CPU_TIMING` | Optional | Unset | Test/debug escape hatch that lets evaluator timing proceed on CPU tensors when set to `1`; not a GPU validation setting. |
 | `SOL_EXECBENCH_GRACEFUL_EXIT` | Optional | Unset | When set to `1`, the eval driver uses `sys.exit(0)` instead of `os._exit(0)` at process end. Automatically injected by the profiler adapter during profiled evaluations. |
-| `SOLEXECBENCH_ENV_SNAPSHOT` | Optional | Unset | Set to `1` to write an environment snapshot sidecar next to `--output`. |
+| `SOLEXECBENCH_ENV_SNAPSHOT` | Optional | Unset | Set to `1` to write an environment snapshot sidecar next to `--trace-output`. |
 | `SOLEXECBENCH_ENV_SNAPSHOT_PATH` | Optional | Unset | Explicit environment snapshot sidecar output path. |
 | `HIP_VISIBLE_DEVICES` | Optional | Unset | Device visibility filter recorded in environment and runtime evidence. |
 | `ROCR_VISIBLE_DEVICES` | Optional | Unset | ROCr device visibility filter recorded in environment and runtime evidence. |
@@ -189,7 +189,7 @@ clock-sensitive evaluation paths can reject the run based on
 | Docker local image name | `sol-execbench` | `scripts/run_docker.sh` |
 | Docker local image tag | `rocm-<selected Docker tag>` | `scripts/run_docker.sh` |
 | Docker FlashInfer trace root | `/sol-execbench/data/flashinfer-trace` | `scripts/run_docker.sh` |
-| Python package version | `1.0.5` | `pyproject.toml`; separate from milestone and prerelease labels |
+| Python package version | `2.0.0` | `pyproject.toml`; separate from milestone and prerelease labels |
 | Python requirement | `>=3.12,<3.14` | `pyproject.toml` |
 | Default ROCm Torch wheel | `torch==2.10.0+rocm7.1` | `pyproject.toml` Linux x86_64 marker and Docker target metadata |
 | Default ROCm torchvision wheel | `torchvision==0.25.0+rocm7.1` | `pyproject.toml` Linux x86_64 marker and Docker target metadata |
@@ -203,7 +203,7 @@ The repository does not define `.env.development`, `.env.production`, or
 files. Use these source-backed override paths instead:
 
 - Host benchmark runs: pass CLI flags such as `--config`, `--compile-timeout`,
-  `--timeout`, `--output`, `--profile`, `--static-evidence`, and
+  `--timeout`, `--trace-output`, `--profile`, `--static-evidence`, and
   `--feedback-*` diagnostic metadata flags.
 - Per-problem benchmark settings: place the benchmark config JSON next to the
   problem definition and workload files, or pass a config file explicitly with
@@ -246,7 +246,7 @@ uv run sol-execbench evaluate <problem_dir> --solution solution.json
 Explicit input form:
 
 ```bash
-uv run sol-execbench \
+uv run sol-execbench evaluate \
   --definition definition.json \
   --workload workload.jsonl \
   --solution solution.json
@@ -260,8 +260,7 @@ uv run sol-execbench \
 | `--config` | None | Optional benchmark config JSON. |
 | `--compile-timeout` | `120` | HIP/C++ compilation timeout in seconds. |
 | `--timeout` | `600` | Evaluation subprocess timeout in seconds. |
-| `-o`, `--output` | None | Trace JSONL output path. |
-| `--trace-output` | Disabled | Write canonical trace JSONL separately from stdout. |
+| `--trace-output` | Disabled | Write canonical Trace JSONL separately from stdout. |
 | `--lock-clocks` | Disabled | Require GPU clocks to be locked. |
 | `--keep-staging` | Disabled | Preserve the temporary staging directory. |
 | `--profile` | `none` | Use `rocprofv3` for optional diagnostic profiling when set to `rocprofv3`. |
@@ -275,7 +274,7 @@ uv run sol-execbench \
 
 No-trace diagnostic sidecars are not controlled by a separate flag. When an
 evaluation subprocess produces no parseable trace JSONL, the CLI writes a
-bounded diagnostic-only sidecar next to `--output`, in the kept staging
+bounded diagnostic-only sidecar next to `--trace-output`, in the kept staging
 directory, or in the system temp directory depending on the available path.
 That sidecar records stdout/stderr tails and line counts and is not canonical
 trace JSONL.
@@ -368,17 +367,16 @@ The package exposes `sol-execbench baseline compare` for comparing existing trac
 JSONL files. It does not run GPU evaluation.
 
 ```bash
-uv run sol-execbench baseline compare \
+uv run sol-execbench --format json baseline compare \
   --candidate out/current/traces.jsonl \
   --baseline out/baseline/traces.jsonl \
-  --format json --output out/baseline-comparison.json
+  --output out/baseline-comparison.json
 ```
 
 | Flag | Default | Purpose |
 | --- | --- | --- |
 | `--candidate` | Required | Candidate trace JSONL file. |
 | `--baseline` | Required, repeatable | One or more baseline trace JSONL files. |
-| `--format` | `text` | Output `text` or `json`. |
 | `--output` | stdout | Optional output path. |
 | `--win-pct` | `2.0` | Candidate must beat baseline by at least this percentage to be a win. |
 | `--parity-pct` | `5.0` | Candidate within this percentage of baseline is parity. |
@@ -393,7 +391,7 @@ arguments before `--` that are not wrapper flags are forwarded to `docker run`.
 
 ```bash
 ./scripts/run_docker.sh --target rocm-7.1.1-ubuntu-24.04-container -- \
-  sol-execbench tests/sol_execbench/samples/rmsnorm \
+  sol-execbench evaluate tests/sol_execbench/samples/rmsnorm \
     --solution tests/sol_execbench/samples/rmsnorm/solution_triton.json
 ```
 
@@ -501,7 +499,7 @@ closure audit also accepts repeated `--target-status` values.
 `pyproject.toml` defines:
 
 - Package name `sol-execbench`
-- Version `1.0.5`, which is the Python package version rather than the v1.26
+- Version `2.0.0`, which is the Python package version rather than the v1.26
   research-prerelease milestone tag
 - Python range `>=3.12,<3.14`
 - Console script `sol-execbench`
@@ -589,12 +587,12 @@ Docker build arguments include `ROCM_DOCKER_IMAGE`, `ROCM_DOCKER_TAG`,
 
 These settings create sidecars without changing trace JSONL schema:
 
-- `--profile rocprofv3` writes profiler metadata next to `--output`, or under
+- `--profile rocprofv3` writes profiler metadata next to `--trace-output`, or under
   the staging directory when no output file is provided.
 - `--static-evidence auto` writes static kernel evidence metadata for native
   solution builds.
 - `SOLEXECBENCH_ENV_SNAPSHOT=1` writes an environment sidecar next to
-  `--output`.
+  `--trace-output`.
 - `SOLEXECBENCH_ENV_SNAPSHOT_PATH=<path>` writes an environment sidecar to an
   explicit path.
 
