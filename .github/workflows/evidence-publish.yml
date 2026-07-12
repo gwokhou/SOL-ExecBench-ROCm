@@ -113,12 +113,14 @@ jobs:
         run: |
           set -euo pipefail
           mkdir public-download public-artifacts
-          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
-            --pattern "${RELEASE_TAG}-evidence.tar.gz" --dir public-download
+          archive="${RELEASE_TAG}-evidence.tar.gz"
+          curl --fail --location --silent --show-error \
+            -o "public-download/${archive}" \
+            "https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/${archive}"
           expected=$(awk '{print $1}' incoming/SHA256SUMS)
-          actual=$(sha256sum "public-download/${RELEASE_TAG}-evidence.tar.gz" | awk '{print $1}')
+          actual=$(sha256sum "public-download/${archive}" | awk '{print $1}')
           test "$actual" = "$expected"
-          tar -xzf "public-download/${RELEASE_TAG}-evidence.tar.gz" -C public-artifacts
+          tar -xzf "public-download/${archive}" -C public-artifacts
           uv run sol-execbench baseline publication verify \
             --manifest "docs/releases/${RELEASE_TAG}.evidence.json" \
             --artifact-root public-artifacts
