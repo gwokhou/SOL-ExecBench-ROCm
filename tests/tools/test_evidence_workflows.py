@@ -33,7 +33,9 @@ def test_publish_workflow_requires_review_and_round_trip_verification() -> None:
     assert ".prevent_self_review == true" in workflow
     assert "attestations: write" in workflow
     assert "id-token: write" in workflow
-    assert "Refuse to mutate an existing release" in workflow
+    assert "Classify an existing release for safe recovery" in workflow
+    assert "steps.release_state.outputs.exists != 'true'" in workflow
+    assert "concurrency:" in workflow
     assert "Download public release and verify it again" in workflow
 
 

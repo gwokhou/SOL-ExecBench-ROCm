@@ -22,6 +22,10 @@ permissions:
   actions: read
   contents: read
 
+concurrency:
+  group: evidence-publish-${{ inputs.release_tag }}
+  cancel-in-progress: false
+
 jobs:
   publish:
     if: github.ref == 'refs/heads/main'
@@ -82,18 +86,20 @@ jobs:
           uv run sol-execbench baseline publication verify \
             --manifest "docs/releases/${RELEASE_TAG}.evidence.json" \
             --artifact-root artifacts
-      - name: Refuse to mutate an existing release
+      - name: Classify an existing release for safe recovery
+        id: release_state
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "refusing to mutate existing evidence release: $RELEASE_TAG" >&2
-            exit 1
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
       - name: Create immutable release assets
-        id: release
+        if: steps.release_state.outputs.exists != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.release_tag }}
@@ -106,11 +112,6 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "${RELEASE_TAG} evidence bundle" \
             --notes "Machine-published evidence bundle. Verify against docs/releases/${RELEASE_TAG}.evidence.json before relying on its scope claims."
-          echo "url=https://github.com/${GITHUB_REPOSITORY}/releases/tag/${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
-      - name: Attest the published archive
-        uses: actions/attest-build-provenance@v2
-        with:
-          subject-path: incoming/release.tar.gz
       - name: Download public release and verify it again
         env:
           GH_TOKEN: ${{ github.token }}
@@ -127,15 +128,28 @@ jobs:
           uv run sol-execbench baseline publication verify \
             --manifest "docs/releases/${RELEASE_TAG}.evidence.json" \
             --artifact-root public-artifacts
+      - name: Attest the verified published archive
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: incoming/release.tar.gz
       - name: Record published lifecycle state
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.release_tag }}
-          RELEASE_URL: ${{ steps.release.outputs.url }}
+          RELEASE_URL: https://github.com/${{ github.repository }}/releases/tag/${{ inputs.release_tag }}
           SUPERSEDES: ${{ inputs.supersedes }}
         run: |
           set -euo pipefail
           bundle_sha256=$(awk '{print $1}' incoming/SHA256SUMS)
+          existing=$(jq -cer --arg release "$RELEASE_TAG" \
+            '.records[] | select(.release == $release)' \
+            docs/releases/evidence-lifecycle.json || true)
+          if [ -n "$existing" ]; then
+            test "$(jq -r .status <<<"$existing")" = published
+            test "$(jq -r .bundle_sha256 <<<"$existing")" = "$bundle_sha256"
+            test "$(jq -r .release_url <<<"$existing")" = "$RELEASE_URL"
+            exit 0
+          fi
           args=(
             --registry docs/releases/evidence-lifecycle.json
             --repo-root .
