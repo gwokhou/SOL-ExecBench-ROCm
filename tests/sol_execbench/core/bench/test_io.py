@@ -37,7 +37,6 @@ from sol_execbench.core.bench.io import (
     _is_softmax_output,
     _is_ssm_decay,
     _is_weight_matrix,
-    _rand_tensor,
     _resolve_blob_path,
     flashinfer_safetensors_env,
     gen_inputs,
@@ -52,57 +51,6 @@ def test_flashinfer_safetensors_env_preserves_user_root():
     env = flashinfer_safetensors_env({FLASHINFER_TRACE_ENV: "/custom/root"})
 
     assert env[FLASHINFER_TRACE_ENV] == "/custom/root"
-
-
-# ------------------------------------------------------------------
-# _rand_tensor
-# ------------------------------------------------------------------
-
-
-class TestRandTensor:
-    def test_float32(self):
-        t = _rand_tensor([4, 8], torch.float32, torch.device("cpu"))
-        assert t.shape == (4, 8)
-        assert t.dtype == torch.float32
-
-    def test_float16(self):
-        t = _rand_tensor([3], torch.float16, torch.device("cpu"))
-        assert t.dtype == torch.float16
-
-    def test_bfloat16(self):
-        t = _rand_tensor([2, 2], torch.bfloat16, torch.device("cpu"))
-        assert t.dtype == torch.bfloat16
-
-    def test_float8_e4m3fn(self):
-        t = _rand_tensor([16], torch.float8_e4m3fn, torch.device("cpu"))
-        assert t.dtype == torch.float8_e4m3fn
-
-    def test_float8_e5m2(self):
-        t = _rand_tensor([16], torch.float8_e5m2, torch.device("cpu"))
-        assert t.dtype == torch.float8_e5m2
-
-    def test_bool(self):
-        t = _rand_tensor([100], torch.bool, torch.device("cpu"))
-        assert t.dtype == torch.bool
-        assert set(t.unique().tolist()).issubset({True, False})
-
-    def test_int8(self):
-        t = _rand_tensor([100], torch.int8, torch.device("cpu"))
-        assert t.dtype == torch.int8
-        assert t.min().item() >= -128
-        assert t.max().item() < 128
-
-    def test_int32(self):
-        t = _rand_tensor([50], torch.int32, torch.device("cpu"))
-        assert t.dtype == torch.int32
-
-    def test_int64(self):
-        t = _rand_tensor([50], torch.int64, torch.device("cpu"))
-        assert t.dtype == torch.int64
-
-    def test_unsupported_dtype(self):
-        with pytest.raises(ValueError, match="Unsupported random dtype"):
-            _rand_tensor([4], torch.complex64, torch.device("cpu"))
 
 
 # ------------------------------------------------------------------

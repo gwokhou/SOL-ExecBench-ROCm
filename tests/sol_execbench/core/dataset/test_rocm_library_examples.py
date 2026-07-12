@@ -249,7 +249,9 @@ def test_hipblas_example_stages_through_native_packager(tmp_path):
 def test_miopen_example_stages_through_native_packager(tmp_path):
     example_dir = REPO_ROOT / "examples/miopen/softmax"
     definition = make_definition(**_load_solution(example_dir / "definition.json"))
-    workload = make_workload(**json.loads((example_dir / "workload.jsonl").read_text().splitlines()[0]))
+    workload = make_workload(
+        **json.loads((example_dir / "workload.jsonl").read_text().splitlines()[0])
+    )
     solution = make_solution(**_load_solution(example_dir / "solution_miopen.json"))
     packager = ProblemPackager(
         definition=definition,
@@ -274,7 +276,9 @@ def test_miopen_example_stages_through_native_packager(tmp_path):
 def test_ck_example_stages_through_native_packager(tmp_path):
     example_dir = REPO_ROOT / "examples/ck/gemm"
     definition = make_definition(**_load_solution(example_dir / "definition.json"))
-    workload = make_workload(**json.loads((example_dir / "workload.jsonl").read_text().splitlines()[0]))
+    workload = make_workload(
+        **json.loads((example_dir / "workload.jsonl").read_text().splitlines()[0])
+    )
     solution = make_solution(**_load_solution(example_dir / "solution_ck.json"))
     packager = ProblemPackager(
         definition=definition,
@@ -299,7 +303,9 @@ def test_ck_example_stages_through_native_packager(tmp_path):
 def test_rocwmma_example_stages_through_native_packager(tmp_path):
     example_dir = REPO_ROOT / "examples/rocwmma/gemm"
     definition = make_definition(**_load_solution(example_dir / "definition.json"))
-    workload = make_workload(**json.loads((example_dir / "workload.jsonl").read_text().splitlines()[0]))
+    workload = make_workload(
+        **json.loads((example_dir / "workload.jsonl").read_text().splitlines()[0])
+    )
     solution = make_solution(**_load_solution(example_dir / "solution_rocwmma.json"))
     packager = ProblemPackager(
         definition=definition,
@@ -350,8 +356,7 @@ def test_remaining_rocm_library_categories_stage_through_native_packager(tmp_pat
                 "sources": [
                     {
                         "path": source_path,
-                        "content": include_text
-                        + "void run() {}\n",
+                        "content": include_text + "void run() {}\n",
                     }
                 ],
             }

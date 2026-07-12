@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import inspect
+from dataclasses import replace
 
 import pytest
 
@@ -126,7 +127,7 @@ def test_authority_mode_requires_release_and_candidate_evidence():
 
 def test_legacy_score_without_bound_eligibility_cannot_be_official():
     legacy = _amd_score()
-    legacy = AmdNativeScore(**{**legacy.__dict__, "bound_eligibility": None})
+    legacy = replace(legacy, bound_eligibility=None)
 
     evidence = official_score_from_amd_native_score(
         legacy, aggregation_policy=AGGREGATION_POLICY
@@ -138,7 +139,7 @@ def test_legacy_score_without_bound_eligibility_cannot_be_official():
 
 def test_missing_authority_evidence_refs_cannot_be_official():
     score = _amd_score()
-    score = AmdNativeScore(**{**score.__dict__, "evidence_refs": {}})
+    score = replace(score, evidence_refs={})
 
     evidence = official_score_from_amd_native_score(
         score, aggregation_policy=AGGREGATION_POLICY
@@ -166,18 +167,16 @@ def test_inconsistent_baseline_or_candidate_bound_is_blocked():
 
 def test_inexact_or_degraded_bound_evidence_cannot_be_official():
     score = _amd_score()
-    blocked = AmdNativeScore(
-        **{
-            **score.__dict__,
-            "bound_eligibility": BoundEligibilityEvidence(
-                amd_sol_status="degraded",
-                solar_status="scored",
-                hardware_profile_state="measured",
-                hardware_validation_status="validated",
-                model_validation_status="validated",
-                warnings=("inexact hardware estimate",),
-            ),
-        }
+    blocked = replace(
+        score,
+        bound_eligibility=BoundEligibilityEvidence(
+            amd_sol_status="degraded",
+            solar_status="scored",
+            hardware_profile_state="measured",
+            hardware_validation_status="validated",
+            model_validation_status="validated",
+            warnings=("inexact hardware estimate",),
+        ),
     )
 
     evidence = official_score_from_amd_native_score(

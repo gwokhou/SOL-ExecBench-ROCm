@@ -6,8 +6,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
 
+from sol_execbench.core.data.base_model import StrictArtifactModel
 from sol_execbench.core.data.json_utils import stable_model_checksum, stable_model_json
 from sol_execbench.core.dataset.manifest import DatasetManifestChecksum
 
@@ -48,18 +49,14 @@ CLAIM_BOUNDARY_TEXT = (
 )
 
 
-class AmdBoundSanitySourceRef(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class AmdBoundSanitySourceRef(StrictArtifactModel):
     path: str | None = None
     ref: str | None = None
     schema_version: str | None = None
     checksum: str | None = None
 
 
-class AmdBoundSanitySources(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class AmdBoundSanitySources(StrictArtifactModel):
     trace_refs: list[AmdBoundSanitySourceRef] = Field(default_factory=list)
     execution_closure: AmdBoundSanitySourceRef = Field(
         default_factory=AmdBoundSanitySourceRef
@@ -74,9 +71,7 @@ class AmdBoundSanitySources(BaseModel):
     )
 
 
-class AmdBoundSanityArtifactAvailability(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class AmdBoundSanityArtifactAvailability(StrictArtifactModel):
     trace_refs: int = 0
     execution_closure: bool = False
     amd_sol_artifacts: int = 0
@@ -85,9 +80,7 @@ class AmdBoundSanityArtifactAvailability(BaseModel):
     compatibility_matrix: bool = False
 
 
-class AmdBoundSanityStatusTotals(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class AmdBoundSanityStatusTotals(StrictArtifactModel):
     scored: int = 0
     degraded: int = 0
     unscored: int = 0
@@ -99,18 +92,14 @@ class AmdBoundSanityStatusTotals(BaseModel):
         setattr(self, status, getattr(self, status) + 1)
 
 
-class AmdBoundSanitySourceStatuses(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class AmdBoundSanitySourceStatuses(StrictArtifactModel):
     closure_status: str | None = None
     amd_sol_status: str | None = None
     solar_status: str | None = None
     amd_score_supported: bool | None = None
 
 
-class AmdBoundSanityWorkload(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class AmdBoundSanityWorkload(StrictArtifactModel):
     category: str = "unknown"
     problem_id: str
     problem_path: str | None = None
@@ -128,18 +117,14 @@ class AmdBoundSanityWorkload(BaseModel):
     blocker_codes: list[str] = Field(default_factory=list)
 
 
-class AmdBoundSanityEvidenceGap(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class AmdBoundSanityEvidenceGap(StrictArtifactModel):
     reason_code: str
     count: int
     example_refs: list[str]
     next_evidence: str
 
 
-class AmdBoundSanityClaimBoundary(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class AmdBoundSanityClaimBoundary(StrictArtifactModel):
     provisional_rdna4_model_risk: bool = False
     upstream_solar_equivalence: bool = False
     amd_sol_model_validation: bool = False
@@ -154,9 +139,7 @@ class AmdBoundSanityClaimBoundary(BaseModel):
     new_hardware_validation: bool = False
 
 
-class AmdBoundSanityReport(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class AmdBoundSanityReport(StrictArtifactModel):
     schema_version: str = AMD_BOUND_SANITY_SCHEMA_VERSION
     authority_audit_policy_version: str | None = None
     created_at: str

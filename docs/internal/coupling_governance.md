@@ -86,3 +86,10 @@ Continue coupling refactors only when one of these happens:
 
 Otherwise, stop. Passing guardrails mean coupling is converged for the current
 scope.
+# Process readability is a separate completion condition
+
+Passing fan-out, cycle, and facade checks only proves that imports remain
+bounded. A refactor is complete only when lifecycle stages are named, mutable
+state is typed, raw artifact mappings stop at parser boundaries, and domain
+functions remain locally understandable. `scripts/check_readability.py` tracks
+these properties with a non-increasing baseline alongside this coupling check.

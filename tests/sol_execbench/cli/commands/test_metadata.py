@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 from click.testing import CliRunner
 
@@ -22,7 +23,7 @@ from sol_execbench.core.platform.toolchain import (
 )
 
 
-def _json(args: list[str]) -> tuple[object, object]:
+def _json(args: list[str]) -> tuple[object, dict[str, Any]]:
     result = CliRunner().invoke(cli, ["--format", "json", *args])
     assert result.exit_code == 0, result.output
     return result, json.loads(result.output)

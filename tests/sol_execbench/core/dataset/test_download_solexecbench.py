@@ -31,7 +31,9 @@ def _row(name: str = "matmul_demo") -> dict:
     }
 
 
-def test_downloader_honors_category_output_root_revision_and_manifest(tmp_path, monkeypatch):
+def test_downloader_honors_category_output_root_revision_and_manifest(
+    tmp_path, monkeypatch
+):
     calls = []
 
     def fake_load_dataset(repo_id, **kwargs):
@@ -83,15 +85,19 @@ def test_downloader_normalizes_empty_hf_id_to_null(tmp_path, monkeypatch):
 
     assert rc == 0
     definition = json.loads(
-        (output_root / "FlashInfer-Bench" / "matmul_demo" / "definition.json").read_text(
-            encoding="utf-8"
-        )
+        (
+            output_root / "FlashInfer-Bench" / "matmul_demo" / "definition.json"
+        ).read_text(encoding="utf-8")
     )
     assert definition["hf_id"] is None
 
 
-def test_downloader_reuses_identical_files_and_rejects_divergent_files(tmp_path, monkeypatch):
-    monkeypatch.setattr(download_solexecbench, "load_dataset", lambda *args, **kwargs: [_row()])
+def test_downloader_reuses_identical_files_and_rejects_divergent_files(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(
+        download_solexecbench, "load_dataset", lambda *args, **kwargs: [_row()]
+    )
     output_root = tmp_path / "dataset"
     args = ["--category", "L1", "--output-root", str(output_root)]
 
@@ -105,7 +111,9 @@ def test_downloader_reuses_identical_files_and_rejects_divergent_files(tmp_path,
     assert json.loads(definition_path.read_text(encoding="utf-8")) == {"local": "edit"}
 
     assert download_solexecbench.main([*args, "--force"]) == 0
-    assert json.loads(definition_path.read_text(encoding="utf-8"))["name"] == "matmul_demo"
+    assert (
+        json.loads(definition_path.read_text(encoding="utf-8"))["name"] == "matmul_demo"
+    )
 
 
 def test_verify_only_writes_manifest_without_downloading(tmp_path, monkeypatch):
@@ -140,7 +148,9 @@ def test_verify_only_writes_manifest_without_downloading(tmp_path, monkeypatch):
 
 def test_unknown_category_is_rejected(tmp_path):
     with pytest.raises(ValueError, match="unknown SOL-ExecBench category"):
-        download_solexecbench.main(["--category", "CUDA", "--output-root", str(tmp_path)])
+        download_solexecbench.main(
+            ["--category", "CUDA", "--output-root", str(tmp_path)]
+        )
 
 
 @pytest.mark.parametrize("unsafe_name", ["../escape", "/tmp/escape", "", ".", ".."])

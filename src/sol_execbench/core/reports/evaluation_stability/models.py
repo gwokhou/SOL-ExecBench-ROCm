@@ -4,6 +4,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
+from pathlib import Path
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from sol_execbench.core.data.json_utils import stable_model_checksum, stable_model_json
@@ -51,6 +55,17 @@ CLAIM_BOUNDARY_TEXT = (
     "authority, not score authority, not paper parity, not leaderboard "
     "authority, not native-host validation, and not new-hardware validation."
 )
+
+
+@dataclass(frozen=True, slots=True)
+class EvaluationStabilityInputs:
+    """Read-only timing artifacts and policy for one stability-report build."""
+
+    timing_evidence: Sequence[Mapping[str, object]]
+    source_paths: Sequence[Path | None] = field(default_factory=tuple)
+    created_at: str | None = None
+    noise_cv_threshold: float = 0.10
+    min_samples: int = 3
 
 
 class StabilitySourceRef(BaseModel):

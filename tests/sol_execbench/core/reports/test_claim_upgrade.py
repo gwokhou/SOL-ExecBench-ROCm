@@ -8,10 +8,35 @@ from pydantic import ValidationError
 
 from sol_execbench.core.reports.claim_upgrade import (
     CLAIM_UPGRADE_SCHEMA_VERSION,
+    ClaimUpgradeInputs,
     ClaimUpgradeReport,
     build_claim_upgrade_report,
     render_claim_upgrade_markdown,
 )
+
+
+def test_claim_upgrade_inputs_preserve_legacy_report_semantics() -> None:
+    consistency = {"summary": {"finding_totals": {"blocker": 0}}}
+    expected = build_claim_upgrade_report(
+        consistency_report=consistency,
+        created_at="2026-06-01T00:00:00Z",
+    )
+
+    actual = build_claim_upgrade_report(
+        ClaimUpgradeInputs(
+            consistency_report=consistency,
+            created_at="2026-06-01T00:00:00Z",
+        )
+    )
+
+    assert actual.model_dump(mode="json") == expected.model_dump(mode="json")
+
+
+def test_claim_upgrade_inputs_reject_mixed_legacy_arguments() -> None:
+    with pytest.raises(TypeError, match="ClaimUpgradeInputs"):
+        build_claim_upgrade_report(
+            ClaimUpgradeInputs(), created_at="2026-06-01T00:00:00Z"
+        )
 
 
 def test_claim_upgrade_blocks_authority_when_evidence_is_missing_or_contradictory():

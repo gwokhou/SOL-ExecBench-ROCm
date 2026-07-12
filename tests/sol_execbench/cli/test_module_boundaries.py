@@ -267,9 +267,9 @@ def test_cross_domain_imports_stay_explicitly_allowlisted() -> None:
             "sol_execbench.core.dataset.manifest",
         ): "authority slice manifests reuse the canonical dataset checksum type",
         (
-            "sol_execbench.core.scoring.fusion_validation",
+            "sol_execbench.core.scoring.fusion_validation.resources",
             "sol_execbench.core.bench.static_kernel.amdgpu_metadata",
-        ): "fusion authority reuses the code-object metadata parser without promoting diagnostic footprints",
+        ): "fusion resource evidence reuses the code-object metadata parser without promoting diagnostic footprints",
         (
             "sol_execbench.core.scoring.hardware_calibration.builder",
             "sol_execbench.core.bench",
@@ -783,9 +783,16 @@ def test_cli_metadata_commands_live_outside_main() -> None:
 
 def test_cli_baseline_commands_live_outside_main() -> None:
     from sol_execbench.cli.commands import baseline
+    from sol_execbench.cli.commands.baseline import authority as baseline_authority
+    from sol_execbench.cli.commands.baseline import export as baseline_export
+    from sol_execbench.cli.commands.baseline import publication as baseline_publication
+    from sol_execbench.cli.commands.baseline import release as baseline_release
 
     assert baseline._baseline_cli is not None
-    assert baseline._baseline_export_cli is not None
+    assert baseline_authority.register_authority_commands is not None
+    assert baseline_export.register_export_command is not None
+    assert baseline_publication.register_publication_commands is not None
+    assert baseline_release.register_release_commands is not None
 
     for name in (
         "_baseline_cli",

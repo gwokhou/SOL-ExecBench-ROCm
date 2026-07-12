@@ -1,4 +1,5 @@
 from copy import deepcopy
+from typing import Any
 
 import pytest
 
@@ -66,10 +67,10 @@ def test_artifact_parser_rejects_wrong_json_types(
     path: tuple[object, ...], value: object, message: str
 ) -> None:
     payload = deepcopy(_payload())
-    target: object = payload
+    target: Any = payload
     for key in path[:-1]:
-        target = target[key]  # type: ignore[index]
-    target[path[-1]] = value  # type: ignore[index]
+        target = target[key]
+    target[path[-1]] = value
 
     with pytest.raises(ValueError, match=message):
         hardware_calibration_artifact_from_dict(payload)

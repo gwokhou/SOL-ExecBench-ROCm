@@ -15,7 +15,9 @@ SPEC.loader.exec_module(check_dataset_redistribution)
 
 
 def _policy() -> dict[str, object]:
-    return check_dataset_redistribution.load_dataset_policy(REPO_ROOT / "provenance.toml")
+    return check_dataset_redistribution.load_dataset_policy(
+        REPO_ROOT / "provenance.toml"
+    )
 
 
 def test_blocks_nvidia_dataset_paths_for_repository_redistribution() -> None:
@@ -36,7 +38,9 @@ def test_blocks_nvidia_dataset_paths_for_repository_redistribution() -> None:
 def test_blocks_generated_nvidia_derivatives_for_release_bundles(tmp_path) -> None:
     restricted = tmp_path / "out/dataset_migration/nvidia-sol-execbench/problem.json"
     restricted.parent.mkdir(parents=True)
-    restricted.write_text(json.dumps({"source_boundary": "nvidia_sol_execbench"}), encoding="utf-8")
+    restricted.write_text(
+        json.dumps({"source_boundary": "nvidia_sol_execbench"}), encoding="utf-8"
+    )
     allowed = tmp_path / "docs/provenance.md"
     allowed.parent.mkdir(parents=True)
     allowed.write_text("# Provenance\n", encoding="utf-8")

@@ -54,7 +54,9 @@ def _write_problem(category_dir: Path, name: str, *, workloads: int = 1) -> None
         json.dumps({"uuid": f"{name}-{idx}", "axes": {}, "inputs": {}})
         for idx in range(workloads)
     ]
-    (problem_dir / "workload.jsonl").write_text("\n".join(rows) + "\n", encoding="utf-8")
+    (problem_dir / "workload.jsonl").write_text(
+        "\n".join(rows) + "\n", encoding="utf-8"
+    )
 
 
 def _write_dataset_root(root: Path) -> None:
@@ -80,7 +82,11 @@ def test_layout_reports_missing_default_category(tmp_path):
     assert not layout.ok
     assert layout.categories[0].name == "FlashInfer-Bench"
     assert layout.categories[0].status == "missing"
-    missing = [diagnostic for diagnostic in layout.diagnostics if diagnostic.code == "missing_category"]
+    missing = [
+        diagnostic
+        for diagnostic in layout.diagnostics
+        if diagnostic.code == "missing_category"
+    ]
     assert {diagnostic.category for diagnostic in missing} == {
         "FlashInfer-Bench",
         "L2",

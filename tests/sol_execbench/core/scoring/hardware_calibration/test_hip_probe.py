@@ -2,8 +2,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import hashlib
+from collections.abc import Callable
 from importlib import resources
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -182,7 +184,10 @@ def test_malformed_execution_output_is_unknown() -> None:
     key = CalibrationProfileKey("compute", "vector", "fp32", "fp32", "portable")
     probe = HipProbe(
         compile_candidate=lambda _: "passed",
-        execute_candidate=lambda _: object(),  # type: ignore[arg-type]
+        execute_candidate=cast(
+            Callable[[CalibrationProfileKey], ProbeExecution | None],
+            lambda _: object(),
+        ),
         check_correctness=lambda _, __: True,
         check_stability=lambda _, __: True,
     )

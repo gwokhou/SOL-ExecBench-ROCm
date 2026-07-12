@@ -127,7 +127,9 @@ def test_build_profile_evidence_ref_binds_calibration_checksum(
         lambda _: GpuEnvironment(0, "gfx1200", uuid="GPU-a", rocm_version="7.1.1"),
     )
 
-    hardware_model._build.callback(calibration_path, output, None)
+    callback = hardware_model._build.callback
+    assert callback is not None
+    callback(calibration_path, output, None)
 
     model = json.loads(output.read_text())
     assert (

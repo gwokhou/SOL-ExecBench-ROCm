@@ -10,6 +10,7 @@ from sol_execbench.core.reports.evaluation_stability.builder import (
 from sol_execbench.core.reports.evaluation_stability.models import (
     CLAIM_BOUNDARY_TEXT,
     EVALUATION_STABILITY_SCHEMA_VERSION,
+    EvaluationStabilityInputs,
     SOURCE_CHECKSUM_KEYS,
     STABILITY_STATUS_KEYS,
     STABILITY_STATUS_PRIORITY,
@@ -29,6 +30,7 @@ from sol_execbench.core.reports.trust_summary import load_json, utc_timestamp
 __all__ = [
     "CLAIM_BOUNDARY_TEXT",
     "EVALUATION_STABILITY_SCHEMA_VERSION",
+    "EvaluationStabilityInputs",
     "SOURCE_CHECKSUM_KEYS",
     "STABILITY_STATUS_KEYS",
     "STABILITY_STATUS_PRIORITY",

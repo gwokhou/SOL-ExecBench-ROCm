@@ -22,6 +22,7 @@ from .models import (
     AmdBoundSanitySourceRef,
     SOURCE_CHECKSUM_KEYS,
 )
+from .state import EvidenceGapState, WorkloadAuditState
 
 
 def _payload_artifacts(
@@ -50,53 +51,40 @@ def _payload_artifacts(
     return payloads
 
 
-def _workload_seed(uuid: str, payload: dict[str, Any]) -> dict[str, Any]:
+def _workload_seed(uuid: str, payload: dict[str, Any]) -> WorkloadAuditState:
     definition = path_str_or_none(payload, "definition")
     problem_id = path_str_or_none(payload, "problem_id") or definition or "unknown"
-    return {
-        "category": path_str_or_none(payload, "category") or "unknown",
-        "problem_id": problem_id,
-        "problem_path": path_str_or_none(payload, "problem_path"),
-        "definition": definition,
-        "workload_uuid": uuid,
-        "row_index": path_int_or_none(payload, "row_index"),
-        "diagnostic_flags": set(),
-        "source_statuses": {
-            "closure_status": None,
-            "amd_sol_status": None,
-            "solar_status": None,
-            "amd_score_supported": None,
-        },
-        "amd_score_supported": None,
-        "coverage_summary": {},
-        "warnings": [],
-        "evidence_refs": {},
-        "evidence_gaps": [],
-        "blocker_codes": set(),
-    }
+    return WorkloadAuditState(
+        category=path_str_or_none(payload, "category") or "unknown",
+        problem_id=problem_id,
+        problem_path=path_str_or_none(payload, "problem_path"),
+        definition=definition,
+        workload_uuid=uuid,
+        row_index=path_int_or_none(payload, "row_index"),
+    )
 
 
 def _ensure_workload(
-    workloads: dict[str, dict[str, Any]],
+    workloads: dict[str, WorkloadAuditState],
     uuid: str,
     payload: dict[str, Any],
-) -> dict[str, Any]:
+) -> WorkloadAuditState:
     if uuid not in workloads:
         workloads[uuid] = _workload_seed(uuid, payload)
         return workloads[uuid]
     workload = workloads[uuid]
     definition = path_str_or_none(payload, "definition")
-    if definition and workload["definition"] is None:
-        workload["definition"] = definition
-        if workload["problem_id"] == "unknown":
-            workload["problem_id"] = definition
+    if definition and workload.definition is None:
+        workload.definition = definition
+        if workload.problem_id == "unknown":
+            workload.problem_id = definition
     for key in ("category", "problem_id", "problem_path"):
         value = path_str_or_none(payload, key)
-        if value and (workload[key] in {None, "unknown"}):
-            workload[key] = value
+        if value and (getattr(workload, key) in {None, "unknown"}):
+            setattr(workload, key, value)
     row_index = path_int_or_none(payload, "row_index")
-    if row_index is not None and workload["row_index"] is None:
-        workload["row_index"] = row_index
+    if row_index is not None and workload.row_index is None:
+        workload.row_index = row_index
     return workload
 
 
@@ -125,28 +113,25 @@ def _extend_unique(target: list[str], values: list[str]) -> None:
             target.append(value)
 
 
-def _add_gap(workload: dict[str, Any], reason_code: str) -> None:
-    if reason_code not in workload["evidence_gaps"]:
-        workload["evidence_gaps"].append(reason_code)
+def _add_gap(workload: WorkloadAuditState, reason_code: str) -> None:
+    if reason_code not in workload.evidence_gaps:
+        workload.evidence_gaps.append(reason_code)
 
 
 def _add_gap_group(
-    groups: dict[str, dict[str, Any]],
+    groups: dict[str, EvidenceGapState],
     *,
     reason_code: str,
     example_ref: str,
 ) -> None:
-    group = groups.setdefault(
-        reason_code,
-        {"reason_code": reason_code, "count": 0, "example_refs": []},
-    )
-    group["count"] += 1
-    if len(group["example_refs"]) < 5 and example_ref not in group["example_refs"]:
-        group["example_refs"].append(example_ref)
+    group = groups.setdefault(reason_code, EvidenceGapState(reason_code=reason_code))
+    group.count += 1
+    if len(group.example_refs) < 5 and example_ref not in group.example_refs:
+        group.example_refs.append(example_ref)
 
 
 def _apply_missing_required_artifact_gaps(
-    workload: dict[str, Any],
+    workload: WorkloadAuditState,
     *,
     has_amd_score: bool,
     has_amd_sol: bool,
@@ -155,9 +140,9 @@ def _apply_missing_required_artifact_gaps(
 ) -> None:
     if not has_amd_score:
         _add_gap(workload, "amd_score_evidence_missing")
-    if not has_amd_sol or workload["source_statuses"]["amd_sol_status"] is None:
+    if not has_amd_sol or workload.source_statuses.amd_sol_status is None:
         _add_gap(workload, "amd_sol_evidence_missing")
-    if not has_solar or workload["source_statuses"]["solar_status"] is None:
+    if not has_solar or workload.source_statuses.solar_status is None:
         _add_gap(workload, "solar_derivation_missing")
     if not has_matrix:
         _add_gap(workload, "compatibility_matrix_missing")
@@ -264,24 +249,24 @@ def _coverage_summary(
 
 
 def _suite_warnings(
-    workloads: dict[str, dict[str, Any]],
+    workloads: dict[str, WorkloadAuditState],
     amd_score_report: dict[str, Any] | None,
 ) -> list[str]:
     warnings: list[str] = []
     _extend_unique(warnings, _warnings_from(amd_score_report or {}))
     for workload in workloads.values():
-        _extend_unique(warnings, workload["warnings"])
+        _extend_unique(warnings, workload.warnings)
     return sorted(warnings)
 
 
 def _sorted_evidence_gaps(
-    groups: dict[str, dict[str, Any]],
+    groups: dict[str, EvidenceGapState],
 ) -> list[AmdBoundSanityEvidenceGap]:
     return [
         AmdBoundSanityEvidenceGap(
             reason_code=reason_code,
-            count=group["count"],
-            example_refs=sorted(group["example_refs"]),
+            count=group.count,
+            example_refs=sorted(group.example_refs),
             next_evidence=_next_evidence(reason_code),
         )
         for reason_code, group in sorted(groups.items())
@@ -302,8 +287,8 @@ def _next_evidence(reason_code: str) -> str:
     return "Attach bounded existing evidence refs/checksums before upgrading claims."
 
 
-def _workload_ref(workload: dict[str, Any]) -> str:
-    return f"{workload['problem_id']}#{workload['workload_uuid']}"
+def _workload_ref(workload: WorkloadAuditState) -> str:
+    return f"{workload.problem_id}#{workload.workload_uuid}"
 
 
 def _sorted_jsonable(value: Any) -> Any:

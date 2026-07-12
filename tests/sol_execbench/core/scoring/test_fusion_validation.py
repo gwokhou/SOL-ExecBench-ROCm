@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import copy
+from typing import Any, cast
 
 import pytest
 
@@ -89,7 +90,7 @@ def test_fusion_validation_round_trip_is_strict() -> None:
     ],
 )
 def test_capacity_status_cannot_contradict_resources(field: str, value: object) -> None:
-    invalid = _artifact().to_dict()
+    invalid = cast(dict[str, Any], _artifact().to_dict())
     invalid["cases"][0]["fused"][field] = value
     with pytest.raises(ValueError, match="capacity_status contradicts"):
         fusion_validation_from_dict(invalid)
@@ -106,7 +107,7 @@ def test_performance_policy_separates_ratio_and_stability() -> None:
 
 
 def test_duplicate_exact_signature_is_rejected() -> None:
-    invalid = _artifact().to_dict()
+    invalid = cast(dict[str, Any], _artifact().to_dict())
     duplicate = copy.deepcopy(invalid["cases"][0])
     duplicate["evidence_id"] = "duplicate"
     invalid["cases"].append(duplicate)

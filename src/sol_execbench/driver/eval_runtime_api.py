@@ -1,8 +1,65 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
-"""Stable import surface for generated evaluation drivers."""
+"""Stable, explicit import surface for generated evaluation drivers."""
 
-import sol_execbench.driver.eval_runtime_api_exports as _eval_runtime_api_exports
-from sol_execbench.driver.eval_runtime_api_exports import *  # noqa: F403
+from sol_execbench.driver.eval_runtime_api_exports import (
+    BenchmarkConfig,
+    Definition,
+    EvaluationDependencies,
+    EvaluationStatus,
+    Solution,
+    Trace,
+    Workload,
+    WorkloadEvaluationRequest,
+    allocate_outputs,
+    call_and_collect_outputs,
+    check_eval_integrity,
+    check_lazy_outputs,
+    check_monkey_patch,
+    check_thread_injection,
+    compute_error_stats,
+    dtype_str_to_torch_dtype,
+    emit_trace_jsonl,
+    evaluate_workloads,
+    gen_inputs,
+    load_reference_function,
+    load_staged_problem,
+    load_user_function,
+    make_eval,
+    measure_latency,
+    measure_reference_latency,
+    review_solution_sources,
+    run_reward_hack_check,
+    snapshot_critical_functions,
+)
 
-__all__ = _eval_runtime_api_exports.__all__
+__all__ = [
+    "BenchmarkConfig",
+    "Definition",
+    "EvaluationDependencies",
+    "EvaluationStatus",
+    "Solution",
+    "Trace",
+    "Workload",
+    "WorkloadEvaluationRequest",
+    "allocate_outputs",
+    "call_and_collect_outputs",
+    "check_eval_integrity",
+    "check_lazy_outputs",
+    "check_monkey_patch",
+    "check_thread_injection",
+    "compute_error_stats",
+    "dtype_str_to_torch_dtype",
+    "emit_trace_jsonl",
+    "evaluate_workloads",
+    "gen_inputs",
+    "load_reference_function",
+    "load_staged_problem",
+    "load_user_function",
+    "make_eval",
+    "measure_latency",
+    "measure_reference_latency",
+    "review_solution_sources",
+    "run_reward_hack_check",
+    "snapshot_critical_functions",
+]

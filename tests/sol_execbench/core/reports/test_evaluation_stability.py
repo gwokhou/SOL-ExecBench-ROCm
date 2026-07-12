@@ -15,10 +15,41 @@ from sol_execbench.core.bench.timing_policy import (
 )
 from sol_execbench.core.reports.evaluation_stability import (
     EVALUATION_STABILITY_SCHEMA_VERSION,
+    EvaluationStabilityInputs,
     EvaluationStabilityReport,
     build_evaluation_stability_report,
     render_evaluation_stability_markdown,
 )
+
+
+def test_evaluation_stability_inputs_preserve_legacy_report_semantics() -> None:
+    evidence = [
+        {
+            "workload_uuid": "w1",
+            "backend": "rocprofv3",
+            "runtime_ms_distribution": [1.0, 1.0, 1.0],
+        }
+    ]
+    expected = build_evaluation_stability_report(
+        timing_evidence=evidence,
+        created_at="2026-06-01T00:00:00Z",
+    )
+
+    actual = build_evaluation_stability_report(
+        EvaluationStabilityInputs(
+            timing_evidence=evidence,
+            created_at="2026-06-01T00:00:00Z",
+        )
+    )
+
+    assert actual.model_dump(mode="json") == expected.model_dump(mode="json")
+
+
+def test_evaluation_stability_inputs_reject_mixed_legacy_arguments() -> None:
+    with pytest.raises(TypeError, match="EvaluationStabilityInputs"):
+        build_evaluation_stability_report(
+            EvaluationStabilityInputs(timing_evidence=[]), min_samples=4
+        )
 
 
 def test_evaluation_stability_classifies_core_statuses():

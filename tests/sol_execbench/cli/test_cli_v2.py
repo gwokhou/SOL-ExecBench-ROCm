@@ -76,11 +76,11 @@ def test_evaluate_json_returns_summary_and_artifact(
     solution.write_text("{}\n")
     trace = tmp_path / "trace.jsonl"
 
-    def fake_run(**kwargs):
-        kwargs["output_file"].write_text('{"canonical":"trace"}\n')
+    def fake_run(*, request):
+        request.output_file.write_text('{"canonical":"trace"}\n')
         return CliResult(
             data={"workloads": 1, "passed": 1, "all_passed": True},
-            artifacts=(artifact(kwargs["output_file"], "canonical_trace_jsonl"),),
+            artifacts=(artifact(request.output_file, "canonical_trace_jsonl"),),
         )
 
     monkeypatch.setattr(

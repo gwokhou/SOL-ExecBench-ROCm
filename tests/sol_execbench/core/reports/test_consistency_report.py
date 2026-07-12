@@ -8,10 +8,33 @@ from pydantic import ValidationError
 
 from sol_execbench.core.reports.consistency import (
     CONSISTENCY_REPORT_SCHEMA_VERSION,
+    ConsistencyInputs,
     ConsistencyReport,
     build_consistency_report,
     render_consistency_markdown,
 )
+
+
+def test_consistency_inputs_preserve_legacy_report_semantics() -> None:
+    closure = {"schema_version": "closure.v1", "records": []}
+    expected = build_consistency_report(
+        execution_closure=closure,
+        created_at="2026-06-01T00:00:00Z",
+    )
+
+    actual = build_consistency_report(
+        ConsistencyInputs(
+            execution_closure=closure,
+            created_at="2026-06-01T00:00:00Z",
+        )
+    )
+
+    assert actual.model_dump(mode="json") == expected.model_dump(mode="json")
+
+
+def test_consistency_inputs_reject_mixed_legacy_arguments() -> None:
+    with pytest.raises(TypeError, match="ConsistencyInputs"):
+        build_consistency_report(ConsistencyInputs(), created_at="2026-06-01T00:00:00Z")
 
 
 def test_consistency_report_flags_cross_report_contradictions():

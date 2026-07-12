@@ -4,7 +4,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -43,6 +45,24 @@ CLAIM_BOUNDARY_TEXT = (
     "authority fields and is not itself paper parity, leaderboard authority, "
     "native-host validation, score authority, or new-hardware validation."
 )
+
+
+@dataclass(frozen=True, slots=True)
+class ClaimUpgradeInputs:
+    """Read-only artifact boundary for one claim-upgrade evaluation."""
+
+    consistency_report: Mapping[str, object] | None = None
+    evaluation_stability: Mapping[str, object] | None = None
+    execution_closure: Mapping[str, object] | None = None
+    paper_denominator: Mapping[str, object] | None = None
+    matrix_report: Mapping[str, object] | None = None
+    amd_score_report: Mapping[str, object] | None = None
+    amd_sol_report: Mapping[str, object] | None = None
+    solar_derivation: Mapping[str, object] | None = None
+    amd_bound_sanity: Mapping[str, object] | None = None
+    hardware_validation: Mapping[str, object] | None = None
+    source_paths: Mapping[str, Path | None] = field(default_factory=dict)
+    created_at: str | None = None
 
 
 class ClaimSourceRef(BaseModel):

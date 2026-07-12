@@ -31,3 +31,18 @@ class BaseModelWithDocstrings(BaseModel):
     """Base model with the attribute docstrings being extracted to the model JSON schema."""
 
     model_config = ConfigDict(use_attribute_docstrings=True)
+
+
+class StrictArtifactModel(BaseModel):
+    """Base class for stable, strictly validated JSON artifacts.
+
+    Artifact models are deliberately mutable unless an individual schema opts in
+    to freezing.  This keeps the base suitable for incremental report builders
+    while ensuring that parser boundaries reject misspelled or future fields.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        use_attribute_docstrings=True,
+        validate_assignment=True,
+    )

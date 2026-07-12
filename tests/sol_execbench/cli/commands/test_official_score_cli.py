@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 from click.testing import CliRunner
@@ -107,15 +108,13 @@ def _write_report(tmp_path: Path, scores: list[AmdNativeScore]) -> Path:
     )
     timing_path.write_text('{"policy":"latency_ms"}\n', encoding="utf-8")
     scores = [
-        AmdNativeScore(
-            **{
-                **score.__dict__,
-                "evidence_refs": {
-                    **score.evidence_refs,
-                    "trace": f"{trace_path}#{score.workload_uuid}",
-                    "timing": f"{timing_path}#{score.workload_uuid}",
-                },
-            }
+        replace(
+            score,
+            evidence_refs={
+                **score.evidence_refs,
+                "trace": f"{trace_path}#{score.workload_uuid}",
+                "timing": f"{timing_path}#{score.workload_uuid}",
+            },
         )
         for score in scores
     ]
