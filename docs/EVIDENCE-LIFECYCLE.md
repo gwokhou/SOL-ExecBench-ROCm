@@ -19,17 +19,26 @@ Publishing is deliberately split into two workflows:
   again from GitHub, and verifies the extracted closure. Only this job receives
   `contents: write`, `attestations: write`, and `id-token: write`.
 
+## Single-maintainer mode
+
+This repository currently has one maintainer. It intentionally does **not** claim
+independent human approval: `evidence-publish` and `evidence-lifecycle` are GitHub
+Environments restricted to `main`, without required reviewers. The publish and
+revoke workflows are manual-only and also require `github.ref` to be `main`.
+
+This mode still limits write access to the two narrowly scoped jobs and keeps all
+other workflows read-only, but it is not dual control. Add a distinct reviewer or
+team and reinstate required-reviewer protection before making a two-person approval
+claim.
+
 Configure the repository before dispatching either workflow:
 
-1. Create an `evidence-publish` GitHub Environment with a required reviewer or
-   reviewer team, block self-review, and restrict deployments to `main`.
-2. Create an `evidence-lifecycle` Environment with the same protection for
-   revocations. The workflows fail closed if the Environment has no
-   `required_reviewers` rule.
-3. Restrict the `evidence-producer` self-hosted runner group to this repository and
+1. Create `evidence-publish` and `evidence-lifecycle` GitHub Environments and
+   restrict their deployment branch policies to `main`.
+2. Restrict the `evidence-producer` self-hosted runner group to this repository and
    do not store long-lived GitHub tokens, signing keys, or production credentials on
    it. The runner only needs access to the locally generated evidence input.
-4. Permit the protected publisher and lifecycle jobs to push only the lifecycle
+3. Permit the publisher and lifecycle jobs to push only the lifecycle
    index. Do not grant `contents: write` to pull-request, scheduled, or ordinary CI
    workflows.
 
@@ -58,9 +67,8 @@ be handled before making new authority claims.
 2. Place the source closure on the restricted producer runner at
    `$RUNNER_TEMP/evidence/<release>/source`.
 3. Dispatch `Prepare evidence bundle` on `main` and retain its successful run ID.
-4. Dispatch `Publish evidence bundle` on `main` with that run ID; a reviewer must
-   approve the `evidence-publish` Environment before the write-capable job starts.
-   If a run stops after creating the immutable Release but before recording its
+4. Dispatch `Publish evidence bundle` on `main` with that run ID. If a run stops
+   after creating the immutable Release but before recording its
    lifecycle commit, redispatch the same inputs. The workflow re-verifies the
    public archive, attests it, and records it without replacing release assets.
 5. Confirm the lifecycle commit and the scheduled verifier are green. To replace an
