@@ -37,10 +37,10 @@ leaderboard 等价结果。
 中的 legacy 副本仅保留为本地重建/诊断输入，不属于 manifest upload set。Git-tracked v4
 manifest 位于 `docs/releases/gfx1200-20260712-hipblaslt-v4.evidence.json`，已
 通过 `baseline publication stage` 生成严格、无额外文件的 upload directory，并由
-`baseline publication verify` 对该目录复核；但其 URI 仍是计划位置，manifest 未 Git
-跟踪，工件也尚未上传至不可变 HTTPS store。因此它只能称为 *locally verified authority
-slice*，不能称为 *published authority slice*。发布的剩余动作是：上传 staged directory、
-提交使用最终 URI 的 manifest，并在干净下载目录重新验证。
+`baseline publication verify` 对该目录复核。manifest 已 Git 跟踪，工件已上传到
+不可变 GitHub Release；2026-07-12 又从该 Release 的全新下载目录解压并通过同一校验。
+因此它可以称为 *published authority slice*，但仍不是完整 RDNA4 分母、NVIDIA/SOLAR
+parity 或 leaderboard authority。
 
 ## 当前 AMD SOL bound 与正式 baseline 的计算现状
 

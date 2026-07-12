@@ -5,10 +5,9 @@ Git.  A score claim is nevertheless reproducible only when Git fixes the exact
 identity of every externally stored input.  This repository uses
 `sol_execbench.evidence_publication_manifest.v1` for that purpose.
 
-## Current TODO: publish the authority slice
+## Current published authority slice
 
-**Status: v4 local closure verified; external publication pending artifact-store
-selection.** Legacy v3 evidence was rejected by the current official gate and has
+**Status: published.** Legacy v3 evidence was rejected by the current official gate and has
 been removed from the local worktree; it must not be restored or uploaded as an
 authority release. Its replacement is the local
 `gfx1200-20260712-hipblaslt-v4` source evidence tree at
@@ -29,11 +28,14 @@ uv run sol-execbench baseline publication verify \
   --artifact-root out/gfx1200-20260712-hipblaslt-v4-publish
 ```
 
-The manifest's HTTPS URI is only a planned release location. When a suitable public
-immutable store is available, upload this closure without changing filenames,
-commit the resulting final manifest, and repeat the command from a clean download.
-Until then, this is a **locally verified authority slice**, not a **published
-authority slice**.
+The immutable bundle is now published as
+[`gfx1200-20260712-hipblaslt-v4-evidence.tar.gz`](https://github.com/gwokhou/SOL-ExecBench-ROCm/releases/download/gfx1200-20260712-hipblaslt-v4/gfx1200-20260712-hipblaslt-v4-evidence.tar.gz)
+in the [GitHub Release](https://github.com/gwokhou/SOL-ExecBench-ROCm/releases/tag/gfx1200-20260712-hipblaslt-v4).
+Its SHA-256 is
+`0866ec026f53d6e77d73258c24f19108dce746c1a463dc6536d9e641a758513b`.
+The bundle was downloaded into a fresh temporary directory, extracted, and verified
+against the Git-tracked manifest with `baseline publication verify` on 2026-07-12.
+This is a **published authority slice**, not a full-suite or leaderboard claim.
 
 ## What is committed
 
