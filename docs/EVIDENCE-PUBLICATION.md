@@ -37,6 +37,9 @@ The bundle was downloaded into a fresh temporary directory, extracted, and verif
 against the Git-tracked manifest with `baseline publication verify` on 2026-07-12.
 This is a **published authority slice**, not a full-suite or leaderboard claim.
 
+Lifecycle policy, protected workflow setup, and the operator sequence are in
+[`docs/EVIDENCE-LIFECYCLE.md`](EVIDENCE-LIFECYCLE.md).
+
 ## What is committed
 
 Commit the small JSON manifest next to the release notes.  It must contain:

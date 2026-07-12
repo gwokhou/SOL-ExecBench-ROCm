@@ -1,0 +1,51 @@
+name: Revoke published evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Published lifecycle release to revoke without deleting its artifacts.
+        required: true
+        type: string
+      reason:
+        description: Public, non-sensitive reason for revocation.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  revoke:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: evidence-lifecycle
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Require protected lifecycle environment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          rules=$(gh api "repos/${GITHUB_REPOSITORY}/environments/evidence-lifecycle" \
+            --jq '[.protection_rules[]? | select(.type == "required_reviewers")] | length')
+          test "$rules" -gt 0
+      - name: Record revocation without deleting historic evidence
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          REASON: ${{ inputs.reason }}
+        run: |
+          set -euo pipefail
+          uv sync --locked --all-groups
+          uv run python tools/evidence_lifecycle.py \
+            --registry docs/releases/evidence-lifecycle.json --repo-root . \
+            --revoke --release "$RELEASE_TAG" --reason "$REASON"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/releases/evidence-lifecycle.json
+          git commit -s -m "Revoke evidence ${RELEASE_TAG}"
+          git push origin "HEAD:main"

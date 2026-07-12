@@ -327,34 +327,39 @@ class EvidencePublicationManifest:
             raise ValueError(
                 "published bundle release or scope does not match manifest"
             )
-        if evidence.get("scope") != self.scope or not evidence.get("score_authority"):
+        if _field(evidence, "scope") != self.scope or not _field(
+            evidence, "score_authority"
+        ):
             raise ValueError(
                 "published official score evidence is not authoritative for manifest scope"
             )
-        if verification.get("release") != self.release:
+        if _field(verification, "release") != self.release:
             raise ValueError("published verification release does not match manifest")
-        if bundle.get("baseline_artifact_sha256") != by_role["scoring_baseline"].sha256:
+        if (
+            _field(bundle, "baseline_artifact_sha256")
+            != by_role["scoring_baseline"].sha256
+        ):
             raise ValueError("published scoring baseline does not match release bundle")
-        if bundle.get("suite_manifest_sha256") != by_role["suite_manifest"].sha256:
+        if _field(bundle, "suite_manifest_sha256") != by_role["suite_manifest"].sha256:
             raise ValueError("published suite manifest does not match release bundle")
         if (
-            verification.get("bundle_sha256")
+            _field(verification, "bundle_sha256")
             != by_role["release_baseline_bundle"].sha256
         ):
             raise ValueError("published verification does not match release bundle")
-        candidate = evidence.get("candidate_evidence")
+        candidate = _field(evidence, "candidate_evidence")
         if (
             not isinstance(candidate, dict)
-            or candidate.get("solution_sha256") != self.candidate.solution_sha256
-            or candidate.get("trace_sha256") != self.candidate.trace_sha256
-            or candidate.get("timing_sha256") != self.candidate.timing_sha256
+            or _field(candidate, "solution_sha256") != self.candidate.solution_sha256
+            or _field(candidate, "trace_sha256") != self.candidate.trace_sha256
+            or _field(candidate, "timing_sha256") != self.candidate.timing_sha256
         ):
             raise ValueError(
                 "published official score evidence does not bind manifest candidate"
             )
 
         digests = {artifact.sha256 for artifact in self.artifacts}
-        if verification.get("rerun_trace_sha256") not in digests:
+        if _field(verification, "rerun_trace_sha256") not in digests:
             raise ValueError("published rerun trace is absent from artifact manifest")
         self._verify_referenced_artifacts(root, bundle, verification, evidence)
 
@@ -368,32 +373,35 @@ class EvidencePublicationManifest:
         """Require every authority reference to resolve to its declared artifact."""
         by_path = {artifact.relative_path: artifact for artifact in self.artifacts}
         self._require_reference(
-            bundle.get("baseline_artifact_ref"),
-            bundle.get("baseline_artifact_sha256"),
+            _field(bundle, "baseline_artifact_ref"),
+            _field(bundle, "baseline_artifact_sha256"),
             by_path,
             "published scoring baseline reference",
         )
         self._require_reference(
-            bundle.get("suite_manifest_ref"),
-            bundle.get("suite_manifest_sha256"),
+            _field(bundle, "suite_manifest_ref"),
+            _field(bundle, "suite_manifest_sha256"),
             by_path,
             "published suite manifest reference",
         )
         self._require_reference(
-            verification.get("rerun_trace_ref"),
-            verification.get("rerun_trace_sha256"),
+            _field(verification, "rerun_trace_ref"),
+            _field(verification, "rerun_trace_sha256"),
             by_path,
             "published rerun trace reference",
         )
-        workloads = bundle.get("workloads")
+        workloads = _field(bundle, "workloads")
         if not isinstance(workloads, list):
             raise ValueError("published release bundle has no workload list")
         official_rows: dict[tuple[str, str], Mapping[str, Any]] = {}
         for row in workloads:
-            if not isinstance(row, Mapping) or row.get("classification") != "official":
+            if (
+                not isinstance(row, Mapping)
+                or _field(row, "classification") != "official"
+            ):
                 continue
-            definition = row.get("definition")
-            workload_uuid = row.get("workload_uuid")
+            definition = _field(row, "definition")
+            workload_uuid = _field(row, "workload_uuid")
             if not isinstance(definition, str) or not isinstance(workload_uuid, str):
                 raise ValueError("published official workload has invalid identity")
             key = (definition, workload_uuid)
@@ -408,8 +416,8 @@ class EvidencePublicationManifest:
                 ("hardware_model_ref", "hardware_model_sha256", "hardware model"),
             ):
                 self._require_reference(
-                    row.get(ref_field),
-                    row.get(digest_field),
+                    _field(row, ref_field),
+                    _field(row, digest_field),
                     by_path,
                     f"published official workload {label} reference",
                 )
@@ -426,7 +434,7 @@ class EvidencePublicationManifest:
         if not isinstance(reference, str) or not isinstance(digest, str):
             raise ValueError(f"{label} is missing")
         _relative_path(reference, label)
-        artifact = by_path.get(reference)
+        artifact = by_path[reference] if reference in by_path else None
         if artifact is None or artifact.sha256 != digest:
             raise ValueError(f"{label} is absent from artifact manifest")
 
@@ -443,10 +451,10 @@ class EvidencePublicationManifest:
             raise ValueError("published AMD SOL bound is not valid JSON") from exc
         if not isinstance(bound, Mapping):
             raise ValueError("published AMD SOL bound must be an object")
-        if bound.get("schema_version") != "sol_execbench.amd_sol_bound.v4":
+        if _field(bound, "schema_version") != "sol_execbench.amd_sol_bound.v4":
             return
-        reference = bound.get("fusion_validation_ref")
-        digest = bound.get("fusion_validation_sha256")
+        reference = _field(bound, "fusion_validation_ref")
+        digest = _field(bound, "fusion_validation_sha256")
         if not isinstance(reference, str) or not isinstance(digest, str):
             raise ValueError(
                 "published v4 bound fusion validation reference is missing"
@@ -458,7 +466,7 @@ class EvidencePublicationManifest:
             raise ValueError(
                 "published v4 bound fusion validation escapes artifact root"
             ) from exc
-        artifact = by_path.get(relative_path)
+        artifact = by_path[relative_path] if relative_path in by_path else None
         if artifact is None or artifact.sha256 != digest:
             raise ValueError(
                 "published v4 bound fusion validation reference is absent from artifact manifest"
@@ -469,15 +477,15 @@ class EvidencePublicationManifest:
         evidence: Mapping[str, Any],
         official_rows: Mapping[tuple[str, str], Mapping[str, Any]],
     ) -> None:
-        scores = evidence.get("scores")
+        scores = _field(evidence, "scores")
         if not isinstance(scores, list):
             raise ValueError("published official score evidence has no score list")
         by_key: dict[tuple[str, str], Mapping[str, Any]] = {}
         for score in scores:
             if not isinstance(score, Mapping):
                 raise ValueError("published official score entry must be an object")
-            definition = score.get("definition")
-            workload_uuid = score.get("workload_uuid")
+            definition = _field(score, "definition")
+            workload_uuid = _field(score, "workload_uuid")
             if not isinstance(definition, str) or not isinstance(workload_uuid, str):
                 raise ValueError(
                     "published official score has invalid workload identity"
@@ -495,7 +503,7 @@ class EvidencePublicationManifest:
             )
         for key, row in official_rows.items():
             score = by_key[key]
-            refs = score.get("input_refs")
+            refs = _field(score, "input_refs")
             if not isinstance(refs, Mapping):
                 raise ValueError("published official score has no input references")
             expected = {
@@ -503,7 +511,9 @@ class EvidencePublicationManifest:
                 "sol_bound": row["bound_ref"],
                 "hardware_model": row["hardware_model_ref"],
             }
-            if any(refs.get(name) != reference for name, reference in expected.items()):
+            if any(
+                _field(refs, name) != reference for name, reference in expected.items()
+            ):
                 raise ValueError(
                     "published official score input reference does not match bundle"
                 )
@@ -513,8 +523,8 @@ def evidence_publication_manifest_from_dict(
     payload: Mapping[str, Any],
 ) -> EvidencePublicationManifest:
     """Parse a strict publication manifest from JSON data."""
-    artifacts_raw = payload.get("artifacts")
-    candidate_raw = payload.get("candidate")
+    artifacts_raw = _field(payload, "artifacts")
+    candidate_raw = _field(payload, "candidate")
     if not isinstance(artifacts_raw, list) or not isinstance(candidate_raw, Mapping):
         raise ValueError("publication manifest requires candidate and artifacts")
     try:
@@ -544,10 +554,10 @@ def evidence_publication_manifest_from_dict(
             ),
             manifest_sha256=(
                 str(payload["manifest_sha256"])
-                if payload.get("manifest_sha256") is not None
+                if _field(payload, "manifest_sha256") is not None
                 else None
             ),
-            schema_version=str(payload.get("schema_version")),
+            schema_version=str(_field(payload, "schema_version")),
         )
     except (KeyError, TypeError, ValueError) as exc:
         raise ValueError(f"invalid evidence publication manifest: {exc}") from exc

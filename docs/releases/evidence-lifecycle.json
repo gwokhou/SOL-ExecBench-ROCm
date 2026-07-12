@@ -1,0 +1,18 @@
+{
+  "schema_version": "sol_execbench.evidence_lifecycle.v1",
+  "records": [
+    {
+      "release": "gfx1200-20260712-hipblaslt-v4",
+      "status": "published",
+      "manifest": "docs/releases/gfx1200-20260712-hipblaslt-v4.evidence.json",
+      "bundle_asset": "gfx1200-20260712-hipblaslt-v4-evidence.tar.gz",
+      "bundle_sha256": "0866ec026f53d6e77d73258c24f19108dce746c1a463dc6536d9e641a758513b",
+      "release_url": "https://github.com/gwokhou/SOL-ExecBench-ROCm/releases/tag/gfx1200-20260712-hipblaslt-v4",
+      "source_revision": "f958556fad0a5ce6740267c91f51956c378bf6fc",
+      "published_at": "2026-07-12T15:12:10Z",
+      "supersedes": null,
+      "replaced_by": null,
+      "revocation_reason": null
+    }
+  ]
+}

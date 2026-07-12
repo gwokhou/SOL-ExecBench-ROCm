@@ -10,12 +10,13 @@ release.
 
 ## Assets
 
-- Artifact bundle JSON: upload as a versioned release asset before publishing (the
-  historical ignored local copy was pruned)
+- Artifact bundle JSON: `prerelease_artifact_bundle.json`, uploaded as a
+  versioned release asset before publishing (the historical ignored local copy
+  was pruned)
 - Artifact bundle Markdown: upload as a versioned release asset before publishing
 - SHA-256 checksums: `SHA256SUMS`
-- Readiness JSON: upload as a versioned release asset before publishing (the
-  historical ignored local copy was pruned)
+- Readiness JSON: `prerelease_readiness.json`, uploaded as a versioned release
+  asset before publishing (the historical ignored local copy was pruned)
 - Readiness Markdown: `docs/prerelease_readiness.md`
 
 ## What This Prerelease Contains
