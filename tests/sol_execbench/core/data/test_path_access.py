@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import MappingProxyType
+
 import pytest
 
 from sol_execbench.core.data.path_access import (
@@ -24,9 +26,27 @@ def test_path_get_reads_nested_values_and_defaults() -> None:
     assert path_get(payload, "a.x", default="missing") == "missing"
 
 
+def test_path_get_accepts_mappings_and_stops_at_missing_or_scalar_segments() -> None:
+    payload = MappingProxyType(
+        {
+            "nested": MappingProxyType({"value": None}),
+            "scalar": 3,
+        }
+    )
+
+    assert path_get(payload, "nested.value", default="missing") is None
+    assert path_get(payload, "nested.missing.value", default="missing") == "missing"
+    assert path_get(payload, "scalar.value", default="missing") == "missing"
+
+
 def test_path_require_reports_source_and_path() -> None:
     with pytest.raises(ValueError, match="sidecar missing required field: a.b"):
         path_require({}, "a.b", source="sidecar")
+
+    with pytest.raises(
+        ValueError, match="payload missing required field: scalar.value"
+    ):
+        path_require({"scalar": 3}, "scalar.value")
 
 
 def test_path_dict_accepts_only_dict_values() -> None:
