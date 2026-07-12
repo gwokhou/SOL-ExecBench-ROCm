@@ -11,10 +11,10 @@ Use `--decision auto` with a normal benchmark run. Decision hints derive from
 static footprints, so it must be paired with `--static-evidence auto`:
 
 ```bash
-uv run sol-execbench examples/hip_cpp/rmsnorm \
+uv run sol-execbench evaluate examples/hip_cpp/rmsnorm \
   --solution examples/hip_cpp/rmsnorm/solution_hip.json \
   --static-evidence auto --decision auto \
-  -o out/rmsnorm.trace.jsonl
+  --trace-output out/rmsnorm.trace.jsonl
 ```
 
 The default is `--decision none`; in that mode no decision sidecar is written.
@@ -22,10 +22,11 @@ The default is `--decision none`; in that mode no decision sidecar is written.
 ## Applicability
 
 The sidecar requires `StaticKernelEvidenceSidecar.footprints[]`, which the
-static-evidence path collects only for HIP/C++ solutions (its `is_cpp` gate)
-and only when `roc-objdump` is installed (it is the footprint source). PyTorch
-and Triton solutions, or HIP/C++ solutions without `roc-objdump`, produce no
-footprints, so no decision sidecar is written for them.
+static-evidence path collects only for HIP/C++ solutions (its `is_cpp` gate).
+PyTorch and Triton solutions do not produce these footprints, so no decision
+sidecar is written for them. HIP/C++ footprints require a supported static
+extractor or code-object metadata; unavailable static evidence also leaves the
+decision sidecar absent.
 
 > **ROCm 7.x footprint path:** `roc-objdump` is absent on ROCm 7.x and its
 > `llvm-objdump` does not support `--resource-usage`. The static-evidence path
@@ -38,8 +39,8 @@ footprints, so no decision sidecar is written for them.
 
 | Artifact | Location |
 | --- | --- |
-| Canonical traces | `<trace>.jsonl` |
-| Decision sidecar | `<trace>.decision.json` |
+| Canonical traces | `<trace-output>` |
+| Decision sidecar | `<trace-output>.decision.json` |
 
 ## Status Vocabulary
 

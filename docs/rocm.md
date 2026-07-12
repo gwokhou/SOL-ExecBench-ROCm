@@ -76,7 +76,7 @@ SOLEXECBENCH_ENV_SNAPSHOT=1 \
   --trace-output traces.jsonl
 ```
 
-This writes an environment-sidecar JSON file next to the chosen output file. Use
+This writes an environment-sidecar JSON file next to the chosen trace output file. Use
 `SOLEXECBENCH_ENV_SNAPSHOT_PATH=out/env.json` to choose an explicit path.
 The sidecar is reproducibility evidence only; it is not part of SOL/SOLAR
 correctness or scoring.

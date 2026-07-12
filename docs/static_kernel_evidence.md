@@ -10,10 +10,10 @@ trace JSONL.
 Use `--static-evidence auto` with a normal benchmark run:
 
 ```bash
-uv run sol-execbench examples/hip_cpp/rmsnorm \
+uv run sol-execbench evaluate examples/hip_cpp/rmsnorm \
   --solution examples/hip_cpp/rmsnorm/solution_hip.json \
   --static-evidence auto \
-  -o out/rmsnorm.trace.jsonl
+  --trace-output out/rmsnorm.trace.jsonl
 ```
 
 The default is `--static-evidence none`; in that mode no static evidence is
@@ -21,16 +21,16 @@ collected and no static evidence sidecar is written.
 
 ## Output Files
 
-When `--output` is provided, static evidence is written beside the trace:
+When `--trace-output` is provided, static evidence is written beside the trace:
 
 | Artifact | Location |
 | --- | --- |
-| Canonical traces | `<trace-output>.jsonl` |
-| Static sidecar | `static-evidence payload file` |
-| Evidence directory | `trace-output static-evidence artifact directory` |
+| Canonical traces | `<trace-output>` |
+| Static sidecar | `<trace-output>.static-evidence.json` |
+| Evidence directory | `<trace-output>.static-evidence/` |
 
-Without `--output`, static evidence is written under a temporary staging location
-for the current invocation. Use `--output` for durable, repository-independent
+Without `--trace-output`, static evidence is written under a temporary staging location
+for the current invocation. Use `--trace-output` for durable, repository-independent
 artifacts.
 
 ## Status Vocabulary
