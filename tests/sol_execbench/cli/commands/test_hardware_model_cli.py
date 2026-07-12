@@ -207,7 +207,19 @@ def test_build_rejects_measured_mismatched_matrix_evidence(
     assert "compute.matrix.bf16.bf16.wmma" in payload["reason"]
 
 
-def test_calibrate_writes_rejected_artifact_before_nonzero_exit(tmp_path) -> None:
+def test_calibrate_writes_rejected_artifact_before_nonzero_exit(
+    tmp_path, monkeypatch
+) -> None:
+    from sol_execbench.cli.commands import hardware_model
+    from sol_execbench.core.scoring.hardware_calibration.environment import (
+        GpuEnvironment,
+    )
+
+    monkeypatch.setattr(
+        hardware_model,
+        "discover_gpu",
+        lambda _: GpuEnvironment(0, "gfx1200"),
+    )
     output = tmp_path / "calibration.json"
 
     result = CliRunner().invoke(
@@ -240,6 +252,9 @@ def test_calibrate_provisional_result_writes_rejected_diagnostic_before_exit(
     tmp_path, monkeypatch
 ) -> None:
     from sol_execbench.cli.commands import hardware_model
+    from sol_execbench.core.scoring.hardware_calibration.environment import (
+        GpuEnvironment,
+    )
 
     artifact = HardwareCalibrationArtifact(
         generated_at="2026-07-10T00:00:00Z",
@@ -264,6 +279,11 @@ def test_calibrate_provisional_result_writes_rejected_diagnostic_before_exit(
     )
     monkeypatch.setattr(
         hardware_model, "ensure_profiler_environment", lambda *a, **k: None
+    )
+    monkeypatch.setattr(
+        hardware_model,
+        "discover_gpu",
+        lambda _: GpuEnvironment(0, "gfx1200"),
     )
     monkeypatch.setattr(hardware_model, "run_calibration", lambda request: artifact)
     output = tmp_path / "calibration.json"
