@@ -29,7 +29,8 @@ def test_publish_workflow_requires_review_and_round_trip_verification() -> None:
     assert "workflow_dispatch:" in workflow
     assert "pull_request:" not in workflow
     assert "name: evidence-publish" in workflow
-    assert 'select(.type == "required_reviewers")' in workflow
+    assert '"required_reviewers"' in workflow
+    assert ".prevent_self_review == true" in workflow
     assert "attestations: write" in workflow
     assert "id-token: write" in workflow
     assert "Refuse to mutate an existing release" in workflow
@@ -42,7 +43,8 @@ def test_revocation_is_manual_reviewed_and_never_deletes_assets() -> None:
     assert "workflow_dispatch:" in workflow
     assert "pull_request:" not in workflow
     assert "name: evidence-lifecycle" in workflow
-    assert 'select(.type == "required_reviewers")' in workflow
+    assert '"required_reviewers"' in workflow
+    assert ".prevent_self_review == true" in workflow
     assert "Record revocation without deleting historic evidence" in workflow
     assert "gh release delete" not in workflow
 
