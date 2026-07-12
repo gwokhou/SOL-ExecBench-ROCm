@@ -60,6 +60,9 @@ be handled before making new authority claims.
 3. Dispatch `Prepare evidence bundle` on `main` and retain its successful run ID.
 4. Dispatch `Publish evidence bundle` on `main` with that run ID; a reviewer must
    approve the `evidence-publish` Environment before the write-capable job starts.
+   If a run stops after creating the immutable Release but before recording its
+   lifecycle commit, redispatch the same inputs. The workflow re-verifies the
+   public archive, attests it, and records it without replacing release assets.
 5. Confirm the lifecycle commit and the scheduled verifier are green. To replace an
    older release, pass its name as `supersedes`; to revoke a release, use the
    protected revoke workflow rather than deleting the GitHub Release.
