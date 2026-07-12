@@ -42,9 +42,6 @@ def _cache_root() -> Path:
     )
 
 
-_sha256 = sha256_file
-
-
 @contextmanager
 def _file_lock(path: Path) -> Iterator[None]:
     import fcntl
@@ -160,7 +157,7 @@ class IsaSpecRepository:
     def _is_complete(root: Path, entry: dict[str, Any]) -> bool:
         for spec in entry["files"].values():
             path = root / spec["name"]
-            if not path.is_file() or _sha256(path) != spec["sha256"]:
+            if not path.is_file() or sha256_file(path) != spec["sha256"]:
                 return False
         return True
 
@@ -189,7 +186,7 @@ class IsaSpecRepository:
                 raise IsaDownloadError(
                     f"unable to download AMD ISA archive: {exc}"
                 ) from exc
-            if _sha256(archive) != entry["archive_sha256"]:
+            if sha256_file(archive) != entry["archive_sha256"]:
                 raise IsaIntegrityError(
                     "AMD ISA archive checksum does not match release lock"
                 )
@@ -215,7 +212,7 @@ class IsaSpecRepository:
                     target = destination / name
                     with bundle.open(name) as source, target.open("wb") as output:
                         shutil.copyfileobj(source, output)
-                    if _sha256(target) != checksum:
+                    if sha256_file(target) != checksum:
                         raise IsaIntegrityError(
                             f"AMD ISA XML checksum mismatch: {name}"
                         )

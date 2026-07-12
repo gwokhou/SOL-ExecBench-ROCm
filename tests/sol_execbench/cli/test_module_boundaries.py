@@ -199,22 +199,6 @@ def test_core_does_not_depend_on_cli() -> None:
 def test_cross_domain_imports_stay_explicitly_allowlisted() -> None:
     allowed_with_rationale = {
         (
-            "sol_execbench.core.dataset.amd_score_reports",
-            "sol_execbench.core.scoring.amd_score.reports",
-        ): "dataset score report exports scoring report helpers",
-        (
-            "sol_execbench.core.dataset.amd_score_reports",
-            "sol_execbench.core.scoring.amd_score.sidecar_parsing",
-        ): "dataset score report exports sidecar payload parsers",
-        (
-            "sol_execbench.core.dataset.amd_score_reports",
-            "sol_execbench.core.scoring.amd_sol",
-        ): "dataset score report exports the AMD SOL artifact builder",
-        (
-            "sol_execbench.core.dataset.amd_score_reports",
-            "sol_execbench.core.scoring.solar_derivation",
-        ): "dataset score report exports SOLAR derivation helpers",
-        (
             "sol_execbench.core.dataset.cli_execution",
             "sol_execbench.core.bench.io",
         ): "dataset CLI execution loads benchmark result traces",
@@ -937,8 +921,11 @@ def test_amd_score_report_sidecar_parsers_live_outside_orchestrator() -> None:
     assert amd_score_sidecar_parsing.read_json_object is not None
     assert amd_score_sidecar_parsing.amd_sol_bound_from_payload is not None
     assert amd_score_sidecar_parsing.minimal_solar_aggregate_from_payload is not None
+    assert amd_score_reports.AmdScoreReportRequest is not None
+    assert amd_score_reports.build_amd_score_reports_for_problem is not None
 
     for name in (
+        "_build_amd_score_reports_for_problem_impl",
         "_read_json_object",
         "_amd_sol_bound_from_payload",
         "_minimal_solar_aggregate_from_payload",

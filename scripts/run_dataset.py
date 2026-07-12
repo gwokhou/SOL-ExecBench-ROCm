@@ -85,8 +85,7 @@ from sol_execbench.core.dataset.runner import (
     write_summary_report,
 )
 from sol_execbench.core.dataset.runner_scoring import (
-    _extend_derived_reports_for_problem,
-    build_amd_score_reports_for_problem,
+    extend_derived_reports_for_problem,
     scoring_baseline_coverage_report,
     write_amd_score_report,
     write_official_score_report,
@@ -116,6 +115,7 @@ from sol_execbench.core.dataset.sharding import (
 )
 from sol_execbench.core.scoring.amd_score import (
     AmdNativeScore,
+    build_amd_score_reports_for_problem,
 )
 from sol_execbench.core.scoring.amd_score.derived_artifacts import (
     ResolvedHardwareModel,
@@ -1123,7 +1123,7 @@ def _run_existing_trace_derived_problem(
         or amd_sol_bound_dir is not None
         or solar_derivation is not None
     ):
-        _extend_derived_reports_for_problem(
+        extend_derived_reports_for_problem(
             amd_scores=amd_scores,
             definition_path=definition_path,
             workload_path=workload_path,
@@ -1730,7 +1730,7 @@ def _run_pipeline_post_trace_outputs(
             or args.amd_sol_bound_dir is not None
             or args.solar_derivation is not None
         ):
-            _extend_derived_reports_for_problem(
+            extend_derived_reports_for_problem(
                 amd_scores=amd_scores,
                 definition_path=definition_path,
                 workload_path=workload_path,
@@ -2946,7 +2946,7 @@ def main():
                 or args.amd_sol_bound_dir is not None
                 or args.solar_derivation is not None
             ):
-                _extend_derived_reports_for_problem(
+                extend_derived_reports_for_problem(
                     amd_scores=amd_scores,
                     definition_path=definition_path,
                     workload_path=workload_path,
@@ -3090,7 +3090,7 @@ def main():
                     or args.amd_sol_bound_dir is not None
                     or args.solar_derivation is not None
                 ):
-                    _extend_derived_reports_for_problem(
+                    extend_derived_reports_for_problem(
                         amd_scores=amd_scores,
                         definition_path=definition_path,
                         workload_path=workload_path,
@@ -3377,7 +3377,7 @@ def main():
             or args.amd_sol_bound_dir is not None
             or args.solar_derivation is not None
         ):
-            _extend_derived_reports_for_problem(
+            extend_derived_reports_for_problem(
                 amd_scores=amd_scores,
                 definition_path=definition_path,
                 workload_path=workload_path,

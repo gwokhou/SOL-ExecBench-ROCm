@@ -6,14 +6,14 @@ import json
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-import sol_execbench.core.dataset.cli_execution as cli_execution
 from sol_execbench.core.evidence.baseline_coverage import (
     BaselineCoverageReport,
     validate_baseline_coverage,
 )
 from sol_execbench.core.scoring.amd_score import AmdNativeScore
 from sol_execbench.core.scoring.amd_score.reports import (
-    _build_amd_score_reports_for_problem_impl,
+    AmdScoreReportRequest,
+    build_amd_score_reports_for_problem,
     write_amd_score_report,
 )
 from sol_execbench.core.scoring.amd_score.derived_artifacts import ResolvedHardwareModel
@@ -26,49 +26,11 @@ from sol_execbench.core.scoring.official_score import (
 from sol_execbench.core.scoring.release_baseline import OfficialReleaseBaseline
 
 __all__ = [
-    "build_amd_score_reports_for_problem",
     "extend_derived_reports_for_problem",
     "scoring_baseline_coverage_report",
     "write_amd_score_report",
     "write_official_score_report",
 ]
-
-
-def build_amd_score_reports_for_problem(
-    *,
-    definition_payload: dict,
-    workload_path: Path,
-    traces_payload: list[dict],
-    trace_ref: str,
-    baseline_artifact: ScoringBaselineArtifact | None = None,
-    sol_bound_artifact_dir: Path | None = None,
-    solar_derivation_dir: Path | None = None,
-    sidecar_namespace: str | None = None,
-    derived_sidecar_exclusions: dict[str, str] | None = None,
-    hardware_model: ResolvedHardwareModel | None = None,
-    fusion_validation: FusionValidationArtifact | None = None,
-    fusion_validation_ref: str | None = None,
-    fusion_validation_sha256: str | None = None,
-    fusion_validation_path: Path | None = None,
-) -> list[AmdNativeScore]:
-    """Build derived AMD-native scores for one dataset-run problem."""
-    return _build_amd_score_reports_for_problem_impl(
-        definition_payload=definition_payload,
-        workload_path=workload_path,
-        traces_payload=traces_payload,
-        trace_ref=trace_ref,
-        run_cli_func=cli_execution.run_cli,
-        baseline_artifact=baseline_artifact,
-        sol_bound_artifact_dir=sol_bound_artifact_dir,
-        solar_derivation_dir=solar_derivation_dir,
-        sidecar_namespace=sidecar_namespace,
-        derived_sidecar_exclusions=derived_sidecar_exclusions,
-        hardware_model=hardware_model,
-        fusion_validation=fusion_validation,
-        fusion_validation_ref=fusion_validation_ref,
-        fusion_validation_sha256=fusion_validation_sha256,
-        fusion_validation_path=fusion_validation_path,
-    )
 
 
 def extend_derived_reports_for_problem(
@@ -100,25 +62,24 @@ def extend_derived_reports_for_problem(
         sidecar_namespace = None
     amd_scores.extend(
         build_amd_score_reports_for_problem(
-            definition_payload=json.loads(definition_path.read_text()),
-            workload_path=workload_path,
-            traces_payload=traces_payload,
-            trace_ref=trace_ref,
-            baseline_artifact=baseline_artifact,
-            sol_bound_artifact_dir=sol_bound_artifact_dir,
-            solar_derivation_dir=solar_derivation_dir,
-            sidecar_namespace=sidecar_namespace,
-            derived_sidecar_exclusions=derived_sidecar_exclusions,
-            hardware_model=hardware_model,
-            fusion_validation=fusion_validation,
-            fusion_validation_ref=fusion_validation_ref,
-            fusion_validation_sha256=fusion_validation_sha256,
-            fusion_validation_path=fusion_validation_path,
+            AmdScoreReportRequest(
+                definition_payload=json.loads(definition_path.read_text()),
+                workload_path=workload_path,
+                traces_payload=traces_payload,
+                trace_ref=trace_ref,
+                baseline_artifact=baseline_artifact,
+                sol_bound_artifact_dir=sol_bound_artifact_dir,
+                solar_derivation_dir=solar_derivation_dir,
+                sidecar_namespace=sidecar_namespace,
+                derived_sidecar_exclusions=derived_sidecar_exclusions,
+                hardware_model=hardware_model,
+                fusion_validation=fusion_validation,
+                fusion_validation_ref=fusion_validation_ref,
+                fusion_validation_sha256=fusion_validation_sha256,
+                fusion_validation_path=fusion_validation_path,
+            )
         )
     )
-
-
-_extend_derived_reports_for_problem = extend_derived_reports_for_problem
 
 
 def write_official_score_report(

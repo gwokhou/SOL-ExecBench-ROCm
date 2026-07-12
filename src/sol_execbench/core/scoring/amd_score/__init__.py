@@ -14,6 +14,10 @@ from sol_execbench.core.scoring.amd_score.models import (
     amd_native_score_from_dict,
     amd_native_suite_report_from_dict,
 )
+from sol_execbench.core.scoring.amd_score.reports import (
+    AmdScoreReportRequest,
+    build_amd_score_reports_for_problem,
+)
 from sol_execbench.core.scoring.amd_score.traces import (
     build_amd_native_suite_report,
     build_amd_native_suite_report_from_traces,
@@ -43,12 +47,14 @@ __all__ = [
     "UNVALIDATED_HARDWARE_WARNING",
     "AmdNativeScore",
     "AmdNativeSuiteReport",
+    "AmdScoreReportRequest",
     "BoundEligibilityEvidence",
     "SolarScoreGuard",
     "amd_native_score_from_dict",
     "amd_native_suite_report_from_dict",
     "build_amd_native_suite_report",
     "build_amd_native_suite_report_from_traces",
+    "build_amd_score_reports_for_problem",
     "score_amd_native_trace_workload",
     "score_amd_native_workload",
 ]

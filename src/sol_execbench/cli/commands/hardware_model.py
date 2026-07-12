@@ -122,7 +122,7 @@ def _calibrate(
             auto_install=not no_auto_install,
         )
         requirements = _load_requirements(requirements_path, environment.architecture)
-        artifact = run_calibration(
+        calibration_artifact = run_calibration(
             CalibrationRequest(
                 environment=environment,
                 require_clock_lock=require_clock_lock,
@@ -141,7 +141,7 @@ def _calibrate(
         raise CliFailure(
             str(exc), code="environment_unavailable", exit_code=EXIT_UNAVAILABLE
         ) from exc
-    if artifact.validation_status != "validated":
+    if calibration_artifact.validation_status != "validated":
         reason = (
             "calibration is diagnostic only; validation provenance is not confirmed"
         )
@@ -149,10 +149,10 @@ def _calibrate(
         raise CliFailure(
             reason, code="environment_unavailable", exit_code=EXIT_UNAVAILABLE
         )
-    _write_json(output, artifact.to_dict())
+    _write_json(output, calibration_artifact.to_dict())
     return CliResult(
-        data={"validation_status": artifact.validation_status},
-        artifacts=(artifact_ref(output, "json_file"),),
+        data={"validation_status": calibration_artifact.validation_status},
+        artifacts=(artifact(output, "json_file"),),
     )
 
 
@@ -306,7 +306,7 @@ def _build(
             "schema_version": AMD_HARDWARE_MODEL_SCHEMA_VERSION,
             "architecture": architecture,
         },
-        artifacts=(artifact_ref(output, "json_file"),),
+        artifacts=(artifact(output, "json_file"),),
     )
 
 
@@ -452,7 +452,3 @@ def _conservative_profile_value(
     if other.value is None:
         raise ValueError("verification calibration profile is unmeasured")
     return min(float(value), float(other.value))
-
-
-artifact_ref = artifact
-_hardware_model_cli = hardware_model_cli

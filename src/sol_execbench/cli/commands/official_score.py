@@ -283,7 +283,6 @@ def _suite_workloads(path: Path) -> tuple[tuple[str, str], ...]:
     return tuple(workloads)
 
 
-_official_score_cli = score_cli
 _official_score_cli_command = score_cli.commands["official"]
 setattr(
     _official_score_cli_command,
