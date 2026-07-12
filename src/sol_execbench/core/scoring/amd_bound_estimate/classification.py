@@ -67,7 +67,7 @@ _CALL_CLASSIFIERS: tuple[tuple[set[str], CallClassification], ...] = (
         ),
     ),
     (
-        {"layer_norm", "group_norm", "rms_norm", "norm", "rsqrt"},
+        {"layer_norm", "group_norm", "rms_norm", "norm"},
         CallClassification(
             "normalization",
             EstimateConfidence.INEXACT,
@@ -83,11 +83,27 @@ _CALL_CLASSIFIERS: tuple[tuple[set[str], CallClassification], ...] = (
         ),
     ),
     (
-        {"relu", "gelu", "silu", "sigmoid", "tanh", "exp", "sqrt", "gate"},
+        {
+            "relu",
+            "gelu",
+            "silu",
+            "sigmoid",
+            "exp",
+            "sqrt",
+            "gate",
+        },
         CallClassification(
             "mlp_activation",
             EstimateConfidence.INEXACT,
             "recognized activation operation",
+        ),
+    ),
+    (
+        {"tanh", "rsqrt"},
+        CallClassification(
+            "mlp_activation",
+            EstimateConfidence.SUPPORTED,
+            "recognized static-shape pointwise activation",
         ),
     ),
     (
@@ -104,6 +120,7 @@ _CALL_CLASSIFIERS: tuple[tuple[set[str], CallClassification], ...] = (
             "logical_and",
             "logical_or",
             "logical_not",
+            "pow",
         },
         CallClassification(
             "elementwise",
@@ -147,11 +164,21 @@ _CALL_CLASSIFIERS: tuple[tuple[set[str], CallClassification], ...] = (
             "concat",
             "stack",
             "copy_",
+            "clone",
+            "pad",
         },
         CallClassification(
             "data_movement",
             EstimateConfidence.SUPPORTED,
             "recognized materialized data-movement operation",
+        ),
+    ),
+    (
+        {"chunk", "split", "tensor_split"},
+        CallClassification(
+            "data_movement",
+            EstimateConfidence.INEXACT,
+            "recognized tensor partition view with unresolved output shapes",
         ),
     ),
     (
@@ -173,11 +200,14 @@ _LOGICAL_VIEW_NAMES = {
     "flatten",
     "unsqueeze",
     "squeeze",
+    "chunk",
+    "split",
+    "tensor_split",
 }
 _BROADCAST_VIEW_NAMES = {"expand", "broadcast_to"}
 _MATERIALIZED_MOVEMENT_NAMES = {"contiguous"}
 _MATERIALIZED_MOVEMENT_NAMES.update(
-    {"zeros", "zeros_like", "cat", "concat", "stack", "copy_", "getitem"}
+    {"zeros", "zeros_like", "cat", "concat", "stack", "copy_", "clone", "pad"}
 )
 _DTYPE_METHOD_TARGETS = {
     "float": "float32",

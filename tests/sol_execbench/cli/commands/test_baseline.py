@@ -483,3 +483,50 @@ def test_baseline_export_json_prints_sorted_registry(
         "a": {"b": 2},
         "z": 1,
     }
+
+
+def test_selection_build_requires_and_freezes_every_suite_workload(
+    tmp_path: Path,
+) -> None:
+    suite_path = tmp_path / "suite.json"
+    candidates_path = tmp_path / "candidates.json"
+    output_path = tmp_path / "selection.json"
+    suite_path.write_text(
+        json.dumps({"workloads": [{"definition": "gemm", "workload_uuid": "w1"}]}),
+        encoding="utf-8",
+    )
+    candidate = {
+        "definition": "gemm",
+        "workload_uuid": "w1",
+        "candidate": "hipblas",
+        "solution_sha256": "a" * 64,
+        "backend": "hipblas",
+        "backend_version": "7.1",
+        "build_id": "build-1",
+        "dependencies": ["hipblas"],
+        "timings_ms": [1.0, 1.0, 1.0],
+        "median_ms": 1.0,
+        "spread_rel": 0.0,
+        "correctness_passed": True,
+    }
+    candidates_path.write_text(json.dumps([candidate]), encoding="utf-8")
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "baseline",
+            "selection",
+            "build",
+            "--suite-manifest",
+            str(suite_path),
+            "--candidates",
+            str(candidates_path),
+            "--scope",
+            "gfx1200:test",
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(output_path.read_text())["selections"][0]["winner"] == "hipblas"

@@ -49,12 +49,7 @@ def _with_hardware_profile_evidence(
     outputs = node_tensors(graph, node.output_tensor_ids)
     input_dtype = _profile_dtype(first_tensor_dtype(inputs))
     output_dtype = _profile_dtype(first_tensor_dtype(outputs))
-    matrix_families = {OpFamily.GEMM, OpFamily.CONVOLUTION, OpFamily.ATTENTION}
-    operation = (
-        ("matrix" if node.op_family in matrix_families else "vector")
-        if estimate.flops > 0.0
-        else None
-    )
+    operation = _compute_operation_for(node) if estimate.flops > 0.0 else None
     path = str(
         node.attributes.get("compute_path")
         or ("mfma" if operation == "matrix" else "portable")
@@ -81,6 +76,19 @@ def _profile_dtype(dtype: str | None) -> str | None:
         "float32": "fp32",
         "float64": "fp64",
     }.get(dtype or "", dtype)
+
+
+def _compute_operation_for(node: BoundGraphNode) -> str:
+    """Return the calibrated instruction class for a visible operation node."""
+    if node.op_family in {OpFamily.GEMM, OpFamily.CONVOLUTION, OpFamily.ATTENTION}:
+        return "matrix"
+    if node.op_family == OpFamily.REDUCTION:
+        return "reduction"
+    if node.op_family == OpFamily.MLP_ACTIVATION and node.op_name.rsplit(
+        ".", maxsplit=1
+    )[-1] in {"tanh", "rsqrt"}:
+        return "transcendental"
+    return "vector"
 
 
 __all__ = [

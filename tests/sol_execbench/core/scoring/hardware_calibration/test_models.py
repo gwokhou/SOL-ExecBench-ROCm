@@ -23,9 +23,12 @@ def test_unknown_candidate_cannot_carry_a_value() -> None:
 
 def _payload() -> dict[str, object]:
     return {
-        "schema_version": "sol_execbench.hardware_calibration.v1",
+        "schema_version": "sol_execbench.hardware_calibration.v2",
         "generated_at": "2026-07-10T00:00:00Z",
-        "metadata": {},
+        "metadata": {
+            "profile_requirements": {"required_profile_keys": ["compute.fp32.vector"]},
+            "probe_protocol": {"warmup_iterations": 3, "timed_samples": 7},
+        },
         "candidates": [
             {
                 "key": "compute.fp32.vector",
@@ -86,9 +89,23 @@ def test_artifact_parser_rejects_edited_payload_checksum() -> None:
         ),
         collection_status="collected",
         validation_status="validated",
+        metadata={
+            "profile_requirements": {
+                "required_profile_keys": ["compute.vector.fp32.fp32.portable"]
+            },
+            "probe_protocol": {"warmup_iterations": 3, "timed_samples": 7},
+        },
     )
     payload = artifact.to_dict()
     payload["generated_at"] = "2026-07-11T00:00:00Z"
 
     with pytest.raises(ValueError, match="checksum"):
+        hardware_calibration_artifact_from_dict(payload)
+
+
+def test_artifact_parser_rejects_superseded_v1_schema() -> None:
+    payload = _payload()
+    payload["schema_version"] = "sol_execbench.hardware_calibration.v1"
+
+    with pytest.raises(ValueError, match="unsupported calibration schema"):
         hardware_calibration_artifact_from_dict(payload)

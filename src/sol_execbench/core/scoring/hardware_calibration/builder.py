@@ -23,6 +23,7 @@ from sol_execbench.core.scoring.hardware_calibration.hip_probe import (
     default_hip_probe,
 )
 from sol_execbench.core.scoring.hardware_calibration.models import (
+    CALIBRATION_SCHEMA_VERSION,
     HardwareCalibrationArtifact,
 )
 from sol_execbench.core.scoring.hardware_calibration.rocprof_compute import (
@@ -62,6 +63,9 @@ class CalibrationRequest:
     clock_controller: ClockController | None = None
     profiler_environment: ProfilerEnvironment | None = None
     profiler_run: Callable[..., object] | None = None
+    required_profile_keys: tuple[str, ...] = ()
+    requirements_ref: str | None = None
+    requirements_sha256: str | None = None
 
 
 def _profile_metadata(
@@ -116,6 +120,23 @@ def run_calibration(request: CalibrationRequest) -> HardwareCalibrationArtifact:
     probe = request.hip_probe or default_hip_probe(
         architecture=request.environment.architecture
     )
+    declared_keys = {key.value for key in adapter.all_candidates}
+    required_keys = (
+        tuple(sorted(set(request.required_profile_keys)))
+        if request.required_profile_keys
+        else tuple(sorted(key.value for key in adapter.candidates))
+    )
+    unknown_required = set(required_keys) - declared_keys
+    if unknown_required:
+        raise ValueError(
+            "calibration requirements contain undeclared profiles: "
+            + ", ".join(sorted(unknown_required))
+        )
+    measurement_keys = tuple(
+        key
+        for key in adapter.all_candidates
+        if key in adapter.candidates or key.value in required_keys
+    )
     try:
         if controller is None:
             clock_reason = "clock_lock_adapter_unavailable"
@@ -142,7 +163,7 @@ def run_calibration(request: CalibrationRequest) -> HardwareCalibrationArtifact:
                 observations["during"] = bool(observe())
             except Exception:
                 observations["during"] = None
-        candidates = tuple(probe.measure(key) for key in adapter.candidates)
+        candidates = tuple(probe.measure(key) for key in measurement_keys)
     finally:
         # Reset is unconditional: a failed/ambiguous lock command can still
         # have changed policy, and diagnostic collection must leave no setting
@@ -177,6 +198,20 @@ def run_calibration(request: CalibrationRequest) -> HardwareCalibrationArtifact:
         },
         "gpu_uuid": request.environment.uuid,
         "rocm_version": request.environment.rocm_version,
+        "profile_requirements": {
+            "architecture": request.environment.architecture,
+            "required_profile_keys": list(required_keys),
+            "requirements_ref": request.requirements_ref,
+            "requirements_sha256": request.requirements_sha256,
+        },
+        "probe_protocol": {
+            "warmup_iterations": 3,
+            "timed_samples": 7,
+            "selection": "minimum_of_best_three",
+        },
+        "probe_evidence": {
+            key.value: probe.provenance_for(key) for key in measurement_keys
+        },
     }
     if clock_reason:
         metadata["clock_lock_reason"] = clock_reason
@@ -187,15 +222,21 @@ def run_calibration(request: CalibrationRequest) -> HardwareCalibrationArtifact:
         and observations["during"] is True
         and observations["post"] is False
         and bool(candidates)
-        and all(candidate.state == "measured" for candidate in candidates)
+        and all(
+            candidate.state == "measured"
+            for candidate in candidates
+            if candidate.key in required_keys
+        )
     )
     metadata["validation_provenance"] = {
         "adapter_requires_clock_lock": adapter.supports_clock_lock,
         "clock_locked": locked,
         "clock_observed_during_sampling": observations["during"] is True,
         "clock_reset_observed": observations["post"] is False,
-        "all_declared_profiles_measured": all(
-            candidate.state == "measured" for candidate in candidates
+        "all_required_profiles_measured": all(
+            candidate.state == "measured"
+            for candidate in candidates
+            if candidate.key in required_keys
         ),
     }
     return HardwareCalibrationArtifact(
@@ -204,4 +245,5 @@ def run_calibration(request: CalibrationRequest) -> HardwareCalibrationArtifact:
         collection_status="collected",
         validation_status="validated" if validated_from_provenance else "provisional",
         metadata=metadata,
+        schema_version=CALIBRATION_SCHEMA_VERSION,
     )

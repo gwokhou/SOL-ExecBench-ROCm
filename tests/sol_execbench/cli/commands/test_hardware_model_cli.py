@@ -43,6 +43,10 @@ def test_build_authority_rejects_mismatched_live_environment() -> None:
             "rocm_version": "7.1.1",
             "adapter_policy": {"requires_clock_lock": True},
             "clock_observations": {"pre": False, "during": True, "post": False},
+            "profile_requirements": {
+                "required_profile_keys": ["compute.vector.fp32.fp32.portable"]
+            },
+            "probe_protocol": {"warmup_iterations": 3, "timed_samples": 7},
         },
     )
 
@@ -108,6 +112,10 @@ def test_build_profile_evidence_ref_binds_calibration_checksum(
             "rocm_version": "7.1.1",
             "adapter_policy": {"requires_clock_lock": True},
             "clock_observations": {"pre": False, "during": True, "post": False},
+            "profile_requirements": {
+                "required_profile_keys": ["compute.vector.fp32.fp32.portable"]
+            },
+            "probe_protocol": {"warmup_iterations": 3, "timed_samples": 7},
         },
     )
     calibration_path = tmp_path / "calibration.json"
@@ -163,6 +171,10 @@ def test_build_rejects_measured_mismatched_matrix_evidence(
             "rocm_version": "7.1.1",
             "adapter_policy": {"requires_clock_lock": True},
             "clock_observations": {"pre": False, "during": True, "post": False},
+            "profile_requirements": {
+                "required_profile_keys": ["compute.vector.fp32.fp32.portable"]
+            },
+            "probe_protocol": {"warmup_iterations": 3, "timed_samples": 7},
         },
     )
     calibration_path = tmp_path / "calibration.json"
@@ -240,7 +252,13 @@ def test_calibrate_provisional_result_writes_rejected_diagnostic_before_exit(
         ),
         collection_status="collected",
         validation_status="provisional",
-        metadata={"architecture": "gfx1200"},
+        metadata={
+            "architecture": "gfx1200",
+            "profile_requirements": {
+                "required_profile_keys": ["compute.vector.fp32.fp32.portable"]
+            },
+            "probe_protocol": {"warmup_iterations": 3, "timed_samples": 7},
+        },
     )
     monkeypatch.setattr(
         hardware_model, "ensure_profiler_environment", lambda *a, **k: None

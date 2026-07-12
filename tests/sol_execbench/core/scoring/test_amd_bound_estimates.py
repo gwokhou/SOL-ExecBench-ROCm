@@ -971,6 +971,41 @@ def test_static_sum_reduction_estimate_records_exact_axis_and_formula():
     assert "exact sum-reduction" in estimate.rationale
 
 
+def test_static_broadcast_and_full_sum_are_exact() -> None:
+    from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
+
+    definition = make_definition(
+        name="broadcast_sum_demo",
+        axes={
+            "M": {"type": "const", "value": 2},
+            "N": {"type": "const", "value": 4},
+        },
+        inputs={
+            "x": {"shape": ["M", "N"], "dtype": "float32"},
+            "mask": {"shape": ["M", "1"], "dtype": "float32"},
+        },
+        outputs={"out": {"shape": [], "dtype": "float32"}},
+        reference=(
+            "import torch\n\ndef run(x, mask):\n    return torch.sum(x * mask)\n"
+        ),
+    )
+    workload = make_workload(
+        axes={},
+        inputs={"x": {"type": "random"}, "mask": {"type": "random"}},
+        uuid="broadcast-sum-workload",
+    )
+
+    estimates = estimate_bound_work(build_bound_graph(definition, workload))
+    pointwise, reduction = estimates
+
+    assert pointwise.confidence == EstimateConfidence.SUPPORTED
+    assert pointwise.formula_inputs["output_elements"] == 8
+    assert reduction.confidence == EstimateConfidence.SUPPORTED
+    assert reduction.formula_inputs["output_elements"] == 1
+    assert reduction.formula_inputs["axis"] is None
+    assert reduction.flops == 7.0
+
+
 def test_softmax_missing_axis_stays_inexact_with_missing_axis_evidence():
     node = BoundGraphNode(
         node_id="op_1",
@@ -1100,7 +1135,89 @@ def test_contiguous_and_dtype_conversion_count_movement_bytes():
     assert conversion.flops == 0.0
     assert conversion.movement_bytes > 0.0
     assert conversion.formula_inputs["target_dtype"] == "float16"
+    assert conversion.confidence == EstimateConfidence.SUPPORTED
     assert "dtype conversion" in conversion.rationale
+
+
+def test_pow_two_is_exact_but_general_pow_stays_inexact() -> None:
+    from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
+
+    def estimate_for(exponent: int):
+        definition = make_definition(
+            name=f"pow_{exponent}_demo",
+            axes={"N": {"type": "const", "value": 8}},
+            inputs={"x": {"shape": ["N"], "dtype": "float32"}},
+            outputs={"out": {"shape": ["N"], "dtype": "float32"}},
+            reference=f"def run(x):\n    return x.pow({exponent})\n",
+        )
+        workload = make_workload(
+            axes={}, inputs={"x": {"type": "random"}}, uuid=f"pow-{exponent}"
+        )
+        return estimate_bound_work(build_bound_graph(definition, workload))[0]
+
+    assert estimate_for(2).confidence == EstimateConfidence.SUPPORTED
+    assert estimate_for(3).confidence == EstimateConfidence.INEXACT
+
+
+def test_same_dtype_conversion_is_a_shape_proved_no_op() -> None:
+    from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
+
+    definition = make_definition(
+        name="same_dtype_conversion_demo",
+        axes={"N": {"type": "const", "value": 8}},
+        inputs={"x": {"shape": ["N"], "dtype": "bfloat16"}},
+        outputs={"out": {"shape": ["N"], "dtype": "bfloat16"}},
+        reference=("import torch\n\ndef run(x):\n    return x.to(torch.bfloat16)\n"),
+    )
+    workload = make_workload(
+        axes={}, inputs={"x": {"type": "random"}}, uuid="same-dtype-workload"
+    )
+
+    estimate = estimate_bound_work(build_bound_graph(definition, workload))[0]
+
+    assert estimate.confidence == EstimateConfidence.SUPPORTED
+    assert estimate.formula == "0"
+    assert estimate.total_bytes == 0.0
+    assert estimate.formula_inputs["no_op"] is True
+
+
+def test_ast_rms_chain_resolves_reduction_shape_and_input_dtype_metadata() -> None:
+    from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
+
+    definition = make_definition(
+        name="ast_rms_chain_demo",
+        axes={
+            "M": {"type": "const", "value": 2},
+            "N": {"type": "const", "value": 8},
+        },
+        inputs={"x": {"shape": ["M", "N"], "dtype": "bfloat16"}},
+        outputs={"out": {"shape": ["M", "1"], "dtype": "bfloat16"}},
+        reference=(
+            "import torch\n\n"
+            "def run(x):\n"
+            "    batch, hidden = x.shape\n"
+            "    assert hidden == 8\n"
+            "    y = x.to(torch.float32).pow(2).mean(dim=-1, keepdim=True)\n"
+            "    return y.to(x.dtype)\n"
+        ),
+    )
+    workload = make_workload(
+        axes={}, inputs={"x": {"type": "random"}}, uuid="ast-rms-chain"
+    )
+
+    graph = build_bound_graph(definition, workload)
+    estimates = estimate_bound_work(graph)
+    reduction = next(
+        estimate for estimate in estimates if estimate.op_family == OpFamily.REDUCTION
+    )
+    final_conversion = estimates[-1]
+
+    assert "dynamic_trace_failed" in graph.warnings
+    assert all(
+        estimate.confidence == EstimateConfidence.SUPPORTED for estimate in estimates
+    )
+    assert reduction.formula_inputs["output_elements"] == 2
+    assert final_conversion.formula_inputs["target_dtype"] == "bfloat16"
 
 
 def test_zeros_like_has_exact_fill_bytes_without_reading_source_values():

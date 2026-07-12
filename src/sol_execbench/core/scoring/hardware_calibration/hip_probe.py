@@ -12,11 +12,12 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import hashlib
 from math import isfinite
 from pathlib import Path
 from tempfile import mkdtemp
 from dataclasses import dataclass
-from typing import Callable
+from typing import Any, Callable, Mapping
 
 from sol_execbench.core.scoring.hardware_calibration.models import CalibrationCandidate
 from sol_execbench.core.scoring.hardware_calibration.statistics import (
@@ -55,6 +56,7 @@ class ProbeExecution:
 CompileCandidate = Callable[[CalibrationProfileKey], str | bool | None]
 ExecuteCandidate = Callable[[CalibrationProfileKey], ProbeExecution | None]
 CheckCandidate = Callable[[CalibrationProfileKey, ProbeExecution], bool | None]
+ProbeEvidence = Callable[[CalibrationProfileKey], Mapping[str, Any] | None]
 _DEFAULT_HIPCC = object()
 
 
@@ -66,6 +68,21 @@ class HipProbe:
     execute_candidate: ExecuteCandidate | None = None
     check_correctness: CheckCandidate | None = None
     check_stability: CheckCandidate | None = None
+    evidence_for: ProbeEvidence | None = None
+
+    def provenance_for(self, key: CalibrationProfileKey) -> dict[str, Any]:
+        """Return compile/run provenance when the concrete backend exposes it."""
+        if self.evidence_for is None:
+            return {"collection": "injected_probe"}
+        try:
+            evidence = self.evidence_for(key)
+        except Exception:
+            return {"collection": "unavailable"}
+        return (
+            dict(evidence)
+            if isinstance(evidence, Mapping)
+            else {"collection": "unavailable"}
+        )
 
     def measure(self, key: CalibrationProfileKey) -> CalibrationCandidate:
         compile_state = self._compile(key)
@@ -155,6 +172,7 @@ class HipCommandBackend:
         self.architecture = architecture.lower() if architecture is not None else None
         self.run = run
         self._executables: dict[CalibrationProfileKey, Path] = {}
+        self._evidence: dict[CalibrationProfileKey, dict[str, Any]] = {}
 
     def compile(self, key: CalibrationProfileKey) -> str:
         if self.architecture is not None and not _matrix_path_is_supported(
@@ -169,26 +187,48 @@ class HipCommandBackend:
             and key.output_dtype == key.input_dtype
             and key.path in {"wmma", "mfma"}
         )
-        is_fp32_probe = (
-            key.input_dtype == "fp32"
-            and key.output_dtype == "fp32"
+        is_vector_probe = (
+            key.input_dtype in {"fp32", "fp16", "bf16"}
+            and key.output_dtype == key.input_dtype
             and key.operation == "vector"
         )
-        is_stream_probe = (
-            key.input_dtype in {"fp32", "fp16"}
-            and key.output_dtype == key.input_dtype
-            and key.operation == "stream_copy"
+        is_stream_probe = key.operation == "stream_copy" and (
+            key.input_dtype,
+            key.output_dtype,
+        ) in {
+            ("fp32", "fp32"),
+            ("fp16", "fp16"),
+            ("bf16", "bf16"),
+            ("bf16", "fp32"),
+            ("fp32", "bf16"),
+        }
+        is_reduction_probe = (
+            key.kind == "compute"
+            and key.operation == "reduction"
+            and key.input_dtype == key.output_dtype == "fp32"
         )
-        if not (is_matrix or is_fp32_probe or is_stream_probe):
+        is_transcendental_probe = (
+            key.kind == "compute"
+            and key.operation == "transcendental"
+            and key.input_dtype == key.output_dtype == "fp32"
+        )
+        if not (
+            is_matrix
+            or is_vector_probe
+            or is_stream_probe
+            or is_reduction_probe
+            or is_transcendental_probe
+        ):
             return "failed"
         self.workspace.mkdir(parents=True, exist_ok=True)
         stem = key.value.replace(".", "_")
         source = self.workspace / f"{stem}.hip"
         executable = self.workspace / stem
         try:
-            source.write_text(_hip_source(key), encoding="utf-8")
+            source_text = _hip_source(key)
+            source.write_text(source_text, encoding="utf-8")
             command = [self.hipcc, "-O3"]
-            if is_matrix and self.architecture is not None:
+            if self.architecture is not None:
                 command.append(f"--offload-arch={self.architecture}")
             command.extend((str(source), "-o", str(executable)))
             result = self.run(
@@ -202,7 +242,21 @@ class HipCommandBackend:
         if getattr(result, "returncode", 1) != 0:
             return "failed"
         self._executables[key] = executable
+        try:
+            binary_sha256 = hashlib.sha256(executable.read_bytes()).hexdigest()
+        except OSError:
+            binary_sha256 = None
+        self._evidence[key] = {
+            "compiler_command": command,
+            "source_sha256": hashlib.sha256(source_text.encode("utf-8")).hexdigest(),
+            "binary_sha256": binary_sha256,
+            "warmup_iterations": 3,
+            "timed_samples": 7,
+        }
         return "passed"
+
+    def evidence(self, key: CalibrationProfileKey) -> Mapping[str, Any] | None:
+        return self._evidence.get(key)
 
     def execute(self, key: CalibrationProfileKey) -> ProbeExecution | None:
         executable = self._executables.get(key)
@@ -252,6 +306,7 @@ def default_hip_probe(
         execute_candidate=backend.execute,
         check_correctness=backend.correctness,
         check_stability=backend.stability,
+        evidence_for=backend.evidence,
     )
 
 
@@ -279,6 +334,22 @@ def _hip_source(key: CalibrationProfileKey) -> str:
         and key.path in {"wmma", "mfma"}
     ):
         return _matrix_hip_source(key)
+    if key.operation == "reduction" and key.input_dtype == key.output_dtype == "fp32":
+        return _reduction_hip_source()
+    if (
+        key.operation == "transcendental"
+        and key.input_dtype == key.output_dtype == "fp32"
+    ):
+        return _transcendental_hip_source()
+    if key.input_dtype == key.output_dtype == "bf16":
+        return _bf16_hip_source(key)
+    if key.input_dtype == key.output_dtype == "fp16":
+        return _fp16_hip_source(key)
+    if key.operation == "stream_copy" and {
+        key.input_dtype,
+        key.output_dtype,
+    } == {"bf16", "fp32"}:
+        return _bf16_fp32_conversion_hip_source(key)
 
     is_compute = key.kind == "compute"
     scalar_type = "__half" if key.input_dtype == "fp16" else "float"
@@ -346,6 +417,226 @@ int main() {{
   for (size_t index = 0; index < count; ++index) if (std::fabs(static_cast<float>(out[index]) - {expected}) > 1.0e-5f) return 4;
   hipFree(d_left); hipFree(d_right); hipFree(d_out); hipEventDestroy(start); hipEventDestroy(stop); return 0;
 }}
+"""
+
+
+def _bf16_hip_source(key: CalibrationProfileKey) -> str:
+    """Generate a BF16 vector or streaming probe with explicit conversions.
+
+    HIP's BF16 type does not have a portable host-side arithmetic operator
+    contract.  Keeping conversions explicit makes the source valid on the
+    supported gfx12 toolchain and lets the post-run check verify that actual
+    BF16 storage, rather than a substituted FP32 buffer, was exercised.
+    """
+    is_compute = key.kind == "compute"
+    if is_compute:
+        kernel = """hip_bfloat16 value = left[index];
+    #pragma unroll 16
+    for (int repeat = 0; repeat < arithmetic_repetitions; ++repeat) {
+      value = hip_bfloat16(fmaf(static_cast<float>(value), static_cast<float>(right[index]), 0.0000001f));
+    }
+    out[index] = value;"""
+        count_declaration = "constexpr size_t count = 1 << 20;"
+        initialization = (
+            "left[index] = hip_bfloat16(1.0f); right[index] = hip_bfloat16(1.0f);"
+        )
+        rate = "(static_cast<double>(count) * 2.0 * arithmetic_repetitions / elapsed_ms / 1.0e9)"
+    else:
+        kernel = "out[index] = left[index];"
+        count_declaration = """size_t free_bytes = 0, total_bytes = 0;
+  if (hipMemGetInfo(&free_bytes, &total_bytes) != hipSuccess) return 2;
+  const size_t maximum_count = static_cast<size_t>(1) << 27;
+  const size_t count = std::min(maximum_count, free_bytes / (sizeof(hip_bfloat16) * 12));
+  if (count < (static_cast<size_t>(1) << 24)) return 5;"""
+        initialization = (
+            "left[index] = hip_bfloat16(1.0f); right[index] = hip_bfloat16(0.0f);"
+        )
+        rate = "(static_cast<double>(count) * 2.0 * sizeof(hip_bfloat16) / elapsed_ms / 1.0e6)"
+    return f"""#include <hip/hip_runtime.h>
+#include <hip/hip_bfloat16.h>
+#include <hip/hip_fp16.h>
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
+#include <vector>
+
+constexpr int arithmetic_repetitions = 4096;
+
+__global__ void probe_kernel(const hip_bfloat16* left, const hip_bfloat16* right, hip_bfloat16* out, size_t count) {{
+  const size_t index = blockIdx.x * blockDim.x + threadIdx.x;
+  if (index < count) {{ {kernel} }}
+}}
+
+int main() {{
+  {count_declaration}
+  std::vector<hip_bfloat16> left(count), right(count), out(count);
+  for (size_t index = 0; index < count; ++index) {{ {initialization} }}
+  hip_bfloat16 *d_left = nullptr, *d_right = nullptr, *d_out = nullptr;
+  if (hipMalloc(&d_left, count * sizeof(hip_bfloat16)) || hipMalloc(&d_right, count * sizeof(hip_bfloat16)) || hipMalloc(&d_out, count * sizeof(hip_bfloat16))) return 2;
+  if (hipMemcpy(d_left, left.data(), count * sizeof(hip_bfloat16), hipMemcpyHostToDevice) != hipSuccess || hipMemcpy(d_right, right.data(), count * sizeof(hip_bfloat16), hipMemcpyHostToDevice) != hipSuccess) return 2;
+  hipEvent_t start, stop; hipEventCreate(&start); hipEventCreate(&stop);
+  for (int warmup = 0; warmup < 3; ++warmup) {{
+    hipLaunchKernelGGL(probe_kernel, dim3((count + 255) / 256), dim3(256), 0, 0, d_left, d_right, d_out, count);
+  }}
+  if (hipDeviceSynchronize() != hipSuccess) return 2;
+  for (int repeat = 0; repeat < 7; ++repeat) {{
+    hipEventRecord(start); hipLaunchKernelGGL(probe_kernel, dim3((count + 255) / 256), dim3(256), 0, 0, d_left, d_right, d_out, count); hipEventRecord(stop); hipEventSynchronize(stop);
+    float elapsed_ms = 0.0f; hipEventElapsedTime(&elapsed_ms, start, stop);
+    if (elapsed_ms <= 0.0f) return 3;
+    std::printf("RESULT %.9f\\n", {rate});
+  }}
+  if (hipMemcpy(out.data(), d_out, count * sizeof(hip_bfloat16), hipMemcpyDeviceToHost) != hipSuccess) return 2;
+  for (size_t index = 0; index < count; ++index) if (!std::isfinite(static_cast<float>(out[index])) || std::fabs(static_cast<float>(out[index]) - 1.0f) > 0.01f) return 4;
+  hipFree(d_left); hipFree(d_right); hipFree(d_out); hipEventDestroy(start); hipEventDestroy(stop); return 0;
+}}
+"""
+
+
+def _fp16_hip_source(key: CalibrationProfileKey) -> str:
+    """Reuse the low-precision probe shape with HIP's explicit FP16 helpers."""
+    return (
+        _bf16_hip_source(key)
+        .replace("hip_bfloat16(", "__float2half(")
+        .replace("hip_bfloat16", "__half")
+        .replace("#include <hip/__half.h>\n", "")
+        .replace("static_cast<float>", "__half2float")
+    )
+
+
+def _bf16_fp32_conversion_hip_source(key: CalibrationProfileKey) -> str:
+    """Generate a bandwidth probe for one explicit BF16/FP32 conversion path."""
+    input_type = "hip_bfloat16" if key.input_dtype == "bf16" else "float"
+    output_type = "hip_bfloat16" if key.output_dtype == "bf16" else "float"
+    conversion = (
+        "static_cast<float>(left[index])"
+        if key.output_dtype == "fp32"
+        else "hip_bfloat16(left[index])"
+    )
+    input_init = "hip_bfloat16(1.0f)" if key.input_dtype == "bf16" else "1.0f"
+    output_value = (
+        "static_cast<float>(out[index])" if key.output_dtype == "bf16" else "out[index]"
+    )
+    return f"""#include <hip/hip_runtime.h>
+#include <hip/hip_bfloat16.h>
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
+#include <vector>
+
+__global__ void conversion_probe_kernel(const {input_type}* left, {output_type}* out, size_t count) {{
+  const size_t index = blockIdx.x * blockDim.x + threadIdx.x;
+  if (index < count) out[index] = {conversion};
+}}
+
+int main() {{
+  size_t free_bytes = 0, total_bytes = 0;
+  if (hipMemGetInfo(&free_bytes, &total_bytes) != hipSuccess) return 2;
+  const size_t maximum_count = static_cast<size_t>(1) << 27;
+  const size_t count = std::min(maximum_count, free_bytes / ((sizeof({input_type}) + sizeof({output_type})) * 8));
+  if (count < (static_cast<size_t>(1) << 24)) return 5;
+  std::vector<{input_type}> left(count, {input_init});
+  std::vector<{output_type}> out(count);
+  {input_type} *d_left = nullptr; {output_type} *d_out = nullptr;
+  if (hipMalloc(&d_left, count * sizeof({input_type})) != hipSuccess || hipMalloc(&d_out, count * sizeof({output_type})) != hipSuccess) return 2;
+  if (hipMemcpy(d_left, left.data(), count * sizeof({input_type}), hipMemcpyHostToDevice) != hipSuccess) return 2;
+  hipEvent_t start, stop; hipEventCreate(&start); hipEventCreate(&stop);
+  for (int warmup = 0; warmup < 3; ++warmup) hipLaunchKernelGGL(conversion_probe_kernel, dim3((count + 255) / 256), dim3(256), 0, 0, d_left, d_out, count);
+  if (hipDeviceSynchronize() != hipSuccess) return 2;
+  for (int sample = 0; sample < 7; ++sample) {{
+    hipEventRecord(start); hipLaunchKernelGGL(conversion_probe_kernel, dim3((count + 255) / 256), dim3(256), 0, 0, d_left, d_out, count); hipEventRecord(stop); hipEventSynchronize(stop);
+    float elapsed_ms = 0.0f; hipEventElapsedTime(&elapsed_ms, start, stop);
+    if (elapsed_ms <= 0.0f) return 3;
+    std::printf("RESULT %.9f\\n", static_cast<double>(count) * (sizeof({input_type}) + sizeof({output_type})) / elapsed_ms / 1.0e6);
+  }}
+  if (hipMemcpy(out.data(), d_out, count * sizeof({output_type}), hipMemcpyDeviceToHost) != hipSuccess) return 2;
+  for (size_t index = 0; index < count; ++index) if (!std::isfinite({output_value}) || std::fabs({output_value} - 1.0f) > 0.01f) return 4;
+  hipFree(d_left); hipFree(d_out); hipEventDestroy(start); hipEventDestroy(stop); return 0;
+}}
+"""
+
+
+def _reduction_hip_source() -> str:
+    """Generate a throughput probe for a block-local FP32 sum reduction."""
+    return """#include <hip/hip_runtime.h>
+#include <cmath>
+#include <cstdio>
+#include <vector>
+
+constexpr size_t count = static_cast<size_t>(1) << 24;
+constexpr int threads = 256;
+
+__global__ void reduction_probe_kernel(const float* input, float* output) {
+  __shared__ float partial[threads];
+  const size_t index = static_cast<size_t>(blockIdx.x) * threads + threadIdx.x;
+  partial[threadIdx.x] = input[index];
+  __syncthreads();
+  for (int stride = threads / 2; stride > 0; stride /= 2) {
+    if (threadIdx.x < stride) partial[threadIdx.x] += partial[threadIdx.x + stride];
+    __syncthreads();
+  }
+  if (threadIdx.x == 0) output[blockIdx.x] = partial[0];
+}
+
+int main() {
+  constexpr size_t blocks = count / threads;
+  std::vector<float> input(count, 1.0f), output(blocks);
+  float *d_input = nullptr, *d_output = nullptr;
+  if (hipMalloc(&d_input, count * sizeof(float)) != hipSuccess || hipMalloc(&d_output, blocks * sizeof(float)) != hipSuccess) return 2;
+  if (hipMemcpy(d_input, input.data(), count * sizeof(float), hipMemcpyHostToDevice) != hipSuccess) return 2;
+  hipEvent_t start, stop; hipEventCreate(&start); hipEventCreate(&stop);
+  for (int warmup = 0; warmup < 3; ++warmup) hipLaunchKernelGGL(reduction_probe_kernel, dim3(blocks), dim3(threads), 0, 0, d_input, d_output);
+  if (hipDeviceSynchronize() != hipSuccess) return 2;
+  for (int sample = 0; sample < 7; ++sample) {
+    hipEventRecord(start); hipLaunchKernelGGL(reduction_probe_kernel, dim3(blocks), dim3(threads), 0, 0, d_input, d_output); hipEventRecord(stop); hipEventSynchronize(stop);
+    float elapsed_ms = 0.0f; hipEventElapsedTime(&elapsed_ms, start, stop);
+    if (elapsed_ms <= 0.0f) return 3;
+    std::printf("RESULT %.9f\\n", static_cast<double>(count - blocks) / elapsed_ms / 1.0e9);
+  }
+  if (hipMemcpy(output.data(), d_output, blocks * sizeof(float), hipMemcpyDeviceToHost) != hipSuccess) return 2;
+  for (float value : output) if (std::fabs(value - static_cast<float>(threads)) > 1.0e-5f) return 4;
+  hipFree(d_input); hipFree(d_output); hipEventDestroy(start); hipEventDestroy(stop); return 0;
+}
+"""
+
+
+def _transcendental_hip_source() -> str:
+    """Generate a self-checking FP32 ``tanhf`` throughput probe."""
+    return """#include <hip/hip_runtime.h>
+#include <cmath>
+#include <cstdio>
+#include <vector>
+
+constexpr size_t count = static_cast<size_t>(1) << 24;
+constexpr int repetitions = 64;
+
+__global__ void transcendental_probe_kernel(const float* input, float* output) {
+  const size_t index = blockIdx.x * blockDim.x + threadIdx.x;
+  if (index >= count) return;
+  float value = input[index];
+  #pragma unroll 8
+  for (int repeat = 0; repeat < repetitions; ++repeat) value = tanhf(value);
+  output[index] = value;
+}
+
+int main() {
+  std::vector<float> input(count), output(count);
+  for (size_t index = 0; index < count; ++index) input[index] = 0.25f + static_cast<float>(index % 31) * 0.01f;
+  float *d_input = nullptr, *d_output = nullptr;
+  if (hipMalloc(&d_input, count * sizeof(float)) != hipSuccess || hipMalloc(&d_output, count * sizeof(float)) != hipSuccess) return 2;
+  if (hipMemcpy(d_input, input.data(), count * sizeof(float), hipMemcpyHostToDevice) != hipSuccess) return 2;
+  hipEvent_t start, stop; hipEventCreate(&start); hipEventCreate(&stop);
+  for (int warmup = 0; warmup < 3; ++warmup) hipLaunchKernelGGL(transcendental_probe_kernel, dim3((count + 255) / 256), dim3(256), 0, 0, d_input, d_output);
+  if (hipDeviceSynchronize() != hipSuccess) return 2;
+  for (int sample = 0; sample < 7; ++sample) {
+    hipEventRecord(start); hipLaunchKernelGGL(transcendental_probe_kernel, dim3((count + 255) / 256), dim3(256), 0, 0, d_input, d_output); hipEventRecord(stop); hipEventSynchronize(stop);
+    float elapsed_ms = 0.0f; hipEventElapsedTime(&elapsed_ms, start, stop);
+    if (elapsed_ms <= 0.0f) return 3;
+    std::printf("RESULT %.9f\\n", static_cast<double>(count) * repetitions / elapsed_ms / 1.0e9);
+  }
+  if (hipMemcpy(output.data(), d_output, count * sizeof(float), hipMemcpyDeviceToHost) != hipSuccess) return 2;
+  for (float value : output) if (!std::isfinite(value) || value <= 0.0f || value >= 1.0f) return 4;
+  hipFree(d_input); hipFree(d_output); hipEventDestroy(start); hipEventDestroy(stop); return 0;
+}
 """
 
 

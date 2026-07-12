@@ -104,7 +104,13 @@ def _gpu_agents_from_rocminfo(output: str) -> list[tuple[str, str | None]]:
 class ArchitectureAdapter:
     family: str
     candidates: tuple[CalibrationProfileKey, ...]
+    diagnostic_candidates: tuple[CalibrationProfileKey, ...] = ()
     supports_clock_lock: bool = False
+
+    @property
+    def all_candidates(self) -> tuple[CalibrationProfileKey, ...]:
+        """Return core and opt-in diagnostic profiles without duplication."""
+        return self.candidates + self.diagnostic_candidates
 
 
 def _matrix_key(family: str, dtype: str = "bf16") -> CalibrationProfileKey:
@@ -120,18 +126,41 @@ def _adapter(family: str, *, supports_clock_lock: bool = False) -> ArchitectureA
         _matrix_key(family),
         CalibrationProfileKey("memory", "stream_copy", "fp32", "fp32", family),
     ]
+    diagnostic_candidates: list[CalibrationProfileKey] = []
     if family == "gfx12":
+        diagnostic_candidates.append(
+            CalibrationProfileKey("compute", "vector", "bf16", "bf16", family)
+        )
+        diagnostic_candidates.append(
+            CalibrationProfileKey("compute", "vector", "fp16", "fp16", family)
+        )
         candidates.append(_matrix_key(family, "fp16"))
+        diagnostic_candidates.append(
+            CalibrationProfileKey("memory", "stream_copy", "bf16", "bf16", family)
+        )
+        diagnostic_candidates.extend(
+            (
+                CalibrationProfileKey("memory", "stream_copy", "bf16", "fp32", family),
+                CalibrationProfileKey("memory", "stream_copy", "fp32", "bf16", family),
+            )
+        )
         candidates.append(
             CalibrationProfileKey("memory", "stream_copy", "fp16", "fp16", "portable")
         )
         candidates.append(
             CalibrationProfileKey("memory", "stream_copy", "fp16", "fp16", family)
         )
+        diagnostic_candidates.append(
+            CalibrationProfileKey("compute", "reduction", "fp32", "fp32", family)
+        )
+        diagnostic_candidates.append(
+            CalibrationProfileKey("compute", "transcendental", "fp32", "fp32", family)
+        )
     return ArchitectureAdapter(
         family=family,
         supports_clock_lock=supports_clock_lock,
         candidates=tuple(candidates),
+        diagnostic_candidates=tuple(diagnostic_candidates),
     )
 
 

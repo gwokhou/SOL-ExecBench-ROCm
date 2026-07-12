@@ -69,15 +69,28 @@ def _reduction_estimate(
     exact_sum = _has_exact_sum_reduction_contract(
         node, axis, input_elements, output_elements, warnings
     )
+    leaf_name = node.op_name.rsplit(".", maxsplit=1)[-1]
     flops = (
-        float(input_elements - output_elements) if exact_sum else float(input_elements)
+        float(
+            input_elements
+            - output_elements
+            + (output_elements if leaf_name == "mean" else 0)
+        )
+        if exact_sum
+        else float(input_elements)
     )
     return OperatorWorkEstimate(
         node_id=node.node_id,
         op_family=node.op_family,
         op_name=node.op_name,
         formula_kind="reduction_flops",
-        formula=("input_elements-output_elements" if exact_sum else "input_elements"),
+        formula=(
+            "input_elements"
+            if leaf_name == "mean" and exact_sum
+            else "input_elements-output_elements"
+            if exact_sum
+            else "input_elements"
+        ),
         formula_inputs=formula_inputs,
         flops=flops,
         read_bytes=read_bytes,
@@ -109,9 +122,9 @@ def _has_exact_sum_reduction_contract(
     warnings: list[str],
 ) -> bool:
     """Return whether the visible operation is a statically exact sum reduction."""
-    if node.op_name.rsplit(".", maxsplit=1)[-1] != "sum":
+    if node.op_name.rsplit(".", maxsplit=1)[-1] not in {"sum", "mean"}:
         return False
-    if axis is None or input_elements <= 0 or output_elements <= 0:
+    if input_elements <= 0 or output_elements <= 0:
         return False
     if input_elements < output_elements or input_elements % output_elements:
         return False

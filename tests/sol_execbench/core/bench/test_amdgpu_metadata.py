@@ -11,6 +11,7 @@ from pathlib import Path
 from sol_execbench.core.bench.static_kernel.amdgpu_metadata import (
     _unpack_msgpack,
     extract_amdgpu_footprints,
+    extract_amdgpu_kernel_metadata,
 )
 
 
@@ -99,6 +100,36 @@ def test_no_spill_when_scratch_zero():
     assert len(fps) == 1
     assert fps[0].spill_detected is False
     assert fps[0].scratch_bytes == 0
+
+
+def test_extract_named_kernel_metadata_for_authority_matching():
+    metadata = {
+        "amdhsa.target": "amdgcn-amd-amdhsa--gfx1200",
+        "amdhsa.kernels": [
+            {
+                ".name": "fused_reduction",
+                ".symbol": "fused_reduction.kd",
+                ".vgpr_count": 13,
+                ".sgpr_count": 14,
+                ".vgpr_spill_count": 0,
+                ".sgpr_spill_count": 0,
+                ".private_segment_fixed_size": 0,
+                ".group_segment_fixed_size": 4096,
+            }
+        ],
+    }
+    records = extract_amdgpu_kernel_metadata(
+        _note(_pack(metadata)), target_architecture="gfx1200"
+    )
+    assert len(records) == 1
+    assert records[0].name == "fused_reduction"
+    assert records[0].group_segment_bytes == 4096
+    assert (
+        extract_amdgpu_kernel_metadata(
+            _note(_pack(metadata)), target_architecture="gfx942"
+        )
+        == []
+    )
 
 
 def test_empty_when_no_kernels():

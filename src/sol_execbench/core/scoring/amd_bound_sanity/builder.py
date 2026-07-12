@@ -375,7 +375,10 @@ def _audit_bound_artifact(
         _increment_nested_count(blocker_counts_by_operator, operator, blocker)
         _increment_nested_count(blocker_counts_by_op_family, family, blocker)
 
-    if artifact.get("schema_version") == "sol_execbench.amd_sol_bound.v3":
+    if artifact.get("schema_version") in {
+        "sol_execbench.amd_sol_bound.v3",
+        "sol_execbench.amd_sol_bound.v4",
+    }:
         _audit_fusion_groups(artifact, workload)
     else:
         workload["blocker_codes"].add("unsupported_amd_sol_schema")

@@ -147,18 +147,26 @@ class RootGroup(LazyGroup):
 
 
 def _requested_json(args: list[str]) -> bool:
-    try:
-        index = args.index("--format")
-    except ValueError:
-        return False
-    return index + 1 < len(args) and args[index + 1] == "json"
+    return any(
+        argument == "--format=json"
+        or (
+            argument == "--format"
+            and index + 1 < len(args)
+            and args[index + 1] == "json"
+        )
+        for index, argument in enumerate(args)
+    )
 
 
 def _command_name(args: list[str]) -> str:
-    values = list(args)
-    if "--format" in values:
-        index = values.index("--format")
-        del values[index : index + 2]
+    values = [
+        argument
+        for index, argument in enumerate(args)
+        if argument != "--format=json"
+        and not (
+            argument == "--format" or (index > 0 and args[index - 1] == "--format")
+        )
+    ]
     if not values or values[0].startswith("-"):
         return "sol-execbench"
     domain = values[0]

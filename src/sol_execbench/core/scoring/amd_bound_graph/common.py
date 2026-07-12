@@ -102,6 +102,16 @@ def _ast_call_attributes(
         if axis is not _MISSING:
             attributes["dim"] = axis
             attributes["axis_source"] = "attribute"
+        if op_family == OpFamily.REDUCTION and "keepdim" in keyword_values:
+            keepdim = _literal_value(keyword_values["keepdim"])
+            if isinstance(keepdim, bool):
+                attributes["keepdim"] = keepdim
+
+    if leaf_name == "pow":
+        exponent_position = 0 if isinstance(node.func, ast.Attribute) else 1
+        exponent = _arg_literal(tuple(node.args), exponent_position)
+        if isinstance(exponent, int | float):
+            attributes["exponent"] = exponent
 
     target_dtype = _target_dtype_from_values(
         leaf_name,
@@ -163,17 +173,20 @@ def _convolution_attributes(
         return {}
     output_shape = _fx_tensor_meta(node)[0] if node is not None else None
     attrs: dict[str, object] = {"dimensionality": dimensionality}
-    for name, position in (
-        ("stride", 3),
-        ("padding", 4),
-        ("dilation", 5),
-        ("groups", 6),
+    for name, position, default in (
+        ("stride", 3, 1),
+        ("padding", 4, 0),
+        ("dilation", 5, 1),
+        ("groups", 6, 1),
     ):
+        provided = name in kwargs or position < len(args)
         value = (
             _literal_value(kwargs[name])
             if name in kwargs
             else _arg_literal(args, position)
         )
+        if value is _MISSING and not provided:
+            value = default
         if value is not _MISSING:
             attrs[name] = (
                 int(value)

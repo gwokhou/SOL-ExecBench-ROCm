@@ -55,7 +55,10 @@ def pointwise_estimate(
 
     confidence = EstimateConfidence.INEXACT
     if (
-        node.confidence == EstimateConfidence.SUPPORTED
+        (
+            node.confidence == EstimateConfidence.SUPPORTED
+            or node.op_family == OpFamily.ELEMENTWISE
+        )
         and not warnings
         and _has_exact_pointwise_tensor_contract(input_tensors, output_tensors)
         and _is_exact_elementwise_operation(node)
@@ -90,25 +93,50 @@ def pointwise_estimate(
 def _has_exact_pointwise_tensor_contract(
     input_tensors: tuple[BoundTensor, ...], output_tensors: tuple[BoundTensor, ...]
 ) -> bool:
-    """Return whether every material tensor has the exact output shape.
-
-    This deliberately excludes broadcasting: it makes the byte count and the
-    elementwise operation count depend on implementation-specific expansion.
-    Constants are absent from the tensor list and remain safe here.
-    """
+    """Return whether static PyTorch broadcasting proves the output shape."""
     if len(output_tensors) != 1 or not input_tensors:
         return False
     output_shape = output_tensors[0].shape
-    return output_shape is not None and all(
-        tensor.shape == output_shape for tensor in input_tensors
+    input_shapes = tuple(tensor.shape for tensor in input_tensors)
+    if output_shape is None or any(shape is None for shape in input_shapes):
+        return False
+    return (
+        _broadcast_shape(tuple(shape for shape in input_shapes if shape is not None))
+        == output_shape
     )
 
 
+def _broadcast_shape(shapes: tuple[tuple[int, ...], ...]) -> tuple[int, ...] | None:
+    """Return the exact broadcast result for fully static tensor shapes."""
+    result: list[int] = []
+    for dimensions in zip(*(reversed(shape) for shape in shapes), strict=False):
+        non_unit = {dimension for dimension in dimensions if dimension != 1}
+        if len(non_unit) > 1:
+            return None
+        result.append(next(iter(non_unit), 1))
+    widest = max((len(shape) for shape in shapes), default=0)
+    while len(result) < widest:
+        index = len(result)
+        dimensions = tuple(
+            shape[-index - 1] if len(shape) > index else 1 for shape in shapes
+        )
+        non_unit = {dimension for dimension in dimensions if dimension != 1}
+        if len(non_unit) > 1:
+            return None
+        result.append(next(iter(non_unit), 1))
+    return tuple(reversed(result))
+
+
 def _is_exact_elementwise_operation(node: BoundGraphNode) -> bool:
-    """Limit supported pointwise modeling to one exact binary primitive."""
+    """Return whether static shapes determine a visible pointwise operation."""
+    leaf_name = node.op_name.rsplit(".", maxsplit=1)[-1]
+    if node.op_family == OpFamily.MLP_ACTIVATION:
+        return leaf_name in {"relu", "tanh", "rsqrt"}
     if node.op_family != OpFamily.ELEMENTWISE:
         return False
-    return node.op_name.rsplit(".", maxsplit=1)[-1] in {
+    if leaf_name == "pow":
+        return node.attributes.get("exponent") == 2
+    return leaf_name in {
         "add",
         "sub",
         "mul",

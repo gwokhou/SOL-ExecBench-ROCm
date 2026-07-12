@@ -16,7 +16,7 @@ from sol_execbench.core.scoring.hardware_calibration.statistics import (
     select_conservative_value,
 )
 
-CALIBRATION_SCHEMA_VERSION = "sol_execbench.hardware_calibration.v1"
+CALIBRATION_SCHEMA_VERSION = "sol_execbench.hardware_calibration.v2"
 CALIBRATION_CANDIDATE_STATES = frozenset({"measured", "unavailable", "unknown"})
 
 
@@ -159,6 +159,19 @@ class HardwareCalibrationArtifact:
         keys = [candidate.key for candidate in self.candidates]
         if len(keys) != len(set(keys)):
             raise ValueError("calibration candidate keys must be unique")
+        requirements = self.metadata.get("profile_requirements")
+        protocol = self.metadata.get("probe_protocol")
+        if not isinstance(requirements, Mapping) or not isinstance(protocol, Mapping):
+            raise ValueError(
+                "calibration requires profile_requirements and probe_protocol"
+            )
+        required_keys = requirements.get("required_profile_keys")
+        if not isinstance(required_keys, list) or not required_keys:
+            raise ValueError("calibration profile_requirements require profile keys")
+        if not isinstance(protocol.get("warmup_iterations"), int) or not isinstance(
+            protocol.get("timed_samples"), int
+        ):
+            raise ValueError("calibration probe protocol is incomplete")
         # The checksum binds every byte of the semantic payload.  It deliberately
         # excludes itself so callers can verify a parsed artifact identically.
         try:

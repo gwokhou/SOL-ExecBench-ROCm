@@ -29,7 +29,11 @@ from sol_execbench.core.scoring.hardware_calibration.environment import (
     discover_gpu,
 )
 from sol_execbench.core.scoring.hardware_calibration.models import (
+    CALIBRATION_SCHEMA_VERSION,
     hardware_calibration_artifact_from_dict,
+)
+from sol_execbench.core.scoring.hardware_profile_requirements import (
+    hardware_profile_requirements_from_dict,
 )
 from sol_execbench.core.scoring.hardware_calibration.rocprof_compute import (
     default_profiler_discovery,
@@ -41,6 +45,7 @@ from sol_execbench.cli.protocol import (
     CliResult,
     artifact,
 )
+from sol_execbench.cli.commands.fusion_validation import fusion_cli
 
 
 def _write_json(path: Path, payload: dict[str, object]) -> None:
@@ -67,6 +72,9 @@ def hardware_cli() -> None:
     """Manage hardware-derived benchmark evidence."""
 
 
+hardware_cli.add_command(fusion_cli)
+
+
 @hardware_cli.group("model")
 def hardware_model_cli() -> None:
     """Create diagnostic calibration evidence and external hardware models."""
@@ -81,6 +89,12 @@ def hardware_model_cli() -> None:
     "--architecture", default=None, help="Assert the discovered AMD GFX architecture."
 )
 @click.option("--require-clock-lock", is_flag=True)
+@click.option(
+    "--requirements",
+    "requirements_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="Exact profile requirements derived from the score suite.",
+)
 @click.option("--offline", is_flag=True, help="Never install profiler dependencies.")
 @click.option(
     "--no-auto-install", is_flag=True, help="Do not install profiler dependencies."
@@ -90,6 +104,7 @@ def _calibrate(
     output: Path,
     architecture: str | None,
     require_clock_lock: bool,
+    requirements_path: Path | None,
     offline: bool,
     no_auto_install: bool,
 ) -> CliResult:
@@ -106,11 +121,19 @@ def _calibrate(
             offline=offline,
             auto_install=not no_auto_install,
         )
+        requirements = _load_requirements(requirements_path, environment.architecture)
         artifact = run_calibration(
             CalibrationRequest(
                 environment=environment,
                 require_clock_lock=require_clock_lock,
                 profiler_environment=profiler,
+                required_profile_keys=(
+                    requirements.required_profile_keys if requirements else ()
+                ),
+                requirements_ref=str(requirements_path) if requirements else None,
+                requirements_sha256=(
+                    requirements.payload_sha256 if requirements else None
+                ),
             )
         )
     except (RuntimeError, ValueError) as exc:
@@ -141,6 +164,17 @@ def _calibrate(
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
 )
 @click.option(
+    "--verification-calibration",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="Second independently collected calibration required with --requirements.",
+)
+@click.option(
+    "--requirements",
+    "requirements_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="Exact profile requirements for this hardware model.",
+)
+@click.option(
     "--output", required=True, type=click.Path(dir_okay=False, path_type=Path)
 )
 @click.option(
@@ -150,7 +184,11 @@ def _calibrate(
     help="Reject calibration evidence older than this age.",
 )
 def _build(
-    calibration_path: Path, output: Path, max_age_hours: float | None
+    calibration_path: Path,
+    output: Path,
+    max_age_hours: float | None,
+    verification_calibration: Path | None = None,
+    requirements_path: Path | None = None,
 ) -> CliResult:
     """Convert a validated calibration artifact into an external v3 model."""
     try:
@@ -162,9 +200,19 @@ def _build(
             raise ValueError("calibration payload checksum is missing")
         calibration = hardware_calibration_artifact_from_dict(raw_calibration)
         architecture = str(calibration.metadata["architecture"])
+        requirements = _load_requirements(requirements_path, architecture)
         if calibration.validation_status != "validated":
             raise ValueError("calibration validation status is not validated")
-        if any(candidate.state != "measured" for candidate in calibration.candidates):
+        required_profile_keys = (
+            set(requirements.required_profile_keys)
+            if requirements is not None
+            else {candidate.key for candidate in calibration.candidates}
+        )
+        if any(
+            candidate.state != "measured"
+            for candidate in calibration.candidates
+            if candidate.key in required_profile_keys
+        ):
             raise ValueError("calibration contains non-measured hardware profiles")
         required_matrix_keys = {
             candidate.value
@@ -173,6 +221,8 @@ def _build(
             and candidate.input_dtype in {"bf16", "fp16"}
             and candidate.output_dtype == candidate.input_dtype
         }
+        if requirements is not None:
+            required_matrix_keys &= required_profile_keys
         missing_matrix_keys = required_matrix_keys - {
             candidate.key for candidate in calibration.candidates
         }
@@ -186,6 +236,24 @@ def _build(
             discover_gpu(int(calibration.metadata["device"])),
             max_age_hours,
         )
+        verification = None
+        if requirements is not None:
+            if verification_calibration is None:
+                raise ValueError(
+                    "--verification-calibration is required with --requirements"
+                )
+            verification = _load_calibration(verification_calibration)
+            _validate_second_calibration(
+                primary=calibration,
+                verification=verification,
+                requirements_sha256=requirements.payload_sha256,
+                architecture=architecture,
+            )
+            _validate_calibration_authority(
+                verification,
+                discover_gpu(int(verification.metadata["device"])),
+                max_age_hours,
+            )
     except (KeyError, OSError, ValueError, json.JSONDecodeError) as exc:
         _rejected(output, str(exc))
         raise click.ClickException(str(exc)) from exc
@@ -194,14 +262,21 @@ def _build(
         {
             "key": candidate.key,
             "state": candidate.state,
-            "value": candidate.value,
+            "value": _conservative_profile_value(candidate, verification),
             "confidence": "supported",
             "evidence_ref": (
                 f"{calibration_path}#sha256:{calibration.payload_sha256}:"
                 f"{candidate.key}"
+                + (
+                    f";{verification_calibration}#sha256:"
+                    f"{verification.payload_sha256}:{candidate.key}"
+                    if verification is not None
+                    else ""
+                )
             ),
         }
         for candidate in calibration.candidates
+        if candidate.key in required_profile_keys
     ]
     _write_json(
         output,
@@ -213,7 +288,11 @@ def _build(
             "confidence": "supported",
             "hardware_validation_status": "validated",
             "model_validation_status": "validated",
-            "evidence_refs": [str(calibration_path)],
+            "evidence_refs": [
+                str(calibration_path),
+                *([str(verification_calibration)] if verification is not None else []),
+                *([str(requirements_path)] if requirements is not None else []),
+            ],
             "compute_profiles": [
                 p for p in profiles if str(p["key"]).startswith("compute.")
             ],
@@ -273,6 +352,106 @@ def _validate_calibration_authority(
             raise ValueError("calibration timestamp is invalid") from exc
         if generated < datetime.now(UTC) - timedelta(hours=max_age_hours):
             raise ValueError("calibration evidence exceeds requested freshness window")
+
+
+def _load_requirements(path: Path | None, architecture: str):
+    if path is None:
+        return None
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("hardware profile requirements must be an object")
+    requirements = hardware_profile_requirements_from_dict(payload)
+    if requirements.architecture != architecture:
+        raise ValueError("requirements architecture does not match calibration")
+    return requirements
+
+
+def _load_calibration(path: Path):
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict) or "payload_sha256" not in payload:
+        raise ValueError("calibration payload checksum is missing")
+    return hardware_calibration_artifact_from_dict(payload)
+
+
+def _validate_second_calibration(
+    *,
+    primary: object,
+    verification: object,
+    requirements_sha256: str | None,
+    architecture: str,
+) -> None:
+    if getattr(verification, "schema_version") != CALIBRATION_SCHEMA_VERSION:
+        raise ValueError("verification calibration has an unsupported schema")
+    if getattr(verification, "validation_status") != "validated":
+        raise ValueError("verification calibration validation status is not validated")
+    metadata = getattr(verification, "metadata")
+    if metadata.get("architecture") != architecture:
+        raise ValueError("verification calibration architecture does not match")
+    for calibration_artifact in (primary, verification):
+        profile_requirements = getattr(calibration_artifact, "metadata").get(
+            "profile_requirements"
+        )
+        if (
+            not isinstance(profile_requirements, dict)
+            or profile_requirements.get("requirements_sha256") != requirements_sha256
+        ):
+            raise ValueError("calibration does not bind the supplied requirements")
+    first_time = getattr(primary, "generated_at")
+    second_time = getattr(verification, "generated_at")
+    if first_time == second_time:
+        raise ValueError("calibrations must be independent runs")
+    primary_by_key = {
+        candidate.key: candidate for candidate in getattr(primary, "candidates")
+    }
+    verification_by_key = {
+        candidate.key: candidate for candidate in getattr(verification, "candidates")
+    }
+    required_keys = getattr(primary, "metadata")["profile_requirements"][
+        "required_profile_keys"
+    ]
+    for key in required_keys:
+        left, right = primary_by_key.get(key), verification_by_key.get(key)
+        if (
+            left is None
+            or right is None
+            or left.state != "measured"
+            or right.state != "measured"
+        ):
+            raise ValueError(f"independent calibration missing measured profile: {key}")
+        assert left.value is not None and right.value is not None
+        if abs(left.value - right.value) / min(left.value, right.value) > 0.05:
+            raise ValueError(f"independent calibration differs by more than 5%: {key}")
+        for calibration in (primary, verification):
+            evidence = (
+                getattr(calibration, "metadata").get("probe_evidence", {}).get(key)
+            )
+            required_evidence = {
+                "compiler_command",
+                "source_sha256",
+                "binary_sha256",
+                "warmup_iterations",
+                "timed_samples",
+            }
+            if not isinstance(evidence, dict) or not required_evidence <= set(evidence):
+                raise ValueError(f"calibration lacks probe provenance: {key}")
+
+
+def _conservative_profile_value(
+    candidate: object, verification: object | None
+) -> float:
+    value = getattr(candidate, "value")
+    if value is None:
+        raise ValueError("model cannot be built from an unmeasured profile")
+    if verification is None:
+        return float(value)
+    other = next(
+        entry
+        for entry in getattr(verification, "candidates")
+        if entry.key == getattr(candidate, "key")
+    )
+    if other.value is None:
+        raise ValueError("verification calibration profile is unmeasured")
+    return min(float(value), float(other.value))
 
 
 artifact_ref = artifact
