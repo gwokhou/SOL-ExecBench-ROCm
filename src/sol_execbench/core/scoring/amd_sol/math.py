@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from sol_execbench.core.scoring.amd_bound_estimate.models import OperatorWorkEstimate
 from sol_execbench.core.scoring.amd_hardware_models import AmdHardwareModel
-from sol_execbench.core.scoring.amd_sol.v3_models import AmdSolCoverageSummary
+from sol_execbench.core.scoring.amd_sol.models import AmdSolCoverageSummary
 from sol_execbench.core.scoring.confidence import EstimateConfidence
 
 

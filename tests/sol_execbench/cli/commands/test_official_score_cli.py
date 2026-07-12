@@ -41,6 +41,12 @@ from sol_execbench.core.scoring.release_baseline import (
     write_release_baseline_verification,
 )
 from sol_execbench.core.reports.reporting import CANONICAL_BENCHMARK_OUTPUT
+from sol_execbench_type_helpers import (
+    make_amd_hardware_model,
+    make_amd_sol_bound,
+    make_definition,
+    make_workload,
+)
 
 
 def _score(
@@ -179,7 +185,9 @@ def _write_release_inputs(
     )
     baseline_path.write_text(json.dumps(baseline.to_dict()), encoding="utf-8")
     hardware_model_path = tmp_path / "model.json"
-    hardware_model_path.write_text("{}\n", encoding="utf-8")
+    hardware_model_path.write_text(
+        json.dumps(make_amd_hardware_model().to_dict()), encoding="utf-8"
+    )
     candidate_trace_path = tmp_path / "candidate-trace.jsonl"
     workloads = tuple(
         ReleaseBaselineWorkload(
@@ -192,7 +200,7 @@ def _write_release_inputs(
             trace_sha256=sha256_file(candidate_trace_path),
             bound_ref=str(tmp_path / f"bound-{score['workload_uuid']}.json"),
             bound_sha256=sha256_file(
-                _write_v3_bound(
+                _write_current_bound(
                     tmp_path,
                     score["definition"],
                     score["workload_uuid"],
@@ -267,18 +275,24 @@ def _write_release_inputs(
     return baseline_path, bundle_path, verification_path, manifest_path
 
 
-def _write_v3_bound(tmp_path: Path, definition: str, workload_uuid: str) -> Path:
+def _write_current_bound(tmp_path: Path, definition: str, workload_uuid: str) -> Path:
     path = tmp_path / f"bound-{workload_uuid}.json"
-    path.write_text(
-        json.dumps(
-            {
-                "schema_version": "sol_execbench.amd_sol_bound.v3",
-                "definition": definition,
-                "workload_uuid": workload_uuid,
-            }
-        ),
-        encoding="utf-8",
+    definition_model = make_definition(
+        name=definition,
+        axes={"N": {"type": "const", "value": 4}},
+        inputs={"x": {"shape": ["N"], "dtype": "float32"}},
+        outputs={"out": {"shape": ["N"], "dtype": "float32"}},
+        reference="def run(x):\n    return x + 1",
     )
+    workload = make_workload(
+        axes={}, inputs={"x": {"type": "random"}}, uuid=workload_uuid
+    )
+    payload = make_amd_sol_bound(definition_model, workload).to_dict()
+    fusion_path = tmp_path / "fusion-validation.json"
+    fusion_path.write_text("{}\n", encoding="utf-8")
+    payload["fusion_validation_ref"] = str(fusion_path)
+    payload["fusion_validation_sha256"] = sha256_file(fusion_path)
+    path.write_text(json.dumps(payload), encoding="utf-8")
     return path
 
 

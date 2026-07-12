@@ -10,6 +10,7 @@ from sol_execbench.core.scoring.amd_bound_graph.models import (
     BoundGraph,
     BoundGraphNode,
 )
+from sol_execbench.core.scoring.amd_hardware_models import AmdHardwareModel
 from sol_execbench.core.scoring.solar_derivation.confidence import (
     classify_solar_confidence,
 )
@@ -38,6 +39,8 @@ def _semantic_group_evidence(
     *,
     nodes_by_id: dict[str, BoundGraphNode],
     tensor_evidence_by_id: dict[str, SolarTensorEvidence],
+    hardware_model: AmdHardwareModel,
+    hardware_model_ref: str,
 ) -> tuple[SolarSemanticGroupEvidence, ...]:
     estimates_by_family: dict[str, list[OperatorWorkEstimate]] = {}
     for estimate in estimates:
@@ -81,7 +84,11 @@ def _semantic_group_evidence(
             nodes_by_id=nodes_by_id,
             tensor_evidence_by_id=tensor_evidence_by_id,
         )
-        bound_evidence = _bound_evidence_for_estimates(ordered_estimates)
+        bound_evidence = _bound_evidence_for_estimates(
+            ordered_estimates,
+            hardware_model=hardware_model,
+            hardware_model_ref=hardware_model_ref,
+        )
         groups.append(
             SolarSemanticGroupEvidence(
                 family=family,

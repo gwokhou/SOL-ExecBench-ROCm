@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""Strict parsing for fusion-aware AMD SOL v3 artifacts."""
+"""Strict parsing for the internal fusion-aware AMD SOL base payload."""
 
 from __future__ import annotations
 
@@ -13,19 +13,18 @@ from sol_execbench.core.platform.arch_capabilities import (
 )
 from sol_execbench.core.scoring.amd_hardware_models import amd_hardware_model_from_dict
 from sol_execbench.core.scoring.amd_sol.fusion import FusionGroup
-from sol_execbench.core.scoring.amd_sol.v3_models import (
+from sol_execbench.core.scoring.amd_sol.models import (
     AGGREGATE_STATUSES,
-    AMD_SOL_V3_SCHEMA_VERSION,
     AmdSolAggregateBound,
-    AmdSolBoundV3Artifact,
     AmdSolCoverageSummary,
-    AmdSolV3GroupBound,
+    AmdSolGroupBound,
+    _AmdSolBoundBase,
 )
 from sol_execbench.core.scoring.confidence import EstimateConfidence
 
 
-def amd_sol_bound_v3_from_dict(payload: dict[str, Any]) -> AmdSolBoundV3Artifact:
-    """Parse a v3 sidecar and reject missing or unknown top-level fields."""
+def _amd_sol_bound_base_from_dict(payload: dict[str, Any]) -> _AmdSolBoundBase:
+    """Parse an internal base payload after the public v4 fields are stripped."""
     _exact_keys(
         payload,
         {
@@ -47,8 +46,8 @@ def amd_sol_bound_v3_from_dict(payload: dict[str, Any]) -> AmdSolBoundV3Artifact
         },
         "AMD SOL v3 artifact",
     )
-    if payload["schema_version"] != AMD_SOL_V3_SCHEMA_VERSION:
-        raise ValueError("AMD SOL v3 artifact has invalid schema_version")
+    if payload["schema_version"] != "sol_execbench.amd_sol_bound.v3":
+        raise ValueError("internal AMD SOL base has invalid schema_version")
     if not isinstance(payload["definition"], str) or not isinstance(
         payload["workload_uuid"], str
     ):
@@ -137,7 +136,7 @@ def amd_sol_bound_v3_from_dict(payload: dict[str, Any]) -> AmdSolBoundV3Artifact
         if payload["capability_budget"] is not None
         else None
     )
-    return AmdSolBoundV3Artifact(
+    return _AmdSolBoundBase(
         definition=payload["definition"],
         workload_uuid=payload["workload_uuid"],
         hardware_model_ref=payload["hardware_model_ref"],
@@ -213,7 +212,7 @@ def _fusion_group_from_dict(payload: dict[str, Any], index: int) -> FusionGroup:
     return group
 
 
-def _group_bound_from_dict(payload: dict[str, Any], index: int) -> AmdSolV3GroupBound:
+def _group_bound_from_dict(payload: dict[str, Any], index: int) -> AmdSolGroupBound:
     source = f"group_bounds[{index}]"
     _exact_keys(
         payload,
@@ -239,7 +238,7 @@ def _group_bound_from_dict(payload: dict[str, Any], index: int) -> AmdSolV3Group
     limiting = _string(payload, "limiting_resource", source)
     if limiting not in {"compute", "memory"}:
         raise ValueError(f"{source}.limiting_resource is invalid")
-    return AmdSolV3GroupBound(
+    return AmdSolGroupBound(
         group_id=_string(payload, "group_id", source),
         pattern_id=_string(payload, "pattern_id", source),
         node_ids=_string_tuple(payload, "node_ids", source),
@@ -296,7 +295,7 @@ def _coverage_from_dict(payload: dict[str, Any]) -> AmdSolCoverageSummary:
 
 
 def _validate_group_partition(
-    groups: tuple[FusionGroup, ...], bounds: tuple[AmdSolV3GroupBound, ...]
+    groups: tuple[FusionGroup, ...], bounds: tuple[AmdSolGroupBound, ...]
 ) -> None:
     if len({group.group_id for group in groups}) != len(groups):
         raise ValueError("fusion_groups contains duplicate group_id")

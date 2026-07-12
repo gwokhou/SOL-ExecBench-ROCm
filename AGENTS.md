@@ -29,6 +29,11 @@ and Pydantic models. Keep focused changes local to the affected subsystem; avoid
 unrelated refactors. Name tests descriptively, for example
 `test_rejects_invalid_solution_schema`.
 
+In production code, do not embed large HIP or C++ source files directly in
+Python string literals. Store them as package resources and load them through
+`importlib.resources`. Tests may embed source snippets or fixtures directly when
+that keeps the test focused and readable.
+
 ## Testing Guidelines
 
 Use Pytest and place coverage near the implementation. Mark environment-specific

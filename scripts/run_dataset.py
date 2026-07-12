@@ -126,6 +126,10 @@ from sol_execbench.core.scoring.baseline_artifact import (
     load_scoring_baseline_artifact,
 )
 from sol_execbench.core.scoring.official_score import OFFICIAL_AGGREGATION_POLICY
+from sol_execbench.core.scoring.fusion_validation import (
+    fusion_validation_from_dict,
+    sha256_file,
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -648,6 +652,7 @@ def _normalized_command_args(args: argparse.Namespace) -> list[str]:
         ("--official-score-report", args.official_score_report),
         ("--amd-sol-bound-dir", args.amd_sol_bound_dir),
         ("--amd-hardware-model", args.amd_hardware_model),
+        ("--fusion-validation", args.fusion_validation),
         ("--solar-derivation", args.solar_derivation),
         ("--timing-evidence-dir", args.timing_evidence_dir),
         ("--scoring-baseline", args.scoring_baseline),
@@ -1020,6 +1025,10 @@ def _run_existing_trace_derived_problem(
     scoring_baseline,
     derived_sidecar_exclusions: dict[str, str] | None = None,
     hardware_model: ResolvedHardwareModel | None = None,
+    fusion_validation=None,
+    fusion_validation_ref: str | None = None,
+    fusion_validation_sha256: str | None = None,
+    fusion_validation_path: Path | None = None,
 ) -> dict:
     problem_name = problem_dir.name
     category = problem_dir.parent.name
@@ -1126,6 +1135,10 @@ def _run_existing_trace_derived_problem(
             solar_derivation_dir=solar_derivation,
             derived_sidecar_exclusions=derived_sidecar_exclusions,
             hardware_model=hardware_model,
+            fusion_validation=fusion_validation,
+            fusion_validation_ref=fusion_validation_ref,
+            fusion_validation_sha256=fusion_validation_sha256,
+            fusion_validation_path=fusion_validation_path,
         )
 
     if selected_workload_refs is not None:
@@ -1727,6 +1740,11 @@ def _run_pipeline_post_trace_outputs(
                 baseline_artifact=scoring_baseline,
                 sol_bound_artifact_dir=args.amd_sol_bound_dir,
                 solar_derivation_dir=args.solar_derivation,
+                hardware_model=args._resolved_hardware_model,
+                fusion_validation=args._fusion_validation,
+                fusion_validation_ref=str(args.fusion_validation),
+                fusion_validation_sha256=args._fusion_validation_sha256,
+                fusion_validation_path=args.fusion_validation,
             )
 
         if args.timing_evidence_dir is None:
@@ -2019,6 +2037,15 @@ def main():
         ),
     )
     ap.add_argument(
+        "--fusion-validation",
+        type=Path,
+        default=None,
+        help=(
+            "Validated fusion evidence required when generating AMD scores or "
+            "AMD SOL bounds."
+        ),
+    )
+    ap.add_argument(
         "--solar-derivation",
         type=Path,
         default=None,
@@ -2081,6 +2108,22 @@ def main():
         ap.error("--workload-shard-size must be a positive integer")
     if args.gpu_jobs != 1:
         ap.error("--gpu-jobs currently only supports 1")
+    derived_phase = args.phase in {"all", "derived"}
+    needs_hardware_model = derived_phase and any(
+        value is not None
+        for value in (
+            args.amd_score_report,
+            args.amd_sol_bound_dir,
+            args.solar_derivation,
+        )
+    )
+    needs_fusion_validation = derived_phase and any(
+        value is not None for value in (args.amd_score_report, args.amd_sol_bound_dir)
+    )
+    if needs_hardware_model and args.amd_hardware_model is None:
+        ap.error("derived AMD evidence requires --amd-hardware-model")
+    if needs_fusion_validation and args.fusion_validation is None:
+        ap.error("AMD score and AMD SOL generation require --fusion-validation")
     if args.official_score_report is not None:
         if args.phase not in {"all", "derived"}:
             ap.error("--official-score-report requires --phase all or derived")
@@ -2370,6 +2413,29 @@ def main():
         if args.amd_hardware_model is not None
         else None
     )
+    fusion_validation = None
+    fusion_validation_sha256 = None
+    if args.fusion_validation is not None:
+        args.fusion_validation = args.fusion_validation.resolve()
+        try:
+            fusion_payload = json.loads(
+                args.fusion_validation.read_text(encoding="utf-8")
+            )
+            fusion_validation = fusion_validation_from_dict(fusion_payload)
+        except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+            ap.error(f"invalid --fusion-validation: {exc}")
+        fusion_validation_sha256 = sha256_file(args.fusion_validation)
+        if (
+            external_hardware_model is not None
+            and fusion_validation.architecture
+            != external_hardware_model.model.architecture.lower()
+        ):
+            ap.error(
+                "--fusion-validation architecture does not match --amd-hardware-model"
+            )
+    args._resolved_hardware_model = external_hardware_model
+    args._fusion_validation = fusion_validation
+    args._fusion_validation_sha256 = fusion_validation_sha256
     if (
         args.official_score_report is not None
         and scoring_baseline is not None
@@ -2655,6 +2721,10 @@ def main():
                 timing_evidence_dir=None,
                 scoring_baseline=scoring_baseline,
                 hardware_model=external_hardware_model,
+                fusion_validation=fusion_validation,
+                fusion_validation_ref=str(args.fusion_validation),
+                fusion_validation_sha256=fusion_validation_sha256,
+                fusion_validation_path=args.fusion_validation,
                 derived_sidecar_exclusions=_derived_sidecar_exclusions_for_problem(
                     problem_id=problem_id,
                     workload_path=problem_dir / "workload.jsonl",
@@ -2888,6 +2958,10 @@ def main():
                     solar_derivation_dir=args.solar_derivation,
                     derived_sidecar_exclusions=derived_sidecar_exclusions,
                     hardware_model=external_hardware_model,
+                    fusion_validation=fusion_validation,
+                    fusion_validation_ref=str(args.fusion_validation),
+                    fusion_validation_sha256=fusion_validation_sha256,
+                    fusion_validation_path=args.fusion_validation,
                 )
 
             if run_timing_phase and args.timing_evidence_dir is not None:
@@ -3028,6 +3102,10 @@ def main():
                         solar_derivation_dir=args.solar_derivation,
                         derived_sidecar_exclusions=derived_sidecar_exclusions,
                         hardware_model=external_hardware_model,
+                        fusion_validation=fusion_validation,
+                        fusion_validation_ref=str(args.fusion_validation),
+                        fusion_validation_sha256=fusion_validation_sha256,
+                        fusion_validation_path=args.fusion_validation,
                     )
                 print("  Skipping (already passed). Use --rerun to re-evaluate.")
                 summaries.append(summary)
@@ -3311,6 +3389,10 @@ def main():
                 solar_derivation_dir=args.solar_derivation,
                 derived_sidecar_exclusions=derived_sidecar_exclusions,
                 hardware_model=external_hardware_model,
+                fusion_validation=fusion_validation,
+                fusion_validation_ref=str(args.fusion_validation),
+                fusion_validation_sha256=fusion_validation_sha256,
+                fusion_validation_path=args.fusion_validation,
             )
 
         if (

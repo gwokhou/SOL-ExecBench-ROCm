@@ -18,6 +18,7 @@ from sol_execbench.core.scoring.amd_score.reports import (
 )
 from sol_execbench.core.scoring.amd_score.derived_artifacts import ResolvedHardwareModel
 from sol_execbench.core.scoring.baseline_artifact import ScoringBaselineArtifact
+from sol_execbench.core.scoring.fusion_validation import FusionValidationArtifact
 from sol_execbench.core.scoring.official_score import (
     build_official_score_suite_evidence,
     validate_official_aggregation_policy,
@@ -45,6 +46,10 @@ def build_amd_score_reports_for_problem(
     sidecar_namespace: str | None = None,
     derived_sidecar_exclusions: dict[str, str] | None = None,
     hardware_model: ResolvedHardwareModel | None = None,
+    fusion_validation: FusionValidationArtifact | None = None,
+    fusion_validation_ref: str | None = None,
+    fusion_validation_sha256: str | None = None,
+    fusion_validation_path: Path | None = None,
 ) -> list[AmdNativeScore]:
     """Build derived AMD-native scores for one dataset-run problem."""
     return _build_amd_score_reports_for_problem_impl(
@@ -59,6 +64,10 @@ def build_amd_score_reports_for_problem(
         sidecar_namespace=sidecar_namespace,
         derived_sidecar_exclusions=derived_sidecar_exclusions,
         hardware_model=hardware_model,
+        fusion_validation=fusion_validation,
+        fusion_validation_ref=fusion_validation_ref,
+        fusion_validation_sha256=fusion_validation_sha256,
+        fusion_validation_path=fusion_validation_path,
     )
 
 
@@ -75,6 +84,10 @@ def extend_derived_reports_for_problem(
     solar_derivation_dir: Path | None,
     derived_sidecar_exclusions: dict[str, str] | None = None,
     hardware_model: ResolvedHardwareModel | None = None,
+    fusion_validation: FusionValidationArtifact | None = None,
+    fusion_validation_ref: str | None = None,
+    fusion_validation_sha256: str | None = None,
+    fusion_validation_path: Path | None = None,
 ) -> None:
     """Append requested derived reports and materialize requested sidecars."""
     trace_ref = (
@@ -97,6 +110,10 @@ def extend_derived_reports_for_problem(
             sidecar_namespace=sidecar_namespace,
             derived_sidecar_exclusions=derived_sidecar_exclusions,
             hardware_model=hardware_model,
+            fusion_validation=fusion_validation,
+            fusion_validation_ref=fusion_validation_ref,
+            fusion_validation_sha256=fusion_validation_sha256,
+            fusion_validation_path=fusion_validation_path,
         )
     )
 

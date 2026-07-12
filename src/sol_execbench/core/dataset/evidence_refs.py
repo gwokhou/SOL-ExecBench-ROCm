@@ -44,7 +44,7 @@ def build_derived_evidence_refs(
             problem_namespace=f"{category}/{problem_output_dir.name}",
         )
         if sol_bound_artifact_dir is not None:
-            path = sol_bound_artifact_dir / f"{sidecar_stem}.amd-sol-v3.json"
+            path = sol_bound_artifact_dir / f"{sidecar_stem}.amd-sol.json"
             if path.exists():
                 refs["amd_sol_bound"] = relative_ref(path, output_dir)
             else:

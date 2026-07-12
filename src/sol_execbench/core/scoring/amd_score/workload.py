@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from sol_execbench.core.scoring.amd_sol.v3 import AmdSolBoundV3Artifact
+from sol_execbench.core.scoring.amd_sol import AmdSolBoundArtifact
 from sol_execbench.core.scoring.amd_score.models import (
     AMD_SCORE_CLAIM_LEVEL,
     AmdNativeScore,
@@ -27,7 +27,7 @@ from sol_execbench.sol_score import sol_score
 
 
 def score_amd_native_workload(
-    artifact: AmdSolBoundV3Artifact,
+    artifact: AmdSolBoundArtifact,
     *,
     measured_latency_ms: float | None,
     baseline_latency_ms: float | None,
@@ -96,7 +96,7 @@ def score_amd_native_workload(
 
 
 def _bound_eligibility(
-    artifact: AmdSolBoundV3Artifact,
+    artifact: AmdSolBoundArtifact,
     solar_aggregate: SolarScoreGuard | None,
 ) -> BoundEligibilityEvidence:
     """Capture the exact inputs of the authority gate with the score."""
@@ -151,7 +151,7 @@ def has_complete_numeric_inputs(
 
 
 def artifact_sol_bound_ms(
-    artifact: AmdSolBoundV3Artifact,
+    artifact: AmdSolBoundArtifact,
 ) -> float:
     """Return the aggregate SOL bound latency from either artifact schema."""
     return artifact.aggregate_bound.sol_bound_ms

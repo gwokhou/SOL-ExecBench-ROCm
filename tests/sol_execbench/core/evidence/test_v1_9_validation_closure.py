@@ -48,11 +48,11 @@ def _assert_no_v1_10_positive_overclaims(text: str) -> None:
         assert phrase not in text
 
 
-def test_analysis_docs_explain_v3_sidecars_and_rdna4_scope():
+def test_analysis_docs_explain_current_sidecars_and_rdna4_scope():
     text = _text("docs/analysis.md")
 
     for expected in (
-        "sol_execbench.amd_sol_bound.v3",
+        "sol_execbench.amd_sol_bound.v4",
         "--amd-sol-bound-dir",
         "operator_work_estimates",
         "aggregate_bound",
@@ -121,9 +121,9 @@ def test_golden_bound_modeling_coverage_inventory_is_present():
     estimate_tests = _text(
         "tests/sol_execbench/core/scoring/test_amd_bound_estimates.py"
     )
-    sol_v3_tests = _text("tests/sol_execbench/core/scoring/test_amd_sol_v3.py")
+    sol_tests = _text("tests/sol_execbench/core/scoring/test_amd_sol_bound.py")
     evidence = _text("docs/internal/rdna4_v1_9_validation_evidence.md")
-    combined = "\n".join([graph_tests, estimate_tests, sol_v3_tests, evidence])
+    combined = "\n".join([graph_tests, estimate_tests, sol_tests, evidence])
 
     for expected in (
         "matmul",

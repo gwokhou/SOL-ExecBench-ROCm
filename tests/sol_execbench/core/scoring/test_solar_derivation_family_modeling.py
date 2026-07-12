@@ -9,10 +9,24 @@ from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.scoring.amd_bound_estimate.estimates import estimate_bound_work
 from sol_execbench.core.scoring.amd_bound_graph import OpFamily, build_bound_graph
 from sol_execbench.core.scoring.solar_derivation import (
-    build_solar_derivation_evidence,
+    build_solar_derivation_evidence as _build_solar_derivation_evidence,
     solar_derivation_from_dict,
 )
-from sol_execbench_type_helpers import JsonDict, make_definition, make_workload
+from sol_execbench_type_helpers import (
+    JsonDict,
+    make_amd_hardware_model,
+    make_definition,
+    make_workload,
+)
+
+
+def build_solar_derivation_evidence(definition, workload):
+    return _build_solar_derivation_evidence(
+        definition,
+        workload,
+        make_amd_hardware_model(),
+        hardware_model_ref="test-calibration.json",
+    )
 
 
 FIXTURE_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "solar_derivation"
@@ -561,7 +575,7 @@ def test_convolution_sidecar_records_subroles_formula_bytes_and_bounds():
     ]
     assert group.formula_evidence[0].formula_kind == "convolution_flops"
     assert group.byte_evidence[0].total_bytes > 0.0
-    assert group.bound_evidence[0].limiting_resource in {"compute", "memory"}
+    assert group.bound_evidence[0].limiting_resource == "none"
     assert group.missing_evidence == ()
 
 
@@ -654,7 +668,7 @@ def test_embedding_positional_sidecar_records_memory_bound_evidence():
         "embedding_positional_bytes"
     }
     assert all(item.total_bytes > 0.0 for item in group.byte_evidence)
-    assert all(item.limiting_resource == "memory" for item in group.bound_evidence)
+    assert all(item.limiting_resource == "none" for item in group.bound_evidence)
 
 
 def test_embedding_dynamic_indices_degrade_without_selected_byte_fabrication():

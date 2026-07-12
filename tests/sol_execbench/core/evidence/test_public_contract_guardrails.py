@@ -27,17 +27,15 @@ from sol_execbench.core.scoring.amd_score import (
     build_amd_native_suite_report,
     score_amd_native_workload,
 )
-from sol_execbench.core.scoring.amd_sol import (
-    EstimateConfidence,
-    default_amd_hardware_models,
-)
-from sol_execbench.core.scoring.amd_sol.v3 import build_amd_sol_bound_v3_artifact
+from sol_execbench.core.scoring.amd_sol import EstimateConfidence
 from sol_execbench.core.scoring.amd_hardware_models import HardwareValidationStatus
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.scoring import solar_derivation as solar_derivation_module
 from sol_execbench.core.scoring.solar_derivation import SolarAggregateStatus
 from sol_execbench_type_helpers import (
     json_dict,
+    make_amd_hardware_model,
+    make_amd_sol_bound,
     make_definition,
     make_solution,
     make_trace,
@@ -502,12 +500,12 @@ def test_amd_sol_artifacts_may_keep_existing_bound_fields_while_solar_fields_sta
         inputs={"a": {"type": "random"}, "b": {"type": "random"}},
         uuid="matmul-workload",
     )
-    hardware = default_amd_hardware_models()["gfx1200"]
-    v3_payload = build_amd_sol_bound_v3_artifact(
+    hardware = make_amd_hardware_model()
+    v3_payload = make_amd_sol_bound(
         definition,
         workload,
         hardware,
-        hardware_model_ref="default_amd_hardware_models.gfx1200",
+        hardware_model_ref="hardware/gfx1200.json",
     ).to_dict()
 
     assert "compute_bound_ms" in repr(v3_payload)
@@ -1158,10 +1156,10 @@ def test_public_score_evidence_refs_keep_exact_established_key_space():
         inputs={"a": {"type": "random"}, "b": {"type": "random"}},
         uuid="matmul-workload",
     )
-    artifact = build_amd_sol_bound_v3_artifact(
+    artifact = make_amd_sol_bound(
         definition,
         workload,
-        default_amd_hardware_models()["gfx1200"],
+        make_amd_hardware_model(),
     )
 
     payload = score_amd_native_workload(
@@ -1172,10 +1170,10 @@ def test_public_score_evidence_refs_keep_exact_established_key_space():
         timing_evidence_ref="timing/matmul.json",
         sol_bound_ref="bounds/matmul.json",
         baseline_ref="baseline/matmul.json",
-        hardware_model_ref="default_amd_hardware_models.gfx1200",
+        hardware_model_ref="hardware/gfx1200.json",
         derived_evidence_refs={
             "formula": "solar/matmul.json#groups.formula_evidence",
-            "hardware_model": "default_amd_hardware_models.gfx1200",
+            "hardware_model": "hardware/gfx1200.json",
             "coverage": "solar/matmul.json#coverage_summary",
             "score_eligibility": "solar/matmul.json#aggregate_status",
         },
@@ -1275,15 +1273,15 @@ def test_degraded_complex_family_score_eligibility_ignores_solar_sidecars():
             "ssm_mamba_degraded_scan_bytes",
         ),
     )
-    hardware = default_amd_hardware_models()["gfx1200"]
+    hardware = make_amd_hardware_model()
 
     for definition, workload, formula_kind in cases:
-        artifact = build_amd_sol_bound_v3_artifact(definition, workload, hardware)
+        artifact = make_amd_sol_bound(definition, workload, hardware)
         score = score_amd_native_workload(
             artifact,
             measured_latency_ms=1.0,
             baseline_latency_ms=2.0,
-            hardware_model_ref="default_amd_hardware_models.gfx1200",
+            hardware_model_ref="hardware/gfx1200.json",
         )
 
         assert artifact.aggregate_bound.status == "degraded"
@@ -1323,19 +1321,19 @@ def test_importing_solar_derivation_keeps_amd_native_score_eligibility_unchanged
         inputs={"a": {"type": "random"}, "b": {"type": "random"}},
         uuid="matmul-workload",
     )
-    hardware = default_amd_hardware_models()["gfx1200"]
-    v3_artifact = build_amd_sol_bound_v3_artifact(
+    hardware = make_amd_hardware_model()
+    v3_artifact = make_amd_sol_bound(
         definition,
         workload,
         hardware,
-        hardware_model_ref="default_amd_hardware_models.gfx1200",
+        hardware_model_ref="hardware/gfx1200.json",
     )
 
     v3_score = score_amd_native_workload(
         v3_artifact,
         measured_latency_ms=1.0,
         baseline_latency_ms=2.0,
-        hardware_model_ref="default_amd_hardware_models.gfx1200",
+        hardware_model_ref="hardware/gfx1200.json",
     )
 
     assert v3_score.supported is True
@@ -1367,10 +1365,10 @@ def test_solar_score_guard_does_not_expose_internal_evidence_refs_or_claims():
         inputs={"a": {"type": "random"}, "b": {"type": "random"}},
         uuid="matmul-workload",
     )
-    artifact = build_amd_sol_bound_v3_artifact(
+    artifact = make_amd_sol_bound(
         definition,
         workload,
-        default_amd_hardware_models()["gfx1200"],
+        make_amd_hardware_model(),
     )
 
     unscored = score_amd_native_workload(
@@ -1482,26 +1480,24 @@ def test_hardware_model_evidence_survives_bound_and_score_artifacts():
         inputs={"a": {"type": "random"}, "b": {"type": "random"}},
         uuid="matmul-workload",
     )
-    hardware = default_amd_hardware_models()["gfx1200"]
-    artifact = build_amd_sol_bound_v3_artifact(definition, workload, hardware)
+    hardware = make_amd_hardware_model()
+    artifact = make_amd_sol_bound(definition, workload, hardware)
     score = score_amd_native_workload(
         artifact,
         measured_latency_ms=1.0,
         baseline_latency_ms=2.0,
-        hardware_model_ref="default_amd_hardware_models.gfx1200",
+        hardware_model_ref="hardware/gfx1200.json",
     )
     payload = artifact.to_dict()
 
     assert payload["hardware_model"]["source"]
-    assert payload["hardware_model"]["confidence"] == EstimateConfidence.INEXACT.value
+    assert payload["hardware_model"]["confidence"] == EstimateConfidence.SUPPORTED.value
     assert (
         payload["hardware_model"]["model_validation_status"]
-        == HardwareValidationStatus.PROVISIONAL.value
+        == HardwareValidationStatus.VALIDATED.value
     )
     assert "validation_status" not in payload["hardware_model"]
-    assert (
-        score.evidence_refs["hardware_model"] == "default_amd_hardware_models.gfx1200"
-    )
+    assert score.evidence_refs["hardware_model"] == "hardware/gfx1200.json"
 
 
 def test_definition_workload_trace_schemas_do_not_include_derived_artifact_fields():

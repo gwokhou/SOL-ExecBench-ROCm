@@ -3,20 +3,25 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from sol_execbench.core.evidence.evidence_refs import sidecar_stem_for_workload
 from sol_execbench.core.scoring.amd_score.sidecar_parsing import (
-    minimal_amd_sol_bound_v3_from_payload,
+    amd_sol_bound_from_payload,
     minimal_solar_aggregate_from_payload,
     read_json_object,
 )
-from sol_execbench.core.scoring.amd_hardware_models import load_amd_hardware_model
-from sol_execbench.core.scoring.amd_sol import default_amd_hardware_models
-from sol_execbench.core.scoring.amd_sol.v3 import build_amd_sol_bound_v3_artifact
+from sol_execbench.core.scoring.amd_hardware_models import (
+    AmdHardwareModel,
+    load_amd_hardware_model,
+)
+from sol_execbench.core.scoring.amd_sol import (
+    AmdSolBoundArtifact,
+    build_amd_sol_bound_artifact,
+)
+from sol_execbench.core.scoring.fusion_validation import FusionValidationArtifact
 from sol_execbench.core.scoring.solar_derivation import (
     build_solar_derivation_evidence,
     solar_derivation_from_dict,
@@ -25,10 +30,10 @@ from sol_execbench.core.scoring.solar_derivation import (
 
 @dataclass(frozen=True)
 class ResolvedHardwareModel:
-    """Resolved default hardware model for derived score artifacts."""
+    """Resolved external hardware model for derived score artifacts."""
 
     key: str
-    model: Any
+    model: AmdHardwareModel
     ref: str
 
 
@@ -36,39 +41,15 @@ class ResolvedHardwareModel:
 class DerivedScoreArtifacts:
     """Derived artifact inputs for one AMD-native workload score."""
 
-    sol_bound_artifact: Any | None
+    sol_bound_artifact: AmdSolBoundArtifact | None
     sol_bound_ref: str
     solar_derivation: Any | None
     evidence_refs: dict[str, str] | None
 
 
-def resolve_hardware_model_from_trace_payloads(
-    traces_payload: Sequence[dict],
-) -> ResolvedHardwareModel:
-    """Return the first known AMD hardware model referenced by trace payloads."""
-    hardware_models = default_amd_hardware_models()
-    hardware_model_key = "gfx1200"
-    for payload in traces_payload:
-        try:
-            hardware = str(payload["evaluation"]["environment"].get("hardware", ""))
-        except (KeyError, TypeError, AttributeError):
-            continue
-        for key in hardware_models:
-            if key in hardware:
-                hardware_model_key = key
-                break
-        if hardware_model_key != "gfx1200":
-            break
-    return ResolvedHardwareModel(
-        key=hardware_model_key,
-        model=hardware_models[hardware_model_key],
-        ref=f"default_amd_hardware_models.{hardware_model_key}",
-    )
-
-
 def resolve_hardware_model_from_path(path: Path) -> ResolvedHardwareModel:
     """Load a validated external model instead of silently using a package default."""
-    path = Path(path)
+    path = Path(path).resolve()
     model = load_amd_hardware_model(path)
     return ResolvedHardwareModel(
         key=model.architecture,
@@ -83,6 +64,10 @@ def resolve_derived_score_artifacts(
     workload: Any | None,
     workload_uuid: str,
     hardware_model: ResolvedHardwareModel,
+    fusion_validation: FusionValidationArtifact | None,
+    fusion_validation_ref: str | None,
+    fusion_validation_sha256: str | None,
+    fusion_validation_path: Path | None,
     sol_bound_artifact_dir: Path | None,
     solar_derivation_dir: Path | None,
     sidecar_namespace: str | None,
@@ -98,9 +83,9 @@ def resolve_derived_score_artifacts(
         if workload is not None
         else None
     )
-    sol_bound_ref = f"derived:{definition.name}:{workload_uuid}:amd_sol_bound_v3"
+    sol_bound_ref = f"derived:{definition.name}:{workload_uuid}:amd_sol_bound"
     sol_bound_path = (
-        sol_bound_artifact_dir / f"{sidecar_stem}.amd-sol-v3.json"
+        sol_bound_artifact_dir / f"{sidecar_stem}.amd-sol.json"
         if sol_bound_artifact_dir is not None and sidecar_stem is not None
         else None
     )
@@ -110,6 +95,10 @@ def resolve_derived_score_artifacts(
         hardware_model=hardware_model,
         derived_exclusion=derived_exclusion,
         sol_bound_path=sol_bound_path,
+        fusion_validation=fusion_validation,
+        fusion_validation_ref=fusion_validation_ref,
+        fusion_validation_sha256=fusion_validation_sha256,
+        fusion_validation_path=fusion_validation_path,
     )
     if sol_bound_path is not None and sol_bound_artifact is not None:
         sol_bound_artifact_dir = sol_bound_path.parent
@@ -144,17 +133,31 @@ def _resolve_sol_bound_artifact(
     hardware_model: ResolvedHardwareModel,
     derived_exclusion: str | None,
     sol_bound_path: Path | None,
-) -> Any | None:
+    fusion_validation: FusionValidationArtifact | None,
+    fusion_validation_ref: str | None,
+    fusion_validation_sha256: str | None,
+    fusion_validation_path: Path | None,
+) -> AmdSolBoundArtifact | None:
     artifact = None
     if sol_bound_path is not None and sol_bound_path.exists():
         existing_payload = read_json_object(sol_bound_path)
         if existing_payload is not None:
-            artifact = minimal_amd_sol_bound_v3_from_payload(existing_payload)
+            artifact = amd_sol_bound_from_payload(existing_payload)
     if artifact is None and workload is not None and derived_exclusion is None:
-        artifact = build_amd_sol_bound_v3_artifact(
+        if (
+            fusion_validation is None
+            or fusion_validation_ref is None
+            or fusion_validation_sha256 is None
+        ):
+            raise ValueError("AMD SOL generation requires fusion-validation evidence")
+        artifact = build_amd_sol_bound_artifact(
             definition,
             workload,
             hardware_model.model,
+            fusion_validation=fusion_validation,
+            fusion_validation_ref=fusion_validation_ref,
+            fusion_validation_sha256=fusion_validation_sha256,
+            evidence_path=fusion_validation_path,
             hardware_model_ref=hardware_model.ref,
         )
     return artifact
@@ -192,7 +195,12 @@ def _resolve_solar_derivation(
         solar_derivation_dir.mkdir(parents=True, exist_ok=True)
         assert solar_derivation_path is not None
         if solar_derivation is None:
-            generated = build_solar_derivation_evidence(definition, workload)
+            generated = build_solar_derivation_evidence(
+                definition,
+                workload,
+                hardware_model.model,
+                hardware_model_ref=hardware_model.ref,
+            )
             generated_payload = generated.to_dict()
             solar_derivation_path.write_text(json.dumps(generated_payload, indent=2))
             solar_derivation_ref = str(solar_derivation_path)

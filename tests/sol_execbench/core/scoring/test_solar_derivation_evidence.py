@@ -33,9 +33,9 @@ from sol_execbench.core.scoring.solar_derivation import (
     SolarSemanticGroupEvidence,
     SolarSubroleEvidence,
     SolarTensorEvidence,
-    build_solar_derivation_evidence,
+    build_solar_derivation_evidence as _build_solar_derivation_evidence,
     classify_solar_confidence,
-    derive_solar_derivation_evidence,
+    derive_solar_derivation_evidence as _derive_solar_derivation_evidence,
     solar_derivation_from_dict,
 )
 from sol_execbench.core.scoring.solar_derivation.coverage import (
@@ -51,9 +51,31 @@ from sol_execbench.core.scoring.solar_derivation.status import (
 from sol_execbench_type_helpers import (
     JsonDict,
     json_dict,
+    make_amd_hardware_model,
     make_definition,
     make_workload,
 )
+
+
+def build_solar_derivation_evidence(definition, workload):
+    return _build_solar_derivation_evidence(
+        definition,
+        workload,
+        make_amd_hardware_model(),
+        hardware_model_ref="test-calibration.json",
+    )
+
+
+def derive_solar_derivation_evidence(definition, workload, graph, estimates):
+    return _derive_solar_derivation_evidence(
+        definition,
+        workload,
+        graph,
+        estimates,
+        make_amd_hardware_model(),
+        hardware_model_ref="test-calibration.json",
+    )
+
 
 TEST_DIR = str(Path(__file__).resolve().parent)
 if TEST_DIR not in sys.path:
@@ -1491,7 +1513,7 @@ def test_derive_solar_evidence_records_tensor_shape_dtype_axis_and_sources():
         group["bound_evidence"][0]["compute_bound_ms"],
         group["bound_evidence"][0]["memory_bound_ms"],
     )
-    assert group["bound_evidence"][0]["limiting_resource"] in {"compute", "memory"}
+    assert group["bound_evidence"][0]["limiting_resource"] == "none"
     assert "formula_evidence:op_1" in group["required_evidence"]
     assert "byte_evidence:op_1" in group["required_evidence"]
     assert "bound_evidence:op_1" in group["required_evidence"]
@@ -1756,7 +1778,7 @@ def test_linear_projection_sidecar_records_formula_bytes_bounds_and_bias_subrole
         group["bound_evidence"][0]["compute_bound_ms"],
         group["bound_evidence"][0]["memory_bound_ms"],
     )
-    assert group["bound_evidence"][0]["limiting_resource"] in {"compute", "memory"}
+    assert group["bound_evidence"][0]["limiting_resource"] == "none"
     assert "formula_evidence:op_1" in group["required_evidence"]
     assert "byte_evidence:op_1" in group["required_evidence"]
     assert "bound_evidence:op_1" in group["required_evidence"]

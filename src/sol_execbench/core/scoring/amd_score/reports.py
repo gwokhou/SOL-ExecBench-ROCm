@@ -20,8 +20,8 @@ from sol_execbench.core.scoring.amd_score.report_inputs import (
 from sol_execbench.core.scoring.amd_score.derived_artifacts import (
     ResolvedHardwareModel,
     resolve_derived_score_artifacts,
-    resolve_hardware_model_from_trace_payloads,
 )
+from sol_execbench.core.scoring.fusion_validation import FusionValidationArtifact
 from sol_execbench.core.scoring.baseline_artifact import ScoringBaselineArtifact
 
 RunCliFunc = Callable[..., list[dict] | None]
@@ -40,14 +40,17 @@ def _build_amd_score_reports_for_problem_impl(
     sidecar_namespace: str | None = None,
     derived_sidecar_exclusions: dict[str, str] | None = None,
     hardware_model: ResolvedHardwareModel | None = None,
+    fusion_validation: FusionValidationArtifact | None = None,
+    fusion_validation_ref: str | None = None,
+    fusion_validation_sha256: str | None = None,
+    fusion_validation_path: Path | None = None,
 ) -> list[AmdNativeScore]:
     """Build derived AMD-native scores for one dataset-run problem."""
     _ = run_cli_func
     definition = parse_score_report_definition(definition_payload)
     workloads = load_score_report_workloads(workload_path)
-    hardware_model = hardware_model or resolve_hardware_model_from_trace_payloads(
-        traces_payload
-    )
+    if hardware_model is None:
+        raise ValueError("derived AMD evidence requires an external hardware model")
     scores: list[AmdNativeScore] = []
     derived_sidecar_exclusions = derived_sidecar_exclusions or {}
 
@@ -60,6 +63,10 @@ def _build_amd_score_reports_for_problem_impl(
             workload=workload,
             workload_uuid=trace.workload.uuid,
             hardware_model=hardware_model,
+            fusion_validation=fusion_validation,
+            fusion_validation_ref=fusion_validation_ref,
+            fusion_validation_sha256=fusion_validation_sha256,
+            fusion_validation_path=fusion_validation_path,
             sol_bound_artifact_dir=sol_bound_artifact_dir,
             solar_derivation_dir=solar_derivation_dir,
             sidecar_namespace=sidecar_namespace,

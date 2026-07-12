@@ -200,10 +200,6 @@ def test_cross_domain_imports_stay_explicitly_allowlisted() -> None:
     allowed_with_rationale = {
         (
             "sol_execbench.core.dataset.amd_score_reports",
-            "sol_execbench.core.scoring.amd_score.derived_artifacts",
-        ): "dataset score report exports derive hardware model references",
-        (
-            "sol_execbench.core.dataset.amd_score_reports",
             "sol_execbench.core.scoring.amd_score.reports",
         ): "dataset score report exports scoring report helpers",
         (
@@ -212,8 +208,8 @@ def test_cross_domain_imports_stay_explicitly_allowlisted() -> None:
         ): "dataset score report exports sidecar payload parsers",
         (
             "sol_execbench.core.dataset.amd_score_reports",
-            "sol_execbench.core.scoring.amd_sol.v3",
-        ): "dataset score report exports AMD SOL v3 artifact builder",
+            "sol_execbench.core.scoring.amd_sol",
+        ): "dataset score report exports the AMD SOL artifact builder",
         (
             "sol_execbench.core.dataset.amd_score_reports",
             "sol_execbench.core.scoring.solar_derivation",
@@ -254,6 +250,10 @@ def test_cross_domain_imports_stay_explicitly_allowlisted() -> None:
             "sol_execbench.core.dataset.runner_scoring",
             "sol_execbench.core.scoring.official_score",
         ): "dataset scoring bridge writes authoritative official-score sidecars",
+        (
+            "sol_execbench.core.dataset.runner_scoring",
+            "sol_execbench.core.scoring.fusion_validation",
+        ): "dataset scoring bridge passes validated fusion evidence to bound generation",
         (
             "sol_execbench.core.dataset.runner_scoring",
             "sol_execbench.core.scoring.release_baseline",
@@ -400,7 +400,6 @@ def test_p2_hotspots_stay_bounded_after_refactor() -> None:
         "sol_execbench.core.bench.input_generation": (260, 5),
         "sol_execbench.core.scoring.amd_bound_graph.fx": (260, 6),
         "sol_execbench.core.bench.rocm_profiler": (180, 5),
-        "sol_execbench.core.scoring.amd_sol.graph": (220, 6),
     }
 
     observed = {
@@ -929,12 +928,12 @@ def test_amd_score_report_sidecar_parsers_live_outside_orchestrator() -> None:
     )
 
     assert amd_score_sidecar_parsing.read_json_object is not None
-    assert amd_score_sidecar_parsing.minimal_amd_sol_bound_v3_from_payload is not None
+    assert amd_score_sidecar_parsing.amd_sol_bound_from_payload is not None
     assert amd_score_sidecar_parsing.minimal_solar_aggregate_from_payload is not None
 
     for name in (
         "_read_json_object",
-        "_minimal_amd_sol_bound_v3_from_payload",
+        "_amd_sol_bound_from_payload",
         "_minimal_solar_aggregate_from_payload",
     ):
         assert not hasattr(amd_score_reports, name)

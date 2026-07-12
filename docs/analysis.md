@@ -327,10 +327,12 @@ score report, provide a sidecar directory:
 uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
   --limit 5 \
   --amd-score-report out/amd-score-report.json \
-  --amd-sol-bound-dir out/amd-sol-bounds
+  --amd-sol-bound-dir out/amd-sol-bounds \
+  --amd-hardware-model calibration/gfx1200.json \
+  --fusion-validation calibration/fusion-validation.json
 ```
 
-The sidecars use schema version `sol_execbench.amd_sol_bound.v3`. Each sidecar
+The sidecars use schema version `sol_execbench.amd_sol_bound.v4`. Each sidecar
 contains the derived marker, definition name, workload UUID, hardware model
 reference, hardware model payload, bound graph, rich operator work estimates,
 versioned fusion groups, per-group SOL bounds, aggregate bound state,
@@ -352,7 +354,9 @@ uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
   --limit 5 \
   --amd-score-report out/amd-score-report.json \
   --amd-sol-bound-dir out/amd-sol-bounds \
-  --solar-derivation out/solar-derivation
+  --solar-derivation out/solar-derivation \
+  --amd-hardware-model calibration/gfx1200.json \
+  --fusion-validation calibration/fusion-validation.json
 ```
 
 This local workflow produces three artifact layers:
@@ -360,7 +364,7 @@ This local workflow produces three artifact layers:
 - canonical trace JSONL files: the benchmark trace JSONL output for each problem.
   The canonical trace JSONL remains unchanged by `--amd-score-report`,
   `--amd-sol-bound-dir`, and `--solar-derivation`.
-- AMD SOL v3 sidecars under `--amd-sol-bound-dir`: derived AMD roofline and
+- AMD SOL v4 sidecars under `--amd-sol-bound-dir`: derived AMD roofline and
   work-estimate inputs used for AMD-native score eligibility.
 - SOLAR derivation sidecars under `--solar-derivation`: paper-aligned automatic
   SOLAR derivation evidence for the ROCm port, generated from `Definition`,

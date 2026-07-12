@@ -21,6 +21,8 @@ from sol_execbench.core.scoring.baseline_artifact import (
     ScoringBaselineArtifact,
     load_scoring_baseline_artifact,
 )
+from sol_execbench.core.scoring.amd_hardware_models import load_amd_hardware_model
+from sol_execbench.core.scoring.amd_sol import amd_sol_bound_from_dict
 
 from .models import (
     ReleaseBaselineBundle,
@@ -29,10 +31,6 @@ from .models import (
     release_baseline_verification_from_dict,
     sha256_file,
 )
-
-
-_AMD_SOL_V3_SCHEMA_VERSION = "sol_execbench.amd_sol_bound.v3"
-_AMD_SOL_V4_SCHEMA_VERSION = "sol_execbench.amd_sol_bound.v4"
 
 
 @dataclass(frozen=True)
@@ -65,7 +63,7 @@ class OfficialReleaseBaseline:
         sol_bound_ref: str | None,
         hardware_model_ref: str | None,
     ) -> bool:
-        """Verify immutable v3 bound and model inputs for one official score.
+        """Verify immutable current bound and model inputs for one official score.
 
         The score report is derived data.  Official authority therefore requires
         that its cited inputs resolve to the exact, checksummed files published
@@ -103,25 +101,28 @@ class OfficialReleaseBaseline:
             bound_payload = json.loads(bound_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             return False
-        if not isinstance(bound_payload, dict) or bound_payload.get(
-            "schema_version"
-        ) not in {_AMD_SOL_V3_SCHEMA_VERSION, _AMD_SOL_V4_SCHEMA_VERSION}:
+        if not isinstance(bound_payload, dict):
+            return False
+        try:
+            bound = amd_sol_bound_from_dict(bound_payload)
+            model = load_amd_hardware_model(hardware_path)
+        except (KeyError, OSError, TypeError, ValueError):
             return False
         if (
             bound_payload.get("definition") != definition
             or bound_payload.get("workload_uuid") != workload_uuid
         ):
             return False
-        if bound_payload.get("schema_version") == _AMD_SOL_V4_SCHEMA_VERSION:
-            fusion_ref = bound_payload.get("fusion_validation_ref")
-            fusion_sha256 = bound_payload.get("fusion_validation_sha256")
-            if not isinstance(fusion_ref, str) or not isinstance(fusion_sha256, str):
-                return False
-            fusion_path = Path(fusion_ref)
-            if not fusion_path.is_absolute():
-                fusion_path = bound_path.parent / fusion_path
-            if not fusion_path.is_file() or sha256_file(fusion_path) != fusion_sha256:
-                return False
+        if bound.hardware_model.architecture != model.architecture:
+            return False
+        fusion_path = Path(bound.fusion_validation_ref)
+        if not fusion_path.is_absolute():
+            fusion_path = bound_path.parent / fusion_path
+        if (
+            not fusion_path.is_file()
+            or sha256_file(fusion_path) != bound.fusion_validation_sha256
+        ):
+            return False
         return True
 
 

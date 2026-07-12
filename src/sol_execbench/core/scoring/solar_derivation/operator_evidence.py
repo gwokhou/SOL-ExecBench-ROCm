@@ -7,16 +7,14 @@ from __future__ import annotations
 
 from sol_execbench.core.scoring.amd_bound_estimate.estimates import OperatorWorkEstimate
 from sol_execbench.core.scoring.amd_bound_graph.models import BoundGraphNode
-from sol_execbench.core.scoring.amd_hardware_models import default_amd_hardware_models
+from sol_execbench.core.scoring.amd_hardware_models import AmdHardwareModel
+from sol_execbench.core.scoring.amd_sol.math import bound_for_estimate
 from sol_execbench.core.scoring.solar_derivation.evidence_models import (
     SolarBoundEvidence,
     SolarByteEvidence,
     SolarEvidenceSource,
     SolarFormulaEvidence,
     SolarTensorEvidence,
-)
-from sol_execbench.core.scoring.solar_derivation.models import (
-    SOLAR_DEFAULT_AMD_HARDWARE_MODEL_REF,
 )
 from sol_execbench.core.scoring.solar_derivation.sources import _node_tensor_ids
 
@@ -89,31 +87,22 @@ def _byte_evidence_for_estimates(
 
 def _bound_evidence_for_estimates(
     estimates: tuple[OperatorWorkEstimate, ...],
+    *,
+    hardware_model: AmdHardwareModel,
+    hardware_model_ref: str,
 ) -> tuple[SolarBoundEvidence, ...]:
-    hardware_model = default_amd_hardware_models()["gfx1200"]
     evidence: list[SolarBoundEvidence] = []
     for estimate in estimates:
-        compute_bound_ms = (
-            estimate.flops / (hardware_model.peak_tflops * 1_000_000_000_000.0) * 1000.0
-            if hardware_model.peak_tflops > 0.0
-            else 0.0
+        compute_bound_ms, memory_bound_ms, confidence, warnings = bound_for_estimate(
+            estimate, hardware_model
         )
-        memory_bound_ms = (
-            estimate.total_bytes
-            / (hardware_model.memory_bandwidth_gbps * 1_000_000_000.0)
-            * 1000.0
-            if hardware_model.memory_bandwidth_gbps > 0.0
-            else 0.0
+        limiting_resource = (
+            "none"
+            if compute_bound_ms == 0.0 and memory_bound_ms == 0.0
+            else "compute"
+            if compute_bound_ms >= memory_bound_ms
+            else "memory"
         )
-        if (
-            hardware_model.peak_tflops <= 0.0
-            and hardware_model.memory_bandwidth_gbps <= 0.0
-        ):
-            limiting_resource = "none"
-        else:
-            limiting_resource = (
-                "compute" if compute_bound_ms >= memory_bound_ms else "memory"
-            )
         evidence.append(
             SolarBoundEvidence(
                 node_id=estimate.node_id,
@@ -124,12 +113,16 @@ def _bound_evidence_for_estimates(
                 sol_bound_ms=max(compute_bound_ms, memory_bound_ms),
                 source=SolarEvidenceSource(
                     kind="estimate",
-                    detail=f"amd_sol_v2:{SOLAR_DEFAULT_AMD_HARDWARE_MODEL_REF}",
+                    detail=f"amd_sol:{hardware_model_ref}",
                     node_id=estimate.node_id,
                     tensor_id=None,
                 ),
-                confidence=estimate.confidence,
-                rationale=estimate.rationale,
+                confidence=confidence,
+                rationale=(
+                    estimate.rationale
+                    if not warnings
+                    else f"{estimate.rationale}; {', '.join(warnings)}"
+                ),
             )
         )
     return tuple(sorted(evidence, key=lambda item: item.node_id))

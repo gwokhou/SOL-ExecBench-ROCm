@@ -27,7 +27,7 @@ from sol_execbench.core.evidence.scoring_guardrails import (
     interpret_sol_score,
 )
 from sol_execbench.core.scoring.amd_score.sidecar_parsing import (
-    minimal_amd_sol_bound_v3_from_payload,
+    amd_sol_bound_from_payload,
     minimal_solar_aggregate_from_payload,
 )
 from sol_execbench.sol_score import sol_score
@@ -154,10 +154,10 @@ def test_static_evidence_sidecar_construction_does_not_mutate_trace_or_scoring()
     assert interpretation.claim_level == "benchmark-relative"
 
 
-def test_minimal_amd_sol_bound_v3_rejects_malformed_nested_payloads() -> None:
-    assert minimal_amd_sol_bound_v3_from_payload({"schema_version": "wrong"}) is None
+def test_amd_sol_bound_rejects_malformed_nested_payloads() -> None:
+    assert amd_sol_bound_from_payload({"schema_version": "wrong"}) is None
     assert (
-        minimal_amd_sol_bound_v3_from_payload(
+        amd_sol_bound_from_payload(
             {
                 "schema_version": "sol_execbench.amd_sol_bound.v3",
                 "aggregate_bound": [],
