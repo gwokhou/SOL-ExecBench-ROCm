@@ -5,8 +5,8 @@ area: execbench
 files:
   - src/sol_execbench/core/bench/agent_feedback.py
   - src/sol_execbench/core/bench/profile_summary.py
-  - docs/agent_feedback_sidecar.md
-  - docs/profile_summary_sidecar.md
+  - docs/user/agent_feedback_sidecar.md
+  - docs/user/profile_summary_sidecar.md
   - tests/sol_execbench/test_agent_feedback.py
   - tests/sol_execbench/test_profile_summary.py
 ---

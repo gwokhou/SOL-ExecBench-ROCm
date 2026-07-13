@@ -10,7 +10,7 @@ and focused tests.
 |-------------|------|-------------------------|------------------|
 | `src/sol_execbench/core/bench/timing_policy.py` | New pure timing source/backend policy module | `src/sol_execbench/core/diagnostics.py` | `str, Enum` classifications plus frozen dataclasses with explicit reason/fallback fields. |
 | `src/sol_execbench/core/bench/timing.py` | Existing timing boundary, maybe imports/uses policy only lightly in Phase 23 | `src/sol_execbench/core/bench/timing.py` | Preserve current callable signatures and compatibility wrappers. |
-| `docs/rocm_timing.md` | New timing semantics documentation | `docs/analysis.md`, `docs/ARCHITECTURE.md` | Explain ROCm compatibility names and separate canonical trace from derived evidence. |
+| `docs/user/rocm_timing.md` | New timing semantics documentation | `docs/internal/analysis.md`, `docs/user/ARCHITECTURE.md` | Explain ROCm compatibility names and separate canonical trace from derived evidence. |
 | `tests/sol_execbench/test_timing_policy.py` | New policy unit tests | `tests/sol_execbench/test_rocm_diagnostics_reporting.py` | Direct enum/dataclass assertions with no GPU/tool dependency. |
 | `tests/sol_execbench/test_rocm_eval_timing_audit.py` | Existing audit extension | Same file | Add allowlist/doc assertions without weakening forbidden CUDA/NVIDIA checks. |
 

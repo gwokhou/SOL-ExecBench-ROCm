@@ -5,10 +5,10 @@
 
 ## Delivered
 
-- Updated `docs/TESTING.md` with direct CDNA3 marker-test commands, expected
+- Updated `docs/user/TESTING.md` with direct CDNA3 marker-test commands, expected
   skip interpretation, and the boundary that marker readiness is not full
   MI300X validation evidence.
-- Updated `docs/rocm.md` to distinguish CDNA3 schema support, concrete CDNA3
+- Updated `docs/user/rocm.md` to distinguish CDNA3 schema support, concrete CDNA3
   test readiness, deferred MI300X full-suite validation, and unavailable CDNA4.
 - Updated `CONTRIBUTING.md` with future CDNA3 test placement, marker usage, and
   MI300X evidence-chain expectations.

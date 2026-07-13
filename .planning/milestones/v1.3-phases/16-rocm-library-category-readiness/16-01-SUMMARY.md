@@ -6,7 +6,7 @@
 
 ## Changes
 
-- Added `docs/rocm_libraries.md` defining supported, candidate, and
+- Added `docs/user/rocm_libraries.md` defining supported, candidate, and
   compatibility-example levels.
 - Updated README and solution schema docs so `hipblas`, `miopen`, `ck`, and
   `rocwmma` are described as candidate categories unless runnable evidence

@@ -51,10 +51,10 @@ cutover-gate decisions.
 
 3. **Documentation explains which SOL artifacts HIP must consume for confirmed
    pass/fail and which remain diagnostic-only:** VERIFIED
-   - `docs/confirmed_evidence.md` adds the HIP consume/diagnostic-only table,
+   - `docs/user/confirmed_evidence.md` adds the HIP consume/diagnostic-only table,
      the `sol-execbench official-score` emission path, blocker-removal
      semantics, the six fixture cases, and authority wording.
-   - `docs/EVALUATOR-CONTRACT.md` extends `## Capabilities`, `## Official Score
+   - `docs/user/EVALUATOR-CONTRACT.md` extends `## Capabilities`, `## Official Score
      Evidence`, and `## Ownership Boundary` with the confirmed surface.
 
 4. **Valid fixture runs remove `missing_score`, `missing_baseline`, and

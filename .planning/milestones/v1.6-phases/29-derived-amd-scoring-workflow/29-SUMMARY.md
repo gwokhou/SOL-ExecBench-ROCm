@@ -13,7 +13,7 @@
   score JSON output.
 - Added guarded unscored states for missing timing, baseline, or SOL-bound
   evidence.
-- Documented the derived report workflow in `docs/analysis.md`.
+- Documented the derived report workflow in `docs/internal/analysis.md`.
 
 ## Verification
 

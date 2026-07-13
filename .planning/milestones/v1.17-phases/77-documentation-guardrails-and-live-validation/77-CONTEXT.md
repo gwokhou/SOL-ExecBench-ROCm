@@ -24,8 +24,8 @@ paper-parity, or leaderboard authority.
   hardware pass.
 
 ### Documentation
-- Add `docs/static_kernel_evidence.md` as the primary user-facing guide.
-- Update `docs/CLAIMS.md` and `docs/RESEARCHER-GUIDE.md`.
+- Add `docs/user/static_kernel_evidence.md` as the primary user-facing guide.
+- Update `docs/user/CLAIMS.md` and `docs/user/RESEARCHER-GUIDE.md`.
 - Add a v1.17 validation artifact under `docs/internal/`.
 
 ### Deferred And Unsupported Scope

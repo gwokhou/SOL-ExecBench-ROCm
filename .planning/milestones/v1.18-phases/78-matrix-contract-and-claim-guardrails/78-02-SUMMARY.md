@@ -27,7 +27,7 @@ key-files:
   modified:
     - src/sol_execbench/core/compatibility.py
     - tests/sol_execbench/test_public_contract_guardrails.py
-    - docs/CLAIMS.md
+    - docs/user/CLAIMS.md
     - docs/internal/v1_4_compatibility_inventory.md
     - .planning/REQUIREMENTS.md
 
@@ -65,7 +65,7 @@ completed: 2026-05-28
 - Added `MatrixExecutionDecision` and `classify_matrix_entry_for_execution` for pure pre-benchmark decisions.
 - Enforced `host_validated` claim boundaries in `MatrixEntry` validation.
 - Added CPU-safe guardrail tests for mixed-version blocking, debug override limits, host/container separation, public schema isolation, and claim wording.
-- Added concise Docker Matrix claim wording to `docs/CLAIMS.md`.
+- Added concise Docker Matrix claim wording to `docs/user/CLAIMS.md`.
 
 ## Task Commits
 
@@ -81,7 +81,7 @@ completed: 2026-05-28
 - `src/sol_execbench/core/compatibility.py` - Pure execution decision model/helper and Matrix Entry claim-boundary validation.
 - `tests/sol_execbench/test_matrix_claim_guardrails.py` - Mixed-version, debug override, status, host/container, and wording guardrails.
 - `tests/sol_execbench/test_public_contract_guardrails.py` - Canonical payload compatibility-sidecar exclusion guardrail.
-- `docs/CLAIMS.md` - Docker Matrix container user-space claim boundary sentence.
+- `docs/user/CLAIMS.md` - Docker Matrix container user-space claim boundary sentence.
 - `docs/internal/v1_4_compatibility_inventory.md` - Restored exact public CLI invariant phrase used by existing guardrail tests.
 - `.planning/REQUIREMENTS.md` - Restored exact MI300X-on-CDNA3 deferred-validation phrase used by existing guardrail tests.
 
@@ -140,7 +140,7 @@ Phase 79 can consume deterministic Matrix execution decisions and strict host/co
 - Found created file: `tests/sol_execbench/test_matrix_claim_guardrails.py`.
 - Found modified file: `src/sol_execbench/core/compatibility.py`.
 - Found modified file: `tests/sol_execbench/test_public_contract_guardrails.py`.
-- Found modified file: `docs/CLAIMS.md`.
+- Found modified file: `docs/user/CLAIMS.md`.
 - Found task commits: `c8df6d8`, `65d5cd5`, `099eb73`, `b2d80d1`, `6104d65`, `e9c09d4`.
 - Re-ran plan verification successfully.
 

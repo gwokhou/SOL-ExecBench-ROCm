@@ -16,7 +16,7 @@ Added a local pre-commit-managed `pre-push` hook named `ty-check` that runs
 
 - Added `ty-check` to `.pre-commit-config.yaml` with `stages: [pre-push]` and
   `pass_filenames: false`.
-- Updated `docs/DEVELOPMENT.md` and `CONTRIBUTING.md` with the
+- Updated `docs/user/DEVELOPMENT.md` and `CONTRIBUTING.md` with the
   `pre-commit install --hook-type pre-push` setup command.
 - Installed the hook locally at `.git/hooks/pre-push`.
 

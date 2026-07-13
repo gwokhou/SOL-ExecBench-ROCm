@@ -5,7 +5,7 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 
 
 def test_dataset_failure_mode_matrix_documents_reuse_and_incomplete_states():
-    text = (REPO_ROOT / "docs" / "analysis.md").read_text(encoding="utf-8")
+    text = (REPO_ROOT / "docs" / "internal" / "analysis.md").read_text(encoding="utf-8")
 
     assert "### Dataset Reuse And Failure-Mode Matrix" in text
     for phrase in (
@@ -26,7 +26,7 @@ def test_dataset_failure_mode_matrix_documents_reuse_and_incomplete_states():
 
 
 def test_dataset_sharding_contract_documents_default_cli_boundary():
-    text = (REPO_ROOT / "docs" / "analysis.md").read_text(encoding="utf-8")
+    text = (REPO_ROOT / "docs" / "internal" / "analysis.md").read_text(encoding="utf-8")
 
     for phrase in (
         "sol_execbench.core.dataset.sharding",

@@ -6,12 +6,12 @@
 
 ## What Changed
 
-- Added `docs/static_kernel_evidence.md` as the public guide for
+- Added `docs/user/static_kernel_evidence.md` as the public guide for
   `--static-evidence none|auto`, sidecar paths, schema identity, status
   vocabulary, and diagnostic-only claim boundaries.
-- Updated `docs/CLAIMS.md` with allowed Static Kernel Evidence wording,
+- Updated `docs/user/CLAIMS.md` with allowed Static Kernel Evidence wording,
   required evidence, forbidden authority claims, and upgrade rules.
-- Updated `docs/RESEARCHER-GUIDE.md` and `docs/rocm_toolchain_routing.md` so
+- Updated `docs/user/RESEARCHER-GUIDE.md` and `docs/user/rocm_toolchain_routing.md` so
   researcher and routing docs describe the v1.17 static evidence surface.
 - Added `docs/internal/v1_17_static_kernel_evidence_validation.md` with bounded
   RDNA 4 validation results.

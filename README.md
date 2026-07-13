@@ -11,8 +11,8 @@ and selected ROCm library categories while rejecting legacy CUDA/NVIDIA
 runtime metadata.
 
 This project is independent and is not endorsed by NVIDIA or AMD. See
-[Provenance Policy](docs/provenance.md), [Compliance](docs/compliance.md),
-and [Claims](docs/CLAIMS.md) for upstream attribution, licensing, validation
+[Provenance Policy](docs/user/provenance.md), [Compliance](docs/user/compliance.md),
+and [Claims](docs/user/CLAIMS.md) for upstream attribution, licensing, validation
 boundaries, and hardware-specific claim limits.
 
 ## Installation
@@ -217,68 +217,67 @@ you control.
 
 ## Documentation
 
-Use the [Documentation Map](docs/README.md) to select current user guides,
-contracts, evidence/release material, internal records, or historical plans.
+Use the [Documentation Map](docs/README.md) to select user guides, internal
+maintainer records, examples, or release evidence.
 
 Start here:
 
-- [Getting Started](docs/GETTING-STARTED.md) -- prerequisites, installation,
+- [Getting Started](docs/user/GETTING-STARTED.md) -- prerequisites, installation,
   first run, and setup issues
-- [Cookbook](docs/COOKBOOK.md) -- task-oriented commands and troubleshooting
+- [Cookbook](docs/user/COOKBOOK.md) -- task-oriented commands and troubleshooting
   for common benchmark workflows
-- [Researcher Guide](docs/RESEARCHER-GUIDE.md) -- workflows for kernel,
+- [Researcher Guide](docs/user/RESEARCHER-GUIDE.md) -- workflows for kernel,
   compiler/backend, agent, and reproducibility researchers
-- [Configuration](docs/CONFIGURATION.md) -- CLI flags, benchmark config,
+- [Configuration](docs/user/CONFIGURATION.md) -- CLI flags, benchmark config,
   environment variables, Docker settings, and no-trace diagnostics
-- [Evaluator Contract](docs/EVALUATOR-CONTRACT.md) -- GPU-free compatibility
+- [Evaluator Contract](docs/user/EVALUATOR-CONTRACT.md) -- GPU-free compatibility
   contract for evaluator integrations
 
-Project and development references:
+User references:
 
-- [Architecture](docs/ARCHITECTURE.md) -- package layers, data flow, subprocess
-  isolation, and ROCm boundaries
-- [Development](docs/DEVELOPMENT.md) -- local setup, coding style, source areas,
-  and PR process
-- [Testing](docs/TESTING.md) -- pytest commands, markers, CI, and
-  hardware-sensitive checks
-- [Analysis](docs/analysis.md) -- trace analysis, dataset closure, failure modes,
-  and sharding
-- [ROCm Notes](docs/rocm.md) -- host, Docker, and validation notes
-- [ROCm Timing](docs/rocm_timing.md) -- timing backends, profiler collection,
+- [ROCm Notes](docs/user/rocm.md) -- host, Docker, and validation notes
+- [ROCm Timing](docs/user/rocm_timing.md) -- timing backends, profiler collection,
   and source-specific semantics
-- [ROCm Toolchain Routing](docs/rocm_toolchain_routing.md) -- routing rules for
+- [ROCm Toolchain Routing](docs/user/rocm_toolchain_routing.md) -- routing rules for
   profiling, static evidence, compiler, and runtime artifacts
-- [ROCm Libraries](docs/rocm_libraries.md) -- supported ROCm library categories
+- [ROCm Libraries](docs/user/rocm_libraries.md) -- supported ROCm library categories
   (hipBLAS, MIOpen, Composable Kernel, rocWMMA) for RDNA 4 and CDNA 3 targets;
   CDNA 4-specific low-precision benchmark adaptation is deferred until suitable
   hardware evidence is available. CDNA 4 validation is also deferred.
 
-Validation, release, and provenance:
+Public policy and evidence references:
 
-- [Claims](docs/CLAIMS.md) -- support, evidence, and forbidden claim boundaries
-- [Provenance Policy](docs/provenance.md) -- upstream attribution, project-owned
+- [Claims](docs/user/CLAIMS.md) -- support, evidence, and forbidden claim boundaries
+- [Provenance Policy](docs/user/provenance.md) -- upstream attribution, project-owned
   ROCm work, SPDX policy, and non-endorsement boundaries
-- [Compliance](docs/compliance.md) -- Apache-2.0 license, dependencies, and
+- [Compliance](docs/user/compliance.md) -- Apache-2.0 license, dependencies, and
   known gaps
-- [Research Preview](docs/research_preview.md) -- methodology, evidence surfaces,
+- [Research Preview](docs/user/research_preview.md) -- methodology, evidence surfaces,
   representative commands, and non-claims
-- [v1.25 Engineering Prerelease](docs/v1_25_release_notes.md) -- release notes,
-  checklist, and validation evidence
-- [Prerelease Artifact Bundle](docs/prerelease_artifact_bundle.md) -- versioned
-  artifact bundle and reproducibility closure
-- [Prerelease Readiness](docs/prerelease_readiness.md) -- release readiness
-  gates and quality checks
-- [Public Prerelease](docs/public_prerelease.md) -- public release materials
+- [Public Prerelease](docs/user/public_prerelease.md) -- public release materials
   and navigation
-- [v1.25 Prerelease Checklist](docs/v1_25_prerelease_checklist.md) -- shipping
-  checklist and verification steps
+
+Release and maintainer records:
+
+- [v1.25 Engineering Prerelease](docs/internal/v1_25_release_notes.md) and its
+  [release checklist](docs/internal/v1_25_prerelease_checklist.md)
+- [Prerelease artifact bundle](docs/internal/prerelease_artifact_bundle.md) and
+  [prerelease readiness gates](docs/internal/prerelease_readiness.md)
+- [Release evidence manifests](docs/releases/) -- version-scoped, non-authoritative
+  evidence records
 
 Schema-specific references:
 
-- [Definition schema](docs/definition.md)
-- [Workload schema](docs/workload.md)
-- [Solution schema](docs/solution.md)
-- [Trace schema](docs/trace.md)
+- [Definition schema](docs/user/definition.md)
+- [Workload schema](docs/user/workload.md)
+- [Solution schema](docs/user/solution.md)
+- [Trace schema](docs/user/trace.md)
+
+[Architecture](docs/user/ARCHITECTURE.md), [Development](docs/user/DEVELOPMENT.md),
+and [Testing](docs/user/TESTING.md) are public contributor documentation.
+Maintainer and historical material, such as [Analysis](docs/internal/analysis.md),
+lives in [`docs/internal/`](docs/internal/). Versioned release evidence remains
+in [`docs/releases/`](docs/releases/).
 
 ## Contributing
 
@@ -287,4 +286,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE) and
-[docs/compliance.md](docs/compliance.md).
+[docs/user/compliance.md](docs/user/compliance.md).

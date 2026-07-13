@@ -7,7 +7,7 @@ preview's claim language explicit and hard to accidentally overstate.
 
 ## Tasks
 
-1. Add `docs/CLAIMS.md` with allowed claim levels, unsupported claims, and
+1. Add `docs/user/CLAIMS.md` with allowed claim levels, unsupported claims, and
    upgrade evidence rules.
 2. Add focused tests for the new claims document.
 3. Verify the new tests pass.

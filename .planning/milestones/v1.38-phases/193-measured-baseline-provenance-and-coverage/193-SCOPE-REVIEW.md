@@ -149,7 +149,7 @@ them separated).
   (likely `trace.evaluation.environment` / `libs`, already read by
   `baseline_export.py`).
 - **Decision sidecar is orthogonal.** The recent decision sidecar work
-  (`docs/decision_sidecar.md`) is diagnostic-only optimization guidance and
+  (`docs/user/decision_sidecar.md`) is diagnostic-only optimization guidance and
   does not touch confirmed pass/fail authority. It does not substitute for 193
   or 194 and does not change this scope.
 - **ROADMAP status was stale.** As of 2026-07-10 the ROADMAP listed 192 as

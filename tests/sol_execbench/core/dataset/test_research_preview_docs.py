@@ -10,7 +10,7 @@ def _read(path: str) -> str:
 
 
 def test_research_preview_covers_methodology_scope_evidence_and_limits():
-    text = _read("docs/research_preview.md")
+    text = _read("docs/user/research_preview.md")
 
     for required in (
         "## Methodology",
@@ -29,21 +29,21 @@ def test_research_preview_covers_methodology_scope_evidence_and_limits():
 
 
 def test_research_preview_distinguishes_paper_citation_from_file_copyright():
-    text = _read("docs/research_preview.md")
+    text = _read("docs/user/research_preview.md")
 
     for required in (
         "NVIDIA SOL-ExecBench",
         "independent ROCm work",
         "The SOL-ExecBench paper is the benchmark and methodology citation",
         "make every independent ROCm implementation file NVIDIA-owned",
-        "docs/provenance.md",
+        "docs/user/provenance.md",
         "provenance.toml",
     ):
         assert required in text
 
 
 def test_research_preview_distinguishes_amd_derived_from_external_authority():
-    text = _read("docs/research_preview.md")
+    text = _read("docs/user/research_preview.md")
 
     for required in (
         "AMD-native SOL and score reports are derived from ROCm traces",
@@ -56,7 +56,7 @@ def test_research_preview_distinguishes_amd_derived_from_external_authority():
 
 
 def test_research_preview_links_representative_commands_to_artifacts():
-    text = _read("docs/research_preview.md")
+    text = _read("docs/user/research_preview.md")
 
     for required in (
         "uv run sol-execbench --format json evaluate tests/sol_execbench/samples/rmsnorm",
@@ -73,12 +73,12 @@ def test_research_preview_links_representative_commands_to_artifacts():
 
 
 def test_researcher_guide_links_research_preview_entrypoint():
-    text = _read("docs/RESEARCHER-GUIDE.md")
+    text = _read("docs/user/RESEARCHER-GUIDE.md")
 
     for required in (
-        "docs/research_preview.md",
-        "docs/prerelease_artifact_bundle.md",
-        "docs/prerelease_readiness.md",
+        "docs/user/research_preview.md",
+        "docs/internal/prerelease_artifact_bundle.md",
+        "docs/internal/prerelease_readiness.md",
         "CDNA3-family validation, including MI300X, and no CDNA4 validation",
     ):
         assert required in text

@@ -341,9 +341,9 @@ def test_cli_help_documents_hip_cpp_compile_timeout_option():
 
 
 def test_static_and_profile_docs_keep_diagnostic_only_authority_boundaries():
-    static_docs = (REPO_ROOT / "docs/static_kernel_evidence.md").read_text()
-    timing_docs = (REPO_ROOT / "docs/rocm_timing.md").read_text()
-    claims_docs = (REPO_ROOT / "docs/CLAIMS.md").read_text()
+    static_docs = (REPO_ROOT / "docs/user/static_kernel_evidence.md").read_text()
+    timing_docs = (REPO_ROOT / "docs/user/rocm_timing.md").read_text()
+    claims_docs = (REPO_ROOT / "docs/user/CLAIMS.md").read_text()
 
     for docs in (static_docs, timing_docs):
         for expected in (
@@ -564,8 +564,8 @@ def test_v1_11_dataset_manifest_keeps_acquisition_claim_boundary(tmp_path):
 def test_v1_11_dataset_docs_do_not_overclaim_acquisition_layout():
     docs = "\n".join(
         [
-            (REPO_ROOT / "docs/GETTING-STARTED.md").read_text(),
-            (REPO_ROOT / "docs/analysis.md").read_text(),
+            (REPO_ROOT / "docs/user/GETTING-STARTED.md").read_text(),
+            (REPO_ROOT / "docs/internal/analysis.md").read_text(),
         ]
     )
 
@@ -657,7 +657,7 @@ def test_v1_11_execution_closure_fields_remain_sidecar_only():
 
 
 def test_v1_11_execution_closure_docs_keep_bounded_claim_boundary():
-    docs = (REPO_ROOT / "docs/analysis.md").read_text()
+    docs = (REPO_ROOT / "docs/internal/analysis.md").read_text()
 
     assert "--execution-closure" in docs
     assert "bounded local execution audit" in docs

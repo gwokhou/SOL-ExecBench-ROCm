@@ -7,7 +7,7 @@ reviewed_at: 2026-06-01
 
 ## Scope Reviewed
 
-- `docs/public_prerelease.md`
+- `docs/user/public_prerelease.md`
 - `docs/releases/v1_26_prerelease_draft.md`
 - README documentation links
 - `tests/sol_execbench/test_public_prerelease_docs.py`

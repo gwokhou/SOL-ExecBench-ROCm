@@ -21,8 +21,8 @@ Key outcomes:
 - Coverage, denominator, consistency, claim, trust, and prerelease bundle
   reports were rebuilt from the rerun evidence. Consistency reports 0 findings;
   the full prerelease bundle reports `overall_status=passed`.
-- Related Markdown validation conclusions were updated in `docs/CLAIMS.md`,
-  `docs/rocm.md`, `docs/research_preview.md`,
+- Related Markdown validation conclusions were updated in `docs/user/CLAIMS.md`,
+  `docs/user/rocm.md`, `docs/user/research_preview.md`,
   `docs/internal/RDNA4-AUTHORITY-GAP-CLOSURE.md`, and
   `docs/internal/RDNA4-DENOMINATOR-POLICY.md`.
 

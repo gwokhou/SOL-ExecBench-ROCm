@@ -9,13 +9,13 @@ created_at: "2026-07-09T00:00:00Z"
 
 ## Goal
 
-Convert the legacy `docs/superpowers/` planning and design documents into GSD
+Convert the legacy `docs/internal/superpowers/` planning and design documents into GSD
 planning artifacts and merge them under `.planning/` without changing active
 v1.38 roadmap phase scope.
 
 ## Plan
 
-1. Inventory `docs/superpowers/plans/` and `docs/superpowers/specs/`.
+1. Inventory `docs/internal/superpowers/plans/` and `docs/internal/superpowers/specs/`.
 2. Convert implementation plans into GSD quick task directories with source
    frontmatter and preserved original content.
 3. Convert design specs into GSD research notes under `.planning/research/`.

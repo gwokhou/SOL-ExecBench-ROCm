@@ -461,7 +461,7 @@ def test_optional_environment_evidence_unavailable_does_not_block_bundle(
             return subprocess.CompletedProcess(command, 1, stdout="", stderr="no tag")
         if command[:2] == ["git", "status"]:
             return subprocess.CompletedProcess(
-                command, 0, stdout=" M docs/CLAIMS.md\n", stderr=""
+                command, 0, stdout=" M docs/user/CLAIMS.md\n", stderr=""
             )
         if any(part.endswith("release_candidate_validation.py") for part in command):
             output_dir = Path(command[command.index("--output-dir") + 1])

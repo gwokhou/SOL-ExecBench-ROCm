@@ -43,7 +43,7 @@ schema remains unchanged and tests cover contract stability.
 ### Integration Points
 - New baseline helpers belong in `src/sol_execbench/core/`.
 - New public command belongs under `src/sol_execbench/cli/`.
-- User-facing workflow belongs in `docs/analysis.md`.
+- User-facing workflow belongs in `docs/internal/analysis.md`.
 </code_context>
 
 <specifics>

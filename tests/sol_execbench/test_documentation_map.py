@@ -11,16 +11,16 @@ def test_documentation_map_classifies_current_and_historical_material() -> None:
     documentation_map = (REPO_ROOT / "docs/README.md").read_text(encoding="utf-8")
 
     for required in (
-        "Current product and maintainer documentation",
-        "Evidence, research, and release material",
-        "Directory classification",
+        "User documentation",
+        "Internal documentation",
+        "Examples and release records",
+        "[`user/`](user/)",
+        "[`internal/`](internal/)",
         "[`examples/`](examples/)",
         "[`releases/`](releases/)",
-        "[`internal/`](internal/)",
-        "[`superpowers/specs/`](superpowers/specs/)",
-        "[`superpowers/plans/`](superpowers/plans/)",
+        "[`internal/superpowers/`](internal/superpowers/)",
+        "not user-facing product documentation",
         "not a current product contract",
-        "not an implementation-status source",
     ):
         assert required in documentation_map
 
@@ -29,11 +29,13 @@ def test_current_evaluation_documentation_matches_cli_v2() -> None:
     project = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     version = project["project"]["version"]
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
-    configuration = (REPO_ROOT / "docs/CONFIGURATION.md").read_text(encoding="utf-8")
-    static_evidence = (REPO_ROOT / "docs/static_kernel_evidence.md").read_text(
+    configuration = (REPO_ROOT / "docs/user/CONFIGURATION.md").read_text(
         encoding="utf-8"
     )
-    decision = (REPO_ROOT / "docs/decision_sidecar.md").read_text(encoding="utf-8")
+    static_evidence = (REPO_ROOT / "docs/user/static_kernel_evidence.md").read_text(
+        encoding="utf-8"
+    )
+    decision = (REPO_ROOT / "docs/user/decision_sidecar.md").read_text(encoding="utf-8")
 
     assert f"version-{version}-blue.svg" in readme
     assert "uv run sol-execbench evaluate examples/pytorch/gemma3_swiglu" in readme

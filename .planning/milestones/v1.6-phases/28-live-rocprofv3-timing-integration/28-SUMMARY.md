@@ -15,7 +15,7 @@
   fallback selection metadata instead of pretending to be kernel activity.
 - Added fallback labeling for profiler command failures and missing CSV output.
 - Documented the live adapter and chimney-style timing semantics in
-  `docs/rocm_timing.md`.
+  `docs/user/rocm_timing.md`.
 
 ## Verification
 

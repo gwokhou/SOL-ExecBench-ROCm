@@ -15,7 +15,7 @@ v1.37 turns `profile_summary.sidecar.v1` from a reserved future capability into 
 </decisions>
 
 <code_context>
-- CLI capability documentation lives in `docs/EVALUATOR-CONTRACT.md`.
+- CLI capability documentation lives in `docs/user/EVALUATOR-CONTRACT.md`.
 - Existing profile metadata is represented by `Rocprofv3ProfileResult`.
 - New schema and builder code belongs near benchmark/profile helpers under `src/sol_execbench/core/bench/`.
 - Existing sidecar tests are in `tests/sol_execbench/test_cli_environment_snapshot.py` and contract tests are in `tests/sol_execbench/test_contract.py`.

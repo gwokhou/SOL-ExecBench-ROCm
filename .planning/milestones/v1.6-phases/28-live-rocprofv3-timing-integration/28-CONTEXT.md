@@ -43,7 +43,7 @@ trace JSONL or primary CLI defaults.
   fallback labels.
 - Do not require real `rocprofv3` or GPU hardware in unit tests.
 - Do not modify canonical trace models or trace JSONL.
-- Update `docs/rocm_timing.md` to describe the live adapter and chimney-style
+- Update `docs/user/rocm_timing.md` to describe the live adapter and chimney-style
   source-specific timing outputs.
 
 ### the agent's Discretion
@@ -76,7 +76,7 @@ priority.
 ### Integration Points
 - Add live collection helpers to `rocm_profiler.py`.
 - Keep event timing in `timing.py` unchanged for the default path.
-- Update `docs/rocm_timing.md`.
+- Update `docs/user/rocm_timing.md`.
 
 </code_context>
 

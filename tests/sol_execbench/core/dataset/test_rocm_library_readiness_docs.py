@@ -8,7 +8,7 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 
 
 def test_rocm_library_readiness_doc_classifies_all_schema_categories():
-    text = (REPO_ROOT / "docs/rocm_libraries.md").read_text()
+    text = (REPO_ROOT / "docs/user/rocm_libraries.md").read_text()
     for category in ("`hip_cpp`", "`hipblas`", "`miopen`", "`ck`", "`rocwmma`"):
         assert category in text
     assert "Supported" in text
@@ -21,7 +21,7 @@ def test_readme_links_library_readiness_and_names_supported_libraries():
     assert "MIOpen" in text
     assert "Composable Kernel" in text
     assert "rocWMMA" in text
-    assert "docs/rocm_libraries.md" in text
+    assert "docs/user/rocm_libraries.md" in text
     assert "CDNA 3" in text
     assert "CDNA 4 validation is also deferred" in text
 

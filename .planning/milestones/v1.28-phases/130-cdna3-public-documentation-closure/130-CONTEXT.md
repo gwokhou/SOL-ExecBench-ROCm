@@ -18,9 +18,9 @@ before validation claims can change.
 ## Implementation Decisions
 
 ### Documentation Surface
-- Update `docs/TESTING.md` for marker commands, expected skips, and current-host
+- Update `docs/user/TESTING.md` for marker commands, expected skips, and current-host
   limits.
-- Update `docs/rocm.md` for support matrix wording: schema support, test
+- Update `docs/user/rocm.md` for support matrix wording: schema support, test
   readiness, deferred MI300X validation, unavailable CDNA4.
 - Update `CONTRIBUTING.md` for future CDNA3 test placement and evidence rules.
 
@@ -36,9 +36,9 @@ before validation claims can change.
 <code_context>
 ## Existing Code Insights
 
-- `docs/TESTING.md` already lists `requires_cdna3` commands but does not explain
+- `docs/user/TESTING.md` already lists `requires_cdna3` commands but does not explain
   the new concrete marker test surface or skip interpretation.
-- `docs/rocm.md` already has support matrix rows for MI300X/CDNA3 and CDNA4.
+- `docs/user/rocm.md` already has support matrix rows for MI300X/CDNA3 and CDNA4.
 - `CONTRIBUTING.md` lists markers but does not explain where future CDNA3 tests
   belong or what evidence must be recorded.
 - `tests/sol_execbench/test_rocm_matrix_docs.py` and
@@ -51,7 +51,7 @@ before validation claims can change.
 ## Specific Ideas
 
 - Add a CDNA3 subsection under Hardware-Sensitive Tests.
-- Add a short paragraph to `docs/rocm.md` after Hardware Status.
+- Add a short paragraph to `docs/user/rocm.md` after Hardware Status.
 - Add contributor bullets for `tests/sol_execbench/test_cdna3_hardware_marker.py`
   and handoff evidence.
 - Extend docs tests to assert these public instructions exist.

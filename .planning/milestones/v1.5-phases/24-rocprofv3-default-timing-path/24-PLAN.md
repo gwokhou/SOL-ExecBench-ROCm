@@ -6,7 +6,7 @@ wave: 1
 depends_on: []
 files_modified:
   - src/sol_execbench/core/bench/rocm_profiler.py
-  - docs/rocm_timing.md
+  - docs/user/rocm_timing.md
   - tests/sol_execbench/test_rocm_profiler.py
   - tests/sol_execbench/test_rocm_eval_timing_audit.py
 autonomous: true
@@ -93,21 +93,21 @@ and audit profiler-backed timing while preserving explicit fallback behavior.
   <title>Document profiler evidence semantics</title>
   <requirements>PROF-03, PROF-04</requirements>
   <files>
-    <file>docs/rocm_timing.md</file>
+    <file>docs/user/rocm_timing.md</file>
     <file>tests/sol_execbench/test_rocm_eval_timing_audit.py</file>
   </files>
   <read_first>
-    <file>docs/rocm_timing.md</file>
+    <file>docs/user/rocm_timing.md</file>
     <file>tests/sol_execbench/test_rocm_eval_timing_audit.py</file>
   </read_first>
   <action>
-    Extend `docs/rocm_timing.md` with a `Profiler Evidence` section naming
+    Extend `docs/user/rocm_timing.md` with a `Profiler Evidence` section naming
     required fields: tool version, GPU architecture, activity domain,
     aggregation rule, parsed timing rows, backend, fallback reason, and
     interpretation. Extend the audit test to assert those strings exist.
   </action>
   <acceptance_criteria>
-    <criterion>`docs/rocm_timing.md` contains `Profiler Evidence`.</criterion>
+    <criterion>`docs/user/rocm_timing.md` contains `Profiler Evidence`.</criterion>
     <criterion>`uv run pytest tests/sol_execbench/test_rocm_eval_timing_audit.py` exits 0.</criterion>
   </acceptance_criteria>
   <verify>

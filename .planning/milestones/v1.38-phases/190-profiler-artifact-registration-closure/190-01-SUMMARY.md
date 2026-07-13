@@ -26,8 +26,8 @@ key-files:
     - "tests/sol_execbench/test_rocm_profiler.py"
     - "tests/sol_execbench/test_cli_environment_snapshot.py"
     - "tests/sol_execbench/test_profile_summary.py"
-    - "docs/rocm_timing.md"
-    - "docs/profile_summary_sidecar.md"
+    - "docs/user/rocm_timing.md"
+    - "docs/user/profile_summary_sidecar.md"
 key-decisions:
   - "Return-code-zero rocprofv3 profile runs with at least one artifact remain status: success."
   - "Incomplete artifact evidence is represented through artifact_coverage_status, reason_codes, and warnings."

@@ -86,8 +86,8 @@ baseline provenance. Those belong to phases 192 and 193.
   generation and citation behavior.
 - `tests/sol_execbench/fixtures/profile_summary/` — HIP-facing profile summary
   fixtures.
-- `docs/profile_summary_sidecar.md` — consumer contract.
-- `docs/agent_feedback_sidecar.md` and `docs/EVALUATOR-CONTRACT.md` —
+- `docs/user/profile_summary_sidecar.md` — consumer contract.
+- `docs/user/agent_feedback_sidecar.md` and `docs/user/EVALUATOR-CONTRACT.md` —
   diagnostic sidecar authority boundaries and capability references.
 
 </canonical_refs>

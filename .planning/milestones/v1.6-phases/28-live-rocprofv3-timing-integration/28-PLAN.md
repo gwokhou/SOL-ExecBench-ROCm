@@ -49,7 +49,7 @@ defaults.
 ### 28-04: Document live timing boundary
 
 **Files:**
-- `docs/rocm_timing.md`
+- `docs/user/rocm_timing.md`
 
 **Work:**
 - Describe live adapter behavior, output boundaries, and source-specific

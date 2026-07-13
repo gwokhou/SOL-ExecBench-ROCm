@@ -11,7 +11,7 @@
   or JSON output.
 - Added the public `sol-execbench-baseline` command.
 - Documented baseline comparison and AMD-native score interpretation guardrails
-  in `docs/analysis.md`.
+  in `docs/internal/analysis.md`.
 - Added focused tests for classification, CLI output, JSON output, and AMD claim
   warnings.
 

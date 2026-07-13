@@ -24,7 +24,7 @@ matrix-core GEMM path.
 - Added public-contract tests for rocWMMA metadata, source consistency, native
   staging, RDNA 4 E2E registration, and support-status documentation.
 - Added `requires_rocwmma` test gating for environments missing rocWMMA headers.
-- Updated `docs/rocm_libraries.md` to classify rocWMMA as supported for the
+- Updated `docs/user/rocm_libraries.md` to classify rocWMMA as supported for the
   RDNA 4 FP16-to-FP32 matrix-core GEMM path and document CDNA deferral.
 
 ## Validation

@@ -19,9 +19,9 @@ def test_docs_distinguish_cdna3_schema_support_from_hardware_validation():
         _read(path)
         for path in (
             "README.md",
-            "docs/rocm.md",
-            "docs/solution.md",
-            "docs/compliance.md",
+            "docs/user/rocm.md",
+            "docs/user/solution.md",
+            "docs/user/compliance.md",
         )
     )
 

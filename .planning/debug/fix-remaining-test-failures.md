@@ -31,4 +31,4 @@ updated: 2026-06-14
 - root_cause: tests and compatibility expectations still referenced legacy root-level report script paths after scripts moved under `scripts/internal/`; public guardrail docs/planning missed exact assertion phrases; one README edit removed a required "troubleshooting" navigation keyword.
 - fix: added root-level compatibility wrapper scripts that delegate to internal scripts, restored the README keyword while avoiding a dead link, corrected generated docs, and added missing claim-boundary wording.
 - verification: `uv run pytest tests/` passed with 1664 passed and 63 skipped.
-- files_changed: README.md, docs/GETTING-STARTED.md, docs/DEVELOPMENT.md, docs/CLAIMS.md, .planning/milestones/v1.28-REQUIREMENTS.md, scripts/*.py compatibility wrappers.
+- files_changed: README.md, docs/user/GETTING-STARTED.md, docs/user/DEVELOPMENT.md, docs/user/CLAIMS.md, .planning/milestones/v1.28-REQUIREMENTS.md, scripts/*.py compatibility wrappers.

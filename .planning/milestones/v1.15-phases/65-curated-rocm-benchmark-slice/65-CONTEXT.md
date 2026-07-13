@@ -32,7 +32,7 @@ reproduced without implying full paper parity.
 <specifics>
 ## Specific Ideas
 
-- Add `docs/curated_rocm_slice.md`.
+- Add `docs/internal/curated_rocm_slice.md`.
 - Include selection criteria, initial problem list, commands, optional evidence,
   and artifact expectations.
 </specifics>

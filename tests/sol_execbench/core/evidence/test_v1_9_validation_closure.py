@@ -7,7 +7,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 V1_10_DOC_PATHS = (
-    "docs/analysis.md",
+    "docs/internal/analysis.md",
     "docs/internal/solar_derivation_contract.md",
 )
 V1_10_REQUIRED_NO_CLAIM_PHRASES = (
@@ -49,7 +49,7 @@ def _assert_no_v1_10_positive_overclaims(text: str) -> None:
 
 
 def test_analysis_docs_explain_current_sidecars_and_rdna4_scope():
-    text = _text("docs/analysis.md")
+    text = _text("docs/internal/analysis.md")
 
     for expected in (
         "sol_execbench.amd_sol_bound.v4",
@@ -68,7 +68,7 @@ def test_analysis_docs_explain_current_sidecars_and_rdna4_scope():
 def test_v1_9_docs_do_not_make_forbidden_equivalence_or_validation_claims():
     combined = "\n".join(
         [
-            _text("docs/analysis.md"),
+            _text("docs/internal/analysis.md"),
             _text("docs/internal/rdna4_v1_9_validation_evidence.md"),
         ]
     )

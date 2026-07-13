@@ -11,7 +11,7 @@ Clarified timing fallback semantics after Phase 147:
 
 - Added HIP native source-collection coverage proving native ROCm sources route
   to profiler-backed `rocprofv3` kernel activity timing when available.
-- Updated `docs/rocm_timing.md` to distinguish source-policy fallback from
+- Updated `docs/user/rocm_timing.md` to distinguish source-policy fallback from
   profiler-unavailable fallback.
 - Updated `.planning/STATE.md` with the quick task record.
 

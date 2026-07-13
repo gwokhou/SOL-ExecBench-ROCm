@@ -44,11 +44,11 @@ This phase covers requirements BOUNDARY-01 through BOUNDARY-04:
 
 - `.planning/codebase/CONCERNS.md` already distinguishes subprocess separation
   from hardened sandboxing.
-- `docs/CLAIMS.md` already states the project does not claim hard sandboxing or
+- `docs/user/CLAIMS.md` already states the project does not claim hard sandboxing or
   multi-tenant safety.
-- `docs/RESEARCHER-GUIDE.md` mentions source review blocks external files,
+- `docs/user/RESEARCHER-GUIDE.md` mentions source review blocks external files,
   subprocesses, network calls, and embedded payload patterns.
-- `docs/ARCHITECTURE.md` describes the subprocess boundary, but the boundary
+- `docs/user/ARCHITECTURE.md` describes the subprocess boundary, but the boundary
   section should explicitly say this is not a security sandbox.
 - `README.md` does not yet surface the security boundary in quick-start usage
   where new users are most likely to see it.

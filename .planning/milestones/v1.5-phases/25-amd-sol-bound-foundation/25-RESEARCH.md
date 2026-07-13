@@ -37,7 +37,7 @@ model registry, and tests proving evidence is required before scoring.
 
 - `src/sol_execbench/core/data/definition.py`
 - `src/sol_execbench/core/scoring_guardrails.py`
-- `docs/analysis.md`
+- `docs/internal/analysis.md`
 - SOL ExecBench paper baseline: https://arxiv.org/abs/2603.19173
 </sources>
 

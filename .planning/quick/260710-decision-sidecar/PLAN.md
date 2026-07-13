@@ -12,18 +12,18 @@ branch: feat/decision-ready-data-layer
 Implement the Decision sidecar that turns decision-ready data-layer facts
 (`ArchIsaBudget` + `StaticResourceFootprint`) into confidence-weighted **Layer
 R** optimization hints, without ever re-asserting benchmark authority. This
-delivers the modeling surveyed in `docs/decision-modeling-research.md` and
-fulfills the mount-point contract in `docs/decision_sidecar_contract.md`.
+delivers the modeling surveyed in `docs/internal/decision-modeling-research.md` and
+fulfills the mount-point contract in `docs/user/decision_sidecar_contract.md`.
 
 ## Context (already done — do NOT redo)
 
-- **Research**: `docs/decision-modeling-research.md` — AMD official taxonomy,
+- **Research**: `docs/internal/decision-modeling-research.md` — AMD official taxonomy,
   RDNA/CDNA divergence, occupancy formulas, occupancy!=performance confidence
   model, third-party credibility assessments. Primary input; cite §-numbers below.
 - **Data layer**: 4 commits on `feat/decision-ready-data-layer` —
   `ArchIsaBudget` (18 fields, divergence/dialect tiers), `StaticResourceFootprint`,
   roc-objdump wiring, gfx942/gfx1150 budgets corrected and extended.
-- **Mount-point contract**: `docs/decision_sidecar_contract.md`.
+- **Mount-point contract**: `docs/user/decision_sidecar_contract.md`.
 
 ## Hard Constraints
 
@@ -99,7 +99,7 @@ fulfills the mount-point contract in `docs/decision_sidecar_contract.md`.
 - [ ] **3.2** `src/sol_execbench/core/data/contract.py`: add
   `"decision.sidecar": "profile:diagnostic"` capability + boundary
   `{"owner":"sol","scope":"decision","authority":"diagnostic"}`. Update
-  `docs/EVALUATOR-CONTRACT.md` capability table + boundaries (enforced by
+  `docs/user/EVALUATOR-CONTRACT.md` capability table + boundaries (enforced by
   `test_current_contract_doc_matches_builder_capabilities`).
   Acceptance: `sol-execbench contract --json` lists `decision.sidecar`;
   contract test green.
@@ -119,9 +119,9 @@ fulfills the mount-point contract in `docs/decision_sidecar_contract.md`.
   Acceptance: `uv run pytest tests/sol_execbench/core/bench/test_decision* -v` green;
   full CPU-safe suite no new failures vs baseline (4 pre-existing doc failures
   unchanged).
-- [ ] **4.4** Docs: update `docs/decision_sidecar_contract.md` (schema now exists,
-  remove "not implemented"), flip `docs/decision-modeling-research.md` open items
-  to resolved, add `docs/EVALUATOR-CONTRACT.md` rows.
+- [ ] **4.4** Docs: update `docs/user/decision_sidecar_contract.md` (schema now exists,
+  remove "not implemented"), flip `docs/internal/decision-modeling-research.md` open items
+  to resolved, add `docs/user/EVALUATOR-CONTRACT.md` rows.
   Acceptance: no doc-test regression.
 
 ## Verification

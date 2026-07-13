@@ -11,7 +11,7 @@ User-approved scope:
 
 Design spec:
 
-- `docs/superpowers/specs/2026-07-08-module-aligned-layout-design.md`
+- `docs/internal/superpowers/specs/2026-07-08-module-aligned-layout-design.md`
 
 Execution constraints:
 

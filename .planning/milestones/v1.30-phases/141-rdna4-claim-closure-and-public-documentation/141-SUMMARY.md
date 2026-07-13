@@ -12,8 +12,8 @@ completed_at: 2026-06-08
 - Updated README validation status with the bounded RDNA4 `gfx1200` ready-subset
   result, derived score counts, sidecar coverage counts, timing boundary, and
   isolated-run rule for OOM-heavy jobs.
-- Updated `docs/CLAIMS.md`, `docs/research_preview.md`,
-  `docs/release_candidate_validation.md`, and `docs/rocm.md` so RDNA4 wording
+- Updated `docs/user/CLAIMS.md`, `docs/user/research_preview.md`,
+  `docs/internal/release_candidate_validation.md`, and `docs/user/rocm.md` so RDNA4 wording
   matches Phase 138-140 evidence without upgrading unrelated claims.
 - Added CPU-safe public-contract guardrail coverage for RDNA4 bounded evidence
   counts, non-authoritative timing, isolated long-job execution, and forbidden

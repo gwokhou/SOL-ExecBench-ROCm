@@ -5,7 +5,7 @@ subsystem: documentation
 tags: [v1.19, demo-fixtures, evidence-examples, docs-guardrails, public-contracts]
 requires:
   - phase: 88-documentation-examples-and-guardrail-tests
-    provides: docs/v1_19_evidence_guide.md
+    provides: docs/internal/v1_19_evidence_guide.md
 provides:
   - Demo-only JSON and Markdown fixtures for v1.19 evidence report shapes
   - Focused tests for fixture shape, bounded refs, checksums, and authority boundaries

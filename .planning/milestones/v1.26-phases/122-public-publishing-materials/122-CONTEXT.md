@@ -38,8 +38,8 @@ This phase delivers public publishing materials for the v1.26 engineering prerel
 ## Existing Code Insights
 
 ### Reusable Assets
-- `docs/v1_25_release_notes.md` and `docs/v1_25_prerelease_checklist.md` provide earlier prerelease shape.
-- `docs/prerelease_artifact_bundle.md`, `docs/prerelease_readiness.md`, and `docs/research_preview.md` provide the new v1.26 publication evidence.
+- `docs/internal/v1_25_release_notes.md` and `docs/internal/v1_25_prerelease_checklist.md` provide earlier prerelease shape.
+- `docs/internal/prerelease_artifact_bundle.md`, `docs/internal/prerelease_readiness.md`, and `docs/user/research_preview.md` provide the new v1.26 publication evidence.
 - README already has a documentation index.
 
 ### Established Patterns
@@ -47,7 +47,7 @@ This phase delivers public publishing materials for the v1.26 engineering prerel
 - Tests directly inspect docs for required links and forbidden/allowed wording.
 
 ### Integration Points
-- Add `docs/public_prerelease.md`.
+- Add `docs/user/public_prerelease.md`.
 - Add `docs/releases/v1_26_prerelease_draft.md`.
 - Update README docs list.
 - Add `tests/sol_execbench/test_public_prerelease_docs.py`.

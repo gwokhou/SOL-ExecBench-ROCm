@@ -2,7 +2,7 @@
 
 ## Scope
 
-1. Add `docs/v1_15_release_closure.md`.
+1. Add `docs/internal/v1_15_release_closure.md`.
 2. Link the release closure from README documentation.
 3. Extend documentation guardrail tests to cover the release closure, curated
    slice, researcher guide, and cookbook.

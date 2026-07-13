@@ -458,7 +458,7 @@ class TestTimeRunnable:
 
         Small matmuls (64-512) are launch-overhead dominated and show wider
         variance from dispatch jitter.  Large matmuls (2048+) are compute-
-        dominated with tight variance. See docs/rocm_timing.md for the ROCm
+        dominated with tight variance. See docs/user/rocm_timing.md for the ROCm
         timing model.
         """
         a = torch.randn(size, size, device="cuda")

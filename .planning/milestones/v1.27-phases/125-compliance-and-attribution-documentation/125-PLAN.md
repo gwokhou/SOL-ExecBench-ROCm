@@ -7,12 +7,12 @@ materials avoid ownership or endorsement ambiguity.
 
 ## Tasks
 
-1. Update `docs/compliance.md`.
+1. Update `docs/user/compliance.md`.
    - Explain fork relationship, upstream notices, project-owned ROCm
      contributions, paper citation boundary, and non-endorsement wording.
 
 2. Update README documentation links.
-   - Add `docs/provenance.md`.
+   - Add `docs/user/provenance.md`.
    - Ensure compliance/provenance are easy to find from the main entry point.
 
 3. Update research and prerelease materials.

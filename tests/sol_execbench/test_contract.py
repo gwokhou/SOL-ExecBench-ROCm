@@ -38,13 +38,13 @@ OPTIONAL_CAPABILITIES = {
     "decision.sidecar",
 }
 REPO_ROOT = Path(__file__).resolve().parents[2]
-CURRENT_CONTRACT_DOC = REPO_ROOT / "docs/EVALUATOR-CONTRACT.md"
+CURRENT_CONTRACT_DOC = REPO_ROOT / "docs/user/EVALUATOR-CONTRACT.md"
 ACTIVE_CONTRACT_DOCS = (
     CURRENT_CONTRACT_DOC,
-    REPO_ROOT / "docs/trace.md",
-    REPO_ROOT / "docs/agent_feedback_sidecar.md",
-    REPO_ROOT / "docs/profile_summary_sidecar.md",
-    REPO_ROOT / "docs/decision_sidecar.md",
+    REPO_ROOT / "docs/user/trace.md",
+    REPO_ROOT / "docs/user/agent_feedback_sidecar.md",
+    REPO_ROOT / "docs/user/profile_summary_sidecar.md",
+    REPO_ROOT / "docs/user/decision_sidecar.md",
 )
 STALE_SIDECAR_CAPABILITY_TOKENS = {
     f"{sidecar_name}.sidecar.v2"
@@ -389,10 +389,10 @@ def test_contract_confirmed_evidence_blockers_match_official_score_constants():
 
 
 def test_official_score_automation_docs_preserve_policy_and_authority_boundaries():
-    contract = (REPO_ROOT / "docs/EVALUATOR-CONTRACT.md").read_text()
+    contract = (REPO_ROOT / "docs/user/EVALUATOR-CONTRACT.md").read_text()
     rdna4_policy = (REPO_ROOT / "docs/internal/RDNA4-DENOMINATOR-POLICY.md").read_text()
     readme = (REPO_ROOT / "README.md").read_text()
-    consumer_guide = (REPO_ROOT / "docs/confirmed_evidence.md").read_text()
+    consumer_guide = (REPO_ROOT / "docs/user/confirmed_evidence.md").read_text()
 
     assert "official_score_evidence.v1" in contract
     assert "fixed_suite_denominator_zero_for_blocked" in contract

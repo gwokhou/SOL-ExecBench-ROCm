@@ -1,7 +1,7 @@
 # v1.20 Evidence Quality Examples
 
 These files are demo-only fixtures for
-[`docs/v1_20_evidence_quality_guide.md`](../../v1_20_evidence_quality_guide.md).
+[`docs/internal/v1_20_evidence_quality_guide.md`](../../internal/v1_20_evidence_quality_guide.md).
 They show JSON shapes for consistency, stability, claim-upgrade, and trust
 summary reports.
 

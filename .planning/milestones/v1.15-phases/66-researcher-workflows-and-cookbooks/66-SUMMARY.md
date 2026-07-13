@@ -2,8 +2,8 @@
 
 ## Delivered
 
-- Added `docs/RESEARCHER-GUIDE.md` with role-specific entry points.
-- Added `docs/COOKBOOK.md` with concrete commands for common workflows.
+- Added `docs/user/RESEARCHER-GUIDE.md` with role-specific entry points.
+- Added `docs/user/COOKBOOK.md` with concrete commands for common workflows.
 
 ## Evidence
 

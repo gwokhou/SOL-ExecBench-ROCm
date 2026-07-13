@@ -67,7 +67,7 @@ classified source type.
 - `time_runnable()` is the current eval-driver timing boundary.
 - Phase 24 should add parser/wrapper tests before relying on local hardware
   traces.
-- `docs/rocm_timing.md` is the user-facing timing semantics document.
+- `docs/user/rocm_timing.md` is the user-facing timing semantics document.
 
 </code_context>
 

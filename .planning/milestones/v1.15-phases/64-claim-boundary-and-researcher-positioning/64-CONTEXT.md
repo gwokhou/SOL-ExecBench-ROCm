@@ -15,7 +15,7 @@ research positioning explicit and test-protected.
 ## Implementation Decisions
 
 - Treat claim wording as part of the public benchmark contract.
-- Prefer one central `docs/CLAIMS.md` page over scattering claim rules across
+- Prefer one central `docs/user/CLAIMS.md` page over scattering claim rules across
   release notes.
 - Add tests that check the most important allowed and forbidden claim language.
 </decisions>
@@ -23,8 +23,8 @@ research positioning explicit and test-protected.
 <code_context>
 ## Existing Code Insights
 
-- Existing claim boundaries already appear in `docs/analysis.md`,
-  `docs/original_parity.md`, and planning artifacts.
+- Existing claim boundaries already appear in `docs/internal/analysis.md`,
+  `docs/internal/original_parity.md`, and planning artifacts.
 - Public contract guardrail tests already validate claim-boundary phrases in
   docs and reports.
 </code_context>

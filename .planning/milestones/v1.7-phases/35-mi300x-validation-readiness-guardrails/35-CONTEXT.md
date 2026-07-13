@@ -15,7 +15,7 @@ MI300X-on-CDNA3 status without recorded full-suite evidence.
 - `src/sol_execbench/core/diagnostics.py` contains ROCm readiness helpers.
 - `docs/internal/cdna3_validation_readiness.md` documents existing CDNA 3
   readiness.
-- `README.md`, `docs/rocm.md`, and `.planning/REQUIREMENTS.md` carry public
+- `README.md`, `docs/user/rocm.md`, and `.planning/REQUIREMENTS.md` carry public
   no-claim language.
 - `tests/sol_execbench/test_rocm_diagnostics_reporting.py` and
   `tests/sol_execbench/test_rocm_support_docs.py` protect readiness behavior and

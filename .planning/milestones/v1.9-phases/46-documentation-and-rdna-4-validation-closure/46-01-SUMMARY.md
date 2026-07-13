@@ -5,7 +5,7 @@
 
 ## Implemented
 
-- Expanded `docs/analysis.md` with AMD SOL bound artifact v2 schema semantics,
+- Expanded `docs/internal/analysis.md` with AMD SOL bound artifact v2 schema semantics,
   sidecar emission command, aggregate states, confidence/coverage behavior,
   hardware model provenance, and RDNA 4-only validation scope.
 - Added `docs/internal/rdna4_v1_9_validation_evidence.md` to record the v1.9

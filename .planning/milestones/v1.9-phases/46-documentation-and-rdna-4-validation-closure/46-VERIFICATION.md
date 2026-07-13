@@ -47,7 +47,7 @@ Passed.
 
 | Requirement | Status | Evidence |
 | --- | --- | --- |
-| DOC-02 | Passed | `docs/analysis.md` v2 artifact and RDNA4 scope sections. |
+| DOC-02 | Passed | `docs/internal/analysis.md` v2 artifact and RDNA4 scope sections. |
 | DOC-03 | Passed | Forbidden-claim closure tests. |
 | VAL-01 | Passed | Golden bound modeling coverage inventory test and focused suite. |
 | VAL-02 | Passed | AMD-native score closure coverage tests. |

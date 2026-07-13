@@ -23,7 +23,7 @@ small GEMM replacement path.
 - Added public-contract tests for CK metadata, source consistency, native
   staging, RDNA 4 E2E registration, and support-status documentation.
 - Added `requires_ck` test gating for environments missing CK headers.
-- Updated `docs/rocm_libraries.md` to classify CK as supported for the small
+- Updated `docs/user/rocm_libraries.md` to classify CK as supported for the small
   GEMM path and document limits.
 
 ## Validation

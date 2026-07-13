@@ -4,7 +4,8 @@ These files are demo-only fixtures for the v1.19 evidence guide. They show
 small JSON and Markdown report shapes for researchers who want to inspect the
 artifact layout before generating local evidence.
 
-Start with the central guide: [v1.19 evidence guide](../../v1_19_evidence_guide.md).
+Start with the central guide:
+[v1.19 evidence guide](../../internal/v1_19_evidence_guide.md).
 
 The fixtures are diagnostic-only and sidecars/reports only. They do not change
 canonical Trace, Definition, Workload, Solution contracts, correctness, timing,

@@ -26,7 +26,7 @@ against SOL ExecBench ROCm v1.36.
 
 | Task | Files | Verification |
 |------|-------|--------------|
-| 1. Documentation clarification | `docs/EVALUATOR-CONTRACT.md`, `docs/agent_feedback_sidecar.md` | docs tests / grep |
+| 1. Documentation clarification | `docs/user/EVALUATOR-CONTRACT.md`, `docs/user/agent_feedback_sidecar.md` | docs tests / grep |
 | 2. Identity derivation | `src/sol_execbench/core/bench/agent_feedback.py`, `src/sol_execbench/cli/main.py` | pytest sidecar tests |
 | 3. Bottleneck vocabulary | `src/sol_execbench/core/bench/agent_feedback.py`, fixtures/tests | pytest schema tests |
 

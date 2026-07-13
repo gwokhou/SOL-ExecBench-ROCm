@@ -27,11 +27,11 @@ Result: `75 passed in 11.51s`.
 
 ## Goal-Backward Assessment
 
-- SUPPORT-01: Passed. `docs/rocm.md` identifies RDNA 4 engineering-prerelease
+- SUPPORT-01: Passed. `docs/user/rocm.md` identifies RDNA 4 engineering-prerelease
   evidence without upgrading it to full paper validation or broader hardware
   validation.
-- SUPPORT-02: Passed. `docs/rocm.md`, `docs/CLAIMS.md`, and
-  `docs/release_candidate_validation.md` keep Docker/container ROCm user-space
+- SUPPORT-02: Passed. `docs/user/rocm.md`, `docs/user/CLAIMS.md`, and
+  `docs/internal/release_candidate_validation.md` keep Docker/container ROCm user-space
   evidence distinct from native-host validation.
 - SUPPORT-03: Passed. Public docs state MI300X is the concrete CDNA3 hardware
   target (`gfx942`) and full-suite MI300X-on-CDNA3 validation remains deferred

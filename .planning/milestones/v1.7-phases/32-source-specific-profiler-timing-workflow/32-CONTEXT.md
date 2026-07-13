@@ -18,7 +18,7 @@ profiler numbers against event timing traces.
   parses CSV output, and returns fallback metadata.
 - `scripts/run_dataset.py` owns dataset batch execution and optional derived
   reporting.
-- `docs/analysis.md` documents benchmark trace and profiling workflows.
+- `docs/internal/analysis.md` documents benchmark trace and profiling workflows.
 
 ## Constraints
 

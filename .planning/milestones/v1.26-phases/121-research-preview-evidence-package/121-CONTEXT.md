@@ -38,8 +38,8 @@ This phase delivers a researcher-facing evidence package that explains how to in
 ## Existing Code Insights
 
 ### Reusable Assets
-- `docs/RESEARCHER-GUIDE.md` already explains researcher workflows and artifact interpretation.
-- `docs/CLAIMS.md`, `docs/rocm.md`, `docs/prerelease_artifact_bundle.md`, and `docs/prerelease_readiness.md` now define the core public boundaries.
+- `docs/user/RESEARCHER-GUIDE.md` already explains researcher workflows and artifact interpretation.
+- `docs/user/CLAIMS.md`, `docs/user/rocm.md`, `docs/internal/prerelease_artifact_bundle.md`, and `docs/internal/prerelease_readiness.md` now define the core public boundaries.
 - `scripts/build_prerelease_artifact_bundle.py` and `scripts/check_prerelease_readiness.py` provide representative release evidence commands.
 
 ### Established Patterns
@@ -47,8 +47,8 @@ This phase delivers a researcher-facing evidence package that explains how to in
 - Guardrail tests read docs directly and assert required wording.
 
 ### Integration Points
-- Add `docs/research_preview.md`.
-- Link it from `docs/RESEARCHER-GUIDE.md` and prerelease docs.
+- Add `docs/user/research_preview.md`.
+- Link it from `docs/user/RESEARCHER-GUIDE.md` and prerelease docs.
 - Add a focused docs test for research preview coverage.
 
 </code_context>

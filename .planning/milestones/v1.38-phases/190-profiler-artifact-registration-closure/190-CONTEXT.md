@@ -96,8 +96,8 @@ that belongs to Phase 191.
   discovery, collection, and timing evidence tests.
 - `tests/sol_execbench/test_cli_environment_snapshot.py` — current profile
   sidecar/profile-summary citation behavior.
-- `docs/rocm_timing.md` — existing ROCm timing/profile evidence explanation.
-- `docs/profile_summary_sidecar.md` — current diagnostic-only profile summary
+- `docs/user/rocm_timing.md` — existing ROCm timing/profile evidence explanation.
+- `docs/user/profile_summary_sidecar.md` — current diagnostic-only profile summary
   contract.
 
 ### External Source References

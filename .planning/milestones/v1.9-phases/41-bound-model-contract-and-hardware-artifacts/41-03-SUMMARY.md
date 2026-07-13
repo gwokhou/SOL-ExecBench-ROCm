@@ -6,7 +6,7 @@
 ## Scope Completed
 - Extended `tests/sol_execbench/test_public_contract_guardrails.py` to assert primary CLI does not expose hardware-model-path or derived-workflow flags and to verify definition/workload/trace schemas stay without derived artifact fields.
 - Added split-status/no-claim alignment checks in the same guardrail suite.
-- Updated `docs/analysis.md` with v1.9 AMD scope language, split status wording, and deferred CDNA3/MS300X claims.
+- Updated `docs/internal/analysis.md` with v1.9 AMD scope language, split status wording, and deferred CDNA3/MS300X claims.
 
 ## Acceptance
 - Public contract guardrails now cover CLI/help and documentation claims:

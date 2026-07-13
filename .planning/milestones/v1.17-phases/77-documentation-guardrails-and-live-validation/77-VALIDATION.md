@@ -13,7 +13,7 @@ created: 2026-05-26
 
 - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest tests/sol_execbench/test_research_release_docs.py tests/sol_execbench/test_public_contract_guardrails.py -q`
 - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest tests/sol_execbench/test_static_kernel_evidence.py tests/sol_execbench/test_toolchain_routing.py tests/sol_execbench/test_cli_environment_snapshot.py tests/sol_execbench/test_research_release_docs.py tests/sol_execbench/test_public_contract_guardrails.py -q`
-- `UV_CACHE_DIR=/tmp/uv-cache uv run ruff check docs/CLAIMS.md docs/RESEARCHER-GUIDE.md docs/static_kernel_evidence.md docs/internal/v1_17_static_kernel_evidence_validation.md tests/sol_execbench/test_research_release_docs.py`
+- `UV_CACHE_DIR=/tmp/uv-cache uv run ruff check docs/user/CLAIMS.md docs/user/RESEARCHER-GUIDE.md docs/user/static_kernel_evidence.md docs/internal/v1_17_static_kernel_evidence_validation.md tests/sol_execbench/test_research_release_docs.py`
 
 ## Coverage
 

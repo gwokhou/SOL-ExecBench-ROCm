@@ -50,7 +50,7 @@ created: 2026-05-22
 ## Wave 0 Requirements
 
 - [ ] `tests/sol_execbench/test_timing_policy.py` — unit coverage for TIME-01, TIME-02, TIME-03.
-- [ ] `docs/rocm_timing.md` — documentation target for TIME-03 and TIME-04.
+- [ ] `docs/user/rocm_timing.md` — documentation target for TIME-03 and TIME-04.
 - [ ] `tests/sol_execbench/test_rocm_eval_timing_audit.py` — extend audit coverage for timing documentation and public-contract guardrails.
 
 ---

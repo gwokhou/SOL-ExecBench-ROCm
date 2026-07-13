@@ -9,7 +9,7 @@ from sol_execbench.core.reports.evaluation_stability import EvaluationStabilityR
 from sol_execbench.core.reports.trust_summary import TrustSummaryReport
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
-GUIDE = REPO_ROOT / "docs/v1_20_evidence_quality_guide.md"
+GUIDE = REPO_ROOT / "docs/internal/v1_20_evidence_quality_guide.md"
 EXAMPLES_DIR = REPO_ROOT / "docs/examples/v1_20_evidence_quality"
 
 
@@ -22,8 +22,12 @@ def _json(path: Path) -> dict:
 
 
 def test_v1_20_guide_is_linked_from_public_entry_docs():
-    for doc in ("docs/CLAIMS.md", "docs/RESEARCHER-GUIDE.md", "docs/TESTING.md"):
-        assert "docs/v1_20_evidence_quality_guide.md" in _read(doc)
+    for doc in (
+        "docs/user/CLAIMS.md",
+        "docs/user/RESEARCHER-GUIDE.md",
+        "docs/user/TESTING.md",
+    ):
+        assert "docs/internal/v1_20_evidence_quality_guide.md" in _read(doc)
 
 
 def test_v1_20_guide_names_scripts_and_boundaries():
@@ -64,7 +68,7 @@ def test_v1_20_consistency_example_includes_amd_sol_and_solar_refs():
 
 def test_v1_20_example_readme_references_existing_fixture_files():
     readme = (EXAMPLES_DIR / "README.md").read_text(encoding="utf-8")
-    assert "../../v1_20_evidence_quality_guide.md" in readme
+    assert "../../internal/v1_20_evidence_quality_guide.md" in readme
 
     for fixture in (
         "trust_summary.consistent.demo.json",
@@ -123,9 +127,9 @@ def test_v1_20_docs_keep_required_negative_claim_boundaries_visible():
     combined = "\n".join(
         [
             GUIDE.read_text(encoding="utf-8"),
-            _read("docs/CLAIMS.md"),
-            _read("docs/RESEARCHER-GUIDE.md"),
-            _read("docs/TESTING.md"),
+            _read("docs/user/CLAIMS.md"),
+            _read("docs/user/RESEARCHER-GUIDE.md"),
+            _read("docs/user/TESTING.md"),
             (EXAMPLES_DIR / "README.md").read_text(encoding="utf-8"),
         ]
     )
@@ -146,7 +150,7 @@ def test_agent_feedback_claim_boundaries_are_documented():
     combined = "\n".join(
         [
             GUIDE.read_text(encoding="utf-8"),
-            _read("docs/CLAIMS.md"),
+            _read("docs/user/CLAIMS.md"),
         ]
     )
 

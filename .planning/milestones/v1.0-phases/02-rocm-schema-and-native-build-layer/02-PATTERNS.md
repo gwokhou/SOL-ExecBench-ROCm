@@ -26,7 +26,7 @@
 
 - `src/sol_execbench/__init__.py`, `src/sol_execbench/core/__init__.py`, and `src/sol_execbench/core/data/__init__.py` re-export schema classes and should only need changes if class names change. `CompileOptions` remains the same class name.
 - `src/sol_execbench/driver/templates/eval_driver.py` still references native CUDA language values. That is intentionally Phase 3 unless Phase 2 schema changes require a narrow compatibility edit.
-- `docs/solution.md`, examples, and broad example tests still contain NVIDIA/CUDA names. They are outside the failing Phase 2 audit scope.
+- `docs/user/solution.md`, examples, and broad example tests still contain NVIDIA/CUDA names. They are outside the failing Phase 2 audit scope.
 
 ## Suggested Plan Slices
 

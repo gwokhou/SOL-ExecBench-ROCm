@@ -2,9 +2,9 @@
 
 ## Scope
 
-1. Add `docs/rocm_toolchain_routing.md`.
+1. Add `docs/user/rocm_toolchain_routing.md`.
 2. Link docs from README and cookbook.
-3. Update `docs/CLAIMS.md`.
+3. Update `docs/user/CLAIMS.md`.
 4. Add documentation guardrail tests.
 
 ## Acceptance Criteria

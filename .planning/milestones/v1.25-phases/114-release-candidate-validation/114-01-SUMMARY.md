@@ -18,7 +18,7 @@ tech-stack:
     - optional evidence classified as deferred or diagnostic-only instead of authority
 key-files:
   created:
-    - docs/release_candidate_validation.md
+    - docs/internal/release_candidate_validation.md
     - scripts/release_candidate_validation.py
     - tests/sol_execbench/test_release_candidate_validation.py
   modified:
@@ -73,7 +73,7 @@ completed: 2026-06-01
 
 - `scripts/release_candidate_validation.py` - Bounded prerelease validation
   wrapper and JSON/Markdown summary writer.
-- `docs/release_candidate_validation.md` - Maintainer-facing prerelease
+- `docs/internal/release_candidate_validation.md` - Maintainer-facing prerelease
   validation guide and failure policy.
 - `tests/sol_execbench/test_release_candidate_validation.py` - CPU-safe
   regression coverage.

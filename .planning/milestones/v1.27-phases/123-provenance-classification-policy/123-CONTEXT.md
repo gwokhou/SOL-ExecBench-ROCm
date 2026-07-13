@@ -53,7 +53,7 @@ classification artifact that Phase 124 will consume.
 
 - Add `provenance.toml` as a reviewable manifest with exact
   `nvidia_notice.allowed` and `nvidia_notice.cleanup_candidates` entries.
-- Add `docs/provenance.md` to define the classification policy and release
+- Add `docs/user/provenance.md` to define the classification policy and release
   interpretation.
 - Add a focused test proving the manifest accounts for all current NVIDIA SPDX
   headers.

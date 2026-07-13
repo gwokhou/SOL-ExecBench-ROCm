@@ -12,7 +12,7 @@ affects:
   - "src/sol_execbench/core/scoring/official_score.py"
   - "src/sol_execbench/core/scoring/__init__.py"
   - "tests/sol_execbench/test_official_score_evidence.py"
-  - "docs/EVALUATOR-CONTRACT.md"
+  - "docs/user/EVALUATOR-CONTRACT.md"
 tech-stack:
   added: []
   patterns:
@@ -25,7 +25,7 @@ key-files:
     - "tests/sol_execbench/test_official_score_evidence.py"
   modified:
     - "src/sol_execbench/core/scoring/__init__.py"
-    - "docs/EVALUATOR-CONTRACT.md"
+    - "docs/user/EVALUATOR-CONTRACT.md"
 key-decisions:
   - "Official score evidence is separate from AMD-native derived scores."
   - "A non-null official score requires measured latency, official baseline latency, SOL/SOLAR bound evidence, and an aggregation policy."

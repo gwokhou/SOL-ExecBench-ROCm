@@ -42,7 +42,7 @@ def _has_project_header(path: Path) -> bool:
 def test_provenance_manifest_defines_header_policy_classes() -> None:
     provenance = _load_provenance()
 
-    assert provenance["policy_doc"] == "docs/provenance.md"
+    assert provenance["policy_doc"] == "docs/user/provenance.md"
     assert provenance["project_attribution"].startswith("Copyright (c) 2026")
 
     classes = provenance["classes"]
@@ -73,7 +73,9 @@ def test_provenance_manifest_defines_dataset_redistribution_policy() -> None:
         assert expected in redistribution_classes
 
     dataset_policy = provenance["dataset_policy"]
-    assert dataset_policy["schema_version"] == "sol_execbench.dataset_provenance_policy.v1"
+    assert (
+        dataset_policy["schema_version"] == "sol_execbench.dataset_provenance_policy.v1"
+    )
     assert dataset_policy["guardrail"] == "scripts/check_dataset_redistribution.py"
 
     sources = {source["id"]: source for source in dataset_policy["sources"]}

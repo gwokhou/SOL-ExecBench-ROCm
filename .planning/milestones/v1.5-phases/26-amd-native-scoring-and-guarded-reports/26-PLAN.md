@@ -9,7 +9,7 @@ files_modified:
   - src/sol_execbench/core/scoring/amd_score.py
   - src/sol_execbench/core/scoring/__init__.py
   - tests/sol_execbench/test_amd_native_score.py
-  - docs/analysis.md
+  - docs/internal/analysis.md
 autonomous: true
 requirements:
   - SCORE-01
@@ -70,7 +70,7 @@ explicitly guarding unvalidated CDNA3 claims.
 <task id="26-01-02" type="execute">
   <requirements>SCORE-02, COMPAT-01, COMPAT-02</requirements>
   <files>
-    <file>docs/analysis.md</file>
+    <file>docs/internal/analysis.md</file>
     <file>tests/sol_execbench/test_amd_native_score.py</file>
   </files>
   <action>

@@ -14,7 +14,7 @@ provenance before any bulk SPDX/copyright cleanup.
    - Record cleanup candidates that currently carry NVIDIA-only notices but do
      not exist at the same upstream path.
 
-2. Add `docs/provenance.md`.
+2. Add `docs/user/provenance.md`.
    - Define upstream retained, derivative modified, independent ROCm work, and
      generated/planning material.
    - Explain header policy for each class.

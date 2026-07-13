@@ -12,7 +12,7 @@ reviewed_at: "2026-06-01"
 
 Reviewed first-run documentation and guardrail changes in:
 
-- `docs/GETTING-STARTED.md`
+- `docs/user/GETTING-STARTED.md`
 - `tests/sol_execbench/test_research_release_docs.py`
 
 ## Findings

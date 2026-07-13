@@ -9,7 +9,7 @@ reviewed_at: 2026-06-01
 
 - `scripts/build_prerelease_artifact_bundle.py`
 - `tests/sol_execbench/test_prerelease_artifact_bundle.py`
-- `docs/prerelease_artifact_bundle.md`
+- `docs/internal/prerelease_artifact_bundle.md`
 - Claim-boundary wording updates for the MI300X-on-CDNA3 relationship.
 
 ## Findings

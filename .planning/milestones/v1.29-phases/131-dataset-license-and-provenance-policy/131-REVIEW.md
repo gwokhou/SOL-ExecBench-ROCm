@@ -16,9 +16,9 @@ Clean. No blocking findings identified in the phase scope.
 - `provenance.toml`
 - `scripts/check_dataset_redistribution.py`
 - `scripts/check_prerelease_readiness.py`
-- `docs/provenance.md`
-- `docs/compliance.md`
-- `docs/prerelease_artifact_bundle.md`
+- `docs/user/provenance.md`
+- `docs/user/compliance.md`
+- `docs/internal/prerelease_artifact_bundle.md`
 - `tests/sol_execbench/test_provenance_policy.py`
 - `tests/sol_execbench/test_dataset_redistribution_policy.py`
 - `tests/sol_execbench/test_prerelease_readiness.py`

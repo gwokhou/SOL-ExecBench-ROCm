@@ -60,7 +60,7 @@ Timing evidence dict
 
 - `src/sol_execbench/core/bench/rocm_profiler.py`
 - `tests/sol_execbench/test_rocm_profiler.py`
-- `docs/rocm_timing.md`
+- `docs/user/rocm_timing.md`
 - `tests/sol_execbench/test_rocm_eval_timing_audit.py`
 
 ## Parser Strategy

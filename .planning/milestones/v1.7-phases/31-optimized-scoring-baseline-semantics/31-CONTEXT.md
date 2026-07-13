@@ -53,7 +53,7 @@ artifacts keyed by definition and workload UUID.
   AMD-native per-workload and suite reports.
 - `scripts/run_dataset.py --amd-score-report` already connects trace JSON,
   derived AMD SOL bounds, and score output.
-- `docs/analysis.md` already documents derived score reports and no-equivalence
+- `docs/internal/analysis.md` already documents derived score reports and no-equivalence
   claim boundaries.
 
 ### Established Patterns

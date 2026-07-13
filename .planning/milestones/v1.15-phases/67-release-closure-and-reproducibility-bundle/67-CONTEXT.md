@@ -7,10 +7,10 @@ curated ROCm slice, researcher guide, and cookbook into one release checklist.
 
 ## Inputs
 
-- `docs/CLAIMS.md`
-- `docs/curated_rocm_slice.md`
-- `docs/RESEARCHER-GUIDE.md`
-- `docs/COOKBOOK.md`
+- `docs/user/CLAIMS.md`
+- `docs/internal/curated_rocm_slice.md`
+- `docs/user/RESEARCHER-GUIDE.md`
+- `docs/user/COOKBOOK.md`
 - v1.15 requirements `REPRO-01` and `REPRO-02`
 
 ## Constraints

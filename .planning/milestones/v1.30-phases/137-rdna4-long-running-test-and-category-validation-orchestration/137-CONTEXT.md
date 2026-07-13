@@ -30,7 +30,7 @@ The NVIDIA device is not validation evidence for this milestone.
 - RDNA4 docs and historical evidence:
   - `docs/internal/rdna4_v1_9_validation_evidence.md`
   - `.planning/milestones/v1.0-phases/05-rocm-test-suite-and-hardware-validation/`
-  - `docs/rocm.md`
+  - `docs/user/rocm.md`
 - Category/example coverage:
   - `tests/examples/test_examples.py`
   - `tests/examples/test_rocm_cli_paths.py`

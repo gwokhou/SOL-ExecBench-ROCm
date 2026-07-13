@@ -95,7 +95,7 @@ evidence without changing benchmark semantics.
   status.
 - `src/sol_execbench/core/toolchain.py` provides precedent for routed status
   and reason reporting.
-- `docs/CLAIMS.md` already carries project claim-boundary language and should
+- `docs/user/CLAIMS.md` already carries project claim-boundary language and should
   receive wording guardrails for container user-space vs native host validation
   in later phases.
 - `tests/sol_execbench/test_public_contract_guardrails.py` and nearby schema

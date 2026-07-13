@@ -16,9 +16,9 @@ Make the ROCm port usable and legally clear for researchers and developers.
 ## Existing State
 
 - `README.md` still described NVIDIA Container Toolkit, B200, CUDA C++, CUTLASS, cuDNN, CuTe DSL, and cuTile as active support.
-- `docs/solution.md` still documented CUDA/NVIDIA schema values that the ROCm schema now rejects.
-- `docs/trace.md` used NVIDIA hardware examples and did not explain ROCm environment fields.
-- `docs/definition.md` used CUDA wording for the custom input device parameter.
+- `docs/user/solution.md` still documented CUDA/NVIDIA schema values that the ROCm schema now rejects.
+- `docs/user/trace.md` used NVIDIA hardware examples and did not explain ROCm environment fields.
+- `docs/user/definition.md` used CUDA wording for the custom input device parameter.
 - No dedicated ROCm setup, profiling, compliance, or limitations document existed.
 
 ## Constraints

@@ -13,7 +13,7 @@ Passed.
 
 | Requirement | Status | Evidence |
 | --- | --- | --- |
-| RESEARCH-01 | passed | `docs/research_preview.md` covers methodology, benchmark scope, hardware scope, evidence surfaces, and limitations. |
+| RESEARCH-01 | passed | `docs/user/research_preview.md` covers methodology, benchmark scope, hardware scope, evidence surfaces, and limitations. |
 | RESEARCH-02 | passed | Report distinguishes AMD-derived evidence from upstream SOLAR parity, paper-scale validation, and leaderboard authority. |
 | RESEARCH-03 | passed | Report maps first-run, release validation, bundle, readiness, and bounded dataset-slice commands to expected artifacts. |
 

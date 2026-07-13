@@ -11,12 +11,12 @@ requirements: [CLAIM-01, CLAIM-02, CLAIM-03]
 
 ## Completed Work
 
-- Added `docs/v1_25_release_notes.md` as the central engineering-prerelease
+- Added `docs/internal/v1_25_release_notes.md` as the central engineering-prerelease
   release note and artifact authority page.
-- Updated `docs/CLAIMS.md` to link v1.25 release notes and keep Trace JSONL,
+- Updated `docs/user/CLAIMS.md` to link v1.25 release notes and keep Trace JSONL,
   diagnostic sidecars, provisional prerelease evidence, deferred items, and
   unavailable validation in separate authority classes.
-- Updated `docs/release_candidate_validation.md` to link release notes and
+- Updated `docs/internal/release_candidate_validation.md` to link release notes and
   repeat the canonical/sidecar/provisional boundary.
 - Added CPU-safe docs guardrails in
   `tests/sol_execbench/test_research_release_docs.py`.

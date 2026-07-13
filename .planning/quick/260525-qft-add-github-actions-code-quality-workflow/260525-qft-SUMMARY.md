@@ -21,7 +21,7 @@ existing consistency tests.
 ## Files Changed
 
 - `.github/workflows/code-quality.yml`
-- `docs/TESTING.md`
+- `docs/user/TESTING.md`
 
 ## Verification
 

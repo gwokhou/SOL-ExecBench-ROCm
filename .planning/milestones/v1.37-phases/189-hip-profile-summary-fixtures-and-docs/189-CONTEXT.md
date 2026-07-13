@@ -15,7 +15,7 @@ HIP Playground needs stable SOL-side fixtures and ingestion guidance to implemen
 
 <code_context>
 - Fixture package belongs under `tests/sol_execbench/fixtures/profile_summary/`.
-- HIP-facing docs belong in `docs/profile_summary_sidecar.md`.
+- HIP-facing docs belong in `docs/user/profile_summary_sidecar.md`.
 - CPU-safe fixture validation belongs under `tests/sol_execbench/`.
 </code_context>
 

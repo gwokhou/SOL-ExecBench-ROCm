@@ -16,7 +16,7 @@
 - `.planning/CDNA3-VALIDATION-HANDOFF.md`
   - Defines required `gfx94*` hardware, ROCm >= 7.0, full pytest command,
     environment capture, evidence to record, and acceptance criteria.
-- `docs/rocm.md`, `docs/solution.md`, and `docs/compliance.md`
+- `docs/user/rocm.md`, `docs/user/solution.md`, and `docs/user/compliance.md`
   - Explicitly separate CDNA 3 code/schema support from hardware validation.
 
 ## Gap For Phase 21

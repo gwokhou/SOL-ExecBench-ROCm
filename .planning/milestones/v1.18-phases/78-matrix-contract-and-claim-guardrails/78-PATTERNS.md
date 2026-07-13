@@ -12,7 +12,7 @@
 | `tests/sol_execbench/test_rocm_compatibility_matrix.py` | test | transform, request-response contract checks | `tests/sol_execbench/test_static_kernel_evidence.py` | exact |
 | `tests/sol_execbench/test_matrix_claim_guardrails.py` | test | transform, guardrail assertions | `tests/sol_execbench/test_trace_reporting_and_score_guardrails.py` | exact |
 | `tests/sol_execbench/test_public_contract_guardrails.py` | test | public contract guardrail | `tests/sol_execbench/test_public_contract_guardrails.py` | exact |
-| `docs/CLAIMS.md` | documentation | claim-boundary wording guardrail | `docs/CLAIMS.md` and `tests/sol_execbench/test_research_release_docs.py` | role-match |
+| `docs/user/CLAIMS.md` | documentation | claim-boundary wording guardrail | `docs/user/CLAIMS.md` and `tests/sol_execbench/test_research_release_docs.py` | role-match |
 
 ## Pattern Assignments
 
@@ -446,9 +446,9 @@ def build_evaluator_contract() -> EvaluatorContract:
 
 If Phase 78 exposes a capability, follow this existing list pattern with a token like `rocm_compatibility_matrix.v1`; avoid changing canonical trace requirements.
 
-### `docs/CLAIMS.md` (documentation, claim-boundary wording)
+### `docs/user/CLAIMS.md` (documentation, claim-boundary wording)
 
-**Analog:** `docs/CLAIMS.md` and `tests/sol_execbench/test_research_release_docs.py`
+**Analog:** `docs/user/CLAIMS.md` and `tests/sol_execbench/test_research_release_docs.py`
 
 **Use when:** Adding wording guardrails for container user-space validation versus native host validation.
 
@@ -486,7 +486,7 @@ def _read_doc(path: str) -> str:
 
 
 def test_claims_doc_defines_allowed_and_unsupported_claims():
-    text = _read_doc("docs/CLAIMS.md")
+    text = _read_doc("docs/user/CLAIMS.md")
 
     for allowed in (
         "ROCm-port evidence",
@@ -504,8 +504,8 @@ def test_claims_doc_defines_allowed_and_unsupported_claims():
 
 
 def test_static_kernel_evidence_docs_define_usage_and_boundaries():
-    text = _read_doc("docs/static_kernel_evidence.md")
-    claims = _read_doc("docs/CLAIMS.md")
+    text = _read_doc("docs/user/static_kernel_evidence.md")
+    claims = _read_doc("docs/user/CLAIMS.md")
 
     for boundary in (
         "correctness authority",
@@ -559,8 +559,8 @@ Build representative objects in memory. Do not require Docker, ROCm devices, PyT
 Assert the new compatibility model does not alter canonical trace/workload/definition top-level fields or scoring semantics.
 
 ### Documentation Claim Wording
-**Source:** `docs/CLAIMS.md` lines 19-36 and 49-69; `tests/sol_execbench/test_research_release_docs.py` lines 9-39 and 136-168  
-**Apply to:** `docs/CLAIMS.md` and claim guardrail tests
+**Source:** `docs/user/CLAIMS.md` lines 19-36 and 49-69; `tests/sol_execbench/test_research_release_docs.py` lines 9-39 and 136-168
+**Apply to:** `docs/user/CLAIMS.md` and claim guardrail tests
 
 Use exact wording assertions for allowed and forbidden claim language. Phrase positive claims narrowly and keep forbidden claims explicit.
 

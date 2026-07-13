@@ -2,10 +2,10 @@
 
 ## Completed
 
-- Rewrote `docs/solution.md` around ROCm schema values, HIP compile options, and replacement guidance.
-- Rewrote `docs/trace.md` with AMD/ROCm environment examples.
-- Updated `docs/definition.md` device wording from CUDA-specific to GPU/ROCm-compatible.
-- Added `docs/analysis.md` for trace review, timing, clock locking, and `rocprofv3` profiling.
+- Rewrote `docs/user/solution.md` around ROCm schema values, HIP compile options, and replacement guidance.
+- Rewrote `docs/user/trace.md` with AMD/ROCm environment examples.
+- Updated `docs/user/definition.md` device wording from CUDA-specific to GPU/ROCm-compatible.
+- Added `docs/internal/analysis.md` for trace review, timing, clock locking, and `rocprofv3` profiling.
 - Updated the trace model docstring to use an AMD hardware example.
 
 ## Evidence

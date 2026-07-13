@@ -17,7 +17,7 @@ Passed.
   reason.
 - TIME-03: Passed. Code and docs expose source-specific timing semantics rather
   than forcing one interpretation.
-- TIME-04: Passed. `docs/rocm_timing.md` documents kernel activity, HIP
+- TIME-04: Passed. `docs/user/rocm_timing.md` documents kernel activity, HIP
   runtime/API activity, PyTorch operator attribution, and fallback event timing.
 
 ## Evidence

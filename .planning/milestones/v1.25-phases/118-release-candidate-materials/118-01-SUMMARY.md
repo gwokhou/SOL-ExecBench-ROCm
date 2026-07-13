@@ -11,9 +11,9 @@ requirements: [REL-01, REL-02, REL-03]
 
 ## Completed Work
 
-- Added `docs/v1_25_prerelease_checklist.md` with a maintainer flow from clean
+- Added `docs/internal/v1_25_prerelease_checklist.md` with a maintainer flow from clean
   tree to annotated release-candidate tag and push.
-- Updated `docs/v1_25_release_notes.md` with deferred claims and public entry
+- Updated `docs/internal/v1_25_release_notes.md` with deferred claims and public entry
   points.
 - Updated `README.md` with v1.25 prerelease materials, claims, and first-run
   troubleshooting navigation.

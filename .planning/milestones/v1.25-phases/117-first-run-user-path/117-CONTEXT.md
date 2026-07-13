@@ -17,12 +17,12 @@ compatibility names with NVIDIA/CUDA support.
 
 ## Inputs
 
-- `docs/GETTING-STARTED.md` already contains install commands, ROCm visibility
+- `docs/user/GETTING-STARTED.md` already contains install commands, ROCm visibility
   checks, example commands, Docker path, dataset setup, and common setup
   issues.
-- `docs/trace.md` defines Trace JSONL fields and states that PyTorch ROCm uses
+- `docs/user/trace.md` defines Trace JSONL fields and states that PyTorch ROCm uses
   historical `torch.cuda` compatibility APIs.
-- `docs/CONFIGURATION.md` documents no-trace diagnostic sidecars.
+- `docs/user/CONFIGURATION.md` documents no-trace diagnostic sidecars.
 - Existing docs tests use direct Markdown substring assertions in
   `tests/sol_execbench/test_research_release_docs.py`.
 

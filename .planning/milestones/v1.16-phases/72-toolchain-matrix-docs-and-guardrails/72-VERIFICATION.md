@@ -24,6 +24,6 @@ Final milestone verification passed:
 
 | Requirement | Status | Evidence |
 | --- | --- | --- |
-| DOC-01 | passed | `docs/rocm_toolchain_routing.md` defines the availability matrix. |
-| DOC-02 | passed | `docs/COOKBOOK.md` includes routing inspection commands. |
-| DOC-03 | passed | `docs/CLAIMS.md` and docs tests protect authority boundaries. |
+| DOC-01 | passed | `docs/user/rocm_toolchain_routing.md` defines the availability matrix. |
+| DOC-02 | passed | `docs/user/COOKBOOK.md` includes routing inspection commands. |
+| DOC-03 | passed | `docs/user/CLAIMS.md` and docs tests protect authority boundaries. |

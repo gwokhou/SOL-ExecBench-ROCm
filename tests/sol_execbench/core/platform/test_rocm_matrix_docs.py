@@ -5,8 +5,8 @@ import re
 
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
-CLAIMS = REPO_ROOT / "docs" / "CLAIMS.md"
-TESTING = REPO_ROOT / "docs" / "TESTING.md"
+CLAIMS = REPO_ROOT / "docs" / "user" / "CLAIMS.md"
+TESTING = REPO_ROOT / "docs" / "user" / "TESTING.md"
 
 
 def _text(path: Path) -> str:
@@ -30,7 +30,10 @@ def test_claims_document_target_requested_vs_observed_evidence() -> None:
     assert "Target/requested values" in text
     assert "Observed evidence" in text
     assert "Target identity is required" in text
-    assert "host, container, Python dependency, dependency policy, toolchain, and GPU" in text
+    assert (
+        "host, container, Python dependency, dependency policy, toolchain, and GPU"
+        in text
+    )
 
 
 def test_claims_document_mixed_version_debug_authority_boundary() -> None:

@@ -30,7 +30,7 @@ as they preserve public contract clarity.
 ## Existing Code Insights
 
 ### Reusable Assets
-- `README.md`, `docs/solution.md`, `docs/trace.md`, and `docs/compliance.md`
+- `README.md`, `docs/user/solution.md`, `docs/user/trace.md`, and `docs/user/compliance.md`
   already document ROCm public surfaces.
 - `tests/sol_execbench/test_public_contract_guardrails.py` establishes the
   local pattern for documentation and public-contract checks.
