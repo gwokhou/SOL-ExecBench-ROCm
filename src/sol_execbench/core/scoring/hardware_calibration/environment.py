@@ -129,6 +129,9 @@ def _adapter(family: str, *, supports_clock_lock: bool = False) -> ArchitectureA
     diagnostic_candidates: list[CalibrationProfileKey] = []
     if family == "gfx12":
         diagnostic_candidates.append(
+            CalibrationProfileKey("compute", "matrix", "fp32", "fp32", family)
+        )
+        diagnostic_candidates.append(
             CalibrationProfileKey("compute", "vector", "bf16", "bf16", family)
         )
         diagnostic_candidates.append(

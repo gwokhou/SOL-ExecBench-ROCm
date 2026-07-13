@@ -24,6 +24,7 @@ def build_cli_command(
     keep_staging: bool = False,
     verbose: bool = False,
     trace_output_path: Path | None = None,
+    release_authority_json: Path | None = None,
 ) -> list[str]:
     """Build the ``sol-execbench`` command used by dataset runs."""
     cmd = [
@@ -46,6 +47,8 @@ def build_cli_command(
     )
     if trace_output_path is not None:
         cmd.extend(["--trace-output", str(trace_output_path)])
+    if release_authority_json is not None:
+        cmd.extend(["--release-authority-json", str(release_authority_json)])
 
     if config_path:
         cmd.extend(["--config", str(config_path)])
@@ -67,6 +70,7 @@ def run_cli(
     config_path: Path | None = None,
     keep_staging: bool = False,
     verbose: bool = False,
+    release_authority_json: Path | None = None,
 ) -> list[dict] | None:
     """Invoke ``sol-execbench`` and return parsed trace dicts."""
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -80,6 +84,7 @@ def run_cli(
         keep_staging=keep_staging,
         verbose=verbose,
         trace_output_path=trace_path,
+        release_authority_json=release_authority_json,
     )
 
     stdout_path = _temporary_stream_path(output_dir, job_name, "stdout")

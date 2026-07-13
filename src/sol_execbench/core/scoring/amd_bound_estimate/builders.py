@@ -138,11 +138,13 @@ def _is_exact_elementwise_operation(node: BoundGraphNode) -> bool:
         return node.attributes.get("exponent") == 2
     return leaf_name in {
         "add",
+        "invert",
         "sub",
         "mul",
         "mult",
         "truediv",
         "div",
+        "usub",
     }
 
 

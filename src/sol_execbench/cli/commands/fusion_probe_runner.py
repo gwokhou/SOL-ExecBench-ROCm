@@ -23,6 +23,20 @@ from statistics import median
 from tempfile import TemporaryDirectory
 from typing import Any
 
+from sol_execbench.core.data.definition import Definition
+from sol_execbench.core.data.workload import Workload
+from sol_execbench.core.platform.arch_capabilities import (
+    load_packaged_arch_capability_budget,
+)
+from sol_execbench.core.scoring.amd_bound_estimate.estimates import (
+    estimate_bound_work,
+    resolve_architecture_profile_paths,
+)
+from sol_execbench.core.scoring.amd_bound_graph.builder import build_static_bound_graph
+from sol_execbench.core.scoring.amd_sol import (
+    build_fusion_groups,
+    fusion_signature_for_group,
+)
 from sol_execbench.core.bench.static_kernel.amdgpu_metadata import (
     extract_amdgpu_kernel_metadata,
 )
@@ -50,7 +64,7 @@ def main() -> int:
         architecture = _required_env("SOL_EXECBENCH_FUSION_ARCHITECTURE")
         device = int(_required_env("SOL_EXECBENCH_FUSION_DEVICE"))
         manifest = _json_object(suite_path)
-        shapes = _selected_shapes(manifest, root)
+        shapes = _selected_shapes(manifest, root, architecture)
         with TemporaryDirectory(prefix="sol-execbench-fusion-") as temporary:
             with resources.as_file(_SOURCE_RESOURCES) as source_dir:
                 executable, command = _compile_runner(
@@ -92,7 +106,7 @@ def main() -> int:
 
 
 def _selected_shapes(
-    manifest: dict[str, Any], root: Path
+    manifest: dict[str, Any], root: Path, architecture: str
 ) -> tuple[dict[str, Any], ...]:
     selected = {
         row["workload_uuid"]: row["definition"]
@@ -108,23 +122,31 @@ def _selected_shapes(
     rows: list[dict[str, Any]] = []
     for definition in (_RMS_DEFINITION, _TANH_DEFINITION):
         path = _workload_file(root, definition)
+        definition_model = Definition.model_validate_json(
+            (path.parent / "definition.json").read_text(encoding="utf-8")
+        )
         for raw in path.read_text(encoding="utf-8").splitlines():
-            row = json.loads(raw)
-            if row.get("uuid") not in selected:
+            workload = Workload.model_validate_json(raw)
+            if str(workload.uuid) not in selected:
                 continue
-            axes = row.get("axes")
-            if not isinstance(axes, dict):
-                raise ValueError(f"workload {row.get('uuid')} has no axes")
+            axes = workload.axes
             batch = axes.get("batch_size")
             sequence = axes.get("seq_len", 1)
             if not isinstance(batch, int) or not isinstance(sequence, int):
-                raise ValueError(f"workload {row.get('uuid')} has non-static shape")
+                raise ValueError(f"workload {workload.uuid} has non-static shape")
+            kind = "rms" if definition == _RMS_DEFINITION else "tanh"
             rows.append(
                 {
-                    "uuid": row["uuid"],
-                    "kind": "rms" if definition == _RMS_DEFINITION else "tanh",
+                    "uuid": str(workload.uuid),
+                    "kind": kind,
                     "batch": batch,
                     "sequence": sequence,
+                    "signature": _workload_fusion_signature(
+                        definition_model,
+                        workload,
+                        architecture=architecture,
+                        kind=kind,
+                    ),
                 }
             )
     if {row["uuid"] for row in rows} != set(selected):
@@ -132,6 +154,52 @@ def _selected_shapes(
             "representative manifest workloads are not present in benchmark root"
         )
     return tuple(sorted(rows, key=lambda row: str(row["uuid"])))
+
+
+def _workload_fusion_signature(
+    definition: Definition,
+    workload: Workload,
+    *,
+    architecture: str,
+    kind: str,
+) -> FusionSignature:
+    """Bind probe evidence to the exact fusion group extracted for a workload."""
+    graph = build_static_bound_graph(definition, workload)
+    estimates = resolve_architecture_profile_paths(
+        estimate_bound_work(graph), architecture
+    )
+    groups = build_fusion_groups(
+        graph,
+        estimates,
+        capability_budget=load_packaged_arch_capability_budget(architecture),
+    )
+    expected_ops = ("mean", "add") if kind == "rms" else ("torch.sum", "mult")
+    matches = []
+    for group in groups:
+        if len(group.node_ids) <= 1:
+            continue
+        signature = fusion_signature_for_group(group, graph.to_dict())
+        if signature.op_names == expected_ops:
+            matches.append((group, signature))
+    if len(matches) != 1:
+        raise ValueError(
+            f"workload {workload.uuid} has {len(matches)} matching {kind} fusion groups"
+        )
+    group, _ = matches[0]
+    tile_contract: dict[str, object] = (
+        {"workgroup_size": 256, "reduction": "mean", "epilogue": "epsilon_add"}
+        if kind == "rms"
+        else {
+            "workgroup_size": 256,
+            "reduction": "sum",
+            "epilogue": "scalar_mul",
+        }
+    )
+    return fusion_signature_for_group(
+        group,
+        graph.to_dict(),
+        tile_contract=tile_contract,
+    )
 
 
 def _workload_file(root: Path, definition: str) -> Path:
@@ -230,31 +298,14 @@ def _collect_case(
     occupancy = samples[0]["occupancy"]
     lds_limit = int(samples[0]["lds_limit"])
     if kind == "rms":
-        signature = FusionSignature(
-            "reduction_epilogue.v1",
-            1,
-            ("mean", "add"),
-            "fp32",
-            ((rows, 4096),),
-            ((rows,),),
-            {"workgroup_size": 256, "reduction": "mean", "epilogue": "epsilon_add"},
-        )
+        signature = shape["signature"]
         fused_name, unfused_names, variant = (
             "sol_fusion_rms_mean_epsilon",
             ("sol_unfused_rms_mean", "sol_unfused_rms_epsilon"),
             "rmsnorm_fp32_mean_epsilon",
         )
     else:
-        signature = FusionSignature(
-            "reduction_epilogue.v1",
-            1,
-            ("sum", "mul"),
-            "fp32",
-            ((int(shape["batch"]), int(shape["sequence"]), 4096),) * 2
-            + ((int(shape["batch"]), int(shape["sequence"]), 1),),
-            ((1,),),
-            {"workgroup_size": 256, "reduction": "sum", "epilogue": "scalar_mul"},
-        )
+        signature = shape["signature"]
         fused_name, unfused_names, variant = (
             "sol_fusion_tanh_backward_sum_scalar",
             ("sol_unfused_tanh_backward_sum", "sol_unfused_tanh_backward_scalar"),

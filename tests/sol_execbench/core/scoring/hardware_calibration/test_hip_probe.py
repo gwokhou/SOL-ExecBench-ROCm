@@ -76,6 +76,15 @@ _RESOURCE_CASES = (
 )
 
 
+def test_fp32_matrix_profile_reuses_the_gfx12_fma_probe() -> None:
+    key = CalibrationProfileKey("compute", "matrix", "fp32", "fp32", "gfx12")
+
+    assert _hip_source(key) == _hip_source(
+        CalibrationProfileKey("compute", "vector", "fp32", "fp32", "portable")
+    )
+    assert "fmaf(value" in _hip_source(key)
+
+
 @pytest.mark.parametrize(("filename", "key"), _RESOURCE_CASES)
 def test_every_probe_route_loads_its_package_resource(
     filename: str, key: CalibrationProfileKey
@@ -361,6 +370,7 @@ def test_extended_profiles_compile_when_declared(tmp_path) -> None:
     )
 
     for key in (
+        CalibrationProfileKey("compute", "matrix", "fp32", "fp32", "gfx12"),
         CalibrationProfileKey("compute", "vector", "bf16", "bf16", "gfx12"),
         CalibrationProfileKey("memory", "stream_copy", "bf16", "bf16", "gfx12"),
         CalibrationProfileKey("compute", "reduction", "fp32", "fp32", "gfx12"),

@@ -7,6 +7,19 @@ from pathlib import Path
 import sol_execbench.core.dataset.cli_execution as cli_execution
 
 
+def test_build_cli_command_passes_release_authority_json():
+    command = cli_execution.build_cli_command(
+        definition_path=Path("definition.json"),
+        workload_path=Path("workload.jsonl"),
+        solution_path=Path("solution.json"),
+        timeout=1,
+        trace_output_path=Path("trace.jsonl"),
+        release_authority_json=Path("authority.json"),
+    )
+
+    assert command[-2:] == ["--release-authority-json", "authority.json"]
+
+
 def test_run_cli_parses_jsonl_and_ignores_non_json_stdout(tmp_path, monkeypatch):
     trace = {"evaluation": {"status": "PASSED"}}
 

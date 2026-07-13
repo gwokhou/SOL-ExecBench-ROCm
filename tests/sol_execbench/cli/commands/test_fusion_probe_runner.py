@@ -5,6 +5,7 @@ from importlib import resources
 from pathlib import Path
 
 from sol_execbench.cli.commands import fusion_probe_runner
+from sol_execbench_type_helpers import make_definition, make_workload
 
 
 def test_fusion_probe_sources_are_package_resources() -> None:
@@ -39,3 +40,41 @@ def test_compile_runner_uses_materialized_resource_directory(
     assert command == commands[0]
     assert f"-I{source_dir}" in command
     assert str(source_dir / "fusion_probe_runner.hip") in command
+
+
+def test_probe_signature_is_derived_from_exact_bound_graph_group() -> None:
+    definition = make_definition(
+        name="sum_then_scalar",
+        axes={
+            "B": {"type": "const", "value": 2},
+            "S": {"type": "const", "value": 3},
+            "H": {"type": "const", "value": 4},
+        },
+        inputs={
+            "x": {"shape": ["B", "S", "H"], "dtype": "float32"},
+            "scalar": {"shape": [], "dtype": "float32"},
+        },
+        outputs={"out": {"shape": [], "dtype": "float32"}},
+        reference="def run(x, scalar):\n    return torch.sum(x) * scalar\n",
+    )
+    workload = make_workload(
+        axes={},
+        inputs={"x": {"type": "random"}, "scalar": {"type": "random"}},
+        uuid="sum-then-scalar",
+    )
+
+    signature = fusion_probe_runner._workload_fusion_signature(
+        definition,
+        workload,
+        architecture="gfx1200",
+        kind="tanh",
+    )
+
+    assert signature.op_names == ("torch.sum", "mult")
+    assert signature.input_shapes == ((), (2, 3, 4))
+    assert signature.output_shapes == ((),)
+    assert signature.tile_contract == {
+        "workgroup_size": 256,
+        "reduction": "sum",
+        "epilogue": "scalar_mul",
+    }

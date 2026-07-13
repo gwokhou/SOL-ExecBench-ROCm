@@ -18,6 +18,7 @@
 
 from __future__ import annotations
 
+import math
 import random
 from typing import Optional, Tuple
 
@@ -26,6 +27,14 @@ import torch
 from sol_execbench.core.data.trace import EvaluationStatus
 from sol_execbench.core.data.trace import Correctness
 from sol_execbench.core.data.workload import ToleranceSpec
+
+
+_CORRECTNESS_CHUNK_ELEMENTS = 1 << 20
+
+
+def _tensor_chunks(tensor: torch.Tensor):
+    """Yield bounded flat views so correctness checks do not scale VRAM overhead."""
+    return tensor.reshape(-1).split(_CORRECTNESS_CHUNK_ELEMENTS)
 
 
 def set_seed(seed: int) -> None:
@@ -65,26 +74,30 @@ def check_tensor_sanity(
     *allow_negative_inf* is True, in which case positions where **both**
     tensors are -inf are tolerated.
     """
-    # Non-finite values in either tensor are always wrong.
-    # Even matching infinities (e.g. both -inf) are rejected because
-    # non-finite values indicate degenerate numerics, not correct output.
-    ref_nonfinite = ~torch.isfinite(ref_tensor)
-    sol_nonfinite = ~torch.isfinite(sol_tensor)
+    has_nonfinite = False
+    has_nan = False
+    ref_nonzero = False
+    sol_nonzero = False
+    ref_norm_squared = 0.0
+    for sol_chunk, ref_chunk in zip(
+        _tensor_chunks(sol_tensor), _tensor_chunks(ref_tensor), strict=True
+    ):
+        ref_nonfinite = ~torch.isfinite(ref_chunk)
+        sol_nonfinite = ~torch.isfinite(sol_chunk)
+        if allow_negative_inf:
+            both_neg_inf = (ref_chunk == float("-inf")) & (sol_chunk == float("-inf"))
+            ref_nonfinite &= ~both_neg_inf
+            sol_nonfinite &= ~both_neg_inf
+        if bool(ref_nonfinite.any().item()) or bool(sol_nonfinite.any().item()):
+            has_nonfinite = True
+            has_nan = has_nan or bool(torch.isnan(sol_chunk).any().item())
+            has_nan = has_nan or bool(torch.isnan(ref_chunk).any().item())
+        ref_nonzero = ref_nonzero or bool(torch.count_nonzero(ref_chunk).item())
+        sol_nonzero = sol_nonzero or bool(torch.count_nonzero(sol_chunk).item())
+        chunk_norm = float(torch.linalg.vector_norm(ref_chunk.float()).item())
+        ref_norm_squared += chunk_norm * chunk_norm
 
-    if allow_negative_inf:
-        # Exclude positions where both tensors are -inf.
-        both_neg_inf = (ref_tensor == float("-inf")) & (sol_tensor == float("-inf"))
-        ref_nonfinite = ref_nonfinite & ~both_neg_inf
-        sol_nonfinite = sol_nonfinite & ~both_neg_inf
-
-    has_nonfinite = bool(ref_nonfinite.any().item()) or bool(
-        sol_nonfinite.any().item()
-    )
     if has_nonfinite:
-        has_nan = (
-            bool(torch.isnan(sol_tensor).any().item())
-            or bool(torch.isnan(ref_tensor).any().item())
-        )
         # has_inf is True only when there are Inf values but NO NaN values.
         # NaN takes priority because it's a stricter failure mode (Inf can
         # result from overflow, but NaN indicates undefined computation).
@@ -92,12 +105,8 @@ def check_tensor_sanity(
 
     # Non-zero output check: if reference has non-trivial values
     # but solution is all zeros, fail immediately.
-    ref_norm = torch.linalg.vector_norm(ref_tensor.to(torch.float32))
-    if (
-        ref_norm.item() > 0
-        and torch.linalg.vector_norm(sol_tensor.to(torch.float32)).item() == 0
-    ):
-        abs_err = float(ref_norm.item())
+    if ref_nonzero and not sol_nonzero:
+        abs_err = math.sqrt(ref_norm_squared)
         return Correctness(
             max_absolute_error=abs_err,
             max_relative_error=abs_err,
@@ -116,38 +125,39 @@ def compute_error_stats(
     ``has_inf`` flags when non-finite values are detected), and *exceeds*
     is ``True`` when the tolerance is violated.
     """
-    x = output.to(torch.float32)
-    y = reference.to(torch.float32)
-
     allow_neg_inf = tolerance.allow_negative_inf
 
     # Automatically fail on infs/nans in either tensor even if they're in the same position.
-    infs_nans = check_tensor_sanity(x, y, allow_negative_inf=allow_neg_inf)
+    infs_nans = check_tensor_sanity(output, reference, allow_negative_inf=allow_neg_inf)
     if infs_nans is not None:
         return infs_nans, True
 
-    # When allow_negative_inf is set, exclude matching -inf positions from
-    # error computation — they have already been validated by check_tensor_sanity.
-    if allow_neg_inf:
-        both_neg_inf = (x == float("-inf")) & (y == float("-inf"))
-        finite_mask = ~both_neg_inf
-        x = x[finite_mask]
-        y = y[finite_mask]
+    total_elements = 0
+    exceeds_count = 0
+    max_abs = 0.0
+    max_rel = 0.0
+    for output_chunk, reference_chunk in zip(
+        _tensor_chunks(output), _tensor_chunks(reference), strict=True
+    ):
+        x = output_chunk.float()
+        y = reference_chunk.float()
+        if allow_neg_inf:
+            finite_mask = ~((x == float("-inf")) & (y == float("-inf")))
+            x = x[finite_mask]
+            y = y[finite_mask]
+        if not x.numel():
+            continue
+        abs_error = torch.abs(x - y)
+        total_elements += abs_error.numel()
+        max_abs = max(max_abs, float(abs_error.max().item()))
+        tol_bound = tolerance.max_atol + tolerance.max_rtol * torch.abs(y)
+        exceeds_tol_mask = (abs_error > tol_bound) | ~torch.isfinite(abs_error)
+        exceeds_count += int(exceeds_tol_mask.sum().item())
+        rel_error = abs_error / torch.clamp(torch.abs(y), min=tolerance.max_atol)
+        max_rel = max(max_rel, float(rel_error.max().item()))
 
-    abs_error = torch.abs(x - y)
-    total_elements = abs_error.numel()
     if total_elements == 0:
         return Correctness(), False
-
-    max_abs = float(abs_error.max().item())
-
-    # torch.allclose style: |a - b| <= atol + rtol * |b|
-    # ensure nans automatically exceed tolerance
-    tol_bound = tolerance.max_atol + tolerance.max_rtol * torch.abs(y)
-    exceeds_tol_mask = (abs_error > tol_bound) | ~torch.isfinite(abs_error)
-    del tol_bound  # save VRAM
-
-    exceeds_count = float(exceeds_tol_mask.sum().item())
     matched_ratio = 1.0 - (exceeds_count / float(total_elements))
     matched_ratio = max(0.0, min(1.0, matched_ratio))
 
@@ -157,10 +167,6 @@ def compute_error_stats(
     exceeds_tol = matched_ratio < tolerance.required_matched_ratio
     if tolerance.max_error_cap is not None and max_abs > tolerance.max_error_cap:
         exceeds_tol = True
-
-    # Relative error using max_atol as floor to avoid division-by-near-zero
-    rel_error = abs_error / torch.clamp(torch.abs(y), min=tolerance.max_atol)
-    max_rel = float(rel_error.max().item())
 
     return Correctness(
         max_absolute_error=max_abs, max_relative_error=max_rel

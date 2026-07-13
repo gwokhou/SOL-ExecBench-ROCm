@@ -203,7 +203,7 @@ def test_exact_elementwise_and_activation_chain_estimates_stay_per_node():
     assert estimates[1].formula_kind == "activation_flops"
     assert estimates[1].formula_inputs["activation_ops_per_element"] == 1
     assert estimates[0].confidence == EstimateConfidence.SUPPORTED
-    assert estimates[1].confidence == EstimateConfidence.INEXACT
+    assert estimates[1].confidence == EstimateConfidence.SUPPORTED
 
 
 def test_missing_shape_or_dtype_downgrades_without_fabricating_bytes():
@@ -394,6 +394,50 @@ def test_softmax_missing_axis_stays_inexact_with_missing_axis_evidence():
     assert "max, exp, sum, and normalize" in estimate.rationale
 
 
+def test_static_softmax_axis_has_exact_operation_count():
+    from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
+
+    definition = make_definition(
+        name="softmax_demo",
+        axes={"M": {"type": "const", "value": 2}, "N": {"type": "const", "value": 4}},
+        inputs={"x": {"shape": ["M", "N"], "dtype": "float32"}},
+        outputs={"out": {"shape": ["M", "N"], "dtype": "float32"}},
+        reference="import torch\n\ndef run(x):\n    return torch.softmax(x, dim=1)",
+    )
+    workload = make_workload(
+        axes={}, inputs={"x": {"type": "random"}}, uuid="softmax-workload"
+    )
+
+    estimate = estimate_bound_work(build_bound_graph(definition, workload))[0]
+
+    assert estimate.confidence == EstimateConfidence.SUPPORTED
+    assert estimate.formula_inputs["groups"] == 2
+    assert estimate.flops == 36.0
+    assert "exact softmax" in estimate.rationale
+
+
+def test_static_logsumexp_has_exact_operation_count():
+    from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
+
+    definition = make_definition(
+        name="logsumexp_demo",
+        axes={"M": {"type": "const", "value": 2}, "N": {"type": "const", "value": 4}},
+        inputs={"x": {"shape": ["M", "N"], "dtype": "float32"}},
+        outputs={"out": {"shape": ["M"], "dtype": "float32"}},
+        reference="import torch\n\ndef run(x):\n    return torch.logsumexp(x, dim=1)",
+    )
+    workload = make_workload(
+        axes={}, inputs={"x": {"type": "random"}}, uuid="logsumexp-workload"
+    )
+
+    estimate = estimate_bound_work(build_bound_graph(definition, workload))[0]
+
+    assert estimate.confidence == EstimateConfidence.SUPPORTED
+    assert estimate.formula == "4*input_elements"
+    assert estimate.flops == 32.0
+    assert "exact logsumexp" in estimate.rationale
+
+
 def test_normalization_estimate_uses_conservative_pass_count():
     from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
 
@@ -476,6 +520,28 @@ def test_contiguous_and_dtype_conversion_count_movement_bytes():
     assert conversion.formula_inputs["target_dtype"] == "float16"
     assert conversion.confidence == EstimateConfidence.SUPPORTED
     assert "dtype conversion" in conversion.rationale
+
+
+def test_static_relu_has_exact_pointwise_estimate() -> None:
+    from sol_execbench.core.scoring.amd_bound_graph.builder import (
+        build_static_bound_graph,
+    )
+
+    definition = make_definition(
+        name="relu_demo",
+        axes={"N": {"type": "const", "value": 8}},
+        inputs={"x": {"shape": ["N"], "dtype": "float32"}},
+        outputs={"out": {"shape": ["N"], "dtype": "float32"}},
+        reference="import torch.nn.functional as F\n\ndef run(x):\n    return F.relu(x)\n",
+    )
+    workload = make_workload(
+        axes={}, inputs={"x": {"type": "random"}}, uuid="relu-workload"
+    )
+
+    estimate = estimate_bound_work(build_static_bound_graph(definition, workload))[0]
+
+    assert estimate.confidence == EstimateConfidence.SUPPORTED
+    assert estimate.flops == 8.0
 
 
 def test_pow_two_is_exact_but_general_pow_stays_inexact() -> None:

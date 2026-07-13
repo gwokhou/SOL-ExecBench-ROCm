@@ -96,13 +96,12 @@ int rms(int rows) {
 
 int tanh_backward(int rows) {
   const long count = static_cast<long>(rows) * 4096;
-  float *left = nullptr, *right = nullptr, *mask = nullptr, *fused = nullptr, *unfused = nullptr;
-  HIP_CHECK(hipMalloc(&left, count * sizeof(float))); HIP_CHECK(hipMalloc(&right, count * sizeof(float)));
-  HIP_CHECK(hipMalloc(&mask, rows * sizeof(float))); HIP_CHECK(hipMalloc(&fused, sizeof(float))); HIP_CHECK(hipMalloc(&unfused, sizeof(float)));
-  initialise<<<(count + 255) / 256, 256>>>(left, count, 17); initialise<<<(count + 255) / 256, 256>>>(right, count, 13); initialise<<<(rows + 255) / 256, 256>>>(mask, rows, 7);
+  float *input = nullptr, *fused = nullptr, *unfused = nullptr;
+  HIP_CHECK(hipMalloc(&input, count * sizeof(float))); HIP_CHECK(hipMalloc(&fused, sizeof(float))); HIP_CHECK(hipMalloc(&unfused, sizeof(float)));
+  initialise<<<(count + 255) / 256, 256>>>(input, count, 17);
   HIP_CHECK(hipDeviceSynchronize());
-  auto fused_launch = [&] { sol_fusion_tanh_backward_sum_scalar<<<kTanhBlocks, kRunnerBlockSize>>>(left, right, mask, fused, count, 0.75f); };
-  auto unfused_launch = [&] { sol_unfused_tanh_backward_sum<<<kTanhBlocks, kRunnerBlockSize>>>(left, right, mask, unfused, count); sol_unfused_tanh_backward_scalar<<<1, 1>>>(unfused, 0.75f); };
+  auto fused_launch = [&] { sol_fusion_tanh_backward_sum_scalar<<<kTanhBlocks, kRunnerBlockSize>>>(input, fused, count, 0.75f); };
+  auto unfused_launch = [&] { sol_unfused_tanh_backward_sum<<<kTanhBlocks, kRunnerBlockSize>>>(input, unfused, count); sol_unfused_tanh_backward_scalar<<<1, 1>>>(unfused, 0.75f); };
   for (int index = 0; index < 10; ++index) { hipMemset(fused, 0, sizeof(float)); fused_launch(); hipMemset(unfused, 0, sizeof(float)); unfused_launch(); }
   HIP_CHECK(hipDeviceSynchronize()); hipMemset(fused, 0, sizeof(float)); fused_launch(); hipMemset(unfused, 0, sizeof(float)); unfused_launch(); HIP_CHECK(hipDeviceSynchronize());
   float first = 0.0f, second = 0.0f; HIP_CHECK(hipMemcpy(&first, fused, sizeof(float), hipMemcpyDeviceToHost)); HIP_CHECK(hipMemcpy(&second, unfused, sizeof(float), hipMemcpyDeviceToHost));
@@ -118,7 +117,7 @@ int tanh_backward(int rows) {
     if (pair % 2 == 0) { measure_fused(); measure_unfused(); } else { measure_unfused(); measure_fused(); }
     hipEventDestroy(start); hipEventDestroy(stop); std::printf("PAIR %.9g %.9g\n", fused_ms, unfused_ms);
   }
-  hipFree(left); hipFree(right); hipFree(mask); hipFree(fused); hipFree(unfused); return 0;
+  hipFree(input); hipFree(fused); hipFree(unfused); return 0;
 }
 }  // namespace
 

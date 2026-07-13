@@ -49,11 +49,15 @@ def test_adapter_declares_its_exact_bf16_matrix_path(
 
 
 def test_gfx12_adapter_declares_fp16_wmma_evidence() -> None:
-    keys = {key.value for key in adapter_for("gfx1200").candidates}
+    adapter = adapter_for("gfx1200")
+    keys = {key.value for key in adapter.candidates}
+    all_keys = {key.value for key in adapter.all_candidates}
 
     assert "compute.matrix.fp16.fp16.wmma" in keys
     assert "memory.stream_copy.fp16.fp16.portable" in keys
     assert "memory.stream_copy.fp16.fp16.gfx12" in keys
+    assert "compute.matrix.fp32.fp32.gfx12" in all_keys
+    assert "compute.matrix.fp32.fp32.wmma" not in all_keys
 
 
 def test_runtime_discovery_uses_the_requested_device() -> None:

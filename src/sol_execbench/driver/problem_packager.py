@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Any
 
 from ..core.bench.config import BenchmarkConfig
-from ..core.bench.clock_lock import lock_clocks, unlock_clocks
+from ..core.bench.clock_lock import lock_clocks, unlock_clocks, verify_clocks
 from ..core.data.solution import NATIVE_ROCM_LANGUAGES
 from .build_config import (
     first_gfx_target as _first_gfx_target_core,
@@ -86,13 +86,12 @@ class ProblemPackager:
         self.keep_output_dir = keep_output_dir
         self._closed = False
         self._clock_lock_active = False
+        self._clock_lock_acquired = False
         self._prior_clock_lock_env: str | None = None
-
         self.definition = definition
         self.workloads = workloads
         self.solution = solution
         self.config = config
-
         # Write problem files to staging directory up front.
         (self.output_dir / "definition.json").write_text(definition.model_dump_json())
         (self.output_dir / "workload.jsonl").write_text(
@@ -120,7 +119,7 @@ class ProblemPackager:
             return
         self._closed = True
         if self.config.lock_clocks:
-            if self._clock_lock_active:
+            if self._clock_lock_acquired:
                 unlock_clocks()
             if self._prior_clock_lock_env is None:
                 os.environ.pop("SOL_EXECBENCH_CLOCKS_LOCKED", None)
@@ -174,7 +173,6 @@ class ProblemPackager:
             f"compile() only handles HIP/C++ solutions, "
             f"got languages={self.solution.spec.languages}"
         )
-
         sol_dict = self._inject_offload_arch_flags(
             self.solution.model_dump(mode="json")
         )
@@ -210,7 +208,9 @@ class ProblemPackager:
 
         if self.config.lock_clocks:
             self._prior_clock_lock_env = os.environ.get("SOL_EXECBENCH_CLOCKS_LOCKED")
-            self._clock_lock_active = lock_clocks()
+            already_locked = verify_clocks()
+            self._clock_lock_active = already_locked or lock_clocks()
+            self._clock_lock_acquired = self._clock_lock_active and not already_locked
             os.environ["SOL_EXECBENCH_CLOCKS_LOCKED"] = (
                 "1" if self._clock_lock_active else "0"
             )

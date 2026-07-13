@@ -487,6 +487,7 @@ class TestExecute:
         self, tmp_path, definition, workloads, python_solution, monkeypatch
     ):
         calls: list[str] = []
+        monkeypatch.setattr(problem_packager, "verify_clocks", lambda: False)
         monkeypatch.setattr(problem_packager, "lock_clocks", lambda: True)
         monkeypatch.setattr(
             problem_packager, "unlock_clocks", lambda: calls.append("unlock")
@@ -505,6 +506,33 @@ class TestExecute:
         assert problem_packager.os.environ["SOL_EXECBENCH_CLOCKS_LOCKED"] == "1"
         pkg.close()
         assert calls == ["unlock"]
+        assert "SOL_EXECBENCH_CLOCKS_LOCKED" not in problem_packager.os.environ
+
+    def test_preserves_prelocked_clocks_for_evaluator_lifecycle(
+        self, tmp_path, definition, workloads, python_solution, monkeypatch
+    ):
+        calls: list[str] = []
+        monkeypatch.setattr(problem_packager, "verify_clocks", lambda: True)
+        monkeypatch.setattr(
+            problem_packager, "lock_clocks", lambda: calls.append("lock") or True
+        )
+        monkeypatch.setattr(
+            problem_packager, "unlock_clocks", lambda: calls.append("unlock")
+        )
+        monkeypatch.delenv("SOL_EXECBENCH_CLOCKS_LOCKED", raising=False)
+        pkg = _make_packager(
+            tmp_path,
+            definition,
+            workloads,
+            python_solution,
+            BenchmarkConfig(lock_clocks=True),
+        )
+
+        pkg.execute()
+
+        assert problem_packager.os.environ["SOL_EXECBENCH_CLOCKS_LOCKED"] == "1"
+        pkg.close()
+        assert calls == []
         assert "SOL_EXECBENCH_CLOCKS_LOCKED" not in problem_packager.os.environ
 
     def test_raises_without_so_for_cpp(

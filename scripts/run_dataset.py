@@ -203,6 +203,7 @@ def run_cli(
     config_path: Path | None = None,
     keep_staging: bool = False,
     verbose: bool = False,
+    release_authority_json: Path | None = None,
 ) -> list[dict] | None:
     """Compatibility wrapper for tests and callers importing this script module."""
     return _core_run_cli(
@@ -215,6 +216,7 @@ def run_cli(
         config_path=config_path,
         keep_staging=keep_staging,
         verbose=verbose,
+        release_authority_json=release_authority_json,
     )
 
 
@@ -659,6 +661,7 @@ def _normalized_command_args(args: argparse.Namespace) -> list[str]:
         ("--release-baseline-bundle", args.release_baseline_bundle),
         ("--release-baseline-verification", args.release_baseline_verification),
         ("--official-suite-manifest", args.official_suite_manifest),
+        ("--release-authority-json", args.release_authority_json),
     ):
         if value is not None:
             normalized.extend([flag, Path(value).name])
@@ -1586,6 +1589,7 @@ def _run_trace_invocations(
             config_path=config_path,
             keep_staging=args.keep_staging,
             verbose=args.verbose,
+            release_authority_json=args.release_authority_json,
         )
         if shard_traces is None:
             cli_log = output_dir / f"{shard_job_name}_cli.log"
@@ -2005,6 +2009,15 @@ def main():
         type=Path,
         default=None,
         help="release_baseline_bundle.v1 required for an authoritative official score.",
+    )
+    ap.add_argument(
+        "--release-authority-json",
+        type=Path,
+        default=None,
+        help=(
+            "Inject workload-specific immutable bound and hardware-model SHA-256 "
+            "evidence into traces produced by this run."
+        ),
     )
     ap.add_argument(
         "--release-baseline-verification",

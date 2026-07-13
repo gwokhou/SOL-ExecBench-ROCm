@@ -147,7 +147,11 @@ class _AstBoundGraphExtractor:
                 self._append_unsupported_control_flow(statement)
                 self._process_dynamic_statements(tuple(statement.body))
             else:
-                previous = self.constants.get(statement.target.id, _STATIC_MISSING)
+                previous = (
+                    self.constants[statement.target.id]
+                    if statement.target.id in self.constants
+                    else _STATIC_MISSING
+                )
                 for value in values:
                     self.constants[statement.target.id] = value
                     for nested in statement.body:
@@ -210,10 +214,12 @@ class _AstBoundGraphExtractor:
         if expression is None:
             return ()
         if isinstance(expression, ast.Name):
-            tensor_id = self.env.get(expression.id)
+            tensor_id = self.env[expression.id] if expression.id in self.env else None
             if tensor_id is not None:
                 return (tensor_id,)
-            return self.sequences.get(expression.id, ())
+            return (
+                self.sequences[expression.id] if expression.id in self.sequences else ()
+            )
         if isinstance(expression, (ast.Tuple, ast.List)):
             result: list[str] = []
             for element in expression.elts:
@@ -270,13 +276,25 @@ class _AstBoundGraphExtractor:
             input_tensor_ids = self._process_expr(expression.operand)
             if not input_tensor_ids:
                 return ()
+            exact_unary = isinstance(expression.op, (ast.USub, ast.Invert)) and all(
+                self.tensors[tensor_id].shape is not None
+                for tensor_id in input_tensor_ids
+            )
             return self._append_node(
                 op_family=OpFamily.ELEMENTWISE,
                 op_name=expression.op.__class__.__name__.lower(),
                 source_expression=ast.unparse(expression),
                 input_tensor_ids=input_tensor_ids,
-                confidence=EstimateConfidence.INEXACT,
-                rationale="recognized elementwise unary operation",
+                confidence=(
+                    EstimateConfidence.SUPPORTED
+                    if exact_unary
+                    else EstimateConfidence.INEXACT
+                ),
+                rationale=(
+                    "recognized static-shape elementwise unary operation"
+                    if exact_unary
+                    else "recognized elementwise unary operation"
+                ),
                 attributes={},
             )
         if isinstance(expression, ast.Subscript):
@@ -290,17 +308,34 @@ class _AstBoundGraphExtractor:
             input_tensor_ids = self._process_expr(expression.value)
             if not input_tensor_ids:
                 return ()
-            dynamic_index = not self._is_static_index(expression.slice)
+            input_tensor = self.tensors.get(input_tensor_ids[0])
+            input_shape = input_tensor.shape if input_tensor is not None else None
+            output_shape = self._static_basic_index_shape(input_shape, expression.slice)
+            exact_basic_index = output_shape is not None
             return self._append_node(
                 op_family=OpFamily.DATA_MOVEMENT,
                 op_name="getitem",
                 source_expression=ast.unparse(expression),
                 input_tensor_ids=input_tensor_ids,
-                confidence=EstimateConfidence.INEXACT,
-                rationale="recognized materialized tensor indexing operation",
+                confidence=(
+                    EstimateConfidence.SUPPORTED
+                    if exact_basic_index
+                    else EstimateConfidence.INEXACT
+                ),
+                rationale=(
+                    "recognized static basic-index tensor view"
+                    if exact_basic_index
+                    else "recognized dynamic or advanced tensor indexing operation"
+                ),
                 attributes={
-                    "movement_kind": "materialized",
-                    **({"dynamic_index": True} if dynamic_index else {}),
+                    "movement_kind": (
+                        "logical_view" if exact_basic_index else "materialized"
+                    ),
+                    **(
+                        {"output_shape": output_shape}
+                        if exact_basic_index
+                        else {"dynamic_index": True}
+                    ),
                 },
             )
         if isinstance(expression, ast.Attribute):
@@ -313,22 +348,38 @@ class _AstBoundGraphExtractor:
         )
         if isinstance(node.op, ast.MatMult):
             op_family = OpFamily.GEMM
-            confidence = EstimateConfidence.SUPPORTED
-            rationale = "recognized @ matrix multiply"
-            op_name = "@"
-        else:
-            op_family = OpFamily.ELEMENTWISE
+            output_shape = self._matmul_output_shape(tuple(input_tensor_ids))
             confidence = (
                 EstimateConfidence.SUPPORTED
-                if self._has_exact_elementwise_shapes(input_tensor_ids)
+                if output_shape is not None
                 else EstimateConfidence.INEXACT
             )
             rationale = (
-                "recognized exact-shape elementwise binary operation"
+                "recognized static-shape @ matrix multiply"
+                if output_shape is not None
+                else "recognized @ matrix multiply with unresolved shape"
+            )
+            op_name = "@"
+            attributes = (
+                {"output_shape": output_shape} if output_shape is not None else {}
+            )
+        else:
+            op_family = OpFamily.ELEMENTWISE
+            output_shape = self._broadcast_output_shape(input_tensor_ids)
+            confidence = (
+                EstimateConfidence.SUPPORTED
+                if output_shape is not None
+                else EstimateConfidence.INEXACT
+            )
+            rationale = (
+                "recognized static-broadcast elementwise binary operation"
                 if confidence == EstimateConfidence.SUPPORTED
                 else "recognized elementwise binary operation"
             )
             op_name = node.op.__class__.__name__.lower()
+            attributes = (
+                {"output_shape": output_shape} if output_shape is not None else {}
+            )
         return self._append_node(
             op_family=op_family,
             op_name=op_name,
@@ -336,7 +387,7 @@ class _AstBoundGraphExtractor:
             input_tensor_ids=input_tensor_ids,
             confidence=confidence,
             rationale=rationale,
-            attributes={},
+            attributes=attributes,
         )
 
     def _is_static_index(self, expression: ast.AST) -> bool:
@@ -355,11 +406,250 @@ class _AstBoundGraphExtractor:
             return self._is_static_index(expression.operand)
         return False
 
+    def _static_basic_index_shape(
+        self, input_shape: tuple[int, ...] | None, expression: ast.AST
+    ) -> tuple[int, ...] | None:
+        """Infer shape for Python basic indexing; reject advanced indexing."""
+        if input_shape is None:
+            return None
+        raw_items = (
+            expression.elts if isinstance(expression, ast.Tuple) else (expression,)
+        )
+        items: list[object] = []
+        for item in raw_items:
+            if isinstance(item, ast.Slice):
+                parts = [
+                    None if part is None else self._static_value(part)
+                    for part in (item.lower, item.upper, item.step)
+                ]
+                if any(part is _STATIC_MISSING for part in parts):
+                    return None
+                value = slice(*parts)
+            else:
+                value = self._static_value(item)
+            if value is _STATIC_MISSING:
+                return None
+            if isinstance(value, list):
+                return None
+            items.append(value)
+        ellipsis_count = sum(item is Ellipsis for item in items)
+        if ellipsis_count > 1:
+            return None
+        consumed = sum(item is not None and item is not Ellipsis for item in items)
+        if consumed > len(input_shape):
+            return None
+        if ellipsis_count:
+            expanded: list[object] = []
+            for item in items:
+                if item is Ellipsis:
+                    expanded.extend([slice(None)] * (len(input_shape) - consumed))
+                else:
+                    expanded.append(item)
+            items = expanded
+        else:
+            items.extend([slice(None)] * (len(input_shape) - consumed))
+        result: list[int] = []
+        dimension_index = 0
+        for item in items:
+            if item is None:
+                result.append(1)
+                continue
+            if dimension_index >= len(input_shape):
+                return None
+            extent = input_shape[dimension_index]
+            dimension_index += 1
+            if isinstance(item, bool):
+                return None
+            if isinstance(item, int):
+                if item < -extent or item >= extent:
+                    return None
+                continue
+            if isinstance(item, slice):
+                start, stop, step = item.indices(extent)
+                result.append(len(range(start, stop, step)))
+                continue
+            return None
+        result.extend(input_shape[dimension_index:])
+        return tuple(result)
+
     def _has_exact_elementwise_shapes(self, input_tensor_ids: tuple[str, ...]) -> bool:
         if not input_tensor_ids:
             return False
         shapes = [self.tensors[tensor_id].shape for tensor_id in input_tensor_ids]
         return shapes[0] is not None and all(shape == shapes[0] for shape in shapes)
+
+    def _broadcast_output_shape(
+        self, input_tensor_ids: tuple[str, ...]
+    ) -> tuple[int, ...] | None:
+        """Infer the exact PyTorch broadcast result for static tensor shapes."""
+        if not input_tensor_ids:
+            return None
+        shapes = [self.tensors[tensor_id].shape for tensor_id in input_tensor_ids]
+        if any(shape is None for shape in shapes):
+            return None
+        concrete = [shape for shape in shapes if shape is not None]
+        width = max(len(shape) for shape in concrete)
+        result: list[int] = []
+        for offset in range(1, width + 1):
+            dimensions = [
+                shape[-offset] if offset <= len(shape) else 1 for shape in concrete
+            ]
+            extent = max(dimensions)
+            if any(dimension not in {1, extent} for dimension in dimensions):
+                return None
+            result.append(extent)
+        return tuple(reversed(result))
+
+    def _resolve_convolution_attributes(
+        self,
+        node: ast.Call,
+        attributes: dict[str, Any],
+        input_tensor_ids: tuple[str, ...],
+    ) -> None:
+        """Bind static functional-convolution parameters and output shape."""
+        dimensionality = attributes.get("dimensionality")
+        if not isinstance(dimensionality, int) or dimensionality not in {1, 2, 3}:
+            return
+        keywords = {item.arg: item.value for item in node.keywords if item.arg}
+
+        def parameter(name: str, position: int, default: object) -> object:
+            expression = keywords.get(name)
+            if expression is None and position < len(node.args):
+                expression = node.args[position]
+            return default if expression is None else self._static_value(expression)
+
+        def spatial(value: object) -> tuple[int, ...] | None:
+            if isinstance(value, int) and not isinstance(value, bool):
+                return (value,) * dimensionality
+            if (
+                isinstance(value, tuple)
+                and len(value) == dimensionality
+                and all(
+                    isinstance(item, int) and not isinstance(item, bool)
+                    for item in value
+                )
+            ):
+                return tuple(
+                    item
+                    for item in value
+                    if isinstance(item, int) and not isinstance(item, bool)
+                )
+            return None
+
+        stride = spatial(parameter("stride", 3, 1))
+        padding = spatial(parameter("padding", 4, 0))
+        dilation = spatial(parameter("dilation", 5, 1))
+        groups = parameter("groups", 6, 1)
+        if stride is not None:
+            attributes["stride"] = stride
+        if padding is not None:
+            attributes["padding"] = padding
+        if dilation is not None:
+            attributes["dilation"] = dilation
+        if isinstance(groups, int) and groups > 0:
+            attributes["groups"] = groups
+        if (
+            len(input_tensor_ids) < 2
+            or stride is None
+            or padding is None
+            or dilation is None
+            or not isinstance(groups, int)
+            or groups <= 0
+        ):
+            return
+        input_shape = self.tensors[input_tensor_ids[0]].shape
+        weight_shape = self.tensors[input_tensor_ids[1]].shape
+        if (
+            input_shape is None
+            or weight_shape is None
+            or len(input_shape) != dimensionality + 2
+            or len(weight_shape) != dimensionality + 2
+            or input_shape[1] % groups
+            or weight_shape[1] != input_shape[1] // groups
+        ):
+            return
+        output_spatial = tuple(
+            (input_extent + 2 * pad - dil * (kernel_extent - 1) - 1) // step + 1
+            for input_extent, kernel_extent, step, pad, dil in zip(
+                input_shape[2:],
+                weight_shape[2:],
+                stride,
+                padding,
+                dilation,
+                strict=True,
+            )
+        )
+        if any(extent <= 0 for extent in output_spatial):
+            return
+        attributes["output_spatial"] = output_spatial
+        attributes["output_shape"] = (
+            input_shape[0],
+            weight_shape[0],
+            *output_spatial,
+        )
+
+    def _resolve_static_output_shape(
+        self,
+        node: ast.Call,
+        func_name: str,
+        op_family: OpFamily,
+        attributes: dict[str, Any],
+        input_tensor_ids: tuple[str, ...],
+    ) -> None:
+        """Bind exact view and matrix output shapes before downstream extraction."""
+        leaf_name = func_name.rsplit(".", maxsplit=1)[-1]
+        if leaf_name == "t" and input_tensor_ids:
+            shape = self.tensors[input_tensor_ids[0]].shape
+            if shape is not None and len(shape) <= 2:
+                attributes["output_shape"] = tuple(reversed(shape))
+        if op_family == OpFamily.GEMM:
+            output_shape = self._matmul_output_shape(input_tensor_ids)
+            if output_shape is not None:
+                attributes["output_shape"] = output_shape
+
+    def _matmul_output_shape(
+        self, input_tensor_ids: tuple[str, ...]
+    ) -> tuple[int, ...] | None:
+        """Return the exact PyTorch matmul shape for two static operands."""
+        if len(input_tensor_ids) < 2:
+            return None
+        lhs = self.tensors[input_tensor_ids[0]].shape
+        rhs = self.tensors[input_tensor_ids[1]].shape
+        if lhs is None or rhs is None or not lhs or not rhs:
+            return None
+        lhs_vector = len(lhs) == 1
+        rhs_vector = len(rhs) == 1
+        lhs_matrix = (1, lhs[0]) if lhs_vector else lhs
+        rhs_matrix = (rhs[0], 1) if rhs_vector else rhs
+        if lhs_matrix[-1] != rhs_matrix[-2]:
+            return None
+        batch = self._broadcast_output_shape_for_shapes(
+            (lhs_matrix[:-2], rhs_matrix[:-2])
+        )
+        if batch is None:
+            return None
+        result = (*batch, lhs_matrix[-2], rhs_matrix[-1])
+        if lhs_vector:
+            result = (*result[:-2], result[-1])
+        if rhs_vector:
+            result = result[:-1]
+        return result
+
+    @staticmethod
+    def _broadcast_output_shape_for_shapes(
+        shapes: tuple[tuple[int, ...], ...],
+    ) -> tuple[int, ...] | None:
+        width = max((len(shape) for shape in shapes), default=0)
+        result: list[int] = []
+        for offset in range(1, width + 1):
+            dimensions = [
+                shape[-offset] if offset <= len(shape) else 1 for shape in shapes
+            ]
+            extent = max(dimensions)
+            if any(dimension not in {1, extent} for dimension in dimensions):
+                return None
+            result.append(extent)
+        return tuple(reversed(result))
 
     def _process_call(self, node: ast.Call) -> tuple[str, ...]:
         func_name = _call_name(node.func)
@@ -407,6 +697,18 @@ class _AstBoundGraphExtractor:
             )
 
         attributes = _ast_call_attributes(node, func_name, classification)
+        op_family = _classification_family(classification)
+        self._resolve_static_output_shape(
+            node,
+            func_name,
+            op_family,
+            attributes,
+            tuple(input_tensor_ids),
+        )
+        if op_family == OpFamily.CONVOLUTION:
+            self._resolve_convolution_attributes(
+                node, attributes, tuple(input_tensor_ids)
+            )
         if (
             func_name.rsplit(".", maxsplit=1)[-1] in {"to", "type"}
             and "target_dtype" not in attributes
@@ -424,7 +726,7 @@ class _AstBoundGraphExtractor:
                 attributes["target_dtype"] = target_tensor.dtype
 
         return self._append_node(
-            op_family=_classification_family(classification),
+            op_family=op_family,
             op_name=func_name,
             source_expression=ast.unparse(node),
             input_tensor_ids=tuple(input_tensor_ids),
@@ -499,7 +801,9 @@ class _AstBoundGraphExtractor:
         for arg in node.args:
             values.extend(self._process_expr(arg))
         if isinstance(receiver, ast.Name):
-            existing = self.sequences.get(receiver.id, ())
+            existing = (
+                self.sequences[receiver.id] if receiver.id in self.sequences else ()
+            )
             self.sequences[receiver.id] = (*existing, *values)
         return True
 
@@ -568,7 +872,20 @@ class _AstBoundGraphExtractor:
             if confidence == EstimateConfidence.SUPPORTED:
                 confidence = EstimateConfidence.INEXACT
                 rationale = f"{rationale}; dynamic execution multiplicity is unresolved"
-        output_shape = self._default_intermediate_shape(input_tensor_ids)
+        raw_output_shape = node_attributes.get("output_shape")
+        output_shape = (
+            tuple(
+                item
+                for item in raw_output_shape
+                if isinstance(item, int) and not isinstance(item, bool)
+            )
+            if isinstance(raw_output_shape, tuple)
+            and all(
+                isinstance(item, int) and not isinstance(item, bool)
+                for item in raw_output_shape
+            )
+            else self._default_intermediate_shape(input_tensor_ids)
+        )
         if op_family == OpFamily.REDUCTION:
             output_shape = self._reduction_output_shape(
                 input_tensor_ids, node_attributes, output_shape
@@ -689,7 +1006,11 @@ class _AstBoundGraphExtractor:
         if isinstance(expression, ast.Constant):
             return expression.value
         if isinstance(expression, ast.Name):
-            return self.constants.get(expression.id, _STATIC_MISSING)
+            return (
+                self.constants[expression.id]
+                if expression.id in self.constants
+                else _STATIC_MISSING
+            )
         if isinstance(expression, (ast.Tuple, ast.List)):
             values = tuple(self._static_value(element) for element in expression.elts)
             if all(value is not _STATIC_MISSING for value in values):

@@ -11,11 +11,13 @@ from sol_execbench.core.scoring.amd_bound_graph import (
     OpFamily,
     build_bound_graph,
 )
+from sol_execbench.core.scoring.amd_bound_graph.builder import build_static_bound_graph
 from sol_execbench.core.scoring.amd_bound_estimate.classification import (
     classify_call,
     dtype_method_target,
     movement_kind_for_name,
 )
+from sol_execbench.core.scoring.amd_bound_estimate.estimates import estimate_bound_work
 from sol_execbench.core.scoring.amd_hardware_models import EstimateConfidence
 from sol_execbench_type_helpers import make_definition, make_workload
 
@@ -84,6 +86,114 @@ def test_fx_tensor_transpose_preserves_gemm_operand_dependency():
 
     gemm = next(node for node in graph.nodes if node.op_family == OpFamily.GEMM)
     assert gemm.input_tensor_ids == ("input:a", "input:b")
+
+
+def test_static_basic_index_has_exact_view_shape():
+    definition = make_definition(
+        name="basic_index_demo",
+        axes={
+            "M": {"type": "const", "value": 4},
+            "N": {"type": "const", "value": 8},
+            "S": {"type": "const", "value": 2},
+        },
+        inputs={"x": {"shape": ["M", "N"], "dtype": "float32"}},
+        outputs={"out": {"shape": ["M", "S"], "dtype": "float32"}},
+        reference="def run(x):\n    return x[:, 1:3]",
+    )
+    workload = make_workload(
+        axes={}, inputs={"x": {"type": "random"}}, uuid="basic-index-workload"
+    )
+
+    graph = build_static_bound_graph(definition, workload)
+    node = next(node for node in graph.nodes if node.op_name == "getitem")
+
+    assert node.confidence == EstimateConfidence.SUPPORTED
+    assert node.attributes["movement_kind"] == "logical_view"
+    assert graph.tensors[node.output_tensor_ids[0]].shape == (4, 2)
+
+
+def test_static_transpose_and_mm_propagate_exact_shapes():
+    definition = make_definition(
+        name="transpose_mm_demo",
+        axes={
+            "M": {"type": "const", "value": 2},
+            "N": {"type": "const", "value": 8},
+            "K": {"type": "const", "value": 4},
+        },
+        inputs={
+            "x": {"shape": ["M", "K"], "dtype": "float32"},
+            "weight": {"shape": ["N", "K"], "dtype": "float32"},
+        },
+        outputs={"out": {"shape": ["M", "N"], "dtype": "float32"}},
+        reference="def run(x, weight):\n    return x.mm(weight.t())\n",
+    )
+    workload = make_workload(
+        axes={},
+        inputs={"x": {"type": "random"}, "weight": {"type": "random"}},
+        uuid="transpose-mm-workload",
+    )
+
+    graph = build_static_bound_graph(definition, workload)
+    transpose = next(node for node in graph.nodes if node.op_name == "weight.t")
+    matrix = next(node for node in graph.nodes if node.op_family == OpFamily.GEMM)
+
+    assert graph.tensors[transpose.output_tensor_ids[0]].shape == (4, 8)
+    assert graph.tensors[matrix.output_tensor_ids[0]].shape == (2, 8)
+
+
+def test_dynamic_index_remains_inexact():
+    definition = make_definition(
+        name="dynamic_index_demo",
+        axes={
+            "M": {"type": "const", "value": 4},
+            "N": {"type": "const", "value": 8},
+        },
+        inputs={
+            "x": {"shape": ["M", "N"], "dtype": "float32"},
+            "idx": {"shape": [], "dtype": "int64"},
+        },
+        outputs={"out": {"shape": ["M"], "dtype": "float32"}},
+        reference="def run(x, idx):\n    return x[:, idx]",
+    )
+    workload = make_workload(
+        axes={},
+        inputs={"x": {"type": "random"}, "idx": {"type": "random"}},
+        uuid="dynamic-index-workload",
+    )
+
+    graph = build_static_bound_graph(definition, workload)
+    node = next(node for node in graph.nodes if node.op_name == "getitem")
+
+    assert node.confidence == EstimateConfidence.INEXACT
+    assert node.attributes["movement_kind"] == "materialized"
+    assert node.attributes["dynamic_index"] is True
+
+
+def test_static_binary_broadcast_uses_larger_result_shape():
+    definition = make_definition(
+        name="broadcast_demo",
+        axes={
+            "B": {"type": "const", "value": 2},
+            "N": {"type": "const", "value": 8},
+        },
+        inputs={
+            "scale": {"shape": ["B", "1"], "dtype": "float32"},
+            "x": {"shape": ["B", "N"], "dtype": "float32"},
+        },
+        outputs={"out": {"shape": ["B", "N"], "dtype": "float32"}},
+        reference="def run(scale, x):\n    return scale * x",
+    )
+    workload = make_workload(
+        axes={},
+        inputs={"scale": {"type": "random"}, "x": {"type": "random"}},
+        uuid="broadcast-workload",
+    )
+
+    graph = build_static_bound_graph(definition, workload)
+    node = next(node for node in graph.nodes if node.op_name == "mult")
+
+    assert node.confidence == EstimateConfidence.SUPPORTED
+    assert graph.tensors[node.output_tensor_ids[0]].shape == (2, 8)
 
 
 def test_op_family_taxonomy_includes_paper_aligned_families():
@@ -743,7 +853,10 @@ def test_dtype_conversion_is_visible_instead_of_ignored():
         OpFamily.MLP_ACTIVATION,
         OpFamily.DTYPE_CONVERSION,
     ]
-    assert all(node.confidence == EstimateConfidence.INEXACT for node in graph.nodes)
+    assert [node.confidence for node in graph.nodes] == [
+        EstimateConfidence.SUPPORTED,
+        EstimateConfidence.INEXACT,
+    ]
 
 
 def test_unsupported_calls_remain_visible_with_warnings():
@@ -909,6 +1022,69 @@ def test_ast_fallback_inlines_nested_helper_and_tracks_indexed_update():
     assert any(node.op_name == "usub" for node in graph.nodes)
     assert any(node.op_name == "setitem" for node in graph.nodes)
     assert not any("rotate_half" in warning for warning in graph.warnings)
+
+
+def test_ast_fallback_marks_static_unary_negation_supported():
+    definition = make_definition(
+        name="unary_negation_demo",
+        axes={"N": {"type": "const", "value": 64}},
+        inputs={"x": {"shape": ["N"], "dtype": "float32"}},
+        outputs={"out": {"shape": ["N"], "dtype": "float32"}},
+        reference="def run(x):\n    return -x\n",
+    )
+    workload = make_workload(axes={}, inputs={"x": {"type": "random"}}, uuid="w1")
+
+    graph = build_static_bound_graph(definition, workload)
+    estimates = estimate_bound_work(graph)
+
+    assert graph.nodes[0].confidence == EstimateConfidence.SUPPORTED
+    assert estimates[0].confidence == EstimateConfidence.SUPPORTED
+    assert estimates[0].formula_inputs["output_elements"] == 64
+
+
+def test_ast_fallback_resolves_static_grouped_conv1d_contract():
+    definition = make_definition(
+        name="grouped_conv1d_demo",
+        axes={
+            "N": {"type": "const", "value": 2},
+            "C": {"type": "const", "value": 8},
+            "L": {"type": "const", "value": 32},
+            "G": {"type": "const", "value": 1},
+            "K": {"type": "const", "value": 5},
+        },
+        inputs={
+            "x": {"shape": ["N", "C", "L"], "dtype": "float32"},
+            "weight": {"shape": ["C", "G", "K"], "dtype": "float32"},
+        },
+        outputs={"out": {"shape": ["N", "C", "L"], "dtype": "float32"}},
+        reference=(
+            "import torch.nn.functional as F\n"
+            "def run(x, weight):\n"
+            "    channels = x.shape[1]\n"
+            "    return F.conv1d(x, weight, padding=2, groups=channels)\n"
+        ),
+    )
+    workload = make_workload(
+        axes={},
+        inputs={"x": {"type": "random"}, "weight": {"type": "random"}},
+        uuid="w1",
+    )
+
+    graph = build_static_bound_graph(definition, workload)
+    estimates = estimate_bound_work(graph)
+
+    assert graph.nodes[0].attributes["groups"] == 8
+    assert graph.nodes[0].attributes["output_shape"] == (2, 8, 32)
+    assert estimates[0].confidence == EstimateConfidence.SUPPORTED
+    assert estimates[0].formula_inputs == {
+        "N": 2,
+        "C_in": 8,
+        "C_out": 8,
+        "groups": 8,
+        "output_spatial_elements": 32,
+        "kernel_elements": 5,
+        "dimensionality": 1,
+    }
 
 
 def test_ast_fallback_preserves_multi_output_sort_contract():
