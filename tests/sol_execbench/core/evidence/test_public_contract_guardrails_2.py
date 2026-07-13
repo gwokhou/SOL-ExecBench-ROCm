@@ -464,7 +464,7 @@ def test_phase88_example_docs_keep_v1_19_surfaces_sidecar_only():
 
 
 def test_v1_11_parity_gap_docs_keep_bounded_claim_boundary():
-    docs = (REPO_ROOT / "docs/analysis.md").read_text()
+    docs = (REPO_ROOT / "docs/internal/analysis.md").read_text()
 
     assert "scripts/internal/reports/report_parity_gaps.py" in docs
     assert "discovered, parsed, ready, blocked" in docs
@@ -476,7 +476,7 @@ def test_v1_11_parity_gap_docs_keep_bounded_claim_boundary():
 
 
 def test_v1_11_release_closure_summarizes_remaining_claim_gaps():
-    doc = (REPO_ROOT / "docs/v1_11_release_closure.md").read_text()
+    doc = (REPO_ROOT / "docs/internal/v1_11_release_closure.md").read_text()
 
     for expected in (
         "not full 235-problem ROCm validation",
@@ -816,7 +816,7 @@ def test_v1_9_claim_guardrails_keep_cdna3_and_nvidia_equivalence_out_of_scope():
         pytest.skip("SOL planning metadata is not present in this nested checkout")
     project = (PLANNING_ROOT / "PROJECT.md").read_text()
     requirements = (PLANNING_ROOT / "REQUIREMENTS.md").read_text()
-    analysis = Path("docs/analysis.md").read_text()
+    analysis = Path("docs/internal/analysis.md").read_text()
 
     assert "CDNA 3 (`gfx94*`) full adapted suite validation remains deferred" in project
     assert (

@@ -13,7 +13,7 @@
   `pytorch`, `triton`, `hip_native`, `mixed`, and `unknown`.
 - Defined policy metadata for backend, activity domain, aggregation rule,
   interpretation, fallback status, and reason.
-- Added `docs/rocm_timing.md` documenting the
+- Added `docs/user/rocm_timing.md` documenting the
   `source_type -> timer_backend -> interpretation` chimney model.
 - Added focused unit and documentation audit tests for Phase 23 timing
   semantics.

@@ -7,7 +7,7 @@ depends_on: []
 files_modified:
   - src/sol_execbench/core/bench/timing_policy.py
   - src/sol_execbench/core/bench/__init__.py
-  - docs/rocm_timing.md
+  - docs/user/rocm_timing.md
   - tests/sol_execbench/test_timing_policy.py
   - tests/sol_execbench/test_rocm_eval_timing_audit.py
 autonomous: true
@@ -133,32 +133,32 @@ default timing implementation.
   <title>Document timing chimney semantics</title>
   <requirements>TIME-03, TIME-04</requirements>
   <files>
-    <file>docs/rocm_timing.md</file>
+    <file>docs/user/rocm_timing.md</file>
     <file>tests/sol_execbench/test_rocm_eval_timing_audit.py</file>
   </files>
   <read_first>
-    <file>docs/analysis.md</file>
-    <file>docs/ARCHITECTURE.md</file>
-    <file>docs/solution.md</file>
+    <file>docs/internal/analysis.md</file>
+    <file>docs/user/ARCHITECTURE.md</file>
+    <file>docs/user/solution.md</file>
     <file>tests/sol_execbench/test_rocm_eval_timing_audit.py</file>
     <file>.planning/phases/23-timing-semantics-and-policy/23-RESEARCH.md</file>
   </read_first>
   <action>
-    Create `docs/rocm_timing.md` describing the accuracy-first timing rule and
+    Create `docs/user/rocm_timing.md` describing the accuracy-first timing rule and
     the source-specific chimney model. Include a table for `pytorch`, `triton`,
     `hip_native`, and fallback/unknown sources with columns for source type,
     timer backend, measured activity domain, aggregation rule, and
     interpretation. Explicitly state that PyTorch ROCm uses `torch.cuda` and
     CUDA-named profiler activity APIs as compatibility names. Extend
     `tests/sol_execbench/test_rocm_eval_timing_audit.py` with documentation
-    assertions that `docs/rocm_timing.md` contains `kernel activity`, `HIP
+    assertions that `docs/user/rocm_timing.md` contains `kernel activity`, `HIP
     runtime`, `PyTorch operator attribution`, `fallback event timing`, and
     `source_type -> timer_backend -> interpretation`.
   </action>
   <acceptance_criteria>
-    <criterion>`docs/rocm_timing.md` exists.</criterion>
-    <criterion>`docs/rocm_timing.md` contains the text `source_type -> timer_backend -> interpretation`.</criterion>
-    <criterion>`docs/rocm_timing.md` contains the strings `kernel activity`, `HIP runtime`, `PyTorch operator attribution`, and `fallback event timing`.</criterion>
+    <criterion>`docs/user/rocm_timing.md` exists.</criterion>
+    <criterion>`docs/user/rocm_timing.md` contains the text `source_type -> timer_backend -> interpretation`.</criterion>
+    <criterion>`docs/user/rocm_timing.md` contains the strings `kernel activity`, `HIP runtime`, `PyTorch operator attribution`, and `fallback event timing`.</criterion>
     <criterion>`uv run pytest tests/sol_execbench/test_rocm_eval_timing_audit.py` exits 0.</criterion>
   </acceptance_criteria>
   <verify>

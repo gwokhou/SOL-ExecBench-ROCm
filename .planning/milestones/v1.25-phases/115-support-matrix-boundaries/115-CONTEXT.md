@@ -55,12 +55,12 @@ schema unless existing code already has a natural place for it.
 ## Existing Code Insights
 
 ### Reusable Assets
-- `docs/rocm.md` already has a Hardware Status table covering RDNA 4, CDNA 3,
+- `docs/user/rocm.md` already has a Hardware Status table covering RDNA 4, CDNA 3,
   and CDNA 4, but its CDNA4 wording predates the user's unavailable-hardware
   clarification.
-- `docs/CLAIMS.md` defines allowed claims, Docker Matrix boundaries, and
+- `docs/user/CLAIMS.md` defines allowed claims, Docker Matrix boundaries, and
   forbidden stronger claims.
-- `docs/release_candidate_validation.md` now defines engineering prerelease
+- `docs/internal/release_candidate_validation.md` now defines engineering prerelease
   validation language and explicit claim boundaries.
 - Internal readiness docs under `docs/internal/` cover RDNA4, CDNA3, and MI300X
   readiness context.
@@ -75,7 +75,7 @@ schema unless existing code already has a natural place for it.
   pass/skip/fail evidence.
 
 ### Integration Points
-- Update `docs/rocm.md`, `docs/CLAIMS.md`, and any release/prerelease docs that
+- Update `docs/user/rocm.md`, `docs/user/CLAIMS.md`, and any release/prerelease docs that
   mention MI300X-on-CDNA3 and CDNA4 support status.
 - Add or update tests in `tests/sol_execbench/` that read documentation and
   assert support-matrix wording.

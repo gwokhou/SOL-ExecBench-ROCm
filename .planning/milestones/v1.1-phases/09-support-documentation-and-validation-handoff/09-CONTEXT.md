@@ -28,7 +28,7 @@ CDNA 3 hardware validation gate.
 ## Existing Code Insights
 
 ### Reusable Assets
-- `README.md`, `docs/rocm.md`, `docs/solution.md`, and `docs/compliance.md`
+- `README.md`, `docs/user/rocm.md`, `docs/user/solution.md`, and `docs/user/compliance.md`
   already describe ROCm setup, schema, and known gaps.
 - Documentation tests can be added under `tests/sol_execbench/`.
 

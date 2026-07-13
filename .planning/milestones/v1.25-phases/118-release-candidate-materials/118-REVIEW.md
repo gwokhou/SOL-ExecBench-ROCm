@@ -12,8 +12,8 @@ reviewed_at: "2026-06-01"
 
 Reviewed release-candidate material changes in:
 
-- `docs/v1_25_prerelease_checklist.md`
-- `docs/v1_25_release_notes.md`
+- `docs/internal/v1_25_prerelease_checklist.md`
+- `docs/internal/v1_25_release_notes.md`
 - `README.md`
 - `tests/sol_execbench/test_research_release_docs.py`
 

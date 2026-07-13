@@ -17,28 +17,28 @@ release.
 - SHA-256 checksums: `SHA256SUMS`
 - Readiness JSON: `prerelease_readiness.json`, uploaded as a versioned release
   asset before publishing (the historical ignored local copy was pruned)
-- Readiness Markdown: `docs/prerelease_readiness.md`
+- Readiness Markdown: `docs/internal/prerelease_readiness.md`
 
 ## What This Prerelease Contains
 
 - Provenance and compliance policy:
-  `docs/provenance.md`, `docs/compliance.md`.
+  `docs/user/provenance.md`, `docs/user/compliance.md`.
 - A versioned prerelease artifact bundle workflow:
-  `docs/prerelease_artifact_bundle.md`.
+  `docs/internal/prerelease_artifact_bundle.md`.
 - A prerelease readiness gate:
-  `docs/prerelease_readiness.md`.
+  `docs/internal/prerelease_readiness.md`.
 - A bounded research preview evidence package:
-  `docs/research_preview.md`.
+  `docs/user/research_preview.md`.
 - ROCm support and hardware boundary notes:
-  `docs/rocm.md`.
+  `docs/user/rocm.md`.
 - Claim-boundary policy:
-  `docs/CLAIMS.md`.
+  `docs/user/CLAIMS.md`.
 - First-run setup and troubleshooting:
-  `docs/GETTING-STARTED.md`.
+  `docs/user/GETTING-STARTED.md`.
 - Timing semantics and profiler evidence boundaries:
-  `docs/rocm_timing.md`.
+  `docs/user/rocm_timing.md`.
 - Research workflows:
-  `docs/RESEARCHER-GUIDE.md`.
+  `docs/user/RESEARCHER-GUIDE.md`.
 
 ## Validation
 
@@ -109,8 +109,8 @@ This prerelease does not claim:
 
 ## More Links
 
-- v1.25 release notes: `docs/v1_25_release_notes.md`
-- Prerelease checklist: `docs/v1_25_prerelease_checklist.md`
-- Public publishing checklist: `docs/public_prerelease.md`
-- Provenance policy: `docs/provenance.md`
-- Compliance notes: `docs/compliance.md`
+- v1.25 release notes: `docs/internal/v1_25_release_notes.md`
+- Prerelease checklist: `docs/internal/v1_25_prerelease_checklist.md`
+- Public publishing checklist: `docs/user/public_prerelease.md`
+- Provenance policy: `docs/user/provenance.md`
+- Compliance notes: `docs/user/compliance.md`

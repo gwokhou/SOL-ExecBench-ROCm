@@ -7,7 +7,7 @@ depends_on: []
 files_modified:
   - src/sol_execbench/core/scoring/amd_sol.py
   - src/sol_execbench/core/scoring/__init__.py
-  - docs/analysis.md
+  - docs/internal/analysis.md
   - tests/sol_execbench/test_amd_sol_bounds.py
 autonomous: true
 requirements:
@@ -62,10 +62,10 @@ analysis, hardware model entries, and auditable bound artifacts.
 <task id="25-01-02" type="execute">
   <requirements>SOL-04</requirements>
   <files>
-    <file>docs/analysis.md</file>
+    <file>docs/internal/analysis.md</file>
   </files>
   <read_first>
-    <file>docs/analysis.md</file>
+    <file>docs/internal/analysis.md</file>
   </read_first>
   <action>
     Extend the AMD-native score interpretation section to state that AMD-native
@@ -73,7 +73,7 @@ analysis, hardware model entries, and auditable bound artifacts.
     evidence, hardware model source/confidence, and validation status.
   </action>
   <acceptance_criteria>
-    <criterion>`docs/analysis.md` contains `AMD SOL bound artifact`.</criterion>
+    <criterion>`docs/internal/analysis.md` contains `AMD SOL bound artifact`.</criterion>
   </acceptance_criteria>
   <verify>
     <command>uv run pytest tests/sol_execbench/test_amd_sol_bounds.py</command>

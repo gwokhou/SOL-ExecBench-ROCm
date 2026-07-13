@@ -150,7 +150,7 @@ consumer docs also belong to Phase 194.
   registry/CLI/coverage tests (extend, do not break).
 - `tests/sol_execbench/core/evidence/test_baseline_comparison.py` — existing
   comparison tests (orthogonal; success-criterion-#4 coverage cases are new).
-- `docs/EVALUATOR-CONTRACT.md`, `docs/trace.md` — baseline/score authority
+- `docs/user/EVALUATOR-CONTRACT.md`, `docs/user/trace.md` — baseline/score authority
   language (HIP-facing fixture/doc updates belong to 194).
 
 </canonical_refs>

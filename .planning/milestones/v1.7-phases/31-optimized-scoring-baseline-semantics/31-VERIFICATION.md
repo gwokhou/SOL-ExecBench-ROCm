@@ -18,7 +18,7 @@ canonical trace JSONL boundaries.
 | BASE-01 | Passed | `ScoringBaselineArtifact` and `ScoringBaselineEntry` store optimized timing separately from traces. |
 | BASE-02 | Passed | AMD-native scores include `baseline_source` and reference fallback warning. |
 | BASE-03 | Passed | Dataset runner accepts `--scoring-baseline` for AMD score reports. |
-| BASE-04 | Passed | `docs/analysis.md` documents baseline roles and fallback semantics. |
+| BASE-04 | Passed | `docs/internal/analysis.md` documents baseline roles and fallback semantics. |
 
 ## Commands
 

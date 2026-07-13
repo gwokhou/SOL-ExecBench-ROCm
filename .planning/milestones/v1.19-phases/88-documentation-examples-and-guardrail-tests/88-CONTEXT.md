@@ -26,7 +26,7 @@ change canonical benchmark contracts.
 - The guide should explain how to generate and interpret:
   execution closure, paper denominator reports, Matrix schema exports, Matrix
   semantic diffs, and AMD bound sanity reports.
-- Update `docs/CLAIMS.md`, `docs/TESTING.md`, and/or `docs/RESEARCHER-GUIDE.md`
+- Update `docs/user/CLAIMS.md`, `docs/user/TESTING.md`, and/or `docs/user/RESEARCHER-GUIDE.md`
   only enough to point to the guide and preserve claim boundaries.
 
 ### Fixture Examples
@@ -62,15 +62,15 @@ change canonical benchmark contracts.
 ## Existing Code And Docs Insights
 
 ### Reusable Docs
-- `docs/CLAIMS.md` already contains project-wide claims and evidence
+- `docs/user/CLAIMS.md` already contains project-wide claims and evidence
   boundaries, including Docker Matrix/native-host distinctions and claim
   upgrade rules.
-- `docs/TESTING.md` already documents CPU-safe test groups, ROCm Matrix
+- `docs/user/TESTING.md` already documents CPU-safe test groups, ROCm Matrix
   guardrails, and live ROCm validation boundaries.
-- `docs/RESEARCHER-GUIDE.md` already gives researcher workflows and artifact
+- `docs/user/RESEARCHER-GUIDE.md` already gives researcher workflows and artifact
   interpretation tables, but it does not yet summarize all v1.19 evidence
   surfaces.
-- `docs/analysis.md` and older release closure docs contain boundary language
+- `docs/internal/analysis.md` and older release closure docs contain boundary language
   that can be reused carefully without overclaiming.
 
 ### Reusable Tests

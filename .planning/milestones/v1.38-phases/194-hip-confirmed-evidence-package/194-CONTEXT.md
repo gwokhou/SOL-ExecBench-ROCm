@@ -80,15 +80,15 @@ GPU validation.
 
 ### Documentation
 
-- **D-13:** Extend `docs/EVALUATOR-CONTRACT.md` — expand `## Official Score
+- **D-13:** Extend `docs/user/EVALUATOR-CONTRACT.md` — expand `## Official Score
   Evidence`, `## Capabilities`, and `## Ownership Boundary` with the confirmed
   evidence surface, the blocker reason-code vocabulary, and the confirmed
   boundaries.
-- **D-14:** Add `docs/confirmed_evidence.md` — a HIP-facing consume/diagnostic-only
+- **D-14:** Add `docs/user/confirmed_evidence.md` — a HIP-facing consume/diagnostic-only
   table explaining which SOL artifacts HIP must consume for confirmed pass/fail
   (official_score_evidence + measured baseline coverage) and which remain
   diagnostic-only (agent_feedback, profile_summary, decision sidecars).
-- **D-15:** Document the six fixture cases in `docs/confirmed_evidence.md`
+- **D-15:** Document the six fixture cases in `docs/user/confirmed_evidence.md`
   (intent + expected blocker set per case).
 - **D-16:** Reaffirm authority wording: diagnostic sidecars cannot provide
   confirmed pass/fail authority; only official_score + measured baseline
@@ -152,10 +152,10 @@ GPU validation.
   convention (`<state>.<artifact>.json` + `.case.json`).
 - `tests/sol_execbench/core/evidence/test_official_score_evidence.py` — gate
   behavior tests to extend for the GATE-03 round-trip.
-- `docs/EVALUATOR-CONTRACT.md` — contract doc to extend (already has
+- `docs/user/EVALUATOR-CONTRACT.md` — contract doc to extend (already has
   `## Official Score Evidence` section).
-- `docs/profile_summary_sidecar.md`, `docs/agent_feedback_sidecar.md` —
-  diagnostic-sidecar doc conventions to mirror for `docs/confirmed_evidence.md`.
+- `docs/user/profile_summary_sidecar.md`, `docs/user/agent_feedback_sidecar.md` —
+  diagnostic-sidecar doc conventions to mirror for `docs/user/confirmed_evidence.md`.
 
 </canonical_refs>
 
@@ -190,7 +190,7 @@ GPU validation.
 - New `official-score` CLI command in `cli/commands/` registered via the CLI
   root.
 - New `confirmed_evidence/` fixture directory + a loader test.
-- `docs/EVALUATOR-CONTRACT.md` extended; new `docs/confirmed_evidence.md`.
+- `docs/user/EVALUATOR-CONTRACT.md` extended; new `docs/user/confirmed_evidence.md`.
 
 </code_context>
 

@@ -6,7 +6,7 @@ files_reviewed: 3
 files_reviewed_list:
   - scripts/release_candidate_validation.py
   - tests/sol_execbench/test_release_candidate_validation.py
-  - docs/release_candidate_validation.md
+  - docs/internal/release_candidate_validation.md
 findings:
   critical: 1
   warning: 2

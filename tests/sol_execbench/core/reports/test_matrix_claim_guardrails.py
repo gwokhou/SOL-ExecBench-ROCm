@@ -368,7 +368,7 @@ def test_matrix_contract_uses_target_and_matrix_entry_not_row_wording():
 
 
 def test_container_claim_wording_does_not_overstate_native_host_validation():
-    claims = (REPO_ROOT / "docs/CLAIMS.md").read_text()
+    claims = (REPO_ROOT / "docs/user/CLAIMS.md").read_text()
 
     assert (
         "container ROCm user-space validated on\nrecorded host driver/devices" in claims

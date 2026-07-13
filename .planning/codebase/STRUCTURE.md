@@ -139,14 +139,14 @@ coverage increasingly mirrors the package subdirectories.
 
 ## Documentation Layout
 
-Primary user docs are `README.md`, `docs/GETTING-STARTED.md`,
-`docs/COOKBOOK.md`, `docs/CONFIGURATION.md`, `docs/DEVELOPMENT.md`,
-`docs/TESTING.md`, and `docs/RESEARCHER-GUIDE.md`. Contract and schema docs
-include `docs/EVALUATOR-CONTRACT.md`, `docs/definition.md`,
-`docs/workload.md`, `docs/solution.md`, and `docs/trace.md`.
+Primary user docs are `README.md`, `docs/user/GETTING-STARTED.md`,
+`docs/user/COOKBOOK.md`, `docs/user/CONFIGURATION.md`, `docs/user/DEVELOPMENT.md`,
+`docs/user/TESTING.md`, and `docs/user/RESEARCHER-GUIDE.md`. Contract and schema docs
+include `docs/user/EVALUATOR-CONTRACT.md`, `docs/user/definition.md`,
+`docs/user/workload.md`, `docs/user/solution.md`, and `docs/user/trace.md`.
 
-ROCm-specific docs include `docs/rocm.md`, `docs/rocm_timing.md`,
-`docs/rocm_toolchain_routing.md`, and `docs/rocm_libraries.md`.
+ROCm-specific docs include `docs/user/rocm.md`, `docs/user/rocm_timing.md`,
+`docs/user/rocm_toolchain_routing.md`, and `docs/user/rocm_libraries.md`.
 Internal validation records live under `docs/internal/`.
 
 ## Naming Conventions

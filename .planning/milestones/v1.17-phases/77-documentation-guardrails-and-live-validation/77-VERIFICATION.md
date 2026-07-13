@@ -18,8 +18,8 @@ boundary.
 
 | Requirement | Verdict | Evidence |
 |-------------|---------|----------|
-| SKE-DOCS-01 | PASS | `docs/static_kernel_evidence.md` documents `--static-evidence`, sidecar paths, schema, statuses, artifacts, and diagnostic-only authority flags. |
-| SKE-DOCS-02 | PASS | `docs/CLAIMS.md` and `docs/RESEARCHER-GUIDE.md` define allowed and forbidden Static Kernel Evidence claims. |
+| SKE-DOCS-01 | PASS | `docs/user/static_kernel_evidence.md` documents `--static-evidence`, sidecar paths, schema, statuses, artifacts, and diagnostic-only authority flags. |
+| SKE-DOCS-02 | PASS | `docs/user/CLAIMS.md` and `docs/user/RESEARCHER-GUIDE.md` define allowed and forbidden Static Kernel Evidence claims. |
 | SKE-DOCS-03 | PASS | `docs/internal/v1_17_static_kernel_evidence_validation.md` records RDNA 4 `gfx1200` static evidence collection and benchmark correctness failure. |
 | SKE-DOCS-04 | PASS | `tests/sol_execbench/test_research_release_docs.py` guards static evidence docs, deferred scope, and validation wording. |
 | SKE-DOCS-05 | PASS | Docs explicitly defer CDNA 3, CDNA 4, Triton cache capture, RGA-rich resource parsing, and paper-scale static coverage. |

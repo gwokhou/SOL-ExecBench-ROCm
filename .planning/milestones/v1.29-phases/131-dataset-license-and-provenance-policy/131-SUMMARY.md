@@ -12,8 +12,8 @@
   release-bundle checks.
 - Integrated restricted dataset bundle scanning into
   `scripts/check_prerelease_readiness.py`.
-- Updated `docs/provenance.md`, `docs/compliance.md`, and
-  `docs/prerelease_artifact_bundle.md` with NVIDIA Evaluation Dataset License
+- Updated `docs/user/provenance.md`, `docs/user/compliance.md`, and
+  `docs/internal/prerelease_artifact_bundle.md` with NVIDIA Evaluation Dataset License
   and Apache-2.0 FlashInfer Trace boundaries.
 - Added tests covering policy shape, checker behavior, and prerelease
   restricted-payload blocking.

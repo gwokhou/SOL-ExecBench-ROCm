@@ -108,7 +108,7 @@ The phase can be validated with fast unit/static tests:
 - **PyTorch API naming leak:** `torch.utils.cpp_extension.load` may still require a keyword named `extra_cuda_cflags` for HIP/ROCm builds. Mitigate with a narrow audit allowlist entry explaining it is an upstream PyTorch API name, not a project schema/build concept.
 - **Generic enum errors:** Pydantic enum validation may hide custom migration guidance. Mitigate with before validators for `languages` and compile option keys.
 - **Local-only hardware target:** Supporting only `gfx1200` initially can block other AMD hosts. Mitigate with a documented enum/test extension path and a clear error that names accepted targets.
-- **Scope bleed into evaluator/examples:** `eval_driver.py`, `docs/solution.md`, examples, and broader tests still contain CUDA/NVIDIA terms. Keep the audit path-scoped to Phase 2-owned files.
+- **Scope bleed into evaluator/examples:** `eval_driver.py`, `docs/user/solution.md`, examples, and broader tests still contain CUDA/NVIDIA terms. Keep the audit path-scoped to Phase 2-owned files.
 
 ## Sources
 

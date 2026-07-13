@@ -28,7 +28,7 @@ BUNDLE_SCHEMA_VERSION = "sol_execbench.prerelease_artifact_bundle.v1"
 DEFAULT_OUTPUT_DIR = Path("out/prerelease_readiness")
 REPO_ROOT = Path(__file__).resolve().parents[3]
 PROVENANCE_MANIFEST_PATH = Path("provenance.toml")
-PROVENANCE_DOC_PATH = Path("docs/provenance.md")
+PROVENANCE_DOC_PATH = Path("docs/user/provenance.md")
 DATASET_REDISTRIBUTION_SCRIPT_PATH = Path("scripts/check_dataset_redistribution.py")
 NVIDIA_HEADER = (
     "# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. "
@@ -58,13 +58,13 @@ FORBIDDEN_TRUTHY_CLAIMS = {
     "cdna4_validated",
 }
 REQUIRED_DOC_PHRASES = {
-    "docs/CLAIMS.md": (
+    "docs/user/CLAIMS.md": (
         "MI300X and MI308X are sibling GPU products",
         "recorded on MI308X",
         "CDNA4 validation is unavailable",
         "not native-host validation",
     ),
-    "docs/prerelease_artifact_bundle.md": (
+    "docs/internal/prerelease_artifact_bundle.md": (
         "engineering prerelease and research preview evidence only",
         "MI300X and MI308X are sibling GPU products",
         "recorded on MI308X",
@@ -615,7 +615,7 @@ def _check_provenance_policy(root: Path = REPO_ROOT) -> list[Finding]:
                 id="missing_provenance_doc",
                 status="blocking",
                 category="provenance",
-                message="Missing docs/provenance.md.",
+                message="Missing docs/user/provenance.md.",
                 path=PROVENANCE_DOC_PATH.as_posix(),
             )
         )

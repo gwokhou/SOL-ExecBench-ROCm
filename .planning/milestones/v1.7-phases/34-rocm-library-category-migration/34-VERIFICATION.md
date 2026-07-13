@@ -8,9 +8,9 @@
 | Requirement | Evidence |
 |-------------|----------|
 | LIB-01 | `examples/hipblas/gemm/solution_hipblas.json` uses `hipblas`, calls `hipblasSgemm`, links `-lhipblas`, and stages through `ProblemPackager.compile()`. |
-| LIB-02 | `docs/rocm_libraries.md` keeps MIOpen as candidate with overclaim tests preventing public examples from using `miopen`. |
-| LIB-03 | `docs/rocm_libraries.md` keeps Composable Kernel as candidate with overclaim tests preventing public examples from using `ck`. |
-| LIB-04 | `docs/rocm_libraries.md` keeps rocWMMA as candidate with overclaim tests preventing public examples from using `rocwmma`. |
+| LIB-02 | `docs/user/rocm_libraries.md` keeps MIOpen as candidate with overclaim tests preventing public examples from using `miopen`. |
+| LIB-03 | `docs/user/rocm_libraries.md` keeps Composable Kernel as candidate with overclaim tests preventing public examples from using `ck`. |
+| LIB-04 | `docs/user/rocm_libraries.md` keeps rocWMMA as candidate with overclaim tests preventing public examples from using `rocwmma`. |
 | LIB-05 | README, solution docs, readiness docs, and tests distinguish supported `hipblas` from candidate MIOpen/CK/rocWMMA categories. |
 
 ## Commands

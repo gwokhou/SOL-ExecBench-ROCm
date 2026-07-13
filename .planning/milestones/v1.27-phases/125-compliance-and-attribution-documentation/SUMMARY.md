@@ -5,9 +5,9 @@
 
 ## Delivered
 
-- Updated `docs/compliance.md` with fork/provenance attribution, paper
+- Updated `docs/user/compliance.md` with fork/provenance attribution, paper
   citation boundaries, non-endorsement wording, and history-cleanup policy.
-- Linked `docs/provenance.md` and `docs/compliance.md` from README and public
+- Linked `docs/user/provenance.md` and `docs/user/compliance.md` from README and public
   prerelease materials.
 - Added attribution and provenance sections to the research preview and v1.26
   release draft.

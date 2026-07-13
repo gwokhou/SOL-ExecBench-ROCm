@@ -2,8 +2,8 @@
 
 ## Completed
 
-- Added `docs/research_preview.md`.
-- Updated `docs/RESEARCHER-GUIDE.md` to link the research preview, bundle, and readiness docs.
+- Added `docs/user/research_preview.md`.
+- Updated `docs/user/RESEARCHER-GUIDE.md` to link the research preview, bundle, and readiness docs.
 - Added focused tests in `tests/sol_execbench/test_research_preview_docs.py`.
 - Updated Phase 121 requirements to complete.
 

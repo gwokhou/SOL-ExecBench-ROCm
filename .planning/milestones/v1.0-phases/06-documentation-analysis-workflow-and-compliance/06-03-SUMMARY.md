@@ -2,7 +2,7 @@
 
 ## Completed
 
-- Added `docs/compliance.md` with Apache-2.0 context, retained upstream attribution, dependency families, unsupported NVIDIA runtime features, ROCm replacement notes, and known gaps.
+- Added `docs/user/compliance.md` with Apache-2.0 context, retained upstream attribution, dependency families, unsupported NVIDIA runtime features, ROCm replacement notes, and known gaps.
 - Updated package metadata description in `pyproject.toml`.
 - Recorded CDNA 3 validation as a known deferred gap rather than an active support claim.
 

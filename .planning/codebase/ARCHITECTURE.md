@@ -67,7 +67,7 @@ extension build products, profiler artifacts, generated runtime files, and
 reference code out of the long-lived CLI process.
 
 The boundary is an execution guardrail, not a sandbox. Documentation in
-`README.md`, `docs/ARCHITECTURE.md`, and `docs/SECURITY.md` says untrusted
+`README.md`, `docs/user/ARCHITECTURE.md`, and `docs/SECURITY.md` says untrusted
 submissions require external isolation such as Docker, a VM, or a dedicated
 ROCm host.
 

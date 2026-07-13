@@ -7,8 +7,8 @@ research preview.
 
 ## Tasks
 
-1. Add `docs/RESEARCHER-GUIDE.md`.
-2. Add `docs/COOKBOOK.md`.
+1. Add `docs/user/RESEARCHER-GUIDE.md`.
+2. Add `docs/user/COOKBOOK.md`.
 3. Cover artifact interpretation, kernel adaptation, compiler/backend entry
    points, agent experiment boundaries, and reproducibility practices.
 

@@ -3,7 +3,7 @@ type: research_note
 status: archived
 title: "Contract Convergence Design"
 source_format: superpowers
-source_path: "docs/superpowers/specs/2026-07-05-contract-convergence-design.md"
+source_path: "docs/internal/superpowers/specs/2026-07-05-contract-convergence-design.md"
 converted_at: "2026-07-09T00:00:00Z"
 ---
 
@@ -91,7 +91,7 @@ their boolean shape makes the guardrail tests and intent clearer.
 
 Update active contract documentation so it reflects the builder payload:
 
-- `docs/EVALUATOR-CONTRACT.md` should list current capability keys and
+- `docs/user/EVALUATOR-CONTRACT.md` should list current capability keys and
   requirement levels.
 - It should document `agent_feedback.sidecar` and `profile_summary.sidecar` as
   contract capability keys whose concrete artifact schemas are v2.
@@ -99,7 +99,7 @@ Update active contract documentation so it reflects the builder payload:
   `toolchain.routing.v1`, `static_kernel_evidence.v1`,
   `agent_feedback.sidecar.v1`, or `profile_summary.sidecar.v1` as current
   evaluator contract capability keys.
-- `docs/trace.md` should refer to the current `runtime.evidence` capability key
+- `docs/user/trace.md` should refer to the current `runtime.evidence` capability key
   when discussing evaluator contract discovery.
 
 Do not edit release notes only to modernize old terms.
@@ -113,7 +113,7 @@ Add or update tests so the current contract cannot drift from the current docs:
   a mapping, current keys have expected levels, and `source_boundary_claims` is
   absent.
 - Add a focused current-documentation guard that checks
-  `docs/EVALUATOR-CONTRACT.md` contains the current capability keys and levels.
+  `docs/user/EVALUATOR-CONTRACT.md` contains the current capability keys and levels.
 - The same guard should reject old evaluator capability key spellings in the
   active contract doc.
 - Keep sidecar tests focused on v2 identity, authority, freshness, and fixture

@@ -367,10 +367,10 @@ def test_phase_141_rdna4_public_claims_stay_bounded():
         path.read_text()
         for path in (
             Path("README.md"),
-            Path("docs/CLAIMS.md"),
-            Path("docs/research_preview.md"),
-            Path("docs/release_candidate_validation.md"),
-            Path("docs/rocm.md"),
+            Path("docs/user/CLAIMS.md"),
+            Path("docs/user/research_preview.md"),
+            Path("docs/internal/release_candidate_validation.md"),
+            Path("docs/user/rocm.md"),
         )
     )
 

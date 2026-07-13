@@ -17,7 +17,7 @@ overclaiming, yet no library category had runnable example evidence.
   through the HIP/C++ build path.
 - `src/sol_execbench/driver/templates/build_ext.py` forwards HIP compiler flags
   and linker flags to PyTorch's ROCm extension builder.
-- `docs/rocm_libraries.md`, `docs/solution.md`, and `README.md` define public
+- `docs/user/rocm_libraries.md`, `docs/user/solution.md`, and `README.md` define public
   support claims.
 - `tests/sol_execbench/test_rocm_library_examples.py` and
   `tests/sol_execbench/test_rocm_library_readiness_docs.py` protect examples

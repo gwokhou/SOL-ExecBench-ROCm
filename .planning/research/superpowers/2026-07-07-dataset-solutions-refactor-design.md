@@ -3,7 +3,7 @@ type: research_note
 status: archived
 title: "Dataset Solutions Refactor Design"
 source_format: superpowers
-source_path: "docs/superpowers/specs/2026-07-07-dataset-solutions-refactor-design.md"
+source_path: "docs/internal/superpowers/specs/2026-07-07-dataset-solutions-refactor-design.md"
 converted_at: "2026-07-09T00:00:00Z"
 ---
 

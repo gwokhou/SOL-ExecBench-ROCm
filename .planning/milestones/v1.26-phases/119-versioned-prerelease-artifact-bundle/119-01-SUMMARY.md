@@ -4,7 +4,7 @@
 
 - Added `scripts/build_prerelease_artifact_bundle.py`.
 - Added focused unit coverage in `tests/sol_execbench/test_prerelease_artifact_bundle.py`.
-- Added `docs/prerelease_artifact_bundle.md`.
+- Added `docs/internal/prerelease_artifact_bundle.md`.
 - Linked the bundle workflow from the prerelease checklist.
 - Updated claim-boundary wording so MI300X is consistently described as the concrete CDNA3 `gfx942` hardware target, not a peer of CDNA3 or CDNA4.
 - Updated Phase 119 requirements to complete.

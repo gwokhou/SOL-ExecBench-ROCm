@@ -36,7 +36,7 @@ into derived workload and suite score reports.
 ### 29-03: Add documentation and guardrail tests
 
 **Files:**
-- `docs/analysis.md`
+- `docs/internal/analysis.md`
 - `tests/sol_execbench/test_amd_native_score.py`
 
 **Work:**

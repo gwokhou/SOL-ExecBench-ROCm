@@ -26,7 +26,7 @@ def test_non_cdna_validation_closure_names_only_cdna_deferred_item():
 
 
 def test_analysis_docs_explain_baseline_output_is_not_amd_roofline_claim():
-    text = (REPO_ROOT / "docs/analysis.md").read_text()
+    text = (REPO_ROOT / "docs/internal/analysis.md").read_text()
     assert "Baseline comparison is baseline-relative" in text
     assert "not an AMD-native roofline claim" in text
     assert "--amd-native-claim" in text

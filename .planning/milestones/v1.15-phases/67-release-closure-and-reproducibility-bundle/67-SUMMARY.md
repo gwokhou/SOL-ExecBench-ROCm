@@ -5,7 +5,7 @@ bundle to the public README and documentation guardrail tests.
 
 ## Delivered
 
-- `docs/v1_15_release_closure.md` records release scope, checklist commands,
+- `docs/internal/v1_15_release_closure.md` records release scope, checklist commands,
   artifact families, result semantics, known gaps, and the release decision.
 - README documentation links now surface the claim boundary, curated slice,
   researcher guide, cookbook, and release closure.

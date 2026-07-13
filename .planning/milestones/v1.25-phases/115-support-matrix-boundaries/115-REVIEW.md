@@ -12,9 +12,9 @@ reviewed_at: "2026-06-01"
 
 Reviewed the Phase 115 support-boundary changes in:
 
-- `docs/rocm.md`
-- `docs/CLAIMS.md`
-- `docs/release_candidate_validation.md`
+- `docs/user/rocm.md`
+- `docs/user/CLAIMS.md`
+- `docs/internal/release_candidate_validation.md`
 - `tests/sol_execbench/test_research_release_docs.py`
 - `tests/sol_execbench/test_public_contract_guardrails.py`
 
@@ -23,7 +23,7 @@ Reviewed the Phase 115 support-boundary changes in:
 No blocking or follow-up findings remain.
 
 One documentation typo was found and fixed locally before completion:
-`docs/release_candidate_validation.md` now says the engineering prerelease path
+`docs/internal/release_candidate_validation.md` now says the engineering prerelease path
 "should be interpreted alongside the support matrix" instead of the malformed
 "does should" wording.
 

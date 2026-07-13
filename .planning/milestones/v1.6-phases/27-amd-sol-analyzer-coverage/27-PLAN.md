@@ -65,7 +65,7 @@ outside canonical trace JSONL.
 ### 27-04: Add compatibility and documentation coverage
 
 **Files:**
-- `docs/analysis.md`
+- `docs/internal/analysis.md`
 - `tests/sol_execbench/test_amd_sol_bounds.py`
 
 **Work:**

@@ -59,13 +59,13 @@ combination. Keep the implementation minimal and release-focused.
 ## Existing Code Insights
 
 ### Reusable Assets
-- `docs/analysis.md` documents trace collection, dataset runs, execution
+- `docs/internal/analysis.md` documents trace collection, dataset runs, execution
   closure, parity gaps, timing evidence, clock locking, reward-hack review,
   profiling, and result interpretation.
-- `docs/CLAIMS.md` defines current allowed claims and forbidden stronger
+- `docs/user/CLAIMS.md` defines current allowed claims and forbidden stronger
   claims for ROCm-port, runtime, profiling, static, Matrix, AMD-native score,
   research-preview, and leaderboard authority.
-- `docs/v1_19_evidence_guide.md` and `docs/v1_20_evidence_quality_guide.md`
+- `docs/internal/v1_19_evidence_guide.md` and `docs/internal/v1_20_evidence_quality_guide.md`
   describe evidence surfaces and trust-quality reports used for release review.
 - `scripts/run_dataset.py`, `scripts/inspect_dataset.py`,
   `scripts/report_parity_gaps.py`, `scripts/report_consistency.py`,

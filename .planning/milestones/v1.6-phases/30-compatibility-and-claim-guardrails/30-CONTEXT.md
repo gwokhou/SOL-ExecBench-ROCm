@@ -57,7 +57,7 @@ trace/schema/primary CLI compatibility as the hard constraint.
   `tests/sol_execbench/test_rocm_profiler.py`, and
   `tests/sol_execbench/test_amd_native_score.py` already cover derived
   artifacts.
-- `docs/analysis.md`, `docs/rocm_timing.md`, and `.planning/PROJECT.md` hold
+- `docs/internal/analysis.md`, `docs/user/rocm_timing.md`, and `.planning/PROJECT.md` hold
   the current public claim wording.
 
 ### Established Patterns

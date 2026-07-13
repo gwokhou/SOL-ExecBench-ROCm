@@ -20,7 +20,7 @@
 | `tests/sol_execbench/test_amd_sol_bounds.py` | test | transform + contract | `tests/sol_execbench/test_amd_sol_bounds.py` | exact |
 | `tests/sol_execbench/test_amd_native_score.py` | test | transform + guardrail | `tests/sol_execbench/test_amd_native_score.py` | exact |
 | `tests/sol_execbench/test_public_contract_guardrails.py` | test | contract guardrail | `tests/sol_execbench/test_public_contract_guardrails.py` | exact |
-| `docs/analysis.md` | documentation | contract text | `docs/analysis.md` + guardrail tests | exact |
+| `docs/internal/analysis.md` | documentation | contract text | `docs/internal/analysis.md` + guardrail tests | exact |
 
 ## Pattern Assignments
 
@@ -554,7 +554,7 @@ Add v1.9 checks that no hardware-model path CLI/dataset option is exposed in Pha
 ```python
 project = Path(".planning/PROJECT.md").read_text()
 requirements = Path(".planning/REQUIREMENTS.md").read_text()
-analysis = Path("docs/analysis.md").read_text()
+analysis = Path("docs/internal/analysis.md").read_text()
 
 assert "not NVIDIA B200, SOLAR, or leaderboard equivalence claims" in analysis
 ```
@@ -570,9 +570,9 @@ Extend these grep-style tests to block premature B200, upstream SOLAR, leaderboa
 
 ---
 
-### `docs/analysis.md` (documentation, contract text)
+### `docs/internal/analysis.md` (documentation, contract text)
 
-**Analog:** existing guardrail tests over `docs/analysis.md`
+**Analog:** existing guardrail tests over `docs/internal/analysis.md`
 
 **Derived-score doc guard pattern** (`tests/sol_execbench/test_amd_native_score.py` lines 320-324):
 ```python

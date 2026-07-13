@@ -10,11 +10,11 @@ def _read_doc(path: str) -> str:
     return (REPO_ROOT / path).read_text()
 
 
-V1_19_GUIDE = "docs/v1_19_evidence_guide.md"
+V1_19_GUIDE = "docs/internal/v1_19_evidence_guide.md"
 V1_19_ENTRY_DOCS = (
-    "docs/CLAIMS.md",
-    "docs/TESTING.md",
-    "docs/RESEARCHER-GUIDE.md",
+    "docs/user/CLAIMS.md",
+    "docs/user/TESTING.md",
+    "docs/user/RESEARCHER-GUIDE.md",
 )
 V1_19_NEGATIVE_CLAIMS = (
     "no full 235-problem paper validation",
@@ -28,7 +28,7 @@ V1_19_NEGATIVE_CLAIMS = (
 
 
 def test_claims_doc_defines_allowed_and_unsupported_claims():
-    text = _read_doc("docs/CLAIMS.md")
+    text = _read_doc("docs/user/CLAIMS.md")
 
     for allowed in (
         "ROCm-port evidence",
@@ -51,7 +51,7 @@ def test_claims_doc_defines_allowed_and_unsupported_claims():
 
 
 def test_claims_doc_requires_evidence_before_claim_upgrades():
-    text = _read_doc("docs/CLAIMS.md")
+    text = _read_doc("docs/user/CLAIMS.md")
 
     for required in (
         "Complete 235-problem denominator accounting",
@@ -64,9 +64,9 @@ def test_claims_doc_requires_evidence_before_claim_upgrades():
 
 
 def test_engineering_prerelease_support_matrix_boundaries():
-    rocm = _read_doc("docs/rocm.md")
-    claims = _read_doc("docs/CLAIMS.md")
-    release_validation = _read_doc("docs/release_candidate_validation.md")
+    rocm = _read_doc("docs/user/rocm.md")
+    claims = _read_doc("docs/user/CLAIMS.md")
+    release_validation = _read_doc("docs/internal/release_candidate_validation.md")
 
     for required in (
         "Engineering Prerelease Support Matrix",
@@ -101,9 +101,9 @@ def test_engineering_prerelease_support_matrix_boundaries():
 
 
 def test_v1_25_release_notes_keep_claim_boundaries_visible():
-    release_notes = _read_doc("docs/v1_25_release_notes.md")
-    claims = _read_doc("docs/CLAIMS.md")
-    release_validation = _read_doc("docs/release_candidate_validation.md")
+    release_notes = _read_doc("docs/internal/v1_25_release_notes.md")
+    claims = _read_doc("docs/user/CLAIMS.md")
+    release_validation = _read_doc("docs/internal/release_candidate_validation.md")
 
     for required in (
         "engineering prerelease",
@@ -124,13 +124,13 @@ def test_v1_25_release_notes_keep_claim_boundaries_visible():
         assert required in release_notes
 
     for linked_doc in (claims, release_validation):
-        assert "docs/v1_25_release_notes.md" in linked_doc
+        assert "docs/internal/v1_25_release_notes.md" in linked_doc
         assert "canonical run artifact" in linked_doc
         assert "diagnostic-only sidecar" in linked_doc
 
 
 def test_first_run_guide_covers_minimal_trace_and_troubleshooting():
-    getting_started = _read_doc("docs/GETTING-STARTED.md")
+    getting_started = _read_doc("docs/user/GETTING-STARTED.md")
 
     for required in (
         "First-Run Checklist",
@@ -153,8 +153,8 @@ def test_first_run_guide_covers_minimal_trace_and_troubleshooting():
 
 
 def test_v1_25_release_materials_cover_checklist_and_public_navigation():
-    checklist = _read_doc("docs/v1_25_prerelease_checklist.md")
-    release_notes = _read_doc("docs/v1_25_release_notes.md")
+    checklist = _read_doc("docs/internal/v1_25_prerelease_checklist.md")
+    release_notes = _read_doc("docs/internal/v1_25_release_notes.md")
     readme = _read_doc("README.md")
 
     for required in (
@@ -172,29 +172,29 @@ def test_v1_25_release_materials_cover_checklist_and_public_navigation():
         "Validation Evidence",
         "Known Limitations",
         "Deferred Claims",
-        "docs/v1_25_prerelease_checklist.md",
-        "docs/rocm_timing.md",
-        "docs/GETTING-STARTED.md",
+        "docs/internal/v1_25_prerelease_checklist.md",
+        "docs/user/rocm_timing.md",
+        "docs/user/GETTING-STARTED.md",
     ):
         assert required in release_notes
 
     for required in (
         "v1.25 Engineering Prerelease",
-        "docs/v1_25_release_notes.md",
-        "docs/v1_25_prerelease_checklist.md",
-        "docs/rocm.md",
-        "docs/CLAIMS.md",
-        "docs/RESEARCHER-GUIDE.md",
-        "docs/rocm_timing.md",
-        "docs/GETTING-STARTED.md",
+        "docs/internal/v1_25_release_notes.md",
+        "docs/internal/v1_25_prerelease_checklist.md",
+        "docs/user/rocm.md",
+        "docs/user/CLAIMS.md",
+        "docs/user/RESEARCHER-GUIDE.md",
+        "docs/user/rocm_timing.md",
+        "docs/user/GETTING-STARTED.md",
         "troubleshooting",
     ):
         assert required in readme
 
 
 def test_v1_21_docs_keep_debt_reduction_separate_from_external_claims():
-    claims = _read_doc("docs/CLAIMS.md")
-    development = _read_doc("docs/DEVELOPMENT.md")
+    claims = _read_doc("docs/user/CLAIMS.md")
+    development = _read_doc("docs/user/DEVELOPMENT.md")
     concerns = _read_doc(".planning/codebase/CONCERNS.md")
 
     for required in (
@@ -220,7 +220,7 @@ def test_v1_21_docs_keep_debt_reduction_separate_from_external_claims():
 
 
 def test_curated_slice_defines_scope_commands_and_artifacts():
-    text = _read_doc("docs/curated_rocm_slice.md")
+    text = _read_doc("docs/internal/curated_rocm_slice.md")
 
     for required in (
         "tests/sol_execbench/samples/rmsnorm",
@@ -236,8 +236,8 @@ def test_curated_slice_defines_scope_commands_and_artifacts():
 
 
 def test_researcher_guide_and_cookbook_cover_core_roles_and_recipes():
-    guide = _read_doc("docs/RESEARCHER-GUIDE.md")
-    cookbook = _read_doc("docs/COOKBOOK.md")
+    guide = _read_doc("docs/user/RESEARCHER-GUIDE.md")
+    cookbook = _read_doc("docs/user/COOKBOOK.md")
 
     for required in (
         "GPU kernel author",
@@ -259,7 +259,7 @@ def test_researcher_guide_and_cookbook_cover_core_roles_and_recipes():
 
 
 def test_v1_15_release_closure_preserves_research_preview_boundary():
-    text = _read_doc("docs/v1_15_release_closure.md")
+    text = _read_doc("docs/internal/v1_15_release_closure.md")
 
     for required in (
         "research-grade benchmark preview",
@@ -281,8 +281,8 @@ def test_v1_15_release_closure_preserves_research_preview_boundary():
 
 
 def test_rocm_toolchain_routing_docs_define_matrix_and_claim_boundaries():
-    text = _read_doc("docs/rocm_toolchain_routing.md")
-    claims = _read_doc("docs/CLAIMS.md")
+    text = _read_doc("docs/user/rocm_toolchain_routing.md")
+    claims = _read_doc("docs/user/CLAIMS.md")
 
     for required in (
         "Evidence Levels",
@@ -307,9 +307,9 @@ def test_rocm_toolchain_routing_docs_define_matrix_and_claim_boundaries():
 
 
 def test_static_kernel_evidence_docs_define_usage_and_boundaries():
-    text = _read_doc("docs/static_kernel_evidence.md")
-    claims = _read_doc("docs/CLAIMS.md")
-    guide = _read_doc("docs/RESEARCHER-GUIDE.md")
+    text = _read_doc("docs/user/static_kernel_evidence.md")
+    claims = _read_doc("docs/user/CLAIMS.md")
+    guide = _read_doc("docs/user/RESEARCHER-GUIDE.md")
 
     for required in (
         "--static-evidence auto",
@@ -338,14 +338,14 @@ def test_static_kernel_evidence_docs_define_usage_and_boundaries():
         assert boundary in text
         assert boundary in claims or boundary.replace("-", " ") in claims
 
-    assert "docs/static_kernel_evidence.md" in guide
+    assert "docs/user/static_kernel_evidence.md" in guide
 
 
 def test_static_kernel_evidence_docs_keep_deferred_scope_explicit():
     combined = "\n".join(
         [
-            _read_doc("docs/static_kernel_evidence.md"),
-            _read_doc("docs/CLAIMS.md"),
+            _read_doc("docs/user/static_kernel_evidence.md"),
+            _read_doc("docs/user/CLAIMS.md"),
             _read_doc("docs/internal/v1_17_static_kernel_evidence_validation.md"),
         ]
     )
@@ -391,7 +391,7 @@ def test_v1_17_static_evidence_validation_artifact_records_live_boundary():
 def test_v1_19_guide_is_linked_from_public_entry_docs():
     for path in V1_19_ENTRY_DOCS:
         text = _read_doc(path)
-        assert "docs/v1_19_evidence_guide.md" in text
+        assert "docs/internal/v1_19_evidence_guide.md" in text
 
 
 def test_v1_19_guide_names_evidence_surfaces_and_scripts():

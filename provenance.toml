@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 version = 1
-policy_doc = "docs/provenance.md"
+policy_doc = "docs/user/provenance.md"
 upstream_repository = "https://github.com/NVIDIA/SOL-ExecBench"
 upstream_ref = "upstream/main"
 project_attribution = "Copyright (c) 2026 contributors to SOL ExecBench ROCm Port"
@@ -43,7 +43,7 @@ release_bundle_blocked = "Must not be copied into prerelease or release artifact
 
 [dataset_policy]
 schema_version = "sol_execbench.dataset_provenance_policy.v1"
-policy_doc = "docs/provenance.md#dataset-license-and-redistribution-boundaries"
+policy_doc = "docs/user/provenance.md#dataset-license-and-redistribution-boundaries"
 guardrail = "scripts/check_dataset_redistribution.py"
 default_boundary = "Dataset source and migrated payloads are local inputs unless this manifest explicitly classifies them as publishable."
 

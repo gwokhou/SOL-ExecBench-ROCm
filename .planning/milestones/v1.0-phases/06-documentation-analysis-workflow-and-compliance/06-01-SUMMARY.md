@@ -3,7 +3,7 @@
 ## Completed
 
 - Rewrote `README.md` as a ROCm-only project entry point.
-- Added `docs/rocm.md` with host, Docker, Python dependency, clock locking, and hardware validation notes.
+- Added `docs/user/rocm.md` with host, Docker, Python dependency, clock locking, and hardware validation notes.
 - Replaced stale active NVIDIA setup instructions with ROCm Docker and `uv` workflows.
 
 ## Evidence

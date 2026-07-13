@@ -9,7 +9,7 @@ protect both incorrect NVIDIA-only headers and missing required NVIDIA notices.
 
 1. Extend `scripts/check_prerelease_readiness.py`.
    - Parse `provenance.toml`.
-   - Verify `docs/provenance.md` exists and has required phrases.
+   - Verify `docs/user/provenance.md` exists and has required phrases.
    - Verify allowed files contain NVIDIA and project attribution.
    - Verify cleanup candidates contain project attribution and no NVIDIA
      attribution.

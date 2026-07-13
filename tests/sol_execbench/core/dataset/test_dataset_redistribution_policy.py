@@ -41,7 +41,7 @@ def test_blocks_generated_nvidia_derivatives_for_release_bundles(tmp_path) -> No
     restricted.write_text(
         json.dumps({"source_boundary": "nvidia_sol_execbench"}), encoding="utf-8"
     )
-    allowed = tmp_path / "docs/provenance.md"
+    allowed = tmp_path / "docs/user/provenance.md"
     allowed.parent.mkdir(parents=True)
     allowed.write_text("# Provenance\n", encoding="utf-8")
 

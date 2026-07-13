@@ -48,8 +48,8 @@ local migration tooling and dataset-runner integration remain later phases.
 - `.planning/REQUIREMENTS.md` — DATA-LIC-01 through DATA-LIC-04 requirements.
 - `.planning/ROADMAP.md` — Phase 131 goal and success criteria.
 - `provenance.toml` — existing machine-readable provenance manifest.
-- `docs/provenance.md` — public provenance policy.
-- `docs/compliance.md` — public compliance and known-gap policy.
+- `docs/user/provenance.md` — public provenance policy.
+- `docs/user/compliance.md` — public compliance and known-gap policy.
 - `scripts/check_prerelease_readiness.py` — existing release gate.
 
 </canonical_refs>
@@ -57,7 +57,7 @@ local migration tooling and dataset-runner integration remain later phases.
 <code_context>
 ## Existing Code Insights
 
-- `provenance.toml`, `docs/provenance.md`, and
+- `provenance.toml`, `docs/user/provenance.md`, and
   `tests/sol_execbench/test_provenance_policy.py` already enforce file-level
   source/header provenance from earlier milestones.
 - `scripts/check_prerelease_readiness.py` already blocks missing provenance docs

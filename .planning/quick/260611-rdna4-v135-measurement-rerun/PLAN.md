@@ -83,7 +83,7 @@ Notes:
   that lack timing sidecars from being misclassified as stale blocked
   denominator rows.
 - 2026-06-12: Updated related Markdown validation conclusions in
-  `docs/CLAIMS.md`, `docs/rocm.md`, `docs/research_preview.md`,
+  `docs/user/CLAIMS.md`, `docs/user/rocm.md`, `docs/user/research_preview.md`,
   `docs/internal/RDNA4-AUTHORITY-GAP-CLOSURE.md`, and
   `docs/internal/RDNA4-DENOMINATOR-POLICY.md` to reflect the v1.35 rerun
   evidence while preserving `full_profiler_backed_timing_coverage=false` and

@@ -17,8 +17,8 @@ documentation with the provenance policy.
 
 ## Implementation Decisions
 
-- `docs/provenance.md` is the canonical provenance policy.
-- `docs/compliance.md` should summarize the license and attribution boundary.
+- `docs/user/provenance.md` is the canonical provenance policy.
+- `docs/user/compliance.md` should summarize the license and attribution boundary.
 - README and release/research materials should link the provenance policy.
 - Public wording must avoid implying NVIDIA or AMD endorsement.
 
@@ -28,8 +28,8 @@ documentation with the provenance policy.
 
 ## Existing Code Insights
 
-The relevant public docs are `README.md`, `docs/compliance.md`,
-`docs/research_preview.md`, `docs/public_prerelease.md`, and
+The relevant public docs are `README.md`, `docs/user/compliance.md`,
+`docs/user/research_preview.md`, `docs/user/public_prerelease.md`, and
 `docs/releases/v1_26_prerelease_draft.md`.
 
 </code_context>

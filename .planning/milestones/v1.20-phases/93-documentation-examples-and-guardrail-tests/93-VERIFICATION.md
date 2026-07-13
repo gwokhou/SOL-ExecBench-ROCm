@@ -19,7 +19,7 @@ passed
 
 | Requirement | Source Plan | Description | Status | Evidence |
 | --- | --- | --- | --- | --- |
-| DOCS-01 | 93-01 | Docs explain generation and interpretation of all v1.20 artifacts. | passed | `docs/v1_20_evidence_quality_guide.md`. |
+| DOCS-01 | 93-01 | Docs explain generation and interpretation of all v1.20 artifacts. | passed | `docs/internal/v1_20_evidence_quality_guide.md`. |
 | DOCS-02 | 93-01 | Docs state v1.20 does not add paper, hardware, native-host, leaderboard, or upstream SOLAR parity. | passed | Docs tests and public guide wording. |
 | DOCS-03 | 93-02 | CPU-safe tests cover contradictions, stability, claim rejection, trust rendering, serialization, docs boundaries, and E2E chain. | passed | v1.20 aggregate pytest suite. |
 | DOCS-04 | 93-01 | Fixtures show consistent, contradictory, noisy, claim-blocked, and missing report shapes. | passed | `docs/examples/v1_20_evidence_quality/` and docs tests. |

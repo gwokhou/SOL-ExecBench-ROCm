@@ -341,7 +341,7 @@ Apache-2.0 ROCm port accurately preserves upstream NVIDIA notices only where
 they apply and clearly attributes independent ROCm work to this project.
 
 **Shipped outcome:** v1.27 added `provenance.toml` and
-`docs/provenance.md`, corrected file-level SPDX attribution according to
+`docs/user/provenance.md`, corrected file-level SPDX attribution according to
 provenance, updated public compliance/release/research wording, and added
 readiness/provenance tests that prevent future blanket NVIDIA header drift.
 

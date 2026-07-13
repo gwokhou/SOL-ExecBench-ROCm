@@ -7,8 +7,8 @@ reviewed_at: 2026-06-01
 
 ## Scope Reviewed
 
-- `docs/research_preview.md`
-- `docs/RESEARCHER-GUIDE.md`
+- `docs/user/research_preview.md`
+- `docs/user/RESEARCHER-GUIDE.md`
 - `tests/sol_execbench/test_research_preview_docs.py`
 
 ## Findings

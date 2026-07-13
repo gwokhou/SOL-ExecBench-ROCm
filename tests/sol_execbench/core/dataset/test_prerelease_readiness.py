@@ -414,7 +414,7 @@ def test_provenance_policy_check_passes_for_repository_state():
 
 def test_provenance_policy_check_blocks_missing_manifest(tmp_path):
     (tmp_path / "docs").mkdir()
-    (tmp_path / "docs/provenance.md").write_text(
+    (tmp_path / "docs/user/provenance.md").write_text(
         "upstream retained derivative modified independent ROCm work not legal advice "
         "not imply NVIDIA or AMD endorsement\n",
         encoding="utf-8",
@@ -439,7 +439,7 @@ def test_provenance_policy_check_blocks_cleanup_candidate_with_nvidia_header(tmp
         encoding="utf-8",
     )
     (tmp_path / "docs").mkdir()
-    (tmp_path / "docs/provenance.md").write_text(
+    (tmp_path / "docs/user/provenance.md").write_text(
         "upstream retained derivative modified independent ROCm work not legal advice "
         "not imply NVIDIA or AMD endorsement\n",
         encoding="utf-8",

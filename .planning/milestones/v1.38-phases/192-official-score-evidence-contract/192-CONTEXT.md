@@ -83,8 +83,8 @@ claims.
 - `tests/sol_execbench/test_amd_native_score.py` — existing provisional score
   behavior, including reference latency fallback.
 - `tests/sol_execbench/test_run_dataset_amd_score.py` — dataset report wiring.
-- `docs/EVALUATOR-CONTRACT.md`, `docs/RESEARCHER-GUIDE.md`,
-  `docs/trace.md`, and `docs/COOKBOOK.md` — score/trace/baseline authority
+- `docs/user/EVALUATOR-CONTRACT.md`, `docs/user/RESEARCHER-GUIDE.md`,
+  `docs/user/trace.md`, and `docs/user/COOKBOOK.md` — score/trace/baseline authority
   language.
 
 </canonical_refs>

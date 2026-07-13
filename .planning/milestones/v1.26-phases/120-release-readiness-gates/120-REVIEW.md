@@ -9,7 +9,7 @@ reviewed_at: 2026-06-01
 
 - `scripts/check_prerelease_readiness.py`
 - `tests/sol_execbench/test_prerelease_readiness.py`
-- `docs/prerelease_readiness.md`
+- `docs/internal/prerelease_readiness.md`
 - Prerelease checklist updates.
 
 ## Findings

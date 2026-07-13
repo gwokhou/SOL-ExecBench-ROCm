@@ -27,7 +27,7 @@ claims out of v1.6.
 - `src/sol_execbench/core/scoring/amd_score.py`
 - `tests/sol_execbench/test_public_contract_guardrails.py`
 - `tests/sol_execbench/test_amd_native_score.py`
-- `docs/analysis.md`
+- `docs/internal/analysis.md`
 
 **Work:**
 - Update stale CDNA3 warning text so it is not v1.5-specific.

@@ -43,7 +43,7 @@ This phase delivers a versioned prerelease artifact bundle workflow for maintain
 ### Reusable Assets
 - `scripts/release_candidate_validation.py` already runs bounded CPU-safe, ROCm smoke, Docker smoke, and dataset-slice checks and writes JSON/Markdown summaries.
 - Existing tests import scripts with `importlib.util.spec_from_file_location` and monkeypatch subprocess boundaries.
-- `docs/CLAIMS.md`, release notes, support matrix, traceability, and validation docs already carry the public prerelease claim boundary.
+- `docs/user/CLAIMS.md`, release notes, support matrix, traceability, and validation docs already carry the public prerelease claim boundary.
 
 ### Established Patterns
 - Repo-level operational workflows live in `scripts/` and write review artifacts under `out/`.

@@ -6,7 +6,7 @@
 ## Delivered
 
 - Added provenance policy checks to `scripts/check_prerelease_readiness.py`.
-- The readiness gate now checks `provenance.toml`, `docs/provenance.md`,
+- The readiness gate now checks `provenance.toml`, `docs/user/provenance.md`,
   NVIDIA notice allowlist consistency, cleanup candidate headers, and project
   attribution presence.
 - Added readiness tests for repository provenance state, missing manifests, and

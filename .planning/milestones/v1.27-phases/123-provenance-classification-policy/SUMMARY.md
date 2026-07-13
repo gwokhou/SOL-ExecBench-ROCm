@@ -7,7 +7,7 @@
 
 - Added `provenance.toml` as a machine-readable provenance policy and NVIDIA
   notice classification artifact.
-- Added `docs/provenance.md` explaining classification classes, header policy,
+- Added `docs/user/provenance.md` explaining classification classes, header policy,
   paper citation boundaries, non-endorsement wording, and history policy.
 - Added `tests/sol_execbench/test_provenance_policy.py` to verify the manifest
   accounts for all current active NVIDIA SPDX header files.

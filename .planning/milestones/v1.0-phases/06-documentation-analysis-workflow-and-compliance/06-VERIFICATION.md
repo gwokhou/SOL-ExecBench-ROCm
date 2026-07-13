@@ -19,11 +19,11 @@ implementation.
 | Requirement | Result | Evidence |
 | --- | --- | --- |
 | SCFG-04 | PASS | `README.md` states this repository is ROCm-only and does not maintain CUDA/NVIDIA runtime support. |
-| DOC-01 | PASS | `README.md` and `docs/rocm.md` document ROCm setup, Docker usage, dataset setup, and local evaluation commands. |
-| DOC-02 | PASS | `docs/solution.md` documents ROCm languages, hardware targets, HIP compile options, and unsupported legacy values. |
-| DOC-03 | PASS | `docs/analysis.md` documents trace analysis, HIP-backed event timing, clock locking, and `rocprofv3`. |
-| DOC-04 | PASS | `docs/compliance.md` documents license context, retained upstream attribution, and dependency families. |
-| DOC-05 | PASS | `docs/compliance.md` and `docs/rocm.md` document unsupported NVIDIA runtimes and deferred CDNA 3 validation. |
+| DOC-01 | PASS | `README.md` and `docs/user/rocm.md` document ROCm setup, Docker usage, dataset setup, and local evaluation commands. |
+| DOC-02 | PASS | `docs/user/solution.md` documents ROCm languages, hardware targets, HIP compile options, and unsupported legacy values. |
+| DOC-03 | PASS | `docs/internal/analysis.md` documents trace analysis, HIP-backed event timing, clock locking, and `rocprofv3`. |
+| DOC-04 | PASS | `docs/user/compliance.md` documents license context, retained upstream attribution, and dependency families. |
+| DOC-05 | PASS | `docs/user/compliance.md` and `docs/user/rocm.md` document unsupported NVIDIA runtimes and deferred CDNA 3 validation. |
 
 ## Verification Commands
 

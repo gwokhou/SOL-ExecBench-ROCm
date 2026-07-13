@@ -6,9 +6,9 @@
 - Modify: `src/sol_execbench/core/scoring/official_score.py`
 - Create: `src/sol_execbench/cli/commands/hardware_model.py`
 - Modify: `src/sol_execbench/cli/commands/root.py`
-- Modify: `docs/CONFIGURATION.md`
-- Modify: `docs/TESTING.md`
-- Modify: `docs/sol_score_gap_and_amd_reuse_report.md`
+- Modify: `docs/user/CONFIGURATION.md`
+- Modify: `docs/user/TESTING.md`
+- Modify: `docs/internal/sol_score_gap_and_amd_reuse_report.md`
 - Test: `tests/sol_execbench/core/scoring/test_amd_native_score.py`
 - Test: `tests/sol_execbench/core/evidence/test_official_score_evidence.py`
 - Test: `tests/sol_execbench/cli/commands/test_hardware_model_cli.py`

@@ -7,8 +7,8 @@
 ## Summary
 
 Phase 77 is documentation and guardrail work. Existing docs already have claim
-boundary patterns in `docs/CLAIMS.md`, researcher artifact interpretation in
-`docs/RESEARCHER-GUIDE.md`, and internal validation-readiness artifacts. Static
+boundary patterns in `docs/user/CLAIMS.md`, researcher artifact interpretation in
+`docs/user/RESEARCHER-GUIDE.md`, and internal validation-readiness artifacts. Static
 Kernel Evidence should be added as an allowed diagnostic evidence class while
 forbidden wording continues to block authority claims.
 

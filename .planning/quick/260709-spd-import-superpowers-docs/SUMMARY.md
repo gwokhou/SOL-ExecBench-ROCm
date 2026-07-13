@@ -7,7 +7,7 @@ completed_at: "2026-07-09T09:00:00Z"
 
 # Summary
 
-Converted the legacy `docs/superpowers/` planning corpus into GSD planning
+Converted the legacy `docs/internal/superpowers/` planning corpus into GSD planning
 artifacts without changing the active v1.38 roadmap. Imported implementation
 plans now live as archived quick task artifacts, and design specs now live as
 archived research notes.
@@ -28,8 +28,8 @@ Passed:
 ```bash
 python - <<'PY'
 from pathlib import Path
-plan_sources = sorted(Path('docs/superpowers/plans').glob('*.md'))
-spec_sources = sorted(Path('docs/superpowers/specs').glob('*.md'))
+plan_sources = sorted(Path('docs/internal/superpowers/plans').glob('*.md'))
+spec_sources = sorted(Path('docs/internal/superpowers/specs').glob('*.md'))
 plan_targets = sorted(Path('.planning/quick').glob('*-sp*/*-PLAN.md'))
 spec_targets = [p for p in Path('.planning/research/superpowers').glob('*.md') if p.name != 'INDEX.md']
 print(f'plans: sources={len(plan_sources)} targets={len(plan_targets)}')

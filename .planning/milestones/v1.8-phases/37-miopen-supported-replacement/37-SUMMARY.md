@@ -25,7 +25,7 @@ replacement path.
   staging, RDNA 4 E2E registration, and support-status documentation.
 - Added `requires_rocm_dev` test gating for native extension development
   headers, so RDNA 4 E2E tests do not fail on partial ROCm installations.
-- Updated `docs/rocm_libraries.md` to classify MIOpen as supported and describe
+- Updated `docs/user/rocm_libraries.md` to classify MIOpen as supported and describe
   operation-specific constraints.
 
 ## Validation

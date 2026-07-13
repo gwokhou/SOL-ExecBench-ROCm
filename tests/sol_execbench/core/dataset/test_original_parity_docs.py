@@ -7,7 +7,7 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 
 
 def test_original_parity_doc_covers_public_surfaces():
-    text = (REPO_ROOT / "docs/original_parity.md").read_text()
+    text = (REPO_ROOT / "docs/internal/original_parity.md").read_text()
     for surface in (
         "Single-problem CLI",
         "Dataset runner",
@@ -22,7 +22,7 @@ def test_original_parity_doc_covers_public_surfaces():
 
 
 def test_original_parity_doc_classifies_nvidia_solution_categories():
-    text = (REPO_ROOT / "docs/original_parity.md").read_text()
+    text = (REPO_ROOT / "docs/internal/original_parity.md").read_text()
     for category in (
         "`pytorch`",
         "`triton`",
@@ -38,7 +38,7 @@ def test_original_parity_doc_classifies_nvidia_solution_categories():
 
 
 def test_original_parity_doc_keeps_rocm_scope_boundary_visible():
-    text = (REPO_ROOT / "docs/original_parity.md").read_text()
+    text = (REPO_ROOT / "docs/internal/original_parity.md").read_text()
     assert "Restoring CUDA/NVIDIA runtime compatibility" in text
     assert "CDNA 3 `gfx94*` hardware validation" in text
     assert "AMD-native scoring or roofline interpretation" in text

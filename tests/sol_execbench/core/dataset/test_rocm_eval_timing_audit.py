@@ -105,7 +105,7 @@ def test_allowlist_entries_have_non_empty_reasons_and_audited_paths():
 
 
 def test_rocm_timing_docs_define_source_specific_timing_semantics():
-    text = (REPO_ROOT / "docs/rocm_timing.md").read_text()
+    text = (REPO_ROOT / "docs/user/rocm_timing.md").read_text()
 
     assert "source_type -> timer_backend -> interpretation" in text
     assert "kernel activity" in text

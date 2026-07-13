@@ -2,7 +2,7 @@
 
 ## Completed
 
-- Added `docs/public_prerelease.md`.
+- Added `docs/user/public_prerelease.md`.
 - Added `docs/releases/v1_26_prerelease_draft.md`.
 - Updated README documentation links for v1.26 artifact bundle, readiness gates, research preview, and public prerelease guide.
 - Added focused tests in `tests/sol_execbench/test_public_prerelease_docs.py`.

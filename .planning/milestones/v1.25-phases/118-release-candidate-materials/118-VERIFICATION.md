@@ -25,9 +25,9 @@ Result: `78 passed in 11.13s`.
 
 ## Goal-Backward Assessment
 
-- REL-01: Passed. `docs/v1_25_prerelease_checklist.md` covers clean tree,
+- REL-01: Passed. `docs/internal/v1_25_prerelease_checklist.md` covers clean tree,
   focused tests, release validation, claim review, tag, and push.
-- REL-02: Passed. `docs/v1_25_release_notes.md` summarizes capability,
+- REL-02: Passed. `docs/internal/v1_25_release_notes.md` summarizes capability,
   evidence, limitations, and deferred claims.
 - REL-03: Passed. `README.md` and release notes point users to support matrix,
   claims, researcher guide, timing semantics, release validation, and

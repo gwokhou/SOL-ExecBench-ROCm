@@ -3,7 +3,7 @@ type: research_note
 status: archived
 title: "Coupling Optimization Design"
 source_format: superpowers
-source_path: "docs/superpowers/specs/2026-07-07-coupling-optimization-design.md"
+source_path: "docs/internal/superpowers/specs/2026-07-07-coupling-optimization-design.md"
 converted_at: "2026-07-09T00:00:00Z"
 ---
 

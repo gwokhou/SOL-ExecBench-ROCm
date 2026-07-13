@@ -10,21 +10,21 @@ def _read(path: str) -> str:
 
 
 def test_public_prerelease_guide_contains_publish_checklist_and_links():
-    text = _read("docs/public_prerelease.md")
+    text = _read("docs/user/public_prerelease.md")
 
     for required in (
         "scripts/internal/release/build_prerelease_artifact_bundle.py",
         "scripts/internal/release/check_prerelease_readiness.py",
-        "docs/prerelease_artifact_bundle.md",
-        "docs/prerelease_readiness.md",
-        "docs/provenance.md",
-        "docs/compliance.md",
-        "docs/research_preview.md",
-        "docs/rocm.md",
-        "docs/CLAIMS.md",
-        "docs/GETTING-STARTED.md",
-        "docs/rocm_timing.md",
-        "docs/RESEARCHER-GUIDE.md",
+        "docs/internal/prerelease_artifact_bundle.md",
+        "docs/internal/prerelease_readiness.md",
+        "docs/user/provenance.md",
+        "docs/user/compliance.md",
+        "docs/user/research_preview.md",
+        "docs/user/rocm.md",
+        "docs/user/CLAIMS.md",
+        "docs/user/GETTING-STARTED.md",
+        "docs/user/rocm_timing.md",
+        "docs/user/RESEARCHER-GUIDE.md",
         "docs/releases/v1_26_prerelease_draft.md",
     ):
         assert required in text
@@ -39,16 +39,16 @@ def test_release_draft_has_required_assets_and_bounded_wording():
         "prerelease_artifact_bundle.json",
         "SHA256SUMS",
         "prerelease_readiness.json",
-        "docs/prerelease_artifact_bundle.md",
-        "docs/prerelease_readiness.md",
-        "docs/provenance.md",
-        "docs/compliance.md",
-        "docs/research_preview.md",
-        "docs/rocm.md",
-        "docs/CLAIMS.md",
-        "docs/GETTING-STARTED.md",
-        "docs/rocm_timing.md",
-        "docs/RESEARCHER-GUIDE.md",
+        "docs/internal/prerelease_artifact_bundle.md",
+        "docs/internal/prerelease_readiness.md",
+        "docs/user/provenance.md",
+        "docs/user/compliance.md",
+        "docs/user/research_preview.md",
+        "docs/user/rocm.md",
+        "docs/user/CLAIMS.md",
+        "docs/user/GETTING-STARTED.md",
+        "docs/user/rocm_timing.md",
+        "docs/user/RESEARCHER-GUIDE.md",
         "recorded on MI308X",
         "CDNA4 validation is unavailable",
         "does not imply NVIDIA or AMD endorsement",
@@ -70,18 +70,18 @@ def test_readme_links_v1_26_public_materials():
     text = _read("README.md")
 
     for required in (
-        "docs/prerelease_artifact_bundle.md",
-        "docs/prerelease_readiness.md",
-        "docs/provenance.md",
-        "docs/compliance.md",
-        "docs/research_preview.md",
-        "docs/public_prerelease.md",
+        "docs/internal/prerelease_artifact_bundle.md",
+        "docs/internal/prerelease_readiness.md",
+        "docs/user/provenance.md",
+        "docs/user/compliance.md",
+        "docs/user/research_preview.md",
+        "docs/user/public_prerelease.md",
     ):
         assert required in text
 
 
 def test_public_materials_explain_provenance_and_non_endorsement():
-    public_guide = _read("docs/public_prerelease.md")
+    public_guide = _read("docs/user/public_prerelease.md")
     release_draft = _read("docs/releases/v1_26_prerelease_draft.md")
 
     for text in (public_guide, release_draft):
@@ -100,7 +100,7 @@ def test_public_materials_explain_provenance_and_non_endorsement():
 
 
 def test_dataset_runner_cookbook_preserves_local_only_dataset_boundaries():
-    text = _read("docs/COOKBOOK.md")
+    text = _read("docs/user/COOKBOOK.md")
     normalized = " ".join(text.split())
 
     for required in (

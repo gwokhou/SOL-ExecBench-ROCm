@@ -361,7 +361,7 @@ def test_trust_summary_skipped_when_dataset_closure_missing(tmp_path, monkeypatc
 
 
 def test_release_candidate_validation_docs_preserve_claim_boundaries():
-    text = (REPO_ROOT / "docs/release_candidate_validation.md").read_text(
+    text = (REPO_ROOT / "docs/internal/release_candidate_validation.md").read_text(
         encoding="utf-8"
     )
     script = (

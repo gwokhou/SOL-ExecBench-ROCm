@@ -11,7 +11,7 @@ requirements: [FIRST-01, FIRST-02, FIRST-03, FIRST-04]
 
 ## Completed Work
 
-- Added a first-run checklist to `docs/GETTING-STARTED.md`.
+- Added a first-run checklist to `docs/user/GETTING-STARTED.md`.
 - Documented a minimal sample command that writes
   `out/first-run.trace.jsonl`.
 - Added a first-trace reading section covering status, correctness, latency,

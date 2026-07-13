@@ -6,8 +6,8 @@
 The Decision sidecar turns decision-ready data-layer facts (an ``ArchIsaBudget``
 plus per-kernel ``StaticResourceFootprint`` records) into confidence-weighted
 Layer R optimization hints. It is diagnostic-only and never re-asserts benchmark
-authority. See ``docs/decision_sidecar_contract.md`` and
-``docs/decision-modeling-research.md`` for the contract and modeling survey.
+authority. See ``docs/user/decision_sidecar_contract.md`` and
+``docs/internal/decision-modeling-research.md`` for the contract and modeling survey.
 """
 
 from __future__ import annotations

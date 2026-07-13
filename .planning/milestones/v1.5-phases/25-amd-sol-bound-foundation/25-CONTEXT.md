@@ -61,7 +61,7 @@ artifacts before AMD-native scoring is allowed.
 
 ### Integration Points
 - Phase 25 artifacts feed Phase 26 AMD-native scoring.
-- `docs/analysis.md` should explain AMD SOL bound artifacts as a prerequisite
+- `docs/internal/analysis.md` should explain AMD SOL bound artifacts as a prerequisite
   for AMD-native claims.
 
 </code_context>

@@ -267,11 +267,11 @@ assertions.
      evidence.
 
 3. **Where should docs live?**
-   - What we know: Existing docs include `docs/analysis.md`, `docs/trace.md`,
-     and `docs/solution.md`.
-   - What's unclear: Whether a dedicated `docs/rocm_timing.md` is preferable to
-     expanding `docs/analysis.md`.
-   - Recommendation: Add a dedicated `docs/rocm_timing.md` and link it from
+   - What we know: Existing docs include `docs/internal/analysis.md`, `docs/user/trace.md`,
+     and `docs/user/solution.md`.
+   - What's unclear: Whether a dedicated `docs/user/rocm_timing.md` is preferable to
+     expanding `docs/internal/analysis.md`.
+   - Recommendation: Add a dedicated `docs/user/rocm_timing.md` and link it from
      existing timing/analysis docs in a later phase if needed.
 </open_questions>
 
@@ -297,7 +297,7 @@ assertions.
 
 ### Secondary
 
-- `docs/analysis.md` - current optional `rocprofv3` guidance and event timing
+- `docs/internal/analysis.md` - current optional `rocprofv3` guidance and event timing
   limitations.
 - `tests/sol_execbench/test_rocm_eval_timing_audit.py` - current ROCm timing
   audit expectations.

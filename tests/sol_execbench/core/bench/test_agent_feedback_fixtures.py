@@ -14,7 +14,7 @@ from sol_execbench.core.bench.agent_feedback import (
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 FIXTURE_DIR = REPO_ROOT / "tests/sol_execbench/fixtures/agent_feedback"
-DOC = REPO_ROOT / "docs/agent_feedback_sidecar.md"
+DOC = REPO_ROOT / "docs/user/agent_feedback_sidecar.md"
 
 
 def _json(path: Path) -> dict:

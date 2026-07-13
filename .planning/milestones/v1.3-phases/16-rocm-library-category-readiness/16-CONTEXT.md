@@ -30,7 +30,7 @@ point users to the support-level distinction.
 ## Existing Code Insights
 
 ### Reusable Assets
-- `docs/solution.md` already lists supported language values.
+- `docs/user/solution.md` already lists supported language values.
 - `tests/sol_execbench/test_rocm_library_examples.py` validates example metadata.
 
 ### Established Patterns

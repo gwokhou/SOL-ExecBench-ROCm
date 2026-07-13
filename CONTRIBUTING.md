@@ -45,8 +45,8 @@ For ROCm GPU evaluation, use a ROCm-capable AMD host or the Docker helper:
 ./scripts/run_docker.sh --build
 ```
 
-See [Getting Started](docs/GETTING-STARTED.md), [Development](docs/DEVELOPMENT.md),
-and [Testing](docs/TESTING.md) for more detail.
+See [Getting Started](docs/user/GETTING-STARTED.md), [Development](docs/user/DEVELOPMENT.md),
+and [Testing](docs/user/TESTING.md) for more detail.
 
 ## Coding Standards
 

@@ -19,8 +19,8 @@ troubleshooting entry points.
 
 - Phase 114 added release-candidate validation commands and docs.
 - Phase 115 added the engineering prerelease support matrix.
-- Phase 116 added `docs/v1_25_release_notes.md`.
-- Phase 117 clarified `docs/GETTING-STARTED.md`.
+- Phase 116 added `docs/internal/v1_25_release_notes.md`.
+- Phase 117 clarified `docs/user/GETTING-STARTED.md`.
 - `README.md` already lists most public documentation entry points.
 
 ## Locked Decisions

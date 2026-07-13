@@ -31,7 +31,7 @@ Result: `76 passed in 11.14s`.
   full-suite validation, and CDNA4 validation overclaims.
 - CLAIM-02: Passed. `tests/sol_execbench/test_research_release_docs.py`
   contains v1.25 release-note guardrails.
-- CLAIM-03: Passed. `docs/v1_25_release_notes.md` classifies evidence as
+- CLAIM-03: Passed. `docs/internal/v1_25_release_notes.md` classifies evidence as
   canonical, diagnostic-only, provisional prerelease evidence, deferred, or
   unavailable.
 

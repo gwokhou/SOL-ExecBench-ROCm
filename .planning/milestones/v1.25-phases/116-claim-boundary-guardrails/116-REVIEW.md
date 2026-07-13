@@ -12,9 +12,9 @@ reviewed_at: "2026-06-01"
 
 Reviewed the Phase 116 documentation and guardrail changes in:
 
-- `docs/v1_25_release_notes.md`
-- `docs/CLAIMS.md`
-- `docs/release_candidate_validation.md`
+- `docs/internal/v1_25_release_notes.md`
+- `docs/user/CLAIMS.md`
+- `docs/internal/release_candidate_validation.md`
 - `tests/sol_execbench/test_research_release_docs.py`
 
 ## Findings
@@ -23,9 +23,9 @@ No actionable findings remain.
 
 During verification, the guardrail test caught two wording gaps:
 
-- `docs/v1_25_release_notes.md` used `paper-parity` but not the explicit
+- `docs/internal/v1_25_release_notes.md` used `paper-parity` but not the explicit
   `paper parity` phrase required by the release-boundary guardrail.
-- `docs/CLAIMS.md` split `canonical run artifact` across a line break, making
+- `docs/user/CLAIMS.md` split `canonical run artifact` across a line break, making
   the intended guardrail phrase invisible to the substring test.
 
 Both were fixed before completion.

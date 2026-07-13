@@ -22,14 +22,14 @@ tech-stack:
   patterns: [focused Path.read_text docs tests, sidecar-only claim-boundary wording]
 key-files:
   created:
-    - docs/v1_19_evidence_guide.md
+    - docs/internal/v1_19_evidence_guide.md
   modified:
-    - docs/CLAIMS.md
-    - docs/TESTING.md
-    - docs/RESEARCHER-GUIDE.md
+    - docs/user/CLAIMS.md
+    - docs/user/TESTING.md
+    - docs/user/RESEARCHER-GUIDE.md
     - tests/sol_execbench/test_research_release_docs.py
 key-decisions:
-  - "v1.19 evidence guidance is centralized in docs/v1_19_evidence_guide.md and linked from public entry docs."
+  - "v1.19 evidence guidance is centralized in docs/internal/v1_19_evidence_guide.md and linked from public entry docs."
   - "v1.19 documentation remains sidecar/report-only and explicitly denies paper, SOLAR, score, leaderboard, native-host Matrix, CDNA/MI300X/CDNA4, and new-hardware authority."
 patterns-established:
   - "Docs guardrails use focused public-entry reads instead of broad repository scans."
@@ -52,8 +52,8 @@ completed: 2026-05-31
 
 ## Accomplishments
 
-- Added `docs/v1_19_evidence_guide.md` covering execution closure, paper denominator reports, Matrix schema export, Matrix semantic diff, and AMD bound sanity.
-- Linked `docs/CLAIMS.md`, `docs/TESTING.md`, and `docs/RESEARCHER-GUIDE.md` to the central guide with explicit v1.19 negative claim boundaries.
+- Added `docs/internal/v1_19_evidence_guide.md` covering execution closure, paper denominator reports, Matrix schema export, Matrix semantic diff, and AMD bound sanity.
+- Linked `docs/user/CLAIMS.md`, `docs/user/TESTING.md`, and `docs/user/RESEARCHER-GUIDE.md` to the central guide with explicit v1.19 negative claim boundaries.
 - Added focused docs tests that keep v1.19 guide coverage and public entry wording CPU-safe.
 
 ## Task Commits
@@ -65,10 +65,10 @@ _Note: Tasks 2 and 3 were committed together because the RED tests intentionally
 
 ## Files Created/Modified
 
-- `docs/v1_19_evidence_guide.md` - Central v1.19 guide and CPU-safe verification commands.
-- `docs/CLAIMS.md` - v1.19 sidecar evidence claim level and explicit denied authorities.
-- `docs/TESTING.md` - Focused CPU-safe v1.19 docs/contract guardrail command.
-- `docs/RESEARCHER-GUIDE.md` - Researcher workflow references for v1.19 evidence surfaces.
+- `docs/internal/v1_19_evidence_guide.md` - Central v1.19 guide and CPU-safe verification commands.
+- `docs/user/CLAIMS.md` - v1.19 sidecar evidence claim level and explicit denied authorities.
+- `docs/user/TESTING.md` - Focused CPU-safe v1.19 docs/contract guardrail command.
+- `docs/user/RESEARCHER-GUIDE.md` - Researcher workflow references for v1.19 evidence surfaces.
 - `tests/sol_execbench/test_research_release_docs.py` - Focused v1.19 docs wording tests.
 
 ## Decisions Made
@@ -108,7 +108,7 @@ Plan 88-02 can add demo fixture reports that point readers back to this guide an
 
 ## Self-Check: PASSED
 
-- Created file exists: `docs/v1_19_evidence_guide.md`.
+- Created file exists: `docs/internal/v1_19_evidence_guide.md`.
 - Commits exist: `544d1f6`, `986776d`.
 
 ---

@@ -11,7 +11,7 @@ focus: concerns
 
 The evaluator runs submitted code in a local subprocess with static and runtime
 guardrails, but it is not a hardened multi-tenant sandbox. This is documented in
-`README.md` and `docs/ARCHITECTURE.md`. Any workflow that evaluates untrusted
+`README.md` and `docs/user/ARCHITECTURE.md`. Any workflow that evaluates untrusted
 solutions must use external isolation such as Docker, a VM, or a dedicated ROCm
 host.
 
@@ -88,7 +88,7 @@ Relevant paths:
 - `src/sol_execbench/cli/evaluation/runtime.py`
 - `src/sol_execbench/core/bench/rocm_profiler/`
 - `src/sol_execbench/core/dataset/profiler_timing_coverage/`
-- `docs/rocm_timing.md`
+- `docs/user/rocm_timing.md`
 
 ## Hardware Coverage Is Bounded
 
@@ -110,7 +110,7 @@ runtime behavior.
 The repository does not redistribute upstream restricted datasets. Migration
 and execution workflows assume the operator supplies local dataset assets under
 the applicable license. Scripts and docs around `scripts/download_solexecbench.py`,
-`src/sol_execbench/core/dataset/migration/`, and `docs/provenance.md` should
+`src/sol_execbench/core/dataset/migration/`, and `docs/user/provenance.md` should
 continue preserving this boundary.
 
 ## Subprocess And Parallelism Resource Risk

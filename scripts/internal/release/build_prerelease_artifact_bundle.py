@@ -473,21 +473,21 @@ def _source_reference_artifacts(
     refs = [
         (
             "claims_doc",
-            Path("docs/CLAIMS.md"),
+            Path("docs/user/CLAIMS.md"),
             "diagnostic-only",
             "Claim boundary source document.",
             True,
         ),
         (
             "v1_25_release_notes",
-            Path("docs/v1_25_release_notes.md"),
+            Path("docs/internal/v1_25_release_notes.md"),
             "provisional",
             "Engineering-prerelease release-note baseline for artifact authority wording.",
             False,
         ),
         (
             "release_candidate_validation_doc",
-            Path("docs/release_candidate_validation.md"),
+            Path("docs/internal/release_candidate_validation.md"),
             "diagnostic-only",
             "Release-candidate validation command guide.",
             False,

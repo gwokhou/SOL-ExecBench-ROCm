@@ -25,7 +25,7 @@ experiments.
 ## Existing Code Insights
 
 - README already covers basic user setup.
-- `docs/analysis.md`, `docs/rocm.md`, and `docs/original_parity.md` contain
+- `docs/internal/analysis.md`, `docs/user/rocm.md`, and `docs/internal/original_parity.md` contain
   detailed artifact semantics but not a role-based entry point.
 </code_context>
 

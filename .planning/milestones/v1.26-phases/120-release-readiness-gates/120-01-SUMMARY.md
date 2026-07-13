@@ -4,7 +4,7 @@
 
 - Added `scripts/check_prerelease_readiness.py`.
 - Added focused readiness tests.
-- Added `docs/prerelease_readiness.md`.
+- Added `docs/internal/prerelease_readiness.md`.
 - Linked the readiness gate from the prerelease checklist.
 - Updated Phase 120 requirements to complete.
 

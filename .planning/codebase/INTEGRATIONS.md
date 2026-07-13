@@ -39,7 +39,7 @@ diagnostic only and is deliberately separate from correctness authority:
   `src/sol_execbench/cli/evaluation/phases.py`.
 - Profiler implementation: `src/sol_execbench/core/bench/rocm_profiler/`.
 - Timing coverage reports: `src/sol_execbench/core/dataset/profiler_timing_coverage/`.
-- Documentation: `docs/rocm_timing.md` and `docs/rocm_toolchain_routing.md`.
+- Documentation: `docs/user/rocm_timing.md` and `docs/user/rocm_toolchain_routing.md`.
 
 Profiler failures fall back to normal evaluation and record bounded diagnostic
 metadata where possible.
@@ -55,7 +55,7 @@ languages and runnable examples:
 - `rocwmma` with example files in `examples/rocwmma/gemm/`.
 
 Readiness and public-support boundaries are documented in
-`docs/rocm_libraries.md`. Native build validation is covered by tests such as
+`docs/user/rocm_libraries.md`. Native build validation is covered by tests such as
 `tests/sol_execbench/core/dataset/test_rocm_library_examples.py` and Docker
 dependency tests under `tests/docker/dependencies/`.
 
@@ -71,8 +71,8 @@ operator:
 - Dataset layout and manifest helpers in `src/sol_execbench/core/dataset/`.
 - Operator batch execution in `scripts/run_dataset.py`.
 
-Dataset policy and provenance are documented in `docs/provenance.md`,
-`docs/compliance.md`, `docs/COOKBOOK.md`, and related release docs. Migration
+Dataset policy and provenance are documented in `docs/user/provenance.md`,
+`docs/user/compliance.md`, `docs/user/COOKBOOK.md`, and related release docs. Migration
 manifests preserve source-boundary metadata and local-only evidence references.
 
 ## Safetensors And FlashInfer Trace Assets

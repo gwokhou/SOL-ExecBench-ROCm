@@ -37,8 +37,8 @@ This phase covers DOCS-01 through DOCS-06:
 
 - Update existing documentation rather than adding a large new documentation
   tree.
-- Use `docs/CLAIMS.md` for Matrix evidence claim boundaries and
-  `docs/TESTING.md` for validation commands and marker-gated live guidance.
+- Use `docs/user/CLAIMS.md` for Matrix evidence claim boundaries and
+  `docs/user/TESTING.md` for validation commands and marker-gated live guidance.
 - Keep Docker Matrix language precise: container ROCm user-space on recorded
   host driver/devices is not native host validation.
 
@@ -75,9 +75,9 @@ This phase covers DOCS-01 through DOCS-06:
 <code_context>
 ## Existing Code Insights
 
-- `docs/CLAIMS.md` already contains general claim boundaries and a short Docker
+- `docs/user/CLAIMS.md` already contains general claim boundaries and a short Docker
   Matrix statement.
-- `docs/TESTING.md` already documents pytest markers such as `requires_rocm`.
+- `docs/user/TESTING.md` already documents pytest markers such as `requires_rocm`.
 - `tests/conftest.py` already defines marker-gated ROCm behavior and hardware
   architecture markers.
 - Phases 78-81 already provide CPU-safe tests for Matrix schema, claim flags,
@@ -89,8 +89,8 @@ This phase covers DOCS-01 through DOCS-06:
 <specifics>
 ## Specific Ideas
 
-- Expand `docs/CLAIMS.md` with a concise "ROCm Compatibility Matrix" section.
-- Expand `docs/TESTING.md` with "ROCm Matrix Guardrails" commands and
+- Expand `docs/user/CLAIMS.md` with a concise "ROCm Compatibility Matrix" section.
+- Expand `docs/user/TESTING.md` with "ROCm Matrix Guardrails" commands and
   marker-gated live evidence guidance.
 - Add `tests/sol_execbench/test_rocm_matrix_docs.py` to assert required wording
   and guardrail command references.

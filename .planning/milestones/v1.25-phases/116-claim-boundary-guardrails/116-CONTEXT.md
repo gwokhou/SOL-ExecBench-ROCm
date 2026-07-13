@@ -19,16 +19,16 @@ full-suite validation.
 ## Inputs
 
 - Phase 114 created `scripts/release_candidate_validation.py` and
-  `docs/release_candidate_validation.md` for bounded prerelease validation.
-- Phase 115 created the public support matrix in `docs/rocm.md` and mirrored
-  support boundaries in `docs/CLAIMS.md`.
+  `docs/internal/release_candidate_validation.md` for bounded prerelease validation.
+- Phase 115 created the public support matrix in `docs/user/rocm.md` and mirrored
+  support boundaries in `docs/user/CLAIMS.md`.
 - Existing docs already contain claim-boundary surfaces:
-  - `docs/CLAIMS.md`
-  - `docs/release_candidate_validation.md`
-  - `docs/v1_19_evidence_guide.md`
-  - `docs/v1_20_evidence_quality_guide.md`
-  - `docs/v1_15_release_closure.md`
-  - `docs/RESEARCHER-GUIDE.md`
+  - `docs/user/CLAIMS.md`
+  - `docs/internal/release_candidate_validation.md`
+  - `docs/internal/v1_19_evidence_guide.md`
+  - `docs/internal/v1_20_evidence_quality_guide.md`
+  - `docs/internal/v1_15_release_closure.md`
+  - `docs/user/RESEARCHER-GUIDE.md`
 
 ## Locked Decisions
 

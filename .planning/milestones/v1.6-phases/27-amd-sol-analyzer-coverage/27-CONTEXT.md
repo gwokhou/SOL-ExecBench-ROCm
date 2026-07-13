@@ -62,7 +62,7 @@ provided they preserve public trace/schema/primary CLI compatibility.
   estimates, hardware models, per-op bounds, and bound artifacts.
 - `tests/sol_execbench/test_amd_sol_bounds.py` covers the existing v1.5
   foundation and is the natural test home for Phase 27 additions.
-- `docs/rocm_timing.md` and score/guardrail docs show the existing pattern for
+- `docs/user/rocm_timing.md` and score/guardrail docs show the existing pattern for
   derived methodology artifacts and compatibility wording.
 
 ### Established Patterns
@@ -77,7 +77,7 @@ provided they preserve public trace/schema/primary CLI compatibility.
 - Extend `extract_graph()`, `estimate_work()`, and `build_amd_sol_bound_artifact()`
   without changing public trace models.
 - Add coverage summary helpers near the AMD SOL artifact code.
-- Update documentation in `docs/analysis.md` or a focused internal/public doc
+- Update documentation in `docs/internal/analysis.md` or a focused internal/public doc
   section without changing CLI defaults.
 
 </code_context>

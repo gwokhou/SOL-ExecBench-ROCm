@@ -6,7 +6,7 @@
 
 ## Changes
 
-- Added `docs/original_parity.md`.
+- Added `docs/internal/original_parity.md`.
 - Classified NVIDIA SOL ExecBench public surfaces as ported, replaced,
   partially ported, compatibility-only, or out of scope.
 - Added tests that keep the parity document anchored to public surfaces,

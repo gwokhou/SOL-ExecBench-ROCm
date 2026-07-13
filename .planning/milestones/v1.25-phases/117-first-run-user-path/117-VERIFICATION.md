@@ -25,7 +25,7 @@ Result: `67 passed in 3.07s`.
 
 ## Goal-Backward Assessment
 
-- FIRST-01: Passed. `docs/GETTING-STARTED.md` includes dependency install,
+- FIRST-01: Passed. `docs/user/GETTING-STARTED.md` includes dependency install,
   contract, doctor, and minimal sample commands.
 - FIRST-02: Passed. The first-run command writes canonical Trace JSONL and the
   guide explains correctness, latency, speedup, and environment fields.

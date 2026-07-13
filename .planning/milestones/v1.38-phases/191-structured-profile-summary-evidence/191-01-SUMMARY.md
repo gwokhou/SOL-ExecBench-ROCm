@@ -14,8 +14,8 @@ affects:
   - "tests/sol_execbench/test_cli_environment_snapshot.py"
   - "tests/sol_execbench/test_profile_summary_fixtures.py"
   - "tests/sol_execbench/fixtures/profile_summary/"
-  - "docs/profile_summary_sidecar.md"
-  - "docs/agent_feedback_sidecar.md"
+  - "docs/user/profile_summary_sidecar.md"
+  - "docs/user/agent_feedback_sidecar.md"
 tech-stack:
   added: []
   patterns:
@@ -33,8 +33,8 @@ key-files:
     - "tests/sol_execbench/fixtures/profile_summary/partial.profile-summary.json"
     - "tests/sol_execbench/fixtures/profile_summary/unavailable.profile-summary.json"
     - "tests/sol_execbench/fixtures/profile_summary/stale.profile-summary.json"
-    - "docs/profile_summary_sidecar.md"
-    - "docs/agent_feedback_sidecar.md"
+    - "docs/user/profile_summary_sidecar.md"
+    - "docs/user/agent_feedback_sidecar.md"
 key-decisions:
   - "CSV and JSON artifacts are parsed with byte and row bounds; rocpd/database artifacts remain citation-only."
   - "Bottleneck hints use the conservative closed taxonomy and degrade to insufficient_counters or unknown when evidence is incomplete."
