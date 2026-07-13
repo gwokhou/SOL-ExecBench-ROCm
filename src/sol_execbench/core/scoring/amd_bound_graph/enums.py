@@ -33,4 +33,6 @@ class OpFamily(str, Enum):
     ELEMENTWISE = "elementwise"
     DATA_MOVEMENT = "data_movement"
     DTYPE_CONVERSION = "dtype_conversion"
+    FFT = "fft"
+    SAMPLING = "sampling"
     UNSUPPORTED = "unsupported"

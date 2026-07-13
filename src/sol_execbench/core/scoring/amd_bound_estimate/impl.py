@@ -30,6 +30,8 @@ from sol_execbench.core.scoring.amd_bound_estimate.memory import (
     _softmax_estimate,
 )
 from sol_execbench.core.scoring.amd_bound_estimate.models import OperatorWorkEstimate
+from sol_execbench.core.scoring.amd_bound_estimate.spectral import _fft_estimate
+from sol_execbench.core.scoring.amd_bound_estimate.sampling import _sampling_estimate
 from sol_execbench.core.scoring.amd_bound_estimate.tensors import (
     first_tensor_dtype,
     node_tensors,
@@ -100,10 +102,12 @@ __all__ = [
     "_dtype_conversion_estimate",
     "_elementwise_estimate",
     "_embedding_positional_estimate",
+    "_fft_estimate",
     "_gemm_estimate",
     "_moe_estimate",
     "_normalization_estimate",
     "_reduction_estimate",
+    "_sampling_estimate",
     "_softmax_estimate",
     "_ssm_mamba_estimate",
     "_unsupported_estimate",

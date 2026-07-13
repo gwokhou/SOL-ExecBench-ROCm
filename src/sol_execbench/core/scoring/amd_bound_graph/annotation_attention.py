@@ -240,7 +240,11 @@ def _dynamic_attention_evidence(
     graph: BoundGraph,
     nodes: list[BoundGraphNode],
 ) -> BoundGraphNode | None:
-    has_dynamic = any(node.op_family == OpFamily.UNSUPPORTED for node in nodes)
+    has_dynamic = any(
+        node.op_family == OpFamily.UNSUPPORTED
+        or node.attributes.get("dynamic_index") is True
+        for node in nodes
+    )
     names = {tensor.name for tensor in graph.tensors.values()}
     has_qkv = {"q", "k", "v"} <= names
     if not has_dynamic or not has_qkv:

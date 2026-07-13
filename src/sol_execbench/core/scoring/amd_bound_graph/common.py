@@ -107,6 +107,25 @@ def _ast_call_attributes(
             if isinstance(keepdim, bool):
                 attributes["keepdim"] = keepdim
 
+    if op_family == OpFamily.FFT:
+        offset = 0 if isinstance(node.func, ast.Attribute) else 1
+        n_value = (
+            _literal_value(keyword_values["n"])
+            if "n" in keyword_values
+            else _arg_literal(tuple(node.args), offset)
+        )
+        dim_value = (
+            _literal_value(keyword_values["dim"])
+            if "dim" in keyword_values
+            else _arg_literal(tuple(node.args), offset + 1)
+        )
+        if isinstance(n_value, int):
+            attributes["n"] = n_value
+        attributes["dim"] = dim_value if isinstance(dim_value, int) else -1
+        attributes["axis_source"] = (
+            "attribute" if isinstance(dim_value, int) else "default"
+        )
+
     if leaf_name == "pow":
         exponent_position = 0 if isinstance(node.func, ast.Attribute) else 1
         exponent = _arg_literal(tuple(node.args), exponent_position)
