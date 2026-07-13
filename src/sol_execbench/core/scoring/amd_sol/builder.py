@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.platform.arch_capabilities import (
@@ -16,7 +18,10 @@ from sol_execbench.core.scoring.amd_bound_estimate.estimates import (
     resolve_architecture_profile_paths,
 )
 from sol_execbench.core.scoring.amd_bound_estimate.models import OperatorWorkEstimate
-from sol_execbench.core.scoring.amd_bound_graph import BoundGraph, build_bound_graph
+from sol_execbench.core.scoring.amd_bound_graph import (
+    BoundGraph,
+    build_authority_bound_graph,
+)
 from sol_execbench.core.scoring.amd_hardware_models import (
     AmdHardwareModel,
     HardwareValidationStatus,
@@ -30,6 +35,7 @@ from sol_execbench.core.scoring.amd_sol.models import (
 from sol_execbench.core.scoring.amd_sol.math import (
     bound_for_estimate,
     coverage_for_estimates,
+    memory_transfer_bound_ms,
     worse_confidence,
 )
 from sol_execbench.core.scoring.confidence import EstimateConfidence
@@ -57,7 +63,8 @@ def _build_amd_sol_bound_base(
         capability_budget_ref = (
             f"packaged:arch_capability_budgets/{budget.architecture}.json"
         )
-    graph = bound_graph or build_bound_graph(definition, workload)
+    graph = bound_graph or build_authority_bound_graph(definition, workload)
+    graph = _authority_semantic_graph(graph)
     estimates = resolve_architecture_profile_paths(
         estimate_bound_work(graph), hardware_model.architecture
     )
@@ -65,6 +72,30 @@ def _build_amd_sol_bound_base(
     group_bounds = tuple(
         _bound_for_group(group, estimates, hardware_model) for group in groups
     )
+    if "semantic_graph_provider_required" in graph.warnings:
+        # Estimate families intentionally remain usable for diagnostics.  Mark
+        # the aggregation inputs themselves unsupported so no later roofline
+        # step can reinterpret that diagnostic work as a scoreable floor.
+        groups = tuple(
+            replace(
+                group,
+                confidence=EstimateConfidence.UNSUPPORTED,
+                warnings=tuple(
+                    dict.fromkeys((*group.warnings, "semantic_graph_provider_required"))
+                ),
+            )
+            for group in groups
+        )
+        group_bounds = tuple(
+            replace(
+                bound,
+                confidence=EstimateConfidence.UNSUPPORTED,
+                warnings=tuple(
+                    dict.fromkeys((*bound.warnings, "semantic_graph_provider_required"))
+                ),
+            )
+            for bound in group_bounds
+        )
     aggregate = _aggregate_for_groups(group_bounds, hardware_model)
     warnings = _warnings_for_artifact(
         graph.warnings, estimates, groups, group_bounds, aggregate, hardware_model
@@ -83,6 +114,30 @@ def _build_amd_sol_bound_base(
         aggregate_bound=aggregate,
         warnings=warnings,
         coverage_summary=coverage_for_estimates(estimates),
+    )
+
+
+def _authority_semantic_graph(graph: BoundGraph) -> BoundGraph:
+    """Refuse to score a floor reconstructed without export FakeTensor proof."""
+    if graph.nodes and all(
+        node.attributes.get("trace_source") == "torch.export" for node in graph.nodes
+    ):
+        return graph
+    warning = "semantic_graph_provider_required"
+    return replace(
+        graph,
+        nodes=tuple(
+            replace(
+                node,
+                # ``degraded`` remains score-eligible for independently
+                # evidenced operations, so INEXACT is insufficient here.  A
+                # missing semantic graph must make the aggregate unscored.
+                confidence=EstimateConfidence.UNSUPPORTED,
+                rationale=(f"{node.rationale}; non-export graph is diagnostic-only"),
+            )
+            for node in graph.nodes
+        ),
+        warnings=tuple(dict.fromkeys((*graph.warnings, warning))),
     )
 
 
@@ -159,7 +214,7 @@ def _group_memory_bound(
     profile = profiles[0]
     assert profile.value is not None
     return (
-        group.external_bytes / (profile.value * 1_000_000_000_000.0) * 1000.0,
+        memory_transfer_bound_ms(group.external_bytes, profile.value),
         profile.confidence,
         (),
     )
@@ -184,6 +239,18 @@ def _aggregate_for_groups(
             scored=False,
             sol_bound_ms=sol_bound_ms,
             reason="unsupported fusion-group evidence present",
+            node_ids=node_ids,
+        )
+    if (
+        hardware_model.shape_aware_roofline is None
+        or hardware_model.shape_aware_roofline.status
+        != HardwareValidationStatus.VALIDATED
+    ):
+        return AmdSolAggregateBound(
+            status="unscored",
+            scored=False,
+            sol_bound_ms=sol_bound_ms,
+            reason="scalar roofline is prediction-only without validated shape-aware envelope evidence",
             node_ids=node_ids,
         )
     if (

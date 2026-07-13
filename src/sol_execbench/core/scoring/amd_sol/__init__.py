@@ -5,8 +5,11 @@
 
 from sol_execbench.core.scoring.amd_sol.artifact import (
     AMD_SOL_SCHEMA_VERSION,
+    LEGACY_AMD_SOL_SCHEMA_VERSION,
     AmdSolBoundArtifact,
+    AmdSolPerformanceDiagnostics,
     FusionGroupEvidenceSummary,
+    PerformanceProviderResult,
     amd_sol_bound_from_dict,
     build_amd_sol_bound_artifact,
     fusion_signature_for_group,
@@ -23,12 +26,15 @@ from sol_execbench.core.scoring.confidence import EstimateConfidence
 __all__ = [
     "AGGREGATE_STATUSES",
     "AMD_SOL_SCHEMA_VERSION",
+    "LEGACY_AMD_SOL_SCHEMA_VERSION",
     "AmdSolAggregateBound",
     "AmdSolBoundArtifact",
+    "AmdSolPerformanceDiagnostics",
     "AmdSolCoverageSummary",
     "AmdSolGroupBound",
     "FusionGroup",
     "FusionGroupEvidenceSummary",
+    "PerformanceProviderResult",
     "EstimateConfidence",
     "amd_sol_bound_from_dict",
     "build_amd_sol_bound_artifact",

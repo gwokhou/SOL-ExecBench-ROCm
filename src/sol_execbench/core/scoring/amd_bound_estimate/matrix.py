@@ -33,7 +33,11 @@ def _gemm_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstim
     write_bytes = _sum_tensor_bytes(output_tensors, "write", warnings, rationale_parts)
     total_bytes = read_bytes + write_bytes
 
-    dims = _infer_gemm_dims(input_tensors, output_tensors)
+    dims = _infer_gemm_dims(
+        input_tensors,
+        output_tensors,
+        transpose_rhs=node.op_family == OpFamily.LINEAR_PROJECTION,
+    )
     if dims is None:
         if not input_tensors and not output_tensors:
             return _unsupported_estimate(
@@ -71,8 +75,12 @@ def _gemm_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstim
         formula = "2*M*N*K"
         flops = float(2 * dims["M"] * dims["N"] * dims["K"])
 
+    if node.confidence != EstimateConfidence.SUPPORTED:
+        warnings.append("inexact_operator:gemm_graph_shape_unresolved")
     confidence = (
-        EstimateConfidence.SUPPORTED if not warnings else EstimateConfidence.INEXACT
+        EstimateConfidence.SUPPORTED
+        if node.confidence == EstimateConfidence.SUPPORTED and not warnings
+        else EstimateConfidence.INEXACT
     )
     dtypes = {tensor.dtype for tensor in (*input_tensors, *output_tensors)}
     if any(dtype.startswith("float8_") for dtype in dtypes):

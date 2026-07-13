@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""torch.fx extraction for AMD bound graphs."""
+"""Torch semantic graph providers converted into the bound-graph IR."""
 
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ def _try_fx_bound_graph(
     """Trace the reference with torch.fx and convert common nodes to BoundGraph."""
     try:
         import torch
-        from torch.fx import Node, symbolic_trace
+        from torch.fx import symbolic_trace
         from torch.fx.passes.shape_prop import ShapeProp
     except Exception:
         return None
@@ -71,13 +71,85 @@ def _try_fx_bound_graph(
     except Exception:
         return None
 
+    return _bound_graph_from_fx_graph(
+        traced,
+        definition,
+        workload,
+        output_shapes,
+        declared_tensors,
+        trace_source="torch.fx",
+    )
+
+
+def _try_torch_export_bound_graph(
+    definition: Definition,
+    workload: Workload,
+    input_shapes: dict[str, tuple[int, ...] | None],
+    output_shapes: dict[str, tuple[int, ...] | None],
+    declared_tensors: dict[str, BoundTensor],
+) -> BoundGraph | None:
+    """Export a complete ATen graph, failing closed when export cannot prove it."""
+    try:
+        import torch
+    except Exception:
+        return None
+
+    namespace: dict[str, Any] = {"torch": torch}
+    try:
+        exec(
+            compile(definition.reference, f"<{definition.name}.reference>", "exec"),
+            namespace,
+        )
+        run = namespace["run"]
+
+        class ReferenceModule(torch.nn.Module):
+            def forward(self, *args: Any) -> Any:
+                return run(*args)
+
+        sample_inputs: list[Any] = []
+        for name, spec in definition.inputs.items():
+            shape = input_shapes[name]
+            dtype = _torch_dtype(torch, spec.dtype)
+            if shape is None:
+                # Data-dependent dimensions cannot receive authority from this
+                # concrete export attempt.
+                return None
+            sample_inputs.append(torch.zeros(shape, dtype=dtype, device="cpu"))
+        exported = torch.export.export(
+            ReferenceModule(), tuple(sample_inputs), strict=True
+        )
+    except Exception:
+        return None
+
+    return _bound_graph_from_fx_graph(
+        exported.graph_module,
+        definition,
+        workload,
+        output_shapes,
+        declared_tensors,
+        trace_source="torch.export",
+    )
+
+
+def _bound_graph_from_fx_graph(
+    traced: Any,
+    definition: Definition,
+    workload: Workload,
+    output_shapes: dict[str, tuple[int, ...] | None],
+    declared_tensors: dict[str, BoundTensor],
+    *,
+    trace_source: str,
+) -> BoundGraph | None:
+    """Convert a shape-annotated FX graph from an approved semantic provider."""
     tensors = dict(declared_tensors)
     nodes: list[BoundGraphNode] = []
     edges: list[BoundEdge] = []
     warnings: list[str] = []
-    node_outputs: dict[Node, str] = {}
+    node_outputs: dict[Any, str] = {}
+    metadata_complete = True
 
-    def append_fx_node(fx_node: Node) -> None:
+    def append_fx_node(fx_node: Any) -> None:
+        nonlocal metadata_complete
         func_name, classification, warning = _classify_fx_node(fx_node)
         if warning is not None:
             warnings.append(warning)
@@ -92,13 +164,21 @@ def _try_fx_bound_graph(
         )
         output_tensor_id = f"tmp:{node_id}:0"
         output_shape, output_dtype = _fx_tensor_meta(fx_node)
+        if trace_source == "torch.export" and (
+            output_shape is None or output_dtype is None
+        ):
+            # Do not borrow a shape from a neighbouring tensor for authority.
+            # Missing FakeTensor output metadata invalidates this semantic
+            # capture rather than silently turning it into an AST-like guess.
+            metadata_complete = False
+            return
         resolved_output_shape = (
             output_shape
             if output_shape is not None
             else _first_input_shape(input_tensor_ids, tensors, output_shapes)
         )
         attributes = {
-            "trace_source": "torch.fx",
+            "trace_source": trace_source,
             **_fx_node_attributes(fx_node, func_name, classification),
         }
         confidence, rationale = _static_data_movement_confidence(
@@ -143,9 +223,16 @@ def _try_fx_bound_graph(
                 )
             )
 
+    input_names = iter(definition.inputs)
+    matched_output_names: set[str] = set()
     for fx_node in traced.graph.nodes:
         if fx_node.op == "placeholder":
-            node_outputs[fx_node] = f"input:{fx_node.target}"
+            name = str(fx_node.target)
+            if name not in definition.inputs:
+                name = next(input_names, "")
+            if name not in definition.inputs:
+                return None
+            node_outputs[fx_node] = f"input:{name}"
         elif fx_node.op in {"call_function", "call_method", "call_module"}:
             if _fx_node_name(fx_node) == "builtins.getattr":
                 # ``Tensor.T`` is represented as ``getattr(tensor, "T")`` by
@@ -179,13 +266,24 @@ def _try_fx_bound_graph(
                     break
                 tensor_id = f"output:{output_name}"
                 source_tensor = tensors[output_tensor_ids[index]]
+                declared_output = tensors[tensor_id]
+                if trace_source == "torch.export" and (
+                    source_tensor.shape != declared_output.shape
+                    or source_tensor.dtype != declared_output.dtype
+                ):
+                    return None
                 tensors[tensor_id] = replace(
-                    tensors[tensor_id],
+                    declared_output,
                     producer_node_id=source_tensor.producer_node_id,
                     source=source_tensor.tensor_id,
                 )
+                matched_output_names.add(output_name)
 
-    if not nodes:
+    if not nodes or not metadata_complete:
+        return None
+    if trace_source == "torch.export" and matched_output_names != set(
+        definition.outputs
+    ):
         return None
 
     return _annotate_family_graph(

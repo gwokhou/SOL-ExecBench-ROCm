@@ -19,6 +19,7 @@ from sol_execbench.core.scoring._amd_hardware_model_parsing import (
     EstimateConfidence,
     HardwareProfile,
     HardwareValidationStatus,
+    ShapeAwareRooflineEvidence,
     amd_hardware_model_from_dict,
 )
 
@@ -28,6 +29,7 @@ __all__ = [
     "EstimateConfidence",
     "HardwareProfile",
     "HardwareValidationStatus",
+    "ShapeAwareRooflineEvidence",
     "amd_hardware_model_from_dict",
     "load_amd_hardware_model",
 ]

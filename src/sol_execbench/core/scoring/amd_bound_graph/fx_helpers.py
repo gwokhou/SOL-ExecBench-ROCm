@@ -49,6 +49,7 @@ __all__ = [
 def _classify_fx_node(node: Any) -> tuple[str, _CallClassification, str | None]:
     func_name = _fx_node_name(node)
     classification = _classify_call(func_name)
+    leaf_name = func_name.rsplit(".", maxsplit=1)[-1]
     if node.op == "call_function" and node.target is operator.matmul:
         return (
             "@",
@@ -59,25 +60,37 @@ def _classify_fx_node(node: Any) -> tuple[str, _CallClassification, str | None]:
             ),
             None,
         )
-    if node.op == "call_function" and node.target in {
-        operator.add,
-        operator.sub,
-        operator.mul,
-        operator.truediv,
-        operator.pow,
-        operator.eq,
-        operator.ne,
-        operator.lt,
-        operator.le,
-        operator.gt,
-        operator.ge,
-    }:
-        supported = node.target in {
+    binary_operators = {
+        "add",
+        "sub",
+        "mul",
+        "truediv",
+        "pow",
+        "eq",
+        "ne",
+        "lt",
+        "le",
+        "gt",
+        "ge",
+    }
+    if node.op == "call_function" and (
+        node.target
+        in {
             operator.add,
             operator.sub,
             operator.mul,
             operator.truediv,
+            operator.pow,
+            operator.eq,
+            operator.ne,
+            operator.lt,
+            operator.le,
+            operator.gt,
+            operator.ge,
         }
+        or leaf_name in binary_operators
+    ):
+        supported = leaf_name in {"add", "sub", "mul", "truediv"}
         return (
             func_name,
             _CallClassification(
@@ -147,8 +160,18 @@ def _fx_node_name(node: Any) -> str:
             return name
         if module == "torch._C._linalg" and name.startswith("linalg_"):
             return f"torch.linalg.{name.removeprefix('linalg_')}"
-        return f"{module}.{name}"
-    return str(target)
+        target_name = f"{module}.{name}"
+    else:
+        target_name = str(target)
+    # Exported ATen operations are OpOverloads such as ``aten.add.Tensor``.
+    # Classification is expressed in public torch operation names and must not
+    # mistake the overload suffix (``Tensor``, ``default``, ...) for the op.
+    aten_name = target_name.removeprefix("torch._ops.")
+    if aten_name.startswith("aten."):
+        parts = aten_name.split(".")
+        if len(parts) >= 2:
+            return f"torch.{parts[1]}"
+    return target_name
 
 
 def _fx_input_tensor_ids(

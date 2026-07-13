@@ -153,5 +153,5 @@ def has_complete_numeric_inputs(
 def artifact_sol_bound_ms(
     artifact: AmdSolBoundArtifact,
 ) -> float:
-    """Return the aggregate SOL bound latency from either artifact schema."""
-    return artifact.aggregate_bound.sol_bound_ms
+    """Return the authority floor, never a provider prediction or measurement."""
+    return artifact.t_sol_floor_ms

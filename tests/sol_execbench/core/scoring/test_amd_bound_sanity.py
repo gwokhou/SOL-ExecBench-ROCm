@@ -68,6 +68,36 @@ def test_amd_bound_sanity_loads_path_backed_bound_sidecars(tmp_path: Path) -> No
     assert report.workloads[0].source_statuses.amd_sol_status == "scored"
 
 
+def test_amd_bound_sanity_reads_v5_explicit_theoretical_floor_status() -> None:
+    report = build_amd_bound_sanity_report(
+        amd_sol_artifacts=[
+            {
+                "schema_version": "sol_execbench.amd_sol_bound.v5",
+                "definition": "demo",
+                "workload_uuid": "w0",
+                "theoretical_lower_bound": {
+                    "status": "scored",
+                    "authority_eligible": True,
+                    "t_sol_floor_ms": 1.0,
+                    "reason": "complete authority evidence",
+                    "node_ids": [],
+                },
+                "coverage_summary": {"worst_confidence": "supported"},
+                "hardware_model": {
+                    "hardware_validation_status": "validated",
+                    "model_validation_status": "validated",
+                },
+                "warnings": [],
+                "fusion_groups": [],
+            }
+        ],
+        created_at=CREATED_AT,
+    )
+
+    assert report.workloads[0].source_statuses.amd_sol_status == "scored"
+    assert "amd_sol_not_scored" not in report.workloads[0].blocker_codes
+
+
 def trace_ref_fixture() -> list[AmdBoundSanitySourceRef | dict[str, Any] | str | Path]:
     return [
         {

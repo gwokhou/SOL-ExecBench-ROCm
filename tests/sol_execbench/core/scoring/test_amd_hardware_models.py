@@ -81,3 +81,17 @@ def test_unknown_and_legacy_scalar_fields_are_rejected():
     payload = {**_payload(), "peak_tflops": 100.0}
     with pytest.raises(ValueError, match="unknown field"):
         amd_hardware_model_from_dict(payload)
+
+
+def test_validated_shape_aware_roofline_requires_all_authority_dimensions():
+    payload = {
+        **_payload(),
+        "shape_aware_roofline": {
+            "status": "validated",
+            "evidence_refs": ["shape-envelope.json"],
+            "bucketing_dimensions": ["shape", "layout"],
+        },
+    }
+
+    with pytest.raises(ValueError, match="shape, layout, launch, and occupancy"):
+        amd_hardware_model_from_dict(payload)

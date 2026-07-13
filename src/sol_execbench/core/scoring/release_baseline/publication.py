@@ -451,25 +451,28 @@ class EvidencePublicationManifest:
             raise ValueError("published AMD SOL bound is not valid JSON") from exc
         if not isinstance(bound, Mapping):
             raise ValueError("published AMD SOL bound must be an object")
-        if _field(bound, "schema_version") != "sol_execbench.amd_sol_bound.v4":
+        if _field(bound, "schema_version") not in {
+            "sol_execbench.amd_sol_bound.v4",
+            "sol_execbench.amd_sol_bound.v5",
+        }:
             return
         reference = _field(bound, "fusion_validation_ref")
         digest = _field(bound, "fusion_validation_sha256")
         if not isinstance(reference, str) or not isinstance(digest, str):
             raise ValueError(
-                "published v4 bound fusion validation reference is missing"
+                "published AMD SOL bound fusion validation reference is missing"
             )
         fusion_path = (root / bound_ref).parent / reference
         try:
             relative_path = fusion_path.resolve().relative_to(root.resolve()).as_posix()
         except ValueError as exc:
             raise ValueError(
-                "published v4 bound fusion validation escapes artifact root"
+                "published AMD SOL bound fusion validation escapes artifact root"
             ) from exc
         artifact = by_path[relative_path] if relative_path in by_path else None
         if artifact is None or artifact.sha256 != digest:
             raise ValueError(
-                "published v4 bound fusion validation reference is absent from artifact manifest"
+                "published AMD SOL bound fusion validation reference is absent from artifact manifest"
             )
 
     @staticmethod

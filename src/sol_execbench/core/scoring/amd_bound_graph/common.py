@@ -19,6 +19,11 @@ from sol_execbench.core.scoring.amd_bound_graph.enums import OpFamily
 
 def _fx_tensor_meta(node: Any) -> tuple[tuple[int, ...] | None, str | None]:
     meta = node.meta.get("tensor_meta") if hasattr(node, "meta") else None
+    # ``torch.export`` records the FakeTensor in ``val``.  Some PyTorch
+    # versions also expose tensor_meta, but accepting either representation
+    # keeps the semantic provider independent of that incidental detail.
+    if meta is None and hasattr(node, "meta"):
+        meta = node.meta.get("val")
     if meta is None:
         return None, None
     shape = (

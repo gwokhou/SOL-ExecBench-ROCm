@@ -13,7 +13,10 @@ from sol_execbench.core.scoring.amd_bound_graph.annotations import (
     _annotate_family_graph,
 )
 from sol_execbench.core.scoring.amd_bound_graph.ast import _AstBoundGraphExtractor
-from sol_execbench.core.scoring.amd_bound_graph.fx import _try_fx_bound_graph
+from sol_execbench.core.scoring.amd_bound_graph.fx import (
+    _try_fx_bound_graph,
+    _try_torch_export_bound_graph,
+)
 from sol_execbench.core.scoring.amd_bound_graph.models import (
     BoundGraph,
     BoundTensor,
@@ -22,7 +25,12 @@ from sol_execbench.core.scoring.amd_bound_graph.models import (
 
 
 def build_bound_graph(definition: Definition, workload: Workload) -> BoundGraph:
-    """Build a structured bound graph for a concrete definition/workload pair."""
+    """Build a diagnostic structured graph for a concrete workload.
+
+    This compatibility path preserves the existing FX/AST inspection behaviour.
+    AMD SOL scoring instead uses :func:`build_authority_bound_graph`, which
+    requires the stronger torch.export/FakeTensor provider.
+    """
     input_shapes = definition.get_input_shapes(workload.axes)
     output_shapes = definition.get_output_shapes(workload.axes)
     tensors = _declared_tensors(definition, input_shapes, output_shapes)
@@ -35,6 +43,34 @@ def build_bound_graph(definition: Definition, workload: Workload) -> BoundGraph:
 
     return build_static_bound_graph(
         definition, workload, warnings=("dynamic_trace_failed",)
+    )
+
+
+def build_authority_bound_graph(
+    definition: Definition, workload: Workload
+) -> BoundGraph:
+    """Build the graph eligible for AMD SOL authority, failing closed on export.
+
+    A diagnostic FX or AST graph is retained when export cannot prove the
+    reference, but the AMD SOL builder demotes it before any floor is scored.
+    """
+    input_shapes = definition.get_input_shapes(workload.axes)
+    output_shapes = definition.get_output_shapes(workload.axes)
+    tensors = _declared_tensors(definition, input_shapes, output_shapes)
+    export_graph = _try_torch_export_bound_graph(
+        definition, workload, input_shapes, output_shapes, tensors
+    )
+    if export_graph is not None:
+        return export_graph
+    diagnostic = build_bound_graph(definition, workload)
+    return BoundGraph(
+        definition=diagnostic.definition,
+        workload_uuid=diagnostic.workload_uuid,
+        nodes=diagnostic.nodes,
+        tensors=diagnostic.tensors,
+        edges=diagnostic.edges,
+        warnings=tuple(dict.fromkeys((*diagnostic.warnings, "semantic_export_failed"))),
+        derived=diagnostic.derived,
     )
 
 

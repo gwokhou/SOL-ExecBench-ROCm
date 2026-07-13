@@ -63,6 +63,32 @@ class HardwareProfile:
 
 
 @dataclass(frozen=True)
+class ShapeAwareRooflineEvidence:
+    """Evidence that roofline rates cover shape and execution constraints."""
+
+    status: HardwareValidationStatus
+    evidence_refs: tuple[str, ...]
+    bucketing_dimensions: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if self.status == HardwareValidationStatus.VALIDATED:
+            required = {"shape", "layout", "launch", "occupancy"}
+            if not self.evidence_refs or not required.issubset(
+                self.bucketing_dimensions
+            ):
+                raise ValueError(
+                    "validated shape-aware roofline evidence must cover shape, layout, launch, and occupancy"
+                )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "status": self.status.value,
+            "evidence_refs": list(self.evidence_refs),
+            "bucketing_dimensions": list(self.bucketing_dimensions),
+        }
+
+
+@dataclass(frozen=True)
 class AmdHardwareModel:
     """AMD model containing exact calibrated compute and memory profiles."""
 
@@ -76,6 +102,7 @@ class AmdHardwareModel:
     schema_version: str = AMD_HARDWARE_MODEL_SCHEMA_VERSION
     compute_profiles: tuple[HardwareProfile, ...] = ()
     memory_profiles: tuple[HardwareProfile, ...] = ()
+    shape_aware_roofline: ShapeAwareRooflineEvidence | None = None
 
     def resolve_compute(
         self, operation: str, input_dtype: str, output_dtype: str, path: str
@@ -107,6 +134,10 @@ class AmdHardwareModel:
         payload["memory_profiles"] = [
             profile.to_dict() for profile in self.memory_profiles
         ]
+        if self.shape_aware_roofline is not None:
+            payload["shape_aware_roofline"] = self.shape_aware_roofline.to_dict()
+        else:
+            payload.pop("shape_aware_roofline")
         return payload
 
 
@@ -178,6 +209,27 @@ def _profiles(
     return tuple(profiles)
 
 
+def _shape_aware_roofline(
+    payload: dict[str, Any], source: str | None
+) -> ShapeAwareRooflineEvidence | None:
+    raw = payload.get("shape_aware_roofline")
+    if raw is None:
+        return None
+    if not isinstance(raw, dict) or set(raw) != {
+        "status",
+        "evidence_refs",
+        "bucketing_dimensions",
+    }:
+        raise ValueError(
+            f"{source or 'hardware model'} shape_aware_roofline has invalid fields"
+        )
+    return ShapeAwareRooflineEvidence(
+        _status(raw["status"], "shape_aware_roofline.status", source),
+        _strings(raw, "evidence_refs", source),
+        _strings(raw, "bucketing_dimensions", source),
+    )
+
+
 def amd_hardware_model_from_dict(
     payload: dict[str, Any],
     *,
@@ -204,8 +256,13 @@ def amd_hardware_model_from_dict(
         "evidence_refs",
     }
     expected = common | {"compute_profiles", "memory_profiles"}
-    if not expected or set(payload) != expected:
-        unknown = sorted(set(payload) - expected)
+    allowed = expected | {"shape_aware_roofline"}
+    if (
+        not expected
+        or not expected.issubset(payload)
+        or not set(payload).issubset(allowed)
+    ):
+        unknown = sorted(set(payload) - allowed)
         missing = sorted(expected - set(payload))
         details = [
             *(f"unknown field(s): {', '.join(unknown)}" for _ in [0] if unknown),
@@ -235,4 +292,5 @@ def amd_hardware_model_from_dict(
         schema_version,
         compute_profiles,
         memory_profiles,
+        _shape_aware_roofline(payload, source),
     )
