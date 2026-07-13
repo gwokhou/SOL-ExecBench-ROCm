@@ -815,7 +815,7 @@ def test_suite_workflow_missing_solar_guard_entry_is_neutral():
 
 
 def test_analysis_docs_describe_derived_score_reports_and_no_equivalence_claims():
-    text = (REPO_ROOT / "docs" / "analysis.md").read_text()
+    text = (REPO_ROOT / "docs" / "internal" / "analysis.md").read_text()
 
     assert "AMD-native score reports are derived artifacts" in text
     assert "not NVIDIA B200, SOLAR, or leaderboard equivalence claims" in text

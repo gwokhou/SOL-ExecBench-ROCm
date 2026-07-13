@@ -59,6 +59,16 @@ def make_amd_hardware_model(architecture: str = "gfx1200"):
             "hardware_validation_status": "validated",
             "model_validation_status": "validated",
             "evidence_refs": ["test-calibration.json"],
+            "shape_aware_roofline": {
+                "status": "validated",
+                "evidence_refs": ["test-shape-envelope.json"],
+                "bucketing_dimensions": [
+                    "shape",
+                    "layout",
+                    "launch",
+                    "occupancy",
+                ],
+            },
             "compute_profiles": [
                 {
                     "key": f"compute.matrix.float32.float32.{path}",

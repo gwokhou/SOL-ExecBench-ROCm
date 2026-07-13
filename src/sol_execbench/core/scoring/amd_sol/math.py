@@ -11,6 +11,18 @@ from sol_execbench.core.scoring.amd_sol.models import AmdSolCoverageSummary
 from sol_execbench.core.scoring.confidence import EstimateConfidence
 
 
+_FLOPS_PER_TFLOP = 1_000_000_000_000.0
+_BYTES_PER_GIGABYTE = 1_000_000_000.0
+_MILLISECONDS_PER_SECOND = 1000.0
+
+
+def memory_transfer_bound_ms(byte_count: float, bandwidth_gb_s: float) -> float:
+    """Return transfer time in ms for a hardware profile measured in GB/s."""
+    return (
+        byte_count / (bandwidth_gb_s * _BYTES_PER_GIGABYTE) * _MILLISECONDS_PER_SECOND
+    )
+
+
 def bound_for_estimate(
     estimate: OperatorWorkEstimate, hardware_model: AmdHardwareModel
 ) -> tuple[float, float, EstimateConfidence, tuple[str, ...]]:
@@ -41,15 +53,13 @@ def bound_for_estimate(
     usable_memory = not memory_required or _measured(memory_profile)
     compute_bound_ms = (
         estimate.flops
-        / (_profile_value(compute_profile) * 1_000_000_000_000.0)
-        * 1000.0
+        / (_profile_value(compute_profile) * _FLOPS_PER_TFLOP)
+        * _MILLISECONDS_PER_SECOND
         if compute_required and usable_compute
         else 0.0
     )
     memory_bound_ms = (
-        estimate.total_bytes
-        / (_profile_value(memory_profile) * 1_000_000_000_000.0)
-        * 1000.0
+        memory_transfer_bound_ms(estimate.total_bytes, _profile_value(memory_profile))
         if memory_required and usable_memory
         else 0.0
     )

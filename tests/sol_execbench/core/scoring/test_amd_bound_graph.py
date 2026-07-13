@@ -9,6 +9,7 @@ from sol_execbench.core.scoring.amd_bound_graph import (
     BoundTensor,
     BoundTensorRole,
     OpFamily,
+    build_authority_bound_graph,
     build_bound_graph,
 )
 from sol_execbench.core.scoring.amd_bound_graph.builder import build_static_bound_graph
@@ -59,6 +60,14 @@ def test_bound_graph_contract_serializes_json_like_values():
     assert payload["nodes"][0]["op_family"] == "gemm"
     assert payload["tensors"]["input:a"]["shape"] == [2, 4]
     assert payload["tensors"]["output:out"]["shape"] == [2, 8]
+
+
+def test_authority_graph_uses_exported_aten_with_faketensor_metadata():
+    graph = build_authority_bound_graph(_matmul_definition(), _matmul_workload())
+
+    assert graph.nodes[0].op_family == OpFamily.GEMM
+    assert graph.nodes[0].attributes["trace_source"] == "torch.export"
+    assert graph.tensors[graph.nodes[0].output_tensor_ids[0]].shape == (2, 8)
 
 
 def test_fx_tensor_transpose_preserves_gemm_operand_dependency():
@@ -139,6 +148,71 @@ def test_static_transpose_and_mm_propagate_exact_shapes():
 
     assert graph.tensors[transpose.output_tensor_ids[0]].shape == (4, 8)
     assert graph.tensors[matrix.output_tensor_ids[0]].shape == (2, 8)
+
+
+def test_static_tensor_T_propagates_exact_shape_to_torch_matmul():
+    definition = make_definition(
+        name="tensor_T_matmul_demo",
+        axes={
+            "M": {"type": "const", "value": 2},
+            "N": {"type": "const", "value": 8},
+            "K": {"type": "const", "value": 4},
+        },
+        inputs={
+            "x": {"shape": ["M", "K"], "dtype": "float32"},
+            "weight": {"shape": ["N", "K"], "dtype": "float32"},
+        },
+        outputs={"out": {"shape": ["M", "N"], "dtype": "float32"}},
+        reference="import torch\n\ndef run(x, weight):\n    return torch.matmul(x, weight.T)\n",
+    )
+    workload = make_workload(
+        axes={},
+        inputs={"x": {"type": "random"}, "weight": {"type": "random"}},
+        uuid="tensor-T-matmul-workload",
+    )
+
+    graph = build_static_bound_graph(definition, workload)
+    transpose = next(node for node in graph.nodes if node.op_name == "weight.T")
+    matrix = next(node for node in graph.nodes if node.op_family == OpFamily.GEMM)
+    estimate = estimate_bound_work(graph)[-1]
+
+    assert transpose.confidence == EstimateConfidence.SUPPORTED
+    assert graph.tensors[transpose.output_tensor_ids[0]].shape == (4, 8)
+    assert graph.tensors[matrix.output_tensor_ids[0]].shape == (2, 8)
+    assert estimate.formula_inputs == {"M": 2, "N": 8, "K": 4}
+    assert estimate.confidence == EstimateConfidence.SUPPORTED
+
+
+def test_static_unresolved_torch_matmul_shape_is_inexact():
+    definition = make_definition(
+        name="unresolved_matmul_demo",
+        axes={
+            "M": {"type": "const", "value": 2},
+            "N": {"type": "const", "value": 8},
+            "K": {"type": "const", "value": 4},
+        },
+        inputs={
+            "x": {"shape": ["M", "K"], "dtype": "float32"},
+            "weight": {"shape": ["N", "K"], "dtype": "float32"},
+        },
+        outputs={"out": {"shape": ["M", "N"], "dtype": "float32"}},
+        reference="import torch\n\ndef run(x, weight):\n    return torch.matmul(x, weight)\n",
+    )
+    workload = make_workload(
+        axes={},
+        inputs={"x": {"type": "random"}, "weight": {"type": "random"}},
+        uuid="unresolved-matmul-workload",
+    )
+
+    graph = build_static_bound_graph(definition, workload)
+    matrix = next(node for node in graph.nodes if node.op_family == OpFamily.GEMM)
+    estimate = estimate_bound_work(graph)[0]
+
+    assert matrix.confidence == EstimateConfidence.INEXACT
+    assert matrix.attributes["shape_provenance"] == "unresolved"
+    assert estimate.confidence == EstimateConfidence.INEXACT
+    assert estimate.formula_inputs == {}
+    assert "inexact_operator:gemm_missing_shape" in estimate.warnings
 
 
 def test_dynamic_index_remains_inexact():

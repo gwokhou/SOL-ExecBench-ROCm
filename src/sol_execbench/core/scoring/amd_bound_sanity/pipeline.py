@@ -122,7 +122,7 @@ def _ingest_amd_sol(audit: SanityAuditState, artifacts: list[SourceInput]) -> No
         if uuid is None:
             continue
         workload = _ensure_workload(audit.workloads, uuid, artifact)
-        status = path_str_or_none(path_dict(artifact, "aggregate_bound"), "status")
+        status = _bound_status(artifact)
         if status:
             workload.source_statuses.amd_sol_status = status
             _increment_count(audit.amd_sol_statuses, status)
@@ -202,7 +202,7 @@ def _ingest_scores(
 def _audit_bound_artifact(
     audit: SanityAuditState, artifact: dict[str, Any], workload: WorkloadAuditState
 ) -> None:
-    if path_str_or_none(path_dict(artifact, "aggregate_bound"), "status") != "scored":
+    if _bound_status(artifact) != "scored":
         workload.blocker_codes.add("amd_sol_not_scored")
     hardware = path_dict(artifact, "hardware_model")
     if path_str_or_none(hardware, "hardware_validation_status") != "validated":
@@ -217,10 +217,18 @@ def _audit_bound_artifact(
     if artifact.get("schema_version") in {
         "sol_execbench.amd_sol_bound.v3",
         "sol_execbench.amd_sol_bound.v4",
+        "sol_execbench.amd_sol_bound.v5",
     }:
         _audit_fusion_groups(artifact, workload)
     else:
         workload.blocker_codes.add("unsupported_amd_sol_schema")
+
+
+def _bound_status(artifact: dict[str, Any]) -> str | None:
+    """Read legacy aggregate status or the v5 explicit authority floor status."""
+    return path_str_or_none(
+        path_dict(artifact, "theoretical_lower_bound"), "status"
+    ) or path_str_or_none(path_dict(artifact, "aggregate_bound"), "status")
 
 
 def _audit_operator_estimates(

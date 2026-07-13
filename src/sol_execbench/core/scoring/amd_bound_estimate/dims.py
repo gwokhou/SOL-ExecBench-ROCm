@@ -15,6 +15,8 @@ from sol_execbench.core.scoring.amd_bound_graph.models import (
 def infer_gemm_dims(
     input_tensors: tuple[BoundTensor, ...],
     output_tensors: tuple[BoundTensor, ...],
+    *,
+    transpose_rhs: bool = False,
 ) -> dict[str, int] | None:
     if len(input_tensors) < 2 or not output_tensors:
         return None
@@ -23,29 +25,64 @@ def infer_gemm_dims(
     out_shape = output_tensors[0].shape
     if lhs_shape is None or rhs_shape is None or out_shape is None:
         return None
-    if len(lhs_shape) == 2 and len(rhs_shape) == 2 and len(out_shape) >= 2:
+    rhs_shapes = (rhs_shape,)
+    if transpose_rhs and len(rhs_shape) >= 2:
+        # ``torch.nn.functional.linear`` conventionally receives weights as
+        # [N, K], while historical sidecar evidence also contains explicit
+        # [K, N] projection weights.  Accept either representation only when
+        # it exactly produces the recorded output shape.
+        rhs_shapes = (
+            (*rhs_shape[:-2], rhs_shape[-1], rhs_shape[-2]),
+            rhs_shape,
+        )
+    matrix_rhs_shape: tuple[int, ...] | None = None
+    expected_output: tuple[int, ...] | None = None
+    for candidate_rhs_shape in rhs_shapes:
+        candidate_output = _matmul_output_shape(lhs_shape, candidate_rhs_shape)
+        if candidate_output == out_shape:
+            matrix_rhs_shape = candidate_rhs_shape
+            expected_output = candidate_output
+            break
+    if matrix_rhs_shape is None or expected_output is None:
+        return None
+    if len(expected_output) == 2:
         return {
             "M": int(lhs_shape[-2]),
-            "N": int(out_shape[-1]),
+            "N": int(matrix_rhs_shape[-1]),
             "K": int(lhs_shape[-1]),
         }
-    if len(lhs_shape) >= 3 and len(rhs_shape) == 2 and len(out_shape) >= 3:
-        batch = prod(out_shape[:-2])
-        return {
-            "B": int(batch),
-            "M": int(out_shape[-2]),
-            "N": int(out_shape[-1]),
-            "K": int(lhs_shape[-1]),
-        }
-    if len(lhs_shape) >= 3 and len(rhs_shape) >= 3 and len(out_shape) >= 3:
-        batch = prod(out_shape[:-2])
-        return {
-            "B": int(batch),
-            "M": int(out_shape[-2]),
-            "N": int(out_shape[-1]),
-            "K": int(lhs_shape[-1]),
-        }
-    return None
+    return {
+        "B": int(prod(expected_output[:-2])),
+        "M": int(lhs_shape[-2]),
+        "N": int(matrix_rhs_shape[-1]),
+        "K": int(lhs_shape[-1]),
+    }
+
+
+def _matmul_output_shape(
+    lhs_shape: tuple[int, ...], rhs_shape: tuple[int, ...]
+) -> tuple[int, ...] | None:
+    """Return the exact matrix-multiply result shape for matrix operands."""
+    if len(lhs_shape) < 2 or len(rhs_shape) < 2 or lhs_shape[-1] != rhs_shape[-2]:
+        return None
+    batch_shape = _broadcast_batch_shape(lhs_shape[:-2], rhs_shape[:-2])
+    if batch_shape is None:
+        return None
+    return (*batch_shape, lhs_shape[-2], rhs_shape[-1])
+
+
+def _broadcast_batch_shape(
+    lhs_batch: tuple[int, ...], rhs_batch: tuple[int, ...]
+) -> tuple[int, ...] | None:
+    result: list[int] = []
+    width = max(len(lhs_batch), len(rhs_batch))
+    for offset in range(1, width + 1):
+        lhs_dim = lhs_batch[-offset] if offset <= len(lhs_batch) else 1
+        rhs_dim = rhs_batch[-offset] if offset <= len(rhs_batch) else 1
+        if lhs_dim != rhs_dim and lhs_dim != 1 and rhs_dim != 1:
+            return None
+        result.append(max(lhs_dim, rhs_dim))
+    return tuple(reversed(result))
 
 
 def convolution_dims(

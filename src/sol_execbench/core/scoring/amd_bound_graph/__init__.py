@@ -5,7 +5,10 @@
 
 from __future__ import annotations
 
-from sol_execbench.core.scoring.amd_bound_graph.builder import build_bound_graph
+from sol_execbench.core.scoring.amd_bound_graph.builder import (
+    build_authority_bound_graph,
+    build_bound_graph,
+)
 from sol_execbench.core.scoring.amd_bound_graph.models import (
     BoundEdge,
     BoundGraph,
@@ -23,4 +26,5 @@ __all__ = [
     "BoundTensorRole",
     "OpFamily",
     "build_bound_graph",
+    "build_authority_bound_graph",
 ]

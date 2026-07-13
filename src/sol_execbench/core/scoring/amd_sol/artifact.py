@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+import math
 from pathlib import Path
 from typing import Any, cast
 
@@ -36,7 +37,192 @@ from sol_execbench.core.scoring.fusion_validation import (
 from sol_execbench.core.integrity.checksums import sha256_file
 
 
-AMD_SOL_SCHEMA_VERSION = "sol_execbench.amd_sol_bound.v4"
+AMD_SOL_SCHEMA_VERSION = "sol_execbench.amd_sol_bound.v5"
+LEGACY_AMD_SOL_SCHEMA_VERSION = "sol_execbench.amd_sol_bound.v4"
+
+
+@dataclass(frozen=True)
+class PerformanceProviderResult:
+    """A non-authoritative result supplied by one performance provider.
+
+    A provider may describe a compiled candidate or predict its latency, but it
+    cannot turn a finite compiler search space into a theoretical lower bound.
+    """
+
+    provider_name: str
+    provider_revision: str
+    provider_schema_version: str
+    target_architecture: str
+    rocm_version: str
+    input_identity_sha256: str
+    status: str
+    result_kind: str
+    is_theoretical_lower_bound: bool
+    predicted_latency_ms: float | None
+    measured_latency_ms: float | None
+    warnings: tuple[str, ...]
+    raw_evidence_ref: str | None
+    raw_evidence_sha256: str | None
+    output_payload: dict[str, object]
+
+    def __post_init__(self) -> None:
+        if not all(
+            isinstance(value, str) and value.strip()
+            for value in (
+                self.provider_name,
+                self.provider_revision,
+                self.provider_schema_version,
+                self.target_architecture,
+                self.rocm_version,
+            )
+        ):
+            raise ValueError("performance provider identity fields must be non-empty")
+        if (
+            not isinstance(self.input_identity_sha256, str)
+            or (len(self.input_identity_sha256) != 64)
+            or any(c not in "0123456789abcdef" for c in self.input_identity_sha256)
+        ):
+            raise ValueError("provider input identity must be a lowercase SHA-256")
+        if self.status not in {"supported", "inexact", "unavailable", "failed"}:
+            raise ValueError("performance provider status is invalid")
+        if self.result_kind not in {
+            "prediction",
+            "compiled_candidate",
+            "measurement",
+        }:
+            raise ValueError("performance provider result_kind is invalid")
+        if not isinstance(self.is_theoretical_lower_bound, bool):
+            raise ValueError("performance provider lower-bound flag must be a boolean")
+        if self.is_theoretical_lower_bound:
+            raise ValueError(
+                "external provider results cannot claim a theoretical lower bound"
+            )
+        for name, value in (
+            ("predicted_latency_ms", self.predicted_latency_ms),
+            ("measured_latency_ms", self.measured_latency_ms),
+        ):
+            if value is not None and (
+                isinstance(value, bool)
+                or not isinstance(value, int | float)
+                or not math.isfinite(value)
+                or value <= 0.0
+            ):
+                raise ValueError(f"{name} must be a positive finite number or null")
+        if not all(isinstance(warning, str) for warning in self.warnings):
+            raise ValueError("performance provider warnings must be strings")
+        if (self.raw_evidence_ref is None) != (self.raw_evidence_sha256 is None):
+            raise ValueError("raw performance evidence ref and checksum must be paired")
+        if self.raw_evidence_ref is not None and (
+            not isinstance(self.raw_evidence_ref, str)
+            or not self.raw_evidence_ref.strip()
+        ):
+            raise ValueError("raw performance evidence ref must be a non-empty string")
+        if self.raw_evidence_sha256 is not None and (
+            not isinstance(self.raw_evidence_sha256, str)
+            or len(self.raw_evidence_sha256) != 64
+            or any(c not in "0123456789abcdef" for c in self.raw_evidence_sha256)
+        ):
+            raise ValueError(
+                "raw performance evidence checksum must be a lowercase SHA-256"
+            )
+        if (
+            self.predicted_latency_ms is not None
+            or self.measured_latency_ms is not None
+        ) and self.raw_evidence_ref is None:
+            raise ValueError("performance latency requires raw evidence provenance")
+        if not isinstance(self.output_payload, dict):
+            raise ValueError("performance provider output_payload must be an object")
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "provider_name": self.provider_name,
+            "provider_revision": self.provider_revision,
+            "provider_schema_version": self.provider_schema_version,
+            "target_architecture": self.target_architecture,
+            "rocm_version": self.rocm_version,
+            "input_identity_sha256": self.input_identity_sha256,
+            "status": self.status,
+            "result_kind": self.result_kind,
+            "is_theoretical_lower_bound": self.is_theoretical_lower_bound,
+            "predicted_latency_ms": self.predicted_latency_ms,
+            "measured_latency_ms": self.measured_latency_ms,
+            "warnings": list(self.warnings),
+            "raw_evidence_ref": self.raw_evidence_ref,
+            "raw_evidence_sha256": self.raw_evidence_sha256,
+            "output_payload": dict(self.output_payload),
+        }
+
+
+@dataclass(frozen=True)
+class AmdSolPerformanceDiagnostics:
+    """Diagnostic predictions and observations, deliberately outside authority."""
+
+    provider_results: tuple[PerformanceProviderResult, ...] = ()
+
+    @classmethod
+    def from_provider_results(
+        cls, provider_results: tuple[PerformanceProviderResult, ...]
+    ) -> "AmdSolPerformanceDiagnostics":
+        return cls(provider_results=provider_results)
+
+    @property
+    def status(self) -> str:
+        if not self.provider_results:
+            return "not_requested"
+        if any(
+            result.predicted_latency_ms is not None
+            or result.measured_latency_ms is not None
+            for result in self.provider_results
+        ):
+            return "available"
+        if any(result.status == "failed" for result in self.provider_results):
+            return "failed"
+        if any(result.status == "inexact" for result in self.provider_results):
+            return "inexact"
+        return "unavailable"
+
+    @property
+    def t_predicted_best_ms(self) -> float | None:
+        values = [
+            result.predicted_latency_ms
+            for result in self.provider_results
+            if result.predicted_latency_ms is not None
+        ]
+        return min(values) if values else None
+
+    @property
+    def fastest_known_ms(self) -> float | None:
+        values = [
+            result.measured_latency_ms
+            for result in self.provider_results
+            if result.status == "supported"
+            and result.result_kind in {"compiled_candidate", "measurement"}
+            and result.measured_latency_ms is not None
+        ]
+        return min(values) if values else None
+
+    def to_dict(self, *, t_sol_floor_ms: float) -> dict[str, object]:
+        fastest_known_ms = self.fastest_known_ms
+        predicted_best_ms = self.t_predicted_best_ms
+        return {
+            "status": self.status,
+            "t_predicted_best_ms": predicted_best_ms,
+            "fastest_known_ms": fastest_known_ms,
+            "t_sol_floor_to_fastest_known_ratio": (
+                t_sol_floor_ms / fastest_known_ms
+                if fastest_known_ms is not None
+                else None
+            ),
+            "t_predicted_best_to_fastest_known_ratio": (
+                predicted_best_ms / fastest_known_ms
+                if predicted_best_ms is not None and fastest_known_ms is not None
+                else None
+            ),
+            "floor_contradicts_fastest_known": (
+                fastest_known_ms is not None and t_sol_floor_ms > fastest_known_ms
+            ),
+            "provider_results": [result.to_dict() for result in self.provider_results],
+        }
 
 
 @dataclass(frozen=True)
@@ -54,12 +240,15 @@ class FusionGroupEvidenceSummary:
 
 @dataclass(frozen=True)
 class AmdSolBoundArtifact:
-    """AMD SOL payload with independently bound fusion-validation evidence."""
+    """AMD SOL artifact with separate authority and diagnostic tracks."""
 
     base: _AmdSolBoundBase
     fusion_validation_ref: str
     fusion_validation_sha256: str
     fusion_validation_matches: tuple[FusionGroupEvidenceSummary, ...]
+    performance_diagnostics: AmdSolPerformanceDiagnostics = (
+        AmdSolPerformanceDiagnostics()
+    )
     schema_version: str = AMD_SOL_SCHEMA_VERSION
 
     @property
@@ -107,6 +296,11 @@ class AmdSolBoundArtifact:
         return self.base.aggregate_bound
 
     @property
+    def t_sol_floor_ms(self) -> float:
+        """The only latency value eligible to be consumed as a SOL authority."""
+        return self.base.aggregate_bound.sol_bound_ms
+
+    @property
     def warnings(self) -> tuple[str, ...]:
         return self.base.warnings
 
@@ -119,8 +313,27 @@ class AmdSolBoundArtifact:
         return self.base.derived
 
     def to_dict(self) -> dict[str, Any]:
+        if self.schema_version == LEGACY_AMD_SOL_SCHEMA_VERSION:
+            return self._to_v4_dict()
+        if self.schema_version != AMD_SOL_SCHEMA_VERSION:
+            raise ValueError("AMD SOL artifact has invalid schema_version")
         payload = self.base.to_dict()
         payload["schema_version"] = self.schema_version
+        aggregate = payload.pop("aggregate_bound")
+        payload["theoretical_lower_bound"] = {
+            "status": aggregate["status"],
+            "authority_eligible": aggregate["scored"],
+            "t_sol_floor_ms": aggregate["sol_bound_ms"],
+            "reason": aggregate["reason"],
+            "node_ids": aggregate["node_ids"],
+        }
+        payload["group_bounds"] = [
+            {
+                **{key: value for key, value in bound.items() if key != "sol_bound_ms"},
+                "t_sol_floor_ms": bound["sol_bound_ms"],
+            }
+            for bound in payload["group_bounds"]
+        ]
         summaries = {item.group_id: item for item in self.fusion_validation_matches}
         groups = []
         for group in payload["fusion_groups"]:
@@ -136,6 +349,34 @@ class AmdSolBoundArtifact:
                 }
             )
         payload["fusion_groups"] = groups
+        payload["fusion_validation_ref"] = self.fusion_validation_ref
+        payload["fusion_validation_sha256"] = self.fusion_validation_sha256
+        payload["fusion_validation_matches"] = [
+            item.to_dict() for item in self.fusion_validation_matches
+        ]
+        payload["performance_diagnostics"] = self.performance_diagnostics.to_dict(
+            t_sol_floor_ms=self.t_sol_floor_ms
+        )
+        return payload
+
+    def _to_v4_dict(self) -> dict[str, Any]:
+        """Serialize a parsed legacy artifact without changing its field meanings."""
+        payload = self.base.to_dict()
+        payload["schema_version"] = LEGACY_AMD_SOL_SCHEMA_VERSION
+        summaries = {item.group_id: item for item in self.fusion_validation_matches}
+        payload["fusion_groups"] = [
+            {
+                **group,
+                "signature_sha256": summaries[group["group_id"]].signature_sha256,
+                "variant_id": summaries[group["group_id"]].variant_id,
+                "capacity_evidence_id": summaries[
+                    group["group_id"]
+                ].capacity_evidence_id,
+                "capacity_status": summaries[group["group_id"]].capacity_status,
+                "performance_status": summaries[group["group_id"]].performance_status,
+            }
+            for group in payload["fusion_groups"]
+        ]
         payload["fusion_validation_ref"] = self.fusion_validation_ref
         payload["fusion_validation_sha256"] = self.fusion_validation_sha256
         payload["fusion_validation_matches"] = [
@@ -244,8 +485,9 @@ def build_amd_sol_bound_artifact(
     capability_budget: ArchIsaBudget | None = None,
     tile_contracts: dict[str, dict[str, object]] | None = None,
     bound_graph: BoundGraph | None = None,
+    performance_diagnostics: AmdSolPerformanceDiagnostics | None = None,
 ) -> AmdSolBoundArtifact:
-    """Build the bound, promoting only uniquely matched, capacity-passed groups."""
+    """Build the authority floor without allowing diagnostics to influence it."""
     evidence_payload = (
         cast(dict[str, Any], fusion_validation)
         if isinstance(fusion_validation, dict)
@@ -265,6 +507,8 @@ def build_amd_sol_bound_artifact(
         character not in "0123456789abcdef" for character in fusion_validation_sha256
     ):
         raise ValueError("fusion_validation_sha256 must be a SHA-256")
+    diagnostics = performance_diagnostics or AmdSolPerformanceDiagnostics()
+    _validate_performance_diagnostics(diagnostics, hardware_model.architecture)
     base = _build_amd_sol_bound_base(
         definition,
         workload,
@@ -278,6 +522,9 @@ def build_amd_sol_bound_artifact(
     promoted_groups: list[FusionGroup] = []
     promoted_bounds: list[AmdSolGroupBound] = []
     missing_validation_group_ids: list[str] = []
+    unproven_singleton_partition = len(base.fusion_groups) > 1 and all(
+        group.pattern_id == "singleton.v1" for group in base.fusion_groups
+    )
     estimates = {item["node_id"]: item for item in base.operator_work_estimates}
     for group, bound in zip(base.fusion_groups, base.group_bounds, strict=True):
         tile_contract = (tile_contracts or {}).get(group.group_id)
@@ -365,10 +612,37 @@ def build_amd_sol_bound_artifact(
                 ),
                 warnings=tuple(dict.fromkeys((*bound.warnings, missing_warning))),
             )
+        if unproven_singleton_partition:
+            # A registry miss is not a semantic materialization barrier.  Summing
+            # singleton rooflines would turn the current compiler partition into
+            # a purported lower bound that a longer fused implementation can beat.
+            warning = "unproven_multinode_singleton_partition"
+            group = replace(
+                group,
+                confidence=EstimateConfidence.UNSUPPORTED,
+                warnings=tuple(dict.fromkeys((*group.warnings, warning))),
+            )
+            bound = replace(
+                bound,
+                confidence=EstimateConfidence.UNSUPPORTED,
+                warnings=tuple(dict.fromkeys((*bound.warnings, warning))),
+            )
         promoted_groups.append(group)
         promoted_bounds.append(bound)
     groups_tuple, bounds_tuple = tuple(promoted_groups), tuple(promoted_bounds)
     aggregate = _aggregate_for_groups(bounds_tuple, hardware_model)
+    if (
+        diagnostics.fastest_known_ms is not None
+        and aggregate.sol_bound_ms > diagnostics.fastest_known_ms
+    ):
+        # A validated, faster implementation disproves a claimed lower bound.
+        # This is an authority failure, not merely a diagnostic warning.
+        aggregate = replace(
+            aggregate,
+            status="unscored",
+            scored=False,
+            reason="theoretical floor contradicts fastest-known measurement",
+        )
     passed_group_ids = {
         item.group_id for item in summaries if item.capacity_status == "passed"
     }
@@ -387,6 +661,22 @@ def build_amd_sol_bound_artifact(
                 *(
                     f"fusion_validation_evidence_missing:{group_id}"
                     for group_id in missing_validation_group_ids
+                ),
+                *(
+                    f"fusion_warning:{group.group_id}:{warning}"
+                    for group in groups_tuple
+                    for warning in group.warnings
+                ),
+                *(
+                    f"fusion_bound_warning:{bound.group_id}:{warning}"
+                    for bound in bounds_tuple
+                    for warning in bound.warnings
+                ),
+                *(
+                    ("floor_contradicts_fastest_known",)
+                    if diagnostics.fastest_known_ms is not None
+                    and aggregate.sol_bound_ms > diagnostics.fastest_known_ms
+                    else ()
                 ),
                 *(
                     (f"aggregate_{aggregate.status}:{aggregate.reason}",)
@@ -410,11 +700,85 @@ def build_amd_sol_bound_artifact(
         fusion_validation_ref=fusion_validation_ref,
         fusion_validation_sha256=fusion_validation_sha256,
         fusion_validation_matches=tuple(summaries),
+        performance_diagnostics=diagnostics,
     )
 
 
 def amd_sol_bound_from_dict(payload: dict[str, Any]) -> AmdSolBoundArtifact:
-    """Strict parser for the sole supported AMD SOL schema."""
+    """Strictly parse v5 dual-track artifacts and preserve legacy v4 payloads."""
+    schema_version = payload.get("schema_version")
+    if schema_version == LEGACY_AMD_SOL_SCHEMA_VERSION:
+        return _amd_sol_bound_from_v4_dict(payload)
+    if schema_version != AMD_SOL_SCHEMA_VERSION:
+        raise ValueError("AMD SOL artifact has invalid schema_version")
+    return _amd_sol_bound_from_v5_dict(payload)
+
+
+def _amd_sol_bound_from_v5_dict(payload: dict[str, Any]) -> AmdSolBoundArtifact:
+    required_extra = {
+        "fusion_validation_ref",
+        "fusion_validation_sha256",
+        "fusion_validation_matches",
+        "performance_diagnostics",
+        "theoretical_lower_bound",
+    }
+    base_keys = set(_AmdSolBoundBase.__dataclass_fields__) - {
+        "derived",
+        "aggregate_bound",
+    }
+    expected = base_keys | {"derived", "schema_version"} | required_extra
+    if set(payload) != expected:
+        raise ValueError("AMD SOL v5 artifact has missing or unknown top-level fields")
+    floor = payload["theoretical_lower_bound"]
+    if not isinstance(floor, dict) or set(floor) != {
+        "status",
+        "authority_eligible",
+        "t_sol_floor_ms",
+        "reason",
+        "node_ids",
+    }:
+        raise ValueError("theoretical_lower_bound has missing or unknown fields")
+    if not isinstance(floor["authority_eligible"], bool):
+        raise ValueError("theoretical_lower_bound.authority_eligible must be a boolean")
+    raw_bounds = payload["group_bounds"]
+    if not isinstance(raw_bounds, list):
+        raise ValueError("group_bounds must be a list")
+    legacy_payload = {
+        key: value
+        for key, value in payload.items()
+        if key not in {"theoretical_lower_bound", "performance_diagnostics"}
+    }
+    legacy_payload["schema_version"] = LEGACY_AMD_SOL_SCHEMA_VERSION
+    legacy_payload["aggregate_bound"] = {
+        "status": floor["status"],
+        "scored": floor["authority_eligible"],
+        "sol_bound_ms": floor["t_sol_floor_ms"],
+        "reason": floor["reason"],
+        "node_ids": floor["node_ids"],
+    }
+    legacy_payload["group_bounds"] = [
+        {
+            **{key: value for key, value in bound.items() if key != "t_sol_floor_ms"},
+            "sol_bound_ms": bound.get("t_sol_floor_ms"),
+        }
+        if isinstance(bound, dict)
+        else bound
+        for bound in raw_bounds
+    ]
+    legacy = _amd_sol_bound_from_v4_dict(legacy_payload)
+    diagnostics = _performance_diagnostics_from_dict(
+        payload["performance_diagnostics"], t_sol_floor_ms=legacy.t_sol_floor_ms
+    )
+    _validate_performance_diagnostics(diagnostics, legacy.hardware_model.architecture)
+    return replace(
+        legacy,
+        performance_diagnostics=diagnostics,
+        schema_version=AMD_SOL_SCHEMA_VERSION,
+    )
+
+
+def _amd_sol_bound_from_v4_dict(payload: dict[str, Any]) -> AmdSolBoundArtifact:
+    """Parse v4 exactly; it has no diagnostic track and retains old names."""
     required_extra = {
         "fusion_validation_ref",
         "fusion_validation_sha256",
@@ -425,7 +789,7 @@ def amd_sol_bound_from_dict(payload: dict[str, Any]) -> AmdSolBoundArtifact:
     expected = v3_keys | {"schema_version"} | required_extra
     if set(payload) != expected:
         raise ValueError("AMD SOL v4 artifact has missing or unknown top-level fields")
-    if payload["schema_version"] != AMD_SOL_SCHEMA_VERSION:
+    if payload["schema_version"] != LEGACY_AMD_SOL_SCHEMA_VERSION:
         raise ValueError("AMD SOL artifact has invalid schema_version")
     if (
         not isinstance(payload["fusion_validation_ref"], str)
@@ -474,8 +838,107 @@ def amd_sol_bound_from_dict(payload: dict[str, Any]) -> AmdSolBoundArtifact:
         raise ValueError("fusion_validation_matches must exactly mirror fusion groups")
     matches = tuple(_summary(item) for item in raw_matches)
     return AmdSolBoundArtifact(
-        base, payload["fusion_validation_ref"], checksum, matches
+        base,
+        payload["fusion_validation_ref"],
+        checksum,
+        matches,
+        schema_version=LEGACY_AMD_SOL_SCHEMA_VERSION,
     )
+
+
+def _performance_diagnostics_from_dict(
+    raw: object, *, t_sol_floor_ms: float
+) -> AmdSolPerformanceDiagnostics:
+    expected = {
+        "status",
+        "t_predicted_best_ms",
+        "fastest_known_ms",
+        "t_sol_floor_to_fastest_known_ratio",
+        "t_predicted_best_to_fastest_known_ratio",
+        "floor_contradicts_fastest_known",
+        "provider_results",
+    }
+    if not isinstance(raw, dict) or set(raw) != expected:
+        raise ValueError("performance_diagnostics has missing or unknown fields")
+    raw = cast(dict[str, Any], raw)
+    results_raw = raw["provider_results"]
+    if not isinstance(results_raw, list):
+        raise ValueError("performance_diagnostics.provider_results must be a list")
+    diagnostics = AmdSolPerformanceDiagnostics(
+        tuple(_performance_provider_result_from_dict(item) for item in results_raw)
+    )
+    expected_payload = diagnostics.to_dict(t_sol_floor_ms=t_sol_floor_ms)
+    if raw != expected_payload:
+        raise ValueError(
+            "performance_diagnostics values must be derived from providers"
+        )
+    return diagnostics
+
+
+def _performance_provider_result_from_dict(raw: object) -> PerformanceProviderResult:
+    expected = set(PerformanceProviderResult.__dataclass_fields__)
+    if not isinstance(raw, dict) or set(raw) != expected:
+        raise ValueError("performance provider result has missing or unknown fields")
+    raw = cast(dict[str, Any], raw)
+    string_keys = {
+        "provider_name",
+        "provider_revision",
+        "provider_schema_version",
+        "target_architecture",
+        "rocm_version",
+        "input_identity_sha256",
+        "status",
+        "result_kind",
+    }
+    if any(not isinstance(raw[key], str) for key in string_keys):
+        raise ValueError(
+            "performance provider identity and state fields must be strings"
+        )
+    if not isinstance(raw["is_theoretical_lower_bound"], bool):
+        raise ValueError("performance provider lower-bound flag must be a boolean")
+    for key in ("predicted_latency_ms", "measured_latency_ms"):
+        if raw[key] is not None and (
+            isinstance(raw[key], bool) or not isinstance(raw[key], int | float)
+        ):
+            raise ValueError(f"performance provider {key} must be a number or null")
+    if not isinstance(raw["warnings"], list) or not all(
+        isinstance(item, str) for item in raw["warnings"]
+    ):
+        raise ValueError("performance provider warnings must be a string list")
+    for key in ("raw_evidence_ref", "raw_evidence_sha256"):
+        if raw[key] is not None and not isinstance(raw[key], str):
+            raise ValueError(f"performance provider {key} must be a string or null")
+    if not isinstance(raw["output_payload"], dict):
+        raise ValueError("performance provider output_payload must be an object")
+    return PerformanceProviderResult(
+        provider_name=raw["provider_name"],
+        provider_revision=raw["provider_revision"],
+        provider_schema_version=raw["provider_schema_version"],
+        target_architecture=raw["target_architecture"],
+        rocm_version=raw["rocm_version"],
+        input_identity_sha256=raw["input_identity_sha256"],
+        status=raw["status"],
+        result_kind=raw["result_kind"],
+        is_theoretical_lower_bound=raw["is_theoretical_lower_bound"],
+        predicted_latency_ms=raw["predicted_latency_ms"],
+        measured_latency_ms=raw["measured_latency_ms"],
+        warnings=tuple(raw["warnings"]),
+        raw_evidence_ref=raw["raw_evidence_ref"],
+        raw_evidence_sha256=raw["raw_evidence_sha256"],
+        output_payload=dict(raw["output_payload"]),
+    )
+
+
+def _validate_performance_diagnostics(
+    diagnostics: AmdSolPerformanceDiagnostics, architecture: str
+) -> None:
+    if any(
+        result.target_architecture.lower() != architecture.lower()
+        for result in diagnostics.provider_results
+    ):
+        raise ValueError(
+            "performance provider target architecture does not match hardware model"
+        )
 
 
 def _summary(raw: dict[str, Any]) -> FusionGroupEvidenceSummary:
@@ -504,8 +967,11 @@ def _summary(raw: dict[str, Any]) -> FusionGroupEvidenceSummary:
 
 __all__ = [
     "AMD_SOL_SCHEMA_VERSION",
+    "LEGACY_AMD_SOL_SCHEMA_VERSION",
     "AmdSolBoundArtifact",
+    "AmdSolPerformanceDiagnostics",
     "FusionGroupEvidenceSummary",
+    "PerformanceProviderResult",
     "amd_sol_bound_from_dict",
     "build_amd_sol_bound_artifact",
     "fusion_signature_for_group",

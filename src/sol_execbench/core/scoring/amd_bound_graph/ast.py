@@ -338,6 +338,36 @@ class _AstBoundGraphExtractor:
                     ),
                 },
             )
+        if isinstance(expression, ast.Attribute) and expression.attr in {"T", "mT"}:
+            input_tensor_ids = self._process_expr(expression.value)
+            if not input_tensor_ids:
+                return ()
+            input_tensor = self.tensors.get(input_tensor_ids[0])
+            output_shape = self._transpose_attribute_shape(
+                input_tensor.shape if input_tensor is not None else None,
+                expression.attr,
+            )
+            exact_shape = output_shape is not None
+            return self._append_node(
+                op_family=OpFamily.DATA_MOVEMENT,
+                op_name=ast.unparse(expression),
+                source_expression=ast.unparse(expression),
+                input_tensor_ids=input_tensor_ids,
+                confidence=(
+                    EstimateConfidence.SUPPORTED
+                    if exact_shape
+                    else EstimateConfidence.INEXACT
+                ),
+                rationale=(
+                    "recognized static tensor transpose view"
+                    if exact_shape
+                    else "recognized tensor transpose view with unresolved shape"
+                ),
+                attributes={
+                    "movement_kind": "logical_view",
+                    **({"output_shape": output_shape} if exact_shape else {}),
+                },
+            )
         if isinstance(expression, ast.Attribute):
             return self._process_expr(expression.value)
         return ()
@@ -705,6 +735,12 @@ class _AstBoundGraphExtractor:
             attributes,
             tuple(input_tensor_ids),
         )
+        confidence = classification.confidence
+        rationale = classification.rationale
+        if op_family == OpFamily.GEMM and "output_shape" not in attributes:
+            confidence = EstimateConfidence.INEXACT
+            rationale = f"{rationale}; static output shape is unresolved"
+            attributes["shape_provenance"] = "unresolved"
         if op_family == OpFamily.CONVOLUTION:
             self._resolve_convolution_attributes(
                 node, attributes, tuple(input_tensor_ids)
@@ -730,8 +766,8 @@ class _AstBoundGraphExtractor:
             op_name=func_name,
             source_expression=ast.unparse(node),
             input_tensor_ids=tuple(input_tensor_ids),
-            confidence=classification.confidence,
-            rationale=classification.rationale,
+            confidence=confidence,
+            rationale=rationale,
             attributes=attributes,
             output_count=self._call_output_count(node, func_name, input_tensor_ids),
         )
@@ -1191,6 +1227,19 @@ class _AstBoundGraphExtractor:
         for shape in self.output_shapes.values():
             if shape is not None:
                 return shape
+        return None
+
+    @staticmethod
+    def _transpose_attribute_shape(
+        input_shape: tuple[int, ...] | None, attribute: str
+    ) -> tuple[int, ...] | None:
+        """Return the exact static shape for Tensor.T or Tensor.mT."""
+        if input_shape is None:
+            return None
+        if attribute == "T":
+            return tuple(reversed(input_shape))
+        if attribute == "mT" and len(input_shape) >= 2:
+            return (*input_shape[:-2], input_shape[-1], input_shape[-2])
         return None
 
     def _default_intermediate_dtype(self, input_tensor_ids: tuple[str, ...]) -> str:
