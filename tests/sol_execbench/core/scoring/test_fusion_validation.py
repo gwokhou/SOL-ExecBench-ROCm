@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import copy
+from dataclasses import replace
 from typing import Any, cast
 
 import pytest
@@ -78,6 +79,19 @@ def test_fusion_validation_round_trip_is_strict() -> None:
     invalid["unexpected"] = True
     with pytest.raises(ValueError, match="fields mismatch"):
         fusion_validation_from_dict(invalid)
+
+
+def test_fusion_validation_accepts_exact_scalar_shapes() -> None:
+    artifact = _artifact()
+    scalar_signature = replace(
+        artifact.cases[0].signature,
+        input_shapes=((2, 4096), ()),
+        output_shapes=((),),
+    )
+    scalar_case = replace(artifact.cases[0], signature=scalar_signature)
+    scalar_artifact = replace(artifact, cases=(scalar_case,))
+
+    assert fusion_validation_from_dict(scalar_artifact.to_dict()) == scalar_artifact
 
 
 @pytest.mark.parametrize(

@@ -10,13 +10,11 @@ from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.scoring.amd_bound_estimate.estimates import (
     OperatorWorkEstimate,
     estimate_bound_work,
+    resolve_architecture_profile_paths,
 )
 from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
 from sol_execbench.core.scoring.amd_bound_graph.models import BoundGraph
 from sol_execbench.core.scoring.amd_hardware_models import AmdHardwareModel
-from sol_execbench.core.scoring.amd_sol.builder import (
-    _resolve_architecture_matrix_paths,
-)
 from sol_execbench.core.scoring.solar_derivation.confidence import (
     classify_solar_confidence,
 )
@@ -50,8 +48,8 @@ def build_solar_derivation_evidence(
 ) -> SolarDerivationEvidence:
     """Build internal SOLAR derivation evidence from canonical problem inputs."""
     graph = build_bound_graph(definition, workload)
-    estimates = _resolve_architecture_matrix_paths(
-        estimate_bound_work(graph), hardware_model
+    estimates = resolve_architecture_profile_paths(
+        estimate_bound_work(graph), hardware_model.architecture
     )
     return derive_solar_derivation_evidence(
         definition,

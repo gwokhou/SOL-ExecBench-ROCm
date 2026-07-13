@@ -71,6 +71,9 @@ _PROBE_RESOURCES: dict[tuple[str, str, str, str | None], str] = {
     ("stream_copy", "fp32", "bf16", None): "stream_copy_fp32_bf16.hip",
     ("reduction", "fp32", "fp32", None): "reduction_fp32_fp32.hip",
     ("transcendental", "fp32", "fp32", None): "transcendental_fp32_fp32.hip",
+    # gfx12 FP32 matrix math uses the ordinary FP32 FMA datapath rather than
+    # WMMA. Reuse the self-checking saturation probe for that shared resource.
+    ("matrix", "fp32", "fp32", "gfx12"): "vector_fp32_fp32.hip",
     ("matrix", "bf16", "bf16", "wmma"): "matrix_bf16_bf16_wmma.hip",
     ("matrix", "fp16", "fp16", "wmma"): "matrix_fp16_fp16_wmma.hip",
     ("matrix", "bf16", "bf16", "mfma"): "matrix_bf16_bf16_mfma.hip",
@@ -200,9 +203,9 @@ class HipCommandBackend:
             return "missing"
         is_matrix = (
             key.operation == "matrix"
-            and key.input_dtype in {"bf16", "fp16"}
+            and key.input_dtype in {"bf16", "fp16", "fp32"}
             and key.output_dtype == key.input_dtype
-            and key.path in {"wmma", "mfma"}
+            and key.path in {"wmma", "mfma", "gfx12"}
         )
         is_vector_probe = (
             key.input_dtype in {"fp32", "fp16", "bf16"}
@@ -329,17 +332,19 @@ def default_hip_probe(
 
 def _matrix_path_is_supported(key: CalibrationProfileKey, architecture: str) -> bool:
     """Return whether a declared matrix path matches an AMD ISA family."""
-    if (
-        key.operation != "matrix"
-        or key.input_dtype not in {"bf16", "fp16"}
-        or key.output_dtype != key.input_dtype
-    ):
+    if key.operation != "matrix":
         return True
+    if key.output_dtype != key.input_dtype:
+        return False
+    if key.input_dtype == "fp32":
+        return architecture.startswith("gfx12") and key.path == "gfx12"
     if key.input_dtype == "fp16":
         return architecture.startswith("gfx12") and key.path == "wmma"
-    return (architecture.startswith("gfx12") and key.path == "wmma") or (
-        architecture.startswith(("gfx94", "gfx95")) and key.path == "mfma"
-    )
+    if key.input_dtype == "bf16":
+        return (architecture.startswith("gfx12") and key.path == "wmma") or (
+            architecture.startswith(("gfx94", "gfx95")) and key.path == "mfma"
+        )
+    return False
 
 
 def _hip_source(key: CalibrationProfileKey) -> str:

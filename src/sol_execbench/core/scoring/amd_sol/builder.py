@@ -5,17 +5,18 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
-
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.platform.arch_capabilities import (
     ArchIsaBudget,
     derive_arch_capability_budget,
 )
-from sol_execbench.core.scoring.amd_bound_estimate.estimates import estimate_bound_work
+from sol_execbench.core.scoring.amd_bound_estimate.estimates import (
+    estimate_bound_work,
+    resolve_architecture_profile_paths,
+)
 from sol_execbench.core.scoring.amd_bound_estimate.models import OperatorWorkEstimate
-from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
+from sol_execbench.core.scoring.amd_bound_graph import BoundGraph, build_bound_graph
 from sol_execbench.core.scoring.amd_hardware_models import (
     AmdHardwareModel,
     HardwareValidationStatus,
@@ -42,6 +43,7 @@ def _build_amd_sol_bound_base(
     hardware_model_ref: str | None = None,
     capability_budget_ref: str | None = None,
     capability_budget: ArchIsaBudget | None = None,
+    bound_graph: BoundGraph | None = None,
 ) -> _AmdSolBoundBase:
     """Build a fusion-aware sidecar using explicit architecture capability evidence."""
     budget = capability_budget or derive_arch_capability_budget(
@@ -55,9 +57,9 @@ def _build_amd_sol_bound_base(
         capability_budget_ref = (
             f"packaged:arch_capability_budgets/{budget.architecture}.json"
         )
-    graph = build_bound_graph(definition, workload)
-    estimates = _resolve_architecture_matrix_paths(
-        estimate_bound_work(graph), hardware_model
+    graph = bound_graph or build_bound_graph(definition, workload)
+    estimates = resolve_architecture_profile_paths(
+        estimate_bound_work(graph), hardware_model.architecture
     )
     groups = build_fusion_groups(graph, estimates, capability_budget=budget)
     group_bounds = tuple(
@@ -249,29 +251,3 @@ def _warnings_for_artifact(
     if aggregate.status != "scored":
         warnings.append(f"aggregate_{aggregate.status}:{aggregate.reason}")
     return tuple(dict.fromkeys(warnings))
-
-
-def _resolve_architecture_matrix_paths(
-    estimates: tuple[OperatorWorkEstimate, ...], hardware_model: AmdHardwareModel
-) -> tuple[OperatorWorkEstimate, ...]:
-    if not hardware_model.architecture.lower().startswith("gfx12"):
-        return estimates
-    return tuple(
-        replace(
-            estimate,
-            compute_path=(
-                "wmma"
-                if estimate.compute_operation == "matrix"
-                and estimate.compute_path == "mfma"
-                else "gfx12"
-                if estimate.compute_operation
-                in {"vector", "reduction", "transcendental"}
-                and estimate.compute_path == "portable"
-                else estimate.compute_path
-            ),
-            memory_path=(
-                "gfx12" if estimate.memory_path == "portable" else estimate.memory_path
-            ),
-        )
-        for estimate in estimates
-    )

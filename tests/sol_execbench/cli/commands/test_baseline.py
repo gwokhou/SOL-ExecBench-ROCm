@@ -226,7 +226,13 @@ def test_release_verify_writes_report(monkeypatch, tmp_path: Path) -> None:
     class FakeReport:
         release: str = "v2.14"
         summary: dict[str, int] = field(
-            default_factory=lambda: {"passed": 0, "total": 0}
+            default_factory=lambda: {
+                "total": 2,
+                "official": 1,
+                "derived": 0,
+                "blocked": 1,
+                "passed": 1,
+            }
         )
 
         def to_dict(self) -> dict[str, object]:

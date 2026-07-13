@@ -41,6 +41,7 @@ class OfficialReleaseBaseline:
     bundle: ReleaseBaselineBundle
     verification: ReleaseBaselineVerification
     official_keys: frozenset[tuple[str, str]]
+    evidence_root: Path | None = None
 
     def permits(
         self, definition: str, workload_uuid: str, latency_ms: float | None
@@ -88,8 +89,8 @@ class OfficialReleaseBaseline:
             or hardware_model_ref != row.hardware_model_ref
         ):
             return False
-        bound_path = Path(row.bound_ref)
-        hardware_path = Path(row.hardware_model_ref)
+        bound_path = self._resolve_evidence_ref(row.bound_ref)
+        hardware_path = self._resolve_evidence_ref(row.hardware_model_ref)
         if not bound_path.is_file() or not hardware_path.is_file():
             return False
         if (
@@ -115,8 +116,8 @@ class OfficialReleaseBaseline:
             return False
         if bound.hardware_model.architecture != model.architecture:
             return False
-        fusion_path = Path(bound.fusion_validation_ref)
-        if not fusion_path.is_absolute():
+        fusion_path = self._resolve_evidence_ref(bound.fusion_validation_ref)
+        if not fusion_path.is_file():
             fusion_path = bound_path.parent / fusion_path
         if (
             not fusion_path.is_file()
@@ -124,6 +125,12 @@ class OfficialReleaseBaseline:
         ):
             return False
         return True
+
+    def _resolve_evidence_ref(self, reference: str) -> Path:
+        path = Path(reference)
+        if path.is_absolute() or self.evidence_root is None:
+            return path
+        return self.evidence_root / path
 
 
 def load_official_release_baseline(
@@ -206,4 +213,5 @@ def load_official_release_baseline(
         bundle=bundle,
         verification=verification,
         official_keys=frozenset(official_keys),
+        evidence_root=bundle_path.parent,
     )

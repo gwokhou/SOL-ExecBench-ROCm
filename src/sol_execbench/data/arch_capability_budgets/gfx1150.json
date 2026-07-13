@@ -6,6 +6,7 @@
   "sgpr_limit": 102,
   "waves_per_cu_max": 32,
   "lds_per_workgroup_bytes": null,
+  "lds_confidence": "inexact",
   "register_file_per_cu_bytes": null,
   "supported_dtypes": ["fp32", "fp16", "bf16", "int8", "fp8"],
   "matrix_unit": "wmma",

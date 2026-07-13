@@ -68,6 +68,23 @@ class TestComputeErrorStats:
         _, exceeds = compute_error_stats(out, ref, _spec())
         assert exceeds
 
+    def test_chunked_reduction_preserves_global_metrics(self, monkeypatch):
+        from sol_execbench.core.bench import correctness
+
+        monkeypatch.setattr(correctness, "_CORRECTNESS_CHUNK_ELEMENTS", 2)
+        ref = torch.tensor([0.0, 1.0, 2.0, 3.0, 4.0])
+        out = torch.tensor([0.0, 1.1, 2.0, 3.5, 4.0])
+
+        result, exceeds = compute_error_stats(
+            out,
+            ref,
+            _spec(max_atol=0.01, max_rtol=0.0, required_matched_ratio=0.6),
+        )
+
+        assert result.max_absolute_error == pytest.approx(0.5)
+        assert result.max_relative_error == pytest.approx(1 / 6)
+        assert not exceeds
+
     # ------------------------------------------------------------------
     # Empty tensor
     # ------------------------------------------------------------------
@@ -277,17 +294,13 @@ class TestCheckOutputShapeDtype:
         ref = [torch.zeros((2, 2), dtype=torch.float32)]
         user = [torch.zeros(4, dtype=torch.float16)]
 
-        assert (
-            check_output_shape_dtype(ref, user) == EvaluationStatus.INCORRECT_SHAPE
-        )
+        assert check_output_shape_dtype(ref, user) == EvaluationStatus.INCORRECT_SHAPE
 
     def test_returns_incorrect_dtype_when_shape_matches(self):
         ref = [torch.zeros(2, dtype=torch.float32)]
         user = [torch.zeros(2, dtype=torch.float16)]
 
-        assert (
-            check_output_shape_dtype(ref, user) == EvaluationStatus.INCORRECT_DTYPE
-        )
+        assert check_output_shape_dtype(ref, user) == EvaluationStatus.INCORRECT_DTYPE
 
     def test_bfloat16_inputs(self):
         """bfloat16 inputs are upcast to float32 internally."""
@@ -500,7 +513,7 @@ class TestCheckOutputShapeDtype:
         assert exceeds
 
     # ------------------------------------------------------------------
-        # max_error_cap for library-style kernels
+    # max_error_cap for library-style kernels
     # ------------------------------------------------------------------
 
     def test_max_error_cap_no_cap(self):

@@ -353,6 +353,35 @@ def test_matmul_estimate_records_formula_inputs_flops_and_node_local_bytes():
     assert estimate.confidence == EstimateConfidence.SUPPORTED
 
 
+def test_fp8_matmul_remains_inexact_without_a_validated_matrix_probe():
+    from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
+
+    definition = make_definition(
+        name="fp8_matmul_demo",
+        axes={
+            "M": {"type": "const", "value": 2},
+            "K": {"type": "const", "value": 4},
+            "N": {"type": "const", "value": 8},
+        },
+        inputs={
+            "a": {"shape": ["M", "K"], "dtype": "float8_e4m3fn"},
+            "b": {"shape": ["K", "N"], "dtype": "float8_e4m3fn"},
+        },
+        outputs={"out": {"shape": ["M", "N"], "dtype": "float8_e4m3fn"}},
+        reference="def run(a, b):\n    return a @ b",
+    )
+    workload = make_workload(
+        axes={},
+        inputs={"a": {"type": "random"}, "b": {"type": "random"}},
+        uuid="fp8-matmul-workload",
+    )
+
+    estimate = estimate_bound_work(build_bound_graph(definition, workload))[0]
+
+    assert estimate.confidence == EstimateConfidence.INEXACT
+    assert "inexact_operator:gemm_fp8_matrix_probe_unavailable" in estimate.warnings
+
+
 def test_batched_matmul_estimate_records_batch_formula_inputs():
     from sol_execbench.core.scoring.amd_bound_graph import build_bound_graph
 

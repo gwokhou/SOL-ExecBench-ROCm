@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from sol_execbench.core.scoring.amd_bound_estimate.families import (
     EstimateDispatchFamily,
     estimate_dispatch_family,
@@ -36,6 +38,33 @@ from sol_execbench.core.scoring.amd_bound_graph.models import BoundGraph, BoundG
 def estimate_bound_work(graph: BoundGraph) -> tuple[OperatorWorkEstimate, ...]:
     """Estimate per-node operator work from a structured bound graph."""
     return tuple(_estimate_node(graph, node) for node in graph.nodes)
+
+
+def resolve_architecture_profile_paths(
+    estimates: tuple[OperatorWorkEstimate, ...], architecture: str
+) -> tuple[OperatorWorkEstimate, ...]:
+    """Resolve generic estimate paths to the target ISA family's probe keys."""
+    if not architecture.lower().startswith("gfx12"):
+        return estimates
+    return tuple(
+        replace(
+            estimate,
+            compute_path=(
+                ("wmma" if estimate.input_dtype in {"bf16", "fp16"} else "gfx12")
+                if estimate.compute_operation == "matrix"
+                and estimate.compute_path == "mfma"
+                else "gfx12"
+                if estimate.compute_operation
+                in {"vector", "reduction", "transcendental"}
+                and estimate.compute_path == "portable"
+                else estimate.compute_path
+            ),
+            memory_path=(
+                "gfx12" if estimate.memory_path == "portable" else estimate.memory_path
+            ),
+        )
+        for estimate in estimates
+    )
 
 
 def _estimate_node(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstimate:
@@ -79,4 +108,5 @@ __all__ = [
     "OperatorWorkEstimate",
     "_dtype_bytes",
     "estimate_bound_work",
+    "resolve_architecture_profile_paths",
 ]

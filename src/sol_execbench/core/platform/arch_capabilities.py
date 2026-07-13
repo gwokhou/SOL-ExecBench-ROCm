@@ -54,6 +54,8 @@ class ArchIsaBudget(BaseModelWithDocstrings):
     """Conservative maximum waves per CU when statically known."""
     lds_per_workgroup_bytes: int | None = Field(default=None, ge=0)
     """Local Data Share bytes available per work-group when known."""
+    lds_confidence: EstimateConfidence | None = None
+    """Field-level confidence for the LDS capacity value."""
     register_file_per_cu_bytes: int | None = Field(default=None, ge=0)
     """Vector register file bytes per CU when known."""
     supported_dtypes: list[str] = Field(default_factory=list)
@@ -86,6 +88,7 @@ _ALLOWED_BUDGET_KEYS = {
     "sgpr_limit",
     "waves_per_cu_max",
     "lds_per_workgroup_bytes",
+    "lds_confidence",
     "register_file_per_cu_bytes",
     "supported_dtypes",
     "matrix_unit",
@@ -98,6 +101,7 @@ _ALLOWED_BUDGET_KEYS = {
     "confidence",
     "evidence_refs",
 }
+_OPTIONAL_BUDGET_KEYS = {"lds_confidence"}
 
 
 def _normalize_gfx_token(gfx_target: str) -> str:
@@ -112,7 +116,7 @@ def _require_keys(payload: dict[str, Any]) -> None:
         raise ValueError(
             f"arch capability budget has unknown field(s): {', '.join(unknown)}"
         )
-    missing = sorted(_ALLOWED_BUDGET_KEYS - set(payload.keys()))
+    missing = sorted(_ALLOWED_BUDGET_KEYS - _OPTIONAL_BUDGET_KEYS - set(payload.keys()))
     if missing:
         raise ValueError(
             f"arch capability budget missing required field(s): {', '.join(missing)}"
@@ -143,6 +147,9 @@ def arch_capability_budget_from_dict(
     enriched = dict(payload)
     try:
         enriched["confidence"] = EstimateConfidence(str(payload["confidence"]))
+        enriched["lds_confidence"] = EstimateConfidence(
+            str(payload.get("lds_confidence", payload["confidence"]))
+        )
     except ValueError as exc:
         valid = ", ".join(value.value for value in EstimateConfidence)
         raise ValueError(

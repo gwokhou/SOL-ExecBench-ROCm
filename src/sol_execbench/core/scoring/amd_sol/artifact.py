@@ -18,6 +18,7 @@ from sol_execbench.core.scoring.amd_sol.builder import (
     _aggregate_for_groups,
     _build_amd_sol_bound_base,
 )
+from sol_execbench.core.scoring.amd_bound_graph.models import BoundGraph
 from sol_execbench.core.scoring.amd_sol.models import (
     AmdSolAggregateBound,
     AmdSolCoverageSummary,
@@ -168,10 +169,8 @@ def fusion_signature_for_group(
     def shape(tensor_id: str) -> tuple[int, ...]:
         tensor = tensors.get(tensor_id)
         raw = tensor.get("shape") if isinstance(tensor, dict) else None
-        if (
-            not isinstance(raw, list)
-            or not raw
-            or not all(isinstance(dim, int) and dim > 0 for dim in raw)
+        if not isinstance(raw, list) or not all(
+            isinstance(dim, int) and dim > 0 for dim in raw
         ):
             raise ValueError(f"fusion tensor {tensor_id} has no exact static shape")
         return tuple(raw)
@@ -201,6 +200,36 @@ def fusion_signature_for_group(
     )
 
 
+def _matching_evidence_tile_contract(
+    group: FusionGroup,
+    bound_graph: dict[str, object],
+    evidence: FusionValidationArtifact,
+    *,
+    workload_uuid: str,
+) -> dict[str, object] | None:
+    """Return a uniquely identified evidence contract for one fusion group."""
+    if len(group.node_ids) <= 1:
+        return None
+    try:
+        signature = fusion_signature_for_group(group, bound_graph)
+    except ValueError:
+        return None
+    matches = [
+        case
+        for case in evidence.cases
+        if case.workload_uuid == workload_uuid
+        and case.signature.pattern_id == signature.pattern_id
+        and case.signature.pattern_version == signature.pattern_version
+        and case.signature.op_names == signature.op_names
+        and case.signature.dtype == signature.dtype
+        and case.signature.input_shapes == signature.input_shapes
+        and case.signature.output_shapes == signature.output_shapes
+    ]
+    if len(matches) != 1:
+        return None
+    return dict(matches[0].signature.tile_contract)
+
+
 def build_amd_sol_bound_artifact(
     definition: Definition,
     workload: Workload,
@@ -214,6 +243,7 @@ def build_amd_sol_bound_artifact(
     capability_budget_ref: str | None = None,
     capability_budget: ArchIsaBudget | None = None,
     tile_contracts: dict[str, dict[str, object]] | None = None,
+    bound_graph: BoundGraph | None = None,
 ) -> AmdSolBoundArtifact:
     """Build the bound, promoting only uniquely matched, capacity-passed groups."""
     evidence_payload = (
@@ -242,17 +272,27 @@ def build_amd_sol_bound_artifact(
         hardware_model_ref=hardware_model_ref,
         capability_budget_ref=capability_budget_ref,
         capability_budget=capability_budget,
+        bound_graph=bound_graph,
     )
     summaries: list[FusionGroupEvidenceSummary] = []
     promoted_groups: list[FusionGroup] = []
     promoted_bounds: list[AmdSolGroupBound] = []
+    missing_validation_group_ids: list[str] = []
     estimates = {item["node_id"]: item for item in base.operator_work_estimates}
     for group, bound in zip(base.fusion_groups, base.group_bounds, strict=True):
+        tile_contract = (tile_contracts or {}).get(group.group_id)
+        if tile_contract is None:
+            tile_contract = _matching_evidence_tile_contract(
+                group,
+                base.bound_graph,
+                evidence,
+                workload_uuid=str(workload.uuid),
+            )
         try:
             signature = fusion_signature_for_group(
                 group,
                 base.bound_graph,
-                tile_contract=(tile_contracts or {}).get(group.group_id),
+                tile_contract=tile_contract,
             )
         except ValueError:
             signature = None
@@ -304,6 +344,27 @@ def build_amd_sol_bound_artifact(
                 else bound.confidence
             )
             bound = replace(bound, warnings=bound_warnings, confidence=bound_confidence)
+        elif len(group.node_ids) > 1 and not passed:
+            missing_validation_group_ids.append(group.group_id)
+            missing_warning = "fusion_validation_evidence_missing"
+            group = replace(
+                group,
+                confidence=(
+                    EstimateConfidence.UNSUPPORTED
+                    if group.confidence == EstimateConfidence.UNSUPPORTED
+                    else EstimateConfidence.INEXACT
+                ),
+                warnings=tuple(dict.fromkeys((*group.warnings, missing_warning))),
+            )
+            bound = replace(
+                bound,
+                confidence=(
+                    EstimateConfidence.UNSUPPORTED
+                    if bound.confidence == EstimateConfidence.UNSUPPORTED
+                    else EstimateConfidence.INEXACT
+                ),
+                warnings=tuple(dict.fromkeys((*bound.warnings, missing_warning))),
+            )
         promoted_groups.append(group)
         promoted_bounds.append(bound)
     groups_tuple, bounds_tuple = tuple(promoted_groups), tuple(promoted_bounds)
@@ -317,6 +378,22 @@ def build_amd_sol_bound_artifact(
         if not (
             "fusion_capacity_evidence_missing" in warning
             and any(f":{group_id}:" in warning for group_id in passed_group_ids)
+        )
+    )
+    warnings = tuple(
+        dict.fromkeys(
+            (
+                *warnings,
+                *(
+                    f"fusion_validation_evidence_missing:{group_id}"
+                    for group_id in missing_validation_group_ids
+                ),
+                *(
+                    (f"aggregate_{aggregate.status}:{aggregate.reason}",)
+                    if aggregate.status != "scored"
+                    else ()
+                ),
+            )
         )
     )
     if aggregate.status == "scored":

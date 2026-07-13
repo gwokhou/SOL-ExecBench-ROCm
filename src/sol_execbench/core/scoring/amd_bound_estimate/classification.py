@@ -126,7 +126,6 @@ _CALL_CLASSIFIERS: tuple[tuple[set[str], CallClassification], ...] = (
     ),
     (
         {
-            "relu",
             "gelu",
             "silu",
             "sigmoid",
@@ -142,7 +141,7 @@ _CALL_CLASSIFIERS: tuple[tuple[set[str], CallClassification], ...] = (
         ),
     ),
     (
-        {"tanh", "rsqrt"},
+        {"relu", "tanh", "rsqrt"},
         CallClassification(
             "mlp_activation",
             EstimateConfidence.SUPPORTED,
@@ -192,22 +191,31 @@ _CALL_CLASSIFIERS: tuple[tuple[set[str], CallClassification], ...] = (
             "view",
             "reshape",
             "flatten",
-            "contiguous",
             "unsqueeze",
             "squeeze",
+            "movedim",
             "expand",
-            "broadcast_to",
             "expand_as",
+            "broadcast_to",
+        },
+        CallClassification(
+            "data_movement",
+            EstimateConfidence.SUPPORTED,
+            "recognized shape-proved tensor view or broadcast operation",
+        ),
+    ),
+    (
+        {
+            "contiguous",
             "repeat",
             "repeat_interleave",
             "roll",
-            "movedim",
             "unfold",
         },
         CallClassification(
             "data_movement",
             EstimateConfidence.INEXACT,
-            "recognized logical view or broadcast operation",
+            "recognized movement operation with unresolved materialization semantics",
         ),
     ),
     (

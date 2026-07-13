@@ -26,6 +26,7 @@ from sol_execbench.core.scoring.fusion_validation import (
     fusion_validation_from_dict,
 )
 from sol_execbench.core.integrity.checksums import sha256_file
+from sol_execbench.core.bench.clock_lock import lock_clocks, unlock_clocks
 from sol_execbench.core.scoring.hardware_calibration.environment import discover_gpu
 
 
@@ -190,8 +191,12 @@ def collect_fusion_validation(
         bool(getattr(environment, "clocks_locked", False))
         or os.environ.get("SOL_EXECBENCH_CLOCKS_LOCKED") == "1"
     )
+    acquired_clock_lock = False
     if require_clock_lock and not clocks_locked:
-        raise RuntimeError("locked GPU clocks are required for fusion collection")
+        acquired_clock_lock = lock_clocks()
+        clocks_locked = acquired_clock_lock
+        if not clocks_locked:
+            raise RuntimeError("locked GPU clocks are required for fusion collection")
     if not getattr(environment, "uuid", None):
         raise RuntimeError("GPU UUID discovery is required for fusion collection")
     if not getattr(environment, "rocm_version", None):
@@ -206,39 +211,45 @@ def collect_fusion_validation(
         "SOL_EXECBENCH_FUSION_SUITE_MANIFEST": str(suite_manifest.resolve()),
         "SOL_EXECBENCH_FUSION_BENCHMARK_ROOT": str(benchmark_root.resolve()),
         "SOL_EXECBENCH_FUSION_OUTPUT": str(output.resolve()),
+        "SOL_EXECBENCH_CLOCKS_LOCKED": "1" if clocks_locked else "0",
     }
-    completed = runner(
-        command,
-        cwd=benchmark_root,
-        env=process_env,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    if completed.returncode not in {0, EXIT_RESULT_FAILED}:
-        raise RuntimeError(
-            f"fusion probe failed with exit {completed.returncode}: {completed.stderr.strip()}"
+    try:
+        completed = runner(
+            command,
+            cwd=benchmark_root,
+            env=process_env,
+            text=True,
+            capture_output=True,
+            check=False,
         )
-    parsed = fusion_validation_from_dict(_json_object(output))
-    expected_suite = sha256_file(suite_manifest)
-    if parsed.suite_manifest_sha256 != expected_suite:
-        raise ValueError("probe output suite manifest checksum mismatch")
-    _verify_suite_coverage(parsed, manifest)
-    if parsed.architecture != live_arch:
-        raise ValueError("probe output architecture mismatch")
-    if parsed.gpu_uuid != str(getattr(environment, "uuid")):
-        raise ValueError("probe output GPU UUID mismatch")
-    live_rocm = getattr(environment, "rocm_version", None)
-    if live_rocm is not None and parsed.rocm_version != str(live_rocm):
-        raise ValueError("probe output ROCm version mismatch")
-    if require_clock_lock and not parsed.clocks_locked:
-        raise ValueError("probe output does not attest locked clocks")
-    # Preserve strict parsed normalization rather than accepting non-canonical
-    # JSON emitted by the child.
-    output.write_text(
-        json.dumps(parsed.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
-    return parsed
+        if completed.returncode not in {0, EXIT_RESULT_FAILED}:
+            raise RuntimeError(
+                f"fusion probe failed with exit {completed.returncode}: {completed.stderr.strip()}"
+            )
+        parsed = fusion_validation_from_dict(_json_object(output))
+        expected_suite = sha256_file(suite_manifest)
+        if parsed.suite_manifest_sha256 != expected_suite:
+            raise ValueError("probe output suite manifest checksum mismatch")
+        _verify_suite_coverage(parsed, manifest)
+        if parsed.architecture != live_arch:
+            raise ValueError("probe output architecture mismatch")
+        if parsed.gpu_uuid != str(getattr(environment, "uuid")):
+            raise ValueError("probe output GPU UUID mismatch")
+        live_rocm = getattr(environment, "rocm_version", None)
+        if live_rocm is not None and parsed.rocm_version != str(live_rocm):
+            raise ValueError("probe output ROCm version mismatch")
+        if require_clock_lock and not parsed.clocks_locked:
+            raise ValueError("probe output does not attest locked clocks")
+        # Preserve strict parsed normalization rather than accepting non-canonical
+        # JSON emitted by the child.
+        output.write_text(
+            json.dumps(parsed.to_dict(), indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        return parsed
+    finally:
+        if acquired_clock_lock:
+            unlock_clocks()
 
 
 def _built_in_probe_command() -> tuple[str, ...]:

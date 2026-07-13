@@ -194,7 +194,6 @@ def _shapes(raw: object, source: str) -> tuple[tuple[int, ...], ...]:
         raise ValueError(f"{source} shapes must be non-empty lists")
     if not all(
         isinstance(shape, list)
-        and shape
         and all(isinstance(dim, int) and dim > 0 for dim in shape)
         for shape in raw
     ):

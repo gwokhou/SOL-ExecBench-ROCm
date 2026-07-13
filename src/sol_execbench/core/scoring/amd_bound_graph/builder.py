@@ -26,7 +26,6 @@ def build_bound_graph(definition: Definition, workload: Workload) -> BoundGraph:
     input_shapes = definition.get_input_shapes(workload.axes)
     output_shapes = definition.get_output_shapes(workload.axes)
     tensors = _declared_tensors(definition, input_shapes, output_shapes)
-    warnings: list[str] = []
 
     fx_graph = _try_fx_bound_graph(
         definition, workload, input_shapes, output_shapes, tensors
@@ -34,7 +33,28 @@ def build_bound_graph(definition: Definition, workload: Workload) -> BoundGraph:
     if fx_graph is not None:
         return fx_graph
 
-    warnings.append("dynamic_trace_failed")
+    return build_static_bound_graph(
+        definition, workload, warnings=("dynamic_trace_failed",)
+    )
+
+
+def build_static_bound_graph(
+    definition: Definition,
+    workload: Workload,
+    *,
+    warnings: tuple[str, ...] = (),
+) -> BoundGraph:
+    """Build the deterministic AST graph without attempting an FX runtime trace.
+
+    Full-suite coverage audits intentionally use this path: trying thousands of
+    known-to-be-dynamic references through FX first is both slow and vulnerable
+    to data-dependent tracing hangs. Runtime scoring should keep using
+    :func:`build_bound_graph` so traceable references retain richer evidence.
+    """
+    input_shapes = definition.get_input_shapes(workload.axes)
+    output_shapes = definition.get_output_shapes(workload.axes)
+    tensors = _declared_tensors(definition, input_shapes, output_shapes)
+    graph_warnings = list(warnings)
 
     try:
         tree = ast.parse(definition.reference, mode="exec")
@@ -50,7 +70,7 @@ def build_bound_graph(definition: Definition, workload: Workload) -> BoundGraph:
         output_shapes=output_shapes,
     )
     nodes, extracted_tensors, edges, extractor_warnings = extractor.extract(tree)
-    warnings.extend(extractor_warnings)
+    graph_warnings.extend(extractor_warnings)
 
     return _annotate_family_graph(
         BoundGraph(
@@ -59,7 +79,7 @@ def build_bound_graph(definition: Definition, workload: Workload) -> BoundGraph:
             nodes=nodes,
             tensors=extracted_tensors,
             edges=edges,
-            warnings=tuple(dict.fromkeys(warnings)),
+            warnings=tuple(dict.fromkeys(graph_warnings)),
         )
     )
 

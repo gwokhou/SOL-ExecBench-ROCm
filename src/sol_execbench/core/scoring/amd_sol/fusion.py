@@ -262,7 +262,7 @@ def _worst_confidence(*values: EstimateConfidence) -> EstimateConfidence:
 def _capacity_supports(budget: object | None, required_lds_bytes: int | None) -> bool:
     return bool(
         required_lds_bytes is not None
-        and getattr(budget, "confidence", None) == EstimateConfidence.SUPPORTED
+        and getattr(budget, "lds_confidence", None) == EstimateConfidence.SUPPORTED
         and isinstance(getattr(budget, "lds_per_workgroup_bytes", None), int)
         and getattr(budget, "lds_per_workgroup_bytes") >= required_lds_bytes
     )

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 
 import pytest
 
@@ -34,7 +35,7 @@ def _hardware(architecture: str = "gfx1200"):
             "evidence_refs": ["fixture"],
             "compute_profiles": [
                 {
-                    "key": "compute.matrix.fp32.fp32.wmma",
+                    "key": "compute.matrix.fp32.fp32.gfx12",
                     "state": "measured",
                     "value": 100.0,
                     "confidence": "supported",
@@ -103,6 +104,37 @@ def _empty_evidence(architecture: str = "gfx1200"):
     )
 
 
+def _passed_case(signature, *, workload_uuid: str) -> FusionValidationCase:
+    kernel = KernelResourceEvidence(
+        "fused",
+        "a" * 64,
+        "b" * 64,
+        ("hipcc", "probe.hip"),
+        "gfx1200",
+        32,
+        20,
+        0,
+        0,
+        0,
+        64,
+        0,
+        65536,
+        1,
+        True,
+        True,
+    )
+    return FusionValidationCase(
+        "case",
+        workload_uuid,
+        "variant",
+        signature,
+        kernel,
+        (kernel,),
+        "passed",
+        PerformanceEvidence("not_measured", (), (), None, None),
+    )
+
+
 def test_current_bound_round_trip_and_fusion_match():
     definition, workload = _inputs()
     provisional = build_amd_sol_bound_artifact(
@@ -168,6 +200,60 @@ def test_current_bound_round_trip_and_fusion_match():
     assert payload["schema_version"] == AMD_SOL_SCHEMA_VERSION
     assert payload["fusion_groups"][0]["capacity_status"] == "passed"
     assert amd_sol_bound_from_dict(payload).to_dict() == payload
+
+
+def test_multinode_fusion_requires_matching_validation_case():
+    definition, workload = _inputs()
+
+    artifact = build_amd_sol_bound_artifact(
+        definition,
+        workload,
+        _hardware(),
+        fusion_validation=_empty_evidence(),
+        fusion_validation_ref="fusion.json",
+        fusion_validation_sha256="e" * 64,
+    )
+
+    assert artifact.aggregate_bound.status == "degraded"
+    assert artifact.fusion_groups[0].confidence.value == "inexact"
+    assert "fusion_validation_evidence_missing" in artifact.fusion_groups[0].warnings
+    assert "fusion_validation_evidence_missing:fusion_0000" in artifact.warnings
+
+
+def test_multinode_fusion_uniquely_recovers_evidence_tile_contract():
+    definition, workload = _inputs()
+    provisional = build_amd_sol_bound_artifact(
+        definition,
+        workload,
+        _hardware(),
+        fusion_validation=_empty_evidence(),
+        fusion_validation_ref="fusion.json",
+        fusion_validation_sha256="e" * 64,
+    )
+    signature = fusion_signature_for_group(
+        provisional.fusion_groups[0],
+        provisional.bound_graph,
+        tile_contract={"block_size": 256, "required_lds_bytes": 0},
+    )
+    evidence = replace(
+        _empty_evidence(),
+        cases=(_passed_case(signature, workload_uuid=str(workload.uuid)),),
+    )
+
+    artifact = build_amd_sol_bound_artifact(
+        definition,
+        workload,
+        _hardware(),
+        fusion_validation=evidence,
+        fusion_validation_ref="fusion.json",
+        fusion_validation_sha256="e" * 64,
+    )
+
+    assert artifact.aggregate_bound.status == "scored"
+    assert (
+        artifact.fusion_validation_matches[0].signature_sha256 == signature.canonical_id
+    )
+    assert artifact.fusion_validation_matches[0].capacity_status == "passed"
 
 
 @pytest.mark.parametrize(

@@ -281,7 +281,12 @@ def _verify_release(request: ReleaseVerifyRequest) -> CliResult:
     return CliResult(
         data={"release": report.release, "summary": report.summary},
         artifacts=(artifact(request.output_path, "json_file"),),
-        exit_code=(1 if report.summary["passed"] != report.summary["total"] else 0),
+        exit_code=(
+            1
+            if report.summary["passed"]
+            != bundle.summary["official"] + bundle.summary["derived"]
+            else 0
+        ),
     )
 
 

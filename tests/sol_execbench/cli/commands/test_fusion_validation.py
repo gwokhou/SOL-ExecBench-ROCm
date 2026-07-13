@@ -44,8 +44,17 @@ def _capacity_kernel() -> KernelResourceEvidence:
 
 
 def test_collect_uses_built_in_driver_when_manifest_has_no_override(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch
 ) -> None:
+    clock_events: list[str] = []
+    monkeypatch.setattr(
+        "sol_execbench.cli.commands.fusion_validation.lock_clocks",
+        lambda: clock_events.append("lock") or True,
+    )
+    monkeypatch.setattr(
+        "sol_execbench.cli.commands.fusion_validation.unlock_clocks",
+        lambda: clock_events.append("unlock"),
+    )
     workload_uuid = "rms-workload"
     manifest_path = tmp_path / "suite.json"
     manifest_path.write_text(
@@ -68,7 +77,7 @@ def test_collect_uses_built_in_driver_when_manifest_has_no_override(
             gpu_uuid="GPU-a",
             rocm_version="7.1",
             hipcc_version="7.1",
-            clocks_locked=False,
+            clocks_locked=True,
             suite_manifest_sha256=sha256_file(manifest_path),
             benchmark_root_sha256="c" * 64,
             generated_at="2026-07-12T00:00:00Z",
@@ -102,7 +111,7 @@ def test_collect_uses_built_in_driver_when_manifest_has_no_override(
         suite_manifest=manifest_path,
         benchmark_root=tmp_path,
         output=output,
-        require_clock_lock=False,
+        require_clock_lock=True,
         runner=fake_runner,
         discover=lambda _: GpuEnvironment(
             device=0, architecture="gfx1200", uuid="GPU-a", rocm_version="7.1"
@@ -110,3 +119,4 @@ def test_collect_uses_built_in_driver_when_manifest_has_no_override(
     )
 
     assert result.cases[0].capacity_status == "passed"
+    assert clock_events == ["lock", "unlock"]

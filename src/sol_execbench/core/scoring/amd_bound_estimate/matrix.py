@@ -74,6 +74,14 @@ def _gemm_estimate(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstim
     confidence = (
         EstimateConfidence.SUPPORTED if not warnings else EstimateConfidence.INEXACT
     )
+    dtypes = {tensor.dtype for tensor in (*input_tensors, *output_tensors)}
+    if any(dtype.startswith("float8_") for dtype in dtypes):
+        # The current gfx12 probe contract has no validated FP8 WMMA
+        # instruction/throughput probe. Keep the operation modeled, but do not
+        # let a generic 2*M*N*K count promote it into authority evidence.
+        confidence = EstimateConfidence.INEXACT
+        warnings.append("inexact_operator:gemm_fp8_matrix_probe_unavailable")
+        rationale_parts.append("FP8 matrix instruction calibration is unavailable")
     return OperatorWorkEstimate(
         node_id=node.node_id,
         op_family=node.op_family,
