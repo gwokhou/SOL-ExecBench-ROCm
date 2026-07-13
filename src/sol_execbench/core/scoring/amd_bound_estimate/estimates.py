@@ -18,10 +18,12 @@ from sol_execbench.core.scoring.amd_bound_estimate.impl import (
     _dtype_conversion_estimate,
     _elementwise_estimate,
     _embedding_positional_estimate,
+    _fft_estimate,
     _gemm_estimate,
     _moe_estimate,
     _normalization_estimate,
     _reduction_estimate,
+    _sampling_estimate,
     _softmax_estimate,
     _ssm_mamba_estimate,
     _unsupported_estimate,
@@ -64,6 +66,10 @@ def _estimate_node(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstim
         estimate = _data_movement_estimate(graph, node)
     elif dispatch_family == EstimateDispatchFamily.DTYPE_CONVERSION:
         estimate = _dtype_conversion_estimate(graph, node)
+    elif dispatch_family == EstimateDispatchFamily.FFT:
+        estimate = _fft_estimate(graph, node)
+    elif dispatch_family == EstimateDispatchFamily.SAMPLING:
+        estimate = _sampling_estimate(graph, node)
     else:
         estimate = _unsupported_estimate(node)
     return _with_hardware_profile_evidence(graph, node, estimate)

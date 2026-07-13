@@ -247,6 +247,10 @@ def test_estimate_dispatch_groups_are_family_specific_and_directly_testable():
         estimate_dispatch_family(OpFamily.DATA_MOVEMENT)
         == EstimateDispatchFamily.DATA_MOVEMENT
     )
+    assert estimate_dispatch_family(OpFamily.FFT) == EstimateDispatchFamily.FFT
+    assert (
+        estimate_dispatch_family(OpFamily.SAMPLING) == EstimateDispatchFamily.SAMPLING
+    )
     assert (
         estimate_dispatch_family(OpFamily.UNSUPPORTED)
         == EstimateDispatchFamily.UNSUPPORTED
@@ -271,6 +275,65 @@ def test_estimate_bound_work_returns_one_unsupported_estimate_per_node():
     assert estimates[0].to_dict()["warnings"] == [
         "unsupported_operator:torch.linalg.inv"
     ]
+
+
+@pytest.mark.parametrize(
+    ("family", "op_name", "formula_kind"),
+    [
+        (OpFamily.FFT, "torch.fft.rfft", "fft_flops"),
+        (OpFamily.SAMPLING, "torch.multinomial", "sampling_ops"),
+    ],
+)
+def test_data_frontier_families_have_nonzero_inexact_estimates(
+    family: OpFamily, op_name: str, formula_kind: str
+):
+    input_tensor = BoundTensor(
+        tensor_id="input:x",
+        name="x",
+        role=BoundTensorRole.INPUT,
+        shape=(64,),
+        dtype="float32",
+        producer_node_id=None,
+        source="definition.inputs.x",
+    )
+    output_tensor = BoundTensor(
+        tensor_id="tmp:op_1:0",
+        name="tmp:op_1:0",
+        role=BoundTensorRole.INTERMEDIATE,
+        shape=(64,),
+        dtype="float32",
+        producer_node_id="op_1",
+        source=op_name,
+    )
+    node = BoundGraphNode(
+        node_id="op_1",
+        op_family=family,
+        op_name=op_name,
+        source_expression=f"{op_name}(x)",
+        input_tensor_ids=(input_tensor.tensor_id,),
+        output_tensor_ids=(output_tensor.tensor_id,),
+        attributes={"dim": -1},
+        confidence=EstimateConfidence.INEXACT,
+        rationale="covered data frontier operation",
+    )
+    graph = BoundGraph(
+        definition="frontier_demo",
+        workload_uuid="w1",
+        nodes=(node,),
+        tensors={
+            input_tensor.tensor_id: input_tensor,
+            output_tensor.tensor_id: output_tensor,
+        },
+        edges=(),
+        warnings=(),
+    )
+
+    estimate = estimate_bound_work(graph)[0]
+
+    assert estimate.formula_kind == formula_kind
+    assert estimate.flops > 0
+    assert estimate.total_bytes > 0
+    assert estimate.confidence == EstimateConfidence.INEXACT
 
 
 def test_matmul_estimate_records_formula_inputs_flops_and_node_local_bytes():

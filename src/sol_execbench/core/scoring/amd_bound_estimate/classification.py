@@ -27,6 +27,22 @@ _CALL_CLASSIFIERS: tuple[tuple[set[str], CallClassification], ...] = (
         ),
     ),
     (
+        {"scaled_mm", "_scaled_mm", "einsum", "outer"},
+        CallClassification(
+            "gemm",
+            EstimateConfidence.INEXACT,
+            "recognized matrix contraction with data-dependent layout semantics",
+        ),
+    ),
+    (
+        {"scaled_dot_product_attention", "attention"},
+        CallClassification(
+            "attention",
+            EstimateConfidence.INEXACT,
+            "recognized fused attention operation",
+        ),
+    ),
+    (
         {"linear", "in_proj", "out_proj"},
         CallClassification(
             "linear_projection",
@@ -51,6 +67,14 @@ _CALL_CLASSIFIERS: tuple[tuple[set[str], CallClassification], ...] = (
         ),
     ),
     (
+        {"nonzero", "argwhere"},
+        CallClassification(
+            "embedding_positional",
+            EstimateConfidence.INEXACT,
+            "recognized data-dependent index extraction operation",
+        ),
+    ),
+    (
         {"router", "topk", "top_k", "dispatch_and_combine", "dispatch_dynamic"},
         CallClassification(
             "moe",
@@ -59,7 +83,25 @@ _CALL_CLASSIFIERS: tuple[tuple[set[str], CallClassification], ...] = (
         ),
     ),
     (
-        {"sum", "mean", "amax", "max", "amin", "min", "var", "std"},
+        {
+            "sum",
+            "mean",
+            "amax",
+            "max",
+            "amin",
+            "min",
+            "var",
+            "std",
+            "prod",
+            "any",
+            "all",
+            "argmax",
+            "argmin",
+            "logsumexp",
+            "cumsum",
+            "cumprod",
+            "bincount",
+        },
         CallClassification(
             "reduction",
             EstimateConfidence.INEXACT,
@@ -67,7 +109,7 @@ _CALL_CLASSIFIERS: tuple[tuple[set[str], CallClassification], ...] = (
         ),
     ),
     (
-        {"layer_norm", "group_norm", "rms_norm", "norm"},
+        {"layer_norm", "group_norm", "rms_norm", "norm", "vector_norm"},
         CallClassification(
             "normalization",
             EstimateConfidence.INEXACT,
@@ -90,6 +132,7 @@ _CALL_CLASSIFIERS: tuple[tuple[set[str], CallClassification], ...] = (
             "sigmoid",
             "exp",
             "sqrt",
+            "softplus",
             "gate",
         },
         CallClassification(
@@ -121,6 +164,11 @@ _CALL_CLASSIFIERS: tuple[tuple[set[str], CallClassification], ...] = (
             "logical_or",
             "logical_not",
             "pow",
+            "sin",
+            "cos",
+            "log",
+            "log2",
+            "greater",
         },
         CallClassification(
             "elementwise",
@@ -149,6 +197,12 @@ _CALL_CLASSIFIERS: tuple[tuple[set[str], CallClassification], ...] = (
             "squeeze",
             "expand",
             "broadcast_to",
+            "expand_as",
+            "repeat",
+            "repeat_interleave",
+            "roll",
+            "movedim",
+            "unfold",
         },
         CallClassification(
             "data_movement",
@@ -166,11 +220,42 @@ _CALL_CLASSIFIERS: tuple[tuple[set[str], CallClassification], ...] = (
             "copy_",
             "clone",
             "pad",
+            "ones",
+            "ones_like",
+            "full",
+            "empty",
+            "empty_like",
+            "new_zeros",
+            "tensor",
+            "arange",
+            "linspace",
+            "eye",
+            "triu",
+            "tril",
         },
         CallClassification(
             "data_movement",
             EstimateConfidence.SUPPORTED,
             "recognized materialized data-movement operation",
+        ),
+    ),
+    (
+        {
+            "sort",
+            "argsort",
+            "masked_fill",
+            "masked_fill_",
+            "scatter_",
+            "scatter_add_",
+            "index_add_",
+            "index_copy_",
+            "zero_",
+            "mul_",
+        },
+        CallClassification(
+            "data_movement",
+            EstimateConfidence.INEXACT,
+            "recognized data-dependent reorder or indexed tensor update",
         ),
     ),
     (
@@ -182,7 +267,79 @@ _CALL_CLASSIFIERS: tuple[tuple[set[str], CallClassification], ...] = (
         ),
     ),
     (
-        {"to", "type", "float", "half", "bfloat16", "double", "bool", "int", "long"},
+        {"unbind"},
+        CallClassification(
+            "data_movement",
+            EstimateConfidence.INEXACT,
+            "recognized tensor unbind with shape-dependent output cardinality",
+        ),
+    ),
+    (
+        {"conv_transpose2d"},
+        CallClassification(
+            "convolution",
+            EstimateConfidence.INEXACT,
+            "recognized transposed convolution operation",
+        ),
+    ),
+    (
+        {"max_pool2d"},
+        CallClassification(
+            "reduction",
+            EstimateConfidence.INEXACT,
+            "recognized pooling reduction operation",
+        ),
+    ),
+    (
+        {"interpolate"},
+        CallClassification(
+            "data_movement",
+            EstimateConfidence.INEXACT,
+            "recognized resampling data-movement operation",
+        ),
+    ),
+    (
+        {
+            "quantize",
+            "apply_scaling",
+            "compute_scales",
+            "convert_to_blocked_format_for_pytorch_scaled_mm",
+        },
+        CallClassification(
+            "dtype_conversion",
+            EstimateConfidence.INEXACT,
+            "recognized low-precision quantization operation",
+        ),
+    ),
+    (
+        {"rfft", "irfft"},
+        CallClassification(
+            "fft",
+            EstimateConfidence.INEXACT,
+            "recognized real spectral transform",
+        ),
+    ),
+    (
+        {"multinomial"},
+        CallClassification(
+            "sampling",
+            EstimateConfidence.INEXACT,
+            "recognized probability sampling operation",
+        ),
+    ),
+    (
+        {
+            "to",
+            "type",
+            "type_as",
+            "float",
+            "half",
+            "bfloat16",
+            "double",
+            "bool",
+            "int",
+            "long",
+        },
         CallClassification(
             "dtype_conversion",
             EstimateConfidence.INEXACT,
@@ -203,11 +360,52 @@ _LOGICAL_VIEW_NAMES = {
     "chunk",
     "split",
     "tensor_split",
+    "unbind",
+    "movedim",
 }
-_BROADCAST_VIEW_NAMES = {"expand", "broadcast_to"}
+_BROADCAST_VIEW_NAMES = {
+    "expand",
+    "expand_as",
+    "broadcast_to",
+    "repeat",
+    "repeat_interleave",
+}
 _MATERIALIZED_MOVEMENT_NAMES = {"contiguous"}
 _MATERIALIZED_MOVEMENT_NAMES.update(
-    {"zeros", "zeros_like", "cat", "concat", "stack", "copy_", "clone", "pad"}
+    {
+        "zeros",
+        "zeros_like",
+        "ones",
+        "ones_like",
+        "full",
+        "empty",
+        "empty_like",
+        "new_zeros",
+        "tensor",
+        "arange",
+        "linspace",
+        "eye",
+        "cat",
+        "concat",
+        "stack",
+        "copy_",
+        "clone",
+        "pad",
+        "roll",
+        "unfold",
+        "triu",
+        "tril",
+        "sort",
+        "argsort",
+        "masked_fill",
+        "masked_fill_",
+        "scatter_",
+        "scatter_add_",
+        "index_add_",
+        "index_copy_",
+        "zero_",
+        "mul_",
+    }
 )
 _DTYPE_METHOD_TARGETS = {
     "float": "float32",
@@ -222,6 +420,8 @@ _DTYPE_METHOD_TARGETS = {
 
 def classify_call(func_name: str) -> CallClassification | None:
     """Classify a fully qualified or leaf call name into an operation family."""
+    if func_name.startswith("math."):
+        return None
     leaf_name = func_name.rsplit(".", maxsplit=1)[-1]
     for names, classification in _CALL_CLASSIFIERS:
         if leaf_name in names or func_name in names:

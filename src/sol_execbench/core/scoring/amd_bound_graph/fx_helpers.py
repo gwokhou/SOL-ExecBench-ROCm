@@ -231,6 +231,16 @@ def _fx_node_attributes(
             if isinstance(keepdim, bool):
                 attributes["keepdim"] = keepdim
 
+    if op_family == OpFamily.FFT:
+        n_value = node.kwargs.get("n", node.args[1] if len(node.args) > 1 else None)
+        dim_value = node.kwargs.get("dim", node.args[2] if len(node.args) > 2 else -1)
+        if isinstance(n_value, int):
+            attributes["n"] = n_value
+        attributes["dim"] = dim_value if isinstance(dim_value, int) else -1
+        attributes["axis_source"] = (
+            "attribute" if isinstance(dim_value, int) else "default"
+        )
+
     if leaf_name == "pow":
         # FX args include the receiver for both call_method and call_function.
         exponent_position = 1

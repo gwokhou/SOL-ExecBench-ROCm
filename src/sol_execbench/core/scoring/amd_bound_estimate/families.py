@@ -24,6 +24,8 @@ class EstimateDispatchFamily(str, Enum):
     SOFTMAX = "softmax"
     DATA_MOVEMENT = "data_movement"
     DTYPE_CONVERSION = "dtype_conversion"
+    FFT = "fft"
+    SAMPLING = "sampling"
     UNSUPPORTED = "unsupported"
 
 
@@ -42,6 +44,8 @@ _DISPATCH_BY_OP_FAMILY_VALUE = {
     "softmax": EstimateDispatchFamily.SOFTMAX,
     "data_movement": EstimateDispatchFamily.DATA_MOVEMENT,
     "dtype_conversion": EstimateDispatchFamily.DTYPE_CONVERSION,
+    "fft": EstimateDispatchFamily.FFT,
+    "sampling": EstimateDispatchFamily.SAMPLING,
 }
 
 

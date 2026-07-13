@@ -104,6 +104,8 @@ def test_op_family_taxonomy_includes_paper_aligned_families():
         "elementwise",
         "data_movement",
         "dtype_conversion",
+        "fft",
+        "sampling",
         "unsupported",
     } <= values
 
@@ -123,6 +125,29 @@ def test_call_classification_helpers_cover_representative_families():
     assert topk.op_family == OpFamily.MOE.value
     assert selective_scan.op_family == OpFamily.SSM_MAMBA.value
     assert classify_call("unknown_custom_call") is None
+
+
+def test_call_classification_covers_data_problem_operator_frontier():
+    expected = {
+        "torch._scaled_mm": OpFamily.GEMM,
+        "torch.einsum": OpFamily.GEMM,
+        "torch.fft.rfft": OpFamily.FFT,
+        "torch.multinomial": OpFamily.SAMPLING,
+        "torch.logsumexp": OpFamily.REDUCTION,
+        "torch.cumsum": OpFamily.REDUCTION,
+        "torch.repeat_interleave": OpFamily.DATA_MOVEMENT,
+        "output.index_add_": OpFamily.DATA_MOVEMENT,
+        "scores.masked_fill": OpFamily.DATA_MOVEMENT,
+        "torch.sin": OpFamily.ELEMENTWISE,
+        "torch.cos": OpFamily.ELEMENTWISE,
+    }
+
+    for name, family in expected.items():
+        classification = classify_call(name)
+        assert classification is not None
+        assert classification.op_family == family.value
+
+    assert classify_call("math.sqrt") is None
 
 
 def test_movement_and_dtype_classification_helpers_are_directly_testable():
@@ -763,7 +788,7 @@ def test_dynamic_trace_failure_records_warning_but_keeps_fallback_evidence():
     assert "raise" in graph.nodes[0].source_expression
 
 
-def test_dynamic_control_flow_is_inexact_or_unsupported_evidence():
+def test_ast_resolves_control_flow_from_concrete_workload_shape():
     definition = make_definition(
         name="control_flow_demo",
         axes={"N": {"type": "var"}},
@@ -777,10 +802,10 @@ def test_dynamic_control_flow_is_inexact_or_unsupported_evidence():
 
     graph = build_bound_graph(definition, workload)
 
-    assert graph.nodes
-    assert graph.nodes[0].op_family == OpFamily.UNSUPPORTED
-    assert graph.nodes[0].confidence == EstimateConfidence.UNSUPPORTED
-    assert "unsupported_operator:if" in graph.warnings
+    assert [node.op_family for node in graph.nodes] == [OpFamily.ELEMENTWISE]
+    assert not any(
+        warning.startswith("unsupported_operator:") for warning in graph.warnings
+    )
 
 
 def test_ast_fallback_expands_static_control_flow_and_ignores_metadata_calls():
@@ -824,7 +849,7 @@ def test_ast_fallback_expands_static_control_flow_and_ignores_metadata_calls():
     assert not any("unsupported_operator" in warning for warning in warnings)
 
 
-def test_ast_fallback_keeps_dynamic_loop_unsupported():
+def test_ast_fallback_unrolls_small_shape_bounded_loop():
     definition = make_definition(
         name="dynamic_loop_demo",
         axes={"N": {"type": "const", "value": 8}},
@@ -836,8 +861,76 @@ def test_ast_fallback_keeps_dynamic_loop_unsupported():
 
     graph = build_bound_graph(definition, workload)
 
-    assert any(node.op_name == "for" for node in graph.nodes)
-    assert "unsupported_operator:for" in graph.warnings
+    assert len(graph.nodes) == 8
+    assert all(node.op_family == OpFamily.ELEMENTWISE for node in graph.nodes)
+    assert not any(
+        warning.startswith("unsupported_operator:") for warning in graph.warnings
+    )
+
+
+def test_ast_fallback_summarizes_large_loop_body_as_inexact():
+    definition = make_definition(
+        name="large_loop_demo",
+        axes={"N": {"type": "const", "value": 64}},
+        inputs={"x": {"shape": ["N"], "dtype": "float32"}},
+        outputs={"out": {"shape": ["N"], "dtype": "float32"}},
+        reference="def run(x):\n    for i in range(x.size(0)):\n        x = x + 1\n    return x\n",
+    )
+    workload = make_workload(axes={}, inputs={"x": {"type": "random"}}, uuid="w1")
+
+    graph = build_bound_graph(definition, workload)
+
+    assert len(graph.nodes) == 1
+    assert graph.nodes[0].op_family == OpFamily.ELEMENTWISE
+    assert graph.nodes[0].confidence == EstimateConfidence.INEXACT
+    assert graph.nodes[0].attributes["dynamic_control_flow"] is True
+    assert "inexact_control_flow:for" in graph.warnings
+
+
+def test_ast_fallback_inlines_nested_helper_and_tracks_indexed_update():
+    definition = make_definition(
+        name="helper_mutation_demo",
+        axes={"N": {"type": "const", "value": 64}},
+        inputs={"x": {"shape": ["N"], "dtype": "float32"}},
+        outputs={"out": {"shape": ["N"], "dtype": "float32"}},
+        reference=(
+            "def run(x):\n"
+            "    def rotate_half(value):\n"
+            "        return -value\n"
+            "    for i in range(x.size(0)):\n"
+            "        x[i] = rotate_half(x[i])\n"
+            "    return x\n"
+        ),
+    )
+    workload = make_workload(axes={}, inputs={"x": {"type": "random"}}, uuid="w1")
+
+    graph = build_bound_graph(definition, workload)
+
+    assert any(node.op_name == "usub" for node in graph.nodes)
+    assert any(node.op_name == "setitem" for node in graph.nodes)
+    assert not any("rotate_half" in warning for warning in graph.warnings)
+
+
+def test_ast_fallback_preserves_multi_output_sort_contract():
+    definition = make_definition(
+        name="multi_output_sort_demo",
+        axes={"N": {"type": "const", "value": 64}},
+        inputs={"x": {"shape": ["N"], "dtype": "float32"}},
+        outputs={"out": {"shape": ["N"], "dtype": "float32"}},
+        reference=(
+            "def run(x):\n"
+            "    for i in range(x.size(0)):\n"
+            "        values, indices = x.sort()\n"
+            "        return values + indices.float()\n"
+        ),
+    )
+    workload = make_workload(axes={}, inputs={"x": {"type": "random"}}, uuid="w1")
+
+    graph = build_bound_graph(definition, workload)
+
+    sort = next(node for node in graph.nodes if node.op_name.endswith("sort"))
+    assert len(sort.output_tensor_ids) == 2
+    assert all(tensor_id in graph.tensors for tensor_id in sort.output_tensor_ids)
 
 
 def test_projection_residual_graph_has_edges_for_common_patterns():
