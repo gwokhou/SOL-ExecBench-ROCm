@@ -63,15 +63,18 @@ def _build_amd_sol_bound_base(
         capability_budget_ref = (
             f"packaged:arch_capability_budgets/{budget.architecture}.json"
         )
-    graph = bound_graph or build_authority_bound_graph(definition, workload)
-    graph = _authority_semantic_graph(graph)
+    source_graph = bound_graph or build_authority_bound_graph(definition, workload)
+    # Keep fallback graph estimates as diagnostic evidence. Authority gating is
+    # applied after estimating/grouping so a failed export cannot erase the
+    # operator-family and formula coverage needed to explain the block.
     estimates = resolve_architecture_profile_paths(
-        estimate_bound_work(graph), hardware_model.architecture
+        estimate_bound_work(source_graph), hardware_model.architecture
     )
-    groups = build_fusion_groups(graph, estimates, capability_budget=budget)
+    groups = build_fusion_groups(source_graph, estimates, capability_budget=budget)
     group_bounds = tuple(
         _bound_for_group(group, estimates, hardware_model) for group in groups
     )
+    graph = _authority_semantic_graph(source_graph)
     if "semantic_graph_provider_required" in graph.warnings:
         # Estimate families intentionally remain usable for diagnostics.  Mark
         # the aggregation inputs themselves unsupported so no later roofline
@@ -151,7 +154,11 @@ def _bound_for_group(
     member_bounds = tuple(
         bound_for_estimate(member, hardware_model) for member in members
     )
-    compute_bound_ms = sum(bound[0] for bound in member_bounds)
+    # A graph partition is not proof that member kernels must execute without
+    # overlap. The authority floor therefore takes the strongest individual
+    # compute constraint. Summing belongs to a fixed-stack prediction model,
+    # not to a lower bound that future fusion/scheduling can beat.
+    compute_bound_ms = max((bound[0] for bound in member_bounds), default=0.0)
     warnings = list(group.warnings)
     confidence = group.confidence
 
@@ -180,7 +187,9 @@ def _bound_for_group(
         limiting_resource=limiting_resource,
         confidence=confidence,
         rationale=(
-            "fusion-group roofline bound using proved external traffic"
+            "physical-fusion roofline bound using proved external traffic"
+            if group.pattern_id != "semantic_component.v1" and len(members) > 1
+            else "semantic-component lower bound with optimistic intermediate traffic"
             if len(members) > 1
             else members[0].rationale
         ),
@@ -223,7 +232,11 @@ def _group_memory_bound(
 def _aggregate_for_groups(
     bounds: tuple[AmdSolGroupBound, ...], hardware_model: AmdHardwareModel
 ) -> AmdSolAggregateBound:
-    sol_bound_ms = sum(bound.sol_bound_ms for bound in bounds)
+    # Only independently proved non-overlap barriers may be summed. This
+    # reducer currently has no such proof, so aggregate the strongest semantic
+    # component constraint. The result is intentionally loose but cannot be
+    # invalidated merely because a provider fuses or overlaps current groups.
+    sol_bound_ms = max((bound.sol_bound_ms for bound in bounds), default=0.0)
     node_ids = tuple(node_id for bound in bounds for node_id in bound.node_ids)
     if not bounds:
         return AmdSolAggregateBound(
@@ -271,7 +284,7 @@ def _aggregate_for_groups(
         status="scored",
         scored=True,
         sol_bound_ms=sol_bound_ms,
-        reason="all fusion-group and hardware evidence is supported",
+        reason="all semantic-component and hardware evidence is supported",
         node_ids=node_ids,
     )
 

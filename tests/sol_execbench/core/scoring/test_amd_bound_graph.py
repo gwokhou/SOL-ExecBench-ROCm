@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.scoring.amd_bound_graph import (
@@ -11,6 +13,8 @@ from sol_execbench.core.scoring.amd_bound_graph import (
     OpFamily,
     build_authority_bound_graph,
     build_bound_graph,
+    build_semantic_graph_coverage_report,
+    compare_semantic_graphs,
 )
 from sol_execbench.core.scoring.amd_bound_graph.builder import build_static_bound_graph
 from sol_execbench.core.scoring.amd_bound_estimate.classification import (
@@ -68,6 +72,84 @@ def test_authority_graph_uses_exported_aten_with_faketensor_metadata():
     assert graph.nodes[0].op_family == OpFamily.GEMM
     assert graph.nodes[0].attributes["trace_source"] == "torch.export"
     assert graph.tensors[graph.nodes[0].output_tensor_ids[0]].shape == (2, 8)
+
+
+def test_authority_graph_export_covers_view_broadcast_and_multiple_outputs():
+    definition = make_definition(
+        name="export_view_broadcast_multi_output",
+        axes={
+            "B": {"type": "const", "value": 2},
+            "N": {"type": "const", "value": 8},
+        },
+        inputs={
+            "x": {"shape": ["B", "N"], "dtype": "float32"},
+            "bias": {"shape": ["N"], "dtype": "float32"},
+        },
+        outputs={
+            "shifted": {"shape": ["B", "N"], "dtype": "float32"},
+            "squared": {"shape": ["B", "N"], "dtype": "float32"},
+        },
+        reference=(
+            "def run(x, bias):\n"
+            "    shifted = x.reshape(2, 8) + bias\n"
+            "    return shifted, shifted * shifted\n"
+        ),
+    )
+    workload = make_workload(
+        axes={},
+        inputs={"x": {"type": "random"}, "bias": {"type": "random"}},
+        uuid="export-view-broadcast-multi-output",
+    )
+
+    graph = build_authority_bound_graph(definition, workload)
+
+    assert all(
+        node.attributes["trace_source"] == "torch.export" for node in graph.nodes
+    )
+    assert graph.tensors["output:shifted"].producer_node_id is not None
+    assert graph.tensors["output:squared"].producer_node_id is not None
+    assert graph.tensors["output:shifted"].shape == (2, 8)
+    assert graph.tensors["output:squared"].shape == (2, 8)
+
+
+def test_semantic_graph_coverage_reports_export_capture_and_metadata():
+    definition = _matmul_definition()
+    workload = _matmul_workload()
+
+    comparison = compare_semantic_graphs(definition, workload)
+    report = build_semantic_graph_coverage_report(((definition, workload),))
+
+    assert comparison.authority_captured is True
+    assert comparison.authority_output_metadata_complete is True
+    assert comparison.authority_op_families == ("gemm",)
+    assert report.to_dict() == {
+        "schema_version": "sol_execbench.semantic_graph_coverage.v1",
+        "total_workloads": 1,
+        "authority_captured_workloads": 1,
+        "authority_fallback_workloads": 0,
+        "output_metadata_mismatch_workloads": 0,
+        "graph_difference_workloads": 0,
+        "authority_op_family_counts": {"gemm": 1},
+        "comparisons": [comparison.to_dict()],
+    }
+
+
+def test_semantic_graph_comparison_marks_diagnostic_drift_without_promoting_it():
+    definition = _matmul_definition()
+    workload = _matmul_workload()
+    authority = build_authority_bound_graph(definition, workload)
+    diagnostic = replace(authority, nodes=())
+
+    comparison = compare_semantic_graphs(
+        definition,
+        workload,
+        authority_graph=authority,
+        diagnostic_graph=diagnostic,
+    )
+
+    assert comparison.authority_captured is True
+    assert "op_family_sequence_mismatch" in comparison.differences
+    assert "node_count_mismatch" in comparison.differences
 
 
 def test_fx_tensor_transpose_preserves_gemm_operand_dependency():

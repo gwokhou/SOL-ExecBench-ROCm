@@ -14,7 +14,10 @@ from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.platform.arch_capabilities import ArchIsaBudget
 from sol_execbench.core.scoring.amd_hardware_models import AmdHardwareModel
-from sol_execbench.core.scoring.amd_sol.fusion import FusionGroup
+from sol_execbench.core.scoring.amd_sol.fusion import (
+    FusionGroup,
+    requires_physical_fusion_validation,
+)
 from sol_execbench.core.scoring.amd_sol.builder import (
     _aggregate_for_groups,
     _build_amd_sol_bound_base,
@@ -522,9 +525,6 @@ def build_amd_sol_bound_artifact(
     promoted_groups: list[FusionGroup] = []
     promoted_bounds: list[AmdSolGroupBound] = []
     missing_validation_group_ids: list[str] = []
-    unproven_singleton_partition = len(base.fusion_groups) > 1 and all(
-        group.pattern_id == "singleton.v1" for group in base.fusion_groups
-    )
     estimates = {item["node_id"]: item for item in base.operator_work_estimates}
     for group, bound in zip(base.fusion_groups, base.group_bounds, strict=True):
         tile_contract = (tile_contracts or {}).get(group.group_id)
@@ -591,7 +591,7 @@ def build_amd_sol_bound_artifact(
                 else bound.confidence
             )
             bound = replace(bound, warnings=bound_warnings, confidence=bound_confidence)
-        elif len(group.node_ids) > 1 and not passed:
+        elif requires_physical_fusion_validation(group) and not passed:
             missing_validation_group_ids.append(group.group_id)
             missing_warning = "fusion_validation_evidence_missing"
             group = replace(
@@ -611,21 +611,6 @@ def build_amd_sol_bound_artifact(
                     else EstimateConfidence.INEXACT
                 ),
                 warnings=tuple(dict.fromkeys((*bound.warnings, missing_warning))),
-            )
-        if unproven_singleton_partition:
-            # A registry miss is not a semantic materialization barrier.  Summing
-            # singleton rooflines would turn the current compiler partition into
-            # a purported lower bound that a longer fused implementation can beat.
-            warning = "unproven_multinode_singleton_partition"
-            group = replace(
-                group,
-                confidence=EstimateConfidence.UNSUPPORTED,
-                warnings=tuple(dict.fromkeys((*group.warnings, warning))),
-            )
-            bound = replace(
-                bound,
-                confidence=EstimateConfidence.UNSUPPORTED,
-                warnings=tuple(dict.fromkeys((*bound.warnings, warning))),
             )
         promoted_groups.append(group)
         promoted_bounds.append(bound)
