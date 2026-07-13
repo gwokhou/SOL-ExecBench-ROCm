@@ -558,7 +558,7 @@ def test_public_score_evidence_refs_keep_exact_established_key_space():
     )
 
 
-def test_degraded_complex_family_score_eligibility_ignores_solar_sidecars():
+def test_complex_family_without_export_semantic_proof_is_unscored():
     cases = (
         (
             make_definition(
@@ -656,14 +656,14 @@ def test_degraded_complex_family_score_eligibility_ignores_solar_sidecars():
             hardware_model_ref="hardware/gfx1200.json",
         )
 
-        assert artifact.aggregate_bound.status == "degraded"
+        assert artifact.aggregate_bound.status == "unscored"
         assert any(
             estimate["formula_kind"] == formula_kind
             for estimate in artifact.operator_work_estimates
         )
-        assert score.supported is True
+        assert score.supported is False
         assert score.claim_level == "amd-native-derived"
-        assert DEGRADED_SOL_BOUND_WARNING in score.warnings
+        assert UNSCORED_SOL_BOUND_WARNING in score.warnings
         for field in PHASE51_SCORE_INTERNAL_EVIDENCE_REFS:
             assert field not in score.evidence_refs
 

@@ -18,7 +18,11 @@ from sol_execbench.core.scoring.amd_sol import (
     build_amd_sol_bound_artifact,
     fusion_signature_for_group,
 )
-from sol_execbench.core.scoring.amd_sol.builder import _group_memory_bound
+from sol_execbench.core.scoring.amd_sol.builder import (
+    _aggregate_for_groups,
+    _group_memory_bound,
+)
+from sol_execbench.core.scoring.amd_sol.models import AmdSolGroupBound
 from sol_execbench.core.scoring.amd_sol.fusion import FusionGroup
 from sol_execbench.core.scoring.amd_sol.math import bound_for_estimate
 from sol_execbench.core.scoring.amd_score.workload import score_amd_native_workload
@@ -445,7 +449,7 @@ def test_multinode_fusion_requires_matching_validation_case():
     assert "fusion_validation_evidence_missing:fusion_0000" in artifact.warnings
 
 
-def test_multinode_singleton_partition_cannot_be_scored_as_authority():
+def test_multinode_component_uses_optimistic_semantic_traffic_not_registry_partition():
     definition, workload = _singleton_chain_inputs()
 
     artifact = build_amd_sol_bound_artifact(
@@ -457,18 +461,46 @@ def test_multinode_singleton_partition_cannot_be_scored_as_authority():
         fusion_validation_sha256="e" * 64,
     )
 
-    assert len(artifact.fusion_groups) > 1
-    assert all(group.pattern_id == "singleton.v1" for group in artifact.fusion_groups)
-    assert artifact.aggregate_bound.status == "unscored"
-    assert artifact.aggregate_bound.scored is False
-    assert all(
-        "unproven_multinode_singleton_partition" in group.warnings
-        for group in artifact.fusion_groups
+    assert len(artifact.fusion_groups) == 1
+    group = artifact.fusion_groups[0]
+    assert group.pattern_id == "semantic_component.v1"
+    assert len(group.node_ids) > 1
+    assert artifact.fusion_validation_matches[0].capacity_status == "missing"
+    assert "fusion_validation_evidence_missing" not in artifact.warnings
+    assert "optimistic intermediate traffic" in artifact.group_bounds[0].rationale
+
+
+def test_aggregate_uses_maximum_until_non_overlap_is_explicitly_proved():
+    bounds = (
+        AmdSolGroupBound(
+            group_id="group-a",
+            pattern_id="semantic_component.v1",
+            node_ids=("op_1",),
+            compute_bound_ms=1.0,
+            memory_bound_ms=0.5,
+            sol_bound_ms=1.0,
+            limiting_resource="compute",
+            confidence=EstimateConfidence.SUPPORTED,
+            rationale="fixture",
+        ),
+        AmdSolGroupBound(
+            group_id="group-b",
+            pattern_id="semantic_component.v1",
+            node_ids=("op_2",),
+            compute_bound_ms=0.75,
+            memory_bound_ms=2.0,
+            sol_bound_ms=2.0,
+            limiting_resource="memory",
+            confidence=EstimateConfidence.SUPPORTED,
+            rationale="fixture",
+        ),
     )
-    assert any(
-        "unproven_multinode_singleton_partition" in warning
-        for warning in artifact.warnings
-    )
+
+    aggregate = _aggregate_for_groups(bounds, _hardware())
+
+    assert aggregate.sol_bound_ms == 2.0
+    assert aggregate.status == "scored"
+    assert "semantic-component" in aggregate.reason
 
 
 def test_scalar_roofline_without_shape_aware_evidence_is_prediction_only():

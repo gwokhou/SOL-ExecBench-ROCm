@@ -32,6 +32,12 @@ _EPILOGUE_PATTERNS = {
     "ssm_mamba": "ssm_mamba_epilogue.v1",
 }
 
+# This group is an authority-only traffic envelope, not a claim that a current
+# compiler can emit one physical kernel. It deliberately eliminates internal
+# tensors from mandatory external traffic; that can make the floor looser, but
+# cannot turn a compiler partition into a lower-bound claim.
+_SEMANTIC_COMPONENT_PATTERN = "semantic_component.v1"
+
 
 @dataclass(frozen=True)
 class FusionGroup:
@@ -84,27 +90,28 @@ def build_fusion_groups(
 ) -> tuple[FusionGroup, ...]:
     """Return a deterministic, complete partition of graph nodes.
 
-    The registry recognizes a statically modeled producer followed by a
-    single-consumer elementwise/activation epilogue. All remaining nodes stay
-    singleton groups. This captures the important distinction between internal
-    and external traffic, while keeping unknown and data-dependent patterns
-    conservatively separate.
+    A two-node producer/epilogue pair may retain its physical-fusion pattern
+    for diagnostic validation. Every other connected component is represented
+    by one semantic traffic component instead of being split at the current
+    compiler/registry boundary. That component is deliberately optimistic
+    about intermediate materialization, so it is a safe (possibly loose)
+    lower-bound envelope rather than a claim that the component is physically
+    fusable.
     """
     estimates_by_node = {estimate.node_id: estimate for estimate in estimates}
     nodes_by_id = {node.node_id: node for node in graph.nodes}
     consumers = _consumers_by_tensor(graph)
-    assigned: set[str] = set()
     groups: list[FusionGroup] = []
 
-    for node in graph.nodes:
-        if node.node_id in assigned:
-            continue
-        node_ids = _gemm_epilogue_nodes(node.node_id, nodes_by_id, consumers, assigned)
-        pattern_id = (
-            _EPILOGUE_PATTERNS[getattr(getattr(node, "op_family", None), "value", "")]
-            if len(node_ids) > 1
-            else "singleton.v1"
-        )
+    for node_ids in _semantic_components(graph):
+        pattern_id = _SEMANTIC_COMPONENT_PATTERN
+        if len(node_ids) == 1:
+            pattern_id = "singleton.v1"
+        elif _is_epilogue_pair(node_ids, nodes_by_id, consumers):
+            producer = nodes_by_id[node_ids[0]]
+            pattern_id = _EPILOGUE_PATTERNS[
+                getattr(getattr(producer, "op_family", None), "value", "")
+            ]
         group = _group_from_nodes(
             graph,
             tuple(node_ids),
@@ -115,36 +122,68 @@ def build_fusion_groups(
             capability_budget=capability_budget,
         )
         groups.append(group)
-        assigned.update(node_ids)
 
+    assigned = {node_id for group in groups for node_id in group.node_ids}
     if assigned != set(nodes_by_id):  # Defensive: a future matcher must partition.
         raise ValueError("fusion groups do not cover every bound-graph node")
     return tuple(groups)
 
 
-def _gemm_epilogue_nodes(
-    node_id: str,
+def _is_epilogue_pair(
+    node_ids: tuple[str, ...],
     nodes_by_id: Mapping[str, BoundGraphNode],
     consumers: dict[str, tuple[str, ...]],
-    assigned: set[str],
-) -> tuple[str, ...]:
-    node = nodes_by_id[node_id]
+) -> bool:
+    """Return whether exactly two semantic neighbours match v1 validation."""
+    if len(node_ids) != 2:
+        return False
+    node, next_node = (nodes_by_id[node_id] for node_id in node_ids)
     family = getattr(getattr(node, "op_family", None), "value", None)
     if family not in _EPILOGUE_PATTERNS:
-        return (node_id,)
+        return False
     outputs = tuple(getattr(node, "output_tensor_ids", ()))
     if len(outputs) != 1:
-        return (node_id,)
+        return False
     next_ids = consumers.get(outputs[0], ())
-    if len(next_ids) != 1 or next_ids[0] in assigned:
-        return (node_id,)
-    next_node = nodes_by_id[next_ids[0]]
+    if next_ids != (next_node.node_id,):
+        return False
     next_family = getattr(getattr(next_node, "op_family", None), "value", None)
-    if next_family not in {"elementwise", "mlp_activation"}:
-        return (node_id,)
-    # A single epilogue node is deliberately all that v1 proves.  Longer chains
-    # require alias and tile-liveness evidence that this graph does not yet hold.
-    return (node_id, next_ids[0])
+    return next_family in {"elementwise", "mlp_activation"}
+
+
+def _semantic_components(graph: BoundGraph) -> tuple[tuple[str, ...], ...]:
+    """Return data-flow-connected components in declaration order.
+
+    Connectivity expresses semantic data flow only. It never says a compiler
+    partition is mandatory, which is why non-pair components receive the
+    explicit semantic-component pattern above.
+    """
+    node_order = {node.node_id: index for index, node in enumerate(graph.nodes)}
+    neighbours = {node_id: set() for node_id in node_order}
+    for edge in graph.edges:
+        tensor = graph.tensors.get(edge.source_tensor_id)
+        source = tensor.producer_node_id if tensor is not None else None
+        target = edge.target_node_id
+        if source in neighbours and target in neighbours:
+            neighbours[source].add(target)
+            neighbours[target].add(source)
+
+    seen: set[str] = set()
+    components: list[tuple[str, ...]] = []
+    for node_id in node_order:
+        if node_id in seen:
+            continue
+        stack = [node_id]
+        component: set[str] = set()
+        while stack:
+            current = stack.pop()
+            if current in seen:
+                continue
+            seen.add(current)
+            component.add(current)
+            stack.extend(sorted(neighbours[current] - seen, reverse=True))
+        components.append(tuple(sorted(component, key=node_order.__getitem__)))
+    return tuple(components)
 
 
 def _consumers_by_tensor(graph: BoundGraph) -> dict[str, tuple[str, ...]]:
@@ -266,3 +305,13 @@ def _capacity_supports(budget: object | None, required_lds_bytes: int | None) ->
         and isinstance(getattr(budget, "lds_per_workgroup_bytes", None), int)
         and getattr(budget, "lds_per_workgroup_bytes") >= required_lds_bytes
     )
+
+
+def requires_physical_fusion_validation(group: FusionGroup) -> bool:
+    """Whether a group claims a concrete physical-fusion pattern.
+
+    Semantic components are intentionally optimistic lower-bound envelopes, so
+    compiler-kernel validation is useful diagnostics but not an authority
+    precondition. Physical v1 epilogue patterns retain their validation rule.
+    """
+    return len(group.node_ids) > 1 and group.pattern_id != _SEMANTIC_COMPONENT_PATTERN
