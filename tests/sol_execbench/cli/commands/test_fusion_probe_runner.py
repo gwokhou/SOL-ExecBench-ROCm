@@ -70,7 +70,8 @@ def test_probe_signature_is_derived_from_exact_bound_graph_group() -> None:
         kind="tanh",
     )
 
-    assert signature.op_names == ("torch.sum", "mult")
+    assert signature.pattern_id == "diagnostic_reduction_epilogue.v1"
+    assert signature.op_names == ("torch.sum", "torch.mul")
     assert signature.input_shapes == ((), (2, 3, 4))
     assert signature.output_shapes == ((),)
     assert signature.tile_contract == {
