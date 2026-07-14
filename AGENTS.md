@@ -72,3 +72,13 @@ When a required container operation fails solely because of sandbox, cache, or
 filesystem permissions, request the necessary escalation from the user and retry
 the same scoped operation. Do not treat that permission failure as a benchmark,
 calibration, or implementation failure.
+
+For any GPU-related operation (enumeration, compilation, execution, profiling,
+tracing, or calibration), a sandbox may expose `/dev/kfd` incompletely or hide
+`/dev/dri/renderD*` and other required runtime resources. Before concluding that
+a GPU, architecture, counter, driver, compiler, or runtime feature is
+unsupported or broken, request narrowly scoped host execution for the exact
+failing command and retry it there. Keep the command bounded (single workload or
+explicit limit), write generated evidence only to an approved temporary/output
+directory, and do not use service-manager or other sandbox-escape wrappers as a
+substitute for that approval.
