@@ -26,7 +26,7 @@ from sol_execbench.core.scoring.fusion_validation import FusionValidationArtifac
 from sol_execbench.core.scoring.baseline_artifact import ScoringBaselineArtifact
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class AmdScoreReportRequest:
     """Score-domain inputs required to derive reports for one problem run.
 

@@ -77,7 +77,7 @@ class Rocprofv3ProfileArtifact:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Rocprofv3ProfileRequest:
     """Request to collect optional diagnostic `rocprofv3` artifacts."""
 
@@ -267,7 +267,7 @@ class DefaultTimingSelection:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Rocprofv3CollectionRequest:
     """Request to collect live profiler timing evidence for one command."""
 

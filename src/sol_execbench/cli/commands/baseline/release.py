@@ -26,7 +26,7 @@ from sol_execbench.core.integrity.checksums import sha256_file
 console = Console(stderr=True)
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ReleaseBuildRequest:
     """Complete input contract for one release-baseline build."""
 
@@ -46,7 +46,7 @@ class ReleaseBuildRequest:
     latency_tolerance_rel: float
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ReleaseVerifyRequest:
     """Complete input contract for one release-baseline rerun verification."""
 
