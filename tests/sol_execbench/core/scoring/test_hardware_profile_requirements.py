@@ -52,6 +52,19 @@ def test_requirements_bind_exact_compute_and_memory_profiles() -> None:
     )
 
 
+def test_requirements_allow_no_profiles_when_no_workload_is_authority_eligible() -> (
+    None
+):
+    requirements = requirements_from_estimates(
+        architecture="gfx1200", estimates=[], scope="test-suite"
+    )
+
+    assert requirements.required_profile_keys == ()
+    assert (
+        hardware_profile_requirements_from_dict(requirements.to_dict()) == requirements
+    )
+
+
 def test_requirements_reject_missing_exact_profile_fields() -> None:
     estimate = _estimate()
     estimate = replace(estimate, compute_path=None)

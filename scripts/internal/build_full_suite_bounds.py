@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""Build v5 AMD SOL floors for every static-authority-eligible workload."""
+"""Build v5 AMD SOL floors for every export-authority-eligible workload."""
 
 from __future__ import annotations
 
@@ -21,7 +21,9 @@ from sol_execbench.core.scoring.amd_sol import (
     PerformanceProviderResult,
     build_amd_sol_bound_artifact,
 )
-from sol_execbench.core.scoring.amd_bound_graph.builder import build_static_bound_graph
+from sol_execbench.core.scoring.amd_bound_graph.builder import (
+    build_authority_bound_graph,
+)
 
 
 def _load(path: Path) -> dict[str, Any]:
@@ -114,7 +116,8 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    coverage = _load(args.closure_dir / "static-coverage.json")
+    coverage_path = args.closure_dir / "authority-coverage.json"
+    coverage = _load(coverage_path)
     output_dir = args.output_dir or args.closure_dir
     hardware = load_amd_hardware_model(args.hardware_model)
     fusion = _load(args.fusion_validation)
@@ -150,7 +153,7 @@ def main() -> int:
                 fusion_validation_sha256=fusion_sha256,
                 evidence_path=args.fusion_validation,
                 hardware_model_ref=args.hardware_model_ref,
-                bound_graph=build_static_bound_graph(definition, workload),
+                bound_graph=build_authority_bound_graph(definition, workload),
                 performance_diagnostics=AmdSolPerformanceDiagnostics.from_provider_results(
                     provider_results.get((definition.name, workload_uuid), ())
                 ),
@@ -199,12 +202,10 @@ def main() -> int:
                 }
             )
     index_payload = {
-        "schema_version": "sol_execbench.amd_sol_bound_index.v2",
+        "schema_version": "sol_execbench.amd_sol_bound_index.v3",
         "bound_schema_version": "sol_execbench.amd_sol_bound.v5",
-        "static_coverage_ref": str(args.closure_dir / "static-coverage.json"),
-        "static_coverage_sha256": sha256_file(
-            args.closure_dir / "static-coverage.json"
-        ),
+        "authority_coverage_ref": str(coverage_path),
+        "authority_coverage_sha256": sha256_file(coverage_path),
         "hardware_model_ref": args.hardware_model_ref,
         "hardware_model_sha256": sha256_file(args.hardware_model),
         "fusion_validation_ref": args.fusion_validation_ref,

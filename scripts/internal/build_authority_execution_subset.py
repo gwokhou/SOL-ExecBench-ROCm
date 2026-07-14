@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""Turn full-suite static coverage into an execution subset and blocker ledger."""
+"""Turn full-suite authority coverage into an execution subset and blocker ledger."""
 
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ def build_inputs(
     hardware_model: Path | None = None,
     additional_blockers_by_key: dict[tuple[str, str], tuple[str, ...]] | None = None,
 ) -> tuple[ReadySubset, dict[str, Any]]:
-    """Build the executable static-authority subset and complete blocker ledger."""
+    """Build the executable export-authority subset and complete blocker ledger."""
     validate_full_suite_coverage(coverage, requirements, manifest)
     grouped: defaultdict[str, list[ReadySubsetWorkloadRef]] = defaultdict(list)
     meta: dict[str, tuple[str, str]] = {}
@@ -195,7 +195,7 @@ def main() -> int:
     args = parser.parse_args()
     closure_dir = args.closure_dir
     manifest = _load(closure_dir / "canonical-suite.json")
-    coverage = _load(closure_dir / "static-coverage.json")
+    coverage = _load(closure_dir / "authority-coverage.json")
     requirements = _load(closure_dir / "hardware-profile-requirements.json")
     if (args.bounds_index is None) != (args.hardware_model is None):
         raise ValueError(

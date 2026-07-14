@@ -5,8 +5,12 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from dataclasses import replace
+import logging
+from logging.handlers import QueueHandler
 from typing import Any
+import warnings
 
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import Workload
@@ -34,6 +38,81 @@ from sol_execbench.core.scoring.amd_bound_graph.models import (
     BoundTensor,
     BoundTensorRole,
 )
+
+
+_TORCH_EXPORT_LOGGER = logging.getLogger(f"{__name__}.torch_export")
+_TORCH_EXPORT_LOGGER.setLevel(logging.INFO)
+_TORCH_EXPORT_LOGGER.addHandler(logging.NullHandler())
+_TORCH_EXPORT_LOGGER.propagate = False
+
+
+class _LoggerTextStream:
+    """Turn complete stdout/stderr lines into asynchronous logging records."""
+
+    def __init__(self, logger: logging.Logger, level: int) -> None:
+        self._logger = logger
+        self._level = level
+        self._pending = ""
+
+    def write(self, message: str) -> int:
+        self._pending += message
+        while "\n" in self._pending:
+            line, self._pending = self._pending.split("\n", 1)
+            if line:
+                self._logger.log(self._level, "%s", line)
+        return len(message)
+
+    def flush(self) -> None:
+        if self._pending:
+            self._logger.log(self._level, "%s", self._pending)
+            self._pending = ""
+
+
+def configure_torch_export_diagnostics(
+    log_target: logging.Handler | Any | None,
+) -> tuple[list[logging.Handler], int, bool]:
+    """Route export diagnostics to a queue or a caller-supplied handler."""
+    previous = (
+        list(_TORCH_EXPORT_LOGGER.handlers),
+        _TORCH_EXPORT_LOGGER.level,
+        _TORCH_EXPORT_LOGGER.propagate,
+    )
+    _TORCH_EXPORT_LOGGER.handlers.clear()
+    handler: logging.Handler
+    if isinstance(log_target, logging.Handler):
+        handler = log_target
+    elif log_target is not None:
+        handler = QueueHandler(log_target)
+    else:
+        handler = logging.NullHandler()
+    _TORCH_EXPORT_LOGGER.addHandler(handler)
+    _TORCH_EXPORT_LOGGER.setLevel(logging.INFO)
+    _TORCH_EXPORT_LOGGER.propagate = False
+    return previous
+
+
+def restore_torch_export_diagnostics(
+    state: tuple[list[logging.Handler], int, bool],
+) -> None:
+    """Restore a logger state returned by configure_torch_export_diagnostics."""
+    handlers, level, propagate = state
+    _TORCH_EXPORT_LOGGER.handlers.clear()
+    _TORCH_EXPORT_LOGGER.handlers.extend(handlers)
+    _TORCH_EXPORT_LOGGER.setLevel(level)
+    _TORCH_EXPORT_LOGGER.propagate = propagate
+
+
+@contextmanager
+def _redirect_torch_export_output() -> Any:
+    """Keep third-party export diagnostics out of stdout without dropping them."""
+    stdout = _LoggerTextStream(_TORCH_EXPORT_LOGGER, logging.INFO)
+    stderr = _LoggerTextStream(_TORCH_EXPORT_LOGGER, logging.WARNING)
+    with redirect_stdout(stdout), redirect_stderr(stderr):
+        try:
+            yield
+        finally:
+            stdout.flush()
+            stderr.flush()
 
 
 def _try_fx_bound_graph(
@@ -114,21 +193,65 @@ def _try_torch_export_bound_graph(
                 # Data-dependent dimensions cannot receive authority from this
                 # concrete export attempt.
                 return None
-            sample_inputs.append(torch.zeros(shape, dtype=dtype, device="cpu"))
-        exported = torch.export.export(
-            ReferenceModule(), tuple(sample_inputs), strict=True
-        )
+            # Authority extraction only needs the concrete shape/dtype
+            # contract. Meta tensors make that FakeTensor contract available
+            # without allocating the benchmark's (occasionally multi-GiB)
+            # concrete inputs on the host during a full-suite rebuild.
+            sample_inputs.append(torch.zeros(shape, dtype=dtype, device="meta"))
+        with _redirect_torch_export_output():
+            exported = torch.export.export(
+                ReferenceModule(), tuple(sample_inputs), strict=True
+            )
     except Exception:
+        _TORCH_EXPORT_LOGGER.exception(
+            "torch.export capture failed for definition=%s workload_uuid=%s",
+            definition.name,
+            workload.uuid,
+        )
         return None
 
-    return _bound_graph_from_fx_graph(
-        exported.graph_module,
-        definition,
-        workload,
-        output_shapes,
-        declared_tensors,
-        trace_source="torch.export",
-    )
+    try:
+        with _redirect_torch_export_output(), warnings.catch_warnings():
+            # PyTorch's current export implementation emits this deprecation from
+            # Python's copyreg once per capture. It contains no workload evidence
+            # and would otherwise overwhelm a full-suite closure log.
+            warnings.filterwarnings(
+                "ignore",
+                message=r"`isinstance\(treespec, LeafSpec\)` is deprecated.*",
+                category=FutureWarning,
+            )
+            normalized_graph_module = exported.run_decompositions(
+                decomp_table={}
+            ).graph_module
+    except Exception:
+        _TORCH_EXPORT_LOGGER.exception(
+            "torch.export normalization failed for definition=%s workload_uuid=%s",
+            definition.name,
+            workload.uuid,
+        )
+        return None
+
+    try:
+        return _bound_graph_from_fx_graph(
+            # Keep the ATen operator families intact while functionalizing the
+            # exported program. In particular, ``@torch.no_grad()`` can
+            # otherwise leave a ``higher_order.wrap_with_set_grad_enabled``
+            # call whose actual tensor operators live in a nested module. An
+            # empty decomposition table is deliberate: it normalizes/export-
+            # flattens the graph without lowering high-level operator families
+            # into a different accounting vocabulary.
+            normalized_graph_module,
+            definition,
+            workload,
+            output_shapes,
+            declared_tensors,
+            trace_source="torch.export",
+        )
+    except Exception:
+        # Conversion is part of the semantic provider. A provider-internal
+        # failure is diagnostic evidence, never a reason to abort the full
+        # suite or accept the AST fallback as authority.
+        return None
 
 
 def _bound_graph_from_fx_graph(
@@ -234,6 +357,16 @@ def _bound_graph_from_fx_graph(
                 return None
             node_outputs[fx_node] = f"input:{name}"
         elif fx_node.op in {"call_function", "call_method", "call_module"}:
+            if _fx_node_name(fx_node) in {
+                "aten._assert_tensor_metadata.default",
+                "_assert_tensor_metadata",
+                "torch._assert_tensor_metadata",
+            }:
+                # Export emits these as input/output contracts after
+                # functionalization. They have no tensor result and do not
+                # represent GPU work, so they must not be mistaken for an
+                # operator with missing FakeTensor metadata.
+                continue
             if _fx_node_name(fx_node) == "builtins.getattr":
                 # ``Tensor.T`` is represented as ``getattr(tensor, "T")`` by
                 # FX. It is a logical layout view, not a GPU operation, but

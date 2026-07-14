@@ -49,7 +49,7 @@ class HardwareProfileRequirements:
             raise ValueError("architecture must be non-empty")
         if not isinstance(self.scope, str) or not self.scope.strip():
             raise ValueError("scope must be non-empty")
-        if not self.required_profile_keys or any(
+        if any(
             not isinstance(key, str) or not key.strip()
             for key in self.required_profile_keys
         ):
