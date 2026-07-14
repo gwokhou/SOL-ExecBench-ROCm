@@ -61,7 +61,10 @@ def make_amd_hardware_model(architecture: str = "gfx1200"):
             "evidence_refs": ["test-calibration.json"],
             "shape_aware_roofline": {
                 "status": "validated",
-                "evidence_refs": ["test-shape-envelope.json"],
+                "evidence_refs": [
+                    "test-shape-envelope.json#sha256:"
+                    "0000000000000000000000000000000000000000000000000000000000000000"
+                ],
                 "bucketing_dimensions": [
                     "shape",
                     "layout",

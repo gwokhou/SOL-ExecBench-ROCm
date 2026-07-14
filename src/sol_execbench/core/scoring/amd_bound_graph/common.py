@@ -26,11 +26,16 @@ def _fx_tensor_meta(node: Any) -> tuple[tuple[int, ...] | None, str | None]:
         meta = node.meta.get("val")
     if meta is None:
         return None, None
-    shape = (
-        tuple(int(dim) for dim in meta.shape)
-        if getattr(meta, "shape", None) is not None
-        else None
-    )
+    shape = None
+    if getattr(meta, "shape", None) is not None:
+        try:
+            shape = tuple(int(dim) for dim in meta.shape)
+        except Exception:
+            # Export may expose an unbacked/data-dependent SymInt. It has
+            # FakeTensor metadata but cannot prove a concrete extent for this
+            # workload, so the authority provider must fail closed instead of
+            # aborting an entire coverage rebuild.
+            shape = None
     dtype = (
         str(meta.dtype).removeprefix("torch.")
         if getattr(meta, "dtype", None) is not None
@@ -65,7 +70,7 @@ def _target_dtype_from_values(
     method_target = _dtype_method_target(leaf_name)
     if method_target is not None:
         return method_target
-    if leaf_name not in {"to", "type"}:
+    if leaf_name not in {"to", "_to_copy", "type"}:
         return None
     if "dtype" in kwargs:
         dtype = _normalize_dtype_value(kwargs["dtype"])

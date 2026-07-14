@@ -338,6 +338,7 @@ _CALL_CLASSIFIERS: tuple[tuple[set[str], CallClassification], ...] = (
     (
         {
             "to",
+            "_to_copy",
             "type",
             "type_as",
             "float",
