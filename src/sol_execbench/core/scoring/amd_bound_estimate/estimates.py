@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import replace
 
 from sol_execbench.core.scoring.amd_bound_estimate.families import (
@@ -33,6 +34,27 @@ from sol_execbench.core.scoring.amd_bound_estimate.impl import (
 )
 from sol_execbench.core.scoring.amd_bound_estimate.models import OperatorWorkEstimate
 from sol_execbench.core.scoring.amd_bound_graph.models import BoundGraph, BoundGraphNode
+
+
+_Estimator = Callable[[BoundGraph, BoundGraphNode], OperatorWorkEstimate]
+
+_ESTIMATORS: dict[EstimateDispatchFamily, _Estimator] = {
+    EstimateDispatchFamily.ATTENTION: _attention_estimate,
+    EstimateDispatchFamily.CONVOLUTION: _convolution_estimate,
+    EstimateDispatchFamily.EMBEDDING_POSITIONAL: _embedding_positional_estimate,
+    EstimateDispatchFamily.MOE: _moe_estimate,
+    EstimateDispatchFamily.SSM_MAMBA: _ssm_mamba_estimate,
+    EstimateDispatchFamily.GEMM: _gemm_estimate,
+    EstimateDispatchFamily.ELEMENTWISE: _elementwise_estimate,
+    EstimateDispatchFamily.ACTIVATION: _activation_estimate,
+    EstimateDispatchFamily.REDUCTION: _reduction_estimate,
+    EstimateDispatchFamily.NORMALIZATION: _normalization_estimate,
+    EstimateDispatchFamily.SOFTMAX: _softmax_estimate,
+    EstimateDispatchFamily.DATA_MOVEMENT: _data_movement_estimate,
+    EstimateDispatchFamily.DTYPE_CONVERSION: _dtype_conversion_estimate,
+    EstimateDispatchFamily.FFT: _fft_estimate,
+    EstimateDispatchFamily.SAMPLING: _sampling_estimate,
+}
 
 
 def estimate_bound_work(graph: BoundGraph) -> tuple[OperatorWorkEstimate, ...]:
@@ -69,38 +91,10 @@ def resolve_architecture_profile_paths(
 
 def _estimate_node(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstimate:
     dispatch_family = estimate_dispatch_family(node.op_family)
-    if dispatch_family == EstimateDispatchFamily.ATTENTION:
-        estimate = _attention_estimate(graph, node)
-    elif dispatch_family == EstimateDispatchFamily.CONVOLUTION:
-        estimate = _convolution_estimate(graph, node)
-    elif dispatch_family == EstimateDispatchFamily.EMBEDDING_POSITIONAL:
-        estimate = _embedding_positional_estimate(graph, node)
-    elif dispatch_family == EstimateDispatchFamily.MOE:
-        estimate = _moe_estimate(graph, node)
-    elif dispatch_family == EstimateDispatchFamily.SSM_MAMBA:
-        estimate = _ssm_mamba_estimate(graph, node)
-    elif dispatch_family == EstimateDispatchFamily.GEMM:
-        estimate = _gemm_estimate(graph, node)
-    elif dispatch_family == EstimateDispatchFamily.ELEMENTWISE:
-        estimate = _elementwise_estimate(graph, node)
-    elif dispatch_family == EstimateDispatchFamily.ACTIVATION:
-        estimate = _activation_estimate(graph, node)
-    elif dispatch_family == EstimateDispatchFamily.REDUCTION:
-        estimate = _reduction_estimate(graph, node)
-    elif dispatch_family == EstimateDispatchFamily.NORMALIZATION:
-        estimate = _normalization_estimate(graph, node)
-    elif dispatch_family == EstimateDispatchFamily.SOFTMAX:
-        estimate = _softmax_estimate(graph, node)
-    elif dispatch_family == EstimateDispatchFamily.DATA_MOVEMENT:
-        estimate = _data_movement_estimate(graph, node)
-    elif dispatch_family == EstimateDispatchFamily.DTYPE_CONVERSION:
-        estimate = _dtype_conversion_estimate(graph, node)
-    elif dispatch_family == EstimateDispatchFamily.FFT:
-        estimate = _fft_estimate(graph, node)
-    elif dispatch_family == EstimateDispatchFamily.SAMPLING:
-        estimate = _sampling_estimate(graph, node)
-    else:
-        estimate = _unsupported_estimate(node)
+    estimator = _ESTIMATORS.get(dispatch_family)
+    estimate = (
+        estimator(graph, node) if estimator is not None else _unsupported_estimate(node)
+    )
     return _with_hardware_profile_evidence(graph, node, estimate)
 
 
