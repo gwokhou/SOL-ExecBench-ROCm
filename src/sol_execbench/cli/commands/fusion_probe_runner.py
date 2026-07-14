@@ -25,18 +25,14 @@ from typing import Any
 
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import Workload
-from sol_execbench.core.platform.arch_capabilities import (
-    load_packaged_arch_capability_budget,
+from sol_execbench.core.scoring.amd_bound_graph.builder import (
+    build_authority_bound_graph,
 )
-from sol_execbench.core.scoring.amd_bound_estimate.estimates import (
-    estimate_bound_work,
-    resolve_architecture_profile_paths,
-)
-from sol_execbench.core.scoring.amd_bound_graph.builder import build_static_bound_graph
 from sol_execbench.core.scoring.amd_sol import (
-    build_fusion_groups,
     fusion_signature_for_group,
 )
+from sol_execbench.core.scoring.amd_sol.fusion import FusionGroup
+from sol_execbench.core.scoring.confidence import EstimateConfidence
 from sol_execbench.core.bench.static_kernel.amdgpu_metadata import (
     extract_amdgpu_kernel_metadata,
 )
@@ -164,28 +160,26 @@ def _workload_fusion_signature(
     kind: str,
 ) -> FusionSignature:
     """Bind probe evidence to the exact fusion group extracted for a workload."""
-    graph = build_static_bound_graph(definition, workload)
-    estimates = resolve_architecture_profile_paths(
-        estimate_bound_work(graph), architecture
+    # Physical fusion evidence must bind the same semantic provider as the
+    # publishable floor.  A static AST signature may be useful diagnostically,
+    # but it cannot validate a torch.export-authority group.
+    graph = build_authority_bound_graph(definition, workload)
+    if any(
+        warning in {"semantic_export_failed", "semantic_graph_provider_required"}
+        for warning in graph.warnings
+    ):
+        raise ValueError(
+            f"workload {workload.uuid} has no torch.export authority graph"
+        )
+    expected_ops = (
+        ("torch.mean", "torch.add") if kind == "rms" else ("torch.sum", "torch.mul")
     )
-    groups = build_fusion_groups(
-        graph,
-        estimates,
-        capability_budget=load_packaged_arch_capability_budget(architecture),
-    )
-    expected_ops = ("mean", "add") if kind == "rms" else ("torch.sum", "mult")
-    matches = []
-    for group in groups:
-        if len(group.node_ids) <= 1:
-            continue
-        signature = fusion_signature_for_group(group, graph.to_dict())
-        if signature.op_names == expected_ops:
-            matches.append((group, signature))
+    matches = _diagnostic_subgraph_matches(graph, expected_ops)
     if len(matches) != 1:
         raise ValueError(
             f"workload {workload.uuid} has {len(matches)} matching {kind} fusion groups"
         )
-    group, _ = matches[0]
+    group = matches[0]
     tile_contract: dict[str, object] = (
         {"workgroup_size": 256, "reduction": "mean", "epilogue": "epsilon_add"}
         if kind == "rms"
@@ -200,6 +194,49 @@ def _workload_fusion_signature(
         graph.to_dict(),
         tile_contract=tile_contract,
     )
+
+
+def _diagnostic_subgraph_matches(
+    graph: Any, expected_ops: tuple[str, str]
+) -> list[FusionGroup]:
+    """Return exact adjacent authority subgraphs for a diagnostic HIP probe.
+
+    ``semantic_component.v1`` intentionally absorbs longer data-flow chains for
+    the authority floor.  A two-op HIP probe can validate an implementation
+    candidate for the matching subgraph, but must not be re-labelled as proof
+    that the whole component is physically fusable.  Its distinct pattern ID
+    prevents accidental matching by the authority reducer.
+    """
+    nodes = tuple(graph.nodes)
+    matches: list[FusionGroup] = []
+    for first, second in zip(nodes, nodes[1:], strict=False):
+        if (first.op_name, second.op_name) != expected_ops:
+            continue
+        internal = set(first.output_tensor_ids) & set(second.input_tensor_ids)
+        if not internal:
+            continue
+        node_ids = (first.node_id, second.node_id)
+        inputs = set(first.input_tensor_ids) | set(second.input_tensor_ids)
+        outputs = set(first.output_tensor_ids) | set(second.output_tensor_ids)
+        matches.append(
+            FusionGroup(
+                group_id=f"diagnostic_{first.node_id}_{second.node_id}",
+                pattern_id="diagnostic_reduction_epilogue.v1",
+                pattern_version=1,
+                node_ids=node_ids,
+                external_input_tensor_ids=tuple(sorted(inputs - internal)),
+                external_output_tensor_ids=tuple(sorted(outputs - internal)),
+                internal_tensor_ids=tuple(sorted(internal)),
+                flops=0.0,
+                external_read_bytes=0.0,
+                external_write_bytes=0.0,
+                eliminated_intermediate_bytes=0.0,
+                required_lds_bytes=None,
+                confidence=EstimateConfidence.INEXACT,
+                warnings=("diagnostic_subgraph_not_authority_fusion",),
+            )
+        )
+    return matches
 
 
 def _workload_file(root: Path, definition: str) -> Path:

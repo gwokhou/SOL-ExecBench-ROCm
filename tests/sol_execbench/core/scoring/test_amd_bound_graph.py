@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from io import StringIO
+import logging
+from types import SimpleNamespace
 
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import Workload
@@ -17,6 +20,8 @@ from sol_execbench.core.scoring.amd_bound_graph import (
     compare_semantic_graphs,
 )
 from sol_execbench.core.scoring.amd_bound_graph.builder import build_static_bound_graph
+from sol_execbench.core.scoring.amd_bound_graph.common import _fx_tensor_meta
+from sol_execbench.core.scoring.amd_bound_graph.fx import _LoggerTextStream
 from sol_execbench.core.scoring.amd_bound_estimate.classification import (
     classify_call,
     dtype_method_target,
@@ -74,6 +79,29 @@ def test_authority_graph_uses_exported_aten_with_faketensor_metadata():
     assert graph.tensors[graph.nodes[0].output_tensor_ids[0]].shape == (2, 8)
 
 
+def test_export_log_stream_preserves_every_line_without_stdout_truncation() -> None:
+    logger = logging.getLogger("test.torch_export_diagnostics")
+    sink = StringIO()
+    handler = logging.StreamHandler(sink)
+    previous_handlers = list(logger.handlers)
+    previous_level = logger.level
+    previous_propagate = logger.propagate
+    logger.handlers = [handler]
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+    try:
+        stream = _LoggerTextStream(logger, logging.INFO)
+        stream.write("complete first line\n")
+        stream.write("complete second")
+        stream.flush()
+    finally:
+        logger.handlers = previous_handlers
+        logger.setLevel(previous_level)
+        logger.propagate = previous_propagate
+
+    assert sink.getvalue().splitlines() == ["complete first line", "complete second"]
+
+
 def test_authority_graph_export_covers_view_broadcast_and_multiple_outputs():
     definition = make_definition(
         name="export_view_broadcast_multi_output",
@@ -110,6 +138,69 @@ def test_authority_graph_export_covers_view_broadcast_and_multiple_outputs():
     assert graph.tensors["output:squared"].producer_node_id is not None
     assert graph.tensors["output:shifted"].shape == (2, 8)
     assert graph.tensors["output:squared"].shape == (2, 8)
+
+
+def test_authority_graph_normalizes_no_grad_wrapper_before_conversion():
+    definition = make_definition(
+        name="export_no_grad_wrapper",
+        axes={"N": {"type": "const", "value": 8}},
+        inputs={"x": {"shape": ["N"], "dtype": "float32"}},
+        outputs={"out": {"shape": ["N"], "dtype": "float32"}},
+        reference=(
+            "import torch\n\n"
+            "@torch.no_grad()\n"
+            "def run(x):\n"
+            "    return torch.rsqrt(x * x + 1.0)\n"
+        ),
+    )
+    workload = make_workload(
+        axes={}, inputs={"x": {"type": "random"}}, uuid="export-no-grad-wrapper"
+    )
+
+    graph = build_authority_bound_graph(definition, workload)
+
+    assert graph.nodes
+    assert all(
+        node.attributes["trace_source"] == "torch.export" for node in graph.nodes
+    )
+    assert "semantic_export_failed" not in graph.warnings
+    assert all(node.op_family != OpFamily.UNSUPPORTED for node in graph.nodes)
+
+
+def test_authority_graph_accepts_large_concrete_shapes_without_host_allocation():
+    definition = make_definition(
+        name="export_large_meta_input",
+        axes={"N": {"type": "const", "value": 100_000_000}},
+        inputs={"x": {"shape": ["N"], "dtype": "float32"}},
+        outputs={"out": {"shape": ["N"], "dtype": "float32"}},
+        reference="def run(x):\n    return x + 1\n",
+    )
+    workload = make_workload(
+        axes={}, inputs={"x": {"type": "random"}}, uuid="export-large-meta-input"
+    )
+
+    graph = build_authority_bound_graph(definition, workload)
+
+    assert graph.nodes
+    assert graph.nodes[0].attributes["trace_source"] == "torch.export"
+    assert graph.tensors["output:out"].shape == (100_000_000,)
+
+
+def test_export_unbacked_symbolic_shape_is_not_concretized() -> None:
+    class UnbackedDimension:
+        def __int__(self) -> int:
+            raise RuntimeError("unbacked SymInt")
+
+    node = SimpleNamespace(
+        meta={
+            "val": SimpleNamespace(
+                shape=(UnbackedDimension(),),
+                dtype="float32",
+            )
+        }
+    )
+
+    assert _fx_tensor_meta(node) == (None, "float32")
 
 
 def test_semantic_graph_coverage_reports_export_capture_and_metadata():

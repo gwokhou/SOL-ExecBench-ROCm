@@ -216,12 +216,13 @@ def _group_from_nodes(
         output_ids.update(node.output_tensor_ids)
         produced_ids.update(node.output_tensor_ids)
 
+    graph_output_ids = _graph_output_ids(graph)
     internal_ids = {
         tensor_id
         for tensor_id in produced_ids
         if consumers.get(tensor_id, ())
         and set(consumers[tensor_id]).issubset(node_set)
-        and tensor_id not in _graph_output_ids(graph)
+        and tensor_id not in graph_output_ids
     }
     external_input_ids = {
         tensor_id
