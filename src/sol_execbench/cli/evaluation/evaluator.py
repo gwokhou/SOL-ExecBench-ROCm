@@ -63,23 +63,20 @@ def run_evaluation_cli(*, request: EvaluationRequest) -> CliResult:
         )
 
     staging_dir = Path(tempfile.mkdtemp(prefix="sol_execbench_"))
-    packager = ProblemPackager(
+    with ProblemPackager(
         definition=definition,
         workloads=workloads,
         solution=solution,
         config=config,
         output_dir=staging_dir,
         keep_output_dir=request.keep_staging,
-    )
-    try:
+    ) as packager:
         return _run_packaged_evaluation(
             request=request,
             loaded=loaded,
             staging_dir=staging_dir,
             packager=packager,
         )
-    finally:
-        packager.close()
 
 
 def _run_packaged_evaluation(
