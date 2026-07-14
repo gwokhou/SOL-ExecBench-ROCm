@@ -64,6 +64,52 @@ def _architecture(torch: Any) -> str:
     return architecture.split(":", maxsplit=1)[0].lower()
 
 
+def _tensor_layout(name: str, tensor: Any) -> dict[str, object]:
+    """Serialize concrete tensor metadata without retaining its storage."""
+    return {
+        "name": name,
+        "shape": list(tensor.shape),
+        "stride": list(tensor.stride()),
+        "dtype": str(tensor.dtype).removeprefix("torch."),
+        "contiguous": bool(tensor.is_contiguous()),
+    }
+
+
+def _output_layouts(value: Any) -> list[dict[str, object]]:
+    """Return stable metadata for a tensor or a tuple/list of tensors."""
+    if hasattr(value, "shape") and hasattr(value, "stride"):
+        return [_tensor_layout("output_0", value)]
+    if isinstance(value, (tuple, list)):
+        if not all(
+            hasattr(item, "shape") and hasattr(item, "stride") for item in value
+        ):
+            raise ValueError("compiled reference returned a non-tensor output")
+        return [
+            _tensor_layout(f"output_{index}", item) for index, item in enumerate(value)
+        ]
+    raise ValueError("compiled reference returned a non-tensor output")
+
+
+def _record_profiler_trace(
+    torch: Any, compiled: Any, inputs: tuple[Any, ...], output: Path
+) -> str:
+    """Record one shape-aware compiled invocation for provider observability."""
+    activities = [
+        torch.profiler.ProfilerActivity.CPU,
+        torch.profiler.ProfilerActivity.CUDA,
+    ]
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with torch.profiler.profile(
+        activities=activities,
+        record_shapes=True,
+        profile_memory=True,
+    ) as profiler:
+        compiled(*inputs)
+        torch.cuda.synchronize()
+    profiler.export_chrome_trace(str(output))
+    return sha256_file(output)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--problem-dir", required=True, type=Path)
@@ -77,6 +123,11 @@ def main() -> int:
     )
     parser.add_argument("--warmup", type=int, default=10)
     parser.add_argument("--repetitions", type=int, default=30)
+    parser.add_argument(
+        "--profiler-trace-output",
+        type=Path,
+        help="Optional PyTorch profiler Chrome trace for compiled-kernel attribution.",
+    )
     args = parser.parse_args()
     if args.warmup < 1 or args.repetitions < 3:
         raise ValueError("warmup must be >= 1 and repetitions must be >= 3")
@@ -106,6 +157,14 @@ def main() -> int:
     actual = compiled(*inputs)
     torch.testing.assert_close(actual, eager)
     torch.cuda.synchronize()
+    profiler_trace: dict[str, str] | None = None
+    if args.profiler_trace_output is not None:
+        profiler_trace = {
+            "ref": str(args.profiler_trace_output),
+            "sha256": _record_profiler_trace(
+                torch, compiled, inputs, args.profiler_trace_output
+            ),
+        }
     samples_ms: list[float] = []
     for _ in range(args.repetitions):
         start = perf_counter()
@@ -133,10 +192,19 @@ def main() -> int:
         "device_name": torch.cuda.get_device_name(0),
         "input_identity_sha256": identity,
         "compile": {"backend": "inductor", "fullgraph": True},
+        "tensor_layouts": {
+            "inputs": [
+                _tensor_layout(name, tensor)
+                for name, tensor in zip(definition.inputs, inputs, strict=True)
+            ],
+            "outputs": _output_layouts(actual),
+        },
         "warmup": args.warmup,
         "samples_ms": samples_ms,
         "measurement_ms": min(samples_ms),
     }
+    if profiler_trace is not None:
+        evidence["profiler_trace"] = profiler_trace
     args.evidence_output.parent.mkdir(parents=True, exist_ok=True)
     args.evidence_output.write_text(
         json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -156,7 +224,11 @@ def main() -> int:
         warnings=(),
         raw_evidence_ref=str(args.evidence_output),
         raw_evidence_sha256=sha256_file(args.evidence_output),
-        output_payload={"backend": "inductor", "fullgraph": True},
+        output_payload={
+            "backend": "inductor",
+            "fullgraph": True,
+            **({"profiler_trace": profiler_trace} if profiler_trace else {}),
+        },
     )
     row = {
         "definition": definition.name,
