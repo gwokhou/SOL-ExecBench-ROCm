@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class EvaluationRequest:
     """Complete, immutable configuration for one CLI evaluation lifecycle."""
 

@@ -55,7 +55,7 @@ class ClockLockRequiredError(RuntimeError):
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class CalibrationRequest:
     environment: GpuEnvironment
     hip_probe: HipProbe | None = None

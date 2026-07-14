@@ -29,7 +29,7 @@ class EvaluationDependencies:
     real_stdout: TextIO
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class WorkloadEvaluationRequest:
     """Data configuration for evaluating a homogeneous workload collection."""
 
