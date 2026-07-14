@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import asdict, dataclass
 from enum import Enum
 from typing import Any
@@ -79,6 +80,16 @@ class ShapeAwareRooflineEvidence:
                 raise ValueError(
                     "validated shape-aware roofline evidence must cover shape, layout, launch, and occupancy"
                 )
+            if any("#sha256:" not in ref for ref in self.evidence_refs):
+                raise ValueError(
+                    "validated shape-aware roofline evidence refs must bind a SHA-256 payload"
+                )
+            for ref in self.evidence_refs:
+                digest = ref.rsplit("#sha256:", maxsplit=1)[-1]
+                if not re.fullmatch(r"[0-9a-f]{64}", digest):
+                    raise ValueError(
+                        "validated shape-aware roofline evidence refs must bind a SHA-256 payload"
+                    )
 
     def to_dict(self) -> dict[str, Any]:
         return {

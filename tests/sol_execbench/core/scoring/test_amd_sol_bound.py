@@ -51,7 +51,10 @@ def _hardware(architecture: str = "gfx1200"):
             "evidence_refs": ["fixture"],
             "shape_aware_roofline": {
                 "status": "validated",
-                "evidence_refs": ["fixture-shape-envelope"],
+                "evidence_refs": [
+                    "fixture-shape-envelope#sha256:"
+                    "0000000000000000000000000000000000000000000000000000000000000000"
+                ],
                 "bucketing_dimensions": [
                     "shape",
                     "layout",
