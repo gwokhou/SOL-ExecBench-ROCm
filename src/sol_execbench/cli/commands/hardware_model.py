@@ -10,6 +10,7 @@ bound eligibility recorded on every score.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -32,9 +33,15 @@ from sol_execbench.core.scoring.hardware_calibration.models import (
     CALIBRATION_SCHEMA_VERSION,
     hardware_calibration_artifact_from_dict,
 )
+from sol_execbench.core.scoring.hardware_calibration.shape_aware_roofline import (
+    ShapeAwareRooflineArtifact,
+    shape_aware_roofline_from_dict,
+    validate_shape_aware_raw_evidence,
+)
 from sol_execbench.core.scoring.hardware_profile_requirements import (
     hardware_profile_requirements_from_dict,
 )
+from sol_execbench.core.integrity.checksums import sha256_file
 from sol_execbench.core.scoring.hardware_calibration.rocprof_compute import (
     default_profiler_discovery,
     ensure_profiler_environment,
@@ -164,6 +171,24 @@ def _calibrate(
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
 )
 @click.option(
+    "--shape-aware-evidence",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help=(
+        "Checksummed shape/layout/launch/occupancy envelope evidence. Required "
+        "only when the emitted model is intended to satisfy the authority envelope gate."
+    ),
+)
+@click.option(
+    "--authority-coverage",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="Authority coverage artifact bound by --shape-aware-evidence.",
+)
+@click.option(
+    "--shape-aware-plan",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="Checksummed workload/profile plan that the envelope evidence must cover.",
+)
+@click.option(
     "--verification-calibration",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     help="Second independently collected calibration required with --requirements.",
@@ -189,6 +214,9 @@ def _build(
     max_age_hours: float | None,
     verification_calibration: Path | None = None,
     requirements_path: Path | None = None,
+    shape_aware_evidence: Path | None = None,
+    authority_coverage: Path | None = None,
+    shape_aware_plan: Path | None = None,
 ) -> CliResult:
     """Convert a validated calibration artifact into an external v3 model."""
     try:
@@ -254,6 +282,32 @@ def _build(
                 discover_gpu(int(verification.metadata["device"])),
                 max_age_hours,
             )
+        shape_evidence = _load_shape_aware_evidence(shape_aware_evidence)
+        if shape_evidence is not None:
+            if requirements is None or verification is None:
+                raise ValueError(
+                    "--shape-aware-evidence requires --requirements and --verification-calibration"
+                )
+            if authority_coverage is None:
+                raise ValueError("--shape-aware-evidence requires --authority-coverage")
+            if shape_aware_plan is None:
+                raise ValueError("--shape-aware-evidence requires --shape-aware-plan")
+            if shape_aware_evidence is None:
+                raise ValueError("--shape-aware-evidence path is missing")
+            primary_sha256 = calibration.payload_sha256
+            verification_sha256 = verification.payload_sha256
+            if primary_sha256 is None or verification_sha256 is None:
+                raise ValueError("calibration payload checksum is missing")
+            _validate_shape_aware_evidence(
+                shape_evidence,
+                evidence_path=shape_aware_evidence,
+                plan=_load_shape_aware_plan(shape_aware_plan),
+                architecture=architecture,
+                primary_sha256=primary_sha256,
+                verification_sha256=verification_sha256,
+                requirements=requirements,
+                authority_coverage_sha256=sha256_file(authority_coverage),
+            )
     except (KeyError, OSError, ValueError, json.JSONDecodeError) as exc:
         _rejected(output, str(exc))
         raise click.ClickException(str(exc)) from exc
@@ -278,29 +332,33 @@ def _build(
         for candidate in calibration.candidates
         if candidate.key in required_profile_keys
     ]
-    _write_json(
-        output,
-        {
-            "schema_version": AMD_HARDWARE_MODEL_SCHEMA_VERSION,
-            "architecture": architecture,
-            "clock_assumptions": ["calibration provenance recorded in input artifact"],
-            "source": f"calibrated from {calibration_path}",
-            "confidence": "supported",
-            "hardware_validation_status": "validated",
-            "model_validation_status": "validated",
+    model_payload: dict[str, object] = {
+        "schema_version": AMD_HARDWARE_MODEL_SCHEMA_VERSION,
+        "architecture": architecture,
+        "clock_assumptions": ["calibration provenance recorded in input artifact"],
+        "source": f"calibrated from {calibration_path}",
+        "confidence": "supported",
+        "hardware_validation_status": "validated",
+        "model_validation_status": "validated",
+        "evidence_refs": [
+            str(calibration_path),
+            *([str(verification_calibration)] if verification is not None else []),
+            *([str(requirements_path)] if requirements is not None else []),
+        ],
+        "compute_profiles": [
+            p for p in profiles if str(p["key"]).startswith("compute.")
+        ],
+        "memory_profiles": [p for p in profiles if str(p["key"]).startswith("memory.")],
+    }
+    if shape_evidence is not None:
+        model_payload["shape_aware_roofline"] = {
+            "status": "validated",
             "evidence_refs": [
-                str(calibration_path),
-                *([str(verification_calibration)] if verification is not None else []),
-                *([str(requirements_path)] if requirements is not None else []),
+                f"{shape_aware_evidence}#sha256:{shape_evidence.payload_sha256}"
             ],
-            "compute_profiles": [
-                p for p in profiles if str(p["key"]).startswith("compute.")
-            ],
-            "memory_profiles": [
-                p for p in profiles if str(p["key"]).startswith("memory.")
-            ],
-        },
-    )
+            "bucketing_dimensions": list(shape_evidence.bucketing_dimensions),
+        }
+    _write_json(output, model_payload)
     return CliResult(
         data={
             "schema_version": AMD_HARDWARE_MODEL_SCHEMA_VERSION,
@@ -371,6 +429,154 @@ def _load_calibration(path: Path):
     if not isinstance(payload, dict) or "payload_sha256" not in payload:
         raise ValueError("calibration payload checksum is missing")
     return hardware_calibration_artifact_from_dict(payload)
+
+
+def _load_shape_aware_evidence(
+    path: Path | None,
+) -> ShapeAwareRooflineArtifact | None:
+    if path is None:
+        return None
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("shape-aware roofline evidence must be an object")
+    return shape_aware_roofline_from_dict(payload)
+
+
+def _load_shape_aware_plan(path: Path) -> dict[str, object]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    expected = {
+        "schema_version",
+        "architecture",
+        "authority_coverage_sha256",
+        "requirements_sha256",
+        "required_dimensions",
+        "authority_workload_count",
+        "profile_shards",
+        "payload_sha256",
+    }
+    if not isinstance(payload, dict) or set(payload) != expected:
+        raise ValueError("shape-aware roofline plan has invalid fields")
+    digest_payload = {
+        key: value for key, value in payload.items() if key != "payload_sha256"
+    }
+    digest = hashlib.sha256(
+        json.dumps(
+            digest_payload, sort_keys=True, separators=(",", ":"), allow_nan=False
+        ).encode()
+    ).hexdigest()
+    if payload["payload_sha256"] != digest:
+        raise ValueError("shape-aware roofline plan checksum mismatch")
+    return payload
+
+
+def _validate_shape_aware_evidence(
+    evidence: ShapeAwareRooflineArtifact,
+    *,
+    evidence_path: Path,
+    plan: dict[str, object] | None = None,
+    architecture: str,
+    primary_sha256: str,
+    verification_sha256: str,
+    requirements: object,
+    authority_coverage_sha256: str,
+) -> None:
+    """Bind a validated envelope to the same two scalar calibration runs.
+
+    Envelope samples are diagnostic measurements, never inputs to the scalar
+    peak/bandwidth values.  The only authority effect is satisfying the
+    explicitly separate shape-aware evidence gate.
+    """
+    if evidence.architecture != architecture:
+        raise ValueError("shape-aware roofline architecture does not match calibration")
+    if set(evidence.calibration_sha256s) != {primary_sha256, verification_sha256}:
+        raise ValueError("shape-aware roofline does not bind both calibration runs")
+    if evidence.requirements_sha256 != getattr(requirements, "payload_sha256"):
+        raise ValueError("shape-aware roofline does not bind supplied requirements")
+    if evidence.authority_coverage_sha256 != authority_coverage_sha256:
+        raise ValueError(
+            "shape-aware roofline does not bind supplied authority coverage"
+        )
+    if plan is not None and evidence.plan_payload_sha256 != plan["payload_sha256"]:
+        raise ValueError("shape-aware roofline does not bind supplied collection plan")
+    required_keys = set(getattr(requirements, "required_profile_keys"))
+    missing = required_keys - evidence.profile_keys
+    if missing:
+        raise ValueError(
+            "shape-aware roofline lacks required profile evidence: "
+            + ", ".join(sorted(missing))
+        )
+    for case in evidence.cases:
+        raw_path = Path(case.raw_evidence_ref)
+        if not raw_path.is_absolute():
+            raw_path = evidence_path.parent / raw_path
+        if not raw_path.is_file():
+            raise ValueError(
+                f"shape-aware roofline raw evidence is missing: {case.raw_evidence_ref}"
+            )
+        if sha256_file(raw_path) != case.raw_evidence_sha256:
+            raise ValueError(
+                f"shape-aware roofline raw evidence checksum mismatch: {case.raw_evidence_ref}"
+            )
+        if plan is not None:
+            validate_shape_aware_raw_evidence(case, raw_path, architecture=architecture)
+    if plan is None:
+        return
+    plan_assignments = _shape_aware_plan_assignments(plan)
+    covered_assignments = [
+        (case.profile_key, definition, workload_uuid, problem_id)
+        for case in evidence.cases
+        for definition, workload_uuid, problem_id in case.covered_workloads
+    ]
+    if len(covered_assignments) != len(set(covered_assignments)):
+        raise ValueError("shape-aware roofline workload/profile coverage is duplicated")
+    if set(covered_assignments) != plan_assignments:
+        raise ValueError(
+            "shape-aware roofline does not cover every planned workload/profile"
+        )
+
+
+def _shape_aware_plan_assignments(
+    plan: dict[str, object],
+) -> set[tuple[str, str, str, str]]:
+    raw_shards = plan["profile_shards"]
+    if not isinstance(raw_shards, list):
+        raise ValueError("shape-aware roofline plan profile_shards must be a list")
+    assignments: set[tuple[str, str, str, str]] = set()
+    for raw_shard in raw_shards:
+        if not isinstance(raw_shard, dict) or set(raw_shard) != {
+            "profile_key",
+            "workloads",
+        }:
+            raise ValueError("shape-aware roofline plan has an invalid profile shard")
+        shard = cast(dict[str, object], raw_shard)
+        profile_key = shard["profile_key"]
+        raw_workloads = shard["workloads"]
+        if not isinstance(profile_key, str) or not profile_key.strip():
+            raise ValueError("shape-aware roofline plan profile_key must be non-empty")
+        if not isinstance(raw_workloads, list):
+            raise ValueError("shape-aware roofline plan workloads must be a list")
+        for raw_workload in raw_workloads:
+            if not isinstance(raw_workload, dict) or set(raw_workload) != {
+                "definition",
+                "workload_uuid",
+                "problem_id",
+            }:
+                raise ValueError(
+                    "shape-aware roofline plan has an invalid workload assignment"
+                )
+            workload = cast(dict[str, object], raw_workload)
+            values = (
+                workload["definition"],
+                workload["workload_uuid"],
+                workload["problem_id"],
+            )
+            if any(not isinstance(value, str) or not value.strip() for value in values):
+                raise ValueError(
+                    "shape-aware roofline plan workload fields must be non-empty"
+                )
+            definition, workload_uuid, problem_id = cast(tuple[str, str, str], values)
+            assignments.add((profile_key, definition, workload_uuid, problem_id))
+    return assignments
 
 
 def _validate_second_calibration(
