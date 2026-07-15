@@ -10,9 +10,9 @@ readme = "README.md"
 requires-python = ">=3.12,<3.14"
 dependencies = [
     "torch==2.10.0; sys_platform != 'linux' or platform_machine != 'x86_64'",
-    "torch==2.10.0+rocm7.1; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "torch==2.11.0+rocm7.2; sys_platform == 'linux' and platform_machine == 'x86_64'",
     "torchvision==0.25.0; sys_platform != 'linux' or platform_machine != 'x86_64'",
-    "torchvision==0.25.0+rocm7.1; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "torchvision==0.26.0+rocm7.2; sys_platform == 'linux' and platform_machine == 'x86_64'",
     "ninja>=1.13.0",
     "pydantic>=2.12.5",
     "safetensors>=0.7.0",
@@ -87,8 +87,8 @@ url = "https://pypi.org/simple"
 default = true
 
 [[tool.uv.index]]
-name = "pytorch-rocm71"
-url = "https://download.pytorch.org/whl/rocm7.1"
+name = "pytorch-rocm72"
+url = "https://download.pytorch.org/whl/rocm7.2"
 explicit = true
 
 [[tool.uv.index]]
@@ -98,10 +98,10 @@ explicit = true
 
 [tool.uv.sources]
 torch = [
-  { index = "pytorch-rocm71", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
+  { index = "pytorch-rocm72", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
 ]
 torchvision = [
-  { index = "pytorch-rocm71", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
+  { index = "pytorch-rocm72", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
 ]
 triton-rocm = [
   { index = "pytorch-rocm-root", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },

@@ -3,10 +3,10 @@
 # =============================================================================
 
 ARG ROCM_DOCKER_IMAGE=rocm/dev-ubuntu-24.04
-ARG ROCM_DOCKER_TAG=7.1.1-complete
-ARG PYTORCH_TORCH_VERSION=2.10.0+rocm7.1
-ARG PYTORCH_TORCHVISION_VERSION=0.25.0+rocm7.1
-ARG PYTORCH_ROCM_INDEX_URL=https://download.pytorch.org/whl/rocm7.1
+ARG ROCM_DOCKER_TAG=7.2-complete
+ARG PYTORCH_TORCH_VERSION=2.11.0+rocm7.2
+ARG PYTORCH_TORCHVISION_VERSION=0.26.0+rocm7.2
+ARG PYTORCH_ROCM_INDEX_URL=https://download.pytorch.org/whl/rocm7.2
 ARG TRITON_ROCM_VERSION=3.6.0
 ARG TRITON_ROCM_INDEX_URL=https://download.pytorch.org/whl/
 FROM ${ROCM_DOCKER_IMAGE}:${ROCM_DOCKER_TAG} AS base
@@ -104,7 +104,7 @@ RUN --mount=type=cache,target=/home/${HOST_USER}/.cache/uv,uid=${HOST_UID},gid=$
 RUN --mount=type=cache,target=/home/${HOST_USER}/.cache/uv,uid=${HOST_UID},gid=${HOST_GID} \
     uv run python -c "from sol_execbench.tools.amd_isa.helper import ensure_helper; ensure_helper()"
 
-# The checked-in lock is the default ROCm 7.1 stack. Non-default Docker targets
+# The checked-in lock is the default ROCm 7.2 stack. Non-default Docker targets
 # install their declared PyTorch ROCm wheels after the frozen sync so each image
 # matches its target user-space version without mutating the repository lock.
 RUN --mount=type=cache,target=/home/${HOST_USER}/.cache/uv,uid=${HOST_UID},gid=${HOST_GID} \

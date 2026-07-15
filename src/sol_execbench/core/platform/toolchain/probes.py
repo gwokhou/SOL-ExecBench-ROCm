@@ -9,6 +9,7 @@ import shutil
 import subprocess
 
 from ..environment import ProbeCompletedProcess
+from ..runtime import resolve_tool_path
 from ...text_utils import text_tail
 from .models import (
     DEFAULT_TOOLCHAIN_PROBE_TIMEOUT_SECONDS,
@@ -30,7 +31,8 @@ def probe_toolchain_tool(
 ) -> ToolchainProbeResult:
     """Run one bounded toolchain probe."""
 
-    path = which(binary)
+    resolved_path = resolve_tool_path(binary, which=which)
+    path = str(resolved_path) if resolved_path is not None else None
     if path is None:
         return ToolchainProbeResult(
             tool_id=tool_id,
@@ -38,13 +40,14 @@ def probe_toolchain_tool(
             status=ToolchainStatus.UNAVAILABLE,
             timeout_seconds=timeout_seconds,
         )
+    effective_command = [path, *command[1:]]
     effective_runner = runner or run_probe
     try:
-        completed = effective_runner(command, timeout_seconds)
+        completed = effective_runner(effective_command, timeout_seconds)
     except subprocess.TimeoutExpired as exc:
         return ToolchainProbeResult(
             tool_id=tool_id,
-            command=command,
+            command=effective_command,
             path=path,
             status=ToolchainStatus.FAILED,
             stdout_tail=text_tail(exc.stdout),
@@ -54,7 +57,7 @@ def probe_toolchain_tool(
     except OSError as exc:
         return ToolchainProbeResult(
             tool_id=tool_id,
-            command=command,
+            command=effective_command,
             path=path,
             status=ToolchainStatus.FAILED,
             stderr_tail=text_tail(str(exc)),
@@ -63,7 +66,7 @@ def probe_toolchain_tool(
 
     return ToolchainProbeResult(
         tool_id=tool_id,
-        command=command,
+        command=effective_command,
         path=path,
         status=(
             ToolchainStatus.AVAILABLE

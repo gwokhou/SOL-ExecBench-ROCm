@@ -45,6 +45,7 @@ from sol_execbench.core.scoring.fusion_validation import (
     performance_from_rounds,
 )
 from sol_execbench.core.integrity.checksums import sha256_file
+from sol_execbench.core.platform.runtime import resolve_rocm_tool
 
 
 _RMS_DEFINITION = "025_rmsnorm_h4096"
@@ -253,7 +254,7 @@ def _compile_runner(
     source = source_dir / "fusion_probe_runner.hip"
     executable = workspace / "fusion_probe_runner"
     command = (
-        "hipcc",
+        _hipcc_command(),
         "-O3",
         f"--offload-arch={architecture}",
         f"-I{source_dir}",
@@ -418,10 +419,15 @@ def _selected_input_sha256(root: Path) -> str:
 
 def _hipcc_version() -> str:
     output = subprocess.run(
-        ("hipcc", "--version"), text=True, capture_output=True, check=False
+        (_hipcc_command(), "--version"), text=True, capture_output=True, check=False
     ).stdout
     match = re.search(r"(?:HIP|ROCm) version:\s*([^\s]+)", output, re.I)
     return match.group(1) if match else output.strip() or "unknown"
+
+
+def _hipcc_command() -> str:
+    path = resolve_rocm_tool("hipcc")
+    return str(path) if path is not None else "hipcc"
 
 
 def _json_object(path: Path) -> dict[str, Any]:

@@ -19,6 +19,7 @@ from .environment_models import (
     ToolProbeResult,
     Which,
 )
+from .runtime import resolve_tool_path
 from ..text_utils import text_tail
 
 
@@ -32,7 +33,8 @@ def probe_tool(
 ) -> ToolProbeResult:
     """Run one bounded environment probe."""
 
-    path = which(tool)
+    resolved_path = resolve_tool_path(tool, which=which)
+    path = str(resolved_path) if resolved_path is not None else None
     if path is None:
         return ToolProbeResult(
             tool=tool,
@@ -40,12 +42,13 @@ def probe_tool(
             status=EnvironmentEvidenceStatus.UNAVAILABLE,
             timeout_seconds=timeout_seconds,
         )
+    effective_command = [path, *command[1:]]
     try:
-        completed = runner(command, timeout_seconds)
+        completed = runner(effective_command, timeout_seconds)
     except subprocess.TimeoutExpired as exc:
         return ToolProbeResult(
             tool=tool,
-            command=command,
+            command=effective_command,
             path=path,
             status=EnvironmentEvidenceStatus.TIMEOUT,
             stdout_tail=text_tail(exc.stdout),
@@ -55,7 +58,7 @@ def probe_tool(
     except OSError as exc:
         return ToolProbeResult(
             tool=tool,
-            command=command,
+            command=effective_command,
             path=path,
             status=EnvironmentEvidenceStatus.FAILED,
             stderr_tail=text_tail(str(exc)),
@@ -65,7 +68,7 @@ def probe_tool(
     output = "\n".join(part for part in (completed.stdout, completed.stderr) if part)
     return ToolProbeResult(
         tool=tool,
-        command=command,
+        command=effective_command,
         path=path,
         status=(
             EnvironmentEvidenceStatus.AVAILABLE

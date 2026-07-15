@@ -11,7 +11,6 @@ portable and prevents a missing ROCm installation from becoming fabricated data.
 from __future__ import annotations
 
 import hashlib
-import shutil
 import subprocess
 from importlib import resources
 from math import isfinite
@@ -21,6 +20,7 @@ from tempfile import mkdtemp
 from typing import Any, Callable, Mapping
 
 from sol_execbench.core.scoring.hardware_calibration.models import CalibrationCandidate
+from sol_execbench.core.platform.runtime import resolve_rocm_tool
 from sol_execbench.core.scoring.hardware_calibration.statistics import (
     MINIMUM_SAMPLE_COUNT,
     select_conservative_value,
@@ -188,7 +188,11 @@ class HipCommandBackend:
         run: Callable[..., object] = subprocess.run,
     ) -> None:
         self.workspace = workspace or Path(mkdtemp(prefix="sol-execbench-hip-"))
-        self.hipcc = shutil.which("hipcc") if hipcc is _DEFAULT_HIPCC else hipcc
+        if hipcc is _DEFAULT_HIPCC:
+            discovered_hipcc = resolve_rocm_tool("hipcc")
+            self.hipcc = str(discovered_hipcc) if discovered_hipcc else None
+        else:
+            self.hipcc = hipcc
         self.architecture = architecture.lower() if architecture is not None else None
         self.run = run
         self._executables: dict[CalibrationProfileKey, Path] = {}

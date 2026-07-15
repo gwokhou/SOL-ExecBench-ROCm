@@ -14,7 +14,7 @@ import ctypes.util
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Mapping
 
 from sol_execbench.core.platform.diagnostics_models import (
     ROCM_LIBRARY_SPECS,
@@ -23,6 +23,7 @@ from sol_execbench.core.platform.diagnostics_models import (
     SolExecBenchError,
     StageDiagnostic,
 )
+from sol_execbench.core.platform.runtime import rocm_search_roots, resolve_rocm_tool
 
 
 def detect_tool(path: str, which: Callable[[str], str | None] = shutil.which) -> bool:
@@ -33,6 +34,8 @@ def detect_tool(path: str, which: Callable[[str], str | None] = shutil.which) ->
 def rocm_tool_diagnostics(
     *,
     which: Callable[[str], str | None] = shutil.which,
+    environ: Mapping[str, str] | None = None,
+    tool_resolver: Callable[..., Path | None] = resolve_rocm_tool,
 ) -> list[StageDiagnostic]:
     """Return diagnostics for ROCm tools used by the benchmark environment."""
     tools = {
@@ -43,7 +46,7 @@ def rocm_tool_diagnostics(
     }
     diagnostics: list[StageDiagnostic] = []
     for tool, hint in tools.items():
-        available = detect_tool(tool, which)
+        available = tool_resolver(tool, environ=environ, which=which) is not None
         diagnostics.append(
             StageDiagnostic(
                 stage=DiagnosticStage.ENVIRONMENT,
@@ -56,11 +59,7 @@ def rocm_tool_diagnostics(
 
 
 def _default_rocm_roots() -> tuple[Path, ...]:
-    roots = [Path("/opt/rocm")]
-    for candidate in (Path("/usr"), Path("/usr/local")):
-        if candidate.exists():
-            roots.append(candidate)
-    return tuple(roots)
+    return rocm_search_roots()
 
 
 def _find_header(
@@ -176,9 +175,13 @@ def rocm_library_diagnostics(
 def local_gfx_target(
     *,
     check_output: Callable[..., str] = subprocess.check_output,
+    tool_resolver: Callable[[str], Path | None] | None = None,
 ) -> str | None:
     """Best-effort local gfx target detection through ROCm command output."""
-    for cmd in (["rocm_agent_enumerator", "-name"], ["rocminfo"]):
+    resolve_tool = tool_resolver or resolve_rocm_tool
+    for tool, arguments in (("rocm_agent_enumerator", ["-name"]), ("rocminfo", [])):
+        path = resolve_tool(tool)
+        cmd = [str(path or tool), *arguments]
         try:
             output = check_output(cmd, text=True, stderr=subprocess.DEVNULL)
         except Exception:

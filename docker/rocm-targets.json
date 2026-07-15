@@ -1,6 +1,6 @@
 {
   "schema_version": "sol_execbench.rocm_docker_targets.v1",
-  "default_target_id": "rocm-7.1.1-ubuntu-24.04-container",
+  "default_target_id": "rocm-7.2.0-ubuntu-24.04-container",
   "targets": [
     {
       "target_id": "rocm-7.0.2-ubuntu-24.04-container",
@@ -55,15 +55,15 @@
       "docker_image_tag": "7.2-complete",
       "pytorch_rocm_target": "rocm7.2",
       "pytorch_dependency_policy": {
-        "policy_id": "pytorch-2.11.0-rocm7.2-explicit",
+        "policy_id": "pytorch-2.11.0-rocm7.2-project-default",
         "wheel_availability": "available",
         "torch_version": "2.11.0+rocm7.2",
         "torchvision_version": "0.26.0+rocm7.2",
         "expected_local_version": "rocm7.2",
         "uv_index_name": "pytorch-rocm72",
         "uv_index_url": "https://download.pytorch.org/whl/rocm7.2",
-        "lock_strategy": "explicit_target_workflow",
-        "suggested_uv_command": "uv sync --index pytorch-rocm72=https://download.pytorch.org/whl/rocm7.2 --index pytorch-rocm-root=https://download.pytorch.org/whl/",
+        "lock_strategy": "project_default",
+        "suggested_uv_command": "uv sync --all-groups using pyproject.toml sources pytorch-rocm72 and pytorch-rocm-root",
         "triton_rocm_version": "3.6.0",
         "triton_rocm_index_name": "pytorch-rocm-root",
         "triton_rocm_index_url": "https://download.pytorch.org/whl/"

@@ -21,10 +21,10 @@ from sol_execbench.core.platform.toolchain import (
 
 def _which(binary: str) -> str | None:
     paths = {
-        "rocprofv3": "/opt/rocm/bin/rocprofv3",
-        "rocminfo": "/opt/rocm/bin/rocminfo",
-        "llvm-objdump": "/usr/bin/llvm-objdump",
-        "readelf": "/usr/bin/readelf",
+        "rocprofv3": "/fake/rocprofv3",
+        "rocminfo": "/fake/rocminfo",
+        "llvm-objdump": "/fake/llvm-objdump",
+        "readelf": "/fake/readelf",
     }
     return paths.get(binary)
 
@@ -43,7 +43,7 @@ def test_default_registry_records_lifecycle_and_static_tools():
 
 def test_routing_selects_available_tool_and_preserves_authority_boundaries():
     def runner(command: list[str], timeout_seconds: float) -> ProbeCompletedProcess:
-        assert command == ["rocprofv3", "--version"]
+        assert command == ["/fake/rocprofv3", "--version"]
         assert timeout_seconds == 3.0
         return ProbeCompletedProcess(returncode=0, stdout="rocprofv3 7.0.0")
 
@@ -137,8 +137,8 @@ def test_static_tools_are_routable_and_optional_candidates_remain_nonmandatory()
     assert statuses["llvm-objdump"] == ToolchainStatus.AVAILABLE
     assert statuses["roc-objdump"] == ToolchainStatus.UNAVAILABLE
     assert statuses["rga"] == ToolchainStatus.PLANNED
-    assert ["readelf", "--version"] in commands
-    assert ["llvm-objdump", "--version"] in commands
+    assert ["/fake/readelf", "--version"] in commands
+    assert ["/fake/llvm-objdump", "--version"] in commands
 
 
 def test_toolchain_cli_prints_routing_json(monkeypatch):

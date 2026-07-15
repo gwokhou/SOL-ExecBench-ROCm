@@ -67,7 +67,7 @@ def test_probe_tool_reports_unavailable_without_running_command():
 
 def test_probe_tool_reports_available_and_parses_gfx_target():
     def runner(command: list[str], timeout_seconds: float) -> ProbeCompletedProcess:
-        assert command == ["rocminfo"]
+        assert command == ["/fake/rocminfo"]
         assert timeout_seconds == 2.0
         return ProbeCompletedProcess(
             returncode=0,
@@ -78,7 +78,7 @@ def test_probe_tool_reports_available_and_parses_gfx_target():
         "rocminfo",
         ["rocminfo"],
         runner=runner,
-        which=lambda _tool: "/opt/rocm/bin/rocminfo",
+        which=lambda _tool: "/fake/rocminfo",
         timeout_seconds=2.0,
     )
 
@@ -124,7 +124,7 @@ def test_collect_environment_snapshot_uses_injected_runner_and_is_gpu_free():
 
     def runner(command: list[str], timeout_seconds: float) -> ProbeCompletedProcess:
         commands.append(command)
-        if command == ["rocm_agent_enumerator"]:
+        if command == ["/fake/rocm_agent_enumerator"]:
             return ProbeCompletedProcess(returncode=0, stdout="gfx1200\n")
         return ProbeCompletedProcess(returncode=0, stdout="")
 
@@ -138,9 +138,9 @@ def test_collect_environment_snapshot_uses_injected_runner_and_is_gpu_free():
     assert snapshot.schema_version == ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION
     assert snapshot.collection_status == EnvironmentEvidenceStatus.AVAILABLE
     assert [gpu.gfx_target for gpu in snapshot.gpus] == ["gfx1200"]
-    assert ["amd-smi", "static", "-a"] in commands
-    assert ["rocminfo"] in commands
-    assert ["rocm_agent_enumerator"] in commands
+    assert ["/fake/amd-smi", "static", "-a"] in commands
+    assert ["/fake/rocminfo"] in commands
+    assert ["/fake/rocm_agent_enumerator"] in commands
 
 
 def test_collect_environment_snapshot_handles_missing_tools():

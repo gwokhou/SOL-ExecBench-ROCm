@@ -16,11 +16,11 @@
 
 import json
 from pathlib import Path
-import shutil
 
 import torch.utils.cpp_extension as ext
 
 from sol_execbench.core.data.solution import Solution
+from sol_execbench.core.platform.runtime import discover_rocm_root
 
 HERE = Path.cwd().resolve()
 ENVIRON = __import__("os").environ
@@ -30,18 +30,7 @@ solution = Solution(**json.loads((HERE / "solution.json").read_text()))
 compile_options = solution.spec.compile_options
 
 
-def _active_rocm_root() -> Path | None:
-    """Resolve the installed ROCm tree from HIPCC rather than assuming /opt/rocm."""
-    hipcc = shutil.which("hipcc")
-    if hipcc is None:
-        return None
-    resolved = Path(hipcc).resolve()
-    # HIPCC normally lives at <ROCM_ROOT>/bin/hipcc.  Keep this defensive for
-    # distro wrappers that do not resolve into the ROCm installation.
-    return resolved.parent.parent if resolved.parent.name == "bin" else None
-
-
-ROCM_ROOT = _active_rocm_root()
+ROCM_ROOT = discover_rocm_root()
 if ROCM_ROOT is not None:
     ENVIRON.setdefault("CXX", str(ROCM_ROOT / "bin" / "hipcc"))
 
