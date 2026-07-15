@@ -5,6 +5,15 @@ Published evidence has a Git-tracked lifecycle index at
 superseded, and revoked authority slices; GitHub Releases are immutable distribution
 objects, not the source of lifecycle state.
 
+The current index contains no V5 authority slice.  Its `published` status is a
+revision-pinned distribution and clean-download verification state, not a
+claim that every historically published schema is current authority.  In
+particular, the gfx1200 V4 record remains published for immutable archive
+verification, but is historical ROCm 7.1 evidence: its non-V5 bounds are
+rejected by current authority readers and must not be cited as ROCm 7.2/V5
+authority.  A V5 publication will supersede it through the normal protected
+lifecycle transition.
+
 ## Permission boundary
 
 Publishing is deliberately split into two workflows:

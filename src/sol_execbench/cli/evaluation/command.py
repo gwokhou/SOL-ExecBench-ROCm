@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import os
-import shutil
 import subprocess
 from collections.abc import Callable, Mapping
 from pathlib import Path
@@ -21,6 +20,7 @@ from ...core.bench.rocm_profiler import (
     Rocprofv3ProfileResult,
     collect_rocprofv3_profile,
 )
+from ...core.platform.runtime import resolve_rocm_tool
 from ..sidecars.profile import _profile_output_directory
 from .diagnostics import (
     NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION,
@@ -103,7 +103,7 @@ def _run_profiled_evaluation(
         timeout_seconds=timeout,
     )
     if rocprofv3_available is None:
-        rocprofv3_available = shutil.which(ROCPROFV3_EXECUTABLE) is not None
+        rocprofv3_available = resolve_rocm_tool(ROCPROFV3_EXECUTABLE) is not None
     profile_result = profile_collector(
         request,
         rocprofv3_available=rocprofv3_available,

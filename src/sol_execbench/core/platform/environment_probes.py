@@ -19,7 +19,7 @@ from .environment_models import (
     ToolProbeResult,
     Which,
 )
-from .runtime import resolve_tool_path
+from .runtime import resolve_rocm_tool, resolve_tool_path
 from ..text_utils import text_tail
 
 
@@ -33,7 +33,18 @@ def probe_tool(
 ) -> ToolProbeResult:
     """Run one bounded environment probe."""
 
-    resolved_path = resolve_tool_path(tool, which=which)
+    # Environment doctor must use the same ROCm-root-aware lookup as the
+    # collectors.  ROCm packages are commonly installed under a versioned
+    # /opt/rocm-* root without adding every utility to PATH.
+    # A caller-supplied ``which`` represents a hermetic probe environment in
+    # tests and integrations; do not accidentally consult the host's /opt/rocm
+    # installation in that case. Normal environment doctor use retains full
+    # ROCm-root-aware discovery.
+    resolved_path = (
+        resolve_rocm_tool(tool, which=which)
+        if which is shutil.which
+        else resolve_tool_path(tool, which=which)
+    )
     path = str(resolved_path) if resolved_path is not None else None
     if path is None:
         return ToolProbeResult(
