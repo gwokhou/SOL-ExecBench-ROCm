@@ -1695,11 +1695,10 @@ def _is_classified_replacement_sidecar(path: Path) -> bool:
         return False
     if metadata.get("workload_slice_applied") is True:
         return False
-    return metadata.get("replacement_status") in {
-        "profiler_backed",
-        "partial_profiler_backed",
-        "profiler_blocked",
-    }
+    return (
+        metadata.get("replacement_status") == "profiler_backed"
+        and metadata.get("full_workload_coverage") is True
+    )
 
 
 def _full_workload_coverage(payload: dict[str, Any]) -> bool:
