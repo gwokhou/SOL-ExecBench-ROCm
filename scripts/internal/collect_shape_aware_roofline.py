@@ -163,6 +163,24 @@ def load_plan(path: Path) -> tuple[dict[str, Any], tuple[WorkloadTask, ...]]:
     return payload, tasks
 
 
+def select_tasks(
+    tasks: tuple[WorkloadTask, ...], excluded_workload_uuids: Iterable[str]
+) -> tuple[tuple[WorkloadTask, ...], tuple[WorkloadTask, ...]]:
+    """Select diagnostic tasks while retaining an auditable exclusion record."""
+    requested = tuple(excluded_workload_uuids)
+    if len(set(requested)) != len(requested):
+        raise ValueError("excluded workload UUIDs must be unique")
+    known = {task.workload_uuid for task in tasks}
+    unknown = sorted(set(requested) - known)
+    if unknown:
+        raise ValueError(f"excluded workload UUID is not in the plan: {unknown[0]}")
+    excluded = set(requested)
+    return (
+        tuple(task for task in tasks if task.workload_uuid not in excluded),
+        tuple(task for task in tasks if task.workload_uuid in excluded),
+    )
+
+
 def _int(value: object, field: str) -> int:
     try:
         result = int(str(value))
@@ -596,6 +614,12 @@ def main() -> int:
     parser.add_argument("--repetitions", type=int, default=7)
     parser.add_argument("--timeout-seconds", type=int, default=120)
     parser.add_argument("--max-workloads", type=int, default=None)
+    parser.add_argument("--exclude-workload", action="append", default=[])
+    parser.add_argument(
+        "--exclusion-reason",
+        default=None,
+        help="Required diagnostic reason when --exclude-workload is used.",
+    )
     args = parser.parse_args()
     if args.warmup < 1 or args.repetitions < 7 or args.timeout_seconds < 1:
         raise ValueError(
@@ -610,6 +634,11 @@ def main() -> int:
     if args.patch_id and not args.real_rocprofv3:
         raise ValueError("patched rocprofv3 requires --real-rocprofv3")
     plan, tasks = load_plan(args.plan)
+    tasks, excluded_tasks = select_tasks(tasks, args.exclude_workload)
+    if excluded_tasks and not args.exclusion_reason:
+        raise ValueError("--exclude-workload requires --exclusion-reason")
+    if args.exclusion_reason and not excluded_tasks:
+        raise ValueError("--exclusion-reason requires --exclude-workload")
     if args.max_workloads is not None:
         if args.max_workloads < 1:
             raise ValueError("max-workloads must be positive")
@@ -649,10 +678,14 @@ def main() -> int:
             row.update({"status": "failed", "reason": str(exc)})
         rows.append(row)
         print(json.dumps(row, sort_keys=True), flush=True)
-    complete = len(tasks) == plan["authority_workload_count"] and all(
-        row["status"] in {"collected", "resumed"}
-        and row.get("occupancy_status") == "measured"
-        for row in rows
+    complete = (
+        not excluded_tasks
+        and len(tasks) == plan["authority_workload_count"]
+        and all(
+            row["status"] in {"collected", "resumed"}
+            and row.get("occupancy_status") == "measured"
+            for row in rows
+        )
     )
     report: dict[str, Any] = {
         "schema_version": REPORT_SCHEMA_VERSION,
@@ -664,6 +697,18 @@ def main() -> int:
         "collection_status": "collected" if complete else "incomplete",
         "workloads": rows,
     }
+    if excluded_tasks:
+        report["excluded_workloads"] = [
+            {
+                "definition": task.definition,
+                "workload_uuid": task.workload_uuid,
+                "problem_id": task.problem_id,
+                "profile_keys": list(task.profile_keys),
+                "reason": args.exclusion_reason,
+                "authority_eligible": False,
+            }
+            for task in excluded_tasks
+        ]
     report["payload_sha256"] = _canonical_digest(report)
     report_path = args.output_root / "collection-report.json"
     report_path.write_text(

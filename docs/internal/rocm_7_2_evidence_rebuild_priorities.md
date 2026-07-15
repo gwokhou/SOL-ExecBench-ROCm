@@ -201,10 +201,12 @@ same OOM result.
 This item is **unverifiable on this host**.  The generated local blocker
 sidecar binds the incomplete report and sampling-plan checksums and explicitly
 sets `authority_eligible` to false.  It is not a waiver for the missing raw
-evidence: do not start the second collection, finalize the shape-aware
-artifact or model, or make a ROCm 7.2 authority claim until the workload has
-been collected on suitable hardware (or an independently justified provider
-change has been implemented and verified).
+evidence.  A user-authorized local diagnostic run may explicitly exclude this
+UUID and collect the other 563 workloads, but that report must remain
+`incomplete`; do not finalize the shape-aware artifact or model, or make a
+ROCm 7.2 authority claim.  Authority collection still requires suitable
+hardware (or an independently justified provider change that has been
+implemented and verified).
 
 ### 10. Collect complete shape-aware roofline evidence
 
