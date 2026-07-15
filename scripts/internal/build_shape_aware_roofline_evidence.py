@@ -17,7 +17,7 @@ import hashlib
 import json
 from math import ceil
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from sol_execbench.core.integrity.checksums import sha256_file
 from sol_execbench.core.scoring.hardware_calibration.models import (
@@ -127,7 +127,7 @@ def _occupancy(raw: dict[str, Any]) -> dict[str, int]:
     }
 
 
-def build_evidence(
+def _build_single_evidence(
     *,
     plan: dict[str, Any],
     report: dict[str, Any],
@@ -135,6 +135,7 @@ def build_evidence(
     verification_sha256: str,
     requirements_sha256: str,
     authority_coverage_sha256: str,
+    collection_report_sha256s: tuple[str, str],
 ) -> ShapeAwareRooflineArtifact:
     if report.get("collection_status") != "collected":
         raise ValueError("shape-aware collection report is incomplete")
@@ -169,13 +170,14 @@ def build_evidence(
             isinstance(item, str) for item in profiles
         ):
             raise ValueError("raw shape-aware profile keys are invalid")
-        identity = (
+        raw_identity = (
             raw.get("definition"),
             raw.get("workload_uuid"),
             raw.get("problem_id"),
         )
-        if not all(isinstance(value, str) and value for value in identity):
+        if not all(isinstance(value, str) and value for value in raw_identity):
             raise ValueError("raw shape-aware identity is invalid")
+        identity = cast(tuple[str, str, str], raw_identity)
         shape = raw.get("shape")
         launch = raw.get("launch")
         samples = raw.get("samples_ms")
@@ -217,6 +219,7 @@ def build_evidence(
         requirements_sha256=requirements_sha256,
         authority_coverage_sha256=authority_coverage_sha256,
         plan_payload_sha256=plan["payload_sha256"],
+        collection_report_sha256s=collection_report_sha256s,
         bucketing_dimensions=("shape", "layout", "launch", "occupancy"),
         cases=tuple(cases),
         collection_status="collected",
@@ -224,10 +227,63 @@ def build_evidence(
     )
 
 
+def _raw_evidence_by_assignment(
+    artifact: ShapeAwareRooflineArtifact,
+) -> dict[tuple[str, str, str, str], str]:
+    assignments: dict[tuple[str, str, str, str], str] = {}
+    for case in artifact.cases:
+        for definition, workload_uuid, problem_id in case.covered_workloads:
+            key = (case.profile_key, definition, workload_uuid, problem_id)
+            if key in assignments:
+                raise ValueError("shape-aware collection duplicates a plan assignment")
+            assignments[key] = case.raw_evidence_sha256
+    return assignments
+
+
+def build_evidence(
+    *,
+    plan: dict[str, Any],
+    reports: tuple[dict[str, Any], dict[str, Any]],
+    primary_sha256: str,
+    verification_sha256: str,
+    requirements_sha256: str,
+    authority_coverage_sha256: str,
+    collection_report_sha256s: tuple[str, str],
+) -> ShapeAwareRooflineArtifact:
+    """Require two independent, complete raw collections for every assignment."""
+    if len(set(collection_report_sha256s)) != 2:
+        raise ValueError("shape-aware collection reports must be independent")
+    primary = _build_single_evidence(
+        plan=plan,
+        report=reports[0],
+        primary_sha256=primary_sha256,
+        verification_sha256=verification_sha256,
+        requirements_sha256=requirements_sha256,
+        authority_coverage_sha256=authority_coverage_sha256,
+        collection_report_sha256s=collection_report_sha256s,
+    )
+    verification = _build_single_evidence(
+        plan=plan,
+        report=reports[1],
+        primary_sha256=primary_sha256,
+        verification_sha256=verification_sha256,
+        requirements_sha256=requirements_sha256,
+        authority_coverage_sha256=authority_coverage_sha256,
+        collection_report_sha256s=collection_report_sha256s,
+    )
+    primary_raw = _raw_evidence_by_assignment(primary)
+    verification_raw = _raw_evidence_by_assignment(verification)
+    if primary_raw.keys() != verification_raw.keys():
+        raise ValueError("shape-aware collections do not cover the same assignments")
+    if any(primary_raw[key] == verification_raw[key] for key in primary_raw):
+        raise ValueError("shape-aware collections reuse raw evidence")
+    return primary
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--plan", required=True, type=Path)
-    parser.add_argument("--collection-report", required=True, type=Path)
+    parser.add_argument("--collection-report", action="append", type=Path)
     parser.add_argument("--primary-calibration", required=True, type=Path)
     parser.add_argument("--verification-calibration", required=True, type=Path)
     parser.add_argument("--requirements", required=True, type=Path)
@@ -235,19 +291,34 @@ def main() -> int:
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
     plan = _checked_payload(args.plan, _PLAN_SCHEMA)
-    report = _checked_payload(args.collection_report, _REPORT_SCHEMA)
+    if args.collection_report is None or len(args.collection_report) != 2:
+        raise ValueError("exactly two --collection-report paths are required")
+    report_paths = tuple(args.collection_report)
+    if report_paths[0] == report_paths[1]:
+        raise ValueError("collection report paths must identify independent runs")
+    reports = tuple(_checked_payload(path, _REPORT_SCHEMA) for path in report_paths)
     primary = hardware_calibration_artifact_from_dict(_load(args.primary_calibration))
     verification = hardware_calibration_artifact_from_dict(
         _load(args.verification_calibration)
     )
     requirements = hardware_profile_requirements_from_dict(_load(args.requirements))
+    if (
+        primary.payload_sha256 is None
+        or verification.payload_sha256 is None
+        or requirements.payload_sha256 is None
+    ):
+        raise ValueError("calibration or requirements payload checksum is missing")
     evidence = build_evidence(
         plan=plan,
-        report=report,
+        reports=(reports[0], reports[1]),
         primary_sha256=primary.payload_sha256,
         verification_sha256=verification.payload_sha256,
         requirements_sha256=requirements.payload_sha256,
         authority_coverage_sha256=sha256_file(args.authority_coverage),
+        collection_report_sha256s=(
+            sha256_file(report_paths[0]),
+            sha256_file(report_paths[1]),
+        ),
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(

@@ -342,6 +342,7 @@ class ShapeAwareRooflineArtifact:
     requirements_sha256: str
     authority_coverage_sha256: str
     plan_payload_sha256: str
+    collection_report_sha256s: tuple[str, str]
     bucketing_dimensions: tuple[str, ...]
     cases: tuple[ShapeAwareRooflineCase, ...]
     collection_status: str
@@ -366,6 +367,14 @@ class ShapeAwareRooflineArtifact:
         _checksum(self.requirements_sha256, "requirements_sha256")
         _checksum(self.authority_coverage_sha256, "authority_coverage_sha256")
         _checksum(self.plan_payload_sha256, "plan_payload_sha256")
+        if len(self.collection_report_sha256s) != 2:
+            raise ValueError("two independent collection report checksums are required")
+        if len(set(self.collection_report_sha256s)) != 2:
+            raise ValueError(
+                "collection report checksums must identify independent runs"
+            )
+        for index, value in enumerate(self.collection_report_sha256s):
+            _checksum(value, f"collection_report_sha256s[{index}]")
         if len(self.bucketing_dimensions) != len(_DIMENSIONS) or set(
             self.bucketing_dimensions
         ) != set(_DIMENSIONS):
@@ -398,6 +407,7 @@ class ShapeAwareRooflineArtifact:
             "requirements_sha256": self.requirements_sha256,
             "authority_coverage_sha256": self.authority_coverage_sha256,
             "plan_payload_sha256": self.plan_payload_sha256,
+            "collection_report_sha256s": list(self.collection_report_sha256s),
             "bucketing_dimensions": list(self.bucketing_dimensions),
             "cases": [case.to_dict() for case in self.cases],
             "collection_status": self.collection_status,
@@ -424,6 +434,7 @@ def shape_aware_roofline_from_dict(
         "requirements_sha256",
         "authority_coverage_sha256",
         "plan_payload_sha256",
+        "collection_report_sha256s",
         "bucketing_dimensions",
         "cases",
         "collection_status",
@@ -514,13 +525,20 @@ def shape_aware_roofline_from_dict(
             )
         )
     raw_calibrations = payload["calibration_sha256s"]
+    raw_reports = payload["collection_report_sha256s"]
     dimensions = payload["bucketing_dimensions"]
-    if not isinstance(raw_calibrations, list) or not isinstance(dimensions, list):
+    if (
+        not isinstance(raw_calibrations, list)
+        or not isinstance(raw_reports, list)
+        or not isinstance(dimensions, list)
+    ):
         raise ValueError(
             "shape-aware roofline checksum and dimension fields must be lists"
         )
     if len(raw_calibrations) != 2:
         raise ValueError("two independent calibration checksums are required")
+    if len(raw_reports) != 2:
+        raise ValueError("two independent collection report checksums are required")
     return ShapeAwareRooflineArtifact(
         schema_version=_non_empty(payload["schema_version"], "schema_version"),
         generated_at=_non_empty(payload["generated_at"], "generated_at"),
@@ -537,6 +555,10 @@ def shape_aware_roofline_from_dict(
         ),
         plan_payload_sha256=_checksum(
             payload["plan_payload_sha256"], "plan_payload_sha256"
+        ),
+        collection_report_sha256s=(
+            _checksum(raw_reports[0], "collection_report_sha256s[0]"),
+            _checksum(raw_reports[1], "collection_report_sha256s[1]"),
         ),
         bucketing_dimensions=tuple(
             _non_empty(item, "bucketing_dimensions") for item in dimensions
