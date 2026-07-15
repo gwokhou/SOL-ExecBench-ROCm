@@ -347,10 +347,10 @@ upgrade or invalidate the deferred MI300X full-suite status. Passing CDNA3
 marker-gated tests on MI308X/gfx942 is validation-infrastructure evidence for
 that recorded sibling product, not a full MI300X hardware-validation pass.
 
-For Matrix evidence, the current host ROCm 7.1.x environment may be recorded as
+For Matrix evidence, the current host ROCm 7.2.x environment may be recorded as
 observed evidence through compatibility sidecars. ROCm 7.0.x or
-ROCm 7.2.x native-host validation requires a matching host or separate machine;
-default validation does not require host reinstall for ROCm 7.0.x or ROCm 7.2.x.
+ROCm 7.1.x native-host validation requires a matching host or separate machine;
+default validation does not require host reinstall for ROCm 7.0.x or ROCm 7.1.x.
 Docker rows for those Targets remain container ROCm user-space evidence on the
 recorded host driver/devices unless direct native-host evidence is archived.
 
@@ -369,8 +369,8 @@ readiness.
 | Target id | Local image tag | Requested ROCm user-space | Evidence summary |
 | --- | --- | --- | --- |
 | `rocm-7.0.2-ubuntu-24.04-container` | `sol-execbench:rocm-7.0.2-complete` | 7.0.2 | `linear_backward` passed 3/3 workloads with `--record-container-validation`; generated trace and compatibility sidecar artifacts record container_validated evidence, but `CLOCKS_LOCKED=0` leaves performance unlocked. |
-| `rocm-7.1.1-ubuntu-24.04-container` | `sol-execbench:rocm-7.1.1-complete` | 7.1.1 | Default target with project-default target-specific PyTorch ROCm dependencies and `CLOCKS_LOCKED=1` when the recorded container-validation path succeeds. |
-| `rocm-7.2.0-ubuntu-24.04-container` | `sol-execbench:rocm-7.2-complete` | 7.2.0 | `linear_backward` passed 3/3 workloads with generated trace and compatibility sidecar artifacts; `CLOCKS_LOCKED=1` was recorded for official wrapper evidence. |
+| `rocm-7.1.1-ubuntu-24.04-container` | `sol-execbench:rocm-7.1.1-complete` | 7.1.1 | Historical declared target with target-specific PyTorch ROCm dependencies. |
+| `rocm-7.2.0-ubuntu-24.04-container` | `sol-execbench:rocm-7.2-complete` | 7.2.0 | Default target with project-default PyTorch ROCm dependencies; `linear_backward` passed 3/3 workloads with generated trace and compatibility sidecar artifacts. |
 
 Key interpretation points:
 
@@ -469,9 +469,9 @@ Live ROCm validation is marker-gated: use `requires_rocm`, `requires_rdna4`,
 or `requires_cdna3` to select hardware-sensitive checks. The marker contract is
 covered by `tests/sol_execbench/test_cdna3_hardware_marker.py`. RDNA4 smoke
 coverage is not full MI300X hardware-validation evidence, and RDNA4 is not a
-`gfx94*` validation target. The current host ROCm 7.1.x environment is the
+`gfx94*` validation target. The current host ROCm 7.2.x environment is the
 recorded default; default validation does not require host reinstall. ROCm 7.0.x
-or ROCm 7.2.x native-host validation requires a matching host.
+or ROCm 7.1.x native-host validation requires a matching host.
 
 ## BF16 matrix-probe calibration
 

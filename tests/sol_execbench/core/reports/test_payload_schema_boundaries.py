@@ -36,6 +36,7 @@ RAW_PAYLOAD_ARTIFACT_BOUNDARIES = {
     "sol_execbench.core.scoring.fusion_validation.parsing",
     "sol_execbench.core.scoring.full_suite",
     "sol_execbench.core.scoring.hardware_calibration.models",
+    "sol_execbench.core.scoring.hardware_calibration.shape_aware_roofline",
     "sol_execbench.core.scoring.release_baseline.authority",
     "sol_execbench.core.scoring.release_baseline.publication",
     "sol_execbench.core.scoring.representative_suite",

@@ -141,7 +141,9 @@ def run_probe(command: list[str], timeout_seconds: float) -> ProbeCompletedProce
 
 
 def parse_probe_output(output: str) -> dict[str, Any]:
-    gfx_targets = sorted(set(re.findall(r"\bgfx[0-9a-fA-F]+\b", output)))
+    # ROCm 7.2 emits generic labels such as ``gfx12`` in addition to concrete
+    # ISA targets.  Only the latter identify a device architecture.
+    gfx_targets = sorted(set(re.findall(r"\bgfx[0-9a-fA-F]{3,}\b", output)))
     parsed: dict[str, Any] = {}
     if gfx_targets:
         parsed["gfx_targets"] = gfx_targets

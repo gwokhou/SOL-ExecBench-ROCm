@@ -83,7 +83,7 @@ def test_preflight_records_requested_image_and_nullable_digest() -> None:
 
     assert result.entry.observed.container is not None
     assert result.entry.observed.container.image_repository == ("rocm/dev-ubuntu-24.04")
-    assert result.entry.observed.container.image_tag == "7.1.1-complete"
+    assert result.entry.observed.container.image_tag == "7.2-complete"
     assert result.entry.observed.container.image_digest is None
 
 
@@ -110,10 +110,10 @@ def test_preflight_result_payload_contains_build_args_and_decision_flags() -> No
 
     assert payload["target_id"]
     assert payload["image_repository"] == "rocm/dev-ubuntu-24.04"
-    assert payload["image_tag"] == "7.1.1-complete"
+    assert payload["image_tag"] == "7.2-complete"
     assert payload["image_digest"] is None
     assert payload["build_args"]["ROCM_DOCKER_IMAGE"] == "rocm/dev-ubuntu-24.04"
-    assert payload["build_args"]["ROCM_DOCKER_TAG"] == "7.1.1-complete"
+    assert payload["build_args"]["ROCM_DOCKER_TAG"] == "7.2-complete"
     assert payload["status"] == "runtime_unavailable"
     assert payload["reason_code"] == "rocm_runtime_unavailable"
     assert payload["benchmark_allowed"] is False
@@ -155,10 +155,10 @@ def test_module_main_emits_preflight_json_from_explicit_observations() -> None:
     assert payload["target_id"]
     assert payload["validation_scope"] == "container_user_space"
     assert payload["image_repository"] == "rocm/dev-ubuntu-24.04"
-    assert payload["image_tag"] == "7.1.1-complete"
+    assert payload["image_tag"] == "7.2-complete"
     assert payload["image_digest"] is None
     assert payload["build_args"]["ROCM_DOCKER_IMAGE"] == "rocm/dev-ubuntu-24.04"
-    assert payload["build_args"]["ROCM_DOCKER_TAG"] == "7.1.1-complete"
+    assert payload["build_args"]["ROCM_DOCKER_TAG"] == "7.2-complete"
     assert payload["status"] == "runtime_unavailable"
     assert payload["reason_code"] == "rocm_runtime_unavailable"
     assert payload["benchmark_allowed"] is False

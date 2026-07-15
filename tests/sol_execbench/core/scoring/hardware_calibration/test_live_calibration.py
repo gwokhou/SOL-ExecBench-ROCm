@@ -8,6 +8,7 @@ import pytest
 from click.testing import CliRunner
 
 from sol_execbench.cli.main import cli
+from sol_execbench.core.bench.clock_lock import probe_clock_lock_available
 from sol_execbench.cli.commands.hardware_model import _validate_calibration_authority
 from sol_execbench.core.scoring.hardware_calibration.environment import discover_gpu
 from sol_execbench.core.scoring.hardware_calibration.builder import (
@@ -26,6 +27,9 @@ from sol_execbench.core.scoring.hardware_calibration.models import (
 
 @pytest.mark.requires_rdna4
 def test_live_rdna4_wmma_calibration_is_measured() -> None:
+    if not probe_clock_lock_available():
+        pytest.skip("requires passwordless amd-smi clock locking")
+
     environment = discover_gpu(0)
     artifact = run_calibration(
         CalibrationRequest(environment=environment, require_clock_lock=True)

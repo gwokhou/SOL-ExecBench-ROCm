@@ -17,21 +17,19 @@ pytestmark = [pytest.mark.requires_linux, pytest.mark.subprocess_uv]
 
 def _matching_default_dependency_env() -> dict[str, str]:
     return {
-        "SOL_EXECBENCH_DEPENDENCY_TORCH_DISTRIBUTION_VERSION": "2.10.0+rocm7.1",
-        "SOL_EXECBENCH_DEPENDENCY_TORCH_VERSION": "2.10.0+rocm7.1",
-        "SOL_EXECBENCH_DEPENDENCY_TORCH_LOCAL_VERSION": "rocm7.1",
-        "SOL_EXECBENCH_DEPENDENCY_TORCH_ROCM_TARGET": "rocm7.1",
-        "SOL_EXECBENCH_DEPENDENCY_TORCH_HIP_VERSION": "7.1.0",
+        "SOL_EXECBENCH_DEPENDENCY_TORCH_DISTRIBUTION_VERSION": "2.11.0+rocm7.2",
+        "SOL_EXECBENCH_DEPENDENCY_TORCH_VERSION": "2.11.0+rocm7.2",
+        "SOL_EXECBENCH_DEPENDENCY_TORCH_LOCAL_VERSION": "rocm7.2",
+        "SOL_EXECBENCH_DEPENDENCY_TORCH_ROCM_TARGET": "rocm7.2",
+        "SOL_EXECBENCH_DEPENDENCY_TORCH_HIP_VERSION": "7.2.0",
         "SOL_EXECBENCH_DEPENDENCY_TORCH_CUDA_VERSION": "none",
         "SOL_EXECBENCH_DEPENDENCY_TORCH_DEVICE_AVAILABLE": "true",
-        "SOL_EXECBENCH_DEPENDENCY_TORCHVISION_DISTRIBUTION_VERSION": (
-            "0.25.0+rocm7.1"
-        ),
+        "SOL_EXECBENCH_DEPENDENCY_TORCHVISION_DISTRIBUTION_VERSION": ("0.26.0+rocm7.2"),
         "SOL_EXECBENCH_DEPENDENCY_TRITON_ROCM_DISTRIBUTION_VERSION": "3.6.0",
         "SOL_EXECBENCH_DEPENDENCY_TRITON_ROCM_STATUS": "installed",
-        "SOL_EXECBENCH_DEPENDENCY_CONTAINER_ROCM_USER_SPACE_VERSION": "7.1.1",
-        "SOL_EXECBENCH_DEPENDENCY_HIPCC_VERSION": "HIP version: 7.1.1",
-        "SOL_EXECBENCH_DEPENDENCY_TOOLCHAIN_ROCM_VERSION": "7.1.1",
+        "SOL_EXECBENCH_DEPENDENCY_CONTAINER_ROCM_USER_SPACE_VERSION": "7.2.0",
+        "SOL_EXECBENCH_DEPENDENCY_HIPCC_VERSION": "HIP version: 7.2.0",
+        "SOL_EXECBENCH_DEPENDENCY_TOOLCHAIN_ROCM_VERSION": "7.2.0",
     }
 
 
@@ -44,7 +42,7 @@ def _host_preflight_env() -> dict[str, str]:
         "SOL_EXECBENCH_DEV_DRI_PRESENT": "true",
         "SOL_EXECBENCH_DEV_DRI_ACCESSIBLE": "true",
         "SOL_EXECBENCH_GPU_ACCESSIBLE": "true",
-        "SOL_EXECBENCH_HOST_ROCM_VERSION": "7.1.1",
+        "SOL_EXECBENCH_HOST_ROCM_VERSION": "7.2.0",
         "SOL_EXECBENCH_HOST_DRIVER_VERSION": "6.14.0",
         "SOL_EXECBENCH_RUNTIME_DEVICE_COUNT": "1",
         "SOL_EXECBENCH_RUNTIME_DEVICE_NAME": "AMD Radeon",
@@ -104,15 +102,15 @@ def test_explicit_entry_sidecar_records_scoped_evidence(tmp_path: Path) -> None:
     assert completed.returncode != 0
     payload = json.loads(entry_path.read_text())
     assert payload["status"] == "not_tested"
-    assert payload["observed"]["host"]["rocm_version"] == "7.1.1"
-    assert payload["observed"]["container"]["image_tag"] == "7.1.1-complete"
+    assert payload["observed"]["host"]["rocm_version"] == "7.2.0"
+    assert payload["observed"]["container"]["image_tag"] == "7.2-complete"
     assert payload["observed"]["python_dependency"]["torch_version"] == (
-        "2.10.0+rocm7.1"
+        "2.11.0+rocm7.2"
     )
     assert payload["observed"]["dependency_policy"]["expected_local_version"] == (
-        "rocm7.1"
+        "rocm7.2"
     )
-    assert payload["observed"]["toolchain"]["toolchain_rocm_version"] == "7.1.1"
+    assert payload["observed"]["toolchain"]["toolchain_rocm_version"] == "7.2.0"
     assert payload["observed"]["gpu"]["gfx_architecture"] == "gfx1200"
     assert payload["observed"]["gpu"]["visible_device_environment"] == {
         "HIP_VISIBLE_DEVICES": "0"
@@ -125,13 +123,13 @@ def test_explicit_matrix_aggregates_mixed_dependency_sidecar(tmp_path: Path) -> 
     completed = _run_docker(
         "--preflight-only",
         "--target",
-        "rocm-7.2.0-ubuntu-24.04-container",
+        "rocm-7.1.1-ubuntu-24.04-container",
         "--compatibility-matrix",
         str(matrix_path),
         **{
             **_matching_default_dependency_env(),
-            "SOL_EXECBENCH_DEPENDENCY_CONTAINER_ROCM_USER_SPACE_VERSION": "7.2.0",
-            "SOL_EXECBENCH_DEPENDENCY_TOOLCHAIN_ROCM_VERSION": "7.2.0",
+            "SOL_EXECBENCH_DEPENDENCY_CONTAINER_ROCM_USER_SPACE_VERSION": "7.1.1",
+            "SOL_EXECBENCH_DEPENDENCY_TOOLCHAIN_ROCM_VERSION": "7.1.1",
             **_host_preflight_env(),
         },
     )

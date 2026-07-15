@@ -143,8 +143,8 @@ current evaluator contract capability `runtime.evidence`.
     "environment": {
       "hardware": "AMD Radeon Graphics gfx1200",
       "libs": {
-        "torch": "2.10.0+rocm7.1",
-        "hip": "7.1.25424",
+        "torch": "2.11.0+rocm7.2",
+        "hip": "7.2.26015",
         "triton": "3.6.0"
       }
     },

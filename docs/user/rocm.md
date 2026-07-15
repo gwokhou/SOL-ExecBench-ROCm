@@ -1,7 +1,7 @@
 # ROCm Setup
 
 This port targets ROCm 7.0 or newer. The current dependency lock uses PyTorch
-ROCm 7.1 wheels.
+ROCm 7.2 wheels.
 
 ## Host Requirements
 
@@ -126,8 +126,8 @@ requires the native Linux Docker daemon. It runs containers with:
 - `--ipc=host`
 
 The default declared target is based on
-`rocm/dev-ubuntu-24.04:7.1.1-complete` and builds the local image as
-`sol-execbench:rocm-7.1.1-complete`. The image installs the project into
+`rocm/dev-ubuntu-24.04:7.2-complete` and builds the local image as
+`sol-execbench:rocm-7.2-complete`. The image installs the project into
 `/venv`. Non-default declared targets keep the same wrapper flow but pass
 target-specific Docker build arguments for the PyTorch ROCm wheel stack, such
 as `torch==2.10.0+rocm7.0` for ROCm 7.0 and `torch==2.11.0+rocm7.2` for ROCm

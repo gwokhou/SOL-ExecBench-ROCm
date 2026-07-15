@@ -46,13 +46,13 @@ def test_manifest_records_dependency_policy_for_every_declared_target() -> None:
     manifest = load_docker_target_manifest(MANIFEST_PATH)
     policy_ids: set[str] = set()
 
-    assert manifest.default_target_id == "rocm-7.1.1-ubuntu-24.04-container"
+    assert manifest.default_target_id == "rocm-7.2.0-ubuntu-24.04-container"
     assert (
         manifest.targets_by_id[manifest.default_target_id].docker_image_repository
         == "rocm/dev-ubuntu-24.04"
     )
     assert manifest.targets_by_id[manifest.default_target_id].docker_image_tag == (
-        "7.1.1-complete"
+        "7.2-complete"
     )
     for target in manifest.targets:
         policy = load_docker_target_dependency_policy(target)
@@ -69,18 +69,18 @@ def test_manifest_records_dependency_policy_for_every_declared_target() -> None:
         assert policy.triton_rocm_index_url == "https://download.pytorch.org/whl/"
 
 
-def test_default_target_policy_preserves_rocm_7_1_project_default() -> None:
+def test_default_target_policy_matches_rocm_7_2_project_default() -> None:
     selection = select_docker_target(None, manifest_path=MANIFEST_PATH)
     policy = load_docker_target_dependency_policy(selection.target)
 
-    assert selection.target_id == "rocm-7.1.1-ubuntu-24.04-container"
+    assert selection.target_id == "rocm-7.2.0-ubuntu-24.04-container"
     assert selection.target.docker_image_repository == "rocm/dev-ubuntu-24.04"
-    assert selection.target.docker_image_tag == "7.1.1-complete"
-    assert policy.torch_version == "2.10.0+rocm7.1"
-    assert policy.torchvision_version == "0.25.0+rocm7.1"
-    assert policy.expected_local_version == "rocm7.1"
-    assert policy.uv_index_name == "pytorch-rocm71"
-    assert policy.uv_index_url == "https://download.pytorch.org/whl/rocm7.1"
+    assert selection.target.docker_image_tag == "7.2-complete"
+    assert policy.torch_version == "2.11.0+rocm7.2"
+    assert policy.torchvision_version == "0.26.0+rocm7.2"
+    assert policy.expected_local_version == "rocm7.2"
+    assert policy.uv_index_name == "pytorch-rocm72"
+    assert policy.uv_index_url == "https://download.pytorch.org/whl/rocm7.2"
     assert policy.lock_strategy == "project_default"
     assert policy.triton_rocm_version == "3.6.0"
     assert policy.triton_rocm_index_name == "pytorch-rocm-root"
@@ -109,18 +109,18 @@ def test_non_default_target_policies_record_explicit_workflows() -> None:
     assert rocm_72.uv_index_url == "https://download.pytorch.org/whl/rocm7.2"
 
 
-def test_default_project_dependency_path_remains_rocm_7_1() -> None:
+def test_default_project_dependency_path_matches_rocm_7_2() -> None:
     pyproject = PYPROJECT_PATH.read_text()
     uv_lock = UV_LOCK_PATH.read_text()
 
-    assert "torch==2.10.0+rocm7.1" in pyproject
-    assert "torchvision==0.25.0+rocm7.1" in pyproject
+    assert "torch==2.11.0+rocm7.2" in pyproject
+    assert "torchvision==0.26.0+rocm7.2" in pyproject
     assert "triton-rocm==3.6.0" in pyproject
-    assert "https://download.pytorch.org/whl/rocm7.1" in pyproject
+    assert "https://download.pytorch.org/whl/rocm7.2" in pyproject
     assert "https://download.pytorch.org/whl/" in pyproject
-    assert "pytorch-rocm71" in pyproject
+    assert "pytorch-rocm72" in pyproject
     assert "pytorch-rocm-root" in pyproject
-    assert "https://download.pytorch.org/whl/rocm7.1" in uv_lock
+    assert "https://download.pytorch.org/whl/rocm7.2" in uv_lock
     assert "https://download.pytorch.org/whl/" in uv_lock
 
 
@@ -170,9 +170,9 @@ def test_matrix_entry_payload_records_dependency_policy() -> None:
 
     assert payload["observed"]["dependency_policy"] == {
         "policy_id": policy.policy_id,
-        "expected_local_version": "rocm7.1",
-        "uv_index_name": "pytorch-rocm71",
-        "uv_index_url": "https://download.pytorch.org/whl/rocm7.1",
+        "expected_local_version": "rocm7.2",
+        "uv_index_name": "pytorch-rocm72",
+        "uv_index_url": "https://download.pytorch.org/whl/rocm7.2",
         "lock_strategy": "project_default",
         "suggested_uv_command": policy.suggested_uv_command,
         "triton_rocm_version": "3.6.0",

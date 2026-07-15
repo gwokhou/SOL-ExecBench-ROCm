@@ -30,11 +30,11 @@ def test_dockerfile_declares_rocm_base_args_before_first_from() -> None:
     pre_from_lines = lines[:first_from_index]
 
     assert "ARG ROCM_DOCKER_IMAGE=rocm/dev-ubuntu-24.04" in pre_from_lines
-    assert "ARG ROCM_DOCKER_TAG=7.1.1-complete" in pre_from_lines
-    assert "ARG PYTORCH_TORCH_VERSION=2.10.0+rocm7.1" in pre_from_lines
-    assert "ARG PYTORCH_TORCHVISION_VERSION=0.25.0+rocm7.1" in pre_from_lines
+    assert "ARG ROCM_DOCKER_TAG=7.2-complete" in pre_from_lines
+    assert "ARG PYTORCH_TORCH_VERSION=2.11.0+rocm7.2" in pre_from_lines
+    assert "ARG PYTORCH_TORCHVISION_VERSION=0.26.0+rocm7.2" in pre_from_lines
     assert (
-        "ARG PYTORCH_ROCM_INDEX_URL=https://download.pytorch.org/whl/rocm7.1"
+        "ARG PYTORCH_ROCM_INDEX_URL=https://download.pytorch.org/whl/rocm7.2"
         in pre_from_lines
     )
     assert lines[first_from_index] == (
@@ -131,19 +131,19 @@ def test_run_docker_host_helpers_use_uv_managed_python() -> None:
 
 @pytest.mark.requires_linux
 @pytest.mark.subprocess_uv
-def test_run_docker_default_build_preview_uses_rocm_7_1_build_args() -> None:
+def test_run_docker_default_build_preview_uses_rocm_7_2_build_args() -> None:
     completed = _run_docker_preview("--build")
 
     assert completed.returncode == 0, completed.stderr
-    assert "docker build -t sol-execbench:rocm-7.1.1-complete" in completed.stdout
+    assert "docker build -t sol-execbench:rocm-7.2-complete" in completed.stdout
     assert '--build-arg ROCM_DOCKER_IMAGE="rocm/dev-ubuntu-24.04"' in completed.stdout
-    assert '--build-arg ROCM_DOCKER_TAG="7.1.1-complete"' in completed.stdout
-    assert '--build-arg PYTORCH_TORCH_VERSION="2.10.0+rocm7.1"' in completed.stdout
+    assert '--build-arg ROCM_DOCKER_TAG="7.2-complete"' in completed.stdout
+    assert '--build-arg PYTORCH_TORCH_VERSION="2.11.0+rocm7.2"' in completed.stdout
     assert (
-        '--build-arg PYTORCH_TORCHVISION_VERSION="0.25.0+rocm7.1"' in completed.stdout
+        '--build-arg PYTORCH_TORCHVISION_VERSION="0.26.0+rocm7.2"' in completed.stdout
     )
     assert (
-        '--build-arg PYTORCH_ROCM_INDEX_URL="https://download.pytorch.org/whl/rocm7.1"'
+        '--build-arg PYTORCH_ROCM_INDEX_URL="https://download.pytorch.org/whl/rocm7.2"'
         in completed.stdout
     )
     assert '--build-arg TRITON_ROCM_VERSION="3.6.0"' in completed.stdout
@@ -219,7 +219,7 @@ def test_run_docker_target_flag_is_not_forwarded_to_docker_args_or_command() -> 
     )
     assert "--name matrix-test" in run_line
     assert "echo inside-container" in run_line
-    assert "sol-execbench:rocm-7.1.1-complete" in run_line
+    assert "sol-execbench:rocm-7.2-complete" in run_line
     assert "--target" not in run_line
 
 
@@ -267,11 +267,11 @@ def test_run_docker_preflight_only_emits_runtime_unavailable_diagnostics() -> No
     assert payload["reason_code"] == "rocm_runtime_unavailable"
     assert payload["target_id"]
     assert payload["image_repository"] == "rocm/dev-ubuntu-24.04"
-    assert payload["image_tag"] == "7.1.1-complete"
+    assert payload["image_tag"] == "7.2-complete"
     assert "image_digest" in payload
     assert payload["image_digest"] is None
     assert payload["build_args"]["ROCM_DOCKER_IMAGE"] == "rocm/dev-ubuntu-24.04"
-    assert payload["build_args"]["ROCM_DOCKER_TAG"] == "7.1.1-complete"
+    assert payload["build_args"]["ROCM_DOCKER_TAG"] == "7.2-complete"
     assert payload["benchmark_allowed"] is False
     assert payload["score_authority"] is False
     assert payload["paper_parity_authority"] is False

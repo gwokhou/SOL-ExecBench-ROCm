@@ -41,12 +41,12 @@ def test_rocm_dependency_sources():
         assert all(forbidden not in dep for dep in dependencies), forbidden
 
     indexes = data["tool"]["uv"]["index"]
-    assert any(idx["name"] == "pytorch-rocm71" for idx in indexes)
-    rocm_index = next(idx for idx in indexes if idx["name"] == "pytorch-rocm71")
+    assert any(idx["name"] == "pytorch-rocm72" for idx in indexes)
+    rocm_index = next(idx for idx in indexes if idx["name"] == "pytorch-rocm72")
     assert rocm_index["url"] == "https://download.pytorch.org/whl/rocm7.2"
     assert rocm_index["explicit"] is True
 
     sources = data["tool"]["uv"]["sources"]
     for package in ("torch", "torchvision"):
         assert package in sources
-        assert any(src["index"] == "pytorch-rocm71" for src in sources[package])
+        assert any(src["index"] == "pytorch-rocm72" for src in sources[package])

@@ -431,8 +431,8 @@ schemas. The artifact exists to make AMD-native score inputs auditable:
   movement bytes, confidence, rationale, and warnings.
 - `fusion_groups` and `group_bounds`: fusion-aware compute/memory lower-bound
   evidence, confidence, and rationale.
-- `theoretical_lower_bound`: the sole score-eligibility state and theoretical
-  `T_SOL` floor for the workload.
+- `aggregate_bound`: the sole score-eligibility state and conservative
+  end-to-end `T_SOL` floor for the workload.
 - `performance_diagnostics`: provider and fastest-known measurements that are
   explicitly excluded from score authority.
 - `coverage_summary`: supported, inexact, and unsupported counts by operation
@@ -464,7 +464,7 @@ B200 or Blackwell equivalence, hosted leaderboard readiness, or new
 real-hardware validation.
 
 Use these artifacts as auditable AMD ROCm derived evidence. Do not present
-`coverage_summary`, `theoretical_lower_bound`, `derived_evidence_refs`, or score
+`coverage_summary`, `aggregate_bound`, `derived_evidence_refs`, or score
 eligibility as proof of original-paper parity, upstream SOLAR parity, Blackwell
 or B200 equivalence, leaderboard readiness, or benchmark-scale hardware
 validation.

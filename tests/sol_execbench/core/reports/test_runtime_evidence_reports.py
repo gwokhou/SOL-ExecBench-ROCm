@@ -28,25 +28,25 @@ MANIFEST_PATH = REPO_ROOT / "docker" / "rocm-targets.json"
 
 def _target():
     return load_docker_target_manifest(MANIFEST_PATH).targets_by_id[
-        "rocm-7.1.1-ubuntu-24.04-container"
+        "rocm-7.2.0-ubuntu-24.04-container"
     ]
 
 
 def _matching_observation():
     return build_dependency_observation(
-        torch_distribution_version="2.10.0+rocm7.1",
-        torch_version="2.10.0+rocm7.1",
-        torch_local_version="rocm7.1",
-        torch_rocm_target="rocm7.1",
-        torch_hip_version="7.1.0",
+        torch_distribution_version="2.11.0+rocm7.2",
+        torch_version="2.11.0+rocm7.2",
+        torch_local_version="rocm7.2",
+        torch_rocm_target="rocm7.2",
+        torch_hip_version="7.2.0",
         torch_cuda_version=None,
         torch_device_available=True,
-        torchvision_distribution_version="0.25.0+rocm7.1",
+        torchvision_distribution_version="0.26.0+rocm7.2",
         triton_rocm_distribution_version="3.6.0",
         triton_rocm_status="installed",
-        container_rocm_user_space_version="7.1.1",
-        hipcc_version="HIP version: 7.1.1",
-        toolchain_rocm_version="7.1.1",
+        container_rocm_user_space_version="7.2.0",
+        hipcc_version="HIP version: 7.2.0",
+        toolchain_rocm_version="7.2.0",
     )
 
 
@@ -57,18 +57,18 @@ def test_dependency_observation_preserves_auto_collected_container_versions(
         runtime_evidence,
         "collect_pytorch_dependency_observation",
         lambda: build_dependency_observation(
-            torch_distribution_version="2.10.0+rocm7.1",
-            container_rocm_user_space_version="7.1.1",
-            hipcc_version="HIP version: 7.1.1",
-            toolchain_rocm_version="7.1.1",
+            torch_distribution_version="2.11.0+rocm7.2",
+            container_rocm_user_space_version="7.2.0",
+            hipcc_version="HIP version: 7.2.0",
+            toolchain_rocm_version="7.2.0",
         ),
     )
 
     observation = build_dependency_observation()
 
-    assert observation.container_rocm_user_space_version == "7.1.1"
-    assert observation.hipcc_version == "HIP version: 7.1.1"
-    assert observation.toolchain_rocm_version == "7.1.1"
+    assert observation.container_rocm_user_space_version == "7.2.0"
+    assert observation.hipcc_version == "HIP version: 7.2.0"
+    assert observation.toolchain_rocm_version == "7.2.0"
 
 
 def test_runtime_entry_keeps_observed_evidence_scopes_separate() -> None:
@@ -76,7 +76,7 @@ def test_runtime_entry_keeps_observed_evidence_scopes_separate() -> None:
         target=_target(),
         dependency_observation=_matching_observation(),
         host=build_host_evidence(
-            rocm_version="7.1.1",
+            rocm_version="7.2.0",
             driver_version="6.14.0",
             dev_kfd_present=True,
             dev_kfd_accessible=True,
@@ -100,15 +100,15 @@ def test_runtime_entry_keeps_observed_evidence_scopes_separate() -> None:
         "toolchain",
         "gpu",
     }
-    assert observed["host"]["rocm_version"] == "7.1.1"
-    assert observed["container"]["rocm_user_space_version"] == "7.1.1"
-    assert observed["python_dependency"]["torch_version"] == "2.10.0+rocm7.1"
-    assert observed["python_dependency"]["torch_hip_version"] == "7.1.0"
+    assert observed["host"]["rocm_version"] == "7.2.0"
+    assert observed["container"]["rocm_user_space_version"] == "7.2.0"
+    assert observed["python_dependency"]["torch_version"] == "2.11.0+rocm7.2"
+    assert observed["python_dependency"]["torch_hip_version"] == "7.2.0"
     assert observed["python_dependency"]["torch_cuda_version"] is None
     assert observed["python_dependency"]["torch_device_available"] is True
     assert observed["python_dependency"]["triton_rocm_status"] == "installed"
-    assert observed["dependency_policy"]["expected_local_version"] == "rocm7.1"
-    assert observed["toolchain"]["hipcc_version"] == "HIP version: 7.1.1"
+    assert observed["dependency_policy"]["expected_local_version"] == "rocm7.2"
+    assert observed["toolchain"]["hipcc_version"] == "HIP version: 7.2.0"
     assert observed["gpu"]["device_count"] == 1
     assert observed["gpu"]["device_name"] == "AMD Radeon"
     assert observed["gpu"]["gfx_architecture"] == "gfx1200"
@@ -213,7 +213,7 @@ def test_runtime_evidence_cli_collects_and_aggregates(tmp_path: Path) -> None:
             "--output",
             str(entry_path),
             "--host-rocm-version",
-            "7.1.1",
+            "7.2.0",
             "--host-driver-version",
             "6.14.0",
             "--dev-kfd-present",
@@ -225,31 +225,31 @@ def test_runtime_evidence_cli_collects_and_aggregates(tmp_path: Path) -> None:
             "--dev-dri-accessible",
             "true",
             "--torch-distribution-version",
-            "2.10.0+rocm7.1",
+            "2.11.0+rocm7.2",
             "--torch-version",
-            "2.10.0+rocm7.1",
+            "2.11.0+rocm7.2",
             "--torch-local-version",
-            "rocm7.1",
+            "rocm7.2",
             "--torch-rocm-target",
-            "rocm7.1",
+            "rocm7.2",
             "--torch-hip-version",
-            "7.1.0",
+            "7.2.0",
             "--torch-cuda-version",
             "none",
             "--torch-device-available",
             "true",
             "--torchvision-distribution-version",
-            "0.25.0+rocm7.1",
+            "0.26.0+rocm7.2",
             "--triton-rocm-distribution-version",
             "3.6.0",
             "--triton-rocm-status",
             "installed",
             "--container-rocm-user-space-version",
-            "7.1.1",
+            "7.2.0",
             "--hipcc-version",
-            "HIP version: 7.1.1",
+            "HIP version: 7.2.0",
             "--toolchain-rocm-version",
-            "7.1.1",
+            "7.2.0",
             "--container-validated",
             "--device-count",
             "1",

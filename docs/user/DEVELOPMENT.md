@@ -27,8 +27,8 @@ cd SOL-ExecBench-ROCm
 Install runtime and development dependencies with `uv`. The project requires
 Python `>=3.12,<3.14`, and `.python-version` pins local development to Python
 3.12. On Linux x86_64, the checked-in dependency configuration resolves the
-default ROCm stack to PyTorch `2.10.0+rocm7.1`, torchvision
-`0.25.0+rocm7.1`, and `triton-rocm==3.6.0`:
+default ROCm stack to PyTorch `2.11.0+rocm7.2`, torchvision
+`0.26.0+rocm7.2`, and `triton-rocm==3.6.0`:
 
 ```bash
 uv sync --all-groups
@@ -60,7 +60,7 @@ configured:
 
 GPU evaluation requires ROCm-capable AMD hardware, device access to `/dev/kfd`
 and `/dev/dri`, ROCm user-space tooling, and a ROCm PyTorch build. The default
-Docker target is `rocm-7.1.1-ubuntu-24.04-container`; declared targets for
+Docker target is `rocm-7.2.0-ubuntu-24.04-container`; declared targets for
 ROCm 7.0, 7.1, and 7.2 live in `docker/rocm-targets.json`.
 
 ## Build Commands

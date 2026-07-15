@@ -42,7 +42,7 @@ below are optional runtime, Docker, diagnostic, or build inputs discovered in
 | `SOL_EXECBENCH_CLOCKS_LOCKED` | Optional | `0` when unset | Set by `docker/entrypoint.sh` after clock-lock attempts; read by clock-lock checks. |
 | `FLASHINFER_TRACE_DIR` | Optional | `/sol-execbench/data/flashinfer-trace` under `scripts/run_docker.sh` | Adds the FlashInfer trace safetensors lookup root for evaluation. |
 | `IMAGE_NAME` | Optional | `sol-execbench` | Docker wrapper local image name. |
-| `IMAGE_TAG` | Optional | `rocm-<selected Docker tag>` | Docker wrapper local image tag. The default target resolves to `rocm-7.1.1-complete`. |
+| `IMAGE_TAG` | Optional | `rocm-<selected Docker tag>` | Docker wrapper local image tag. The default target resolves to `rocm-7.2-complete`. |
 | `ROCM_DOCKER_IMAGE` | Optional | `rocm/dev-ubuntu-24.04` for unknown-target override | Docker image repository override when `--allow-unknown-target` is used. |
 | `ROCM_DOCKER_TAG` | Optional | Selected target ID for unknown-target override | Docker image tag override when `--allow-unknown-target` is used. |
 | `SOL_EXECBENCH_ALLOW_MIXED_VERSION_DEPENDENCIES` | Optional | `0` | Allows dependency probe diagnostics for mixed-version stacks. |
@@ -184,15 +184,15 @@ clock-sensitive evaluation paths can reject the run based on
 | Dataset runner execution mode | `serial` | `scripts/run_dataset.py --execution-mode` |
 | Baseline comparison win threshold | `2.0` percent | `sol-execbench baseline compare --win-pct` |
 | Baseline comparison parity threshold | `5.0` percent | `sol-execbench baseline compare --parity-pct` |
-| Docker target | `rocm-7.1.1-ubuntu-24.04-container` | `docker/rocm-targets.json` |
-| Docker base image | `rocm/dev-ubuntu-24.04:7.1.1-complete` | Default Docker target and `docker/Dockerfile` |
+| Docker target | `rocm-7.2.0-ubuntu-24.04-container` | `docker/rocm-targets.json` |
+| Docker base image | `rocm/dev-ubuntu-24.04:7.2-complete` | Default Docker target and `docker/Dockerfile` |
 | Docker local image name | `sol-execbench` | `scripts/run_docker.sh` |
 | Docker local image tag | `rocm-<selected Docker tag>` | `scripts/run_docker.sh` |
 | Docker FlashInfer trace root | `/sol-execbench/data/flashinfer-trace` | `scripts/run_docker.sh` |
 | Python package version | `2.0.0` | `pyproject.toml`; separate from milestone and prerelease labels |
 | Python requirement | `>=3.12,<3.14` | `pyproject.toml` |
-| Default ROCm Torch wheel | `torch==2.10.0+rocm7.1` | `pyproject.toml` Linux x86_64 marker and Docker target metadata |
-| Default ROCm torchvision wheel | `torchvision==0.25.0+rocm7.1` | `pyproject.toml` Linux x86_64 marker and Docker target metadata |
+| Default ROCm Torch wheel | `torch==2.11.0+rocm7.2` | `pyproject.toml` Linux x86_64 marker and Docker target metadata |
+| Default ROCm torchvision wheel | `torchvision==0.26.0+rocm7.2` | `pyproject.toml` Linux x86_64 marker and Docker target metadata |
 | Default Triton ROCm wheel | `triton-rocm==3.6.0` | `pyproject.toml` Linux x86_64 marker and Docker target metadata |
 | Provenance policy document | `docs/user/provenance.md` | `provenance.toml` |
 
@@ -390,7 +390,7 @@ inside the container. Arguments after `--` become the container command;
 arguments before `--` that are not wrapper flags are forwarded to `docker run`.
 
 ```bash
-./scripts/run_docker.sh --target rocm-7.1.1-ubuntu-24.04-container -- \
+./scripts/run_docker.sh --target rocm-7.2.0-ubuntu-24.04-container -- \
   sol-execbench evaluate tests/sol_execbench/samples/rmsnorm \
     --solution tests/sol_execbench/samples/rmsnorm/solution_triton.json
 ```
@@ -509,7 +509,7 @@ closure audit also accepts repeated `--target-status` values.
 - Pytest markers
 - Ruff exclusions
 - Ty source roots
-- UV package indexes for PyPI, PyTorch ROCm 7.1, and the PyTorch ROCm package root
+- UV package indexes for PyPI, PyTorch ROCm 7.2, and the PyTorch ROCm package root
 
 ## Docker Wrapper Settings
 
