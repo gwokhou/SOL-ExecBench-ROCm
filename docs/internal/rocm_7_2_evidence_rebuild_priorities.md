@@ -187,6 +187,25 @@ Acceptance criteria:
 
 ## P3: Run the Expensive Complete Collections
 
+### Current local execution record (2026-07-15)
+
+The P3 primary shape-aware collection for source revision
+`09221dde3480bb9180903ae7084070a3ddeed9ed` measured 563 of 564 planned
+authority workloads.  The remaining required workload,
+`L1/013_fused_residual_rms_norm_backward`
+(`ea1263c4-b63d-5fa4-a641-fc4f16d3462a`), exhausts the local GPU while
+TorchInductor allocates the `batch_size=64`, `seq_len=8192` case.  A clean
+retry with `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` produced the
+same OOM result.
+
+This item is **unverifiable on this host**.  The generated local blocker
+sidecar binds the incomplete report and sampling-plan checksums and explicitly
+sets `authority_eligible` to false.  It is not a waiver for the missing raw
+evidence: do not start the second collection, finalize the shape-aware
+artifact or model, or make a ROCm 7.2 authority claim until the workload has
+been collected on suitable hardware (or an independently justified provider
+change has been implemented and verified).
+
 ### 10. Collect complete shape-aware roofline evidence
 
 Run two independent complete collections for the authority sampling plan. Each
