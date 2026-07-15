@@ -179,7 +179,7 @@ Example command shape:
 UV_CACHE_DIR=out/v1_19_demo/uv-cache uv run scripts/internal/reports/report_amd_bound_sanity.py \
   --trace out/v1_19_demo/traces/demo.trace.jsonl \
   --execution-closure out/v1_19_demo/execution_closure.json \
-  --amd-sol-artifact out/v1_19_demo/amd-sol/demo.amd-sol-v3.json \
+  --amd-sol-artifact out/v1_19_demo/amd-sol/demo.amd-sol-v5.json \
   --solar-artifact out/v1_19_demo/solar/demo.solar-derivation.json \
   --compatibility-matrix out/v1_19_demo/matrix.json \
   --amd-score-report out/v1_19_demo/amd_score.json \

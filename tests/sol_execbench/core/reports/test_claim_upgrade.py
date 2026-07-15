@@ -110,7 +110,7 @@ def test_claim_upgrade_allows_container_and_score_when_prerequisites_are_clean()
         paper_denominator={"workloads": [{"workload_uuid": "w1"}]},
         amd_score_report={"scores": [{"workload_uuid": "w1", "score": 1.0}]},
         amd_sol_report={
-            "schema_version": "sol_execbench.amd_sol_bound.v1",
+            "schema_version": "sol_execbench.amd_sol_bound.v5",
             "amd_sol_checksum": {"value": "amd-sol-real"},
             "aggregate_bound": {"status": "scored"},
         },

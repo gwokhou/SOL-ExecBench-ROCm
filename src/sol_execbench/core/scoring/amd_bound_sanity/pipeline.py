@@ -214,11 +214,7 @@ def _audit_bound_artifact(
     if _warnings_from(artifact):
         workload.blocker_codes.add("bound_evidence_warning")
     _audit_operator_estimates(audit, artifact, workload)
-    if artifact.get("schema_version") in {
-        "sol_execbench.amd_sol_bound.v3",
-        "sol_execbench.amd_sol_bound.v4",
-        "sol_execbench.amd_sol_bound.v5",
-    }:
+    if artifact.get("schema_version") == "sol_execbench.amd_sol_bound.v5":
         _audit_fusion_groups(artifact, workload)
     else:
         workload.blocker_codes.add("unsupported_amd_sol_schema")

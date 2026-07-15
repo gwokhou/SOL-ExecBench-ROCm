@@ -270,7 +270,7 @@ under `workload-manifests/`, per-workload timing sidecars under
 workload evidence is available.
 
 `src/sol_execbench/core/scoring/` contains AMD hardware models, bound graphs,
-operator work estimates, AMD SOL v4 bound artifacts, SOLAR derivation
+operator work estimates, AMD SOL v5 bound artifacts, SOLAR derivation
 helpers, baseline artifacts, and AMD-native score models. These helpers consume
 traces, hardware-model records, optional timing evidence, SOL bound sidecars,
 and baseline artifacts to produce guarded AMD-native-derived reports. Missing,

@@ -51,7 +51,7 @@ Expected derived artifacts:
 
 - `trace_jsonl`: remains the canonical benchmark output and is not modified by
   the v3 sidecars.
-- `sol_execbench.amd_sol_bound.v3`: contains graph, rich estimate, versioned
+- `sol_execbench.amd_sol_bound.v5`: contains graph, rich estimate, versioned
   fusion groups, per-group bound, aggregate, warning, coverage, capability
   budget, and hardware model evidence.
 - `sol_execbench.amd_native_score.v1`: references trace, SOL-bound, baseline,

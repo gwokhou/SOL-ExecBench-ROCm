@@ -5,7 +5,6 @@
 
 from sol_execbench.core.scoring.amd_sol.artifact import (
     AMD_SOL_SCHEMA_VERSION,
-    LEGACY_AMD_SOL_SCHEMA_VERSION,
     AmdSolBoundArtifact,
     AmdSolPerformanceDiagnostics,
     FusionGroupEvidenceSummary,
@@ -26,7 +25,6 @@ from sol_execbench.core.scoring.confidence import EstimateConfidence
 __all__ = [
     "AGGREGATE_STATUSES",
     "AMD_SOL_SCHEMA_VERSION",
-    "LEGACY_AMD_SOL_SCHEMA_VERSION",
     "AmdSolAggregateBound",
     "AmdSolBoundArtifact",
     "AmdSolPerformanceDiagnostics",

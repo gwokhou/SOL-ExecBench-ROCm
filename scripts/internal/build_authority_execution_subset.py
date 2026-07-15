@@ -106,7 +106,7 @@ def build_inputs(
         key = (str(row["definition"]), str(row["workload_uuid"]))
         bound = (bounds_by_key or {}).get(key)
         if bound is None or hardware_model is None:
-            # A selected workload cannot yet be official until its v4 bound is
+            # A selected workload cannot yet be official until its v5 bound is
             # materialized. Keep that blocker explicit so a partial trace
             # cannot be promoted by the release-baseline builder.
             authority_rows.append(

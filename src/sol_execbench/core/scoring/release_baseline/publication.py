@@ -451,11 +451,8 @@ class EvidencePublicationManifest:
             raise ValueError("published AMD SOL bound is not valid JSON") from exc
         if not isinstance(bound, Mapping):
             raise ValueError("published AMD SOL bound must be an object")
-        if _field(bound, "schema_version") not in {
-            "sol_execbench.amd_sol_bound.v4",
-            "sol_execbench.amd_sol_bound.v5",
-        }:
-            return
+        if _field(bound, "schema_version") != "sol_execbench.amd_sol_bound.v5":
+            raise ValueError("published AMD SOL bound must use schema v5")
         reference = _field(bound, "fusion_validation_ref")
         digest = _field(bound, "fusion_validation_sha256")
         if not isinstance(reference, str) or not isinstance(digest, str):

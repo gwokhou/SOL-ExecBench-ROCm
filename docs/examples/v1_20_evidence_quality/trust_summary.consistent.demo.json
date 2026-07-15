@@ -17,7 +17,7 @@
     {
       "source_id": "amd_sol_report",
       "path": "out/v1_20_demo/amd_sol.json",
-      "schema_version": "sol_execbench.amd_sol_bound.v1",
+      "schema_version": "sol_execbench.amd_sol_bound.v5",
       "checksum": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     },
     {

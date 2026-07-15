@@ -5,37 +5,13 @@ Git.  A score claim is nevertheless reproducible only when Git fixes the exact
 identity of every externally stored input.  This repository uses
 `sol_execbench.evidence_publication_manifest.v1` for that purpose.
 
-## Current published authority slice
+## Current publication status
 
-**Status: published.** Legacy v3 evidence was rejected by the current official gate and has
-been removed from the local worktree; it must not be restored or uploaded as an
-authority release. Its replacement is the local
-`gfx1200-20260712-hipblaslt-v4` source evidence tree at
-`out/authority-release-20260712-v3-closure/` (the directory name is historical).
-It contains 25 v4 bounds, matching fusion validation, baseline/bundle/rerun evidence,
-candidate identity, and official-score evidence, plus retained local generation
-diagnostics. It is not itself the upload directory. Stage exactly the manifest-listed
-files into a new directory, then verify that exact directory:
-
-```bash
-uv run sol-execbench baseline publication stage \
-  --manifest docs/releases/gfx1200-20260712-hipblaslt-v4.evidence.json \
-  --source-root out/authority-release-20260712-v3-closure \
-  --destination out/gfx1200-20260712-hipblaslt-v4-publish
-
-uv run sol-execbench baseline publication verify \
-  --manifest docs/releases/gfx1200-20260712-hipblaslt-v4.evidence.json \
-  --artifact-root out/gfx1200-20260712-hipblaslt-v4-publish
-```
-
-The immutable bundle is now published as
-[`gfx1200-20260712-hipblaslt-v4-evidence.tar.gz`](https://github.com/gwokhou/SOL-ExecBench-ROCm/releases/download/gfx1200-20260712-hipblaslt-v4/gfx1200-20260712-hipblaslt-v4-evidence.tar.gz)
-in the [GitHub Release](https://github.com/gwokhou/SOL-ExecBench-ROCm/releases/tag/gfx1200-20260712-hipblaslt-v4).
-Its SHA-256 is
-`0866ec026f53d6e77d73258c24f19108dce746c1a463dc6536d9e641a758513b`.
-The bundle was downloaded into a fresh temporary directory, extracted, and verified
-against the Git-tracked manifest with `baseline publication verify` on 2026-07-12.
-This is a **published authority slice**, not a full-suite or leaderboard claim.
+**Status: no current V5 authority bundle is registered in this worktree.** Earlier
+release bundles are immutable historical evidence only. Their non-V5 AMD SOL bounds
+are rejected by current tooling, so they must not be staged, verified, or cited as
+current authority. Produce a fresh V5 closure using the publisher procedure below
+before making an authority claim.
 
 Lifecycle policy, protected workflow setup, and the operator sequence are in
 [`EVIDENCE-LIFECYCLE.md`](EVIDENCE-LIFECYCLE.md).

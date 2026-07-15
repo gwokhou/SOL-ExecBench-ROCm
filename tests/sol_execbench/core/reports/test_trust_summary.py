@@ -44,7 +44,7 @@ def test_trust_summary_separates_reviewable_and_blocked_outcomes():
         matrix_report={"schema_version": "sol_execbench.rocm_matrix.v1"},
         amd_score_report={"schema_version": "sol_execbench.amd_native_score.v1"},
         amd_sol_report={
-            "schema_version": "sol_execbench.amd_sol_bound.v1",
+            "schema_version": "sol_execbench.amd_sol_bound.v5",
             "amd_sol_checksum": {"value": "amd-sol-real"},
         },
         solar_derivation={
