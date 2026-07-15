@@ -110,6 +110,10 @@ def compare_execution_closure_provenance(
         ("log_order", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
         ("warmup_runs", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
         ("iterations", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
+        (
+            "min_measurement_time_seconds",
+            ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH,
+        ),
         ("lock_clocks", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
         ("benchmark_config", ExecutionClosureReasonCode.RUNTIME_CONFIG_MISMATCH),
         ("git_commit", ExecutionClosureReasonCode.GIT_COMMIT_MISMATCH),

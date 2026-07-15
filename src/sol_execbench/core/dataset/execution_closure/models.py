@@ -103,6 +103,7 @@ class ExecutionClosureProvenance(BaseModel):
     timeout: int | None = None
     warmup_runs: int | None = None
     iterations: int | None = None
+    min_measurement_time_seconds: float | None = None
     lock_clocks: bool | None = None
     rerun: bool | None = None
     keep_staging: bool | None = None
