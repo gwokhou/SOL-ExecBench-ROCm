@@ -73,6 +73,20 @@ def test_rdna4_validates_when_real_wmma_candidate_is_measured() -> None:
     assert artifact.validation_status == "validated"
 
 
+def test_calibration_binds_explicit_source_revision() -> None:
+    revision = "a" * 40
+    artifact = run_calibration(
+        CalibrationRequest(
+            environment=GpuEnvironment(0, "gfx1200"),
+            hip_probe=_probe_with_states({"compute.matrix.bf16.bf16.wmma": "measured"}),
+            clock_controller=_locked_clock(),
+            source_revision=revision,
+        )
+    )
+
+    assert artifact.metadata["source_revision"] == revision
+
+
 def test_rdna4_remains_provisional_when_wmma_is_unknown() -> None:
     artifact = run_calibration(
         CalibrationRequest(

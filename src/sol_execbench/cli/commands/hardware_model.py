@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
@@ -102,6 +103,10 @@ def hardware_model_cli() -> None:
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     help="Exact profile requirements derived from the score suite.",
 )
+@click.option(
+    "--source-revision",
+    help="Full Git revision of the source used for this calibration.",
+)
 @click.option("--offline", is_flag=True, help="Never install profiler dependencies.")
 @click.option(
     "--no-auto-install", is_flag=True, help="Do not install profiler dependencies."
@@ -112,11 +117,17 @@ def _calibrate(
     architecture: str | None,
     require_clock_lock: bool,
     requirements_path: Path | None,
+    source_revision: str | None,
     offline: bool,
     no_auto_install: bool,
 ) -> CliResult:
     """Collect calibration candidates without fabricating unavailable evidence."""
     try:
+        if (
+            source_revision is not None
+            and re.fullmatch(r"[0-9a-f]{40}", source_revision) is None
+        ):
+            raise ValueError("source revision must be a full lowercase Git object id")
         environment = discover_gpu(device)
         if architecture and architecture.lower() != environment.architecture:
             raise ValueError(
@@ -141,6 +152,7 @@ def _calibrate(
                 requirements_sha256=(
                     requirements.payload_sha256 if requirements else None
                 ),
+                source_revision=source_revision,
             )
         )
     except (RuntimeError, ValueError) as exc:
