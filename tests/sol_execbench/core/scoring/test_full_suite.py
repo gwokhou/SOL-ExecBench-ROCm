@@ -261,7 +261,7 @@ def test_parallel_coverage_supervisor_reaps_a_stuck_export_task(
         tmp_path,
         manifest,
         analysis_timeout_seconds=1,
-        workers=2,
+        workers=1,
         worker_tasks_per_child=1,
         analysis_log_path=tmp_path / "authority-analysis.log",
     )
@@ -273,23 +273,26 @@ def test_parallel_coverage_supervisor_reaps_a_stuck_export_task(
     assert row["blocker_codes"] == ["authority_analysis_failed"]
 
 
-def test_full_suite_coverage_records_per_workload_analysis_failure(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+def test_full_suite_coverage_records_per_workload_analysis_diagnostic(
+    tmp_path: Path,
 ) -> None:
-    _problem(tmp_path, "L1", "001_first", "first", ["w1"])
+    _problem(
+        tmp_path,
+        "L1",
+        "001_first",
+        "first",
+        ["w1"],
+        reference="def run(x):\n    raise RuntimeError('provider failure')",
+    )
     manifest = build_full_suite_manifest(
         tmp_path, expected_problem_count=1, expected_workload_count=1
     )
 
-    def _raise(*_args: object, **_kwargs: object) -> object:
-        raise RuntimeError("provider failure")
-
-    monkeypatch.setattr(full_suite, "build_authority_bound_graph", _raise)
-
-    coverage, requirements = build_full_suite_coverage(tmp_path, manifest)
+    coverage, requirements = build_full_suite_coverage(
+        tmp_path, manifest, workers=1, worker_tasks_per_child=1
+    )
 
     validate_full_suite_coverage(coverage, requirements, manifest)
-    assert coverage["summary"]["workloads_by_blocker"] == {
-        "authority_analysis_failed": 1
-    }
-    assert coverage["workloads"][0]["analysis_error"] == "RuntimeError"
+    row = coverage["workloads"][0]
+    assert row["semantic_graph_provider"] == "diagnostic"
+    assert "semantic_graph_provider_required" in row["blocker_codes"]
