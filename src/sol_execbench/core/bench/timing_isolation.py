@@ -6,7 +6,7 @@
 This module provides five public functions for detecting and warning about
 conditions that could introduce timing variability or measurement bias:
 
-1. ``detect_concurrent_gpu_processes()`` — Detect concurrent GPU processes via rocm-smi
+1. ``detect_concurrent_gpu_processes()`` — Detect concurrent GPU processes via amd-smi
 2. ``verify_clock_state_with_warning()`` — Verify STABLE_PEAK clock mode with context-aware logging
 3. ``clear_gpu_cache_between_subprocesses()`` — Clear GPU cache at subprocess boundaries
 4. ``collect_timing_environment_snapshot()`` — Record environment state for reproducibility audits
@@ -20,10 +20,14 @@ from __future__ import annotations
 
 import logging
 import os
-import re
 import subprocess
 from datetime import UTC, datetime
 from typing import Any
+
+from pydantic import ValidationError
+
+from sol_execbench.core.platform.amd_smi import parse_gpu_count, parse_processes
+from sol_execbench.core.platform.runtime import resolve_rocm_tool_command
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +35,25 @@ TIMING_ISOLATION_SNAPSHOT_SCHEMA_VERSION = "sol_execbench.timing_isolation_snaps
 GPU_ISOLATION_SCHEMA_VERSION = "sol_execbench.gpu_device_isolation.v1"
 
 
+def _run_amd_smi_json(*arguments: str) -> str:
+    result = subprocess.run(
+        [resolve_rocm_tool_command("amd-smi"), *arguments, "--json"],
+        capture_output=True,
+        text=True,
+        timeout=5,
+    )
+    if result.returncode != 0:
+        raise subprocess.CalledProcessError(
+            result.returncode,
+            result.args,
+            output=result.stdout,
+            stderr=result.stderr,
+        )
+    return result.stdout
+
+
 def detect_concurrent_gpu_processes() -> list[dict[str, Any]]:
-    """Detect concurrent GPU processes via ``rocm-smi --showpids``.
+    """Detect concurrent GPU processes via ``amd-smi process --json``.
 
     Returns a list of process dicts with keys: ``pid``, ``device``, ``name``.
     Returns an empty list if no processes are running, on timeout, or on error.
@@ -41,74 +62,21 @@ def detect_concurrent_gpu_processes() -> list[dict[str, Any]]:
     but never raises exceptions, following the pitfall avoidance guidance from RESEARCH.md.
     """
     try:
-        result = subprocess.run(
-            ["rocm-smi", "--showpids"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
+        raw = _run_amd_smi_json("process")
     except FileNotFoundError:
-        logger.warning("rocm-smi not found; cannot detect concurrent GPU processes")
+        logger.warning("amd-smi not found; cannot detect concurrent GPU processes")
         return []
     except subprocess.TimeoutExpired:
-        logger.warning("rocm-smi --showpids timed out after 5 seconds")
+        logger.warning("amd-smi process timed out after 5 seconds")
         return []
-
-    stdout = result.stdout or ""
-
-    # Check for "No KFD PIDs" marker
-    if "No KFD PIDs" in stdout:
+    except subprocess.CalledProcessError as exc:
+        logger.warning("amd-smi process query failed: %s", exc)
         return []
-
-    # Parse ROCm SMI output to extract process information
-    processes = []
-    lines = stdout.splitlines()
-
-    # Track current device
-    current_device = "unknown"
-
-    for line in lines:
-        line = line.strip()
-
-        # Detect GPU device lines
-        if "GPU" in line and ("0000:" in line or ":" in line):
-            parts = line.split()
-            for part in parts:
-                if ":" in part and part.count(":") >= 2:
-                    current_device = part
-                    break
-
-        # Look for KFD PID lines
-        if "KFD PID" in line and "Name" in line:
-            # Extract PID and name from lines like:
-            # "KFD PID                     12345  Name              python"
-            parts = line.split()
-            try:
-                # Find all numeric values (potential PIDs)
-                for i, part in enumerate(parts):
-                    if part.isdigit():
-                        pid = int(part)
-
-                        # Find the name (typically after "Name")
-                        name = "unknown"
-                        if "Name" in parts:
-                            name_idx = parts.index("Name") + 1
-                            if name_idx < len(parts):
-                                name = parts[name_idx]
-
-                        processes.append(
-                            {
-                                "pid": pid,
-                                "device": current_device,
-                                "name": name,
-                            }
-                        )
-                        break  # Only take first PID from line
-            except (ValueError, IndexError):
-                # Skip malformed lines
-                continue
-
-    return processes
+    try:
+        return parse_processes(raw)
+    except (ValidationError, ValueError) as exc:
+        logger.warning("amd-smi process payload was invalid: %s", exc)
+        return []
 
 
 def verify_clock_state_with_warning(context: str = "batch_start") -> bool:
@@ -165,26 +133,22 @@ def clear_gpu_cache_between_subprocesses() -> None:
 
 
 def _detect_gpu_count() -> int:
-    """Detect GPU count via ``rocm-smi --showid``.
+    """Detect GPU count via ``amd-smi list --json``.
 
-    Returns 0 on error or when rocm-smi is unavailable.
+    Returns 0 on error or when amd-smi is unavailable.
     """
     try:
-        result = subprocess.run(
-            ["rocm-smi", "--showid"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
+        raw = _run_amd_smi_json("list")
+    except (
+        FileNotFoundError,
+        subprocess.CalledProcessError,
+        subprocess.TimeoutExpired,
+    ):
         return 0
-
-    gpu_ids: set[str] = set()
-    for line in (result.stdout or "").splitlines():
-        match = re.match(r"^\s*GPU\[(\d+)\]\s*:", line)
-        if match:
-            gpu_ids.add(match.group(1))
-    return len(gpu_ids)
+    try:
+        return parse_gpu_count(raw)
+    except (ValidationError, ValueError):
+        return 0
 
 
 def validate_gpu_device_isolation(
@@ -222,7 +186,7 @@ def validate_gpu_device_isolation(
     gpu_count = _detect_gpu_count()
 
     if gpu_count == 0:
-        warnings.append("gpu_count_unknown: rocm-smi unavailable or returned no GPUs")
+        warnings.append("gpu_count_unknown: amd-smi unavailable or returned no GPUs")
     elif gpu_count > 1 and rocr_visible is None:
         warnings.append(
             f"multi_gpu_no_restriction: {gpu_count} GPUs detected but "

@@ -32,8 +32,8 @@ def test_rocm_runtime_tools():
     rocminfo = require_tool("rocminfo")
     hipcc = require_tool("hipcc")
     rocprofv3 = require_tool("rocprofv3")
-    smi = next((tool for tool in ("amd-smi", "rocm-smi") if shutil.which(tool)), None)
-    assert smi, "Missing ROCm tool: amd-smi or rocm-smi"
+    smi = shutil.which("amd-smi")
+    assert smi, "Missing ROCm tool: amd-smi"
 
     result = run_command([rocminfo], timeout=60)
     assert result.returncode == 0, command_output(result)
@@ -47,7 +47,7 @@ def test_rocm_runtime_tools():
     assert result.returncode == 0, command_output(result)
     assert result.stdout.strip(), "rocprofv3 --help produced no output"
 
-    smi_version_args = [smi, "version"] if smi.endswith("amd-smi") else [smi, "--version"]
+    smi_version_args = [smi, "version"]
     result = run_command(smi_version_args, timeout=30)
     assert result.returncode == 0, command_output(result)
     assert result.stdout.strip(), f"{' '.join(smi_version_args)} produced no output"

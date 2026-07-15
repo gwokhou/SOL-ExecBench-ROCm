@@ -7,6 +7,7 @@ clock lock during the workload, then resets and records post-state.
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -16,10 +17,12 @@ from sol_execbench.core.bench.clock_lock import lock_clocks, unlock_clocks
 OUTPUT_DIR = Path("out/rdna4-clock-lock-workload-20260609")
 
 
-def rocm_smi(*args: str) -> str:
+def amd_smi(*args: str) -> str:
+    executable = shutil.which("amd-smi") or "/opt/rocm/bin/amd-smi"
     result = subprocess.run(
-        ["rocm-smi", *args],
+        [executable, *args],
         capture_output=True,
+        check=True,
         text=True,
         timeout=30,
     )
@@ -52,7 +55,7 @@ def run_gpu_workload(duration_sec: float = 45.0) -> None:
         if i % 5 == 0:
             elapsed = time.monotonic()
             remaining = max(0, end - elapsed)
-            clock_state = rocm_smi("--showclocks", "--showclkfrq")
+            clock_state = amd_smi("metric", "-c", "-l")
             log(f"clock_check_at_{int(elapsed)}s", clock_state)
             print(f"  ... {i} iterations done, {remaining:.1f}s remaining")
     # Final sync
@@ -68,65 +71,32 @@ def main() -> None:
     print()
 
     # 1. Pre-state (read-only)
-    log(
-        "pre_state",
-        rocm_smi(
-            "--showclocks",
-            "--showperflevel",
-            "--showproductname",
-            "--showdriverversion",
-            "--showhw",
-        ),
-    )
-    log("pre_power_temp", rocm_smi("--showpower", "--showtemp", "--showuse"))
+    log("pre_static", amd_smi("static", "-a"))
+    log("pre_metrics", amd_smi("metric", "-c", "-l", "-p", "-t", "-u"))
 
     # 2. Lock with the production clock-lock helper.
     if not lock_clocks():
         log("lock_failed", "STABLE_PEAK lock failed\n")
         raise SystemExit(1)
-    log(
-        "after_lock",
-        rocm_smi(
-            "--showclocks",
-            "--showperflevel",
-            "--showclkfrq",
-            "--showproductname",
-            "--showdriverversion",
-            "--showhw",
-        ),
-    )
-    log("after_lock_power", rocm_smi("--showpower", "--showtemp", "--showuse"))
+    try:
+        log("after_lock", amd_smi("metric", "-c", "-l", "-p", "-t", "-u"))
 
-    # 3. Run sustained GPU workload while monitoring clocks
-    print("--- Running GPU workload with clock monitoring ---")
-    run_gpu_workload(duration_sec=20.0)
+        # 3. Run sustained GPU workload while monitoring clocks
+        print("--- Running GPU workload with clock monitoring ---")
+        run_gpu_workload(duration_sec=20.0)
 
-    # 4. Post-workload state (with clocks still locked)
-    log(
-        "post_workload",
-        rocm_smi(
-            "--showclocks",
-            "--showperflevel",
-            "--showclkfrq",
-        ),
-    )
-    log("post_workload_power", rocm_smi("--showpower", "--showtemp", "--showuse"))
-
-    # 5. Reset clocks through the production helper.
-    unlock_clocks()
-    time.sleep(1)
-    log(
-        "after_reset",
-        rocm_smi(
-            "--showclocks",
-            "--showperflevel",
-            "--showclkfrq",
-            "--showproductname",
-            "--showdriverversion",
-            "--showhw",
-        ),
-    )
-    log("after_reset_power", rocm_smi("--showpower", "--showtemp", "--showuse"))
+        # 4. Post-workload state (with clocks still locked)
+        log(
+            "post_workload",
+            amd_smi("metric", "-c", "-l", "-p", "-t", "-u"),
+        )
+    finally:
+        # 5. Reset clocks even if the workload or evidence collection fails.
+        reset_verified = unlock_clocks()
+        time.sleep(1)
+        log("after_reset", amd_smi("metric", "-c", "-l", "-p", "-t", "-u"))
+        if not reset_verified:
+            raise RuntimeError("failed to reset and verify every GPU at AUTO")
 
     print("=" * 60)
     print("Clock-lock evidence collection complete.")

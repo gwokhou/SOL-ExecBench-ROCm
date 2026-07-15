@@ -33,8 +33,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     hipcc --version && \
     command -v rocminfo && \
     command -v rocprofv3 && \
-    command -v amd-smi && \
-    command -v rocm-smi
+    command -v amd-smi
 
 ARG HOST_UID=1000
 ARG HOST_GID=1000
@@ -63,13 +62,18 @@ RUN if [ "${HOST_UID}" = "0" ]; then \
     mkdir -p /sol-execbench /venv /home/${HOST_USER}/.cache/uv && \
     chown -R ${HOST_UID}:${HOST_GID} /sol-execbench /venv /home/${HOST_USER} && \
     AMD_SMI="$(command -v amd-smi)" && \
+    SUDOERS_TMP="$(mktemp)" && \
     { \
         echo "# SOL ExecBench ROCm clock commands"; \
         echo "${RUN_USER} ALL=(root) NOPASSWD: ${AMD_SMI} version, \\"; \
         echo "    ${AMD_SMI} set -l STABLE_PEAK, \\"; \
         echo "    ${AMD_SMI} set -l AUTO"; \
-    } > /etc/sudoers.d/sol-execbench-amd-smi && \
-    chmod 0440 /etc/sudoers.d/sol-execbench-amd-smi
+    } > "${SUDOERS_TMP}" && \
+    visudo -cf "${SUDOERS_TMP}" && \
+    install -o root -g root -m 0440 "${SUDOERS_TMP}" \
+        /etc/sudoers.d/sol-execbench-amd-smi && \
+    visudo -cf /etc/sudoers.d/sol-execbench-amd-smi && \
+    rm -f "${SUDOERS_TMP}"
 
 # Copy and set up entrypoint while still root (avoid switching back)
 COPY docker/entrypoint.sh /entrypoint.sh

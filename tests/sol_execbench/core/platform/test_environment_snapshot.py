@@ -130,7 +130,7 @@ def test_probe_tool_reports_nonzero_exit_as_failed():
         "amd-smi",
         ["amd-smi", "static", "-a"],
         runner=runner,
-        which=lambda _tool: "/usr/bin/amd-smi",
+        which=lambda _tool: "/opt/rocm/bin/amd-smi",
     )
 
     assert result.status == EnvironmentEvidenceStatus.FAILED

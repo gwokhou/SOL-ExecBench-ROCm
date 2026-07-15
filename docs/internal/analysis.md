@@ -184,7 +184,8 @@ For benchmark-grade runs, use:
 uv run sol-execbench evaluate <problem_dir> --solution <solution-file> --lock-clocks
 ```
 
-Clock locking uses `rocm-smi`. The command fails the workload if
+Clock locking uses `amd-smi set -l STABLE_PEAK` and verifies every visible GPU
+through `amd-smi metric -l --json`. The command fails the workload if
 `--lock-clocks` is requested but the environment did not lock clocks before the
 evaluation subprocess starts. This prevents silently mixing locked and unlocked
 timing data.

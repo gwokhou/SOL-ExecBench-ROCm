@@ -39,9 +39,9 @@ blockers without changing benchmark semantics.
 
 ## Benchmark-Grade Timing Authority
 
-Prior RDNA4 evidence verified:
+Historical RDNA4 evidence verified:
 
-- `rocm-smi` clock-control command path;
+- the then-current `rocm-smi` clock-control command path;
 - manual SCLK/MCLK set command path;
 - reset path returning the device to `Performance Level: auto`.
 
@@ -51,6 +51,9 @@ The v1.35 rerun adds stricter execution evidence:
 - `rocprofv3` overhead calibration evidence;
 - clock-lock/audit sidecars for the measured rerun;
 - no cross-report consistency findings in the rebuilt same-source reports.
+
+Current runtime locking and all-GPU state verification use `amd-smi`; the
+`rocm-smi` statements above describe only the recorded historical bundle.
 
 Closure status: `closed_as_deferred_blocker`
 

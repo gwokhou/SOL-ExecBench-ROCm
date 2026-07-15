@@ -10,7 +10,7 @@ which diagnostic surface consumes the route.
 
 | Evidence level | Purpose | Example tools |
 | --- | --- | --- |
-| Runtime | Device and runtime discovery. | `rocminfo`, `rocm_agent_enumerator`, `amd-smi`, `rocm-smi` |
+| Runtime | Device and runtime discovery. | `rocminfo`, `rocm_agent_enumerator`, `amd-smi` |
 | Profiling | Diagnostic execution-time artifacts. | `rocprofv3`, `rocprofv3-avail` |
 | Static | Diagnostic current-build artifact metadata and bounded extractor output. | RGA, `llvm-objdump`, `roc-objdump`, `readelf` |
 | Derived score | Derived AMD-side score and bound artifacts. | AMD SOL/SOLAR sidecars |

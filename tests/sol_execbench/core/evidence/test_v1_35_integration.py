@@ -16,6 +16,7 @@ dependencies.
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -276,23 +277,25 @@ class TestIsolationAuditOutput:
         self, tmp_path: Path
     ):
         """Verify that snapshot includes concurrent process information when detected."""
-        # Mock rocm-smi to return concurrent processes
-        mock_rocm_smi_output = """
-=================== GPUs ====================
-GPU  ID  							    UUID
-0  0000:0C:00.0					    GPU-123
-
-=================== KFD PIDs ====================
-KFD PID                     12345  Name              python
-KFD PID                     12346  Name              sol-execbench
-"""
+        # Mock amd-smi to return concurrent processes.
+        mock_amd_smi_output = json.dumps(
+            [
+                {
+                    "gpu": 0,
+                    "process_list": [
+                        {"pid": 12345, "name": "python"},
+                        {"pid": 12346, "name": "sol-execbench"},
+                    ],
+                }
+            ]
+        )
 
         with patch(
             "subprocess.run",
             return_value=subprocess.CompletedProcess(
-                args=["rocm-smi", "--showpids"],
+                args=["amd-smi", "process", "--json"],
                 returncode=0,
-                stdout=mock_rocm_smi_output,
+                stdout=mock_amd_smi_output,
                 stderr="",
             ),
         ):

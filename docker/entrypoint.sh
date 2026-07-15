@@ -36,7 +36,8 @@ cleanup() {
         python -c '
 from sol_execbench.core.bench.clock_lock import unlock_clocks
 print("Unlocking clocks...")
-unlock_clocks()
+if not unlock_clocks():
+    raise SystemExit("Clock reset to AUTO failed or could not be verified")
 print("Clocks unlocked")
 '
     fi

@@ -3,9 +3,10 @@
 This note records the Phase 167 host clock evidence boundary for RDNA4
 `gfx1200` validation.
 
-## Current Finding
+## Historical Finding
 
-The `rocm-smi` clock-control path works on the local RDNA4 host:
+Phase 167 used the now-retired `rocm-smi` clock-control path on the local RDNA4
+host:
 
 - manual performance mode can be requested;
 - SCLK and MCLK masks can be set;
@@ -31,9 +32,12 @@ must stay below authoritative timing unless the evidence bundle includes:
 ## Operator Policy
 
 Clock-lock commands should be run by an operator or through a tightly scoped
-sudoers policy for `rocm-smi` clock management. The release evidence bundle
-must record the exact commands and the observed readback; successful set
-commands alone are not enough to prove lock authority.
+sudoers policy for the exact `amd-smi version`, `amd-smi set -l STABLE_PEAK`,
+and `amd-smi set -l AUTO` commands. Current verification uses
+`amd-smi metric -l --json`; the historical `rocm-smi` observations above remain
+only as Phase 167 evidence. The release evidence bundle must record the exact
+commands and observed readback; successful set commands alone are not enough
+to prove lock authority.
 
 ## Current Bundle Boundary
 

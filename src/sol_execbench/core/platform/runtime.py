@@ -75,6 +75,32 @@ def resolve_rocm_tool(
     return candidate if is_file(candidate) else None
 
 
+def resolve_rocm_tool_command(
+    tool: str,
+    *,
+    environ: Mapping[str, str] | None = None,
+    which: Which = shutil.which,
+    is_file: Callable[[Path], bool] = Path.is_file,
+    is_dir: Callable[[Path], bool] = Path.is_dir,
+) -> str:
+    """Return an invocation path without resolving a sudoers-visible symlink.
+
+    Unlike :func:`resolve_rocm_tool`, this preserves the exact path returned by
+    ``PATH`` because sudoers command matching distinguishes a symlink from its
+    resolved target. If no installed file is found, the bare tool name is
+    returned so callers receive the normal ``FileNotFoundError`` behavior.
+    """
+    located = which(tool)
+    if located is not None:
+        return located
+    root = discover_rocm_root(environ=environ, which=which, is_dir=is_dir)
+    if root is not None:
+        candidate = root / "bin" / tool
+        if is_file(candidate):
+            return str(candidate)
+    return tool
+
+
 def rocm_search_roots(
     *,
     environ: Mapping[str, str] | None = None,

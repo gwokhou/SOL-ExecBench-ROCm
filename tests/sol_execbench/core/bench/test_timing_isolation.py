@@ -33,30 +33,43 @@ class TestDetectConcurrentGpuProcesses:
         with unittest.mock.patch(
             "subprocess.run",
             return_value=subprocess.CompletedProcess(
-                ["rocm-smi", "--showpids"],
+                ["amd-smi", "process", "--json"],
                 returncode=0,
-                stdout="No KFD PIDs currently running",
+                stdout=json.dumps(
+                    [
+                        {
+                            "gpu": 0,
+                            "process_list": [
+                                {"process_info": "No running processes detected"}
+                            ],
+                        }
+                    ]
+                ),
                 stderr="",
             ),
         ):
             result = detect_concurrent_gpu_processes()
             assert result == []
-            assert "No KFD PIDs" in caplog.text or result == []
 
     def test_processes_detected(self, caplog):
         """Test that process list is returned when GPU processes are present."""
         import unittest.mock
 
-        mock_output = """
-============================XX PIDs =============================
-GPU  0000:01:00.1
-  KFD PID                     12345  Name              python
-  KFD PID                     67890  Name              rocprofv3
-"""
+        mock_output = json.dumps(
+            [
+                {
+                    "gpu": 0,
+                    "process_list": [
+                        {"pid": 12345, "name": "python"},
+                        {"pid": 67890, "name": "rocprofv3"},
+                    ],
+                }
+            ]
+        )
         with unittest.mock.patch(
             "subprocess.run",
             return_value=subprocess.CompletedProcess(
-                ["rocm-smi", "--showpids"],
+                ["amd-smi", "process", "--json"],
                 returncode=0,
                 stdout=mock_output,
                 stderr="",
@@ -73,7 +86,7 @@ GPU  0000:01:00.1
 
         with unittest.mock.patch(
             "subprocess.run",
-            side_effect=subprocess.TimeoutExpired(["rocm-smi", "--showpids"], 5),
+            side_effect=subprocess.TimeoutExpired(["amd-smi", "process"], 5),
         ):
             result = detect_concurrent_gpu_processes()
             assert result == []
@@ -83,12 +96,12 @@ GPU  0000:01:00.1
             )
 
     def test_file_not_found_handling(self, caplog):
-        """Test that empty list is returned when rocm-smi is not found."""
+        """Test that empty list is returned when amd-smi is not found."""
         import unittest.mock
 
         with unittest.mock.patch(
             "subprocess.run",
-            side_effect=FileNotFoundError("rocm-smi not found"),
+            side_effect=FileNotFoundError("amd-smi not found"),
         ):
             result = detect_concurrent_gpu_processes()
             assert result == []
@@ -166,12 +179,8 @@ class TestClearGpuCacheBetweenSubprocesses:
         """Test that function handles torch unavailable gracefully."""
         import unittest.mock
 
-        with unittest.mock.patch.dict("sys.modules", {}, clear=False):
-            # Remove torch from modules if present
-            import sys
-
-            sys.modules.pop("torch", None)
-
+        caplog.set_level(logging.DEBUG)
+        with unittest.mock.patch.dict("sys.modules", {"torch": None}):
             clear_gpu_cache_between_subprocesses()
             # Should not raise exception
             assert (
@@ -303,30 +312,26 @@ class TestIntegrationPreflightAudit:
 class TestValidateGpuDeviceIsolation:
     """Test GPU device isolation validation."""
 
-    def test_detect_gpu_count_counts_unique_rocm_smi_gpu_ids(self):
-        """rocm-smi --showid emits multiple GPU[n] attribute rows per device."""
+    def test_detect_gpu_count_counts_unique_amd_smi_gpu_ids(self):
+        """amd-smi list --json reports one object per device."""
         import unittest.mock
 
-        mock_output = """
-============================ ROCm System Management Interface ============================
-=========================================== ID ===========================================
-GPU[0]		: Device Name: 		AMD Radeon Graphics
-GPU[0]		: Device ID: 		0x7590
-GPU[0]		: Device Rev: 		0xc0
-GPU[0]		: Subsystem ID: 	0x2438
-GPU[0]		: GUID: 		7729
-==========================================================================================
-"""
+        mock_output = json.dumps(
+            [
+                {"gpu": 0, "bdf": "0000:01:00.0"},
+                {"gpu": 1, "bdf": "0000:02:00.0"},
+            ]
+        )
         with unittest.mock.patch(
             "subprocess.run",
             return_value=subprocess.CompletedProcess(
-                ["rocm-smi", "--showid"],
+                ["amd-smi", "list", "--json"],
                 returncode=0,
                 stdout=mock_output,
                 stderr="",
             ),
         ):
-            assert _detect_gpu_count() == 1
+            assert _detect_gpu_count() == 2
 
     def test_single_gpu_is_isolated(self):
         """Single GPU system is always isolated regardless of ROCR_VISIBLE_DEVICES."""
@@ -388,7 +393,7 @@ GPU[0]		: GUID: 		7729
                 assert os.environ.get("ROCR_VISIBLE_DEVICES") == "1"
 
     def test_gpu_count_unknown(self):
-        """Unknown GPU count (rocm-smi unavailable) generates warning."""
+        """Unknown GPU count (amd-smi unavailable) generates warning."""
         import unittest.mock
 
         with unittest.mock.patch(
