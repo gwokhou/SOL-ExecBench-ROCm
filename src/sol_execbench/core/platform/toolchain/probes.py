@@ -9,7 +9,7 @@ import shutil
 import subprocess
 
 from ..environment import ProbeCompletedProcess
-from ...text_utils import text_tail as _tail
+from ...text_utils import text_tail
 from .models import (
     DEFAULT_TOOLCHAIN_PROBE_TIMEOUT_SECONDS,
     ProbeRunner,
@@ -47,8 +47,8 @@ def probe_toolchain_tool(
             command=command,
             path=path,
             status=ToolchainStatus.FAILED,
-            stdout_tail=_tail(exc.stdout),
-            stderr_tail=_tail(exc.stderr),
+            stdout_tail=text_tail(exc.stdout),
+            stderr_tail=text_tail(exc.stderr),
             timeout_seconds=timeout_seconds,
         )
     except OSError as exc:
@@ -57,7 +57,7 @@ def probe_toolchain_tool(
             command=command,
             path=path,
             status=ToolchainStatus.FAILED,
-            stderr_tail=_tail(str(exc)),
+            stderr_tail=text_tail(str(exc)),
             timeout_seconds=timeout_seconds,
         )
 
@@ -71,8 +71,8 @@ def probe_toolchain_tool(
             else ToolchainStatus.FAILED
         ),
         returncode=completed.returncode,
-        stdout_tail=_tail(completed.stdout),
-        stderr_tail=_tail(completed.stderr),
+        stdout_tail=text_tail(completed.stdout),
+        stderr_tail=text_tail(completed.stderr),
         timeout_seconds=timeout_seconds,
     )
 

@@ -17,7 +17,15 @@
 
 """Tests for sol_execbench.core.data.workload.Workload."""
 
-from sol_execbench.core.data.workload import RandomInput, ToleranceSpec, Workload
+import pytest
+from pydantic import ValidationError
+
+from sol_execbench.core.data.workload import (
+    RandomInput,
+    ScalarInput,
+    ToleranceSpec,
+    Workload,
+)
 
 
 def _wkl(**inputs):
@@ -55,6 +63,15 @@ class TestGetScalarInputs:
     def test_all_custom_returns_empty(self):
         wkl = _wkl(a={"type": "custom"}, b={"type": "custom"})
         assert wkl.get_scalar_inputs() == {}
+
+    def test_input_type_discriminator_selects_the_declared_model(self):
+        wkl = _wkl(value={"type": "scalar", "value": 42})
+
+        assert isinstance(wkl.inputs["value"], ScalarInput)
+
+    def test_input_type_discriminator_rejects_unknown_types(self):
+        with pytest.raises(ValidationError, match="union_tag_invalid"):
+            _wkl(value={"type": "generated", "value": 42})
 
 
 class TestToleranceSpec:

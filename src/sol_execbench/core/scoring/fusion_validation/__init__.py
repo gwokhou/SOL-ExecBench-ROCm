@@ -3,6 +3,8 @@
 from .io import canonical_json_bytes, sha256_payload
 from .models import (
     FUSION_VALIDATION_SCHEMA_VERSION,
+    FusionCapacityStatus,
+    FusionPerformanceStatus,
     FusionSignature,
     FusionValidationArtifact,
     FusionValidationCase,
@@ -15,6 +17,8 @@ from .resources import kernel_resource_from_code_object
 
 __all__ = [
     "FUSION_VALIDATION_SCHEMA_VERSION",
+    "FusionCapacityStatus",
+    "FusionPerformanceStatus",
     "FusionSignature",
     "FusionValidationArtifact",
     "FusionValidationCase",

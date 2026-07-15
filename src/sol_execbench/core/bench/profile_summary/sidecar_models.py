@@ -10,7 +10,12 @@ from typing import Literal
 
 from pydantic import ConfigDict, Field
 
-from sol_execbench.core.bench.diagnostic_sidecar import DiagnosticSidecarAuthority
+from sol_execbench.core.bench.diagnostic_sidecar import (
+    DiagnosticFreshnessStatus,
+    DiagnosticGovernanceStatus,
+    DiagnosticSidecarAuthority,
+    DiagnosticSidecarStatus,
+)
 from sol_execbench.core.bench.profile_summary.models import (
     ProfileSummaryArtifactCitation,
     ProfileSummaryBottleneckHint,
@@ -29,13 +34,10 @@ _PROFILE_SUMMARY_MODEL_EXPORTS = (
     ProfileSummaryStructuredMetric,
 )
 
-
-class ProfileSummaryStatus(str, Enum):
-    """Aggregate profile summary availability."""
-
-    AVAILABLE = "available"
-    PARTIAL = "partial"
-    UNAVAILABLE = "unavailable"
+# Public compatibility names for this sidecar's contract vocabulary.
+ProfileSummaryStatus = DiagnosticSidecarStatus
+ProfileSummaryFreshnessStatus = DiagnosticFreshnessStatus
+ProfileSummaryGovernanceStatus = DiagnosticGovernanceStatus
 
 
 class ProfileSummaryReasonCode(str, Enum):
@@ -45,23 +47,6 @@ class ProfileSummaryReasonCode(str, Enum):
     PROFILE_PARTIAL = "profile_partial"
     PROFILE_UNAVAILABLE = "profile_unavailable"
     NO_PROFILE_RESULT = "no_profile_result"
-
-
-class ProfileSummaryFreshnessStatus(str, Enum):
-    """Freshness validation status for a profile summary."""
-
-    CURRENT = "current"
-    STALE = "stale"
-    UNKNOWN = "unknown"
-
-
-class ProfileSummaryGovernanceStatus(str, Enum):
-    """Diagnostic governance status for a profile summary sidecar."""
-
-    USABLE_DIAGNOSTIC = "usable_diagnostic"
-    STALE_DIAGNOSTIC = "stale_diagnostic"
-    UNAVAILABLE = "unavailable"
-    INVALID_DIAGNOSTIC = "invalid_diagnostic"
 
 
 class ProfileSummaryIdentity(BaseModelWithDocstrings):

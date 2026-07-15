@@ -17,12 +17,13 @@ from sol_execbench.driver import ProblemPackager
 
 from . import command as cli_evaluation
 from . import compilation as cli_compilation
+from . import profile_mode
 from . import runtime as cli_evaluation_runtime
 from ..sidecars import static_evidence as cli_static_evidence
 from ..protocol import EXIT_EXECUTION, CliFailure
 
-PROFILE_NONE = "none"
-PROFILE_ROCPROFV3 = "rocprofv3"
+PROFILE_NONE = profile_mode.PROFILE_NONE
+PROFILE_ROCPROFV3 = profile_mode.PROFILE_ROCPROFV3
 
 
 def run_optional_compile_phase(

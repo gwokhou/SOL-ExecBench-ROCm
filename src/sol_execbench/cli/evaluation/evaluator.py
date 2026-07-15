@@ -26,6 +26,8 @@ from sol_execbench.cli.evaluation.requests import EvaluationRequest
 
 console = Console(stderr=True)
 
+# Compatibility exports for callers of the root evaluator module.  The
+# canonical definitions live in ``profile_mode`` and are re-exported by phases.
 PROFILE_NONE = cli_phases.PROFILE_NONE
 PROFILE_ROCPROFV3 = cli_phases.PROFILE_ROCPROFV3
 

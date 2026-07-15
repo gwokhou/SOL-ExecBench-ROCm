@@ -18,8 +18,7 @@ from ....core.scoring.baseline_selection import (
     build_baseline_selection_manifest,
 )
 from ...protocol import CliResult, artifact
-from .inputs import load_json as _load_json
-from .inputs import suite_workloads_from_json as _suite_workloads_from_json
+from .inputs import load_json, suite_workloads_from_json
 
 
 @click.group("baseline", context_settings={"help_option_names": ["-h", "--help"]})
@@ -87,7 +86,7 @@ def _selection_build_cli(
 ) -> CliResult:
     """Select exactly one baseline candidate for every frozen workload."""
     try:
-        workloads = _suite_workloads_from_json(suite_manifest_path)
+        workloads = suite_workloads_from_json(suite_manifest_path)
         required_keys = []
         for index, workload in enumerate(workloads):
             if not isinstance(workload, dict):
@@ -102,7 +101,7 @@ def _selection_build_cli(
         manifest = build_baseline_selection_manifest(
             scope=scope,
             candidates=baseline_candidates_from_dict(
-                _load_json(candidates_path, "baseline candidates")
+                load_json(candidates_path, "baseline candidates")
             ),
             required_workload_keys=required_keys,
         )

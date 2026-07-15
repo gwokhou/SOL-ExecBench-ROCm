@@ -8,9 +8,13 @@ from __future__ import annotations
 from typing import Any
 
 from sol_execbench.core.scoring.confidence import EstimateConfidence
+from sol_execbench.core.scoring.aggregation import (
+    AGGREGATE_BOUND_STATUSES,
+    AggregateBoundStatus,
+)
 
 
-SOLAR_DERIVATION_STATUSES = frozenset({"scored", "degraded", "unscored"})
+SOLAR_DERIVATION_STATUSES = AGGREGATE_BOUND_STATUSES
 SOLAR_DERIVATION_SOURCE_BOUNDARY_FIELDS = frozenset(
     {
         "canonical_trace_jsonl",
@@ -20,13 +24,13 @@ SOLAR_DERIVATION_SOURCE_BOUNDARY_FIELDS = frozenset(
 )
 
 
-def status_for_confidence(confidence: EstimateConfidence) -> str:
+def status_for_confidence(confidence: EstimateConfidence) -> AggregateBoundStatus:
     """Map estimate confidence to SOLAR derivation status."""
     if confidence == EstimateConfidence.SUPPORTED:
-        return "scored"
+        return AggregateBoundStatus.SCORED
     if confidence == EstimateConfidence.INEXACT:
-        return "degraded"
-    return "unscored"
+        return AggregateBoundStatus.DEGRADED
+    return AggregateBoundStatus.UNSCORED
 
 
 def unique_sorted(items: tuple[str, ...] | list[str]) -> tuple[str, ...]:

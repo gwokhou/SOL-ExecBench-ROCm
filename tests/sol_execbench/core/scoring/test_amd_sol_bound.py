@@ -27,6 +27,8 @@ from sol_execbench.core.scoring.amd_sol.math import bound_for_estimate
 from sol_execbench.core.scoring.amd_score.workload import score_amd_native_workload
 from sol_execbench.core.scoring.confidence import EstimateConfidence
 from sol_execbench.core.scoring.fusion_validation import (
+    FusionCapacityStatus,
+    FusionPerformanceStatus,
     FusionValidationArtifact,
     FusionValidationCase,
     KernelResourceEvidence,
@@ -260,8 +262,8 @@ def _passed_case(signature, *, workload_uuid: str) -> FusionValidationCase:
         signature,
         kernel,
         (kernel,),
-        "passed",
-        PerformanceEvidence("not_measured", (), (), None, None),
+        FusionCapacityStatus.PASSED,
+        PerformanceEvidence(FusionPerformanceStatus.NOT_MEASURED, (), (), None, None),
     )
 
 
@@ -313,8 +315,10 @@ def test_current_bound_round_trip_and_fusion_match():
                 signature,
                 kernel,
                 (kernel,),
-                "passed",
-                PerformanceEvidence("not_measured", (), (), None, None),
+                FusionCapacityStatus.PASSED,
+                PerformanceEvidence(
+                    FusionPerformanceStatus.NOT_MEASURED, (), (), None, None
+                ),
             ),
         ),
     )

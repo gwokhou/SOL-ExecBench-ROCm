@@ -17,20 +17,22 @@ from typing import Literal
 
 from pydantic import ConfigDict, Field
 
-from sol_execbench.core.bench.diagnostic_sidecar import DiagnosticSidecarAuthority
+from sol_execbench.core.bench.diagnostic_sidecar import (
+    DiagnosticFreshnessStatus,
+    DiagnosticGovernanceStatus,
+    DiagnosticSidecarAuthority,
+    DiagnosticSidecarStatus,
+)
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 
 
 DECISION_SCHEMA_VERSION = "sol_execbench.decision.v1"
 _MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
 
-
-class DecisionStatus(str, Enum):
-    """Aggregate decision sidecar availability."""
-
-    AVAILABLE = "available"
-    PARTIAL = "partial"
-    UNAVAILABLE = "unavailable"
+# Public compatibility names for this sidecar's contract vocabulary.
+DecisionStatus = DiagnosticSidecarStatus
+DecisionFreshnessStatus = DiagnosticFreshnessStatus
+DecisionGovernanceStatus = DiagnosticGovernanceStatus
 
 
 class DecisionReasonCode(str, Enum):
@@ -70,23 +72,6 @@ class DecisionConfidence(str, Enum):
     INFERRED_HIGH = "inferred_high"
     INFERRED_MEDIUM = "inferred_medium"
     INFERRED_LOW = "inferred_low"
-
-
-class DecisionFreshnessStatus(str, Enum):
-    """Freshness validation status for a decision sidecar."""
-
-    CURRENT = "current"
-    STALE = "stale"
-    UNKNOWN = "unknown"
-
-
-class DecisionGovernanceStatus(str, Enum):
-    """Diagnostic governance status for a decision sidecar."""
-
-    USABLE_DIAGNOSTIC = "usable_diagnostic"
-    STALE_DIAGNOSTIC = "stale_diagnostic"
-    UNAVAILABLE = "unavailable"
-    INVALID_DIAGNOSTIC = "invalid_diagnostic"
 
 
 class DecisionSourceRef(BaseModelWithDocstrings):

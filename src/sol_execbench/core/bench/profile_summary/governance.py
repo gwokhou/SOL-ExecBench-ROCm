@@ -13,10 +13,8 @@ from sol_execbench.core.bench.diagnostic_sidecar import (
     match_required_optional,
 )
 from sol_execbench.core.bench.profile_summary.sidecar_models import (
-    ProfileSummaryFreshnessStatus,
     ProfileSummaryFreshnessValidation,
     ProfileSummaryGovernanceGuardrail,
-    ProfileSummaryGovernanceStatus,
     ProfileSummarySidecar,
 )
 
@@ -38,9 +36,9 @@ def validate_profile_summary_freshness(
     any_expected = (
         trace_path is not None or run_id is not None or sol_version is not None
     )
-    status_value, reason_codes = classify_freshness(reasons, any_expected=any_expected)
+    status, reason_codes = classify_freshness(reasons, any_expected=any_expected)
     return ProfileSummaryFreshnessValidation(
-        status=ProfileSummaryFreshnessStatus(status_value),
+        status=status,
         reason_codes=reason_codes,
     )
 
@@ -53,15 +51,15 @@ def evaluate_profile_summary_governance(
 ) -> ProfileSummaryGovernanceGuardrail:
     """Return diagnostic-only governance state for an optional profile summary."""
 
-    status_value, reason_codes = classify_diagnostic_governance(
+    status, reason_codes = classify_diagnostic_governance(
         sidecar_present=sidecar is not None,
-        freshness_status=(freshness.status.value if freshness is not None else None),
+        freshness_status=freshness.status if freshness is not None else None,
         freshness_reason_codes=(
             freshness.reason_codes if freshness is not None else None
         ),
         parse_error=parse_error,
     )
     return ProfileSummaryGovernanceGuardrail(
-        status=ProfileSummaryGovernanceStatus(status_value),
+        status=status,
         reason_codes=reason_codes,
     )

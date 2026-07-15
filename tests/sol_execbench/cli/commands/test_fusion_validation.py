@@ -12,6 +12,8 @@ from sol_execbench.cli.commands.fusion_validation import (
     collect_fusion_validation,
 )
 from sol_execbench.core.scoring.fusion_validation import (
+    FusionCapacityStatus,
+    FusionPerformanceStatus,
     FusionSignature,
     FusionValidationArtifact,
     FusionValidationCase,
@@ -97,8 +99,10 @@ def test_collect_uses_built_in_driver_when_manifest_has_no_override(
                     ),
                     fused=_capacity_kernel(),
                     unfused=(_capacity_kernel(),),
-                    capacity_status="passed",
-                    performance=PerformanceEvidence("not_measured", (), (), None, None),
+                    capacity_status=FusionCapacityStatus.PASSED,
+                    performance=PerformanceEvidence(
+                        FusionPerformanceStatus.NOT_MEASURED, (), (), None, None
+                    ),
                 ),
             ),
         )

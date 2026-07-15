@@ -9,12 +9,14 @@ from dataclasses import dataclass
 from typing import Any
 
 from sol_execbench.core.platform.arch_capabilities import ArchIsaBudget
+from sol_execbench.core.scoring.aggregation import AGGREGATE_BOUND_STATUSES
 from sol_execbench.core.scoring.amd_hardware_models import AmdHardwareModel
 from sol_execbench.core.scoring.amd_sol.fusion import FusionGroup
 from sol_execbench.core.scoring.confidence import EstimateConfidence
 
 
-AGGREGATE_STATUSES = frozenset({"scored", "degraded", "unscored"})
+# Compatibility export for the AMD SOL parsing API.
+AGGREGATE_STATUSES = AGGREGATE_BOUND_STATUSES
 
 
 @dataclass(frozen=True)

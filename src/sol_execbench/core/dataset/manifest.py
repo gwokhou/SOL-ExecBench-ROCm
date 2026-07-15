@@ -24,7 +24,7 @@ from pydantic import BaseModel
 from sol_execbench.core.data.json_utils import stable_model_checksum, stable_model_json
 
 from .layout import LayoutCategory, LayoutDiagnostic, inspect_dataset_layout
-from sol_execbench.core.timestamps import utc_timestamp as _utc_timestamp
+from sol_execbench.core.timestamps import utc_timestamp
 
 MANIFEST_SCHEMA_VERSION = "sol_execbench.dataset_manifest.v1"
 
@@ -104,7 +104,7 @@ def build_dataset_manifest(
 
     layout = inspect_dataset_layout(root, categories=categories)
     manifest = DatasetManifest(
-        created_at=created_at or _utc_timestamp(),
+        created_at=created_at or utc_timestamp(),
         source=source or DatasetManifestSource(local_provenance="local_layout"),
         root=DatasetManifestRoot(path=Path(root).as_posix()),
         selected_categories=layout.selected_categories,

@@ -40,6 +40,7 @@ from sol_execbench.core.bench.static_kernel.extractor_routing import (
     extractor_command as _extractor_command,
     reason_for_route_status as _reason_for_route_status,
     route_static_tool as _route_static_tool,
+    static_extractor_tool_ids,
     tool_run_from_route_decision as _tool_run_from_route_decision,
     toolchain_artifact_type_for_static_artifact,
 )
@@ -53,7 +54,6 @@ from sol_execbench.core.platform.toolchain import (
 from sol_execbench.core.platform.toolchain.probes import run_probe
 
 
-_STATIC_EXTRACTOR_TOOL_IDS = ("llvm-objdump", "readelf")
 _FOOTPRINT_EXTRACTOR_TOOL_IDS = ("roc-objdump",)
 
 
@@ -151,7 +151,7 @@ def run_static_kernel_extractors(
             )
             continue
 
-        for tool_id in _STATIC_EXTRACTOR_TOOL_IDS:
+        for tool_id in static_extractor_tool_ids():
             route_decision = _route_static_tool(
                 tool_id=tool_id,
                 artifact_type=artifact_type,

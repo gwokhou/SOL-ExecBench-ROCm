@@ -14,9 +14,7 @@ from typing import Any, Literal, Protocol
 from ...core.bench.rocm_profiler import Rocprofv3ProfileResult
 from ...core.bench.stderr import filter_benign_rocm_stderr
 from . import command as cli_evaluation
-
-PROFILE_NONE = "none"
-PROFILE_ROCPROFV3 = "rocprofv3"
+from .profile_mode import PROFILE_ROCPROFV3
 
 
 class EvaluationPackager(Protocol):
