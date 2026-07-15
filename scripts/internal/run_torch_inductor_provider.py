@@ -18,6 +18,10 @@ from pathlib import Path
 from time import perf_counter
 from typing import Any
 
+from sol_execbench.core.bench.correctness import (
+    check_output_shape_dtype,
+    compute_error_stats,
+)
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.integrity.checksums import sha256_file
@@ -90,6 +94,41 @@ def _output_layouts(value: Any) -> list[dict[str, object]]:
     raise ValueError("compiled reference returned a non-tensor output")
 
 
+def _tensor_outputs(value: Any) -> list[Any]:
+    """Normalize provider outputs for the shared workload correctness check."""
+
+    if hasattr(value, "shape") and hasattr(value, "dtype"):
+        return [value]
+    if isinstance(value, (tuple, list)) and all(
+        hasattr(item, "shape") and hasattr(item, "dtype") for item in value
+    ):
+        return list(value)
+    raise ValueError("compiled reference returned a non-tensor output")
+
+
+def _assert_correct_output(actual: Any, eager: Any, workload: Workload) -> None:
+    """Require compiled output to meet the workload's numerical contract."""
+
+    actual_outputs = _tensor_outputs(actual)
+    eager_outputs = _tensor_outputs(eager)
+    if len(actual_outputs) != len(eager_outputs):
+        raise AssertionError("compiled output count differs from eager reference")
+    if check_output_shape_dtype(eager_outputs, actual_outputs) is not None:
+        raise AssertionError(
+            "compiled output shape or dtype differs from eager reference"
+        )
+    for output, reference in zip(actual_outputs, eager_outputs, strict=True):
+        correctness, exceeds = compute_error_stats(
+            output, reference, workload.tolerance
+        )
+        if exceeds:
+            raise AssertionError(
+                "compiled output exceeds workload tolerance: "
+                f"abs={correctness.max_absolute_error}, "
+                f"rel={correctness.max_relative_error}"
+            )
+
+
 def _record_profiler_trace(
     torch: Any, compiled: Any, inputs: tuple[Any, ...], output: Path
 ) -> str:
@@ -155,7 +194,7 @@ def main() -> int:
         compiled(*inputs)
     torch.cuda.synchronize()
     actual = compiled(*inputs)
-    torch.testing.assert_close(actual, eager)
+    _assert_correct_output(actual, eager, workload)
     torch.cuda.synchronize()
     profiler_trace: dict[str, str] | None = None
     if args.profiler_trace_output is not None:
