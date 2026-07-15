@@ -872,22 +872,14 @@ def build_full_suite_coverage(
         analysis_timeout_seconds,
     )
     with _authority_analysis_log(analysis_log_path) as log_queue:
-        if resolved_workers == 1:
-            for definition, workload, entry in tasks:
-                consume(
-                    _analyze_authority_workload(
-                        definition, workload, entry, *common_args
-                    )
-                )
-        else:
-            for analysis in _supervised_parallel_analyses(
-                tasks,
-                workers=resolved_workers,
-                worker_tasks_per_child=worker_tasks_per_child,
-                common_args=common_args,
-                log_queue=log_queue,
-            ):
-                consume(analysis)
+        for analysis in _supervised_parallel_analyses(
+            tasks,
+            workers=resolved_workers,
+            worker_tasks_per_child=worker_tasks_per_child,
+            common_args=common_args,
+            log_queue=log_queue,
+        ):
+            consume(analysis)
 
     requirements = HardwareProfileRequirements(
         architecture=str(manifest["architecture"]),
