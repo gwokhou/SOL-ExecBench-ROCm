@@ -161,6 +161,14 @@ def main() -> int:
             "Defaults to run_dir; useful when an independent rerun only retains traces."
         ),
     )
+    parser.add_argument(
+        "--compiler-build-id",
+        required=True,
+        help=(
+            "Compiler identity recorded for this baseline run. Supply the current "
+            "HIP compiler build/version; historical ROCm identities are not inferred."
+        ),
+    )
     args = parser.parse_args()
     coverage = _json(args.coverage)
     if not isinstance(coverage, dict):
@@ -217,7 +225,7 @@ def main() -> int:
         "environment_fingerprint": _canonical_digest(environment),
         "clock_policy": "rocm_smi_stable_peak_lock_with_post_reset",
         "timing_policy": "latency_ms",
-        "compiler_build_id": "hipcc-7.1.52802-26aae437f6",
+        "compiler_build_id": args.compiler_build_id,
         "eligible_workloads": len(expected),
     }
     (output_dir / "baseline-inputs.json").write_text(

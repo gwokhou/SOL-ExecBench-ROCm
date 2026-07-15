@@ -82,6 +82,8 @@ def test_filters_traces_that_are_explicitly_blocked_after_measurement(
             str(output_dir),
             "--authority-input",
             str(authority),
+            "--compiler-build-id",
+            "hipcc-7.2-current-build",
         ],
     )
 
@@ -93,3 +95,5 @@ def test_filters_traces_that_are_explicitly_blocked_after_measurement(
     assert [(row["definition"], row["workload"]["uuid"]) for row in rows] == [
         ("gemm", "eligible")
     ]
+    inputs = json.loads((output_dir / "baseline-inputs.json").read_text())
+    assert inputs["compiler_build_id"] == "hipcc-7.2-current-build"
