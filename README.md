@@ -154,6 +154,9 @@ The `sol-execbench` command provides several subcommands:
 | `--format json contract cli` | Print the generated CLI contract |
 | `--format json environment doctor` | Print ROCm environment diagnostics |
 | `--format json toolchain route` | Print ROCm toolchain routing diagnostics |
+| `hardware model calibrate` | Collect diagnostic AMD hardware calibration evidence |
+| `hardware fusion collect` | Collect shape-exact fusion-capacity evidence |
+| `score official` | Emit gated official-score evidence from release artifacts |
 | `baseline export` | Export a measured HIP baseline registry from SOL trace JSONL |
 | `dataset migrate sol` | Migrate downloaded SOL-ExecBench inputs into local layout |
 | `dataset migrate flashinfer` | Migrate downloaded FlashInfer trace inputs into local layout |
@@ -174,6 +177,7 @@ Key evaluation options:
 | `--keep-staging` | off | Preserve the temporary staging directory |
 | `--profile` | `none` | Collect diagnostic profiling artifacts (`rocprofv3`) |
 | `--static-evidence` | `none` | Collect diagnostic static kernel evidence (`auto`) |
+| `--decision` | `none` | Collect diagnostic resource-decision hints (`auto`; HIP/C++ static evidence only) |
 | `-v`, `--verbose` | off | Show subprocess output and staging details |
 
 CLI 2.0 is intentionally breaking and does not install compatibility aliases:
@@ -244,6 +248,14 @@ User references:
   (hipBLAS, MIOpen, Composable Kernel, rocWMMA) for RDNA 4 and CDNA 3 targets;
   CDNA 4-specific low-precision benchmark adaptation is deferred until suitable
   hardware evidence is available. CDNA 4 validation is also deferred.
+- [Release and Official Score Workflow](docs/user/RELEASE-SCORING.md) -- hardware
+  calibration, fusion evidence, release baselines, rerun verification, and the
+  gated `score official` artifact chain
+- [Static Kernel Evidence](docs/user/static_kernel_evidence.md),
+  [Decision Sidecar](docs/user/decision_sidecar.md),
+  [Profile Summary](docs/user/profile_summary_sidecar.md), and
+  [Agent Feedback](docs/user/agent_feedback_sidecar.md) -- optional diagnostic
+  sidecars and their limits
 
 Public policy and evidence references:
 
@@ -256,6 +268,9 @@ Public policy and evidence references:
   representative commands, and non-claims
 - [Public Prerelease](docs/user/public_prerelease.md) -- public release materials
   and navigation
+- [Confirmed Evidence](docs/user/confirmed_evidence.md) and
+  [AMD SOL Bound Evidence](docs/user/amd_sol.md) -- confirmed-score consumers and
+  bound-artifact requirements
 
 Release and maintainer records:
 

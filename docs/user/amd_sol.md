@@ -36,3 +36,9 @@ model plus fusion-validation evidence, its reference path, and SHA-256 digest.
 The builder validates the evidence architecture and checksum before producing
 an artifact. Only v5 files are accepted by the derived-score path and official
 gate; older schemas are rejected rather than migrated.
+
+The command and artifact sequence for collecting calibration and fusion inputs,
+freezing a release baseline, and emitting a gated score is documented in
+[Release and Official Score Workflow](RELEASE-SCORING.md). The sequence does
+not imply that every calibration or bound is authoritative: each output keeps
+its recorded validation and scope boundary.

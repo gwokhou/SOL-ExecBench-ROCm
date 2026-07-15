@@ -16,7 +16,20 @@ integrators, and researchers. Start with:
   [Workload Schema](user/workload.md), [Solution Schema](user/solution.md), and
   [Trace Schema](user/trace.md)
 - [Researcher Guide](user/RESEARCHER-GUIDE.md), [ROCm Setup](user/rocm.md),
-  [ROCm Timing](user/rocm_timing.md), and [ROCm Libraries](user/rocm_libraries.md)
+  [ROCm Timing](user/rocm_timing.md),
+  [ROCm Toolchain Routing](user/rocm_toolchain_routing.md), and
+  [ROCm Libraries](user/rocm_libraries.md)
+- [Release and Official Score Workflow](user/RELEASE-SCORING.md),
+  [AMD SOL Bound Evidence](user/amd_sol.md), and
+  [Confirmed Evidence](user/confirmed_evidence.md)
+- [Static Kernel Evidence](user/static_kernel_evidence.md),
+  [Decision Sidecar](user/decision_sidecar.md),
+  [Decision Sidecar Contract](user/decision_sidecar_contract.md),
+  [Profile Summary Sidecar](user/profile_summary_sidecar.md), and
+  [Agent Feedback Sidecar](user/agent_feedback_sidecar.md)
+- [Schema Boundaries](user/schema-boundaries.md),
+  [Research Preview](user/research_preview.md), and
+  [Public Prerelease](user/public_prerelease.md)
 - [Claims](user/CLAIMS.md), [Provenance](user/provenance.md), and
   [Compliance](user/compliance.md)
 
