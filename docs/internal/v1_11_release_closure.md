@@ -1,5 +1,8 @@
 # v1.11 Release Closure
 
+> Historical release record. It does not define the current sidecar contract;
+> current AMD SOL readers require only `sol_execbench.amd_sol_bound.v5`.
+
 v1.11 adds a local paper-dataset parity inventory and ROCm execution-closure
 workflow. It improves auditability of the public SOL ExecBench dataset surface,
 but it is not full 235-problem ROCm validation, not original 124-model
@@ -34,6 +37,6 @@ required evidence:
 ## Public Contract Boundary
 
 v1.11 sidecars do not modify canonical problem-local `definition.json`, `workload.jsonl`,
-problem-local `solution.json`, trace JSON, primary `sol-execbench` CLI behavior, AMD SOL v2
-sidecars, or SOLAR derivation sidecars. New report and closure fields remain
+problem-local `solution.json`, trace JSON, primary `sol-execbench` CLI behavior,
+pre-V5 AMD SOL sidecars, or SOLAR derivation sidecars. New report and closure fields remain
 sidecar-only.

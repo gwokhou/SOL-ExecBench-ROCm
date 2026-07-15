@@ -99,6 +99,14 @@ class AmdNativeSuiteReport:
     derived: bool = True
     canonical_output: str = CANONICAL_BENCHMARK_OUTPUT
 
+    def __post_init__(self) -> None:
+        if self.schema_version != AMD_SCORE_SCHEMA_VERSION:
+            raise ValueError("AMD-native score report has invalid schema_version")
+        if not isinstance(self.derived, bool):
+            raise ValueError("AMD-native score report derived must be a boolean")
+        if self.canonical_output != CANONICAL_BENCHMARK_OUTPUT:
+            raise ValueError("AMD-native score report has invalid canonical_output")
+
     @property
     def mean_score(self) -> float | None:
         """Mean score across workloads with complete numeric evidence."""
@@ -194,48 +202,90 @@ def _bound_eligibility(value: Any) -> BoundEligibilityEvidence | None:
 def amd_native_score_from_dict(payload: Mapping[str, Any]) -> AmdNativeScore:
     """Reconstruct an :class:`AmdNativeScore` from its ``to_dict()`` payload.
 
-    The ``supported`` key emitted by ``to_dict()`` is a computed property and is
-    ignored on load.
+    Only the exact serialization emitted by :meth:`AmdNativeScore.to_dict` is
+    accepted.
     """
-    warnings = payload.get("warnings")
-    return AmdNativeScore(
+    expected = {
+        "definition",
+        "workload_uuid",
+        "measured_latency_ms",
+        "baseline_latency_ms",
+        "sol_bound_ms",
+        "score",
+        "claim_level",
+        "warnings",
+        "baseline_source",
+        "supported",
+        "evidence_refs",
+        "derived_evidence_refs",
+        "bound_eligibility",
+    }
+    if set(payload) != expected:
+        raise ValueError("AMD-native score has missing or unknown fields")
+    if not isinstance(payload["warnings"], list):
+        raise ValueError("AMD-native score warnings must be a list")
+    if not isinstance(payload["supported"], bool):
+        raise ValueError("AMD-native score supported must be a boolean")
+    score = AmdNativeScore(
         definition=str(payload["definition"]),
         workload_uuid=str(payload["workload_uuid"]),
-        measured_latency_ms=_optional_float(payload.get("measured_latency_ms")),
-        baseline_latency_ms=_optional_float(payload.get("baseline_latency_ms")),
-        sol_bound_ms=_optional_float(payload.get("sol_bound_ms")),
-        score=_optional_float(payload.get("score")),
-        claim_level=str(payload.get("claim_level", AMD_SCORE_CLAIM_LEVEL)),
-        warnings=tuple(str(warning) for warning in warnings)
-        if isinstance(warnings, list)
-        else (),
-        baseline_source=str(payload.get("baseline_source", "missing")),
-        evidence_refs=_str_dict(payload.get("evidence_refs")),
-        derived_evidence_refs=_str_dict(payload.get("derived_evidence_refs")),
-        bound_eligibility=_bound_eligibility(payload.get("bound_eligibility")),
+        measured_latency_ms=_optional_float(payload["measured_latency_ms"]),
+        baseline_latency_ms=_optional_float(payload["baseline_latency_ms"]),
+        sol_bound_ms=_optional_float(payload["sol_bound_ms"]),
+        score=_optional_float(payload["score"]),
+        claim_level=str(payload["claim_level"]),
+        warnings=tuple(str(warning) for warning in payload["warnings"]),
+        baseline_source=str(payload["baseline_source"]),
+        evidence_refs=_str_dict(payload["evidence_refs"]),
+        derived_evidence_refs=_str_dict(payload["derived_evidence_refs"]),
+        bound_eligibility=_bound_eligibility(payload["bound_eligibility"]),
     )
+    if score.to_dict() != dict(payload):
+        raise ValueError("AMD-native score fields are inconsistent")
+    return score
 
 
 def amd_native_suite_report_from_dict(
     payload: Mapping[str, Any],
 ) -> AmdNativeSuiteReport:
-    """Reconstruct an :class:`AmdNativeSuiteReport` from its ``to_dict()`` payload."""
-    scores_payload = payload.get("scores")
+    """Strictly reconstruct the sole AMD-native score report schema."""
+    expected = {
+        "schema_version",
+        "derived",
+        "canonical_output",
+        "mean_score",
+        "scored_count",
+        "unscored_count",
+        "warnings",
+        "baseline_summary",
+        "evidence_summary",
+        "scores",
+    }
+    if set(payload) != expected:
+        raise ValueError("AMD-native score report has missing or unknown fields")
+    if payload["schema_version"] != AMD_SCORE_SCHEMA_VERSION:
+        raise ValueError("AMD-native score report has invalid schema_version")
+    if not isinstance(payload["derived"], bool):
+        raise ValueError("AMD-native score report derived must be a boolean")
+    if payload["canonical_output"] != CANONICAL_BENCHMARK_OUTPUT:
+        raise ValueError("AMD-native score report has invalid canonical_output")
+    scores_payload = payload["scores"]
     if not isinstance(scores_payload, list):
         raise ValueError("amd native suite report requires a scores list")
     scores = tuple(amd_native_score_from_dict(score) for score in scores_payload)
-    raw_summary = payload.get("baseline_summary")
+    raw_summary = payload["baseline_summary"]
     baseline_summary: dict[str, int] | None
     if isinstance(raw_summary, Mapping):
         baseline_summary = {str(key): int(val) for key, val in raw_summary.items()}
     else:
         baseline_summary = None
-    return AmdNativeSuiteReport(
+    report = AmdNativeSuiteReport(
         scores=scores,
         baseline_summary=baseline_summary,
-        schema_version=str(payload.get("schema_version", AMD_SCORE_SCHEMA_VERSION)),
-        derived=bool(payload.get("derived", True)),
-        canonical_output=str(
-            payload.get("canonical_output", CANONICAL_BENCHMARK_OUTPUT)
-        ),
+        schema_version=payload["schema_version"],
+        derived=payload["derived"],
+        canonical_output=payload["canonical_output"],
     )
+    if report.to_dict() != dict(payload):
+        raise ValueError("AMD-native score report fields are inconsistent")
+    return report

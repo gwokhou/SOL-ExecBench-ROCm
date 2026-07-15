@@ -143,10 +143,7 @@ def load_official_release_baseline(
     baseline_path = Path(baseline_path)
     bundle_path = Path(bundle_path)
     verification_path = Path(verification_path)
-    baseline = load_scoring_baseline_artifact(
-        baseline_path,
-        required_schema_version="sol_execbench.scoring_baseline.v1",
-    )
+    baseline = load_scoring_baseline_artifact(baseline_path)
     bundle = load_release_baseline_bundle(bundle_path)
     verification = release_baseline_verification_from_dict(
         json.loads(verification_path.read_text(encoding="utf-8"))

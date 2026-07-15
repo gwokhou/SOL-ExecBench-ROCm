@@ -9,6 +9,7 @@ import json
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
 from click.testing import CliRunner
 
 from sol_execbench.cli.main import cli
@@ -563,3 +564,21 @@ def test_report_loader_round_trips_amd_native_score_report(tmp_path: Path) -> No
     assert restored.schema_version == AMD_SCORE_SCHEMA_VERSION
     assert [s.score for s in restored.scores] == [0.75, 0.9]
     assert restored.to_dict() == payload
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        lambda payload: payload.pop("schema_version"),
+        lambda payload: payload.__setitem__("schema_version", "unsupported"),
+        lambda payload: payload.pop("evidence_summary"),
+    ),
+)
+def test_report_loader_rejects_noncurrent_or_incomplete_schema(mutation) -> None:
+    from sol_execbench.core.scoring.amd_score import amd_native_suite_report_from_dict
+
+    payload = AmdNativeSuiteReport(scores=(_score(),)).to_dict()
+    mutation(payload)
+
+    with pytest.raises(ValueError, match="schema|fields"):
+        amd_native_suite_report_from_dict(payload)

@@ -399,7 +399,10 @@ Baseline artifacts are derived JSON inputs keyed by definition and workload UUID
 ```json
 {
   "schema_version": "sol_execbench.scoring_baseline.v1",
+  "derived": true,
   "release": "v1.7",
+  "source": "optimized-baseline-release",
+  "summary": {"entries": 1},
   "entries": [
     {
       "definition": "example_problem",
@@ -417,18 +420,21 @@ is labeled with `baseline_source: reference_latency` and carries a provisional
 baseline warning. Treat `baseline_source: scoring_baseline` as the release-style
 path; treat `reference_latency` as a development fallback.
 
-## AMD SOL Bound Artifact V2 Semantics
+## AMD SOL Bound Artifact V5 Semantics
 
-The v2 AMD SOL bound artifact is a derived sidecar. It does not modify
+The v5 AMD SOL bound artifact is a derived sidecar. It does not modify
 `Definition`, `Workload`, `Trace`, `Solution`, or primary `sol-execbench` CLI
 schemas. The artifact exists to make AMD-native score inputs auditable:
 
 - `bound_graph`: workload-bound operation and tensor evidence.
 - `operator_work_estimates`: per-operation formulas, FLOPs, byte buckets,
   movement bytes, confidence, rationale, and warnings.
-- `op_bounds`: per-operation compute bound, memory bound, SOL bound, limiting
-  resource, confidence, and rationale.
-- `aggregate_bound`: the score-eligibility state for the workload.
+- `fusion_groups` and `group_bounds`: fusion-aware compute/memory lower-bound
+  evidence, confidence, and rationale.
+- `theoretical_lower_bound`: the sole score-eligibility state and theoretical
+  `T_SOL` floor for the workload.
+- `performance_diagnostics`: provider and fastest-known measurements that are
+  explicitly excluded from score authority.
 - `coverage_summary`: supported, inexact, and unsupported counts by operation
   family plus worst confidence.
 - `warnings`: deterministic degradation categories for callers and reports.
@@ -458,7 +464,7 @@ B200 or Blackwell equivalence, hosted leaderboard readiness, or new
 real-hardware validation.
 
 Use these artifacts as auditable AMD ROCm derived evidence. Do not present
-`coverage_summary`, `aggregate_status`, `derived_evidence_refs`, or score
+`coverage_summary`, `theoretical_lower_bound`, `derived_evidence_refs`, or score
 eligibility as proof of original-paper parity, upstream SOLAR parity, Blackwell
 or B200 equivalence, leaderboard readiness, or benchmark-scale hardware
 validation.

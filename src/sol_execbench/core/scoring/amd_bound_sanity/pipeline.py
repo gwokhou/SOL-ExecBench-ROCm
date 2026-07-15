@@ -202,6 +202,9 @@ def _ingest_scores(
 def _audit_bound_artifact(
     audit: SanityAuditState, artifact: dict[str, Any], workload: WorkloadAuditState
 ) -> None:
+    if artifact.get("schema_version") != "sol_execbench.amd_sol_bound.v5":
+        workload.blocker_codes.add("unsupported_amd_sol_schema")
+        return
     if _bound_status(artifact) != "scored":
         workload.blocker_codes.add("amd_sol_not_scored")
     hardware = path_dict(artifact, "hardware_model")
@@ -214,17 +217,12 @@ def _audit_bound_artifact(
     if _warnings_from(artifact):
         workload.blocker_codes.add("bound_evidence_warning")
     _audit_operator_estimates(audit, artifact, workload)
-    if artifact.get("schema_version") == "sol_execbench.amd_sol_bound.v5":
-        _audit_fusion_groups(artifact, workload)
-    else:
-        workload.blocker_codes.add("unsupported_amd_sol_schema")
+    _audit_fusion_groups(artifact, workload)
 
 
 def _bound_status(artifact: dict[str, Any]) -> str | None:
-    """Read legacy aggregate status or the v5 explicit authority floor status."""
-    return path_str_or_none(
-        path_dict(artifact, "theoretical_lower_bound"), "status"
-    ) or path_str_or_none(path_dict(artifact, "aggregate_bound"), "status")
+    """Read the v5 explicit authority-floor status."""
+    return path_str_or_none(path_dict(artifact, "theoretical_lower_bound"), "status")
 
 
 def _audit_operator_estimates(

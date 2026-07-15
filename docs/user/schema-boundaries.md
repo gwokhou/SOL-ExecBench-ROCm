@@ -12,15 +12,14 @@ Allowed raw payload infrastructure:
 
 Allowed artifact boundaries:
 
-- historical trace/report readers
 - benchmark artifact readers
-- compatibility adapters for legacy sidecars
+- current, version-specific sidecar readers
 
 Allowed parser boundaries:
 
 - `*_parsing.py` modules
 - source reference adapters such as `paper_denominator_sources.py`
-- sidecar readers whose public contract is compatibility with historical JSON
+- sidecar readers that require their sole supported schema version
 
 Business logic must not add new `isinstance(value, dict)` payload checks. Use
 `sol_execbench.core.data.path_access` helpers or define a local typed adapter.

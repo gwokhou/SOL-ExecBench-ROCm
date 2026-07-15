@@ -622,7 +622,10 @@ def test_trace_workflow_prefers_release_scoring_baseline_artifact():
     baseline = scoring_baseline_artifact_from_dict(
         {
             "schema_version": BASELINE_ARTIFACT_SCHEMA_VERSION,
+            "derived": True,
             "release": "v1.7",
+            "source": "baselines/v1.7.json",
+            "summary": {"entries": 1},
             "entries": [
                 {
                     "definition": artifact.definition,
@@ -632,7 +635,6 @@ def test_trace_workflow_prefers_release_scoring_baseline_artifact():
                 }
             ],
         },
-        source="baselines/v1.7.json",
     )
 
     score = score_amd_native_trace_workload(

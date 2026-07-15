@@ -1,5 +1,8 @@
 # v1.4 Compatibility Inventory
 
+> Historical planning record only. It does not define the current JSON sidecar
+> contract; current readers accept only their explicitly supported schema version.
+
 This inventory defines public contracts that v1.4 must preserve while adapting
 engineering practices from the separate hip-execbench project.
 It is source-grounded and intentionally separate from the user-facing benchmark
@@ -125,8 +128,8 @@ above:
 
 - Historical Phase 19 analysis originally avoided public CLI additions; the
   current CLI now includes public diagnostic and metadata surfaces.
-- Scope future compatibility analysis to preserving the current public
-  `sol-execbench` options and subcommands.
+- Do not infer a sidecar or JSON compatibility obligation from this historical
+  inventory.
 - Do not add public `sol-execbench` CLI options or subcommands.
 - Do not change Pydantic public field names, required fields, or validation
   semantics.

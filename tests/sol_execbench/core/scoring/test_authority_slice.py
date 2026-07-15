@@ -9,6 +9,7 @@ from sol_execbench.cli.main import cli
 from sol_execbench.core.scoring.amd_bound_sanity.builder import (
     build_amd_bound_sanity_report,
 )
+from sol_execbench.core.scoring.amd_bound_sanity.models import AmdBoundSanityReport
 from sol_execbench.core.scoring.authority_slice import (
     AUTHORITY_SLICE_SCHEMA_VERSION,
     authority_slice_manifest_from_dict,
@@ -21,7 +22,13 @@ def _bound(uuid: str, *, status: str = "scored", confidence: str = "supported") 
         "schema_version": "sol_execbench.amd_sol_bound.v5",
         "definition": f"demo_{uuid}",
         "workload_uuid": uuid,
-        "aggregate_bound": {"status": status},
+        "theoretical_lower_bound": {
+            "status": status,
+            "authority_eligible": status == "scored",
+            "t_sol_floor_ms": 1.0,
+            "reason": "test authority floor",
+            "node_ids": [],
+        },
         "hardware_model": {
             "architecture": "gfx1200",
             "hardware_validation_status": "validated",
@@ -118,6 +125,15 @@ def test_authority_slice_is_conservative_complete_and_deterministic() -> None:
     )
     assert first.to_json() == second.to_json()
     assert authority_slice_manifest_from_dict(json.loads(first.to_json())) == first
+
+
+def test_authority_slice_rejects_noncurrent_sanity_report_schema() -> None:
+    report = build_amd_bound_sanity_report(created_at="2026-07-11T00:00:00Z")
+    payload = json.loads(report.to_json())
+    payload["schema_version"] = "unsupported"
+
+    with pytest.raises(ValueError, match="schema_version"):
+        AmdBoundSanityReport.model_validate(payload)
 
 
 def test_authority_slice_rejects_digest_tampering() -> None:
