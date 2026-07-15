@@ -47,7 +47,9 @@ def test_amd_bound_sanity_ignores_non_object_score_records() -> None:
     assert report.status_totals.missing_evidence >= 1
 
 
-def test_amd_bound_sanity_loads_path_backed_bound_sidecars(tmp_path: Path) -> None:
+def test_amd_bound_sanity_rejects_bound_sidecars_without_v5_schema(
+    tmp_path: Path,
+) -> None:
     artifact_path = tmp_path / "bound.json"
     artifact_path.write_text(
         json.dumps(
@@ -65,7 +67,8 @@ def test_amd_bound_sanity_loads_path_backed_bound_sidecars(tmp_path: Path) -> No
         amd_sol_artifacts=[artifact_path], created_at=CREATED_AT
     )
 
-    assert report.workloads[0].source_statuses.amd_sol_status == "scored"
+    assert report.workloads[0].source_statuses.amd_sol_status is None
+    assert "unsupported_amd_sol_schema" in report.workloads[0].blocker_codes
 
 
 def test_amd_bound_sanity_reads_v5_explicit_theoretical_floor_status() -> None:
@@ -218,11 +221,12 @@ def amd_sol_artifact(
             "hardware_validation_status": hardware_validation_status,
             "model_validation_status": model_validation_status,
         },
-        "aggregate_bound": {
+        "theoretical_lower_bound": {
             "status": status,
-            "scored": status != "unscored",
+            "authority_eligible": status != "unscored",
             "reason": f"aggregate {status}",
-            "sol_bound_ms": 1.0 if status != "unscored" else 0.0,
+            "t_sol_floor_ms": 1.0 if status != "unscored" else 0.0,
+            "node_ids": [],
         },
         "coverage_summary": {
             "total_ops": 2,

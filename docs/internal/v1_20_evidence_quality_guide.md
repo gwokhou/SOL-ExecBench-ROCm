@@ -75,7 +75,7 @@ not mutate source authority fields. Trust summaries are review guidance only.
 
 Agent-feedback sidecars are separate next-experiment guidance. Valid, missing,
 malformed, contradictory-authority, stale, unknown, partial, or unavailable
-`sol_execbench.agent_feedback.v1` payloads do not feed claim-upgrade eligibility
+`sol_execbench.agent_feedback.v2` payloads do not feed claim-upgrade eligibility
 and do not create correctness, timing, score, evidence-tier,
 confirmed-improvement, release-gate, cutover, paper-parity, or leaderboard
 authority. Consumers must treat freshness mismatches as diagnostic stale states

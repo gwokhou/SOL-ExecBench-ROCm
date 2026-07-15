@@ -102,24 +102,9 @@ class ScoringBaselineArtifact:
 
 def load_scoring_baseline_artifact(
     path: Path,
-    *,
-    required_schema_version: str | None = None,
 ) -> ScoringBaselineArtifact:
-    """Load a scoring baseline artifact from JSON.
-
-    Callers that emit authoritative evidence can require an explicit schema
-    marker. The legacy default remains permissive for non-authoritative score
-    derivation inputs.
-    """
+    """Load the sole supported scoring baseline artifact schema from JSON."""
     payload = json.loads(path.read_text())
-    if (
-        required_schema_version is not None
-        and payload.get("schema_version") != required_schema_version
-    ):
-        raise ValueError(
-            "scoring baseline artifact requires schema_version "
-            f"{required_schema_version!r}; got {payload.get('schema_version')!r}"
-        )
     return scoring_baseline_artifact_from_dict(payload, source=str(path))
 
 
@@ -130,17 +115,25 @@ def scoring_baseline_artifact_from_dict(
 ) -> ScoringBaselineArtifact:
     """Parse a baseline artifact payload.
 
-    Expected shape:
-
-    ```json
-    {
-      "release": "v1.7",
-      "entries": [
-        {"definition": "name", "workload_uuid": "uuid", "latency_ms": 1.23}
-      ]
-    }
-    ```
+    Only the exact ``sol_execbench.scoring_baseline.v1`` serialization emitted
+    by :meth:`ScoringBaselineArtifact.to_dict` is accepted.
     """
+    expected = {
+        "schema_version",
+        "derived",
+        "release",
+        "source",
+        "summary",
+        "entries",
+    }
+    if set(payload) != expected:
+        raise ValueError("scoring baseline artifact has missing or unknown fields")
+    if payload["schema_version"] != BASELINE_ARTIFACT_SCHEMA_VERSION:
+        raise ValueError("scoring baseline artifact has invalid schema_version")
+    if not isinstance(payload["derived"], bool):
+        raise ValueError("scoring baseline artifact derived must be a boolean")
+    if not isinstance(payload["summary"], dict):
+        raise ValueError("scoring baseline artifact summary must be an object")
     entries_payload = payload.get("entries")
     if not isinstance(entries_payload, list):
         raise ValueError("scoring baseline artifact requires an entries list")
@@ -150,6 +143,17 @@ def scoring_baseline_artifact_from_dict(
         if not isinstance(raw, dict):
             raise ValueError(f"baseline entry {index} must be an object")
         raw_entry = cast(dict[str, Any], raw)
+        allowed_entry_keys = {
+            "definition",
+            "workload_uuid",
+            "latency_ms",
+            "solution",
+            "source",
+        }
+        if not {"definition", "workload_uuid", "latency_ms"}.issubset(
+            raw_entry
+        ) or not set(raw_entry).issubset(allowed_entry_keys):
+            raise ValueError(f"baseline entry {index} has missing or unknown fields")
         try:
             definition = raw_entry["definition"]
             workload_uuid = raw_entry["workload_uuid"]
@@ -174,12 +178,13 @@ def scoring_baseline_artifact_from_dict(
             )
         )
 
-    return ScoringBaselineArtifact(
+    artifact = ScoringBaselineArtifact(
         entries=tuple(entries),
-        release=str(payload.get("release", "unknown")),
-        source=str(payload.get("source") or source or "unknown"),
-        schema_version=str(
-            payload.get("schema_version", BASELINE_ARTIFACT_SCHEMA_VERSION)
-        ),
-        derived=bool(payload.get("derived", True)),
+        release=payload["release"],
+        source=payload["source"],
+        schema_version=payload["schema_version"],
+        derived=payload["derived"],
     )
+    if artifact.to_dict() != payload:
+        raise ValueError("scoring baseline artifact fields are inconsistent")
+    return artifact

@@ -10,7 +10,8 @@
 
 ## Global Constraints
 
-- Preserve `sol_execbench.scoring_baseline.v1` as the compact backward-compatible score-input artifact.
+- Historical planning note: the current `sol_execbench.scoring_baseline.v1` reader
+  requires the exact current serialization and has no backward-compatibility mode.
 - The selected suite manifest is the denominator: every `(definition, workload_uuid)` appears exactly once in the release bundle.
 - Classification is exactly one of `official`, `derived`, or `blocked`; `derived`/`blocked` must remain visible in summaries.
 - Only `official` rows may be described as official score authority; a nonzero derived or blocked count forbids full-suite-official wording.

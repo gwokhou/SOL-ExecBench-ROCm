@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import Field
 
@@ -140,7 +140,9 @@ class AmdBoundSanityClaimBoundary(StrictArtifactModel):
 
 
 class AmdBoundSanityReport(StrictArtifactModel):
-    schema_version: str = AMD_BOUND_SANITY_SCHEMA_VERSION
+    schema_version: Literal["sol_execbench.amd_bound_sanity.v1"] = (
+        AMD_BOUND_SANITY_SCHEMA_VERSION
+    )
     authority_audit_policy_version: str | None = None
     created_at: str
     sources: AmdBoundSanitySources

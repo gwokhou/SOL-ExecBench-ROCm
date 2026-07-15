@@ -122,7 +122,6 @@ from sol_execbench.core.scoring.amd_score.derived_artifacts import (
     resolve_hardware_model_from_path,
 )
 from sol_execbench.core.scoring.baseline_artifact import (
-    BASELINE_ARTIFACT_SCHEMA_VERSION,
     load_scoring_baseline_artifact,
 )
 from sol_execbench.core.scoring.official_score import OFFICIAL_AGGREGATION_POLICY
@@ -2410,14 +2409,7 @@ def main():
     summaries = []
     amd_scores: list[AmdNativeScore] = []
     scoring_baseline = (
-        load_scoring_baseline_artifact(
-            args.scoring_baseline,
-            required_schema_version=(
-                BASELINE_ARTIFACT_SCHEMA_VERSION
-                if args.official_score_report is not None
-                else None
-            ),
-        )
+        load_scoring_baseline_artifact(args.scoring_baseline)
         if args.scoring_baseline is not None
         else None
     )
@@ -2449,16 +2441,6 @@ def main():
     args._resolved_hardware_model = external_hardware_model
     args._fusion_validation = fusion_validation
     args._fusion_validation_sha256 = fusion_validation_sha256
-    if (
-        args.official_score_report is not None
-        and scoring_baseline is not None
-        and scoring_baseline.schema_version != BASELINE_ARTIFACT_SCHEMA_VERSION
-    ):
-        raise ValueError(
-            "--official-score-report requires --scoring-baseline schema_version "
-            f"{BASELINE_ARTIFACT_SCHEMA_VERSION!r}; got "
-            f"{scoring_baseline.schema_version!r}"
-        )
     release_baseline = (
         load_official_release_baseline(
             baseline_path=args.scoring_baseline,

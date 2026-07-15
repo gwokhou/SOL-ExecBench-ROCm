@@ -16,8 +16,10 @@ from sol_execbench.core.scoring.baseline_artifact import (
 def _payload(entries: list[dict]) -> dict:
     return {
         "schema_version": BASELINE_ARTIFACT_SCHEMA_VERSION,
+        "derived": True,
         "release": "v2.14",
         "source": "release_baseline_bundle",
+        "summary": {"entries": len(entries)},
         "entries": entries,
     }
 
@@ -48,3 +50,21 @@ def test_baseline_rejects_duplicate_definition_workload_key() -> None:
                 ]
             )
         )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        lambda payload: payload.pop("schema_version"),
+        lambda payload: payload.__setitem__("schema_version", "unsupported"),
+        lambda payload: payload.__setitem__("summary", {"entries": 99}),
+    ),
+)
+def test_baseline_requires_exact_current_schema(mutation) -> None:
+    payload = _payload(
+        [{"definition": "gemm", "workload_uuid": "w1", "latency_ms": 1.0}]
+    )
+    mutation(payload)
+
+    with pytest.raises(ValueError, match="schema|fields|inconsistent"):
+        scoring_baseline_artifact_from_dict(payload)
