@@ -92,9 +92,9 @@ below are optional runtime, Docker, diagnostic, or build inputs discovered in
 | `HOST_UID` | Optional | `1000` Docker build argument | Host user ID used when creating the Docker image user. |
 | `HOST_GID` | Optional | `1000` Docker build argument | Host group ID used when creating the Docker image group. |
 | `HOST_USER` | Optional | `sol-execbench` Docker build argument | Host user name used when creating the Docker image user. |
-| `PYTORCH_TORCH_VERSION` | Optional | `2.10.0+rocm7.1` Docker build argument | Torch wheel version installed in the Docker image. |
-| `PYTORCH_TORCHVISION_VERSION` | Optional | `0.25.0+rocm7.1` Docker build argument | Torchvision wheel version installed in the Docker image. |
-| `PYTORCH_ROCM_INDEX_URL` | Optional | `https://download.pytorch.org/whl/rocm7.1` Docker build argument | PyTorch ROCm wheel index URL. |
+| `PYTORCH_TORCH_VERSION` | Optional | `2.11.0+rocm7.2` Docker build argument | Torch wheel version installed in the Docker image. |
+| `PYTORCH_TORCHVISION_VERSION` | Optional | `0.26.0+rocm7.2` Docker build argument | Torchvision wheel version installed in the Docker image. |
+| `PYTORCH_ROCM_INDEX_URL` | Optional | `https://download.pytorch.org/whl/rocm7.2` Docker build argument | PyTorch ROCm wheel index URL. |
 | `TRITON_ROCM_VERSION` | Optional | `3.6.0` Docker build argument | `triton-rocm` wheel version installed in the Docker image. |
 | `TRITON_ROCM_INDEX_URL` | Optional | `https://download.pytorch.org/whl/` Docker build argument | Extra wheel index URL used for `triton-rocm`. |
 
@@ -132,7 +132,7 @@ The current declared targets are:
 | --- | --- | --- | --- |
 | `rocm-7.0.2-ubuntu-24.04-container` | `7.0.2` | `7.0.2-complete` | `torch==2.10.0+rocm7.0`, `torchvision==0.25.0+rocm7.0`, `triton-rocm==3.6.0` |
 | `rocm-7.1.1-ubuntu-24.04-container` | `7.1.1` | `7.1.1-complete` | `torch==2.10.0+rocm7.1`, `torchvision==0.25.0+rocm7.1`, `triton-rocm==3.6.0` |
-| `rocm-7.2.0-ubuntu-24.04-container` | `7.2.0` | `7.2-complete` | `torch==2.11.0+rocm7.2`, `torchvision==0.26.0+rocm7.2`, `triton-rocm==3.6.0` |
+| `rocm-7.2.0-ubuntu-24.04-container` | `7.2.0` | `7.2-complete` | Default: `torch==2.11.0+rocm7.2`, `torchvision==0.26.0+rocm7.2`, `triton-rocm==3.6.0` |
 
 These targets describe container user-space and dependency policy. They do not,
 by themselves, make native-host, paper-parity, leaderboard, MI300X, CDNA4, or

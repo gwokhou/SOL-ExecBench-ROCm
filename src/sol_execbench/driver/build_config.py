@@ -8,9 +8,11 @@ from __future__ import annotations
 import re
 import subprocess
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from sol_execbench.core.data.solution import CompileOptions, SupportedHardware
+from sol_execbench.core.platform.runtime import resolve_rocm_tool
 from sol_execbench.core.text_utils import ordered_unique
 
 
@@ -26,11 +28,14 @@ def first_gfx_target(lines: list[str]) -> str | None:
 def get_local_gfx(
     *,
     check_output: Callable[..., str] = subprocess.check_output,
+    tool_resolver: Callable[[str], Path | None] | None = None,
 ) -> str | None:
     """Detect the local AMD GPU gfx target using ROCm tooling."""
+    resolve_tool = tool_resolver or resolve_rocm_tool
+    agent_enumerator = resolve_tool("rocm_agent_enumerator")
     try:
         out = check_output(
-            ["rocm_agent_enumerator", "-name"],
+            [str(agent_enumerator or "rocm_agent_enumerator"), "-name"],
             text=True,
             stderr=subprocess.DEVNULL,
         )
@@ -40,9 +45,10 @@ def get_local_gfx(
     except Exception:
         pass
 
+    rocminfo = resolve_tool("rocminfo")
     try:
         out = check_output(
-            ["rocminfo"],
+            [str(rocminfo or "rocminfo")],
             text=True,
             stderr=subprocess.DEVNULL,
         )

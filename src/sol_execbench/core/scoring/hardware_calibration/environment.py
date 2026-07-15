@@ -10,6 +10,7 @@ import subprocess
 from dataclasses import dataclass
 from typing import Protocol
 
+from sol_execbench.core.platform.runtime import resolve_rocm_tool
 from sol_execbench.core.scoring.hardware_calibration.hip_probe import (
     CalibrationProfileKey,
 )
@@ -41,7 +42,7 @@ class RocmInfoRuntime:
     def _fields_for(self, device: int) -> tuple[str, str | None]:
         try:
             output = subprocess.check_output(
-                ("rocminfo",), text=True, stderr=subprocess.DEVNULL
+                (_rocm_command("rocminfo"),), text=True, stderr=subprocess.DEVNULL
             )
         except (OSError, subprocess.SubprocessError) as exc:
             raise RuntimeError("HIP runtime discovery unavailable") from exc
@@ -57,12 +58,20 @@ class RocmInfoRuntime:
     def rocm_version(self) -> str | None:
         try:
             output = subprocess.check_output(
-                ("hipcc", "--version"), text=True, stderr=subprocess.DEVNULL
+                (_rocm_command("hipcc"), "--version"),
+                text=True,
+                stderr=subprocess.DEVNULL,
             )
         except (OSError, subprocess.SubprocessError):
             return None
         match = re.search(r"(?:HIP|ROCm) version:\s*([^\s]+)", output, re.I)
         return match.group(1) if match else None
+
+
+def _rocm_command(tool: str) -> str:
+    """Use the discovered absolute ROCm tool path when available."""
+    path = resolve_rocm_tool(tool)
+    return str(path) if path is not None else tool
 
 
 def discover_gpu(device: int, runtime: GpuRuntime | None = None) -> GpuEnvironment:

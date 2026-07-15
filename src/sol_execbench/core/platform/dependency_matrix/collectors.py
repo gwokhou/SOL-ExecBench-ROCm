@@ -6,6 +6,8 @@ import importlib.metadata
 import subprocess
 from pathlib import Path
 
+from sol_execbench.core.platform.runtime import discover_rocm_root, resolve_rocm_tool
+
 from sol_execbench.core.platform.dependency_matrix.models import (
     PytorchDependencyObservation,
 )
@@ -55,16 +57,16 @@ def collect_pytorch_dependency_observation() -> PytorchDependencyObservation:
         triton_rocm_distribution_version=triton_rocm_distribution_version,
         triton_rocm_status=triton_rocm_status,
         container_rocm_user_space_version=rocm_version,
-        hipcc_version=_collect_command_output(["hipcc", "--version"]),
+        hipcc_version=_collect_command_output(_hipcc_version_command()),
         toolchain_rocm_version=rocm_version,
     )
 
 
-def _collect_rocm_version_file() -> str | None:
-    for path in (
-        Path("/opt/rocm/.info/version"),
-        Path("/opt/rocm/.info/version-dev"),
-    ):
+def _collect_rocm_version_file(root: Path | None = None) -> str | None:
+    root = root or discover_rocm_root()
+    if root is None:
+        return None
+    for path in (root / ".info/version", root / ".info/version-dev"):
         try:
             version = path.read_text(encoding="utf-8").strip()
         except OSError:
@@ -72,6 +74,11 @@ def _collect_rocm_version_file() -> str | None:
         if version:
             return version
     return None
+
+
+def _hipcc_version_command() -> list[str]:
+    hipcc = resolve_rocm_tool("hipcc")
+    return [str(hipcc or "hipcc"), "--version"]
 
 
 def _collect_command_output(command: list[str]) -> str | None:

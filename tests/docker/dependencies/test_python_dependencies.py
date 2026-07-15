@@ -26,7 +26,7 @@ def test_rocm_dependency_sources():
         in dependencies
     )
     assert (
-        "torch==2.10.0+rocm7.1; sys_platform == 'linux' and platform_machine == 'x86_64'"
+        "torch==2.11.0+rocm7.2; sys_platform == 'linux' and platform_machine == 'x86_64'"
         in dependencies
     )
     assert (
@@ -34,7 +34,7 @@ def test_rocm_dependency_sources():
         in dependencies
     )
     assert (
-        "torchvision==0.25.0+rocm7.1; sys_platform == 'linux' and platform_machine == 'x86_64'"
+        "torchvision==0.26.0+rocm7.2; sys_platform == 'linux' and platform_machine == 'x86_64'"
         in dependencies
     )
     for forbidden in FORBIDDEN:
@@ -43,7 +43,7 @@ def test_rocm_dependency_sources():
     indexes = data["tool"]["uv"]["index"]
     assert any(idx["name"] == "pytorch-rocm71" for idx in indexes)
     rocm_index = next(idx for idx in indexes if idx["name"] == "pytorch-rocm71")
-    assert rocm_index["url"] == "https://download.pytorch.org/whl/rocm7.1"
+    assert rocm_index["url"] == "https://download.pytorch.org/whl/rocm7.2"
     assert rocm_index["explicit"] is True
 
     sources = data["tool"]["uv"]["sources"]

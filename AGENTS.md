@@ -28,9 +28,9 @@ commits.
 - `uv run pytest tests/` runs the test suite. Do not add `-n auto`: ROCm workers
   consume substantial memory; the repository config limits the default to eight.
 - `uv run pytest tests/sol_execbench/test_e2e.py` runs a focused test module.
-- `uv run sol-execbench <problem_dir> --solution <path>` evaluates one solution.
+- `uv run sol-execbench evaluate <problem_dir> --solution <path>` evaluates one solution.
 - `uv run --with ruff ruff check .` lints, and `uv run --with ruff ruff format .`
-  formats Python files. Run `uv run ty` for static type checking when relevant.
+  formats Python files. Run `uv run ty check` for static type checking when relevant.
 - `./scripts/run_docker.sh --build` builds the ROCm evaluation environment.
 
 ## Coding Style & Naming Conventions
@@ -53,6 +53,24 @@ tests with existing markers such as `requires_rocm`, `cpp`, `requires_rdna4`, or
 `requires_cdna3`; these document required hardware and allow safe skipping. Prefer
 small unit tests for schemas and driver logic, adding integration coverage for
 subprocess or GPU execution changes.
+
+## Quality Regression Guardrails
+
+- For Python changes, run the relevant subset of Ruff, `ty check`, readability,
+  coupling, and Pytest; CI runs all four static gates. Keep their limits in one
+  policy source, and never raise a quality baseline to accept new debt.
+- Lint exclusions are root-scoped: exclude downloaded `data/` and root
+  `examples/` only, never `core/data` or `tests/examples` by name.
+- Do not add production functions over 80 lines or 10 parameters, or test files
+  over 1000 lines. Split touched violations unless fixing correctness urgently.
+- Orchestrators use typed stage inputs/results; parsers own raw JSON validation.
+  Reuse core primitives; write canonical artifacts atomically.
+- Subprocesses need bounded, redacted output, timeouts, and process-group cleanup.
+  Hardware tests declare all prerequisites and precisely skip when unavailable;
+  never hide source regressions behind broad `xfail` or skips.
+- Breaking public changes are allowed, but update the CLI contract, user docs,
+  examples, and tests together; remove superseded paths. User-facing errors need
+  a stable code, actionable hint, and no leaked credentials.
 
 ## Commit & Pull Request Guidelines
 

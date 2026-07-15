@@ -22,7 +22,7 @@ uv sync --all-groups
 ```
 
 Requires Python >=3.12, <3.14 and the `uv` package manager. On Linux x86_64,
-dependencies resolve to PyTorch `2.10.0+rocm7.1`, torchvision `0.25.0+rocm7.1`,
+dependencies resolve to PyTorch `2.11.0+rocm7.2`, torchvision `0.26.0+rocm7.2`,
 and `triton-rocm==3.6.0`. Other platforms use non-ROCm PyTorch wheels so
 CPU-safe development tasks still work.
 

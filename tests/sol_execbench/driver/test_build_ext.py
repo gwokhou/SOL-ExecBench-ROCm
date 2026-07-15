@@ -131,7 +131,7 @@ class TestTemplateAST:
             elif isinstance(node, ast.ImportFrom):
                 import_names.append(node.module)
         assert "os" not in import_names
-        assert "shutil" in import_names
+        assert "sol_execbench.core.platform.runtime" in import_names
         assert "torch.utils.cpp_extension" in import_names
         assert "sol_execbench.core.data.solution" in import_names
 
@@ -251,7 +251,7 @@ class TestRocmRootResolution:
     def test_template_rebases_portable_rocm_flags(self):
         source = _TEMPLATE_PATH.read_text()
 
-        assert 'shutil.which("hipcc")' in source
+        assert "discover_rocm_root" in source
         assert 'ENVIRON.setdefault("CXX"' in source
         assert 'flag == "-I/opt/rocm/include"' in source
         assert 'flag == "-L/opt/rocm/lib"' in source

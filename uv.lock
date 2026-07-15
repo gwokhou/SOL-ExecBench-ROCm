@@ -1136,8 +1136,25 @@ wheels = [
 
 [[package]]
 name = "setuptools"
+version = "81.0.0"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "platform_machine == 'x86_64' and sys_platform == 'linux'",
+]
+sdist = { url = "https://files.pythonhosted.org/packages/0d/1c/73e719955c59b8e424d015ab450f51c0af856ae46ea2da83eba51cc88de1/setuptools-81.0.0.tar.gz", hash = "sha256:487b53915f52501f0a79ccfd0c02c165ffe06631443a886740b91af4b7a5845a", size = 1198299, upload-time = "2026-02-06T21:10:39.601Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e1/e3/c164c88b2e5ce7b24d667b9bd83589cf4f3520d97cad01534cd3c4f55fdb/setuptools-81.0.0-py3-none-any.whl", hash = "sha256:fdd925d5c5d9f62e4b74b30d6dd7828ce236fd6ed998a08d81de62ce5a6310d6", size = 1062021, upload-time = "2026-02-06T21:10:37.175Z" },
+]
+
+[[package]]
+name = "setuptools"
 version = "82.0.0"
 source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "platform_machine != 'x86_64' and sys_platform == 'linux'",
+    "sys_platform == 'win32'",
+    "sys_platform != 'linux' and sys_platform != 'win32'",
+]
 sdist = { url = "https://files.pythonhosted.org/packages/82/f3/748f4d6f65d1756b9ae577f329c951cda23fb900e4de9f70900ced962085/setuptools-82.0.0.tar.gz", hash = "sha256:22e0a2d69474c6ae4feb01951cb69d515ed23728cf96d05513d36e42b62b37cb", size = 1144893, upload-time = "2026-02-08T15:08:40.206Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e1/c6/76dc613121b793286a3f91621d7b75a2b493e0390ddca50f11993eadf192/setuptools-82.0.0-py3-none-any.whl", hash = "sha256:70b18734b607bd1da571d097d236cfcfacaf01de45717d59e6e04b96877532e0", size = 1003468, upload-time = "2026-02-08T15:08:38.723Z" },
@@ -1174,10 +1191,10 @@ dependencies = [
     { name = "rich" },
     { name = "safetensors" },
     { name = "torch", version = "2.10.0", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine != 'x86_64' or sys_platform != 'linux'" },
-    { name = "torch", version = "2.10.0+rocm7.1", source = { registry = "https://download.pytorch.org/whl/rocm7.1" }, marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
+    { name = "torch", version = "2.11.0+rocm7.2", source = { registry = "https://download.pytorch.org/whl/rocm7.2" }, marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
     { name = "torch-c-dlpack-ext" },
     { name = "torchvision", version = "0.25.0", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine != 'x86_64' or sys_platform != 'linux'" },
-    { name = "torchvision", version = "0.25.0+rocm7.1", source = { registry = "https://download.pytorch.org/whl/rocm7.1" }, marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
+    { name = "torchvision", version = "0.26.0+rocm7.2", source = { registry = "https://download.pytorch.org/whl/rocm7.2" }, marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
     { name = "triton-rocm", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
 ]
 
@@ -1200,10 +1217,10 @@ requires-dist = [
     { name = "rich", specifier = ">=13.0" },
     { name = "safetensors", specifier = ">=0.7.0" },
     { name = "torch", marker = "platform_machine != 'x86_64' or sys_platform != 'linux'", specifier = "==2.10.0" },
-    { name = "torch", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'", specifier = "==2.10.0+rocm7.1", index = "https://download.pytorch.org/whl/rocm7.1" },
+    { name = "torch", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'", specifier = "==2.11.0+rocm7.2", index = "https://download.pytorch.org/whl/rocm7.2" },
     { name = "torch-c-dlpack-ext", specifier = ">=0.1.5" },
     { name = "torchvision", marker = "platform_machine != 'x86_64' or sys_platform != 'linux'", specifier = "==0.25.0" },
-    { name = "torchvision", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'", specifier = "==0.25.0+rocm7.1", index = "https://download.pytorch.org/whl/rocm7.1" },
+    { name = "torchvision", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'", specifier = "==0.26.0+rocm7.2", index = "https://download.pytorch.org/whl/rocm7.2" },
     { name = "triton-rocm", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'", specifier = "==3.6.0", index = "https://download.pytorch.org/whl/" },
 ]
 
@@ -1238,13 +1255,13 @@ resolution-markers = [
     "sys_platform != 'linux' and sys_platform != 'win32'",
 ]
 dependencies = [
-    { name = "filelock", marker = "platform_machine != 'x86_64' or sys_platform != 'linux'" },
-    { name = "fsspec", marker = "platform_machine != 'x86_64' or sys_platform != 'linux'" },
-    { name = "jinja2", marker = "platform_machine != 'x86_64' or sys_platform != 'linux'" },
-    { name = "networkx", marker = "platform_machine != 'x86_64' or sys_platform != 'linux'" },
-    { name = "setuptools", marker = "platform_machine != 'x86_64' or sys_platform != 'linux'" },
-    { name = "sympy", marker = "platform_machine != 'x86_64' or sys_platform != 'linux'" },
-    { name = "typing-extensions", marker = "platform_machine != 'x86_64' or sys_platform != 'linux'" },
+    { name = "filelock" },
+    { name = "fsspec" },
+    { name = "jinja2" },
+    { name = "networkx" },
+    { name = "setuptools", version = "82.0.0", source = { registry = "https://pypi.org/simple" } },
+    { name = "sympy" },
+    { name = "typing-extensions" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d3/54/a2ba279afcca44bbd320d4e73675b282fcee3d81400ea1b53934efca6462/torch-2.10.0-2-cp312-none-macosx_11_0_arm64.whl", hash = "sha256:13ec4add8c3faaed8d13e0574f5cd4a323c11655546f91fbe6afa77b57423574", size = 79498202, upload-time = "2026-02-10T21:44:52.603Z" },
@@ -1268,25 +1285,25 @@ wheels = [
 
 [[package]]
 name = "torch"
-version = "2.10.0+rocm7.1"
-source = { registry = "https://download.pytorch.org/whl/rocm7.1" }
+version = "2.11.0+rocm7.2"
+source = { registry = "https://download.pytorch.org/whl/rocm7.2" }
 resolution-markers = [
     "platform_machine == 'x86_64' and sys_platform == 'linux'",
 ]
 dependencies = [
-    { name = "filelock", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
-    { name = "fsspec", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
-    { name = "jinja2", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
-    { name = "networkx", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
-    { name = "setuptools", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
-    { name = "sympy", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
-    { name = "triton-rocm", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
-    { name = "typing-extensions", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
+    { name = "filelock" },
+    { name = "fsspec" },
+    { name = "jinja2" },
+    { name = "networkx" },
+    { name = "setuptools", version = "81.0.0", source = { registry = "https://pypi.org/simple" } },
+    { name = "sympy" },
+    { name = "triton-rocm" },
+    { name = "typing-extensions" },
 ]
 wheels = [
-    { url = "https://download-r2.pytorch.org/whl/rocm7.1/torch-2.10.0%2Brocm7.1-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:008ee0d77bb8b5f9f4ee1f00212019c4619171e3c4195de56f253331b3bc320d", upload-time = "2026-01-26T16:51:17Z" },
-    { url = "https://download-r2.pytorch.org/whl/rocm7.1/torch-2.10.0%2Brocm7.1-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:3f18b06f233d4871baaafdb8ba662ae69ff91ec11aa1bf76ca76dde31b43e9cd", upload-time = "2026-01-26T16:54:26Z" },
-    { url = "https://download-r2.pytorch.org/whl/rocm7.1/torch-2.10.0%2Brocm7.1-cp313-cp313t-manylinux_2_28_x86_64.whl", hash = "sha256:a7b101cabf76800b37d20c118782c94b6f32074e73c2260173058f688043aefa", upload-time = "2026-01-26T16:57:36Z" },
+    { url = "https://download-r2.pytorch.org/whl/rocm7.2/torch-2.11.0%2Brocm7.2-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:8f02a36213288ab5921e277e13f5954cc62afe7cfa899b79d739d4ef2be6510b", upload-time = "2026-04-28T19:44:39Z" },
+    { url = "https://download-r2.pytorch.org/whl/rocm7.2/torch-2.11.0%2Brocm7.2-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:0aea46cd17f648deb3ff590e162a6243a4825765bd0072743960efa9d4a5bc1d", upload-time = "2026-04-28T19:48:30Z" },
+    { url = "https://download-r2.pytorch.org/whl/rocm7.2/torch-2.11.0%2Brocm7.2-cp313-cp313t-manylinux_2_28_x86_64.whl", hash = "sha256:003692fc509f1af32c0aaf77eb3b5d42e82de64be5cf15a4a1b7b9f101a24a3c", upload-time = "2026-04-28T19:52:12Z" },
 ]
 
 [[package]]
@@ -1295,7 +1312,7 @@ version = "0.1.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "torch", version = "2.10.0", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine != 'x86_64' or sys_platform != 'linux'" },
-    { name = "torch", version = "2.10.0+rocm7.1", source = { registry = "https://download.pytorch.org/whl/rocm7.1" }, marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
+    { name = "torch", version = "2.11.0+rocm7.2", source = { registry = "https://download.pytorch.org/whl/rocm7.2" }, marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/37/de/921b6491efce5c389a5ef9bbed3d2d6660005840dae488124173180859ab/torch_c_dlpack_ext-0.1.5.tar.gz", hash = "sha256:d06f0357d575d22a168cc77acb9020fc4bae30968ceb6718a055dcbe92bacabe", size = 12913, upload-time = "2026-01-12T11:25:08.484Z" }
 wheels = [
@@ -1319,9 +1336,9 @@ resolution-markers = [
     "sys_platform != 'linux' and sys_platform != 'win32'",
 ]
 dependencies = [
-    { name = "numpy", marker = "platform_machine != 'x86_64' or sys_platform != 'linux'" },
-    { name = "pillow", marker = "platform_machine != 'x86_64' or sys_platform != 'linux'" },
-    { name = "torch", version = "2.10.0", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine != 'x86_64' or sys_platform != 'linux'" },
+    { name = "numpy" },
+    { name = "pillow" },
+    { name = "torch", version = "2.10.0", source = { registry = "https://pypi.org/simple" } },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/56/3a/6ea0d73f49a9bef38a1b3a92e8dd455cea58470985d25635beab93841748/torchvision-0.25.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:c2abe430c90b1d5e552680037d68da4eb80a5852ebb1c811b2b89d299b10573b", size = 1874920, upload-time = "2026-01-21T16:27:45.348Z" },
@@ -1340,20 +1357,20 @@ wheels = [
 
 [[package]]
 name = "torchvision"
-version = "0.25.0+rocm7.1"
-source = { registry = "https://download.pytorch.org/whl/rocm7.1" }
+version = "0.26.0+rocm7.2"
+source = { registry = "https://download.pytorch.org/whl/rocm7.2" }
 resolution-markers = [
     "platform_machine == 'x86_64' and sys_platform == 'linux'",
 ]
 dependencies = [
-    { name = "numpy", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
-    { name = "pillow", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
-    { name = "torch", version = "2.10.0+rocm7.1", source = { registry = "https://download.pytorch.org/whl/rocm7.1" }, marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
+    { name = "numpy" },
+    { name = "pillow" },
+    { name = "torch", version = "2.11.0+rocm7.2", source = { registry = "https://download.pytorch.org/whl/rocm7.2" } },
 ]
 wheels = [
-    { url = "https://download-r2.pytorch.org/whl/rocm7.1/torchvision-0.25.0%2Brocm7.1-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:8aea3ddbdb74801d3374577a10b3f04d49897c27add235cb25313df6e65b1929", upload-time = "2026-01-20T18:32:56Z" },
-    { url = "https://download-r2.pytorch.org/whl/rocm7.1/torchvision-0.25.0%2Brocm7.1-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:54c06f29e20efa36522eedcc5a0fb6f03627ff0ff23cc7bef46f71a3042db074", upload-time = "2026-01-20T18:32:56Z" },
-    { url = "https://download-r2.pytorch.org/whl/rocm7.1/torchvision-0.25.0%2Brocm7.1-cp313-cp313t-manylinux_2_28_x86_64.whl", hash = "sha256:3ab05255c5b31a950b51c61d8b4344603346a77783caacd59398e9f7d4330ba3", upload-time = "2026-01-20T18:32:56Z" },
+    { url = "https://download-r2.pytorch.org/whl/rocm7.2/torchvision-0.26.0%2Brocm7.2-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:2d766e7b69bfaf2fc29471ed95727fd19fa7aa88124fcf1f1808fd03bf86f226", upload-time = "2026-03-23T15:36:37Z" },
+    { url = "https://download-r2.pytorch.org/whl/rocm7.2/torchvision-0.26.0%2Brocm7.2-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:51e9bdb4d603b61d4d26be9436ce968daef1492b138753ae610cceb4ad6b5c0c", upload-time = "2026-03-23T15:36:37Z" },
+    { url = "https://download-r2.pytorch.org/whl/rocm7.2/torchvision-0.26.0%2Brocm7.2-cp313-cp313t-manylinux_2_28_x86_64.whl", hash = "sha256:720e0c54d6384223c4678685a0522a8fca367293b646dbdf6bc5b5f804da0f49", upload-time = "2026-03-23T15:36:37Z" },
 ]
 
 [[package]]

@@ -68,7 +68,10 @@ def test_invalid_profile_level_has_actionable_stage_error():
 
 
 def test_rocm_tool_diagnostics_reports_missing_tools():
-    diagnostics = rocm_tool_diagnostics(which=lambda _: None)
+    diagnostics = rocm_tool_diagnostics(
+        which=lambda _: None,
+        tool_resolver=lambda _tool, **_kwargs: None,
+    )
     assert {diag.message for diag in diagnostics} == {
         "hipcc not found",
         "rocminfo not found",
@@ -141,7 +144,13 @@ def test_local_gfx_target_uses_first_available_rocm_output():
             return "gfx000\n"
         return "Name: gfx1200\n"
 
-    assert local_gfx_target(check_output=fake_check_output) == "gfx1200"
+    assert (
+        local_gfx_target(
+            check_output=fake_check_output,
+            tool_resolver=lambda _tool: None,
+        )
+        == "gfx1200"
+    )
 
 
 def test_cdna3_validation_readiness_for_gfx94_target():

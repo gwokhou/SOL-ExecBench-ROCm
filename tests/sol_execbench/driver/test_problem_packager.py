@@ -562,6 +562,9 @@ class TestLocalGfxDetection:
         monkeypatch.setattr(
             problem_packager.subprocess, "check_output", fake_check_output
         )
+        monkeypatch.setattr(
+            "sol_execbench.driver.build_config.resolve_rocm_tool", lambda _tool: None
+        )
         assert _get_local_gfx() == "gfx1200"
 
     def test_get_local_gfx_falls_back_to_rocminfo(self, monkeypatch):
@@ -574,6 +577,9 @@ class TestLocalGfxDetection:
         monkeypatch.setattr(
             problem_packager.subprocess, "check_output", fake_check_output
         )
+        monkeypatch.setattr(
+            "sol_execbench.driver.build_config.resolve_rocm_tool", lambda _tool: None
+        )
         assert _get_local_gfx() == "gfx1200"
 
     def test_get_local_gfx_returns_none_when_no_target_found(self, monkeypatch):
@@ -584,6 +590,9 @@ class TestLocalGfxDetection:
 
         monkeypatch.setattr(
             problem_packager.subprocess, "check_output", fake_check_output
+        )
+        monkeypatch.setattr(
+            "sol_execbench.driver.build_config.resolve_rocm_tool", lambda _tool: None
         )
         assert _get_local_gfx() is None
 
