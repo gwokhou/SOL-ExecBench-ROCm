@@ -37,8 +37,9 @@ def _probe_with_states(states: dict[str, str]) -> HipProbe:
         execute_candidate=lambda key: ProbeExecution(
             (10.0,) * 7, "TFLOP/s" if key.kind == "compute" else "GB/s"
         ),
-        check_correctness=lambda key, _: states.get(key.value, "measured")
-        == "measured",
+        check_correctness=lambda key, _: (
+            states.get(key.value, "measured") == "measured"
+        ),
         check_stability=lambda _, __: True,
     )
 
@@ -64,9 +65,7 @@ def test_rdna4_validates_when_real_wmma_candidate_is_measured() -> None:
     artifact = run_calibration(
         CalibrationRequest(
             environment=GpuEnvironment(0, "gfx1200"),
-            hip_probe=_probe_with_states(
-                {"compute.matrix.bf16.bf16.wmma": "measured"}
-            ),
+            hip_probe=_probe_with_states({"compute.matrix.bf16.bf16.wmma": "measured"}),
             clock_controller=_locked_clock(),
         )
     )
@@ -78,9 +77,7 @@ def test_rdna4_remains_provisional_when_wmma_is_unknown() -> None:
     artifact = run_calibration(
         CalibrationRequest(
             environment=GpuEnvironment(0, "gfx1200"),
-            hip_probe=_probe_with_states(
-                {"compute.matrix.bf16.bf16.wmma": "unknown"}
-            ),
+            hip_probe=_probe_with_states({"compute.matrix.bf16.bf16.wmma": "unknown"}),
             clock_controller=_locked_clock(),
         )
     )
@@ -153,6 +150,60 @@ def test_rdna4_lock_lifecycle_wraps_measurement() -> None:
 
     assert events == ["lock", "unlock"]
     assert artifact.validation_status == "validated"
+
+
+def test_rdna4_preserves_external_clock_lock() -> None:
+    events: list[str] = []
+
+    class Clock:
+        def lock(self) -> bool:
+            events.append("lock")
+            return True
+
+        def unlock(self) -> None:
+            events.append("unlock")
+
+        def observe_locked(self) -> bool:
+            return True
+
+    artifact = run_calibration(
+        CalibrationRequest(
+            environment=GpuEnvironment(device=0, architecture="gfx1200"),
+            hip_probe=_probe(),
+            clock_controller=Clock(),
+        )
+    )
+
+    assert events == []
+    assert artifact.metadata["clock_observations"] == {
+        "pre": True,
+        "during": True,
+        "post": True,
+    }
+    assert artifact.validation_status == "validated"
+
+
+def test_unlock_failure_is_not_silently_accepted() -> None:
+    class Clock:
+        observations = iter((False, True, True))
+
+        def lock(self) -> bool:
+            return True
+
+        def unlock(self) -> bool:
+            return False
+
+        def observe_locked(self) -> bool:
+            return next(self.observations)
+
+    with pytest.raises(ClockLockRequiredError, match="clock_unlock_failed"):
+        run_calibration(
+            CalibrationRequest(
+                environment=GpuEnvironment(device=0, architecture="gfx1200"),
+                hip_probe=_probe(),
+                clock_controller=Clock(),
+            )
+        )
 
 
 def test_reset_is_attempted_after_unsuccessful_lock() -> None:

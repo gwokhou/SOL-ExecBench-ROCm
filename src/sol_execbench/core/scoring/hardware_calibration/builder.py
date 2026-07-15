@@ -9,21 +9,25 @@ import csv
 import hashlib
 import io
 import subprocess
+import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Callable, Protocol
 
 from sol_execbench.core.bench import clock_lock
 from sol_execbench.core.scoring.hardware_calibration.environment import (
+    ArchitectureAdapter,
     GpuEnvironment,
     adapter_for,
 )
 from sol_execbench.core.scoring.hardware_calibration.hip_probe import (
+    CalibrationProfileKey,
     HipProbe,
     default_hip_probe,
 )
 from sol_execbench.core.scoring.hardware_calibration.models import (
     CALIBRATION_SCHEMA_VERSION,
+    CalibrationCandidate,
     HardwareCalibrationArtifact,
 )
 from sol_execbench.core.scoring.hardware_calibration.rocprof_compute import (
@@ -35,17 +39,21 @@ from sol_execbench.core.scoring.hardware_calibration.rocprof_compute import (
 class ClockController(Protocol):
     def lock(self) -> bool: ...
 
-    def unlock(self) -> None: ...
+    def unlock(self) -> bool | None: ...
 
     def observe_locked(self) -> bool: ...
 
 
 class Rdna4ClockController:
-    def lock(self) -> bool:
-        return clock_lock.lock_clocks()
+    def __init__(self) -> None:
+        self._lease: clock_lock.ClockLockLease | None = None
 
-    def unlock(self) -> None:
-        clock_lock.unlock_clocks()
+    def lock(self) -> bool:
+        self._lease = clock_lock.acquire_clock_lock()
+        return self._lease.locked
+
+    def unlock(self) -> bool:
+        return self._lease is None or self._lease.release()
 
     def observe_locked(self) -> bool:
         return clock_lock.verify_clocks()
@@ -66,6 +74,97 @@ class CalibrationRequest:
     required_profile_keys: tuple[str, ...] = ()
     requirements_ref: str | None = None
     requirements_sha256: str | None = None
+
+
+@dataclass(frozen=True)
+class ClockedMeasurements:
+    locked: bool
+    observations: dict[str, bool | None]
+    clock_reason: str | None
+    candidates: tuple[CalibrationCandidate, ...]
+
+
+def _observe_locked(controller: ClockController) -> bool | None:
+    observe = getattr(controller, "observe_locked", None)
+    if not callable(observe):
+        return None
+    try:
+        return bool(observe())
+    except Exception:
+        return None
+
+
+def _measure_with_clock(
+    *,
+    controller: ClockController | None,
+    probe: HipProbe,
+    measurement_keys: tuple[CalibrationProfileKey, ...],
+    require_clock_lock: bool,
+) -> ClockedMeasurements:
+    locked = False
+    lock_attempted = False
+    observations: dict[str, bool | None] = {"pre": None, "during": None, "post": None}
+    clock_reason: str | None = None
+    try:
+        if controller is None:
+            clock_reason = "clock_lock_adapter_unavailable"
+            if require_clock_lock:
+                raise ClockLockRequiredError(clock_reason)
+        else:
+            observations["pre"] = _observe_locked(controller)
+            if observations["pre"] is True:
+                locked = True
+            else:
+                lock_attempted = True
+                try:
+                    locked = controller.lock()
+                except Exception:
+                    locked = False
+            if not locked:
+                clock_reason = "clock_lock_failed"
+                if require_clock_lock:
+                    raise ClockLockRequiredError(clock_reason)
+        if controller is not None:
+            observations["during"] = _observe_locked(controller)
+        candidates = tuple(probe.measure(key) for key in measurement_keys)
+    finally:
+        active_exception = sys.exception()
+        cleanup_failed = False
+        if controller is not None:
+            if lock_attempted:
+                try:
+                    cleanup_failed = controller.unlock() is False
+                except Exception:
+                    cleanup_failed = True
+            observations["post"] = _observe_locked(controller)
+        if cleanup_failed:
+            if active_exception is None:
+                raise ClockLockRequiredError("clock_unlock_failed")
+            active_exception.add_note("clock_unlock_failed")
+    return ClockedMeasurements(locked, observations, clock_reason, candidates)
+
+
+def _resolve_measurement_keys(
+    adapter: ArchitectureAdapter, request: CalibrationRequest
+) -> tuple[tuple[str, ...], tuple[CalibrationProfileKey, ...]]:
+    declared_keys = {key.value for key in adapter.all_candidates}
+    required_keys = (
+        tuple(sorted(set(request.required_profile_keys)))
+        if request.required_profile_keys
+        else tuple(sorted(key.value for key in adapter.candidates))
+    )
+    unknown_required = set(required_keys) - declared_keys
+    if unknown_required:
+        raise ValueError(
+            "calibration requirements contain undeclared profiles: "
+            + ", ".join(sorted(unknown_required))
+        )
+    measurement_keys = tuple(
+        key
+        for key in adapter.all_candidates
+        if key in adapter.candidates or key.value in required_keys
+    )
+    return required_keys, measurement_keys
 
 
 def _profile_metadata(
@@ -108,77 +207,59 @@ def _profile_metadata(
     }
 
 
+def _validation_provenance(
+    adapter: ArchitectureAdapter,
+    measurements: ClockedMeasurements,
+    required_keys: tuple[str, ...],
+) -> tuple[bool, dict[str, bool]]:
+    observations = measurements.observations
+    required_profiles_measured = all(
+        candidate.state == "measured"
+        for candidate in measurements.candidates
+        if candidate.key in required_keys
+    )
+    clock_state_restored = (
+        observations["pre"] is not None and observations["post"] == observations["pre"]
+    )
+    provenance = {
+        "adapter_requires_clock_lock": adapter.supports_clock_lock,
+        "clock_locked": measurements.locked,
+        "clock_observed_during_sampling": observations["during"] is True,
+        "clock_state_restored": clock_state_restored,
+        "clock_reset_observed": (
+            observations["pre"] is False and observations["post"] is False
+        ),
+        "all_required_profiles_measured": required_profiles_measured,
+    }
+    validated = (
+        adapter.supports_clock_lock
+        and measurements.locked
+        and observations["during"] is True
+        and clock_state_restored
+        and bool(measurements.candidates)
+        and required_profiles_measured
+    )
+    return validated, provenance
+
+
 def run_calibration(request: CalibrationRequest) -> HardwareCalibrationArtifact:
     """Run declared candidates and return an evidence artifact, never defaults."""
     adapter = adapter_for(request.environment.architecture)
     controller = request.clock_controller
     if controller is None and adapter.supports_clock_lock:
         controller = Rdna4ClockController()
-    locked = False
-    observations: dict[str, bool | None] = {"pre": None, "during": None, "post": None}
-    clock_reason: str | None = None
     probe = request.hip_probe or default_hip_probe(
         architecture=request.environment.architecture
     )
-    declared_keys = {key.value for key in adapter.all_candidates}
-    required_keys = (
-        tuple(sorted(set(request.required_profile_keys)))
-        if request.required_profile_keys
-        else tuple(sorted(key.value for key in adapter.candidates))
+    required_keys, measurement_keys = _resolve_measurement_keys(adapter, request)
+    measurements = _measure_with_clock(
+        controller=controller,
+        probe=probe,
+        measurement_keys=measurement_keys,
+        require_clock_lock=request.require_clock_lock,
     )
-    unknown_required = set(required_keys) - declared_keys
-    if unknown_required:
-        raise ValueError(
-            "calibration requirements contain undeclared profiles: "
-            + ", ".join(sorted(unknown_required))
-        )
-    measurement_keys = tuple(
-        key
-        for key in adapter.all_candidates
-        if key in adapter.candidates or key.value in required_keys
-    )
-    try:
-        if controller is None:
-            clock_reason = "clock_lock_adapter_unavailable"
-            if request.require_clock_lock:
-                raise ClockLockRequiredError(clock_reason)
-        else:
-            observe = getattr(controller, "observe_locked", None)
-            if callable(observe):
-                try:
-                    observations["pre"] = bool(observe())
-                except Exception:
-                    observations["pre"] = None
-            try:
-                locked = controller.lock()
-            except Exception:
-                locked = False
-            if not locked:
-                clock_reason = "clock_lock_failed"
-                if request.require_clock_lock:
-                    raise ClockLockRequiredError(clock_reason)
-        observe = getattr(controller, "observe_locked", None) if controller else None
-        if callable(observe):
-            try:
-                observations["during"] = bool(observe())
-            except Exception:
-                observations["during"] = None
-        candidates = tuple(probe.measure(key) for key in measurement_keys)
-    finally:
-        # Reset is unconditional: a failed/ambiguous lock command can still
-        # have changed policy, and diagnostic collection must leave no setting
-        # behind.  Reset failure is reflected by absent post observation.
-        if controller is not None:
-            try:
-                controller.unlock()
-            except Exception:
-                pass
-            observe = getattr(controller, "observe_locked", None)
-            if callable(observe):
-                try:
-                    observations["post"] = bool(observe())
-                except Exception:
-                    observations["post"] = None
+    observations = measurements.observations
+    candidates = measurements.candidates
     metric_map = {
         "Peak FP32": tuple(
             (key.value, "TFLOP/s")
@@ -190,7 +271,7 @@ def run_calibration(request: CalibrationRequest) -> HardwareCalibrationArtifact:
         "device": request.environment.device,
         "architecture": request.environment.architecture,
         "adapter_family": adapter.family,
-        "clock_locked": locked,
+        "clock_locked": measurements.locked,
         "clock_observations": observations,
         "adapter_policy": {
             "requires_clock_lock": adapter.supports_clock_lock,
@@ -213,32 +294,13 @@ def run_calibration(request: CalibrationRequest) -> HardwareCalibrationArtifact:
             key.value: probe.provenance_for(key) for key in measurement_keys
         },
     }
-    if clock_reason:
-        metadata["clock_lock_reason"] = clock_reason
+    if measurements.clock_reason:
+        metadata["clock_lock_reason"] = measurements.clock_reason
     metadata.update(_profile_metadata(request, metric_map))
-    validated_from_provenance = (
-        adapter.supports_clock_lock
-        and locked
-        and observations["during"] is True
-        and observations["post"] is False
-        and bool(candidates)
-        and all(
-            candidate.state == "measured"
-            for candidate in candidates
-            if candidate.key in required_keys
-        )
+    validated_from_provenance, provenance = _validation_provenance(
+        adapter, measurements, required_keys
     )
-    metadata["validation_provenance"] = {
-        "adapter_requires_clock_lock": adapter.supports_clock_lock,
-        "clock_locked": locked,
-        "clock_observed_during_sampling": observations["during"] is True,
-        "clock_reset_observed": observations["post"] is False,
-        "all_required_profiles_measured": all(
-            candidate.state == "measured"
-            for candidate in candidates
-            if candidate.key in required_keys
-        ),
-    }
+    metadata["validation_provenance"] = provenance
     return HardwareCalibrationArtifact(
         generated_at=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         candidates=candidates,

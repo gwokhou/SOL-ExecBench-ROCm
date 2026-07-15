@@ -26,7 +26,10 @@ from sol_execbench.core.scoring.fusion_validation import (
     fusion_validation_from_dict,
 )
 from sol_execbench.core.integrity.checksums import sha256_file
-from sol_execbench.core.bench.clock_lock import lock_clocks, unlock_clocks
+from sol_execbench.core.bench.clock_lock import (
+    ClockLockLease,
+    acquire_clock_lock,
+)
 from sol_execbench.core.scoring.hardware_calibration.environment import discover_gpu
 
 
@@ -162,14 +165,7 @@ def collect_fusion_validation(
     runner: Runner = subprocess.run,
     discover: Callable[[int], object] = discover_gpu,
 ) -> FusionValidationArtifact:
-    """Execute an injected or manifest-provided probe driver.
-
-    The driver is deliberately a process boundary: each shape can create its
-    three independent timing processes while this parent validates and binds
-    the resulting evidence. A suite may override the built-in driver through
-    ``fusion_probe.command``; normal representative manifests need no extra
-    field.
-    """
+    """Execute and validate the built-in or manifest-provided probe driver."""
     manifest = _json_object(suite_manifest)
     probe = manifest.get("fusion_probe")
     command = probe.get("command") if isinstance(probe, dict) else None
@@ -182,38 +178,31 @@ def collect_fusion_validation(
     ):
         raise ValueError("fusion_probe.command must be a non-empty argv list")
     environment = discover(device)
-    live_arch = str(getattr(environment, "architecture")).lower()
-    if live_arch != architecture.lower():
-        raise ValueError(
-            f"architecture assertion does not match runtime discovery: {architecture.lower()} != {live_arch}"
-        )
+    live_arch, gpu_uuid, rocm_version = _validated_gpu_identity(
+        environment, architecture
+    )
     clocks_locked = (
         bool(getattr(environment, "clocks_locked", False))
         or os.environ.get("SOL_EXECBENCH_CLOCKS_LOCKED") == "1"
     )
-    acquired_clock_lock = False
+    output.parent.mkdir(parents=True, exist_ok=True)
+    clock_lock = ClockLockLease(locked=clocks_locked, acquired=False)
     if require_clock_lock and not clocks_locked:
-        acquired_clock_lock = lock_clocks()
-        clocks_locked = acquired_clock_lock
+        clock_lock = acquire_clock_lock()
+        clocks_locked = clock_lock.locked
         if not clocks_locked:
             raise RuntimeError("locked GPU clocks are required for fusion collection")
-    if not getattr(environment, "uuid", None):
-        raise RuntimeError("GPU UUID discovery is required for fusion collection")
-    if not getattr(environment, "rocm_version", None):
-        raise RuntimeError("ROCm version discovery is required for fusion collection")
-    output.parent.mkdir(parents=True, exist_ok=True)
-    process_env = {
-        **os.environ,
-        "SOL_EXECBENCH_FUSION_DEVICE": str(device),
-        "SOL_EXECBENCH_FUSION_ARCHITECTURE": live_arch,
-        "SOL_EXECBENCH_FUSION_GPU_UUID": str(getattr(environment, "uuid")),
-        "SOL_EXECBENCH_FUSION_ROCM_VERSION": str(getattr(environment, "rocm_version")),
-        "SOL_EXECBENCH_FUSION_SUITE_MANIFEST": str(suite_manifest.resolve()),
-        "SOL_EXECBENCH_FUSION_BENCHMARK_ROOT": str(benchmark_root.resolve()),
-        "SOL_EXECBENCH_FUSION_OUTPUT": str(output.resolve()),
-        "SOL_EXECBENCH_CLOCKS_LOCKED": "1" if clocks_locked else "0",
-    }
-    try:
+    with clock_lock:
+        process_env = _fusion_process_environment(
+            device=device,
+            live_arch=live_arch,
+            gpu_uuid=gpu_uuid,
+            rocm_version=rocm_version,
+            suite_manifest=suite_manifest,
+            benchmark_root=benchmark_root,
+            output=output,
+            clocks_locked=clocks_locked,
+        )
         completed = runner(
             command,
             cwd=benchmark_root,
@@ -227,19 +216,15 @@ def collect_fusion_validation(
                 f"fusion probe failed with exit {completed.returncode}: {completed.stderr.strip()}"
             )
         parsed = fusion_validation_from_dict(_json_object(output))
-        expected_suite = sha256_file(suite_manifest)
-        if parsed.suite_manifest_sha256 != expected_suite:
-            raise ValueError("probe output suite manifest checksum mismatch")
-        _verify_suite_coverage(parsed, manifest)
-        if parsed.architecture != live_arch:
-            raise ValueError("probe output architecture mismatch")
-        if parsed.gpu_uuid != str(getattr(environment, "uuid")):
-            raise ValueError("probe output GPU UUID mismatch")
-        live_rocm = getattr(environment, "rocm_version", None)
-        if live_rocm is not None and parsed.rocm_version != str(live_rocm):
-            raise ValueError("probe output ROCm version mismatch")
-        if require_clock_lock and not parsed.clocks_locked:
-            raise ValueError("probe output does not attest locked clocks")
+        _validate_fusion_artifact(
+            parsed=parsed,
+            manifest=manifest,
+            suite_manifest=suite_manifest,
+            live_arch=live_arch,
+            gpu_uuid=gpu_uuid,
+            rocm_version=rocm_version,
+            require_clock_lock=require_clock_lock,
+        )
         # Preserve strict parsed normalization rather than accepting non-canonical
         # JSON emitted by the child.
         output.write_text(
@@ -247,9 +232,71 @@ def collect_fusion_validation(
             encoding="utf-8",
         )
         return parsed
-    finally:
-        if acquired_clock_lock:
-            unlock_clocks()
+
+
+def _validated_gpu_identity(
+    environment: object, architecture: str
+) -> tuple[str, str, str]:
+    live_arch = str(getattr(environment, "architecture")).lower()
+    if live_arch != architecture.lower():
+        raise ValueError(
+            "architecture assertion does not match runtime discovery: "
+            f"{architecture.lower()} != {live_arch}"
+        )
+    gpu_uuid = getattr(environment, "uuid", None)
+    if not gpu_uuid:
+        raise RuntimeError("GPU UUID discovery is required for fusion collection")
+    rocm_version = getattr(environment, "rocm_version", None)
+    if not rocm_version:
+        raise RuntimeError("ROCm version discovery is required for fusion collection")
+    return live_arch, str(gpu_uuid), str(rocm_version)
+
+
+def _validate_fusion_artifact(
+    *,
+    parsed: FusionValidationArtifact,
+    manifest: dict[str, Any],
+    suite_manifest: Path,
+    live_arch: str,
+    gpu_uuid: str,
+    rocm_version: str,
+    require_clock_lock: bool,
+) -> None:
+    if parsed.suite_manifest_sha256 != sha256_file(suite_manifest):
+        raise ValueError("probe output suite manifest checksum mismatch")
+    _verify_suite_coverage(parsed, manifest)
+    if parsed.architecture != live_arch:
+        raise ValueError("probe output architecture mismatch")
+    if parsed.gpu_uuid != gpu_uuid:
+        raise ValueError("probe output GPU UUID mismatch")
+    if parsed.rocm_version != rocm_version:
+        raise ValueError("probe output ROCm version mismatch")
+    if require_clock_lock and not parsed.clocks_locked:
+        raise ValueError("probe output does not attest locked clocks")
+
+
+def _fusion_process_environment(
+    *,
+    device: int,
+    live_arch: str,
+    gpu_uuid: str,
+    rocm_version: str,
+    suite_manifest: Path,
+    benchmark_root: Path,
+    output: Path,
+    clocks_locked: bool,
+) -> dict[str, str]:
+    return {
+        **os.environ,
+        "SOL_EXECBENCH_FUSION_DEVICE": str(device),
+        "SOL_EXECBENCH_FUSION_ARCHITECTURE": live_arch,
+        "SOL_EXECBENCH_FUSION_GPU_UUID": gpu_uuid,
+        "SOL_EXECBENCH_FUSION_ROCM_VERSION": rocm_version,
+        "SOL_EXECBENCH_FUSION_SUITE_MANIFEST": str(suite_manifest.resolve()),
+        "SOL_EXECBENCH_FUSION_BENCHMARK_ROOT": str(benchmark_root.resolve()),
+        "SOL_EXECBENCH_FUSION_OUTPUT": str(output.resolve()),
+        "SOL_EXECBENCH_CLOCKS_LOCKED": "1" if clocks_locked else "0",
+    }
 
 
 def _built_in_probe_command() -> tuple[str, ...]:

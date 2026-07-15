@@ -25,14 +25,13 @@ from __future__ import annotations
 import dataclasses
 import json
 import os
-import shutil
 import sys
 import subprocess
 from pathlib import Path
 from typing import Any
 
 from ..core.bench.config import BenchmarkConfig
-from ..core.bench.clock_lock import lock_clocks, unlock_clocks, verify_clocks
+from ..core.bench.clock_lock import acquire_clock_lock
 from ..core.data.solution import NATIVE_ROCM_LANGUAGES
 from .build_config import (
     first_gfx_target as _first_gfx_target_core,
@@ -46,6 +45,7 @@ from .staging import (
     stage_solution_sources,
 )
 from .trace_output import parse_trace_jsonl
+from .problem_packager_lifecycle import ProblemPackagerLifecycle
 
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
 
@@ -83,11 +83,7 @@ class ProblemPackager:
     ):
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.keep_output_dir = keep_output_dir
-        self._closed = False
-        self._clock_lock_active = False
-        self._clock_lock_acquired = False
-        self._prior_clock_lock_env: str | None = None
+        self._lifecycle = ProblemPackagerLifecycle(output_dir, keep_output_dir)
         self.definition = definition
         self.workloads = workloads
         self.solution = solution
@@ -105,28 +101,19 @@ class ProblemPackager:
         self._stage_safetensors_inputs()
 
     def __del__(self):
-        self.close()
+        lifecycle = getattr(self, "_lifecycle", None)
+        if lifecycle is not None:
+            lifecycle.close_safely()
 
     def __enter__(self) -> "ProblemPackager":
         return self
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:
-        self.close()
+        self._lifecycle.close_for_context(exc_value)
 
     def close(self) -> None:
         """Release the staging directory when this packager owns cleanup."""
-        if self._closed:
-            return
-        self._closed = True
-        if self.config.lock_clocks:
-            if self._clock_lock_acquired:
-                unlock_clocks()
-            if self._prior_clock_lock_env is None:
-                os.environ.pop("SOL_EXECBENCH_CLOCKS_LOCKED", None)
-            else:
-                os.environ["SOL_EXECBENCH_CLOCKS_LOCKED"] = self._prior_clock_lock_env
-        if not self.keep_output_dir:
-            shutil.rmtree(self.output_dir, ignore_errors=True)
+        self._lifecycle.close()
 
     @property
     def _is_cpp(self) -> bool:
@@ -206,14 +193,10 @@ class ProblemPackager:
                     "run compile() first for HIP/C++ solutions"
                 )
 
+        if self._lifecycle.closed:
+            raise RuntimeError("ProblemPackager is already closed")
         if self.config.lock_clocks:
-            self._prior_clock_lock_env = os.environ.get("SOL_EXECBENCH_CLOCKS_LOCKED")
-            already_locked = verify_clocks()
-            self._clock_lock_active = already_locked or lock_clocks()
-            self._clock_lock_acquired = self._clock_lock_active and not already_locked
-            os.environ["SOL_EXECBENCH_CLOCKS_LOCKED"] = (
-                "1" if self._clock_lock_active else "0"
-            )
+            self._lifecycle.acquire_clock_lock(acquire_clock_lock)
 
         (self.output_dir / "eval_driver.py").write_text(
             (_TEMPLATES_DIR / "eval_driver.py").read_text()

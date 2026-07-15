@@ -14,6 +14,7 @@ from sol_execbench.core.platform.docker_matrix import load_docker_target_manifes
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 DOCKERFILE_PATH = REPO_ROOT / "docker" / "Dockerfile"
+ENTRYPOINT_PATH = REPO_ROOT / "docker" / "entrypoint.sh"
 RUN_DOCKER_SCRIPT = REPO_ROOT / "scripts" / "run_docker.sh"
 MANIFEST_PATH = REPO_ROOT / "docker" / "rocm-targets.json"
 
@@ -77,6 +78,50 @@ def test_dockerfile_installs_exact_validated_amd_smi_sudoers_rule() -> None:
     assert "install -o root -g root -m 0440" in dockerfile
     assert "command -v rocm-smi" not in dockerfile
     assert "${AMD_SMI} set -l *" not in dockerfile
+
+
+def test_entrypoint_registers_owned_lock_cleanup_before_locking() -> None:
+    entrypoint = ENTRYPOINT_PATH.read_text(encoding="utf-8")
+
+    assert entrypoint.index("trap 'cleanup' EXIT") < entrypoint.index("\nlock_clocks\n")
+    assert "CLOCK_LOCK_ACQUIRED={int(clock_lock.acquired)}" in entrypoint
+    assert "clock_lock.detach()" in entrypoint
+    assert 'if [ "${SOL_EXECBENCH_CLOCK_LOCK_ACQUIRED}" = "1" ]' in entrypoint
+
+
+def test_entrypoint_releases_owned_lock_after_workload_failure(tmp_path: Path) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    cleanup_log = tmp_path / "cleanup.log"
+    fake_python = bin_dir / "python"
+    fake_python.write_text(
+        """#!/bin/bash
+if [[ ${1:-} == -c ]]; then
+  printf 'cleanup\n' >>"${CLEANUP_LOG}"
+  exit 0
+fi
+printf 'CLOCKS_LOCKED=1\nCLOCK_LOCK_ACQUIRED=1\n'
+""",
+        encoding="utf-8",
+    )
+    fake_python.chmod(0o755)
+    env = {
+        **os.environ,
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+        "CLEANUP_LOG": str(cleanup_log),
+        "FLASHINFER_TRACE_DIR": str(tmp_path),
+    }
+
+    result = subprocess.run(
+        [ENTRYPOINT_PATH, "bash", "-c", "exit 23"],
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 23
+    assert cleanup_log.read_text(encoding="utf-8") == "cleanup\n"
 
 
 def _run_docker_preview(*args: str) -> subprocess.CompletedProcess[str]:

@@ -7,6 +7,10 @@ import json
 import subprocess
 from pathlib import Path
 
+import pytest
+
+from sol_execbench.core.bench import clock_lock as clock_lock_module
+from sol_execbench.core.bench.clock_lock import ClockLockLease
 from sol_execbench.cli.commands.fusion_validation import (
     _built_in_probe_command,
     collect_fusion_validation,
@@ -50,12 +54,15 @@ def test_collect_uses_built_in_driver_when_manifest_has_no_override(
 ) -> None:
     clock_events: list[str] = []
     monkeypatch.setattr(
-        "sol_execbench.cli.commands.fusion_validation.lock_clocks",
-        lambda: clock_events.append("lock") or True,
+        "sol_execbench.cli.commands.fusion_validation.acquire_clock_lock",
+        lambda: (
+            clock_events.append("lock") or ClockLockLease(locked=True, acquired=True)
+        ),
     )
     monkeypatch.setattr(
-        "sol_execbench.cli.commands.fusion_validation.unlock_clocks",
-        lambda: clock_events.append("unlock"),
+        clock_lock_module,
+        "unlock_clocks",
+        lambda: clock_events.append("unlock") or True,
     )
     workload_uuid = "rms-workload"
     manifest_path = tmp_path / "suite.json"
@@ -124,3 +131,68 @@ def test_collect_uses_built_in_driver_when_manifest_has_no_override(
 
     assert result.cases[0].capacity_status == "passed"
     assert clock_events == ["lock", "unlock"]
+
+
+def test_collect_releases_owned_lock_when_runner_raises(
+    tmp_path: Path, monkeypatch
+) -> None:
+    events: list[str] = []
+    monkeypatch.setattr(
+        "sol_execbench.cli.commands.fusion_validation.acquire_clock_lock",
+        lambda: events.append("lock") or ClockLockLease(locked=True, acquired=True),
+    )
+    monkeypatch.setattr(
+        clock_lock_module,
+        "unlock_clocks",
+        lambda: events.append("unlock") or True,
+    )
+    manifest_path = tmp_path / "suite.json"
+    manifest_path.write_text(
+        json.dumps({"workloads": []}),
+        encoding="utf-8",
+    )
+
+    def failing_runner(*_args, **_kwargs):
+        raise OSError("runner failed")
+
+    with pytest.raises(OSError, match="runner failed"):
+        collect_fusion_validation(
+            device=0,
+            architecture="gfx1200",
+            suite_manifest=manifest_path,
+            benchmark_root=tmp_path,
+            output=tmp_path / "evidence.json",
+            require_clock_lock=True,
+            runner=failing_runner,
+            discover=lambda _: GpuEnvironment(
+                device=0, architecture="gfx1200", uuid="GPU-a", rocm_version="7.1"
+            ),
+        )
+
+    assert events == ["lock", "unlock"]
+
+
+def test_collect_validates_environment_before_locking(
+    tmp_path: Path, monkeypatch
+) -> None:
+    def acquire():
+        pytest.fail("clock lock should not be acquired")
+
+    monkeypatch.setattr(
+        "sol_execbench.cli.commands.fusion_validation.acquire_clock_lock", acquire
+    )
+    manifest_path = tmp_path / "suite.json"
+    manifest_path.write_text(json.dumps({"workloads": []}), encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="GPU UUID"):
+        collect_fusion_validation(
+            device=0,
+            architecture="gfx1200",
+            suite_manifest=manifest_path,
+            benchmark_root=tmp_path,
+            output=tmp_path / "evidence.json",
+            require_clock_lock=True,
+            discover=lambda _: GpuEnvironment(
+                device=0, architecture="gfx1200", uuid=None, rocm_version="7.1"
+            ),
+        )
