@@ -25,6 +25,7 @@ def _manifest(root: Path) -> EvidencePublicationManifest:
     suite = root / "suite.json"
     baseline = root / "baseline.json"
     bound = root / "bound.json"
+    fusion = root / "fusion.json"
     hardware = root / "hardware.json"
     solution.write_text('{"name":"candidate"}\n', encoding="utf-8")
     trace.write_text(
@@ -37,7 +38,15 @@ def _manifest(root: Path) -> EvidencePublicationManifest:
     _write_json(timing, {"policy": "latency_ms"})
     _write_json(suite, {"workloads": [{"definition": "gemm", "workload_uuid": "w1"}]})
     _write_json(baseline, {"schema_version": "sol_execbench.scoring_baseline.v1"})
-    _write_json(bound, {"schema_version": "sol_execbench.amd_sol_bound.v3"})
+    _write_json(fusion, {"schema_version": "sol_execbench.fusion_validation.v1"})
+    _write_json(
+        bound,
+        {
+            "schema_version": "sol_execbench.amd_sol_bound.v5",
+            "fusion_validation_ref": fusion.name,
+            "fusion_validation_sha256": sha256_file(fusion),
+        },
+    )
     _write_json(hardware, {"schema_version": "sol_execbench.amd_hardware_model.v1"})
     bundle = root / "bundle.json"
     _write_json(
@@ -119,6 +128,7 @@ def _manifest(root: Path) -> EvidencePublicationManifest:
         "suite_manifest": suite,
         "official_score_evidence": official,
         "amd_sol_bound:w1": bound,
+        "fusion_validation:w1": fusion,
         "hardware_model:gfx1200": hardware,
     }
     return EvidencePublicationManifest(

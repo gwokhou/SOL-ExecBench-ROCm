@@ -167,7 +167,7 @@ def test_amd_sol_bound_rejects_malformed_nested_payloads() -> None:
     assert (
         amd_sol_bound_from_payload(
             {
-                "schema_version": "sol_execbench.amd_sol_bound.v3",
+                "schema_version": "unsupported-amd-sol-schema",
                 "aggregate_bound": [],
                 "hardware_model": {},
                 "coverage_summary": {},

@@ -24,11 +24,10 @@ from sol_execbench.core.scoring.confidence import EstimateConfidence
 
 
 def _amd_sol_bound_base_from_dict(payload: dict[str, Any]) -> _AmdSolBoundBase:
-    """Parse an internal base payload after the public v4 fields are stripped."""
+    """Parse the normalized internal fields of a public AMD SOL artifact."""
     _exact_keys(
         payload,
         {
-            "schema_version",
             "derived",
             "definition",
             "workload_uuid",
@@ -44,57 +43,55 @@ def _amd_sol_bound_base_from_dict(payload: dict[str, Any]) -> _AmdSolBoundBase:
             "warnings",
             "coverage_summary",
         },
-        "AMD SOL v3 artifact",
+        "AMD SOL base payload",
     )
-    if payload["schema_version"] != "sol_execbench.amd_sol_bound.v3":
-        raise ValueError("internal AMD SOL base has invalid schema_version")
     if not isinstance(payload["definition"], str) or not isinstance(
         payload["workload_uuid"], str
     ):
         raise ValueError(
-            "AMD SOL v3 artifact definition and workload_uuid must be strings"
+            "AMD SOL base payload definition and workload_uuid must be strings"
         )
     if not isinstance(payload["derived"], bool):
-        raise ValueError("AMD SOL v3 artifact derived must be a boolean")
+        raise ValueError("AMD SOL base payload derived must be a boolean")
     if payload["hardware_model_ref"] is not None and not isinstance(
         payload["hardware_model_ref"], str
     ):
         raise ValueError(
-            "AMD SOL v3 artifact hardware_model_ref must be a string or null"
+            "AMD SOL base payload hardware_model_ref must be a string or null"
         )
     if payload["capability_budget_ref"] is not None and not isinstance(
         payload["capability_budget_ref"], str
     ):
         raise ValueError(
-            "AMD SOL v3 artifact capability_budget_ref must be a string or null"
+            "AMD SOL base payload capability_budget_ref must be a string or null"
         )
     if payload["capability_budget"] is not None and not isinstance(
         payload["capability_budget"], dict
     ):
         raise ValueError(
-            "AMD SOL v3 artifact capability_budget must be an object or null"
+            "AMD SOL base payload capability_budget must be an object or null"
         )
     if (payload["capability_budget_ref"] is None) != (
         payload["capability_budget"] is None
     ):
         raise ValueError(
-            "AMD SOL v3 artifact capability_budget and capability_budget_ref "
+            "AMD SOL base payload capability_budget and capability_budget_ref "
             "must be provided together"
         )
     if not isinstance(payload["bound_graph"], dict):
-        raise ValueError("AMD SOL v3 artifact bound_graph must be an object")
+        raise ValueError("AMD SOL base payload bound_graph must be an object")
     if not isinstance(payload["operator_work_estimates"], list) or not all(
         isinstance(item, dict) for item in payload["operator_work_estimates"]
     ):
         raise ValueError(
-            "AMD SOL v3 artifact operator_work_estimates must be object list"
+            "AMD SOL base payload operator_work_estimates must be object list"
         )
     if not isinstance(payload["warnings"], list) or not all(
         isinstance(item, str) for item in payload["warnings"]
     ):
-        raise ValueError("AMD SOL v3 artifact warnings must be string list")
+        raise ValueError("AMD SOL base payload warnings must be string list")
     if not isinstance(payload["hardware_model"], dict):
-        raise ValueError("AMD SOL v3 artifact hardware_model must be an object")
+        raise ValueError("AMD SOL base payload hardware_model must be an object")
     fusion_groups = tuple(
         _fusion_group_from_dict(item, index)
         for index, item in enumerate(_object_list(payload, "fusion_groups"))
@@ -125,12 +122,12 @@ def _amd_sol_bound_base_from_dict(payload: dict[str, Any]) -> _AmdSolBoundBase:
         "coverage_summary",
     )
     hardware_model = amd_hardware_model_from_dict(
-        payload["hardware_model"], source="AMD SOL v3 artifact hardware_model"
+        payload["hardware_model"], source="AMD SOL base payload hardware_model"
     )
     capability_budget = (
         arch_capability_budget_from_dict(
             payload["capability_budget"],
-            source="AMD SOL v3 artifact capability_budget",
+            source="AMD SOL base payload capability_budget",
             expected_architecture=hardware_model.architecture,
         )
         if payload["capability_budget"] is not None

@@ -18,7 +18,7 @@ from sol_execbench.core.scoring.authority_slice import (
 
 def _bound(uuid: str, *, status: str = "scored", confidence: str = "supported") -> dict:
     return {
-        "schema_version": "sol_execbench.amd_sol_bound.v3",
+        "schema_version": "sol_execbench.amd_sol_bound.v5",
         "definition": f"demo_{uuid}",
         "workload_uuid": uuid,
         "aggregate_bound": {"status": status},

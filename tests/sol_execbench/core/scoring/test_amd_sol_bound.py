@@ -11,7 +11,6 @@ from sol_execbench.core.scoring.amd_bound_graph import OpFamily
 from sol_execbench.core.scoring.amd_bound_graph.builder import build_static_bound_graph
 from sol_execbench.core.scoring.amd_sol import (
     AMD_SOL_SCHEMA_VERSION,
-    LEGACY_AMD_SOL_SCHEMA_VERSION,
     AmdSolPerformanceDiagnostics,
     PerformanceProviderResult,
     amd_sol_bound_from_dict,
@@ -414,7 +413,7 @@ def test_fastest_known_measurement_contradiction_blocks_authority_floor():
     assert "floor_contradicts_fastest_known" in artifact.warnings
 
 
-def test_v4_payloads_remain_readable_without_silent_semantic_migration():
+def test_rejects_non_v5_payloads():
     definition, workload = _inputs()
     artifact = build_amd_sol_bound_artifact(
         definition,
@@ -424,14 +423,11 @@ def test_v4_payloads_remain_readable_without_silent_semantic_migration():
         fusion_validation_ref="fusion.json",
         fusion_validation_sha256="e" * 64,
     )
-    legacy_payload = replace(
-        artifact, schema_version=LEGACY_AMD_SOL_SCHEMA_VERSION
-    ).to_dict()
+    payload = artifact.to_dict()
+    payload["schema_version"] = "unsupported-amd-sol-schema"
 
-    parsed = amd_sol_bound_from_dict(legacy_payload)
-
-    assert parsed.schema_version == LEGACY_AMD_SOL_SCHEMA_VERSION
-    assert parsed.to_dict() == legacy_payload
+    with pytest.raises(ValueError, match="invalid schema_version"):
+        amd_sol_bound_from_dict(payload)
 
 
 def test_multinode_fusion_requires_matching_validation_case():
@@ -577,7 +573,7 @@ def test_multinode_fusion_uniquely_recovers_evidence_tile_contract():
 
 
 @pytest.mark.parametrize(
-    "version", ("sol_execbench.amd_sol_bound.v1", "sol_execbench.amd_sol_bound.v3")
+    "version", ("unsupported-amd-sol-v1", "unsupported-amd-sol-v3")
 )
 def test_old_bound_schemas_are_rejected(version):
     with pytest.raises(ValueError, match="missing|invalid"):

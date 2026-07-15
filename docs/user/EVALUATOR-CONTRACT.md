@@ -104,7 +104,7 @@ required inputs:
 
 For release authority, the bound and hardware-model refs must also match the
 bundle's per-workload paths and SHA-256 values, and the bound must be
-`sol_execbench.amd_sol_bound.v4`, backed by a
+`sol_execbench.amd_sol_bound.v5`, backed by a
 `sol_execbench.amd_hardware_model.v3` exact-profile model and checksum-bound
 fusion-validation evidence. A missing, stale, or old-schema ref emits
 `release_bound_not_verified` and remains blocked.

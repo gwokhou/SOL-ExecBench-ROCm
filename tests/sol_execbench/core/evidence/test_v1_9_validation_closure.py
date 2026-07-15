@@ -52,7 +52,7 @@ def test_analysis_docs_explain_current_sidecars_and_rdna4_scope():
     text = _text("docs/internal/analysis.md")
 
     for expected in (
-        "sol_execbench.amd_sol_bound.v4",
+        "sol_execbench.amd_sol_bound.v5",
         "--amd-sol-bound-dir",
         "operator_work_estimates",
         "aggregate_bound",
@@ -168,7 +168,7 @@ def test_rdna4_validation_evidence_records_sample_outputs():
     for expected in (
         "Validation target:** RDNA 4 `gfx1200`",
         "trace_jsonl",
-        "sol_execbench.amd_sol_bound.v3",
+        "sol_execbench.amd_sol_bound.v5",
         "sol_execbench.amd_native_score.v1",
         "out/amd-sol-bounds",
         "out/amd-score-report.json",

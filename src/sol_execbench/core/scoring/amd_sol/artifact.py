@@ -41,7 +41,6 @@ from sol_execbench.core.integrity.checksums import sha256_file
 
 
 AMD_SOL_SCHEMA_VERSION = "sol_execbench.amd_sol_bound.v5"
-LEGACY_AMD_SOL_SCHEMA_VERSION = "sol_execbench.amd_sol_bound.v4"
 
 
 @dataclass(frozen=True)
@@ -316,8 +315,6 @@ class AmdSolBoundArtifact:
         return self.base.derived
 
     def to_dict(self) -> dict[str, Any]:
-        if self.schema_version == LEGACY_AMD_SOL_SCHEMA_VERSION:
-            return self._to_v4_dict()
         if self.schema_version != AMD_SOL_SCHEMA_VERSION:
             raise ValueError("AMD SOL artifact has invalid schema_version")
         payload = self.base.to_dict()
@@ -360,31 +357,6 @@ class AmdSolBoundArtifact:
         payload["performance_diagnostics"] = self.performance_diagnostics.to_dict(
             t_sol_floor_ms=self.t_sol_floor_ms
         )
-        return payload
-
-    def _to_v4_dict(self) -> dict[str, Any]:
-        """Serialize a parsed legacy artifact without changing its field meanings."""
-        payload = self.base.to_dict()
-        payload["schema_version"] = LEGACY_AMD_SOL_SCHEMA_VERSION
-        summaries = {item.group_id: item for item in self.fusion_validation_matches}
-        payload["fusion_groups"] = [
-            {
-                **group,
-                "signature_sha256": summaries[group["group_id"]].signature_sha256,
-                "variant_id": summaries[group["group_id"]].variant_id,
-                "capacity_evidence_id": summaries[
-                    group["group_id"]
-                ].capacity_evidence_id,
-                "capacity_status": summaries[group["group_id"]].capacity_status,
-                "performance_status": summaries[group["group_id"]].performance_status,
-            }
-            for group in payload["fusion_groups"]
-        ]
-        payload["fusion_validation_ref"] = self.fusion_validation_ref
-        payload["fusion_validation_sha256"] = self.fusion_validation_sha256
-        payload["fusion_validation_matches"] = [
-            item.to_dict() for item in self.fusion_validation_matches
-        ]
         return payload
 
 
@@ -690,11 +662,8 @@ def build_amd_sol_bound_artifact(
 
 
 def amd_sol_bound_from_dict(payload: dict[str, Any]) -> AmdSolBoundArtifact:
-    """Strictly parse v5 dual-track artifacts and preserve legacy v4 payloads."""
-    schema_version = payload.get("schema_version")
-    if schema_version == LEGACY_AMD_SOL_SCHEMA_VERSION:
-        return _amd_sol_bound_from_v4_dict(payload)
-    if schema_version != AMD_SOL_SCHEMA_VERSION:
+    """Strictly parse the sole supported AMD SOL v5 artifact schema."""
+    if payload.get("schema_version") != AMD_SOL_SCHEMA_VERSION:
         raise ValueError("AMD SOL artifact has invalid schema_version")
     return _amd_sol_bound_from_v5_dict(payload)
 
@@ -728,20 +697,32 @@ def _amd_sol_bound_from_v5_dict(payload: dict[str, Any]) -> AmdSolBoundArtifact:
     raw_bounds = payload["group_bounds"]
     if not isinstance(raw_bounds, list):
         raise ValueError("group_bounds must be a list")
-    legacy_payload = {
+    fusion_validation_ref = payload["fusion_validation_ref"]
+    if not isinstance(fusion_validation_ref, str) or not fusion_validation_ref:
+        raise ValueError("fusion_validation_ref must be a non-empty string")
+    fusion_validation_sha256 = payload["fusion_validation_sha256"]
+    if (
+        not isinstance(fusion_validation_sha256, str)
+        or len(fusion_validation_sha256) != 64
+        or any(
+            character not in "0123456789abcdef"
+            for character in fusion_validation_sha256
+        )
+    ):
+        raise ValueError("fusion_validation_sha256 must be a lowercase SHA-256")
+    base_payload = {
         key: value
         for key, value in payload.items()
-        if key not in {"theoretical_lower_bound", "performance_diagnostics"}
+        if key not in required_extra | {"schema_version"}
     }
-    legacy_payload["schema_version"] = LEGACY_AMD_SOL_SCHEMA_VERSION
-    legacy_payload["aggregate_bound"] = {
+    base_payload["aggregate_bound"] = {
         "status": floor["status"],
         "scored": floor["authority_eligible"],
         "sol_bound_ms": floor["t_sol_floor_ms"],
         "reason": floor["reason"],
         "node_ids": floor["node_ids"],
     }
-    legacy_payload["group_bounds"] = [
+    base_payload["group_bounds"] = [
         {
             **{key: value for key, value in bound.items() if key != "t_sol_floor_ms"},
             "sol_bound_ms": bound.get("t_sol_floor_ms"),
@@ -750,84 +731,51 @@ def _amd_sol_bound_from_v5_dict(payload: dict[str, Any]) -> AmdSolBoundArtifact:
         else bound
         for bound in raw_bounds
     ]
-    legacy = _amd_sol_bound_from_v4_dict(legacy_payload)
-    diagnostics = _performance_diagnostics_from_dict(
-        payload["performance_diagnostics"], t_sol_floor_ms=legacy.t_sol_floor_ms
-    )
-    _validate_performance_diagnostics(diagnostics, legacy.hardware_model.architecture)
-    return replace(
-        legacy,
-        performance_diagnostics=diagnostics,
-        schema_version=AMD_SOL_SCHEMA_VERSION,
-    )
-
-
-def _amd_sol_bound_from_v4_dict(payload: dict[str, Any]) -> AmdSolBoundArtifact:
-    """Parse v4 exactly; it has no diagnostic track and retains old names."""
-    required_extra = {
-        "fusion_validation_ref",
-        "fusion_validation_sha256",
-        "fusion_validation_matches",
-    }
-    v3_keys = set(_AmdSolBoundBase.__dataclass_fields__) - {"derived"}
-    v3_keys.add("derived")
-    expected = v3_keys | {"schema_version"} | required_extra
-    if set(payload) != expected:
-        raise ValueError("AMD SOL v4 artifact has missing or unknown top-level fields")
-    if payload["schema_version"] != LEGACY_AMD_SOL_SCHEMA_VERSION:
-        raise ValueError("AMD SOL artifact has invalid schema_version")
-    if (
-        not isinstance(payload["fusion_validation_ref"], str)
-        or not payload["fusion_validation_ref"]
-    ):
-        raise ValueError("fusion_validation_ref must be a non-empty string")
-    checksum = payload["fusion_validation_sha256"]
-    if (
-        not isinstance(checksum, str)
-        or len(checksum) != 64
-        or any(c not in "0123456789abcdef" for c in checksum)
-    ):
-        raise ValueError("fusion_validation_sha256 must be a lowercase SHA-256")
-    raw_groups = payload["fusion_groups"]
-    if not isinstance(raw_groups, list):
-        raise ValueError("fusion_groups must be a list")
-    extra_group_keys = {
+    evidence_group_keys = {
         "signature_sha256",
         "variant_id",
         "capacity_evidence_id",
         "capacity_status",
         "performance_status",
     }
-    stripped_groups = []
-    embedded = []
+    raw_groups = payload["fusion_groups"]
+    if not isinstance(raw_groups, list):
+        raise ValueError("fusion_groups must be a list")
+    embedded_matches = []
+    base_groups = []
     for group in raw_groups:
-        if not isinstance(group, dict) or not extra_group_keys.issubset(group):
-            raise ValueError("v4 fusion group validation fields are missing")
-        embedded.append(
+        if not isinstance(group, dict) or not evidence_group_keys.issubset(group):
+            raise ValueError("fusion group validation fields are missing")
+        embedded_matches.append(
             {
                 "group_id": group.get("group_id"),
-                **{key: group[key] for key in extra_group_keys},
+                **{key: group[key] for key in evidence_group_keys},
             }
         )
-        stripped_groups.append(
-            {key: value for key, value in group.items() if key not in extra_group_keys}
+        base_groups.append(
+            {
+                key: value
+                for key, value in group.items()
+                if key not in evidence_group_keys
+            }
         )
-    v3_payload = {
-        key: value for key, value in payload.items() if key not in required_extra
-    }
-    v3_payload["schema_version"] = "sol_execbench.amd_sol_bound.v3"
-    v3_payload["fusion_groups"] = stripped_groups
-    base = _amd_sol_bound_base_from_dict(v3_payload)
+    base_payload["fusion_groups"] = base_groups
+    base = _amd_sol_bound_base_from_dict(base_payload)
     raw_matches = payload["fusion_validation_matches"]
-    if not isinstance(raw_matches, list) or embedded != raw_matches:
+    if not isinstance(raw_matches, list) or embedded_matches != raw_matches:
         raise ValueError("fusion_validation_matches must exactly mirror fusion groups")
     matches = tuple(_summary(item) for item in raw_matches)
+    diagnostics = _performance_diagnostics_from_dict(
+        payload["performance_diagnostics"],
+        t_sol_floor_ms=base.aggregate_bound.sol_bound_ms,
+    )
+    _validate_performance_diagnostics(diagnostics, base.hardware_model.architecture)
     return AmdSolBoundArtifact(
-        base,
-        payload["fusion_validation_ref"],
-        checksum,
-        matches,
-        schema_version=LEGACY_AMD_SOL_SCHEMA_VERSION,
+        base=base,
+        fusion_validation_ref=fusion_validation_ref,
+        fusion_validation_sha256=fusion_validation_sha256,
+        fusion_validation_matches=matches,
+        performance_diagnostics=diagnostics,
     )
 
 
@@ -952,7 +900,6 @@ def _summary(raw: dict[str, Any]) -> FusionGroupEvidenceSummary:
 
 __all__ = [
     "AMD_SOL_SCHEMA_VERSION",
-    "LEGACY_AMD_SOL_SCHEMA_VERSION",
     "AmdSolBoundArtifact",
     "AmdSolPerformanceDiagnostics",
     "FusionGroupEvidenceSummary",

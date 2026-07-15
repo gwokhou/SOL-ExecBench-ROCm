@@ -331,7 +331,7 @@ uv run scripts/run_dataset.py data/SOL-ExecBench/benchmark \
   --fusion-validation calibration/fusion-validation.json
 ```
 
-The sidecars use schema version `sol_execbench.amd_sol_bound.v4`. Each sidecar
+The sidecars use schema version `sol_execbench.amd_sol_bound.v5`. Each sidecar
 contains the derived marker, definition name, workload UUID, hardware model
 reference, hardware model payload, bound graph, rich operator work estimates,
 versioned fusion groups, per-group SOL bounds, aggregate bound state,
@@ -363,7 +363,7 @@ This local workflow produces three artifact layers:
 - canonical trace JSONL files: the benchmark trace JSONL output for each problem.
   The canonical trace JSONL remains unchanged by `--amd-score-report`,
   `--amd-sol-bound-dir`, and `--solar-derivation`.
-- AMD SOL v4 sidecars under `--amd-sol-bound-dir`: derived AMD roofline and
+- AMD SOL v5 sidecars under `--amd-sol-bound-dir`: derived AMD roofline and
   work-estimate inputs used for AMD-native score eligibility.
 - SOLAR derivation sidecars under `--solar-derivation`: paper-aligned automatic
   SOLAR derivation evidence for the ROCm port, generated from `Definition`,

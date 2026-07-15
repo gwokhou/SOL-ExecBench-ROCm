@@ -73,7 +73,7 @@ def test_v1_20_scripts_chain_generated_outputs_and_source_refs(tmp_path):
     _write_json(
         amd_sol,
         {
-            "schema_version": "sol_execbench.amd_sol_bound.v1",
+            "schema_version": "sol_execbench.amd_sol_bound.v5",
             "amd_sol_checksum": {"value": "amd-sol-real"},
             "aggregate_bound": {"status": "scored"},
         },

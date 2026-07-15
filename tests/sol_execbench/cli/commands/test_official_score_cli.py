@@ -463,7 +463,7 @@ def test_v2_bound_reference_is_blocked_even_when_the_score_report_claims_authori
     bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
     bound_path = Path(bundle["workloads"][0]["bound_ref"])
     bound = json.loads(bound_path.read_text(encoding="utf-8"))
-    bound["schema_version"] = "sol_execbench.amd_sol_bound.v2"
+    bound["schema_version"] = "unsupported-amd-sol-schema"
     bound_path.write_text(json.dumps(bound), encoding="utf-8")
 
     result = CliRunner().invoke(
