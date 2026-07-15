@@ -82,7 +82,7 @@ def test_v1_19_example_readme_references_existing_fixture_files():
 
     assert "demo-only" in readme
     assert "diagnostic-only" in readme
-    assert "../../v1_19_evidence_guide.md" in readme
+    assert "../../internal/v1_19_evidence_guide.md" in readme
     for name in EXPECTED_FILES:
         assert name in readme
         path = EXAMPLES_DIR / name

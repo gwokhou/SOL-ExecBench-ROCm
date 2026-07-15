@@ -17,20 +17,18 @@ pytestmark = [pytest.mark.requires_linux, pytest.mark.subprocess_uv]
 
 def _matching_default_dependency_env() -> dict[str, str]:
     return {
-        "SOL_EXECBENCH_DEPENDENCY_TORCH_DISTRIBUTION_VERSION": "2.10.0+rocm7.1",
-        "SOL_EXECBENCH_DEPENDENCY_TORCH_VERSION": "2.10.0+rocm7.1",
-        "SOL_EXECBENCH_DEPENDENCY_TORCH_LOCAL_VERSION": "rocm7.1",
-        "SOL_EXECBENCH_DEPENDENCY_TORCH_ROCM_TARGET": "rocm7.1",
-        "SOL_EXECBENCH_DEPENDENCY_TORCH_HIP_VERSION": "7.1.0",
+        "SOL_EXECBENCH_DEPENDENCY_TORCH_DISTRIBUTION_VERSION": "2.11.0+rocm7.2",
+        "SOL_EXECBENCH_DEPENDENCY_TORCH_VERSION": "2.11.0+rocm7.2",
+        "SOL_EXECBENCH_DEPENDENCY_TORCH_LOCAL_VERSION": "rocm7.2",
+        "SOL_EXECBENCH_DEPENDENCY_TORCH_ROCM_TARGET": "rocm7.2",
+        "SOL_EXECBENCH_DEPENDENCY_TORCH_HIP_VERSION": "7.2.0",
         "SOL_EXECBENCH_DEPENDENCY_TORCH_CUDA_VERSION": "none",
         "SOL_EXECBENCH_DEPENDENCY_TORCH_DEVICE_AVAILABLE": "true",
-        "SOL_EXECBENCH_DEPENDENCY_TORCHVISION_DISTRIBUTION_VERSION": (
-            "0.25.0+rocm7.1"
-        ),
+        "SOL_EXECBENCH_DEPENDENCY_TORCHVISION_DISTRIBUTION_VERSION": ("0.26.0+rocm7.2"),
         "SOL_EXECBENCH_DEPENDENCY_TRITON_ROCM_DISTRIBUTION_VERSION": "3.6.0",
         "SOL_EXECBENCH_DEPENDENCY_TRITON_ROCM_STATUS": "installed",
-        "SOL_EXECBENCH_DEPENDENCY_CONTAINER_ROCM_USER_SPACE_VERSION": "7.1.1",
-        "SOL_EXECBENCH_DEPENDENCY_TOOLCHAIN_ROCM_VERSION": "7.1.1",
+        "SOL_EXECBENCH_DEPENDENCY_CONTAINER_ROCM_USER_SPACE_VERSION": "7.2.0",
+        "SOL_EXECBENCH_DEPENDENCY_TOOLCHAIN_ROCM_VERSION": "7.2.0",
     }
 
 
@@ -59,11 +57,11 @@ def test_mixed_dependency_state_blocks_before_docker_command_text() -> None:
     completed = _run_docker_dependency_preflight(
         "--preflight-only",
         "--target",
-        "rocm-7.2.0-ubuntu-24.04-container",
+        "rocm-7.1.1-ubuntu-24.04-container",
         **{
             **_matching_default_dependency_env(),
-            "SOL_EXECBENCH_DEPENDENCY_CONTAINER_ROCM_USER_SPACE_VERSION": "7.2.0",
-            "SOL_EXECBENCH_DEPENDENCY_TOOLCHAIN_ROCM_VERSION": "7.2.0",
+            "SOL_EXECBENCH_DEPENDENCY_CONTAINER_ROCM_USER_SPACE_VERSION": "7.1.1",
+            "SOL_EXECBENCH_DEPENDENCY_TOOLCHAIN_ROCM_VERSION": "7.1.1",
         },
     )
 
@@ -82,9 +80,7 @@ def test_missing_required_dependency_blocks_before_docker_command_text() -> None
         **{
             **_matching_default_dependency_env(),
             "SOL_EXECBENCH_DEPENDENCY_TORCH_DISTRIBUTION_VERSION": "none",
-            "SOL_EXECBENCH_DEPENDENCY_TORCH_IMPORT_ERROR": (
-                "No module named 'torch'"
-            ),
+            "SOL_EXECBENCH_DEPENDENCY_TORCH_IMPORT_ERROR": ("No module named 'torch'"),
         },
     )
 
@@ -97,7 +93,9 @@ def test_missing_required_dependency_blocks_before_docker_command_text() -> None
     assert "docker run" not in completed.stdout
 
 
-def test_matching_default_dependency_stack_stops_only_on_clean_validation_policy() -> None:
+def test_matching_default_dependency_stack_stops_only_on_clean_validation_policy() -> (
+    None
+):
     completed = _run_docker_dependency_preflight(
         "--preflight-only",
         **_matching_default_dependency_env(),
@@ -105,11 +103,11 @@ def test_matching_default_dependency_stack_stops_only_on_clean_validation_policy
 
     assert completed.returncode != 0
     payload = json.loads(completed.stdout)
-    assert payload["target_id"] == "rocm-7.1.1-ubuntu-24.04-container"
+    assert payload["target_id"] == "rocm-7.2.0-ubuntu-24.04-container"
     assert payload["status"] == "not_tested"
     assert payload["reason_code"] == "target_not_tested"
-    assert payload["expected_local_version"] == "rocm7.1"
-    assert payload["uv_index_name"] == "pytorch-rocm71"
+    assert payload["expected_local_version"] == "rocm7.2"
+    assert payload["uv_index_name"] == "pytorch-rocm72"
     assert payload["benchmark_allowed"] is False
     assert "docker build" not in completed.stdout
     assert "docker run" not in completed.stdout
@@ -123,21 +121,22 @@ def test_help_documents_dependency_override_separately_from_unknown_target() -> 
     assert "SOL_EXECBENCH_ALLOW_MIXED_VERSION_DEPENDENCIES" in script
     assert "SOL_EXECBENCH_RECORD_CONTAINER_VALIDATION" in script
     assert "allow-unknown-target" in script
-    assert "dependency mismatch override" not in script.partition(
-        "--allow-unknown-target"
-    )[2].splitlines()[0]
+    assert (
+        "dependency mismatch override"
+        not in script.partition("--allow-unknown-target")[2].splitlines()[0]
+    )
 
 
 def test_unknown_target_override_does_not_allow_mixed_dependencies() -> None:
     completed = _run_docker_dependency_preflight(
         "--preflight-only",
         "--target",
-        "rocm-7.2.0-ubuntu-24.04-container",
+        "rocm-7.1.1-ubuntu-24.04-container",
         "--allow-unknown-target",
         **{
             **_matching_default_dependency_env(),
-            "SOL_EXECBENCH_DEPENDENCY_CONTAINER_ROCM_USER_SPACE_VERSION": "7.2.0",
-            "SOL_EXECBENCH_DEPENDENCY_TOOLCHAIN_ROCM_VERSION": "7.2.0",
+            "SOL_EXECBENCH_DEPENDENCY_CONTAINER_ROCM_USER_SPACE_VERSION": "7.1.1",
+            "SOL_EXECBENCH_DEPENDENCY_TOOLCHAIN_ROCM_VERSION": "7.1.1",
         },
     )
 
@@ -156,12 +155,12 @@ def test_dependency_override_reports_probe_smoke_only_without_authority() -> Non
     completed = _run_docker_dependency_preflight(
         "--preflight-only",
         "--target",
-        "rocm-7.2.0-ubuntu-24.04-container",
+        "rocm-7.1.1-ubuntu-24.04-container",
         "--allow-mixed-version-dependencies",
         **{
             **_matching_default_dependency_env(),
-            "SOL_EXECBENCH_DEPENDENCY_CONTAINER_ROCM_USER_SPACE_VERSION": "7.2.0",
-            "SOL_EXECBENCH_DEPENDENCY_TOOLCHAIN_ROCM_VERSION": "7.2.0",
+            "SOL_EXECBENCH_DEPENDENCY_CONTAINER_ROCM_USER_SPACE_VERSION": "7.1.1",
+            "SOL_EXECBENCH_DEPENDENCY_TOOLCHAIN_ROCM_VERSION": "7.1.1",
         },
     )
 
@@ -185,11 +184,11 @@ def test_dependency_env_override_reports_probe_smoke_only_without_authority() ->
     completed = _run_docker_dependency_preflight(
         "--preflight-only",
         "--target",
-        "rocm-7.2.0-ubuntu-24.04-container",
+        "rocm-7.1.1-ubuntu-24.04-container",
         **{
             **_matching_default_dependency_env(),
-            "SOL_EXECBENCH_DEPENDENCY_CONTAINER_ROCM_USER_SPACE_VERSION": "7.2.0",
-            "SOL_EXECBENCH_DEPENDENCY_TOOLCHAIN_ROCM_VERSION": "7.2.0",
+            "SOL_EXECBENCH_DEPENDENCY_CONTAINER_ROCM_USER_SPACE_VERSION": "7.1.1",
+            "SOL_EXECBENCH_DEPENDENCY_TOOLCHAIN_ROCM_VERSION": "7.1.1",
             "SOL_EXECBENCH_ALLOW_MIXED_VERSION_DEPENDENCIES": "1",
         },
     )
@@ -209,21 +208,21 @@ def test_dependency_env_override_reports_probe_smoke_only_without_authority() ->
 def test_dependency_override_allows_normal_dry_run_smoke_without_authority() -> None:
     completed = _run_docker_dependency_preflight(
         "--target",
-        "rocm-7.2.0-ubuntu-24.04-container",
+        "rocm-7.1.1-ubuntu-24.04-container",
         "--allow-mixed-version-dependencies",
         "--",
         "sol-execbench",
         "examples/pytorch/linear_backward",
         **{
             **_matching_default_dependency_env(),
-            "SOL_EXECBENCH_DEPENDENCY_CONTAINER_ROCM_USER_SPACE_VERSION": "7.2.0",
-            "SOL_EXECBENCH_DEPENDENCY_TOOLCHAIN_ROCM_VERSION": "7.2.0",
+            "SOL_EXECBENCH_DEPENDENCY_CONTAINER_ROCM_USER_SPACE_VERSION": "7.1.1",
+            "SOL_EXECBENCH_DEPENDENCY_TOOLCHAIN_ROCM_VERSION": "7.1.1",
         },
     )
 
     assert completed.returncode == 0, completed.stderr
     assert "+ docker run" in completed.stdout
-    assert "sol-execbench:rocm-7.2-complete" in completed.stdout
+    assert "sol-execbench:rocm-7.1.1-complete" in completed.stdout
     assert "sol-execbench examples/pytorch/linear_backward" in completed.stdout
 
 
@@ -236,9 +235,7 @@ def test_missing_required_dependency_still_blocks_normal_dry_run_smoke() -> None
         **{
             **_matching_default_dependency_env(),
             "SOL_EXECBENCH_DEPENDENCY_TORCH_DISTRIBUTION_VERSION": "none",
-            "SOL_EXECBENCH_DEPENDENCY_TORCH_IMPORT_ERROR": (
-                "No module named 'torch'"
-            ),
+            "SOL_EXECBENCH_DEPENDENCY_TORCH_IMPORT_ERROR": ("No module named 'torch'"),
         },
     )
 
@@ -259,7 +256,7 @@ def test_record_container_validation_allows_matching_not_tested_dry_run() -> Non
 
     assert completed.returncode == 0, completed.stderr
     assert "+ docker run" in completed.stdout
-    assert "sol-execbench:rocm-7.1.1-complete" in completed.stdout
+    assert "sol-execbench:rocm-7.2-complete" in completed.stdout
     assert "sol-execbench examples/pytorch/linear_backward" in completed.stdout
 
 
@@ -267,14 +264,14 @@ def test_record_container_validation_still_blocks_mixed_dry_run() -> None:
     completed = _run_docker_dependency_preflight(
         "--record-container-validation",
         "--target",
-        "rocm-7.2.0-ubuntu-24.04-container",
+        "rocm-7.1.1-ubuntu-24.04-container",
         "--",
         "sol-execbench",
         "examples/pytorch/linear_backward",
         **{
             **_matching_default_dependency_env(),
-            "SOL_EXECBENCH_DEPENDENCY_CONTAINER_ROCM_USER_SPACE_VERSION": "7.2.0",
-            "SOL_EXECBENCH_DEPENDENCY_TOOLCHAIN_ROCM_VERSION": "7.2.0",
+            "SOL_EXECBENCH_DEPENDENCY_CONTAINER_ROCM_USER_SPACE_VERSION": "7.1.1",
+            "SOL_EXECBENCH_DEPENDENCY_TOOLCHAIN_ROCM_VERSION": "7.1.1",
         },
     )
 

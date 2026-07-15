@@ -9,12 +9,16 @@ from sol_execbench.core.platform.environment import (
     EnvironmentDiagnostics,
     EnvironmentEvidenceStatus,
     EnvironmentSnapshot,
+    GpuEnvironmentSummary,
     ProbeCompletedProcess,
+    PytorchRocmSummary,
     ToolProbeResult,
     build_environment_diagnostics,
     collect_environment_snapshot,
     probe_tool,
 )
+from sol_execbench.core.platform.environment_probes import parse_probe_output
+from sol_execbench.core.platform.environment_snapshot import summarize_gpus
 
 
 def test_minimal_environment_snapshot_round_trips():
@@ -85,6 +89,37 @@ def test_probe_tool_reports_available_and_parses_gfx_target():
     assert result.status == EnvironmentEvidenceStatus.AVAILABLE
     assert result.returncode == 0
     assert result.parsed["gfx_targets"] == ["gfx942"]
+
+
+def test_parse_probe_output_ignores_rocm_generic_isa_labels() -> None:
+    parsed = parse_probe_output("ISA: gfx12\nName: gfx1200\n")
+
+    assert parsed["gfx_targets"] == ["gfx1200"]
+
+
+def test_summarize_gpus_deduplicates_single_pytorch_device_from_tools():
+    tools = {
+        "rocminfo": ToolProbeResult(
+            tool="rocminfo",
+            status=EnvironmentEvidenceStatus.AVAILABLE,
+            parsed={"gfx_targets": ["gfx1200"]},
+        )
+    }
+    pytorch = PytorchRocmSummary(
+        available=True,
+        device_count=1,
+        device_name="AMD Radeon RX 9060 XT",
+        gfx_target="gfx1200",
+    )
+
+    assert summarize_gpus(tools, pytorch) == [
+        GpuEnvironmentSummary(
+            source="pytorch",
+            index=0,
+            name="AMD Radeon RX 9060 XT",
+            gfx_target="gfx1200",
+        )
+    ]
 
 
 def test_probe_tool_reports_nonzero_exit_as_failed():

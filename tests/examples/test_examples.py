@@ -103,7 +103,7 @@ _EXAMPLES = [
         problem="rmsnorm",
         solution_file="solution_hip.json",
         expected_count=14,
-        extra_markers=["cpp"],
+        extra_markers=["cpp", "requires_rocm_dev"],
     ),
     Example(
         test_id="flux_rope_hip",
@@ -111,7 +111,7 @@ _EXAMPLES = [
         problem="flux_rope",
         solution_file="solution_hip.json",
         expected_count=3,
-        extra_markers=["cpp"],
+        extra_markers=["cpp", "requires_rocm_dev"],
     ),
     Example(
         test_id="jamba_attn_proj_rocm_cute_dsl_compatibility",
@@ -147,7 +147,13 @@ _EXAMPLES = [
         problem="softmax",
         solution_file="solution_miopen.json",
         expected_count=3,
-        extra_markers=["cpp", "requires_rocm", "requires_rocm_dev", "requires_rdna4"],
+        extra_markers=[
+            "cpp",
+            "requires_rocm",
+            "requires_rocm_dev",
+            "requires_miopen",
+            "requires_rdna4",
+        ],
     ),
     Example(
         test_id="gemm_ck",

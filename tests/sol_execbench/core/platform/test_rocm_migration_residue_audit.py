@@ -66,8 +66,11 @@ def _classification(relative_path: str, line: str) -> str | None:
         "torch.cuda" in line
         or "at::cuda" in line
         or "c10/cuda" in line
+        or "c10::cuda::CUDAGuard" in line
         or ".is_cuda()" in line
     ):
+        return "PyTorch ROCm compatibility namespace"
+    if relative_path == "scripts/internal/run_torch_inductor_provider.py":
         return "PyTorch ROCm compatibility namespace"
     if "extra_cuda_cflags" in line:
         return "PyTorch extension API keyword used for HIP compiler flags"

@@ -30,7 +30,7 @@ __global__ void rope_kernel(
 
 torch::Tensor run(torch::Tensor query_or_key,
                   torch::Tensor freqs_cos, torch::Tensor freqs_sin) {
-    const c10::hip::HIPGuard guard(
+    const c10::cuda::CUDAGuard guard(
         static_cast<c10::DeviceIndex>(query_or_key.get_device()));
     auto B = query_or_key.size(0), S = query_or_key.size(1);
     auto H = query_or_key.size(2), head_dim = query_or_key.size(3);

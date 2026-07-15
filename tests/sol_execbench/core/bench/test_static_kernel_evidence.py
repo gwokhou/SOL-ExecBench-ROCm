@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from pathlib import Path
 import shutil
 import subprocess
 
@@ -562,8 +563,14 @@ def test_static_extractor_runs_routed_objdump_and_readelf_with_raw_outputs(tmp_p
 
     assert payload["status"] == "collected"
     assert payload["reason_code"] == "static_evidence_collected"
-    assert ["llvm-objdump", "--version"] in probe_commands
-    assert ["readelf", "--version"] in probe_commands
+    assert any(
+        Path(command[0]).name == "llvm-objdump" and command[1:] == ["--version"]
+        for command in probe_commands
+    )
+    assert any(
+        Path(command[0]).name.endswith("readelf") and command[1:] == ["--version"]
+        for command in probe_commands
+    )
     assert extractor_commands == [
         [
             "llvm-objdump",

@@ -12,11 +12,11 @@ included sample problems and, when available, a ROCm-capable AMD GPU.
 | Package manager | `uv`. |
 | ROCm runtime | Required for live GPU evaluation. The project baseline is ROCm >= 7.0. |
 | GPU access | `/dev/kfd` and `/dev/dri` must be visible for ROCm hardware tests and evaluation. |
-| Optional Docker runtime | Native Linux Docker with ROCm device passthrough; the default image is `rocm/dev-ubuntu-24.04:7.1.1-complete`. |
+| Optional Docker runtime | Native Linux Docker with ROCm device passthrough; the default image is `rocm/dev-ubuntu-24.04:7.2-complete`. |
 | Optional dataset download | Hugging Face CLI, available through `huggingface-hub[cli]`. |
 
-On Linux x86_64, dependency resolution uses the PyTorch ROCm 7.1 index for
-`torch==2.10.0+rocm7.1`, `torchvision==0.25.0+rocm7.1`, and
+On Linux x86_64, dependency resolution uses the PyTorch ROCm 7.2 index for
+`torch==2.11.0+rocm7.2`, `torchvision==0.26.0+rocm7.2`, and
 `triton-rocm==3.6.0`. Non-Linux and non-x86_64 environments use non-ROCm
 PyTorch wheels for CPU-safe development tasks such as schema checks,
 documentation work, and GPU-free CLI metadata commands.
@@ -149,7 +149,7 @@ Run a benchmark command inside the container:
 Select a declared Docker target:
 
 ```bash
-./scripts/run_docker.sh --target rocm-7.1.1-ubuntu-24.04-container -- sol-execbench --format json contract evaluator
+./scripts/run_docker.sh --target rocm-7.2.0-ubuntu-24.04-container -- sol-execbench --format json contract evaluator
 ```
 
 The wrapper uses `docker/rocm-targets.json` to preview target images and

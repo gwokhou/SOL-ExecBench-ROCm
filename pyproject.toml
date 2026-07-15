@@ -50,6 +50,7 @@ markers = [
     "requires_rocm_dev: test requires ROCm native extension development headers",
     "requires_triton_rocm: test requires the triton-rocm Python package",
     "requires_safetensors_torch: test requires safetensors.torch support",
+    "requires_miopen: test requires MIOpen headers",
     "docker_dependency: test verifies dependencies expected inside the Docker ROCm environment",
     "subprocess_uv: test launches uv-managed subprocesses and may need build-system dependencies cached",
     "native_extension: test loads native extension modules such as torch or safetensors",

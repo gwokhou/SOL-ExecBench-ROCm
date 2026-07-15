@@ -33,7 +33,7 @@ def test_manifest_declares_default_and_configured_rocm_complete_targets() -> Non
         manifest.default_target_id
     ].docker_image_repository == ("rocm/dev-ubuntu-24.04")
     assert manifest.targets_by_id[manifest.default_target_id].docker_image_tag == (
-        "7.1.1-complete"
+        "7.2-complete"
     )
     tags = {target.docker_image_tag for target in manifest.targets}
     assert any(tag.startswith("7.0.") and tag.endswith("-complete") for tag in tags)
@@ -44,15 +44,15 @@ def test_manifest_declares_default_and_configured_rocm_complete_targets() -> Non
 
     raw = MANIFEST_PATH.read_text()
     assert "rocm/dev-ubuntu-24.04" in raw
-    assert "7.1.1-complete" in raw
+    assert "7.2-complete" in raw
 
 
-def test_default_selection_preserves_existing_rocm_7_1_docker_image() -> None:
+def test_default_selection_uses_rocm_7_2_docker_image() -> None:
     selection = select_docker_target(None, manifest_path=MANIFEST_PATH)
 
     assert selection.target_id == selection.target.target_id
     assert selection.target.docker_image_repository == "rocm/dev-ubuntu-24.04"
-    assert selection.target.docker_image_tag == "7.1.1-complete"
+    assert selection.target.docker_image_tag == "7.2-complete"
     assert selection.status is None
     assert selection.entry is None
     assert selection.decision is None
@@ -63,10 +63,10 @@ def test_selection_converts_declared_target_to_phase_78_matrix_target() -> None:
     matrix_target = to_matrix_target(selection.target)
 
     assert matrix_target.target_id == selection.target.target_id
-    assert matrix_target.requested_rocm_user_space_version.startswith("7.1.")
+    assert matrix_target.requested_rocm_user_space_version.startswith("7.2.")
     assert matrix_target.docker_image_repository == "rocm/dev-ubuntu-24.04"
-    assert matrix_target.docker_image_tag == "7.1.1-complete"
-    assert matrix_target.pytorch_rocm_target == "rocm7.1"
+    assert matrix_target.docker_image_tag == "7.2-complete"
+    assert matrix_target.pytorch_rocm_target == "rocm7.2"
     assert matrix_target.validation_scope is MatrixValidationScope.CONTAINER_USER_SPACE
 
 
@@ -75,10 +75,10 @@ def test_docker_build_args_use_requested_manifest_repository_and_tag() -> None:
 
     assert docker_build_args_for_target(selection.target) == {
         "ROCM_DOCKER_IMAGE": "rocm/dev-ubuntu-24.04",
-        "ROCM_DOCKER_TAG": "7.1.1-complete",
-        "PYTORCH_TORCH_VERSION": "2.10.0+rocm7.1",
-        "PYTORCH_TORCHVISION_VERSION": "0.25.0+rocm7.1",
-        "PYTORCH_ROCM_INDEX_URL": "https://download.pytorch.org/whl/rocm7.1",
+        "ROCM_DOCKER_TAG": "7.2-complete",
+        "PYTORCH_TORCH_VERSION": "2.11.0+rocm7.2",
+        "PYTORCH_TORCHVISION_VERSION": "0.26.0+rocm7.2",
+        "PYTORCH_ROCM_INDEX_URL": "https://download.pytorch.org/whl/rocm7.2",
         "TRITON_ROCM_VERSION": "3.6.0",
         "TRITON_ROCM_INDEX_URL": "https://download.pytorch.org/whl/",
     }
@@ -122,15 +122,15 @@ def test_default_preview_json_is_shell_consumable_without_docker() -> None:
 
     assert payload["target_id"]
     assert payload["image_repository"] == "rocm/dev-ubuntu-24.04"
-    assert payload["image_tag"] == "7.1.1-complete"
+    assert payload["image_tag"] == "7.2-complete"
     assert payload["image_digest"] is None
     assert payload["validation_scope"] == "container_user_space"
     assert payload["build_args"]["ROCM_DOCKER_IMAGE"] == "rocm/dev-ubuntu-24.04"
-    assert payload["build_args"]["ROCM_DOCKER_TAG"] == "7.1.1-complete"
-    assert payload["build_args"]["PYTORCH_TORCH_VERSION"] == "2.10.0+rocm7.1"
-    assert payload["build_args"]["PYTORCH_TORCHVISION_VERSION"] == ("0.25.0+rocm7.1")
+    assert payload["build_args"]["ROCM_DOCKER_TAG"] == "7.2-complete"
+    assert payload["build_args"]["PYTORCH_TORCH_VERSION"] == "2.11.0+rocm7.2"
+    assert payload["build_args"]["PYTORCH_TORCHVISION_VERSION"] == ("0.26.0+rocm7.2")
     assert payload["build_args"]["PYTORCH_ROCM_INDEX_URL"] == (
-        "https://download.pytorch.org/whl/rocm7.1"
+        "https://download.pytorch.org/whl/rocm7.2"
     )
     assert payload["build_args"]["TRITON_ROCM_VERSION"] == "3.6.0"
     assert payload["build_args"]["TRITON_ROCM_INDEX_URL"] == (
@@ -219,4 +219,4 @@ def test_module_main_emits_default_preview_json_without_live_docker() -> None:
     payload = json.loads(completed.stdout)
 
     assert payload["build_args"]["ROCM_DOCKER_IMAGE"] == "rocm/dev-ubuntu-24.04"
-    assert payload["build_args"]["ROCM_DOCKER_TAG"] == "7.1.1-complete"
+    assert payload["build_args"]["ROCM_DOCKER_TAG"] == "7.2-complete"

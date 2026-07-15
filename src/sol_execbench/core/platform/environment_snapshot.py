@@ -107,6 +107,14 @@ def summarize_gpus(
     pytorch: PytorchRocmSummary | None,
 ) -> list[GpuEnvironmentSummary]:
     gpus: list[GpuEnvironmentSummary] = []
+    # Probe tools expose ISA targets rather than device IDs.  If PyTorch sees a
+    # single device, a matching target from a tool is evidence about that device,
+    # not an additional GPU.
+    pytorch_targets = (
+        {pytorch.gfx_target.lower()}
+        if pytorch is not None and pytorch.device_count == 1 and pytorch.gfx_target
+        else set()
+    )
     if pytorch and (pytorch.device_name or pytorch.gfx_target):
         gpus.append(
             GpuEnvironmentSummary(
@@ -120,6 +128,8 @@ def summarize_gpus(
         gfx_targets = result.parsed.get("gfx_targets")
         if isinstance(gfx_targets, list):
             for index, gfx_target in enumerate(gfx_targets):
+                if str(gfx_target).lower() in pytorch_targets:
+                    continue
                 gpus.append(
                     GpuEnvironmentSummary(
                         source=tool_name,

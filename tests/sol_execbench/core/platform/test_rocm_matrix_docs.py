@@ -85,10 +85,10 @@ def test_testing_docs_document_marker_gated_live_validation() -> None:
     assert "tests/sol_execbench/test_cdna3_hardware_marker.py" in text
     assert "not full MI300X hardware-validation evidence" in text
     assert "not a `gfx94*` validation target" in text
-    assert "current host ROCm 7.1.x environment" in text
+    assert "current host ROCm 7.2.x environment" in text
     assert "default validation does not require host reinstall" in text
     assert re.search(
-        r"ROCm 7\.0\.x or\s+ROCm 7\.2\.x native-host validation requires a matching host",
+        r"ROCm 7\.0\.x or\s+ROCm 7\.1\.x native-host validation requires a matching host",
         text,
     )
 

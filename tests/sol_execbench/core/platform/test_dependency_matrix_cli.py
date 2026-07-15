@@ -26,29 +26,29 @@ def _base_command(*extra: str) -> list[str]:
         "--manifest",
         str(MANIFEST_PATH),
         "--torch-distribution-version",
-        "2.10.0+rocm7.1",
+        "2.11.0+rocm7.2",
         "--torch-version",
-        "2.10.0+rocm7.1",
+        "2.11.0+rocm7.2",
         "--torch-local-version",
-        "rocm7.1",
+        "rocm7.2",
         "--torch-rocm-target",
-        "rocm7.1",
+        "rocm7.2",
         "--torch-hip-version",
-        "7.1.0",
+        "7.2.0",
         "--torch-cuda-version",
         "none",
         "--torch-device-available",
         "true",
         "--torchvision-distribution-version",
-        "0.25.0+rocm7.1",
+        "0.26.0+rocm7.2",
         "--triton-rocm-distribution-version",
         "3.6.0",
         "--triton-rocm-status",
         "installed",
         "--container-rocm-user-space-version",
-        "7.1.1",
+        "7.2.0",
         "--toolchain-rocm-version",
-        "7.1.1",
+        "7.2.0",
         *extra,
     ]
 
@@ -62,16 +62,16 @@ def test_module_main_emits_default_dependency_preflight_json() -> None:
     )
     payload = json.loads(completed.stdout)
 
-    assert payload["target_id"] == "rocm-7.1.1-ubuntu-24.04-container"
-    assert payload["pytorch_rocm_target"] == "rocm7.1"
-    assert payload["policy_id"] == "pytorch-2.10.0-rocm7.1-project-default"
+    assert payload["target_id"] == "rocm-7.2.0-ubuntu-24.04-container"
+    assert payload["pytorch_rocm_target"] == "rocm7.2"
+    assert payload["policy_id"] == "pytorch-2.11.0-rocm7.2-project-default"
     assert payload["wheel_availability"] == "available"
-    assert payload["expected_local_version"] == "rocm7.1"
-    assert payload["uv_index_name"] == "pytorch-rocm71"
-    assert payload["uv_index_url"] == "https://download.pytorch.org/whl/rocm7.1"
+    assert payload["expected_local_version"] == "rocm7.2"
+    assert payload["uv_index_name"] == "pytorch-rocm72"
+    assert payload["uv_index_url"] == "https://download.pytorch.org/whl/rocm7.2"
     assert payload["lock_strategy"] == "project_default"
-    assert payload["torch_version"] == "2.10.0+rocm7.1"
-    assert payload["torchvision_version"] == "0.25.0+rocm7.1"
+    assert payload["torch_version"] == "2.11.0+rocm7.2"
+    assert payload["torchvision_version"] == "0.26.0+rocm7.2"
     assert payload["triton_rocm_version"] == "3.6.0"
     assert payload["triton_rocm_index_name"] == "pytorch-rocm-root"
     assert payload["triton_rocm_index_url"] == "https://download.pytorch.org/whl/"
@@ -82,21 +82,21 @@ def test_module_main_emits_default_dependency_preflight_json() -> None:
 
 def test_cli_json_matches_underlying_matrix_entry_policy_payload() -> None:
     manifest = load_docker_target_manifest(MANIFEST_PATH)
-    target = manifest.targets_by_id["rocm-7.1.1-ubuntu-24.04-container"]
+    target = manifest.targets_by_id["rocm-7.2.0-ubuntu-24.04-container"]
     policy = load_docker_target_dependency_policy(target)
     observation = PytorchDependencyObservation(
-        torch_distribution_version="2.10.0+rocm7.1",
-        torch_version="2.10.0+rocm7.1",
-        torch_local_version="rocm7.1",
-        torch_rocm_target="rocm7.1",
-        torch_hip_version="7.1.0",
+        torch_distribution_version="2.11.0+rocm7.2",
+        torch_version="2.11.0+rocm7.2",
+        torch_local_version="rocm7.2",
+        torch_rocm_target="rocm7.2",
+        torch_hip_version="7.2.0",
         torch_cuda_version=None,
         torch_device_available=True,
-        torchvision_distribution_version="0.25.0+rocm7.1",
+        torchvision_distribution_version="0.26.0+rocm7.2",
         triton_rocm_distribution_version="3.6.0",
         triton_rocm_status="installed",
-        container_rocm_user_space_version="7.1.1",
-        toolchain_rocm_version="7.1.1",
+        container_rocm_user_space_version="7.2.0",
+        toolchain_rocm_version="7.2.0",
     )
 
     result = classify_dependency_preflight(
@@ -119,15 +119,15 @@ def test_cli_json_matches_underlying_matrix_entry_policy_payload() -> None:
         assert payload[key] == matrix_policy[key]
 
 
-def test_rocm_7_2_target_with_default_rocm_7_1_stack_reports_mixed_version() -> None:
+def test_rocm_7_1_target_with_default_rocm_7_2_stack_reports_mixed_version() -> None:
     completed = subprocess.run(
         _base_command(
             "--target",
-            "rocm-7.2.0-ubuntu-24.04-container",
+            "rocm-7.1.1-ubuntu-24.04-container",
             "--container-rocm-user-space-version",
-            "7.2.0",
+            "7.1.1",
             "--toolchain-rocm-version",
-            "7.2.0",
+            "7.1.1",
         ),
         check=True,
         capture_output=True,
@@ -135,8 +135,8 @@ def test_rocm_7_2_target_with_default_rocm_7_1_stack_reports_mixed_version() -> 
     )
     payload = json.loads(completed.stdout)
 
-    assert payload["target_id"] == "rocm-7.2.0-ubuntu-24.04-container"
-    assert payload["expected_local_version"] == "rocm7.2"
+    assert payload["target_id"] == "rocm-7.1.1-ubuntu-24.04-container"
+    assert payload["expected_local_version"] == "rocm7.1"
     assert payload["status"] == "mixed_version"
     assert payload["reason_code"] == "target_observed_mismatch"
     assert payload["benchmark_allowed"] is False
