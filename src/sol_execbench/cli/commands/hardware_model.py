@@ -75,6 +75,15 @@ def _rejected(path: Path, reason: str) -> None:
     )
 
 
+def _validated_source_revision(source_revision: str | None) -> str | None:
+    if (
+        source_revision is not None
+        and re.fullmatch(r"[0-9a-f]{40}", source_revision) is None
+    ):
+        raise ValueError("source revision must be a full lowercase Git object id")
+    return source_revision
+
+
 @click.group("hardware", context_settings={"help_option_names": ["-h", "--help"]})
 def hardware_cli() -> None:
     """Manage hardware-derived benchmark evidence."""
@@ -123,11 +132,7 @@ def _calibrate(
 ) -> CliResult:
     """Collect calibration candidates without fabricating unavailable evidence."""
     try:
-        if (
-            source_revision is not None
-            and re.fullmatch(r"[0-9a-f]{40}", source_revision) is None
-        ):
-            raise ValueError("source revision must be a full lowercase Git object id")
+        source_revision = _validated_source_revision(source_revision)
         environment = discover_gpu(device)
         if architecture and architecture.lower() != environment.architecture:
             raise ValueError(
@@ -212,6 +217,10 @@ def _calibrate(
     help="Exact profile requirements for this hardware model.",
 )
 @click.option(
+    "--source-revision",
+    help="Full Git revision that both calibration artifacts must bind.",
+)
+@click.option(
     "--output", required=True, type=click.Path(dir_okay=False, path_type=Path)
 )
 @click.option(
@@ -226,12 +235,14 @@ def _build(
     max_age_hours: float | None,
     verification_calibration: Path | None = None,
     requirements_path: Path | None = None,
+    source_revision: str | None = None,
     shape_aware_evidence: Path | None = None,
     authority_coverage: Path | None = None,
     shape_aware_plan: Path | None = None,
 ) -> CliResult:
     """Convert a validated calibration artifact into an external v3 model."""
     try:
+        source_revision = _validated_source_revision(source_revision)
         raw_calibration = json.loads(calibration_path.read_text(encoding="utf-8"))
         if (
             not isinstance(raw_calibration, dict)
@@ -288,6 +299,7 @@ def _build(
                 verification=verification,
                 requirements_sha256=requirements.payload_sha256,
                 architecture=architecture,
+                source_revision=source_revision,
             )
             _validate_calibration_authority(
                 verification,
@@ -601,6 +613,7 @@ def _validate_second_calibration(
     verification: object,
     requirements_sha256: str | None,
     architecture: str,
+    source_revision: str | None,
 ) -> None:
     if getattr(verification, "schema_version") != CALIBRATION_SCHEMA_VERSION:
         raise ValueError("verification calibration has an unsupported schema")
@@ -610,6 +623,7 @@ def _validate_second_calibration(
     if metadata.get("architecture") != architecture:
         raise ValueError("verification calibration architecture does not match")
     for calibration_artifact in (primary, verification):
+        metadata = getattr(calibration_artifact, "metadata")
         profile_requirements = getattr(calibration_artifact, "metadata").get(
             "profile_requirements"
         )
@@ -618,6 +632,11 @@ def _validate_second_calibration(
             or profile_requirements.get("requirements_sha256") != requirements_sha256
         ):
             raise ValueError("calibration does not bind the supplied requirements")
+        if (
+            source_revision is not None
+            and metadata.get("source_revision") != source_revision
+        ):
+            raise ValueError("calibration does not bind the supplied source revision")
     first_time = getattr(primary, "generated_at")
     second_time = getattr(verification, "generated_at")
     if first_time == second_time:
