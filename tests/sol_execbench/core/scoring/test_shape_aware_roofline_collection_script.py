@@ -4,6 +4,8 @@ import importlib.util
 from pathlib import Path
 import sys
 
+import pytest
+
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "internal" / "collect_shape_aware_roofline.py"
@@ -70,6 +72,32 @@ def test_plan_groups_profiles_without_losing_assignments(tmp_path) -> None:
             ),
         ),
     )
+
+
+def test_select_tasks_records_only_known_unique_exclusions(tmp_path) -> None:
+    path = tmp_path / "plan.json"
+    path.write_text(__import__("json").dumps(_plan()), encoding="utf-8")
+    _, tasks = collector.load_plan(path)
+
+    selected, excluded = collector.select_tasks(tasks, ["w1"])
+
+    assert selected == ()
+    assert excluded == tasks
+
+
+@pytest.mark.parametrize(
+    "workload_uuids, message",
+    [(["missing"], "not in the plan"), (["w1", "w1"], "must be unique")],
+)
+def test_select_tasks_rejects_ambiguous_or_unknown_exclusions(
+    tmp_path, workload_uuids, message
+) -> None:
+    path = tmp_path / "plan.json"
+    path.write_text(__import__("json").dumps(_plan()), encoding="utf-8")
+    _, tasks = collector.load_plan(path)
+
+    with pytest.raises(ValueError, match=message):
+        collector.select_tasks(tasks, workload_uuids)
 
 
 def test_csv_parser_preserves_actual_dispatch_and_rejects_zero_occupancy(
