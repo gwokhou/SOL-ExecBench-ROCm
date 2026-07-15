@@ -74,6 +74,7 @@ class CalibrationRequest:
     required_profile_keys: tuple[str, ...] = ()
     requirements_ref: str | None = None
     requirements_sha256: str | None = None
+    source_revision: str | None = None
 
 
 @dataclass(frozen=True)
@@ -294,6 +295,8 @@ def run_calibration(request: CalibrationRequest) -> HardwareCalibrationArtifact:
             key.value: probe.provenance_for(key) for key in measurement_keys
         },
     }
+    if request.source_revision is not None:
+        metadata["source_revision"] = request.source_revision
     if measurements.clock_reason:
         metadata["clock_lock_reason"] = measurements.clock_reason
     metadata.update(_profile_metadata(request, metric_map))
