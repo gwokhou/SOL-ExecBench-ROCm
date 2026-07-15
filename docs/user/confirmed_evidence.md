@@ -31,6 +31,12 @@ or leaderboard authority.
 
 ## Consuming Confirmed Evidence
 
+For the producer-side artifact chain—hardware calibration and fusion evidence,
+AMD-native score generation, frozen release baseline, independent rerun, and
+this final command—see [Release and Official Score Workflow](RELEASE-SCORING.md).
+This guide defines what a consumer may accept after the command runs; it does
+not make a diagnostic sidecar or an incomplete artifact set confirmed evidence.
+
 ### Emission (GATE-03)
 
 SOL emits `official_score_evidence.v1` via the GPU-free CLI:

@@ -265,11 +265,15 @@ uv run sol-execbench evaluate \
 | `--keep-staging` | Disabled | Preserve the temporary staging directory. |
 | `--profile` | `none` | Use `rocprofv3` for optional diagnostic profiling when set to `rocprofv3`. |
 | `--static-evidence` | `none` | Collect optional diagnostic static kernel evidence when set to `auto`. |
+| `--decision` | `none` | Write optional diagnostic resource-decision metadata when set to `auto`; requires static footprints, so pair it with `--static-evidence auto` for HIP/C++ solutions. |
 | `--feedback-target-id` | None | Consumer target identity persisted in diagnostic agent feedback. |
 | `--feedback-run-id` | None | Consumer run identity persisted in diagnostic agent feedback. |
 | `--feedback-candidate-id` | None | Consumer candidate identity persisted in diagnostic agent feedback. |
 | `--feedback-source-sha256` | None | Consumer source SHA256 identity persisted in diagnostic agent feedback. |
 | `--feedback-sol-version` | None | Consumer SOL version or tag identity persisted in diagnostic agent feedback. |
+| `--release-bound-sha256` | None | SHA-256 of the release AMD SOL bound cited by a release rerun. Must be paired with `--release-hardware-model-sha256`. |
+| `--release-hardware-model-sha256` | None | SHA-256 of the release hardware model cited by a release rerun. Must be paired with `--release-bound-sha256`. |
+| `--release-authority-json` | None | Release authority record for a rerun. Mutually exclusive with the paired release SHA-256 options. |
 | `-v`, `--verbose` | Disabled | Show subprocess output and staging details. |
 
 No-trace diagnostic sidecars are not controlled by a separate flag. When an
@@ -278,6 +282,12 @@ bounded diagnostic-only sidecar next to `--trace-output`, in the kept staging
 directory, or in the system temp directory depending on the available path.
 That sidecar records stdout/stderr tails and line counts and is not canonical
 trace JSONL.
+
+`--release-bound-sha256` and `--release-hardware-model-sha256` are all-or-none.
+They and `--release-authority-json` carry release-rerun provenance only; they do
+not turn an ordinary evaluation into an official score. See
+[Release and Official Score Workflow](RELEASE-SCORING.md) for the complete
+baseline, verification, and score-evidence process.
 
 Metadata and diagnostic subcommands support the root JSON format:
 
@@ -381,6 +391,17 @@ uv run sol-execbench --format json baseline compare \
 | `--win-pct` | `2.0` | Candidate must beat baseline by at least this percentage to be a win. |
 | `--parity-pct` | `5.0` | Candidate within this percentage of baseline is parity. |
 | `--amd-native-claim` | Disabled | Label output as an AMD-native claim and emit guardrail warnings. |
+
+## Release And Official Score CLI
+
+`baseline compare` and `baseline export` are local analysis utilities; neither
+creates an official score baseline. Release-scoped baseline construction lives
+under `sol-execbench baseline release build` and independent rerun verification
+lives under `sol-execbench baseline release verify`. The final, GPU-free
+`sol-execbench score official` command consumes the AMD-native report, frozen
+baseline, bundle, passing verification, and canonical suite manifest. The
+required artifact chain, command skeletons, and authority boundaries are in
+[Release and Official Score Workflow](RELEASE-SCORING.md).
 
 ## Docker Wrapper Flags
 

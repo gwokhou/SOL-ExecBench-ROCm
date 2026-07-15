@@ -100,7 +100,7 @@ Benchmark execution can collect diagnostic profiler artifacts with:
 
 ```bash
 uv run sol-execbench evaluate <problem_dir> --solution solution.json \
-  --profile rocprofv3 -o traces.jsonl
+  --profile rocprofv3 --trace-output traces.jsonl
 ```
 
 This path is separate from benchmark timing authority. It records a
