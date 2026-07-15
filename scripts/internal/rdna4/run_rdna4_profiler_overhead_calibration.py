@@ -14,6 +14,7 @@ import argparse
 import json
 import logging
 import os
+import re
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -29,6 +30,7 @@ from sol_execbench.core.bench.timing_isolation import (
     validate_gpu_device_isolation,
     verify_clock_state_with_warning,
 )
+from sol_execbench.core.platform.runtime import resolve_rocm_tool_command
 
 logger = logging.getLogger(__name__)
 
@@ -68,8 +70,16 @@ def run_calibration(
     gpu_device: int | None = None,
     manage_clocks: bool = True,
     reset_clocks: bool = True,
+    profiler_executable: str | None = None,
+    source_revision: str | None = None,
 ) -> int:
     """Run rocprofv3 overhead calibration and write result to output_path."""
+    if (
+        source_revision is not None
+        and re.fullmatch(r"[0-9a-f]{40}", source_revision) is None
+    ):
+        raise ValueError("source revision must be a full lowercase Git object id")
+    resolved_profiler = profiler_executable or resolve_rocm_tool_command("rocprofv3")
     clock_state = _setup_calibration_clocks(
         manage_clocks=manage_clocks,
         strict_isolation=strict_isolation,
@@ -147,6 +157,7 @@ def run_calibration(
                 c,
                 iterations=iterations,
                 temp_dir=DEFAULT_TEMP_ROOT,
+                profiler_executable=resolved_profiler,
             )
             profiler_durations = profiler_result
         except Exception as exc:
@@ -174,6 +185,7 @@ def run_calibration(
             "warmup_runs": warmup_runs,
             "element_count": element_count,
             "gpu_architecture": gpu_architecture,
+            "profiler_executable": resolved_profiler,
             "clock_locked": clock_ok,
             "clock_setup": {
                 "managed": manage_clocks,
@@ -184,6 +196,8 @@ def run_calibration(
             "baseline_sample_count": len(baseline_durations),
             "profiler_sample_count": len(profiler_durations),
         }
+        if source_revision is not None:
+            calibration["source_revision"] = source_revision
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(
@@ -281,6 +295,7 @@ def _run_with_rocprofv3(
     *,
     iterations: int,
     temp_dir: Path | None = None,
+    profiler_executable: str = "rocprofv3",
 ) -> list[float]:
     """Run vector add under rocprofv3 and collect profiler-backed durations.
 
@@ -328,6 +343,7 @@ def _run_with_rocprofv3(
             [sys.executable, str(script_path)],
             output_directory=str(output_dir),
             output_file="rocprofv3-overhead-calibration",
+            executable=profiler_executable,
         )
 
         result = subprocess.run(
@@ -379,6 +395,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--gpu-architecture", default=DEFAULT_GPU_ARCHITECTURE)
     parser.add_argument("--element-count", type=int, default=DEFAULT_ELEMENT_COUNT)
     parser.add_argument(
+        "--profiler-executable",
+        help="Explicit rocprofv3 executable or patched wrapper for this calibration.",
+    )
+    parser.add_argument(
+        "--source-revision",
+        help="Full Git revision that produced this calibration.",
+    )
+    parser.add_argument(
         "--strict-isolation",
         action=argparse.BooleanOptionalAction,
         default=True,
@@ -424,6 +448,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 gpu_device=args.gpu_device,
                 manage_clocks=args.lock_clocks,
                 reset_clocks=args.reset_clocks,
+                profiler_executable=args.profiler_executable,
+                source_revision=args.source_revision,
             )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"ERROR: {exc}")

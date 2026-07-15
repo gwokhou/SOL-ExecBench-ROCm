@@ -207,6 +207,19 @@ class TestCalibrationScriptArgs:
         args = mod.parse_args(["--iterations", "50"])
         assert args.iterations == 50
 
+    def test_profiler_and_source_provenance_flags(self):
+        mod = self._load_script()
+        args = mod.parse_args(
+            [
+                "--profiler-executable",
+                "/tmp/rocprofv3-gfx1200-patched",
+                "--source-revision",
+                "a" * 40,
+            ]
+        )
+        assert args.profiler_executable.endswith("rocprofv3-gfx1200-patched")
+        assert args.source_revision == "a" * 40
+
 
 class TestCalibrationJsonSchema:
     """Test calibration JSON output schema validation."""
@@ -346,10 +359,12 @@ class TestCalibrationClockSetup:
             tensor,
             iterations=2,
             temp_dir=temp_dir,
+            profiler_executable="/tmp/rocprofv3-gfx1200-patched",
         )
 
         assert durations == [1.25, 1.5]
         kwargs = cast(dict[str, Any], captured["kwargs"])
         assert kwargs["output_file"] == "rocprofv3-overhead-calibration"
+        assert kwargs["executable"] == "/tmp/rocprofv3-gfx1200-patched"
         output_directory = Path(kwargs["output_directory"])
         assert output_directory.is_relative_to(temp_dir)
