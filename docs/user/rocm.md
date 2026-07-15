@@ -8,7 +8,7 @@ ROCm 7.2 wheels.
 - Linux host with AMD ROCm drivers and runtime installed.
 - `/dev/kfd` and `/dev/dri` present and accessible.
 - `rocminfo` can see at least one AMD GPU agent.
-- `rocm-smi` or `amd-smi` is available for hardware inspection.
+- `amd-smi` is available for hardware inspection and clock-state management.
 - `hipcc` is available when building HIP/C++ solutions.
 - ROCm library development headers are installed when running native library
   examples: `hipblas/hipblas.h`, `miopen/miopen.h`, `ck/ck.hpp`, and
@@ -18,7 +18,8 @@ Quick host checks:
 
 ```bash
 rocminfo
-rocm-smi
+amd-smi list
+amd-smi metric -l
 hipcc --version
 find /opt/rocm/include -maxdepth 3 \
   \( -path '*hipblas/hipblas.h' \
@@ -166,6 +167,11 @@ sudo amd-smi set -l AUTO
 The Docker image and `scripts/setup_rocm_clock_sudoers.py` install sudoers
 coverage for the exact `amd-smi` commands used by the runtime. If clock locking
 is unavailable, run without `--lock-clocks` for functional validation.
+
+The set commands apply to every visible AMD GPU because no `-g` selector is
+used. The setup script is self-documenting; run it with `--help`. Its default
+`check` mode is read-only, while `verify-live` explicitly exercises
+`STABLE_PEAK` and guarantees an `AUTO` cleanup attempt.
 
 ## Engineering Prerelease Support Matrix
 

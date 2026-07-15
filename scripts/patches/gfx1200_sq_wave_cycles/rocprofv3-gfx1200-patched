@@ -1,0 +1,143 @@
+#!/usr/bin/env bash
+# SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
+# SPDX-License-Identifier: Apache-2.0
+
+set -euo pipefail
+
+readonly PATCH_ID="gfx1200-sq-wave-cycles-stable-peak-v1"
+readonly REAL_ROCPROF="${ROCPROFV3_REAL:-/opt/rocm/bin/rocprofv3}"
+readonly AMD_SMI_BIN="${AMD_SMI:-/opt/rocm/bin/amd-smi}"
+readonly SUDO_BIN="${SOL_EXECBENCH_SUDO:-sudo}"
+readonly LOCK_ROOT="${XDG_RUNTIME_DIR:-/tmp}"
+readonly LOCK_PATH="${LOCK_ROOT}/sol-execbench-${PATCH_ID}-${UID}.lock"
+
+usage() {
+  cat <<'EOF'
+Run rocprofv3 with the gfx1200 SQ_WAVE_CYCLES power-state workaround.
+
+Usage:
+  rocprofv3-gfx1200-patched [normal rocprofv3 arguments]
+  rocprofv3-gfx1200-patched --patch-help
+
+Example:
+  rocprofv3-gfx1200-patched \
+    --kernel-trace \
+    --pmc SQ_WAVE_CYCLES,SQ_BUSY_CYCLES,SQ_WAVES \
+    --output-format csv --output-directory out/rocprof -- <workload>
+
+Why this exists:
+  On the validated gfx1200/ROCm 7.2.0 host, SQ selector 24 returns zero in
+  AUTO but returns valid SQ_WAVE_CYCLES in STABLE_PEAK. Selector 21 is not a
+  semantic replacement. This wrapper changes only the collection-time power
+  state; it does not modify ROCm counter definitions or shared libraries.
+
+Safety lifecycle:
+  1. Serialize patched profiler sessions with a per-user lock.
+  2. Require every visible AMD GPU to be uniformly AUTO or STABLE_PEAK.
+  3. For AUTO, use passwordless amd-smi to enter and verify STABLE_PEAK on
+     every GPU. `amd-smi set -l` has all-GPU scope without a `-g` argument.
+  4. Run the real /opt/rocm/bin/rocprofv3 with all arguments unchanged.
+  5. Restore and verify AUTO after success, failure, or a trapped signal.
+  6. Preserve an external STABLE_PEAK instead of resetting someone else's lock.
+
+The wrapper rejects MANUAL and other initial policies because it cannot safely
+reconstruct them. SIGKILL cannot be trapped; if a process is killed that way,
+run the one-click rollback command, which resets STABLE_PEAK to AUTO:
+
+  ~/.local/bin/rollback-rocprofv3-gfx1200-patch
+
+`--help` is passed to the real rocprofv3. Use `--patch-help` for this text.
+
+Notable wrapper exit codes:
+  66 missing executable       69 state/flock unavailable
+  70 AUTO reset failed        75 another patched run is active
+  77 lock/verification failed 78 unsupported initial performance level
+
+Optional deployment/test overrides:
+  ROCPROFV3_REAL, AMD_SMI, SOL_EXECBENCH_SUDO, XDG_RUNTIME_DIR
+EOF
+}
+
+if [[ "${1:-}" == "--patch-help" ]]; then
+  usage
+  exit 0
+fi
+
+if [[ ! -x "${REAL_ROCPROF}" ]]; then
+  echo "patch_error=missing_rocprofv3 path=${REAL_ROCPROF}" >&2
+  exit 66
+fi
+if [[ ! -x "${AMD_SMI_BIN}" ]]; then
+  echo "patch_error=missing_amd_smi path=${AMD_SMI_BIN}" >&2
+  exit 66
+fi
+if ! command -v flock >/dev/null 2>&1; then
+  echo "patch_error=missing_flock" >&2
+  exit 69
+fi
+
+exec 9>"${LOCK_PATH}"
+if ! flock -n 9; then
+  echo "patch_error=already_running lock=${LOCK_PATH}" >&2
+  exit 75
+fi
+
+perf_levels() {
+  "${AMD_SMI_BIN}" metric -l 2>&1
+}
+
+all_levels_are() {
+  local output=$1
+  local expected=$2
+  local level_lines
+  level_lines=$(grep "PERF_LEVEL:" <<<"${output}") || return 1
+  [[ -n "${level_lines}" ]] || return 1
+  ! grep -vq "${expected}" <<<"${level_lines}"
+}
+
+acquired_lock=0
+cleanup() {
+  local status=$?
+  local reset_output=""
+  trap - EXIT HUP INT TERM
+  if [[ "${acquired_lock}" -eq 1 ]]; then
+    if ! reset_output=$("${SUDO_BIN}" -n "${AMD_SMI_BIN}" set -l AUTO 2>&1); then
+      echo "patch_error=clock_reset_failed output=${reset_output}" >&2
+      [[ "${status}" -ne 0 ]] || status=70
+    else
+      local reset_state=""
+      reset_state=$(perf_levels) || true
+      if ! all_levels_are "${reset_state}" "AMDSMI_DEV_PERF_LEVEL_AUTO"; then
+        echo "patch_error=clock_reset_unverified output=${reset_state}" >&2
+        [[ "${status}" -ne 0 ]] || status=70
+      fi
+    fi
+  fi
+  exit "${status}"
+}
+trap cleanup EXIT HUP INT TERM
+
+initial_level=$(perf_levels) || {
+  echo "patch_error=clock_state_unavailable output=${initial_level}" >&2
+  exit 69
+}
+if all_levels_are "${initial_level}" "AMDSMI_DEV_PERF_LEVEL_STABLE_PEAK"; then
+  echo "patch_clock_state=preserved_external_stable_peak" >&2
+elif all_levels_are "${initial_level}" "AMDSMI_DEV_PERF_LEVEL_AUTO"; then
+  acquired_lock=1
+  lock_output=$("${SUDO_BIN}" -n "${AMD_SMI_BIN}" set -l STABLE_PEAK 2>&1) || {
+    echo "patch_error=clock_lock_failed output=${lock_output}" >&2
+    exit 77
+  }
+  locked_levels=$(perf_levels) || true
+  if ! all_levels_are "${locked_levels}" "AMDSMI_DEV_PERF_LEVEL_STABLE_PEAK"; then
+    echo "patch_error=clock_lock_unverified output=${locked_levels}" >&2
+    exit 77
+  fi
+  echo "patch_clock_state=acquired_stable_peak" >&2
+else
+  echo "patch_error=unsupported_initial_perf_level output=${initial_level}" >&2
+  exit 78
+fi
+
+"${REAL_ROCPROF}" "$@"

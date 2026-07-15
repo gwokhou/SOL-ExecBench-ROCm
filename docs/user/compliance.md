@@ -27,7 +27,7 @@ locked in `uv.lock`. Important dependency families include:
 | --- | --- |
 | PyTorch ROCm / torchvision ROCm | Tensor runtime, reference execution, HIP-backed extension builds. |
 | Triton ROCm | Triton kernel examples and evaluation. |
-| ROCm runtime and tools | HIP compiler, `rocminfo`, `rocm-smi`, `rocprofv3`, AMD GPU runtime libraries. |
+| ROCm runtime and tools | HIP compiler, `rocminfo`, `amd-smi`, `rocprofv3`, AMD GPU runtime libraries. |
 | Pydantic, Click, Rich | Schemas and CLI. |
 | safetensors, datasets | Benchmark input loading and dataset workflows. |
 | pytest, pytest-xdist | Test execution and parallelization tooling. |

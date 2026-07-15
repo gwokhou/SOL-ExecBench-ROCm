@@ -194,7 +194,7 @@ ROCM_LIBRARY_SPECS: dict[str, RocmLibrarySpec] = {
 CDNA3_VALIDATION_COMMANDS: tuple[str, ...] = (
     "uv run pytest tests/",
     "uv run python -c 'import torch; print(torch.__version__, torch.version.hip, torch.cuda.is_available())'",
-    "rocm-smi --showproductname --showdriverversion --showhw || true",
+    "amd-smi static -a || true",
     'rocminfo | grep -E "Name: *gfx94|Marketing Name" || true',
 )
 

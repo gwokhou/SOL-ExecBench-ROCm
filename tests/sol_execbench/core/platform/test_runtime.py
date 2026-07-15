@@ -4,6 +4,7 @@ from sol_execbench.core.platform.runtime import (
     discover_rocm_root,
     hardware_from_device,
     resolve_rocm_tool,
+    resolve_rocm_tool_command,
     resolve_tool_path,
     rocm_search_roots,
 )
@@ -49,6 +50,30 @@ def test_resolve_rocm_tool_falls_back_to_configured_root(tmp_path) -> None:
         )
         == rocminfo
     )
+
+
+def test_resolve_rocm_tool_command_preserves_path_symlink(tmp_path) -> None:
+    target = tmp_path / "rocm-7.2/bin/amd-smi"
+    target.parent.mkdir(parents=True)
+    target.write_text("tool", encoding="utf-8")
+    wrapper = tmp_path / "rocm/bin/amd-smi"
+    wrapper.parent.mkdir(parents=True)
+    wrapper.symlink_to(target)
+
+    assert resolve_rocm_tool_command("amd-smi", which=lambda _: str(wrapper)) == str(
+        wrapper
+    )
+
+
+def test_resolve_rocm_tool_command_falls_back_to_configured_root(tmp_path) -> None:
+    root = tmp_path / "rocm"
+    amd_smi = root / "bin/amd-smi"
+    amd_smi.parent.mkdir(parents=True)
+    amd_smi.write_text("tool", encoding="utf-8")
+
+    assert resolve_rocm_tool_command(
+        "amd-smi", environ={"ROCM_PATH": str(root)}, which=lambda _: None
+    ) == str(amd_smi)
 
 
 def test_rocm_search_roots_puts_discovered_root_first(tmp_path) -> None:

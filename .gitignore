@@ -37,6 +37,7 @@ pytest*
 # other
 /out/
 /tmp/
+/.rocprofv3/
 .planning/config.json
 .planning/tmp/
 .artifacts/

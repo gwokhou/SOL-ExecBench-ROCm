@@ -24,9 +24,13 @@ from __future__ import annotations
 
 import logging
 import os
-import shutil
 import subprocess
 import time
+
+from pydantic import ValidationError
+
+from sol_execbench.core.platform.amd_smi import parse_performance_levels
+from sol_execbench.core.platform.runtime import resolve_rocm_tool_command
 
 logger = logging.getLogger(__name__)
 
@@ -38,12 +42,8 @@ AMD_SMI_FAILURE_MARKERS = (
 )
 
 
-def _rocm_smi_executable() -> str:
-    return shutil.which("rocm-smi") or "rocm-smi"
-
-
 def _amd_smi_executable() -> str:
-    return shutil.which("amd-smi") or "amd-smi"
+    return resolve_rocm_tool_command("amd-smi")
 
 
 def _has_command_failure(
@@ -66,7 +66,9 @@ def _has_command_failure(
 
 
 def _run_checked_amd_smi(command: list[str]) -> subprocess.CompletedProcess:
-    result = subprocess.run(command, check=True, capture_output=True, text=True)
+    result = subprocess.run(
+        command, check=True, capture_output=True, text=True, timeout=30
+    )
     failure = _has_command_failure(result, AMD_SMI_FAILURE_MARKERS)
     if failure:
         raise subprocess.CalledProcessError(
@@ -75,16 +77,54 @@ def _run_checked_amd_smi(command: list[str]) -> subprocess.CompletedProcess:
     return result
 
 
-def probe_clock_lock_available() -> bool:
-    """Probe whether ``amd-smi`` is available via passwordless sudo."""
+def _query_performance_levels() -> tuple[str, ...]:
+    """Return the performance level reported for every visible AMD GPU."""
+    result = subprocess.run(
+        [_amd_smi_executable(), "metric", "-l", "--json"],
+        capture_output=True,
+        check=True,
+        text=True,
+        timeout=10,
+    )
+    return parse_performance_levels(result.stdout)
+
+
+def _all_gpus_at_level(level: str) -> bool:
+    expected = f"AMDSMI_DEV_PERF_LEVEL_{level.upper()}"
     try:
-        probe = subprocess.run(
-            ["sudo", "-n", _amd_smi_executable(), "version"],
-            capture_output=True,
-        )
-    except FileNotFoundError:
+        levels = _query_performance_levels()
+    except (
+        FileNotFoundError,
+        subprocess.CalledProcessError,
+        subprocess.TimeoutExpired,
+        ValidationError,
+        ValueError,
+    ) as exc:
+        logger.warning("Failed to query amd-smi performance levels: %s", exc)
         return False
-    return probe.returncode == 0
+    return all(current == expected for current in levels)
+
+
+def probe_clock_lock_available() -> bool:
+    """Check read-only sudo policy coverage for every clock lifecycle command."""
+    amd_smi = _amd_smi_executable()
+    commands = (
+        [amd_smi, "version"],
+        [amd_smi, "set", "-l", "STABLE_PEAK"],
+        [amd_smi, "set", "-l", "AUTO"],
+    )
+    try:
+        return all(
+            subprocess.run(
+                ["sudo", "-n", "-l", "--", *command],
+                capture_output=True,
+                timeout=10,
+            ).returncode
+            == 0
+            for command in commands
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return False
 
 
 def lock_clocks() -> bool:
@@ -112,7 +152,11 @@ def lock_clocks() -> bool:
             ]
         )
         logger.info("GPU clock locked to STABLE_PEAK")
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+    except (
+        subprocess.CalledProcessError,
+        FileNotFoundError,
+        subprocess.TimeoutExpired,
+    ) as e:
         logger.warning("Failed to lock clocks (STABLE_PEAK): %s", e)
         return False
 
@@ -127,46 +171,28 @@ def lock_clocks() -> bool:
 
 
 def verify_clocks() -> bool:
-    """Verify that the GPU is in STABLE_PEAK mode via ``rocm-smi --showperflevel``."""
-    try:
-        result = subprocess.run(
-            [_rocm_smi_executable(), "--showperflevel"],
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode != 0:
-            logger.warning(
-                "rocm-smi perf level query failed: %s", result.stderr.strip()
-            )
-            return False
-    except FileNotFoundError:
-        logger.warning("rocm-smi not found; cannot verify clock state")
-        return False
-
-    stdout = (result.stdout or "").lower()
-    if not stdout.strip():
-        logger.warning("rocm-smi returned no data")
-        return False
-
-    if "stable_peak" in stdout:
-        return True
-
-    logger.warning("GPU is not in STABLE_PEAK mode")
-    return False
+    """Return whether every visible AMD GPU is in STABLE_PEAK mode."""
+    locked = _all_gpus_at_level("STABLE_PEAK")
+    if not locked:
+        logger.warning("Not all visible GPUs are in STABLE_PEAK mode")
+    return locked
 
 
-def unlock_clocks() -> None:
+def unlock_clocks() -> bool:
     """Reset GPU clocks to auto via ``amd-smi set -l AUTO``.
 
-    Best-effort; errors are logged but not raised.
+    Best-effort; errors are logged but not raised. Returns whether every visible
+    GPU was verified back in AUTO mode.
     """
     try:
-        subprocess.run(
-            ["sudo", "-n", _amd_smi_executable(), "set", "-l", "AUTO"],
-            capture_output=True,
-        )
+        _run_checked_amd_smi(["sudo", "-n", _amd_smi_executable(), "set", "-l", "AUTO"])
     except Exception as e:
         logger.warning("Failed to unlock clocks: %s", e)
+        return False
+    if not _all_gpus_at_level("AUTO"):
+        logger.warning("GPU clock reset could not be verified at AUTO")
+        return False
+    return True
 
 
 def are_clocks_locked() -> bool:

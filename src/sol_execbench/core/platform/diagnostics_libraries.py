@@ -41,7 +41,7 @@ def rocm_tool_diagnostics(
     tools = {
         "hipcc": "Install ROCm HIP compiler tooling and ensure hipcc is on PATH.",
         "rocminfo": "Install ROCm runtime tools or source the ROCm environment setup.",
-        "rocm-smi": "Install ROCm SMI tooling if hardware state capture is required.",
+        "amd-smi": "Install AMD SMI tooling if hardware state capture is required.",
         "rocprofv3": "Install ROCm profiling tools for profiler readiness checks.",
     }
     diagnostics: list[StageDiagnostic] = []

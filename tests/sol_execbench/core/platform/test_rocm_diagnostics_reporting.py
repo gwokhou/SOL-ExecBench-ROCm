@@ -75,7 +75,7 @@ def test_rocm_tool_diagnostics_reports_missing_tools():
     assert {diag.message for diag in diagnostics} == {
         "hipcc not found",
         "rocminfo not found",
-        "rocm-smi not found",
+        "amd-smi not found",
         "rocprofv3 not found",
     }
     assert all(diag.hint for diag in diagnostics)

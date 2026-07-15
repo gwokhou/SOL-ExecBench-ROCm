@@ -11,7 +11,7 @@ scope for this ROCm-only fork.
 | --- | --- | --- | --- |
 | Single-problem CLI | `sol-execbench evaluate <problem_dir> --solution <solution-path>` and explicit `evaluate --definition/--workload/--solution` mode | Ported in CLI 2.0 | Compile wording and runtime behavior are HIP/ROCm-specific. |
 | CLI output controls | root `--format`, `--trace-output`, `--verbose`, `--keep-staging`, timeouts | Ported in CLI 2.0 | Trace JSONL remains the machine-readable artifact contract. |
-| Clock locking | `--lock-clocks` via NVIDIA tooling | Replaced | ROCm lock/unlock operations use `amd-smi`, while `rocm-smi` is used for clock verification; failure remains explicit when requested locking is unavailable. |
+| Clock locking | `--lock-clocks` via NVIDIA tooling | Replaced | ROCm lock, all-GPU JSON verification, and reset operations use `amd-smi`; failure remains explicit when requested locking is unavailable. |
 | Dataset download | `scripts/download_data.sh` downloads SOL-ExecBench and FlashInfer Trace datasets | Ported | Dataset origin remains NVIDIA/Hugging Face; runtime support is ROCm-only. |
 | Dataset runner | `scripts/run_dataset.py` discovers L1, L2, FlashInfer-Bench, and Quant problems | Ported | Runner preserves reference/custom solution wrapping and JSONL trace parsing. |
 | Definition schema | Benchmark definition Pydantic contract | Ported | Schema semantics are preserved for workload/reference evaluation. |

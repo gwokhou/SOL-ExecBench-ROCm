@@ -65,11 +65,18 @@ def test_dockerfile_keeps_existing_runtime_setup() -> None:
     assert 'ENTRYPOINT ["/entrypoint.sh"]' in dockerfile
 
 
-def test_dockerfile_allows_passwordless_rocm_smi_tools() -> None:
+def test_dockerfile_installs_exact_validated_amd_smi_sudoers_rule() -> None:
     dockerfile = DOCKERFILE_PATH.read_text()
 
     assert 'AMD_SMI="$(command -v amd-smi)"' in dockerfile
     assert "NOPASSWD: ${AMD_SMI}" in dockerfile
+    assert "${AMD_SMI} version" in dockerfile
+    assert "${AMD_SMI} set -l STABLE_PEAK" in dockerfile
+    assert "${AMD_SMI} set -l AUTO" in dockerfile
+    assert "visudo -cf" in dockerfile
+    assert "install -o root -g root -m 0440" in dockerfile
+    assert "command -v rocm-smi" not in dockerfile
+    assert "${AMD_SMI} set -l *" not in dockerfile
 
 
 def _run_docker_preview(*args: str) -> subprocess.CompletedProcess[str]:
