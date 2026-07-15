@@ -235,10 +235,10 @@ def _build(
     max_age_hours: float | None,
     verification_calibration: Path | None = None,
     requirements_path: Path | None = None,
-    source_revision: str | None = None,
     shape_aware_evidence: Path | None = None,
     authority_coverage: Path | None = None,
     shape_aware_plan: Path | None = None,
+    source_revision: str | None = None,
 ) -> CliResult:
     """Convert a validated calibration artifact into an external v3 model."""
     try:

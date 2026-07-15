@@ -26,6 +26,7 @@ _CALIBRATION_SHA256S = (
 )
 _COVERAGE_SHA256 = "4" * 64
 _PLAN_SHA256 = "6" * 64
+_COLLECTION_REPORT_SHA256S = ("7" * 64, "8" * 64)
 _PROFILE = "compute.vector.fp32.fp32.gfx12"
 
 
@@ -41,6 +42,7 @@ def _artifact(
         requirements_sha256=requirements_sha256,
         authority_coverage_sha256=coverage_sha256,
         plan_payload_sha256=_PLAN_SHA256,
+        collection_report_sha256s=_COLLECTION_REPORT_SHA256S,
         bucketing_dimensions=("shape", "layout", "launch", "occupancy"),
         cases=(
             ShapeAwareRooflineCase(
