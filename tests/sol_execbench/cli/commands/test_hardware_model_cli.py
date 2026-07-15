@@ -272,6 +272,32 @@ def test_calibrate_rejects_noncanonical_source_revision(tmp_path) -> None:
     assert "source revision" in payload["reason"]
 
 
+def test_build_rejects_noncanonical_source_revision(tmp_path) -> None:
+    calibration = tmp_path / "calibration.json"
+    calibration.write_text("{}", encoding="utf-8")
+    output = tmp_path / "model.json"
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "hardware",
+            "model",
+            "build",
+            "--calibration",
+            str(calibration),
+            "--output",
+            str(output),
+            "--source-revision",
+            "not-a-full-git-revision",
+        ],
+    )
+
+    assert result.exit_code != 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["status"] == "rejected"
+    assert "source revision" in payload["reason"]
+
+
 def test_calibrate_provisional_result_writes_rejected_diagnostic_before_exit(
     tmp_path, monkeypatch
 ) -> None:
