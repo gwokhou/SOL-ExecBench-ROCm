@@ -518,7 +518,7 @@ def test_batch_selects_ready_missing_profiler_timing_targets(tmp_path):
     assert [target.problem_id for target in targets] == ["L1/missing"]
 
 
-def test_batch_resume_skips_classified_partial_replacement(tmp_path):
+def test_batch_resume_retries_classified_partial_replacement(tmp_path):
     dataset_root = tmp_path / "dataset"
     source_timing = tmp_path / "fallback"
     replacement = tmp_path / "replacement"
@@ -556,7 +556,7 @@ def test_batch_resume_skips_classified_partial_replacement(tmp_path):
         resume=True,
     )
 
-    assert targets == []
+    assert [target.problem_id for target in targets] == ["L1/one"]
 
 
 def test_batch_resume_keeps_workload_limited_partial_replacement(tmp_path):
@@ -663,7 +663,7 @@ def test_batch_select_targets_honors_skip_problem(tmp_path):
     assert [target.problem_id for target in targets] == ["L1/two"]
 
 
-def test_batch_resume_skips_profiler_blocked_replacement(tmp_path):
+def test_batch_resume_retries_profiler_blocked_replacement(tmp_path):
     dataset_root = tmp_path / "dataset"
     source_timing = tmp_path / "fallback"
     replacement = tmp_path / "replacement"
@@ -698,7 +698,7 @@ def test_batch_resume_skips_profiler_blocked_replacement(tmp_path):
         resume=True,
     )
 
-    assert targets == []
+    assert [target.problem_id for target in targets] == ["L1/one"]
 
 
 def test_batch_writes_profiler_backed_replacement_sidecar(tmp_path):
