@@ -1,10 +1,14 @@
 """Stable names and policy values for official-score evidence."""
 
+from sol_execbench.core.scoring import aggregation
+
+
+OFFICIAL_AGGREGATION_POLICY = aggregation.OFFICIAL_AGGREGATION_POLICY
+
 OFFICIAL_SCORE_SCHEMA_VERSION = "sol_execbench.official_score_evidence.v1"
 OFFICIAL_SCORE_SOURCE = "official_score_evidence"
 OFFICIAL_SCORE_KIND = "official_benchmark_score"
 OFFICIAL_SCORE_CLAIM_LEVEL = "official-confirmed"
-OFFICIAL_AGGREGATION_POLICY = "fixed_suite_denominator_zero_for_blocked"
 DEFAULT_OFFICIAL_BASELINE_SOURCES = ("scoring_baseline",)
 
 MISSING_SCORE_BLOCKER = "missing_score"

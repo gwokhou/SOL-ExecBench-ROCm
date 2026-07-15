@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
 from sol_execbench.core.bench.static_kernel.evidence_models import (
@@ -30,6 +31,35 @@ from sol_execbench.core.platform.toolchain import (
     build_toolchain_routing_report,
     default_toolchain_registry,
 )
+
+
+@dataclass(frozen=True)
+class ExtractorCommandSpec:
+    """Declarative command strategy for one supported static extractor."""
+
+    tool_id: str
+    arguments: tuple[str, ...]
+
+    def command_for(self, artifact_path: Path) -> list[str]:
+        """Build the bounded command for ``artifact_path``."""
+
+        return [self.tool_id, *self.arguments, str(artifact_path)]
+
+
+_EXTRACTOR_COMMAND_SPECS = {
+    spec.tool_id: spec
+    for spec in (
+        ExtractorCommandSpec("llvm-objdump", ("--disassemble",)),
+        ExtractorCommandSpec("readelf", ("--headers", "--wide")),
+        ExtractorCommandSpec("roc-objdump", ("--disassemble", "--resource-usage")),
+    )
+}
+
+
+def static_extractor_tool_ids() -> tuple[str, ...]:
+    """Return general static extractors in deterministic execution order."""
+
+    return ("llvm-objdump", "readelf")
 
 
 def route_static_tool(
@@ -81,13 +111,12 @@ def tool_run_from_route_decision(
 
 
 def extractor_command(tool_id: str, artifact_path: Path) -> list[str]:
-    if tool_id == "llvm-objdump":
-        return [tool_id, "--disassemble", str(artifact_path)]
-    if tool_id == "readelf":
-        return [tool_id, "--headers", "--wide", str(artifact_path)]
-    if tool_id == "roc-objdump":
-        return [tool_id, "--disassemble", "--resource-usage", str(artifact_path)]
-    raise ValueError(f"unsupported static extractor: {tool_id}")
+    """Build an extractor command from the registered command strategy."""
+
+    try:
+        return _EXTRACTOR_COMMAND_SPECS[tool_id].command_for(artifact_path)
+    except KeyError as exc:
+        raise ValueError(f"unsupported static extractor: {tool_id}") from exc
 
 
 def toolchain_artifact_type_for_static_artifact(

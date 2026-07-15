@@ -10,6 +10,8 @@ from typing import Any, cast
 import pytest
 
 from sol_execbench.core.scoring.fusion_validation import (
+    FusionCapacityStatus,
+    FusionPerformanceStatus,
     FusionSignature,
     FusionValidationArtifact,
     FusionValidationCase,
@@ -65,8 +67,10 @@ def _artifact() -> FusionValidationArtifact:
                 signature,
                 kernel,
                 (kernel,),
-                "passed",
-                PerformanceEvidence("not_measured", (), (), None, None),
+                FusionCapacityStatus.PASSED,
+                PerformanceEvidence(
+                    FusionPerformanceStatus.NOT_MEASURED, (), (), None, None
+                ),
             ),
         ),
     )
@@ -79,6 +83,20 @@ def test_fusion_validation_round_trip_is_strict() -> None:
     invalid["unexpected"] = True
     with pytest.raises(ValueError, match="fields mismatch"):
         fusion_validation_from_dict(invalid)
+
+
+def test_fusion_statuses_are_typed_and_invalid_in_memory_values_are_rejected() -> None:
+    artifact = _artifact()
+    case = artifact.cases[0]
+
+    assert case.capacity_status is FusionCapacityStatus.PASSED
+    assert case.performance.status is FusionPerformanceStatus.NOT_MEASURED
+    with pytest.raises(ValueError, match="not_a_status"):
+        PerformanceEvidence(
+            cast(FusionPerformanceStatus, "not_a_status"), (), (), None, None
+        )
+    with pytest.raises(ValueError, match="not_a_status"):
+        replace(case, capacity_status=cast(FusionCapacityStatus, "not_a_status"))
 
 
 def test_fusion_validation_accepts_exact_scalar_shapes() -> None:

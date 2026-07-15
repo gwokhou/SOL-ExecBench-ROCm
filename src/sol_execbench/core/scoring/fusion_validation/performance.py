@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 
-from .models import PerformanceEvidence
+from .models import FusionPerformanceStatus, PerformanceEvidence
 
 
 def performance_from_rounds(
@@ -27,7 +27,13 @@ def performance_from_rounds(
     ratio = median(fused_round_medians_ms) / median(unfused_round_medians_ms)
     max_spread = max(spread(fused_round_medians_ms), spread(unfused_round_medians_ms))
     status = (
-        "unstable" if max_spread > 0.05 else ("passed" if ratio <= 1.02 else "failed")
+        FusionPerformanceStatus.UNSTABLE
+        if max_spread > 0.05
+        else (
+            FusionPerformanceStatus.PASSED
+            if ratio <= 1.02
+            else FusionPerformanceStatus.FAILED
+        )
     )
     return PerformanceEvidence(
         status, fused_round_medians_ms, unfused_round_medians_ms, ratio, max_spread

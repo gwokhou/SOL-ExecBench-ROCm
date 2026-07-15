@@ -8,7 +8,7 @@ import argparse
 import json
 from pathlib import Path
 
-from sol_execbench.core.arguments import parse_bool as _parse_bool
+from sol_execbench.core.arguments import parse_bool
 from sol_execbench.core.platform.docker_matrix.models import (
     DEFAULT_DOCKER_TARGET_MANIFEST,
     DockerPreflightObservation,
@@ -42,11 +42,11 @@ def _build_parser() -> argparse.ArgumentParser:
     preflight.add_argument("--target")
     preflight.add_argument("--docker-context")
     preflight.add_argument("--docker-host")
-    preflight.add_argument("--dev-kfd-present", required=True, type=_parse_bool)
-    preflight.add_argument("--dev-kfd-accessible", required=True, type=_parse_bool)
-    preflight.add_argument("--dev-dri-present", required=True, type=_parse_bool)
-    preflight.add_argument("--dev-dri-accessible", required=True, type=_parse_bool)
-    preflight.add_argument("--gpu-accessible", type=_parse_bool)
+    preflight.add_argument("--dev-kfd-present", required=True, type=parse_bool)
+    preflight.add_argument("--dev-kfd-accessible", required=True, type=parse_bool)
+    preflight.add_argument("--dev-dri-present", required=True, type=parse_bool)
+    preflight.add_argument("--dev-dri-accessible", required=True, type=parse_bool)
+    preflight.add_argument("--gpu-accessible", type=parse_bool)
     preflight.add_argument("--image-digest")
     return parser
 

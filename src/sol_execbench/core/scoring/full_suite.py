@@ -31,6 +31,7 @@ from sol_execbench.core.scoring.amd_bound_estimate.estimates import (
     estimate_bound_work,
     resolve_architecture_profile_paths,
 )
+from sol_execbench.core.scoring.aggregation import OFFICIAL_AGGREGATION_POLICY
 from sol_execbench.core.scoring.amd_bound_graph.builder import (
     build_authority_bound_graph,
 )
@@ -51,7 +52,6 @@ FULL_SUITE_COVERAGE_SCHEMA_VERSION = "sol_execbench.full_suite_coverage.v3"
 FULL_SUITE_SCOPE = "gfx1200:sol-execbench:235-problems:3957-workloads"
 FULL_SUITE_PROBLEM_COUNT = 235
 FULL_SUITE_WORKLOAD_COUNT = 3957
-OFFICIAL_AGGREGATION_POLICY = "fixed_suite_denominator_zero_for_blocked"
 DERIVED_AGGREGATION_POLICY = "available_scored_workloads_mean"
 _CONFIDENCE_RANK = {"supported": 0, "inexact": 1, "unsupported": 2}
 _SUPERVISED_WORKER_MEMORY_LIMIT_BYTES = 3 * 1024**3

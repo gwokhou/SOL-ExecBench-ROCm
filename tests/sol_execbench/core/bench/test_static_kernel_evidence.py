@@ -29,6 +29,10 @@ from sol_execbench.core.bench.static_kernel.status import (
     aggregate_extractor_reason_value,
     aggregate_extractor_status_value,
 )
+from sol_execbench.core.bench.static_kernel.extractor_routing import (
+    extractor_command,
+    static_extractor_tool_ids,
+)
 from sol_execbench.core.platform.environment import ProbeCompletedProcess
 
 
@@ -56,6 +60,25 @@ EXPECTED_REASON_CODES = {
     "extractor_timeout",
     "parser_failed",
 }
+
+
+def test_extractor_commands_are_built_by_the_registered_strategies(tmp_path):
+    artifact = tmp_path / "kernel.o"
+
+    assert static_extractor_tool_ids() == ("llvm-objdump", "readelf")
+    assert extractor_command("llvm-objdump", artifact) == [
+        "llvm-objdump",
+        "--disassemble",
+        str(artifact),
+    ]
+    assert extractor_command("readelf", artifact) == [
+        "readelf",
+        "--headers",
+        "--wide",
+        str(artifact),
+    ]
+    with pytest.raises(ValueError, match="unsupported static extractor"):
+        extractor_command("unknown", artifact)
 
 
 def _tool_run(

@@ -37,6 +37,7 @@ from sol_execbench.core.bench.static_kernel.amdgpu_metadata import (
     extract_amdgpu_kernel_metadata,
 )
 from sol_execbench.core.scoring.fusion_validation import (
+    FusionCapacityStatus,
     FusionSignature,
     FusionValidationArtifact,
     FusionValidationCase,
@@ -368,7 +369,7 @@ def _collect_case(
             )
             for name in unfused_names
         ),
-        capacity_status="passed",
+        capacity_status=FusionCapacityStatus.PASSED,
         performance=performance,
     )
 

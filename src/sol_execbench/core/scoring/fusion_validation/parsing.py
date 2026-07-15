@@ -9,6 +9,8 @@ from typing import cast
 from .models import (
     CAPACITY_STATUSES,
     FUSION_VALIDATION_SCHEMA_VERSION,
+    FusionCapacityStatus,
+    FusionPerformanceStatus,
     PERFORMANCE_STATUSES,
     FusionSignature,
     FusionValidationArtifact,
@@ -121,9 +123,9 @@ def _case(raw: object, index: int, architecture: str) -> FusionValidationCase:
         _kernel(kernel, f"{source}.unfused", architecture) for kernel in raw_unfused
     )
     computed_capacity = (
-        "passed"
+        FusionCapacityStatus.PASSED
         if fused.capacity_passed and all(kernel.capacity_passed for kernel in unfused)
-        else "failed"
+        else FusionCapacityStatus.FAILED
     )
     if (
         values["capacity_status"] not in CAPACITY_STATUSES
@@ -264,13 +266,14 @@ def _performance(raw: object, source: str) -> PerformanceEvidence:
     status = values["status"]
     if not isinstance(status, str) or status not in PERFORMANCE_STATUSES:
         raise ValueError(f"{source}.status is invalid")
+    performance_status = FusionPerformanceStatus(status)
     protocol = _non_negative_integers(
         values, ("pairs_per_round", "warmups", "process_count"), source
     )
     order = values["order"]
     if not isinstance(order, str):
         raise ValueError(f"{source}.order must be a string")
-    if status == "not_measured":
+    if performance_status == FusionPerformanceStatus.NOT_MEASURED:
         if (
             values["fused_round_medians_ms"]
             or values["unfused_round_medians_ms"]
@@ -279,7 +282,7 @@ def _performance(raw: object, source: str) -> PerformanceEvidence:
         ):
             raise ValueError(f"{source} not_measured status contains samples")
         result = PerformanceEvidence(
-            status,
+            performance_status,
             (),
             (),
             None,
@@ -294,7 +297,7 @@ def _performance(raw: object, source: str) -> PerformanceEvidence:
         unfused = _round_medians(values["unfused_round_medians_ms"], source)
         computed = performance_from_rounds(fused, unfused)
         if (
-            status != computed.status
+            performance_status != computed.status
             or not math.isclose(
                 _float(values["fused_over_unfused"], source),
                 computed.fused_over_unfused or 0.0,
@@ -308,7 +311,7 @@ def _performance(raw: object, source: str) -> PerformanceEvidence:
         ):
             raise ValueError(f"{source} status or aggregates contradict samples")
         result = PerformanceEvidence(
-            cast(str, status),
+            performance_status,
             computed.fused_round_medians_ms,
             computed.unfused_round_medians_ms,
             computed.fused_over_unfused,

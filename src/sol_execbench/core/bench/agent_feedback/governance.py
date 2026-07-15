@@ -6,10 +6,8 @@
 from __future__ import annotations
 
 from sol_execbench.core.bench.agent_feedback.models import (
-    AgentFeedbackFreshnessStatus,
     AgentFeedbackFreshnessValidation,
     AgentFeedbackGovernanceGuardrail,
-    AgentFeedbackGovernanceStatus,
     AgentFeedbackSidecar,
 )
 from sol_execbench.core.bench.diagnostic_sidecar import (
@@ -54,9 +52,9 @@ def validate_agent_feedback_freshness(
     any_expected = trace_path is not None or any(
         (target_id, run_id, candidate_id, source_sha256, sol_version)
     )
-    status_value, reason_codes = classify_freshness(reasons, any_expected=any_expected)
+    status, reason_codes = classify_freshness(reasons, any_expected=any_expected)
     return AgentFeedbackFreshnessValidation(
-        status=AgentFeedbackFreshnessStatus(status_value),
+        status=status,
         reason_codes=reason_codes,
     )
 
@@ -69,15 +67,15 @@ def evaluate_agent_feedback_governance(
 ) -> AgentFeedbackGovernanceGuardrail:
     """Return diagnostic-only governance state for an optional feedback sidecar."""
 
-    status_value, reason_codes = classify_diagnostic_governance(
+    status, reason_codes = classify_diagnostic_governance(
         sidecar_present=sidecar is not None,
-        freshness_status=(freshness.status.value if freshness is not None else None),
+        freshness_status=freshness.status if freshness is not None else None,
         freshness_reason_codes=(
             freshness.reason_codes if freshness is not None else None
         ),
         parse_error=parse_error,
     )
     return AgentFeedbackGovernanceGuardrail(
-        status=AgentFeedbackGovernanceStatus(status_value),
+        status=status,
         reason_codes=reason_codes,
     )

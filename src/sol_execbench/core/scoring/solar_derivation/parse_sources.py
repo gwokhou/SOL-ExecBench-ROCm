@@ -7,10 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sol_execbench.core.scoring.parsing_utils import (
-    parse_optional_str as _parse_optional_str,
-)
-from sol_execbench.core.scoring.parsing_utils import parse_str as _parse_str
+from sol_execbench.core.scoring.parsing_utils import parse_optional_str, parse_str
 from sol_execbench.core.scoring.solar_derivation.evidence_models import (
     SolarEvidenceSource,
 )
@@ -30,10 +27,10 @@ def _evidence_source_from_dict(
         payload, {"kind", "detail", "node_id", "tensor_id"}, source=source
     )
     return SolarEvidenceSource(
-        kind=_parse_str(payload, "kind", source=source),
-        detail=_parse_str(payload, "detail", source=source),
-        node_id=_parse_optional_str(payload, "node_id", source=source),
-        tensor_id=_parse_optional_str(payload, "tensor_id", source=source),
+        kind=parse_str(payload, "kind", source=source),
+        detail=parse_str(payload, "detail", source=source),
+        node_id=parse_optional_str(payload, "node_id", source=source),
+        tensor_id=parse_optional_str(payload, "tensor_id", source=source),
     )
 
 

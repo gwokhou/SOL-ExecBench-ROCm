@@ -3,12 +3,32 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 
 from .io import sha256_payload
 
 FUSION_VALIDATION_SCHEMA_VERSION = "sol_execbench.fusion_validation.v1"
-CAPACITY_STATUSES = frozenset({"passed", "failed"})
-PERFORMANCE_STATUSES = frozenset({"passed", "failed", "unstable", "not_measured"})
+
+
+class FusionCapacityStatus(str, Enum):
+    """Capacity-validation outcomes admitted by fusion evidence."""
+
+    PASSED = "passed"
+    FAILED = "failed"
+
+
+class FusionPerformanceStatus(str, Enum):
+    """Performance-validation outcomes admitted by fusion evidence."""
+
+    PASSED = "passed"
+    FAILED = "failed"
+    UNSTABLE = "unstable"
+    NOT_MEASURED = "not_measured"
+
+
+# Kept as value sets for strict parsing and backwards-compatible public imports.
+CAPACITY_STATUSES = frozenset(status.value for status in FusionCapacityStatus)
+PERFORMANCE_STATUSES = frozenset(status.value for status in FusionPerformanceStatus)
 
 
 @dataclass(frozen=True)
@@ -92,7 +112,7 @@ class KernelResourceEvidence:
 
 @dataclass(frozen=True)
 class PerformanceEvidence:
-    status: str
+    status: FusionPerformanceStatus
     fused_round_medians_ms: tuple[float, ...]
     unfused_round_medians_ms: tuple[float, ...]
     fused_over_unfused: float | None
@@ -102,9 +122,14 @@ class PerformanceEvidence:
     process_count: int = 3
     order: str = "alternating_ab_ba"
 
+    def __post_init__(self) -> None:
+        """Coerce serialized values and reject invalid in-memory evidence."""
+
+        object.__setattr__(self, "status", FusionPerformanceStatus(self.status))
+
     def to_dict(self) -> dict[str, object]:
         return {
-            "status": self.status,
+            "status": self.status.value,
             "fused_round_medians_ms": list(self.fused_round_medians_ms),
             "unfused_round_medians_ms": list(self.unfused_round_medians_ms),
             "fused_over_unfused": self.fused_over_unfused,
@@ -124,9 +149,18 @@ class FusionValidationCase:
     signature: FusionSignature
     fused: KernelResourceEvidence
     unfused: tuple[KernelResourceEvidence, ...]
-    capacity_status: str
+    capacity_status: FusionCapacityStatus
     performance: PerformanceEvidence
     diagnostics: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        """Coerce serialized values and reject invalid in-memory evidence."""
+
+        object.__setattr__(
+            self,
+            "capacity_status",
+            FusionCapacityStatus(self.capacity_status),
+        )
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -137,7 +171,7 @@ class FusionValidationCase:
             "signature_sha256": self.signature.canonical_id,
             "fused": self.fused.to_dict(),
             "unfused": [kernel.to_dict() for kernel in self.unfused],
-            "capacity_status": self.capacity_status,
+            "capacity_status": self.capacity_status.value,
             "performance": self.performance.to_dict(),
             "diagnostics": list(self.diagnostics),
         }
@@ -196,6 +230,8 @@ __all__ = [
     "CAPACITY_STATUSES",
     "FUSION_VALIDATION_SCHEMA_VERSION",
     "PERFORMANCE_STATUSES",
+    "FusionCapacityStatus",
+    "FusionPerformanceStatus",
     "FusionSignature",
     "FusionValidationArtifact",
     "FusionValidationCase",

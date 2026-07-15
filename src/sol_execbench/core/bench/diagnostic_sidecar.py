@@ -11,12 +11,38 @@ circular imports.
 
 from __future__ import annotations
 
+from enum import Enum
 from pathlib import Path
 from typing import Literal
 
 from pydantic import ConfigDict
 
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
+
+
+class DiagnosticSidecarStatus(str, Enum):
+    """Availability vocabulary shared by diagnostic-only sidecars."""
+
+    AVAILABLE = "available"
+    PARTIAL = "partial"
+    UNAVAILABLE = "unavailable"
+
+
+class DiagnosticFreshnessStatus(str, Enum):
+    """Freshness vocabulary shared by diagnostic-only sidecars."""
+
+    CURRENT = "current"
+    STALE = "stale"
+    UNKNOWN = "unknown"
+
+
+class DiagnosticGovernanceStatus(str, Enum):
+    """Governance vocabulary shared by diagnostic-only sidecars."""
+
+    USABLE_DIAGNOSTIC = "usable_diagnostic"
+    STALE_DIAGNOSTIC = "stale_diagnostic"
+    UNAVAILABLE = "unavailable"
+    INVALID_DIAGNOSTIC = "invalid_diagnostic"
 
 
 class DiagnosticSidecarAuthority(BaseModelWithDocstrings):
@@ -84,12 +110,10 @@ def classify_freshness(
     reasons: list[str],
     *,
     any_expected: bool,
-) -> tuple[str, list[str]]:
+) -> tuple[DiagnosticFreshnessStatus, list[str]]:
     """Tail classification shared by both freshness validators.
 
-    Returns ``(status_value, reason_codes)`` where ``status_value`` is one of
-    ``"current"`` / ``"stale"`` / ``"unknown"``. Callers map the string to their
-    own enum via ``MyFreshnessStatus(status_value)``.
+    Returns ``(status, reason_codes)`` using the shared freshness enum.
 
     ``any_expected`` is true iff the caller received at least one expected-identity
     argument. The caller owns this predicate because the two sidecars validate
@@ -97,24 +121,22 @@ def classify_freshness(
     """
 
     if reasons:
-        return "stale", list(reasons)
+        return DiagnosticFreshnessStatus.STALE, list(reasons)
     if not any_expected:
-        return "unknown", ["insufficient_expected_identity"]
-    return "current", []
+        return DiagnosticFreshnessStatus.UNKNOWN, ["insufficient_expected_identity"]
+    return DiagnosticFreshnessStatus.CURRENT, []
 
 
 def classify_diagnostic_governance(
     *,
     sidecar_present: bool,
-    freshness_status: str | None,
+    freshness_status: DiagnosticFreshnessStatus | None,
     freshness_reason_codes: list[str] | None,
     parse_error: str | None,
-) -> tuple[str, list[str]]:
+) -> tuple[DiagnosticGovernanceStatus, list[str]]:
     """Shared governance state machine for diagnostic sidecars.
 
-    Returns ``(status_value, reason_codes)`` where ``status_value`` is one of
-    ``"usable_diagnostic"`` / ``"stale_diagnostic"`` / ``"unavailable"`` /
-    ``"invalid_diagnostic"``. Callers map via ``MyGovernanceStatus(status_value)``.
+    Returns ``(status, reason_codes)`` using the shared governance enum.
 
     Branch order mirrors both originals verbatim:
 
@@ -126,11 +148,15 @@ def classify_diagnostic_governance(
     """
 
     if parse_error is not None:
-        return "invalid_diagnostic", ["sidecar_parse_error"]
+        return DiagnosticGovernanceStatus.INVALID_DIAGNOSTIC, ["sidecar_parse_error"]
     if not sidecar_present:
-        return "unavailable", ["sidecar_missing"]
-    if freshness_status == "stale":
-        return "stale_diagnostic", freshness_reason_codes or ["sidecar_stale"]
-    if freshness_status == "unknown":
-        return "unavailable", freshness_reason_codes or ["sidecar_freshness_unknown"]
-    return "usable_diagnostic", []
+        return DiagnosticGovernanceStatus.UNAVAILABLE, ["sidecar_missing"]
+    if freshness_status == DiagnosticFreshnessStatus.STALE:
+        return DiagnosticGovernanceStatus.STALE_DIAGNOSTIC, freshness_reason_codes or [
+            "sidecar_stale"
+        ]
+    if freshness_status == DiagnosticFreshnessStatus.UNKNOWN:
+        return DiagnosticGovernanceStatus.UNAVAILABLE, freshness_reason_codes or [
+            "sidecar_freshness_unknown"
+        ]
+    return DiagnosticGovernanceStatus.USABLE_DIAGNOSTIC, []

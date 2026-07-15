@@ -19,7 +19,7 @@ from .environment_models import (
     ToolProbeResult,
     Which,
 )
-from ..text_utils import text_tail as _tail
+from ..text_utils import text_tail
 
 
 def probe_tool(
@@ -48,8 +48,8 @@ def probe_tool(
             command=command,
             path=path,
             status=EnvironmentEvidenceStatus.TIMEOUT,
-            stdout_tail=_tail(exc.stdout),
-            stderr_tail=_tail(exc.stderr),
+            stdout_tail=text_tail(exc.stdout),
+            stderr_tail=text_tail(exc.stderr),
             timeout_seconds=timeout_seconds,
         )
     except OSError as exc:
@@ -58,7 +58,7 @@ def probe_tool(
             command=command,
             path=path,
             status=EnvironmentEvidenceStatus.FAILED,
-            stderr_tail=_tail(str(exc)),
+            stderr_tail=text_tail(str(exc)),
             timeout_seconds=timeout_seconds,
         )
 
@@ -73,8 +73,8 @@ def probe_tool(
             else EnvironmentEvidenceStatus.FAILED
         ),
         returncode=completed.returncode,
-        stdout_tail=_tail(completed.stdout),
-        stderr_tail=_tail(completed.stderr),
+        stdout_tail=text_tail(completed.stdout),
+        stderr_tail=text_tail(completed.stderr),
         timeout_seconds=timeout_seconds,
         parsed=parse_probe_output(output),
     )
