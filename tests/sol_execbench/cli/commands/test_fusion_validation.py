@@ -96,7 +96,7 @@ def test_collect_uses_built_in_driver_when_manifest_has_no_override(
                     workload_uuid=workload_uuid,
                     variant_id="rmsnorm_fp32_mean_epsilon",
                     signature=FusionSignature(
-                        "reduction_epilogue.v1",
+                        "diagnostic_reduction_epilogue.v1",
                         1,
                         ("mean", "add"),
                         "fp32",
