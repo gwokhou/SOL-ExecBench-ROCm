@@ -56,6 +56,16 @@ def _clear_cache(cache: torch.Tensor) -> None:
     cache.zero_()
 
 
+def _measurement_budget_reached(
+    times_ms: list[float], min_measurement_time_seconds: float | None
+) -> bool:
+    """Return whether the configured aggregate measurement budget is satisfied."""
+    return (
+        min_measurement_time_seconds is not None
+        and sum(times_ms) >= min_measurement_time_seconds * 1000.0
+    )
+
+
 def clone_args(args: list[Any]) -> list[Any]:
     """Clone tensor arguments to prevent cross-iteration data contamination.
 
@@ -67,10 +77,11 @@ def clone_args(args: list[Any]) -> list[Any]:
 
 def bench_time_with_device_events(
     fn: Callable[..., Any],
-    warmup: int = 10,
+    warmup: int = 25,
     rep: int = 100,
     setup: Callable[[], Any] | None = None,
     device: str = "cuda",
+    min_measurement_time_seconds: float | None = 0.5,
 ) -> list[float]:
     """Benchmark a GPU callable using PyTorch device events.
 
@@ -82,9 +93,11 @@ def bench_time_with_device_events(
     explicitly synchronize; it may enqueue default-stream work that should be
     excluded by the synchronization before each start event.
     """
+    if warmup < 0 or rep <= 0:
+        raise ValueError("warmup must be >= 0 and rep must be > 0")
+    if min_measurement_time_seconds is not None and min_measurement_time_seconds <= 0:
+        raise ValueError("min_measurement_time_seconds must be > 0 or None")
     cache = _get_empty_cache_for_benchmark(device)
-    start_events = [torch.cuda.Event(enable_timing=True) for _ in range(rep)]
-    end_events = [torch.cuda.Event(enable_timing=True) for _ in range(rep)]
     torch.cuda.synchronize()
 
     if setup is None:
@@ -102,17 +115,23 @@ def bench_time_with_device_events(
         fn(args)
     torch.cuda.synchronize()
 
-    for i in range(rep):
+    times: list[float] = []
+    for _ in range(rep):
         args = setup()
         _clear_cache(cache)
         torch.cuda.synchronize()
-        start_events[i].record()
+        start_event = torch.cuda.Event(enable_timing=True)
+        end_event = torch.cuda.Event(enable_timing=True)
+        start_event.record()
         fn(args)
         torch.cuda.synchronize()
-        end_events[i].record()
+        end_event.record()
+        torch.cuda.synchronize()
+        times.append(start_event.elapsed_time(end_event))
+        if _measurement_budget_reached(times, min_measurement_time_seconds):
+            break
 
-    torch.cuda.synchronize()
-    return [s.elapsed_time(e) for s, e in zip(start_events, end_events)]
+    return times
 
 
 def time_runnable(
@@ -120,8 +139,9 @@ def time_runnable(
     inputs: list,
     outputs: list,
     device: str,
-    warmup: int = 10,
+    warmup: int = 25,
     rep: int = 100,
+    min_measurement_time_seconds: float | None = 0.5,
     return_mode: Literal["mean", "median", "all"] = "median",
     methodology: Literal["events"] = "events",
 ) -> Union[float, list[float]]:
@@ -143,6 +163,7 @@ def time_runnable(
             rep=rep,
             setup=allocator.get_unique_args,
             device=device,
+            min_measurement_time_seconds=min_measurement_time_seconds,
         )
         if not times:
             raise ValueError(f"No timing results for methodology: {methodology}")

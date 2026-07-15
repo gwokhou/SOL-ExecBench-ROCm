@@ -107,6 +107,7 @@ def collect_rocprofv3_timing(
             gpu_architecture=request.gpu_architecture,
             warmup_runs=request.warmup_runs,
             iterations=request.iterations,
+            min_measurement_time_seconds=request.min_measurement_time_seconds,
             trial_count=request.trial_count,
             clock_locked=request.clock_locked,
             profiler_overhead_ms=profiler_overhead_ms,
@@ -119,6 +120,7 @@ def collect_rocprofv3_timing(
             gpu_architecture=request.gpu_architecture,
             warmup_runs=request.warmup_runs,
             iterations=request.iterations,
+            min_measurement_time_seconds=request.min_measurement_time_seconds,
             trial_count=request.trial_count,
             clock_locked=request.clock_locked,
             profiler_overhead_ms=profiler_overhead_ms,
@@ -169,6 +171,7 @@ def collect_source_timing_evidence(
     executable: str = ROCPROFV3_EXECUTABLE,
     warmup_runs: int | None = None,
     iterations: int | None = None,
+    min_measurement_time_seconds: float | None = None,
     trial_count: int | None = None,
     clock_locked: bool | None = None,
 ) -> Rocprofv3CollectionResult:
@@ -184,6 +187,7 @@ def collect_source_timing_evidence(
         executable=executable,
         warmup_runs=warmup_runs,
         iterations=iterations,
+        min_measurement_time_seconds=min_measurement_time_seconds,
         trial_count=trial_count,
         clock_locked=clock_locked,
     )

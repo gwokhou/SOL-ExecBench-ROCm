@@ -106,8 +106,9 @@ The benchmark evaluator accepts an optional JSON config file through
 
 ```json
 {
-  "warmup_runs": 10,
-  "iterations": 50,
+  "warmup_runs": 25,
+  "iterations": 100,
+  "min_measurement_time_seconds": 0.5,
   "lock_clocks": false,
   "benchmark_reference": true,
   "seed": 200
@@ -116,8 +117,9 @@ The benchmark evaluator accepts an optional JSON config file through
 
 | Field | Default | Description |
 | --- | --- | --- |
-| `warmup_runs` | `10` | Number of warmup runs before measurement. Must be greater than or equal to `0`. |
-| `iterations` | `50` | Number of timed iterations. Must be greater than `0`. |
+| `warmup_runs` | `25` | Number of warmup runs before measurement. Must be greater than or equal to `0`. |
+| `iterations` | `100` | Maximum number of timed iterations. Must be greater than `0`. |
+| `min_measurement_time_seconds` | `0.5` | Stop after this much aggregate timed work, or at `iterations`; use `null` for a fixed iteration count. |
 | `lock_clocks` | `false` | Whether evaluation requires clocks to be locked. |
 | `benchmark_reference` | `true` | Whether to benchmark the reference implementation. |
 | `seed` | `200` | Integer seed for benchmark input generation. |
@@ -156,7 +158,7 @@ inputs are passed as files or positional arguments:
   solution JSON file in the problem directory.
 - JSON responses use root-level `--format json` before the subcommand
   output and raise a Click exception without it.
-- `BenchmarkConfig.warmup_runs` must be `>= 0`; `iterations` must be `> 0`.
+- `BenchmarkConfig.warmup_runs` must be `>= 0`; `iterations` must be `> 0`; `min_measurement_time_seconds` must be positive or `null`.
 - `scripts/run_docker.sh --target`, `--compatibility-entry`, and
   `--compatibility-matrix` require argument values when those flags are used.
 
@@ -169,8 +171,9 @@ clock-sensitive evaluation paths can reject the run based on
 
 | Setting | Default | Source |
 | --- | --- | --- |
-| Benchmark warmup runs | `10` | `BenchmarkConfig.warmup_runs` |
-| Benchmark iterations | `50` | `BenchmarkConfig.iterations` |
+| Benchmark warmup runs | `25` | `BenchmarkConfig.warmup_runs` |
+| Benchmark maximum iterations | `100` | `BenchmarkConfig.iterations` |
+| Benchmark minimum measurement time | `0.5 seconds` | `BenchmarkConfig.min_measurement_time_seconds` |
 | Benchmark clock-lock requirement | `false` | `BenchmarkConfig.lock_clocks` |
 | Benchmark reference timing | `true` | `BenchmarkConfig.benchmark_reference` |
 | Benchmark seed | `200` | `BenchmarkConfig.seed` |

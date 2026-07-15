@@ -26,6 +26,7 @@ def measure_solution_latency(
     inputs: list[Any],
     warmup: int,
     rep: int,
+    min_measurement_time_seconds: float | None,
 ) -> float:
     """Measure user solution latency and raise when timing failed."""
     timing_outputs = (
@@ -40,6 +41,7 @@ def measure_solution_latency(
         device,
         warmup=warmup,
         rep=rep,
+        min_measurement_time_seconds=min_measurement_time_seconds,
     )
     if timing.failure is not None:
         raise RuntimeError(timing.failure)
@@ -54,6 +56,7 @@ def measure_optional_reference_latency(
     device: str,
     warmup: int,
     rep: int,
+    min_measurement_time_seconds: float | None,
 ) -> tuple[float, str | None]:
     """Measure reference latency when configured."""
     if not benchmark_reference:
@@ -65,6 +68,7 @@ def measure_optional_reference_latency(
         device,
         warmup=warmup,
         rep=rep,
+        min_measurement_time_seconds=min_measurement_time_seconds,
     )
     return timing.latency_ms, timing.failure
 

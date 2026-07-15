@@ -43,15 +43,22 @@ def _cpu_time_runnable(
     *,
     warmup: int,
     rep: int,
+    min_measurement_time_seconds: float | None,
 ) -> float:
     for _ in range(warmup):
         fn(*inputs, *outputs)
 
-    start = time.perf_counter()
+    samples: list[float] = []
     for _ in range(rep):
+        start = time.perf_counter()
         fn(*inputs, *outputs)
-    elapsed = time.perf_counter() - start
-    return (elapsed / max(rep, 1)) * 1000.0
+        samples.append(time.perf_counter() - start)
+        if (
+            min_measurement_time_seconds is not None
+            and sum(samples) >= min_measurement_time_seconds
+        ):
+            break
+    return (sum(samples) / max(len(samples), 1)) * 1000.0
 
 
 def measure_latency(
@@ -62,6 +69,7 @@ def measure_latency(
     *,
     warmup: int,
     rep: int,
+    min_measurement_time_seconds: float | None = 0.5,
     time_fn: Callable[..., Any] | None = None,
 ) -> TimingResult:
     """Measure callable latency with an opt-in CPU fallback for subprocess tests."""
@@ -78,6 +86,7 @@ def measure_latency(
                     outputs,
                     warmup=warmup,
                     rep=rep,
+                    min_measurement_time_seconds=min_measurement_time_seconds,
                 )
             )
 
@@ -93,6 +102,7 @@ def measure_latency(
             device,
             warmup=warmup,
             rep=rep,
+            min_measurement_time_seconds=min_measurement_time_seconds,
         )
         if not isinstance(latency_raw, (int, float)):
             return TimingResult(
@@ -226,6 +236,7 @@ def measure_reference_latency(
     *,
     warmup: int,
     rep: int,
+    min_measurement_time_seconds: float | None = 0.5,
     time_fn: Callable[..., Any] | None = None,
 ) -> ReferenceTimingResult:
     """Measure reference latency and return explicit diagnostics on failure."""
@@ -236,6 +247,7 @@ def measure_reference_latency(
         device,
         warmup=warmup,
         rep=rep,
+        min_measurement_time_seconds=min_measurement_time_seconds,
         time_fn=time_fn,
     )
     if result.failure is None:

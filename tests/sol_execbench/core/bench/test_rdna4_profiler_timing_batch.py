@@ -259,6 +259,39 @@ def test_batch_uses_explicit_profiler_executable_in_recorded_command(tmp_path):
     assert captured_commands[0][0] == "/opt/patches/rocprofv3-gfx1200-patched"
 
 
+def test_batch_resolves_relative_explicit_profiler_before_staging(
+    tmp_path, monkeypatch
+):
+    dataset_root = tmp_path / "dataset"
+    source_timing = tmp_path / "source"
+    output_dir = tmp_path / "out"
+    wrapper = tmp_path / "tools" / "rocprofv3-gfx1200-patched"
+    wrapper.parent.mkdir()
+    wrapper.write_text("#!/bin/sh\n", encoding="utf-8")
+    captured_commands: list[Sequence[str]] = []
+    _write_problem(dataset_root, "L1", "one")
+    _write_fallback_timing(source_timing, "L1", "one")
+    monkeypatch.chdir(tmp_path)
+
+    def runner(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
+        captured_commands.append(tuple(command))
+        return _successful_runner(command)
+
+    rc = batch.run_batch(
+        dataset_root=dataset_root,
+        output_dir=output_dir,
+        source_timing_dirs=(source_timing,),
+        only_problem=("L1/one",),
+        profiler_executable="tools/rocprofv3-gfx1200-patched",
+        rocprofv3_available=True,
+        runner=runner,
+        max_workers=1,
+    )
+
+    assert rc == 0
+    assert captured_commands[0][0] == str(wrapper.resolve())
+
+
 def test_batch_can_enable_hip_runtime_trace_for_debugging(tmp_path):
     dataset_root = tmp_path / "dataset"
     source_timing = tmp_path / "source"
