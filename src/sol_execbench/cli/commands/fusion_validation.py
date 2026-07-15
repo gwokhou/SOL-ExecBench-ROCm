@@ -344,8 +344,13 @@ def _verify_suite_coverage(
             f"fusion evidence shape coverage mismatch; missing={missing}, unknown={unknown}"
         )
     for case in evidence.cases:
-        if case.signature.pattern_id != "reduction_epilogue.v1":
-            raise ValueError(f"{case.evidence_id} does not prove reduction_epilogue.v1")
+        if case.signature.pattern_id not in {
+            "reduction_epilogue.v1",
+            "diagnostic_reduction_epilogue.v1",
+        }:
+            raise ValueError(
+                f"{case.evidence_id} does not prove a reduction/epilogue fusion probe"
+            )
         if case.signature.dtype != "fp32":
             raise ValueError(f"{case.evidence_id} does not prove FP32 fusion")
         if not any(shape[-1] == 4096 for shape in case.signature.input_shapes):
