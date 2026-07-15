@@ -12,7 +12,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from sol_execbench.core.bench.clock_lock import lock_clocks, unlock_clocks
+from sol_execbench.core.bench.clock_lock import acquire_clock_lock
 
 OUTPUT_DIR = Path("out/rdna4-clock-lock-workload-20260609")
 
@@ -75,10 +75,11 @@ def main() -> None:
     log("pre_metrics", amd_smi("metric", "-c", "-l", "-p", "-t", "-u"))
 
     # 2. Lock with the production clock-lock helper.
-    if not lock_clocks():
+    clock_lock = acquire_clock_lock()
+    if not clock_lock.locked:
         log("lock_failed", "STABLE_PEAK lock failed\n")
         raise SystemExit(1)
-    try:
+    with clock_lock:
         log("after_lock", amd_smi("metric", "-c", "-l", "-p", "-t", "-u"))
 
         # 3. Run sustained GPU workload while monitoring clocks
@@ -90,13 +91,9 @@ def main() -> None:
             "post_workload",
             amd_smi("metric", "-c", "-l", "-p", "-t", "-u"),
         )
-    finally:
-        # 5. Reset clocks even if the workload or evidence collection fails.
-        reset_verified = unlock_clocks()
-        time.sleep(1)
-        log("after_reset", amd_smi("metric", "-c", "-l", "-p", "-t", "-u"))
-        if not reset_verified:
-            raise RuntimeError("failed to reset and verify every GPU at AUTO")
+    # 5. The lease resets owned clocks and preserves an external lock.
+    time.sleep(1)
+    log("after_release", amd_smi("metric", "-c", "-l", "-p", "-t", "-u"))
 
     print("=" * 60)
     print("Clock-lock evidence collection complete.")

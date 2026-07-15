@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import tempfile
 from pathlib import Path
@@ -254,9 +255,17 @@ class TestCalibrationClockSetup:
         calls: list[str] = []
 
         monkeypatch.delenv("SOL_EXECBENCH_CLOCKS_LOCKED", raising=False)
-        monkeypatch.setattr(mod, "verify_clocks", lambda: False)
-        monkeypatch.setattr(mod, "lock_clocks", lambda: calls.append("lock") is None)
-        monkeypatch.setattr(mod, "unlock_clocks", lambda: calls.append("unlock"))
+        monkeypatch.setattr(
+            mod,
+            "acquire_clock_lock",
+            lambda: (
+                calls.append("lock") or mod.ClockLockLease(locked=True, acquired=True)
+            ),
+        )
+        monkeypatch.setattr(
+            "sol_execbench.core.bench.clock_lock.unlock_clocks",
+            lambda: calls.append("unlock") or True,
+        )
 
         state = mod._setup_calibration_clocks(
             manage_clocks=True,
@@ -274,9 +283,15 @@ class TestCalibrationClockSetup:
         calls: list[str] = []
 
         monkeypatch.setenv("SOL_EXECBENCH_CLOCKS_LOCKED", "external")
-        monkeypatch.setattr(mod, "verify_clocks", lambda: True)
-        monkeypatch.setattr(mod, "lock_clocks", lambda: calls.append("lock") is None)
-        monkeypatch.setattr(mod, "unlock_clocks", lambda: calls.append("unlock"))
+        monkeypatch.setattr(
+            mod,
+            "acquire_clock_lock",
+            lambda: mod.ClockLockLease(locked=True, acquired=False),
+        )
+        monkeypatch.setattr(
+            "sol_execbench.core.bench.clock_lock.unlock_clocks",
+            lambda: calls.append("unlock") or True,
+        )
 
         state = mod._setup_calibration_clocks(
             manage_clocks=True,
@@ -287,6 +302,22 @@ class TestCalibrationClockSetup:
 
         mod._teardown_calibration_clocks(state, reset_clocks=True)
         assert calls == []
+
+    def test_teardown_without_reset_explicitly_detaches_owned_lease(self, monkeypatch):
+        mod = self._load_script()
+        lease = mod.ClockLockLease(locked=True, acquired=True)
+        monkeypatch.setenv("SOL_EXECBENCH_CLOCKS_LOCKED", "1")
+        state = mod.CalibrationClockState(
+            clock_locked=True,
+            lock_acquired=True,
+            previous_env=None,
+            lease=lease,
+        )
+
+        mod._teardown_calibration_clocks(state, reset_clocks=False)
+
+        assert lease.detached is True
+        assert "SOL_EXECBENCH_CLOCKS_LOCKED" not in os.environ
 
     def test_run_with_rocprofv3_passes_output_file(self, monkeypatch, tmp_path):
         mod = self._load_script()

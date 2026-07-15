@@ -20,9 +20,8 @@ from pathlib import Path
 from typing import Any
 
 from sol_execbench.core.bench.clock_lock import (
-    lock_clocks,
-    unlock_clocks,
-    verify_clocks,
+    ClockLockLease,
+    acquire_clock_lock,
 )
 from sol_execbench.core.bench.pid_lock import acquire_pid_lock
 from sol_execbench.core.bench.timing_isolation import (
@@ -50,10 +49,12 @@ class CalibrationClockState:
         clock_locked: bool,
         lock_acquired: bool,
         previous_env: str | None,
+        lease: ClockLockLease | None = None,
     ) -> None:
         self.clock_locked = clock_locked
         self.lock_acquired = lock_acquired
         self.previous_env = previous_env
+        self.lease = lease
 
 
 def run_calibration(
@@ -198,10 +199,16 @@ def run_calibration(
         logger.info("Calibration written to: %s", output_path)
         return 0
     finally:
-        _teardown_calibration_clocks(
-            clock_state,
-            reset_clocks=reset_clocks,
-        )
+        active_exception = sys.exception()
+        try:
+            _teardown_calibration_clocks(
+                clock_state,
+                reset_clocks=reset_clocks,
+            )
+        except Exception as cleanup_error:
+            if active_exception is None:
+                raise
+            active_exception.add_note(str(cleanup_error))
 
 
 def _setup_calibration_clocks(
@@ -222,16 +229,9 @@ def _setup_calibration_clocks(
             previous_env=previous_env,
         )
 
-    if verify_clocks():
-        os.environ["SOL_EXECBENCH_CLOCKS_LOCKED"] = "1"
-        return CalibrationClockState(
-            clock_locked=True,
-            lock_acquired=False,
-            previous_env=previous_env,
-        )
-
     logger.info("Locking GPU clocks to STABLE_PEAK for calibration...")
-    if not lock_clocks():
+    lease = acquire_clock_lock()
+    if not lease.locked:
         if strict_isolation:
             logger.error("STRICT ISOLATION: Failed to lock GPU clocks, aborting")
         else:
@@ -245,8 +245,9 @@ def _setup_calibration_clocks(
     os.environ["SOL_EXECBENCH_CLOCKS_LOCKED"] = "1"
     return CalibrationClockState(
         clock_locked=True,
-        lock_acquired=True,
+        lock_acquired=lease.acquired,
         previous_env=previous_env,
+        lease=lease,
     )
 
 
@@ -255,14 +256,22 @@ def _teardown_calibration_clocks(
     *,
     reset_clocks: bool,
 ) -> None:
-    if clock_state.lock_acquired and reset_clocks:
-        logger.info("Resetting GPU clocks to AUTO after calibration...")
-        unlock_clocks()
-
-    if clock_state.previous_env is None:
-        os.environ.pop("SOL_EXECBENCH_CLOCKS_LOCKED", None)
-    else:
-        os.environ["SOL_EXECBENCH_CLOCKS_LOCKED"] = clock_state.previous_env
+    try:
+        if clock_state.lock_acquired:
+            if clock_state.lease is None:
+                raise RuntimeError("owned GPU clock state is missing its lease")
+            if reset_clocks:
+                logger.info("Resetting GPU clocks to AUTO after calibration...")
+                if not clock_state.lease.release():
+                    raise RuntimeError("failed to reset and verify every GPU at AUTO")
+            else:
+                logger.info("Retaining GPU clock policy by explicit request")
+                clock_state.lease.detach()
+    finally:
+        if clock_state.previous_env is None:
+            os.environ.pop("SOL_EXECBENCH_CLOCKS_LOCKED", None)
+        else:
+            os.environ["SOL_EXECBENCH_CLOCKS_LOCKED"] = clock_state.previous_env
 
 
 def _run_with_rocprofv3(

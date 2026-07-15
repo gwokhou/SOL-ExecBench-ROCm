@@ -23,6 +23,8 @@ from pathlib import Path
 
 import pytest
 
+from sol_execbench.core.bench import clock_lock as clock_lock_module
+from sol_execbench.core.bench.clock_lock import ClockLockLease
 from sol_execbench.core import (
     BenchmarkConfig,
     Definition,
@@ -487,10 +489,15 @@ class TestExecute:
         self, tmp_path, definition, workloads, python_solution, monkeypatch
     ):
         calls: list[str] = []
-        monkeypatch.setattr(problem_packager, "verify_clocks", lambda: False)
-        monkeypatch.setattr(problem_packager, "lock_clocks", lambda: True)
         monkeypatch.setattr(
-            problem_packager, "unlock_clocks", lambda: calls.append("unlock")
+            problem_packager,
+            "acquire_clock_lock",
+            lambda: ClockLockLease(locked=True, acquired=True),
+        )
+        monkeypatch.setattr(
+            clock_lock_module,
+            "unlock_clocks",
+            lambda: calls.append("unlock") or True,
         )
         monkeypatch.delenv("SOL_EXECBENCH_CLOCKS_LOCKED", raising=False)
         pkg = _make_packager(
@@ -512,12 +519,15 @@ class TestExecute:
         self, tmp_path, definition, workloads, python_solution, monkeypatch
     ):
         calls: list[str] = []
-        monkeypatch.setattr(problem_packager, "verify_clocks", lambda: True)
         monkeypatch.setattr(
-            problem_packager, "lock_clocks", lambda: calls.append("lock") or True
+            problem_packager,
+            "acquire_clock_lock",
+            lambda: ClockLockLease(locked=True, acquired=False),
         )
         monkeypatch.setattr(
-            problem_packager, "unlock_clocks", lambda: calls.append("unlock")
+            clock_lock_module,
+            "unlock_clocks",
+            lambda: calls.append("unlock") or True,
         )
         monkeypatch.delenv("SOL_EXECBENCH_CLOCKS_LOCKED", raising=False)
         pkg = _make_packager(
@@ -534,6 +544,57 @@ class TestExecute:
         pkg.close()
         assert calls == []
         assert "SOL_EXECBENCH_CLOCKS_LOCKED" not in problem_packager.os.environ
+
+    def test_repeated_execute_keeps_original_lock_ownership(
+        self, tmp_path, definition, workloads, python_solution, monkeypatch
+    ):
+        calls: list[str] = []
+        monkeypatch.setattr(
+            problem_packager,
+            "acquire_clock_lock",
+            lambda: calls.append("lock") or ClockLockLease(locked=True, acquired=True),
+        )
+        monkeypatch.setattr(
+            clock_lock_module,
+            "unlock_clocks",
+            lambda: calls.append("unlock") or True,
+        )
+        pkg = _make_packager(
+            tmp_path,
+            definition,
+            workloads,
+            python_solution,
+            BenchmarkConfig(lock_clocks=True),
+        )
+
+        pkg.execute()
+        pkg.execute()
+        pkg.close()
+
+        assert calls == ["lock", "unlock"]
+
+    def test_failed_reset_is_reported_and_close_can_retry(
+        self, tmp_path, definition, workloads, python_solution, monkeypatch
+    ):
+        monkeypatch.setattr(
+            problem_packager,
+            "acquire_clock_lock",
+            lambda: ClockLockLease(locked=True, acquired=True),
+        )
+        outcomes = iter((False, True))
+        monkeypatch.setattr(clock_lock_module, "unlock_clocks", lambda: next(outcomes))
+        pkg = _make_packager(
+            tmp_path,
+            definition,
+            workloads,
+            python_solution,
+            BenchmarkConfig(lock_clocks=True),
+        )
+        pkg.execute()
+
+        with pytest.raises(RuntimeError, match="failed to reset"):
+            pkg.close()
+        pkg.close()
 
     def test_raises_without_so_for_cpp(
         self, tmp_path, definition, workloads, hip_solution, config

@@ -4,12 +4,15 @@
 
 """Tests for sol_execbench.core.bench.clock_lock."""
 
+import gc
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from sol_execbench.core.bench import clock_lock as clock_lock_module
 from sol_execbench.core.bench.clock_lock import (
+    ClockLockLease,
+    acquire_clock_lock,
     are_clocks_locked,
     lock_clocks,
     probe_clock_lock_available,
@@ -65,16 +68,27 @@ class TestProbeClockLockAvailable:
 class TestLockClocks:
     def _patch_verify_and_sleep(self):
         return (
+            patch(
+                f"{_MODULE}._observed_performance_levels",
+                return_value=("AMDSMI_DEV_PERF_LEVEL_AUTO",),
+            ),
             patch(f"{_MODULE}.verify_clocks", return_value=True),
             patch(f"{_MODULE}.time.sleep"),
         )
 
     def test_locks_with_stable_peak(self):
-        p_verify, p_sleep = self._patch_verify_and_sleep()
-        with patch(f"{_MODULE}.subprocess.run") as mock_run, p_verify, p_sleep:
-            result = lock_clocks()
+        p_levels, p_verify, p_sleep = self._patch_verify_and_sleep()
+        with (
+            patch(f"{_MODULE}.subprocess.run") as mock_run,
+            p_levels,
+            p_verify,
+            p_sleep,
+        ):
+            result = acquire_clock_lock()
 
-        assert result is True
+        assert result.locked is True
+        assert result.acquired is True
+        result.detach()
         assert mock_run.call_count == 1
         mock_run.assert_called_once_with(
             ["sudo", "-n", "amd-smi", "set", "-l", "STABLE_PEAK"],
@@ -91,7 +105,14 @@ class TestLockClocks:
             stderr="",
         )
 
-        with patch(f"{_MODULE}.subprocess.run", return_value=failed) as mock_run:
+        with (
+            patch(
+                f"{_MODULE}._observed_performance_levels",
+                return_value=("AMDSMI_DEV_PERF_LEVEL_AUTO",),
+            ),
+            patch(f"{_MODULE}.subprocess.run", return_value=failed) as mock_run,
+            patch(f"{_MODULE}.unlock_clocks", return_value=True) as unlock,
+        ):
             result = lock_clocks()
 
         assert result is False
@@ -102,38 +123,236 @@ class TestLockClocks:
             text=True,
             timeout=30,
         )
+        unlock.assert_called_once_with()
 
     def test_returns_false_when_amd_smi_fails(self):
         import subprocess as sp
 
-        with patch(
-            f"{_MODULE}.subprocess.run",
-            side_effect=sp.CalledProcessError(1, "amd-smi"),
-        ) as mock_run:
+        with (
+            patch(
+                f"{_MODULE}._observed_performance_levels",
+                return_value=("AMDSMI_DEV_PERF_LEVEL_AUTO",),
+            ),
+            patch(
+                f"{_MODULE}.subprocess.run",
+                side_effect=sp.CalledProcessError(1, "amd-smi"),
+            ) as mock_run,
+            patch(f"{_MODULE}.unlock_clocks", return_value=True) as unlock,
+        ):
             result = lock_clocks()
 
         assert result is False
         assert mock_run.call_count == 1
+        unlock.assert_called_once_with()
 
     def test_returns_false_and_unlocks_when_verification_fails(self):
         p_sleep = patch(f"{_MODULE}.time.sleep")
         p_verify = patch(f"{_MODULE}.verify_clocks", return_value=False)
         p_unlock = patch(f"{_MODULE}.unlock_clocks", return_value=True)
-        with patch(f"{_MODULE}.subprocess.run"), p_verify, p_sleep, p_unlock as unlock:
+        p_levels = patch(
+            f"{_MODULE}._observed_performance_levels",
+            return_value=("AMDSMI_DEV_PERF_LEVEL_AUTO",),
+        )
+        with (
+            patch(f"{_MODULE}.subprocess.run"),
+            p_levels,
+            p_verify,
+            p_sleep,
+            p_unlock as unlock,
+        ):
             result = lock_clocks()
 
         assert result is False
         unlock.assert_called_once_with()
+
+    def test_compatibility_wrapper_detaches_owned_lease(self):
+        lease = ClockLockLease(locked=True, acquired=True)
+
+        with patch(f"{_MODULE}.acquire_clock_lock", return_value=lease):
+            assert lock_clocks() is True
+
+        assert lease.detached is True
 
     def test_sleeps_before_verification(self):
         from sol_execbench.core.bench.clock_lock import VERIFY_DELAY_S
 
         p_verify = patch(f"{_MODULE}.verify_clocks", return_value=True)
         p_sleep = patch(f"{_MODULE}.time.sleep")
-        with patch(f"{_MODULE}.subprocess.run"), p_verify, p_sleep as mock_sleep:
+        p_levels = patch(
+            f"{_MODULE}._observed_performance_levels",
+            return_value=("AMDSMI_DEV_PERF_LEVEL_AUTO",),
+        )
+        with (
+            patch(f"{_MODULE}.subprocess.run"),
+            p_levels,
+            p_verify,
+            p_sleep as mock_sleep,
+        ):
             lock_clocks()
 
         mock_sleep.assert_called_once_with(VERIFY_DELAY_S)
+
+    def test_preserves_existing_stable_peak_without_taking_ownership(self):
+        with (
+            patch(
+                f"{_MODULE}._observed_performance_levels",
+                return_value=("AMDSMI_DEV_PERF_LEVEL_STABLE_PEAK",),
+            ),
+            patch(f"{_MODULE}.subprocess.run") as run,
+        ):
+            result = acquire_clock_lock()
+
+        assert result == ClockLockLease(locked=True, acquired=False)
+        run.assert_not_called()
+
+    def test_refuses_to_replace_manual_policy(self):
+        with (
+            patch(
+                f"{_MODULE}._observed_performance_levels",
+                return_value=("AMDSMI_DEV_PERF_LEVEL_MANUAL",),
+            ),
+            patch(f"{_MODULE}.subprocess.run") as run,
+        ):
+            result = acquire_clock_lock()
+
+        assert result == ClockLockLease(locked=False, acquired=False)
+        run.assert_not_called()
+
+    def test_keyboard_interrupt_during_stabilization_attempts_reset(self):
+        with (
+            patch(
+                f"{_MODULE}._observed_performance_levels",
+                return_value=("AMDSMI_DEV_PERF_LEVEL_AUTO",),
+            ),
+            patch(f"{_MODULE}.subprocess.run"),
+            patch(f"{_MODULE}.time.sleep", side_effect=KeyboardInterrupt),
+            patch(f"{_MODULE}.unlock_clocks", return_value=True) as unlock,
+            pytest.raises(KeyboardInterrupt),
+        ):
+            acquire_clock_lock()
+
+        unlock.assert_called_once_with()
+
+    def test_unexpected_lock_exception_attempts_reset_before_reraising(self):
+        with (
+            patch(
+                f"{_MODULE}._observed_performance_levels",
+                return_value=("AMDSMI_DEV_PERF_LEVEL_AUTO",),
+            ),
+            patch(f"{_MODULE}.subprocess.run", side_effect=RuntimeError("boom")),
+            patch(f"{_MODULE}.unlock_clocks", return_value=True) as unlock,
+            pytest.raises(RuntimeError, match="boom"),
+        ):
+            acquire_clock_lock()
+
+        unlock.assert_called_once_with()
+
+
+class TestClockLockLease:
+    def test_exposes_owned_lease_state(self):
+        lease = ClockLockLease(locked=True, acquired=True)
+
+        assert lease.active is True
+        assert lease.released is False
+        assert lease.detached is False
+        lease.detach()
+        assert lease.active is False
+        assert lease.released is False
+        assert lease.detached is True
+
+    def test_context_manager_releases_only_owned_lock(self):
+        owned_lease = ClockLockLease(locked=True, acquired=True)
+        external_lease = ClockLockLease(locked=True, acquired=False)
+        with patch(f"{_MODULE}.unlock_clocks", return_value=True) as unlock:
+            with owned_lease:
+                pass
+            with external_lease:
+                pass
+
+        unlock.assert_called_once_with()
+        assert owned_lease.released is True
+        assert external_lease.released is True
+
+    def test_failed_release_can_be_retried(self):
+        lease = ClockLockLease(locked=True, acquired=True)
+        with patch(f"{_MODULE}.unlock_clocks", side_effect=[False, True]) as unlock:
+            assert lease.release() is False
+            assert lease.active is True
+            assert lease.released is False
+            assert lease.release() is True
+            assert lease.active is False
+            assert lease.released is True
+            assert lease.release() is True
+
+        assert unlock.call_count == 2
+
+    def test_cleanup_failure_after_success_is_reported(self):
+        lease = ClockLockLease(locked=True, acquired=True)
+        with (
+            patch(f"{_MODULE}.unlock_clocks", return_value=False),
+            pytest.raises(RuntimeError, match="failed to reset"),
+        ):
+            with lease:
+                pass
+        lease.detach()
+
+    def test_cleanup_failure_does_not_mask_body_exception(self):
+        lease = ClockLockLease(locked=True, acquired=True)
+        with (
+            patch(f"{_MODULE}.unlock_clocks", return_value=False),
+            pytest.raises(ValueError, match="body failed") as caught,
+        ):
+            with lease:
+                raise ValueError("body failed")
+
+        assert caught.value.__notes__ == [
+            "failed to reset and verify every GPU at AUTO"
+        ]
+        lease.detach()
+
+    def test_detached_lease_rejects_release(self):
+        lease = ClockLockLease(locked=True, acquired=True)
+        lease.detach()
+
+        with pytest.raises(RuntimeError, match="detached"):
+            lease.release()
+
+    def test_garbage_collected_owned_lease_emits_stable_error(self, caplog):
+        lease = ClockLockLease(locked=True, acquired=True)
+        with patch(f"{_MODULE}.unlock_clocks", return_value=False):
+            assert lease.release() is False
+
+        del lease
+        gc.collect()
+
+        assert "gpu_clock_lease_leaked" in caplog.text
+
+    @pytest.mark.parametrize("resolution", ("release", "detach"))
+    def test_resolved_owned_lease_does_not_emit_leak_error(self, resolution, caplog):
+        lease = ClockLockLease(locked=True, acquired=True)
+        if resolution == "release":
+            with patch(f"{_MODULE}.unlock_clocks", return_value=True):
+                assert lease.release() is True
+        else:
+            lease.detach()
+
+        del lease
+        gc.collect()
+
+        assert "gpu_clock_lease_leaked" not in caplog.text
+
+    @pytest.mark.parametrize(
+        "lease",
+        (
+            ClockLockLease(locked=True, acquired=False),
+            ClockLockLease(locked=False, acquired=False),
+        ),
+    )
+    def test_non_owned_lease_does_not_emit_leak_error(self, lease, caplog):
+        del lease
+        gc.collect()
+
+        assert "gpu_clock_lease_leaked" not in caplog.text
 
 
 class TestVerifyClocks:

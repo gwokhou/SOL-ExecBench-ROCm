@@ -392,12 +392,16 @@ def _validate_calibration_authority(
     if metadata["rocm_version"] != getattr(live_environment, "rocm_version"):
         raise ValueError("calibration ROCm version does not match current runtime")
     observations = metadata["clock_observations"]
+    initial_clock_state = (
+        observations.get("pre") if isinstance(observations, dict) else None
+    )
     if (
         not isinstance(observations, dict)
         or observations.get("during") is not True
-        or observations.get("post") is not False
+        or (initial_clock_state is not True and initial_clock_state is not False)
+        or observations.get("post") is not initial_clock_state
     ):
-        raise ValueError("calibration lacks observed clock lock/reset evidence")
+        raise ValueError("calibration lacks observed clock lock/restoration evidence")
     policy = metadata["adapter_policy"]
     if not isinstance(policy, dict) or policy.get("requires_clock_lock") is not True:
         raise ValueError("calibration adapter policy is not authority eligible")

@@ -26,6 +26,7 @@ import logging
 import os
 import subprocess
 import time
+from dataclasses import dataclass, field
 
 from pydantic import ValidationError
 
@@ -40,6 +41,101 @@ AMD_SMI_FAILURE_MARKERS = (
     "failed to set",
     "error:",
 )
+
+
+@dataclass
+class ClockLockLease:
+    """Owned STABLE_PEAK lease with idempotent, exception-aware release."""
+
+    locked: bool
+    acquired: bool
+    _released: bool = field(default=False, init=False, repr=False, compare=False)
+    _previous_environment: str | None = field(
+        default=None, init=False, repr=False, compare=False
+    )
+    _environment_published: bool = field(
+        default=False, init=False, repr=False, compare=False
+    )
+    _detached: bool = field(default=False, init=False, repr=False, compare=False)
+
+    @property
+    def active(self) -> bool:
+        """Return whether this object still owns an unreleased GPU policy."""
+        return self.acquired and not self._released and not self._detached
+
+    @property
+    def released(self) -> bool:
+        """Return whether release completed or no owned policy required it."""
+        return self._released or not self.acquired
+
+    @property
+    def detached(self) -> bool:
+        """Return whether release responsibility was explicitly transferred."""
+        return self._detached
+
+    def release(self) -> bool:
+        """Release an owned lock, retaining ownership when reset fails."""
+        if self._detached:
+            raise RuntimeError("cannot release a detached GPU clock lease")
+        if self._released or not self.acquired:
+            self._released = True
+            return True
+        if not unlock_clocks():
+            return False
+        self._released = True
+        return True
+
+    def detach(self) -> None:
+        """Transfer or intentionally retain release responsibility."""
+        if self._released:
+            raise RuntimeError("cannot detach a released GPU clock lease")
+        self._detached = True
+
+    def __del__(self) -> None:
+        try:
+            if self.active:
+                logger.error(
+                    "gpu_clock_lease_leaked: owned STABLE_PEAK lease was "
+                    "garbage-collected without release or detach"
+                )
+        except BaseException:
+            # Destructors must never turn observability into shutdown failure.
+            pass
+
+    def __enter__(self) -> "ClockLockLease":
+        return self
+
+    def publish_environment(self) -> None:
+        """Publish verified state while retaining the previous environment."""
+        if self._environment_published:
+            return
+        self._previous_environment = os.environ.get("SOL_EXECBENCH_CLOCKS_LOCKED")
+        os.environ["SOL_EXECBENCH_CLOCKS_LOCKED"] = "1" if self.locked else "0"
+        self._environment_published = True
+
+    def restore_environment(self) -> None:
+        """Restore the environment captured by :meth:`publish_environment`."""
+        if not self._environment_published:
+            return
+        if self._previous_environment is None:
+            os.environ.pop("SOL_EXECBENCH_CLOCKS_LOCKED", None)
+        else:
+            os.environ["SOL_EXECBENCH_CLOCKS_LOCKED"] = self._previous_environment
+        self._environment_published = False
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: object,
+    ) -> None:
+        if self.release():
+            return
+        message = "failed to reset and verify every GPU at AUTO"
+        if exc_value is not None:
+            exc_value.add_note(message)
+            return
+        raise RuntimeError(message)
 
 
 def _amd_smi_executable() -> str:
@@ -89,10 +185,9 @@ def _query_performance_levels() -> tuple[str, ...]:
     return parse_performance_levels(result.stdout)
 
 
-def _all_gpus_at_level(level: str) -> bool:
-    expected = f"AMDSMI_DEV_PERF_LEVEL_{level.upper()}"
+def _observed_performance_levels() -> tuple[str, ...] | None:
     try:
-        levels = _query_performance_levels()
+        return _query_performance_levels()
     except (
         FileNotFoundError,
         subprocess.CalledProcessError,
@@ -101,8 +196,23 @@ def _all_gpus_at_level(level: str) -> bool:
         ValueError,
     ) as exc:
         logger.warning("Failed to query amd-smi performance levels: %s", exc)
-        return False
+        return None
+
+
+def _levels_are(levels: tuple[str, ...], level: str) -> bool:
+    expected = f"AMDSMI_DEV_PERF_LEVEL_{level.upper()}"
     return all(current == expected for current in levels)
+
+
+def _all_gpus_at_level(level: str) -> bool:
+    levels = _observed_performance_levels()
+    return levels is not None and _levels_are(levels, level)
+
+
+def _reset_after_failed_lock() -> None:
+    """Best-effort reset after a lock command may have changed GPU policy."""
+    if not unlock_clocks():
+        logger.error("Failed to restore GPU clocks to AUTO after lock failure")
 
 
 def probe_clock_lock_available() -> bool:
@@ -127,12 +237,13 @@ def probe_clock_lock_available() -> bool:
         return False
 
 
-def lock_clocks() -> bool:
-    """Lock GPU clocks to STABLE_PEAK via ``amd-smi``.
+def acquire_clock_lock() -> ClockLockLease:
+    """Request STABLE_PEAK and report whether this process changed the policy.
 
     Uses ``sudo amd-smi set -l STABLE_PEAK`` which sets the GPU to a
-    stable near-maximum performance level with clock gating disabled.
-    Returns ``True`` only when the command and verification both succeed.
+    stable near-maximum performance level with clock gating disabled. Any
+    unsuccessful exit after the mutating command starts attempts to restore
+    AUTO, including interruption during stabilization or verification.
 
     On RDNA4 ``gfx1200``, STABLE_PEAK provides:
       - SCLK at ~2709-2754Mhz (within 1-2% of maximum 2780Mhz)
@@ -140,7 +251,22 @@ def lock_clocks() -> bool:
       - Clock and power gating disabled
 
     """
+    initial_levels = _observed_performance_levels()
+    if initial_levels is None:
+        return ClockLockLease(locked=False, acquired=False)
+    if _levels_are(initial_levels, "STABLE_PEAK"):
+        logger.info("GPU clocks are already at STABLE_PEAK; preserving external lock")
+        return ClockLockLease(locked=True, acquired=False)
+    if not _levels_are(initial_levels, "AUTO"):
+        logger.warning(
+            "Refusing to replace non-AUTO GPU performance levels: %s",
+            initial_levels,
+        )
+        return ClockLockLease(locked=False, acquired=False)
+
+    command_started = False
     try:
+        command_started = True
         _run_checked_amd_smi(
             [
                 "sudo",
@@ -152,22 +278,35 @@ def lock_clocks() -> bool:
             ]
         )
         logger.info("GPU clock locked to STABLE_PEAK")
+        logger.info("Waiting %ss for clocks to stabilize...", VERIFY_DELAY_S)
+        time.sleep(VERIFY_DELAY_S)
+        if not verify_clocks():
+            logger.warning("STABLE_PEAK verification failed; unlocking")
+            _reset_after_failed_lock()
+            return ClockLockLease(locked=False, acquired=False)
     except (
         subprocess.CalledProcessError,
         FileNotFoundError,
         subprocess.TimeoutExpired,
-    ) as e:
-        logger.warning("Failed to lock clocks (STABLE_PEAK): %s", e)
-        return False
+    ) as exc:
+        logger.warning("Failed to lock clocks (STABLE_PEAK): %s", exc)
+        if command_started:
+            _reset_after_failed_lock()
+        return ClockLockLease(locked=False, acquired=False)
+    except BaseException:
+        if command_started:
+            _reset_after_failed_lock()
+        raise
 
-    logger.info("Waiting %ss for clocks to stabilize...", VERIFY_DELAY_S)
-    time.sleep(VERIFY_DELAY_S)
-    if not verify_clocks():
-        logger.warning("STABLE_PEAK verification failed; unlocking")
-        unlock_clocks()
-        return False
+    return ClockLockLease(locked=True, acquired=True)
 
-    return True
+
+def lock_clocks() -> bool:
+    """Compatibility wrapper returning whether GPUs are at STABLE_PEAK."""
+    lease = acquire_clock_lock()
+    if lease.acquired:
+        lease.detach()
+    return lease.locked
 
 
 def verify_clocks() -> bool:

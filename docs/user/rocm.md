@@ -164,6 +164,17 @@ sudo amd-smi set -l STABLE_PEAK
 sudo amd-smi set -l AUTO
 ```
 
+Clock management records ownership. A run that changes `AUTO` to
+`STABLE_PEAK` restores `AUTO` through an exception-aware context manager; a run
+that finds every visible GPU already at `STABLE_PEAK` preserves that external
+setting. Failed, timed-out, or interrupted lock attempts trigger a best-effort
+`AUTO` rollback, and verified reset failures are reported instead of silently
+discarded. Mixed or non-`AUTO` initial performance levels are not overwritten.
+Owned leases that are garbage-collected without either a verified release or an
+explicit ownership transfer emit a `gpu_clock_lease_leaked` error. Cross-process
+Docker cleanup and deliberate `--no-reset-clocks` use explicit transfer so that
+intentional retention is not reported as a leak.
+
 The Docker image and `scripts/setup_rocm_clock_sudoers.py` install sudoers
 coverage for the exact `amd-smi` commands used by the runtime. If clock locking
 is unavailable, run without `--lock-clocks` for functional validation.
