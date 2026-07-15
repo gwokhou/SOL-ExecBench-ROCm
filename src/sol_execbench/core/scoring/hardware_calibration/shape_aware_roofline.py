@@ -105,6 +105,55 @@ def _positive_int_mapping(value: object, field: str) -> dict[str, int]:
     return normalized
 
 
+def _validate_patch_provenance(raw: Mapping[str, Any], raw_path: Path) -> None:
+    provenance = raw["patch_provenance"]
+    expected = {
+        "patch_id",
+        "wrapper",
+        "real_rocprofv3",
+        "amd_smi",
+        "runtime",
+        "performance_levels",
+        "clock_lease",
+        "raw_profiler_csvs",
+    }
+    if not isinstance(provenance, Mapping) or set(provenance) != expected:
+        raise ValueError("shape-aware patch provenance has invalid fields")
+    _non_empty(provenance["patch_id"], "patch provenance ID")
+    for field, version in (
+        ("wrapper", False),
+        ("real_rocprofv3", True),
+        ("amd_smi", True),
+    ):
+        value = provenance[field]
+        if not isinstance(value, Mapping):
+            raise ValueError(f"shape-aware patch provenance {field} is invalid")
+        path = value.get("path")
+        checksum = value.get("sha256")
+        _checksum(checksum, f"patch provenance {field} checksum")
+        if not isinstance(path, str) or not Path(path).is_file():
+            raise ValueError(f"shape-aware patch provenance {field} path is invalid")
+        if sha256_file(Path(path)) != checksum:
+            raise ValueError(f"shape-aware patch provenance {field} checksum mismatch")
+        if version:
+            _non_empty(value.get("version"), f"patch provenance {field} version")
+    runtime = provenance["runtime"]
+    if not isinstance(runtime, Mapping) or not isinstance(
+        runtime.get("driver_and_gpu_static_sha256"), str
+    ):
+        raise ValueError("shape-aware patch provenance runtime is invalid")
+    levels = provenance["performance_levels"]
+    if not isinstance(levels, Mapping) or set(levels) != {"pre", "during", "post"}:
+        raise ValueError("shape-aware patch provenance levels are invalid")
+    if "STABLE_PEAK" not in _non_empty(levels["during"], "patch during level"):
+        raise ValueError("shape-aware patch provenance lacks STABLE_PEAK")
+    lease = provenance["clock_lease"]
+    if not isinstance(lease, Mapping) or lease.get("reset_verified") is not True:
+        raise ValueError("shape-aware patch provenance reset is unverified")
+    if provenance["raw_profiler_csvs"] != raw["trace_files"]:
+        raise ValueError("shape-aware patch provenance CSV binding mismatch")
+
+
 def validate_shape_aware_raw_evidence(
     case: "ShapeAwareRooflineCase", raw_path: Path, *, architecture: str | None = None
 ) -> None:
@@ -141,7 +190,10 @@ def validate_shape_aware_raw_evidence(
         "occupancy_status",
         "payload_sha256",
     }
-    if not isinstance(raw, dict) or set(raw) != expected:
+    if not isinstance(raw, dict) or set(raw) not in (
+        expected,
+        expected | {"patch_provenance"},
+    ):
         raise ValueError("shape-aware raw evidence has invalid fields")
     if raw["schema_version"] != SHAPE_AWARE_ROOFLINE_RAW_SCHEMA_VERSION:
         raise ValueError("shape-aware raw evidence schema is unsupported")
@@ -188,6 +240,8 @@ def validate_shape_aware_raw_evidence(
         if not isinstance(trace, dict) or set(trace) != {"path", "sha256"}:
             raise ValueError("shape-aware raw evidence has invalid profiler trace")
         _bound_raw_file(raw_path, trace["path"], trace["sha256"], "profiler trace")
+    if "patch_provenance" in raw:
+        _validate_patch_provenance(raw, raw_path)
 
 
 def _bound_raw_file(

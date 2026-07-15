@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import subprocess
 from datetime import UTC, datetime
+from pathlib import Path
 
 from sol_execbench.core.platform.environment import (
     ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION,
@@ -89,6 +90,26 @@ def test_probe_tool_reports_available_and_parses_gfx_target():
     assert result.status == EnvironmentEvidenceStatus.AVAILABLE
     assert result.returncode == 0
     assert result.parsed["gfx_targets"] == ["gfx942"]
+
+
+def test_probe_tool_uses_rocm_root_aware_resolution_by_default(monkeypatch):
+    monkeypatch.setattr(
+        "sol_execbench.core.platform.environment_probes.resolve_rocm_tool",
+        lambda _tool, **_kwargs: Path("/opt/rocm-7.2/bin/amd-smi"),
+    )
+
+    result = probe_tool(
+        "amd-smi",
+        ["amd-smi", "version"],
+        runner=lambda command, timeout: (
+            ProbeCompletedProcess(returncode=0)
+            if command == ["/opt/rocm-7.2/bin/amd-smi", "version"]
+            else (_ for _ in ()).throw(AssertionError(command))
+        ),
+    )
+
+    assert result.path == "/opt/rocm-7.2/bin/amd-smi"
+    assert result.status == EnvironmentEvidenceStatus.AVAILABLE
 
 
 def test_parse_probe_output_ignores_rocm_generic_isa_labels() -> None:

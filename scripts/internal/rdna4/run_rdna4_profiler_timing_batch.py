@@ -17,7 +17,7 @@ import tempfile
 from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from sol_execbench.core import BenchmarkConfig, Definition, Solution, Workload
 from sol_execbench.core.bench.rocm_profiler import (
@@ -41,6 +41,10 @@ from sol_execbench.core.dataset.inventory import build_dataset_inventory
 from sol_execbench.core.dataset.readiness import classify_rocm_readiness
 from sol_execbench.core.dataset.solutions import build_reference_solution
 from sol_execbench.core.data.json_utils import load_json_dict
+from sol_execbench.core.platform.runtime import (
+    resolve_rocm_tool,
+    resolve_rocm_tool_command,
+)
 from sol_execbench.driver import ProblemPackager
 from sol_execbench.core.bench.pid_lock import (
     acquire_pid_lock,
@@ -143,6 +147,17 @@ RDNA4_REFERENCE_OVERRIDE_METADATA: dict[str, dict[str, Any]] = {
 }
 
 
+def _is_gfx1200_patched_profiler(executable: str) -> bool:
+    """Return whether *executable* is the explicit patched clock owner.
+
+    This is deliberately name-based rather than a PATH lookup: clock ownership
+    is an operator-selected batch contract, and implicit same-name shadows are
+    not accepted as evidence of that contract.
+    """
+
+    return Path(executable).name == "rocprofv3-gfx1200-patched"
+
+
 def _partition_targets_by_index(
     targets: list[ProfilerTimingProblemCoverage],
     max_workers: int,
@@ -178,7 +193,7 @@ def _process_target_chunk(
     clock_locked: bool = True,
     include_hip_runtime_trace: bool = False,
     rocprofv3_available: bool,
-    runner: ProfilerRunner,
+    runner: ProfilerRunner | None,
     marked_blocked_ids: set[str],
     global_start_index: int = 0,
     concurrent_gpu_processes: list[dict[str, Any]] | None = None,
@@ -187,6 +202,7 @@ def _process_target_chunk(
     compact_workload_slices: bool = True,
     keep_staging: bool = False,
     keep_rocprofv3_csv: bool = False,
+    profiler_executable: str = ROCPROFV3_EXECUTABLE,
 ) -> list[dict[str, Any]]:
     """Process a chunk of targets with CPU-parallel staging + serial GPU profiling (PRFL-01, PRFL-02)."""
     chunk_results = []
@@ -231,6 +247,7 @@ def _process_target_chunk(
                 compact_workload_slices=compact_workload_slices,
                 keep_staging=keep_staging,
                 keep_rocprofv3_csv=keep_rocprofv3_csv,
+                profiler_executable=profiler_executable,
             )
         else:
             result = _profile_target(
@@ -256,6 +273,7 @@ def _process_target_chunk(
                 pid_lock_contention=contention_detected,
                 keep_staging=keep_staging,
                 keep_rocprofv3_csv=keep_rocprofv3_csv,
+                profiler_executable=profiler_executable,
             )
 
         chunk_results.append(result)
@@ -301,6 +319,7 @@ def run_batch(
     compact_workload_slices: bool = True,
     keep_staging: bool = False,
     keep_rocprofv3_csv: bool = False,
+    profiler_executable: str | None = None,
 ) -> int:
     """Run fallback replacement batch and return a process-style status code."""
     if limit is not None and limit <= 0:
@@ -349,11 +368,19 @@ def run_batch(
         resume=resume,
     )
     output_dir.mkdir(parents=True, exist_ok=True)
+    selected_profiler = profiler_executable or resolve_rocm_tool_command(
+        ROCPROFV3_EXECUTABLE
+    )
     available = (
-        shutil.which(ROCPROFV3_EXECUTABLE) is not None
+        (
+            Path(selected_profiler).is_file()
+            if profiler_executable
+            else resolve_rocm_tool(ROCPROFV3_EXECUTABLE) is not None
+        )
         if rocprofv3_available is None
         else rocprofv3_available
     )
+    logger.info("Using rocprofv3 executable: %s", selected_profiler)
 
     # Pre-flight timing isolation audit
     logger.info("Running timing isolation pre-flight audit...")
@@ -371,14 +398,23 @@ def run_batch(
             len(concurrent_processes),
             concurrent_processes,
         )
+    # A requested patched wrapper owns the AUTO -> STABLE_PEAK transition.
+    # Strict isolation must not reject AUTO before that owner has a chance to
+    # acquire its lease.  Normal profiler runs still require a pre-locked GPU.
+    profiler_manages_clocks = _is_gfx1200_patched_profiler(selected_profiler)
     clock_state_verified = verify_clock_state_with_warning(context="batch_start")
     if not clock_state_verified:
-        if strict_isolation:
+        if strict_isolation and not profiler_manages_clocks:
             logger.error(
                 "STRICT ISOLATION: Clock state verification failed at batch start, aborting"
             )
             return 1
-        logger.warning("Clock state verification failed at batch start")
+        logger.warning(
+            "Clock state verification failed at batch start%s",
+            "; requested patched profiler will acquire STABLE_PEAK"
+            if profiler_manages_clocks
+            else "",
+        )
 
     # GPU device isolation check (ENV-01)
     gpu_isolation = validate_gpu_device_isolation(gpu_device=gpu_device)
@@ -449,6 +485,7 @@ def run_batch(
                     compact_workload_slices=compact_workload_slices,
                     keep_staging=keep_staging,
                     keep_rocprofv3_csv=keep_rocprofv3_csv,
+                    profiler_executable=selected_profiler,
                 )
                 futures[future] = chunk_idx
 
@@ -626,6 +663,7 @@ def _profile_target(
     compact_workload_slices: bool = True,
     keep_staging: bool = False,
     keep_rocprofv3_csv: bool = False,
+    profiler_executable: str = ROCPROFV3_EXECUTABLE,
 ) -> dict[str, Any]:
     problem_dir = dataset_root / target.problem_path
     if temp_dir is not None:
@@ -718,6 +756,7 @@ def _profile_target(
                 clock_locked=clock_locked,
                 include_hip_runtime=include_hip_runtime_trace,
                 compact_rows=True,
+                executable=profiler_executable,
             ),
             rocprofv3_available=rocprofv3_available,
             runner=batch_runner,
@@ -765,11 +804,12 @@ def _profile_target(
         and trace_status_counts.get("PASSED", 0) >= target.workload_count
         and sum(trace_status_counts.values()) >= target.workload_count
     )
-    payload = result.to_dict()
+    payload: dict[str, Any] = dict(result.to_dict())
     if not isinstance(payload.get("evidence"), dict):
         payload["evidence"] = {"backend": "rocprofv3", "parsed_rows": []}
-    evidence = (
-        payload.get("evidence") if isinstance(payload.get("evidence"), dict) else {}
+    evidence: dict[str, Any] = cast(
+        dict[str, Any],
+        payload.get("evidence") if isinstance(payload.get("evidence"), dict) else {},
     )
     kernel_activity_rows = _kernel_activity_rows(evidence)
     kernel_duration_ms = _float_value(evidence.get("kernel_duration_ms"))
@@ -871,6 +911,7 @@ def _profile_target_workload_sharded(
     compact_workload_slices: bool = True,
     keep_staging: bool = False,
     keep_rocprofv3_csv: bool = False,
+    profiler_executable: str = ROCPROFV3_EXECUTABLE,
 ) -> dict[str, Any]:
     if workload_limit is not None or workload_offset:
         raise ValueError("workload-sharded mode owns workload slicing")
@@ -964,6 +1005,7 @@ def _profile_target_workload_sharded(
             calibration_path=calibration_path,
             keep_staging=keep_staging,
             keep_rocprofv3_csv=keep_rocprofv3_csv,
+            profiler_executable=profiler_executable,
         )
         results.append(result)
         entry = _workload_manifest_entry(ref, result=result, sidecar=None)
@@ -1052,7 +1094,7 @@ def _write_blocked_sidecar(
     reference_override: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     workload_slice_applied = workload_offset != 0 or workload_limit is not None
-    payload = {
+    payload: dict[str, Any] = {
         "profiler_collected": False,
         "csv_path": None,
         "selection": {
@@ -1193,10 +1235,11 @@ def _imported_workload_slice_sidecars(
         payload = _load_optional_json(path)
         if payload is None:
             continue
-        metadata = (
+        metadata: dict[str, Any] = cast(
+            dict[str, Any],
             payload.get("replacement_metadata")
             if isinstance(payload.get("replacement_metadata"), dict)
-            else {}
+            else {},
         )
         if metadata.get("workload_slice_applied") is not True:
             continue
@@ -1224,13 +1267,15 @@ def _apply_rdna4_reference_override(
 
 
 def _workload_slice_sidecar_complete(payload: dict[str, Any]) -> bool:
-    evidence = (
-        payload.get("evidence") if isinstance(payload.get("evidence"), dict) else {}
+    evidence: dict[str, Any] = cast(
+        dict[str, Any],
+        payload.get("evidence") if isinstance(payload.get("evidence"), dict) else {},
     )
-    metadata = (
+    metadata: dict[str, Any] = cast(
+        dict[str, Any],
         payload.get("replacement_metadata")
         if isinstance(payload.get("replacement_metadata"), dict)
-        else {}
+        else {},
     )
     trace_counts = _trace_status_counts_from_mapping(
         metadata.get("trace_status_counts")
@@ -1308,12 +1353,14 @@ def _write_workload_manifest(path: Path, manifest: dict[str, Any]) -> None:
 
 
 def _workload_manifest_entry_complete(entry: object) -> bool:
+    if not isinstance(entry, dict):
+        return False
+    payload = cast(dict[str, Any], entry)
     return (
-        isinstance(entry, dict)
-        and entry.get("status") == "profiler_backed"
-        and entry.get("profiler_collected") is True
-        and _int_value(entry.get("kernel_activity_rows")) > 0
-        and _trace_status_counts_from_mapping(entry.get("trace_status_counts")).get(
+        payload.get("status") == "profiler_backed"
+        and payload.get("profiler_collected") is True
+        and _int_value(payload.get("kernel_activity_rows")) > 0
+        and _trace_status_counts_from_mapping(payload.get("trace_status_counts")).get(
             "PASSED", 0
         )
         >= 1
@@ -1327,13 +1374,15 @@ def _workload_manifest_entry(
     sidecar: dict[str, Any] | None,
 ) -> dict[str, Any]:
     sidecar = sidecar or {}
-    evidence = (
-        sidecar.get("evidence") if isinstance(sidecar.get("evidence"), dict) else {}
+    evidence: dict[str, Any] = cast(
+        dict[str, Any],
+        sidecar.get("evidence") if isinstance(sidecar.get("evidence"), dict) else {},
     )
-    metadata = (
+    metadata: dict[str, Any] = cast(
+        dict[str, Any],
         sidecar.get("replacement_metadata")
         if isinstance(sidecar.get("replacement_metadata"), dict)
-        else {}
+        else {},
     )
     trace_counts = _trace_status_counts_from_mapping(result.get("trace_status_counts"))
     if not trace_counts:
@@ -1595,8 +1644,11 @@ def _load_sidecar_rows(path_value: object) -> list[dict[str, Any]]:
     if not isinstance(path_value, str):
         return []
     payload = _load_optional_json(Path(path_value))
-    evidence = (
-        payload.get("evidence") if isinstance(payload.get("evidence"), dict) else {}
+    if payload is None:
+        return []
+    evidence: dict[str, Any] = cast(
+        dict[str, Any],
+        payload.get("evidence") if isinstance(payload.get("evidence"), dict) else {},
     )
     rows = evidence.get("parsed_rows")
     if not isinstance(rows, list):
@@ -1986,7 +2038,7 @@ def _int_value(value: object) -> int:
     if isinstance(value, bool) or value is None:
         return 0
     try:
-        return int(value)
+        return int(str(value))
     except (TypeError, ValueError):
         return 0
 
@@ -1995,7 +2047,7 @@ def _float_value(value: object) -> float:
     if isinstance(value, bool) or value is None:
         return 0.0
     try:
-        return float(value)
+        return float(str(value))
     except (TypeError, ValueError):
         return 0.0
 
@@ -2208,6 +2260,16 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument("--timing-tool-version", default=DEFAULT_TOOL_VERSION)
+    parser.add_argument(
+        "--profiler-executable",
+        type=str,
+        default=None,
+        help=(
+            "Explicit rocprofv3 executable or gfx1200 patched wrapper. The exact "
+            "value is recorded in every profiler command; when omitted, resolve "
+            "rocprofv3 through the active ROCm root."
+        ),
+    )
     parser.add_argument("--gpu-architecture", default=DEFAULT_GPU_ARCHITECTURE)
     parser.add_argument(
         "--clock-locked",
@@ -2333,6 +2395,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 compact_workload_slices=args.compact_workload_slices,
                 keep_staging=args.keep_staging,
                 keep_rocprofv3_csv=args.keep_rocprofv3_csv,
+                profiler_executable=args.profiler_executable,
                 max_workers=args.max_workers,
             )
     except (OSError, ValueError, json.JSONDecodeError) as exc:

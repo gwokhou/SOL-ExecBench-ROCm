@@ -30,6 +30,7 @@ import sys
 from typing import Any, Iterable, Mapping
 
 from sol_execbench.core.integrity.checksums import sha256_file
+from sol_execbench.core.platform.runtime import resolve_rocm_tool
 from sol_execbench.core.scoring.hardware_calibration.shape_aware_roofline import (
     has_measured_occupancy,
 )
@@ -141,9 +142,10 @@ def load_plan(path: Path) -> tuple[dict[str, Any], tuple[WorkloadTask, ...]]:
                 "problem_id",
             }:
                 raise ValueError("shape-aware collection workload is invalid")
-            identity = tuple(
-                _require_string(workload[field], field)
-                for field in ("definition", "workload_uuid", "problem_id")
+            identity = (
+                _require_string(workload["definition"], "definition"),
+                _require_string(workload["workload_uuid"], "workload_uuid"),
+                _require_string(workload["problem_id"], "problem_id"),
             )
             assignment = (profile_key, *identity)
             if assignment in assignments:
@@ -155,7 +157,7 @@ def load_plan(path: Path) -> tuple[dict[str, Any], tuple[WorkloadTask, ...]]:
             "shape-aware collection plan workload count does not match shards"
         )
     tasks = tuple(
-        WorkloadTask(*identity, tuple(sorted(profile_keys)))
+        WorkloadTask(identity[0], identity[1], identity[2], tuple(sorted(profile_keys)))
         for identity, profile_keys in sorted(grouped.items(), key=lambda item: item[0])
     )
     return payload, tasks
@@ -267,6 +269,114 @@ def _tensor_shape_and_layout(
     return tuple(flat_shape), "layout_sha256:" + _canonical_digest(layouts)
 
 
+def _tool_identity(executable: str, *, include_version: bool = True) -> dict[str, str]:
+    """Collect a bounded identity record for an executable used as evidence."""
+
+    path = Path(executable).resolve()
+    if not path.is_file():
+        raise ValueError(f"required executable is missing: {executable}")
+    identity = {
+        "path": str(path),
+        "sha256": sha256_file(path),
+    }
+    if include_version:
+        version = subprocess.run(
+            [str(path), "--version"],
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=10,
+        )
+        output = (version.stdout + version.stderr).strip()
+        identity["version"] = output[-2000:] or f"exit:{version.returncode}"
+    return identity
+
+
+def _performance_level(amd_smi: str) -> str:
+    """Return bounded raw amd-smi level output for patch provenance."""
+
+    result = subprocess.run(
+        [amd_smi, "metric", "-l"],
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+    output = (result.stdout + result.stderr).strip()
+    if result.returncode != 0 or not output:
+        raise ValueError("amd-smi could not read GPU performance level")
+    return output[-4000:]
+
+
+def _runtime_identity(amd_smi: str) -> dict[str, str | None]:
+    """Record the runtime identities that qualify a local patch observation."""
+
+    static = subprocess.run(
+        [amd_smi, "static", "-a"],
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+    static_output = (static.stdout + static.stderr).strip()
+    try:
+        import torch
+
+        torch_version = str(torch.__version__)
+        hip_version = str(torch.version.hip) if torch.version.hip else None
+        gpu_name = torch.cuda.get_device_name(0) if torch.cuda.is_available() else None
+    except (ImportError, RuntimeError):
+        torch_version = hip_version = gpu_name = None
+    return {
+        "rocm_hip_version": hip_version,
+        "pytorch_version": torch_version,
+        "gpu_name": gpu_name,
+        "driver_and_gpu_static_sha256": hashlib.sha256(
+            static_output.encode()
+        ).hexdigest(),
+    }
+
+
+def _patch_provenance(
+    *,
+    patch_id: str | None,
+    wrapper: str,
+    real_rocprofv3: str | None,
+    amd_smi: str | None,
+    pre_level: str | None,
+    post_level: str | None,
+    profiler_stderr: str,
+) -> dict[str, Any] | None:
+    """Build mandatory provenance only for an explicitly selected workaround."""
+
+    if patch_id is None:
+        return None
+    if not real_rocprofv3 or not amd_smi or pre_level is None or post_level is None:
+        raise ValueError(
+            "patched collection requires real profiler, amd-smi, and levels"
+        )
+    if "patch_clock_state=" not in profiler_stderr:
+        raise ValueError("patched profiler did not report verified clock acquisition")
+    acquired = "patch_clock_state=acquired_stable_peak" in profiler_stderr
+    reset_ok = not acquired or "patch_error=clock_reset" not in profiler_stderr
+    return {
+        "patch_id": patch_id,
+        "wrapper": _tool_identity(wrapper, include_version=False),
+        "real_rocprofv3": _tool_identity(real_rocprofv3),
+        "amd_smi": _tool_identity(amd_smi),
+        "runtime": _runtime_identity(amd_smi),
+        "performance_levels": {
+            "pre": pre_level,
+            "during": "STABLE_PEAK verified by patched wrapper",
+            "post": post_level,
+        },
+        "clock_lease": {
+            "acquired_by_current_process": acquired,
+            "reset_verified": reset_ok,
+        },
+    }
+
+
 def _raw_payload(
     *,
     task: WorkloadTask,
@@ -275,6 +385,7 @@ def _raw_payload(
     provider_evidence: Mapping[str, Any],
     trace_files: Iterable[Path],
     observation: DispatchObservation,
+    patch_provenance: dict[str, Any] | None,
 ) -> dict[str, Any]:
     shape, layout = _tensor_shape_and_layout(provider_evidence)
     samples = provider_evidence.get("samples_ms")
@@ -295,10 +406,11 @@ def _raw_payload(
         "layout": layout,
         "tensor_layouts": provider_evidence["tensor_layouts"],
         "samples_ms": samples_ms,
-        "provider_evidence_ref": str(provider_path),
+        "provider_evidence_ref": str(provider_path.resolve()),
         "provider_evidence_sha256": sha256_file(provider_path),
         "trace_files": [
-            {"path": str(path), "sha256": sha256_file(path)} for path in trace_files
+            {"path": str(path.resolve()), "sha256": sha256_file(path)}
+            for path in trace_files
         ],
         "launch": {
             key: value
@@ -312,6 +424,9 @@ def _raw_payload(
             "measured" if observation.occupancy_available else "unavailable"
         ),
     }
+    if patch_provenance is not None:
+        patch_provenance["raw_profiler_csvs"] = list(payload["trace_files"])
+        payload["patch_provenance"] = patch_provenance
     payload["payload_sha256"] = _canonical_digest(payload)
     return payload
 
@@ -334,6 +449,9 @@ def _run_task(
     warmup: int,
     repetitions: int,
     timeout_seconds: int,
+    patch_id: str | None,
+    real_rocprofv3: str | None,
+    amd_smi: str | None,
 ) -> dict[str, Any]:
     raw_path = output_root / "raw" / f"{task.safe_id}.json"
     if raw_path.is_file():
@@ -396,6 +514,8 @@ def _run_task(
         "--repetitions",
         str(repetitions),
     ]
+    resolved_amd_smi = amd_smi or str(resolve_rocm_tool("amd-smi") or "")
+    pre_level = _performance_level(resolved_amd_smi) if patch_id is not None else None
     result = subprocess.run(
         command,
         text=True,
@@ -410,6 +530,16 @@ def _run_task(
             "returncode": result.returncode,
             "stderr": result.stderr[-2000:],
         }
+    post_level = _performance_level(resolved_amd_smi) if patch_id is not None else None
+    provenance = _patch_provenance(
+        patch_id=patch_id,
+        wrapper=rocprofv3,
+        real_rocprofv3=real_rocprofv3,
+        amd_smi=resolved_amd_smi,
+        pre_level=pre_level,
+        post_level=post_level,
+        profiler_stderr=result.stderr,
+    )
     provider_evidence = json.loads(provider_path.read_text(encoding="utf-8"))
     observation, trace_files = parse_rocprof_csv(run_root)
     payload = _raw_payload(
@@ -419,6 +549,7 @@ def _run_task(
         provider_evidence=provider_evidence,
         trace_files=trace_files,
         observation=observation,
+        patch_provenance=provenance,
     )
     raw_path.parent.mkdir(parents=True, exist_ok=True)
     raw_path.write_text(
@@ -446,6 +577,17 @@ def main() -> int:
         ),
     )
     parser.add_argument(
+        "--patch-id",
+        default=None,
+        help="Patch ID when --rocprofv3 is the gfx1200 patched wrapper.",
+    )
+    parser.add_argument(
+        "--real-rocprofv3",
+        default=None,
+        help="Path to the unwrapped ROCm rocprofv3 required for patch provenance.",
+    )
+    parser.add_argument("--amd-smi", default=None)
+    parser.add_argument(
         "--provider-script",
         type=Path,
         default=Path(__file__).with_name("run_torch_inductor_provider.py"),
@@ -459,6 +601,14 @@ def main() -> int:
         raise ValueError(
             "warmup >= 1, repetitions >= 7, and positive timeout are required"
         )
+    patched_name = "rocprofv3-gfx1200-patched"
+    uses_patched_wrapper = Path(args.rocprofv3).name == patched_name
+    if uses_patched_wrapper and not args.patch_id:
+        raise ValueError("patched rocprofv3 requires --patch-id provenance")
+    if args.patch_id and not uses_patched_wrapper:
+        raise ValueError("--patch-id requires the explicit patched rocprofv3 wrapper")
+    if args.patch_id and not args.real_rocprofv3:
+        raise ValueError("patched rocprofv3 requires --real-rocprofv3")
     plan, tasks = load_plan(args.plan)
     if args.max_workloads is not None:
         if args.max_workloads < 1:
@@ -485,6 +635,9 @@ def main() -> int:
                     warmup=args.warmup,
                     repetitions=args.repetitions,
                     timeout_seconds=args.timeout_seconds,
+                    patch_id=args.patch_id,
+                    real_rocprofv3=args.real_rocprofv3,
+                    amd_smi=args.amd_smi,
                 )
             )
         except (
