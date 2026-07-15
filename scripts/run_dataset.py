@@ -1937,13 +1937,22 @@ def main():
         "--iterations",
         type=int,
         default=None,
-        help="Number of timing iterations per workload (default: 50, from BenchmarkConfig).",
+        help="Maximum timing iterations per workload (default: 100, from BenchmarkConfig).",
     )
     ap.add_argument(
         "--warmup-runs",
         type=int,
         default=None,
-        help="Number of warmup executions before timing (default: 10, from BenchmarkConfig).",
+        help="Number of warmup executions before timing (default: 25, from BenchmarkConfig).",
+    )
+    ap.add_argument(
+        "--min-measurement-time-seconds",
+        type=float,
+        default=None,
+        help=(
+            "Minimum aggregate device timing duration before stopping early "
+            "(default: 0.5, from BenchmarkConfig)."
+        ),
     )
     ap.add_argument(
         "--lock-clocks",
@@ -2391,15 +2400,28 @@ def main():
             if args.iterations is not None
             else BenchmarkConfig().iterations
         ),
+        min_measurement_time_seconds=(
+            args.min_measurement_time_seconds
+            if args.min_measurement_time_seconds is not None
+            else BenchmarkConfig().min_measurement_time_seconds
+        ),
         lock_clocks=args.lock_clocks,
     )
 
     # Build benchmark config if non-default timing settings were requested
     config_path = None
-    if args.iterations is not None or args.warmup_runs is not None or args.lock_clocks:
+    if (
+        args.iterations is not None
+        or args.warmup_runs is not None
+        or args.min_measurement_time_seconds is not None
+        or args.lock_clocks
+    ):
         config_dict = {
             "warmup_runs": benchmark_config.warmup_runs,
             "iterations": benchmark_config.iterations,
+            "min_measurement_time_seconds": (
+                benchmark_config.min_measurement_time_seconds
+            ),
             "lock_clocks": benchmark_config.lock_clocks,
         }
         config_path = output_dir / "config.json"
@@ -2474,6 +2496,7 @@ def main():
         "timeout": args.timeout,
         "warmup_runs": benchmark_config.warmup_runs,
         "iterations": benchmark_config.iterations,
+        "min_measurement_time_seconds": benchmark_config.min_measurement_time_seconds,
         "lock_clocks": benchmark_config.lock_clocks,
         "rerun": args.rerun,
         "keep_staging": args.keep_staging,
@@ -2531,6 +2554,9 @@ def main():
         "benchmark_config": {
             "warmup_runs": benchmark_config.warmup_runs,
             "iterations": benchmark_config.iterations,
+            "min_measurement_time_seconds": (
+                benchmark_config.min_measurement_time_seconds
+            ),
             "lock_clocks": benchmark_config.lock_clocks,
         },
         "derived_evidence": {

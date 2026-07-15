@@ -265,8 +265,14 @@ def test_provenance_comparison_rejects_runtime_and_selection_drift():
         timeout=300,
         warmup_runs=10,
         iterations=50,
+        min_measurement_time_seconds=0.5,
         lock_clocks=False,
-        benchmark_config={"warmup_runs": 10, "iterations": 50, "lock_clocks": False},
+        benchmark_config={
+            "warmup_runs": 10,
+            "iterations": 50,
+            "min_measurement_time_seconds": 0.5,
+            "lock_clocks": False,
+        },
         git_commit="old-sha",
     )
     observed = _provenance(
@@ -277,8 +283,14 @@ def test_provenance_comparison_rejects_runtime_and_selection_drift():
         timeout=600,
         warmup_runs=20,
         iterations=100,
+        min_measurement_time_seconds=1.0,
         lock_clocks=True,
-        benchmark_config={"warmup_runs": 20, "iterations": 100, "lock_clocks": True},
+        benchmark_config={
+            "warmup_runs": 20,
+            "iterations": 100,
+            "min_measurement_time_seconds": 1.0,
+            "lock_clocks": True,
+        },
         git_commit="new-sha",
     )
 
@@ -293,6 +305,7 @@ def test_provenance_comparison_rejects_runtime_and_selection_drift():
         ("workload_shard_size", "runtime_config_mismatch"),
         ("warmup_runs", "runtime_config_mismatch"),
         ("iterations", "runtime_config_mismatch"),
+        ("min_measurement_time_seconds", "runtime_config_mismatch"),
         ("lock_clocks", "runtime_config_mismatch"),
         ("benchmark_config", "runtime_config_mismatch"),
         ("git_commit", "git_commit_mismatch"),
