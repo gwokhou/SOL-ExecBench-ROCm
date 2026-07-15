@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import warnings
 from collections.abc import Callable
-from typing import cast
+from typing import Any, cast
 
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import Workload
@@ -20,6 +20,45 @@ from sol_execbench.core.scoring.amd_bound_graph.fx_diagnostics import (
 )
 from sol_execbench.core.scoring.amd_bound_graph.fx_helpers import _torch_dtype
 from sol_execbench.core.scoring.amd_bound_graph.models import BoundGraph, BoundTensor
+
+
+def _reference_module(torch: Any, run: Callable[..., object], input_count: int) -> Any:
+    """Build an export wrapper with positional parameters, not ``*args``.
+
+    PyTorch 2.11's strict exporter can construct invalid FakeTensor strides
+    while tracing ``CALL_FUNCTION_EX`` on ROCm.  The generated positional
+    signature keeps the call statically visible to Dynamo.
+    """
+    parameter_names = tuple(f"arg_{index}" for index in range(input_count))
+    parameters = ", ".join(("self", *parameter_names))
+    arguments = ", ".join(parameter_names)
+    namespace: dict[str, object] = {"run": run}
+    exec(
+        compile(
+            f"def forward({parameters}):\n    return run({arguments})\n",
+            "<sol-execbench.export-wrapper>",
+            "exec",
+        ),
+        namespace,
+    )
+    forward = cast(Callable[..., object], namespace["forward"])
+    module_type = type("ReferenceModule", (torch.nn.Module,), {"forward": forward})
+    return module_type()
+
+
+def _contiguous_meta_tensor(torch: Any, shape: tuple[int, ...], dtype: Any) -> Any:
+    """Create a meta tensor with an explicit contiguous stride contract."""
+    stride = 1
+    reversed_strides = []
+    for size in reversed(shape):
+        reversed_strides.append(stride)
+        stride *= max(size, 1)
+    return torch.empty_strided(
+        shape,
+        tuple(reversed(reversed_strides)),
+        dtype=dtype,
+        device="meta",
+    )
 
 
 def _try_fx_bound_graph(
@@ -88,20 +127,18 @@ def _try_torch_export_bound_graph(
         )
         run = cast(Callable[..., object], namespace["run"])
 
-        class ReferenceModule(torch.nn.Module):
-            def forward(self, *args: object) -> object:
-                return run(*args)
-
         sample_inputs: list[object] = []
         for name, spec in definition.inputs.items():
             shape = input_shapes[name]
             dtype = _torch_dtype(torch, spec.dtype)
             if shape is None:
                 return None
-            sample_inputs.append(torch.zeros(shape, dtype=dtype, device="meta"))
+            sample_inputs.append(_contiguous_meta_tensor(torch, shape, dtype))
         with redirect_torch_export_output():
             exported = torch.export.export(
-                ReferenceModule(), tuple(sample_inputs), strict=True
+                _reference_module(torch, run, len(sample_inputs)),
+                tuple(sample_inputs),
+                strict=True,
             )
     except Exception:
         _TORCH_EXPORT_LOGGER.exception(
