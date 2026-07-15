@@ -24,6 +24,7 @@ import torch
 
 from sol_execbench.core.bench.io import ShiftingMemoryPoolAllocator
 from sol_execbench.core.bench.timing import (
+    _measurement_budget_reached,
     _summarize_statistics,
     bench_time_with_device_events,
     clone_args,
@@ -103,6 +104,12 @@ class TestSummarizeStatistics:
     def test_all(self):
         times = [1.0, 2.0, 3.0]
         assert _summarize_statistics(times, "all") == times
+
+
+def test_measurement_budget_uses_aggregate_device_time() -> None:
+    assert not _measurement_budget_reached([100.0, 200.0], 0.5)
+    assert _measurement_budget_reached([100.0, 200.0, 200.0], 0.5)
+    assert not _measurement_budget_reached([1000.0], None)
 
 
 # ---------------------------------------------------------------------------

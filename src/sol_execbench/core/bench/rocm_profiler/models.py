@@ -208,6 +208,7 @@ class Rocprofv3TimingEvidence:
     parsed_rows: tuple[Rocprofv3TimingRow, ...]
     warmup_runs: int | None = None
     iterations: int | None = None
+    min_measurement_time_seconds: float | None = None
     trial_count: int | None = None
     clock_locked: bool | None = None
     fallback_applied: bool = False
@@ -238,6 +239,7 @@ class Rocprofv3TimingEvidence:
             "interpretation": self.interpretation,
             "warmup_runs": self.warmup_runs,
             "iterations": self.iterations,
+            "min_measurement_time_seconds": self.min_measurement_time_seconds,
             "trial_count": self.trial_count,
             "clock_locked": self.clock_locked,
             "fallback_applied": self.fallback_applied,
@@ -281,6 +283,7 @@ class Rocprofv3CollectionRequest:
     include_hip_runtime: bool = True
     warmup_runs: int | None = None
     iterations: int | None = None
+    min_measurement_time_seconds: float | None = None
     trial_count: int | None = None
     clock_locked: bool | None = None
     compact_rows: bool = False

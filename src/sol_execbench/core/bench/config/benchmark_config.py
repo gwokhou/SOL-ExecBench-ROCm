@@ -28,8 +28,9 @@ class BenchmarkConfig:
     All fields have default values to make configuration optional.
     """
 
-    warmup_runs: int = field(default=10)
-    iterations: int = field(default=50)
+    warmup_runs: int = field(default=25)
+    iterations: int = field(default=100)
+    min_measurement_time_seconds: float | None = field(default=0.5)
     lock_clocks: bool = field(default=False)
     benchmark_reference: bool = field(default=True)
     seed: int = field(default=200)
@@ -39,3 +40,8 @@ class BenchmarkConfig:
             raise ValueError("warmup_runs must be >= 0")
         if self.iterations <= 0:
             raise ValueError("iterations must be > 0")
+        if (
+            self.min_measurement_time_seconds is not None
+            and self.min_measurement_time_seconds <= 0
+        ):
+            raise ValueError("min_measurement_time_seconds must be > 0 or None")

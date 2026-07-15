@@ -368,8 +368,10 @@ def run_batch(
         resume=resume,
     )
     output_dir.mkdir(parents=True, exist_ok=True)
-    selected_profiler = profiler_executable or resolve_rocm_tool_command(
-        ROCPROFV3_EXECUTABLE
+    selected_profiler = (
+        str(Path(profiler_executable).resolve())
+        if profiler_executable and Path(profiler_executable).is_file()
+        else profiler_executable or resolve_rocm_tool_command(ROCPROFV3_EXECUTABLE)
     )
     available = (
         (
@@ -752,6 +754,9 @@ def _profile_target(
                 gpu_architecture=gpu_architecture,
                 warmup_runs=BenchmarkConfig().warmup_runs,
                 iterations=BenchmarkConfig().iterations,
+                min_measurement_time_seconds=(
+                    BenchmarkConfig().min_measurement_time_seconds
+                ),
                 trial_count=1,
                 clock_locked=clock_locked,
                 include_hip_runtime=include_hip_runtime_trace,

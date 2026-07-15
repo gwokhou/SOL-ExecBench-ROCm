@@ -122,6 +122,7 @@ def _measure_and_emit(
             inputs=inputs,
             warmup=request.bench_config.warmup_runs,
             rep=request.bench_config.iterations,
+            min_measurement_time_seconds=request.bench_config.min_measurement_time_seconds,
         )
     except Exception as exc:
         emitter.emit_status(
@@ -142,6 +143,7 @@ def _measure_and_emit(
         device=request.device,
         warmup=request.bench_config.warmup_runs,
         rep=request.bench_config.iterations,
+        min_measurement_time_seconds=request.bench_config.min_measurement_time_seconds,
     )
     speedup = ref_latency_ms / sol_latency_ms if sol_latency_ms > 0 else 0.0
     emitter.emit_status(
