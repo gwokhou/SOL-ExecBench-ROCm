@@ -45,6 +45,7 @@ from sol_execbench.core.platform.runtime import (
     resolve_rocm_tool,
     resolve_rocm_tool_command,
 )
+from sol_execbench.core.process import run_in_process_group
 from sol_execbench.driver import ProblemPackager
 from sol_execbench.core.bench.pid_lock import (
     acquire_pid_lock,
@@ -1986,13 +1987,10 @@ def _staging_runner(
             "TMPDIR": str(staging_dir.parent.resolve()),
         }
         preexec_fn = _memory_limit_preexec(memory_limit_gib)
-        return subprocess.run(
-            list(command),
+        return run_in_process_group(
+            command,
             cwd=staging_dir,
             env=env,
-            check=False,
-            text=True,
-            capture_output=True,
             timeout=timeout,
             preexec_fn=preexec_fn,
         )

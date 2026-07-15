@@ -331,7 +331,7 @@ def test_staging_runner_applies_subprocess_memory_limit(
         captured["kwargs"] = kwargs
         return subprocess.CompletedProcess(args=args[0], returncode=0)
 
-    monkeypatch.setattr(batch.subprocess, "run", fake_run)
+    monkeypatch.setattr(batch, "run_in_process_group", fake_run)
 
     runner = batch._staging_runner(
         tmp_path,
@@ -361,7 +361,7 @@ def test_staging_runner_forces_absolute_tmpdir(
         return subprocess.CompletedProcess(args=args[0], returncode=0)
 
     monkeypatch.setenv("TMPDIR", os.path.join("relative", "tmp"))
-    monkeypatch.setattr(batch.subprocess, "run", fake_run)
+    monkeypatch.setattr(batch, "run_in_process_group", fake_run)
 
     runner = batch._staging_runner(
         staging_dir,
