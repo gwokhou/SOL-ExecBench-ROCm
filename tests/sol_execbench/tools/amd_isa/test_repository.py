@@ -71,3 +71,26 @@ def test_offline_repository_never_downloads(tmp_path) -> None:
 
     with pytest.raises(IsaSpecUnavailableError, match="downloads are disabled"):
         repository.spec_path("gfx1200", allow_download=False)
+
+
+def test_resolved_spec_carries_release_family_and_checksum(
+    tmp_path, monkeypatch
+) -> None:
+    payload = b"<isa>fixture</isa>"
+    entry = _entry(payload)
+    archive = BytesIO()
+    with zipfile.ZipFile(archive, "w") as bundle:
+        bundle.writestr("amdgpu_isa_rdna4.xml", payload)
+    monkeypatch.setattr(
+        "sol_execbench.tools.amd_isa.repository.urlopen",
+        lambda *_args, **_kwargs: BytesIO(archive.getvalue()),
+    )
+    repository = IsaSpecRepository(cache_root=tmp_path / "cache")
+    repository._releases = {"fixture": entry}
+    repository._default_release = "fixture"
+
+    descriptor = repository.resolve("gfx1200")
+
+    assert descriptor.release == "fixture"
+    assert descriptor.family == "rdna4"
+    assert descriptor.sha256 == hashlib.sha256(payload).hexdigest()

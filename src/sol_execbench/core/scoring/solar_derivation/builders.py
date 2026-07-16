@@ -49,7 +49,15 @@ def build_solar_derivation_evidence(
     """Build internal SOLAR derivation evidence from canonical problem inputs."""
     graph = build_bound_graph(definition, workload)
     estimates = resolve_architecture_profile_paths(
-        estimate_bound_work(graph), hardware_model.architecture
+        estimate_bound_work(graph),
+        hardware_model.architecture,
+        declared_profile_keys={
+            profile.key
+            for profile in (
+                *hardware_model.compute_profiles,
+                *hardware_model.memory_profiles,
+            )
+        },
     )
     return derive_solar_derivation_evidence(
         definition,

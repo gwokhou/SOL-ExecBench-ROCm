@@ -55,6 +55,7 @@ def _static_evidence_summary(
         "reason_code": sidecar.reason_code,
         "artifact_count": len(sidecar.artifacts),
         "tool_run_count": len(sidecar.tool_runs),
+        "isa_analysis_count": len(sidecar.isa_analyses),
         "metadata_present": classification.metadata_present,
         "disassembly_present": classification.disassembly_present,
         "detected_architectures": classification.detected_architectures,
@@ -139,6 +140,7 @@ def _collect_static_evidence_for_cli(
             artifacts=artifact_sidecar.artifacts,
             evidence_directory=evidence_dir,
             sidecar_base_directory=evidence_dir,
+            analyze_isa=True,
         )
     except Exception as exc:
         sidecar = build_static_kernel_evidence_failed()

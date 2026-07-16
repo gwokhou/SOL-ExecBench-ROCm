@@ -12,6 +12,7 @@ from pathlib import Path
 import platform
 import subprocess
 
+from sol_execbench.core.process.subprocesses import run_in_process_group
 from sol_execbench.tools.amd_isa.errors import IsaHelperBuildError
 from sol_execbench.tools.amd_isa.repository import _cache_root, _file_lock
 
@@ -57,7 +58,7 @@ def ensure_helper(cache_root: Path | None = None) -> Path:
             return executable
         source_dir = _resource_path("native")
         try:
-            configure = subprocess.run(
+            configure = run_in_process_group(
                 [
                     "cmake",
                     "-S",
@@ -66,24 +67,24 @@ def ensure_helper(cache_root: Path | None = None) -> Path:
                     str(build_dir),
                     "-DCMAKE_BUILD_TYPE=Release",
                 ],
-                check=False,
-                capture_output=True,
-                text=True,
+                timeout=120,
             )
             if configure.returncode != 0:
-                raise IsaHelperBuildError(configure.stderr or configure.stdout)
-            build = subprocess.run(
+                raise IsaHelperBuildError(
+                    (configure.stderr or configure.stdout)[-4000:]
+                )
+            build = run_in_process_group(
                 ["cmake", "--build", str(build_dir), "--parallel"],
-                check=False,
-                capture_output=True,
-                text=True,
+                timeout=300,
             )
             if build.returncode != 0:
-                raise IsaHelperBuildError(build.stderr or build.stdout)
+                raise IsaHelperBuildError((build.stderr or build.stdout)[-4000:])
         except FileNotFoundError as exc:
             raise IsaHelperBuildError(
                 "cmake and a C++14 compiler are required for AMD ISA support"
             ) from exc
+        except subprocess.TimeoutExpired as exc:
+            raise IsaHelperBuildError("AMD ISA helper build timed out") from exc
         if not executable.is_file() or not os.access(executable, os.X_OK):
             raise IsaHelperBuildError(
                 "AMD ISA helper build finished without an executable"

@@ -6,8 +6,10 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import select
+import signal
 import subprocess
 import threading
 from typing import Any, Mapping
@@ -90,7 +92,12 @@ class AmdIsa:
     """A loaded ISA specification with decoder and explorer namespaces."""
 
     def __init__(
-        self, helper: Path, spec_path: Path, *, timeout_seconds: float = 120.0
+        self,
+        helper: Path,
+        spec_path: Path,
+        *,
+        timeout_seconds: float = 120.0,
+        provenance: Mapping[str, Any] | None = None,
     ) -> None:
         self._process = subprocess.Popen(
             [str(helper)],
@@ -99,14 +106,25 @@ class AmdIsa:
             stderr=subprocess.PIPE,
             text=True,
             bufsize=1,
+            start_new_session=True,
         )
         self._lock = threading.Lock()
         self._next_id = 1
         self._timeout_seconds = 30.0
         self.decoder = Decoder(self, "decoder")
         self.explorer = Explorer(self, "explorer")
-        self._call("hello", {})
-        self._provenance = self._call("load", {"spec_path": str(spec_path)})
+        try:
+            self._call("hello", {})
+            loaded = self._call("load", {"spec_path": str(spec_path)})
+        except BaseException:
+            self._terminate_process_group(signal.SIGTERM)
+            try:
+                self._process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                self._terminate_process_group(signal.SIGKILL)
+                self._process.wait(timeout=2)
+            raise
+        self._provenance = {**dict(provenance or {}), **dict(loaded)}
         self._timeout_seconds = timeout_seconds
 
     @property
@@ -166,17 +184,23 @@ class AmdIsa:
         if self._process.poll() is None:
             try:
                 self._call("shutdown", {})
-            except IsaProtocolError:
+            except (IsaDecodeError, IsaProtocolError):
                 pass
             try:
                 self._process.wait(timeout=2)
             except subprocess.TimeoutExpired:
-                self._process.terminate()
+                self._terminate_process_group(signal.SIGTERM)
                 try:
                     self._process.wait(timeout=2)
                 except subprocess.TimeoutExpired:
-                    self._process.kill()
+                    self._terminate_process_group(signal.SIGKILL)
                     self._process.wait(timeout=2)
+
+    def _terminate_process_group(self, signal_number: int) -> None:
+        try:
+            os.killpg(self._process.pid, signal_number)
+        except ProcessLookupError:
+            pass
 
     def __enter__(self) -> AmdIsa:
         return self
@@ -194,8 +218,15 @@ def open_isa(
 ) -> AmdIsa:
     """Open one architecture's specification, building/downloading on demand."""
     repository = repository or IsaSpecRepository()
+    descriptor = repository.resolve(architecture, allow_download=allow_download)
     return AmdIsa(
         ensure_helper(repository.cache_root),
-        repository.spec_path(architecture, allow_download=allow_download),
+        descriptor.path,
         timeout_seconds=timeout_seconds,
+        provenance={
+            "architecture_target": descriptor.architecture,
+            "family": descriptor.family,
+            "release": descriptor.release,
+            "spec_sha256": descriptor.sha256,
+        },
     )

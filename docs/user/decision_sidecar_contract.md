@@ -28,7 +28,7 @@ The Decision sidecar consumes facts from the diagnostic data sidecars:
   (`sol_execbench.environment_snapshot.v2` with packaged
   `sol_execbench.arch_capability_budget.v1` budgets).
 - `StaticKernelEvidenceSidecar.footprints[]` and `kernels[].footprint` —
-  per-kernel resource usage (`sol_execbench.static_kernel_evidence.v2`).
+  per-kernel resource usage (`sol_execbench.static_kernel_evidence.v3`).
 - Optional `profile_summary.v2` runtime bottleneck hints and `agent_feedback.v2`
   aggregate items, after each passes its own freshness and authority checks.
 

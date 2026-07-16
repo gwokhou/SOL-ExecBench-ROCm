@@ -13,6 +13,9 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import shutil
+import tempfile
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
@@ -32,6 +35,7 @@ from sol_execbench.core.scoring.hardware_calibration.environment import (
 )
 from sol_execbench.core.scoring.hardware_calibration.models import (
     CALIBRATION_SCHEMA_VERSION,
+    HardwareCalibrationArtifact,
     hardware_calibration_artifact_from_dict,
 )
 from sol_execbench.core.scoring.hardware_calibration.shape_aware_roofline import (
@@ -43,6 +47,7 @@ from sol_execbench.core.scoring.hardware_profile_requirements import (
     hardware_profile_requirements_from_dict,
 )
 from sol_execbench.core.integrity.checksums import sha256_file
+from sol_execbench.core.data.json_utils import atomic_write_json_value
 from sol_execbench.core.scoring.hardware_calibration.rocprof_compute import (
     default_profiler_discovery,
     ensure_profiler_environment,
@@ -57,10 +62,7 @@ from sol_execbench.cli.commands.fusion_validation import fusion_cli
 
 
 def _write_json(path: Path, payload: dict[str, object]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    atomic_write_json_value(path, payload)
 
 
 def _rejected(path: Path, reason: str) -> None:
@@ -158,6 +160,7 @@ def _calibrate(
                     requirements.payload_sha256 if requirements else None
                 ),
                 source_revision=source_revision,
+                allow_isa_download=not offline,
             )
         )
     except (RuntimeError, ValueError) as exc:
@@ -173,11 +176,109 @@ def _calibrate(
         raise CliFailure(
             reason, code="environment_unavailable", exit_code=EXIT_UNAVAILABLE
         )
+    calibration_artifact = _persist_calibration_isa_artifacts(
+        calibration_artifact, output
+    )
     _write_json(output, calibration_artifact.to_dict())
     return CliResult(
         data={"validation_status": calibration_artifact.validation_status},
         artifacts=(artifact(output, "json_file"),),
     )
+
+
+def _persist_calibration_isa_artifacts(
+    calibration: HardwareCalibrationArtifact, output: Path
+) -> HardwareCalibrationArtifact:
+    """Publish verified ISA artifacts and bind relative paths into calibration."""
+
+    verified = [
+        candidate
+        for candidate in calibration.candidates
+        if candidate.isa_validation is not None
+        and candidate.isa_validation.status == "verified"
+    ]
+    if not verified:
+        return calibration
+    output.parent.mkdir(parents=True, exist_ok=True)
+    target = output.with_name(f"{output.name}.artifacts")
+    staging = Path(tempfile.mkdtemp(prefix=f".{target.name}-", dir=output.parent))
+    updated = []
+    try:
+        for candidate in calibration.candidates:
+            validation = candidate.isa_validation
+            if validation is None or validation.status != "verified":
+                updated.append(candidate)
+                continue
+            candidate_dir = staging / candidate.key.replace(".", "_")
+            candidate_dir.mkdir(parents=True)
+            code_source = Path(validation.code_object_path or "")
+            disassembly_source = Path(validation.disassembly_path or "")
+            if not code_source.is_file() or not disassembly_source.is_file():
+                raise RuntimeError("verified ISA calibration artifacts are missing")
+            code_target = candidate_dir / f"{validation.architecture}.hsaco"
+            disassembly_target = candidate_dir / f"{validation.architecture}.isa.txt"
+            shutil.copy2(code_source, code_target)
+            shutil.copy2(disassembly_source, disassembly_target)
+            relative_root = Path(target.name) / candidate_dir.relative_to(staging)
+            updated.append(
+                replace(
+                    candidate,
+                    isa_validation=replace(
+                        validation,
+                        code_object_path=(relative_root / code_target.name).as_posix(),
+                        disassembly_path=(
+                            relative_root / disassembly_target.name
+                        ).as_posix(),
+                    ),
+                )
+            )
+        if target.exists():
+            shutil.rmtree(target)
+        staging.replace(target)
+    except Exception:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+    return replace(
+        calibration,
+        candidates=tuple(updated),
+        payload_sha256=None,
+    )
+
+
+def _validate_required_isa_evidence(
+    calibration: HardwareCalibrationArtifact,
+    calibration_path: Path,
+    required_profile_keys: set[str],
+) -> None:
+    for candidate in calibration.candidates:
+        if candidate.key not in required_profile_keys or not candidate.key.endswith(
+            (".mfma", ".wmma")
+        ):
+            continue
+        validation = candidate.isa_validation
+        if validation is None or validation.status != "verified":
+            raise ValueError(
+                f"calibration ISA evidence is not verified: {candidate.key}"
+            )
+        for relative_path, expected_sha256 in (
+            (validation.code_object_path, validation.code_object_sha256),
+            (validation.disassembly_path, validation.disassembly_sha256),
+        ):
+            if relative_path is None or expected_sha256 is None:
+                raise ValueError("verified ISA evidence is missing an artifact binding")
+            artifact_reference = Path(relative_path)
+            if artifact_reference.is_absolute() or ".." in artifact_reference.parts:
+                raise ValueError("calibration ISA artifact path must be relative")
+            artifact_path = (calibration_path.parent / artifact_reference).resolve()
+            if not artifact_path.is_relative_to(calibration_path.parent.resolve()):
+                raise ValueError("calibration ISA artifact escapes its evidence root")
+            if (
+                not artifact_path.is_file()
+                or sha256_file(artifact_path) != expected_sha256
+            ):
+                raise ValueError(
+                    f"calibration ISA artifact checksum mismatch: {relative_path}"
+                )
 
 
 @hardware_model_cli.command("build")
@@ -282,6 +383,9 @@ def _build(
                 "calibration missing required architecture matrix evidence: "
                 + ", ".join(sorted(missing_matrix_keys))
             )
+        _validate_required_isa_evidence(
+            calibration, calibration_path, required_profile_keys
+        )
         _validate_calibration_authority(
             calibration,
             discover_gpu(int(calibration.metadata["device"])),

@@ -1,5 +1,5 @@
 {
-  "schema_version": "sol_execbench.static_kernel_evidence.v2",
+  "schema_version": "sol_execbench.static_kernel_evidence.v3",
   "status": "collected",
   "reason_code": "static_evidence_collected",
   "diagnostic_only": true,

@@ -6,6 +6,7 @@
 from sol_execbench.core.scoring.hardware_calibration.models import (
     CALIBRATION_SCHEMA_VERSION,
     CalibrationCandidate,
+    CalibrationIsaValidation,
     HardwareCalibrationArtifact,
     hardware_calibration_artifact_from_dict,
 )
@@ -27,6 +28,7 @@ from sol_execbench.core.scoring.hardware_calibration.shape_aware_roofline import
 __all__ = [
     "CALIBRATION_SCHEMA_VERSION",
     "CalibrationCandidate",
+    "CalibrationIsaValidation",
     "HardwareCalibrationArtifact",
     "ensure_profiler_environment",
     "hardware_calibration_artifact_from_dict",

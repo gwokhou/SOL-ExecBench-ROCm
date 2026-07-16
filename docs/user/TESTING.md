@@ -483,4 +483,4 @@ uv run pytest tests/sol_execbench/core/scoring/hardware_calibration \
 ```
 
 In a live calibration report, `unavailable` means an explicit architecture-aware capability check proved that the exact path is unsupported.
-`unknown` means support could not be determined reliably; it includes compiler, runtime, output, correctness, and stability failures.
+`unknown` means support could not be determined reliably; it includes compiler, runtime, output, correctness, and stability failures. Matrix candidates additionally carry `isa_validation`: `verified` binds an exact instruction match, extracted code object, disassembly, and pinned ISA-spec provenance. The calibration CLI rejects required matrix candidates with unavailable or failed ISA validation.

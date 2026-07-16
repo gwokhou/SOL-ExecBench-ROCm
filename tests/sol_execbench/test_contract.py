@@ -64,7 +64,7 @@ SCHEMA_IDS_NOT_CAPABILITIES = {
     "sol_execbench.official_score_evidence.v1",
     "sol_execbench.agent_feedback.v2",
     "sol_execbench.profile_summary.v2",
-    "sol_execbench.static_kernel_evidence.v2",
+    "sol_execbench.static_kernel_evidence.v3",
     "sol_execbench.environment_snapshot.v2",
     "sol_execbench.arch_capability_budget.v1",
 }

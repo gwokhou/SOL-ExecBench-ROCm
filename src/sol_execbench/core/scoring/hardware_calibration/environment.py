@@ -122,17 +122,24 @@ class ArchitectureAdapter:
         return self.candidates + self.diagnostic_candidates
 
 
-def _matrix_key(family: str, dtype: str = "bf16") -> CalibrationProfileKey:
-    path = "wmma" if family == "gfx12" else "mfma"
+def _matrix_key(
+    family: str, dtype: str = "bf16", *, matrix_unit: str | None = None
+) -> CalibrationProfileKey:
+    path = matrix_unit or ("wmma" if family == "gfx12" else "mfma")
     return CalibrationProfileKey("compute", "matrix", dtype, dtype, path)
 
 
-def _adapter(family: str, *, supports_clock_lock: bool = False) -> ArchitectureAdapter:
+def _adapter(
+    family: str,
+    *,
+    supports_clock_lock: bool = False,
+    matrix_unit: str | None = None,
+) -> ArchitectureAdapter:
     candidates = [
         CalibrationProfileKey("compute", "vector", "fp32", "fp32", "portable"),
         CalibrationProfileKey("memory", "stream_copy", "fp32", "fp32", "portable"),
         CalibrationProfileKey("compute", "vector", "fp32", "fp32", family),
-        _matrix_key(family),
+        _matrix_key(family, matrix_unit=matrix_unit),
         CalibrationProfileKey("memory", "stream_copy", "fp32", "fp32", family),
     ]
     diagnostic_candidates: list[CalibrationProfileKey] = []
@@ -146,7 +153,7 @@ def _adapter(family: str, *, supports_clock_lock: bool = False) -> ArchitectureA
         diagnostic_candidates.append(
             CalibrationProfileKey("compute", "vector", "fp16", "fp16", family)
         )
-        candidates.append(_matrix_key(family, "fp16"))
+        candidates.append(_matrix_key(family, "fp16", matrix_unit=matrix_unit))
         diagnostic_candidates.append(
             CalibrationProfileKey("memory", "stream_copy", "bf16", "bf16", family)
         )
@@ -183,10 +190,18 @@ _ADAPTERS = {
 }
 
 
-def adapter_for(architecture: str) -> ArchitectureAdapter:
+def adapter_for(
+    architecture: str, *, matrix_unit: str | None = None
+) -> ArchitectureAdapter:
     """Return the declared calibration adapter for a supported AMD ISA family."""
     normalized = architecture.lower()
     for prefix, adapter in _ADAPTERS.items():
         if normalized.startswith(prefix):
-            return adapter
+            if matrix_unit is None:
+                return adapter
+            return _adapter(
+                prefix,
+                supports_clock_lock=adapter.supports_clock_lock,
+                matrix_unit=matrix_unit,
+            )
     raise ValueError(f"unsupported GPU architecture: {architecture}")

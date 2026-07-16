@@ -10,14 +10,18 @@ from datetime import datetime
 import hashlib
 import json
 from math import isfinite
-from typing import Any, Mapping, TypeGuard
+import re
+from typing import Any, Mapping, TypeGuard, cast
 
 from sol_execbench.core.scoring.hardware_calibration.statistics import (
     select_conservative_value,
 )
 
-CALIBRATION_SCHEMA_VERSION = "sol_execbench.hardware_calibration.v2"
+CALIBRATION_SCHEMA_VERSION = "sol_execbench.hardware_calibration.v3"
 CALIBRATION_CANDIDATE_STATES = frozenset({"measured", "unavailable", "unknown"})
+ISA_VALIDATION_STATES = frozenset(
+    {"verified", "unavailable", "failed", "not_applicable"}
+)
 
 
 def _is_json_number(value: object) -> TypeGuard[int | float]:
@@ -40,6 +44,57 @@ def _require_json_number(value: object, field_name: str) -> float:
 
 
 @dataclass(frozen=True)
+class CalibrationIsaValidation:
+    """ISA proof bound to one compiled calibration candidate."""
+
+    status: str
+    architecture: str
+    expected_instruction: str | None = None
+    expected_subgroup: str | None = None
+    matched_instruction_count: int = 0
+    code_object_path: str | None = None
+    code_object_sha256: str | None = None
+    disassembly_path: str | None = None
+    disassembly_sha256: str | None = None
+    spec_provenance: Mapping[str, str] = field(default_factory=dict)
+    reason_code: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.status not in ISA_VALIDATION_STATES:
+            raise ValueError("invalid ISA validation status")
+        if not self.architecture:
+            raise ValueError("ISA validation architecture must be non-empty")
+        if self.matched_instruction_count < 0:
+            raise ValueError("ISA matched instruction count must be non-negative")
+        if self.status == "verified":
+            if re.fullmatch(r"gfx[0-9a-z]+", self.architecture) is None:
+                raise ValueError("verified ISA validation requires a gfx architecture")
+            if not self.expected_instruction or self.matched_instruction_count <= 0:
+                raise ValueError(
+                    "verified ISA validation requires a matched instruction"
+                )
+            if not self.code_object_sha256 or not self.disassembly_sha256:
+                raise ValueError("verified ISA validation requires artifact checksums")
+        elif self.status in {"unavailable", "failed"} and not self.reason_code:
+            raise ValueError("failed ISA validation requires a reason code")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "status": self.status,
+            "architecture": self.architecture,
+            "expected_instruction": self.expected_instruction,
+            "expected_subgroup": self.expected_subgroup,
+            "matched_instruction_count": self.matched_instruction_count,
+            "code_object_path": self.code_object_path,
+            "code_object_sha256": self.code_object_sha256,
+            "disassembly_path": self.disassembly_path,
+            "disassembly_sha256": self.disassembly_sha256,
+            "spec_provenance": dict(self.spec_provenance),
+            "reason_code": self.reason_code,
+        }
+
+
+@dataclass(frozen=True)
 class CalibrationCandidate:
     """One calibration capability, including its explicit evidence state."""
 
@@ -51,6 +106,7 @@ class CalibrationCandidate:
     reason_code: str | None = None
     retained_samples: tuple[float, ...] = ()
     retained_spread: float | None = None
+    isa_validation: CalibrationIsaValidation | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.key, str):
@@ -122,6 +178,11 @@ class CalibrationCandidate:
             "reason_code": self.reason_code,
             "retained_samples": list(self.retained_samples),
             "retained_spread": self.retained_spread,
+            "isa_validation": (
+                self.isa_validation.to_dict()
+                if self.isa_validation is not None
+                else None
+            ),
         }
 
 
@@ -231,6 +292,7 @@ def calibration_candidate_from_dict(payload: Mapping[str, Any]) -> CalibrationCa
         "reason_code",
         "retained_samples",
         "retained_spread",
+        "isa_validation",
     }
     _require_exact_keys(payload, expected, "calibration candidate")
     if not isinstance(payload["samples"], list) or not isinstance(
@@ -261,9 +323,75 @@ def calibration_candidate_from_dict(payload: Mapping[str, Any]) -> CalibrationCa
     retained_spread = payload["retained_spread"]
     if retained_spread is not None:
         retained_spread = _require_json_number(retained_spread, "retained_spread")
+    isa_validation = _isa_validation_from_dict(payload["isa_validation"])
     return CalibrationCandidate(
-        key, state, value, unit, samples, reason_code, retained_samples, retained_spread
+        key,
+        state,
+        value,
+        unit,
+        samples,
+        reason_code,
+        retained_samples,
+        retained_spread,
+        isa_validation,
     )
+
+
+def _isa_validation_from_dict(value: object) -> CalibrationIsaValidation | None:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise ValueError("candidate isa_validation must be an object or null")
+    payload = cast(Mapping[str, object], value)
+    expected = {
+        "status",
+        "architecture",
+        "expected_instruction",
+        "expected_subgroup",
+        "matched_instruction_count",
+        "code_object_path",
+        "code_object_sha256",
+        "disassembly_path",
+        "disassembly_sha256",
+        "spec_provenance",
+        "reason_code",
+    }
+    _require_exact_keys(payload, expected, "candidate isa_validation")
+    provenance = payload["spec_provenance"]
+    if not isinstance(provenance, Mapping) or any(
+        not isinstance(key, str) or not isinstance(item, str)
+        for key, item in provenance.items()
+    ):
+        raise ValueError("ISA spec provenance must contain string pairs")
+    return CalibrationIsaValidation(
+        status=_require_json_string(payload["status"], "isa_validation.status"),
+        architecture=_require_json_string(
+            payload["architecture"], "isa_validation.architecture"
+        ),
+        expected_instruction=_optional_string(payload["expected_instruction"]),
+        expected_subgroup=_optional_string(payload["expected_subgroup"]),
+        matched_instruction_count=_require_non_negative_int(
+            payload["matched_instruction_count"], "matched_instruction_count"
+        ),
+        code_object_path=_optional_string(payload["code_object_path"]),
+        code_object_sha256=_optional_string(payload["code_object_sha256"]),
+        disassembly_path=_optional_string(payload["disassembly_path"]),
+        disassembly_sha256=_optional_string(payload["disassembly_sha256"]),
+        spec_provenance=dict(cast(Mapping[str, str], provenance)),
+        reason_code=_optional_string(payload["reason_code"]),
+    )
+
+
+def _optional_string(value: object) -> str | None:
+    if value is None:
+        return None
+    return _require_json_string(value, "optional string")
+
+
+def _require_non_negative_int(value: object, field_name: str) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise ValueError(f"{field_name} must be a non-negative integer")
+    return value
 
 
 def hardware_calibration_artifact_from_dict(
@@ -280,8 +408,8 @@ def hardware_calibration_artifact_from_dict(
         "validation_status",
         "payload_sha256",
     }
-    # v1 artifacts written before checksum support remain parseable diagnostics;
-    # the model-build authority boundary separately requires the checksum.
+    # Pre-checksum diagnostics remain parseable; the model-build authority
+    # boundary separately requires the checksum field.
     extras = sorted(set(payload) - expected)
     missing = sorted((expected - {"payload_sha256"}) - set(payload))
     if extras or missing:

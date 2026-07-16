@@ -75,13 +75,13 @@ def test_footprint_round_trip():
     assert rebuilt.sgpr_used == 16
 
 
-def test_valid_footprint_fixture_loads_as_v2_sidecar():
+def test_valid_footprint_fixture_loads_as_v3_sidecar():
     payload = json.loads(
         (FIXTURE_DIR / "valid.static-footprint.json").read_text(encoding="utf-8")
     )
     sidecar = StaticKernelEvidenceSidecar.model_validate(payload)
 
-    assert sidecar.schema_version == "sol_execbench.static_kernel_evidence.v2"
+    assert sidecar.schema_version == "sol_execbench.static_kernel_evidence.v3"
     assert len(sidecar.footprints) == 1
     footprint = sidecar.footprints[0]
     assert footprint.vgpr_used == 32

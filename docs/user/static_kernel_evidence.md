@@ -49,7 +49,7 @@ timing, scoring, paper-parity, leaderboard, or default benchmark semantics.
 
 ## What The Sidecar Contains
 
-The sidecar schema is `sol_execbench.static_kernel_evidence.v2`. It contains:
+The sidecar schema is `sol_execbench.static_kernel_evidence.v3`. It contains:
 
 - diagnostic-only authority flags
 - aggregate status and reason code
@@ -59,6 +59,9 @@ The sidecar schema is `sol_execbench.static_kernel_evidence.v2`. It contains:
 - routed `llvm-objdump`, `readelf`, and `roc-objdump` tool-run records
 - bounded stdout/stderr tails and bounded raw output artifact paths
 - conservative metadata and disassembly presence flags
+- `isa_analyses[]` records decoded instruction counts, functional-group and
+  subgroup counts, observed `mfma`/`wmma` units, code-object/disassembly
+  checksums, and the exact pinned ISA specification provenance
 - per-kernel `footprints[]` resource usage (VGPR/SGPR/LDS/scratch/spill/wavefront)
   parsed from routed `roc-objdump --resource-usage` output, or — on ROCm 7.x
   where `roc-objdump` is absent — from the code object's `NT_AMDGPU_METADATA`
@@ -66,7 +69,14 @@ The sidecar schema is `sol_execbench.static_kernel_evidence.v2`. It contains:
 - a compact `summary` section for human-facing reporting
 
 `llvm-objdump`, `readelf`, and `roc-objdump` are routed through the toolchain
-registry. `rga` remains a planned route and is not yet wired as an extractor.
+registry. In `auto` mode the AMD ISA integration also extracts the exact target
+code object from a HIP fat binary, disassembles it, and decodes it using AMD's
+machine-readable XML. Its helper and pinned XML are installed into the user
+cache on first use. If the helper, XML, network, or ROCm fat-binary tools are
+unavailable, collection remains diagnostic and the aggregate status becomes
+`partial` rather than failing the benchmark. Set
+`SOL_EXECBENCH_AMD_ISA_OFFLINE=1` to forbid ISA downloads. `rga` remains a
+planned route and is not yet wired as an extractor.
 
 ## Claim Boundaries
 
@@ -116,5 +126,6 @@ The static evidence implementation has CPU-safe tests for:
 - fake routed `llvm-objdump` and `readelf` extractors
 - unavailable, unsupported, failed, partial, timeout, and skipped outcomes
 - CLI sidecar path and summary writing
+- machine-readable ISA aggregation and soft-unavailable behavior
 
 Live GPU validation is recorded separately when the environment supports it.

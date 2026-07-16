@@ -302,6 +302,23 @@ def extract_amdgpu_footprints(
     return footprints
 
 
+def extract_amdgpu_targets(data: bytes) -> tuple[str, ...]:
+    """Return normalized gfx targets declared by embedded AMDGPU metadata."""
+
+    targets: set[str] = set()
+    for metadata in _iter_amdgpu_metadata(data):
+        target = metadata.get("amdhsa.target")
+        if not isinstance(target, str):
+            continue
+        match = next(
+            (part for part in target.lower().split("-") if part.startswith("gfx")),
+            None,
+        )
+        if match is not None:
+            targets.add(match.split(":", maxsplit=1)[0])
+    return tuple(sorted(targets))
+
+
 @dataclass(frozen=True)
 class AmdgpuKernelMetadata:
     """Resource fields for one named kernel in an AMDGPU code object."""

@@ -317,7 +317,9 @@ def _analyze_authority_workload(
         with _workload_analysis_timeout(analysis_timeout_seconds):
             graph = build_authority_bound_graph(definition, workload)
             estimates = resolve_architecture_profile_paths(
-                estimate_bound_work(graph), architecture
+                estimate_bound_work(graph),
+                architecture,
+                declared_profile_keys=declared_profile_keys,
             )
             groups = build_fusion_groups(graph, estimates, capability_budget=budget)
     except Exception as exc:

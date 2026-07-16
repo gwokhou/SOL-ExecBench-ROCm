@@ -11,6 +11,7 @@ from sol_execbench.core.bench.static_kernel.evidence_models import (
     StaticKernelEvidenceArtifact,
     StaticKernelEvidenceClassification,
     StaticKernelEvidenceKernel,
+    StaticIsaAnalysis,
     StaticKernelEvidenceReasonCode,
     StaticKernelEvidenceSidecar,
     StaticKernelEvidenceSourceReference,
@@ -30,6 +31,7 @@ def build_static_kernel_evidence_sidecar(
     tool_runs: Sequence[StaticKernelEvidenceToolRun] = (),
     kernels: Sequence[StaticKernelEvidenceKernel] = (),
     footprints: Sequence[StaticResourceFootprint] = (),
+    isa_analyses: Sequence[StaticIsaAnalysis] = (),
     warnings: Sequence[StaticKernelEvidenceWarning] = (),
     source_references: Sequence[StaticKernelEvidenceSourceReference] = (),
 ) -> StaticKernelEvidenceSidecar:
@@ -43,6 +45,7 @@ def build_static_kernel_evidence_sidecar(
         tool_runs=list(tool_runs),
         kernels=list(kernels),
         footprints=list(footprints),
+        isa_analyses=list(isa_analyses),
         warnings=list(warnings),
         source_references=list(source_references),
     )

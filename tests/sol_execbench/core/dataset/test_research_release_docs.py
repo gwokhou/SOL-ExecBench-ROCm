@@ -314,7 +314,7 @@ def test_static_kernel_evidence_docs_define_usage_and_boundaries():
     for required in (
         "--static-evidence auto",
         "--static-evidence none",
-        "sol_execbench.static_kernel_evidence.v2",
+        "sol_execbench.static_kernel_evidence.v3",
         "collected",
         "partial",
         "unavailable",

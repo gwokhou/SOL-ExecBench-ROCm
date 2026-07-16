@@ -17,6 +17,10 @@ from sol_execbench.core.scoring.hardware_calibration.hip_probe import (
 from sol_execbench.core.scoring.hardware_calibration.rocprof_compute import (
     ProfilerEnvironment,
 )
+from sol_execbench.core.platform.isa_validation import (
+    IsaCapabilityReport,
+    IsaSpecProvenance,
+)
 
 
 def _probe() -> HipProbe:
@@ -114,6 +118,23 @@ def test_missing_clock_adapter_is_collected_but_provisional() -> None:
 
 def test_request_without_injected_probe_uses_default_backend(monkeypatch) -> None:
     probe = _probe()
+    report = IsaCapabilityReport(
+        architecture="gfx942",
+        supported_instructions=("V_MFMA_F32_16X16X16_BF16",),
+        matrix_units=("mfma",),
+        provenance=IsaSpecProvenance(
+            architecture="gfx942",
+            family="cdna3",
+            release="test",
+            spec_sha256="a" * 64,
+            decoder_version="test",
+            specification_architecture="gfx942",
+        ),
+    )
+    monkeypatch.setattr(
+        "sol_execbench.core.scoring.hardware_calibration.builder.inspect_isa_requirements",
+        lambda *_, **__: report,
+    )
     monkeypatch.setattr(
         "sol_execbench.core.scoring.hardware_calibration.builder.default_hip_probe",
         lambda **_: probe,
@@ -124,6 +145,12 @@ def test_request_without_injected_probe_uses_default_backend(monkeypatch) -> Non
     )
 
     assert all(candidate.state == "measured" for candidate in artifact.candidates)
+    assert artifact.metadata["isa_budget_audit"] == {
+        "status": "consistent",
+        "architecture": "gfx942",
+        "matrix_unit": "mfma",
+        "matrix_dtypes": ["bf16"],
+    }
 
 
 def test_require_clock_lock_rejects_missing_adapter() -> None:

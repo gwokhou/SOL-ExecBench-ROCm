@@ -66,8 +66,8 @@ Concrete artifact schema versions are separate from contract capability keys.
 &lt;trace&gt;.agent-feedback.json. `profile_summary.sidecar` currently emits
 `sol_execbench.profile_summary.v2` as &lt;trace&gt;.profile-summary.json when a
 trace output path is available. Static kernel evidence emits the concrete
-`sol_execbench.static_kernel_evidence.v2` sidecar schema (now carrying
-per-kernel `footprints[]` resource usage) behind the `static_kernel.evidence`
+`sol_execbench.static_kernel_evidence.v3` sidecar schema (now carrying
+per-kernel `footprints[]` resource usage and diagnostic `isa_analyses[]`) behind the `static_kernel.evidence`
 capability key. `environment_budget.sidecar` advertises the `capability_budgets[]`
 derived from a run's detected gfx targets, sourced from upstream ISA references
 (opengpu/rocm-systems) and emitted under `sol_execbench.environment_snapshot.v2`
