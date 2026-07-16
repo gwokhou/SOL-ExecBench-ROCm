@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from sol_execbench.core.data.json_utils import atomic_write_json_value
 from sol_execbench.core.scoring.baseline_artifact import (
     ScoringBaselineArtifact,
     ScoringBaselineEntry,
@@ -162,7 +163,7 @@ def write_release_baseline_outputs(
     bundle_path = Path(bundle_path)
     if baseline_path.resolve() == bundle_path.resolve():
         raise ValueError("baseline_path and bundle_path must be different paths")
-    _atomic_write_json(baseline_path, baseline.to_dict())
+    atomic_write_json_value(baseline_path, baseline.to_dict())
     written_bundle = ReleaseBaselineBundle(
         release=bundle.release,
         suite_manifest_ref=bundle.suite_manifest_ref,
@@ -314,16 +315,6 @@ def _sha256_json(payload: object) -> str:
             payload, sort_keys=True, separators=(",", ":"), allow_nan=False
         ).encode()
     ).hexdigest()
-
-
-def _atomic_write_json(path: Path, payload: object) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.tmp")
-    temporary.write_text(
-        json.dumps(payload, indent=2, sort_keys=True, allow_nan=False) + "\n",
-        encoding="utf-8",
-    )
-    temporary.replace(path)
 
 
 def _atomic_write_bundle(bundle: ReleaseBaselineBundle, path: Path) -> None:

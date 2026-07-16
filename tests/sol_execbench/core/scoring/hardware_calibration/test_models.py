@@ -5,9 +5,47 @@ import pytest
 
 from sol_execbench.core.scoring.hardware_calibration.models import (
     CalibrationCandidate,
+    CalibrationIsaValidation,
     HardwareCalibrationArtifact,
     hardware_calibration_artifact_from_dict,
 )
+
+
+def test_verified_isa_validation_round_trips_with_candidate() -> None:
+    validation = CalibrationIsaValidation(
+        status="verified",
+        architecture="gfx1200",
+        expected_instruction="V_WMMA_F32_16X16X16_BF16",
+        expected_subgroup="WMMA",
+        matched_instruction_count=32,
+        code_object_path="calibration.json.artifacts/wmma/gfx1200.hsaco",
+        code_object_sha256="a" * 64,
+        disassembly_path="calibration.json.artifacts/wmma/gfx1200.isa.txt",
+        disassembly_sha256="b" * 64,
+        spec_provenance={"release": "fixture"},
+    )
+    candidate = CalibrationCandidate(
+        key="compute.matrix.bf16.bf16.wmma",
+        state="measured",
+        value=5.0,
+        unit="TFLOP/s",
+        samples=(5.0,) * 7,
+        isa_validation=validation,
+    )
+
+    assert candidate.to_dict()["isa_validation"]["matched_instruction_count"] == 32
+
+
+def test_verified_isa_validation_rejects_non_gfx_architecture() -> None:
+    with pytest.raises(ValueError, match="gfx architecture"):
+        CalibrationIsaValidation(
+            status="verified",
+            architecture="../escape",
+            expected_instruction="V_WMMA_F32_16X16X16_BF16",
+            matched_instruction_count=1,
+            code_object_sha256="a" * 64,
+            disassembly_sha256="b" * 64,
+        )
 
 
 def test_unknown_candidate_cannot_carry_a_value() -> None:
@@ -24,7 +62,7 @@ def test_unknown_candidate_cannot_carry_a_value() -> None:
 
 def _payload() -> dict[str, object]:
     return {
-        "schema_version": "sol_execbench.hardware_calibration.v2",
+        "schema_version": "sol_execbench.hardware_calibration.v3",
         "generated_at": "2026-07-10T00:00:00Z",
         "metadata": {
             "profile_requirements": {"required_profile_keys": ["compute.fp32.vector"]},
@@ -40,6 +78,7 @@ def _payload() -> dict[str, object]:
                 "reason_code": None,
                 "retained_samples": [5.02, 5.01, 5.0],
                 "retained_spread": 0.004,
+                "isa_validation": None,
             }
         ],
         "collection_status": "collected",

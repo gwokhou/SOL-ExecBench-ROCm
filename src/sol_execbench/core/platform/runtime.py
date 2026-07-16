@@ -72,7 +72,10 @@ def resolve_rocm_tool(
     if root is None:
         return None
     candidate = root / "bin" / tool
-    return candidate if is_file(candidate) else None
+    if is_file(candidate):
+        return candidate
+    llvm_candidate = root / "lib" / "llvm" / "bin" / tool
+    return llvm_candidate if is_file(llvm_candidate) else None
 
 
 def resolve_rocm_tool_command(

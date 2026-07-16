@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from dataclasses import dataclass
 from importlib import resources
 import json
 import os
@@ -28,6 +29,17 @@ from sol_execbench.tools.amd_isa.errors import (
 _MAX_ARCHIVE_BYTES = 16 * 1024 * 1024
 _MAX_EXTRACTED_BYTES = 128 * 1024 * 1024
 _LOCK_NAME = ".lock"
+
+
+@dataclass(frozen=True)
+class IsaSpecDescriptor:
+    """Integrity-bound identity for one resolved ISA specification."""
+
+    architecture: str
+    family: str
+    release: str
+    path: Path
+    sha256: str
 
 
 def _cache_root() -> Path:
@@ -112,10 +124,35 @@ class IsaSpecRepository:
         release: str | None = None,
         allow_download: bool = True,
     ) -> Path:
+        return self.resolve(
+            architecture,
+            release=release,
+            allow_download=allow_download,
+        ).path
+
+    def resolve(
+        self,
+        architecture: str,
+        *,
+        release: str | None = None,
+        allow_download: bool = True,
+    ) -> IsaSpecDescriptor:
+        """Resolve an architecture to an integrity-bound local spec."""
+
+        selected_release = release or self._default_release
         family = self.architecture_family(architecture)
-        root = self.ensure(release=release, allow_download=allow_download)
-        entry = self._release(release or self._default_release)
-        return root / entry["files"][family]["name"]
+        root = self.ensure(
+            release=selected_release,
+            allow_download=allow_download,
+        )
+        spec = self._release(selected_release)["files"][family]
+        return IsaSpecDescriptor(
+            architecture=architecture.lower().split(":", maxsplit=1)[0].strip(),
+            family=family,
+            release=selected_release,
+            path=root / spec["name"],
+            sha256=str(spec["sha256"]),
+        )
 
     def ensure(
         self, *, release: str | None = None, allow_download: bool = True

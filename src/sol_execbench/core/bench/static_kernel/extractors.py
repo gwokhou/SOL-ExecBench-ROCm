@@ -44,6 +44,9 @@ from sol_execbench.core.bench.static_kernel.extractor_routing import (
     tool_run_from_route_decision as _tool_run_from_route_decision,
     toolchain_artifact_type_for_static_artifact,
 )
+from sol_execbench.core.bench.static_kernel.isa_analysis import (
+    collect_static_isa_analyses,
+)
 from sol_execbench.core.platform.environment import ProbeCompletedProcess
 from sol_execbench.core.platform.toolchain import (
     ProbeRunner,
@@ -99,6 +102,7 @@ def run_static_kernel_extractors(
     probe_runner: ProbeRunner | None = None,
     which: Which = shutil.which,
     registry: Sequence[ToolchainCapability] | None = None,
+    analyze_isa: bool = False,
 ) -> StaticKernelEvidenceSidecar:
     """Run routed bounded static extractors for persisted artifacts."""
 
@@ -222,6 +226,16 @@ def run_static_kernel_extractors(
         output_artifacts=output_artifacts,
     )
     tool_runs.extend(amdgpu_runs)
+    isa_analyses = []
+    if analyze_isa:
+        isa_analyses, isa_runs, isa_artifacts = collect_static_isa_analyses(
+            artifacts=artifacts,
+            evidence_root=evidence_root,
+            sidecar_base=sidecar_base,
+            timeout_seconds=max(timeout_seconds, 30.0),
+        )
+        tool_runs.extend(isa_runs)
+        output_artifacts.extend(isa_artifacts)
     all_artifacts = list(artifacts) + output_artifacts
     return build_static_kernel_evidence_sidecar(
         status=_aggregate_extractor_status(tool_runs),
@@ -229,6 +243,7 @@ def run_static_kernel_extractors(
         artifacts=all_artifacts,
         tool_runs=tool_runs,
         footprints=footprints,
+        isa_analyses=isa_analyses,
         warnings=warnings,
         classification=_classification_from_tool_runs(tool_runs, artifacts),
     )

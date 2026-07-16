@@ -68,7 +68,15 @@ def _build_amd_sol_bound_base(
     # applied after estimating/grouping so a failed export cannot erase the
     # operator-family and formula coverage needed to explain the block.
     estimates = resolve_architecture_profile_paths(
-        estimate_bound_work(source_graph), hardware_model.architecture
+        estimate_bound_work(source_graph),
+        hardware_model.architecture,
+        declared_profile_keys={
+            profile.key
+            for profile in (
+                *hardware_model.compute_profiles,
+                *hardware_model.memory_profiles,
+            )
+        },
     )
     groups = build_fusion_groups(source_graph, estimates, capability_budget=budget)
     group_bounds = tuple(

@@ -476,12 +476,21 @@ roots plus target and workload controls:
 
 ### Calibrated AMD hardware models
 
-`sol-execbench hardware model calibrate --device 0 --output calibration.json` records
-measured or explicitly unknown calibration evidence.  The optional `--offline` and
-`--no-auto-install` switches prevent managed ROCm Compute Profiler dependency
-installation; unavailable profiler data remains `unknown`.  Convert only a validated
-artifact with `hardware model build --calibration calibration.json --output model.json`,
-then select that external model explicitly in bound-generation workflows.
+`sol-execbench hardware model calibrate --device 0 --output calibration.json`
+records measured or explicitly unknown calibration evidence. Matrix candidates
+are a hard gate: the command first confirms the exact instruction against AMD's
+machine-readable ISA, then extracts and decodes the compiled target code object
+and requires the expected MFMA or WMMA instruction. Successful v3 calibration
+files bind the pinned ISA XML provenance and store companion HSACO/disassembly
+files under `<output-name>.artifacts/`.
+
+The optional `--offline` switch prevents both managed ROCm Compute Profiler
+installation and ISA XML downloads; the ISA cache must already be populated.
+`--no-auto-install` only disables profiler installation. Convert only a
+validated artifact with `hardware model build --calibration calibration.json
+--output model.json`; the build command rechecks the companion artifact
+checksums before accepting matrix profiles. Then select that external model
+explicitly in bound-generation workflows.
 
 | `--temp-dir` | Parent directory for profiler staging directories. |
 | `--resume`, `--no-resume` | Resume from existing sidecars and manifests; enabled by default. |
@@ -506,6 +515,11 @@ imports have no build or network side effect. Set
 `SOL_EXECBENCH_AMD_ISA_OFFLINE=1` to require a pre-populated cache. Missing
 tools, a missing cache, or failed integrity checks produce explicit tool-layer
 errors rather than fabricated ISA capability claims.
+
+Static evidence `auto` mode uses this layer opportunistically. Explicit hardware
+calibration uses it as a required preflight and post-compile validation gate.
+The ISA facts audit existing diagnostic architecture budgets but do not derive
+physical register-file, occupancy, cache, or throughput values.
 
 `tools/` is reserved for integrations with independently managed external
 tools, resources, or protocols. General-purpose package primitives live under

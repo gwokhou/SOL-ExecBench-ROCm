@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from collections.abc import Collection
 from dataclasses import replace
 
 from sol_execbench.core.scoring.amd_bound_estimate.families import (
@@ -34,6 +35,7 @@ from sol_execbench.core.scoring.amd_bound_estimate.impl import (
 )
 from sol_execbench.core.scoring.amd_bound_estimate.models import OperatorWorkEstimate
 from sol_execbench.core.scoring.amd_bound_graph.models import BoundGraph, BoundGraphNode
+from sol_execbench.core.scoring.confidence import EstimateConfidence
 
 
 _Estimator = Callable[[BoundGraph, BoundGraphNode], OperatorWorkEstimate]
@@ -63,30 +65,79 @@ def estimate_bound_work(graph: BoundGraph) -> tuple[OperatorWorkEstimate, ...]:
 
 
 def resolve_architecture_profile_paths(
-    estimates: tuple[OperatorWorkEstimate, ...], architecture: str
+    estimates: tuple[OperatorWorkEstimate, ...],
+    architecture: str,
+    *,
+    declared_profile_keys: Collection[str],
 ) -> tuple[OperatorWorkEstimate, ...]:
-    """Resolve generic estimate paths to the target ISA family's probe keys."""
-    if not architecture.lower().startswith("gfx12"):
-        return estimates
+    """Resolve paths from exact validated/declared profile keys, never gfx guesses."""
+
+    normalized_architecture = architecture.lower().split(":", maxsplit=1)[0]
     return tuple(
-        replace(
-            estimate,
-            compute_path=(
-                ("wmma" if estimate.input_dtype in {"bf16", "fp16"} else "gfx12")
-                if estimate.compute_operation == "matrix"
-                and estimate.compute_path == "mfma"
-                else "gfx12"
-                if estimate.compute_operation
-                in {"vector", "reduction", "transcendental"}
-                and estimate.compute_path == "portable"
-                else estimate.compute_path
-            ),
-            memory_path=(
-                "gfx12" if estimate.memory_path == "portable" else estimate.memory_path
-            ),
+        _resolve_estimate_paths(
+            estimate, declared_profile_keys, normalized_architecture
         )
         for estimate in estimates
     )
+
+
+def _resolve_estimate_paths(
+    estimate: OperatorWorkEstimate,
+    declared_profile_keys: Collection[str],
+    architecture: str,
+) -> OperatorWorkEstimate:
+    compute_path = _unique_profile_path(
+        declared_profile_keys,
+        "compute",
+        estimate.compute_operation,
+        estimate.input_dtype,
+        estimate.output_dtype,
+        architecture,
+    )
+    memory_path = _unique_profile_path(
+        declared_profile_keys,
+        "memory",
+        estimate.memory_access,
+        estimate.input_dtype,
+        estimate.output_dtype,
+        architecture,
+    )
+    unresolved = (estimate.compute_operation is not None and compute_path is None) or (
+        estimate.memory_access is not None and memory_path is None
+    )
+    warnings = estimate.warnings
+    confidence = estimate.confidence
+    if unresolved:
+        warnings = tuple(dict.fromkeys((*warnings, "unknown_hardware_profile_path")))
+        if confidence == EstimateConfidence.SUPPORTED:
+            confidence = EstimateConfidence.INEXACT
+    return replace(
+        estimate,
+        compute_path=compute_path,
+        memory_path=memory_path,
+        warnings=warnings,
+        confidence=confidence,
+    )
+
+
+def _unique_profile_path(
+    keys: Collection[str],
+    kind: str,
+    operation: str | None,
+    input_dtype: str | None,
+    output_dtype: str | None,
+    architecture: str,
+) -> str | None:
+    if operation is None or input_dtype is None or output_dtype is None:
+        return None
+    prefix = f"{kind}.{operation}.{input_dtype}.{output_dtype}."
+    matches = {key.removeprefix(prefix) for key in keys if key.startswith(prefix)}
+    architecture_matches = {
+        path for path in matches if path != "portable" and architecture.startswith(path)
+    }
+    if len(architecture_matches) == 1:
+        return next(iter(architecture_matches))
+    return next(iter(matches)) if len(matches) == 1 else None
 
 
 def _estimate_node(graph: BoundGraph, node: BoundGraphNode) -> OperatorWorkEstimate:

@@ -234,7 +234,7 @@ def test_canonical_trace_jsonl_excludes_derived_report_key_space():
         "environment_snapshot",
         "static_kernel_evidence",
         "static_kernel_evidence.v2",
-        "sol_execbench.static_kernel_evidence.v2",
+        "sol_execbench.static_kernel_evidence.v3",
         "diagnostic_only",
         "correctness_authority",
         "performance_authority",

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 
 import pytest
@@ -11,8 +12,85 @@ from click.testing import CliRunner
 from sol_execbench.cli.main import cli
 from sol_execbench.core.scoring.hardware_calibration.models import (
     CalibrationCandidate,
+    CalibrationIsaValidation,
     HardwareCalibrationArtifact,
 )
+
+
+def _verified_isa(tmp_path, name: str, instruction: str) -> CalibrationIsaValidation:
+    artifact_dir = tmp_path / "calibration.json.artifacts" / name
+    artifact_dir.mkdir(parents=True)
+    code_object = artifact_dir / "gfx1200.hsaco"
+    disassembly = artifact_dir / "gfx1200.isa.txt"
+    code_object.write_bytes(f"code-object:{name}".encode())
+    disassembly.write_text(instruction, encoding="utf-8")
+    return CalibrationIsaValidation(
+        status="verified",
+        architecture="gfx1200",
+        expected_instruction=instruction,
+        expected_subgroup="WMMA",
+        matched_instruction_count=1,
+        code_object_path=str(code_object.relative_to(tmp_path)),
+        code_object_sha256=hashlib.sha256(code_object.read_bytes()).hexdigest(),
+        disassembly_path=str(disassembly.relative_to(tmp_path)),
+        disassembly_sha256=hashlib.sha256(disassembly.read_bytes()).hexdigest(),
+        spec_provenance={"spec_sha256": "a" * 64},
+    )
+
+
+def test_persist_calibration_isa_artifacts_binds_companion_files(tmp_path) -> None:
+    from sol_execbench.cli.commands.hardware_model import (
+        _persist_calibration_isa_artifacts,
+    )
+
+    source_dir = tmp_path / "temporary"
+    source_dir.mkdir()
+    code_object = source_dir / "probe.hsaco"
+    disassembly = source_dir / "probe.isa.txt"
+    code_object.write_bytes(b"hsaco")
+    disassembly.write_text("V_WMMA_F32_16X16X16_BF16", encoding="utf-8")
+    validation = CalibrationIsaValidation(
+        status="verified",
+        architecture="gfx1200",
+        expected_instruction="V_WMMA_F32_16X16X16_BF16",
+        expected_subgroup="WMMA",
+        matched_instruction_count=1,
+        code_object_path=str(code_object),
+        code_object_sha256=hashlib.sha256(code_object.read_bytes()).hexdigest(),
+        disassembly_path=str(disassembly),
+        disassembly_sha256=hashlib.sha256(disassembly.read_bytes()).hexdigest(),
+        spec_provenance={"spec_sha256": "a" * 64},
+    )
+    calibration = HardwareCalibrationArtifact(
+        generated_at="2026-07-16T00:00:00Z",
+        candidates=(
+            CalibrationCandidate(
+                "compute.matrix.bf16.bf16.wmma",
+                "measured",
+                10.0,
+                "TFLOP/s",
+                (10.0,) * 7,
+                isa_validation=validation,
+            ),
+        ),
+        collection_status="collected",
+        validation_status="validated",
+        metadata={
+            "profile_requirements": {
+                "required_profile_keys": ["compute.matrix.bf16.bf16.wmma"]
+            },
+            "probe_protocol": {"warmup_iterations": 3, "timed_samples": 7},
+        },
+    )
+    output = tmp_path / "calibration.json"
+
+    persisted = _persist_calibration_isa_artifacts(calibration, output)
+
+    persisted_validation = persisted.candidates[0].isa_validation
+    assert persisted_validation is not None
+    assert persisted_validation.code_object_path is not None
+    assert (tmp_path / persisted_validation.code_object_path).read_bytes() == b"hsaco"
+    assert persisted.payload_sha256 != calibration.payload_sha256
 
 
 def test_build_authority_rejects_mismatched_live_environment() -> None:
@@ -94,6 +172,11 @@ def test_build_profile_evidence_ref_binds_calibration_checksum(
                 10.0,
                 "TFLOP/s",
                 (10.0,) * 7,
+                isa_validation=_verified_isa(
+                    tmp_path,
+                    "bf16",
+                    "V_WMMA_F32_16X16X16_BF16",
+                ),
             ),
             CalibrationCandidate(
                 "compute.matrix.fp16.fp16.wmma",
@@ -101,6 +184,11 @@ def test_build_profile_evidence_ref_binds_calibration_checksum(
                 10.0,
                 "TFLOP/s",
                 (10.0,) * 7,
+                isa_validation=_verified_isa(
+                    tmp_path,
+                    "fp16",
+                    "V_WMMA_F32_16X16X16_F16",
+                ),
             ),
         ),
         collection_status="collected",

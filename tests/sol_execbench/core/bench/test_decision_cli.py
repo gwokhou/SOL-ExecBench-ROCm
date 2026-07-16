@@ -46,7 +46,7 @@ def _environment_sidecar(path: Path, archs: list[str]) -> None:
 
 def _static_evidence(detected: list[str]) -> StaticKernelEvidenceSidecar:
     return StaticKernelEvidenceSidecar(
-        schema_version="sol_execbench.static_kernel_evidence.v2",
+        schema_version="sol_execbench.static_kernel_evidence.v3",
         status=StaticKernelEvidenceStatus.COLLECTED,
         reason_code=StaticKernelEvidenceReasonCode.STATIC_EVIDENCE_COLLECTED,
         classification=StaticKernelEvidenceClassification(
@@ -101,7 +101,7 @@ def test_decision_auto_without_footprints_writes_nothing(tmp_path: Path) -> None
     output = tmp_path / "trace.jsonl"
     output.write_text("{}\n")
     empty = StaticKernelEvidenceSidecar(
-        schema_version="sol_execbench.static_kernel_evidence.v2",
+        schema_version="sol_execbench.static_kernel_evidence.v3",
         status=StaticKernelEvidenceStatus.COLLECTED,
         reason_code=StaticKernelEvidenceReasonCode.STATIC_EVIDENCE_COLLECTED,
     )

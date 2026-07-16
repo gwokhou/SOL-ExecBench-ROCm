@@ -18,7 +18,7 @@ from sol_execbench.tools.amd_isa.errors import (
     IsaProtocolError,
     IsaSpecUnavailableError,
 )
-from sol_execbench.tools.amd_isa.repository import IsaSpecRepository
+from sol_execbench.tools.amd_isa.repository import IsaSpecDescriptor, IsaSpecRepository
 
 __all__ = [
     "AmdIsa",
@@ -29,6 +29,7 @@ __all__ = [
     "IsaIntegrityError",
     "IsaProtocolError",
     "IsaSpecRepository",
+    "IsaSpecDescriptor",
     "IsaSpecUnavailableError",
     "open_isa",
 ]

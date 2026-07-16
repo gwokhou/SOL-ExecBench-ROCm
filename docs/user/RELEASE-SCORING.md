@@ -28,13 +28,18 @@ partial artifact set also cannot create score authority by itself. See
 
 On the target AMD host, collect calibration evidence. This command writes a
 rejected diagnostic artifact rather than inventing values when prerequisites
-are unavailable:
+are unavailable. Matrix calibration also requires the pinned AMD ISA XML and
+verifies the expected MFMA/WMMA instruction in the compiled target code object:
 
 ```bash
 uv run sol-execbench hardware model calibrate \
   --device 0 --architecture gfx1200 --require-clock-lock \
   --output out/calibration.json
 ```
+
+The successful calibration is `sol_execbench.hardware_calibration.v3`; its
+companion code objects and disassemblies are stored in
+`out/calibration.json.artifacts/` and checksum-bound by the JSON artifact.
 
 When the score suite defines exact hardware-profile requirements, pass its
 requirements file to calibration. Convert only validated calibration evidence

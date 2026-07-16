@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import subprocess
+from dataclasses import replace
 from importlib import resources
 from math import isfinite
 from pathlib import Path
@@ -19,7 +20,17 @@ from dataclasses import dataclass
 from tempfile import mkdtemp
 from typing import Any, Callable, Mapping
 
-from sol_execbench.core.scoring.hardware_calibration.models import CalibrationCandidate
+from sol_execbench.core.platform.amdgpu_code_object import extract_code_object
+from sol_execbench.core.platform.isa_validation import (
+    IsaInstructionRequirement,
+    analyze_isa_disassembly,
+    inspect_isa_requirements,
+)
+from sol_execbench.core.scoring.hardware_calibration.models import (
+    CalibrationCandidate,
+    CalibrationIsaValidation,
+)
+from sol_execbench.tools.amd_isa import IsaError
 from sol_execbench.core.platform.runtime import resolve_rocm_tool
 from sol_execbench.core.scoring.hardware_calibration.statistics import (
     MINIMUM_SAMPLE_COUNT,
@@ -58,6 +69,10 @@ CompileCandidate = Callable[[CalibrationProfileKey], str | bool | None]
 ExecuteCandidate = Callable[[CalibrationProfileKey], ProbeExecution | None]
 CheckCandidate = Callable[[CalibrationProfileKey, ProbeExecution], bool | None]
 ProbeEvidence = Callable[[CalibrationProfileKey], Mapping[str, Any] | None]
+IsaPreflight = Callable[[CalibrationProfileKey, IsaInstructionRequirement], bool]
+CompiledIsaValidator = Callable[
+    [CalibrationProfileKey, Path, IsaInstructionRequirement], bool
+]
 _DEFAULT_HIPCC = object()
 _PROBE_RESOURCE_PACKAGE = "sol_execbench.data.hardware_calibration_probes"
 _PROBE_RESOURCES: dict[tuple[str, str, str, str | None], str] = {
@@ -78,6 +93,24 @@ _PROBE_RESOURCES: dict[tuple[str, str, str, str | None], str] = {
     ("matrix", "fp16", "fp16", "wmma"): "matrix_fp16_fp16_wmma.hip",
     ("matrix", "bf16", "bf16", "mfma"): "matrix_bf16_bf16_mfma.hip",
 }
+
+_MATRIX_ISA_REQUIREMENTS = {
+    "compute.matrix.bf16.bf16.wmma": IsaInstructionRequirement(
+        "V_WMMA_F32_16X16X16_BF16", "WMMA"
+    ),
+    "compute.matrix.fp16.fp16.wmma": IsaInstructionRequirement(
+        "V_WMMA_F32_16X16X16_F16", "WMMA"
+    ),
+    "compute.matrix.bf16.bf16.mfma": IsaInstructionRequirement(
+        "V_MFMA_F32_16X16X16_BF16", "MFMA"
+    ),
+}
+
+
+def matrix_isa_requirements() -> tuple[IsaInstructionRequirement, ...]:
+    """Return exact ISA requirements declared by packaged matrix probes."""
+
+    return tuple(_MATRIX_ISA_REQUIREMENTS.values())
 
 
 @dataclass(frozen=True)
@@ -107,28 +140,73 @@ class HipProbe:
     def measure(self, key: CalibrationProfileKey) -> CalibrationCandidate:
         compile_state = self._compile(key)
         if compile_state == "unsupported":
-            return self._unavailable(key, "hip_probe_explicitly_unsupported")
+            return self._with_isa_validation(
+                self._unavailable(key, "hip_probe_explicitly_unsupported"), key
+            )
         if compile_state != "passed":
-            return self._unknown(key, f"hip_probe_compile_{compile_state}")
+            return self._with_isa_validation(
+                self._unknown(key, f"hip_probe_compile_{compile_state}"), key
+            )
         execution = self._execute(key)
         if execution is None:
-            return self._unknown(key, "hip_probe_run_failed")
+            return self._with_isa_validation(
+                self._unknown(key, "hip_probe_run_failed"), key
+            )
         if not isinstance(execution, ProbeExecution):
-            return self._unknown(key, "hip_probe_execution_malformed")
+            return self._with_isa_validation(
+                self._unknown(key, "hip_probe_execution_malformed"), key
+            )
         if not self._check(self.check_correctness, key, execution):
-            return self._unknown(key, "hip_probe_correctness_failed")
+            return self._with_isa_validation(
+                self._unknown(key, "hip_probe_correctness_failed"), key
+            )
         if not self._check(self.check_stability, key, execution):
-            return self._unknown(key, "hip_probe_stability_failed")
+            return self._with_isa_validation(
+                self._unknown(key, "hip_probe_stability_failed"), key
+            )
         try:
-            return CalibrationCandidate(
-                key=key.value,
-                state="measured",
-                value=select_conservative_value(execution.samples).value,
-                unit=execution.unit,
-                samples=execution.samples,
+            return self._with_isa_validation(
+                CalibrationCandidate(
+                    key=key.value,
+                    state="measured",
+                    value=select_conservative_value(execution.samples).value,
+                    unit=execution.unit,
+                    samples=execution.samples,
+                ),
+                key,
             )
         except (TypeError, ValueError):
-            return self._unknown(key, "hip_probe_samples_invalid")
+            return self._with_isa_validation(
+                self._unknown(key, "hip_probe_samples_invalid"), key
+            )
+
+    def _with_isa_validation(
+        self, candidate: CalibrationCandidate, key: CalibrationProfileKey
+    ) -> CalibrationCandidate:
+        evidence = self.provenance_for(key)
+        raw = evidence.get("isa_validation")
+        if not isinstance(raw, Mapping):
+            return candidate
+        try:
+            validation = CalibrationIsaValidation(
+                status=str(raw["status"]),
+                architecture=str(raw["architecture"]),
+                expected_instruction=_optional_text(raw.get("expected_instruction")),
+                expected_subgroup=_optional_text(raw.get("expected_subgroup")),
+                matched_instruction_count=int(raw.get("matched_instruction_count", 0)),
+                code_object_path=_optional_text(raw.get("code_object_path")),
+                code_object_sha256=_optional_text(raw.get("code_object_sha256")),
+                disassembly_path=_optional_text(raw.get("disassembly_path")),
+                disassembly_sha256=_optional_text(raw.get("disassembly_sha256")),
+                spec_provenance={
+                    str(item_key): str(item)
+                    for item_key, item in dict(raw.get("spec_provenance", {})).items()
+                },
+                reason_code=_optional_text(raw.get("reason_code")),
+            )
+        except (KeyError, TypeError, ValueError):
+            return candidate
+        return replace(candidate, isa_validation=validation)
 
     def _compile(self, key: CalibrationProfileKey) -> str:
         if self.compile_candidate is None:
@@ -186,6 +264,9 @@ class HipCommandBackend:
         hipcc: str | None | object = _DEFAULT_HIPCC,
         architecture: str | None = None,
         run: Callable[..., object] = subprocess.run,
+        allow_isa_download: bool = True,
+        isa_preflight: IsaPreflight | None = None,
+        compiled_isa_validator: CompiledIsaValidator | None = None,
     ) -> None:
         self.workspace = workspace or Path(mkdtemp(prefix="sol-execbench-hip-"))
         if hipcc is _DEFAULT_HIPCC:
@@ -195,54 +276,21 @@ class HipCommandBackend:
             self.hipcc = hipcc
         self.architecture = architecture.lower() if architecture is not None else None
         self.run = run
+        self.allow_isa_download = allow_isa_download
+        self.isa_preflight = isa_preflight
+        self.compiled_isa_validator = compiled_isa_validator
         self._executables: dict[CalibrationProfileKey, Path] = {}
         self._evidence: dict[CalibrationProfileKey, dict[str, Any]] = {}
 
     def compile(self, key: CalibrationProfileKey) -> str:
-        if self.architecture is not None and not _matrix_path_is_supported(
-            key, self.architecture
-        ):
-            return "unsupported"
         if self.hipcc is None:
             return "missing"
-        is_matrix = (
-            key.operation == "matrix"
-            and key.input_dtype in {"bf16", "fp16", "fp32"}
-            and key.output_dtype == key.input_dtype
-            and key.path in {"wmma", "mfma", "gfx12"}
-        )
-        is_vector_probe = (
-            key.input_dtype in {"fp32", "fp16", "bf16"}
-            and key.output_dtype == key.input_dtype
-            and key.operation == "vector"
-        )
-        is_stream_probe = key.operation == "stream_copy" and (
-            key.input_dtype,
-            key.output_dtype,
-        ) in {
-            ("fp32", "fp32"),
-            ("fp16", "fp16"),
-            ("bf16", "bf16"),
-            ("bf16", "fp32"),
-            ("fp32", "bf16"),
-        }
-        is_reduction_probe = (
-            key.kind == "compute"
-            and key.operation == "reduction"
-            and key.input_dtype == key.output_dtype == "fp32"
-        )
-        is_transcendental_probe = (
-            key.kind == "compute"
-            and key.operation == "transcendental"
-            and key.input_dtype == key.output_dtype == "fp32"
-        )
-        if not (
-            is_matrix
-            or is_vector_probe
-            or is_stream_probe
-            or is_reduction_probe
-            or is_transcendental_probe
-        ):
+        requirement = _MATRIX_ISA_REQUIREMENTS.get(key.value)
+        if requirement is not None:
+            supported = (self.isa_preflight or self._preflight_isa)(key, requirement)
+            if not supported:
+                return "unsupported"
+        if not _is_supported_probe(key):
             return "failed"
         self.workspace.mkdir(parents=True, exist_ok=True)
         stem = key.value.replace(".", "_")
@@ -277,7 +325,91 @@ class HipCommandBackend:
             "warmup_iterations": 3,
             "timed_samples": 7,
         }
+        validator = self.compiled_isa_validator or self._validate_compiled_isa
+        if requirement is not None and not validator(key, executable, requirement):
+            return "failed"
         return "passed"
+
+    def _preflight_isa(
+        self, key: CalibrationProfileKey, requirement: IsaInstructionRequirement
+    ) -> bool:
+        assert self.architecture is not None
+        try:
+            report = inspect_isa_requirements(
+                self.architecture,
+                (requirement,),
+                allow_download=self.allow_isa_download,
+            )
+        except IsaError as exc:
+            self._set_isa_failure(key, requirement, "unavailable", _isa_error_code(exc))
+            return False
+        if not report.supports(requirement):
+            self._set_isa_failure(
+                key, requirement, "unavailable", "isa_instruction_unsupported"
+            )
+            return False
+        return True
+
+    def _validate_compiled_isa(
+        self,
+        key: CalibrationProfileKey,
+        executable: Path,
+        requirement: IsaInstructionRequirement,
+    ) -> bool:
+        assert self.architecture is not None
+        try:
+            extracted = extract_code_object(
+                executable,
+                self.architecture,
+                self.workspace / "isa-artifacts" / key.value,
+            )
+            disassembly_path = extracted.path.with_suffix(".disassembly.txt")
+            disassembly_path.write_text(extracted.disassembly, encoding="utf-8")
+            analysis = analyze_isa_disassembly(
+                self.architecture,
+                extracted.disassembly,
+                expected_instructions=(requirement.instruction,),
+                allow_download=self.allow_isa_download,
+            )
+        except (IsaError, OSError, RuntimeError, ValueError) as exc:
+            self._set_isa_failure(key, requirement, "failed", _isa_error_code(exc))
+            return False
+        matched = analysis.matched_instruction_counts.get(requirement.instruction, 0)
+        self._evidence.setdefault(key, {})["isa_validation"] = {
+            "status": "verified" if matched > 0 else "failed",
+            "architecture": self.architecture,
+            "expected_instruction": requirement.instruction,
+            "expected_subgroup": requirement.functional_subgroup,
+            "matched_instruction_count": matched,
+            "code_object_path": str(extracted.path),
+            "code_object_sha256": extracted.sha256,
+            "disassembly_path": str(disassembly_path),
+            "disassembly_sha256": extracted.disassembly_sha256,
+            "spec_provenance": analysis.provenance.to_dict(),
+            "reason_code": None if matched > 0 else "isa_expected_instruction_missing",
+        }
+        return matched > 0
+
+    def _set_isa_failure(
+        self,
+        key: CalibrationProfileKey,
+        requirement: IsaInstructionRequirement,
+        status: str,
+        reason_code: str,
+    ) -> None:
+        self._evidence.setdefault(key, {})["isa_validation"] = {
+            "status": status,
+            "architecture": self.architecture or "unknown",
+            "expected_instruction": requirement.instruction,
+            "expected_subgroup": requirement.functional_subgroup,
+            "matched_instruction_count": 0,
+            "code_object_path": None,
+            "code_object_sha256": None,
+            "disassembly_path": None,
+            "disassembly_sha256": None,
+            "spec_provenance": {},
+            "reason_code": reason_code,
+        }
 
     def evidence(self, key: CalibrationProfileKey) -> Mapping[str, Any] | None:
         return self._evidence.get(key)
@@ -321,10 +453,15 @@ class HipCommandBackend:
 
 
 def default_hip_probe(
-    backend: HipCommandBackend | None = None, architecture: str | None = None
+    backend: HipCommandBackend | None = None,
+    architecture: str | None = None,
+    *,
+    allow_isa_download: bool = True,
 ) -> HipProbe:
     """Return the concrete HIP probe without resolving HIP tools at import time."""
-    backend = backend or HipCommandBackend(architecture=architecture)
+    backend = backend or HipCommandBackend(
+        architecture=architecture, allow_isa_download=allow_isa_download
+    )
     return HipProbe(
         compile_candidate=backend.compile,
         execute_candidate=backend.execute,
@@ -334,21 +471,31 @@ def default_hip_probe(
     )
 
 
-def _matrix_path_is_supported(key: CalibrationProfileKey, architecture: str) -> bool:
-    """Return whether a declared matrix path matches an AMD ISA family."""
-    if key.operation != "matrix":
-        return True
-    if key.output_dtype != key.input_dtype:
-        return False
-    if key.input_dtype == "fp32":
-        return architecture.startswith("gfx12") and key.path == "gfx12"
-    if key.input_dtype == "fp16":
-        return architecture.startswith("gfx12") and key.path == "wmma"
-    if key.input_dtype == "bf16":
-        return (architecture.startswith("gfx12") and key.path == "wmma") or (
-            architecture.startswith(("gfx94", "gfx95")) and key.path == "mfma"
+def _is_supported_probe(key: CalibrationProfileKey) -> bool:
+    if key.operation == "matrix":
+        return (
+            key.input_dtype in {"bf16", "fp16", "fp32"}
+            and key.output_dtype == key.input_dtype
+            and key.path in {"wmma", "mfma", "gfx12"}
         )
-    return False
+    if key.operation == "vector":
+        return (
+            key.input_dtype in {"fp32", "fp16", "bf16"}
+            and key.output_dtype == key.input_dtype
+        )
+    if key.operation == "stream_copy":
+        return (key.input_dtype, key.output_dtype) in {
+            ("fp32", "fp32"),
+            ("fp16", "fp16"),
+            ("bf16", "bf16"),
+            ("bf16", "fp32"),
+            ("fp32", "bf16"),
+        }
+    return (
+        key.kind == "compute"
+        and key.operation in {"reduction", "transcendental"}
+        and key.input_dtype == key.output_dtype == "fp32"
+    )
 
 
 def _hip_source(key: CalibrationProfileKey) -> str:
@@ -377,3 +524,21 @@ def _read_probe_source(filename: str) -> str:
         raise RuntimeError(
             f"cannot read HIP calibration probe resource: {filename}"
         ) from exc
+
+
+def _optional_text(value: object) -> str | None:
+    return None if value is None else str(value)
+
+
+def _isa_error_code(exc: Exception) -> str:
+    name = type(exc).__name__
+    return {
+        "IsaSpecUnavailableError": "isa_spec_unavailable",
+        "IsaDownloadError": "isa_download_failed",
+        "IsaIntegrityError": "isa_integrity_failed",
+        "IsaHelperBuildError": "isa_helper_build_failed",
+        "IsaDecodeError": "isa_decode_failed",
+        "IsaProtocolError": "isa_protocol_failed",
+        "FileNotFoundError": "isa_artifact_tool_unavailable",
+        "ValueError": "isa_artifact_invalid",
+    }.get(name, "isa_artifact_validation_failed")

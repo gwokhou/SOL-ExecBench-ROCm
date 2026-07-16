@@ -151,7 +151,7 @@ def test_default_probe_passes_architecture_to_command_backend(monkeypatch) -> No
 
     monkeypatch.setattr(
         "sol_execbench.core.scoring.hardware_calibration.hip_probe.HipCommandBackend",
-        lambda *, architecture: backend,
+        lambda **_: backend,
     )
 
     default_hip_probe(architecture="gfx1200")
@@ -347,6 +347,8 @@ def test_matrix_compile_targets_selected_architecture(tmp_path) -> None:
         run=lambda command, **_: (
             commands.append(command) or type("Result", (), {"returncode": 0})()
         ),
+        isa_preflight=lambda *_: True,
+        compiled_isa_validator=lambda *_: True,
     )
 
     assert (

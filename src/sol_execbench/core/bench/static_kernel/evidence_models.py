@@ -13,7 +13,7 @@ from pydantic import BeforeValidator, ConfigDict, Field
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 
 
-STATIC_KERNEL_EVIDENCE_SCHEMA_VERSION = "sol_execbench.static_kernel_evidence.v2"
+STATIC_KERNEL_EVIDENCE_SCHEMA_VERSION = "sol_execbench.static_kernel_evidence.v3"
 _STATIC_MODEL_CONFIG = ConfigDict(
     extra="forbid",
     frozen=True,
@@ -193,6 +193,35 @@ class StaticKernelEvidenceKernel(BaseModelWithDocstrings):
     """Per-kernel resource footprint when routed extractors produced one."""
 
 
+class StaticIsaAnalysis(BaseModelWithDocstrings):
+    """Diagnostic AMD ISA analysis for one persisted target code object."""
+
+    model_config = _STATIC_MODEL_CONFIG
+
+    artifact_id: str
+    """Source artifact identifier."""
+    architecture: str
+    """Normalized AMD gfx target."""
+    status: StaticKernelEvidenceStatusField
+    """ISA collection status for this target."""
+    reason_code: str | None = None
+    """Stable ISA-specific unavailable or failure reason."""
+    decoded_instruction_count: int = Field(default=0, ge=0)
+    """Instructions decoded by the machine-readable ISA helper."""
+    functional_group_counts: dict[str, int] = Field(default_factory=dict)
+    """Decoded instruction counts grouped by AMD functional group."""
+    functional_subgroup_counts: dict[str, int] = Field(default_factory=dict)
+    """Decoded instruction counts grouped by AMD functional subgroup."""
+    observed_matrix_units: list[str] = Field(default_factory=list)
+    """Observed matrix instruction classes such as MFMA or WMMA."""
+    code_object_sha256: str | None = None
+    """Checksum of the exact extracted target code object."""
+    disassembly_sha256: str | None = None
+    """Checksum of the decoded disassembly text."""
+    spec_provenance: dict[str, str] = Field(default_factory=dict)
+    """Pinned AMD ISA specification and decoder provenance."""
+
+
 class StaticKernelEvidenceArtifact(BaseModelWithDocstrings):
     """One static evidence artifact entry."""
 
@@ -260,7 +289,7 @@ class StaticKernelEvidenceSidecar(BaseModelWithDocstrings):
 
     model_config = _STATIC_MODEL_CONFIG
 
-    schema_version: Literal["sol_execbench.static_kernel_evidence.v2"] = (
+    schema_version: Literal["sol_execbench.static_kernel_evidence.v3"] = (
         STATIC_KERNEL_EVIDENCE_SCHEMA_VERSION
     )
     """Static kernel evidence schema version."""
@@ -294,6 +323,8 @@ class StaticKernelEvidenceSidecar(BaseModelWithDocstrings):
     """Conservative kernel metadata entries."""
     footprints: list[StaticResourceFootprint] = Field(default_factory=list)
     """Per-kernel resource footprints when routed extractors produced them."""
+    isa_analyses: list[StaticIsaAnalysis] = Field(default_factory=list)
+    """Per-artifact machine-readable AMD ISA analysis when available."""
     warnings: list[StaticKernelEvidenceWarning] = Field(default_factory=list)
     """Nonfatal static evidence warnings."""
     source_references: list[StaticKernelEvidenceSourceReference] = Field(

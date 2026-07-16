@@ -15,6 +15,13 @@ from datetime import UTC, datetime
 from typing import Callable, Protocol
 
 from sol_execbench.core.bench import clock_lock
+from sol_execbench.core.platform.arch_capabilities import (
+    derive_arch_capability_budget,
+)
+from sol_execbench.core.platform.isa_validation import (
+    IsaCapabilityReport,
+    inspect_isa_requirements,
+)
 from sol_execbench.core.scoring.hardware_calibration.environment import (
     ArchitectureAdapter,
     GpuEnvironment,
@@ -24,6 +31,7 @@ from sol_execbench.core.scoring.hardware_calibration.hip_probe import (
     CalibrationProfileKey,
     HipProbe,
     default_hip_probe,
+    matrix_isa_requirements,
 )
 from sol_execbench.core.scoring.hardware_calibration.models import (
     CALIBRATION_SCHEMA_VERSION,
@@ -75,6 +83,7 @@ class CalibrationRequest:
     requirements_ref: str | None = None
     requirements_sha256: str | None = None
     source_revision: str | None = None
+    allow_isa_download: bool = True
 
 
 @dataclass(frozen=True)
@@ -212,6 +221,8 @@ def _validation_provenance(
     adapter: ArchitectureAdapter,
     measurements: ClockedMeasurements,
     required_keys: tuple[str, ...],
+    *,
+    injected_probe: bool,
 ) -> tuple[bool, dict[str, bool]]:
     observations = measurements.observations
     required_profiles_measured = all(
@@ -222,6 +233,16 @@ def _validation_provenance(
     clock_state_restored = (
         observations["pre"] is not None and observations["post"] == observations["pre"]
     )
+    all_required_isa_paths_verified = (
+        all(
+            candidate.isa_validation is not None
+            and candidate.isa_validation.status == "verified"
+            for candidate in measurements.candidates
+            if candidate.key in required_keys
+            and candidate.key.rsplit(".", maxsplit=1)[-1] in {"mfma", "wmma"}
+        )
+        or injected_probe
+    )
     provenance = {
         "adapter_requires_clock_lock": adapter.supports_clock_lock,
         "clock_locked": measurements.locked,
@@ -231,6 +252,7 @@ def _validation_provenance(
             observations["pre"] is False and observations["post"] is False
         ),
         "all_required_profiles_measured": required_profiles_measured,
+        "all_required_isa_paths_verified": all_required_isa_paths_verified,
     }
     validated = (
         adapter.supports_clock_lock
@@ -239,19 +261,17 @@ def _validation_provenance(
         and clock_state_restored
         and bool(measurements.candidates)
         and required_profiles_measured
+        and all_required_isa_paths_verified
     )
     return validated, provenance
 
 
 def run_calibration(request: CalibrationRequest) -> HardwareCalibrationArtifact:
     """Run declared candidates and return an evidence artifact, never defaults."""
-    adapter = adapter_for(request.environment.architecture)
+    adapter, probe, capability_report = _calibration_runtime(request)
     controller = request.clock_controller
     if controller is None and adapter.supports_clock_lock:
         controller = Rdna4ClockController()
-    probe = request.hip_probe or default_hip_probe(
-        architecture=request.environment.architecture
-    )
     required_keys, measurement_keys = _resolve_measurement_keys(adapter, request)
     measurements = _measure_with_clock(
         controller=controller,
@@ -295,13 +315,19 @@ def run_calibration(request: CalibrationRequest) -> HardwareCalibrationArtifact:
             key.value: probe.provenance_for(key) for key in measurement_keys
         },
     }
+    if capability_report is not None:
+        metadata["isa_capability_report"] = capability_report.to_dict()
+        metadata["isa_budget_audit"] = _audit_isa_budget(capability_report)
     if request.source_revision is not None:
         metadata["source_revision"] = request.source_revision
     if measurements.clock_reason:
         metadata["clock_lock_reason"] = measurements.clock_reason
     metadata.update(_profile_metadata(request, metric_map))
     validated_from_provenance, provenance = _validation_provenance(
-        adapter, measurements, required_keys
+        adapter,
+        measurements,
+        required_keys,
+        injected_probe=request.hip_probe is not None,
     )
     metadata["validation_provenance"] = provenance
     return HardwareCalibrationArtifact(
@@ -312,3 +338,59 @@ def run_calibration(request: CalibrationRequest) -> HardwareCalibrationArtifact:
         metadata=metadata,
         schema_version=CALIBRATION_SCHEMA_VERSION,
     )
+
+
+def _calibration_runtime(
+    request: CalibrationRequest,
+) -> tuple[ArchitectureAdapter, HipProbe, IsaCapabilityReport | None]:
+    capability_report: IsaCapabilityReport | None = None
+    matrix_unit: str | None = None
+    if request.hip_probe is None:
+        capability_report = inspect_isa_requirements(
+            request.environment.architecture,
+            matrix_isa_requirements(),
+            allow_download=request.allow_isa_download,
+        )
+        if len(capability_report.matrix_units) != 1:
+            raise RuntimeError(
+                "ISA specification does not declare one unambiguous matrix unit"
+            )
+        matrix_unit = capability_report.matrix_units[0]
+    adapter = adapter_for(request.environment.architecture, matrix_unit=matrix_unit)
+    probe = request.hip_probe or default_hip_probe(
+        architecture=request.environment.architecture,
+        allow_isa_download=request.allow_isa_download,
+    )
+    return adapter, probe, capability_report
+
+
+def _audit_isa_budget(report: IsaCapabilityReport) -> dict[str, object]:
+    """Fail closed when packaged diagnostic budgets contradict the ISA spec."""
+
+    budget = derive_arch_capability_budget(report.architecture)
+    if budget is None:
+        return {"status": "not_declared", "architecture": report.architecture}
+    matrix_units = set(report.matrix_units)
+    if budget.matrix_unit not in matrix_units:
+        raise RuntimeError(
+            "ISA matrix unit contradicts the packaged architecture budget: "
+            f"{sorted(matrix_units)} != {budget.matrix_unit}"
+        )
+    isa_dtypes = {
+        dtype
+        for instruction in report.supported_instructions
+        for dtype in ("bf16", "fp16")
+        if dtype.upper() in instruction
+    }
+    missing_dtypes = isa_dtypes - set(budget.supported_dtypes)
+    if missing_dtypes:
+        raise RuntimeError(
+            "ISA matrix dtype contradicts the packaged architecture budget: "
+            + ", ".join(sorted(missing_dtypes))
+        )
+    return {
+        "status": "consistent",
+        "architecture": report.architecture,
+        "matrix_unit": budget.matrix_unit,
+        "matrix_dtypes": sorted(isa_dtypes),
+    }

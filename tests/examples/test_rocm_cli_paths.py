@@ -219,7 +219,7 @@ def test_sol_execbench_cli_runs_hip_cpp_with_static_evidence_on_rocm(tmp_path: P
 
     sidecar_path = trace_path.with_name(f"{trace_path.name}.static-evidence.json")
     sidecar = json.loads(sidecar_path.read_text())
-    assert sidecar["schema_version"] == "sol_execbench.static_kernel_evidence.v2"
+    assert sidecar["schema_version"] == "sol_execbench.static_kernel_evidence.v3"
     assert sidecar["status"] in {
         "collected",
         "partial",

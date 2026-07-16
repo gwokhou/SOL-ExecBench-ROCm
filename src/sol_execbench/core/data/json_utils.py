@@ -18,12 +18,35 @@
 
 import hashlib
 import json
+import os
 from pathlib import Path
+import tempfile
 from typing import Any, Type, TypeVar, Union
 
 from pydantic import BaseModel
 
 T = TypeVar("T", bound=BaseModel)
+
+
+def atomic_write_json_value(path: Union[str, Path], value: Any) -> None:
+    """Atomically write a deterministic JSON value in the destination directory."""
+
+    destination = Path(path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{destination.name}.", suffix=".tmp", dir=destination.parent
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(
+                json.dumps(value, indent=2, sort_keys=True, allow_nan=False) + "\n"
+            )
+            handle.flush()
+            os.fsync(handle.fileno())
+        temporary.replace(destination)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def save_json_file(object: BaseModel, path: Union[str, Path]) -> None:
